@@ -17,7 +17,10 @@ import java.nio.channels.AsynchronousServerSocketChannel
 import java.nio.channels.AsynchronousSocketChannel
 import java.nio.channels.CompletionHandler
 import java.nio.charset.StandardCharsets
+import java.util.Collections
+import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.Executors
+import java.util.concurrent.TimeUnit
 
 /**
  * JvmLitebikeBindAdapter — the only place native bind lives for the
@@ -56,6 +59,8 @@ object JvmLitebikeBindAdapter {
         port: Int,
         host: String = "0.0.0.0",
     ) {
+        val activeConnections = Collections.newSetFromMap(ConcurrentHashMap<AsynchronousSocketChannel, Boolean>())
+
         // JVM NIO executor — one thread per CPU, daemon.
         val group: AsynchronousChannelGroup =
             AsynchronousChannelGroup.withFixedThreadPool(
@@ -72,30 +77,37 @@ object JvmLitebikeBindAdapter {
         // each accepted connection is its own AsynchronousSocketChannel
         // and each accepted runOnDispatch puts bytes on the listener.
         // No Htx/HTTP framework, no reactor-without-bind.
-        coroutineScope {
-            // Single-element-listener loops — one per protocol slot —
-            // ensure incoming bytes are routed by protocol.
-            element.fanoutChannels { _, _ -> true }
+        try {
+            coroutineScope {
+                // Single-element-listener loops — one per protocol slot —
+                // ensure incoming bytes are routed by protocol.
+                element.fanoutChannels { _, _ -> true }
 
-            acceptLoop(server, element)
+                acceptLoop(server, element, activeConnections)
+            }
+        } finally {
+            // Best-effort cleanup if scope exits unexpectedly or normally.
+            runCatching { server.close() }
+            activeConnections.forEach { runCatching { it.close() } }
+            activeConnections.clear()
+            runCatching { group.shutdown() }
         }
-
-        // Best-effort cleanup if scope exits unexpectedly.
-        runCatching { server.close() }
-        runCatching { group.shutdown() }
     }
 
     private suspend fun acceptLoop(
         server: AsynchronousServerSocketChannel,
         element: LitebikeListenerElement,
+        activeConnections: MutableSet<AsynchronousSocketChannel>
     ) = kotlinx.coroutines.suspendCancellableCoroutine<Unit> { cont ->
         val handler = object : CompletionHandler<AsynchronousSocketChannel, Any?> {
             override fun completed(ch: AsynchronousSocketChannel, attached: Any?) {
                 // Continue accepting the next connection immediately.
                 server.accept(null, this)
+
+                activeConnections.add(ch)
                 // Read all bytes from the channel asynchronously, then
                 // forward to the listener with the detected protocol.
-                drainOne(ch, element)
+                drainOne(ch, element, activeConnections)
             }
 
             override fun failed(t: Throwable, attached: Any?) {
@@ -111,14 +123,16 @@ object JvmLitebikeBindAdapter {
     private fun drainOne(
         ch: AsynchronousSocketChannel,
         element: LitebikeListenerElement,
+        activeConnections: MutableSet<AsynchronousSocketChannel>
     ) {
         val buf = ByteBuffer.allocate(8 * 1024)
         ch.read(
-            buf, null,
+            buf, 60L, TimeUnit.SECONDS, null,
             object : CompletionHandler<Int, Any?> {
                 override fun completed(read: Int, attached: Any?) {
                     if (read <= 0) {
                         runCatching { ch.close() }
+                        activeConnections.remove(ch)
                         return
                     }
                     val bytes = ByteArray(read).also { buf.flip(); buf.get(it) }
@@ -127,14 +141,20 @@ object JvmLitebikeBindAdapter {
                     // runBlocking is OK from a JDK CompletionHandler because
                     // those callbacks are pure Java threads, not coroutines.
                     val ok = runBlocking { element.accept(proto, bytes) }
-                    if (!ok) runCatching { ch.close() }
+                    if (!ok) {
+                        runCatching { ch.close() }
+                        activeConnections.remove(ch)
+                        // If not ok we break the read loop
+                        return
+                    }
                     // Continue draining while data remains.
                     buf.clear()
-                    ch.read(buf, null, this)
+                    ch.read(buf, 60L, TimeUnit.SECONDS, null, this)
                 }
 
                 override fun failed(t: Throwable, attached: Any?) {
                     runCatching { ch.close() }
+                    activeConnections.remove(ch)
                 }
             }
         )
