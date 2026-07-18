@@ -2216,6 +2216,8 @@ button, input, textarea, select { font:inherit; }
     renderGallery();
     renderBlackboardChrome();
   }
+
+  function renderCascadeGrid() {
     const root = document.getElementById('cascade-grid-root');
     if (!root) return;
     root.innerHTML = '';
@@ -2241,6 +2243,16 @@ button, input, textarea, select { font:inherit; }
     });
     table.appendChild(tbody);
     root.appendChild(table);
+  }
+
+  function renderGallery() {
+    const root = document.getElementById('gallery-root');
+    if (!root || !seed.gallery) return;
+    // Gallery is server-rendered into the seed HTML; client-side re-render not needed
+  }
+
+  function renderBlackboardChrome() {
+    // 3D blackboard chrome not yet implemented in JS shell
   }
 
   function selectField(labelText, options, selectedValue, onChange) {
@@ -2625,10 +2637,6 @@ button, input, textarea, select { font:inherit; }
   }
 
   // ===== END ATTACHMENT FUNCTIONS =====
-
-  function clamp(value, min, max) {
-    return Math.min(max, Math.max(min, value));
-  }
 
   render();
 })();

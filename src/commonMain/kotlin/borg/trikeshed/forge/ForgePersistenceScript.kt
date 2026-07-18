@@ -1808,6 +1808,8 @@ fun forgePersistenceScript(): String = """
     renderGallery();
     renderBlackboardChrome();
   }
+
+  function renderCascadeGrid() {
     const root = document.getElementById('cascade-grid-root');
     if (!root) return;
     root.innerHTML = '';
@@ -1833,6 +1835,16 @@ fun forgePersistenceScript(): String = """
     });
     table.appendChild(tbody);
     root.appendChild(table);
+  }
+
+  function renderGallery() {
+    const root = document.getElementById('gallery-root');
+    if (!root || !seed.gallery) return;
+    // Gallery is server-rendered into the seed HTML; client-side re-render not needed
+  }
+
+  function renderBlackboardChrome() {
+    // 3D blackboard chrome not yet implemented in JS shell
   }
 
   function selectField(labelText, options, selectedValue, onChange) {
@@ -2217,10 +2229,6 @@ fun forgePersistenceScript(): String = """
   }
 
   // ===== END ATTACHMENT FUNCTIONS =====
-
-  function clamp(value, min, max) {
-    return Math.min(max, Math.max(min, value));
-  }
 
   render();
 })();
