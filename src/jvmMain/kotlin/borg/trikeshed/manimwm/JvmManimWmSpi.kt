@@ -7,25 +7,25 @@ import borg.trikeshed.manimwm.spi.ManimWmSpi
  * Acts as a native peering layer for testing/demonstration.
  */
 class JvmManimWmSpi : ManimWmSpi {
-    override fun createWindow(title: String, width: Int, height: Int) {
-        println("JvmManimWmSpi: Creating window '$title' (${width}x${height})")
+    override fun initSurface(width: Int, height: Int) {
+        println("JvmManimWmSpi: Initializing render surface (${width}x${height})")
     }
 
-    override fun destroyWindow() {
-        println("JvmManimWmSpi: Destroying window")
+    override fun destroySurface() {
+        println("JvmManimWmSpi: Destroying render surface")
     }
 
-    override fun setWindowTitle(title: String) {
-        println("JvmManimWmSpi: Setting window title to '$title'")
+    override fun resizeSurface(width: Int, height: Int) {
+        println("JvmManimWmSpi: Resizing render surface to (${width}x${height})")
     }
 
-    override fun setWindowDecorations(decorated: Boolean) {
-        println("JvmManimWmSpi: Setting window decorations to $decorated")
+    override fun requestFrame() {
+        println("JvmManimWmSpi: Frame requested")
     }
 
-    override fun pollEvents(onEvent: (WindowEvent) -> Unit) {
-        // In a real implementation, this would poll GLFW, AWT, or JavaFX events
-        // and push them via manimWindowElement.pushEvent(...)
-        println("JvmManimWmSpi: Polling events")
+    override fun pushEvent(event: WindowEvent) {
+        // In a real implementation, this would push GLFW, AWT, or JavaFX events
+        // via manimWindowElement.pushEvent(...)
+        println("JvmManimWmSpi: Pushing event $event")
     }
 }
