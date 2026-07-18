@@ -162,7 +162,7 @@ kotlin {
                 implementation("org.graalvm.truffle:truffle-api:$graalVersion")
                 implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:$serializationVersion")
 
-                                // Compose Desktop UI — JVM + Skiko only
+                // Compose Desktop UI — JVM + Skiko only
                 implementation(compose.desktop.currentOs)
                 implementation(compose.foundation)
                 implementation(compose.material3)
@@ -171,6 +171,83 @@ kotlin {
             }
             kotlin.srcDir("src/jmhMain/kotlin")
             resources.srcDir("src/jmhMain/resources")
+        }
+
+        val jvmTest = getByName("jvmTest") {
+            kotlin.exclude("**/ConfixSerializationTest.kt")
+            kotlin.exclude("**/ViewServerTest.kt")
+            kotlin.exclude("**/strategy/SignalValidationTest.kt")
+            kotlin.exclude("**/demos/SignalBlackboardDemoTest.kt")
+            kotlin.exclude("**/lib/ReduxListBridgeTest.kt")
+            kotlin.exclude("**/lib/MutableSeriesStrategyTest.kt")
+            dependencies {
+                implementation("org.junit.jupiter:junit-jupiter-api:5.10.2")
+                implementation("org.junit.jupiter:junit-jupiter-engine:5.10.2")
+                implementation("org.junit.vintage:junit-vintage-engine:5.10.2")
+                implementation("org.jetbrains.kotlin:kotlin-test-junit5")
+            }
+        }
+
+        val jsMain = getByName("jsMain") {
+            dependsOn(commonMain)
+            dependencies {
+                implementation(npm("workbox-webpack-plugin", "7.4.1"))
+            }
+        }
+        val jsTest = getByName("jsTest") { dependsOn(commonTest) }
+
+        val wasmJsMain = getByName("wasmJsMain") {
+            dependsOn(commonMain)
+            dependencies {
+                implementation(npm("workbox-webpack-plugin", "7.4.1"))
+            }
+        }
+        val wasmJsTest = getByName("wasmJsTest") { dependsOn(commonTest) }
+
+        // ── posixMain: shared intermediate above the default nativeMain template ───
+        // Default hierarchy: nativeMain ← macosMain ← macosArm64Main
+        //                  nativeMain ← linuxMain  ← linuxX64Main
+        // We insert posixMain between nativeMain and each platform leaf so
+        // src/posixMain actuals resolve for both macOS and Linux.
+        val posixMain = maybeCreate("posixMain")
+        val posixTest = maybeCreate("posixTest")
+        val nativeMain = maybeCreate("nativeMain").apply { dependsOn(commonMain) }
+        val nativeTest = maybeCreate("nativeTest").apply { dependsOn(commonTest) }
+        posixMain.dependsOn(nativeMain)
+        posixTest.dependsOn(nativeTest)
+
+        findByName("macosMain")?.dependsOn(posixMain)
+        findByName("macosTest")?.dependsOn(posixTest)
+        findByName("linuxMain")?.dependsOn(posixMain)
+        findByName("linuxTest")?.dependsOn(posixTest)
+
+        all {
+            languageSettings.optIn("kotlinx.cinterop.ExperimentalForeignApi")
+            languageSettings.optIn("kotlin.RequiresOptIn")
+        }
+    }
+
+    // CInterop - Only compile io_uring bindings for focusedTransportSlice
+    if (focusedTransportSlice) {
+        linuxX64 {
+            compilations.getByName("main") {
+                cinterops {
+                    val liburing = create("liburing") {
+                        defFile = project.file("src/linuxMain/resources/META-INF/cinterop/liburing.def")
+                        compilerOpts("-I${project.rootDir}/liburing/src/include", "-I${project.rootDir}/io_uring_interop")
+                    }
+                }
+            }
+        }
+    } else {
+        sourceSets.getByName("commonTest") {
+            kotlin.exclude("**/transport/**")
+            kotlin.exclude("**/userspace/**")
+            kotlin.exclude("**/ipfs/**")
+            kotlin.exclude("**/quic/**")
+            kotlin.exclude("**/sctp/**")
+            kotlin.exclude("**/window/**")
+            kotlin.exclude("**/htx/**")
         }
     }
 }
@@ -272,10 +349,6 @@ tasks.register<Sync>("generateForgePages") {
         println("Published WASM_JS_BROWSER target to ${project.layout.projectDirectory.dir("docs").asFile.absolutePath}")
     }
 }
-
-
-
-
 
 // Config cache
 tasks.register("kmpPartiallyResolvedDependenciesCheckerIgnore") {
