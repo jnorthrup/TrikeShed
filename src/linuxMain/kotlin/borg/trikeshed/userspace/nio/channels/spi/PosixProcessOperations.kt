@@ -25,59 +25,63 @@ class PosixProcessOperations : ProcessOperations {
             }
 
         val exitCode = memScoped {
-            val pid = alloc<pid_tVar>()
-            val actions = alloc<posix_spawn_file_actions_t>()
-            posix_spawn_file_actions_init(actions.ptr)
-
-            if (stdinPath != null) {
-                posix_spawn_file_actions_addopen(
-                    actions.ptr, STDIN_FILENO, stdinPath, O_RDONLY, 0u
-                )
-            }
-
-            // 420u is 0644 octal (S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH)
-            val mode = (S_IRUSR or S_IWUSR or S_IRGRP or S_IROTH).toUInt()
-            posix_spawn_file_actions_addopen(
-                actions.ptr, STDOUT_FILENO, stdoutPath, O_WRONLY or O_CREAT or O_TRUNC, mode
-            )
-
-            posix_spawn_file_actions_addopen(
-                actions.ptr, STDERR_FILENO, stderrPath, O_WRONLY or O_CREAT or O_TRUNC, mode
-            )
-
-            // We use 'env' to set environment variables and inherit the rest, similar to the original behavior
-            val argv = allocArray<CPointerVar<ByteVar>>(env.size + args.size + 3)
-            var argIndex = 0
-
-            argv[argIndex++] = "env".cstr.ptr
-            env.forEach { (key, value) ->
-                argv[argIndex++] = "$key=$value".cstr.ptr
-            }
-            argv[argIndex++] = command.cstr.ptr
-            args.forEach { arg ->
-                argv[argIndex++] = arg.cstr.ptr
-            }
-            argv[argIndex] = null
-
-            // Pass environ for envp to inherit the current environment (which 'env' will then augment)
-            val spawnResult = posix_spawnp(pid.ptr, "env", actions.ptr, null, argv, platform.posix.environ)
-            posix_spawn_file_actions_destroy(actions.ptr)
-
-            if (spawnResult != 0) {
+            val pid = fork()
+            if (pid == -1) {
                 return@memScoped -1
-            }
+            } else if (pid == 0) {
+                // child process
+                if (stdinPath != null) {
+                    val fd = open(stdinPath, O_RDONLY)
+                    if (fd != -1) {
+                        dup2(fd, STDIN_FILENO)
+                        close(fd)
+                    }
+                }
 
-            val status = alloc<IntVar>()
-            var waitRes: Int
-            do {
-                waitRes = waitpid(pid.value, status.ptr, 0)
-            } while (waitRes == -1 && errno == EINTR)
+                // 0644 octal (S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH)
+                val mode = (S_IRUSR or S_IWUSR or S_IRGRP or S_IROTH).toUInt()
+                val stdoutFd = open(stdoutPath, O_WRONLY or O_CREAT or O_TRUNC, mode)
+                if (stdoutFd != -1) {
+                    dup2(stdoutFd, STDOUT_FILENO)
+                    close(stdoutFd)
+                }
 
-            if ((status.value and 0x7F) == 0) {
-                // WIFEXITED
-                (status.value shr 8) and 0xFF
+                val stderrFd = open(stderrPath, O_WRONLY or O_CREAT or O_TRUNC, mode)
+                if (stderrFd != -1) {
+                    dup2(stderrFd, STDERR_FILENO)
+                    close(stderrFd)
+                }
+
+                val argv = allocArray<CPointerVar<ByteVar>>(env.size + args.size + 3)
+                var argIndex = 0
+
+                argv[argIndex++] = "env".cstr.ptr
+                env.forEach { (key, value) ->
+                    argv[argIndex++] = "$key=$value".cstr.ptr
+                }
+                argv[argIndex++] = command.cstr.ptr
+                args.forEach { arg ->
+                    argv[argIndex++] = arg.cstr.ptr
+                }
+                argv[argIndex] = null
+
+                execvp("env", argv)
+                _exit(127)
+                -1 // unreachable but makes compiler happy
             } else {
-                -1
+                // parent process
+                val status = alloc<IntVar>()
+                var waitRes: Int
+                do {
+                    waitRes = waitpid(pid, status.ptr, 0)
+                } while (waitRes == -1 && errno == EINTR)
+
+                if ((status.value and 0x7F) == 0) {
+                    // WIFEXITED
+                    (status.value shr 8) and 0xFF
+                } else {
+                    -1
+                }
             }
         }
 
