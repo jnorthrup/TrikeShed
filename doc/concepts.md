@@ -67,12 +67,25 @@ Key operators (in `lib/Join.kt`, `lib/Series.kt`):
 │  - ForgeDoc block tree, ForgeBoardFSM, KanbanFSM                    │
 │  - CCEK choreography (channels, projections, agents)                │
 │  - Gallery / blackboard 2.5D/3D spatial layout                      │
+│  - Blackboard-as-Confix-cursor: single JSON file → Cursor slices      │
+│  - ManimWM RTS camera: momentum, tilt, translucent marble/jade      │
+├──────────────────────────────────────────────────────────────────────┤
+│  NUID / CCEK FANOUT   (authorization + dispatch)                    │
+│  - Nuid = Join<Capability, Join<Nonce, Subnet>>                     │
+│  - NuidFanoutElement: concentric narrowing, escalation, CAS claim   │
+│  - Workgroup: scope + TraitSpace → canHandle(request)               │
+├──────────────────────────────────────────────────────────────────────┤
+│  LITEBIKE LISTENER   (multiprotocol CCEK listener)                  │
+│  - LitebikeListenerElement: protocol-keyed channel slots            │
+│  - JvmLitebikeBindAdapter: sole socket bind, bytes → CCEK accept    │
+│  - JvmMulticastAdapter: mDNS/SSDP join + SO_REUSEPORT fallback      │
+│  - JvmKanbanServer: daemon, no framework, hand-rolled HTTP          │
 ├──────────────────────────────────────────────────────────────────────┤
 │  JOB NEXUS   (durable work orchestration)                           │
 │  - JobSupervisorElement — bounded command channel + reactor         │
 │  - JobReducer (pure) — idempotency, optimistic revision, lifecycle  │
 │  - CasStore (CAS), JobLog (WAL), JobIndex, Checkpoint              │
-│  - ReteNetwork — production rule engine (alpha/beta/agenda/refraction)
+│  - ReteNetwork — production rule engine (alpha/beta/agenda/refraction)│
 │  - JobKanbanProjection / ForgeKanbanJobSink — Kanban as projection  │
 ├──────────────────────────────────────────────────────────────────────┤
 │  COUCH / ISAM   (content-addressable persistence)                   │
@@ -302,6 +315,57 @@ ForgeApp.kt       ← HTML template + seed JSON injection (forge-seed)
 
 **Gallery on GitHub Pages** — `jsNodeProductionRun` prints exact HTML to stdout; `generateForgePages` captures it into `docs/`. The seed embeds `ForgeBoardFSM.current()`, `KanbanFSM.current()`, `ForgeSpatialState`, and `ForgeGalleryCatalog.toJsonValue()`.
 
+**Blackboard-as-Confix-cursor** — the target architecture. A single JSON file is the blackboard; `confixDoc(json)` → `Cursor` → `BlackboardSurface.project(cursor)` → UI renders cursor slices by path/offset/facet. No parallel DTO truth. `BlackboardSurface` joins `LcncEntitySurface` + `CausalGraphNodeIndex` into a deterministic `Cursor` of `BlackboardSurfaceRow`s (`card_id`, `lane`, `phase`, `facet`, `provenance`, `causalKey`, `lcncKind`). Facet drilldown = child cursor projections from the same doc.
+
+**ManimWM 2.5D RTS surface** — `ForgeBlackboardCamera` carries momentum (`vx`, `vy`, `vz`), tilt (2.5D parallax), and bounded zoom. The blackboard is the VFS; cursors are the files; facets are drilldown views. The PWA hydrates from a cursor seed and animates through the camera model. Marble-and-jade translucent motif for the builder-tool gallery.
+
+### 8.1a NUID / CCEK Fanout (authorization + dispatch)
+
+```
+Nuid = Join<Capability, Join<Nonce, Subnet>>
+  - Capability: sealed hierarchy (Process/Cas/Wireproto/Sctp/Model/BlackBoard/Custom + wildcard family roots)
+  - Subnet: concentric containment (core < process < local < lan.localhost < mesh.worker.* < global.relay)
+  - Nonce: RandomBytes + Derived (causal chaining)
+
+NuidFanoutElement
+  - CCEK lifecycle (CREATED→OPEN→ACTIVE→DRAINING→CLOSED)
+  - Concentric narrowing: filter by scope⊇subnet AND TraitSpace.can(capability), sort by scope.level ascending
+  - Escalation: timeout at request level → walk outward up to escalationBudget+1 levels
+  - Claim: first WorkgroupSlot.tryTake() matching claimId wins; losers stand down
+
+Workgroup
+  - name + scope: Subnet + traits: TraitSpace
+  - canHandle(request: Nuid) = traits.can(capability) && (scope contains subnet)
+```
+
+### 8.1b Litebike Listener (clean-room Kotlin port — no FFI)
+
+```
+LitebikeListenerElement
+  - CCEK element; registry keyed by Protocol.id (UByte)
+  - register(protocol) → ChannelWorkgroupSlot; slot.consume() suspends for ChannelMessage
+  - accept(protocol, bytes) → offers to slot, fires LitebikeFanoutEvent to CCEK subscribers
+  - Protocol enum: Http(1) Socks5(2) Tls(3) Dns(4) Json(5) Http2(6) WebSocket(7) Bonjour(8) Upnp(9)
+  - IDs 1-7 match litebike taxonomy.rs conceptually; 8-9 are TrikeShed-local extensions
+
+JvmLitebikeBindAdapter
+  - The ONLY place that opens AsynchronousServerSocketChannel
+  - Reads bytes → ProtocolDetector.detect(head) → listener.accept(protocol, bytes)
+  - No HtxReactorElement, no com.sun.net.httpserver, no RfxHttpServerJvm
+
+JvmMulticastAdapter
+  - Joins mDNS 224.0.0.251:5353 and SSDP 239.255.255.250:1900 via DatagramChannel
+  - SO_REUSEPORT-first fallback for macOS mDNSResponder port conflict
+  - Tracks Jobs + MembershipKeys; close() cancels all read loops and drops groups
+
+JvmKanbanServer
+  - Daemon entrypoint (--port, --donor)
+  - Owns one LitebikeListenerElement; registers Http/Json/Socks5/Tls/Bonjour/Upnp slots
+  - HTTP worker consumes httpSlot, hand-parses request line, routes to /api/health|cap|board|submit|donor
+  - Bonjour/Upnp consumers parse minimal mDNS/SSDP headers, emit JSON to Json slot
+  - No server framework; CCEK fanout all the way down
+```
+
 ### 8.2 CCEK (choreography for Forge)
 
 ```
@@ -372,6 +436,10 @@ gh api repos/jnorthrup/TrikeShed/pages/builds/latest
 | MultiIndex | `collections/multiindex/*.kt`, `collections/associative/trie/RadixTree.kt` |
 | Forge surfaces | `forge/ForgeDoc.kt`, `forge/ForgeBoardFSM.kt`, `forge/ForgeKanbanIngest.kt`, `forge/ForgePersistenceScript.kt` |
 | Reactor / choreography | `userspace/reactor/MuxReactorElement.kt`, `context/AsyncContextElement.kt`, `userspace/nio/channels/ChannelRunner.kt` |
+| NUID / CCEK fanout | `context/nuid/Nuid.kt`, `context/nuid/NuidFanoutElement.kt` |
+| Litebike listener | `litebike/LitebikeListenerElement.kt`, `litebike/ProtocolDetector.kt`, `litebike/taxonomy/Taxonomy.kt`, `jvmMain/litebike/JvmLitebikeBindAdapter.kt`, `jvmMain/litebike/JvmMulticastAdapter.kt`, `jvmMain/litebike/JvmKanbanServer.kt` |
+| Blackboard-as-cursor | `blackboard/BlackboardSurface.kt`, `parse/confix/Confix.kt`, `parse/confix/ConfixKit.kt` |
+| ManimWM RTS camera | `forge/blackboard/ForgeBlackboardCamera.kt`, `forge/blackboard/ForgeBlackboardInteraction.kt`, `manimwm/` |
 | Transport / HTX | `htx/Htx*.kt`, `cli/htx/HtxAria2*.kt` |
 | Gallery / Pages | `forge/gallery/*.kt`, `ForgeApp.kt`, `build.gradle.kts` (`generateForgePages`) |
 
@@ -389,6 +457,18 @@ gh api repos/jnorthrup/TrikeShed/pages/builds/latest
 | Orphaned submodule (gitmode 160000, no .gitmodules) | CI checkout fails silently | `git rm --cached <path>` |
 | `build.gradle.kts` checkout from ref | Local commits lost | Never `git checkout <ref> -- build.gradle.kts` |
 | `rm -rf` untracked `??` dirs | Sibling Jules jobs destroyed | Never — they are active work, not stubs |
+| macOS mDNS bind with only `SO_REUSEADDR` | `EADDRINUSE` on port 5353 | Try `SO_REUSEPORT` first (runCatching), fall back to `SO_REUSEADDR` |
+| `Random.Default` / `nextBits` in commonMain | Native compile failure | Use `Random(0L)` + `nextInt(0, 256)` — KMP-safe |
+| `System.currentTimeMillis()` in commonMain | Deprecated / KMP-unsafe | Use `kotlinx.datetime.Clock.System.now().toEpochMilliseconds()` |
+| `@Volatile` / `synchronized` in commonMain | KMP compile failure | Use `Mutex` + `withLock` — kotlinx-coroutines is KMP-safe |
+| `Charsets.US_ASCII` in commonMain | JVM-only constant | Use `CharArray(n) { bytes[i].toInt().toChar() }.concatToString()` |
+| `for (msg in channel)` on `Channel<T>` | Ambiguous iterator / compile error | Use `while (true) { val msg = slot.consume() }` or `channel.consumeEach { }` |
+| `runCatching { subscriber.javaClass.methods... }` in commonMain | `javaClass` unresolved on JS/Wasm | Use explicit interface (`LitebikeFanoutEventSink`), no reflection |
+| `toSortedMap()` on `groupBy` result | JVM-only stdlib | Use `.keys.sorted()` explicitly |
+| `String(bytes, 0, len, charset)` in commonMain | JVM-only constructor | Decode via `CharArray` + `concatToString()` |
+| `HtxReactorElement` used as server listener | Exchange-only, does not bind | Use `LitebikeListenerElement` + `JvmLitebikeBindAdapter` — Htx is client-side only |
+| `com.sun.net.httpserver` for Kanban server | Framework dependency, not CCEK | Hand-rolled HTTP worker on `LitebikeListenerElement` slot — zero framework |
+| Parallel DTO truth (`ForgeAppState` vs Confix doc) | Dual-truth seam, silent fork | Single JSON file → `confixDoc()` → `Cursor` → `BlackboardSurface.project()` — one canonical source |
 
 ---
 
@@ -397,8 +477,9 @@ gh api repos/jnorthrup/TrikeShed/pages/builds/latest
 1. **Vertical slice** — failing contract test → minimal production wiring → adjacent/full verification.
 2. **Exclusive file ownership** — Jules tasks declare owned paths + forbidden paths; no overlap.
 3. **No libs/ references** — root-only, composite builds consume via `includeBuild("../..")`.
-4. **Pre-commit** — `git diff --check`, verify no `kotlinx-serialization-json/cbor` in commonMain, run focused tests.
-5. **Evidence** — real test output, generated artifact proof (HTML/WASM), branch + PR with exact commands.
+4. **No FFI / no Rust linkage** — litebike is conceptual inspiration only; ports are clean-room Kotlin with TrikeShed-local conventions.
+5. **Pre-commit** — `git diff --check`, verify no `kotlinx-serialization-json/cbor` in commonMain, run focused tests.
+6. **Evidence** — real test output, generated artifact proof (HTML/WASM), branch + PR with exact commands.
 
 ---
 

@@ -2,6 +2,7 @@ package borg.trikeshed.forge
 
 import borg.trikeshed.forge.blackboard.ForgeBlackboardView
 import borg.trikeshed.forge.gallery.ForgeGalleryCatalog
+import borg.trikeshed.forge.gallery.ForgeGalleryRenderer
 import borg.trikeshed.graph.CausalGraphNodeDTO
 import borg.trikeshed.kanban.ForgeKanbanIngest
 import borg.trikeshed.parse.json.JsonSupport
@@ -421,7 +422,7 @@ ${forgeAppStyles()}
           <h2>Widget Gallery</h2>
           <p>Forge widget catalog with per-target support matrix.</p>
         </div>
-        <div id="gallery-root" class="gallery-list"></div>
+        <div id="gallery-root" class="gallery-list">${galleryHtml()}</div>
       </div>
     </aside>
     <main class="editor">
@@ -808,6 +809,9 @@ private fun forgeAppStyles(): String = """
 """.trimIndent()
 
 private fun forgeAppScript(): String = forgePersistenceScript()
+
+/** Server-rendered gallery HTML for the workspace rail. No client-side hydration needed. */
+private fun galleryHtml(): String = ForgeGalleryRenderer.renderHtml()
 
 private fun forgeBlackboardSeed(): Map<String, Any?> {
     val view = ForgeBlackboardView.DEFAULT

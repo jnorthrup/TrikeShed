@@ -149,6 +149,11 @@ kotlin {
                 // Full UI deps stay in jvmMain — Compose doesn't publish for macosX64.
                 // implementation(org.jetbrains.compose.ComposePlugin.Dependencies(project).runtime) // REMOVED: breaks macosX64
             }
+            // Slab hollows: GraalJS-eval / DuckDB-c-interop / MiniDuck layers are
+            // entirely TODO() stubs with zero non-test consumers. Keep the files on
+            // disk (user rule: preserve, don't delete) but cut them out of the
+            // commonMain compile path until a real backend lands.
+            kotlin.exclude("**/classfile/slab/**")
         }
 
         val commonTest = getByName("commonTest") {
@@ -362,7 +367,7 @@ tasks.register<Sync>("generateForgePages") {
     dependsOn("wasmJsBrowserProductionWebpack")
 
     from(project.layout.buildDirectory.dir("kotlin-webpack/wasmJs/productionExecutable"))
-    from(project.layout.projectDirectory.dir("src/jsMain/resources"))
+    from(project.layout.projectDirectory.dir("src/commonMain/resources/web"))
     into(project.layout.projectDirectory.dir("docs"))
 
     doLast {

@@ -1,17 +1,14 @@
 package borg.trikeshed.forge.gallery
 
 import borg.trikeshed.parse.json.JsonSupport
-import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.JsonConfiguration
 
 /**
- * Browser-side gallery renderer. Called from the Forge workspace shell when
- * the user opens the gallery section. The catalog lives in commonMain so the
- * same data drives the JVM printer and the browser section.
+ * Gallery renderer shared by JVM printer, Node.js, and browser targets.
+ * Called from the Forge workspace shell when the user opens the gallery
+ * section. The catalog lives in commonMain so the same data drives all
+ * targets.
  */
 object ForgeGalleryRenderer {
-
-    private val json = Json { prettyPrint = true; ignoreUnknownKeys = true }
 
     /**
      * Render the catalog as a portable JSON string suitable for embedding in

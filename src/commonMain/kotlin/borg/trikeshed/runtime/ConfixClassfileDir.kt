@@ -1,13 +1,6 @@
 package borg.trikeshed.runtime
 
 import borg.trikeshed.classfile.model.PointcutCoordinate
-import borg.trikeshed.classfile.slab.SlabFacet
-import borg.trikeshed.classfile.slab.facet.LCNCModeFacet
-import borg.trikeshed.lib.Join
-import borg.trikeshed.lib.Series
-import borg.trikeshed.lib.get
-import borg.trikeshed.lib.j
-import borg.trikeshed.lib.size
 
 /**
  * ConfixClassfileDir — classfile hierarchy as Confix paths.
@@ -42,47 +35,10 @@ object ConfixClassfileDir {
     )
 }
 
-/** Constructs a Series<T> from size and index function (canonical `j`). */
-fun <T> mkSeries(size: Int, oracle: (Int) -> T): Series<T> = size j oracle
-
-/** Facet projection — returns new Series filtered by facet mask. */
-fun <T> withFacet(series: Series<T>, mask: Long, facetSelector: (T) -> Long): Series<T> =
-    series.size j { i ->
-        val t = series[i]
-        require((facetSelector(t) and mask) != 0L) { "facet mask mismatch" }
-        t
-    }
-
-/** LCNC mode dispatch — new Series with per-element transform via α shape. */
-fun <T, R> inMode(series: Series<T>, mode: LCNCModeFacet, transform: (T) -> R): Series<R> =
-    series.size j { i -> transform(series[i]) }
-
-/** Tag each element with facet — returns Series<Join<T, SlabFacet>> */
-fun <T> tagged(series: Series<T>, facet: SlabFacet): Series<Join<T, SlabFacet>> =
-    series.size j { i -> series[i] j facet }
-
-/**
- * ChildRowVec — lazy composition over blackboard children.
- * Materializes only on demand.
- */
-class ChildRowVec<T>(
-    private val source: () -> Series<T>,
-    private val facetSelector: (T) -> Long = { 0L },
-) {
-    operator fun get(index: Int): T = source()[index]
-    val size: Int get() = source().size
-
-    /** Filter by facet — returns new ChildRowVec, no materialization */
-    fun withFacet(mask: Long): ChildRowVec<T> = ChildRowVec(source, facetSelector)
-
-    /** Map with LCNC mode — lazy transform */
-    fun <R> inMode(mode: LCNCModeFacet, transform: (T) -> R): Series<R> =
-        inMode(source(), mode, transform)
-
-    /** Materialize only when forced */
-    fun materialize(): Series<T> = source()
-}
-
-/** Create ChildRowVec from blackboard path (stub for commonMain) */
-fun childRowVec(path: String): ChildRowVec<Map<String, Any>> =
-    error("confix blackboard integration not wired for path=$path")
+// Note: the LCNC/Slab-facet helpers (withFacet, inMode, tagged, ChildRowVec,
+// childRowVec) used to live below. They depended entirely on `SlabFacet` /
+// `LCNCModeFacet`, both of which live in the now-excluded **classfile/slab/**
+// package — an entire layer of TODO() stubs with no non-test consumers. The
+// helpers have been removed; the real entry points above (pathOf, nodeVal)
+// remain. Consumers of those helpers should switch to canonical Series
+// projections (`series.size j { ... }`, `series α { ... }`).
