@@ -343,9 +343,6 @@ tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile>().configureEach 
     }
 }
 
-    from(kotlin.sourceSets.getByName("jvmMain").resources.srcDirs)
-}
-
 // JMH Setup
 tasks.register<JavaExec>("jmh") {
     dependsOn(":compileKotlinJvm")
