@@ -25,21 +25,19 @@ class VersionGatewayTest {
     @Test
     fun testGitInitAndRecord() = runTest {
         val processOps = FakeProcessOperations()
-        val gateway = VersionGateway(processOps)
+        val gateway = GitVersionGateway(processOps)
 
-        val initSuccess = gateway.initRepo("/test/dir")
+        val initSuccess = gateway.init("/test/dir")
         assertTrue(initSuccess)
         assertEquals(listOf("git", "-C", "/test/dir", "init"), processOps.executedCommands[0])
 
-        val recordSuccess = gateway.recordVersion("/test/dir", "test commit")
-        assertTrue(recordSuccess)
+        val recordSuccess = gateway.record("/test/dir", "oroboros", "test commit")
+        assertEquals("0", recordSuccess)
         assertEquals(listOf("git", "-C", "/test/dir", "add", "."), processOps.executedCommands[1])
         assertEquals(
             listOf(
-                "git", "-C", "/test/dir",
-                "-c", "user.name=oroboros",
-                "-c", "user.email=agent@trikeshed.borg",
-                "commit", "-m", "test commit"
+                "git", "-c", "user.name=oroboros", "-c", "user.email=agent@trikeshed.local",
+                "-C", "/test/dir", "commit", "--author=oroboros", "-m", "test commit"
             ),
             processOps.executedCommands[2]
         )
@@ -48,14 +46,14 @@ class VersionGatewayTest {
     @Test
     fun testPijulInitAndRecord() = runTest {
         val processOps = FakeProcessOperations()
-        val gateway = VersionGateway(processOps, usePijul = true)
+        val gateway = PijulVersionGateway(processOps)
 
-        val initSuccess = gateway.initRepo("/test/dir")
+        val initSuccess = gateway.init("/test/dir")
         assertTrue(initSuccess)
         assertEquals(listOf("pijul", "init", "--repository", "/test/dir"), processOps.executedCommands[0])
 
-        val recordSuccess = gateway.recordVersion("/test/dir", "test record")
-        assertTrue(recordSuccess)
+        val recordSuccess = gateway.record("/test/dir", "oroboros", "test record")
+        assertEquals("0", recordSuccess)
         assertEquals(listOf("pijul", "add", "--repository", "/test/dir", "."), processOps.executedCommands[1])
         assertEquals(listOf("pijul", "record", "--repository", "/test/dir", "-a", "-m", "test record"), processOps.executedCommands[2])
     }
