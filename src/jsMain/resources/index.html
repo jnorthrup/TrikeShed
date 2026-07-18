@@ -50,6 +50,24 @@
     }
     window.addEventListener('DOMContentLoaded', init);
   </script>
-  <script type="module" src="./TrikeShed.js"></script>
+  <script type="module">
+    import * as ts from './TrikeShed.js';
+
+    async function start() {
+      try {
+        const forge = await (globalThis.TrikeShed || ts);
+        const html = forge.getForgeHtml();
+        const boot = document.getElementById('boot');
+        if (boot) boot.remove();
+        document.body.insertAdjacentHTML('beforeend', html);
+      } catch (err) {
+        const el = document.getElementById('err');
+        el.textContent = err.message + '\n' + (err.stack || '');
+        el.style.display = 'block';
+      }
+    }
+
+    start();
+  </script>
 </body>
 </html>

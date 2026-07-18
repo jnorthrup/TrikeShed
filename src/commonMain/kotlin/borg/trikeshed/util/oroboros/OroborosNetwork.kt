@@ -52,11 +52,16 @@ fun extractHtxPayloadBytes(response: HtxExchangeResult): ByteArray {
     var result = ByteArray(0)
     val frames = response.frames.toList()
     for (frame in frames) {
-         // Placeholder for body extraction
-         // Real app would deserialize frames appropriately
          if (frame.toString() == "MOCK_PAYLOAD") {
              result += "MOCK_PAYLOAD".encodeToByteArray()
          }
+    }
+    val body = response.state.response?.body
+    if (body != null) {
+        val bytes = body.toArray()
+        if (bytes != null && bytes.isNotEmpty()) {
+            return bytes
+        }
     }
     return result
 }
@@ -74,17 +79,8 @@ open class IpfsContentGateway(private val htxElement: HtxElement) : ContentGatew
 
         val payload = extractPayload(response)
 
-        val expectedHex = contentId.value.substring("sha256:".length)
-        val actualHash = Sha256Pure.digest(payload)
-
-        // Portable hex string conversion
-        val hexBuilder = StringBuilder(actualHash.size * 2)
-        for (b in actualHash) {
-            val v = b.toInt() and 0xFF
-            hexBuilder.append(HEX_CHARS[v ushr 4])
-            hexBuilder.append(HEX_CHARS[v and 0x0F])
-        }
-        val actualHex = hexBuilder.toString()
+        val expectedHex = contentId.value
+        val actualHex = ContentId.of(payload).value
 
         if (expectedHex != actualHex) {
             error("Digest mismatch rejection: expected $expectedHex, got $actualHex")

@@ -97,6 +97,7 @@ kotlin {
         // Compose runtime for WASM target (compose compiler requires runtime on classpath)
         kotlin.sourceSets.getByName("wasmJsMain").dependencies {
             implementation(org.jetbrains.compose.ComposePlugin.Dependencies(project).runtime)
+            implementation(devNpm("workbox-webpack-plugin", "7.0.0"))
         }
     }
 
@@ -271,6 +272,10 @@ tasks.register<Sync>("generateForgePages") {
         println("Published WASM_JS_BROWSER target to ${project.layout.projectDirectory.dir("docs").asFile.absolutePath}")
     }
 }
+
+
+
+
 
 // Config cache
 tasks.register("kmpPartiallyResolvedDependenciesCheckerIgnore") {
