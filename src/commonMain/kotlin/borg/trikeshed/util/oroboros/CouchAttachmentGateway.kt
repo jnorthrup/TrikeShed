@@ -5,6 +5,7 @@ import borg.trikeshed.couch.Document
 import borg.trikeshed.couch.Field
 import borg.trikeshed.job.CasStore
 import borg.trikeshed.job.ContentId
+import borg.trikeshed.lib.Series
 import borg.trikeshed.lib.Series2
 import borg.trikeshed.lib.j
 import borg.trikeshed.lib.joins
@@ -89,8 +90,8 @@ class CouchAttachmentGateway(
             doc.fields.none { it.name == "deleted" && it.value == "true" }
         }
 
-        val paths = allDocs.size j { i -> allDocs[i].id }
-        val refs = allDocs.size j { i ->
+        val paths: Series<String> = allDocs.size j { i: Int -> allDocs[i].id }
+        val refs: Series<OroborosAttachmentRef> = allDocs.size j { i: Int ->
             val doc = allDocs[i]
             val contentType = doc.fields.find { it.name == "contentType" }?.value as? String ?: ""
             val lengthStr = doc.fields.find { it.name == "length" }?.value as? String ?: "0"
@@ -110,6 +111,6 @@ class CouchAttachmentGateway(
             )
         }
 
-        return paths joins refs
+        return paths.joins(refs)
     }
 }

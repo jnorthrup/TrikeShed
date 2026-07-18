@@ -1,6 +1,6 @@
 package borg.trikeshed.util.oroboros
 
-import borg.trikeshed.context.sctp.SctpElement
+import borg.trikeshed.sctp.SctpElement
 import borg.trikeshed.lib.OpK
 import borg.trikeshed.lib.FacetedRow
 

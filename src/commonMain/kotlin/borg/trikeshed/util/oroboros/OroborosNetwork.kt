@@ -15,14 +15,17 @@ import borg.trikeshed.job.ContentId
 import borg.trikeshed.lib.OpK
 import borg.trikeshed.lib.FacetedRow
 import borg.trikeshed.lib.Join
+import borg.trikeshed.lib.Series
+import borg.trikeshed.lib.toList
+import borg.trikeshed.lib.toSeries
+import borg.trikeshed.lib.ByteSeries
 import borg.trikeshed.context.StreamTransport
 import borg.trikeshed.job.Sha256Pure
-import borg.trikeshed.lib.toList
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.selects.select
-import borg.trikeshed.lib.ByteSeries
+import kotlinx.coroutines.CancellationException
 import borg.trikeshed.lib.toSeries
 import kotlinx.coroutines.CancellationException
 
@@ -53,7 +56,7 @@ class DhtContentGateway<TNum : Comparable<TNum>, Sz : NetMask<TNum>>(
 // Global payload extraction method as HtxFrame internal details aren't known, mocked for testing tests.
 fun extractHtxPayloadBytes(response: HtxExchangeResult): ByteArray {
     var result = ByteArray(0)
-    val frames = response.frames.iterable().toList()
+    val frames = response.frames.view.toList()
     for (frame in frames) {
          // Placeholder for body extraction
          // Real app would deserialize frames appropriately
@@ -77,8 +80,8 @@ open class IpfsContentGateway(private val htxElement: HtxElement) : ContentGatew
 
         val payload = extractPayload(response)
 
-        val expectedHex = contentId.value.substring("sha256-".length)
-        val actualHash = Sha256Pure.hash(payload)
+        val expectedHex = contentId.value.substring("sha256:".length)
+        val actualHash = Sha256Pure.digest(payload)
 
         // Portable hex string conversion
         val hexBuilder = StringBuilder(actualHash.size * 2)
