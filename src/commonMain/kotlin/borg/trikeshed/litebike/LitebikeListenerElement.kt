@@ -7,12 +7,9 @@ import borg.trikeshed.context.AsyncContextKey
 import borg.trikeshed.context.ElementState
 import borg.trikeshed.litebike.taxonomy.Protocol
 import borg.trikeshed.litebike.taxonomy.ProtocolMark
-import kotlinx.coroutines.CompletableJob
 import kotlinx.coroutines.Job
-import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.channels.Channel
-import kotlinx.coroutines.channels.consumeEach
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -144,6 +141,53 @@ class LitebikeListenerElement(
     }
 
     /**
+     * R05 — pre-allocate a sequence id without emitting. The JVM bind
+     * adapter calls this before calling [acceptWithSequence] so the
+     * originating connection can be stamped with the same id the
+     * worker will see on its inbound [ChannelMessage].
+     */
+    internal suspend fun nextSequenceIdForEmit(): Long = nextSequenceId()
+
+    /**
+     * R05 — accept [payload] with a caller-supplied [sequenceId]. Same
+     * semantics as [accept] but skips sequence-id allocation so the
+     * caller can correlate the inbound message with a side table of
+     * originating sockets.
+     */
+    internal suspend fun acceptWithSequence(
+        protocol: Protocol,
+        payload: ByteArray,
+        sequenceId: Long,
+    ): Boolean = acceptWithSequence(protocol.id, payload, sequenceId)
+
+    /**
+     * UByte overload of [acceptWithSequence].
+     */
+    internal suspend fun acceptWithSequence(
+        protocolId: UByte,
+        payload: ByteArray,
+        sequenceId: Long,
+    ): Boolean {
+        check(state == ElementState.OPEN || state == ElementState.ACTIVE) {
+            "LitebikeListenerElement must be OPEN/ACTIVE before accept() (was $state)"
+        }
+        val slot = registry[protocolId] ?: return false
+        val proto = Protocol.fromId(protocolId)
+        val msg = ChannelMessage(protocolId, sequenceId, payload)
+        slot.offer(msg)
+        val event = LitebikeFanoutEvent(
+            protocol = proto ?: return true,
+            sequenceId = sequenceId,
+            payloadSize = payload.size,
+            accepted = true,
+            subscriberCount = fanoutSubscribers.size,
+            epochMillis = kotlinx.datetime.Clock.System.now().toEpochMilliseconds(),
+        )
+        fireFanoutEvent(event)
+        return true
+    }
+
+    /**
      * Classify [bytes] and offer the resulting [ChannelMessage] to the
      * matching protocol's slot. Litebike classifies via RBCursive;
      * here we trust the caller's protocol tag (the wire decoder lives
@@ -206,29 +250,21 @@ class LitebikeListenerElement(
         .mapNotNull { Protocol.fromId(it) }
         .map { ProtocolMark.forProtocol(it) }
 
-    /** Structured-concurrency fanout: launch a consumer for each slot.
-     *  Mirrors litebike's `consume_each` per channel. Stops when the
-     *  parent job is cancelled or [block] returns false. */
+    /** Structured-concurrency fanout: launch exactly one consumer for each
+     *  registered slot. Mirrors litebike's `consume_each` per channel and
+     *  stops a slot consumer when [block] returns false or the slot closes. */
     suspend fun fanoutChannels(block: suspend (Protocol, ChannelMessage) -> Boolean) {
         check(state == ElementState.OPEN || state == ElementState.ACTIVE) {
             "LitebikeListenerElement must be OPEN/ACTIVE before fanoutChannels() (was $state)"
         }
+        val slots = registryMutex.withLock { registry.values.toList() }
         kotlinx.coroutines.coroutineScope {
-            registry.values.forEach { slot ->
+            slots.forEach { slot ->
                 launch {
-                    slot.consume()
-                }
-            }
-            // Drive consumers: collect any single message, run block; if
-            // block returns false, exit. The structured-concurrency scope
-            // ensures launches cancel on this function's exit.
-            for ((protoId, slot) in registry) {
-                launch {
-                    val proto = Protocol.fromId(protoId) ?: return@launch
                     try {
                         while (true) {
                             val msg = slot.consume()
-                            block(proto, msg)
+                            if (!block(slot.protocol, msg)) break
                         }
                     } catch (_: kotlinx.coroutines.channels.ClosedReceiveChannelException) {
                         // slot closed — exit normally

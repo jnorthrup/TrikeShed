@@ -5,9 +5,7 @@ package borg.trikeshed.context.nuid
 import borg.trikeshed.context.AsyncContextElement
 import borg.trikeshed.context.AsyncContextKey
 import borg.trikeshed.context.ElementState
-import kotlinx.coroutines.CompletableJob
 import kotlinx.coroutines.Job
-import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.sync.Mutex
@@ -57,20 +55,31 @@ class NuidFanoutElement(
     companion object Key : AsyncContextKey<NuidFanoutElement>()
     override val key: AsyncContextKey<NuidFanoutElement> = Key
 
-    /** Per-workgroup claim slot: workers drain their inbox via [WorkgroupSlot.tryTake]. */
+    /** Per-workgroup claim slot. Claim intake belongs to the dispatcher;
+     *  production workers receive accepted claims through [consume]. */
     class WorkgroupSlot(val workgroup: Workgroup) {
         // Buffered so a brief latency from one worker doesn't block concurrent
         // offers to its peers. Capacity scales with claim pressure.
         private val inbox: Channel<Claim> = Channel(Channel.BUFFERED)
+        private val accepted: Channel<Claim> = Channel(Channel.BUFFERED)
 
         /** Try to consume one pending claim (non-blocking). Returns null if empty. */
         fun tryTake(): Claim? = inbox.tryReceive().getOrNull()
+
+        /** Consume one claim accepted for this workgroup. */
+        suspend fun consume(): Claim = accepted.receive()
+
+        /** Publish a claim after dispatcher admission succeeds. */
+        internal suspend fun publishAccepted(claim: Claim) { accepted.send(claim) }
 
         /** Enqueue a claim offer to this workgroup. */
         suspend fun offer(claim: Claim) { inbox.send(claim) }
 
         /** Close the slot — no more offers. Existing claims remain drainable. */
-        fun close() { inbox.close() }
+        fun close() {
+            inbox.close()
+            accepted.close()
+        }
     }
 
     /** A claim is the unit of dispatch: identity + payload + the originating Nuid. */
@@ -261,6 +270,7 @@ class NuidFanoutElement(
             for (slot in candidates) {
                 val taken = slot.tryTake() ?: continue
                 if (taken.claimId == claimId && acceptClaim(slot.workgroup, taken)) {
+                    slot.publishAccepted(taken)
                     return slot
                 }
             }

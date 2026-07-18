@@ -4,6 +4,12 @@ package borg.trikeshed.userspace.nio.channels.spi
 
 import kotlinx.cinterop.*
 import platform.posix.*
+import platform.linux.posix_spawn_file_actions_t
+import platform.linux.posix_spawn_file_actions_tVar
+import platform.linux.posix_spawn_file_actions_addopen
+import platform.linux.posix_spawn_file_actions_init
+import platform.linux.posix_spawn_file_actions_destroy
+import platform.linux.posix_spawnp
 
 class PosixProcessOperations : ProcessOperations {
 
@@ -26,7 +32,7 @@ class PosixProcessOperations : ProcessOperations {
 
         val exitCode = memScoped {
             val pid = alloc<pid_tVar>()
-            val actions = alloc<posix_spawn_file_actions_t>()
+            val actions = alloc<posix_spawn_file_actions_tVar>()
             posix_spawn_file_actions_init(actions.ptr)
 
             if (stdinPath != null) {
