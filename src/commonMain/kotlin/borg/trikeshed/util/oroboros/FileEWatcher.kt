@@ -1,114 +1,118 @@
 package borg.trikeshed.util.oroboros
 
-import borg.trikeshed.job.ContentId
 import borg.trikeshed.userspace.nio.file.spi.FileOperations
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.channels.ReceiveChannel
 
-data class FileEvent(
-    val agentId: String,
-    val path: String,
-    val type: EventType,
-    val contentId: ContentId? = null
-) {
-    enum class EventType { CREATED, MODIFIED, DELETED }
+enum class FileEventType {
+    CREATE, MODIFY, DELETE
 }
 
+data class FileEvent(val path: String, val type: FileEventType)
+
 class FileEWatcher(
-    val fileOps: FileOperations,
-    val forgeHome: ForgeHome,
-    val ignores: Set<String> = setOf(".git", ".pijul", ".oroboros")
+    private val baseDir: String,
+    private val fileOps: FileOperations,
+    private val ignorePatterns: List<String> = emptyList()
 ) {
-    // Finite channel; no unlimited, no drop oldest
-    private val _events = Channel<FileEvent>(Channel.BUFFERED)
-    val events: ReceiveChannel<FileEvent> get() = _events
+    // Deterministic bounded output channel
+    private val eventChannel = Channel<List<FileEvent>>(100)
 
-    // State tracking to coalesce events by agent+path+ContentId
-    private val knownHashes = mutableMapOf<Pair<String, String>, ContentId?>()
+    // Coalesced events (latest event per path wins)
+    private val pendingEvents = mutableMapOf<String, FileEventType>()
 
-    /**
-     * Recursively provisions a directory structure, starting the watch state.
-     */
-    suspend fun provision(agentId: String, path: String = "") {
-        val fullPath = forgeHome.resolveAgentPath(agentId, path)
-        if (!fileOps.exists(fullPath)) return
+    private val knownFiles = mutableSetOf<String>()
 
-        if (fileOps.isDir(fullPath)) {
-            val children = fileOps.listDir(fullPath)
-            for (child in children) {
-                if (child in ignores) continue
-                provision(agentId, if (path.isEmpty()) child else "$path/$child")
-            }
-        } else {
-            val bytes = fileOps.readAllBytes(fullPath)
-            val hash = ContentId.of(bytes)
-            knownHashes[agentId to path] = hash
-            _events.send(FileEvent(agentId, path, FileEvent.EventType.CREATED, hash))
+    // Store content hash for known files to detect modifications
+    private val knownHashes = mutableMapOf<String, Int>()
+
+    fun startProvisioning() {
+        if (!fileOps.exists(baseDir)) {
+            fileOps.mkdirs(baseDir)
+        }
+        scanRecursively(baseDir)
+    }
+
+    private fun isIgnored(path: String): Boolean {
+        return ignorePatterns.any { pattern ->
+            path.contains(pattern) || path.endsWith(pattern)
         }
     }
 
-    /**
-     * Reconciles the current file system state against known state to generate bounded deterministic batches.
-     */
-    suspend fun reconcile(agentId: String, path: String = "") {
-        val fullPath = forgeHome.resolveAgentPath(agentId, path)
-
-        if (!fileOps.exists(fullPath)) {
-            // Check if it was known before; if so, it's deleted
-            val deletedPaths = knownHashes.keys.filter {
-                it.first == agentId && (
-                    it.second == path ||
-                    it.second.startsWith("$path/") ||
-                    (path.isEmpty() && it.second.isNotEmpty())
-                ) }
-            for (deleted in deletedPaths) {
-                knownHashes.remove(deleted)
-                _events.send(FileEvent(agentId, deleted.second, FileEvent.EventType.DELETED, null))
-            }
-            return
-        }
-
-        if (fileOps.isDir(fullPath)) {
-            val children = fileOps.listDir(fullPath)
-
-            // Check for deletions within this dir (shallowly, then recursive calls will handle deeper)
-            val expectedPrefix = if (path.isEmpty()) "" else "$path/"
-            val knownChildren = knownHashes.keys
-                .filter { it.first == agentId && it.second.startsWith(expectedPrefix) }
-                .map {
-                    val relative = it.second.removePrefix(expectedPrefix)
-                    relative.substringBefore("/")
-                }
-                .toSet()
-
-            for (known in knownChildren) {
-                if (known !in children && known !in ignores) {
-                    // It was deleted
-                    reconcile(agentId, expectedPrefix + known)
-                }
-            }
-
-            for (child in children) {
-                if (child in ignores) continue
-                reconcile(agentId, expectedPrefix + child)
-            }
-        } else {
-            // It's a file
-            val bytes = fileOps.readAllBytes(fullPath)
-            val hash = ContentId.of(bytes)
-            val prevHash = knownHashes[agentId to path]
-
-            if (prevHash == null) {
-                knownHashes[agentId to path] = hash
-                _events.send(FileEvent(agentId, path, FileEvent.EventType.CREATED, hash))
-            } else if (prevHash != hash) {
-                knownHashes[agentId to path] = hash
-                _events.send(FileEvent(agentId, path, FileEvent.EventType.MODIFIED, hash))
-            }
+    private fun hashFileContent(path: String): Int {
+        return try {
+            fileOps.readAllBytes(path).contentHashCode()
+        } catch (e: Exception) {
+            0
         }
     }
 
-    suspend fun close() {
-        _events.close()
+    private fun scanRecursively(dir: String) {
+        val currentFiles = mutableSetOf<String>()
+        val queue = mutableListOf(dir)
+
+        while (queue.isNotEmpty()) {
+            val currentDir = queue.removeFirst()
+            if (isIgnored(currentDir)) continue
+
+            try {
+                val list = fileOps.listDir(currentDir)
+                for (name in list) {
+                    val fullPath = fileOps.resolvePath(currentDir, name)
+                    if (isIgnored(fullPath)) continue
+
+                    if (fileOps.isDir(fullPath)) {
+                        queue.add(fullPath)
+                    } else if (fileOps.isFile(fullPath)) {
+                        currentFiles.add(fullPath)
+                        val currentHash = hashFileContent(fullPath)
+
+                        if (!knownFiles.contains(fullPath)) {
+                            knownFiles.add(fullPath)
+                            knownHashes[fullPath] = currentHash
+                            pendingEvents[fullPath] = FileEventType.CREATE
+                        } else {
+                            val previousHash = knownHashes[fullPath]
+                            if (previousHash != currentHash) {
+                                knownHashes[fullPath] = currentHash
+                                pendingEvents[fullPath] = FileEventType.MODIFY
+                            }
+                        }
+                    }
+                }
+            } catch (e: Exception) {
+                // directory might have been deleted while scanning
+            }
+        }
+
+        // Find deleted files
+        val deleted = knownFiles.filter { !currentFiles.contains(it) }
+        for (del in deleted) {
+            knownFiles.remove(del)
+            knownHashes.remove(del)
+            pendingEvents[del] = FileEventType.DELETE
+        }
+    }
+
+    // For test use or external modification notifications
+    fun recordEvent(path: String, type: FileEventType) {
+        if (isIgnored(path)) return
+        pendingEvents[path] = type
+    }
+
+    suspend fun drain() {
+        if (pendingEvents.isEmpty()) return
+
+        val batch = pendingEvents.map { FileEvent(it.key, it.value) }
+        pendingEvents.clear()
+
+        eventChannel.send(batch)
+    }
+
+    fun getChannel(): ReceiveChannel<List<FileEvent>> = eventChannel
+
+    // explicit drain semantics (close the channel)
+    fun close() {
+        eventChannel.close()
     }
 }

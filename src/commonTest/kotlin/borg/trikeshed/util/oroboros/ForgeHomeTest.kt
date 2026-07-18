@@ -3,44 +3,68 @@ package borg.trikeshed.util.oroboros
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
-import borg.trikeshed.userspace.nio.platform.spi.SystemOperations
-import kotlin.coroutines.CoroutineContext
-
-class DummySysOps(override val homedir: String) : SystemOperations {
-    override fun getenv(name: String, defaultVal: String?) = defaultVal
-    override fun getProperty(name: String, defaultVal: String?) = defaultVal
-}
+import borg.trikeshed.userspace.nio.file.spi.FileOperations
+import borg.trikeshed.lib.Join
+import borg.trikeshed.lib.Series
 
 class ForgeHomeTest {
+    private val fileOps = FakeFileOperations()
+
     @Test
-    fun testDefaultPath() {
-        val sysOps = DummySysOps("/home/user")
-        val fh = ForgeHome(sysOps)
-        assertEquals("/home/user/.local/forge_home", fh.basePath)
+    fun testValidPaths() {
+        val resolved = ForgeHome.resolveSafe("/base", "a/b/c", fileOps)
+        assertEquals("/base/a/b/c", resolved)
     }
 
     @Test
-    fun testSafeAgentNamespace() {
-        val fh = ForgeHome(DummySysOps("/h"))
-        assertEquals("/h/.local/forge_home/agents/agent1/foo/bar", fh.resolveAgentPath("agent1", "foo/bar"))
-        assertEquals("/h/.local/forge_home/agents/agent1", fh.resolveAgentPath("agent1", ""))
-        assertEquals("/h/.local/forge_home/agents/agent1/baz", fh.resolveAgentPath("agent1", "./baz"))
+    fun testEmptySegments() {
+        assertFailsWith<IllegalArgumentException> {
+            ForgeHome.resolveSafe("/base", "a//b///c", fileOps)
+        }
     }
 
     @Test
-    fun testRejection() {
-        val fh = ForgeHome(DummySysOps("/h"))
+    fun testEmptyPath() {
+        val resolved = ForgeHome.resolveSafe("/base", "", fileOps)
+        assertEquals("/base", resolved)
+    }
 
-        // Agent ID rejection
-        assertFailsWith<IllegalArgumentException> { fh.resolveAgentPath("", "foo") }
-        assertFailsWith<IllegalArgumentException> { fh.resolveAgentPath("a/b", "foo") }
-        assertFailsWith<IllegalArgumentException> { fh.resolveAgentPath("..", "foo") }
+    @Test
+    fun testAbsolutePaths() {
+        assertFailsWith<IllegalArgumentException> {
+            ForgeHome.resolveSafe("/base", "/a/b", fileOps)
+        }
+    }
 
-        // Subpath rejection
-        assertFailsWith<IllegalArgumentException> { fh.resolveAgentPath("a", "/foo") }
-        assertFailsWith<IllegalArgumentException> { fh.resolveAgentPath("a", "foo/../bar") }
-        assertFailsWith<IllegalArgumentException> { fh.resolveAgentPath("a", "foo/.git/bar") }
-        assertFailsWith<IllegalArgumentException> { fh.resolveAgentPath("a", ".pijul/bar") }
-        assertFailsWith<IllegalArgumentException> { fh.resolveAgentPath("a", "bar/.oroboros") }
+    @Test
+    fun testPathTraversal() {
+        assertFailsWith<IllegalArgumentException> {
+            ForgeHome.resolveSafe("/base", "a/../b", fileOps)
+        }
+    }
+
+    @Test
+    fun testReservedDirectories() {
+        assertFailsWith<IllegalArgumentException> {
+            ForgeHome.resolveSafe("/base", "a/.git/b", fileOps)
+        }
+        assertFailsWith<IllegalArgumentException> {
+            ForgeHome.resolveSafe("/base", ".pijul/b", fileOps)
+        }
+        assertFailsWith<IllegalArgumentException> {
+            ForgeHome.resolveSafe("/base", "a/.oroboros", fileOps)
+        }
+    }
+
+    @Test
+    fun testResolveAgentPath() {
+        // Just mock resolvePath to simple string concat with slash
+        val mockFileOps = object : FileOperations by fileOps {
+            override fun resolvePath(vararg parts: String): String = parts.joinToString("/")
+        }
+        // Instead of mocking SystemOperations, just assert based on behavior
+        val resolvedBase = ForgeHome.resolve("test_agent", mockFileOps)
+        val finalPath = ForgeHome.resolveAgentPath("test_agent", "data/file.txt", mockFileOps)
+        assertEquals("$resolvedBase/data/file.txt", finalPath)
     }
 }

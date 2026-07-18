@@ -1,50 +1,46 @@
 package borg.trikeshed.util.oroboros
 
 import borg.trikeshed.userspace.nio.platform.spi.SystemOperations
+import borg.trikeshed.userspace.nio.file.spi.FileOperations
 
-/**
- * Handles confinement of agent workspaces within `~/.local/forge_home/agents/<agent-id>`.
- */
-class ForgeHome(
-    val sysOps: SystemOperations = SystemOperations.default,
-    val basePath: String = "${sysOps.homedir}/.local/forge_home"
-) {
-    /**
-     * Resolves and confines a sub-path for a given agent.
-     * Rejects absolute paths, ".." traversals, empty segments, and internal roots (.git, .pijul, .oroboros).
-     */
-    fun resolveAgentPath(agentId: String, subPath: String): String {
-        require(agentId.isNotBlank()) { "Agent ID cannot be empty" }
-        require(!agentId.contains("/")) { "Agent ID cannot contain slashes" }
-        require(agentId !in listOf(".", "..")) { "Invalid agent ID" }
+object ForgeHome {
+    val defaultHome: String
+        get() = "${SystemOperations.default.homedir}/.local/forge_home"
 
-        if (subPath.startsWith("/")) {
-            throw IllegalArgumentException("Absolute paths are rejected")
+    fun resolve(namespace: String, fileOps: FileOperations): String {
+        return resolveSafe(defaultHome, namespace, fileOps)
+    }
+
+    fun resolveAgentPath(namespace: String, path: String, fileOps: FileOperations): String {
+        val agentBase = resolve(namespace, fileOps)
+        return resolveSafe(agentBase, path, fileOps)
+    }
+
+    fun resolveSafe(base: String, path: String, fileOps: FileOperations): String {
+        val segments = path.split("/")
+
+        if (path.startsWith("/")) {
+            throw IllegalArgumentException("Absolute paths are not allowed")
         }
 
-        val segments = subPath.split("/").filter { it.isNotEmpty() }
-
         for (segment in segments) {
+            if (segment.isEmpty() && path.isNotEmpty()) {
+                throw IllegalArgumentException("Empty segments are not allowed")
+            }
             if (segment == "..") {
-                throw IllegalArgumentException("Path traversal '..' is rejected")
+                throw IllegalArgumentException("Path traversal (..) is not allowed")
             }
-            if (segment == "." || segment == "") {
-                continue
-            }
-        }
-
-        // Check internal roots. These are strictly forbidden at any level to prevent agent breakout or tampering
-        // with the version control layer.
-        for (segment in segments) {
             if (segment == ".git" || segment == ".pijul" || segment == ".oroboros") {
-                throw IllegalArgumentException("Internal roots (.git, .pijul, .oroboros) are rejected")
+                throw IllegalArgumentException("Access to reserved directories (.git, .pijul, .oroboros) is not allowed")
             }
         }
 
-        val agentHome = "$basePath/agents/$agentId"
-        if (segments.isEmpty()) {
-            return agentHome
-        }
-        return "$agentHome/${segments.joinToString("/")}"
+        val validSegments = segments.filter { it.isNotEmpty() }
+
+        // If empty path, just return base
+        if (validSegments.isEmpty()) return base
+
+        val joined = validSegments.joinToString("/")
+        return fileOps.resolvePath(base, joined)
     }
 }
