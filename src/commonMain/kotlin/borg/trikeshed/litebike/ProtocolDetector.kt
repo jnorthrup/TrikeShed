@@ -48,6 +48,20 @@ private object DefaultDetector : ProtocolDetectorStrategy {
         val charArr = CharArray(length) { firstBytes[it].toInt().toChar() }
         val head = charArr.concatToString()
         for (token in httpMethods) if (head.startsWith(token)) return Protocol.Http
+        // SSH banner sniff -> Socks5 (litebike style dispatch)
+        if (firstBytes.size >= 3 &&
+            firstBytes[0] == 'S'.code.toByte() &&
+            firstBytes[1] == 'S'.code.toByte() &&
+            firstBytes[2] == 'H'.code.toByte()
+        ) {
+            return Protocol.Socks5
+        }
+
+        // SOCKS5 greeting (Version 5)
+        if (firstBytes[0] == 0x05.toByte()) {
+            return Protocol.Socks5
+        }
+
         // DNS header (note: litebike reserves a future Socks5 path here)
         if (firstBytes[0] in 0x00.toByte()..0x04.toByte() && total >= 2 &&
             (firstBytes[1].toInt() and 0x80) == 0x00
