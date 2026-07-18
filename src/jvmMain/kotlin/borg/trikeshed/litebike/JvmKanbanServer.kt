@@ -4,6 +4,14 @@ package borg.trikeshed.litebike
 
 import borg.trikeshed.kanban.ForgeKanbanIngest
 import borg.trikeshed.litebike.taxonomy.Protocol
+import borg.trikeshed.context.nuid.NuidFanoutElement
+import borg.trikeshed.context.nuid.Workgroup
+import borg.trikeshed.context.nuid.TraitSpace
+import borg.trikeshed.context.nuid.Capability
+import borg.trikeshed.context.nuid.Subnet
+import borg.trikeshed.context.nuid.Nonce
+import borg.trikeshed.context.nuid.nuid
+import borg.trikeshed.lib.j
 import borg.trikeshed.parse.json.JsonSupport
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -78,6 +86,10 @@ object JvmKanbanServer {
 
     suspend fun run(port: Int, donorPath: String?) {
         val listener = LitebikeListenerElement(parentJob = null).also { it.open() }
+        val fanout = NuidFanoutElement(parentJob = null).also { it.open() }
+        fanout.register(Workgroup("process", Subnet.process, TraitSpace { 1 j { Capability.ProcessAll } }))
+        fanout.register(Workgroup("cas", Subnet.process, TraitSpace { 1 j { Capability.CasAll } }))
+        fanout.register(Workgroup("wireproto", Subnet.process, TraitSpace { 1 j { Capability.WireprotoAll } }))
         // Register Http + Json + Socks5 + Tls + Bonjour + Upnp.
         // IDs are TrikeShed-local conventions (Taxonomy.kt), not FFI-stable.
         val httpSlot  = listener.register(Protocol.Http)
@@ -119,16 +131,14 @@ object JvmKanbanServer {
         // The HTTP worker consumes the httpSlot. Each accepted byte
         // stream is a request; we route on the request path.
         val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+
+        // The HTTP handler logic is handled by the wireproto workgroup.
         scope.launch {
+            val slot = fanout.slotOf("wireproto") ?: return@launch
             while (true) {
-                val msg = runCatching { httpSlot.consume() }.getOrNull() ?: continue
-                val resp = routeHttp(msg.payload)
-                // Echo the response back into the same listener on the
-                // Json slot — the bind adapter will eventually learn to
-                // echo through the original connection. For now this is
-                // a "log the response" surface, so the daemon isn't a
-                // black hole: we surface the response as a Json message
-                // downstream.
+                val claim = slot.consume()
+                val payload = claim.payload as? ByteArray ?: continue
+                val resp = routeHttp(payload)
                 val out = buildString {
                     append("HTTP/1.1 ${resp.status} ${statusReason(resp.status)}\r\n")
                     append("Content-Length: ${resp.body.toByteArray(StandardCharsets.UTF_8).size}\r\n")
@@ -139,40 +149,37 @@ object JvmKanbanServer {
                 listener.accept(Protocol.Json, out.toByteArray(StandardCharsets.UTF_8))
             }
         }
+
+        // Fanout channels
         scope.launch {
-            while (true) {
-                runCatching { jsonSlot.consume() }.getOrNull() ?: continue
-                // Json-channel messages are response payloads from workers;
-                // in a full bind adapter they'd be written back to the
-                // originating socket. Here they go to stderr for now.
+            listener.fanoutChannels { protocol, msg ->
+                when (protocol) {
+                    Protocol.Http -> {
+                        val text = String(msg.payload, StandardCharsets.UTF_8)
+                        val path = text.lineSequence().firstOrNull()?.split(' ')?.getOrNull(1) ?: "/"
+                        fanout.dispatch(nuid(Capability.Wireproto(path), Nonce.RandomBytes(), Subnet.process), msg.payload)
+                        true
+                    }
+                    Protocol.Json -> {
+                        // Just consume and ignore for now (previously loop/ignore)
+                        true
+                    }
+                    Protocol.Bonjour -> {
+                        val parsed = parseBonjourDatagram(msg.payload)
+                        emitMulticastLine(listener, jsonSlot, "bonjour", parsed)
+                        true
+                    }
+                    Protocol.Upnp -> {
+                        val parsed = parseSsdpDatagram(msg.payload)
+                        emitMulticastLine(listener, jsonSlot, "upnp", parsed)
+                        true
+                    }
+                    else -> true
+                }
             }
         }
 
-        // R02 — Bonjour/mDNS + Upnp/SSDP slot consumers.
-        // Previously both slots were registered but never drained, so
-        // their bounded buffers filled and any further datagram from the
-        // multicast adapter blocked the listener. Drain both; emit a
-        // tiny JSON line per datagram onto the Json slot.
-        scope.launch {
-            while (true) {
-                val msg = runCatching { bonjourSlot.consume() }.getOrNull() ?: continue
-                val parsed = parseBonjourDatagram(msg.payload)
-                emitMulticastLine(listener, jsonSlot, "bonjour", parsed)
-            }
-        }
-        scope.launch {
-            while (true) {
-                val msg = runCatching { upnpSlot.consume() }.getOrNull() ?: continue
-                val parsed = parseSsdpDatagram(msg.payload)
-                emitMulticastLine(listener, jsonSlot, "upnp", parsed)
-            }
-        }
-
-        // multicastHandles is held so the shutdown hook above can see
-        // the live membership count via the adapter's internal table
-        // (JvmMulticastAdapter.close() walks every registered handle).
-        // No further use here — the variable documents the wiring.
-        @Suppress("UNUSED_VARIABLE") val keptForDocs = multicastHandles
+        // @Suppress("UNUSED_VARIABLE") val keptForDocs = multicastHandles
 
         System.err.println("trikeshed-kanban: listening on :$port  donor=${donorPath ?: "<none>"}")
         System.err.println("Endpoints (CCEK): GET /api/health /api/cap /api/board POST /api/submit /api/donor")
