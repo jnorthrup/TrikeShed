@@ -93,7 +93,8 @@ class LlmSession(
 
 class ModelMux internal constructor(
     private val core: ModelMuxCore,
-    private val keyMux: KeyMux
+    private val keyMux: KeyMux,
+    private val configuredBaseUrls: Map<String, String>,
 ) {
     private val models: Series<ModelEntry> get() = core.a
     private val router: ModelRouter get() = core.b
@@ -113,6 +114,7 @@ class ModelMux internal constructor(
             ?: error("no auth key for model: $modelId")
         val baseUrl = keyMux.get("llm.${card.id}.base_url")
             ?: keyMux.get("llm.default.base_url")
+            ?: configuredBaseUrls[modelId]
             ?: "https://api.openai.com/v1"
         val session = LlmSession(entry, authKey, baseUrl)
         session.open()
@@ -160,6 +162,10 @@ class ModelMux internal constructor(
 
             val resp = htx.request(htxReq)
             val respBody = resp.body.toArray().decodeToString()
+
+            check(resp.status in 200..299) {
+                "ModelMux chat failed with HTTP ${resp.status}: ${respBody.take(500)}"
+            }
 
             if (reactor != null) {
                 reactor.cacheApiCall(provider = card.id, modelId = modelId, requestHash = requestHash, ttlMs = 3600_000, payload = respBody)
@@ -333,6 +339,6 @@ class ModelMuxBuilder(private val keyMux: KeyMux) {
 
     internal fun build(): ModelMux {
         val core: ModelMuxCore = models.toSeries() j CapabilityRouter
-        return ModelMux(core, keyMux)
+        return ModelMux(core, keyMux, pendingUrls.toMap())
     }
 }
