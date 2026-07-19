@@ -412,3 +412,69 @@ tasks.withType<Test>().configureEach {
         showStandardStreams = true
     }
 }
+
+
+val generateForgeAssets = tasks.register("generateForgeAssets") {
+    group = "build"
+    description = "Generates Kotlin strings for Forge web assets"
+
+    val webDir = file("src/commonMain/resources/web")
+    val htmlFile = File(webDir, "index.html")
+    val cssFile = File(webDir, "styles.css")
+    val jsFile = File(webDir, "script.js")
+
+    val outputDir = layout.buildDirectory.dir("generated/source/forgeAssets/kotlin/borg/trikeshed/forge/generated")
+
+    inputs.file(htmlFile)
+    inputs.file(cssFile)
+    inputs.file(jsFile)
+    outputs.dir(outputDir)
+
+    doLast {
+        val outDirFile = outputDir.get().asFile
+        outDirFile.mkdirs()
+
+        fun createByteArray(name: String, bytes: ByteArray): String {
+            val chunks = bytes.toList().chunked(5000)
+            for ((i, chunk) in chunks.withIndex()) {
+                val code = "package borg.trikeshed.forge.generated\n\ninternal object ${name}_$i {\n" +
+                           "    val data: ByteArray = byteArrayOf(\n" +
+                           "        " + chunk.joinToString(",") { it.toString() } + "\n" +
+                           "    )\n}\n"
+                File(outDirFile, "${name}_$i.kt").writeText(code)
+            }
+
+            var code = "package borg.trikeshed.forge.generated\n\ninternal object ${name} {\n"
+            code += "    val data: ByteArray get() {\n"
+            code += "        val size = " + bytes.size + "\n"
+            code += "        val arr = ByteArray(size)\n"
+            code += "        var offset = 0\n"
+            for (i in chunks.indices) {
+                code += "        ${name}_$i.data.copyInto(arr, offset)\n"
+                code += "        offset += ${chunks[i].size}\n"
+            }
+            code += "        return arr\n"
+            code += "    }\n}\n"
+            File(outDirFile, "${name}.kt").writeText(code)
+            return name
+        }
+
+        createByteArray("ForgeAssetsHtml", htmlFile.readBytes())
+        createByteArray("ForgeAssetsCss", cssFile.readBytes())
+        createByteArray("ForgeAssetsJs", jsFile.readBytes())
+
+        File(outDirFile, "ForgeAssets.kt").writeText(
+            "package borg.trikeshed.forge.generated\n\ninternal object ForgeAssets {\n" +
+            "    val indexHtml: String by lazy { ForgeAssetsHtml.data.decodeToString() }\n" +
+            "    val stylesCss: String by lazy { ForgeAssetsCss.data.decodeToString() }\n" +
+            "    val scriptJs: String by lazy { ForgeAssetsJs.data.decodeToString() }\n" +
+            "}\n"
+        )
+    }
+}
+
+kotlin {
+    sourceSets.getByName("commonMain") {
+        kotlin.srcDir(generateForgeAssets.map { it.outputs.files })
+    }
+}
