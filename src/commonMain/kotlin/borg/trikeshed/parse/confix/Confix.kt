@@ -310,6 +310,27 @@ enum class Syntax {
             }
             if (key !in keys) keys[key] = index
         }
+
+        val cids = arrayOfNulls<String>(flat.spans.size)
+        for (i in flat.spans.size - 1 downTo 0) {
+            val tag = flat.tags[i]
+            val children = flat.childOf(i)
+            if (tag == IOMemento.IoObject || tag == IOMemento.IoArray || children.size > 0) {
+                var hashString = "node:\n"
+                for (c in 0 until children.size) {
+                    val childIdx = children[c]
+                    hashString += "${cids[childIdx]}\n"
+                }
+                cids[i] = borg.trikeshed.job.ContentId.of(hashString.encodeToByteArray()).value
+            } else {
+                val span = flat.spans[i]
+                val length = maxOf(0, span.b - span.a + 1)
+                val bytes = ByteArray(length) { offset -> src[span.a + offset] }
+                cids[i] = borg.trikeshed.job.ContentId.of(bytes).value
+            }
+        }
+        val structuralNodes = flat.spans.size j { i: Int -> cids[i] }
+
         return flat.spans.size j { operation: Any? ->
             when (operation) {
                 ConfixIndexK.Spans -> flat.spans
@@ -318,6 +339,7 @@ enum class Syntax {
                 ConfixIndexK.DirectChildren -> flat.childOf
                 ConfixIndexK.TreeCursor -> tree
                 ConfixIndexK.KeyToChild -> ({ key: CharSequence -> keys[key.toString()] })
+                ConfixIndexK.StructuralNodes -> structuralNodes
                 else -> null
             }
         }
