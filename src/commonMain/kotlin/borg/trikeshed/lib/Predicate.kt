@@ -6,13 +6,26 @@ typealias Predicate<T> = (self: T) -> Boolean
 //test operator
 operator fun <T> T.get(test: Predicate<T>): Boolean = test(this)
 
-//filter iterator
-operator fun <T> Series<T>.get(test: Predicate<T>): Iterator<T> =
-    iterator { for (i in 0 until size) if (test(get(i))) yield(get(i)) }
+//filter method for Series
+fun <T> Series<T>.filter(test: Predicate<T>): Series<T> {
+    val indices = this % test
+    return indices.size j { i -> this[indices[i]] }
+}
+
+//filter operator
+operator fun <T> Series<T>.get(test: Predicate<T>): Series<T> = filter(test)
 
 //filter for indices
-operator fun <T> Series<T>.rem(test: Predicate<T>): Iterator<Int> =
-    iterator { for (i in 0 until size) if (test(get(i))) yield(i) }
+operator fun <T> Series<T>.rem(test: Predicate<T>): Series<Int> {
+    val matched = ArrayList<Int>()
+    for (i in 0 until size) {
+        if (test(get(i))) {
+            matched.add(i)
+        }
+    }
+    val indices = matched.toIntArray()
+    return indices.size j { i -> indices[i] }
+}
 
 
 //same as where above but transforming the result instead of testing it
