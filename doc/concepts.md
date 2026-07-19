@@ -24,7 +24,8 @@ TrikeShed/
 **Confix** — the only portable serializer (desired boundary: commonMain allows only `kotlinx-serialization-core`; currently `kotlinx-serialization-json` is a direct `commonMain` dep in `build.gradle.kts` — the boundary is aspirational, not enforced).  
 **License** — AGPLv3 (effective 2017). Do not change.  
 **Task ledger** — `doc/todo.md` (LCNC T22–T29, Kanban-live T-KANBAN-* queues).  
-**Compiled-out layers** — `classfile/slab/**` is excluded from `commonMain` compile in `build.gradle.kts` (~20 `TODO()` stubs: GraalJS eval, DuckDB c-interop, `FacetedCursorContract`, `MiniDuckContract`; files preserved on disk). `CircularQueue.poll/peek/iterator.remove` converted from `TODO()` to `error(...)` — loud hollow, not silent stub.
+**Compiled-out layers** — `classfile/slab/**` is excluded from `commonMain` compile in `build.gradle.kts` (~20 `TODO()` stubs: GraalJS eval, DuckDB c-interop, `FacetedCursorContract`, `MiniDuckContract`; files preserved on disk). `CircularQueue.poll/peek/iterator.remove` converted from `TODO()` to `error(...)` — loud hollow, not silent stub.  
+**Static assets** — `src/commonMain/resources/web/` (index.html, styles.css, script.js, manifest.webmanifest, icons/) is the single source of truth for the Forge HTML shell; the `generateForgeAssets` Gradle task bakes these into the Kotlin-internal `ForgeAssets` object so no runtime resource lookup is needed.
 
 ---
 
@@ -70,6 +71,7 @@ Key operators (in `lib/Join.kt`, `lib/Series.kt`):
 │  - CCEK choreography (channels, projections, agents)                │
 │  - Gallery / blackboard 2.5D/3D spatial layout                      │
 │  - BlackboardSurface projection: `confixDoc(persistedJson)` → `BlackboardSurface.project(...)` → seed rows; the `ForgeAppState` DTO family was removed (commit `1e8fd692`) │
+│  - Static HTML/CSS/JS shell consolidated under src/commonMain/resources/web/; `generateForgeAssets` task bakes them into the `ForgeAssets` Kotlin object so `ForgeApp.kt` references the asset by symbol, not by resource lookup │
 │  - ManimWM RTS camera: momentum, tilt, translucent marble/jade      │
 ├──────────────────────────────────────────────────────────────────────┤
 │  NUID / CCEK FANOUT   (authorization + dispatch)                    │
@@ -380,6 +382,19 @@ ArticulatedNode
 
 Signals flow **into** `ArticulatedNode`; projections flow **out** via `SharedFlow`. No dual-mutable truth.
 
+### 8.1c ProcessReactorEndpoint (NUID-authorized exec)
+
+```
+ProcessReactorEndpoint  ← ReactorEndpoint (commonMain)
+  - Requires Capability.Process on the NUID; rejects other capabilities
+  - Verb "exec" → ProcessOperations.exec(command, args)
+  - Response verb: "ok" (stdout) when exit==0, "error" (stderr) otherwise
+  - Fulfills T12 (Process worker) — wires ProcessOperations SPI into the reactor algebra
+  - Lives in userspace/reactor/process/ (commonMain) — platform exec lives in ProcessOperations actuals
+```
+
+The endpoint is a thin Capability.Process dispatcher. It does not own a process pool; it is the reactor surface for one-shot exec. Long-lived processes belong to a future worker element on the same NUID/Capability contract.
+
 ### 8.3 HTX / htxc (CLI utility)
 
 ```
@@ -422,6 +437,7 @@ gh api repos/jnorthrup/TrikeShed/pages/builds/latest
 - `printForgeGallery` — JVM text grid of catalog + blackboard
 - `runForgeJvm` — Compose Desktop shell
 - `generateForgePages` — Sync task (WASM target → docs/)
+- `generateForgeAssets` — bakes `src/commonMain/resources/web/{index.html,styles.css,script.js}` into `borg.trikeshed.forge.generated.ForgeAssets` (ByteArray chunk objects, 5000 bytes each) so the Forge HTML/CSS/JS shell ships as a Kotlin-internal asset, not a resource lookup. `commonMain` consumes the generated object; `ForgeApp.kt` / `ForgePersistenceScript.kt` / `index.html` template all reference it via `{{SEED}}`/`{{STYLES}}`/`{{GALLERY}}`/`{{SCRIPT}}` placeholders.
 
 ---
 
@@ -443,7 +459,8 @@ gh api repos/jnorthrup/TrikeShed/pages/builds/latest
 | Blackboard-as-cursor | `blackboard/BlackboardSurface.kt`, `parse/confix/Confix.kt`, `parse/confix/ConfixKit.kt` |
 | ManimWM RTS camera | `forge/blackboard/ForgeBlackboardCamera.kt`, `forge/blackboard/ForgeBlackboardInteraction.kt`, `manimwm/` |
 | Transport / HTX | `htx/Htx*.kt`, `cli/htx/HtxAria2*.kt` |
-| Gallery / Pages | `forge/gallery/*.kt`, `ForgeApp.kt`, `build.gradle.kts` (`generateForgePages`) |
+| Process reactor | `userspace/reactor/process/ProcessReactorEndpoint.kt`, `userspace/nio/channels/spi/ProcessOperations.kt` |
+| Gallery / Pages | `forge/gallery/*.kt`, `ForgeApp.kt`, `resources/web/`, `build.gradle.kts` (`generateForgeAssets`, `generateForgePages`) |
 
 ---
 
