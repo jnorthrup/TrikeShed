@@ -165,11 +165,17 @@ object TypedefProductionSystem {
     // ── Ring ─────────────────────────────────────────────────────────
 
     private val ring = RingSeries<TraceEvent>(RING_CAP) { }
+    val synapseRing = SynapseRing(RING_CAP)
 
     private var seq = 0
     private fun nextSeq(): Int = seq++
 
-    @Volatile var active = false
+    var active = false
+        @Synchronized set(value) {
+            field = value
+            synapseRing.active = value
+        }
+        @Synchronized get() = field
 
     // ── Slab subscriber ─────────────────────────────────────────────
 
@@ -293,6 +299,10 @@ object TypedefProductionSystem {
     // Convenience publish for algebra-matched rules
     fun publish(rule: AdjacentRule, typedefName: String, methodName: String, siteIdx: Int, isAfter: Boolean) {
         publish(rule.opcode, typedefName, methodName, siteIdx, rule.depth, isAfter)
+    }
+
+    fun publish(synapse: FieldSynapse) {
+        synapseRing.publish(synapse)
     }
 
     // ── Slab flush ───────────────────────────────────────────────────
