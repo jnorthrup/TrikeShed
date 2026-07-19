@@ -18,6 +18,7 @@ import borg.trikeshed.lib.*
 //   DirectChildren → (Int) → Series<Int>  parent → child indices
 //   TreeCursor    → Cursor                recursive tree of RowVec
 //   KeyToChild    → (CharSequence) → Int? key name → token index
+//   StructuralNodes → Series<String?>     content-addressed CID (or null for unhashed leaf)
 //
 // ConfixKit already references these facets; this file defines them.
 
@@ -28,6 +29,7 @@ sealed class ConfixIndexK<out R> : OpK<R>() {
     data object DirectChildren : ConfixIndexK<(Int) -> Series<Int>>()
     data object TreeCursor     : ConfixIndexK<Cursor>()
     data object KeyToChild     : ConfixIndexK<(CharSequence) -> Int?>()
+    data object StructuralNodes : ConfixIndexK<Series<String?>>()
 }
 
 /**
