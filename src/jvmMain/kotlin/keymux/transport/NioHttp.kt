@@ -133,8 +133,8 @@ object NioHttp {
             val reqText = buildString {
                 append("${req.method} ${req.uri.rawPath}${req.uri.rawQuery?.let { "?$it" } ?: ""} HTTP/1.1\r\n")
                 append("Host: $host\r\n")
-                for (i in 0 until req.headers.size) {
-                    val (k, v) = req.headers[i]; append("$k: $v\r\n")
+                for ((k, v) in req.headers.view) {
+                    append("$k: $v\r\n")
                 }
                 bodyBytes?.let { append("Content-Length: ${it.size}\r\n") }
                 append("\r\n")
@@ -196,8 +196,8 @@ object NioHttp {
                 append("GET ${req.uri.rawPath}?${req.uri.rawQuery} HTTP/1.1\r\n")
                 append("Host: $host\r\n")
                 append("Accept: text/event-stream\r\n")
-                for (i in 0 until req.headers.size) {
-                    val (k, v) = req.headers[i]; append("$k: $v\r\n")
+                for ((k, v) in req.headers.view) {
+                    append("$k: $v\r\n")
                 }
                 append("\r\n")
             }

@@ -292,8 +292,7 @@ fun List<Any?>.toJsPath(): JsPath {
 
 fun ConfixDoc.navigate(path: JsPath): ConfixCell? {
     var cur: ConfixCell? = rootCell ?: return null
-    for (i in 0 until path.size) {
-        val elem = path[i]
+    for (elem in path.view) {
         cur = when {
             elem.key != null -> cur?.get(elem.key!!)
             elem.idx != null -> cur?.get(elem.idx!!)

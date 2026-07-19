@@ -54,17 +54,15 @@ object AcpCodec {
         append("{")
         append("\"model\":\"${meta.a}\",")   // version field reused as model id at wire level
         append("\"messages\":[")
-        for (i in 0 until msgs.size) {
+        msgs.view.forEachIndexed { i, (role, content) ->
             if (i > 0) append(",")
-            val (role, content) = msgs[i]
             append("{\"role\":\"$role\",\"content\":${jsonStr(content)}}")
         }
         append("]")
         if (tools.size > 0) {
             append(",\"tools\":[")
-            for (i in 0 until tools.size) {
+            tools.view.forEachIndexed { i, (name, schema) ->
                 if (i > 0) append(",")
-                val (name, schema) = tools[i]
                 append("{\"type\":\"function\",\"function\":{\"name\":\"$name\",\"parameters\":$schema}}")
             }
             append("]")

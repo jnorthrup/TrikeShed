@@ -78,8 +78,7 @@ class TypeDefOracle {
 
     fun parseCBORTypeDefs(doc: ConfixDoc) {
         val roots = doc.roots
-        for (i in 0 until roots.size) {
-            val row = roots[i]
+        for (row in roots.view) {
             if (row.tag != IOMemento.IoObject) continue
             val kids = row.kids
             var name: String? = null
@@ -114,8 +113,7 @@ class TypeDefOracle {
     fun ingestOracleJson(jsonText: String) {
         val doc = confixDoc(jsonText)
         val rows: Series<ConfixCell> = doc.docAt("rows")?.cellKids ?: return
-        for (i in 0 until rows.size) {
-            val elem = rows[i]
+        for (elem in rows.view) {
             val kind  = elem["kind"]?.reify() as? String
             val ngram = elem["ngram"]?.reify() as? String
             if (kind == null || ngram == null) continue

@@ -39,8 +39,8 @@ class CouchChangesProjection {
     fun afterSequence(sequence: Long): Series<CouchCommittedFrame> {
         // Binary search could be used if series supported it, but simple scan works for now
         var startIdx = -1
-        for (i in 0 until frames.size) {
-            if (frames[i].sequence > sequence) {
+        for ((i, frame) in frames.view.withIndex()) {
+            if (frame.sequence > sequence) {
                 startIdx = i
                 break
             }

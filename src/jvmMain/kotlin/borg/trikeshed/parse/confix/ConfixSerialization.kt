@@ -7,6 +7,7 @@ import borg.trikeshed.cursor.IOMemento
 import borg.trikeshed.cursor.RowVec
 import borg.trikeshed.lib.j
 import borg.trikeshed.lib.size
+import borg.trikeshed.lib.view
 import borg.trikeshed.parse.yaml.YamlParser
 import kotlinx.serialization.DeserializationStrategy
 import kotlinx.serialization.ExperimentalSerializationApi
@@ -190,7 +191,7 @@ private fun rowVecToJson(rv: RowVec, doc: ConfixDoc): JsonElement {
         IOMemento.IoArray -> {
             val kids = rv.kids
             val items = ArrayList<JsonElement>(kids.size)
-            for (i in 0 until kids.size) items.add(rowVecToJson(kids.b(i), doc))
+            for (kid in kids.view) items.add(rowVecToJson(kid, doc))
             JsonArray(items)
         }
         else -> {
@@ -392,30 +393,29 @@ internal object ConfixDocTextEmitter {
         when (syntax) {
             ConfixSyntax.JSON -> {
                 sb.append("[")
-                for (i in 0 until kids.size) {
+                kids.view.forEachIndexed { i, kid ->
                     if (i > 0) sb.append(",")
                     if (pretty) sb.append("\n").append(" ".repeat(indent + 2))
-                    emitRow(sb, kids.b(i), doc, syntax, if (pretty) indent + 2 else -1, cfg)
+                    emitRow(sb, kid, doc, syntax, if (pretty) indent + 2 else -1, cfg)
                 }
                 if (pretty) sb.append("\n").append(" ".repeat(indent))
                 sb.append("]")
             }
             ConfixSyntax.YAML -> {
-                for (i in 0 until kids.size) {
+                kids.view.forEachIndexed { i, kid ->
                     if (i > 0 || indent > 0) sb.append("\n").append(" ".repeat(indent))
                     sb.append("- ")
-                    val v = kids.b(i)
-                    when (v.tag) {
-                        IOMemento.IoObject, IOMemento.IoArray -> emitRow(sb, v, doc, syntax, indent + 2, cfg)
-                        else -> emitRow(sb, v, doc, syntax, indent, cfg)
+                    when (kid.tag) {
+                        IOMemento.IoObject, IOMemento.IoArray -> emitRow(sb, kid, doc, syntax, indent + 2, cfg)
+                        else -> emitRow(sb, kid, doc, syntax, indent, cfg)
                     }
                 }
             }
             ConfixSyntax.CBOR -> {
                 sb.append("[")
-                for (i in 0 until kids.size) {
+                kids.view.forEachIndexed { i, kid ->
                     if (i > 0) sb.append(",")
-                    emitRow(sb, kids.b(i), doc, syntax, -1, cfg)
+                    emitRow(sb, kid, doc, syntax, -1, cfg)
                 }
                 sb.append("]")
             }

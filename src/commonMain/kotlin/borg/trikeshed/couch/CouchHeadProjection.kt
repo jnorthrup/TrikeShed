@@ -58,8 +58,8 @@ class CouchHeadProjection {
 
     private fun rebuildDocIndex() {
         docIndex.clear()
-        for (i in 0 until docs.a) {
-            docIndex[docs[i].id] = i
+        for ((i, doc) in docs.view.withIndex()) {
+            docIndex[doc.id] = i
         }
     }
 

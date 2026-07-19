@@ -235,8 +235,7 @@ object CursorTensorReifier {
 
    fun selectNumericColumns(meta: Series<ColumnMeta>): IntArray {
         val selected = mutableListOf<Int>()
-        (0 until meta.size).forEach { column ->
-            val value: ColumnMeta = meta[column]
+        meta.view.forEachIndexed { column, value ->
             if (isNumeric(value.type)) {
                 selected.add(column)
             }

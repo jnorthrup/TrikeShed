@@ -5,6 +5,7 @@ import borg.trikeshed.lib.Series
 import borg.trikeshed.lib.Twin
 import borg.trikeshed.lib.get
 import borg.trikeshed.lib.size
+import borg.trikeshed.lib.view
 
 sealed interface SaxEvent {
     data class Enter(val tag: IOMemento, val offset: Int) : SaxEvent
@@ -14,10 +15,7 @@ sealed interface SaxEvent {
 fun ConfixIndex.saxWalk(action: (SaxEvent) -> Unit) {
     val spans: Series<Twin<Int>> = facet(ConfixIndexK.Spans)
     val tags: Series<IOMemento> = facet(ConfixIndexK.Tags)
-    val count = spans.size
-    for (i in 0 until count) {
-        val tag = tags[i]
-        val twin = spans[i]
+    spans.view.zip(tags.view).forEach { (twin, tag) ->
         action(SaxEvent.Enter(tag, twin.a))
         action(SaxEvent.Leave(tag, twin.b))
     }
