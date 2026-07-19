@@ -90,6 +90,25 @@
     try { localStorage.setItem(LS_KEY, JSON.stringify(state)); } catch (e) { /* quota */ }
   }
 
+  // ── Command Queue ───────────────────────────────────────────────────
+  window.__forgeCommandQueue = window.__forgeCommandQueue || [];
+
+  function mutate(updater) {
+    updater(state);
+    saveState();
+
+    const jobId = uid();
+    const idempotencyKey = jobId + '-' + Date.now();
+    window.__forgeCommandQueue.push({
+      type: 'Submit',
+      jobId: jobId,
+      idempotencyKey: idempotencyKey,
+      dependencies: [],
+      expectedRevision: null
+    });
+  }
+
+
   // ── Element refs ────────────────────────────────────────────────────
   const pageTreeEl = document.getElementById('page-tree');
   const breadcrumbEl = document.getElementById('breadcrumb');
@@ -124,9 +143,10 @@
 
   function newPage(title) {
     const page = { id: uid(), icon: '▤', title: title || '', blocks: [], children: [] };
-    state.pages.push(page);
-    state.activePageId = page.id;
-    saveState();
+    mutate((s) => {
+      s.pages.push(page);
+    s.activePageId = page.id;
+    });
     return page;
   }
 
@@ -147,8 +167,7 @@
       label.textContent = page.title || 'Untitled';
       item.append(toggle, icon, label);
       item.addEventListener('click', () => {
-        state.activePageId = page.id;
-        saveState();
+        mutate((s) => { s.activePageId = page.id; });
         renderAll();
       });
       pageTreeEl.appendChild(item);
@@ -164,8 +183,7 @@
   }
 
   titleEl.addEventListener('input', () => {
-    activePage().title = titleEl.textContent;
-    saveState();
+    mutate(() => { activePage().title = titleEl.textContent; });
     renderSidebar();
     breadcrumbEl.textContent = 'Private  /  ' + (activePage().title || 'Untitled');
   });
@@ -174,8 +192,7 @@
       e.preventDefault();
       const page = activePage();
       if (page.blocks.length === 0) {
-        page.blocks.push({ id: uid(), type: 'p', text: '' });
-        saveState();
+        mutate(() => { page.blocks.push({ id: uid(), type: 'p', text: '' }); });
         renderBlocks();
         focusBlock(page.blocks[0].id, true);
       } else {
@@ -228,8 +245,7 @@
       cb.className = 'todo-checkbox';
       cb.checked = !!block.checked;
       cb.addEventListener('change', () => {
-        block.checked = cb.checked;
-        saveState();
+        mutate(() => { block.checked = cb.checked; });
         el.classList.toggle('done', cb.checked);
       });
       el.appendChild(cb);
@@ -251,8 +267,7 @@
     el.appendChild(content);
 
     content.addEventListener('input', () => {
-      block.text = content.textContent;
-      saveState();
+      mutate(() => { block.text = content.textContent; });
       if (content.textContent === '/') openSlashMenu(block, el);
     });
     content.addEventListener('keydown', (e) => blockKeydown(e, block, idx, content));
@@ -287,9 +302,10 @@
       e.preventDefault();
       closeSlashMenu();
       const focusTarget = idx > 0 ? page.blocks[idx - 1].id : null;
-      page.blocks.splice(idx, 1);
-      if (page.blocks.length === 0) page.blocks.push({ id: uid(), type: 'p', text: '' });
-      saveState();
+      mutate(() => {
+        page.blocks.splice(idx, 1);
+        if (page.blocks.length === 0) page.blocks.push({ id: uid(), type: 'p', text: '' });
+      });
       renderBlocks();
       if (focusTarget) focusBlock(focusTarget, false, true);
     } else if (e.key === 'Escape') {
@@ -326,8 +342,7 @@
   }
 
   function insertBlock(idx, block) {
-    activePage().blocks.splice(idx, 0, block);
-    saveState();
+    mutate(() => { activePage().blocks.splice(idx, 0, block); });
     renderBlocks();
   }
 
@@ -353,7 +368,7 @@
     slashMenuEl.hidden = true;
     if (slashBlock) {
       const el = blocksEl.querySelector('[data-block-id="' + slashBlock.id + '"] .block-content');
-      if (el && el.textContent === '/') { el.textContent = ''; slashBlock.text = ''; saveState(); }
+      if (el && el.textContent === '/') { el.textContent = ''; mutate(() => { slashBlock.text = ''; }); }
     }
     slashBlock = null;
     slashAnchor = null;
@@ -401,13 +416,15 @@
 
   function slashApply(type) {
     if (!slashBlock) { closeSlashMenu(); return; }
-    slashBlock.type = type;
-    slashBlock.text = '';
-    if (type === 'todo') slashBlock.checked = false;
-    saveState();
+    mutate(() => {
+      slashBlock.type = type;
+      slashBlock.text = '';
+      if (type === 'todo') slashBlock.checked = false;
+    });
+    const focusTargetId = slashBlock.id;
     closeSlashMenuSilent();
     renderBlocks();
-    focusBlock(slashBlock.id, true);
+    focusBlock(focusTargetId, true);
   }
 
   function closeSlashMenuSilent() {
@@ -456,8 +473,7 @@
           // cycle columns on click for a lightweight gesture
           const order = state.board.columns.map((c) => c.id);
           const next = order[(order.indexOf(card.column) + 1) % order.length];
-          card.column = next;
-          saveState();
+          mutate(() => { card.column = next; });
           renderBoard();
         });
         cardsEl.appendChild(cardEl);
@@ -468,8 +484,7 @@
       addBtn.className = 'board-add-card';
       addBtn.textContent = '+ New';
       addBtn.addEventListener('click', () => {
-        state.board.cards.push({ id: uid(), title: '', column: col.id, meta: '' });
-        saveState();
+        mutate((s) => { s.board.cards.push({ id: uid(), title: '', column: col.id, meta: '' }); });
         renderBoard();
       });
       colEl.appendChild(addBtn);
@@ -482,8 +497,7 @@
   const viewBoardBtn = document.getElementById('btn-view-board');
 
   function setView(view) {
-    state.view = view;
-    saveState();
+    mutate((s) => { s.view = view; });
     docScrollEl.hidden = view !== 'doc';
     boardScrollEl.hidden = view !== 'board';
     viewDocBtn.classList.toggle('active', view === 'doc');
