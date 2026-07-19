@@ -10,4 +10,12 @@ data class TreeCursor(
             yieldAll(child.flatten())
         }
     }
+
+    fun navigate(path: IntArray): TreeCursor {
+        var current = this
+        for (index in path) {
+            current = current.children.elementAt(index)
+        }
+        return current
+    }
 }
