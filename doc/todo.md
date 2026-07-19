@@ -500,3 +500,22 @@ under one `project(cid)` path.
     zero heap allocation on the read path.
 
 ## DRY / PRELOAD cuts already shipped (Jul 2026 audit pass)
+
+## T-REWIRE-3 Follow-up Cuts (from doc/rewire.md §9)
+
+These are the separated follow-up tasks from T-REWIRE-3 (Cuts 1 and 7 landed in T-REWIRE-3).
+
+- [ ] **T-REWIRE-3b. Modelmux kanban agent**
+  JobCommand handler routing cards through modelmux.
+
+- [ ] **T-REWIRE-3c. UPnP workspace discovery**
+  Workspace announce payload over mDNS/SSDP.
+
+- [ ] **T-REWIRE-3d. SSH mesh transport**
+  SSH tunnel over litebike Tls carrying Confix docs.
+
+- [ ] **T-REWIRE-3e. IPFS/IPNS bridge**
+  CAS blocks as IPFS blocks, IPNS names = manifest CIDs.
+
+- [ ] **T-REWIRE-3f. Progressive rendering**
+  Jules jobs reading TreeDoc archives into ForgeDoc.

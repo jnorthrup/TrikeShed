@@ -56,6 +56,17 @@ object ForgeKanbanIngest {
         return reduce(source)
     }
 
+    fun persistArchive(userId: String, archive: borg.trikeshed.lib.Series<Any?>, pipeline: borg.trikeshed.treedoc.TreeDocPipeline): ForgeKanbanReduction {
+        val documents = archive.b(borg.trikeshed.treedoc.TreeDocK.Documents.ordinal) as borg.trikeshed.cursor.Cursor
+        val allMarkdown = StringBuilder()
+        for (i in 0 until documents.a) {
+            val bytes = pipeline.restoreDocument(archive, i)
+            allMarkdown.append(bytes.decodeToString()).append("\n\n")
+        }
+        val source = ForgeBoardPersistence.source(userId, allMarkdown.toString(), "archive:${(archive.b(borg.trikeshed.treedoc.TreeDocK.ArchiveId.ordinal) as borg.trikeshed.job.ContentId).value}")
+        return reduce(source)
+    }
+
     fun load(userId: String): ForgeKanbanReduction =
         reduce(ForgeBoardPersistence.load(userId).getOrThrow())
 
