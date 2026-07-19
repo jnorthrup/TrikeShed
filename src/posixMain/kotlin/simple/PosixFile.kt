@@ -485,20 +485,25 @@ class PosixFile(
         fun exists(fname: String): Boolean = access(fname, F_OK).z
 
         /** lean on getline to read a file into a sequence of CharSeries */
-        fun readLinesSeq(path: String): Sequence<String> = memScoped {
+        fun readLinesSeq(path: String): Sequence<String> = sequence {
             val file = PosixFile(path)
             val fp = fdopen(file.fd, "r")
+            if (fp == null) return@sequence
             try {
-                val line: CPointerVarOf<CPointer<ByteVarOf<Byte>>> = alloc()
-                val len: ULongVarOf<size_t> = alloc()
-                line.value = null
-                len.value = 0u
+                var line: CPointer<ByteVarOf<Byte>>? = null
+                var len: size_t = 0u
                 try {
-                    sequence {
+                    memScoped {
+                        val linePtr: CPointerVarOf<CPointer<ByteVarOf<Byte>>> = alloc()
+                        val lenPtr: ULongVarOf<size_t> = alloc()
+                        linePtr.value = line
+                        lenPtr.value = len
                         while (true) {
-                            val read = getline(line.ptr, len.ptr, fp)
+                            val read = getline(linePtr.ptr, lenPtr.ptr, fp)
+                            line = linePtr.value
+                            len = lenPtr.value
                             if (read == -1L) break
-                            yield(line.value!!.toKString().trim())
+                            yield(line!!.toKString().trim())
                         }
                         if (ferror(fp) != 0) {
                             perror("ferror")
@@ -506,7 +511,7 @@ class PosixFile(
                         }
                     }
                 } finally {
-                    free(line.value)
+                    free(line)
                 }
             } finally {
                 fclose(fp)
