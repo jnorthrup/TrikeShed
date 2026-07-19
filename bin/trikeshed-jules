@@ -60,13 +60,13 @@ api_request() {
     local method="$1"
     local path="$2"
     local body="${3:-}"
-    
+
     if [[ -z "${JULES_API_KEY}" ]]; then
         die "JULES_API_KEY not set. Get one from https://developers.google.com/jules/api or set it: export JULES_API_KEY=***"
     fi
-    
+
     local url="${JULES_API_BASE}${path}"
-    
+
     if [[ -n "${body}" ]]; then
         curl -s -X "${method}" "${url}" \
             -H "x-goog-api-key: ${JULES_API_KEY}" \
@@ -95,26 +95,24 @@ cmd_session() {
 cmd_create() {
     local prompt="${1:-}"
     local title="${2:-}"
-    local require_approval="${3:-false}"
-    
+
     if [[ -z "${prompt}" ]]; then
         prompt=$(cat 2>/dev/null || true)
     fi
-    
+
     [[ -n "${prompt}" ]] || die "Prompt required (arg or stdin)"
-    
-    # Default repo source: jnorthrup/TrikeShed. Override via TRIKESHED_JULES_SOURCE env.
-    local source="${TRIKESHED_JULES_SOURCE:-sources/github/jnorthrup/TrikeShed}"
-    
-    local body
-    body=$(jq -n \
-        --arg prompt "${prompt}" \
-        --arg title "${title}" \
-        --argjson require_approval "${require_approval}" \
-        --arg source "${source}" \
-        '{prompt: $prompt, title: $title, requirePlanApproval: $require_approval, sourceContext: {source: $source}}')
-    
-    api_request POST "/sessions" "${body}" | jq .
+
+    # Delegate to the native `jules` binary — it has the right OAuth
+    # auth and uses the /v1alpha/sessions API directly. The custom
+    # API-key curl path in this script 400s because session creation
+    # requires OAuth, not API-key auth (see
+    # https://developers.google.com/jules/api).
+    local repo="${TRIKESHED_JULES_REPO:-jnorthrup/TrikeShed}"
+    if [[ -n "${title}" ]]; then
+        printf '%s' "${prompt}" | jules remote new --repo "${repo}" --session "${title}" 2>&1
+    else
+        printf '%s' "${prompt}" | jules remote new --repo "${repo}" 2>&1
+    fi
 }
 
 cmd_send() {
