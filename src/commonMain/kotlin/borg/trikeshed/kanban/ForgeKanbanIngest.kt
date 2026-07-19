@@ -10,6 +10,14 @@ import borg.trikeshed.dag.ReteWorkingMemory
 import borg.trikeshed.graph.CausalGraphNode
 import borg.trikeshed.graph.causalGraphNode
 import borg.trikeshed.job.ContentId
+import borg.trikeshed.lcnc.isam.LcncEntity
+import borg.trikeshed.lib.Series
+import borg.trikeshed.lib.emptySeriesOf
+import borg.trikeshed.lcnc.ccek.IngestStateElement
+import borg.trikeshed.lcnc.reactor.LcncIngestPipeline
+import borg.trikeshed.lcnc.reactor.IngestSource
+import borg.trikeshed.lcnc.reactor.IngestFormat
+import borg.trikeshed.runBlocking
 
 data class ForgeKanbanCorrelation(
     val taskId: String,
@@ -25,6 +33,7 @@ data class ForgeKanbanReduction(
     val causalNodes: List<CausalGraphNode>,
     val reteFacts: List<ReteStoredFact>,
     val correlations: List<ForgeKanbanCorrelation>,
+    val lcncEntities: Series<LcncEntity> = emptySeriesOf(),
 )
 
 private data class SourceTask(
@@ -53,11 +62,11 @@ object ForgeKanbanIngest {
         val markdown = borg.trikeshed.common.Files.readString(markdownPath)
         val source = ForgeBoardPersistence.source(userId, markdown, markdownPath)
         ForgeBoardPersistence.persist(source).getOrThrow()
-        return reduce(source)
+        return reduce(source, markdown.encodeToByteArray())
     }
 
     fun load(userId: String): ForgeKanbanReduction =
-        reduce(ForgeBoardPersistence.load(userId).getOrThrow())
+        reduce(ForgeBoardPersistence.load(userId).getOrThrow(), null)
 
     /**
      * Browser-safe fallback — builds a minimal reduction entirely in memory
@@ -88,10 +97,19 @@ object ForgeKanbanIngest {
             """.trimIndent(),
             contentId = "fallback",
         )
-        return reduce(source)
+        return reduce(source, null)
     }
 
-    fun reduce(source: ForgeKanbanSource): ForgeKanbanReduction {
+    fun reduce(source: ForgeKanbanSource, rawBytes: ByteArray? = null): ForgeKanbanReduction {
+        val bytesToParse = rawBytes ?: source.description.encodeToByteArray()
+        val stateElement = IngestStateElement("run-${source.contentId}")
+        val pipeline = LcncIngestPipeline(stateElement)
+        val lcncEntities = runBlocking {
+            val entities = pipeline.decode(IngestSource.FileStream(bytesToParse), IngestFormat.MARKDOWN)
+            pipeline.drain()
+            pipeline.close()
+            entities
+        }
         val tasks = parseWorkPackages(source.description)
         require(tasks.isNotEmpty()) { "no work packages found in source description" }
         require(tasks.map { it.id }.toSet().size == tasks.size) { "duplicate work package id" }
@@ -230,6 +248,7 @@ object ForgeKanbanIngest {
             causalNodes = causalNodes,
             reteFacts = taskFacts + dependencyFacts,
             correlations = correlations,
+            lcncEntities = lcncEntities,
         )
     }
 

@@ -46,7 +46,8 @@ class ForgeKanbanIngestTest {
     @Test
     fun ingestReducesHermesStyleTasksLinksReteCorrelationsAndCausality() {
         val reduction = ForgeKanbanIngest.reduce(
-            ForgeBoardPersistence.source("jim", markdown, "/tmp/hi")
+            ForgeBoardPersistence.source("jim", markdown, "/tmp/hi"),
+            markdown.encodeToByteArray()
         )
 
         assertEquals(listOf("G0", "F0", "S1"), reduction.board.cards.map { it.id.value })
@@ -64,5 +65,6 @@ class ForgeKanbanIngestTest {
         assertEquals(2, reduction.reteFacts.count { it.fields["kind"] == "link" })
         assertEquals(listOf("G0"), reduction.causalNodes.first { it.nodeId == "F0" }.parentNodeIds)
         assertEquals(f0.causalKey, reduction.causalNodes.first { it.nodeId == "F0" }.causalKey)
+        assertTrue(reduction.lcncEntities.size > 0, "LCNC entities should not be empty")
     }
 }

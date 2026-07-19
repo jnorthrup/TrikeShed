@@ -139,8 +139,12 @@ class LcncIngestPipeline(
         fanoutScope.launch {
             try {
                 channel.consumeEach { action ->
-                    if (action is ReactorAction.PublishEntity) {
-                        state.publishEntity(action.entity)
+                    when (action) {
+                        is ReactorAction.PublishEntity -> state.publishEntity(action.entity)
+                        is ReactorAction.Opened -> state.transition(IngestLifecycle.OPEN)
+                        is ReactorAction.Activated -> state.transition(IngestLifecycle.ACTIVE)
+                        is ReactorAction.Draining -> state.transition(IngestLifecycle.DRAINING)
+                        is ReactorAction.Closed -> state.transition(IngestLifecycle.CLOSED)
                     }
                 }
             } finally {
@@ -195,6 +199,10 @@ class LcncIngestPipeline(
         }
 
         return entities.size j { i -> entities[i] }
+    }
+
+    override suspend fun decodeText(text: String, format: IngestFormat): Series<LcncEntity> {
+        return decode(IngestSource.Paste(text), format)
     }
 
     /** Stop accepting new work; transition ACTIVE → DRAINING. */

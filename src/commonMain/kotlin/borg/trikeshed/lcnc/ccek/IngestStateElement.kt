@@ -23,12 +23,18 @@ class IngestStateElement(
     // In a real system, this might use a mutable thread-safe structure or Channel.
     private val parsedEntities = mutableListOf<LcncEntity>()
 
+    var lifecycleState: borg.trikeshed.lcnc.reactor.IngestLifecycle = borg.trikeshed.lcnc.reactor.IngestLifecycle.CREATED
+        private set
+
     /**
      * Called by codecs to publish a newly parsed entity into the context scope.
      */
     fun publishEntity(entity: LcncEntity) {
         parsedEntities.add(entity)
-        // Here we could fan out to a PointcutEventProducer or other bus
+    }
+
+    fun transition(state: borg.trikeshed.lcnc.reactor.IngestLifecycle) {
+        lifecycleState = state
     }
 
     /**
