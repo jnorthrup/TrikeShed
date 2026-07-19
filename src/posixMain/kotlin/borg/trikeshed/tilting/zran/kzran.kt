@@ -172,32 +172,58 @@ class GzIndex {
         val windowSizes = mutableListOf<UShort>()
         val buf = ByteArray(ULong.SIZE_BYTES)
 
-        buf.usePinned { tempOutput ->
-            val __ptr = tempOutput.addressOf(0)
+        val l2Chunk = ByteArray(256 * 1024)
+        l2Chunk.usePinned { chunk ->
+            val chunkPtr = chunk.addressOf(0)
+            var bufRemaining = 0
+            var bufPos = 0
+
             while (true) {
-                fread(__ptr, __ulSz, 1u, indexFp)
+                if (bufRemaining < ULong.SIZE_BYTES) {
+                    l2Chunk.copyInto(l2Chunk, 0, bufPos, bufPos + bufRemaining)
+                    val bytesRead = fread(chunkPtr + bufRemaining, 1u, (l2Chunk.size - bufRemaining).toULong(), indexFp).toInt()
+                    if (bytesRead <= 0) break
+                    bufRemaining += bytesRead
+                    bufPos = 0
+                }
+                l2Chunk.copyInto(buf, 0, bufPos, bufPos + ULong.SIZE_BYTES)
                 val uLong = readULong(buf)
+                bufPos += ULong.SIZE_BYTES
+                bufRemaining -= ULong.SIZE_BYTES
                 if (uLong == ULong.MAX_VALUE) break
                 pointOutput.add(uLong)
             }
 
-        }
+            val count = pointOutput.size
+            val bulkSize = count * (ULong.SIZE_BYTES + UShort.SIZE_BYTES)
+            val bulkBuf = ByteArray(bulkSize)
 
-        val count = pointOutput.size
-        val bulkSize = count * (ULong.SIZE_BYTES + UShort.SIZE_BYTES)
-        val bulkBuf = ByteArray(bulkSize)
-        bulkBuf.usePinned { fread(it.addressOf(0), 1u, bulkSize.toULong(), indexFp) }
+            var bulkRead = 0
+            if (bufRemaining > 0) {
+                val toCopy = minOf(bufRemaining, bulkSize)
+                l2Chunk.copyInto(bulkBuf, 0, bufPos, bufPos + toCopy)
+                bufRemaining -= toCopy
+                bufPos += toCopy
+                bulkRead = toCopy
+            }
 
-        var offset = 0
-        for (i in 0 until count) {
-            bulkBuf.copyInto(buf, 0, offset, offset + ULong.SIZE_BYTES)
-            pointInput.add(readULong(buf))
-            offset += ULong.SIZE_BYTES
-        }
-        for (i in 0 until count) {
-            bulkBuf.copyInto(buf, 0, offset, offset + UShort.SIZE_BYTES)
-            windowSizes.add(readUShort(buf))
-            offset += UShort.SIZE_BYTES
+            if (bulkRead < bulkSize) {
+                bulkBuf.usePinned { bulkPinned ->
+                    fread(bulkPinned.addressOf(bulkRead), 1u, (bulkSize - bulkRead).toULong(), indexFp)
+                }
+            }
+
+            var offset = 0
+            for (i in 0 until count) {
+                bulkBuf.copyInto(buf, 0, offset, offset + ULong.SIZE_BYTES)
+                pointInput.add(readULong(buf))
+                offset += ULong.SIZE_BYTES
+            }
+            for (i in 0 until count) {
+                bulkBuf.copyInto(buf, 0, offset, offset + UShort.SIZE_BYTES)
+                windowSizes.add(readUShort(buf))
+                offset += UShort.SIZE_BYTES
+            }
         }
 
         list.clear()
