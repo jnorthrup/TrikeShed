@@ -25,6 +25,7 @@ actual class FileBuffer actual constructor(
     @OptIn(ExperimentalForeignApi::class)
     var buffer: COpaquePointer? = null
     var file: PosixFile? = null
+    private var mappedLength: ULong = 0u
 
     actual override val a: Long by lazy {
         open()
@@ -39,12 +40,17 @@ actual class FileBuffer actual constructor(
 
     actual fun close() {
         logDebug { "closing $filename" }
-        munmap(buffer, blkSize.toULong())
+        buffer?.let { mapped ->
+            if (mappedLength > 0u) munmap(mapped, mappedLength)
+        }
         file?.close()
-        file = null; buffer = null
+        file = null
+        buffer = null
+        mappedLength = 0u
     }
 
     actual fun open(): Unit = memScoped  {
+        if (buffer != null) return
         logDebug { "opening $filename" }
         file = PosixFile(
             path = filename,
@@ -53,6 +59,7 @@ actual class FileBuffer actual constructor(
         )
         val len: ULong = if (blkSize == (-1L)) file!!.size.toULong() else blkSize.toULong()
         buffer = file!!.mmap(len, offset = initialOffset)
+        mappedLength = len
     }
 
     actual fun isOpen(): Boolean = buffer != null

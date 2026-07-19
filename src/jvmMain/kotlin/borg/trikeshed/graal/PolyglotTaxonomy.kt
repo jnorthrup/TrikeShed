@@ -1,19 +1,17 @@
 package borg.trikeshed.graal
 
-import borg.trikeshed.lib.Join
-import borg.trikeshed.lib.Series
+import org.xvm.cursor.PointcutFacet
+import borg.trikeshed.lib.MutableSeries
+import borg.trikeshed.lib.SeriesBuffer
 
 /**
  * PolyglotFacet represents different language features for pointcuts.
  */
-sealed class PolyglotFacet(
-    override val a: String = "PolyglotFacet",
-    override val b: String = "",
-) : Join<String, String> {
-    object PolyglotFunction : PolyglotFacet(b = "function")
-    object PolyglotVariable : PolyglotFacet(b = "variable")
-    object PolyglotBlock : PolyglotFacet(b = "block")
-    object Unfaceted : PolyglotFacet(b = "unfaceted")
+sealed class PolyglotFacet : PointcutFacet {
+    object PolyglotFunction : PolyglotFacet()
+    object PolyglotVariable : PolyglotFacet()
+    object PolyglotBlock : PolyglotFacet()
+    object Unfaceted : PolyglotFacet()
 }
 
 /**
@@ -28,21 +26,10 @@ data class PolyglotCoordinateRow(
 )
 
 /**
- * Simple series implementation for PolyglotTaxonomy.
- * Series<T> = Join<Int, (Int) -> T>
- */
-class SimpleSeries<T> : Series<T> {
-    private val items = mutableListOf<T>()
-    override val a: Int get() = items.size
-    override val b: (Int) -> T get() = { items[it] }
-    fun add(item: T) { items.add(item) }
-}
-
-/**
  * PolyglotTaxonomy registers these rows into the broader TrikeShed taxonomic structure.
  */
 class PolyglotTaxonomy {
-    var rows: SimpleSeries<PolyglotCoordinateRow> = SimpleSeries()
+    var rows: MutableSeries<PolyglotCoordinateRow> = SeriesBuffer()
 
     val size: Int get() = rows.a
 
@@ -52,5 +39,5 @@ class PolyglotTaxonomy {
 
     fun rowAt(index: Int): PolyglotCoordinateRow = rows.b(index)
 
-    fun getRows(): Series<PolyglotCoordinateRow> = rows
+    fun getRows(): borg.trikeshed.lib.Series<PolyglotCoordinateRow> = rows
 }

@@ -108,16 +108,96 @@ fun ConfixDoc.value(vararg path: Any): Any?         = docAt(*path)?.reify()
 // ── Reification (re-exported from Confix.kt, no duplicate here) ───────────────
 
 fun RowVec.reify(src: Series<Byte>): Any? = when (tag) {
-    borg.trikeshed.cursor.IOMemento.IoNothing             -> null
-    borg.trikeshed.cursor.IOMemento.IoBoolean             -> src[open].toInt().toChar() == 't'
-    borg.trikeshed.cursor.IOMemento.IoDouble              -> src.spanStr(open, close).toDoubleOrNull()
-    borg.trikeshed.cursor.IOMemento.IoInt                 -> src.spanLong(open, close).toInt()
-    borg.trikeshed.cursor.IOMemento.IoLong                -> src.spanLong(open, close)
-    borg.trikeshed.cursor.IOMemento.IoString              -> src.spanStr(open + 1, close - 1) // strip quotes
-    borg.trikeshed.cursor.IOMemento.IoBytes               -> ByteArray(close - open + 1) { src[open + it] }
+    borg.trikeshed.cursor.IOMemento.IoNothing -> null
+    borg.trikeshed.cursor.IOMemento.IoBoolean -> when (src[open].toInt() and 0xFF) {
+        0xF4 -> false
+        0xF5 -> true
+        else -> src[open].toInt().toChar() == 't'
+    }
+    borg.trikeshed.cursor.IOMemento.IoDouble -> decodeCborFloat(src, open)
+        ?: src.spanStr(open, close).toDoubleOrNull()
+    borg.trikeshed.cursor.IOMemento.IoInt -> src.spanLong(open, close).toInt()
+    borg.trikeshed.cursor.IOMemento.IoLong -> decodeCborLong(src, open)
+        ?: src.spanLong(open, close)
+    borg.trikeshed.cursor.IOMemento.IoString -> decodeCborText(src, open)
+        ?: src.spanStr(open + 1, close - 1)
+    borg.trikeshed.cursor.IOMemento.IoBytes -> decodeCborBytes(src, open)
+        ?: ByteArray(close - open + 1) { src[open + it] }
     borg.trikeshed.cursor.IOMemento.IoObject,
-    borg.trikeshed.cursor.IOMemento.IoArray               -> kids
-    else                            -> src.spanStr(open, close)
+    borg.trikeshed.cursor.IOMemento.IoArray -> kids
+    else -> src.spanStr(open, close)
+}
+
+private data class CborHead(val major: Int, val value: Long, val payloadOpen: Int)
+
+private fun cborHead(src: Series<Byte>, open: Int): CborHead? {
+    if (open !in 0 until src.size) return null
+    val initial = src[open].toInt() and 0xFF
+    val major = initial ushr 5
+    val additional = initial and 0x1F
+    var cursor = open + 1
+    val value = when (additional) {
+        in 0..23 -> additional.toLong()
+        24 -> src[cursor++].toLong() and 0xFF
+        25 -> {
+            val result = ((src[cursor].toInt() and 0xFF) shl 8) or (src[cursor + 1].toInt() and 0xFF)
+            cursor += 2
+            result.toLong()
+        }
+        26 -> {
+            var result = 0L
+            repeat(4) { result = (result shl 8) or (src[cursor++].toLong() and 0xFF) }
+            result
+        }
+        27 -> {
+            var result = 0L
+            repeat(8) { result = (result shl 8) or (src[cursor++].toLong() and 0xFF) }
+            result
+        }
+        else -> return null
+    }
+    return CborHead(major, value, cursor)
+}
+
+internal fun decodeCborText(src: Series<Byte>, open: Int): String? {
+    val head = cborHead(src, open) ?: return null
+    if (head.major != 3 || head.value > Int.MAX_VALUE) return null
+    return CharArray(head.value.toInt()) { offset ->
+        src[head.payloadOpen + offset].toInt().toChar()
+    }.concatToString()
+}
+
+private fun decodeCborBytes(src: Series<Byte>, open: Int): ByteArray? {
+    val head = cborHead(src, open) ?: return null
+    if (head.major != 2 || head.value > Int.MAX_VALUE) return null
+    return ByteArray(head.value.toInt()) { offset -> src[head.payloadOpen + offset] }
+}
+
+private fun decodeCborLong(src: Series<Byte>, open: Int): Long? {
+    val head = cborHead(src, open) ?: return null
+    return when (head.major) {
+        0 -> head.value
+        1 -> -1L - head.value
+        else -> null
+    }
+}
+
+private fun decodeCborFloat(src: Series<Byte>, open: Int): Double? {
+    val initial = src[open].toInt() and 0xFF
+    if (initial ushr 5 != 7) return null
+    return when (initial and 0x1F) {
+        26 -> {
+            var bits = 0
+            repeat(4) { offset -> bits = (bits shl 8) or (src[open + 1 + offset].toInt() and 0xFF) }
+            Float.fromBits(bits).toDouble()
+        }
+        27 -> {
+            var bits = 0L
+            repeat(8) { offset -> bits = (bits shl 8) or (src[open + 1 + offset].toLong() and 0xFF) }
+            Double.fromBits(bits)
+        }
+        else -> null
+    }
 }
 
 fun ConfixDoc.reify(tokenIdx: Int): Any? =

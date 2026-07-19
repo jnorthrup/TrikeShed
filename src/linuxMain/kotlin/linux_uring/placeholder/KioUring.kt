@@ -26,8 +26,9 @@ import simple.LinuxPosixFile.Companion.getDirFd
 import simple.LinuxPosixFile.Companion.namedDirAndFile
 import simple.PosixStatMode
 import kotlin.math.min
-import platform.posix.free as posix_free
-
+import platform.linux.BLKGETSIZE64 as PlatformLinuxBLKGETSIZE64
+import platform.posix.free
+import platform.posix.fstat as posix_fstat
 import platform.posix.ioctl as posix_ioctl
 import platform.posix.mmap as posix_mmap
 import platform.posix.off_t as posix_off_t

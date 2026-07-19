@@ -2,11 +2,13 @@ package borg.trikeshed.pointcut
 
 import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.atomic.AtomicReferenceArray
+import java.util.concurrent.CopyOnWriteArrayList
 
 object PointcutReporter {
     private const val BUFFER_SIZE = 100_000
     private val buffer = AtomicReferenceArray<PointcutEvent>(BUFFER_SIZE)
     private val head = AtomicInteger(0)
+    private val subscribers = CopyOnWriteArrayList<(PointcutEvent) -> Unit>()
 
     @Volatile
     var vetoCallback: ((PointcutEvent) -> Boolean)? = null
@@ -28,6 +30,12 @@ object PointcutReporter {
         buffer.set(index, event)
 
         blackboardCallback?.invoke(event)
+        subscribers.forEach { it(event) }
+    }
+
+    fun subscribe(subscriber: (PointcutEvent) -> Unit): () -> Unit {
+        subscribers.add(subscriber)
+        return { subscribers.remove(subscriber) }
     }
 
     fun getEvents(): List<PointcutEvent> {

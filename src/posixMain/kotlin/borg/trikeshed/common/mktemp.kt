@@ -3,8 +3,11 @@
 package borg.trikeshed.common
 
 import borg.trikeshed.lib.fromOctal
+import kotlinx.cinterop.ByteVar
 import kotlinx.cinterop.ExperimentalForeignApi
-import kotlinx.cinterop.cstr
+import kotlinx.cinterop.allocArray
+import kotlinx.cinterop.memScoped
+import kotlinx.cinterop.set
 import kotlinx.cinterop.toKStringFromUtf8
 import kotlinx.cinterop.convert
 import platform.posix.mkdtemp
@@ -12,11 +15,15 @@ import platform.posix.unlink
 
 /** emulates shell command*/
 actual fun mktemp(): String {
-    //cinterop
-    val template = "/tmp/tmpXXXXXX".cstr
-    val res = mkdtemp(template)
-    return res?.toKStringFromUtf8() ?: throw IllegalStateException("mkdtemp failed")
+    return createTempDirectory("tmp")
+}
 
+internal fun createTempDirectory(prefix: String): String = memScoped {
+    val template = "/tmp/$prefix-XXXXXX".encodeToByteArray()
+    val buffer = allocArray<ByteVar>(template.size + 1)
+    template.forEachIndexed { index, byte -> buffer[index] = byte }
+    buffer[template.size] = 0
+    mkdtemp(buffer)?.toKStringFromUtf8() ?: throw IllegalStateException("mkdtemp failed")
 }
 
 actual fun rm(path: String): Boolean {

@@ -3,6 +3,7 @@
 package borg.trikeshed.userspace.nio.file.spi
 
 import borg.trikeshed.PosixUringIO
+import borg.trikeshed.common.createTempDirectory
 import borg.trikeshed.lib.Join
 import borg.trikeshed.lib.Series
 import borg.trikeshed.lib.j
@@ -141,8 +142,7 @@ class LinuxFileOperations : FileOperations {
     }
     override fun resolvePath(vararg parts: String): String = parts.joinToString("/")
     override fun readZip(path: String): List<Pair<String, ByteArray>> = throw UnsupportedOperationException("readZip unsupported")
-    override fun createTempDir(prefix: String): String =
-        "/tmp/$prefix-${generateSequence { ('a'..'z').random() }.take(8).joinToString("")}"
+    override fun createTempDir(prefix: String): String = createTempDirectory(prefix)
 
     override fun open(path: String, readOnly: Boolean): Int {
         val flags = if (readOnly) O_RDONLY else (O_RDWR or O_CREAT)
@@ -153,6 +153,6 @@ class LinuxFileOperations : FileOperations {
 
     override fun size(fd: Int): Long = memScoped {
         val st = alloc<stat>()
-        if (fstat(fd, st.ptr) == 0) st.st_size else 0L
+        if (fstat(fd, st.ptr) == 0) st.st_size else -1L
     }
 }

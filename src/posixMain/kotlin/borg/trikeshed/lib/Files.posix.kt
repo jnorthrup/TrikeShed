@@ -2,6 +2,7 @@
 
 package borg.trikeshed.lib
 
+import borg.trikeshed.common.createTempDirectory
 import kotlinx.cinterop.*
 import platform.posix.*
 
@@ -165,8 +166,7 @@ actual object Files {
 
     actual fun readZip(path: String): List<Pair<String, ByteArray>> = throw UnsupportedOperationException("readZip unsupported")
 
-    actual fun createTempDir(prefix: String): String =
-        "/tmp/$prefix-${generateSequence { ('a'..'z').random() }.take(8).joinToString("")}"
+    actual fun createTempDir(prefix: String): String = createTempDirectory(prefix)
 
 
 }

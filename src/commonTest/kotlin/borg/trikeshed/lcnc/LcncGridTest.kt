@@ -22,10 +22,10 @@ class LcncGridTest {
         val page = grid.page(1, 3)
         assertEquals(2, page.rowCount)
 
-        val nameB = page.srcDocs[0].root!!.kids[0].reify(page.srcDocs[0].src)
+        val nameB = page.srcDocs[0].value("name")
         assertEquals("B", nameB)
 
-        val nameC = page.srcDocs[1].root!!.kids[0].reify(page.srcDocs[1].src)
+        val nameC = page.srcDocs[1].value("name")
         assertEquals("C", nameC)
 
         // Test formula

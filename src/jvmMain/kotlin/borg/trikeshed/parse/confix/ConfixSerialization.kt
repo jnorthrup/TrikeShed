@@ -7,6 +7,7 @@ import borg.trikeshed.cursor.IOMemento
 import borg.trikeshed.cursor.RowVec
 import borg.trikeshed.lib.j
 import borg.trikeshed.lib.size
+import borg.trikeshed.parse.yaml.YamlParser
 import kotlinx.serialization.DeserializationStrategy
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.SerialFormat
@@ -96,12 +97,10 @@ class ConfixString(
     }
 
     override fun <T> decode(deserializer: DeserializationStrategy<T>, source: String): T {
-        // wire text -> ConfixDoc (existing Syntax scanner builds the faceted index)
-        val bytes = source.encodeToByteArray()
         val doc = when (syntax) {
-            ConfixSyntax.JSON -> confixDoc(bytes, Syntax.JSON)
-            ConfixSyntax.YAML -> confixDoc(bytes, Syntax.YAML)
-            ConfixSyntax.CBOR -> confixDoc(bytes, Syntax.JSON)
+            ConfixSyntax.JSON -> confixDoc(source.encodeToByteArray(), Syntax.JSON)
+            ConfixSyntax.YAML -> docFromJsonElement(YamlParser.reify(source).toJsonElement())
+            ConfixSyntax.CBOR -> confixDoc(source.encodeToByteArray(), Syntax.JSON)
         }
         // ConfixDoc -> JsonElement (cursor walk over the faceted index)
         val element = jsonElementFromDoc(doc)
@@ -150,6 +149,16 @@ class ConfixBinary(
  */
 internal fun docFromJsonElement(element: JsonElement): ConfixDoc =
     confixDoc(element.toString().encodeToByteArray(), Syntax.JSON)
+
+private fun Any?.toJsonElement(): JsonElement = when (this) {
+    null -> JsonNull
+    is Boolean -> JsonPrimitive(this)
+    is Number -> JsonPrimitive(this)
+    is String -> JsonPrimitive(this)
+    is List<*> -> JsonArray(map { it.toJsonElement() })
+    is Map<*, *> -> JsonObject(entries.associate { (key, value) -> key.toString() to value.toJsonElement() })
+    else -> JsonPrimitive(toString())
+}
 
 /**
  * Walk a parsed [ConfixDoc]'s cursor tree into a kotlinx [JsonElement].
@@ -200,17 +209,7 @@ private fun rowVecToJson(rv: RowVec, doc: ConfixDoc): JsonElement {
 }
 
 private fun reifyKey(rv: RowVec, doc: ConfixDoc): String {
-    val src = doc.src
-    return when (rv.tag) {
-        IOMemento.IoString -> {
-            val o = rv.open + 1; val c = rv.close - 1
-            if (c >= o) CharArray(c - o + 1) { src.b(o + it).toInt().toChar() }.concatToString() else ""
-        }
-        else -> {
-            val o = rv.open; val c = rv.close
-            if (c >= o) CharArray(c - o + 1) { src.b(o + it).toInt().toChar() }.concatToString() else ""
-        }
-    }
+    return rv.reify(doc.src)?.toString().orEmpty()
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -225,8 +224,58 @@ internal object ConfixDocTextEmitter {
      */
     fun emitElement(element: JsonElement, syntax: ConfixSyntax, cfg: ConfixConfig): String {
         val sb = StringBuilder()
-        emitJsonElement(sb, element, if (cfg.prettyPrint) 0 else -1, cfg)
+        when (syntax) {
+            ConfixSyntax.YAML -> emitYamlElement(sb, element, 0)
+            else -> emitJsonElement(sb, element, if (cfg.prettyPrint) 0 else -1, cfg)
+        }
         return sb.toString()
+    }
+
+    private fun emitYamlElement(sb: StringBuilder, element: JsonElement, indent: Int) {
+        when (element) {
+            is JsonObject -> {
+                if (element.isEmpty()) { sb.append("{}"); return }
+                element.entries.forEachIndexed { index, (key, value) ->
+                    if (index > 0) sb.append('\n')
+                    sb.append(" ".repeat(indent)).append(key).append(':')
+                    if (value.isYamlScalar()) {
+                        sb.append(' ')
+                        emitYamlScalar(sb, value)
+                    } else {
+                        sb.append('\n')
+                        emitYamlElement(sb, value, indent + 2)
+                    }
+                }
+            }
+            is JsonArray -> {
+                if (element.isEmpty()) { sb.append("[]"); return }
+                element.forEachIndexed { index, value ->
+                    if (index > 0) sb.append('\n')
+                    sb.append(" ".repeat(indent)).append('-')
+                    if (value.isYamlScalar()) {
+                        sb.append(' ')
+                        emitYamlScalar(sb, value)
+                    } else {
+                        sb.append('\n')
+                        emitYamlElement(sb, value, indent + 2)
+                    }
+                }
+            }
+            else -> emitYamlScalar(sb, element)
+        }
+    }
+
+    private fun JsonElement.isYamlScalar(): Boolean =
+        this is JsonPrimitive || this === JsonNull ||
+            (this is JsonObject && isEmpty()) || (this is JsonArray && isEmpty())
+
+    private fun emitYamlScalar(sb: StringBuilder, element: JsonElement) {
+        when (element) {
+            JsonNull -> sb.append("null")
+            is JsonPrimitive -> if (element.isString) sb.append(element.toString()) else sb.append(element.content)
+            is JsonObject -> sb.append("{}")
+            is JsonArray -> sb.append("[]")
+        }
     }
 
     private fun emitJsonElement(sb: StringBuilder, element: JsonElement, indent: Int, cfg: ConfixConfig) {

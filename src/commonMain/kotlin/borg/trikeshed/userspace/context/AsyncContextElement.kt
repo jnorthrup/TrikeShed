@@ -19,3 +19,11 @@ typealias AsyncContextElement = borg.trikeshed.context.AsyncContextElement
 open class NioUserspaceElement : AsyncContextElement() {
     override val key: CoroutineContext.Key<*> get() = AsyncContextKey.NioUserspaceKey
 }
+
+open class LiburingElement : borg.trikeshed.context.LiburingElement() {
+    override val key: CoroutineContext.Key<*> get() = AsyncContextKey.LiburingKey
+}
+
+open class FanoutDispatcherElement : borg.trikeshed.context.FanoutDispatcherElement() {
+    override val key: CoroutineContext.Key<*> get() = AsyncContextKey.FanoutDispatcherKey
+}
