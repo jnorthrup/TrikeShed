@@ -547,6 +547,7 @@ ${forgeAppStyles()}
   <script>
 ${forgeAppScript()}
   </script>
+  <script src="./TrikeShed.js"></script>
 </body>
 </html>
     """.trimIndent()
