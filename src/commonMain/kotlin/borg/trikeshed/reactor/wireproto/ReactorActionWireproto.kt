@@ -1,8 +1,6 @@
 package borg.trikeshed.reactor.wireproto
 
 import borg.trikeshed.lcnc.reactor.ReactorAction
-import borg.trikeshed.isam.WireProtoSpec
-import borg.trikeshed.isam.STANDARD_WIRE_PROTO
 import borg.trikeshed.isam.FieldSynapse
 import borg.trikeshed.isam.Phase
 import borg.trikeshed.lcnc.isam.LcncEntity
@@ -79,14 +77,27 @@ fun ReactorAction.toFieldSynapse(): FieldSynapse {
  * Note: PublishEntity requires additional payload for full LcncEntity reconstruction.
  */
 fun FieldSynapse.toReactorAction(entityPayload: LcncEntity? = null): ReactorAction {
+    // Need a dummy Nuid for reconstruction since wireproto doesn't carry Nuid
+    val dummyNuid = borg.trikeshed.context.nuid.nuid(
+        borg.trikeshed.context.nuid.Capability.Custom("wireproto", "decode"),
+        borg.trikeshed.context.nuid.Nonce.RandomBytes(),
+        borg.trikeshed.context.nuid.Subnet.core
+    )
+    
     return when (opcode) {
-        OPCODE_OPENED -> ReactorAction.Opened
-        OPCODE_ACTIVATED -> ReactorAction.Activated
-        OPCODE_PUBLISH_ENTITY -> ReactorAction.PublishEntity(
-            entityPayload ?: LcncPage(id = "dummy", title = "dummy", parentId = null, contentBlocks = 0 j { throw Exception("dummy") })
+        OPCODE_OPENED -> ReactorAction.opened(dummyNuid)
+        OPCODE_ACTIVATED -> ReactorAction.activated(dummyNuid)
+        OPCODE_PUBLISH_ENTITY -> ReactorAction.publishEntity(
+            dummyNuid,
+            entityPayload ?: LcncPage(
+                id = "dummy", 
+                title = "dummy", 
+                parentId = null, 
+                contentBlocks = 0 j { throw Exception("dummy") }
+            )
         )
-        OPCODE_DRAINING -> ReactorAction.Draining
-        OPCODE_CLOSED -> ReactorAction.Closed
+        OPCODE_DRAINING -> ReactorAction.draining(dummyNuid)
+        OPCODE_CLOSED -> ReactorAction.closed(dummyNuid)
         else -> throw IllegalArgumentException("Unknown opcode for ReactorAction: $opcode")
     }
 }
