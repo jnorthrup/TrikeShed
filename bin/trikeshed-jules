@@ -1,0 +1,242 @@
+#!/usr/bin/env bash
+# bin/trikeshed-jules - TrikeShed Jules API CLI
+# Usage: trikeshed-jules <command> [args...]
+# Commands: sessions, session, pull, new, create, send, chat, approve, responses, sources, delete
+# Supports: heredocs, pipes, API key auth
+
+set -euo pipefail
+
+# =============================================================================
+# CONFIGURATION
+# =============================================================================
+JULES_API_BASE="https://jules.googleapis.com/v1alpha"
+# Jules REST API uses X-Goog-Api-Key header for auth (NOT OAuth)
+# https://developers.google.com/jules/api/reference/rest
+JULES_API_KEY="${JULES_API_KEY:-}"
+OAUTH_CLIENT_ID="${JULES_OAUTH_CLIENT_ID:-}"
+OAUTH_CLIENT_SECRET="${JULES_OAUTH_CLIENT_SECRET:-}"
+CACHE_DIR="${HOME}/.cache/jules-cli"
+TOKEN_FILE="${CACHE_DIR}/trikeshed_oauth_token"
+TOKEN_EXPIRY_FILE="${CACHE_DIR}/trikeshed_oauth_expiry"
+SCOPES="https://www.googleapis.com/auth/cloud-platform"
+
+# =============================================================================
+# UTILITIES
+# =============================================================================
+log() { echo "[$(date -u +%Y-%m-%dT%H:%M:%SZ)] $*" >&2; }
+die() { echo "ERROR: $*" >&2; exit 1; }
+require_cmd() { command -v "$1" >/dev/null 2>&1 || die "Required command '$1' not found"; }
+
+read_stdin() {
+    local data
+    data=$(cat 2>/dev/null || true)
+    echo "${data}"
+}
+
+# =============================================================================
+# OAUTH TOKEN MANAGEMENT (only used if you want OAuth fallback instead of API key)
+# =============================================================================
+mkdir -p "${CACHE_DIR}"
+
+token_valid() {
+    [[ -f "${TOKEN_FILE}" && -f "${TOKEN_EXPIRY_FILE}" ]] || return 1
+    local expiry
+    expiry=$(cat "${TOKEN_EXPIRY_FILE}" 2>/dev/null || echo 0)
+    [[ $(date +%s) -lt $((expiry - 60)) ]]
+}
+
+save_token() {
+    local token="$1"
+    local expires_in="${2:-3600}"
+    echo "${token}" > "${TOKEN_FILE}"
+    echo "$(( $(date +%s) + expires_in ))" > "${TOKEN_EXPIRY_FILE}"
+    chmod 600 "${TOKEN_FILE}" "${TOKEN_EXPIRY_FILE}"
+}
+
+# =============================================================================
+# API REQUEST HELPER - uses X-Goog-Api-Key (Jules REST API auth method)
+# =============================================================================
+api_request() {
+    local method="$1"
+    local path="$2"
+    local body="${3:-}"
+    
+    if [[ -z "${JULES_API_KEY}" ]]; then
+        die "JULES_API_KEY not set. Get one from https://developers.google.com/jules/api or set it: export JULES_API_KEY=***"
+    fi
+    
+    local url="${JULES_API_BASE}${path}"
+    
+    if [[ -n "${body}" ]]; then
+        curl -s -X "${method}" "${url}" \
+            -H "x-goog-api-key: ${JULES_API_KEY}" \
+            -H "Content-Type: application/json" \
+            -d "${body}"
+    else
+        curl -s -X "${method}" "${url}" \
+            -H "x-goog-api-key: ${JULES_API_KEY}" \
+            -H "Content-Type: application/json"
+    fi
+}
+
+# =============================================================================
+# COMMANDS
+# =============================================================================
+cmd_sessions() {
+    api_request GET "/sessions" | jq .
+}
+
+cmd_session() {
+    local session_name="${1:-}"
+    [[ -n "${session_name}" ]] || die "Session name required"
+    api_request GET "/${session_name}" | jq .
+}
+
+cmd_create() {
+    local prompt="${1:-}"
+    local title="${2:-}"
+    local require_approval="${3:-false}"
+    
+    if [[ -z "${prompt}" ]]; then
+        prompt=$(cat 2>/dev/null || true)
+    fi
+    
+    [[ -n "${prompt}" ]] || die "Prompt required (arg or stdin)"
+    
+    # Default repo source: jnorthrup/TrikeShed. Override via TRIKESHED_JULES_SOURCE env.
+    local source="${TRIKESHED_JULES_SOURCE:-sources/github/jnorthrup/TrikeShed}"
+    
+    local body
+    body=$(jq -n \
+        --arg prompt "${prompt}" \
+        --arg title "${title}" \
+        --argjson require_approval "${require_approval}" \
+        --arg source "${source}" \
+        '{prompt: $prompt, title: $title, requirePlanApproval: $require_approval, sourceContext: {source: $source}}')
+    
+    api_request POST "/sessions" "${body}" | jq .
+}
+
+cmd_send() {
+    local session_name="${1:-}"
+    local message="${2:-}"
+    
+    if [[ -z "${session_name}" ]]; then
+        die "Session name required"
+    fi
+    
+    if [[ -z "${message}" ]]; then
+        message=$(cat 2>/dev/null || true)
+    fi
+    
+    [[ -n "${message}" ]] || die "Message required (arg or stdin)"
+    
+    local body
+    body=$(jq -n --arg prompt "${message}" '{prompt: $prompt}')
+    
+    api_request POST "/${session_name}:sendMessage" "${body}" | jq .
+}
+
+cmd_approve() {
+    local session_name="${1:-}"
+    [[ -n "${session_name}" ]] || die "Session name required"
+    api_request POST "/${session_name}:approvePlan" "{}" | jq .
+}
+
+cmd_responses() {
+    local session_name="${1:-}"
+    [[ -n "${session_name}" ]] || die "Session name required"
+    api_request GET "/${session_name}/activities" | jq .
+}
+
+cmd_sources() {
+    api_request GET "/sources" | jq .
+}
+
+cmd_delete() {
+    local session_name="${1:-}"
+    [[ -n "${session_name}" ]] || die "Session name required"
+    api_request DELETE "/${session_name}" | jq .
+}
+
+cmd_pull() {
+    local session_name="${1:-}"
+    [[ -n "${session_name}" ]] || die "Session name required"
+
+    # Delegate to official jules binary for pull + apply
+    if command -v jules >/dev/null 2>&1; then
+        log "Pulling session ${session_name} via jules binary..."
+        jules remote pull --session "${session_name}" --apply
+    else
+        die "jules binary not found in PATH. Install jules CLI to use pull."
+    fi
+}
+
+show_help() {
+    cat <<'EOF'
+Usage: trikeshed-jules <command> [args...]
+
+Commands:
+  sessions, list              List all Jules sessions
+  session <name>, get <name>  Get session details
+  pull <name>                 Pull session (delegates to `jules remote pull --apply`)
+  new "prompt" [title]        Create new session (prompt from arg or stdin)
+  create "prompt" [title]     Alias for new
+  send <session> "message"    Send message to session (arg or stdin)
+  chat <session> "message"    Alias for send
+  approve <session>           Approve session plan
+  responses <session>, activities  Get session activities
+  sources                     List sources
+  delete <session>            Delete session
+  --help, -h                  Show this help
+  --version, -v               Show version
+
+Input:
+  - Prompt/message can be passed as argument or read from stdin (pipe/heredoc)
+  - If no prompt/message argument provided, reads from stdin
+
+Environment (REQUIRED):
+  JULES_API_KEY               API key from https://developers.google.com/jules/api
+                              (uses X-Goog-Api-Key header per Jules REST API spec)
+
+Examples:
+  trikeshed-jules sessions
+  trikeshed-jules new "Implement feature X"
+  echo "Refactor module Y" | trikeshed-jules create
+  trikeshed-jules create <<'EOF'
+  Multi-line prompt
+  with details
+  EOF
+  trikeshed-jules send 12345 "Continue implementation"
+  trikeshed-jules approve 12345
+  trikeshed-jules pull 12345
+EOF
+}
+
+show_version() {
+    echo "trikeshed-jules 1.0.1"
+}
+
+# =============================================================================
+# MAIN
+# =============================================================================
+require_cmd curl
+require_cmd jq
+
+CMD="${1:-}"
+shift || true
+
+case "${CMD}" in
+    --help|-h)          show_help ;;
+    --version|-v)       show_version ;;
+    sessions|list)      cmd_sessions ;;
+    session|get)        cmd_session "$@" ;;
+    pull)               cmd_pull "$@" ;;
+    new|create)         cmd_create "$@" ;;
+    send|chat)          cmd_send "$@" ;;
+    approve)            cmd_approve "$@" ;;
+    responses|activities) cmd_responses "$@" ;;
+    sources)            cmd_sources "$@" ;;
+    delete)             cmd_delete "$@" ;;
+    *)                  show_help; die "Unknown command: ${CMD}" ;;
+esac
