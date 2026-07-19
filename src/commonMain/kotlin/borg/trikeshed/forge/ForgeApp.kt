@@ -399,6 +399,146 @@ fun forgeAppHtml(): String {
     baseSeed["gallery"] = ForgeGalleryCatalog.toJsonValue()
     baseSeed["blackboard"] = forgeBlackboardSeed()
     val seed = htmlEscape(JsonSupport.stringify(baseSeed))
+    return """
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="theme-color" content="#090d13" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <link rel="manifest" href="./manifest.webmanifest" />
+  <link rel="icon" href="./icons/forge-icon.svg" type="image/svg+xml" />
+  <link rel="apple-touch-icon" href="./icons/forge-icon-maskable.svg" />
+  <title>TrikeShed Forge workspace</title>
+  <style>
+${forgeAppStyles()}
+  </style>
+</head>
+<body>
+  <div id="blackboard" class="blackboard">
+    <div id="blackboard-canvas" class="blackboard-canvas">
+      <div class="app-shell">
+        <aside class="rail">
+          <div class="brand panel">
+            <div class="eyebrow">Forge local-first</div>
+            <h1>Page, board, field</h1>
+            <p>CRUD on the same local-first work graph, with an RTS-style zoom surface that opens fractal detail around the selected card.</p>
+            <div class="toolbar compact">
+              <button class="btn primary" id="add-item-top">New work item</button>
+              <button class="btn" id="reset-workspace">Reset local state</button>
+            </div>
+          </div>
+          <div class="panel section-block">
+            <div class="section-head">
+              <h2>Use cases</h2>
+              <p>Load document + board patterns into the same workspace.</p>
+            </div>
+            <div id="usecase-root" class="usecase-list"></div>
+          </div>
+          <div class="panel section-block">
+            <div class="section-head">
+              <h2>Work items</h2>
+              <p>Document blocks and board cards are the same local objects.</p>
+            </div>
+            <div id="nav-root" class="nav-list"></div>
+          </div>
+          <div class="panel section-block">
+            <div class="section-head">
+              <h2>Widget Gallery</h2>
+              <p>Forge widget catalog with per-target support matrix.</p>
+            </div>
+            <div id="gallery-root" class="gallery-list">${galleryHtml()}</div>
+          </div>
+        </aside>
+        <main class="editor">
+          <div id="doc-root" class="page"></div>
+        </main>
+        <main class="graph-pane">
+      <div class="panel section-block" style="height:100%; display:grid; grid-template-rows:auto 1fr auto;">
+        <div class="section-head">
+          <h2>RTS / Causal Graph</h2>
+          <p>Force-directed causal graph — drag nodes, scroll to zoom, click to inspect</p>
+        </div>
+        <div class="graph-toolbar" style="display:flex; gap:8px; align-items:center; padding:8px 0;">
+          <label class="zoom-stack" for="graph-zoom-slider" style="display:grid; gap:4px; color:var(--muted); font-size:11px; text-transform:uppercase; letter-spacing:.08em;">
+            <span>Zoom</span>
+            <input id="graph-zoom-slider" type="range" min="0.2" max="3" step="0.05" value="1" style="width:140px;" />
+          </label>
+          <button class="btn" id="btn-graph-fit">Fit</button>
+          <button class="btn" id="btn-graph-center">Center</button>
+          <button class="btn primary" id="btn-graph-seed">Seed Demo</button>
+        </div>
+        <div id="graph-spatial-shell" class="graph-spatial-shell" style="flex:1; position:relative; min-height:500px; border:1px solid var(--line2); border-radius:18px; background:radial-gradient(circle at top, rgba(122,162,247,.08), rgba(8,12,18,.96) 56%); overflow:hidden; cursor:grab;">
+          <svg id="graph-spatial-root" class="graph-spatial-root" viewBox="0 0 1200 720" preserveAspectRatio="xMidYMid meet" style="width:100%; height:100%; display:block;"></svg>
+        </div>
+        <div class="graph-status" style="display:flex; gap:8px; flex-wrap:wrap; padding-top:12px;">
+          <span class="status-chip"><span class="dot"></span>Force sim active</span>
+          <span class="status-chip"><span class="dot"></span>Graph: <span id="graph-stat-nodes">0</span> nodes, <span id="graph-stat-links">0</span> links</span>
+        </div>
+      </div>
+    </main>
+    <aside class="board-pane">
+      <div class="panel section-block">
+        <div class="section-head">
+          <h2>RTS / fractal field</h2>
+          <p>Zoom from workspace lanes into card-level checklist detail without leaving the board.</p>
+        </div>
+        <div class="space-toolbar">
+          <label class="zoom-stack" for="zoom-slider">
+            <span>Zoom</span>
+            <input id="zoom-slider" type="range" min="0.55" max="2.8" step="0.05" />
+          </label>
+          <div class="toolbar compact">
+            <button class="btn" id="focus-board">Whole board</button>
+            <button class="btn" id="focus-selected">Selected card</button>
+            <button class="btn" id="toggle-depth">2.5D depth</button>
+          </div>
+        </div>
+        <div class="space-caption"><span id="zoom-label"></span></div>
+        <div id="spatial-shell" class="spatial-shell">
+          <svg id="spatial-root" class="spatial-root" viewBox="0 0 1200 720" preserveAspectRatio="xMidYMid meet"></svg>
+        </div>
+      </div>
+      <div class="panel section-block">
+        <div class="section-head">
+          <h2>Kanban board</h2>
+          <p>Move the same items you edit in the page. CRUD stays local-first.</p>
+        </div>
+        <div id="board-root" class="column-stack"></div>
+      </div>
+      <div class="panel section-block">
+        <div class="section-head">
+          <h2>Cascade grid</h2>
+          <p>CouchDB Cascade metric rollup via view-server tool.</p>
+        </div>
+        <div id="cascade-grid-root" class="cascade-grid"></div>
+      </div>
+    </aside>
+      </div>
+    </div>
+    <div class="bb-hud">
+      <div class="bb-hud-corner bb-hud-tl"><button class="bb-btn bb-hud-btn" id="hud-reset" title="Reset view (0)">⌂</button></div>
+      <div class="bb-hud-corner bb-hud-tr"><button class="bb-btn bb-hud-btn" id="hud-depth" title="Cycle depth (d)">◈</button></div>
+      <div class="bb-hud-corner bb-hud-bl"><button class="bb-btn bb-hud-btn" id="hud-fit" title="Fit all (f)">⤢</button></div>
+      <div class="bb-hud-corner bb-hud-br"><button class="bb-btn bb-hud-btn" id="hud-center" title="Center (c)">◎</button></div>
+      <div class="bb-hud-title">
+        <span id="hud-title-left">Forge</span>
+        <span id="hud-zoom-pill" class="bb-zoom-pill">1.0×</span>
+        <span id="hud-title-right">Blackboard</span>
+      </div>
+    </div>
+  </div>
+  <div id="reactor-root" class="status-strip"></div>
+  <script id="forge-seed" type="application/json">$seed</script>
+  <script>
+${forgeAppScript()}
+  </script>
+</body>
+</html>
+    """.trimIndent()
+}
 
     return borg.trikeshed.forge.generated.ForgeAssets.indexHtml
         .replace("{{STYLES}}", forgeAppStyles())
@@ -408,6 +548,304 @@ fun forgeAppHtml(): String {
 }
 
 private fun forgeAppStyles(): String = borg.trikeshed.forge.generated.ForgeAssets.stylesCss
+private fun forgeAppStyles(): String = """
+    :root {
+      --bg:#090d13;
+      --pane:#111824;
+      --pane2:#0d131d;
+      --line:#1b2635;
+      --line2:#263548;
+      --ink:#dbe7f3;
+      --muted:#7e8da0;
+      --blue:#7aa2f7;
+      --cyan:#7dcfff;
+      --green:#9ece6a;
+      --amber:#e0af68;
+      --red:#f7768e;
+      --shadow:0 18px 44px rgba(0,0,0,.28);
+    }
+    * { box-sizing:border-box; }
+    html, body {
+      margin:0;
+      min-height:100%;
+      background:radial-gradient(circle at top, #101a27 0%, var(--bg) 52%);
+      color:var(--ink);
+      font-family:Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+    }
+    button, input, textarea, select { font:inherit; }
+    .app-shell {
+      min-height:100vh;
+      position:relative;
+      background:linear-gradient(180deg, rgba(255,255,255,.015), rgba(255,255,255,0));
+    }
+    .app-shell > * { position:absolute; }
+    .rail { border-right:1px solid var(--line); padding:16px; display:grid; gap:14px; background:rgba(9,13,19,.88); left:0; top:0; width:260px; height:100%; overflow:auto; }
+    .editor { padding:18px; overflow:auto; background:linear-gradient(180deg, rgba(9,13,19,.52), rgba(9,13,19,.16)); border-right:1px solid var(--line); left:260px; top:0; width:500px; height:100%; }
+    .graph-pane { padding:18px; overflow:auto; background:linear-gradient(180deg, rgba(9,13,19,.52), rgba(9,13,19,.16)); left:760px; top:0; width:600px; height:100%; }
+    .board-pane { border-left:1px solid var(--line); padding:18px; display:grid; gap:14px; background:rgba(9,13,19,.94); overflow:auto; left:1360px; top:0; width:500px; height:100%; }
+    .panel {
+      background:linear-gradient(180deg, rgba(18,25,36,.97), rgba(12,18,28,.95));
+      border:1px solid var(--line);
+      border-radius:18px;
+      box-shadow:var(--shadow);
+    }
+    .brand { padding:16px; }
+    .section-block { padding:14px; }
+    .eyebrow { color:var(--cyan); font-size:11px; text-transform:uppercase; letter-spacing:.16em; font-weight:800; }
+    .brand h1 { margin:10px 0 8px; font-size:24px; line-height:1.1; }
+    .brand p, .section-head p, .status-note, .space-caption { color:var(--muted); font-size:12px; line-height:1.55; }
+    .section-head { margin-bottom:12px; }
+    .section-head h2 { margin:0 0 6px; font-size:16px; }
+    .toolbar { display:flex; flex-wrap:wrap; gap:8px; }
+    .toolbar.compact { margin-top:12px; }
+    .btn, .status-btn, .ghost-btn {
+      border:1px solid var(--line2);
+      border-radius:12px;
+      background:rgba(17,24,36,.95);
+      color:var(--ink);
+      min-height:38px;
+      padding:0 12px;
+      cursor:pointer;
+    }
+    .btn.primary { background:rgba(122,162,247,.18); border-color:rgba(122,162,247,.45); }
+    .status-btn { min-width:38px; padding:0; }
+    .ghost-btn { background:rgba(9,13,19,.55); color:var(--muted); }
+    .usecase-list, .nav-list, .column-stack, .checklist { display:grid; gap:10px; }
+    .usecase-card, .nav-card, .item-card, .board-column, .board-card { border:1px solid var(--line); border-radius:16px; background:rgba(17,24,36,.95); box-shadow:var(--shadow); }
+    .usecase-card, .nav-card { width:100%; text-align:left; padding:12px; cursor:pointer; }
+    .usecase-card:hover, .nav-card:hover, .board-card:hover { border-color:rgba(122,162,247,.45); }
+    .nav-card.active, .board-card.active, .item-card.selected { border-color:var(--blue); box-shadow:0 0 0 1px rgba(122,162,247,.24), var(--shadow); }
+    .usecase-name, .nav-name, .board-title { font-size:14px; font-weight:700; }
+    .usecase-summary, .nav-meta, .board-meta { margin-top:6px; color:var(--muted); font-size:12px; line-height:1.5; white-space:pre-wrap; }
+    .page { max-width:760px; margin:0 auto; }
+    .page-head {
+      display:grid;
+      grid-template-columns:minmax(0, 1.1fr) minmax(240px, .9fr) auto;
+      gap:12px;
+      margin-bottom:14px;
+      align-items:end;
+    }
+    .title-input, .item-title, .notes-input, .check-input, .page-notes { width:100%; border:none; outline:none; background:transparent; color:var(--ink); }
+    .title-input { font-size:28px; font-weight:800; letter-spacing:-.03em; min-height:56px; }
+    .page-notes, .notes-input, .check-input { resize:vertical; line-height:1.6; }
+    .page-notes-wrap, .notes-wrap, .field select { border:1px solid var(--line2); border-radius:14px; background:rgba(8,12,18,.82); }
+    .page-notes-wrap, .notes-wrap { padding:10px 12px; }
+    .page-notes { min-height:56px; color:var(--muted); }
+    .dialog-shell {
+      display:grid;
+      grid-template-columns:minmax(0, 1fr);
+      gap:12px;
+      align-items:start;
+    }
+    .dialog-card, .dialog-sidecard {
+      border:1px solid var(--line);
+      border-radius:20px;
+      background:linear-gradient(180deg, rgba(17,24,36,.98), rgba(10,15,23,.96));
+      box-shadow:var(--shadow);
+    }
+    .dialog-card { padding:14px; }
+    .dialog-sidecard { padding:14px; display:grid; gap:12px; }
+    .dialog-head {
+      display:flex;
+      justify-content:space-between;
+      gap:10px;
+      align-items:flex-start;
+      margin-bottom:12px;
+    }
+    .dialog-title-stack { display:grid; gap:8px; min-width:0; }
+    .dialog-kicker { color:var(--cyan); font-size:11px; font-weight:800; letter-spacing:.14em; text-transform:uppercase; }
+    .dialog-title {
+      width:100%;
+      border:none;
+      outline:none;
+      background:transparent;
+      color:var(--ink);
+      font-size:22px;
+      font-weight:780;
+      letter-spacing:-.03em;
+      padding:0;
+    }
+    .dialog-meta-line { color:var(--muted); font-size:12px; line-height:1.5; }
+    .dialog-chip-row { display:flex; flex-wrap:wrap; gap:8px; }
+    .dialog-chip {
+      display:inline-flex;
+      align-items:center;
+      min-height:28px;
+      padding:0 10px;
+      border-radius:999px;
+      border:1px solid rgba(122,162,247,.28);
+      background:rgba(122,162,247,.12);
+      color:var(--ink);
+      font-size:12px;
+    }
+    .dialog-grid { display:grid; grid-template-columns:repeat(2, minmax(0, 1fr)); gap:10px; margin-bottom:12px; }
+    .dialog-field { display:grid; gap:8px; }
+    .dialog-field label { font-size:11px; color:var(--muted); text-transform:uppercase; letter-spacing:.08em; }
+    .dialog-field textarea, .dialog-field input, .dialog-field select {
+      width:100%;
+      border:1px solid var(--line2);
+      border-radius:14px;
+      background:rgba(8,12,18,.88);
+      color:var(--ink);
+      padding:12px 14px;
+      outline:none;
+    }
+    .dialog-field textarea { min-height:96px; resize:vertical; line-height:1.55; }
+    .dialog-actions { display:flex; flex-wrap:wrap; gap:8px; margin:4px 0 12px; }
+    .dialog-section { display:grid; gap:10px; }
+    .dialog-section-head { display:flex; justify-content:space-between; gap:10px; align-items:center; }
+    .dialog-section-head h3, .dialog-sidecard h3 { margin:0; font-size:14px; }
+    .dialog-hint { color:var(--muted); font-size:12px; line-height:1.5; }
+    .dialog-summary-list { display:grid; gap:10px; }
+    .dialog-summary {
+      width:100%;
+      text-align:left;
+      border:1px solid var(--line2);
+      border-radius:14px;
+      background:rgba(8,12,18,.78);
+      color:var(--ink);
+      padding:12px;
+      cursor:pointer;
+    }
+    .dialog-summary:hover { border-color:rgba(122,162,247,.45); }
+    .dialog-summary.active { border-color:var(--blue); box-shadow:0 0 0 1px rgba(122,162,247,.22) inset; }
+    .dialog-summary strong { display:block; font-size:13px; }
+    .dialog-summary span { display:block; margin-top:6px; color:var(--muted); font-size:12px; line-height:1.45; white-space:pre-wrap; }
+    .item-card { padding:16px; margin-bottom:14px; }
+    .item-title { font-size:24px; font-weight:760; margin-bottom:12px; }
+    .item-meta { display:grid; grid-template-columns:repeat(2, minmax(0, 1fr)); gap:10px; margin-bottom:12px; }
+    .field { display:grid; gap:6px; }
+    .field label { font-size:11px; color:var(--muted); text-transform:uppercase; letter-spacing:.08em; }
+    .field select { color:var(--ink); padding:10px 12px; min-height:42px; }
+    .notes-input { min-height:96px; }
+    .check-row {
+      display:grid;
+      grid-template-columns:auto 1fr auto;
+      gap:8px;
+      align-items:start;
+      border:1px solid var(--line2);
+      border-radius:12px;
+      padding:8px 10px;
+      background:rgba(8,12,18,.82);
+    }
+    .check-row input[type=checkbox] { margin-top:6px; }
+    .check-input { min-height:32px; }
+    .board-column { overflow:hidden; }
+    .board-column .head {
+      padding:12px 14px;
+      border-bottom:1px solid var(--line);
+      display:flex;
+      justify-content:space-between;
+      gap:10px;
+    }
+    .board-column .name { font-weight:700; }
+    .board-column .count { color:var(--muted); font-size:12px; }
+    .board-list { padding:12px; display:grid; gap:10px; }
+    .board-card { padding:12px; }
+    .board-actions { display:flex; gap:8px; margin-top:10px; }
+    .empty {
+      color:var(--muted);
+      font-size:12px;
+      border:1px dashed var(--line2);
+      border-radius:12px;
+      padding:14px;
+      text-align:center;
+    }
+    .status-strip {
+      border-top:1px solid var(--line);
+      background:rgba(9,13,19,.96);
+      padding:12px 16px 16px;
+    }
+    .status-row {
+      display:flex;
+      flex-wrap:wrap;
+      gap:8px;
+      align-items:center;
+    }
+    .status-chip {
+      display:inline-flex;
+      align-items:center;
+      gap:8px;
+      min-height:32px;
+      padding:0 12px;
+      border-radius:999px;
+      border:1px solid var(--line2);
+      background:rgba(8,12,18,.82);
+      font-size:12px;
+    }
+    .status-chip .label { color:var(--muted); text-transform:uppercase; letter-spacing:.08em; font-size:10px; }
+    .status-chip .value { color:var(--ink); font-weight:700; }
+    .status-trail {
+      margin-top:8px;
+      display:flex;
+      flex-wrap:wrap;
+      gap:8px;
+    }
+    .status-pill {
+      display:inline-flex;
+      align-items:center;
+      min-height:26px;
+      padding:0 10px;
+      border-radius:999px;
+      border:1px solid rgba(122,162,247,.28);
+      background:rgba(122,162,247,.12);
+      font-size:11px;
+      color:var(--ink);
+    }
+    .status-note { margin-top:8px; }
+    .space-toolbar {
+      display:grid;
+      grid-template-columns:minmax(0,1fr) auto;
+      gap:12px;
+      align-items:end;
+      margin-bottom:10px;
+    }
+    .zoom-stack { display:grid; gap:6px; color:var(--muted); font-size:11px; text-transform:uppercase; letter-spacing:.08em; }
+    .zoom-stack input { width:100%; }
+    .spatial-shell {
+      position:relative;
+      min-height:540px;
+      border:1px solid var(--line2);
+      border-radius:18px;
+      background:radial-gradient(circle at top, rgba(122,162,247,.08), rgba(8,12,18,.96) 56%);
+      overflow:hidden;
+      cursor:grab;
+    }
+    .spatial-shell.dragging { cursor:grabbing; }
+    .spatial-root { width:100%; height:540px; display:block; }
+    @media (max-width: 1380px) {
+      .app-shell { grid-template-columns:250px minmax(0, 1fr); }
+      .board-pane { grid-column:1 / -1; border-left:none; border-top:1px solid var(--line); }
+    }
+    @media (max-width: 900px) {
+      .app-shell { grid-template-columns:1fr; }
+      .rail { border-right:none; border-bottom:1px solid var(--line); }
+      .editor { padding:16px; }
+      .page-head, .dialog-grid { grid-template-columns:1fr; }
+      .item-meta, .space-toolbar { grid-template-columns:1fr; }
+      .board-pane { border-top:1px solid var(--line); }
+    }
+    .cascade-grid { display:grid; gap:6px; }
+    .cascade-grid table { width:100%; border-collapse:collapse; font-size:12px; }
+    .cascade-grid th { text-align:left; color:var(--muted); text-transform:uppercase; letter-spacing:.08em; font-size:10px; padding:6px 8px; border-bottom:1px solid var(--line2); }
+    .cascade-grid td { padding:6px 8px; border-bottom:1px solid var(--line); color:var(--ink); }
+    .cascade-grid td.num { text-align:right; font-variant-numeric:tabular-nums; }
+
+    /* ── Blackboard MDI shell ── */
+    .blackboard { position:relative; width:100vw; height:100vh; overflow:hidden; background:radial-gradient(circle at 50% 30%, #101a27 0%, var(--bg) 60%); }
+    .blackboard-canvas { position:absolute; inset:0; transform-origin:0 0; transition:transform 0.3s cubic-bezier(.2,.8,.2,1); }
+    .bb-hud { position:absolute; inset:0; pointer-events:none; z-index:100; }
+    .bb-hud-corner { position:absolute; pointer-events:auto; }
+    .bb-hud-tl { top:12px; left:12px; }
+    .bb-hud-tr { top:12px; right:12px; }
+    .bb-hud-bl { bottom:12px; left:12px; }
+    .bb-hud-br { bottom:12px; right:12px; }
+    .bb-hud-btn { width:36px; height:36px; border-radius:50%; font-size:16px; display:flex; align-items:center; justify-content:center; background:rgba(9,13,19,.9); backdrop-filter:blur(8px); border:1px solid var(--line); color:var(--ink); cursor:pointer; }
+    .bb-hud-btn:hover { border-color:var(--blue); background:var(--line); }
+    .bb-hud-title { position:absolute; top:12px; left:50%; transform:translateX(-50%); display:flex; gap:12px; align-items:center; pointer-events:auto; background:rgba(9,13,19,.9); padding:6px 16px; border-radius:20px; border:1px solid var(--line); backdrop-filter:blur(8px); }
+    .bb-hud-title span { font-size:12px; font-weight:600; color:var(--muted); }
+    .bb-zoom-pill { background:var(--blue); color:#fff !important; padding:2px 8px; border-radius:10px; font-size:11px !important; }
+""".trimIndent()
 
 private fun forgeAppScript(): String = forgePersistenceScript()
 

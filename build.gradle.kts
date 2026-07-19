@@ -238,6 +238,15 @@ kotlin {
         val macosMain = maybeCreate("macosMain").apply { dependsOn(posixMain) }
         val macosTest = maybeCreate("macosTest").apply { dependsOn(posixTest) }
 
+        val androidMain = maybeCreate("androidMain").apply { dependsOn(commonMain) }
+        val androidTest = maybeCreate("androidTest").apply { dependsOn(commonTest) }
+
+        findByName("macosMain")?.dependsOn(posixMain)
+        findByName("macosTest")?.dependsOn(posixTest)
+        findByName("macosX64Main")?.dependsOn(posixMain)
+        findByName("macosX64Test")?.dependsOn(posixTest)
+        findByName("linuxMain")?.dependsOn(posixMain)
+        findByName("linuxTest")?.dependsOn(posixTest)
         // T7 browser storage: IndexedDB test doubles for JS/Wasm storage tests.
         getByName("jsTest") {
             dependencies {

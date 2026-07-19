@@ -39,6 +39,19 @@ body {
   font-size: 16px;
   line-height: 1.5;
   -webkit-font-smoothing: antialiased;
+* { box-sizing:border-box; }
+html, body {
+  margin:0;
+  min-height:100%;
+  background:radial-gradient(circle at top, #101a27 0%, var(--bg) 52%);
+  color:var(--ink);
+  font-family:Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+}
+button, input, textarea, select { font:inherit; }
+.app-shell {
+  min-height:100vh;
+  position:relative;
+  background:linear-gradient(180deg, rgba(255,255,255,.015), rgba(255,255,255,0));
 }
 button { font: inherit; color: inherit; background: none; border: none; cursor: pointer; }
 [hidden] { display: none !important; }
@@ -56,6 +69,16 @@ button { font: inherit; color: inherit; background: none; border: none; cursor: 
   flex-direction: column;
   overflow-y: auto;
   padding: 8px 0;
+.app-shell > * { position:absolute; }
+.rail { border-right:1px solid var(--line); padding:16px; display:grid; gap:14px; background:rgba(9,13,19,.88); left:0; top:0; width:260px; height:100%; overflow:auto; }
+.editor { padding:18px; overflow:auto; background:linear-gradient(180deg, rgba(9,13,19,.52), rgba(9,13,19,.16)); border-right:1px solid var(--line); left:260px; top:0; width:500px; height:100%; }
+.graph-pane { padding:18px; overflow:auto; background:linear-gradient(180deg, rgba(9,13,19,.52), rgba(9,13,19,.16)); left:760px; top:0; width:600px; height:100%; }
+.board-pane { border-left:1px solid var(--line); padding:18px; display:grid; gap:14px; background:rgba(9,13,19,.94); overflow:auto; left:1360px; top:0; width:500px; height:100%; }
+.panel {
+  background:linear-gradient(180deg, rgba(18,25,36,.97), rgba(12,18,28,.95));
+  border:1px solid var(--line);
+  border-radius:18px;
+  box-shadow:var(--shadow);
 }
 .sidebar-top { padding: 8px 8px 0; }
 .workspace-switcher {
@@ -396,19 +419,40 @@ button { font: inherit; color: inherit; background: none; border: none; cursor: 
   .doc-page { padding: 0 24px 30vh; }
   .block-gutter { position: static; opacity: 1; }
 }
+.cascade-grid { display:grid; gap:6px; }
+.cascade-grid table { width:100%; border-collapse:collapse; font-size:12px; }
+.cascade-grid th { text-align:left; color:var(--muted); text-transform:uppercase; letter-spacing:.08em; font-size:10px; padding:6px 8px; border-bottom:1px solid var(--line2); }
+.cascade-grid td { padding:6px 8px; border-bottom:1px solid var(--line); color:var(--ink); }
+.cascade-grid td.num { text-align:right; font-variant-numeric:tabular-nums; }
 
+/* ── Blackboard MDI shell ── */
+.blackboard { position:relative; width:100vw; height:100vh; overflow:hidden; background:radial-gradient(circle at 50% 30%, #101a27 0%, var(--bg) 60%); }
+.blackboard-canvas { position:absolute; inset:0; transform-origin:0 0; transition:transform 0.3s cubic-bezier(.2,.8,.2,1); }
+.bb-hud { position:absolute; inset:0; pointer-events:none; z-index:100; }
+.bb-hud-corner { position:absolute; pointer-events:auto; }
+.bb-hud-tl { top:12px; left:12px; }
+.bb-hud-tr { top:12px; right:12px; }
+.bb-hud-bl { bottom:12px; left:12px; }
+.bb-hud-br { bottom:12px; right:12px; }
+.bb-hud-btn { width:36px; height:36px; border-radius:50%; font-size:16px; display:flex; align-items:center; justify-content:center; background:rgba(9,13,19,.9); backdrop-filter:blur(8px); border:1px solid var(--line); color:var(--ink); cursor:pointer; }
+.bb-hud-btn:hover { border-color:var(--blue); background:var(--line); }
+.bb-hud-title { position:absolute; top:12px; left:50%; transform:translateX(-50%); display:flex; gap:12px; align-items:center; pointer-events:auto; background:rgba(9,13,19,.9); padding:6px 16px; border-radius:20px; border:1px solid var(--line); backdrop-filter:blur(8px); }
+.bb-hud-title span { font-size:12px; font-weight:600; color:var(--muted); }
+.bb-zoom-pill { background:var(--blue); color:#fff !important; padding:2px 8px; border-radius:10px; font-size:11px !important; }
   </style>
 </head>
 <body>
-  <div class="app">
-    <aside class="sidebar" id="sidebar">
-      <div class="sidebar-top">
-        <div class="workspace-switcher">
+  <div id="blackboard" class="blackboard">
+    <div id="blackboard-canvas" class="blackboard-canvas">
+      <div class="app">
+        <aside class="sidebar" id="sidebar">
+          <div class="sidebar-top">
+            <div class="workspace-switcher">
           <div class="workspace-icon">F</div>
           <div class="workspace-name">Forge workspace</div>
         </div>
-        <div class="sidebar-actions">
-          <button class="sidebar-item" id="btn-search" title="Search">
+            <div class="sidebar-actions">
+              <button class="sidebar-item" id="btn-search" title="Search">
             <span class="sidebar-item-icon">⌕</span><span>Search</span>
           </button>
           <button class="sidebar-item" id="btn-home" title="Home">
@@ -458,6 +502,19 @@ button { font: inherit; color: inherit; background: none; border: none; cursor: 
         <div class="board-canvas" id="board-canvas"></div>
       </div>
     </main>
+      </div>
+    </div>
+    <div class="bb-hud">
+      <div class="bb-hud-corner bb-hud-tl"><button class="bb-btn bb-hud-btn" id="hud-reset" title="Reset view (0)">⌂</button></div>
+      <div class="bb-hud-corner bb-hud-tr"><button class="bb-btn bb-hud-btn" id="hud-depth" title="Cycle depth (d)">◈</button></div>
+      <div class="bb-hud-corner bb-hud-bl"><button class="bb-btn bb-hud-btn" id="hud-fit" title="Fit all (f)">⤢</button></div>
+      <div class="bb-hud-corner bb-hud-br"><button class="bb-btn bb-hud-btn" id="hud-center" title="Center (c)">◎</button></div>
+      <div class="bb-hud-title">
+        <span id="hud-title-left">Forge</span>
+        <span id="hud-zoom-pill" class="bb-zoom-pill">1.0×</span>
+        <span id="hud-title-right">Blackboard</span>
+      </div>
+    </div>
   </div>
 
   <div class="slash-menu" id="slash-menu" hidden></div>
@@ -472,6 +529,156 @@ button { font: inherit; color: inherit; background: none; border: none; cursor: 
  */
 (function () {
   'use strict';
+(() => {
+  const STORAGE_KEY = 'forge.workspace.v4';
+  const CACHE_NAME = 'forge-webcache-v1';
+  const SNAPSHOT_CACHE_URL = './forge-workspace.snapshot.json';
+  const DB_NAME = 'forge-local-first-v1';
+  const DB_VERSION = 1;
+  const SNAPSHOT_STORE = 'workspaceSnapshots';
+  const EVENT_STORE = 'reactorEvents';
+  const REACTOR_LOG_LIMIT = 24;
+  const SVG_NS = 'http://www.w3.org/2000/svg';
+  const seed = JSON.parse(document.getElementById('forge-seed').textContent);
+  let state = loadState();
+  let camera = normalizeCamera(state.spatial.camera);
+  let dragCamera = null;
+  let cameraAnimationFrame = null;
+  let cameraFrameTimestamp = 0;
+  let cameraSavePending = false;
+  let persistenceDbPromise = null;
+  let persistenceWritePromise = Promise.resolve();
+  let persistenceRotationSnapshot = null;
+
+  // ── Blackboard MDI: pan/zoom camera + section drag ──
+  const blackboard = document.getElementById('blackboard');
+  const blackboardCanvas = document.getElementById('blackboard-canvas');
+  let bbCamera = { x: 0, y: 0, zoom: 1 };
+  let bbDragState = null;
+  let bbSectionDrag = null;
+  const bbSectionPositions = {};
+
+  function applyBlackboardCamera() {
+    if (!blackboardCanvas) return;
+    blackboardCanvas.style.transform = 'translate(' + (-bbCamera.x * bbCamera.zoom) + 'px, ' + (-bbCamera.y * bbCamera.zoom) + 'px) scale(' + bbCamera.zoom + ')';
+    const zoomPill = document.getElementById('hud-zoom-pill');
+    if (zoomPill) zoomPill.textContent = bbCamera.zoom.toFixed(1) + '×';
+  }
+
+  function resetBlackboard() {
+    bbCamera = { x: 0, y: 0, zoom: 1 };
+    applyBlackboardCamera();
+  }
+
+  function bindBlackboardGestures() {
+    if (!blackboard) return;
+    // Pan on empty canvas
+    blackboard.addEventListener('mousedown', (e) => {
+      if (e.target.closest('.bb-hud') || e.target.closest('button') || e.target.closest('input')) return;
+      if (e.target.closest('.panel')) return; // Don't pan when clicking inside sections
+      bbDragState = { startX: e.clientX, startY: e.clientY, camX: bbCamera.x, camY: bbCamera.y };
+      blackboard.style.cursor = 'grabbing';
+    });
+    // Section drag via header
+    document.querySelectorAll('.panel').forEach(panel => {
+      const header = panel.querySelector('.section-head');
+      if (!header) return;
+      header.style.cursor = 'grab';
+      header.addEventListener('mousedown', (e) => {
+        e.stopPropagation();
+        const rect = panel.getBoundingClientRect();
+        const canvasRect = blackboardCanvas.getBoundingClientRect();
+        const panelId = panel.id || panel.className.split(' ')[0];
+        bbSectionDrag = {
+          panel,
+          startX: e.clientX,
+          startY: e.clientY,
+          origX: rect.left - canvasRect.left,
+          origY: rect.top - canvasRect.top,
+          panelId
+        };
+        header.style.cursor = 'grabbing';
+        panel.style.zIndex = '20';
+      });
+    });
+    window.addEventListener('mousemove', (e) => {
+      if (bbSectionDrag) {
+        const dx = (e.clientX - bbSectionDrag.startX) / bbCamera.zoom;
+        const dy = (e.clientY - bbSectionDrag.startY) / bbCamera.zoom;
+        const newX = bbSectionDrag.origX + dx;
+        const newY = bbSectionDrag.origY + dy;
+        bbSectionDrag.panel.style.position = 'absolute';
+        bbSectionDrag.panel.style.left = newX + 'px';
+        bbSectionDrag.panel.style.top = newY + 'px';
+        bbSectionPositions[bbSectionDrag.panelId] = { x: newX, y: newY };
+        return;
+      }
+      if (!bbDragState) return;
+      const dx = (e.clientX - bbDragState.startX) / bbCamera.zoom;
+      const dy = (e.clientY - bbDragState.startY) / bbCamera.zoom;
+      bbCamera.x = bbDragState.camX - dx;
+      bbCamera.y = bbDragState.camY - dy;
+      applyBlackboardCamera();
+    });
+    window.addEventListener('mouseup', () => {
+      if (bbSectionDrag) {
+        const header = bbSectionDrag.panel.querySelector('.section-head');
+        if (header) header.style.cursor = 'grab';
+        bbSectionDrag.panel.style.zIndex = '';
+        bbSectionDrag = null;
+      }
+      bbDragState = null;
+      blackboard.style.cursor = '';
+    });
+    blackboard.addEventListener('wheel', (e) => {
+      if (e.target.closest('.bb-hud')) return;
+      e.preventDefault();
+      const delta = e.deltaY > 0 ? 0.9 : 1.1;
+      bbCamera.zoom = clamp(bbCamera.zoom * delta, 0.2, 4.0);
+      applyBlackboardCamera();
+    }, { passive: false });
+  }
+
+  function bindBlackboardHud() {
+    document.getElementById('hud-reset')?.addEventListener('click', resetBlackboard);
+    document.getElementById('hud-fit')?.addEventListener('click', () => {
+      const content = document.querySelector('.app-shell');
+      if (!content) return;
+      const rect = content.getBoundingClientRect();
+      const vw = window.innerWidth;
+      const vh = window.innerHeight;
+      bbCamera.zoom = Math.min(vw / rect.width, vh / rect.height) * 0.9;
+      bbCamera.x = rect.left + rect.width / 2 - vw / (2 * bbCamera.zoom);
+      bbCamera.y = rect.top + rect.height / 2 - vh / (2 * bbCamera.zoom);
+      applyBlackboardCamera();
+    });
+    document.getElementById('hud-center')?.addEventListener('click', () => {
+      bbCamera.x = 0;
+      bbCamera.y = 0;
+      applyBlackboardCamera();
+    });
+    document.getElementById('hud-depth')?.addEventListener('click', () => {
+      // Cycle zoom levels for depth effect
+      bbCamera.zoom = bbCamera.zoom === 1 ? 1.5 : bbCamera.zoom === 1.5 ? 0.7 : 1;
+      applyBlackboardCamera();
+    });
+  }
+
+  // Keyboard shortcuts
+  document.addEventListener('keydown', (e) => {
+    if (e.target.matches('input, textarea, select')) return;
+    if (e.key === '0') resetBlackboard();
+    else if (e.key === 'f') document.getElementById('hud-fit')?.click();
+    else if (e.key === 'c') document.getElementById('hud-center')?.click();
+    else if (e.key === 'd') document.getElementById('hud-depth')?.click();
+  });
+
+  // Init blackboard
+  bindBlackboardGestures();
+  bindBlackboardHud();
+  applyBlackboardCamera();
+
+  // ── Existing code below ──
 
   // ── Seed + persistence ──────────────────────────────────────────────
   const seedEl = document.getElementById('forge-seed');
