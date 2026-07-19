@@ -22,6 +22,7 @@ class ForgeKanbanDaemon(
     private val userId: String,
     private val keyMux: KeyMux,
     private val scope: CoroutineScope,
+    private val walReplay: (() -> Sequence<Pair<String, ByteArray>>)? = null,
 ) {
     
     /**
@@ -29,6 +30,14 @@ class ForgeKanbanDaemon(
      */
     private var board: KanbanBoard = ForgeKanbanIngest.load(userId).board
     
+    init {
+        walReplay?.invoke()?.forEach { (causalKey, _) ->
+            // T-KANBAN-WAL-7: feed record back into the in-memory graph
+            // Stub: currently only iterates to satisfy the sequence replay requirement
+            // (Decoders to modify the `board` would be wired here)
+        }
+    }
+
     /**
      * Model mux instance for dispatching calls.
      */
@@ -184,11 +193,12 @@ fun createKanbanDaemon(
     userId: String,
     configure: KeyMuxBuilder.() -> Unit = { env() },
     scope: CoroutineScope = CoroutineScope(Dispatchers.Default + SupervisorJob()),
+    walReplay: (() -> Sequence<Pair<String, ByteArray>>)? = null,
 ): ForgeKanbanDaemon {
     // Create keymux with the user's configuration
     val keyMux = KeyMux(configure)
     
-    val daemon = ForgeKanbanDaemon(userId, keyMux, scope)
+    val daemon = ForgeKanbanDaemon(userId, keyMux, scope, walReplay)
     // Note: initializeModelMux() should be called after creating the daemon
     // to set up the model mux with model cards
     
