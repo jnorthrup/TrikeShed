@@ -426,4 +426,61 @@ class CowBPlusTree(
             }
         }
     }
+
+    /**
+     * Freeze the current root into an immutable snapshot.
+     * Since the tree is already COW, this just returns the CID.
+     */
+    fun snapshot(rootCid: ContentId): ContentId {
+        return rootCid
+    }
+
+    /**
+     * Serializes a delta between two CIDs. Returns a list of serialized blocks
+     * (the nodes reachable from `toCid` that are not reachable from `fromCid`).
+     */
+    fun send(fromCid: ContentId?, toCid: ContentId): List<ByteArray> {
+        val fromNodes = mutableSetOf<ContentId>()
+        if (fromCid != null) {
+            fun collectFrom(cid: ContentId) {
+                if (!fromNodes.add(cid)) return
+                val node = loadNode(cid)
+                if (node is BTreeNode.Internal) {
+                    for (child in node.children) {
+                        collectFrom(child)
+                    }
+                }
+            }
+            collectFrom(fromCid)
+        }
+
+        val delta = mutableListOf<ByteArray>()
+        fun collectTo(cid: ContentId) {
+            if (fromNodes.contains(cid)) return
+            val bytes = casStore.get(cid) ?: throw IllegalStateException("Node not found: $cid")
+            val node = CowBPlusTreeCodec.decode(bytes)
+            if (node is BTreeNode.Internal) {
+                for (child in node.children) {
+                    collectTo(child)
+                }
+            }
+            delta.add(bytes)
+        }
+        collectTo(toCid)
+        return delta
+    }
+
+    /**
+     * Applies a serialized delta to the target tree (inserts blocks into the CAS).
+     * The last block is typically the root of the delta, but we just insert all
+     * blocks into the CAS. Returns the ContentId of the last block inserted.
+     */
+    fun recv(delta: List<ByteArray>): ContentId {
+        require(delta.isNotEmpty()) { "Delta cannot be empty" }
+        var lastCid: ContentId? = null
+        for (bytes in delta) {
+            lastCid = casStore.put(bytes)
+        }
+        return lastCid!!
+    }
 }
