@@ -58,16 +58,25 @@ fun forgePersistenceScript(): String = """
       header.style.cursor = 'grab';
       header.addEventListener('mousedown', (e) => {
         e.stopPropagation();
+        const appShell = document.querySelector('.app-shell');
+        if (!appShell) return;
+        // Switch to absolute positioning mode
+        if (!appShell.classList.contains('dragging')) {
+          appShell.classList.add('dragging');
+          // Position all panels absolutely
+          document.querySelectorAll('.panel').forEach(p => {
+            const r = p.getBoundingClientRect();
+            const canvasRect = blackboardCanvas.getBoundingClientRect();
+            p.style.position = 'absolute';
+            p.style.left = (r.left - canvasRect.left) + 'px';
+            p.style.top = (r.top - canvasRect.top) + 'px';
+            p.style.width = r.width + 'px';
+            p.style.margin = '0';
+          });
+        }
         const rect = panel.getBoundingClientRect();
         const canvasRect = blackboardCanvas.getBoundingClientRect();
         const panelId = panel.id || panel.className.split(' ')[0];
-        // Make panel absolutely positioned for dragging
-        if (panel.style.position !== 'absolute') {
-          panel.style.position = 'absolute';
-          panel.style.left = (rect.left - canvasRect.left) + 'px';
-          panel.style.top = (rect.top - canvasRect.top) + 'px';
-          panel.style.width = rect.width + 'px';
-        }
         bbSectionDrag = {
           panel,
           startX: e.clientX,

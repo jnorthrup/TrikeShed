@@ -601,7 +601,11 @@ private fun forgeAppStyles(): String = """
       display:grid;
       grid-template-columns:260px minmax(320px, 0.8fr) 1.2fr minmax(400px, 1.3fr);
       background:linear-gradient(180deg, rgba(255,255,255,.015), rgba(255,255,255,0));
+      position:relative;
     }
+    .app-shell > * { position:relative; }
+    .app-shell.dragging { display:block; }
+    .app-shell.dragging > * { position:absolute; }
     .rail { border-right:1px solid var(--line); padding:16px; display:grid; gap:14px; background:rgba(9,13,19,.88); }
     .editor { padding:18px; overflow:auto; background:linear-gradient(180deg, rgba(9,13,19,.52), rgba(9,13,19,.16)); border-right:1px solid var(--line); }
     .graph-pane { padding:18px; overflow:auto; background:linear-gradient(180deg, rgba(9,13,19,.52), rgba(9,13,19,.16)); }

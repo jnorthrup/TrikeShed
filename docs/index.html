@@ -40,7 +40,11 @@ button, input, textarea, select { font:inherit; }
   display:grid;
   grid-template-columns:260px minmax(320px, 0.8fr) 1.2fr minmax(400px, 1.3fr);
   background:linear-gradient(180deg, rgba(255,255,255,.015), rgba(255,255,255,0));
+  position:relative;
 }
+.app-shell > * { position:relative; }
+.app-shell.dragging { display:block; }
+.app-shell.dragging > * { position:absolute; }
 .rail { border-right:1px solid var(--line); padding:16px; display:grid; gap:14px; background:rgba(9,13,19,.88); }
 .editor { padding:18px; overflow:auto; background:linear-gradient(180deg, rgba(9,13,19,.52), rgba(9,13,19,.16)); border-right:1px solid var(--line); }
 .graph-pane { padding:18px; overflow:auto; background:linear-gradient(180deg, rgba(9,13,19,.52), rgba(9,13,19,.16)); }
@@ -496,16 +500,25 @@ button, input, textarea, select { font:inherit; }
       header.style.cursor = 'grab';
       header.addEventListener('mousedown', (e) => {
         e.stopPropagation();
+        const appShell = document.querySelector('.app-shell');
+        if (!appShell) return;
+        // Switch to absolute positioning mode
+        if (!appShell.classList.contains('dragging')) {
+          appShell.classList.add('dragging');
+          // Position all panels absolutely
+          document.querySelectorAll('.panel').forEach(p => {
+            const r = p.getBoundingClientRect();
+            const canvasRect = blackboardCanvas.getBoundingClientRect();
+            p.style.position = 'absolute';
+            p.style.left = (r.left - canvasRect.left) + 'px';
+            p.style.top = (r.top - canvasRect.top) + 'px';
+            p.style.width = r.width + 'px';
+            p.style.margin = '0';
+          });
+        }
         const rect = panel.getBoundingClientRect();
         const canvasRect = blackboardCanvas.getBoundingClientRect();
         const panelId = panel.id || panel.className.split(' ')[0];
-        // Make panel absolutely positioned for dragging
-        if (panel.style.position !== 'absolute') {
-          panel.style.position = 'absolute';
-          panel.style.left = (rect.left - canvasRect.left) + 'px';
-          panel.style.top = (rect.top - canvasRect.top) + 'px';
-          panel.style.width = rect.width + 'px';
-        }
         bbSectionDrag = {
           panel,
           startX: e.clientX,
