@@ -361,22 +361,22 @@ class ViewServer {
         val op = ast.value("op") as? String ?: return null
         val mapExpr = ast.value("map")
 
-        val values = if (mapExpr != null) {
-            group.map { evaluateExpr(mapExpr, it.value) }
+        val values: Series<Any?> = if (mapExpr != null) {
+            group.size j { i: Int -> evaluateExpr(mapExpr, group[i].value) }
         } else {
-            group.map { it.value }
+            group.size j { i: Int -> group[i].value }
         }
 
         return when (op) {
-            "sum" -> values.sumOf { it.toDoubleValue() }
+            "sum" -> values.view.sumOf { it.toDoubleValue() }
             "count" -> values.size.toLong()
-            "min" -> values.minOfOrNull { it.toDoubleValue(Double.MAX_VALUE) } ?: 0.0
-            "max" -> values.maxOfOrNull { it.toDoubleValue(Double.MIN_VALUE) } ?: 0.0
+            "min" -> values.view.minOfOrNull { it.toDoubleValue(Double.MAX_VALUE) } ?: 0.0
+            "max" -> values.view.maxOfOrNull { it.toDoubleValue(Double.MIN_VALUE) } ?: 0.0
             "avg" -> {
-                if (values.isEmpty()) 0.0
-                else values.sumOf { it.toDoubleValue() } / values.size
+                if (values.size == 0) 0.0
+                else values.view.sumOf { it.toDoubleValue() } / values.size
             }
-            "concat" -> values.joinToString("") { it?.toString() ?: "" }
+            "concat" -> values.view.joinToString("") { it?.toString() ?: "" }
             "collect" -> values.toList()
             else -> null
         }
@@ -391,12 +391,12 @@ class ViewServer {
 
         return when (op) {
             "+" -> {
-                val evaluated = args.map { evaluateExpr(it, rowValue) }
-                evaluated.sumOf { it.toDoubleValue() }
+                val evaluated: Series<Any?> = args.size j { i: Int -> evaluateExpr(args[i], rowValue) }
+                evaluated.view.sumOf { it.toDoubleValue() }
             }
             "*" -> {
-                val evaluated = args.map { evaluateExpr(it, rowValue) }
-                evaluated.fold(1.0) { acc, e -> acc * e.toDoubleValue(1.0) }
+                val evaluated: Series<Any?> = args.size j { i: Int -> evaluateExpr(args[i], rowValue) }
+                evaluated.view.fold(1.0) { acc, e -> acc * e.toDoubleValue(1.0) }
             }
             "value" -> rowValue
             else -> null
