@@ -448,43 +448,45 @@ ${forgeAppStyles()}
   </style>
 </head>
 <body>
-  <div class="app-shell">
-    <aside class="rail">
-      <div class="brand panel">
-        <div class="eyebrow">Forge local-first</div>
-        <h1>Page, board, field</h1>
-        <p>CRUD on the same local-first work graph, with an RTS-style zoom surface that opens fractal detail around the selected card.</p>
-        <div class="toolbar compact">
-          <button class="btn primary" id="add-item-top">New work item</button>
-          <button class="btn" id="reset-workspace">Reset local state</button>
-        </div>
-      </div>
-      <div class="panel section-block">
-        <div class="section-head">
-          <h2>Use cases</h2>
-          <p>Load document + board patterns into the same workspace.</p>
-        </div>
-        <div id="usecase-root" class="usecase-list"></div>
-      </div>
-      <div class="panel section-block">
-        <div class="section-head">
-          <h2>Work items</h2>
-          <p>Document blocks and board cards are the same local objects.</p>
-        </div>
-        <div id="nav-root" class="nav-list"></div>
-      </div>
-      <div class="panel section-block">
-        <div class="section-head">
-          <h2>Widget Gallery</h2>
-          <p>Forge widget catalog with per-target support matrix.</p>
-        </div>
-        <div id="gallery-root" class="gallery-list">${galleryHtml()}</div>
-      </div>
-    </aside>
-    <main class="editor">
-      <div id="doc-root" class="page"></div>
-    </main>
-    <main class="graph-pane">
+  <div id="blackboard" class="blackboard">
+    <div id="blackboard-canvas" class="blackboard-canvas">
+      <div class="app-shell">
+        <aside class="rail">
+          <div class="brand panel">
+            <div class="eyebrow">Forge local-first</div>
+            <h1>Page, board, field</h1>
+            <p>CRUD on the same local-first work graph, with an RTS-style zoom surface that opens fractal detail around the selected card.</p>
+            <div class="toolbar compact">
+              <button class="btn primary" id="add-item-top">New work item</button>
+              <button class="btn" id="reset-workspace">Reset local state</button>
+            </div>
+          </div>
+          <div class="panel section-block">
+            <div class="section-head">
+              <h2>Use cases</h2>
+              <p>Load document + board patterns into the same workspace.</p>
+            </div>
+            <div id="usecase-root" class="usecase-list"></div>
+          </div>
+          <div class="panel section-block">
+            <div class="section-head">
+              <h2>Work items</h2>
+              <p>Document blocks and board cards are the same local objects.</p>
+            </div>
+            <div id="nav-root" class="nav-list"></div>
+          </div>
+          <div class="panel section-block">
+            <div class="section-head">
+              <h2>Widget Gallery</h2>
+              <p>Forge widget catalog with per-target support matrix.</p>
+            </div>
+            <div id="gallery-root" class="gallery-list">${galleryHtml()}</div>
+          </div>
+        </aside>
+        <main class="editor">
+          <div id="doc-root" class="page"></div>
+        </main>
+        <main class="graph-pane">
       <div class="panel section-block" style="height:100%; display:grid; grid-template-rows:auto 1fr auto;">
         <div class="section-head">
           <h2>RTS / Causal Graph</h2>
@@ -545,6 +547,19 @@ ${forgeAppStyles()}
         <div id="cascade-grid-root" class="cascade-grid"></div>
       </div>
     </aside>
+      </div>
+    </div>
+    <div class="bb-hud">
+      <div class="bb-hud-corner bb-hud-tl"><button class="bb-btn bb-hud-btn" id="hud-reset" title="Reset view (0)">⌂</button></div>
+      <div class="bb-hud-corner bb-hud-tr"><button class="bb-btn bb-hud-btn" id="hud-depth" title="Cycle depth (d)">◈</button></div>
+      <div class="bb-hud-corner bb-hud-bl"><button class="bb-btn bb-hud-btn" id="hud-fit" title="Fit all (f)">⤢</button></div>
+      <div class="bb-hud-corner bb-hud-br"><button class="bb-btn bb-hud-btn" id="hud-center" title="Center (c)">◎</button></div>
+      <div class="bb-hud-title">
+        <span id="hud-title-left">Forge</span>
+        <span id="hud-zoom-pill" class="bb-zoom-pill">1.0×</span>
+        <span id="hud-title-right">Blackboard</span>
+      </div>
+    </div>
   </div>
   <div id="reactor-root" class="status-strip"></div>
   <script id="forge-seed" type="application/json">$seed</script>
@@ -838,6 +853,21 @@ private fun forgeAppStyles(): String = """
     .cascade-grid th { text-align:left; color:var(--muted); text-transform:uppercase; letter-spacing:.08em; font-size:10px; padding:6px 8px; border-bottom:1px solid var(--line2); }
     .cascade-grid td { padding:6px 8px; border-bottom:1px solid var(--line); color:var(--ink); }
     .cascade-grid td.num { text-align:right; font-variant-numeric:tabular-nums; }
+
+    /* ── Blackboard MDI shell ── */
+    .blackboard { position:relative; width:100vw; height:100vh; overflow:hidden; background:radial-gradient(circle at 50% 30%, #101a27 0%, var(--bg) 60%); }
+    .blackboard-canvas { position:absolute; inset:0; transform-origin:0 0; transition:transform 0.3s cubic-bezier(.2,.8,.2,1); }
+    .bb-hud { position:absolute; inset:0; pointer-events:none; z-index:100; }
+    .bb-hud-corner { position:absolute; pointer-events:auto; }
+    .bb-hud-tl { top:12px; left:12px; }
+    .bb-hud-tr { top:12px; right:12px; }
+    .bb-hud-bl { bottom:12px; left:12px; }
+    .bb-hud-br { bottom:12px; right:12px; }
+    .bb-hud-btn { width:36px; height:36px; border-radius:50%; font-size:16px; display:flex; align-items:center; justify-content:center; background:rgba(9,13,19,.9); backdrop-filter:blur(8px); border:1px solid var(--line); color:var(--ink); cursor:pointer; }
+    .bb-hud-btn:hover { border-color:var(--blue); background:var(--line); }
+    .bb-hud-title { position:absolute; top:12px; left:50%; transform:translateX(-50%); display:flex; gap:12px; align-items:center; pointer-events:auto; background:rgba(9,13,19,.9); padding:6px 16px; border-radius:20px; border:1px solid var(--line); backdrop-filter:blur(8px); }
+    .bb-hud-title span { font-size:12px; font-weight:600; color:var(--muted); }
+    .bb-zoom-pill { background:var(--blue); color:#fff !important; padding:2px 8px; border-radius:10px; font-size:11px !important; }
 """.trimIndent()
 
 private fun forgeAppScript(): String = forgePersistenceScript()
