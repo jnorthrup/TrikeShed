@@ -95,6 +95,7 @@ cmd_session() {
 cmd_create() {
     local prompt="${1:-}"
     local title="${2:-}"
+    local require_approval="${3:-false}"
 
     if [[ -z "${prompt}" ]]; then
         prompt=$(cat 2>/dev/null || true)
@@ -102,17 +103,45 @@ cmd_create() {
 
     [[ -n "${prompt}" ]] || die "Prompt required (arg or stdin)"
 
-    # Delegate to the native `jules` binary — it has the right OAuth
-    # auth and uses the /v1alpha/sessions API directly. The custom
-    # API-key curl path in this script 400s because session creation
-    # requires OAuth, not API-key auth (see
-    # https://developers.google.com/jules/api).
+    # Prefer the native `jules` binary — it has OAuth + the correct
+    # sourceContext shape (source + githubRepoContext union). Override
+    # via TRIKESHED_JULES_REPO env var.
     local repo="${TRIKESHED_JULES_REPO:-jnorthrup/TrikeShed}"
     if [[ -n "${title}" ]]; then
         printf '%s' "${prompt}" | jules remote new --repo "${repo}" --session "${title}" 2>&1
-    else
-        printf '%s' "${prompt}" | jules remote new --repo "${repo}" 2>&1
+        return
     fi
+    printf '%s' "${prompt}" | jules remote new --repo "${repo}" 2>&1
+}
+
+# cmd_create_api: raw REST path mirroring the API exactly. Used only
+# for debugging — prefer cmd_create (delegates to the native jules
+# binary with OAuth). The Session resource shape per the REST ref:
+#   { prompt, sourceContext: { source, githubRepoContext: {...} },
+#     title?, requirePlanApproval? }
+# sourceContext is a oneof union: githubRepoContext | ...; passing only
+# {source} is rejected as INVALID_ARGUMENT.
+cmd_create_api() {
+    local prompt="${1:-}"
+    local title="${2:-}"
+    local require_approval="${3:-false}"
+
+    [[ -n "${prompt}" ]] || prompt=$(cat 2>/dev/null || true)
+    [[ -n "${prompt}" ]] || die "Prompt required (arg or stdin)"
+
+    local source="${TRIKESHED_JULES_SOURCE:-sources/github/jnorthrup/TrikeShed}"
+    local starting_branch="${TRIKESHED_JULES_BRANCH:-master}"
+
+    local body
+    body=$(jq -n \
+        --arg prompt "${prompt}" \
+        --arg title "${title}" \
+        --argjson require_approval "${require_approval}" \
+        --arg source "${source}" \
+        --arg starting_branch "${starting_branch}" \
+        '{prompt: $prompt, title: $title, requirePlanApproval: $require_approval, sourceContext: {source: $source, githubRepoContext: {startingBranch: $starting_branch}}}')
+
+    api_request POST "/sessions" "${body}" | jq .
 }
 
 cmd_send() {
@@ -220,6 +249,7 @@ show_version() {
 # =============================================================================
 require_cmd curl
 require_cmd jq
+require_cmd jules
 
 CMD="${1:-}"
 shift || true
@@ -231,6 +261,7 @@ case "${CMD}" in
     session|get)        cmd_session "$@" ;;
     pull)               cmd_pull "$@" ;;
     new|create)         cmd_create "$@" ;;
+    new-api)            cmd_create_api "$@" ;;
     send|chat)          cmd_send "$@" ;;
     approve)            cmd_approve "$@" ;;
     responses|activities) cmd_responses "$@" ;;
