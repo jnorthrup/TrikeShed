@@ -1,6 +1,7 @@
 package modelmux.acp
 
 import borg.trikeshed.lib.*
+import borg.trikeshed.lib.`▶`
 
 // ═══════════════════════════════════════════
 // ACP type algebra — everything is Join/Series
@@ -54,14 +55,14 @@ object AcpCodec {
         append("{")
         append("\"model\":\"${meta.a}\",")   // version field reused as model id at wire level
         append("\"messages\":[")
-        msgs.view.forEachIndexed { i, (role, content) ->
+        msgs.`▶`.forEachIndexed { i, (role, content) ->
             if (i > 0) append(",")
             append("{\"role\":\"$role\",\"content\":${jsonStr(content)}}")
         }
         append("]")
         if (tools.size > 0) {
             append(",\"tools\":[")
-            tools.view.forEachIndexed { i, (name, schema) ->
+            tools.`▶`.forEachIndexed { i, (name, schema) ->
                 if (i > 0) append(",")
                 append("{\"type\":\"function\",\"function\":{\"name\":\"$name\",\"parameters\":$schema}}")
             }

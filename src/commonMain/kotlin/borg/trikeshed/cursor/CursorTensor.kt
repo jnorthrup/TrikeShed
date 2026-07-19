@@ -2,6 +2,7 @@ package borg.trikeshed.cursor
 
 import borg.trikeshed.isam.meta.IOMemento
 import borg.trikeshed.lib.Series
+import borg.trikeshed.lib.`▶`
 import borg.trikeshed.lib.j
 import borg.trikeshed.lib.*
 import kotlin.collections.forEach
@@ -235,7 +236,7 @@ object CursorTensorReifier {
 
    fun selectNumericColumns(meta: Series<ColumnMeta>): IntArray {
         val selected = mutableListOf<Int>()
-        meta.view.forEachIndexed { column, value ->
+        meta.`▶`.forEachIndexed { column, value ->
             if (isNumeric(value.type)) {
                 selected.add(column)
             }

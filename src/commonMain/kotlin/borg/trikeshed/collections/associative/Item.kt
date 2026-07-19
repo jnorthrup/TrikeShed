@@ -5,7 +5,7 @@ package borg.trikeshed.collections.associative
 import borg.trikeshed.lib.Join
 import borg.trikeshed.lib.Series
 import borg.trikeshed.lib.j
-import borg.trikeshed.lib.view
+import borg.trikeshed.lib.`▶`
 
 /**
  * Item: the shared metamodel for JSON / YAML / CBOR.
@@ -21,7 +21,7 @@ sealed interface Item {
     data class Map(val entries: Series<Join<String, Item>>) : Item {
         val size: Int get() = entries.a
         operator fun get(key: String): Item? {
-            for (e in entries.view) {
+            for (e in entries.`▶`) {
                 if (e.a == key) return e.b
             }
             return null
@@ -93,7 +93,7 @@ fun Item.toAny(): Any? = when (this) {
     is Item.Bin -> value
     is Item.Map -> {
         val m = LinkedHashMap<String, Any?>(size)
-        for (e in entries.view) {
+        for (e in entries.`▶`) {
             m[e.a] = e.b.toAny()
         }
         m

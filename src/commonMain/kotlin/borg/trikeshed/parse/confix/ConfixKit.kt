@@ -4,6 +4,7 @@ package borg.trikeshed.parse.confix
 
 import borg.trikeshed.cursor.*
 import borg.trikeshed.lib.*
+import borg.trikeshed.lib.`▶`
 
 // ─────────────────────────────────────────────────────────────────────────────
 // CONFIX KIT — parse entry points, navigation, BlackBoard alignment
@@ -292,7 +293,7 @@ fun List<Any?>.toJsPath(): JsPath {
 
 fun ConfixDoc.navigate(path: JsPath): ConfixCell? {
     var cur: ConfixCell? = rootCell ?: return null
-    for (elem in path.view) {
+    for (elem in path.`▶`) {
         cur = when {
             elem.key != null -> cur?.get(elem.key!!)
             elem.idx != null -> cur?.get(elem.idx!!)

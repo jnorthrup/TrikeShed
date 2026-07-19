@@ -1,6 +1,7 @@
 package borg.trikeshed.couch
 
 import borg.trikeshed.lib.*
+import borg.trikeshed.lib.`▶`
 import borg.trikeshed.mutable.MutableSeries
 import borg.trikeshed.mutable.mutableSeriesOf
 
@@ -39,7 +40,7 @@ class CouchChangesProjection {
     fun afterSequence(sequence: Long): Series<CouchCommittedFrame> {
         // Binary search could be used if series supported it, but simple scan works for now
         var startIdx = -1
-        for ((i, frame) in frames.view.withIndex()) {
+        for ((i, frame) in frames.`▶`.withIndex()) {
             if (frame.sequence > sequence) {
                 startIdx = i
                 break

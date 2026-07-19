@@ -155,7 +155,7 @@ class ByteSeries(
             mark != other.mark -> return false
             size != other.size -> return false
             else -> {
-                for ((x, y) in this.view.zip(other.view)) if (x != y) return false
+                for ((x, y) in this.`▶`.zip(other.`▶`)) if (x != y) return false
                 return true
             }
         }

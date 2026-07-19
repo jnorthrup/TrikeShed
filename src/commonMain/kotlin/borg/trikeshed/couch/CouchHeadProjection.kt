@@ -1,6 +1,7 @@
 package borg.trikeshed.couch
 
 import borg.trikeshed.lib.*
+import borg.trikeshed.lib.`▶`
 import borg.trikeshed.mutable.MutableSeries
 import borg.trikeshed.mutable.mutableSeriesOf
 import borg.trikeshed.cursor.Cursor
@@ -58,7 +59,7 @@ class CouchHeadProjection {
 
     private fun rebuildDocIndex() {
         docIndex.clear()
-        for ((i, doc) in docs.view.withIndex()) {
+        for ((i, doc) in docs.`▶`.withIndex()) {
             docIndex[doc.id] = i
         }
     }

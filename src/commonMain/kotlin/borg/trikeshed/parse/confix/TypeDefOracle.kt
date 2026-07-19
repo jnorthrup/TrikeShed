@@ -4,6 +4,7 @@ package borg.trikeshed.parse.confix
 
 import borg.trikeshed.cursor.*
 import borg.trikeshed.lib.*
+import borg.trikeshed.lib.`▶`
 
 // ─────────────────────────────────────────────────────────────────────────────
 // TYPEDEF ORACLE — typedef collection + lattice build
@@ -78,7 +79,7 @@ class TypeDefOracle {
 
     fun parseCBORTypeDefs(doc: ConfixDoc) {
         val roots = doc.roots
-        for (row in roots.view) {
+        for (row in roots.`▶`) {
             if (row.tag != IOMemento.IoObject) continue
             val kids = row.kids
             var name: String? = null
@@ -113,7 +114,7 @@ class TypeDefOracle {
     fun ingestOracleJson(jsonText: String) {
         val doc = confixDoc(jsonText)
         val rows: Series<ConfixCell> = doc.docAt("rows")?.cellKids ?: return
-        for (elem in rows.view) {
+        for (elem in rows.`▶`) {
             val kind  = elem["kind"]?.reify() as? String
             val ngram = elem["ngram"]?.reify() as? String
             if (kind == null || ngram == null) continue

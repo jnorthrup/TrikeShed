@@ -7,7 +7,7 @@ import borg.trikeshed.cursor.IOMemento
 import borg.trikeshed.cursor.RowVec
 import borg.trikeshed.lib.j
 import borg.trikeshed.lib.size
-import borg.trikeshed.lib.view
+import borg.trikeshed.lib.`▶`
 import borg.trikeshed.parse.yaml.YamlParser
 import kotlinx.serialization.DeserializationStrategy
 import kotlinx.serialization.ExperimentalSerializationApi
@@ -191,7 +191,7 @@ private fun rowVecToJson(rv: RowVec, doc: ConfixDoc): JsonElement {
         IOMemento.IoArray -> {
             val kids = rv.kids
             val items = ArrayList<JsonElement>(kids.size)
-            for (kid in kids.view) items.add(rowVecToJson(kid, doc))
+            for (kid in kids.`▶`) items.add(rowVecToJson(kid, doc))
             JsonArray(items)
         }
         else -> {
@@ -393,7 +393,7 @@ internal object ConfixDocTextEmitter {
         when (syntax) {
             ConfixSyntax.JSON -> {
                 sb.append("[")
-                kids.view.forEachIndexed { i, kid ->
+                kids.`▶`.forEachIndexed { i, kid ->
                     if (i > 0) sb.append(",")
                     if (pretty) sb.append("\n").append(" ".repeat(indent + 2))
                     emitRow(sb, kid, doc, syntax, if (pretty) indent + 2 else -1, cfg)
@@ -402,7 +402,7 @@ internal object ConfixDocTextEmitter {
                 sb.append("]")
             }
             ConfixSyntax.YAML -> {
-                kids.view.forEachIndexed { i, kid ->
+                kids.`▶`.forEachIndexed { i, kid ->
                     if (i > 0 || indent > 0) sb.append("\n").append(" ".repeat(indent))
                     sb.append("- ")
                     when (kid.tag) {
@@ -413,7 +413,7 @@ internal object ConfixDocTextEmitter {
             }
             ConfixSyntax.CBOR -> {
                 sb.append("[")
-                kids.view.forEachIndexed { i, kid ->
+                kids.`▶`.forEachIndexed { i, kid ->
                     if (i > 0) sb.append(",")
                     emitRow(sb, kid, doc, syntax, -1, cfg)
                 }
