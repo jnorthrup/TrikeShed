@@ -1,7 +1,9 @@
 package borg.trikeshed.classfile.model
 
 import borg.trikeshed.lib.Series
+import borg.trikeshed.lib.filter
 import borg.trikeshed.lib.j
+import borg.trikeshed.lib.rem
 import borg.trikeshed.lib.toSeries
 import borg.trikeshed.lib.view
 
@@ -57,19 +59,12 @@ typealias PointcutCoordinateSeries = Series<PointcutCoordinate>
  * `/` is the value-side reduction gateway: keep coordinates of a kind as a Series.
  * This keeps downstream `α` transforms lazy and uses `.view` only at stdlib boundaries.
  */
-operator fun PointcutCoordinateSeries.div(kind: BytecodePointcutKind): PointcutCoordinateSeries {
-    val kept = view.filter { it.kind == kind }.toList()
-    return kept.toSeries()
-}
+operator fun PointcutCoordinateSeries.div(kind: BytecodePointcutKind): PointcutCoordinateSeries =
+    this.filter(fun (it: PointcutCoordinate) = it.kind == kind)
 
 /** `%` is the index-side reduction gateway: select matching coordinate indexes as a Series. */
-operator fun PointcutCoordinateSeries.rem(kind: BytecodePointcutKind): Series<Int> {
-    val indexes = ArrayList<Int>()
-    for (i in 0 until a) {
-        if (b(i).kind == kind) indexes.add(i)
-    }
-    return indexes.toSeries()
-}
+operator fun PointcutCoordinateSeries.rem(kind: BytecodePointcutKind): Series<Int> =
+    this % fun (it: PointcutCoordinate) = it.kind == kind
 
 fun emptyPointcutCoordinates(): PointcutCoordinateSeries = 0 j { _: Int ->
     throw IndexOutOfBoundsException("empty pointcut coordinate series")
