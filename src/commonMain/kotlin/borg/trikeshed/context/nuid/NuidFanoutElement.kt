@@ -70,7 +70,7 @@ class NuidFanoutElement(
         fun tryTake(): Claim? = inbox.tryReceive().getOrNull()
 
         /** Consume one claim accepted for this workgroup. */
-        suspend fun consume(): Claim = accepted.receive()
+        suspend fun consumeAccepted(): Claim = accepted.receive()
 
         /** Publish a claim after dispatcher admission succeeds. */
         internal suspend fun publishAccepted(claim: Claim) { accepted.send(claim) }

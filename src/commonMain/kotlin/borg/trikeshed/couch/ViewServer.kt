@@ -362,9 +362,9 @@ class ViewServer {
         val mapExpr = ast.value("map")
 
         val values = if (mapExpr != null) {
-            group.asSequence().map { evaluateExpr(mapExpr, it.value) }
+            group.map { evaluateExpr(mapExpr, it.value) }
         } else {
-            group.asSequence().map { it.value }
+            group.map { it.value }
         }
 
         return when (op) {

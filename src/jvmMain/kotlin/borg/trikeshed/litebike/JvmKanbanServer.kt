@@ -13,14 +13,6 @@ import borg.trikeshed.context.nuid.Workgroup
 import borg.trikeshed.context.nuid.nuid
 import borg.trikeshed.lib.j
 import borg.trikeshed.litebike.taxonomy.Protocol
-import borg.trikeshed.context.nuid.NuidFanoutElement
-import borg.trikeshed.context.nuid.Workgroup
-import borg.trikeshed.context.nuid.TraitSpace
-import borg.trikeshed.context.nuid.Capability
-import borg.trikeshed.context.nuid.Subnet
-import borg.trikeshed.context.nuid.Nonce
-import borg.trikeshed.context.nuid.nuid
-import borg.trikeshed.lib.j
 import borg.trikeshed.parse.json.JsonSupport
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
@@ -95,11 +87,45 @@ object JvmKanbanServer {
     }
 
     suspend fun run(port: Int, donorPath: String?) {
-        val listener = LitebikeListenerElement(parentJob = null).also { it.open() }
-        val fanout = NuidFanoutElement(parentJob = null).also { it.open() }
-        fanout.register(Workgroup("process", Subnet.process, TraitSpace { 1 j { Capability.ProcessAll } }))
-        fanout.register(Workgroup("cas", Subnet.process, TraitSpace { 1 j { Capability.CasAll } }))
-        fanout.register(Workgroup("wireproto", Subnet.process, TraitSpace { 1 j { Capability.WireprotoAll } }))
+        val serverJob = SupervisorJob()
+        val scope = CoroutineScope(serverJob + Dispatchers.Default)
+        val listener = LitebikeListenerElement(parentJob = serverJob).also { it.open() }
+        val fanout = NuidFanoutElement(parentJob = serverJob).also { it.open() }
+
+        val processWorkgroup = Workgroup(
+            name = "kanban-process-local",
+            scope = Subnet.local,
+            traits = traitSpaceOf(Capability.ProcessAll),
+        )
+        val casWorkgroup = Workgroup(
+            name = "kanban-cas-local",
+            scope = Subnet.local,
+            traits = traitSpaceOf(Capability.CasAll),
+        )
+        val wireprotoWorkgroup = Workgroup(
+            name = "kanban-wireproto-lan",
+            scope = Subnet.lanLocalhost,
+            traits = traitSpaceOf(Capability.WireprotoAll),
+        )
+        fanout.register(processWorkgroup)
+        fanout.register(casWorkgroup)
+        fanout.register(wireprotoWorkgroup)
+        fanout.activate()
+        listOf(processWorkgroup, casWorkgroup, wireprotoWorkgroup).forEach { workgroup ->
+            val slot = requireNotNull(fanout.slotOf(workgroup.name))
+            scope.launch {
+                try {
+                    while (true) {
+                        // Workgroup reducers attach at this seam. Drain every
+                        // accepted claim now so production fanout has live workers.
+                        slot.consume()
+                    }
+                } catch (_: ClosedReceiveChannelException) {
+                    // Fanout closed during structured shutdown.
+                }
+            }
+        }
+
         // Register Http + Json + Socks5 + Tls + Bonjour + Upnp.
         // IDs are TrikeShed-local conventions (Taxonomy.kt), not FFI-stable.
         listOf(
@@ -159,10 +185,10 @@ object JvmKanbanServer {
 
         // The HTTP worker consumes the httpSlot. Each accepted byte
         // stream is a request; we route on the request path.
-        val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+        val httpScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
 
         // The HTTP handler logic is handled by the wireproto workgroup.
-        scope.launch {
+        httpScope.launch {
             val slot = fanout.slotOf("wireproto") ?: return@launch
             while (true) {
                 val claim = slot.consume()
