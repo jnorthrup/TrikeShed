@@ -91,10 +91,8 @@ class MemvidStoragePipeline(
         }
     }
 
-    private fun buildDocsCursor(documents: Series<MemvidDocument>): Cursor {
-        val list = mutableListOf<RowVec>()
-        for (i in 0 until documents.size) {
-            val doc = documents.b(i)
+    private fun buildDocsCursor(documents: Series<MemvidDocument>): Cursor =
+        documents α { doc ->
             val expectedCid = ContentId.of(doc.bytes)
             val rowValues: Series<Any?> = 3 j { j: Int ->
                 when (j) {
@@ -103,10 +101,8 @@ class MemvidStoragePipeline(
                     else -> expectedCid
                 }
             }
-            list.add(createDocRow(rowValues))
+            createDocRow(rowValues)
         }
-        return list.size j { list[it] }
-    }
 
     private fun buildManifestJson(documents: Series<MemvidDocument>, frames: List<RowVec>): String {
         val sb = StringBuilder()

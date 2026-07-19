@@ -1,10 +1,31 @@
 # TrikeShed `src/` — Core Substrate
 
-Shared IO substrate, HTX tokenizer, and choreography base classes for all `libs/*` modules.
+Shared IO substrate, HTX tokenizer, and choreography base classes for all targets.
 Targets commonMain, nativeMain, posixMain, linuxMain, macosMain, jvmMain, jsMain, wasmJsMain.
 
 Kernel algebra (`Join`, `Series<T>`, `Twin`, `α`, `j`) is defined in `lib/` and documented in
 [`PRELOAD.md`](../PRELOAD.md). This README covers the IO transport, reactor, and choreography layers.
+
+> **Lineage.** The kernel is not novel — it is a clean-room Kotlin port of four
+> well-established array-algebra traditions, dense-composed for JVM/native/Wasm/JS:
+> - **`Series<T> = Join<Int, (Int) -> T>`** is K's enumerable (size + index oracle),
+>   the same primitive kdb+ has shipped since 1993. `α` is `each`/`map`, `j` is K's join
+>   (`,`), `s_[...]` is K's `enlist`, `/` (split) and `%` (filter-indices) are K's
+>   reshape and where. Read PRELOAD.md as K clothing.
+> - **`Cursor = Series<RowVec>` + `ColumnMeta` + `IOMemento`** is Apache Arrow's
+>   `RecordBatch` + `FieldVector` + `ArrowType`, lazified. `get(range)`/`get(IntArray)`
+>   reorder is Arrow/NumPy fancy indexing. Columnar, zero-copy, type-tagged.
+> - **The typed-facet / GADT-key pattern** (`ConfixIndexK<R>`, `facet(key): R`) is
+>   Haskell `Lens' s a` / Scala Monocle optics, expressed as sealed-key singletons
+>   whose result type is fixed by the key. No runtime casts at the call site.
+> - **The CCEK lifecycle** (`CREATED → OPEN → ACTIVE → DRAINING → CLOSED` + fanout) is
+>   an Rx `Subject` / Project Reactor `Flux` operator state machine, just renamed.
+>
+> The gaps you will hit (lazy `filter` returning `Iterator` not `Series`; `fold`
+> having two cost models under one name) are where this port skipped a page from
+> the originals. K's `&` filter and Arrow's `filter(mask)` both return a same-typed
+> lazy structure; TrikeShed's `%` and `[Predicate]` return `Iterator`, breaking
+> further composition. Fix-by-matching-the-original, not by inventing new behavior.
 
 ---
 
@@ -348,9 +369,14 @@ ipfs?.dhtService?.store(key, value)
 
 ---
 
-## Consuming from `libs/`
+## Consuming the substrate
 
-A `libs/` module declares `api(project(":"))` and receives all of the above:
+The reactor, HTX tokenizer, and kernel algebra are the single IO path. New
+protocols extend `AsyncContextElement` and route through `userspace.Channel`
++ `FunctionalUringFacade`. There is no `libs/` module layer anymore — the
+root `src/` tree is authoritative (see `doc/concepts.md` §0 and the project's
+root-only-build rule). Composite builds that need the substrate consume it via
+`includeBuild("../..")`.
 
 ```kotlin
 class MyProtocolElement : AsyncContextElement() {
@@ -388,8 +414,8 @@ class MyProtocolElement : AsyncContextElement() {
 ## Related
 
 - [`PRELOAD.md`](../PRELOAD.md) — kernel algebra: `Join`, `Series<T>`, `Twin`, `α`, `j`
-- [`docs/plans/PLAN.md`](../docs/plans/PLAN.md) — consolidation roadmap
-- [`io_uring_interop/`](../io_uring_interop/) — C interop headers for io_uring
+- [`doc/concepts.md`](../doc/concepts.md) — maintainer-facing architecture map + spine
+- [`doc/concepts-gap-analysis.md`](../doc/concepts-gap-analysis.md) — doc-vs-code drift audit
 - [`src/linuxMain/.../Liburing.linux.kt`](linuxMain/kotlin/borg/trikeshed/userspace/Liburing.linux.kt) — cinterop actual
 - [`src/posixMain/.../PosixUringIO.kt`](posixMain/kotlin/borg/trikeshed/PosixUringIO.kt) — uring-or-POSIX fallback
-- [`libs/couch/src/commonMain/.../couch/htx/`](../libs/couch/src/commonMain/kotlin/borg/trikeshed/couch/htx/) — HTX tokenizer source
+- [`src/commonMain/.../couch/htx/`](commonMain/kotlin/borg/trikeshed/couch/htx/) — HTX tokenizer source

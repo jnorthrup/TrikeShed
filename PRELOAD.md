@@ -1,5 +1,22 @@
 below is the project's kernel fp concepts we use in our kotlin-common projects.
 
+> **Lineage.** This algebra is a clean-room Kotlin expression of four
+> well-established traditions. Read each primitive through the matching lens:
+>
+> | TrikeShed | Pedigree | Notes |
+> |-----------|----------|-------|
+> | `Series<T> = Join<Int, (Int) -> T>` | **K / kdb+ enumerable** (1993) | size + index oracle. `α`=`each`, `j`=`,`, `s_[]`=`enlist`, `/`=`reshape`, `%`=`where` |
+> | `Cursor = Series<RowVec>` + `ColumnMeta` + `IOMemento` | **Apache Arrow RecordBatch + FieldVector + ArrowType** | lazified; `get(range)`/`get(IntArray)` = fancy indexing |
+> | `ConfixIndexK<R>` / `facet(key): R` GADT-key pattern | **Haskell `Lens' s a` / Monocle optics** | sealed-key singletons fix the result type by the key |
+> | CCEK (`CREATED→OPEN→ACTIVE→DRAINING→CLOSED` + fanout) | **Rx `Subject` / Reactor `Flux`** | same state machine, different alphabet |
+>
+> The design bias below (composition over inheritance; ranges and projections
+> over mutable loops; lazy views first; typealiases compress semantics) is the
+> K/Arrow house style. Where a primitive here diverges from its original — e.g.
+> `Series.filter` is missing and `%`/`[Predicate]` return `Iterator` not `Series`
+> (K's `&` and Arrow's `filter(mask)` both return same-typed lazy structures) —
+> that is a port gap, not a design choice. Fix by matching the original.
+
 ## Kernel algebra
 
 ```kotlin
@@ -144,7 +161,18 @@ Read this as:
 
 # REFACTOR RECIPES
 
-## alpha xform 
+These are the two canonical loop-elimination strategies. Both close on the
+same principle: **keep the result a `Series` so downstream `α`/`get(range)`/
+`/`/`%` compose; only call `.view`/`.toList()` at the stdlib boundary.**
+
+## α xform — replace `(0 until X.size).map { X[it] }` with a lazy projection
+
+> Strategy: K `each` / Arrow `map` — the projection stays lazy and same-typed.
+> Don't follow this with `.toList()` to satisfy an `assertEquals(listOf(...))`;
+> that's materialization ceremony that throws away the laziness α just bought.
+> Use α when the result is consumed by another Series combinator or by a
+> Series-typed `contains`/`in` check. Use `.view.map { }` (stdlib) when you
+> genuinely need a List at the boundary.
 
 ```kotlin
          val supers = o.lattice.supertypes(cursor)
@@ -156,7 +184,17 @@ Read this as:
 ```
 
 
-## looping with views
+## looping with views — replace index-only `for` with element iteration
+
+> Strategy: stdlib `for (e in iterable)` via the `IterableSeries` bridge.
+> Use when the loop body only uses the index to dereference the Series
+> (`X[i]`/`X.b(i)`) and the result is a side effect (append to builder,
+> mutate state), not a new Series. If the body builds a new Series, prefer
+> the α recipe above — the loop vanishes entirely.
+>
+> When the index is also needed (separator guards like `if (i > 0) append(",")`,
+> or building `Document("reconstructed-$i")`), use `forEachIndexed` on the view
+> rather than forcing the whole Series into a List just to get `.withIndex()`.
 
 ```kotlin
          // params preserved
