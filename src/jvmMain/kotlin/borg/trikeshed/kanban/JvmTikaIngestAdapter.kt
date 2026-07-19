@@ -15,14 +15,14 @@ import kotlin.io.path.name
 
 /**
  * JvmTikaIngestAdapter — JVM-side document text extraction via Apache Tika,
- * using the tweaked config ported from jnorthrup/tika4all (no memvid):
+ * using the tweaked config ported from jnorthrup/tika4all (no treedoc):
  *
  *   - TesseractOCRParser enabled for images / scanned PDFs
  *   - ffmpeg preprocessing hook (src/jvmMain/resources/tika/ffmpeg_ocr.sh)
  *     applies grayscale + contrast equalization before OCR
  *
  * Only the text-extraction kernel is wired here. The tika4all flywheel
- * (NVIDIA NIM, SRDF, model-card evaluation, memvid RAG) is intentionally
+ * (NVIDIA NIM, SRDF, model-card evaluation, treedoc RAG) is intentionally
  * excluded — this adapter is a pure function Path -> extracted text.
  *
  * Usage:

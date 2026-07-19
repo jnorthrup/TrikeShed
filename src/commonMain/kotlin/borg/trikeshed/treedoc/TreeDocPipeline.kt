@@ -1,4 +1,4 @@
-package borg.trikeshed.memvid
+package borg.trikeshed.treedoc
 
 import borg.trikeshed.cursor.*
 import borg.trikeshed.job.CanonicalCbor
@@ -9,7 +9,7 @@ import borg.trikeshed.parse.confix.ConfixDoc
 import borg.trikeshed.parse.confix.confixDoc
 import borg.trikeshed.parse.confix.Syntax
 
-class MemvidStoragePipeline(
+class TreeDocPipeline(
     private val cas: CasStore,
     private val maxFrameBytes: Int
 ) {
@@ -18,8 +18,8 @@ class MemvidStoragePipeline(
     }
 
     private fun createFrameRow(values: Series<Any?>): RowVec {
-        val meta0: `ColumnMeta↻` = { MemvidFrameColumn.DOCUMENT_ORDINAL.meta }
-        val meta1: `ColumnMeta↻` = { MemvidFrameColumn.PAYLOAD.meta }
+        val meta0: `ColumnMeta↻` = { TreeDocFrameColumn.DOCUMENT_ORDINAL.meta }
+        val meta1: `ColumnMeta↻` = { TreeDocFrameColumn.PAYLOAD.meta }
         val metas: Series<`ColumnMeta↻`> = values.size j { i: Int ->
             if (i == 0) meta0 else meta1
         }
@@ -29,23 +29,31 @@ class MemvidStoragePipeline(
     private fun createDocRow(values: Series<Any?>): RowVec {
         val metaString: `ColumnMeta↻` = { ColumnMeta("path", borg.trikeshed.isam.meta.IOMemento.IoString) }
         val metaId: `ColumnMeta↻` = { ColumnMeta("cid", borg.trikeshed.isam.meta.IOMemento.IoByteArray) }
+        val metaInt: `ColumnMeta↻` = { ColumnMeta("frameInfo", borg.trikeshed.isam.meta.IOMemento.IoInt) }
         val metas: Series<`ColumnMeta↻`> = values.size j { i: Int ->
-            if (i < 2) metaString else metaId
+            when {
+                i < 2 -> metaString
+                i == 2 -> metaId
+                else -> metaInt
+            }
         }
         return borg.trikeshed.cursor.ReifiedSplitSeries2<Any?, `ColumnMeta↻`>(values, metas)
     }
 
     /**
-     * Stores a series of MemvidDocuments, splitting them into frames and storing
-     * them in the CAS. Returns a typed meta-series indexable by MemvidK.
+     * Stores a series of TreeDocuments, splitting them into frames and storing
+     * them in the CAS. Returns a typed meta-series indexable by TreeDocK.
      */
-    fun store(documents: Series<MemvidDocument>): Series<Any?> {
+    fun store(documents: Series<TreeDocument>): Series<Any?> {
         var frameCount = 0
         val framesList = mutableListOf<RowVec>()
+        val docFirstFrame = IntArray(documents.size)
+        val docFrameCount = IntArray(documents.size)
 
         for (docOrdinal in 0 until documents.size) {
             val doc = documents.b(docOrdinal)
             val bytes = doc.bytes
+            docFirstFrame[docOrdinal] = frameCount
 
             if (bytes.isEmpty()) {
                 val chunk = ByteArray(0)
@@ -53,6 +61,7 @@ class MemvidStoragePipeline(
                 val rowValues: Series<Any?> = 2 j { i: Int -> if (i == 0) docOrdinal else cid }
                 framesList.add(createFrameRow(rowValues))
                 frameCount++
+                docFrameCount[docOrdinal] = 1
                 continue
             }
 
@@ -68,10 +77,11 @@ class MemvidStoragePipeline(
                 frameCount++
                 offset += length
             }
+            docFrameCount[docOrdinal] = frameCount - docFirstFrame[docOrdinal]
         }
 
         val frames: Cursor = framesList.size j { framesList[it] }
-        val docsCursor = buildDocsCursor(documents)
+        val docsCursor = buildDocsCursor(documents, docFirstFrame, docFrameCount)
 
         // Build canonical manifest for CID
         val manifestJson = buildManifestJson(documents, framesList)
@@ -79,32 +89,40 @@ class MemvidStoragePipeline(
         val manifestCid = ContentId.of(manifestDoc) // This canonicalizes internally
         cas.put(manifestDoc) // Puts canonical CBOR
 
-        return MemvidK.entries.size j { i ->
-            when (MemvidK.entries[i]) {
-                MemvidK.ArchiveId -> manifestCid
-                MemvidK.ManifestCid -> manifestCid
-                MemvidK.DocumentCount -> documents.size
-                MemvidK.FrameCount -> frameCount
-                MemvidK.Documents -> docsCursor
-                MemvidK.Frames -> frames
+        return TreeDocK.entries.size j { i ->
+            when (TreeDocK.entries[i]) {
+                TreeDocK.ArchiveId -> manifestCid
+                TreeDocK.ManifestCid -> manifestCid
+                TreeDocK.DocumentCount -> documents.size
+                TreeDocK.FrameCount -> frameCount
+                TreeDocK.Documents -> docsCursor
+                TreeDocK.Frames -> frames
             }
         }
     }
 
-    private fun buildDocsCursor(documents: Series<MemvidDocument>): Cursor =
-        documents α { doc ->
+    private fun buildDocsCursor(
+        documents: Series<TreeDocument>,
+        docFirstFrame: IntArray,
+        docFrameCount: IntArray
+    ): Cursor =
+        documents.size j { i ->
+            val doc = documents.b(i)
             val expectedCid = ContentId.of(doc.bytes)
-            val rowValues: Series<Any?> = 3 j { j: Int ->
+            val rowValues: Series<Any?> = 5 j { j: Int ->
                 when (j) {
                     0 -> doc.path
                     1 -> doc.mediaType
-                    else -> expectedCid
+                    2 -> expectedCid
+                    3 -> docFirstFrame[i]
+                    4 -> docFrameCount[i]
+                    else -> error("unexpected column $j")
                 }
             }
             createDocRow(rowValues)
         }
 
-    private fun buildManifestJson(documents: Series<MemvidDocument>, frames: List<RowVec>): String {
+    private fun buildManifestJson(documents: Series<TreeDocument>, frames: List<RowVec>): String {
         val sb = StringBuilder()
         sb.append("{")
         sb.append("\"docs\":[")
@@ -132,8 +150,8 @@ class MemvidStoragePipeline(
      * Restores a document from the archive by its ordinal.
      */
     fun restoreDocument(archive: Series<Any?>, ordinal: Int): ByteArray {
-        val frames = archive.b(MemvidK.Frames.ordinal) as Cursor
-        val documents = archive.b(MemvidK.Documents.ordinal) as Cursor
+        val frames = archive.b(TreeDocK.Frames.ordinal) as Cursor
+        val documents = archive.b(TreeDocK.Documents.ordinal) as Cursor
 
         if (ordinal < 0 || ordinal >= documents.size) {
             throw IllegalArgumentException("Invalid document ordinal: $ordinal")
@@ -141,21 +159,22 @@ class MemvidStoragePipeline(
 
         val docVals = (documents.b(ordinal) as borg.trikeshed.cursor.ReifiedSplitSeries2<Any?, `ColumnMeta↻`>).leftSeries
         val expectedCid = docVals.b(2) as ContentId
+        val firstFrame = docVals.b(3) as Int
+        val docFrameCount = docVals.b(4) as Int
 
         var totalBytes = 0
         val chunks = mutableListOf<ByteArray>()
 
-        for (i in 0 until frames.size) {
+        // Direct slice — doc cursor carries firstFrameOrdinal/frameCount so
+        // restore is O(f_d) not O(F). No scan over the full frame cursor.
+        for (i in firstFrame until firstFrame + docFrameCount) {
             val frame = frames.b(i)
             val vals = (frame as borg.trikeshed.cursor.ReifiedSplitSeries2<Any?, `ColumnMeta↻`>).leftSeries
-            val frameDocOrdinal = vals.b(0) as Int
-            if (frameDocOrdinal == ordinal) {
-                val cid = vals.b(1) as ContentId
-                val chunk = cas.get(cid) ?: throw IllegalStateException("CAS corruption: chunk $cid not found")
-                // cas.get verifies the digest implicitly
-                chunks.add(chunk)
-                totalBytes += chunk.size
-            }
+            val cid = vals.b(1) as ContentId
+            val chunk = cas.get(cid) ?: throw IllegalStateException("CAS corruption: chunk $cid not found")
+            // cas.get verifies the digest implicitly
+            chunks.add(chunk)
+            totalBytes += chunk.size
         }
 
         val result = ByteArray(totalBytes)

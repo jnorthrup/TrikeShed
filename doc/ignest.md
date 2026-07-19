@@ -2,7 +2,7 @@
 
 ## Current gap
 
-`utils/ingest` has a useful commonMain scheduling and media-detection SPI, but the payload is still DTO-shaped (`String`, `Map`, `List`) and does not persist extracted bytes, metadata, or manifests through TrikeShed CAS. The JVM Tika adapter detects files but does not expose extracted content as Cursor rows or canonical Confix, and its metadata helper references an undefined `detector`. The root tree has no memvid production implementation; only `src/commonTest/kotlin/borg/trikeshed/memvid/MemvidStoragePipelineTest.kt` defines the intended archive behavior.
+`utils/ingest` has a useful commonMain scheduling and media-detection SPI, but the payload is still DTO-shaped (`String`, `Map`, `List`) and does not persist extracted bytes, metadata, or manifests through TrikeShed CAS. The JVM Tika adapter detects files but does not expose extracted content as Cursor rows or canonical Confix, and its metadata helper references an undefined `detector`. The root tree has no treedoc production implementation; only `src/commonTest/kotlin/borg/trikeshed/treedoc/TreeDocPipelineTest.kt` defines the intended archive behavior.
 
 ## Boundary
 
@@ -19,15 +19,15 @@ Platform adapters own extraction:
 - suffix/magic-byte detection remains the dependency-free JVM fallback.
 - other targets can supply the same SPI without changing archive identity or schemas.
 
-## Memvid archive contract
+## TreeDoc archive contract
 
-Add `borg.trikeshed.memvid` in root commonMain.
+Add `borg.trikeshed.treedoc` in root commonMain.
 
-- `MemvidDocument(path, mediaType, bytes)` is input only.
+- `TreeDocument(path, mediaType, bytes)` is input only.
 - Split each document into deterministic `maxFrameBytes` chunks.
 - Put every chunk in `CasStore`; frame rows store document ordinal, frame ordinal, byte range, chunk CID, and a lazy payload cell that resolves through CAS.
 - Put a canonical Confix document manifest in CAS. Its CID is both `ArchiveId` and `ManifestCid`.
-- Return a typed meta-series keyed by `MemvidK`: archive identity, document count, frame count, document cursor, and frame cursor.
+- Return a typed meta-series keyed by `TreeDocK`: archive identity, document count, frame count, document cursor, and frame cursor.
 - Restore joins frames in ordinal order, verifies each chunk through `CasStore.get`, then verifies the restored document CID before returning bytes.
 - Empty archives are valid; `maxFrameBytes <= 0` is rejected.
 - Identical ordered inputs and frame size produce identical manifest bytes and archive CID.
@@ -51,12 +51,12 @@ Do not add Apache Camel now. Camel is JVM-only and would duplicate the existing 
 
 ## Jules split
 
-### J1 — memvid commonMain archive
+### J1 — treedoc commonMain archive
 
 Own only:
 
-- `src/commonMain/kotlin/borg/trikeshed/memvid/**`
-- `src/commonTest/kotlin/borg/trikeshed/memvid/**`
+- `src/commonMain/kotlin/borg/trikeshed/treedoc/**`
+- `src/commonTest/kotlin/borg/trikeshed/treedoc/**`
 
 Do not edit `CasStore`, Confix, Cursor, Gradle, or `utils/ingest`. Implement the archive contract above and make the focused common tests pass on JVM plus one non-JVM compile target.
 
@@ -71,8 +71,8 @@ Do not edit root `src/**`. Introduce the commonMain Confix/Cursor/CAS envelope a
 
 ## Gates
 
-1. Root: `./gradlew compileKotlinJvm` and focused memvid tests pass.
-2. Root: at least `compileKotlinJs` or `compileKotlinWasmJs` compiles the memvid commonMain implementation.
+1. Root: `./gradlew compileKotlinJvm` and focused treedoc tests pass.
+2. Root: at least `compileKotlinJs` or `compileKotlinWasmJs` compiles the treedoc commonMain implementation.
 3. Ingest: `utils/ingest/gradlew jvmTest` or `../../gradlew -p utils/ingest jvmTest` passes using the composite build.
 4. No `java.*`, Tika, Camel, kotlinx JSON, or kotlinx CBOR imports in either commonMain tree.
 5. CAS corruption is detected on read; identical input yields identical CIDs.

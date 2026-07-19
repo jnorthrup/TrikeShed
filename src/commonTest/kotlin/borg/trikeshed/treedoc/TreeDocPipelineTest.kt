@@ -1,4 +1,4 @@
-package borg.trikeshed.memvid
+package borg.trikeshed.treedoc
 
 import borg.trikeshed.job.CasStore
 import borg.trikeshed.job.ContentId
@@ -13,22 +13,22 @@ import kotlin.test.assertTrue
 import borg.trikeshed.cursor.ReifiedSplitSeries2
 import borg.trikeshed.cursor.`ColumnMeta↻`
 
-class MemvidStoragePipelineTest {
+class TreeDocPipelineTest {
 
     @Test
     fun testTwoDocsFrameSize4() {
         val cas = CasStore.inMemory()
-        val pipeline = MemvidStoragePipeline(cas, 4)
+        val pipeline = TreeDocPipeline(cas, 4)
 
         val docs = seriesOf(listOf(
-            MemvidDocument("doc1.txt", "text/plain", "abcdefgh".encodeToByteArray()),
-            MemvidDocument("doc2.txt", "text/plain", "xyz".encodeToByteArray())
+            TreeDocument("doc1.txt", "text/plain", "abcdefgh".encodeToByteArray()),
+            TreeDocument("doc2.txt", "text/plain", "xyz".encodeToByteArray())
         ))
 
         val archive = pipeline.store(docs)
 
-        assertEquals(2, archive.b(MemvidK.DocumentCount.ordinal) as Int)
-        assertEquals(3, archive.b(MemvidK.FrameCount.ordinal) as Int)
+        assertEquals(2, archive.b(TreeDocK.DocumentCount.ordinal) as Int)
+        assertEquals(3, archive.b(TreeDocK.FrameCount.ordinal) as Int)
 
         val restored1 = pipeline.restoreDocument(archive, 0)
         assertEquals("abcdefgh", restored1.decodeToString())
@@ -40,14 +40,14 @@ class MemvidStoragePipelineTest {
     @Test
     fun testFrameSize3GivesPayloadRowsWithSchema() {
         val cas = CasStore.inMemory()
-        val pipeline = MemvidStoragePipeline(cas, 3)
+        val pipeline = TreeDocPipeline(cas, 3)
 
         val docs = seriesOf(listOf(
-            MemvidDocument("doc1.txt", "text/plain", "abcdef".encodeToByteArray())
+            TreeDocument("doc1.txt", "text/plain", "abcdef".encodeToByteArray())
         ))
 
         val archive = pipeline.store(docs)
-        val frames = archive.b(MemvidK.Frames.ordinal) as Cursor
+        val frames = archive.b(TreeDocK.Frames.ordinal) as Cursor
 
         assertEquals(2, frames.size)
 
@@ -66,17 +66,17 @@ class MemvidStoragePipelineTest {
     @Test
     fun testUtf8BytesRestoreExactlyAndCasCorruptionThrows() {
         val cas = CasStore.inMemory()
-        val pipeline = MemvidStoragePipeline(cas, 2)
+        val pipeline = TreeDocPipeline(cas, 2)
 
         val bytes = "Hello, 世界".encodeToByteArray()
-        val docs = seriesOf(listOf(MemvidDocument("doc", "text/plain", bytes)))
+        val docs = seriesOf(listOf(TreeDocument("doc", "text/plain", bytes)))
 
         val archive = pipeline.store(docs)
 
         val restored = pipeline.restoreDocument(archive, 0)
         assertTrue(bytes.contentEquals(restored))
 
-        val frames = archive.b(MemvidK.Frames.ordinal) as Cursor
+        val frames = archive.b(TreeDocK.Frames.ordinal) as Cursor
         val firstCid = (frames.b(0) as ReifiedSplitSeries2<Any?, `ColumnMeta↻`>).leftSeries.b(1) as ContentId
         cas.corrupt(firstCid)
 
@@ -88,38 +88,38 @@ class MemvidStoragePipelineTest {
     @Test
     fun testDeterministicArchiveAndManifestCid() {
         val cas1 = CasStore.inMemory()
-        val pipeline1 = MemvidStoragePipeline(cas1, 4)
-        val docs1 = seriesOf(listOf(MemvidDocument("d", "text/plain", "abc".encodeToByteArray())))
+        val pipeline1 = TreeDocPipeline(cas1, 4)
+        val docs1 = seriesOf(listOf(TreeDocument("d", "text/plain", "abc".encodeToByteArray())))
         val archive1 = pipeline1.store(docs1)
 
         val cas2 = CasStore.inMemory()
-        val pipeline2 = MemvidStoragePipeline(cas2, 4)
-        val docs2 = seriesOf(listOf(MemvidDocument("d", "text/plain", "abc".encodeToByteArray())))
+        val pipeline2 = TreeDocPipeline(cas2, 4)
+        val docs2 = seriesOf(listOf(TreeDocument("d", "text/plain", "abc".encodeToByteArray())))
         val archive2 = pipeline2.store(docs2)
 
-        val cid1 = archive1.b(MemvidK.ArchiveId.ordinal) as ContentId
-        val cid2 = archive2.b(MemvidK.ArchiveId.ordinal) as ContentId
+        val cid1 = archive1.b(TreeDocK.ArchiveId.ordinal) as ContentId
+        val cid2 = archive2.b(TreeDocK.ArchiveId.ordinal) as ContentId
 
         assertEquals(cid1, cid2)
-        assertEquals(cid1, archive1.b(MemvidK.ManifestCid.ordinal))
+        assertEquals(cid1, archive1.b(TreeDocK.ManifestCid.ordinal))
     }
 
     @Test
     fun testEmptyArchiveAndInvalidFrameSize() {
         assertFailsWith<IllegalArgumentException> {
-            MemvidStoragePipeline(CasStore.inMemory(), 0)
+            TreeDocPipeline(CasStore.inMemory(), 0)
         }
 
         assertFailsWith<IllegalArgumentException> {
-            MemvidStoragePipeline(CasStore.inMemory(), -1)
+            TreeDocPipeline(CasStore.inMemory(), -1)
         }
 
         val cas = CasStore.inMemory()
-        val pipeline = MemvidStoragePipeline(cas, 10)
-        val emptyDocs = seriesOf(emptyList<MemvidDocument>())
+        val pipeline = TreeDocPipeline(cas, 10)
+        val emptyDocs = seriesOf(emptyList<TreeDocument>())
 
         val archive = pipeline.store(emptyDocs)
-        assertEquals(0, archive.b(MemvidK.DocumentCount.ordinal))
-        assertEquals(0, archive.b(MemvidK.FrameCount.ordinal))
+        assertEquals(0, archive.b(TreeDocK.DocumentCount.ordinal))
+        assertEquals(0, archive.b(TreeDocK.FrameCount.ordinal))
     }
 }

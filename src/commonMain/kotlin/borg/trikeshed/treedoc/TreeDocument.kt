@@ -1,9 +1,9 @@
-package borg.trikeshed.memvid
+package borg.trikeshed.treedoc
 
 /**
  * Represents a document to be archived.
  */
-data class MemvidDocument(
+data class TreeDocument(
     val path: String,
     val mediaType: String,
     val bytes: ByteArray
@@ -12,7 +12,7 @@ data class MemvidDocument(
         if (this === other) return true
         if (other == null || this::class != other::class) return false
 
-        other as MemvidDocument
+        other as TreeDocument
 
         if (path != other.path) return false
         if (mediaType != other.mediaType) return false
