@@ -9,7 +9,6 @@ plugins {
     kotlin("plugin.serialization") version "2.4.10"
     kotlin("plugin.compose") version "2.4.10"
     id("org.jetbrains.compose") version "1.11.1"
-    id("com.android.library") version "8.5.2"
 }
 
 // Compose UI is a JVM-only surface in this multiplatform project.  The Kotlin
@@ -67,9 +66,6 @@ kotlin {
     }
 
     jvmToolchain(25)
-
-    androidTarget {
-    }
 
     jvm {
         compilerOptions {
@@ -423,19 +419,5 @@ tasks.withType<Test>().configureEach {
     testLogging {
         events("passed", "skipped", "failed")
         showStandardStreams = true
-    }
-}
-
-android {
-    namespace = "borg.trikeshed"
-    compileSdk = 34
-
-    defaultConfig {
-        minSdk = 24
-    }
-
-    compileOptions {
-        sourceCompatibility = JavaVersion.VERSION_25
-        targetCompatibility = JavaVersion.VERSION_25
     }
 }
