@@ -46,7 +46,7 @@ class ReteWorkingMemory {
         }
 
         val fact = ReteStoredFact(factId, fields.toMap(), versionCid, board)
-        current.put(factId, fact)
+        current.set(factId, fact)
         return ReteAssertionResult(isNew = true, fact = fact)
     }
 
@@ -58,7 +58,7 @@ class ReteWorkingMemory {
         val existing = current.get(factId)
             ?: error("cannot modify absent fact: $factId")
         val modified = existing.copy(fields = fields.toMap(), versionCid = versionCid)
-        current.put(factId, modified)
+        current.set(factId, modified)
         return modified
     }
 

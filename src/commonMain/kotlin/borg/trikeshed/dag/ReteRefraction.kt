@@ -16,7 +16,7 @@ class ReteRefraction {
     fun record(activation: Activation): Boolean {
         val key = activation.refractionKey()
         if (key in fired) return false
-        fired.put(key, Unit)
+        fired.set(key, Unit)
         return true
     }
 

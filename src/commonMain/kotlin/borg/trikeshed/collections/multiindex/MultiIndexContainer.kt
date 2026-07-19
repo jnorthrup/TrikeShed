@@ -67,7 +67,7 @@ class MultiIndexContainer<E : Any> {
         // update hash indexes
         for (he in hashIndexes) {
             val k = he.extractor(element) ?: continue
-            he.map.put(k, pos)
+            he.map[k] = pos
         }
         // rebuild sort indexes (small cost, typically few sort indexes)
         rebuildSortIndexes()
@@ -135,7 +135,7 @@ class MultiIndexContainer<E : Any> {
         val map = LinearHashMap<Any, Int>(store.size.coerceAtLeast(16))
         for (pos in store.indices) {
             val k = extractor(store[pos]) ?: continue
-            map.put(k, pos)
+            map[k] = pos
         }
         return HashEntry(extractor, map)
     }

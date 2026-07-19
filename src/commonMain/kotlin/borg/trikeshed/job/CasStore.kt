@@ -1,11 +1,13 @@
 package borg.trikeshed.job
 
+import borg.trikeshed.collections.associative.LinearHashMap as CasHashMap
+
 /**
  * CasStore — content-addressable store.
  * In-memory implementation: SHA-256 keyed blob map with digest verification on read.
  */
 open class CasStore protected constructor(
-    private val blobs: MutableMap<ContentId, ByteArray> = mutableMapOf(),
+    private val blobs: CasHashMap<ContentId, ByteArray> = CasHashMap(),
 ) {
     open fun put(bytes: ByteArray): ContentId {
         val cid = ContentId.of(bytes)

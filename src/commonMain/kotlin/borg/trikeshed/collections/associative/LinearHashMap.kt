@@ -64,7 +64,7 @@ class LinearHashMap<K : Any, V>(initialCapacity: Int = 16) {
 
     val count: Int get() = size
 
-    fun put(key: K, value: V): V? {
+    operator fun set(key: K, value: V): V? {
         if (size + tombstones >= capacity ushr 1) resize()   // load > 0.5
         val hash = key.hashCode()
         var firstTomb = -1
@@ -94,10 +94,10 @@ class LinearHashMap<K : Any, V>(initialCapacity: Int = 16) {
         }
         // Probe exhausted — table misconfigured (load exceeded). Resize and retry.
         resize()
-        return put(key, value)
+        return set(key, value)
     }
 
-    fun get(key: K): V? {
+    operator fun get(key: K): V? {
         val hash = key.hashCode()
         var i = 0
         while (i <= capacity) {
@@ -169,7 +169,7 @@ class LinearHashMap<K : Any, V>(initialCapacity: Int = 16) {
         tombstones = 0
         for (s in 0 until oldCap) {
             val k = oldKeys[s]
-            if (!isAbsent(k) && !isDeleted(k)) put(k as K, oldValues[s] as V)
+            if (!isAbsent(k) && !isDeleted(k)) set(k as K, oldValues[s] as V)
         }
     }
 }

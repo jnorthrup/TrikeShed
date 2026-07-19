@@ -30,7 +30,7 @@ class ReteAgenda {
             }
             return false
         }
-        pending.put(activation.activationId, activation)
+        pending.set(activation.activationId, activation)
         return true
     }
 

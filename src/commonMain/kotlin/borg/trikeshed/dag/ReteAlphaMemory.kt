@@ -21,7 +21,7 @@ class ReteAlphaNode internal constructor(
     internal fun accept(fact: ReteStoredFact) {
         evaluationCount++
         if (predicate.matches(fact)) {
-            matchingFacts.put(fact.factId, fact)
+            matchingFacts.set(fact.factId, fact)
         } else {
             matchingFacts.remove(fact.factId)
         }
@@ -48,7 +48,7 @@ class ReteAlphaMemory {
         if (existing != null) return existing
 
         val node = ReteAlphaNode(predicate)
-        nodes.put(predicate, node)
+        nodes.set(predicate, node)
         return node
     }
 

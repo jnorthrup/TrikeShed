@@ -45,10 +45,10 @@ class ReteBetaMemory(
         if (!fact.fields.containsKey(join.leftFacetId)) return
 
         val key = BetaJoinKey(fact.factId.partitionId, fact.fields[join.leftFacetId])
-        bucket(leftIndex, key).facts.put(fact.factId, fact)
-        leftKeys.put(fact.factId, key)
+        bucket(leftIndex, key).facts.set(fact.factId, fact)
+        leftKeys.set(fact.factId, key)
         rightIndex.get(key)?.facts?.entries()?.forEach { (_, right) ->
-            tokenMemory.put(
+            tokenMemory.set(
                 BetaTokenId(fact.factId, right.factId),
                 BetaToken(fact, right, key.value),
             )
@@ -60,10 +60,10 @@ class ReteBetaMemory(
         if (!fact.fields.containsKey(join.rightFacetId)) return
 
         val key = BetaJoinKey(fact.factId.partitionId, fact.fields[join.rightFacetId])
-        bucket(rightIndex, key).facts.put(fact.factId, fact)
-        rightKeys.put(fact.factId, key)
+        bucket(rightIndex, key).facts.set(fact.factId, fact)
+        rightKeys.set(fact.factId, key)
         leftIndex.get(key)?.facts?.entries()?.forEach { (_, left) ->
-            tokenMemory.put(
+            tokenMemory.set(
                 BetaTokenId(left.factId, fact.factId),
                 BetaToken(left, fact, key.value),
             )
@@ -103,7 +103,7 @@ class ReteBetaMemory(
         val existing = index.get(key)
         if (existing != null) return existing
         val created = BetaBucket()
-        index.put(key, created)
+        index.set(key, created)
         return created
     }
 
