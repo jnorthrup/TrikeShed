@@ -22,11 +22,13 @@ fun forgePersistenceScript(): String = """
   let persistenceWritePromise = Promise.resolve();
   let persistenceRotationSnapshot = null;
 
-  // ── Blackboard MDI: pan/zoom camera ──
+  // ── Blackboard MDI: pan/zoom camera + section drag ──
   const blackboard = document.getElementById('blackboard');
   const blackboardCanvas = document.getElementById('blackboard-canvas');
   let bbCamera = { x: 0, y: 0, zoom: 1 };
   let bbDragState = null;
+  let bbSectionDrag = null;
+  const bbSectionPositions = {};
 
   function applyBlackboardCamera() {
     if (!blackboardCanvas) return;
@@ -42,12 +44,47 @@ fun forgePersistenceScript(): String = """
 
   function bindBlackboardGestures() {
     if (!blackboard) return;
+    // Pan on empty canvas
     blackboard.addEventListener('mousedown', (e) => {
       if (e.target.closest('.bb-hud') || e.target.closest('button') || e.target.closest('input')) return;
+      if (e.target.closest('.panel')) return; // Don't pan when clicking inside sections
       bbDragState = { startX: e.clientX, startY: e.clientY, camX: bbCamera.x, camY: bbCamera.y };
       blackboard.style.cursor = 'grabbing';
     });
+    // Section drag via header
+    document.querySelectorAll('.panel').forEach(panel => {
+      const header = panel.querySelector('.section-head');
+      if (!header) return;
+      header.style.cursor = 'grab';
+      header.addEventListener('mousedown', (e) => {
+        e.stopPropagation();
+        const rect = panel.getBoundingClientRect();
+        const canvasRect = blackboardCanvas.getBoundingClientRect();
+        const panelId = panel.id || panel.className.split(' ')[0];
+        bbSectionDrag = {
+          panel,
+          startX: e.clientX,
+          startY: e.clientY,
+          origX: rect.left - canvasRect.left,
+          origY: rect.top - canvasRect.top,
+          panelId
+        };
+        header.style.cursor = 'grabbing';
+        panel.style.zIndex = '20';
+      });
+    });
     window.addEventListener('mousemove', (e) => {
+      if (bbSectionDrag) {
+        const dx = (e.clientX - bbSectionDrag.startX) / bbCamera.zoom;
+        const dy = (e.clientY - bbSectionDrag.startY) / bbCamera.zoom;
+        const newX = bbSectionDrag.origX + dx;
+        const newY = bbSectionDrag.origY + dy;
+        bbSectionDrag.panel.style.position = 'absolute';
+        bbSectionDrag.panel.style.left = newX + 'px';
+        bbSectionDrag.panel.style.top = newY + 'px';
+        bbSectionPositions[bbSectionDrag.panelId] = { x: newX, y: newY };
+        return;
+      }
       if (!bbDragState) return;
       const dx = (e.clientX - bbDragState.startX) / bbCamera.zoom;
       const dy = (e.clientY - bbDragState.startY) / bbCamera.zoom;
@@ -56,6 +93,12 @@ fun forgePersistenceScript(): String = """
       applyBlackboardCamera();
     });
     window.addEventListener('mouseup', () => {
+      if (bbSectionDrag) {
+        const header = bbSectionDrag.panel.querySelector('.section-head');
+        if (header) header.style.cursor = 'grab';
+        bbSectionDrag.panel.style.zIndex = '';
+        bbSectionDrag = null;
+      }
       bbDragState = null;
       blackboard.style.cursor = '';
     });
