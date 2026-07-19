@@ -298,18 +298,7 @@ private fun defaultForgeAppState(): ForgeAppState {
         // Legacy DTO view retained unchanged for existing seed consumers.
         lcncEntities = reduction.correlations.map { correlation ->
             val card = board.cards.first { it.id.value == correlation.taskId }
-            borg.trikeshed.lcnc.isam.LcncBlock(
-                id = "task:${correlation.taskId}",
-                type = "work-package",
-                parentId = null,
-                content = mapOf(
-                    "lane" to card.columnId.value,
-                    "facet" to if (correlation.ready) "ready" else "dependency-gated",
-                    "causalKey" to correlation.causalKey,
-                    "title" to card.title,
-                    "description" to card.description,
-                )
-            )
+            correlationToBlock(correlation, card)
         },
         blackboardId = board.id.value,
         surfaceRows = surface.rows,
@@ -370,15 +359,14 @@ private fun ForgeAppState.toJsonValue(): Map<String, Any?> = linkedMapOf(
         )
     },
     "lcncEntities" to lcncEntities.map {
-        val content = it.content as? Map<*, *>
         linkedMapOf(
             "entityId" to it.id,
             "lcncKind" to it.type,
-            "lane" to content?.get("lane"),
-            "facet" to content?.get("facet"),
-            "causalKey" to content?.get("causalKey"),
-            "title" to content?.get("title"),
-            "description" to content?.get("description"),
+            "lane" to it.lane,
+            "facet" to it.facet,
+            "causalKey" to it.causalKey,
+            "title" to it.title,
+            "description" to it.description,
         )
     },
     "blackboardId" to blackboardId,
