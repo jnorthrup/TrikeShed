@@ -22,7 +22,135 @@ fun forgePersistenceScript(): String = """
   let persistenceWritePromise = Promise.resolve();
   let persistenceRotationSnapshot = null;
 
-  registerPwaShell();
+  // ── Blackboard MDI: pan/zoom camera + section drag ──
+  const blackboard = document.getElementById('blackboard');
+  const blackboardCanvas = document.getElementById('blackboard-canvas');
+  let bbCamera = { x: 0, y: 0, zoom: 1 };
+  let bbDragState = null;
+  let bbSectionDrag = null;
+  const bbSectionPositions = {};
+
+  function applyBlackboardCamera() {
+    if (!blackboardCanvas) return;
+    blackboardCanvas.style.transform = 'translate(' + (-bbCamera.x * bbCamera.zoom) + 'px, ' + (-bbCamera.y * bbCamera.zoom) + 'px) scale(' + bbCamera.zoom + ')';
+    const zoomPill = document.getElementById('hud-zoom-pill');
+    if (zoomPill) zoomPill.textContent = bbCamera.zoom.toFixed(1) + '×';
+  }
+
+  function resetBlackboard() {
+    bbCamera = { x: 0, y: 0, zoom: 1 };
+    applyBlackboardCamera();
+  }
+
+  function bindBlackboardGestures() {
+    if (!blackboard) return;
+    // Pan on empty canvas
+    blackboard.addEventListener('mousedown', (e) => {
+      if (e.target.closest('.bb-hud') || e.target.closest('button') || e.target.closest('input')) return;
+      if (e.target.closest('.panel')) return; // Don't pan when clicking inside sections
+      bbDragState = { startX: e.clientX, startY: e.clientY, camX: bbCamera.x, camY: bbCamera.y };
+      blackboard.style.cursor = 'grabbing';
+    });
+    // Section drag via header
+    document.querySelectorAll('.panel').forEach(panel => {
+      const header = panel.querySelector('.section-head');
+      if (!header) return;
+      header.style.cursor = 'grab';
+      header.addEventListener('mousedown', (e) => {
+        e.stopPropagation();
+        const rect = panel.getBoundingClientRect();
+        const canvasRect = blackboardCanvas.getBoundingClientRect();
+        const panelId = panel.id || panel.className.split(' ')[0];
+        bbSectionDrag = {
+          panel,
+          startX: e.clientX,
+          startY: e.clientY,
+          origX: rect.left - canvasRect.left,
+          origY: rect.top - canvasRect.top,
+          panelId
+        };
+        header.style.cursor = 'grabbing';
+        panel.style.zIndex = '20';
+      });
+    });
+    window.addEventListener('mousemove', (e) => {
+      if (bbSectionDrag) {
+        const dx = (e.clientX - bbSectionDrag.startX) / bbCamera.zoom;
+        const dy = (e.clientY - bbSectionDrag.startY) / bbCamera.zoom;
+        const newX = bbSectionDrag.origX + dx;
+        const newY = bbSectionDrag.origY + dy;
+        bbSectionDrag.panel.style.position = 'absolute';
+        bbSectionDrag.panel.style.left = newX + 'px';
+        bbSectionDrag.panel.style.top = newY + 'px';
+        bbSectionPositions[bbSectionDrag.panelId] = { x: newX, y: newY };
+        return;
+      }
+      if (!bbDragState) return;
+      const dx = (e.clientX - bbDragState.startX) / bbCamera.zoom;
+      const dy = (e.clientY - bbDragState.startY) / bbCamera.zoom;
+      bbCamera.x = bbDragState.camX - dx;
+      bbCamera.y = bbDragState.camY - dy;
+      applyBlackboardCamera();
+    });
+    window.addEventListener('mouseup', () => {
+      if (bbSectionDrag) {
+        const header = bbSectionDrag.panel.querySelector('.section-head');
+        if (header) header.style.cursor = 'grab';
+        bbSectionDrag.panel.style.zIndex = '';
+        bbSectionDrag = null;
+      }
+      bbDragState = null;
+      blackboard.style.cursor = '';
+    });
+    blackboard.addEventListener('wheel', (e) => {
+      if (e.target.closest('.bb-hud')) return;
+      e.preventDefault();
+      const delta = e.deltaY > 0 ? 0.9 : 1.1;
+      bbCamera.zoom = clamp(bbCamera.zoom * delta, 0.2, 4.0);
+      applyBlackboardCamera();
+    }, { passive: false });
+  }
+
+  function bindBlackboardHud() {
+    document.getElementById('hud-reset')?.addEventListener('click', resetBlackboard);
+    document.getElementById('hud-fit')?.addEventListener('click', () => {
+      const content = document.querySelector('.app-shell');
+      if (!content) return;
+      const rect = content.getBoundingClientRect();
+      const vw = window.innerWidth;
+      const vh = window.innerHeight;
+      bbCamera.zoom = Math.min(vw / rect.width, vh / rect.height) * 0.9;
+      bbCamera.x = rect.left + rect.width / 2 - vw / (2 * bbCamera.zoom);
+      bbCamera.y = rect.top + rect.height / 2 - vh / (2 * bbCamera.zoom);
+      applyBlackboardCamera();
+    });
+    document.getElementById('hud-center')?.addEventListener('click', () => {
+      bbCamera.x = 0;
+      bbCamera.y = 0;
+      applyBlackboardCamera();
+    });
+    document.getElementById('hud-depth')?.addEventListener('click', () => {
+      // Cycle zoom levels for depth effect
+      bbCamera.zoom = bbCamera.zoom === 1 ? 1.5 : bbCamera.zoom === 1.5 ? 0.7 : 1;
+      applyBlackboardCamera();
+    });
+  }
+
+  // Keyboard shortcuts
+  document.addEventListener('keydown', (e) => {
+    if (e.target.matches('input, textarea, select')) return;
+    if (e.key === '0') resetBlackboard();
+    else if (e.key === 'f') document.getElementById('hud-fit')?.click();
+    else if (e.key === 'c') document.getElementById('hud-center')?.click();
+    else if (e.key === 'd') document.getElementById('hud-depth')?.click();
+  });
+
+  // Init blackboard
+  bindBlackboardGestures();
+  bindBlackboardHud();
+  applyBlackboardCamera();
+
+  // ── Existing code below ──
 
   const navRoot = document.getElementById('nav-root');
   const usecaseRoot = document.getElementById('usecase-root');

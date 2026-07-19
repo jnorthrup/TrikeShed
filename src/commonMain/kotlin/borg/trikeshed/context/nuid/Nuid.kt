@@ -189,6 +189,9 @@ sealed class Nonce(val bytes: ByteArray) {
      *  can be causally traced. Always 32 bytes. */
     class Derived(priorCausalKey: String) : Nonce(derive(priorCausalKey))
 
+    /** Restored nonce — constructed from arbitrary bytes during deserialization. */
+    class Restored(bytes: ByteArray) : Nonce(bytes)
+
     companion object {
         private fun derive(text: String): ByteArray {
             var h1 = 0x811c9dc5.toInt()

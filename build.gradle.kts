@@ -104,6 +104,10 @@ kotlin {
         binaries.executable()
     }
 
+    @OptIn(org.jetbrains.kotlin.gradle.ExperimentalWasmDsl::class)
+    wasmWasi {
+    }
+
     // ── Host-detected native targets (restored from c0e3f0fc) ────────────────
     val hostOs = System.getProperty("os.name").lowercase()
     val isMac = hostOs.contains("mac")
@@ -170,6 +174,8 @@ kotlin {
                 implementation("org.openjdk.jmh:jmh-generator-annprocess:1.37")
                 implementation("org.bouncycastle:bcprov-jdk15on:1.70")
                 implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:$coroutinesVersion")
+                implementation("org.ow2.asm:asm:9.7")
+                implementation("org.ow2.asm:asm-tree:9.7")
 
                 // GraalVM Polyglot — locked to 25.0.2 (GraalVM CE)
                 implementation("org.graalvm.polyglot:polyglot:$graalVersion")
@@ -240,6 +246,9 @@ kotlin {
         val macosX64Test = maybeCreate("macosX64Test").apply { dependsOn(macosTest) }
         val linuxMain = maybeCreate("linuxMain").apply { dependsOn(posixMain) }
         val linuxTest = maybeCreate("linuxTest").apply { dependsOn(posixTest) }
+
+        val androidMain = maybeCreate("androidMain").apply { dependsOn(commonMain) }
+        val androidTest = maybeCreate("androidTest").apply { dependsOn(commonTest) }
 
         findByName("macosMain")?.dependsOn(posixMain)
         findByName("macosTest")?.dependsOn(posixTest)

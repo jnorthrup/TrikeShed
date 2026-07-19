@@ -2,7 +2,6 @@
 
 package borg.trikeshed.lib
 
-import kotlin.jvm.JvmInline
 import kotlin.math.ln
 
 /**
