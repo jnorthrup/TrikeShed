@@ -176,7 +176,18 @@ object JvmKanbanServer {
         if (donorPath != null && NioFiles.exists(Paths.get(donorPath))) {
             // Replay donor on startup; mirrors prior daemon behavior.
             try {
-                ForgeKanbanIngest.persistMarkdown("jim", donorPath)
+                val donor = Paths.get(donorPath)
+                val ingestPath = if (borg.trikeshed.kanban.JvmTikaIngestAdapter.isTikaCandidate(donor)) {
+                    // Non-markdown donor (PDF/DOCX/image) — extract text via Tika
+                    // (tika4all tweaked config: Tesseract OCR + ffmpeg preprocessing).
+                    val md = borg.trikeshed.kanban.JvmTikaIngestAdapter.extractToMarkdown(donor)
+                    val tmp = NioFiles.createTempFile("tika-donor", ".md")
+                    NioFiles.writeString(tmp, md)
+                    tmp.toString()
+                } else {
+                    donorPath
+                }
+                ForgeKanbanIngest.persistMarkdown("jim", ingestPath)
                 System.err.println("donor replayed: $donorPath")
             } catch (t: Throwable) {
                 System.err.println("donor replay failed: ${t.message}")

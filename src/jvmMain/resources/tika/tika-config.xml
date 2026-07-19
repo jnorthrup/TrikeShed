@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Ported from jnorthrup/tika4all tika-config.xml (no memvid).
+     Enables Tesseract OCR with ffmpeg-based image preprocessing.
+     %s placeholders are filled by TesseractOCRParser as input/output paths. -->
+<properties>
+    <parsers>
+        <parser class="org.apache.tika.parser.ocr.TesseractOCRParser">
+            <params>
+                <enableImageProcessing>true</enableImageProcessing>
+                <imageProcessingCommand>bash ${user.dir}/src/jvmMain/resources/tika/ffmpeg_ocr.sh %s %s</imageProcessingCommand>
+            </params>
+        </parser>
+    </parsers>
+</properties>

@@ -184,6 +184,11 @@ kotlin {
                 implementation("org.graalvm.truffle:truffle-api:$graalVersion")
                 implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:$serializationVersion")
 
+                // Apache Tika — document text extraction (PDF/DOCX/images via Tesseract OCR).
+                // Parsers pull in POI/PDFBox/etc. only on the JVM target.
+                implementation("org.apache.tika:tika-core:3.2.3")
+                implementation("org.apache.tika:tika-parsers-standard-package:3.2.3")
+
                 // Compose Desktop UI — JVM + Skiko only
                 implementation(compose.desktop.currentOs)
                 implementation(compose.foundation)
