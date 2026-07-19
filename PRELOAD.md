@@ -78,6 +78,28 @@ Design bias:
 4. lazy views first; materialization later
 5. typealiases compress semantics, not substance
 
+**Maxim of categorical idempotency.** If a structure is not mutated, it should
+stay in the category it came from. A `Series` that gets copied to a `List` only
+to be read back is a type demotion: the List is a step-function pause, not a
+resting type. The rule cuts both ways:
+- A `mutableListOf` that is built and never mutated thereafter should be a
+  `Series` (`s_[...]` literal, or `xs α { ... }` projection, or `xs.toSeries()`).
+  The List shape was a transient; if the end state is read-only, return to Series.
+- A `List` that genuinely gets mutated (append-in-loop, index-assign, remove)
+  stays a List — but then say so with `mutableListOf`, not `listOf`, so the
+  mutation is honest in the type.
+
+The round-trip `list.toSeries()` → `series.toList()` is a category change and
+should be a no-op when the List was never mutated. If you see `.toList()` on a
+Series followed by no further mutation, the `.toList()` is the demotion — revert
+it. The canonical form is `(xs α { f(it) }).toList()` only when the consumer
+demands `List` (kotlinx `JsonArray`, stdlib `joinToString`, etc.); otherwise the
+α result stays a Series and composes downstream.
+
+Idempotency check: `xs.toSeries().toList().toSeries() == xs.toSeries()`. If a
+refactor introduces a step that breaks this equality by materializing, that
+step is the debt.
+
 ## Cursor algebra
 
 ```kotlin

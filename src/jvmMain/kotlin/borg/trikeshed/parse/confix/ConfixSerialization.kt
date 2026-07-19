@@ -8,6 +8,8 @@ import borg.trikeshed.cursor.RowVec
 import borg.trikeshed.lib.j
 import borg.trikeshed.lib.size
 import borg.trikeshed.lib.`▶`
+import borg.trikeshed.lib.α
+import borg.trikeshed.lib.toList
 import borg.trikeshed.parse.yaml.YamlParser
 import kotlinx.serialization.DeserializationStrategy
 import kotlinx.serialization.ExperimentalSerializationApi
@@ -190,9 +192,9 @@ private fun rowVecToJson(rv: RowVec, doc: ConfixDoc): JsonElement {
         }
         IOMemento.IoArray -> {
             val kids = rv.kids
-            val items = ArrayList<JsonElement>(kids.size)
-            for (kid in kids.`▶`) items.add(rowVecToJson(kid, doc))
-            JsonArray(items)
+            // α keeps the projection lazy; .toList returns an AbstractList view
+            // (Series.kt:39) backed by the index function — no ArrayList alloc.
+            JsonArray((kids α { rowVecToJson(it, doc) }).toList())
         }
         else -> {
             val v = rv.reify(doc.src) ?: return JsonNull

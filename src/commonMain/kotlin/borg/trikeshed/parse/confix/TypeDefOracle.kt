@@ -146,19 +146,21 @@ class TypeDefOracle {
             }
         }
 
-        val edgeSeries: Series<IsAEdge> = edges.size j { edges[it] }
+        val edgeSeries: Series<IsAEdge> = edges.toSeries()
         val lattice    = IsALattice(edgeSeries)
-        val capturedEntries = entries.toList()
-        val capturedNames   = idxToName.toList()
+        // Freeze mutable accumulators into Series (Collection.toSeries snapshots
+        // via toList internally — PRELOAD maxim: read-only end state is Series).
+        val capturedEntries: Series<TypeDefEntry> = entries.toSeries()
+        val capturedNames:   Series<String>      = idxToName.toSeries()
         val capturedByName  = LinkedHashMap(nameToIdx)
 
         return capturedEntries.size j { op: Any? ->
             @Suppress("UNCHECKED_CAST")
             when (op) {
-                TypeDefOracleK.Entries   -> (capturedEntries.size j { i: Int -> capturedEntries[i] })
-                TypeDefOracleK.Tokens     -> (capturedNames.size j { i: Int -> TypeToken(i) })
-                TypeDefOracleK.Names      -> ({ token: TypeToken ->
-                    if (token.poolIdx in capturedNames.indices) capturedNames[token.poolIdx] else "?$token"
+                TypeDefOracleK.Entries   -> capturedEntries
+                TypeDefOracleK.Tokens    -> (capturedNames.size j { i: Int -> TypeToken(i) })
+                TypeDefOracleK.Names     -> ({ token: TypeToken ->
+                    if (token.poolIdx in 0 until capturedNames.size) capturedNames[token.poolIdx] else "?$token"
                 })
                 TypeDefOracleK.ByName    -> ({ name: String ->
                     capturedByName[name]?.let { TypeToken(it) }

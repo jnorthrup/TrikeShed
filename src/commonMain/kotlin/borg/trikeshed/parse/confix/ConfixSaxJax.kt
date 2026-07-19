@@ -3,6 +3,8 @@ package borg.trikeshed.parse.confix
 import borg.trikeshed.cursor.IOMemento
 import borg.trikeshed.lib.Series
 import borg.trikeshed.lib.Twin
+import borg.trikeshed.lib.α
+import borg.trikeshed.lib.emptySeriesOf
 import borg.trikeshed.lib.get
 import borg.trikeshed.lib.size
 import borg.trikeshed.lib.`▶`
@@ -21,8 +23,7 @@ fun ConfixIndex.saxWalk(action: (SaxEvent) -> Unit) {
     }
 }
 
-class JaxElement(val tag: IOMemento, val startIndex: Int, val endIndex: Int) {
-    val children = mutableListOf<JaxElement>()
+class JaxElement(val tag: IOMemento, val startIndex: Int, val endIndex: Int, val children: Series<JaxElement>) {
     private var backingBytes: ByteArray? = null
 
     fun bytes(): ByteArray {
@@ -35,20 +36,19 @@ class JaxElement(val tag: IOMemento, val startIndex: Int, val endIndex: Int) {
             val tags: Series<IOMemento> = index.facet(ConfixIndexK.Tags)
             val directChildrenFn: (Int) -> Series<Int> = index.facet(ConfixIndexK.DirectChildren)
 
-            if (spans.size == 0) return JaxElement(IOMemento.IoObject, 0, 0)
+            if (spans.size == 0) return JaxElement(IOMemento.IoObject, 0, 0, emptySeriesOf())
 
             val rootTag = tags[parentTokenIdx]
             val rootTwin = spans[parentTokenIdx]
             val rootStart = rootTwin.a
             val rootEnd = rootTwin.b
-            val root = JaxElement(rootTag, rootStart, rootEnd)
 
             val directChildren = directChildrenFn(parentTokenIdx)
-            val childCount = directChildren.size
-            for (i in 0 until childCount) {
-                val childIdx = directChildren[i]
-                root.children.add(inflate(index, childIdx, src))
-            }
+            // α keeps children lazy and Series-typed (PRELOAD maxim: read-only
+            // end state is Series). Recursion composes through the projection.
+            val childSeries = directChildren α { childIdx -> inflate(index, childIdx, src) }
+
+            val root = JaxElement(rootTag, rootStart, rootEnd, childSeries)
 
             val len = rootEnd - rootStart + 1
             root.backingBytes = if (len > 0) ByteArray(len) { i -> src[rootStart + i] } else ByteArray(0)
