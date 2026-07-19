@@ -61,6 +61,13 @@ fun forgePersistenceScript(): String = """
         const rect = panel.getBoundingClientRect();
         const canvasRect = blackboardCanvas.getBoundingClientRect();
         const panelId = panel.id || panel.className.split(' ')[0];
+        // Make panel absolutely positioned for dragging
+        if (panel.style.position !== 'absolute') {
+          panel.style.position = 'absolute';
+          panel.style.left = (rect.left - canvasRect.left) + 'px';
+          panel.style.top = (rect.top - canvasRect.top) + 'px';
+          panel.style.width = rect.width + 'px';
+        }
         bbSectionDrag = {
           panel,
           startX: e.clientX,
