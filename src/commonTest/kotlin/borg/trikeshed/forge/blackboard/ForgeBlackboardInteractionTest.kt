@@ -1,5 +1,6 @@
 package borg.trikeshed.forge.blackboard
 
+import kotlin.math.abs
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotEquals
@@ -74,6 +75,33 @@ class ForgeBlackboardInteractionTest {
         )
         val ticked = impulse.tick(1.0 / 60.0)
         assertNotEquals(impulse.camera2d.vx, ticked.camera2d.vx, "velocity must change")
+    }
+
+    @Test
+    fun impulseUpdatesVelocity() {
+        val interaction = ForgeBlackboardInteraction()
+        val impulse = interaction.impulse(10.0, -5.0, 0.5)
+        assertEquals(10.0, impulse.camera2d.vx)
+        assertEquals(-5.0, impulse.camera2d.vy)
+        assertEquals(0.5, impulse.camera2d.vz)
+        assertTrue(impulse.animating)
+    }
+
+    @Test
+    fun centerAtSeedsVelocityTowardsTarget() {
+        val interaction = ForgeBlackboardInteraction(camera2d = ForgeBlackboardCamera(x = 0.0, y = 0.0))
+        val centered = interaction.centerAt(100.0, -50.0)
+        assertTrue(centered.camera2d.vx > 0.0, "vx should be positive towards target")
+        assertTrue(centered.camera2d.vy < 0.0, "vy should be negative towards target")
+        assertTrue(centered.animating)
+    }
+
+    @Test
+    fun zoomOutSeedsNegativeZoomVelocity() {
+        val interaction = ForgeBlackboardInteraction()
+        val zoomed = interaction.zoomOut()
+        assertTrue(zoomed.camera2d.vz < 0.0, "vz should be negative to zoom out")
+        assertTrue(zoomed.animating)
     }
 
     @Test

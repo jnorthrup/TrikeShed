@@ -64,6 +64,43 @@ data class ForgeBlackboardInteraction(
         return copy(camera2d = next2d, animating = !resting)
     }
 
+    /** Add an impulse to the 2D camera velocity (e.g. dragging a card or background). */
+    fun impulse(panVx: Double, panVy: Double, zoomV: Double = 0.0): ForgeBlackboardInteraction {
+        return copy(
+            camera2d = camera2d.impulse(panVx, panVy, zoomV),
+            animating = true
+        )
+    }
+
+    /**
+     * Re-center the camera to a target position, e.g. clicking a card
+     * to expand it to a document.
+     */
+    fun centerAt(worldX: Double, worldY: Double): ForgeBlackboardInteraction {
+        val dx = worldX - camera2d.x
+        val dy = worldY - camera2d.y
+        // Seed velocity towards the target so it animates there
+        return copy(
+            camera2d = camera2d.copy(
+                vx = dx * 5.0,
+                vy = dy * 5.0
+            ),
+            animating = true
+        )
+    }
+
+    /**
+     * Zoom out the camera, treating the graph as a constellation.
+     */
+    fun zoomOut(): ForgeBlackboardInteraction {
+        return copy(
+            camera2d = camera2d.copy(
+                vz = -5.0 // Seed negative zoom momentum
+            ),
+            animating = true
+        )
+    }
+
     /**
      * Human-readable label for the depth-toggle corner button so the renderer
      * doesn't need to know the enum order.
