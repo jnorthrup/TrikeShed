@@ -9,7 +9,7 @@ set +u
 source "$SDKMAN_DIR/bin/sdkman-init.sh"
 
 sdk install java 25.0.2-graalce
-sdk install kotlin 2.4.0
+sdk install kotlin 2.4.10
 sdk install gradle 9.6.1
 hash -r
 set -u

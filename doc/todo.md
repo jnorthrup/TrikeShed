@@ -462,4 +462,41 @@ post-NUID/CCEK audit. Each task is single-best-debt-reduction sized
 - [ ] **T-KANBAN-CROSS-11. Single submission format shared between
       Forge path and Hermes-donor path (closes G15)**
 
+## Storage unification — projection registry (2026-07-19)
+
+From `doc/rewire.md` §0 (one CID, five lenses). The blackboard causal
+graph is in-memory; making it CAS-backed unifies the five lenses
+(auxiliary CAS / materialized / reified / btrfs content / graph trees)
+under one `project(cid)` path.
+
+- [ ] **T-CAS-PROJ-1. Projection registry — `project(cid): Lens`**
+  - File: `src/commonMain/kotlin/borg/trikeshed/job/CasProjection.kt`.
+  - Goal: sealed class `Lens = Raw | Cursor | BtreePage | CausalNode |
+    Manifest`; `project(cid, kind)` reads `cas.get(cid)`, parses via
+    `confixDoc(bytes)`, dispatches on the doc's `kind`/`tag` field.
+  - Uses existing `ConfixIndexK<R>` facet machinery — no new storage,
+    no new formats.
+  - Verification: store a btree page, a causal node, and a manifest;
+    `project` each and confirm the correct lens resolves.
+
+- [ ] **T-CAS-PROJ-2. Blackboard causal graph → CAS-backed**
+  - File: `src/commonMain/kotlin/borg/trikeshed/dag/BlackboardDagCausalGraph.kt`.
+  - Goal: every causal node becomes a Confix doc `{causalKey, deps: [CID...],
+    payload}` stored in CAS. Edges are CIDs, not object references.
+  - Traversal: `cas.get(dep) → confixDoc → recurse`. Force-directed
+    layout consumes CID=identity, deps=edge-list.
+  - Snapshot: record the root CID. COW: new page on every edit,
+    re-point parent path to root.
+  - Depends on: T-CAS-PROJ-1.
+  - Verification: submit two linked jobs, snapshot the root CID,
+    restart, traverse from root CID and recover both nodes + the edge.
+
+- [ ] **T-CAS-PROJ-3. `MmapCasStore` (closes T4 from `doc/taste.md`)**
+  - File: `src/jvmMain/kotlin/borg/trikeshed/job/MmapCasStore.kt`.
+  - Goal: `get(cid)` returns a mapped slice (io_uring / Panama
+    MemorySegment), not a heap copy. Composes: mmap file →
+    `Series<Byte>` → Confix index over mapped bytes without copy.
+  - Verification: store 1MB blob, read via mapped slice, confirm
+    zero heap allocation on the read path.
+
 ## DRY / PRELOAD cuts already shipped (Jul 2026 audit pass)

@@ -98,6 +98,32 @@ for the current verdict on each.
 | LCNC | N6 DEFERRED — self-enclosed package; re-evaluate when it gains an external consumer |
 | Process reactor | **NEW 2026-07-19** — §8.1c documents `ProcessReactorEndpoint` (merged from `origin/jules-1801...`) |
 | Static assets | **NEW 2026-07-19** — §0 + §2 + §9 document `resources/web/` consolidation + `generateForgeAssets` (merged from `origin/fix-forge-assets-...`) |
+| treedoc | **NEW 2026-07-19** — memvid renamed to treedoc; doc cursor expanded to 5 fields (firstFrameOrdinal/frameCount); restore is direct slice, not scan |
+| LinearHashMap | **NEW 2026-07-19** — CasStore backing moved from MutableMap to LinearHashMap (KMP-native); put→set, operator get/set for MutableMap drop-in |
+
+## Taste-essay gap review (2026-07-19)
+
+The "Taste in High-Performance Data Engines for Hierarchical UIs" essay
+(mapped in `doc/taste.md`) reviewed against the live tree. The essay and
+TrikeShed agree on shape; the gaps are all in depth — shapes that exist
+but stop one composition short. Ten findings, ranked by impact:
+
+| # | Finding | Severity | Evidence |
+|---|---------|----------|----------|
+| T1 | No structural sharing within Confix docs — single-cell edits re-encode the whole document | HIGH | `ConfixDoc` re-encode on edit; CAS dedups blobs not subtrees |
+| T2 | Boxing wall in query path — `RowVec = Series2<Any?, ColumnMeta↻>` defeats autovec | HIGH | `ViewServer.evaluateExpr` walks boxed `Any?`; `DoubleSeries` primitive path exists but unwired |
+| T3 | No lazy `Series.filter(pred): Series<T>` — `%`/`[Predicate]` return Iterator not Series | HIGH | `Predicate.kt:10-15`; PointcutCoordinate.div materializes via `.toList()` |
+| T4 | CAS is heap-based, not mmap — uring exists for transport, never for document arena | MED | `CasStore.blobs` is `LinearHashMap<ContentId, ByteArray>`; `MmapCasStore` is the one-cut composition |
+| T5 | Browser dual-truth — JS mutates local state instead of lowering to JobCommand | MED | `script.js` local state mutation vs server-side bounded ingress |
+| T6 | `zoom(path)` returns `ConfixCell` not `Cursor` — breaks cursor composability at the most common hierarchical op | MED | `ConfixKit.kt:docAt`/`cellGetAt` return cell |
+| T7 | No spatial index over `layout3D` — rendering is O(nodes) per frame | MED | camera projects every node; no quadtree/interval tree |
+| T8 | No UX metrics harness — JMH for algebra, nothing for keystroke/zoom/cold-start | LOW | gh-pages element counts verify correctness, not latency |
+| T9 | No incremental delta propagation — projections full-rebuild per commit | LOW | Rete has affected-branch machinery; projections don't subscribe |
+| T10 | Guest language bound to ViewServer not cursors; JVM-only | LOW | `GraalVmViewServerHost` — wrong operand, single target |
+
+Cut list in `doc/taste.md` §"Cut list". T1–T3 are the essay's core promise
+(interactive editing on large documents); T4–T6 are the storage/cursor
+compositions that make it feel inevitable; T7–T10 are refinement.
 
 ## Stale-evidence note
 

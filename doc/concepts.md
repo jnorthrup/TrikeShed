@@ -23,9 +23,12 @@ TrikeShed/
 **No libs/ subprojects** — everything lives in `src/`.  
 **Confix** — the only portable serializer (desired boundary: commonMain allows only `kotlinx-serialization-core`; currently `kotlinx-serialization-json` is a direct `commonMain` dep in `build.gradle.kts` — the boundary is aspirational, not enforced).  
 **License** — AGPLv3 (effective 2017). Do not change.  
-**Task ledger** — `doc/todo.md` (LCNC T22–T29, Kanban-live T-KANBAN-* queues).  
+**Task ledger** — `doc/todo.md` (LCNC T22–T29, Kanban-live T-KANBAN-*, Storage-unification T-CAS-PROJ-* queues).  
+**Architecture docs** — `doc/rewire.md` (user-centric Forge workspace architecture, storage unification, K8s emulation via GraalVM pointcut server), `doc/taste.md` (high-performance hierarchical-UI engine principles, 10-point gap review).  
 **Compiled-out layers** — `classfile/slab/**` is excluded from `commonMain` compile in `build.gradle.kts` (~20 `TODO()` stubs: GraalJS eval, DuckDB c-interop, `FacetedCursorContract`, `MiniDuckContract`; files preserved on disk). `CircularQueue.poll/peek/iterator.remove` converted from `TODO()` to `error(...)` — loud hollow, not silent stub.  
-**Static assets** — `src/commonMain/resources/web/` (index.html, styles.css, script.js, manifest.webmanifest, icons/) is the single source of truth for the Forge HTML shell; the `generateForgeAssets` Gradle task bakes these into the Kotlin-internal `ForgeAssets` object so no runtime resource lookup is needed.
+**Static assets** — `src/commonMain/resources/web/` (index.html, styles.css, script.js, manifest.webmanifest, icons/) is the single source of truth for the Forge HTML shell; the `generateForgeAssets` Gradle task bakes these into the Kotlin-internal `ForgeAssets` object so no runtime resource lookup is needed.  
+**Categorical idempotency** — the kernel maxim (see PRELOAD.md): if a structure is not mutated, it stays in the category it came from. `Series` that gets copied to `List` only to be read back is a type demotion. `LinearHashMap` (KMP-native) replaces `MutableMap` where the map is not mutated post-construction; CasStore uses it as the blob backing.  
+**Storage unification** — one CAS, five lenses (auxiliary CAS / materialized / reified Confix / btrfs content / graph trees). `doc/rewire.md` §0. Projection registry (`project(cid): Lens`) is the one new piece (T-CAS-PROJ-1).
 
 ---
 
@@ -67,12 +70,14 @@ Key operators (in `lib/Join.kt`, `lib/Series.kt`):
 ```
 ┌──────────────────────────────────────────────────────────────────────┐
 │  FORGE / KANBAN / BLACKBOARD   (user-facing surfaces)               │
-│  - ForgeDoc block tree, ForgeBoardFSM, KanbanFSM                    │
+│  - Forge Workspace: light-theme block editor (sidebar + doc + board)│
+│  - ForgeDoc block tree (H1/H2/H3, P, TODO, BULLET, QUOTE, CODE)     │
+│  - ForgeBoardFSM, KanbanFSM, slash-command menu, localStorage PWA   │
 │  - CCEK choreography (channels, projections, agents)                │
 │  - Gallery / blackboard 2.5D/3D spatial layout                      │
 │  - BlackboardSurface projection: `confixDoc(persistedJson)` → `BlackboardSurface.project(...)` → seed rows; the `ForgeAppState` DTO family was removed (commit `1e8fd692`) │
 │  - Static HTML/CSS/JS shell consolidated under src/commonMain/resources/web/; `generateForgeAssets` task bakes them into the `ForgeAssets` Kotlin object so `ForgeApp.kt` references the asset by symbol, not by resource lookup │
-│  - ManimWM RTS camera: momentum, tilt, translucent marble/jade      │
+│  - ManimWM camera: momentum, tilt, 2.5D parallax + 3D orbit         │
 ├──────────────────────────────────────────────────────────────────────┤
 │  NUID / CCEK FANOUT   (authorization + dispatch)                    │
 │  - Nuid = Join<Capability, Join<Nonce, Subnet>>                     │
@@ -92,11 +97,14 @@ Key operators (in `lib/Join.kt`, `lib/Series.kt`):
 │  - ReteNetwork — production rule engine (alpha/beta/agenda/refraction)│
 │  - JobKanbanProjection / ForgeKanbanJobSink — Kanban as projection  │
 ├──────────────────────────────────────────────────────────────────────┤
-│  COUCH / ISAM   (content-addressable persistence)                   │
+│  COUCH / ISAM / TREEDOC   (content-addressed persistence)           │
+│  - CasStore — LinearHashMap<ContentId, ByteArray> (KMP-native)      │
 │  - CouchStore (in-memory, pluggable persistence)                    │
+│  - TreeDocPipeline — document archive over CAS (git-tree-shaped)    │
 │  - DurableAppendLog / WalFrame — frame format with CRC32C           │
 │  - JobRepository — recovery from checkpoint + tail replay           │
 │  - ConfixDocStore, ViewServer cascade rollups                       │
+│  - CowBPlusTree — COW pages in CAS, btrfs-style snapshot/send/recv  │
 ├──────────────────────────────────────────────────────────────────────┤
 │  DAG / RETE   (causal + rule engine)                                │
 │  - ReteWorkingMemory, Alpha/Beta memories, Agenda, Refraction       │
@@ -118,6 +126,7 @@ Key operators (in `lib/Join.kt`, `lib/Series.kt`):
 │  - NioSupervisor / LiburingElement / FanoutDispatcherElement        │
 │  - ChannelRunner — RelaxFactory inner loop → coroutines             │
 │  - MuxReactorElement — keymux/modelmux/taxonomy/kanban events       │
+│  - ProcessReactorEndpoint — NUID-authorized exec (Capability.Process)│
 ├──────────────────────────────────────────────────────────────────────┤
 │  TRANSPORT / HTX   (version-agnostic HTTP)                          │
 │  - HtxMessage blocks (ReqSl·Hdr·EOH·Data·EOT·EOM)                   │
@@ -309,19 +318,71 @@ fun run(scope, pollTimeout, onSignal) { ... }    // CQE loop → dispatch
 ### 8.1 Forge / Kanban / Blackboard (user-facing)
 
 ```
-ForgeDoc          ← block tree (PAGE, HEADING, TEXT, BULLET, TODO, CODE, …)
+Forge Workspace   ← block-based document editor (light theme)
+  src/commonMain/resources/web/
+    index.html  ← shell (sidebar + document + board + slash menu)
+    styles.css  ← light theme, 16px Inter, sidebar #f7f6f3, doc #fff
+    script.js   ← block editor: h1/h2/h3/p/todo/bullet/quote/code/divider
+                  slash command menu, hover affordances (+/drag handle)
+                  localStorage persistence, seed hydration, board view
+ForgeApp.kt       ← placeholder substitution: {{STYLES}} {{SEED}} {{SCRIPT}}
+                    → ForgeAssets.indexHtml/stylesCss/scriptJs
+                    (generateForgeAssets bakes web/ into Kotlin object)
+generateForgeAssets ← Gradle task, 5000-byte ByteArray chunks
+                      → borg.trikeshed.forge.generated.ForgeAssets
+
+ForgeDoc          ← block tree (H1/H2/H3, P, TODO, BULLET, NUMBERED, QUOTE, CODE, DIVIDER)
 ForgeBoardFSM     ← board/card FSM (BoardLoaded, CardMoved, CardCreated, Drag*)
 ForgeKanbanIngest ← /tmp/hi markdown → Rete facts + causal nodes + Kanban cards
 ForgeGalleryCatalog/Renderer ← widget catalog (sections LAYOUT..CAS, preview tokens)
-ForgePersistenceScript.kt ← browser IndexedDB/localStorage/Cache + force-directed graph
-ForgeApp.kt       ← HTML template + seed JSON injection (forge-seed)
+ForgePersistenceScript.kt ← browser IndexedDB/localStorage/Cache persistence
 ```
 
-**Gallery on GitHub Pages** — `jsNodeProductionRun` prints exact HTML to stdout; `generateForgePages` captures it into `docs/`. The seed embeds `ForgeBoardFSM.current()`, `KanbanFSM.current()`, `ForgeSpatialState`, and `ForgeGalleryCatalog.toJsonValue()`.
+**Shell architecture** — the workspace shell is a pure client-side block
+editor (no server at runtime). It hydrates from a baked seed JSON
+(`<script id="forge-seed">`) and persists all edits to `localStorage`.
+The seed is injected server-side by `ForgeApp.kt` via `{{SEED}}`
+placeholder; `jsNodeProductionRun` captures the fully-baked HTML into
+`docs/index.html` for gh-pages deployment.
 
-**Blackboard-as-Confix-cursor** — the target architecture. A single JSON file is the blackboard; `confixDoc(json)` → `Cursor` → `BlackboardSurface.project(cursor)` → UI renders cursor slices by path/offset/facet. No parallel DTO truth. `BlackboardSurface` joins `LcncEntitySurface` + `CausalGraphNodeIndex` into a deterministic `Cursor` of `BlackboardSurfaceRow`s (`card_id`, `lane`, `phase`, `facet`, `provenance`, `causalKey`, `lcncKind`). Facet drilldown = child cursor projections from the same doc.
+**Block types and slash commands** — typing `/` at the start of a block
+opens a slash menu with: Text, Heading 1/2/3, To-do, Bulleted list,
+Numbered list, Quote, Code, Divider. Each block has hover affordances
+(`+` to add below, `⋮⋮` to drag). Enter on a heading exits to paragraph;
+Backspace on empty block deletes and focuses the previous block.
 
-**ManimWM 2.5D RTS surface** — `ForgeBlackboardCamera` carries momentum (`vx`, `vy`, `vz`), tilt (2.5D parallax), and bounded zoom. The blackboard is the VFS; cursors are the files; facets are drilldown views. The PWA hydrates from a cursor seed and animates through the camera model. Marble-and-jade translucent motif for the builder-tool gallery.
+**Board view** — toggle between Document and Board views via the topbar.
+The board shows kanban columns (To do / Doing / Done) populated from
+seed cards (lcncEntities) or user-created cards. Cards cycle columns
+on click. Same items as the document — different projection.
+
+**Sidebar page tree** — left sidebar shows workspace pages with icons,
+titles, and active highlighting. "+ Add a page" creates a new page.
+Pages persist to `localStorage`.
+
+**Seed hydration** — the baked seed carries `lcncEntities` (→ bulleted
+list in the document + cards on the board), `causalNodes` (→ causal
+graph), and `gallery` (→ widget catalog). The shell note in the sidebar
+bottom shows the seed summary ("13 entities · 13 causal nodes · gallery").
+
+**Gallery on GitHub Pages** — `jsNodeProductionRun` prints exact HTML
+to stdout; awk-extract `<!doctype`..`</html>` into `docs/index.html`.
+Seed is ~200KB baked. `kotlinUpgradeYarnLock` may be needed if yarn
+lock drifts.
+
+**Blackboard-as-Confix-cursor** — the target architecture. A single JSON
+file is the blackboard; `confixDoc(json)` → `Cursor` →
+`BlackboardSurface.project(cursor)` → UI renders cursor slices by
+path/offset/facet. No parallel DTO truth. `BlackboardSurface` joins
+`LcncEntitySurface` + `CausalGraphNodeIndex` into a deterministic
+`Cursor` of `BlackboardSurfaceRow`s. Facet drilldown = child cursor
+projections from the same doc.
+
+**ManimWM 2.5D/3D surface** — `ForgeBlackboardCamera` carries momentum
+(`vx`, `vy`, `vz`), tilt (2.5D parallax), and bounded zoom. The
+blackboard is the VFS; cursors are the files; facets are drilldown
+views. `ForgeBlackboard3D` adds true 3D orbit with per-section
+elevation (gallery above board above page).
 
 ### 8.1a NUID / CCEK Fanout (authorization + dispatch)
 

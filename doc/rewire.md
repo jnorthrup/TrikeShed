@@ -11,6 +11,67 @@
 
 ---
 
+## 0. Storage Unification — One CID, Five Lenses
+
+The foundational rule: **the bytes are the thing; the views are lenses,
+not copies.** A CAS blob never gets materialized five ways. It gets stored
+once as Confix bytes, and the tag inside the bytes decides which projection
+applies. Everything else is a lazy read of the same content address.
+
+```
+cas.get(cid) → ByteArray                        (auxiliary CAS — the raw lens)
+     │
+     ├─ materialized   → the bytes exist in the store (LinearHashMap / mmap)
+     │
+     ├─ confixDoc(bytes) → ConfixIndex → cells   (reified — decode on demand)
+     │
+     ├─ tag == "btree-page"      → {keys[], values[], children[]}  (btrfs content)
+     ├─ tag == "causal-node"     → {causalKey, deps[], payload}    (graph tree)
+     └─ tag == "treedoc-manifest" → {docs[], frames[]}            (archive)
+```
+
+Three mechanisms make this work:
+
+**1. Tag dispatch, not storage dispatch.** You don't decide "this blob is
+a btree page" when you store it. You read the bytes, look at the Confix
+tag/kind field, and project. This is the existing `ConfixIndexK<R>`
+GADT-key pattern — `facet(TreeCursor)` gives a Cursor, `facet(CausalNode)`
+gives a graph node, `facet(BtreePage)` gives a page. The key fixes the
+result type; the bytes stay bytes. No parallel storage systems.
+
+**2. Edges are CIDs, so the graph is free.** A graph node is a Confix doc
+whose `deps` field is an array of CIDs. Traversal is
+`cas.get(dep) → confixDoc → recurse`. The blackboard's causal graph becomes
+CAS-backed for free — nodes are content addresses, edges are references
+into the same store. Force-directed layout consumes this directly: CID =
+node identity, deps = edge list. CAS dedup means two nodes sharing a
+dependency literally share the blob — diamond structures are physical.
+
+**3. btrfs semantics fall out of CIDs + COW discipline.** A btrfs tree is
+a COW page tree whose root is a content address. `CowBPlusTree` already
+does this: pages as Confix docs in CAS, root is a CID, checkpoint +
+hydrate. Snapshot = record the root CID. Send/recv = walk two root CIDs
+and emit pages reachable from one but not the other (shared pages have
+identical CIDs). Compression is TreeDoc frame chunking. The "btrfs
+content" isn't a separate format — it's Confix pages obeying the COW rule.
+
+| Lens | Existing code | State |
+|------|--------------|-------|
+| auxiliary CAS | `CasStore.get(cid)` → bytes, digest-verified | done |
+| materialized | `LinearHashMap<ContentId, ByteArray>` | done; `MmapCasStore` pending (T4) |
+| reified | `confixDoc(bytes)` → index → `cell.reify()` | done |
+| btrfs content | `CowBPlusTree` pages in CAS, root CID | done for job snapshots |
+| graph trees | `BlackboardDagCausalGraph` | **in-memory, NOT CAS-backed** — the gap |
+| Confix at rest | manifest via `cas.put(confixDoc)` | done (treedoc, job frames) |
+
+**The one new piece:** a projection registry — `project(cid): Lens` where
+`Lens = Raw | Cursor | BtreePage | CausalNode | Manifest`, dispatched on
+the doc's tag. Sealed class + existing facet machinery. One file, no new
+storage, no new formats. Turns "five systems that happen to share a CAS"
+into "one store with five lenses." Task: T-CAS-PROJ-1 in `doc/todo.md`.
+
+---
+
 ## 1. The Unified Surface (Blackboard + Rete + Types + UI)
 
 The workspace is not a set of views over a database. It is one continuous
