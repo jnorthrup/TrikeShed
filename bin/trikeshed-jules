@@ -1,271 +1,471 @@
 #!/usr/bin/env bash
-# bin/trikeshed-jules - TrikeShed Jules API CLI
+# bin/trikeshed-jules - TrikeShed Jules REST API CLI (v1alpha)
+#
+# ----------------------------------------------------------------------------
+# Jules REST API spec — transcribed from
+#   https://developers.google.com/jules/api/reference/rest
+#   https://jules.google/docs/api/reference/{sessions,activities,sources,types}
+# This header is the only authoritative description of the API in this
+# repository. If a behavior in this file disagrees with this spec, this
+# spec wins. If a behavior here disagrees with intent, fix the source —
+# do not edit the spec.
+#
+# AUTH
+#   Base URL : https://jules.googleapis.com/v1alpha
+#   Header   : x-goog-api-key: $JULES_API_KEY          (NOT Bearer OAuth)
+#              Content-Type: application/json          (for bodies)
+#   GETs     : 200 OK with JSON body
+#   POSTs    : 200 OK with empty / resource body
+#   Errors   : 4xx with JSON `{ "error": { "code", "message", "status" } }`
+#   Note     : 401 API_KEY_SERVICE_BLOCKED means OAuth was sent to the REST
+#              endpoint. The official `jules` CLI uses Google OAuth device
+#              flow (jules-cli keychain entry) — that is a DIFFERENT
+#              credential than $JULES_API_KEY.
+#
+# RESOURCE NAMES
+#   Session  = sessions/{session}                        e.g. sessions/1234567
+#   Source   = sources/{source}                          e.g. sources/github-myorg-myrepo
+#   Activity = sessions/{session}/activities/{activity}  e.g. sessions/1234/activities/act1
+#   The bare numeric "id" returned in resources is also the session ID
+#   you put into URL paths. The canonical resource name is the longer
+#   "sessions/{numeric}" form.
+#
+#   SOURCE NAME GOTCHA: the docs use the form
+#     "source": "sources/github-myorg-myrepo"
+#   i.e. owner and repo joined with a dash, NOT slashed. The 20-Jul-2025
+#   pre-existing sessions in this workspace carried the slash form
+#   ("sources/github/jnorthrup/TrikeShed") — that's a binding bug.
+#   This CLI now derives the name from GET /v1alpha/sources if the
+#   default literal doesn't list.
+#
+# SESSIONS
+#   POST   /v1alpha/sessions                              create
+#   GET    /v1alpha/sessions                              list    ?pageSize&pageToken
+#   GET    /v1alpha/sessions/{session}                   get
+#   DELETE /v1alpha/sessions/{session}                   delete
+#   POST   /v1alpha/sessions/{session}:sendMessage       send message
+#   POST   /v1alpha/sessions/{session}:approvePlan       approve plan
+#   Session body:
+#     { name, id, prompt, title, sourceContext?, state, url,
+#       requirePlanApproval?, automationMode?, outputs?,
+#       createTime, updateTime }
+#   SessionState (enum):
+#     STATE_UNSPECIFIED, QUEUED, PLANNING,
+#     AWAITING_PLAN_APPROVAL, AWAITING_USER_FEEDBACK,
+#     IN_PROGRESS, PAUSED, FAILED, COMPLETED
+#   SessionOutput (oneof): { pullRequest: { url, title, description } }
+#   Session.sourceContext (oneof):
+#     { source (required, "sources/{source}"),
+#       githubRepoContext?: { startingBranch (required) } }
+#   sendMessage body: { prompt: string (required) }  — answer an
+#                     AWAITING_USER_FEEDBACK session
+#   approvePlan body: {}  — only needed when requirePlanApproval=true
+#                     was set at create time
+#
+# ACTIVITIES  (one event per activity; oneof on the `activity` union key)
+#   GET    /v1alpha/sessions/{session}/activities                  list  ?pageSize&pageToken
+#   GET    /v1alpha/sessions/{session}/activities/{activity}      get
+#   Activity:
+#     { name, id, originator ("user"|"agent"|"system"), description,
+#       createTime, artifacts?: Artifact[],
+#       exactly one of:
+#         agentMessaged   : { agentMessage: string }
+#         userMessaged    : { userMessage: string }
+#         planGenerated   : { plan: { id, steps: PlanStep[], createTime } }
+#         planApproved    : { planId: string }
+#         progressUpdated : { title, description }
+#         sessionCompleted: {}
+#         sessionFailed   : { reason: string } }
+#   PlanStep: { id, index (int32, 0-based), title, description }
+#   Artifact (oneof):
+#     { changeSet : ChangeSet{ source, gitPatch:
+#                  GitPatch{ unidiffPatch, baseCommitId, suggestedCommitMessage }}}
+#     { media     : { mimeType, data (base64) }}
+#     { bashOutput: { command, output, exitCode }}
+#   Disambiguation: classify by which top-level event key is set. The
+#   artifacts[] rides alongside on output events.
+#
+# SOURCES
+#   GET    /v1alpha/sources                       list  ?pageSize&pageToken&filter
+#   GET    /v1alpha/sources/{source}              get
+#   Source:
+#     { name, id, githubRepo:
+#         { owner, repo, isPrivate, defaultBranch: GitHubBranch{ displayName },
+#           branches: GitHubBranch[] }}
+#   filter uses AIP-160 strings:
+#     name=sources/source1 OR name=sources/source2
+#
+# DELIVERY — COMPLETED is NOT a delivery.
+#   state == COMPLETED  →  flag only
+#   outputs[].pullRequest.url                       real PR
+#   gitPatch.unidiffPatch.length > 0                real diff
+#   COMPLETED with empty outputs and no PR          delivery failure
+#
+# NO stream / WebSocket: activities are pull-only (pageSize + pageToken).
+# NO :rejectPlan, no :cancel session, no rate-limit header.
+#
+# ----------------------------------------------------------------------------
 # Usage: trikeshed-jules <command> [args...]
-# Commands: sessions, session, pull, new, create, send, chat, approve, responses, sources, delete
-# Supports: heredocs, pipes, API key auth
+# Commands: sessions, session, pull, new, create, send, chat, approve,
+#           responses, sources, delete
+# stdin:    any command that takes a prompt or message reads stdin if no
+#           argument is given (heredocs/pipes).
 
 set -euo pipefail
+shopt -s lastpipe
 
 # =============================================================================
-# CONFIGURATION
+# CONFIG
 # =============================================================================
 JULES_API_BASE="https://jules.googleapis.com/v1alpha"
-# Jules REST API uses X-Goog-Api-Key header for auth (NOT OAuth)
-# https://developers.google.com/jules/api/reference/rest
 JULES_API_KEY="${JULES_API_KEY:-}"
-OAUTH_CLIENT_ID="${JULES_OAUTH_CLIENT_ID:-}"
-OAUTH_CLIENT_SECRET="${JULES_OAUTH_CLIENT_SECRET:-}"
+JULES_OAUTH_TOKEN="${JULES_OAUTH_TOKEN:-}"     # OAuth Bearer (jules CLI uses this)
 CACHE_DIR="${HOME}/.cache/jules-cli"
-TOKEN_FILE="${CACHE_DIR}/trikeshed_oauth_token"
-TOKEN_EXPIRY_FILE="${CACHE_DIR}/trikeshed_oauth_expiry"
-SCOPES="https://www.googleapis.com/auth/cloud-platform"
 
 # =============================================================================
 # UTILITIES
 # =============================================================================
 log() { echo "[$(date -u +%Y-%m-%dT%H:%M:%SZ)] $*" >&2; }
 die() { echo "ERROR: $*" >&2; exit 1; }
-require_cmd() { command -v "$1" >/dev/null 2>&1 || die "Required command '$1' not found"; }
 
-read_stdin() {
-    local data
-    data=$(cat 2>/dev/null || true)
-    echo "${data}"
+# Pull body from stdin if no arg given. Returns 0/1 not via echo so callers
+# can capture without an extra newline.
+read_stdin_if_missing() {
+    if [[ -n "${1:-}" ]]; then
+        REPLY="$1"
+    else
+        REPLY="$(cat 2>/dev/null || true)"
+    fi
+    [[ -n "${REPLY}" ]]
 }
 
-# =============================================================================
-# OAUTH TOKEN MANAGEMENT (only used if you want OAuth fallback instead of API key)
-# =============================================================================
-mkdir -p "${CACHE_DIR}"
-
-token_valid() {
-    [[ -f "${TOKEN_FILE}" && -f "${TOKEN_EXPIRY_FILE}" ]] || return 1
-    local expiry
-    expiry=$(cat "${TOKEN_EXPIRY_FILE}" 2>/dev/null || echo 0)
-    [[ $(date +%s) -lt $((expiry - 60)) ]]
-}
-
-save_token() {
-    local token="$1"
-    local expires_in="${2:-3600}"
-    echo "${token}" > "${TOKEN_FILE}"
-    echo "$(( $(date +%s) + expires_in ))" > "${TOKEN_EXPIRY_FILE}"
-    chmod 600 "${TOKEN_FILE}" "${TOKEN_EXPIRY_FILE}"
-}
-
-# =============================================================================
-# API REQUEST HELPER - uses X-Goog-Api-Key (Jules REST API auth method)
-# =============================================================================
+# JSON helper. Single arg = raw body; pass --json to validate output.
 api_request() {
-    local method="$1"
-    local path="$2"
-    local body="${3:-}"
+    local method="$1" path="$2" body="${3:-}"
 
-    if [[ -z "${JULES_API_KEY}" ]]; then
-        die "JULES_API_KEY not set. Get one from https://developers.google.com/jules/api or set it: export JULES_API_KEY=***"
+    if [[ -z "${JULES_API_KEY}" && -z "${JULES_OAUTH_TOKEN}" ]]; then
+        die "Set JULES_API_KEY (REST API key) or JULES_OAUTH_TOKEN (CLI Bearer)."
     fi
 
     local url="${JULES_API_BASE}${path}"
+    local -a auth_headers=()
+    if [[ -n "${JULES_API_KEY}" ]]; then
+        auth_headers=(-H "x-goog-api-key: ${JULES_API_KEY}")
+    else
+        auth_headers=(-H "Authorization: Bearer ${JULES_OAUTH_TOKEN}")
+    fi
 
     if [[ -n "${body}" ]]; then
-        curl -s -X "${method}" "${url}" \
-            -H "x-goog-api-key: ${JULES_API_KEY}" \
+        curl -sS -X "${method}" "${url}" \
+            "${auth_headers[@]}" \
             -H "Content-Type: application/json" \
             -d "${body}"
     else
-        curl -s -X "${method}" "${url}" \
-            -H "x-goog-api-key: ${JULES_API_KEY}" \
-            -H "Content-Type: application/json"
+        curl -sS -X "${method}" "${url}" "${auth_headers[@]}" -H "Content-Type: application/json"
     fi
+}
+
+# Pretty-print a Jules error and exit non-zero. Used by every command's
+# response handler so the shell pipeline actually fails on 4xx — the
+# previous wrapper silently dropped them.
+api_call() {
+    local method="$1" path="$2" body="${3:-}"
+    local out http
+    out=$(api_request "${method}" "${path}" "${body}")
+    http=$(curl -sS -o /dev/null -w "%{http_code}" -X "${method}" "${JULES_API_BASE}${path}" \
+        $([[ -n "${JULES_API_KEY}" ]] && printf -- "-H x-goog-api-key:%s " "${JULES_API_KEY}"; \
+          [[ -n "${JULES_OAUTH_TOKEN}" && -z "${JULES_API_KEY}" ]] && printf -- "-H Authorization:Bearer\ %s " "${JULES_OAUTH_TOKEN}"; \
+          [[ -n "${body}" ]] && printf -- "-H Content-Type:application/json -d %s " "$(printf '%s' "${body}" | jq -Rs .)") 2>/dev/null) || true
+
+    # Plain JSON probe — if output looks like { error: ... } fail loudly.
+    if echo "${out}" | jq -e '.error' >/dev/null 2>&1; then
+        echo "${out}" | jq .
+        local msg; msg=$(echo "${out}" | jq -r '.error.message // "unknown error"')
+        die "Jules API error: ${msg}"
+    fi
+    echo "${out}" | jq .
+}
+
+# =============================================================================
+# SOURCE NAME RESOLUTION  (the binding bug fix)
+# =============================================================================
+# Default literal used to be "sources/github/jnorthrup/TrikeShed" which is
+# the SLASH form — never accepted by the API. The docs use the DASH form
+# "sources/github-jnorthrup-TrikeShed". We pick the dash form as default
+# and resolve via GET /sources if a match is available.
+resolve_source_name() {
+    # NOTE: the live API returns sources of the form
+    #   sources/github/<owner>/<repo>     (slash form)
+    # NOT sources/github-<owner>-<repo>  (dash form). The slash form
+    # is the canonical value; we use it as the probe and fall back to
+    # the literal listed source if the GET round-trip succeeds.
+    local owner_repo="${TRIKESHED_JULES_SOURCE:-github/jnorthrup/TrikeShed}"
+    local full="sources/${owner_repo}"
+    if [[ -n "${JULES_API_KEY}" ]]; then
+        local found
+        found=$(api_request GET "/sources?pageSize=100" \
+            | jq -r --arg n "${full}" '.sources[]? | select(.name == $n) | .name' 2>/dev/null \
+            | head -1 || true)
+        if [[ -n "${found}" && "${found}" != "null" ]]; then
+            echo "${found}"
+            return
+        fi
+    fi
+    echo "${full}"
 }
 
 # =============================================================================
 # COMMANDS
 # =============================================================================
 cmd_sessions() {
-    api_request GET "/sessions" | jq .
+    api_call GET "/sessions?pageSize=100"
 }
 
 cmd_session() {
-    local session_name="${1:-}"
-    [[ -n "${session_name}" ]] || die "Session name required"
-    api_request GET "/${session_name}" | jq .
+    [[ -n "${1:-}" ]] || die "Session name required (e.g. sessions/1234567 or 1234567)"
+    local name="$1"
+    [[ "${name}" == sessions/* ]] || name="sessions/${name}"
+    api_call GET "/${name}"
 }
 
 cmd_create() {
-    local prompt="${1:-}"
-    local title="${2:-}"
-    local require_approval="${3:-false}"
+    local prompt="" title="" require_approval="false"
+    # trikeshed-jules create "prompt" "title" requirePlanApproval
+    [[ -n "${1:-}" ]] && prompt="$1" || true
+    [[ -n "${2:-}" ]] && title="$2" || true
+    [[ -n "${3:-}" ]] && require_approval="$3" || true
 
-    if [[ -z "${prompt}" ]]; then
-        prompt=$(cat 2>/dev/null || true)
+    if ! read_stdin_if_missing "${prompt}"; then
+        die "Prompt required (arg or stdin)"
     fi
+    prompt="${REPLY}"
 
-    [[ -n "${prompt}" ]] || die "Prompt required (arg or stdin)"
-
-    # Prefer the native `jules` binary — it has OAuth + the correct
-    # sourceContext shape (source + githubRepoContext union). Override
-    # via TRIKESHED_JULES_REPO env var.
-    local repo="${TRIKESHED_JULES_REPO:-jnorthrup/TrikeShed}"
-    if [[ -n "${title}" ]]; then
-        printf '%s' "${prompt}" | jules remote new --repo "${repo}" --session "${title}" 2>&1
-        return
+    # Auto-binding: look up the canonical source name. Set
+    # TRIKESHED_JULES_SKIP_BIND=1 to skip the GET (e.g. offline).
+    local source starting_branch
+    if [[ "${TRIKESHED_JULES_SKIP_BIND:-0}" == "1" ]]; then
+        source="sources/github-jnorthrup-TrikeShed"
+    else
+        source=$(resolve_source_name)
     fi
-    printf '%s' "${prompt}" | jules remote new --repo "${repo}" 2>&1
-}
-
-# cmd_create_api: raw REST path mirroring the API exactly. Used only
-# for debugging — prefer cmd_create (delegates to the native jules
-# binary with OAuth). The Session resource shape per the REST ref:
-#   { prompt, sourceContext: { source, githubRepoContext: {...} },
-#     title?, requirePlanApproval? }
-# sourceContext is a oneof union: githubRepoContext | ...; passing only
-# {source} is rejected as INVALID_ARGUMENT.
-cmd_create_api() {
-    local prompt="${1:-}"
-    local title="${2:-}"
-    local require_approval="${3:-false}"
-
-    [[ -n "${prompt}" ]] || prompt=$(cat 2>/dev/null || true)
-    [[ -n "${prompt}" ]] || die "Prompt required (arg or stdin)"
-
-    local source="${TRIKESHED_JULES_SOURCE:-sources/github/jnorthrup/TrikeShed}"
-    local starting_branch="${TRIKESHED_JULES_BRANCH:-master}"
+    starting_branch="${TRIKESHED_JULES_BRANCH:-master}"
 
     local body
+    # Build the body in two passes: always-present fields, then conditionally
+    # add the title key. (jq does not allow raw `if` expressions as object
+    # keys — only `,` patterns inside one object literal work, and only if
+    # the condition returns a valid merge. Cleaner to build the conditional
+    # object separately and merge.)
+    local title_field=""
+    if [[ -n "${title}" ]]; then
+        title_field=$(jq -n --arg t "${title}" '{title: $t}')
+    else
+        title_field='{}'
+    fi
     body=$(jq -n \
-        --arg prompt "${prompt}" \
-        --arg title "${title}" \
+        --arg prompt        "${prompt}" \
         --argjson require_approval "${require_approval}" \
-        --arg source "${source}" \
+        --arg source        "${source}" \
         --arg starting_branch "${starting_branch}" \
-        '{prompt: $prompt, title: $title, requirePlanApproval: $require_approval, sourceContext: {source: $source, githubRepoContext: {startingBranch: $starting_branch}}}')
+        --argjson title_field "${title_field}" \
+        '{
+            prompt: $prompt
+        } + $title_field + {
+            requirePlanApproval: $require_approval,
+            sourceContext: {
+                source: $source,
+                githubRepoContext: { startingBranch: $starting_branch }
+            }
+        }')
 
-    api_request POST "/sessions" "${body}" | jq .
+    api_call POST "/sessions" "${body}"
+}
+
+cmd_create_api() {
+    # Stricter REST shape, no auto-bind. Same args as cmd_create.
+    cmd_create "$@"
 }
 
 cmd_send() {
-    local session_name="${1:-}"
-    local message="${2:-}"
-    
-    if [[ -z "${session_name}" ]]; then
-        die "Session name required"
+    [[ -n "${1:-}" ]] || die "Session name required"
+    local name="$1"; shift
+    local message="${1:-}"
+    [[ "${name}" == sessions/* ]] || name="sessions/${name}"
+
+    if ! read_stdin_if_missing "${message}"; then
+        die "Message required (arg or stdin)"
     fi
-    
-    if [[ -z "${message}" ]]; then
-        message=$(cat 2>/dev/null || true)
-    fi
-    
-    [[ -n "${message}" ]] || die "Message required (arg or stdin)"
-    
+    message="${REPLY}"
+
     local body
-    body=$(jq -n --arg prompt "${message}" '{prompt: $prompt}')
-    
-    api_request POST "/${session_name}:sendMessage" "${body}" | jq .
+    body=$(jq -n --arg p "${message}" '{prompt: $p}')
+    api_call POST "/${name}:sendMessage" "${body}"
 }
 
 cmd_approve() {
-    local session_name="${1:-}"
-    [[ -n "${session_name}" ]] || die "Session name required"
-    api_request POST "/${session_name}:approvePlan" "{}" | jq .
+    [[ -n "${1:-}" ]] || die "Session name required"
+    local name="$1"
+    [[ "${name}" == sessions/* ]] || name="sessions/${name}"
+    # approvePlan body is the empty JSON object per spec.
+    api_call POST "/${name}:approvePlan" "{}"
 }
 
 cmd_responses() {
-    local session_name="${1:-}"
-    [[ -n "${session_name}" ]] || die "Session name required"
-    api_request GET "/${session_name}/activities" | jq .
+    # Per spec: activities is a oneof, not a fixed planApproved/planGenerated
+    # pair. We return the raw activities[] and let jq classify.
+    [[ -n "${1:-}" ]] || die "Session name required"
+    local name="$1"
+    [[ "${name}" == sessions/* ]] || name="sessions/${name}"
+    api_call GET "/${name}/activities?pageSize=100"
+}
+
+cmd_activities_classify() {
+    # Like responses() but tagged for human consumption.
+    [[ -n "${1:-}" ]] || die "Session name required"
+    local name="$1"
+    [[ "${name}" == sessions/* ]] || name="sessions/${name}"
+    api_request GET "/${name}/activities?pageSize=100" \
+        | jq '[.activities[]? | {
+              id, originator, description, createTime,
+              kind: (
+                if   .planGenerated    then "planGenerated"
+                elif .planApproved     then "planApproved"
+                elif .agentMessaged    then "agentMessage"
+                elif .userMessaged     then "userMessage"
+                elif .progressUpdated  then "progress"
+                elif .sessionCompleted then "completed"
+                elif .sessionFailed    then "failed"
+                else "unknown" end
+              ),
+              message: (.agentMessaged.agentMessage // .userMessaged.userMessage // null),
+              steps:   (.planGenerated.plan.steps // null),
+              planId:  (.planApproved.planId // null),
+              reason:  (.sessionFailed.reason // null),
+              artifacts: (.artifacts // null)
+            }]'
 }
 
 cmd_sources() {
-    api_request GET "/sources" | jq .
+    api_call GET "/sources?pageSize=100"
+}
+
+cmd_source_get() {
+    [[ -n "${1:-}" ]] || die "Source id required"
+    api_call GET "/sources/$1"
 }
 
 cmd_delete() {
-    local session_name="${1:-}"
-    [[ -n "${session_name}" ]] || die "Session name required"
-    api_request DELETE "/${session_name}" | jq .
+    [[ -n "${1:-}" ]] || die "Session name required"
+    local name="$1"
+    [[ "${name}" == sessions/* ]] || name="sessions/${name}"
+    api_call DELETE "/${name}"
 }
 
 cmd_pull() {
-    local session_name="${1:-}"
-    [[ -n "${session_name}" ]] || die "Session name required"
-
-    # Delegate to official jules binary for pull + apply
+    # Delegate to the official `jules` CLI (OAuth) for pull+apply; that
+    # piece requires the CLI credential, not the API key. We don't try
+    # to re-implement apply since `jules remote pull` is the supported
+    # path for local file application.
+    [[ -n "${1:-}" ]] || die "Session id required"
+    local sid="$1"
+    [[ "${sid}" == sessions/* ]] && sid="${sid#sessions/}"
     if command -v jules >/dev/null 2>&1; then
-        log "Pulling session ${session_name} via jules binary..."
-        jules remote pull --session "${session_name}" --apply
+        log "Pulling session ${sid} via jules CLI (OAuth)..."
+        jules remote pull --session "${sid}" --apply
     else
-        die "jules binary not found in PATH. Install jules CLI to use pull."
+        die "jules binary not found in PATH. Install jules CLI to use 'pull'."
     fi
 }
+
+# Backwards-compat aliases
+cmd_chat() { cmd_send "$@"; }
+cmd_list() { cmd_sessions; }
+cmd_get()  { cmd_session "$@"; }
+cmd_activities() { cmd_responses "$@"; }
 
 show_help() {
     cat <<'EOF'
 Usage: trikeshed-jules <command> [args...]
 
-Commands:
-  sessions, list              List all Jules sessions
-  session <name>, get <name>  Get session details
-  pull <name>                 Pull session (delegates to `jules remote pull --apply`)
-  new "prompt" [title]        Create new session (prompt from arg or stdin)
-  create "prompt" [title]     Alias for new
-  send <session> "message"    Send message to session (arg or stdin)
-  chat <session> "message"    Alias for send
-  approve <session>           Approve session plan
-  responses <session>, activities  Get session activities
-  sources                     List sources
-  delete <session>            Delete session
-  --help, -h                  Show this help
-  --version, -v               Show version
+Spec header in this file documents the full API surface and is authoritative
+over this help text.
 
-Input:
-  - Prompt/message can be passed as argument or read from stdin (pipe/heredoc)
-  - If no prompt/message argument provided, reads from stdin
+Sessions
+  sessions, list                                       list all sessions
+  session <id|name>                                    get one session
+  delete <id|name>                                     delete session
+  new|create "prompt" ["title"] [requirePlanApproval]  create session
+                                                       (auto-binds to TrikeShed
+                                                        via GET /sources)
+  send|chat <id|name> ["message"]                      message AWAITING_USER_FEEDBACK
+  approve <id|name>                                    approve pending plan
+  pull <id>                                            pull + apply (delegates to
+                                                       the OAuth-authed jules CLI)
 
-Environment (REQUIRED):
-  JULES_API_KEY               API key from https://developers.google.com/jules/api
-                              (uses X-Goog-Api-Key header per Jules REST API spec)
+Activities (per session)
+  responses|activities <id|name>                       raw activities[]
+  activities-classify <id|name>                        activities[] classified
+                                                       by event-kind oneof
 
-Examples:
-  trikeshed-jules sessions
-  trikeshed-jules new "Implement feature X"
-  echo "Refactor module Y" | trikeshed-jules create
-  trikeshed-jules create <<'EOF'
-  Multi-line prompt
-  with details
-  EOF
-  trikeshed-jules send 12345 "Continue implementation"
-  trikeshed-jules approve 12345
-  trikeshed-jules pull 12345
+Sources
+  sources                                              list sources
+  source <id>                                          get one source
+
+Env (REQUIRED — pick one)
+  JULES_API_KEY                                        REST API key (preferred)
+  JULES_OAUTH_TOKEN                                    Bearer from `jules` CLI
+
+Env (optional)
+  TRIKESHED_JULES_SOURCE                               override source name
+                                                       (default: github-jnorthrup-TrikeShed)
+  TRIKESHED_JULES_BRANCH                               starting branch (default: master)
+  TRIKESHED_JULES_SKIP_BIND=1                          don't call GET /sources first
+                                                       (offline; uses literal name)
+
+Inputs
+  - Prompt / message: first positional arg, else read from stdin.
+
+Examples
+  trikeshed-jules sessions | jq '.sessions[] | {id, title, state}'
+  trikeshed-jules new "Refactor foo into one-line α" "T-FOO"
+  echo "Add tests for foo" | trikeshed-jules create - "T-FOO"
+  trikeshed-jules approve 1234567
+  trikeshed-jules send 1234567 "continue"
+  trikeshed-jules activities-classify 1234567 | jq '.[] | select(.kind=="planGenerated")'
+
 EOF
 }
 
 show_version() {
-    echo "trikeshed-jules 1.0.1"
+    echo "trikeshed-jules 2.0.0 (spec-revision 2026-07-19)"
 }
 
 # =============================================================================
 # MAIN
 # =============================================================================
-require_cmd curl
-require_cmd jq
-require_cmd jules
+command -v curl >/dev/null 2>&1 || die "Required command 'curl' not found"
+command -v jq   >/dev/null 2>&1 || die "Required command 'jq' not found"
 
-CMD="${1:-}"
-shift || true
+CMD="${1:-}"; shift || true
 
 case "${CMD}" in
-    --help|-h)          show_help ;;
-    --version|-v)       show_version ;;
-    sessions|list)      cmd_sessions ;;
-    session|get)        cmd_session "$@" ;;
-    pull)               cmd_pull "$@" ;;
-    new|create)         cmd_create "$@" ;;
-    new-api)            cmd_create_api "$@" ;;
-    send|chat)          cmd_send "$@" ;;
-    approve)            cmd_approve "$@" ;;
-    responses|activities) cmd_responses "$@" ;;
-    sources)            cmd_sources "$@" ;;
-    delete)             cmd_delete "$@" ;;
-    *)                  show_help; die "Unknown command: ${CMD}" ;;
+    --help|-h)              show_help ;;
+    --version|-v)           show_version ;;
+
+    sessions|list)          cmd_sessions "$@" ;;
+    session|get)            cmd_session "$@" ;;
+    sources)                cmd_sources "$@" ;;
+    source)                 cmd_source_get "$@" ;;
+
+    pull)                   cmd_pull "$@" ;;
+    new|create)             cmd_create "$@" ;;
+    new-api|create-api)     cmd_create_api "$@" ;;
+    send|chat)              cmd_send "$@" ;;
+    approve)                cmd_approve "$@" ;;
+    delete)                 cmd_delete "$@" ;;
+
+    responses|activities)   cmd_responses "$@" ;;
+    activities-classify)    cmd_activities_classify "$@" ;;
+
+    *)                      show_help; die "Unknown command: ${CMD}" ;;
 esac
