@@ -1,6 +1,6 @@
 package borg.trikeshed.dag
 
-import borg.trikeshed.collections.LinearHashMap
+import borg.trikeshed.collections.associative.LinearHashMap
 import borg.trikeshed.cursor.BlackboardContext
 import borg.trikeshed.job.ContentId
 

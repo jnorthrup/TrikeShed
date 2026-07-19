@@ -2,7 +2,7 @@
 
 package borg.trikeshed.collections.multiindex
 
-import borg.trikeshed.collections.LinearHashMap
+import borg.trikeshed.collections.associative.LinearHashMap
 import borg.trikeshed.lib.Series
 import borg.trikeshed.lib.j
 
@@ -48,7 +48,7 @@ class MultiIndexContainer<E : Any> {
     // number of hash indexes is tiny in practice so linear scan is fine.
     private data class HashEntry(
         val extractor: (Any?) -> Any?,
-        val map: LinearHashMap<Any, Int>,
+        val map: borg.trikeshed.collections.associative.LinearHashMap<Any, Int>,
     )
     private val hashIndexes = ArrayList<HashEntry>()
 

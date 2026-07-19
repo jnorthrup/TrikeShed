@@ -1,6 +1,6 @@
 package borg.trikeshed.collections.multiindex
 
-import borg.trikeshed.collections.LinearHashMap
+import borg.trikeshed.collections.associative.LinearHashMap
 import borg.trikeshed.lib.size
 import kotlin.test.Test
 import kotlin.test.assertEquals

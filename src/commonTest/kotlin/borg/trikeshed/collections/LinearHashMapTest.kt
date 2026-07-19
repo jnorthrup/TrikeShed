@@ -1,14 +1,14 @@
 package borg.trikeshed.collections
 
+import borg.trikeshed.collections.associative.LinearHashMap
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
-import kotlin.test.assertTrue
 
 class LinearHashMapTest {
 
     @Test fun putAndGet() {
-        val m = LinearHashMap<String, Int>()
+        val m = borg.trikeshed.collections.associative.LinearHashMap<String, Int>()
         assertNull(m.get("x"))
         m.put("a", 1)
         m.put("b", 2)
@@ -18,14 +18,14 @@ class LinearHashMapTest {
     }
 
     @Test fun putOverwrite() {
-        val m = LinearHashMap<String, Int>()
+        val m = borg.trikeshed.collections.associative.LinearHashMap<String, Int>()
         assertEquals(null, m.put("k", 10))
         assertEquals(10,   m.put("k", 20))
         assertEquals(20,   m.get("k"))
     }
 
     @Test fun remove() {
-        val m = LinearHashMap<String, Int>()
+        val m = borg.trikeshed.collections.associative.LinearHashMap<String, Int>()
         m.put("a", 1); m.put("b", 2)
         assertEquals(1, m.remove("a"))
         assertNull(m.get("a"))
@@ -34,7 +34,7 @@ class LinearHashMapTest {
     }
 
     @Test fun resize() {
-        val m = LinearHashMap<Int, Int>(4)
+        val m = borg.trikeshed.collections.associative.LinearHashMap<Int, Int>(4)
         repeat(200) { m.put(it, it * 2) }
         repeat(200) { assertEquals(it * 2, m.get(it), "key=$it") }
         assertEquals(200, m.count)

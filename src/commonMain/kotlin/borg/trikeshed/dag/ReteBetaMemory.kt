@@ -1,6 +1,6 @@
 package borg.trikeshed.dag
 
-import borg.trikeshed.collections.LinearHashMap
+import borg.trikeshed.collections.associative.LinearHashMap
 
 data class BetaJoin(
     val leftFacetId: String,
@@ -97,7 +97,7 @@ class ReteBetaMemory(
         ))
 
     private fun bucket(
-        index: LinearHashMap<BetaJoinKey, BetaBucket>,
+        index: borg.trikeshed.collections.associative.LinearHashMap<BetaJoinKey, BetaBucket>,
         key: BetaJoinKey,
     ): BetaBucket {
         val existing = index.get(key)

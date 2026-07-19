@@ -1,13 +1,14 @@
 package keymux
 
-import borg.trikeshed.lib.*
 import borg.trikeshed.htx.*
+import borg.trikeshed.lib.*
 import borg.trikeshed.userspace.nio.file.spi.FileOperations
 import borg.trikeshed.userspace.nio.platform.spi.SystemOperations
-import borg.trikeshed.userspace.reactor.MuxReactorElement
 import borg.trikeshed.userspace.reactor.MuxKeyStatus
-import kotlinx.coroutines.*
-import kotlinx.coroutines.flow.*
+import borg.trikeshed.userspace.reactor.MuxReactorElement
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.emptyFlow
 
 /** Lazy iterable — delegates to Series.view, no eager size-N List. */
 fun <T> Series<T>.iterable(): Iterable<T> = view
@@ -119,7 +120,7 @@ private fun defaultCodecWrite(m: Map<String, String>): ByteArray {
 
 class ApiSource(
     private val baseUrl: String,
-    private val headers: Series<Join<String, String>> = 0 j { throw IndexOutOfBoundsException() },
+    private val headers: Series<Twin<String>> = 0 j { throw IndexOutOfBoundsException() },
     private val explicitHtx: HtxElement? = null
 ) : KeySource() {
     override val name = "api"

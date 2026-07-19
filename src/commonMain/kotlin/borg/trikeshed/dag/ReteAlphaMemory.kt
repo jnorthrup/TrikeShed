@@ -1,6 +1,6 @@
 package borg.trikeshed.dag
 
-import borg.trikeshed.collections.LinearHashMap
+import borg.trikeshed.collections.associative.LinearHashMap
 
 data class AlphaPredicate(
     val facetId: String,
