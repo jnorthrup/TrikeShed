@@ -2,7 +2,6 @@ package borg.trikeshed.forge.gallery
 
 import borg.trikeshed.parse.json.JsonSupport
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.json.Json
 import borg.trikeshed.forge.blackboard.ForgeBlackboardView
 
 /**
