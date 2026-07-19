@@ -369,22 +369,27 @@ class ViewServer {
         val mapExpr = ast.value("map")
 
         val values = if (mapExpr != null) {
-            group.map { evaluateExpr(mapExpr, it.value) }
+            group.asSequence().map { evaluateExpr(mapExpr, it.value) }
         } else {
-            group.map { it.value }
+            group.asSequence().map { it.value }
         }
 
         return when (op) {
             "sum" -> values.sumOf { (it as? Number)?.toDouble() ?: (it as? String)?.toDoubleOrNull() ?: 0.0 }
-            "count" -> values.size.toLong()
+            "count" -> values.count().toLong()
             "min" -> values.minOfOrNull { (it as? Number)?.toDouble() ?: (it as? String)?.toDoubleOrNull() ?: Double.MAX_VALUE } ?: 0.0
             "max" -> values.maxOfOrNull { (it as? Number)?.toDouble() ?: (it as? String)?.toDoubleOrNull() ?: Double.MIN_VALUE } ?: 0.0
             "avg" -> {
-                if (values.isEmpty()) 0.0
-                else values.sumOf { (it as? Number)?.toDouble() ?: (it as? String)?.toDoubleOrNull() ?: 0.0 } / values.size
+                var sum = 0.0
+                var count = 0
+                for (v in values) {
+                    sum += (v as? Number)?.toDouble() ?: (v as? String)?.toDoubleOrNull() ?: 0.0
+                    count++
+                }
+                if (count == 0) 0.0 else sum / count
             }
             "concat" -> values.joinToString("") { it?.toString() ?: "" }
-            "collect" -> values
+            "collect" -> values.toList()
             else -> null
         }
     }
@@ -398,11 +403,11 @@ class ViewServer {
 
         return when (op) {
             "+" -> {
-                val evaluated = args.map { evaluateExpr(it, rowValue) }
+                val evaluated = args.asSequence().map { evaluateExpr(it, rowValue) }
                 evaluated.sumOf { (it as? Number)?.toDouble() ?: (it as? String)?.toDoubleOrNull() ?: 0.0 }
             }
             "*" -> {
-                val evaluated = args.map { evaluateExpr(it, rowValue) }
+                val evaluated = args.asSequence().map { evaluateExpr(it, rowValue) }
                 evaluated.fold(1.0) { acc, e -> acc * ((e as? Number)?.toDouble() ?: (e as? String)?.toDoubleOrNull() ?: 1.0) }
             }
             "value" -> rowValue

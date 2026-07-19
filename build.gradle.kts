@@ -9,6 +9,7 @@ plugins {
     kotlin("plugin.serialization") version "2.4.10"
     kotlin("plugin.compose") version "2.4.10"
     id("org.jetbrains.compose") version "1.11.1"
+    id("com.android.library") version "8.5.2"
 }
 
 // Compose UI is a JVM-only surface in this multiplatform project.  The Kotlin
@@ -67,6 +68,9 @@ kotlin {
 
     jvmToolchain(25)
 
+    androidTarget {
+    }
+
     jvm {
         compilerOptions {
             freeCompilerArgs = listOf(
@@ -102,6 +106,10 @@ kotlin {
             }
         }
         binaries.executable()
+    }
+
+    @OptIn(org.jetbrains.kotlin.gradle.ExperimentalWasmDsl::class)
+    wasmWasi {
     }
 
     // ── Host-detected native targets (restored from c0e3f0fc) ────────────────
@@ -170,6 +178,8 @@ kotlin {
                 implementation("org.openjdk.jmh:jmh-generator-annprocess:1.37")
                 implementation("org.bouncycastle:bcprov-jdk15on:1.70")
                 implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:$coroutinesVersion")
+                implementation("org.ow2.asm:asm:9.7")
+                implementation("org.ow2.asm:asm-tree:9.7")
 
                 // GraalVM Polyglot — locked to 25.0.2 (GraalVM CE)
                 implementation("org.graalvm.polyglot:polyglot:$graalVersion")
@@ -240,6 +250,9 @@ kotlin {
         val macosX64Test = maybeCreate("macosX64Test").apply { dependsOn(macosTest) }
         val linuxMain = maybeCreate("linuxMain").apply { dependsOn(posixMain) }
         val linuxTest = maybeCreate("linuxTest").apply { dependsOn(posixTest) }
+
+        val androidMain = maybeCreate("androidMain").apply { dependsOn(commonMain) }
+        val androidTest = maybeCreate("androidTest").apply { dependsOn(commonTest) }
 
         findByName("macosMain")?.dependsOn(posixMain)
         findByName("macosTest")?.dependsOn(posixTest)
@@ -410,5 +423,19 @@ tasks.withType<Test>().configureEach {
     testLogging {
         events("passed", "skipped", "failed")
         showStandardStreams = true
+    }
+}
+
+android {
+    namespace = "borg.trikeshed"
+    compileSdk = 34
+
+    defaultConfig {
+        minSdk = 24
+    }
+
+    compileOptions {
+        sourceCompatibility = JavaVersion.VERSION_25
+        targetCompatibility = JavaVersion.VERSION_25
     }
 }

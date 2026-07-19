@@ -487,36 +487,57 @@ class LinuxPosixFile(
         fun exists(fname: String): Boolean = access(fname, F_OK).z
 
         /** lean on getline to read a file into a sequence of CharSeries */
-        fun readLinesSeq(path: String): Sequence<String> = sequence {
-            val file = LinuxPosixFile(path)
-            val fp = fdopen(file.fd, "r")
-            if (fp == null) return@sequence
-            try {
-                var line: CPointer<ByteVarOf<Byte>>? = null
-                var len: size_t = 0u
-                try {
-                    memScoped {
-                        val linePtr: CPointerVarOf<CPointer<ByteVarOf<Byte>>> = alloc()
-                        val lenPtr: ULongVarOf<size_t> = alloc()
-                        linePtr.value = line
-                        lenPtr.value = len
-                        while (true) {
-                            val read = getline(linePtr.ptr, lenPtr.ptr, fp)
-                            line = linePtr.value
-                            len = lenPtr.value
-                            if (read == -1L) break
-                            yield(line!!.toKString().trim())
-                        }
+        fun readLinesSeq(path: String): Sequence<String> = Sequence {
+            object : Iterator<String> {
+                val file = LinuxPosixFile(path)
+                val fp = fdopen(file.fd, "r")
+                val lineArena = Arena()
+                val line: CPointerVarOf<CPointer<ByteVarOf<Byte>>> = lineArena.alloc()
+                val len: ULongVarOf<size_t> = lineArena.alloc()
+
+                init {
+                    HasPosixErr.posixRequires(fp != null) { "fdopen $path" }
+                    line.value = null
+                    len.value = 0u
+                }
+
+                var nextLine: String? = null
+                var isClosed = false
+
+                private fun fetchNext() {
+                    if (isClosed || nextLine != null) return
+                    val read = getline(line.ptr, len.ptr, fp)
+                    if (read != -1L) {
+                        nextLine = line.value!!.toKString().trim()
+                    } else {
                         if (ferror(fp) != 0) {
                             perror("ferror")
+                            close()
                             exit(1)
                         }
+                        close()
                     }
-                } finally {
-                    free(line)
                 }
-            } finally {
-                fclose(fp)
+
+                private fun close() {
+                    if (isClosed) return
+                    isClosed = true
+                    free(line.value)
+                    lineArena.clear()
+                    if (fp != null) fclose(fp)
+                }
+
+                override fun hasNext(): Boolean {
+                    fetchNext()
+                    return nextLine != null
+                }
+
+                override fun next(): String {
+                    fetchNext()
+                    val result = nextLine ?: throw NoSuchElementException()
+                    nextLine = null
+                    return result
+                }
             }
         }
 
