@@ -245,6 +245,18 @@ kotlin {
         getByName("macosArm64Main").dependsOn(macosMain)
         getByName("macosArm64Test").dependsOn(macosTest)
 
+        // T7 browser storage: IndexedDB test doubles for JS/Wasm storage tests.
+        getByName("jsTest") {
+            dependencies {
+                implementation(npm("fake-indexeddb", "6.0.0"))
+            }
+        }
+        getByName("wasmJsTest") {
+            dependencies {
+                implementation(npm("fake-indexeddb", "6.0.0"))
+            }
+        }
+
         all {
             languageSettings.optIn("kotlinx.cinterop.ExperimentalForeignApi")
             languageSettings.optIn("kotlin.RequiresOptIn")
