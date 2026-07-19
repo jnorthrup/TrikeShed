@@ -178,6 +178,8 @@ kotlin {
                 implementation("org.openjdk.jmh:jmh-generator-annprocess:1.37")
                 implementation("org.bouncycastle:bcprov-jdk15on:1.70")
                 implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:$coroutinesVersion")
+                implementation("org.ow2.asm:asm:9.7")
+                implementation("org.ow2.asm:asm-tree:9.7")
 
                 // GraalVM Polyglot — locked to 25.0.2 (GraalVM CE)
                 implementation("org.graalvm.polyglot:polyglot:$graalVersion")
