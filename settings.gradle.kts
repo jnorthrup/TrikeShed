@@ -34,11 +34,15 @@ if (libsDir.exists() && libsDir.isDirectory) {
         .forEach { include(":libs:${it.name}") }
 }
 
-// Include lib_cursor explicitly (skip classfile root and its problematic subprojects)
-include(":libs:classfile:lib_cursor")
+// Include lib_cursor explicitly only when the classfile tree is present.
+if (libsDir.resolve("classfile").exists()) {
+    include(":libs:classfile:lib_cursor")
+}
 
 // Support hybrid kotlin xvm build if ../xvm exists
 if (java.io.File("../xvm").exists()) {
     includeBuild("../xvm")
 }
-include(":libs:lcnc")
+if (libsDir.resolve("lcnc").exists()) {
+    include(":libs:lcnc")
+}

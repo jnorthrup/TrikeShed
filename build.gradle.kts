@@ -152,8 +152,6 @@ kotlin {
         }
     }
 
-    macosArm64()
-
     sourceSets {
         val commonMain = getByName("commonMain") {
             dependencies {
@@ -240,11 +238,6 @@ kotlin {
         val macosMain = maybeCreate("macosMain").apply { dependsOn(posixMain) }
         val macosTest = maybeCreate("macosTest").apply { dependsOn(posixTest) }
 
-        getByName("linuxX64Main").dependsOn(linuxMain)
-        getByName("linuxX64Test").dependsOn(linuxTest)
-        getByName("macosArm64Main").dependsOn(macosMain)
-        getByName("macosArm64Test").dependsOn(macosTest)
-
         // T7 browser storage: IndexedDB test doubles for JS/Wasm storage tests.
         getByName("jsTest") {
             dependencies {
@@ -262,6 +255,7 @@ kotlin {
             languageSettings.optIn("kotlin.RequiresOptIn")
         }
     }
+}
 
 // ─────────────────────────────────────────────────────────────────
 // Gradle Configuration Cache / Deprecation Suppression Hooks
