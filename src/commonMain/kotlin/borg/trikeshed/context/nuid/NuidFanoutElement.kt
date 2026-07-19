@@ -261,6 +261,27 @@ class NuidFanoutElement(
         )
     }
 
+    /**
+     * Attempts to dispatch [nuid] and returns the [Capability] that won the claim,
+     * or null if no workgroup claimed it.
+     */
+    suspend fun claimWinnerCapability(nuid: Nuid, payload: Any? = null, timeoutMillis: Long = 50L): Capability? {
+        val result = dispatch(nuid, payload, timeoutMillis)
+        if (result.winner != null) {
+            // Finding the exact matching capability in the winner's trait space
+            val winnerSlot = slotOf(result.winner)
+            if (winnerSlot != null) {
+                val caps = winnerSlot.workgroup.traits.capabilities()
+                for (i in 0 until caps.a) { // Series.a is size
+                    val cap = caps.b(i) // Series.b is the index accessor
+                    if (cap matches nuid.capability) return cap
+                }
+            }
+            return nuid.capability
+        }
+        return null
+    }
+
     /** Watch candidate slots for any one of them to take [claimId]. */
     private suspend fun pollForWinner(
         candidates: List<WorkgroupSlot>,
