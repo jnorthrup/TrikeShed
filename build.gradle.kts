@@ -210,7 +210,12 @@ kotlin {
                 implementation(npm("workbox-webpack-plugin", "7.4.1"))
             }
         }
-        val jsTest = getByName("jsTest") { dependsOn(commonTest) }
+        val jsTest = getByName("jsTest") {
+            dependsOn(commonTest)
+            dependencies {
+                implementation(npm("fake-indexeddb", "^6.0.0"))
+            }
+        }
 
         val wasmJsMain = getByName("wasmJsMain") {
             dependsOn(commonMain)
@@ -218,7 +223,12 @@ kotlin {
                 implementation(npm("workbox-webpack-plugin", "7.4.1"))
             }
         }
-        val wasmJsTest = getByName("wasmJsTest") { dependsOn(commonTest) }
+        val wasmJsTest = getByName("wasmJsTest") {
+            dependsOn(commonTest)
+            dependencies {
+                implementation(npm("fake-indexeddb", "^6.0.0"))
+            }
+        }
 
         // ── posixMain: shared intermediate above the default nativeMain template ───
         // Default hierarchy: nativeMain ← macosMain ← macosArm64Main
