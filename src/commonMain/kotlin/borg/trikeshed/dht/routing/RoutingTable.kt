@@ -23,20 +23,40 @@ open class RoutingTable<TNum : Comparable<TNum>, Sz : borg.trikeshed.dht.net.Net
     /**
      * contract is to have the route guid id fully realized in agent first
      */
-    fun addRoute(other: borg.trikeshed.dht.include.Route<TNum>): Join<borg.trikeshed.dht.id.NUID<TNum>, borg.trikeshed.dht.include.Address>? = other.let { (g: borg.trikeshed.dht.id.NUID<TNum>) ->
+    /**
+     * Note: CCEK emission is performed by publishing to the RoutingEventElement present in the coroutine context.
+     * Ensure this method is called within a coroutine context having RoutingEventElement to broadcast events.
+     */
+    suspend fun addRoute(other: borg.trikeshed.dht.include.Route<TNum>, context: kotlin.coroutines.CoroutineContext? = null): Join<borg.trikeshed.dht.id.NUID<TNum>, borg.trikeshed.dht.include.Address>? = other.let { (g: borg.trikeshed.dht.id.NUID<TNum>) ->
         min(agentNUID.netmask.distance(agentNUID.id!!, g.id!!), bucketCount).let {
-            if (it > 0)
-                buckets[it.dec()].getOrPut(g.id!!, other.leftIdentity)
+            if (it > 0) {
+                val res = buckets[it.dec()].getOrPut(g.id!!, other.leftIdentity)
+                if (context != null) publishRoutingEvent(context, RoutingEvent.RouteAdded(other))
+                res
+            }
             else null
         }
     }
 
-    fun rmRoute(other: borg.trikeshed.dht.include.Route<TNum>): Join<borg.trikeshed.dht.id.NUID<TNum>, borg.trikeshed.dht.include.Address>? = other.let { (g: borg.trikeshed.dht.id.NUID<TNum>) ->
+    suspend fun rmRoute(other: borg.trikeshed.dht.include.Route<TNum>, context: kotlin.coroutines.CoroutineContext? = null): Join<borg.trikeshed.dht.id.NUID<TNum>, borg.trikeshed.dht.include.Address>? = other.let { (g: borg.trikeshed.dht.id.NUID<TNum>) ->
         agentNUID.netmask.distance(agentNUID.id!!, g.id!!).let { origDistance ->
-            if (origDistance > 0)
-                buckets.takeIf { it.isNotEmpty() }?.get(min(bucketCount, origDistance.dec()))?.remove(g.id!!)
+            if (origDistance > 0) {
+                val res = buckets.takeIf { it.isNotEmpty() }?.get(min(bucketCount, origDistance.dec()))?.remove(g.id!!)
+                if (context != null && res != null) publishRoutingEvent(context, RoutingEvent.RouteEvicted(other))
+                res
+            }
             else null
 
+        }
+    }
+
+    /**
+     * Non-suspending variant for legacy compatibility where context is unavailable.
+     */
+    fun addRouteSync(other: borg.trikeshed.dht.include.Route<TNum>): Join<borg.trikeshed.dht.id.NUID<TNum>, borg.trikeshed.dht.include.Address>? = other.let { (g: borg.trikeshed.dht.id.NUID<TNum>) ->
+        min(agentNUID.netmask.distance(agentNUID.id!!, g.id!!), bucketCount).let {
+            if (it > 0) buckets[it.dec()].getOrPut(g.id!!, other.leftIdentity)
+            else null
         }
     }
 

@@ -38,19 +38,19 @@ class RouteTableTest {
             val id1 = random(netmask.bits)
             borg.trikeshed.dht.id.WorkerNUID(id1) j "urn:$id1"
         }
-        routingTable.addRoute(other).run {
-            routingTable.addRoute(nuid1 j "urn:null")
+        routingTable.addRouteSync(other).run {
+            routingTable.addRouteSync(nuid1 j "urn:null")
 
-            for (dOne in d_ones) routingTable.addRoute(WorkerNUID(dOne) j "urn:$dOne@net")
-            for (dOne in d_twos) routingTable.addRoute(WorkerNUID(dOne) j "urn:$dOne@net")
-            for (dOne in d_twos_point_one) routingTable.addRoute(WorkerNUID(dOne) j "urn:$dOne@net")
+            for (dOne in d_ones) routingTable.addRouteSync(WorkerNUID(dOne) j "urn:$dOne@net")
+            for (dOne in d_twos) routingTable.addRouteSync(WorkerNUID(dOne) j "urn:$dOne@net")
+            for (dOne in d_twos_point_one) routingTable.addRouteSync(WorkerNUID(dOne) j "urn:$dOne@net")
 
             assertEquals(routingTable.buckets[0].size, 7)
             assertEquals(routingTable.buckets[1].size, 11)
             assertEquals(routingTable.buckets[6].size, 1)
 
             for (n in 0 until 20000) {
-                routingTable.addRoute(WorkerNUID(nuid.run { random() }) j "urn:$n")
+                routingTable.addRouteSync(WorkerNUID(nuid.run { random() }) j "urn:$n")
             }
 
             logDebug {
@@ -62,24 +62,24 @@ class RouteTableTest {
 
         routingTable = object : RoutingTable<Byte, NetMask.Companion.WarmSz>(NUID) {}
 
-        routingTable.addRoute(nuid.run {
+        routingTable.addRouteSync(nuid.run {
             val id1 = random(nuid.netmask.bits)
             WorkerNUID(id1) j "urn:$id1"
         }).run {
-            routingTable.addRoute(other)
+            routingTable.addRouteSync(other)
 
             val ich = nuid.ops.one
 
             run {
                 val linkedSetOf = linkedSetOf(ich).also { it.clear() }
                 while (linkedSetOf.size < 3) linkedSetOf.add(nuid.run { random(netmask.bits - 1) })
-                linkedSetOf.forEach { routingTable.addRoute(WorkerNUID(it) j "urn:$it") }
+                linkedSetOf.forEach { routingTable.addRouteSync(WorkerNUID(it) j "urn:$it") }
             }
 
             run {
                 val linkedSetOf = linkedSetOf(ich).also { it.clear() }
                 while (linkedSetOf.size < 7) linkedSetOf.add(nuid.run { random(1) })
-                linkedSetOf.forEach { routingTable.addRoute(WorkerNUID(it) j "urn:$it") }
+                linkedSetOf.forEach { routingTable.addRouteSync(WorkerNUID(it) j "urn:$it") }
             }
 
             assertEquals(7, routingTable.buckets[0].size)
@@ -87,7 +87,7 @@ class RouteTableTest {
             val fibonacciReporter = FibonacciReporter(20000, "routed")
             for (n in 0 until 20000) {
                 fibonacciReporter.report()?.run { ::logDebug }
-                routingTable.addRoute(WorkerNUID(nuid.run { random() }) j "urn:$n")
+                routingTable.addRouteSync(WorkerNUID(nuid.run { random() }) j "urn:$n")
             }
 
             logDebug {
@@ -97,21 +97,21 @@ class RouteTableTest {
 
         routingTable = object : RoutingTable<Byte, NetMask.Companion.WarmSz>(NUID, true) {}
 
-        routingTable.addRoute(other).run {
-            routingTable.addRoute(other)
+        routingTable.addRouteSync(other).run {
+            routingTable.addRouteSync(other)
 
             val satu = nuid.ops.one
 
             run {
                 val linkedSetOf = linkedSetOf(satu).also { it.clear() }
                 while (linkedSetOf.size < 3) linkedSetOf.add(nuid.run { random(netmask.bits - 1) })
-                linkedSetOf.forEach { routingTable.addRoute(WorkerNUID(it) j "urn:$it") }
+                linkedSetOf.forEach { routingTable.addRouteSync(WorkerNUID(it) j "urn:$it") }
             }
 
             run {
                 val linkedSetOf = linkedSetOf(satu).also { it.clear() }
                 while (linkedSetOf.size < 7) linkedSetOf.add(nuid.run { random(1) })
-                linkedSetOf.forEach { routingTable.addRoute(WorkerNUID(it) j "urn:$it") }
+                linkedSetOf.forEach { routingTable.addRouteSync(WorkerNUID(it) j "urn:$it") }
             }
 
             assertEquals(7, routingTable.buckets[0].size)
@@ -120,7 +120,7 @@ class RouteTableTest {
             val fibonacciReporter = FibonacciReporter(20000, "routed")
             for (n in 0 until 20000) {
                 fibonacciReporter.report()
-                routingTable.addRoute(WorkerNUID(nuid.run { random() }) j "urn:$n")
+                routingTable.addRouteSync(WorkerNUID(nuid.run { random() }) j "urn:$n")
             }
 
             logDebug {
@@ -130,21 +130,21 @@ class RouteTableTest {
 
         routingTable = object : RoutingTable<Byte, NetMask.Companion.WarmSz>(NUID, false) {}
 
-        routingTable.addRoute(other).run {
-            routingTable.addRoute(other)
+        routingTable.addRouteSync(other).run {
+            routingTable.addRouteSync(other)
 
             val ich = nuid.ops.one
 
             run {
                 val linkedSetOf = linkedSetOf(ich).also { it.clear() }
                 while (linkedSetOf.size < 3) linkedSetOf.add(nuid.run { random(netmask.bits - 1) })
-                linkedSetOf.forEach { routingTable.addRoute(WorkerNUID(it) j "urn:$it") }
+                linkedSetOf.forEach { routingTable.addRouteSync(WorkerNUID(it) j "urn:$it") }
             }
 
             run {
                 val linkedSetOf = linkedSetOf(ich).also { it.clear() }
                 while (linkedSetOf.size < 7) linkedSetOf.add(nuid.run { random(1) })
-                linkedSetOf.forEach { routingTable.addRoute(WorkerNUID(it) j "urn:$it") }
+                linkedSetOf.forEach { routingTable.addRouteSync(WorkerNUID(it) j "urn:$it") }
             }
 
             assertEquals(7, routingTable.buckets[0].size)
@@ -152,7 +152,7 @@ class RouteTableTest {
             val fibonacciReporter = FibonacciReporter(20000, "routed")
             for (n in 0 until 20000) {
                 fibonacciReporter.report()
-                routingTable.addRoute(WorkerNUID(nuid.run { random() }) j "urn:$n")
+                routingTable.addRouteSync(WorkerNUID(nuid.run { random() }) j "urn:$n")
             }
 
             logDebug {
@@ -162,20 +162,20 @@ class RouteTableTest {
 
         routingTable = object : RoutingTable<Byte, NetMask.Companion.WarmSz>(NUID) {}
 
-        routingTable.addRoute(other)
+        routingTable.addRouteSync(other)
 
         val ich = nuid.ops.one
 
         run {
             val linkedSetOf = linkedSetOf(ich).also { it.clear() }
             while (linkedSetOf.size < 3) linkedSetOf.add(nuid.run { random(netmask.bits - 1) })
-            linkedSetOf.forEach { routingTable.addRoute(WorkerNUID(it) j "urn:$it") }
+            linkedSetOf.forEach { routingTable.addRouteSync(WorkerNUID(it) j "urn:$it") }
         }
 
         run {
             val linkedSetOf = linkedSetOf(ich).also { it.clear() }
             while (linkedSetOf.size < 7) linkedSetOf.add(nuid.run { random(1) })
-            linkedSetOf.forEach { routingTable.addRoute(WorkerNUID(it) j "urn:$it") }
+            linkedSetOf.forEach { routingTable.addRouteSync(WorkerNUID(it) j "urn:$it") }
         }
 
         assertEquals(routingTable.buckets[0].size, 7)
@@ -183,11 +183,25 @@ class RouteTableTest {
         val fibonacciReporter = FibonacciReporter(20000, "routed")
         for (n in 0 until 20000) {
             fibonacciReporter.report()
-            routingTable.addRoute(WorkerNUID(nuid.run { random() }) j "urn:$n")
+            routingTable.addRouteSync(WorkerNUID(nuid.run { random() }) j "urn:$n")
         }
 
         logDebug {
             "bits: ${routingTable.agentNUID.netmask.bits} fog: ${null} total: ${routingTable.buckets.sumOf { it.size }} bits/count: ${routingTable.buckets.mapIndexed { x, y -> x.inc() to y.size }}"
         }
+    }
+
+    @Test
+    fun testGetClosestScanBoundedByK() {
+        val routingTable = object : RoutingTable<Byte, NetMask.Companion.WarmSz>(nuid) {}
+        // populate table
+        for (i in 1..20) {
+            routingTable.addRouteSync(WorkerNUID(i.toByte()) j "urn:$i")
+        }
+
+        // request K closest
+        val k = 5
+        val closest = routingTable.getClosest(10.toByte(), k)
+        assertEquals(k, closest.size)
     }
 }
