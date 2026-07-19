@@ -129,6 +129,24 @@ object JvmLitebikeBindAdapter {
         connId: Long,
     ) {
         val buf = ByteBuffer.allocate(8 * 1024)
+        val respondCallback: suspend (ByteArray) -> Unit = { responseBytes ->
+            withContext(Dispatchers.IO) {
+                val writeBuf = ByteBuffer.wrap(responseBytes)
+                while (writeBuf.hasRemaining()) {
+                    val written = kotlin.coroutines.suspendCoroutine { cont ->
+                        ch.write(writeBuf, null, object : CompletionHandler<Int, Any?> {
+                            override fun completed(result: Int, attachment: Any?) {
+                                cont.resumeWith(Result.success(result))
+                            }
+                            override fun failed(exc: Throwable, attachment: Any?) {
+                                cont.resumeWith(Result.failure(exc))
+                            }
+                        })
+                    }
+                    if (written < 0) break
+                }
+            }
+        }
         ch.read(
             buf, null,
             object : CompletionHandler<Int, Any?> {
@@ -143,14 +161,8 @@ object JvmLitebikeBindAdapter {
                     val proto: Protocol = ProtocolDetector.detect(head, bytes.size)
                     // runBlocking is OK from a JDK CompletionHandler because
                     // those callbacks are pure Java threads, not coroutines.
-                    //
-                    // R05 — capture the sequence id the listener stamps on
-                    // this message and attach it to the connection so the
-                    // HTTP worker can look up the originating socket.
-                    val seqId = runBlocking { element.nextSequenceIdForEmit() }
-                    connections.attachSequence(connId, seqId)
-                    val ok = runBlocking { element.acceptWithSequence(proto, bytes, seqId) }
-                    if (!ok) connections.unregister(connId)
+                    val ok = runBlocking { element.accept(proto, bytes, respondCallback) }
+                    if (!ok) runCatching { ch.close() }
                     // Continue draining while data remains.
                     buf.clear()
                     ch.read(buf, null, this)

@@ -50,7 +50,30 @@ class LitebikeListenerElement(
         val protocolId: UByte,
         val sequenceId: Long,
         val payload: ByteArray,
-    )
+        val respond: (suspend (ByteArray) -> Unit)? = null,
+    ) {
+        override fun equals(other: Any?): Boolean {
+            if (this === other) return true
+            if (other == null || this::class != other::class) return false
+
+            other as ChannelMessage
+
+            if (protocolId != other.protocolId) return false
+            if (sequenceId != other.sequenceId) return false
+            if (!payload.contentEquals(other.payload)) return false
+            if (respond != other.respond) return false
+
+            return true
+        }
+
+        override fun hashCode(): Int {
+            var result = protocolId.hashCode()
+            result = 31 * result + sequenceId.hashCode()
+            result = 31 * result + payload.contentHashCode()
+            result = 31 * result + (respond?.hashCode() ?: 0)
+            return result
+        }
+    }
 
     /** Per-protocol inbox. Each registered worker drains via [ChannelWorkgroupSlot.consume]. */
     class ChannelWorkgroupSlot(val protocol: Protocol) {
@@ -197,14 +220,14 @@ class LitebikeListenerElement(
      * CCEK subscriber — this is the bridge SCTP / HTX elements use to
      * observe inbound protocol traffic.
      */
-    suspend fun accept(protocolId: UByte, payload: ByteArray): Boolean {
+    suspend fun accept(protocolId: UByte, payload: ByteArray, respond: (suspend (ByteArray) -> Unit)? = null): Boolean {
         check(state == ElementState.OPEN || state == ElementState.ACTIVE) {
             "LitebikeListenerElement must be OPEN/ACTIVE before accept() (was $state)"
         }
         val slot = registry[protocolId] ?: return false
         val proto = Protocol.fromId(protocolId)
         val sequenceId = nextSequenceId()
-        val msg = ChannelMessage(protocolId, sequenceId, payload)
+        val msg = ChannelMessage(protocolId, sequenceId, payload, respond)
         slot.offer(msg)
         // Bridge: notify every CCEK subscriber of the fanout event.
         val event = LitebikeFanoutEvent(
@@ -223,8 +246,8 @@ class LitebikeListenerElement(
      * Convenience overload: caller did the protocol detection and has a
      * `Protocol` enum value. Same behavior.
      */
-    suspend fun accept(protocol: Protocol, payload: ByteArray): Boolean =
-        accept(protocol.id, payload)
+    suspend fun accept(protocol: Protocol, payload: ByteArray, respond: (suspend (ByteArray) -> Unit)? = null): Boolean =
+        accept(protocol.id, payload, respond)
 
     /**
      * Notify every CCEK subscriber of [event]. Subscribers may implement

@@ -13,6 +13,14 @@ import borg.trikeshed.context.nuid.Workgroup
 import borg.trikeshed.context.nuid.nuid
 import borg.trikeshed.lib.j
 import borg.trikeshed.litebike.taxonomy.Protocol
+import borg.trikeshed.context.nuid.NuidFanoutElement
+import borg.trikeshed.context.nuid.Workgroup
+import borg.trikeshed.context.nuid.TraitSpace
+import borg.trikeshed.context.nuid.Capability
+import borg.trikeshed.context.nuid.Subnet
+import borg.trikeshed.context.nuid.Nonce
+import borg.trikeshed.context.nuid.nuid
+import borg.trikeshed.lib.j
 import borg.trikeshed.parse.json.JsonSupport
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
@@ -53,20 +61,14 @@ import kotlin.system.exitProcess
  */
 object JvmKanbanServer {
 
-    /**
-     * Wire-level HTTP response built by the HTTP worker. Serialized
-     * back through the listener as bytes on the same connection.
-     */
+    /** Wire-level HTTP response built by the HTTP worker. Serialized back through the listener as bytes on the same connection. */
     data class HttpResponse(
         val status: Int,
         val body: String,
         val contentType: String = "application/json; charset=utf-8",
     )
 
-    /**
-     * Marker carrier passed between workers when a request must cross
-     * the listener boundary (e.g. submit → board projection).
-     */
+    /** Marker carrier passed between workers when a request must cross the listener boundary (e.g. submit → board projection). */
     data class HttpWorkItem(
         val requestBytes: ByteArray,
         val method: String,
@@ -93,45 +95,11 @@ object JvmKanbanServer {
     }
 
     suspend fun run(port: Int, donorPath: String?) {
-        val serverJob = SupervisorJob()
-        val scope = CoroutineScope(serverJob + Dispatchers.Default)
-        val listener = LitebikeListenerElement(parentJob = serverJob).also { it.open() }
-        val fanout = NuidFanoutElement(parentJob = serverJob).also { it.open() }
-
-        val processWorkgroup = Workgroup(
-            name = "kanban-process-local",
-            scope = Subnet.local,
-            traits = traitSpaceOf(Capability.ProcessAll),
-        )
-        val casWorkgroup = Workgroup(
-            name = "kanban-cas-local",
-            scope = Subnet.local,
-            traits = traitSpaceOf(Capability.CasAll),
-        )
-        val wireprotoWorkgroup = Workgroup(
-            name = "kanban-wireproto-lan",
-            scope = Subnet.lanLocalhost,
-            traits = traitSpaceOf(Capability.WireprotoAll),
-        )
-        fanout.register(processWorkgroup)
-        fanout.register(casWorkgroup)
-        fanout.register(wireprotoWorkgroup)
-        fanout.activate()
-        listOf(processWorkgroup, casWorkgroup, wireprotoWorkgroup).forEach { workgroup ->
-            val slot = requireNotNull(fanout.slotOf(workgroup.name))
-            scope.launch {
-                try {
-                    while (true) {
-                        // Workgroup reducers attach at this seam. Drain every
-                        // accepted claim now so production fanout has live workers.
-                        slot.consume()
-                    }
-                } catch (_: ClosedReceiveChannelException) {
-                    // Fanout closed during structured shutdown.
-                }
-            }
-        }
-
+        val listener = LitebikeListenerElement(parentJob = null).also { it.open() }
+        val fanout = NuidFanoutElement(parentJob = null).also { it.open() }
+        fanout.register(Workgroup("process", Subnet.process, TraitSpace { 1 j { Capability.ProcessAll } }))
+        fanout.register(Workgroup("cas", Subnet.process, TraitSpace { 1 j { Capability.CasAll } }))
+        fanout.register(Workgroup("wireproto", Subnet.process, TraitSpace { 1 j { Capability.WireprotoAll } }))
         // Register Http + Json + Socks5 + Tls + Bonjour + Upnp.
         // IDs are TrikeShed-local conventions (Taxonomy.kt), not FFI-stable.
         listOf(
@@ -189,34 +157,37 @@ object JvmKanbanServer {
             }
         }
 
-        // One structured fanout consumer per registered protocol slot. HTTP
-        // requests cross the NUID dispatcher before routing; JSON, Socks5,
-        // and TLS are deliberately drained even when no reducer is mounted.
+        // The HTTP worker consumes the httpSlot. Each accepted byte
+        // stream is a request; we route on the request path.
+        val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+
+        // The HTTP handler logic is handled by the wireproto workgroup.
         scope.launch {
-            listener.fanoutChannels { protocol, msg ->
-                when (protocol) {
-                    Protocol.Http -> handleHttpMessage(listener, fanout, connections, msg)
-                    Protocol.Bonjour -> emitMulticastLine(
-                        listener,
-                        "bonjour",
-                        parseBonjourDatagram(msg.payload),
-                    )
-                    Protocol.Upnp -> emitMulticastLine(
-                        listener,
-                        "upnp",
-                        parseSsdpDatagram(msg.payload),
-                    )
-                    else -> Unit
+            val slot = fanout.slotOf("wireproto") ?: return@launch
+            while (true) {
+                val claim = slot.consume()
+                val payload = claim.payload as? ByteArray ?: continue
+                val resp = routeHttp(payload)
+                val out = buildString {
+                    append("HTTP/1.1 ${resp.status} ${statusReason(resp.status)}\r\n")
+                    append("Content-Length: ${resp.body.toByteArray(StandardCharsets.UTF_8).size}\r\n")
+                    append("Content-Type: ${resp.contentType}\r\n")
+                    append("Access-Control-Allow-Origin: *\r\n\r\n")
+                    append(resp.body)
                 }
-                true
+                val outBytes = out.toByteArray(StandardCharsets.UTF_8)
+                // Surface the response on the Json protocol slot (downstream consumers)
+                listener.accept(Protocol.Json, out.toByteArray(StandardCharsets.UTF_8))
             }
         }
 
-        // multicastHandles is held so the shutdown hook above can see
-        // the live membership count via the adapter's internal table
-        // (JvmMulticastAdapter.close() walks every registered handle).
-        // No further use here — the variable documents the wiring.
-        @Suppress("UNUSED_VARIABLE") val keptForDocs = multicastHandles
+        // Fanout channels
+        scope.launch {
+            listener.fanoutChannels { protocol, msg ->
+                System.err.println("fanout: $protocol seq=${msg.sequenceId} ${msg.payload.size} bytes")
+                true // keep listening
+            }
+        }
 
         System.err.println("trikeshed-kanban: listening on :$port  donor=${donorPath ?: "<none>"}")
         System.err.println("Endpoints (CCEK): GET /api/health /api/cap /api/board POST /api/submit /api/donor")
@@ -294,161 +265,6 @@ object JvmKanbanServer {
         405 -> "Method Not Allowed"
         500 -> "Internal Server Error"
         else -> "OK"
-    }
-
-    /** Convert an HTTP request into the NUID bearer used by fanout.
-     *  The request line selects the Wireproto trait, the full request
-     *  supplies a derived bearer nonce, and network ingress starts at LAN. */
-    private fun nuidForRequest(request: HttpWorkItem): Nuid = nuid(
-        cap = Capability.Wireproto("http:${request.method.lowercase()}:${request.path}"),
-        nonce = Nonce.Derived(
-            buildString {
-                append(request.method).append(' ').append(request.path).append('\n')
-                request.headers.toSortedMap().forEach { (key, value) ->
-                    append(key.lowercase()).append(':').append(value).append('\n')
-                }
-                append(String(request.requestBytes, StandardCharsets.UTF_8))
-            },
-        ),
-        subnet = Subnet.lanLocalhost,
-    )
-
-    private fun parseHttpWorkItem(payload: ByteArray): HttpWorkItem {
-        val text = String(payload, StandardCharsets.UTF_8)
-        val lines = text.split("\r\n", "\n")
-        val firstLine = lines.firstOrNull().orEmpty()
-        val parts = firstLine.split(' ', limit = 3)
-        val headers = lines.drop(1)
-            .takeWhile { it.isNotBlank() }
-            .mapNotNull { line ->
-                val separator = line.indexOf(':')
-                if (separator <= 0) null
-                else line.substring(0, separator).trim() to line.substring(separator + 1).trim()
-            }
-            .toMap()
-        return HttpWorkItem(
-            requestBytes = payload,
-            method = parts.getOrNull(0) ?: "GET",
-            path = parts.getOrNull(1) ?: "/",
-            headers = headers,
-        )
-    }
-
-    private suspend fun handleHttpMessage(
-        listener: LitebikeListenerElement,
-        fanout: NuidFanoutElement,
-        connections: ConnectionRegistry,
-        msg: LitebikeListenerElement.ChannelMessage,
-    ) {
-        val request = parseHttpWorkItem(msg.payload)
-        val dispatch = fanout.dispatch(nuidForRequest(request), request, timeoutMillis = 50L)
-        val response = routeHttp(request.requestBytes)
-        if (dispatch.winner == null) {
-            System.err.println("http NUID dispatch unclaimed: claimId=${dispatch.claimId} path=${request.path}")
-        }
-        val responseBytes = buildString {
-            append("HTTP/1.1 ${response.status} ${statusReason(response.status)}\r\n")
-            append("Content-Length: ${response.body.toByteArray(StandardCharsets.UTF_8).size}\r\n")
-            append("Content-Type: ${response.contentType}\r\n")
-            append("Access-Control-Allow-Origin: *\r\n\r\n")
-            append(response.body)
-        }.toByteArray(StandardCharsets.UTF_8)
-        val connId = connections.consumeForSequence(msg.sequenceId)
-        val written = if (connId != null) {
-            connections.write(connId, responseBytes)
-        } else {
-            listener.accept(Protocol.Json, responseBytes)
-            true
-        }
-        if (!written) {
-            System.err.println("http write failed for sequence ${msg.sequenceId}")
-        }
-    }
-
-    // ── R02 — multicast slot consumer helpers ────────────────────────────
-
-    /**
-     * Emit one JSON line per datagram onto the Json slot. Reuses the
-     * existing JsonSupport to keep escaping consistent with the
-     * /api/board and /api/submit handlers.
-     */
-    private suspend fun emitMulticastLine(
-        listener: LitebikeListenerElement,
-        source: String,
-        body: Map<String, Any?>,
-    ) {
-        val merged = linkedMapOf<String, Any?>("src" to source, "ts" to System.currentTimeMillis())
-        merged.putAll(body)
-        val line = JsonSupport.stringify(merged).toByteArray(StandardCharsets.UTF_8)
-        listener.accept(Protocol.Json, line)
-    }
-
-    /**
-     * Minimal mDNS / DNS-SD parse — just enough to surface a service
-     * name and a sender note. Skips DNS compression-pointer resolution
-     * (RFC 1035 §4.1.4) — if a label starts with 0xC0 we treat it as
-     * "compressed" and stop. No full record decoding: the goal is
-     * a service-name hint per query, not a wire-faithful parser.
-     */
-    private fun parseBonjourDatagram(payload: ByteArray): Map<String, Any?> {
-        val out = linkedMapOf<String, Any?>("bytes" to payload.size)
-        if (payload.size < 12) {
-            out["note"] = "too_short"
-            return out
-        }
-        val qdcount = ((payload[4].toInt() and 0xFF) shl 8) or (payload[5].toInt() and 0xFF)
-        out["qd"] = qdcount
-        // Walk the first question's QNAME label sequence starting at offset 12.
-        var off = 12
-        val labels = mutableListOf<String>()
-        while (off < payload.size && labels.size < 8) {
-            val len = payload[off].toInt() and 0xFF
-            if (len == 0) { off++; break }
-            // Compression pointer (top two bits set) — stop here, no inline decode.
-            if ((len and 0xC0) != 0) {
-                out["compressed"] = true
-                off++
-                break
-            }
-            if (off + 1 + len > payload.size) break
-            val labelBytes = payload.copyOfRange(off + 1, off + 1 + len)
-            labels += String(labelBytes, StandardCharsets.UTF_8)
-            off += 1 + len
-        }
-        if (labels.isNotEmpty()) {
-            out["name"] = labels.joinToString(".")
-        }
-        // QTYPE/QCLASS (4 bytes) if present
-        if (off + 4 <= payload.size) {
-            val qtype = ((payload[off].toInt() and 0xFF) shl 8) or (payload[off + 1].toInt() and 0xFF)
-            out["qtype"] = qtype
-        }
-        out["note"] = "first_question"
-        return out
-    }
-
-    /**
-     * Minimal SSDP / UPnP parse — extract the first method/response
-     * line and one header value (ST/NT/USN/CACHE-CONTROL — whichever
-     * appears first). SSDP packets are HTTP-like text; this reads
-     * up to the first CRLF and the first matching header line.
-     */
-    private fun parseSsdpDatagram(payload: ByteArray): Map<String, Any?> {
-        val out = linkedMapOf<String, Any?>("bytes" to payload.size)
-        val text = runCatching { String(payload, StandardCharsets.US_ASCII) }
-            .getOrElse { "<binary:${payload.size}>" }
-        val firstLine = text.lineSequence().firstOrNull().orEmpty().trim()
-        if (firstLine.isNotEmpty()) {
-            out["method"] = firstLine.substringBefore(' ')
-            out["raw"] = firstLine.take(160)
-        }
-        val st = Regex("(?im)^(?:ST|NT|USN|CACHE-CONTROL):\\s*(.+)\\s*$").find(text)
-        if (st != null) out["header"] = st.groupValues[1].take(160)
-        out["note"] = if (firstLine.startsWith("M-SEARCH")) "msearch"
-            else if (firstLine.startsWith("NOTIFY")) "notify"
-            else if (firstLine.startsWith("HTTP/1.")) "response"
-            else "other"
-        return out
     }
 }
 

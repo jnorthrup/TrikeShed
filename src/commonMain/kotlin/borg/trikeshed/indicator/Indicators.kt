@@ -50,15 +50,10 @@ object EmaMacd {
 object RSI {
     fun compute(close: Series<Double>, period: Int = 14): Series<Double> {
         val n = close.size
-        val gains = DoubleArray(n)
-        val losses = DoubleArray(n)
-        for (i in 1 until n) {
-            val d = close[i] - close[i - 1]
-            gains[i] = maxOf(d, 0.0)
-            losses[i] = maxOf(-d, 0.0)
-        }
-        val avgGain = gains.toSeries().wilderSmooth(period)
-        val avgLoss = losses.toSeries().wilderSmooth(period)
+        val gains = n j { i: Int -> if (i == 0) 0.0 else maxOf(close[i] - close[i - 1], 0.0) }
+        val losses = n j { i: Int -> if (i == 0) 0.0 else maxOf(-(close[i] - close[i - 1]), 0.0) }
+        val avgGain = gains.wilderSmooth(period)
+        val avgLoss = losses.wilderSmooth(period)
         return n j { i: Int ->
             if (avgLoss[i] == 0.0) 100.0
             else 100.0 - (100.0 / (1.0 + avgGain[i] / avgLoss[i]))
@@ -85,15 +80,11 @@ object Bollinger {
 object ATR {
     fun compute(high: Series<Double>, low: Series<Double>, close: Series<Double>, period: Int = 14): Series<Double> {
         val n = high.size
-        val tr = DoubleArray(n)
-        tr[0] = high[0] - low[0]
-        for (i in 1 until n) {
-            val hl = high[i] - low[i]
-            val hc = abs(high[i] - close[i - 1])
-            val lc = abs(low[i] - close[i - 1])
-            tr[i] = maxOf(hl, hc, lc)
+        val tr = n j { i: Int ->
+            if (i == 0) high[0] - low[0]
+            else maxOf(high[i] - low[i], abs(high[i] - close[i - 1]), abs(low[i] - close[i - 1]))
         }
-        return tr.toSeries().wilderSmooth(period)
+        return tr.wilderSmooth(period)
     }
 }
 
@@ -124,17 +115,23 @@ object ADX {
 
     fun compute(high: Series<Double>, low: Series<Double>, close: Series<Double>, period: Int = 14): Result {
         val n = high.size
-        val plusDM = DoubleArray(n)
-        val minusDM = DoubleArray(n)
-        for (i in 1 until n) {
-            val upMove = high[i] - high[i - 1]
-            val downMove = low[i - 1] - low[i]
-            plusDM[i] = if (upMove > downMove && upMove > 0.0) upMove else 0.0
-            minusDM[i] = if (downMove > upMove && downMove > 0.0) downMove else 0.0
+        val plusDM = n j { i: Int ->
+            if (i == 0) 0.0 else {
+                val upMove = high[i] - high[i - 1]
+                val downMove = low[i - 1] - low[i]
+                if (upMove > downMove && upMove > 0.0) upMove else 0.0
+            }
+        }
+        val minusDM = n j { i: Int ->
+            if (i == 0) 0.0 else {
+                val upMove = high[i] - high[i - 1]
+                val downMove = low[i - 1] - low[i]
+                if (downMove > upMove && downMove > 0.0) downMove else 0.0
+            }
         }
         val atr = ATR.compute(high, low, close, period)
-        val smoothPlus = plusDM.toSeries().wilderSmooth(period)
-        val smoothMinus = minusDM.toSeries().wilderSmooth(period)
+        val smoothPlus = plusDM.wilderSmooth(period)
+        val smoothMinus = minusDM.wilderSmooth(period)
         val plusDi = n j { i: Int -> if (atr[i] == 0.0) 0.0 else 100.0 * smoothPlus[i] / atr[i] }
         val minusDi = n j { i: Int -> if (atr[i] == 0.0) 0.0 else 100.0 * smoothMinus[i] / atr[i] }
         val dx = n j { i: Int ->
@@ -179,9 +176,8 @@ object ZScore {
 object Volatility {
     fun compute(close: Series<Double>, period: Int = 20): Series<Double> {
         val n = close.size
-        val ret = DoubleArray(n)
-        for (i in 1 until n) ret[i] = (close[i] - close[i - 1]) / close[i - 1]
-        return ret.toSeries().rollingStd(period)
+        val ret = n j { i: Int -> if (i == 0) 0.0 else (close[i] - close[i - 1]) / close[i - 1] }
+        return ret.rollingStd(period)
     }
 }
 
@@ -304,8 +300,7 @@ object RiskAdjusted {
      *  Annualized assuming 252 trading days. */
     fun compute(close: Series<Double>, period: Int = 20, riskFreeDaily: Double = 0.0): Result {
         val n = close.size
-        val ret = DoubleArray(n)
-        for (i in 1 until n) ret[i] = (close[i] - close[i - 1]) / close[i - 1]
+        val ret = n j { i: Int -> if (i == 0) 0.0 else (close[i] - close[i - 1]) / close[i - 1] }
         val sharpeBuf = DoubleArray(n)
         val sortinoBuf = DoubleArray(n)
         for (i in 0 until n) {
@@ -356,8 +351,7 @@ object Autocorrelation {
      *  Positive = momentum, negative = mean-reversion. */
     fun compute(close: Series<Double>, period: Int = 20, lag: Int = 1): Series<Double> {
         val n = close.size
-        val ret = DoubleArray(n)
-        for (i in 1 until n) ret[i] = ln(close[i] / close[i - 1])
+        val ret = n j { i: Int -> if (i == 0) 0.0 else ln(close[i] / close[i - 1]) }
         val buf = DoubleArray(n)
         for (i in 0 until n) {
             if (i < period + lag) { buf[i] = 0.0; continue }
@@ -408,8 +402,7 @@ object Entropy {
      *  Quants use this for regime detection and strategy rotation. */
     fun compute(close: Series<Double>, period: Int = 20, bins: Int = 10): Series<Double> {
         val n = close.size
-        val ret = DoubleArray(n)
-        for (i in 1 until n) ret[i] = ln(close[i] / close[i - 1])
+        val ret = n j { i: Int -> if (i == 0) 0.0 else ln(close[i] / close[i - 1]) }
         val buf = DoubleArray(n)
         val counts = IntArray(bins)
         for (i in 0 until n) {
@@ -443,13 +436,12 @@ object ParkinsonVol {
      *  The quant's preferred vol measure when you have OHLC data. */
     fun compute(high: Series<Double>, low: Series<Double>, period: Int = 20): Series<Double> {
         val n = high.size
-        val hl2 = DoubleArray(n)
         val factor = 1.0 / (4.0 * ln(2.0))
-        for (i in 0 until n) {
+        val hl2 = n j { i: Int ->
             val ratio = if (low[i] == 0.0) 1.0 else high[i] / low[i]
-            hl2[i] = ln(ratio).let { it * it }
+            ln(ratio).let { it * it }
         }
-        val rolling = hl2.toSeries().rollingMean(period)
+        val rolling = hl2.rollingMean(period)
         return n j { i: Int -> sqrt(factor * rolling[i]) * sqrt(252.0) } // Annualized
     }
 }
@@ -464,15 +456,13 @@ object Microstructure {
      *  These are the metrics that separate market-making desks from chart readers. */
     fun compute(close: Series<Double>, volume: Series<Double>, period: Int = 20): Result {
         val n = close.size
-        val ret = DoubleArray(n)
-        for (i in 1 until n) ret[i] = abs((close[i] - close[i - 1]) / close[i - 1])
+        val ret = n j { i: Int -> if (i == 0) 0.0 else abs((close[i] - close[i - 1]) / close[i - 1]) }
         // Amihud: rolling mean of |r| / (price * volume)
-        val amihudRaw = DoubleArray(n)
-        for (i in 0 until n) {
+        val amihudRaw = n j { i: Int ->
             val dv = close[i] * volume[i]
-            amihudRaw[i] = if (dv == 0.0) 0.0 else ret[i] / dv
+            if (dv == 0.0) 0.0 else ret[i] / dv
         }
-        val amihud = amihudRaw.toSeries().rollingMean(period)
+        val amihud = amihudRaw.rollingMean(period)
         // Kyle's Lambda: regression slope of delta-price on signed volume
         val kyleBuf = DoubleArray(n)
         for (i in 0 until n) {

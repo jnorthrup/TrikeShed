@@ -63,6 +63,9 @@ class NuidFanoutElement(
         private val inbox: Channel<Claim> = Channel(Channel.BUFFERED)
         private val accepted: Channel<Claim> = Channel(Channel.BUFFERED)
 
+        /** Consume one pending claim, suspending if empty. */
+        suspend fun consume(): Claim = inbox.receive()
+
         /** Try to consume one pending claim (non-blocking). Returns null if empty. */
         fun tryTake(): Claim? = inbox.tryReceive().getOrNull()
 

@@ -2,7 +2,11 @@ package borg.trikeshed.lcnc.ccek
 
 import borg.trikeshed.lcnc.isam.LcncEntity
 import borg.trikeshed.lib.Series
-import kotlin.coroutines.AbstractCoroutineContextElement
+import borg.trikeshed.context.AsyncContextElement
+import borg.trikeshed.context.ElementState
+import borg.trikeshed.lcnc.reactor.ReactorAction
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.channels.Channel
 import kotlin.coroutines.CoroutineContext
 
 /**
@@ -16,25 +20,21 @@ import kotlin.coroutines.CoroutineContext
  * Can be used by codecs to publish parsed entities, and by the reactor to fan out updates.
  */
 class IngestStateElement(
-    val ingestId: String
-) : AbstractCoroutineContextElement(Key) {
+    val ingestId: String,
+    parentJob: Job? = null
+) : AsyncContextElement(ElementState.CREATED, parentJob) {
 
-    // Internal state holding the parsed entities so far.
-    // In a real system, this might use a mutable thread-safe structure or Channel.
-    private val parsedEntities = mutableListOf<LcncEntity>()
+    // Fanout channel for reactor actions, replacing mutableListOf accumulator
+    val fanout = Channel<ReactorAction>(Channel.BUFFERED)
 
     /**
      * Called by codecs to publish a newly parsed entity into the context scope.
      */
-    fun publishEntity(entity: LcncEntity) {
-        parsedEntities.add(entity)
-        // Here we could fan out to a PointcutEventProducer or other bus
+    suspend fun publishEntity(action: ReactorAction) {
+        fanout.send(action)
     }
 
-    /**
-     * Retrieves all entities parsed within this context.
-     */
-    fun getEntities(): List<LcncEntity> = parsedEntities.toList()
+    override val key: CoroutineContext.Key<*> get() = Key
 
     companion object Key : CoroutineContext.Key<IngestStateElement>
 }
@@ -44,7 +44,7 @@ class IngestStateElement(
  */
 suspend inline fun publishIngestedEntity(
     context: CoroutineContext,
-    entity: LcncEntity
+    action: ReactorAction
 ) {
-    context[IngestStateElement]?.publishEntity(entity)
+    context[IngestStateElement]?.publishEntity(action)
 }

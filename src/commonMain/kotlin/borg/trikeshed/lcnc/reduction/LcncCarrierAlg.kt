@@ -27,7 +27,7 @@ private fun <T> listToSeries(list: List<T>): Series<T> = list.size j { i -> list
 /** Freeze known-size carrier into ArrayList once (sort / group values). */
 private fun <T> freezeList(size: Int, get: (Int) -> T): ArrayList<T> {
     val out = ArrayList<T>(size)
-    for (i in 0 until size) out.add(get(i))
+    for (item in (size j get).view) out.add(item)
     return out
 }
 
@@ -40,12 +40,11 @@ class SeriesCarrier<T>(private val series: Series<T>) : ReductionCarrier<T> {
 
     /** Lazy projection — no ArrayList. */
     override fun <U> map(transform: (T) -> U): ReductionCarrier<U> =
-        SeriesCarrier(series.size j { transform(series[it]) })
+        SeriesCarrier(series α transform)
 
     override fun filter(predicate: (T) -> Boolean): ReductionCarrier<T> {
         val out = ArrayList<T>(size)
-        for (i in 0 until size) {
-            val item = series[i]
+        for (item in series.view) {
             if (predicate(item)) out.add(item)
         }
         return SeriesCarrier(listToSeries(out))
@@ -53,8 +52,7 @@ class SeriesCarrier<T>(private val series: Series<T>) : ReductionCarrier<T> {
 
     override fun <K> groupBy(key: (T) -> K): Map<K, ReductionCarrier<T>> {
         val groups = linkedMapOf<K, MutableList<T>>()
-        for (i in 0 until size) {
-            val item = series[i]
+        for (item in series.view) {
             groups.getOrPut(key(item)) { mutableListOf() }.add(item)
         }
         return groups.mapValues { (_, v) -> SeriesCarrier(listToSeries(v)) }
@@ -62,8 +60,7 @@ class SeriesCarrier<T>(private val series: Series<T>) : ReductionCarrier<T> {
 
     override fun <K, V> groupBy(key: (T) -> K, value: (T) -> V): Map<K, ReductionCarrier<V>> {
         val groups = linkedMapOf<K, MutableList<V>>()
-        for (i in 0 until size) {
-            val item = series[i]
+        for (item in series.view) {
             groups.getOrPut(key(item)) { mutableListOf() }.add(value(item))
         }
         return groups.mapValues { (_, v) -> SeriesCarrier(listToSeries(v)) }
@@ -77,7 +74,7 @@ class SeriesCarrier<T>(private val series: Series<T>) : ReductionCarrier<T> {
 
     override fun <Acc> fold(initial: Acc, folder: Folder<T, Acc>): Acc {
         var acc = initial
-        for (i in 0 until size) acc = folder.fold(acc, series[i])
+        for (item in series.view) acc = folder.fold(acc, item)
         return acc
     }
 
@@ -93,12 +90,11 @@ class RingCarrier<T>(private val ring: Series<T>, private val slabSize: Int) : R
     override fun get(index: Int): T = ring[index]
 
     override fun <U> map(transform: (T) -> U): ReductionCarrier<U> =
-        SeriesCarrier(size j { transform(get(it)) })
+        SeriesCarrier((size j ::get) α transform)
 
     override fun filter(predicate: (T) -> Boolean): ReductionCarrier<T> {
         val out = ArrayList<T>(size)
-        for (i in 0 until size) {
-            val item = get(i)
+        for (item in (size j ::get).view) {
             if (predicate(item)) out.add(item)
         }
         return SeriesCarrier(listToSeries(out))
@@ -106,8 +102,7 @@ class RingCarrier<T>(private val ring: Series<T>, private val slabSize: Int) : R
 
     override fun <K> groupBy(key: (T) -> K): Map<K, ReductionCarrier<T>> {
         val groups = linkedMapOf<K, MutableList<T>>()
-        for (i in 0 until size) {
-            val item = get(i)
+        for (item in (size j ::get).view) {
             groups.getOrPut(key(item)) { mutableListOf() }.add(item)
         }
         return groups.mapValues { (_, v) -> SeriesCarrier(listToSeries(v)) }
@@ -115,8 +110,7 @@ class RingCarrier<T>(private val ring: Series<T>, private val slabSize: Int) : R
 
     override fun <K, V> groupBy(key: (T) -> K, value: (T) -> V): Map<K, ReductionCarrier<V>> {
         val groups = linkedMapOf<K, MutableList<V>>()
-        for (i in 0 until size) {
-            val item = get(i)
+        for (item in (size j ::get).view) {
             groups.getOrPut(key(item)) { mutableListOf() }.add(value(item))
         }
         return groups.mapValues { (_, v) -> SeriesCarrier(listToSeries(v)) }
@@ -130,7 +124,7 @@ class RingCarrier<T>(private val ring: Series<T>, private val slabSize: Int) : R
 
     override fun <Acc> fold(initial: Acc, folder: Folder<T, Acc>): Acc {
         var acc = initial
-        for (i in 0 until size) acc = folder.fold(acc, get(i))
+        for (item in (size j ::get).view) acc = folder.fold(acc, item)
         return acc
     }
 
@@ -145,7 +139,7 @@ class ArrayCarrier<T>(private val arr: Array<T>) : ReductionCarrier<T> {
     override fun get(index: Int): T = arr[index]
 
     override fun <U> map(transform: (T) -> U): ReductionCarrier<U> =
-        SeriesCarrier(size j { transform(arr[it]) })
+        SeriesCarrier((size j { arr[it] }) α transform)
 
     override fun filter(predicate: (T) -> Boolean): ReductionCarrier<T> {
         val out = ArrayList<T>(size)
@@ -188,12 +182,11 @@ class CursorCarrier(private val cursor: Cursor) : ReductionCarrier<RowVec> {
     override fun get(index: Int): RowVec = cursor[index]
 
     override fun <U> map(transform: (RowVec) -> U): ReductionCarrier<U> =
-        SeriesCarrier(size j { transform(cursor[it]) })
+        SeriesCarrier(cursor α transform)
 
     override fun filter(predicate: (RowVec) -> Boolean): ReductionCarrier<RowVec> {
         val out = ArrayList<RowVec>(size)
-        for (i in 0 until size) {
-            val row = cursor[i]
+        for (row in cursor.view) {
             if (predicate(row)) out.add(row)
         }
         return SeriesCarrier(listToSeries(out))
@@ -201,8 +194,7 @@ class CursorCarrier(private val cursor: Cursor) : ReductionCarrier<RowVec> {
 
     override fun <K> groupBy(key: (RowVec) -> K): Map<K, ReductionCarrier<RowVec>> {
         val groups = linkedMapOf<K, MutableList<RowVec>>()
-        for (i in 0 until size) {
-            val row = cursor[i]
+        for (row in cursor.view) {
             groups.getOrPut(key(row)) { mutableListOf() }.add(row)
         }
         return groups.mapValues { (_, v) -> SeriesCarrier(listToSeries(v)) }
@@ -210,8 +202,7 @@ class CursorCarrier(private val cursor: Cursor) : ReductionCarrier<RowVec> {
 
     override fun <K, V> groupBy(key: (RowVec) -> K, value: (RowVec) -> V): Map<K, ReductionCarrier<V>> {
         val groups = linkedMapOf<K, MutableList<V>>()
-        for (i in 0 until size) {
-            val row = cursor[i]
+        for (row in cursor.view) {
             groups.getOrPut(key(row)) { mutableListOf() }.add(value(row))
         }
         return groups.mapValues { (_, v) -> SeriesCarrier(listToSeries(v)) }
@@ -225,7 +216,7 @@ class CursorCarrier(private val cursor: Cursor) : ReductionCarrier<RowVec> {
 
     override fun <Acc> fold(initial: Acc, folder: Folder<RowVec, Acc>): Acc {
         var acc = initial
-        for (i in 0 until size) acc = folder.fold(acc, cursor[i])
+        for (row in cursor.view) acc = folder.fold(acc, row)
         return acc
     }
 

@@ -1,0 +1,9 @@
+--- src/commonMain/kotlin/borg/trikeshed/dag/BlackboardDagFabric.kt
++++ src/commonMain/kotlin/borg/trikeshed/dag/BlackboardDagFabric.kt
+@@ -432,6 +432,6 @@
+  */
+ object BlackboardFabrics {
+     /** Create a new in-memory blackboard fabric. */
+-    fun create(): BlackboardFabric = InMemoryBlackboardFabric()
++    fun create(): BlackboardFabric = TODO()
+ }
