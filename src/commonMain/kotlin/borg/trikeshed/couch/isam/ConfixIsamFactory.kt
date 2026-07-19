@@ -4,7 +4,8 @@ package borg.trikeshed.couch.isam
 // import borg.trikeshed.collections.toMetaSeries
 import borg.trikeshed.cursor.Cursor
 import borg.trikeshed.isam.*
-import borg.trikeshed.parse.confix.Syntax
+import borg.trikeshed.parse.confix.ConfixIndex
+import borg.trikeshed.parse.confix.scan
 import borg.trikeshed.lib.*
 import borg.trikeshed.userspace.nio.file.spi.FileOperations
 import borg.trikeshed.couch.isam.ConfixIsamIsomorphism
@@ -14,27 +15,29 @@ class ConfixIsamStoreBuilder {
     var dataFileLocation: String = ""
     var stringpoolLocation: String = ""
     var fileOps: FileOperations? = null
-    private var exemplarCursor: Cursor? = null
+    private var exemplarIndex: ConfixIndex? = null
 
     /**
-     * Define the schema implicitly by providing a representative JSON/CBOR document.
-     * The isomorphism infers the RecordMeta from this structure.
+     * Define the schema implicitly by providing a representative JSON / CBOR
+     * document. The isomorphism infers the `RecordMeta` from the scanned
+     * `ConfixIndex`'s `ConfixIndexK` facets (Tags / Spans / DirectChildren /
+     * KeyToChild). NOTE: `ConfixIsamIsomorphism.inferIsamSchemaFromConfixIndex`
+     * is currently unimplemented and throws — see its kdoc for the missing cut.
      */
     fun exemplar(jsonString: String) {
-        val src = jsonString.encodeToByteArray().toSeries()
-        exemplarCursor = Syntax.JSON.scan(src)
+        exemplarIndex = scan(jsonString)
     }
 
-    fun exemplar(cursor: Cursor) {
-        exemplarCursor = cursor
+    fun exemplar(index: ConfixIndex) {
+        exemplarIndex = index
     }
 
     fun build(): ConfixIsamCursorBridge {
         require(dataFileLocation.isNotEmpty()) { "dataFileLocation must be set" }
         require(stringpoolLocation.isNotEmpty()) { "stringpoolLocation must be set" }
-        requireNotNull(exemplarCursor) { "an exemplar document must be provided to infer the ISAM schema" }
+        requireNotNull(exemplarIndex) { "an exemplar document must be provided to infer the ISAM schema" }
 
-        val isamSchema = borg.trikeshed.couch.isam.ConfixIsamIsomorphism.inferIsamSchemaFromConfixCursor(exemplarCursor!!)
+        val isamSchema = ConfixIsamIsomorphism.inferIsamSchemaFromConfixIndex(exemplarIndex!!)
 
         val resolvedFileOps = fileOps ?: throw IllegalStateException("fileOps must be configured")
         val stringpool = FileBackedStringpool(stringpoolLocation, resolvedFileOps)

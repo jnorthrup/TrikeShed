@@ -21,7 +21,7 @@ TrikeShed/
 
 **Toolchain** — JDK 25 (GraalVM CE 25.0.2), Kotlin 2.4.10, Gradle 9.6.1.  
 **No libs/ subprojects** — everything lives in `src/`.  
-**Confix** — the only portable serializer (desired boundary: commonMain allows only `kotlinx-serialization-core`; currently `kotlinx-serialization-json` is a direct `commonMain` dep in `build.gradle.kts` — the boundary is aspirational, not enforced).  
+**Confix** — the only portable serializer; `kotlinx-serialization-json` is not a `commonMain` dependency (jvmMain pulls it for the one target that needs the kotlinx JSON frontend). `commonMain` source allows only `kotlinx-serialization-core` annotations (`@Serializable`/`@Contextual`) via the `kotlin("plugin.serialization")` plugin; the json runtime never crosses into portable code.  
 **License** — AGPLv3 (effective 2017). Do not change.  
 **Task ledger** — `doc/todo.md` (LCNC T22–T29, Kanban-live T-KANBAN-*, Storage-unification T-CAS-PROJ-* queues).  
 **Architecture docs** — `doc/rewire.md` (user-centric Forge workspace architecture, storage unification, K8s emulation via GraalVM pointcut server), `doc/taste.md` (high-performance hierarchical-UI engine principles, 10-point gap review).  

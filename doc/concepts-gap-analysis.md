@@ -110,12 +110,12 @@ but stop one composition short. Ten findings, ranked by impact:
 
 | # | Finding | Severity | Evidence |
 |---|---------|----------|----------|
-| T1 | No structural sharing within Confix docs — single-cell edits re-encode the whole document | HIGH | `ConfixDoc` re-encode on edit; CAS dedups blobs not subtrees |
-| T2 | Boxing wall in query path — `RowVec = Series2<Any?, ColumnMeta↻>` defeats autovec | HIGH | `ViewServer.evaluateExpr` walks boxed `Any?`; `DoubleSeries` primitive path exists but unwired |
-| T3 | No lazy `Series.filter(pred): Series<T>` — `%`/`[Predicate]` return Iterator not Series | HIGH | `Predicate.kt:10-15`; PointcutCoordinate.div materializes via `.toList()` |
-| T4 | CAS is heap-based, not mmap — uring exists for transport, never for document arena | MED | `CasStore.blobs` is `LinearHashMap<ContentId, ByteArray>`; `MmapCasStore` is the one-cut composition |
-| T5 | Browser dual-truth — JS mutates local state instead of lowering to JobCommand | MED | `script.js` local state mutation vs server-side bounded ingress |
-| T6 | `zoom(path)` returns `ConfixCell` not `Cursor` — breaks cursor composability at the most common hierarchical op | MED | `ConfixKit.kt:docAt`/`cellGetAt` return cell |
+|| T1 | No structural sharing within Confix docs — single-cell edits re-encode the whole document | HIGH | `ConfixDoc` re-encode on edit; CAS dedups blobs not subtrees. `ConfixIndexK.StructuralNodes: Series<String?>` (`ConfixIndexK.kt:21,32`) emits CID per token; `StructuralSharingTest.kt:22,60` reads `facet(StructuralNodes)` but no `ConfixDoc.edit(path, value)` exists — any mutation path drops to full byte re-encode (`src/commonMain/kotlin/borg/trikeshed/parse/confix/ConfixKit.kt` has no write facet). |
+|| T2 | Boxing wall in query path — `RowVec = Series2<Any?, ColumnMeta↻>` defeats autovec | HIGH | `ViewServer.evaluateExpr` walks boxed `Any?`; `DoubleSeries` primitive path exists but unwired |
+|| T3 | No lazy `Series.filter(pred): Series<T>` — `%`/`[Predicate]` return Iterator not Series | HIGH | `Predicate.kt:10-15`; PointcutCoordinate.div materializes via `.toList()` |
+|| T4 | CAS is heap-based, not mmap — uring exists for transport, never for document arena | MED | `CasStore.blobs` is `LinearHashMap<ContentId, ByteArray>`; `MmapCasStore` is the one-cut composition |
+|| T5 | Browser dual-truth — JS mutates local state instead of lowering to JobCommand | MED | `script.js` local state mutation vs server-side bounded ingress |
+|| T6 | `zoom(path)` returns `ConfixCell` not `Cursor` — breaks cursor composability at the most common hierarchical op | MED | `ConfixKit.kt:106` `docAt` → `rootCell?.cellGetAt()` returns `ConfixCell?`; `ConfixKit.kt:88-103` `cellGetAt` walks `ConfixCell` chain, no `Cursor` projection. Contrast `ConfixKit.kt:43` `roots: Cursor = index.facet(TreeCursor)` — the `TreeCursor` facet exists but `docAt`/`cellGetAt` don't return it. |
 | T7 | No spatial index over `layout3D` — rendering is O(nodes) per frame | MED | camera projects every node; no quadtree/interval tree |
 | T8 | No UX metrics harness — JMH for algebra, nothing for keystroke/zoom/cold-start | LOW | gh-pages element counts verify correctness, not latency |
 | T9 | No incremental delta propagation — projections full-rebuild per commit | LOW | Rete has affected-branch machinery; projections don't subscribe |

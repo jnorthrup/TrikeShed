@@ -139,6 +139,47 @@ read_stdin_if_missing() {
     [[ -n "${REPLY}" ]]
 }
 
+# New Jules work must start from exactly the revision visible upstream.
+# This is deliberately not bypassable by an environment flag: a local-only
+# commit or dirty worktree gives Jules a stale contract and creates merge debt.
+require_clean_pushed_upstream() {
+    command -v git >/dev/null 2>&1 || die "Required command 'git' not found"
+
+    local root branch expected_branch upstream remote head_sha upstream_sha counts
+    root=$(git rev-parse --show-toplevel 2>/dev/null) \
+        || die "New Jules work must be created from inside a git worktree."
+    branch=$(git -C "${root}" branch --show-current)
+    [[ -n "${branch}" ]] || die "Detached HEAD: checkout the branch Jules will use, push it, then retry."
+
+    expected_branch="${TRIKESHED_JULES_BRANCH:-master}"
+    [[ "${branch}" == "${expected_branch}" ]] \
+        || die "Checked out '${branch}', but Jules would start from '${expected_branch}'. Checkout '${expected_branch}', make it clean, push it, then retry."
+
+    if [[ -n "$(git -C "${root}" status --porcelain=v1 --untracked-files=all)" ]]; then
+        git -C "${root}" status --short >&2
+        die "Dirty worktree: commit every intended file, preserve or remove unintended files, push, then retry."
+    fi
+
+    upstream=$(git -C "${root}" rev-parse --abbrev-ref --symbolic-full-name '@{upstream}' 2>/dev/null) \
+        || die "Branch '${branch}' has no upstream. Push with: git push -u origin '${branch}'"
+    remote=$(git -C "${root}" config --get "branch.${branch}.remote")
+    [[ -n "${remote}" && "${remote}" != "." ]] \
+        || die "Branch '${branch}' does not track a pushable remote. Configure and push an upstream first."
+
+    log "Refreshing ${upstream} before Jules dispatch..."
+    git -C "${root}" fetch --quiet "${remote}" \
+        || die "Could not fetch '${remote}'; cannot prove the selected revision is upstream."
+
+    head_sha=$(git -C "${root}" rev-parse HEAD)
+    upstream_sha=$(git -C "${root}" rev-parse '@{upstream}')
+    if [[ "${head_sha}" != "${upstream_sha}" ]]; then
+        counts=$(git -C "${root}" rev-list --left-right --count 'HEAD...@{upstream}')
+        die "HEAD is not identical to ${upstream} (ahead/behind: ${counts}). Reconcile and push before creating Jules work."
+    fi
+
+    log "Dispatch barrier passed: clean ${branch} at ${head_sha:0:12}, identical to ${upstream}."
+}
+
 # JSON helper. Single arg = raw body; pass --json to validate output.
 api_request() {
     local method="$1" path="$2" body="${3:-}"
@@ -229,6 +270,8 @@ cmd_session() {
 }
 
 cmd_create() {
+    require_clean_pushed_upstream
+
     local prompt="" title="" require_approval="false"
     # trikeshed-jules create "prompt" "title" requirePlanApproval
     [[ -n "${1:-}" ]] && prompt="$1" || true
@@ -396,7 +439,8 @@ Sessions
   delete <id|name>                                     delete session
   new|create "prompt" ["title"] [requirePlanApproval]  create session
                                                        (auto-binds to TrikeShed
-                                                        via GET /sources)
+                                                        via GET /sources; requires
+                                                        clean HEAD == git upstream)
   send|chat <id|name> ["message"]                      message AWAITING_USER_FEEDBACK
   approve <id|name>                                    approve pending plan
   pull <id>                                            pull + apply (delegates to
@@ -437,7 +481,7 @@ EOF
 }
 
 show_version() {
-    echo "trikeshed-jules 2.0.0 (spec-revision 2026-07-19)"
+    echo "trikeshed-jules 2.1.0 (spec-revision 2026-07-19; upstream-push barrier)"
 }
 
 # =============================================================================
