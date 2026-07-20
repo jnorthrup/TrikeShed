@@ -15,7 +15,10 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.merge
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.yield
 import kotlinx.coroutines.withTimeoutOrNull
+import kotlin.coroutines.CoroutineContext
+import kotlin.time.TimeSource
 
 /**
  * NuidFanoutElement — the CCEK owner of the concentric-narrowing dispatcher.
@@ -51,13 +54,13 @@ import kotlinx.coroutines.withTimeoutOrNull
  *   DRAINING  ⇒ registry frozen; no new dispatches; in-flight claims finish.
  *   CLOSED    ⇒ registry empty; supervisor cancelled.
  */
-class NuidFanoutElement(
+open class NuidFanoutElement(
     parentJob: Job? = null,
     val escalationBudget: Int = 3,
 ) : AsyncContextElement(ElementState.CREATED, parentJob) {
 
     companion object Key : AsyncContextKey<NuidFanoutElement>()
-    override val key: AsyncContextKey<NuidFanoutElement> = Key
+    override open val key: CoroutineContext.Key<*> = Key
 
     /** Per-workgroup claim slot. Claim intake belongs to the dispatcher;
      *  production workers receive accepted claims through [consume]. */
