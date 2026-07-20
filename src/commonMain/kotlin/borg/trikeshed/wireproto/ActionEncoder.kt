@@ -9,7 +9,11 @@ class ActionEncoder {
         if (payload.size > WireprotoFrame.MAX_PAYLOAD) {
             throw WireprotoFormatException(WireprotoFormatException.OVERSIZE_PAYLOAD)
         }
+<<<<<<< HEAD
         
+=======
+
+>>>>>>> origin/wireproto-codec-9444185639294947999
         // Convert Nuid to a deterministic string
         val nuid = envelope.nuid
         val cap = nuid.a
@@ -39,6 +43,7 @@ class ActionEncoder {
         } else {
             "restored:${nonce.bytes.joinToString(",")}"
         }
+<<<<<<< HEAD
         
         val subnetStr = subnet.toString()
         val nuidStr = "$capStr|$nonceStr|$subnetStr"
@@ -48,6 +53,17 @@ class ActionEncoder {
         val nuidLen = nuidBytes.size
         val verbLen = verbBytes.size
         
+=======
+
+        val subnetStr = subnet.toString()
+        val nuidStr = "$capStr|$nonceStr|$subnetStr"
+        val nuidBytes = nuidStr.encodeToByteArray()
+
+        val verbBytes = envelope.verb.encodeToByteArray()
+        val nuidLen = nuidBytes.size
+        val verbLen = verbBytes.size
+
+>>>>>>> origin/wireproto-codec-9444185639294947999
         if (nuidLen > 65535) throw WireprotoFormatException(WireprotoFormatException.BAD_NUID_LENGTH + nuidLen)
         if (verbLen > 65535) throw WireprotoFormatException(WireprotoFormatException.BAD_VERB_LENGTH + verbLen)
 
@@ -55,18 +71,27 @@ class ActionEncoder {
         val totalSize = 14 + nuidLen + verbLen + payload.size
         val bytes = ByteArray(totalSize)
         var offset = 0
+<<<<<<< HEAD
         
+=======
+
+>>>>>>> origin/wireproto-codec-9444185639294947999
         // Magic (4 bytes BE)
         val magic = WireprotoFrame.MAGIC
         bytes[offset++] = (magic ushr 24).toByte()
         bytes[offset++] = (magic ushr 16).toByte()
         bytes[offset++] = (magic ushr 8).toByte()
         bytes[offset++] = magic.toByte()
+<<<<<<< HEAD
         
+=======
+
+>>>>>>> origin/wireproto-codec-9444185639294947999
         // Version (2 bytes BE)
         val version = WireprotoFrame.VERSION.toInt()
         bytes[offset++] = (version ushr 8).toByte()
         bytes[offset++] = version.toByte()
+<<<<<<< HEAD
         
         // NUID length (2 bytes BE)
         bytes[offset++] = (nuidLen ushr 8).toByte()
@@ -84,16 +109,42 @@ class ActionEncoder {
         verbBytes.copyInto(bytes, offset)
         offset += verbLen
         
+=======
+
+        // NUID length (2 bytes BE)
+        bytes[offset++] = (nuidLen ushr 8).toByte()
+        bytes[offset++] = nuidLen.toByte()
+
+        // NUID bytes
+        nuidBytes.copyInto(bytes, offset)
+        offset += nuidLen
+
+        // Verb length (2 bytes BE)
+        bytes[offset++] = (verbLen ushr 8).toByte()
+        bytes[offset++] = verbLen.toByte()
+
+        // Verb bytes
+        verbBytes.copyInto(bytes, offset)
+        offset += verbLen
+
+>>>>>>> origin/wireproto-codec-9444185639294947999
         // Payload length (4 bytes BE)
         val payloadLen = payload.size
         bytes[offset++] = (payloadLen ushr 24).toByte()
         bytes[offset++] = (payloadLen ushr 16).toByte()
         bytes[offset++] = (payloadLen ushr 8).toByte()
         bytes[offset++] = payloadLen.toByte()
+<<<<<<< HEAD
         
         // Payload bytes
         payload.copyInto(bytes, offset)
         
+=======
+
+        // Payload bytes
+        payload.copyInto(bytes, offset)
+
+>>>>>>> origin/wireproto-codec-9444185639294947999
         return bytes
     }
 }

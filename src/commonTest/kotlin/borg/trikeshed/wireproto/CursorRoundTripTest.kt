@@ -25,7 +25,7 @@ class CursorRoundTripTest {
             val meta: () -> ColumnMeta = { ColumnMeta("col_$c", IOMemento.IoInt) }
             meta
         }
-        
+
         return rows j { r: Int ->
             val row: RowVec = cols j { c: Int ->
                 (r * cols + c) j metas.b(c)
@@ -54,16 +54,16 @@ class CursorRoundTripTest {
     fun cursorRoundTrip3x4() {
         val cursor = createDummyCursor(4, 3)
         val payloadStr = serializeCursor(cursor)
-        
+
         val testNuid = nuid(Capability.Process("test"), Nonce.Restored(ByteArray(0)), Subnet.core)
         val envelope = ReactorActionEnvelope(testNuid, "cursor.put", payloadStr.encodeToByteArray())
-        
+
         val bytes = encoder.encode(envelope)
         val decoded = decoder.decode(bytes)
-        
+
         val decodedPayloadStr = decoded.payload.decodeToString()
         val decodedCursor = deserializeCursor(decodedPayloadStr)
-        
+
         assertEquals(4, decodedCursor.a)
         val cols = if (decodedCursor.a > 0) decodedCursor.b(0).a else 0
         assertEquals(3, cols)
@@ -73,16 +73,16 @@ class CursorRoundTripTest {
     fun cursorEmptyRoundTrip() {
         val cursor = createDummyCursor(0, 0)
         val payloadStr = serializeCursor(cursor)
-        
+
         val testNuid = nuid(Capability.Process("test"), Nonce.Restored(ByteArray(0)), Subnet.core)
         val envelope = ReactorActionEnvelope(testNuid, "cursor.put", payloadStr.encodeToByteArray())
-        
+
         val bytes = encoder.encode(envelope)
         val decoded = decoder.decode(bytes)
-        
+
         val decodedPayloadStr = decoded.payload.decodeToString()
         val decodedCursor = deserializeCursor(decodedPayloadStr)
-        
+
         assertEquals(0, decodedCursor.a)
     }
 
@@ -90,16 +90,16 @@ class CursorRoundTripTest {
     fun cursorSingleCellRoundTrip() {
         val cursor = createDummyCursor(1, 1)
         val payloadStr = serializeCursor(cursor)
-        
+
         val testNuid = nuid(Capability.Process("test"), Nonce.Restored(ByteArray(0)), Subnet.core)
         val envelope = ReactorActionEnvelope(testNuid, "cursor.put", payloadStr.encodeToByteArray())
-        
+
         val bytes = encoder.encode(envelope)
         val decoded = decoder.decode(bytes)
-        
+
         val decodedPayloadStr = decoded.payload.decodeToString()
         val decodedCursor = deserializeCursor(decodedPayloadStr)
-        
+
         assertEquals(1, decodedCursor.a)
         val cols = if (decodedCursor.a > 0) decodedCursor.b(0).a else 0
         assertEquals(1, cols)
@@ -110,19 +110,19 @@ class CursorRoundTripTest {
     fun cursorPayloadBase64Encoded() {
         val cursor = createDummyCursor(2, 2)
         val payloadStr = serializeCursor(cursor)
-        
+
         val testNuid = nuid(Capability.Process("test"), Nonce.Restored(ByteArray(0)), Subnet.core)
         val envelope = ReactorActionEnvelope(testNuid, "cursor.put", payloadStr.encodeToByteArray())
-        
+
         val bytes = encoder.encode(envelope)
         val decoded = decoder.decode(bytes)
-        
+
         val decodedPayloadStr = decoded.payload.decodeToString()
-        
+
         // Assert it is valid base64
         val decodedBytes = Base64.decode(decodedPayloadStr)
         val rawStr = decodedBytes.decodeToString()
-        
+
         assertEquals("2,2", rawStr)
     }
 }
