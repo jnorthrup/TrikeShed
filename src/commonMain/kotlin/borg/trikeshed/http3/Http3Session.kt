@@ -19,7 +19,7 @@ class Http3Session(
     suspend fun createStream(): MplexStream = mutex.withLock {
         val id = nextStreamId
         nextStreamId += 4 // Bi-directional streams increment by 4
-        
+
         val stream = MplexStream(id, sessionWindow) { streamId, data ->
             // In a real QUIC implementation, this would format a STREAM frame
             // For now, we simulate sending a datagram containing the stream data
@@ -34,7 +34,7 @@ class Http3Session(
         streams[id] = stream
         stream
     }
-    
+
     suspend fun getStream(id: Long): MplexStream? = mutex.withLock {
         streams[id]
     }
@@ -43,15 +43,15 @@ class Http3Session(
         // In a real QUIC implementation, this would parse QUIC frames
         // For our multiplexing simulation, we extract the stream ID and route the data
         if (datagram.size < 8) return
-        
+
         var streamId = 0L
         for (i in 0..7) {
             streamId = (streamId shl 8) or (datagram[i].toLong() and 0xFF)
         }
-        
+
         val data = datagram.copyOfRange(8, datagram.size)
         val stream = getStream(streamId)
-        
+
         if (stream == null) {
             // Unidirectional stream from peer, auto-create
             mutex.withLock {
@@ -72,7 +72,7 @@ class Http3Session(
             stream.receiveData(data)
         }
     }
-    
+
     suspend fun close() {
         mutex.withLock {
             for (stream in streams.values) {

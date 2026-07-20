@@ -9,31 +9,31 @@ class WsHttp3Mux(
 ) {
     suspend fun sendFrame(streamId: Long, frameData: ByteArray, opcode: WebSocketFrame.OpCode = WebSocketFrame.OpCode.TEXT, fin: Boolean = true) {
         val stream = session.getStream(streamId) ?: throw IllegalArgumentException("Stream not found")
-        
+
         val frame = WebSocketFrame.buildFrame(
             opcode = opcode,
             fin = fin,
             masked = false, // Client-to-server frames should be masked, this assumes server sending to client
             payload = frameData
         )
-        
+
         stream.write(frame)
     }
 
     suspend fun receiveFrameData(streamId: Long): Pair<WebSocketFrame.OpCode, ByteArray>? {
         val stream = session.getStream(streamId) ?: return null
-        
+
         // Ensure we properly read the bytes
         val headerPart = stream.readExactly(2)
         if (headerPart.isEmpty()) return null
-        
+
         val b0 = headerPart[0].toInt() and 0xFF
         val opcode = WebSocketFrame.OpCode.fromCode(b0 and 0x0F)
-        
+
         val b1 = headerPart[1].toInt() and 0xFF
         val masked = (b1 and 0x80) != 0
         val length7 = b1 and 0x7F
-        
+
         val payloadLength = when {
             length7 < 126 -> length7.toLong()
             length7 == 126 -> {
@@ -47,14 +47,14 @@ class WsHttp3Mux(
                 len
             }
         }
-        
+
         val maskingKey = if (masked) stream.readExactly(4) else null
         val payload = stream.readExactly(payloadLength.toInt())
-        
+
         if (masked && maskingKey != null) {
             WebSocketFrame.applyMask(maskingKey, payload)
         }
-        
+
         return Pair(opcode, payload)
     }
 }

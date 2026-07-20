@@ -17,7 +17,7 @@ interface Stream {
 
 open class FlowWindow(initialSize: Int = 65535) {
     private val availableState = MutableStateFlow(initialSize)
-    
+
     val available: Int
         get() = availableState.value
 
@@ -25,7 +25,7 @@ open class FlowWindow(initialSize: Int = 65535) {
         while (true) {
             // Suspend until we might have enough bytes available
             availableState.first { it >= bytes }
-            
+
             // Try to atomically consume the bytes
             var success = false
             availableState.update { current ->
@@ -53,13 +53,13 @@ class StreamWindow(initialSize: Int = 65535) : FlowWindow(initialSize)
 class SessionWindow(initialSize: Int = 65535) : FlowWindow(initialSize)
 
 class MplexStream(
-    override val id: Long, 
+    override val id: Long,
     private val sessionWindow: SessionWindow,
     initialWindowSize: Int = 65535,
     private val onWrite: suspend (Long, ByteArray) -> Unit = { _, _ -> }
 ) : Stream {
     val streamWindow = StreamWindow(initialWindowSize)
-    
+
     // Applying receive side backpressure limit. Buffer size prevents immediate HOL blocking,
     // though a full implementation needs proper flow control feedback.
     private val readChannel = Channel<ByteArray>(64)
@@ -72,7 +72,7 @@ class MplexStream(
         } catch (e: ClosedReceiveChannelException) {
             return ByteArray(0)
         }
-        
+
         return if (data.size <= maxBytes) {
             leftover = null
             data
@@ -82,7 +82,7 @@ class MplexStream(
             chunk
         }
     }
-    
+
     override suspend fun readExactly(bytes: Int): ByteArray {
         val buffer = ByteArray(bytes)
         var offset = 0
@@ -96,13 +96,13 @@ class MplexStream(
         }
         return buffer
     }
-    
+
     fun receiveData(data: ByteArray) {
         if (!closed && data.isNotEmpty()) {
             try {
                 // Using trySend instead of send to avoid suspending the session reader loop,
                 // mitigating Head-of-Line (HOL) blocking. If the channel is full, data is dropped
-                // (in a real QUIC implementation, we would rely on QUIC's reliable delivery 
+                // (in a real QUIC implementation, we would rely on QUIC's reliable delivery
                 // and flow control to not exceed window size).
                 readChannel.trySend(data)
             } catch (e: ClosedSendChannelException) {
