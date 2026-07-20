@@ -10,6 +10,10 @@ import borg.trikeshed.lib.j
 import java.io.RandomAccessFile
 import borg.trikeshed.collections.associative.LinearHashMap
 
+import java.lang.foreign.Arena
+import java.lang.foreign.MemorySegment
+import java.lang.foreign.ValueLayout
+
 class MmapCasStore(val file: Path) : CasStore() {
     private val randomAccessFile = RandomAccessFile(file.toFile(), "rw")
     private val channel = randomAccessFile.channel
@@ -22,7 +26,8 @@ class MmapCasStore(val file: Path) : CasStore() {
     private var writeOffset: Long = 0L
 
     // Keep a single mapped region to avoid memory leaks. We remap when file grows.
-    private var currentMapping: MappedByteBuffer? = null
+    private var currentArena: Arena? = null
+    private var currentMapping: MemorySegment? = null
     private var mappedSize: Long = 0L
     private val mapLock = Any()
 
@@ -67,11 +72,12 @@ class MmapCasStore(val file: Path) : CasStore() {
     private fun remap() {
         synchronized(mapLock) {
             val size = channel.size()
-        if (size == 0L) return
+            if (size == 0L) return
             if (size > 0 && size > mappedSize) {
-                // In a robust implementation, we would unmap the old buffer here using reflection or Unsafe.
-                // For this exercise, we just map a new one encompassing the whole file.
-                currentMapping = channel.map(FileChannel.MapMode.READ_ONLY, 0, size)
+                currentArena?.close()
+                val newArena = Arena.ofShared()
+                currentMapping = channel.map(FileChannel.MapMode.READ_ONLY, 0, size, newArena)
+                currentArena = newArena
                 mappedSize = size
             }
         }
@@ -99,7 +105,8 @@ class MmapCasStore(val file: Path) : CasStore() {
 
     override fun get(cid: ContentId): ByteArray? {
         val loc = synchronized(this) { offsetMap[cid] } ?: return null
-        val (offset, length) = loc
+        val offset = loc.first
+        val length = loc.second
         val buffer = ByteBuffer.allocate(length)
         channel.read(buffer, offset)
         return buffer.array()
@@ -107,14 +114,20 @@ class MmapCasStore(val file: Path) : CasStore() {
 
     fun getMapped(cid: ContentId): Series<Byte>? {
         val loc = synchronized(this) { offsetMap[cid] } ?: return null
-        val (offset, length) = loc
+        val offset = loc.first
+        val length = loc.second
         val map = synchronized(mapLock) { currentMapping } ?: return null
 
         // Return a series that reads from the mapped buffer without copy
-        return length j { i -> map.get((offset + i).toInt()) }
+        return length j { i: Int -> map.get(ValueLayout.JAVA_BYTE, offset + i.toLong()) }
     }
 
     fun close() {
+        synchronized(mapLock) {
+            currentArena?.close()
+            currentArena = null
+            currentMapping = null
+        }
         channel.close()
         randomAccessFile.close()
     }
