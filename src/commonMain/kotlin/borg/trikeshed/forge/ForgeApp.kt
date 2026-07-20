@@ -3,13 +3,13 @@ package borg.trikeshed.forge
 import borg.trikeshed.common.Files
 import borg.trikeshed.cursor.blackboardContext
 import borg.trikeshed.cursor.provenance
-import borg.trikeshed.dag.causalGraphNode
 import borg.trikeshed.forge.blackboard.ForgeBlackboardSection3D
 import borg.trikeshed.forge.blackboard.ForgeBlackboardView
 import borg.trikeshed.forge.gallery.ForgeGalleryCatalog
 import borg.trikeshed.forge.gallery.ForgeGalleryRenderer
 import borg.trikeshed.job.ContentId
 import borg.trikeshed.kanban.ForgeKanbanIngest
+import borg.trikeshed.kanban.CardPriority
 import borg.trikeshed.lcnc.reactor.IngestCodec
 import borg.trikeshed.lcnc.reactor.IngestFormat
 import borg.trikeshed.lcnc.reactor.IngestSource
@@ -125,8 +125,8 @@ object ForgeApp {
             causalGraph = reduction.causalNodes.map { node ->
                 CausalNode(
                     id = node.causalKey,
-                    title = node.payload["title"]?.toString() ?? node.causalKey,
-                    parents = node.deps.map { it.value },
+                    title = node.nodeId,
+                    parents = node.parentNodeIds,
                     children = emptyList(),
                 )
             },
