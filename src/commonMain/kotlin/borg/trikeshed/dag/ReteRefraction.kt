@@ -21,8 +21,8 @@ class ReteRefraction {
     }
 
     fun invalidateBySupport(supportCid: ContentId): Int {
-        val invalidated = fired.keyList().filter { supportCid in it.supportCids }
-        invalidated.forEach(fired::remove)
+        val invalidated = fired.entries().filter { supportCid in it.first.supportCids }
+        invalidated.forEach { fired.remove(it.first) }
         return invalidated.size
     }
 

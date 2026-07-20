@@ -105,7 +105,7 @@ object ForgeApp {
                 ForgeItem(
                     id = card.id.value,
                     title = card.title,
-                    notes = card.body,
+                    notes = card.description,
                     status = card.columnId.value,
                     priority = card.priority.name,
                 )
@@ -212,7 +212,7 @@ object ForgeApp {
                             "mimeType" to JsonPrimitive(job.mimeType),
                             "status" to JsonPrimitive(job.status),
                             "progress" to JsonPrimitive(job.progress),
-                            "error" to job.error?.let { JsonPrimitive(it) },
+                            "error" to (job.error?.let { JsonPrimitive(it) } ?: JsonPrimitive("")),
                             "entitiesCreated" to JsonPrimitive(job.entitiesCreated),
                         )
                     )

@@ -2,6 +2,7 @@ package borg.trikeshed.collections.associative
 
 import borg.trikeshed.lib.Join
 import borg.trikeshed.lib.Series
+import borg.trikeshed.lib.j
 
 /**
  * Base class for open-addressing hash maps with triangular probing.
@@ -46,10 +47,10 @@ abstract class OpenAddressingMap<K : Any, V, IK : Any>(
     protected abstract fun makeInternalKey(userKey: K): IK
     protected abstract fun internalKeyEquals(a: IK, b: IK): Boolean
     protected abstract fun internalKeyHash(internalKey: IK): Int
-    protected abstract fun onInsert(internalKey: IK): Unit = {}
-    protected abstract fun onRemove(internalKey: IK): Unit = {}
+    protected open fun onInsert(internalKey: IK) { }
+    protected open fun onRemove(internalKey: IK) { }
 
-    // ─── public API ───
+     // ─── public API ───
     open val count: Int get() = size
 
     operator fun set(key: K, value: V): V? {
@@ -178,12 +179,12 @@ class LinkedLinearHashMap<K : Any, V>(initialCapacity: Int = 16)
     private var sequence: ULong = 0UL
 
     override fun makeInternalKey(userKey: K): Join<Int, ULong> =
-        Join(userKey.hashCode(), sequence++)
+        userKey.hashCode() j sequence++
 
     override fun internalKeyEquals(a: Join<Int, ULong>, b: Join<Int, ULong>): Boolean =
-        a.left == b.left && a.right == b.right
+        a.a == b.a && a.b == b.b
 
-    override fun internalKeyHash(internalKey: Join<Int, ULong>): Int = internalKey.left
+    override fun internalKeyHash(internalKey: Join<Int, ULong>): Int = internalKey.a
 
     override fun extractUserKey(internalKey: Join<Int, ULong>): K =
         throw UnsupportedOperationException("LinkedLinearHashMap: reverse lookup not stored; use entriesInOrder()")
@@ -196,7 +197,7 @@ class LinkedLinearHashMap<K : Any, V>(initialCapacity: Int = 16)
             val k = keys[s]
             if (!isAbsent(k) && !isDeleted(k)) {
                 val ik = k as Join<Int, ULong>
-                live += (ik.right) to (extractUserKeyByValue(values[s] as V) to values[s] as V)
+                live += (ik.b) to (extractUserKeyByValue(values[s] as V) to values[s] as V)
             }
         }
         live.sortBy { it.first }

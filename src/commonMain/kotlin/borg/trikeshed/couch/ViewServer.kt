@@ -363,26 +363,16 @@ class ViewServer {
 
         val values: Series<Any?> = if (mapExpr != null) {
             group.size j { i: Int -> evaluateExpr(mapExpr, group[i].value) }
-        val values = if (mapExpr != null) {
-            group.asSequence().map { evaluateExpr(mapExpr, it.value) }
         } else {
             group.size j { i: Int -> group[i].value }
-            group.asSequence().map { it.value }
         }
 
         return when (op) {
             "sum" -> values.view.sumOf { it.toDoubleValue() }
-            "count" -> values.count().toLong()
+            "count" -> values.size.toLong()
             "min" -> values.view.minOfOrNull { it.toDoubleValue(Double.MAX_VALUE) } ?: 0.0
             "max" -> values.view.maxOfOrNull { it.toDoubleValue(Double.MIN_VALUE) } ?: 0.0
             "avg" -> {
-                var sum = 0.0
-                var count = 0
-                for (v in values) {
-                    sum += (v as? Number)?.toDouble() ?: (v as? String)?.toDoubleOrNull() ?: 0.0
-                    count++
-                }
-                if (count == 0) 0.0 else sum / count
                 if (values.size == 0) 0.0
                 else values.view.sumOf { it.toDoubleValue() } / values.size
             }
@@ -403,14 +393,10 @@ class ViewServer {
             "+" -> {
                 val evaluated: Series<Any?> = args.size j { i: Int -> evaluateExpr(args[i], rowValue) }
                 evaluated.view.sumOf { it.toDoubleValue() }
-                val evaluated = args.asSequence().map { evaluateExpr(it, rowValue) }
-                evaluated.sumOf { (it as? Number)?.toDouble() ?: (it as? String)?.toDoubleOrNull() ?: 0.0 }
             }
             "*" -> {
                 val evaluated: Series<Any?> = args.size j { i: Int -> evaluateExpr(args[i], rowValue) }
                 evaluated.view.fold(1.0) { acc, e -> acc * e.toDoubleValue(1.0) }
-                val evaluated = args.asSequence().map { evaluateExpr(it, rowValue) }
-                evaluated.fold(1.0) { acc, e -> acc * ((e as? Number)?.toDouble() ?: (e as? String)?.toDoubleOrNull() ?: 1.0) }
             }
             "value" -> rowValue
             else -> null

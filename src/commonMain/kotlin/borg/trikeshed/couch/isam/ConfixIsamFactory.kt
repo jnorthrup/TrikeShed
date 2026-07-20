@@ -80,7 +80,7 @@ class ConfixIsamCursorBridge(
         }
     }
 
-    fun indexFacet(cid: borg.trikeshed.job.ContentId, projection: borg.trikeshed.reactor.FacetProjection) {
+    fun indexFacet(cid: borg.trikeshed.job.ContentId) {
         // Stub for indexing a facet
     }
 }

@@ -181,3 +181,35 @@ unmerged (Pages deployment root, intentional).
 | J14-J22 | all CLOSED (one merge commit `7303bfd2` predates this refresh) |
 
 T1–T10 taste-essay findings unchanged (refinement queue still open).
+
+## 2026-07-20 RGA: resume ingest → Narsese → Couch multiverse → Rete → Kanban
+
+Audit of the live tree at `73072593` against the resume/Narsese/Kanban
+architecture spec in `doc/todo.md:465-570`. `compileKotlinJvm` is RED;
+no downstream test can run.
+
+| ID | Sev | Area | Finding | Evidence |
+|----|-----|------|---------|----------|
+| N1 | CRIT | build | `compileKotlinJvm` fails on 3 independent compile blockers | ViewServer.kt:364-412, CreeperNode.kt:42-52, LinearHashMap.kt:49-50,181-199 |
+| N2 | S5 | manifold | `ManifoldConcept`, `BudgetCoord`, `NarsBag`, `MutableNarsBag`, `SealedNarsBag` have zero production consumers | `grep -rn 'borg.trikeshed.manifold' src/` outside the package → 0 hits (`manifold/ManifoldConcept.kt:68-214`) |
+| N3 | S4 | job/kanban | `ForgeKanbanIngest.reduce` builds a throwaway `ReteWorkingMemory()` instead of submitting `JobCommand`s through `JobSupervisorElement` | `ForgeKanbanIngest.kt:199`; durable path proven in `JobSupervisorReteIntegrationTest` but bypassed in production |
+| N4 | S5 | ingest | Resume ingest is not a live path. `ForgeKanbanIngest` requires literal `6. Work packages` headers; ordinary resumes fail with `no work packages found` | `ForgeKanbanIngest.kt:247-269`; `JvmTikaIngestAdapter.kt:88` extracts but feeds dead parser |
+| N5 | S4 | kanban | Board is a parallel truth rebuilt from markdown, not a projection over committed commands | `ForgeKanbanIngest.kt:228-244`; `JvmKanbanServer.kt:260` |
+| N6 | S3 | couch | ViewServer custom-reducer path has duplicated `val evaluated` declarations (Series form + Sequence form in same scope) | `couch/ViewServer.kt:364-412` |
+| N7 | S3 | collections | `LinearHashMap` associative declares `onInsert`/`onRemove` as `abstract` with bodies; tree-walk references `left`/`right` that don't exist | `collections/associative/LinearHashMap.kt:49-50,181-199` |
+| N8 | S3 | creeper | `CreeperNode` constructs `AcpAction(verb=,resource=,params=)` and calls `modelMux.route(models=,...)` — neither signature exists | `creeper/CreeperNode.kt:42-52` |
+
+Best debt reduction: fix the three compile blockers (N1) so `compileKotlinJvm`
+goes green. ViewServer: remove the duplicated Sequence-form `evaluated` decls
+(`:367,370,406,412`), keep the Series form. CreeperNode: delete or fix against
+live API (zero consumers). LinearHashMap: fix `abstract`-with-body and
+`left`/`right` refs. This unblocks every downstream cut in the resume/Narsese
+vertical (`doc/todo.md` T-RESUME-FOUNDATION-1 through T-RESUME-VIEWS-8).
+
+Non-problems:
+- `JobSupervisorElement` + `ReteNetwork` + `JobReducer` work correctly in
+  tests (`JobSupervisorReteIntegrationTest`, `JobSupervisorDrainTest`). The
+  durable pipeline is real; it is just not wired to production ingress.
+- `CommonViewServer` + `CouchDbCascadeTool` map/reduce protocol is sound;
+  only the custom-reducer evaluation path is broken.
+- `NuidFanoutElement` concentric narrowing + escalation is tested and correct.

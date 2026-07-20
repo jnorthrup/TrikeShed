@@ -462,6 +462,148 @@ post-NUID/CCEK audit. Each task is single-best-debt-reduction sized
 - [ ] **T-KANBAN-CROSS-11. Single submission format shared between
       Forge path and Hermes-donor path (closes G15)**
 
+## Resume ingest → causal Kanban → ModelMux fulfillment — RGA 2026-07-20
+
+Target runtime:
+
+`resume + job-requisition bytes → CAS/extraction evidence → semantic/Narsese
+signal bags → Couch reducer multiverse → causal facts → card reducers →
+ModelMux work descriptors → fulfillment facts → NUID concentric dispatch →
+Forge projections`
+
+Multiverse model (../couchdbcascade as reference): the Narsese signal layer is
+the multiverse center that several document sources feed and that Kanban reads.
+Each source (`resumes | listings | coverletters`) is a Couch document domain
+whose map/reduce reducers run as `ViewServer` tools and emit evidence-backed
+Narsese signals into the shared signal bags. `kanban` consumes those signals
+through the same reducer pipeline rather than holding a second truth. The
+reference `Atlas<C,P>` / `Chart<C,P>` manifold-atlas code stays in history
+(`96e0d7b0`); it is not revived for this work.
+
+Ingest stack: local-first PWA. Tika handles office formats (PDF/DOCX/PPTX,
+image OCR via Tesseract with an ffmpeg preprocessing hook). GDoc export is
+pulled through the same Tika/filters pipeline once it lands as bytes. Camel
+routs files only when a transport-mediated path is needed. Filters normalize
+and classify the extracted streams before they reach the evidence reducers.
+Non-Tika targets (plain text, markdown, JSON) are read directly. Ingest UX is
+either a drag-and-drop onto a blackboard coordinate or a dialog, both of which
+produce the same evidence submission. A web-scraper plugin lands later and
+shares the same evidence submission contract; it is out of scope for the first
+vertical.
+
+UI contract: Kanban and the force-directed causality graph remain separate,
+first-class views over the same causal/card identity. The user switches between
+them; do not collapse them into a hybrid canvas. Selection, camera focus, and
+card/node identity survive the switch.
+
+Resumes and job requisitions occupy a signalling panel beside those views. The
+panel is not a third mutable truth: it projects two evidence-backed bags and
+their relations. Resume signals say what the candidate can evidence; requisition
+signals say what the role requires or prefers. Matches, gaps, contradictions,
+and missing evidence are derived signals that open/focus the same causal card.
+
+The pieces exist, but this runtime does not. Evidence below is from live source
+and `./gradlew jvmTest --tests ConcentricKanbanDemoTest --tests
+LcncFanoutElementTest --tests ModelMuxTest` on 2026-07-20; compilation failed
+before tests on the cited merged-source errors.
+
+| ID | Severity | Live backing | Gap |
+|---|---|---|---|
+| RSM-01 | CRIT | `JvmTikaIngestAdapter.extractToMarkdown` extracts PDF/DOCX/image text (`src/jvmMain/.../kanban/JvmTikaIngestAdapter.kt:53-94`) | `ForgeKanbanIngest` accepts only a literal `6. Work packages` section with `A1 — title` headers (`ForgeKanbanIngest.kt:247-269`). An ordinary resume therefore extracts successfully and then fails with `no work packages found`; no resume facts, spans, or evidence IDs are produced. |
+| RSM-02 | CRIT | `JvmKanbanServer` creates `ingestPath` for Tika output (`JvmKanbanServer.kt:178-191`) | The computed path is never consumed; line 192 calls donor ingest with the original `donorPath`. `/api/submit` writes every body to `/tmp/hi` and treats it as the board source (`JvmKanbanServer.kt:277-297`). Resume ingest is not a live endpoint. The shell has a drop zone (`resources/web/index.html:48-58`) but it only enqueues files locally; it never produces evidence, signals, or a reducer submission. |
+| RSM-03 | CRIT | `LitebikeListenerElement`, `NuidFanoutElement`, and three workgroups are constructed (`JvmKanbanServer.kt:91-140`) | Wire fanout only logs and returns true (`:223-229`); it never calls `NuidFanoutElement.dispatch`. The HTTP worker looks up `slotOf("wireproto")` (`:203-220`) although registration used `kanban-wireproto-lan` (`:107-114`), so the worker returns immediately. No broadcast-node request reaches a reducer. |
+| RSM-04 | HIGH | `ForgeKanbanIngest.reduce` creates cards, Rete facts, causal nodes, and correlations (`ForgeKanbanIngest.kt:105-244`) | It constructs a derived `KanbanBoard` directly. It does not submit `JobCommand`s through the durable single-writer supervisor, so card transitions are not replayable reducer outcomes. |
+| RSM-05 | HIGH | `JobReducer` supports submit/start/complete/fail/retry/progress/block/move (`JobCommand.kt:9-93`, `JobReducer.kt:50-163`) | No production Kanban ingress calls it. `ConcentricKanbanDemoTest` manually copies board cards after reducer calls (`ConcentricKanbanDemoTest.kt:102-129`), proving projection and reducer are adjacent but disconnected. |
+| RSM-06 | HIGH | `ForgeKanbanDaemon` can queue and execute `ModelCallDescriptor`s (`ForgeKanbanDaemon.kt:57-147`) | It has zero production callers. Results are truncated into an in-memory board copy; there is no causal output CID, fulfillment fact, or `JobCommand.Complete/Fail` lowering. WAL replay only iterates records (`:33-38`). |
+| RSM-07 | HIGH | `ModelMux` performs chat/embed and reactor cache/lease handling (`modelmux/ModelMux.kt:124-279`) | Kanban uses an explicit model ID rather than capability + NUID route selection. `CreeperNode`, the only proposed bridge, is uncalled and currently fails compilation against the live NUID/AcpAction/ModelMux API (`CreeperNode.kt:36-70`). |
+| RSM-08 | HIGH | `NuidFanoutElement` implements concentric eligibility and outward escalation (`NuidFanoutElement.kt:205-263`) | A winning claim means only that a worker consumed its inbox. The server workers discard every accepted claim (`JvmKanbanServer.kt:116-129`); no reducer result or fulfillment is returned to the originating connection. |
+| RSM-09 | MED | `LcncFanoutElement` and `ReducerRegistry` map process/cas/wireproto capabilities to reductions (`LcncFanoutElement.kt:14-43`, `ReducerRegistry.kt:5-26`) | The registry is duplicated, generic, and disconnected from the server. It has no card reducer, resume evidence reducer, fulfillment reducer, or typed output envelope. |
+| RSM-10 | HIGH | CAS identities and causal nodes exist | Resume evidence has no exact source-span contract. Tika emits one flattened string, and `ForgeKanbanIngest` hashes whole task bodies. Model enrichment could not cite or replay the resume evidence that justified a card or fulfillment. |
+| RSM-11 | HIGH | The standalone board renderer is complete enough to display and mutate cards (`resources/web/script.js:440-493`); the standalone deterministic force layout is implemented and tested (`forge/blackboard/ForceLayout.kt:16-134`, `ForceLayoutTest.kt:13-48`) | The current shell exposes a Graph sidebar button (`resources/web/index.html:32-37`) but has no graph view container, render function, or click handler. `setView` recognizes only `doc` and `board` (`script.js:495-511`). The two individually useful views are not switchable and do not consume one shared selected-card/node state. |
+| RSM-12 | HIGH | Root `ManifoldConcept` already carries semantic angular identity plus priority/durability/quality, and `NarsBag` supports recall/near-recall (`manifold/ManifoldConcept.kt:68-176`). The mothballed `libs/nars3/Nars3Machine.kt` adds budget decay, refeeding atoms, and pair derivation. Canonical `collections.associative.FunnelHashMap` provides the needed tiered lookup (`:25-218`). | `NarsBag` is currently a `MutableList` with no production consumers or stable evidence key. The old engine depends on the retired `libs/narsive` parser/Kursive surface. We want its typed budget/derivation behavior, not another parser dependency. There is no Narsese funnel bag, concentric work scorer, pair of source bags, match/gap reducer, or signalling-panel projection. |
+
+### Single best debt reduction: T-RESUME-FOUNDATION-1
+
+Build one deterministic resume/job-requisition evidence vertical before adding
+model fanout:
+
+- Add a commonMain evidence contract for `RESUME` and `JOB_REQUISITION` sources:
+  source CID, extracted-text CID, stable evidence ID, exact character span,
+  section/kind, normalized value, and extraction version. Raw/extracted bytes
+  remain in CAS; cards and signals carry references.
+- Add a deterministic ingest reducer: extracted text → evidence `Series` → one
+  parent `JobCommand.Submit` plus child submits for evidence-backed sections.
+  Child identity derives from `sourceCid|span|kind`; dependencies point to the
+  parent. No LLM is called in this pass.
+- Route those commands only through `JobSupervisorElement.commands`; publish
+  causal/card projections only after durable acceptance. Do not mutate
+  `KanbanBoard` directly.
+- Add one JVM adapter from `JvmTikaIngestAdapter.extract` to the common contract;
+  preserve the original source CID and extracted-text CID. Do not feed resume
+  text into the `6. Work packages` parser.
+- Add one PWA-side drop path: the existing `drop-zone` ships the file to the
+  JVM ingest endpoint and shows a deterministic result; the dialog path shares
+  the same submission contract.
+- Verify with a real `.docx` or `.pdf` fixture: repeated ingest yields identical
+  evidence/job IDs; every card resolves to exact source text; parent completion
+  releases children; restart replay reconstructs the same projection.
+
+This cut creates the canonical operand needed by every later layer. ModelMux,
+fulfillment, and broadcast work remain downstream until it lands:
+
+1. `T-RESUME-NARSESEBAG-2`: extract only the useful mothballed engine behavior
+   into a root `NarseseBag<K, P>` shaped as
+   `FunnelHashMap<K, ManifoldConcept<P>>`. Required operations are keyed
+   upsert/get/remove, `recall()` by budget energy, `recallNear()` by angular
+   Hamming distance, immutable `seal()`, decay/reinforce, and deterministic
+   pair derivation. Port the existing `Nars3Budget`/derivation semantics into
+   the root manifold algebra; do **not** restore `libs/nars3`, `libs/narsive`,
+   their Gradle modules, or new Kursive imports. Narsese enters as a typed signal
+   payload produced by reducers; text parsing remains outside this bag.
+2. `T-RESUME-SIGNALS-3`: define `SemanticSignal` and typed Narsese statement
+   payloads keyed by evidence ID. Maintain separate resume and requisition
+   `NarseseBag<SignalId, Signal>` instances. Angular distance is semantic
+   proximity; `BudgetCoord(p,d,q)` controls attention, retention, and evidence
+   quality. A reducer emits `MATCH`, `GAP`, `CONTRADICTION`, and
+   `MISSING_EVIDENCE` relations without changing source statements. Seal each
+   committed revision into a deterministic energy-sorted `Series` for the UI.
+   Similarity proposes work; it never establishes truth.
+3. `T-RESUME-CONCENTRIC-SCORE-4`: score eligible work after NUID capability and
+   subnet admission. Rank by local-first scope distance, semantic/angular
+   distance, evidence quality, priority, durability, and worker/model health.
+   The score selects among already-authorized workgroups; it never broadens
+   capability or subnet authority. Persist the score components and source
+   signal IDs as a causal analysis fact so the choice is replayable.
+4. `T-RESUME-MODELMUX-5`: capability-routed enrichment consumes evidence/signal
+   IDs and emits attributable result CIDs; it never edits cards directly. Model
+   output may propose or reinforce a signal only through a validated reducer;
+   ModelMux uses the concentric score after its hard eligibility filter.
+5. `T-RESUME-FULFILLMENT-6`: fulfillment reducer lowers model/tool outcomes to
+   accepted `Complete`, `Fail`, `Block`, or child `Submit` commands with causal
+   evidence references.
+6. `T-RESUME-BROADCAST-7`: Litebike ingress derives a NUID, dispatches the typed
+   command envelope to concentric workgroups, executes the reducer, and writes
+   the correlated result to the originating connection. Local wins first;
+   unclaimed work escalates outward within budget.
+7. `T-RESUME-VIEWS-8`: add a third `graph` view to the existing shell, rendering
+   the same causal nodes and dependency edges as the board through
+   `forceLayout`. `btn-graph` selects it; Board selects the unchanged Kanban
+   renderer. Keep one `selectedCausalKey` and map it to card ID/node ID in both
+   directions. A graph click followed by Board highlights the same card; a card
+   click followed by Graph focuses the same node. Preserve independent board
+   scroll and graph camera state. No force layout inside Kanban and no columns
+   inside the graph.
+8. `T-RESUME-SIGNAL-PANEL-9`: render the two bags as facing resume/requisition
+   lanes with the derived relations between them. Selecting a signal highlights
+   its exact source span and corresponding card/node; selecting a card filters
+   both bags to its causal evidence. The panel displays budget and provenance,
+   not opaque model scores. It shares `selectedCausalKey` with Board and Graph.
+
+Non-goals: no second board truth, no model call during deterministic ingest, no
+credential values in cards/claims, no unbounded channel, no detached daemon
+scope, no separate scheduler beside the existing Job/Rete dependency DAG, and
+no combined graph/Kanban renderer.
+
 ## Storage unification — projection registry (2026-07-19)
 
 From `doc/rewire.md` §0 (one CID, five lenses). The blackboard causal

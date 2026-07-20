@@ -108,6 +108,6 @@ class ReteBetaMemory(
     }
 
     private fun removeTokens(predicate: (BetaTokenId) -> Boolean) {
-        tokenMemory.keyList().filter(predicate).forEach(tokenMemory::remove)
+        tokenMemory.entries().filter { predicate(it.first) }.forEach { tokenMemory.remove(it.first) }
     }
 }
