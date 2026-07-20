@@ -104,19 +104,51 @@ class PolyglotObservationElement(
 
     /** Launch a coroutine that drains a guest channel and emits to the shared flow. */
     private fun launchGuestObserver(guest: PolyglotGuest, channel: Channel<PolyglotEvent>) {
-        supervisor.launch {
+        kotlinx.coroutines.CoroutineScope(supervisor).launch {
             try {
                 for (event in channel) {
                     if (state == ElementState.ACTIVE) {
                         _events.emit(event)
+                        fanoutSubscribers.forEach { subscriber ->
+                            if (subscriber is ConfixSinkElement) {
+                                // Downstream sink expects ConfixFacetEvent, construct and submit
+                                val columns = mapOf(
+                                    "guest" to ColumnData.StringColumn(arrayOf(event.guest.name)),
+                                    "kind" to ColumnData.StringColumn(arrayOf(event.kind.name)),
+                                    "timestamp" to ColumnData.LongColumn(arrayOf(event.timestampMs)),
+                                    "traceId" to ColumnData.StringColumn(arrayOf(event.traceId))
+                                )
+                                subscriber.submit(ConfixFacetEvent(
+                                    facetProjection = FacetProjection(columns),
+                                    timestampMs = event.timestampMs,
+                                    traceId = event.traceId
+                                ))
+                            }
+                            // Add other subscriber types here as needed, e.g., ReteAlphaElement
+                        }
                     }
                 }
             } catch (e: Throwable) {
-                _events.emit(PolyglotEvent.InstrumentationError(
+                val errorEvent = PolyglotEvent.InstrumentationError(
                     guest = guest,
                     message = e.message ?: e.javaClass.simpleName,
                     timestampMs = kotlinx.datetime.Clock.System.now().toEpochMilliseconds(),
-                ))
+                )
+                _events.emit(errorEvent)
+                fanoutSubscribers.forEach { subscriber ->
+                    if (subscriber is ConfixSinkElement) {
+                        val columns = mapOf(
+                            "guest" to ColumnData.StringColumn(arrayOf(errorEvent.guest.name)),
+                            "kind" to ColumnData.StringColumn(arrayOf(errorEvent.kind.name)),
+                            "error" to ColumnData.StringColumn(arrayOf(errorEvent.message))
+                        )
+                        subscriber.submit(ConfixFacetEvent(
+                            facetProjection = FacetProjection(columns),
+                            timestampMs = errorEvent.timestampMs,
+                            traceId = errorEvent.traceId
+                        ))
+                    }
+                }
             }
         }
     }
@@ -126,7 +158,7 @@ class PolyglotObservationElement(
         guestChannels[guest.name]?.trySend(event)
     }
 
-    fun updateConfig(newConfig: PolyglotObservationConfig) {
+    suspend fun updateConfig(newConfig: PolyglotObservationConfig) {
         config = newConfig
         // Re-attach if guest set changed
         if (state == ElementState.ACTIVE) {

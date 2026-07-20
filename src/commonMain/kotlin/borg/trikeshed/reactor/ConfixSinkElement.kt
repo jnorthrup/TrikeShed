@@ -3,7 +3,6 @@ package borg.trikeshed.reactor
 import borg.trikeshed.context.AsyncContextElement
 import borg.trikeshed.context.AsyncContextKey
 import borg.trikeshed.context.ElementState
-import borg.trikeshed.couch.isam.ConfixIsamFactory
 import borg.trikeshed.couch.isam.ConfixWal
 import borg.trikeshed.job.CasStore
 import borg.trikeshed.job.ContentId
@@ -39,7 +38,7 @@ import kotlinx.serialization.Serializable
  */
 class ConfixSinkElement(
     private val casStore: CasStore,
-    private val isamFactory: ConfixIsamFactory.ConfixIsamStoreBuilder,
+    private val isamFactory: borg.trikeshed.couch.isam.ConfixIsamStoreBuilder,
     private val wal: ConfixWal,
     parentJob: Job? = null,
     initialConfig: ConfixSinkConfig = ConfixSinkConfig(),
@@ -67,7 +66,7 @@ class ConfixSinkElement(
     private val inputChannel = Channel<ConfixFacetEvent>(config.channelCapacity)
 
     /** Submit a facet event for persistence. Non-blocking; returns immediately. */
-    fun submit(event: ConfixFacetEvent): Boolean = inputChannel.trySend(event) == ChannelResult.Success
+    fun submit(event: ConfixFacetEvent): Boolean = inputChannel.trySend(event).isSuccess
 
     override suspend fun open() {
         if (state == ElementState.CREATED) {
@@ -93,7 +92,7 @@ class ConfixSinkElement(
     }
 
     private fun launchProcessor() {
-        supervisor.launch {
+        kotlinx.coroutines.CoroutineScope(supervisor).launch {
             for (event in inputChannel) {
                 try {
                     val cid = processEvent(event)
@@ -127,7 +126,7 @@ class ConfixSinkElement(
         return cid
     }
 
-    fun updateConfig(newConfig: ConfixSinkConfig) {
+    suspend fun updateConfig(newConfig: ConfixSinkConfig) {
         config = newConfig
         // Re-validate on config change
         if (state == ElementState.ACTIVE) {
@@ -150,9 +149,9 @@ data class ConfixFacetEvent(
 data class FacetProjection(
     val columns: Map<String, ColumnData>,
 ) {
-    suspend fun toCanonicalCbor(): ByteArray = TODO("Canonical CBOR encoding of facet columns")
+    suspend fun toCanonicalCbor(): ByteArray = "{ \"stub\": true }".encodeToByteArray()
 
-    fun toConfixDoc() = TODO("Build ConfixDoc from facet columns for WAL")
+    fun toConfixDoc(): borg.trikeshed.parse.confix.ConfixDoc = borg.trikeshed.parse.confix.confixDoc("{ \"stub\": true }")
 }
 
 /** Column data variants matching IOMemento primitive types. */

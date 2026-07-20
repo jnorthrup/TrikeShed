@@ -4,11 +4,22 @@ import borg.trikeshed.context.AsyncContextElement
 import borg.trikeshed.context.ElementState
 import borg.trikeshed.forge.ForgeDocument
 import borg.trikeshed.kanban.KanbanBoard
-import kotlinx.coroutines.CoroutineContext
+import borg.trikeshed.forge.toKanbanBoard
+
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.asSharedFlow
+import kotlin.coroutines.CoroutineContext
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.CoroutineScope
+
+sealed class ForgeSignal {
+    data class AppendBlock(val kind: borg.trikeshed.forge.ForgeBlockKind, val text: String, val properties: Map<String, String> = emptyMap()) : ForgeSignal()
+    data class UpdateText(val blockId: borg.trikeshed.forge.ForgeBlockId, val text: String) : ForgeSignal()
+    data class DeleteBlock(val blockId: borg.trikeshed.forge.ForgeBlockId) : ForgeSignal()
+    data class MoveCard(val cardId: borg.trikeshed.kanban.KanbanCardId, val toColumnId: borg.trikeshed.kanban.KanbanColumnId) : ForgeSignal()
+}
 
 /**
  * Forge workspace element — replaces [CCEK.ArticulatedNode] and [CCEK.CcekReactorBinding].
@@ -57,7 +68,7 @@ class ForgeElement(
         state = ElementState.ACTIVE
         emitProjections()
 
-        processorJob = supervisor.launch {
+        processorJob = kotlinx.coroutines.CoroutineScope(supervisor).launch {
             for (signal in signalIn) {
                 if (state != ElementState.ACTIVE) break
                 applySignal(signal)
@@ -71,7 +82,7 @@ class ForgeElement(
         state = ElementState.DRAINING
         // Drain remaining signals in the channel
         while (true) {
-            val signal = signalIn.poll()
+            val signal = signalIn.tryReceive().getOrNull()
             if (signal == null) break
             applySignal(signal)
             emitProjections()
