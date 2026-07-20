@@ -9,17 +9,17 @@ import borg.trikeshed.graph.query.Graph
 fun <N, E> Graph<N, E>.bfs(vararg startNodes: N): Sequence<N> = sequence {
     val visited = mutableSetOf<N>()
     val queue = ArrayDeque<N>()
-    
+
     for (start in startNodes) {
         if (visited.add(start)) {
             queue.addLast(start)
         }
     }
-    
+
     while (queue.isNotEmpty()) {
         val node = queue.removeFirst()
         yield(node)
-        
+
         for (neighbor in outEdges(node).keys) {
             if (visited.add(neighbor)) {
                 queue.addLast(neighbor)
@@ -34,7 +34,7 @@ fun <N, E> Graph<N, E>.bfs(vararg startNodes: N): Sequence<N> = sequence {
  */
 fun <N, E> Graph<N, E>.dfs(vararg startNodes: N): Sequence<N> = sequence {
     val visited = mutableSetOf<N>()
-    
+
     suspend fun SequenceScope<N>.dfsVisit(node: N) {
         if (visited.add(node)) {
             yield(node)
@@ -43,7 +43,7 @@ fun <N, E> Graph<N, E>.dfs(vararg startNodes: N): Sequence<N> = sequence {
             }
         }
     }
-    
+
     for (start in startNodes) {
         dfsVisit(start)
     }
@@ -57,18 +57,18 @@ fun <N, E> Graph<N, E>.transitiveClosure(start: N): Set<N> {
     val reachable = mutableSetOf<N>()
     reachable.add(start)
     val queue = ArrayDeque<N>()
-    
+
     queue.addLast(start)
-    
+
     while (queue.isNotEmpty()) {
         val node = queue.removeFirst()
-        
+
         for (neighbor in outEdges(node).keys) {
             if (reachable.add(neighbor)) {
                 queue.addLast(neighbor)
             }
         }
     }
-    
+
     return reachable
 }

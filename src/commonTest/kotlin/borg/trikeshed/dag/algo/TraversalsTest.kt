@@ -34,14 +34,14 @@ class TraversalsTest {
         assertEquals("A", dfsOrder[0])
         // B or C could be next
     }
-    
+
     @Test
     fun testTransitiveClosure() {
         val graph = AdjacencyListGraph<String, Unit>()
         graph.addEdge("A", "B", Unit)
         graph.addEdge("B", "C", Unit)
         graph.addEdge("D", "E", Unit)
-        
+
         val closure = graph.transitiveClosure("A")
         assertEquals(setOf("A", "B", "C"), closure)
     }

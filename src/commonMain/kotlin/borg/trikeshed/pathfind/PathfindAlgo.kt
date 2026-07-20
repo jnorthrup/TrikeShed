@@ -89,7 +89,7 @@ fun <N, E> Graph<N, E>.aStar(start: N, end: N, weightFn: (E) -> Double, heuristi
 
     val openSet = PriorityQueue<State>(compareBy { it.fScore })
     val cameFrom = mutableMapOf<N, N>()
-    
+
     // cost from start to node
     val gScore = mutableMapOf<N, Double>().withDefault { Double.POSITIVE_INFINITY }
     gScore[start] = 0.0
@@ -121,6 +121,6 @@ fun <N, E> Graph<N, E>.aStar(start: N, end: N, weightFn: (E) -> Double, heuristi
             }
         }
     }
-    
+
     return null
 }

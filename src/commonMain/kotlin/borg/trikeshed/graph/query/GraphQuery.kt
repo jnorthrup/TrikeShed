@@ -25,11 +25,11 @@ interface MutableGraph<N, E> : Graph<N, E> {
 class AdjacencyListGraph<N, E> : MutableGraph<N, E> {
     private val outAdj = mutableMapOf<N, MutableMap<N, E>>()
     private val inAdj = mutableMapOf<N, MutableMap<N, E>>()
-    
+
     override val nodes: Set<N> get() = outAdj.keys
 
     override fun outEdges(node: N): Map<N, E> = outAdj[node] ?: emptyMap()
-    
+
     override fun inEdges(node: N): Map<N, E> = inAdj[node] ?: emptyMap()
 
     override fun addNode(node: N): Boolean {
@@ -41,17 +41,17 @@ class AdjacencyListGraph<N, E> : MutableGraph<N, E> {
 
     override fun removeNode(node: N): Boolean {
         if (!outAdj.containsKey(node)) return false
-        
+
         // Remove incoming edges to this node from other nodes
         inAdj[node]?.keys?.forEach { from ->
             outAdj[from]?.remove(node)
         }
-        
+
         // Remove outgoing edges from this node to other nodes
         outAdj[node]?.keys?.forEach { to ->
             inAdj[to]?.remove(node)
         }
-        
+
         outAdj.remove(node)
         inAdj.remove(node)
         return true
@@ -75,12 +75,12 @@ class AdjacencyListGraph<N, E> : MutableGraph<N, E> {
  * Query builder to traverse graphs.
  */
 class GraphQuery<N, E>(private val graph: Graph<N, E>, private val currentNodes: Set<N>) {
-    
+
     /** Filter current nodes by a predicate. */
     fun filter(predicate: (N) -> Boolean): GraphQuery<N, E> {
         return GraphQuery(graph, currentNodes.filter(predicate).toSet())
     }
-    
+
     /** Traverse outbound edges from the current nodes. */
     fun out(): GraphQuery<N, E> {
         val nextNodes = mutableSetOf<N>()
@@ -98,7 +98,7 @@ class GraphQuery<N, E>(private val graph: Graph<N, E>, private val currentNodes:
         }
         return GraphQuery(graph, nextNodes)
     }
-    
+
     /** Traverse out filtering edges by a predicate. */
     fun outE(predicate: (E) -> Boolean): GraphQuery<N, E> {
         val nextNodes = mutableSetOf<N>()
@@ -111,13 +111,13 @@ class GraphQuery<N, E>(private val graph: Graph<N, E>, private val currentNodes:
         }
         return GraphQuery(graph, nextNodes)
     }
-    
+
     /** Return all nodes matching the query so far. */
     fun toList(): List<N> = currentNodes.toList()
-    
+
     /** Return nodes as a Set. */
     fun toSet(): Set<N> = currentNodes
-    
+
     /** Aggregate values over the current nodes. */
     fun <T> aggregate(initial: T, operation: (acc: T, N) -> T): T {
         var acc = initial

@@ -6,13 +6,13 @@ import borg.trikeshed.graph.CausalGraphNodeIndex
 /**
  * Connects the Graph Query Engine to the CausalGraphNodeIndex.
  * CausalGraphNodeIndex models edges via CausalGraphNode.parentNodeIds (child -> parent).
- * 
+ *
  * In this adapter:
  * - outEdges(node) models the flow of time (parent -> child).
  * - inEdges(node) models the dependencies (child -> parent).
  */
 class CausalGraphAdapter(private val index: CausalGraphNodeIndex) : Graph<CausalGraphNode, Unit> {
-    
+
     // We lazily construct adjacency based on the index to provide O(1) lookups for edges.
     private val childrenMap by lazy {
         val map = mutableMapOf<String, MutableList<CausalGraphNode>>()
