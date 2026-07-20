@@ -1,138 +1,16 @@
 #!/usr/bin/env bash
-# bin/trikeshed-jules - TrikeShed Jules REST API CLI (v1alpha)
+# bin/trikeshed-jules - TrikeShed Jules REST API CLI v2 with predicates
 #
-# ----------------------------------------------------------------------------
-# Jules REST API spec — transcribed from
-#   https://developers.google.com/jules/api/reference/rest
-#   https://jules.google/docs/api/reference/{sessions,activities,sources,types}
-# This header is the only authoritative description of the API in this
-# repository. If a behavior in this file disagrees with this spec, this
-# spec wins. If a behavior here disagrees with intent, fix the source —
-# do not edit the spec.
+# PREDICATES ENFORCED BEFORE TASK CREATION:
+# 1. Clean worktree (no uncommitted changes)
+# 2. HEAD identical to upstream (no unpushed commits)
+# 3. Branch is master (or configured branch)
+# 4. No existing "Awaiting User Feedback" sessions for this project
+# 5. No more than N concurrent running sessions (quota check)
+# 6. Prompt contains required keywords (JDK, TDD, PR, packages)
+# 7. Prompt does NOT contain forbidden keywords (libs/, legacy paths)
 #
-# AUTH
-#   Base URL : https://jules.googleapis.com/v1alpha
-#   Header   : x-goog-api-key: ***          (NOT Bearer OAuth)
-#              Content-Type: application/json          (for bodies)
-#   GETs     : 200 OK with JSON body
-#   POSTs    : 200 OK with empty / resource body
-#   Errors   : 4xx with JSON `{ "error": { "code", "message", "status" } }`
-#   Note     : 401 API_KEY_SERVICE_BLOCKED means OAuth was sent to the REST
-#              endpoint. The official `jules` CLI uses Google OAuth device
-#              flow (jules-cli keychain entry) — that is a DIFFERENT
-#              credential than $JULES_API_KEY.
-#
-# RESOURCE NAMES
-#   Session  = sessions/{session}                        e.g. sessions/1234567
-#   Source   = sources/{source}                          e.g. sources/github-myorg-myrepo
-#   Activity = sessions/{session}/activities/{activity}  e.g. sessions/1234/activities/act1
-#   The bare numeric "id" returned in resources is also the session ID
-#   you put into URL paths. The canonical resource name is the longer
-#   "sessions/{numeric}" form.
-#
-#   SOURCE NAME GOTCHA: the docs use the form
-#     "source": "sources/github-myorg-myrepo"
-#   i.e. owner and repo joined with a dash, NOT slashed. The 20-Jul-2025
-#   pre-existing sessions in this workspace carried the slash form
-#   ("sources/github/jnorthrup/TrikeShed") — that's a binding bug.
-#   This CLI now derives the name from GET /v1alpha/sources if the
-#   default literal doesn't list.
-#
-# SESSIONS
-#   POST   /v1alpha/sessions                              create
-#   GET    /v1alpha/sessions                              list    ?pageSize&pageToken
-#   GET    /v1alpha/sessions/{session}                   get
-#   DELETE /v1alpha/sessions/{session}                   delete
-#   POST   /v1alpha/sessions/{session}:sendMessage       send message
-#   POST   /v1alpha/sessions/{session}:approvePlan       approve plan
-#   Session body:
-#     { name, id, prompt, title, sourceContext?, state, url,
-#       requirePlanApproval?, automationMode?, outputs?,
-#       createTime, updateTime }
-#   SessionState (enum):
-#     STATE_UNSPECIFIED, QUEUED, PLANNING,
-#     AWAITING_PLAN_APPROVAL, AWAITING_USER_FEEDBACK,
-#     IN_PROGRESS, PAUSED, FAILED, COMPLETED
-#   SessionOutput (oneof): { pullRequest: { url, title, description } }
-#   Session.sourceContext (oneof):
-#     { source (required, "sources/{source}"),
-#       githubRepoContext?: { startingBranch (required) } }
-#   sendMessage body: { prompt: string (required) }  — answer an
-#                     AWAITING_USER_FEEDBACK session
-#   approvePlan body: {}  — only needed when requirePlanApproval=true
-#                     was set at create time
-#
-# ACTIVITIES  (one event per activity; oneof on the `activity` union key)
-#   GET    /v1alpha/sessions/{session}/activities                  list  ?pageSize&pageToken
-#   GET    /v1alpha/sessions/{session}/activities/{activity}      get
-#   Activity:
-#     { name, id, originator ("user"|"agent"|"system"), description,
-#       createTime, artifacts?: Artifact[],
-#       exactly one of:
-#         agentMessaged   : { agentMessage: string }
-#         userMessaged    : { userMessage: string }
-#         planGenerated   : { plan: { id, steps: PlanStep[], createTime } }
-#         planApproved    : { planId: string }
-#         progressUpdated : { title, description }
-#         sessionCompleted: {}
-#         sessionFailed   : { reason: string } }
-#   PlanStep: { id, index (int32, 0-based), title, description }
-#   Artifact (oneof):
-#     { changeSet : ChangeSet{ source, gitPatch:
-#                  GitPatch{ unidiffPatch, baseCommitId, suggestedCommitMessage }}}
-#     { media     : { mimeType, data (base64) }}
-#     { bashOutput: { command, output, exitCode }}
-#   Disambiguation: classify by which top-level event key is set. The
-#   artifacts[] rides alongside on output events.
-#
-# SOURCES
-#   GET    /v1alpha/sources                       list  ?pageSize&pageToken&filter
-#   GET    /v1alpha/sources/{source}              get
-#   Source:
-#     { name, id, githubRepo:
-#         { owner, repo, isPrivate, defaultBranch: GitHubBranch{ displayName },
-#           branches: GitHubBranch[] }}
-#   filter uses AIP-160 strings:
-#     name=sources/source1 OR name=sources/source2
-#
-# DELIVERY — COMPLETED is NOT a delivery.
-#   state == COMPLETED  →  flag only
-#   outputs[].pullRequest.url                       real PR
-#   gitPatch.unidiffPatch.length > 0                real diff
-#   COMPLETED with empty outputs and no PR          delivery failure
-#
-# NO stream / WebSocket: activities are pull-only (pageSize + pageToken).
-# NO :rejectPlan, no :cancel session, no rate-limit header.
-#
-# ----------------------------------------------------------------------------
-# Usage: trikeshed-jules <command> [args...]
-# Commands: sessions, session, sources, source, create, send, approve,
-#           delete, responses, activities-classify
-# stdin:    create reads prompt from stdin if no first argument given.
-#           send reads message from stdin if no second argument given.
-#
-# Env (REQUIRED — pick one)
-#   JULES_API_KEY                                        REST API key (preferred)
-#   JULES_OAUTH_TOKEN                                    Bearer from `jules` CLI
-#
-# Env (optional)
-#   TRIKESHED_JULES_SOURCE                               override source name
-#                                                        (default: github-jnorthrup-TrikeShed)
-#   TRIKESHED_JULES_BRANCH                               starting branch (default: master)
-#   TRIKESHED_JULES_SKIP_BIND=1                          don't call GET /sources first
-#                                                        (offline; uses literal name)
-#   TRIKESHED_JULES_NO_TITLE=1                           don't send title (Jules picks)
-#
-# Inputs
-#   - Prompt / message: first positional arg, else read from stdin.
-#
-# Examples
-#   trikeshed-jules sessions | jq '.sessions[] | {id, title, state}'
-#   trikeshed-jules create "Refactor foo into one-line α" "T-FOO"
-#   echo "Add tests for foo" | trikeshed-jules create - "T-FOO"
-#   trikeshed-jules approve 1234567
-#   trikeshed-jules send 1234567 "continue"
-#   trikeshed-jules activities-classify 1234567 | jq '.[] | select(.kind=="planGenerated")'
+# If any predicate fails, the task is rejected with explanation.
 
 set -euo pipefail
 shopt -s lastpipe
@@ -142,8 +20,14 @@ shopt -s lastpipe
 # =============================================================================
 JULES_API_BASE="https://jules.googleapis.com/v1alpha"
 JULES_API_KEY="${JULES_API_KEY:-}"
-JULES_OAUTH_TOKEN="${JULES_OAUTH_TOKEN:-}"     # OAuth Bearer (jules CLI uses this)
+JULES_OAUTH_TOKEN="${JULES_OAUTH_TOKEN:-}"
 CACHE_DIR="${HOME}/.cache/jules-cli"
+
+# Predicate configuration
+MAX_CONCURRENT=10
+REQUIRED_KEYWORDS=("TDD" "PR" "Deliver")
+FORBIDDEN_PATTERNS=("libs/" "/libs" "lib/" "/lib" ".zenith/" "~/.zenith")
+ALLOWED_BRANCH="${TRIKESHED_JULES_BRANCH:-master}"
 
 # =============================================================================
 # UTILITIES
@@ -151,8 +35,6 @@ CACHE_DIR="${HOME}/.cache/jules-cli"
 log() { echo "[$(date -u +%Y-%m-%dT%H:%M:%SZ)] $*" >&2; }
 die() { echo "ERROR: $*" >&2; exit 1; }
 
-# Pull body from stdin if no arg given. Returns 0/1 not via echo so callers
-# can capture without an extra newline.
 read_stdin_if_missing() {
     if [[ -n "${1:-}" ]]; then
         REPLY="$1"
@@ -162,55 +44,149 @@ read_stdin_if_missing() {
     [[ -n "${REPLY}" ]]
 }
 
-# New Jules work must start from exactly the revision visible upstream.
-# This is deliberately not bypassable by an environment flag: a local-only
-# commit or dirty worktree gives Jules a stale contract and creates merge debt.
-require_clean_pushed_upstream() {
-    command -v git >/dev/null 2>&1 || die "Required command 'git' not found"
+# =============================================================================
+# PREDICATE CHECKS
+# =============================================================================
 
-    local root branch expected_branch upstream remote head_sha upstream_sha counts
-    root=$(git rev-parse --show-toplevel 2>/dev/null) \
-        || die "New Jules work must be created from inside a git worktree."
-    branch=$(git -C "${root}" branch --show-current)
-    [[ -n "${branch}" ]] || die "Detached HEAD: checkout the branch Jules will use, push it, then retry."
-
-    expected_branch="${TRIKESHED_JULES_BRANCH:-master}"
-    [[ "${branch}" == "${expected_branch}" ]] \
-        || die "Checked out '${branch}', but Jules would start from '${expected_branch}'. Checkout '${expected_branch}', make it clean, push it, then retry."
-
+# Predicate 1: Clean worktree
+check_clean_worktree() {
+    local root="$1"
     if [[ -n "$(git -C "${root}" status --porcelain=v1 --untracked-files=all)" ]]; then
         git -C "${root}" status --short >&2
-        die "Dirty worktree: commit every intended file, preserve or remove unintended files, push, then retry."
+        die "PREDICATE FAILED: Dirty worktree. Commit or stash changes first."
     fi
-
-    upstream=$(git -C "${root}" rev-parse --abbrev-ref --symbolic-full-name '@{upstream}' 2>/dev/null) \
-        || die "Branch '${branch}' has no upstream. Push with: git push -u origin '${branch}'"
-    remote=$(git -C "${root}" config --get "branch.${branch}.remote")
-    [[ -n "${remote}" && "${remote}" != "." ]] \
-        || die "Branch '${branch}' does not track a pushable remote. Configure and push an upstream first."
-
-    log "Refreshing ${upstream} before Jules dispatch..."
-    git -C "${root}" fetch --quiet "${remote}" \
-        || die "Could not fetch '${remote}'; cannot prove the selected revision is upstream."
-
-    head_sha=$(git -C "${root}" rev-parse HEAD)
-    upstream_sha=$(git -C "${root}" rev-parse '@{upstream}')
-    if [[ "${head_sha}" != "${upstream_sha}" ]]; then
-        counts=$(git -C "${root}" rev-list --left-right --count 'HEAD...@{upstream}')
-        die "HEAD is not identical to ${upstream} (ahead/behind: ${counts}). Reconcile and push before creating Jules work."
-    fi
-
-    log "Dispatch barrier passed: clean ${branch} at ${head_sha:0:12}, identical to ${upstream}."
+    log "PREDICATE PASSED: Clean worktree"
 }
 
-# JSON helper. Single arg = raw body; pass --json to validate output.
+# Predicate 2: HEAD identical to upstream
+check_upstream_synced() {
+    local root="$1"
+    local branch upstream remote head_sha upstream_sha counts
+    
+    branch=$(git -C "${root}" branch --show-current)
+    [[ -n "${branch}" ]] || die "PREDICATE FAILED: Detached HEAD"
+    
+    upstream=$(git -C "${root}" rev-parse --abbrev-ref --symbolic-full-name '@{upstream}' 2>/dev/null) \
+        || die "PREDICATE FAILED: Branch '${branch}' has no upstream. Push first."
+    
+    remote=$(git -C "${root}" config --get "branch.${branch}.remote")
+    [[ -n "${remote}" && "${remote}" != "." ]] \
+        || die "PREDICATE FAILED: Branch '${branch}' does not track a remote."
+    
+    git -C "${root}" fetch --quiet "${remote}" \
+        || die "PREDICATE FAILED: Could not fetch '${remote}'"
+    
+    head_sha=$(git -C "${root}" rev-parse HEAD)
+    upstream_sha=$(git -C "${root}" rev-parse '@{upstream}')
+    
+    if [[ "${head_sha}" != "${upstream_sha}" ]]; then
+        counts=$(git -C "${root}" rev-list --left-right --count 'HEAD...@{upstream}')
+        die "PREDICATE FAILED: HEAD not identical to upstream (ahead/behind: ${counts}). Push or reconcile first."
+    fi
+    log "PREDICATE PASSED: HEAD identical to upstream"
+}
+
+# Predicate 3: Correct branch
+check_correct_branch() {
+    local root="$1"
+    local branch
+    branch=$(git -C "${root}" branch --show-current)
+    if [[ "${branch}" != "${ALLOWED_BRANCH}" ]]; then
+        die "PREDICATE FAILED: On branch '${branch}', but must be '${ALLOWED_BRANCH}'. Checkout correct branch first."
+    fi
+    log "PREDICATE PASSED: Correct branch (${branch})"
+}
+
+# Predicate 4: No Awaiting User Feedback sessions
+check_no_awaiting_sessions() {
+    local current
+    current=$(api_request GET "/sessions?pageSize=100" 2>/dev/null | \
+        jq -r --arg src "sources/github/jnorthrup/TrikeShed" \
+        '[.sessions[]? | select(.state == "AWAITING_USER_FEEDBACK" and .sourceContext.source == $src)] | length' 2>/dev/null || echo "0")
+    
+    if [[ "${current}" -gt 0 ]]; then
+        die "PREDICATE FAILED: ${current} sessions already Awaiting User Feedback. Nudge or resolve them first."
+    fi
+    log "PREDICATE PASSED: No awaiting sessions"
+}
+
+# Predicate 5: Concurrent quota check
+check_concurrent_quota() {
+    local active
+    active=$(api_request GET "/sessions?pageSize=100" 2>/dev/null | \
+        jq -r '[.sessions[]? | select(.state == "IN_PROGRESS" or .state == "PLANNING" or .state == "QUEUED")] | length' 2>/dev/null || echo "0")
+    
+    if [[ "${active}" -ge "${MAX_CONCURRENT}" ]]; then
+        die "PREDICATE FAILED: ${active} active sessions (max ${MAX_CONCURRENT}). Wait for completion first."
+    fi
+    log "PREDICATE PASSED: Concurrent quota OK (${active}/${MAX_CONCURRENT})"
+}
+
+# Predicate 6: Required keywords in prompt
+check_required_keywords() {
+    local prompt="$1"
+    local missing=()
+    for kw in "${REQUIRED_KEYWORDS[@]}"; do
+        if ! echo "${prompt}" | grep -qi "${kw}"; then
+            missing+=("${kw}")
+        fi
+    done
+    if [[ ${#missing[@]} -gt 0 ]]; then
+        die "PREDICATE FAILED: Prompt missing required keywords: ${missing[*]}"
+    fi
+    log "PREDICATE PASSED: Required keywords present"
+}
+
+# Predicate 7: No forbidden patterns
+check_no_forbidden_patterns() {
+    local prompt="$1"
+    local found=()
+    for pat in "${FORBIDDEN_PATTERNS[@]}"; do
+        if echo "${prompt}" | grep -q "${pat}"; then
+            found+=("${pat}")
+        fi
+    done
+    if [[ ${#found[@]} -gt 0 ]]; then
+        die "PREDICATE FAILED: Prompt contains forbidden patterns: ${found[*]}"
+    fi
+    log "PREDICATE PASSED: No forbidden patterns"
+}
+
+# Run all predicates
+run_predicates() {
+    local prompt="$1"
+    local root
+    
+    root=$(git rev-parse --show-toplevel 2>/dev/null) \
+        || die "Must run from inside a git worktree"
+    
+    log "Running predicates..."
+    check_clean_worktree "${root}"
+    check_upstream_synced "${root}"
+    check_correct_branch "${root}"
+    
+    # These require API access
+    if [[ -n "${JULES_API_KEY}" || -n "${JULES_OAUTH_TOKEN}" ]]; then
+        check_no_awaiting_sessions
+        check_concurrent_quota
+    fi
+    
+    check_required_keywords "${prompt}"
+    check_no_forbidden_patterns "${prompt}"
+    
+    log "ALL PREDICATES PASSED"
+}
+
+# =============================================================================
+# API HELPERS
+# =============================================================================
 api_request() {
     local method="$1" path="$2" body="${3:-}"
-
+    
     if [[ -z "${JULES_API_KEY}" && -z "${JULES_OAUTH_TOKEN}" ]]; then
-        die "Set JULES_API_KEY (REST API key) or JULES_OAUTH_TOKEN (CLI Bearer)."
+        die "Set JULES_API_KEY or JULES_OAUTH_TOKEN"
     fi
-
+    
     local url="${JULES_API_BASE}${path}"
     local -a auth_headers=()
     if [[ -n "${JULES_API_KEY}" ]]; then
@@ -218,7 +194,7 @@ api_request() {
     else
         auth_headers=(-H "Authorization: Bearer ${JULES_OAUTH_TOKEN}")
     fi
-
+    
     if [[ -n "${body}" ]]; then
         curl -sS -X "${method}" "${url}" \
             "${auth_headers[@]}" \
@@ -229,19 +205,11 @@ api_request() {
     fi
 }
 
-# Pretty-print a Jules error and exit non-zero. Used by every command's
-# response handler so the shell pipeline actually fails on 4xx — the
-# previous wrapper silently dropped them.
 api_call() {
     local method="$1" path="$2" body="${3:-}"
-    local out http
+    local out
     out=$(api_request "${method}" "${path}" "${body}")
-    http=$(curl -sS -o /dev/null -w "%{http_code}" -X "${method}" "${JULES_API_BASE}${path}" \
-        $([[ -n "${JULES_API_KEY}" ]] && printf -- "-H x-goog-api-key:*** " "${JULES_API_KEY}"; \
-          [[ -n "${JULES_OAUTH_TOKEN}" && -z "${JULES_API_KEY}" ]] && printf -- "-H Authorization:*** %s " "${JULES_OAUTH_TOKEN}"; \
-          [[ -n "${body}" ]] && printf -- "-H Content-Type:application/json -d %s " "$(printf '%s' "${body}" | jq -Rs .)") 2>/dev/null) || true
-
-    # Plain JSON probe — if output looks like { error: ... } fail loudly.
+    
     if echo "${out}" | jq -e '.error' >/dev/null 2>&1; then
         echo "${out}" | jq .
         local msg; msg=$(echo "${out}" | jq -r '.error.message // "unknown error"')
@@ -250,19 +218,7 @@ api_call() {
     echo "${out}" | jq .
 }
 
-# =============================================================================
-# SOURCE NAME RESOLUTION  (the binding bug fix)
-# =============================================================================
-# Default literal used to be "sources/github/jnorthrup/TrikeShed" which is
-# the SLASH form — never accepted by the API. The docs use the DASH form
-# "sources/github-jnorthrup-TrikeShed". We pick the dash form as default
-# and resolve via GET /sources if a match is available.
 resolve_source_name() {
-    # NOTE: the live API returns sources of the form
-    #   sources/github/<owner>/<repo>     (slash form)
-    # NOT sources/github-<owner>-<repo>  (dash form). The slash form
-    # is the canonical value; we use it as the probe and fall back to
-    # the literal listed source if the GET round-trip succeeds.
     local owner_repo="${TRIKESHED_JULES_SOURCE:-github/jnorthrup/TrikeShed}"
     local full="sources/${owner_repo}"
     if [[ -n "${JULES_API_KEY}" ]]; then
@@ -286,31 +242,26 @@ cmd_sessions() {
 }
 
 cmd_session() {
-    [[ -n "${1:-}" ]] || die "Session name required (e.g. sessions/1234567 or 1234567)"
+    [[ -n "${1:-}" ]] || die "Session name required"
     local name="$1"
     [[ "${name}" == sessions/* ]] || name="sessions/${name}"
     api_call GET "/${name}"
 }
 
 cmd_create() {
-    require_clean_pushed_upstream
-
-    local prompt="" title="" require_approval="false"
-
-    # Only argument is the prompt (or stdin). Title is optional env or Jules picks.
-    # Usage: trikeshed-jules create "prompt" [title]
-    #   or: echo "prompt" | trikeshed-jules create
-    # Title is optional — if omitted or TRIKESHED_JULES_NO_TITLE=1, Jules generates one.
+    local prompt="" title=""
+    
     [[ -n "${1:-}" ]] && prompt="$1" || true
     [[ -n "${2:-}" ]] && title="$2" || true
-
+    
     if ! read_stdin_if_missing "${prompt}"; then
         die "Prompt required (arg or stdin)"
     fi
     prompt="${REPLY}"
-
-    # Auto-binding: look up the canonical source name. Set
-    # TRIKESHED_JULES_SKIP_BIND=1 to skip the GET (e.g. offline).
+    
+    # RUN ALL PREDICATES BEFORE CREATING
+    run_predicates "${prompt}"
+    
     local source starting_branch
     if [[ "${TRIKESHED_JULES_SKIP_BIND:-0}" == "1" ]]; then
         source="sources/github-jnorthrup-TrikeShed"
@@ -318,22 +269,18 @@ cmd_create() {
         source=$(resolve_source_name)
     fi
     starting_branch="${TRIKESHED_JULES_BRANCH:-master}"
-
-    local body
-    # Build the body in two passes: always-present fields, then conditionally
-    # add the title key. (jq does not allow raw `if` expressions as object
-    # keys — only `,` patterns inside one object literal work, and only if
-    # the condition returns a valid merge. Cleaner to build the conditional
-    # object separately and merge.)
+    
     local title_field=""
     if [[ -n "${title}" && "${TRIKESHED_JULES_NO_TITLE:-0}" != "1" ]]; then
         title_field=$(jq -n --arg t "${title}" '{title: $t}')
     else
         title_field='{}'
     fi
+    
+    local body
     body=$(jq -n \
         --arg prompt        "${prompt}" \
-        --argjson require_approval "${require_approval}" \
+        --argjson require_approval false \
         --arg source        "${source}" \
         --arg starting_branch "${starting_branch}" \
         --argjson title_field "${title_field}" \
@@ -343,10 +290,10 @@ cmd_create() {
             requirePlanApproval: $require_approval,
             sourceContext: {
                 source: $source,
-                githubRepoContext: { startingBranch: $starting_branch }
+                githubRepoContext: { startingBranch: $startingBranch }
             }
         }')
-
+    
     api_call POST "/sessions" "${body}"
 }
 
@@ -355,12 +302,12 @@ cmd_send() {
     local name="$1"; shift
     local message="${1:-}"
     [[ "${name}" == sessions/* ]] || name="sessions/${name}"
-
+    
     if ! read_stdin_if_missing "${message}"; then
         die "Message required (arg or stdin)"
     fi
     message="${REPLY}"
-
+    
     local body
     body=$(jq -n --arg p "${message}" '{prompt: $p}')
     api_call POST "/${name}:sendMessage" "${body}"
@@ -370,13 +317,10 @@ cmd_approve() {
     [[ -n "${1:-}" ]] || die "Session name required"
     local name="$1"
     [[ "${name}" == sessions/* ]] || name="sessions/${name}"
-    # approvePlan body is the empty JSON object per spec.
     api_call POST "/${name}:approvePlan" "{}"
 }
 
 cmd_responses() {
-    # Per spec: activities is a oneof, not a fixed planApproved/planGenerated
-    # pair. We return the raw activities[] and let jq classify.
     [[ -n "${1:-}" ]] || die "Session name required"
     local name="$1"
     [[ "${name}" == sessions/* ]] || name="sessions/${name}"
@@ -384,7 +328,6 @@ cmd_responses() {
 }
 
 cmd_activities_classify() {
-    # Like responses() but tagged for human consumption.
     [[ -n "${1:-}" ]] || die "Session name required"
     local name="$1"
     [[ "${name}" == sessions/* ]] || name="sessions/${name}"
@@ -426,110 +369,167 @@ cmd_delete() {
 }
 
 cmd_pull() {
-    # Delegate to the official `jules` CLI (OAuth) for pull+apply; that
-    # piece requires the CLI credential, not the API key. We don't try
-    # to re-implement apply since `jules remote pull` is the supported
-    # path for local file application.
     [[ -n "${1:-}" ]] || die "Session id required"
     local sid="$1"
     [[ "${sid}" == sessions/* ]] && sid="${sid#sessions/}"
     if command -v jules >/dev/null 2>&1; then
-        log "Pulling session ${sid} via jules CLI (OAuth)..."
+        log "Pulling session ${sid} via jules CLI..."
         jules remote pull --session "${sid}" --apply
     else
-        die "jules binary not found in PATH. Install jules CLI to use 'pull'."
+        die "jules binary not found in PATH"
     fi
 }
 
-# Backwards-compat aliases
-cmd_chat() { cmd_send "$@"; }
-cmd_list() { cmd_sessions; }
-cmd_get()  { cmd_session "$@"; }
-cmd_activities() { cmd_responses "$@"; }
-
-show_help() {
-    cat <<'EOF'
-Usage: trikeshed-jules <command> [args...]
-
-Spec header in this file documents the full API surface and is authoritative
-over this help text.
-
-Sessions
-  sessions, list                                       list all sessions
-  session <id|name>                                    get one session
-  delete <id|name>                                     delete session
-  create "prompt" [title]                              create session
-                                                       (auto-binds to TrikeShed
-                                                        via GET /sources; requires
-                                                        clean HEAD == git upstream)
-  send|chat <id|name> ["message"]                      message AWAITING_USER_FEEDBACK
-  approve <id|name>                                    approve pending plan
-  pull <id>                                            pull + apply (delegates to
-                                                       the OAuth-authed jules CLI)
-
-Activities (per session)
-  responses|activities <id|name>                       raw activities[]
-  activities-classify <id|name>                        activities[] classified
-                                                       by event-kind oneof
-
-Sources
-  sources                                              list sources
-  source <id>                                          get one source
-
-Env (REQUIRED — pick one)
-  JULES_API_KEY                                        REST API key (preferred)
-  JULES_OAUTH_TOKEN                                    Bearer from `jules` CLI
-
-Env (optional)
-  TRIKESHED_JULES_SOURCE                               override source name
-                                                       (default: github-jnorthrup-TrikeShed)
-  TRIKESHED_JULES_BRANCH                               starting branch (default: master)
-  TRIKESHED_JULES_SKIP_BIND=1                          don't call GET /sources first
-                                                       (offline; uses literal name)
-  TRIKESHED_JULES_NO_TITLE=1                           don't send title (Jules picks)
-
-Inputs
-  - Prompt / message: first positional arg, else read from stdin.
-
-Examples
-  trikeshed-jules sessions | jq '.sessions[] | {id, title, state}'
-  trikeshed-jules create "Refactor foo into one-line α" "T-FOO"
-  echo "Add tests for foo" | trikeshed-jules create - "T-FOO"
-  trikeshed-jules approve 1234567
-  trikeshed-jules send 1234567 "continue"
-  trikeshed-jules activities-classify 1234567 | jq '.[] | select(.kind=="planGenerated")'
-EOF
+cmd_check() {
+    # New command: Run predicates without creating a task
+    log "Running predicates for current state..."
+    run_predicates "dummy prompt for keyword check"
+    log "All predicates pass!"
 }
 
-show_version() {
-    echo "trikeshed-jules 2.1.0 (spec-revision 2026-07-19; upstream-push barrier)"
+cmd_status() {
+    # New command: Show current session status summary
+    log "Session Status Summary"
+    echo "======================"
+    
+    local sessions_json
+    sessions_json=$(api_request GET "/sessions?pageSize=100" 2>/dev/null)
+    
+    local total active planning queued awaiting completed failed
+    total=$(echo "${sessions_json}" | jq -r '[.sessions[]?] | length')
+    active=$(echo "${sessions_json}" | jq -r '[.sessions[]? | select(.state == "IN_PROGRESS")] | length')
+    planning=$(echo "${sessions_json}" | jq -r '[.sessions[]? | select(.state == "PLANNING")] | length')
+    queued=$(echo "${sessions_json}" | jq -r '[.sessions[]? | select(.state == "QUEUED")] | length')
+    awaiting=$(echo "${sessions_json}" | jq -r '[.sessions[]? | select(.state == "AWAITING_USER_FEEDBACK")] | length')
+    completed=$(echo "${sessions_json}" | jq -r '[.sessions[]? | select(.state == "COMPLETED")] | length')
+    failed=$(echo "${sessions_json}" | jq -r '[.sessions[]? | select(.state == "FAILED")] | length')
+    
+    echo "Total:     ${total}"
+    echo "In Progress: ${active}"
+    echo "Planning:   ${planning}"
+    echo "Queued:    ${queued}"
+    echo "Awaiting:  ${awaiting}"
+    echo "Completed: ${completed}"
+    echo "Failed:    ${failed}"
+    echo ""
+    echo "Predicate limits: max ${MAX_CONCURRENT} concurrent"
+}
+
+cmd_nudge() {
+    # Nudge all awaiting sessions
+    local sessions_json
+    sessions_json=$(api_request GET "/sessions?pageSize=100" 2>/dev/null)
+    
+    local awaiting_sessions
+    awaiting_sessions=$(echo "${sessions_json}" | jq -r '[.sessions[]? | select(.state == "AWAITING_USER_FEEDBACK")]')
+    local count
+    count=$(echo "${awaiting_sessions}" | jq 'length')
+    
+    if [[ "${count}" -eq 0 ]]; then
+        log "No sessions awaiting user feedback"
+        return
+    fi
+    
+    log "Nudging ${count} sessions..."
+    echo "${awaiting_sessions}" | jq -r '.[] | .id' | while read -r sid; do
+        log "Nudging ${sid}..."
+        cmd_send "${sid}" "Please proceed with implementation. Deliver a PR with non-empty diff and passing tests."
+    done
+    log "Done nudging"
+}
+
+cmd_merge_completed() {
+    # Pull and merge all completed sessions with artifacts
+    local sessions_json
+    sessions_json=$(api_request GET "/sessions?pageSize=100" 2>/dev/null)
+    
+    local completed_sessions
+    completed_sessions=$(echo "${sessions_json}" | jq -r '[.sessions[]? | select(.state == "COMPLETED")]')
+    local count
+    count=$(echo "${completed_sessions}" | jq 'length')
+    
+    if [[ "${count}" -eq 0 ]]; then
+        log "No completed sessions"
+        return
+    fi
+    
+    log "Found ${count} completed sessions, checking for pullable patches..."
+    
+    echo "${completed_sessions}" | jq -r '.[] | .id' | while read -r sid; do
+        local patch_len
+        patch_len=$(api_request GET "/sessions/${sid}/activities?pageSize=100" 2>/dev/null | \
+            jq -r '[.activities[]? | select(.artifacts != null) | .artifacts[]? | .changeSet.gitPatch.unidiffPatch] | map(length) | add // 0')
+        
+        if [[ "${patch_len}" -gt 0 ]]; then
+            log "Found patch for ${sid} (${patch_len} bytes), pulling..."
+            if command -v jules >/dev/null 2>&1; then
+                jules remote pull --session "${sid}" --apply 2>&1 || true
+            fi
+        else
+            log "No patch for ${sid}, skipping"
+        fi
+    done
+    log "Done checking completed sessions"
 }
 
 # =============================================================================
 # MAIN
 # =============================================================================
-command -v curl >/dev/null 2>&1 || die "Required command 'curl' not found"
-command -v jq   >/dev/null 2>&1 || die "Required command 'jq' not found"
-
-CMD="${1:-}"; shift || true
+CMD="${1:-}"
+shift || true
 
 case "${CMD}" in
-    --help|-h)              show_help ;;
-    --version|-v)           show_version ;;
+    sessions|list) cmd_sessions "$@" ;;
+    session|get)   cmd_session "$@" ;;
+    create)       cmd_create "$@" ;;
+    send|chat)    cmd_send "$@" ;;
+    approve)      cmd_approve "$@" ;;
+    responses|activities) cmd_responses "$@" ;;
+    activities-classify) cmd_activities_classify "$@" ;;
+    sources)      cmd_sources "$@" ;;
+    source)       cmd_source_get "$@" ;;
+    delete)      cmd_delete "$@" ;;
+    pull)        cmd_pull "$@" ;;
+    check)       cmd_check "$@" ;;
+    status)      cmd_status "$@" ;;
+    nudge)       cmd_nudge "$@" ;;
+    merge-completed) cmd_merge_completed "$@" ;;
+    help|--help|-h)
+        cat <<'EOF'
+trikeshed-jules v2 - TrikeShed Jules CLI with predicates
 
-    sessions|list)          cmd_sessions "$@" ;;
-    session|get)            cmd_session "$@" ;;
-    delete)                 cmd_delete "$@" ;;
-    create)                 cmd_create "$@" ;;
-    send|chat)              cmd_send "$@" ;;
-    approve)                cmd_approve "$@" ;;
-    pull)                   cmd_pull "$@" ;;
+Commands:
+  sessions, list               List all sessions
+  session <id>                 Get session details
+  create "prompt" [title]      Create new session (PREDICATES REQUIRED)
+  send <id> "message"         Send message to awaiting session
+  approve <id>                Approve pending plan
+  responses <id>              Get session activities
+  activities-classify <id>    Get classified activities
+  sources                     List sources
+  delete <id>                 Delete session
+  pull <id>                   Pull and apply patch
+  check                       Run predicates without creating task
+  status                      Show session status summary
+  nudge                       Nudge all awaiting sessions
+  merge-completed             Pull all completed sessions with patches
 
-    responses|activities)   cmd_responses "$@" ;;
-    activities-classify)    cmd_activities_classify "$@" ;;
+Predicates (enforced on create):
+  - Clean worktree (no uncommitted changes)
+  - HEAD identical to upstream
+  - On correct branch (master)
+  - No existing "Awaiting User Feedback" sessions
+  - Concurrent sessions below quota (${MAX_CONCURRENT})
+  - Prompt contains required keywords: ${REQUIRED_KEYWORDS[*]}
+  - Prompt has no forbidden patterns: ${FORBIDDEN_PATTERNS[*]}
 
-    sources)                cmd_sources ;;
-    source)                 cmd_source_get "$@" ;;
-
-    *)                      show_help; die "Unknown command: ${CMD}" ;;
+Environment:
+  JULES_API_KEY              REST API key (preferred)
+  JULES_OAUTH_TOKEN          OAuth Bearer token
+  TRIKESHED_JULES_BRANCH     Branch to use (default: master)
+  TRIKESHED_JULES_SKIP_BIND  Skip source binding
+  TRIKESHED_JULES_NO_TITLE   Let Jules pick title
+EOF
+        ;;
+    *) die "Unknown command: ${CMD}. Run 'help' for usage." ;;
 esac

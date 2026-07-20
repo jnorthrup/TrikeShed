@@ -21,8 +21,8 @@ class LcncFanoutElementTest {
 
     @Test
     fun testDispatchCallsReducerRegistryWithWinningCapability() = runTest {
-        val nuidFanout = NuidFanoutElement()
-        nuidFanout.open()
+        val lcncFanout = LcncFanoutElement()
+        lcncFanout.open()
 
         val processWorkgroup = Workgroup(
             name = "process-worker",
@@ -36,8 +36,8 @@ class LcncFanoutElementTest {
             traits = TraitSpace { 1 j { Capability.Cas("test_cas") } }
         )
 
-        nuidFanout.register(processWorkgroup)
-        nuidFanout.register(casWorkgroup)
+        lcncFanout.register(processWorkgroup)
+        lcncFanout.register(casWorkgroup)
 
         var runForCalled = false
 
@@ -62,14 +62,14 @@ class LcncFanoutElementTest {
 
         val stubRegistry = mapOf("process" to stubReduction)
 
-        val lcncFanout = LcncFanoutElement(nuidFanout, stubRegistry)
-        lcncFanout.open()
+        val originalRegistry = borg.trikeshed.lcnc.reduction.ReducerRegistry.registry
+        borg.trikeshed.lcnc.reduction.ReducerRegistry.registry = stubRegistry
 
         val testPayload = emptyArray<Any>()
         val nuid = nuid(Capability.Process("test_process"), Nonce.RandomBytes(), Subnet.core)
 
-        // Launch consumer so that nuidFanout polling loop can actually complete
-        val slot = nuidFanout.slotOf("process-worker")
+        // Launch consumer so that lcncFanout polling loop can actually complete
+        val slot = lcncFanout.slotOf("process-worker")
         assertNotNull(slot)
 
         val job = launch {
@@ -77,11 +77,14 @@ class LcncFanoutElementTest {
             // Simulating successful dispatch inside the dispatcher
         }
 
-        val result = lcncFanout.dispatch(nuid, testPayload)
+        try {
+            val result = lcncFanout.dispatch(nuid, testPayload)
 
-        assertTrue(runForCalled, "execute should have been called on the reduction")
-        assertEquals("success", result)
-
-        job.cancel()
+            assertTrue(runForCalled, "execute should have been called on the reduction")
+            assertEquals("success", result)
+        } finally {
+            job.cancel()
+            borg.trikeshed.lcnc.reduction.ReducerRegistry.registry = originalRegistry
+        }
     }
 }

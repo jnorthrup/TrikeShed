@@ -9,6 +9,10 @@ import kotlinx.serialization.Serializable
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import borg.trikeshed.jules.conductor.JulesSyncConductor
+import borg.trikeshed.jules.sync.SyncMessage
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonPrimitive
 
 @Serializable
 enum class JulesAgentState {
@@ -117,6 +121,14 @@ class JulesAgent(
         }
     }
 
+    // Integrated Sync Conductor
+    val syncConductor = JulesSyncConductor(agentId) { msg: SyncMessage -> 
+        // In a real application this would send via websocket or similar.
+        // For now, we simulate an ack by immediately receiving it locally 
+        // or pushing to the underlying client's transport.
+        println("Sync Conductor Outbound: ${msg.id}")
+    }
+
     private val supervisor = RealSupervisorJob("jules-agent-$agentId")
 
     private val _fsmState = MutableStateFlow(
@@ -154,9 +166,11 @@ class JulesAgent(
         when (next.status) {
             JulesAgentState.SESSION_ACTIVE -> {
                 supervisor.open()
+                syncConductor.connect()
             }
             JulesAgentState.DRAINING -> {
                 supervisor.drain()
+                syncConductor.disconnect("Agent draining")
             }
             JulesAgentState.TERMINATED -> {
                 supervisor.close()
@@ -174,12 +188,18 @@ class JulesAgent(
         val session = client.createSession(prompt = prompt, title = title)
         sessionName = session.name
         emit(JulesAgentEvent.SessionStarted(session.name, session.id, Clock.System.now()))
+        
+        // Initialize sync session
+        syncConductor.markConnected()
+        syncConductor.enqueuePayload("session-started", JsonPrimitive(session.id), Clock.System.now().toEpochMilliseconds())
+        
         return session
     }
 
     fun shutdown() {
         if (state.value != JulesAgentState.TERMINATED) {
             transitionTo(JulesAgentState.TERMINATED, "Agent shutdown requested")
+            syncConductor.disconnect("Agent terminated")
         }
     }
 }

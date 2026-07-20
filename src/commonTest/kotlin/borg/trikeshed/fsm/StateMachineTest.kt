@@ -44,7 +44,7 @@ class StateMachineTest {
         assertEquals(3, enterCount) // Idle -> Active, Active -> Idle, Idle -> Active
         assertEquals(3, exitCount)  // Idle -> Active, Active -> Idle, Idle -> Active
     }
-
+ 
     @Test
     fun testHierarchicalFsm() {
         val childFsm = StateMachine<TestState, TestEvent>(
