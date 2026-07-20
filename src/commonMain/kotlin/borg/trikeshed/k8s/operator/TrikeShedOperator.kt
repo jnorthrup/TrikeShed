@@ -12,7 +12,14 @@ import kotlinx.coroutines.launch
 
 class TrikeShedOperator(private val scope: CoroutineScope) : BaseOperatorSdk<TrikeShedResource>(scope) {
     val dummyDocNode = borg.trikeshed.ccek.UserContext("dummy", scope).choreograph(
-        doc = borg.trikeshed.forge.ForgeDocument(borg.trikeshed.context.nuid.Nuid("doc"), emptyMap<String, String>())
+        borg.trikeshed.forge.ForgeDocument(
+            rootPageId = borg.trikeshed.forge.ForgeBlockId("doc"),
+            blocks = emptyMap<String, borg.trikeshed.forge.ForgeBlock>(),
+            cursor = borg.trikeshed.forge.ForgeCursor(
+                pageId = borg.trikeshed.forge.ForgeBlockId("doc"),
+                blockId = borg.trikeshed.forge.ForgeBlockId("doc"),
+            ),
+        )
     )
 
     init {

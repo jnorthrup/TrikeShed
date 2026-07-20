@@ -344,5 +344,4 @@ ${forgeAppScript()}
                 }),
             )
         )
-    }
 }
