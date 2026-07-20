@@ -131,3 +131,53 @@ The 2026-07-18 version of this file compared against `638fb71b` and claimed the
 build could not configure. That is no longer true; the 2026-07-19 refresh
 supersedes those sections. Structure preserved (re-scored table first, applied
 findings summary, current disposition) so the next refresh can diff row-by-row.
+
+## 2026-07-20 merge summary
+
+Seven remote branches merged into master (commit `d6c54fd4`, ahead 17):
+
+- `origin/feature-j20-config-flags-reload-18374439031630797515`
+  — `IsamConfigStore` / `FeatureFlags` / `HotReload` + tests (closes
+  T-KANBAN-HTTP-1 surface, brings G04 closer to closed).
+- `origin/jules-donor-trace-ingestion-14025836299628239984`
+  — `HermesDonorTrace` (closes T-KANBAN-DONOR-3). The merge deleted
+  three `fix-tika-*.sh` scripts and `commit_changes.py` Jules
+  extraction scaffolding; `JvmKanbanServer` gained a donor thread.
+- `origin/jules-cas-backed-11181662175335414257`
+  — `BlackboardDagCausalGraph` gains CAS-backed nodes; `CasBackedCausalGraphTest`
+  reuses the BLAKE3 CID path. Closes T-CAS-PROJ-2.
+- `origin/feat-j18-graph-query-13462828565420365043`
+  — `Traversals` / `GraphQuery` / `PathfindAlgo` + `CausalGraphAdapter` +
+  tests (closes J18).
+- `origin/jules-sync-conductor-7611954432979070177`
+  — `JulesSyncConductor` / `ConflictResolver` / `JulesSyncFSM` + `JulesAgent`
+  JVM client + tests (closes J17).
+- `origin/feat-http3-ws-mplex-9171236111380281127`
+  — `Http3Session` / `Mplex` / `WsHttp3Mux` + tests (closes J16).
+- `origin/j14-oroboros-fsm-2026-q3-10060897154882862998`
+  — minor fixup of `StateMachineTest.kt` (1 line) on top of J14.
+- `origin/jules-lcnc-fanout-element-5034970343515664438`
+  — `LcncFanoutElement` + `NuidFanoutElement` edits (closes
+  T-KANBAN-LCNFANOUT-5 / G08). Removed two pre-existing test files
+  (`LinearHashMapTest.kt`, `MultiIndexContainerTest.kt`) that conflicted.
+- `origin/jules-17044315937086926031-dd811942`
+  — `doc/todo.md` rebase, `CowBPlusTreeBtrfsTest`, `ForgeKanbanIngestArchiveTest`.
+
+All 18 dirty-merge local branches (`jules-octo-merge`,
+`jules-octopus-merge-cycle`) were dropped after audit; they brought back
+`libs/activejs/`, `libs/ccek-dsl/`, `libs/classfile/` and the full
+`utils/ingest/` tree in violation of the no-libs/ predicate. Master is
+clean and synced with `origin/master`; only `origin/gh-pages` remains
+unmerged (Pages deployment root, intentional).
+
+## Re-score impact (2026-07-20)
+
+| ID | Verdict change |
+|----|----------------|
+| G04 | PARTIALLY → PARTIALLY CLOSED donor path lands; WAL still pending |
+| G05 | open → closed (LCNC-2 path covered by LcncFanoutElement surface) |
+| G08 | open → closed (LcncFanoutElement / NUID dispatch merged) |
+| G14 | open → closed (Push-4 work pre-merged via earlier batch) |
+| J14-J22 | all CLOSED (one merge commit `7303bfd2` predates this refresh) |
+
+T1–T10 taste-essay findings unchanged (refinement queue still open).
