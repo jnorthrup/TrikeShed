@@ -1,5 +1,6 @@
 package borg.trikeshed.forge.shell
 
+<<<<<<< HEAD
 // Minimal stub for jsMain to satisfy expect, exact async fetching logic would require
 // async/await but the actual is synchronous in the expect, so we throw or return placeholders
 // if synchronous behaviour is strictly expected. The issue instructions stated:
@@ -21,4 +22,10 @@ actual object HtmlShell {
     actual fun jsAsset(name: String): String {
         throw UnsupportedOperationException("Synchronous fetch not supported in JS. Use async.")
     }
+=======
+actual object HtmlShell {
+    actual fun load(): String = TODO("Implement fetch via kotlinx.browser.window.fetch")
+    actual fun cssAsset(name: String): String = TODO("Implement fetch via kotlinx.browser.window.fetch")
+    actual fun jsAsset(name: String): String = TODO("Implement fetch via kotlinx.browser.window.fetch")
+>>>>>>> origin/add-html-shell-assets-10555369453043646034
 }
