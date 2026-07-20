@@ -1,0 +1,4 @@
+#forge-root { width: 100vw; height: 100vh; font-family: sans-serif; }
+.hidden { display: none; }
+.trikeshed-fade-in { animation: fadeIn 200ms ease-out; }
+@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
