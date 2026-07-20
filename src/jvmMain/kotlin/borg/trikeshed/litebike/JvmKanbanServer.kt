@@ -72,21 +72,23 @@ object JvmKanbanServer {
     fun main(args: Array<String>) {
         var port = 8888
         var donor: String? = null
+        var donorFormat: String = "md"
         val i = args.iterator()
         while (i.hasNext()) {
             when (val a = i.next()) {
                 "--port"  -> if (i.hasNext()) port = i.next().toIntOrNull() ?: 8888
                 "--donor" -> if (i.hasNext()) donor = i.next()
+                "--donor-format" -> if (i.hasNext()) donorFormat = i.next()
                 "-h", "--help" -> {
-                    System.err.println("Usage: JvmKanbanServer [--port N] [--donor path]")
+                    System.err.println("Usage: JvmKanbanServer [--port N] [--donor path] [--donor-format md|sqlite]")
                     exitProcess(2)
                 }
             }
         }
-        runBlocking { run(port, donor) }
+        runBlocking { run(port, donor, donorFormat) }
     }
 
-    suspend fun run(port: Int, donorPath: String?) {
+    suspend fun run(port: Int, donorPath: String?, donorFormat: String = "md") {
         val serverJob = SupervisorJob()
         val scope = CoroutineScope(serverJob + Dispatchers.Default)
         val listener = LitebikeListenerElement(parentJob = serverJob).also { it.open() }
@@ -187,7 +189,7 @@ object JvmKanbanServer {
                 } else {
                     donorPath
                 }
-                ForgeKanbanIngest.persistMarkdown("jim", ingestPath)
+                borg.trikeshed.forge.donor.HermesDonorTrace.ingestDonor("jim", donorFormat, donorPath.toString())
                 System.err.println("donor replayed: $donorPath")
             } catch (t: Throwable) {
                 System.err.println("donor replay failed: ${t.message}")
@@ -247,9 +249,10 @@ object JvmKanbanServer {
             "/api/cap"    -> HttpResponse(200, """{"protocols":["Http","Json","Socks5","Tls","Bonjour","Upnp"],"capabilities":["Process@local","Cas@local","Wireproto@lan.localhost"]}""")
             "/api/board"  -> HttpResponse(200, boardJson())
             "/api/submit" -> if (method == "POST") submit(text) else HttpResponse(405, """{"error":"method_not_allowed"}""")
-            "/api/donor"  -> if (method == "POST") submit(text) else HttpResponse(405, """{"error":"method_not_allowed"}""")
+
+
             "/"           -> HttpResponse(200, "<html><body>Forge litebike listener — see /api/health</body></html>", "text/html; charset=utf-8")
-            else           -> HttpResponse(404, """{"error":"not_found","path":"$path"}""")
+            else -> if (path.startsWith("/api/donor")) { if (method == "POST") submitDonor(path) else HttpResponse(405, """{"error":"method_not_allowed"}""") } else { HttpResponse(404, """{"error":"not_found","path":"$path"}""") }
         }
     }
 
@@ -281,6 +284,25 @@ object JvmKanbanServer {
             val tmp = "/tmp/hi"
             writeStringJvm(tmp, payload)
             val reduction = ForgeKanbanIngest.persistMarkdown("jim", tmp)
+            HttpResponse(
+                201,
+                JsonSupport.stringify(
+                    linkedMapOf(
+                        "ok" to true,
+                        "correlations" to reduction.correlations.size,
+                        "firstCausalKey" to (reduction.correlations.firstOrNull()?.causalKey ?: ""),
+                    )
+                ),
+            )
+        }.getOrElse { HttpResponse(500, """{"error":"submit_failed","reason":"${it.message}"}""") }
+    }
+
+    private fun submitDonor(path: String): HttpResponse {
+        val query = path.substringAfter("?", "")
+        val format = query.split("&").find { it.startsWith("format=") }?.substringAfter("format=") ?: "sqlite"
+        val donorPathStr = Paths.get(System.getProperty("user.home"), ".hermes", "kanban.db").toString()
+        return runCatching {
+            val reduction = borg.trikeshed.forge.donor.HermesDonorTrace.ingestDonor("jim", format, donorPathStr)
             HttpResponse(
                 201,
                 JsonSupport.stringify(

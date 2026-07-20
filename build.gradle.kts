@@ -145,7 +145,7 @@ kotlin {
     }
 
     if (isLinux || providers.gradleProperty("enableLinuxX64").orNull == "true") {
-        linuxX64("linux") {
+        linuxX64 {
             if (enableNativeSharedLib) {
                 binaries.sharedLib { baseName = "trikeshed" }
             }
@@ -201,6 +201,7 @@ kotlin {
                 // Parsers pull in POI/PDFBox/etc. only on the JVM target.
                 implementation("org.apache.tika:tika-core:3.2.3")
                 implementation("org.apache.tika:tika-parsers-standard-package:3.2.3")
+                implementation("org.xerial:sqlite-jdbc:3.42.0.0")
 
                 // Compose Desktop UI — JVM + Skiko only
                 implementation(compose.desktop.currentOs)
