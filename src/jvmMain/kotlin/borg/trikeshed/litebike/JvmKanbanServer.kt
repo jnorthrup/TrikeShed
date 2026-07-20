@@ -222,6 +222,41 @@ object JvmKanbanServer {
         scope.launch {
             listener.fanoutChannels { protocol, msg ->
                 System.err.println("fanout: $protocol seq=${msg.sequenceId} ${msg.payload.size} bytes")
+                if (protocol == Protocol.Http) {
+                    val text = String(msg.payload, StandardCharsets.UTF_8)
+                    if (text.startsWith("GET /api/stream ") && text.contains("Upgrade: websocket", ignoreCase = true)) {
+                        val keyLine = text.lineSequence().find { it.startsWith("Sec-WebSocket-Key: ", ignoreCase = true) }
+                        if (keyLine != null && msg.respond != null) {
+                            val key = keyLine.substringAfter(":").trim()
+                            val magic = "258EAFA5-E914-47DA-95CA-C5AB0DC85B11"
+                            val digest = java.security.MessageDigest.getInstance("SHA-1")
+                            val acceptHash = java.util.Base64.getEncoder().encodeToString(digest.digest((key + magic).toByteArray()))
+
+                            val response = buildString {
+                                append("HTTP/1.1 101 Switching Protocols\r\n")
+                                append("Upgrade: websocket\r\n")
+                                append("Connection: Upgrade\r\n")
+                                append("Sec-WebSocket-Accept: $acceptHash\r\n")
+                                append("\r\n")
+                            }
+                            msg.respond.invoke(response.toByteArray(StandardCharsets.UTF_8))
+
+                            scope.launch {
+                                try {
+                                    borg.trikeshed.forge.server.KanbanPushBus.patches.collect { patch ->
+                                        val frame = borg.trikeshed.ws.WebSocketFrame.buildFrame(
+                                            opcode = borg.trikeshed.ws.WebSocketFrame.OpCode.TEXT,
+                                            payload = patch.toByteArray(StandardCharsets.UTF_8)
+                                        )
+                                        msg.respond.invoke(frame)
+                                    }
+                                } catch (e: Exception) {
+                                    System.err.println("ws push disconnected: ${e.message}")
+                                }
+                            }
+                        }
+                    }
+                }
                 true // keep listening
             }
         }
@@ -281,6 +316,10 @@ object JvmKanbanServer {
             val tmp = "/tmp/hi"
             writeStringJvm(tmp, payload)
             val reduction = ForgeKanbanIngest.persistMarkdown("jim", tmp)
+
+            // Push board update to connected WS clients
+            borg.trikeshed.forge.server.KanbanPushBus.publish(boardJson())
+
             HttpResponse(
                 201,
                 JsonSupport.stringify(
