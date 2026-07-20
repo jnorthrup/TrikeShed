@@ -27,9 +27,9 @@ class ForgeKanbanIngestArchiveTest {
 
         B1 — Second task
         Depends on: A1.
-        
+
         Prove one vertical cut.
-        
+
         7. Production-rule behavior tied to Kanban
     """.trimIndent()
 
@@ -41,11 +41,11 @@ class ForgeKanbanIngestArchiveTest {
             TreeDocument("doc1.md", "text/markdown", markdown1.encodeToByteArray()),
             TreeDocument("doc2.md", "text/markdown", markdown2.encodeToByteArray())
         ))
-        
+
         val archive = pipeline.store(docs)
-        
+
         val reduction = ForgeKanbanIngest.persistArchive("jim", archive, pipeline)
-        
+
         assertEquals(listOf("A1", "B1"), reduction.board.cards.map { it.id.value })
         assertEquals("ready", reduction.board.cards.first { it.id.value == "A1" }.columnId.value)
         assertEquals("todo", reduction.board.cards.first { it.id.value == "B1" }.columnId.value)

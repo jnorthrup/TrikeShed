@@ -505,42 +505,6 @@ under one `project(cid)` path.
 
 These are the separated follow-up tasks from T-REWIRE-3 (Cuts 1 and 7 landed in T-REWIRE-3).
 
-- [ ] **T-MESH-1. Assignment-bound KeyMux credential leasing**
-  - Files: commonMain lease algebra plus a focused edit to
-    `borg/trikeshed/userspace/reactor/MuxReactorElement.kt`.
-  - Goal: replace synthetic "next available key" leasing with an explicit
-    `leaseCredential(request)` command bound to assignment NUID, holder NUID,
-    provider, model/capabilities, subnet, and TTL.
-  - Authority: return an opaque broker handle where possible; otherwise a
-    holder-sealed payload. Never put secret values or handles in reactor state,
-    Kanban events, logs, caches, advertisements, or operational history.
-  - Verification: mismatch is rejected before dispatch; completion releases in
-    `finally`; worker loss reclaims by TTL; no secret appears in any projection.
-  - Non-goals: no credential replication, quorum protocol, or new vault.
-
-- [ ] **T-MESH-2. Mesh resource advertisements and ModelMux routes**
-  - Files: commonMain `PeerAdvertisement` / `ModelRoute` algebra and ModelMux
-    eligibility/ranking integration.
-  - Goal: combine local and VPS model resources into expiring route advertisements;
-    reject by capability, NUID subnet, capacity, provider backoff, authority, and
-    policy before deterministic ranking by pin, locality, cache, health, latency,
-    cost, and stable route ID.
-  - Verification: route decisions expose candidates and redacted rejection reasons;
-    VPS loss or provider backoff selects a valid alternative; a valid response-cache
-    hit completes without issuing a provider lease.
-  - Non-goals: no competing ModelMux subclass and no new discovery/transport stack.
-
-- [ ] **T-MESH-3. WRT Linux sentinel Forge-agent composition**
-  - File: a platform composition adapter using the existing litebike bind point,
-    peer registry, reactor endpoint, KeyMux lease client, and ModelMux executor.
-  - Goal: run the upstream router as a capability-limited mesh participant for
-    discovery, tunnel maintenance, reachability observation, queue watching, and
-    bounded assignments. It leases only authority required by work it owns.
-  - Verification: sentinel assignment releases by `finally` or TTL; two healthy
-    peers continue direct execution after sentinel shutdown.
-  - Non-goals: sentinel is not a vault, universal relay, sole coordinator, packet
-    inspector, or required hop between healthy peers.
-
 - [ ] **T-REWIRE-3b. Modelmux kanban agent**
   JobCommand handler routing cards through modelmux.
 
@@ -555,4 +519,3 @@ These are the separated follow-up tasks from T-REWIRE-3 (Cuts 1 and 7 landed in 
 
 - [ ] **T-REWIRE-3f. Progressive rendering**
   Jules jobs reading TreeDoc archives into ForgeDoc.
-
