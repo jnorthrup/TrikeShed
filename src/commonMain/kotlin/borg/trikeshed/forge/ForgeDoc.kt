@@ -58,6 +58,34 @@ data class ForgeDocument(
     val blocks: Map<String, ForgeBlock>,
     val cursor: ForgeCursor,
 ) {
+    fun appendBlock(kind: ForgeBlockKind, text: String, properties: Map<String, String> = emptyMap()): ForgeDocument {
+        // Stub for appendBlock
+        return this
+    }
+
+    fun updateText(blockId: ForgeBlockId, text: String): ForgeDocument {
+        // Stub for updateText
+        return this
+    }
+
+    fun deleteBlock(blockId: ForgeBlockId): ForgeDocument {
+        // Stub for deleteBlock
+        return this
+    }
+
+    fun moveCard(cardId: borg.trikeshed.kanban.KanbanCardId, toColumnId: borg.trikeshed.kanban.KanbanColumnId): ForgeDocument {
+        // Stub for moveCard
+        return this
+    }
+
+    fun toMarkdown(): String {
+        // Stub for toMarkdown
+        return ""
+    }
+
+    companion object {
+        fun empty(): ForgeDocument = ForgeDocument(ForgeBlockId("empty"), emptyMap(), ForgeCursor(ForgeBlockId("empty"), ForgeBlockId("empty")))
+    }
     fun block(id: ForgeBlockId): ForgeBlock? = blocks[id.value]
     fun requireBlock(id: ForgeBlockId): ForgeBlock =
         block(id) ?: error("Missing block: ${id.value}")

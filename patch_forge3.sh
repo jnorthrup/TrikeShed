@@ -1,0 +1,1 @@
+sed -i 's/import borg.trikeshed.kanban.KanbanBoard/import borg.trikeshed.kanban.KanbanBoard\nimport borg.trikeshed.forge.toKanbanBoard/' src/commonMain/kotlin/borg/trikeshed/forge/ccek/ForgeElement.kt

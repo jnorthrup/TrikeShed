@@ -79,6 +79,10 @@ class ConfixIsamCursorBridge(
             TODO("Compose Stringpool ISAM RowVec for $i")
         }
     }
+
+    fun indexFacet(cid: borg.trikeshed.job.ContentId, projection: borg.trikeshed.reactor.FacetProjection) {
+        // Stub for indexing a facet
+    }
 }
 
 /**

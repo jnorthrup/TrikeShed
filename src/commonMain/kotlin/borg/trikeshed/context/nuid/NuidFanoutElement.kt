@@ -8,9 +8,15 @@ import borg.trikeshed.context.ElementState
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.filter
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.merge
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.yield
+import kotlinx.coroutines.withTimeoutOrNull
 import kotlin.coroutines.CoroutineContext
 import kotlin.time.TimeSource
 
@@ -62,19 +68,14 @@ open class NuidFanoutElement(
         // Buffered so a brief latency from one worker doesn't block concurrent
         // offers to its peers. Capacity scales with claim pressure.
         private val inbox: Channel<Claim> = Channel(Channel.BUFFERED)
-        private val accepted: Channel<Claim> = Channel(Channel.BUFFERED)
+        internal val acceptedFlow: MutableSharedFlow<Claim> = MutableSharedFlow(replay = 1, extraBufferCapacity = 64)
 
         /** Consume one pending claim, suspending if empty. */
-        suspend fun consume(): Claim = inbox.receive()
-
-        /** Try to consume one pending claim (non-blocking). Returns null if empty. */
-        fun tryTake(): Claim? = inbox.tryReceive().getOrNull()
-
-        /** Consume one claim accepted for this workgroup. */
-        suspend fun consumeAccepted(): Claim = accepted.receive()
-
-        /** Publish a claim after dispatcher admission succeeds. */
-        internal suspend fun publishAccepted(claim: Claim) { accepted.send(claim) }
+        suspend fun consume(): Claim {
+            val claim = inbox.receive()
+            acceptedFlow.emit(claim)
+            return claim
+        }
 
         /** Enqueue a claim offer to this workgroup. */
         suspend fun offer(claim: Claim) { inbox.send(claim) }
@@ -82,7 +83,6 @@ open class NuidFanoutElement(
         /** Close the slot — no more offers. Existing claims remain drainable. */
         fun close() {
             inbox.close()
-            accepted.close()
         }
     }
 
@@ -289,19 +289,16 @@ open class NuidFanoutElement(
         claimId: Long,
         timeoutMillis: Long,
     ): WorkgroupSlot? {
-        val mark = TimeSource.Monotonic.markNow()
-        val deadlineNanos = timeoutMillis * 1_000_000L
-        while (mark.elapsedNow().inWholeNanoseconds < deadlineNanos) {
-            for (slot in candidates) {
-                val taken = slot.tryTake() ?: continue
-                if (taken.claimId == claimId && acceptClaim(slot.workgroup, taken)) {
-                    slot.publishAccepted(taken)
-                    return slot
+        return withTimeoutOrNull(timeoutMillis) {
+            candidates
+                .map { slot ->
+                    slot.acceptedFlow
+                        .filter { it.claimId == claimId && acceptClaim(slot.workgroup, it) }
+                        .map { slot }
                 }
-            }
-            yield()
+                .merge()
+                .first()
         }
-        return null
     }
 
     /** Default admission policy — accepts any claim whose workgroup can handle it. */

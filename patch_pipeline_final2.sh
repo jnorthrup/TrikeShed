@@ -1,3 +1,4 @@
+cat << 'INNER_EOF' > src/commonMain/kotlin/borg/trikeshed/lcnc/reactor/LcncIngestPipeline.kt
 package borg.trikeshed.lcnc.reactor
 
 import borg.trikeshed.context.AsyncContextElement
@@ -81,27 +82,32 @@ class LcncIngestPipeline(
     companion object Key : kotlin.coroutines.CoroutineContext.Key<LcncIngestPipeline>
     override val key = Key
 
-    
+    private val fanoutChannel = Channel<ReactorAction>(
+        capacity = config.fanoutBufferSize,
+        onBufferOverflow = BufferOverflow.SUSPEND
+    )
+
     private val _metrics = MutableSharedFlow<IngestMetrics>(replay = 1)
     val metrics: SharedFlow<IngestMetrics> = _metrics.asSharedFlow()
-    
+
     private var currentMetrics = IngestMetrics()
-    
+
+    private val parseSemaphore = Semaphore(config.maxConcurrentParses)
 
     override suspend fun decode(source: IngestSource, format: IngestFormat): Series<LcncEntity> {
         val stateElement = currentCoroutineContext()[IngestStateElement]
         val mockNuid = nuid(Capability.Custom("lcnc", "ingest"), Nonce.RandomBytes(), Subnet.core)
 
         stateElement?.fanout?.send(ReactorAction.opened(mockNuid))
-        
+
         val startTime = System.nanoTime()
-        
+
         try {
             val entities = parse(source, format)
             val parseDuration = System.nanoTime() - startTime
             currentMetrics = currentMetrics.recordParse(entities.a, parseDuration)
             _metrics.tryEmit(currentMetrics)
-            
+
             stateElement?.fanout?.send(ReactorAction.activated(mockNuid))
 
             var publishedCount = 0
@@ -110,16 +116,16 @@ class LcncIngestPipeline(
                 stateElement?.fanout?.send(ReactorAction.publishEntity(mockNuid, entity))
                 publishedCount++
             }
-            
+
             val publishDuration = System.nanoTime() - startTime - parseDuration
             currentMetrics = currentMetrics.recordPublish(publishedCount, publishDuration)
             _metrics.tryEmit(currentMetrics)
-            
+
             stateElement?.fanout?.send(ReactorAction.draining(mockNuid))
             stateElement?.fanout?.send(ReactorAction.closed(mockNuid))
 
             return entities
-            
+
         } catch (e: Throwable) {
             currentMetrics = currentMetrics.recordParseError()
             _metrics.tryEmit(currentMetrics)
@@ -133,7 +139,7 @@ class LcncIngestPipeline(
             is IngestSource.FileStream -> source.data.decodeToString()
             is IngestSource.Link -> source.uri
         }
-        
+
         return when (format) {
             IngestFormat.MARKDOWN -> parseMarkdown(text)
             IngestFormat.CSV, IngestFormat.TSV -> parseCsvOrTsv(text, format)
@@ -147,7 +153,7 @@ class LcncIngestPipeline(
     private fun parseMarkdown(text: String): Series<LcncEntity> {
         val lines = text.lines()
         val headerRegex = Regex("^(#+)\\s+(.+)$")
-        
+
         return lines.size j { i ->
             val line = lines[i]
             val match = headerRegex.matchEntire(line.trim())
@@ -155,7 +161,7 @@ class LcncIngestPipeline(
                 val level = match.groupValues[1].length
                 val title = match.groupValues[2].trim()
                 val id = title.lowercase().replace(Regex("[^a-z0-9]+"), "-")
-                
+
                 LcncBlock(
                     id = id,
                     type = "heading_${'$'}level",
@@ -177,10 +183,10 @@ class LcncIngestPipeline(
         val delimiter = if (format == IngestFormat.CSV) "," else "\t"
         val lines = text.lines().filter { it.isNotBlank() }
         if (lines.isEmpty()) return emptySeriesOf()
-        
+
         val headers = lines.first().split(delimiter).map { it.trim() }
         val inferredColumns = headers.joinToString(", ")
-        
+
         val databaseId = "db-${'$'}{text.hashCode()}"
 
         val pages: Series<LcncPage> = (lines.size - 1) j { i: Int ->
@@ -194,7 +200,7 @@ class LcncIngestPipeline(
                 contentBlocks = emptySeriesOf<LcncBlock>()
             )
         }
-        
+
         val db = LcncDatabase(
             id = databaseId,
             title = "Imported Database (Columns: ${'$'}inferredColumns)",
@@ -231,9 +237,9 @@ class LcncIngestPipeline(
             contentBlocks = emptySeriesOf<LcncBlock>()
         ) }
     }
-    
+
     suspend fun getMetrics(): IngestMetrics = currentMetrics
-    
+
     suspend fun resetMetrics() {
         currentMetrics = IngestMetrics()
         _metrics.tryEmit(currentMetrics)
@@ -249,7 +255,7 @@ class IngestPipelineConfigBuilder {
     private var maxPendingEntities: Int = 10000
     private var enableParallelParsing: Boolean = true
     private var minParallelChunkSize: Int = 1000
-    
+
     fun maxConcurrentParses(n: Int): IngestPipelineConfigBuilder { maxConcurrentParses = n; return this }
     fun fanoutBufferSize(n: Int): IngestPipelineConfigBuilder { fanoutBufferSize = n; return this }
     fun publishBatchSize(n: Int): IngestPipelineConfigBuilder { publishBatchSize = n; return this }
@@ -258,14 +264,14 @@ class IngestPipelineConfigBuilder {
     fun maxPendingEntities(n: Int): IngestPipelineConfigBuilder { maxPendingEntities = n; return this }
     fun enableParallelParsing(b: Boolean): IngestPipelineConfigBuilder { enableParallelParsing = b; return this }
     fun minParallelChunkSize(n: Int): IngestPipelineConfigBuilder { minParallelChunkSize = n; return this }
-    
+
     fun forHighThroughput(): IngestPipelineConfigBuilder = apply {
         maxConcurrentParses = (Runtime.getRuntime().availableProcessors() * 4).coerceAtLeast(8)
         fanoutBufferSize = 4096
         publishBatchSize = 256
         maxPendingEntities = 50000
     }
-    
+
     fun forLowLatency(): IngestPipelineConfigBuilder = apply {
         maxConcurrentParses = Runtime.getRuntime().availableProcessors()
         fanoutBufferSize = 256
@@ -274,7 +280,7 @@ class IngestPipelineConfigBuilder {
         publishTimeoutNs = 1_000_000_000L
         maxPendingEntities = 1000
     }
-    
+
     fun forMemoryConstrained(): IngestPipelineConfigBuilder = apply {
         maxConcurrentParses = 2
         fanoutBufferSize = 128
@@ -282,7 +288,7 @@ class IngestPipelineConfigBuilder {
         maxPendingEntities = 1000
         enableParallelParsing = false
     }
-    
+
     fun build(): IngestPipelineConfig = IngestPipelineConfig(
         maxConcurrentParses = maxConcurrentParses,
         fanoutBufferSize = fanoutBufferSize,
@@ -294,3 +300,4 @@ class IngestPipelineConfigBuilder {
         minParallelChunkSize = minParallelChunkSize,
     )
 }
+INNER_EOF
