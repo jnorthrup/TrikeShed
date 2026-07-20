@@ -1,0 +1,1 @@
+sed -i 's/fun updateConfig(newConfig: PolyglotObservationConfig)/suspend fun updateConfig(newConfig: PolyglotObservationConfig)/g' src/commonMain/kotlin/borg/trikeshed/reactor/PolyglotObservationElement.kt

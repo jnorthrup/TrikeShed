@@ -33,6 +33,11 @@ data class ConfixFacetPlan(
 
     data class ValidationResult(val valid: Boolean, val errors: List<String> = emptyList())
 
+    fun validateAgainst(schema: Series<borg.trikeshed.isam.RecordMeta>): ValidationResult {
+        // Stub for validation against ISAM schema
+        return ValidationResult(valid = true)
+    }
+
 
     fun validate(doc: ConfixDoc): ValidationResult {
         val errors = mutableListOf<String>()
