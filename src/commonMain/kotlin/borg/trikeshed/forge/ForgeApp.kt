@@ -4,13 +4,20 @@ import borg.trikeshed.common.Files
 import borg.trikeshed.cursor.blackboardContext
 import borg.trikeshed.cursor.provenance
 import borg.trikeshed.dag.causalGraphNode
+import borg.trikeshed.forge.blackboard.ForgeBlackboardSection3D
+import borg.trikeshed.forge.blackboard.ForgeBlackboardView
 import borg.trikeshed.forge.gallery.ForgeGalleryCatalog
 import borg.trikeshed.forge.gallery.ForgeGalleryRenderer
 import borg.trikeshed.job.ContentId
 import borg.trikeshed.kanban.ForgeKanbanIngest
+import borg.trikeshed.lcnc.reactor.IngestCodec
+import borg.trikeshed.lcnc.reactor.IngestFormat
+import borg.trikeshed.lcnc.reactor.IngestSource
+import borg.trikeshed.lcnc.reactor.LcncIngestPipeline
+import borg.trikeshed.lib.Series
 import borg.trikeshed.lib.j
-import borg.trikeshed.lib.linkedMapOf
 import kotlinx.datetime.Clock
+import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 
@@ -20,15 +27,6 @@ import kotlinx.serialization.json.JsonPrimitive
  * PWA offline-first: Forge captures projects server-free; server/mesh additive sync.
  */
 object ForgeApp {
-
-    data class ForgeAppState(
-        val title: String,
-        val userId: String,
-        val items: List<ForgeItem>,
-        val workspace: WorkspaceLayout,
-        val causalGraph: List<CausalNode>,
-        val cascadeGrid: List<CascadeGridRow>,
-    )
 
     data class ForgeItem(
         val id: String,
@@ -72,7 +70,28 @@ object ForgeApp {
         val count: Long = 0L,
     )
 
-    fun defaultForgeAppState(userId: String): ForgeAppState {
+    data class IngestJob(
+        val id: String,
+        val fileName: String,
+        val fileSize: Long,
+        val mimeType: String,
+        val status: String, // "pending" | "processing" | "done" | "error"
+        val progress: Double = 0.0,
+        val error: String? = null,
+        val entitiesCreated: Int = 0,
+    )
+
+    data class ForgeAppState(
+        val title: String,
+        val userId: String,
+        val items: List<ForgeItem>,
+        val workspace: WorkspaceLayout,
+        val causalGraph: List<CausalNode>,
+        val cascadeGrid: List<CascadeGridRow>,
+        val ingestJobs: List<IngestJob> = emptyList(),
+    )
+
+    fun defaultForgeAppState(userId: String, ingestJobs: List<IngestJob> = emptyList()): ForgeAppState {
         val markdownPath = "/tmp/hi"
         val reduction = if (Files.exists(markdownPath)) {
             ForgeKanbanIngest.persistMarkdown(userId, markdownPath)
@@ -112,6 +131,7 @@ object ForgeApp {
                 )
             },
             cascadeGrid = emptyList(),
+            ingestJobs = ingestJobs,
         )
     }
 
@@ -123,11 +143,11 @@ object ForgeApp {
     }
 
     private fun forgeSeedJson(state: ForgeAppState): String {
-        return JsonObject(
+        val json = JsonObject(
             mapOf(
                 "title" to JsonPrimitive(state.title),
                 "userId" to JsonPrimitive(state.userId),
-                "items" to state.items.map { item ->
+                "items" to JsonArray(state.items.map { item ->
                     JsonObject(
                         mapOf(
                             "id" to JsonPrimitive(item.id),
@@ -135,7 +155,7 @@ object ForgeApp {
                             "notes" to JsonPrimitive(item.notes),
                             "status" to JsonPrimitive(item.status),
                             "priority" to JsonPrimitive(item.priority),
-                            "checklist" to item.checklist.map { c ->
+                            "checklist" to JsonArray(item.checklist.map { c ->
                                 JsonObject(
                                     mapOf(
                                         "id" to JsonPrimitive(c.id),
@@ -143,13 +163,13 @@ object ForgeApp {
                                         "checked" to JsonPrimitive(c.checked),
                                     )
                                 )
-                            },
+                            }),
                         )
                     )
-                },
+                }),
                 "workspace" to JsonObject(
                     mapOf(
-                        "columns" to state.workspace.columns.map { col ->
+                        "columns" to JsonArray(state.workspace.columns.map { col ->
                             JsonObject(
                                 mapOf(
                                     "id" to JsonPrimitive(col.id),
@@ -157,20 +177,20 @@ object ForgeApp {
                                     "order" to JsonPrimitive(col.order),
                                 )
                             )
-                        },
+                        }),
                     )
                 ),
-                "causalGraph" to state.causalGraph.map { node ->
+                "causalGraph" to JsonArray(state.causalGraph.map { node ->
                     JsonObject(
                         mapOf(
                             "id" to JsonPrimitive(node.id),
                             "title" to JsonPrimitive(node.title),
-                            "parents" to node.parents.map { JsonPrimitive(it) },
-                            "children" to node.children.map { JsonPrimitive(it) },
+                            "parents" to JsonArray(node.parents.map { JsonPrimitive(it) }),
+                            "children" to JsonArray(node.children.map { JsonPrimitive(it) }),
                         )
                     )
-                },
-                "cascadeGrid" to state.cascadeGrid.map { row ->
+                }),
+                "cascadeGrid" to JsonArray(state.cascadeGrid.map { row ->
                     JsonObject(
                         mapOf(
                             "viewName" to JsonPrimitive(row.viewName),
@@ -182,10 +202,25 @@ object ForgeApp {
                             "count" to JsonPrimitive(row.count),
                         )
                     )
-                },
+                }),
+                "ingestJobs" to JsonArray(state.ingestJobs.map { job ->
+                    JsonObject(
+                        mapOf(
+                            "id" to JsonPrimitive(job.id),
+                            "fileName" to JsonPrimitive(job.fileName),
+                            "fileSize" to JsonPrimitive(job.fileSize),
+                            "mimeType" to JsonPrimitive(job.mimeType),
+                            "status" to JsonPrimitive(job.status),
+                            "progress" to JsonPrimitive(job.progress),
+                            "error" to job.error?.let { JsonPrimitive(it) },
+                            "entitiesCreated" to JsonPrimitive(job.entitiesCreated),
+                        )
+                    )
+                }),
                 "blackboardSeed" to forgeBlackboardSeed(),
             )
-        ).toString()
+        )
+        return json.toString()
     }
 
     private fun htmlShell(seed: String): String = """
@@ -252,52 +287,62 @@ ${forgeAppScript()}
     /** Server-rendered gallery HTML for the workspace rail. No client-side hydration needed. */
     private fun galleryHtml(): String = ForgeGalleryRenderer.renderHtml()
 
-    private fun forgeBlackboardSeed(): Map<String, Any?> {
+    private fun forgeBlackboardSeed(): JsonObject {
         val view = ForgeBlackboardView.DEFAULT
         val cam = view.defaultCamera
         val cam3d = view.mode3D
-        return linkedMapOf(
-            "surface" to view.surface,
-            "sections" to view.sections,
-            "defaultMode" to view.defaultMode.name,
-            "cornerButtons" to view.cornerButtons.map {
-                linkedMapOf(
-                    "slot" to it.slot.name,
-                    "id" to it.id,
-                    "label" to it.label,
-                    "hotkey" to it.hotkey,
-                    "surface" to it.surface,
-                )
-            },
-            "camera" to linkedMapOf(
-                "x" to cam.x,
-                "y" to cam.y,
-                "zoom" to cam.zoom,
-                "tilt" to cam.tilt,
-                "vx" to cam.vx,
-                "vy" to cam.vy,
-                "vz" to cam.vz,
-                "minZoom" to cam.minZoom,
-                "maxZoom" to cam.maxZoom,
-            ),
-            "camera3D" to linkedMapOf(
-                "yawRadians" to cam3d.yawRadians,
-                "pitchRadians" to cam3d.pitchRadians,
-                "distance" to cam3d.distance,
-                "focalLength" to cam3d.focalLength,
-                "minDistance" to cam3d.minDistance,
-                "maxDistance" to cam3d.maxDistance,
-            ),
-            "layout3D" to view.layout3D.map {
-                linkedMapOf(
-                    "sectionId" to it.sectionId,
-                    "centerX" to it.centerX,
-                    "centerY" to it.centerY,
-                    "width" to it.width,
-                    "height" to it.height,
-                    "elevation" to it.elevation,
-                )
-            },
+        return JsonObject(
+            mapOf(
+                "surface" to JsonPrimitive(view.surface),
+                "sections" to JsonArray(view.sections.map { JsonPrimitive(it) }),
+                "defaultMode" to JsonPrimitive(view.defaultMode.name),
+                "cornerButtons" to JsonArray(view.cornerButtons.map { btn ->
+                    JsonObject(
+                        mapOf(
+                            "slot" to JsonPrimitive(btn.slot.name),
+                            "id" to JsonPrimitive(btn.id),
+                            "label" to JsonPrimitive(btn.label),
+                            "hotkey" to JsonPrimitive(btn.hotkey),
+                            "surface" to JsonPrimitive(btn.surface),
+                        )
+                    )
+                }),
+                "camera" to JsonObject(
+                    mapOf(
+                        "x" to JsonPrimitive(cam.x),
+                        "y" to JsonPrimitive(cam.y),
+                        "zoom" to JsonPrimitive(cam.zoom),
+                        "tilt" to JsonPrimitive(cam.tilt),
+                        "vx" to JsonPrimitive(cam.vx),
+                        "vy" to JsonPrimitive(cam.vy),
+                        "vz" to JsonPrimitive(cam.vz),
+                        "minZoom" to JsonPrimitive(cam.minZoom),
+                        "maxZoom" to JsonPrimitive(cam.maxZoom),
+                    )
+                ),
+                "camera3D" to JsonObject(
+                    mapOf(
+                        "yawRadians" to JsonPrimitive(cam3d.yawRadians),
+                        "pitchRadians" to JsonPrimitive(cam3d.pitchRadians),
+                        "distance" to JsonPrimitive(cam3d.distance),
+                        "focalLength" to JsonPrimitive(cam3d.focalLength),
+                        "minDistance" to JsonPrimitive(cam3d.minDistance),
+                        "maxDistance" to JsonPrimitive(cam3d.maxDistance),
+                    )
+                ),
+                "layout3D" to JsonArray(view.layout3D.map { section ->
+                    JsonObject(
+                        mapOf(
+                            "sectionId" to JsonPrimitive(section.sectionId),
+                            "centerX" to JsonPrimitive(section.centerX),
+                            "centerY" to JsonPrimitive(section.centerY),
+                            "width" to JsonPrimitive(section.width),
+                            "height" to JsonPrimitive(section.height),
+                            "elevation" to JsonPrimitive(section.elevation),
+                        )
+                    )
+                }),
+            )
         )
     }
 }
