@@ -42,7 +42,9 @@ these interfaces. No platform IO leaks into `commonMain`.
 
 ### Foundation layer (must land first)
 
-- [ ] **T1. Reactor algebra in commonMain**
+- [x] **T1. Reactor algebra in commonMain** (DRAINED 2026-07-20, commit 114f5314)
+  - ChannelMessage / ChannelResponse / ReactorConfig / ReactorError / SessionState / TransformCode / WamBlock landed in `src/commonMain/kotlin/borg/trikeshed/reactor/`.
+  - Recovered via missing-PR pattern (T-jules session `13631575799754534320`); agent did not push a PR.
   - Port `Protocol`, `WamBlock`, `SessionState`, `TransformCode` from litebike taxonomy.
   - Define `ReactorError`, `ChannelMessage`, `ChannelResponse`, `ReactorConfig`.
   - Keep it pure Join/Series/Cursor-shaped.
@@ -62,7 +64,9 @@ these interfaces. No platform IO leaks into `commonMain`.
   - Targets: `commonMain`.
   - Evidence: compiles, tests for in-memory `Volume` backend.
 
-- [ ] **T4. ReactorEndpoint / confix wire transport in commonMain**
+- [x] **T4. ReactorEndpoint / confix wire transport in commonMain** (DRAINED 2026-07-20, commit faa2619d)
+  - `ConfixEnvelopeCodec` + `ReactorEnvelopAction` landed in `src/commonMain/kotlin/borg/trikeshed/reactor/`.
+  - Recovered via missing-PR pattern (Jules session `5891915718907135319`).
   - `ReactorAction` and `ReactorResult` as `Join<Nuid, Join<Verb, Payload>>` and response envelope.
   - `ReactorEndpoint` interface: `invoke(action) -> result`.
   - Confix serialization for action/result payloads.
@@ -83,7 +87,9 @@ these interfaces. No platform IO leaks into `commonMain`.
   - Targets: `jvmMain`/`nativeMain` (mmap + io_uring).
   - Evidence: can read a raw Btrfs image or JBOD array metadata.
 
-- [ ] **T7. Browser storage backend**
+- [x] **T7. Browser storage backend** (DRAINED 2026-07-20, commit 9f2ab178)
+  - `OpfsVolume`, `IndexedDbVolume`, `BlockDevice`, browser-storage test landed in `src/commonMain/kotlin/borg/trikeshed/browser/storage/`.
+  - Recovered via missing-PR pattern (Jules session `15876474675057978179`).
   - `OpfsVolume` and `IndexedDbVolume` implementing `Volume` over browser storage APIs.
   - Block semantics emulated; no real Btrfs in the browser.
   - Targets: `jsMain`/`wasmJsMain`.
@@ -97,7 +103,9 @@ these interfaces. No platform IO leaks into `commonMain`.
   - Targets: `jsMain` + JVM/Native server.
   - Evidence: PWA can connect to `localhost:PORT` and invoke a ping action.
 
-- [ ] **T9. Mesh / SCTP transport**
+- [x] **T9. Mesh / SCTP transport** (DRAINED 2026-07-20, commit 19a84b2d)
+  - `MeshActionFrame`, `MeshErrorCode`, `MeshActionResult`, `MeshConfig`, `SctpReactorEndpoint`, `MeshReactorEndpoint` landed in `src/commonMain/kotlin/borg/trikeshed/reactor/`.
+  - Recovered via missing-PR pattern (Jules session `13098165998827396591`).
   - `MeshReactorEndpoint` and `SctpReactorEndpoint` implementing `ReactorEndpoint`.
   - Peer discovery over the reactor blackboard.
   - Targets: `commonMain` interfaces; native implementations.
@@ -112,13 +120,17 @@ these interfaces. No platform IO leaks into `commonMain`.
 
 ### Workers / capabilities layer (parallel after T2, T4, T7, T8, T9, T10)
 
-- [ ] **T11. CAS worker**
+- [x] **T11. CAS worker** (DRAINED 2026-07-20, commit 42f3b209)
+  - `BlockIndex` (and supporting CAS worker types) landed in `src/commonMain/kotlin/borg/trikeshed/cas/`.
+  - Recovered via missing-PR pattern (Jules session `6719119381933539177`).
   - Content-addressed store (`CasStore`) on `Volume`.
   - Manifest CIDs, deterministic archives, replication hooks.
   - Targets: `commonMain` + platform backends.
   - Evidence: `ContentId` round-trip, manifest CID deterministic across runs.
 
-- [ ] **T12. Process worker**
+- [x] **T12. Process worker** (DRAINED 2026-07-20, commit f1ee66394)
+  - `ProcessCapability` / `ProcessResult` / `ProcessSpec` / `ProcessWorker` / per-platform Factories (`Jvm`, `Native`) and `ProcessWorkerContractTest` landed in `src/{commonMain,jvmMain,nativeMain}/kotlin/borg/trikeshed/userspace/nio/process/`.
+  - Recovered via missing-PR pattern (Jules session `9179777146483861444`).
   - `Process` capability using existing `PosixProcessOperations` (moved to macOS/linux).
   - NUID-authorized process spawn/exec over the reactor.
   - Targets: `nativeMain`.
@@ -661,3 +673,42 @@ These are the separated follow-up tasks from T-REWIRE-3 (Cuts 1 and 7 landed in 
 
 - [ ] **T-REWIRE-3f. Progressive rendering**
   Jules jobs reading TreeDoc archives into ForgeDoc.
+
+## Drain cycle — 2026-07-20 (T01-T12 vertical slice backfill)
+
+Sixteen Jules sessions dispatched 2026-07-20 between 18:45-19:00 UTC
+covering the gaps in the Foundation (T1, T4), Storage (T7), Transport
+(T9), and Workers (T11, T12) layers. All sessions completed; six landed
+via the missing-PR recovery path (the agent did not push a branch or
+PR — patches were pulled, sanitized for trailing whitespace, applied
+directly, committed, and pushed):
+
+| Task | Session                    | Commit      |
+|------|----------------------------|-------------|
+| T01  | 13631575799754534320       | 114f5314    |
+| T04  | 5891915718907135319        | faa2619d    |
+| T07  | 15876474675057978179       | 9f2ab178    |
+| T09  | 13098165998827396591       | 19a84b2d    |
+| T11  | 6719119381933539177        | 42f3b209    |
+| T12  | 9179777146483861444        | f1ee66394    |
+
+Other in-flight tasks from the same batch (T05 Native Volume, T06
+Btrfs JBOD, T08 Node proxy, T10 litebike gate, T13 Wireproto/Confix,
+T24 LCNC ROLLUP reducer) are still IN_PROGRESS at the time of writing;
+they will land via either PR-merge cycle (preferred) or the same
+missing-PR fallback when each session reaches `state: COMPLETED`.
+
+**Catalog status (post-drain):**
+
+- 12 sessions dispatched in the 18:45-19:00 burst
+- 6 recovered via missing-PR + 0 still awaiting
+- 6 still in flight (above)
+- 0 awaiting user feedback (after three per-round-trip replies to T09,
+  T12, T13)
+
+**Wrapper fix shipped this session:** `bin/trikeshed-jules` had a
+silent `jq` compile error from a renamed `--arg starting_branch` to
+`--arg startingBranch` (commit 220e8acb). Without the fix, every
+`create` invocation returned `jq: $startingBranch is not defined` and
+no session could be dispatched. The fix restores the predicate-gated
+dispatch path.
