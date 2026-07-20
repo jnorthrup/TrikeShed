@@ -34,12 +34,12 @@ object ConflictResolver {
 
     private fun resolveMerge(local: SyncMessage, remote: SyncMessage): SyncMessage {
         val baseMessage = resolveLastWriterWins(local, remote)
-        
+
         // Very basic merge if both payloads are JSON Objects
         if (local.payload is JsonObject && remote.payload is JsonObject) {
             val mergedPayload = mutableMapOf<String, JsonElement>()
             mergedPayload.putAll(local.payload)
-            
+
             for ((key, value) in remote.payload) {
                 if (mergedPayload.containsKey(key)) {
                     // For conflicting keys, use last writer wins logic based on message timestamp
@@ -52,7 +52,7 @@ object ConflictResolver {
             }
             return baseMessage.copy(payload = JsonObject(mergedPayload))
         }
-        
+
         return baseMessage
     }
 }

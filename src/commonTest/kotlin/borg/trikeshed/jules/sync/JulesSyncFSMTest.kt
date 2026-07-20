@@ -26,10 +26,10 @@ class JulesSyncFSMTest {
     @Test
     fun testEnqueueAndSend() {
         var state = SyncSessionState(status = SyncState.CONNECTED)
-        
+
         val msg = SyncMessage("1", 0L, "client", JsonPrimitive("a"), 100)
         state = JulesSyncFSM.reduce(SyncEvent.EnqueueMessage(msg), state)
-        
+
         assertEquals(1L, state.localSequenceNumber)
         assertEquals(1, state.offlineQueue.size)
         assertEquals(1L, state.offlineQueue[0].sequenceNumber)
@@ -43,9 +43,9 @@ class JulesSyncFSMTest {
     fun testAckAndNack() {
         var state = SyncSessionState(status = SyncState.CONNECTED)
         val msg = SyncMessage("1", 1L, "client", JsonPrimitive("a"), 100)
-        
+
         state = state.copy(unacknowledgedMessages = mapOf("1" to msg))
-        
+
         // Ack
         val ackState = JulesSyncFSM.reduce(SyncEvent.ReceiveAck(Ack("1", 1L, "server", 101L)), state)
         assertTrue(ackState.unacknowledgedMessages.isEmpty())

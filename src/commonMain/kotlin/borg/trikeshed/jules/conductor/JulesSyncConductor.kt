@@ -20,7 +20,7 @@ class JulesSyncConductor(
     fun markConnected() {
         dispatch(SyncEvent.Connected)
     }
-    
+
     fun disconnect(reason: String? = null) {
         dispatch(SyncEvent.Disconnect(reason))
     }
@@ -41,15 +41,15 @@ class JulesSyncConductor(
         // Resolve conflicts if there's a matching message in our unacknowledged or offline queue
         val conflictingOffline = _state.value.offlineQueue.find { it.id == message.id }
         val conflictingUnacked = _state.value.unacknowledgedMessages[message.id]
-        
+
         val conflicting = conflictingOffline ?: conflictingUnacked
-        
+
         val finalMessage = if (conflicting != null) {
             ConflictResolver.resolve(conflicting, message, strategy)
         } else {
             message
         }
-        
+
         dispatch(SyncEvent.ReceiveRemoteMessage(finalMessage))
         return if (finalMessage == message) finalMessage else null // Returns remote message if it won, else null
     }
@@ -69,7 +69,7 @@ class JulesSyncConductor(
 
     suspend fun drainQueue() {
         if (_state.value.status != SyncState.CONNECTED) return
-        
+
         // Take a snapshot of the queue to send
         val toSend = _state.value.offlineQueue.toList()
         for (message in toSend) {

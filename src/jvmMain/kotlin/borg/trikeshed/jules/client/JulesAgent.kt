@@ -122,9 +122,9 @@ class JulesAgent(
     }
 
     // Integrated Sync Conductor
-    val syncConductor = JulesSyncConductor(agentId) { msg: SyncMessage -> 
+    val syncConductor = JulesSyncConductor(agentId) { msg: SyncMessage ->
         // In a real application this would send via websocket or similar.
-        // For now, we simulate an ack by immediately receiving it locally 
+        // For now, we simulate an ack by immediately receiving it locally
         // or pushing to the underlying client's transport.
         println("Sync Conductor Outbound: ${msg.id}")
     }
@@ -188,11 +188,11 @@ class JulesAgent(
         val session = client.createSession(prompt = prompt, title = title)
         sessionName = session.name
         emit(JulesAgentEvent.SessionStarted(session.name, session.id, Clock.System.now()))
-        
+
         // Initialize sync session
         syncConductor.markConnected()
         syncConductor.enqueuePayload("session-started", JsonPrimitive(session.id), Clock.System.now().toEpochMilliseconds())
-        
+
         return session
     }
 

@@ -32,7 +32,7 @@ class ConflictResolverTest {
         val msg2 = SyncMessage("1", 1L, "client-b", obj2, 2000L)
 
         val resolved = ConflictResolver.resolve(msg1, msg2, ResolutionStrategy.MERGE)
-        
+
         val payload = resolved.payload as JsonObject
         assertEquals(3, payload.size)
         assertEquals("val1", (payload["key1"] as JsonPrimitive).content)

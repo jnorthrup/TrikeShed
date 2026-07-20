@@ -25,28 +25,28 @@ data class SyncSessionState(
 sealed class SyncEvent {
     @Serializable
     data object Connect : SyncEvent()
-    
+
     @Serializable
     data object Connected : SyncEvent()
-    
+
     @Serializable
     data class Disconnect(val reason: String? = null) : SyncEvent()
-    
+
     @Serializable
     data class EnqueueMessage(val message: SyncMessage) : SyncEvent()
-    
+
     @Serializable
     data class MessageSent(val message: SyncMessage) : SyncEvent()
-    
+
     @Serializable
     data class ReceiveAck(val ack: Ack) : SyncEvent()
-    
+
     @Serializable
     data class ReceiveNack(val nack: Nack) : SyncEvent()
-    
+
     @Serializable
     data class ReceiveRemoteMessage(val message: SyncMessage) : SyncEvent()
-    
+
     @Serializable
     data class Error(val details: String) : SyncEvent()
 }
