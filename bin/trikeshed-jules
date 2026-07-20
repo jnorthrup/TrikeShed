@@ -282,7 +282,7 @@ cmd_create() {
         --arg prompt        "${prompt}" \
         --argjson require_approval false \
         --arg source        "${source}" \
-        --arg starting_branch "${starting_branch}" \
+        --arg startingBranch "${starting_branch}" \
         --argjson title_field "${title_field}" \
         '{
             prompt: $prompt
