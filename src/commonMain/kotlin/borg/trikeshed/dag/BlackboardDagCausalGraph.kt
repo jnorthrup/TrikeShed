@@ -99,7 +99,7 @@ class CasBackedCausalGraph(val casStore: CasStore) {
         val depsJson = deps.joinToString(",") { "\"${it.value}\"" }
         val docJson = """{"kind":"causal-node", "causalKey":"$causalKey", "deps":[$depsJson], "payload":$payload}"""
         val newCid = casStore.put(docJson.encodeToByteArray())
-        snapshotRoot(newCid)
+        snapshotRoot(newCid) // COW: Update root on every edit
         return newCid
     }
 
@@ -111,12 +111,15 @@ class CasBackedCausalGraph(val casStore: CasStore) {
             if (cid in visited) return
             visited.add(cid)
 
-            val lens = project(cid, casStore)
-            if (lens is Lens.CausalNode) {
+            try {
+                val lensSeries = borg.trikeshed.job.project(cid, casStore, borg.trikeshed.job.CausalNode)
                 result.add(cid)
 
-                // Parse deps array manually since we don't have a typed mapping right here
-                val depsRaw = lens.doc.value("deps")
+                val bytes = casStore.get(cid) ?: return
+                val syntax = if (bytes.isNotEmpty() && bytes[0].toInt().toChar() in setOf('{', '[', '"')) borg.trikeshed.parse.confix.Syntax.JSON else borg.trikeshed.parse.confix.Syntax.CBOR
+                val doc = borg.trikeshed.parse.confix.confixDoc(bytes, syntax)
+                val depsRaw = doc.value("deps")
+
                 if (depsRaw is Iterable<*>) {
                     depsRaw.forEach {
                         if (it is String) {
@@ -124,6 +127,8 @@ class CasBackedCausalGraph(val casStore: CasStore) {
                         }
                     }
                 }
+            } catch (e: Exception) {
+                // Handle missing or invalid CIDs gracefully during traversal
             }
         }
 
