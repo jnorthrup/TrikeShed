@@ -13,7 +13,7 @@ class ProfilerTest {
         val sessionId = profiler.startProfiling()
         assertNotNull(sessionId)
         assertTrue(sessionId.startsWith("session-"))
-        
+
         val scan = profiler.stopProfiling(sessionId)
         assertEquals(sessionId, scan.id)
         assertTrue(scan.durationMs > 0)
@@ -22,7 +22,6 @@ class ProfilerTest {
     @Test
     fun testAnalyzeTaskGraph() {
         val profiler = DefaultGradleProfilerIntegration()
-        
         val smallGraph = TaskGraph("root", mapOf("taskA" to listOf("taskB")))
         assertTrue(profiler.analyzeTaskGraph(smallGraph).isEmpty())
 

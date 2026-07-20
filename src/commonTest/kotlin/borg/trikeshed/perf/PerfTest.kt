@@ -18,11 +18,12 @@ class PerfTest {
 
         val hotspots = analyzer.analyze(scan, tasks)
         assertEquals(2, hotspots.size)
-        
+
         // Sorted by duration descending
         assertEquals("taskSlow", hotspots[0].taskId)
         assertTrue(hotspots[0].recommendation.contains("Consider enabling task caching"))
-        
+
+
         assertEquals("taskMedium", hotspots[1].taskId)
         assertTrue(hotspots[1].recommendation.contains("Ensure caching is configured properly"))
     }
