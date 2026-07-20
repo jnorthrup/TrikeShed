@@ -55,6 +55,15 @@ class EnvSource(private val prefix: String = "") : KeySource() {
     }
 }
 
+/** Resolve one exact environment variable for an explicitly bound key path. */
+class EnvVarSource(private val variable: String) : KeySource() {
+    override val name = "env:$variable"
+    override suspend fun read(path: KeyPath): String? = SystemOperations.default.getenv(variable)
+    override suspend fun write(path: KeyPath, value: String) {
+        throw UnsupportedOperationException("env source is read-only")
+    }
+}
+
 // ── PERSIST source ──
 
 class PersistSource(

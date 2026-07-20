@@ -12,7 +12,7 @@
 #
 # AUTH
 #   Base URL : https://jules.googleapis.com/v1alpha
-#   Header   : x-goog-api-key: $JULES_API_KEY          (NOT Bearer OAuth)
+#   Header   : x-goog-api-key: ***          (NOT Bearer OAuth)
 #              Content-Type: application/json          (for bodies)
 #   GETs     : 200 OK with JSON body
 #   POSTs    : 200 OK with empty / resource body
@@ -106,10 +106,33 @@
 #
 # ----------------------------------------------------------------------------
 # Usage: trikeshed-jules <command> [args...]
-# Commands: sessions, session, pull, new, create, send, chat, approve,
-#           responses, sources, delete
-# stdin:    any command that takes a prompt or message reads stdin if no
-#           argument is given (heredocs/pipes).
+# Commands: sessions, session, sources, source, create, send, approve,
+#           delete, responses, activities-classify
+# stdin:    create reads prompt from stdin if no first argument given.
+#           send reads message from stdin if no second argument given.
+#
+# Env (REQUIRED — pick one)
+#   JULES_API_KEY                                        REST API key (preferred)
+#   JULES_OAUTH_TOKEN                                    Bearer from `jules` CLI
+#
+# Env (optional)
+#   TRIKESHED_JULES_SOURCE                               override source name
+#                                                        (default: github-jnorthrup-TrikeShed)
+#   TRIKESHED_JULES_BRANCH                               starting branch (default: master)
+#   TRIKESHED_JULES_SKIP_BIND=1                          don't call GET /sources first
+#                                                        (offline; uses literal name)
+#   TRIKESHED_JULES_NO_TITLE=1                           don't send title (Jules picks)
+#
+# Inputs
+#   - Prompt / message: first positional arg, else read from stdin.
+#
+# Examples
+#   trikeshed-jules sessions | jq '.sessions[] | {id, title, state}'
+#   trikeshed-jules create "Refactor foo into one-line α" "T-FOO"
+#   echo "Add tests for foo" | trikeshed-jules create - "T-FOO"
+#   trikeshed-jules approve 1234567
+#   trikeshed-jules send 1234567 "continue"
+#   trikeshed-jules activities-classify 1234567 | jq '.[] | select(.kind=="planGenerated")'
 
 set -euo pipefail
 shopt -s lastpipe
@@ -214,8 +237,8 @@ api_call() {
     local out http
     out=$(api_request "${method}" "${path}" "${body}")
     http=$(curl -sS -o /dev/null -w "%{http_code}" -X "${method}" "${JULES_API_BASE}${path}" \
-        $([[ -n "${JULES_API_KEY}" ]] && printf -- "-H x-goog-api-key:%s " "${JULES_API_KEY}"; \
-          [[ -n "${JULES_OAUTH_TOKEN}" && -z "${JULES_API_KEY}" ]] && printf -- "-H Authorization:Bearer\ %s " "${JULES_OAUTH_TOKEN}"; \
+        $([[ -n "${JULES_API_KEY}" ]] && printf -- "-H x-goog-api-key:*** " "${JULES_API_KEY}"; \
+          [[ -n "${JULES_OAUTH_TOKEN}" && -z "${JULES_API_KEY}" ]] && printf -- "-H Authorization:*** %s " "${JULES_OAUTH_TOKEN}"; \
           [[ -n "${body}" ]] && printf -- "-H Content-Type:application/json -d %s " "$(printf '%s' "${body}" | jq -Rs .)") 2>/dev/null) || true
 
     # Plain JSON probe — if output looks like { error: ... } fail loudly.
@@ -273,10 +296,13 @@ cmd_create() {
     require_clean_pushed_upstream
 
     local prompt="" title="" require_approval="false"
-    # trikeshed-jules create "prompt" "title" requirePlanApproval
+
+    # Only argument is the prompt (or stdin). Title is optional env or Jules picks.
+    # Usage: trikeshed-jules create "prompt" [title]
+    #   or: echo "prompt" | trikeshed-jules create
+    # Title is optional — if omitted or TRIKESHED_JULES_NO_TITLE=1, Jules generates one.
     [[ -n "${1:-}" ]] && prompt="$1" || true
     [[ -n "${2:-}" ]] && title="$2" || true
-    [[ -n "${3:-}" ]] && require_approval="$3" || true
 
     if ! read_stdin_if_missing "${prompt}"; then
         die "Prompt required (arg or stdin)"
@@ -300,7 +326,7 @@ cmd_create() {
     # the condition returns a valid merge. Cleaner to build the conditional
     # object separately and merge.)
     local title_field=""
-    if [[ -n "${title}" ]]; then
+    if [[ -n "${title}" && "${TRIKESHED_JULES_NO_TITLE:-0}" != "1" ]]; then
         title_field=$(jq -n --arg t "${title}" '{title: $t}')
     else
         title_field='{}'
@@ -322,11 +348,6 @@ cmd_create() {
         }')
 
     api_call POST "/sessions" "${body}"
-}
-
-cmd_create_api() {
-    # Stricter REST shape, no auto-bind. Same args as cmd_create.
-    cmd_create "$@"
 }
 
 cmd_send() {
@@ -437,7 +458,7 @@ Sessions
   sessions, list                                       list all sessions
   session <id|name>                                    get one session
   delete <id|name>                                     delete session
-  new|create "prompt" ["title"] [requirePlanApproval]  create session
+  create "prompt" [title]                              create session
                                                        (auto-binds to TrikeShed
                                                         via GET /sources; requires
                                                         clean HEAD == git upstream)
@@ -465,18 +486,18 @@ Env (optional)
   TRIKESHED_JULES_BRANCH                               starting branch (default: master)
   TRIKESHED_JULES_SKIP_BIND=1                          don't call GET /sources first
                                                        (offline; uses literal name)
+  TRIKESHED_JULES_NO_TITLE=1                           don't send title (Jules picks)
 
 Inputs
   - Prompt / message: first positional arg, else read from stdin.
 
 Examples
   trikeshed-jules sessions | jq '.sessions[] | {id, title, state}'
-  trikeshed-jules new "Refactor foo into one-line α" "T-FOO"
+  trikeshed-jules create "Refactor foo into one-line α" "T-FOO"
   echo "Add tests for foo" | trikeshed-jules create - "T-FOO"
   trikeshed-jules approve 1234567
   trikeshed-jules send 1234567 "continue"
   trikeshed-jules activities-classify 1234567 | jq '.[] | select(.kind=="planGenerated")'
-
 EOF
 }
 
@@ -498,18 +519,17 @@ case "${CMD}" in
 
     sessions|list)          cmd_sessions "$@" ;;
     session|get)            cmd_session "$@" ;;
-    sources)                cmd_sources "$@" ;;
-    source)                 cmd_source_get "$@" ;;
-
-    pull)                   cmd_pull "$@" ;;
-    new|create)             cmd_create "$@" ;;
-    new-api|create-api)     cmd_create_api "$@" ;;
+    delete)                 cmd_delete "$@" ;;
+    create)                 cmd_create "$@" ;;
     send|chat)              cmd_send "$@" ;;
     approve)                cmd_approve "$@" ;;
-    delete)                 cmd_delete "$@" ;;
+    pull)                   cmd_pull "$@" ;;
 
     responses|activities)   cmd_responses "$@" ;;
     activities-classify)    cmd_activities_classify "$@" ;;
+
+    sources)                cmd_sources ;;
+    source)                 cmd_source_get "$@" ;;
 
     *)                      show_help; die "Unknown command: ${CMD}" ;;
 esac

@@ -56,7 +56,8 @@ yarn-error.log*
 .mcp.json
 
 # TrikeShed local artifacts
-bin/
+# bin/ (but track trikeshed-jules)
+!bin/trikeshed-jules
 .jules/
 .zenith/
 .zenith-build-sha

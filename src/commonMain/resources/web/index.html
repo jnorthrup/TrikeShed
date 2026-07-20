@@ -44,6 +44,18 @@
           <span class="sidebar-item-icon">+</span><span>Add a page</span>
         </button>
       </div>
+      <div class="sidebar-section">
+        <div class="sidebar-section-label">Ingest</div>
+        <div class="drop-zone" id="drop-zone" role="button" tabindex="0" aria-label="Drop files or click to upload">
+          <span class="drop-zone-icon">⬇</span>
+          <span class="drop-zone-text">Drag resumes, job postings, PDFs, DOCX<br>or click to select files</span>
+          <input type="file" id="file-input" multiple accept=".pdf,.docx,.txt,.md,.html,.json" hidden />
+        </div>
+        <div class="ingest-queue" id="ingest-queue" hidden>
+          <div class="ingest-queue-header">Processing</div>
+          <div class="ingest-items" id="ingest-items"></div>
+        </div>
+      </div>
       <div class="sidebar-bottom">
         <div class="sidebar-seed-note" id="seed-note"></div>
       </div>

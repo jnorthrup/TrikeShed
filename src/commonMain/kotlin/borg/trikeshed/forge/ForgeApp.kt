@@ -4,13 +4,20 @@ import borg.trikeshed.common.Files
 import borg.trikeshed.cursor.blackboardContext
 import borg.trikeshed.cursor.provenance
 import borg.trikeshed.dag.causalGraphNode
+import borg.trikeshed.forge.blackboard.ForgeBlackboardSection3D
+import borg.trikeshed.forge.blackboard.ForgeBlackboardView
 import borg.trikeshed.forge.gallery.ForgeGalleryCatalog
 import borg.trikeshed.forge.gallery.ForgeGalleryRenderer
 import borg.trikeshed.job.ContentId
 import borg.trikeshed.kanban.ForgeKanbanIngest
+import borg.trikeshed.lcnc.reactor.IngestCodec
+import borg.trikeshed.lcnc.reactor.IngestFormat
+import borg.trikeshed.lcnc.reactor.IngestSource
+import borg.trikeshed.lcnc.reactor.LcncIngestPipeline
+import borg.trikeshed.lib.Series
 import borg.trikeshed.lib.j
-import borg.trikeshed.lib.linkedMapOf
 import kotlinx.datetime.Clock
+import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 
@@ -21,6 +28,59 @@ import kotlinx.serialization.json.JsonPrimitive
  */
 object ForgeApp {
 
+    data class ForgeItem(
+        val id: String,
+        val title: String,
+        val notes: String,
+        val status: String,
+        val priority: String,
+        val checklist: List<ForgeChecklistItem> = emptyList(),
+    )
+
+    data class ForgeChecklistItem(
+        val id: String,
+        val text: String,
+        val checked: Boolean = false,
+    )
+
+    data class WorkspaceLayout(
+        val columns: List<ForgeColumn>,
+    )
+
+    data class ForgeColumn(
+        val id: String,
+        val name: String,
+        val order: Int,
+    )
+
+    data class CausalNode(
+        val id: String,
+        val title: String,
+        val parents: List<String> = emptyList(),
+        val children: List<String> = emptyList(),
+    )
+
+    data class CascadeGridRow(
+        val viewName: String,
+        val metric: String,
+        val sum: Double = 0.0,
+        val avg: Double = 0.0,
+        val min: Double = 0.0,
+        val max: Double = 0.0,
+        val count: Long = 0L,
+    )
+
+    data class IngestJob(
+        val id: String,
+        val fileName: String,
+        val fileSize: Long,
+        val mimeType: String,
+        val status: String, // "pending" | "processing" | "done" | "error"
+        val progress: Double = 0.0,
+        val error: String? = null,
+        val entitiesCreated: Int = 0,
+    )
+
     data class ForgeAppState(
         val title: String,
         val userId: String,
@@ -28,284 +88,193 @@ object ForgeApp {
         val workspace: WorkspaceLayout,
         val causalGraph: List<CausalNode>,
         val cascadeGrid: List<CascadeGridRow>,
-    ) {
-        fun toJsonValue(): JsonObject = JsonObject(mapOf(
-            "title" to JsonPrimitive(title),
-            "userId" to JsonPrimitive(userId),
-            "items" to kotlinx.serialization.json.JsonArray(items.map { it.toJsonValue() }),
-            "workspace" to workspace.toJsonValue(),
-            "causalGraph" to kotlinx.serialization.json.JsonArray(causalGraph.map { it.toJsonValue() }),
-            "cascadeGrid" to kotlinx.serialization.json.JsonArray(cascadeGrid.map { it.toJsonValue() }),
-        ))
-    }
+        val ingestJobs: List<IngestJob> = emptyList(),
+    )
 
-    data class ForgeItem(
-        val id: String,
-        val title: String,
-        val description: String,
-        val status: String,
-        val column: String,
-        val causalKey: String,
-        val lcncKind: String,
-    ) {
-        fun toJsonValue(): JsonObject = JsonObject(mapOf(
-            "id" to JsonPrimitive(id),
-            "title" to JsonPrimitive(title),
-            "description" to JsonPrimitive(description),
-            "status" to JsonPrimitive(status),
-            "column" to JsonPrimitive(column),
-            "causalKey" to JsonPrimitive(causalKey),
-            "lcncKind" to JsonPrimitive(lcncKind),
-        ))
-    }
-
-    data class WorkspaceLayout(
-        val columns: List<ColumnLayout>,
-    ) {
-        fun toJsonValue(): JsonObject = JsonObject(mapOf(
-            "columns" to kotlinx.serialization.json.JsonArray(columns.map { it.toJsonValue() }),
-        ))
-    }
-
-    data class ColumnLayout(
-        val id: String,
-        val title: String,
-        val order: Int,
-    ) {
-        fun toJsonValue(): JsonObject = JsonObject(mapOf(
-            "id" to JsonPrimitive(id),
-            "title" to JsonPrimitive(title),
-            "order" to JsonPrimitive(order),
-        ))
-    }
-
-    data class CausalNode(
-        val id: String,
-        val opId: String,
-        val opVersion: String,
-        val parentNodeIds: List<String>,
-        val inputFingerprint: String,
-        val causalKey: String,
-        val topoOrdinal: Int,
-    ) {
-        fun toJsonValue(): JsonObject = JsonObject(mapOf(
-            "id" to JsonPrimitive(id),
-            "opId" to JsonPrimitive(opId),
-            "opVersion" to JsonPrimitive(opVersion),
-            "parentNodeIds" to kotlinx.serialization.json.JsonArray(parentNodeIds.map { JsonPrimitive(it) }),
-            "inputFingerprint" to JsonPrimitive(inputFingerprint),
-            "causalKey" to JsonPrimitive(causalKey),
-            "topoOrdinal" to JsonPrimitive(topoOrdinal),
-        ))
-    }
-
-    data class CascadeGridRow(
-        val viewName: String,
-        val metric: String,
-        val sum: Double,
-        val avg: Double,
-        val min: Double,
-        val max: Double,
-        val count: Long,
-    ) {
-        fun toJsonValue(): JsonObject = JsonObject(mapOf(
-            "viewName" to JsonPrimitive(viewName),
-            "metric" to JsonPrimitive(metric),
-            "sum" to JsonPrimitive(sum),
-            "avg" to JsonPrimitive(avg),
-            "min" to JsonPrimitive(min),
-            "max" to JsonPrimitive(max),
-            "count" to JsonPrimitive(count),
-        ))
-    }
-
-    fun defaultForgeAppState(): ForgeAppState {
-        val reduction = ForgeKanbanIngest.reduce(ForgeBoardPersistence.load("jim").getOrThrow())
+    fun defaultForgeAppState(userId: String, ingestJobs: List<IngestJob> = emptyList()): ForgeAppState {
+        val markdownPath = "/tmp/hi"
+        val reduction = if (Files.exists(markdownPath)) {
+            ForgeKanbanIngest.persistMarkdown(userId, markdownPath)
+        } else {
+            ForgeKanbanIngest.fallbackReduction()
+        }
         return ForgeAppState(
-            title = reduction.source.title,
-            userId = reduction.source.userId,
+            title = "Forge Workspace",
+            userId = userId,
             items = reduction.board.cards.map { card ->
                 ForgeItem(
                     id = card.id.value,
                     title = card.title,
-                    description = card.description,
+                    notes = card.body,
                     status = card.columnId.value,
-                    column = card.columnId.value,
-                    causalKey = reduction.correlations.first { it.taskId == card.id.value }.causalKey,
-                    lcncKind = "task",
+                    priority = card.priority.name,
                 )
             },
             workspace = WorkspaceLayout(
-                columns = reduction.board.columns.map { col ->
-                    ColumnLayout(id = col.id.value, title = col.name, order = col.order)
-                },
+                columns = ForgeGalleryCatalog.widgets()
+                    .groupBy { it.section }
+                    .map { (section, widgets) ->
+                        ForgeColumn(
+                            id = section.name.lowercase().replace(" ", "-"),
+                            name = section.name,
+                            order = section.ordinal,
+                        )
+                    }
+                    .sortedBy { it.order },
             ),
             causalGraph = reduction.causalNodes.map { node ->
                 CausalNode(
-                    id = node.nodeId,
-                    opId = node.opId,
-                    opVersion = node.opVersion,
-                    parentNodeIds = node.parentNodeIds,
-                    inputFingerprint = node.inputFingerprint,
-                    causalKey = node.causalKey,
-                    topoOrdinal = node.topoOrdinal,
+                    id = node.causalKey,
+                    title = node.payload["title"]?.toString() ?? node.causalKey,
+                    parents = node.deps.map { it.value },
+                    children = emptyList(),
                 )
             },
-            cascadeGrid = listOf(
-                CascadeGridRow("work-packages", "duration", 120.0, 12.0, 1.0, 40.0, 10),
-                CascadeGridRow("work-packages", "effort", 500.0, 50.0, 5.0, 200.0, 10),
-            ),
+            cascadeGrid = emptyList(),
+            ingestJobs = ingestJobs,
         )
     }
 
-    private fun htmlEscape(s: String): String = s
-        .replace("&", "&")
-        .replace("<", "<")
-        .replace(">", ">")
-        .replace("\"", """)
-        .replace("'", "'")
+    /** Render the complete Forge HTML shell with seeded state for PWA offline-first hydration. */
+    fun renderHtml(userId: String = "jim"): String {
+        val state = defaultForgeAppState(userId)
+        val seed = forgeSeedJson(state)
+        return htmlShell(seed)
+    }
 
-    fun forgeAppHtml(): String {
-        val baseSeed = defaultForgeAppState().toJsonValue().toMutableMap()
-        baseSeed["gallery"] = ForgeGalleryCatalog.toJsonValue()
-        baseSeed["blackboard"] = forgeBlackboardSeed()
-        val seed = htmlEscape(JsonSupport.stringify(baseSeed))
-        return """
-<!doctype html>
+    private fun forgeSeedJson(state: ForgeAppState): String {
+        val json = JsonObject(
+            mapOf(
+                "title" to JsonPrimitive(state.title),
+                "userId" to JsonPrimitive(state.userId),
+                "items" to JsonArray(state.items.map { item ->
+                    JsonObject(
+                        mapOf(
+                            "id" to JsonPrimitive(item.id),
+                            "title" to JsonPrimitive(item.title),
+                            "notes" to JsonPrimitive(item.notes),
+                            "status" to JsonPrimitive(item.status),
+                            "priority" to JsonPrimitive(item.priority),
+                            "checklist" to JsonArray(item.checklist.map { c ->
+                                JsonObject(
+                                    mapOf(
+                                        "id" to JsonPrimitive(c.id),
+                                        "text" to JsonPrimitive(c.text),
+                                        "checked" to JsonPrimitive(c.checked),
+                                    )
+                                )
+                            }),
+                        )
+                    )
+                }),
+                "workspace" to JsonObject(
+                    mapOf(
+                        "columns" to JsonArray(state.workspace.columns.map { col ->
+                            JsonObject(
+                                mapOf(
+                                    "id" to JsonPrimitive(col.id),
+                                    "name" to JsonPrimitive(col.name),
+                                    "order" to JsonPrimitive(col.order),
+                                )
+                            )
+                        }),
+                    )
+                ),
+                "causalGraph" to JsonArray(state.causalGraph.map { node ->
+                    JsonObject(
+                        mapOf(
+                            "id" to JsonPrimitive(node.id),
+                            "title" to JsonPrimitive(node.title),
+                            "parents" to JsonArray(node.parents.map { JsonPrimitive(it) }),
+                            "children" to JsonArray(node.children.map { JsonPrimitive(it) }),
+                        )
+                    )
+                }),
+                "cascadeGrid" to JsonArray(state.cascadeGrid.map { row ->
+                    JsonObject(
+                        mapOf(
+                            "viewName" to JsonPrimitive(row.viewName),
+                            "metric" to JsonPrimitive(row.metric),
+                            "sum" to JsonPrimitive(row.sum),
+                            "avg" to JsonPrimitive(row.avg),
+                            "min" to JsonPrimitive(row.min),
+                            "max" to JsonPrimitive(row.max),
+                            "count" to JsonPrimitive(row.count),
+                        )
+                    )
+                }),
+                "ingestJobs" to JsonArray(state.ingestJobs.map { job ->
+                    JsonObject(
+                        mapOf(
+                            "id" to JsonPrimitive(job.id),
+                            "fileName" to JsonPrimitive(job.fileName),
+                            "fileSize" to JsonPrimitive(job.fileSize),
+                            "mimeType" to JsonPrimitive(job.mimeType),
+                            "status" to JsonPrimitive(job.status),
+                            "progress" to JsonPrimitive(job.progress),
+                            "error" to job.error?.let { JsonPrimitive(it) },
+                            "entitiesCreated" to JsonPrimitive(job.entitiesCreated),
+                        )
+                    )
+                }),
+                "blackboardSeed" to forgeBlackboardSeed(),
+            )
+        )
+        return json.toString()
+    }
+
+    private fun htmlShell(seed: String): String = """
+<!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <meta name="theme-color" content="#090d13" />
-  <meta name="apple-mobile-web-app-capable" content="yes" />
-  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-  <link rel="manifest" href="./manifest.webmanifest" />
-  <link rel="icon" href="./icons/forge-icon.svg" type="image/svg+xml" />
-  <link rel="apple-touch-icon" href="./icons/forge-icon-maskable.svg" />
-  <title>TrikeShed Forge workspace</title>
-  <style>
-${forgeAppStyles()}
-  </style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Forge — Local-First Workspace</title>
+  <link rel="manifest" href="/manifest.webmanifest">
+  <meta name="theme-color" content="#090D13">
+  <style>${forgeAppStyles()}</style>
 </head>
 <body>
-  <div id="blackboard" class="blackboard">
-    <div id="blackboard-canvas" class="blackboard-canvas">
-      <div class="app-shell">
-        <aside class="rail">
-          <div class="brand panel">
-            <div class="eyebrow">Forge local-first</div>
-            <h1>Page, board, field</h1>
-            <p>CRUD on the same local-first work graph, with an RTS-style zoom surface that opens fractal detail around the selected card.</p>
-            <div class="toolbar compact">
-              <button class="btn primary" id="add-item-top">New work item</button>
-              <button class="btn" id="reset-workspace">Reset local state</button>
-            </div>
-          </div>
-          <div class="panel section-block">
-            <div class="section-head">
-              <h2>Use cases</h2>
-              <p>Load document + board patterns into the same workspace.</p>
-            </div>
-            <div id="usecase-root" class="usecase-list"></div>
-          </div>
-          <div class="panel section-block">
-            <div class="section-head">
-              <h2>Work items</h2>
-              <p>Document blocks and board cards are the same local objects.</p>
-            </div>
-            <div id="nav-root" class="nav-list"></div>
-          </div>
-          <div class="panel section-block">
-            <div class="section-head">
-              <h2>Widget Gallery</h2>
-              <p>Forge widget catalog with per-target support matrix.</p>
-            </div>
-            <div id="gallery-root" class="gallery-list">${galleryHtml()}</div>
-          </div>
-        </aside>
-        <main class="editor">
-          <div id="doc-root" class="page"></div>
-        </main>
-        <main class="graph-pane">
-      <div class="panel section-block" style="height:100%; display:grid; grid-template-rows:auto 1fr auto;">
-        <div class="section-head">
-          <h2>RTS / Causal Graph</h2>
-          <p>Force-directed causal graph — drag nodes, scroll to zoom, click to inspect</p>
-        </div>
-        <div class="graph-toolbar" style="display:flex; gap:8px; align-items:center; padding:8px 0;">
-          <label class="zoom-stack" for="graph-zoom-slider" style="display:grid; gap:4px; color:var(--muted); font-size:11px; text-transform:uppercase; letter-spacing:.08em;">
-            <span>Zoom</span>
-            <input id="graph-zoom-slider" type="range" min="0.2" max="3" step="0.05" value="1" style="width:140px;" />
-          </label>
-          <button class="btn" id="btn-graph-fit">Fit</button>
-          <button class="btn" id="btn-graph-center">Center</button>
-          <button class="btn primary" id="btn-graph-seed">Seed Demo</button>
-        </div>
-        <div id="graph-spatial-shell" class="graph-spatial-shell" style="flex:1; position:relative; min-height:500px; border:1px solid var(--line2); border-radius:18px; background:radial-gradient(circle at top, rgba(122,162,247,.08), rgba(8,12,18,.96) 56%); overflow:hidden; cursor:grab;">
-          <svg id="graph-spatial-root" class="graph-spatial-root" viewBox="0 0 1200 720" preserveAspectRatio="xMidYMid meet" style="width:100%; height:100%; display:block;"></svg>
-        </div>
-        <div class="graph-status" style="display:flex; gap:8px; flex-wrap:wrap; padding-top:12px;">
-          <span class="status-chip"><span class="dot"></span>Force sim active</span>
-          <span class="status-chip"><span class="dot"></span>Graph: <span id="graph-stat-nodes">0</span> nodes, <span id="graph-stat-links">0</span> links</span>
-        </div>
+  <div id="forge-root">
+    <header class="forge-header">
+      <div class="header-left">
+        <svg class="forge-logo" viewBox="0 0 32 32" width="28" height="28"><path d="M4 28V4h24v24H4Zm2-2h20V6H6v20Z"/></svg>
+        <span id="forge-title">FORGE</span>
       </div>
-    </main>
-    <aside class="board-pane">
-      <div class="panel section-block">
-        <div class="section-head">
-          <h2>RTS / fractal field</h2>
-          <p>Zoom from workspace lanes into card-level checklist detail without leaving the board.</p>
+      <div class="header-center">
+        <div class="search-box"><input type="text" placeholder="Search workspace…" id="forge-search"/></div>
+      </div>
+      <div class="header-right">
+        <button class="btn" id="new-doc-btn">New Doc</button>
+        <button class="btn" id="sync-btn">Sync</button>
+      </div>
+    </header>
+    <div class="forge-body">
+      <aside id="rail" class="rail">
+        <div class="rail-section">
+          <h3>Workspace</h3>
+          <nav id="rail-nav"></nav>
         </div>
-        <div class="space-toolbar">
-          <label class="zoom-stack" for="zoom-slider">
-            <span>Zoom</span>
-            <input id="zoom-slider" type="range" min="0.55" max="2.8" step="0.05" />
-          </label>
-          <div class="toolbar compact">
-            <button class="btn" id="focus-board">Whole board</button>
-            <button class="btn" id="focus-selected">Selected card</button>
-            <button class="btn" id="toggle-depth">2.5D depth</button>
+        <div class="rail-section">
+          <h3>Gallery</h3>
+          ${galleryHtml()}
+        </div>
+      </aside>
+      <main id="canvas" class="canvas">
+        <div id="blackboard-surface" class="blackboard-surface">
+          <div class="hud-top">
+            <span id="hud-title-left">Page</span>
+            <span id="hud-title-center">Board</span>
+            <span id="hud-title-right">Blackboard</span>
           </div>
         </div>
-        <div class="space-caption"><span id="zoom-label"></span></div>
-        <div id="spatial-shell" class="spatial-shell">
-          <svg id="spatial-root" class="spatial-root" viewBox="0 0 1200 720" preserveAspectRatio="xMidYMid meet"></svg>
-        </div>
-      </div>
-      <div class="panel section-block">
-        <div class="section-head">
-          <h2>Kanban board</h2>
-          <p>Move the same items you edit in the page. CRUD stays local-first.</p>
-        </div>
-        <div id="board-root" class="column-stack"></div>
-      </div>
-      <div class="panel section-block">
-        <div class="section-head">
-          <h2>Cascade grid</h2>
-          <p>CouchDB Cascade metric rollup via view-server tool.</p>
-        </div>
-        <div id="cascade-grid-root" class="cascade-grid"></div>
-      </div>
-    </aside>
-      </div>
+      </main>
     </div>
-    <div class="bb-hud">
-      <div class="bb-hud-corner bb-hud-tl"><button class="bb-btn bb-hud-btn" id="hud-reset" title="Reset view (0)">⌂</button></div>
-      <div class="bb-hud-corner bb-hud-tr"><button class="bb-btn bb-hud-btn" id="hud-depth" title="Cycle depth (d)">◈</button></div>
-      <div class="bb-hud-corner bb-hud-bl"><button class="bb-btn bb-hud-btn" id="hud-fit" title="Fit all (f)">⤢</button></div>
-      <div class="bb-hud-corner bb-hud-br"><button class="bb-btn bb-hud-btn" id="hud-center" title="Center (c)">◎</button></div>
-      <div class="bb-hud-title">
-        <span id="hud-title-left">Forge</span>
-        <span id="hud-zoom-pill" class="bb-zoom-pill">1.0×</span>
-        <span id="hud-title-right">Blackboard</span>
-      </div>
-    </div>
-  </div>
-  <div id="reactor-root" class="status-strip"></div>
-  <script id="forge-seed" type="application/json">$seed</script>
-  <script>
+    <div id="reactor-root" class="status-strip"></div>
+    <script id="forge-seed" type="application/json">$seed</script>
+    <script>
 ${forgeAppScript()}
-  </script>
+    </script>
 </body>
 </html>
     """.trimIndent()
@@ -318,52 +287,62 @@ ${forgeAppScript()}
     /** Server-rendered gallery HTML for the workspace rail. No client-side hydration needed. */
     private fun galleryHtml(): String = ForgeGalleryRenderer.renderHtml()
 
-    private fun forgeBlackboardSeed(): Map<String, Any?> {
+    private fun forgeBlackboardSeed(): JsonObject {
         val view = ForgeBlackboardView.DEFAULT
         val cam = view.defaultCamera
         val cam3d = view.mode3D
-        return linkedMapOf(
-            "surface" to view.surface,
-            "sections" to view.sections,
-            "defaultMode" to view.defaultMode.name,
-            "cornerButtons" to view.cornerButtons.map {
-                linkedMapOf(
-                    "slot" to it.slot.name,
-                    "id" to it.id,
-                    "label" to it.label,
-                    "hotkey" to it.hotkey,
-                    "surface" to it.surface,
-                )
-            },
-            "camera" to linkedMapOf(
-                "x" to cam.x,
-                "y" to cam.y,
-                "zoom" to cam.zoom,
-                "tilt" to cam.tilt,
-                "vx" to cam.vx,
-                "vy" to cam.vy,
-                "vz" to cam.vz,
-                "minZoom" to cam.minZoom,
-                "maxZoom" to cam.maxZoom,
-            ),
-            "camera3D" to linkedMapOf(
-                "yawRadians" to cam3d.yawRadians,
-                "pitchRadians" to cam3d.pitchRadians,
-                "distance" to cam3d.distance,
-                "focalLength" to cam3d.focalLength,
-                "minDistance" to cam3d.minDistance,
-                "maxDistance" to cam3d.maxDistance,
-            ),
-            "layout3D" to view.layout3D.map {
-                linkedMapOf(
-                    "sectionId" to it.sectionId,
-                    "centerX" to it.centerX,
-                    "centerY" to it.centerY,
-                    "width" to it.width,
-                    "height" to it.height,
-                    "elevation" to it.elevation,
-                )
-            },
+        return JsonObject(
+            mapOf(
+                "surface" to JsonPrimitive(view.surface),
+                "sections" to JsonArray(view.sections.map { JsonPrimitive(it) }),
+                "defaultMode" to JsonPrimitive(view.defaultMode.name),
+                "cornerButtons" to JsonArray(view.cornerButtons.map { btn ->
+                    JsonObject(
+                        mapOf(
+                            "slot" to JsonPrimitive(btn.slot.name),
+                            "id" to JsonPrimitive(btn.id),
+                            "label" to JsonPrimitive(btn.label),
+                            "hotkey" to JsonPrimitive(btn.hotkey),
+                            "surface" to JsonPrimitive(btn.surface),
+                        )
+                    )
+                }),
+                "camera" to JsonObject(
+                    mapOf(
+                        "x" to JsonPrimitive(cam.x),
+                        "y" to JsonPrimitive(cam.y),
+                        "zoom" to JsonPrimitive(cam.zoom),
+                        "tilt" to JsonPrimitive(cam.tilt),
+                        "vx" to JsonPrimitive(cam.vx),
+                        "vy" to JsonPrimitive(cam.vy),
+                        "vz" to JsonPrimitive(cam.vz),
+                        "minZoom" to JsonPrimitive(cam.minZoom),
+                        "maxZoom" to JsonPrimitive(cam.maxZoom),
+                    )
+                ),
+                "camera3D" to JsonObject(
+                    mapOf(
+                        "yawRadians" to JsonPrimitive(cam3d.yawRadians),
+                        "pitchRadians" to JsonPrimitive(cam3d.pitchRadians),
+                        "distance" to JsonPrimitive(cam3d.distance),
+                        "focalLength" to JsonPrimitive(cam3d.focalLength),
+                        "minDistance" to JsonPrimitive(cam3d.minDistance),
+                        "maxDistance" to JsonPrimitive(cam3d.maxDistance),
+                    )
+                ),
+                "layout3D" to JsonArray(view.layout3D.map { section ->
+                    JsonObject(
+                        mapOf(
+                            "sectionId" to JsonPrimitive(section.sectionId),
+                            "centerX" to JsonPrimitive(section.centerX),
+                            "centerY" to JsonPrimitive(section.centerY),
+                            "width" to JsonPrimitive(section.width),
+                            "height" to JsonPrimitive(section.height),
+                            "elevation" to JsonPrimitive(section.elevation),
+                        )
+                    )
+                }),
+            )
         )
     }
 }
