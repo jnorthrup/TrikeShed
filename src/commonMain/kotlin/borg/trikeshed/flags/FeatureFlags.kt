@@ -22,7 +22,7 @@ class FeatureFlagManager {
 
     fun isEnabled(key: String, contextId: String): Boolean {
         val flag = flags[key] ?: return false
-        
+
         if (flag.rolloutPercentage == 0) return false
         if (flag.rolloutPercentage == 100) return true
 

@@ -28,10 +28,10 @@ class IsamConfigStore(
                 is ConfigValue.DoubleValue -> "DOUBLE"
             }
             val valStr = value.value.toString()
-            
+
             val list = listOf<Any?>(key, typeStr, valStr)
             val columns = listOf("key", "type", "value")
-            
+
             val metaFuncs = columns.map { colName ->
                 val f: `ColumnMeta↻` = { ColumnMeta(colName, IOMemento.IoString) }
                 f
@@ -41,11 +41,11 @@ class IsamConfigStore(
                 override val a: Series<Any?> = list.size j { i -> list[i] }
                 override val b: Series<`ColumnMeta↻`> = metaFuncs.size j { i -> metaFuncs[i] }
             }
-            
+
             @Suppress("UNCHECKED_CAST")
             rowVec as RowVec
         }
-        
+
         IsamDataFile.append(
             msf = rows,
             datafilename = dataFilename,

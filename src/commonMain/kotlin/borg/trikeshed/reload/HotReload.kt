@@ -20,7 +20,7 @@ class HotReloader(
         if (fileOps.exists(filePath)) {
             lastHash = fileOps.readAllBytes(filePath).contentHashCode()
         }
-        
+
         while (isActive) {
             delay(POLL_INTERVAL_MS)
             if (fileOps.exists(filePath)) {
