@@ -1,17 +1,26 @@
-1. **Modify `NuidFanoutElement.kt`**
-   - Replace the `pollForWinner(...)` loop inside `NuidFanoutElement` with a `MutableSharedFlow<Claim>` mechanism to avoid scalar polling and spin-loops.
-   - We will replace `accepted: Channel<Claim>` in `WorkgroupSlot` with `acceptedFlow: MutableSharedFlow<Claim>`.
-   - Update `pollForWinner` to merge the `acceptedFlow`s of all candidates and use `first()` with `withTimeoutOrNull` to find the exact winner.
+1. **Config schema and values (`borg.trikeshed.config`)**
+   - Create `ConfigSchema`, `ConfigType`, and `ConfigValue` definitions.
+   - We will put them in `src/commonMain/kotlin/borg/trikeshed/config/Config.kt`.
 
-2. **Add Unit Test**
-   - Add a unit test in `src/commonTest/kotlin/borg/trikeshed/context/nuid/NuidFanoutElementTest.kt` for 16+ candidates expecting sub-100ms selection under fanout.
+2. **Feature flags (`borg.trikeshed.flags`)**
+   - Create `FeatureFlag` with `rolloutPercentage`.
+   - Create `FeatureFlagManager` for percentage-based rollout using a stable hash function over a string like user ID or context ID.
+   - We will put them in `src/commonMain/kotlin/borg/trikeshed/flags/FeatureFlags.kt`.
 
-3. **Verify Pre-commit**
-   - Run tests to ensure changes are correct and regressions are not introduced. Note: If the Gradle build is broken due to unrelated compilation errors, the prompt states it is acceptable to remove uncompilable test files. However, if the error is in source files (`src/commonMain`), we cannot run tests fully but we can still compile and run the specific test we added (if we remove all other uncompilable files).
-   - I will do my best to verify the code visually and conceptually, and then submit.
+3. **Hot-reload (`borg.trikeshed.reload`)**
+   - Create `HotReloader` using coroutines to poll or watch a config file.
+   - Given `FileOperations` SPI, we can check file modification times or hash codes periodically.
+   - We will put them in `src/commonMain/kotlin/borg/trikeshed/reload/HotReload.kt`.
 
-4. **Complete Pre-commit steps**
-   - Complete pre commit steps to ensure proper testing, verification, review, and reflection are done.
+4. **ISAM/Persistence connection (`borg.trikeshed.config`)**
+   - Connect the configuration model to the ISAM persistence layer (e.g. read/write to `IsamDataFile`).
+   - Create `IsamConfigStore` in `src/commonMain/kotlin/borg/trikeshed/config/IsamConfigStore.kt`.
 
-5. **Submit the change**
-   - Once all steps are completed, I will submit the change with a descriptive commit message.
+5. **Testing (TDD)**
+   - Run tests that I already created in `src/commonTest/kotlin/borg/trikeshed/{config,flags,reload}/`.
+   - Iterate to make sure the tests compile and run properly. Note there are unrelated compilation errors in other files that should not block us, but we can compile just our test sources if needed.
+
+6. **Pre-commit instructions**
+   - Complete pre-commit steps to make sure proper testing, verifications, reviews and reflections are done.
+
+7. **Submit**
