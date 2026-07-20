@@ -35,7 +35,6 @@ class TrikeShedOperatorTest {
         // Verify that a signal was recorded in CCEK via the dummy doc node
         val recording = operator.dummyDocNode.recording()
         assertTrue(recording.isNotEmpty(), "Expected at least one signal to be recorded")
-        
         val lastSignal = recording.last()
         assertTrue(lastSignal is ForgeSignal.AppendBlock, "Expected AppendBlock signal")
         assertEquals("Resource added: test-resource", (lastSignal as ForgeSignal.AppendBlock).text)
