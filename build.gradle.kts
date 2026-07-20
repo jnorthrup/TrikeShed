@@ -564,3 +564,107 @@ kotlin {
         kotlin.srcDir(generateForgeAssets.map { it.outputs.files })
     }
 }
+
+tasks.register("metrics") {
+    group = "verification"
+    description = "Run JMH + regression gate against metrics-baseline.json"
+
+    dependsOn("jmh", "jsNodeTest")
+
+    doLast {
+        val jmhResultsFile = project.layout.buildDirectory.file("jmh-result.json").get().asFile
+        require(jmhResultsFile.exists()) { "JMH results file not found at \${jmhResultsFile.absolutePath}" }
+        val jmhJsonText = jmhResultsFile.readText()
+
+        var coldStart = -1.0
+        var zoomLatency = -1.0
+
+        val coldStartRegex = """"benchmark"\s*:\s*"[^"]*coldStartInteractive"[^}]*"primaryMetric"\s*:\s*\{[^}]*"score"\s*:\s*([0-9.]+)""".toRegex(RegexOption.DOT_MATCHES_ALL)
+        val coldStartMatch = coldStartRegex.find(jmhJsonText)
+        if (coldStartMatch != null) {
+            coldStart = coldStartMatch.groupValues[1].toDouble()
+        }
+
+        val zoomRegex = """"benchmark"\s*:\s*"[^"]*zoomLatency"[^}]*"primaryMetric"\s*:\s*\{[^}]*"score"\s*:\s*([0-9.]+)""".toRegex(RegexOption.DOT_MATCHES_ALL)
+        val zoomMatch = zoomRegex.find(jmhJsonText)
+        if (zoomMatch != null) {
+            zoomLatency = zoomMatch.groupValues[1].toDouble()
+        }
+
+        require(coldStart >= 0.0) { "coldStartInteractive metric not found in JMH output" }
+        require(zoomLatency >= 0.0) { "zoomLatency metric not found in JMH output" }
+
+        var keystrokeToPaint = -1.0
+        val jsTestReportDir = project.layout.buildDirectory.dir("test-results/jsNodeTest").get().asFile
+        if (jsTestReportDir.exists()) {
+            val files = jsTestReportDir.listFiles()
+            if (files != null) {
+                for (file in files) {
+                    if (file.name.endsWith(".xml")) {
+                        val content = file.readText()
+                        val match = "METRIC:keystrokeToPaint:([0-9.]+)".toRegex().find(content)
+                        if (match != null) {
+                            keystrokeToPaint = match.groupValues[1].toDouble()
+                            break
+                        }
+                    }
+                }
+            }
+        }
+
+        require(keystrokeToPaint >= 0.0) { "keystrokeToPaint metric not found in jsNodeTest output" }
+
+        println("=== UX Metrics ===")
+        println("coldStartInteractive: \$coldStart ms/op")
+        println("zoomLatency: \$zoomLatency ms/op")
+        println("keystrokeToPaint: \$keystrokeToPaint ms")
+
+        val baselineFile = project.file("metrics-baseline.json")
+        if (!baselineFile.exists()) {
+            println("No baseline found. Creating metrics-baseline.json...")
+            val json = """
+            {
+              "coldStartInteractive": \$coldStart,
+              "zoomLatency": \$zoomLatency,
+              "keystrokeToPaint": \$keystrokeToPaint
+            }
+            """.trimIndent()
+            baselineFile.writeText(json)
+            println("Baseline created successfully.")
+        } else {
+            val baselineContent = baselineFile.readText()
+
+            val baseColdStartMatch = """"coldStartInteractive"\s*:\s*([0-9.]+)""".toRegex().find(baselineContent)
+            val baseZoomMatch = """"zoomLatency"\s*:\s*([0-9.]+)""".toRegex().find(baselineContent)
+            val baseKeystrokeMatch = """"keystrokeToPaint"\s*:\s*([0-9.]+)""".toRegex().find(baselineContent)
+
+            val baseColdStart = baseColdStartMatch?.groupValues?.get(1)?.toDouble() ?: 0.0
+            val baseZoom = baseZoomMatch?.groupValues?.get(1)?.toDouble() ?: 0.0
+            val baseKeystroke = baseKeystrokeMatch?.groupValues?.get(1)?.toDouble() ?: 0.0
+
+            val maxAllowedColdStart = baseColdStart * 1.2
+            val maxAllowedZoom = baseZoom * 1.2
+            val maxAllowedKeystroke = baseKeystroke * 1.2
+
+            var failed = false
+            if (coldStart > maxAllowedColdStart) {
+                System.err.println("REGRESSION: coldStartInteractive (\$coldStart) exceeded baseline (\$baseColdStart) by >20% (max \$maxAllowedColdStart)")
+                failed = true
+            }
+            if (zoomLatency > maxAllowedZoom) {
+                System.err.println("REGRESSION: zoomLatency (\$zoomLatency) exceeded baseline (\$baseZoom) by >20% (max \$maxAllowedZoom)")
+                failed = true
+            }
+            if (keystrokeToPaint > maxAllowedKeystroke) {
+                System.err.println("REGRESSION: keystrokeToPaint (\$keystrokeToPaint) exceeded baseline (\$baseKeystroke) by >20% (max \$maxAllowedKeystroke)")
+                failed = true
+            }
+
+            if (failed) {
+                throw GradleException("UX Metrics Regression detected (>20% over baseline)")
+            } else {
+                println("All metrics within acceptable bounds of baseline.")
+            }
+        }
+    }
+}
