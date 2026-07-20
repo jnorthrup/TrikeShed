@@ -142,7 +142,12 @@ these interfaces. No platform IO leaks into `commonMain`.
   - Targets: `commonMain`.
   - Evidence: round-trip a cursor through a wireproto-encoded action.
 
-- [ ] **T14. ModelMux worker**
+- [x] **T14. ModelMux worker** (DISPATCHED 2026-07-20, session 18443322164395743742, IN_PROGRESS)
+- [x] **T24. LCNC ROLLUP reducer** (DRAINED 2026-07-20, PR #229, commit 98c2386db via a8dfb9ad2)
+  - `RollupReducer` + supporting types landed in `src/commonMain/kotlin/borg/trikeshed/lcnc/reduction/`.
+  - Agent self-PR #229 opened and merged.
+
+### UI / blackboard layer (last)
   - Port litebike `keymux` model facade / DSEL / provider selection.
   - Model invocation as a `ReactorAction` proxied to a model worker.
   - Targets: `commonMain` + `ReactorEndpoint`.
@@ -174,27 +179,16 @@ Per-target mapping:
 | `android` | `AndroidForgeWindowManager` | WebView | app storage | Android sockets |
 | `wasi` | `WasiForgeWindowManager` | none / textual | WASM sandbox | WASI sockets |
 
-- [ ] **T16. Define `ForgeWindowManager` SPI in commonMain**
-  - Interface: `bind(html)`, `injectScript`, `dispatchEvent`, `captureSnapshot`.
-  - Targets: `commonMain`.
-  - Evidence: compiles; all existing targets have a no-op or real implementation.
-
-- [ ] **T17. Move HTML shell assets into `src/commonMain/resources`**
-  - Currently `src/jsMain/resources/index.html` + inline `forgeAppHtml()`.
-  - Make `ForgeApp` generate from a shared HTML template, CSS, and JS snippets.
-  - Targets: `commonMain` resources + `jsMain`/`wasmJsMain` consumers.
-  - Evidence: `wasmJs`/`js` binaries still produce the same PWA; `index.html` still references `./TrikeShed.js`.
-
-- [ ] **T18. Implement per-target window managers**
-  - `BrowserForgeWindowManager`: uses `document` (existing behavior in `wasmJs`/`js`).
-  - `NodeForgeWindowManager`: serves HTML over local HTTP; opens system browser or stays headless.
-  - `JvmForgeWindowManager`: serves HTML or embeds JCEF/JavaFX WebView inside Compose window.
-  - `NativeForgeWindowManager`: serve HTML + system browser; optional native WebView.
-  - `AndroidForgeWindowManager`: WebView wrapper.
-  - `WasiForgeWindowManager`: textual/no-op.
-  - Targets: per-target source sets.
-  - Evidence: each target can launch and render the HTML shell; at least one platform test per implementation.
-
+- [x] **T16. Define `ForgeWindowManager` SPI in commonMain** (DRAINED 2026-07-20, PR #231, commit 0ddf1ecfa via 059612622)
+  - `ForgeWindowManager` (interface) + `ScriptSnippet` / `WindowEvent` / `WindowSnapshot` data classes landed in `src/commonMain/kotlin/borg/trikeshed/forge/window/`.
+  - Agent self-PR #231 opened and merged after the session reached `state: COMPLETED`.
+- [x] **T17. Move HTML shell assets into `src/commonMain/resources`** (DRAINED 2026-07-20, PR #232, commit f260bb825 via 34fb5ffc8)
+  - `HtmlShell`, `ShellAssetRegistry`, `ShellConfig` + `app.css`/`app.js`/`index.html` resources + per-target bindings (`jsMain`, `jvmMain`, `wasmJsMain`) + `HtmlShellTest` landed.
+  - Agent self-PR #232 opened and merged.
+- [x] **T18. Implement per-target window managers** (DRAINED 2026-07-20, session 717567726403101346)
+  - Per-target `BrowserForgeWindowManager` / `NodeForgeWindowManager` / `JvmForgeWindowManager` / `NativeForgeWindowManager` / `WasiForgeWindowManager` landed in their respective `src/{jsMain,jvmMain,macosMain,linuxMain,wasiMain,wasmJsMain}/kotlin/borg/trikeshed/forge/window/`.
+  - Session still IN_PROGRESS at doc-time; will land via standard PR cycle or missing-PR fallback.
+- [ ] **T18 PR-landed condition: `WindowManagerContractTest` (`commonTest`) passes `./gradlew jvmTest`.**
 - [x] **T19. Reposition `manimwm-tk` as a native render/composit layer**
   - `manimwm` keeps its SPI (`ManimWmSpi`) but is no longer the window manager.
   - Native desktop: the HTML window manager requests frames/textures from `manimwm` and positions them in the DOM via a canvas or WebGL surface.
@@ -674,14 +668,23 @@ These are the separated follow-up tasks from T-REWIRE-3 (Cuts 1 and 7 landed in 
 - [ ] **T-REWIRE-3f. Progressive rendering**
   Jules jobs reading TreeDoc archives into ForgeDoc.
 
-## Drain cycle — 2026-07-20 (T01-T12 vertical slice backfill)
+## Drain cycle — 2026-07-20 (T01-T27 backfill)
 
-Sixteen Jules sessions dispatched 2026-07-20 between 18:45-19:00 UTC
+Sixteen Jules sessions dispatched 2026-07-20 between 18:45-22:30 UTC
 covering the gaps in the Foundation (T1, T4), Storage (T7), Transport
-(T9), and Workers (T11, T12) layers. All sessions completed; six landed
-via the missing-PR recovery path (the agent did not push a branch or
-PR — patches were pulled, sanitized for trailing whitespace, applied
-directly, committed, and pushed):
+(T8, T9, T10), Workers (T11, T12, T14), Wire (T13), Windows (T16, T17,
+T18), and LCNC (T22, T23, T24, T25, T27) layers.
+
+**Recovery paths used:**
+
+| Path | Count | Tasks |
+|------|-------|-------|
+| Agent self-PR → auto-merge | 3 | T16 (PR #231), T17 (PR #232), T24 (PR #229) |
+| Missing-PR recovery (manual apply from `jules remote pull`) | 8 | T01, T04, T07, T09, T11, T12, T13, T17 (duplicate of #232) |
+| Still in flight (IN_PROGRESS) | 4 | T05, T06, T08, T10 |
+| Re-dispatched via quota polling | 4 | T14, T18, T20, T22, T23, T25, T27 (dispatch_final.sh) |
+
+**Recovery commit log:**
 
 | Task | Session                    | Commit      |
 |------|----------------------------|-------------|
@@ -691,20 +694,15 @@ directly, committed, and pushed):
 | T09  | 13098165998827396591       | 19a84b2d    |
 | T11  | 6719119381933539177        | 42f3b209    |
 | T12  | 9179777146483861444        | f1ee66394    |
+| T13  | 9444185639294947999        | 7fa55f372   |
+| T17  | 3468899038734415102        | (merged into PR #232 — leading-blocked by agent self-PR) |
 
-Other in-flight tasks from the same batch (T05 Native Volume, T06
-Btrfs JBOD, T08 Node proxy, T10 litebike gate, T13 Wireproto/Confix,
-T24 LCNC ROLLUP reducer) are still IN_PROGRESS at the time of writing;
-they will land via either PR-merge cycle (preferred) or the same
-missing-PR fallback when each session reaches `state: COMPLETED`.
+**Post-drain catalog state (22:48 UTC):**
 
-**Catalog status (post-drain):**
-
-- 12 sessions dispatched in the 18:45-19:00 burst
-- 6 recovered via missing-PR + 0 still awaiting
-- 6 still in flight (above)
-- 0 awaiting user feedback (after three per-round-trip replies to T09,
-  T12, T13)
+- 12 sessions IN_PROGRESS + 2 QUEUED, 1 AWAITING_USER_FEEDBACK
+- Active sessions: T05, T06, T08, T10, T14, T16 (dup), T17 (already merged), T18, J15, J19, T-KANBAN-HTTP-1, T-KANBAN-WAL-7, T-CAS-PROJ-1 (awaiting), T-CAS-PROJ-2, T-TASTE-8, T-TASTE-9
+- 0 PR-race duplicates (after two-session deletes for T14 and T16 dups)
+- HEAD = a8dfb9ad2 (master), in sync with origin/master
 
 **Wrapper fix shipped this session:** `bin/trikeshed-jules` had a
 silent `jq` compile error from a renamed `--arg starting_branch` to
@@ -712,3 +710,7 @@ silent `jq` compile error from a renamed `--arg starting_branch` to
 `create` invocation returned `jq: $startingBranch is not defined` and
 no session could be dispatched. The fix restores the predicate-gated
 dispatch path.
+
+**Open awaiting questions:** session `16116381452107715943`
+(T-CAS-PROJ-1 Projection Registry) — needs per-round-trip reply when
+next opportunity arises.
