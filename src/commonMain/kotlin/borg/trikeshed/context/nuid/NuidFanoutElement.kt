@@ -11,6 +11,7 @@ import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.yield
+import kotlin.coroutines.CoroutineContext
 import kotlin.time.TimeSource
 
 /**
@@ -47,13 +48,13 @@ import kotlin.time.TimeSource
  *   DRAINING  ⇒ registry frozen; no new dispatches; in-flight claims finish.
  *   CLOSED    ⇒ registry empty; supervisor cancelled.
  */
-class NuidFanoutElement(
+open class NuidFanoutElement(
     parentJob: Job? = null,
     val escalationBudget: Int = 3,
 ) : AsyncContextElement(ElementState.CREATED, parentJob) {
 
     companion object Key : AsyncContextKey<NuidFanoutElement>()
-    override val key: AsyncContextKey<NuidFanoutElement> = Key
+    override open val key: CoroutineContext.Key<*> = Key
 
     /** Per-workgroup claim slot. Claim intake belongs to the dispatcher;
      *  production workers receive accepted claims through [consume]. */
