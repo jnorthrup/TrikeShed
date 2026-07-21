@@ -1,3 +1,7 @@
+/*
+ * Copyright (c) 2026 TrikeShed Authors
+ * SPDX-License-Identifier: AGPL-3.0-or-later
+ */
 package borg.trikeshed.lcnc.collections.associative
 
 import borg.trikeshed.lib.Series
@@ -12,7 +16,27 @@ import borg.trikeshed.lib.j
  * Defines the type of a property (column) in a Lcnc Database.
  */
 enum class PropertyType {
-    TITLE, TEXT, NUMBER, SELECT, CHECKBOX, DATE, PEOPLE, FILES
+    TITLE, 
+    TEXT, 
+    NUMBER, 
+    SELECT, 
+    CHECKBOX, 
+    DATE
+    
+    // De-stubbed aspirational types (removed 2026-07-21, see git history or doc/lcnc-property-type-decision.md for more info)
+    // MULTI_SELECT: removed 2026-07-21, was meant for multiple tags/selects
+    // PEOPLE: removed 2026-07-21, was meant for user references
+    // FILES: removed 2026-07-21, was meant for file attachments and images
+    // URL: removed 2026-07-21, was meant for web links
+    // EMAIL: removed 2026-07-21, was meant for email addresses
+    // PHONE_NUMBER: removed 2026-07-21, was meant for phone numbers
+    // FORMULA: removed 2026-07-21, was meant for computed column formulas
+    // RELATION: removed 2026-07-21, was meant for inter-database relations
+    // ROLLUP: removed 2026-07-21, was meant for aggregating related properties
+    // CREATED_TIME: removed 2026-07-21, was meant for automatic creation timestamp
+    // CREATED_BY: removed 2026-07-21, was meant for automatic creator tracking
+    // LAST_EDITED_TIME: removed 2026-07-21, was meant for automatic modification timestamp
+    // LAST_EDITED_BY: removed 2026-07-21, was meant for automatic modifier tracking
 }
 
 /**
