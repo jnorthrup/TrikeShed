@@ -89,9 +89,9 @@ class ForgeDocTest {
     }
 
     @Test fun forgeAppHtmlIncludesPwaShellAndSeed() {
-        val html = forgeAppHtml()
+        val html = ForgeApp.renderHtml()
 
-        assertTrue(html.startsWith("<!doctype html>"))
+        assertTrue(html.startsWith("<!DOCTYPE html>"))
         assertTrue(html.contains("<title>TrikeShed Forge workspace</title>"))
         assertTrue(html.contains("<link rel=\"manifest\" href=\"./manifest.webmanifest\" />"))
         assertTrue(html.contains("<link rel=\"icon\" href=\"./icons/forge-icon.svg\" type=\"image/svg+xml\" />"))
@@ -108,7 +108,7 @@ class ForgeDocTest {
     }
 
     @Test fun forgeAppHtmlIncludesCascadeGrid() {
-        val html = forgeAppHtml()
+        val html = ForgeApp.renderHtml()
 
         assertTrue(html.contains("id=\"cascade-grid-root\""))
         assertTrue(html.contains("Cascade grid"))
