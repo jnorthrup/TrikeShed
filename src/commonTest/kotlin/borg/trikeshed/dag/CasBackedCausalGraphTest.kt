@@ -23,23 +23,20 @@ class CasBackedCausalGraphTest {
             payload = """{"data":"child-payload"}"""
         )
 
-        // Snapshot is automatically updated to childCid in submitNode
         assertEquals(childCid, graph.rootCid)
 
-        // Traverse from rootCid
         val visited = graph.traverse(childCid)
 
         assertEquals(2, visited.size)
         assertTrue(visited.contains(rootCid))
         assertTrue(visited.contains(childCid))
 
-        // Recover nodes and edge explicitly
         val childBytes = casStore.get(childCid)!!
         val childDocStr = childBytes.decodeToString()
-        assertTrue(childDocStr.contains(""""causalKey":"child-key""""))
-        assertTrue(childDocStr.contains(""""deps":["${rootCid.value}"]"""))
+        assertTrue(childDocStr.contains("\"causalKey\":\"child-key\""))
+        assertTrue(childDocStr.contains("\"deps\":[\"${rootCid.value}\"]"))
 
         val rootBytes = casStore.get(rootCid)!!
-        assertTrue(rootBytes.decodeToString().contains(""""causalKey":"root-key""""))
+        assertTrue(rootBytes.decodeToString().contains("\"causalKey\":\"root-key\""))
     }
 }
