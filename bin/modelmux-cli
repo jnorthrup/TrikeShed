@@ -1,0 +1,185 @@
+#!/usr/bin/env bash
+# modelmux-cli — command-line control for the ACP modelmux + kanban session
+
+set -euo pipefail
+
+MODEL_MUX_DIR="${HOME}/.local/forge/modelmux"
+mkdir -p "${MODEL_MUX_DIR}"
+
+SESSION_FILE="${MODEL_MUX_DIR}/session.json"
+CONFIG_FILE="${MODEL_MUX_DIR}/config.json"
+
+usage() {
+  cat <<EOF
+modelmux-cli — control a modelmux session from the kanban
+
+Commands:
+  init [--user USER]           Initialize a new session (creates config + daemon)
+  start                        Start the daemon (background)
+  stop                         Stop the daemon
+  status                       Show daemon status + board state
+  models                       List registered models + capabilities
+  register <id> <name> <caps>  Register a model (caps=comma list: chat,stream,tools,vision,embed)
+  queue <card-id> <model> <action> <prompt>  Queue a model call on a card
+  process                      Process all pending calls on the board
+  call <card-id> <model> <action> <prompt>   One-shot: queue + process + show result
+  logs                         Tail daemon logs
+  config                       Show/edit config
+EOF
+  exit 1
+}
+
+# JSON helpers (jq required)
+json_get() { jq -r "$1" < "${SESSION_FILE}" 2>/dev/null || echo ""; }
+json_set() { local tmp=$(mktemp); jq "$1" < "${SESSION_FILE}" > "${tmp}" && mv "${tmp}" "${SESSION_FILE}"; }
+
+cmd_init() {
+  local user="jim"
+  while [[ $# -gt 0 ]]; do
+    case $1 in
+      --user) user="$2"; shift 2;;
+      *) usage;;
+    esac
+  done
+
+  cat > "${CONFIG_FILE}" <<EOF
+{
+  "user": "${user}",
+  "providers": {},
+  "modelCards": [],
+  "daemonPort": 8888,
+  "keyMuxPrefix": "LLM_"
+}
+EOF
+
+  cat > "${SESSION_FILE}" <<EOF
+{
+  "pid": null,
+  "startedAt": null,
+  "boardPath": "${MODEL_MUX_DIR}/board.json",
+  "logPath": "${MODEL_MUX_DIR}/daemon.log"
+}
+EOF
+
+  echo "Initialized session for user: ${user}"
+  echo "Config: ${CONFIG_FILE}"
+  echo "Session: ${SESSION_FILE}"
+}
+
+cmd_register() {
+  local id="${1:-}"; local name="${2:-}"; local caps="${3:-}"
+  [[ -z "$id" || -z "$name" || -z "$caps" ]] && { echo "Usage: register <id> <name> <caps>"; exit 1; }
+
+  local tmp=$(mktemp)
+  jq --arg id "$id" --arg name "$name" --arg caps "$caps" '
+    .providers[$id] = {
+      "id": $id,
+      "displayName": $name,
+      "costPer1kTokens": 0.001,
+      "averageLatencyMs": 200
+    }
+    | .modelCards += [{
+      "modelId": $id,
+      "providerId": $id,
+      "capabilities": ($caps | split(",")),
+      "defaultMeta": {
+        "version": "1.0",
+        "action": "chat",
+        "headers": []
+      }
+    }]' < "${CONFIG_FILE}" > "${tmp}" && mv "${tmp}" "${CONFIG_FILE}"
+  echo "Registered model: $id ($name) with caps: $caps"
+}
+
+cmd_models() {
+  jq -r '.modelCards[] | "\(.modelId)\t\(.capabilities|join(","))"' < "${CONFIG_FILE}"
+}
+
+cmd_start() {
+  local pid=$(json_get .pid)
+  if [[ -n "$pid" && "$pid" != "null" ]] && kill -0 "$pid" 2>/dev/null; then
+    echo "Daemon already running (pid=$pid)"
+    exit 0
+  fi
+
+  # Ensure board exists
+  local boardPath=$(json_get .boardPath)
+  if [[ ! -f "$boardPath" ]]; then
+    echo '{"columns":[{"id":"backlog","name":"Backlog","cards":[]}],"modelCallLog":[]}' > "$boardPath"
+  fi
+
+  nohup java -cp $(./gradlew -q jvmMainJar --console=plain 2>/dev/null | tail -1) \
+    borg.trikeshed.forge.server.KanbanHttpServerJvm \
+    --modelmux --config "${CONFIG_FILE}" \
+    >> "$(json_get .logPath)" 2>&1 &
+  local newPid=$!
+  json_set ".pid = $newPid | .startedAt = \"$(date -Iseconds)\""
+  echo "Started daemon (pid=$newPid). Log: $(json_get .logPath)"
+}
+
+cmd_stop() {
+  local pid=$(json_get .pid)
+  if [[ -z "$pid" || "$pid" == "null" ]]; then
+    echo "No daemon running"
+    exit 0
+  fi
+  kill "$pid" 2>/dev/null && echo "Stopped (pid=$pid)" || echo "Failed to stop (pid=$pid)"
+  json_set '.pid = null | .startedAt = null'
+}
+
+cmd_status() {
+  local pid=$(json_get .pid)
+  if [[ -n "$pid" && "$pid" != "null" ]] && kill -0 "$pid" 2>/dev/null; then
+    echo "Daemon: RUNNING (pid=$pid, started=$(json_get .startedAt))"
+  else
+    echo "Daemon: STOPPED"
+  fi
+  local boardPath=$(json_get .boardPath)
+  if [[ -f "$boardPath" ]]; then
+    jq '.columns[] | "\(.name): \(.cards|length) cards"' < "$boardPath" 2>/dev/null | sed 's/^/  /'
+  fi
+}
+
+cmd_queue() {
+  local cardId="${1:-}"; local model="${2:-}"; local action="${3:-}"; local prompt="${4:-}"
+  [[ -z "$cardId" || -z "$model" || -z "$action" || -z "$prompt" ]] && { echo "Usage: queue <card-id> <model> <action> <prompt>"; exit 1; }
+  # TODO: POST to /api/submit with ModelCallDescriptor
+  echo "TODO: queue via HTTP to daemon"
+}
+
+cmd_process() {
+  echo "TODO: trigger daemon processPendingCalls"
+}
+
+cmd_call() {
+  cmd_queue "$@"
+  cmd_process
+}
+
+cmd_logs() {
+  tail -f "$(json_get .logPath)"
+}
+
+cmd_config() {
+  cat "${CONFIG_FILE}"
+}
+
+main() {
+  local cmd="${1:-}"; shift || usage
+  case "$cmd" in
+    init) cmd_init "$@";;
+    register) cmd_register "$@";;
+    models) cmd_models;;
+    start) cmd_start;;
+    stop) cmd_stop;;
+    status) cmd_status;;
+    queue) cmd_queue "$@";;
+    process) cmd_process;;
+    call) cmd_call "$@";;
+    logs) cmd_logs;;
+    config) cmd_config;;
+    *) usage;;
+  esac
+}
+
+main "$@"

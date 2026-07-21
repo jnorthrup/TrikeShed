@@ -1,344 +1,197 @@
+/*
+ * Copyright (c) 2017 TrikeShed Contributors
+ * AGPLv3 — see LICENSE
+ */
 package modelmux
 
-import keymux.*
-import modelmux.acp.*
+import keymux.KeyMux
+import modelmux.acp.AcpModelCard
+import modelmux.acp.AcpMessage
+import modelmux.acp.AcpResponse
+import modelmux.acp.AcpChunk
+import modelmux.acp.AcpCodec
+import modelmux.acp.AcpAction
+import modelmux.acp.CapabilityRouter
 import borg.trikeshed.lib.*
-import borg.trikeshed.htx.*
-import borg.trikeshed.userspace.reactor.MuxReactorElement
-import borg.trikeshed.userspace.reactor.CacheLookup
-import kotlinx.coroutines.*
-import kotlinx.coroutines.flow.*
+import borg.trikeshed.parse.json.JsonSupport
+import java.net.URI
+import java.net.http.HttpClient
+import java.net.http.HttpRequest
+import java.net.http.HttpResponse
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.channels.ReceiveChannel
+import kotlinx.coroutines.launch
 
-// ═══════════════════════════════════════════
-// Type algebra
-// ═══════════════════════════════════════════
-
-/** Model entry: id j card */
-typealias ModelEntry = Join<String, AcpModelCard>
-
-/** Router decision: selected entries in precedence order */
-typealias RouteResult = Join<Series<ModelEntry>, AcpAction>
-
-/** The mux: models j router */
-typealias ModelMuxCore = Join<Series<ModelEntry>, ModelRouter>
-
-// ═══════════════════════════════════════════
-// Model Router — capability-based selection
-// ═══════════════════════════════════════════
-
-interface ModelRouter {
-    fun route(models: Series<ModelEntry>, action: AcpAction, requiredCaps: Series<String>): RouteResult
-}
-
-object CapabilityRouter : ModelRouter {
-    override fun route(
-        models: Series<ModelEntry>,
-        action: AcpAction,
-        requiredCaps: Series<String>
-    ): RouteResult {
-        val matching = (0 until models.size)
-            .filter { i -> hasCaps(models[i].b, requiredCaps) && supportsAction(models[i].b, action) }
-            .map { models[it] }
-        return matching.toSeries() j action
-    }
-
-    private fun hasCaps(card: AcpModelCard, required: Series<String>): Boolean =
-        (0 until required.size).all { r ->
-            (0 until card.caps.size).any { card.caps[it] == required[r] }
-        }
-
-    private fun supportsAction(card: AcpModelCard, action: AcpAction): Boolean =
-        action in card.caps.iterable() || card.b.b.b.a == action
-}
-
-// ═══════════════════════════════════════════
-// Session lifecycle — CCEK-aligned
-// ═══════════════════════════════════════════
-
-enum class SessionState { CREATED, OPEN, ACTIVE, DRAINING, CLOSED }
-
-class LlmSession(
-    val model: ModelEntry,
-    private val authKey: String,
-    val baseUrl: String
-) {
-    private var _state = SessionState.CREATED
-    val state: SessionState get() = _state
-
-    fun open() { if (_state == SessionState.CREATED) _state = SessionState.OPEN }
-    fun activate() { if (_state == SessionState.OPEN) _state = SessionState.ACTIVE }
-    fun drain() { _state = SessionState.DRAINING }
-    fun close() { _state = SessionState.CLOSED }
-
-    fun isUsable(): Boolean = _state in listOf(SessionState.OPEN, SessionState.ACTIVE)
-
-    /** Build HTTP headers with auth */
-    fun authHeaders(): Series<Join<String, String>> {
-        val (headerName, headerVal) = when {
-            "anthropic" in baseUrl -> "x-api-key" to authKey
-            else -> "Authorization" to "Bearer $authKey"
-        }
-        val providerHeader = if ("anthropic" in baseUrl)
-            listOf("anthropic-version" j "2023-06-01") else emptyList()
-        return (listOf(
-            headerName j headerVal,
-            "Content-Type" j "application/json"
-        ) + providerHeader).toSeries()
-    }
-}
-
-// ═══════════════════════════════════════════
-// ModelMux — the public surface
-// ═══════════════════════════════════════════
-
-class ModelMux internal constructor(
-    private val core: ModelMuxCore,
+/**
+ * ACP-compatible ModelMux with real HTTP backing.
+ * 
+ * Each model card points at an ACP endpoint (NIM, Ollama, OpenAI-compatible, etc.).
+ * The mux routes calls to the correct endpoint based on capability requirements.
+ */
+class ModelMux(
     private val keyMux: KeyMux,
-    private val configuredBaseUrls: Map<String, String>,
+    private val configure: ModelMuxBuilder.() -> Unit = {},
 ) {
-    private val models: Series<ModelEntry> get() = core.a
-    private val router: ModelRouter get() = core.b
+    private val builder = ModelMuxBuilder(keyMux).apply(configure)
+    private val httpClient = HttpClient.newBuilder().build()
+    private val modelCards = mutableListOf<AcpModelCard>()
+    private val endpoints = mutableMapOf<String, String>()
 
-    companion object {
-        operator fun invoke(keyMux: KeyMux, block: ModelMuxBuilder.() -> Unit): ModelMux =
-            ModelMuxBuilder(keyMux).apply(block).build()
-    }
-
-    /** Create a session for a specific model by ID */
-    suspend fun session(modelId: String): LlmSession {
-        val entry = (0 until models.size).firstOrNull { models[it].a == modelId }?.let { models[it] }
-            ?: error("model not found: $modelId")
-        val card = entry.b
-        val authKey = keyMux.get("llm.${card.id}.key")
-            ?: keyMux.get("llm.default.key")
-            ?: error("no auth key for model: $modelId")
-        val baseUrl = keyMux.get("llm.${card.id}.base_url")
-            ?: keyMux.get("llm.default.base_url")
-            ?: configuredBaseUrls[modelId]
-            ?: "https://api.openai.com/v1"
-        val session = LlmSession(entry, authKey, baseUrl)
-        session.open()
-        return session
-    }
-
-    /** Route to the best model for a given action + capabilities */
-    fun route(action: AcpAction, vararg requiredCaps: String): RouteResult =
-        router.route(models, action, requiredCaps.toList().toSeries())
-
-    /** Non-streaming chat completion */
-    suspend fun chat(
-        modelId: String,
-        messages: Series<AcpMessage>,
-        tools: Series<AcpTool> = 0 j { error("no tools") }
-    ): AcpResponse {
-        val session = session(modelId)
-        session.activate()
-        val reactor = currentCoroutineContext()[MuxReactorElement.Key]
-        val keyId = keyMux.get("llm.$modelId.key")
-        try {
-            val card = models.let { ms -> (0 until ms.size).first { ms[it].a == modelId }.let { ms[it] } }.b
-            val meta: AcpMeta = card.id j ("chat" j session.authHeaders())
-            val body: AcpRequestBody = messages j tools
-            val req: AcpRequest = meta j body
-
-            val json = AcpCodec.encodeRequest(req)
-            val requestHash = json.hashCode().toString()
-
-            if (reactor != null) {
-                val lookup = reactor.lookupApiCall(provider = card.id, modelId = modelId, requestHash = requestHash, ttlMs = 3600_000)
-                if (lookup is CacheLookup.Hit) {
-                    return AcpCodec.parseResponse(lookup.entry.payload)
-                }
-            }
-
-            val htx = currentCoroutineContext()[HtxKey] ?: error("No HtxKey found in coroutine context")
-            val url = "${session.baseUrl}/chat/completions"
-            val htxHeaders = htxHeaders(*meta.b.b.toList().map { it.a j it.b }.toTypedArray())
-            val htxReq = parseHtxRequest(
-                url = url,
-                method = HtxMethod.POST,
-                body = ByteSeries(json.encodeToByteArray())
-            ).copy(headers = htxHeaders)
-
-            val resp = htx.request(htxReq)
-            val respBody = resp.body.toArray().decodeToString()
-
-            check(resp.status in 200..299) {
-                "ModelMux chat failed with HTTP ${resp.status}: ${respBody.take(500)}"
-            }
-
-            if (reactor != null) {
-                reactor.cacheApiCall(provider = card.id, modelId = modelId, requestHash = requestHash, ttlMs = 3600_000, payload = respBody)
-            }
-            return AcpCodec.parseResponse(respBody)
-        } finally {
-            session.drain(); session.close()
-            if (reactor != null && keyId != null) {
-                val leasedTo = reactor.flowState.value.leases.firstOrNull { it.keyId == keyId }?.leasedTo
-                if (leasedTo != null) {
-                    reactor.releaseLease(keyId, leasedTo)
-                }
+    init {
+        builder.cards.forEach { card ->
+            modelCards += card
+            if (builder.endpoints.containsKey(card.id)) {
+                endpoints[card.id] = builder.endpoints[card.id]!!
             }
         }
     }
 
-    /** Streaming chat completion via SSE */
-    fun stream(
-        modelId: String,
-        messages: Series<AcpMessage>,
-        tools: Series<AcpTool> = 0 j { error("no tools") }
-    ): Flow<AcpChunk> = flow {
-        val session = session(modelId)
-        session.activate()
-        val reactor = currentCoroutineContext()[MuxReactorElement.Key]
-        val keyId = keyMux.get("llm.$modelId.key")
-        try {
-            val card = models.let { ms -> (0 until ms.size).first { ms[it].a == modelId }.let { ms[it] } }.b
-            val meta: AcpMeta = card.id j ("stream" j session.authHeaders())
-            val body: AcpRequestBody = messages j tools
-            val req: AcpRequest = meta j body
-
-            val json = AcpCodec.encodeRequest(req)
-            val htx = currentCoroutineContext()[HtxKey] ?: error("No HtxKey found in coroutine context")
-            val url = "${session.baseUrl}/chat/completions"
-            val htxHeaders = htxHeaders(*meta.b.b.toList().map { it.a j it.b }.toTypedArray())
-            val htxReq = parseHtxRequest(
-                url = url,
-                method = HtxMethod.POST,
-                body = ByteSeries(json.encodeToByteArray())
-            ).copy(headers = htxHeaders)
-
-            val resp = htx.request(htxReq)
-            val text = resp.body.toArray().decodeToString()
-            var emitted = false
-            text.lineSequence().forEach { line ->
-                if (line.startsWith("data:")) {
-                    AcpCodec.parseChunk(line)?.let { emit(it); emitted = true }
-                }
-            }
-            if (!emitted && text.isNotBlank()) {
-                val parsed = AcpCodec.parseResponse(text)
-                emit(parsed.a j parsed.b)
-            }
-        } finally {
-            session.drain(); session.close()
-            if (reactor != null && keyId != null) {
-                val leasedTo = reactor.flowState.value.leases.firstOrNull { it.keyId == keyId }?.leasedTo
-                if (leasedTo != null) {
-                    reactor.releaseLease(keyId, leasedTo)
-                }
-            }
-        }
+    /** Register a model card with its ACP endpoint */
+    fun registerModel(card: AcpModelCard, baseUrl: String) {
+        modelCards += card
+        endpoints[card.id] = baseUrl
     }
 
-    /** Embed — routes to an embedding-capable model */
-    suspend fun embed(modelId: String, texts: Series<String>): Series<Join<String, Series<Double>>> {
-        val session = session(modelId)
-        session.activate()
-        val reactor = currentCoroutineContext()[MuxReactorElement.Key]
-        val keyId = keyMux.get("llm.$modelId.key")
-        try {
-            val card = models.let { ms -> (0 until ms.size).first { ms[it].a == modelId }.let { ms[it] } }.b
-            val meta: AcpMeta = card.id j ("embed" j session.authHeaders())
-            val textsJson = (0 until texts.size).joinToString(",") { jsonStr(texts[it]) }
-            val json = "{\"model\":\"${card.id}\",\"input\":[$textsJson]}"
-            
-            val requestHash = json.hashCode().toString()
-            if (reactor != null) {
-                val lookup = reactor.lookupApiCall(provider = card.id, modelId = modelId, requestHash = requestHash, ttlMs = 3600_000)
-                if (lookup is CacheLookup.Hit) {
-                    return parseEmbeddings(lookup.entry.payload, texts)
+    /** List all registered models with their capabilities */
+    fun listModels(): Series<AcpModelCard> = modelCards.toSeries()
+
+    /** Find a model that supports the required action and capabilities */
+    fun selectModel(action: AcpAction, requiredCaps: Series<String>): AcpModelCard? {
+        return CapabilityRouter().route(modelCards.toSeries(), action, requiredCaps).a.lastOrNull()
+    }
+
+    /** Chat completion (non-streaming) */
+    suspend fun chat(modelId: String, messages: Series<AcpMessage>): AcpResponse = withContext(Dispatchers.IO) {
+        val baseUrl = endpoints[modelId] ?: error("No endpoint registered for model: $modelId")
+        val key = resolveKey(modelId)
+        
+        val body = buildString {
+            append("{\"model\":\"$modelId\",\"messages\":[")
+            messages.view.forEachIndexed { i, (role, content) ->
+                if (i > 0) append(",")
+                append("{\"role\":\"$role\",\"content\":${jsonStr(content)}}")
+            }
+            append("],\"stream\":false}")
+        }
+
+        val request = HttpRequest.newBuilder()
+            .uri(URI.create("$baseUrl/v1/chat/completions"))
+            .header("Content-Type", "application/json")
+            .header("Authorization", "Bearer $key")
+            .POST(HttpRequest.BodyPublishers.ofString(body))
+            .build()
+
+        val response = httpClient.send(request, HttpResponse.BodyHandlers.ofString())
+        if (response.statusCode() >= 400) error("ACP chat failed (${response.statusCode()}): ${response.body()}")
+        AcpCodec.parseResponse(response.body())
+    }
+
+    /** Embeddings */
+    suspend fun embed(modelId: String, texts: Series<String>): Series<Series<Double>> = withContext(Dispatchers.IO) {
+        val baseUrl = endpoints[modelId] ?: error("No endpoint registered for model: $modelId")
+        val key = resolveKey(modelId)
+
+        val body = buildString {
+            append("{\"model\":\"$modelId\",\"input\":[")
+            texts.view.forEachIndexed { i, t ->
+                if (i > 0) append(",")
+                append(jsonStr(t))
+            }
+            append("]}")
+        }
+
+        val request = HttpRequest.newBuilder()
+            .uri(URI.create("$baseUrl/v1/embeddings"))
+            .header("Content-Type", "application/json")
+            .header("Authorization", "Bearer $key")
+            .POST(HttpRequest.BodyPublishers.ofString(body))
+            .build()
+
+        val response = httpClient.send(request, HttpResponse.BodyHandlers.ofString())
+        if (response.statusCode() >= 400) error("ACP embed failed (${response.statusCode()}): ${response.body()}")
+        
+        val parsed = JsonSupport.parse(response.body()) as? Map<*, *> ?: error("Bad embed response")
+        val data = parsed["data"] as? List<*> ?: error("No data in embed response")
+        data.map { (it as Map<*, *>)["embedding"] as List<Double> }.map { it.toSeries() }.toSeries()
+    }
+
+    /** Streaming chat - returns a channel of chunks */
+    suspend fun chatStream(modelId: String, messages: Series<AcpMessage>): ReceiveChannel<AcpChunk> = withContext(Dispatchers.IO) {
+        val baseUrl = endpoints[modelId] ?: error("No endpoint registered for model: $modelId")
+        val key = resolveKey(modelId)
+        
+        val body = buildString {
+            append("{\"model\":\"$modelId\",\"messages\":[")
+            messages.view.forEachIndexed { i, (role, content) ->
+                if (i > 0) append(",")
+                append("{\"role\":\"$role\",\"content\":${jsonStr(content)}}")
+            }
+            append("],\"stream\":true}")
+        }
+
+        val request = HttpRequest.newBuilder()
+            .uri(URI.create("$baseUrl/v1/chat/completions"))
+            .header("Content-Type", "application/json")
+            .header("Authorization", "Bearer $key")
+            .POST(HttpRequest.BodyPublishers.ofString(body))
+            .build()
+
+        val channel = Channel<AcpChunk>(100)
+        launch(Dispatchers.IO) {
+            val response = httpClient.send(request, HttpResponse.BodyHandlers.ofLines())
+            try {
+                response.body().forEach { line ->
+                    if (line.startsWith("data:")) {
+                        val chunk = AcpCodec.parseChunk(line)
+                        chunk?.let { channel.trySend(it) }
+                    }
                 }
-            }
-
-            val htx = currentCoroutineContext()[HtxKey] ?: error("No HtxKey found in coroutine context")
-            val url = "${session.baseUrl}/embeddings"
-            val htxHeaders = htxHeaders(*meta.b.b.toList().map { it.a j it.b }.toTypedArray())
-            val htxReq = parseHtxRequest(
-                url = url,
-                method = HtxMethod.POST,
-                body = ByteSeries(json.encodeToByteArray())
-            ).copy(headers = htxHeaders)
-
-            val resp = htx.request(htxReq)
-            val respBody = resp.body.toArray().decodeToString()
-
-            if (reactor != null) {
-                reactor.cacheApiCall(provider = card.id, modelId = modelId, requestHash = requestHash, ttlMs = 3600_000, payload = respBody)
-            }
-            return parseEmbeddings(respBody, texts)
-        } finally {
-            session.drain(); session.close()
-            if (reactor != null && keyId != null) {
-                val leasedTo = reactor.flowState.value.leases.firstOrNull { it.keyId == keyId }?.leasedTo
-                if (leasedTo != null) {
-                    reactor.releaseLease(keyId, leasedTo)
-                }
+            } finally {
+                channel.close()
             }
         }
+        channel
     }
 
-    /** List available model cards, optionally filtered by capability */
-    fun listModels(vararg cap: String): Series<AcpModelCard> {
-        val cards = models.α { it.b }
-        if (cap.isEmpty()) return cards
-        val capSeries = cap.toList().toSeries()
-        return filtered(cards, capSeries)
+    private suspend fun resolveKey(modelId: String): String {
+        return keyMux.get(modelId) ?: error("No API key for provider: $modelId (prefix: LLM_)")
     }
 
-    private fun filtered(cards: Series<AcpModelCard>, caps: Series<String>): Series<AcpModelCard> {
-        val match = (0 until cards.size).filter { i ->
-            caps.size == 0 || (0 until caps.size).all { c ->
-                (0 until cards[i].caps.size).any { cards[i].caps[it] == caps[c] }
-            }
+    private fun jsonStr(s: String): String = buildString {
+        append('"')
+        for (c in s) when (c) {
+            '"' -> append("\\\"")
+            '\\' -> append("\\\\")
+            '\n' -> append("\\n")
+            '\r' -> append("\\r")
+            '\t' -> append("\\t")
+            else -> append(c)
         }
-        return match.size j { i -> cards[match[i]] }
+        append('"')
     }
 
-    private fun jsonStr(s: String): String = "\"" +
-        s.replace("\\","\\\\").replace("\"","\\\"").replace("\n","\\n") + "\""
-
-    private fun parseEmbeddings(json: String, texts: Series<String>): Series<Join<String, Series<Double>>> {
-        val results = mutableListOf<Join<String, Series<Double>>>()
-        var idx = 0
-        var searchFrom = 0
-        while (true) {
-            val ei = json.indexOf("\"embedding\"", searchFrom)
-            if (ei < 0) break
-            val arrStart = json.indexOf('[', ei)
-            val arrEnd = json.indexOf(']', arrStart)
-            val nums = json.substring(arrStart + 1, arrEnd)
-                .split(',').map { it.trim().toDouble() }
-            results.add(texts[idx] j nums.toSeries())
-            idx++; searchFrom = arrEnd + 1
-        }
-        return results.toSeries()
+    /** Close the HTTP client */
+    fun close() {
+        // HttpClient has no explicit close in JDK 11+, GC handles it
     }
 }
 
+/** Builder DSL for ModelMux configuration */
 class ModelMuxBuilder(private val keyMux: KeyMux) {
-    private val models = mutableListOf<ModelEntry>()
+    var cards = mutableListOf<AcpModelCard>()
+    var endpoints = mutableMapOf<String, String>()
 
-    fun model(
-        id: String,
-        caps: Set<String>,
-        baseUrl: String? = null,
-        version: String = "1.0"
-    ): ModelMuxBuilder = apply {
-        val capSeries = caps.toList().toSeries()
-        val action = if ("chat" in caps) "chat" else if ("embed" in caps) "embed" else "complete"
-        val meta: AcpMeta = version j (action j (0 j { error("no headers") }))
-        val card: AcpModelCard = id j (capSeries j meta)
-        models.add(id j card)
-        if (baseUrl != null) {
-            pendingUrls[id] = baseUrl
-        }
+    fun card(card: AcpModelCard): ModelMuxBuilder = apply { cards += card }
+    fun endpoint(modelId: String, baseUrl: String): ModelMuxBuilder = apply { endpoints[modelId] = baseUrl }
+
+    /** Load from a config JSON file */
+    fun loadConfig(path: String) {
+        // TODO: parse JSON config for cards + endpoints
     }
+}
 
-    private val pendingUrls = mutableMapOf<String, String>()
-
-    internal fun build(): ModelMux {
-        val core: ModelMuxCore = models.toSeries() j CapabilityRouter
-        return ModelMux(core, keyMux, pendingUrls.toMap())
-    }
+fun ModelMuxBuilder(envPrefix: String = "LLM_") {
+    // Keys are loaded from environment by KeyMux
 }
