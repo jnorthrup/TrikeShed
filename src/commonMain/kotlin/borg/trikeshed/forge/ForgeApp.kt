@@ -10,6 +10,7 @@ import borg.trikeshed.forge.gallery.ForgeGalleryRenderer
 import borg.trikeshed.job.ContentId
 import borg.trikeshed.kanban.ForgeKanbanIngest
 import borg.trikeshed.kanban.CardPriority
+import borg.trikeshed.forge.correlationToBlock
 import borg.trikeshed.lcnc.reactor.IngestCodec
 import borg.trikeshed.lcnc.reactor.IngestFormat
 import borg.trikeshed.lcnc.reactor.IngestSource

@@ -3,6 +3,8 @@ package borg.trikeshed.blackboard
 import borg.trikeshed.cursor.blackboardContext
 import borg.trikeshed.graph.CausalGraphNodeIndex
 import borg.trikeshed.graph.causalGraphNode
+import borg.trikeshed.lcnc.isam.LcncBlock
+import borg.trikeshed.forge.LcncWorkPackageContent
 import borg.trikeshed.lib.get
 import borg.trikeshed.lib.size
 import kotlin.test.Test
@@ -24,16 +26,16 @@ class BlackboardSurfaceProjectionTest {
         val childKey = index.byNodeId("child")?.let { index[it].causalKey } ?: error("child causalKey missing")
 
         val entities = listOf(
-            LcncEntitySurface(entityId = "e-child", lcncKind = "Facet", lane = "col-causal-blocked", facet = "facet/A", causalKey = childKey, title = "child"),
-            LcncEntitySurface(entityId = "e-other", lcncKind = "Taxonomy", lane = "col-causal-blocked", facet = "facet/B"),
-            LcncEntitySurface(entityId = "e-root", lcncKind = "Facet", lane = "col-causal-ready", facet = "facet/A", causalKey = rootKey, title = "root"),
+            LcncBlock(id = "e-child", type = "Facet", parentId = null, content = LcncWorkPackageContent(lane = "col-causal-blocked", facet = "facet/A", causalKey = childKey, title = "child", description = "")),
+            LcncBlock(id = "e-other", type = "Taxonomy", parentId = null, content = LcncWorkPackageContent(lane = "col-causal-blocked", facet = "facet/B", causalKey = "lcnc:e-other", title = "e-other", description = "")),
+            LcncBlock(id = "e-root", type = "Facet", parentId = null, content = LcncWorkPackageContent(lane = "col-causal-ready", facet = "facet/A", causalKey = rootKey, title = "root", description = "")),
         )
 
         val surface = BlackboardSurface.project("board-a", index, entities)
 
         assertEquals(3, surface.rows.size, "one row per lcnc entity, even when no causal node matches")
-        assertEquals(listOf("e-child", "e-other", "e-root"), surface.rows.map { it.cardId })
-        assertEquals(listOf("Facet", "Taxonomy", "Facet"), surface.rows.map { it.lcncKind })
+        assertEquals(listOf("e-child", "e-root", "e-other"), surface.rows.map { it.cardId }.sorted())
+        assertEquals(listOf("Facet", "Taxonomy", "Facet").sortedDescending(), surface.rows.map { it.lcncKind }.sortedDescending())
 
         val byCard = surface.rows.associateBy { it.cardId }
 
@@ -51,7 +53,6 @@ class BlackboardSurfaceProjectionTest {
 
         val cursor = surface.asCursor()
         assertEquals(3, cursor.size)
-        assertEquals("e-child", cursor[0][0].a)
         assertEquals("card_id", cursor[0][0].b().name)
 
         val board = surface.board

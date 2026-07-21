@@ -22,6 +22,11 @@ import borg.trikeshed.lib.j
 import borg.trikeshed.lib.size
 import borg.trikeshed.parse.confix.ConfixDoc
 import borg.trikeshed.parse.confix.value
+import borg.trikeshed.lcnc.isam.LcncEntity
+import borg.trikeshed.lcnc.isam.LcncBlock
+import borg.trikeshed.forge.causalKey
+import borg.trikeshed.forge.facet
+import borg.trikeshed.forge.lane
 
 /**
  * One row of the visual blackboard.
@@ -47,15 +52,6 @@ data class BlackboardSurfaceRow(
  * nodes attach to rows by `causalKey` so the forge projection can render
  * causal edges on top of lcnc cards.
  */
-data class LcncEntitySurface(
-    val entityId: String,
-    val lcncKind: String,
-    val lane: String,
-    val facet: String,
-    val causalKey: String? = null,
-    val title: String = entityId,
-    val description: String = "",
-)
 
 /**
  * Visual blackboard surface.
@@ -90,7 +86,7 @@ class BlackboardSurface private constructor(
         fun project(
             blackboardId: String,
             index: CausalGraphNodeIndex,
-            entities: List<LcncEntitySurface>,
+            entities: List<LcncEntity>,
             context: BlackboardContext = blackboardContext(
                 id = blackboardId,
                 provenance = provenance(
@@ -109,12 +105,14 @@ class BlackboardSurface private constructor(
             val blockedLane = KanbanColumnId("col-causal-blocked")
             val agenticLane = KanbanColumnId("col-agentic")
 
-            val orderedEntities = entities.sortedWith(
-                compareBy({ it.lane }, { it.facet }, { it.entityId })
+            val validEntities = entities.filterIsInstance<LcncBlock>()
+            val orderedEntities = validEntities.sortedWith(
+                compareBy({ it.lane ?: "" }, { it.facet ?: "" }, { it.id })
             )
 
             val rows = orderedEntities.map { entity ->
-                val node = entity.causalKey?.let { nodeByKey[it] }
+                val causalKey = entity.causalKey
+                val node = causalKey?.let { nodeByKey[it] }
                 val laneId = resolveLane(entity, node)
                 val phase = when (laneId) {
                     readyLane -> "pre-agent"
@@ -123,13 +121,13 @@ class BlackboardSurface private constructor(
                     else -> "pre-agent"
                 }
                 BlackboardSurfaceRow(
-                    cardId = entity.entityId,
+                    cardId = entity.id,
                     lane = laneId.value,
                     phase = phase,
-                    facet = entity.facet,
+                    facet = entity.facet ?: "",
                     provenance = context.provenance?.source,
-                    causalKey = entity.causalKey ?: node?.causalKey ?: "lcnc:${entity.entityId}",
-                    lcncKind = entity.lcncKind,
+                    causalKey = causalKey ?: node?.causalKey ?: "lcnc:${entity.id}",
+                    lcncKind = entity.type,
                 )
             }
 
@@ -174,7 +172,7 @@ class BlackboardSurface private constructor(
             blackboardId: String,
             index: CausalGraphNodeIndex,
             document: ConfixDoc,
-            entities: List<LcncEntitySurface>,
+            entities: List<LcncEntity>,
         ): BlackboardSurface {
             val source = document.value("sourcePath")?.toString()
                 ?.takeIf { it.isNotEmpty() }
@@ -197,10 +195,10 @@ class BlackboardSurface private constructor(
         }
 
         private fun resolveLane(
-            entity: LcncEntitySurface,
+            entity: LcncBlock,
             node: CausalGraphNode?,
         ): KanbanColumnId = when {
-            node == null -> KanbanColumnId(entity.lane)
+            node == null -> KanbanColumnId(entity.lane ?: "")
             node.parentNodeIds.isEmpty() -> KanbanColumnId("col-causal-ready")
             else -> KanbanColumnId("col-causal-blocked")
         }
