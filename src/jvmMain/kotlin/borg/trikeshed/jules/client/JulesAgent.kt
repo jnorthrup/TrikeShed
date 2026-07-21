@@ -11,8 +11,8 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import borg.trikeshed.jules.conductor.JulesSyncConductor
 import borg.trikeshed.jules.sync.SyncMessage
-import kotlinx.serialization.json.JsonElement
-import kotlinx.serialization.json.JsonPrimitive
+import borg.trikeshed.parse.confix.ConfixElement
+import borg.trikeshed.parse.confix.ConfixPrimitive
 
 @Serializable
 enum class JulesAgentState {
@@ -191,7 +191,7 @@ class JulesAgent(
 
         // Initialize sync session
         syncConductor.markConnected()
-        syncConductor.enqueuePayload("session-started", JsonPrimitive(session.id), Clock.System.now().toEpochMilliseconds())
+        syncConductor.enqueuePayload("session-started", ConfixPrimitive(session.id), Clock.System.now().toEpochMilliseconds())
 
         return session
     }

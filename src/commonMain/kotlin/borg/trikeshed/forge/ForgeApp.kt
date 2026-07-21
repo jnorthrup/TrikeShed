@@ -18,9 +18,9 @@ import borg.trikeshed.lcnc.reactor.LcncIngestPipeline
 import borg.trikeshed.lib.Series
 import borg.trikeshed.lib.j
 import kotlinx.datetime.Clock
-import kotlinx.serialization.json.JsonArray
-import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.JsonPrimitive
+import borg.trikeshed.parse.confix.ConfixArray
+import borg.trikeshed.parse.confix.ConfixObject
+import borg.trikeshed.parse.confix.ConfixPrimitive
 
 /**
  * ForgeApp — single file server-side renderable workspace shell.
@@ -144,77 +144,77 @@ object ForgeApp {
     }
 
     private fun forgeSeedJson(state: ForgeAppState): String {
-        val json = JsonObject(
+        val json = ConfixObject(
             mapOf(
-                "title" to JsonPrimitive(state.title),
-                "userId" to JsonPrimitive(state.userId),
-                "items" to JsonArray(state.items.map { item ->
-                    JsonObject(
+                "title" to ConfixPrimitive(state.title),
+                "userId" to ConfixPrimitive(state.userId),
+                "items" to ConfixArray(state.items.map { item ->
+                    ConfixObject(
                         mapOf(
-                            "id" to JsonPrimitive(item.id),
-                            "title" to JsonPrimitive(item.title),
-                            "notes" to JsonPrimitive(item.notes),
-                            "status" to JsonPrimitive(item.status),
-                            "priority" to JsonPrimitive(item.priority),
-                            "checklist" to JsonArray(item.checklist.map { c ->
-                                JsonObject(
+                            "id" to ConfixPrimitive(item.id),
+                            "title" to ConfixPrimitive(item.title),
+                            "notes" to ConfixPrimitive(item.notes),
+                            "status" to ConfixPrimitive(item.status),
+                            "priority" to ConfixPrimitive(item.priority),
+                            "checklist" to ConfixArray(item.checklist.map { c ->
+                                ConfixObject(
                                     mapOf(
-                                        "id" to JsonPrimitive(c.id),
-                                        "text" to JsonPrimitive(c.text),
-                                        "checked" to JsonPrimitive(c.checked),
+                                        "id" to ConfixPrimitive(c.id),
+                                        "text" to ConfixPrimitive(c.text),
+                                        "checked" to ConfixPrimitive(c.checked),
                                     )
                                 )
                             }),
                         )
                     )
                 }),
-                "workspace" to JsonObject(
+                "workspace" to ConfixObject(
                     mapOf(
-                        "columns" to JsonArray(state.workspace.columns.map { col ->
-                            JsonObject(
+                        "columns" to ConfixArray(state.workspace.columns.map { col ->
+                            ConfixObject(
                                 mapOf(
-                                    "id" to JsonPrimitive(col.id),
-                                    "name" to JsonPrimitive(col.name),
-                                    "order" to JsonPrimitive(col.order),
+                                    "id" to ConfixPrimitive(col.id),
+                                    "name" to ConfixPrimitive(col.name),
+                                    "order" to ConfixPrimitive(col.order),
                                 )
                             )
                         }),
                     )
                 ),
-                "causalGraph" to JsonArray(state.causalGraph.map { node ->
-                    JsonObject(
+                "causalGraph" to ConfixArray(state.causalGraph.map { node ->
+                    ConfixObject(
                         mapOf(
-                            "id" to JsonPrimitive(node.id),
-                            "title" to JsonPrimitive(node.title),
-                            "parents" to JsonArray(node.parents.map { JsonPrimitive(it) }),
-                            "children" to JsonArray(node.children.map { JsonPrimitive(it) }),
+                            "id" to ConfixPrimitive(node.id),
+                            "title" to ConfixPrimitive(node.title),
+                            "parents" to ConfixArray(node.parents.map { ConfixPrimitive(it) }),
+                            "children" to ConfixArray(node.children.map { ConfixPrimitive(it) }),
                         )
                     )
                 }),
-                "cascadeGrid" to JsonArray(state.cascadeGrid.map { row ->
-                    JsonObject(
+                "cascadeGrid" to ConfixArray(state.cascadeGrid.map { row ->
+                    ConfixObject(
                         mapOf(
-                            "viewName" to JsonPrimitive(row.viewName),
-                            "metric" to JsonPrimitive(row.metric),
-                            "sum" to JsonPrimitive(row.sum),
-                            "avg" to JsonPrimitive(row.avg),
-                            "min" to JsonPrimitive(row.min),
-                            "max" to JsonPrimitive(row.max),
-                            "count" to JsonPrimitive(row.count),
+                            "viewName" to ConfixPrimitive(row.viewName),
+                            "metric" to ConfixPrimitive(row.metric),
+                            "sum" to ConfixPrimitive(row.sum),
+                            "avg" to ConfixPrimitive(row.avg),
+                            "min" to ConfixPrimitive(row.min),
+                            "max" to ConfixPrimitive(row.max),
+                            "count" to ConfixPrimitive(row.count),
                         )
                     )
                 }),
-                "ingestJobs" to JsonArray(state.ingestJobs.map { job ->
-                    JsonObject(
+                "ingestJobs" to ConfixArray(state.ingestJobs.map { job ->
+                    ConfixObject(
                         mapOf(
-                            "id" to JsonPrimitive(job.id),
-                            "fileName" to JsonPrimitive(job.fileName),
-                            "fileSize" to JsonPrimitive(job.fileSize),
-                            "mimeType" to JsonPrimitive(job.mimeType),
-                            "status" to JsonPrimitive(job.status),
-                            "progress" to JsonPrimitive(job.progress),
-                            "error" to (job.error?.let { JsonPrimitive(it) } ?: JsonPrimitive("")),
-                            "entitiesCreated" to JsonPrimitive(job.entitiesCreated),
+                            "id" to ConfixPrimitive(job.id),
+                            "fileName" to ConfixPrimitive(job.fileName),
+                            "fileSize" to ConfixPrimitive(job.fileSize),
+                            "mimeType" to ConfixPrimitive(job.mimeType),
+                            "status" to ConfixPrimitive(job.status),
+                            "progress" to ConfixPrimitive(job.progress),
+                            "error" to (job.error?.let { ConfixPrimitive(it) } ?: ConfixPrimitive("")),
+                            "entitiesCreated" to ConfixPrimitive(job.entitiesCreated),
                         )
                     )
                 }),
@@ -288,58 +288,58 @@ ${forgeAppScript()}
     /** Server-rendered gallery HTML for the workspace rail. No client-side hydration needed. */
     private fun galleryHtml(): String = ForgeGalleryRenderer.renderHtml()
 
-    private fun forgeBlackboardSeed(): JsonObject {
+    private fun forgeBlackboardSeed(): ConfixObject {
         val view = ForgeBlackboardView.DEFAULT
         val cam = view.defaultCamera
         val cam3d = view.mode3D
-        return JsonObject(
+        return ConfixObject(
             mapOf(
-                "surface" to JsonPrimitive(view.surface),
-                "sections" to JsonArray(view.sections.map { JsonPrimitive(it) }),
-                "defaultMode" to JsonPrimitive(view.defaultMode.name),
-                "cornerButtons" to JsonArray(view.cornerButtons.map { btn ->
-                    JsonObject(
+                "surface" to ConfixPrimitive(view.surface),
+                "sections" to ConfixArray(view.sections.map { ConfixPrimitive(it) }),
+                "defaultMode" to ConfixPrimitive(view.defaultMode.name),
+                "cornerButtons" to ConfixArray(view.cornerButtons.map { btn ->
+                    ConfixObject(
                         mapOf(
-                            "slot" to JsonPrimitive(btn.slot.name),
-                            "id" to JsonPrimitive(btn.id),
-                            "label" to JsonPrimitive(btn.label),
-                            "hotkey" to JsonPrimitive(btn.hotkey),
-                            "surface" to JsonPrimitive(btn.surface),
+                            "slot" to ConfixPrimitive(btn.slot.name),
+                            "id" to ConfixPrimitive(btn.id),
+                            "label" to ConfixPrimitive(btn.label),
+                            "hotkey" to ConfixPrimitive(btn.hotkey),
+                            "surface" to ConfixPrimitive(btn.surface),
                         )
                     )
                 }),
-                "camera" to JsonObject(
+                "camera" to ConfixObject(
                     mapOf(
-                        "x" to JsonPrimitive(cam.x),
-                        "y" to JsonPrimitive(cam.y),
-                        "zoom" to JsonPrimitive(cam.zoom),
-                        "tilt" to JsonPrimitive(cam.tilt),
-                        "vx" to JsonPrimitive(cam.vx),
-                        "vy" to JsonPrimitive(cam.vy),
-                        "vz" to JsonPrimitive(cam.vz),
-                        "minZoom" to JsonPrimitive(cam.minZoom),
-                        "maxZoom" to JsonPrimitive(cam.maxZoom),
+                        "x" to ConfixPrimitive(cam.x),
+                        "y" to ConfixPrimitive(cam.y),
+                        "zoom" to ConfixPrimitive(cam.zoom),
+                        "tilt" to ConfixPrimitive(cam.tilt),
+                        "vx" to ConfixPrimitive(cam.vx),
+                        "vy" to ConfixPrimitive(cam.vy),
+                        "vz" to ConfixPrimitive(cam.vz),
+                        "minZoom" to ConfixPrimitive(cam.minZoom),
+                        "maxZoom" to ConfixPrimitive(cam.maxZoom),
                     )
                 ),
-                "camera3D" to JsonObject(
+                "camera3D" to ConfixObject(
                     mapOf(
-                        "yawRadians" to JsonPrimitive(cam3d.yawRadians),
-                        "pitchRadians" to JsonPrimitive(cam3d.pitchRadians),
-                        "distance" to JsonPrimitive(cam3d.distance),
-                        "focalLength" to JsonPrimitive(cam3d.focalLength),
-                        "minDistance" to JsonPrimitive(cam3d.minDistance),
-                        "maxDistance" to JsonPrimitive(cam3d.maxDistance),
+                        "yawRadians" to ConfixPrimitive(cam3d.yawRadians),
+                        "pitchRadians" to ConfixPrimitive(cam3d.pitchRadians),
+                        "distance" to ConfixPrimitive(cam3d.distance),
+                        "focalLength" to ConfixPrimitive(cam3d.focalLength),
+                        "minDistance" to ConfixPrimitive(cam3d.minDistance),
+                        "maxDistance" to ConfixPrimitive(cam3d.maxDistance),
                     )
                 ),
-                "layout3D" to JsonArray(view.layout3D.map { section ->
-                    JsonObject(
+                "layout3D" to ConfixArray(view.layout3D.map { section ->
+                    ConfixObject(
                         mapOf(
-                            "sectionId" to JsonPrimitive(section.sectionId),
-                            "centerX" to JsonPrimitive(section.centerX),
-                            "centerY" to JsonPrimitive(section.centerY),
-                            "width" to JsonPrimitive(section.width),
-                            "height" to JsonPrimitive(section.height),
-                            "elevation" to JsonPrimitive(section.elevation),
+                            "sectionId" to ConfixPrimitive(section.sectionId),
+                            "centerX" to ConfixPrimitive(section.centerX),
+                            "centerY" to ConfixPrimitive(section.centerY),
+                            "width" to ConfixPrimitive(section.width),
+                            "height" to ConfixPrimitive(section.height),
+                            "elevation" to ConfixPrimitive(section.elevation),
                         )
                     )
                 }),

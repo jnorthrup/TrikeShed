@@ -1,14 +1,14 @@
 package borg.trikeshed.jules.sync
 
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.json.JsonElement
+import borg.trikeshed.parse.confix.ConfixElement
 
 @Serializable
 data class SyncMessage(
     val id: String,
     val sequenceNumber: Long,
     val clientId: String,
-    val payload: JsonElement,
+    val payload: ConfixElement,
     val timestamp: Long
 )
 

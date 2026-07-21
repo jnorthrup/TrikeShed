@@ -4,7 +4,7 @@ import borg.trikeshed.jules.sync.*
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.serialization.json.JsonElement
+import borg.trikeshed.parse.confix.ConfixElement
 
 class JulesSyncConductor(
     val clientId: String,
@@ -25,7 +25,7 @@ class JulesSyncConductor(
         dispatch(SyncEvent.Disconnect(reason))
     }
 
-    suspend fun enqueuePayload(id: String, payload: JsonElement, timestamp: Long) {
+    suspend fun enqueuePayload(id: String, payload: ConfixElement, timestamp: Long) {
         val msg = SyncMessage(
             id = id,
             sequenceNumber = 0, // Assigned by FSM

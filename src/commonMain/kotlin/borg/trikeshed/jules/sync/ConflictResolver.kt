@@ -1,8 +1,8 @@
 package borg.trikeshed.jules.sync
 
-import kotlinx.serialization.json.JsonElement
-import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.JsonPrimitive
+import borg.trikeshed.parse.confix.ConfixElement
+import borg.trikeshed.parse.confix.ConfixObject
+import borg.trikeshed.parse.confix.ConfixPrimitive
 
 enum class ResolutionStrategy {
     LAST_WRITER_WINS,
@@ -36,8 +36,8 @@ object ConflictResolver {
         val baseMessage = resolveLastWriterWins(local, remote)
 
         // Very basic merge if both payloads are JSON Objects
-        if (local.payload is JsonObject && remote.payload is JsonObject) {
-            val mergedPayload = mutableMapOf<String, JsonElement>()
+        if (local.payload is ConfixObject && remote.payload is ConfixObject) {
+            val mergedPayload = mutableMapOf<String, ConfixElement>()
             mergedPayload.putAll(local.payload)
 
             for ((key, value) in remote.payload) {
@@ -50,7 +50,7 @@ object ConflictResolver {
                     mergedPayload[key] = value
                 }
             }
-            return baseMessage.copy(payload = JsonObject(mergedPayload))
+            return baseMessage.copy(payload = ConfixObject(mergedPayload))
         }
 
         return baseMessage

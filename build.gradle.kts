@@ -200,7 +200,6 @@ kotlin {
                 implementation("org.graalvm.polyglot:js-community:$graalVersion")
                 implementation("org.graalvm.polyglot:python-community:$graalVersion")
                 implementation("org.graalvm.truffle:truffle-api:$graalVersion")
-                implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:$serializationVersion")
 
                 // Apache Tika — document text extraction (PDF/DOCX/images via Tesseract OCR).
                 // Parsers pull in POI/PDFBox/etc. only on the JVM target.
