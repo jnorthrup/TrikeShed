@@ -51,7 +51,7 @@ these interfaces. No platform IO leaks into `commonMain`.
   - Targets: `commonMain`.
   - Evidence: compiles in `commonMain`, unit tests for protocol ID round-trip and transform identity.
 
-- [ ] **T2. NUID / authorization algebra in commonMain**
+- [x] **T2. NUID / authorization algebra in commonMain** (DRAINED 2026-07-21, commit ed8d5a79)
   - `Nuid`, `Capability`, `Nonce`, `Subnet` as data classes / typealiases.
   - `TraitSpace` matching `capability` against a worker's advertised traits.
   - Subnet routing prefix rules.
@@ -81,7 +81,7 @@ these interfaces. No platform IO leaks into `commonMain`.
   - Targets: `nativeMain` (`posixMain` / `linuxMain`).
   - Evidence: native tests pass on Linux; macOS uses posix fallback.
 
-- [ ] **T6. Btrfs userspace JBOD backend**
+- [x] **T6. Btrfs userspace JBOD backend** (DRAINED 2026-07-21, commit da20abcd)
   - `BtrfsVolume` implementing `Volume` by parsing superblock, chunk tree, device tree.
   - Built on top of `Volume`, not replacing it.
   - Targets: `jvmMain`/`nativeMain` (mmap + io_uring).
@@ -97,7 +97,7 @@ these interfaces. No platform IO leaks into `commonMain`.
 
 ### Transport / proxy layer (parallel after T1, T2, T4)
 
-- [ ] **T8. Node localhost proxy**
+- [x] **T8. Node localhost proxy** (DRAINED 2026-07-21, commit ed8d5a79)
   - `NodeReactorEndpoint` in `jsMain` that wraps `FetchReactorEndpoint`.
   - Server-side forwarder that accepts `/api` actions and routes to a local `Reactor`.
   - Targets: `jsMain` + JVM/Native server.
@@ -363,7 +363,7 @@ requires the cuts in dependency order below. Gaps identified in the
 post-NUID/CCEK audit. Each task is single-best-debt-reduction sized
 (1-3 files, real verification, non-goals explicit).
 
-- [ ] **T-KANBAN-HTTP-1. `KanbanHttpServerJvm` in jvmMain — closes G01+G02+G06**
+- [x] **T-KANBAN-HTTP-1. `KanbanHttpServerJvm` in jvmMain — closes G01+G02+G06** (DRAINED 2026-07-21, commit da20abcd)
   - File: `src/jvmMain/kotlin/borg/trikeshed/forge/server/KanbanHttpServerJvm.kt`
   - Builds on the existing `HtxReactorElement` (no new HTTP machinery).
   - Mounts `POST /api/submit` for markdown ingest (calls
