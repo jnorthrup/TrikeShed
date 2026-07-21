@@ -93,17 +93,17 @@ object GraalVmCursorHost {
             defaultMeta
         }
 
-        return size j { i: Int ->
+        val metaList = mutableListOf<ColumnMeta>()
+        var current: ColumnMeta? = exemplarMeta()
+        while (current != null) {
+            metaList.add(current)
+            current = current.child
+        }
+
+        // Eagerly materialize all row values before context closes
+        val eagerlyEvaluatedRows = Array(size) { i ->
             val rowVal = value.getArrayElement(i.toLong())
-
-            val metaList = mutableListOf<ColumnMeta>()
-            var current: ColumnMeta? = exemplarMeta()
-            while (current != null) {
-                metaList.add(current)
-                current = current.child
-            }
-
-            val rowValues = Array<Any?>(metaList.size) { colIdx ->
+            Array<Any?>(metaList.size) { colIdx ->
                 val meta = metaList[colIdx]
                 val memberVal = rowVal.getMember(meta.name.toString())
                 when (meta.type) {
@@ -114,7 +114,10 @@ object GraalVmCursorHost {
                     else -> null // Simplification for test
                 }
             }
+        }
 
+        return size j { i: Int ->
+            val rowValues = eagerlyEvaluatedRows[i]
             val rowA = (rowValues.size j { idx: Int -> rowValues[idx] })
             val res = rowA j exemplarMeta
             res as RowVec
