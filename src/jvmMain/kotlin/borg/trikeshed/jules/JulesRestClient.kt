@@ -40,6 +40,7 @@ class JulesRestClient(
         val originator: String,
         val kind: String,       // agentMessaged | userMessaged | planGenerated | progressUpdated | artifacts
         val patchBytes: Long,   // unidiff bytes carried by this activity, 0 if none
+        val excerpt: String,    // first 140 chars of the message body, if any
     )
 
     /** List all sessions (pageSize 100). */
@@ -57,6 +58,49 @@ class JulesRestClient(
                 patchBytes = 0L, // filled by patchProbe for COMPLETED sessions
             )
         }
+    }
+
+    /** Ordered activities for a session, each carrying its minted serial. */
+    fun activities(sessionId: String): List<ActivityInfo> {
+        val body = get("/sessions/$sessionId/activities?pageSize=100")
+        val parsed = JsonSupport.parse(body) as? Map<*, *> ?: return emptyList()
+        val raw = parsed["activities"] as? List<*> ?: return emptyList()
+        val out = ArrayList<ActivityInfo>(raw.size)
+        var seq = 0
+        for (a in raw) {
+            val m = a as? Map<*, *> ?: continue
+            val name = m["name"]?.toString() ?: continue
+            var kind = "unknown"
+            var patch = 0L
+            for (k in listOf("agentMessaged", "userMessaged", "planGenerated", "progressUpdated")) {
+                if (m.containsKey(k)) { kind = k; break }
+            }
+            val msgBody = when (kind) {
+                "agentMessaged" -> (m["agentMessaged"] as? Map<*, *>)?.get("agentMessage")?.toString()
+                "userMessaged" -> (m["userMessaged"] as? Map<*, *>)?.get("userMessage")?.toString()
+                else -> null
+            }
+            val artifacts = m["artifacts"] as? List<*>
+            if (artifacts != null) {
+                if (kind == "unknown") kind = "artifacts"
+                for (art in artifacts) {
+                    val am = art as? Map<*, *> ?: continue
+                    val cs = am["changeSet"] as? Map<*, *> ?: continue
+                    val gp = cs["gitPatch"] as? Map<*, *> ?: continue
+                    patch += (gp["unidiffPatch"]?.toString()?.length ?: 0).toLong()
+                }
+            }
+            out += ActivityInfo(
+                id = name.substringAfterLast('/'),
+                seq = seq++,
+                createTime = m["createTime"]?.toString() ?: "",
+                originator = m["originator"]?.toString() ?: "unknown",
+                kind = kind,
+                patchBytes = patch,
+                excerpt = msgBody?.take(140) ?: "",
+            )
+        }
+        return out
     }
 
     /** Sum of unidiff patch bytes across a session's artifacts. */
@@ -99,9 +143,15 @@ class JulesRestClient(
         return last
     }
 
-    /** Send a message to an AWAITING session. */
-    fun sendMessage(sessionId: String, message: String) {
-        post("/sessions/$sessionId:sendMessage", """{"message": ${jsonString(message)}}""")
+    /**
+     * Send a message to an AWAITING session. Returns the created activity's id
+     * (the dedup anchor — without it the next poll would double-count our own
+     * answer as a fresh user event), or null if the response carried no id.
+     */
+    fun sendMessage(sessionId: String, message: String): String? {
+        val resp = post("/sessions/$sessionId:sendMessage", """{"message": ${jsonString(message)}}""")
+        val parsed = JsonSupport.parse(resp) as? Map<*, *> ?: return null
+        return parsed["name"]?.toString()?.substringAfterLast('/')
     }
 
     /** Create a session. Returns the new session id. */

@@ -249,9 +249,16 @@ kotlin {
         val androidMain = maybeCreate("androidMain").apply { dependsOn(commonMain) }
         val androidTest = maybeCreate("androidTest").apply { dependsOn(commonTest) }
 
+        // Source Set Hierarchy Documentation:
+        // - posixMain: Code shared across posix platforms (macOS, Linux)
+        // - macosMain: macOS-specific code
+        // - linuxMain: Linux-specific code
+        // - appleMain: Apple-platform-specific code (macOS, iOS, etc.)
+        // Note: Default KMP hierarchy handles macosX64Main -> macosMain -> appleMain -> nativeMain.
+        // We explicitly connect macosMain and linuxMain to posixMain above.
+        
         findByName("macosMain")?.dependsOn(posixMain)
         findByName("macosTest")?.dependsOn(posixTest)
-        findByName("macosX64Main")?.dependsOn(posixMain)
         findByName("macosX64Test")?.dependsOn(posixTest)
         findByName("linuxMain")?.dependsOn(posixMain)
         findByName("linuxTest")?.dependsOn(posixTest)

@@ -4,32 +4,45 @@
  */
 package borg.trikeshed.jules
 
+import borg.trikeshed.utils.kanban.JulesBoardStore
 import kotlinx.coroutines.delay
+import kotlinx.datetime.Clock
 
 /**
  * Jules conductor: polls Jules, snapshots each session into its card's assumpsis,
  * records the cause of every lane transition, and renders the board.
  *
  * The board is the conductor of development scale; the commits are only the
- * recording of actions it decided. This class owns no durable state beyond the
- * cards — card state is the only truth, snapshots are its world, causes its memory.
+ * recording of actions it decided. Card state is the only truth in memory —
+ * when a [JulesBoardStore] is attached, every mutation is appended to the
+ * Confix causal log and the in-memory board is rehydrated from it at boot.
  */
 class JulesConductor(
     private val client: JulesRestClient,
     private val headShaProvider: () -> String,
+    private val store: JulesBoardStore? = null,
 ) {
-    /** Cards keyed by session id. The board. */
-    val cards: MutableMap<String, JulesSessionCard> = mutableMapOf()
+    /** Cards keyed by session id. The board. Projection of the causal log. */
+    val cards: MutableMap<String, JulesSessionCard> = store?.load() ?: mutableMapOf()
 
-    /** One poll cycle: snapshot surroundings, diff, record causes. */
-    fun pollOnce() {
+    /** One poll cycle: snapshot surroundings, diff, record causes, persist. */
+    suspend fun pollOnce() {
         val sessions = client.listSessions()
         val active = sessions.count { it.state == "IN_PROGRESS" || it.state == "PLANNING" || it.state == "QUEUED" }
         val awaiting = sessions.count { it.state == "AWAITING_USER_FEEDBACK" }
         val headSha = headShaProvider()
 
         for (s in sessions) {
-            val patchBytes = if (s.state == "COMPLETED") client.patchProbe(s.id) else 0L
+            val existing = cards[s.id]
+            val stateChanged = existing != null && existing.snapshot.state != s.state
+            // Activities are fetched only when needed: COMPLETED sessions (patch
+            // accounting) and state transitions (cause anchoring). Steady-state
+            // sessions cost zero extra calls.
+            val acts = if (s.state == "COMPLETED" || (stateChanged && s.state == "AWAITING_USER_FEEDBACK"))
+                client.activities(s.id) else emptyList()
+            // changeSets are cumulative per activity — the last non-zero carries the total.
+            val patchBytes = acts.lastOrNull { it.patchBytes > 0 }?.patchBytes ?: 0L
+
             val snap = JulesSnapshot(
                 sessionId = s.id,
                 state = s.state,
@@ -39,19 +52,44 @@ class JulesConductor(
                 activeCount = active,
                 awaitingCount = awaiting,
             )
-            val existing = cards[s.id]
             if (existing == null) {
-                cards[s.id] = JulesSessionCard.capture(snap)
-            } else if (existing.snapshot.state != snap.state || existing.snapshot.patchBytes != snap.patchBytes) {
+                val card = JulesSessionCard.capture(snap)
+                cards[s.id] = card
+                store?.append(snap, drained = false, cause = card.causes.last())
+            } else if (stateChanged || existing.snapshot.patchBytes != snap.patchBytes) {
                 val cause: JulesCause = when {
-                    snap.patchBytes > existing.snapshot.patchBytes ->
-                        JulesCause.PatchArrived(snap.patchBytes, snap.capturedAt)
+                    snap.patchBytes > existing.snapshot.patchBytes -> {
+                        val anchor = acts.lastOrNull { it.patchBytes > 0 }
+                        JulesCause.PatchArrived(snap.patchBytes, snap.capturedAt, anchor?.id, anchor?.seq)
+                    }
+                    s.state == "AWAITING_USER_FEEDBACK" -> {
+                        val anchor = acts.lastOrNull { it.kind == "agentMessaged" } ?: acts.lastOrNull()
+                        JulesCause.AgentMessaged(anchor?.excerpt ?: "", snap.capturedAt, anchor?.id, anchor?.seq)
+                    }
                     else ->
                         JulesCause.StateObserved(existing.snapshot.state, snap.state, snap.capturedAt)
                 }
                 cards[s.id] = existing.transition(snap, cause)
+                store?.append(snap, existing.drained, cause)
             }
         }
+    }
+
+    /** Answer an AWAITING session; the returned activity id anchors the cause. */
+    suspend fun answer(sessionId: String, message: String) {
+        val activityId = client.sendMessage(sessionId, message)
+        val card = cards[sessionId] ?: return
+        val cause = JulesCause.HumanAnswered(message, Clock.System.now().toEpochMilliseconds(), activityId)
+        cards[sessionId] = card.copy(causes = card.causes + cause)
+        store?.append(card.snapshot, card.drained, cause)
+    }
+
+    /** Record a drain outcome on the card and the log. */
+    suspend fun recordDrain(sessionId: String, commitSha: String, rejects: Int) {
+        val card = cards[sessionId] ?: return
+        val updated = card.markDrained(commitSha, rejects)
+        cards[sessionId] = updated
+        store?.append(updated.snapshot, drained = true, cause = updated.causes.last())
     }
 
     /** Run forever at [intervalMs]. */
@@ -93,12 +131,15 @@ class JulesConductor(
                         .redirectErrorStream(true)
                         .start().inputStream.bufferedReader().readText().trim()
                 },
+                store = JulesBoardStore(),
             )
-            if (once) {
-                conductor.pollOnce()
-                print(conductor.renderBoard())
-            } else {
-                kotlinx.coroutines.runBlocking { conductor.run() }
+            kotlinx.coroutines.runBlocking {
+                if (once) {
+                    conductor.pollOnce()
+                    print(conductor.renderBoard())
+                } else {
+                    conductor.run()
+                }
             }
         }
     }
