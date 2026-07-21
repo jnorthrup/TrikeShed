@@ -34,18 +34,47 @@ data class JulesSnapshot(
     val capturedAt: Long = Clock.System.now().toEpochMilliseconds(),
 )
 
-/** What caused a lane transition. Sealed so every cause is inspectable. */
+/**
+ * What caused a lane transition. Sealed so every cause is inspectable.
+ *
+ * Jules exposes no mutation serials — activity ids are random hex, only
+ * createTime orders them. So the board mints its own per-session serial
+ * ([activitySeq] = index in the ordered activities list) and anchors it to the
+ * Jules activity [activityId] for dedup. Causes without an anchor are
+ * conductor-internal (predicate flips, drain bookkeeping).
+ */
 sealed class JulesCause {
     abstract val at: Long
 
+    /** Jules activity id that provoked this cause, if any (dedup anchor). */
+    open val activityId: String? get() = null
+
+    /** Board-minted serial: index of the activity in the session's ordered list. */
+    open val activitySeq: Int? get() = null
+
     /** Agent posted a progress/question message. */
-    data class AgentMessaged(val excerpt: String, override val at: Long) : JulesCause()
+    data class AgentMessaged(
+        val excerpt: String,
+        override val at: Long,
+        override val activityId: String? = null,
+        override val activitySeq: Int? = null,
+    ) : JulesCause()
 
     /** Human answered an AWAITING session via the board. */
-    data class HumanAnswered(val message: String, override val at: Long) : JulesCause()
+    data class HumanAnswered(
+        val message: String,
+        override val at: Long,
+        override val activityId: String? = null,
+        override val activitySeq: Int? = null,
+    ) : JulesCause()
 
     /** Session delivered a patch (changeSet artifact observed). */
-    data class PatchArrived(val bytes: Long, override val at: Long) : JulesCause()
+    data class PatchArrived(
+        val bytes: Long,
+        override val at: Long,
+        override val activityId: String? = null,
+        override val activitySeq: Int? = null,
+    ) : JulesCause()
 
     /** Drain applied the patch locally and committed. */
     data class DrainApplied(val commitSha: String, val rejects: Int, override val at: Long) : JulesCause()

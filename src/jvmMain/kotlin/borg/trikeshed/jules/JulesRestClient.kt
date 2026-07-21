@@ -27,6 +27,21 @@ class JulesRestClient(
         val patchBytes: Long,
     )
 
+    /**
+     * One Jules activity with the board-minted serial. Jules gives random hex ids
+     * and microsecond createTime but no sequence numbers; [seq] is our serial —
+     * the activity's index in the chronologically-ordered list. [id] is the dedup
+     * anchor that survives retroactive insertions.
+     */
+    data class ActivityInfo(
+        val id: String,
+        val seq: Int,
+        val createTime: String,
+        val originator: String,
+        val kind: String,       // agentMessaged | userMessaged | planGenerated | progressUpdated | artifacts
+        val patchBytes: Long,   // unidiff bytes carried by this activity, 0 if none
+    )
+
     /** List all sessions (pageSize 100). */
     fun listSessions(): List<SessionInfo> {
         val body = get("/sessions?pageSize=100")
