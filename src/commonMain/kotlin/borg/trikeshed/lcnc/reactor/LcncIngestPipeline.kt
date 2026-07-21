@@ -195,7 +195,7 @@ class LcncIngestPipeline(
             )
         }
         
-        val db = LcncDatabase(
+        val db = borg.trikeshed.lcnc.isam.LcncDatabase(
             id = databaseId,
             title = "Imported Database (Columns: ${'$'}inferredColumns)",
             parentId = null,
