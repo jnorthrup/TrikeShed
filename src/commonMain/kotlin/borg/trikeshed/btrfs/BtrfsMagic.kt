@@ -1,0 +1,5 @@
+package borg.trikeshed.btrfs
+
+const val BTRFS_MAGIC = 0x4D5F53665248425FuL
+
+val BTRFS_MAGIC_BYTES = ubyteArrayOf(0x5Fu, 0x42u, 0x48u, 0x52u, 0x66u, 0x53u, 0x5Fu, 0x4Du)
