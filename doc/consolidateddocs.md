@@ -2521,7 +2521,7 @@ post-NUID/CCEK audit. Each task is single-best-debt-reduction sized
     lifecycle (CREATED → OPEN → ACTIVE → DRAINING → CLOSED) with
     `Channel<ReactorAction>` fanout, not a `mutableListOf` accumulator.
 
-- [ ] **T-KANBAN-PERSIST-9. Pick a persistence surface (closes G09)**
+- [x] **T-KANBAN-PERSIST-9. Pick a persistence surface (closes G09)**
   - Decision only — either port the Hermes SQLite schema to Kotlin
     (~300 lines) or officially adopt the JSON / ConfixDocStore path
     and document it. No code in this task — sign-off only.
@@ -2774,3 +2774,15 @@ interface WasmCursorHost {
 2. **Host Bindings**: Create a Kotlin/JS wrapper around `WebAssembly.instantiateStreaming` that injects `{ env: { get_cell: ... } }`.
 3. **Guest Implementation**: Write a simple C/Rust guest that takes a `row_count` and `col_count` and calls `get_cell(r, c)`.
 
+
+## Architectural Decision Record (ADR): T-KANBAN-PERSIST-9
+
+**Date:** 2024-07-21
+**Decision:** Adopt JSON / ConfixDocStore path for Kanban persistence.
+**Status:** Accepted
+
+**Context:**
+We evaluated whether to port the Hermes SQLite schema to Kotlin (approx. 300 LOC) or officially adopt the JSON / ConfixDocStore path for Kanban persistence.
+
+**Decision:**
+We officially adopt the JSON / ConfixDocStore path. CouchStore combined with ConfixDoc storage natively supports the Causal Graph and Kanban features without requiring an embedded relational database dependency like SQLite across all KMP targets. The `ConfixPersistence` and `JsonFilePersistence` implementations are already functional, tested (e.g. `ConfixPersistenceTest`), and aligned with the overarching architecture of using content-addressed JSON/Confix stores on top of our custom CAS and IO bindings.
