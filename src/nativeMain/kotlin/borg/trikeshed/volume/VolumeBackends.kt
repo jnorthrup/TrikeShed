@@ -1,6 +1,6 @@
 package borg.trikeshed.volume
 
-import borg.trikeshed.userspace.volume.Volume
+import borg.trikeshed.volume.Volume
 
 expect object VolumeBackends {
     fun openPosix(path: String, blockSize: Int = 4096, capacityBytes: Long = blockSize.toLong() * 1024L): Volume
