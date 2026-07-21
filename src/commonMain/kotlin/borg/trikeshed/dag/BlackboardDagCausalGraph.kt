@@ -2,7 +2,6 @@ package borg.trikeshed.dag
 
 import borg.trikeshed.parse.confix.value
 import borg.trikeshed.dag.BlackboardEvent
-import borg.trikeshed.job.ContentId.Companion.of
 
 import borg.trikeshed.cursor.blackboardContext
 import borg.trikeshed.cursor.provenance
@@ -11,7 +10,9 @@ import borg.trikeshed.graph.causalGraphNode
 import borg.trikeshed.dag.ReteAgent
 import borg.trikeshed.job.CasStore
 import borg.trikeshed.job.ContentId
+import borg.trikeshed.job.ContentId.Companion.of
 import borg.trikeshed.job.project
+import borg.trikeshed.job.CausalNode
 import borg.trikeshed.job.Lens
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
