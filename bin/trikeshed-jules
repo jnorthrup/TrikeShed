@@ -24,7 +24,7 @@ JULES_OAUTH_TOKEN="${JULES_OAUTH_TOKEN:-}"
 CACHE_DIR="${HOME}/.cache/jules-cli"
 
 # Predicate configuration
-MAX_CONCURRENT=10
+MAX_CONCURRENT=15
 REQUIRED_KEYWORDS=("TDD" "PR" "Deliver")
 FORBIDDEN_PATTERNS=("libs/" "/libs" "lib/" "/lib" ".zenith/" "~/.zenith")
 ALLOWED_BRANCH="${TRIKESHED_JULES_BRANCH:-master}"
