@@ -455,6 +455,16 @@ cmd_merge_completed() {
     
     log "Found ${count} completed sessions, checking for pullable patches..."
     
+    # Stage all local files first (Jules may have written them directly)
+    # This commits duplicate work without reapplying anything
+    local root
+    root=$(git rev-parse --show-toplevel 2>/dev/null) || root="."
+    if [[ -n "$(git -C "${root}" status --porcelain=v1 --untracked-files=all)" ]]; then
+        log "Staging $(git -C "${root}" status --porcelain=v1 --untracked-files=all | wc -l) local file(s) from Jules work..."
+        git -C "${root}" add -A
+        git -C "${root}" commit -m "merge-completed: stage Jules artifacts $(date -u +%Y-%m-%dT%H:%M:%SZ)" || true
+    fi
+    
     echo "${completed_sessions}" | jq -r '.[] | .id' | while read -r sid; do
         local patch_len
         patch_len=$(api_request GET "/sessions/${sid}/activities?pageSize=100" 2>/dev/null | \
@@ -463,7 +473,16 @@ cmd_merge_completed() {
         if [[ "${patch_len}" -gt 0 ]]; then
             log "Found patch for ${sid} (${patch_len} bytes), pulling..."
             if command -v jules >/dev/null 2>&1; then
-                jules remote pull --session "${sid}" --apply 2>&1 || true
+                # Capture output; "already exists" means Jules already wrote the file locally — skip reapplying
+                local output
+                output=$(jules remote pull --session "${sid}" --apply 2>&1 || true)
+                if echo "${output}" | grep -q "already exists"; then
+                    log "Patch ${sid}: files already exist locally — skipping (committed above)"
+                elif echo "${output}" | grep -q "patch does not apply"; then
+                    log "Patch ${sid}: patch does not apply cleanly — skipping"
+                else
+                    log "Patch ${sid}: applied OK"
+                fi
             fi
         else
             log "No patch for ${sid}, skipping"
