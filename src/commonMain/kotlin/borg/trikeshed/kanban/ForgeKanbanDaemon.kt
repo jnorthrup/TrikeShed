@@ -5,6 +5,7 @@ import modelmux.acp.*
 import keymux.*
 import borg.trikeshed.lib.*
 import borg.trikeshed.htx.*
+import borg.trikeshed.userspace.FanoutEvent
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.*
 
@@ -165,16 +166,15 @@ class ForgeKanbanDaemon(
     }
     
     /**
-     * Start the daemon as a background job.
+     * Start the daemon as a background job reacting to fanout events.
      */
-    fun startAutoProcess(intervalMs: Long = 60_000): Job = scope.launch {
-        while (isActive) {
+    fun startAutoProcess(fanoutFlow: Flow<FanoutEvent>): Job = scope.launch {
+        fanoutFlow.collect { event ->
             try {
                 processPendingCalls()
             } catch (e: Exception) {
                 println("[ForgeKanbanDaemon] Error processing calls: ${e.message}")
             }
-            delay(intervalMs)
         }
     }
     
