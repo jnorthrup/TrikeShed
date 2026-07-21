@@ -1,0 +1,8 @@
+T29 Aspirational|T29: Decide implement or de-stub aspirational modules
+
+Review aspirational modules and decide to implement or remove stubs.
+
+TDD: Write test first, then implement.
+PR: Deliver PR with non-empty diff.
+
+Verify: ./gradlew compileKotlinJvm passes

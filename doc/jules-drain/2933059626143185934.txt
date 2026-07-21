@@ -1,0 +1,8 @@
+T9b: Bind reactor adapter to upstream KMPngSCTP
+
+Bind reactor adapter to upstream KMPngSCTP.
+
+TDD: Write test first, then implement.
+PR: Deliver PR with non-empty diff.
+
+Verify: ./gradlew jvmTest --tests '*Sctp*' passes

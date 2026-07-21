@@ -1,0 +1,8 @@
+T-REWIRE-3e IPFS|T-REWIRE-3e: IPFS/IPNS bridge
+
+Implement IPFS/IPNS bridge for TrikeShed.
+
+TDD: Write test first, then implement.
+PR: Deliver PR with non-empty diff.
+
+Verify: ./gradlew jvmTest --tests '*IPFS*' passes

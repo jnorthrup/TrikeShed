@@ -1,0 +1,8 @@
+T-REWIRE-3f Progressive|T-REWIRE-3f: Progressive rendering
+
+Implement progressive rendering for TrikeShed.
+
+TDD: Write test first, then implement.
+PR: Deliver PR with non-empty diff.
+
+Verify: ./gradlew jvmTest --tests '*Progressive*' passes

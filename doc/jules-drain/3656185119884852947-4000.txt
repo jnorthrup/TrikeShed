@@ -1,0 +1,8 @@
+T-REWIRE-3b Modelmux|T-REWIRE-3b: Modelmux kanban agent
+
+Implement Modelmux kanban agent for TrikeShed.
+
+TDD: Write test first, then implement.
+PR: Deliver PR with non-empty diff.
+
+Verify: ./gradlew jvmTest --tests '*Modelmux*' passes
