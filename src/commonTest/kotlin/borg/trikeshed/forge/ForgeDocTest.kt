@@ -1,8 +1,8 @@
-package borg.trikeshed.forge.donor
+package borg.trikeshed.forge
 
 import kotlin.test.*
 
-class HermesDonorTraceTest {
+class ForgeDocTest {
 
     @Test
     fun testNotImplemented() {

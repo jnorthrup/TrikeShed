@@ -97,9 +97,9 @@ sealed class Capability(val category: String) {
 /** Internal capability equality + family matching. */
 infix fun Capability.matches(other: Capability): Boolean {
     if (this == other) return true
-    val thisFamily = familyRoot()
-    val otherFamily = other.familyRoot()
-    return thisFamily != null && thisFamily == otherFamily
+    if (this == other.familyRoot()) return true
+    if (this.familyRoot() == other) return true
+    return false
 }
 
 // ── Subnet ──────────────────────────────────────────────────────────────

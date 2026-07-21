@@ -1,8 +1,8 @@
-package borg.trikeshed.forge.donor
+package borg.trikeshed.forge.window
 
 import kotlin.test.*
 
-class HermesDonorTraceTest {
+class JvmForgeWindowManagerTest {
 
     @Test
     fun testNotImplemented() {

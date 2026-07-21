@@ -1,8 +1,8 @@
-package borg.trikeshed.forge.donor
+package borg.trikeshed.k8s.operator
 
 import kotlin.test.*
 
-class HermesDonorTraceTest {
+class TrikeShedOperatorTest {
 
     @Test
     fun testNotImplemented() {
