@@ -2,6 +2,16 @@ package borg.trikeshed.lcnc.reduction
 
 import borg.trikeshed.context.nuid.Capability
 
+val Capability.category: String
+    get() = when (this) {
+        is Capability.Process -> "process"
+        is Capability.Cas -> "cas"
+        is Capability.Wireproto -> "wireproto"
+        is Capability.Mesh -> "mesh"
+        is Capability.ModelMux -> "modelmux"
+        else -> "custom"
+    }
+
 object ReducerRegistry {
     var registry: Map<String, LcncReduction<*, *, *, *>> = mapOf(
         "process" to LcncReductions.forgeCascade(emptyList(), emptyList()),
