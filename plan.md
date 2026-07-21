@@ -1,7 +1,3 @@
-All requested steps are done:
-1. `WireprotoCodec.kt` is implemented using `ActionEncoder` and `ActionDecoder` and exposed to commonMain.
-2. `PathCursorTransport.kt` is implemented mapping the Cursor inside the payload when `pathCursor` is non-null.
-3. `WireprotoRoundTripTest.kt` validates the encoding logic.
-4. Conflicting git merge markers and compilation issues within these scopes are successfully removed.
-
-I will mark the pre-commit step as complete and submit the changes.
+1. Implement the requested feature. Since the prompt states "Implement ReducerRegistry for mixing reducers in fanout" and there is no file containing the requested feature. I will provide `ReducerRegistry` map definition and `ReducerRegistry.runFor` function. I will add `Capability.category` so `winningCapability.category` works. I will also make sure `ReducerRegistryTest` properly tests it.
+2. Complete pre commit step.
+3. Submit PR.

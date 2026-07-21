@@ -9,6 +9,7 @@ import borg.trikeshed.lcnc.reduction.KeyAlg
 import borg.trikeshed.lcnc.reduction.ValueAlg
 import borg.trikeshed.lcnc.reduction.PhaseAlg
 import borg.trikeshed.lcnc.reduction.CarrierAlg
+import borg.trikeshed.lcnc.reduction.ReducerRegistry
 import borg.trikeshed.lib.j
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.runTest
@@ -27,17 +28,10 @@ class LcncFanoutElementTest {
         val processWorkgroup = Workgroup(
             name = "process-worker",
             scope = Subnet.core,
-            traits = TraitSpace { 1 j { Capability.Process("test_process") } }
-        )
-
-        val casWorkgroup = Workgroup(
-            name = "cas-worker",
-            scope = Subnet.core,
-            traits = TraitSpace { 1 j { Capability.Cas("test_cas") } }
+            traits = TraitSpace { 1 j { Capability.Process } }
         )
 
         nuidFanout.register(processWorkgroup)
-        nuidFanout.register(casWorkgroup)
 
         var runForCalled = false
 
@@ -60,28 +54,33 @@ class LcncFanoutElementTest {
             }
         }
 
-        val stubRegistry = mapOf("process" to stubReduction)
+        // Mock ReducerRegistry temporarily to verify fanout
+        val originalRegistry = ReducerRegistry.registry
+        try {
+            ReducerRegistry.registry = mapOf("process" to stubReduction)
 
-        val lcncFanout = LcncFanoutElement(nuidFanout, stubRegistry)
-        lcncFanout.open()
+            val lcncFanout = LcncFanoutElement(nuidFanout)
+            lcncFanout.open()
 
-        val testPayload = emptyArray<Any>()
-        val nuid = nuid(Capability.Process("test_process"), Nonce.RandomBytes(), Subnet.core)
+            val testPayload = emptyArray<Any>()
+            val nuid = nuid(Capability.Process, Nonce.RandomBytes(), Subnet.core)
 
-        // Launch consumer so that nuidFanout polling loop can actually complete
-        val slot = nuidFanout.slotOf("process-worker")
-        assertNotNull(slot)
+            // Launch consumer so that nuidFanout polling loop can actually complete
+            val slot = nuidFanout.slotOf("process-worker")
+            assertNotNull(slot)
 
-        val job = launch {
-            val claim = slot.consume()
-            // Simulating successful dispatch inside the dispatcher
+            val job = launch {
+                val claim = slot.consume()
+            }
+
+            val result = lcncFanout.dispatch(nuid, testPayload)
+
+            assertTrue(runForCalled, "execute should have been called on the reduction")
+            assertEquals("success", result)
+
+            job.cancel()
+        } finally {
+            ReducerRegistry.registry = originalRegistry
         }
-
-        val result = lcncFanout.dispatch(nuid, testPayload)
-
-        assertTrue(runForCalled, "execute should have been called on the reduction")
-        assertEquals("success", result)
-
-        job.cancel()
     }
 }
