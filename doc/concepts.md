@@ -608,7 +608,10 @@ reagents that the rest of the system can compose on top of:
 | T09 Mesh/SCTP | `reactor/` | `MeshActionFrame`, `MeshErrorCode`, `MeshActionResult`, `MeshConfig`, `SctpReactorEndpoint`, `MeshReactorEndpoint` | UDP stand-in until SCTP c-interop lands |
 | T11 CAS worker | `cas/` | `BlockIndex` (+ supporting CAS worker types on `Volume`) | Manifest CIDs, deterministic archives |
 | T12 Process worker | `userspace/nio/process/` | `ProcessCapability`, `ProcessResult`, `ProcessSpec`, `ProcessWorker`, `ProcessWorker{Jvm,Native}` | Per-platform factories |
-| T13 Wireproto | `wireproto/` | `WireprotoFrame`, `WireprotoFormatException`, `ReactorActionEnvelope`, `ActionEncoder`, `ActionDecoder`, `ConfixWorker` | Length-prefixed binary protocol (magic 0xCAFEBABE, v1) |
+| T10 Litebike gate | `litebike/` | `Protocol`, `Tunnel`, `SshTunnel`, `ProtocolDetector`, `LitebikeListenerElement` | Clean-room Kotlin port; protocol-keyed channel slots |
+| T13 Wireproto | `wireproto/` | `WireprotoFrame`, `WireprotoFormatException`, `ReactorActionEnvelope`, `PathCursorTransport`, `WireprotoCodec` | Length-prefixed binary protocol (magic 0xCAFEBABE, v1); Confix worker with path/cursor transport |
+| T-KANBAN-HTTP-1 | `jvmMain/litebike/` | `JvmKanbanServer`, `KanbanHttpServerJvm` | Hand-rolled HTTP daemon on LitebikeListenerElement slot |
+| T-KANBAN-WAL-7 | `jvmMain/forge/persistence/` | `CausalWal`, `graphIndex` | WAL append and replay for causal chain recovery |
 | T16 SPI | `forge/window/` | `ForgeWindowManager` (interface), `ScriptSnippet`, `WindowEvent`, `WindowSnapshot` | SPI only; per-target impls in T18 |
 | T17 HTML shell | `forge/shell/` | `HtmlShell`, `ShellAssetRegistry`, `ShellConfig` + `app.css`/`app.js`/`index.html` resources | Resources in `src/commonMain/resources/shell/` |
 | T18 Per-target WMs | `forge/window/{jsMain,jvmMain,macosMain,linuxMain,wasiMain,wasmJsMain}/` | `BrowserForgeWindowManager`, `NodeForgeWindowManager`, `JvmForgeWindowManager`, `NativeForgeWindowManager`, `WasiForgeWindowManager` | JVM uses `java.awt.Desktop`; Native uses `kotlin.time.TimeSource.Monotonic` |

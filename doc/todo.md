@@ -5,6 +5,57 @@ KMP targets into inheritance-based domains around a shared, addressable reactor
 blackboard. It preserves the `Join`/`Series`/`Cursor` algebra in `commonMain`
 and adapts the `../litebike/` taxonomy into the TrikeShed source tree.
 
+## Gating substrate and trust actions (must land before feature expansion)
+
+> **Read this before opening or merging any Jules session.**
+> The positioning paper (`/tmp/forge_positioning_paper.agent.final/forge_positioning_paper.agent.final.md` §7.3) names three trust actions that gate every market pair in §5. Two substrate gates precede them: one Confix serialization/CBOR path and the upstream ngSCTP transport. LLM sessions that keep cranking out feature-local codecs, transports, or windows while these five sit open are procrastinating on the substrate and trust surfaces the early adopters inspect first — that is the diagnosed behavior this section exists to foreclose.
+>
+> **Priority rule:** a Jules session that closes an unchecked gate below outranks every T1–T29 / T-KANBAN-* / T-RESUME-* / T-CAS-* feature task. Gates are not optional and not "after the next merge." No new serializer, CBOR implementation, or SCTP implementation may be invented beside the named canonical paths.
+
+The first two gates establish runtime truth. The final three are **market actions, not engineering chores**. All five are owned by the sole maintainer plus the Jules sessions already in the loop — no hiring, no procurement, no roadmap.
+
+- [ ] **GATE-CONFIX-CBOR. One portable serializer and one canonical CBOR path**
+  - Contract: `KSerializer<T> ↔ Confix Encoder/Decoder ↔ ConfixDoc/RowVec ↔ JSON/YAML/CBOR bytes`. Confix is the `SerialFormat`; Kotlin serialization supplies generated serializers and the base `kotlinx-serialization-core` library only.
+  - Classpath invariant: beside the Kotlin serialization base/core library, Confix is the only serialization format. No `kotlinx-serialization-json`, `kotlinx-serialization-cbor`, protobuf, or properties runtime may remain on a product runtime classpath or act as an intermediate DOM.
+  - Current verified gap: `jvmRuntimeClasspath` contains `kotlinx-serialization-json:1.11.0`; `commonMain` contains forbidden `JsonElement`/`JsonObject`/`JsonPrimitive` references; `parse/confix/ConfixSerialization.kt` is in `jvmMain` and routes through the kotlinx JSON DOM. The existing `ConfixSerializationBoundaryTest` states the intended boundary but the tree currently violates it.
+  - Canonical CBOR must be one Confix-owned RFC 8949 implementation, not `CanonicalCbor` plus an unrelated Confix scanner. Pin deterministic map ordering, definite lengths, minimal integer widths, nested arrays/maps, byte/text strings, tags, floats, null/bool, malformed/truncated rejection, and Confix `(value,key)` kid order. Live processing, CID computation, WAL replay, and cross-target decode use the same bytes and the same lowering path.
+  - Evidence: boundary test scans all product source sets and resolved runtime classpaths; dependency reports show only `kotlinx-serialization-core`; RFC 8949 vectors and malformed-input tests pass; JVM/JS/Wasm/Native encode identical fixtures byte-for-byte; every encoded `ConfixDoc` decodes to the same facets and canonical re-encoding is idempotent.
+
+- [ ] **GATE-NGSCTP-UPSTREAM. Use `jnorthrup/KMPngSCTP` as the ngSCTP implementation**
+  - Canonical upstream: `https://github.com/jnorthrup/KMPngSCTP`, module `ngsctp`, currently verified at `0d3e2b6dcaee8a5a59f56f1897819fd3d707a5fc`. License: Apache-2.0. There is no release or published package yet, so integration must pin source/commit explicitly rather than inventing Maven coordinates.
+  - TrikeShed owns only the CCEK/NUID/Reactor adapter. `src/commonMain/kotlin/borg/trikeshed/context/sctp/SctpElement.kt` is not a second ngSCTP implementation and must not continue growing a parallel handshake/chunk/congestion stack. Adapt upstream association/stream lifecycle into `SctpReactorEndpoint`, `MeshReactorEndpoint`, and the sole platform bind seam.
+  - Preserve upstream structured concurrency: association is the owned coroutine scope; streams are bounded/cancellable channels; cancellation drains/closes transport ownership. No UDP stand-in may be presented as the production leg.
+  - Confix boundary applies transitively: upstream may expose `@Serializable` types through `kotlinx-serialization-core`, but no extra serialization format runtime enters TrikeShed through the integration.
+  - Evidence: pinned upstream source builds independently; TrikeShed compiles against the pinned API without copied ngSCTP protocol classes; two peers exchange a NUID-authorized Confix-CBOR action over an upstream association; multihoming failover and cancellation/close are exercised; resolved classpaths satisfy GATE-CONFIX-CBOR.
+
+- [ ] **GATE-LICENSE. Resolve the license contradiction** (POSITIONING PAPER §7.1.1, §7.3.1)
+  - `LICENSE` is a custom "ThisIsSuperior" zlib-variant; `doc/concepts.md:25` declares "AGPLv3, do not change"; the GitHub API reports "Other." Three texts, one project — no company, NGO, or OSS distributor can adopt Forge until one OSI-approved text governs.
+  - Action: choose one OSI-approved text (AGPLv3 per `concepts.md` is the project's own declaration), delete the contradiction, let the API settle.
+  - Owner: maintainer (sole decision-maker). No agent session can ratify this — it is a sign-off, not a patch.
+  - Unblocks: **all pairs**; P3, P5, P6 first (institutional adopters bounce off a contradictory license on page one).
+  - Evidence: `LICENSE`, `doc/concepts.md`, and the GitHub API report one consistent license string.
+
+- [ ] **GATE-CLEAN-MASTER. Clean master of integrity debt and branch drift** (POSITIONING PAPER §7.1.1, §7.3.1)
+  - The positioning-paper snapshot found nine conflict blocks in `HtmlShell.kt` and `ActionDecoder.kt`; live verification on 2026-07-20 finds no markers in either file. Keep this closed sub-finding from regressing while the remaining branch/PWA/build integrity work is completed.
+  - 129 open branches, ~70 `jules-*` agent sessions, fifteen `wip` commits, one named `dirty-push-to-master`. The deployed PWA (`docs/index.html`) has drifted from master HEAD; the GitHub Pages API returns 404.
+  - Actions: strip the conflict markers, triage the 129 branches, realign the deployed PWA with master HEAD.
+  - Owner: maintainer with the Jules sessions that produced the debt.
+  - Unblocks: P4, P7 first (infra audiences clone before they read — master fails inspection on page one, and the PWA is the first touch); then P1, P2, P6.
+  - Evidence: `./gradlew build` passes on master HEAD; `git branch --list | wc -l` shows triaged count; the gh-pages HTML matches the committed shell.
+
+- [ ] **GATE-MATURITY-MAP. Publish the one-page honest maturity map** (POSITIONING PAPER §7.3.1, §1.3.3)
+  - Distinguish shipped subsystems from adapters-without-production-legs, codecs-without-sockets, and aspirational specs. PWA/litebike/Kanban-daemon/CAS are shipped. TrikeShed SCTP is an adapter awaiting GATE-NGSCTP-UPSTREAM, not the canonical implementation; HTTP3/LCNC remain codec/contract surfaces; tunnels/Creeper-Node/UX-metrics are aspirational-spec. The performance creed (`doc/taste.md`) is aspiration, not telemetry — zero UX-level numbers are published.
+  - Action: land that table as a repo-resident page (e.g. `doc/maturity-map.md`) so the P1–P4 audiences who detect oversold infrastructure on sight find the disclosure *before* they find the claims.
+  - Owner: maintainer.
+  - Unblocks: P1–P4 (the trust-verifiers). Pre-empts the oversold-infrastructure verdict, which for these audiences is the same thing as arriving credible.
+  - Evidence: `doc/maturity-map.md` exists, is linked from the README, and names each shipped/codec/aspirational row with its repo path.
+
+### Reading order for the gates
+
+Read by dependency, the sequence is: **GATE-CONFIX-CBOR → GATE-NGSCTP-UPSTREAM**, because the transport carries the canonical document/action bytes; then **GATE-LICENSE** before institutional conversations, **GATE-CLEAN-MASTER** before clone-first audiences, and **GATE-MATURITY-MAP** before trust-verifiers. Feature work fans out only after the substrate gate it depends on is closed.
+
+---
+
 ## Core hierarchy (non-designated NUID -> subnets -> workgroups -> capabilities)
 
 ```
@@ -103,17 +154,22 @@ these interfaces. No platform IO leaks into `commonMain`.
   - Targets: `jsMain` + JVM/Native server.
   - Evidence: PWA can connect to `localhost:PORT` and invoke a ping action.
 
-- [x] **T9. Mesh / SCTP transport** (DRAINED 2026-07-20, commit 19a84b2d)
+- [x] **T9a. Mesh / SCTP reactor adapter** (DRAINED 2026-07-20, commit 19a84b2d)
   - `MeshActionFrame`, `MeshErrorCode`, `MeshActionResult`, `MeshConfig`, `SctpReactorEndpoint`, `MeshReactorEndpoint` landed in `src/commonMain/kotlin/borg/trikeshed/reactor/`.
   - Recovered via missing-PR pattern (Jules session `13098165998827396591`).
   - `MeshReactorEndpoint` and `SctpReactorEndpoint` implementing `ReactorEndpoint`.
   - Peer discovery over the reactor blackboard.
-  - Targets: `commonMain` interfaces; native implementations.
-  - Evidence: two native peers exchange a NUID-authorized action over loopback.
+  - This landed the reactor/frame adapter only. It is not completion of the ngSCTP transport.
 
-- [ ] **T10. litebike gate / tunnel adaptation**
-  - Port litebike `Protocol`, `rbcursive`, `gates` into `commonMain` taxonomy.
-  - `Tunnel` interface; SSH / shadowsocks / SOCKS5 / proxy backends in native.
+- [ ] **T9b. Bind the reactor adapter to upstream KMPngSCTP** (GATE-NGSCTP-UPSTREAM)
+  - Depend on the pinned `jnorthrup/KMPngSCTP` source; do not extend the local `SctpElement` into a competing protocol implementation.
+  - Targets: common adapter plus upstream JVM/Native transports.
+  - Evidence: two peers exchange a NUID-authorized Confix-CBOR action over upstream ngSCTP loopback; failover and structured cancellation pass.
+
+- [x] **T10. litebike gate / tunnel adaptation** (DRAINED 2026-07-21, PR #241, commit c7cd42059)
+  - `Protocol`, `Tunnel`, `SshTunnel` interfaces landed in `src/commonMain/kotlin/borg/trikeshed/litebike/`.
+  - `ProtocolDetector` for protocol identification.
+  - `LitebikeListenerElement` with protocol-keyed channel slots.
   - Browser uses `ReactorEndpoint` to ask a native/node peer to open a tunnel.
   - Targets: `commonMain` + `nativeMain`/`jvmMain` + `jsMain`.
   - Evidence: protocol detection test; native SSH exec round-trip (or mock).
@@ -137,10 +193,10 @@ these interfaces. No platform IO leaks into `commonMain`.
   - Evidence: spawn `echo` via reactor action, receive stdout as result.
 
 - [ ] **T13. Wireproto / Confix worker**
-  - Serialize/deserialize `ReactorAction` over wireproto.
+  - Serialize/deserialize `ReactorAction` through the single Confix canonical-CBOR path from GATE-CONFIX-CBOR.
   - Path/cursor transport over `ReactorEndpoint`.
   - Targets: `commonMain`.
-  - Evidence: round-trip a cursor through a wireproto-encoded action.
+  - Evidence: round-trip a cursor through a wireproto-encoded action with byte-identical JVM/JS/Wasm/Native canonical output and no non-core kotlinx serialization runtime.
 
 - [x] **T14. ModelMux worker** (DISPATCHED 2026-07-20, session 18443322164395743742, IN_PROGRESS)
 - [x] **T24. LCNC ROLLUP reducer** (DRAINED 2026-07-20, PR #229, commit 98c2386db via a8dfb9ad2)
@@ -215,6 +271,7 @@ Per-target mapping:
 - The global `./gradlew build` is a gateway check, not a long-running Jules session.
 - Stale or broken tests should be excluded from compilation, not deleted, until reconciled.
 - No platform IO or Btrfs code in `commonMain` or browser targets.
+- **The five gates at the top of this file outrank feature expansion.** A green slice that adds another serializer or SCTP implementation while Confix CBOR and upstream KMPngSCTP remain disconnected is not green at the architecture boundary. Likewise, feature-local green does not substitute for license, master, and maturity-map trust gates.
 
 ## Open questions / risks
 
@@ -442,12 +499,13 @@ post-NUID/CCEK audit. Each task is single-best-debt-reduction sized
     selection under fanout.
   - Non-goals: do NOT change the concentric narrowing logic.
 
-- [ ] **T-KANBAN-WAL-7. WAL for causal chain recovery (closes G12)**
+- [x] **T-KANBAN-WAL-7. WAL for causal chain recovery (closes G12)** (DRAINED 2026-07-21, commit 7c7ebd32d)
   - File: `src/jvmMain/.../forge/persistence/CausalWal.kt`.
-  - Goal: append causal updates to a `.wal` log keyed by `causalKey`;
-    on daemon restart, replay into the in-memory graph.
-  - Verification: start daemon, submit twice, kill mid-dispatch,
-    restart, observe both submissions present.
+  - `JvmKanbanServer` now has `causalWal` and `graphIndex`.
+  - Adds log replay logic to reconstruct causal nodes on daemon startup.
+  - Adds append logic within the `/api/submit` flow to persist changes to `.causal.wal`.
+  - Leverages JsonSupport for object serialization during append operations.
+  - Evidence: daemon restart replays causal chain; WAL appends on submit.
 
 - [ ] **T-KANBAN-LCNCPIPE-8. `LcncIngestPipeline` producing
       `Series<LcncEntity>` from Paste / FileStream / Link (closes G07)**
@@ -681,7 +739,7 @@ T18), and LCNC (T22, T23, T24, T25, T27) layers.
 |------|-------|-------|
 | Agent self-PR → auto-merge | 3 | T16 (PR #231), T17 (PR #232), T24 (PR #229) |
 | Missing-PR recovery (manual apply from `jules remote pull`) | 8 | T01, T04, T07, T09, T11, T12, T13, T17 (duplicate of #232) |
-| Still in flight (IN_PROGRESS) | 4 | T05, T06, T08, T10 |
+| Still in flight (IN_PROGRESS) | 1 | T05 |
 | Re-dispatched via quota polling | 4 | T14, T18, T20, T22, T23, T25, T27 (dispatch_final.sh) |
 
 **Recovery commit log:**
@@ -700,7 +758,7 @@ T18), and LCNC (T22, T23, T24, T25, T27) layers.
 **Post-drain catalog state (22:48 UTC):**
 
 - 12 sessions IN_PROGRESS + 2 QUEUED, 1 AWAITING_USER_FEEDBACK
-- Active sessions: T05, T06, T08, T10, T14, T16 (dup), T17 (already merged), T18, J15, J19, T-KANBAN-HTTP-1, T-KANBAN-WAL-7, T-CAS-PROJ-1 (awaiting), T-CAS-PROJ-2, T-TASTE-8, T-TASTE-9
+- Active sessions: T05, T14, J15, J19, T-CAS-PROJ-1 (awaiting), T-CAS-PROJ-2, T-TASTE-8, T-TASTE-9
 - 0 PR-race duplicates (after two-session deletes for T14 and T16 dups)
 - HEAD = a8dfb9ad2 (master), in sync with origin/master
 
