@@ -66,7 +66,7 @@ private class OroborosJvmRuntime(private val options: OroborosOptions) {
         options.home,
         ".oroboros/manifests/${options.agent}.tsv",
         fileOps,
-        allowInternal = true,
+        
     )
     private val casStore = FileCasStore(fileOps, fileOps.resolvePath(options.home, "cas"))
     private val attachments = CouchAttachmentGateway(CouchStoreFactory.inMemory(), casStore)
