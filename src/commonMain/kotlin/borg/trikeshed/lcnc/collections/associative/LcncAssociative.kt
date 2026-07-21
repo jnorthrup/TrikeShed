@@ -12,8 +12,18 @@ import borg.trikeshed.lib.j
  * Defines the type of a property (column) in a Lcnc Database.
  */
 enum class PropertyType {
-    TITLE, TEXT, NUMBER, SELECT, CHECKBOX, DATE
+    TITLE, TEXT, NUMBER, SELECT, CHECKBOX, DATE, PEOPLE, FILES
 }
+
+/**
+ * Represents a reference to a user in a PEOPLE property.
+ */
+data class UserRef(val id: String)
+
+/**
+ * Represents a reference to a file or image in a FILES property.
+ */
+data class FileRef(val url: String)
 
 /**
  * Defines a single property's schema within a Database.

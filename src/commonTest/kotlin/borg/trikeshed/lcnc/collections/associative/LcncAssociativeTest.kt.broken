@@ -1,0 +1,33 @@
+package borg.trikeshed.lcnc.collections.associative
+
+import kotlin.test.Test
+import kotlin.test.assertEquals
+
+class LcncAssociativeTest {
+    @Test
+    fun testSupportedPropertyTypesOnly() {
+        val expectedTypes = setOf(
+            "TITLE", "TEXT", "NUMBER", "SELECT", "CHECKBOX", "DATE", "PEOPLE", "FILES"
+        )
+        val actualTypes = PropertyType.values().map { it.name }.toSet()
+        assertEquals(expectedTypes, actualTypes, "PropertyType should only contain supported types")
+    }
+
+    @Test
+    fun testPeopleProducer() {
+        val text = "Hello @alice and @bob"
+        val people = borg.trikeshed.lcnc.reactor.producePeopleCell(text)
+        assertEquals(2, people.size)
+        assertEquals("alice", people[0].id)
+        assertEquals("bob", people[1].id)
+    }
+
+    @Test
+    fun testFilesProducer() {
+        val text = "Look at this ![image1](http://example.com/img1.png) and ![image2](img2.jpg)"
+        val files = borg.trikeshed.lcnc.reactor.produceFilesCell(text)
+        assertEquals(2, files.size)
+        assertEquals("http://example.com/img1.png", files[0].url)
+        assertEquals("img2.jpg", files[1].url)
+    }
+}

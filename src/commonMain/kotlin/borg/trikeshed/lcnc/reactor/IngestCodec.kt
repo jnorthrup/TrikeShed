@@ -3,6 +3,7 @@ package borg.trikeshed.lcnc.reactor
 import borg.trikeshed.lcnc.isam.LcncEntity
 import borg.trikeshed.lib.Series
 import borg.trikeshed.lib.emptySeriesOf
+import borg.trikeshed.lcnc.reduction.j
 
 /**
  * Reactor asynchronous gems for parsing and digesting various formats.
@@ -65,4 +66,26 @@ interface IngestCodec {
      */
     suspend fun decodeText(text: String, format: IngestFormat): Series<LcncEntity> =
         emptySeriesOf()
+}
+
+/**
+ * Parses a string for @user mentions and returns a series of [UserRef]s.
+ */
+fun producePeopleCell(text: String): Series<borg.trikeshed.lcnc.collections.associative.UserRef> {
+    val regex = Regex("@([a-zA-Z0-9_.-]+)")
+    val matches = regex.findAll(text).toList()
+    return matches.size j { i ->
+        borg.trikeshed.lcnc.collections.associative.UserRef(matches[i].groupValues[1])
+    }
+}
+
+/**
+ * Parses a string for markdown image links and returns a series of [FileRef]s.
+ */
+fun produceFilesCell(text: String): Series<borg.trikeshed.lcnc.collections.associative.FileRef> {
+    val regex = Regex("!\\[[^\\]]*\\]\\(([^)]+)\\)")
+    val matches = regex.findAll(text).toList()
+    return matches.size j { i ->
+        borg.trikeshed.lcnc.collections.associative.FileRef(matches[i].groupValues[1])
+    }
 }
