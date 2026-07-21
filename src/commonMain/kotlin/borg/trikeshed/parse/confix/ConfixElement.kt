@@ -8,6 +8,7 @@ class ConfixPrimitive(
     val content: String,
     val isString: Boolean
 ) : ConfixElement() {
+    constructor(s: String) : this(s, true)
     constructor(b: Boolean) : this(b.toString(), false)
     constructor(n: Number) : this(n.toString(), false)
     
