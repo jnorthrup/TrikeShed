@@ -1,6 +1,12 @@
 @file:Suppress("UNCHECKED_CAST", "FunctionName")
 
 package borg.trikeshed.litebike
+
+import borg.trikeshed.cursor.blackboardContext
+import borg.trikeshed.forge.persistence.CausalWal
+import borg.trikeshed.graph.CausalGraphNode
+import borg.trikeshed.graph.CausalGraphNodeIndex
+import borg.trikeshed.graph.causalGraphNode
 import borg.trikeshed.kanban.ForgeKanbanIngest
 import borg.trikeshed.context.nuid.Capability
 import borg.trikeshed.context.nuid.Nonce
@@ -20,19 +26,18 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.channels.ClosedReceiveChannelException
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
-import java.nio.charset.StandardCharsets
+import java.io.File
 import java.nio.ByteBuffer
 import java.nio.channels.AsynchronousSocketChannel
 import java.nio.channels.CompletionHandler
+import java.nio.charset.StandardCharsets
 import java.nio.file.Files as NioFiles
 import java.nio.file.Paths
 import java.nio.file.StandardOpenOption
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicLong
 import kotlin.system.exitProcess
-import java.io.File
-import borg.trikeshed.forge.persistence.CausalWal
-import borg.trikeshed.graph.CausalGraphNodeIndex
+
 /**
  * JvmKanbanServer — the daemon that owns one [LitebikeListenerElement] and
  * registers workers for the protocols we serve.
@@ -40,31 +45,38 @@ import borg.trikeshed.graph.CausalGraphNodeIndex
  * There is exactly ONE bind (in [JvmLitebikeBindAdapter]); everything
  * downstream is CCEK. Workers consume channel slots from the listener
  * and run their side of the request.
+ *
  * The HTTP layer is *not* a `com.sun.net.httpserver` or a ktor app; it
  * is the HTTP branch of [LitebikeListenerElement.fanoutChannels]. Its job:
  * parse the request line + headers, derive a NUID, dispatch it through
  * [NuidFanoutElement], route to `/api/health`, `/api/cap`, `/api/board`,
  * `/api/submit`, etc., and write back the JSON.
+ *
  * The litebike taxonomy file (`borg.trikeshed.litebike.taxonomy.Taxonomy.kt`)
  * is the wire-stable identifier table — same numeric IDs as the Rust
  * side — and is the input that the ProtocolDetector uses to choose the
  * per-request channel.
  */
 object JvmKanbanServer {
+
     private val causalWal = CausalWal(File(".causal.wal"))
     private val graphIndex = CausalGraphNodeIndex()
+
     /** Wire-level HTTP response built by the HTTP worker. Serialized back through the listener as bytes on the same connection. */
     data class HttpResponse(
         val status: Int,
         val body: String,
         val contentType: String = "application/json; charset=utf-8",
     )
+
     /** Marker carrier passed between workers when a request must cross the listener boundary (e.g. submit → board projection). */
     data class HttpWorkItem(
         val requestBytes: ByteArray,
         val method: String,
         val path: String,
         val headers: Map<String, String>,
+    )
+
     @JvmStatic
     fun main(args: Array<String>) {
         var port = 8888
@@ -82,41 +94,14 @@ object JvmKanbanServer {
         }
         runBlocking { run(port, donor) }
     }
+
     suspend fun run(port: Int, donorPath: String?) {
-        causalWal.replay().forEach { (_, bytes) ->
-            try {
-                val jsonString = String(bytes, StandardCharsets.UTF_8)
-                val map = JsonSupport.parse(jsonString) as Map<String, Any?>
-                val nodeId = map["nodeId"] as String
-                val opId = map["opId"] as String
-                val opVersion = map["opVersion"] as String
-                val parentNodeIds = (map["parentNodeIds"] as List<*>).map { it.toString() }
-                val inputFingerprint = map["inputFingerprint"] as String
-                val blackboardMap = map["blackboard"] as Map<String, Any?>
-                val blackboardId = blackboardMap["id"] as String
-                val causalClock = (map["causalClock"] as Number).toLong()
-                val topoOrdinal = (map["topoOrdinal"] as Number).toInt()
-                val outputHash = map["outputHash"] as String?
-                val node = borg.trikeshed.graph.causalGraphNode(
-                    nodeId = nodeId,
-                    opId = opId,
-                    opVersion = opVersion,
-                    parentNodeIds = parentNodeIds,
-                    inputFingerprint = inputFingerprint,
-                    blackboard = borg.trikeshed.cursor.blackboardContext(id = blackboardId),
-                    causalClock = causalClock,
-                    topoOrdinal = topoOrdinal,
-                    outputHash = outputHash
-                )
-                graphIndex.addOrGet(node)
-                System.err.println("Replayed causal node: ${node.causalKey}")
-            } catch (e: Exception) {
-                System.err.println("Failed to replay causal node: ${e.message}")
-        System.err.println("Replayed ${graphIndex.size} nodes into CausalGraphNodeIndex")
+        replayCausalWal()
         val serverJob = SupervisorJob()
         val scope = CoroutineScope(serverJob + Dispatchers.Default)
         val listener = LitebikeListenerElement(parentJob = serverJob).also { it.open() }
         val fanout = NuidFanoutElement(parentJob = serverJob).also { it.open() }
+
         val processWorkgroup = Workgroup(
             name = "kanban-process-local",
             scope = Subnet.local,
@@ -124,11 +109,14 @@ object JvmKanbanServer {
         )
         val casWorkgroup = Workgroup(
             name = "kanban-cas-local",
+            scope = Subnet.local,
             traits = traitSpaceOf(Capability.CasAll),
+        )
         val wireprotoWorkgroup = Workgroup(
             name = "kanban-wireproto-lan",
             scope = Subnet.lanLocalhost,
             traits = traitSpaceOf(Capability.WireprotoAll),
+        )
         fanout.register(processWorkgroup)
         fanout.register(casWorkgroup)
         fanout.register(wireprotoWorkgroup)
@@ -144,6 +132,10 @@ object JvmKanbanServer {
                     }
                 } catch (_: ClosedReceiveChannelException) {
                     // Fanout closed during structured shutdown.
+                }
+            }
+        }
+
         // Register Http + Json + Socks5 + Tls + Bonjour + Upnp.
         // IDs are TrikeShed-local conventions (Taxonomy.kt), not FFI-stable.
         listOf(
@@ -155,6 +147,7 @@ object JvmKanbanServer {
             Protocol.Upnp,
         ).forEach { listener.register(it) }
         listener.activate()
+
         // R05 — register the connection registry. The bind adapter
         // calls registry.register(channel) on every accepted socket and
         // receives a connectionId; it then stamps the same id onto a
@@ -162,6 +155,7 @@ object JvmKanbanServer {
         // sees ChannelMessage.sequenceId) can write back through the
         // originating socket.
         val connections = ConnectionRegistry()
+
         // Join multicast groups so Bonjour/UPnP datagrams flow into the listener.
         // This is the only UDP bind in the daemon.
         // R04 — keep the handles (Job + MembershipKey) so the read loops can
@@ -172,7 +166,9 @@ object JvmKanbanServer {
         } catch (t: Throwable) {
             System.err.println("multicast join failed: ${t.message}")
             emptyList()
+        }
         System.err.println("multicast joined: ${multicastHandles.size} groups")
+
         // R04 — shutdown hook cancels read loops + drops multicast memberships
         // so the daemon doesn't leak DatagramChannels past JVM exit.
         Runtime.getRuntime().addShutdownHook(Thread {
@@ -182,10 +178,14 @@ object JvmKanbanServer {
                 runBlocking {
                     listener.close()
                     fanout.close()
+                }
+            }
             serverJob.cancel()
         })
+
         if (donorPath != null && NioFiles.exists(Paths.get(donorPath))) {
             // Replay donor on startup; mirrors prior daemon behavior.
+            try {
                 val donor = Paths.get(donorPath)
                 val ingestPath = if (borg.trikeshed.kanban.JvmTikaIngestAdapter.isTikaCandidate(donor)) {
                     // Non-markdown donor (PDF/DOCX/image) — extract text via Tika
@@ -196,13 +196,18 @@ object JvmKanbanServer {
                     tmp.toString()
                 } else {
                     donorPath
+                }
                 ForgeKanbanIngest.persistMarkdown("jim", ingestPath)
                 System.err.println("donor replayed: $donorPath")
             } catch (t: Throwable) {
                 System.err.println("donor replay failed: ${t.message}")
+            }
+        }
+
         // The HTTP worker consumes the httpSlot. Each accepted byte
         // stream is a request; we route on the request path.
         val httpScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+
         // The HTTP handler logic is handled by the wireproto workgroup.
         httpScope.launch {
             val slot = fanout.slotOf("wireproto") ?: return@launch
@@ -216,20 +221,31 @@ object JvmKanbanServer {
                     append("Content-Type: ${resp.contentType}\r\n")
                     append("Access-Control-Allow-Origin: *\r\n\r\n")
                     append(resp.body)
+                }
                 val outBytes = out.toByteArray(StandardCharsets.UTF_8)
                 // Surface the response on the Json protocol slot (downstream consumers)
                 listener.accept(Protocol.Json, out.toByteArray(StandardCharsets.UTF_8))
+            }
+        }
+
         // Fanout channels
         scope.launch {
             listener.fanoutChannels { protocol, msg ->
                 System.err.println("fanout: $protocol seq=${msg.sequenceId} ${msg.payload.size} bytes")
                 true // keep listening
+            }
+        }
+
         System.err.println("trikeshed-kanban: listening on :$port  donor=${donorPath ?: "<none>"}")
         System.err.println("Endpoints (CCEK): GET /api/health /api/cap /api/board POST /api/submit /api/donor")
+
         // Bind happens here — only place outside the worker scope that
         // opens a socket. The adapter resumes this coroutine on close.
         JvmLitebikeBindAdapter.bindAndServe(listener, port = port, connections = connections)
+    }
+
     // ── routes (single worker, hand-rolled) ──────────────────────────────
+
     private fun routeHttp(payload: ByteArray): HttpResponse {
         val text = String(payload, StandardCharsets.UTF_8)
         val firstLine = text.lineSequence().firstOrNull() ?: ""
@@ -244,6 +260,9 @@ object JvmKanbanServer {
             "/api/donor"  -> if (method == "POST") submit(text) else HttpResponse(405, """{"error":"method_not_allowed"}""")
             "/"           -> HttpResponse(200, "<html><body>Forge litebike listener — see /api/health</body></html>", "text/html; charset=utf-8")
             else           -> HttpResponse(404, """{"error":"not_found","path":"$path"}""")
+        }
+    }
+
     private fun boardJson(): String = runCatching {
         val reduction = ForgeKanbanIngest.load("jim")
         JsonSupport.stringify(
@@ -259,43 +278,38 @@ object JvmKanbanServer {
                 },
                 "correlations" to reduction.correlations.size,
             )
+        )
     }.getOrElse { """{"error":"load_failed","reason":"${it.message}"}""" }
+
     private fun submit(body: String): HttpResponse {
         val payload = body.substringAfter("\r\n\r\n", "").ifEmpty {
             // Some clients use \n separators; tolerate that.
             body.substringAfter("\n\n", "")
+        }
         if (payload.isBlank()) return HttpResponse(400, """{"error":"empty_body"}""")
         return runCatching {
             val tmp = "/tmp/hi"
             writeStringJvm(tmp, payload)
             val reduction = ForgeKanbanIngest.persistMarkdown("jim", tmp)
-
             runBlocking {
                 reduction.causalNodes.forEach { node ->
-                    val map = mapOf(
-                        "nodeId" to node.nodeId,
-                        "opId" to node.opId,
-                        "opVersion" to node.opVersion,
-                        "parentNodeIds" to node.parentNodeIds,
-                        "inputFingerprint" to node.inputFingerprint,
-                        "blackboard" to mapOf(
-                            "id" to node.blackboard.id
-                        ),
-                        "causalClock" to node.causalClock,
-                        "topoOrdinal" to node.topoOrdinal,
-                        "outputHash" to node.outputHash,
-                        "causalKey" to node.causalKey
-                    val jsonString = JsonSupport.stringify(map)
-                    causalWal.append(node.causalKey, jsonString.toByteArray(StandardCharsets.UTF_8))
+                    causalWal.append(node.causalKey, JsonSupport.stringify(node.toWalMap()).encodeToByteArray())
                     graphIndex.addOrGet(node)
+                }
+            }
             HttpResponse(
                 201,
                 JsonSupport.stringify(
+                    linkedMapOf(
                         "ok" to true,
                         "correlations" to reduction.correlations.size,
                         "firstCausalKey" to (reduction.correlations.firstOrNull()?.causalKey ?: ""),
+                    )
                 ),
+            )
         }.getOrElse { HttpResponse(500, """{"error":"submit_failed","reason":"${it.message}"}""") }
+    }
+
     private fun statusReason(code: Int): String = when (code) {
         200 -> "OK"
         201 -> "Created"
@@ -304,28 +318,78 @@ object JvmKanbanServer {
         405 -> "Method Not Allowed"
         500 -> "Internal Server Error"
         else -> "OK"
+    }
+
+    private fun replayCausalWal() {
+        causalWal.replay().forEach { (_, bytes) ->
+            runCatching {
+                @Suppress("UNCHECKED_CAST")
+                val map = JsonSupport.parse(bytes.decodeToString()) as Map<String, Any?>
+                graphIndex.addOrGet(map.toCausalNode())
+            }.onFailure { error ->
+                System.err.println("causal WAL replay skipped corrupt record: ${error.message}")
+            }
+        }
+        System.err.println("Replayed ${graphIndex.size} nodes into CausalGraphNodeIndex")
+    }
 }
+
+private fun CausalGraphNode.toWalMap(): Map<String, Any?> = linkedMapOf(
+    "nodeId" to nodeId,
+    "opId" to opId,
+    "opVersion" to opVersion,
+    "parentNodeIds" to parentNodeIds,
+    "inputFingerprint" to inputFingerprint,
+    "blackboardId" to blackboard.id,
+    "causalClock" to causalClock,
+    "topoOrdinal" to topoOrdinal,
+    "outputHash" to outputHash,
+)
+
+private fun Map<String, Any?>.toCausalNode(): CausalGraphNode = causalGraphNode(
+    nodeId = requireNotNull(this["nodeId"] as? String),
+    opId = requireNotNull(this["opId"] as? String),
+    opVersion = requireNotNull(this["opVersion"] as? String),
+    parentNodeIds = (this["parentNodeIds"] as? List<*>)?.map(Any?::toString).orEmpty(),
+    inputFingerprint = requireNotNull(this["inputFingerprint"] as? String),
+    blackboard = blackboardContext(id = requireNotNull(this["blackboardId"] as? String)),
+    causalClock = (this["causalClock"] as? Number)?.toLong() ?: error("missing causalClock"),
+    topoOrdinal = (this["topoOrdinal"] as? Number)?.toInt() ?: error("missing topoOrdinal"),
+    outputHash = this["outputHash"] as? String,
+)
+
 private fun traitSpaceOf(vararg capabilities: Capability): TraitSpace = TraitSpace {
     capabilities.size j { index -> capabilities[index] }
+}
+
+/**
  * ConnectionRegistry — JVM-side per-connection state for the litebike
  * bind adapter. R05: the bind adapter hands each accepted
  * [AsynchronousSocketChannel] to [register]; the HTTP worker looks up
  * the originating channel by [ChannelMessage.sequenceId][LitebikeListenerElement.ChannelMessage.sequenceId]
  * via [consumeForSequence] and writes the response back via [write].
+ *
  * Why a JVM-only registry? [LitebikeListenerElement.ChannelMessage]
  * lives in commonMain and adding a JVM-specific socket field there
  * would poison the KMP source set. The sequence id already exists in
  * the message; we map it to a socket in JVM space.
+ *
  * Concurrency: backed by [ConcurrentHashMap]; safe under arbitrary
  * reader/writer concurrency. Writes are issued on the JVM NIO group
  * via [AsynchronousSocketChannel.write], so workers never block on I/O.
+ */
 class ConnectionRegistry {
+
     private val nextId = AtomicLong(0L)
+
     private data class Entry(
         val channel: AsynchronousSocketChannel,
         /** SequenceId of the in-flight request, if any. */
         @Volatile var pendingSequenceId: Long? = null,
+    )
+
     private val connections: ConcurrentHashMap<Long, Entry> = ConcurrentHashMap()
+
     /**
      * Register a freshly accepted channel. Returns a stable
      * connectionId that the caller can later use with [write] or
@@ -335,11 +399,18 @@ class ConnectionRegistry {
         val id = nextId.incrementAndGet()
         connections[id] = Entry(channel)
         return id
+    }
+
+    /**
      * Stamp a [sequenceId] onto an existing connection so the worker
      * can find the originating channel via [consumeForSequence].
+     */
     fun attachSequence(connectionId: Long, sequenceId: Long) {
         val entry = connections[connectionId] ?: return
         entry.pendingSequenceId = sequenceId
+    }
+
+    /**
      * Pop the [connectionId] associated with [sequenceId]. Returns
      * null if no mapping exists (worker message did not originate
      * from a registered socket, e.g. an in-process emit).
@@ -347,21 +418,30 @@ class ConnectionRegistry {
      * The mapping is one-shot: the next write is expected to be the
      * response. Callers that need to keep the connection alive for
      * further traffic should not consume here.
+     */
     fun consumeForSequence(sequenceId: Long): Long? {
         for ((id, entry) in connections) {
             if (entry.pendingSequenceId == sequenceId) {
                 entry.pendingSequenceId = null
                 return id
+            }
+        }
         return null
+    }
+
+    /**
      * Write [bytes] back through the channel registered as
      * [connectionId]. Returns true on success, false if the write
      * completes with a negative result (peer closed) or throws.
+     *
      * Asynchronous — completes via the supplied [CompletionHandler]
      * or the channel group's default executor. Does not block the
      * calling worker.
+     *
      * On completion the channel is closed and unregistered; this is
      * HTTP/1.1 per-connection semantics. If you want keep-alive,
      * replace the `unregister` call with a reset of `pendingSequenceId`.
+     */
     fun write(connectionId: Long, bytes: ByteArray): Boolean {
         val entry = connections[connectionId] ?: return false
         val channel = entry.channel
@@ -371,12 +451,16 @@ class ConnectionRegistry {
             channel.write(buf, null, object : CompletionHandler<Int, Any?> {
                 override fun completed(written: Int, attached: Any?) {
                     done.complete(written >= 0)
+                }
                 override fun failed(t: Throwable, attached: Any?) {
                     done.complete(false)
+                }
             })
+        } catch (t: Throwable) {
             // Channel already closed or in invalid state.
             unregister(connectionId)
             return false
+        }
         // Block briefly for the write to finish — the worker is on a
         // Default dispatcher so a short park here is fine, and we need
         // the boolean to decide whether to log failure. We don't want
@@ -385,20 +469,34 @@ class ConnectionRegistry {
         val ok = runBlocking { done.await() }
         unregister(connectionId)
         return ok
+    }
+
+    /**
      * Drop [connectionId] from the registry and close the underlying
      * channel. Idempotent.
+     */
     fun unregister(connectionId: Long) {
         val entry = connections.remove(connectionId) ?: return
         runCatching { entry.channel.close() }
+    }
+
+    /**
      * Close every registered channel. Called from the JVM shutdown
      * hook so the daemon doesn't leak sockets on exit.
+     */
     fun closeAll() {
         for (id in connections.keys.toList()) unregister(id)
+    }
+
     /** Live connection count — useful for `/api/cap` and tests. */
     fun activeCount(): Int = connections.size
+}
+
 private fun writeStringJvm(path: String, text: String) {
     val p = Paths.get(path)
     if (p.parent != null) NioFiles.createDirectories(p.parent)
     NioFiles.writeString(
         p, text,
         StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING, StandardOpenOption.WRITE,
+    )
+}

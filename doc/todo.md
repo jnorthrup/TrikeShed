@@ -21,12 +21,12 @@ The first two gates establish runtime truth. The final three are **market action
   - Canonical CBOR must be one Confix-owned RFC 8949 implementation, not `CanonicalCbor` plus an unrelated Confix scanner. Pin deterministic map ordering, definite lengths, minimal integer widths, nested arrays/maps, byte/text strings, tags, floats, null/bool, malformed/truncated rejection, and Confix `(value,key)` kid order. Live processing, CID computation, WAL replay, and cross-target decode use the same bytes and the same lowering path.
   - Evidence: boundary test scans all product source sets and resolved runtime classpaths; dependency reports show only `kotlinx-serialization-core`; RFC 8949 vectors and malformed-input tests pass; JVM/JS/Wasm/Native encode identical fixtures byte-for-byte; every encoded `ConfixDoc` decodes to the same facets and canonical re-encoding is idempotent.
 
-- [ ] **GATE-NGSCTP-UPSTREAM. Use `jnorthrup/KMPngSCTP` as the ngSCTP implementation**
-  - Canonical upstream: `https://github.com/jnorthrup/KMPngSCTP`, module `ngsctp`, currently verified at `0d3e2b6dcaee8a5a59f56f1897819fd3d707a5fc`. License: Apache-2.0. There is no release or published package yet, so integration must pin source/commit explicitly rather than inventing Maven coordinates.
-  - TrikeShed owns only the CCEK/NUID/Reactor adapter. `src/commonMain/kotlin/borg/trikeshed/context/sctp/SctpElement.kt` is not a second ngSCTP implementation and must not continue growing a parallel handshake/chunk/congestion stack. Adapt upstream association/stream lifecycle into `SctpReactorEndpoint`, `MeshReactorEndpoint`, and the sole platform bind seam.
-  - Preserve upstream structured concurrency: association is the owned coroutine scope; streams are bounded/cancellable channels; cancellation drains/closes transport ownership. No UDP stand-in may be presented as the production leg.
-  - Confix boundary applies transitively: upstream may expose `@Serializable` types through `kotlinx-serialization-core`, but no extra serialization format runtime enters TrikeShed through the integration.
-  - Evidence: pinned upstream source builds independently; TrikeShed compiles against the pinned API without copied ngSCTP protocol classes; two peers exchange a NUID-authorized Confix-CBOR action over an upstream association; multihoming failover and cancellation/close are exercised; resolved classpaths satisfy GATE-CONFIX-CBOR.
+- [ ] **GATE-NGSCTP. Finish TrikeShed ngSCTP from the KMPngSCTP README contract**
+  - Donor evidence: `jnorthrup/KMPngSCTP` README and source. The README is the feature contract; the donor is not a nested project, composite build, submodule, or runtime dependency.
+  - Canonical implementation lives in TrikeShed's existing `borg.trikeshed.sctp` / reactor spine. Import useful behavior instead of importing the donor build or growing a second SCTP implementation.
+  - Required behavior: TLV chunks with unknown-skip, bounded/cancellable channel streams, association-owned structured concurrency, multihoming/failover, partial reliability, migration, observable control plane, and the existing liburing facade seam.
+  - Constraints: current TrikeShed Kotlin 2.4.x; no Ktor, Netty, Spirit parser, duplicate protocol stack, or UDP placeholder presented as completion.
+  - Evidence: two peers exchange a NUID-authorized Confix-CBOR action over loopback; failover, partial reliability, cancellation/close, and dependency-boundary tests pass.
 
 - [ ] **GATE-LICENSE. Resolve the license contradiction** (POSITIONING PAPER §7.1.1, §7.3.1)
   - `LICENSE` is a custom "ThisIsSuperior" zlib-variant; `doc/concepts.md:25` declares "AGPLv3, do not change"; the GitHub API reports "Other." Three texts, one project — no company, NGO, or OSS distributor can adopt Forge until one OSI-approved text governs.
@@ -161,10 +161,10 @@ these interfaces. No platform IO leaks into `commonMain`.
   - Peer discovery over the reactor blackboard.
   - This landed the reactor/frame adapter only. It is not completion of the ngSCTP transport.
 
-- [ ] **T9b. Bind the reactor adapter to upstream KMPngSCTP** (GATE-NGSCTP-UPSTREAM)
-  - Depend on the pinned `jnorthrup/KMPngSCTP` source; do not extend the local `SctpElement` into a competing protocol implementation.
-  - Targets: common adapter plus upstream JVM/Native transports.
-  - Evidence: two peers exchange a NUID-authorized Confix-CBOR action over upstream ngSCTP loopback; failover and structured cancellation pass.
+- [ ] **T9b. Finish the existing TrikeShed SCTP/reactor spine** (GATE-NGSCTP)
+  - Read the KMPngSCTP README/source as donor evidence, then port only missing behavior into the canonical TrikeShed implementation.
+  - No nested donor checkout, new subproject, external transport framework, or duplicate protocol types.
+  - Evidence: loopback action exchange plus multihoming failover, partial reliability, migration, and structured cancellation tests.
 
 - [x] **T10. litebike gate / tunnel adaptation** (DRAINED 2026-07-21, PR #241, commit c7cd42059)
   - `Protocol`, `Tunnel`, `SshTunnel` interfaces landed in `src/commonMain/kotlin/borg/trikeshed/litebike/`.

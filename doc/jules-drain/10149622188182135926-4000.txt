@@ -1,8 +1,0 @@
-T-REWIRE-3c UPnP|T-REWIRE-3c: UPnP workspace discovery
-
-Implement UPnP workspace discovery for TrikeShed.
-
-TDD: Write test first, then implement.
-PR: Deliver PR with non-empty diff.
-
-Verify: ./gradlew jvmTest --tests '*UPnP*' passes

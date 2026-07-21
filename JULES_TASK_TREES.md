@@ -299,9 +299,13 @@ J08-TRANSPORT-PROTOCOL
 │   ├── Implement: TlsCodec.encode/decode(ByteRegion)
 │   ├── Implement: WsFrame.parse/serialize(ByteRegion)
 │   └── Implement: HtxRequest/Response ↔ ByteRegion
-├── J08-02: Keep SCTP direction and reject revived QUIC/demo topology
-│   ├── Verify: ngsctp only (no QUIC)
-│   └── Remove: any QUIC demo code
+├── J08-02: Finish TrikeShed ngSCTP from the KMPngSCTP README contract
+│   ├── Treat the donor README as feature/spec evidence, not as a build dependency
+│   ├── Port useful behavior into the existing borg.trikeshed.sctp/reactor spine
+│   ├── Preserve TLV chunks, bounded streams, association-owned scopes, multihoming,
+│   │   partial reliability, migration, observable control plane, and liburing seam
+│   ├── Reject QUIC, duplicate SCTP stacks, nested projects, Ktor, Netty, and Spirit
+│   └── Verify loopback exchange, failover, cancellation, and current Kotlin 2.4.x
 ├── J08-03: Make backpressure, closure, and fanout observable through CCEK
 │   ├── Emit: BackpressureSignal (highWatermark, lowWatermark)
 │   ├── Emit: ChannelClosedSignal (reason)
@@ -530,6 +534,17 @@ For each job J02-J11:
 4. Branch name: `jules/J<NN>-<kebab-name>-<sessionId>`
 5. PR must pass: `./gradlew :test` (root-only), all job-specific tests green
 6. No libs/ references, no new subprojects, no new external deps
+7. Use Jules's large context for a broad read and a narrow write: inspect the owned
+   symbol, every implementation, every direct caller, and adjacent same-purpose
+   interfaces before editing; keep the allowed edit set explicit and small.
+8. Produce a peripheral-interface duplicate matrix before implementation:
+   `symbol | definition | implementors | callers | overlapping symbol | canonical owner`.
+   Search at least two hops out from the requested seam. Reuse or consolidate the
+   canonical interface; do not add an adapter/typealias/helper merely to avoid reading
+   its callers. If two interfaces differ, state the semantic difference and preserve it.
+9. Spend context on source, tests, and git history—not generated planning documents.
+   Return the matrix in the PR description; do not add scan reports or prompt artifacts
+   to the repository.
 
 ---
 

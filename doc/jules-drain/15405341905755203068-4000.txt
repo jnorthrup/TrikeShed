@@ -1,8 +1,0 @@
-T28 Split Reduction|T28: Split lcnc/reduction out of LCNC package
-
-Split lcnc/reduction/* into its own package.
-
-TDD: Write test first, then implement.
-PR: Deliver PR with non-empty diff.
-
-Verify: ./gradlew compileKotlinJvm passes

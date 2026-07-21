@@ -1,8 +1,0 @@
-T-REWIRE-3d SSH|T-REWIRE-3d: SSH mesh transport
-
-Implement SSH mesh transport for TrikeShed.
-
-TDD: Write test first, then implement.
-PR: Deliver PR with non-empty diff.
-
-Verify: ./gradlew jvmTest --tests '*SSH*' passes

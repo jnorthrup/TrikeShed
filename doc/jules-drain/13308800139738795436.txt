@@ -1,8 +1,0 @@
-T27: Ingest pipeline that feeds a Database / page
-
-Implement ingest pipeline that produces Database entries.
-
-TDD: Write test first, then implement.
-PR: Deliver PR with non-empty diff.
-
-Verify: ./gradlew jvmTest --tests '*Ingest*' passes

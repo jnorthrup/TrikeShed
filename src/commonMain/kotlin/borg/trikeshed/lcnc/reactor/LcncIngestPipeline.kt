@@ -135,74 +135,13 @@ class LcncIngestPipeline(
         }
         
         return when (format) {
-            IngestFormat.MARKDOWN -> parseMarkdown(text)
-            IngestFormat.CSV, IngestFormat.TSV -> parseCsvOrTsv(text, format)
+            IngestFormat.MARKDOWN -> MarkdownIngestCodec().decodeText(text, format)
+            IngestFormat.CSV, IngestFormat.TSV -> CsvIngestCodec().decodeText(text, format)
             IngestFormat.JSON -> parseJson(text)
             IngestFormat.HTML -> parseHtml(text)
             IngestFormat.LCNC_NATIVE -> parseLcncNative(text)
             else -> emptySeriesOf()
         }
-    }
-
-    private fun parseMarkdown(text: String): Series<LcncEntity> {
-        val lines = text.lines()
-        val headerRegex = Regex("^(#+)\\s+(.+)$")
-        
-        return lines.size j { i ->
-            val line = lines[i]
-            val match = headerRegex.matchEntire(line.trim())
-            if (match != null) {
-                val level = match.groupValues[1].length
-                val title = match.groupValues[2].trim()
-                val id = title.lowercase().replace(Regex("[^a-z0-9]+"), "-")
-                
-                LcncBlock(
-                    id = id,
-                    type = "heading_${'$'}level",
-                    parentId = "root",
-                    content = title
-                )
-            } else {
-                LcncBlock(
-                    id = "p-${'$'}i",
-                    type = "paragraph",
-                    parentId = "root",
-                    content = line
-                )
-            }
-        }
-    }
-
-    private fun parseCsvOrTsv(text: String, format: IngestFormat): Series<LcncEntity> {
-        val delimiter = if (format == IngestFormat.CSV) "," else "\t"
-        val lines = text.lines().filter { it.isNotBlank() }
-        if (lines.isEmpty()) return emptySeriesOf()
-        
-        val headers = lines.first().split(delimiter).map { it.trim() }
-        val inferredColumns = headers.joinToString(", ")
-        
-        val databaseId = "db-${'$'}{text.hashCode()}"
-
-        val pages: Series<LcncPage> = (lines.size - 1) j { i: Int ->
-            val values = lines[i + 1].split(delimiter).map { it.trim() }
-            val props = headers.zip(values).toMap()
-            val id = props["id"] ?: props["title"] ?: "row-${'$'}i"
-            LcncPage(
-                id = id,
-                title = props["title"] ?: id,
-                parentId = databaseId,
-                contentBlocks = emptySeriesOf<LcncBlock>()
-            )
-        }
-        
-        val db = borg.trikeshed.lcnc.isam.LcncDatabase(
-            id = databaseId,
-            title = "Imported Database (Columns: ${'$'}inferredColumns)",
-            parentId = null,
-            pages = pages
-        )
-
-        return 1 j { db }
     }
 
     private fun parseJson(text: String): Series<LcncEntity> {

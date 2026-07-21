@@ -133,6 +133,17 @@ JULES_J12_STATUS=In Progress (existing)
 # =============================================================================
 # JULES CLI USAGE
 # =============================================================================
+# Planning rule: use Gemini's large context for a broad read and a narrow write.
+# Before implementation, trace each owned symbol through definitions,
+# implementations, direct callers, tests, manifests, and recent git history.
+# Scan peripheral interfaces at least two hops out and produce a temporary matrix:
+#   symbol | definition | implementors | callers | overlap | canonical owner
+# Classify overlap as duplicate, shared responsibility, adapter boundary, or
+# intentionally distinct semantics. Reuse/consolidate the canonical owner rather
+# than adding another interface, adapter, typealias, helper, module, or dependency.
+# Keep the final edit scope small. Put the scan matrix in the session/PR description,
+# never in generated repository planning documents.
+#
 # List all sessions:
 #   jules remote list --session
 #

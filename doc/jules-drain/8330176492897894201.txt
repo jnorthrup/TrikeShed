@@ -1,8 +1,0 @@
-T26: LCNC PEOPLE / FILES typed properties
-
-Implement PropertyType.PEOPLE and PropertyType.FILES typed properties.
-
-TDD: Write test first, then implement.
-PR: Deliver PR with non-empty diff.
-
-Verify: ./gradlew jvmTest --tests '*People*' passes
