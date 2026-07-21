@@ -1,6 +1,7 @@
 package borg.trikeshed.userspace.volume
 
 import borg.trikeshed.userspace.nio.file.spi.PosixFileOperations
+import borg.trikeshed.lib.Closeable
 import platform.posix.*
 import kotlinx.cinterop.*
 import kotlinx.coroutines.CancellationException
@@ -20,7 +21,7 @@ sealed class IoResult {
 class LiburingVolume(
     val path: String,
     override val blockSize: Int = 4096
-) : Volume {
+) : Volume, Closeable {
 
     private val fileOps = PosixFileOperations()
     private val fd: Int
@@ -30,20 +31,17 @@ class LiburingVolume(
     }
 
     init {
-        fd = fileOps.open(path, readOnly = false)
-        if (fd < 0) {
-            val file = fopen(path, "wb")
-            if (file != null) {
-                fclose(file)
-            }
+        val initialFd = fileOps.open(path, readOnly = false)
+        fd = if (initialFd < 0) {
+            fileOps.write(path, ByteArray(0))
             val secondFd = fileOps.open(path, readOnly = false)
             if (secondFd < 0) {
                 val err = errno
                 throw RuntimeException("Failed to open or create file: $path (errno: $err)")
             }
-            this.fd = secondFd
+            secondFd
         } else {
-            this.fd = fd
+            initialFd
         }
     }
 
@@ -99,24 +97,32 @@ class LiburingVolume(
                 val offset = req.lba * blockSize
 
                 if (req.kind == IoKind.WRITE) {
-                    req.payload.usePinned { pinned ->
-                        val pwriteRes = pwrite(fd, pinned.addressOf(0), req.payload.size.convert(), offset.convert())
-                        if (pwriteRes < 0L) {
-                            results[idx] = IoResult.Failure(RuntimeException("pwrite failed (errno: $errno)"))
-                        } else {
-                            results[idx] = IoResult.Ok(ByteArray(0))
+                    if (req.payload.isNotEmpty()) {
+                        req.payload.usePinned { pinned ->
+                            val pwriteRes = pwrite(fd, pinned.addressOf(0), req.payload.size.convert(), offset.convert())
+                            if (pwriteRes < 0L) {
+                                results[idx] = IoResult.Failure(RuntimeException("pwrite failed (errno: $errno)"))
+                            } else {
+                                results[idx] = IoResult.Ok(ByteArray(0))
+                            }
                         }
+                    } else {
+                        results[idx] = IoResult.Ok(ByteArray(0))
                     }
                 } else if (req.kind == IoKind.READ) {
                     val size = req.payload.size
-                    val buf = ByteArray(size)
-                    buf.usePinned { pinned ->
-                        val preadRes = pread(fd, pinned.addressOf(0), size.convert(), offset.convert())
-                        if (preadRes < 0L) {
-                            results[idx] = IoResult.Failure(RuntimeException("pread failed (errno: $errno)"))
-                        } else {
-                            results[idx] = IoResult.Ok(buf)
+                    if (size > 0) {
+                        val buf = ByteArray(size)
+                        buf.usePinned { pinned ->
+                            val preadRes = pread(fd, pinned.addressOf(0), size.convert(), offset.convert())
+                            if (preadRes < 0L) {
+                                results[idx] = IoResult.Failure(RuntimeException("pread failed (errno: $errno)"))
+                            } else {
+                                results[idx] = IoResult.Ok(buf)
+                            }
                         }
+                    } else {
+                        results[idx] = IoResult.Ok(ByteArray(0))
                     }
                 }
 
@@ -128,7 +134,7 @@ class LiburingVolume(
         return results.requireNoNulls()
     }
     
-    fun close() {
+    override fun close() {
         if (fd >= 0) {
             fsync(fd)
             fileOps.close(fd)

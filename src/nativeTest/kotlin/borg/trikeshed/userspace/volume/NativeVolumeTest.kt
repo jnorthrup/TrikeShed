@@ -6,6 +6,30 @@ import kotlinx.coroutines.runBlocking
 
 class NativeVolumeTest {
     @Test
+    fun testPosixVolumeEmpty() = runBlocking {
+        val path = "test_posix_empty.bin"
+        platform.posix.remove(path)
+        val volume = PosixVolume(path, blockSize = 512)
+        volume.write(0, ByteArray(0))
+        val emptyRead = volume.read(0, 0)
+        assertEquals(0, emptyRead.size)
+        volume.close()
+        platform.posix.remove(path)
+    }
+
+    @Test
+    fun testLiburingVolumeEmpty() = runBlocking {
+        val path = "test_liburing_empty.bin"
+        platform.posix.remove(path)
+        val volume = LiburingVolume(path, blockSize = 512)
+        volume.write(0, ByteArray(0))
+        val emptyRead = volume.read(0, 0)
+        assertEquals(0, emptyRead.size)
+        volume.close()
+        platform.posix.remove(path)
+    }
+
+    @Test
     fun testPosixVolume() = runBlocking {
         val path = "test_posix_volume.bin"
         val volume = PosixVolume(path, blockSize = 512)
@@ -20,6 +44,7 @@ class NativeVolumeTest {
             assertEquals(testData[i], readData[i])
         }
 
+        volume.close()
         platform.posix.remove(path)
     }
 
@@ -38,6 +63,7 @@ class NativeVolumeTest {
             assertEquals(testData[i], readData[i])
         }
 
+        volume.close()
         platform.posix.remove(path)
     }
 }

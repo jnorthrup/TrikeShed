@@ -20,10 +20,17 @@ class PosixVolume(
             "capacity $capacityBytes not aligned to blockSize $blockSize"
         }
 
-        fd = fileOps.open(path, readOnly = false)
-        if (fd < 0) {
-            val err = errno
-            throw RuntimeException("Failed to open file: $path (errno: $err)")
+        val initialFd = fileOps.open(path, readOnly = false)
+        fd = if (initialFd < 0) {
+            fileOps.write(path, ByteArray(0))
+            val secondFd = fileOps.open(path, readOnly = false)
+            if (secondFd < 0) {
+                val err = errno
+                throw RuntimeException("Failed to open file: $path (errno: $err)")
+            }
+            secondFd
+        } else {
+            initialFd
         }
 
         if (ftruncate(fd, capacityBytes) != 0) {

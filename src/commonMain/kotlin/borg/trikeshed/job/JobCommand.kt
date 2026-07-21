@@ -9,6 +9,7 @@ import kotlinx.serialization.Serializable
 sealed class JobCommand {
     abstract val jobId: JobId
     abstract val idempotencyKey: String
+    val operationName: String get() = this::class.simpleName?.lowercase() ?: ""
 
     @Serializable
     data class Submit(

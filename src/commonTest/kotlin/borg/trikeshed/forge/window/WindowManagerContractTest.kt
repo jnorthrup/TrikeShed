@@ -42,4 +42,11 @@ abstract class WindowManagerContractTest {
         val snapshot = manager.captureSnapshot()
         assertTrue(snapshot.dispatchedEvents.contains(event))
     }
+
+    @Test
+    fun `test snapshot is not noop by default`() {
+        val manager = getManager()
+        val snapshot = manager.captureSnapshot()
+        assertTrue(!snapshot.isNoop, "Snapshot should not be marked as noop")
+    }
 }
