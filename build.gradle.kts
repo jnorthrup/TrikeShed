@@ -114,23 +114,8 @@ kotlin {
         binaries.executable()
     }
 
-    @OptIn(org.jetbrains.kotlin.gradle.ExperimentalWasmDsl::class)
-    wasmWasi {
-    }
-
     androidNativeArm64("android")
     linuxX64()
-    macosArm64()
-    iosX64()
-    iosSimulatorArm64()
-    watchosX64()
-    watchosSimulatorArm64()
-    tvosX64()
-    tvosSimulatorArm64()
-
-    androidNativeArm64("android")
-    linuxX64()
-    macosArm64()
     iosX64()
     iosSimulatorArm64()
     watchosX64()

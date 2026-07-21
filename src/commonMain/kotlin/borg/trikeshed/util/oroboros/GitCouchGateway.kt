@@ -29,12 +29,15 @@ class GitCouchGateway(
         if (!fileOps.isDir(gitRoot)) return Snapshot(revision, emptyList())
 
         val current = collectFiles(gitRoot)
-        val existing = attachments.listAttachments(GIT_PREFIX).associateBy { it.path }
+        val existingMap = mutableMapOf<String, OroborosAttachmentRef>()
+        for (ref in attachments.listAttachments(GIT_PREFIX)) {
+            existingMap[ref.path] = ref
+        }
 
         for ((logicalPath, physicalPath) in current) {
             val bytes = fileOps.readAllBytes(physicalPath)
             val cid = ContentId.of(bytes)
-            val previous = existing[logicalPath]
+            val previous = existingMap[logicalPath]
             if (previous?.contentId == cid) continue
 
             attachments.putAttachment(
@@ -52,7 +55,7 @@ class GitCouchGateway(
         }
 
         val currentPaths = current.keys
-        for ((path, ref) in existing) {
+        for ((path, ref) in existingMap) {
             if (path !in currentPaths) attachments.deleteAttachment(path, ref.revision)
         }
 
@@ -61,8 +64,8 @@ class GitCouchGateway(
 
     /** Restore a complete local .git database from Couch/CAS. */
     fun restore(forgeHome: String): Snapshot {
-        val refs = attachments.listAttachments(GIT_PREFIX)
-        for (ref in refs) {
+        val refsList = attachments.listAttachments(GIT_PREFIX)
+        for (ref in refsList) {
             val stored = attachments.getAttachment(ref.path)
                 ?: error("missing Git attachment ${ref.path}")
             val relative = ref.path.removePrefix(GIT_PREFIX)
@@ -72,8 +75,15 @@ class GitCouchGateway(
             }
             fileOps.write(target, stored.second)
         }
-        val revision = refs.maxByOrNull { it.sequence }?.revision.orEmpty()
-        return Snapshot(revision, refs.map { it.path }.sorted())
+        var maxSeq = 0L
+        var maxRev = ""
+        for (ref in refsList) {
+            if (ref.sequence > maxSeq) {
+                maxSeq = ref.sequence
+                maxRev = ref.revision
+            }
+        }
+        return Snapshot(maxRev, refsList.map { it.path }.sorted())
     }
 
     private fun collectFiles(gitRoot: String): Map<String, String> {
@@ -82,29 +92,59 @@ class GitCouchGateway(
         while (queue.isNotEmpty()) {
             val (directory, relativeDirectory) = queue.removeAt(0)
             for (name in fileOps.listDir(directory).sorted()) {
-                val physical = fileOps.resolvePath(directory, name)
+                val fullPath = fileOps.resolvePath(directory, name)
                 val relative = if (relativeDirectory.isEmpty()) name else "$relativeDirectory/$name"
-                when {
-                    fileOps.isDir(physical) -> queue += physical to relative
-                    fileOps.isFile(physical) && !name.endsWith(".lock") -> files["$GIT_PREFIX$relative"] = physical
+                if (fileOps.isDir(fullPath)) {
+                    queue.add(fullPath to relative)
+                } else {
+                    files[relative] = fullPath
                 }
             }
         }
-        return files.toSortedMap()
+        return files
     }
 
     private fun contentType(path: String): String = when {
-        path.endsWith("/HEAD") || path.endsWith("/config") || path.contains("/refs/") -> "text/plain"
-        else -> "application/x-git-object"
+        path.endsWith(".go") -> "text/plain"
+        path.endsWith(".kt") -> "text/kotlin"
+        path.endsWith(".kts") -> "text/kotlin"
+        path.endsWith(".md") -> "text/markdown"
+        path.endsWith(".json") -> "application/json"
+        path.endsWith(".sh") -> "application/x-sh"
+        path.endsWith(".bash") -> "application/x-sh"
+        path.endsWith(".txt") -> "text/plain"
+        path.endsWith(".html") -> "text/html"
+        path.endsWith(".css") -> "text/css"
+        path.endsWith(".js") -> "application/javascript"
+        path.endsWith(".xml") -> "application/xml"
+        path.endsWith(".yaml") || path.endsWith(".yml") -> "application/yaml"
+        path.endsWith(".toml") -> "application/toml"
+        path.endsWith(".csv") -> "text/csv"
+        path.endsWith(".png") -> "image/png"
+        path.endsWith(".jpg") || path.endsWith(".jpeg") -> "image/jpeg"
+        path.endsWith(".gif") -> "image/gif"
+        path.endsWith(".svg") -> "image/svg+xml"
+        path.endsWith(".pdf") -> "application/pdf"
+        path.endsWith(".zip") -> "application/zip"
+        path.endsWith(".tar") -> "application/x-tar"
+        path.endsWith(".gz") -> "application/gzip"
+        path.endsWith(".bz2") -> "application/x-bzip2"
+        path.endsWith(".xz") -> "application/x-xz"
+        path.endsWith(".zst") -> "application/zstd"
+        GIT_OBJECTS_DIR in path -> "application/x-git-object"
+        GIT_REFS_DIR in path -> "application/x-git-ref"
+        else -> "application/octet-stream"
     }
 
-    private fun parentOf(path: String): String? {
-        val slash = maxOf(path.lastIndexOf('/'), path.lastIndexOf('\\'))
-        return if (slash > 0) path.substring(0, slash) else null
-    }
-
-    private companion object {
+    companion object {
         const val GIT_DIR = ".git"
-        const val GIT_PREFIX = ".git/"
+        const val GIT_PREFIX = "$GIT_DIR/"
+        private const val GIT_OBJECTS_DIR = "$GIT_DIR/objects/"
+        private const val GIT_REFS_DIR = "$GIT_DIR/refs/"
+
+        private fun parentOf(path: String): String? {
+            val lastSep = maxOf(path.lastIndexOf('/'), path.lastIndexOf('\\'))
+            return if (lastSep > 0) path.substring(0, lastSep) else null
+        }
     }
 }

@@ -7,8 +7,9 @@ val Capability.category: String
         is Capability.Process -> "process"
         is Capability.Cas -> "cas"
         is Capability.Wireproto -> "wireproto"
-        is Capability.Mesh -> "mesh"
-        is Capability.ModelMux -> "modelmux"
+        is Capability.Sctp -> "sctp"
+        is Capability.Model -> "modelmux"
+        is Capability.BlackBoard -> "blackboard"
         else -> "custom"
     }
 

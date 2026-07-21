@@ -85,6 +85,35 @@ class CouchAttachmentGateway(
         }
     }
 
+    fun listAttachments(prefix: String): List<OroborosAttachmentRef> {
+        val allDocs = couchStore.all().filter { doc ->
+            doc.fields.none { it.name == "deleted" && it.value == "true" }
+        }
+        val result = mutableListOf<OroborosAttachmentRef>()
+        for (doc in allDocs) {
+            val docId = doc.id
+            if (!docId.startsWith(prefix)) continue
+            val contentType = doc.fields.find { it.name == "contentType" }?.value as? String ?: ""
+            val lengthStr = doc.fields.find { it.name == "length" }?.value as? String ?: "0"
+            val contentIdStr = doc.fields.find { it.name == "contentId" }?.value as? String ?: ""
+            val agentId = doc.fields.find { it.name == "agentId" }?.value as? String ?: ""
+            val revision = doc.fields.find { it.name == "revision" }?.value as? String ?: ""
+            val sequenceStr = doc.fields.find { it.name == "sequence" }?.value as? String ?: "0"
+            val contentId = if (contentIdStr.isNotEmpty()) ContentId(contentIdStr)
+                else ContentId("sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855")
+            result.add(OroborosAttachmentRef(
+                path = docId,
+                contentType = contentType,
+                length = lengthStr.toLongOrNull() ?: 0L,
+                contentId = contentId,
+                agentId = agentId,
+                revision = revision,
+                sequence = sequenceStr.toLongOrNull() ?: 0L
+            ))
+        }
+        return result
+    }
+
     fun manifest(): Series2<String, OroborosAttachmentRef> {
         val allDocs = couchStore.all().filter { doc ->
             doc.fields.none { it.name == "deleted" && it.value == "true" }

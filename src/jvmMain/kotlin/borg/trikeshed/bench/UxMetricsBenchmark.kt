@@ -2,7 +2,7 @@ package borg.trikeshed.bench
 
 import org.openjdk.jmh.annotations.*
 import java.util.concurrent.TimeUnit
-import borg.trikeshed.forge.forgeAppHtml
+import borg.trikeshed.forge.ForgeApp
 import borg.trikeshed.cursor.Cursor
 import borg.trikeshed.cursor.RowVec
 import borg.trikeshed.lib.j
@@ -41,7 +41,7 @@ open class UxMetricsBenchmark {
 
     @Benchmark
     fun coldStartInteractive(): String {
-        return forgeAppHtml()
+        return ForgeApp.renderHtml()
     }
 
     @Benchmark
