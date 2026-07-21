@@ -1,6 +1,7 @@
 package borg.trikeshed.forge.gallery
 
 import borg.trikeshed.parse.json.JsonSupport
+import borg.trikeshed.lcnc.editor.*
 
 /**
  * Gallery renderer shared by JVM printer, Node.js, and browser targets.

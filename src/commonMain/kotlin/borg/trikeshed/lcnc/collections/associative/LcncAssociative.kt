@@ -21,15 +21,15 @@ enum class PropertyType {
     NUMBER, 
     SELECT, 
     CHECKBOX, 
-    DATE
+    DATE,
+    URL,
+    EMAIL,
+    PHONE_NUMBER
     
     // De-stubbed aspirational types (removed 2026-07-21, see git history or doc/lcnc-property-type-decision.md for more info)
     // MULTI_SELECT: removed 2026-07-21, was meant for multiple tags/selects
     // PEOPLE: removed 2026-07-21, was meant for user references
     // FILES: removed 2026-07-21, was meant for file attachments and images
-    // URL: removed 2026-07-21, was meant for web links
-    // EMAIL: removed 2026-07-21, was meant for email addresses
-    // PHONE_NUMBER: removed 2026-07-21, was meant for phone numbers
     // FORMULA: removed 2026-07-21, was meant for computed column formulas
     // RELATION: removed 2026-07-21, was meant for inter-database relations
     // ROLLUP: removed 2026-07-21, was meant for aggregating related properties
