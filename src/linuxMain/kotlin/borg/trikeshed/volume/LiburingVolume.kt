@@ -1,6 +1,6 @@
 package borg.trikeshed.volume
 
-import borg.trikeshed.userspace.volume.Volume
+import borg.trikeshed.volume.Volume
 import borg.trikeshed.userspace.nio.file.spi.PosixFileOperations
 import borg.trikeshed.lib.Closeable
 import kotlinx.cinterop.*
