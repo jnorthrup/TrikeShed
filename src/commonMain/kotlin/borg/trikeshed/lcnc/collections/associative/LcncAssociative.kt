@@ -12,7 +12,7 @@ import borg.trikeshed.lib.j
  * Defines the type of a property (column) in a Lcnc Database.
  */
 enum class PropertyType {
-    TITLE, TEXT, NUMBER, SELECT, MULTI_SELECT, DATE, PEOPLE, FILES, CHECKBOX, URL, EMAIL, PHONE_NUMBER, FORMULA, RELATION, ROLLUP, CREATED_TIME, CREATED_BY, LAST_EDITED_TIME, LAST_EDITED_BY
+    TITLE, TEXT, NUMBER, SELECT, CHECKBOX, DATE
 }
 
 /**
