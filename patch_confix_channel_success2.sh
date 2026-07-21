@@ -1,1 +1,0 @@
-sed -i 's/inputChannel.trySend(event) == kotlinx.coroutines.channels.ChannelResult.success(Unit).isSuccess/inputChannel.trySend(event).isSuccess/g' src/commonMain/kotlin/borg/trikeshed/reactor/ConfixSinkElement.kt

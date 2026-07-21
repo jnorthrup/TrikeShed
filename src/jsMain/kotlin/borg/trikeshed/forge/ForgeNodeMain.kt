@@ -39,7 +39,7 @@ fun main() {
         }
     }
 
-    val html = forgeAppHtml()
+    val html = ForgeApp.renderHtml()
     if (isBrowserRuntime()) {
         renderBrowser(html)
     } else {

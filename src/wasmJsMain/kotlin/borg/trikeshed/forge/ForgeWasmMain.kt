@@ -12,4 +12,4 @@ import kotlin.js.JsName
  */
 @JsExport
 @JsName("getForgeHtml")
-fun getForgeHtml(): String = forgeAppHtml()
+fun getForgeHtml(): String = ForgeApp.renderHtml()
