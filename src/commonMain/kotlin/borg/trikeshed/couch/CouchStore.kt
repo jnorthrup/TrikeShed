@@ -66,8 +66,8 @@ class CouchStore(
     /**
      * Put a document — insert or replace.
      */
-    fun put(document: Document): Boolean {
-        return ingress.putIntent(document, null)
+    fun put(document: Document, expectedRev: String? = null): Boolean {
+        return ingress.putIntent(document, expectedRev)
     }
     
     /**
@@ -80,8 +80,8 @@ class CouchStore(
     /**
      * Delete a document by id.
      */
-    fun delete(docId: String): Boolean {
-        return ingress.deleteIntent(docId, null)
+    fun delete(docId: String, expectedRev: String? = null): Boolean {
+        return ingress.deleteIntent(docId, expectedRev)
     }
 
     /**
@@ -130,7 +130,7 @@ class CouchStore(
                 if (frame.deleted) {
                     observer(MutationEvent.Deleted(frame.docId))
                 } else if (frame.doc != null) {
-                    if (frame.rev.startsWith("uuid-0-")) {
+                    if (frame.rev.startsWith("1-")) {
                          observer(MutationEvent.Inserted(frame.doc))
                     } else {
                          observer(MutationEvent.Updated(frame.doc))
@@ -148,7 +148,7 @@ class CouchStore(
             val mapped: Series<MutationEvent> = src.size j { i: Int ->
                 val f = src[i]
                 if (f.deleted) MutationEvent.Deleted(f.docId)
-                else if (f.rev.startsWith("uuid-0-")) MutationEvent.Inserted(f.doc!!)
+                else if (f.rev.startsWith("1-")) MutationEvent.Inserted(f.doc!!)
                 else MutationEvent.Updated(f.doc!!)
             }
             // For now, this is a leaky abstraction that wraps Series inside a Twin dummy view.
