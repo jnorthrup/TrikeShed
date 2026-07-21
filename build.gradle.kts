@@ -118,6 +118,26 @@ kotlin {
     wasmWasi {
     }
 
+    androidNativeArm64("android")
+    linuxX64()
+    macosArm64()
+    iosX64()
+    iosSimulatorArm64()
+    watchosX64()
+    watchosSimulatorArm64()
+    tvosX64()
+    tvosSimulatorArm64()
+
+    androidNativeArm64("android")
+    linuxX64()
+    macosArm64()
+    iosX64()
+    iosSimulatorArm64()
+    watchosX64()
+    watchosSimulatorArm64()
+    tvosX64()
+    tvosSimulatorArm64()
+
     // ── Host-detected native targets (restored from c0e3f0fc) ────────────────
     val hostOs = System.getProperty("os.name").lowercase()
     val isMac = hostOs.contains("mac")

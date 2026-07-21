@@ -2260,7 +2260,7 @@ Per-target mapping:
   - Targets: `commonMain` interface; native/JVM implementations.
   - Evidence: a native desktop build shows the HTML shell with a manim-rendered canvas panel inside it.
 
-- [ ] **T20. Add missing targets to Gradle build**
+- [x] **T20. Add missing targets to Gradle build**
   - `android()` target with `androidMain` source set.
   - `wasmWasi()` target with `wasiMain` source set.
   - Ensure `composeCompiler` stays restricted to `KotlinPlatformType.jvm`.
