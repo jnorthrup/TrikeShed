@@ -10,48 +10,27 @@ import kotlin.test.assertFailsWith
 import kotlin.test.assertTrue
 
 class ActionCodecTest {
-<<<<<<< HEAD
-    
-    private val encoder = ActionEncoder()
-    private val decoder = ActionDecoder()
-    
-=======
 
     private val encoder = ActionEncoder()
     private val decoder = ActionDecoder()
 
->>>>>>> origin/wireproto-codec-9444185639294947999
     @Test
     fun knownVectorEncodes() {
         val testNuid = nuid(Capability.Process("test"), Nonce.Restored(ByteArray(4) { it.toByte() }), Subnet.core)
         val envelope = ReactorActionEnvelope(testNuid, "ping", "test_payload".encodeToByteArray())
-<<<<<<< HEAD
-        
-        val bytes = encoder.encode(envelope)
-        
-=======
 
         val bytes = encoder.encode(envelope)
 
->>>>>>> origin/wireproto-codec-9444185639294947999
         // Magic
         assertEquals(0xCA.toByte(), bytes[0])
         assertEquals(0xFE.toByte(), bytes[1])
         assertEquals(0xBA.toByte(), bytes[2])
         assertEquals(0xBE.toByte(), bytes[3])
-<<<<<<< HEAD
-        
-        // Version 1
-        assertEquals(0x00.toByte(), bytes[4])
-        assertEquals(0x01.toByte(), bytes[5])
-        
-=======
 
         // Version 1
         assertEquals(0x00.toByte(), bytes[4])
         assertEquals(0x01.toByte(), bytes[5])
 
->>>>>>> origin/wireproto-codec-9444185639294947999
         // NUID length check -> the first part of the custom format
         val nuidLen = ((bytes[6].toInt() and 0xFF) shl 8) or (bytes[7].toInt() and 0xFF)
         assertTrue(nuidLen > 0, "nuid length should be > 0")
@@ -61,17 +40,10 @@ class ActionCodecTest {
     fun roundTripPreservesAllFields() {
         val testNuid = nuid(Capability.Process("hello"), Nonce.Restored(ByteArray(8) { it.toByte() }), Subnet.core)
         val envelope = ReactorActionEnvelope(testNuid, "echo", "test".encodeToByteArray())
-<<<<<<< HEAD
-        
-        val bytes = encoder.encode(envelope)
-        val decoded = decoder.decode(bytes)
-        
-=======
 
         val bytes = encoder.encode(envelope)
         val decoded = decoder.decode(bytes)
 
->>>>>>> origin/wireproto-codec-9444185639294947999
         assertEquals(envelope.verb, decoded.verb)
         assertTrue(envelope.payload.contentEquals(decoded.payload))
         assertEquals(envelope.nuid.a, decoded.nuid.a)
@@ -84,21 +56,13 @@ class ActionCodecTest {
         val testNuid = nuid(Capability.Process("test"), Nonce.Restored(ByteArray(0)), Subnet.core)
         val envelope = ReactorActionEnvelope(testNuid, "ping", ByteArray(0))
         val bytes = encoder.encode(envelope)
-<<<<<<< HEAD
-        
-=======
 
->>>>>>> origin/wireproto-codec-9444185639294947999
         // Alter magic
         bytes[0] = 0xDE.toByte()
         bytes[1] = 0xAD.toByte()
         bytes[2] = 0xBE.toByte()
         bytes[3] = 0xEF.toByte()
-<<<<<<< HEAD
-        
-=======
 
->>>>>>> origin/wireproto-codec-9444185639294947999
         val ex = assertFailsWith<WireprotoFormatException> {
             decoder.decode(bytes)
         }
@@ -110,19 +74,11 @@ class ActionCodecTest {
         val testNuid = nuid(Capability.Process("test"), Nonce.Restored(ByteArray(0)), Subnet.core)
         val envelope = ReactorActionEnvelope(testNuid, "ping", ByteArray(0))
         val bytes = encoder.encode(envelope)
-<<<<<<< HEAD
-        
-        // Alter version
-        bytes[4] = 0x00.toByte()
-        bytes[5] = 99.toByte()
-        
-=======
 
         // Alter version
         bytes[4] = 0x00.toByte()
         bytes[5] = 99.toByte()
 
->>>>>>> origin/wireproto-codec-9444185639294947999
         val ex = assertFailsWith<WireprotoFormatException> {
             decoder.decode(bytes)
         }
@@ -134,17 +90,10 @@ class ActionCodecTest {
         val testNuid = nuid(Capability.Process("test"), Nonce.Restored(ByteArray(0)), Subnet.core)
         val envelope = ReactorActionEnvelope(testNuid, "ping", ByteArray(1024))
         val bytes = encoder.encode(envelope)
-<<<<<<< HEAD
-        
-        // truncate to 100 bytes from end
-        val truncatedBytes = bytes.copyOfRange(0, bytes.size - (1024 - 100))
-        
-=======
 
         // truncate to 100 bytes from end
         val truncatedBytes = bytes.copyOfRange(0, bytes.size - (1024 - 100))
 
->>>>>>> origin/wireproto-codec-9444185639294947999
         val ex = assertFailsWith<WireprotoFormatException> {
             decoder.decode(truncatedBytes)
         }
@@ -156,11 +105,7 @@ class ActionCodecTest {
         val testNuid = nuid(Capability.Process("test"), Nonce.Restored(ByteArray(0)), Subnet.core)
         val oversizePayload = ByteArray(70_000)
         val envelope = ReactorActionEnvelope(testNuid, "ping", oversizePayload)
-<<<<<<< HEAD
-        
-=======
 
->>>>>>> origin/wireproto-codec-9444185639294947999
         val ex = assertFailsWith<WireprotoFormatException> {
             encoder.encode(envelope)
         }
@@ -171,17 +116,10 @@ class ActionCodecTest {
     fun encodeIsDeterministic() {
         val testNuid = nuid(Capability.Process("test"), Nonce.Restored(ByteArray(0)), Subnet.core)
         val envelope = ReactorActionEnvelope(testNuid, "ping", "deterministic".encodeToByteArray())
-<<<<<<< HEAD
-        
-        val bytes1 = encoder.encode(envelope)
-        val bytes2 = encoder.encode(envelope)
-        
-=======
 
         val bytes1 = encoder.encode(envelope)
         val bytes2 = encoder.encode(envelope)
 
->>>>>>> origin/wireproto-codec-9444185639294947999
         assertTrue(bytes1.contentEquals(bytes2), "Encode should be deterministic")
     }
 
@@ -214,19 +152,11 @@ class ActionCodecTest {
         val testNuid = nuid(Capability.Process("test"), Nonce.Restored(ByteArray(0)), Subnet.core)
         val envelope = ReactorActionEnvelope(testNuid, "ping", ByteArray(0))
         val bytes = encoder.encode(envelope)
-<<<<<<< HEAD
-        
-        // Alter NUID length to 0xFFFF
-        bytes[6] = 0xFF.toByte()
-        bytes[7] = 0xFF.toByte()
-        
-=======
 
         // Alter NUID length to 0xFFFF
         bytes[6] = 0xFF.toByte()
         bytes[7] = 0xFF.toByte()
 
->>>>>>> origin/wireproto-codec-9444185639294947999
         val ex = assertFailsWith<WireprotoFormatException> {
             decoder.decode(bytes)
         }
