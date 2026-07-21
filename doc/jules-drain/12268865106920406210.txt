@@ -1,0 +1,250 @@
+# T06 — Btrfs userspace JBOD backend
+
+## Repository binding
+
+This task binds to `sources/github/jnorthrup/TrikeShed` on the `master` branch
+at `/Users/jim/work/TrikeShed`. The worktree is clean and HEAD is identical
+to `origin/master`. JDK: GraalVM CE 25.0.2 at
+`/Users/jim/.sdkman/candidates/java/25.0.2-graalce`. Tests run on the JVM
+target only (`./gradlew jvmTest`); the JVM host compiles via ByteBuffer +
+MappedByteBuffer.
+
+## Scope (owned files only)
+
+Create the following files and ONLY the following files:
+
+- `src/commonMain/kotlin/borg/trikeshed/btrfs/BtrfsMagic.kt` (one `const val`
+  `BTRFS_MAGIC = 0x4D5F53665248425F.toULong()` plus
+  `BTRFS_MAGIC_BYTES = ubyteArrayOf(0x5Fu, 0x42u, 0x48u, 0x52u, 0x66u, 0x53u, 0x5Fu, 0x4Du)` —
+  little-endian encoding of the ASCII `"_BHRfS_M"`.)
+- `src/commonMain/kotlin/borg/trikeshed/btrfs/BtrfsSuperblock.kt` (parse
+  4096-byte superblock struct, no platform IO.)
+- `src/commonMain/kotlin/borg/trikeshed/btrfs/BtrfsChunkTree.kt`
+- `src/commonMain/kotlin/borg/trikeshed/btrfs/BtrfsDeviceTree.kt`
+- `src/commonMain/kotlin/borg/trikeshed/btrfs/BtrfsKey.kt` (a 24-byte key
+  struct: objectid: ULong, type: UByte, offset: ULong; the btrfs on-disk
+  key tuple.)
+- `src/commonMain/kotlin/borg/trikeshed/btrfs/BtrfsChunkItem.kt` (data
+  class: stripeLength: ULong, type: UByte (0=RAID0, 1=RAID1, 2=SINGLE,
+  10=DUP), numStripes: UShort, subStripes: UShort,
+  stripes: List<BtrfsStripe>.)
+- `src/commonMain/kotlin/borg/trikeshed/btrfs/BtrfsStripe.kt` (data class:
+  devid: ULong, offset: ULong.)
+- `src/commonMain/kotlin/borg/trikeshed/btrfs/BtrfsDevItem.kt`
+- `src/commonMain/kotlin/borg/trikeshed/btrfs/BtrfsHeader.kt` (a sealed
+  hierarchy: `BtrfsHeader.Super`, `BtrfsHeader.ChunkItem`,
+  `BtrfsHeader.DevItem`, `BtrfsHeader.Unknown(type: UByte)`.)
+- `src/jvmMain/kotlin/borg/trikeshed/btrfs/BtrfsVolume.kt`
+- `src/jvmTest/kotlin/borg/trikeshed/btrfs/BtrfsSuperblockTest.kt`
+- `src/jvmTest/kotlin/borg/trikeshed/btrfs/BtrfsChunkTreeTest.kt`
+- `src/jvmTest/kotlin/borg/trikeshed/btrfs/BtrfsVolumeTest.kt`
+
+Forbidden: `build.gradle.kts`, `settings.gradle.kts`, `gradle/`, any
+`the-dependency-dir`, `src/nativeMain/`, `src/jsMain/`, `src/wasmJsMain/`, any file
+under `src/commonMain/kotlin/borg/trikeshed/btrfs/` other than the files
+listed above (the `btrfs/` package currently has files at
+`src/commonMain/kotlin/borg/trikeshed/btrfs/` — they exist but this task
+ADDS to that package only with the names above; do NOT modify the existing
+ones).
+
+## BtrfsSuperblock requirements
+
+A btrfs superblock is exactly 4096 bytes (often larger but the minimum is
+4096; this parser only handles 4096). The on-disk layout is little-endian:
+
+```
+struct btrfs_super_block {
+    uint8_t  bytenr[8];              // 0..7
+    uint8_t  flags[8];               // 8..15
+    uint8_t  magic[8];               // 16..23   = "_BHRfS_M" (8 ASCII bytes)
+    uint64_t generation;            // 24..31
+    uint64_t root;                  // 32..39
+    uint64_t chunk_root;            // 40..47
+    uint64_t total_bytes;           // 48..55
+    uint64_t bytes_used;            // 56..63
+    // ... lots of other fields we DON'T parse in this task ...
+};
+```
+
+In `BtrfsSuperblock.kt`:
+
+```kotlin
+package borg.trikeshed.btrfs
+data class BtrfsSuperblock(
+    val bytenr: ULong,
+    val flags: ULong,
+    val magic: ULong,        // must equal BTRFS_MAGIC
+    val generation: ULong,
+    val root: ULong,
+    val chunkRoot: ULong,
+    val totalBytes: ULong,
+    val bytesUsed: ULong,
+) {
+    companion object {
+        fun parse(buf: ByteArray): BtrfsSuperblock {
+            require(buf.size >= 4096) { "superblock buffer must be >= 4096 bytes (got ${buf.size})" }
+            val magic = readULongLE(buf, 16)
+            require(magic == BTRFS_MAGIC) {
+                "bad magic 0x${magic.toString(16)}; expected 0x${BTRFS_MAGIC.toString(16)}"
+            }
+            return BtrfsSuperblock(
+                bytenr       = readULongLE(buf, 0),
+                flags        = readULongLE(buf, 8),
+                magic        = magic,
+                generation   = readULongLE(buf, 24),
+                root         = readULongLE(buf, 32),
+                chunkRoot    = readULongLE(buf, 40),
+                totalBytes   = readULongLE(buf, 48),
+                bytesUsed    = readULongLE(buf, 56),
+            )
+        }
+    }
+}
+```
+
+The `readULongLE(buf: ByteArray, offset: Int): ULong` helper must be
+hand-rolled, no `java.nio.ByteBuffer` (commonMain is platform-free). Use
+a small fold: `(buf[offset].toULong() and 0xFFuL) or
+((buf[offset+1].toULong() and 0xFFuL) shl 8) or … shl 56`.
+
+## BtrfsChunkTree / BtrfsDeviceTree requirements
+
+`BtrfsKey` (24 bytes LE on-disk):
+
+```kotlin
+package borg.trikeshed.btrfs
+data class BtrfsKey(val objectid: ULong, val type: UByte, val offset: ULong)
+```
+
+Key type constants: `BTRFS_KEY_TYPE_CHUNK_ITEM = 228u`, `BTRFS_KEY_TYPE_DEV_ITEM = 216u`.
+
+`BtrfsChunkItem`:
+
+```kotlin
+data class BtrfsChunkItem(
+    val stripeLength: ULong,
+    val type: UByte,             // 0=RAID0, 1=RAID1, 2=SINGLE, 10=DUP
+    val numStripes: UShort,
+    val subStripes: UShort,
+    val stripes: List<BtrfsStripe>,
+)
+```
+
+`BtrfsStripe`:
+
+```kotlin
+data class BtrfsStripe(val devid: ULong, val offset: ULong)
+```
+
+`BtrfsChunkTree.parse(bytes: ByteArray, offset: Int): List<Pair<BtrfsKey, BtrfsChunkItem>>` —
+parses a chunk tree node starting at `offset`. Default btrfs chunk items
+have exactly 3 stripes (one per device in a typical 3-disk JBOD).
+
+`BtrfsDeviceTree.parse(bytes: ByteArray, offset: Int): List<Pair<BtrfsKey, BtrfsDevItem>>` —
+parses dev items. Each `BtrfsDevItem` carries `devid: ULong, uuid: ULong, size: ULong,
+bytesUsed: ULong, path: String` (path is NUL-terminated UTF-8; truncate at
+the first NUL byte).
+
+## BtrfsVolume (jvmMain)
+
+In `src/jvmMain/kotlin/borg/trikeshed/btrfs/BtrfsVolume.kt`:
+
+```kotlin
+package borg.trikeshed.btrfs
+import borg.trikeshed.userspace.volume.Volume
+import java.io.RandomAccessFile
+import java.nio.channels.FileChannel
+
+class BtrfsVolume(devicePath: String) : Volume {
+    override val blockSize: Int = 4096
+    override val capacity: Long
+
+    init {
+        // Read superblock
+        RandomAccessFile(devicePath, "r").use { raf ->
+            val buf = ByteArray(4096)
+            raf.seek(0)
+            raf.readFully(buf)
+            val sb = BtrfsSuperblock.parse(buf)
+            capacity = sb.totalBytes.toLong()
+        }
+    }
+
+    override fun read(lba: Long, count: Int): ByteArray { /* FileChannel.read */ }
+    override fun write(lba: Long, data: ByteArray): Nothing =
+        throw UnsupportedOperationException("BtrfsVolume is read-only; COW not in scope for this task")
+    override fun sync(): Unit = Unit  // read-only — no-op
+}
+```
+
+`read(lba, count)`:
+- Computes logical = `lba * blockSize`.
+- Walks the chunk tree (loaded on init), finds the chunk whose logical
+  range covers `logical..logical + count*blockSize`, looks up its stripe
+  list, picks the first stripe (single-device reads; RAID0 striping not
+  reassembled in this task — assert `numStripes == 1u || type == SINGLE`).
+- Reads `count * blockSize` bytes via
+  `FileChannel.position(physicalOffset).read(ByteBuffer.wrap(buf))`.
+- For chunk-item lookup, build a `sortedMapOf<ULong, BtrfsChunkItem>` on
+  init from `chunk_tree_bytes` (the superblock's `chunkRoot` field tells
+  where to seek).
+
+## Test requirements (RED-GREEN-REFACTOR — write failing tests FIRST)
+
+`BtrfsSuperblockTest.kt` (jvmTest) MUST contain at MINIMUM these `@Test`
+methods with `// verifies: …` comments:
+
+1. `knownVectorParses` — build a 4096-byte buffer with magic
+   `BTRFS_MAGIC` at offset 16, generation = 42, totalBytes = 0x100000000uL
+   (= 4 GiB), `parse(buf)` returns an object with `magic == BTRFS_MAGIC`,
+   `generation == 42uL`, `totalBytes == 0x100000000uL`.
+2. `rejectsBadMagic` — buffer with magic 0xDEADBEEFDEADBEEFuL at offset 16
+   → `parse` throws `IllegalArgumentException("bad magic …")`.
+3. `rejectsTruncatedBuffer` — buffer of size 1023 → throws
+   `IllegalArgumentException("superblock buffer must be >= 4096 bytes (got 1023)")`.
+4. `flagsFieldIsExposed` — set flags = 0xCAFE_BABEuL, assert
+   `parsed.flags == 0xCAFEBABEuL`.
+5. `littleEndianRoundTrip` — encode magic as raw bytes and parse → assert
+   it round-trips exactly. (Hand-rolled LE encoder for the test.)
+
+`BtrfsChunkTreeTest.kt` MUST contain at MINIMUM:
+
+1. `parses3StripeChunkItem` — build a chunk tree buffer with one chunk
+   item of `numStripes = 3u`, 3 stripes with devids 1, 2, 3 and offsets
+   0, 4096, 8192. `parse(buf, 0)` returns one entry whose
+   `BtrfsChunkItem.numStripes == 3u` and stripes have the expected devids
+   and offsets.
+2. `rejectsKeyTypeMismatch` — buffer with key.type = 200u (not 228u) →
+   `parse` throws `IllegalArgumentException("expected key.type = 228, got 200")`.
+
+`BtrfsVolumeTest.kt` MUST contain at MINIMUM:
+
+1. `openFixtureImageReadsSuperblock` — write a fixture btrfs image to a
+   temp file: 4096-byte superblock with `totalBytes = 1MiB`, plus 8 KiB
+   of zeros. Open `BtrfsVolume(path)`; assert `volume.blockSize == 4096`
+   and `volume.capacity == 1L * 1024 * 1024`.
+2. `writeReturnsUnsupported` — `volume.write(0L, ByteArray(4096))` throws
+   `UnsupportedOperationException("BtrfsVolume is read-only; …")`.
+3. `readAtKnownChunkReturnsExpectedBytes` — extend the fixture with one
+   chunk item at logical offset 0 with one stripe (devid 1, offset 8192),
+   plus 4096 known bytes at offset 8192. `volume.read(0L, 1)` returns
+   those 4096 bytes.
+
+Run `./gradlew jvmTest --tests "*BtrfsSuperblockTest*" --tests "*BtrfsChunkTreeTest*" --tests "*BtrfsVolumeTest*"`. All three test classes must pass.
+
+## Constraints
+
+- `commonMain` parsers: NO `java.nio.ByteBuffer`, NO `java.io.File`,
+  NO platform imports. Hand-rolled byte reads only.
+- `jvmMain` is the only place `java.nio.channels.FileChannel` /
+  `RandomAccessFile` are allowed.
+- TDD: tests first, run RED, then implement, then GREEN.
+- Forbidden: `the-dependency-dir`, build files, `nativeMain/`, `jsMain/`.
+- Deliver as a PR with non-empty diff. PR description includes
+  "TDD", "PR", "Deliver" keywords.
+
+## Done means
+
+- `./gradlew jvmTest --tests "*Btrfs*"` passes for all three test classes.
+- The diff is scoped to the 13 files listed under "owned files only".
+- No `the-dependency-dir` introduced.

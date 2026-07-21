@@ -1,0 +1,13 @@
+T5: Native Volume backend
+
+Implement PosixVolume and LiburingVolume in nativeMain using existing PosixFileOperations.
+
+TDD: Write test first, then implement.
+PR: Deliver PR with non-empty diff.
+
+OWNED FILES:
+- src/nativeMain/kotlin/borg/trikeshed/userspace/volume/PosixVolume.kt
+- src/nativeMain/kotlin/borg/trikeshed/userspace/volume/LiburingVolume.kt
+
+TARGET: nativeMain (posixMain/linuxMain)
+Verify: ./gradlew compileKotlinNative compileKotlinJvm passes

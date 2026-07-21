@@ -1,0 +1,17 @@
+T10: litebike gate / tunnel adaptation
+
+OWNED FILES:
+- src/commonMain/kotlin/borg/trikeshed/litebike/Protocol.kt: Port litebike Protocol interface
+- src/commonMain/kotlin/borg/trikeshed/litebike/Tunnel.kt: Tunnel interface
+- src/nativeMain/kotlin/borg/trikeshed/litebike/SshTunnel.kt: SSH tunnel backend
+- src/commonTest/.../litebike/TunnelTest.kt: Tests
+
+TARGET: commonMain + nativeMain
+
+CONSTRAINTS:
+- Do NOT port Rust code; port type names/shapes only (clean-room)
+- Do NOT modify any other pre-existing file
+- Tests: ./gradlew compileKotlinJvm compileKotlinMacosX64
+- Deliver PR with non-empty diff
+
+TDD: tests first RED, then implement GREEN.

@@ -1,0 +1,32 @@
+Repository: jnorthrup/TrikeShed, start from current origin/master.
+
+Implement a portable memvid archive pipeline in Kotlin commonMain. Deliver a PR with a non-empty diff and passing focused tests.
+
+Exclusive owned paths:
+- src/commonMain/kotlin/borg/trikeshed/memvid/**
+- src/commonTest/kotlin/borg/trikeshed/memvid/**
+
+Do not edit build.gradle.kts, CasStore, Confix, Cursor, other root source paths, utils/ingest, docs, libs, or generated files.
+
+Use the existing commonMain borg.trikeshed.job.CasStore and ContentId, borg.trikeshed.parse.confix Confix model with CanonicalCbor, and borg.trikeshed.cursor Cursor/RowVec/ColumnMeta/IOMemento. commonMain must not import java.*, Apache Tika, Apache Camel, kotlinx JSON, or kotlinx CBOR. Outside borg.trikeshed.lib, access Series through .b(index), not [index].
+
+Required API and behavior:
+- package borg.trikeshed.memvid
+- MemvidDocument(path: String, mediaType: String, bytes: ByteArray)
+- MemvidStoragePipeline(cas: CasStore, maxFrameBytes: Int)
+- store(documents: Series<MemvidDocument>) returns a typed meta-series indexable by MemvidK.ArchiveId, ManifestCid, DocumentCount, FrameCount, Documents, Frames.
+- MemvidK.Documents is a document Cursor; MemvidK.Frames is a frame Cursor.
+- MemvidFrameColumn enum includes DOCUMENT_ORDINAL and PAYLOAD and stable ordinal-based schema. PAYLOAD has IOMemento.IoBytes and resolves bytes through CasStore, not a second authoritative copy.
+- Split bytes deterministically by maxFrameBytes, including multibyte UTF-8 without treating chunks as text.
+- Put chunks in CAS. Create a deterministic canonical Confix manifest and put it in CAS. ArchiveId equals ManifestCid.
+- restoreDocument(archive, ordinal) joins chunks in frame order, relies on CasStore.get digest verification, and verifies the restored document ContentId before returning bytes.
+- empty archive valid; maxFrameBytes <= 0 rejected; identical ordered input yields identical archive identity.
+
+Create focused common tests covering:
+1. two docs abcdefgh/xyz at frame size 4 => 2 docs, 3 frames;
+2. frame size 3 gives payload rows abc and def with schema names/types;
+3. UTF-8 bytes restore exactly and CAS corruption throws IllegalStateException;
+4. deterministic archive/manifest CID;
+5. empty archive and invalid frame size.
+
+Follow existing Series/Join/Cursor construction patterns already in root. Run ./gradlew compileKotlinJvm and the focused memvid JVM tests, plus compileKotlinJs or compileKotlinWasmJs. Deliver a PR URL.

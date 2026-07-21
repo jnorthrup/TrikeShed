@@ -1,0 +1,35 @@
+Repository: jnorthrup/TrikeShed, start from current origin/master.
+
+Repair all outstanding Forge shipping-surface build/runtime failures in one PR. Deliver a non-empty PR with real build and browser verification.
+
+Owned paths only:
+- build.gradle.kts
+- src/jsMain/resources/index.html
+- src/commonMain/kotlin/borg/trikeshed/lib/NetworkOrder.kt
+- src/commonMain/kotlin/borg/trikeshed/util/oroboros/CouchAttachmentGateway.kt
+- src/commonMain/kotlin/borg/trikeshed/util/oroboros/NgSctpGateway.kt
+- src/commonMain/kotlin/borg/trikeshed/util/oroboros/OroborosNetwork.kt
+- src/jvmMain/kotlin/borg/trikeshed/forge/gallery/ForgeComposeFactory.kt
+- src/jvmMain/kotlin/borg/trikeshed/forge/shell/ForgeWorkspace.kt only if needed
+- generated docs/** produced only by ./gradlew generateForgePages
+
+Do not touch any PosixProcessOperations, posixMain/linuxMain/macosMain work, memvid, utils/ingest, Confix schema compiler, or unrelated files.
+
+Required repairs:
+1. WASM webpack output is asynchronous. The UMD global globalThis.TrikeShed is a Promise resolving to exports. Await it, then call module.getForgeHtml(). Do not poll for a global getForgeHtml function.
+2. Production TrikeShed.js contains import.meta and must be loaded as <script type="module" src="./TrikeShed.js"></script>. Preserve the exact bundle script path.
+3. Render returned Forge HTML without dereferencing the removed loading DOM afterward; hydrate gallery from forge-seed.
+4. Fix current compileKotlinWasmJs blockers in Oroboros using actual APIs: borg.trikeshed.sctp.SctpElement; FacetedRow is MetaSeries keyed by OpK; explicit Int lambda parameters; response.frames.toList(); ContentId.of(payload) instead of stale Sha256Pure.hash and wrong sha256- prefix.
+5. Remove the accidental commonMain demo main() in NetworkOrder.kt so browser startup does not print float conversion samples.
+6. generateForgePages must be a pure build/generation task. Remove the invalid gh pages deploy command and automatic finalizedBy deployment. Do not push/deploy from Gradle.
+7. Fix JVM Compose launch truthfully. ForgeComposeFactory currently declares fun createAndShow(): Window = TODO, but Window is a composable function, not a return type. Reuse the real ForgeWorkspace main/application surface or make the factory a real executable entrypoint. Ensure runForgeJvm points to an actual main class and launches the real window; no TODO/placeholders.
+
+Verification:
+- ./gradlew compileKotlinWasmJs
+- ./gradlew generateForgePages
+- serve docs over HTTP and verify in a headless browser that loading text disappears, no error panel is visible, getForgeHtml resolves, and gallery sections render
+- ./gradlew compileKotlinJvm
+- start ./gradlew runForgeJvm long enough to prove the Compose window initializes, then stop it cleanly
+- git diff --check
+
+Do not report completion unless all five verification paths genuinely execute. Deliver the PR URL.
