@@ -27,6 +27,7 @@ import borg.trikeshed.lcnc.isam.LcncBlock
 import borg.trikeshed.forge.causalKey
 import borg.trikeshed.forge.facet
 import borg.trikeshed.forge.lane
+import borg.trikeshed.forge.title
 
 /**
  * One row of the visual blackboard.
@@ -43,6 +44,7 @@ data class BlackboardSurfaceRow(
     val provenance: String?,
     val causalKey: String,
     val lcncKind: String,
+    val title: String?,
 )
 
 /**
@@ -81,6 +83,7 @@ class BlackboardSurface private constructor(
             "provenance" to IOMemento.IoString,
             "causalKey" to IOMemento.IoString,
             "lcncKind" to IOMemento.IoString,
+            "title" to IOMemento.IoString,
         )
 
         fun project(
@@ -128,6 +131,7 @@ class BlackboardSurface private constructor(
                     provenance = context.provenance?.source,
                     causalKey = causalKey ?: node?.causalKey ?: "lcnc:${entity.id}",
                     lcncKind = entity.type,
+                    title = entity.title,
                 )
             }
 
@@ -139,7 +143,7 @@ class BlackboardSurface private constructor(
                 }
                 KanbanCard(
                     id = KanbanCardId(row.cardId),
-                    title = rows[order].cardId,
+                    title = row.title ?: rows[order].cardId,
                     description = "lcnc:${rows[order].lcncKind}",
                     columnId = KanbanColumnId(row.lane),
                     order = order,
@@ -212,6 +216,7 @@ class BlackboardSurface private constructor(
                 row.provenance,
                 row.causalKey,
                 row.lcncKind,
+                row.title,
             )
             return SURFACE_COLUMNS.size j { col: Int ->
                 values[col] j { ColumnMeta(SURFACE_COLUMNS[col].first, SURFACE_COLUMNS[col].second) }
