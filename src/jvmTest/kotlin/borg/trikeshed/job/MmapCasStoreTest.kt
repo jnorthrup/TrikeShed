@@ -33,4 +33,28 @@ class MmapCasStoreTest {
 
         store.close()
     }
+
+    @Test
+    fun testRebuildIndex() {
+        val tempFile = Files.createTempFile("mmap-cas-store-rebuild", ".dat")
+        tempFile.toFile().deleteOnExit()
+
+        val store = MmapCasStore(tempFile)
+        val data1 = byteArrayOf(1, 2, 3)
+        val data2 = byteArrayOf(4, 5, 6, 7)
+        val cid1 = store.put(data1)
+        val cid2 = store.put(data2)
+        store.close()
+
+        val store2 = MmapCasStore(tempFile)
+        val retrieved1 = store2.get(cid1)
+        assertNotNull(retrieved1)
+        assertTrue(data1.contentEquals(retrieved1))
+
+        val retrieved2 = store2.get(cid2)
+        assertNotNull(retrieved2)
+        assertTrue(data2.contentEquals(retrieved2))
+
+        store2.close()
+    }
 }
