@@ -103,10 +103,6 @@ class MmapCasStore(val file: Path) {
         return cid
     }
 
-<<<<<<< HEAD
-=======
-
->>>>>>> 7b92d06fda9a01b8412a2f4db7bc0f4dc60a46fc
     fun get(cid: ContentId): Series<Byte>? {
         val loc = synchronized(this) { offsetMap[cid] } ?: return null
         val offset = loc.first
