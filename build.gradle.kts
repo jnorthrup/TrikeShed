@@ -161,6 +161,8 @@ kotlin {
         val commonMain = getByName("commonMain") {
             dependencies {
                 implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:$coroutinesVersion")
+                implementation("org.jetbrains.kotlinx:kotlinx-serialization-cbor:$serializationVersion")
+                
                 implementation("org.jetbrains.kotlinx:kotlinx-datetime:$datetimeVersion")
                 // Confix is the only portable serializer in commonMain. The kotlinx-serialization
                 // plugin stays applied (core @Serializable/@Contextual annotations need it), but the
@@ -192,6 +194,8 @@ kotlin {
                 implementation("org.openjdk.jmh:jmh-generator-annprocess:1.37")
                 implementation("org.bouncycastle:bcprov-jdk15on:1.70")
                 implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:$coroutinesVersion")
+                implementation("org.jetbrains.kotlinx:kotlinx-serialization-cbor:$serializationVersion")
+                
                 implementation("org.ow2.asm:asm:9.7")
                 implementation("org.ow2.asm:asm-tree:9.7")
 
