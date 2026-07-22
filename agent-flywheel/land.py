@@ -107,8 +107,20 @@ def detect_test_cmd(repo: str) -> str:
                 return f"npm test --silent -- {t}"
         except Exception:
             pass
+    gradlew = os.path.join(repo, "gradlew")
+    if os.path.exists(gradlew):
+        build_text = ""
+        for build_name in ("build.gradle.kts", "build.gradle"):
+            build_path = os.path.join(repo, build_name)
+            if os.path.exists(build_path):
+                with open(build_path) as build_file:
+                    build_text = build_file.read()
+                break
+        if ("kotlin(\"multiplatform\")" in build_text
+                or "org.jetbrains.kotlin.multiplatform" in build_text):
+            return "./gradlew jvmTest"
+        return "./gradlew test"
     for probe, cmd in [
-        ("gradlew", "./gradlew test"),
         ("pytest", "python -m pytest -x -q"),
         ("poetry.lock", "poetry run pytest -x -q"),
         ("Cargo.toml", "cargo test --quiet"),
