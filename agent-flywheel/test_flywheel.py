@@ -38,6 +38,16 @@ class WorkQueueTest(unittest.TestCase):
 
         self.assertEqual(1, len(queue))
 
+    def test_snapshot_budget_keeps_the_complete_work_pool(self):
+        pool = "## doc/ work pool\n- [ ] first\n- [ ] final\n"
+        fitted = flywheel.fit_snapshot("x" * 16000 + pool, 16000)
+        self.assertIn("- [ ] first", fitted)
+        self.assertIn("- [ ] final", fitted)
+
+    def test_researcher_task_wrapper_is_unwrapped(self):
+        tasks = [{"title": "one"}]
+        self.assertEqual(tasks, flywheel.proposal_list({"tasks": tasks}))
+
 
 class ReconciliationTest(unittest.TestCase):
     def test_completed_session_without_patch_is_removed_and_requeued(self):
