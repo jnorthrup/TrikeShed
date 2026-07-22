@@ -7,16 +7,16 @@ package borg.trikeshed.flywheel
 import borg.trikeshed.jules.JulesRestClient
 import borg.trikeshed.utils.kanban.JulesBoardStore
 import java.io.File
-import java.time.Duration
 import java.time.Instant
+import java.util.ArrayDeque
 import kotlin.math.roundToInt
 
 /**
- * Live throughput view of the flywheel.
+ * Live throughput view of the flywheel — a fancy colored log reader.
  *
- * This deliberately does not render causal internals. It renders the control
- * surface an operator needs: queue pressure, workers occupying slots, work on
- * each paddle, recent task per worker, and a pulse when work crosses an arrow.
+ * Polls Jules REST + local process table + todo queue + WAL, derives
+ * paddle counts and per-agent state, and renders a spinning wheel with
+ * colored boxes, pulsing arrows, and a rolling event log.
  */
 object FlywheelTui {
     private const val DEFAULT_SOURCE = "sources/github/jnorthrup/TrikeShed"
@@ -67,6 +67,12 @@ object FlywheelTui {
         }
     }
 
+    private data class LogEvent(
+        val at: Long,
+        val stage: String,
+        val message: String,
+    )
+
     @JvmStatic
     fun main(args: Array<String>) {
         val once = args.contains("--once")
@@ -74,19 +80,22 @@ object FlywheelTui {
             ?.substringAfter('=')?.toLongOrNull() ?: 2_000L
         val source = args.firstOrNull { it.startsWith("--source=") }
             ?.substringAfter('=') ?: DEFAULT_SOURCE
+        val colors = !args.contains("--no-color") && System.getenv("NO_COLOR") == null
         val repoDir = File(args.firstOrNull { !it.startsWith("--") } ?: System.getProperty("user.dir"))
         val forgeDir = File(System.getenv("TRIKESHED_HOME") ?: File(System.getProperty("user.home"), ".local/forge").path)
         val apiKey = System.getenv("JULES_API_KEY")
         val client = apiKey?.let(::JulesRestClient)
         val pulses = Pulses()
+        val events = ArrayDeque<LogEvent>()
         var previous: Snapshot? = null
         var tick = 0
 
         do {
             val snapshot = capture(client, source, repoDir, forgeDir)
             updatePulses(previous, snapshot, pulses)
+            updateEvents(previous, snapshot, events)
             print("\u001b[2J\u001b[H")
-            print(render(snapshot, pulses, tick++))
+            print(render(snapshot, pulses, events, tick++, colors))
             previous = snapshot
             pulses.decay()
             if (!once) Thread.sleep(intervalMs)
@@ -159,52 +168,117 @@ object FlywheelTui {
         if (now.slice > previous.slice) pulses.curateSlice = 4
     }
 
-    private fun render(s: Snapshot, pulses: Pulses, tick: Int): String = buildString {
+    private fun updateEvents(previous: Snapshot?, now: Snapshot, events: ArrayDeque<LogEvent>) {
+        if (previous == null) {
+            addEvent(events, LogEvent(now.at, "BOOT", "queue=${now.queue}  agents=${now.occupied}/${now.capacity}  run=${now.running}  guide=${now.guide}  harvest=${now.harvest}"))
+            return
+        }
+        if (now.queue != previous.queue) {
+            val stage = if (now.queue > previous.queue) "QUEUE" else "DISPATCH"
+            addEvent(events, LogEvent(now.at, stage, "ready queue ${previous.queue} → ${now.queue}"))
+        }
+        if (now.land != previous.land) {
+            addEvent(events, LogEvent(now.at, "LAND", "merged total ${previous.land} → ${now.land}"))
+        }
+        if (now.openCodeRunning != previous.openCodeRunning) {
+            addEvent(events, LogEvent(now.at, "BRAIN", "OpenCode workers ${previous.openCodeRunning} → ${now.openCodeRunning}"))
+        }
+        if (now.codexRunning != previous.codexRunning) {
+            addEvent(events, LogEvent(now.at, "RUN", "Codex workers ${previous.codexRunning} → ${now.codexRunning}"))
+        }
+        val before = previous.sessions.associateBy { it.id }
+        val after = now.sessions.associateBy { it.id }
+        for ((id, session) in after) {
+            val old = before[id]
+            if (old == null) {
+                addEvent(events, LogEvent(now.at, stateLabel(session.state), "jules/${id.takeLast(6)} + ${session.title.take(76)}"))
+            } else if (old.state != session.state) {
+                addEvent(events, LogEvent(now.at, stateLabel(session.state), "jules/${id.takeLast(6)} ${stateLabel(old.state)} → ${stateLabel(session.state)}  ${session.title.take(62)}"))
+            }
+        }
+        for ((id, session) in before) {
+            if (id !in after) addEvent(events, LogEvent(now.at, "RETIRED", "jules/${id.takeLast(6)} - ${session.title.take(76)}"))
+        }
+    }
+
+    private fun addEvent(events: ArrayDeque<LogEvent>, event: LogEvent) {
+        while (events.size >= 10) events.removeFirst()
+        events.addLast(event)
+    }
+
+    private fun render(s: Snapshot, pulses: Pulses, events: ArrayDeque<LogEvent>, tick: Int, colors: Boolean): String = buildString {
         val bar = saturationBar(s.saturation)
-        appendLine("OROBOROS FLYWHEEL   SATURATION ${s.occupied}/${s.capacity} ${s.saturation}% $bar")
-        appendLine("updated ${Instant.ofEpochMilli(s.at)}${s.error?.let { "   ERROR: $it" } ?: ""}")
+        val wheel = listOf("\u25D0", "\u25D3", "\u25D1", "\u25D2")[tick % 4]
+        val saturationColor = when {
+            s.saturation >= 85 -> GREEN
+            s.saturation >= 50 -> YELLOW
+            else -> RED
+        }
+        val bottleneck = listOf(
+            "DISPATCH" to s.dispatch,
+            "RUNNING" to s.running,
+            "GUIDE" to s.guide,
+            "HARVEST" to s.harvest,
+        ).maxBy { it.second }
+        appendLine(paint(colors, BOLD + CYAN, "$wheel  OROBOROS FLYWHEEL") + "   " + paint(colors, saturationColor, "SATURATION ${s.occupied}/${s.capacity} ${s.saturation}% $bar"))
+        appendLine(paint(colors, DIM, "updated ${Instant.ofEpochMilli(s.at)}") + "   bottleneck=" + paint(colors, stageColor(bottleneck.first), "${bottleneck.first}:${bottleneck.second}") + (s.error?.let { "   " + paint(colors, RED, "ERROR: $it") } ?: ""))
         appendLine()
-        appendLine("                                  ┌──────────────────┐")
-        appendLine("                                  │ SLICE / INSIGHT ${padCount(s.slice)}│")
-        appendLine("                                  └────────┬─────────┘")
-        appendLine("                              ${diag(pulses.curateSlice, tick, true)}         ${diag(pulses.sliceQueue, tick, false)}")
-        appendLine("                 ┌──────────────────┐             ┌──────────────────┐")
-        appendLine("                 │ CURATE / REFILL ${padCount(s.curate)}│             │ READY QUEUE     ${padCount(s.queue)}│")
-        appendLine("                 └────────▲─────────┘             └────────┬─────────┘")
-        appendLine("                          ${vertical(pulses.landCurate, tick, true)}                            ${vertical(pulses.queueDispatch, tick, false)}")
-        appendLine("                 ┌────────┴─────────┐             ┌────────▼─────────┐")
-        appendLine("                 │ LAND / MERGE    ${padCount(s.land)}│             │ DISPATCH        ${padCount(s.dispatch)}│")
-        appendLine("                 └────────▲─────────┘             └────────┬─────────┘")
-        appendLine("                          ${vertical(pulses.harvestLand, tick, true)}                            ${vertical(pulses.dispatchRun, tick, false)}")
-        appendLine("                 ┌────────┴─────────┐  ${leftArrow(pulses.runHarvest, tick)}  ┌────────▼─────────┐")
-        appendLine("                 │ HARVEST / REVIEW${padCount(s.harvest)}│             │ RUNNING         ${padCount(s.running)}│")
-        appendLine("                 └──────────────────┘  ${leftArrow(pulses.runGuide, tick)}  └────────┬─────────┘")
-        appendLine("                                                ┌────────▼─────────┐")
-        appendLine("                                                │ GUIDE / AWAITING${padCount(s.guide)}│")
-        appendLine("                                                └──────────────────┘")
+
+        // Diagram
+        appendLine("                                  \u250C\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2510")
+        appendLine("                                  \u2502 ${paint(colors, PURPLE, "SLICE / INSIGHT")} ${padCount(s.slice)}\u2502")
+        appendLine("                                  \u2514\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u252C\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2518")
+        appendLine("                              ${diag(pulses.curateSlice, tick, true, colors)}         ${diag(pulses.sliceQueue, tick, false, colors)}")
+        appendLine("                 \u250C\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2510             \u250C\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2510")
+        appendLine("                 \u2502 ${paint(colors, PURPLE, "CURATE / REFILL")} ${padCount(s.curate)}\u2502             \u2502 ${paint(colors, CYAN, "READY QUEUE")}     ${padCount(s.queue)}\u2502")
+        appendLine("                 \u2514\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2532\u2500\u2500\u2500\u2500\u2500\u2518             \u2514\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u252C\u2500\u2500\u2500\u2500\u2500\u2518")
+        appendLine("                          ${vertical(pulses.landCurate, tick, true, colors)}                            ${vertical(pulses.queueDispatch, tick, false, colors)}")
+        appendLine("                 \u250C\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2534\u2500\u2500\u2500\u2500\u2500\u2510             \u250C\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2532\u2500\u2500\u2500\u2500\u2500\u2510")
+        appendLine("                 \u2502 ${paint(colors, GREEN, "LAND / MERGE")}    ${padCount(s.land)}\u2502             \u2502 ${paint(colors, YELLOW, "DISPATCH")}        ${padCount(s.dispatch)}\u2502")
+        appendLine("                 \u2514\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2532\u2500\u2500\u2500\u2500\u2500\u2518             \u2514\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u252C\u2500\u2500\u2500\u2500\u2500\u2518")
+        appendLine("                          ${vertical(pulses.harvestLand, tick, true, colors)}                            ${vertical(pulses.dispatchRun, tick, false, colors)}")
+        appendLine("                 \u250C\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2534\u2500\u2500\u2500\u2500\u2500\u2510  ${leftArrow(pulses.runHarvest, tick, colors)}  \u250C\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2532\u2500\u2500\u2500\u2500\u2500\u2510")
+        appendLine("                 \u2502 ${paint(colors, BLUE, "HARVEST / REVIEW")}${padCount(s.harvest)}\u2502             \u2502 ${paint(colors, GREEN, "RUNNING")}         ${padCount(s.running)}\u2502")
+        appendLine("                 \u2514\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2518  ${leftArrow(pulses.runGuide, tick, colors)}  \u2514\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u252C\u2500\u2500\u2500\u2500\u2500\u2518")
+        appendLine("                                                \u250C\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2532\u2500\u2500\u2500\u2500\u2500\u2510")
+        appendLine("                                                \u2502 ${paint(colors, MAGENTA, "GUIDE / AWAITING")}${padCount(s.guide)}\u2502")
+        appendLine("                                                \u2514\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2518")
         appendLine()
-        appendLine("AGENT POOLS")
-        appendLine("  Jules      ${poolBar(s.sessions.count { it.state !in TERMINAL }, JULES_CAPACITY)}  latest: ${latest(s.sessions)}")
-        appendLine("  OpenCode   ${poolBar(s.openCodeRunning, if (s.openCodeAvailable) OPENCODE_CAPACITY else 0)}  ${if (s.openCodeAvailable) "idle/brain workers" else "unavailable"}")
-        appendLine("  Codex      ${poolBar(s.codexRunning, if (s.codexAvailable) 2 else 0)}  ${if (s.codexAvailable) "local workers" else "unavailable"}")
+
+        // Agent pools
+        appendLine(paint(colors, BOLD + CYAN, "AGENT POOLS"))
+        appendLine("  ${paint(colors, BLUE, "Jules")}      ${poolBar(s.sessions.count { it.state !in TERMINAL }, JULES_CAPACITY, colors)}  latest: ${paint(colors, DIM, latest(s.sessions))}")
+        appendLine("  ${paint(colors, PURPLE, "OpenCode")}   ${poolBar(s.openCodeRunning, if (s.openCodeAvailable) OPENCODE_CAPACITY else 0, colors)}  ${if (s.openCodeAvailable) "idle/brain workers" else paint(colors, RED, "unavailable")}")
+        appendLine("  ${paint(colors, GREEN, "Codex")}      ${poolBar(s.codexRunning, if (s.codexAvailable) 2 else 0, colors)}  ${if (s.codexAvailable) "local workers" else paint(colors, RED, "unavailable")}")
         appendLine()
-        appendLine("LATEST JULES AGENTS")
+
+        // Latest agents
+        appendLine(paint(colors, BOLD + CYAN, "LATEST JULES AGENTS"))
         s.sessions.take(10).forEach { session ->
-            appendLine("  jules/${session.id.takeLast(6)}  ${stateLabel(session.state).padEnd(10)}  ${session.title.take(68)}")
+            val state = stateLabel(session.state)
+            appendLine("  " + paint(colors, DIM, "jules/${session.id.takeLast(6)}") + "  " + paint(colors, stageColor(state), state.padEnd(10)) + "  ${session.title.take(68)}")
         }
         if (s.sessions.isEmpty()) appendLine("  (none)")
         appendLine()
-        appendLine("Arrow pulse: ● = a work item crossed that paddle since the previous refresh.  Ctrl+C quits.")
+
+        // Event log
+        appendLine(paint(colors, BOLD + CYAN, "RECENT MOVEMENT"))
+        events.toList().takeLast(8).forEach { event ->
+            val time = Instant.ofEpochMilli(event.at).toString().substring(11, 19)
+            appendLine("  " + paint(colors, DIM, time) + "  " + paint(colors, stageColor(event.stage), event.stage.padEnd(9)) + " ${event.message}")
+        }
+        appendLine()
+        appendLine(paint(colors, DIM, "\u25CF on an arrow = work crossed that paddle.  Ctrl+C quits.  --no-color disables ANSI."))
     }
 
     private fun padCount(n: Int): String = n.toString().padStart(3).padEnd(4)
     private fun saturationBar(percent: Int): String {
         val filled = (percent.coerceIn(0, 100) / 5)
-        return "[" + "█".repeat(filled) + "·".repeat(20 - filled) + "]"
+        return "[" + "\u2588".repeat(filled) + "\u00B7".repeat(20 - filled) + "]"
     }
-    private fun poolBar(running: Int, capacity: Int): String =
+    private fun poolBar(running: Int, capacity: Int, colors: Boolean): String =
         if (capacity == 0) "  -/- [unavailable]"
-        else "%3d/%-3d [%s%s]".format(running, capacity, "█".repeat(running.coerceAtMost(capacity)), "·".repeat((capacity - running).coerceAtLeast(0)))
+        else "%3d/%-3d [%s%s]".format(running, capacity, "\u2588".repeat(running.coerceAtMost(capacity)), "\u00B7".repeat((capacity - running).coerceAtLeast(0)))
 
     private fun latest(sessions: List<JulesRestClient.SessionInfo>): String =
         sessions.firstOrNull()?.title?.take(58) ?: "idle"
@@ -219,10 +293,26 @@ object FlywheelTui {
         else -> state.take(10)
     }
 
-    private fun pulse(active: Int, tick: Int): Char = if (active > 0 && tick % 2 == 0) '●' else ' '
-    private fun diag(active: Int, tick: Int, up: Boolean): String = if (up) "↖${pulse(active, tick)}" else "${pulse(active, tick)}↘"
-    private fun vertical(active: Int, tick: Int, up: Boolean): String = if (up) "${pulse(active, tick)}│" else "│${pulse(active, tick)}"
-    private fun leftArrow(active: Int, tick: Int): String = "◀──${pulse(active, tick)}────"
+    private fun pulse(active: Int, tick: Int): Char = if (active > 0 && tick % 2 == 0) '\u25CF' else ' '
+    private fun diag(active: Int, tick: Int, up: Boolean, colors: Boolean): String =
+        paint(colors, if (active > 0) YELLOW else DIM, if (up) "\u2196${pulse(active, tick)}" else "${pulse(active, tick)}\u2197")
+    private fun vertical(active: Int, tick: Int, up: Boolean, colors: Boolean): String =
+        paint(colors, if (active > 0) YELLOW else DIM, if (up) "${pulse(active, tick)}\u2502" else "\u2502${pulse(active, tick)}")
+    private fun leftArrow(active: Int, tick: Int, colors: Boolean): String =
+        paint(colors, if (active > 0) YELLOW else DIM, "\u25C0\u2500\u2500${pulse(active, tick)}\u2500\u2500\u2500\u2500")
+
+    private fun stageColor(stage: String): String = when (stage) {
+        "BOOT", "QUEUE", "DISPATCH" -> CYAN
+        "RUN", "RUNNING", "LAND" -> GREEN
+        "GUIDE" -> MAGENTA
+        "HARVEST", "REVIEW" -> BLUE
+        "BRAIN", "SLICE", "CURATE" -> PURPLE
+        "FAILED", "ERROR", "RETIRED" -> RED
+        else -> YELLOW
+    }
+
+    private fun paint(enabled: Boolean, color: String, text: String): String =
+        if (enabled) "$color$text$RESET" else text
 
     private fun processCount(needle: String): Int = ProcessHandle.allProcesses()
         .filter { p ->
@@ -237,4 +327,14 @@ object FlywheelTui {
         (System.getenv("PATH") ?: "").split(File.pathSeparator).any { File(it, name).canExecute() }
 
     private val TERMINAL = setOf("COMPLETED", "FINISHED", "FAILED", "PAUSED", "CANCELLED")
+    private const val RESET = "\u001b[0m"
+    private const val BOLD = "\u001b[1m"
+    private const val DIM = "\u001b[2m"
+    private const val RED = "\u001b[31m"
+    private const val GREEN = "\u001b[32m"
+    private const val YELLOW = "\u001b[33m"
+    private const val BLUE = "\u001b[34m"
+    private const val MAGENTA = "\u001b[35m"
+    private const val CYAN = "\u001b[36m"
+    private const val PURPLE = "\u001b[95m"
 }
