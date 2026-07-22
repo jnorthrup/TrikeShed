@@ -317,7 +317,7 @@ if (!focusedTransportSlice) {
             kotlin.exclude("**/userspace/**")
             kotlin.exclude("**/ipfs/**")
             kotlin.exclude("**/quic/**")
-            kotlin.exclude("**/sctp/**")
+            // kotlin.exclude("**/sctp/**")
             kotlin.exclude("**/window/**")
             kotlin.exclude("**/htx/**")
             // Stale against current CouchStore/CouchAttachmentGateway/Htx APIs; re-enable after reconciliation.
