@@ -351,6 +351,11 @@ def should_answer_question(state, question, last_question):
     return (state == "AWAITING_USER_FEEDBACK" and bool(question)
             and question != last_question)
 
+def session_interruption_reason(state):
+    if state in ("FAILED", "PAUSED"):
+        return f"Jules session {state.lower()} before producing a landable patch"
+    return None
+
 def change_set_patch(change_set):
     patch = change_set.get("gitPatch", "") if isinstance(change_set, dict) else ""
     if isinstance(patch, str):
@@ -574,8 +579,8 @@ def main():
                     Jules.delete(name)
                     del live[name]
                     print(f"  ↻ no patch, requeued: {sess['work']['title']}", flush=True)
-            elif state == "FAILED":
-                reason = "Jules session failed before producing a landable patch"
+            elif state in ("FAILED", "PAUSED"):
+                reason = session_interruption_reason(state)
                 outcomes.append({"title": sess["work"]["title"], "ok": False,
                                  "why": reason,
                                  "fingerprint": sess["work"].get("fingerprint")})
