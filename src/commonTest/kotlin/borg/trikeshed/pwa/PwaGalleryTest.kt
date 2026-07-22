@@ -32,13 +32,13 @@ class PwaGalleryTest {
         }
         val gallery = PwaGallery(items)
         val html = gallery.render()
-        
+
         assertTrue(html.contains("pwa-gallery"), "Should contain gallery container")
         assertFalse(html.contains("empty-gallery"), "Should not indicate gallery is empty")
-        
+
         assertTrue(html.contains("https://example.com/1.png"), "Should render first image url")
         assertTrue(html.contains("Image 1"), "Should render first image alt text")
-        
+
         assertTrue(html.contains("https://example.com/2.png"), "Should render second image url")
         assertTrue(html.contains("Image 2"), "Should render second image alt text")
     }
@@ -50,7 +50,7 @@ class PwaGalleryTest {
         }
         val gallery = PwaGallery(items)
         val html = gallery.render()
-        
+
         assertTrue(html.contains("pwa-gallery-grid"), "Should use a responsive grid layout")
         assertTrue(html.contains("pwa-gallery-item"), "Should style items individually")
         assertTrue(html.contains("gallery-nav"), "Should contain navigation controls")
