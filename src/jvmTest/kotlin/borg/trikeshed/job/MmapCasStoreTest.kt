@@ -23,7 +23,11 @@ class MmapCasStoreTest {
         val bytes = ByteArray(size) { (it % 256).toByte() }
         val cid = store.put(bytes)
 
+<<<<<<< HEAD
         // Read via get
+=======
+        // Read via getMapped
+>>>>>>> 7b92d06fda9a01b8412a2f4db7bc0f4dc60a46fc
         val mappedSeries = store.get(cid)
         assertNotNull(mappedSeries)
         assertEquals(size, mappedSeries.a) // size
@@ -53,6 +57,7 @@ class MmapCasStoreTest {
         
         val retrieved1 = store2.get(cid1)
         assertNotNull(retrieved1)
+<<<<<<< HEAD
         assertEquals(data1.size, retrieved1.a)
         for (i in data1.indices) {
             assertEquals(data1[i], retrieved1[i])
@@ -64,6 +69,17 @@ class MmapCasStoreTest {
         for (i in data2.indices) {
             assertEquals(data2[i], retrieved2[i])
         }
+=======
+        val expected1 = data1.toList()
+        val actual1 = List(retrieved1.a) { retrieved1[it] }
+        assertEquals(expected1, actual1)
+
+        val retrieved2 = store2.get(cid2)
+        assertNotNull(retrieved2)
+        val expected2 = data2.toList()
+        val actual2 = List(retrieved2.a) { retrieved2[it] }
+        assertEquals(expected2, actual2)
+>>>>>>> 7b92d06fda9a01b8412a2f4db7bc0f4dc60a46fc
 
         store2.close()
     }
