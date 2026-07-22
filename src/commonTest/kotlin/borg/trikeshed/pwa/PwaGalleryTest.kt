@@ -7,52 +7,96 @@
 package borg.trikeshed.pwa
 
 import borg.trikeshed.lib.j
+import borg.trikeshed.lib.get
+import borg.trikeshed.lib.size
 import kotlin.test.Test
+import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 import kotlin.test.assertFalse
 
 class PwaGalleryTest {
-
     @Test
-    fun testEmptyGalleryRendering() {
-        val gallery = PwaGallery(0 j { _: Int -> PwaGalleryItem("", "", "") })
-        val html = gallery.render()
-        assertTrue(html.contains("pwa-gallery"), "Should contain gallery container class")
-        assertTrue(html.contains("empty-gallery"), "Should indicate gallery is empty")
+    fun testGalleryInitialRender() {
+        val item1 = GalleryItem("img1", "url1.jpg", "Image 1")
+        val item2 = GalleryItem("img2", "url2.jpg", "Image 2")
+        val items = 2 j { i: Int -> if (i == 0) item1 else item2 }
+
+        val gallery = PwaGallery(items)
+        val html = gallery.renderHtml()
+
+        assertTrue(html.contains("class=\"pwa-gallery\""))
+        assertTrue(html.contains("url1.jpg"))
+        assertTrue(html.contains("url2.jpg"))
+        assertTrue(html.contains("Image 1"))
+        assertTrue(html.contains("Image 2"))
+
+        // Grid view should be active initially
+        assertTrue(html.contains("class=\"pwa-gallery-grid\""))
+        assertFalse(html.contains("class=\"pwa-gallery-viewer\""))
     }
 
     @Test
-    fun testPopulatedGalleryRendering() {
-        val items = 2 j { index: Int ->
-            when (index) {
-                0 -> PwaGalleryItem("img1", "https://example.com/1.png", "Image 1")
-                1 -> PwaGalleryItem("img2", "https://example.com/2.png", "Image 2")
-                else -> error("Out of bounds")
+    fun testGalleryViewerRender() {
+        val item1 = GalleryItem("img1", "url1.jpg", "Image 1")
+        val item2 = GalleryItem("img2", "url2.jpg", "Image 2")
+        val items = 2 j { i: Int -> if (i == 0) item1 else item2 }
+
+        val gallery = PwaGallery(items)
+        gallery.setActiveItem("img2")
+
+        val html = gallery.renderHtml()
+
+        // Viewer should be active
+        assertTrue(html.contains("class=\"pwa-gallery-viewer\""))
+        assertTrue(html.contains("url2.jpg"))
+
+        // Next/Prev buttons
+        assertTrue(html.contains("pwaGalleryNext"))
+        assertTrue(html.contains("pwaGalleryPrev"))
+        assertTrue(html.contains("pwaGalleryClose"))
+    }
+
+    @Test
+    fun testGalleryNavigation() {
+        val item1 = GalleryItem("img1", "url1.jpg", "Image 1")
+        val item2 = GalleryItem("img2", "url2.jpg", "Image 2")
+        val item3 = GalleryItem("img3", "url3.jpg", "Image 3")
+        val items = 3 j { i: Int ->
+            when (i) {
+                0 -> item1
+                1 -> item2
+                else -> item3
             }
         }
+
         val gallery = PwaGallery(items)
-        val html = gallery.render()
 
-        assertTrue(html.contains("pwa-gallery"), "Should contain gallery container")
-        assertFalse(html.contains("empty-gallery"), "Should not indicate gallery is empty")
+        // Start by viewing img1
+        gallery.setActiveItem("img1")
+        assertEquals("img1", gallery.getActiveItem()?.id)
 
-        assertTrue(html.contains("https://example.com/1.png"), "Should render first image url")
-        assertTrue(html.contains("Image 1"), "Should render first image alt text")
+        // Go next
+        gallery.next()
+        assertEquals("img2", gallery.getActiveItem()?.id)
 
-        assertTrue(html.contains("https://example.com/2.png"), "Should render second image url")
-        assertTrue(html.contains("Image 2"), "Should render second image alt text")
-    }
+        // Go next again
+        gallery.next()
+        assertEquals("img3", gallery.getActiveItem()?.id)
 
-    @Test
-    fun testGalleryNavigationAndResponsiveLayout() {
-        val items = 3 j { index: Int ->
-            PwaGalleryItem("img$index", "https://example.com/$index.png", "Image $index")
-        }
-        val gallery = PwaGallery(items)
-        val html = gallery.render()
+        // Go next from last (should wrap around or stop, let's say wrap)
+        gallery.next()
+        assertEquals("img1", gallery.getActiveItem()?.id)
 
-        assertTrue(html.contains("pwa-gallery-grid"), "Should use a responsive grid layout")
-        assertTrue(html.contains("pwa-gallery-item"), "Should style items individually")
-        assertTrue(html.contains("gallery-nav"), "Should contain navigation controls")
+        // Go prev from first (should wrap)
+        gallery.prev()
+        assertEquals("img3", gallery.getActiveItem()?.id)
+
+        // Go prev
+        gallery.prev()
+        assertEquals("img2", gallery.getActiveItem()?.id)
+
+        // Close viewer
+        gallery.closeViewer()
+        assertEquals(null, gallery.getActiveItem())
     }
 }
