@@ -25,7 +25,6 @@ import borg.trikeshed.lib.`▶`
 //   ConfixDoc compound navigation: .getAt(), .scalar(), .docAt(), .value()
 //   ConfixCell navigation: .get(String), .get(Int), .cellGetAt(), .reify()
 //   ConfixCell.cellKids
-//   JsonElement alias
 //   JsPath / JsPathElement
 //   BlackBoard alignment helpers
 
@@ -263,10 +262,6 @@ fun RowVec.getAt(vararg path: Any, src: Series<Byte>): RowVec? {
     }
     return cur
 }
-
-// ── JsonElement alias (backward compat) ───────────────────────────────────────
-
-typealias JsonElement = ConfixCell
 
 // ── JsPath — typed path segments ──────────────────────────────────────────────
 

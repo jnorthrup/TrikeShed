@@ -1,72 +1,39 @@
 package borg.trikeshed.couch
 
-import borg.trikeshed.parse.confix.roots
-import borg.trikeshed.parse.confix.root
+import borg.trikeshed.lib.size
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class ConfixPersistenceTest {
-
     @Test
-    fun `document round-trips through confix persistence`() {
-        val persistence = ConfixPersistence()
-        val doc = Document(
-            id = "doc-1",
-            fields = listOf(
-                Field("name", "Alice"),
-                Field("age", "30"),
-                Field("active", "true"),
-            ),
-        )
+    fun revisionsRejectConflictsAndGuardDeletes() {
+        val store = ConfixDocStoreFactory.createSequential()
+        val created = assertNotNull(store.put("doc-1", "{\"name\":\"Alice\"}"))
+        assertEquals("0-uuid", created.rev)
 
-        persistence.persist(doc)
+        assertNull(store.put("doc-1", "{\"name\":\"Mallory\"}", rev = "stale"))
+        val updated = assertNotNull(store.put("doc-1", "{\"name\":\"Bob\"}", rev = created.rev))
+        assertEquals("1-uuid", updated.rev)
+        assertEquals(updated, store["doc-1"])
 
-        // Confix-backed record exists
-        val confixDoc = persistence.loadConfixDoc("doc-1")
-        assertNotNull(confixDoc, "confix doc must exist after persist")
-        assertTrue(confixDoc.root != null, "confix doc must have a root")
-
-        // Round-trip back to Document
-        val loaded = persistence.loadDocument("doc-1")
-        assertNotNull(loaded)
-        assertEquals("doc-1", loaded.id)
-        val fieldsByName = loaded.fields.associateBy { it.name }
-        assertEquals("Alice", fieldsByName["name"]?.value)
-        assertEquals("30", fieldsByName["age"]?.value)
+        assertFalse(store.delete("doc-1", created.rev))
+        assertTrue(store.delete("doc-1", updated.rev))
+        assertNull(store["doc-1"])
     }
 
     @Test
-    fun `delete removes confix record`() {
-        val persistence = ConfixPersistence()
-        persistence.persist(Document("doc-2", listOf(Field("k", "v"))))
-        assertNotNull(persistence.loadConfixDoc("doc-2"))
-        persistence.delete("doc-2")
-        assertNull(persistence.loadConfixDoc("doc-2"))
-    }
+    fun prefixProjectionReturnsOnlyMatchingDocuments() {
+        val store = ConfixDocStoreFactory.createSequential()
+        store.put("user:1", "{\"name\":\"Bob\"}")
+        store.put("user:2", "{\"name\":\"Carol\"}")
+        store.put("job:1", "{\"name\":\"Build\"}")
 
-    @Test
-    fun `couch store with confix persistence stores and queries`() {
-        val persistence = ConfixPersistence()
-        val store = CouchStoreFactory.withPersistence(persistence)
-
-        store.put(Document("user:1", listOf(Field("name", "Bob"), Field("role", "admin"))))
-        store.put(Document("user:2", listOf(Field("name", "Carol"), Field("role", "user"))))
-
-        // Document is in the store
-        val doc = store.get("user:1")
-        assertNotNull(doc)
-        assertEquals("Bob", doc.fields.first { it.name == "name" }.value)
-
-        // Confix-backed record is persisted underneath
-        val confixRec = persistence.loadConfixDoc("user:1")
-        assertNotNull(confixRec)
-        assertEquals(2, store.size)
-
-        // ids reflect both documents
-        assertTrue(persistence.ids().contains("user:1"))
-        assertTrue(persistence.ids().contains("user:2"))
+        assertEquals(3, store.size)
+        assertEquals(2, store.byIdPrefix("user:").size)
+        assertEquals(1, store.byIdPrefix("job:").size)
     }
 }

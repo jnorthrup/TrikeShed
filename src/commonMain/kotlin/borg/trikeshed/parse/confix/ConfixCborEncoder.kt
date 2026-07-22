@@ -44,7 +44,10 @@ internal object ConfixCborEmitter {
                 val dbl = v.toDoubleOrNull()
                 when {
                     bool != null -> out.write(if (bool) 0xF5 else 0xF4)
-                    long != null -> writeHead(out, 0, long)
+                    long != null -> {
+                        if (long >= 0) writeHead(out, 0, long)
+                        else writeHead(out, 1, -1L - long)
+                    }
                     dbl != null -> {
                         out.write(0xFB)
                         val bits = dbl.toBits()
