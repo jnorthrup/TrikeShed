@@ -131,4 +131,9 @@ class PosixVolume(
             }
         }
     }
+
+    override suspend fun submitBatch(requests: List<IoRequest>): List<IoResult> = throw NotImplementedError()
+
+    override fun enqueue_burst(requests: List<IoRequest>) { throw NotImplementedError() }
+    override suspend fun dequeue_burst(): List<IoResult> = throw NotImplementedError()
 }

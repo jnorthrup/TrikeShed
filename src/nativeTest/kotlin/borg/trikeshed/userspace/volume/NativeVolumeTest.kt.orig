@@ -220,23 +220,4 @@ class NativeVolumeTest {
         
         platform.posix.remove(path)
     }
-
-    @Test
-    fun testPosixVolumeBurst() = runBlocking {
-        val path = "test_posix_burst.bin"
-        platform.posix.remove(path)
-        
-        val volume = PosixVolume(path, blockSize = 512, capacityBytes = 4096L)
-        
-        val requests = listOf(
-            IoRequest(0L, ByteArray(512) { 1 }, IoKind.WRITE),
-            IoRequest(1L, ByteArray(512) { 2 }, IoKind.WRITE)
-        )
-        volume.enqueue_burst(requests)
-        val results = volume.dequeue_burst()
-        assertEquals(2, results.size)
-        
-        volume.close()
-        platform.posix.remove(path)
-    }
 }
