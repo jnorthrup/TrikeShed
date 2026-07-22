@@ -89,8 +89,18 @@ class Jules:
     def get(name): return http("GET", f"{JULES_BASE}/{name}")
     @staticmethod
     def activities(name, after_ts=None):
-        url = f"{JULES_BASE}/{name}/activities?pageSize=50"
-        activities = http("GET", url).get("activities", [])
+        base_url = f"{JULES_BASE}/{name}/activities?pageSize=50"
+        activities = []
+        page_token = ""
+        while True:
+            url = base_url
+            if page_token:
+                url += f"&pageToken={urllib.parse.quote(page_token)}"
+            page = http("GET", url)
+            activities.extend(page.get("activities", []))
+            page_token = str(page.get("nextPageToken", ""))
+            if not page_token:
+                break
         if after_ts:
             activities = [a for a in activities
                           if str(a.get("createTime", "")) > after_ts]
