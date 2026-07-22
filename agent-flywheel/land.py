@@ -39,12 +39,16 @@ def patch_policy(patch_text: str) -> tuple[bool, str]:
     placeholder_patterns = (
         re.compile(r"\bstub(?:bed)?\b.*\b(?:compile|implementation|out)\b", re.I),
         re.compile(r"\b(?:fail|error|todo)\s*\(\s*['\"](?:not implemented|stub|placeholder)", re.I),
+        re.compile(r"\b(?:NotImplementedError|UnsupportedOperationException)\s*\(", re.I),
+        re.compile(r"\bTODO\s*\(\s*\)", re.I),
     )
 
     for line in patch_text.splitlines():
         if line.startswith("diff --git "):
             parts = line.split()
             current_file = parts[2][2:] if len(parts) >= 3 else "<unknown>"
+            if current_file.lower().endswith((".diff", ".patch", ".orig", ".rej")):
+                return False, f"patch/backup artifact added: {current_file}"
             per_file.setdefault(current_file, [0, 0])
             continue
         if line.startswith("+") and not line.startswith("+++"):
@@ -52,6 +56,11 @@ def patch_policy(patch_text: str) -> tuple[bool, str]:
             added = line[1:].strip()
             if any(pattern.search(added) for pattern in placeholder_patterns):
                 return False, f"placeholder compile-fix code in {current_file}: {added[:160]}"
+            production_path = "test" not in current_file.lower()
+            if production_path and (
+                    re.search(r"\bfun\b.*\{\s*\}\s*$", added)
+                    or re.search(r"=\s*empty(?:List|Map|Set|Array)\s*\(", added)):
+                return False, f"no-op production implementation in {current_file}: {added[:160]}"
         elif line.startswith("-") and not line.startswith("---"):
             per_file.setdefault(current_file, [0, 0])[1] += 1
 

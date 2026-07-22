@@ -350,6 +350,38 @@ class BaselineGateTest(unittest.TestCase):
         self.assertFalse(ok)
         self.assertIn("deletion-dominant", reason)
 
+    def test_policy_rejects_not_implemented_production_code(self):
+        patch_text = (
+            "diff --git a/src/commonMain/Foo.kt b/src/commonMain/Foo.kt\n"
+            "--- a/src/commonMain/Foo.kt\n+++ b/src/commonMain/Foo.kt\n"
+            "+override suspend fun submit() = throw NotImplementedError()\n"
+        )
+        ok, reason = land.patch_policy(patch_text)
+        self.assertFalse(ok)
+        self.assertIn("placeholder", reason)
+
+    def test_policy_rejects_patch_and_backup_artifacts(self):
+        for path in ("patch7.diff", "src/Foo.kt.orig", "src/Foo.kt.rej"):
+            patch_text = (
+                f"diff --git a/{path} b/{path}\n"
+                "new file mode 100644\n"
+                "--- /dev/null\n+++ b/file\n+artifact\n"
+            )
+            ok, reason = land.patch_policy(patch_text)
+            self.assertFalse(ok, path)
+            self.assertIn("artifact", reason)
+
+    def test_policy_rejects_empty_production_implementation(self):
+        patch_text = (
+            "diff --git a/src/nativeMain/Foo.kt b/src/nativeMain/Foo.kt\n"
+            "--- a/src/nativeMain/Foo.kt\n+++ b/src/nativeMain/Foo.kt\n"
+            "+override fun enqueue(items: List<Int>) {}\n"
+            "+override suspend fun dequeue(): List<Int> = emptyList()\n"
+        )
+        ok, reason = land.patch_policy(patch_text)
+        self.assertFalse(ok)
+        self.assertIn("no-op", reason)
+
     def test_policy_allows_balanced_implementation(self):
         patch_text = (
             "diff --git a/Foo.kt b/Foo.kt\n"
