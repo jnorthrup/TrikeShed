@@ -164,6 +164,20 @@ class WorkPQ:
     def __len__(self): return len(self._h)
     def __iter__(self): return iter(sorted(self._h))
 
+def unseen_proposals(proposals, pq, live):
+    known_titles = {w.title for w in pq}
+    known_titles.update(
+        str(s.get("work", {}).get("title", "")) for s in live.values()
+    )
+    unseen = []
+    for proposal in proposals:
+        title = str(proposal.get("title", "")) if isinstance(proposal, dict) else ""
+        if not title or title in known_titles:
+            continue
+        unseen.append(proposal)
+        known_titles.add(title)
+    return unseen
+
 def load_state():
     pq = WorkPQ(); live = {}; landed = 0; outcomes = deque(maxlen=50)
     if not os.path.exists(STATE_PATH): return pq, live, landed, outcomes
@@ -325,8 +339,9 @@ def main():
             snap = snapshot()
             print(f"  cycle {cycle}: snapshot {len(snap)}B; calling RESEARCHER…",
                   flush=True)
-            props = proposal_list(brain_json(RESEARCHER,
-                f"{snap}\n\nRecent outcomes:\n{list(outcomes)[-10:]}", []))
+            props = unseen_proposals(proposal_list(brain_json(RESEARCHER,
+                f"{snap}\n\nRecent outcomes:\n{list(outcomes)[-10:]}", [])),
+                pq, live)
             print(f"  cycle {cycle}: RESEARCHER returned "
                   f"{type(props).__name__} len={len(props) if isinstance(props,(list,str)) else '?'}",
                   flush=True)
