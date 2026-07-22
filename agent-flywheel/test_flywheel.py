@@ -90,6 +90,27 @@ class WorkQueueTest(unittest.TestCase):
             flywheel.change_set_patch(change_set),
         )
 
+    def test_activity_poll_drains_all_pages(self):
+        requested = []
+        old_http = flywheel.http
+        try:
+            def fake_http(method, url, body=None):
+                requested.append(url)
+                if "pageToken=" not in url:
+                    return {
+                        "activities": [{"name": "first", "createTime": "1"}],
+                        "nextPageToken": "next page",
+                    }
+                return {"activities": [{"name": "second", "createTime": "2"}]}
+
+            flywheel.http = fake_http
+            activities = flywheel.Jules.activities("sessions/1")
+        finally:
+            flywheel.http = old_http
+
+        self.assertEqual(["first", "second"], [a["name"] for a in activities])
+        self.assertIn("pageToken=next%20page", requested[1])
+
 
 class ReconciliationTest(unittest.TestCase):
     def test_completed_session_without_patch_is_removed_and_requeued(self):
