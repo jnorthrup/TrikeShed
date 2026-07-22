@@ -76,7 +76,7 @@ class PropertyEditorTest {
             mapOf("options" to listOf("Tag A", "Tag B", "Tag C"))
         )
         val editor = MultiSelectPropertyEditor(schema, listOf("Tag A", "Tag C"))
-        
+
         val html = editor.renderHtml()
         assertTrue(html.contains("<select multiple"))
         assertTrue(html.contains("value=\"Tag A\" selected"))

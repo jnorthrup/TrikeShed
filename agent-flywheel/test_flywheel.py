@@ -58,6 +58,18 @@ class WorkQueueTest(unittest.TestCase):
             flywheel.unseen_proposals(proposals, queue, live),
         )
 
+    def test_settled_task_variants_are_not_proposed_again(self):
+        queue = flywheel.WorkPQ()
+        outcomes = [{"ok": True, "title": "T29 Aspirational"}]
+        proposals = [
+            {"title": "T29. Decide one of: implement or de-stub"},
+            {"title": "new work"},
+        ]
+        self.assertEqual(
+            [{"title": "new work"}],
+            flywheel.unseen_proposals(proposals, queue, {}, outcomes),
+        )
+
     def test_activity_cursor_is_filtered_client_side(self):
         requested = []
         old_http = flywheel.http
@@ -232,6 +244,19 @@ class WorkQueueTest(unittest.TestCase):
         )
         self.assertIsNone(flywheel.session_interruption_reason("IN_PROGRESS"))
 
+    def test_merge_receipt_exposes_trikeshed_drain_accounting(self):
+        receipt = flywheel.merge_receipt({
+            "drainDate": "2026-07-22T06:02:09-05:00",
+            "parentSha": "a" * 40,
+            "mergeSha": "b" * 40,
+            "commitSha": "c" * 40,
+        })
+        self.assertIn("drainTarget: TrikeShed", receipt)
+        self.assertIn("drainStatus: MERGED", receipt)
+        self.assertIn("drainDate: 2026-07-22T06:02:09-05:00", receipt)
+        self.assertIn(f"parentSha: {'a' * 40}", receipt)
+        self.assertIn(f"mergeSha: {'b' * 40}", receipt)
+
 
 class ReconciliationTest(unittest.TestCase):
     def test_completed_session_without_patch_is_removed_and_requeued(self):
@@ -360,6 +385,7 @@ class ReconciliationTest(unittest.TestCase):
                 flywheel.land = lambda patch, branch, title: (
                     False,
                     "git apply conflict in src/commonMain/Foo.kt",
+                    {},
                 )
                 sys.argv = ["flywheel.py", "--once"]
 
