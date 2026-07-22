@@ -315,7 +315,7 @@ def dispatch_available(pq, live, cycle):
                      "fingerprint": w.fingerprint, "attempt": w.attempt,
                      "feedback": w.feedback},
             "state": s.get("state", "QUEUED"), "last_poll": None,
-            "patches": [], "last_question": None,
+            "patches": [], "last_question": None, "answer_count": 0,
             "url": f"https://jules.google.com/task/{sid.split('/')[-1]}"}
         print(f"  cycle {cycle}: dispatched [{w.tier}] {w.title} "
               f"attempt={w.attempt}", flush=True)
@@ -342,6 +342,10 @@ def latest_question(activities):
         if question:
             return question
     return None
+
+def confirmation_loop(state, answer_count, question, last_question):
+    return (state == "AWAITING_USER_FEEDBACK" and answer_count >= 2
+            and bool(question) and question != last_question)
 
 def change_set_patch(change_set):
     patch = change_set.get("gitPatch", "") if isinstance(change_set, dict) else ""
@@ -476,6 +480,8 @@ def main():
             except Exception as e:
                 print(f"  poll error {name}: {e}", flush=True); continue
             sess["state"] = meta.get("state", sess["state"])
+            if sess["state"] != "AWAITING_USER_FEEDBACK":
+                sess["answer_count"] = 0
             if sess["state"] == "AWAITING_PLAN_APPROVAL":
                 try:
                     Jules.approve(name)
@@ -499,6 +505,21 @@ def main():
                         if cs and change_set_patch(cs):
                             sess["patches"].append({"changeSet": cs})
                 q = latest_question(acts)
+                if confirmation_loop(sess["state"], sess.get("answer_count", 0),
+                                     q, sess.get("last_question")):
+                    reason = "Jules remained in a confirmation loop after two targeted answers"
+                    loop_patch = client_patch(name)
+                    if not loop_patch and sess["patches"]:
+                        loop_patch = change_set_patch(sess["patches"][-1]["changeSet"])
+                    outcomes.append({"title": sess["work"]["title"], "ok": False,
+                                     "why": reason,
+                                     "fingerprint": sess["work"].get("fingerprint")})
+                    pq.push(retry_work(sess, reason, loop_patch))
+                    Jules.delete(name)
+                    del live[name]
+                    print(f"  ↻ confirmation loop, requeued: {sess['work']['title']}",
+                          flush=True)
+                    continue
                 if q and q != sess.get("last_question"):
                     ans = brain_chat(ANSWERER,
                         f"Task: {sess['work']['spec']}\nInquiry: {q}")
@@ -506,6 +527,7 @@ def main():
                         try:
                             Jules.send(name, ans)
                             sess["last_question"] = q
+                            sess["answer_count"] = sess.get("answer_count", 0) + 1
                             print(f"  answered: {name} q='{q[:60]}'",
                                   flush=True)
                         except Exception as e:
