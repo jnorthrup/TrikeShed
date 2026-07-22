@@ -319,10 +319,17 @@ def dispatch_available(pq, live, cycle):
                       f"candidate did not fit. Do not abandon the task. Resolve "
                       f"the conflict or gate failure against current HEAD and emit "
                       f"a new cumulative patch.\n{w.feedback}")
-        spec = (f"{w.spec}{repair}\n\nRULES: TDD strictly — commit failing "
-                f"tests first, then implement to green. Do NOT open "
-                f"a PR; produce a final patch/changeset only. Reply "
-                f"with KEEP_GOING if you have no question.")
+        spec = (f"{w.spec}{repair}\n\n"
+                f"RULES:\n"
+                f"1. TDD strictly — write failing tests first, then implement to green.\n"
+                f"2. Run ./gradlew jvmTest yourself before finishing. Your patch MUST\n"
+                f"   produce a green jvmTest. If tests fail, fix them before emitting\n"
+                f"   the final patch. Do not emit a patch that has failing tests.\n"
+                f"3. Keep the diff minimal: one test file + one implementation file.\n"
+                f"4. Do NOT open a PR. Produce a final cumulative patch/changeset only.\n"
+                f"5. Reply with KEEP_GOING only if you have a genuine blocking question.\n"
+                f"6. Use platform.posix not jnr-posix. Domain in commonMain, JVM in jvmMain.\n"
+                f"7. Series<T> over List<T>. Confix is the only serializer.\n")
         try:
             s = Jules.create(spec, w.title)
         except Exception as e:
@@ -675,15 +682,18 @@ def main():
                     del live[name]
                     print(f"  ↻ no patch, requeued: {sess['work']['title']}", flush=True)
             elif state in ("FAILED", "PAUSED"):
-                reason = session_interruption_reason(state)
-                outcomes.append({"title": sess["work"]["title"], "ok": False,
-                                 "why": reason,
-                                 "fingerprint": sess["work"].get("fingerprint")})
-                pq.push(retry_work(sess, reason))
-                harvested.add(name)
-                Jules.delete(name)
-                del live[name]
-                print(f"  ↻ failed, requeued: {sess['work']['title']}", flush=True)
+                    reason = session_interruption_reason(state)
+                    outcomes.append({"title": sess["work"]["title"], "ok": False,
+                                     "why": reason,
+                                     "fingerprint": sess["work"].get("fingerprint")})
+                    pq.push(retry_work(sess, reason))
+                    harvested.add(name)
+                    Jules.delete(name)
+                    del live[name]
+                    print(f"  ↻ failed, requeued: {sess['work']['title']}", flush=True)
+
+            # Save state after each session so a slow cycle never loses progress.
+            save_state(pq, live, landed, outcomes, harvested)
 
         dispatch_available(pq, live, cycle)
 
