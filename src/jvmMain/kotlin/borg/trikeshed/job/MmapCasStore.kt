@@ -14,7 +14,7 @@ import java.lang.foreign.Arena
 import java.lang.foreign.MemorySegment
 import java.lang.foreign.ValueLayout
 
-class MmapCasStore(val file: Path) : CasStore() {
+class MmapCasStore(val file: Path) {
     private val randomAccessFile = RandomAccessFile(file.toFile(), "rw")
     private val channel = randomAccessFile.channel
 
@@ -83,7 +83,7 @@ class MmapCasStore(val file: Path) : CasStore() {
         }
     }
 
-    override fun put(bytes: ByteArray): ContentId {
+    fun put(bytes: ByteArray): ContentId {
         val cid = ContentId.of(bytes)
         synchronized(this) {
             if (cid in offsetMap) return cid
@@ -103,16 +103,7 @@ class MmapCasStore(val file: Path) : CasStore() {
         return cid
     }
 
-    override fun get(cid: ContentId): ByteArray? {
-        val loc = synchronized(this) { offsetMap[cid] } ?: return null
-        val offset = loc.first
-        val length = loc.second
-        val buffer = ByteBuffer.allocate(length)
-        channel.read(buffer, offset)
-        return buffer.array()
-    }
-
-    fun getMapped(cid: ContentId): Series<Byte>? {
+    fun get(cid: ContentId): Series<Byte>? {
         val loc = synchronized(this) { offsetMap[cid] } ?: return null
         val offset = loc.first
         val length = loc.second
