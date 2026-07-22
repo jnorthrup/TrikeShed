@@ -54,6 +54,9 @@ yarn-error.log*
 .codex/
 .hermes/
 .mcp.json
+.flywheel.state.json
+.flywheel.state.json.patch
+.flywheel-failures/
 
 # TrikeShed local artifacts
 # bin/ (but track trikeshed-jules)

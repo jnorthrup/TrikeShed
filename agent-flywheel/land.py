@@ -1,0 +1,185 @@
+#!/usr/bin/env python3
+"""land.py — TDD/test gate for one incoming patch.
+
+Usage:
+  ./land.py REPO_PATH BRANCH PATCH_FILE [--test CMD] [--commit MSG] [--no-apply]
+
+Override test detection: FLYWHEEL_TEST_CMD env, [tool.flywheel] test
+in pyproject.toml, package.json scripts.test, or auto-probe (pytest /
+cargo / go / make). Override main branch via FLYWHEEL_MAIN (default
+auto-detect main → master → trunk).
+"""
+import argparse, json, os, re, subprocess, sys
+
+
+def failure_signatures(output: str) -> set[str]:
+    signatures = set()
+    for raw in output.splitlines():
+        line = raw.strip()
+        if (line.startswith(("e:", "error:", "FAILED ", "FAILURE:"))
+                or (line.startswith("> Task ") and line.endswith(" FAILED"))):
+            signatures.add(re.sub(r"\s+", " ", line))
+    return signatures
+
+
+def is_nonregression(baseline_code: int, baseline_output: str,
+                     candidate_code: int, candidate_output: str) -> bool:
+    if candidate_code == 0:
+        return True
+    if baseline_code == 0:
+        return False
+    baseline_failures = failure_signatures(baseline_output)
+    candidate_failures = failure_signatures(candidate_output)
+    return bool(baseline_failures) and candidate_failures.issubset(baseline_failures)
+
+
+def restore_main(repo: str, main_branch: str, branch: str) -> None:
+    subprocess.run(["git", "-C", repo, "merge", "--abort"],
+                   capture_output=True, text=True)
+    subprocess.run(["git", "-C", repo, "reset", "--hard"],
+                   capture_output=True, text=True)
+    subprocess.run(["git", "-C", repo, "checkout", main_branch],
+                   capture_output=True, text=True)
+    subprocess.run(["git", "-C", repo, "branch", "-D", branch],
+                   capture_output=True, text=True)
+
+def detect_test_cmd(repo: str) -> str:
+    env = os.environ.get("FLYWHEEL_TEST_CMD", "").strip()
+    if env:
+        return env
+    pp = os.path.join(repo, "pyproject.toml")
+    if os.path.exists(pp):
+        try:
+            content = open(pp).read()
+            if "flywheel" in content:
+                for line in content.splitlines():
+                    line = line.strip()
+                    if line.startswith("test") and "=" in line:
+                        _, _, val = line.partition("=")
+                        v = val.strip().strip('"').strip("'")
+                        if v:
+                            return v
+        except Exception:
+            pass
+    pj = os.path.join(repo, "package.json")
+    if os.path.exists(pj):
+        try:
+            data = json.load(open(pj))
+            t = data.get("scripts", {}).get("test", "")
+            if t and "Error: no test specified" not in t:
+                return f"npm test --silent -- {t}"
+        except Exception:
+            pass
+    for probe, cmd in [
+        ("gradlew", "./gradlew test"),
+        ("pytest", "python -m pytest -x -q"),
+        ("poetry.lock", "poetry run pytest -x -q"),
+        ("Cargo.toml", "cargo test --quiet"),
+        ("go.mod", "go test ./..."),
+        ("Makefile", "make test"),
+        ("node_modules", "npm test --silent"),
+    ]:
+        if os.path.exists(os.path.join(repo, probe)):
+            return cmd
+    return ""
+
+def detect_main(repo: str) -> str:
+    env = os.environ.get("FLYWHEEL_MAIN", "").strip()
+    if env:
+        return env
+    for c in ("main", "master", "trunk"):
+        p = subprocess.run(["git", "-C", repo, "rev-parse", "--verify", c],
+                           capture_output=True, text=True)
+        if p.returncode == 0:
+            return c
+    return "main"
+
+def main() -> int:
+    ap = argparse.ArgumentParser()
+    ap.add_argument("repo"); ap.add_argument("branch"); ap.add_argument("patch_file")
+    ap.add_argument("--test", default=""); ap.add_argument("--commit", default="")
+    ap.add_argument("--no-apply", action="store_true")
+    args = ap.parse_args()
+
+    main_branch = detect_main(args.repo)
+    test_cmd = args.test or detect_test_cmd(args.repo)
+
+    baseline_code = 0
+    baseline_output = ""
+    if test_cmd:
+        baseline = subprocess.run(test_cmd, shell=True, cwd=args.repo,
+                                  capture_output=True, text=True, timeout=900)
+        baseline_code = baseline.returncode
+        baseline_output = baseline.stdout + baseline.stderr
+
+    co = subprocess.run(["git", "-C", args.repo, "checkout", "-B",
+                         args.branch, main_branch], capture_output=True, text=True)
+    if co.returncode != 0:
+        print(json.dumps({"ok": False, "stage": "checkout",
+                          "detail": co.stderr.strip()[:500]}))
+        return 2
+
+    if not args.no_apply:
+        patch_text = open(args.patch_file).read()
+        ap_res = subprocess.run(["git", "-C", args.repo, "apply", "--3way", "-"],
+                                input=patch_text, capture_output=True, text=True)
+        if ap_res.returncode != 0:
+            restore_main(args.repo, main_branch, args.branch)
+            print(json.dumps({"ok": False, "stage": "apply",
+                              "detail": ap_res.stderr.strip()[:1000]}))
+            return 3
+
+    if not test_cmd:
+        print(json.dumps({"ok": True, "stage": "no-test",
+                          "detail": "no test command discovered"}))
+    else:
+        t_res = subprocess.run(test_cmd, shell=True, cwd=args.repo,
+                               capture_output=True, text=True, timeout=900)
+        candidate_output = t_res.stdout + t_res.stderr
+        if not is_nonregression(baseline_code, baseline_output,
+                                t_res.returncode, candidate_output):
+            new_failures = sorted(failure_signatures(candidate_output)
+                                  - failure_signatures(baseline_output))
+            restore_main(args.repo, main_branch, args.branch)
+            tail = candidate_output[-2000:]
+            print(json.dumps({"ok": False, "stage": "test",
+                              "detail": (f"cmd={test_cmd}\n"
+                                         f"new_failures={new_failures[:20]}\n{tail}")}))
+            return 4
+
+    subprocess.run(["git", "-C", args.repo, "add", "-A"], capture_output=True, text=True)
+    msg = args.commit or f"flywheel: {args.branch}"
+    cm = subprocess.run(["git", "-C", args.repo, "commit", "-m", msg],
+                        capture_output=True, text=True)
+    if cm.returncode != 0:
+        restore_main(args.repo, main_branch, args.branch)
+        print(json.dumps({"ok": False, "stage": "commit",
+                          "detail": cm.stderr.strip()[:500]}))
+        return 5
+
+    subprocess.run(["git", "-C", args.repo, "checkout", main_branch],
+                   capture_output=True, text=True)
+    mg = subprocess.run(["git", "-C", args.repo, "merge", "--no-ff",
+                         args.branch, "-m", f"land {args.branch}"],
+                        capture_output=True, text=True)
+    if mg.returncode != 0:
+        restore_main(args.repo, main_branch, args.branch)
+        print(json.dumps({"ok": False, "stage": "merge",
+                          "detail": mg.stderr.strip()[:500]}))
+        return 6
+
+    ps = subprocess.run(["git", "-C", args.repo, "push", "origin", main_branch],
+                        capture_output=True, text=True)
+    if ps.returncode != 0:
+        print(json.dumps({"ok": False, "stage": "push",
+                          "detail": ps.stderr.strip()[:500]}))
+        return 7
+
+    subprocess.run(["git", "-C", args.repo, "branch", "-D", args.branch],
+                   capture_output=True, text=True)
+    print(json.dumps({"ok": True, "stage": "pushed",
+                      "detail": f"landed {args.branch} on {main_branch}"}))
+    return 0
+
+if __name__ == "__main__":
+    sys.exit(main())
