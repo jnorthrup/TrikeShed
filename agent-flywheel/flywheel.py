@@ -88,6 +88,19 @@ class Jules:
     @staticmethod
     def get(name): return http("GET", f"{JULES_BASE}/{name}")
     @staticmethod
+    def sessions():
+        sessions = []
+        page_token = ""
+        while True:
+            url = f"{JULES_BASE}/sessions?pageSize=100"
+            if page_token:
+                url += f"&pageToken={urllib.parse.quote(page_token)}"
+            page = http("GET", url)
+            sessions.extend(page.get("sessions", []))
+            page_token = str(page.get("nextPageToken", ""))
+            if not page_token:
+                return sessions
+    @staticmethod
     def activities(name, after_ts=None):
         base_url = f"{JULES_BASE}/{name}/activities?pageSize=50"
         activities = []
@@ -190,6 +203,30 @@ def unseen_proposals(proposals, pq, live):
         unseen.append(proposal)
         known_titles.add(title)
     return unseen
+
+def adopt_active_sessions(live, sessions):
+    adopted = []
+    for session in sessions:
+        name = str(session.get("name", ""))
+        state = str(session.get("state", ""))
+        source = str(session.get("sourceContext", {}).get("source", ""))
+        active = state in ("QUEUED", "PLANNING", "IN_PROGRESS") or state.startswith("AWAITING_")
+        if not name or name in live or source != JULES_SOURCE or not active:
+            continue
+        title = str(session.get("title") or f"adopted Jules session {name.split('/')[-1]}")
+        spec = str(session.get("prompt") or title)
+        work = WorkItem(tier="task", score=0.5, title=title, spec=spec)
+        live[name] = {
+            "work": {"tier": work.tier, "score": work.score,
+                     "title": work.title, "spec": work.spec,
+                     "parent": work.parent, "fingerprint": work.fingerprint,
+                     "attempt": 0, "feedback": "adopted from live Jules source"},
+            "state": state, "last_poll": None, "patches": [],
+            "last_question": None, "answer_count": 0, "adopted": True,
+            "url": str(session.get("url") or
+                       f"https://jules.google.com/task/{name.split('/')[-1]}")}
+        adopted.append(name)
+    return adopted
 
 def load_state():
     pq = WorkPQ(); live = {}; landed = 0; outcomes = deque(maxlen=50)
@@ -373,6 +410,14 @@ def main():
     cycle = 0
     while True:
         cycle += 1
+
+        try:
+            adopted = adopt_active_sessions(live, Jules.sessions())
+            if adopted:
+                print(f"  cycle {cycle}: adopted {len(adopted)} live Jules sessions",
+                      flush=True)
+        except Exception as e:
+            print(f"  session reconciliation failed: {e}", flush=True)
 
         if len(pq) + len(live) < MAX_LIVE * 2:
             snap = snapshot()

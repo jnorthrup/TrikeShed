@@ -132,6 +132,38 @@ class WorkQueueTest(unittest.TestCase):
         self.assertEqual(["jules", "remote", "pull", "--session", "123"], calls[0])
         self.assertEqual("diff --git a/Foo b/Foo\npatch body\n", patch)
 
+    def test_unmanaged_active_source_session_is_adopted(self):
+        live = {}
+        sessions = [
+            {
+                "name": "sessions/900",
+                "title": "existing TrikeShed work",
+                "prompt": "implement the existing task",
+                "state": "AWAITING_USER_FEEDBACK",
+                "sourceContext": {"source": flywheel.JULES_SOURCE},
+            },
+            {
+                "name": "sessions/901",
+                "title": "completed work",
+                "prompt": "already done",
+                "state": "COMPLETED",
+                "sourceContext": {"source": flywheel.JULES_SOURCE},
+            },
+            {
+                "name": "sessions/902",
+                "title": "other repository",
+                "prompt": "ignore",
+                "state": "IN_PROGRESS",
+                "sourceContext": {"source": "sources/github/example/other"},
+            },
+        ]
+
+        adopted = flywheel.adopt_active_sessions(live, sessions)
+
+        self.assertEqual(["sessions/900"], adopted)
+        self.assertEqual("existing TrikeShed work", live["sessions/900"]["work"]["title"])
+        self.assertEqual("implement the existing task", live["sessions/900"]["work"]["spec"])
+
 
 class ReconciliationTest(unittest.TestCase):
     def test_completed_session_without_patch_is_removed_and_requeued(self):
