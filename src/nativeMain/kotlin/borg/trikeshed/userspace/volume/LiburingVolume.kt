@@ -29,4 +29,8 @@ expect class LiburingVolume(
     override suspend fun write(lba: Long, data: ByteArray)
     override suspend fun sync()
     override fun close()
+
+    override suspend fun submitBatch(requests: List<IoRequest>): List<IoResult>
+    override fun enqueue_burst(requests: List<IoRequest>)
+    override suspend fun dequeue_burst(): List<IoResult>
 }

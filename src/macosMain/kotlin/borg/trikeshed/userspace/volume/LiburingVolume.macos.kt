@@ -43,4 +43,8 @@ actual class LiburingVolume actual constructor(
     actual override fun close() {
         posixVolume.close()
     }
+
+    actual override suspend fun submitBatch(requests: List<IoRequest>): List<IoResult> = emptyList()
+    actual override fun enqueue_burst(requests: List<IoRequest>) {}
+    actual override suspend fun dequeue_burst(): List<IoResult> = emptyList()
 }

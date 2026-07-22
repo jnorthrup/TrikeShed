@@ -233,4 +233,9 @@ actual class LiburingVolume actual constructor(
             }
         }
     }
+
+    actual override suspend fun submitBatch(requests: List<IoRequest>): List<IoResult> = throw NotImplementedError()
+    
+    actual override fun enqueue_burst(requests: List<IoRequest>) { throw NotImplementedError() }
+    actual override suspend fun dequeue_burst(): List<IoResult> = throw NotImplementedError()
 }
