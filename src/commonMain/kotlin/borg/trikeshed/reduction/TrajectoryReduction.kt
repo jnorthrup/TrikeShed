@@ -123,6 +123,13 @@ class TrajectoryReduction : LcncReduction<String, JulesCause, TrajectoryOutcome,
         is JulesCause.DrainFailed -> parseReason(cause.reason)
         is JulesCause.SessionFailed -> parseReason(cause.reason)
         is JulesCause.PatchArrived -> current
+        // Work causes map to outcomes:
+        //   WorkQueued     → NoPatch (queue position; nothing has happened yet)
+        //   WorkDispatched → NoPatch (in-flight, can't judge yet)
+        //   WorkDrained    → Landed (success path: work produced a commit)
+        is JulesCause.WorkQueued -> current
+        is JulesCause.WorkDispatched -> current
+        is JulesCause.WorkDrained -> TrajectoryOutcome.Landed
         else -> current
     }
 
@@ -140,7 +147,9 @@ class TrajectoryReduction : LcncReduction<String, JulesCause, TrajectoryOutcome,
         val attemptCauses = ArrayList<JulesCause>()
         val mappedSeries = payload.causes α { cause ->
             if (cause is JulesCause.DrainFailed || cause is JulesCause.DrainApplied ||
-                cause is JulesCause.SessionFailed || cause is JulesCause.PatchArrived) cause else null
+                cause is JulesCause.SessionFailed || cause is JulesCause.PatchArrived ||
+                cause is JulesCause.WorkQueued || cause is JulesCause.WorkDispatched ||
+                cause is JulesCause.WorkDrained) cause else null
         }
         for (i in 0 until mappedSeries.size) {
             val cause = mappedSeries[i]

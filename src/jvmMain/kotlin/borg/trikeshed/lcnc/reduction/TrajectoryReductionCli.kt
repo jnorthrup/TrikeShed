@@ -5,6 +5,7 @@ import borg.trikeshed.parse.json.JsonSupport
 import borg.trikeshed.reduction.TrajectoryOutcome
 import borg.trikeshed.reduction.TrajectoryReduction
 import borg.trikeshed.reduction.verdictFor
+import java.io.File
 import kotlin.system.exitProcess
 
 /**
@@ -68,8 +69,10 @@ fun main(args: Array<String>) {
         }
     }
 
-    // Extract fingerprint
-    val fingerprint = parsed["taskFingerprint"] as? String ?: "unknown"
+    // Prefer workId (human-readable slug) over taskFingerprint (SHA1).
+    val fingerprint = (parsed["workId"] as? String)
+        ?: (parsed["taskFingerprint"] as? String)
+        ?: "unknown"
 
     // Extract attemptCount
     val attemptCount = (parsed["attemptCount"] as? Number)?.toInt() ?: 1
@@ -111,7 +114,7 @@ fun main(args: Array<String>) {
 private fun parseCause(causeItem: Any?): JulesCause? {
     if (causeItem !is Map<*, *>) return null
 
-    val type = causeItem["type"] as? String ?: return null
+    val type = (causeItem["type"] ?: causeItem["kind"]) as? String ?: return null
     val at = (causeItem["at"] as? Number)?.toLong() ?: 0L
 
     return when (type) {
@@ -204,7 +207,10 @@ private fun renderDashboard(json: String) {
     if (causesRaw is List<*>) {
         for (causeItem in causesRaw) parseCause(causeItem)?.let { causesList.add(it) }
     }
-    val fingerprint = parsed["taskFingerprint"] as? String ?: "unknown"
+    // Prefer workId (human-readable slug) over taskFingerprint (SHA1).
+    val fingerprint = (parsed["workId"] as? String)
+        ?: (parsed["taskFingerprint"] as? String)
+        ?: "unknown"
     val attemptCount = (parsed["attemptCount"] as? Number)?.toInt() ?: causesList.size
     val depsList = mutableListOf<String>()
     val depsRaw = parsed["deps"]
@@ -218,6 +224,15 @@ private fun renderDashboard(json: String) {
         is TrajectoryOutcome.GateRed -> "GateRed"
         is TrajectoryOutcome.Landed -> "Landed"
     }
+
+    // Look up the human-readable title from the queue projection.
+    val title = (parsed["title"] as? String)
+        ?: run {
+            val dir = File(System.getProperty("user.home"), ".local/forge")
+            val store = borg.trikeshed.utils.kanban.JulesBoardStore(dir)
+            store.loadQueue().firstOrNull { it.workId == fingerprint }?.title
+        }
+        ?: fingerprint
 
     val reset = "\u001b[0m"
     val cyan = "\u001b[36m"
@@ -238,7 +253,9 @@ private fun renderDashboard(json: String) {
     println("${cyan}╔══════════════════════════════════════════════════════════════╗$reset")
     println("${cyan}║              TRAJECTORY REDUCTION DASHBOARD                 ║$reset")
     println("${cyan}╠══════════════════════════════════════════════════════════════╣$reset")
-    println("${cyan}║${reset}  Task:        ${yellow}${verdict.taskFingerprint}$reset".padEnd(78) + "${cyan}║$reset")
+    println("${cyan}║${reset}  Work ID:     ${yellow}${fingerprint}$reset".padEnd(78) + "${cyan}║$reset")
+    val titleDisplay = if (title.length > 56) title.take(53) + "..." else title
+    println("${cyan}║${reset}  Title:       ${magenta}${titleDisplay}$reset".padEnd(78) + "${cyan}║$reset")
     println("${cyan}║${reset}  Attempts:    ${yellow}${verdict.attemptCount}$reset".padEnd(78) + "${cyan}║$reset")
     println("${cyan}║${reset}  Category:    ${catColor}${category}$reset".padEnd(78) + "${cyan}║$reset")
     println("${cyan}║${reset}  Frozen:      ${frozenColor}${verdict.frozen}$reset".padEnd(78) + "${cyan}║$reset")

@@ -25,6 +25,8 @@ class JulesRestClient(
         val state: String,
         val title: String,
         val patchBytes: Long,
+        val source: String = "",
+        val updateTime: String = "",
     )
 
     /**
@@ -56,6 +58,8 @@ class JulesRestClient(
                 state = m["state"]?.toString() ?: "UNKNOWN",
                 title = m["title"]?.toString() ?: "",
                 patchBytes = 0L, // filled by patchProbe for COMPLETED sessions
+                source = ((m["sourceContext"] as? Map<*, *>)?.get("source"))?.toString() ?: "",
+                updateTime = m["updateTime"]?.toString() ?: m["createTime"]?.toString() ?: "",
             )
         }
     }

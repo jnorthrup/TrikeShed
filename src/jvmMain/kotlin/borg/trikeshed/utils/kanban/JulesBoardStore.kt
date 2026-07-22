@@ -49,10 +49,23 @@ class JulesBoardStore(
         wal.append(workId, KanbanEventCodec.encodeCause(workId, cause).encodeToByteArray())
     }
 
+    fun replayCauses(workId: String): List<JulesCause> {
+        val causes = mutableListOf<JulesCause>()
+        for ((key, payload) in wal.replay()) {
+            if (key == workId) {
+                val decoded = KanbanEventCodec.decode(payload.decodeToString())
+                if (decoded is KanbanEventCodec.CauseEvent) {
+                    causes.add(decoded.cause)
+                }
+            }
+        }
+        return causes
+    }
+
     /** Fold the log into cards. Card state is a projection; the log is truth. */
     fun load(): MutableMap<String, JulesSessionCard> {
-        val snapshots = HashMap<String, KanbanEventCodec.SnapEvent>()
-        val causes = HashMap<String, MutableList<JulesCause>>()
+        val snapshots = mutableMapOf<String, KanbanEventCodec.SnapEvent>()
+        val causes = mutableMapOf<String, MutableList<JulesCause>>()
         for ((sid, payload) in wal.replay()) {
             when (val ev = KanbanEventCodec.decode(payload.decodeToString())) {
                 is KanbanEventCodec.SnapEvent -> snapshots[sid] = ev
@@ -60,7 +73,7 @@ class JulesBoardStore(
                 null -> {} // forward-compat: skip unknown record shapes
             }
         }
-        val board = HashMap<String, JulesSessionCard>()
+        val board = mutableMapOf<String, JulesSessionCard>()
         for ((sid, snap) in snapshots) {
             val card = JulesSessionCard.capture(snap.snapshot)
             board[sid] = card.copy(
@@ -79,7 +92,7 @@ class JulesBoardStore(
      * reads from here, not from a separate state.json.
      */
     fun loadQueue(): List<QueueEntry> {
-        val byWorkId = LinkedHashMap<String, QueueEntry>()
+        val byWorkId = mutableMapOf<String, QueueEntry>()
         for ((workId, payload) in wal.replay()) {
             val ev = KanbanEventCodec.decode(payload.decodeToString()) as? KanbanEventCodec.CauseEvent ?: continue
             val c = ev.cause
