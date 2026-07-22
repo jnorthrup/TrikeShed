@@ -166,4 +166,108 @@ class RollupReducerTest {
 
         assertEquals(true, ctx.config.showEmptyGroups)
     }
+
+    private fun createDummyDbWithGroups(vararg entries: Pair<String, Double>): LcncDatabase {
+        val pages = entries.mapIndexed { index, entry ->
+            val groupContent = PropertyValue("groupProp", PropertyType.TEXT, entry.first)
+            val valContent = PropertyValue("valProp", PropertyType.NUMBER, entry.second)
+            
+            val groupBlock = LcncBlock(id = "gb$index", type = "property_wrapper", parentId = "page$index", content = groupContent)
+            val valBlock = LcncBlock(id = "vb$index", type = "property_wrapper", parentId = "page$index", content = valContent)
+
+            LcncPage(
+                id = "page$index",
+                title = "Page $index",
+                parentId = "db1",
+                contentBlocks = 2 j { if(it == 0) groupBlock else valBlock }
+            )
+        }
+        return LcncDatabase(
+            id = "db1",
+            title = "Test DB Grouped",
+            parentId = null,
+            pages = pages.size j { pages[it] }
+        )
+    }
+
+    @Test
+    fun sumRollupAggregatesValuesByGroup() {
+        val db = createDummyDbWithGroups("A" to 10.0, "B" to 20.0, "A" to 30.0)
+        val ctx = RollupContext(db, "valProp")
+        val spec = RollupSpec("valProp", RollupFunction.Sum, groupByPropertyId = "groupProp")
+        val reducer = RollupReducer()
+        val result = reducer.reduce(ctx, spec)
+
+        assertEquals(RollupFunction.Sum, result.function)
+        assertEquals(60.0, result.value)
+        assertEquals(3, result.sampleSize)
+
+        val groups = result.groups
+        kotlin.test.assertNotNull(groups)
+        assertEquals(2, groups.size)
+        
+        val groupA = groups["A"]
+        kotlin.test.assertNotNull(groupA)
+        assertEquals(40.0, groupA.value)
+        assertEquals(2, groupA.sampleSize)
+
+        val groupB = groups["B"]
+        kotlin.test.assertNotNull(groupB)
+        assertEquals(20.0, groupB.value)
+        assertEquals(1, groupB.sampleSize)
+    }
+
+    @Test
+    fun avgRollupAggregatesValuesByGroup() {
+        val db = createDummyDbWithGroups("A" to 10.0, "B" to 20.0, "A" to 30.0)
+        val ctx = RollupContext(db, "valProp")
+        val spec = RollupSpec("valProp", RollupFunction.Avg, groupByPropertyId = "groupProp")
+        val reducer = RollupReducer()
+        val result = reducer.reduce(ctx, spec)
+
+        assertEquals(RollupFunction.Avg, result.function)
+        assertEquals(20.0, result.value)
+        assertEquals(3, result.sampleSize)
+
+        val groups = result.groups
+        kotlin.test.assertNotNull(groups)
+        assertEquals(2, groups.size)
+        
+        val groupA = groups["A"]
+        kotlin.test.assertNotNull(groupA)
+        assertEquals(20.0, groupA.value)
+        assertEquals(2, groupA.sampleSize)
+
+        val groupB = groups["B"]
+        kotlin.test.assertNotNull(groupB)
+        assertEquals(20.0, groupB.value)
+        assertEquals(1, groupB.sampleSize)
+    }
+    
+    @Test
+    fun countRollupAggregatesValuesByGroup() {
+        val db = createDummyDbWithGroups("A" to 10.0, "B" to 20.0, "A" to 30.0)
+        val ctx = RollupContext(db, "valProp")
+        val spec = RollupSpec("valProp", RollupFunction.Count, groupByPropertyId = "groupProp")
+        val reducer = RollupReducer()
+        val result = reducer.reduce(ctx, spec)
+
+        assertEquals(RollupFunction.Count, result.function)
+        assertEquals(3.0, result.value)
+        assertEquals(3, result.sampleSize)
+
+        val groups = result.groups
+        kotlin.test.assertNotNull(groups)
+        assertEquals(2, groups.size)
+        
+        val groupA = groups["A"]
+        kotlin.test.assertNotNull(groupA)
+        assertEquals(2.0, groupA.value)
+        assertEquals(2, groupA.sampleSize)
+
+        val groupB = groups["B"]
+        kotlin.test.assertNotNull(groupB)
+        assertEquals(1.0, groupB.value)
+        assertEquals(1, groupB.sampleSize)
+    }
 }

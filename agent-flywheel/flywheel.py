@@ -448,9 +448,31 @@ TRIAGER = ("You filter coding-agent proposals. Reject merge-conflict-prone, "
            "duplicate, or vague items. Output JSON "
            '{"keep": [indices], "reason": "..."} Keep at most half.')
 ANSWERER = ("You answer a coding agent's inquiry on behalf of the project "
-            "owner. Be decisive, concrete, unblockingly specific. Prefer TDD, "
-            "minimal diffs, existing conventions. Plain text, under 200 words. "
-            "Answer only the concrete inquiry; never send a generic nudge.")
+            "owner. Be decisive, concrete, unblockingly specific. "
+            "Answer only the concrete inquiry, point by point. "
+            "Never send KEEP_GOING or a generic nudge.\n\n"
+            "PROJECT CONVENTIONS (TrikeShed KMP):\n"
+            "- Domain logic lives in commonMain. JVM-specific code (java.nio, "
+            "JNR, JMH, Bouncycastle) lives in jvmMain only.\n"
+            "- Use platform.posix (Kotlin/Native) for POSIX, NOT jnr-posix. "
+            "jnr-posix is JVM-only and forbidden in commonMain.\n"
+            "- No kotlinx-serialization-json or kotlinx-serialization-cbor in "
+            "commonMain. Confix is the only serialization format.\n"
+            "- Inheritance/shared intermediate source sets over expect/actual. "
+            "Use expect/actual only for platform SPI.\n"
+            "- Series<T> (borg.trikeshed.lib) over List<T>. Use the alpha "
+            "operator (it). Avoid .view.toList() materialization.\n"
+            "- TDD strictly: write the failing test first, then implement.\n"
+            "- Keep diffs minimal. One test file + one implementation file.\n"
+            "- If a symbol the test references does not exist, create the "
+            "minimal production type that makes the test compile, then "
+            "implement to green. Do not rename the test's API.\n"
+            "- No mocks, fakes, or stubs in production code. If a dependency "
+            "is unavailable, use an interface and inject a real implementation.\n"
+            "- Test files go in commonTest (for commonMain) or jvmTest (for "
+            "jvmMain). Match the source set of the code under test.\n"
+            "- The gate is: ./gradlew jvmTest must exit zero.\n"
+            "Plain text, under 200 words.")
 
 def land(patch, branch, title):
     patch_path = STATE_PATH + ".patch"
@@ -581,7 +603,9 @@ def main():
                     sess["state"], q, sess.get("last_question")
                 ):
                     ans = brain_chat(ANSWERER,
-                        f"Task: {sess['work']['spec']}\nInquiry: {q}")
+                        f"Task title: {sess['work']['title']}\n"
+                        f"Task spec: {sess['work']['spec']}\n\n"
+                        f"Inquiry from the coding agent:\n{q}")
                     if not ans.startswith("__BRAIN_ERROR__"):
                         try:
                             Jules.send(name, ans)

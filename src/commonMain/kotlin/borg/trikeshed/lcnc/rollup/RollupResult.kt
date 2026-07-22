@@ -5,4 +5,5 @@ data class RollupResult(
     val value: Double?,                     // null when no rows / not applicable
     val sampleSize: Int,
     val isApproximation: Boolean = false,
+    val groups: Map<String, RollupResult>? = null,
 )
