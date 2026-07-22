@@ -90,8 +90,11 @@ class Jules:
     @staticmethod
     def activities(name, after_ts=None):
         url = f"{JULES_BASE}/{name}/activities?pageSize=50"
-        if after_ts: url += f"&createTime={urllib.parse.quote(after_ts)}"
-        return http("GET", url).get("activities", [])
+        activities = http("GET", url).get("activities", [])
+        if after_ts:
+            activities = [a for a in activities
+                          if str(a.get("createTime", "")) > after_ts]
+        return activities
     @staticmethod
     def send(name, msg): http("POST", f"{JULES_BASE}/{name}:sendMessage", {"prompt": msg})
     @staticmethod

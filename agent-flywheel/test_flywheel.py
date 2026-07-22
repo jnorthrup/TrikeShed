@@ -57,6 +57,27 @@ class WorkQueueTest(unittest.TestCase):
             flywheel.unseen_proposals(proposals, queue, live),
         )
 
+    def test_activity_cursor_is_filtered_client_side(self):
+        requested = []
+        old_http = flywheel.http
+        try:
+            def fake_http(method, url, body=None):
+                requested.append(url)
+                return {"activities": [
+                    {"name": "old", "createTime": "2026-01-01T00:00:00Z"},
+                    {"name": "new", "createTime": "2026-01-01T00:00:02Z"},
+                ]}
+
+            flywheel.http = fake_http
+            activities = flywheel.Jules.activities(
+                "sessions/1", after_ts="2026-01-01T00:00:01Z"
+            )
+        finally:
+            flywheel.http = old_http
+
+        self.assertNotIn("createTime=", requested[0])
+        self.assertEqual(["new"], [activity["name"] for activity in activities])
+
 
 class ReconciliationTest(unittest.TestCase):
     def test_completed_session_without_patch_is_removed_and_requeued(self):
