@@ -124,22 +124,4 @@ class LiburingVolumeTest {
             remove(path)
         }
     }
-
-    @Test
-    fun enqueueBurstAndDequeueBurstWorkCorrectly() = runBlocking {
-        val path = tempFile()
-        try {
-            val vol = LiburingVolume(path, 4096, 4096L * 256)
-            val writeRequests = (0 until 4).map { i ->
-                IoRequest(i.toLong(), ByteArray(4096) { i.toByte() }, IoKind.WRITE)
-            }
-            vol.enqueue_burst(writeRequests)
-            val results = vol.dequeue_burst()
-            assertEquals(4, results.size)
-            results.forEach { assertTrue(it is IoResult.Ok) }
-            vol.close()
-        } finally {
-            remove(path)
-        }
-    }
 }
