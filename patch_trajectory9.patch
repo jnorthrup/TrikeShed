@@ -1,0 +1,43 @@
+--- src/commonMain/kotlin/borg/trikeshed/lcnc/reduction/TrajectoryReduction.kt
++++ src/commonMain/kotlin/borg/trikeshed/lcnc/reduction/TrajectoryReduction.kt
+@@ -8,6 +8,8 @@
+ import borg.trikeshed.ws.Sha1Common
+ import borg.trikeshed.lib.j
+ import borg.trikeshed.lib.α
++import borg.trikeshed.lib.size
++import borg.trikeshed.lib.get
+
+ data class TrajectoryPayload(
+@@ -28,8 +30,8 @@
+         for (id in depJobIds) {
+             var foundComplete = false
+-            for (i in 0 until deps.a) {
+-                val item = deps.b(i)
++            for (i in 0 until deps.size) {
++                val item = deps[i]
+                 if (item.jobId.value == id && item.lifecycle == "complete") {
+                     foundComplete = true
+                     break
+                 }
+@@ -63,3 +65,3 @@
+         override val merger = Merger<TrajectoryOutcome> { partials ->
+-            if (partials.a == 0) initial else partials.b(partials.a - 1)
++            if (partials.size == 0) initial else partials[partials.size - 1]
+         }
+@@ -109,11 +111,11 @@
+         val attemptCauses = ArrayList<JulesCause>()
+-        for (i in 0 until payload.causes.a) {
+-            val cause = payload.causes.b(i)
+-            if (cause is JulesCause.DrainFailed || cause is JulesCause.DrainApplied ||
+-                cause is JulesCause.SessionFailed || cause is JulesCause.PatchArrived) {
+-                attemptCauses.add(cause)
+-            }
+-        }
++        val filteredSeries = payload.causes α { cause ->
++            if (cause is JulesCause.DrainFailed || cause is JulesCause.DrainApplied || cause is JulesCause.SessionFailed || cause is JulesCause.PatchArrived) cause else null
++        }
++        for (i in 0 until filteredSeries.size) {
++            val cause = filteredSeries[i]
++            if (cause != null) attemptCauses.add(cause)
++        }
+         val attemptCount = attemptCauses.size

@@ -10,6 +10,7 @@ val Capability.category: String
         is Capability.Sctp -> "sctp"
         is Capability.Model -> "modelmux"
         is Capability.BlackBoard -> "blackboard"
+        is Capability.Trajectory -> "trajectory"
         else -> "custom"
     }
 
@@ -17,7 +18,8 @@ object ReducerRegistry {
     var registry: Map<String, LcncReduction<*, *, *, *>> = mapOf(
         "process" to LcncReductions.forgeCascade(emptyList(), emptyList()),
         "cas" to LcncReductions.confixParse(),
-        "wireproto" to LcncReductions.crmsFold()
+        "wireproto" to LcncReductions.crmsFold(),
+        "trajectory" to TrajectoryReduction()
     )
 
     fun runFor(winningCapability: Capability, payload: Any?): Any? {
