@@ -6,11 +6,11 @@ import borg.trikeshed.context.ElementState
 import borg.trikeshed.context.nuid.Capability
 import borg.trikeshed.context.nuid.Nuid
 import borg.trikeshed.context.nuid.NuidFanoutElement
-import borg.trikeshed.lcnc.reduction.LcncCarrierAlg
-import borg.trikeshed.lcnc.reduction.LcncReduction
-import borg.trikeshed.lcnc.reduction.LcncReductions
-import borg.trikeshed.lcnc.reduction.ReducerRegistry
-import borg.trikeshed.lcnc.reduction.category
+import borg.trikeshed.reduction.LcncCarrierAlg
+import borg.trikeshed.reduction.LcncReduction
+import borg.trikeshed.reduction.LcncReductions
+import borg.trikeshed.reduction.ReducerRegistry
+import borg.trikeshed.reduction.category
 import kotlinx.coroutines.Job
 
 class LcncFanoutElement(
