@@ -284,6 +284,15 @@ def _extract_question(act):
             if "?" in text: return text
     return None
 
+def change_set_patch(change_set):
+    patch = change_set.get("gitPatch", "") if isinstance(change_set, dict) else ""
+    if isinstance(patch, str):
+        return patch
+    if isinstance(patch, dict):
+        nested = patch.get("unidiffPatch", "")
+        return nested if isinstance(nested, str) else ""
+    return ""
+
 RESEARCHER = (
     "You are the research spoke of a generic dev flywheel. The repo snapshot "
     "includes a 'doc/ work pool' section listing unchecked [ ] task items — "
@@ -415,13 +424,13 @@ def main():
                                 print(f"  send failed {name}: {e}", flush=True)
                     for art in a.get("artifacts", []):
                         cs = art.get("changeSet")
-                        if cs and cs.get("gitPatch"):
+                        if cs and change_set_patch(cs):
                             sess["patches"].append({"changeSet": cs})
 
             state = sess["state"]
             if state in ("COMPLETED", "FINISHED") and sess["patches"]:
                 cs = sess["patches"][-1]["changeSet"]
-                patch_text = cs.get("gitPatch","")
+                patch_text = change_set_patch(cs)
                 if not patch_text:
                     Jules.delete(name); del live[name]; continue
                 fp = sess["work"]["fingerprint"]
