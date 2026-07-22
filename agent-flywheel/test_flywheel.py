@@ -48,6 +48,15 @@ class WorkQueueTest(unittest.TestCase):
         tasks = [{"title": "one"}]
         self.assertEqual(tasks, flywheel.proposal_list({"tasks": tasks}))
 
+    def test_active_tasks_are_removed_before_triage(self):
+        queue = flywheel.WorkPQ()
+        live = {"sessions/1": {"work": {"title": "already active"}}}
+        proposals = [{"title": "already active"}, {"title": "new work"}]
+        self.assertEqual(
+            [{"title": "new work"}],
+            flywheel.unseen_proposals(proposals, queue, live),
+        )
+
 
 class ReconciliationTest(unittest.TestCase):
     def test_completed_session_without_patch_is_removed_and_requeued(self):
