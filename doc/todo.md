@@ -120,7 +120,7 @@ these interfaces. No platform IO leaks into `commonMain`.
 
 ## GATE-CONFIX-CBOR (decomposed into 6 small tasks)
 
-- [ ] **CBOR-1. Confix Cbor encoder: uint/int test vectors**
+- [x] **CBOR-1. Confix Cbor encoder: uint/int test vectors** — DRAINED 2199106204565555300
   Write failing tests for canonical CBOR encoding of unsigned integers (0, 1, 23, 24, 255, 65535, 4294967295) and negative integers. Test file: src/commonTest/kotlin/borg/trikeshed/parse/confix/ConfixCborIntTest.kt. Assert exact byte output per RFC 8949. Implement: ConfixCbor.encodeUInt in commonMain.
 
 - [ ] **CBOR-2. Confix Cbor encoder: text strings and byte strings**
