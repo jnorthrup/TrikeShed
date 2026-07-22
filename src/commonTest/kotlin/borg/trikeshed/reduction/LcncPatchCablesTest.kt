@@ -1,4 +1,4 @@
-package borg.trikeshed.lcnc.reduction
+package borg.trikeshed.reduction
 
 import kotlin.test.Test
 import kotlin.test.assertEquals

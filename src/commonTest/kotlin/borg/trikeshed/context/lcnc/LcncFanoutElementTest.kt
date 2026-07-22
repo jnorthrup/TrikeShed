@@ -1,13 +1,13 @@
 package borg.trikeshed.context.lcnc
 
 import borg.trikeshed.context.nuid.*
-import borg.trikeshed.lcnc.reduction.LcncReduction
-import borg.trikeshed.lcnc.reduction.ReductionCarrier
-import borg.trikeshed.lcnc.reduction.ReductionResult
-import borg.trikeshed.lcnc.reduction.KeyAlg
-import borg.trikeshed.lcnc.reduction.ValueAlg
-import borg.trikeshed.lcnc.reduction.PhaseAlg
-import borg.trikeshed.lcnc.reduction.CarrierAlg
+import borg.trikeshed.reduction.LcncReduction
+import borg.trikeshed.reduction.ReductionCarrier
+import borg.trikeshed.reduction.ReductionResult
+import borg.trikeshed.reduction.KeyAlg
+import borg.trikeshed.reduction.ValueAlg
+import borg.trikeshed.reduction.PhaseAlg
+import borg.trikeshed.reduction.CarrierAlg
 import borg.trikeshed.lib.j
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.runTest
@@ -40,7 +40,7 @@ class LcncFanoutElementTest {
             override val phaseAlg: PhaseAlg get() = TODO("Not yet implemented")
             override val carrierAlg: CarrierAlg<Any>
                 get() = object : CarrierAlg<Any> {
-                    override val carrier: (Any) -> ReductionCarrier<Any> = { borg.trikeshed.lcnc.reduction.emptySeriesCarrier() }
+                    override val carrier: (Any) -> ReductionCarrier<Any> = { borg.trikeshed.reduction.emptySeriesCarrier() }
                 }
 
             override fun execute(input: ReductionCarrier<*>): Any {

@@ -1,4 +1,4 @@
-package borg.trikeshed.lcnc.reduction
+package borg.trikeshed.reduction
 
 /**
  * Universal phase marker — unifies Forge MAP/REDUCE/REREDUCE, Confix scan/buildTree, CRMS BEFORE/AFTER.
