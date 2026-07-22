@@ -331,6 +331,18 @@ def _extract_question(act):
             if "?" in text: return text
     return None
 
+def latest_question(activities):
+    explicit = [_extract_question(activity) for activity in activities
+                if "agentMessaged" in activity]
+    explicit = [question for question in explicit if question]
+    if explicit:
+        return explicit[-1]
+    for activity in reversed(activities):
+        question = _extract_question(activity)
+        if question:
+            return question
+    return None
+
 def change_set_patch(change_set):
     patch = change_set.get("gitPatch", "") if isinstance(change_set, dict) else ""
     if isinstance(patch, str):
@@ -482,22 +494,22 @@ def main():
                     if "planGenerated" in a:
                         try: Jules.approve(name)
                         except Exception: pass
-                    q = _extract_question(a)
-                    if q and q != sess.get("last_question"):
-                        ans = brain_chat(ANSWERER,
-                            f"Task: {sess['work']['spec']}\nInquiry: {q}")
-                        if not ans.startswith("__BRAIN_ERROR__"):
-                            try:
-                                Jules.send(name, ans)
-                                sess["last_question"] = q
-                                print(f"  answered: {name} q='{q[:60]}'",
-                                      flush=True)
-                            except Exception as e:
-                                print(f"  send failed {name}: {e}", flush=True)
                     for art in a.get("artifacts", []):
                         cs = art.get("changeSet")
                         if cs and change_set_patch(cs):
                             sess["patches"].append({"changeSet": cs})
+                q = latest_question(acts)
+                if q and q != sess.get("last_question"):
+                    ans = brain_chat(ANSWERER,
+                        f"Task: {sess['work']['spec']}\nInquiry: {q}")
+                    if not ans.startswith("__BRAIN_ERROR__"):
+                        try:
+                            Jules.send(name, ans)
+                            sess["last_question"] = q
+                            print(f"  answered: {name} q='{q[:60]}'",
+                                  flush=True)
+                        except Exception as e:
+                            print(f"  send failed {name}: {e}", flush=True)
 
             state = sess["state"]
             if state in ("COMPLETED", "FINISHED"):
