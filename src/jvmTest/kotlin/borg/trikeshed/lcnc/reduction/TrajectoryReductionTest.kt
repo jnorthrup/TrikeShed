@@ -3,6 +3,11 @@ package borg.trikeshed.lcnc.reduction
 import borg.trikeshed.job.JobSnapshot
 import borg.trikeshed.jules.JulesCause
 import borg.trikeshed.lib.j
+import borg.trikeshed.reduction.TrajectoryCarrier
+import borg.trikeshed.reduction.TrajectoryOutcome
+import borg.trikeshed.reduction.TrajectoryPayload
+import borg.trikeshed.reduction.TrajectoryReduction
+import borg.trikeshed.reduction.TrajectoryVerdict
 import org.junit.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse

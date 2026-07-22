@@ -1,4 +1,4 @@
-package borg.trikeshed.lcnc.reduction
+package borg.trikeshed.reduction
 
 sealed class TrajectoryOutcome {
     data object NoPatch : TrajectoryOutcome()
