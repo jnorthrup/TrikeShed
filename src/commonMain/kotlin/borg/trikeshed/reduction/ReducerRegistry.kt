@@ -2,7 +2,7 @@ package borg.trikeshed.reduction
 
 import borg.trikeshed.context.nuid.Capability
 
-val Capability.category: String
+val borg.trikeshed.context.nuid.Capability.category: String
     get() = when (this) {
         is Capability.Process -> "process"
         is Capability.Cas -> "cas"

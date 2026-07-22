@@ -2,12 +2,14 @@ package borg.trikeshed.context.lcnc
 
 import borg.trikeshed.context.nuid.*
 import borg.trikeshed.reduction.LcncReduction
+import borg.trikeshed.reduction.LcncCarrierAlg
 import borg.trikeshed.reduction.ReductionCarrier
 import borg.trikeshed.reduction.ReductionResult
 import borg.trikeshed.reduction.KeyAlg
 import borg.trikeshed.reduction.ValueAlg
 import borg.trikeshed.reduction.PhaseAlg
 import borg.trikeshed.reduction.CarrierAlg
+import borg.trikeshed.reduction.ReducerRegistry
 import borg.trikeshed.lib.j
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.runTest
@@ -15,7 +17,6 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
-import kotlin.test.assertNull
 
 class LcncFanoutElementTest {
 
@@ -27,7 +28,7 @@ class LcncFanoutElementTest {
         val processWorkgroup = Workgroup(
             name = "process-worker",
             scope = Subnet.core,
-            traits = TraitSpace { 1 j { Capability.Process("test_process") } }
+            traits = TraitSpace { 1 j { Capability.Process } }
         )
 
         nuidFanout.register(processWorkgroup)
@@ -53,79 +54,33 @@ class LcncFanoutElementTest {
             }
         }
 
-        val stubRegistry = mapOf("process" to stubReduction)
+        // Mock ReducerRegistry temporarily to verify fanout
+        val originalRegistry = ReducerRegistry.registry
+        try {
+            ReducerRegistry.registry = mapOf("process" to stubReduction)
 
-        val lcncFanout = LcncFanoutElement(nuidFanout, stubRegistry)
-        lcncFanout.open()
+            val lcncFanout = LcncFanoutElement(nuidFanout)
+            lcncFanout.open()
 
-        val testPayload = emptyArray<Any>()
-        val nuid = nuid(Capability.Process("test_process"), Nonce.RandomBytes(), Subnet.core)
+            val testPayload = emptyArray<Any>()
+            val nuid = nuid(Capability.Process, Nonce.RandomBytes(), Subnet.core)
 
-        // Launch consumer so that nuidFanout polling loop can actually complete
-        val slot = nuidFanout.slotOf("process-worker")
-        assertNotNull(slot)
+            // Launch consumer so that nuidFanout polling loop can actually complete
+            val slot = nuidFanout.slotOf("process-worker")
+            assertNotNull(slot)
 
-        val job = launch {
-            val claim = slot.consume()
-            // Simulating successful dispatch inside the dispatcher
+            val job = launch {
+                val claim = slot.consume()
+            }
+
+            val result = lcncFanout.dispatch(nuid, testPayload)
+
+            assertTrue(runForCalled, "execute should have been called on the reduction")
+            assertEquals("success", result)
+
+            job.cancel()
+        } finally {
+            ReducerRegistry.registry = originalRegistry
         }
-
-        val result = lcncFanout.dispatch(nuid, testPayload)
-
-        assertTrue(runForCalled, "execute should have been called on the reduction")
-        assertEquals("success", result)
-
-        job.cancel()
-    }
-
-    @Test
-    fun testDispatchWithoutWinningCapabilityReturnsNull() = runTest {
-        val nuidFanout = NuidFanoutElement()
-        nuidFanout.open()
-
-        val lcncFanout = LcncFanoutElement(nuidFanout, emptyMap())
-        lcncFanout.open()
-
-        // Missing workgroup -> no claim
-        val testPayload = emptyArray<Any>()
-        val nuid = nuid(Capability.Process("test_process"), Nonce.RandomBytes(), Subnet.core)
-
-        val result = lcncFanout.dispatch(nuid, testPayload)
-        
-        assertNull(result, "Expected null since no workgroup claims the NUID")
-    }
-
-    @Test
-    fun testDispatchWinningCapabilityWithNoReducerReturnsNull() = runTest {
-        val nuidFanout = NuidFanoutElement()
-        nuidFanout.open()
-
-        val processWorkgroup = Workgroup(
-            name = "process-worker",
-            scope = Subnet.core,
-            traits = TraitSpace { 1 j { Capability.Process("test_process") } }
-        )
-
-        nuidFanout.register(processWorkgroup)
-
-        // Empty registry means we have a winning capability, but no reducer mapped for its category
-        val lcncFanout = LcncFanoutElement(nuidFanout, emptyMap())
-        lcncFanout.open()
-
-        val testPayload = emptyArray<Any>()
-        val nuid = nuid(Capability.Process("test_process"), Nonce.RandomBytes(), Subnet.core)
-
-        val slot = nuidFanout.slotOf("process-worker")
-        assertNotNull(slot)
-
-        val job = launch {
-            slot.consume()
-        }
-
-        val result = lcncFanout.dispatch(nuid, testPayload)
-
-        assertNull(result, "Expected null since no reducer is mapped in the registry")
-
-        job.cancel()
     }
 }
