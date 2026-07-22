@@ -347,6 +347,10 @@ def confirmation_loop(state, answer_count, question, last_question):
     return (state == "AWAITING_USER_FEEDBACK" and answer_count >= 2
             and bool(question) and question != last_question)
 
+def should_answer_question(state, question, last_question):
+    return (state == "AWAITING_USER_FEEDBACK" and bool(question)
+            and question != last_question)
+
 def change_set_patch(change_set):
     patch = change_set.get("gitPatch", "") if isinstance(change_set, dict) else ""
     if isinstance(patch, str):
@@ -520,7 +524,9 @@ def main():
                     print(f"  ↻ confirmation loop, requeued: {sess['work']['title']}",
                           flush=True)
                     continue
-                if q and q != sess.get("last_question"):
+                if q is not None and should_answer_question(
+                    sess["state"], q, sess.get("last_question")
+                ):
                     ans = brain_chat(ANSWERER,
                         f"Task: {sess['work']['spec']}\nInquiry: {q}")
                     if not ans.startswith("__BRAIN_ERROR__"):
