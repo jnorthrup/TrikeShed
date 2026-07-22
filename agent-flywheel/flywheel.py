@@ -227,11 +227,18 @@ def adopt_active_sessions(live, sessions, harvested=None):
         name = str(session.get("name", ""))
         state = str(session.get("state", ""))
         source = str(session.get("sourceContext", {}).get("source", ""))
+        is_terminal = state in ("COMPLETED", "FINISHED")
         harvestable = (state in ("QUEUED", "PLANNING", "IN_PROGRESS",
                                  "COMPLETED", "FINISHED")
                        or state.startswith("AWAITING_"))
         if (not name or name in live or name in harvested
                 or source != JULES_SOURCE or not harvestable):
+            continue
+        # Cap active (non-terminal) adoption at MAX_LIVE so the live map
+        # doesn't bloat to 47 sessions and stall the serial harvest loop.
+        # Terminal sessions are always adopted — they need harvesting to
+        # free dispatch slots.
+        if not is_terminal and len(live) >= MAX_LIVE:
             continue
         title = str(session.get("title") or f"adopted Jules session {name.split('/')[-1]}")
         spec = str(session.get("prompt") or title)
@@ -411,6 +418,41 @@ def inform_merged_session(name, settlement):
             time.sleep(2 ** attempt)
     return False, error
 
+def mark_drained(title, session_name):
+    """After a Jules merge, mark the task done in doc/todo.md.
+    The Jules URL task ID is the object ID, stripped of REST prefix."""
+    task_id = session_name.split("/")[-1]
+    todo_path = os.path.join(REPO_PATH, "doc", "todo.md")
+    if not os.path.exists(todo_path):
+        return
+    try:
+        with open(todo_path) as f:
+            lines = f.readlines()
+    except Exception:
+        return
+    changed = False
+    for i, line in enumerate(lines):
+        if "- [ ]" in line and title[:40].lower() in line.lower():
+            indent = line[:line.index("- [ ]")]
+            rest = line[line.index("] ") + 2:].rstrip()
+            # Strip trailing markdown bold/parens for clean drain marker
+            lines[i] = f"{indent}- [x] {rest} — DRAINED {task_id}\n"
+            changed = True
+            break
+    if changed:
+        with open(todo_path, "w") as f:
+            f.writelines(lines)
+        try:
+            subprocess.run(["git", "-C", REPO_PATH, "add", "doc/todo.md"],
+                           capture_output=True, text=True, timeout=10)
+            subprocess.run(["git", "-C", REPO_PATH, "commit", "-m",
+                           f"drain: {title[:60]} ({task_id})"],
+                           capture_output=True, text=True, timeout=10)
+            subprocess.run(["git", "-C", REPO_PATH, "push", "origin", MAIN_BRANCH],
+                           capture_output=True, text=True, timeout=30)
+        except Exception:
+            pass
+
 def change_set_patch(change_set):
     patch = change_set.get("gitPatch", "") if isinstance(change_set, dict) else ""
     if isinstance(patch, str):
@@ -560,7 +602,12 @@ def main():
 
         dispatch_available(pq, live, cycle)
 
-        for name, sess in list(live.items()):
+        # Harvest COMPLETED sessions FIRST — they block new dispatch slots.
+        # Polling IN_PROGRESS sessions is cheap; harvesting a completed one
+        # runs the gate (70s), so do the highest-leverage work first.
+        live_sorted = sorted(live.items(),
+            key=lambda kv: 0 if kv[1].get("state") in ("COMPLETED","FINISHED") else 1)
+        for name, sess in live_sorted:
             try: meta = Jules.get(name)
             except Exception as e:
                 print(f"  poll error {name}: {e}", flush=True); continue
@@ -653,6 +700,7 @@ def main():
                             "accountingError": accounting_error,
                         })
                         print(f"  ✓ LANDED: {sess['work']['title']}", flush=True)
+                        mark_drained(sess["work"]["title"], name)
                         if informed:
                             print(f"  ↳ merge receipt: {name}", flush=True)
                         else:
