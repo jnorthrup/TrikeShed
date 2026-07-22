@@ -120,4 +120,4 @@ go.sum.bak
 
 # Bazel
 bazel-*/
-.bazelrc.local
+.bazelrc.local.idea/
