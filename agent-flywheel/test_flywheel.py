@@ -347,6 +347,14 @@ class TestCommandDetectionTest(unittest.TestCase):
             (Path(tmp) / "gradlew").touch()
             self.assertEqual("./gradlew test", land.detect_test_cmd(tmp))
 
+    def test_kmp_gradle_wrapper_selects_jvm_test_gate(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            (Path(tmp) / "gradlew").touch()
+            (Path(tmp) / "build.gradle.kts").write_text(
+                'plugins { kotlin("multiplatform") }\nkotlin { jvm() }\n'
+            )
+            self.assertEqual("./gradlew jvmTest", land.detect_test_cmd(tmp))
+
 
 class BaselineGateTest(unittest.TestCase):
     def test_policy_rejects_compile_fix_stub(self):
