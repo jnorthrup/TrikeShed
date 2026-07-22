@@ -1,4 +1,4 @@
-package borg.trikeshed.lcnc.reduction
+package borg.trikeshed.reduction
 
 import borg.trikeshed.cursor.Cursor
 import borg.trikeshed.mutable.RingSeries

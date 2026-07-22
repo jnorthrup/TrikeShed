@@ -1,6 +1,6 @@
 @file:Suppress("ObjectPropertyName", "FunctionName")
 
-package borg.trikeshed.lcnc.reduction
+package borg.trikeshed.reduction
 
 import borg.trikeshed.lib.Join
 import borg.trikeshed.lib.Series
