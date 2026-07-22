@@ -126,6 +126,7 @@ class DatabaseView(var database: LcncDatabase, val ingestState: IngestStateEleme
                     val editor = when (prop.type) {
                         PropertyType.TEXT -> TextPropertyEditor(prop, value, onChangeHandler)
                         PropertyType.SELECT -> SelectPropertyEditor(prop, value, onChangeHandler)
+                        PropertyType.MULTI_SELECT -> MultiSelectPropertyEditor(prop, value, onChangeHandler)
                         PropertyType.CHECKBOX -> CheckboxPropertyEditor(prop, value, onChangeHandler)
                         PropertyType.NUMBER -> NumberPropertyEditor(prop, value, onChangeHandler)
                         PropertyType.DATE -> DatePropertyEditor(prop, value, onChangeHandler)

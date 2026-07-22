@@ -48,6 +48,38 @@ class TextPropertyEditor(
     override fun validate(input: Any?): Boolean = true
 }
 
+class MultiSelectPropertyEditor(
+    override val schema: PropertySchema,
+    override val value: Any?,
+    override val onChange: ((PropertyChangeEvent) -> Unit)? = null
+) : PropertyEditor {
+    override fun renderHtml(): String = html {
+        val options = (schema.configuration?.get("options") as? List<*>)?.filterIsInstance<String>() ?: emptyList()
+        val selectedValues = (value as? List<*>)?.filterIsInstance<String>() ?: emptyList()
+        val builder = HtmlBuilder()
+        builder.div(classes = "lcnc-prop-multi-select", id = "prop-${schema.id}") {
+            // Need to emit something that triggers onchange with an array. In vanilla HTML/JS without framework,
+            // multiple select elements need a script to extract values. We'll simplify to string match or pass an array literal.
+            // But lcncPropChange accepts `this.value`. For a multi-select, we need to collect selected options.
+            // Using a basic select multiple logic:
+            text("<select multiple onchange=\"window.lcncPropChange('${schema.id}', Array.from(this.selectedOptions).map(o => o.value))\">")
+            for (opt in options) {
+                val selected = if (selectedValues.contains(opt)) " selected" else ""
+                text("<option value=\"$opt\"$selected>$opt</option>")
+            }
+            text("</select>")
+        }
+        text(builder.toString())
+    }
+
+    override fun validate(input: Any?): Boolean {
+        val options = (schema.configuration?.get("options") as? List<*>)?.filterIsInstance<String>() ?: emptyList()
+        if (input == null) return true
+        val inputList = (input as? List<*>)?.filterIsInstance<String>() ?: return false
+        return inputList.all { options.contains(it) }
+    }
+}
+
 class SelectPropertyEditor(
     override val schema: PropertySchema,
     override val value: Any?,

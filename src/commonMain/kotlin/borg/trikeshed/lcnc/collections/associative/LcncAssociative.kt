@@ -24,10 +24,10 @@ enum class PropertyType {
     DATE,
     URL,
     EMAIL,
-    PHONE_NUMBER
+    PHONE_NUMBER,
+    MULTI_SELECT
     
     // De-stubbed aspirational types (removed 2026-07-21, see git history or doc/lcnc-property-type-decision.md for more info)
-    // MULTI_SELECT: removed 2026-07-21, was meant for multiple tags/selects
     // PEOPLE: removed 2026-07-21, was meant for user references
     // FILES: removed 2026-07-21, was meant for file attachments and images
     // FORMULA: removed 2026-07-21, was meant for computed column formulas
