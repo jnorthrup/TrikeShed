@@ -1,4 +1,4 @@
-package borg.trikeshed.lcnc.reduction
+package borg.trikeshed.reduction
 
 /**
  * Forge-specific Folder/Merger implementations extracted from ForgeWorkspaceImpl.
