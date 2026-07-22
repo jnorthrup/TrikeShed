@@ -405,10 +405,10 @@ class BaselineGateTest(unittest.TestCase):
         )
         self.assertEqual((True, "ok"), land.patch_policy(patch_text))
 
-    def test_red_baseline_allows_same_errors(self):
+    def test_red_baseline_rejects_red_candidate_even_with_same_errors(self):
         baseline = "e: file:///repo/Foo.kt:1 Unresolved reference 'x'.\n"
         candidate = "e: file:///repo/Foo.kt:1 Unresolved reference 'x'.\n"
-        self.assertTrue(land.is_nonregression(1, baseline, 1, candidate))
+        self.assertFalse(land.is_nonregression(1, baseline, 1, candidate))
 
     def test_red_baseline_rejects_new_errors(self):
         baseline = "e: file:///repo/Foo.kt:1 Unresolved reference 'x'.\n"
