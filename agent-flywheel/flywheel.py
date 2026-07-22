@@ -190,18 +190,34 @@ class WorkPQ:
     def __len__(self): return len(self._h)
     def __iter__(self): return iter(sorted(self._h))
 
-def unseen_proposals(proposals, pq, live):
-    known_titles = {w.title for w in pq}
+def task_key(title):
+    title = str(title).strip()
+    match = re.match(
+        r"^(T\d+[A-Z]?|ORO-\d+|GATE-[A-Z0-9-]+|T-[A-Z0-9-]+)",
+        title.upper(),
+    )
+    if match:
+        return match.group(1)
+    return re.sub(r"[^a-z0-9]+", " ", title.lower()).strip()
+
+def unseen_proposals(proposals, pq, live, outcomes=()):
+    known_titles = {task_key(w.title) for w in pq}
     known_titles.update(
-        str(s.get("work", {}).get("title", "")) for s in live.values()
+        task_key(s.get("work", {}).get("title", "")) for s in live.values()
+    )
+    known_titles.update(
+        task_key(outcome.get("title", ""))
+        for outcome in outcomes
+        if outcome.get("ok")
     )
     unseen = []
     for proposal in proposals:
         title = str(proposal.get("title", "")) if isinstance(proposal, dict) else ""
-        if not title or title in known_titles:
+        key = task_key(title)
+        if not key or key in known_titles:
             continue
         unseen.append(proposal)
-        known_titles.add(title)
+        known_titles.add(key)
     return unseen
 
 def adopt_active_sessions(live, sessions):
@@ -473,7 +489,7 @@ def main():
                   flush=True)
             props = unseen_proposals(proposal_list(brain_json(RESEARCHER,
                 f"{snap}\n\nRecent outcomes:\n{list(outcomes)[-10:]}", [])),
-                pq, live)
+                pq, live, outcomes)
             print(f"  cycle {cycle}: RESEARCHER returned "
                   f"{type(props).__name__} len={len(props) if isinstance(props,(list,str)) else '?'}",
                   flush=True)

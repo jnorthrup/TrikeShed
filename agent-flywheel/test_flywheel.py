@@ -58,6 +58,18 @@ class WorkQueueTest(unittest.TestCase):
             flywheel.unseen_proposals(proposals, queue, live),
         )
 
+    def test_settled_task_variants_are_not_proposed_again(self):
+        queue = flywheel.WorkPQ()
+        outcomes = [{"ok": True, "title": "T29 Aspirational"}]
+        proposals = [
+            {"title": "T29. Decide one of: implement or de-stub"},
+            {"title": "new work"},
+        ]
+        self.assertEqual(
+            [{"title": "new work"}],
+            flywheel.unseen_proposals(proposals, queue, {}, outcomes),
+        )
+
     def test_activity_cursor_is_filtered_client_side(self):
         requested = []
         old_http = flywheel.http
