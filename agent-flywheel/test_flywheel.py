@@ -295,6 +295,41 @@ class TestCommandDetectionTest(unittest.TestCase):
 
 
 class BaselineGateTest(unittest.TestCase):
+    def test_policy_rejects_compile_fix_stub(self):
+        patch_text = (
+            "diff --git a/Foo.kt b/Foo.kt\n"
+            "--- a/Foo.kt\n+++ b/Foo.kt\n"
+            "-class Foo { fun work() = 1 }\n"
+            "+// stubbed out to fix compile\n"
+            "+class Foo\n"
+        )
+        ok, reason = land.patch_policy(patch_text)
+        self.assertFalse(ok)
+        self.assertIn("placeholder", reason)
+
+    def test_policy_rejects_deletion_dominant_file(self):
+        patch_text = (
+            "diff --git a/Foo.kt b/Foo.kt\n"
+            "--- a/Foo.kt\n+++ b/Foo.kt\n"
+            + "".join(f"-old line {i}\n" for i in range(100))
+            + "+replacement\n"
+        )
+        ok, reason = land.patch_policy(patch_text)
+        self.assertFalse(ok)
+        self.assertIn("deletion-dominant", reason)
+
+    def test_policy_allows_balanced_implementation(self):
+        patch_text = (
+            "diff --git a/Foo.kt b/Foo.kt\n"
+            "--- a/Foo.kt\n+++ b/Foo.kt\n"
+            "-fun value() = 1\n"
+            "+fun value() = 2\n"
+            "diff --git a/FooTest.kt b/FooTest.kt\n"
+            "--- a/FooTest.kt\n+++ b/FooTest.kt\n"
+            "+fun verifiesValue() = check(value() == 2)\n"
+        )
+        self.assertEqual((True, "ok"), land.patch_policy(patch_text))
+
     def test_red_baseline_allows_same_errors(self):
         baseline = "e: file:///repo/Foo.kt:1 Unresolved reference 'x'.\n"
         candidate = "e: file:///repo/Foo.kt:1 Unresolved reference 'x'.\n"

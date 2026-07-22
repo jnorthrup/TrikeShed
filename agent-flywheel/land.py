@@ -33,6 +33,40 @@ def is_nonregression(baseline_code: int, baseline_output: str,
     return bool(baseline_failures) and candidate_failures.issubset(baseline_failures)
 
 
+def patch_policy(patch_text: str) -> tuple[bool, str]:
+    per_file: dict[str, list[int]] = {}
+    current_file = "<unknown>"
+    placeholder_patterns = (
+        re.compile(r"\bstub(?:bed)?\b.*\b(?:compile|implementation|out)\b", re.I),
+        re.compile(r"\b(?:fail|error|todo)\s*\(\s*['\"](?:not implemented|stub|placeholder)", re.I),
+    )
+
+    for line in patch_text.splitlines():
+        if line.startswith("diff --git "):
+            parts = line.split()
+            current_file = parts[2][2:] if len(parts) >= 3 else "<unknown>"
+            per_file.setdefault(current_file, [0, 0])
+            continue
+        if line.startswith("+") and not line.startswith("+++"):
+            per_file.setdefault(current_file, [0, 0])[0] += 1
+            added = line[1:].strip()
+            if any(pattern.search(added) for pattern in placeholder_patterns):
+                return False, f"placeholder compile-fix code in {current_file}: {added[:160]}"
+        elif line.startswith("-") and not line.startswith("---"):
+            per_file.setdefault(current_file, [0, 0])[1] += 1
+
+    total_added = sum(counts[0] for counts in per_file.values())
+    total_deleted = sum(counts[1] for counts in per_file.values())
+    for path, (added, deleted) in per_file.items():
+        if deleted >= 80 and deleted > max(added * 2, added + 60):
+            return False, (f"deletion-dominant patch in {path}: "
+                           f"added={added} deleted={deleted}")
+    if total_deleted >= 150 and total_deleted > total_added * 2:
+        return False, (f"deletion-dominant patch overall: "
+                       f"added={total_added} deleted={total_deleted}")
+    return True, "ok"
+
+
 def restore_main(repo: str, main_branch: str, branch: str) -> None:
     subprocess.run(["git", "-C", repo, "merge", "--abort"],
                    capture_output=True, text=True)
@@ -103,6 +137,15 @@ def main() -> int:
 
     main_branch = detect_main(args.repo)
     test_cmd = args.test or detect_test_cmd(args.repo)
+    patch_text = ""
+    if not args.no_apply:
+        with open(args.patch_file) as patch_file:
+            patch_text = patch_file.read()
+        policy_ok, policy_reason = patch_policy(patch_text)
+        if not policy_ok:
+            print(json.dumps({"ok": False, "stage": "policy",
+                              "detail": policy_reason}))
+            return 8
 
     baseline_code = 0
     baseline_output = ""
@@ -120,7 +163,6 @@ def main() -> int:
         return 2
 
     if not args.no_apply:
-        patch_text = open(args.patch_file).read()
         ap_res = subprocess.run(["git", "-C", args.repo, "apply", "--3way", "-"],
                                 input=patch_text, capture_output=True, text=True)
         if ap_res.returncode != 0:
