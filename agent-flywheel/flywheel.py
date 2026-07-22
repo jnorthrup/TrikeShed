@@ -609,6 +609,16 @@ def main():
             key=lambda kv: 0 if kv[1].get("state") in ("COMPLETED","FINISHED") else 1)
         for name, sess in live_sorted:
             try: meta = Jules.get(name)
+            except urllib.error.HTTPError as e:
+                if e.code == 404:
+                    # Session deleted on Jules side — purge from live, mark harvested
+                    print(f"  ⊘ 404 gone, purging: {name}", flush=True)
+                    harvested.add(name)
+                    del live[name]
+                    save_state(pq, live, landed, outcomes, harvested)
+                else:
+                    print(f"  poll error {name}: {e}", flush=True)
+                continue
             except Exception as e:
                 print(f"  poll error {name}: {e}", flush=True); continue
             sess["state"] = meta.get("state", sess["state"])
