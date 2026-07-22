@@ -12,7 +12,7 @@ class LcncAssociativeTest {
     fun testSupportedPropertyTypesOnly() {
         val expectedTypes = setOf(
             "TITLE", "TEXT", "NUMBER", "SELECT", "CHECKBOX", "DATE",
-            "URL", "EMAIL", "PHONE_NUMBER",
+            "URL", "EMAIL", "PHONE_NUMBER", "MULTI_SELECT"
         )
         val actualTypes = PropertyType.values().map { it.name }.toSet()
         assertEquals(expectedTypes, actualTypes, "PropertyType should only contain supported types")

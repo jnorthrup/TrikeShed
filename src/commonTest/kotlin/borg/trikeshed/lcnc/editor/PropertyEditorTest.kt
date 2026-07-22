@@ -68,4 +68,24 @@ class PropertyEditorTest {
         assertTrue(editor.validate("+1 (555) 555-5555"))
         assertFalse(editor.validate("123"))
     }
+
+    @Test
+    fun testMultiSelectPropertyEditor() {
+        val schema = PropertySchema(
+            "7", "Tags", PropertyType.MULTI_SELECT,
+            mapOf("options" to listOf("Tag A", "Tag B", "Tag C"))
+        )
+        val editor = MultiSelectPropertyEditor(schema, listOf("Tag A", "Tag C"))
+        
+        val html = editor.renderHtml()
+        assertTrue(html.contains("<select multiple"))
+        assertTrue(html.contains("value=\"Tag A\" selected"))
+        assertTrue(html.contains("value=\"Tag C\" selected"))
+        assertTrue(html.contains("value=\"Tag B\">")) // Note: NOT selected
+
+        assertTrue(editor.validate(listOf("Tag B")))
+        assertTrue(editor.validate(listOf("Tag A", "Tag B")))
+        assertFalse(editor.validate(listOf("Tag D")), "Should reject unconfigured option")
+        assertFalse(editor.validate("Not a list"), "Should reject non-list input")
+    }
 }
