@@ -1,171 +1,145 @@
 package borg.trikeshed.lcnc.reduction
 
-import borg.trikeshed.jules.JulesCause
 import borg.trikeshed.job.JobSnapshot
-import borg.trikeshed.lib.*
+import borg.trikeshed.jules.JulesCause
+import borg.trikeshed.lib.Series
+import borg.trikeshed.lib.emptySeriesOf
+import borg.trikeshed.ws.Sha1Common
+import borg.trikeshed.lib.j
+import borg.trikeshed.lib.α
+import borg.trikeshed.lib.size
+import borg.trikeshed.lib.get
 
-/**
- * TrajectoryReduction — folds a Series<JulesCause> trajectory into a TrajectoryVerdict.
- *
- * This is the PRM/ freeze signal for the flywheel: given a task's cause history,
- * produce a verdict that says whether to retry, freeze, or consider it done.
- *
- * Input: Series<JulesCause> — the causal chain from a JulesSessionCard
- * Output: TrajectoryVerdict — {fingerprint, attemptCount, outcome, frozen, depsSatisfied}
- *
- * Key: taskFingerprint (SHA1 of session title + headSha, 12 hex)
- * Value: JulesCause (fold causes → TrajectoryOutcome)
- * Acc: List<TrajectoryOutcome> (history across attempts)
- * Out: TrajectoryVerdict (final verdict per task)
- */
-class TrajectoryReduction : LcncReduction<String, JulesCause, List<TrajectoryOutcome>, TrajectoryVerdict> {
+data class TrajectoryPayload(
+    val title: String,
+    val headSha: String,
+    val causes: Series<JulesCause>,
+    val depJobIds: List<String> = emptyList(),
+    val deps: Series<JobSnapshot> = emptySeriesOf()
+)
 
+class TrajectoryCarrier(val payload: TrajectoryPayload) : ReductionCarrier<JulesCause> by SeriesCarrier(payload.causes)
+
+object TrajectoryPhaseAlg : PhaseAlg {
+    override val transitions: PhaseTransition = LcncPhaseAlg.forgeTransitions
+    override fun validateSequence(phases: List<ReductionPhase>): Boolean = true
+    override fun nextValidPhases(current: ReductionPhase): Set<ReductionPhase> = emptySet()
+
+    fun checkDeps(depJobIds: List<String>, deps: Series<JobSnapshot>): Boolean {
+        if (depJobIds.isEmpty()) return true
+        for (id in depJobIds) {
+            var foundComplete = false
+            for (i in 0 until deps.size) {
+                val item = deps[i]
+                if (item.jobId.value == id && item.lifecycle == "complete") {
+                    foundComplete = true
+                    break
+                }
+            }
+            if (!foundComplete) return false
+        }
+        return true
+    }
+}
+
+class TrajectoryReduction : LcncReduction<String, JulesCause, TrajectoryOutcome, TrajectoryVerdict> {
     override val keyAlg: KeyAlg<String> = object : KeyAlg<String> {
-        // For trajectories, we key by fingerprint. If input is JulesSessionCard, extract fingerprint.
-        override val extractor: KeyExtractor<Any, String> = KeyExtractor { input ->
-            when (input) {
-                is String -> input // already a fingerprint
-                else -> "unknown"
+        override val extractor = KeyExtractor<Any, String> { input ->
+            val payload = (input as TrajectoryCarrier).payload
+            val text = payload.title + payload.headSha
+            val hashBytes = Sha1Common.hash(text.encodeToByteArray())
+            hashBytes.joinToString("") { it.toUByte().toString(16).padStart(2, '0') }.take(12)
+        }
+        override val hierarchy = object : KeyHierarchy<String> {
+            override val levels = emptyList<KeyExtractor<Any, String>>()
+            override fun compositeKey(input: Any) = listOf(extractor.extract(input))
+            override fun prefix(key: List<String>, depth: Int) = key
+        }
+        override val order = LcncKeyAlg.naturalKeyOrder<String>()
+    }
+
+    override val valueAlg: ValueAlg<JulesCause, TrajectoryOutcome> = object : ValueAlg<JulesCause, TrajectoryOutcome> {
+        override val initial = TrajectoryOutcome.NoPatch
+        override val folder = Folder<JulesCause, TrajectoryOutcome> { acc, cause ->
+            parseCause(cause, acc)
+        }
+        override val merger = Merger<TrajectoryOutcome> { partials ->
+            if (partials.size == 0) initial else partials[partials.size - 1]
+        }
+    }
+
+    override val phaseAlg: PhaseAlg = TrajectoryPhaseAlg
+
+    override val carrierAlg: CarrierAlg<JulesCause> = object : CarrierAlg<JulesCause> {
+        override val carrier: (Any) -> ReductionCarrier<JulesCause> = { input ->
+            if (input is TrajectoryPayload) TrajectoryCarrier(input)
+            else SeriesCarrier(emptySeriesOf())
+        }
+    }
+
+    private fun parseReason(reason: String): TrajectoryOutcome {
+        return when {
+            "no patch" in reason || "without a client" in reason -> TrajectoryOutcome.NoPatch
+            "deletion-dominant" in reason -> {
+                val path = reason.substringAfter("deletion-dominant").trim(':', ' ')
+                TrajectoryOutcome.DeletionDominant(path)
             }
-        }
-
-        override val hierarchy: KeyHierarchy<String> = object : KeyHierarchy<String> {
-            override val levels: List<KeyExtractor<Any, String>> = listOf(extractor)
-            override fun compositeKey(input: Any): List<String> = listOf(extractor.extract(input))
-            override fun prefix(key: List<String>, depth: Int): List<String> = key.take(depth)
-        }
-
-        override val order: KeyOrder<String> = object : KeyOrder<String> {
-            override fun compare(a: String, b: String): Int = a.compareTo(b)
+            "NotImplementedError" in reason || "no-op" in reason -> TrajectoryOutcome.Stub(reason)
+            "red" in reason || "FAILED" in reason -> TrajectoryOutcome.GateRed(listOf(reason))
+            else -> TrajectoryOutcome.GateRed(listOf(reason))
         }
     }
 
-    override val valueAlg: ValueAlg<JulesCause, List<TrajectoryOutcome>> = object : ValueAlg<JulesCause, List<TrajectoryOutcome>> {
-        // Fold causes into a single outcome, accumulate in a list
-        override val folder: Folder<JulesCause, List<TrajectoryOutcome>> = Folder { acc, cause ->
-            val outcome = when (cause) {
-                is JulesCause.DrainApplied -> TrajectoryOutcome.Landed
-                is JulesCause.DrainFailed -> {
-                    val r = cause.reason.lowercase()
-                    when {
-                        r.contains("deletion") -> TrajectoryOutcome.DeletionDominant(cause.reason)
-                        r.contains("not implemented") || r.contains("no-op") -> TrajectoryOutcome.Stub(cause.reason)
-                        else -> TrajectoryOutcome.NoPatch
-                    }
-                }
-                is JulesCause.SessionFailed -> {
-                    val r = cause.reason.lowercase()
-                    if (r.contains("deletion")) TrajectoryOutcome.DeletionDominant(cause.reason)
-                    else TrajectoryOutcome.NoPatch
-                }
-                else -> return@Folder acc // Skip non-terminal causes
-            }
-            acc + outcome
-        }
-
-        override val merger: Merger<List<TrajectoryOutcome>> = Merger { partials ->
-            val all = mutableListOf<TrajectoryOutcome>()
-            for (p in partials) { all.addAll(p) }
-            all
-        }
-
-        override val initial: List<TrajectoryOutcome> = emptyList()
+    private fun parseCause(cause: JulesCause, current: TrajectoryOutcome): TrajectoryOutcome = when (cause) {
+        is JulesCause.DrainApplied -> TrajectoryOutcome.Landed
+        is JulesCause.DrainFailed -> parseReason(cause.reason)
+        is JulesCause.SessionFailed -> parseReason(cause.reason)
+        is JulesCause.PatchArrived -> current
+        else -> current
     }
-
-    // Use the default Forge phase transitions: MAP → REDUCE → REREDUCE
-    override val phaseAlg: PhaseAlg = object : PhaseAlg {
-        override val transitions: PhaseTransition = LcncPhaseAlg.forgeTransitions
-
-        override fun validateSequence(phases: List<ReductionPhase>): Boolean = true
-
-        override fun nextValidPhases(current: ReductionPhase): Set<ReductionPhase> =
-            setOf(ReductionPhase.REDUCE, ReductionPhase.REREDUCE)
-    }
-
-    // Use the existing series carrier alg
-    override val carrierAlg: CarrierAlg<JulesCause> = LcncCarrierAlg.seriesCarrierAlg()
 
     override fun execute(input: ReductionCarrier<*>): TrajectoryVerdict {
-        val typed = input as ReductionCarrier<JulesCause>
-
-        // Simple execution: fold all causes into one outcome
-        val outcomes = typed.fold(initial = valueAlg.initial, folder = valueAlg.folder)
-
-        // For now, produce a simple verdict
-        // In practice, we'd also need: taskFingerprint, attemptCount, depsSatisfied
-        val outcome = outcomes.lastOrNull() ?: TrajectoryOutcome.NoPatch
-
-        return TrajectoryVerdict(
-            taskFingerprint = "unknown",
-            attemptCount = 1,
-            outcome = outcome,
-            frozen = false,
-            depsSatisfied = true
-        )
+        return executeWithCheckpoints(input).output
     }
 
     override fun executeWithCheckpoints(input: ReductionCarrier<*>): ReductionResult<TrajectoryVerdict> {
-        val typed = input as ReductionCarrier<JulesCause>
+        val carrier = input as TrajectoryCarrier
+        val payload = carrier.payload
 
-        // Fold causes into outcomes
-        val outcomes = typed.fold(initial = valueAlg.initial, folder = valueAlg.folder)
+        val fingerprint = keyAlg.extractor.extract(carrier)
+        val depsSatisfied = TrajectoryPhaseAlg.checkDeps(payload.depJobIds, payload.deps)
 
-        val outcome = outcomes.lastOrNull() ?: TrajectoryOutcome.NoPatch
+        val attemptCauses = ArrayList<JulesCause>()
+        val mappedSeries = payload.causes α { cause ->
+            if (cause is JulesCause.DrainFailed || cause is JulesCause.DrainApplied ||
+                cause is JulesCause.SessionFailed || cause is JulesCause.PatchArrived) cause else null
+        }
+        for (i in 0 until mappedSeries.size) {
+            val cause = mappedSeries[i]
+            if (cause != null) attemptCauses.add(cause)
+        }
+        val attemptCount = attemptCauses.size
+
+        val finalOutcome = attemptCauses.fold(valueAlg.initial as TrajectoryOutcome) { acc, cause ->
+            parseCause(cause, acc)
+        }
+
+        var frozen = false
+        if (attemptCount >= 3) {
+            val last3 = attemptCauses.takeLast(3).map { parseCause(it, TrajectoryOutcome.NoPatch) }
+            if (last3[0]::class == last3[1]::class && last3[1]::class == last3[2]::class) {
+                frozen = true
+            }
+        }
 
         val verdict = TrajectoryVerdict(
-            taskFingerprint = "unknown",
-            attemptCount = outcomes.size.coerceAtLeast(1),
-            outcome = outcome,
-            frozen = isFrozen(outcomes.size.coerceAtLeast(1), outcomes),
-            depsSatisfied = true
+            taskFingerprint = fingerprint,
+            attemptCount = attemptCount,
+            outcome = finalOutcome,
+            frozen = frozen,
+            depsSatisfied = depsSatisfied
         )
 
         return ReductionResult(verdict, emptyMap())
     }
-}
-
-/**
- * TrajectoryReduction for a single JulesSessionCard's cause chain.
- * Convenience wrapper that takes the card and produces a verdict.
- */
-fun verdictFor(
-    cardCauses: List<JulesCause>,
-    taskFingerprint: String,
-    attemptCount: Int,
-    deps: List<String>,
-    completedSnapshots: Map<String, JobSnapshot> = emptyMap()
-): TrajectoryVerdict {
-    val outcomes = cardCauses.mapNotNull { cause ->
-        when (cause) {
-            is JulesCause.DrainApplied -> TrajectoryOutcome.Landed
-            is JulesCause.DrainFailed -> {
-                val r = cause.reason.lowercase()
-                when {
-                    r.contains("deletion") -> TrajectoryOutcome.DeletionDominant(cause.reason)
-                    r.contains("not implemented") || r.contains("no-op") -> TrajectoryOutcome.Stub(cause.reason)
-                    else -> TrajectoryOutcome.NoPatch
-                }
-            }
-            is JulesCause.SessionFailed -> {
-                val r = cause.reason.lowercase()
-                if (r.contains("deletion")) TrajectoryOutcome.DeletionDominant(cause.reason)
-                else TrajectoryOutcome.NoPatch
-            }
-            else -> null
-        }
-    }
-
-    val outcome = outcomes.lastOrNull() ?: TrajectoryOutcome.NoPatch
-
-    // Check deps satisfaction against completed snapshots
-    val depsOk = depsSatisfied(deps, completedSnapshots)
-
-    return TrajectoryVerdict(
-        taskFingerprint = taskFingerprint,
-        attemptCount = attemptCount,
-        outcome = outcome,
-        frozen = isFrozen(attemptCount, outcomes),
-        depsSatisfied = depsOk,
-        deps = deps
-    )
 }
