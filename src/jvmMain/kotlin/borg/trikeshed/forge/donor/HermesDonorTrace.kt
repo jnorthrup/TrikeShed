@@ -11,10 +11,28 @@ import java.sql.Connection
 import java.sql.ResultSet
 
 object HermesDonorTrace {
-    fun ingestDonor(userId: String, format: String, donorPath: String): ForgeKanbanReduction {
+    fun ingestDonor(userId: String, format: String, donorPath: String? = null): ForgeKanbanReduction {
         return when (format.lowercase()) {
-            "sqlite" -> ingestSqlite(userId, Paths.get(donorPath))
-            "md", "markdown" -> ingestMarkdown(userId, Paths.get(donorPath))
+            "sqlite" -> {
+                val path = if (donorPath == null) {
+                    val userHome = System.getProperty("user.home")
+                    Paths.get(userHome, ".hermes", "hermes-agent", "hermes_core", "kanban.db")
+                } else {
+                    Paths.get(donorPath)
+                }
+                
+                // Fallback to older `.hermes/kanban.db` if the new deep path doesn't exist but the old one does
+                val finalPath = if (!Files.exists(path) && donorPath == null) {
+                    val fallbackPath = Paths.get(System.getProperty("user.home"), ".hermes", "kanban.db")
+                    if (Files.exists(fallbackPath)) fallbackPath else path
+                } else path
+
+                ingestSqlite(userId, finalPath)
+            }
+            "md", "markdown" -> {
+                requireNotNull(donorPath) { "donorPath is required for markdown format" }
+                ingestMarkdown(userId, Paths.get(donorPath))
+            }
             else -> throw IllegalArgumentException("Unknown donor format: $format. Use 'md' or 'sqlite'.")
         }
     }
@@ -45,22 +63,50 @@ object HermesDonorTrace {
                 val sb = java.lang.StringBuilder()
                 sb.append("TARGET: SQLite Donor Replay\n\n6. Work packages\n\n")
 
+                var hasWorkPackages = false
                 while (rs.next()) {
+                    hasWorkPackages = true
                     val id = rs.getString("id")
                     val title = rs.getString("title")
                     val body = rs.getString("body")
                     val parentIds = rs.getString("parent_ids")
 
-                    sb.append("### $id — $title\n\n")
+                    // id needs to match "^([A-Z][0-9]+)$"
+                    val formattedId = if (id.matches(Regex("^[A-Z][0-9]+$"))) id else {
+                        // try to extract an ID from something like TASK-1 -> T1
+                        val match = Regex(".*?([A-Z]+)[^0-9]*([0-9]+).*?").find(id)
+                        if (match != null) {
+                           match.groupValues[1].take(1) + match.groupValues[2]
+                        } else {
+                           "T${id.hashCode().toUInt() % 1000u}"
+                        }
+                    }
+
+                    sb.append("$formattedId — $title\n\n")
                     if (!body.isNullOrBlank()) {
                         sb.append("$body\n\n")
                     }
                     if (!parentIds.isNullOrBlank()) {
-                        val deps = parentIds.split(",").map { it.trim() }.joinToString(", ")
-                        sb.append("Depends on: $deps\n\n")
+                        val deps = parentIds.split(",").mapNotNull { parentIdStr -> 
+                             val parentId = parentIdStr.trim()
+                             if (parentId.matches(Regex("^[A-Z][0-9]+$"))) parentId else {
+                                val match = Regex(".*?([A-Z]+)[^0-9]*([0-9]+).*?").find(parentId)
+                                if (match != null) {
+                                   match.groupValues[1].take(1) + match.groupValues[2]
+                                } else null
+                             }
+                        }.joinToString(", ")
+                        if (deps.isNotBlank()) {
+                            sb.append("Depends on: $deps\n\n")
+                        }
                     }
                 }
-                sb.append("7.\n")
+                sb.append("7. \n")
+                
+                // Even if no tasks exist, provide a dummy task so parser doesn't fail
+                if (!hasWorkPackages) {
+                     sb.append("D0 — Dummy Task\n\nDummy task to prevent empty work package crash\n\n")
+                }
                 sourceDescription = sb.toString()
             }
         }
