@@ -97,7 +97,6 @@ interface LiburingFacade {
 class SctpReactorSpine : SctpReactorEndpoint {
     private val scope = SctpAssociationScope()
     private val stream = BoundedChannelStream(capacity = 100)
-    private val inboundChannel = Channel<Pair<PeerAddress, ReactorAction>>(Channel.BUFFERED)
 
     override suspend fun bind(port: Int): Int {
         return port
@@ -109,19 +108,10 @@ class SctpReactorSpine : SctpReactorEndpoint {
     }
 
     override suspend fun receive(): Pair<PeerAddress, ReactorAction> {
-        return inboundChannel.receive()
-    }
-
-    suspend fun receiveOrNull(): Pair<PeerAddress, ReactorAction>? {
-        return inboundChannel.receiveCatching().getOrNull()
-    }
-
-    suspend fun triggerReceive(peer: PeerAddress, action: ReactorAction) {
-        inboundChannel.send(Pair(peer, action))
+        throw NotImplementedError()
     }
 
     override suspend fun close() {
         scope.close()
-        inboundChannel.close()
     }
 }

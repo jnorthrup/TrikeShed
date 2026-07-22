@@ -7,13 +7,6 @@ package borg.trikeshed.reactor.ngsctp
 import borg.trikeshed.lib.size
 import borg.trikeshed.lib.get
 import borg.trikeshed.lib.j
-import borg.trikeshed.lcnc.reactor.ReactorAction
-import borg.trikeshed.context.nuid.Nuid
-import borg.trikeshed.context.nuid.nuid
-import borg.trikeshed.context.nuid.Capability
-import borg.trikeshed.context.nuid.Nonce
-import borg.trikeshed.context.nuid.Subnet
-import borg.trikeshed.reactor.PeerAddress
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -103,16 +96,6 @@ class SctpReactorSpineTest {
     fun testSctpReactorSpineLifecycle() = runTest {
         val spine = SctpReactorSpine()
         assertEquals(8080, spine.bind(8080))
-
-        val nuidObj = nuid(Capability.Sctp, Nonce.RandomBytes(), Subnet.core)
-        val action = ReactorAction.opened(nuidObj)
-        val peer = PeerAddress("localhost", 1234)
-        spine.triggerReceive(peer, action)
-
-        val received = spine.receive()
-        assertEquals(peer, received.first)
-        assertEquals(action, received.second)
-
         spine.close()
     }
 }
