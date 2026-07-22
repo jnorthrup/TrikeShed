@@ -56,14 +56,26 @@ def brain_chat(system, user, model=BRAIN_MODEL, max_tokens=8192, temperature=1.0
         return f"__BRAIN_ERROR__: {e}"
 
 def brain_json(system, user, default):
-    txt = brain_chat(system + "\nRespond ONLY with valid JSON.", user)
-    m = re.search(r"\{.*\}|\[.*\]", txt, re.S)
-    if not m:
-        return default
-    try:
-        return json.loads(m.group(0))
-    except Exception:
-        return default
+    for _ in range(2):
+        txt = brain_chat(system + "\nRespond ONLY with valid JSON.", user,
+                         temperature=0.2)
+        m = re.search(r"\{.*\}|\[.*\]", txt, re.S)
+        if not m:
+            continue
+        try:
+            return json.loads(m.group(0))
+        except Exception:
+            continue
+    return default
+
+def proposal_list(value):
+    if isinstance(value, list):
+        return value
+    if isinstance(value, dict):
+        for key in ("tasks", "items", "proposals"):
+            if isinstance(value.get(key), list):
+                return value[key]
+    return []
 
 class Jules:
     @staticmethod
@@ -99,14 +111,24 @@ def _main():
             MAIN_BRANCH = c; return c
     MAIN_BRANCH = "main"; return "main"
 
+def fit_snapshot(out, limit=16000):
+    if len(out) <= limit:
+        return out
+    marker = "## doc/ work pool"
+    pool_at = out.find(marker)
+    if pool_at < 0:
+        return out[:limit]
+    pool = out[pool_at:]
+    separator = "\n\n[earlier snapshot content truncated]\n\n"
+    prefix_size = max(0, limit - len(pool) - len(separator))
+    return (out[:prefix_size] + separator + pool)[:limit]
+
 def snapshot():
     custom = os.environ.get("FLYWHEEL_SNAPSHOT")
     script = custom or os.path.join(os.path.dirname(__file__) or ".", "snapshot.sh")
     p = subprocess.run([script, REPO_PATH], capture_output=True, text=True)
     out = (p.stdout or "")
-    # Reserve at least 4000 chars for the work pool (it's at the bottom).
-    # Truncate the tree section if needed to keep total under 16000.
-    return out[:16000]
+    return fit_snapshot(out)
 
 TIER = {"epic": 0, "feature": 1, "task": 2, "test": 3, "chore": 4}
 _seq = itertools.count()
@@ -299,12 +321,12 @@ def main():
     while True:
         cycle += 1
 
-        if len(pq) < MAX_LIVE * 2:
+        if len(pq) + len(live) < MAX_LIVE * 2:
             snap = snapshot()
             print(f"  cycle {cycle}: snapshot {len(snap)}B; calling RESEARCHER…",
                   flush=True)
-            props = brain_json(RESEARCHER,
-                f"{snap}\n\nRecent outcomes:\n{list(outcomes)[-10:]}", [])
+            props = proposal_list(brain_json(RESEARCHER,
+                f"{snap}\n\nRecent outcomes:\n{list(outcomes)[-10:]}", []))
             print(f"  cycle {cycle}: RESEARCHER returned "
                   f"{type(props).__name__} len={len(props) if isinstance(props,(list,str)) else '?'}",
                   flush=True)
@@ -315,6 +337,10 @@ def main():
                       f"{type(keep).__name__}: {str(keep)[:200]}", flush=True)
                 indices = (keep or {}).get("keep", list(range(len(props))))
                 added = 0
+                known_titles = {w.title for w in pq}
+                known_titles.update(
+                    str(s.get("work", {}).get("title", "")) for s in live.values()
+                )
                 for i in indices:
                     if 0 <= i < len(props):
                         p = props[i]
@@ -325,7 +351,9 @@ def main():
                                          spec=str(p.get("spec","")),
                                          parent=p.get("parent"))
                         except Exception: continue
-                        pq.push(w); added += 1
+                        if w.title in known_titles:
+                            continue
+                        pq.push(w); known_titles.add(w.title); added += 1
                 if added:
                     print(f"  cycle {cycle}: research queued +{added} "
                           f"(depth={len(pq)})", flush=True)
