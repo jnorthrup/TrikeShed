@@ -197,6 +197,13 @@ class WorkQueueTest(unittest.TestCase):
             "AWAITING_USER_FEEDBACK", "Which codec?", "Which codec?"
         ))
 
+    def test_paused_session_is_an_interrupted_custody_slot(self):
+        self.assertEqual(
+            "Jules session paused before producing a landable patch",
+            flywheel.session_interruption_reason("PAUSED"),
+        )
+        self.assertIsNone(flywheel.session_interruption_reason("IN_PROGRESS"))
+
 
 class ReconciliationTest(unittest.TestCase):
     def test_completed_session_without_patch_is_removed_and_requeued(self):
