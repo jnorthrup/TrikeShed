@@ -175,6 +175,17 @@ class WorkQueueTest(unittest.TestCase):
             flywheel.latest_question(activities),
         )
 
+    def test_third_distinct_awaiting_inquiry_is_confirmation_loop(self):
+        self.assertFalse(flywheel.confirmation_loop(
+            "AWAITING_USER_FEEDBACK", 1, "second question?", "first question?"
+        ))
+        self.assertTrue(flywheel.confirmation_loop(
+            "AWAITING_USER_FEEDBACK", 2, "third question?", "second question?"
+        ))
+        self.assertFalse(flywheel.confirmation_loop(
+            "IN_PROGRESS", 2, "third question?", "second question?"
+        ))
+
 
 class ReconciliationTest(unittest.TestCase):
     def test_completed_session_without_patch_is_removed_and_requeued(self):
