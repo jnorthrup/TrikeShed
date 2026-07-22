@@ -164,6 +164,17 @@ class WorkQueueTest(unittest.TestCase):
         self.assertEqual("existing TrikeShed work", live["sessions/900"]["work"]["title"])
         self.assertEqual("implement the existing task", live["sessions/900"]["work"]["spec"])
 
+    def test_latest_question_prefers_one_explicit_agent_inquiry(self):
+        activities = [
+            {"progressUpdated": {"title": "Should I guess?", "message": ""}},
+            {"agentMessaged": {"agentMessage": "Which existing codec should I use?"}},
+            {"progressUpdated": {"title": "Tests still running?", "message": ""}},
+        ]
+        self.assertEqual(
+            "Which existing codec should I use?",
+            flywheel.latest_question(activities),
+        )
+
 
 class ReconciliationTest(unittest.TestCase):
     def test_completed_session_without_patch_is_removed_and_requeued(self):
