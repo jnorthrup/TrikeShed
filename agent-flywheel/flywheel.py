@@ -204,14 +204,18 @@ def unseen_proposals(proposals, pq, live):
         known_titles.add(title)
     return unseen
 
-def adopt_active_sessions(live, sessions):
+def adopt_active_sessions(live, sessions, harvested=None):
+    harvested = harvested if harvested is not None else set()
     adopted = []
     for session in sessions:
         name = str(session.get("name", ""))
         state = str(session.get("state", ""))
         source = str(session.get("sourceContext", {}).get("source", ""))
-        active = state in ("QUEUED", "PLANNING", "IN_PROGRESS") or state.startswith("AWAITING_")
-        if not name or name in live or source != JULES_SOURCE or not active:
+        harvestable = (state in ("QUEUED", "PLANNING", "IN_PROGRESS",
+                                 "COMPLETED", "FINISHED")
+                       or state.startswith("AWAITING_"))
+        if (not name or name in live or name in harvested
+                or source != JULES_SOURCE or not harvestable):
             continue
         title = str(session.get("title") or f"adopted Jules session {name.split('/')[-1]}")
         spec = str(session.get("prompt") or title)
@@ -230,11 +234,12 @@ def adopt_active_sessions(live, sessions):
 
 def load_state():
     pq = WorkPQ(); live = {}; landed = 0; outcomes = deque(maxlen=50)
-    if not os.path.exists(STATE_PATH): return pq, live, landed, outcomes
+    harvested = set()
+    if not os.path.exists(STATE_PATH): return pq, live, landed, outcomes, harvested
     try:
         with open(STATE_PATH) as f:
             data = json.load(f)
-    except Exception: return pq, live, landed, outcomes
+    except Exception: return pq, live, landed, outcomes, harvested
     for w in data.get("queue", []):
         pq.push(WorkItem(tier=w.get("tier","task"), score=float(w.get("score",0.5)),
                          title=w.get("title",""), spec=w.get("spec",""),
@@ -243,14 +248,17 @@ def load_state():
     live.update(data.get("live", {}))
     landed = int(data.get("landed", 0))
     for o in data.get("outcomes", []): outcomes.append(o)
-    return pq, live, landed, outcomes
+    for name in data.get("harvested", []): harvested.add(str(name))
+    return pq, live, landed, outcomes, harvested
 
-def save_state(pq, live, landed, outcomes):
+def save_state(pq, live, landed, outcomes, harvested=None):
+    harvested = harvested if harvested is not None else set()
     tmp = STATE_PATH + ".tmp"
     payload = {"queue": [{"tier": w.tier, "score": w.score, "title": w.title,
                           "spec": w.spec, "parent": w.parent,
                           "attempt": w.attempt, "feedback": w.feedback} for w in pq],
                "live": live, "landed": landed, "outcomes": list(outcomes),
+               "harvested": sorted(harvested),
                "saved_at": datetime.now(timezone.utc).isoformat()}
     with open(tmp, "w") as f: json.dump(payload, f, indent=2)
     os.replace(tmp, STATE_PATH)
@@ -427,7 +435,7 @@ def main():
     ap.add_argument("--cycle-interval", type=int, default=POLL_INTERVAL)
     args = ap.parse_args()
 
-    pq, live, landed, outcomes = load_state()
+    pq, live, landed, outcomes, harvested = load_state()
     main_branch = _main()
     print(f"agent-flywheel: REPO={REPO_PATH} BRANCH={main_branch} "
           f"MAX_LIVE={MAX_LIVE} STATE={STATE_PATH}", flush=True)
@@ -437,7 +445,7 @@ def main():
         cycle += 1
 
         try:
-            adopted = adopt_active_sessions(live, Jules.sessions())
+            adopted = adopt_active_sessions(live, Jules.sessions(), harvested)
             if adopted:
                 print(f"  cycle {cycle}: adopted {len(adopted)} live Jules sessions",
                       flush=True)
@@ -524,6 +532,7 @@ def main():
                                      "why": reason,
                                      "fingerprint": sess["work"].get("fingerprint")})
                     pq.push(retry_work(sess, reason, loop_patch))
+                    harvested.add(name)
                     Jules.delete(name)
                     del live[name]
                     print(f"  ↻ confirmation loop, requeued: {sess['work']['title']}",
@@ -559,6 +568,7 @@ def main():
                         outcomes.append({"title": sess["work"]["title"],
                                          "ok": True, "fingerprint": fp})
                         print(f"  ✓ LANDED: {sess['work']['title']}", flush=True)
+                        harvested.add(name)
                         Jules.delete(name)
                         del live[name]
                     else:
@@ -566,6 +576,7 @@ def main():
                                          "ok": False, "why": msg[:200],
                                          "fingerprint": fp})
                         pq.push(retry_work(sess, msg, patch_text))
+                        harvested.add(name)
                         Jules.delete(name)
                         del live[name]
                         print(f"  ↻ gate red, requeued: {sess['work']['title']}: "
@@ -576,6 +587,7 @@ def main():
                                      "why": reason,
                                      "fingerprint": sess["work"].get("fingerprint")})
                     pq.push(retry_work(sess, reason))
+                    harvested.add(name)
                     Jules.delete(name)
                     del live[name]
                     print(f"  ↻ no patch, requeued: {sess['work']['title']}", flush=True)
@@ -585,17 +597,18 @@ def main():
                                  "why": reason,
                                  "fingerprint": sess["work"].get("fingerprint")})
                 pq.push(retry_work(sess, reason))
+                harvested.add(name)
                 Jules.delete(name)
                 del live[name]
                 print(f"  ↻ failed, requeued: {sess['work']['title']}", flush=True)
 
         dispatch_available(pq, live, cycle)
 
-        save_state(pq, live, landed, outcomes)
+        save_state(pq, live, landed, outcomes, harvested)
 
         if args.once:
             print(f"agent-flywheel: one cycle. queue={len(pq)} live={len(live)} "
-                  f"landed={landed}", flush=True)
+                  f"landed={landed} harvested={len(harvested)}", flush=True)
             return 0
         time.sleep(args.cycle_interval)
 

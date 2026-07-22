@@ -160,9 +160,37 @@ class WorkQueueTest(unittest.TestCase):
 
         adopted = flywheel.adopt_active_sessions(live, sessions)
 
-        self.assertEqual(["sessions/900"], adopted)
+        # COMPLETED sessions must be adopted so their patches can be harvested.
+        self.assertIn("sessions/900", adopted)
+        self.assertIn("sessions/901", adopted)
+        self.assertNotIn("sessions/902", adopted)
         self.assertEqual("existing TrikeShed work", live["sessions/900"]["work"]["title"])
         self.assertEqual("implement the existing task", live["sessions/900"]["work"]["spec"])
+
+    def test_harvested_sessions_are_not_readopted(self):
+        live = {}
+        sessions = [
+            {
+                "name": "sessions/900",
+                "title": "already harvested work",
+                "prompt": "done",
+                "state": "COMPLETED",
+                "sourceContext": {"source": flywheel.JULES_SOURCE},
+            },
+            {
+                "name": "sessions/901",
+                "title": "new work",
+                "prompt": "implement",
+                "state": "IN_PROGRESS",
+                "sourceContext": {"source": flywheel.JULES_SOURCE},
+            },
+        ]
+
+        adopted = flywheel.adopt_active_sessions(
+            live, sessions, harvested={"sessions/900"})
+
+        self.assertNotIn("sessions/900", adopted)
+        self.assertIn("sessions/901", adopted)
 
     def test_latest_question_prefers_one_explicit_agent_inquiry(self):
         activities = [
