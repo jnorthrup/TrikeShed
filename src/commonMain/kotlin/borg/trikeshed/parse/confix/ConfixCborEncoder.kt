@@ -40,13 +40,24 @@ internal object ConfixCborEmitter {
             is ConfixPrimitive -> {
                 val v = e.content
                 val bool = e.booleanOrNull
+                
+                // Try ULong first for positive integers including very large ones
+                val ulong = v.toULongOrNull()
+                // Try Long for negative integers
                 val long = v.toLongOrNull()
                 val dbl = v.toDoubleOrNull()
                 when {
                     bool != null -> out.write(if (bool) 0xF5 else 0xF4)
+                    ulong != null -> {
+                        writeHead(out, 0, ulong)
+                    }
                     long != null -> {
-                        if (long >= 0) writeHead(out, 0, long)
-                        else writeHead(out, 1, -1L - long)
+                        if (long >= 0) {
+                            writeHead(out, 0, long.toULong())
+                        } else {
+                            val magnitude = (-1L - long).toULong()
+                            writeHead(out, 1, magnitude)
+                        }
                     }
                     dbl != null -> {
                         out.write(0xFB)
@@ -62,21 +73,21 @@ internal object ConfixCborEmitter {
                     }
                     else -> {
                         val b = v.encodeToByteArray()
-                        writeHead(out, 3, b.size.toLong())
+                        writeHead(out, 3, b.size.toULong())
                         out.write(b)
                     }
                 }
             }
             is ConfixArray -> {
-                writeHead(out, 4, e.size.toLong())
+                writeHead(out, 4, e.size.toULong())
                 e.forEach { write(out, it) }
             }
             is ConfixObject -> {
-                writeHead(out, 5, e.size.toLong())
+                writeHead(out, 5, e.size.toULong())
                 val sortedEntries = e.entries.map {
                     val keyBytes = it.key.encodeToByteArray()
                     val outKey = ByteArrayBuilder()
-                    writeHead(outKey, 3, keyBytes.size.toLong())
+                    writeHead(outKey, 3, keyBytes.size.toULong())
                     outKey.write(keyBytes)
                     val keyEncoded = outKey.toByteArray()
                     Triple(it.key, keyEncoded, it.value)
@@ -102,17 +113,17 @@ internal object ConfixCborEmitter {
         }
     }
 
-    private fun writeHead(out: ByteArrayBuilder, mt: Int, len: Long) {
+    private fun writeHead(out: ByteArrayBuilder, mt: Int, len: ULong) {
         val base = mt shl 5
         when {
-            len in 0..23 -> out.write(base or len.toInt())
-            len in 24..255 -> { out.write(base or 24); out.write(len.toInt()) }
-            len in 256..65535 -> { 
+            len <= 23u -> out.write(base or len.toInt())
+            len <= 255u -> { out.write(base or 24); out.write(len.toInt()) }
+            len <= 65535u -> { 
                 out.write(base or 25)
                 out.write((len.toInt() ushr 8) and 0xFF)
                 out.write(len.toInt() and 0xFF) 
             }
-            len in 65536..4294967295L -> {
+            len <= 4294967295u -> {
                 out.write(base or 26)
                 out.write((len.toInt() ushr 24) and 0xFF)
                 out.write((len.toInt() ushr 16) and 0xFF)
@@ -122,7 +133,7 @@ internal object ConfixCborEmitter {
             else -> { 
                 out.write(base or 27)
                 for (s in 56 downTo 0 step 8) {
-                    out.write((len ushr s).toInt() and 0xFF)
+                    out.write((len shr s).toInt() and 0xFF)
                 }
             }
         }

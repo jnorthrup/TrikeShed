@@ -451,6 +451,15 @@ tasks.register<JavaExec>("printForgeGallery") {
     classpath(tasks.named("jvmJar"), configurations.getByName("jvmRuntimeClasspath"))
 }
 
+// TrajectoryReduction CLI — fold JulesCause chains into freeze verdicts
+tasks.register<JavaExec>("trajectoryReduction") {
+    group = "oroboros"
+    description = "Run TrajectoryReduction: fold JulesCause trajectory into freeze verdict."
+    dependsOn("jvmJar")
+    mainClass.set("borg.trikeshed.lcnc.reduction.TrajectoryReductionCliKt")
+    classpath(tasks.named("jvmJar"), configurations.getByName("jvmRuntimeClasspath"))
+}
+
 // Forge JVM shell — interactive Compose Desktop window that hosts the same
 // workspace model the browser bundle renders (board, page, gallery, blackboard).
 tasks.register<JavaExec>("runForgeJvm") {
