@@ -78,6 +78,18 @@ class WorkQueueTest(unittest.TestCase):
         self.assertNotIn("createTime=", requested[0])
         self.assertEqual(["new"], [activity["name"] for activity in activities])
 
+    def test_nested_jules_git_patch_extracts_unidiff(self):
+        change_set = {
+            "gitPatch": {
+                "baseCommitId": "abc123",
+                "unidiffPatch": "diff --git a/Foo b/Foo\n",
+            }
+        }
+        self.assertEqual(
+            "diff --git a/Foo b/Foo\n",
+            flywheel.change_set_patch(change_set),
+        )
+
 
 class ReconciliationTest(unittest.TestCase):
     def test_completed_session_without_patch_is_removed_and_requeued(self):
