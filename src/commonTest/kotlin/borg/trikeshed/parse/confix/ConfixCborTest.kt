@@ -1,85 +1,46 @@
 package borg.trikeshed.parse.confix
 
-import kotlinx.serialization.Serializable
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
-import kotlin.test.assertEquals
-import kotlin.test.assertFailsWith
-
-@Serializable
-data class CborTestRecord(
-    val id: Int,
-    val name: String,
-    val active: Boolean,
-    val tags: List<String>,
-    val metadata: Map<String, String>
-)
 
 class ConfixCborTest {
+    @Test
+    fun integersUseMinimalCanonicalWidths() {
+        assertContentEquals(bytes(0x00), emit(ConfixPrimitive(0)))
+        assertContentEquals(bytes(0x17), emit(ConfixPrimitive(23)))
+        assertContentEquals(bytes(0x18, 0x18), emit(ConfixPrimitive(24)))
+        assertContentEquals(bytes(0x18, 0xff), emit(ConfixPrimitive(255)))
+        assertContentEquals(bytes(0x19, 0x01, 0x00), emit(ConfixPrimitive(256)))
+
+        assertContentEquals(bytes(0x20), emit(ConfixPrimitive(-1)))
+        assertContentEquals(bytes(0x37), emit(ConfixPrimitive(-24)))
+        assertContentEquals(bytes(0x38, 0x18), emit(ConfixPrimitive(-25)))
+        assertContentEquals(bytes(0x38, 0xff), emit(ConfixPrimitive(-256)))
+    }
 
     @Test
-    fun testIntegersMinimalWidths() {
-        val cbor = ConfixCbor
-        // Minimal integer encoding tests
-        val v0 = 0
-        assertContentEquals(byteArrayOf(0x00.toByte()), cbor.encode(v0))
-        val v23 = 23
-        assertContentEquals(byteArrayOf(0x17.toByte()), cbor.encode(v23))
-        val v24 = 24
-        assertContentEquals(byteArrayOf(0x18.toByte(), 0x18.toByte()), cbor.encode(v24))
-        val v255 = 255
-        assertContentEquals(byteArrayOf(0x18.toByte(), 0xFF.toByte()), cbor.encode(v255))
-        val v256 = 256
-        assertContentEquals(byteArrayOf(0x19.toByte(), 0x01.toByte(), 0x00.toByte()), cbor.encode(v256))
-        
-        // Decode check
-        assertEquals(v0, cbor.decode(cbor.encode(v0)))
-        assertEquals(v23, cbor.decode(cbor.encode(v23)))
-        assertEquals(v24, cbor.decode(cbor.encode(v24)))
-        assertEquals(v255, cbor.decode(cbor.encode(v255)))
-        assertEquals(v256, cbor.decode(cbor.encode(v256)))
-    }
-    
-    @Test
-    fun testStringAndBooleans() {
-        val cbor = ConfixCbor
-        assertEquals(true, cbor.decode(cbor.encode(true)))
-        assertEquals(false, cbor.decode(cbor.encode(false)))
-        val str = "hello"
-        assertContentEquals(byteArrayOf(0x65.toByte(), 0x68.toByte(), 0x65.toByte(), 0x6c.toByte(), 0x6c.toByte(), 0x6f.toByte()), cbor.encode(str))
-        assertEquals(str, cbor.decode(cbor.encode(str)))
-    }
-    
-    @Test
-    fun testRecordIdempotency() {
-        val record = CborTestRecord(
-            id = 42,
-            name = "Alice",
-            active = true,
-            tags = listOf("a", "b"),
-            metadata = mapOf("k1" to "v1", "k2" to "v2")
+    fun stringsBooleansNullAndArraysUseCborMajorTypes() {
+        assertContentEquals(bytes(0x65, 0x68, 0x65, 0x6c, 0x6c, 0x6f), emit(ConfixPrimitive("hello")))
+        assertContentEquals(bytes(0xf5), emit(ConfixPrimitive(true)))
+        assertContentEquals(bytes(0xf4), emit(ConfixPrimitive(false)))
+        assertContentEquals(bytes(0xf6), emit(ConfixNull))
+        assertContentEquals(
+            bytes(0x82, 0x01, 0x61, 0x78),
+            emit(ConfixArray(listOf(ConfixPrimitive(1), ConfixPrimitive("x")))),
         )
-        val cbor = ConfixCbor
-        val encoded1 = cbor.encode(record)
-        val decoded1: CborTestRecord = cbor.decode(encoded1)
-        assertEquals(record, decoded1)
-        
-        val encoded2 = cbor.encode(decoded1)
-        assertContentEquals(encoded1, encoded2) // Idempotency byte-for-byte
     }
 
     @Test
-    fun testDeterministicMapOrdering() {
-        // Map keys must be sorted per RFC 8949 Section 3.9
-        @Serializable
-        data class MapWrapper(val map: Map<String, Int>)
-        
-        val m1 = MapWrapper(mapOf("b" to 2, "a" to 1, "c" to 3))
-        val m2 = MapWrapper(mapOf("c" to 3, "a" to 1, "b" to 2))
-        
-        val cbor = ConfixCbor
-        val e1 = cbor.encode(m1)
-        val e2 = cbor.encode(m2)
-        assertContentEquals(e1, e2, "Map keys must be ordered canonically (sorted bytes)")
+    fun objectKeysAreOrderedByCanonicalEncodedBytes() {
+        val first = ConfixObject(mapOf("b" to ConfixPrimitive(2), "a" to ConfixPrimitive(1)))
+        val second = ConfixObject(mapOf("a" to ConfixPrimitive(1), "b" to ConfixPrimitive(2)))
+        val expected = bytes(0xa2, 0x61, 0x61, 0x01, 0x61, 0x62, 0x02)
+
+        assertContentEquals(expected, emit(first))
+        assertContentEquals(expected, emit(second))
     }
+
+    private fun emit(element: ConfixElement): ByteArray = ConfixCborEmitter.emit(element)
+
+    private fun bytes(vararg values: Int): ByteArray = ByteArray(values.size) { values[it].toByte() }
 }

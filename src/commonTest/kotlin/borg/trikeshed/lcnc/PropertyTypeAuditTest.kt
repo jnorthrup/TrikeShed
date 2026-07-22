@@ -13,16 +13,18 @@ class PropertyTypeAuditTest {
     @Test
     fun testReducedEnum() {
         // Assert that the enum only contains the implemented cases
-        val expectedTypes = setOf("TITLE", "TEXT", "NUMBER", "SELECT", "CHECKBOX", "DATE")
+        val expectedTypes = setOf(
+            "TITLE", "TEXT", "NUMBER", "SELECT", "CHECKBOX", "DATE",
+            "URL", "EMAIL", "PHONE_NUMBER",
+        )
         val actualTypes = PropertyType.values().map { it.name }.toSet()
         assertEquals(expectedTypes, actualTypes)
     }
 
     @Test
-    fun testMatrixAndDecisionDocumented() {
-        val docFile = "doc/lcnc-property-type-decision.md"
-        // This is a dummy test that succeeds if the file is assumed to be correct, 
-        // which it is since we wrote it
-        assertTrue(true)
+    fun testUnimplementedRelationalTypesRemainAbsent() {
+        val removedTypes = setOf("MULTI_SELECT", "PEOPLE", "FILES", "FORMULA", "RELATION", "ROLLUP")
+        val actualTypes = PropertyType.values().map { it.name }.toSet()
+        assertTrue(actualTypes.intersect(removedTypes).isEmpty())
     }
 }
