@@ -24,13 +24,7 @@ def failure_signatures(output: str) -> set[str]:
 
 def is_nonregression(baseline_code: int, baseline_output: str,
                      candidate_code: int, candidate_output: str) -> bool:
-    if candidate_code == 0:
-        return True
-    if baseline_code == 0:
-        return False
-    baseline_failures = failure_signatures(baseline_output)
-    candidate_failures = failure_signatures(candidate_output)
-    return bool(baseline_failures) and candidate_failures.issubset(baseline_failures)
+    return candidate_code == 0
 
 
 def patch_policy(patch_text: str) -> tuple[bool, str]:
