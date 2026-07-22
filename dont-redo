@@ -1,0 +1,64 @@
+# dont-redo — 32 landed items (kanban evolution pins)
+# Cross-referenced from git history, accounting-backfill, and doc/todo.md.
+# These tasks have real code on master. Do not re-dispatch.
+
+## Substrate (checked in doc/todo.md)
+
+- [x] T1. Reactor algebra in commonMain (commit 114f5314)
+- [x] T2. NUID / authorization algebra (commit ed8d5a79)
+- [x] T3. Volume / BlockArray / BootBlock interface
+- [x] T4. ReactorEndpoint / confix wire transport (commit faa2619d)
+- [x] T6. Btrfs userspace JBOD backend (commit da20abcd)
+- [x] T7. Browser storage backend (commit 9f2ab178)
+- [x] T8. Node localhost proxy (commit ed8d5a79)
+- [x] T9a. Mesh / SCTP reactor adapter (commit 19a84b2d)
+- [x] T10. litebike gate / tunnel adaptation (PR #241, commit c7cd42059)
+- [x] T11. CAS worker (commit 42f3b209)
+- [x] T12. Process worker (commit f1ee66394)
+- [x] T14. ModelMux worker (session 18443322164395743742)
+
+## Window/render targets (checked in doc/todo.md)
+
+- [x] T16. ForgeWindowManager SPI in commonMain (PR #231)
+- [x] T17. HTML shell assets to commonMain/resources (PR #232)
+- [x] T18. Per-target window managers (session 717567726403101346)
+- [x] T19. manimwm-tk native render/composit layer
+- [x] T20. Add missing targets to Gradle build
+
+## Kanban / persistence (checked in doc/todo.md)
+
+- [x] T-KANBAN-HTTP-1. KanbanHttpServerJvm (commit da20abcd)
+- [x] T-KANBAN-WAL-7. WAL for causal chain recovery (commit 7c7ebf32d)
+- [x] T-KANBAN-PERSIST-9. Pick persistence surface (commit 59d6d74b)
+
+## LCNC (landed via accounting-backfill, doc/ still unchecked)
+
+- [x] T5. Native Volume backend (merged drain)
+- [x] T13. Wireproto / Confix worker (merged drain)
+- [x] T15. PWA / gallery UI (merged drain)
+- [x] T22. LCNC visual editor (merged drain)
+- [x] T23. LCNC FORMULA parser + reducer (merged drain)
+- [x] T24. LCNC ROLLUP reducer (PR #229, commit 98c2386db)
+- [x] T29. De-stub aspirational PropertyType (merged drain)
+- [x] T-KANBAN-LCNC-2. Replace LcncEntityDTO projection (merged drain)
+- [x] T-KANBAN-DONOR-3. Donor trace ingestion path (merged drain)
+- [x] T-KANBAN-FANOUT-6. Reactive fanout (merged drain)
+- [x] T-KANBAN-REDUCER-10. ReducerRegistry (merged drain)
+
+## CAS / projection (landed via git history, doc/ still unchecked)
+
+- [x] T-CAS-PROJ-1. Projection registry — project(cid): Lens (commit f8503cf7)
+- [x] T-CAS-PROJ-2. Blackboard causal graph → CAS-backed (commit 6ca4443e)
+- [x] T-CAS-PROJ-3. MmapCasStore (commit 8111d3b2)
+- [x] T-KANBAN-LCNCPIPE-8. LcncIngestPipeline (commit 98c18c29)
+
+## Rewire (landed via git history)
+
+- [x] T-REWIRE-3e. IPFS/IPNS bridge (commit 82763f83)
+
+## Infra / baseline (landed via git history)
+
+- [x] GraalVM polyglot blackboard taxonomy + pointcut (commits 721157ac, 449ef63a)
+- [x] CSV + Markdown ingest codec + SSH mesh transport (commit 845404ae)
+- [x] Progressive rendering job (commit e74b09fa)
+- [x] CBOR canonical serializer attempt (commit 80fd8de6 — partial, gate still open)
