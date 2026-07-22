@@ -1,9 +1,0 @@
-sed -i 's/^    fun testCreateUpdateDeleteRoundTrip() {/    @Test\n    fun testCreateUpdateDeleteRoundTrip() {/' src/commonTest/kotlin/borg/trikeshed/couch/CouchStoreCoverageTest.kt
-sed -i 's/^    fun testStaleRevisionRejection() {/    @Test\n    fun testStaleRevisionRejection() {/' src/commonTest/kotlin/borg/trikeshed/couch/CouchStoreCoverageTest.kt
-sed -i 's/^    fun testTombstoneHistory() {/    @Test\n    fun testTombstoneHistory() {/' src/commonTest/kotlin/borg/trikeshed/couch/CouchStoreCoverageTest.kt
-sed -i 's/^    fun testNoPreCommitVisibility() {/    @Test\n    fun testNoPreCommitVisibility() {/' src/commonTest/kotlin/borg/trikeshed/couch/CouchStoreCoverageTest.kt
-sed -i 's/^    fun testContainsCheck() {/    @Test\n    fun testContainsCheck() {/' src/commonTest/kotlin/borg/trikeshed/couch/CouchStoreCoverageTest.kt
-sed -i 's/^    fun testSubscriptionReceivesMutations() {/    @Test\n    fun testSubscriptionReceivesMutations() {/' src/commonTest/kotlin/borg/trikeshed/couch/CouchStoreCoverageTest.kt
-sed -i 's/^    fun testChangesResumeAndReplayEquivalence() {/    @Test\n    fun testChangesResumeAndReplayEquivalence() {/' src/commonTest/kotlin/borg/trikeshed/couch/CouchStoreCoverageTest.kt
-sed -i 's/^    fun testQueryAllReturnsCursor() {/    @Test\n    fun testQueryAllReturnsCursor() {/' src/commonTest/kotlin/borg/trikeshed/couch/CouchStoreCoverageTest.kt
-sed -i 's/^    fun testIdsReturnsAllDocumentIds() {/    @Test\n    fun testIdsReturnsAllDocumentIds() {/' src/commonTest/kotlin/borg/trikeshed/couch/CouchStoreCoverageTest.kt
