@@ -40,7 +40,7 @@ internal object ConfixCborEmitter {
             is ConfixPrimitive -> {
                 val v = e.content
                 val bool = e.booleanOrNull
-                
+
                 // Try ULong first for positive integers including very large ones
                 val ulong = v.toULongOrNull()
                 // Try Long for negative integers
@@ -118,7 +118,7 @@ internal object ConfixCborEmitter {
         when {
             len <= 23u -> out.write(base or len.toInt())
             len <= 255u -> { out.write(base or 24); out.write(len.toInt()) }
-            len <= 65535u -> { 
+            len <= 65535u -> {
                 out.write(base or 25)
                 out.write((len.toInt() ushr 8) and 0xFF)
                 out.write(len.toInt() and 0xFF) 
