@@ -35,7 +35,7 @@ The first two gates establish runtime truth. The final three are **market action
   - Unblocks: **all pairs**; P3, P5, P6 first (institutional adopters bounce off a contradictory license on page one).
   - Evidence: `LICENSE`, `doc/concepts.md`, and the GitHub API report one consistent license string.
 
-- [ ] **GATE-CLEAN-MASTER. Clean master of integrity debt and branch drift** (POSITIONING PAPER §7.1.1, §7.3.1)
+- [x] **GATE-CLEAN-MASTER. Clean master of integrity debt and branch drift** (POSITIONING PAPER §7.1.1, §7.3.1) — DRAINED 10559702188945957626
   - The positioning-paper snapshot found nine conflict blocks in `HtmlShell.kt` and `ActionDecoder.kt`; live verification on 2026-07-20 finds no markers in either file. Keep this closed sub-finding from regressing while the remaining branch/PWA/build integrity work is completed.
   - 129 open branches, ~70 `jules-*` agent sessions, fifteen `wip` commits, one named `dirty-push-to-master`. The deployed PWA (`docs/index.html`) has drifted from master HEAD; the GitHub Pages API returns 404.
   - Actions: strip the conflict markers, triage the 129 branches, realign the deployed PWA with master HEAD.
