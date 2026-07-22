@@ -20,7 +20,7 @@ object HermesDonorTrace {
                 } else {
                     Paths.get(donorPath)
                 }
-                
+
                 // Fallback to older `.hermes/kanban.db` if the new deep path doesn't exist but the old one does
                 val finalPath = if (!Files.exists(path) && donorPath == null) {
                     val fallbackPath = Paths.get(System.getProperty("user.home"), ".hermes", "kanban.db")
@@ -87,7 +87,7 @@ object HermesDonorTrace {
                         sb.append("$body\n\n")
                     }
                     if (!parentIds.isNullOrBlank()) {
-                        val deps = parentIds.split(",").mapNotNull { parentIdStr -> 
+                        val deps = parentIds.split(",").mapNotNull { parentIdStr ->
                              val parentId = parentIdStr.trim()
                              if (parentId.matches(Regex("^[A-Z][0-9]+$"))) parentId else {
                                 val match = Regex(".*?([A-Z]+)[^0-9]*([0-9]+).*?").find(parentId)
@@ -102,7 +102,7 @@ object HermesDonorTrace {
                     }
                 }
                 sb.append("7. \n")
-                
+
                 // Even if no tasks exist, provide a dummy task so parser doesn't fail
                 if (!hasWorkPackages) {
                      sb.append("D0 — Dummy Task\n\nDummy task to prevent empty work package crash\n\n")
