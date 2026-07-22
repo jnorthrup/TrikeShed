@@ -213,6 +213,9 @@ def main() -> int:
         print(json.dumps({"ok": False, "stage": "commit",
                           "detail": cm.stderr.strip()[:500]}))
         return 5
+    commit_sha = subprocess.check_output(
+        ["git", "-C", args.repo, "rev-parse", "HEAD"], text=True
+    ).strip()
 
     subprocess.run(["git", "-C", args.repo, "checkout", main_branch],
                    capture_output=True, text=True)
@@ -224,6 +227,16 @@ def main() -> int:
         print(json.dumps({"ok": False, "stage": "merge",
                           "detail": mg.stderr.strip()[:500]}))
         return 6
+    merge_sha = subprocess.check_output(
+        ["git", "-C", args.repo, "rev-parse", "HEAD"], text=True
+    ).strip()
+    parent_sha = subprocess.check_output(
+        ["git", "-C", args.repo, "rev-parse", f"{merge_sha}^1"], text=True
+    ).strip()
+    drain_date = subprocess.check_output(
+        ["git", "-C", args.repo, "show", "-s", "--format=%cI", merge_sha],
+        text=True,
+    ).strip()
 
     ps = subprocess.run(["git", "-C", args.repo, "push", "origin", main_branch],
                         capture_output=True, text=True)
@@ -232,10 +245,27 @@ def main() -> int:
                           "detail": ps.stderr.strip()[:500]}))
         return 7
 
+    subprocess.run(
+        ["git", "-C", args.repo, "fetch", "origin", main_branch],
+        capture_output=True, text=True,
+    )
+    remote_sha = subprocess.check_output(
+        ["git", "-C", args.repo, "rev-parse", f"origin/{main_branch}"],
+        text=True,
+    ).strip()
+    if remote_sha != merge_sha:
+        print(json.dumps({"ok": False, "stage": "remote-verify",
+                          "detail": f"pushed {merge_sha} but origin is {remote_sha}"}))
+        return 9
+
     subprocess.run(["git", "-C", args.repo, "branch", "-D", args.branch],
                    capture_output=True, text=True)
     print(json.dumps({"ok": True, "stage": "pushed",
-                      "detail": f"landed {args.branch} on {main_branch}"}))
+                      "detail": f"landed {args.branch} on {main_branch}",
+                      "drainDate": drain_date,
+                      "parentSha": parent_sha,
+                      "mergeSha": merge_sha,
+                      "commitSha": commit_sha}))
     return 0
 
 if __name__ == "__main__":

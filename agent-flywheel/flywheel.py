@@ -356,6 +356,30 @@ def session_interruption_reason(state):
         return f"Jules session {state.lower()} before producing a landable patch"
     return None
 
+def merge_receipt(settlement):
+    return "\n".join([
+        "TRIKESHED DRAIN RECEIPT",
+        "drainTarget: TrikeShed",
+        "drainStatus: MERGED",
+        f"drainDate: {settlement['drainDate']}",
+        f"parentSha: {settlement['parentSha']}",
+        f"mergeSha: {settlement['mergeSha']}",
+        f"commitSha: {settlement['commitSha']}",
+        "source: origin/master",
+    ])
+
+def inform_merged_session(name, settlement):
+    receipt = merge_receipt(settlement)
+    error = None
+    for attempt in range(3):
+        try:
+            Jules.send(name, receipt)
+            return True, None
+        except Exception as exc:
+            error = str(exc)
+            time.sleep(2 ** attempt)
+    return False, error
+
 def change_set_patch(change_set):
     patch = change_set.get("gitPatch", "") if isinstance(change_set, dict) else ""
     if isinstance(patch, str):
@@ -402,8 +426,7 @@ TRIAGER = ("You filter coding-agent proposals. Reject merge-conflict-prone, "
 ANSWERER = ("You answer a coding agent's inquiry on behalf of the project "
             "owner. Be decisive, concrete, unblockingly specific. Prefer TDD, "
             "minimal diffs, existing conventions. Plain text, under 200 words. "
-            "If the inquiry is just a status update, reply KEEP_GOING and a "
-            "1-line restatement of the task spec.")
+            "Answer only the concrete inquiry; never send a generic nudge.")
 
 def land(patch, branch, title):
     patch_path = STATE_PATH + ".patch"
@@ -417,9 +440,9 @@ def land(patch, branch, title):
     out = p.stdout.strip()
     try:
         j = json.loads(out)
-        return bool(j.get("ok")), str(j.get("detail", out))
+        return bool(j.get("ok")), str(j.get("detail", out)), j
     except Exception:
-        return False, out or p.stderr[:500]
+        return False, out or p.stderr[:500], {}
 
 def main():
     ap = argparse.ArgumentParser()
@@ -553,13 +576,32 @@ def main():
                 if patch_text:
                     fp = sess["work"]["fingerprint"]
                     branch = f"flywheel/{fp}"
-                    ok, msg = land(patch_text, branch, sess["work"]["title"])
+                    ok, msg, settlement = land(
+                        patch_text, branch, sess["work"]["title"]
+                    )
                     if ok:
                         landed += 1
-                        outcomes.append({"title": sess["work"]["title"],
-                                         "ok": True, "fingerprint": fp})
+                        informed, accounting_error = inform_merged_session(
+                            name, settlement
+                        )
+                        outcomes.append({
+                            "title": sess["work"]["title"],
+                            "session": name,
+                            "ok": True,
+                            "fingerprint": fp,
+                            "drainDate": settlement.get("drainDate"),
+                            "parentSha": settlement.get("parentSha"),
+                            "mergeSha": settlement.get("mergeSha"),
+                            "commitSha": settlement.get("commitSha"),
+                            "julesInformed": informed,
+                            "accountingError": accounting_error,
+                        })
                         print(f"  ✓ LANDED: {sess['work']['title']}", flush=True)
-                        Jules.delete(name)
+                        if informed:
+                            print(f"  ↳ merge receipt: {name}", flush=True)
+                        else:
+                            print(f"  ! merge receipt failed {name}: "
+                                  f"{accounting_error}", flush=True)
                         del live[name]
                     else:
                         outcomes.append({"title": sess["work"]["title"],
