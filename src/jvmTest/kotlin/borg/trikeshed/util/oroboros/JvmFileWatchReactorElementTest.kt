@@ -28,7 +28,7 @@ class JvmFileWatchReactorElementTest {
             root.toFile().deleteRecursively()
         }
         assertEquals(borg.trikeshed.context.ElementState.CLOSED, watcher.state)
-        
+
         // Drain any remaining events (e.g. MODIFY after CREATE) that were queued before close
         while (true) {
             if (watcher.events.receiveCatching().isClosed) break
