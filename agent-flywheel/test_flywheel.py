@@ -4,6 +4,7 @@ import os
 from pathlib import Path
 import sys
 import tempfile
+from types import SimpleNamespace
 from typing import Any
 import unittest
 
@@ -111,6 +112,26 @@ class WorkQueueTest(unittest.TestCase):
         self.assertEqual(["first", "second"], [a["name"] for a in activities])
         self.assertIn("pageToken=next%20page", requested[1])
 
+    def test_official_client_supplies_authoritative_result_patch(self):
+        calls = []
+        old_run = flywheel.subprocess.run
+        try:
+            def fake_run(args, **kwargs):
+                calls.append(args)
+                return SimpleNamespace(
+                    returncode=0,
+                    stdout="status line\ndiff --git a/Foo b/Foo\npatch body\n",
+                    stderr="",
+                )
+
+            flywheel.subprocess.run = fake_run
+            patch = flywheel.client_patch("sessions/123")
+        finally:
+            flywheel.subprocess.run = old_run
+
+        self.assertEqual(["jules", "remote", "pull", "--session", "123"], calls[0])
+        self.assertEqual("diff --git a/Foo b/Foo\npatch body\n", patch)
+
 
 class ReconciliationTest(unittest.TestCase):
     def test_completed_session_without_patch_is_removed_and_requeued(self):
@@ -147,6 +168,7 @@ class ReconciliationTest(unittest.TestCase):
             old_get = flywheel.Jules.get
             old_activities = flywheel.Jules.activities
             old_delete = flywheel.Jules.delete
+            old_client_patch = flywheel.client_patch
             old_max_live = flywheel.MAX_LIVE
             try:
                 flywheel.STATE_PATH = str(state_path)
@@ -161,6 +183,7 @@ class ReconciliationTest(unittest.TestCase):
                     lambda name, after_ts=None: []
                 )
                 flywheel.Jules.delete = staticmethod(deleted.append)
+                flywheel.client_patch = lambda name: ""
                 sys.argv = ["flywheel.py", "--once"]
 
                 self.assertEqual(0, flywheel.main())
@@ -172,6 +195,7 @@ class ReconciliationTest(unittest.TestCase):
                 flywheel.Jules.get = old_get
                 flywheel.Jules.activities = old_activities
                 flywheel.Jules.delete = old_delete
+                flywheel.client_patch = old_client_patch
                 flywheel.MAX_LIVE = old_max_live
                 sys.argv = old_argv
 
@@ -217,6 +241,7 @@ class ReconciliationTest(unittest.TestCase):
             old_activities = flywheel.Jules.activities
             old_delete = flywheel.Jules.delete
             old_land = flywheel.land
+            old_client_patch = flywheel.client_patch
             old_max_live = flywheel.MAX_LIVE
             try:
                 flywheel.STATE_PATH = str(state_path)
@@ -231,6 +256,7 @@ class ReconciliationTest(unittest.TestCase):
                     lambda name, after_ts=None: []
                 )
                 flywheel.Jules.delete = staticmethod(deleted.append)
+                flywheel.client_patch = lambda name: ""
                 flywheel.land = lambda patch, branch, title: (
                     False,
                     "git apply conflict in src/commonMain/Foo.kt",
@@ -247,6 +273,7 @@ class ReconciliationTest(unittest.TestCase):
                 flywheel.Jules.activities = old_activities
                 flywheel.Jules.delete = old_delete
                 flywheel.land = old_land
+                flywheel.client_patch = old_client_patch
                 flywheel.MAX_LIVE = old_max_live
                 sys.argv = old_argv
 

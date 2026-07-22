@@ -303,6 +303,23 @@ def change_set_patch(change_set):
         return nested if isinstance(nested, str) else ""
     return ""
 
+def client_patch(name):
+    session_id = name.split("/")[-1]
+    command = [os.environ.get("JULES_CLI", "jules"), "remote", "pull",
+               "--session", session_id]
+    try:
+        result = subprocess.run(command, cwd=REPO_PATH, capture_output=True,
+                                text=True, timeout=120)
+    except (OSError, subprocess.TimeoutExpired) as e:
+        print(f"  Jules client pull failed {name}: {e}", flush=True)
+        return ""
+    if result.returncode != 0:
+        print(f"  Jules client pull failed {name}: {result.stderr[:300]}",
+              flush=True)
+        return ""
+    patch_at = result.stdout.find("diff --git ")
+    return result.stdout[patch_at:] if patch_at >= 0 else ""
+
 RESEARCHER = (
     "You are the research spoke of a generic dev flywheel. The repo snapshot "
     "includes a 'doc/ work pool' section listing unchecked [ ] task items — "
@@ -438,37 +455,40 @@ def main():
                             sess["patches"].append({"changeSet": cs})
 
             state = sess["state"]
-            if state in ("COMPLETED", "FINISHED") and sess["patches"]:
-                cs = sess["patches"][-1]["changeSet"]
-                patch_text = change_set_patch(cs)
-                if not patch_text:
-                    Jules.delete(name); del live[name]; continue
-                fp = sess["work"]["fingerprint"]
-                branch = f"flywheel/{fp}"
-                ok, msg = land(patch_text, branch, sess["work"]["title"])
-                if ok:
-                    landed += 1
-                    outcomes.append({"title": sess["work"]["title"], "ok": True})
-                    print(f"  ✓ LANDED: {sess['work']['title']}", flush=True)
-                    Jules.delete(name); del live[name]
+            if state in ("COMPLETED", "FINISHED"):
+                api_patch = ""
+                if sess["patches"]:
+                    api_patch = change_set_patch(sess["patches"][-1]["changeSet"])
+                patch_text = client_patch(name) or api_patch
+                if patch_text:
+                    fp = sess["work"]["fingerprint"]
+                    branch = f"flywheel/{fp}"
+                    ok, msg = land(patch_text, branch, sess["work"]["title"])
+                    if ok:
+                        landed += 1
+                        outcomes.append({"title": sess["work"]["title"],
+                                         "ok": True, "fingerprint": fp})
+                        print(f"  ✓ LANDED: {sess['work']['title']}", flush=True)
+                        Jules.delete(name)
+                        del live[name]
+                    else:
+                        outcomes.append({"title": sess["work"]["title"],
+                                         "ok": False, "why": msg[:200],
+                                         "fingerprint": fp})
+                        pq.push(retry_work(sess, msg, patch_text))
+                        Jules.delete(name)
+                        del live[name]
+                        print(f"  ↻ gate red, requeued: {sess['work']['title']}: "
+                              f"{msg[:200]}", flush=True)
                 else:
-                    outcomes.append({"title": sess["work"]["title"],
-                                     "ok": False, "why": msg[:200],
+                    reason = "Jules reached a terminal state without a client or API patch"
+                    outcomes.append({"title": sess["work"]["title"], "ok": False,
+                                     "why": reason,
                                      "fingerprint": sess["work"].get("fingerprint")})
-                    pq.push(retry_work(sess, msg, patch_text))
+                    pq.push(retry_work(sess, reason))
                     Jules.delete(name)
                     del live[name]
-                    print(f"  ↻ gate red, requeued: {sess['work']['title']}: "
-                          f"{msg[:200]}", flush=True)
-            elif state in ("COMPLETED", "FINISHED"):
-                reason = "Jules reached a terminal state without emitting a gitPatch"
-                outcomes.append({"title": sess["work"]["title"], "ok": False,
-                                 "why": reason,
-                                 "fingerprint": sess["work"].get("fingerprint")})
-                pq.push(retry_work(sess, reason))
-                Jules.delete(name)
-                del live[name]
-                print(f"  ↻ no patch, requeued: {sess['work']['title']}", flush=True)
+                    print(f"  ↻ no patch, requeued: {sess['work']['title']}", flush=True)
             elif state == "FAILED":
                 reason = "Jules session failed before producing a landable patch"
                 outcomes.append({"title": sess["work"]["title"], "ok": False,
