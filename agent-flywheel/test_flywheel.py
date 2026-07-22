@@ -186,6 +186,17 @@ class WorkQueueTest(unittest.TestCase):
             "IN_PROGRESS", 2, "third question?", "second question?"
         ))
 
+    def test_questions_are_answered_only_for_awaiting_sessions(self):
+        self.assertFalse(flywheel.should_answer_question(
+            "IN_PROGRESS", "Should I continue?", None
+        ))
+        self.assertTrue(flywheel.should_answer_question(
+            "AWAITING_USER_FEEDBACK", "Which codec?", None
+        ))
+        self.assertFalse(flywheel.should_answer_question(
+            "AWAITING_USER_FEEDBACK", "Which codec?", "Which codec?"
+        ))
+
 
 class ReconciliationTest(unittest.TestCase):
     def test_completed_session_without_patch_is_removed_and_requeued(self):
