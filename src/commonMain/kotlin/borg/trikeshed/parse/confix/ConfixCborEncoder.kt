@@ -1,6 +1,6 @@
 package borg.trikeshed.parse.confix
 
-class ByteArrayBuilder(initialCapacity: Int = 32) {
+internal class ByteArrayBuilder(initialCapacity: Int = 32) {
     private var buffer = ByteArray(initialCapacity)
     var size = 0
         private set
