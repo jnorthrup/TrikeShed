@@ -21,7 +21,7 @@ class MmapCasStoreTest {
         val cid = store.put(bytes)
 
         // Read via getMapped
-        val mappedSeries = store.getMapped(cid)
+        val mappedSeries = store.get(cid)
         assertNotNull(mappedSeries)
         assertEquals(size, mappedSeries.a) // size
 
@@ -49,11 +49,15 @@ class MmapCasStoreTest {
         val store2 = MmapCasStore(tempFile)
         val retrieved1 = store2.get(cid1)
         assertNotNull(retrieved1)
-        assertTrue(data1.contentEquals(retrieved1))
+        val expected1 = data1.toList()
+        val actual1 = List(retrieved1.a) { retrieved1[it] }
+        assertEquals(expected1, actual1)
 
         val retrieved2 = store2.get(cid2)
         assertNotNull(retrieved2)
-        assertTrue(data2.contentEquals(retrieved2))
+        val expected2 = data2.toList()
+        val actual2 = List(retrieved2.a) { retrieved2[it] }
+        assertEquals(expected2, actual2)
 
         store2.close()
     }
