@@ -2,6 +2,7 @@ package borg.trikeshed.parse.confix
 
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
+import kotlin.test.fail
 
 class ConfixCborEncoderTest {
     @Test
