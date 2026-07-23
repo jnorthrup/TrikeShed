@@ -76,6 +76,40 @@ enum class FlywheelPhase(val order: Int, val label: String) {
  * Run with:
  *   ./gradlew jvmRun -PmainClass=borg.trikeshed.jules.FlywheelDriver
  */
+/** Poison threshold: NOON CST today. Branches/refs created after this wallclock are viable; older are poison. */
+private val noonCstToday: Long by lazy {
+    // CDTK: summer (DST) — no wonder it doesn't smell right. We'll compute it once per process.
+    val now = java.util.Calendar.getInstance()
+    now.set(java.util.Calendar.HOUR_OF_DAY, 12)
+    now.set(java.util.Calendar.MINUTE, 0)
+    now.set(java.util.Calendar.SECOND, 0)
+    now.set(java.util.Calendar.MILLISECOND, 0)
+    now.timeInMillis
+}
+
+/** True if a session capturedAt is stale (created before today's NOON CST threshold). */
+private fun isPoison(capturedAt: Long): Boolean =
+    capturedAt < noonCstToday
+
+/** POISON log tag (orange), e.g. "[FLYWHEEL] POISON session=… reason=pre-noon-CST". */
+private fun markPoison(reason: String, card: JulesSessionCard) {
+    println("[FLYWHEEL] POISON ${card.snapshot.sessionId.takeLast(6)} reason=$reason title=${card.card.title.take(50)}")
+}
+
+/**
+ * Apply pill logic to the completed set: skip drained-rejects whose capturedAt is before NOON CST today. The wheel
+ * releases those slots, the work won't be re-applied (reanimate in a new session citing the receipt), and induction
+ * proceeds on the day's tail. Cards in the session that ARE post-noon proceed normally.
+ */
+private fun dropPoisonedCompleted(allCompleted: List<JulesSessionCard>): List<JulesSessionCard> {
+    return allCompleted.filter { card ->
+        if (isPoison(card.snapshot.capturedAt)) {
+            markPoison("pre-noon-CST", card)
+            false
+        } else true
+    }
+}
+
 class FlywheelDriver(
     private val apiKey: String,
     private val repoDir: File = File(System.getProperty("user.dir")),
@@ -112,7 +146,9 @@ class FlywheelDriver(
         val awaiting = conductor.cards.values.filter {
             it.snapshot.state == "AWAITING_USER_FEEDBACK" &&
                 it.causes.lastOrNull() !is JulesCause.HumanAnswered
-        }.sortedBy { it.snapshot.capturedAt }
+        }
+        .filter { !isPoison(it.snapshot.capturedAt) }
+        .sortedBy { it.snapshot.capturedAt }
         for (card in awaiting) {
             val answer = buildAnswer(card)
             if (answer.isNotEmpty()) {
@@ -139,7 +175,7 @@ class FlywheelDriver(
         //    blob, and the optional prUrl ties it to the upstream PR/branch if one
         //    was fished from origin. Drains are serial: each commits onto master.
         var harvested = 0
-        val completed = conductor.cards.values.filter { it.snapshot.state == "COMPLETED" && !it.drained }
+        val completed = dropPoisonedCompleted(conductor.cards.values.filter { it.snapshot.state == "COMPLETED" && !it.drained })
         for (card in completed) {
             val sid = card.snapshot.sessionId
             val patch = client.lastPatch(sid)
