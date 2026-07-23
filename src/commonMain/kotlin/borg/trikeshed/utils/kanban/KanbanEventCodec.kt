@@ -51,6 +51,20 @@ object KanbanEventCodec {
             is JulesCause.PredicateFlipped -> { field("predicate", c.predicate); append(",\"nowPassing\":").append(c.nowPassing) }
             is JulesCause.SessionFailed -> field("reason", c.reason)
             is JulesCause.StateObserved -> { field("from", c.from); field("to", c.to) }
+            is JulesCause.WorkQueued -> {
+                field("workId", c.workId); field("tier", c.tier); field("title", c.title)
+                field("spec", c.spec)
+                c.parent?.let { field("parent", it) }
+                append(",\"score\":").append(c.score)
+            }
+            is JulesCause.WorkDispatched -> {
+                field("workId", c.workId); field("sessionId", c.sessionId)
+                append(",\"attempt\":").append(c.attempt)
+            }
+            is JulesCause.WorkDrained -> {
+                field("workId", c.workId); field("sessionId", c.sessionId)
+                field("commitSha", c.commitSha); field("taskId", c.taskId)
+            }
         }
         append('}')
     }
@@ -90,6 +104,28 @@ object KanbanEventCodec {
                     "DrainFailed" -> JulesCause.DrainFailed(m.str("reason"), at)
                     "PredicateFlipped" -> JulesCause.PredicateFlipped(m.str("predicate"), m["nowPassing"]?.toString() == "true", at)
                     "SessionFailed" -> JulesCause.SessionFailed(m.str("reason"), at)
+                    "WorkQueued" -> JulesCause.WorkQueued(
+                        workId = m.str("workId"),
+                        tier = m.str("tier"),
+                        title = m.str("title"),
+                        spec = m.str("spec"),
+                        parent = m["parent"]?.toString(),
+                        score = m["score"]?.toString()?.toDoubleOrNull() ?: 0.5,
+                        at = at,
+                    )
+                    "WorkDispatched" -> JulesCause.WorkDispatched(
+                        workId = m.str("workId"),
+                        sessionId = m.str("sessionId"),
+                        attempt = m.num("attempt").toInt(),
+                        at = at,
+                    )
+                    "WorkDrained" -> JulesCause.WorkDrained(
+                        workId = m.str("workId"),
+                        sessionId = m.str("sessionId"),
+                        commitSha = m.str("commitSha"),
+                        taskId = m.str("taskId"),
+                        at = at,
+                    )
                     else -> JulesCause.StateObserved(m.str("from"), m.str("to"), at)
                 }
                 CauseEvent(sid, cause)
@@ -107,6 +143,9 @@ object KanbanEventCodec {
         is JulesCause.PredicateFlipped -> "PredicateFlipped"
         is JulesCause.SessionFailed -> "SessionFailed"
         is JulesCause.StateObserved -> "StateObserved"
+        is JulesCause.WorkQueued -> "WorkQueued"
+        is JulesCause.WorkDispatched -> "WorkDispatched"
+        is JulesCause.WorkDrained -> "WorkDrained"
     }
 
     private fun Map<*, *>.str(k: String): String = this[k]?.toString() ?: ""

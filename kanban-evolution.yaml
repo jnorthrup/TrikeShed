@@ -1,0 +1,109 @@
+# kanban-evolution.yaml
+# Flywheel tasking ratios and FSM configuration.
+# 80/20 split: 12 project workers : 3 kanban-evolution workers.
+# Matches MAX_LIVE=15 with 3 slots reserved for pin/dedup/evolution work.
+
+max_live: 15
+
+ratios:
+  project: 12        # 80% — CBOR, SCTP, zero-consumer wiring, stubs, LCNC
+  kanban_evolution: 3  # 20% — snapshot, dedup, answerer, decomposer, state
+
+# Project work pool (80%)
+project_lanes:
+  - id: gate-confix-cbor
+    source: todo
+    tasks: [CBOR-1, CBOR-2, CBOR-3, CBOR-4, CBOR-5, CBOR-6]
+    max_concurrent: 3
+    priority: gate   # gates outrank all features
+
+  - id: gate-ngsctp
+    source: todo
+    tasks: [SCTP-1, SCTP-2, SCTP-3, SCTP-4, SCTP-5]
+    max_concurrent: 2
+    priority: gate
+
+  - id: wire-consumers
+    source: todo
+    tasks: [WIRE-DHT, WIRE-CRDT, WIRE-BTRFS, WIRE-DUCKDB, WIRE-ANIM, WIRE-FLAGS]
+    max_concurrent: 3
+    priority: high
+
+  - id: fill-stubs
+    source: todo
+    tasks: [STUB-CCEK-1, STUB-CCEK-2, STUB-ISAM-1, STUB-ISAM-2, STUB-BLACKBOARD-1, STUB-BLACKBOARD-2]
+    max_concurrent: 2
+    priority: medium
+
+  - id: lcnc-remaining
+    source: todo
+    tasks: [LCNC-RELATION, LCNC-PEOPLE, LCNC-FILES, T28]
+    max_concurrent: 2
+    priority: medium
+
+  - id: build-platform
+    source: todo
+    tasks: [BUILD-LINUX-POSIX, BUILD-KMP-CURSOR]
+    max_concurrent: 1
+    priority: low
+
+# Kanban evolution (20%)
+pin_lanes:
+  - id: kanban-evolve
+    source: todo
+    tasks: [KAN-EVOLVE-1, KAN-EVOLVE-2, KAN-EVOLVE-3, KAN-EVOLVE-4, KAN-EVOLVE-5, KAN-EVOLVE-6, KAN-EVOLVE-7]
+    max_concurrent: 3
+    priority: evolution
+
+# Dedup / pin ledger
+dont_redo:
+  source: dont-redo
+  rule: reject any proposed task whose title matches a dont-redo entry
+  reset_on_change: true   # if dont-redo file changes, reset dedup ledger
+
+# Brain roles (replaces 3 dead roles with 1 decomposer + answerer)
+brain:
+  decomposer:
+    trigger: when queue depth < max_live * 2
+    reads: [todo, dont-redo]
+    action: slice big items into Jules-sized specs (max 300 chars)
+    output: JSON list of {id, title, spec, lane}
+  
+  answerer:
+    trigger: session state == AWAITING_USER_FEEDBACK
+    conventions_source: doc/conventions.md
+    context: [task_title, task_spec, inquiry]
+    max_answers_per_session: 2
+    third_answer: confirmation_loop  # requeue + delete on 3rd distinct inquiry
+
+# Reconciliation rules
+reconciliation:
+  adopt_completed: true        # harvest COMPLETED/FINISHED sessions
+  skip_harvested: true         # skip sessions in harvested ledger
+  reset_ledger_on_dont_redo_change: true
+
+# Settlement gate
+settlement:
+  test_cmd: ./gradlew jvmTest --rerun-tasks --no-daemon
+  require_green: true
+  reject_noop: true
+  reject_deletion_dominant: true
+  reject_placeholders: true
+  on_land: move_todo_to_dont_redo
+
+# Snapshot config
+snapshot:
+  source: [todo, dont-redo]    # read flat files, not doc/todo.md
+  max_bytes: 4096              # cap at 4KB for brain context
+
+# State persistence
+state:
+  path: ~/.local/forge/flywheel/state.json
+  persist:
+    - queue
+    - live
+    - landed          # git-derived count, not manual counter
+    - harvested       # durable session-id ledger
+    - outcomes
+    - todo_checksum   # reset dedup when todo changes
+    - dont_redo_checksum

@@ -1,7 +1,7 @@
 package borg.trikeshed.lcnc.rollup
 
 import borg.trikeshed.lcnc.collections.associative.PropertyValue
-import borg.trikeshed.lcnc.reduction.*
+import borg.trikeshed.reduction.*
 import borg.trikeshed.lib.Series
 import kotlin.math.pow
 import kotlin.math.round

@@ -52,6 +52,9 @@ sealed class JulesCause {
     /** Board-minted serial: index of the activity in the session's ordered list. */
     open val activitySeq: Int? get() = null
 
+    /** Work id anchor for unified-queue causes (WorkQueued/WorkDispatched/WorkDrained). */
+    open val workId: String? get() = null
+
     /** Agent posted a progress/question message. */
     data class AgentMessaged(
         val excerpt: String,
@@ -90,6 +93,34 @@ sealed class JulesCause {
 
     /** Poll observed a state change with no finer-grained cause. */
     data class StateObserved(val from: String, val to: String, override val at: Long) : JulesCause()
+
+    /** Work item appended to the unified queue. workId is the dedup anchor. */
+    data class WorkQueued(
+        override val workId: String,
+        val tier: String,
+        val title: String,
+        val spec: String,
+        val parent: String? = null,
+        val score: Double = 0.5,
+        override val at: Long,
+    ) : JulesCause()
+
+    /** Queue item promoted to a Jules session. workId → sessionId is the delta. */
+    data class WorkDispatched(
+        override val workId: String,
+        val sessionId: String,
+        val attempt: Int,
+        override val at: Long,
+    ) : JulesCause()
+
+    /** Jules session merged locally; the work item is drained. */
+    data class WorkDrained(
+        override val workId: String,
+        val sessionId: String,
+        val commitSha: String,
+        val taskId: String,
+        override val at: Long,
+    ) : JulesCause()
 }
 
 /** Kanban lanes for the Jules conductor board. Order matters (left→right). */

@@ -92,6 +92,9 @@ sealed class Capability(val category: String) {
     data object ModelAll : Capability("modelmux*")
     data object BlackBoardAll : Capability("blackboard*")
     data object CustomAll : Capability("custom*")
+
+    data object Trajectory : Capability("trajectory") { override fun familyRoot() = TrajectoryAll }
+    data object TrajectoryAll : Capability("trajectory*")
 }
 
 /** Internal capability equality + family matching. */

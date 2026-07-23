@@ -1,5 +1,8 @@
 package borg.trikeshed.job
 
+import borg.trikeshed.parse.confix.Syntax
+import borg.trikeshed.parse.confix.ConfixIndexK
+import borg.trikeshed.parse.confix.facet
 import org.junit.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -20,8 +23,8 @@ class MmapCasStoreTest {
         val bytes = ByteArray(size) { (it % 256).toByte() }
         val cid = store.put(bytes)
 
-        // Read via getMapped
-        val mappedSeries = store.getMapped(cid)
+        // Read via get
+        val mappedSeries = store.get(cid)
         assertNotNull(mappedSeries)
         assertEquals(size, mappedSeries.a) // size
 
@@ -47,14 +50,42 @@ class MmapCasStoreTest {
         store.close()
 
         val store2 = MmapCasStore(tempFile)
+
         val retrieved1 = store2.get(cid1)
         assertNotNull(retrieved1)
-        assertTrue(data1.contentEquals(retrieved1))
+        assertEquals(data1.size, retrieved1.a)
+        for (i in data1.indices) {
+            assertEquals(data1[i], retrieved1[i])
+        }
 
         val retrieved2 = store2.get(cid2)
         assertNotNull(retrieved2)
-        assertTrue(data2.contentEquals(retrieved2))
+        assertEquals(data2.size, retrieved2.a)
+        for (i in data2.indices) {
+            assertEquals(data2[i], retrieved2[i])
+        }
 
         store2.close()
+    }
+
+    @Test
+    fun testMmapConfixIndexOverMappedBytes() {
+        val tempFile = Files.createTempFile("mmap-cas-store-confix", ".dat")
+        tempFile.toFile().deleteOnExit()
+        val store = MmapCasStore(tempFile)
+
+        val jsonStr = """{"hello": "world", "data": [1, 2, 3]}"""
+        val cid = store.put(jsonStr.encodeToByteArray())
+
+        val mappedSeries = store.get(cid)
+        assertNotNull(mappedSeries)
+
+        // Composes: mmap file -> Series<Byte> -> Confix index over mapped bytes without copy
+        val confixIndex = Syntax.JSON.scanIndex(mappedSeries)
+        val tags = confixIndex.facet(ConfixIndexK.Tags)
+
+        assertTrue(tags.a > 0)
+
+        store.close()
     }
 }

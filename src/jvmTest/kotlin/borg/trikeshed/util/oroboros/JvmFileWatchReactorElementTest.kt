@@ -84,5 +84,10 @@ class JvmFileWatchReactorElementTest {
            delay(100)
         }
         assertTrue(closed, "Channel must be closed after drain")
+ 
+        // Drain any remaining events (e.g. MODIFY after CREATE) that were queued before close
+        while (true) {
+            if (watcher.events.receiveCatching().isClosed) break
+        } 
     }
 }

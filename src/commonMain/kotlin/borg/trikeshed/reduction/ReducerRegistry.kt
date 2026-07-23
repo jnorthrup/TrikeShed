@@ -1,0 +1,41 @@
+package borg.trikeshed.reduction
+
+import borg.trikeshed.context.nuid.Capability
+import borg.trikeshed.reduction.TrajectoryReduction
+
+val borg.trikeshed.context.nuid.Capability.category: String
+    get() = when (this) {
+        is Capability.Process -> "process"
+        is Capability.Cas -> "cas"
+        is Capability.Wireproto -> "wireproto"
+        is Capability.Sctp -> "sctp"
+        is Capability.Model -> "modelmux"
+        is Capability.BlackBoard -> "blackboard"
+        is Capability.Trajectory -> "trajectory"
+        else -> "custom"
+    }
+
+object ReducerRegistry {
+    var registry: Map<String, LcncReduction<*, *, *, *>> = mapOf(
+        "process" to LcncReductions.forgeCascade(emptyList(), emptyList()),
+        "cas" to LcncReductions.confixParse(),
+        "wireproto" to LcncReductions.crmsFold(),
+        "trajectory" to TrajectoryReduction()
+    )
+
+    fun runFor(winningCapability: Capability, payload: Any?): Any? {
+        val reduction = registry[winningCapability.category] ?: return null
+
+        @Suppress("UNCHECKED_CAST")
+        val typedReduction = reduction as LcncReduction<Any, Any, Any, Any>
+        val typedCarrierAlg = typedReduction.carrierAlg
+
+        val carrier = if (payload != null) {
+            typedCarrierAlg.carrier(payload)
+        } else {
+            emptySeriesCarrier()
+        }
+
+        return typedReduction.execute(carrier)
+    }
+}

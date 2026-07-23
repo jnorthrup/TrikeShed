@@ -40,10 +40,32 @@ class JulesBoardStore(
         }
     }
 
+    /**
+     * Append a work-queue cause (WorkQueued/WorkDispatched/WorkDrained) under the
+     * workId as the WAL key. Idempotent on (workId, kind): a second WorkQueued for
+     * the same workId is a no-op.
+     */
+    suspend fun appendWork(workId: String, cause: JulesCause) {
+        wal.append(workId, KanbanEventCodec.encodeCause(workId, cause).encodeToByteArray())
+    }
+
+    fun replayCauses(workId: String): List<JulesCause> {
+        val causes = mutableListOf<JulesCause>()
+        for ((key, payload) in wal.replay()) {
+            if (key == workId) {
+                val decoded = KanbanEventCodec.decode(payload.decodeToString())
+                if (decoded is KanbanEventCodec.CauseEvent) {
+                    causes.add(decoded.cause)
+                }
+            }
+        }
+        return causes
+    }
+
     /** Fold the log into cards. Card state is a projection; the log is truth. */
     fun load(): MutableMap<String, JulesSessionCard> {
-        val snapshots = HashMap<String, KanbanEventCodec.SnapEvent>()
-        val causes = HashMap<String, MutableList<JulesCause>>()
+        val snapshots = mutableMapOf<String, KanbanEventCodec.SnapEvent>()
+        val causes = mutableMapOf<String, MutableList<JulesCause>>()
         for ((sid, payload) in wal.replay()) {
             when (val ev = KanbanEventCodec.decode(payload.decodeToString())) {
                 is KanbanEventCodec.SnapEvent -> snapshots[sid] = ev
@@ -51,7 +73,7 @@ class JulesBoardStore(
                 null -> {} // forward-compat: skip unknown record shapes
             }
         }
-        val board = HashMap<String, JulesSessionCard>()
+        val board = mutableMapOf<String, JulesSessionCard>()
         for ((sid, snap) in snapshots) {
             val card = JulesSessionCard.capture(snap.snapshot)
             board[sid] = card.copy(
@@ -61,4 +83,64 @@ class JulesBoardStore(
         }
         return board
     }
+
+    /**
+     * Fold the work-cause records into a queue projection keyed by workId.
+     *
+     * State per workId is derived: latest WorkQueued wins, WorkDispatched attaches
+     * a sessionId, WorkDrained marks drained. This is the unified queue — dispatch
+     * reads from here, not from a separate state.json.
+     */
+    fun loadQueue(): List<QueueEntry> {
+        val byWorkId = mutableMapOf<String, QueueEntry>()
+        for ((workId, payload) in wal.replay()) {
+            val ev = KanbanEventCodec.decode(payload.decodeToString()) as? KanbanEventCodec.CauseEvent ?: continue
+            val c = ev.cause
+            when (c) {
+                is JulesCause.WorkQueued -> byWorkId.getOrPut(c.workId) {
+                    QueueEntry(
+                        workId = c.workId,
+                        tier = c.tier,
+                        title = c.title,
+                        spec = c.spec,
+                        parent = c.parent,
+                        score = c.score,
+                        queuedAt = c.at,
+                    )
+                }
+                is JulesCause.WorkDispatched -> byWorkId[c.workId]?.let {
+                    byWorkId[c.workId] = it.copy(sessionId = c.sessionId, attempt = c.attempt, dispatchedAt = c.at)
+                }
+                is JulesCause.WorkDrained -> byWorkId[c.workId]?.let {
+                    byWorkId[c.workId] = it.copy(
+                        commitSha = c.commitSha,
+                        taskId = c.taskId,
+                        drainedAt = c.at,
+                    )
+                }
+                else -> {} // session-cause records do not carry workId; skip
+            }
+        }
+        return byWorkId.values.toList()
+    }
+}
+
+/** Queue entry projected from the unified WAL. */
+data class QueueEntry(
+    val workId: String,
+    val tier: String,
+    val title: String,
+    val spec: String,
+    val parent: String? = null,
+    val score: Double = 0.5,
+    val queuedAt: Long = 0L,
+    val sessionId: String? = null,
+    val attempt: Int = 0,
+    val dispatchedAt: Long? = null,
+    val commitSha: String? = null,
+    val taskId: String? = null,
+    val drainedAt: Long? = null,
+) {
+    val isDispatched: Boolean get() = sessionId != null
+    val isDrained: Boolean get() = drainedAt != null
 }

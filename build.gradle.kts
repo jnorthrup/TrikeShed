@@ -321,7 +321,7 @@ if (!focusedTransportSlice) {
             kotlin.exclude("**/userspace/**")
             kotlin.exclude("**/ipfs/**")
             kotlin.exclude("**/quic/**")
-            kotlin.exclude("**/sctp/**")
+            // kotlin.exclude("**/sctp/**")
             kotlin.exclude("**/window/**")
             kotlin.exclude("**/htx/**")
             // Stale against current CouchStore/CouchAttachmentGateway/Htx APIs; re-enable after reconciliation.
@@ -448,6 +448,15 @@ tasks.register<JavaExec>("printForgeGallery") {
     description = "Print the Forge widget gallery catalog and blackboard view to stdout."
     dependsOn("compileKotlinJvm")
     mainClass.set("borg.trikeshed.forge.gallery.ForgeGalleryPrinterKt")
+    classpath(tasks.named("jvmJar"), configurations.getByName("jvmRuntimeClasspath"))
+}
+
+// TrajectoryReduction CLI — fold JulesCause chains into freeze verdicts
+tasks.register<JavaExec>("trajectoryReduction") {
+    group = "oroboros"
+    description = "Run TrajectoryReduction: fold JulesCause trajectory into freeze verdict."
+    dependsOn("jvmJar")
+    mainClass.set("borg.trikeshed.lcnc.reduction.TrajectoryReductionCliKt")
     classpath(tasks.named("jvmJar"), configurations.getByName("jvmRuntimeClasspath"))
 }
 

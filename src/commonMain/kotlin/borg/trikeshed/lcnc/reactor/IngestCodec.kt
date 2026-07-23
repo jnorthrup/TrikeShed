@@ -7,7 +7,7 @@ package borg.trikeshed.lcnc.reactor
 import borg.trikeshed.lcnc.isam.LcncEntity
 import borg.trikeshed.lib.Series
 import borg.trikeshed.lib.emptySeriesOf
-import borg.trikeshed.lcnc.reduction.j
+import borg.trikeshed.reduction.j
 
 /**
  * Reactor asynchronous gems for parsing and digesting various formats.
