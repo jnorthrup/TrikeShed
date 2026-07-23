@@ -2,6 +2,7 @@ package borg.trikeshed.parse.confix
 
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
+import kotlin.test.fail
 
 class ConfixCborEncoderTest {
     @Test
@@ -28,6 +29,21 @@ class ConfixCborEncoderTest {
         assertContentEquals(bytes(0x3a, 0xff, 0xff, 0xff, 0xff), emit(ConfixPrimitive((-4294967296L).toString(), false)))
         assertContentEquals(bytes(0x3b, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00), emit(ConfixPrimitive((-4294967297L).toString(), false)))
         assertContentEquals(bytes(0x3b, 0x7f, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff), emit(ConfixPrimitive(Long.MIN_VALUE.toString(), false)))
+    }
+
+    @Test
+    fun testBoolNullFloat() {
+        assertContentEquals(bytes(0xf4), emit(ConfixPrimitive("false", false)))
+        assertContentEquals(bytes(0xf5), emit(ConfixPrimitive("true", false)))
+        assertContentEquals(bytes(0xf6), emit(ConfixNull))
+
+        // Float64
+        // 1.5 in IEEE 754 float64 is 0x3ff8000000000000
+        assertContentEquals(bytes(0xfb, 0x3f, 0xf8, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00), emit(ConfixPrimitive("1.5", false)))
+        // -1.5 is 0xbff8000000000000
+        assertContentEquals(bytes(0xfb, 0xbf, 0xf8, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00), emit(ConfixPrimitive("-1.5", false)))
+        // 0.0 is 0x0000000000000000
+        assertContentEquals(bytes(0xfb, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00), emit(ConfixPrimitive("0.0", false)))
     }
 
     private fun emit(element: ConfixElement): ByteArray = ConfixCborEmitter.emit(element)
