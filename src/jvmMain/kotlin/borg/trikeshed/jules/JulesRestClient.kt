@@ -161,7 +161,7 @@ class JulesRestClient(
      * answer as a fresh user event), or null if the response carried no id.
      */
     fun sendMessage(sessionId: String, message: String): String? {
-        val resp = post("/sessions/$sessionId:sendMessage", """{"message": ${jsonString(message)}}""")
+        val resp = post("/sessions/$sessionId:sendMessage", """{"prompt": ${jsonString(message)}}""")
         val parsed = JsonSupport.parse(resp) as? Map<*, *> ?: return null
         return parsed["name"]?.toString()?.substringAfterLast('/')
     }
