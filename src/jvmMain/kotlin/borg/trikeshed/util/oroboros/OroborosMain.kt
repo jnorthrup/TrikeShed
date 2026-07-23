@@ -30,17 +30,23 @@ fun main(args: Array<String>) = runBlocking {
     printSummary(runtime.ingest(), options, 0)
     if (!options.watch) return@runBlocking
 
-    val watcher = JvmFileWatchReactorElement(options.source, coroutineContext[Job])
+    val watcher = JvmFileWatchReactorElement(
+        options.source,
+        coroutineContext[Job],
+    )
     watcher.open()
     try {
-        for (first in watcher.events) {
-            var changeCount = 1
-            while (withTimeoutOrNull(options.intervalMillis) {
+        while (true) {
+            val first = watcher.events.receiveCatching().getOrNull() ?: break
+            val batch = mutableListOf(first)
+            while (true) {
+                val next = withTimeoutOrNull(options.intervalMillis) {
                     watcher.events.receiveCatching().getOrNull()
-                } != null) {
-                changeCount++
+                } ?: break
+                batch.add(next)
             }
-            printSummary(runtime.ingest(), options, changeCount)
+            val summary = runtime.ingest()
+            printSummary(summary, options, batch.size)
         }
     } finally {
         watcher.drain()
@@ -182,7 +188,11 @@ private class OroborosJvmRuntime(private val options: OroborosOptions) {
 
 private fun parseOptions(args: Array<String>): OroborosOptions {
     var source = JvmFileOperations().cwd()
-    var home = ForgeHome.defaultHome
+    // Storage root is fixed: ForgeHome.defaultHome.
+    // Override via OROBOROS_HOME env var (the documented deployment seam).
+    // No --home CLI flag — silently allowing per-call roots scatters manifests
+    // across $HOME/.local/forge_home, $HOME/.local/forge, etc.
+    val home = ForgeHome.defaultHome
     var agent = "trikeshed"
     var watch = false
     var intervalMillis = 2_000L
@@ -190,11 +200,10 @@ private fun parseOptions(args: Array<String>): OroborosOptions {
     while (index < args.size) {
         when (val arg = args[index]) {
             "--source" -> source = args.valueAfter(index++, arg)
-            "--home" -> home = args.valueAfter(index++, arg)
             "--agent" -> agent = args.valueAfter(index++, arg)
             "--interval-ms" -> intervalMillis = args.valueAfter(index++, arg).toLong()
             "--watch" -> watch = true
-            else -> error("Unknown Oroboros option: $arg")
+            else -> error("Unknown Oroboros option: $arg (storage root is fixed at $home; set OROBOROS_HOME to override)")
         }
         index++
     }

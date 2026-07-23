@@ -23,26 +23,33 @@ class JulesConductor(
     private val client: JulesRestClient,
     private val headShaProvider: () -> String,
     private val store: JulesBoardStore? = null,
+    private val source: String = "sources/github/jnorthrup/TrikeShed",
 ) {
     /** Cards keyed by session id. The board. Projection of the causal log. */
     val cards: MutableMap<String, JulesSessionCard> = store?.load() ?: mutableMapOf()
 
     /** One poll cycle: snapshot surroundings, diff, record causes, persist. */
     suspend fun pollOnce() {
-        val sessions = client.listSessions()
+        val sessions = client.listSessions(source)
+        // The WAL may predate source isolation. Never retain a replayed card
+        // unless the authoritative Jules source currently owns that session.
+        val authoritativeIds = sessions.mapTo(mutableSetOf()) { it.id }
+        cards.keys.retainAll(authoritativeIds)
         val active = sessions.count { it.state == "IN_PROGRESS" || it.state == "PLANNING" || it.state == "QUEUED" }
         val awaiting = sessions.count { it.state == "AWAITING_USER_FEEDBACK" }
         val headSha = headShaProvider()
         for (s in sessions) {
             val existing = cards[s.id]
             val stateChanged = existing != null && existing.snapshot.state != s.state
-            // Activities are fetched only when needed: COMPLETED sessions (patch
-            // accounting) and state transitions (cause anchoring). Steady-state
-            // sessions cost zero extra calls.
-            val acts = if (s.state == "COMPLETED" || (stateChanged && s.state == "AWAITING_USER_FEEDBACK"))
+            // COMPLETED and AWAITING sessions can both carry cumulative patches.
+            // Fetch them on every poll: retaining a stale zero makes a patch-bearing
+            // awaiting card look empty and can route it to the wrong paddle.
+            val acts = if (s.state == "COMPLETED" || s.state == "AWAITING_USER_FEEDBACK")
                 client.activities(s.id) else emptyList()
             // changeSets are cumulative per activity — the last non-zero carries the total.
-            val patchBytes = acts.lastOrNull { it.patchBytes > 0 }?.patchBytes ?: 0L
+            val patchBytes = acts.lastOrNull { it.patchBytes > 0 }?.patchBytes
+                ?: existing?.snapshot?.patchBytes
+                ?: 0L
             val snap = JulesSnapshot(
                 sessionId = s.id,
                 state = s.state,
@@ -134,6 +141,7 @@ class JulesConductor(
                         .start().inputStream.bufferedReader().readText().trim()
                 },
                 store = JulesBoardStore(wal),
+                source = "sources/github/jnorthrup/TrikeShed",
             )
             kotlinx.coroutines.runBlocking {
                 if (once) {

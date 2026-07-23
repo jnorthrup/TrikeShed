@@ -45,106 +45,114 @@ class JulesRestClient(
         val excerpt: String,    // first 140 chars of the message body, if any
     )
 
-    /** List all sessions (pageSize 100). */
-    fun listSessions(): List<SessionInfo> {
-        val body = get("/sessions?pageSize=100")
-        val parsed = JsonSupport.parse(body) as? Map<*, *> ?: return emptyList()
-        val sessions = parsed["sessions"] as? List<*> ?: return emptyList()
-        return sessions.mapNotNull { s ->
-            val m = s as? Map<*, *> ?: return@mapNotNull null
-            val name = m["name"]?.toString() ?: return@mapNotNull null
-            SessionInfo(
-                id = name.substringAfterLast('/'),
-                state = m["state"]?.toString() ?: "UNKNOWN",
-                title = m["title"]?.toString() ?: "",
-                patchBytes = 0L, // filled by patchProbe for COMPLETED sessions
-                source = ((m["sourceContext"] as? Map<*, *>)?.get("source"))?.toString() ?: "",
-                updateTime = m["updateTime"]?.toString() ?: m["createTime"]?.toString() ?: "",
-            )
-        }
+    /**
+     * List sessions across every API page, optionally constrained to one exact
+     * Jules source. Empty/missing source values never match a requested source:
+     * adopting them would let patches from another repository cross the tenant
+     * boundary and reach this repository's settlement gate.
+     */
+    fun listSessions(source: String? = null): List<SessionInfo> {
+        val out = mutableListOf<SessionInfo>()
+        var pageToken: String? = null
+        do {
+            val path = buildString {
+                append("/sessions?pageSize=100")
+                if (!pageToken.isNullOrEmpty()) append("&pageToken=${java.net.URLEncoder.encode(pageToken, Charsets.UTF_8)}")
+            }
+            val parsed = JsonSupport.parse(get(path)) as? Map<*, *> ?: break
+            val sessions = parsed["sessions"] as? List<*> ?: emptyList<Any?>()
+            for (s in sessions) {
+                val m = s as? Map<*, *> ?: continue
+                val name = m["name"]?.toString() ?: continue
+                val sessionSource = ((m["sourceContext"] as? Map<*, *>)?.get("source"))?.toString() ?: ""
+                if (source != null && sessionSource != source) continue
+                out += SessionInfo(
+                    id = name.substringAfterLast('/'),
+                    state = m["state"]?.toString() ?: "UNKNOWN",
+                    title = m["title"]?.toString() ?: "",
+                    patchBytes = 0L, // filled from activities for COMPLETED sessions
+                    source = sessionSource,
+                    updateTime = m["updateTime"]?.toString() ?: m["createTime"]?.toString() ?: "",
+                )
+            }
+            pageToken = parsed["nextPageToken"]?.toString()?.takeIf { it.isNotBlank() }
+        } while (pageToken != null)
+        return out
     }
 
     /** Ordered activities for a session, each carrying its minted serial. */
     fun activities(sessionId: String): List<ActivityInfo> {
-        val body = get("/sessions/$sessionId/activities?pageSize=100")
-        val parsed = JsonSupport.parse(body) as? Map<*, *> ?: return emptyList()
-        val raw = parsed["activities"] as? List<*> ?: return emptyList()
+        val raw = activityMaps(sessionId)
         val out = ArrayList<ActivityInfo>(raw.size)
-        var seq = 0
-        for (a in raw) {
-            val m = a as? Map<*, *> ?: continue
+        for ((seq, m) in raw.withIndex()) {
             val name = m["name"]?.toString() ?: continue
             var kind = "unknown"
-            var patch = 0L
             for (k in listOf("agentMessaged", "userMessaged", "planGenerated", "progressUpdated")) {
                 if (m.containsKey(k)) { kind = k; break }
             }
             val msgBody = when (kind) {
                 "agentMessaged" -> (m["agentMessaged"] as? Map<*, *>)?.get("agentMessage")?.toString()
                 "userMessaged" -> (m["userMessaged"] as? Map<*, *>)?.get("userMessage")?.toString()
+                "progressUpdated" -> (m["progressUpdated"] as? Map<*, *>)?.let { p ->
+                    listOfNotNull(p["title"]?.toString(), p["description"]?.toString())
+                        .joinToString(": ")
+                        .takeIf { it.isNotBlank() }
+                }
                 else -> null
             }
-            val artifacts = m["artifacts"] as? List<*>
-            if (artifacts != null) {
-                if (kind == "unknown") kind = "artifacts"
-                for (art in artifacts) {
-                    val am = art as? Map<*, *> ?: continue
-                    val cs = am["changeSet"] as? Map<*, *> ?: continue
-                    val gp = cs["gitPatch"] as? Map<*, *> ?: continue
-                    patch += (gp["unidiffPatch"]?.toString()?.length ?: 0).toLong()
-                }
-            }
+            val patches = patchTexts(m)
+            if (patches.isNotEmpty() && kind == "unknown") kind = "artifacts"
             out += ActivityInfo(
                 id = name.substringAfterLast('/'),
-                seq = seq++,
+                seq = seq,
                 createTime = m["createTime"]?.toString() ?: "",
                 originator = m["originator"]?.toString() ?: "unknown",
                 kind = kind,
-                patchBytes = patch,
+                patchBytes = patches.lastOrNull()?.length?.toLong() ?: 0L,
                 excerpt = msgBody?.take(140) ?: "",
             )
         }
         return out
     }
 
-    /** Sum of unidiff patch bytes across a session's artifacts. */
-    fun patchProbe(sessionId: String): Long {
-        val body = get("/sessions/$sessionId/activities?pageSize=100")
-        val parsed = JsonSupport.parse(body) as? Map<*, *> ?: return 0L
-        val activities = parsed["activities"] as? List<*> ?: return 0L
-        var total = 0L
-        for (a in activities) {
-            val m = a as? Map<*, *> ?: continue
-            val artifacts = m["artifacts"] as? List<*> ?: continue
-            for (art in artifacts) {
-                val am = art as? Map<*, *> ?: continue
-                val cs = am["changeSet"] as? Map<*, *> ?: continue
-                val gp = cs["gitPatch"] as? Map<*, *> ?: continue
-                val p = gp["unidiffPatch"]?.toString() ?: continue
-                total += p.length.toLong()
-            }
-        }
-        return total
-    }
+    /** Byte length of the latest cumulative patch. */
+    fun patchProbe(sessionId: String): Long = lastPatch(sessionId)?.length?.toLong() ?: 0L
 
     /** Last activity's cumulative patch (the only one worth applying). */
-    fun lastPatch(sessionId: String): String? {
-        val body = get("/sessions/$sessionId/activities?pageSize=100")
-        val parsed = JsonSupport.parse(body) as? Map<*, *> ?: return null
-        val activities = parsed["activities"] as? List<*> ?: return null
-        var last: String? = null
-        for (a in activities) {
-            val m = a as? Map<*, *> ?: continue
-            val artifacts = m["artifacts"] as? List<*> ?: continue
-            for (art in artifacts) {
-                val am = art as? Map<*, *> ?: continue
-                val cs = am["changeSet"] as? Map<*, *> ?: continue
-                val gp = cs["gitPatch"] as? Map<*, *> ?: continue
-                val p = gp["unidiffPatch"]?.toString() ?: continue
-                last = p
+    fun lastPatch(sessionId: String): String? =
+        activityMaps(sessionId).asSequence().flatMap { patchTexts(it).asSequence() }.lastOrNull()
+
+    /** Fetch every chronological activity page; sequence numbers are minted afterwards. */
+    private fun activityMaps(sessionId: String): List<Map<*, *>> {
+        val out = mutableListOf<Map<*, *>>()
+        var pageToken: String? = null
+        do {
+            val path = buildString {
+                append("/sessions/$sessionId/activities?pageSize=100")
+                if (!pageToken.isNullOrEmpty()) append("&pageToken=${java.net.URLEncoder.encode(pageToken, Charsets.UTF_8)}")
             }
+            val parsed = JsonSupport.parse(get(path)) as? Map<*, *> ?: break
+            val page = parsed["activities"] as? List<*> ?: emptyList<Any?>()
+            page.mapNotNullTo(out) { it as? Map<*, *> }
+            pageToken = parsed["nextPageToken"]?.toString()?.takeIf { it.isNotBlank() }
+        } while (pageToken != null)
+        return out
+    }
+
+    /** Normalize both live gitPatch shapes: string and {unidiffPatch: string}. */
+    private fun patchTexts(activity: Map<*, *>): List<String> {
+        val out = mutableListOf<String>()
+        val artifacts = activity["artifacts"] as? List<*> ?: return out
+        for (artifact in artifacts) {
+            val changeSet = (artifact as? Map<*, *>)?.get("changeSet") as? Map<*, *> ?: continue
+            val patch = when (val gitPatch = changeSet["gitPatch"]) {
+                is String -> gitPatch
+                is Map<*, *> -> gitPatch["unidiffPatch"]?.toString()
+                else -> null
+            }
+            if (!patch.isNullOrEmpty()) out += patch
         }
-        return last
+        return out
     }
 
     /**
@@ -153,7 +161,7 @@ class JulesRestClient(
      * answer as a fresh user event), or null if the response carried no id.
      */
     fun sendMessage(sessionId: String, message: String): String? {
-        val resp = post("/sessions/$sessionId:sendMessage", """{"message": ${jsonString(message)}}""")
+        val resp = post("/sessions/$sessionId:sendMessage", """{"prompt": ${jsonString(message)}}""")
         val parsed = JsonSupport.parse(resp) as? Map<*, *> ?: return null
         return parsed["name"]?.toString()?.substringAfterLast('/')
     }

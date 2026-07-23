@@ -13,7 +13,12 @@ class JvmFileWatchReactorElementTest {
     @Test
     fun emitsCreateAndDrainsClosed() = runBlocking {
         val root = Files.createTempDirectory("oroboros-watch-")
-        val watcher = JvmFileWatchReactorElement(root.toString(), coroutineContext[kotlinx.coroutines.Job])
+        val watcher = JvmFileWatchReactorElement(
+            root.toString(),
+            coroutineContext[kotlinx.coroutines.Job],
+            includeGlobs = emptyList(),
+            excludeGlobs = emptyList(),
+        )
         try {
             watcher.open()
             val received = async {
@@ -33,5 +38,37 @@ class JvmFileWatchReactorElementTest {
         while (true) {
             if (watcher.events.receiveCatching().isClosed) break
         }
+    }
+
+    @Test
+    fun globAcceptsGitPathsAndRejectsKotlinSources() {
+        // Default include/exclude — what OroborosMain uses unless overridden.
+        val glob = PathGlob(
+            includeGlobs = listOf(".git/**"),
+            excludeGlobs = listOf("**" + "/" + "*.kt"),
+        )
+
+        // `.git/**` accepted (loose objects, packs, refs).
+        assertEquals(true, glob.accepts(".git/objects/aa/bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"))
+        assertEquals(true, glob.accepts(".git/refs/heads/master"))
+        assertEquals(true, glob.accepts(".git/packed-refs"))
+
+        // Source code rejected (the "code checked in").
+        kotlin.test.assertEquals(false, glob.accepts("src/main/kotlin/Foo.kt"))
+        kotlin.test.assertEquals(false, glob.accepts("src/commonMain/OroborosMain.kt"))
+
+        // Non-git, non-kt files are not in the include glob — rejected.
+        kotlin.test.assertEquals(false, glob.accepts("README.md"))
+        kotlin.test.assertEquals(false, glob.accepts("data.json"))
+
+        // Empty includes = accept everything (broad test mode).
+        val noFilter = PathGlob(emptyList(), emptyList())
+        kotlin.test.assertEquals(true, noFilter.accepts("anything/at/all.kt"))
+        kotlin.test.assertEquals(true, noFilter.accepts("README.md"))
+
+        // Empty includes + non-empty excludes — accept everything NOT in excludes.
+        val exclusionsOnly = PathGlob(emptyList(), listOf("**" + "/" + "*.kt"))
+        kotlin.test.assertEquals(true, exclusionsOnly.accepts("README.md"))
+        kotlin.test.assertEquals(false, exclusionsOnly.accepts("src/foo.kt"))
     }
 }
