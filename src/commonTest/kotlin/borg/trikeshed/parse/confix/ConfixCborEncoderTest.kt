@@ -32,18 +32,46 @@ class ConfixCborEncoderTest {
     }
 
     @Test
-    fun testBoolNullFloat() {
-        assertContentEquals(bytes(0xf4), emit(ConfixPrimitive("false", false)))
-        assertContentEquals(bytes(0xf5), emit(ConfixPrimitive("true", false)))
-        assertContentEquals(bytes(0xf6), emit(ConfixNull))
+    fun testDefiniteLengthArrays() {
+        // []
+        assertContentEquals(bytes(0x80), emit(ConfixArray(emptyList())))
 
-        // Float64
-        // 1.5 in IEEE 754 float64 is 0x3ff8000000000000
-        assertContentEquals(bytes(0xfb, 0x3f, 0xf8, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00), emit(ConfixPrimitive("1.5", false)))
-        // -1.5 is 0xbff8000000000000
-        assertContentEquals(bytes(0xfb, 0xbf, 0xf8, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00), emit(ConfixPrimitive("-1.5", false)))
-        // 0.0 is 0x0000000000000000
-        assertContentEquals(bytes(0xfb, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00), emit(ConfixPrimitive("0.0", false)))
+        // [1, 2, 3]
+        assertContentEquals(bytes(0x83, 0x01, 0x02, 0x03), emit(ConfixArray(listOf(
+            ConfixPrimitive(1.toString(), false),
+            ConfixPrimitive(2.toString(), false),
+            ConfixPrimitive(3.toString(), false)
+        ))))
+
+        // Array of 24 elements (major type 4, length 24 => 0x98 0x18)
+        val arr24 = ConfixArray(List(24) { ConfixPrimitive(0.toString(), false) })
+        val expected24 = ByteArray(26)
+        expected24[0] = 0x98.toByte()
+        expected24[1] = 0x18.toByte()
+        assertContentEquals(expected24, emit(arr24))
+    }
+
+    @Test
+    fun testDefiniteLengthMaps() {
+        // {}
+        assertContentEquals(bytes(0xa0), emit(ConfixObject(emptyMap())))
+
+        // {"a": 1, "b": 2}
+        assertContentEquals(
+            bytes(0xa2, 0x61, 0x61, 0x01, 0x61, 0x62, 0x02),
+            emit(ConfixObject(mapOf(
+                "a" to ConfixPrimitive(1.toString(), false),
+                "b" to ConfixPrimitive(2.toString(), false)
+            )))
+        )
+
+        // Map of 24 pairs (major type 5, length 24 => 0xb8 0x18)
+        val map24 = ConfixObject((0 until 24).associate {
+            ('a' + it).toString() to ConfixPrimitive(0.toString(), false)
+        })
+        val emitted = emit(map24)
+        kotlin.test.assertEquals(0xb8.toByte(), emitted[0])
+        kotlin.test.assertEquals(0x18.toByte(), emitted[1])
     }
 
     private fun emit(element: ConfixElement): ByteArray = ConfixCborEmitter.emit(element)

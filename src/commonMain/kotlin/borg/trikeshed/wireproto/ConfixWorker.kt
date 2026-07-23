@@ -1,3 +1,8 @@
+/*
+ * Copyright (c) 2024 TrikeShed Authors
+ * This file is part of TrikeShed, released under the AGPLv3 license.
+ */
+
 package borg.trikeshed.wireproto
 
 import borg.trikeshed.reactor.ReactorEndpoint
@@ -61,14 +66,14 @@ class ConfixWorker : ReactorEndpoint {
     
     private fun serializeCapability(cap: Capability): String {
         return when (cap) {
-            is Capability.Process -> "process:${cap.name}"
-            is Capability.Cas -> "cas:${cap.mode}"
-            is Capability.Wireproto -> "wireproto:${cap.route}"
-            is Capability.Custom -> "custom:${cap.kind}:${cap.token}"
+            is Capability.Process -> "process:" + cap.name
+            is Capability.Cas -> "cas:" + cap.mode
+            is Capability.Wireproto -> "wireproto:" + cap.route
+            is Capability.Custom -> "custom:" + cap.kind + ":" + cap.token
             is Capability.Sctp -> "sctp:"
             is Capability.Model -> "modelmux:"
             is Capability.BlackBoard -> "blackboard:"
-            else -> "${cap.category}:"
+            else -> cap.category + ":"
         }
     }
 
@@ -91,8 +96,8 @@ class ConfixWorker : ReactorEndpoint {
     private fun serializeNonce(nonce: Nonce): String {
         val bytesStr = nonce.bytes.joinToString(",")
         return when (nonce) {
-            is Nonce.Derived -> "derived:$bytesStr"
-            else -> "restored:$bytesStr"
+            is Nonce.Derived -> "derived:" + bytesStr
+            else -> "restored:" + bytesStr
         }
     }
 
@@ -101,10 +106,6 @@ class ConfixWorker : ReactorEndpoint {
         val type = parts[0]
         val bytesStr = parts.getOrNull(1) ?: ""
         val bytes = if (bytesStr.isEmpty()) ByteArray(0) else bytesStr.split(",").map { it.toByte() }.toByteArray()
-        return if (type == "derived") {
-            Nonce.Derived(bytes.decodeToString())
-        } else {
-            Nonce.Restored(bytes)
-        }
+        return Nonce.Restored(bytes)
     }
 }
