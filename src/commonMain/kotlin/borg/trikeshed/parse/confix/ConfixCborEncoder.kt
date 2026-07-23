@@ -39,42 +39,48 @@ internal object ConfixCborEmitter {
             ConfixNull -> out.write(0xF6)
             is ConfixPrimitive -> {
                 val v = e.content
-                val bool = e.booleanOrNull
 
-                // Try ULong first for positive integers including very large ones
-                val ulong = v.toULongOrNull()
-                // Try Long for negative integers
-                val long = v.toLongOrNull()
-                val dbl = v.toDoubleOrNull()
-                when {
-                    bool != null -> out.write(if (bool) 0xF5 else 0xF4)
-                    ulong != null -> {
-                        writeHead(out, 0, ulong)
-                    }
-                    long != null -> {
-                        if (long >= 0) {
-                            writeHead(out, 0, long.toULong())
-                        } else {
-                            val magnitude = (-1L - long).toULong()
-                            writeHead(out, 1, magnitude)
+                if (e.isString) {
+                    val b = v.encodeToByteArray()
+                    writeHead(out, 3, b.size.toULong())
+                    out.write(b)
+                } else {
+                    val bool = e.booleanOrNull
+                    // Try ULong first for positive integers including very large ones
+                    val ulong = v.toULongOrNull()
+                    // Try Long for negative integers
+                    val long = v.toLongOrNull()
+                    val dbl = v.toDoubleOrNull()
+                    when {
+                        bool != null -> out.write(if (bool) 0xF5 else 0xF4)
+                        ulong != null -> {
+                            writeHead(out, 0, ulong)
                         }
-                    }
-                    dbl != null -> {
-                        out.write(0xFB)
-                        val bits = dbl.toBits()
-                        out.write((bits ushr 56).toInt() and 0xFF)
-                        out.write((bits ushr 48).toInt() and 0xFF)
-                        out.write((bits ushr 40).toInt() and 0xFF)
-                        out.write((bits ushr 32).toInt() and 0xFF)
-                        out.write((bits ushr 24).toInt() and 0xFF)
-                        out.write((bits ushr 16).toInt() and 0xFF)
-                        out.write((bits ushr 8).toInt() and 0xFF)
-                        out.write((bits ushr 0).toInt() and 0xFF)
-                    }
-                    else -> {
-                        val b = v.encodeToByteArray()
-                        writeHead(out, 3, b.size.toULong())
-                        out.write(b)
+                        long != null -> {
+                            if (long >= 0) {
+                                writeHead(out, 0, long.toULong())
+                            } else {
+                                val magnitude = (-1L - long).toULong()
+                                writeHead(out, 1, magnitude)
+                            }
+                        }
+                        dbl != null -> {
+                            out.write(0xFB)
+                            val bits = dbl.toBits()
+                            out.write((bits ushr 56).toInt() and 0xFF)
+                            out.write((bits ushr 48).toInt() and 0xFF)
+                            out.write((bits ushr 40).toInt() and 0xFF)
+                            out.write((bits ushr 32).toInt() and 0xFF)
+                            out.write((bits ushr 24).toInt() and 0xFF)
+                            out.write((bits ushr 16).toInt() and 0xFF)
+                            out.write((bits ushr 8).toInt() and 0xFF)
+                            out.write((bits ushr 0).toInt() and 0xFF)
+                        }
+                        else -> {
+                            val b = v.encodeToByteArray()
+                            writeHead(out, 2, b.size.toULong())
+                            out.write(b)
+                        }
                     }
                 }
             }

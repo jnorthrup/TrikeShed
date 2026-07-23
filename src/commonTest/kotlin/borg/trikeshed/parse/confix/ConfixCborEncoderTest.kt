@@ -30,6 +30,30 @@ class ConfixCborEncoderTest {
         assertContentEquals(bytes(0x3b, 0x7f, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff), emit(ConfixPrimitive(Long.MIN_VALUE.toString(), false)))
     }
 
+    @Test
+    fun testTextStrings() {
+        assertContentEquals(bytes(0x60), emit(ConfixPrimitive("", true)))
+        assertContentEquals(bytes(0x61, 0x61), emit(ConfixPrimitive("a", true)))
+        assertContentEquals(bytes(0x64, 0x49, 0x45, 0x54, 0x46), emit(ConfixPrimitive("IETF", true)))
+        assertContentEquals(bytes(0x62, 0x22, 0x5c), emit(ConfixPrimitive("\"\\", true)))
+        assertContentEquals(bytes(0x62, 0xc3, 0xbc), emit(ConfixPrimitive("\u00fc", true)))
+        assertContentEquals(bytes(0x63, 0xe6, 0xb0, 0xb4), emit(ConfixPrimitive("\u6c34", true)))
+        assertContentEquals(bytes(0x64, 0xf0, 0x90, 0x85, 0x91), emit(ConfixPrimitive("\ud800\udd51", true)))
+
+        // Ensure string "24" is not encoded as integer 24
+        assertContentEquals(bytes(0x62, 0x32, 0x34), emit(ConfixPrimitive("24", true)))
+        // Ensure string "true" is not encoded as boolean true
+        assertContentEquals(bytes(0x64, 0x74, 0x72, 0x75, 0x65), emit(ConfixPrimitive("true", true)))
+    }
+
+    @Test
+    fun testByteStrings() {
+        assertContentEquals(bytes(0x40), emit(ConfixPrimitive("", false)))
+        // 4 bytes: 01 02 03 04
+        val bytesContent = ByteArray(4) { (it + 1).toByte() }.decodeToString()
+        assertContentEquals(bytes(0x44, 0x01, 0x02, 0x03, 0x04), emit(ConfixPrimitive(bytesContent, false)))
+    }
+
     private fun emit(element: ConfixElement): ByteArray = ConfixCborEmitter.emit(element)
     private fun bytes(vararg values: Int): ByteArray = ByteArray(values.size) { values[it].toByte() }
 }
