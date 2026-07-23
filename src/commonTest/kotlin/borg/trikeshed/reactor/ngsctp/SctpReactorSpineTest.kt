@@ -10,6 +10,7 @@ import borg.trikeshed.lib.j
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -57,6 +58,8 @@ class SctpReactorSpineTest {
         val job = assoc.launch {
             try {
                 delay(1000)
+            } catch (e: CancellationException) {
+                jobCancelled = true
             } finally {
                 jobCancelled = true
             }
