@@ -51,7 +51,7 @@ class SctpReactorSpineTest {
         kotlinx.coroutines.yield()
         assoc.close()
         job.join()
-        assertTrue(jobCancelled)
+        assertTrue(job.isCancelled)
     }
 
     @Test
