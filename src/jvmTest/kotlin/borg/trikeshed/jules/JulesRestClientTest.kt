@@ -54,7 +54,7 @@ class JulesRestClientTest {
         assertEquals("new-session", client.createSession("implement", "title"))
         assertEquals("answer-1", client.sendMessage("new-session", "Use Confix"))
         assertTrue(requests[0].body.contains("\"prompt\": \"implement\""))
-        assertTrue(requests[1].body.contains("\"prompt\": \"Use Confix\"") || requests[1].body.contains("\"message\": \"Use Confix\""))
+        assertTrue(requests[1].body.contains("\"prompt\": \"Use Confix\""))
     }
 
     private data class RecordedRequest(val path: String, val apiKey: String?, val body: String)

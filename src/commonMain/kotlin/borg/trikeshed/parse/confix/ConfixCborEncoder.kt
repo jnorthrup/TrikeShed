@@ -51,6 +51,7 @@ internal object ConfixCborEmitter {
                     // Try Long for negative integers
                     val long = v.toLongOrNull()
                     val dbl = v.toDoubleOrNull()
+
                     when {
                         bool != null -> out.write(if (bool) 0xF5 else 0xF4)
                         ulong != null -> {
@@ -85,45 +86,37 @@ internal object ConfixCborEmitter {
                 }
             }
             is ConfixArray -> {
-                writeDefiniteLengthArray(out, e)
+                writeHead(out, 4, e.size.toULong())
+                e.forEach { write(out, it) }
             }
             is ConfixObject -> {
-                writeDefiniteLengthMap(out, e)
-            }
-        }
-    }
-
-    private fun writeDefiniteLengthArray(out: ByteArrayBuilder, e: ConfixArray) {
-        writeHead(out, 4, e.size.toULong())
-        e.forEach { write(out, it) }
-    }
-
-    private fun writeDefiniteLengthMap(out: ByteArrayBuilder, e: ConfixObject) {
-        writeHead(out, 5, e.size.toULong())
-        val sortedEntries = e.entries.map {
-            val keyBytes = it.key.encodeToByteArray()
-            val outKey = ByteArrayBuilder()
-            writeHead(outKey, 3, keyBytes.size.toULong())
-            outKey.write(keyBytes)
-            val keyEncoded = outKey.toByteArray()
-            Triple(it.key, keyEncoded, it.value)
-        }.sortedWith { a, b ->
-            val lenCmp = a.second.size.compareTo(b.second.size)
-            if (lenCmp != 0) lenCmp else {
-                var res = 0
-                for (i in a.second.indices) {
-                    val ba = a.second[i].toInt() and 0xFF
-                    val bb = b.second[i].toInt() and 0xFF
-                    res = ba.compareTo(bb)
-                    if (res != 0) break
+                writeHead(out, 5, e.size.toULong())
+                val sortedEntries = e.entries.map {
+                    val keyBytes = it.key.encodeToByteArray()
+                    val outKey = ByteArrayBuilder()
+                    writeHead(outKey, 3, keyBytes.size.toULong())
+                    outKey.write(keyBytes)
+                    val keyEncoded = outKey.toByteArray()
+                    Triple(it.key, keyEncoded, it.value)
+                }.sortedWith { a, b ->
+                    val lenCmp = a.second.size.compareTo(b.second.size)
+                    if (lenCmp != 0) lenCmp else {
+                        var res = 0
+                        for (i in a.second.indices) {
+                            val ba = a.second[i].toInt() and 0xFF
+                            val bb = b.second[i].toInt() and 0xFF
+                            res = ba.compareTo(bb)
+                            if (res != 0) break
+                        }
+                        res
+                    }
                 }
-                res
+                
+                for ((_, keyEncoded, value) in sortedEntries) {
+                    out.write(keyEncoded)
+                    write(out, value)
+                }
             }
-        }
-
-        for ((_, keyEncoded, value) in sortedEntries) {
-            out.write(keyEncoded)
-            write(out, value)
         }
     }
 
