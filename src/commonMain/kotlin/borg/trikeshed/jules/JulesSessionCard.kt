@@ -7,6 +7,7 @@ package borg.trikeshed.jules
 import borg.trikeshed.kanban.KanbanCard
 import borg.trikeshed.kanban.KanbanCardId
 import borg.trikeshed.kanban.KanbanColumnId
+import borg.trikeshed.util.oroboros.MergeReceipt
 import kotlinx.datetime.Clock
 
 /**
@@ -119,6 +120,7 @@ sealed class JulesCause {
         val sessionId: String,
         val commitSha: String,
         val taskId: String,
+        val receipt: MergeReceipt? = null,
         override val at: Long,
     ) : JulesCause()
 }

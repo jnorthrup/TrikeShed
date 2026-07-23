@@ -135,6 +135,7 @@ class JulesBoardStore(
                     byWorkId[c.workId] = it.copy(
                         commitSha = c.commitSha,
                         taskId = c.taskId,
+                        receipt = c.receipt,
                         drainedAt = c.at,
                     )
                 }
@@ -162,6 +163,7 @@ data class QueueEntry(
     val dispatchedAt: Long? = null,
     val commitSha: String? = null,
     val taskId: String? = null,
+    val receipt: borg.trikeshed.util.oroboros.MergeReceipt? = null,
     val drainedAt: Long? = null,
 ) {
     val isDispatched: Boolean get() = sessionId != null

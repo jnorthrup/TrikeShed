@@ -59,10 +59,27 @@ class JulesConductor(
                 activeCount = active,
                 awaitingCount = awaiting,
             )
+            val latestInquiry = acts.lastOrNull { it.kind == "agentMessaged" }
+                ?: acts.lastOrNull { it.kind == "progressUpdated" && '?' in it.excerpt }
+            val unseenInquiry = latestInquiry?.takeIf { inquiry ->
+                existing?.causes?.none { it.activityId == inquiry.id } != false
+            }
             if (existing == null) {
-                val card = JulesSessionCard.capture(snap)
+                val captured = JulesSessionCard.capture(snap)
+                val inquiryCause = unseenInquiry?.let {
+                    JulesCause.AgentMessaged(it.excerpt, snap.capturedAt, it.id, it.seq)
+                }
+                val card = if (inquiryCause == null) captured
+                    else captured.copy(causes = captured.causes + inquiryCause)
                 cards[s.id] = card
-                store?.append(snap, drained = false, cause = card.causes.last())
+                store?.append(snap, drained = false, cause = inquiryCause ?: captured.causes.last())
+            } else if (unseenInquiry != null) {
+                // A conversation can advance while Jules remains AWAITING. Record
+                // the new inquiry by activity id so GUIDE answers it exactly once.
+                val cause = JulesCause.AgentMessaged(
+                    unseenInquiry.excerpt, snap.capturedAt, unseenInquiry.id, unseenInquiry.seq)
+                cards[s.id] = existing.transition(snap, cause)
+                store?.append(snap, existing.drained, cause)
             } else if (stateChanged || existing.snapshot.patchBytes != snap.patchBytes) {
                 val cause: JulesCause = when {
                     snap.patchBytes > existing.snapshot.patchBytes -> {

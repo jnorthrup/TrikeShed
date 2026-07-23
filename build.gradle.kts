@@ -460,6 +460,22 @@ tasks.register<JavaExec>("trajectoryReduction") {
     classpath(tasks.named("jvmJar"), configurations.getByName("jvmRuntimeClasspath"))
 }
 
+// Historical Flywheel exposure reaper — stream selected exported sessions into
+// Oroboros CAS and write a deterministic evidence manifest.
+tasks.register<JavaExec>("reapFlywheelHistory") {
+    group = "oroboros"
+    description = "Claim selected session exports in Oroboros CAS and project evidence receipts."
+    dependsOn("jvmJar")
+    mainClass.set("borg.trikeshed.util.oroboros.FlywheelHistoryReaper")
+    classpath(tasks.named("jvmJar"), configurations.getByName("jvmRuntimeClasspath"))
+    args(providers.gradleProperty("historyExport").orElse("/tmp/trikeshed-history.jsonl").get())
+    providers.gradleProperty("historySessions").orNull
+        ?.split(',')
+        ?.map(String::trim)
+        ?.filter(String::isNotEmpty)
+        ?.let(::args)
+}
+
 // Forge JVM shell — interactive Compose Desktop window that hosts the same
 // workspace model the browser bundle renders (board, page, gallery, blackboard).
 tasks.register<JavaExec>("runForgeJvm") {

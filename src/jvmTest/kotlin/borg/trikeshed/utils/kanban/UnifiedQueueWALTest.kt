@@ -5,6 +5,10 @@
 package borg.trikeshed.utils.kanban
 
 import borg.trikeshed.jules.JulesCause
+import borg.trikeshed.userspace.nio.file.spi.JvmAppendWal
+import borg.trikeshed.job.ContentId
+import borg.trikeshed.util.oroboros.LexicalMemory
+import borg.trikeshed.util.oroboros.MergeReceipt
 import kotlinx.coroutines.runBlocking
 import java.io.File
 import java.nio.file.Files
@@ -23,8 +27,9 @@ class UnifiedQueueWALTest {
 
     private fun tempStore(): Pair<JulesBoardStore, File> {
         val dir = Files.createTempDirectory("unified-queue-test").toFile()
-        val store = JulesBoardStore(dir)
-        return store to dir
+        val walFile = File(dir, "test-board.wal")
+        val store = JulesBoardStore(JvmAppendWal(walFile))
+        return store to walFile
     }
 
     @Test
@@ -78,7 +83,22 @@ class UnifiedQueueWALTest {
             // drain → merged
             store.appendWork("w-2", JulesCause.WorkDrained(
                 workId = "w-2", sessionId = "sess-abc",
-                commitSha = "deadbeef", taskId = "abc-task-id", at = 300L,
+                commitSha = "deadbeef", taskId = "abc-task-id",
+                receipt = MergeReceipt(
+                    workId = "w-2",
+                    producer = "jules",
+                    producerRef = "sess-abc",
+                    patchCid = ContentId("sha256:" + "0".repeat(64)),
+                    revision = "deadbeef",
+                    versionTag = "flywheel/jules-sess-abc-deadbeef",
+                    lexicalMemory = LexicalMemory(
+                        summary = "Fix queue drain",
+                        title = "Queue receipt",
+                        content = "retain immutable patch claim",
+                    ),
+                    claimedAt = 299L,
+                ),
+                at = 300L,
             ))
 
             val queue = store.loadQueue()
@@ -90,6 +110,9 @@ class UnifiedQueueWALTest {
             assertEquals(200L, entry.dispatchedAt)
             assertEquals("deadbeef", entry.commitSha)
             assertEquals("abc-task-id", entry.taskId)
+            assertEquals("flywheel/jules-sess-abc-deadbeef", entry.receipt?.versionTag)
+            assertEquals("sha256:" + "0".repeat(64), entry.receipt?.patchCid?.value)
+            assertEquals("Queue receipt", entry.receipt?.lexicalMemory?.title)
             assertEquals(300L, entry.drainedAt)
             assertTrue(entry.isDispatched)
             assertTrue(entry.isDrained)
