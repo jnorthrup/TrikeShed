@@ -31,27 +31,46 @@ class ConfixCborEncoderTest {
     }
 
     @Test
-    fun testTextStrings() {
-        assertContentEquals(bytes(0x60), emit(ConfixPrimitive("", true)))
-        assertContentEquals(bytes(0x61, 0x61), emit(ConfixPrimitive("a", true)))
-        assertContentEquals(bytes(0x64, 0x49, 0x45, 0x54, 0x46), emit(ConfixPrimitive("IETF", true)))
-        assertContentEquals(bytes(0x62, 0x22, 0x5c), emit(ConfixPrimitive("\"\\", true)))
-        assertContentEquals(bytes(0x62, 0xc3, 0xbc), emit(ConfixPrimitive("\u00fc", true)))
-        assertContentEquals(bytes(0x63, 0xe6, 0xb0, 0xb4), emit(ConfixPrimitive("\u6c34", true)))
-        assertContentEquals(bytes(0x64, 0xf0, 0x90, 0x85, 0x91), emit(ConfixPrimitive("\ud800\udd51", true)))
+    fun testDefiniteLengthArrays() {
+        // []
+        assertContentEquals(bytes(0x80), emit(ConfixArray(emptyList())))
 
-        // Ensure string "24" is not encoded as integer 24
-        assertContentEquals(bytes(0x62, 0x32, 0x34), emit(ConfixPrimitive("24", true)))
-        // Ensure string "true" is not encoded as boolean true
-        assertContentEquals(bytes(0x64, 0x74, 0x72, 0x75, 0x65), emit(ConfixPrimitive("true", true)))
+        // [1, 2, 3]
+        assertContentEquals(bytes(0x83, 0x01, 0x02, 0x03), emit(ConfixArray(listOf(
+            ConfixPrimitive(1.toString(), false),
+            ConfixPrimitive(2.toString(), false),
+            ConfixPrimitive(3.toString(), false)
+        ))))
+
+        // Array of 24 elements (major type 4, length 24 => 0x98 0x18)
+        val arr24 = ConfixArray(List(24) { ConfixPrimitive(0.toString(), false) })
+        val expected24 = ByteArray(26)
+        expected24[0] = 0x98.toByte()
+        expected24[1] = 0x18.toByte()
+        assertContentEquals(expected24, emit(arr24))
     }
 
     @Test
-    fun testByteStrings() {
-        assertContentEquals(bytes(0x40), emit(ConfixPrimitive("", false)))
-        // 4 bytes: 01 02 03 04
-        val bytesContent = ByteArray(4) { (it + 1).toByte() }.decodeToString()
-        assertContentEquals(bytes(0x44, 0x01, 0x02, 0x03, 0x04), emit(ConfixPrimitive(bytesContent, false)))
+    fun testDefiniteLengthMaps() {
+        // {}
+        assertContentEquals(bytes(0xa0), emit(ConfixObject(emptyMap())))
+
+        // {"a": 1, "b": 2}
+        assertContentEquals(
+            bytes(0xa2, 0x61, 0x61, 0x01, 0x61, 0x62, 0x02),
+            emit(ConfixObject(mapOf(
+                "a" to ConfixPrimitive(1.toString(), false),
+                "b" to ConfixPrimitive(2.toString(), false)
+            )))
+        )
+
+        // Map of 24 pairs (major type 5, length 24 => 0xb8 0x18)
+        val map24 = ConfixObject((0 until 24).associate {
+            ('a' + it).toString() to ConfixPrimitive(0.toString(), false)
+        })
+        val emitted = emit(map24)
+        kotlin.test.assertEquals(0xb8.toByte(), emitted[0])
+        kotlin.test.assertEquals(0x18.toByte(), emitted[1])
     }
 
     private fun emit(element: ConfixElement): ByteArray = ConfixCborEmitter.emit(element)

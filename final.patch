@@ -1,0 +1,198 @@
+diff --git a/fix_cas.sh b/fix_cas.sh
+deleted file mode 100644
+index d8344e24..00000000
+--- a/fix_cas.sh
++++ /dev/null
+@@ -1,28 +0,0 @@
+-cat << 'MERGE' > /tmp/merge_cas.diff
+-<<<<<<< SEARCH
+-package borg.trikeshed.job
+-
+-import borg.trikeshed.collections.associative.LinearHashMap as CasHashMap
+-
+-/**
+- * CasStore — content-addressable store.
+- * In-memory implementation: SHA-256 keyed blob map with digest verification on read.
+- */
+-open class CasStore protected constructor(
+-    private val blobs: CasHashMap<ContentId, ByteArray> = CasHashMap(),
+-) {
+-    open fun put(bytes: ByteArray): ContentId {
+-=======
+-package borg.trikeshed.job
+-
+-/**
+- * CasStore — content-addressable store.
+- * In-memory implementation: SHA-256 keyed blob map with digest verification on read.
+- */
+-open class CasStore protected constructor(
+-    private val blobs: MutableMap<ContentId, ByteArray> = mutableMapOf(),
+-) : borg.trikeshed.cas.CasStore {
+-    override fun put(bytes: ByteArray): ContentId {
+->>>>>>> REPLACE
+-MERGE
+-patch -u src/commonMain/kotlin/borg/trikeshed/job/CasStore.kt -i /tmp/merge_cas.diff
+diff --git a/src/commonMain/kotlin/borg/trikeshed/userspace/concurrency/ChannelDefinition.kt b/src/commonMain/kotlin/borg/trikeshed/userspace/concurrency/ChannelDefinition.kt
+new file mode 100644
+index 00000000..3194fae6
+--- /dev/null
++++ b/src/commonMain/kotlin/borg/trikeshed/userspace/concurrency/ChannelDefinition.kt
+@@ -0,0 +1,7 @@
++package borg.trikeshed.userspace.concurrency
++
++interface ChannelDefinition {
++    enum class Enum : ChannelDefinition {
++        MonoChannel
++    }
++}
+diff --git a/src/commonMain/kotlin/borg/trikeshed/userspace/concurrency/MonoChannel.kt b/src/commonMain/kotlin/borg/trikeshed/userspace/concurrency/MonoChannel.kt
+new file mode 100644
+index 00000000..6639940f
+--- /dev/null
++++ b/src/commonMain/kotlin/borg/trikeshed/userspace/concurrency/MonoChannel.kt
+@@ -0,0 +1,58 @@
++package borg.trikeshed.userspace.concurrency
++
++import borg.trikeshed.userspace.nio.channels.ReadableByteChannel
++import borg.trikeshed.userspace.nio.channels.WritableByteChannel
++import borg.trikeshed.userspace.nio.ByteBuffer
++
++class MonoChannel(
++    private val stdin: ReadableByteChannel,
++    private val stdout: WritableByteChannel
++) {
++    // Current frame state
++    private var pendingLength: Long? = null
++    private val lengthBuffer = ByteBuffer.allocate(8)
++    private var msgBuffer: ByteBuffer? = null
++
++    fun writeMessage(message: ByteArray) {
++        val buf = ByteBuffer.allocate(8 + message.size)
++        buf.putLong(message.size.toLong())
++        buf.put(message)
++        buf.flip()
++        while (buf.hasRemaining()) {
++            stdout.write(buf)
++        }
++    }
++
++    fun readMessage(): ByteArray? {
++        if (pendingLength == null) {
++            val read = stdin.read(lengthBuffer)
++            if (!lengthBuffer.hasRemaining()) {
++                lengthBuffer.flip()
++                pendingLength = lengthBuffer.getLong()
++                lengthBuffer.clear()
++            } else {
++                return null
++            }
++        }
++
++        val length = pendingLength!!
++        if (msgBuffer == null) {
++            msgBuffer = ByteBuffer.allocate(length.toInt())
++        }
++
++        val buf = msgBuffer!!
++        val read = stdin.read(buf)
++
++        if (!buf.hasRemaining()) {
++            buf.flip()
++            val bytes = ByteArray(length.toInt())
++            buf.get(bytes)
++
++            pendingLength = null
++            msgBuffer = null
++
++            return bytes
++        }
++        return null
++    }
++}
+diff --git a/src/commonTest/kotlin/borg/trikeshed/userspace/concurrency/MonoChannelTest.kt b/src/commonTest/kotlin/borg/trikeshed/userspace/concurrency/MonoChannelTest.kt
+new file mode 100644
+index 00000000..797ecd28
+--- /dev/null
++++ b/src/commonTest/kotlin/borg/trikeshed/userspace/concurrency/MonoChannelTest.kt
+@@ -0,0 +1,81 @@
++package borg.trikeshed.userspace.concurrency
++
++import borg.trikeshed.userspace.nio.ByteBuffer
++import borg.trikeshed.userspace.nio.channels.ReadableByteChannel
++import borg.trikeshed.userspace.nio.channels.WritableByteChannel
++import kotlin.test.Test
++import kotlin.test.assertEquals
++import kotlin.test.assertNull
++
++class MockReadableByteChannel(private val buf: ByteBuffer) : ReadableByteChannel {
++    override fun read(dst: ByteBuffer): Int {
++        val rem = dst.remaining()
++        if (rem == 0) return 0
++        if (!buf.hasRemaining()) return 0
++        val toRead = minOf(rem, buf.remaining())
++        val oldLimit = buf.limit()
++        buf.limit(buf.position() + toRead)
++        dst.put(buf)
++        buf.limit(oldLimit)
++        return toRead
++    }
++    override fun close() {}
++    override fun isOpen() = true
++}
++
++class MockWritableByteChannel(val buf: ByteBuffer) : WritableByteChannel {
++    override fun write(src: ByteBuffer): Int {
++        val rem = src.remaining()
++        buf.put(src)
++        return rem
++    }
++    override fun close() {}
++    override fun isOpen() = true
++}
++
++class MonoChannelTest {
++    @Test
++    fun testMonoChannelFraming() {
++        val stdinBuf = ByteBuffer.allocate(1024)
++        val stdoutBuf = ByteBuffer.allocate(1024)
++
++        val stdin = MockReadableByteChannel(stdinBuf)
++        val stdout = MockWritableByteChannel(stdoutBuf)
++
++        val channel = MonoChannel(stdin, stdout)
++
++        // Write message via channel
++        val msg1 = "Hello".encodeToByteArray()
++        channel.writeMessage(msg1)
++
++        // Check stdout framing
++        stdoutBuf.flip()
++        assertEquals(5L, stdoutBuf.getLong())
++        val outMsg = ByteArray(5)
++        stdoutBuf.get(outMsg)
++        assertEquals("Hello", outMsg.decodeToString())
++
++        // Feed stdin with incomplete frame
++        stdinBuf.putLong(5L)
++        stdinBuf.put(byteArrayOf(72, 101, 108)) // "Hel"
++        stdinBuf.flip()
++
++        // Should be non-blocking and return null
++        assertNull(channel.readMessage())
++
++        // Complete the frame
++        val pos = stdinBuf.position()
++        stdinBuf.position(stdinBuf.limit())
++        stdinBuf.limit(stdinBuf.capacityInt)
++        stdinBuf.put(byteArrayOf(108, 111)) // "lo"
++        stdinBuf.limit(stdinBuf.position())
++        stdinBuf.position(pos)
++
++        // Now it should return the message
++        val readMsg = channel.readMessage()
++        assertEquals("Hello", readMsg?.decodeToString())
++
++        // Enum check
++        assertEquals("MonoChannel", ChannelDefinition.Enum.MonoChannel.name)
++    }
++}
