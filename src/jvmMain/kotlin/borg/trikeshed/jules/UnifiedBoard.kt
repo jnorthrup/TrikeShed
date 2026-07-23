@@ -14,11 +14,11 @@ import kotlinx.datetime.Clock
 /**
  * Unified board — Jules session cards projected onto the Forge kanban board.
  *
- * The Jules session card carries a [borg.trikeshed.kanban.KanbanCard] whose
- * [borg.trikeshed.kanban.KanbanCard.columnId] is the Jules lane's column name
- * (see [JulesLane.columnName], e.g. "Causal Ready", "Agentic Work"). The Forge
- * kanban board is keyed on the same `KanbanColumnId`. Unifying them is a
- * column-keyed merge, not a parallel truth.
+ * Jules and Forge intentionally use different column vocabularies. Jules cards
+ * carry session lanes such as "Causal Ready" and "Agentic Work"; Forge cards
+ * carry workflow IDs such as `ready`, `running`, and `blocked`. [saturationWheel]
+ * maps both vocabularies onto the same causal paddles without rewriting either
+ * source model.
  *
  * The Jules REST plane and the Forge markdown board are two projections of the
  * same causal wheel. This function returns one board keyed on `columnId`.
@@ -98,45 +98,36 @@ data class WheelSnapshot(
 /**
  * Project a merged board onto the saturation wheel.
  *
- * Mapping (JulesLane → paddle):
- *  - TO_DO              → SLICE/CURATE        (work pool items in the markdown board)
- *  - CAUSAL_READY       → READY QUEUE         (ready for dispatch)
- *  - (dispatch action)  → DISPATCH            (cards transitioning queued→in-progress; counted as zero on a snapshot)
- *  - AGENTIC_WORK       → RUNNING             (live Jules sessions)
- *  - CAUSAL_BLOCKED     → GUIDE/AWAIT        (AWAITING_USER_FEEDBACK — needs the brain)
- *  - REVIEW             → HARVEST/REV         (AWAITING_PLAN_APPROVAL or COMPLETED-with-patch)
- *  - DONE               → LAND/MERGE          (drained + committed)
- *  - FAILED             → HARVEST/REV         (failed settlements requeue here)
- *  - (crossed-paddle marker `●`) is computed by the caller from consecutive snapshots.
+ * Forge and Jules mappings are explicit in [paddleForColumn]. In particular,
+ * Jules CAUSAL_READY means COMPLETED-with-patch and therefore belongs at
+ * HARVEST, not READY-for-dispatch.
  */
 fun saturationWheel(board: KanbanBoard): List<WheelSnapshot> {
-    val byCol = board.cards.groupBy { it.columnId.value }
-    fun col(name: String): List<KanbanCard> = byCol[name] ?: emptyList()
+    val byPaddle = board.cards.groupBy { paddleForColumn(it.columnId.value) }
+    return WheelPaddle.entries.map { paddle ->
+        val cards = byPaddle[paddle].orEmpty()
+        WheelSnapshot(paddle, cards.size, cards.take(4).map { it.title })
+    }
+}
 
-    return listOf(
-        WheelSnapshot(WheelPaddle.SLICE,
-            col(JulesLane.TO_DO.columnName).size,
-            col(JulesLane.TO_DO.columnName).map { it.title }),
-        WheelSnapshot(WheelPaddle.READY,
-            col(JulesLane.CAUSAL_READY.columnName).size,
-            col(JulesLane.CAUSAL_READY.columnName).map { it.title }),
-        WheelSnapshot(WheelPaddle.DISPATCH,
-            0, emptyList()),
-        WheelSnapshot(WheelPaddle.RUNNING,
-            col(JulesLane.AGENTIC_WORK.columnName).size,
-            col(JulesLane.AGENTIC_WORK.columnName).map { it.title }),
-        WheelSnapshot(WheelPaddle.GUIDE,
-            col(JulesLane.CAUSAL_BLOCKED.columnName).size,
-            col(JulesLane.CAUSAL_BLOCKED.columnName).map { it.title }),
-        WheelSnapshot(WheelPaddle.HARVEST,
-            (col(JulesLane.REVIEW.columnName) + col(JulesLane.FAILED.columnName)).size,
-            (col(JulesLane.REVIEW.columnName) + col(JulesLane.FAILED.columnName)).map { it.title }),
-        WheelSnapshot(WheelPaddle.LAND,
-            col(JulesLane.DONE.columnName).size,
-            col(JulesLane.DONE.columnName).map { it.title }),
-        WheelSnapshot(WheelPaddle.CURATE,
-            0, emptyList()),  // refilled by the slicer; empty on a snapshot
-    )
+private fun paddleForColumn(columnId: String): WheelPaddle = when (columnId) {
+    // Forge workflow columns.
+    "triage", "todo" -> WheelPaddle.SLICE
+    "ready" -> WheelPaddle.READY
+    "running" -> WheelPaddle.RUNNING
+    "blocked" -> WheelPaddle.GUIDE
+    "done" -> WheelPaddle.LAND
+    "archived" -> WheelPaddle.CURATE
+
+    // Jules session lanes.
+    JulesLane.TO_DO.columnName -> WheelPaddle.DISPATCH
+    JulesLane.AGENTIC_WORK.columnName -> WheelPaddle.RUNNING
+    JulesLane.CAUSAL_BLOCKED.columnName -> WheelPaddle.GUIDE
+    JulesLane.REVIEW.columnName,
+    JulesLane.CAUSAL_READY.columnName,
+    JulesLane.FAILED.columnName -> WheelPaddle.HARVEST
+    JulesLane.DONE.columnName -> WheelPaddle.LAND
+    else -> WheelPaddle.CURATE
 }
 
 /** The current bottleneck: highest-pressure paddle that isn't LAND/DONE/SLICE/CURATE. */
