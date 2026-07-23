@@ -1,117 +1,111 @@
 package borg.trikeshed.parse.confix
 
-internal object ConfixCborDecoder {
+class BufferReader(private val bytes: ByteArray) {
+    var position = 0
+
+    fun readByte(): Int {
+        if (position >= bytes.size) throw IllegalArgumentException("Unexpected end of CBOR input")
+        return bytes[position++].toInt() and 0xFF
+    }
+
+    fun readBytes(count: Int): ByteArray {
+        if (position + count > bytes.size) throw IllegalArgumentException("Unexpected end of CBOR input")
+        val result = bytes.copyOfRange(position, position + count)
+        position += count
+        return result
+    }
+}
+
+object ConfixCborDecoder {
     fun decode(bytes: ByteArray): ConfixElement {
-        return decode(ByteArrayReader(bytes))
+        val reader = BufferReader(bytes)
+        return decodeElement(reader)
     }
 
-    private class ByteArrayReader(val bytes: ByteArray) {
-        var pos = 0
-        fun read(): Int {
-            if (pos >= bytes.size) throw IllegalArgumentException("Unexpected end of CBOR bytes")
-            return bytes[pos++].toInt() and 0xFF
-        }
-
-        fun readBytes(count: Int): ByteArray {
-            if (pos + count > bytes.size) throw IllegalArgumentException("Unexpected end of CBOR bytes")
-            val res = bytes.copyOfRange(pos, pos + count)
-            pos += count
-            return res
-        }
-    }
-
-    private fun decode(reader: ByteArrayReader): ConfixElement {
-        val initialByte = reader.read()
+    private fun decodeElement(reader: BufferReader): ConfixElement {
+        val initialByte = reader.readByte()
         val majorType = initialByte ushr 5
-        val additionalInformation = initialByte and 0x1F
+        val additionalInfo = initialByte and 0x1F
 
         return when (majorType) {
-            0 -> { // unsigned integer
-                val value = readArgument(reader, additionalInformation)
-                ConfixPrimitive(value.toLong().toString(), false)
+            0 -> ConfixPrimitive(readArgument(reader, additionalInfo).toString(), false)
+            1 -> {
+                val value = -1L - readArgument(reader, additionalInfo).toLong()
+                ConfixPrimitive(value.toString(), false)
             }
-            1 -> { // negative integer
-                val value = readArgument(reader, additionalInformation)
-                val longVal = -1L - value.toLong()
-                ConfixPrimitive(longVal.toString(), false)
+            2 -> {
+                val length = readArgument(reader, additionalInfo).toInt()
+                val bytes = reader.readBytes(length)
+                ConfixPrimitive(bytes.decodeToString(), false)
             }
-            2 -> { // byte string (encoded as base64 or just string for primitive... let's check how it's emitted)
-                // In ConfixCborEncoder.kt, fallback string/bytes are emitted as type 3 (text string)
-                // but byte strings are type 2. If it's a byte array encoded, we decode to primitive string?
-                // Wait, ConfixCborEncoder encodes string using: `v.encodeToByteArray()`, major type 3.
-                // Let's handle byte strings as strings just in case
-                val len = readArgument(reader, additionalInformation).toInt()
-                val bytes = reader.readBytes(len)
+            3 -> {
+                val length = readArgument(reader, additionalInfo).toInt()
+                val bytes = reader.readBytes(length)
                 ConfixPrimitive(bytes.decodeToString(), true)
             }
-            3 -> { // text string
-                val len = readArgument(reader, additionalInformation).toInt()
-                val bytes = reader.readBytes(len)
-                ConfixPrimitive(bytes.decodeToString(), true)
-            }
-            4 -> { // array
-                val len = readArgument(reader, additionalInformation).toInt()
-                val list = ArrayList<ConfixElement>(len)
-                for (i in 0 until len) {
-                    list.add(decode(reader))
+            4 -> {
+                val length = readArgument(reader, additionalInfo).toInt()
+                val elements = mutableListOf<ConfixElement>()
+                for (i in 0 until length) {
+                    elements.add(decodeElement(reader))
                 }
-                ConfixArray(list)
+                ConfixArray(elements)
             }
-            5 -> { // map
-                val len = readArgument(reader, additionalInformation).toInt()
-                val map = LinkedHashMap<String, ConfixElement>(len)
-                for (i in 0 until len) {
-                    val keyElement = decode(reader)
-                    val keyStr = (keyElement as ConfixPrimitive).content
-                    val valueElement = decode(reader)
-                    map[keyStr] = valueElement
+            5 -> {
+                val length = readArgument(reader, additionalInfo).toInt()
+                val map = mutableMapOf<String, ConfixElement>()
+                for (i in 0 until length) {
+                    val keyElement = decodeElement(reader)
+                    val keyString = (keyElement as ConfixPrimitive).content
+                    val valueElement = decodeElement(reader)
+                    map[keyString] = valueElement
                 }
                 ConfixObject(map)
             }
-            7 -> { // simple values / floats
-                when (additionalInformation) {
-                    20 -> ConfixPrimitive("false", false)
-                    21 -> ConfixPrimitive("true", false)
+            7 -> {
+                when (additionalInfo) {
+                    20 -> ConfixPrimitive(false)
+                    21 -> ConfixPrimitive(true)
                     22 -> ConfixNull
-                    27 -> { // 64-bit float
-                        val bits = reader.readBytes(8)
-                        var longBits = 0L
+                    27 -> { // float64
+                        var l = 0L
                         for (i in 0..7) {
-                            longBits = (longBits shl 8) or (bits[i].toLong() and 0xFF)
+                            l = (l shl 8) or reader.readByte().toLong()
                         }
-                        ConfixPrimitive(Double.fromBits(longBits).toString(), false)
+                        val dbl = Double.fromBits(l)
+                        ConfixPrimitive(dbl.toString(), false)
                     }
-                    else -> throw IllegalArgumentException("Unsupported CBOR simple value / float: $additionalInformation")
+                    else -> throw IllegalArgumentException("Unsupported CBOR simple value: $additionalInfo")
                 }
             }
             else -> throw IllegalArgumentException("Unsupported CBOR major type: $majorType")
         }
     }
 
-    private fun readArgument(reader: ByteArrayReader, additionalInformation: Int): ULong {
-        return when (additionalInformation) {
-            in 0..23 -> additionalInformation.toULong()
-            24 -> reader.read().toULong()
+    private fun readArgument(reader: BufferReader, additionalInfo: Int): ULong {
+        return when (additionalInfo) {
+            in 0..23 -> additionalInfo.toULong()
+            24 -> reader.readByte().toULong()
             25 -> {
-                val b1 = reader.read()
-                val b2 = reader.read()
+                val b1 = reader.readByte()
+                val b2 = reader.readByte()
                 ((b1 shl 8) or b2).toULong()
             }
             26 -> {
-                val b1 = reader.read().toULong()
-                val b2 = reader.read().toULong()
-                val b3 = reader.read().toULong()
-                val b4 = reader.read().toULong()
-                (b1 shl 24) or (b2 shl 16) or (b3 shl 8) or b4
+                val b1 = reader.readByte()
+                val b2 = reader.readByte()
+                val b3 = reader.readByte()
+                val b4 = reader.readByte()
+                ((b1.toLong() shl 24) or (b2.toLong() shl 16) or (b3.toLong() shl 8) or b4.toLong()).toULong()
             }
             27 -> {
-                var res = 0UL
+                var l = 0UL
                 for (i in 0..7) {
-                    res = (res shl 8) or reader.read().toULong()
+                    l = (l shl 8) or reader.readByte().toULong()
                 }
-                res
+                l
             }
-            else -> throw IllegalArgumentException("Unsupported CBOR length/value: $additionalInformation")
+            else -> throw IllegalArgumentException("Unsupported CBOR additional info: $additionalInfo")
         }
     }
 }

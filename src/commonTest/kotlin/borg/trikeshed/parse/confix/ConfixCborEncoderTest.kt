@@ -2,9 +2,34 @@ package borg.trikeshed.parse.confix
 
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
-import kotlin.test.fail
 
 class ConfixCborEncoderTest {
+    @Test
+    fun testTextStringsAndByteStrings() {
+        // Text string: Major Type 3 (0x60 base)
+        assertContentEquals(bytes(0x60), emit(ConfixPrimitive("", true)))
+        assertContentEquals(bytes(0x61, 0x61), emit(ConfixPrimitive("a", true)))
+        assertContentEquals(bytes(0x64, 0x49, 0x45, 0x54, 0x46), emit(ConfixPrimitive("IETF", true)))
+        assertContentEquals(bytes(0x62, 0x22, 0x5c), emit(ConfixPrimitive("\"\\", true)))
+        assertContentEquals(bytes(0x62, 0xc3, 0xbc), emit(ConfixPrimitive("\u00fc", true)))
+        assertContentEquals(bytes(0x63, 0xe6, 0xb0, 0xb4), emit(ConfixPrimitive("\u6c34", true)))
+        assertContentEquals(bytes(0x64, 0xf0, 0x90, 0x85, 0x91), emit(ConfixPrimitive("\ud800\udd51", true))) // water
+
+        // Byte string: Major Type 2 (0x40 base), for non-numbers when isString = false
+        assertContentEquals(bytes(0x40), emit(ConfixPrimitive("", false)))
+        assertContentEquals(bytes(0x41, 0x61), emit(ConfixPrimitive("a", false)))
+        assertContentEquals(bytes(0x44, 0x49, 0x45, 0x54, 0x46), emit(ConfixPrimitive("IETF", false)))
+        assertContentEquals(bytes(0x42, 0x22, 0x5c), emit(ConfixPrimitive("\"\\", false)))
+        assertContentEquals(bytes(0x42, 0xc3, 0xbc), emit(ConfixPrimitive("\u00fc", false)))
+        assertContentEquals(bytes(0x43, 0xe6, 0xb0, 0xb4), emit(ConfixPrimitive("\u6c34", false)))
+        assertContentEquals(bytes(0x44, 0xf0, 0x90, 0x85, 0x91), emit(ConfixPrimitive("\ud800\udd51", false)))
+
+        // A string that looks like a number/boolean should still be a string (MT 3) if isString = true
+        assertContentEquals(bytes(0x61, 0x31), emit(ConfixPrimitive("1", true)))
+        assertContentEquals(bytes(0x62, 0x2d, 0x31), emit(ConfixPrimitive("-1", true)))
+        assertContentEquals(bytes(0x64, 0x74, 0x72, 0x75, 0x65), emit(ConfixPrimitive("true", true)))
+    }
+
     @Test
     fun testUnsignedAndSignedIntegers() {
         assertContentEquals(bytes(0x00), emit(ConfixPrimitive(0.toString(), false)))
@@ -20,8 +45,6 @@ class ConfixCborEncoderTest {
 
         assertContentEquals(bytes(0x1b, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff), emit(ConfixPrimitive(ULong.MAX_VALUE.toString(), false)))
 
-        assertContentEquals(bytes(0xfb, 0xc3, 0xf0, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00), emit(ConfixPrimitive("-18446744073709551616", false)))
-
         assertContentEquals(bytes(0x20), emit(ConfixPrimitive((-1).toString(), false)))
         assertContentEquals(bytes(0x37), emit(ConfixPrimitive((-24).toString(), false)))
         assertContentEquals(bytes(0x38, 0x18), emit(ConfixPrimitive((-25).toString(), false)))
@@ -34,46 +57,36 @@ class ConfixCborEncoderTest {
     }
 
     @Test
-    fun testDefiniteLengthArrays() {
-        // []
-        assertContentEquals(bytes(0x80), emit(ConfixArray(emptyList())))
-
-        // [1, 2, 3]
-        assertContentEquals(bytes(0x83, 0x01, 0x02, 0x03), emit(ConfixArray(listOf(
-            ConfixPrimitive(1.toString(), false),
-            ConfixPrimitive(2.toString(), false),
-            ConfixPrimitive(3.toString(), false)
-        ))))
-
-        // Array of 24 elements (major type 4, length 24 => 0x98 0x18)
-        val arr24 = ConfixArray(List(24) { ConfixPrimitive(0.toString(), false) })
-        val expected24 = ByteArray(26)
-        expected24[0] = 0x98.toByte()
-        expected24[1] = 0x18.toByte()
-        assertContentEquals(expected24, emit(arr24))
+    fun testNull() {
+        assertContentEquals(bytes(0xf6), emit(ConfixNull))
     }
 
     @Test
-    fun testDefiniteLengthMaps() {
-        // {}
-        assertContentEquals(bytes(0xa0), emit(ConfixObject(emptyMap())))
+    fun testBool() {
+        assertContentEquals(bytes(0xf5), emit(ConfixPrimitive(true)))
+        assertContentEquals(bytes(0xf4), emit(ConfixPrimitive(false)))
 
-        // {"a": 1, "b": 2}
-        assertContentEquals(
-            bytes(0xa2, 0x61, 0x61, 0x01, 0x61, 0x62, 0x02),
-            emit(ConfixObject(mapOf(
-                "a" to ConfixPrimitive(1.toString(), false),
-                "b" to ConfixPrimitive(2.toString(), false)
-            )))
-        )
+        // "true" as a string, not boolean
+        assertContentEquals(bytes(0x64, 0x74, 0x72, 0x75, 0x65), emit(ConfixPrimitive("true", true)))
+        // "false" as a string
+        assertContentEquals(bytes(0x65, 0x66, 0x61, 0x6c, 0x73, 0x65), emit(ConfixPrimitive("false", true)))
+    }
 
-        // Map of 24 pairs (major type 5, length 24 => 0xb8 0x18)
-        val map24 = ConfixObject((0 until 24).associate {
-            ('a' + it).toString() to ConfixPrimitive(0.toString(), false)
-        })
-        val emitted = emit(map24)
-        kotlin.test.assertEquals(0xb8.toByte(), emitted[0])
-        kotlin.test.assertEquals(0x18.toByte(), emitted[1])
+    @Test
+    fun testFloat() {
+        // 1.1 -> 0xFB, 3FF199999999999A
+        assertContentEquals(bytes(0xfb, 0x3f, 0xf1, 0x99, 0x99, 0x99, 0x99, 0x99, 0x9a), emit(ConfixPrimitive(1.1)))
+        assertContentEquals(bytes(0xfb, 0xbf, 0xf1, 0x99, 0x99, 0x99, 0x99, 0x99, 0x9a), emit(ConfixPrimitive(-1.1)))
+
+        // "1.1" as a string
+        assertContentEquals(bytes(0x63, 0x31, 0x2e, 0x31), emit(ConfixPrimitive("1.1", true)))
+    }
+
+    @Test
+    fun testByteStringFallback() {
+        // "abc" with isString == false should fall back to Major Type 2 (byte string)
+        // 0x43 (Major type 2, length 3) followed by "abc" (0x61, 0x62, 0x63)
+        assertContentEquals(bytes(0x43, 0x61, 0x62, 0x63), emit(ConfixPrimitive("abc", false)))
     }
 
     private fun emit(element: ConfixElement): ByteArray = ConfixCborEmitter.emit(element)

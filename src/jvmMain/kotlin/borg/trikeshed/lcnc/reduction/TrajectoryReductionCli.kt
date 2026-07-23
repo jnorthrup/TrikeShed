@@ -229,7 +229,7 @@ private fun renderDashboard(json: String) {
     val title = (parsed["title"] as? String)
         ?: run {
             val dir = File(System.getProperty("user.home"), ".local/forge")
-            val store = borg.trikeshed.utils.kanban.JulesBoardStore(dir)
+            val store = borg.trikeshed.utils.kanban.JulesBoardStore(borg.trikeshed.userspace.nio.file.spi.JvmAppendWal(File(dir, "jules-board.wal")))
             store.loadQueue().firstOrNull { it.workId == fingerprint }?.title
         }
         ?: fingerprint

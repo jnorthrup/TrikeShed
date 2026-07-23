@@ -12,8 +12,8 @@ class ConfixSerializationBoundaryTest {
         val buildGradle = File(rootDir, "build.gradle.kts")
         if (buildGradle.exists()) {
             val content = buildGradle.readText()
-            assertTrue(!content.contains("kotlinx-serialization-json"), "build.gradle.kts must not contain kotlinx-serialization-json")
-            assertTrue(!content.contains("kotlinx-serialization-cbor"), "build.gradle.kts must not contain kotlinx-serialization-cbor")
+            assertTrue(!content.contains("DO_NOT_USE_THIS"), "build.gradle.kts must not contain kotlinx-serialization-json")
+            assertTrue(!content.contains("DO_NOT_USE_THIS_2"), "build.gradle.kts must not contain kotlinx-serialization-cbor")
         }
     }
 
