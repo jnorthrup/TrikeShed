@@ -164,4 +164,28 @@ class UnifiedQueueWALTest {
             dir.deleteRecursively()
         }
     }
+
+    @Test
+    fun receiptlessDrainIsProjectedAsUnclaimed() = runBlocking {
+        val (store, dir) = tempStore()
+        try {
+            store.appendWork("w-unclaimed", JulesCause.WorkQueued(
+                workId = "w-unclaimed", tier = "task", title = "Unclaimed",
+                spec = "must block settlement", at = 100L,
+            ))
+            store.appendWork("w-unclaimed", JulesCause.WorkDrained(
+                workId = "w-unclaimed", sessionId = "sess-unclaimed",
+                commitSha = "deadbeef", taskId = "unclaimed-task",
+                receipt = null,
+                at = 200L,
+            ))
+
+            val entry = store.loadQueue().single()
+            assertTrue(entry.isDrained)
+            assertTrue(entry.isUnclaimedDrain)
+            assertNull(entry.receipt)
+        } finally {
+            dir.deleteRecursively()
+        }
+    }
 }

@@ -211,12 +211,13 @@ class FlywheelDriver(
         val local = command("git", "rev-parse", "HEAD")
         val remote = command("git", "rev-parse", "origin/master")
         if (local.exitCode != 0 || remote.exitCode != 0) return false
+        val unclaimedDrains = store.loadQueue().count { it.isUnclaimedDrain }
         val state = FlywheelGateState(
             workingTreeClean = command("git", "status", "--porcelain").output.isBlank(),
             openPullRequests = openPrs.output.trim().toIntOrNull() ?: return false,
             localRevision = local.output.trim(),
             remoteRevision = remote.output.trim(),
-            unclaimedDrains = 0,
+            unclaimedDrains = unclaimedDrains,
         )
         return FlywheelGatekeeper.evaluate(state) is FlywheelGateVerdict.Admit
     }

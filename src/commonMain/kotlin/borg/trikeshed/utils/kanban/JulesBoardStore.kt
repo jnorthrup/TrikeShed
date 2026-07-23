@@ -168,4 +168,5 @@ data class QueueEntry(
 ) {
     val isDispatched: Boolean get() = sessionId != null
     val isDrained: Boolean get() = drainedAt != null
+    val isUnclaimedDrain: Boolean get() = isDrained && receipt == null
 }
