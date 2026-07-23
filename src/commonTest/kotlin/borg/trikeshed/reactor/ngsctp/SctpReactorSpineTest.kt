@@ -63,7 +63,7 @@ class SctpReactorSpineTest {
         }
         assoc.close()
         job.join()
-        assertTrue(jobCancelled)
+        assertTrue(job.isCancelled)
     }
 
     @Test
