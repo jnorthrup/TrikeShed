@@ -13,6 +13,8 @@ import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
+import borg.trikeshed.lib.get
+import borg.trikeshed.lib.size
 
 /**
  * Round-trip the unified queue through the WAL. The board store is the truth —
