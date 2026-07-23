@@ -59,19 +59,6 @@ class TlvChunkParser {
     }
 }
 
-// 2. Bounded Channel Stream
-class BoundedChannelStream(capacity: Int) {
-    private val channel = Channel<ByteArray>(capacity)
-
-    fun enqueue(data: ByteArray): Boolean {
-        return channel.trySend(data).isSuccess
-    }
-
-    suspend fun dequeue(): ByteArray? {
-        val res = channel.receiveCatching()
-        return res.getOrNull()
-    }
-}
 
 // 3. Association Scope
 class SctpAssociationScope : CoroutineScope {
@@ -229,7 +216,7 @@ class SctpReactorSpine(
     private val sctpElement: SctpElement? = null,  // Optional: real SCTP element
 ) : SctpReactorEndpoint {
     private val scope = SctpAssociationScope()
-    private val stream = BoundedChannelStream(capacity = 100)
+    private val stream = borg.trikeshed.sctp.BoundedChannelStream(capacity = 100)
     private val parser = TlvChunkParser()
     
     // Active stream for actual SCTP I/O when sctpElement is provided
