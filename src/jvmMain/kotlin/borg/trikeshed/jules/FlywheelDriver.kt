@@ -180,20 +180,29 @@ class FlywheelDriver(
         - gate: ./gradlew jvmTest --no-daemon
     """.trimIndent()
 
-    /** Apply a patch locally, run jvmTest, commit on green. Returns commit SHA or null. */
+    /**
+     * Apply a patch locally, run jvmTest, commit on green. Returns commit SHA or null.
+     *
+     * The gate is non-destructive to the surrounding working tree: only the files
+     * the patch touches are applied, reverted on red, and committed on green. We
+     * never `git add -A` or `git checkout .` — those would sweep uncommitted local
+     * work into a flywheel commit or discard it entirely.
+     */
     private fun applyAndTest(patch: String, title: String): String? {
         try {
-            // Write patch file
+            val touchedFiles = parsePatchFiles(patch)
+            if (touchedFiles.isEmpty()) return null
+
+            // Write patch file and check if it applies cleanly
             val patchFile = File(repoDir, ".flywheel-patch")
             patchFile.writeText(patch)
 
-            // Check if can apply
-            val apply = ProcessBuilder("git", "apply", "--check", ".flywheel-patch")
+            val applyCheck = ProcessBuilder("git", "apply", "--check", ".flywheel-patch")
                 .directory(repoDir)
                 .redirectErrorStream(true)
                 .start()
                 .also { it.waitFor() }
-            if (apply.exitValue() != 0) {
+            if (applyCheck.exitValue() != 0) {
                 patchFile.delete()
                 return null
             }
@@ -210,23 +219,52 @@ class FlywheelDriver(
                 .start()
                 .also { it.waitFor() }
             if (test.exitValue() != 0) {
-                ProcessBuilder("git", "checkout", ".")
-                    .directory(repoDir).start().waitFor()
+                revertFiles(touchedFiles)
                 return null
             }
 
-            // Commit
-            val add = ProcessBuilder("git", "add", "-A")
+            // Stage ONLY the touched files, then commit
+            val addCmd = mutableListOf("git", "add")
+            addCmd.addAll(touchedFiles)
+            ProcessBuilder(addCmd)
                 .directory(repoDir).start().also { it.waitFor() }
+
             val commit = ProcessBuilder("git", "commit", "-m", "flywheel: $title")
                 .directory(repoDir).start().also { it.waitFor() }
-            if (commit.exitValue() != 0) return null
+            if (commit.exitValue() != 0) {
+                revertFiles(touchedFiles)
+                return null
+            }
 
             return headSha()
         } catch (_: Exception) {
-            ProcessBuilder("git", "checkout", ".").directory(repoDir).start().waitFor()
             return null
         }
+    }
+
+    /** Revert only the given files to HEAD. */
+    private fun revertFiles(files: List<String>) {
+        val cmd = mutableListOf("git", "checkout", "HEAD", "--")
+        cmd.addAll(files)
+        ProcessBuilder(cmd).directory(repoDir).redirectErrorStream(true).start().waitFor()
+    }
+
+    /** Parse unidiff headers (--- a/path, +++ b/path) to extract touched file paths. */
+    private fun parsePatchFiles(patch: String): List<String> {
+        val files = mutableListOf<String>()
+        for (line in patch.lines()) {
+            if (line.startsWith("+++ b/")) {
+                val path = line.removePrefix("+++ b/").trim()
+                if (path.isNotEmpty() && path != "/dev/null") files.add(path)
+            } else if (line.startsWith("+++ ") && !line.startsWith("+++ /dev/null")) {
+                // fallback: bare path without b/ prefix
+                val path = line.removePrefix("+++ ").trim()
+                if (path.isNotEmpty() && path != "/dev/null" && !path.startsWith("a/") && !path.startsWith("b/")) {
+                    files.add(path)
+                }
+            }
+        }
+        return files.distinct()
     }
 
     private fun headSha(): String {
