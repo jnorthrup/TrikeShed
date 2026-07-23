@@ -96,20 +96,6 @@ private fun markPoison(reason: String, card: JulesSessionCard) {
     println("[FLYWHEEL] POISON ${card.snapshot.sessionId.takeLast(6)} reason=$reason title=${card.card.title.take(50)}")
 }
 
-/**
- * Apply pill logic to the completed set: skip drained-rejects whose capturedAt is before NOON CST today. The wheel
- * releases those slots, the work won't be re-applied (reanimate in a new session citing the receipt), and induction
- * proceeds on the day's tail. Cards in the session that ARE post-noon proceed normally.
- */
-private fun dropPoisonedCompleted(allCompleted: List<JulesSessionCard>): List<JulesSessionCard> {
-    return allCompleted.filter { card ->
-        if (isPoison(card.snapshot.capturedAt)) {
-            markPoison("pre-noon-CST", card)
-            false
-        } else true
-    }
-}
-
 class FlywheelDriver(
     private val apiKey: String,
     private val repoDir: File = File(System.getProperty("user.dir")),
@@ -124,6 +110,28 @@ class FlywheelDriver(
         JvmFileOperations().resolvePath(forgeDir.absolutePath, "cas"),
     ),
 ) {
+    /**
+     * Refactor a poisoned work title into `doc/todo.md` as an unchecked item, IF the title is still
+     * relevant and not already queued. The wheel wouldn't have re-run the rejected session anyway,
+     * but if its stated work is still actionable the curator can re-dispatch it in a fresh session
+     * citing the poison receipt as parent evidence.
+     *
+     * Idempotent: skips if the same first-40-char fingerprint is already in todo.md. No-op on IO error.
+     */
+    private fun refactorPoisonedTitleIntoTodo(title: String) {
+        if (title.isBlank()) return
+        val todo = File(repoDir, "doc/todo.md")
+        if (!todo.exists()) return
+        val fingerprint = title.take(40).lowercase()
+        try {
+            val existing = todo.readLines()
+            if (existing.any { it.lowercase().contains(fingerprint) }) return
+            todo.appendText("\n- [ ] $title  *(requeued from poison: pre-noon-CST)*\n")
+            println("[FLYWHEEL] REFACTOR $fingerprint → doc/todo.md")
+        } catch (t: Throwable) {
+            println("[FLYWHEEL] REFACTOR-FAIL $fingerprint: ${t.message}")
+        }
+    }
     private val client = JulesRestClient(apiKey)
     private val brain: BrainClient? = System.getenv("NVIDIA_API_KEY")?.let { BrainClient(it) }
     private val store = JulesBoardStore(JvmAppendWal(File(forgeDir, "jules-board.wal")))
@@ -134,15 +142,19 @@ class FlywheelDriver(
         source = source,
     )
 
-    /** One cycle: poll → answer → drain → induct → dispatch. */
+    /** One cycle: poll → answer → sync → drain → induct → dispatch. */
     suspend fun cycle(): CycleReport {
+        // Mutable counters carried across all return points (early-exits must report them).
+        var answered = 0
+        var harvested = 0
+        var poisonTombstoned = 0
         // 1. POLL
         conductor.pollOnce()
 
         // 2. ANSWER — a waiting conversation is higher-leverage than a new
         //    dispatch: it unblocks a slot the wheel reuses THIS cycle. Draining
-        //    blocked work before induction keeps the flow even.
-        var answered = 0
+        //    blocked work before induction keeps the flow even. The `answered`
+        //    counter is hoisted above the POLL/SYNC early-exits so we report it.
         val awaiting = conductor.cards.values.filter {
             it.snapshot.state == "AWAITING_USER_FEEDBACK" &&
                 it.causes.lastOrNull() !is JulesCause.HumanAnswered
@@ -164,7 +176,7 @@ class FlywheelDriver(
         //    cannot proceed until master is synchronized.
         if (!synchronizeMain()) {
             println("[FLYWHEEL] BLOCKED master is not cleanly synchronized with origin/master")
-            return CycleReport(answered, 0, 0, activeCount(), settled = false, phase = FlywheelPhase.SYNC)
+            return CycleReport(answered, harvested, 0, activeCount(), settled = false, poisonTombstoned = poisonTombstoned, phase = FlywheelPhase.SYNC)
         }
 
         // 4. DRAIN — settle completed patches so slots free for induction.
@@ -174,8 +186,47 @@ class FlywheelDriver(
         //    Jules session id (the ticket); the patchCid is backed by a real CAS
         //    blob, and the optional prUrl ties it to the upstream PR/branch if one
         //    was fished from origin. Drains are serial: each commits onto master.
-        var harvested = 0
-        val completed = dropPoisonedCompleted(conductor.cards.values.filter { it.snapshot.state == "COMPLETED" && !it.drained })
+        //    `harvested` and `poisonTombstoned` are hoisted above for early-exit reporting.
+        val prePoison = conductor.cards.values.filter { it.snapshot.state == "COMPLETED" && !it.drained }
+        val (viableCards, poisonCards) = prePoison.partition { !isPoison(it.snapshot.capturedAt) }
+        for (card in poisonCards) {
+            markPoison("pre-noon-CST", card)
+            // Emit a poison receipt: an immutable claim naming the session, the verdict=poison, and a null patchCid.
+            // This is the canonical "rejected" record — it settles the work so the slot frees and the wheel
+            // doesn't retry it. The receipt is appended as a WorkDrained cause so it lands in the WAL.
+            val sid = card.snapshot.sessionId
+            val work = store.loadQueue().firstOrNull { it.sessionId == sid }
+            val poisonReceipt = borg.trikeshed.util.oroboros.MergeReceipt(
+                workId = work?.workId ?: "session:$sid",
+                producer = "jules",
+                producerRef = sid,
+                patchCid = borg.trikeshed.job.ContentId.of("poison:".encodeToByteArray()),
+                revision = headSha(),
+                versionTag = "poison/jules-$sid",
+                lexicalMemory = LexicalMemory(
+                    summary = "POISON:pre-noon-CST",
+                    title = card.card.title.take(120),
+                    content = "rejected:${card.card.title}",
+                ),
+                claimedAt = Clock.System.now().toEpochMilliseconds(),
+                prUrl = null,
+            )
+            conductor.recordDrain(sid, poisonReceipt.revision, 0)
+            work?.let {
+                store.appendWork(it.workId, JulesCause.WorkDrained(
+                    workId = it.workId,
+                    sessionId = sid,
+                    commitSha = poisonReceipt.revision,
+                    taskId = "poison",
+                    receipt = poisonReceipt,
+                    at = Clock.System.now().toEpochMilliseconds(),
+                ))
+            }
+            // Refactor the work into doc/todo.md if it's still relevant and not already present.
+            refactorPoisonedTitleIntoTodo(card.card.title)
+            poisonTombstoned++
+        }
+        val completed = viableCards
         for (card in completed) {
             val sid = card.snapshot.sessionId
             val patch = client.lastPatch(sid)
@@ -221,7 +272,7 @@ class FlywheelDriver(
         //    this cycle adds no new work. Phase [FlywheelPhase.SETTLE].
         if (!settlementBarrier()) {
             println("[FLYWHEEL] BLOCKED settlement barrier: push/parity/open-PR invariant failed")
-            return CycleReport(answered, harvested, 0, activeCount(), settled = false, phase = FlywheelPhase.SETTLE)
+            return CycleReport(answered, harvested, 0, activeCount(), settled = false, poisonTombstoned = poisonTombstoned, phase = FlywheelPhase.SETTLE)
         }
 
         // 6. INDUCT — read doc/todo.md into the WAL as WorkQueued causes.
@@ -281,7 +332,7 @@ class FlywheelDriver(
             }
         }
 
-        return CycleReport(answered, harvested, dispatched, alive, inducted, settled = true, phase = FlywheelPhase.DISPATCH)
+        return CycleReport(answered, harvested, dispatched, alive, inducted, poisonTombstoned, settled = true, phase = FlywheelPhase.DISPATCH)
     }
 
     private fun activeCount(): Int = conductor.cards.values.count {
@@ -764,6 +815,7 @@ class FlywheelDriver(
         val dispatched: Int,
         val alive: Int,
         val inducted: Int = 0,
+        val poisonTombstoned: Int = 0,
         val settled: Boolean = false,
         /** Which [FlywheelPhase] the cycle last reached before returning (the priority manifest). */
         val phase: FlywheelPhase = FlywheelPhase.POLL,
