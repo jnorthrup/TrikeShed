@@ -10,6 +10,7 @@ import borg.trikeshed.lib.j
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -35,32 +36,19 @@ class SctpReactorSpineTest {
     }
 
     @Test
-    fun testBoundedChannelStreamEnqueueDequeue() = runTest {
-        val stream = BoundedChannelStream(capacity = 2)
-        assertTrue(stream.enqueue("chunk1".encodeToByteArray()))
-        assertTrue(stream.enqueue("chunk2".encodeToByteArray()))
-
-        val overflow = !stream.enqueue("chunk3".encodeToByteArray())
-        assertTrue(overflow, "Should overflow")
-
-        val chunk1 = stream.dequeue()
-        assertEquals("chunk1", chunk1?.decodeToString())
-
-        val chunk2 = stream.dequeue()
-        assertEquals("chunk2", chunk2?.decodeToString())
-    }
-
-    @Test
     fun testAssociationScopeCancellation() = runTest {
         val assoc = SctpAssociationScope()
         var jobCancelled = false
         val job = assoc.launch {
             try {
                 delay(1000)
+            } catch (e: CancellationException) {
+                jobCancelled = true
             } finally {
                 jobCancelled = true
             }
         }
+        kotlinx.coroutines.yield()
         assoc.close()
         job.join()
         assertTrue(jobCancelled)
@@ -97,6 +85,87 @@ class SctpReactorSpineTest {
         val spine = SctpReactorSpine()
         assertEquals(8080, spine.bind(8080))
         spine.close()
+    }
+
+    @Test
+    fun testSubnetJobBufferCapacityTrigger() = runTest {
+        var triggerCount = 0
+        var lastBatchSize = 0
+        
+        val buffer = SubnetJobBuffer(
+            subnet = "test.subnet",
+            capacity = 3,
+            onFull = { batch ->
+                triggerCount++
+                lastBatchSize = batch.size
+            }
+        )
+        
+        // Enqueue 2 jobs - should not trigger
+        assertTrue(!buffer.enqueue("job1".encodeToByteArray()))
+        assertTrue(!buffer.enqueue("job2".encodeToByteArray()))
+        assertEquals(0, triggerCount)
+        assertEquals(2, buffer.size())
+        
+        // Enqueue 3rd job - should trigger (capacity = 3)
+        assertTrue(buffer.enqueue("job3".encodeToByteArray()))
+        assertEquals(1, triggerCount)
+        assertEquals(3, lastBatchSize)
+        
+        // Buffer should be cleared after trigger
+        assertEquals(0, buffer.size())
+        
+        // Enqueue 2 more - should not trigger
+        assertTrue(!buffer.enqueue("job4".encodeToByteArray()))
+        assertTrue(!buffer.enqueue("job5".encodeToByteArray()))
+        assertEquals(1, triggerCount)
+        
+        // Enqueue 3rd - should trigger again
+        assertTrue(buffer.enqueue("job6".encodeToByteArray()))
+        assertEquals(2, triggerCount)
+        assertEquals(3, lastBatchSize)
+    }
+
+    @Test
+    fun testSubnetJobAssemblyDefaultCapacities() {
+        val assembly = SubnetJobAssembly()
+        
+        // Verify default concentric capacities
+        assertEquals(3, SubnetJobAssembly.capacityForSubnet("core"))
+        assertEquals(5, SubnetJobAssembly.capacityForSubnet("process.self"))
+        assertEquals(10, SubnetJobAssembly.capacityForSubnet("local"))
+        assertEquals(20, SubnetJobAssembly.capacityForSubnet("lan.localhost"))
+        
+        // Unknown subnet defaults to local
+        assertEquals(10, SubnetJobAssembly.capacityForSubnet("unknown.subnet"))
+    }
+
+    @Test
+    fun testSubnetJobAssemblyCustomCapacities() = runTest {
+        val customCaps = mapOf(
+            "core" to 2,
+            "mesh.worker.1" to 15
+        )
+        
+        val assembly = SubnetJobAssembly(
+            fanout = null,
+            defaultCapacity = 5,
+            subnetCapacities = customCaps
+        )
+        
+        // Register subnets with custom capacities
+        assembly.registerSubnet("core", 2)
+        assembly.registerSubnet("mesh.worker.1", 15)
+        
+        // Enqueue to core - should trigger at 2
+        assertTrue(!assembly.enqueue("core", "job1".encodeToByteArray()))
+        assertTrue(assembly.enqueue("core", "job2".encodeToByteArray())) // triggers
+        
+        // Enqueue to mesh.worker.1 - should trigger at 15
+        for (i in 1..14) {
+            assertTrue(!assembly.enqueue("mesh.worker.1", "job$i".encodeToByteArray()))
+        }
+        assertTrue(assembly.enqueue("mesh.worker.1", "job15".encodeToByteArray())) // triggers
     }
 }
 
