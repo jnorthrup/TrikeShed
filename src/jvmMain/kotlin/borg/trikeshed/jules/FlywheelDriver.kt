@@ -50,6 +50,7 @@ class FlywheelDriver(
     private val forgeDir: File = File(System.getProperty("user.home"), ".local/forge"),
     private val intervalMs: Long = 60_000L,
     private val maxSlots: Int = 15,
+    private val maxInductPerCycle: Int = 1,
     private val source: String = "sources/github/jnorthrup/TrikeShed",
 ) {
     private val client = JulesRestClient(apiKey)
@@ -150,10 +151,14 @@ class FlywheelDriver(
         // 7. DISPATCH — take from the unified queue projection, sorted by
         //    score descending. Waiting work (AWAITING, just answered above)
         //    already holds its slot; we only fill capacity freed by drain.
+        //    Guard: never dispatch new work while any session is still
+        //    AWAITING — that would pile new conversations onto unresolved ones.
         var dispatched = 0
         val alive = activeCount()
         val available = (maxSlots - alive).coerceAtLeast(0)
-        if (available > 0) {
+        val stillAwaiting = conductor.cards.values.count {
+            it.snapshot.state == "AWAITING_USER_FEEDBACK" }
+        if (available > 0 && stillAwaiting == 0) {
             val pending = store.loadQueue()
                 .filter { !it.isDispatched && !it.isDrained }
                 .sortedByDescending { it.score }
@@ -275,6 +280,7 @@ class FlywheelDriver(
             ))
             knownWorkIds += workId
             n++
+            if (n >= maxInductPerCycle) break
         }
         return n
     }
@@ -499,14 +505,28 @@ class FlywheelDriver(
         @JvmStatic
         fun main(args: Array<String>) {
             val apiKey = System.getenv("JULES_API_KEY") ?: error("JULES_API_KEY required")
+            val once = args.any { it == "--once" }
+            val watch = args.any { it == "--watch" }
             val driver = FlywheelDriver(apiKey)
             println("[FLYWHEEL] Starting driver on ${driver.repoDir}")
+            if (once) {
+                runBlocking {
+                    val report = driver.cycle()
+                    println(driver.renderSaturation())
+                    println("[FLYWHEEL] Cycle: answered=${report.answered} harvested=${report.harvested} inducted=${report.inducted} dispatched=${report.dispatched} alive=${report.alive} settled=${report.settled}")
+                }
+                return
+            }
             runBlocking {
                 while (true) {
                     val start = System.currentTimeMillis()
                     val report = driver.cycle()
                     println(driver.renderSaturation())
                     println("[FLYWHEEL] Cycle: answered=${report.answered} harvested=${report.harvested} inducted=${report.inducted} dispatched=${report.dispatched} alive=${report.alive} settled=${report.settled}")
+                    if (!watch) {
+                        println("[FLYWHEEL] one-shot (no --watch); exiting")
+                        return@runBlocking
+                    }
                     val elapsed = System.currentTimeMillis() - start
                     val delay = (driver.intervalMs - elapsed).coerceAtLeast(5_000)
                     delay(delay)
