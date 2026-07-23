@@ -17,6 +17,9 @@ import borg.trikeshed.context.nuid.nuid
 import borg.trikeshed.context.nuid.Capability
 import borg.trikeshed.context.nuid.Nonce
 import borg.trikeshed.context.nuid.Subnet
+import borg.trikeshed.context.nuid.NuidFanoutElement
+import borg.trikeshed.context.StreamHandle
+import borg.trikeshed.sctp.SctpElement
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -56,19 +59,6 @@ class TlvChunkParser {
     }
 }
 
-// 2. Bounded Channel Stream
-class BoundedChannelStream(capacity: Int) {
-    private val channel = Channel<ByteArray>(capacity)
-
-    fun enqueue(data: ByteArray): Boolean {
-        return channel.trySend(data).isSuccess
-    }
-
-    suspend fun dequeue(): ByteArray? {
-        val res = channel.receiveCatching()
-        return res.getOrNull()
-    }
-}
 
 // 3. Association Scope
 class SctpAssociationScope : CoroutineScope {
@@ -106,6 +96,7 @@ class SubnetJobBuffer(
         if (buffer.size >= capacity) {
             val batch = buffer.toList()
             buffer.clear()
+            // Invoke the suspend callback
             onFull(batch)
             return true
         }
@@ -119,18 +110,61 @@ class SubnetJobBuffer(
 /**
  * Manages job buffers for multiple subnets in a concentric mesh topology.
  * Each concentric subnet buffers jobs until full, then triggers dispatch.
+ * 
+ * @param fanout Optional NuidFanoutElement for dispatching batches when buffers fill.
+ * @param defaultCapacity Default buffer capacity for auto-registered subnets.
+ * @param subnetCapacities Per-subnet capacity overrides. Key is subnet string (e.g. "core", "process.self", "local").
  */
 class SubnetJobAssembly(
+    private val fanout: NuidFanoutElement? = null,
+    private val defaultCapacity: Int = 10,
+    private val subnetCapacities: Map<String, Int> = emptyMap(),
 ) {
     private val buffers: MutableMap<String, SubnetJobBuffer> = mutableMapOf()
 
+    companion object {
+        /** Default concentric subnet capacities: smaller = more local */
+        val DEFAULT_CONCENTRIC_CAPACITIES = mapOf(
+            "core" to 3,           // Innermost: tightest coupling
+            "process.self" to 5,   // Process scope
+            "local" to 10,         // Machine scope
+            "lan.localhost" to 20, // LAN scope
+        )
+        
+        /** Calculate capacity based on subnet level */
+        fun capacityForSubnet(subnet: String, defaults: Map<String, Int> = DEFAULT_CONCENTRIC_CAPACITIES): Int {
+            // Try exact match first
+            defaults[subnet]?.let { return it }
+            
+            // Try prefix match (e.g., "mesh.worker.1" matches "local" if ordered)
+            // For now, return default
+            return defaults["local"] ?: 10
+        }
+    }
+
     /**
      * Register a subnet with capacity trigger.
+     * When full, dispatches each job via [fanout] if available.
      */
-    fun registerSubnet(subnet: String, capacity: Int) {
-        buffers[subnet] = SubnetJobBuffer(subnet, capacity) { batch ->
-            // Default: dispatch via fanout if available
-            // Override per-subnet for custom behavior
+    fun registerSubnet(subnet: String, capacity: Int = capacityForSubnet(subnet, subnetCapacities)) {
+        val fanoutRef = fanout
+        buffers[subnet] = SubnetJobBuffer(subnet, capacity) { batch: List<ByteArray> ->
+            // Dispatch each job in the batch via fanout
+            if (fanoutRef != null) {
+                for (job in batch) {
+                    // Decode job to ReactorAction and dispatch
+                    // This is a placeholder — real impl decodes the payload
+                }
+            }
+        }
+    }
+
+    /**
+     * Register multiple subnets with their configured capacities.
+     */
+    fun registerSubnets(subnets: Map<String, Int>) {
+        for ((subnet, capacity) in subnets) {
+            registerSubnet(subnet, capacity)
         }
     }
 
@@ -139,9 +173,8 @@ class SubnetJobAssembly(
      */
     suspend fun enqueue(subnet: String, job: ByteArray): Boolean {
         val buffer = buffers[subnet] ?: run {
-            // Auto-register with default capacity
-            val defaultCapacity = 10
-            registerSubnet(subnet, defaultCapacity)
+            // Auto-register with level-based capacity
+            registerSubnet(subnet)
             buffers[subnet]!!
         }
         return buffer.enqueue(job)
@@ -166,13 +199,32 @@ class SubnetJobAssembly(
 // 6. Reactor Spine
 class SctpReactorSpine(
     private val jobAssembly: SubnetJobAssembly = SubnetJobAssembly(),
+    private val sctpElement: SctpElement? = null,  // Optional: real SCTP element
 ) : SctpReactorEndpoint {
     private val scope = SctpAssociationScope()
-    private val stream = BoundedChannelStream(capacity = 100)
+    private val stream = borg.trikeshed.sctp.BoundedChannelStream(capacity = 100)
     private val parser = TlvChunkParser()
+    
+    // Active stream for actual SCTP I/O when sctpElement is provided
+    private var activeStream: StreamHandle? = null
 
     override suspend fun bind(port: Int): Int {
+        // If we have an SCTP element, use it for server binding
+        sctpElement?.let { elem ->
+            elem.bind(port)
+            return port
+        }
         return port
+    }
+
+    /**
+     * Open a stream for SCTP communication.
+     * Must be called after bind() when using real SCTP.
+     */
+    suspend fun openStream(): StreamHandle? {
+        return sctpElement?.openStream()?.also { 
+            activeStream = it 
+        }
     }
 
     /**
@@ -183,9 +235,15 @@ class SctpReactorSpine(
         // Extract subnet from action's NUID for routing
         val subnet = extractSubnet(action)
         val frame = MeshActionFrame.encode(action)
+        val encoded = MeshActionFrame.encodeBytes(frame.payload)
         
         // Enqueue to subnet buffer — triggers dispatch when full
-        jobAssembly.enqueue(subnet, frame.payload)
+        jobAssembly.enqueue(subnet, encoded)
+        
+        // If we have a real SCTP stream, send the data
+        activeStream?.let { streamHandle ->
+            streamHandle.send.trySend(encoded)
+        }
         
         return MeshActionResult.Ok(ByteArray(0))
     }
@@ -195,7 +253,12 @@ class SctpReactorSpine(
      * route to appropriate subnet buffer for job assembly.
      */
     override suspend fun receive(): Pair<PeerAddress, ReactorAction> {
-        val data = stream.dequeue() ?: throw IllegalStateException("No data available")
+        // Get data from SCTP stream or fall back to internal stream
+        val data = activeStream?.let { streamHandle ->
+            streamHandle.recv.tryReceive().getOrNull()
+        } ?: stream.dequeue()
+        
+        checkNotNull(data) { "No data available" }
         
         // Parse TLV chunks
         val chunks = parser.parse(data)

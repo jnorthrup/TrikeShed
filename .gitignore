@@ -1,3 +1,11 @@
+# Flywheel runtime artifacts — state lives in ~/.local/forge, never in the repo
+jules-board.wal
+trajectory.json
+**/jules-board.wal
+**/trajectory.json
+~/
+.graveyard/
+
 # Gradle
 .gradle/
 build/
