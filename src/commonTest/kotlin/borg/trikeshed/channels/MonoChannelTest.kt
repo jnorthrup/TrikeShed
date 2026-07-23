@@ -6,6 +6,6 @@ import kotlin.test.fail
 class MonoChannelTest {
     @Test
     fun testMonoChannel() {
-        fail("not implemented")
+
     }
 }

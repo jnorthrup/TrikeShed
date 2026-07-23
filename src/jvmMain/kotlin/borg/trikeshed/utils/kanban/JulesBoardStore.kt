@@ -145,22 +145,3 @@ data class QueueEntry(
     val isDrained: Boolean get() = drainedAt != null
 }
 
-/** Queue entry projected from the unified WAL. */
-data class QueueEntry(
-    val workId: String,
-    val tier: String,
-    val title: String,
-    val spec: String,
-    val parent: String? = null,
-    val score: Double = 0.5,
-    val queuedAt: Long = 0L,
-    val sessionId: String? = null,
-    val attempt: Int = 0,
-    val dispatchedAt: Long? = null,
-    val commitSha: String? = null,
-    val taskId: String? = null,
-    val drainedAt: Long? = null,
-) {
-    val isDispatched: Boolean get() = sessionId != null
-    val isDrained: Boolean get() = drainedAt != null
-}
