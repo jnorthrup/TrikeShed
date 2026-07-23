@@ -13,22 +13,23 @@ class ReducerRegistryTest {
         assertNotNull(ReducerRegistry.registry["cas"])
         assertNotNull(ReducerRegistry.registry["wireproto"])
     }
-    
+
     @Test
     fun testCategoryExtension() {
-        assertEquals("process", Capability.Process.category)
-        assertEquals("cas", Capability.Cas.category)
-        assertEquals("wireproto", Capability.Wireproto.category)
-        assertEquals("mesh", Capability.Mesh.category)
-        assertEquals("modelmux", Capability.ModelMux.category)
+        assertEquals("process", Capability.Process("test").category)
+        assertEquals("cas", Capability.Cas("test").category)
+        assertEquals("wireproto", Capability.Wireproto("test").category)
+        assertEquals("sctp", Capability.Sctp.category)
+        assertEquals("modelmux", Capability.Model.category)
+        assertEquals("trajectory", Capability.Trajectory.category)
     }
 
     @Test
     fun testRunForMix() {
-        val res = ReducerRegistry.runFor(Capability.Process, null)
+        val res = ReducerRegistry.runFor(Capability.Process("test"), null)
         assertNotNull(res)
-        
-        val meshRes = ReducerRegistry.runFor(Capability.Mesh, null)
-        assertNull(meshRes)
+
+        val sctpRes = ReducerRegistry.runFor(Capability.Sctp, null)
+        assertNull(sctpRes)
     }
 }

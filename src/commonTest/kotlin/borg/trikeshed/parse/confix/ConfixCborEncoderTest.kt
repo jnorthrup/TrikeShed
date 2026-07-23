@@ -19,6 +19,8 @@ class ConfixCborEncoderTest {
 
         assertContentEquals(bytes(0x1b, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff), emit(ConfixPrimitive(ULong.MAX_VALUE.toString(), false)))
 
+        assertContentEquals(bytes(0xfb, 0xc3, 0xf0, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00), emit(ConfixPrimitive("-18446744073709551616", false)))
+
         assertContentEquals(bytes(0x20), emit(ConfixPrimitive((-1).toString(), false)))
         assertContentEquals(bytes(0x37), emit(ConfixPrimitive((-24).toString(), false)))
         assertContentEquals(bytes(0x38, 0x18), emit(ConfixPrimitive((-25).toString(), false)))

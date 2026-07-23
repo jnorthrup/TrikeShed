@@ -45,19 +45,18 @@ internal object ConfixCborEmitter {
                 val ulong = v.toULongOrNull()
                 // Try Long for negative integers
                 val long = v.toLongOrNull()
+
+                val isNegativeStr = v.startsWith("-")
+                val ulongNeg = if (isNegativeStr && v != "-") v.substring(1).toULongOrNull() else null
                 val dbl = v.toDoubleOrNull()
                 when {
                     bool != null -> out.write(if (bool) 0xF5 else 0xF4)
                     ulong != null -> {
                         writeHead(out, 0, ulong)
                     }
-                    long != null -> {
-                        if (long >= 0) {
-                            writeHead(out, 0, long.toULong())
-                        } else {
-                            val magnitude = (-1L - long).toULong()
-                            writeHead(out, 1, magnitude)
-                        }
+                    ulongNeg != null -> {
+                        val magnitude = ulongNeg - 1uL
+                        writeHead(out, 1, magnitude)
                     }
                     dbl != null -> {
                         out.write(0xFB)

@@ -1,4 +1,4 @@
-package borg.trikeshed.lcnc.reduction
+package borg.trikeshed.reduction
 
 import borg.trikeshed.job.JobSnapshot
 import borg.trikeshed.jules.JulesCause
@@ -9,6 +9,34 @@ import borg.trikeshed.lib.j
 import borg.trikeshed.lib.α
 import borg.trikeshed.lib.size
 import borg.trikeshed.lib.get
+
+/**
+ * Top-level convenience: fold a list of causes into a verdict without building a
+ * full TrajectoryPayload. Used by the CLI and by callers that already have a
+ * plain List<JulesCause>. Uses a synthetic empty-deps TrajectoryPayload.
+ */
+fun verdictFor(
+    cardCauses: List<JulesCause>,
+    taskFingerprint: String,
+    attemptCount: Int,
+    deps: List<String>,
+): TrajectoryVerdict {
+    val series = emptySeriesOf<JulesCause>().let { empty ->
+        // Build a Series<JulesCause> from a list — uses the same α map mechanism.
+        var result = empty
+        for (c in cardCauses) result = result α { c }
+        result
+    }
+    val payload = TrajectoryPayload(
+        title = taskFingerprint,
+        headSha = taskFingerprint,
+        causes = series,
+        depJobIds = deps,
+    )
+    val carrier = TrajectoryCarrier(payload)
+    val reduction = TrajectoryReduction()
+    return reduction.executeWithCheckpoints(carrier).output.copy(attemptCount = attemptCount)
+}
 
 data class TrajectoryPayload(
     val title: String,

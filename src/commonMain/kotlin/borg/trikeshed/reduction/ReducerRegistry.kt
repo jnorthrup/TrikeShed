@@ -1,6 +1,7 @@
 package borg.trikeshed.reduction
 
 import borg.trikeshed.context.nuid.Capability
+import borg.trikeshed.reduction.TrajectoryReduction
 
 val borg.trikeshed.context.nuid.Capability.category: String
     get() = when (this) {
