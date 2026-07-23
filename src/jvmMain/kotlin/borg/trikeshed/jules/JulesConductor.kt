@@ -21,13 +21,18 @@ class JulesConductor(
     private val client: JulesRestClient,
     private val headShaProvider: () -> String,
     private val store: JulesBoardStore? = null,
+    private val source: String = "sources/github/jnorthrup/TrikeShed",
 ) {
     /** Cards keyed by session id. The board. Projection of the causal log. */
     val cards: MutableMap<String, JulesSessionCard> = store?.load() ?: mutableMapOf()
 
     /** One poll cycle: snapshot surroundings, diff, record causes, persist. */
     suspend fun pollOnce() {
-        val sessions = client.listSessions()
+        val sessions = client.listSessions(source)
+        // The WAL may predate source isolation. Never retain a replayed card
+        // unless the authoritative Jules source currently owns that session.
+        val authoritativeIds = sessions.mapTo(mutableSetOf()) { it.id }
+        cards.keys.retainAll(authoritativeIds)
         val active = sessions.count { it.state == "IN_PROGRESS" || it.state == "PLANNING" || it.state == "QUEUED" }
         val awaiting = sessions.count { it.state == "AWAITING_USER_FEEDBACK" }
         val headSha = headShaProvider()
@@ -132,6 +137,7 @@ class JulesConductor(
                         .start().inputStream.bufferedReader().readText().trim()
                 },
                 store = JulesBoardStore(),
+                source = "sources/github/jnorthrup/TrikeShed",
             )
             kotlinx.coroutines.runBlocking {
                 if (once) {

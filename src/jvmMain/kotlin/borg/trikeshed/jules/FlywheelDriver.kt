@@ -39,6 +39,7 @@ class FlywheelDriver(
         client = client,
         headShaProvider = { headSha() },
         store = store,
+        source = source,
     )
 
     /** One cycle: poll → answer → harvest → dispatch → persist */

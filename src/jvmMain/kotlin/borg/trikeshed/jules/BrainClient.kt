@@ -32,7 +32,7 @@ class BrainClient(
     /** Non-streaming chat completion. Returns the assistant's message text. */
     fun chat(messages: List<Pair<String, String>>, maxTokens: Int = 256, temperature: Double = 0.2): String {
         val body = buildString {
-            append("""{"model":${jsonStr(model)},"messages":[$""")
+            append("""{"model":${jsonStr(model)},"messages":[""")
             messages.forEachIndexed { i, (role, content) ->
                 if (i > 0) append(',')
                 append("""{"role":${jsonStr(role)},"content":${jsonStr(content)}}""")

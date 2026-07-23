@@ -45,23 +45,39 @@ class JulesRestClient(
         val excerpt: String,    // first 140 chars of the message body, if any
     )
 
-    /** List all sessions (pageSize 100). */
-    fun listSessions(): List<SessionInfo> {
-        val body = get("/sessions?pageSize=100")
-        val parsed = JsonSupport.parse(body) as? Map<*, *> ?: return emptyList()
-        val sessions = parsed["sessions"] as? List<*> ?: return emptyList()
-        return sessions.mapNotNull { s ->
-            val m = s as? Map<*, *> ?: return@mapNotNull null
-            val name = m["name"]?.toString() ?: return@mapNotNull null
-            SessionInfo(
-                id = name.substringAfterLast('/'),
-                state = m["state"]?.toString() ?: "UNKNOWN",
-                title = m["title"]?.toString() ?: "",
-                patchBytes = 0L, // filled by patchProbe for COMPLETED sessions
-                source = ((m["sourceContext"] as? Map<*, *>)?.get("source"))?.toString() ?: "",
-                updateTime = m["updateTime"]?.toString() ?: m["createTime"]?.toString() ?: "",
-            )
-        }
+    /**
+     * List sessions across every API page, optionally constrained to one exact
+     * Jules source. Empty/missing source values never match a requested source:
+     * adopting them would let patches from another repository cross the tenant
+     * boundary and reach this repository's settlement gate.
+     */
+    fun listSessions(source: String? = null): List<SessionInfo> {
+        val out = mutableListOf<SessionInfo>()
+        var pageToken: String? = null
+        do {
+            val path = buildString {
+                append("/sessions?pageSize=100")
+                if (!pageToken.isNullOrEmpty()) append("&pageToken=${java.net.URLEncoder.encode(pageToken, Charsets.UTF_8)}")
+            }
+            val parsed = JsonSupport.parse(get(path)) as? Map<*, *> ?: break
+            val sessions = parsed["sessions"] as? List<*> ?: emptyList<Any?>()
+            for (s in sessions) {
+                val m = s as? Map<*, *> ?: continue
+                val name = m["name"]?.toString() ?: continue
+                val sessionSource = ((m["sourceContext"] as? Map<*, *>)?.get("source"))?.toString() ?: ""
+                if (source != null && sessionSource != source) continue
+                out += SessionInfo(
+                    id = name.substringAfterLast('/'),
+                    state = m["state"]?.toString() ?: "UNKNOWN",
+                    title = m["title"]?.toString() ?: "",
+                    patchBytes = 0L, // filled from activities for COMPLETED sessions
+                    source = sessionSource,
+                    updateTime = m["updateTime"]?.toString() ?: m["createTime"]?.toString() ?: "",
+                )
+            }
+            pageToken = parsed["nextPageToken"]?.toString()?.takeIf { it.isNotBlank() }
+        } while (pageToken != null)
+        return out
     }
 
     /** Ordered activities for a session, each carrying its minted serial. */
