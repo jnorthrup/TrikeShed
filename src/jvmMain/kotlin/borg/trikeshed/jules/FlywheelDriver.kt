@@ -80,27 +80,51 @@ class FlywheelDriver(
             }
         }
 
-        // 4. DISPATCH from doc/todo.md
+        // 4. PRODUCER: Parse doc/todo.md and append WorkQueued to WAL
+        val todo = File(repoDir, "doc/todo.md")
+        if (todo.exists()) {
+            val lines = todo.readLines()
+            val items = lines.filter { it.matches(Regex("^\\s*- \\[ \\].*")) }
+            val totalItems = items.size
+            for ((index, item) in items.withIndex()) {
+                val title = item.replace(Regex("^\\s*- \\[ \\]\\s*\\*\\*?|\\*\\*?$"), "").trim()
+                if (title.isNotEmpty()) {
+                    val workId = title.hashCode().toUInt().toString(16)
+                    val spec = buildSpec(title)
+                    val score = (totalItems - index).toDouble() / totalItems.toDouble()
+                    val cause = JulesCause.WorkQueued(
+                        workId = workId,
+                        tier = "todo",
+                        title = title,
+                        spec = spec,
+                        score = score,
+                        at = System.currentTimeMillis()
+                    )
+                    store.appendWork(workId, cause)
+                }
+            }
+        }
+
+        // 5. DISPATCH: Take from unified queue WAL projection
         var dispatched = 0
         val alive = conductor.cards.values.count { it.snapshot.state != "COMPLETED" && it.snapshot.state != "FINISHED" }
         val available = maxSlots - alive
         if (available > 0) {
-            val todo = File(repoDir, "doc/todo.md")
-            if (todo.exists()) {
-                val items = todo.readLines().filter { it.matches(Regex("^\\s*- \\[ \\].*")) }
-                val existing = conductor.cards.values.map { it.card.title }.toSet()
-                for (item in items.take(available)) {
-                    val title = item.replace(Regex("^\\s*- \\[ \\]\\s*\\*\\*?|\\*\\*?$"), "").trim()
-                    if (title.isNotEmpty() && title !in existing) {
-                        val spec = buildSpec(title)
-                        try {
-                            client.createSession(prompt = spec, title = title, source = source)
-                            dispatched++
-                            println("[FLYWHEEL] DISPATCH ${title.take(60)}")
-                        } catch (t: Throwable) {
-                            println("[FLYWHEEL] FAIL $title: ${t.message}")
-                        }
-                    }
+            val queue = store.loadQueue()
+            val pending = queue.filter { !it.isDispatched && !it.isDrained }.sortedByDescending { it.score }
+            for (entry in pending.take(available)) {
+                try {
+                    val sessionId = client.createSession(prompt = entry.spec, title = entry.title, source = source)
+                    store.appendWork(entry.workId, JulesCause.WorkDispatched(
+                        workId = entry.workId,
+                        sessionId = sessionId,
+                        attempt = entry.attempt + 1,
+                        at = System.currentTimeMillis()
+                    ))
+                    dispatched++
+                    println("[FLYWHEEL] DISPATCH ${entry.title.take(60)}")
+                } catch (t: Throwable) {
+                    println("[FLYWHEEL] FAIL ${entry.title}: ${t.message}")
                 }
             }
         }
