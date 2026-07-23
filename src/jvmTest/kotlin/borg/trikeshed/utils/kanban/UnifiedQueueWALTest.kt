@@ -122,6 +122,79 @@ class UnifiedQueueWALTest {
     }
 
     @Test
+    fun receiptPrUrlRoundTripsThroughWal() = runBlocking {
+        // The receipt's prUrl is optional but, when set, must survive the
+        // WAL encode/decode round trip — otherwise the receipt persisted on
+        // disk loses its tie to the upstream PR/branch surface.
+        val (store, dir) = tempStore()
+        try {
+            val prUrl = "https://github.com/jnorthrup/TrikeShed/commit/abc123def456abc123def456abc123def456abcd"
+            // loadQueue folds WorkDrained onto a pre-existing WorkQueued key
+            // (JulesBoardStore.loadQueue:127-141); mirror the production pattern.
+            store.appendWork("w-4", JulesCause.WorkQueued(
+                workId = "w-4", tier = "feature", title = "PR bridge",
+                spec = "do it", at = 900L,
+            ))
+            store.appendWork("w-4", JulesCause.WorkDrained(
+                workId = "w-4", sessionId = "sess-4",
+                commitSha = "abc123def456abc123def456abc123def456abcd",
+                taskId = "abc-task",
+                receipt = MergeReceipt(
+                    workId = "w-4",
+                    producer = "jules",
+                    producerRef = "sess-4",
+                    patchCid = ContentId("sha256:" + "a".repeat(64)),
+                    revision = "abc123def456abc123def456abc123def456abcd",
+                    versionTag = "flywheel/jules-sess-4-abc123def456",
+                    lexicalMemory = LexicalMemory(
+                        summary = "PR-bridge", title = "t", content = "c",
+                    ),
+                    claimedAt = 999L,
+                    prUrl = prUrl,
+                ),
+                at = 1000L,
+            ))
+            val r = store.loadQueue().single().receipt
+            assertNotNull(r)
+            assertEquals(prUrl, r.prUrl)
+        } finally {
+            dir.deleteRecursively()
+        }
+    }
+
+    @Test
+    fun receiptWithoutPrUrlSurvivesAsNull() = runBlocking {
+        // Negative case: a receipt with no upstream PR (Jules pushed a branch
+        // but no PR was opened) must round-trip with prUrl == null, not empty string.
+        val (store, dir) = tempStore()
+        try {
+            store.appendWork("w-5", JulesCause.WorkQueued(
+                workId = "w-5", tier = "feature", title = "no PR",
+                spec = "do it", at = 1L,
+            ))
+            store.appendWork("w-5", JulesCause.WorkDrained(
+                workId = "w-5", sessionId = "sess-5",
+                commitSha = "feedface",
+                taskId = "t5",
+                receipt = MergeReceipt(
+                    workId = "w-5",
+                    producer = "jules",
+                    producerRef = "sess-5",
+                    patchCid = ContentId("sha256:" + "b".repeat(64)),
+                    revision = "feedface",
+                    versionTag = "flywheel/jules-sess-5-feedface",
+                    lexicalMemory = LexicalMemory(summary = "s", title = "t", content = "c"),
+                    claimedAt = 1L,
+                ),
+                at = 2L,
+            ))
+            assertNull(store.loadQueue().single().receipt?.prUrl)
+        } finally {
+            dir.deleteRecursively()
+        }
+    }
+
+    @Test
     fun queueAndBoardCoexistOnSameWal() = runBlocking {
         val (store, dir) = tempStore()
         try {

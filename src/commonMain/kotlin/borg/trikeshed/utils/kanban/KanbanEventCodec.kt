@@ -77,6 +77,7 @@ object KanbanEventCodec {
                     field("receiptTitle", it.lexicalMemory.title)
                     field("receiptContent", it.lexicalMemory.content)
                     append(",\"receiptClaimedAt\":").append(it.claimedAt)
+                    it.prUrl?.let { url -> field("receiptPrUrl", url) }
                 }
             }
         }
@@ -152,6 +153,7 @@ object KanbanEventCodec {
                                     content = m.str("receiptContent"),
                                 ),
                                 claimedAt = m.num("receiptClaimedAt"),
+                                prUrl = m["receiptPrUrl"]?.toString(),
                             )
                         },
                         at = at,
