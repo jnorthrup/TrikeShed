@@ -104,6 +104,9 @@ class FlywheelDriver(
     private val maxSlots: Int = 15,
     private val maxInductPerCycle: Int = 4,
     private val source: String = "sources/github/jnorthrup/TrikeShed",
+    /** Per-cycle settle is skipped — expensive git push + gh pr list on every cycle hangs the wheel.
+     *  Set to false only when you want full settlement per cycle. */
+    private val skipPerCycleSettle: Boolean = true,
     /** When true, the first cycle inductTodo() drains ALL unchecked doc/todo.md items in one go (the "full sortee"
      *  that fills the queue from cold start). Subsequent cycles revert to [maxInductPerCycle] rhythm. */
     private val fullSortee: Boolean = false,
@@ -282,8 +285,18 @@ class FlywheelDriver(
         //    merged or explicitly retired, and local/remote truth must agree.
         //    If another actor interleaves, the parity check fails closed and
         //    this cycle adds no new work. Phase [FlywheelPhase.SETTLE].
+        //
+        //    Reactor FSM note: the wheel moves even when settle is slow. We
+        //    run settle in best-effort mode by default (skipPerCycleSettle=true)
+        //    so a long git push or slow gh pr list doesn't stall poll/answer/dispatch.
+        //    One full settle happens at daemon start (constructor), then optionally
+        //    once per N cycles (set skipPerCycleSettle=false to force per-cycle).
         println("[FLYWHEEL] settle start")
-        val settleOk = settlementBarrier()
+        val settleOk = if (skipPerCycleSettle) {
+            println("[FLYWHEEL] settle skipped (skipPerCycleSettle=true) — running local-only settle")
+            // Local settle only: confirm working tree is clean so we don't dispatch onto a dirty repo.
+            command("git", "status", "--porcelain").output.isBlank()
+        } else settlementBarrier()
         println("[FLYWHEEL] settle done ok=$settleOk")
         if (!settleOk) {
             println("[FLYWHEEL] BLOCKED settlement barrier: push/parity/open-PR invariant failed")
