@@ -5,6 +5,7 @@
 package borg.trikeshed.utils.kanban
 
 import borg.trikeshed.jules.JulesCause
+import borg.trikeshed.jules.JulesSessionCard
 import borg.trikeshed.jules.JulesSnapshot
 import borg.trikeshed.lib.AppendWal
 import kotlinx.datetime.Clock

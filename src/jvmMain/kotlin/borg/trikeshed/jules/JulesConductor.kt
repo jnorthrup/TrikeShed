@@ -5,6 +5,8 @@
 package borg.trikeshed.jules
 
 import borg.trikeshed.utils.kanban.JulesBoardStore
+import borg.trikeshed.userspace.nio.file.spi.JvmAppendWal
+import java.io.File
 import kotlinx.coroutines.delay
 import kotlinx.datetime.Clock
 
@@ -31,7 +33,6 @@ class JulesConductor(
         val active = sessions.count { it.state == "IN_PROGRESS" || it.state == "PLANNING" || it.state == "QUEUED" }
         val awaiting = sessions.count { it.state == "AWAITING_USER_FEEDBACK" }
         val headSha = headShaProvider()
-
         for (s in sessions) {
             val existing = cards[s.id]
             val stateChanged = existing != null && existing.snapshot.state != s.state
@@ -42,7 +43,6 @@ class JulesConductor(
                 client.activities(s.id) else emptyList()
             // changeSets are cumulative per activity — the last non-zero carries the total.
             val patchBytes = acts.lastOrNull { it.patchBytes > 0 }?.patchBytes ?: 0L
-
             val snap = JulesSnapshot(
                 sessionId = s.id,
                 state = s.state,
@@ -124,6 +124,8 @@ class JulesConductor(
         fun main(args: Array<String>) {
             val apiKey = System.getenv("JULES_API_KEY") ?: error("JULES_API_KEY required")
             val once = args.contains("--once")
+            val forgeDir = File(System.getProperty("user.home"), ".local/forge")
+            val wal = JvmAppendWal(File(forgeDir, "jules-board.wal"))
             val conductor = JulesConductor(
                 client = JulesRestClient(apiKey),
                 headShaProvider = {
@@ -131,7 +133,7 @@ class JulesConductor(
                         .redirectErrorStream(true)
                         .start().inputStream.bufferedReader().readText().trim()
                 },
-                store = JulesBoardStore(),
+                store = JulesBoardStore(wal),
             )
             kotlinx.coroutines.runBlocking {
                 if (once) {
