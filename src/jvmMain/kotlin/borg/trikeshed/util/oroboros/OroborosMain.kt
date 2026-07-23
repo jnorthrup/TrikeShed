@@ -33,7 +33,6 @@ fun main(args: Array<String>) = runBlocking {
     val watcher = JvmFileWatchReactorElement(
         options.source,
         coroutineContext[Job],
-        ignoredSegments = setOf(".git", ".gradle", ".idea", "build", "node_modules"),
     )
     watcher.open()
     try {
