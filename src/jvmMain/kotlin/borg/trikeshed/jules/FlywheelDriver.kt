@@ -151,8 +151,13 @@ class FlywheelDriver(
         var answered = 0
         var harvested = 0
         var poisonTombstoned = 0
+        println("[FLYWHEEL] ==== cycle start ====")
         // 1. POLL
+        val pollStart = System.currentTimeMillis()
         conductor.pollOnce()
+        val liveCount = conductor.cards.values.count { it.snapshot.state != "COMPLETED" && it.snapshot.state != "FINISHED" }
+        val completedCount = conductor.cards.values.count { it.snapshot.state == "COMPLETED" && !it.drained }
+        println("[FLYWHEEL] poll done in ${System.currentTimeMillis() - pollStart}ms live=$liveCount completed-undrained=$completedCount cards=${conductor.cards.size}")
 
         // 2. ANSWER — a waiting conversation is higher-leverage than a new
         //    dispatch: it unblocks a slot the wheel reuses THIS cycle. Draining
@@ -177,7 +182,10 @@ class FlywheelDriver(
         //    blocked, but no patch is applied against a stale master.
         //    Phase ordering per [FlywheelPhase]: ANSWER ran above; DRAIN
         //    cannot proceed until master is synchronized.
-        if (!synchronizeMain()) {
+        println("[FLYWHEEL] sync start")
+        val syncOk = synchronizeMain()
+        println("[FLYWHEEL] sync done ok=$syncOk")
+        if (!syncOk) {
             println("[FLYWHEEL] BLOCKED master is not cleanly synchronized with origin/master")
             return CycleReport(answered, harvested, 0, activeCount(), settled = false, poisonTombstoned = poisonTombstoned, phase = FlywheelPhase.SYNC)
         }
@@ -192,6 +200,7 @@ class FlywheelDriver(
         //    `harvested` and `poisonTombstoned` are hoisted above for early-exit reporting.
         val prePoison = conductor.cards.values.filter { it.snapshot.state == "COMPLETED" && !it.drained }
         val (viableCards, poisonCards) = prePoison.partition { !isPoison(it.snapshot.capturedAt) }
+        println("[FLYWHEEL] drain start prePoison=${prePoison.size} viable=${viableCards.size} poison=${poisonCards.size}")
         for (card in poisonCards) {
             markPoison("pre-noon-CST", card)
             // Emit a poison receipt: an immutable claim naming the session, the verdict=poison, and a null patchCid.
@@ -273,7 +282,10 @@ class FlywheelDriver(
         //    merged or explicitly retired, and local/remote truth must agree.
         //    If another actor interleaves, the parity check fails closed and
         //    this cycle adds no new work. Phase [FlywheelPhase.SETTLE].
-        if (!settlementBarrier()) {
+        println("[FLYWHEEL] settle start")
+        val settleOk = settlementBarrier()
+        println("[FLYWHEEL] settle done ok=$settleOk")
+        if (!settleOk) {
             println("[FLYWHEEL] BLOCKED settlement barrier: push/parity/open-PR invariant failed")
             return CycleReport(answered, harvested, 0, activeCount(), settled = false, poisonTombstoned = poisonTombstoned, phase = FlywheelPhase.SETTLE)
         }
@@ -292,10 +304,13 @@ class FlywheelDriver(
         //    before the next dispatch. Refuses to broadcast duplicates — the
         //    curator's getOrPut fingerprint gate is the canonical dedup key.
         val alivePreInduct = activeCount()
-        val topUpBudget = maxSlots - (alivePreInduct + pendingQueueDepth())
+        val pendingBefore = pendingQueueDepth()
+        val topUpBudget = maxSlots - (alivePreInduct + pendingBefore)
+        println("[FLYWHEEL] induct start alive=$alivePreInduct pending=$pendingBefore budget=$topUpBudget")
         val inducted =
             if (topUpBudget > 0) inductTodo(fillBudget = topUpBudget)
             else 0
+        println("[FLYWHEEL] induct done inducted=$inducted queueDepth=${pendingQueueDepth()}")
 
         // 7. DISPATCH — take from the unified queue projection, sorted by
         //    score descending. Waiting work (AWAITING, just answered above)
