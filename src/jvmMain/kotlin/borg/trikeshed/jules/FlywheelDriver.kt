@@ -102,8 +102,11 @@ class FlywheelDriver(
     private val forgeDir: File = File(System.getProperty("user.home"), ".local/forge"),
     private val intervalMs: Long = 60_000L,
     private val maxSlots: Int = 15,
-    private val maxInductPerCycle: Int = 1,
+    private val maxInductPerCycle: Int = 4,
     private val source: String = "sources/github/jnorthrup/TrikeShed",
+    /** When true, the first cycle inductTodo() drains ALL unchecked doc/todo.md items in one go (the "full sortee"
+     *  that fills the queue from cold start). Subsequent cycles revert to [maxInductPerCycle] rhythm. */
+    private val fullSortee: Boolean = false,
     /** CAS store backing the patch blobs cited by [MergeReceipt.patchCid]. Default <forgeDir>/cas (same path OroborosMain wires). */
     private val casStore: FileCasStore = FileCasStore(
         JvmFileOperations(),
@@ -417,6 +420,10 @@ class FlywheelDriver(
         val knownWorkIds = queue.mapTo(mutableSetOf()) { it.workId }
         val drainedReceipts = queue.mapNotNull { it.receipt }
         val drainedTitles = drainedReceipts.map { it.lexicalMemory.title }
+        // The full-sortee limit fills the queue from a cold start in one cycle,
+        // capping at maxSlots (the dispatch fanout ceiling). Otherwise we induct
+        // [maxInductPerCycle] per cycle — slow but bounded.
+        val inductBudget = if (fullSortee) maxSlots else maxInductPerCycle
         var n = 0
         for ((index, item) in items.withIndex()) {
             val title = item.replace(Regex("^\\s*- \\[ \\]\\s*\\*\\*?|\\*\\*?$"), "").trim()
@@ -426,7 +433,7 @@ class FlywheelDriver(
             if (!curateTodo(title, workId, knownWorkIds, drainedReceipts, drainedTitles)) {
                 println("[FLYWHEEL] CURATE-SKIP ${title.take(60)} (duplicate/circular)")
                 knownWorkIds += workId  // suppress repeat on next poll even when skipped
-                if (n >= maxInductPerCycle) break
+                if (n >= inductBudget) break
                 continue
             }
             val score = (items.size - index).toDouble() / items.size.toDouble()
@@ -445,7 +452,7 @@ class FlywheelDriver(
             ))
             knownWorkIds += workId
             n++
-            if (n >= maxInductPerCycle) break
+            if (n >= inductBudget) break
         }
         return n
     }
@@ -827,13 +834,14 @@ class FlywheelDriver(
             val apiKey = System.getenv("JULES_API_KEY") ?: error("JULES_API_KEY required")
             val once = args.any { it == "--once" }
             val watch = args.any { it == "--watch" }
-            val driver = FlywheelDriver(apiKey)
-            println("[FLYWHEEL] Starting driver on ${driver.repoDir}")
+            val sortee = args.any { it == "--sortee" }
+            val driver = FlywheelDriver(apiKey, fullSortee = sortee)
+            println("[FLYWHEEL] Starting driver on ${driver.repoDir}  mode=${if (sortee) "full-sortee" else "rhythmic"}")
             if (once) {
                 runBlocking {
                     val report = driver.cycle()
                     println(driver.renderSaturation())
-                    println("[FLYWHEEL] Cycle: answered=${report.answered} harvested=${report.harvested} inducted=${report.inducted} dispatched=${report.dispatched} alive=${report.alive} settled=${report.settled}")
+                    println("[FLYWHEEL] Cycle: answered=${report.answered} harvested=${report.harvested} poison=${report.poisonTombstoned} inducted=${report.inducted} dispatched=${report.dispatched} alive=${report.alive} settled=${report.settled} phase=${report.phase}")
                 }
                 return
             }
@@ -842,7 +850,7 @@ class FlywheelDriver(
                     val start = System.currentTimeMillis()
                     val report = driver.cycle()
                     println(driver.renderSaturation())
-                    println("[FLYWHEEL] Cycle: answered=${report.answered} harvested=${report.harvested} inducted=${report.inducted} dispatched=${report.dispatched} alive=${report.alive} settled=${report.settled}")
+                    println("[FLYWHEEL] Cycle: answered=${report.answered} harvested=${report.harvested} poison=${report.poisonTombstoned} inducted=${report.inducted} dispatched=${report.dispatched} alive=${report.alive} settled=${report.settled} phase=${report.phase}")
                     if (!watch) {
                         println("[FLYWHEEL] one-shot (no --watch); exiting")
                         return@runBlocking
