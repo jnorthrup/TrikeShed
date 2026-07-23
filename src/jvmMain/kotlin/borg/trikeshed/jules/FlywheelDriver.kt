@@ -285,7 +285,17 @@ class FlywheelDriver(
         //    Phase [FlywheelPhase.INDUCT]: the brain curates each candidate
         //    against drained receipts + queued work to avoid circular chases
         //    (re-dispatching work a receipt already closed). See [curateTodo].
-        val inducted = inductTodo()
+        //
+        //    Top-up the queue every cycle so the pipe stays at maxSlots: even
+        //    if the rhythm is bounded at [maxInductPerCycle], any cycle that
+        //    ships drains should immediately fill those slots from doc/todo.md
+        //    before the next dispatch. Refuses to broadcast duplicates — the
+        //    curator's getOrPut fingerprint gate is the canonical dedup key.
+        val alivePreInduct = activeCount()
+        val topUpBudget = maxSlots - (alivePreInduct + pendingQueueDepth())
+        val inducted =
+            if (topUpBudget > 0) inductTodo(fillBudget = topUpBudget)
+            else 0
 
         // 7. DISPATCH — take from the unified queue projection, sorted by
         //    score descending. Waiting work (AWAITING, just answered above)
@@ -411,7 +421,11 @@ class FlywheelDriver(
      * is offline the curator falls back to lexical-overlap cycle detection
      * ([FlywheelGatekeeper.closestReceipt] ≥ a meaningful overlap).
      */
-    private suspend fun inductTodo(): Int {
+    /** Number of queued-but-undispatched-and-undrained work items in the WAL. */
+    private fun pendingQueueDepth(): Int =
+        store.loadQueue().count { !it.isDispatched && !it.isDrained }
+
+    private suspend fun inductTodo(fillBudget: Int = maxInductPerCycle): Int {
         val todo = File(repoDir, "doc/todo.md")
         if (!todo.exists()) return 0
         val items = todo.readLines().filter { it.matches(Regex("^\\s*- \\[ \\].*")) }
@@ -420,10 +434,9 @@ class FlywheelDriver(
         val knownWorkIds = queue.mapTo(mutableSetOf()) { it.workId }
         val drainedReceipts = queue.mapNotNull { it.receipt }
         val drainedTitles = drainedReceipts.map { it.lexicalMemory.title }
-        // The full-sortee limit fills the queue from a cold start in one cycle,
-        // capping at maxSlots (the dispatch fanout ceiling). Otherwise we induct
-        // [maxInductPerCycle] per cycle — slow but bounded.
-        val inductBudget = if (fullSortee) maxSlots else maxInductPerCycle
+        // The full-sortee limit fills the queue from a cold start in one cycle.
+        // Use fillBudget as the cap; rhythmic mode passes maxInductPerCycle, sortee passes items.size.
+        val inductBudget = fillBudget
         var n = 0
         for ((index, item) in items.withIndex()) {
             val title = item.replace(Regex("^\\s*- \\[ \\]\\s*\\*\\*?|\\*\\*?$"), "").trim()
