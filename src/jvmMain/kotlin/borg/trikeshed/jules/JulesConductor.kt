@@ -40,13 +40,15 @@ class JulesConductor(
         for (s in sessions) {
             val existing = cards[s.id]
             val stateChanged = existing != null && existing.snapshot.state != s.state
-            // Activities are fetched only when needed: COMPLETED sessions (patch
-            // accounting) and state transitions (cause anchoring). Steady-state
-            // sessions cost zero extra calls.
-            val acts = if (s.state == "COMPLETED" || (stateChanged && s.state == "AWAITING_USER_FEEDBACK"))
+            // COMPLETED and AWAITING sessions can both carry cumulative patches.
+            // Fetch them on every poll: retaining a stale zero makes a patch-bearing
+            // awaiting card look empty and can route it to the wrong paddle.
+            val acts = if (s.state == "COMPLETED" || s.state == "AWAITING_USER_FEEDBACK")
                 client.activities(s.id) else emptyList()
             // changeSets are cumulative per activity — the last non-zero carries the total.
-            val patchBytes = acts.lastOrNull { it.patchBytes > 0 }?.patchBytes ?: 0L
+            val patchBytes = acts.lastOrNull { it.patchBytes > 0 }?.patchBytes
+                ?: existing?.snapshot?.patchBytes
+                ?: 0L
 
             val snap = JulesSnapshot(
                 sessionId = s.id,
