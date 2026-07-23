@@ -70,20 +70,6 @@ class SctpAssociationScope : CoroutineScope {
     }
 }
 
-// 4. Partial Reliability
-class PartialReliabilityBuffer(val capacity: Int) {
-    private val buffer = mutableListOf<Pair<Int, ByteArray>>()
-
-    fun enqueue(tsn: Int, data: ByteArray) {
-        if (buffer.size >= capacity) {
-            buffer.removeAt(0) // Drop oldest
-        }
-        buffer.add(tsn to data)
-    }
-
-    fun getAllUnacked(): Series<Pair<Int, ByteArray>> = buffer.size j { i -> buffer[i] }
-}
-
 // 5. Liburing Facade
 interface LiburingFacade {
     fun submitBatch(batch: Series<ByteArray>)
