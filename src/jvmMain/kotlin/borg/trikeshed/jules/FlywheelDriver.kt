@@ -4,6 +4,7 @@
  */
 package borg.trikeshed.jules
 
+import borg.trikeshed.kanban.ForgeKanbanIngest
 import borg.trikeshed.utils.kanban.JulesBoardStore
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
@@ -15,7 +16,8 @@ import java.time.Instant
  *
  * Every cycle:
  * 1. POLL Jules sessions via [JulesConductor.pollOnce]
- * 2. ANSWER every AWAITING_USER_FEEDBACK session with project conventions
+ * 2. ANSWER every AWAITING_USER_FEEDBACK session through the [BrainClient]
+ *    brain with project conventions — the GUIDE role fires a real model.
  * 3. HARVEST every COMPLETED session with a patch: git apply, jvmTest, land
  * 4. DISPATCH unchecked items from doc/todo.md until slots are full
  *
@@ -31,6 +33,7 @@ class FlywheelDriver(
     private val source: String = "sources/github/jnorthrup/TrikeShed",
 ) {
     private val client = JulesRestClient(apiKey)
+    private val brain: BrainClient? = System.getenv("NVIDIA_API_KEY")?.let { BrainClient(it) }
     private val store = JulesBoardStore(forgeDir)
     private val conductor = JulesConductor(
         client = client,
@@ -101,31 +104,71 @@ class FlywheelDriver(
             }
         }
 
-        return CycleReport(answered, harvested, dispatched)
+        return CycleReport(answered, harvested, dispatched, alive)
     }
 
-    /** Build a project-conventions answer for an AWAITING session inquiry. */
+    /** Project the unified Forge×Jules board and render the saturation wheel. */
+    fun renderSaturation(): String {
+        val kanban = try { ForgeKanbanIngest.load("jim").board }
+        catch (_: Throwable) { borg.trikeshed.kanban.KanbanBoard(
+            id = borg.trikeshed.kanban.KanbanBoardId("flywheel"),
+            name = "flywheel",
+            columns = JulesLane.values().map { borg.trikeshed.kanban.KanbanColumn(
+                borg.trikeshed.kanban.KanbanColumnId(it.columnName), it.columnName, it.order) },
+            cards = emptyList(),
+        ) }
+        val unified = unifyBoard(kanban, conductor.cards.values)
+        val aliveCount = conductor.cards.values.count {
+            it.snapshot.state != "COMPLETED" && it.snapshot.state != "FINISHED" }
+        return renderWheel(unified, aliveCount, maxSlots, intervalMs)
+    }
+
+    /** Build a project-conventions answer for an AWAITING session inquiry.
+     *  Fires the [brain] (BrainClient → NVIDIA NIM Laguna XS 2.1) with
+     *  conventions as the system message and the inquiry as the user message.
+     *  Returns "" if no brain is configured (NVIDIA_API_KEY missing) — the
+     *  caller skips the answer; never sends a template. */
     private fun buildAnswer(card: JulesSessionCard): String {
         val title = card.card.title
         val lastCause = card.causes.lastOrNull()
         val lastAct = client.activities(card.snapshot.sessionId).lastOrNull()
-        val inquiry = lastAct?.excerpt?.take(200) ?: lastCause?.let { when (it) {
-            is JulesCause.AgentMessaged -> it.excerpt.take(200)
+        val inquiry = lastAct?.excerpt?.take(400) ?: lastCause?.let { when (it) {
+            is JulesCause.AgentMessaged -> it.excerpt.take(400)
             else -> null
         } } ?: return ""
 
-        // Project conventions — the answerer must provide context.
         val conventions = buildString {
-            appendLine("Project: TrikeShed (KMP)")
-            appendLine("  - domain logic goes in commonMain/")
-            appendLine("  - platform adapters go in jvmMain/jsMain/nativeMain")
+            appendLine("You are the GUIDE for the TrikeShed project (KMP, AGPLv3 2017).")
+            appendLine("Answer coding-agent questions with concrete, decisive guidance (<200 words).")
+            appendLine("Project conventions:")
+            appendLine("  - domain logic goes in commonMain/kotlin/; platform adapters in jvmMain/jsMain/nativeMain")
             appendLine("  - use Series<T> over List<T> for read-only indexed data")
-            appendLine("  - use Confix JSON (JsonSupport) not kotlinx-serialization-json")
+            appendLine("  - use Confix JSON (borg.trikeshed.parse.json.JsonSupport), not kotlinx-serialization-json")
             appendLine("  - test gate: ./gradlew jvmTest --no-daemon")
-            appendLine("  - TDD: write failing test first, then impl")
+            appendLine("  - TDD: write failing test first, then one minimal implementation file")
             appendLine("  - one test file + one implementation file per task")
+            appendLine("  - never use the word 'notion' in code, comments, or identifiers (trademark)")
+            appendLine("  - never delete a working runner to replace with not-yet-built code")
         }
-        return "$conventions\nRegarding \"$title\":\n$inquiry"
+
+        val b = brain
+        if (b == null) {
+            println("[FLYWHEEL] WARN no NVIDIA_API_KEY — GUIDE offline, skipping ${card.snapshot.sessionId.takeLast(6)}")
+            return ""
+        }
+        return try {
+            b.chat(
+                messages = listOf(
+                    "system" to conventions,
+                    "user" to "Task title: $title\n\nInquiry from the coding agent:\n$inquiry",
+                ),
+                maxTokens = 400,
+                temperature = 0.2,
+            )
+        } catch (t: Throwable) {
+            println("[FLYWHEEL] BRAIN-ERROR ${card.snapshot.sessionId.takeLast(6)}: ${t.message}")
+            ""
+        }
     }
 
     /** Build a dispatch spec from a todo title. */
@@ -191,7 +234,7 @@ class FlywheelDriver(
         return proc.inputStream.bufferedReader().readText().trim()
     }
 
-    data class CycleReport(val answered: Int, val harvested: Int, val dispatched: Int)
+    data class CycleReport(val answered: Int, val harvested: Int, val dispatched: Int, val alive: Int)
 
     companion object {
         @JvmStatic
@@ -203,7 +246,8 @@ class FlywheelDriver(
                 while (true) {
                     val start = System.currentTimeMillis()
                     val report = driver.cycle()
-                    println("[FLYWHEEL] Cycle: answered=${report.answered} harvested=${report.harvested} dispatched=${report.dispatched}")
+                    println(driver.renderSaturation())
+                    println("[FLYWHEEL] Cycle: answered=${report.answered} harvested=${report.harvested} dispatched=${report.dispatched} alive=${report.alive}")
                     val elapsed = System.currentTimeMillis() - start
                     val delay = (driver.intervalMs - elapsed).coerceAtLeast(5_000)
                     delay(delay)
