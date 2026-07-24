@@ -34,7 +34,7 @@ import java.nio.channels.SocketChannel
  *   repoDir                 default = cwd
  */
 object OroborosDaemon {
-
+ 
     data class CycleReport(
         val cycleMs: Long,
         val drained: Int,
@@ -59,8 +59,18 @@ object OroborosDaemon {
         if (apiKey.isNullOrBlank()) {
             System.err.println("[OROBOROS] JULES_API_KEY not set; the conductor cannot poll Jules. Aborting.")
             exitProcess(1)
-        }
+        } 
+    const val DEFAULT_INTERVAL_MS = 30_000L
+    const val DEFAULT_MAX_SLOTS = 15
 
+    data class DaemonConfig(
+        val watch: Boolean,
+        val intervalMs: Long,
+        val maxSlots: Int,
+        val positional: List<String>
+    ) 
+
+    fun parseConfig(args: Array<String>): DaemonConfig {
         var watch = true
         var intervalMs = DEFAULT_INTERVAL_MS
         var maxSlots = DEFAULT_MAX_SLOTS
@@ -84,6 +94,23 @@ object OroborosDaemon {
                 else -> { positional.add(a); i++ }
             }
         }
+        return DaemonConfig(watch, intervalMs, maxSlots, positional)
+    }
+
+    @JvmStatic
+    fun main(args: Array<String>) = runBlocking {
+        val apiKey = System.getenv("JULES_API_KEY")
+        if (apiKey.isNullOrBlank()) {
+            System.err.println("[OROBOROS] JULES_API_KEY not set; the conductor cannot poll Jules. Aborting.")
+            exitProcess(1)
+        }
+
+        val config = parseConfig(args)
+        val watch = config.watch
+        val intervalMs = config.intervalMs
+        val maxSlots = config.maxSlots
+        val positional = config.positional
+
         val home = System.getProperty("user.home")
             ?: die("System property user.home not set")
         // Defer to ForgeHome.defaultHome via the canonical Kotlin/JVM runtime path.
