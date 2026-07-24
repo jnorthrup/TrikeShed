@@ -81,13 +81,22 @@ object OroborosDaemon {
             maxSlots = maxSlots,
         )
 
+        val consecutivePollErrors = java.util.concurrent.atomic.AtomicInteger(0)
+        var pollErrOccurred = false
+
         // Stdout observer so cycles are visible without a TUI.
-        driver.subscribe { ev -> println("[FLY-EVENT] $ev") }
+        driver.subscribe { ev ->
+            println("[FLY-EVENT] $ev")
+            if (ev is FlywheelDriver.FlywheelEvent.PollError) {
+                pollErrOccurred = true
+            }
+        }
         System.err.println(
             "[OROBOROS] daemon up. forgeHome=$forgeHome repo=$repoDir " +
                 "intervalMs=$intervalMs maxSlots=$maxSlots mode=${if (watch) "watch" else "once"}"
         )
 
+        pollErrOccurred = false
         println("[FLYWHEEL] " + driver.cycle())
         if (!watch) {
             driver.close()
@@ -95,8 +104,19 @@ object OroborosDaemon {
         }
         try {
             while (true) {
-                delay(intervalMs)
+                val errors = consecutivePollErrors.get()
+                val backoffMs = kotlin.math.min(intervalMs * (1L shl kotlin.math.min(errors, 30)), intervalMs * 5)
+                System.err.println("[OROBOROS] backoff=${backoffMs}ms consecutiveErrors=$errors")
+                delay(backoffMs)
+
+                pollErrOccurred = false
                 println("[FLYWHEEL] " + driver.cycle())
+
+                if (pollErrOccurred) {
+                    consecutivePollErrors.incrementAndGet()
+                } else {
+                    consecutivePollErrors.set(0)
+                }
             }
         } finally {
             driver.close()
