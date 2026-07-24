@@ -15,8 +15,8 @@ if [[ ! -f "$JAR" ]]; then
 fi
 CP="$JAR:$(find "$HOME/.gradle/caches/modules-2" -name '*.jar' 2>/dev/null | tr '\n' ':')"
 
+# Use daemon's default interval. Override with --interval-ms if needed.
 WATCH="--watch"
-INTERVAL="20000"
 DAEMON_ARGS=()
 
 while [[ $# -gt 0 ]]; do
@@ -30,7 +30,8 @@ while [[ $# -gt 0 ]]; do
       shift
       ;;
     --interval-ms)
-      INTERVAL="$2"
+      DAEMON_ARGS+=("--interval-ms")
+      DAEMON_ARGS+=("$2")
       shift 2
       ;;
     *)
@@ -40,4 +41,4 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
-exec java -cp "$CP" borg.trikeshed.daemon.OroborosDaemon $WATCH --interval-ms "$INTERVAL" "${DAEMON_ARGS[@]}"
+exec java -cp "$CP" borg.trikeshed.daemon.OroborosDaemon $WATCH "${DAEMON_ARGS[@]}"
