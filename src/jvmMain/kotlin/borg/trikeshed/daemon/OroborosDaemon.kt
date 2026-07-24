@@ -2,29 +2,23 @@ package borg.trikeshed.daemon
 
 import borg.trikeshed.jules.FlywheelDriver
 import borg.trikeshed.jules.FlywheelDriver.FlywheelEvent
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import java.io.BufferedWriter
 import java.io.File
 import java.io.FileOutputStream
-import kotlin.system.exitProcess
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.isActive
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 import java.net.StandardProtocolFamily
 import java.net.UnixDomainSocketAddress
 import java.nio.ByteBuffer
 import java.nio.channels.ServerSocketChannel
 import java.nio.channels.SocketChannel
+import kotlin.system.exitProcess
 
 /**
  * Oroboros daemon — thin entry-point over [FlywheelDriver].
- *
- * The reactor (poll → drain → dispatch → harvest) lives in
- * [borg.trikeshed.jules.FlywheelDriver]. This object constructs it directly
- * so it can defer to [ForgeHome.defaultHome] (`~/.local/forge`) and parse
- * the daemon's full flag set.
  *
  * Env: JULES_API_KEY (required)
  * Flags:
@@ -37,7 +31,10 @@ import java.nio.channels.SocketChannel
  *   repoDir                 default = cwd
  */
 object OroborosDaemon {
- 
+
+    const val DEFAULT_INTERVAL_MS = 30_000L
+    const val DEFAULT_MAX_SLOTS = 15
+
     data class CycleReport(
         val cycleMs: Long,
         val drained: Int,
@@ -46,32 +43,18 @@ object OroborosDaemon {
         val available: Int
     )
 
-    @Volatile
-    var lastCycleReport: CycleReport? = null
-
-    @Volatile
-    var daemonStartTime = 0L
-
-
-    private const val DEFAULT_INTERVAL_MS = 30_000L
-    private const val DEFAULT_MAX_SLOTS = 15
-
-    @JvmStatic
-    fun main(args: Array<String>) = runBlocking {
-        val apiKey = System.getenv("JULES_API_KEY") ?: System.getProperty("JULES_API_KEY")
-        if (apiKey.isNullOrBlank()) {
-            System.err.println("[OROBOROS] JULES_API_KEY not set; the conductor cannot poll Jules. Aborting.")
-            exitProcess(1)
-        } 
-    const val DEFAULT_INTERVAL_MS = 30_000L
-    const val DEFAULT_MAX_SLOTS = 15
-
     data class DaemonConfig(
         val watch: Boolean,
         val intervalMs: Long,
         val maxSlots: Int,
         val positional: List<String>
-    ) 
+    )
+
+    @Volatile
+    var lastCycleReport: CycleReport? = null
+
+    @Volatile
+    var daemonStartTime = 0L
 
     fun parseConfig(args: Array<String>): DaemonConfig {
         var watch = true
@@ -102,7 +85,7 @@ object OroborosDaemon {
 
     @JvmStatic
     fun main(args: Array<String>) = runBlocking {
-        val apiKey = System.getenv("JULES_API_KEY")
+        val apiKey = System.getenv("JULES_API_KEY") ?: System.getProperty("JULES_API_KEY")
         if (apiKey.isNullOrBlank()) {
             System.err.println("[OROBOROS] JULES_API_KEY not set; the conductor cannot poll Jules. Aborting.")
             exitProcess(1)
@@ -116,8 +99,6 @@ object OroborosDaemon {
 
         val home = System.getProperty("user.home")
             ?: die("System property user.home not set")
-        // Defer to ForgeHome.defaultHome via the canonical Kotlin/JVM runtime path.
-        // The TrikeShed canonical root is $HOME/.local/forge (see ForgeHome.defaultHome).
         val canonicalForge = File(home, ".local/forge")
         val forgeHome = File(positional.getOrNull(0) ?: canonicalForge.absolutePath)
         val repoDir = File(positional.getOrNull(1) ?: System.getProperty("user.dir"))
@@ -144,9 +125,7 @@ object OroborosDaemon {
                 try {
                     traceWriter?.flush()
                     traceWriter?.close()
-                } catch (e: Exception) {
-                    // Ignore stream closed on exit
-                }
+                } catch (e: Exception) { /* ignore */ }
             })
         } catch (e: Exception) {
             System.err.println("[OROBOROS] warning: failed to open trace file: ${e.message}")
@@ -162,46 +141,6 @@ object OroborosDaemon {
             "[OROBOROS] daemon up. forgeHome=$forgeHome repo=$repoDir " +
                 "intervalMs=$intervalMs maxSlots=$maxSlots mode=${if (watch) "watch" else "once"}"
         )
-
-        suspend fun doCycle() {
-            val t0 = System.currentTimeMillis()
-            val startPollErrors = pollErrors
-            val summary = driver.cycle()
-            val cycleMs = System.currentTimeMillis() - t0
-            val cyclePollErrors = pollErrors - startPollErrors
-            println("[FLYWHEEL] $summary")
-
-            var d = 0; var p = 0; var a = 0; var v = 0
-            Regex("drained=(\\d+)").find(summary)?.let { d = it.groupValues[1].toInt() }
-            Regex("dispatched=(\\d+)").find(summary)?.let { p = it.groupValues[1].toInt() }
-            Regex("alive=(\\d+)").find(summary)?.let { a = it.groupValues[1].toInt() }
-            Regex("available=(\\d+)").find(summary)?.let { v = it.groupValues[1].toInt() }
-
-            val json = "{\"t\":$t0,\"c\":$cycleMs,\"d\":$d,\"p\":$p,\"a\":$a,\"v\":$v,\"e\":$cyclePollErrors}"
-            try {
-                if (traceLineCount >= 10000) {
-                    traceWriter?.close()
-                    val backup = File(traceFile.parentFile, traceFile.name + ".1")
-                    traceFile.renameTo(backup)
-                    traceWriter = FileOutputStream(traceFile, false).bufferedWriter()
-                    traceLineCount = 0
-                }
-                traceWriter?.let {
-                    it.write(json)
-                    it.write("\n")
-                    traceLineCount++
-                }
-            } catch (e: Exception) {
-                System.err.println("[OROBOROS] warning: failed to write trace file: ${e.message}")
-            }
-        }
-
-        doCycle()
-        if (!watch) {
-            traceWriter?.flush()
-            traceWriter?.close()
-            driver.close()
-            return@runBlocking
 
         daemonStartTime = System.currentTimeMillis()
         lastCycleReport = null
@@ -230,37 +169,48 @@ object OroborosDaemon {
                     while (buf.hasRemaining()) {
                         client.write(buf)
                     }
-                } catch (e: Exception) {
-                    // Ignore closed channel exceptions during shutdown
-                } finally {
+                } catch (e: Exception) { /* ignore */ }
+                finally {
                     try { client?.close() } catch (_: Exception) {}
                 }
             }
         }
 
-        try {
-            while (true) {
-                delay(intervalMs)
-                doCycle()
-            suspend fun runCycle() {
-                val start = System.currentTimeMillis()
-                val result = driver.cycle()
-                val cycleMs = System.currentTimeMillis() - start
+        suspend fun runCycle() {
+            val t0 = System.currentTimeMillis()
+            val startPollErrors = pollErrors
+            val summary = driver.cycle()
+            val cycleMs = System.currentTimeMillis() - t0
+            val cyclePollErrors = pollErrors - startPollErrors
+            println("[FLYWHEEL] $summary")
 
-                val drainedMatch = Regex("drained=([-0-9]+)").find(result)
-                val dispatchedMatch = Regex("dispatched=([-0-9]+)").find(result)
-                val aliveMatch = Regex("alive=([0-9]+)").find(result)
-                val availableMatch = Regex("available=([0-9]+)").find(result)
+            var d = 0; var p = 0; var a = 0; var v = 0
+            Regex("drained=(\\d+)").find(summary)?.let { d = it.groupValues[1].toInt() }
+            Regex("dispatched=(\\d+)").find(summary)?.let { p = it.groupValues[1].toInt() }
+            Regex("alive=(\\d+)").find(summary)?.let { a = it.groupValues[1].toInt() }
+            Regex("available=(\\d+)").find(summary)?.let { v = it.groupValues[1].toInt() }
 
-                val drained = drainedMatch?.groupValues?.get(1)?.toIntOrNull() ?: 0
-                val dispatched = dispatchedMatch?.groupValues?.get(1)?.toIntOrNull() ?: 0
-                val alive = aliveMatch?.groupValues?.get(1)?.toIntOrNull() ?: 0
-                val available = availableMatch?.groupValues?.get(1)?.toIntOrNull() ?: 0
-
-                lastCycleReport = CycleReport(cycleMs, drained, dispatched, alive, available)
-                println("[FLYWHEEL] $result")
+            lastCycleReport = CycleReport(cycleMs, d, p, a, v)
+            val json = "{\"t\":$t0,\"c\":$cycleMs,\"d\":$d,\"p\":$p,\"a\":$a,\"v\":$v,\"e\":$cyclePollErrors}"
+            try {
+                if (traceLineCount >= 10000) {
+                    traceWriter?.close()
+                    val backup = File(traceFile.parentFile, traceFile.name + ".1")
+                    traceFile.renameTo(backup)
+                    traceWriter = FileOutputStream(traceFile, false).bufferedWriter()
+                    traceLineCount = 0
+                }
+                traceWriter?.let {
+                    it.write(json)
+                    it.write("\n")
+                    traceLineCount++
+                }
+            } catch (e: Exception) {
+                System.err.println("[OROBOROS] warning: failed to write trace file: ${e.message}")
             }
+        }
 
+        try {
             runCycle()
             if (watch) {
                 while (true) {
@@ -272,6 +222,7 @@ object OroborosDaemon {
             healthJob.cancel()
             try { serverSocket.close() } catch (_: Exception) {}
             if (healthSock.exists()) healthSock.delete()
+            try { traceWriter?.flush(); traceWriter?.close() } catch (_: Exception) {}
             driver.close()
         }
     }

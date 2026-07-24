@@ -106,10 +106,6 @@ class FlywheelDriver(
         val completed = sessions.filter { it.state == "COMPLETED" }.take(maxSlots)
         val drained = drainFanout(completed)
         val trunkClean = isWorkingTreeClean()
-        // MERGE-COMPLETE: for sessions whose patches failed apply (e.g. stale noise
-        // hunks from deleted files), strip those hunks and re-apply with --3way.
-        // On clean trunk, stage, commit, push. The operator stays out of the loop.
-        if (trunkClean) mergeCompletedNoiseHunks(completed)
         // Dispatch from doc/todo.md whenever we have headroom, regardless of whether
         // listSessions came back empty. Alpha-on-launch invariant: top the pipe up
         // to maxSlots from the project todo on every cycle.
