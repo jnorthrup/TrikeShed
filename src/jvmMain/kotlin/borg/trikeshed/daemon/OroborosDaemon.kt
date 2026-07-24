@@ -88,7 +88,9 @@ object OroborosDaemon {
                 "intervalMs=$intervalMs maxSlots=$maxSlots mode=${if (watch) "watch" else "once"}"
         )
 
-        println("[FLYWHEEL] " + driver.cycle())
+        if (preflight(repoDir, driver)) {
+            println("[FLYWHEEL] " + driver.cycle())
+        }
         if (!watch) {
             driver.close()
             return@runBlocking
@@ -96,11 +98,37 @@ object OroborosDaemon {
         try {
             while (true) {
                 delay(intervalMs)
-                println("[FLYWHEEL] " + driver.cycle())
+                if (preflight(repoDir, driver)) {
+                    println("[FLYWHEEL] " + driver.cycle())
+                }
             }
         } finally {
             driver.close()
         }
+    }
+
+    private fun preflight(repoDir: File, driver: FlywheelDriver): Boolean {
+        // git fetch origin master (best-effort, 5s timeout)
+        val fetch = ProcessBuilder("git", "fetch", "origin", "master", "--dry-run")
+            .directory(repoDir).start()
+        val fetchOk = fetch.waitFor() == 0
+        if (!fetchOk) return true // offline is OK, we'll poll anyway
+
+        fun command(vararg args: String): String {
+            val p = ProcessBuilder(*args).directory(repoDir).redirectErrorStream(true).start()
+            p.waitFor()
+            return p.inputStream.bufferedReader().readText().trim()
+        }
+
+        val local = command("git", "rev-parse", "HEAD")
+        val remote = command("git", "rev-parse", "origin/master")
+        if (local != remote) {
+            // Emit event but don't crash
+            println("[OROBOROS] UPSTREAM-DIVERGED local=$local remote=$remote")
+            driver.emitDrifted(local, remote)
+            return false
+        }
+        return true
     }
 
     private fun die(msg: String): Nothing {
