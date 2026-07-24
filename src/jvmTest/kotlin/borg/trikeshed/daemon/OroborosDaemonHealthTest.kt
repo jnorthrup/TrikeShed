@@ -40,6 +40,7 @@ class OroborosDaemonHealthTest {
     @Test
     fun testHealthEndpoint(): Unit = runBlocking {
         System.setProperty("JULES_API_KEY", "dummy-key")
+
         
         val job = launch(Dispatchers.IO) {
             OroborosDaemon.main(arrayOf("--once", "--interval-ms", "1000", forgeHome.absolutePath, repoDir.absolutePath))
@@ -65,13 +66,20 @@ class OroborosDaemonHealthTest {
         withContext(Dispatchers.IO) {
             bytesRead = client.read(buf)
             client.close()
-        }
+        } 
+
+        assertTrue(bytesRead > 0, "No bytes read from health socket")
+        val response = String(buf.array(), 0, bytesRead)
+
+        System.err.println("Daemon response: $response")
+ 
         
         assertTrue(bytesRead > 0, "No bytes read from health socket")
         val response = String(buf.array(), 0, bytesRead)
         
         System.err.println("Daemon response: $response")
         
+ 
         assertTrue(response.startsWith("ALIVE"), "Response should start with ALIVE")
         val parts = response.trim().split(" ")
         assertTrue(parts.size == 7, "Response should have 7 parts")
