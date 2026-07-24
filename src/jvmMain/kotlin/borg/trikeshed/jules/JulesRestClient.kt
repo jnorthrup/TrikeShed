@@ -168,15 +168,32 @@ class JulesRestClient(
             val c = s[i]
             if (c == '\\' && i + 1 < s.length) {
                 when (s[i + 1]) {
-                    'n' -> sb.append('\n')
-                    't' -> sb.append('\t')
-                    'r' -> sb.append('\r')
-                    '"' -> sb.append('"')
-                    '\\' -> sb.append('\\')
-                    '/' -> sb.append('/')
-                    else -> { sb.append(s[i + 1]) }
+                    'n' -> { sb.append('\n'); i += 2 }
+                    't' -> { sb.append('\t'); i += 2 }
+                    'r' -> { sb.append('\r'); i += 2 }
+                    '"' -> { sb.append('"'); i += 2 }
+                    '\\' -> { sb.append('\\'); i += 2 }
+                    '/' -> { sb.append('/'); i += 2 }
+                    'u' -> {
+                        // \uXXXX — 4 hex digits. Required for binary diff
+                        // hunks where the JSON carries the UTF-16 code unit
+                        // (e.g. \u003c for '<'). Leaving these un-expanded
+                        // corrupts the patch body.
+                        if (i + 6 <= s.length) {
+                            val hex = s.substring(i + 2, i + 6)
+                            val cp = hex.toIntOrNull(16)
+                            if (cp != null) {
+                                sb.appendCodePoint(cp)
+                                i += 6
+                            } else {
+                                sb.append(c); i++
+                            }
+                        } else {
+                            sb.append(c); i++
+                        }
+                    }
+                    else -> { sb.append(s[i + 1]); i += 2 }
                 }
-                i += 2
             } else {
                 sb.append(c)
                 i++
