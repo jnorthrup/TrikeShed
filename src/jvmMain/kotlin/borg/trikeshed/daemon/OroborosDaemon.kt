@@ -48,6 +48,9 @@ object OroborosDaemon {
         val store = JulesBoardStore(forgeHome)
         val headShaProvider: () -> String = { headSha(repoDir) }
 
+        val keyMux = keymux.KeyMux { env() }
+        val modelMux = modelmux.ModelMux(keyMux) { }
+
         val element = FlywheelElement()
         val flywheel = Flywheel(store, repoDir, element)
         val conductor = JulesConductor(julesClient, headShaProvider, store)
