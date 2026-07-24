@@ -1,5 +1,11 @@
 #!/usr/bin/env bash
 # bin/oroboros-daemon — launch the TrikeShed flywheel+modelmux+jules daemon
+#
+# Forwards all flags to OroborosDaemon. Recognized:
+#   --once / --watch           run one cycle, or loop forever (default)
+#   --interval-ms <N>          poll cadence (default: FlywheelElement.pollIntervalMs)
+#   --home <path>              forge home (default: $HOME/.local/forge_home)
+#   --repo <path>              repo work tree (default: cwd)
 set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 JAR="$ROOT/build/libs/TrikeShed-jvm-1.0.jar"

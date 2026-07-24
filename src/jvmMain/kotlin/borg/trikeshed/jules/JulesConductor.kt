@@ -35,10 +35,19 @@ class JulesConductor(
         for (s in sessions) {
             val existing = cards[s.id]
             val stateChanged = existing != null && existing.snapshot.state != s.state
+            // Answer dedup: once a session has any HumanAnswered cause on its card
+            // (and the WAL rehydrates causes from disk at boot, so this survives
+            // restarts), skip the per-cycle re-answer even if the session is still
+            // sitting in AWAITING_USER_FEEDBACK. Jules takes one poll cycle to flip
+            // to IN_PROGRESS after the answer lands; without this guard the daemon
+            // would re-spam the same answer every poll.
+            val alreadyAnswered = existing?.causes?.any { it is JulesCause.HumanAnswered } == true
             // Activities are fetched only when needed: COMPLETED sessions (patch
-            // accounting) and state transitions (cause anchoring). Steady-state
-            // sessions cost zero extra calls.
-            val acts = if (s.state == "COMPLETED" || (stateChanged && s.state == "AWAITING_USER_FEEDBACK"))
+            // accounting), state transitions (cause anchoring), and unanswered
+            // AWAITING sessions (so the GUIDE brain has the inquiry excerpt).
+            val acts = if (s.state == "COMPLETED" ||
+                (stateChanged && s.state == "AWAITING_USER_FEEDBACK") ||
+                (s.state == "AWAITING_USER_FEEDBACK" && !alreadyAnswered))
                 client.activities(s.id) else emptyList()
             // changeSets are cumulative per activity — the last non-zero carries the total.
             val patchBytes = acts.lastOrNull { it.patchBytes > 0 }?.patchBytes ?: 0L
