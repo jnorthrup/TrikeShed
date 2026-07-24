@@ -81,8 +81,26 @@ object OroborosDaemon {
             maxSlots = maxSlots,
         )
 
-        // Stdout observer so cycles are visible without a TUI.
-        driver.subscribe { ev -> println("[FLY-EVENT] $ev") }
+        // Stdout observer so cycles are visible without a TUI, and bridge to KanbanFSM.
+        driver.subscribe { ev ->
+            println("[FLY-EVENT] $ev")
+            val now = System.currentTimeMillis()
+            when (ev) {
+                is borg.trikeshed.jules.FlywheelDriver.FlywheelEvent.Polled ->
+                    borg.trikeshed.userspace.reactor.KanbanFSM.reduce(
+                        borg.trikeshed.userspace.reactor.KanbanEvent.CycleObserved(0L, 0, 0, ev.alive, ev.available, now)
+                    )
+                is borg.trikeshed.jules.FlywheelDriver.FlywheelEvent.Drained ->
+                    borg.trikeshed.userspace.reactor.KanbanFSM.reduce(
+                        borg.trikeshed.userspace.reactor.KanbanEvent.PatchDrained(ev.sessionId, ev.sha, ev.tag, now)
+                    )
+                is borg.trikeshed.jules.FlywheelDriver.FlywheelEvent.Dispatched ->
+                    borg.trikeshed.userspace.reactor.KanbanFSM.reduce(
+                        borg.trikeshed.userspace.reactor.KanbanEvent.DispatchFired(ev.sessionId, ev.title, now)
+                    )
+                else -> {}
+            }
+        }
         System.err.println(
             "[OROBOROS] daemon up. forgeHome=$forgeHome repo=$repoDir " +
                 "intervalMs=$intervalMs maxSlots=$maxSlots mode=${if (watch) "watch" else "once"}"
