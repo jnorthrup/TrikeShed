@@ -18,7 +18,8 @@ import java.io.File
  * Replay folds the log back into cards: latest snapshot per session wins,
  * causes accumulate in append order.
  *
- * Lives at ~/.local/forge/jules-board.wal — the TrikeShed state default.
+ * The daemon on TrikeShed defaults to ~/.local/forge/jules-board.wal.
+ * The daemon on forge defaults to ~/.local/forge_home/jules-board.wal (canonical for OroborosGateway).
  * The ISAM snapshot spool (high-volume telemetry side of the quandary) lands
  * here later as a sibling file when poll volume demands it.
  */
