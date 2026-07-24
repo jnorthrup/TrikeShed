@@ -23,13 +23,13 @@ import kotlin.system.exitProcess
  * spine running first.
  *
  * Env: JULES_API_KEY (required)
- * Args: [forgeHome] [repoDir] — both default to ~/.local/forge and cwd
+ * Args: [forgeHome] [repoDir] — both default to ~/.local/forge_home and cwd
  */
 object OroborosDaemon {
 
     @JvmStatic
     fun main(args: Array<String>) = runBlocking {
-        val forgeHome = File(args.getOrNull(0) ?: System.getProperty("user.home") + "/.local/forge")
+        val forgeHome = File(args.getOrNull(0) ?: System.getProperty("user.home") + "/.local/forge_home")
         val repoDir = File(args.getOrNull(1) ?: System.getProperty("user.dir"))
         val apiKey = System.getenv("JULES_API_KEY")
 
