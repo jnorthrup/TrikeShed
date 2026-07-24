@@ -8,6 +8,15 @@ import java.io.BufferedWriter
 import java.io.File
 import java.io.FileOutputStream
 import kotlin.system.exitProcess
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.isActive
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import java.net.StandardProtocolFamily
+import java.net.UnixDomainSocketAddress
+import java.nio.ByteBuffer
+import java.nio.channels.ServerSocketChannel
+import java.nio.channels.SocketChannel
 
 /**
  * Oroboros daemon — thin entry-point over [FlywheelDriver].
@@ -28,6 +37,21 @@ import kotlin.system.exitProcess
  *   repoDir                 default = cwd
  */
 object OroborosDaemon {
+ 
+    data class CycleReport(
+        val cycleMs: Long,
+        val drained: Int,
+        val dispatched: Int,
+        val alive: Int,
+        val available: Int
+    )
+
+    @Volatile
+    var lastCycleReport: CycleReport? = null
+
+    @Volatile
+    var daemonStartTime = 0L
+
 
     private const val DEFAULT_INTERVAL_MS = 30_000L
     private const val DEFAULT_MAX_SLOTS = 15
@@ -38,8 +62,18 @@ object OroborosDaemon {
         if (apiKey.isNullOrBlank()) {
             System.err.println("[OROBOROS] JULES_API_KEY not set; the conductor cannot poll Jules. Aborting.")
             exitProcess(1)
-        }
+        } 
+    const val DEFAULT_INTERVAL_MS = 30_000L
+    const val DEFAULT_MAX_SLOTS = 15
 
+    data class DaemonConfig(
+        val watch: Boolean,
+        val intervalMs: Long,
+        val maxSlots: Int,
+        val positional: List<String>
+    ) 
+
+    fun parseConfig(args: Array<String>): DaemonConfig {
         var watch = true
         var intervalMs = DEFAULT_INTERVAL_MS
         var maxSlots = DEFAULT_MAX_SLOTS
@@ -63,6 +97,23 @@ object OroborosDaemon {
                 else -> { positional.add(a); i++ }
             }
         }
+        return DaemonConfig(watch, intervalMs, maxSlots, positional)
+    }
+
+    @JvmStatic
+    fun main(args: Array<String>) = runBlocking {
+        val apiKey = System.getenv("JULES_API_KEY")
+        if (apiKey.isNullOrBlank()) {
+            System.err.println("[OROBOROS] JULES_API_KEY not set; the conductor cannot poll Jules. Aborting.")
+            exitProcess(1)
+        }
+
+        val config = parseConfig(args)
+        val watch = config.watch
+        val intervalMs = config.intervalMs
+        val maxSlots = config.maxSlots
+        val positional = config.positional
+
         val home = System.getProperty("user.home")
             ?: die("System property user.home not set")
         // Defer to ForgeHome.defaultHome via the canonical Kotlin/JVM runtime path.
@@ -151,13 +202,76 @@ object OroborosDaemon {
             traceWriter?.close()
             driver.close()
             return@runBlocking
+
+        daemonStartTime = System.currentTimeMillis()
+        lastCycleReport = null
+
+        val oroborosDir = File(forgeHome, ".oroboros")
+        oroborosDir.mkdirs()
+        val healthSock = File(oroborosDir, "health.sock")
+        if (healthSock.exists()) healthSock.delete()
+
+        val serverSocket = ServerSocketChannel.open(StandardProtocolFamily.UNIX)
+        serverSocket.bind(UnixDomainSocketAddress.of(healthSock.toPath()))
+
+        val healthJob = launch(Dispatchers.IO) {
+            while (isActive) {
+                var client: SocketChannel? = null
+                try {
+                    client = serverSocket.accept()
+                    val report = lastCycleReport
+                    val uptimeMs = System.currentTimeMillis() - daemonStartTime
+                    val msg = if (report != null) {
+                        "ALIVE $uptimeMs ${report.cycleMs} ${report.drained} ${report.dispatched} ${report.alive} ${report.available}\n"
+                    } else {
+                        "ALIVE $uptimeMs -1 -1 -1 -1 -1\n"
+                    }
+                    val buf = ByteBuffer.wrap(msg.toByteArray())
+                    while (buf.hasRemaining()) {
+                        client.write(buf)
+                    }
+                } catch (e: Exception) {
+                    // Ignore closed channel exceptions during shutdown
+                } finally {
+                    try { client?.close() } catch (_: Exception) {}
+                }
+            }
         }
+
         try {
             while (true) {
                 delay(intervalMs)
                 doCycle()
+            suspend fun runCycle() {
+                val start = System.currentTimeMillis()
+                val result = driver.cycle()
+                val cycleMs = System.currentTimeMillis() - start
+
+                val drainedMatch = Regex("drained=([-0-9]+)").find(result)
+                val dispatchedMatch = Regex("dispatched=([-0-9]+)").find(result)
+                val aliveMatch = Regex("alive=([0-9]+)").find(result)
+                val availableMatch = Regex("available=([0-9]+)").find(result)
+
+                val drained = drainedMatch?.groupValues?.get(1)?.toIntOrNull() ?: 0
+                val dispatched = dispatchedMatch?.groupValues?.get(1)?.toIntOrNull() ?: 0
+                val alive = aliveMatch?.groupValues?.get(1)?.toIntOrNull() ?: 0
+                val available = availableMatch?.groupValues?.get(1)?.toIntOrNull() ?: 0
+
+                lastCycleReport = CycleReport(cycleMs, drained, dispatched, alive, available)
+                println("[FLYWHEEL] $result")
+            }
+
+            runCycle()
+            if (watch) {
+                while (true) {
+                    delay(intervalMs)
+                    runCycle()
+                }
             }
         } finally {
+            healthJob.cancel()
+            try { serverSocket.close() } catch (_: Exception) {}
+            if (healthSock.exists()) healthSock.delete()
             driver.close()
         }
     }
