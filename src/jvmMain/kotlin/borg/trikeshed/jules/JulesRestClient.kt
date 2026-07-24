@@ -135,7 +135,15 @@ class JulesRestClient(
         return out
     }
 
-    /** Normalize both live gitPatch shapes: string and {unidiffPatch: string}. */
+    /**
+     * Normalize both live gitPatch shapes: string and {unidiffPatch: string}.
+     *
+     * `JsonSupport.parse` returns raw JSON substrings without unescaping, so a
+     * patch body arrives with literal `\n` / `\\"` sequences. `parsePatchFiles`
+     * splits on real newlines and looks for `+++ b/` prefixes; without unescape
+     * the whole patch is one line and every drain fails at settlePatch's
+     * "no touched files" gate.
+     */
     private fun patchTexts(activity: Map<*, *>): List<String> {
         val out = mutableListOf<String>()
         val artifacts = activity["artifacts"] as? List<*> ?: return out
@@ -146,9 +154,35 @@ class JulesRestClient(
                 is Map<*, *> -> gitPatch["unidiffPatch"]?.toString()
                 else -> null
             }
-            if (!patch.isNullOrEmpty()) out += patch
+            if (!patch.isNullOrEmpty()) out += unescapeJsonString(patch)
         }
         return out
+    }
+
+    /** Unescape the JSON string escapes `JsonSupport.parse` leaves in-place. */
+    private fun unescapeJsonString(s: String): String {
+        if ('\\' !in s) return s
+        val sb = StringBuilder(s.length)
+        var i = 0
+        while (i < s.length) {
+            val c = s[i]
+            if (c == '\\' && i + 1 < s.length) {
+                when (s[i + 1]) {
+                    'n' -> sb.append('\n')
+                    't' -> sb.append('\t')
+                    'r' -> sb.append('\r')
+                    '"' -> sb.append('"')
+                    '\\' -> sb.append('\\')
+                    '/' -> sb.append('/')
+                    else -> { sb.append(s[i + 1]) }
+                }
+                i += 2
+            } else {
+                sb.append(c)
+                i++
+            }
+        }
+        return sb.toString()
     }
 
     /**

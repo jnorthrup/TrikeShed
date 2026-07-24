@@ -120,8 +120,17 @@ class JulesBoardStore(
                         queuedAt = c.at,
                     )
                 }
-                is JulesCause.WorkDispatched -> byWorkId[c.workId]?.let {
-                    byWorkId[c.workId] = it.copy(
+                is JulesCause.WorkDispatched -> {
+                    val existing = byWorkId[c.workId]
+                    byWorkId[c.workId] = (existing ?: QueueEntry(
+                        workId = c.workId,
+                        tier = "ad-hoc",
+                        title = c.workId,
+                        spec = "",
+                        parent = null,
+                        score = 0.5,
+                        queuedAt = c.at,
+                    )).copy(
                         sessionId = c.sessionId,
                         attempt = c.attempt,
                         dispatchedAt = c.at
@@ -165,4 +174,5 @@ data class QueueEntry(
     val isDispatched: Boolean get() = sessionId != null
     val isDrained: Boolean get() = drainedAt != null
     val isUnclaimedDrain: Boolean get() = isDrained && receipt == null
+    val url: String? get() = sessionId?.let { "https://jules.google.com/session/$it" }
 }

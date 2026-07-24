@@ -15,7 +15,7 @@ class OroborosDaemonCycleTraceTest {
 
     @Before
     fun setup() {
-        tempDir = File.createTempFile("oroboros_test", "").apply {
+        tempDir = File.createTempFile("odt", "").apply {
             delete()
             mkdir()
         }

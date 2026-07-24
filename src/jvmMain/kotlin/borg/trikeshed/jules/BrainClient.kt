@@ -51,6 +51,26 @@ class BrainClient(
         return extractContent(resp.body())
     }
 
+    /** Draft one strict TSV work tree from repository evidence. */
+    fun chatWorkDraft(evidence: String): String = chat(
+        messages = listOf(
+            "system" to "Draft executable TDD work only. Return tab-separated WORK rows; no prose.",
+            "user" to evidence,
+        ),
+        maxTokens = 1200,
+        temperature = 0.1,
+    )
+
+    /** Answer one Jules inquiry or approve an actionable generated plan. */
+    fun chatTend(context: String): String = chat(
+        messages = listOf(
+            "system" to "Tend a Jules coding session. Give decisive project guidance or approve a sound TDD plan. Under 180 words; no questions back.",
+            "user" to context,
+        ),
+        maxTokens = 300,
+        temperature = 0.1,
+    )
+
     /** Pull choices[0].message.content out of the OpenAI-compatible JSON. */
     private fun extractContent(json: String): String {
         val key = """"content""""

@@ -22,7 +22,7 @@ class OroborosDaemonHealthTest {
 
     @BeforeEach
     fun setup() {
-        tempDir = File.createTempFile("oroboros_test", "")
+        tempDir = File.createTempFile("odt", "")
         tempDir.delete()
         tempDir.mkdirs()
         forgeHome = File(tempDir, "forge")
@@ -72,14 +72,7 @@ class OroborosDaemonHealthTest {
         val response = String(buf.array(), 0, bytesRead)
 
         System.err.println("Daemon response: $response")
- 
-        
-        assertTrue(bytesRead > 0, "No bytes read from health socket")
-        val response = String(buf.array(), 0, bytesRead)
-        
-        System.err.println("Daemon response: $response")
-        
- 
+
         assertTrue(response.startsWith("ALIVE"), "Response should start with ALIVE")
         val parts = response.trim().split(" ")
         assertTrue(parts.size == 7, "Response should have 7 parts")

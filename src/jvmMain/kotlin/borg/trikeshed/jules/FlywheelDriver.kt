@@ -1,10 +1,12 @@
 package borg.trikeshed.jules
 
 import borg.trikeshed.job.ContentId
+import borg.trikeshed.userspace.nio.file.spi.JvmAppendWal
 import borg.trikeshed.userspace.nio.file.spi.JvmFileOperations
 import borg.trikeshed.util.oroboros.FileCasStore
 import borg.trikeshed.util.oroboros.LexicalMemory
 import borg.trikeshed.util.oroboros.MergeReceipt
+import borg.trikeshed.utils.kanban.JulesBoardStore
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -51,10 +53,22 @@ class FlywheelDriver(
     private val intervalMs: Long = 30_000L,
     private val maxSlots: Int = 15,
     private val source: String = "sources/github/jnorthrup/TrikeShed",
+    private val gateCommand: List<String> = listOf("./gradlew", "jvmTest", "--no-daemon"),
+    private val workDrafter: ((String) -> String)? = System.getenv("NVIDIA_API_KEY")
+        ?.let { key -> BrainClient(key)::chatWorkDraft },
+    private val client: JulesRestClient = JulesRestClient(apiKey),
+    private val tendResponder: ((String) -> String)? = System.getenv("NVIDIA_API_KEY")
+        ?.let { key -> BrainClient(key)::chatTend },
+    private val queueStore: JulesBoardStore? = System.getenv("FLYWHEEL_QUEUE_WAL")
+        ?.takeIf { it.isNotBlank() }
+        ?.let { path -> JulesBoardStore(JvmAppendWal(java.io.File(path))) },
+    internal var sessionCreator: (String, String) -> String = { spec, title ->
+        client.createSession(prompt = spec, title = title, source = source)
+    },
 ) {
     private val reportedSpecMissing = mutableSetOf<String>()
+    private val tendedActivities = mutableSetOf<String>()
 
-    private val client = JulesRestClient(apiKey)
     private val casStore = FileCasStore(
         JvmFileOperations(),
         JvmFileOperations().resolvePath(forgeDir.absolutePath, "cas"),
@@ -75,6 +89,85 @@ class FlywheelDriver(
         data class DispatchFailed(val title: String, val reason: String) : FlywheelEvent
         data class PollError(val message: String) : FlywheelEvent
         data class SpecMissing(val title: String) : FlywheelEvent
+    }
+
+    internal data class RankedWork(
+        val workId: String,
+        val parent: String?,
+        val score: Double,
+        val queuedAt: Long,
+    )
+
+    internal data class DraftedWork(
+        val workId: String,
+        val title: String,
+        val spec: String,
+        val parent: String?,
+        val score: Double,
+        val queuedAt: Long,
+    ) {
+        val ranked: RankedWork get() = RankedWork(workId, parent, score, queuedAt)
+    }
+
+    enum class SessionAction { HARVEST, TEND, STUCK, FAILED, IGNORE }
+
+    internal data class SessionVerdict(
+        val sessionId: String,
+        val action: SessionAction,
+        val lastActivityAt: Long?,
+    )
+
+    /**
+     * One-pass classification: every polled session is reduced to the single action
+     * the cycle should take against it. Replaces the implicit "if COMPLETED drain,
+     * if AWAITING answer, otherwise ignore" gate with a verdict-driven cycle.
+     */
+    internal suspend fun classifySessions(
+        sessions: List<JulesRestClient.SessionInfo>,
+        nowMs: Long,
+        stuckThresholdMs: Long,
+    ): List<SessionVerdict> = sessions.map { s ->
+        when (s.state) {
+            "COMPLETED" -> SessionVerdict(s.id, SessionAction.HARVEST, null)
+            "AWAITING_USER_FEEDBACK", "AWAITING_PLAN_APPROVAL" ->
+                SessionVerdict(s.id, SessionAction.TEND, null)
+            "FAILED" -> SessionVerdict(s.id, SessionAction.FAILED, null)
+            "IN_PROGRESS", "QUEUED", "PLANNING" -> {
+                val activities = runCatching { client.activities(s.id) }.getOrNull().orEmpty()
+                val lastAt = activities.lastOrNull()?.let { act ->
+                    runCatching { java.time.OffsetDateTime.parse(act.createTime).toInstant().toEpochMilli() }
+                        .getOrNull()
+                }
+                val isFresh = lastAt != null && nowMs - lastAt < stuckThresholdMs
+                if (isFresh) SessionVerdict(s.id, SessionAction.IGNORE, lastAt)
+                else SessionVerdict(s.id, SessionAction.STUCK, lastAt)
+            }
+            else -> SessionVerdict(s.id, SessionAction.IGNORE, null)
+        }
+    }
+
+    internal fun draftWorkFromResearch(evidence: String): List<DraftedWork> {
+        val draft = workDrafter?.invoke(buildString {
+            appendLine("Create a hierarchical queue of TDD-first work from CURRENT repository evidence.")
+            appendLine("Each output row must be: WORK<TAB>parent-index-or--<TAB>score<TAB>title<TAB>spec")
+            appendLine("The spec must name an exact Test: path, implementation path, assertions, and run ./gradlew verification.")
+            appendLine("Evidence:")
+            append(evidence)
+        }) ?: return emptyList()
+        val parsed = mutableListOf<DraftedWork>()
+        draft.lineSequence().forEachIndexed { index, line ->
+            val fields = line.split('\t', limit = 5)
+            if (fields.size != 5 || fields[0] != "WORK") return@forEachIndexed
+            val score = fields[2].toDoubleOrNull() ?: return@forEachIndexed
+            val title = fields[3].trim()
+            val spec = fields[4].trim()
+            if (title.isEmpty() || "Test:" !in spec || "run ./gradlew" !in spec) return@forEachIndexed
+            val parentIndex = fields[1].toIntOrNull()
+            val parent = parentIndex?.let { parsed.getOrNull(it)?.workId }
+            val workId = "research:${title.hashCode().toUInt().toString(16)}"
+            parsed += DraftedWork(workId, title, spec, parent, score, index.toLong())
+        }
+        return parsed
     }
 
     /** One reactor tick. POLL → fanout DRAIN + DISPATCH under ioGate.
@@ -102,6 +195,18 @@ class FlywheelDriver(
         } else if (sessions.isEmpty()) {
             _events.emit(FlywheelEvent.PollError("listSessions: returned empty for source=$source (alive=$alive available=$available)"))
         }
+        // Tend blocked sessions before harvesting or dispatching new work.
+        val tended = tendSessions(sessions)
+        val nowMs = System.currentTimeMillis()
+        val stuckThresholdMs = (intervalMs * 20).coerceAtLeast(60_000L)
+        val verdicts = classifySessions(sessions, nowMs, stuckThresholdMs)
+        val stuckCount = verdicts.count { it.action == SessionAction.STUCK }
+        val failedCount = verdicts.count { it.action == SessionAction.FAILED }
+        if (stuckCount > 0 || failedCount > 0) {
+            _events.emit(FlywheelEvent.PollError(
+                "stuck=$stuckCount failed=$failedCount (threshold=${stuckThresholdMs}ms)"
+            ))
+        }
         // DRAIN runs first under ioGate (serial) so trunk lands clean before DISPATCH.
         val completed = sessions.filter { it.state == "COMPLETED" }.take(maxSlots)
         val drained = drainFanout(completed)
@@ -119,10 +224,41 @@ class FlywheelDriver(
         val items = allItems.filter { it.spec.isNotBlank() }.take(available)
         val dispatched = if (trunkClean && available > 0) dispatchFanout(items) else 0
         if (pollErr == null && sessions.isEmpty()) {
-            "poll-empty alive=0 available=$available trunk=${if (trunkClean) "clean" else "dirty"} dispatched=$dispatched skipped=$skipped"
+            "poll-empty alive=0 available=$available trunk=${if (trunkClean) "clean" else "dirty"} tended=$tended dispatched=$dispatched skipped=$skipped"
         } else {
-            "drained=$drained dispatched=$dispatched alive=$alive available=$available trunk=${if (trunkClean) "clean" else "dirty"} skipped=$skipped"
+            "drained=$drained tended=$tended dispatched=$dispatched alive=$alive available=$available trunk=${if (trunkClean) "clean" else "dirty"} skipped=$skipped"
         }
+    }
+
+    internal fun tendSessions(sessions: List<JulesRestClient.SessionInfo>): Int {
+        val responder = tendResponder ?: return 0
+        var tended = 0
+        sessions.filter {
+            it.state == "AWAITING_USER_FEEDBACK" || it.state == "AWAITING_PLAN_APPROVAL"
+        }.forEach { session ->
+            val activities = runCatching { client.activities(session.id) }.getOrElse { return@forEach }
+            val latest = activities.lastOrNull {
+                it.kind == "agentMessaged" || it.kind == "progressUpdated" || it.kind == "planGenerated"
+            }
+            val activityKey = "${session.id}:${latest?.id ?: session.state}"
+            if (activityKey in tendedActivities) return@forEach
+            val context = buildString {
+                appendLine("Session: ${session.id}")
+                appendLine("Title: ${session.title}")
+                appendLine("State: ${session.state}")
+                if (session.state == "AWAITING_PLAN_APPROVAL") {
+                    appendLine("A plan is awaiting approval. Approve it if it is TDD-first and scoped; otherwise give exact corrections.")
+                }
+                appendLine("Latest Jules activity: ${latest?.excerpt.orEmpty()}")
+                appendLine("TrikeShed conventions: commonMain domain logic; focused tests; no unrelated edits or test deletion.")
+            }
+            val response = runCatching { responder(context).trim() }.getOrNull().orEmpty()
+            if (response.isNotEmpty() && runCatching { client.sendMessage(session.id, response) }.isSuccess) {
+                tendedActivities += activityKey
+                tended++
+            }
+        }
+        return tended
     }
 
     private suspend fun drainFanout(sessions: List<JulesRestClient.SessionInfo>): Int =
@@ -143,10 +279,11 @@ class FlywheelDriver(
                     ioGate.withPermit {
                         try {
                             val prompt = buildSpecPrompt(item)
-                            val sid = client.createSession(
-                                prompt = prompt,
+                            val sid = dispatchAndRecord(
+                                workId = item.workId,
                                 title = item.title,
-                                source = source)
+                                spec = prompt,
+                            )
                             _events.emit(FlywheelEvent.Dispatched(sid, item.title))
                             true
                         } catch (t: Throwable) {
@@ -159,8 +296,28 @@ class FlywheelDriver(
         }
 
     /**
-     * Build the full prompt from a todo item: title + the body lines (TDD spec, file
-     * path, assertions, implement directive) plus the canonical TrikeShed project
+     * Spawn one Jules session and persist the durable workId → sessionId link so the
+     * operator can observe what the loop is doing and so the feedback loop has a
+     * real artifact to feed back into RESEARCH.
+     */
+    internal suspend fun dispatchAndRecord(workId: String, title: String, spec: String): String {
+        val sessionId = sessionCreator(spec, title)
+        queueStore?.appendWork(
+            workId,
+            JulesCause.WorkDispatched(
+                workId = workId,
+                sessionId = sessionId,
+                attempt = 1,
+                at = System.currentTimeMillis(),
+            )
+        )
+        return sessionId
+    }
+
+    private val queueStoreRef: JulesBoardStore? get() = queueStore
+
+    /**
+     * Build the full prompt from a todo item
      * conventions block. Jules no longer needs a 4000-byte follow-up because the
      * original dispatch carries the spec inline.
      */
@@ -183,40 +340,26 @@ class FlywheelDriver(
 
     private suspend fun drainOne(s: JulesRestClient.SessionInfo): Int {
         val patch = client.lastPatch(s.id)
-        if (patch == null) { _events.emit(FlywheelEvent.PollError("drain ${s.id}: no patch from lastPatch()")); return 0 }
-        if (patch.isBlank()) { _events.emit(FlywheelEvent.PollError("drain ${s.id}: blank patch")); return 0 }
-        if (!isWorkingTreeClean()) { _events.emit(FlywheelEvent.PollError("drain ${s.id}: trunk dirty, skipping")); return 0 }
-        val patchFile = File(repoDir, ".flywheel-patch")
-        patchFile.writeText(patch)
-        val applyCheck = ProcessBuilder("git", "apply", "--check", ".flywheel-patch")
-            .directory(repoDir).redirectErrorStream(true).start()
-        applyCheck.waitFor()
-        if (applyCheck.exitValue() != 0) {
-            val stderr = applyCheck.inputStream.bufferedReader().readText().take(200)
-            patchFile.delete()
-            _events.emit(FlywheelEvent.PollError("drain ${s.id}: apply --check failed: $stderr"))
+        if (patch == null) {
+            _events.emit(FlywheelEvent.PollError("drain ${s.id}: no patch from lastPatch()"))
             return 0
         }
-        ProcessBuilder("git", "apply", ".flywheel-patch").directory(repoDir).start().waitFor()
-        patchFile.delete()
-        val commitSha = headSha()
-        val patchBytes = patch.encodeToByteArray()
-        val patchCid = try { casStore.put(patchBytes) } catch (e: Exception) {
-            _events.emit(FlywheelEvent.PollError("drain ${s.id}: cas put failed: ${e.message}"))
-            return -1
+        if (patch.isBlank()) {
+            _events.emit(FlywheelEvent.PollError("drain ${s.id}: blank patch"))
+            return 0
         }
-        val safe = s.id.replace(Regex("[^A-Za-z0-9._-]"), "-")
-        val tag = "flywheel/jules-" + safe + "-" + commitSha.take(12)
-        val msg = ("Jules receipt" + "\n" +
-            "session=" + s.id + "\n" +
-            "patchCid=" + patchCid.value + "\n" +
-            "taskTitle=" + s.title)
-        val tagRes = command("git", "tag", "-a", tag, commitSha, "-m", msg)
-        if (tagRes.exitCode != 0) {
-            _events.emit(FlywheelEvent.PollError("drain ${s.id}: tag create failed: ${tagRes.output.take(200)}"))
-            return -1
+        val claim = settlePatch(
+            patch = patch,
+            title = s.title,
+            sessionId = s.id,
+            workId = "session:${s.id}",
+            content = s.title,
+        )
+        if (claim == null) {
+            _events.emit(FlywheelEvent.PollError("drain ${s.id}: settlement gate failed"))
+            return 0
         }
-        _events.emit(FlywheelEvent.Drained(s.id, commitSha, tag))
+        _events.emit(FlywheelEvent.Drained(s.id, claim.commitSha, claim.receipt.versionTag))
         return 1
     }
 
@@ -229,9 +372,17 @@ class FlywheelDriver(
      */
     private suspend fun readTodoItems(): List<TodoItem> {
         val todo = File(repoDir, "doc/todo.md")
-        if (!todo.exists()) return emptyList()
+        if (!todo.exists()) {
+            val drafted = draftWorkFromResearch(researchEvidence())
+            val ranked = rankWork(drafted.map { it.ranked })
+            val byId = drafted.associateBy { it.workId }
+            return ranked.map { byId.getValue(it.workId) }.map {
+                TodoItem(it.workId, it.title, it.spec, it.parent, it.score, it.queuedAt)
+            }
+        }
         val titleRe = Regex("^\\s*- \\[ \\]\\s*\\*\\*?(.+?)\\*\\*?\\s*$")
         val items = mutableListOf<TodoItem>()
+        val hierarchy = mutableListOf<Pair<Int, String>>()
         val lines = todo.readLines()
         var i = 0
         while (i < lines.size) {
@@ -250,13 +401,144 @@ class FlywheelDriver(
                 j++
             }
             val spec = body.toString().trim()
-            items.add(TodoItem(title, spec))
+            val workId = "todo:${title.hashCode().toUInt().toString(16)}"
+            val indent = lines[i].indexOf('-').coerceAtLeast(0)
+            while (hierarchy.isNotEmpty() && hierarchy.last().first >= indent) hierarchy.removeLast()
+            val parent = hierarchy.lastOrNull()?.second
+            items.add(
+                TodoItem(
+                    workId = workId,
+                    title = title,
+                    spec = spec,
+                    parent = parent,
+                    score = 1.0 - (items.size.toDouble() / lines.size.coerceAtLeast(1)),
+                    queuedAt = i.toLong(),
+                )
+            )
+            hierarchy += indent to workId
             i = j
         }
-        return items
+        val ranked = rankWork(items.map { RankedWork(it.workId, it.parent, it.score, it.queuedAt) })
+        val byId = items.associateBy { it.workId }
+        return ranked.map { byId.getValue(it.workId) }
     }
 
-    private data class TodoItem(val title: String, val spec: String)
+    private fun researchEvidence(): String {
+        val status = command("git", "status", "--short", "--branch").output.trim()
+        val log = command("git", "log", "-20", "--oneline", "--decorate").output.trim()
+        val surfaces = listOf("doc/taste.md", "doc/concepts.md", "PRELOAD.md")
+            .mapNotNull { path -> File(repoDir, path).takeIf { it.isFile }?.let { path to it.readText().take(12_000) } }
+            .joinToString("\n\n") { (path, text) -> "FILE $path\n$text" }
+        return "GIT STATUS\n$status\n\nGIT LOG\n$log\n\nPROJECT SURFACE\n$surfaces"
+    }
+
+    private data class TodoItem(
+        val workId: String,
+        val title: String,
+        val spec: String,
+        val parent: String?,
+        val score: Double,
+        val queuedAt: Long,
+    )
+
+    internal fun settlePatch(
+        patch: String,
+        title: String,
+        sessionId: String,
+        workId: String,
+        content: String,
+    ): ClaimedPatch? {
+        fun failed(stage: String, result: CommandResult? = null): ClaimedPatch? {
+            val detail = result?.output?.takeLast(300)?.trim().orEmpty()
+            System.err.println("[FLYWHEEL] SETTLE-FAIL $stage${if (detail.isEmpty()) "" else ": $detail"}")
+            return null
+        }
+        val touchedFiles = parsePatchFiles(patch)
+        if (touchedFiles.isEmpty()) return failed("no touched files")
+        if (!isWorkingTreeClean()) return failed("dirty tree")
+        val patchFile = File(repoDir, ".flywheel-patch")
+        patchFile.writeText(patch)
+        try {
+            val check = command("git", "apply", "--check", patchFile.name)
+            if (check.exitCode != 0) return failed("apply check", check)
+            val apply = command("git", "apply", patchFile.name)
+            if (apply.exitCode != 0) return failed("apply", apply)
+            val gate = command(*gateCommand.toTypedArray())
+            if (gate.exitCode != 0) {
+                revertFiles(touchedFiles)
+                return failed("gate", gate)
+            }
+            val add = command("git", "add", "--", *touchedFiles.toTypedArray())
+            if (add.exitCode != 0) {
+                revertFiles(touchedFiles)
+                return failed("stage", add)
+            }
+            val commit = command("git", "commit", "-m", "flywheel: $title")
+            if (commit.exitCode != 0) {
+                revertFiles(touchedFiles)
+                return failed("commit", commit)
+            }
+            val commitSha = headSha()
+            val claim = claimPatch(commitSha, patch, sessionId, workId, title, content)
+                ?: return failed("receipt")
+            val push = command(
+                "git", "push", "--atomic", "origin",
+                "HEAD:refs/heads/master",
+                "refs/tags/${claim.receipt.versionTag}",
+            )
+            return if (push.exitCode == 0) claim else failed("push", push)
+        } finally {
+            patchFile.delete()
+        }
+    }
+
+    private fun parsePatchFiles(patch: String): List<String> = patch.lineSequence()
+        .filter { it.startsWith("+++ b/") }
+        .map { it.removePrefix("+++ b/").trim() }
+        .filter { it.isNotEmpty() }
+        .distinct()
+        .toList()
+
+    private fun revertFiles(files: List<String>) {
+        command("git", "reset", "HEAD", "--", *files.toTypedArray())
+        command("git", "checkout", "HEAD", "--", *files.toTypedArray())
+        files.filter { !File(repoDir, it).exists() }.forEach { File(repoDir, it).delete() }
+        command("git", "clean", "-f", "--", *files.toTypedArray())
+    }
+
+    internal fun claimPatch(
+        commitSha: String,
+        patch: String,
+        sessionId: String,
+        workId: String,
+        title: String,
+        content: String,
+    ): ClaimedPatch? {
+        val patchCid = try {
+            casStore.put(patch.encodeToByteArray())
+        } catch (_: Exception) {
+            return null
+        }
+        val safeSession = sessionId.replace(Regex("[^A-Za-z0-9._-]"), "-")
+        val tag = "flywheel/jules-$safeSession-${commitSha.take(12)}"
+        val message = "Jules merge receipt\nsession=$sessionId\nwork=$workId\npatchCid=${patchCid.value}"
+        if (command("git", "tag", "-a", tag, commitSha, "-m", message).exitCode != 0) return null
+        return ClaimedPatch(
+            commitSha,
+            MergeReceipt(
+                workId = workId,
+                producer = "jules",
+                producerRef = sessionId,
+                patchCid = patchCid,
+                revision = commitSha,
+                versionTag = tag,
+                lexicalMemory = LexicalMemory(summary = title, title = title, content = content),
+                claimedAt = System.currentTimeMillis(),
+            ),
+        )
+    }
+
+    internal data class ClaimedPatch(val commitSha: String, val receipt: MergeReceipt)
 
     private fun isWorkingTreeClean(): Boolean = command("git", "status", "--porcelain").output.isBlank()
     private fun headSha(): String = command("git", "rev-parse", "HEAD").output.trim()
@@ -276,6 +558,28 @@ class FlywheelDriver(
     fun close() { parentJob.cancel() }
 
     companion object {
+        internal fun rankWork(items: List<RankedWork>): List<RankedWork> {
+            val ids = items.mapTo(mutableSetOf()) { it.workId }
+            val byId = items.associateBy { it.workId }
+            val depthMemo = mutableMapOf<String, Int>()
+            fun depth(item: RankedWork, visiting: Set<String> = emptySet()): Int {
+                depthMemo[item.workId]?.let { return it }
+                if (item.workId in visiting) return 0
+                val parent = item.parent?.takeIf { it in ids }
+                val value = if (parent == null) 0 else {
+                    depth(byId.getValue(parent), visiting + item.workId) + 1
+                }
+                depthMemo[item.workId] = value
+                return value
+            }
+            return items.sortedWith(
+                compareByDescending<RankedWork> { depth(it) }
+                    .thenByDescending { it.score }
+                    .thenBy { it.queuedAt }
+                    .thenBy { it.workId }
+            )
+        }
+
         @JvmStatic
         fun main(args: Array<String>) {
             // Single entrypoint is `bin/oroboros-daemon`; this companion is the
