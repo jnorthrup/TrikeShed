@@ -1,2 +1,0 @@
-git add src/wasmJsMain/kotlin/borg/trikeshed/forge/ForgeWasmMain.kt src/jsMain/kotlin/borg/trikeshed/forge/ForgeNodeMain.kt src/wasmJsMain/kotlin/borg/trikeshed/forge/shell/HtmlShellWasm.kt src/jsMain/kotlin/borg/trikeshed/forge/shell/HtmlShellJs.kt src/commonTest/kotlin/borg/trikeshed/forge/ForgeDocTest.kt
-git rm src/wasmJsMain/kotlin/borg/trikeshed/browser/storage/IndexedDbWasm.kt src/wasmJsMain/kotlin/borg/trikeshed/browser/storage/IndexedDbWasmVolume.kt
