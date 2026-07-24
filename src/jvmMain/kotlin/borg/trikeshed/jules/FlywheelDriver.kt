@@ -22,6 +22,8 @@ import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.sync.Semaphore
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
@@ -63,6 +65,7 @@ class FlywheelDriver(
     private val _events = MutableSharedFlow<FlywheelEvent>(extraBufferCapacity = 64)
     val events: SharedFlow<FlywheelEvent> get() = _events.asSharedFlow()
     private val ioGate = Semaphore(permits = maxSlots)
+    private val drainGate = Mutex()
     private val reactorScope = CoroutineScope(Dispatchers.IO + parentJob)
 
     /** A reactor lifecycle event. Fanout subscribers (TUI, reaper, drain observers) listen to [events]. */
@@ -119,8 +122,10 @@ class FlywheelDriver(
         if (sessions.isEmpty()) 0 else coroutineScope {
             sessions.map { s ->
                 async(Dispatchers.IO) {
-                    ioGate.withPermit {
-                        try { drainOne(s) } catch (t: Throwable) { _events.emit(FlywheelEvent.PollError("drain ${s.id}: ${t.message}")); -1 }
+                    drainGate.withLock {
+                        ioGate.withPermit {
+                            try { drainOne(s) } catch (t: Throwable) { _events.emit(FlywheelEvent.PollError("drain ${s.id}: ${t.message}")); -1 }
+                        }
                     }
                 }
             }.awaitAll().count { it > 0 }
