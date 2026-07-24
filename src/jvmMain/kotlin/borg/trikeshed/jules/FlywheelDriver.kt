@@ -210,6 +210,9 @@ class FlywheelDriver(
         return 1
     }
 
+    private var todoFileLastModified: Long = 0L
+    private var cachedTodoItems: List<TodoItem> = emptyList()
+
     /**
      * Read unchecked items from doc/todo.md. Each item is `(title, specBody)` where
      * `specBody` is the indented 1+ lines after the title — the TDD spec, test
@@ -218,11 +221,22 @@ class FlywheelDriver(
      * rubber-stamp a 4000-byte follow-up per task.
      */
     private fun readTodoItems(): List<TodoItem> {
-        val todo = File(repoDir, "doc/todo.md")
-        if (!todo.exists()) return emptyList()
+        val todoFile = File(repoDir, "doc/todo.md")
+        if (!todoFile.exists()) return emptyList()
+
+        val currentMtime = todoFile.lastModified()
+        if (currentMtime != todoFileLastModified || cachedTodoItems.isEmpty()) {
+            println("[FLYWHEEL] todo cache miss, re-parsing")
+            todoFileLastModified = currentMtime
+            cachedTodoItems = parseTheFile(todoFile)
+        }
+        return cachedTodoItems
+    }
+
+    private fun parseTheFile(todoFile: File): List<TodoItem> {
         val titleRe = Regex("^\\s*- \\[ \\]\\s*\\*\\*?(.+?)\\*\\*?\\s*$")
         val items = mutableListOf<TodoItem>()
-        val lines = todo.readLines()
+        val lines = todoFile.readLines()
         var i = 0
         while (i < lines.size) {
             val m = titleRe.find(lines[i])
