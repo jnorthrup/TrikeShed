@@ -29,8 +29,34 @@ object OroborosDaemon {
 
     @JvmStatic
     fun main(args: Array<String>) = runBlocking {
-        val forgeHome = File(args.getOrNull(0) ?: System.getProperty("user.home") + "/.local/forge")
-        val repoDir = File(args.getOrNull(1) ?: System.getProperty("user.dir"))
+        var watch = true
+        var intervalMs = 20000L
+        val positionalArgs = mutableListOf<String>()
+
+        var i = 0
+        while (i < args.size) {
+            when (args[i]) {
+                "--once" -> {
+                    watch = false
+                    i++
+                }
+                "--watch" -> {
+                    watch = true
+                    i++
+                }
+                "--interval-ms" -> {
+                    intervalMs = args.getOrNull(i + 1)?.toLongOrNull() ?: 20000L
+                    i += 2
+                }
+                else -> {
+                    positionalArgs.add(args[i])
+                    i++
+                }
+            }
+        }
+
+        val forgeHome = File(positionalArgs.getOrNull(0) ?: System.getProperty("user.home") + "/.local/forge")
+        val repoDir = File(positionalArgs.getOrNull(1) ?: System.getProperty("user.dir"))
         val apiKey = System.getenv("JULES_API_KEY")
 
         if (apiKey.isNullOrBlank()) {
@@ -52,7 +78,7 @@ object OroborosDaemon {
         val flywheel = Flywheel(store, repoDir, element)
         val conductor = JulesConductor(julesClient, headShaProvider, store)
 
-        System.err.println("[OROBOROS] daemon up. forgeHome=$forgeHome repo=$repoDir maxLive=${element.defaults.maxLive} pollIntervalMs=${element.defaults.pollIntervalMs} simBudgetMs=${element.defaults.sessionSimulationMs}")
+        System.err.println("[OROBOROS] daemon up. forgeHome=$forgeHome repo=$repoDir maxLive=${element.defaults.maxLive} pollIntervalMs=$intervalMs simBudgetMs=${element.defaults.sessionSimulationMs}")
 
         var cycle = 0
         while (true) {
@@ -66,7 +92,8 @@ object OroborosDaemon {
             } catch (t: Throwable) {
                 System.err.println("[OROBOROS] cycle error: ${t::class.simpleName}: ${t.message}")
             }
-            delay(element.defaults.pollIntervalMs)
+            if (!watch) break
+            delay(intervalMs)
         }
     }
 
