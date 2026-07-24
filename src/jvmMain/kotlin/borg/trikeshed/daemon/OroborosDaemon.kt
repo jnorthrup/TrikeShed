@@ -1,9 +1,12 @@
 package borg.trikeshed.daemon
 
 import borg.trikeshed.jules.FlywheelDriver
+import borg.trikeshed.jules.FlywheelDriver.FlywheelEvent
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
+import java.io.BufferedWriter
 import java.io.File
+import java.io.FileOutputStream
 import kotlin.system.exitProcess
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.isActive
@@ -132,13 +135,73 @@ object OroborosDaemon {
             maxSlots = maxSlots,
         )
 
+        val traceFile = File(forgeHome, "oroboros-cycles.jsonl")
+        var traceLineCount = if (traceFile.exists()) traceFile.readLines().size else 0
+        var traceWriter: BufferedWriter? = null
+        try {
+            traceWriter = FileOutputStream(traceFile, true).bufferedWriter()
+            Runtime.getRuntime().addShutdownHook(Thread {
+                try {
+                    traceWriter?.flush()
+                    traceWriter?.close()
+                } catch (e: Exception) {
+                    // Ignore stream closed on exit
+                }
+            })
+        } catch (e: Exception) {
+            System.err.println("[OROBOROS] warning: failed to open trace file: ${e.message}")
+        }
+
+        var pollErrors = 0
         // Stdout observer so cycles are visible without a TUI.
-        driver.subscribe { ev -> println("[FLY-EVENT] $ev") }
+        driver.subscribe { ev ->
+            println("[FLY-EVENT] $ev")
+            if (ev is FlywheelEvent.PollError) pollErrors++
+        }
         System.err.println(
             "[OROBOROS] daemon up. forgeHome=$forgeHome repo=$repoDir " +
                 "intervalMs=$intervalMs maxSlots=$maxSlots mode=${if (watch) "watch" else "once"}"
         )
 
+        suspend fun doCycle() {
+            val t0 = System.currentTimeMillis()
+            val startPollErrors = pollErrors
+            val summary = driver.cycle()
+            val cycleMs = System.currentTimeMillis() - t0
+            val cyclePollErrors = pollErrors - startPollErrors
+            println("[FLYWHEEL] $summary")
+
+            var d = 0; var p = 0; var a = 0; var v = 0
+            Regex("drained=(\\d+)").find(summary)?.let { d = it.groupValues[1].toInt() }
+            Regex("dispatched=(\\d+)").find(summary)?.let { p = it.groupValues[1].toInt() }
+            Regex("alive=(\\d+)").find(summary)?.let { a = it.groupValues[1].toInt() }
+            Regex("available=(\\d+)").find(summary)?.let { v = it.groupValues[1].toInt() }
+
+            val json = "{\"t\":$t0,\"c\":$cycleMs,\"d\":$d,\"p\":$p,\"a\":$a,\"v\":$v,\"e\":$cyclePollErrors}"
+            try {
+                if (traceLineCount >= 10000) {
+                    traceWriter?.close()
+                    val backup = File(traceFile.parentFile, traceFile.name + ".1")
+                    traceFile.renameTo(backup)
+                    traceWriter = FileOutputStream(traceFile, false).bufferedWriter()
+                    traceLineCount = 0
+                }
+                traceWriter?.let {
+                    it.write(json)
+                    it.write("\n")
+                    traceLineCount++
+                }
+            } catch (e: Exception) {
+                System.err.println("[OROBOROS] warning: failed to write trace file: ${e.message}")
+            }
+        }
+
+        doCycle()
+        if (!watch) {
+            traceWriter?.flush()
+            traceWriter?.close()
+            driver.close()
+            return@runBlocking
 
         daemonStartTime = System.currentTimeMillis()
         lastCycleReport = null
@@ -176,6 +239,9 @@ object OroborosDaemon {
         }
 
         try {
+            while (true) {
+                delay(intervalMs)
+                doCycle()
             suspend fun runCycle() {
                 val start = System.currentTimeMillis()
                 val result = driver.cycle()
