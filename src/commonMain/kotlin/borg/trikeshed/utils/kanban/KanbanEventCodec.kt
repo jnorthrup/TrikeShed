@@ -7,6 +7,9 @@ package borg.trikeshed.utils.kanban
 import borg.trikeshed.jules.JulesCause
 import borg.trikeshed.jules.JulesSnapshot
 import borg.trikeshed.parse.json.JsonSupport
+import borg.trikeshed.job.ContentId
+import borg.trikeshed.util.oroboros.LexicalMemory
+import borg.trikeshed.util.oroboros.MergeReceipt
 
 /**
  * Confix record codec for the Kanban causal log.
@@ -64,6 +67,18 @@ object KanbanEventCodec {
             is JulesCause.WorkDrained -> {
                 field("workId", c.workId); field("sessionId", c.sessionId)
                 field("commitSha", c.commitSha); field("taskId", c.taskId)
+                c.receipt?.let {
+                    field("receiptProducer", it.producer)
+                    field("receiptProducerRef", it.producerRef)
+                    field("receiptPatchCid", it.patchCid.value)
+                    field("receiptRevision", it.revision)
+                    field("receiptVersionTag", it.versionTag)
+                    field("receiptSummary", it.lexicalMemory.summary)
+                    field("receiptTitle", it.lexicalMemory.title)
+                    field("receiptContent", it.lexicalMemory.content)
+                    append(",\"receiptClaimedAt\":").append(it.claimedAt)
+                    it.prUrl?.let { url -> field("receiptPrUrl", url) }
+                }
             }
         }
         append('}')
@@ -124,6 +139,23 @@ object KanbanEventCodec {
                         sessionId = m.str("sessionId"),
                         commitSha = m.str("commitSha"),
                         taskId = m.str("taskId"),
+                        receipt = m["receiptPatchCid"]?.toString()?.let { cid ->
+                            MergeReceipt(
+                                workId = m.str("workId"),
+                                producer = m.str("receiptProducer"),
+                                producerRef = m.str("receiptProducerRef"),
+                                patchCid = ContentId(cid),
+                                revision = m.str("receiptRevision"),
+                                versionTag = m.str("receiptVersionTag"),
+                                lexicalMemory = LexicalMemory(
+                                    summary = m.str("receiptSummary"),
+                                    title = m.str("receiptTitle"),
+                                    content = m.str("receiptContent"),
+                                ),
+                                claimedAt = m.num("receiptClaimedAt"),
+                                prUrl = m["receiptPrUrl"]?.toString(),
+                            )
+                        },
                         at = at,
                     )
                     else -> JulesCause.StateObserved(m.str("from"), m.str("to"), at)

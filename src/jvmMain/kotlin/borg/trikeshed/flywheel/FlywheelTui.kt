@@ -6,6 +6,7 @@ package borg.trikeshed.flywheel
 
 import borg.trikeshed.jules.JulesRestClient
 import borg.trikeshed.utils.kanban.JulesBoardStore
+import borg.trikeshed.userspace.nio.file.spi.JvmAppendWal
 import java.io.File
 import java.time.Duration
 import java.time.Instant
@@ -102,7 +103,7 @@ object FlywheelTui {
         val todo = File(repoDir, "doc/todo.md")
         val queue = if (todo.exists()) todo.readLines().count { it.matches(Regex("^\\s*- \\[ \\].*")) } else 0
         val land = runCatching {
-            JulesBoardStore(forgeDir).load().values.count { it.drained }
+            JulesBoardStore(JvmAppendWal(File(forgeDir, "jules-board.wal"))).load().values.count { it.drained }
         }.getOrDefault(0)
         val openCodeRunning = processCount("opencode")
         val codexRunning = processCount("codex")
@@ -110,9 +111,10 @@ object FlywheelTui {
         val codexAvailable = executableOnPath("codex")
 
         return try {
-            val sessions = client?.listSessions()
-                ?.filter { it.source == source }
-                ?.sortedByDescending { it.updateTime }
+            val sessions = readTrajectorySessions(forgeDir, source)
+                ?: client?.listSessions()
+                    ?.filter { it.source == source }
+                    ?.sortedByDescending { it.updateTime }
                 ?: emptyList()
             val dispatch = sessions.count { it.state == "QUEUED" || it.state == "PLANNING" || it.state == "AWAITING_PLAN_APPROVAL" }
             val running = sessions.count { it.state == "IN_PROGRESS" }
@@ -237,4 +239,47 @@ object FlywheelTui {
         (System.getenv("PATH") ?: "").split(File.pathSeparator).any { File(it, name).canExecute() }
 
     private val TERMINAL = setOf("COMPLETED", "FINISHED", "FAILED", "PAUSED", "CANCELLED")
+
+    private fun readTrajectorySessions(forgeDir: File, source: String): List<JulesRestClient.SessionInfo>? {
+        val file = File(forgeDir, "trajectory.json")
+        if (!file.exists() || System.currentTimeMillis() - file.lastModified() > 15_000) return null
+
+        return try {
+            val json = file.readText()
+            val parsed = borg.trikeshed.parse.json.JsonSupport.parse(json) as? Map<*, *> ?: return null
+            val causes = parsed["causes"] as? List<*> ?: return null
+            val rootTitle = parsed["title"]?.toString() ?: "trajectory"
+
+            val out = mutableMapOf<String, JulesRestClient.SessionInfo>()
+            for (cause in causes) {
+                val cMap = cause as? Map<*, *> ?: continue
+                val kind = cMap["kind"]?.toString() ?: continue
+                val sid = cMap["sessionId"]?.toString() ?: cMap["sid"]?.toString() ?: continue
+                val at = cMap["at"]?.toString() ?: ""
+                val state = when (kind) {
+                    "WorkDispatched" -> "IN_PROGRESS"
+                    "DrainApplied", "WorkDrained", "DrainFailed", "SessionFailed" -> "COMPLETED"
+                    "AgentMessaged", "HumanAnswered", "PatchArrived" -> "IN_PROGRESS"
+                    "WorkQueued" -> "QUEUED"
+                    else -> "IN_PROGRESS"
+                }
+
+                // Keep the most recent state if we see multiple events for same session
+                val existing = out[sid]
+                if (existing == null || existing.updateTime < at) {
+                    out[sid] = JulesRestClient.SessionInfo(
+                        id = sid,
+                        state = state,
+                        title = rootTitle,
+                        patchBytes = 0L,
+                        source = source,
+                        updateTime = at
+                    )
+                }
+            }
+            if (out.isEmpty()) null else out.values.sortedByDescending { it.updateTime }
+        } catch (_: Throwable) {
+            null
+        }
+    }
 }

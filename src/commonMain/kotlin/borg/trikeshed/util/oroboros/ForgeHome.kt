@@ -4,8 +4,19 @@ import borg.trikeshed.userspace.nio.platform.spi.SystemOperations
 import borg.trikeshed.userspace.nio.file.spi.FileOperations
 
 object ForgeHome {
+    // Canonical Rook storage root.
+    // Resolution order:
+    //   1. OROBOROS_HOME environment variable (override for deployments/tests)
+    //   2. $HOME/.local/forge sibling storage, kept distinct from any
+    //      project-local forge_home-style directories.
+    // The default location lives alongside other .local state
+    // (forge cas, agents, oroboros manifests). No additional residency is created.
     val defaultHome: String
-        get() = "${SystemOperations.default.homedir}/.local/forge_home"
+        get() {
+            val override = SystemOperations.default.getenv("OROBOROS_HOME")
+            if (!override.isNullOrBlank()) return override
+            return SystemOperations.default.homedir + "/.local/forge"
+        }
 
     fun resolve(namespace: String, fileOps: FileOperations): String {
         return resolveSafe(defaultHome, namespace, fileOps)
@@ -30,7 +41,9 @@ object ForgeHome {
             if (segment == "..") {
                 throw IllegalArgumentException("Path traversal (..) is not allowed")
             }
-            if (segment == ".git" || segment == ".pijul" || segment == ".oroboros") {
+            // Allow .oroboros as a valid first segment for forge internal paths
+            if ((segment == ".git" || segment == ".pijul") ||
+                (segment == ".oroboros" && !path.startsWith(".oroboros/manifests/") && !path.startsWith(".oroboros/status") && !path.startsWith(".oroboros/agents/"))) {
                 throw IllegalArgumentException("Access to reserved directories (.git, .pijul, .oroboros) is not allowed")
             }
         }
@@ -44,3 +57,4 @@ object ForgeHome {
         return fileOps.resolvePath(base, joined)
     }
 }
+

@@ -5,6 +5,32 @@ import kotlin.test.assertContentEquals
 
 class ConfixCborEncoderTest {
     @Test
+    fun testTextStringsAndByteStrings() {
+        // Text string: Major Type 3 (0x60 base)
+        assertContentEquals(bytes(0x60), emit(ConfixPrimitive("", true)))
+        assertContentEquals(bytes(0x61, 0x61), emit(ConfixPrimitive("a", true)))
+        assertContentEquals(bytes(0x64, 0x49, 0x45, 0x54, 0x46), emit(ConfixPrimitive("IETF", true)))
+        assertContentEquals(bytes(0x62, 0x22, 0x5c), emit(ConfixPrimitive("\"\\", true)))
+        assertContentEquals(bytes(0x62, 0xc3, 0xbc), emit(ConfixPrimitive("\u00fc", true)))
+        assertContentEquals(bytes(0x63, 0xe6, 0xb0, 0xb4), emit(ConfixPrimitive("\u6c34", true)))
+        assertContentEquals(bytes(0x64, 0xf0, 0x90, 0x85, 0x91), emit(ConfixPrimitive("\ud800\udd51", true))) // water
+
+        // Byte string: Major Type 2 (0x40 base), for non-numbers when isString = false
+        assertContentEquals(bytes(0x40), emit(ConfixPrimitive("", false)))
+        assertContentEquals(bytes(0x41, 0x61), emit(ConfixPrimitive("a", false)))
+        assertContentEquals(bytes(0x44, 0x49, 0x45, 0x54, 0x46), emit(ConfixPrimitive("IETF", false)))
+        assertContentEquals(bytes(0x42, 0x22, 0x5c), emit(ConfixPrimitive("\"\\", false)))
+        assertContentEquals(bytes(0x42, 0xc3, 0xbc), emit(ConfixPrimitive("\u00fc", false)))
+        assertContentEquals(bytes(0x43, 0xe6, 0xb0, 0xb4), emit(ConfixPrimitive("\u6c34", false)))
+        assertContentEquals(bytes(0x44, 0xf0, 0x90, 0x85, 0x91), emit(ConfixPrimitive("\ud800\udd51", false)))
+
+        // A string that looks like a number/boolean should still be a string (MT 3) if isString = true
+        assertContentEquals(bytes(0x61, 0x31), emit(ConfixPrimitive("1", true)))
+        assertContentEquals(bytes(0x62, 0x2d, 0x31), emit(ConfixPrimitive("-1", true)))
+        assertContentEquals(bytes(0x64, 0x74, 0x72, 0x75, 0x65), emit(ConfixPrimitive("true", true)))
+    }
+
+    @Test
     fun testUnsignedAndSignedIntegers() {
         assertContentEquals(bytes(0x00), emit(ConfixPrimitive(0.toString(), false)))
         assertContentEquals(bytes(0x17), emit(ConfixPrimitive(23.toString(), false)))
@@ -28,6 +54,39 @@ class ConfixCborEncoderTest {
         assertContentEquals(bytes(0x3a, 0xff, 0xff, 0xff, 0xff), emit(ConfixPrimitive((-4294967296L).toString(), false)))
         assertContentEquals(bytes(0x3b, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00), emit(ConfixPrimitive((-4294967297L).toString(), false)))
         assertContentEquals(bytes(0x3b, 0x7f, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff), emit(ConfixPrimitive(Long.MIN_VALUE.toString(), false)))
+    }
+
+    @Test
+    fun testNull() {
+        assertContentEquals(bytes(0xf6), emit(ConfixNull))
+    }
+
+    @Test
+    fun testBool() {
+        assertContentEquals(bytes(0xf5), emit(ConfixPrimitive(true)))
+        assertContentEquals(bytes(0xf4), emit(ConfixPrimitive(false)))
+
+        // "true" as a string, not boolean
+        assertContentEquals(bytes(0x64, 0x74, 0x72, 0x75, 0x65), emit(ConfixPrimitive("true", true)))
+        // "false" as a string
+        assertContentEquals(bytes(0x65, 0x66, 0x61, 0x6c, 0x73, 0x65), emit(ConfixPrimitive("false", true)))
+    }
+
+    @Test
+    fun testFloat() {
+        // 1.1 -> 0xFB, 3FF199999999999A
+        assertContentEquals(bytes(0xfb, 0x3f, 0xf1, 0x99, 0x99, 0x99, 0x99, 0x99, 0x9a), emit(ConfixPrimitive(1.1)))
+        assertContentEquals(bytes(0xfb, 0xbf, 0xf1, 0x99, 0x99, 0x99, 0x99, 0x99, 0x9a), emit(ConfixPrimitive(-1.1)))
+
+        // "1.1" as a string
+        assertContentEquals(bytes(0x63, 0x31, 0x2e, 0x31), emit(ConfixPrimitive("1.1", true)))
+    }
+
+    @Test
+    fun testByteStringFallback() {
+        // "abc" with isString == false should fall back to Major Type 2 (byte string)
+        // 0x43 (Major type 2, length 3) followed by "abc" (0x61, 0x62, 0x63)
+        assertContentEquals(bytes(0x43, 0x61, 0x62, 0x63), emit(ConfixPrimitive("abc", false)))
     }
 
     private fun emit(element: ConfixElement): ByteArray = ConfixCborEmitter.emit(element)

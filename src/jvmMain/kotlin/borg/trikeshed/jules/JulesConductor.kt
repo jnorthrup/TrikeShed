@@ -5,6 +5,8 @@
 package borg.trikeshed.jules
 
 import borg.trikeshed.utils.kanban.JulesBoardStore
+import borg.trikeshed.userspace.nio.file.spi.JvmAppendWal
+import java.io.File
 import kotlinx.coroutines.delay
 import kotlinx.datetime.Clock
 
@@ -21,37 +23,33 @@ class JulesConductor(
     private val client: JulesRestClient,
     private val headShaProvider: () -> String,
     private val store: JulesBoardStore? = null,
+    private val source: String = "sources/github/jnorthrup/TrikeShed",
 ) {
     /** Cards keyed by session id. The board. Projection of the causal log. */
     val cards: MutableMap<String, JulesSessionCard> = store?.load() ?: mutableMapOf()
 
     /** One poll cycle: snapshot surroundings, diff, record causes, persist. */
     suspend fun pollOnce() {
-        val sessions = client.listSessions()
+        val sessions = client.listSessions(source)
+        // The WAL may predate source isolation. Never retain a replayed card
+        // unless the authoritative Jules source currently owns that session.
+        val authoritativeIds = sessions.mapTo(mutableSetOf()) { it.id }
+        cards.keys.retainAll(authoritativeIds)
         val active = sessions.count { it.state == "IN_PROGRESS" || it.state == "PLANNING" || it.state == "QUEUED" }
         val awaiting = sessions.count { it.state == "AWAITING_USER_FEEDBACK" }
         val headSha = headShaProvider()
-
         for (s in sessions) {
             val existing = cards[s.id]
             val stateChanged = existing != null && existing.snapshot.state != s.state
-            // Answer dedup: once a session has any HumanAnswered cause on its card
-            // (and the WAL rehydrates causes from disk at boot, so this survives
-            // restarts), skip the per-cycle re-answer even if the session is still
-            // sitting in AWAITING_USER_FEEDBACK. Jules takes one poll cycle to flip
-            // to IN_PROGRESS after the answer lands; without this guard the daemon
-            // would re-spam the same answer every poll.
-            val alreadyAnswered = existing?.causes?.any { it is JulesCause.HumanAnswered } == true
-            // Activities are fetched only when needed: COMPLETED sessions (patch
-            // accounting), state transitions (cause anchoring), and unanswered
-            // AWAITING sessions (so the GUIDE brain has the inquiry excerpt).
-            val acts = if (s.state == "COMPLETED" ||
-                (stateChanged && s.state == "AWAITING_USER_FEEDBACK") ||
-                (s.state == "AWAITING_USER_FEEDBACK" && !alreadyAnswered))
+            // COMPLETED and AWAITING sessions can both carry cumulative patches.
+            // Fetch them on every poll: retaining a stale zero makes a patch-bearing
+            // awaiting card look empty and can route it to the wrong paddle.
+            val acts = if (s.state == "COMPLETED" || s.state == "AWAITING_USER_FEEDBACK")
                 client.activities(s.id) else emptyList()
             // changeSets are cumulative per activity — the last non-zero carries the total.
-            val patchBytes = acts.lastOrNull { it.patchBytes > 0 }?.patchBytes ?: 0L
-
+            val patchBytes = acts.lastOrNull { it.patchBytes > 0 }?.patchBytes
+                ?: existing?.snapshot?.patchBytes
+                ?: 0L
             val snap = JulesSnapshot(
                 sessionId = s.id,
                 state = s.state,
@@ -61,10 +59,27 @@ class JulesConductor(
                 activeCount = active,
                 awaitingCount = awaiting,
             )
+            val latestInquiry = acts.lastOrNull { it.kind == "agentMessaged" }
+                ?: acts.lastOrNull { it.kind == "progressUpdated" && '?' in it.excerpt }
+            val unseenInquiry = latestInquiry?.takeIf { inquiry ->
+                existing?.causes?.none { it.activityId == inquiry.id } != false
+            }
             if (existing == null) {
-                val card = JulesSessionCard.capture(snap)
+                val captured = JulesSessionCard.capture(snap)
+                val inquiryCause = unseenInquiry?.let {
+                    JulesCause.AgentMessaged(it.excerpt, snap.capturedAt, it.id, it.seq)
+                }
+                val card = if (inquiryCause == null) captured
+                    else captured.copy(causes = captured.causes + inquiryCause)
                 cards[s.id] = card
-                store?.append(snap, drained = false, cause = card.causes.last())
+                store?.append(snap, drained = false, cause = inquiryCause ?: captured.causes.last())
+            } else if (unseenInquiry != null) {
+                // A conversation can advance while Jules remains AWAITING. Record
+                // the new inquiry by activity id so GUIDE answers it exactly once.
+                val cause = JulesCause.AgentMessaged(
+                    unseenInquiry.excerpt, snap.capturedAt, unseenInquiry.id, unseenInquiry.seq)
+                cards[s.id] = existing.transition(snap, cause)
+                store?.append(snap, existing.drained, cause)
             } else if (stateChanged || existing.snapshot.patchBytes != snap.patchBytes) {
                 val cause: JulesCause = when {
                     snap.patchBytes > existing.snapshot.patchBytes -> {
@@ -133,6 +148,8 @@ class JulesConductor(
         fun main(args: Array<String>) {
             val apiKey = System.getenv("JULES_API_KEY") ?: error("JULES_API_KEY required")
             val once = args.contains("--once")
+            val forgeDir = File(System.getProperty("user.home"), ".local/forge")
+            val wal = JvmAppendWal(File(forgeDir, "jules-board.wal"))
             val conductor = JulesConductor(
                 client = JulesRestClient(apiKey),
                 headShaProvider = {
@@ -140,7 +157,8 @@ class JulesConductor(
                         .redirectErrorStream(true)
                         .start().inputStream.bufferedReader().readText().trim()
                 },
-                store = JulesBoardStore(),
+                store = JulesBoardStore(wal),
+                source = "sources/github/jnorthrup/TrikeShed",
             )
             kotlinx.coroutines.runBlocking {
                 if (once) {

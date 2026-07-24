@@ -16,6 +16,7 @@ import borg.trikeshed.reduction.verdictFor
 import borg.trikeshed.utils.kanban.JulesBoardStore
 import borg.trikeshed.utils.kanban.KanbanEventCodec
 import borg.trikeshed.utils.kanban.QueueEntry
+import borg.trikeshed.userspace.nio.file.spi.JvmAppendWal
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -259,7 +260,8 @@ class Flywheel(
         @JvmStatic
         fun main(args: Array<String>) {
             val workDir = File(args.getOrElse(0) { "." })
-            val store = JulesBoardStore(workDir)
+            val wal = JvmAppendWal(File(workDir, "jules-board.wal"))
+            val store = JulesBoardStore(wal)
             val element = FlywheelElement()
             val flywheel = Flywheel(store, workDir, element)
 

@@ -4,51 +4,61 @@
  */
 package borg.trikeshed.utils.kanban
 
-import borg.trikeshed.forge.persistence.CausalWal
 import borg.trikeshed.jules.JulesCause
 import borg.trikeshed.jules.JulesSessionCard
 import borg.trikeshed.jules.JulesSnapshot
-import java.io.File
+import borg.trikeshed.lib.AppendWal
+import kotlinx.datetime.Clock
 
 /**
  * Durable board store: the Kanban's causal truth on disk.
  *
- * Every card mutation appends Confix records to a [CausalWal] — one snapshot
- * record (the card's new assumpsis) plus one cause record (what provoked it).
+ * Every card mutation appends Confix records to [wal] — one snapshot
+ * record (the card's assumpsis) plus one cause record (what provoked it).
  * Replay folds the log back into cards: latest snapshot per session wins,
  * causes accumulate in append order.
  *
  * Lives at ~/.local/forge/jules-board.wal — the TrikeShed state default.
  * The ISAM snapshot spool (high-volume telemetry side of the quandary) lands
  * here later as a sibling file when poll volume demands it.
+ *
+ * @param wal    the append-only WAL — [borg.trikeshed.lib.AppendWal] SPI.
+ *                 JVM: JvmAppendWal (Panama mmap); JS: in-memory; Native: posix mmap.
  */
 class JulesBoardStore(
-    dir: File = File(System.getProperty("user.home"), ".local/forge"),
+    private val wal: AppendWal,
 ) {
-    private val wal: CausalWal
 
-    init {
-        dir.mkdirs()
-        wal = CausalWal(File(dir, "jules-board.wal"))
-    }
-
-    /** Persist a card mutation: new snapshot + the cause of the change. */
+    /**
+     * Persist a card mutation: new snapshot + the cause of the change.
+     * Both records are appended under the sessionId key so replay folds correctly.
+     */
     suspend fun append(snapshot: JulesSnapshot, drained: Boolean, cause: JulesCause?) {
-        wal.append(snapshot.sessionId, KanbanEventCodec.encodeSnapshot(snapshot, drained).encodeToByteArray())
+        wal.append(
+            snapshot.sessionId,
+            KanbanEventCodec.encodeSnapshot(snapshot, drained).encodeToByteArray()
+        )
         if (cause != null) {
-            wal.append(snapshot.sessionId, KanbanEventCodec.encodeCause(snapshot.sessionId, cause).encodeToByteArray())
+            wal.append(
+                snapshot.sessionId,
+                KanbanEventCodec.encodeCause(snapshot.sessionId, cause).encodeToByteArray()
+            )
         }
     }
 
     /**
      * Append a work-queue cause (WorkQueued/WorkDispatched/WorkDrained) under the
      * workId as the WAL key. Idempotent on (workId, kind): a second WorkQueued for
-     * the same workId is a no-op.
+     * the same workId is a no-op (dedup at dispatch time in the flywheel).
      */
     suspend fun appendWork(workId: String, cause: JulesCause) {
         wal.append(workId, KanbanEventCodec.encodeCause(workId, cause).encodeToByteArray())
     }
 
+    /**
+     * Replay causes for a specific workId — used by the flywheel's trajectory reducer
+     * to compute the dispatch verdict without loading the full board.
+     */
     fun replayCauses(workId: String): List<JulesCause> {
         val causes = mutableListOf<JulesCause>()
         for ((key, payload) in wal.replay()) {
@@ -62,7 +72,10 @@ class JulesBoardStore(
         return causes
     }
 
-    /** Fold the log into cards. Card state is a projection; the log is truth. */
+    /**
+     * Fold the WAL into cards. Card state is a projection; the WAL is truth.
+     * Returns the full board keyed by sessionId.
+     */
     fun load(): MutableMap<String, JulesSessionCard> {
         val snapshots = mutableMapOf<String, KanbanEventCodec.SnapEvent>()
         val causes = mutableMapOf<String, MutableList<JulesCause>>()
@@ -90,6 +103,9 @@ class JulesBoardStore(
      * State per workId is derived: latest WorkQueued wins, WorkDispatched attaches
      * a sessionId, WorkDrained marks drained. This is the unified queue — dispatch
      * reads from here, not from a separate state.json.
+     *
+     * Priority is [QueueEntry.score] descending — caller sorts before dispatch.
+     * Idempotent: same workId seen twice → first entry wins (getOrPut).
      */
     fun loadQueue(): List<QueueEntry> {
         val byWorkId = mutableMapOf<String, QueueEntry>()
@@ -109,12 +125,17 @@ class JulesBoardStore(
                     )
                 }
                 is JulesCause.WorkDispatched -> byWorkId[c.workId]?.let {
-                    byWorkId[c.workId] = it.copy(sessionId = c.sessionId, attempt = c.attempt, dispatchedAt = c.at)
+                    byWorkId[c.workId] = it.copy(
+                        sessionId = c.sessionId,
+                        attempt = c.attempt,
+                        dispatchedAt = c.at
+                    )
                 }
                 is JulesCause.WorkDrained -> byWorkId[c.workId]?.let {
                     byWorkId[c.workId] = it.copy(
                         commitSha = c.commitSha,
                         taskId = c.taskId,
+                        receipt = c.receipt,
                         drainedAt = c.at,
                     )
                 }
@@ -125,7 +146,10 @@ class JulesBoardStore(
     }
 }
 
-/** Queue entry projected from the unified WAL. */
+/**
+ * Queue entry projected from the unified WAL.
+ * [score] drives dispatch priority — sort by score descending before dispatch.
+ */
 data class QueueEntry(
     val workId: String,
     val tier: String,
@@ -139,8 +163,10 @@ data class QueueEntry(
     val dispatchedAt: Long? = null,
     val commitSha: String? = null,
     val taskId: String? = null,
+    val receipt: borg.trikeshed.util.oroboros.MergeReceipt? = null,
     val drainedAt: Long? = null,
 ) {
     val isDispatched: Boolean get() = sessionId != null
     val isDrained: Boolean get() = drainedAt != null
+    val isUnclaimedDrain: Boolean get() = isDrained && receipt == null
 }

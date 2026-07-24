@@ -2,13 +2,15 @@ package borg.trikeshed.flywheel.cli
 
 import borg.trikeshed.jules.JulesCause
 import borg.trikeshed.utils.kanban.JulesBoardStore
+import borg.trikeshed.userspace.nio.file.spi.JvmAppendWal
 import kotlinx.coroutines.runBlocking
 import java.io.File
 
 /** Seeds the WAL with sample work items. */
 fun main(args: Array<String>) {
     val dir = File(args.getOrElse(0) { System.getProperty("user.home") + "/.local/forge" })
-    val store = JulesBoardStore(dir)
+    val wal = JvmAppendWal(File(dir, "jules-board.wal"))
+    val store = JulesBoardStore(wal)
     runBlocking {
         store.appendWork("w-flywheel", JulesCause.WorkQueued(
             workId = "w-flywheel", tier = "feature", title = "Wire flywheel to CCEK",

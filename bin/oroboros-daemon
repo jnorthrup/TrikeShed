@@ -14,4 +14,30 @@ if [[ ! -f "$JAR" ]]; then
     exit 1
 fi
 CP="$JAR:$(find "$HOME/.gradle/caches/modules-2" -name '*.jar' 2>/dev/null | tr '\n' ':')"
-exec java -cp "$CP" borg.trikeshed.daemon.OroborosDaemon "$@"
+
+WATCH="--watch"
+INTERVAL="20000"
+DAEMON_ARGS=()
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --once)
+      WATCH="--once"
+      shift
+      ;;
+    --watch)
+      WATCH="--watch"
+      shift
+      ;;
+    --interval-ms)
+      INTERVAL="$2"
+      shift 2
+      ;;
+    *)
+      DAEMON_ARGS+=("$1")
+      shift
+      ;;
+  esac
+done
+
+exec java -cp "$CP" borg.trikeshed.daemon.OroborosDaemon $WATCH --interval-ms "$INTERVAL" "${DAEMON_ARGS[@]}"
