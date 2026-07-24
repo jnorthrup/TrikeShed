@@ -4,9 +4,8 @@ import borg.trikeshed.kanban.ForgeKanbanIngest
 import borg.trikeshed.context.nuid.Capability
 import borg.trikeshed.context.nuid.NuidFanoutElement
 import borg.trikeshed.context.nuid.Subnet
-import borg.trikeshed.context.nuid.TraitSpace
 import borg.trikeshed.context.nuid.Workgroup
-import borg.trikeshed.lib.j
+import borg.trikeshed.util.JvmForgeIo
 import borg.trikeshed.htx.HtxRequest
 import borg.trikeshed.htx.HtxResponse
 import borg.trikeshed.htx.HtxFlowStage
@@ -32,27 +31,17 @@ import kotlinx.coroutines.runBlocking
 import java.nio.charset.StandardCharsets
 import java.nio.file.Files as NioFiles
 import java.nio.file.Paths
-import java.nio.file.StandardOpenOption
-import kotlin.system.exitProcess
 
 object KanbanServerMain {
-    
+
     @JvmStatic
     fun main(args: Array<String>) {
-        var port = 8888
-        var donor: String? = null
-        val i = args.iterator()
-        while (i.hasNext()) {
-            when (val a = i.next()) {
-                "--port"  -> if (i.hasNext()) port = i.next().toIntOrNull() ?: 8888
-                "--donor" -> if (i.hasNext()) donor = i.next()
-                "-h", "--help" -> {
-                    System.err.println("Usage: KanbanServerMain [--port N] [--donor path]")
-                    exitProcess(2)
-                }
-            }
-        }
-        runBlocking { run(port, donor) }
+        val parsed = JvmForgeIo.parseKanbanServerArgs(
+            args = args,
+            programName = "KanbanServerMain",
+            usage = "Usage: KanbanServerMain [--port N] [--donor path]",
+        )
+        runBlocking { run(parsed.port, parsed.donor) }
     }
 
     suspend fun run(port: Int, donorPath: String?) {
@@ -64,17 +53,17 @@ object KanbanServerMain {
         val processWorkgroup = Workgroup(
             name = "kanban-process-local",
             scope = Subnet.local,
-            traits = traitSpaceOf(Capability.ProcessAll),
+            traits = JvmForgeIo.traitSpaceOf(Capability.ProcessAll),
         )
         val casWorkgroup = Workgroup(
             name = "kanban-cas-local",
             scope = Subnet.local,
-            traits = traitSpaceOf(Capability.CasAll),
+            traits = JvmForgeIo.traitSpaceOf(Capability.CasAll),
         )
         val wireprotoWorkgroup = Workgroup(
             name = "kanban-wireproto-lan",
             scope = Subnet.lanLocalhost,
-            traits = traitSpaceOf(Capability.WireprotoAll),
+            traits = JvmForgeIo.traitSpaceOf(Capability.WireprotoAll),
         )
         fanout.register(processWorkgroup)
         fanout.register(casWorkgroup)
@@ -184,7 +173,7 @@ object KanbanServerMain {
         if (payload.isBlank()) return HtxResponse(400, HtxBody("""{"error":"empty_body"}""".toByteArray(StandardCharsets.UTF_8)))
         return runCatching {
             val tmp = "/tmp/hi"
-            writeStringJvm(tmp, payload)
+            JvmForgeIo.writeStringJvm(tmp, payload)
             val reduction = ForgeKanbanIngest.persistMarkdown("jim", tmp)
             HtxResponse(
                 201,
@@ -198,17 +187,4 @@ object KanbanServerMain {
             )
         }.getOrElse { HtxResponse(500, HtxBody("""{"error":"submit_failed","reason":"${it.message}"}""".toByteArray(StandardCharsets.UTF_8))) }
     }
-}
-
-private fun traitSpaceOf(vararg capabilities: Capability): TraitSpace = TraitSpace {
-    capabilities.size j { index -> capabilities[index] }
-}
-
-private fun writeStringJvm(path: String, text: String) {
-    val p = Paths.get(path)
-    if (p.parent != null) NioFiles.createDirectories(p.parent)
-    NioFiles.writeString(
-        p, text,
-        StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING, StandardOpenOption.WRITE,
-    )
 }

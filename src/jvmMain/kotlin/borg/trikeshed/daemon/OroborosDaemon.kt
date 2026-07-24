@@ -2,6 +2,7 @@ package borg.trikeshed.daemon
 
 import borg.trikeshed.jules.FlywheelDriver
 import borg.trikeshed.jules.FlywheelDriver.FlywheelEvent
+import borg.trikeshed.util.io.ForgeCliArgs
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
@@ -61,24 +62,26 @@ object OroborosDaemon {
         var intervalMs = DEFAULT_INTERVAL_MS
         var maxSlots = DEFAULT_MAX_SLOTS
         val positional = mutableListOf<String>()
-        var i = 0
-        while (i < args.size) {
-            when (val a = args[i]) {
-                "--once" -> { watch = false; i++ }
-                "--watch" -> { watch = true; i++ }
-                "--interval-ms" -> {
-                    val v = args.getOrNull(++i) ?: die("--interval-ms requires a positive long")
-                    intervalMs = v.toLongOrNull() ?: die("--interval-ms requires a positive long")
-                    i++
-                }
-                "--max-slots" -> {
-                    val v = args.getOrNull(++i) ?: die("--max-slots requires a positive int")
-                    maxSlots = v.toIntOrNull() ?: die("--max-slots requires a positive int")
-                    i++
-                }
-                "-h", "--help" -> { usage(); exitProcess(0) }
-                else -> { positional.add(a); i++ }
-            }
+
+        val flags = listOf(
+            ForgeCliArgs.Flag(name = "--once") { _, i -> watch = false; i + 1 },
+            ForgeCliArgs.Flag(name = "--watch") { _, i -> watch = true; i + 1 },
+            ForgeCliArgs.Flag(name = "--interval-ms", withValue = true) { a, i ->
+                val v = a[i].toLongOrNull() ?: die("--interval-ms requires a positive long")
+                intervalMs = v
+                i + 1
+            },
+            ForgeCliArgs.Flag(name = "--max-slots", withValue = true) { a, i ->
+                val v = a[i].toIntOrNull() ?: die("--max-slots requires a positive int")
+                maxSlots = v
+                i + 1
+            },
+        )
+
+        when (val r = ForgeCliArgs.parse(args.toList(), flags)) {
+            is ForgeCliArgs.Result.Parsed -> positional.addAll(r.remaining)
+            ForgeCliArgs.Result.Help -> { usage(); exitProcess(0) }
+            is ForgeCliArgs.Result.Error -> die(r.message)
         }
         return DaemonConfig(watch, intervalMs, maxSlots, positional)
     }

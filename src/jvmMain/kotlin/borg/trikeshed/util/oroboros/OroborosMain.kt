@@ -4,6 +4,7 @@ import borg.trikeshed.couch.CouchStoreFactory
 import borg.trikeshed.job.ContentId
 import borg.trikeshed.userspace.nio.channels.spi.JvmProcessOperations
 import borg.trikeshed.userspace.nio.file.spi.JvmFileOperations
+import borg.trikeshed.util.io.ContentTypes
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeoutOrNull
@@ -106,7 +107,7 @@ private class OroborosJvmRuntime(private val options: OroborosOptions) {
             parentOf(target)?.let { if (!fileOps.exists(it)) fileOps.mkdirs(it) }
             if (!sameContent(target, cid)) fileOps.write(target, bytes)
 
-            val contentType = contentType(relative)
+            val contentType = ContentTypes.forPath(relative)
             attachments.putAttachment(
                 OroborosAttachmentRef(
                     path = "projects/trikeshed/$relative",
@@ -217,26 +218,4 @@ private fun Array<String>.valueAfter(index: Int, option: String): String =
 private fun parentOf(path: String): String? {
     val separator = maxOf(path.lastIndexOf('/'), path.lastIndexOf('\\'))
     return if (separator > 0) path.substring(0, separator) else null
-}
-
-private fun contentType(path: String): String = when (path.substringAfterLast('.', "").lowercase()) {
-    "kt", "kts" -> "text/kotlin"
-    "md" -> "text/markdown"
-    "json" -> "application/json"
-    "yaml", "yml" -> "application/yaml"
-    "toml" -> "application/toml"
-    "html" -> "text/html"
-    "css" -> "text/css"
-    "js", "mjs" -> "application/javascript"
-    "xml" -> "application/xml"
-    "sh", "bash" -> "application/x-sh"
-    "txt" -> "text/plain"
-    "svg" -> "image/svg+xml"
-    "png" -> "image/png"
-    "jpg", "jpeg" -> "image/jpeg"
-    "gif" -> "image/gif"
-    "pdf" -> "application/pdf"
-    "zip" -> "application/zip"
-    "gz" -> "application/gzip"
-    else -> "application/octet-stream"
 }
