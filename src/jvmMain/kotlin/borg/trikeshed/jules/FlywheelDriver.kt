@@ -52,6 +52,8 @@ class FlywheelDriver(
     private val maxSlots: Int = 15,
     private val source: String = "sources/github/jnorthrup/TrikeShed",
 ) {
+    private val reportedSpecMissing = mutableSetOf<String>()
+
     private val client = JulesRestClient(apiKey)
     private val casStore = FileCasStore(
         JvmFileOperations(),
@@ -72,6 +74,7 @@ class FlywheelDriver(
         data class Dispatched(val sessionId: String, val title: String) : FlywheelEvent
         data class DispatchFailed(val title: String, val reason: String) : FlywheelEvent
         data class PollError(val message: String) : FlywheelEvent
+        data class SpecMissing(val title: String) : FlywheelEvent
     }
 
     /** One reactor tick. POLL → fanout DRAIN + DISPATCH under ioGate.
@@ -106,12 +109,19 @@ class FlywheelDriver(
         // Dispatch from doc/todo.md whenever we have headroom, regardless of whether
         // listSessions came back empty. Alpha-on-launch invariant: top the pipe up
         // to maxSlots from the project todo on every cycle.
-        val items = if (trunkClean && available > 0) readTodoItems().take(available) else emptyList()
+        val allItems = if (trunkClean && available > 0) readTodoItems() else emptyList()
+        val skipped = allItems.count { it.spec.isBlank() }
+        allItems.filter { it.spec.isBlank() }.forEach {
+            if (it.title.isNotBlank() && reportedSpecMissing.add(it.title)) {
+                _events.tryEmit(FlywheelEvent.SpecMissing(it.title))
+            }
+        }
+        val items = allItems.filter { it.spec.isNotBlank() }.take(available)
         val dispatched = if (trunkClean && available > 0) dispatchFanout(items) else 0
         if (pollErr == null && sessions.isEmpty()) {
-            "poll-empty alive=0 available=$available trunk=${if (trunkClean) "clean" else "dirty"} dispatched=$dispatched"
+            "poll-empty alive=0 available=$available trunk=${if (trunkClean) "clean" else "dirty"} dispatched=$dispatched skipped=$skipped"
         } else {
-            "drained=$drained dispatched=$dispatched alive=$alive available=$available trunk=${if (trunkClean) "clean" else "dirty"}"
+            "drained=$drained dispatched=$dispatched alive=$alive available=$available trunk=${if (trunkClean) "clean" else "dirty"} skipped=$skipped"
         }
     }
 
@@ -217,7 +227,7 @@ class FlywheelDriver(
      * comes back asking the same clarifying questions and the operator has to
      * rubber-stamp a 4000-byte follow-up per task.
      */
-    private fun readTodoItems(): List<TodoItem> {
+    private suspend fun readTodoItems(): List<TodoItem> {
         val todo = File(repoDir, "doc/todo.md")
         if (!todo.exists()) return emptyList()
         val titleRe = Regex("^\\s*- \\[ \\]\\s*\\*\\*?(.+?)\\*\\*?\\s*$")
@@ -239,7 +249,8 @@ class FlywheelDriver(
                 body.append(l.trim()).append(' ')
                 j++
             }
-            items.add(TodoItem(title, body.toString().trim()))
+            val spec = body.toString().trim()
+            items.add(TodoItem(title, spec))
             i = j
         }
         return items
