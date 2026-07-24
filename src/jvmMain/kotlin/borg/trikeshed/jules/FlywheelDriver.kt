@@ -84,24 +84,35 @@ class FlywheelDriver(
      */
     suspend fun cycle(): String = coroutineScope {
         val pollStart = System.currentTimeMillis()
-        val sessions = withTimeoutOrNull(20_000) {
-            withContext(Dispatchers.IO) { client.listSessions(source) }
-        } ?: emptyList()
+        val pollResult = runCatching {
+            withTimeoutOrNull(20_000) {
+                withContext(Dispatchers.IO) { client.listSessions(source) }
+            }
+        }
+        val sessions = pollResult.getOrNull() ?: emptyList()
+        val pollErr = pollResult.exceptionOrNull()
         val alive = sessions.count { it.state != "COMPLETED" && it.state != "FINISHED" }
         val available = (maxSlots - alive).coerceAtLeast(0)
         _events.emit(FlywheelEvent.Polled(alive, available))
-        if (sessions.isEmpty()) return@coroutineScope "poll-empty alive=0"
+        if (pollErr != null) {
+            _events.emit(FlywheelEvent.PollError("listSessions: ${pollErr.javaClass.simpleName}: ${pollErr.message?.take(200)}"))
+        } else if (sessions.isEmpty()) {
+            _events.emit(FlywheelEvent.PollError("listSessions: returned empty for source=$source (alive=$alive available=$available)"))
+        }
+        // DRAIN runs first under ioGate (serial) so trunk lands clean before DISPATCH.
         val completed = sessions.filter { it.state == "COMPLETED" }.take(maxSlots)
-        // Alpha on launch: dispatch reads doc/todo.md up to `available` after DRAIN
-        // completes. DRAIN goes first under ioGate, drains to a clean trunk, then
-        // DISPATCH refills the pipe up to maxSlots.
         val drained = drainFanout(completed)
-        // If trunk landed dirty because DRAIN succeeded but local-push didn't (rare),
-        // refuse to dispatch. Patches accumulate in CAS regardless.
         val trunkClean = isWorkingTreeClean()
-        val titles = if (trunkClean) readTodoTitles().take(available) else emptyList()
-        val dispatched = if (trunkClean) dispatchFanout(titles) else 0
-        "drained=$drained dispatched=$dispatched alive=$alive available=$available trunk=${if (trunkClean) "clean" else "dirty"}"
+        // Dispatch from doc/todo.md whenever we have headroom, regardless of whether
+        // listSessions came back empty. Alpha-on-launch invariant: top the pipe up
+        // to maxSlots from the project todo on every cycle.
+        val titles = if (trunkClean && available > 0) readTodoTitles().take(available) else emptyList()
+        val dispatched = if (trunkClean && available > 0) dispatchFanout(titles) else 0
+        if (pollErr == null && sessions.isEmpty()) {
+            "poll-empty alive=0 available=$available trunk=${if (trunkClean) "clean" else "dirty"} dispatched=$dispatched"
+        } else {
+            "drained=$drained dispatched=$dispatched alive=$alive available=$available trunk=${if (trunkClean) "clean" else "dirty"}"
+        }
     }
 
     private suspend fun drainFanout(sessions: List<JulesRestClient.SessionInfo>): Int =
@@ -137,27 +148,40 @@ class FlywheelDriver(
         }
 
     private suspend fun drainOne(s: JulesRestClient.SessionInfo): Int {
-        val patch = client.lastPatch(s.id) ?: return 0
-        if (patch.isBlank()) return 0
-        if (!isWorkingTreeClean()) return 0
+        val patch = client.lastPatch(s.id)
+        if (patch == null) { _events.emit(FlywheelEvent.PollError("drain ${s.id}: no patch from lastPatch()")); return 0 }
+        if (patch.isBlank()) { _events.emit(FlywheelEvent.PollError("drain ${s.id}: blank patch")); return 0 }
+        if (!isWorkingTreeClean()) { _events.emit(FlywheelEvent.PollError("drain ${s.id}: trunk dirty, skipping")); return 0 }
         val patchFile = File(repoDir, ".flywheel-patch")
         patchFile.writeText(patch)
         val applyCheck = ProcessBuilder("git", "apply", "--check", ".flywheel-patch")
             .directory(repoDir).redirectErrorStream(true).start()
         applyCheck.waitFor()
-        if (applyCheck.exitValue() != 0) { patchFile.delete(); return 0 }
+        if (applyCheck.exitValue() != 0) {
+            val stderr = applyCheck.inputStream.bufferedReader().readText().take(200)
+            patchFile.delete()
+            _events.emit(FlywheelEvent.PollError("drain ${s.id}: apply --check failed: $stderr"))
+            return 0
+        }
         ProcessBuilder("git", "apply", ".flywheel-patch").directory(repoDir).start().waitFor()
         patchFile.delete()
         val commitSha = headSha()
         val patchBytes = patch.encodeToByteArray()
-        val patchCid = try { casStore.put(patchBytes) } catch (_: Exception) { patchFile.delete(); return -1 }
+        val patchCid = try { casStore.put(patchBytes) } catch (e: Exception) {
+            _events.emit(FlywheelEvent.PollError("drain ${s.id}: cas put failed: ${e.message}"))
+            return -1
+        }
         val safe = s.id.replace(Regex("[^A-Za-z0-9._-]"), "-")
         val tag = "flywheel/jules-" + safe + "-" + commitSha.take(12)
         val msg = ("Jules receipt" + "\n" +
             "session=" + s.id + "\n" +
             "patchCid=" + patchCid.value + "\n" +
             "taskTitle=" + s.title)
-        if (command("git", "tag", "-a", tag, commitSha, "-m", msg).exitCode != 0) return -1
+        val tagRes = command("git", "tag", "-a", tag, commitSha, "-m", msg)
+        if (tagRes.exitCode != 0) {
+            _events.emit(FlywheelEvent.PollError("drain ${s.id}: tag create failed: ${tagRes.output.take(200)}"))
+            return -1
+        }
         _events.emit(FlywheelEvent.Drained(s.id, commitSha, tag))
         return 1
     }
@@ -190,10 +214,14 @@ class FlywheelDriver(
     companion object {
         @JvmStatic
         fun main(args: Array<String>) {
+            // Single entrypoint is `bin/oroboros-daemon`; this companion is the
+            // probe-mode seam for jshell and `gradle jvmRun -PmainClass=...`.
+            if (args.isEmpty() || args[0] != "--once" && args[0] != "--watch") {
+                error("Use bin/oroboros-daemon. Companion main only accepts --once | --watch.")
+            }
             val apiKey = System.getenv("JULES_API_KEY") ?: error("JULES_API_KEY required")
-            val watch = args.any { it == "--watch" }
+            val watch = args[0] == "--watch"
             val driver = FlywheelDriver(apiKey)
-            // Subscribe a tiny stdout printer so we can see events without spawning a TUI.
             driver.subscribe { ev -> println("[FLY-EVENT] $ev") }
             println("[FLYWHEEL] reactor started on ${driver.repoDir} mode=${if (watch) "watch" else "once"}")
             runBlocking {

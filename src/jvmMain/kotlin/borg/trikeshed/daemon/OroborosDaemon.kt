@@ -11,7 +11,7 @@ import kotlin.system.exitProcess
  *
  * The reactor (poll → drain → dispatch → harvest) lives in
  * [borg.trikeshed.jules.FlywheelDriver]. This object constructs it directly
- * so it can pin the canonical forge home (`~/.local/forge_home`) and parse
+ * so it can defer to [ForgeHome.defaultHome] (`~/.local/forge`) and parse
  * the daemon's full flag set.
  *
  * Env: JULES_API_KEY (required)
@@ -21,7 +21,7 @@ import kotlin.system.exitProcess
  *   --interval-ms <N>       poll cadence (default = 30000)
  *   --max-slots <N>         live session cap (default = 15)
  * Positional args (must come last):
- *   forgeHome               default = ~/.local/forge_home (canonical)
+ *   forgeHome               default = ~/.local/forge (ForgeHome.defaultHome)
  *   repoDir                 default = cwd
  */
 object OroborosDaemon {
@@ -62,7 +62,9 @@ object OroborosDaemon {
         }
         val home = System.getProperty("user.home")
             ?: die("System property user.home not set")
-        val canonicalForge = File(home, ".local/forge_home")
+        // Defer to ForgeHome.defaultHome via the canonical Kotlin/JVM runtime path.
+        // The TrikeShed canonical root is $HOME/.local/forge (see ForgeHome.defaultHome).
+        val canonicalForge = File(home, ".local/forge")
         val forgeHome = File(positional.getOrNull(0) ?: canonicalForge.absolutePath)
         val repoDir = File(positional.getOrNull(1) ?: System.getProperty("user.dir"))
         if (!repoDir.resolve(".git").exists()) {
@@ -111,7 +113,7 @@ object OroborosDaemon {
         System.err.println(
             """usage: OroborosDaemon [--once | --watch] [--interval-ms N] [--max-slots N] [forgeHome] [repoDir]
               env: JULES_API_KEY (required)
-              forgeHome default: ~/.local/forge_home (canonical)
+              forgeHome default: ~/.local/forge (ForgeHome.defaultHome)
               repoDir  default: cwd"""
         )
     }
