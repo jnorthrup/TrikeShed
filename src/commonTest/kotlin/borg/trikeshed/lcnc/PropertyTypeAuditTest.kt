@@ -1,7 +1,3 @@
-/*
- * Copyright (c) 2026 TrikeShed Authors
- * SPDX-License-Identifier: AGPL-3.0-or-later
- */
 package borg.trikeshed.lcnc
 
 import borg.trikeshed.lcnc.collections.associative.PropertyType

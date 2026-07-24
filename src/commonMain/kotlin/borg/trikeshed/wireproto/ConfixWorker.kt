@@ -1,8 +1,3 @@
-/*
- * Copyright (c) 2024 TrikeShed Authors
- * This file is part of TrikeShed, released under the AGPLv3 license.
- */
-
 package borg.trikeshed.wireproto
 
 import borg.trikeshed.reactor.ReactorEndpoint

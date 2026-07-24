@@ -1,4 +1,3 @@
-/* Copyright (c) 2017 TrikeShed Contributors. AGPLv3 — see LICENSE. */
 package borg.trikeshed.jules
 
 import borg.trikeshed.job.ContentId

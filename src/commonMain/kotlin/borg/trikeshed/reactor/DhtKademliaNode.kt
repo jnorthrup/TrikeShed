@@ -1,8 +1,3 @@
-/*
- * Copyright (c) 2024. TrikeShed Open Source
- * This file is part of TrikeShed, licensed under the GNU Affero General Public License version 3.
- * See the LICENSE file for details.
- */
 package borg.trikeshed.reactor
 
 import borg.trikeshed.dht.net.NetMask
