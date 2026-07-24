@@ -31,13 +31,26 @@ import kotlinx.coroutines.channels.Channel
 
 
 // 3. Association Scope
-class SctpAssociationScope : CoroutineScope {
-    private val job = SupervisorJob()
+interface SctpAssociationScope : CoroutineScope {
+    val associationId: ULong
+    val isActive: Boolean
+    fun cancel(cause: Throwable? = null)
+    suspend fun join()
+    fun close()
+}
+
+class SctpAssociationScopeImpl(
+    override val associationId: ULong,
+    parentScope: CoroutineScope
+) : SctpAssociationScope {
+    private val job = kotlinx.coroutines.Job(parentScope.coroutineContext[kotlinx.coroutines.Job])
     override val coroutineContext = Dispatchers.Default + job
 
-    fun close() {
-        job.cancel()
-    }
+    override val isActive: Boolean
+        get() = job.isActive
+    override fun cancel(cause: Throwable?) { job.cancel(kotlinx.coroutines.CancellationException(cause?.message ?: "cancelled", cause)) }
+    override suspend fun join(): Unit = job.join()
+    override fun close() { job.cancel() }
 }
 
 // 5. Liburing Facade
@@ -171,7 +184,7 @@ class SctpReactorSpine(
     private val jobAssembly: SubnetJobAssembly = SubnetJobAssembly(),
     private val sctpElement: SctpElement? = null,  // Optional: real SCTP element
 ) : SctpReactorEndpoint {
-    private val scope = SctpAssociationScope()
+    private val scope = SctpAssociationScopeImpl(0UL, CoroutineScope(Dispatchers.Default))
     private val stream = borg.trikeshed.sctp.BoundedChannelStream(capacity = 100)
     private val parser = TlvChunkParser()
     
@@ -252,7 +265,7 @@ class SctpReactorSpine(
     }
 
     override suspend fun close() {
-        scope.close()
+        (scope as SctpAssociationScope).close()
     }
 
     // ── helper extraction ───────────────────────────────────────────
