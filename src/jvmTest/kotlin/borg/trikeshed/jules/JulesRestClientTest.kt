@@ -57,6 +57,48 @@ class JulesRestClientTest {
         assertTrue(requests[1].body.contains("\"prompt\": \"Use Confix\""))
     }
 
+    /**
+     * lastPatch MUST read the session resource's outputs[*].changeSet.gitPatch.unidiffPatch,
+     * not just the activity stream. The activity stream's `artifacts` is an
+     * in-progress field that is often empty for sessions whose plan was
+     * completed; the canonical landed patch lives on outputs. Without this
+     * test, the flywheel drained zero patches for every COMPLETED session
+     * because outputs was never consulted.
+     */
+    @Test
+    fun lastPatchReadsSessionOutputsGitPatchUnidiff() = withServer(
+        responder = { exchange ->
+            when (exchange.requestURI.path) {
+                "/v1alpha/sessions/s-outputs/activities" -> """{"activities":[]}"""
+                "/v1alpha/sessions/s-outputs" -> """
+                {
+                  "name": "sessions/s-outputs",
+                  "state": "COMPLETED",
+                  "outputs": [
+                    {
+                      "changeSet": {
+                        "source": "sources/github/jnorthrup/TrikeShed",
+                        "gitPatch": {
+                          "unidiffPatch": "diff --git a/A b/A\nnew file mode 100644\n--- /dev/null\n+++ b/A\n@@ -0,0 +1 @@\n+hi\n"
+                        }
+                      }
+                    }
+                  ]
+                }
+                """.trimIndent()
+                else -> error("unexpected path " + exchange.requestURI.path)
+            }
+        },
+    ) { base, requests ->
+        val client = JulesRestClient("test-key", "$base/v1alpha")
+        val patch = client.lastPatch("s-outputs")
+        assertTrue(patch != null, "lastPatch must return non-null when outputs has a patch; got null")
+        assertTrue(patch!!.startsWith("diff --git a/A b/A"), "patch must be the unidiffPatch from outputs[0]; got: \${patch.take(80)}")
+        // Both endpoints should have been hit: session resource first, then activities.
+        val paths = requests.map { it.path }
+        assertTrue("/v1alpha/sessions/s-outputs" in paths, "must read session resource (the fix); paths: \$paths")
+    }
+
     private data class RecordedRequest(val path: String, val apiKey: String?, val body: String)
 
     private fun withServer(

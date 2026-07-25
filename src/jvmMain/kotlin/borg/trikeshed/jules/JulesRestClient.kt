@@ -118,9 +118,44 @@ class JulesRestClient(
     /** Byte length of the latest cumulative patch. */
     fun patchProbe(sessionId: String): Long = lastPatch(sessionId)?.length?.toLong() ?: 0L
 
-    /** Last activity's cumulative patch (the only one worth applying). */
-    fun lastPatch(sessionId: String): String? =
-        activityMaps(sessionId).asSequence().flatMap { patchTexts(it).asSequence() }.lastOrNull()
+    /**
+     * Last patch worth applying. Two sources, in order of preference:
+     *
+     *  1. `/sessions/$id` top-level `outputs[*].changeSet.gitPatch.unidiffPatch`
+     *     — the FINAL completed patch for the session. This is what landed.
+     *  2. Fallback: in-progress `activities[*].artifacts[*].changeSet.gitPatch`
+     *     — for sessions still mid-flight, the most recent artifact's diff.
+     *
+     * The previous code only read the activity stream and missed the canonical
+     * output entirely; the flywheel drained zero patches because `outputs`
+     * was never consulted.
+     */
+    fun lastPatch(sessionId: String): String? {
+        val fromOutputs = sessionOutputsPatches(sessionId).lastOrNull()
+        if (!fromOutputs.isNullOrEmpty()) return fromOutputs
+        return activityMaps(sessionId).asSequence().flatMap { patchTexts(it).asSequence() }.lastOrNull()
+    }
+
+    /** Fetch the session resource and read outputs[*].changeSet.gitPatch.unidiffPatch. */
+    private fun sessionOutputsPatches(sessionId: String): List<String> {
+        val out = mutableListOf<String>()
+        val parsed = try {
+            JsonSupport.parse(get("/sessions/$sessionId")) as? Map<*, *> ?: return out
+        } catch (t: Throwable) {
+            return out
+        }
+        val outputs = parsed["outputs"] as? List<*> ?: return out
+        for (output in outputs) {
+            val changeSet = (output as? Map<*, *>)?.get("changeSet") as? Map<*, *> ?: continue
+            val patch = when (val gitPatch = changeSet["gitPatch"]) {
+                is String -> gitPatch
+                is Map<*, *> -> gitPatch["unidiffPatch"]?.toString()
+                else -> null
+            }
+            if (!patch.isNullOrEmpty()) out += patch
+        }
+        return out
+    }
 
     /** Fetch every chronological activity page; sequence numbers are minted afterwards. */
     private fun activityMaps(sessionId: String): List<Map<*, *>> {
