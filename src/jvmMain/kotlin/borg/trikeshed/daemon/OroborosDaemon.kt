@@ -36,14 +36,6 @@ object OroborosDaemon {
     const val DEFAULT_INTERVAL_MS = 30_000L
     const val DEFAULT_MAX_SLOTS = 15
 
-    data class CycleReport(
-        val cycleMs: Long,
-        val drained: Int,
-        val dispatched: Int,
-        val alive: Int,
-        val available: Int
-    )
-
     data class DaemonConfig(
         val watch: Boolean,
         val intervalMs: Long,
@@ -52,7 +44,7 @@ object OroborosDaemon {
     )
 
     @Volatile
-    var lastCycleReport: CycleReport? = null
+    var lastCycleReport: FlywheelDriver.CycleReport? = null
 
     @Volatile
     var daemonStartTime = 0L
@@ -185,7 +177,7 @@ object OroborosDaemon {
                     val report = lastCycleReport
                     val uptimeMs = System.currentTimeMillis() - daemonStartTime
                     val msg = if (report != null) {
-                        "ALIVE $uptimeMs ${report.cycleMs} ${report.drained} ${report.dispatched} ${report.alive} ${report.available}\n"
+                        "ALIVE $uptimeMs ${report.cycleMs} ${report.harvested} ${report.dispatched} ${report.alive} ${report.available}\n"
                     } else {
                         "ALIVE $uptimeMs -1 -1 -1 -1 -1\n"
                     }
@@ -208,19 +200,12 @@ object OroborosDaemon {
         suspend fun runCycle() {
             val t0 = System.currentTimeMillis()
             val startPollErrors = pollErrors
-            val summary = driver.cycle()
-            val cycleMs = System.currentTimeMillis() - t0
+            val summary: FlywheelDriver.CycleReport = driver.cycle()
             val cyclePollErrors = pollErrors - startPollErrors
-            println("[FLYWHEEL] $summary")
+            println("[FLYWHEEL] phase=" + summary.phase + " cycleMs=" + summary.cycleMs + " harvested=" + summary.harvested + " dispatched=" + summary.dispatched + " alive=" + summary.alive + "/" + summary.available + " inducted=" + summary.inducted + " settled=" + summary.settled)
 
-            var d = 0; var p = 0; var a = 0; var v = 0
-            Regex("drained=(\\d+)").find(summary)?.let { d = it.groupValues[1].toInt() }
-            Regex("dispatched=(\\d+)").find(summary)?.let { p = it.groupValues[1].toInt() }
-            Regex("alive=(\\d+)").find(summary)?.let { a = it.groupValues[1].toInt() }
-            Regex("available=(\\d+)").find(summary)?.let { v = it.groupValues[1].toInt() }
-
-            lastCycleReport = CycleReport(cycleMs, d, p, a, v)
-            val json = "{\"t\":$t0,\"c\":$cycleMs,\"d\":$d,\"p\":$p,\"a\":$a,\"v\":$v,\"e\":$cyclePollErrors}"
+            lastCycleReport = summary
+            val json = "{\"t\":" + t0 + ",\"c\":" + summary.cycleMs + ",\"d\":" + summary.harvested + ",\"p\":" + summary.dispatched + ",\"a\":" + summary.alive + ",\"v\":" + summary.available + ",\"e\":" + cyclePollErrors + "}"
             try {
                 if (traceLineCount >= 10000) {
                     traceWriter?.close()

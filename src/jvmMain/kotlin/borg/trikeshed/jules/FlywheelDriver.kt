@@ -18,10 +18,18 @@ import borg.trikeshed.util.oroboros.LexicalMemory
 import borg.trikeshed.util.oroboros.MergeReceipt
 import kotlinx.datetime.Clock
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.SharedFlow
+import kotlinx.coroutines.flow.asSharedFlow
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -122,6 +130,17 @@ class FlywheelDriver(
         data class UpstreamDrifted(val local: String, val remote: String) : FlywheelEvent
     }
 
+    /**
+     * Emit a [FlywheelEvent.PollError] and return [returnValue] in one statement.
+     * The dominant shape across [drainOne] / [drainFanout] is "report and exit" —
+     * without this, each site expands to two lines (emit + return) and the
+     * emit-message-and-return-value pair becomes invisible to the eye.
+     */
+    private suspend fun emitPollError(message: String, returnValue: Int): Int {
+        _events.emit(FlywheelEvent.PollError(message))
+        return returnValue
+    }
+
     /** Emits an UpstreamDrifted event for preflight checks without exposing the raw bus. */
     fun emitDrifted(local: String, remote: String) {
         _events.tryEmit(FlywheelEvent.UpstreamDrifted(local, remote))
@@ -129,6 +148,7 @@ class FlywheelDriver(
 
     /** One cycle: poll → answer → drain → induct → dispatch. */
     suspend fun cycle(): CycleReport {
+        val t0 = System.currentTimeMillis()
         // 1. POLL
         conductor.pollOnce()
 
@@ -153,7 +173,15 @@ class FlywheelDriver(
         //    blocked, but no patch is applied against a stale master.
         if (!synchronizeMain()) {
             println("[FLYWHEEL] BLOCKED master is not cleanly synchronized with origin/master")
-            return CycleReport(answered, 0, 0, activeCount(), settled = false, phase = FlywheelPhase.SYNC)
+            return CycleReport(
+            answered = answered,
+            harvested = 0,
+            dispatched = 0,
+            alive = activeCount(),
+            available = (maxSlots - activeCount()).coerceAtLeast(0),
+            settled = false,
+            phase = FlywheelPhase.SYNC,
+        )
         }
 
         // 4. DRAIN — settle completed patches so slots free for induction.
@@ -162,7 +190,14 @@ class FlywheelDriver(
         //    work is inducted. Drains are serial via drainGate (Mutex) inside
         //    drainFanout so git tags are atomic; each commits onto master.
         val completed = conductor.cards.values.filter { it.snapshot.state == "COMPLETED" && !it.drained }
-        val sessions = completed.map { JulesRestClient.SessionInfo(it.snapshot.sessionId, it.card.title) }
+        val sessions = completed.map {
+            JulesRestClient.SessionInfo(
+                id = it.snapshot.sessionId,
+                state = it.snapshot.state,
+                title = it.card.title,
+                patchBytes = 0L,
+            )
+        }
         val harvested = drainFanout(sessions)
 
         // 5. SETTLE — every valid drain must be pushed, every PR must be
@@ -171,7 +206,15 @@ class FlywheelDriver(
         //    this cycle adds no new work. Phase [FlywheelPhase.SETTLE].
         if (!settlementBarrier()) {
             println("[FLYWHEEL] BLOCKED settlement barrier: push/parity/open-PR invariant failed")
-            return CycleReport(answered, harvested, 0, activeCount(), settled = false, phase = FlywheelPhase.SETTLE)
+            return CycleReport(
+            answered = answered,
+            harvested = harvested,
+            dispatched = 0,
+            alive = activeCount(),
+            available = (maxSlots - activeCount()).coerceAtLeast(0),
+            settled = false,
+            phase = FlywheelPhase.SETTLE,
+        )
         }
 
         // 6. INDUCT — read doc/todo.md into the WAL as WorkQueued causes.
@@ -231,8 +274,36 @@ class FlywheelDriver(
             }
         }
 
-        return CycleReport(answered, harvested, dispatched, alive, inducted, settled = true, phase = FlywheelPhase.DISPATCH)
+                return CycleReport(
+            cycleMs = System.currentTimeMillis() - t0,
+            answered = answered,
+            harvested = harvested,
+            dispatched = dispatched,
+            alive = alive,
+            available = (maxSlots - alive).coerceAtLeast(0),
+            inducted = inducted,
+            settled = true,
+            phase = FlywheelPhase.DISPATCH,
+        )
     }
+
+    /**
+     * Serial drain: each [drainOne] runs under [drainGate] (Mutex) then [ioGate]
+     * (Semaphore). G14 guarantees git tag creation is atomic — no two drains
+     * race the same commit. Returns the count of successfully drained sessions.
+     */
+    private suspend fun drainFanout(sessions: List<JulesRestClient.SessionInfo>): Int =
+        if (sessions.isEmpty()) 0 else coroutineScope {
+            sessions.map { s ->
+                async(Dispatchers.IO) {
+                    drainGate.withLock {
+                        ioGate.withPermit {
+                            try { drainOne(s) } catch (t: Throwable) { emitPollError("drain ${s.id}: ${t.message}", -1) }
+                        }
+                    }
+                }
+            }.awaitAll().sum()
+        }
 
     private fun activeCount(): Int = conductor.cards.values.count {
         it.snapshot.state != "COMPLETED" && it.snapshot.state != "FINISHED" && !it.drained
@@ -651,20 +722,45 @@ class FlywheelDriver(
                 if (titleRe.containsMatchIn(l)) break
                 body.append(l.trim()).append(' ')
                 j++
+            }
+            val spec = body.toString().trim()
+            val workId = "todo:${title.hashCode().toUInt().toString(16)}"
+            items.add(TodoItem(workId, title, spec))
+            i = j
+        }
+        return items
+    }
+
+    /** One unchecked doc/todo.md item. */
+    data class TodoItem(val workId: String, val title: String, val spec: String)
+
+    /**
+     * Fish an optional PR/branch URL tying this receipt to the upstream merge
+     * surface. Probes: (1) `git ls-remote origin 'refs/heads/jules-<numericId>-*'`,
+     * (2) `gh pr list --json url,headRefName`. Both swallow errors and return
+     * null on no match; the receipt is provenance-complete via [MergeReceipt.patchCid]
+     * + [revision]. Jules pushes branches (not PRs); null is valid for direct merges.
+     */
+    private fun fishPrUrl(sessionId: String, tag: String): String? {
+        val numericId = sessionId.substringAfterLast('/').filter { it.isDigit() }
+        if (numericId.isEmpty()) return null
+        // Probe 1: branch-on-origin.
+        val ls = command("git", "ls-remote", "origin", "refs/heads/jules-$numericId-*")
+        if (ls.exitCode == 0) {
+            for (line in ls.output.lineSequence()) {
+                val parts = line.trim().split("\t")
+                if (parts.size == 2) {
+                    val sha = parts[0]
+                    val ref = parts[1]
+                    if (ref.startsWith("refs/heads/jules-$numericId-") && sha.length == 40) {
+                        val remote = command("git", "config", "--get", "remote.origin.url")
+                        if (remote.exitCode == 0) {
+                            val url = originToHtmlUrl(remote.output.trim(), sha)
+                            if (url != null) return url
+                        }
+                    }
                 }
             }
-        }
-
-        // Probe 2: gh pr list, match by headRefName containing the numeric session id
-        // as a hyphen-bounded segment, not a loose substring.
-        val gh = command(
-            "gh", "pr", "list", "--state", "all", "--limit", "100",
-            "--json", "url,headRefName", "--jq",
-            ".[] | select(.headRefName | test(\"jules-$numericId(-|\\$)\")) | .url",
-        )
-        if (gh.exitCode == 0) {
-            val url = gh.output.lineSequence().firstOrNull { it.isNotBlank() }
-            if (!url.isNullOrBlank()) return url
         }
         return null
     }
@@ -692,7 +788,7 @@ class FlywheelDriver(
     private fun revertFiles(files: List<String>) {
         val cmd = mutableListOf("git", "checkout", "HEAD", "--")
         cmd.addAll(files)
-        ProcessBuilder(cmd).directory(repoDir).redirectErrorStream(true).start().waitFor()
+        command(*cmd.toTypedArray())
     }
 
     /** Parse unidiff headers (--- a/path, +++ b/path) to extract touched file paths. */
@@ -719,11 +815,63 @@ class FlywheelDriver(
         return proc.inputStream.bufferedReader().readText().trim()
     }
 
+    /** Subscribe a child coroutine to reactor events. Returns the subscriber's job. */
+    fun subscribe(block: suspend (FlywheelEvent) -> Unit): Job =
+        reactorScope.launch { events.collect { block(it) } }
+
+    /** Cancel the supervisor; children propagate. Idempotent. */
+    fun close() { parentJob.cancel() }
+
+    private fun isWorkingTreeClean(): Boolean =
+        command("git", "status", "--porcelain").output.isBlank()
+
+    /**
+     * Drain a single completed session: apply patch, commit, CAS-pin, tag.
+     * Serial inside [drainFanout] via [drainGate]. Returns 1 on success, 0 on
+     * soft skip (no patch / dirty tree / apply-check fail), -1 on hard error.
+     */
+    private suspend fun drainOne(s: JulesRestClient.SessionInfo): Int {
+        val patch = client.lastPatch(s.id)
+        if (patch == null) { return emitPollError("drain ${s.id}: no patch from lastPatch()", 0) }
+        if (patch.isBlank()) { return emitPollError("drain ${s.id}: blank patch", 0) }
+        if (!isWorkingTreeClean()) { return emitPollError("drain ${s.id}: trunk dirty, skipping", 0) }
+        val patchFile = File(repoDir, ".flywheel-patch")
+        patchFile.writeText(patch)
+        val applyCheck = command("git", "apply", "--check", ".flywheel-patch")
+        if (applyCheck.exitCode != 0) {
+            val stderr = applyCheck.output.take(200)
+            patchFile.delete()
+            return emitPollError("drain ${s.id}: apply --check failed: $stderr", 0)
+        }
+        command("git", "apply", ".flywheel-patch")
+        patchFile.delete()
+        val commitSha = headSha()
+        val patchBytes = patch.encodeToByteArray()
+        val patchCid = try { casStore.put(patchBytes) } catch (e: Exception) {
+            return emitPollError("drain ${s.id}: cas put failed: ${e.message}", -1)
+        }
+        val safe = s.id.replace(Regex("[^A-Za-z0-9._-]"), "-")
+        val tag = "flywheel/jules-" + safe + "-" + commitSha.take(12)
+        val msg = "Jules receipt\n" +
+            "session=" + s.id + "\n" +
+            "patchCid=" + patchCid.value + "\n" +
+            "taskTitle=" + s.title
+        val tagRes = command("git", "tag", "-a", tag, commitSha, "-m", msg)
+        if (tagRes.exitCode != 0) {
+            return emitPollError("drain ${s.id}: tag create failed: ${tagRes.output.take(200)}", -1)
+        }
+        _events.emit(FlywheelEvent.Drained(s.id, commitSha, tag))
+        return 1
+    }
+
     data class CycleReport(
-        val answered: Int,
-        val harvested: Int,
-        val dispatched: Int,
-        val alive: Int,
+        /** Wall-clock duration of the cycle in milliseconds. */
+        val cycleMs: Long = 0,
+        val answered: Int = 0,
+        val harvested: Int = 0,
+        val dispatched: Int = 0,
+        val alive: Int = 0,
+        val available: Int = 0,
         val inducted: Int = 0,
         val settled: Boolean = false,
         /** Which [FlywheelPhase] the cycle last reached before returning (the priority manifest). */

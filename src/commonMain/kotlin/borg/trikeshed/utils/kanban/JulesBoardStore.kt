@@ -72,6 +72,9 @@ class JulesBoardStore(
         return causes
     }
 
+    /** Replay all (key, payload) records in insertion order. */
+    fun replayAll(): Sequence<Pair<String, ByteArray>> = wal.replay()
+
     /**
      * Fold the WAL into cards. Card state is a projection; the WAL is truth.
      * Returns the full board keyed by sessionId.

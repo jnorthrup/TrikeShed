@@ -80,6 +80,9 @@ object KanbanEventCodec {
                     it.prUrl?.let { url -> field("receiptPrUrl", url) }
                 }
             }
+            is JulesCause.WorkIdentitySynthesized -> {
+                field("workId", c.workId); field("identity", c.identity.workId)
+            }
         }
         append('}')
     }
@@ -178,6 +181,7 @@ object KanbanEventCodec {
         is JulesCause.WorkQueued -> "WorkQueued"
         is JulesCause.WorkDispatched -> "WorkDispatched"
         is JulesCause.WorkDrained -> "WorkDrained"
+        is JulesCause.WorkIdentitySynthesized -> "WorkIdentitySynthesized"
     }
 
     private fun Map<*, *>.str(k: String): String = this[k]?.toString() ?: ""
