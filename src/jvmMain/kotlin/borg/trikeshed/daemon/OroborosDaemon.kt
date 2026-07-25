@@ -135,10 +135,15 @@ object OroborosDaemon {
         }
 
         var pollErrors = 0
+        val consecutivePollErrors = java.util.concurrent.atomic.AtomicInteger(0)
+        var pollErrOccurred = false
         // Stdout observer so cycles are visible without a TUI, and bridge to KanbanFSM.
         driver.subscribe { ev ->
             println("[FLY-EVENT] $ev")
-            if (ev is FlywheelEvent.PollError) pollErrors++
+            if (ev is FlywheelEvent.PollError) {
+                pollErrors++
+                pollErrOccurred = true
+            }
             val now = System.currentTimeMillis()
             when (ev) {
                 is borg.trikeshed.jules.FlywheelDriver.FlywheelEvent.Polled ->
@@ -233,7 +238,11 @@ object OroborosDaemon {
             runCycle()
             if (watch) {
                 while (true) {
-                    delay(intervalMs)
+                    val errors = consecutivePollErrors.get()
+                    val backoffMs = kotlin.math.min(intervalMs * (1L shl kotlin.math.min(errors, 30)), intervalMs * 5)
+                    if (errors > 0) System.err.println("[OROBOROS] backoff=${backoffMs}ms consecutiveErrors=$errors")
+                    delay(backoffMs)
+                    pollErrOccurred = false
                     try {
                         runCycle()
                     } catch (t: Throwable) {
@@ -242,6 +251,11 @@ object OroborosDaemon {
                         // the daemon's coroutine scheduler) must not tear
                         // down the daemon. Log and continue.
                         System.err.println("[OROBOROS] cycle failed: ${t.javaClass.simpleName}: ${t.message?.take(200)}")
+                    }
+                    if (pollErrOccurred) {
+                        consecutivePollErrors.incrementAndGet()
+                    } else {
+                        consecutivePollErrors.set(0)
                     }
                 }
             }
