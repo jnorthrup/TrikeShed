@@ -613,6 +613,9 @@ class FlywheelDriver(
         return ClaimedPatch(commitSha, receipt)
     }
 
+    private var todoFileLastModified: Long = 0L
+    private var cachedTodoItems: List<TodoItem> = emptyList()
+
     /**
      * Fish an optional PR/branch URL that ties this receipt to the upstream
      * merge surface. Probes:
@@ -624,30 +627,38 @@ class FlywheelDriver(
      * Both probes swallow errors and return null on no match; the receipt is
      * still provenance-complete via [MergeReceipt.patchCid] + [revision].
      */
-    private fun fishPrUrl(sessionId: String, tag: String): String? {
-        // Extract the numeric tail from `sessions/7395203169723873685` or bare `7395203169723873685`.
-        val numericId = sessionId.substringAfterLast('/').filter { it.isDigit() }
-        if (numericId.isEmpty()) return null
+    private fun readTodoItems(): List<TodoItem> {
+        val todoFile = File(repoDir, "doc/todo.md")
+        if (!todoFile.exists()) return emptyList()
 
-        // Probe 1: branch-on-origin. Branch pattern is `refs/heads/jules-<numericId>-<sha>`.
-        // Only accept if the branch HEAD matches the commit we just made (commitSha = tag's object).
-        val ls = command("git", "ls-remote", "origin", "refs/heads/jules-$numericId-*")
-        if (ls.exitCode == 0) {
-            for (line in ls.output.lineSequence()) {
-                val parts = line.trim().split("\t")
-                if (parts.size == 2) {
-                    val sha = parts[0]
-                    val ref = parts[1]
-                    // Strict: ref must be exactly refs/heads/jules-<numericId>-<40hex>
-                    // and the sha must equal our commitSha (the tag's object).
-                    if (ref.startsWith("refs/heads/jules-$numericId-") && sha.length == 40) {
-                        // Derive the canonical commit URL from the origin remote.
-                        val remote = command("git", "config", "--get", "remote.origin.url")
-                        if (remote.exitCode == 0) {
-                            val url = originToHtmlUrl(remote.output.trim(), sha)
-                            if (url != null) return url
-                        }
-                    }
+        val currentMtime = todoFile.lastModified()
+        if (currentMtime != todoFileLastModified || cachedTodoItems.isEmpty()) {
+            println("[FLYWHEEL] todo cache miss, re-parsing")
+            todoFileLastModified = currentMtime
+            cachedTodoItems = parseTheFile(todoFile)
+        }
+        return cachedTodoItems
+    }
+
+    private fun parseTheFile(todoFile: File): List<TodoItem> {
+        val titleRe = Regex("^\\s*- \\[ \\]\\s*\\*\\*?(.+?)\\*\\*?\\s*$")
+        val items = mutableListOf<TodoItem>()
+        val lines = todoFile.readLines()
+        var i = 0
+        while (i < lines.size) {
+            val m = titleRe.find(lines[i])
+            if (m == null) { i++; continue }
+            val title = m.groupValues[1].trim()
+            val body = StringBuilder()
+            var j = i + 1
+            while (j < lines.size) {
+                val l = lines[j]
+                // Bullet ends at the next bullet, header, or blank-then-non-indented line.
+                if (l.isBlank()) { j++; continue }
+                if (!l.startsWith(" ") && !l.startsWith("\t")) break
+                if (titleRe.containsMatchIn(l)) break
+                body.append(l.trim()).append(' ')
+                j++
                 }
             }
         }
