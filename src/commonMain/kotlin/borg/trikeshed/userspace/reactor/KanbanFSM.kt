@@ -81,6 +81,15 @@ sealed class KanbanEvent {
         val sourceSignalId: String,
         override val timestampMs: Long,
     ) : KanbanEvent()
+
+    @Serializable
+    data class CycleObserved(val cycleMs: Long, val drained: Int, val dispatched: Int, val alive: Int, val available: Int, override val timestampMs: Long) : KanbanEvent()
+
+    @Serializable
+    data class PatchDrained(val sessionId: String, val sha: String, val tag: String, override val timestampMs: Long) : KanbanEvent()
+
+    @Serializable
+    data class DispatchFired(val sessionId: String, val title: String, override val timestampMs: Long) : KanbanEvent()
 }
 
 /**
@@ -106,6 +115,12 @@ data class KanbanState(
     val taxonomyNodeCount: Int = 0,
     /** Labels of the most recent taxonomy nodes (capped, for UI display). */
     val recentTaxonomyNodes: List<String> = emptyList(),
+    val cycleCount: Int = 0,
+    val lastCycleMs: Long = 0L,
+    val drainedCount: Int = 0,
+    val dispatchedCount: Int = 0,
+    val aliveSlots: Int = 0,
+    val availableSlots: Int = 0,
 )
 
 /**
@@ -186,6 +201,26 @@ object KanbanFSM {
             )
             is KanbanEvent.SignalFacetReduced -> prior.copy(
                 lastEventKind = "SignalFacetReduced",
+                lastEventTimestampMs = event.timestampMs,
+            )
+            is KanbanEvent.CycleObserved -> prior.copy(
+                cycleCount = prior.cycleCount + 1,
+                lastCycleMs = event.cycleMs,
+                drainedCount = prior.drainedCount + event.drained,
+                dispatchedCount = prior.dispatchedCount + event.dispatched,
+                aliveSlots = event.alive,
+                availableSlots = event.available,
+                lastEventKind = "CycleObserved",
+                lastEventTimestampMs = event.timestampMs,
+            )
+            is KanbanEvent.PatchDrained -> prior.copy(
+                drainedCount = prior.drainedCount + 1,
+                lastEventKind = "PatchDrained",
+                lastEventTimestampMs = event.timestampMs,
+            )
+            is KanbanEvent.DispatchFired -> prior.copy(
+                dispatchedCount = prior.dispatchedCount + 1,
+                lastEventKind = "DispatchFired",
                 lastEventTimestampMs = event.timestampMs,
             )
         }

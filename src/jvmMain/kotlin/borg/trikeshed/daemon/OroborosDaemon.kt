@@ -135,10 +135,26 @@ object OroborosDaemon {
         }
 
         var pollErrors = 0
-        // Stdout observer so cycles are visible without a TUI.
+        // Stdout observer so cycles are visible without a TUI, and bridge to KanbanFSM.
         driver.subscribe { ev ->
             println("[FLY-EVENT] $ev")
             if (ev is FlywheelEvent.PollError) pollErrors++
+            val now = System.currentTimeMillis()
+            when (ev) {
+                is borg.trikeshed.jules.FlywheelDriver.FlywheelEvent.Polled ->
+                    borg.trikeshed.userspace.reactor.KanbanFSM.reduce(
+                        borg.trikeshed.userspace.reactor.KanbanEvent.CycleObserved(0L, 0, 0, ev.alive, ev.available, now)
+                    )
+                is borg.trikeshed.jules.FlywheelDriver.FlywheelEvent.Drained ->
+                    borg.trikeshed.userspace.reactor.KanbanFSM.reduce(
+                        borg.trikeshed.userspace.reactor.KanbanEvent.PatchDrained(ev.sessionId, ev.sha, ev.tag, now)
+                    )
+                is borg.trikeshed.jules.FlywheelDriver.FlywheelEvent.Dispatched ->
+                    borg.trikeshed.userspace.reactor.KanbanFSM.reduce(
+                        borg.trikeshed.userspace.reactor.KanbanEvent.DispatchFired(ev.sessionId, ev.title, now)
+                    )
+                else -> {}
+            }
         }
         System.err.println(
             "[OROBOROS] daemon up. forgeHome=$forgeHome repo=$repoDir " +
