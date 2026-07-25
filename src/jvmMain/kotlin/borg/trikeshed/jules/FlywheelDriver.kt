@@ -558,13 +558,22 @@ class FlywheelDriver(
             if (finished) {
                 CommandResult(p.exitValue(), p.inputStream.bufferedReader().readText())
             } else {
-                // Gate timeout — kill the subtree so the JVM does not leak a
-                // half-dead gradle. destroyForcibly() only kills the direct
-                // process; on POSIX, walk the children via ProcessHandle.
+                // Gate timeout. The gradle daemon can be a deep process tree
+                // (wrapper -> gradle daemon -> test executor). children() only
+                // walks one level; descendants() walks the full subtree so a
+                // grandchild test executor can't keep the wrapper alive past
+                // our timeout. After destroyForcibly(), give each descendant
+                // up to 5s to die before we proceed — we MUST NOT block on
+                // the destroyed subprocess because its IO streams will never
+                // close, and p.inputStream.readText() would hang forever.
+                val root = p.toHandle()
+                val subtree = root.descendants().toList()
                 p.destroyForcibly()
-                p.toHandle().children().forEach { it.destroyForcibly() }
+                subtree.forEach { it.destroyForcibly() }
+                // Bounded wait on the root process only — do not call
+                // p.inputStream.readText() in the timeout path.
                 p.waitFor(5, java.util.concurrent.TimeUnit.SECONDS)
-                CommandResult(124, "command timeout after ${timeoutMs}ms: ${args.joinToString(" ")}")
+                CommandResult(124, "command timeout after ${timeoutMs}ms (killed ${1 + subtree.size} procs): ${args.joinToString(" ")}")
             }
         } catch (t: Throwable) { CommandResult(1, t.message.orEmpty()) }
 
