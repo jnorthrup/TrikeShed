@@ -149,29 +149,21 @@ class FlywheelDriver(
             }
         }
 
-    private suspend fun drainFanout(sessions: List<JulesRestClient.SessionInfo>): Int =
-        if (sessions.isEmpty()) 0 else coroutineScope {
-            sessions.map { s ->
-                async(Dispatchers.IO) {
-                    drainGate.withLock {
-                        ioGate.withPermit {
-                            try { drainOne(s) } catch (t: Throwable) { _events.emit(FlywheelEvent.PollError("drain ${s.id}: ${t.message}")); -1 }
-                        }
-                    }
-                    harvested++
-                    println(
-                        "[FLYWHEEL] RECEIPT session=$sid work=${claim.receipt.workId} " +
-                            "commit=${claim.commitSha} tag=${claim.receipt.versionTag} " +
-                            "patchCid=${claim.receipt.patchCid.value}" +
-                            (claim.receipt.prUrl?.let { " pr=$it" } ?: "")
-                    )
-                    println("[FLYWHEEL] LAND ${sid.takeLast(6)} sha=${claim.commitSha.take(9)} ${card.card.title.take(50)}")
-                } else {
-                    conductor.recordDrain(sid, "gate-red-${System.currentTimeMillis()}", 1)
-                    println("[FLYWHEEL] GATE-RED ${sid.takeLast(6)} ${card.card.title.take(60)}")
-                }
-            }
+        // 3. SYNC — Jules conversations remain responsive even when Git is
+        //    blocked, but no patch is applied against a stale master.
+        if (!synchronizeMain()) {
+            println("[FLYWHEEL] BLOCKED master is not cleanly synchronized with origin/master")
+            return CycleReport(answered, 0, 0, activeCount(), settled = false, phase = FlywheelPhase.SYNC)
         }
+
+        // 4. DRAIN — settle completed patches so slots free for induction.
+        //    Phase [FlywheelPhase.DRAIN]: COMPLETED sessions with a patch are
+        //    applied + tested + committed + CAS-pinned + tagged before any new
+        //    work is inducted. Drains are serial via drainGate (Mutex) inside
+        //    drainFanout so git tags are atomic; each commits onto master.
+        val completed = conductor.cards.values.filter { it.snapshot.state == "COMPLETED" && !it.drained }
+        val sessions = completed.map { JulesRestClient.SessionInfo(it.snapshot.sessionId, it.card.title) }
+        val harvested = drainFanout(sessions)
 
         // 5. SETTLE — every valid drain must be pushed, every PR must be
         //    merged or explicitly retired, and local/remote truth must agree.
