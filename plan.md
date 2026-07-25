@@ -1,0 +1,4 @@
+1. **Add test for Text Strings and Byte Strings**: Write tests in `src/commonTest/kotlin/borg/trikeshed/parse/confix/ConfixCborEncoderTest.kt` to verify that `ConfixPrimitive` with `isString == true` encodes as Major Type 3 (0x60), and `isString == false` with non-numeric/non-boolean values encodes as Major Type 2 (0x40).
+2. **Implement fix in ConfixCborEncoder**: Modify `src/commonMain/kotlin/borg/trikeshed/parse/confix/ConfixCborEncoder.kt` to check the `e.isString` property and output the correct CBOR Major Type (3 for text string, 2 for byte string).
+3. **Run tests**: Execute `./gradlew jvmTest --no-daemon` to ensure the new tests pass and no other tests regress.
+4. **Pre-commit and Submit**: Complete pre-commit steps to make sure proper testing, verifications, reviews and reflections are done, then submit the code.

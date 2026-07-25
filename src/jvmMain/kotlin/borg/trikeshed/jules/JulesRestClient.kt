@@ -1,3 +1,7 @@
+/*
+ * Copyright (c) 2017 TrikeShed Contributors
+ * AGPLv3 — see LICENSE
+ */
 package borg.trikeshed.jules
 
 import borg.trikeshed.parse.json.JsonSupport
@@ -15,13 +19,6 @@ class JulesRestClient(
     private val base: String = "https://jules.googleapis.com/v1alpha",
 ) {
     private val http: HttpClient = HttpClient.newBuilder().build()
-
-    /**
-     * Per-call timing observer: (method, path, elapsedNanos, responseBytes).
-     * Default is a no-op; tests/daemon swap in a recorder to benchmark each
-     * Jules API call without external tooling.
-     */
-    internal var apiCallObserver: (String, String, Long, Int) -> Unit = { _, _, _, _ -> }
 
     data class SessionInfo(
         val id: String,
@@ -142,15 +139,7 @@ class JulesRestClient(
         return out
     }
 
-    /**
-     * Normalize both live gitPatch shapes: string and {unidiffPatch: string}.
-     *
-     * `JsonSupport.parse` returns raw JSON substrings without unescaping, so a
-     * patch body arrives with literal `\n` / `\\"` sequences. `parsePatchFiles`
-     * splits on real newlines and looks for `+++ b/` prefixes; without unescape
-     * the whole patch is one line and every drain fails at settlePatch's
-     * "no touched files" gate.
-     */
+    /** Normalize both live gitPatch shapes: string and {unidiffPatch: string}. */
     private fun patchTexts(activity: Map<*, *>): List<String> {
         val out = mutableListOf<String>()
         val artifacts = activity["artifacts"] as? List<*> ?: return out
@@ -161,52 +150,9 @@ class JulesRestClient(
                 is Map<*, *> -> gitPatch["unidiffPatch"]?.toString()
                 else -> null
             }
-            if (!patch.isNullOrEmpty()) out += unescapeJsonString(patch)
+            if (!patch.isNullOrEmpty()) out += patch
         }
         return out
-    }
-
-    /** Unescape the JSON string escapes `JsonSupport.parse` leaves in-place. */
-    private fun unescapeJsonString(s: String): String {
-        if ('\\' !in s) return s
-        val sb = StringBuilder(s.length)
-        var i = 0
-        while (i < s.length) {
-            val c = s[i]
-            if (c == '\\' && i + 1 < s.length) {
-                when (s[i + 1]) {
-                    'n' -> { sb.append('\n'); i += 2 }
-                    't' -> { sb.append('\t'); i += 2 }
-                    'r' -> { sb.append('\r'); i += 2 }
-                    '"' -> { sb.append('"'); i += 2 }
-                    '\\' -> { sb.append('\\'); i += 2 }
-                    '/' -> { sb.append('/'); i += 2 }
-                    'u' -> {
-                        // \uXXXX — 4 hex digits. Required for binary diff
-                        // hunks where the JSON carries the UTF-16 code unit
-                        // (e.g. \u003c for '<'). Leaving these un-expanded
-                        // corrupts the patch body.
-                        if (i + 6 <= s.length) {
-                            val hex = s.substring(i + 2, i + 6)
-                            val cp = hex.toIntOrNull(16)
-                            if (cp != null) {
-                                sb.appendCodePoint(cp)
-                                i += 6
-                            } else {
-                                sb.append(c); i++
-                            }
-                        } else {
-                            sb.append(c); i++
-                        }
-                    }
-                    else -> { sb.append(s[i + 1]); i += 2 }
-                }
-            } else {
-                sb.append(c)
-                i++
-            }
-        }
-        return sb.toString()
     }
 
     /**
@@ -256,13 +202,9 @@ class JulesRestClient(
             "DELETE" -> builder.DELETE()
             else -> builder.POST(HttpRequest.BodyPublishers.ofString(json ?: "{}"))
         }
-        val t0 = System.nanoTime()
         val resp = http.send(builder.build(), HttpResponse.BodyHandlers.ofString())
-        val elapsed = System.nanoTime() - t0
-        val body = resp.body()
-        if (resp.statusCode() >= 400) error("Jules API ${resp.statusCode()}: ${body.take(300)}")
-        apiCallObserver(method, path, elapsed, body.length)
-        return body
+        if (resp.statusCode() >= 400) error("Jules API ${resp.statusCode()}: ${resp.body().take(300)}")
+        return resp.body()
     }
 
     private fun jsonString(s: String): String = buildString {

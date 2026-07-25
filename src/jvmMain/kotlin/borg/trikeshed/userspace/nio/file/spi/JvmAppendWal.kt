@@ -1,3 +1,7 @@
+/*
+ * Copyright (c) 2017 TrikeShed Contributors
+ * AGPLv3 — see LICENSE
+ */
 package borg.trikeshed.userspace.nio.file.spi
 
 import borg.trikeshed.lib.AppendWal

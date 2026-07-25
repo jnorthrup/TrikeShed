@@ -50,6 +50,7 @@ class FlywheelClaimPatchTest {
             @@ -0,0 +1 @@
             +val x = 1
         """.trimIndent()
+
         val claim = driver.claimPatch(
             commitSha = headSha,
             patch = patch,

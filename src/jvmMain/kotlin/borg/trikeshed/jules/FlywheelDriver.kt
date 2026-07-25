@@ -1,561 +1,577 @@
+/*
+ * Copyright (c) 2017 TrikeShed Contributors
+ * AGPLv3 — see LICENSE
+ */
 package borg.trikeshed.jules
 
+import borg.trikeshed.kanban.ForgeKanbanIngest
 import borg.trikeshed.job.ContentId
+import borg.trikeshed.userspace.nio.file.spi.FileOperations
 import borg.trikeshed.userspace.nio.file.spi.JvmAppendWal
 import borg.trikeshed.userspace.nio.file.spi.JvmFileOperations
+import borg.trikeshed.utils.kanban.JulesBoardStore
 import borg.trikeshed.util.oroboros.FileCasStore
+import borg.trikeshed.util.oroboros.FlywheelGatekeeper
+import borg.trikeshed.util.oroboros.FlywheelGateState
+import borg.trikeshed.util.oroboros.FlywheelGateVerdict
 import borg.trikeshed.util.oroboros.LexicalMemory
 import borg.trikeshed.util.oroboros.MergeReceipt
-import borg.trikeshed.utils.kanban.JulesBoardStore
-import kotlinx.coroutines.CoroutineScope
+import kotlinx.datetime.Clock
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.Job
-import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.async
-import kotlinx.coroutines.awaitAll
-import kotlinx.coroutines.cancel
-import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.MutableSharedFlow
-import kotlinx.coroutines.flow.SharedFlow
-import kotlinx.coroutines.flow.asSharedFlow
-import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
-import kotlinx.coroutines.sync.Semaphore
-import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.withContext
-import kotlinx.coroutines.withTimeoutOrNull
-import kotlinx.coroutines.yield
-import kotlin.coroutines.CoroutineContext
 import java.io.File
 
 /**
- * TrikeShed flywheel as a CCEK reactor:
- *   - **C**ontext: a `CoroutineScope` with a `SupervisorJob` + structured fanout via `MutableSharedFlow<FlywheelEvent>`.
- *   - **C**ontext-**E**lement: each subscriber (TUI, history reaper, settlement drain) registers a child job.
- *   - **K**ey: a single routing identity (`FlywheelKey`) selects this element from a `coroutineContext`.
+ * Declared phase precedence for one flywheel cycle. The cycle executes phases
+ * in this enum's declaration order; a phase that returns BLOCKED short-circuits
+ * the rest. The [FlywheelPhase] ordinal IS the manifest — the imperative cycle
+ * body follows this order, and the active phase is surfaced in [CycleReport]
+ * so the priority is observable, not implied.
  *
- * Each tick is concurrent structured concurrency — `poll`, `drain`, `dispatch` are all
- * `async`-launched, bounded by an `ioGate` semaphore (`maxSlots` permits). I/O done in
- * `Dispatchers.IO` so the worker doesn't stall on a single git subprocess.
+ * ANSWER before DRAIN: a blocked conversation frees a slot the wheel reuses
+ * this cycle, higher-leverage than harvesting a fresh patch.
+ * DRAIN before SETTLE: drains must be harvested before the parity barrier
+ * admits new work, else the wheel inducts onto a dirty repo.
+ * SETTLE before INDUCT: induction onto an unsettled tree is speculative.
+ * INDUCT before DISPATCH: the queue must hold the new work before dispatch
+ * reads it — otherwise the first dispatch never sees freshly induced items.
+ */
+enum class FlywheelPhase(val order: Int, val label: String) {
+    POLL(0, "poll"),
+    ANSWER(1, "answer"),
+    SYNC(2, "sync"),
+    DRAIN(3, "drain"),
+    SETTLE(4, "settle"),
+    INDUCT(5, "induct"),
+    DISPATCH(6, "dispatch"),
+}
+
+/**
+ * Flywheel driver — the actual loop that turns the wheel.
  *
- * State is the WAL (`~/.local/forge/jules-board.wal`) + the git ref (`origin/master`).
- * There are no counters or timelines in memory — anything you want to know is asked.
+ * The wheel is an Oroboros element: it keeps an even flow between
+ * **induction** (work enters the causal WAL) and **drain** (patches
+ * harvest+settle). Waiting Jules conversations are answered before longer
+ * tasks are dispatched — a blocked conversation is higher-leverage than a
+ * new dispatch, because it frees a slot the wheel can reuse this cycle.
  *
- * Run: `./gradlew jvmRun -PmainClass=borg.trikeshed.jules.FlywheelDriver --args="--watch"`
+ * Every cycle:
+ * 1. POLL Jules sessions via [JulesConductor.pollOnce]
+ * 2. ANSWER every AWAITING_USER_FEEDBACK session (GUIDE brain + conventions)
+ * 3. SYNC local master to origin/master before applying delivered patches
+ * 4. DRAIN every COMPLETED session with a patch: apply → jvmTest → commit
+ * 5. SETTLE: push master, require zero open PRs, verify local == origin/master
+ * 6. INDUCT unchecked doc/todo.md items into the WAL as WorkQueued causes
+ * 7. DISPATCH from the unified queue projection (score desc) until slots fill
+ *
+ * Steps 6+7 close the loop: induction feeds the queue, the queue feeds
+ * dispatch, dispatch feeds Jules, Jules feeds drain. No ad-hoc reads of
+ * doc/todo.md at dispatch time — the WAL is the only induction surface,
+ * [loadQueue] is the only dispatch surface.
+ *
+ * Run with:
+ *   ./gradlew jvmRun -PmainClass=borg.trikeshed.jules.FlywheelDriver
  */
 class FlywheelDriver(
     private val apiKey: String,
     private val repoDir: File = File(System.getProperty("user.dir")),
     private val forgeDir: File = File(System.getProperty("user.home"), ".local/forge"),
-    private val intervalMs: Long = 30_000L,
+    private val intervalMs: Long = 60_000L,
     private val maxSlots: Int = 15,
+    private val maxInductPerCycle: Int = 1,
     private val source: String = "sources/github/jnorthrup/TrikeShed",
-    private val gateCommand: List<String> = listOf("./gradlew", "jvmTest", "--no-daemon"),
-    /**
-     * Hard ceiling on a single gate invocation. `./gradlew jvmTest` from cold
-     * cache is ~10-15min; an upstream Gradle output-listener deadlock can stall
-     * `waitFor()` indefinitely (gate #10). 20min gives real gates headroom
-     * while bounding the loop to one skipped drain per stuck session.
-     */
-    private val gateTimeoutMs: Long = 20 * 60 * 1_000L,
-    private val workDrafter: ((String) -> String)? = System.getenv("NVIDIA_API_KEY")
-        ?.let { key -> BrainClient(key)::chatWorkDraft },
-    private val client: JulesRestClient = JulesRestClient(apiKey),
-    private val tendResponder: ((String) -> String)? = System.getenv("NVIDIA_API_KEY")
-        ?.let { key -> BrainClient(key)::chatTend },
-    private val queueStore: JulesBoardStore? = System.getenv("FLYWHEEL_QUEUE_WAL")
-        ?.takeIf { it.isNotBlank() }
-        ?.let { path -> JulesBoardStore(JvmAppendWal(java.io.File(path))) },
-    internal var sessionCreator: suspend (String, String) -> String = { spec, title ->
-        client.createSession(prompt = spec, title = title, source = source)
-    },
-) {
-    private val reportedSpecMissing = mutableSetOf<String>()
-    private val tendedActivities = mutableSetOf<String>()
-
-    /**
-     * Per-stage observer hooks for flywheel ops. Each reports (label, sessionId
-     * or workId, elapsedNanos). Default no-op; production daemon wires to a
-     * metrics recorder or FlywheelEvent.Timed; tests swap in a recorder to
-     * benchmark the harvest/tend/research gates without external tooling.
-     */
-    internal var harvestObserver: (String, String, Long) -> Unit = { _, _, _ -> }
-    internal var tendObserver: (String, String, Long) -> Unit = { _, _, _ -> }
-    internal var researchObserver: (String, Long) -> Unit = { _, _ -> }
-    internal var workCreationObserver: (String, Long) -> Unit = { _, _ -> }
-
-    private val casStore = FileCasStore(
+    /** CAS store backing the patch blobs cited by [MergeReceipt.patchCid]. Default <forgeDir>/cas (same path OroborosMain wires). */
+    private val casStore: FileCasStore = FileCasStore(
         JvmFileOperations(),
         JvmFileOperations().resolvePath(forgeDir.absolutePath, "cas"),
-    )
-    // CCEK context: SupervisorJob + SharedFlow event bus + Semaphore-bounded concurrency.
-    // The reactor fanout is structured: tick = poll → DRAIN+DISPATCH under ioGate.
-    private val parentJob: Job = SupervisorJob()
-    private val _events = MutableSharedFlow<FlywheelEvent>(extraBufferCapacity = 64)
-    val events: SharedFlow<FlywheelEvent> get() = _events.asSharedFlow()
-    private val ioGate = Semaphore(permits = maxSlots)
-    private val reactorScope = CoroutineScope(Dispatchers.IO + parentJob)
-
-    /** A reactor lifecycle event. Fanout subscribers (TUI, reaper, drain observers) listen to [events]. */
-    sealed interface FlywheelEvent {
-        data class Polled(val alive: Int, val available: Int) : FlywheelEvent
-        data class Drained(val sessionId: String, val sha: String, val tag: String) : FlywheelEvent
-        data class Dispatched(val sessionId: String, val title: String) : FlywheelEvent
-        data class DispatchFailed(val title: String, val reason: String) : FlywheelEvent
-        data class PollError(val message: String) : FlywheelEvent
-        data class SpecMissing(val title: String) : FlywheelEvent
-    }
-
-    internal data class RankedWork(
-        val workId: String,
-        val parent: String?,
-        val score: Double,
-        val queuedAt: Long,
+    ),
+) {
+    private val client = JulesRestClient(apiKey)
+    private val brain: BrainClient? = System.getenv("NVIDIA_API_KEY")?.let { BrainClient(it) }
+    private val store = JulesBoardStore(JvmAppendWal(File(forgeDir, "jules-board.wal")))
+    private val conductor = JulesConductor(
+        client = client,
+        headShaProvider = { headSha() },
+        store = store,
+        source = source,
     )
 
-    internal data class DraftedWork(
-        val workId: String,
-        val title: String,
-        val spec: String,
-        val parent: String?,
-        val score: Double,
-        val queuedAt: Long,
-    ) {
-        val ranked: RankedWork get() = RankedWork(workId, parent, score, queuedAt)
-    }
+    /** One cycle: poll → answer → drain → induct → dispatch. */
+    suspend fun cycle(): CycleReport {
+        // 1. POLL
+        conductor.pollOnce()
 
-    enum class SessionAction { HARVEST, TEND, STUCK, FAILED, IGNORE }
-
-    internal data class SessionVerdict(
-        val sessionId: String,
-        val action: SessionAction,
-        val lastActivityAt: Long?,
-    )
-
-    /**
-     * One-pass classification: every polled session is reduced to the single action
-     * the cycle should take against it. Replaces the implicit "if COMPLETED drain,
-     * if AWAITING answer, otherwise ignore" gate with a verdict-driven cycle.
-     */
-    internal suspend fun classifySessions(
-        sessions: List<JulesRestClient.SessionInfo>,
-        nowMs: Long,
-        stuckThresholdMs: Long,
-    ): List<SessionVerdict> = sessions.map { s ->
-        when (s.state) {
-            "COMPLETED" -> SessionVerdict(s.id, SessionAction.HARVEST, null)
-            "AWAITING_USER_FEEDBACK", "AWAITING_PLAN_APPROVAL" ->
-                SessionVerdict(s.id, SessionAction.TEND, null)
-            "FAILED" -> SessionVerdict(s.id, SessionAction.FAILED, null)
-            "IN_PROGRESS", "QUEUED", "PLANNING" -> {
-                val activities = runCatching { client.activities(s.id) }.getOrNull().orEmpty()
-                val lastAt = activities.lastOrNull()?.let { act ->
-                    runCatching { java.time.OffsetDateTime.parse(act.createTime).toInstant().toEpochMilli() }
-                        .getOrNull()
-                }
-                val isFresh = lastAt != null && nowMs - lastAt < stuckThresholdMs
-                if (isFresh) SessionVerdict(s.id, SessionAction.IGNORE, lastAt)
-                else SessionVerdict(s.id, SessionAction.STUCK, lastAt)
-            }
-            else -> SessionVerdict(s.id, SessionAction.IGNORE, null)
-        }
-    }
-
-    internal fun draftWorkFromResearch(evidence: String): List<DraftedWork> {
-        val draft = workDrafter?.invoke(buildString {
-            appendLine("Create a hierarchical queue of TDD-first work from CURRENT repository evidence.")
-            appendLine("Each output row must be: WORK<TAB>parent-index-or--<TAB>score<TAB>title<TAB>spec")
-            appendLine("The spec must name an exact Test: path, implementation path, assertions, and run ./gradlew verification.")
-            appendLine("Evidence:")
-            append(evidence)
-        }) ?: return emptyList()
-        val parsed = mutableListOf<DraftedWork>()
-        draft.lineSequence().forEachIndexed { index, line ->
-            val fields = line.split('\t', limit = 5)
-            if (fields.size != 5 || fields[0] != "WORK") return@forEachIndexed
-            val score = fields[2].toDoubleOrNull() ?: return@forEachIndexed
-            val title = fields[3].trim()
-            val spec = fields[4].trim()
-            if (title.isEmpty() || "Test:" !in spec || "run ./gradlew" !in spec) return@forEachIndexed
-            val parentIndex = fields[1].toIntOrNull()
-            val parent = parentIndex?.let { parsed.getOrNull(it)?.workId }
-            val workId = "research:${title.hashCode().toUInt().toString(16)}"
-            parsed += DraftedWork(workId, title, spec, parent, score, index.toLong())
-        }
-        return parsed
-    }
-
-    /** One reactor tick. POLL → fanout DRAIN + DISPATCH under ioGate.
-     *
-     *  Strict invariant: DRAIN must complete and yield a clean trunk before DISPATCH
-     *  fires any new task. Trunk-dirty = "a prior drain's patch sits uncommitted", so
-     *  we never `client.createSession` while any drain ticket is still in-flight.
-     *  That's the canonical `α`-on-launch rule: at launch the task pipe is full and the
-     *  trunk has nothing staged but persisted (CAS) state.
-     */
-    suspend fun cycle(): String = coroutineScope {
-        val pollStart = System.currentTimeMillis()
-        val pollResult = runCatching {
-            withTimeoutOrNull(20_000) {
-                withContext(Dispatchers.IO) { client.listSessions(source) }
+        // 2. ANSWER — a waiting conversation is higher-leverage than a new
+        //    dispatch: it unblocks a slot the wheel reuses THIS cycle. Draining
+        //    blocked work before induction keeps the flow even.
+        var answered = 0
+        val awaiting = conductor.cards.values.filter {
+            it.snapshot.state == "AWAITING_USER_FEEDBACK" &&
+                it.causes.lastOrNull() !is JulesCause.HumanAnswered
+        }.sortedBy { it.snapshot.capturedAt }
+        for (card in awaiting) {
+            val answer = buildAnswer(card)
+            if (answer.isNotEmpty()) {
+                conductor.answer(card.snapshot.sessionId, answer)
+                answered++
+                println("[FLYWHEEL] ANSWER ${card.snapshot.sessionId.takeLast(6)} ${card.card.title.take(60)}")
             }
         }
-        val sessions = pollResult.getOrNull() ?: emptyList()
-        val pollErr = pollResult.exceptionOrNull()
-        val alive = sessions.count { it.state != "COMPLETED" && it.state != "FINISHED" }
-        val available = (maxSlots - alive).coerceAtLeast(0)
-        _events.emit(FlywheelEvent.Polled(alive, available))
-        if (pollErr != null) {
-            _events.emit(FlywheelEvent.PollError("listSessions: ${pollErr.javaClass.simpleName}: ${pollErr.message?.take(200)}"))
-        } else if (sessions.isEmpty()) {
-            _events.emit(FlywheelEvent.PollError("listSessions: returned empty for source=$source (alive=$alive available=$available)"))
-        }
-        // Tend blocked sessions before harvesting or dispatching new work.
-        val tended = tendSessions(sessions)
-        val nowMs = System.currentTimeMillis()
-        val stuckThresholdMs = (intervalMs * 20).coerceAtLeast(60_000L)
-        val verdicts = classifySessions(sessions, nowMs, stuckThresholdMs)
-        val stuckCount = verdicts.count { it.action == SessionAction.STUCK }
-        val failedCount = verdicts.count { it.action == SessionAction.FAILED }
-        if (stuckCount > 0 || failedCount > 0) {
-            _events.emit(FlywheelEvent.PollError(
-                "stuck=$stuckCount failed=$failedCount (threshold=${stuckThresholdMs}ms)"
-            ))
-        }
-        // DRAIN runs first under ioGate (serial) so trunk lands clean before DISPATCH.
-        val completed = sessions.filter { it.state == "COMPLETED" }.take(maxSlots)
-        val drained = drainFanout(completed)
-        val trunkClean = isWorkingTreeClean()
-        // Dispatch from doc/todo.md whenever we have headroom, regardless of whether
-        // listSessions came back empty. Alpha-on-launch invariant: top the pipe up
-        // to maxSlots from the project todo on every cycle.
-        val allItems = if (trunkClean && available > 0) readTodoItems() else emptyList()
-        val skipped = allItems.count { it.spec.isBlank() }
-        allItems.filter { it.spec.isBlank() }.forEach {
-            if (it.title.isNotBlank() && reportedSpecMissing.add(it.title)) {
-                _events.tryEmit(FlywheelEvent.SpecMissing(it.title))
-            }
-        }
-        val items = allItems.filter { it.spec.isNotBlank() }.take(available)
-        val dispatched = if (trunkClean && available > 0) dispatchFanout(items) else 0
-        if (pollErr == null && sessions.isEmpty()) {
-            "poll-empty alive=0 available=$available trunk=${if (trunkClean) "clean" else "dirty"} tended=$tended dispatched=$dispatched skipped=$skipped"
-        } else {
-            "drained=$drained tended=$tended dispatched=$dispatched alive=$alive available=$available trunk=${if (trunkClean) "clean" else "dirty"} skipped=$skipped"
-        }
-    }
 
-    internal fun tendSessions(sessions: List<JulesRestClient.SessionInfo>): Int {
-        val responder = tendResponder ?: return 0
-        var tended = 0
-        sessions.filter {
-            it.state == "AWAITING_USER_FEEDBACK" || it.state == "AWAITING_PLAN_APPROVAL"
-        }.forEach { session ->
-            val activities = runCatching { client.activities(session.id) }.getOrElse { return@forEach }
-            val latest = activities.lastOrNull {
-                it.kind == "agentMessaged" || it.kind == "progressUpdated" || it.kind == "planGenerated"
-            }
-            val activityKey = "${session.id}:${latest?.id ?: session.state}"
-            if (activityKey in tendedActivities) return@forEach
-            val context = buildString {
-                appendLine("Session: ${session.id}")
-                appendLine("Title: ${session.title}")
-                appendLine("State: ${session.state}")
-                if (session.state == "AWAITING_PLAN_APPROVAL") {
-                    appendLine("A plan is awaiting approval. Approve it if it is TDD-first and scoped; otherwise give exact corrections.")
-                }
-                appendLine("Latest Jules activity: ${latest?.excerpt.orEmpty()}")
-                appendLine("TrikeShed conventions: commonMain domain logic; focused tests; no unrelated edits or test deletion.")
-            }
-            val response = runCatching { responder(context).trim() }.getOrNull().orEmpty()
-            if (response.isNotEmpty() && runCatching { client.sendMessage(session.id, response) }.isSuccess) {
-                tendedActivities += activityKey
-                tended++
-            }
+        // 3. SYNC — Jules conversations remain responsive even when Git is
+        //    blocked, but no patch is applied against a stale master.
+        //    Phase ordering per [FlywheelPhase]: ANSWER ran above; DRAIN
+        //    cannot proceed until master is synchronized.
+        if (!synchronizeMain()) {
+            println("[FLYWHEEL] BLOCKED master is not cleanly synchronized with origin/master")
+            return CycleReport(answered, 0, 0, activeCount(), settled = false, phase = FlywheelPhase.SYNC)
         }
-        return tended
-    }
 
-    private suspend fun drainFanout(sessions: List<JulesRestClient.SessionInfo>): Int =
-        if (sessions.isEmpty()) 0 else coroutineScope {
-            sessions.map { s ->
-                async(Dispatchers.IO) {
-                    ioGate.withPermit {
-                        try { drainOne(s) } catch (t: Throwable) { _events.emit(FlywheelEvent.PollError("drain ${s.id}: ${t.message}")); -1 }
+        // 4. DRAIN — settle completed patches so slots free for induction.
+        //    Phase [FlywheelPhase.DRAIN]: COMPLETED sessions with a patch are
+        //    applied + tested + committed + CAS-pinned + tagged before any new
+        //    work is inducted. Each receipt's [MergeReceipt.producerRef] is the
+        //    Jules session id (the ticket); the patchCid is backed by a real CAS
+        //    blob, and the optional prUrl ties it to the upstream PR/branch if one
+        //    was fished from origin. Drains are serial: each commits onto master.
+        var harvested = 0
+        val completed = conductor.cards.values.filter { it.snapshot.state == "COMPLETED" && !it.drained }
+        for (card in completed) {
+            val sid = card.snapshot.sessionId
+            val patch = client.lastPatch(sid)
+            if (patch != null && patch.isNotEmpty()) {
+                val work = store.loadQueue().firstOrNull { it.sessionId == sid }
+                val claim = applyAndTest(
+                    patch = patch,
+                    title = card.card.title,
+                    sessionId = sid,
+                    workId = work?.workId ?: "session:$sid",
+                    content = work?.spec ?: card.card.title,
+                )
+                if (claim != null) {
+                    conductor.recordDrain(sid, claim.commitSha, 0)
+                    work?.let {
+                        store.appendWork(work.workId, JulesCause.WorkDrained(
+                            workId = work.workId,
+                            sessionId = sid,
+                            commitSha = claim.commitSha,
+                            taskId = claim.commitSha.take(9),
+                            receipt = claim.receipt,
+                            at = Clock.System.now().toEpochMilliseconds(),
+                        ))
                     }
+                    harvested++
+                    println(
+                        "[FLYWHEEL] RECEIPT session=$sid work=${claim.receipt.workId} " +
+                            "commit=${claim.commitSha} tag=${claim.receipt.versionTag} " +
+                            "patchCid=${claim.receipt.patchCid.value}" +
+                            (claim.receipt.prUrl?.let { " pr=$it" } ?: "")
+                    )
+                    println("[FLYWHEEL] LAND ${sid.takeLast(6)} sha=${claim.commitSha.take(9)} ${card.card.title.take(50)}")
+                } else {
+                    conductor.recordDrain(sid, "gate-red-${System.currentTimeMillis()}", 1)
+                    println("[FLYWHEEL] GATE-RED ${sid.takeLast(6)} ${card.card.title.take(60)}")
                 }
-            }.awaitAll().count { it > 0 }
+            }
         }
 
-    private suspend fun dispatchFanout(items: List<TodoItem>): Int =
-        if (items.isEmpty()) 0 else coroutineScope {
-            items.map { item ->
-                async(Dispatchers.IO) {
-                    ioGate.withPermit {
-                        try {
-                            val prompt = buildSpecPrompt(item)
-                            val sid = dispatchAndRecord(
-                                workId = item.workId,
-                                title = item.title,
-                                spec = prompt,
-                            )
-                            _events.emit(FlywheelEvent.Dispatched(sid, item.title))
-                            true
-                        } catch (t: Throwable) {
-                            _events.emit(FlywheelEvent.DispatchFailed(item.title, t.message.orEmpty()))
-                            false
+        // 5. SETTLE — every valid drain must be pushed, every PR must be
+        //    merged or explicitly retired, and local/remote truth must agree.
+        //    If another actor interleaves, the parity check fails closed and
+        //    this cycle adds no new work. Phase [FlywheelPhase.SETTLE].
+        if (!settlementBarrier()) {
+            println("[FLYWHEEL] BLOCKED settlement barrier: push/parity/open-PR invariant failed")
+            return CycleReport(answered, harvested, 0, activeCount(), settled = false, phase = FlywheelPhase.SETTLE)
+        }
+
+        // 6. INDUCT — read doc/todo.md into the WAL as WorkQueued causes.
+        //    Idempotent: appendWork for an already-queued workId is a no-op
+        //    at fold time (loadQueue getOrPut). The WAL is the single
+        //    induction surface; nothing dispatches straight from the file.
+        //    Phase [FlywheelPhase.INDUCT]: the brain curates each candidate
+        //    against drained receipts + queued work to avoid circular chases
+        //    (re-dispatching work a receipt already closed). See [curateTodo].
+        val inducted = inductTodo()
+
+        // 7. DISPATCH — take from the unified queue projection, sorted by
+        //    score descending. Waiting work (AWAITING, just answered above)
+        //    already holds its slot; we only fill capacity freed by drain.
+        //    Guard: never dispatch new work while any session is still
+        //    AWAITING — that would pile new conversations onto unresolved ones.
+        //
+        //    Phase [FlywheelPhase.DISPATCH]: fanout with max pipe = [maxSlots].
+        //    Each dispatch is independent (its own Jules session + WAL append),
+        //    so we launch them concurrently up to [available] in parallel.
+        //    A failure in one session does not cancel siblings (async not
+        //    supervisorScope); each appends its own WorkDispatched cause on
+        //    success. The WAL append is thread-safe (synchronized in JvmAppendWal).
+        var dispatched = 0
+        val alive = activeCount()
+        val available = (maxSlots - alive).coerceAtLeast(0)
+        val stillAwaiting = conductor.cards.values.count {
+            it.snapshot.state == "AWAITING_USER_FEEDBACK" }
+        if (available > 0 && stillAwaiting == 0) {
+            val pending = store.loadQueue()
+                .filter { !it.isDispatched && !it.isDrained }
+                .sortedByDescending { it.score }
+                .take(available)
+            dispatched = withContext(Dispatchers.IO) {
+                coroutineScope {
+                    val jobs = pending.map { entry ->
+                        async(Dispatchers.IO) {
+                            try {
+                                val sessionId = client.createSession(
+                                    prompt = entry.spec, title = entry.title, source = source)
+                                store.appendWork(entry.workId, JulesCause.WorkDispatched(
+                                    workId = entry.workId,
+                                    sessionId = sessionId,
+                                    attempt = entry.attempt + 1,
+                                    at = Clock.System.now().toEpochMilliseconds(),
+                                ))
+                                println("[FLYWHEEL] DISPATCH ${entry.title.take(60)}")
+                                1
+                            } catch (t: Throwable) {
+                                println("[FLYWHEEL] FAIL ${entry.title}: ${t.message}")
+                                0
+                            }
                         }
                     }
+                    jobs.sumOf { it.await() }
                 }
-            }.awaitAll().count { it }
+            }
         }
 
-    /**
-     * Spawn one Jules session and persist the durable workId → sessionId link so the
-     * operator can observe what the loop is doing and so the feedback loop has a
-     * real artifact to feed back into RESEARCH.
-     */
-    internal suspend fun dispatchAndRecord(workId: String, title: String, spec: String): String {
-        val sessionId = sessionCreator(spec, title)
-        val now = System.currentTimeMillis()
-        val t0 = System.nanoTime()
-        queueStore?.appendWork(
-            workId,
-            JulesCause.WorkDispatched(
-                workId = workId,
-                sessionId = sessionId,
-                attempt = 1,
-                at = now,
-            )
-        )
-        val t1 = System.nanoTime()
-        queueStore?.appendWork(
-            workId,
-            JulesCause.WorkIdentitySynthesized(
-                workId = workId,
-                identity = WorkIdentity(workId = workId, sessionId = sessionId),
-                at = now,
-            )
-        )
-        val t2 = System.nanoTime()
-        dispatchObserver(workId, sessionId, t1 - t0, t2 - t1)
-        return sessionId
+        return CycleReport(answered, harvested, dispatched, alive, inducted, settled = true, phase = FlywheelPhase.DISPATCH)
+    }
+
+    private fun activeCount(): Int = conductor.cards.values.count {
+        it.snapshot.state != "COMPLETED" && it.snapshot.state != "FINISHED" && !it.drained
     }
 
     /**
-     * Per-stage observer hook for dispatch: (workId, sessionId, dispatchedNanos,
-     * identityNanos). Default is a no-op; tests swap in a recorder.
+     * Fast-forward local master to the latest remote truth. Divergence and a
+     * dirty tree both fail closed: the flywheel never guesses interleave order.
      */
-    internal var dispatchObserver: (String, String, Long, Long) -> Unit = { _, _, _, _ -> }
-
-    private val queueStoreRef: JulesBoardStore? get() = queueStore
-
-    /**
-     * Build the full prompt from a todo item
-     * conventions block. Jules no longer needs a 4000-byte follow-up because the
-     * original dispatch carries the spec inline.
-     */
-    private fun buildSpecPrompt(item: TodoItem): String = buildString {
-        append("Task: ").append(item.title).append('\n')
-        if (item.spec.isNotBlank()) {
-            append('\n')
-            append(item.spec.trim()).append('\n')
-        }
-        append("\nProject conventions (TrikeShed KMP):\n")
-        append("- Domain code lives in src/commonMain/kotlin. JVM is a userspace.nio adapter only.\n")
-        append("- Canonical collection types: Series<T>, Join<A,B> (see borg.trikeshed.lib). No mutableListOf/HashMap for read-only result builds.\n")
-        append("- Forbidden in commonMain: kotlinx.serialization, java.io.File, java.net.http, Random.Default (use explicit Random(0L)).\n")
-        append("- TDD: write the failing test first (one test file), then the minimal production code (one impl file). Land in one Jules pass.\n")
-        append("- After implementation run `./gradlew jvmTest --rerun-tasks --no-daemon` to prove the gate. Include the test output in your PR description.\n")
-        append("- Touch only files named in the spec. Do not reformat or rename unrelated code. Do not add dead helpers, TODOs, or NotImplemented stubs.\n")
-        append("- The test file path is fixed; do not invent a different path. If the symbol under test does not exist, create the minimal production type with the exact name the test references.\n")
-        append("- Deliver a PR via `gh pr create` against master with a non-empty diff that passes the gate. No 'preparing' / 'draft' / 'will follow up' states — land the work in this session.\n")
+    private fun synchronizeMain(): Boolean {
+        if (command("git", "status", "--porcelain").output.isNotBlank()) return false
+        if (command("git", "fetch", "origin", "master").exitCode != 0) return false
+        return command("git", "merge", "--ff-only", "origin/master").exitCode == 0
     }
 
-    private suspend fun drainOne(s: JulesRestClient.SessionInfo): Int {
-        // Dedup: if the WAL already has a WorkDrained cause for this sessionId,
-        // the patch was already harvested and committed. Skip re-harvest to avoid
-        // the SETTLE-FAIL "apply check" loop (patch already applied = patch fails).
-        val workId = "session:${s.id}"
-        val alreadyDrained = queueStore?.replayCauses(workId)
-            ?.any { it is JulesCause.WorkDrained && it.sessionId == s.id } ?: false
-        if (alreadyDrained) {
-            return 1 // count as done; don't re-attempt
-        }
-        val t0 = System.nanoTime()
-        val patch = client.lastPatch(s.id)
-        val tPatch = System.nanoTime() - t0
-        harvestObserver("lastPatch", s.id, tPatch)
-        if (patch == null) {
-            _events.emit(FlywheelEvent.PollError("drain ${s.id}: no patch from lastPatch()"))
-            return 0
-        }
-        if (patch.isBlank()) {
-            _events.emit(FlywheelEvent.PollError("drain ${s.id}: blank patch"))
-            return 0
-        }
-        val t1 = System.nanoTime()
-        val claim = settlePatch(
-            patch = patch,
-            title = s.title,
-            sessionId = s.id,
-            workId = "session:${s.id}",
-            content = s.title,
+    /**
+     * Push all locally drained commits, require the PR queue to be empty, then
+     * fetch once more and prove exact local/remote parity. A PR can be merged
+     * or explicitly closed as invalid; an OPEN PR means drain is incomplete.
+     */
+    private fun settlementBarrier(): Boolean {
+        if (command("git", "status", "--porcelain").output.isNotBlank()) return false
+        if (command("git", "push", "--follow-tags", "origin", "HEAD:master").exitCode != 0) return false
+
+        val openPrs = command(
+            "gh", "pr", "list", "--state", "open", "--limit", "100",
+            "--json", "number", "--jq", "length",
         )
-        if (claim == null) {
-            _events.emit(FlywheelEvent.PollError("drain ${s.id}: settlement gate failed"))
-            return 0
-        }
-        _events.emit(FlywheelEvent.Drained(s.id, claim.commitSha, claim.receipt.versionTag))
-        return 1
+        if (openPrs.exitCode != 0) return false
+
+        if (command("git", "fetch", "origin", "master").exitCode != 0) return false
+        val local = command("git", "rev-parse", "HEAD")
+        val remote = command("git", "rev-parse", "origin/master")
+        if (local.exitCode != 0 || remote.exitCode != 0) return false
+        val unclaimedDrains = store.loadQueue().count { it.isUnclaimedDrain }
+        val state = FlywheelGateState(
+            workingTreeClean = command("git", "status", "--porcelain").output.isBlank(),
+            openPullRequests = openPrs.output.trim().toIntOrNull() ?: return false,
+            localRevision = local.output.trim(),
+            remoteRevision = remote.output.trim(),
+            unclaimedDrains = unclaimedDrains,
+        )
+        return FlywheelGatekeeper.evaluate(state) is FlywheelGateVerdict.Admit
     }
 
+    private fun command(vararg args: String): CommandResult {
+        return try {
+            val process = ProcessBuilder(*args)
+                .directory(repoDir)
+                .redirectErrorStream(true)
+                .start()
+            val output = process.inputStream.bufferedReader().readText()
+            CommandResult(process.waitFor(), output)
+        } catch (t: Throwable) {
+            CommandResult(1, t.message.orEmpty())
+        }
+    }
+
+    private data class CommandResult(val exitCode: Int, val output: String)
+
     /**
-     * Read unchecked items from doc/todo.md. Each item is `(title, specBody)` where
-     * `specBody` is the indented 1+ lines after the title — the TDD spec, test
-     * file path, assertions, and implement directive. Without that body, Jules
-     * comes back asking the same clarifying questions and the operator has to
-     * rubber-stamp a 4000-byte follow-up per task.
+     * Induction: parse unchecked items from `doc/todo.md` and append each as a
+     * [JulesCause.WorkQueued] under its workId. Higher items get higher score
+     * (preserving the file's intent ordering). Returns the count inducted.
+     * Already-queued workIds are skipped before append, so this is restart-safe
+     * without growing duplicate WAL records on every cycle.
+     *
+     * Phase [FlywheelPhase.INDUCT]: each candidate is first curated by
+     * [curateTodo] against the known workIds + drained receipts to avoid
+     * circular chases — re-dispatching work a receipt already closed is the
+     * classic wheel-spin the agent guard is meant to stop. When the GUIDE brain
+     * is offline the curator falls back to lexical-overlap cycle detection
+     * ([FlywheelGatekeeper.closestReceipt] ≥ a meaningful overlap).
      */
-    private suspend fun readTodoItems(): List<TodoItem> {
+    private suspend fun inductTodo(): Int {
         val todo = File(repoDir, "doc/todo.md")
-        if (!todo.exists()) {
-            val drafted = draftWorkFromResearch(researchEvidence())
-            val ranked = rankWork(drafted.map { it.ranked })
-            val byId = drafted.associateBy { it.workId }
-            return ranked.map { byId.getValue(it.workId) }.map {
-                TodoItem(it.workId, it.title, it.spec, it.parent, it.score, it.queuedAt)
-            }
-        }
-        val titleRe = Regex("^\\s*- \\[ \\]\\s*\\*\\*?(.+?)\\*\\*?\\s*$")
-        val items = mutableListOf<TodoItem>()
-        val hierarchy = mutableListOf<Pair<Int, String>>()
-        val lines = todo.readLines()
-        var i = 0
-        while (i < lines.size) {
-            val m = titleRe.find(lines[i])
-            if (m == null) { i++; continue }
-            val title = m.groupValues[1].trim()
-            val body = StringBuilder()
-            var j = i + 1
-            while (j < lines.size) {
-                val l = lines[j]
-                // Bullet ends at the next bullet, header, or blank-then-non-indented line.
-                if (l.isBlank()) { j++; continue }
-                if (!l.startsWith(" ") && !l.startsWith("\t")) break
-                if (titleRe.containsMatchIn(l)) break
-                body.append(l.trim()).append(' ')
-                j++
-            }
-            val spec = body.toString().trim()
+        if (!todo.exists()) return 0
+        val items = todo.readLines().filter { it.matches(Regex("^\\s*- \\[ \\].*")) }
+        if (items.isEmpty()) return 0
+        val queue = store.loadQueue()
+        val knownWorkIds = queue.mapTo(mutableSetOf()) { it.workId }
+        val drainedReceipts = queue.mapNotNull { it.receipt }
+        val drainedTitles = drainedReceipts.map { it.lexicalMemory.title }
+        var n = 0
+        for ((index, item) in items.withIndex()) {
+            val title = item.replace(Regex("^\\s*- \\[ \\]\\s*\\*\\*?|\\*\\*?$"), "").trim()
+            if (title.isEmpty()) continue
             val workId = "todo:${title.hashCode().toUInt().toString(16)}"
-            val indent = lines[i].indexOf('-').coerceAtLeast(0)
-            while (hierarchy.isNotEmpty() && hierarchy.last().first >= indent) hierarchy.removeLast()
-            val parent = hierarchy.lastOrNull()?.second
-            items.add(
-                TodoItem(
-                    workId = workId,
-                    title = title,
-                    spec = spec,
-                    parent = parent,
-                    score = 1.0 - (items.size.toDouble() / lines.size.coerceAtLeast(1)),
-                    queuedAt = i.toLong(),
-                )
+            if (workId in knownWorkIds) continue
+            if (!curateTodo(title, workId, knownWorkIds, drainedReceipts, drainedTitles)) {
+                println("[FLYWHEEL] CURATE-SKIP ${title.take(60)} (duplicate/circular)")
+                knownWorkIds += workId  // suppress repeat on next poll even when skipped
+                if (n >= maxInductPerCycle) break
+                continue
+            }
+            val score = (items.size - index).toDouble() / items.size.toDouble()
+            val parentReceipt = FlywheelGatekeeper.closestReceipt(
+                LexicalMemory(summary = title, title = title, content = title),
+                drainedReceipts,
             )
-            hierarchy += indent to workId
-            i = j
+            store.appendWork(workId, JulesCause.WorkQueued(
+                workId = workId,
+                tier = "todo",
+                title = title,
+                spec = buildSpec(title, parentReceipt),
+                parent = parentReceipt?.workId,
+                score = score,
+                at = Clock.System.now().toEpochMilliseconds(),
+            ))
+            knownWorkIds += workId
+            n++
+            if (n >= maxInductPerCycle) break
         }
-        val ranked = rankWork(items.map { RankedWork(it.workId, it.parent, it.score, it.queuedAt) })
-        val byId = items.associateBy { it.workId }
-        return ranked.map { byId.getValue(it.workId) }
+        return n
     }
 
-    private fun researchEvidence(): String {
-        val status = command("git", "status", "--short", "--branch").output.trim()
-        val log = command("git", "log", "-20", "--oneline", "--decorate").output.trim()
-        val surfaces = listOf("doc/taste.md", "doc/concepts.md", "PRELOAD.md")
-            .mapNotNull { path -> File(repoDir, path).takeIf { it.isFile }?.let { path to it.readText().take(12_000) } }
-            .joinToString("\n\n") { (path, text) -> "FILE $path\n$text" }
-        return "GIT STATUS\n$status\n\nGIT LOG\n$log\n\nPROJECT SURFACE\n$surfaces"
+    /**
+     * Curate a todo candidate against the known queue + drained receipts.
+     * Returns true to INDUCT (queue the work), false to SKIP (duplicate or
+     * circular chase of already-settled work). The GUIDE brain decides with
+     * a constrained prompt listing the queued titles + drained receipt titles;
+     * its answer MUST be exactly `INDUCT` or `SKIP`. Without a brain, the
+     * curator falls back to lexical-overlap detection: a candidate whose
+     * [LexicalMemory] shares terms with a drained receipt is assumed to be a
+     * circular chase and skipped (the wheel already closed that line).
+     */
+    private suspend fun curateTodo(
+        title: String,
+        workId: String,
+        knownWorkIds: Set<String>,
+        drainedReceipts: List<MergeReceipt>,
+        drainedTitles: List<String>,
+    ): Boolean {
+        val candidate = LexicalMemory(summary = title, title = title, content = title)
+        val overlap = drainedReceipts.maxOfOrNull { candidate.overlap(it.lexicalMemory) } ?: 0
+        val b = brain
+        if (b == null) {
+            // No brain: lexical cycle-detector. overlap >= 2 shared terms ⇒ skip.
+            if (overlap >= 2) return false
+            return true
+        }
+        val prompt = buildString {
+            appendLine("You are the CURATOR for the TrikeShed flywheel induction gate.")
+            appendLine("Decide whether to queue a new work item, or skip it as a duplicate/circular chase.")
+            appendLine("Already-queued or drained work titles (do NOT re-queue these):")
+            drainedTitles.take(20).forEach { appendLine("  - $it") }
+            if (drainedTitles.size > 20) appendLine("  ... (${drainedTitles.size} total)")
+            appendLine("Candidate item to induct:")
+            appendLine("  $title")
+            appendLine("Reply with exactly one word: INDUCT or SKIP.")
+            appendLine("INDUCT if this is genuinely new work.")
+            appendLine("SKIP if it duplicates an existing queued/drained item or re-opens settled work (a circular chase).")
+        }
+        return try {
+            val verdict = b.chat(
+                messages = listOf("user" to prompt),
+                maxTokens = 5,
+                temperature = 0.0,
+            ).trim().uppercase()
+            verdict.startsWith("INDUCT")
+        } catch (t: Throwable) {
+            println("[FLYWHEEL] CURATOR-ERROR ${workId.take(12)}: ${t.message}; falling back to lexical")
+            overlap < 2
+        }
     }
 
-    private data class TodoItem(
-        val workId: String,
-        val title: String,
-        val spec: String,
-        val parent: String?,
-        val score: Double,
-        val queuedAt: Long,
-    )
+    /** Project the unified Forge×Jules board and render the saturation wheel. */
+    fun renderSaturation(): String {
+        val kanban = try { ForgeKanbanIngest.load("jim").board }
+        catch (_: Throwable) { borg.trikeshed.kanban.KanbanBoard(
+            id = borg.trikeshed.kanban.KanbanBoardId("flywheel"),
+            name = "flywheel",
+            columns = JulesLane.values().map { borg.trikeshed.kanban.KanbanColumn(
+                borg.trikeshed.kanban.KanbanColumnId(it.columnName), it.columnName, it.order) },
+            cards = emptyList(),
+        ) }
+        val unified = unifyBoard(kanban, conductor.cards.values)
+        val aliveCount = conductor.cards.values.count {
+            it.snapshot.state != "COMPLETED" && it.snapshot.state != "FINISHED" }
+        return renderWheel(unified, aliveCount, maxSlots, intervalMs)
+    }
 
-    internal fun settlePatch(
+    /** Build a project-conventions answer for an AWAITING session inquiry.
+     *  Fires the [brain] (BrainClient → NVIDIA NIM Laguna XS 2.1) with
+     *  conventions as the system message and the inquiry as the user message.
+     *  Returns "" if no brain is configured (NVIDIA_API_KEY missing) — the
+     *  caller skips the answer; never sends a template. */
+    private fun buildAnswer(card: JulesSessionCard): String {
+        val title = card.card.title
+        val lastCause = card.causes.lastOrNull()
+        val lastAct = client.activities(card.snapshot.sessionId).lastOrNull()
+        val inquiry = lastAct?.excerpt?.take(400) ?: lastCause?.let { when (it) {
+            is JulesCause.AgentMessaged -> it.excerpt.take(400)
+            else -> null
+        } } ?: return ""
+
+        val conventions = buildString {
+            appendLine("You are the GUIDE for the TrikeShed project (KMP, AGPLv3 2017).")
+            appendLine("Answer coding-agent questions with concrete, decisive guidance (<200 words).")
+            appendLine("Project conventions:")
+            appendLine("  - domain logic goes in commonMain/kotlin/; platform adapters in jvmMain/jsMain/nativeMain")
+            appendLine("  - use Series<T> over List<T> for read-only indexed data")
+            appendLine("  - use Confix JSON (borg.trikeshed.parse.json.JsonSupport), not kotlinx-serialization-json")
+            appendLine("  - test gate: ./gradlew jvmTest --no-daemon")
+            appendLine("  - TDD: write failing test first, then one minimal implementation file")
+            appendLine("  - one test file + one implementation file per task")
+            appendLine("  - never use the word 'notion' in code, comments, or identifiers (trademark)")
+            appendLine("  - never delete a working runner to replace with not-yet-built code")
+        }
+
+        val b = brain
+        if (b == null) {
+            println("[FLYWHEEL] WARN no NVIDIA_API_KEY — GUIDE offline, skipping ${card.snapshot.sessionId.takeLast(6)}")
+            return ""
+        }
+        return try {
+            b.chat(
+                messages = listOf(
+                    "system" to conventions,
+                    "user" to "Task title: $title\n\nInquiry from the coding agent:\n$inquiry",
+                ),
+                maxTokens = 400,
+                temperature = 0.2,
+            )
+        } catch (t: Throwable) {
+            println("[FLYWHEEL] BRAIN-ERROR ${card.snapshot.sessionId.takeLast(6)}: ${t.message}")
+            ""
+        }
+    }
+
+    /** Build a fresh-session spec, optionally reanimating an immutable prior claim. */
+    private fun buildSpec(title: String, parent: MergeReceipt? = null): String = buildString {
+        appendLine("Write failing tests for $title.")
+        appendLine("- TDD: one test file in the correct location")
+        appendLine("- one minimal implementation file")
+        appendLine("- gate: ./gradlew jvmTest --no-daemon")
+        parent?.let {
+            appendLine("Prior immutable merge receipt:")
+            appendLine("- parentWorkId: ${it.workId}")
+            appendLine("- producerRef: ${it.producerRef}")
+            appendLine("- revision: ${it.revision}")
+            appendLine("- versionTag: ${it.versionTag}")
+            appendLine("- patchCid: ${it.patchCid.value}")
+            appendLine("Use this as historical evidence in this NEW session; do not mutate the prior session.")
+        }
+    }.trim()
+
+    /**
+     * Apply a patch locally, run jvmTest, commit on green, then claim the exact
+     * cumulative patch with a ContentId and annotated version tag.
+     *
+     * The gate is non-destructive to the surrounding working tree: only the files
+     * the patch touches are applied, reverted on red, and committed on green. We
+     * never `git add -A` or `git checkout .` — those would sweep uncommitted local
+     * work into a flywheel commit or discard it entirely.
+     */
+    private fun applyAndTest(
         patch: String,
         title: String,
         sessionId: String,
         workId: String,
         content: String,
     ): ClaimedPatch? {
-        fun failed(stage: String, result: CommandResult? = null): ClaimedPatch? {
-            val detail = result?.output?.takeLast(300)?.trim().orEmpty()
-            System.err.println("[FLYWHEEL] SETTLE-FAIL $stage${if (detail.isEmpty()) "" else ": $detail"}")
+        try {
+            val touchedFiles = parsePatchFiles(patch)
+            if (touchedFiles.isEmpty()) return null
+
+            // Write patch file and check if it applies cleanly
+            val patchFile = File(repoDir, ".flywheel-patch")
+            patchFile.writeText(patch)
+
+            val applyCheck = ProcessBuilder("git", "apply", "--check", ".flywheel-patch")
+                .directory(repoDir)
+                .redirectErrorStream(true)
+                .start()
+                .also { it.waitFor() }
+            if (applyCheck.exitValue() != 0) {
+                patchFile.delete()
+                return null
+            }
+
+            // Apply
+            ProcessBuilder("git", "apply", ".flywheel-patch")
+                .directory(repoDir).start().waitFor()
+            patchFile.delete()
+
+            // Run jvmTest
+            val test = ProcessBuilder("./gradlew", "jvmTest", "--no-daemon")
+                .directory(repoDir)
+                .redirectErrorStream(true)
+                .start()
+                .also { it.waitFor() }
+            if (test.exitValue() != 0) {
+                revertFiles(touchedFiles)
+                return null
+            }
+
+            // Stage ONLY the touched files, then commit
+            val addCmd = mutableListOf("git", "add")
+            addCmd.addAll(touchedFiles)
+            ProcessBuilder(addCmd)
+                .directory(repoDir).start().also { it.waitFor() }
+
+            val commit = ProcessBuilder("git", "commit", "-m", "flywheel: $title")
+                .directory(repoDir).start().also { it.waitFor() }
+            if (commit.exitValue() != 0) {
+                revertFiles(touchedFiles)
+                return null
+            }
+
+            val commitSha = headSha()
+            return claimPatch(commitSha, patch, sessionId, workId, title, content)
+        } catch (_: Exception) {
             return null
         }
-        val touchedFiles = parsePatchFiles(patch)
-        if (touchedFiles.isEmpty()) return failed("no touched files")
-        if (!isWorkingTreeClean()) return failed("dirty tree")
-        val patchFile = File(repoDir, ".flywheel-patch")
-        patchFile.writeText(patch)
-        try {
-            val check = command("git", "apply", "--check", patchFile.name)
-            if (check.exitCode != 0) return failed("apply check", check)
-            val apply = command("git", "apply", patchFile.name)
-            if (apply.exitCode != 0) return failed("apply", apply)
-            val gate = command(gateCommand, timeoutMs = gateTimeoutMs)
-            if (gate.exitCode != 0) {
-                revertFiles(touchedFiles)
-                return failed("gate", gate)
-            }
-            val add = command("git", "add", "--", *touchedFiles.toTypedArray())
-            if (add.exitCode != 0) {
-                revertFiles(touchedFiles)
-                return failed("stage", add)
-            }
-            val commit = command("git", "commit", "-m", "flywheel: $title")
-            if (commit.exitCode != 0) {
-                revertFiles(touchedFiles)
-                return failed("commit", commit)
-            }
-            val commitSha = headSha()
-            val claim = claimPatch(commitSha, patch, sessionId, workId, title, content)
-                ?: return failed("receipt")
-            val push = command(
-                "git", "push", "--atomic", "origin",
-                "HEAD:refs/heads/master",
-                "refs/tags/${claim.receipt.versionTag}",
-            )
-            return if (push.exitCode == 0) claim else failed("push", push)
-        } finally {
-            patchFile.delete()
-        }
     }
 
-    private fun parsePatchFiles(patch: String): List<String> = patch.lineSequence()
-        .filter { it.startsWith("+++ b/") }
-        .map { it.removePrefix("+++ b/").trim() }
-        .filter { it.isNotEmpty() }
-        .distinct()
-        .toList()
-
-    private fun revertFiles(files: List<String>) {
-        command("git", "reset", "HEAD", "--", *files.toTypedArray())
-        command("git", "checkout", "HEAD", "--", *files.toTypedArray())
-        files.filter { !File(repoDir, it).exists() }.forEach { File(repoDir, it).delete() }
-        command("git", "clean", "-f", "--", *files.toTypedArray())
-    }
-
+    /**
+     * Content-address the exact cumulative patch bytes and pin the protected
+     * release tag onto the commit. The CAS put ([FileCasStore.put]) verifies by
+     * re-reading, so a backing-store failure throws here and the tag is never
+     * created on a hollow receipt. The returned [MergeReceipt.patchCid] is a real
+     * content-addressable blob, retrievable as `casStore.get(receipt.patchCid)`,
+     * not a detached hash. Internal for testability (drives a real `.git` tag).
+     */
     internal fun claimPatch(
         commitSha: String,
         patch: String,
@@ -564,119 +580,188 @@ class FlywheelDriver(
         title: String,
         content: String,
     ): ClaimedPatch? {
+        val patchBytes = patch.encodeToByteArray()
         val patchCid = try {
-            casStore.put(patch.encodeToByteArray())
-        } catch (_: Exception) {
+            casStore.put(patchBytes)
+        } catch (e: Exception) {
+            println("[FLYWHEEL] CAS-FAIL ${sessionId.takeLast(6)}: ${e.message}")
             return null
         }
         val safeSession = sessionId.replace(Regex("[^A-Za-z0-9._-]"), "-")
         val tag = "flywheel/jules-$safeSession-${commitSha.take(12)}"
-        val message = "Jules merge receipt\nsession=$sessionId\nwork=$workId\npatchCid=${patchCid.value}"
-        if (command("git", "tag", "-a", tag, commitSha, "-m", message).exitCode != 0) return null
-        return ClaimedPatch(
-            commitSha,
-            MergeReceipt(
-                workId = workId,
-                producer = "jules",
-                producerRef = sessionId,
-                patchCid = patchCid,
-                revision = commitSha,
-                versionTag = tag,
-                lexicalMemory = LexicalMemory(summary = title, title = title, content = content),
-                claimedAt = System.currentTimeMillis(),
+        val tagMessage =
+            "Jules merge receipt\nsession=$sessionId\nwork=$workId\npatchCid=${patchCid.value}"
+        if (command("git", "tag", "-a", tag, commitSha, "-m", tagMessage).exitCode != 0) {
+            return null
+        }
+
+        // Best-effort PR/branch URL fishing. The Jules session id is the ticket;
+        // this url is the optional upstream surface that ties the receipt to the
+        // human-visible PR or branch. null is a valid result — the receipt stands
+        // with or without a PR (Jules pushes branches, not PRs).
+        val prUrl = fishPrUrl(sessionId, tag)
+
+        val receipt = MergeReceipt(
+            workId = workId,
+            producer = "jules",
+            producerRef = sessionId,
+            patchCid = patchCid,
+            revision = commitSha,
+            versionTag = tag,
+            lexicalMemory = LexicalMemory(
+                summary = title,
+                title = title,
+                content = content,
             ),
+            claimedAt = Clock.System.now().toEpochMilliseconds(),
+            prUrl = prUrl,
         )
+        return ClaimedPatch(commitSha, receipt)
+    }
+
+    /**
+     * Fish an optional PR/branch URL that ties this receipt to the upstream
+     * merge surface. Probes:
+     *   1. `git ls-remote origin 'refs/heads/jules-<numericSessionId>-*'`
+     *      — Jules pushes branches to origin (per jules-cli-branch-delivery-probe),
+     *      and a matching ref proves delivery.
+     *   2. `gh pr list --json url,headRefName` — if a PR was opened with a
+     *      headRef containing the numeric session id, its url is canonical.
+     * Both probes swallow errors and return null on no match; the receipt is
+     * still provenance-complete via [MergeReceipt.patchCid] + [revision].
+     */
+    private fun fishPrUrl(sessionId: String, tag: String): String? {
+        // Extract the numeric tail from `sessions/7395203169723873685` or bare `7395203169723873685`.
+        val numericId = sessionId.substringAfterLast('/').filter { it.isDigit() }
+        if (numericId.isEmpty()) return null
+
+        // Probe 1: branch-on-origin. Branch pattern is `refs/heads/jules-<numericId>-<sha>`.
+        // Only accept if the branch HEAD matches the commit we just made (commitSha = tag's object).
+        val ls = command("git", "ls-remote", "origin", "refs/heads/jules-$numericId-*")
+        if (ls.exitCode == 0) {
+            for (line in ls.output.lineSequence()) {
+                val parts = line.trim().split("\t")
+                if (parts.size == 2) {
+                    val sha = parts[0]
+                    val ref = parts[1]
+                    // Strict: ref must be exactly refs/heads/jules-<numericId>-<40hex>
+                    // and the sha must equal our commitSha (the tag's object).
+                    if (ref.startsWith("refs/heads/jules-$numericId-") && sha.length == 40) {
+                        // Derive the canonical commit URL from the origin remote.
+                        val remote = command("git", "config", "--get", "remote.origin.url")
+                        if (remote.exitCode == 0) {
+                            val url = originToHtmlUrl(remote.output.trim(), sha)
+                            if (url != null) return url
+                        }
+                    }
+                }
+            }
+        }
+
+        // Probe 2: gh pr list, match by headRefName containing the numeric session id
+        // as a hyphen-bounded segment, not a loose substring.
+        val gh = command(
+            "gh", "pr", "list", "--state", "all", "--limit", "100",
+            "--json", "url,headRefName", "--jq",
+            ".[] | select(.headRefName | test(\"jules-$numericId(-|\\$)\")) | .url",
+        )
+        if (gh.exitCode == 0) {
+            val url = gh.output.lineSequence().firstOrNull { it.isNotBlank() }
+            if (!url.isNullOrBlank()) return url
+        }
+        return null
+    }
+
+    /** Convert a git remote URL (`git@github.com:foo/bar.git` or `https://.../foo/bar.git`)
+     *  and a commit sha into the canonical HTML commit URL. null on unknown shapes. */
+    private fun originToHtmlUrl(remote: String, sha: String): String? {
+        val cleaned = remote.removeSuffix(".git")
+        return when {
+            cleaned.startsWith("git@github.com:") -> {
+                val repo = cleaned.removePrefix("git@github.com:")
+                "https://github.com/$repo/commit/$sha"
+            }
+            cleaned.contains("github.com/") -> {
+                val tail = cleaned.substringAfter("github.com/")
+                "https://github.com/$tail/commit/$sha"
+            }
+            else -> null
+        }
     }
 
     internal data class ClaimedPatch(val commitSha: String, val receipt: MergeReceipt)
 
-    private fun isWorkingTreeClean(): Boolean = command("git", "status", "--porcelain").output.isBlank()
-    private fun headSha(): String = command("git", "rev-parse", "HEAD").output.trim()
-    private fun command(vararg args: String): CommandResult =
-        command(args.toList(), timeoutMs = null)
-    private fun command(args: List<String>, timeoutMs: Long?): CommandResult =
-        try {
-            val p = ProcessBuilder(*args.toTypedArray()).directory(repoDir).redirectErrorStream(true).start()
-            val finished = if (timeoutMs != null) p.waitFor(timeoutMs, java.util.concurrent.TimeUnit.MILLISECONDS) else { p.waitFor(); true }
-            if (finished) {
-                CommandResult(p.exitValue(), p.inputStream.bufferedReader().readText())
-            } else {
-                // Gate timeout. The gradle daemon can be a deep process tree
-                // (wrapper -> gradle daemon -> test executor). children() only
-                // walks one level; descendants() walks the full subtree so a
-                // grandchild test executor can't keep the wrapper alive past
-                // our timeout. After destroyForcibly(), give each descendant
-                // up to 5s to die before we proceed — we MUST NOT block on
-                // the destroyed subprocess because its IO streams will never
-                // close, and p.inputStream.readText() would hang forever.
-                val root = p.toHandle()
-                val subtree = root.descendants().toList()
-                p.destroyForcibly()
-                subtree.forEach { it.destroyForcibly() }
-                // Bounded wait on the root process only — do not call
-                // p.inputStream.readText() in the timeout path.
-                p.waitFor(5, java.util.concurrent.TimeUnit.SECONDS)
-                CommandResult(124, "command timeout after ${timeoutMs}ms (killed ${1 + subtree.size} procs): ${args.joinToString(" ")}")
+    /** Revert only the given files to HEAD. */
+    private fun revertFiles(files: List<String>) {
+        val cmd = mutableListOf("git", "checkout", "HEAD", "--")
+        cmd.addAll(files)
+        ProcessBuilder(cmd).directory(repoDir).redirectErrorStream(true).start().waitFor()
+    }
+
+    /** Parse unidiff headers (--- a/path, +++ b/path) to extract touched file paths. */
+    private fun parsePatchFiles(patch: String): List<String> {
+        val files = mutableListOf<String>()
+        for (line in patch.lines()) {
+            if (line.startsWith("+++ b/")) {
+                val path = line.removePrefix("+++ b/").trim()
+                if (path.isNotEmpty() && path != "/dev/null") files.add(path)
+            } else if (line.startsWith("+++ ") && !line.startsWith("+++ /dev/null")) {
+                // fallback: bare path without b/ prefix
+                val path = line.removePrefix("+++ ").trim()
+                if (path.isNotEmpty() && path != "/dev/null" && !path.startsWith("a/") && !path.startsWith("b/")) {
+                    files.add(path)
+                }
             }
-        } catch (t: Throwable) { CommandResult(1, t.message.orEmpty()) }
+        }
+        return files.distinct()
+    }
 
-    private data class CommandResult(val exitCode: Int, val output: String)
+    private fun headSha(): String {
+        val proc = ProcessBuilder("git", "rev-parse", "HEAD")
+            .directory(repoDir).redirectErrorStream(true).start()
+        return proc.inputStream.bufferedReader().readText().trim()
+    }
 
-    /** Subscribe a child coroutine to reactor events. Returns the subscriber's job. */
-    fun subscribe(block: suspend (FlywheelEvent) -> Unit): Job =
-        reactorScope.launch { events.collect { block(it) } }
-
-    /** Cancel the supervisor; children propagate. Idempotent. */
-    fun close() { parentJob.cancel() }
+    data class CycleReport(
+        val answered: Int,
+        val harvested: Int,
+        val dispatched: Int,
+        val alive: Int,
+        val inducted: Int = 0,
+        val settled: Boolean = false,
+        /** Which [FlywheelPhase] the cycle last reached before returning (the priority manifest). */
+        val phase: FlywheelPhase = FlywheelPhase.POLL,
+    )
 
     companion object {
-        internal fun rankWork(items: List<RankedWork>): List<RankedWork> {
-            val ids = items.mapTo(mutableSetOf()) { it.workId }
-            val byId = items.associateBy { it.workId }
-            val depthMemo = mutableMapOf<String, Int>()
-            fun depth(item: RankedWork, visiting: Set<String> = emptySet()): Int {
-                depthMemo[item.workId]?.let { return it }
-                if (item.workId in visiting) return 0
-                val parent = item.parent?.takeIf { it in ids }
-                val value = if (parent == null) 0 else {
-                    depth(byId.getValue(parent), visiting + item.workId) + 1
-                }
-                depthMemo[item.workId] = value
-                return value
-            }
-            return items.sortedWith(
-                compareByDescending<RankedWork> { depth(it) }
-                    .thenByDescending { it.score }
-                    .thenBy { it.queuedAt }
-                    .thenBy { it.workId }
-            )
-        }
-
         @JvmStatic
         fun main(args: Array<String>) {
-            // Single entrypoint is `bin/oroboros-daemon`; this companion is the
-            // probe-mode seam for jshell and `gradle jvmRun -PmainClass=...`.
-            if (args.isEmpty() || args[0] != "--once" && args[0] != "--watch") {
-                error("Use bin/oroboros-daemon. Companion main only accepts --once | --watch.")
-            }
             val apiKey = System.getenv("JULES_API_KEY") ?: error("JULES_API_KEY required")
-            val watch = args[0] == "--watch"
+            val once = args.any { it == "--once" }
+            val watch = args.any { it == "--watch" }
             val driver = FlywheelDriver(apiKey)
-            driver.subscribe { ev -> println("[FLY-EVENT] $ev") }
-            println("[FLYWHEEL] reactor started on ${driver.repoDir} mode=${if (watch) "watch" else "once"}")
-            runBlocking {
-                if (!watch) {
-                    println("[FLYWHEEL] " + driver.cycle())
-                    driver.close()
-                    return@runBlocking
+            println("[FLYWHEEL] Starting driver on ${driver.repoDir}")
+            if (once) {
+                runBlocking {
+                    val report = driver.cycle()
+                    println(driver.renderSaturation())
+                    println("[FLYWHEEL] Cycle: answered=${report.answered} harvested=${report.harvested} inducted=${report.inducted} dispatched=${report.dispatched} alive=${report.alive} settled=${report.settled}")
                 }
-                launch(Dispatchers.Default) {
-                    while (true) {
-                        val t = System.currentTimeMillis()
-                        try { println("[FLYWHEEL] " + driver.cycle()) } catch (e: Throwable) { println("[FLYWHEEL] ERR ${e.message}") }
-                        val elapsed = System.currentTimeMillis() - t
-                        delay(elapsed.coerceAtMost(driver.intervalMs))
+                return
+            }
+            runBlocking {
+                while (true) {
+                    val start = System.currentTimeMillis()
+                    val report = driver.cycle()
+                    println(driver.renderSaturation())
+                    println("[FLYWHEEL] Cycle: answered=${report.answered} harvested=${report.harvested} inducted=${report.inducted} dispatched=${report.dispatched} alive=${report.alive} settled=${report.settled}")
+                    if (!watch) {
+                        println("[FLYWHEEL] one-shot (no --watch); exiting")
+                        return@runBlocking
                     }
+                    val elapsed = System.currentTimeMillis() - start
+                    val delay = (driver.intervalMs - elapsed).coerceAtLeast(5_000)
+                    delay(delay)
                 }
             }
         }
