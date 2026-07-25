@@ -48,6 +48,37 @@ class FlywheelDispatchPersistenceTest {
             "unified queue must expose the canonical jules URL")
     }
 
+    @Test
+    fun workIdentitySynthesizedRoundTripsThroughWal() = runBlocking {
+        val forge = Files.createTempDirectory("identity-forge").toFile()
+        val wal = JvmAppendWal(File(forge, "board.wal"))
+        val store = JulesBoardStore(wal)
+
+        val repo = Files.createTempDirectory("identity-repo").toFile()
+        val driver = FlywheelDriver(apiKey = "k", repoDir = repo, forgeDir = forge, queueStore = store)
+        driver.sessionCreator = { _, _ -> "sess-identity-001" }
+
+        val returned = driver.dispatchAndRecord(
+            workId = "todo:identity-1",
+            title = "Wire identity synonym",
+            spec = "noop",
+        )
+
+        val causes = store.replayCauses("todo:identity-1")
+        val synthesized = causes.filterIsInstance<JulesCause.WorkIdentitySynthesized>()
+        assertEquals(1, synthesized.size, "exactly one WorkIdentitySynthesized cause per dispatch")
+
+        val ident = synthesized.single().identity
+        assertEquals("todo:identity-1", ident.workId)
+        assertEquals(returned, ident.sessionId)
+        assertEquals("https://jules.google.com/session/$returned", ident.sessionUrl)
+        assertEquals(null, ident.gitBranch, "gitBranch is null at dispatch — Jules may never push")
+        assertEquals(null, ident.prUrl, "prUrl is null — Jules may never gh pr create")
+        assertEquals(null, ident.gitTag, "gitTag minted at claimPatch, not dispatch")
+        assertEquals(null, ident.commitSha)
+        assertEquals(false, ident.isLanded)
+    }
+
     private data class CmdResult(val exitCode: Int, val output: String)
 
     private fun runGit(dir: File, vararg args: String): CmdResult {

@@ -119,6 +119,46 @@ sealed class JulesCause {
         val receipt: MergeReceipt? = null,
         override val at: Long,
     ) : JulesCause()
+
+    /** Identity synthesized for a dispatched work item. Carries the durable
+     *  synonym map (sessionId → gitBranch → prUrl → gitTag → commitSha) so the
+     *  flywheel can recover the identity across restarts without re-minting. */
+    data class WorkIdentitySynthesized(
+        override val workId: String,
+        val identity: WorkIdentity,
+        override val at: Long,
+    ) : JulesCause()
+}
+
+/**
+ * Durable identity for one unit of work across all surfaces it can appear on.
+ *
+ * A single Jules task may surface as any combination of:
+ *  - `sessionId`: the Jules API primary key (always present after dispatch)
+ *  - `sessionUrl`: `https://jules.google.com/session/<sessionId>` (derived)
+ *  - `gitBranch`: `refs/heads/jules-<id>-<sha>` pushed by Jules to origin
+ *  - `prUrl`: GitHub PR URL if Jules ran `gh pr create` (may be absent)
+ *  - `gitTag`: `flywheel/jules-<session>-<sha12>` minted by claimPatch
+ *  - `commitSha`: local merge commit after settlePatch lands
+ *
+ * Jules may COMPLETED with no branch, no PR, and no patch (patchBytes == 0).
+ * The identity is still the sessionId; missing synonyms are null, not duplicated.
+ *
+ * Written once at dispatch (WorkIdentitySynthesized cause), enriched at harvest
+ * (gitBranch, prUrl) and land (gitTag, commitSha). The WAL is truth; the
+ * identity is never re-minted — only extended with synonyms as they surface.
+ */
+data class WorkIdentity(
+    val workId: String,
+    val sessionId: String,
+    val sessionUrl: String = "https://jules.google.com/session/$sessionId",
+    val gitBranch: String? = null,
+    val prUrl: String? = null,
+    val gitTag: String? = null,
+    val commitSha: String? = null,
+) {
+    /** Whether this identity has been observed as drained/landed. */
+    val isLanded: Boolean get() = commitSha != null || gitTag != null
 }
 
 /** Kanban lanes for the Jules conductor board. Order matters (left→right). */

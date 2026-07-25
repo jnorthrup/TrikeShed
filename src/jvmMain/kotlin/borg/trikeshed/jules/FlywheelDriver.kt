@@ -309,13 +309,22 @@ class FlywheelDriver(
      */
     internal suspend fun dispatchAndRecord(workId: String, title: String, spec: String): String {
         val sessionId = sessionCreator(spec, title)
+        val now = System.currentTimeMillis()
         queueStore?.appendWork(
             workId,
             JulesCause.WorkDispatched(
                 workId = workId,
                 sessionId = sessionId,
                 attempt = 1,
-                at = System.currentTimeMillis(),
+                at = now,
+            )
+        )
+        queueStore?.appendWork(
+            workId,
+            JulesCause.WorkIdentitySynthesized(
+                workId = workId,
+                identity = WorkIdentity(workId = workId, sessionId = sessionId),
+                at = now,
             )
         )
         return sessionId
@@ -346,6 +355,15 @@ class FlywheelDriver(
     }
 
     private suspend fun drainOne(s: JulesRestClient.SessionInfo): Int {
+        // Dedup: if the WAL already has a WorkDrained cause for this sessionId,
+        // the patch was already harvested and committed. Skip re-harvest to avoid
+        // the SETTLE-FAIL "apply check" loop (patch already applied = patch fails).
+        val workId = "session:${s.id}"
+        val alreadyDrained = queueStore?.replayCauses(workId)
+            ?.any { it is JulesCause.WorkDrained && it.sessionId == s.id } ?: false
+        if (alreadyDrained) {
+            return 1 // count as done; don't re-attempt
+        }
         val patch = client.lastPatch(s.id)
         if (patch == null) {
             _events.emit(FlywheelEvent.PollError("drain ${s.id}: no patch from lastPatch()"))

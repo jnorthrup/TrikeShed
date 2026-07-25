@@ -2,6 +2,7 @@ package borg.trikeshed.utils.kanban
 
 import borg.trikeshed.jules.JulesCause
 import borg.trikeshed.jules.JulesSnapshot
+import borg.trikeshed.jules.WorkIdentity
 import borg.trikeshed.parse.json.JsonSupport
 import borg.trikeshed.job.ContentId
 import borg.trikeshed.util.oroboros.LexicalMemory
@@ -75,6 +76,15 @@ object KanbanEventCodec {
                     append(",\"receiptClaimedAt\":").append(it.claimedAt)
                     it.prUrl?.let { url -> field("receiptPrUrl", url) }
                 }
+            }
+            is JulesCause.WorkIdentitySynthesized -> {
+                field("workId", c.identity.workId)
+                field("sessionId", c.identity.sessionId)
+                field("sessionUrl", c.identity.sessionUrl)
+                c.identity.gitBranch?.let { field("gitBranch", it) }
+                c.identity.prUrl?.let { field("prUrl", it) }
+                c.identity.gitTag?.let { field("gitTag", it) }
+                c.identity.commitSha?.let { field("identityCommitSha", it) }
             }
         }
         append('}')
@@ -154,6 +164,19 @@ object KanbanEventCodec {
                         },
                         at = at,
                     )
+                    "WorkIdentitySynthesized" -> JulesCause.WorkIdentitySynthesized(
+                        workId = m.str("workId"),
+                        identity = WorkIdentity(
+                            workId = m.str("workId"),
+                            sessionId = m.str("sessionId"),
+                            sessionUrl = m.str("sessionUrl").ifBlank { "https://jules.google.com/session/${m.str("sessionId")}" },
+                            gitBranch = m["gitBranch"]?.toString(),
+                            prUrl = m["prUrl"]?.toString(),
+                            gitTag = m["gitTag"]?.toString(),
+                            commitSha = m["identityCommitSha"]?.toString(),
+                        ),
+                        at = at,
+                    )
                     else -> JulesCause.StateObserved(m.str("from"), m.str("to"), at)
                 }
                 CauseEvent(sid, cause)
@@ -174,6 +197,7 @@ object KanbanEventCodec {
         is JulesCause.WorkQueued -> "WorkQueued"
         is JulesCause.WorkDispatched -> "WorkDispatched"
         is JulesCause.WorkDrained -> "WorkDrained"
+        is JulesCause.WorkIdentitySynthesized -> "WorkIdentitySynthesized"
     }
 
     private fun Map<*, *>.str(k: String): String = this[k]?.toString() ?: ""

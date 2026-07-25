@@ -1,0 +1,7 @@
+# flywheel-bench 2026-07-25T03:40:01.863Z
+# ops filter: TDD_GATE,LAND
+{"ts":"2026-07-25T03:40:08.639Z","jules_task":"master","flywheel_op":"TDD_GATE","metric":"gradle_jvmtest_ms_capped_60s","value":6704,"unit":"ms"}
+{"ts":"2026-07-25T03:40:08.660Z","jules_task":"master","flywheel_op":"TDD_GATE","metric":"test_result_xmls","value":226,"unit":"xmls"}
+{"ts":"2026-07-25T03:40:08.701Z","jules_task":"master","flywheel_op":"TDD_GATE","metric":"elapsed_ms","value":6791,"unit":"ms"}
+{"ts":"2026-07-25T03:40:08.813Z","jules_task":"master","flywheel_op":"LAND","metric":"tag_create_ms","value":50,"unit":"ms"}
+{"ts":"2026-07-25T03:40:08.857Z","jules_task":"master","flywheel_op":"LAND","metric":"elapsed_ms","value":117,"unit":"ms"}
