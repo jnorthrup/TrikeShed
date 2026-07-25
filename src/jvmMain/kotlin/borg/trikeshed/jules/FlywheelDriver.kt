@@ -54,6 +54,13 @@ class FlywheelDriver(
     private val maxSlots: Int = 15,
     private val source: String = "sources/github/jnorthrup/TrikeShed",
     private val gateCommand: List<String> = listOf("./gradlew", "jvmTest", "--no-daemon"),
+    /**
+     * Hard ceiling on a single gate invocation. `./gradlew jvmTest` from cold
+     * cache is ~10-15min; an upstream Gradle output-listener deadlock can stall
+     * `waitFor()` indefinitely (gate #10). 20min gives real gates headroom
+     * while bounding the loop to one skipped drain per stuck session.
+     */
+    private val gateTimeoutMs: Long = 20 * 60 * 1_000L,
     private val workDrafter: ((String) -> String)? = System.getenv("NVIDIA_API_KEY")
         ?.let { key -> BrainClient(key)::chatWorkDraft },
     private val client: JulesRestClient = JulesRestClient(apiKey),
@@ -463,7 +470,7 @@ class FlywheelDriver(
             if (check.exitCode != 0) return failed("apply check", check)
             val apply = command("git", "apply", patchFile.name)
             if (apply.exitCode != 0) return failed("apply", apply)
-            val gate = command(*gateCommand.toTypedArray())
+            val gate = command(gateCommand, timeoutMs = gateTimeoutMs)
             if (gate.exitCode != 0) {
                 revertFiles(touchedFiles)
                 return failed("gate", gate)
@@ -543,9 +550,22 @@ class FlywheelDriver(
     private fun isWorkingTreeClean(): Boolean = command("git", "status", "--porcelain").output.isBlank()
     private fun headSha(): String = command("git", "rev-parse", "HEAD").output.trim()
     private fun command(vararg args: String): CommandResult =
+        command(args.toList(), timeoutMs = null)
+    private fun command(args: List<String>, timeoutMs: Long?): CommandResult =
         try {
-            val p = ProcessBuilder(*args).directory(repoDir).redirectErrorStream(true).start()
-            CommandResult(p.waitFor(), p.inputStream.bufferedReader().readText())
+            val p = ProcessBuilder(*args.toTypedArray()).directory(repoDir).redirectErrorStream(true).start()
+            val finished = if (timeoutMs != null) p.waitFor(timeoutMs, java.util.concurrent.TimeUnit.MILLISECONDS) else { p.waitFor(); true }
+            if (finished) {
+                CommandResult(p.exitValue(), p.inputStream.bufferedReader().readText())
+            } else {
+                // Gate timeout — kill the subtree so the JVM does not leak a
+                // half-dead gradle. destroyForcibly() only kills the direct
+                // process; on POSIX, walk the children via ProcessHandle.
+                p.destroyForcibly()
+                p.toHandle().children().forEach { it.destroyForcibly() }
+                p.waitFor(5, java.util.concurrent.TimeUnit.SECONDS)
+                CommandResult(124, "command timeout after ${timeoutMs}ms: ${args.joinToString(" ")}")
+            }
         } catch (t: Throwable) { CommandResult(1, t.message.orEmpty()) }
 
     private data class CommandResult(val exitCode: Int, val output: String)
