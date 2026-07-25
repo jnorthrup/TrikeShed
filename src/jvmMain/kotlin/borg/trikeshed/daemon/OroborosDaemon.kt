@@ -218,7 +218,15 @@ object OroborosDaemon {
             if (watch) {
                 while (true) {
                     delay(intervalMs)
-                    runCycle()
+                    try {
+                        runCycle()
+                    } catch (t: Throwable) {
+                        // A single cycle's failure (gate timeout, drain
+                        // exception, kill -9 on the gate's children reaching
+                        // the daemon's coroutine scheduler) must not tear
+                        // down the daemon. Log and continue.
+                        System.err.println("[OROBOROS] cycle failed: ${t.javaClass.simpleName}: ${t.message?.take(200)}")
+                    }
                 }
             }
         } finally {
