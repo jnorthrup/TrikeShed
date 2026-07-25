@@ -22,6 +22,10 @@ import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.sync.Semaphore
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.withContext
 import java.io.File
 
@@ -99,6 +103,14 @@ class FlywheelDriver(
         store = store,
         source = source,
     )
+    // CCEK context: SupervisorJob + SharedFlow event bus + Semaphore-bounded concurrency.
+    // The reactor fanout is structured: tick = poll → DRAIN+DISPATCH under ioGate.
+    private val parentJob: Job = SupervisorJob()
+    private val _events = MutableSharedFlow<FlywheelEvent>(extraBufferCapacity = 64)
+    val events: SharedFlow<FlywheelEvent> get() = _events.asSharedFlow()
+    private val ioGate = Semaphore(permits = maxSlots)
+    private val drainGate = Mutex()
+    private val reactorScope = CoroutineScope(Dispatchers.IO + parentJob)
 
     /** One cycle: poll → answer → drain → induct → dispatch. */
     suspend fun cycle(): CycleReport {
@@ -122,47 +134,14 @@ class FlywheelDriver(
             }
         }
 
-        // 3. SYNC — Jules conversations remain responsive even when Git is
-        //    blocked, but no patch is applied against a stale master.
-        //    Phase ordering per [FlywheelPhase]: ANSWER ran above; DRAIN
-        //    cannot proceed until master is synchronized.
-        if (!synchronizeMain()) {
-            println("[FLYWHEEL] BLOCKED master is not cleanly synchronized with origin/master")
-            return CycleReport(answered, 0, 0, activeCount(), settled = false, phase = FlywheelPhase.SYNC)
-        }
-
-        // 4. DRAIN — settle completed patches so slots free for induction.
-        //    Phase [FlywheelPhase.DRAIN]: COMPLETED sessions with a patch are
-        //    applied + tested + committed + CAS-pinned + tagged before any new
-        //    work is inducted. Each receipt's [MergeReceipt.producerRef] is the
-        //    Jules session id (the ticket); the patchCid is backed by a real CAS
-        //    blob, and the optional prUrl ties it to the upstream PR/branch if one
-        //    was fished from origin. Drains are serial: each commits onto master.
-        var harvested = 0
-        val completed = conductor.cards.values.filter { it.snapshot.state == "COMPLETED" && !it.drained }
-        for (card in completed) {
-            val sid = card.snapshot.sessionId
-            val patch = client.lastPatch(sid)
-            if (patch != null && patch.isNotEmpty()) {
-                val work = store.loadQueue().firstOrNull { it.sessionId == sid }
-                val claim = applyAndTest(
-                    patch = patch,
-                    title = card.card.title,
-                    sessionId = sid,
-                    workId = work?.workId ?: "session:$sid",
-                    content = work?.spec ?: card.card.title,
-                )
-                if (claim != null) {
-                    conductor.recordDrain(sid, claim.commitSha, 0)
-                    work?.let {
-                        store.appendWork(work.workId, JulesCause.WorkDrained(
-                            workId = work.workId,
-                            sessionId = sid,
-                            commitSha = claim.commitSha,
-                            taskId = claim.commitSha.take(9),
-                            receipt = claim.receipt,
-                            at = Clock.System.now().toEpochMilliseconds(),
-                        ))
+    private suspend fun drainFanout(sessions: List<JulesRestClient.SessionInfo>): Int =
+        if (sessions.isEmpty()) 0 else coroutineScope {
+            sessions.map { s ->
+                async(Dispatchers.IO) {
+                    drainGate.withLock {
+                        ioGate.withPermit {
+                            try { drainOne(s) } catch (t: Throwable) { _events.emit(FlywheelEvent.PollError("drain ${s.id}: ${t.message}")); -1 }
+                        }
                     }
                     harvested++
                     println(
