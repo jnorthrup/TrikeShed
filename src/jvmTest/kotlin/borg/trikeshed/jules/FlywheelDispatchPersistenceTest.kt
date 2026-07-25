@@ -7,6 +7,7 @@ import java.io.File
 import java.nio.file.Files
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 class FlywheelDispatchPersistenceTest {
@@ -77,6 +78,37 @@ class FlywheelDispatchPersistenceTest {
         assertEquals(null, ident.gitTag, "gitTag minted at claimPatch, not dispatch")
         assertEquals(null, ident.commitSha)
         assertEquals(false, ident.isLanded)
+    }
+
+    @Test
+    fun dispatchObserverSeamReportsPerStageWalCost() = runBlocking {
+        val forge = Files.createTempDirectory("observer-forge").toFile()
+        val wal = JvmAppendWal(File(forge, "board.wal"))
+        val store = JulesBoardStore(wal)
+        val repo = Files.createTempDirectory("observer-repo").toFile()
+        val driver = FlywheelDriver(apiKey = "k", repoDir = repo, forgeDir = forge, queueStore = store)
+        driver.sessionCreator = { _, _ -> "sess-obs-001" }
+
+        var observedWorkId: String? = null
+        var observedSid: String? = null
+        var dispatchedNanos: Long? = null
+        var identityNanos: Long? = null
+        driver.dispatchObserver = { wid, sid, dNanos, iNanos ->
+            observedWorkId = wid; observedSid = sid
+            dispatchedNanos = dNanos; identityNanos = iNanos
+        }
+
+        driver.dispatchAndRecord(workId = "todo:obs-1", title = "bench", spec = "noop")
+
+        assertEquals("todo:obs-1", observedWorkId)
+        assertEquals("sess-obs-001", observedSid)
+        assertNotNull(dispatchedNanos, "dispatchedNanos should be reported")
+        assertNotNull(identityNanos, "identityNanos should be reported")
+        assertTrue(dispatchedNanos!! >= 0, "nanos must be non-negative")
+        assertTrue(identityNanos!! >= 0, "nanos must be non-negative")
+        // concurrent WAL seed cost ~ few μs on JvmAppendWal; real values depend
+        // on mmap path. We assert that BOTH stages are reported — the ratio
+        // is observable in the agent's final summary, not asserted here.
     }
 
     private data class CmdResult(val exitCode: Int, val output: String)

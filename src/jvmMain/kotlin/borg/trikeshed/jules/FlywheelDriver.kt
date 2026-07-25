@@ -69,12 +69,23 @@ class FlywheelDriver(
     private val queueStore: JulesBoardStore? = System.getenv("FLYWHEEL_QUEUE_WAL")
         ?.takeIf { it.isNotBlank() }
         ?.let { path -> JulesBoardStore(JvmAppendWal(java.io.File(path))) },
-    internal var sessionCreator: (String, String) -> String = { spec, title ->
+    internal var sessionCreator: suspend (String, String) -> String = { spec, title ->
         client.createSession(prompt = spec, title = title, source = source)
     },
 ) {
     private val reportedSpecMissing = mutableSetOf<String>()
     private val tendedActivities = mutableSetOf<String>()
+
+    /**
+     * Per-stage observer hooks for flywheel ops. Each reports (label, sessionId
+     * or workId, elapsedNanos). Default no-op; production daemon wires to a
+     * metrics recorder or FlywheelEvent.Timed; tests swap in a recorder to
+     * benchmark the harvest/tend/research gates without external tooling.
+     */
+    internal var harvestObserver: (String, String, Long) -> Unit = { _, _, _ -> }
+    internal var tendObserver: (String, String, Long) -> Unit = { _, _, _ -> }
+    internal var researchObserver: (String, Long) -> Unit = { _, _ -> }
+    internal var workCreationObserver: (String, Long) -> Unit = { _, _ -> }
 
     private val casStore = FileCasStore(
         JvmFileOperations(),
@@ -310,6 +321,7 @@ class FlywheelDriver(
     internal suspend fun dispatchAndRecord(workId: String, title: String, spec: String): String {
         val sessionId = sessionCreator(spec, title)
         val now = System.currentTimeMillis()
+        val t0 = System.nanoTime()
         queueStore?.appendWork(
             workId,
             JulesCause.WorkDispatched(
@@ -319,6 +331,7 @@ class FlywheelDriver(
                 at = now,
             )
         )
+        val t1 = System.nanoTime()
         queueStore?.appendWork(
             workId,
             JulesCause.WorkIdentitySynthesized(
@@ -327,8 +340,16 @@ class FlywheelDriver(
                 at = now,
             )
         )
+        val t2 = System.nanoTime()
+        dispatchObserver(workId, sessionId, t1 - t0, t2 - t1)
         return sessionId
     }
+
+    /**
+     * Per-stage observer hook for dispatch: (workId, sessionId, dispatchedNanos,
+     * identityNanos). Default is a no-op; tests swap in a recorder.
+     */
+    internal var dispatchObserver: (String, String, Long, Long) -> Unit = { _, _, _, _ -> }
 
     private val queueStoreRef: JulesBoardStore? get() = queueStore
 
@@ -364,7 +385,10 @@ class FlywheelDriver(
         if (alreadyDrained) {
             return 1 // count as done; don't re-attempt
         }
+        val t0 = System.nanoTime()
         val patch = client.lastPatch(s.id)
+        val tPatch = System.nanoTime() - t0
+        harvestObserver("lastPatch", s.id, tPatch)
         if (patch == null) {
             _events.emit(FlywheelEvent.PollError("drain ${s.id}: no patch from lastPatch()"))
             return 0
@@ -373,6 +397,7 @@ class FlywheelDriver(
             _events.emit(FlywheelEvent.PollError("drain ${s.id}: blank patch"))
             return 0
         }
+        val t1 = System.nanoTime()
         val claim = settlePatch(
             patch = patch,
             title = s.title,

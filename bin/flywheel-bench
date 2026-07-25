@@ -120,9 +120,6 @@ bench_dispatch() {
   # DISPATCH: simulated — time to "create" a session URL (printf only, no
   # real Jules call). The real cost is the API RTT, which we record as
   # `dispatch_url_rtt_estimate_ms` derived from the prior session probe.
-  # Also measures wal_append_ms to model the per-dispatch WAL work
-  # (WorkDispatched + WorkIdentitySynthesized cause appends) added in the
-  # identity cut.
   local jt="$1"
   local t0 t1
   t0=$(ts)
@@ -130,25 +127,6 @@ bench_dispatch() {
   t1=$(ts)
   emit "$jt" DISPATCH local_url_build_ms "$(ms "$t0" "$t1")" ms
   emit "$jt" DISPATCH url_rtt_estimate_ms "150" ms
-
-  # WAL append cost — models the JvmAppendWal wal.append(workId, payload)
-  # cost that dispatchAndRecord() incurs twice (WorkDispatched + WorkIdentity).
-  local wal="/tmp/.flywheel-bench.${jt//\//_}.wal"
-  : > "$wal"
-  t0=$(ts)
-  local now_ms
-  now_ms="$(ts)"
-  for ((i=0; i<10; i++)); do
-    printf 'workIdentity{"workId":"%s","kind":"WorkIdentitySynthesized","sessionId":"%s","at":%s}\n' \
-      "${jt//\//_}" "${jt//\//_}" "$now_ms" >> "$wal"
-  done
-  sync
-  t1=$(ts)
-  local bytes
-  bytes=$(wc -c < "$wal" | tr -d ' ')
-  emit "$jt" DISPATCH wal_append_10x_ms "$(ms "$t0" "$t1")" ms
-  emit "$jt" DISPATCH wal_10x_bytes "$bytes" bytes
-  rm -f "$wal"
 }
 
 bench_tend() {

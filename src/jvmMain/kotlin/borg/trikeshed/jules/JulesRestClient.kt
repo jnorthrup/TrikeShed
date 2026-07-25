@@ -16,6 +16,13 @@ class JulesRestClient(
 ) {
     private val http: HttpClient = HttpClient.newBuilder().build()
 
+    /**
+     * Per-call timing observer: (method, path, elapsedNanos, responseBytes).
+     * Default is a no-op; tests/daemon swap in a recorder to benchmark each
+     * Jules API call without external tooling.
+     */
+    internal var apiCallObserver: (String, String, Long, Int) -> Unit = { _, _, _, _ -> }
+
     data class SessionInfo(
         val id: String,
         val state: String,
@@ -249,9 +256,13 @@ class JulesRestClient(
             "DELETE" -> builder.DELETE()
             else -> builder.POST(HttpRequest.BodyPublishers.ofString(json ?: "{}"))
         }
+        val t0 = System.nanoTime()
         val resp = http.send(builder.build(), HttpResponse.BodyHandlers.ofString())
-        if (resp.statusCode() >= 400) error("Jules API ${resp.statusCode()}: ${resp.body().take(300)}")
-        return resp.body()
+        val elapsed = System.nanoTime() - t0
+        val body = resp.body()
+        if (resp.statusCode() >= 400) error("Jules API ${resp.statusCode()}: ${body.take(300)}")
+        apiCallObserver(method, path, elapsed, body.length)
+        return body
     }
 
     private fun jsonString(s: String): String = buildString {

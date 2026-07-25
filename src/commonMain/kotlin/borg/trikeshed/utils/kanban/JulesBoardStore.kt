@@ -26,6 +26,13 @@ class JulesBoardStore(
 ) {
 
     /**
+     * Stream the raw WAL records in insertion order. Each pair is `(key, payload)`
+     * where key is the workId (work causes) or sessionId (snapshot causes).
+     * Used by [TimeseriesWalCursor] to fold the unified projection.
+     */
+    internal fun replayAll(): Sequence<Pair<String, ByteArray>> = wal.replay()
+
+    /**
      * Persist a card mutation: new snapshot + the cause of the change.
      * Both records are appended under the sessionId key so replay folds correctly.
      */
