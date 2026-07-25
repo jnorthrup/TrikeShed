@@ -112,6 +112,21 @@ class FlywheelDriver(
     private val drainGate = Mutex()
     private val reactorScope = CoroutineScope(Dispatchers.IO + parentJob)
 
+    /** A reactor lifecycle event. Fanout subscribers (TUI, reaper, drain observers) listen to [events]. */
+    sealed interface FlywheelEvent {
+        data class Polled(val alive: Int, val available: Int) : FlywheelEvent
+        data class Drained(val sessionId: String, val sha: String, val tag: String) : FlywheelEvent
+        data class Dispatched(val sessionId: String, val title: String) : FlywheelEvent
+        data class DispatchFailed(val title: String, val reason: String) : FlywheelEvent
+        data class PollError(val message: String) : FlywheelEvent
+        data class UpstreamDrifted(val local: String, val remote: String) : FlywheelEvent
+    }
+
+    /** Emits an UpstreamDrifted event for preflight checks without exposing the raw bus. */
+    fun emitDrifted(local: String, remote: String) {
+        _events.tryEmit(FlywheelEvent.UpstreamDrifted(local, remote))
+    }
+
     /** One cycle: poll → answer → drain → induct → dispatch. */
     suspend fun cycle(): CycleReport {
         // 1. POLL

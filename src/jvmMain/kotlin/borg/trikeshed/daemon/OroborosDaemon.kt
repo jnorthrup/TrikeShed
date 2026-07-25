@@ -199,6 +199,11 @@ object OroborosDaemon {
                 }
             }
         }
+        if (!preflight(repoDir, driver)) {
+            System.err.println("[OROBOROS] preflight failed; aborting before first cycle")
+            driver.close()
+            return@runBlocking
+        }
 
         suspend fun runCycle() {
             val t0 = System.currentTimeMillis()
@@ -242,6 +247,11 @@ object OroborosDaemon {
                     val backoffMs = kotlin.math.min(intervalMs * (1L shl kotlin.math.min(errors, 30)), intervalMs * 5)
                     if (errors > 0) System.err.println("[OROBOROS] backoff=${backoffMs}ms consecutiveErrors=$errors")
                     delay(backoffMs)
+                    if (!preflight(repoDir, driver)) {
+                        System.err.println("[OROBOROS] preflight failed; skipping cycle")
+                        consecutivePollErrors.incrementAndGet()
+                        continue
+                    }
                     pollErrOccurred = false
                     try {
                         runCycle()
@@ -266,6 +276,30 @@ object OroborosDaemon {
             try { traceWriter?.flush(); traceWriter?.close() } catch (_: Exception) {}
             driver.close()
         }
+    }
+
+    private fun preflight(repoDir: File, driver: FlywheelDriver): Boolean {
+        // git fetch origin master (best-effort, 5s timeout)
+        val fetch = ProcessBuilder("git", "fetch", "origin", "master", "--dry-run")
+            .directory(repoDir).start()
+        val fetchOk = fetch.waitFor() == 0
+        if (!fetchOk) return true // offline is OK, we'll poll anyway
+
+        fun command(vararg args: String): String {
+            val p = ProcessBuilder(*args).directory(repoDir).redirectErrorStream(true).start()
+            p.waitFor()
+            return p.inputStream.bufferedReader().readText().trim()
+        }
+
+        val local = command("git", "rev-parse", "HEAD")
+        val remote = command("git", "rev-parse", "origin/master")
+        if (local != remote) {
+            // Emit event but don't crash
+            println("[OROBOROS] UPSTREAM-DIVERGED local=$local remote=$remote")
+            driver.emitDrifted(local, remote)
+            return false
+        }
+        return true
     }
 
     private fun die(msg: String): Nothing {
