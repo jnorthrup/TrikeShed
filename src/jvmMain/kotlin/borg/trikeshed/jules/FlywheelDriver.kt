@@ -35,6 +35,7 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
 import java.io.File
 
 /**
@@ -154,7 +155,7 @@ class FlywheelDriver(
         //    event + a retry on the next interval; drain still proceeds
         //    against the cards the previous cycle rehydrated from WAL.
         try {
-            conductor.pollOnce()
+            withTimeoutOrNull(60_000L) { conductor.pollOnce() }
         } catch (t: Throwable) {
             _events.tryEmit(FlywheelEvent.PollError("poll ${t.javaClass.simpleName}: ${t.message?.take(200)}"))
         }
@@ -168,7 +169,7 @@ class FlywheelDriver(
                 it.causes.lastOrNull() !is JulesCause.HumanAnswered
         }.sortedBy { it.snapshot.capturedAt }
         for (card in awaiting) {
-            val answer = buildAnswer(card)
+            val answer = withTimeoutOrNull(45_000L) { buildAnswer(card) } ?: ""
             if (answer.isNotEmpty()) {
                 conductor.answer(card.snapshot.sessionId, answer)
                 answered++

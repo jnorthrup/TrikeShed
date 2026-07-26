@@ -168,7 +168,8 @@ class JulesRestClient(
                 append("/sessions/$sessionId/activities?pageSize=100")
                 if (!pageToken.isNullOrEmpty()) append("&pageToken=${java.net.URLEncoder.encode(pageToken, Charsets.UTF_8)}")
             }
-            val parsed = JsonSupport.parse(get(path)) as? Map<*, *> ?: break
+            val raw = try { get(path) } catch (t: Throwable) { return out }
+            val parsed = try { JsonSupport.parse(raw) } catch (t: Throwable) { return out } as? Map<*, *> ?: break
             val page = parsed["activities"] as? List<*> ?: emptyList<Any?>()
             page.mapNotNullTo(out) { it as? Map<*, *> }
             pageToken = parsed["nextPageToken"]?.toString()?.takeIf { it.isNotBlank() }
