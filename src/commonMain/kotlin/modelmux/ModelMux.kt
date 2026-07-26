@@ -6,6 +6,7 @@ import borg.trikeshed.lib.*
 import borg.trikeshed.htx.*
 import borg.trikeshed.userspace.reactor.MuxReactorElement
 import borg.trikeshed.userspace.reactor.CacheLookup
+import borg.trikeshed.modelmux.ModelResponseReceipt
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.*
 
@@ -60,10 +61,18 @@ enum class SessionState { CREATED, OPEN, ACTIVE, DRAINING, CLOSED }
 class LlmSession(
     val model: ModelEntry,
     private val authKey: String,
-    val baseUrl: String
+    val baseUrl: String,
+    /** Session id — stamped on every [ModelResponseReceipt] minted from this session. */
+    val sessionId: String = "sess-${java.util.UUID.randomUUID()}",
 ) {
     private var _state = SessionState.CREATED
     val state: SessionState get() = _state
+
+    /** Most recent receipt produced by this session (chat/stream/embed). */
+    var lastReceipt: ModelResponseReceipt? = null
+        private set
+
+    fun recordReceipt(receipt: ModelResponseReceipt) { lastReceipt = receipt }
 
     fun open() { if (_state == SessionState.CREATED) _state = SessionState.OPEN }
     fun activate() { if (_state == SessionState.OPEN) _state = SessionState.ACTIVE }
@@ -129,12 +138,18 @@ class ModelMux internal constructor(
     suspend fun chat(
         modelId: String,
         messages: Series<AcpMessage>,
-        tools: Series<AcpTool> = 0 j { error("no tools") }
+        tools: Series<AcpTool> = 0 j { error("no tools") },
+        assessmentId: String? = null,
     ): AcpResponse {
         val session = session(modelId)
         session.activate()
         val reactor = currentCoroutineContext()[MuxReactorElement.Key]
         val keyId = keyMux.get("llm.$modelId.key")
+        val t0 = System.currentTimeMillis()
+        var httpStatus = 0
+        var cachedHit = false
+        var inputTokens = 0
+        var outputTokens = 0
         try {
             val card = models.let { ms -> (0 until ms.size).first { ms[it].a == modelId }.let { ms[it] } }.b
             val meta: AcpMeta = card.id j ("chat" j session.authHeaders())
@@ -147,7 +162,20 @@ class ModelMux internal constructor(
             if (reactor != null) {
                 val lookup = reactor.lookupApiCall(provider = card.id, modelId = modelId, requestHash = requestHash, ttlMs = 3600_000)
                 if (lookup is CacheLookup.Hit) {
-                    return AcpCodec.parseResponse(lookup.entry.payload)
+                    cachedHit = true
+                    httpStatus = 200
+                    val cached = AcpCodec.parseResponse(lookup.entry.payload)
+                    inputTokens = cached.b.a
+                    outputTokens = cached.b.b
+                    session.recordReceipt(
+                        ModelResponseReceipt.mint(
+                            modelId = modelId, providerId = card.id, requestHash = requestHash,
+                            action = "chat", httpStatus = 200, latencyMs = System.currentTimeMillis() - t0,
+                            inputTokens = inputTokens, outputTokens = outputTokens, cachedHit = true,
+                            assessmentId = assessmentId, sessionId = session.sessionId,
+                        )
+                    )
+                    return cached
                 }
             }
 
@@ -162,15 +190,39 @@ class ModelMux internal constructor(
 
             val resp = htx.request(htxReq)
             val respBody = resp.body.toArray().decodeToString()
+            httpStatus = resp.status
 
             check(resp.status in 200..299) {
                 "ModelMux chat failed with HTTP ${resp.status}: ${respBody.take(500)}"
             }
 
+            val parsed = AcpCodec.parseResponse(respBody)
+            inputTokens = parsed.b.a
+            outputTokens = parsed.b.b
+
             if (reactor != null) {
                 reactor.cacheApiCall(provider = card.id, modelId = modelId, requestHash = requestHash, ttlMs = 3600_000, payload = respBody)
             }
-            return AcpCodec.parseResponse(respBody)
+            session.recordReceipt(
+                ModelResponseReceipt.mint(
+                    modelId = modelId, providerId = card.id, requestHash = requestHash,
+                    action = "chat", httpStatus = httpStatus, latencyMs = System.currentTimeMillis() - t0,
+                    inputTokens = inputTokens, outputTokens = outputTokens, cachedHit = false,
+                    assessmentId = assessmentId, sessionId = session.sessionId,
+                )
+            )
+            return parsed
+        } catch (t: Throwable) {
+            session.recordReceipt(
+                ModelResponseReceipt.mint(
+                    modelId = modelId, providerId = modelId, requestHash = "0",
+                    action = "chat", httpStatus = httpStatus,
+                    latencyMs = System.currentTimeMillis() - t0,
+                    assessmentId = assessmentId, sessionId = session.sessionId,
+                    error = t,
+                )
+            )
+            throw t
         } finally {
             session.drain(); session.close()
             if (reactor != null && keyId != null) {

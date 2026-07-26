@@ -73,6 +73,13 @@ class ForgeKanbanDaemon(
     }
     
     /**
+     * Optional append-only logging leaf. When present, every processed
+     * call records an assessment row + receipt row + association row.
+     * The leaf is the single source of truth that survives board reload.
+     */
+    var leaf: borg.trikeshed.modelmux.ModelCallLeaf? = null
+
+    /**
      * Process a single model call.
      */
     private suspend fun processCall(mux: ModelMux, board: KanbanBoard, call: ModelCallDescriptor): KanbanBoard {
@@ -80,21 +87,54 @@ class ForgeKanbanDaemon(
         var updatedBoard = board.updateModelCall(call.id) {
             copy(status = ModelCallStatus.RUNNING, startedAt = nowMs())
         }
-        
+
+        // Leaf append: assessment row BEFORE the call so a crash mid-call
+        // still leaves the intent on record.
+        val leafSnap = leaf
+        if (leafSnap != null) {
+            leafSnap.appendAssessment(
+                callId = call.id.value,
+                cardId = call.cardId.value,
+                modelId = call.modelId,
+                provider = call.provider,
+                action = call.action,
+                prompt = call.prompt,
+            )
+        }
+
         val result = try {
             when (call.action) {
                 "chat" -> {
                     // role j content - AcpMessage = Join<String, String>
                     val msg: Join<String, String> = "user" j call.prompt
                     val messages = listOf(msg).toSeries()
-                    val response = mux.chat(call.modelId, messages)
-                    // response is Join<String, AcpUsage> = full_text j usage
+                    // Pass assessmentId so the LlmSession stamps the receipt.
+                    val session = mux.session(call.modelId)
+                    val response = try {
+                        mux.chat(call.modelId, messages, assessmentId = call.id.value)
+                    } catch (t: Throwable) {
+                        // session may still hold a partial receipt (minted on error)
+                        throw t
+                    }
                     val (text, _) = response
+                    // After the call, the LlmSession has lastReceipt.
+                    val receipt = session.lastReceipt
+                    if (receipt != null && leafSnap != null) {
+                        leafSnap.appendCall(
+                            callId = call.id.value,
+                            cardId = call.cardId.value,
+                            modelId = call.modelId,
+                            provider = call.provider,
+                            action = call.action,
+                            prompt = call.prompt,
+                            receipt = receipt,
+                        )
+                    }
                     text
                 }
                 "embed" -> {
                     val texts = call.prompt.split("\n").filter { it.isNotBlank() }.toSeries()
-                    mux.embed(call.modelId, texts)
+                    val out = mux.embed(call.modelId, texts)
                     "Embedded ${texts.size} texts"
                 }
                 else -> "Unknown action: ${call.action}"
@@ -109,7 +149,7 @@ class ForgeKanbanDaemon(
             }
             return updatedBoard
         }
-        
+
         // Mark completed
         updatedBoard = updatedBoard.updateModelCall(call.id) {
             copy(
@@ -119,7 +159,7 @@ class ForgeKanbanDaemon(
                 outputTokens = result.length // approximate
             )
         }
-        
+
         return updatedBoard
     }
     
