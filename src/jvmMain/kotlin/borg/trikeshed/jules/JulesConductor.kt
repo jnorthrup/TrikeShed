@@ -112,6 +112,21 @@ class JulesConductor(
         store?.append(updated.snapshot, drained = true, cause = updated.causes.last())
     }
 
+    /**
+     * Record a drain failure: append a [JulesCause.DrainFailed] cause on the
+     * card and persist it to the WAL. The card's lane already reflects COMPLETED
+     * (the patch was delivered); the failed drain cause records that it did not
+     * apply, so the next poll doesn't keep re-trying the same broken patch. The
+     * caller (flywheel) re-queues a rework [JulesCause.WorkQueued] afterwards.
+     */
+    suspend fun recordDrainFailure(sessionId: String, reason: String, at: Long) {
+        val card = cards[sessionId] ?: return
+        val cause = JulesCause.DrainFailed(reason, at)
+        val updated = card.copy(causes = card.causes + cause)
+        cards[sessionId] = updated
+        store?.append(updated.snapshot, drained = false, cause = cause)
+    }
+
     /** Run forever at [intervalMs]. */
     suspend fun run(intervalMs: Long = 60_000) {
         while (true) {

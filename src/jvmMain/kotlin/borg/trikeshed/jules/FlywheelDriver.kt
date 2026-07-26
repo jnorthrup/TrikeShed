@@ -183,6 +183,7 @@ class FlywheelDriver(
             return CycleReport(
             answered = answered,
             harvested = 0,
+            reworked = 0,
             dispatched = 0,
             alive = activeCount(),
             available = (maxSlots - activeCount()).coerceAtLeast(0),
@@ -205,7 +206,7 @@ class FlywheelDriver(
                 patchBytes = 0L,
             )
         }
-        val harvested = drainFanout(sessions)
+        val (harvested, reworked) = drainFanout(sessions)
 
         // 5. SETTLE — every valid drain must be pushed, every PR must be
         //    merged or explicitly retired, and local/remote truth must agree.
@@ -216,6 +217,7 @@ class FlywheelDriver(
             return CycleReport(
             answered = answered,
             harvested = harvested,
+            reworked = reworked,
             dispatched = 0,
             alive = activeCount(),
             available = (maxSlots - activeCount()).coerceAtLeast(0),
@@ -285,6 +287,7 @@ class FlywheelDriver(
             cycleMs = System.currentTimeMillis() - t0,
             answered = answered,
             harvested = harvested,
+            reworked = reworked,
             dispatched = dispatched,
             alive = alive,
             available = (maxSlots - alive).coerceAtLeast(0),
@@ -297,20 +300,36 @@ class FlywheelDriver(
     /**
      * Serial drain: each [drainOne] runs under [drainGate] (Mutex) then [ioGate]
      * (Semaphore). G14 guarantees git tag creation is atomic — no two drains
-     * race the same commit. Returns the count of successfully drained sessions.
+     * race the same commit. Returns the (harvested, reworked) counts — a rework
+     * is a drain whose patch did not apply cleanly and was re-queued with a
+     * bumped attempt instead of silently discarded.
      */
-    private suspend fun drainFanout(sessions: List<JulesRestClient.SessionInfo>): Int =
-        if (sessions.isEmpty()) 0 else coroutineScope {
+    private suspend fun drainFanout(sessions: List<JulesRestClient.SessionInfo>): Pair<Int, Int> =
+        if (sessions.isEmpty()) 0 to 0 else coroutineScope {
             sessions.map { s ->
                 async(Dispatchers.IO) {
                     drainGate.withLock {
                         ioGate.withPermit {
-                            try { drainOne(s) } catch (t: Throwable) { emitPollError("drain ${s.id}: ${t.message}", -1) }
+                            try { drainOne(s) } catch (t: Throwable) {
+                                emitPollError("drain ${s.id}: ${t.message}", -1); DrainOutcome.Skipped
+                            }
                         }
                     }
                 }
-            }.awaitAll().sum()
+            }.awaitAll().fold(0 to 0) { (h, r), o -> when (o) {
+                is DrainOutcome.Harvested -> (h + 1) to r
+                is DrainOutcome.Reworked  -> h to (r + 1)
+                is DrainOutcome.Skipped   -> h to r
+            } }
         }
+
+    /** One drain's terminal outcome. [Skipped] covers no-patch / dirty tree / infra errors. */
+    private sealed interface DrainOutcome {
+        data object Harvested : DrainOutcome
+        data object Skipped   : DrainOutcome
+        /** Patch did not apply cleanly; a rework [JulesCause.WorkQueued] was re-appended. */
+        data class Reworked(val newWorkId: String, val attempt: Int) : DrainOutcome
+    }
 
     private fun activeCount(): Int = conductor.cards.values.count {
         it.snapshot.state != "COMPLETED" && it.snapshot.state != "FINISHED" && !it.drained
@@ -837,25 +856,32 @@ class FlywheelDriver(
      * Serial inside [drainFanout] via [drainGate]. Returns 1 on success, 0 on
      * soft skip (no patch / dirty tree / apply-check fail), -1 on hard error.
      */
-    private suspend fun drainOne(s: JulesRestClient.SessionInfo): Int {
+    private suspend fun drainOne(s: JulesRestClient.SessionInfo): DrainOutcome {
         val patch = client.lastPatch(s.id)
-        if (patch == null) { return emitPollError("drain ${s.id}: no patch from lastPatch()", 0) }
-        if (patch.isBlank()) { return emitPollError("drain ${s.id}: blank patch", 0) }
-        if (!isWorkingTreeClean()) { return emitPollError("drain ${s.id}: trunk dirty, skipping", 0) }
+        if (patch == null) { emitPollError("drain ${s.id}: no patch from lastPatch()", 0); return DrainOutcome.Skipped }
+        if (patch.isBlank()) { emitPollError("drain ${s.id}: blank patch", 0); return DrainOutcome.Skipped }
+        if (!isWorkingTreeClean()) { emitPollError("drain ${s.id}: trunk dirty, skipping", 0); return DrainOutcome.Skipped }
         val patchFile = File(repoDir, ".flywheel-patch")
         patchFile.writeText(patch)
         val applyCheck = command("git", "apply", "--check", ".flywheel-patch")
         if (applyCheck.exitCode != 0) {
             val stderr = applyCheck.output.take(200)
             patchFile.delete()
-            return emitPollError("drain ${s.id}: apply --check failed: $stderr", 0)
+            // Jules produced a patch that does not fit the tree. Emit DrainFailed
+            // on the card and re-queue a reworked prompt with bumped attempt, so
+            // the next cycle's DISPATCH re-raises the work instead of silently
+            // discarding it. Skip cases (no patch, dirty tree) never rework —
+            // they are not Jules's fault and the cycle retries them next tick.
+            val rework = reworkFailedDrain(s, "apply --check failed: $stderr")
+            emitPollError("drain ${s.id}: apply --check failed: $stderr → rework ${rework?.attempt ?: 0}", 0)
+            return rework ?: DrainOutcome.Skipped
         }
         command("git", "apply", ".flywheel-patch")
         patchFile.delete()
         val commitSha = headSha()
         val patchBytes = patch.encodeToByteArray()
         val patchCid = try { casStore.put(patchBytes) } catch (e: Exception) {
-            return emitPollError("drain ${s.id}: cas put failed: ${e.message}", -1)
+            emitPollError("drain ${s.id}: cas put failed: ${e.message}", -1); return DrainOutcome.Skipped
         }
         val safe = s.id.replace(Regex("[^A-Za-z0-9._-]"), "-")
         val tag = "flywheel/jules-" + safe + "-" + commitSha.take(12)
@@ -865,10 +891,54 @@ class FlywheelDriver(
             "taskTitle=" + s.title
         val tagRes = command("git", "tag", "-a", tag, commitSha, "-m", msg)
         if (tagRes.exitCode != 0) {
-            return emitPollError("drain ${s.id}: tag create failed: ${tagRes.output.take(200)}", -1)
+            emitPollError("drain ${s.id}: tag create failed: ${tagRes.output.take(200)}", -1); return DrainOutcome.Skipped
         }
         _events.emit(FlywheelEvent.Drained(s.id, commitSha, tag))
-        return 1
+        return DrainOutcome.Harvested
+    }
+
+    /**
+     * Re-queue a failed drain as a rework: emit [JulesCause.DrainFailed] on the
+     * card, then append a [JulesCause.WorkQueued] with bumped attempt and a
+     * spec that names the failure reason + the original spec. Returns the new
+     * (workId, attempt) so [drainOne] can surface it in its log line, or null
+     * when the card has no prior [JulesCause.WorkDispatched] (a manual session
+     * not inducted through the queue — nothing to rework).
+     */
+    private suspend fun reworkFailedDrain(
+        s: JulesRestClient.SessionInfo,
+        reason: String,
+    ): DrainOutcome.Reworked? {
+        val now = Clock.System.now().toEpochMilliseconds()
+        conductor.recordDrainFailure(s.id, reason, now)
+        val card = conductor.cards[s.id] ?: return null
+        val dispatched = card.causes.filterIsInstance<JulesCause.WorkDispatched>().maxByOrNull { it.at }
+            ?: return null
+        val queued = store.replayCauses(dispatched.workId)
+            .filterIsInstance<JulesCause.WorkQueued>()
+            .maxByOrNull { it.at }
+            ?: return null
+        val nextAttempt = dispatched.attempt + 1
+        val reworkId = "rework:${queued.workId}#${nextAttempt}"
+        val reworkSpec = buildString {
+            appendLine("REWORK attempt $nextAttempt of ${queued.title}.")
+            appendLine("Prior Jules session ${s.id} produced a patch that failed to apply:")
+            appendLine("  reason: $reason")
+            appendLine("Original spec:")
+            appendLine(queued.spec.prependIndent("  "))
+            appendLine("Produce a fresh patch that applies cleanly against current master.")
+            appendLine("TDD: one test file + one minimal implementation file; gate: ./gradlew jvmTest --no-daemon")
+        }.trim()
+        store.appendWork(reworkId, JulesCause.WorkQueued(
+            workId = reworkId,
+            tier = queued.tier,
+            title = "[rework #$nextAttempt] ${queued.title}",
+            spec = reworkSpec,
+            parent = queued.workId,
+            score = (queued.score + 0.1).coerceAtMost(1.0),
+            at = now,
+        ))
+        return DrainOutcome.Reworked(reworkId, nextAttempt)
     }
 
     data class CycleReport(
@@ -876,6 +946,8 @@ class FlywheelDriver(
         val cycleMs: Long = 0,
         val answered: Int = 0,
         val harvested: Int = 0,
+        /** Drains whose patch did not apply cleanly and were re-queued as rework. */
+        val reworked: Int = 0,
         val dispatched: Int = 0,
         val alive: Int = 0,
         val available: Int = 0,
