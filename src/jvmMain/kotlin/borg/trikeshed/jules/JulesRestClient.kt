@@ -142,12 +142,7 @@ class JulesRestClient(
         val outputs = parsed["outputs"] as? List<*> ?: return out
         for (output in outputs) {
             val changeSet = (output as? Map<*, *>)?.get("changeSet") as? Map<*, *> ?: continue
-            val patch = when (val gitPatch = changeSet["gitPatch"]) {
-                is String -> gitPatch
-                is Map<*, *> -> gitPatch["unidiffPatch"]?.toString()
-                else -> null
-            }
-            if (!patch.isNullOrEmpty()) out += patch
+            gitPatchText(changeSet)?.let { out += it }
         }
         return out
     }
@@ -170,20 +165,62 @@ class JulesRestClient(
         return out
     }
 
-    /** Normalize both live gitPatch shapes: string and {unidiffPatch: string}. */
+    /** Normalize both live gitPatch shapes via [gitPatchText]. */
     private fun patchTexts(activity: Map<*, *>): List<String> {
         val out = mutableListOf<String>()
         val artifacts = activity["artifacts"] as? List<*> ?: return out
         for (artifact in artifacts) {
             val changeSet = (artifact as? Map<*, *>)?.get("changeSet") as? Map<*, *> ?: continue
-            val patch = when (val gitPatch = changeSet["gitPatch"]) {
-                is String -> gitPatch
-                is Map<*, *> -> gitPatch["unidiffPatch"]?.toString()
-                else -> null
-            }
-            if (!patch.isNullOrEmpty()) out += patch
+            gitPatchText(changeSet)?.let { out += it }
         }
         return out
+    }
+
+    /** Extract the diff text from a changeSet map: string or {unidiffPatch: string}. */
+    private fun gitPatchText(changeSet: Map<*, *>): String? {
+        val patch = when (val gitPatch = changeSet["gitPatch"]) {
+            is String -> gitPatch
+            is Map<*, *> -> gitPatch["unidiffPatch"]?.toString()
+            else -> null
+        }
+        return patch?.takeIf { it.isNotEmpty() }?.let(::jsonUnescape)
+    }
+
+    /**
+     * Decode JSON string escapes. JsonParser.reify slices raw token chars — its
+     * string branch (parse/json/Json.kt) returns the escaped source verbatim,
+     * so every multi-line string arrived with literal `\n`. A harvested
+     * "patch" was a single-line backslash-n blob that `git apply` rejected
+     * ("No valid patches in input"): every patch-bearing drain failed since
+     * inception (WAL: 281 DrainFailed, 0 harvested) and each failure bred a
+     * rework. HARVEST could not have ever landed through this path.
+     */
+    private fun jsonUnescape(s: String): String {
+        if ('\\' !in s) return s
+        val out = StringBuilder(s.length)
+        var i = 0
+        while (i < s.length) {
+            val c = s[i]
+            if (c == '\\' && i + 1 < s.length) {
+                when (s[i + 1]) {
+                    '"' -> { out.append('"'); i += 2 }
+                    '\\' -> { out.append('\\'); i += 2 }
+                    '/' -> { out.append('/'); i += 2 }
+                    'b' -> { out.append('\b'); i += 2 }
+                    'f' -> { out.append('\u000C'); i += 2 }
+                    'n' -> { out.append('\n'); i += 2 }
+                    'r' -> { out.append('\r'); i += 2 }
+                    't' -> { out.append('\t'); i += 2 }
+                    'u' -> {
+                        val code = s.substring(i + 2, minOf(i + 6, s.length)).toIntOrNull(16)
+                        if (code != null && i + 6 <= s.length) { out.append(code.toChar()); i += 6 }
+                        else { out.append(c); i += 1 }
+                    }
+                    else -> { out.append(c); i += 1 }
+                }
+            } else { out.append(c); i += 1 }
+        }
+        return out.toString()
     }
 
     /**

@@ -901,7 +901,9 @@ class FlywheelDriver(
         store.appendWork(seed.id, JulesCause.WorkQueued(
             workId = seed.id,
             tier = seed.tier,
-            title = "[rework #${seed.attempt}] ${seed.title}",
+            // Base title only: queue entries carry the decorated "[rework #N]"
+            // title, so re-reworks compounded ("[rework #2] [rework #1] ...").
+            title = "[rework #${seed.attempt}] ${seed.title.replace(Regex("^(\\[rework #\\d+\\] )+"), "")}",
             spec = reworkSpec,
             parent = seed.parent,
             score = (seed.score + 0.1).coerceAtMost(1.0),

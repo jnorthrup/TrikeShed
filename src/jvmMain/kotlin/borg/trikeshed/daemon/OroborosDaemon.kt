@@ -128,13 +128,11 @@ object OroborosDaemon {
 
         var pollErrors = 0
         val consecutivePollErrors = java.util.concurrent.atomic.AtomicInteger(0)
-        var pollErrOccurred = false
         // Stdout observer so cycles are visible without a TUI, and bridge to KanbanFSM.
         driver.subscribe { ev ->
             println("[FLY-EVENT] $ev")
             if (ev is FlywheelEvent.PollError) {
                 pollErrors++
-                pollErrOccurred = true
             }
             val now = System.currentTimeMillis()
             when (ev) {
@@ -258,20 +256,20 @@ object OroborosDaemon {
                         consecutivePollErrors.incrementAndGet()
                         continue
                     }
-                    pollErrOccurred = false
                     try {
                         runCycle()
+                        // Backoff tracks daemon-level failure only. Per-session
+                        // drain churn (apply-check fails, no-patch probes) is
+                        // routine flywheel telemetry — it already lands in the
+                        // trace as e=N — and must not throttle the wheel.
+                        consecutivePollErrors.set(0)
                     } catch (t: Throwable) {
                         // A single cycle's failure (gate timeout, drain
                         // exception, kill -9 on the gate's children reaching
                         // the daemon's coroutine scheduler) must not tear
                         // down the daemon. Log and continue.
                         System.err.println("[OROBOROS] cycle failed: ${t.javaClass.simpleName}: ${t.message?.take(200)}")
-                    }
-                    if (pollErrOccurred) {
                         consecutivePollErrors.incrementAndGet()
-                    } else {
-                        consecutivePollErrors.set(0)
                     }
                 }
             }
