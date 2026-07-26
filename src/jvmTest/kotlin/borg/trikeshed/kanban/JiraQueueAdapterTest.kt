@@ -1,5 +1,6 @@
 package borg.trikeshed.kanban
 
+import borg.trikeshed.userspace.nio.file.spi.JvmAppendWal
 import kotlinx.coroutines.runBlocking
 import java.nio.file.Files
 import kotlin.test.Test
@@ -17,7 +18,7 @@ class JiraQueueAdapterTest {
 
     @Test
     fun `test ingest and sync`() = runBlocking {
-        val wal = AppendWal(tempFile.absolutePath)
+        val wal = JvmAppendWal(tempFile)
         val adapter = JiraQueueAdapter(wal)
 
         adapter.ingest("PROJ-123", "Fix crash", "App crashes on start")
@@ -26,7 +27,7 @@ class JiraQueueAdapterTest {
         wal.close()
 
         // reopen to test persistence
-        val wal2 = AppendWal(tempFile.absolutePath)
+        val wal2 = JvmAppendWal(tempFile)
         val adapter2 = JiraQueueAdapter(wal2)
         val syncData = adapter2.sync()
 

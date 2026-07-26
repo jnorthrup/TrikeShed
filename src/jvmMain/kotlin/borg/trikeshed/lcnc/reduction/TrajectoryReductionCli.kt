@@ -5,6 +5,7 @@ import borg.trikeshed.parse.json.JsonSupport
 import borg.trikeshed.reduction.TrajectoryOutcome
 import borg.trikeshed.reduction.TrajectoryReduction
 import borg.trikeshed.reduction.verdictFor
+import borg.trikeshed.utils.kanban.forForgeDir
 import java.io.File
 import kotlin.system.exitProcess
 
@@ -229,7 +230,7 @@ private fun renderDashboard(json: String) {
     val title = (parsed["title"] as? String)
         ?: run {
             val dir = File(System.getProperty("user.home"), ".local/forge")
-            val store = borg.trikeshed.utils.kanban.JulesBoardStore(borg.trikeshed.userspace.nio.file.spi.JvmAppendWal(File(dir, "jules-board.wal")))
+            val store = borg.trikeshed.utils.kanban.JulesBoardStore.forForgeDir(dir)
             store.loadQueue().firstOrNull { it.workId == fingerprint }?.title
         }
         ?: fingerprint

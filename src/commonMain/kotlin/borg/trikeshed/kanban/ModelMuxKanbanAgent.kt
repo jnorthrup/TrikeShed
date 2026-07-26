@@ -13,8 +13,8 @@ class ModelMuxKanbanAgent(private val modelMux: ModelMux) {
                 // For demonstration/spec compliance, we route to the column name without 'col-'
                 val capability = command.toColumn.value.removePrefix("col-")
                 val route = modelMux.route("chat", capability)
-                if (route.a.size > 0) {
-                    return AgentDispatchResult(true, route.a[0].a)
+                if (route.a.a > 0) {
+                    return AgentDispatchResult(true, route.a.b(0).a)
                 }
                 AgentDispatchResult(false, null)
             }

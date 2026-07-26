@@ -25,6 +25,11 @@ class JulesBoardStore(
     private val wal: AppendWal,
 ) {
 
+    companion object {
+        /** Canonical WAL filename under the forge home directory. */
+        const val WAL_FILENAME = "jules-board.wal"
+    }
+
     /**
      * Persist a card mutation: new snapshot + the cause of the change.
      * Both records are appended under the sessionId key so replay folds correctly.

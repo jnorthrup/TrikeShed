@@ -2,7 +2,7 @@ package borg.trikeshed.flywheel
 
 import borg.trikeshed.jules.JulesRestClient
 import borg.trikeshed.utils.kanban.JulesBoardStore
-import borg.trikeshed.userspace.nio.file.spi.JvmAppendWal
+import borg.trikeshed.utils.kanban.forForgeDir
 import kotlinx.coroutines.runBlocking
 import java.io.File
 import java.time.Duration
@@ -100,7 +100,7 @@ object FlywheelTui {
         val todo = File(repoDir, "doc/todo.md")
         val queue = if (todo.exists()) todo.readLines().count { it.matches(Regex("^\\s*- \\[ \\].*")) } else 0
         val land = runCatching {
-            JulesBoardStore(JvmAppendWal(File(forgeDir, "jules-board.wal"))).load().values.count { it.drained }
+            JulesBoardStore.forForgeDir(forgeDir).load().values.count { it.drained }
         }.getOrDefault(0)
         val openCodeRunning = processCount("opencode")
         val codexRunning = processCount("codex")

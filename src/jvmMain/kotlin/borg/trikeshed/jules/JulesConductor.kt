@@ -1,7 +1,7 @@
 package borg.trikeshed.jules
 
 import borg.trikeshed.utils.kanban.JulesBoardStore
-import borg.trikeshed.userspace.nio.file.spi.JvmAppendWal
+import borg.trikeshed.utils.kanban.forForgeDir
 import java.io.File
 import kotlinx.coroutines.delay
 import kotlinx.datetime.Clock
@@ -194,7 +194,7 @@ class JulesConductor(
             val apiKey = System.getenv("JULES_API_KEY") ?: error("JULES_API_KEY required")
             val once = args.contains("--once")
             val forgeDir = File(System.getProperty("user.home"), ".local/forge")
-            val wal = JvmAppendWal(File(forgeDir, "jules-board.wal"))
+            val store = JulesBoardStore.forForgeDir(forgeDir)
             val conductor = JulesConductor(
                 client = JulesRestClient(apiKey),
                 headShaProvider = {
@@ -202,7 +202,7 @@ class JulesConductor(
                         .redirectErrorStream(true)
                         .start().inputStream.bufferedReader().readText().trim()
                 },
-                store = JulesBoardStore(wal),
+                store = store,
                 source = "sources/github/jnorthrup/TrikeShed",
             )
             kotlinx.coroutines.runBlocking {

@@ -3,9 +3,9 @@ package borg.trikeshed.jules
 import borg.trikeshed.kanban.ForgeKanbanIngest
 import borg.trikeshed.job.ContentId
 import borg.trikeshed.userspace.nio.file.spi.FileOperations
-import borg.trikeshed.userspace.nio.file.spi.JvmAppendWal
 import borg.trikeshed.userspace.nio.file.spi.JvmFileOperations
 import borg.trikeshed.utils.kanban.JulesBoardStore
+import borg.trikeshed.utils.kanban.forForgeDir
 import borg.trikeshed.util.oroboros.FileCasStore
 import borg.trikeshed.util.oroboros.FlywheelGatekeeper
 import borg.trikeshed.util.oroboros.FlywheelGateState
@@ -101,7 +101,7 @@ class FlywheelDriver(
 ) {
     private val client = JulesRestClient(apiKey)
     private val brain: BrainClient? = System.getenv("NVIDIA_API_KEY")?.let { BrainClient(it) }
-    private val store = JulesBoardStore(JvmAppendWal(File(forgeDir, "jules-board.wal")))
+    private val store = JulesBoardStore.forForgeDir(forgeDir)
     private val conductor = JulesConductor(
         client = client,
         headShaProvider = { headSha() },
@@ -439,29 +439,24 @@ class FlywheelDriver(
      * when prior work has drifted.
      */
     private suspend fun inductTodo(): Int {
-        val todo = File(repoDir, "doc/todo.md")
-        if (!todo.exists()) return 0
-        val items = todo.readLines().filter { it.matches(Regex("^\\s*- \\[ \\].*")) }
+        val items = readTodoItems()
         if (items.isEmpty()) return 0
         val queue = store.loadQueue()
         val knownWorkIds = queue.mapTo(mutableSetOf()) { it.workId }
         var n = 0
         for ((index, item) in items.withIndex()) {
-            val title = item.replace(Regex("^\\s*- \\[ \\]\\s*\\*\\*?|\\*\\*?$"), "").trim()
-            if (title.isEmpty()) continue
-            val workId = "todo:${title.hashCode().toUInt().toString(16)}"
-            if (workId in knownWorkIds) continue
+            if (item.workId in knownWorkIds) continue
             val score = (items.size - index).toDouble() / items.size.toDouble()
-            store.appendWork(workId, JulesCause.WorkQueued(
-                workId = workId,
+            store.appendWork(item.workId, JulesCause.WorkQueued(
+                workId = item.workId,
                 tier = "todo",
-                title = title,
-                spec = buildSpec(title),
+                title = item.title,
+                spec = if (item.spec.isNotEmpty()) item.spec else buildSpec(item.title),
                 parent = null,
                 score = score,
                 at = Clock.System.now().toEpochMilliseconds(),
             ))
-            knownWorkIds += workId
+            knownWorkIds += item.workId
             n++
             if (n >= maxInductPerCycle) break
         }

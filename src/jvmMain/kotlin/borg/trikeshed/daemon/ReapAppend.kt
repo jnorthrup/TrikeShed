@@ -20,10 +20,9 @@ object ReapAppend {
         val listPath = args.getOrNull(0) ?: error("usage: ReapAppend <sid-list.txt> [wal-path]")
         val walPath = args.getOrNull(1)
             ?: File(System.getProperty("user.home"), ".local/forge/jules-board.wal").absolutePath
-        val forgeHome = File(walPath).parentFile
-        forgeHome.mkdirs()
-
-        val store = JulesBoardStore(JvmAppendWal(File(walPath)))
+        val store = JulesBoardStore(JvmAppendWal(File(walPath)).also {
+            File(walPath).parentFile.mkdirs()
+        })
         val sids = File(listPath).readLines().filter { it.isNotBlank() }
         println("appending WorkDrained for ${sids.size} sessions to $walPath")
         var ok = 0
