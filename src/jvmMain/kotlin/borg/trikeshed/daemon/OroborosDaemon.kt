@@ -237,6 +237,7 @@ object OroborosDaemon {
                 traceWriter?.let {
                     it.write(json)
                     it.write("\n")
+                    it.flush() // observable progress — the trace is the operator's live signal
                     traceLineCount++
                 }
             } catch (e: Exception) {
