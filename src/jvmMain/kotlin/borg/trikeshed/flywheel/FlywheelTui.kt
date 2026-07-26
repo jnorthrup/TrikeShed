@@ -3,6 +3,7 @@ package borg.trikeshed.flywheel
 import borg.trikeshed.jules.JulesRestClient
 import borg.trikeshed.utils.kanban.JulesBoardStore
 import borg.trikeshed.userspace.nio.file.spi.JvmAppendWal
+import kotlinx.coroutines.runBlocking
 import java.io.File
 import java.time.Duration
 import java.time.Instant
@@ -108,10 +109,11 @@ object FlywheelTui {
 
         return try {
             val sessions = readTrajectorySessions(forgeDir, source)
-                ?: client?.listSessions()
-                    ?.filter { it.source == source }
-                    ?.sortedByDescending { it.updateTime }
-                ?: emptyList()
+                ?: runBlocking {
+                    client?.listSessions()
+                        ?.filter { it.source == source }
+                        ?.sortedByDescending { it.updateTime }
+                } ?: emptyList()
             val dispatch = sessions.count { it.state == "QUEUED" || it.state == "PLANNING" || it.state == "AWAITING_PLAN_APPROVAL" }
             val running = sessions.count { it.state == "IN_PROGRESS" }
             val guide = sessions.count { it.state == "AWAITING_USER_FEEDBACK" }

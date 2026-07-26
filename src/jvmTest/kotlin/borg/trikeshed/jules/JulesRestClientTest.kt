@@ -6,6 +6,7 @@ import java.net.InetSocketAddress
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
+import kotlinx.coroutines.runBlocking
 
 class JulesRestClientTest {
     @Test
@@ -103,7 +104,7 @@ class JulesRestClientTest {
 
     private fun withServer(
         responder: (HttpExchange) -> String,
-        block: (String, List<RecordedRequest>) -> Unit,
+        block: suspend (String, List<RecordedRequest>) -> Unit,
     ) {
         val requests = mutableListOf<RecordedRequest>()
         val server = HttpServer.create(InetSocketAddress("127.0.0.1", 0), 0)
@@ -121,7 +122,7 @@ class JulesRestClientTest {
         }
         server.start()
         try {
-            block("http://127.0.0.1:${server.address.port}", requests)
+            runBlocking { block("http://127.0.0.1:${server.address.port}", requests) }
         } finally {
             server.stop(0)
         }

@@ -1,22 +1,19 @@
 package borg.trikeshed.jules
 
 import borg.trikeshed.parse.json.JsonSupport
-import java.net.URI
-import java.net.http.HttpClient
-import java.net.http.HttpRequest
-import java.net.http.HttpResponse
 
 /**
  * Stateless Jules REST client. Zero board state — the Kanban cards own all state.
  * This replaces every curl+jq invocation in bin/trikeshed-jules.
+ *
+ * Transport delegated to [JulesHttpClient] — the platform abstraction.
+ * jvmMain: [JvmJulesHttpClient]. Future: userspace NIO actual.
  */
 class JulesRestClient(
     private val apiKey: String,
     private val base: String = "https://jules.googleapis.com/v1alpha",
 ) {
-    private val http: HttpClient = HttpClient.newBuilder()
-        .connectTimeout(java.time.Duration.ofSeconds(15))
-        .build()
+    private val transport: JulesHttpClient = JvmJulesHttpClient(apiKey, base)
 
     data class SessionInfo(
         val id: String,
@@ -49,7 +46,7 @@ class JulesRestClient(
      * adopting them would let patches from another repository cross the tenant
      * boundary and reach this repository's settlement gate.
      */
-    fun listSessions(source: String? = null): List<SessionInfo> {
+    suspend fun listSessions(source: String? = null): List<SessionInfo> {
         val out = mutableListOf<SessionInfo>()
         var pageToken: String? = null
         do {
@@ -79,7 +76,7 @@ class JulesRestClient(
     }
 
     /** Ordered activities for a session, each carrying its minted serial. */
-    fun activities(sessionId: String): List<ActivityInfo> {
+    suspend fun activities(sessionId: String): List<ActivityInfo> {
         val raw = activityMaps(sessionId)
         val out = ArrayList<ActivityInfo>(raw.size)
         for ((seq, m) in raw.withIndex()) {
@@ -114,7 +111,7 @@ class JulesRestClient(
     }
 
     /** Byte length of the latest cumulative patch. */
-    fun patchProbe(sessionId: String): Long = lastPatch(sessionId)?.length?.toLong() ?: 0L
+    suspend fun patchProbe(sessionId: String): Long = lastPatch(sessionId)?.length?.toLong() ?: 0L
 
     /**
      * Last patch worth applying. Two sources, in order of preference:
@@ -128,14 +125,14 @@ class JulesRestClient(
      * output entirely; the flywheel drained zero patches because `outputs`
      * was never consulted.
      */
-    fun lastPatch(sessionId: String): String? {
+    suspend fun lastPatch(sessionId: String): String? {
         val fromOutputs = sessionOutputsPatches(sessionId).lastOrNull()
         if (!fromOutputs.isNullOrEmpty()) return fromOutputs
         return activityMaps(sessionId).asSequence().flatMap { patchTexts(it).asSequence() }.lastOrNull()
     }
 
     /** Fetch the session resource and read outputs[*].changeSet.gitPatch.unidiffPatch. */
-    private fun sessionOutputsPatches(sessionId: String): List<String> {
+    private suspend fun sessionOutputsPatches(sessionId: String): List<String> {
         val out = mutableListOf<String>()
         val parsed = try {
             JsonSupport.parse(get("/sessions/$sessionId")) as? Map<*, *> ?: return out
@@ -156,7 +153,7 @@ class JulesRestClient(
     }
 
     /** Fetch every chronological activity page; sequence numbers are minted afterwards. */
-    private fun activityMaps(sessionId: String): List<Map<*, *>> {
+    private suspend fun activityMaps(sessionId: String): List<Map<*, *>> {
         val out = mutableListOf<Map<*, *>>()
         var pageToken: String? = null
         do {
@@ -194,14 +191,14 @@ class JulesRestClient(
      * (the dedup anchor — without it the next poll would double-count our own
      * answer as a fresh user event), or null if the response carried no id.
      */
-    fun sendMessage(sessionId: String, message: String): String? {
+    suspend fun sendMessage(sessionId: String, message: String): String? {
         val resp = post("/sessions/$sessionId:sendMessage", """{"prompt": ${jsonString(message)}}""")
         val parsed = JsonSupport.parse(resp) as? Map<*, *> ?: return null
         return parsed["name"]?.toString()?.substringAfterLast('/')
     }
 
     /** Create a session. Returns the new session id. */
-    fun createSession(prompt: String, title: String, source: String = "sources/github/jnorthrup/TrikeShed", branch: String = "master"): String {
+    suspend fun createSession(prompt: String, title: String, source: String = "sources/github/jnorthrup/TrikeShed", branch: String = "master"): String {
         val body = """
         {
           "prompt": ${jsonString(prompt)},
@@ -218,29 +215,15 @@ class JulesRestClient(
     }
 
     /** Delete a session. */
-    fun deleteSession(sessionId: String) {
-        request("DELETE", "/sessions/$sessionId", null)
+    suspend fun deleteSession(sessionId: String) {
+        transport.delete("/sessions/$sessionId")
     }
 
-    private fun get(path: String): String = request("GET", path, null)
+    private suspend fun get(path: String): String = transport.get(path)
 
-    private fun post(path: String, json: String): String = request("POST", path, json)
+    private suspend fun post(path: String, json: String): String = transport.post(path, json)
 
-    private fun request(method: String, path: String, json: String?): String {
-        val builder = HttpRequest.newBuilder()
-            .uri(URI.create("$base$path"))
-            .timeout(java.time.Duration.ofSeconds(30))
-            .header("x-goog-api-key", apiKey)
-            .header("Content-Type", "application/json")
-        when (method) {
-            "GET" -> builder.GET()
-            "DELETE" -> builder.DELETE()
-            else -> builder.POST(HttpRequest.BodyPublishers.ofString(json ?: "{}"))
-        }
-        val resp = http.send(builder.build(), HttpResponse.BodyHandlers.ofString())
-        if (resp.statusCode() >= 400) error("Jules API ${resp.statusCode()}: ${resp.body().take(300)}")
-        return resp.body()
-    }
+    private suspend fun delete(path: String): String = transport.delete(path)
 
     private fun jsonString(s: String): String = buildString {
         append('"')

@@ -469,7 +469,7 @@ class FlywheelDriver(
      *  conventions as the system message and the inquiry as the user message.
      *  Returns "" if no brain is configured (NVIDIA_API_KEY missing) — the
      *  caller skips the answer; never sends a template. */
-    private fun buildAnswer(card: JulesSessionCard): String {
+    private suspend fun buildAnswer(card: JulesSessionCard): String {
         val title = card.card.title
         val lastCause = card.causes.lastOrNull()
         val lastAct = client.activities(card.snapshot.sessionId).lastOrNull()
