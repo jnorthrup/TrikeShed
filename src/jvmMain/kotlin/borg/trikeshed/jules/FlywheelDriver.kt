@@ -173,6 +173,24 @@ class FlywheelDriver(
             }
         }
 
+        // 2b. APPROVE — a session parked in AWAITING_PLAN_APPROVAL holds its
+        //     slot forever unless the wheel signs off; no other phase ever
+        //     unblocks it. Auto-approve: the TDD gate at drain time is the
+        //     quality barrier, not plan review. The HumanAnswered cause makes
+        //     approval exactly-once per plan across polls.
+        for (card in conductor.cards.values.filter {
+            it.snapshot.state == "AWAITING_PLAN_APPROVAL" &&
+                it.causes.lastOrNull() !is JulesCause.HumanAnswered
+        }.sortedBy { it.snapshot.capturedAt }) {
+            try {
+                withTimeoutOrNull(45_000L) { conductor.approvePlan(card.snapshot.sessionId) }
+                answered++
+                println("[FLYWHEEL] APPROVE ${card.snapshot.sessionId.takeLast(6)} ${card.card.title.take(60)}")
+            } catch (t: Throwable) {
+                _events.tryEmit(FlywheelEvent.PollError("approve ${card.snapshot.sessionId}: ${t.message?.take(200)}"))
+            }
+        }
+
         // 3. SYNC — Jules conversations remain responsive even when Git is
         //    blocked, but no patch is applied against a stale master.
         if (!synchronizeMain()) {

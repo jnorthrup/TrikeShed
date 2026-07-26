@@ -104,6 +104,25 @@ class JulesConductor(
         store?.append(card.snapshot, card.drained, cause)
     }
 
+    /**
+     * Approve the latest plan of an AWAITING_PLAN_APPROVAL session and record
+     * the sign-off as [JulesCause.HumanAnswered], so the flywheel approves each
+     * plan exactly once even while Jules lingers in the approval state across
+     * polls. The TDD gate at drain time is the quality barrier; plan review is
+     * not a second gate.
+     */
+    suspend fun approvePlan(sessionId: String) {
+        client.approvePlan(sessionId)
+        val card = cards[sessionId] ?: return
+        val cause = JulesCause.HumanAnswered(
+            "plan approved by GUIDE",
+            Clock.System.now().toEpochMilliseconds(),
+            null,
+        )
+        cards[sessionId] = card.copy(causes = card.causes + cause)
+        store?.append(card.snapshot, card.drained, cause)
+    }
+
     /** Record a drain outcome on the card and the log. */
     suspend fun recordDrain(sessionId: String, commitSha: String, rejects: Int) {
         val card = cards[sessionId] ?: return

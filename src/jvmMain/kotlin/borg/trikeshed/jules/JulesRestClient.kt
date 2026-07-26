@@ -197,6 +197,16 @@ class JulesRestClient(
         return parsed["name"]?.toString()?.substringAfterLast('/')
     }
 
+    /**
+     * Approve the session's latest plan (AWAITING_PLAN_APPROVAL → execution).
+     * The API encodes the empty request as `{}`; any non-2xx throws from the
+     * transport. The response body is not consulted — the sign-off is recorded
+     * on the card's cause log by the conductor.
+     */
+    suspend fun approvePlan(sessionId: String) {
+        post("/sessions/$sessionId:approvePlan", "{}")
+    }
+
     /** Create a session. Returns the new session id. */
     suspend fun createSession(prompt: String, title: String, source: String = "sources/github/jnorthrup/TrikeShed", branch: String = "master"): String {
         val body = """
