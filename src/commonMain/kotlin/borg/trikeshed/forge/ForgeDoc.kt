@@ -412,20 +412,20 @@ private fun parseKanbanColumnsProperty(raw: String?): List<KanbanColumnRef> {
     return out
 }
 
+private val ID_REGEX = Regex("\"id\"\\s*:\\s*(\"([^\"\\\\]*(?:\\\\.[^\"\\\\]*)*)\"|([0-9]+))")
+private val NAME_REGEX = Regex("\"name\"\\s*:\\s*(\"([^\"\\\\]*(?:\\\\.[^\"\\\\]*)*)\"|([0-9]+))")
+private val ORDER_REGEX = Regex("\"order\"\\s*:\\s*(\"([^\"\\\\]*(?:\\\\.[^\"\\\\]*)*)\"|([0-9]+))")
+private val WIP_LIMIT_REGEX = Regex("\"wipLimit\"\\s*:\\s*(\"([^\"\\\\]*(?:\\\\.[^\"\\\\]*)*)\"|([0-9]+))")
+
 private fun parseKanbanColumnObject(entry: String): KanbanColumnRef? {
-    fun field(key: String): String? {
-        val regex = Regex("\"$key\"\\s*:\\s*(\"([^\"\\\\]*(?:\\\\.[^\"\\\\]*)*)\"|([0-9]+))")
+    fun field(regex: Regex): String? {
         val m = regex.find(entry) ?: return null
-        return when {
-            m.groupValues[2].isNotEmpty() -> m.groupValues[2]
-            m.groupValues[3].isNotEmpty() -> m.groupValues[3]
-            else -> null
-        }
+        return m.groupValues[2].ifEmpty { m.groupValues[3] }
     }
-    val id = field("id") ?: return null
-    val name = field("name") ?: id
-    val order = field("order")?.toIntOrNull() ?: 0
-    val wipLimit = field("wipLimit")?.toIntOrNull()
+    val id = field(ID_REGEX) ?: return null
+    val name = field(NAME_REGEX) ?: id
+    val order = field(ORDER_REGEX)?.toIntOrNull() ?: 0
+    val wipLimit = field(WIP_LIMIT_REGEX)?.toIntOrNull()
     return KanbanColumnRef(id = id, name = name, order = order, wipLimit = wipLimit)
 }
 
