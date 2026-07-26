@@ -189,7 +189,14 @@ class FlywheelDriver(
         //    applied + tested + committed + CAS-pinned + tagged before any new
         //    work is inducted. Drains are serial via drainGate (Mutex) inside
         //    drainFanout so git tags are atomic; each commits onto master.
-        val completed = conductor.cards.values.filter { it.snapshot.state == "COMPLETED" && !it.drained }
+        //    Exclude sessions whose last cause is DrainFailed — a failing patch
+        //    (context mismatch against a sibling drain, red tests) would spin
+        //    the wheel on the same session forever otherwise. recordDrainFailed
+        //    appends the cause without flipping drained (failed ≠ done).
+        val completed = conductor.cards.values.filter {
+            it.snapshot.state == "COMPLETED" && !it.drained &&
+                it.causes.lastOrNull() !is JulesCause.DrainFailed
+        }
         val sessions = completed.map {
             JulesRestClient.SessionInfo(
                 id = it.snapshot.sessionId,
@@ -567,10 +574,10 @@ class FlywheelDriver(
         workId: String,
         content: String,
     ): ClaimedPatch? {
+        val touchedFiles = parsePatchFiles(patch)
+        if (touchedFiles.isEmpty()) return null
+        var committed = false
         try {
-            val touchedFiles = parsePatchFiles(patch)
-            if (touchedFiles.isEmpty()) return null
-
             // Write patch file and check if it applies cleanly
             val patchFile = File(repoDir, ".flywheel-patch")
             patchFile.writeText(patch)
@@ -585,21 +592,25 @@ class FlywheelDriver(
                 return null
             }
 
-            // Apply
-            ProcessBuilder("git", "apply", ".flywheel-patch")
-                .directory(repoDir).start().waitFor()
+            // Apply — MUST check exit code. A silent apply failure (FS race,
+            // permissions) left the tree clean but we proceeded to jvmTest on
+            // the OLD code, committed nothing meaningful, and claimPatch minted
+            // a receipt over a no-op. Revert via finally on any non-zero.
+            val apply = ProcessBuilder("git", "apply", ".flywheel-patch")
+                .directory(repoDir).redirectErrorStream(true).start()
+            val applyExit = apply.waitFor()
             patchFile.delete()
+            if (applyExit != 0) return null
 
-            // Run jvmTest
+            // Run jvmTest. Red → null; finally reverts. The tree must be clean
+            // for the next drain (drainFanout holds the mutex, but a sibling
+            // cycle's isWorkingTreeClean() check runs outside drainGate).
             val test = ProcessBuilder("./gradlew", "jvmTest", "--no-daemon")
                 .directory(repoDir)
                 .redirectErrorStream(true)
                 .start()
                 .also { it.waitFor() }
-            if (test.exitValue() != 0) {
-                revertFiles(touchedFiles)
-                return null
-            }
+            if (test.exitValue() != 0) return null
 
             // Stage ONLY the touched files, then commit
             val addCmd = mutableListOf("git", "add")
@@ -609,15 +620,31 @@ class FlywheelDriver(
 
             val commit = ProcessBuilder("git", "commit", "-m", "flywheel: $title")
                 .directory(repoDir).start().also { it.waitFor() }
-            if (commit.exitValue() != 0) {
-                revertFiles(touchedFiles)
+            if (commit.exitValue() != 0) return null
+            // The commit landed here. Do NOT set committed=true yet — if
+            // headSha() or claimPatch fails below, finally's revertFiles is a
+            // no-op (files already match HEAD), so the commit would orphan:
+            // no tag, no receipt, no WorkDrained, and the next cycle's
+            // `git apply --check` fails on the already-applied patch (wheel
+            // spin). git reset --hard HEAD~1 is the only recovery. committed
+            // =true only after claimPatch returns non-null.
+            val commitSha = headSha()
+            val claimed = claimPatch(commitSha, patch, sessionId, workId, title, content)
+            if (claimed == null) {
+                command("git", "reset", "--hard", "HEAD~1")
+                println("[FLYWHEEL] rolled back unclaimed commit for ${sessionId.takeLast(6)} (claimPatch failed)")
                 return null
             }
-
-            val commitSha = headSha()
-            return claimPatch(commitSha, patch, sessionId, workId, title, content)
-        } catch (_: Exception) {
+            committed = true
+            return claimed
+        } catch (e: Exception) {
+            // Never swallow silently with a dirty tree. Revert whatever we
+            // touched and surface the reason so the wheel logs a real cause
+            // rather than a generic "applyAndTest failed" on the next cycle.
+            println("[FLYWHEEL] applyAndTest exception for ${sessionId.takeLast(6)}: ${e.javaClass.simpleName}: ${e.message?.take(200)}")
             return null
+        } finally {
+            if (!committed) revertFiles(touchedFiles)
         }
     }
 
@@ -656,7 +683,11 @@ class FlywheelDriver(
         // this url is the optional upstream surface that ties the receipt to the
         // human-visible PR or branch. null is a valid result — the receipt stands
         // with or without a PR (Jules pushes branches, not PRs).
-        val prUrl = fishPrUrl(sessionId, tag)
+        val prUrl = try {
+            fishPrUrl(sessionId, tag)
+        } catch (t: Throwable) {
+            null
+        }
 
         val receipt = MergeReceipt(
             workId = workId,
@@ -832,36 +863,117 @@ class FlywheelDriver(
      */
     private suspend fun drainOne(s: JulesRestClient.SessionInfo): Int {
         val patch = client.lastPatch(s.id)
-        if (patch == null) { return emitPollError("drain ${s.id}: no patch from lastPatch()", 0) }
-        if (patch.isBlank()) { return emitPollError("drain ${s.id}: blank patch", 0) }
-        if (!isWorkingTreeClean()) { return emitPollError("drain ${s.id}: trunk dirty, skipping", 0) }
-        val patchFile = File(repoDir, ".flywheel-patch")
-        patchFile.writeText(patch)
-        val applyCheck = command("git", "apply", "--check", ".flywheel-patch")
-        if (applyCheck.exitCode != 0) {
-            val stderr = applyCheck.output.take(200)
-            patchFile.delete()
-            return emitPollError("drain ${s.id}: apply --check failed: $stderr", 0)
+        if (patch == null) { return drainFail(s, "no patch from lastPatch()") }
+        if (patch.isBlank()) { return drainFail(s, "blank patch") }
+        if (!isWorkingTreeClean()) { return drainFail(s, "trunk dirty, skipping") }
+        // workId bond: sessionId→workId projection from loadQueue (set at
+        // dispatch by the WorkDispatched append). Sessions with no matching
+        // queue entry (tasks created outside the wheel) fall back to a
+        // session-derived id so they still get a WorkDrained cause + receipt.
+        // The queue projection also carries the ORIGINAL todo bullet title
+        // (set at induction as WorkQueued.title), which is what curateTodo's
+        // lexical cycle detector compares against new candidates. s.title is
+        // the REST-returned session title from Jules, which often diverges
+        // from the intent ("Write failing tests for Fix X" vs "Fix X"), so
+        // prefer the queue title for the receipt when available.
+        val queueEntry = store.loadQueue().firstOrNull { it.sessionId == s.id }
+        val workId = queueEntry?.workId ?: "session:${s.id.replace(Regex("[^A-Za-z0-9._-]"), "-")}"
+        val intentTitle = queueEntry?.title?.takeIf { it.isNotBlank() } ?: s.title
+        // Idempotent recovery. If a prior cycle's WorkDrained cause is already
+        // in the WAL with a non-null receipt, this session was settled — the
+        // patch landed and the receipt stands. Without this short-circuit, a
+        // daemon crash BETWEEN the WorkDrained append and the in-memory
+        // conductor.recordDrain() leaves the rehydrated card with drained=false;
+        // the next cycle re-enters drainOne, hits `git apply --check` failure
+        // (patch already applied), and classifies a settled session as
+        // DrainFailed — poisoning the card against any future legitimate
+        // retry. Return 1 silently so the wheel moves on.
+        if (queueEntry?.isDrained == true && queueEntry.receipt != null) {
+            return 1
         }
-        command("git", "apply", ".flywheel-patch")
-        patchFile.delete()
-        val commitSha = headSha()
-        val patchBytes = patch.encodeToByteArray()
-        val patchCid = try { casStore.put(patchBytes) } catch (e: Exception) {
-            return emitPollError("drain ${s.id}: cas put failed: ${e.message}", -1)
+        // applyAndTest does the full gate: apply-check → apply → jvmTest →
+        // revert on red → stage touched files → commit → claimPatch (CAS put +
+        // git tag + MergeReceipt). The old drainOne skipped commit + jvmTest,
+        // so headSha() was the PRE-patch commit and the tag pointed at the
+        // wrong revision — the patch sat uncommitted, the next cycle's
+        // dirty-tree check failed, and nothing ever merged.
+        val claimed = applyAndTest(patch, intentTitle, s.id, workId, intentTitle)
+        if (claimed == null) { return drainFail(s, "applyAndTest failed (apply/test/commit)") }
+        val commitSha = claimed.commitSha
+        val receipt = claimed.receipt
+        // Close the loop: append WorkDrained so loadQueue() marks the entry
+        // isDrained with a receipt, and recordDrain so the session card's
+        // drained flag flips (laneFor → DONE, no re-drain next cycle).
+        store.appendWork(workId, JulesCause.WorkDrained(
+            workId = workId,
+            sessionId = s.id,
+            commitSha = commitSha,
+            taskId = receipt.versionTag,
+            receipt = receipt,
+            at = Clock.System.now().toEpochMilliseconds(),
+        ))
+        conductor.recordDrain(s.id, commitSha, rejects = 0)
+        if (markTodoChecked(workId, intentTitle)) {
+            // markTodoChecked wrote doc/todo.md; commit it so the tree stays
+            // clean for the next sibling drain and for settlementBarrier's
+            // `git status --porcelain` check. Without this, the first
+            // successful drain poisons the tree: drainFanout's next drainOne
+            // hits isWorkingTreeClean()==false (false-positive DrainFailed),
+            // and settlementBarrier never admits (dirty tree → no push →
+            // unclaimedDrains never clears → wheel blocks on SYNC next cycle).
+            command("git", "add", "doc/todo.md")
+            command("git", "commit", "-m", "flywheel: mark todo checked — $workId")
         }
-        val safe = s.id.replace(Regex("[^A-Za-z0-9._-]"), "-")
-        val tag = "flywheel/jules-" + safe + "-" + commitSha.take(12)
-        val msg = "Jules receipt\n" +
-            "session=" + s.id + "\n" +
-            "patchCid=" + patchCid.value + "\n" +
-            "taskTitle=" + s.title
-        val tagRes = command("git", "tag", "-a", tag, commitSha, "-m", msg)
-        if (tagRes.exitCode != 0) {
-            return emitPollError("drain ${s.id}: tag create failed: ${tagRes.output.take(200)}", -1)
-        }
-        _events.emit(FlywheelEvent.Drained(s.id, commitSha, tag))
+        _events.emit(FlywheelEvent.Drained(s.id, commitSha, receipt.versionTag))
         return 1
+    }
+
+    /**
+     * Close the loop back to the research surface: flip the matching
+     * `doc/todo.md` bullet from `- [ ]` to `- [x]` when a drain lands. The workId
+     * bond is `todo:${title.hashCode()...}` (same derivation as `inductTodo`),
+     * so we re-derive it per unchecked line and match against the drained
+     * workId. Without this, the LAND → research feedback arrow is hollow —
+     * inductTodo re-parses the same unchecked item every cycle, the curator's
+     * lexical-overlap detector is the only thing stopping re-induction (fragile:
+     * two shared terms skips genuinely-new-but-related work), and doc/todo.md
+     * accumulates stale unchecked items forever while the wheel has already
+     * drained them. Returns true if the file was modified (caller commits it
+     * so the tree stays clean); false for a no-op (missing/mismatched). Best
+     * -effort and idempotent: an already-checked line is left alone.
+     */
+    private fun markTodoChecked(workId: String, title: String): Boolean {
+        if (!workId.startsWith("todo:")) return false
+        val todo = File(repoDir, "doc/todo.md")
+        if (!todo.exists()) return false
+        val lines = todo.readLines()
+        var changed = false
+        val out = lines.map { line ->
+            val m = Regex("^\\s*- \\[ \\]\\s*\\*\\*?(.+?)\\*\\*?\\s*$").find(line) ?: return@map line
+            val lineTitle = m.groupValues[1].trim()
+            val lineWorkId = "todo:${lineTitle.hashCode().toUInt().toString(16)}"
+            if (lineWorkId != workId) return@map line
+            changed = true
+            line.replaceFirst("- [ ]", "- [x]")
+        }
+        if (changed) {
+            todo.writeText(out.joinToString("\n") + "\n")
+            println("[FLYWHEEL] MARK-CHECKED ${title.take(60)} in doc/todo.md")
+        }
+        return changed
+    }
+
+    /**
+     * Record a drain failure on the session card, then emit + return 0. The
+     * [JulesCause.DrainFailed] cause is what the DRAIN filter excludes on —
+     * without it the wheel re-attempts the same COMPLETED+undrained session
+     * every cycle (apply --check fails against the same conflicting patch each
+     * time) and spins on DRAIN forever. A failed drain is NOT done: the card's
+     * drained flag stays false, so laneFor keeps it in CAUSAL_READY, not DONE.
+     */
+    private suspend fun drainFail(s: JulesRestClient.SessionInfo, reason: String): Int {
+        conductor.recordDrainFailed(s.id, "drain ${s.id}: $reason")
+        return emitPollError("drain ${s.id}: $reason", 0)
     }
 
     data class CycleReport(

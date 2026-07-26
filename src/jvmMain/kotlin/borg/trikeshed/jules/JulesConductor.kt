@@ -112,6 +112,22 @@ class JulesConductor(
         store?.append(updated.snapshot, drained = true, cause = updated.causes.last())
     }
 
+    /**
+     * Record a drain failure: the patch did not apply/test/commit. The card
+     * stays `drained=false` (a failed drain is NOT done), but a `DrainFailed`
+     * cause is appended so the flywheel's DRAIN filter can exclude it —
+     * otherwise the wheel re-attempts the same COMPLETED+undrained session
+     * every cycle, spinning on DRAIN forever (apply --check fails against the
+     * same already-applied-or-conflicting patch each time).
+     */
+    suspend fun recordDrainFailed(sessionId: String, reason: String) {
+        val card = cards[sessionId] ?: return
+        val cause = JulesCause.DrainFailed(reason, Clock.System.now().toEpochMilliseconds())
+        val updated = card.copy(causes = card.causes + cause)
+        cards[sessionId] = updated
+        store?.append(updated.snapshot, drained = false, cause = cause)
+    }
+
     /** Run forever at [intervalMs]. */
     suspend fun run(intervalMs: Long = 60_000) {
         while (true) {
