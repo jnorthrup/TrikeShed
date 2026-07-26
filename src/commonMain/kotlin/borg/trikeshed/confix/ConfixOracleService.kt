@@ -150,19 +150,24 @@ class ConfixOracleService : ConfixOracleFacade {
         if (expr.isEmpty()) return null
 
         // Strip type parameters: "Series<RowVec>" → "Series"
-        val strippedParams = expr.replace(Regex("""<[^>]+>"""), "")
+        val strippedParams = expr.replace(typeParamRegex, "")
 
         // If there's still angle brackets after stripping params, it's malformed
         if (strippedParams.contains('<') || strippedParams.contains('>')) return null
 
         // Extract the identifier before any | or ( or space
-        val namePart = strippedParams.split(Regex("""[|(\s]""")).firstOrNull() ?: return null
+        val namePart = strippedParams.split(delimiterRegex).firstOrNull() ?: return null
         val name = namePart.trim()
 
         // Must be a valid Java/Kotlin identifier
         if (name.isEmpty() || !name[0].isLetter() || name[0] == '_') return null
 
         return name
+    }
+
+    companion object {
+        private val typeParamRegex = Regex("""<[^>]+>""")
+        private val delimiterRegex = Regex("""[|(\s]""")
     }
 }
 
