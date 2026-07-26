@@ -863,7 +863,7 @@ class FlywheelDriver(
             ReworkSeed(
                 id = "rework:${entry.workId}#${entry.attempt + 1}",
                 attempt = entry.attempt + 1,
-                title = entry.title,
+                title = stripReworkDecoration(entry.title),
                 spec = entry.spec,
                 tier = entry.tier,
                 parent = entry.workId,
@@ -872,7 +872,7 @@ class FlywheelDriver(
         } ?: ReworkSeed(
             id = "synth:${s.id}",
             attempt = 1,
-            title = s.title,
+            title = stripReworkDecoration(s.title),
             spec = buildString {
                 appendLine("Prior Jules session ${s.id} delivered a patch that fails to apply to current master.")
                 card.causes.filterIsInstance<JulesCause.AgentMessaged>().lastOrNull()?.excerpt?.take(400)?.let {
@@ -896,9 +896,9 @@ class FlywheelDriver(
         store.appendWork(seed.id, JulesCause.WorkQueued(
             workId = seed.id,
             tier = seed.tier,
-            // Base title only: queue entries carry the decorated "[rework #N]"
-            // title, so re-reworks compounded ("[rework #2] [rework #1] ...").
-            title = "[rework #${seed.attempt}] ${seed.title.replace(Regex("^(\\[rework #\\d+\\] )+"), "")}",
+            // Base title only: seed.title is already stripped of all prior
+            // rework decorations, so re-reworks never compound.
+            title = "[rework #${seed.attempt}] ${seed.title}",
             spec = reworkSpec,
             parent = seed.parent,
             score = (seed.score + 0.1).coerceAtMost(1.0),
@@ -913,6 +913,16 @@ class FlywheelDriver(
         val id: String, val attempt: Int, val title: String, val spec: String,
         val tier: String, val parent: String?, val score: Double,
     )
+
+    private val reworkDecoration = Regex("^(?:REWORK attempt \\d+ of )?(?:\\[rework #\\d+\\] )*")
+
+    /**
+     * Strip all rework decorations from a title so re-reworks never compound.
+     * Handles both the queue title shape ("[rework #2] [rework #1] foo") and
+     * the Jules session title shape ("REWORK attempt 2 of [rework #1] foo").
+     */
+    private fun stripReworkDecoration(raw: String): String =
+        raw.replace(reworkDecoration, "").trim()
 
     data class CycleReport(
         /** Wall-clock duration of the cycle in milliseconds. */
