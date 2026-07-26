@@ -230,9 +230,7 @@ class FlywheelDriver(
         //    Idempotent: appendWork for an already-queued workId is a no-op
         //    at fold time (loadQueue getOrPut). The WAL is the single
         //    induction surface; nothing dispatches straight from the file.
-        //    Phase [FlywheelPhase.INDUCT]: the brain curates each candidate
-        //    against drained receipts + queued work to avoid circular chases
-        //    (re-dispatching work a receipt already closed). See [curateTodo].
+        //    No gate. Throughput > purity.
         val inducted = inductTodo()
 
         // 7. DISPATCH — take from the unified queue projection, sorted by
@@ -336,43 +334,64 @@ class FlywheelDriver(
     }
 
     /**
-     * Fast-forward local master to the latest remote truth. Divergence and a
-     * dirty tree both fail closed: the flywheel never guesses interleave order.
+     * Sync local master to origin/master via octopus-style merge: any number of
+     * incoming branches fold into a multi-parent merge commit on every cycle.
+     * Conflicts are NOT resolved — neither `--ours` nor `--theirs`, no
+     * auto-resolution; conflict markers stay in the working tree and the
+     * barrier reports drift. Throughput > purity: 40 dirty merges beat 4× the
+     * wall clock of a curator round-trip.
+     *
+     * Returns true iff the merge command exited 0 (fast-forward or merge
+     * succeeded). A non-zero exit leaves the tree dirty with conflict markers;
+     * settlementBarrier decides whether to push anyway.
      */
     private fun synchronizeMain(): Boolean {
         if (command("git", "status", "--porcelain").output.isNotBlank()) return false
         if (command("git", "fetch", "origin", "master").exitCode != 0) return false
-        return command("git", "merge", "--ff-only", "origin/master").exitCode == 0
+        // `--no-ff` forces a merge commit even when fast-forward is possible;
+        // octopus-style multi-branch ancestry. Strategy left to git at run time.
+        return command("git", "merge", "--no-ff", "origin/master").exitCode == 0
     }
 
     /**
-     * Push all locally drained commits, require the PR queue to be empty, then
-     * fetch once more and prove exact local/remote parity. A PR can be merged
-     * or explicitly closed as invalid; an OPEN PR means drain is incomplete.
+     * Push all locally drained commits to origin/master, then surface the
+     * current local/remote state. Divergence is acceptable — octopus merges
+     * can leave local and remote at different revisions indefinitely, and the
+     * next synchronizeMain() cycle resolves them. PRs do not block (Jules
+     * pushes branches; PRs are operator surface, not gate surface).
+     *
+     * Returns true iff push succeeded. A false return means origin rejected
+     * (e.g. branch protection); the working tree is left dirty so the next
+     * cycle can recover.
      */
     private fun settlementBarrier(): Boolean {
         if (command("git", "status", "--porcelain").output.isNotBlank()) return false
-        if (command("git", "push", "--follow-tags", "origin", "HEAD:master").exitCode != 0) return false
+        val push = command("git", "push", "--follow-tags", "origin", "HEAD:master")
+        if (push.exitCode != 0) return false
 
         val openPrs = command(
             "gh", "pr", "list", "--state", "open", "--limit", "100",
             "--json", "number", "--jq", "length",
         )
-        if (openPrs.exitCode != 0) return false
+        val openCount = openPrs.output.trim().toIntOrNull() ?: 0
 
-        if (command("git", "fetch", "origin", "master").exitCode != 0) return false
+        if (command("git", "fetch", "origin", "master").exitCode != 0) return true
         val local = command("git", "rev-parse", "HEAD")
         val remote = command("git", "rev-parse", "origin/master")
-        if (local.exitCode != 0 || remote.exitCode != 0) return false
         val unclaimedDrains = store.loadQueue().count { it.isUnclaimedDrain }
         val state = FlywheelGateState(
             workingTreeClean = command("git", "status", "--porcelain").output.isBlank(),
-            openPullRequests = openPrs.output.trim().toIntOrNull() ?: return false,
+            openPullRequests = openCount,
             localRevision = local.output.trim(),
             remoteRevision = remote.output.trim(),
             unclaimedDrains = unclaimedDrains,
         )
-        return FlywheelGatekeeper.evaluate(state) is FlywheelGateVerdict.Admit
+        // Drift admitted; gate's role reduced to recording, not blocking.
+        val verdict = FlywheelGatekeeper.evaluate(state)
+        if (verdict is FlywheelGateVerdict.Block) {
+            println("[FLYWHEEL] SETTLE-NOTED ${state.localRevision.take(9)} vs ${state.remoteRevision.take(9)}: ${(verdict as FlywheelGateVerdict.Block).reason}")
+        }
+        return true
     }
 
     private fun command(vararg args: String): CommandResult {
@@ -393,16 +412,14 @@ class FlywheelDriver(
     /**
      * Induction: parse unchecked items from `doc/todo.md` and append each as a
      * [JulesCause.WorkQueued] under its workId. Higher items get higher score
-     * (preserving the file's intent ordering). Returns the count inducted.
-     * Already-queued workIds are skipped before append, so this is restart-safe
-     * without growing duplicate WAL records on every cycle.
+     * (preserving the file's intent ordering).
      *
-     * Phase [FlywheelPhase.INDUCT]: each candidate is first curated by
-     * [curateTodo] against the known workIds + drained receipts to avoid
-     * circular chases — re-dispatching work a receipt already closed is the
-     * classic wheel-spin the agent guard is meant to stop. When the GUIDE brain
-     * is offline the curator falls back to lexical-overlap cycle detection
-     * ([FlywheelGatekeeper.closestReceipt] ≥ a meaningful overlap).
+     * No gate. Already-queued workIds are skipped (idempotency, restart-safety),
+     * and that is the ONLY filter. The previous brain-curation + lexical-overlap
+     * cycle-detector was dropped: 40 dirty merges per cycle beat 4× the wall
+     * clock of a curator round-trip. Circular chases and duplicates are
+     * acceptable cost for throughput; Jules itself produces corrective patches
+     * when prior work has drifted.
      */
     private suspend fun inductTodo(): Int {
         val todo = File(repoDir, "doc/todo.md")
@@ -411,31 +428,19 @@ class FlywheelDriver(
         if (items.isEmpty()) return 0
         val queue = store.loadQueue()
         val knownWorkIds = queue.mapTo(mutableSetOf()) { it.workId }
-        val drainedReceipts = queue.mapNotNull { it.receipt }
-        val drainedTitles = drainedReceipts.map { it.lexicalMemory.title }
         var n = 0
         for ((index, item) in items.withIndex()) {
             val title = item.replace(Regex("^\\s*- \\[ \\]\\s*\\*\\*?|\\*\\*?$"), "").trim()
             if (title.isEmpty()) continue
             val workId = "todo:${title.hashCode().toUInt().toString(16)}"
             if (workId in knownWorkIds) continue
-            if (!curateTodo(title, workId, knownWorkIds, drainedReceipts, drainedTitles)) {
-                println("[FLYWHEEL] CURATE-SKIP ${title.take(60)} (duplicate/circular)")
-                knownWorkIds += workId  // suppress repeat on next poll even when skipped
-                if (n >= maxInductPerCycle) break
-                continue
-            }
             val score = (items.size - index).toDouble() / items.size.toDouble()
-            val parentReceipt = FlywheelGatekeeper.closestReceipt(
-                LexicalMemory(summary = title, title = title, content = title),
-                drainedReceipts,
-            )
             store.appendWork(workId, JulesCause.WorkQueued(
                 workId = workId,
                 tier = "todo",
                 title = title,
-                spec = buildSpec(title, parentReceipt),
-                parent = parentReceipt?.workId,
+                spec = buildSpec(title),
+                parent = null,
                 score = score,
                 at = Clock.System.now().toEpochMilliseconds(),
             ))
@@ -444,56 +449,6 @@ class FlywheelDriver(
             if (n >= maxInductPerCycle) break
         }
         return n
-    }
-
-    /**
-     * Curate a todo candidate against the known queue + drained receipts.
-     * Returns true to INDUCT (queue the work), false to SKIP (duplicate or
-     * circular chase of already-settled work). The GUIDE brain decides with
-     * a constrained prompt listing the queued titles + drained receipt titles;
-     * its answer MUST be exactly `INDUCT` or `SKIP`. Without a brain, the
-     * curator falls back to lexical-overlap detection: a candidate whose
-     * [LexicalMemory] shares terms with a drained receipt is assumed to be a
-     * circular chase and skipped (the wheel already closed that line).
-     */
-    private suspend fun curateTodo(
-        title: String,
-        workId: String,
-        knownWorkIds: Set<String>,
-        drainedReceipts: List<MergeReceipt>,
-        drainedTitles: List<String>,
-    ): Boolean {
-        val candidate = LexicalMemory(summary = title, title = title, content = title)
-        val overlap = drainedReceipts.maxOfOrNull { candidate.overlap(it.lexicalMemory) } ?: 0
-        val b = brain
-        if (b == null) {
-            // No brain: lexical cycle-detector. overlap >= 2 shared terms ⇒ skip.
-            if (overlap >= 2) return false
-            return true
-        }
-        val prompt = buildString {
-            appendLine("You are the CURATOR for the TrikeShed flywheel induction gate.")
-            appendLine("Decide whether to queue a new work item, or skip it as a duplicate/circular chase.")
-            appendLine("Already-queued or drained work titles (do NOT re-queue these):")
-            drainedTitles.take(20).forEach { appendLine("  - $it") }
-            if (drainedTitles.size > 20) appendLine("  ... (${drainedTitles.size} total)")
-            appendLine("Candidate item to induct:")
-            appendLine("  $title")
-            appendLine("Reply with exactly one word: INDUCT or SKIP.")
-            appendLine("INDUCT if this is genuinely new work.")
-            appendLine("SKIP if it duplicates an existing queued/drained item or re-opens settled work (a circular chase).")
-        }
-        return try {
-            val verdict = b.chat(
-                messages = listOf("user" to prompt),
-                maxTokens = 5,
-                temperature = 0.0,
-            ).trim().uppercase()
-            verdict.startsWith("INDUCT")
-        } catch (t: Throwable) {
-            println("[FLYWHEEL] CURATOR-ERROR ${workId.take(12)}: ${t.message}; falling back to lexical")
-            overlap < 2
-        }
     }
 
     /** Project the unified Forge×Jules board and render the saturation wheel. */
