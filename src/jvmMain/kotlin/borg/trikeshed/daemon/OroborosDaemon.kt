@@ -298,13 +298,20 @@ object OroborosDaemon {
 
         val local = command("git", "rev-parse", "HEAD")
         val remote = command("git", "rev-parse", "origin/master")
-        if (local != remote) {
-            // Emit event but don't crash
-            println("[OROBOROS] UPSTREAM-DIVERGED local=$local remote=$remote")
-            driver.emitDrifted(local, remote)
-            return false
+        if (local == remote) return true
+        // Local AHEAD of remote is the normal flywheel state between pushes
+        // (drained patches land locally, then get pushed by settlementBarrier).
+        // Only block when truly diverged: local has commits origin doesn't
+        // AND origin has commits local doesn't (true divergence).
+        val mergeBase = command("git", "merge-base", local, remote)
+        if (mergeBase == local || mergeBase == remote) {
+            // linear: local ahead OR local behind, but not both
+            return true
         }
-        return true
+        // local is neither reachable from remote nor vice versa → diverged
+        println("[OROBOROS] UPSTREAM-DIVERGED local=$local remote=$remote mergeBase=$mergeBase")
+        driver.emitDrifted(local, remote)
+        return false
     }
 
     private fun die(msg: String): Nothing {
