@@ -197,9 +197,9 @@ object OroborosDaemon {
                     val report = lastCycleReport
                     val uptimeMs = System.currentTimeMillis() - daemonStartTime
                     val msg = if (report != null) {
-                        "ALIVE $uptimeMs ${report.cycleMs} ${report.harvested} ${report.dispatched} ${report.alive} ${report.available}\n"
+                        "ALIVE $uptimeMs ${report.phase} ${report.cycleMs} ${report.answered} ${report.harvested} ${report.reworked} ${report.dispatched} ${report.alive} ${report.available}\n"
                     } else {
-                        "ALIVE $uptimeMs -1 -1 -1 -1 -1\n"
+                        "ALIVE $uptimeMs ∅ -1 -1 -1 -1 -1 -1\n"
                     }
                     val buf = ByteBuffer.wrap(msg.toByteArray())
                     while (buf.hasRemaining()) {
@@ -222,10 +222,10 @@ object OroborosDaemon {
             val startPollErrors = pollErrors
             val summary: FlywheelDriver.CycleReport = driver.cycle()
             val cyclePollErrors = pollErrors - startPollErrors
-            println("[FLYWHEEL] phase=" + summary.phase + " cycleMs=" + summary.cycleMs + " harvested=" + summary.harvested + " dispatched=" + summary.dispatched + " alive=" + summary.alive + "/" + summary.available + " inducted=" + summary.inducted + " settled=" + summary.settled)
+            println("[FLYWHEEL] phase=" + summary.phase + " cycleMs=" + summary.cycleMs + " answered=" + summary.answered + " harvested=" + summary.harvested + " reworked=" + summary.reworked + " dispatched=" + summary.dispatched + " alive=" + summary.alive + "/" + summary.available + " inducted=" + summary.inducted + " settled=" + summary.settled)
 
             lastCycleReport = summary
-            val json = "{\"t\":" + t0 + ",\"c\":" + summary.cycleMs + ",\"d\":" + summary.harvested + ",\"p\":" + summary.dispatched + ",\"a\":" + summary.alive + ",\"v\":" + summary.available + ",\"e\":" + cyclePollErrors + "}"
+            val json = "{\"t\":" + t0 + ",\"c\":" + summary.cycleMs + ",\"n\":" + summary.answered + ",\"d\":" + summary.harvested + ",\"r\":" + summary.reworked + ",\"p\":" + summary.dispatched + ",\"a\":" + summary.alive + ",\"v\":" + summary.available + ",\"e\":" + cyclePollErrors + ",\"P\":\"" + summary.phase + "\"}"
             try {
                 if (traceLineCount >= 10000) {
                     traceWriter?.close()

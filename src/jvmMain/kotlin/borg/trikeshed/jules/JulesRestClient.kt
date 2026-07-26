@@ -18,7 +18,9 @@ class JulesRestClient(
     private val apiKey: String,
     private val base: String = "https://jules.googleapis.com/v1alpha",
 ) {
-    private val http: HttpClient = HttpClient.newBuilder().build()
+    private val http: HttpClient = HttpClient.newBuilder()
+        .connectTimeout(java.time.Duration.ofSeconds(15))
+        .build()
 
     data class SessionInfo(
         val id: String,
@@ -166,7 +168,8 @@ class JulesRestClient(
                 append("/sessions/$sessionId/activities?pageSize=100")
                 if (!pageToken.isNullOrEmpty()) append("&pageToken=${java.net.URLEncoder.encode(pageToken, Charsets.UTF_8)}")
             }
-            val parsed = JsonSupport.parse(get(path)) as? Map<*, *> ?: break
+            val raw = try { get(path) } catch (t: Throwable) { return out }
+            val parsed = try { JsonSupport.parse(raw) } catch (t: Throwable) { return out } as? Map<*, *> ?: break
             val page = parsed["activities"] as? List<*> ?: emptyList<Any?>()
             page.mapNotNullTo(out) { it as? Map<*, *> }
             pageToken = parsed["nextPageToken"]?.toString()?.takeIf { it.isNotBlank() }
@@ -230,6 +233,7 @@ class JulesRestClient(
     private fun request(method: String, path: String, json: String?): String {
         val builder = HttpRequest.newBuilder()
             .uri(URI.create("$base$path"))
+            .timeout(java.time.Duration.ofSeconds(30))
             .header("x-goog-api-key", apiKey)
             .header("Content-Type", "application/json")
         when (method) {
