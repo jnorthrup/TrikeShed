@@ -578,76 +578,6 @@ class FlywheelDriver(
     }.trim()
 
     /**
-     * Apply a patch locally, run jvmTest, commit on green, then claim the exact
-     * cumulative patch with a ContentId and annotated version tag.
-     *
-     * The gate is non-destructive to the surrounding working tree: only the files
-     * the patch touches are applied, reverted on red, and committed on green. We
-     * never `git add -A` or `git checkout .` — those would sweep uncommitted local
-     * work into a flywheel commit or discard it entirely.
-     */
-    private fun applyAndTest(
-        patch: String,
-        title: String,
-        sessionId: String,
-        workId: String,
-        content: String,
-    ): ClaimedPatch? {
-        try {
-            val touchedFiles = parsePatchFiles(patch)
-            if (touchedFiles.isEmpty()) return null
-
-            // Write patch file and check if it applies cleanly
-            val patchFile = File(repoDir, ".flywheel-patch")
-            patchFile.writeText(patch)
-
-            val applyCheck = ProcessBuilder("git", "apply", "--check", ".flywheel-patch")
-                .directory(repoDir)
-                .redirectErrorStream(true)
-                .start()
-                .also { it.waitFor() }
-            if (applyCheck.exitValue() != 0) {
-                patchFile.delete()
-                return null
-            }
-
-            // Apply
-            ProcessBuilder("git", "apply", ".flywheel-patch")
-                .directory(repoDir).start().waitFor()
-            patchFile.delete()
-
-            // Run jvmTest
-            val test = ProcessBuilder("./gradlew", "jvmTest", "--no-daemon")
-                .directory(repoDir)
-                .redirectErrorStream(true)
-                .start()
-                .also { it.waitFor() }
-            if (test.exitValue() != 0) {
-                revertFiles(touchedFiles)
-                return null
-            }
-
-            // Stage ONLY the touched files, then commit
-            val addCmd = mutableListOf("git", "add")
-            addCmd.addAll(touchedFiles)
-            ProcessBuilder(addCmd)
-                .directory(repoDir).start().also { it.waitFor() }
-
-            val commit = ProcessBuilder("git", "commit", "-m", "flywheel: $title")
-                .directory(repoDir).start().also { it.waitFor() }
-            if (commit.exitValue() != 0) {
-                revertFiles(touchedFiles)
-                return null
-            }
-
-            val commitSha = headSha()
-            return claimPatch(commitSha, patch, sessionId, workId, title, content)
-        } catch (_: Exception) {
-            return null
-        }
-    }
-
-    /**
      * Content-address the exact cumulative patch bytes and pin the protected
      * release tag onto the commit. The CAS put ([FileCasStore.put]) verifies by
      * re-reading, so a backing-store failure throws here and the tag is never
@@ -878,6 +808,37 @@ class FlywheelDriver(
         }
         command("git", "apply", ".flywheel-patch")
         patchFile.delete()
+        // Test gate: every drained patch must pass jvmTest before we tag it. A
+        // red suite reverts exactly the touched files (no `git checkout .` —
+        // never discard surrounding work) and flows into the rework path the
+        // flywheel already wired.
+        val touchedFiles = parsePatchFiles(patch)
+        if (touchedFiles.isEmpty()) {
+            command("git", "checkout", "HEAD", "--")
+            emitPollError("drain ${s.id}: empty patch file list after apply, reverted", 0)
+            return DrainOutcome.Skipped
+        }
+        val test = ProcessBuilder("./gradlew", "jvmTest", "--no-daemon")
+            .directory(repoDir)
+            .redirectErrorStream(true)
+            .start()
+            .also { it.waitFor() }
+        if (test.exitValue() != 0) {
+            val reason = "jvmTest failed for ${s.title}"
+            revertFiles(touchedFiles)
+            val rework = reworkFailedDrain(s, reason)
+            emitPollError("drain ${s.id}: $reason → rework ${rework?.attempt ?: 0}", 0)
+            return rework ?: DrainOutcome.Skipped
+        }
+        // Stage ONLY the touched files, then commit. Never `git add -A`.
+        val addCmd = mutableListOf("git", "add")
+        addCmd.addAll(touchedFiles)
+        command(*addCmd.toTypedArray())
+        val commitRes = command("git", "commit", "-m", "flywheel: ${s.title}")
+        if (commitRes.exitCode != 0) {
+            revertFiles(touchedFiles)
+            return DrainOutcome.Skipped
+        }
         val commitSha = headSha()
         val patchBytes = patch.encodeToByteArray()
         val patchCid = try { casStore.put(patchBytes) } catch (e: Exception) {
