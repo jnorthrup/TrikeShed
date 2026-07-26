@@ -123,6 +123,21 @@ class JulesConductor(
         store?.append(card.snapshot, card.drained, cause)
     }
 
+    /**
+     * Tombstone a terminal drain candidate: the failure is recorded as a
+     * [JulesCause.DrainFailed] cause AND the card leaves the drain set
+     * (drained=true). For sessions that can never produce a landable patch
+     * (e.g. concluded with zero patch bytes after repeated probes) — without
+     * this the wheel re-probes them every cycle forever.
+     */
+    suspend fun retireTerminal(sessionId: String, reason: String, at: Long) {
+        val card = cards[sessionId] ?: return
+        val cause = JulesCause.DrainFailed(reason, at)
+        val updated = card.copy(causes = card.causes + cause, drained = true)
+        cards[sessionId] = updated
+        store?.append(updated.snapshot, drained = true, cause = cause)
+    }
+
     /** Record a drain outcome on the card and the log. */
     suspend fun recordDrain(sessionId: String, commitSha: String, rejects: Int) {
         val card = cards[sessionId] ?: return

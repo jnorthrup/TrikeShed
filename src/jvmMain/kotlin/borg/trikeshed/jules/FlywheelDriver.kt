@@ -115,6 +115,8 @@ class FlywheelDriver(
     val events: SharedFlow<FlywheelEvent> get() = _events.asSharedFlow()
     private val ioGate = Semaphore(permits = maxSlots)
     private val drainGate = Mutex()
+    /** Consecutive zero-patch probes per session id; tombstones at 3 (late outputs finalize async). */
+    private val noPatchProbes = mutableMapOf<String, Int>()
     private val reactorScope = CoroutineScope(Dispatchers.IO + parentJob)
 
     /** A reactor lifecycle event. Fanout subscribers (TUI, reaper, drain observers) listen to [events]. */
@@ -758,8 +760,21 @@ class FlywheelDriver(
      */
     private suspend fun drainOne(s: JulesRestClient.SessionInfo): DrainOutcome {
         val patch = client.lastPatch(s.id)
-        if (patch == null) { emitPollError("drain ${s.id}: no patch from lastPatch()", 0); return DrainOutcome.Skipped }
-        if (patch.isBlank()) { emitPollError("drain ${s.id}: blank patch", 0); return DrainOutcome.Skipped }
+        if (patch.isNullOrBlank()) {
+            // Zero-patch completion: the session concluded with nothing to land.
+            // Probe 3× (outputs finalize async), then tombstone — otherwise the
+            // wheel re-probes the same terminal card every cycle forever.
+            val probes = (noPatchProbes[s.id] ?: 0) + 1
+            noPatchProbes[s.id] = probes
+            if (probes >= 3) {
+                noPatchProbes.remove(s.id)
+                conductor.retireTerminal(s.id, "no patch after $probes probes; nothing to land", Clock.System.now().toEpochMilliseconds())
+                println("[FLYWHEEL] RETIRE ${s.id.takeLast(6)} no-patch after $probes probes")
+            } else {
+                emitPollError("drain ${s.id}: no patch from lastPatch() (probe $probes/3)", 0)
+            }
+            return DrainOutcome.Skipped
+        }
         if (!isWorkingTreeClean()) { emitPollError("drain ${s.id}: trunk dirty, skipping", 0); return DrainOutcome.Skipped }
         val patchFile = File(repoDir, ".flywheel-patch")
         patchFile.writeText(patch)
@@ -829,48 +844,78 @@ class FlywheelDriver(
     }
 
     /**
-     * Re-queue a failed drain as a rework: emit [JulesCause.DrainFailed] on the
-     * card, then append a [JulesCause.WorkQueued] with bumped attempt and a
-     * spec that names the failure reason + the original spec. Returns the new
-     * (workId, attempt) so [drainOne] can surface it in its log line, or null
-     * when the card has no prior [JulesCause.WorkDispatched] (a manual session
-     * not inducted through the queue — nothing to rework).
+     * Re-queue a failed drain as a rework (doneagain), then tombstone the card —
+     * the rework supersedes the dead patch, so the drain set stops re-probing it.
+     *
+     * Lineage lives in the QUEUE, not the card: dispatch appends WorkDispatched
+     * via appendWork keyed by workId; card causes never carry it. The previous
+     * card-cause lookup never matched (WAL: 281 DrainFailed, 0 reworks ever) —
+     * doneagain could not fire and failed cards churned forever. Lineage is now
+     * resolved via [JulesBoardStore.loadQueue] sessionId; a session with no
+     * queue entry (manual/web-dispatched) gets a synthesized identity seeded
+     * from its own completion summary so the wheel can retry its intent.
      */
     private suspend fun reworkFailedDrain(
         s: JulesRestClient.SessionInfo,
         reason: String,
     ): DrainOutcome.Reworked? {
         val now = Clock.System.now().toEpochMilliseconds()
-        conductor.recordDrainFailure(s.id, reason, now)
-        val card = conductor.cards[s.id] ?: return null
-        val dispatched = card.causes.filterIsInstance<JulesCause.WorkDispatched>().maxByOrNull { it.at }
-            ?: return null
-        val queued = store.replayCauses(dispatched.workId)
-            .filterIsInstance<JulesCause.WorkQueued>()
-            .maxByOrNull { it.at }
-            ?: return null
-        val nextAttempt = dispatched.attempt + 1
-        val reworkId = "rework:${queued.workId}#${nextAttempt}"
+        val card = conductor.cards[s.id] ?: run {
+            conductor.recordDrainFailure(s.id, reason, now)
+            return null
+        }
+        val seed = store.loadQueue().firstOrNull { it.sessionId == s.id }?.let { entry ->
+            ReworkSeed(
+                id = "rework:${entry.workId}#${entry.attempt + 1}",
+                attempt = entry.attempt + 1,
+                title = entry.title,
+                spec = entry.spec,
+                tier = entry.tier,
+                parent = entry.workId,
+                score = entry.score,
+            )
+        } ?: ReworkSeed(
+            id = "synth:${s.id}",
+            attempt = 1,
+            title = s.title,
+            spec = buildString {
+                appendLine("Prior Jules session ${s.id} delivered a patch that fails to apply to current master.")
+                card.causes.filterIsInstance<JulesCause.AgentMessaged>().lastOrNull()?.excerpt?.take(400)?.let {
+                    appendLine("Agent's completion summary:")
+                    appendLine(it.prependIndent("  "))
+                }
+            }.trim(),
+            tier = "synth",
+            parent = null,
+            score = 0.5,
+        )
         val reworkSpec = buildString {
-            appendLine("REWORK attempt $nextAttempt of ${queued.title}.")
+            appendLine("REWORK attempt ${seed.attempt} of ${seed.title}.")
             appendLine("Prior Jules session ${s.id} produced a patch that failed to apply:")
             appendLine("  reason: $reason")
             appendLine("Original spec:")
-            appendLine(queued.spec.prependIndent("  "))
+            appendLine(seed.spec.prependIndent("  "))
             appendLine("Produce a fresh patch that applies cleanly against current master.")
             appendLine("TDD: one test file + one minimal implementation file; gate: ./gradlew jvmTest --no-daemon")
         }.trim()
-        store.appendWork(reworkId, JulesCause.WorkQueued(
-            workId = reworkId,
-            tier = queued.tier,
-            title = "[rework #$nextAttempt] ${queued.title}",
+        store.appendWork(seed.id, JulesCause.WorkQueued(
+            workId = seed.id,
+            tier = seed.tier,
+            title = "[rework #${seed.attempt}] ${seed.title}",
             spec = reworkSpec,
-            parent = queued.workId,
-            score = (queued.score + 0.1).coerceAtMost(1.0),
+            parent = seed.parent,
+            score = (seed.score + 0.1).coerceAtMost(1.0),
             at = now,
         ))
-        return DrainOutcome.Reworked(reworkId, nextAttempt)
+        conductor.retireTerminal(s.id, "$reason → superseded by ${seed.id}", now)
+        return DrainOutcome.Reworked(seed.id, seed.attempt)
     }
+
+    /** Provenance for one doneagain: where the rework's identity came from. */
+    private data class ReworkSeed(
+        val id: String, val attempt: Int, val title: String, val spec: String,
+        val tier: String, val parent: String?, val score: Double,
+    )
 
     data class CycleReport(
         /** Wall-clock duration of the cycle in milliseconds. */
