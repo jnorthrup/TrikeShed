@@ -166,14 +166,34 @@ object OroborosDaemon {
         val healthSock = File(oroborosDir, "health.sock")
         if (healthSock.exists()) healthSock.delete()
 
-        val serverSocket = ServerSocketChannel.open(StandardProtocolFamily.UNIX)
-        serverSocket.bind(UnixDomainSocketAddress.of(healthSock.toPath()))
+        // Bind with retry: a prior daemon may have left a stale socket file
+        // even after the JVM exited; the bind() then creates a regular file
+        // instead of a UNIX socket. Retry up to 3× with the file removed
+        // between attempts so we always end up with a real socket.
+        var serverSocket: ServerSocketChannel? = null
+        var bindAttempt = 0
+        while (serverSocket == null && bindAttempt < 3) {
+            try {
+                serverSocket = ServerSocketChannel.open(StandardProtocolFamily.UNIX)
+                serverSocket.bind(UnixDomainSocketAddress.of(healthSock.toPath()))
+            } catch (e: Throwable) {
+                System.err.println("[OROBOROS] health.sock bind attempt ${bindAttempt + 1} failed: ${e.message}")
+                try { serverSocket?.close() } catch (_: Exception) {}
+                serverSocket = null
+                if (healthSock.exists()) healthSock.delete()
+                bindAttempt++
+            }
+        }
+        if (serverSocket == null) {
+            System.err.println("[OROBOROS] health.sock bind FAILED after 3 attempts; aborting")
+            return@runBlocking
+        }
 
         val healthJob = launch(Dispatchers.IO) {
             while (isActive) {
                 var client: SocketChannel? = null
                 try {
-                    client = serverSocket.accept()
+                    client = serverSocket!!.accept()
                     val report = lastCycleReport
                     val uptimeMs = System.currentTimeMillis() - daemonStartTime
                     val msg = if (report != null) {

@@ -149,8 +149,15 @@ class FlywheelDriver(
     /** One cycle: poll → answer → drain → induct → dispatch. */
     suspend fun cycle(): CycleReport {
         val t0 = System.currentTimeMillis()
-        // 1. POLL
-        conductor.pollOnce()
+        // 1. POLL — guarded so a transient API/network failure does NOT
+        //    abort the cycle and starve drain. A failed poll is a PollError
+        //    event + a retry on the next interval; drain still proceeds
+        //    against the cards the previous cycle rehydrated from WAL.
+        try {
+            conductor.pollOnce()
+        } catch (t: Throwable) {
+            _events.tryEmit(FlywheelEvent.PollError("poll ${t.javaClass.simpleName}: ${t.message?.take(200)}"))
+        }
 
         // 2. ANSWER — a waiting conversation is higher-leverage than a new
         //    dispatch: it unblocks a slot the wheel reuses THIS cycle. Draining
