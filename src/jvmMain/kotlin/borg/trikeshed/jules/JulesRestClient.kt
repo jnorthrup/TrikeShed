@@ -18,7 +18,9 @@ class JulesRestClient(
     private val apiKey: String,
     private val base: String = "https://jules.googleapis.com/v1alpha",
 ) {
-    private val http: HttpClient = HttpClient.newBuilder().build()
+    private val http: HttpClient = HttpClient.newBuilder()
+        .connectTimeout(java.time.Duration.ofSeconds(15))
+        .build()
 
     data class SessionInfo(
         val id: String,
@@ -230,6 +232,7 @@ class JulesRestClient(
     private fun request(method: String, path: String, json: String?): String {
         val builder = HttpRequest.newBuilder()
             .uri(URI.create("$base$path"))
+            .timeout(java.time.Duration.ofSeconds(30))
             .header("x-goog-api-key", apiKey)
             .header("Content-Type", "application/json")
         when (method) {
