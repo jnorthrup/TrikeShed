@@ -363,11 +363,11 @@ class FlywheelDriver(
      * settlementBarrier decides whether to push anyway.
      */
     private fun synchronizeMain(): Boolean {
-        if (command("git", "status", "--porcelain").output.isNotBlank()) return false
-        if (command("git", "fetch", "origin", "master").exitCode != 0) return false
+        if (!isWorkingTreeClean()) return false
+        if (git("fetch", "origin", "master").exitCode != 0) return false
         // `--no-ff` forces a merge commit even when fast-forward is possible;
         // octopus-style multi-branch ancestry. Strategy left to git at run time.
-        return command("git", "merge", "--no-ff", "origin/master").exitCode == 0
+        return git("merge", "--no-ff", "origin/master").exitCode == 0
     }
 
     /**
@@ -382,22 +382,22 @@ class FlywheelDriver(
      * cycle can recover.
      */
     private fun settlementBarrier(): Boolean {
-        if (command("git", "status", "--porcelain").output.isNotBlank()) return false
-        val push = command("git", "push", "--follow-tags", "origin", "HEAD:master")
+        if (!isWorkingTreeClean()) return false
+        val push = git("push", "--follow-tags", "origin", "HEAD:master")
         if (push.exitCode != 0) return false
 
-        val openPrs = command(
+        val openPrs = git(
             "gh", "pr", "list", "--state", "open", "--limit", "100",
             "--json", "number", "--jq", "length",
         )
         val openCount = openPrs.output.trim().toIntOrNull() ?: 0
 
-        if (command("git", "fetch", "origin", "master").exitCode != 0) return true
-        val local = command("git", "rev-parse", "HEAD")
-        val remote = command("git", "rev-parse", "origin/master")
+        if (git("fetch", "origin", "master").exitCode != 0) return true
+        val local = git("rev-parse", "HEAD")
+        val remote = git("rev-parse", "origin/master")
         val unclaimedDrains = store.loadQueue().count { it.isUnclaimedDrain }
         val state = FlywheelGateState(
-            workingTreeClean = command("git", "status", "--porcelain").output.isBlank(),
+            workingTreeClean = isWorkingTreeClean(),
             openPullRequests = openCount,
             localRevision = local.output.trim(),
             remoteRevision = remote.output.trim(),
@@ -411,20 +411,30 @@ class FlywheelDriver(
         return true
     }
 
-    private fun command(vararg args: String): CommandResult {
-        return try {
-            val process = ProcessBuilder(*args)
-                .directory(repoDir)
-                .redirectErrorStream(true)
-                .start()
-            val output = process.inputStream.bufferedReader().readText()
-            CommandResult(process.waitFor(), output)
-        } catch (t: Throwable) {
-            CommandResult(1, t.message.orEmpty())
-        }
+    /**
+     * Run a git or gh command in [repoDir]. Unified shell — every ProcessBuilder
+     * site in FlywheelDriver goes through here.
+     */
+    private fun git(vararg args: String): CommandResult = try {
+        val process = ProcessBuilder(*args)
+            .directory(repoDir)
+            .redirectErrorStream(true)
+            .start()
+        CommandResult(process.waitFor(), process.inputStream.bufferedReader().readText())
+    } catch (t: Throwable) {
+        CommandResult(1, t.message.orEmpty())
     }
 
     private data class CommandResult(val exitCode: Int, val output: String)
+
+    /**
+     * True iff the working tree has no tracked modifications or staged changes.
+     * Untracked files do NOT count as dirty — Jules sessions leave artifacts
+     * behind that are harmless to merges and would otherwise permanently block
+     * the wheel.
+     */
+    private fun isWorkingTreeClean(): Boolean =
+        git("status", "--porcelain", "--untracked-files=no").output.isBlank()
 
     /**
      * Induction: parse unchecked items from `doc/todo.md` and append each as a
@@ -571,7 +581,7 @@ class FlywheelDriver(
         val tag = "flywheel/jules-$safeSession-${commitSha.take(12)}"
         val tagMessage =
             "Jules merge receipt\nsession=$sessionId\nwork=$workId\npatchCid=${patchCid.value}"
-        if (command("git", "tag", "-a", tag, commitSha, "-m", tagMessage).exitCode != 0) {
+        if (git("tag", "-a", tag, commitSha, "-m", tagMessage).exitCode != 0) {
             return null
         }
 
@@ -668,7 +678,7 @@ class FlywheelDriver(
         val numericId = sessionId.substringAfterLast('/').filter { it.isDigit() }
         if (numericId.isEmpty()) return null
         // Probe 1: branch-on-origin.
-        val ls = command("git", "ls-remote", "origin", "refs/heads/jules-$numericId-*")
+        val ls = git("ls-remote", "origin", "refs/heads/jules-$numericId-*")
         if (ls.exitCode == 0) {
             for (line in ls.output.lineSequence()) {
                 val parts = line.trim().split("\t")
@@ -676,7 +686,7 @@ class FlywheelDriver(
                     val sha = parts[0]
                     val ref = parts[1]
                     if (ref.startsWith("refs/heads/jules-$numericId-") && sha.length == 40) {
-                        val remote = command("git", "config", "--get", "remote.origin.url")
+                        val remote = git("config", "--get", "remote.origin.url")
                         if (remote.exitCode == 0) {
                             val url = originToHtmlUrl(remote.output.trim(), sha)
                             if (url != null) return url
@@ -711,7 +721,7 @@ class FlywheelDriver(
     private fun revertFiles(files: List<String>) {
         val cmd = mutableListOf("git", "checkout", "HEAD", "--")
         cmd.addAll(files)
-        command(*cmd.toTypedArray())
+        git(*cmd.toTypedArray())
     }
 
     /** Parse unidiff headers (--- a/path, +++ b/path) to extract touched file paths. */
@@ -732,11 +742,7 @@ class FlywheelDriver(
         return files.distinct()
     }
 
-    private fun headSha(): String {
-        val proc = ProcessBuilder("git", "rev-parse", "HEAD")
-            .directory(repoDir).redirectErrorStream(true).start()
-        return proc.inputStream.bufferedReader().readText().trim()
-    }
+    private fun headSha(): String = git("rev-parse", "HEAD").output.trim()
 
     /** Subscribe a child coroutine to reactor events. Returns the subscriber's job. */
     fun subscribe(block: suspend (FlywheelEvent) -> Unit): Job =
@@ -744,9 +750,6 @@ class FlywheelDriver(
 
     /** Cancel the supervisor; children propagate. Idempotent. */
     fun close() { parentJob.cancel() }
-
-    private fun isWorkingTreeClean(): Boolean =
-        command("git", "status", "--porcelain").output.isBlank()
 
     /**
      * Drain a single completed session: apply patch, commit, CAS-pin, tag.
@@ -773,7 +776,7 @@ class FlywheelDriver(
         if (!isWorkingTreeClean()) { emitPollError("drain ${s.id}: trunk dirty, skipping", 0); return DrainOutcome.Skipped }
         val patchFile = File(repoDir, ".flywheel-patch")
         patchFile.writeText(patch)
-        val applyCheck = command("git", "apply", "--check", ".flywheel-patch")
+        val applyCheck = git("apply", "--check", ".flywheel-patch")
         if (applyCheck.exitCode != 0) {
             val stderr = applyCheck.output.take(200)
             patchFile.delete()
@@ -786,24 +789,20 @@ class FlywheelDriver(
             emitPollError("drain ${s.id}: apply --check failed: $stderr → rework ${rework?.attempt ?: 0}", 0)
             return rework ?: DrainOutcome.Skipped
         }
-        command("git", "apply", ".flywheel-patch")
+        git("apply", ".flywheel-patch")
         patchFile.delete()
-        // Test gate: every drained patch must pass jvmTest before we tag it. A
-        // red suite reverts exactly the touched files (no `git checkout .` —
+        // Test gate: every drained patch must pass the build before we tag it.
+        // A red suite reverts exactly the touched files (no `git checkout .` —
         // never discard surrounding work) and flows into the rework path the
         // flywheel already wired.
         val touchedFiles = parsePatchFiles(patch)
         if (touchedFiles.isEmpty()) {
-            command("git", "checkout", "HEAD", "--")
+            git("checkout", "HEAD", "--")
             emitPollError("drain ${s.id}: empty patch file list after apply, reverted", 0)
             return DrainOutcome.Skipped
         }
-        val test = ProcessBuilder("./gradlew", "jvmTest", "--no-daemon")
-            .directory(repoDir)
-            .redirectErrorStream(true)
-            .start()
-            .also { it.waitFor() }
-        if (test.exitValue() != 0) {
+        val test = git("./gradlew", "jvmTest", "--no-daemon")
+        if (test.exitCode != 0) {
             val reason = "jvmTest failed for ${s.title}"
             revertFiles(touchedFiles)
             val rework = reworkFailedDrain(s, reason)
@@ -813,8 +812,8 @@ class FlywheelDriver(
         // Stage ONLY the touched files, then commit. Never `git add -A`.
         val addCmd = mutableListOf("git", "add")
         addCmd.addAll(touchedFiles)
-        command(*addCmd.toTypedArray())
-        val commitRes = command("git", "commit", "-m", "flywheel: ${s.title}")
+        git(*addCmd.toTypedArray())
+        val commitRes = git("commit", "-m", "flywheel: ${s.title}")
         if (commitRes.exitCode != 0) {
             revertFiles(touchedFiles)
             return DrainOutcome.Skipped
@@ -830,7 +829,7 @@ class FlywheelDriver(
             "session=" + s.id + "\n" +
             "patchCid=" + patchCid.value + "\n" +
             "taskTitle=" + s.title
-        val tagRes = command("git", "tag", "-a", tag, commitSha, "-m", msg)
+        val tagRes = git("tag", "-a", tag, commitSha, "-m", msg)
         if (tagRes.exitCode != 0) {
             emitPollError("drain ${s.id}: tag create failed: ${tagRes.output.take(200)}", -1); return DrainOutcome.Skipped
         }
