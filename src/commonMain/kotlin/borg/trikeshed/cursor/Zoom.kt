@@ -127,7 +127,7 @@ fun Cursor.zoom(path: String): Cursor {
     }
     
     if (colIndex == -1) {
-        return emptySeries()
+        error("Column '$path' not found")
     }
     
     val prefixSums = IntArray(this.size + 1)
