@@ -113,22 +113,13 @@ class JulesRestClient(
     /** Byte length of the latest cumulative patch. */
     suspend fun patchProbe(sessionId: String): Long = lastPatch(sessionId)?.length?.toLong() ?: 0L
 
-    /**
-     * Last patch worth applying. Two sources, in order of preference:
-     *
-     *  1. `/sessions/$id` top-level `outputs[*].changeSet.gitPatch.unidiffPatch`
-     *     — the FINAL completed patch for the session. This is what landed.
-     *  2. Fallback: in-progress `activities[*].artifacts[*].changeSet.gitPatch`
-     *     — for sessions still mid-flight, the most recent artifact's diff.
-     *
-     * The previous code only read the activity stream and missed the canonical
-     * output entirely; the flywheel drained zero patches because `outputs`
-     * was never consulted.
-     */
+    /** Latest activity delta; top-level output is fallback when no artifact exists. */
     suspend fun lastPatch(sessionId: String): String? {
-        val fromOutputs = sessionOutputsPatches(sessionId).lastOrNull()
-        if (!fromOutputs.isNullOrEmpty()) return fromOutputs
-        return activityMaps(sessionId).asSequence().flatMap { patchTexts(it).asSequence() }.lastOrNull()
+        val activityDelta = activityMaps(sessionId).asSequence()
+            .flatMap { patchTexts(it).asSequence() }
+            .lastOrNull()
+        if (!activityDelta.isNullOrEmpty()) return activityDelta
+        return sessionOutputsPatches(sessionId).lastOrNull()
     }
 
     /** Fetch the session resource and read outputs[*].changeSet.gitPatch.unidiffPatch. */
