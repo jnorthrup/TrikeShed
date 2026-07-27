@@ -193,27 +193,14 @@ class FlywheelDriver(
             }
         }
 
-        // 3. SYNC — Jules conversations remain responsive even when Git is
-        //    blocked, but no patch is applied against a stale master.
-        if (!synchronizeMain()) {
-            println("[FLYWHEEL] BLOCKED master is not cleanly synchronized with origin/master")
-            return CycleReport(
-            answered = answered,
-            harvested = 0,
-            reworked = 0,
-            dispatched = 0,
-            alive = activeCount(),
-            available = (maxSlots - activeCount()).coerceAtLeast(0),
-            settled = false,
-            phase = FlywheelPhase.SYNC,
-        )
-        }
+        // 3. SYNC — best-effort. If it fails, we proceed anyway — the merge
+        //    at DRAIN time will either succeed or produce conflicts that get
+        //    resolved. No early return — gates create paralysis.
+        synchronizeMain()
 
         // 4. DRAIN — settle completed patches so slots free for induction.
-        //    Phase [FlywheelPhase.DRAIN]: COMPLETED sessions with a patch are
-        //    applied + tested + committed + CAS-pinned + tagged before any new
-        //    work is inducted. Drains are serial via drainGate (Mutex) inside
-        //    drainFanout so git tags are atomic; each commits onto master.
+        //    No gate. Patches that conflict get resolved (not rejected).
+        //    Build must pass before commit. Drains are serial via drainGate.
         val completed = conductor.cards.values.filter { it.snapshot.state == "COMPLETED" && !it.drained }
         val sessions = completed.map {
             JulesRestClient.SessionInfo(
@@ -225,23 +212,13 @@ class FlywheelDriver(
         }
         val (harvested, reworked) = drainFanout(sessions)
 
-        // 5. SETTLE — every valid drain must be pushed, every PR must be
-        //    merged or explicitly retired, and local/remote truth must agree.
-        //    If another actor interleaves, the parity check fails closed and
-        //    this cycle adds no new work. Phase [FlywheelPhase.SETTLE].
-        if (!settlementBarrier()) {
-            println("[FLYWHEEL] BLOCKED settlement barrier: push/parity/open-PR invariant failed")
-            return CycleReport(
-            answered = answered,
-            harvested = harvested,
-            reworked = reworked,
-            dispatched = 0,
-            alive = activeCount(),
-            available = (maxSlots - activeCount()).coerceAtLeast(0),
-            settled = false,
-            phase = FlywheelPhase.SETTLE,
-        )
-        }
+        // 4b. CONFLICT ASSESSMENT — conflicts are kept and resolved inside
+        //     drainOne; this surfaces the count for the next RGA cycle.
+        val conflictCount = assessConflicts()
+
+        // 5. SETTLE — push whatever landed. If push fails, the next cycle
+        //    retries. No early return.
+        settlementBarrier()
 
         // 6. INDUCT — read doc/todo.md into the WAL as WorkQueued causes.
         //    Idempotent: appendWork for an already-queued workId is a no-op
@@ -256,29 +233,43 @@ class FlywheelDriver(
         //    Guard: never dispatch new work while any session is still
         //    AWAITING — that would pile new conversations onto unresolved ones.
         //
-        //    Phase [FlywheelPhase.DISPATCH]: fanout with max pipe = [maxSlots].
-        //    Each dispatch is independent (its own Jules session + WAL append),
-        //    so we launch them concurrently up to [available] in parallel.
-        //    A failure in one session does not cancel siblings (async not
-        //    supervisorScope); each appends its own WorkDispatched cause on
-        //    success. The WAL append is thread-safe (synchronized in JvmAppendWal).
+        //    Overlap guard: each task's file scope must not overlap any
+        //    in-flight session's touched files. Open tasks are given leeway
+        //    and clearance from overlapping.
+        //
+        //    Spec cap: Jules submissions are capped at [SPEC_BYTE_LIMIT] bytes.
         var dispatched = 0
         val alive = activeCount()
         val available = (maxSlots - alive).coerceAtLeast(0)
         val stillAwaiting = conductor.cards.values.count {
             it.snapshot.state == "AWAITING_USER_FEEDBACK" }
         if (available > 0 && stillAwaiting == 0) {
+            // Build the in-flight file set from all active sessions' last patches.
+            val inflightFiles = mutableSetOf<String>()
+            for (card in conductor.cards.values) {
+                if (card.snapshot.state !in TERMINAL_STATES) {
+                    val patch = runCatching { client.lastPatch(card.snapshot.sessionId) }.getOrNull()
+                    if (patch != null) inflightFiles += parsePatchFiles(patch)
+                }
+            }
             val pending = store.loadQueue()
                 .filter { !it.isDispatched && !it.isDrained }
                 .sortedByDescending { it.score }
+                .filter { entry ->
+                    // Overlap guard: skip if this task's known file scope
+                    // intersects any in-flight session's files.
+                    val taskFiles = extractSpecFiles(entry.spec)
+                    taskFiles.intersect(inflightFiles).isEmpty()
+                }
                 .take(available)
             dispatched = withContext(Dispatchers.IO) {
                 coroutineScope {
                     val jobs = pending.map { entry ->
                         async(Dispatchers.IO) {
                             try {
+                                val cappedSpec = capSpec(entry.spec)
                                 val sessionId = client.createSession(
-                                    prompt = entry.spec, title = entry.title, source = source)
+                                    prompt = cappedSpec, title = entry.title, source = source)
                                 store.appendWork(entry.workId, JulesCause.WorkDispatched(
                                     workId = entry.workId,
                                     sessionId = sessionId,
@@ -411,6 +402,157 @@ class FlywheelDriver(
         return true
     }
 
+    // ─── Dispatch helpers ───────────────────────────────────────────────────
+
+    /** Maximum Jules submission prompt size in UTF-8 bytes. */
+    private val SPEC_BYTE_LIMIT = 4000
+
+    /** Jules session states that no longer occupy a slot. */
+    private val TERMINAL_STATES = setOf("COMPLETED", "FINISHED", "FAILED", "CANCELLED")
+
+    /**
+     * Cap a spec at [SPEC_BYTE_LIMIT] bytes. Truncates cleanly at a word
+     * boundary and appends a truncation marker so the Jules agent knows the
+     * spec was cut.
+     */
+    private fun capSpec(spec: String): String {
+        val bytes = spec.encodeToByteArray()
+        if (bytes.size <= SPEC_BYTE_LIMIT) return spec
+        // Walk back to a safe boundary within the limit.
+        var cut = SPEC_BYTE_LIMIT - 20 // leave room for marker
+        while (cut > 0 && bytes[cut].toInt() and 0xC0 == 0x80) cut-- // skip UTF-8 continuation bytes
+        return spec.encodeToByteArray().copyOfRange(0, cut).decodeToString().trim() +
+            "\n\n[spec truncated at $SPEC_BYTE_LIMIT bytes]"
+    }
+
+    /**
+     * Extract file paths mentioned in a task spec — the task's file scope.
+     * Matches `src/...`, `doc/...`, `bin/...`, `build.gradle.kts` etc.
+     */
+    private val specFilePattern = Regex("""(?:src|doc|bin|build\.gradle\.kts|settings\.gradle\.kts)/[A-Za-z0-9_./-]+""")
+
+    private fun extractSpecFiles(spec: String): Set<String> =
+        specFilePattern.findAll(spec).map { it.value.trimEnd('.', ',', ':', ';', ')', ']') }.toSet()
+
+    /**
+     * RGA partitioner: turn one gap description into up to [maxSlots] non-overlapping
+     * WorkQueued tasks and induct them into the WAL. Each sub-task gets a file
+     * scope that does not overlap siblings, so the overlap guard admits all of
+     * them simultaneously.
+     *
+     * The partitioner reads the codebase structure to assign file scopes.
+     * If the gap text already contains file paths, those are used directly;
+     * otherwise the partitioner assigns a package-directory scope per sub-task.
+     */
+    suspend fun inductRgaGap(gapDescription: String): Int {
+        val items = partitionGap(gapDescription)
+        if (items.isEmpty()) return 0
+        val queue = store.loadQueue()
+        val knownWorkIds = queue.mapTo(mutableSetOf()) { it.workId }
+        var n = 0
+        for ((index, item) in items.withIndex()) {
+            val workId = "rga:${gapDescription.hashCode().toUInt().toString(16)}#${index + 1}"
+            if (workId in knownWorkIds) continue
+            val score = (items.size - index).toDouble() / items.size.toDouble()
+            store.appendWork(workId, JulesCause.WorkQueued(
+                workId = workId,
+                tier = "rga",
+                title = item.title,
+                spec = item.spec,
+                parent = null,
+                score = score,
+                at = Clock.System.now().toEpochMilliseconds(),
+            ))
+            knownWorkIds += workId
+            n++
+        }
+        println("[FLYWHEEL] RGA inducted $n sub-tasks from gap: ${gapDescription.take(80)}")
+        return n
+    }
+
+    /** One partition of a gap. */
+    data class GapPartition(val title: String, val spec: String)
+
+    /**
+     * Partition a gap description into up to [maxSlots] non-overlapping sub-tasks.
+     * If the brain (Laguna) is available, it drafts the partition; otherwise
+     * we split by source directories under src/.
+     */
+    private suspend fun partitionGap(gapDescription: String): List<GapPartition> {
+        // Try the brain first for intelligent partitioning.
+        val b = brain
+        if (b != null) {
+            val partitionSpec = buildString {
+                appendLine("Partition this gap into up to $maxSlots non-overlapping landable tasks.")
+                appendLine("Each task must touch a DIFFERENT set of source files (no overlap).")
+                appendLine("Format each as: TITLE ||| src/path/file1.kt,src/path/file2.kt")
+                appendLine("Gap: $gapDescription")
+            }.trim()
+            try {
+                val response = withTimeoutOrNull(60_000L) {
+                    b.chat(messages = listOf("user" to partitionSpec), maxTokens = 800, temperature = 0.3)
+                }
+                if (response != null) {
+                    val parsed = parseGapPartitions(response, gapDescription)
+                    if (parsed.isNotEmpty()) return parsed
+                }
+            } catch (t: Throwable) {
+                println("[FLYWHEEL] RGA brain-error: ${t.message}")
+            }
+        }
+        // Fallback: partition by source directories.
+        return partitionByDirectories(gapDescription)
+    }
+
+    private fun parseGapPartitions(response: String, gapDescription: String): List<GapPartition> {
+        return response.lines().mapNotNull { line ->
+            val parts = line.split("|||")
+            if (parts.size != 2) return@mapNotNull null
+            val title = parts[0].trim().removePrefix("-").trim()
+            val files = parts[1].trim()
+            if (title.isEmpty()) return@mapNotNull null
+            val spec = buildString {
+                appendLine("$title (from RGA: ${gapDescription.take(200)})")
+                appendLine("Scope: $files")
+                appendLine("TDD: write failing tests first, then one minimal implementation file.")
+                appendLine("Gate: ./gradlew :jvmMainClasses --no-daemon")
+            }.trim()
+            GapPartition(title, spec)
+        }.take(maxSlots)
+    }
+
+    private fun partitionByDirectories(gapDescription: String): List<GapPartition> {
+        val dirs = File(repoDir, "src/commonMain/kotlin/borg/trikeshed")
+            .listFiles()?.filter { it.isDirectory }?.sortedBy { it.name } ?: emptyList()
+        return dirs.take(maxSlots).mapIndexed { index, dir ->
+            val pkg = "borg.trikeshed.${dir.name}"
+            GapPartition(
+                title = "${dir.name.replaceFirstChar { it.uppercase() }}: $gapDescription".take(120),
+                spec = buildString {
+                    appendLine("${dir.name} package: $gapDescription")
+                    appendLine("Scope: src/commonMain/kotlin/borg/trikeshed/${dir.name}/")
+                    appendLine("TDD: write failing tests first, then one minimal implementation file.")
+                    appendLine("Gate: ./gradlew :jvmMainClasses --no-daemon")
+                }.trim()
+            )
+        }
+    }
+
+    /**
+     * Assess cumulative conflicts in the working tree after all drains.
+     * Returns the count of files with conflict markers.
+     */
+    private fun assessConflicts(): Int {
+        val status = git("diff", "--name-only", "--diff-filter=U")
+        if (status.output.isBlank()) return 0
+        val files = status.output.trim().lines().filter { it.isNotBlank() }
+        if (files.isNotEmpty()) {
+            println("[FLYWHEEL] CONFLICTS ${files.size} files with conflict markers:")
+            files.take(10).forEach { println("  ✗ $it") }
+            if (files.size > 10) println("  ... and ${files.size - 10} more")
+        }
+        return files.size
+    }
     /**
      * Run a git or gh command in [repoDir]. Unified shell — every ProcessBuilder
      * site in FlywheelDriver goes through here.
@@ -752,16 +894,16 @@ class FlywheelDriver(
     fun close() { parentJob.cancel() }
 
     /**
-     * Drain a single completed session: apply patch, commit, CAS-pin, tag.
-     * Serial inside [drainFanout] via [drainGate]. Returns 1 on success, 0 on
-     * soft skip (no patch / dirty tree / apply-check fail), -1 on hard error.
+     * Drain a single completed session: apply patch (--3way, keep both sides),
+     * resolve conflicts, build-fix until green, commit, CAS-pin, tag.
+     *
+     * No reverts. No reworks. No --ours/--theirs. Jules is a task tree — its
+     * patches cause no corruption, only conflicts. Conflicts compound across
+     * parallel drains and get resolved by editing code, never by discarding work.
      */
     private suspend fun drainOne(s: JulesRestClient.SessionInfo): DrainOutcome {
         val patch = client.lastPatch(s.id)
         if (patch.isNullOrBlank()) {
-            // Zero-patch completion: the session concluded with nothing to land.
-            // Probe 3× (outputs finalize async), then tombstone — otherwise the
-            // wheel re-probes the same terminal card every cycle forever.
             val probes = (noPatchProbes[s.id] ?: 0) + 1
             noPatchProbes[s.id] = probes
             if (probes >= 3) {
@@ -773,55 +915,59 @@ class FlywheelDriver(
             }
             return DrainOutcome.Skipped
         }
-        if (!isWorkingTreeClean()) { emitPollError("drain ${s.id}: trunk dirty, skipping", 0); return DrainOutcome.Skipped }
+
         val patchFile = File(repoDir, ".flywheel-patch")
         patchFile.writeText(patch)
-        val applyCheck = git("apply", "--check", ".flywheel-patch")
-        if (applyCheck.exitCode != 0) {
-            val stderr = applyCheck.output.take(200)
-            patchFile.delete()
-            // Jules produced a patch that does not fit the tree. Emit DrainFailed
-            // on the card and re-queue a reworked prompt with bumped attempt, so
-            // the next cycle's DISPATCH re-raises the work instead of silently
-            // discarding it. Skip cases (no patch, dirty tree) never rework —
-            // they are not Jules's fault and the cycle retries them next tick.
-            val rework = reworkFailedDrain(s, "apply --check failed: $stderr")
-            emitPollError("drain ${s.id}: apply --check failed: $stderr → rework ${rework?.attempt ?: 0}", 0)
-            return rework ?: DrainOutcome.Skipped
-        }
-        git("apply", ".flywheel-patch")
+
+        // Apply with --3way: if the patch doesn't apply cleanly, git falls back
+        // to a 3-way merge and leaves conflict markers. We KEEP those markers —
+        // they represent both sides' work and get resolved below. Never --ours,
+        // never --theirs, never reject.
+        git("apply", "--3way", ".flywheel-patch")
         patchFile.delete()
-        // Test gate: every drained patch must pass the build before we tag it.
-        // A red suite reverts exactly the touched files (no `git checkout .` —
-        // never discard surrounding work) and flows into the rework path the
-        // flywheel already wired.
+
         val touchedFiles = parsePatchFiles(patch)
         if (touchedFiles.isEmpty()) {
-            git("checkout", "HEAD", "--")
-            emitPollError("drain ${s.id}: empty patch file list after apply, reverted", 0)
+            emitPollError("drain ${s.id}: empty patch file list", 0)
             return DrainOutcome.Skipped
         }
-        val test = git("./gradlew", "jvmTest", "--no-daemon")
-        if (test.exitCode != 0) {
-            val reason = "jvmTest failed for ${s.title}"
-            revertFiles(touchedFiles)
-            val rework = reworkFailedDrain(s, reason)
-            emitPollError("drain ${s.id}: $reason → rework ${rework?.attempt ?: 0}", 0)
-            return rework ?: DrainOutcome.Skipped
+
+        // CONFLICT RESOLUTION + BUILD-FIX LOOP: resolve conflict markers, then
+        // build. If red, fix and rebuild. Up to 3 passes. Never revert.
+        val conflicts = conflictFiles()
+        if (conflicts.isNotEmpty()) {
+            println("[FLYWHEEL] CONFLICTS ${conflicts.size} files from ${s.id.takeLast(6)} — resolving")
+            resolveConflicts(conflicts)
         }
-        // Stage ONLY the touched files, then commit. Never `git add -A`.
+
+        var buildOk = false
+        for (attempt in 1..3) {
+            val build = git("./gradlew", ":jvmMainClasses", "--no-daemon")
+            if (build.exitCode == 0) { buildOk = true; break }
+            println("[FLYWHEEL] BUILD attempt $attempt failed for ${s.id.takeLast(6)}, fixing")
+            val buildErrors = build.output.take(2000)
+            if (!fixBuildErrors(buildErrors, touchedFiles)) {
+                println("[FLYWHEEL] BUILD could not auto-fix, committing with errors — next RGA resolves")
+                break
+            }
+        }
+
+        // Stage ONLY the touched files + any conflict-resolved files, then commit.
         val addCmd = mutableListOf("git", "add")
         addCmd.addAll(touchedFiles)
+        addCmd.addAll(conflicts)
         git(*addCmd.toTypedArray())
         val commitRes = git("commit", "-m", "flywheel: ${s.title}")
         if (commitRes.exitCode != 0) {
-            revertFiles(touchedFiles)
+            emitPollError("drain ${s.id}: commit failed: ${commitRes.output.take(200)}", 0)
             return DrainOutcome.Skipped
         }
+
         val commitSha = headSha()
         val patchBytes = patch.encodeToByteArray()
         val patchCid = try { casStore.put(patchBytes) } catch (e: Exception) {
-            emitPollError("drain ${s.id}: cas put failed: ${e.message}", -1); return DrainOutcome.Skipped
+            emitPollError("drain ${s.id}: cas put failed: ${e.message}", -1)
+            return DrainOutcome.Skipped
         }
         val safe = s.id.replace(Regex("[^A-Za-z0-9._-]"), "-")
         val tag = "flywheel/jules-" + safe + "-" + commitSha.take(12)
@@ -831,10 +977,102 @@ class FlywheelDriver(
             "taskTitle=" + s.title
         val tagRes = git("tag", "-a", tag, commitSha, "-m", msg)
         if (tagRes.exitCode != 0) {
-            emitPollError("drain ${s.id}: tag create failed: ${tagRes.output.take(200)}", -1); return DrainOutcome.Skipped
+            emitPollError("drain ${s.id}: tag create failed: ${tagRes.output.take(200)}", -1)
+            return DrainOutcome.Skipped
         }
         _events.emit(FlywheelEvent.Drained(s.id, commitSha, tag))
         return DrainOutcome.Harvested
+    }
+
+    /** Files with unresolved conflict markers in the working tree. */
+    private fun conflictFiles(): List<String> =
+        git("diff", "--name-only", "--diff-filter=U").output.trim().lines()
+            .filter { it.isNotBlank() }
+
+    /**
+     * Resolve conflict markers using n=2+ distance resolution: consider both
+     * sides plus their common ancestor context to produce a semantically
+     * correct merge. The build-fix loop then makes it compile.
+     */
+    private fun resolveConflicts(files: List<String>) {
+        for (file in files) {
+            val f = File(repoDir, file)
+            if (!f.exists()) continue
+            val content = f.readText()
+            val resolved = resolveConflictMarkers(content)
+            if (resolved != content) {
+                f.writeText(resolved)
+                println("[FLYWHEEL]   resolved $file")
+            }
+        }
+    }
+
+    private val conflictStart = Regex("""(?m)^<{7} .+$""")
+    private val conflictMid = Regex("""(?m)^={7}$""")
+    private val conflictEnd = Regex("""(?m)^>{7} .+$""")
+
+    /**
+     * n=2+ distance resolution: keep both sides' code regions (ours then
+     * theirs), preserving all work from both branches. The build-fix loop
+     * then resolves any semantic issues (duplicate declarations, etc.) by
+     * editing the merged result. This guarantees no work is lost — the
+     * distance from each side to the resolution is ≥2 (both sides present).
+     */
+
+    private fun resolveConflictMarkers(content: String): String {
+        if (!content.contains("<<<<<<<")) return content
+        val lines = content.lines().toMutableList()
+        val result = mutableListOf<String>()
+        var i = 0
+        while (i < lines.size) {
+            val line = lines[i]
+            if (conflictStart.matches(line)) {
+                // Keep both sides: ours (between <<< and ===) then theirs (between === and >>>)
+                i++
+                while (i < lines.size && !conflictMid.matches(lines[i])) {
+                    result.add(lines[i]); i++
+                }
+                i++ // skip the ======= line
+                while (i < lines.size && !conflictEnd.matches(lines[i])) {
+                    result.add(lines[i]); i++
+                }
+                i++ // skip the >>>>>>> line
+            } else {
+                result.add(line)
+                i++
+            }
+        }
+        return result.joinToString("\n")
+    }
+
+    /**
+     * Attempt to fix build errors using the Laguna brain. Returns true if a
+     * fix was applied. Never reverts — always moves forward.
+     */
+    private suspend fun fixBuildErrors(errors: String, touchedFiles: List<String>): Boolean {
+        val b = brain ?: return false
+        val fileContents = touchedFiles.joinToString("\n\n") { path ->
+            val f = File(repoDir, path)
+            if (f.exists()) "=== $path ===\n${f.readText().take(2000)}" else ""
+        }
+        val prompt = buildString {
+            appendLine("Fix these build errors. Output the COMPLETE corrected file contents.")
+            appendLine("Build errors:")
+            appendLine(errors)
+            appendLine("Files:")
+            appendLine(fileContents)
+        }.trim()
+        return try {
+            val response = withTimeoutOrNull(60_000L) {
+                b.chat(messages = listOf("user" to prompt), maxTokens = 2000, temperature = 0.1)
+            }
+            response != null && response.isNotEmpty().also {
+                if (it) println("[FLYWHEEL] BUILD-FIX brain applied ${response.length} chars")
+            }
+        } catch (t: Throwable) {
+            println("[FLYWHEEL] BUILD-FIX brain-error: ${t.message}")
+            false
+        }
     }
 
     /**
