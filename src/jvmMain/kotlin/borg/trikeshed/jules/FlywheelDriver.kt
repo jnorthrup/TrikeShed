@@ -117,6 +117,32 @@ class FlywheelDriver(
     private val drainGate = Mutex()
     /** Consecutive zero-patch probes per session id; tombstones at 3 (late outputs finalize async). */
     private val noPatchProbes = mutableMapOf<String, Int>()
+    /** Consecutive drain failures per session id; tombstones at [DRAIN_RETRY_LIMIT]. */
+    private val drainFailures = mutableMapOf<String, Int>()
+    private val DRAIN_RETRY_LIMIT = 3
+
+    /**
+     * Record a drain failure on the session card and return [DrainOutcome.Skipped].
+     * Appends a [JulesCause.DrainFailed] cause (without flipping `drained`) on
+     * each attempt so the causal log tracks why. After [DRAIN_RETRY_LIMIT]
+     * consecutive failures, tombstones via [JulesConductor.retireTerminal] so
+     * the DRAIN filter (`!drained`) stops re-selecting a permanently broken
+     * session. Transient failures (git lock, disk full) get retries; permanent
+     * ones (degenerate patch, corrupt repo) get retired.
+     */
+    private suspend fun drainFail(s: JulesRestClient.SessionInfo, reason: String): DrainOutcome.Skipped {
+        val attempts = (drainFailures[s.id] ?: 0) + 1
+        if (attempts >= DRAIN_RETRY_LIMIT) {
+            drainFailures.remove(s.id)
+            conductor.retireTerminal(s.id, "drain failed $attempts\u00d7: $reason", Clock.System.now().toEpochMilliseconds())
+            println("[FLYWHEEL] RETIRE ${s.id.takeLast(6)} drain failed $attempts\u00d7: ${reason.take(80)}")
+        } else {
+            drainFailures[s.id] = attempts
+            conductor.recordDrainFailure(s.id, "$reason (attempt $attempts/$DRAIN_RETRY_LIMIT)", Clock.System.now().toEpochMilliseconds())
+            return emitPollError("drain ${s.id}: $reason (attempt $attempts/$DRAIN_RETRY_LIMIT)", 0).let { DrainOutcome.Skipped }
+        }
+        return DrainOutcome.Skipped
+    }
     private val reactorScope = CoroutineScope(Dispatchers.IO + parentJob)
 
     /** A reactor lifecycle event. Fanout subscribers (TUI, reaper, drain observers) listen to [events]. */
@@ -928,8 +954,7 @@ class FlywheelDriver(
 
         val touchedFiles = parsePatchFiles(patch)
         if (touchedFiles.isEmpty()) {
-            emitPollError("drain ${s.id}: empty patch file list", 0)
-            return DrainOutcome.Skipped
+            return drainFail(s, "empty patch file list")
         }
 
         // CONFLICT RESOLUTION + BUILD-FIX LOOP: resolve conflict markers, then
@@ -959,15 +984,13 @@ class FlywheelDriver(
         git(*addCmd.toTypedArray())
         val commitRes = git("commit", "-m", "flywheel: ${s.title}")
         if (commitRes.exitCode != 0) {
-            emitPollError("drain ${s.id}: commit failed: ${commitRes.output.take(200)}", 0)
-            return DrainOutcome.Skipped
+            return drainFail(s, "commit failed: ${commitRes.output.take(200)}")
         }
 
         val commitSha = headSha()
         val patchBytes = patch.encodeToByteArray()
         val patchCid = try { casStore.put(patchBytes) } catch (e: Exception) {
-            emitPollError("drain ${s.id}: cas put failed: ${e.message}", -1)
-            return DrainOutcome.Skipped
+            return drainFail(s, "cas put failed: ${e.message}")
         }
         val safe = s.id.replace(Regex("[^A-Za-z0-9._-]"), "-")
         val tag = "flywheel/jules-" + safe + "-" + commitSha.take(12)
@@ -977,8 +1000,7 @@ class FlywheelDriver(
             "taskTitle=" + s.title
         val tagRes = git("tag", "-a", tag, commitSha, "-m", msg)
         if (tagRes.exitCode != 0) {
-            emitPollError("drain ${s.id}: tag create failed: ${tagRes.output.take(200)}", -1)
-            return DrainOutcome.Skipped
+            return drainFail(s, "tag create failed: ${tagRes.output.take(200)}")
         }
 
         // CLOSE THE DRAIN — without these two writes the wheel re-drains this
@@ -1011,6 +1033,7 @@ class FlywheelDriver(
             at = Clock.System.now().toEpochMilliseconds(),
         ))
         _events.emit(FlywheelEvent.Drained(s.id, commitSha, tag))
+        drainFailures.remove(s.id)
         return DrainOutcome.Harvested
     }
 
