@@ -232,7 +232,12 @@ class FlywheelDriver(
         // 4. DRAIN — settle completed patches so slots free for induction.
         //    No gate. Patches that conflict get resolved (not rejected).
         //    Build must pass before commit. Drains are serial via drainGate.
-        val completed = conductor.cards.values.filter { it.snapshot.state == "COMPLETED" && !it.drained }
+        //    Tag dedup: skip sessions that already have a flywheel/jules-<id>-*
+        //    tag — they were drained in a prior cycle (survives daemon restart).
+        val completed = conductor.cards.values.filter {
+            it.snapshot.state == "COMPLETED" && !it.drained &&
+            !hasDrainTag(it.snapshot.sessionId)
+        }
         val sessions = completed.map {
             JulesRestClient.SessionInfo(
                 id = it.snapshot.sessionId,
