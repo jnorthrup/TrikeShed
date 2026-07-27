@@ -2,7 +2,6 @@ package borg.trikeshed.daemon
 
 import borg.trikeshed.jules.FlywheelDriver
 import borg.trikeshed.jules.FlywheelDriver.FlywheelEvent
-import borg.trikeshed.jules.QaLaguna
 import borg.trikeshed.util.io.ForgeCliArgs
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -18,8 +17,6 @@ import java.nio.ByteBuffer
 import java.nio.channels.ServerSocketChannel
 import java.nio.channels.SocketChannel
 import kotlin.system.exitProcess
-import sun.misc.Signal
-import sun.misc.SignalHandler
 
 /**
  * Oroboros daemon — thin entry-point over [FlywheelDriver].
@@ -52,9 +49,6 @@ object OroborosDaemon {
     @Volatile
     var daemonStartTime = 0L
 
-    @Volatile
-    var isRunning = true
-
     fun parseConfig(args: Array<String>): DaemonConfig {
         var watch = true
         var intervalMs = DEFAULT_INTERVAL_MS
@@ -85,18 +79,7 @@ object OroborosDaemon {
     }
 
     @JvmStatic
-    fun main(args: Array<String>) {
-        try {
-            runBlocking {
-                mainImpl(args)
-            }
-        } catch (e: kotlinx.coroutines.CancellationException) {
-            // JVM shutdown triggered by signal handler
-            exitProcess(0)
-        }
-    }
-
-    private suspend fun kotlinx.coroutines.CoroutineScope.mainImpl(args: Array<String>) {
+    fun main(args: Array<String>) = runBlocking {
         val apiKey = System.getenv("JULES_API_KEY") ?: System.getProperty("JULES_API_KEY")
         if (apiKey.isNullOrBlank()) {
             System.err.println("[OROBOROS] JULES_API_KEY not set; the conductor cannot poll Jules. Aborting.")
@@ -128,16 +111,6 @@ object OroborosDaemon {
             maxSlots = maxSlots,
         )
 
-        val mainJob = coroutineContext[kotlinx.coroutines.Job]
-
-        val sigHandler = SignalHandler {
-            driver.close()
-            isRunning = false
-            mainJob?.cancel()
-        }
-        Signal.handle(Signal("TERM"), sigHandler)
-        Signal.handle(Signal("INT"), sigHandler)
-
         val traceFile = File(forgeHome, "oroboros-cycles.jsonl")
         var traceLineCount = if (traceFile.exists()) traceFile.readLines().size else 0
         var traceWriter: BufferedWriter? = null
@@ -155,11 +128,13 @@ object OroborosDaemon {
 
         var pollErrors = 0
         val consecutivePollErrors = java.util.concurrent.atomic.AtomicInteger(0)
+        var pollErrOccurred = false
         // Stdout observer so cycles are visible without a TUI, and bridge to KanbanFSM.
         driver.subscribe { ev ->
             println("[FLY-EVENT] $ev")
             if (ev is FlywheelEvent.PollError) {
                 pollErrors++
+                pollErrOccurred = true
             }
             val now = System.currentTimeMillis()
             when (ev) {
@@ -211,7 +186,7 @@ object OroborosDaemon {
         }
         if (serverSocket == null) {
             System.err.println("[OROBOROS] health.sock bind FAILED after 3 attempts; aborting")
-            return
+            return@runBlocking
         }
 
         val healthJob = launch(Dispatchers.IO) {
@@ -239,7 +214,7 @@ object OroborosDaemon {
         if (!preflight(repoDir, driver)) {
             System.err.println("[OROBOROS] preflight failed; aborting before first cycle")
             driver.close()
-            return
+            return@runBlocking
         }
 
         suspend fun runCycle() {
@@ -247,41 +222,10 @@ object OroborosDaemon {
             val startPollErrors = pollErrors
             val summary: FlywheelDriver.CycleReport = driver.cycle()
             val cyclePollErrors = pollErrors - startPollErrors
-            println("[FLYWHEEL] phase=" + summary.phase + " cycleMs=" + summary.cycleMs + " answered=" + summary.answered + " harvested=" + summary.harvested + " reworked=" + summary.reworked + " dispatched=" + summary.dispatched + " alive=" + summary.alive + "/" + summary.available + " inducted=" + summary.inducted + " settled=" + summary.settled)
-
-            // QA STEP — QaLaguna resolves committed conflict markers.
-            // Runs OUTSIDE the flywheel: the wheel commits markers and moves
-            // on; this reads them with panorama scope and resolves.
-            if (summary.conflicts.isNotEmpty()) {
-                val brain = driver.brain
-                if (brain != null) {
-                    println("[OROBOROS] QA-LAGUNA resolving ${summary.conflicts.size} conflicts")
-                    val results = QaLaguna.resolveConflicts(repoDir, brain, summary.panorama)
-                    val resolved = results.count { it.second }
-                    if (resolved > 0) {
-                        // Build verify after QA resolution.
-                        val build = ProcessBuilder("./gradlew", ":jvmMainClasses", "--no-daemon")
-                            .directory(repoDir).redirectErrorStream(true).start()
-                        val buildOk = build.waitFor() == 0
-                        if (buildOk) {
-                            ProcessBuilder("git", "add", "-A").directory(repoDir).start().waitFor()
-                            ProcessBuilder("git", "commit", "--amend", "--no-edit").directory(repoDir).start().waitFor()
-                            println("[OROBOROS] QA-LAGUNA resolved=$resolved build green, amended")
-                        } else {
-                            println("[OROBOROS] QA-LAGUNA resolved=$resolved build red, committed as-is")
-                            ProcessBuilder("git", "add", "-A").directory(repoDir).start().waitFor()
-                            ProcessBuilder("git", "commit", "--amend", "--no-edit").directory(repoDir).start().waitFor()
-                        }
-                    } else {
-                        println("[OROBOROS] QA-LAGUNA could not resolve — markers stay")
-                    }
-                } else {
-                    println("[OROBOROS] QA-LAGUNA no brain — conflicts stay committed")
-                }
-            }
+            println("[FLYWHEEL] phase=" + summary.phase + " cycleMs=" + summary.cycleMs + " harvested=" + summary.harvested + " dispatched=" + summary.dispatched + " alive=" + summary.alive + "/" + summary.available + " inducted=" + summary.inducted + " settled=" + summary.settled)
 
             lastCycleReport = summary
-            val json = "{\"t\":" + t0 + ",\"c\":" + summary.cycleMs + ",\"n\":" + summary.answered + ",\"d\":" + summary.harvested + ",\"r\":" + summary.reworked + ",\"p\":" + summary.dispatched + ",\"a\":" + summary.alive + ",\"v\":" + summary.available + ",\"e\":" + cyclePollErrors + ",\"P\":\"" + summary.phase + "\"}"
+            val json = "{\"t\":" + t0 + ",\"c\":" + summary.cycleMs + ",\"d\":" + summary.harvested + ",\"p\":" + summary.dispatched + ",\"a\":" + summary.alive + ",\"v\":" + summary.available + ",\"e\":" + cyclePollErrors + "}"
             try {
                 if (traceLineCount >= 10000) {
                     traceWriter?.close()
@@ -304,7 +248,7 @@ object OroborosDaemon {
         try {
             runCycle()
             if (watch) {
-                while (isRunning) {
+                while (true) {
                     val errors = consecutivePollErrors.get()
                     val backoffMs = kotlin.math.min(intervalMs * (1L shl kotlin.math.min(errors, 30)), intervalMs * 5)
                     if (errors > 0) System.err.println("[OROBOROS] backoff=${backoffMs}ms consecutiveErrors=$errors")
@@ -314,20 +258,20 @@ object OroborosDaemon {
                         consecutivePollErrors.incrementAndGet()
                         continue
                     }
+                    pollErrOccurred = false
                     try {
                         runCycle()
-                        // Backoff tracks daemon-level failure only. Per-session
-                        // drain churn (apply-check fails, no-patch probes) is
-                        // routine flywheel telemetry — it already lands in the
-                        // trace as e=N — and must not throttle the wheel.
-                        consecutivePollErrors.set(0)
                     } catch (t: Throwable) {
                         // A single cycle's failure (gate timeout, drain
                         // exception, kill -9 on the gate's children reaching
                         // the daemon's coroutine scheduler) must not tear
                         // down the daemon. Log and continue.
                         System.err.println("[OROBOROS] cycle failed: ${t.javaClass.simpleName}: ${t.message?.take(200)}")
+                    }
+                    if (pollErrOccurred) {
                         consecutivePollErrors.incrementAndGet()
+                    } else {
+                        consecutivePollErrors.set(0)
                     }
                 }
             }
