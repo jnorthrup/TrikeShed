@@ -5,8 +5,8 @@ import kotlin.test.assertEquals
 
 class ConfixCborDecoderTest {
     private fun assertRoundTrip(element: ConfixElement) {
-        val encoded = ConfixCborEmitter.emit(element)
-        val decoded = ConfixCborDecoder.decode(encoded)
+        val encoded = ConfixFormat.encodeElementToCbor(element)
+        val decoded = ConfixFormat.decodeCborToElement(encoded)
         assertEquals(element, decoded)
     }
 

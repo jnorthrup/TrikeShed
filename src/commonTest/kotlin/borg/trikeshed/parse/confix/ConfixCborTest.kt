@@ -40,7 +40,7 @@ class ConfixCborTest {
         assertContentEquals(expected, emit(second))
     }
 
-    private fun emit(element: ConfixElement): ByteArray = ConfixCborEmitter.emit(element)
+    private fun emit(element: ConfixElement): ByteArray = ConfixFormat.encodeElementToCbor(element)
 
     private fun bytes(vararg values: Int): ByteArray = ByteArray(values.size) { values[it].toByte() }
 }
