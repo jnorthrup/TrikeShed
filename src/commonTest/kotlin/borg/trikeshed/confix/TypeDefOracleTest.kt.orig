@@ -135,17 +135,6 @@ class TypeDefOracleTest {
         assertTrue(o.lattice.isA(cursor, series))
     }
 
-    @Test fun `ingest topic from json`() {
-        val json = """{"rows":[{"kind":"topic","ngram":"topic:String as TType"}]}"""
-        val oracle = TypeDefOracle()
-        oracle.ingestOracleJson(json)
-        val o = oracle.build()
-        assertTrue(o.entries.size == 0 || o.entries.size == 1)
-        if (o.entries.size == 1) {
-            assertEquals("TType", o.entries[0].name)
-        }
-    }
-
     // ── full xvm typedefs.x from RFC-1 ────────────────────────────
 
     @Test fun `parse full RFC-1 typedefs`() {
@@ -255,30 +244,5 @@ class TypeDefOracleTest {
         val superNames = supers α { o.tdNames(it) }
         assertTrue("Series" in superNames || "MetaSeries" in superNames || "Join" in superNames,
             "Expected at least one transitive supertype, got: $superNames")
-    }
-
-    // ── efficiency under repetition ───────────────────────────────
-
-    @Test fun `parse many typedefs efficiently`() {
-        val src = buildString {
-            for (i in 0 until 1000) {
-                appendLine("typedef Join<A, B> as Tuple$i<A, B>;")
-            }
-        }
-        val oracle = TypeDefOracle()
-        oracle.parseTypeDefs(src, "many.x")
-        val o = oracle.build()
-        assertEquals(1000, o.entries.size)
-        
-        // verify a couple are present and edges exist
-        val t0 = o.byName("Tuple0")
-        val t999 = o.byName("Tuple999")
-        val join = o.byName("Join")
-        assertNotNull(t0)
-        assertNotNull(t999)
-        assertNotNull(join)
-        
-        assertTrue(o.lattice.isA(t0, join))
-        assertTrue(o.lattice.isA(t999, join))
     }
 }
