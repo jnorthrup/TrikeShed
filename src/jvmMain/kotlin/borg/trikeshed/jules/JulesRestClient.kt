@@ -13,7 +13,7 @@ class JulesRestClient(
     private val apiKey: String,
     private val base: String = "https://jules.googleapis.com/v1alpha",
 ) {
-    private val http: HttpClient = HttpClient.newBuilder().build()
+    private val transport: JulesHttpClient = JvmJulesHttpClient(apiKey, base)
 
     data class SessionInfo(
         val id: String,
@@ -274,20 +274,7 @@ class JulesRestClient(
 
     private suspend fun post(path: String, json: String): String = transport.post(path, json)
 
-    private fun request(method: String, path: String, json: String?): String {
-        val builder = HttpRequest.newBuilder()
-            .uri(URI.create("$base$path"))
-            .header("x-goog-api-key", apiKey)
-            .header("Content-Type", "application/json")
-        when (method) {
-            "GET" -> builder.GET()
-            "DELETE" -> builder.DELETE()
-            else -> builder.POST(HttpRequest.BodyPublishers.ofString(json ?: "{}"))
-        }
-        val resp = http.send(builder.build(), HttpResponse.BodyHandlers.ofString())
-        if (resp.statusCode() >= 400) error("Jules API ${resp.statusCode()}: ${resp.body().take(300)}")
-        return resp.body()
-    }
+    private suspend fun delete(path: String): String = transport.delete(path)
 
     private fun jsonString(s: String): String = buildString {
         append('"')

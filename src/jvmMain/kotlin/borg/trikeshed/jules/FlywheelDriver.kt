@@ -508,18 +508,39 @@ class FlywheelDriver(
         it.snapshot.state != "COMPLETED" && it.snapshot.state != "FINISHED" && !it.drained
     }
 
-    /** Find the local ref for a Jules-pushed branch: refs/remotes/origin/jules-<sessionId>-<hash>. */
+    /** Find the GitHub branch or PR head carrying this Jules session id. */
     private fun findSessionBranch(sessionId: String): String? {
         val numericId = sessionId.substringAfterLast('/').filter { it.isDigit() }
         if (numericId.isEmpty()) return null
-        // After git fetch --prune, remote-tracking refs exist locally.
-        val res = git("branch", "-r", "--list", "origin/jules-$numericId-*")
-        if (res.exitCode != 0) return null
-        for (line in res.output.lineSequence()) {
-            val ref = line.trim()
-            if (ref.startsWith("origin/jules-$numericId-")) return ref
+
+        // Jules branches and task branches both carry the numeric Jules id.
+        val refs = git("for-each-ref", "--format=%(refname:short)", "refs/remotes/origin")
+        if (refs.exitCode == 0) {
+            refs.output.lineSequence().map { it.trim() }.firstOrNull {
+                it.startsWith("origin/") && numericId in it
+            }?.let { return it }
+        }
+
+        // A PR may carry the Jules id in its title/body while its head branch
+        // has another name. Merge that PR head; pushing master closes the PR.
+        val pr = shell(
+            "gh", "pr", "list", "--state", "open", "--search", numericId,
+            "--json", "headRefName", "--jq", ".[0].headRefName // \"\"",
+        )
+        val head = pr.output.trim()
+        if (pr.exitCode == 0 && head.isNotEmpty()) {
+            val ref = "origin/$head"
+            if (git("show-ref", "--verify", "--quiet", "refs/remotes/$ref").exitCode == 0) return ref
         }
         return null
+    }
+
+    /** Restart-safe dedup: one tag per drained Jules session. */
+    private fun hasDrainTag(sessionId: String): Boolean {
+        val safe = sessionId.replace(Regex("[^A-Za-z0-9._-]"), "-")
+        if (git("tag", "-l", "flywheel/jules-$safe-*").output.isNotBlank()) return true
+        return git("ls-remote", "--tags", "origin", "refs/tags/flywheel/jules-$safe-*")
+            .output.isNotBlank()
     }
 
     /**
