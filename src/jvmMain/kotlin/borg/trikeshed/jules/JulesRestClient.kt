@@ -113,14 +113,20 @@ class JulesRestClient(
     /** Byte length of the latest cumulative patch. */
     suspend fun patchProbe(sessionId: String): Long = lastPatch(sessionId)?.length?.toLong() ?: 0L
 
-    /** Latest activity delta; top-level output is fallback when no artifact exists. */
+    /** Latest task delta; repository snapshots containing build caches are not task deltas. */
     suspend fun lastPatch(sessionId: String): String? {
         val activityDelta = activityMaps(sessionId).asSequence()
             .flatMap { patchTexts(it).asSequence() }
+            .filterNot(::isRepositorySnapshot)
             .lastOrNull()
         if (!activityDelta.isNullOrEmpty()) return activityDelta
-        return sessionOutputsPatches(sessionId).lastOrNull()
+        return sessionOutputsPatches(sessionId).lastOrNull { !isRepositorySnapshot(it) }
     }
+
+    private fun isRepositorySnapshot(patch: String): Boolean =
+        "diff --git a/.gradle/" in patch ||
+            "diff --git a/build/" in patch ||
+            "diff --git a/.git/" in patch
 
     /** Fetch the session resource and read outputs[*].changeSet.gitPatch.unidiffPatch. */
     private suspend fun sessionOutputsPatches(sessionId: String): List<String> {
