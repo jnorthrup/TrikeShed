@@ -1,76 +1,76 @@
 package borg.trikeshed.parse.confix
 
+import borg.trikeshed.collections.associative.Cbor
+import borg.trikeshed.collections.associative.Item
+import borg.trikeshed.collections.associative.itemArrayOf
+import borg.trikeshed.collections.associative.itemMapOf
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
 class ConfixCborDecoderTest {
-    private fun assertRoundTrip(element: ConfixElement) {
-        val encoded = ConfixFormat.encodeElementToCbor(element)
-        val decoded = ConfixFormat.decodeCborToElement(encoded)
-        assertEquals(element, decoded)
+    private fun assertRoundTrip(item: Item) {
+        val encoded = Cbor.encode(item)
+        val decoded = Cbor.decode(encoded)
+        assertEquals(item, decoded)
     }
 
     @Test
     fun roundTripNull() {
-        assertRoundTrip(ConfixNull)
+        assertRoundTrip(Item.Nil)
     }
 
     @Test
     fun roundTripBooleans() {
-        assertRoundTrip(ConfixPrimitive(true))
-        assertRoundTrip(ConfixPrimitive(false))
+        assertRoundTrip(Item.Bool(true))
+        assertRoundTrip(Item.Bool(false))
     }
 
     @Test
     fun roundTripIntegers() {
-        assertRoundTrip(ConfixPrimitive(0))
-        assertRoundTrip(ConfixPrimitive(42))
-        assertRoundTrip(ConfixPrimitive(255))
-        assertRoundTrip(ConfixPrimitive(65535))
-        assertRoundTrip(ConfixPrimitive(4294967295L))
-        assertRoundTrip(ConfixPrimitive(-1))
-        assertRoundTrip(ConfixPrimitive(-42))
-        assertRoundTrip(ConfixPrimitive(-256))
-        assertRoundTrip(ConfixPrimitive(-65536))
+        assertRoundTrip(Item.Num(0))
+        assertRoundTrip(Item.Num(42))
+        assertRoundTrip(Item.Num(255))
+        assertRoundTrip(Item.Num(65535))
+        assertRoundTrip(Item.Num(4294967295L))
+        assertRoundTrip(Item.Num(-1))
+        assertRoundTrip(Item.Num(-42))
+        assertRoundTrip(Item.Num(-256))
+        assertRoundTrip(Item.Num(-65536))
     }
 
     @Test
     fun roundTripFloats() {
-        assertRoundTrip(ConfixPrimitive(3.14159))
-        assertRoundTrip(ConfixPrimitive(-0.5))
+        assertRoundTrip(Item.Flt(3.14159))
+        assertRoundTrip(Item.Flt(-0.5))
     }
 
     @Test
     fun roundTripStrings() {
-        assertRoundTrip(ConfixPrimitive("hello world"))
-        assertRoundTrip(ConfixPrimitive(""))
+        assertRoundTrip(Item.Str("hello world"))
+        assertRoundTrip(Item.Str(""))
     }
 
     @Test
     fun roundTripArrays() {
-        assertRoundTrip(ConfixArray(emptyList()))
+        assertRoundTrip(itemArrayOf())
         assertRoundTrip(
-            ConfixArray(
-                listOf(
-                    ConfixPrimitive(1),
-                    ConfixPrimitive("two"),
-                    ConfixNull
-                )
+            itemArrayOf(
+                Item.Num(1),
+                Item.Str("two"),
+                Item.Nil
             )
         )
     }
 
     @Test
     fun roundTripObjects() {
-        assertRoundTrip(ConfixObject(emptyMap()))
+        assertRoundTrip(itemMapOf())
         assertRoundTrip(
-            ConfixObject(
-                mapOf(
-                    "a" to ConfixPrimitive(1),
-                    "b" to ConfixPrimitive("two"),
-                    "c" to ConfixNull,
-                    "d" to ConfixArray(listOf(ConfixPrimitive(3)))
-                )
+            itemMapOf(
+                "a" to Item.Num(1),
+                "b" to Item.Str("two"),
+                "c" to Item.Nil,
+                "d" to itemArrayOf(Item.Num(3))
             )
         )
     }
