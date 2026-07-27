@@ -224,6 +224,11 @@ class FlywheelDriver(
         //    resolved. No early return — gates create paralysis.
         synchronizeMain()
 
+        // 3b. COMMIT CONFLICTS — any unresolved conflict markers from a prior
+        //     drain block every subsequent drain. Keep both sides, commit
+        //     as-is, move forward. Never revert, never --ours, never --theirs.
+        commitExistingConflicts()
+
         // 4. DRAIN — settle completed patches so slots free for induction.
         //    No gate. Patches that conflict get resolved (not rejected).
         //    Build must pass before commit. Drains are serial via drainGate.
@@ -328,34 +333,94 @@ class FlywheelDriver(
     }
 
     /**
-     * Serial drain: each [drainOne] runs under [drainGate] (Mutex) then [ioGate]
-     * (Semaphore). G14 guarantees git tag creation is atomic — no two drains
-     * race the same commit. Returns the (harvested, reworked) counts — a rework
-     * is a drain whose patch did not apply cleanly and was re-queued with a
-     * bumped attempt instead of silently discarded.
+     * Octopus drain: take up to 8 completed sessions, apply all patches to
+     * the working tree greedily, resolve all conflicts together, one build,
+     * one commit. Greedy = take as many as possible per cycle. Octopus =
+     * merge many branches at once, not serial 3-way.
      */
-    private suspend fun drainFanout(sessions: List<JulesRestClient.SessionInfo>): Pair<Int, Int> =
-        if (sessions.isEmpty()) 0 to 0 else coroutineScope {
-            sessions.map { s ->
-                async(Dispatchers.IO) {
-                    drainGate.withLock {
-                        ioGate.withPermit {
-                            try { drainOne(s) } catch (t: Throwable) {
-                                emitPollError("drain ${s.id}: ${t.message}", -1); DrainOutcome.Skipped
-                            }
-                        }
-                    }
-                }
-            }.awaitAll().fold(0 to 0) { (h, r), o -> when (o) {
-                is DrainOutcome.Harvested -> (h + 1) to r
-                is DrainOutcome.Skipped   -> h to r
-            } }
+    private suspend fun drainFanout(sessions: List<JulesRestClient.SessionInfo>): Pair<Int, Int> {
+        if (sessions.isEmpty()) return 0 to 0
+        val batch = sessions.take(8)
+        if (batch.size < sessions.size) {
+            println("[FLYWHEEL] OCTOPUS batch=${batch.size} of ${sessions.size} sessions")
         }
+        return drainOctopus(batch)
+    }
 
     /** One drain's terminal outcome. [Skipped] covers no-patch / dirty tree / infra errors. */
     private sealed interface DrainOutcome {
         data object Harvested : DrainOutcome
         data object Skipped   : DrainOutcome
+    }
+
+    /**
+     * Octopus merge: apply up to 8 patches to the working tree, resolve all
+     * conflicts together (keep both sides), build once, commit once.
+     * Returns (harvested, reworked) counts.
+     */
+    private suspend fun drainOctopus(sessions: List<JulesRestClient.SessionInfo>): Pair<Int, Int> {
+        val patches = mutableListOf<Pair<JulesRestClient.SessionInfo, String>>()
+        for (s in sessions) {
+            val patch = client.lastPatch(s.id)
+            if (patch.isNullOrBlank()) {
+                emitPollError("drain ${s.id}: no patch", 0)
+                continue
+            }
+            patches.add(s to patch)
+        }
+        if (patches.isEmpty()) return 0 to 0
+
+        // Write all patches to files and apply sequentially without committing.
+        val patchFiles = mutableListOf<File>()
+        try {
+            for ((s, patch) in patches) {
+                val pf = File(repoDir, ".flywheel-patch-${s.id.takeLast(6)}")
+                pf.writeText(patch)
+                patchFiles.add(pf)
+                git("apply", "--3way", pf.name)
+                pf.delete()
+            }
+        } finally {
+            patchFiles.forEach { if (it.exists()) it.delete() }
+        }
+
+        // CONFLICTS: markers stay in the files. QA sees the n=2+ distance
+        // graph — competing diffs side by side — and assesses whether the
+        // batch is converging or meandering. Do NOT resolve here.
+        val conflicts = conflictFiles()
+        if (conflicts.isNotEmpty()) {
+            println("[FLYWHEEL] OCTOPUS conflicts=${conflicts.size} files — markers kept for QA panorama")
+            conflicts.take(5).forEach { println("  ✗ $it") }
+        }
+
+        // One build, one commit.
+        var buildOk = false
+        for (attempt in 1..3) {
+            val build = shell("./gradlew", ":jvmMainClasses", "--no-daemon")
+            if (build.exitCode == 0) { buildOk = true; break }
+            println("[FLYWHEEL] OCTOPUS build attempt $attempt failed, fixing")
+            if (!fixBuildErrors(build.output.take(2000), emptyList())) break
+        }
+
+        val touched = patches.flatMap { (_, patch) -> parsePatchFiles(patch) }.distinct()
+        val addCmd = mutableListOf("git", "add")
+        addCmd.addAll(touched)
+        addCmd.addAll(conflicts)
+        git(*addCmd.toTypedArray())
+
+        val titles = patches.joinToString(", ") { (s, _) -> s.title.take(30) }
+        val commitRes = git("commit", "-m", "flywheel: octopus ${patches.size} sessions: $titles")
+        if (commitRes.exitCode != 0) {
+            return 0 to 0
+        }
+
+        val commitSha = headSha()
+        for ((s, _) in patches) {
+            conductor.recordDrain(s.id, commitSha, conflicts.size)
+            _events.emit(FlywheelEvent.Drained(s.id, commitSha, "octopus"))
+            drainFailures.remove(s.id)
+        }
+        return patches.size to 0
     }
 
     private fun activeCount(): Int = conductor.cards.values.count {
@@ -942,6 +1007,29 @@ class FlywheelDriver(
         _events.emit(FlywheelEvent.Drained(s.id, commitSha, tag))
         drainFailures.remove(s.id)
         return DrainOutcome.Harvested
+    }
+
+    /**
+     * Commit any unresolved conflict markers in the working tree as-is.
+     * Both sides are kept (the markers stay in the file); the commit moves
+     * the repo forward so subsequent drains start from a clean tree. The
+     * build-fix loop on the NEXT drain resolves semantic issues.
+     */
+    private fun commitExistingConflicts() {
+        val files = conflictFiles()
+        if (files.isEmpty()) return
+        println("[FLYWHEEL] COMMIT-CONFLICTS ${files.size} files with conflict markers — keeping both sides")
+        files.take(5).forEach { println("  ✗ $it") }
+        val addCmd = mutableListOf("git", "add")
+        addCmd.addAll(files)
+        git(*addCmd.toTypedArray())
+        val msg = "flywheel: conflict — kept both sides (${files.size} files)"
+        val res = git("commit", "-m", msg)
+        if (res.exitCode != 0) {
+            println("[FLYWHEEL] COMMIT-CONFLICTS failed: ${res.output.take(200)}")
+        } else {
+            println("[FLYWHEEL] COMMIT-CONFLICTS ok — ${files.size} files committed with markers")
+        }
     }
 
     /** Files with unresolved conflict markers in the working tree. */
