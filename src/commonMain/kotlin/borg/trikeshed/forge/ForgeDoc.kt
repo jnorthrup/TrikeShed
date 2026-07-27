@@ -419,6 +419,11 @@ private fun parseKanbanColumnsProperty(raw: String?): List<KanbanColumnRef> {
     return out
 }
 
+private val ID_REGEX = Regex("\"id\"\\s*:\\s*(\"([^\"\\\\]*(?:\\\\.[^\"\\\\]*)*)\"|([0-9]+))")
+private val NAME_REGEX = Regex("\"name\"\\s*:\\s*(\"([^\"\\\\]*(?:\\\\.[^\"\\\\]*)*)\"|([0-9]+))")
+private val ORDER_REGEX = Regex("\"order\"\\s*:\\s*(\"([^\"\\\\]*(?:\\\\.[^\"\\\\]*)*)\"|([0-9]+))")
+private val WIP_LIMIT_REGEX = Regex("\"wipLimit\"\\s*:\\s*(\"([^\"\\\\]*(?:\\\\.[^\"\\\\]*)*)\"|([0-9]+))")
+
 private fun parseKanbanColumnObject(entry: String): KanbanColumnRef? {
     fun field(regex: Regex): String? {
         val m = regex.find(entry) ?: return null
