@@ -350,7 +350,6 @@ class FlywheelDriver(
                 }
             }.awaitAll().fold(0 to 0) { (h, r), o -> when (o) {
                 is DrainOutcome.Harvested -> (h + 1) to r
-                is DrainOutcome.Reworked  -> h to (r + 1)
                 is DrainOutcome.Skipped   -> h to r
             } }
         }
@@ -359,8 +358,6 @@ class FlywheelDriver(
     private sealed interface DrainOutcome {
         data object Harvested : DrainOutcome
         data object Skipped   : DrainOutcome
-        /** Patch did not apply cleanly; a rework [JulesCause.WorkQueued] was re-appended. */
-        data class Reworked(val newWorkId: String, val attempt: Int) : DrainOutcome
     }
 
     private fun activeCount(): Int = conductor.cards.values.count {
@@ -1134,92 +1131,6 @@ class FlywheelDriver(
             false
         }
     }
-
-    /**
-     * Re-queue a failed drain as a rework (doneagain), then tombstone the card —
-     * the rework supersedes the dead patch, so the drain set stops re-probing it.
-     *
-     * Lineage lives in the QUEUE, not the card: dispatch appends WorkDispatched
-     * via appendWork keyed by workId; card causes never carry it. The previous
-     * card-cause lookup never matched (WAL: 281 DrainFailed, 0 reworks ever) —
-     * doneagain could not fire and failed cards churned forever. Lineage is now
-     * resolved via [JulesBoardStore.loadQueue] sessionId; a session with no
-     * queue entry (manual/web-dispatched) gets a synthesized identity seeded
-     * from its own completion summary so the wheel can retry its intent.
-     */
-    private suspend fun reworkFailedDrain(
-        s: JulesRestClient.SessionInfo,
-        reason: String,
-    ): DrainOutcome.Reworked? {
-        val now = Clock.System.now().toEpochMilliseconds()
-        val card = conductor.cards[s.id] ?: run {
-            conductor.recordDrainFailure(s.id, reason, now)
-            return null
-        }
-        val seed = store.loadQueue().firstOrNull { it.sessionId == s.id }?.let { entry ->
-            ReworkSeed(
-                id = "rework:${entry.workId}#${entry.attempt + 1}",
-                attempt = entry.attempt + 1,
-                title = stripReworkDecoration(entry.title),
-                spec = entry.spec,
-                tier = entry.tier,
-                parent = entry.workId,
-                score = entry.score,
-            )
-        } ?: ReworkSeed(
-            id = "synth:${s.id}",
-            attempt = 1,
-            title = stripReworkDecoration(s.title),
-            spec = buildString {
-                appendLine("Prior Jules session ${s.id} delivered a patch that fails to apply to current master.")
-                card.causes.filterIsInstance<JulesCause.AgentMessaged>().lastOrNull()?.excerpt?.take(400)?.let {
-                    appendLine("Agent's completion summary:")
-                    appendLine(it.prependIndent("  "))
-                }
-            }.trim(),
-            tier = "synth",
-            parent = null,
-            score = 0.5,
-        )
-        val reworkSpec = buildString {
-            appendLine("REWORK attempt ${seed.attempt} of ${seed.title}.")
-            appendLine("Prior Jules session ${s.id} produced a patch that failed to apply:")
-            appendLine("  reason: $reason")
-            appendLine("Original spec:")
-            appendLine(seed.spec.prependIndent("  "))
-            appendLine("Produce a fresh patch that applies cleanly against current master.")
-            appendLine("TDD: one test file + one minimal implementation file; gate: ./gradlew jvmTest --no-daemon")
-        }.trim()
-        store.appendWork(seed.id, JulesCause.WorkQueued(
-            workId = seed.id,
-            tier = seed.tier,
-            // Base title only: seed.title is already stripped of all prior
-            // rework decorations, so re-reworks never compound.
-            title = "[rework #${seed.attempt}] ${seed.title}",
-            spec = reworkSpec,
-            parent = seed.parent,
-            score = (seed.score + 0.1).coerceAtMost(1.0),
-            at = now,
-        ))
-        conductor.retireTerminal(s.id, "$reason → superseded by ${seed.id}", now)
-        return DrainOutcome.Reworked(seed.id, seed.attempt)
-    }
-
-    /** Provenance for one doneagain: where the rework's identity came from. */
-    private data class ReworkSeed(
-        val id: String, val attempt: Int, val title: String, val spec: String,
-        val tier: String, val parent: String?, val score: Double,
-    )
-
-    private val reworkDecoration = Regex("^(?:REWORK attempt \\d+ of )?(?:\\[rework #\\d+\\] )*")
-
-    /**
-     * Strip all rework decorations from a title so re-reworks never compound.
-     * Handles both the queue title shape ("[rework #2] [rework #1] foo") and
-     * the Jules session title shape ("REWORK attempt 2 of [rework #1] foo").
-     */
-    private fun stripReworkDecoration(raw: String): String =
-        raw.replace(reworkDecoration, "").trim()
 
     data class CycleReport(
         /** Wall-clock duration of the cycle in milliseconds. */

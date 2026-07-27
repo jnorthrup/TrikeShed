@@ -108,3 +108,55 @@ fun Cursor.zoom(vararg path: CharSequence): Cursor {
     
     return current
 }
+
+/**
+ * Zooms into a nested cursor at the specified column name.
+ * Flattening all nested cursors into a single continuous Cursor lazily.
+ */
+fun Cursor.zoom(path: String): Cursor {
+    if (this.size == 0) return emptySeries()
+    
+    val firstRow = this.b(0)
+    var colIndex = -1
+    for (i in 0 until firstRow.size) {
+        val meta = firstRow.b(i).b() as? ColumnMeta ?: (firstRow.b(i).b as? Function0<*>)?.invoke() as? ColumnMeta
+        if (meta?.name == path) {
+            colIndex = i
+            break
+        }
+    }
+    
+    if (colIndex == -1) {
+        return emptySeries()
+    }
+    
+    val prefixSums = IntArray(this.size + 1)
+    var currentOffset = 0
+    prefixSums[0] = 0
+    
+    for (i in 0 until this.size) {
+        val cellValue = this.b(i).b(colIndex).a
+        val childSize = if (cellValue is Join<*, *>) (cellValue as Join<Int, *>).a else 0
+        currentOffset += childSize
+        prefixSums[i + 1] = currentOffset
+    }
+    
+    val totalSize = currentOffset
+    if (totalSize == 0) return emptySeries()
+    
+    return totalSize j { globalIndex ->
+        var rowIdx = prefixSums.binarySearch(globalIndex)
+        if (rowIdx < 0) {
+            rowIdx = -rowIdx - 2
+        } else {
+            while (rowIdx < prefixSums.size - 1 && prefixSums[rowIdx + 1] <= globalIndex) {
+                rowIdx++
+            }
+        }
+        
+        @Suppress("UNCHECKED_CAST")
+        val childCursor = this.b(rowIdx).b(colIndex).a as Cursor
+        val localIndex = globalIndex - prefixSums[rowIdx]
+        childCursor.b(localIndex)
+    }
+}
