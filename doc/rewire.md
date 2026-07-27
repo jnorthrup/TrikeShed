@@ -494,4 +494,3 @@ graph is the UI. The VFS is btrfs-on-JBOD with COW snapshots. The VCS
 gateway is pijul<->git over CAS/IPFS/IPNS. Every claim maps to code
 that exists or is one focused cut away.*
 
-================
