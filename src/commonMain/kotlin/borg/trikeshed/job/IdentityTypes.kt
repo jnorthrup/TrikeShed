@@ -19,12 +19,13 @@ data class Revision(val value: Long) {
     }
 }
 
-@Serializable
-data class KanbanColumnId(val value: String) {
-    companion object {
-        fun of(value: String) = KanbanColumnId(value)
-    }
-}
+/**
+ * KanbanColumnId is canonically owned by [borg.trikeshed.kanban.KanbanColumnId].
+ * This alias preserves source-compatibility for job-package call sites
+ * (e.g. [JobCommand.Move.toColumn]) while unifying the serialization identity
+ * to a single @Serializable type and a single generated serializer.
+ */
+typealias KanbanColumnId = borg.trikeshed.kanban.KanbanColumnId
 
 @Serializable
 data class Sequence(val value: Long) {

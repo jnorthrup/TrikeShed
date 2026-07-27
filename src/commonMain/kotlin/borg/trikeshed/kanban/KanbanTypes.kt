@@ -31,6 +31,8 @@ data class KanbanBoardId(val value: String) {
 data class KanbanColumnId(val value: String) {
     companion object {
         fun generate(): KanbanColumnId = KanbanColumnId(newId("col"))
+        /** Construction alias for call sites that build from an existing id string. */
+        fun of(value: String): KanbanColumnId = KanbanColumnId(value)
     }
 }
 
