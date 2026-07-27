@@ -195,9 +195,9 @@ object OroborosDaemon {
                     val report = lastCycleReport
                     val uptimeMs = System.currentTimeMillis() - daemonStartTime
                     val msg = if (report != null) {
-                        "ALIVE $uptimeMs ${report.phase} ${report.cycleMs} ${report.answered} ${report.harvested} ${report.reworked} ${report.dispatched} ${report.alive} ${report.available}\n"
+                        "ALIVE $uptimeMs ${report.cycleMs} ${report.harvested} ${report.dispatched} ${report.alive} ${report.available}\n"
                     } else {
-                        "ALIVE $uptimeMs ∅ -1 -1 -1 -1 -1 -1\n"
+                        "ALIVE $uptimeMs -1 -1 -1 -1 -1\n"
                     }
                     val buf = ByteBuffer.wrap(msg.toByteArray())
                     while (buf.hasRemaining()) {
