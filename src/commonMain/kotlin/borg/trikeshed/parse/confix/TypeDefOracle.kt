@@ -56,7 +56,6 @@ class TypeDefOracle {
             """^\s*typedef\s+(.+?)\s+as\s+([A-Za-z_]\w*)(?:<([^>]+)>)?\s*;""",
             setOf(RegexOption.MULTILINE)
         )
-
         private val typealiasPattern = Regex(
             """^\s*typealias\s+([A-Za-z_]\w*)(?:<([^>]+)>)?\s*=\s*(.+?)$""",
             setOf(RegexOption.MULTILINE)
