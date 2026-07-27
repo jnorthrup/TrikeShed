@@ -364,95 +364,99 @@ class FlywheelDriver(
     }
 
     /**
-     * Octopus merge: apply up to 8 patches to the working tree, commit with
-     * conflict markers as-is, then LAGUNA QA resolves with panorama scope.
+     * 3-way branch merge: merge up to 8 Jules-pushed branches into master
+     * sequentially. Real merge ancestry — the git graph converges.
+     *
+     * CAS-FIRST: every delta is content-addressed BEFORE it touches the tree.
+     * The patch bytes fetched from the API go into the CAS store first; the
+     * resulting CID is the provenance anchor for the merge. Only AFTER the
+     * CID exists does the branch merge (or patch apply) run.
      *
      * Flow:
-     *   1. Apply all patches (3-way, leave markers)
-     *   2. git add + commit — conflict markers and all. This unblocks the wheel.
-     *   3. QA step: LAGUNA reads conflicted files with panorama scope (all 8
-     *      sessions' patches + titles + the conflict regions), resolves them,
-     *      amends the commit.
-     *   4. Build verify.
+     *   1. git fetch origin (prune stale refs)
+     *   2. For each session: fetch patch → CAS put → CID → merge branch.
+     *      On conflict: git add -A + commit (concludes merge WITH markers).
+     *      Never --ours/--theirs, never abort.
+     *   3. Build verify.
      */
     private suspend fun drainOctopus(sessions: List<JulesRestClient.SessionInfo>): Pair<Int, Int> {
-        val patches = mutableListOf<Pair<JulesRestClient.SessionInfo, String>>()
+        // 1. Fetch all branches so refs are available locally.
+        git("fetch", "origin", "--prune")
+
+        // CAS-FIRST: content-address every delta before merge.
+        data class Arm(val session: JulesRestClient.SessionInfo, val patchCid: ContentId, val patch: String, val branch: String?)
+        val arms = mutableListOf<Arm>()
         for (s in sessions) {
             val patch = client.lastPatch(s.id)
             if (patch.isNullOrBlank()) {
-                emitPollError("drain ${s.id}: no patch", 0)
+                emitPollError("drain ${s.id}: no patch to CAS", 0)
                 continue
             }
-            patches.add(s to patch)
-        }
-        if (patches.isEmpty()) return 0 to 0
-
-        // 1. Apply all patches — conflicts leave markers in working tree.
-        val patchFiles = mutableListOf<File>()
-        try {
-            for ((s, patch) in patches) {
-                val pf = File(repoDir, ".flywheel-patch-${s.id.takeLast(6)}")
-                pf.writeText(patch)
-                patchFiles.add(pf)
-                git("apply", "--3way", pf.name)
-                pf.delete()
+            val patchCid = try { casStore.put(patch.encodeToByteArray()) }
+            catch (e: Exception) {
+                println("[FLYWHEEL] CAS-FAIL ${s.id.takeLast(6)}: ${e.message}")
+                continue
             }
-        } finally {
-            patchFiles.forEach { if (it.exists()) it.delete() }
+            val branch = findSessionBranch(s.id)
+            arms.add(Arm(s, patchCid, patch, branch))
+            println("[FLYWHEEL] CAS ${s.id.takeLast(6)} cid=${patchCid.value.take(16)} branch=${branch ?: "none"}")
         }
+        if (arms.isEmpty()) return 0 to 0
 
-        val conflicts = conflictFiles()
-        if (conflicts.isNotEmpty()) {
-            println("[FLYWHEEL] OCTOPUS conflicts=${conflicts.size} files — committing markers, QA will resolve")
-            conflicts.take(5).forEach { println("  ✗ $it") }
+        // 2. Merge each arm. Branch → git merge; no branch → patch apply.
+        var conflictCount = 0
+        for (arm in arms) {
+            val (s, _, _, branch) = arm
+            if (branch != null) {
+                val mergeRes = git("merge", "--no-ff", "--no-edit", branch)
+                if (mergeRes.exitCode != 0) {
+                    val conflicted = conflictFiles()
+                    conflictCount += conflicted.size
+                    if (conflicted.isNotEmpty()) {
+                        println("[FLYWHEEL] MERGE-CONFLICT ${s.id.takeLast(6)} ($branch): ${conflicted.size} files — committing markers")
+                        conflicted.take(3).forEach { println("  ✗ $it") }
+                    }
+                    git("add", "-A")
+                    git("commit", "--no-verify", "-m", "flywheel: merge ${s.title.take(50)} ($branch) — ${conflicted.size} conflicts kept")
+                } else {
+                    println("[FLYWHEEL] MERGED ${s.id.takeLast(6)} ($branch)")
+                }
+            } else {
+                // Fallback: no branch on origin — apply the CAS'd patch.
+                val pf = File(repoDir, ".flywheel-patch-${s.id.takeLast(6)}")
+                try {
+                    pf.writeText(arm.patch)
+                    git("apply", "--3way", pf.name)
+                    val conflicted = conflictFiles()
+                    conflictCount += conflicted.size
+                    git("add", "-A")
+                    git("commit", "--no-verify", "-m", "flywheel: patch ${s.title.take(50)} (${s.id.takeLast(6)})")
+                } finally {
+                    if (pf.exists()) pf.delete()
+                }
+            }
         }
+        println("[FLYWHEEL] DRAIN ${arms.size} sessions merged, $conflictCount conflict files")
 
-        // 2. Commit EVERYTHING — markers, clean applies, all of it. This is
-        //    the unblock: the wheel never stalls on a dirty tree.
-        git("add", "-A")
-        val titles = patches.joinToString(", ") { (s, _) -> s.title.take(30) }
-        val commitMsg = if (conflicts.isNotEmpty())
-            "flywheel: octopus ${patches.size} sessions (${conflicts.size} conflicts): $titles"
-        else
-            "flywheel: octopus ${patches.size} sessions: $titles"
-        val commitRes = git("commit", "--no-verify", "-m", commitMsg)
-        if (commitRes.exitCode != 0) {
-            println("[FLYWHEEL] OCTOPUS commit failed: ${commitRes.output.take(200)}")
-            return 0 to 0
-        }
-        println("[FLYWHEEL] OCTOPUS committed ${patches.size} sessions, ${conflicts.size} conflicts")
-
-        // Build verify — if green, amend. If red, the committed markers stay
-        // for the QA-Laguna process to resolve (separate from the flywheel).
+        // 3. Build verify — if green, amend. If red, markers stay for QA.
         val build = shell("./gradlew", ":jvmMainClasses", "--no-daemon")
         if (build.exitCode == 0) {
             git("add", "-A")
             git("commit", "--amend", "--no-edit")
-            println("[FLYWHEEL] OCTOPUS build green, amended")
+            println("[FLYWHEEL] DRAIN build green, amended")
         } else {
-            println("[FLYWHEEL] OCTOPUS build red — markers stay committed, QA resolves externally")
+            println("[FLYWHEEL] DRAIN build red — markers stay committed, QA resolves externally")
         }
 
+        // 4. PROVENANCE CLOSE — CID is already in hand from step 2.
         val commitSha = headSha()
         val now = Clock.System.now().toEpochMilliseconds()
-        for ((s, patch) in patches) {
-            // PROVENANCE CLOSE — proposal → merge chain. Without these writes
-            // the wheel re-drains this COMPLETED session every cycle (drained
-            // flag flips via recordDrain, but the queue WAL never learns the
-            // drain landed, and the Jules-created GitHub branch / PR carrying
-            // this session's id is never recorded). The receipt bonds workId →
-            // sessionId → gitBranch (jules-<id>-<hash>) → prUrl → commitSha.
-            val patchCid = try { casStore.put(patch.encodeToByteArray()) }
-            catch (e: Exception) {
-                println("[FLYWHEEL] OCTOPUS cas-fail ${s.id.takeLast(6)}: ${e.message}")
-                continue
-            }
+        for (arm in arms) {
+            val (s, patchCid, _, branch) = arm
             val safeSession = s.id.replace(Regex("[^A-Za-z0-9._-]"), "-")
             val tag = "flywheel/jules-$safeSession-${commitSha.take(12)}"
             git("tag", "-a", tag, commitSha, "-m",
-                "Jules merge receipt\nsession=$s.id\npatchCid=${patchCid.value}\ntaskTitle=${s.title}")
-            // Fish the Jules-pushed branch: refs/heads/jules-<sessionId>-<hash>.
-            // The branch name carries the Jules id — this is the GitHub surface.
+                "Jules merge receipt\nsession=${s.id}\npatchCid=${patchCid.value}\nbranch=${branch ?: "none"}\ntaskTitle=${s.title}")
             val prUrl = try { fishPrUrl(s.id, tag) } catch (_: Throwable) { null }
             val workId = store.loadQueue().firstOrNull { it.sessionId == s.id }?.workId
                 ?: "session:${s.id.replace(Regex("[^A-Za-z0-9._-]"), "-")}"
@@ -467,7 +471,7 @@ class FlywheelDriver(
                 claimedAt = now,
                 prUrl = prUrl,
             )
-            conductor.recordDrain(s.id, commitSha, conflicts.size)
+            conductor.recordDrain(s.id, commitSha, conflictCount)
             store.appendWork(workId, JulesCause.WorkDrained(
                 workId = workId,
                 sessionId = s.id,
@@ -476,17 +480,12 @@ class FlywheelDriver(
                 receipt = receipt,
                 at = now,
             ))
-            // Identity synthesis: records the durable synonym map
-            // (sessionId → gitBranch → prUrl → gitTag → commitSha) so the
-            // wheel can recover provenance across restarts.  The gitBranch is
-            // fished from origin by fishPrUrl; extract the raw ref name.
-            val gitBranch = prUrl?.let { extractBranchRef(s.id) }
             store.appendWork(workId, JulesCause.WorkIdentitySynthesized(
                 workId = workId,
                 identity = WorkIdentity(
                     workId = workId,
                     sessionId = s.id,
-                    gitBranch = gitBranch,
+                    gitBranch = branch,
                     prUrl = prUrl,
                     gitTag = tag,
                     commitSha = commitSha,
@@ -495,28 +494,27 @@ class FlywheelDriver(
             ))
             _events.emit(FlywheelEvent.Drained(s.id, commitSha, tag))
             drainFailures.remove(s.id)
-            println("[FLYWHEEL] OCTOPUS provenance ${s.id.takeLast(6)} workId=$workId branch=${gitBranch ?: "none"} pr=${prUrl ?: "none"} tag=$tag")
+            println("[FLYWHEEL] PROVENANCE ${s.id.takeLast(6)} cid=${patchCid.value.take(16)} branch=${branch ?: "none"} pr=${prUrl ?: "none"} tag=$tag")
         }
-        return patches.size to 0
-    }
-
-    /** Extract the raw `refs/heads/jules-<id>-<hash>` ref for a session id. */
-    private fun extractBranchRef(sessionId: String): String? {
-        val numericId = sessionId.substringAfterLast('/').filter { it.isDigit() }
-        if (numericId.isEmpty()) return null
-        val ls = git("ls-remote", "origin", "refs/heads/jules-$numericId-*")
-        if (ls.exitCode != 0) return null
-        for (line in ls.output.lineSequence()) {
-            val parts = line.trim().split("\t")
-            if (parts.size == 2 && parts[1].startsWith("refs/heads/jules-$numericId-")) {
-                return parts[1]
-            }
-        }
-        return null
+        return arms.size to 0
     }
 
     private fun activeCount(): Int = conductor.cards.values.count {
         it.snapshot.state != "COMPLETED" && it.snapshot.state != "FINISHED" && !it.drained
+    }
+
+    /** Find the local ref for a Jules-pushed branch: refs/remotes/origin/jules-<sessionId>-<hash>. */
+    private fun findSessionBranch(sessionId: String): String? {
+        val numericId = sessionId.substringAfterLast('/').filter { it.isDigit() }
+        if (numericId.isEmpty()) return null
+        // After git fetch --prune, remote-tracking refs exist locally.
+        val res = git("branch", "-r", "--list", "origin/jules-$numericId-*")
+        if (res.exitCode != 0) return null
+        for (line in res.output.lineSequence()) {
+            val ref = line.trim()
+            if (ref.startsWith("origin/jules-$numericId-")) return ref
+        }
+        return null
     }
 
     /**
