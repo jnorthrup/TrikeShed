@@ -61,18 +61,16 @@ class TypeDefOracle {
             """^\s*typealias\s+([A-Za-z_]\w*)(?:<([^>]+)>)?\s*=\s*(.+?)$""",
             setOf(RegexOption.MULTILINE)
         )
-        
-<<<<<<< HEAD
+
         private val topicRegex = Regex("""^topic:(\w+)\s+as\s+(\w+)""")
         private val typeParamsRemoveRegex = Regex("""<[^>]*>""")
         private val parenthesesRemoveRegex = Regex("""\([^)]*\)""")
         private val baseNamesSplitRegex = Regex("""[|,\s]+""")
-=======
-        private val topicPattern = Regex("""^topic:(\w+)\s+as\s+(\w+)""")
-        private val typeParamPattern = Regex("""<[^>]*>""")
-        private val typeParenPattern = Regex("""\([^)]*\)""")
-        private val typeSplitPattern = Regex("""[|,\s]+""")
->>>>>>> flywheel/g09-rework
+        // n=2: both naming conventions resolve to the same regex objects
+        private val topicPattern = topicRegex
+        private val typeParamPattern = typeParamsRemoveRegex
+        private val typeParenPattern = parenthesesRemoveRegex
+        private val typeSplitPattern = baseNamesSplitRegex
     }
 
     fun parseTypeDefs(text: String, source: String = "<unknown>") {
@@ -157,6 +155,7 @@ class TypeDefOracle {
                 }
                 "isA_edge" -> ngram.split(" -> ").takeIf { it.size >= 2 }?.let { (c, p) ->
                     addLinkCheck(c, p)
+                }
                 "topic" -> topicRegex.find(ngram)?.let { mr ->
                     addEntry(mr.groupValues[2], mr.groupValues[1], null, "lda-topic")
                 }

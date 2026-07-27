@@ -2,6 +2,7 @@ package borg.trikeshed.daemon
 
 import borg.trikeshed.jules.FlywheelDriver
 import borg.trikeshed.jules.FlywheelDriver.FlywheelEvent
+import borg.trikeshed.jules.QaLaguna
 import borg.trikeshed.util.io.ForgeCliArgs
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -247,6 +248,37 @@ object OroborosDaemon {
             val summary: FlywheelDriver.CycleReport = driver.cycle()
             val cyclePollErrors = pollErrors - startPollErrors
             println("[FLYWHEEL] phase=" + summary.phase + " cycleMs=" + summary.cycleMs + " answered=" + summary.answered + " harvested=" + summary.harvested + " reworked=" + summary.reworked + " dispatched=" + summary.dispatched + " alive=" + summary.alive + "/" + summary.available + " inducted=" + summary.inducted + " settled=" + summary.settled)
+
+            // QA STEP — QaLaguna resolves committed conflict markers.
+            // Runs OUTSIDE the flywheel: the wheel commits markers and moves
+            // on; this reads them with panorama scope and resolves.
+            if (summary.conflicts.isNotEmpty()) {
+                val brain = driver.brain
+                if (brain != null) {
+                    println("[OROBOROS] QA-LAGUNA resolving ${summary.conflicts.size} conflicts")
+                    val results = QaLaguna.resolveConflicts(repoDir, brain, summary.panorama)
+                    val resolved = results.count { it.second }
+                    if (resolved > 0) {
+                        // Build verify after QA resolution.
+                        val build = ProcessBuilder("./gradlew", ":jvmMainClasses", "--no-daemon")
+                            .directory(repoDir).redirectErrorStream(true).start()
+                        val buildOk = build.waitFor() == 0
+                        if (buildOk) {
+                            ProcessBuilder("git", "add", "-A").directory(repoDir).start().waitFor()
+                            ProcessBuilder("git", "commit", "--amend", "--no-edit").directory(repoDir).start().waitFor()
+                            println("[OROBOROS] QA-LAGUNA resolved=$resolved build green, amended")
+                        } else {
+                            println("[OROBOROS] QA-LAGUNA resolved=$resolved build red, committed as-is")
+                            ProcessBuilder("git", "add", "-A").directory(repoDir).start().waitFor()
+                            ProcessBuilder("git", "commit", "--amend", "--no-edit").directory(repoDir).start().waitFor()
+                        }
+                    } else {
+                        println("[OROBOROS] QA-LAGUNA could not resolve — markers stay")
+                    }
+                } else {
+                    println("[OROBOROS] QA-LAGUNA no brain — conflicts stay committed")
+                }
+            }
 
             lastCycleReport = summary
             val json = "{\"t\":" + t0 + ",\"c\":" + summary.cycleMs + ",\"n\":" + summary.answered + ",\"d\":" + summary.harvested + ",\"r\":" + summary.reworked + ",\"p\":" + summary.dispatched + ",\"a\":" + summary.alive + ",\"v\":" + summary.available + ",\"e\":" + cyclePollErrors + ",\"P\":\"" + summary.phase + "\"}"

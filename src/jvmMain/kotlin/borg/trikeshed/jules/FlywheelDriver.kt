@@ -100,7 +100,7 @@ class FlywheelDriver(
     ),
 ) {
     private val client = JulesRestClient(apiKey)
-    private val brain: BrainClient? = System.getenv("NVIDIA_API_KEY")?.let { BrainClient(it) }
+    internal val brain: BrainClient? = System.getenv("NVIDIA_API_KEY")?.let { BrainClient(it) }
     private val store = JulesBoardStore.forForgeDir(forgeDir)
     private val conductor = JulesConductor(
         client = client,
@@ -243,10 +243,6 @@ class FlywheelDriver(
         }
         val (harvested, reworked) = drainFanout(sessions)
 
-        // 4b. CONFLICT ASSESSMENT — conflicts are kept and resolved inside
-        //     drainOne; this surfaces the count for the next RGA cycle.
-        val conflictCount = assessConflicts()
-
         // 5. SETTLE — push whatever landed. If push fails, the next cycle
         //    retries. No early return.
         settlementBarrier()
@@ -318,7 +314,19 @@ class FlywheelDriver(
             }
         }
 
-                return CycleReport(
+        val conflictCount = assessConflicts()
+        val committedConflicts = conflictFiles()
+
+        // Build panorama from the sessions that were drained this cycle.
+        val panorama = sessions.map { s ->
+            QaLaguna.SessionPanorama(
+                sessionId = s.id,
+                title = s.title,
+                touchedFiles = emptyList(),
+            )
+        }
+
+        return CycleReport(
             cycleMs = System.currentTimeMillis() - t0,
             answered = answered,
             harvested = harvested,
@@ -329,6 +337,8 @@ class FlywheelDriver(
             inducted = inducted,
             settled = true,
             phase = FlywheelPhase.DISPATCH,
+            conflicts = committedConflicts,
+            panorama = panorama,
         )
     }
 
@@ -412,29 +422,97 @@ class FlywheelDriver(
         }
         println("[FLYWHEEL] OCTOPUS committed ${patches.size} sessions, ${conflicts.size} conflicts")
 
-        // 3. QA STEP — LAGUNA resolves conflict markers with panorama scope.
-        if (conflicts.isNotEmpty()) {
-            qaResolveConflicts(conflicts, patches)
-        }
-
-        // 4. Build verify after QA resolution.
+        // Build verify — if green, amend. If red, the committed markers stay
+        // for the QA-Laguna process to resolve (separate from the flywheel).
         val build = shell("./gradlew", ":jvmMainClasses", "--no-daemon")
-        if (build.exitCode != 0) {
-            println("[FLYWHEEL] OCTOPUS build failed after QA: ${build.output.take(200)}")
-        } else {
-            // Amend the commit with resolved files.
+        if (build.exitCode == 0) {
             git("add", "-A")
             git("commit", "--amend", "--no-edit")
-            println("[FLYWHEEL] OCTOPUS QA resolved, build green, amended")
+            println("[FLYWHEEL] OCTOPUS build green, amended")
+        } else {
+            println("[FLYWHEEL] OCTOPUS build red — markers stay committed, QA resolves externally")
         }
 
         val commitSha = headSha()
-        for ((s, _) in patches) {
+        val now = Clock.System.now().toEpochMilliseconds()
+        for ((s, patch) in patches) {
+            // PROVENANCE CLOSE — proposal → merge chain. Without these writes
+            // the wheel re-drains this COMPLETED session every cycle (drained
+            // flag flips via recordDrain, but the queue WAL never learns the
+            // drain landed, and the Jules-created GitHub branch / PR carrying
+            // this session's id is never recorded). The receipt bonds workId →
+            // sessionId → gitBranch (jules-<id>-<hash>) → prUrl → commitSha.
+            val patchCid = try { casStore.put(patch.encodeToByteArray()) }
+            catch (e: Exception) {
+                println("[FLYWHEEL] OCTOPUS cas-fail ${s.id.takeLast(6)}: ${e.message}")
+                continue
+            }
+            val safeSession = s.id.replace(Regex("[^A-Za-z0-9._-]"), "-")
+            val tag = "flywheel/jules-$safeSession-${commitSha.take(12)}"
+            git("tag", "-a", tag, commitSha, "-m",
+                "Jules merge receipt\nsession=$s.id\npatchCid=${patchCid.value}\ntaskTitle=${s.title}")
+            // Fish the Jules-pushed branch: refs/heads/jules-<sessionId>-<hash>.
+            // The branch name carries the Jules id — this is the GitHub surface.
+            val prUrl = try { fishPrUrl(s.id, tag) } catch (_: Throwable) { null }
+            val workId = store.loadQueue().firstOrNull { it.sessionId == s.id }?.workId
+                ?: "session:${s.id.replace(Regex("[^A-Za-z0-9._-]"), "-")}"
+            val receipt = MergeReceipt(
+                workId = workId,
+                producer = "jules",
+                producerRef = s.id,
+                patchCid = patchCid,
+                revision = commitSha,
+                versionTag = tag,
+                lexicalMemory = LexicalMemory(summary = s.title, title = s.title, content = ""),
+                claimedAt = now,
+                prUrl = prUrl,
+            )
             conductor.recordDrain(s.id, commitSha, conflicts.size)
-            _events.emit(FlywheelEvent.Drained(s.id, commitSha, "octopus"))
+            store.appendWork(workId, JulesCause.WorkDrained(
+                workId = workId,
+                sessionId = s.id,
+                commitSha = commitSha,
+                taskId = tag,
+                receipt = receipt,
+                at = now,
+            ))
+            // Identity synthesis: records the durable synonym map
+            // (sessionId → gitBranch → prUrl → gitTag → commitSha) so the
+            // wheel can recover provenance across restarts.  The gitBranch is
+            // fished from origin by fishPrUrl; extract the raw ref name.
+            val gitBranch = prUrl?.let { extractBranchRef(s.id) }
+            store.appendWork(workId, JulesCause.WorkIdentitySynthesized(
+                workId = workId,
+                identity = WorkIdentity(
+                    workId = workId,
+                    sessionId = s.id,
+                    gitBranch = gitBranch,
+                    prUrl = prUrl,
+                    gitTag = tag,
+                    commitSha = commitSha,
+                ),
+                at = now,
+            ))
+            _events.emit(FlywheelEvent.Drained(s.id, commitSha, tag))
             drainFailures.remove(s.id)
+            println("[FLYWHEEL] OCTOPUS provenance ${s.id.takeLast(6)} workId=$workId branch=${gitBranch ?: "none"} pr=${prUrl ?: "none"} tag=$tag")
         }
         return patches.size to 0
+    }
+
+    /** Extract the raw `refs/heads/jules-<id>-<hash>` ref for a session id. */
+    private fun extractBranchRef(sessionId: String): String? {
+        val numericId = sessionId.substringAfterLast('/').filter { it.isDigit() }
+        if (numericId.isEmpty()) return null
+        val ls = git("ls-remote", "origin", "refs/heads/jules-$numericId-*")
+        if (ls.exitCode != 0) return null
+        for (line in ls.output.lineSequence()) {
+            val parts = line.trim().split("\t")
+            if (parts.size == 2 && parts[1].startsWith("refs/heads/jules-$numericId-")) {
+                return parts[1]
+            }
+        }
+        return null
     }
 
     private fun activeCount(): Int = conductor.cards.values.count {
@@ -1108,76 +1186,6 @@ class FlywheelDriver(
     }
 
     /**
-     * QA STEP: LAGUNA resolves conflict markers with panorama scope.
-     *
-     * Reads each conflicted file, sends the conflict regions plus the panorama
-     * (all sessions' titles + their patch context) to the Laguna brain. Laguna
-     * sees the n=2+ distance — competing changes across 8 sessions — and writes
-     * a resolution that preserves both sides' intent.
-     *
-     * Additional scope: if a conflict references symbols/includes from other
-     * files, those are included so Laguna has merge facts.
-     */
-    private suspend fun qaResolveConflicts(
-        conflicts: List<String>,
-        patches: List<Pair<JulesRestClient.SessionInfo, String>>,
-    ) {
-        val b = brain ?: run {
-            println("[FLYWHEEL] QA-LAGUNA no brain (NVIDIA_API_KEY not set), conflicts stay as committed")
-            return
-        }
-
-        val panorama = patches.joinToString("\n") { (s, p) ->
-            val files = parsePatchFiles(p).joinToString(", ")
-            "session ${s.id.takeLast(6)}: ${s.title.take(60)} [files: $files]"
-        }
-
-        for (file in conflicts) {
-            val f = File(repoDir, file)
-            if (!f.exists()) continue
-            val content = f.readText()
-            if (!content.contains("<<<<<<<")) continue
-
-            // Extract import context — the includes that give merge facts.
-            val imports = content.lines()
-                .filter { it.startsWith("import ") || it.startsWith("package ") }
-                .joinToString("\n")
-
-            val prompt = buildString {
-                appendLine("You are QA resolving a git conflict from an octopus merge of ${patches.size} Jules sessions.")
-                appendLine()
-                appendLine("Panorama — the sessions in this batch:")
-                appendLine(panorama)
-                appendLine()
-                appendLine("File: $file")
-                appendLine("Imports (merge facts from includes):")
-                appendLine(imports)
-                appendLine()
-                appendLine("Conflicted file content:")
-                appendLine(content.take(4000))
-                appendLine()
-                appendLine("Resolve ALL conflict markers (<<<<<<<, =======, >>>>>>>).")
-                appendLine("Read both sides and the imports to understand what each side depends on.")
-                appendLine("Output the COMPLETE resolved file.")
-            }.trim()
-
-            try {
-                val resolved = withTimeoutOrNull(90_000L) {
-                    b.chat(messages = listOf("user" to prompt), maxTokens = 4000, temperature = 0.1)
-                }
-                if (resolved != null && resolved.isNotEmpty() && !resolved.contains("<<<<<<<")) {
-                    f.writeText(resolved)
-                    println("[FLYWHEEL] QA-LAGUNA resolved $file (${resolved.length} chars)")
-                } else {
-                    println("[FLYWHEEL] QA-LAGUNA could not resolve $file — markers stay")
-                }
-            } catch (t: Throwable) {
-                println("[FLYWHEEL] QA-LAGUNA error on $file: ${t.message}")
-            }
-        }
-    }
-
-    /**
      * Attempt to fix build errors using the Laguna brain. Returns true if a
      * fix was applied. Never reverts — always moves forward.
      */
@@ -1221,6 +1229,10 @@ class FlywheelDriver(
         val settled: Boolean = false,
         /** Which [FlywheelPhase] the cycle last reached before returning (the priority manifest). */
         val phase: FlywheelPhase = FlywheelPhase.POLL,
+        /** Conflict markers committed this cycle — QaLaguna resolves externally. */
+        val conflicts: List<String> = emptyList(),
+        /** Panorama for QaLaguna: the sessions in the last octopus batch. */
+        val panorama: List<QaLaguna.SessionPanorama> = emptyList(),
     )
 
     companion object {
