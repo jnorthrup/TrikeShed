@@ -403,7 +403,7 @@ class FlywheelDriver(
         val push = git("push", "--follow-tags", "origin", "HEAD:master")
         if (push.exitCode != 0) return false
 
-        val openPrs = git(
+        val openPrs = shell(
             "gh", "pr", "list", "--state", "open", "--limit", "100",
             "--json", "number", "--jq", "length",
         )
@@ -580,10 +580,17 @@ class FlywheelDriver(
         return files.size
     }
     /**
-     * Run a git or gh command in [repoDir]. Unified shell — every ProcessBuilder
-     * site in FlywheelDriver goes through here.
+     * Run a git command in [repoDir]. Unified shell — every git ProcessBuilder
+     * site in FlywheelDriver goes through here. Prepends `"git"` so callers
+     * write `git("commit", "-m", ...)` not `git("git", "commit", "-m", ...)`.
+     * For non-git commands (gh, ./gradlew) use [shell].
      */
-    private fun git(vararg args: String): CommandResult = try {
+    private fun git(vararg args: String): CommandResult = shell("git", *args)
+
+    /**
+     * Run an arbitrary command in [repoDir]. Use [git] for git subcommands.
+     */
+    private fun shell(vararg args: String): CommandResult = try {
         val process = ProcessBuilder(*args)
             .directory(repoDir)
             .redirectErrorStream(true)
@@ -967,7 +974,7 @@ class FlywheelDriver(
 
         var buildOk = false
         for (attempt in 1..3) {
-            val build = git("./gradlew", ":jvmMainClasses", "--no-daemon")
+            val build = shell("./gradlew", ":jvmMainClasses", "--no-daemon")
             if (build.exitCode == 0) { buildOk = true; break }
             println("[FLYWHEEL] BUILD attempt $attempt failed for ${s.id.takeLast(6)}, fixing")
             val buildErrors = build.output.take(2000)
