@@ -980,6 +980,36 @@ class FlywheelDriver(
             emitPollError("drain ${s.id}: tag create failed: ${tagRes.output.take(200)}", -1)
             return DrainOutcome.Skipped
         }
+
+        // CLOSE THE DRAIN — without these two writes the wheel re-drains this
+        // same COMPLETED session every cycle (drained flag never flips) and
+        // loadQueue's isDrained/isUnclaimedDrain never clear (no WorkDrained
+        // cause), so settlementBarrier's unclaimedDrains != 0 sticks forever.
+        // The receipt carries the CAS patchCid + fished prUrl so the queue
+        // entry is a claimed drain, not an unclaimed one.
+        val prUrl = try { fishPrUrl(s.id, tag) } catch (_: Throwable) { null }
+        val receipt = MergeReceipt(
+            workId = "",               // bonded below from the queue projection
+            producer = "jules",
+            producerRef = s.id,
+            patchCid = patchCid,
+            revision = commitSha,
+            versionTag = tag,
+            lexicalMemory = LexicalMemory(summary = s.title, title = s.title, content = ""),
+            claimedAt = Clock.System.now().toEpochMilliseconds(),
+            prUrl = prUrl,
+        )
+        conductor.recordDrain(s.id, commitSha, conflicts.size)
+        val workId = store.loadQueue().firstOrNull { it.sessionId == s.id }?.workId
+            ?: "session:${s.id.replace(Regex("[^A-Za-z0-9._-]"), "-")}"
+        store.appendWork(workId, JulesCause.WorkDrained(
+            workId = workId,
+            sessionId = s.id,
+            commitSha = commitSha,
+            taskId = tag,
+            receipt = receipt.copy(workId = workId),
+            at = Clock.System.now().toEpochMilliseconds(),
+        ))
         _events.emit(FlywheelEvent.Drained(s.id, commitSha, tag))
         return DrainOutcome.Harvested
     }
