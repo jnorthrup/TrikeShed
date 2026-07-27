@@ -37,10 +37,13 @@ class JulesConductor(
         for (s in sessions) {
             val existing = cards[s.id]
             val stateChanged = existing != null && existing.snapshot.state != s.state
-            // COMPLETED and AWAITING sessions can both carry cumulative patches.
-            // Fetch them on every poll: retaining a stale zero makes a patch-bearing
-            // awaiting card look empty and can route it to the wrong paddle.
-            val acts = if (s.state == "COMPLETED" || s.state == "AWAITING_USER_FEEDBACK")
+            // COMPLETED and AWAITING sessions can carry cumulative patches.
+            // A drained card is immutable: its CAS/tag receipt already closed it,
+            // so downloading its activity stream again is duplicate work.
+            val acts = if (
+                existing?.drained != true &&
+                (s.state == "COMPLETED" || s.state == "AWAITING_USER_FEEDBACK")
+            )
                 client.activities(s.id) else emptyList()
             // changeSets are cumulative per activity — the last non-zero carries the total.
             val patchBytes = acts.lastOrNull { it.patchBytes > 0 }?.patchBytes
