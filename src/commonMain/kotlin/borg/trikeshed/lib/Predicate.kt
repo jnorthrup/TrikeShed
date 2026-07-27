@@ -8,8 +8,20 @@ operator fun <T> T.get(test: Predicate<T>): Boolean = test(this)
 
 //filter method for Series
 fun <T> Series<T>.filter(test: Predicate<T>): Series<T> {
-    val indices = this % test
-    return indices.size j { i -> this[indices[i]] }
+    var indices = IntArray(if (size < 10) size else 10)
+    var count = 0
+    for (i in 0 until size) {
+        if (test(get(i))) {
+            if (count == indices.size) {
+                indices = indices.copyOf(indices.size * 2)
+            }
+            indices[count++] = i
+        }
+    }
+    
+    
+    val finalIndices = if (count == indices.size) indices else indices.copyOf(count)
+    return finalIndices.size j { i -> this[finalIndices[i]] }
 }
 
 //filter operator
@@ -17,13 +29,19 @@ operator fun <T> Series<T>.get(test: Predicate<T>): Series<T> = filter(test)
 
 //filter for indices
 operator fun <T> Series<T>.rem(test: Predicate<T>): Series<Int> {
-    val matched = ArrayList<Int>()
+    var matched = IntArray(if (size < 10) size else 10)
+    var count = 0
     for (i in 0 until size) {
         if (test(get(i))) {
-            matched.add(i)
+            if (count == matched.size) {
+                matched = matched.copyOf(matched.size * 2)
+            }
+            matched[count++] = i
         }
     }
-    val indices = matched.toIntArray()
+    
+    
+    val indices = if (count == matched.size) matched else matched.copyOf(count)
     return indices.size j { i -> indices[i] }
 }
 
