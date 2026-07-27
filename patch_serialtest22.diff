@@ -1,0 +1,5 @@
+--- src/jvmTest/kotlin/borg/trikeshed/jules/FlywheelDriverDrainSerialTest.kt
++++ src/jvmTest/kotlin/borg/trikeshed/jules/FlywheelDriverDrainSerialTest.kt
+@@ -109,3 +109,3 @@
+-                                "gitPatch": { "unidiffPatch": ${org.json.JSONObject.quote(patch).replace("$", "\\$")} }
++                                "gitPatch": "${patch.replace("\"", "\\\"").replace("\n", "\\n").replace("$", "\\u0024")}"

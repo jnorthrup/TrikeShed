@@ -107,7 +107,7 @@ class FlywheelDriverDrainSerialTest {
                     "outputs": [
                         {
                             "changeSet": {
-                                "gitPatch": "${patch.replace("\n", "\\n").replace("\"", "\\\"").replace("\$", "\\\$")}"
+                                "gitPatch": { "unidiffPatch": "${patch.replace("\n", "\\n").replace("\"", "\\\"").replace("\$", "\\\$")}" }
                             }
                         }
                     ]

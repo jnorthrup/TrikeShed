@@ -1,0 +1,37 @@
+--- src/jvmMain/kotlin/borg/trikeshed/jules/JulesRestClient.kt
++++ src/jvmMain/kotlin/borg/trikeshed/jules/JulesRestClient.kt
+@@ -197,7 +197,9 @@
+      */
+     private fun jsonUnescape(s: String): String {
+-        if ('\\' !in s) return s
++        var actualS = s
++        if (s.startsWith("\"") && s.endsWith("\"") && s.length >= 2) {
++            actualS = s.substring(1, s.length - 1)
++        }
++        if ('\\' !in actualS) return actualS
+-        val out = StringBuilder(s.length)
++        val out = StringBuilder(actualS.length)
+         var i = 0
+-        while (i < s.length) {
++        while (i < actualS.length) {
+-            val c = s[i]
+-            if (c == '\\' && i + 1 < s.length) {
+-                when (s[i + 1]) {
++            val c = actualS[i]
++            if (c == '\\' && i + 1 < actualS.length) {
++                when (actualS[i + 1]) {
+                     '"' -> { out.append('"'); i += 2 }
+                     '\\' -> { out.append('\\'); i += 2 }
+                     '/' -> { out.append('/'); i += 2 }
+                     'b' -> { out.append('\b'); i += 2 }
+                     'f' -> { out.append('\u000C'); i += 2 }
+                     'n' -> { out.append('\n'); i += 2 }
+                     'r' -> { out.append('\r'); i += 2 }
+                     't' -> { out.append('\t'); i += 2 }
+                     'u' -> {
+-                        val code = s.substring(i + 2, minOf(i + 6, s.length)).toIntOrNull(16)
+-                        if (code != null && i + 6 <= s.length) { out.append(code.toChar()); i += 6 }
++                        val code = actualS.substring(i + 2, minOf(i + 6, actualS.length)).toIntOrNull(16)
++                        if (code != null && i + 6 <= actualS.length) { out.append(code.toChar()); i += 6 }
+                         else { out.append(c); i += 1 }
+                     }

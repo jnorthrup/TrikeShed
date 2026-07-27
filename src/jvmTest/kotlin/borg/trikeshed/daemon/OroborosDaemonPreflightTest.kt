@@ -30,6 +30,14 @@ class OroborosDaemonPreflightTest {
             val clone = File(root, "clone")
             clone.mkdirs()
             ProcessBuilder("git", "clone", origin.absolutePath, clone.absolutePath).directory(root).start().waitFor()
+            ProcessBuilder("git", "config", "user.name", "Test").directory(clone).start().waitFor()
+            ProcessBuilder("git", "config", "user.email", "test@test.com").directory(clone).start().waitFor()
+
+            // Advance clone to commit C
+            val cloneFile = File(clone, "test2.txt")
+            cloneFile.writeText("C")
+            ProcessBuilder("git", "add", "test2.txt").directory(clone).start().waitFor()
+            ProcessBuilder("git", "commit", "-m", "C").directory(clone).start().waitFor()
 
             // Advance origin to commit B directly
             originFile.writeText("B")

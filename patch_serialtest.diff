@@ -1,0 +1,23 @@
+--- src/jvmTest/kotlin/borg/trikeshed/jules/FlywheelDriverDrainSerialTest.kt
++++ src/jvmTest/kotlin/borg/trikeshed/jules/FlywheelDriverDrainSerialTest.kt
+@@ -107,6 +107,24 @@
+                                 }
+                             ]
+                         }
++                    ]
++                }"""
++            } else if (path.startsWith("/v1alpha/sessions/")) {
++                """{
++                    "name": "$path",
++                    "state": "COMPLETED",
++                    "outputs": [
++                        {
++                            "changeSet": {
++                                "gitPatch": {
++                                    "unidiffPatch": "diff --git a/src/test.txt b/src/test.txt\nnew file mode 100644\nindex 0000000..3b18e51\n--- /dev/null\n+++ b/src/test.txt\n@@ -0,0 +1 @@\n+test\n"
++                                }
++                            }
++                        }
+                     ]
+                 }"""
+             } else {

@@ -196,13 +196,17 @@ class JulesRestClient(
      * rework. HARVEST could not have ever landed through this path.
      */
     private fun jsonUnescape(s: String): String {
-        if ('\\' !in s) return s
-        val out = StringBuilder(s.length)
+        var actualS = s
+        if (s.startsWith("\"") && s.endsWith("\"") && s.length >= 2) {
+            actualS = s.substring(1, s.length - 1)
+        }
+        if ('\\' !in actualS) return actualS
+        val out = StringBuilder(actualS.length)
         var i = 0
-        while (i < s.length) {
-            val c = s[i]
-            if (c == '\\' && i + 1 < s.length) {
-                when (s[i + 1]) {
+        while (i < actualS.length) {
+            val c = actualS[i]
+            if (c == '\\' && i + 1 < actualS.length) {
+                when (actualS[i + 1]) {
                     '"' -> { out.append('"'); i += 2 }
                     '\\' -> { out.append('\\'); i += 2 }
                     '/' -> { out.append('/'); i += 2 }
@@ -212,8 +216,8 @@ class JulesRestClient(
                     'r' -> { out.append('\r'); i += 2 }
                     't' -> { out.append('\t'); i += 2 }
                     'u' -> {
-                        val code = s.substring(i + 2, minOf(i + 6, s.length)).toIntOrNull(16)
-                        if (code != null && i + 6 <= s.length) { out.append(code.toChar()); i += 6 }
+                        val code = actualS.substring(i + 2, minOf(i + 6, actualS.length)).toIntOrNull(16)
+                        if (code != null && i + 6 <= actualS.length) { out.append(code.toChar()); i += 6 }
                         else { out.append(c); i += 1 }
                     }
                     else -> { out.append(c); i += 1 }

@@ -1,0 +1,11 @@
+--- src/jvmTest/kotlin/borg/trikeshed/jules/FlywheelDriverDrainSerialTest.kt
++++ src/jvmTest/kotlin/borg/trikeshed/jules/FlywheelDriverDrainSerialTest.kt
+@@ -108,7 +108,7 @@
+                         {
+                             "changeSet": {
+                                 "gitPatch": {
+-                                    "unidiffPatch": "${patch.replace("\"", "\\\"").replace("\n", "\\n")}"
++                                    "unidiffPatch": "${patch.replace("\"", "\\\"").replace("\n", "\\n")}"
+                                 }
+                             }
+                         }
