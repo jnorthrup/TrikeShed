@@ -246,12 +246,10 @@ class FlywheelDriver(
         //    retries. No early return.
         settlementBarrier()
 
-        // 6. INDUCT — read doc/todo.md into the WAL as WorkQueued causes.
-        //    Idempotent: appendWork for an already-queued workId is a no-op
-        //    at fold time (loadQueue getOrPut). The WAL is the single
-        //    induction surface; nothing dispatches straight from the file.
-        //    No gate. Throughput > purity.
-        val inducted = inductTodo()
+        // 6. INDUCT — the WAL is the only induction surface. External agents
+        //    CAS-put a ≤4000-byte spec and appendWork(workId, WorkQueued).
+        //    Nothing to do here — DISPATCH reads loadQueue() directly.
+        val inducted = 0
 
         // 7. DISPATCH — take from the unified queue projection, sorted by
         //    score descending. Waiting work (AWAITING, just answered above)
@@ -608,43 +606,6 @@ class FlywheelDriver(
     private fun isWorkingTreeClean(): Boolean =
         git("status", "--porcelain", "--untracked-files=no").output.isBlank()
 
-    /**
-     * Induction: parse unchecked items from `doc/todo.md` and append each as a
-     * [JulesCause.WorkQueued] under its workId. Higher items get higher score
-     * (preserving the file's intent ordering).
-     *
-     * No gate. Already-queued workIds are skipped (idempotency, restart-safety),
-     * and that is the ONLY filter. The previous brain-curation + lexical-overlap
-     * cycle-detector was dropped: 40 dirty merges per cycle beat 4× the wall
-     * clock of a curator round-trip. Circular chases and duplicates are
-     * acceptable cost for throughput; Jules itself produces corrective patches
-     * when prior work has drifted.
-     */
-    private suspend fun inductTodo(): Int {
-        val items = readTodoItems()
-        if (items.isEmpty()) return 0
-        val queue = store.loadQueue()
-        val knownWorkIds = queue.mapTo(mutableSetOf()) { it.workId }
-        var n = 0
-        for ((index, item) in items.withIndex()) {
-            if (item.workId in knownWorkIds) continue
-            val score = (items.size - index).toDouble() / items.size.toDouble()
-            store.appendWork(item.workId, JulesCause.WorkQueued(
-                workId = item.workId,
-                tier = "todo",
-                title = item.title,
-                spec = if (item.spec.isNotEmpty()) item.spec else buildSpec(item.title),
-                parent = null,
-                score = score,
-                at = Clock.System.now().toEpochMilliseconds(),
-            ))
-            knownWorkIds += item.workId
-            n++
-            if (n >= maxInductPerCycle) break
-        }
-        return n
-    }
-
     /** Project the unified Forge×Jules board and render the saturation wheel. */
     fun renderSaturation(): String {
         val kanban = try { ForgeKanbanIngest.load("jim").board }
@@ -781,66 +742,8 @@ class FlywheelDriver(
         return ClaimedPatch(commitSha, receipt)
     }
 
-    private var todoFileLastModified: Long = 0L
-    private var cachedTodoItems: List<TodoItem> = emptyList()
-
     /**
-     * Fish an optional PR/branch URL that ties this receipt to the upstream
-     * merge surface. Probes:
-     *   1. `git ls-remote origin 'refs/heads/jules-<numericSessionId>-*'`
-     *      — Jules pushes branches to origin (per jules-cli-branch-delivery-probe),
-     *      and a matching ref proves delivery.
-     *   2. `gh pr list --json url,headRefName` — if a PR was opened with a
-     *      headRef containing the numeric session id, its url is canonical.
-     * Both probes swallow errors and return null on no match; the receipt is
-     * still provenance-complete via [MergeReceipt.patchCid] + [revision].
-     */
-    private fun readTodoItems(): List<TodoItem> {
-        val todoFile = File(repoDir, "doc/todo.md")
-        if (!todoFile.exists()) return emptyList()
-
-        val currentMtime = todoFile.lastModified()
-        if (currentMtime != todoFileLastModified || cachedTodoItems.isEmpty()) {
-            println("[FLYWHEEL] todo cache miss, re-parsing")
-            todoFileLastModified = currentMtime
-            cachedTodoItems = parseTheFile(todoFile)
-        }
-        return cachedTodoItems
-    }
-
-    private fun parseTheFile(todoFile: File): List<TodoItem> {
-        val titleRe = Regex("^\\s*- \\[ \\]\\s*\\*\\*?(.+?)\\*\\*?\\s*$")
-        val items = mutableListOf<TodoItem>()
-        val lines = todoFile.readLines()
-        var i = 0
-        while (i < lines.size) {
-            val m = titleRe.find(lines[i])
-            if (m == null) { i++; continue }
-            val title = m.groupValues[1].trim()
-            val body = StringBuilder()
-            var j = i + 1
-            while (j < lines.size) {
-                val l = lines[j]
-                // Bullet ends at the next bullet, header, or blank-then-non-indented line.
-                if (l.isBlank()) { j++; continue }
-                if (!l.startsWith(" ") && !l.startsWith("\t")) break
-                if (titleRe.containsMatchIn(l)) break
-                body.append(l.trim()).append(' ')
-                j++
-            }
-            val spec = body.toString().trim()
-            val workId = "todo:${title.hashCode().toUInt().toString(16)}"
-            items.add(TodoItem(workId, title, spec))
-            i = j
-        }
-        return items
-    }
-
-    /** One unchecked doc/todo.md item. */
-    data class TodoItem(val workId: String, val title: String, val spec: String)
-
-    /**
-     * Fish an optional PR/branch URL tying this receipt to the upstream merge
+     * Fish an optional PR/branch URL tying this receipt to the upstream
      * surface. Probes: (1) `git ls-remote origin 'refs/heads/jules-<numericId>-*'`,
      * (2) `gh pr list --json url,headRefName`. Both swallow errors and return
      * null on no match; the receipt is provenance-complete via [MergeReceipt.patchCid]
