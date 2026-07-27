@@ -421,7 +421,9 @@ class FlywheelDriver(
                         println("[FLYWHEEL] MERGE-CONFLICT ${s.id.takeLast(6)} ($branch): ${conflicted.size} files — committing markers")
                         conflicted.take(3).forEach { println("  ✗ $it") }
                     }
-                    git("add", "-A")
+                    if (conflicted.isNotEmpty()) {
+                        git("add", "--", *conflicted.toTypedArray())
+                    }
                     git("commit", "--no-verify", "-m", "flywheel: merge ${s.title.take(50)} ($branch) — ${conflicted.size} conflicts kept")
                 } else {
                     println("[FLYWHEEL] MERGED ${s.id.takeLast(6)} ($branch)")
@@ -432,9 +434,13 @@ class FlywheelDriver(
                 try {
                     pf.writeText(arm.patch)
                     git("apply", "--3way", pf.name)
+                    if (pf.exists()) pf.delete()
                     val conflicted = conflictFiles()
                     conflictCount += conflicted.size
-                    git("add", "-A")
+                    val touched = parsePatchFiles(arm.patch)
+                    if (touched.isNotEmpty()) {
+                        git("add", "--", *touched.toTypedArray())
+                    }
                     git("commit", "--no-verify", "-m", "flywheel: patch ${s.title.take(50)} (${s.id.takeLast(6)})")
                 } finally {
                     if (pf.exists()) pf.delete()
@@ -446,7 +452,7 @@ class FlywheelDriver(
         // 3. Build verify — if green, amend. If red, markers stay for QA.
         val build = shell("./gradlew", ":jvmMainClasses", "--no-daemon")
         if (build.exitCode == 0) {
-            git("add", "-A")
+            git("add", "-u")
             git("commit", "--amend", "--no-edit")
             println("[FLYWHEEL] DRAIN build green, amended")
         } else {
