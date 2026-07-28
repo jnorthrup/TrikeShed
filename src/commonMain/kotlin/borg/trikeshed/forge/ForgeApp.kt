@@ -18,9 +18,9 @@ import borg.trikeshed.lcnc.reactor.LcncIngestPipeline
 import borg.trikeshed.lib.Series
 import borg.trikeshed.lib.j
 import kotlinx.datetime.Clock
-import borg.trikeshed.parse.confix.ConfixArray
-import borg.trikeshed.parse.confix.ConfixObject
-import borg.trikeshed.parse.confix.ConfixPrimitive
+import borg.trikeshed.blackboard.BlackboardSurface
+import borg.trikeshed.graph.CausalGraphNodeIndex
+import borg.trikeshed.parse.json.JsonSupport
 
 /**
  * ForgeApp — single file server-side renderable workspace shell.
@@ -37,56 +37,65 @@ object ForgeApp {
     }
 
     private fun forgeSeedJson(userId: String, reduction: borg.trikeshed.kanban.ForgeKanbanReduction): String {
-        val json = ConfixObject(
-            mapOf(
-                "title" to ConfixPrimitive("Forge Workspace"),
-                "userId" to ConfixPrimitive(userId),
-                "items" to ConfixArray(reduction.board.cards.map { card ->
-                    ConfixObject(
+        val index = CausalGraphNodeIndex()
+        reduction.causalNodes.forEach { index.addOrGet(it) }
+
+        val entities = reduction.correlations.map { correlation ->
+            val card = reduction.board.cards.first { it.id.value == correlation.taskId }
+            correlationToBlock(correlation, card)
+        }
+        val surface = BlackboardSurface.project("forge-$userId", index, entities)
+
+        val seedMap = mapOf(
+            "title" to "Forge Workspace",
+            "userId" to userId,
+            "items" to reduction.board.cards.map { card ->
+                mapOf(
+                    "id" to card.id.value,
+                    "title" to card.title,
+                    "notes" to card.description,
+                    "status" to card.columnId.value,
+                    "priority" to card.priority.name,
+                    "checklist" to emptyList<Any>(),
+                )
+            },
+            "workspace" to mapOf(
+                "columns" to ForgeGalleryCatalog.widgets()
+                    .groupBy { it.section }
+                    .map { (section, _) -> section }
+                    .sortedBy { it.ordinal }
+                    .map { section ->
                         mapOf(
-                            "id" to ConfixPrimitive(card.id.value),
-                            "title" to ConfixPrimitive(card.title),
-                            "notes" to ConfixPrimitive(card.description),
-                            "status" to ConfixPrimitive(card.columnId.value),
-                            "priority" to ConfixPrimitive(card.priority.name),
-                            "checklist" to ConfixArray(emptyList()),
+                            "id" to section.name.lowercase().replace(" ", "-"),
+                            "name" to section.name,
+                            "order" to section.ordinal,
                         )
-                    )
-                }),
-                "workspace" to ConfixObject(
-                    mapOf(
-                        "columns" to ConfixArray(ForgeGalleryCatalog.widgets()
-                            .groupBy { it.section }
-                            .map { (section, _) -> section }
-                            .sortedBy { it.ordinal }
-                            .map { section ->
-                                ConfixObject(
-                                    mapOf(
-                                        "id" to ConfixPrimitive(section.name.lowercase().replace(" ", "-")),
-                                        "name" to ConfixPrimitive(section.name),
-                                        "order" to ConfixPrimitive(section.ordinal),
-                                    )
-                                )
-                            }
-                        ),
-                    )
-                ),
-                "causalGraph" to ConfixArray(reduction.causalNodes.map { node ->
-                    ConfixObject(
-                        mapOf(
-                            "id" to ConfixPrimitive(node.causalKey),
-                            "title" to ConfixPrimitive(node.nodeId),
-                            "parents" to ConfixArray(node.parentNodeIds.map { ConfixPrimitive(it) }),
-                            "children" to ConfixArray(emptyList()),
-                        )
-                    )
-                }),
-                "cascadeGrid" to ConfixArray(emptyList()),
-                "ingestJobs" to ConfixArray(emptyList()),
-                "blackboardSeed" to forgeBlackboardSeed(),
-            )
+                    }
+            ),
+            "causalGraph" to reduction.causalNodes.map { node ->
+                mapOf(
+                    "id" to node.causalKey,
+                    "title" to node.nodeId,
+                    "parents" to node.parentNodeIds,
+                    "children" to emptyList<Any>(),
+                )
+            },
+            "cascadeGrid" to surface.rows.map { row ->
+                mapOf(
+                    "cardId" to row.cardId,
+                    "lane" to row.lane,
+                    "phase" to row.phase,
+                    "facet" to row.facet,
+                    "provenance" to (row.provenance ?: ""),
+                    "causalKey" to row.causalKey,
+                    "lcncKind" to row.lcncKind,
+                    "title" to (row.title ?: ""),
+                )
+            },
+            "ingestJobs" to emptyList<Any>(),
+            "blackboardSeed" to forgeBlackboardSeed(),
         )
-        return json.toString()
+        return JsonSupport.stringify(seedMap)
     }
 
     private fun htmlShell(seed: String): String = """
@@ -153,61 +162,51 @@ ${forgeAppScript()}
     /** Server-rendered gallery HTML for the workspace rail. No client-side hydration needed. */
     private fun galleryHtml(): String = ForgeGalleryRenderer.renderHtml()
 
-    private fun forgeBlackboardSeed(): ConfixObject {
+    private fun forgeBlackboardSeed(): Map<String, Any?> {
         val view = ForgeBlackboardView.DEFAULT
         val cam = view.defaultCamera
         val cam3d = view.mode3D
-        return ConfixObject(
-            mapOf(
-                "surface" to ConfixPrimitive(view.surface),
-                "sections" to ConfixArray(view.sections.map { ConfixPrimitive(it) }),
-                "defaultMode" to ConfixPrimitive(view.defaultMode.name),
-                "cornerButtons" to ConfixArray(view.cornerButtons.map { btn ->
-                    ConfixObject(
-                        mapOf(
-                            "slot" to ConfixPrimitive(btn.slot.name),
-                            "id" to ConfixPrimitive(btn.id),
-                            "label" to ConfixPrimitive(btn.label),
-                            "hotkey" to ConfixPrimitive(btn.hotkey),
-                            "surface" to ConfixPrimitive(btn.surface),
-                        )
-                    )
-                }),
-                "camera" to ConfixObject(
-                    mapOf(
-                        "x" to ConfixPrimitive(cam.x),
-                        "y" to ConfixPrimitive(cam.y),
-                        "zoom" to ConfixPrimitive(cam.zoom),
-                        "tilt" to ConfixPrimitive(cam.tilt),
-                        "vx" to ConfixPrimitive(cam.vx),
-                        "vy" to ConfixPrimitive(cam.vy),
-                        "vz" to ConfixPrimitive(cam.vz),
-                        "minZoom" to ConfixPrimitive(cam.minZoom),
-                        "maxZoom" to ConfixPrimitive(cam.maxZoom),
-                    )
-                ),
-                "camera3D" to ConfixObject(
-                    mapOf(
-                        "yawRadians" to ConfixPrimitive(cam3d.yawRadians),
-                        "pitchRadians" to ConfixPrimitive(cam3d.pitchRadians),
-                        "distance" to ConfixPrimitive(cam3d.distance),
-                        "focalLength" to ConfixPrimitive(cam3d.focalLength),
-                        "minDistance" to ConfixPrimitive(cam3d.minDistance),
-                        "maxDistance" to ConfixPrimitive(cam3d.maxDistance),
-                    )
-                ),
-                "layout3D" to ConfixArray(view.layout3D.map { section ->
-                    ConfixObject(
-                        mapOf(
-                            "sectionId" to ConfixPrimitive(section.sectionId),
-                            "centerX" to ConfixPrimitive(section.centerX),
-                            "centerY" to ConfixPrimitive(section.centerY),
-                            "width" to ConfixPrimitive(section.width),
-                            "height" to ConfixPrimitive(section.height),
-                            "elevation" to ConfixPrimitive(section.elevation),
-                        )
-                    )
-                }),
-            )
+        return mapOf(
+            "surface" to view.surface,
+            "sections" to view.sections,
+            "defaultMode" to view.defaultMode.name,
+            "cornerButtons" to view.cornerButtons.map { btn ->
+                mapOf(
+                    "slot" to btn.slot.name,
+                    "id" to btn.id,
+                    "label" to btn.label,
+                    "hotkey" to btn.hotkey,
+                    "surface" to btn.surface,
+                )
+            },
+            "camera" to mapOf(
+                "x" to cam.x,
+                "y" to cam.y,
+                "zoom" to cam.zoom,
+                "tilt" to cam.tilt,
+                "vx" to cam.vx,
+                "vy" to cam.vy,
+                "vz" to cam.vz,
+                "minZoom" to cam.minZoom,
+                "maxZoom" to cam.maxZoom,
+            ),
+            "camera3D" to mapOf(
+                "yawRadians" to cam3d.yawRadians,
+                "pitchRadians" to cam3d.pitchRadians,
+                "distance" to cam3d.distance,
+                "focalLength" to cam3d.focalLength,
+                "minDistance" to cam3d.minDistance,
+                "maxDistance" to cam3d.maxDistance,
+            ),
+            "layout3D" to view.layout3D.map { section ->
+                mapOf(
+                    "sectionId" to section.sectionId,
+                    "centerX" to section.centerX,
+                    "centerY" to section.centerY,
+                    "width" to section.width,
+                    "height" to section.height,
+                    "elevation" to section.elevation,
+                )
+            },
         )
-}
+    }
