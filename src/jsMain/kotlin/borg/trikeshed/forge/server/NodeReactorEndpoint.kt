@@ -29,10 +29,6 @@ class NodeReactorEndpoint(
         return decodeResult(response.body)
     }
 
-    private fun bytesToBase64(bytes: ByteArray): String {
-        return window.btoa(bytes.decodeToString())
-    }
-
     private fun base64ToBytes(base64: String): ByteArray {
         return window.atob(base64).encodeToByteArray()
     }
@@ -47,11 +43,11 @@ class NodeReactorEndpoint(
         val capToken = if (cap is Capability.Custom) "${cap.kind}:${cap.token}" else if (cap is Capability.Process) cap.name else if (cap is Capability.Cas) cap.mode else if (cap is Capability.Wireproto) cap.route else ""
 
         // Hand-roll JSON using strings to avoid kotlinx.serialization.json dependency which isn't in commonMain/jsMain
-        val nonceBase64 = bytesToBase64(nonce.bytes)
+        val nonceBase64 = window.btoa(nonce.bytes.decodeToString())
         val derivedKey = if (nonce is Nonce.Derived) ",\"nonceDerivedKey\":\"derived\"" else ""
         val capTokenStr = if (capToken.isNotEmpty()) ",\"capabilityToken\":\"$capToken\"" else ""
         val verb = action.b.a
-        val payload = bytesToBase64(action.b.b)
+        val payload = window.btoa(action.b.b.decodeToString())
 
         val json = """{"nuid":{"capabilityCat":"$capCat"$capTokenStr,"nonceBytes":"$nonceBase64"$derivedKey,"subnet":"$subnet"},"verb":"$verb","payload":"$payload"}"""
 
