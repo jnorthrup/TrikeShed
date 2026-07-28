@@ -155,8 +155,10 @@ class BrainClient(
 
         // Primary: NVIDIA NIM (the default brain)
         System.getenv("NVIDIA_API_KEY")?.let { k ->
-            add("nvidia", k, "https://integrate.api.nvidia.com/v1", "poolside/laguna-xs-2.1")
-            add("nvidia-nemotron", k, "https://integrate.api.nvidia.com/v1", "nvidia/nemotron-3-ultra-550b-a55b")
+            val base = "https://integrate.api.nvidia.com/v1"
+            add("nvidia-deepseek-coder", k, base, "deepseek-ai/deepseek-v4-pro")
+            add("nvidia", k, base, "poolside/laguna-xs-2.1")
+            add("nvidia-nemotron", k, base, "nvidia/nemotron-3-ultra-550b-a55b")
         }
 
         // OpenRouter (many models behind one key)
