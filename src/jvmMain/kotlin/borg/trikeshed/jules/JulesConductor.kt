@@ -147,6 +147,21 @@ class JulesConductor(
         val updated = card.copy(causes = card.causes + cause, drained = true)
         cards[sessionId] = updated
         store?.append(updated.snapshot, drained = true, cause = cause)
+        // Close the queue entry so loadQueue() stops seeing this work as
+        // dispatched-but-undrained. Without this, a retired session occupies
+        // a queue slot forever (isDispatched && !isDrained) and the wheel
+        // can't tell it's done. Uses the same outbox: pattern as ReapAppend.
+        store?.appendWork(
+            workId = sessionId,
+            cause = JulesCause.WorkDrained(
+                workId = sessionId,
+                sessionId = sessionId,
+                commitSha = "outbox-${sessionId.take(8)}",
+                taskId = "retired",
+                receipt = null,
+                at = at,
+            ),
+        )
     }
 
     data class DrainRecord(val sessionId: String, val commitSha: String, val rejects: Int)
