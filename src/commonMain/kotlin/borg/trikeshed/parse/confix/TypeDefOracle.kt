@@ -60,6 +60,11 @@ class TypeDefOracle {
             """^\s*typealias\s+([A-Za-z_]\w*)(?:<([^>]+)>)?\s*=\s*(.+?)$""",
             setOf(RegexOption.MULTILINE)
         )
+
+        private val topicPattern = Regex("""^topic:(\w+)\s+as\s+(\w+)""")
+        private val typeParamPattern = Regex("""<[^>]*>""")
+        private val typeParenPattern = Regex("""\([^)]*\)""")
+        private val typeSplitPattern = Regex("""[|,\s]+""")
     }
 
     fun parseTypeDefs(text: String, source: String = "<unknown>") {
@@ -145,7 +150,7 @@ class TypeDefOracle {
                 "isA_edge" -> ngram.split(" -> ").takeIf { it.size >= 2 }?.let { (c, p) ->
                     addLinkCheck(c, p)
                 }
-                "topic" -> topicRegex.find(ngram)?.let { mr ->
+                "topic" -> Regex("""^topic:(\w+)\s+as\s+(\w+)""").find(ngram)?.let { mr ->
                     addEntry(mr.groupValues[2], mr.groupValues[1], null, "lda-topic")
                 }
             }
@@ -227,9 +232,9 @@ class TypeDefOracle {
 
     private fun extractBaseNames(typeExpr: String): List<String> {
         val cleaned = typeExpr
-            .replace(typeParamsRemoveRegex, "")
-            .replace(parenthesesRemoveRegex, "")
-        return cleaned.split(baseNamesSplitRegex)
+            .replace(Regex("""<[^>]*>"""), "")
+            .replace(Regex("""\([^)]*\)"""), "")
+        return cleaned.split(Regex("""[|,\s]+"""))
             .filter { it.isNotBlank() && it.first().isLetter() }
             .map { it.trim() }
     }
