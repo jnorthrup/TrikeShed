@@ -3,9 +3,7 @@
 package borg.trikeshed.litebike
 
 import borg.trikeshed.litebike.taxonomy.Protocol
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.runBlocking
-import kotlinx.coroutines.withContext
 import java.net.InetSocketAddress
 import java.net.StandardSocketOptions
 import java.nio.ByteBuffer
@@ -131,31 +129,6 @@ object JvmLitebikeBindAdapter {
         connId: Long,
     ) {
         val buf = ByteBuffer.allocate(8 * 1024)
-        val respondCallback: suspend (ByteArray) -> Unit = { responseBytes ->
-            withContext(Dispatchers.IO) {
-                val writeBuf = ByteBuffer.wrap(responseBytes)
-                while (writeBuf.hasRemaining()) {
-                    val written = kotlin.coroutines.suspendCoroutine { cont ->
-                        ch.write(writeBuf, null, object : CompletionHandler<Int, Any?> {
-                                override fun completed(result: Int, attachment: Any?) {
-                                    cont.resumeWith(Result.success(result))
-                                }
-                                override fun failed(exc: Throwable, attachment: Any?) {
-                                    cont.resumeWith(Result.failure(exc))
-                                }
-                            })
-                        }
-                    if (bytesWritten < 0) break
-                    }
-            } finally {
-                connections.unregister(connId)
-                runCatching { ch.close() }
-                }
-            } finally {
-                connections.unregister(connId)
-                runCatching { ch.close() }
-            }
-        }
         ch.read(
             buf, null,
             object : CompletionHandler<Int, Any?> {
@@ -171,7 +144,7 @@ object JvmLitebikeBindAdapter {
                     val proto: Protocol = ProtocolDetector.detect(head, bytes.size)
                     // runBlocking is OK from a JDK CompletionHandler because
                     // those callbacks are pure Java threads, not coroutines.
-                    val ok = runBlocking { element.accept(proto, bytes, respondCallback) }
+                    val ok = runBlocking { element.accept(proto, bytes) }
                     if (!ok) {
                         connections.unregister(connId)
                         runCatching { ch.close() }
