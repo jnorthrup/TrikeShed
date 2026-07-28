@@ -44,7 +44,7 @@ class JobReducer {
             expectedRevision = frame.expectedRevision,
             causalKey = frame.causalKey,
         ),
-        canonicalBytes = canonicalFrameBytes(frame),
+        canonicalBytes = CanonicalCbor.encode(frame.doc),
     )
 
     fun reduce(command: JobCommand): Result = reduce(
@@ -168,6 +168,4 @@ class JobReducer {
     /** Expose all facts for a job (for evidence queries). */
     fun facts(jobId: JobId): List<JobFact> = jobFacts[jobId]?.toList() ?: emptyList()
 
-    private fun canonicalFrameBytes(frame: JobFrame): ByteArray =
-        CanonicalCbor.encode(frame.doc)
 }
