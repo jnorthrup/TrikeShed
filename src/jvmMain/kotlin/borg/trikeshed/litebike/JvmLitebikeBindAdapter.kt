@@ -149,7 +149,6 @@ object JvmLitebikeBindAdapter {
                 }
             } finally {
                 connections.unregister(connId)
-                // Close accepted-channel lifecycle around existing respond callback
                 runCatching { ch.close() }
             }
         }
