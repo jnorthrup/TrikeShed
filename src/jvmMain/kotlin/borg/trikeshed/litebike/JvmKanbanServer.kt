@@ -208,12 +208,16 @@ object JvmKanbanServer {
         // stream is a request; we route on the request path.
         val httpScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
 
-        // The HTTP handler logic is handled by the wireproto workgroup.
+        // The HTTP handler logic is handled by the Protocol.Http slot.
         httpScope.launch {
-            val slot = fanout.slotOf("wireproto") ?: return@launch
+            val httpSlot = listener.register(Protocol.Http)
             while (true) {
-                val claim = slot.consume()
-                val payload = claim.payload as? ByteArray ?: continue
+                val msg = httpSlot.consume()
+                val payload = msg.payload
+                
+                val wireNuid = nuid(Capability.Wireproto("http"), Nonce.RandomBytes(), Subnet.lanLocalhost)
+                fanout.dispatch(wireNuid, payload)
+                
                 val resp = routeHttp(payload)
                 val out = buildString {
                     append("HTTP/1.1 ${resp.status} ${statusReason(resp.status)}\r\n")
@@ -223,8 +227,8 @@ object JvmKanbanServer {
                     append(resp.body)
                 }
                 val outBytes = out.toByteArray(StandardCharsets.UTF_8)
-                // Surface the response on the Json protocol slot (downstream consumers)
-                listener.accept(Protocol.Json, out.toByteArray(StandardCharsets.UTF_8))
+                // Write back through the listener's response callback
+                msg.respond?.invoke(outBytes)
             }
         }
 
