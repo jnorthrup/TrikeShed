@@ -132,9 +132,57 @@ class BtrfsCasStore(
     /**
      * Export CAS blobs as a tar stream (for git fast-import or backup).
      */
-    fun exportTar(paths: Series<String>, output: java.io.OutputStream) {
-        // Implementation for exporting
-        TODO("exportTar")
+    fun exportTar(manifest: Series2<String, ContentId>, output: java.io.OutputStream) {
+        val n = manifest.a
+        for (i in 0 until n) {
+            val entry = manifest.b(i)
+            val path = entry.a
+            val cid = entry.b
+            
+            val content = get(cid) ?: throw IllegalStateException("Missing CAS blob for $cid")
+            
+            val header = ByteArray(512)
+            
+            val pathBytes = path.encodeToByteArray()
+            if (pathBytes.size > 100) {
+                throw IllegalArgumentException("Path too long for ustar: $path")
+            }
+            pathBytes.copyInto(header, 0)
+            
+            "0000644\u0000".encodeToByteArray().copyInto(header, 100)
+            "0000000\u0000".encodeToByteArray().copyInto(header, 108)
+            "0000000\u0000".encodeToByteArray().copyInto(header, 116)
+            
+            val sizeStr = content.size.toString(8).padStart(11, '0') + "\u0000"
+            sizeStr.encodeToByteArray().copyInto(header, 124)
+            
+            "00000000000\u0000".encodeToByteArray().copyInto(header, 136)
+            
+            header[156] = '0'.code.toByte()
+            
+            "ustar\u0000".encodeToByteArray().copyInto(header, 257)
+            "00".encodeToByteArray().copyInto(header, 263)
+            
+            "        ".encodeToByteArray().copyInto(header, 148)
+            
+            var checksum = 0
+            for (b in header) {
+                checksum += b.toInt() and 0xFF
+            }
+            
+            val checksumStr = checksum.toString(8).padStart(6, '0') + "\u0000 "
+            checksumStr.encodeToByteArray().copyInto(header, 148)
+            
+            output.write(header)
+            output.write(content)
+            
+            val padding = (512 - (content.size % 512)) % 512
+            if (padding > 0) {
+                output.write(ByteArray(padding))
+            }
+        }
+        
+        output.write(ByteArray(1024))
     }
     
     /**
