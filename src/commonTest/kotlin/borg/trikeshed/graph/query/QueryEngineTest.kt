@@ -50,4 +50,12 @@ class QueryEngineTest {
             engine.extractDoubleColumn("missing")
         }
     }
+
+    @Test
+    fun extractDoubleColumn_returns_empty_series_for_empty_cursor() {
+        val cursor: Cursor = borg.trikeshed.lib.emptySeries()
+        val engine = QueryEngine(cursor)
+        val series = engine.extractDoubleColumn("score")
+        assertEquals(0, series.size)
+    }
 }

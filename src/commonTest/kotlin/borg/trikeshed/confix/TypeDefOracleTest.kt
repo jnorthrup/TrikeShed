@@ -245,4 +245,29 @@ class TypeDefOracleTest {
         assertTrue("Series" in superNames || "MetaSeries" in superNames || "Join" in superNames,
             "Expected at least one transitive supertype, got: $superNames")
     }
+
+    // ── efficiency under repetition ───────────────────────────────
+
+    @Test fun `parse many typedefs efficiently`() {
+        val src = buildString {
+            for (i in 0 until 1000) {
+                appendLine("typedef Join<A, B> as Tuple$i<A, B>;")
+            }
+        }
+        val oracle = TypeDefOracle()
+        oracle.parseTypeDefs(src, "many.x")
+        val o = oracle.build()
+        assertEquals(1000, o.entries.size)
+
+        // verify a couple are present and edges exist
+        val t0 = o.byName("Tuple0")
+        val t999 = o.byName("Tuple999")
+        val join = o.byName("Join")
+        assertNotNull(t0)
+        assertNotNull(t999)
+        assertNotNull(join)
+
+        assertTrue(o.lattice.isA(t0, join))
+        assertTrue(o.lattice.isA(t999, join))
+    }
 }

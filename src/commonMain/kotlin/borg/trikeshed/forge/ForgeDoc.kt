@@ -375,7 +375,14 @@ private data class KanbanColumnRef(
     val name: String,
     val order: Int,
     val wipLimit: Int? = null,
-)
+) {
+    companion object {
+        val ID_REGEX = Regex("\"id\"\\s*:\\s*(\"([^\"\\\\]*(?:\\\\.[^\"\\\\]*)*)\"|([0-9]+))")
+        val NAME_REGEX = Regex("\"name\"\\s*:\\s*(\"([^\"\\\\]*(?:\\\\.[^\"\\\\]*)*)\"|([0-9]+))")
+        val ORDER_REGEX = Regex("\"order\"\\s*:\\s*(\"([^\"\\\\]*(?:\\\\.[^\"\\\\]*)*)\"|([0-9]+))")
+        val WIP_LIMIT_REGEX = Regex("\"wipLimit\"\\s*:\\s*(\"([^\"\\\\]*(?:\\\\.[^\"\\\\]*)*)\"|([0-9]+))")
+    }
+}
 
 /**
  * Lightweight parser for `kanban.columns` JSON arrays.
@@ -412,20 +419,15 @@ private fun parseKanbanColumnsProperty(raw: String?): List<KanbanColumnRef> {
     return out
 }
 
-private val ID_REGEX = Regex("\"id\"\\s*:\\s*(\"([^\"\\\\]*(?:\\\\.[^\"\\\\]*)*)\"|([0-9]+))")
-private val NAME_REGEX = Regex("\"name\"\\s*:\\s*(\"([^\"\\\\]*(?:\\\\.[^\"\\\\]*)*)\"|([0-9]+))")
-private val ORDER_REGEX = Regex("\"order\"\\s*:\\s*(\"([^\"\\\\]*(?:\\\\.[^\"\\\\]*)*)\"|([0-9]+))")
-private val WIP_LIMIT_REGEX = Regex("\"wipLimit\"\\s*:\\s*(\"([^\"\\\\]*(?:\\\\.[^\"\\\\]*)*)\"|([0-9]+))")
-
 private fun parseKanbanColumnObject(entry: String): KanbanColumnRef? {
     fun field(regex: Regex): String? {
         val m = regex.find(entry) ?: return null
         return m.groupValues[2].ifEmpty { m.groupValues[3] }
     }
-    val id = field(ID_REGEX) ?: return null
-    val name = field(NAME_REGEX) ?: id
-    val order = field(ORDER_REGEX)?.toIntOrNull() ?: 0
-    val wipLimit = field(WIP_LIMIT_REGEX)?.toIntOrNull()
+    val id = field(KanbanColumnRef.ID_REGEX) ?: return null
+    val name = field(KanbanColumnRef.NAME_REGEX) ?: id
+    val order = field(KanbanColumnRef.ORDER_REGEX)?.toIntOrNull() ?: 0
+    val wipLimit = field(KanbanColumnRef.WIP_LIMIT_REGEX)?.toIntOrNull()
     return KanbanColumnRef(id = id, name = name, order = order, wipLimit = wipLimit)
 }
 

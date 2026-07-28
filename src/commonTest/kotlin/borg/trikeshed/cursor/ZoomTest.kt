@@ -43,7 +43,7 @@ class ZoomTest {
     fun `zoom into non-existent path throws error`() {
         val cursor = createNestedCursor()
         assertFailsWith<IllegalStateException> {
-            cursor.zoom("does_not_exist")
+            cursor.zoom("does_not_exist", "another_one")
         }
     }
 

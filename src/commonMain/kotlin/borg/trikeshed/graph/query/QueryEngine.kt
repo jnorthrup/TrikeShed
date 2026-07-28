@@ -1,8 +1,6 @@
 package borg.trikeshed.graph.query
 
 import borg.trikeshed.cursor.Cursor
-import borg.trikeshed.cursor.cells
-import borg.trikeshed.cursor.keys
 import borg.trikeshed.lib.DoubleSeries
 import borg.trikeshed.cursor.RowVec
 
@@ -21,8 +19,8 @@ class QueryEngine(private val data: Cursor) {
         // Find column index
         val firstRow: RowVec = data.b(0)
         var colIdx = -1
-        for (i in 0 until firstRow.keys.a) {
-            if (firstRow.keys.b(i) == columnName) {
+        for (i in 0 until firstRow.a) {
+            if (firstRow.b(i).b().name == columnName) {
                 colIdx = i
                 break
             }
@@ -31,7 +29,7 @@ class QueryEngine(private val data: Cursor) {
         require(colIdx != -1) { "Column '$columnName' not found" }
         
         for (i in 0 until data.a) {
-            val cell = data.b(i).cells.b(colIdx)
+            val cell = data.b(i).b(colIdx).a
             val value = when (cell) {
                 is Double -> cell
                 is Number -> cell.toDouble()
