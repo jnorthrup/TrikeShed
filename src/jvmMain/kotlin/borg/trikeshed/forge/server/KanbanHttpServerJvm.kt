@@ -17,6 +17,7 @@ object KanbanServerMain {
     }
 
     suspend fun run(port: Int, donorPath: String?) {
+        // Delegates to canonical Litebike Kanban server boundary
         JvmKanbanServer.run(port, donorPath)
     }
 }
