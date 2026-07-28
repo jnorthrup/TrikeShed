@@ -53,8 +53,12 @@ fun main() = runBlocking {
     }
 
     val example = ForgeReactorExample(forgeHome = ForgeHome.defaultHome)
+    // Subscribe before synthetic cycle
     val collector = launch(start = CoroutineStart.UNDISPATCHED) {
-        example.events.take(2).collect { println(it) }
+        example.events.take(2).collect { 
+            if (it is ForgeReactorEvent.ReactorOpened) println("ReactorOpened")
+            if (it is ForgeReactorEvent.CycleObserved) println("CycleObserved")
+        }
     }
     example.open(parentJob = coroutineContext[Job]!!)
     try {
@@ -75,7 +79,7 @@ fun main() = runBlocking {
 class ForgeReactorExample(
     private val forgeHome: String,
 ) {
-    private val _events = MutableSharedFlow<ForgeReactorEvent>(extraBufferCapacity = 64)
+    private val _events = MutableSharedFlow<ForgeReactorEvent>()
     val events: SharedFlow<ForgeReactorEvent> = _events.asSharedFlow()
 
     private var scope: CoroutineScope? = null
