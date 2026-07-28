@@ -17,6 +17,8 @@ import java.nio.ByteBuffer
 import java.nio.channels.ServerSocketChannel
 import java.nio.channels.SocketChannel
 import kotlin.system.exitProcess
+import sun.misc.Signal
+import sun.misc.SignalHandler
 
 /**
  * Oroboros daemon — thin entry-point over [FlywheelDriver].
@@ -49,6 +51,9 @@ object OroborosDaemon {
     @Volatile
     var daemonStartTime = 0L
 
+    @Volatile
+    var isRunning = true
+
     fun parseConfig(args: Array<String>): DaemonConfig {
         var watch = true
         var intervalMs = DEFAULT_INTERVAL_MS
@@ -79,7 +84,18 @@ object OroborosDaemon {
     }
 
     @JvmStatic
-    fun main(args: Array<String>) = runBlocking {
+    fun main(args: Array<String>) {
+        try {
+            runBlocking {
+                mainImpl(args)
+            }
+        } catch (e: kotlinx.coroutines.CancellationException) {
+            // JVM shutdown triggered by signal handler
+            exitProcess(0)
+        }
+    }
+
+    private suspend fun kotlinx.coroutines.CoroutineScope.mainImpl(args: Array<String>) {
         val apiKey = System.getenv("JULES_API_KEY") ?: System.getProperty("JULES_API_KEY")
         if (apiKey.isNullOrBlank()) {
             System.err.println("[OROBOROS] JULES_API_KEY not set; the conductor cannot poll Jules. Aborting.")
@@ -110,6 +126,16 @@ object OroborosDaemon {
             intervalMs = intervalMs,
             maxSlots = maxSlots,
         )
+
+        val mainJob = coroutineContext[kotlinx.coroutines.Job]
+
+        val sigHandler = SignalHandler {
+            driver.close()
+            isRunning = false
+            mainJob?.cancel()
+        }
+        Signal.handle(Signal("TERM"), sigHandler)
+        Signal.handle(Signal("INT"), sigHandler)
 
         val traceFile = File(forgeHome, "oroboros-cycles.jsonl")
         var traceLineCount = if (traceFile.exists()) traceFile.readLines().size else 0
@@ -184,7 +210,7 @@ object OroborosDaemon {
         }
         if (serverSocket == null) {
             System.err.println("[OROBOROS] health.sock bind FAILED after 3 attempts; aborting")
-            return@runBlocking
+            return
         }
 
         val healthJob = launch(Dispatchers.IO) {
@@ -212,7 +238,7 @@ object OroborosDaemon {
         if (!preflight(repoDir, driver)) {
             System.err.println("[OROBOROS] preflight failed; aborting before first cycle")
             driver.close()
-            return@runBlocking
+            return
         }
 
         suspend fun runCycle() {
@@ -246,7 +272,7 @@ object OroborosDaemon {
         try {
             runCycle()
             if (watch) {
-                while (true) {
+                while (isRunning) {
                     val errors = consecutivePollErrors.get()
                     val backoffMs = kotlin.math.min(intervalMs * (1L shl kotlin.math.min(errors, 30)), intervalMs * 5)
                     if (errors > 0) System.err.println("[OROBOROS] backoff=${backoffMs}ms consecutiveErrors=$errors")
