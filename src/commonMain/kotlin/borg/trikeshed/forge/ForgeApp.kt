@@ -29,195 +29,60 @@ import borg.trikeshed.parse.confix.ConfixPrimitive
  */
 object ForgeApp {
 
-    data class ForgeItem(
-        val id: String,
-        val title: String,
-        val notes: String,
-        val status: String,
-        val priority: String,
-        val checklist: List<ForgeChecklistItem> = emptyList(),
-    )
-
-    data class ForgeChecklistItem(
-        val id: String,
-        val text: String,
-        val checked: Boolean = false,
-    )
-
-    data class WorkspaceLayout(
-        val columns: List<ForgeColumn>,
-    )
-
-    data class ForgeColumn(
-        val id: String,
-        val name: String,
-        val order: Int,
-    )
-
-    data class CausalNode(
-        val id: String,
-        val title: String,
-        val parents: List<String> = emptyList(),
-        val children: List<String> = emptyList(),
-    )
-
-    data class CascadeGridRow(
-        val viewName: String,
-        val metric: String,
-        val sum: Double = 0.0,
-        val avg: Double = 0.0,
-        val min: Double = 0.0,
-        val max: Double = 0.0,
-        val count: Long = 0L,
-    )
-
-    data class IngestJob(
-        val id: String,
-        val fileName: String,
-        val fileSize: Long,
-        val mimeType: String,
-        val status: String, // "pending" | "processing" | "done" | "error"
-        val progress: Double = 0.0,
-        val error: String? = null,
-        val entitiesCreated: Int = 0,
-    )
-
-    data class ForgeAppState(
-        val title: String,
-        val userId: String,
-        val items: List<ForgeItem>,
-        val workspace: WorkspaceLayout,
-        val causalGraph: List<CausalNode>,
-        val cascadeGrid: List<CascadeGridRow>,
-        val ingestJobs: List<IngestJob> = emptyList(),
-    )
-
-    fun defaultForgeAppState(userId: String, ingestJobs: List<IngestJob> = emptyList()): ForgeAppState {
-        val markdownPath = "/tmp/hi"
-        val reduction = if (Files.exists(markdownPath)) {
-            ForgeKanbanIngest.persistMarkdown(userId, markdownPath)
-        } else {
-            ForgeKanbanIngest.fallbackReduction()
-        }
-        return ForgeAppState(
-            title = "Forge Workspace",
-            userId = userId,
-            items = reduction.board.cards.map { card ->
-                ForgeItem(
-                    id = card.id.value,
-                    title = card.title,
-                    notes = card.description,
-                    status = card.columnId.value,
-                    priority = card.priority.name,
-                )
-            },
-            workspace = WorkspaceLayout(
-                columns = ForgeGalleryCatalog.widgets()
-                    .groupBy { it.section }
-                    .map { (section, widgets) ->
-                        ForgeColumn(
-                            id = section.name.lowercase().replace(" ", "-"),
-                            name = section.name,
-                            order = section.ordinal,
-                        )
-                    }
-                    .sortedBy { it.order },
-            ),
-            causalGraph = reduction.causalNodes.map { node ->
-                CausalNode(
-                    id = node.causalKey,
-                    title = node.nodeId,
-                    parents = node.parentNodeIds,
-                    children = emptyList(),
-                )
-            },
-            cascadeGrid = emptyList(),
-            ingestJobs = ingestJobs,
-        )
-    }
-
     /** Render the complete Forge HTML shell with seeded state for PWA offline-first hydration. */
     fun renderHtml(userId: String = "jim"): String {
-        val state = defaultForgeAppState(userId)
-        val seed = forgeSeedJson(state)
+        val reduction = runCatching { ForgeKanbanIngest.load(userId) }.getOrElse { ForgeKanbanIngest.fallbackReduction() }
+        val seed = forgeSeedJson(userId, reduction)
         return htmlShell(seed)
     }
 
-    private fun forgeSeedJson(state: ForgeAppState): String {
+    private fun forgeSeedJson(userId: String, reduction: borg.trikeshed.kanban.ForgeKanbanReduction): String {
         val json = ConfixObject(
             mapOf(
-                "title" to ConfixPrimitive(state.title),
-                "userId" to ConfixPrimitive(state.userId),
-                "items" to ConfixArray(state.items.map { item ->
+                "title" to ConfixPrimitive("Forge Workspace"),
+                "userId" to ConfixPrimitive(userId),
+                "items" to ConfixArray(reduction.board.cards.map { card ->
                     ConfixObject(
                         mapOf(
-                            "id" to ConfixPrimitive(item.id),
-                            "title" to ConfixPrimitive(item.title),
-                            "notes" to ConfixPrimitive(item.notes),
-                            "status" to ConfixPrimitive(item.status),
-                            "priority" to ConfixPrimitive(item.priority),
-                            "checklist" to ConfixArray(item.checklist.map { c ->
-                                ConfixObject(
-                                    mapOf(
-                                        "id" to ConfixPrimitive(c.id),
-                                        "text" to ConfixPrimitive(c.text),
-                                        "checked" to ConfixPrimitive(c.checked),
-                                    )
-                                )
-                            }),
+                            "id" to ConfixPrimitive(card.id.value),
+                            "title" to ConfixPrimitive(card.title),
+                            "notes" to ConfixPrimitive(card.description),
+                            "status" to ConfixPrimitive(card.columnId.value),
+                            "priority" to ConfixPrimitive(card.priority.name),
+                            "checklist" to ConfixArray(emptyList()),
                         )
                     )
                 }),
                 "workspace" to ConfixObject(
                     mapOf(
-                        "columns" to ConfixArray(state.workspace.columns.map { col ->
-                            ConfixObject(
-                                mapOf(
-                                    "id" to ConfixPrimitive(col.id),
-                                    "name" to ConfixPrimitive(col.name),
-                                    "order" to ConfixPrimitive(col.order),
+                        "columns" to ConfixArray(ForgeGalleryCatalog.widgets()
+                            .groupBy { it.section }
+                            .map { (section, _) -> section }
+                            .sortedBy { it.ordinal }
+                            .map { section ->
+                                ConfixObject(
+                                    mapOf(
+                                        "id" to ConfixPrimitive(section.name.lowercase().replace(" ", "-")),
+                                        "name" to ConfixPrimitive(section.name),
+                                        "order" to ConfixPrimitive(section.ordinal),
+                                    )
                                 )
-                            )
-                        }),
+                            }
+                        ),
                     )
                 ),
-                "causalGraph" to ConfixArray(state.causalGraph.map { node ->
+                "causalGraph" to ConfixArray(reduction.causalNodes.map { node ->
                     ConfixObject(
                         mapOf(
-                            "id" to ConfixPrimitive(node.id),
-                            "title" to ConfixPrimitive(node.title),
-                            "parents" to ConfixArray(node.parents.map { ConfixPrimitive(it) }),
-                            "children" to ConfixArray(node.children.map { ConfixPrimitive(it) }),
+                            "id" to ConfixPrimitive(node.causalKey),
+                            "title" to ConfixPrimitive(node.nodeId),
+                            "parents" to ConfixArray(node.parentNodeIds.map { ConfixPrimitive(it) }),
+                            "children" to ConfixArray(emptyList()),
                         )
                     )
                 }),
-                "cascadeGrid" to ConfixArray(state.cascadeGrid.map { row ->
-                    ConfixObject(
-                        mapOf(
-                            "viewName" to ConfixPrimitive(row.viewName),
-                            "metric" to ConfixPrimitive(row.metric),
-                            "sum" to ConfixPrimitive(row.sum),
-                            "avg" to ConfixPrimitive(row.avg),
-                            "min" to ConfixPrimitive(row.min),
-                            "max" to ConfixPrimitive(row.max),
-                            "count" to ConfixPrimitive(row.count),
-                        )
-                    )
-                }),
-                "ingestJobs" to ConfixArray(state.ingestJobs.map { job ->
-                    ConfixObject(
-                        mapOf(
-                            "id" to ConfixPrimitive(job.id),
-                            "fileName" to ConfixPrimitive(job.fileName),
-                            "fileSize" to ConfixPrimitive(job.fileSize),
-                            "mimeType" to ConfixPrimitive(job.mimeType),
-                            "status" to ConfixPrimitive(job.status),
-                            "progress" to ConfixPrimitive(job.progress),
-                            "error" to (job.error?.let { ConfixPrimitive(it) } ?: ConfixPrimitive("")),
-                            "entitiesCreated" to ConfixPrimitive(job.entitiesCreated),
-                        )
-                    )
-                }),
+                "cascadeGrid" to ConfixArray(emptyList()),
+                "ingestJobs" to ConfixArray(emptyList()),
                 "blackboardSeed" to forgeBlackboardSeed(),
             )
         )
