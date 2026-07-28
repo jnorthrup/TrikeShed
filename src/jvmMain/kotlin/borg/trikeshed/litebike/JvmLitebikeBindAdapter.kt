@@ -133,25 +133,23 @@ object JvmLitebikeBindAdapter {
         val buf = ByteBuffer.allocate(8 * 1024)
         val respondCallback: suspend (ByteArray) -> Unit = { responseBytes ->
             try {
-                withContext(Dispatchers.IO) {
-                    val writeBuf = ByteBuffer.wrap(responseBytes)
-                    while (writeBuf.hasRemaining()) {
-                        val written = kotlin.coroutines.suspendCoroutine { cont ->
-                            ch.write(writeBuf, null, object : CompletionHandler<Int, Any?> {
-                                override fun completed(result: Int, attachment: Any?) {
-                                    cont.resumeWith(Result.success(result))
-                                }
-                                override fun failed(exc: Throwable, attachment: Any?) {
-                                    cont.resumeWith(Result.failure(exc))
-                                }
-                            })
-                        }
-                        if (written < 0) break
+                val writeBuffer = ByteBuffer.wrap(responseBytes)
+                while (writeBuffer.hasRemaining()) {
+                    val bytesWritten = kotlin.coroutines.suspendCoroutine { cont ->
+                        ch.write(writeBuffer, null, object : CompletionHandler<Int, Any?> {
+                            override fun completed(result: Int, attachment: Any?) {
+                                cont.resumeWith(Result.success(result))
+                            }
+                            override fun failed(exc: Throwable, attachment: Any?) {
+                                cont.resumeWith(Result.failure(exc))
+                            }
+                        })
                     }
+                    if (bytesWritten < 0) break
                 }
             } finally {
                 connections.unregister(connId)
-                // Close the accepted-channel lifecycle around the existing respond callback
+                // Close accepted-channel lifecycle around existing respond callback
                 runCatching { ch.close() }
             }
         }
