@@ -253,7 +253,7 @@ class MuxReactorElement(
     }
 
     fun tick(): MuxDispatchResult {
-        reclaimExpiredLeases()
+        val reclaimedCount = reclaimExpiredLeases()
         val runningPerProvider: Map<String, Int> = activeLeases()
             .mapNotNull { lease ->
                 keysById[lease.keyId]?.provider?.let { it to 1 }
@@ -298,7 +298,7 @@ class MuxReactorElement(
         publishState(now)
         return MuxDispatchResult(
             spawned = spawned,
-            reclaimed = 0,
+            reclaimed = reclaimedCount,
             promoted = 0,
             crashed = 0,
             timestampMs = now,
@@ -351,8 +351,9 @@ class MuxReactorElement(
         return entry
     }
 
-    private fun reclaimExpiredLeases() {
+    private fun reclaimExpiredLeases(): Int {
         val now = nowMs()
+        var reclaimed = 0
         keysById.values.forEach { key ->
             if (key.leasedTo != null && key.leaseExpiresAt > 0L && now > key.leaseExpiresAt) {
                 val previous = key.leasedTo
@@ -366,8 +367,10 @@ class MuxReactorElement(
                         timestampMs = now,
                     ),
                 )
+                reclaimed++
             }
         }
+        return reclaimed
     }
 
     private fun activeLeases(): List<MuxLeaseInfo> {
