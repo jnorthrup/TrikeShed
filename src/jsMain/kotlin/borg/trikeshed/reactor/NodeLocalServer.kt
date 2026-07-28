@@ -65,10 +65,6 @@ class NodeLocalServer(
         server?.close()
     }
 
-    private fun bytesToBase64(bytes: ByteArray): String {
-        return js("Buffer.from(bytes).toString('base64')") as String
-    }
-
     private fun base64ToBytes(base64: String): ByteArray {
         val buffer = js("Buffer.from(base64, 'base64')")
         val uint8Array = js("new Uint8Array(buffer)")
@@ -85,11 +81,13 @@ class NodeLocalServer(
         val capCat = cap.category
         val capToken = if (cap is Capability.Custom) "${cap.kind}:${cap.token}" else if (cap is Capability.Process) cap.name else if (cap is Capability.Cas) cap.mode else if (cap is Capability.Wireproto) cap.route else ""
 
-        val nonceBase64 = bytesToBase64(nonce.bytes)
+        val nonceBytesArray = nonce.bytes
+        val nonceBase64 = js("Buffer.from(nonceBytesArray).toString('base64')") as String
         val derivedKey = if (nonce is Nonce.Derived) ",\"nonceDerivedKey\":\"derived\"" else ""
         val capTokenStr = if (capToken.isNotEmpty()) ",\"capabilityToken\":\"$capToken\"" else ""
         val verb = result.b.a
-        val payload = bytesToBase64(result.b.b)
+        val payloadBytesArray = result.b.b
+        val payload = js("Buffer.from(payloadBytesArray).toString('base64')") as String
 
         val json = """{"nuid":{"capabilityCat":"$capCat"$capTokenStr,"nonceBytes":"$nonceBase64"$derivedKey,"subnet":"$subnet"},"verb":"$verb","payload":"$payload"}"""
 
