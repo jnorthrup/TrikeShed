@@ -162,6 +162,14 @@ class FlywheelDriver(
             _events.tryEmit(FlywheelEvent.PollError("poll ${t.javaClass.simpleName}: ${t.message?.take(200)}"))
         }
 
+        // Jules can keep reporting an externally landed branch as active. Close
+        // that card through the normal provenance path before it consumes a slot.
+        try {
+            reconcileGitState()
+        } catch (t: Throwable) {
+            _events.tryEmit(FlywheelEvent.PollError("reconcile ${t.javaClass.simpleName}: ${t.message?.take(200)}"))
+        }
+
         // 2. ANSWER — a waiting conversation is higher-leverage than a new
         //    dispatch: it unblocks a slot the wheel reuses THIS cycle. Draining
         //    blocked work before induction keeps the flow even.
@@ -660,6 +668,136 @@ class FlywheelDriver(
         // `--no-ff` preserves the synchronization edge even when a fast-forward
         // is possible. Jules branches are merged later by drainThreeWay().
         return git("merge", "--no-ff", "origin/master").exitCode == 0
+    }
+
+    /**
+     * Close non-terminal cards whose Jules branch is already an ancestor of
+     * HEAD. Jules can leave the API state at IN_PROGRESS after an external PR
+     * merge, which otherwise occupies a slot forever. Git ancestry is the
+     * authority; every reconciliation still records an immutable CAS artifact,
+     * annotated tag, queue receipt, identity, and drained card in that order.
+     */
+    private suspend fun reconcileGitState() {
+        val candidates = conductor.cards.values.filter { card ->
+            !card.drained && card.snapshot.state !in TERMINAL_STATES
+        }
+        if (candidates.isEmpty()) return
+
+        val fetch = git("fetch", "origin", "--prune")
+        if (fetch.exitCode != 0) {
+            emitPollError("reconcile fetch failed: ${fetch.output.take(200)}", 0)
+            return
+        }
+        val mergedRefs = git(
+            "for-each-ref", "--format=%(refname:short)", "--merged=HEAD", "refs/remotes/origin",
+        )
+        if (mergedRefs.exitCode != 0) {
+            emitPollError("reconcile merged-ref query failed: ${mergedRefs.output.take(200)}", 0)
+            return
+        }
+        val mergedBranches = mergedRefs.output.lineSequence()
+            .map { it.trim() }
+            .filter { it.startsWith("origin/jules-") }
+            .toList()
+        if (mergedBranches.isEmpty()) return
+
+        val workIds = store.loadQueue().mapNotNull { entry ->
+            entry.sessionId?.let { it to entry.workId }
+        }.toMap()
+        for (card in candidates) {
+            val sessionId = card.snapshot.sessionId
+            val numericId = sessionId.substringAfterLast('/').filter { it.isDigit() }
+            if (numericId.isEmpty()) continue
+            // Jules uses both jules-<id>-<hash> and jules-<slug>-<id>-<hash>.
+            val branch = mergedBranches.firstOrNull { numericId in it } ?: continue
+            val revision = git("rev-parse", branch)
+            if (revision.exitCode != 0 || revision.output.isBlank()) {
+                emitPollError("reconcile $sessionId: cannot resolve $branch", 0)
+                continue
+            }
+            val commitSha = revision.output.trim()
+            val gitDelta = git("show", "--format=", "--binary", commitSha)
+            if (gitDelta.exitCode != 0) {
+                emitPollError("reconcile $sessionId: cannot read $commitSha", 0)
+                continue
+            }
+            // A merge commit can have no default show diff; its ref+revision are
+            // still durable Git evidence rather than a hollow empty CID.
+            val patchBytes = gitDelta.output.ifBlank {
+                "reconciled-session=$sessionId\nbranch=$branch\nrevision=$commitSha\n"
+            }.encodeToByteArray()
+            val patchCid = try {
+                casStore.put(patchBytes)
+            } catch (t: Throwable) {
+                emitPollError("reconcile $sessionId: CAS put failed: ${t.message?.take(200)}", 0)
+                continue
+            }
+
+            val safeSession = sessionId.replace(Regex("[^A-Za-z0-9._-]"), "-")
+            val tag = "flywheel/jules-$safeSession-${commitSha.take(12)}"
+            val existingTag = git("rev-parse", "--verify", "$tag^{commit}")
+            if (existingTag.exitCode == 0 && existingTag.output.trim() != commitSha) {
+                emitPollError("reconcile $sessionId: existing tag $tag targets ${existingTag.output.trim()}", 0)
+                continue
+            }
+            if (existingTag.exitCode != 0) {
+                val tagged = git(
+                    "tag", "-a", tag, commitSha, "-m",
+                    "Jules reconciliation receipt\nsession=$sessionId\nbranch=$branch\npatchCid=${patchCid.value}",
+                )
+                if (tagged.exitCode != 0) {
+                    emitPollError("reconcile $sessionId: tag create failed: ${tagged.output.take(200)}", 0)
+                    continue
+                }
+            }
+
+            val workId = workIds[sessionId]
+                ?: "session:${sessionId.replace(Regex("[^A-Za-z0-9._-]"), "-")}"
+            val now = Clock.System.now().toEpochMilliseconds()
+            val prUrl = runCatching { fishPrUrl(sessionId, tag) }.getOrNull()
+            val receipt = MergeReceipt(
+                workId = workId,
+                producer = "jules",
+                producerRef = sessionId,
+                patchCid = patchCid,
+                revision = commitSha,
+                versionTag = tag,
+                lexicalMemory = LexicalMemory(
+                    summary = card.card.title,
+                    title = card.card.title,
+                    content = "reconciled from $branch at $commitSha",
+                ),
+                claimedAt = now,
+                prUrl = prUrl,
+            )
+            try {
+                store.appendWork(workId, JulesCause.WorkDrained(
+                    workId = workId,
+                    sessionId = sessionId,
+                    commitSha = commitSha,
+                    taskId = tag,
+                    receipt = receipt,
+                    at = now,
+                ))
+                store.appendWork(workId, JulesCause.WorkIdentitySynthesized(
+                    workId = workId,
+                    identity = WorkIdentity(
+                        workId = workId,
+                        sessionId = sessionId,
+                        gitBranch = branch,
+                        prUrl = prUrl,
+                        gitTag = tag,
+                        commitSha = commitSha,
+                    ),
+                    at = now,
+                ))
+                conductor.recordDrain(sessionId, commitSha, rejects = 0)
+            } catch (t: Throwable) {
+                emitPollError("reconcile $sessionId: provenance WAL failed: ${t.message?.take(200)}", 0)
+                continue
+            }
+            println("[FLYWHEEL] RECONCILE ${sessionId.takeLast(6)} branch=$branch tag=$tag")
+        }
     }
 
     /**
