@@ -31,13 +31,13 @@ class CouchHeadProjection {
     private val frames = mutableMapOf<String, CouchCommittedFrame>()
 
     fun applyCommit(frame: CouchCommittedFrame) {
-        require(frame.deleted || frame.doc?.id == frame.docId) {
-            "Insert/Update frame docId must match document id"
-        }
-
         val existingFrame = frames[frame.docId]
         if (existingFrame != null && (frame.sequence <= existingFrame.sequence || frame.rev == existingFrame.rev)) {
             return
+        }
+
+        require(frame.deleted || frame.doc?.id == frame.docId) {
+            "Insert/Update frame docId must match document id"
         }
 
         frames[frame.docId] = frame
