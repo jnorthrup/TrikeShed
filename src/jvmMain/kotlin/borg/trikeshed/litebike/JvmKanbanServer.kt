@@ -214,10 +214,10 @@ object JvmKanbanServer {
             while (true) {
                 val msg = httpSlot.consume()
                 val payload = msg.payload
-                
+
                 val wireNuid = nuid(Capability.Wireproto("http"), Nonce.RandomBytes(), Subnet.lanLocalhost)
                 fanout.dispatch(wireNuid, payload)
-                
+
                 val resp = routeHttp(payload)
                 val out = buildString {
                     append("HTTP/1.1 ${resp.status} ${statusReason(resp.status)}\r\n")
