@@ -82,12 +82,15 @@ sealed class KanbanEvent {
         override val timestampMs: Long,
     ) : KanbanEvent()
 
+    /** Cycle observed event from the Oroboros daemon. */
     @Serializable
     data class CycleObserved(val cycleMs: Long, val drained: Int, val dispatched: Int, val alive: Int, val available: Int, override val timestampMs: Long) : KanbanEvent()
 
+    /** Event when a patch is drained. */
     @Serializable
     data class PatchDrained(val sessionId: String, val sha: String, val tag: String, override val timestampMs: Long) : KanbanEvent()
 
+    /** Event when a dispatch fires. */
     @Serializable
     data class DispatchFired(val sessionId: String, val title: String, override val timestampMs: Long) : KanbanEvent()
 }
