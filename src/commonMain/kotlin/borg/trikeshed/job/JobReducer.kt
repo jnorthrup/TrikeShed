@@ -168,4 +168,6 @@ class JobReducer {
     /** Expose all facts for a job (for evidence queries). */
     fun facts(jobId: JobId): List<JobFact> = jobFacts[jobId]?.toList() ?: emptyList()
 
+    private fun canonicalFrameBytes(frame: JobFrame): ByteArray =
+        frame.toString().encodeToByteArray()
 }
