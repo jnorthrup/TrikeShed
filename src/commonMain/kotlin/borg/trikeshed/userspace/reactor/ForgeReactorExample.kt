@@ -9,6 +9,7 @@ import borg.trikeshed.util.oroboros.CouchAttachmentGateway
 import borg.trikeshed.util.oroboros.ForgeHome
 import borg.trikeshed.util.oroboros.OroborosAttachmentRef
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
@@ -16,6 +17,7 @@ import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.asSharedFlow
+import kotlinx.coroutines.flow.take
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 
@@ -51,10 +53,13 @@ fun main() = runBlocking {
     }
 
     val example = ForgeReactorExample(forgeHome = ForgeHome.defaultHome)
+    val collector = launch(start = CoroutineStart.UNDISPATCHED) {
+        example.events.take(2).collect { println(it) }
+    }
     example.open(parentJob = coroutineContext[Job]!!)
     try {
         example.runSyntheticCycle("hello forge")
-        example.events.collect { /* TUI/HUD subscribers hook here */ }
+        collector.join()
     } finally {
         example.close()
     }
