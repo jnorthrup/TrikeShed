@@ -541,5 +541,5 @@ class InMemoryBlackboardFabric : BlackboardFabric {
  */
 object BlackboardFabrics {
     /** Create a new in-memory blackboard fabric. */
-    fun create(): BlackboardFabric = TODO()
+    fun create(): BlackboardFabric = InMemoryBlackboardFabric()
 }
