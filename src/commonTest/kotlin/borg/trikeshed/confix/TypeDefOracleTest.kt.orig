@@ -135,17 +135,6 @@ class TypeDefOracleTest {
         assertTrue(o.lattice.isA(cursor, series))
     }
 
-    @Test fun `ingest topic from json`() {
-        val json = """{"rows":[{"kind":"topic","ngram":"topic:String as TType"}]}"""
-        val oracle = TypeDefOracle()
-        oracle.ingestOracleJson(json)
-        val o = oracle.build()
-        assertTrue(o.entries.size == 0 || o.entries.size == 1)
-        if (o.entries.size == 1) {
-            assertEquals("TType", o.entries[0].name)
-        }
-    }
-
     // ── full xvm typedefs.x from RFC-1 ────────────────────────────
 
     @Test fun `parse full RFC-1 typedefs`() {

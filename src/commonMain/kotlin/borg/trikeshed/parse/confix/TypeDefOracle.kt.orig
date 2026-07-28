@@ -61,11 +61,6 @@ class TypeDefOracle {
             """^\s*typealias\s+([A-Za-z_]\w*)(?:<([^>]+)>)?\s*=\s*(.+?)$""",
             setOf(RegexOption.MULTILINE)
         )
-
-        private val topicPattern = Regex("""^topic:(\w+)\s+as\s+(\w+)""")
-        private val typeParamPattern = Regex("""<[^>]*>""")
-        private val typeParenPattern = Regex("""\([^)]*\)""")
-        private val typeSplitPattern = Regex("""[|,\s]+""")
     }
 
     fun parseTypeDefs(text: String, source: String = "<unknown>") {
@@ -122,23 +117,7 @@ class TypeDefOracle {
 
     fun ingestOracleJson(jsonText: String) {
         val doc = confixDoc(jsonText)
-        var rows: Series<ConfixCell>? = doc.docAt("rows")?.cellKids
-        if (rows == null && doc.roots.size > 0) {
-            val root = doc.roots[0]
-            if (root.tag == IOMemento.IoObject) {
-                for (i in 0 until root.kids.size step 2) {
-                    val kCell = root.kids[i]
-                    val k = kCell.reify(doc.src)
-                    val keyStr = if (k is String) k else {
-                        val o = kCell.open; val c = kCell.close
-                        if (o < c && o >= 0 && c <= doc.src.size) String(CharArray(c - o) { j -> doc.src[o + j].toInt().toChar() }) else ""
-                    }
-                    if (keyStr == "rows") { rows = (root.kids[i + 1] j doc.src).cellKids; break }
-                }
-            }
-        }
-        if (rows == null) return
-
+        val rows: Series<ConfixCell> = doc.docAt("rows")?.cellKids ?: return
         for (elem in rows.`▶`) {
             val kind  = elem["kind"]?.reify() as? String
             val ngram = elem["ngram"]?.reify() as? String
@@ -151,7 +130,7 @@ class TypeDefOracle {
                 "isA_edge" -> ngram.split(" -> ").takeIf { it.size >= 2 }?.let { (c, p) ->
                     addLinkCheck(c, p)
                 }
-                "topic" -> topicPattern.find(ngram)?.let { mr ->
+                "topic" -> Regex("""^topic:(\w+)\s+as\s+(\w+)""").find(ngram)?.let { mr ->
                     addEntry(mr.groupValues[2], mr.groupValues[1], null, "lda-topic")
                 }
             }
@@ -233,9 +212,9 @@ class TypeDefOracle {
 
     private fun extractBaseNames(typeExpr: String): List<String> {
         val cleaned = typeExpr
-            .replace(typeParamPattern, "")
-            .replace(typeParenPattern, "")
-        return cleaned.split(typeSplitPattern)
+            .replace(Regex("""<[^>]*>"""), "")
+            .replace(Regex("""\([^)]*\)"""), "")
+        return cleaned.split(Regex("""[|,\s]+"""))
             .filter { it.isNotBlank() && it.first().isLetter() }
             .map { it.trim() }
     }
