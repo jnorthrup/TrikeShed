@@ -169,5 +169,5 @@ class JobReducer {
     fun facts(jobId: JobId): List<JobFact> = jobFacts[jobId]?.toList() ?: emptyList()
 
     private fun canonicalFrameBytes(frame: JobFrame): ByteArray =
-        frame.toString().encodeToByteArray()
+        CanonicalCbor.encode(frame.doc)
 }
