@@ -36,63 +36,81 @@ object ForgeApp {
         return htmlShell(seed)
     }
 
-    private fun forgeSeedJson(userId: String, reduction: borg.trikeshed.kanban.ForgeKanbanReduction): String {
-        val index = CausalGraphNodeIndex()
-        reduction.causalNodes.forEach { index.addOrGet(it) }
-
-        val entities = reduction.correlations.map { correlation ->
-            val card = reduction.board.cards.first { it.id.value == correlation.taskId }
-            correlationToBlock(correlation, card)
-        }
-        val surface = BlackboardSurface.project("forge-$userId", index, entities)
-
-        val seedMap = mapOf(
-            "title" to "Forge Workspace",
-            "userId" to userId,
-            "items" to reduction.board.cards.map { card ->
+    private fun forgeSeedJson(state: ForgeAppState): String {
+        val json = ConfixObject(
                 mapOf(
-                    "id" to card.id.value,
-                    "title" to card.title,
-                    "notes" to card.description,
-                    "status" to card.columnId.value,
-                    "priority" to card.priority.name,
-                    "checklist" to emptyList<Any>(),
-                )
-            },
-            "workspace" to mapOf(
-                "columns" to ForgeGalleryCatalog.widgets()
-                    .groupBy { it.section }
-                    .map { (section, _) -> section }
-                    .sortedBy { it.ordinal }
-                    .map { section ->
+                "title" to ConfixPrimitive(state.title),
+                "userId" to ConfixPrimitive(state.userId),
+                "items" to ConfixArray(state.items.map { item ->
+                    ConfixObject(
                         mapOf(
-                            "id" to section.name.lowercase().replace(" ", "-"),
-                            "name" to section.name,
-                            "order" to section.ordinal,
+                            "id" to ConfixPrimitive(item.id),
+                            "title" to ConfixPrimitive(item.title),
+                            "notes" to ConfixPrimitive(item.notes),
+                            "status" to ConfixPrimitive(item.status),
+                            "priority" to ConfixPrimitive(item.priority),
+                            "checklist" to ConfixArray(item.checklist.map { c ->
+                                ConfixObject(
+                mapOf(
+                                        "id" to ConfixPrimitive(c.id),
+                                        "text" to ConfixPrimitive(c.text),
+                                        "checked" to ConfixPrimitive(c.checked),
+                                    )
+                                )
+                            }),
                         )
-                    }
-            ),
-            "causalGraph" to reduction.causalNodes.map { node ->
+                    )
+                }),
+                "workspace" to ConfixObject(
                 mapOf(
-                    "id" to node.causalKey,
-                    "title" to node.nodeId,
-                    "parents" to node.parentNodeIds,
-                    "children" to emptyList<Any>(),
+                        "columns" to ConfixArray(state.workspace.columns.map { col ->
+                            ConfixObject(
+                                mapOf(
+                                    "id" to ConfixPrimitive(col.id),
+                                    "name" to ConfixPrimitive(col.name),
+                                    "order" to ConfixPrimitive(col.order),
+                                )
+                            )
+                        }),
+                    )
+                ),
+                "causalGraph" to ConfixArray(state.causalGraph.map { node ->
+                    ConfixObject(
+                        mapOf(
+                            "id" to ConfixPrimitive(node.id),
+                            "title" to ConfixPrimitive(node.title),
+                            "parents" to ConfixArray(node.parents.map { ConfixPrimitive(it) }),
+                            "children" to ConfixArray(node.children.map { ConfixPrimitive(it) }),
+                        )
+                    )
+                }),
+                "cascadeGrid" to ConfixArray(state.cascadeGrid.map { row ->
+                    ConfixObject(
+                        mapOf(
+                            "viewName" to ConfixPrimitive(row.viewName),
+                            "metric" to ConfixPrimitive(row.metric),
+                            "sum" to ConfixPrimitive(row.sum),
+                            "avg" to ConfixPrimitive(row.avg),
+                            "min" to ConfixPrimitive(row.min),
+                            "max" to ConfixPrimitive(row.max),
+                            "count" to ConfixPrimitive(row.count),
+                        )
+                    )
+                }),
+                "ingestJobs" to ConfixArray(state.ingestJobs.map { job ->
+                    ConfixObject(
+                        mapOf(
+                            "id" to ConfixPrimitive(job.id),
+                            "fileName" to ConfixPrimitive(job.fileName),
+                            "fileSize" to ConfixPrimitive(job.fileSize),
+                            "mimeType" to ConfixPrimitive(job.mimeType),
+                            "status" to ConfixPrimitive(job.status),
+                            "progress" to ConfixPrimitive(job.progress),
+                            "error" to (job.error?.let { ConfixPrimitive(it) } ?: ConfixPrimitive("")),
+                            "entitiesCreated" to ConfixPrimitive(job.entitiesCreated),
                 )
-            },
-            "cascadeGrid" to surface.rows.map { row ->
-                mapOf(
-                    "cardId" to row.cardId,
-                    "lane" to row.lane,
-                    "phase" to row.phase,
-                    "facet" to row.facet,
-                    "provenance" to (row.provenance ?: ""),
-                    "causalKey" to row.causalKey,
-                    "lcncKind" to row.lcncKind,
-                    "title" to (row.title ?: ""),
-                )
-            },
-            "ingestJobs" to emptyList<Any>(),
+                    )
+                }),
             "blackboardSeed" to forgeBlackboardSeed(),
         )
         return JsonSupport.stringify(seedMap)
