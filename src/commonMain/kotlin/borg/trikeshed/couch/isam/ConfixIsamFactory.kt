@@ -37,7 +37,10 @@ class ConfixIsamStoreBuilder {
         require(stringpoolLocation.isNotEmpty()) { "stringpoolLocation must be set" }
         requireNotNull(exemplarIndex) { "an exemplar document must be provided to infer the ISAM schema" }
 
-        val isamSchema = ConfixIsamIsomorphism.inferIsamSchemaFromConfixIndex(exemplarIndex!!)
+        val isamSchema = ConfixIsamIsomorphism.inferIsamSchemaFromConfixIndex(
+            exemplarIndex!!,
+            keyNames = emptyMap(),
+        )
 
         val resolvedFileOps = fileOps ?: throw IllegalStateException("fileOps must be configured")
         val stringpool = FileBackedStringpool(stringpoolLocation, resolvedFileOps)

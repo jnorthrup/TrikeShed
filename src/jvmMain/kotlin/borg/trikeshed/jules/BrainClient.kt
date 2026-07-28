@@ -1,54 +1,108 @@
 package borg.trikeshed.jules
 
+import java.io.File
 import java.net.URI
 import java.net.http.HttpClient
 import java.net.http.HttpRequest
 import java.net.http.HttpResponse
+import java.time.Instant
 
 /**
  * BrainClient — the real flywheel brain.
  *
- * OpenAI-compatible chat completions over HTTPS. Default endpoint is NVIDIA NIM
- * (Laguna XS 2.1). The flywheel's [FlywheelDriver.buildAnswer] calls this to
- * answer Jules sessions with project conventions as the system prompt.
+ * OpenAI-compatible chat completions over HTTPS with multi-provider failover.
+ * The flywheel's [FlywheelDriver.buildAnswer] calls this to answer Jules
+ * sessions with project conventions as the system prompt.
  *
  * The brain must fire a real model. A string template is not a brain.
  *
- * @param apiKey NIM API key (NVIDIA_API_KEY env var)
- * @param base endpoint base URL (default: NVIDIA NIM)
- * @param model model id (default: Laguna XS 2.1)
+ * Providers are discovered from the environment and tool config files. When a
+ * provider returns non-200, the brain logs the failure to
+ * `~/.local/forge/brain-errors.jsonl` (daemon-only) and tries the next
+ * provider until one succeeds or all are exhausted.
  */
 class BrainClient(
-    private val apiKey: String,
-    private val base: String = "https://integrate.api.nvidia.com/v1",
-    private val model: String = "poolside/laguna-xs-2.1",
+    /** If non-null, overrides auto-discovery and uses a single endpoint. */
+    apiKey: String? = null,
+    base: String = "https://integrate.api.nvidia.com/v1",
+    model: String = "poolside/laguna-xs-2.1",
 ) {
     private val http: HttpClient = HttpClient.newHttpClient()
 
-    /** Non-streaming chat completion. Returns the assistant's message text. */
+    /** One OpenAI-compatible endpoint with credentials and a default model. */
+    data class Endpoint(
+        val name: String,
+        val apiKey: String,
+        val base: String,
+        val model: String,
+    )
+
+    private val endpoints: List<Endpoint> = if (apiKey != null) {
+        listOf(Endpoint("override", apiKey, base, model))
+    } else {
+        discoverEndpoints()
+    }
+
+    private val errorLog: File? = run {
+        val home = System.getProperty("user.home") ?: return@run null
+        val forgeDir = File(home, ".local/forge")
+        forgeDir.mkdirs()
+        File(forgeDir, "brain-errors.jsonl")
+    }
+
+    /** True if at least one provider endpoint was discovered. */
+    fun hasEndpoints(): Boolean = endpoints.isNotEmpty()
+
+    /** Non-streaming chat completion with multi-provider failover. */
     fun chat(messages: List<Pair<String, String>>, maxTokens: Int = 256, temperature: Double = 0.2): String {
-        val body = buildString {
-            append("""{"model":${jsonStr(model)},"messages":[""")
-            messages.forEachIndexed { i, (role, content) ->
-                if (i > 0) append(',')
-                append("""{"role":${jsonStr(role)},"content":${jsonStr(content)}}""")
+        if (endpoints.isEmpty()) error("Brain: no provider endpoints discovered")
+
+        var lastError: String = "all providers exhausted"
+        for (ep in endpoints) {
+            val body = buildString {
+                append("""{"model":${jsonStr(ep.model)},"messages":[""")
+                messages.forEachIndexed { i, (role, content) ->
+                    if (i > 0) append(',')
+                    append("""{"role":${jsonStr(role)},"content":${jsonStr(content)}}""")
+                }
+                append("],")
+                append("\"max_tokens\":$maxTokens,")
+                append("\"temperature\":$temperature,")
+                append("\"top_p\":0.9")
+                append('}')
             }
-            append("],")
-            append("\"max_tokens\":$maxTokens,")
-            append("\"temperature\":$temperature,")
-            append("\"top_p\":0.9")
+            val req = HttpRequest.newBuilder()
+                .uri(URI.create("${ep.base}/chat/completions"))
+                .header("Authorization", "Bearer ${ep.apiKey}")
+                .header("Content-Type", "application/json")
+                .POST(HttpRequest.BodyPublishers.ofString(body))
+                .build()
+            val resp = http.send(req, HttpResponse.BodyHandlers.ofString())
+            if (resp.statusCode() < 400) {
+                return extractContent(resp.body())
+            }
+            lastError = "Brain ${ep.name} ${resp.statusCode()}: ${resp.body().take(300)}"
+            logError(ep.name, resp.statusCode(), resp.body().take(500))
+        }
+        error(lastError)
+    }
+
+    private fun logError(provider: String, statusCode: Int, bodySnippet: String) {
+        val ts = Instant.now().toEpochMilli()
+        val entry = buildString {
+            append("{\"t\":")
+            append(ts)
+            append(",\"provider\":")
+            append(jsonStr(provider))
+            append(",\"status\":")
+            append(statusCode)
+            append(",\"body\":")
+            append(jsonStr(bodySnippet))
             append('}')
         }
-        val req = HttpRequest.newBuilder()
-            .uri(URI.create("$base/chat/completions"))
-            .header("Authorization", "Bearer $apiKey")
-            .header("Content-Type", "application/json")
-            .POST(HttpRequest.BodyPublishers.ofString(body))
-            .build()
-        val resp = http.send(req, HttpResponse.BodyHandlers.ofString())
-        if (resp.statusCode() >= 400)
-            error("Brain API ${resp.statusCode()}: ${resp.body().take(400)}")
-        return extractContent(resp.body())
+        errorLog?.let { f ->
+            f.appendText(entry + "\n")
+        }
     }
 
     /** Pull choices[0].message.content out of the OpenAI-compatible JSON. */
@@ -80,6 +134,86 @@ class BrainClient(
             }
         }
         error("Brain: unterminated content")
+    }
+
+    /**
+     * Discover all OpenAI-compatible endpoints from env vars and tool config
+     * files. Scans NVIDIA, OpenRouter, OpenAI, Groq, DeepSeek, ZAI, and others.
+     * Provider-specific keys are tried first; generic OpenAI-compatible keys
+     * follow as fallbacks.
+     */
+    private fun discoverEndpoints(): List<Endpoint> {
+        val out = mutableListOf<Endpoint>()
+        val seen = mutableSetOf<String>()
+
+        fun add(name: String, key: String, base: String, model: String) {
+            val id = "$name:$base:$model"
+            if (key.isNotBlank() && seen.add(id)) {
+                out.add(Endpoint(name, key.trim(), base.trim(), model.trim()))
+            }
+        }
+
+        // Primary: NVIDIA NIM (the default brain)
+        System.getenv("NVIDIA_API_KEY")?.let { k ->
+            add("nvidia", k, "https://integrate.api.nvidia.com/v1", "poolside/laguna-xs-2.1")
+            add("nvidia-nemotron", k, "https://integrate.api.nvidia.com/v1", "nvidia/nemotron-3-ultra-550b-a55b")
+        }
+
+        // OpenRouter (many models behind one key)
+        System.getenv("OPENROUTER_API_KEY")?.let { k ->
+            add("openrouter-glm52", k, "https://openrouter.ai/api/v1", "z-ai/glm-5.2")
+            add("openrouter-nemotron", k, "https://openrouter.ai/api/v1", "nvidia/nemotron-3-ultra-550b-a55b:free")
+        }
+
+        // ZAI
+        System.getenv("ZAI_API_KEY")?.let { k ->
+            add("zai", k, "https://api.z.ai/api/paas/v4", "glm-5.2")
+        }
+
+        // Groq (fast inference)
+        System.getenv("GROQ_API_KEY")?.let { k ->
+            add("groq", k, "https://api.groq.com/openai/v1", "llama-3.3-70b-versatile")
+        }
+
+        // DeepSeek
+        System.getenv("DEEPSEEK_API_KEY")?.let { k ->
+            add("deepseek", k, "https://api.deepseek.com/v1", "deepseek-chat")
+        }
+
+        // Cerebras
+        System.getenv("CEREBRAS_API_KEY")?.let { k ->
+            add("cerebras", k, "https://api.cerebras.ai/v1", "llama-3.3-70b")
+        }
+
+        // OpenAI (if real API key, not ChatGPT auth)
+        System.getenv("OPENAI_API_KEY")?.let { k ->
+            if (k.startsWith("sk-")) {
+                val base = System.getenv("OPENAI_API_BASE") ?: "https://api.openai.com/v1"
+                add("openai", k, base, "gpt-4o-mini")
+            }
+        }
+
+        // Perplexity
+        System.getenv("PERPLEXITY_API_KEY")?.let { k ->
+            add("perplexity", k, "https://api.perplexity.ai", "llama-3.1-sonar-small-128k-online")
+        }
+
+        // XAI / Grok
+        System.getenv("XAI_API_KEY")?.let { k ->
+            add("xai", k, "https://api.x.ai/v1", "grok-2-latest")
+        }
+
+        // Moonshot / Kimi
+        System.getenv("MOONSHOT_API_KEY")?.let { k ->
+            add("moonshot", k, "https://api.moonshot.cn/v1", "moonshot-v1-32k")
+        }
+
+        // MiniMax
+        System.getenv("MINIMAX_API_KEY")?.let { k ->
+            add("minimax", k, "https://api.minimax.chat/v1", "MiniMax-Text-01")
+        }
+
+        return out
     }
 
     private fun jsonStr(s: String): String = buildString {

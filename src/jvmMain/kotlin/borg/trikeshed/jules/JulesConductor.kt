@@ -27,10 +27,18 @@ class JulesConductor(
     /** One poll cycle: snapshot surroundings, diff, record causes, persist. */
     suspend fun pollOnce() {
         val sessions = client.listSessions(source)
-        // The WAL may predate source isolation. Never retain a replayed card
-        // unless the authoritative Jules source currently owns that session.
+        // WAL-rehydrated cards survive API rotation. The Jules API expires or
+        // rotates sessions out of its listing; deleting them here erases
+        // COMPLETED-with-patch cards that still need draining, plus drained
+        // cards whose receipts anchor settlement. Only drop cards the API
+        // actively reports as absent AND that have no pending drain work.
         val authoritativeIds = sessions.mapTo(mutableSetOf()) { it.id }
-        cards.keys.retainAll(authoritativeIds)
+        cards.keys.retainAll { sid ->
+            sid in authoritativeIds ||
+                cards[sid]?.drained == true ||
+                (cards[sid]?.snapshot?.state == "COMPLETED" &&
+                    cards[sid]?.snapshot?.patchBytes ?: 0L > 0L)
+        }
         val active = sessions.count { it.state == "IN_PROGRESS" || it.state == "PLANNING" || it.state == "QUEUED" }
         val awaiting = sessions.count { it.state == "AWAITING_USER_FEEDBACK" }
         val headSha = headShaProvider()

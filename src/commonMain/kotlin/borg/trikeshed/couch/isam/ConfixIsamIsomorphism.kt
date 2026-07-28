@@ -1,16 +1,3 @@
-Let me analyze the conflict in this file. The conflict is in the documentation comment and some whitespace differences in the `inferIsamSchemaFromConfixIndex` function.
-
-Looking at the conflict:
-- **HEAD**: Has a slightly different comment about why key names are required
-- **origin**: Has a more complete comment explaining the limitation
-
-The actual code logic is identical in both versions - the conflict is purely in the documentation comment and some whitespace.
-
-Let me resolve this by choosing the more complete and accurate comment from the origin branch, and keeping the code structure from either side (they're identical).
-
-Here's the resolved file:
-
-```kotlin
 package borg.trikeshed.couch.isam
 
 import borg.trikeshed.isam.RecordMeta
@@ -56,10 +43,3 @@ object ConfixIsamIsomorphism {
         }
     }
 }
-```
-
-The resolution:
-- Used the complete comment from the origin branch which better explains why the `keyNames` parameter is required
-- Removed the extra blank line that was in the HEAD version
-- Kept all the code logic identical since both versions were the same
-- Maintained proper formatting and structure

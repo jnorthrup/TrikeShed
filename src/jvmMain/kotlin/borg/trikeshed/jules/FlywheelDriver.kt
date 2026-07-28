@@ -91,7 +91,7 @@ class FlywheelDriver(
     /** Jules Pro concurrency ceiling; configuration may lower but never raise it. */
     private val maxSlots: Int = maxSlots.coerceIn(0, 15)
     private val client = JulesRestClient(apiKey)
-    internal val brain: BrainClient? = System.getenv("NVIDIA_API_KEY")?.let { BrainClient(it) }
+    internal val brain: BrainClient? = BrainClient()
     private val store = JulesBoardStore.forForgeDir(forgeDir)
     private val conductor = JulesConductor(
         client = client,
@@ -806,8 +806,8 @@ class FlywheelDriver(
         }
 
         val b = brain
-        if (b == null) {
-            println("[FLYWHEEL] WARN no NVIDIA_API_KEY — GUIDE offline, skipping ${card.snapshot.sessionId.takeLast(6)}")
+        if (b == null || !b.hasEndpoints()) {
+            println("[FLYWHEEL] WARN no brain endpoints discovered — GUIDE offline, skipping ${card.snapshot.sessionId.takeLast(6)}")
             return ""
         }
         return try {
