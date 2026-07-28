@@ -23,7 +23,7 @@ class OroborosDaemonShutdownTest {
             repoDir.absolutePath
         )
         pb.environment()["JULES_API_KEY"] = "mock_key_for_test"
-        
+
         // Ensure child process uses a temporary directory for output so it doesn't pollute the test environment
         pb.redirectOutput(File(forgeHome, "stdout.log"))
         pb.redirectError(File(forgeHome, "stderr.log"))
@@ -43,7 +43,7 @@ class OroborosDaemonShutdownTest {
 
         // Give it up to 5 seconds to gracefully exit
         val exited = process.waitFor(5, java.util.concurrent.TimeUnit.SECONDS)
-        
+
         // Assertions
         try {
             assertTrue(exited, "Process did not exit gracefully within timeout")

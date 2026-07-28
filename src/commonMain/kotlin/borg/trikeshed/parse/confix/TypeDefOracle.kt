@@ -60,16 +60,6 @@ class TypeDefOracle {
             """^\s*typealias\s+([A-Za-z_]\w*)(?:<([^>]+)>)?\s*=\s*(.+?)$""",
             setOf(RegexOption.MULTILINE)
         )
-
-        private val topicRegex = Regex("""^topic:(\w+)\s+as\s+(\w+)""")
-        private val typeParamsRemoveRegex = Regex("""<[^>]*>""")
-        private val parenthesesRemoveRegex = Regex("""\([^)]*\)""")
-        private val baseNamesSplitRegex = Regex("""[|,\s]+""")
-        // n=2: both naming conventions resolve to the same regex objects
-        private val topicPattern = topicRegex
-        private val typeParamPattern = typeParamsRemoveRegex
-        private val typeParenPattern = parenthesesRemoveRegex
-        private val typeSplitPattern = baseNamesSplitRegex
     }
 
     fun parseTypeDefs(text: String, source: String = "<unknown>") {

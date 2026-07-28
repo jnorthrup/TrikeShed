@@ -269,7 +269,7 @@ class TypeDefOracleTest {
         oracle.parseTypeDefs(src, "many.x")
         val o = oracle.build()
         assertEquals(1000, o.entries.size)
-        
+
         // verify a couple are present and edges exist
         val t0 = o.byName("Tuple0")
         val t999 = o.byName("Tuple999")
@@ -277,7 +277,7 @@ class TypeDefOracleTest {
         assertNotNull(t0)
         assertNotNull(t999)
         assertNotNull(join)
-        
+
         assertTrue(o.lattice.isA(t0, join))
         assertTrue(o.lattice.isA(t999, join))
     }

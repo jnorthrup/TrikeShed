@@ -16,14 +16,14 @@ class KanbanColumnParserTest {
             properties = mapOf("kanban.columns" to columnsJson)
         )
         val doc = ForgeDocument(
-            rootPageId = rootPageId, 
+            rootPageId = rootPageId,
             cursor = ForgeCursor(rootPageId, rootPageId),
             blocks = mapOf(rootPageId.value to pageBlock)
         )
-        
+
         val board = doc.toKanbanBoard()
         assertEquals(2, board.columns.size)
-        
+
         val col1 = board.columns[0]
         assertEquals("col-1", col1.id.value)
         assertEquals("To Do", col1.name)

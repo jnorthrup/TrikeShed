@@ -6,12 +6,12 @@ import kotlin.system.exitProcess
 
 fun main() {
     val process = ProcessBuilder("sleep", "10").start()
-    
+
     val sigHandler = SignalHandler {
         process.destroy()
     }
     Signal.handle(Signal("TERM"), sigHandler)
-    
+
     try {
         runBlocking {
             val job = launch(Dispatchers.IO) {
@@ -19,13 +19,13 @@ fun main() {
                 val code = process.waitFor()
                 println("Process exited with code $code")
             }
-            
+
             val mainJob = coroutineContext[Job]
             Signal.handle(Signal("TERM")) {
                 process.destroy()
                 mainJob?.cancel()
             }
-            
+
             job.join()
             delay(100000)
         }
