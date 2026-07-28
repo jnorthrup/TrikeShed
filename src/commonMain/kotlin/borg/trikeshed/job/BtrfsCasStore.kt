@@ -139,41 +139,40 @@ class BtrfsCasStore(
             val path = entry.a
             val cid = entry.b
             
+            // Explicit error on missing/corrupt CAS blob
             val content = get(cid) ?: throw IllegalStateException("Missing CAS blob for $cid")
             
-            val header = ByteArray(512)
+            val headerBytes = ByteArray(512)
             
             val pathBytes = path.encodeToByteArray()
-            if (pathBytes.size > 100) {
-                throw IllegalArgumentException("Path too long for ustar: $path")
-            }
-            pathBytes.copyInto(header, 0)
+            require(pathBytes.size <= 100) { "Path too long for ustar: $path" }
+            pathBytes.copyInto(headerBytes, 0)
             
-            "0000644\u0000".encodeToByteArray().copyInto(header, 100)
-            "0000000\u0000".encodeToByteArray().copyInto(header, 108)
-            "0000000\u0000".encodeToByteArray().copyInto(header, 116)
+            "0000644\u0000".encodeToByteArray().copyInto(headerBytes, 100)
+            "0000000\u0000".encodeToByteArray().copyInto(headerBytes, 108)
+            "0000000\u0000".encodeToByteArray().copyInto(headerBytes, 116)
             
             val sizeStr = content.size.toString(8).padStart(11, '0') + "\u0000"
-            sizeStr.encodeToByteArray().copyInto(header, 124)
+            sizeStr.encodeToByteArray().copyInto(headerBytes, 124)
             
-            "00000000000\u0000".encodeToByteArray().copyInto(header, 136)
+            "00000000000\u0000".encodeToByteArray().copyInto(headerBytes, 136)
             
-            header[156] = '0'.code.toByte()
+            headerBytes[156] = '0'.code.toByte()
             
-            "ustar\u0000".encodeToByteArray().copyInto(header, 257)
-            "00".encodeToByteArray().copyInto(header, 263)
+            "ustar\u0000".encodeToByteArray().copyInto(headerBytes, 257)
+            "00".encodeToByteArray().copyInto(headerBytes, 263)
             
-            "        ".encodeToByteArray().copyInto(header, 148)
+            "        ".encodeToByteArray().copyInto(headerBytes, 148)
             
             var checksum = 0
-            for (b in header) {
+            for (b in headerBytes) {
                 checksum += b.toInt() and 0xFF
             }
             
             val checksumStr = checksum.toString(8).padStart(6, '0') + "\u0000 "
-            checksumStr.encodeToByteArray().copyInto(header, 148)
+            checksumStr.encodeToByteArray().copyInto(headerBytes, 148)
             
-            output.write(header)
+            output.write(headerBytes)
             output.write(content)
             
             val padding = (512 - (content.size % 512)) % 512
@@ -182,8 +181,10 @@ class BtrfsCasStore(
             }
         }
         
+        // POSIX ustar requires two terminal zero blocks
         output.write(ByteArray(1024))
     }
+
     
     /**
      * btrfs reflink: clone range from src to dst (COW).
