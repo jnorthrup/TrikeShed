@@ -250,8 +250,8 @@ object OroborosDaemon {
             if (watch) {
                 while (true) {
                     val errors = consecutivePollErrors.get()
-                    val backoffMs = kotlin.math.min(intervalMs * (1L shl kotlin.math.min(errors, 30)), intervalMs * 5)
-                    if (errors > 0) System.err.println("[OROBOROS] backoff=${backoffMs}ms consecutiveErrors=$errors")
+                    val backoffMs = kotlin.math.min(intervalMs * (1L shl kotlin.math.min(errors, 2)), intervalMs * 5)
+                    if (errors > 0) System.err.println("[OROBOROS] backoff=${backoffMs}ms")
                     delay(backoffMs)
                     if (!preflight(repoDir, driver)) {
                         System.err.println("[OROBOROS] preflight failed; skipping cycle")
