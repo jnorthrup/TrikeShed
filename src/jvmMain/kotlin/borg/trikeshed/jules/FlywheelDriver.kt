@@ -2,14 +2,10 @@ package borg.trikeshed.jules
 
 import borg.trikeshed.kanban.ForgeKanbanIngest
 import borg.trikeshed.job.ContentId
-import borg.trikeshed.userspace.nio.file.spi.FileOperations
 import borg.trikeshed.userspace.nio.file.spi.JvmFileOperations
 import borg.trikeshed.utils.kanban.JulesBoardStore
 import borg.trikeshed.utils.kanban.forForgeDir
 import borg.trikeshed.util.oroboros.FileCasStore
-import borg.trikeshed.util.oroboros.FlywheelGatekeeper
-import borg.trikeshed.util.oroboros.FlywheelGateState
-import borg.trikeshed.util.oroboros.FlywheelGateVerdict
 import borg.trikeshed.util.oroboros.LexicalMemory
 import borg.trikeshed.util.oroboros.MergeReceipt
 import kotlinx.datetime.Clock
@@ -25,11 +21,6 @@ import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
-import kotlinx.coroutines.awaitAll
-import kotlinx.coroutines.sync.Semaphore
-import kotlinx.coroutines.sync.Mutex
-import kotlinx.coroutines.sync.withLock
-import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 import java.io.File
@@ -72,15 +63,14 @@ enum class FlywheelPhase(val order: Int, val label: String) {
  * 1. POLL Jules sessions via [JulesConductor.pollOnce]
  * 2. ANSWER every AWAITING_USER_FEEDBACK session (GUIDE brain + conventions)
  * 3. SYNC local master to origin/master before applying delivered patches
- * 4. DRAIN every COMPLETED session with a patch: apply → jvmTest → commit
- * 5. SETTLE: push master, require zero open PRs, verify local == origin/master
- * 6. INDUCT unchecked doc/todo.md items into the WAL as WorkQueued causes
- * 7. DISPATCH from the unified queue projection (score desc) until slots fill
+ * 4. DRAIN the entire COMPLETED set: CAS → sequential 3-way → cumulative repair
+ * 5. SETTLE the repaired commits and provenance tags to origin/master
+ * 6. INDUCT is a no-op: coordinated RGA producers append partitioned WorkQueued causes
+ * 7. DISPATCH up to [maxSlots] non-overlapping queue entries after settlement
  *
- * Steps 6+7 close the loop: induction feeds the queue, the queue feeds
- * dispatch, dispatch feeds Jules, Jules feeds drain. No ad-hoc reads of
- * doc/todo.md at dispatch time — the WAL is the only induction surface,
- * [loadQueue] is the only dispatch surface.
+ * The durable WAL is the only intake surface and [loadQueue] is the only
+ * dispatch surface. The daemon never scans the repository or a todo file for
+ * work; the upstream RGA coordinator owns partitioning before WorkQueued.
  *
  * Run with:
  *   ./gradlew jvmRun -PmainClass=borg.trikeshed.jules.FlywheelDriver
@@ -90,8 +80,7 @@ class FlywheelDriver(
     private val repoDir: File = File(System.getProperty("user.dir")),
     private val forgeDir: File = File(System.getProperty("user.home"), ".local/forge"),
     private val intervalMs: Long = 60_000L,
-    private val maxSlots: Int = 15,
-    private val maxInductPerCycle: Int = 1,
+    maxSlots: Int = 15,
     private val source: String = "sources/github/jnorthrup/TrikeShed",
     /** CAS store backing the patch blobs cited by [MergeReceipt.patchCid]. Default <forgeDir>/cas (same path OroborosMain wires). */
     private val casStore: FileCasStore = FileCasStore(
@@ -99,6 +88,8 @@ class FlywheelDriver(
         JvmFileOperations().resolvePath(forgeDir.absolutePath, "cas"),
     ),
 ) {
+    /** Jules Pro concurrency ceiling; configuration may lower but never raise it. */
+    private val maxSlots: Int = maxSlots.coerceIn(0, 15)
     private val client = JulesRestClient(apiKey)
     internal val brain: BrainClient? = System.getenv("NVIDIA_API_KEY")?.let { BrainClient(it) }
     private val store = JulesBoardStore.forForgeDir(forgeDir)
@@ -108,39 +99,26 @@ class FlywheelDriver(
         store = store,
         source = source,
     )
-    // CCEK context: SupervisorJob + SharedFlow event bus + Semaphore-bounded concurrency.
-    // The reactor fanout is structured: tick = poll → DRAIN+DISPATCH under ioGate.
+    // CCEK context: SupervisorJob + SharedFlow event bus. Dispatch concurrency
+    // is bounded by the queue slice (`take(available)`) and structured async.
     private val parentJob: Job = SupervisorJob()
     private val _events = MutableSharedFlow<FlywheelEvent>(extraBufferCapacity = 64)
     val events: SharedFlow<FlywheelEvent> get() = _events.asSharedFlow()
-    private val ioGate = Semaphore(permits = maxSlots)
-    private val drainGate = Mutex()
     /** Consecutive zero-patch probes per session id; tombstones at 3 (late outputs finalize async). */
     private val noPatchProbes = mutableMapOf<String, Int>()
-    /** Consecutive drain failures per session id; tombstones at [DRAIN_RETRY_LIMIT]. */
+    /** Consecutive patch-bearing drain failures per session id; never tombstoned. */
     private val drainFailures = mutableMapOf<String, Int>()
-    private val DRAIN_RETRY_LIMIT = 3
 
     /**
      * Record a drain failure on the session card and return [DrainOutcome.Skipped].
-     * Appends a [JulesCause.DrainFailed] cause (without flipping `drained`) on
-     * each attempt so the causal log tracks why. After [DRAIN_RETRY_LIMIT]
-     * consecutive failures, tombstones via [JulesConductor.retireTerminal] so
-     * the DRAIN filter (`!drained`) stops re-selecting a permanently broken
-     * session. Transient failures (git lock, disk full) get retries; permanent
-     * ones (degenerate patch, corrupt repo) get retired.
+     * Patch-bearing work stays undrained and retryable regardless of attempt
+     * count: the full completion set cannot advance by tombstoning a failed arm.
      */
     private suspend fun drainFail(s: JulesRestClient.SessionInfo, reason: String): DrainOutcome.Skipped {
         val attempts = (drainFailures[s.id] ?: 0) + 1
-        if (attempts >= DRAIN_RETRY_LIMIT) {
-            drainFailures.remove(s.id)
-            conductor.retireTerminal(s.id, "drain failed $attempts\u00d7: $reason", Clock.System.now().toEpochMilliseconds())
-            println("[FLYWHEEL] RETIRE ${s.id.takeLast(6)} drain failed $attempts\u00d7: ${reason.take(80)}")
-        } else {
-            drainFailures[s.id] = attempts
-            conductor.recordDrainFailure(s.id, "$reason (attempt $attempts/$DRAIN_RETRY_LIMIT)", Clock.System.now().toEpochMilliseconds())
-            return emitPollError("drain ${s.id}: $reason (attempt $attempts/$DRAIN_RETRY_LIMIT)", 0).let { DrainOutcome.Skipped }
-        }
+        drainFailures[s.id] = attempts
+        conductor.recordDrainFailure(s.id, "$reason (attempt $attempts)", Clock.System.now().toEpochMilliseconds())
+        emitPollError("drain ${s.id}: $reason (attempt $attempts)", 0)
         return DrainOutcome.Skipped
     }
     private val reactorScope = CoroutineScope(Dispatchers.IO + parentJob)
@@ -203,8 +181,8 @@ class FlywheelDriver(
 
         // 2b. APPROVE — a session parked in AWAITING_PLAN_APPROVAL holds its
         //     slot forever unless the wheel signs off; no other phase ever
-        //     unblocks it. Auto-approve: the TDD gate at drain time is the
-        //     quality barrier, not plan review. The HumanAnswered cause makes
+        //     unblocks it. Auto-approve: the integrated JVM build at drain time
+        //     is the quality barrier, not plan review. The HumanAnswered cause makes
         //     approval exactly-once per plan across polls.
         for (card in conductor.cards.values.filter {
             it.snapshot.state == "AWAITING_PLAN_APPROVAL" &&
@@ -219,24 +197,12 @@ class FlywheelDriver(
             }
         }
 
-        // 3. SYNC — best-effort. If it fails, we proceed anyway — the merge
-        //    at DRAIN time will either succeed or produce conflicts that get
-        //    resolved. No early return — gates create paralysis.
-        synchronizeMain()
-
-        // 3b. COMMIT CONFLICTS — any unresolved conflict markers from a prior
-        //     drain block every subsequent drain. Keep both sides, commit
-        //     as-is, move forward. Never revert, never --ours, never --theirs.
-        commitExistingConflicts()
-
-        // 4. DRAIN — settle completed patches so slots free for induction.
-        //    No gate. Patches that conflict get resolved (not rejected).
-        //    Build must pass before commit. Drains are serial via drainGate.
-        //    Tag dedup: skip sessions that already have a flywheel/jules-<id>-*
-        //    tag — they were drained in a prior cycle (survives daemon restart).
+        // 3. DRAIN — consume the entire completed set. Sequential 3-way is
+        //    the merge topology, not a limit on how many sessions advance.
+        //    A tag alone is not a completed drain: the durable card/WAL close is
+        //    authoritative so an interrupted provenance write remains retryable.
         val completed = conductor.cards.values.filter {
-            it.snapshot.state == "COMPLETED" && !it.drained &&
-            !hasDrainTag(it.snapshot.sessionId)
+            it.snapshot.state == "COMPLETED" && !it.drained
         }
         val sessions = completed.map {
             JulesRestClient.SessionInfo(
@@ -246,11 +212,28 @@ class FlywheelDriver(
                 patchBytes = 0L,
             )
         }
-        val (harvested, reworked) = drainFanout(sessions)
+        // With no Jules deltas waiting, ordinary upstream synchronization can
+        // proceed directly. A non-empty completion set synchronizes only after
+        // every API delta has been written to CAS inside drainThreeWay().
+        if (sessions.isEmpty()) {
+            commitExistingConflicts()
+            synchronizeMain()
+            commitExistingConflicts()
+        }
+        val drain = drainFanout(sessions)
+        val harvested = drain.harvested
+        val reworked = drain.reworked
 
-        // 5. SETTLE — push whatever landed. If push fails, the next cycle
-        //    retries. No early return.
-        settlementBarrier()
+        // 5. SETTLE — only the complete, repaired drain set advances. The cycle
+        //    still returns normally on an incomplete drain; the next cycle
+        //    retries it instead of dispatching a successor wave onto a red tree.
+        val remainingCompleted = conductor.cards.values.count {
+            it.snapshot.state == "COMPLETED" && !it.drained
+        }
+        val committedConflicts = (drain.conflicts + conflictFiles()).distinct()
+        val readyToSettle = remainingCompleted == 0 &&
+            committedConflicts.isEmpty() && isWorkingTreeClean()
+        val settled = readyToSettle && settlementBarrier()
 
         // 6. INDUCT — the WAL is the only induction surface. External agents
         //    CAS-put a ≤4000-byte spec and appendWork(workId, WorkQueued).
@@ -273,7 +256,7 @@ class FlywheelDriver(
         val available = (maxSlots - alive).coerceAtLeast(0)
         val stillAwaiting = conductor.cards.values.count {
             it.snapshot.state == "AWAITING_USER_FEEDBACK" }
-        if (available > 0 && stillAwaiting == 0) {
+        if (settled && available > 0 && stillAwaiting == 0) {
             // Build the in-flight file set from all active sessions' last patches.
             val inflightFiles = mutableSetOf<String>()
             for (card in conductor.cards.values) {
@@ -306,9 +289,11 @@ class FlywheelDriver(
                                     attempt = entry.attempt + 1,
                                     at = Clock.System.now().toEpochMilliseconds(),
                                 ))
+                                _events.emit(FlywheelEvent.Dispatched(sessionId, entry.title))
                                 println("[FLYWHEEL] DISPATCH ${entry.title.take(60)}")
                                 1
                             } catch (t: Throwable) {
+                                _events.emit(FlywheelEvent.DispatchFailed(entry.title, t.message.orEmpty()))
                                 println("[FLYWHEEL] FAIL ${entry.title}: ${t.message}")
                                 0
                             }
@@ -319,16 +304,10 @@ class FlywheelDriver(
             }
         }
 
-        val conflictCount = assessConflicts()
-        val committedConflicts = conflictFiles()
-
-        // Build panorama from the sessions that were drained this cycle.
-        val panorama = sessions.map { s ->
-            QaLaguna.SessionPanorama(
-                sessionId = s.id,
-                title = s.title,
-                touchedFiles = emptyList(),
-            )
+        val phase = when {
+            remainingCompleted > 0 || committedConflicts.isNotEmpty() -> FlywheelPhase.DRAIN
+            !settled -> FlywheelPhase.SETTLE
+            else -> FlywheelPhase.DISPATCH
         }
 
         return CycleReport(
@@ -340,27 +319,26 @@ class FlywheelDriver(
             alive = alive,
             available = (maxSlots - alive).coerceAtLeast(0),
             inducted = inducted,
-            settled = true,
-            phase = FlywheelPhase.DISPATCH,
+            settled = settled,
+            phase = phase,
             conflicts = committedConflicts,
-            panorama = panorama,
+            panorama = drain.panorama,
         )
     }
 
-    /**
-     * Octopus drain: take up to 8 completed sessions, apply all patches to
-     * the working tree greedily, resolve all conflicts together, one build,
-     * one commit. Greedy = take as many as possible per cycle. Octopus =
-     * merge many branches at once, not serial 3-way.
-     */
-    private suspend fun drainFanout(sessions: List<JulesRestClient.SessionInfo>): Pair<Int, Int> {
-        if (sessions.isEmpty()) return 0 to 0
-        val batch = sessions.take(8)
-        if (batch.size < sessions.size) {
-            println("[FLYWHEEL] OCTOPUS batch=${batch.size} of ${sessions.size} sessions")
-        }
-        return drainOctopus(batch)
+    /** Drain every completed session before the next research wave. */
+    private suspend fun drainFanout(sessions: List<JulesRestClient.SessionInfo>): DrainBatch {
+        if (sessions.isEmpty()) return DrainBatch()
+        println("[FLYWHEEL] DRAIN-ALL sessions=${sessions.size}")
+        return drainThreeWay(sessions)
     }
+
+    private data class DrainBatch(
+        val harvested: Int = 0,
+        val reworked: Int = 0,
+        val conflicts: List<String> = emptyList(),
+        val panorama: List<QaLaguna.SessionPanorama> = emptyList(),
+    )
 
     /** One drain's terminal outcome. [Skipped] covers no-patch / dirty tree / infra errors. */
     private sealed interface DrainOutcome {
@@ -369,8 +347,9 @@ class FlywheelDriver(
     }
 
     /**
-     * 3-way branch merge: merge up to 8 Jules-pushed branches into master
-     * sequentially. Real merge ancestry — the git graph converges.
+     * 3-way branch merge: merge every Jules-pushed branch into master
+     * sequentially. There is no drain batch limit; the full completion set
+     * lands and its cumulative conflicts are resolved before research advances.
      *
      * CAS-FIRST: every delta is content-addressed BEFORE it touches the tree.
      * The patch bytes fetched from the API go into the CAS store first; the
@@ -384,7 +363,7 @@ class FlywheelDriver(
      *      Never --ours/--theirs, never abort.
      *   3. Build verify.
      */
-    private suspend fun drainOctopus(sessions: List<JulesRestClient.SessionInfo>): Pair<Int, Int> {
+    private suspend fun drainThreeWay(sessions: List<JulesRestClient.SessionInfo>): DrainBatch {
         // 1. Fetch all branches so refs are available locally.
         git("fetch", "origin", "--prune")
 
@@ -392,82 +371,186 @@ class FlywheelDriver(
         data class Arm(val session: JulesRestClient.SessionInfo, val patchCid: ContentId, val patch: String, val branch: String?)
         val arms = mutableListOf<Arm>()
         for (s in sessions) {
-            val patch = client.lastPatch(s.id)
+            val patch = withTimeoutOrNull(60_000L) { client.lastPatch(s.id) }
             if (patch.isNullOrBlank()) {
-                emitPollError("drain ${s.id}: no patch to CAS", 0)
+                val probes = (noPatchProbes[s.id] ?: 0) + 1
+                noPatchProbes[s.id] = probes
+                if (probes >= 3) {
+                    noPatchProbes.remove(s.id)
+                    conductor.retireTerminal(
+                        s.id,
+                        "no patch after $probes probes; nothing to land",
+                        Clock.System.now().toEpochMilliseconds(),
+                    )
+                    println("[FLYWHEEL] RETIRE ${s.id.takeLast(6)} no-patch after $probes probes")
+                } else {
+                    emitPollError("drain ${s.id}: no patch to CAS (probe $probes/3)", 0)
+                }
                 continue
             }
             val patchCid = try { casStore.put(patch.encodeToByteArray()) }
             catch (e: Exception) {
-                println("[FLYWHEEL] CAS-FAIL ${s.id.takeLast(6)}: ${e.message}")
+                drainFail(s, "CAS put failed: ${e.message}")
                 continue
             }
+            noPatchProbes.remove(s.id)
             val branch = findSessionBranch(s.id)
             arms.add(Arm(s, patchCid, patch, branch))
             println("[FLYWHEEL] CAS ${s.id.takeLast(6)} cid=${patchCid.value.take(16)} branch=${branch ?: "none"}")
         }
-        if (arms.isEmpty()) return 0 to 0
+        if (arms.size != sessions.size) {
+            println("[FLYWHEEL] DRAIN waiting for CAS deltas ${arms.size}/${sessions.size}; tree unchanged")
+            return DrainBatch()
+        }
+
+        // Every completed API delta is now immutable in CAS. Only now may any
+        // synchronization or conflict commit mutate the working tree.
+        commitExistingConflicts()
+        synchronizeMain()
+        commitExistingConflicts()
 
         // 2. Merge each arm. Branch → git merge; no branch → patch apply.
-        var conflictCount = 0
+        val landed = mutableListOf<Arm>()
         for (arm in arms) {
             val (s, _, _, branch) = arm
             if (branch != null) {
                 val mergeRes = git("merge", "--no-ff", "--no-edit", branch)
                 if (mergeRes.exitCode != 0) {
-                    val conflicted = conflictFiles()
-                    conflictCount += conflicted.size
-                    if (conflicted.isNotEmpty()) {
-                        println("[FLYWHEEL] MERGE-CONFLICT ${s.id.takeLast(6)} ($branch): ${conflicted.size} files — committing markers")
-                        conflicted.take(3).forEach { println("  ✗ $it") }
+                    val conflicted = unmergedFiles()
+                    if (conflicted.isEmpty()) {
+                        drainFail(s, "merge $branch failed: ${mergeRes.output.take(200)}")
+                        continue
                     }
-                    if (conflicted.isNotEmpty()) {
-                        git("add", "--", *conflicted.toTypedArray())
+                    println("[FLYWHEEL] MERGE-CONFLICT ${s.id.takeLast(6)} ($branch): ${conflicted.size} files — committing markers")
+                    conflicted.take(3).forEach { println("  ✗ $it") }
+                    git("add", "--", *conflicted.toTypedArray())
+                    val commit = git(
+                        "commit", "--no-verify", "-m",
+                        "flywheel: merge ${s.title.take(50)} ($branch) — ${conflicted.size} conflicts kept",
+                    )
+                    if (commit.exitCode != 0) {
+                        drainFail(s, "conflict commit failed: ${commit.output.take(200)}")
+                        continue
                     }
-                    git("commit", "--no-verify", "-m", "flywheel: merge ${s.title.take(50)} ($branch) — ${conflicted.size} conflicts kept")
                 } else {
                     println("[FLYWHEEL] MERGED ${s.id.takeLast(6)} ($branch)")
                 }
+                landed += arm
             } else {
                 // Fallback: no branch on origin — apply the CAS'd patch.
                 val pf = File(repoDir, ".flywheel-patch-${s.id.takeLast(6)}")
                 try {
                     pf.writeText(arm.patch)
-                    git("apply", "--3way", pf.name)
+                    val apply = git("apply", "--3way", pf.name)
+                    val conflicted = unmergedFiles()
+                    val alreadyApplied = apply.exitCode != 0 && conflicted.isEmpty() &&
+                        git("apply", "--reverse", "--check", pf.name).exitCode == 0
                     if (pf.exists()) pf.delete()
-                    val conflicted = conflictFiles()
-                    conflictCount += conflicted.size
-                    val touched = parsePatchFiles(arm.patch)
-                    if (touched.isNotEmpty()) {
-                        git("add", "--", *touched.toTypedArray())
+                    if (alreadyApplied) {
+                        println("[FLYWHEEL] ALREADY ${s.id.takeLast(6)} API delta is present")
+                        landed += arm
+                        continue
                     }
-                    git("commit", "--no-verify", "-m", "flywheel: patch ${s.title.take(50)} (${s.id.takeLast(6)})")
+                    if (apply.exitCode != 0 && conflicted.isEmpty()) {
+                        drainFail(s, "apply --3way failed: ${apply.output.take(200)}")
+                        continue
+                    }
+                    val touched = parsePatchFiles(arm.patch)
+                    if (touched.isEmpty()) {
+                        drainFail(s, "empty patch file list")
+                        continue
+                    }
+                    git("add", "--", *touched.toTypedArray())
+                    val commit = git(
+                        "commit", "--no-verify", "-m",
+                        "flywheel: patch ${s.title.take(50)} (${s.id.takeLast(6)})",
+                    )
+                    if (commit.exitCode != 0 && !isWorkingTreeClean()) {
+                        drainFail(s, "patch commit failed: ${commit.output.take(200)}")
+                        continue
+                    }
+                    landed += arm
                 } finally {
                     if (pf.exists()) pf.delete()
                 }
             }
         }
-        println("[FLYWHEEL] DRAIN ${arms.size} sessions merged, $conflictCount conflict files")
-
-        // 3. Build verify — if green, amend. If red, markers stay for QA.
-        val build = shell("./gradlew", ":jvmMainClasses", "--no-daemon")
-        if (build.exitCode == 0) {
-            git("add", "-u")
-            git("commit", "--amend", "--no-edit")
-            println("[FLYWHEEL] DRAIN build green, amended")
-        } else {
-            println("[FLYWHEEL] DRAIN build red — markers stay committed, QA resolves externally")
+        if (landed.size != arms.size) {
+            println("[FLYWHEEL] DRAIN waiting for all merges ${landed.size}/${arms.size}; provenance stays open")
+            return DrainBatch()
         }
 
-        // 4. PROVENANCE CLOSE — CID is already in hand from step 2.
+        val panorama = landed.map { arm ->
+            QaLaguna.SessionPanorama(
+                sessionId = arm.session.id,
+                title = arm.session.title,
+                touchedFiles = parsePatchFiles(arm.patch),
+            )
+        }
+        val cumulativeConflicts = conflictFiles()
+        println("[FLYWHEEL] DRAIN ${landed.size}/${sessions.size} sessions merged, ${cumulativeConflicts.size} conflict files")
+
+        // 3. Repair the cumulative panorama after every arm has landed.
+        if (cumulativeConflicts.isNotEmpty()) {
+            val resolutions = QaLaguna.resolveConflicts(
+                repoDir = repoDir,
+                brain = brain,
+                panorama = panorama,
+                files = cumulativeConflicts,
+            )
+            val resolvedFiles = resolutions.filter { it.second }.map { it.first }
+            if (resolvedFiles.isNotEmpty()) {
+                git("add", "--", *resolvedFiles.toTypedArray())
+                val repair = git(
+                    "commit", "--no-verify", "-m",
+                    "flywheel: resolve cumulative ${landed.size}-session conflicts",
+                )
+                if (repair.exitCode != 0 && !isWorkingTreeClean()) {
+                    emitPollError("cumulative repair commit failed: ${repair.output.take(200)}", 0)
+                    return DrainBatch(conflicts = cumulativeConflicts, panorama = panorama)
+                }
+            }
+            val unresolved = conflictFiles()
+            if (unresolved.isNotEmpty()) {
+                println("[FLYWHEEL] DRAIN repair incomplete — ${unresolved.size} conflict files remain")
+                return DrainBatch(conflicts = unresolved, panorama = panorama)
+            }
+        }
+
+        // 4. The integrated tree must compile before provenance closes and the
+        //    successor queue is allowed to dispatch.
+        val build = shell("./gradlew", ":jvmMainClasses", "--no-daemon")
+        if (build.exitCode != 0) {
+            emitPollError("cumulative build failed: ${build.output.take(400)}", 0)
+            println("[FLYWHEEL] DRAIN build red — completion set remains undrained")
+            return DrainBatch(panorama = panorama)
+        }
+        println("[FLYWHEEL] DRAIN build green")
+
+        // 5. PROVENANCE CLOSE — every successful arm shares the final repaired
+        //    commit but retains its own CAS CID, tag, receipt, and WAL identity.
         val commitSha = headSha()
         val now = Clock.System.now().toEpochMilliseconds()
-        for (arm in arms) {
+        data class PreparedClose(
+            val arm: Arm,
+            val tag: String,
+        )
+        val prepared = mutableListOf<PreparedClose>()
+        for (arm in landed) {
             val (s, patchCid, _, branch) = arm
             val safeSession = s.id.replace(Regex("[^A-Za-z0-9._-]"), "-")
             val tag = "flywheel/jules-$safeSession-${commitSha.take(12)}"
-            git("tag", "-a", tag, commitSha, "-m",
-                "Jules merge receipt\nsession=${s.id}\npatchCid=${patchCid.value}\nbranch=${branch ?: "none"}\ntaskTitle=${s.title}")
+            val existingTagCommit = git("rev-parse", "$tag^{commit}")
+            val tagReady = existingTagCommit.exitCode == 0 &&
+                existingTagCommit.output.trim() == commitSha
+            if (!tagReady) {
+                val tagResult = git("tag", "-a", tag, commitSha, "-m",
+                    "Jules merge receipt\nsession=${s.id}\npatchCid=${patchCid.value}\nbranch=${branch ?: "none"}\ntaskTitle=${s.title}")
+                if (tagResult.exitCode != 0) {
+                    drainFail(s, "tag create failed: ${tagResult.output.take(200)}")
+                    return DrainBatch(panorama = panorama)
+                }
+            }
             val prUrl = try { fishPrUrl(s.id, tag) } catch (_: Throwable) { null }
             val workId = store.loadQueue().firstOrNull { it.sessionId == s.id }?.workId
                 ?: "session:${s.id.replace(Regex("[^A-Za-z0-9._-]"), "-")}"
@@ -482,36 +565,54 @@ class FlywheelDriver(
                 claimedAt = now,
                 prUrl = prUrl,
             )
-            conductor.recordDrain(s.id, commitSha, conflictCount)
-            store.appendWork(workId, JulesCause.WorkDrained(
-                workId = workId,
-                sessionId = s.id,
-                commitSha = commitSha,
-                taskId = tag,
-                receipt = receipt,
-                at = now,
-            ))
-            store.appendWork(workId, JulesCause.WorkIdentitySynthesized(
-                workId = workId,
-                identity = WorkIdentity(
+            try {
+                store.appendWork(workId, JulesCause.WorkDrained(
                     workId = workId,
                     sessionId = s.id,
-                    gitBranch = branch,
-                    prUrl = prUrl,
-                    gitTag = tag,
                     commitSha = commitSha,
-                ),
-                at = now,
-            ))
+                    taskId = tag,
+                    receipt = receipt,
+                    at = now,
+                ))
+                store.appendWork(workId, JulesCause.WorkIdentitySynthesized(
+                    workId = workId,
+                    identity = WorkIdentity(
+                        workId = workId,
+                        sessionId = s.id,
+                        gitBranch = branch,
+                        prUrl = prUrl,
+                        gitTag = tag,
+                        commitSha = commitSha,
+                    ),
+                    at = now,
+                ))
+            } catch (t: Throwable) {
+                emitPollError("provenance WAL ${s.id}: ${t.message}", 0)
+                return DrainBatch(panorama = panorama)
+            }
+            prepared += PreparedClose(arm, tag)
+        }
+
+        // All per-arm tags, receipts, and identity records exist before any
+        // card leaves the completion set. A failure above closes no card.
+        conductor.recordDrains(prepared.map {
+            JulesConductor.DrainRecord(
+                sessionId = it.arm.session.id,
+                commitSha = commitSha,
+                rejects = cumulativeConflicts.size,
+            )
+        })
+        for ((arm, tag) in prepared) {
+            val (s, patchCid, _, branch) = arm
             _events.emit(FlywheelEvent.Drained(s.id, commitSha, tag))
             drainFailures.remove(s.id)
-            println("[FLYWHEEL] PROVENANCE ${s.id.takeLast(6)} cid=${patchCid.value.take(16)} branch=${branch ?: "none"} pr=${prUrl ?: "none"} tag=$tag")
+            println("[FLYWHEEL] PROVENANCE ${s.id.takeLast(6)} cid=${patchCid.value.take(16)} branch=${branch ?: "none"} tag=$tag")
         }
-        return arms.size to 0
+        return DrainBatch(harvested = prepared.size, panorama = panorama)
     }
 
     private fun activeCount(): Int = conductor.cards.values.count {
-        it.snapshot.state != "COMPLETED" && it.snapshot.state != "FINISHED" && !it.drained
+        it.snapshot.state !in TERMINAL_STATES && !it.drained
     }
 
     /** Find the GitHub branch or PR head carrying this Jules session id. */
@@ -541,17 +642,9 @@ class FlywheelDriver(
         return null
     }
 
-    /** Restart-safe dedup: one tag per drained Jules session. */
-    private fun hasDrainTag(sessionId: String): Boolean {
-        val safe = sessionId.replace(Regex("[^A-Za-z0-9._-]"), "-")
-        if (git("tag", "-l", "flywheel/jules-$safe-*").output.isNotBlank()) return true
-        return git("ls-remote", "--tags", "origin", "refs/tags/flywheel/jules-$safe-*")
-            .output.isNotBlank()
-    }
 
     /**
-     * Sync local master to origin/master via octopus-style merge: any number of
-     * incoming branches fold into a multi-parent merge commit on every cycle.
+     * Sync local master to origin/master with one ordinary 3-way merge.
      * Conflicts are NOT resolved — neither `--ours` nor `--theirs`, no
      * auto-resolution; conflict markers stay in the working tree and the
      * barrier reports drift. Throughput > purity: 40 dirty merges beat 4× the
@@ -564,16 +657,15 @@ class FlywheelDriver(
     private fun synchronizeMain(): Boolean {
         if (!isWorkingTreeClean()) return false
         if (git("fetch", "origin", "master").exitCode != 0) return false
-        // `--no-ff` forces a merge commit even when fast-forward is possible;
-        // octopus-style multi-branch ancestry. Strategy left to git at run time.
+        // `--no-ff` preserves the synchronization edge even when a fast-forward
+        // is possible. Jules branches are merged later by drainThreeWay().
         return git("merge", "--no-ff", "origin/master").exitCode == 0
     }
 
     /**
      * Push all locally drained commits to origin/master, then surface the
-     * current local/remote state. Divergence is acceptable — octopus merges
-     * can leave local and remote at different revisions indefinitely, and the
-     * next synchronizeMain() cycle resolves them. PRs do not block (Jules
+     * current local/remote state. Divergence is observable and the
+     * next synchronizeMain() cycle resolves it. PRs do not block (Jules
      * pushes branches; PRs are operator surface, not gate surface).
      *
      * Returns true iff push succeeded. A false return means origin rejected
@@ -591,22 +683,18 @@ class FlywheelDriver(
         )
         val openCount = openPrs.output.trim().toIntOrNull() ?: 0
 
-        if (git("fetch", "origin", "master").exitCode != 0) return true
+        if (git("fetch", "origin", "master").exitCode != 0) return false
         val local = git("rev-parse", "HEAD")
         val remote = git("rev-parse", "origin/master")
+        if (local.exitCode != 0 || remote.exitCode != 0 ||
+            local.output.trim() != remote.output.trim()
+        ) return false
         val unclaimedDrains = store.loadQueue().count { it.isUnclaimedDrain }
-        val state = FlywheelGateState(
-            workingTreeClean = isWorkingTreeClean(),
-            openPullRequests = openCount,
-            localRevision = local.output.trim(),
-            remoteRevision = remote.output.trim(),
-            unclaimedDrains = unclaimedDrains,
-        )
-        // Drift admitted; gate's role reduced to recording, not blocking.
-        val verdict = FlywheelGatekeeper.evaluate(state)
-        if (verdict is FlywheelGateVerdict.Block) {
-            println("[FLYWHEEL] SETTLE-NOTED ${state.localRevision.take(9)} vs ${state.remoteRevision.take(9)}: ${(verdict as FlywheelGateVerdict.Block).reason}")
+        if (unclaimedDrains != 0) {
+            println("[FLYWHEEL] SETTLE-BLOCKED $unclaimedDrains drain(s) lack immutable receipts")
+            return false
         }
+        if (openCount != 0) println("[FLYWHEEL] SETTLE-NOTED $openCount open PR(s); branch intake remains non-gating")
         return true
     }
 
@@ -642,125 +730,6 @@ class FlywheelDriver(
     private fun extractSpecFiles(spec: String): Set<String> =
         specFilePattern.findAll(spec).map { it.value.trimEnd('.', ',', ':', ';', ')', ']') }.toSet()
 
-    /**
-     * RGA partitioner: turn one gap description into up to [maxSlots] non-overlapping
-     * WorkQueued tasks and induct them into the WAL. Each sub-task gets a file
-     * scope that does not overlap siblings, so the overlap guard admits all of
-     * them simultaneously.
-     *
-     * The partitioner reads the codebase structure to assign file scopes.
-     * If the gap text already contains file paths, those are used directly;
-     * otherwise the partitioner assigns a package-directory scope per sub-task.
-     */
-    suspend fun inductRgaGap(gapDescription: String): Int {
-        val items = partitionGap(gapDescription)
-        if (items.isEmpty()) return 0
-        val queue = store.loadQueue()
-        val knownWorkIds = queue.mapTo(mutableSetOf()) { it.workId }
-        var n = 0
-        for ((index, item) in items.withIndex()) {
-            val workId = "rga:${gapDescription.hashCode().toUInt().toString(16)}#${index + 1}"
-            if (workId in knownWorkIds) continue
-            val score = (items.size - index).toDouble() / items.size.toDouble()
-            store.appendWork(workId, JulesCause.WorkQueued(
-                workId = workId,
-                tier = "rga",
-                title = item.title,
-                spec = item.spec,
-                parent = null,
-                score = score,
-                at = Clock.System.now().toEpochMilliseconds(),
-            ))
-            knownWorkIds += workId
-            n++
-        }
-        println("[FLYWHEEL] RGA inducted $n sub-tasks from gap: ${gapDescription.take(80)}")
-        return n
-    }
-
-    /** One partition of a gap. */
-    data class GapPartition(val title: String, val spec: String)
-
-    /**
-     * Partition a gap description into up to [maxSlots] non-overlapping sub-tasks.
-     * If the brain (Laguna) is available, it drafts the partition; otherwise
-     * we split by source directories under src/.
-     */
-    private suspend fun partitionGap(gapDescription: String): List<GapPartition> {
-        // Try the brain first for intelligent partitioning.
-        val b = brain
-        if (b != null) {
-            val partitionSpec = buildString {
-                appendLine("Partition this gap into up to $maxSlots non-overlapping landable tasks.")
-                appendLine("Each task must touch a DIFFERENT set of source files (no overlap).")
-                appendLine("Format each as: TITLE ||| src/path/file1.kt,src/path/file2.kt")
-                appendLine("Gap: $gapDescription")
-            }.trim()
-            try {
-                val response = withTimeoutOrNull(60_000L) {
-                    b.chat(messages = listOf("user" to partitionSpec), maxTokens = 800, temperature = 0.3)
-                }
-                if (response != null) {
-                    val parsed = parseGapPartitions(response, gapDescription)
-                    if (parsed.isNotEmpty()) return parsed
-                }
-            } catch (t: Throwable) {
-                println("[FLYWHEEL] RGA brain-error: ${t.message}")
-            }
-        }
-        // Fallback: partition by source directories.
-        return partitionByDirectories(gapDescription)
-    }
-
-    private fun parseGapPartitions(response: String, gapDescription: String): List<GapPartition> {
-        return response.lines().mapNotNull { line ->
-            val parts = line.split("|||")
-            if (parts.size != 2) return@mapNotNull null
-            val title = parts[0].trim().removePrefix("-").trim()
-            val files = parts[1].trim()
-            if (title.isEmpty()) return@mapNotNull null
-            val spec = buildString {
-                appendLine("$title (from RGA: ${gapDescription.take(200)})")
-                appendLine("Scope: $files")
-                appendLine("TDD: write failing tests first, then one minimal implementation file.")
-                appendLine("Gate: ./gradlew :jvmMainClasses --no-daemon")
-            }.trim()
-            GapPartition(title, spec)
-        }.take(maxSlots)
-    }
-
-    private fun partitionByDirectories(gapDescription: String): List<GapPartition> {
-        val dirs = File(repoDir, "src/commonMain/kotlin/borg/trikeshed")
-            .listFiles()?.filter { it.isDirectory }?.sortedBy { it.name } ?: emptyList()
-        return dirs.take(maxSlots).mapIndexed { index, dir ->
-            val pkg = "borg.trikeshed.${dir.name}"
-            GapPartition(
-                title = "${dir.name.replaceFirstChar { it.uppercase() }}: $gapDescription".take(120),
-                spec = buildString {
-                    appendLine("${dir.name} package: $gapDescription")
-                    appendLine("Scope: src/commonMain/kotlin/borg/trikeshed/${dir.name}/")
-                    appendLine("TDD: write failing tests first, then one minimal implementation file.")
-                    appendLine("Gate: ./gradlew :jvmMainClasses --no-daemon")
-                }.trim()
-            )
-        }
-    }
-
-    /**
-     * Assess cumulative conflicts in the working tree after all drains.
-     * Returns the count of files with conflict markers.
-     */
-    private fun assessConflicts(): Int {
-        val status = git("diff", "--name-only", "--diff-filter=U")
-        if (status.output.isBlank()) return 0
-        val files = status.output.trim().lines().filter { it.isNotBlank() }
-        if (files.isNotEmpty()) {
-            println("[FLYWHEEL] CONFLICTS ${files.size} files with conflict markers:")
-            files.take(10).forEach { println("  ✗ $it") }
-            if (files.size > 10) println("  ... and ${files.size - 10} more")
-        }
-        return files.size
-    }
     /**
      * Run a git command in [repoDir]. Unified shell — every git ProcessBuilder
      * site in FlywheelDriver goes through here. Prepends `"git"` so callers
@@ -805,7 +774,7 @@ class FlywheelDriver(
         ) }
         val unified = unifyBoard(kanban, conductor.cards.values)
         val aliveCount = conductor.cards.values.count {
-            it.snapshot.state != "COMPLETED" && it.snapshot.state != "FINISHED" }
+            it.snapshot.state !in TERMINAL_STATES && !it.drained }
         return renderWheel(unified, aliveCount, maxSlots, intervalMs)
     }
 
@@ -824,15 +793,14 @@ class FlywheelDriver(
         } } ?: return ""
 
         val conventions = buildString {
-            appendLine("You are the GUIDE for the TrikeShed project (KMP, AGPLv3 2017).")
+            appendLine("You are the GUIDE for the TrikeShed KMP project.")
             appendLine("Answer coding-agent questions with concrete, decisive guidance (<200 words).")
             appendLine("Project conventions:")
             appendLine("  - domain logic goes in commonMain/kotlin/; platform adapters in jvmMain/jsMain/nativeMain")
             appendLine("  - use Series<T> over List<T> for read-only indexed data")
             appendLine("  - use Confix JSON (borg.trikeshed.parse.json.JsonSupport), not kotlinx-serialization-json")
-            appendLine("  - test gate: ./gradlew jvmTest --no-daemon")
-            appendLine("  - TDD: write failing test first, then one minimal implementation file")
-            appendLine("  - one test file + one implementation file per task")
+            appendLine("  - do not add or run unit tests")
+            appendLine("  - build gate: ./gradlew :jvmMainClasses --no-daemon")
             appendLine("  - never use the word 'notion' in code, comments, or identifiers (trademark)")
             appendLine("  - never delete a working runner to replace with not-yet-built code")
         }
@@ -857,22 +825,6 @@ class FlywheelDriver(
         }
     }
 
-    /** Build a fresh-session spec, optionally reanimating an immutable prior claim. */
-    private fun buildSpec(title: String, parent: MergeReceipt? = null): String = buildString {
-        appendLine("Write failing tests for $title.")
-        appendLine("- TDD: one test file in the correct location")
-        appendLine("- one minimal implementation file")
-        appendLine("- gate: ./gradlew jvmTest --no-daemon")
-        parent?.let {
-            appendLine("Prior immutable merge receipt:")
-            appendLine("- parentWorkId: ${it.workId}")
-            appendLine("- producerRef: ${it.producerRef}")
-            appendLine("- revision: ${it.revision}")
-            appendLine("- versionTag: ${it.versionTag}")
-            appendLine("- patchCid: ${it.patchCid.value}")
-            appendLine("Use this as historical evidence in this NEW session; do not mutate the prior session.")
-        }
-    }.trim()
 
     /**
      * Content-address the exact cumulative patch bytes and pin the protected
@@ -1138,7 +1090,7 @@ class FlywheelDriver(
      * build-fix loop on the NEXT drain resolves semantic issues.
      */
     private fun commitExistingConflicts() {
-        val files = conflictFiles()
+        val files = unmergedFiles()
         if (files.isEmpty()) return
         println("[FLYWHEEL] COMMIT-CONFLICTS ${files.size} files with conflict markers — keeping both sides")
         files.take(5).forEach { println("  ✗ $it") }
@@ -1154,10 +1106,26 @@ class FlywheelDriver(
         }
     }
 
-    /** Files with unresolved conflict markers in the working tree. */
-    private fun conflictFiles(): List<String> =
+    /** Files still unmerged in Git's index for the current 3-way arm. */
+    private fun unmergedFiles(): List<String> =
         git("diff", "--name-only", "--diff-filter=U").output.trim().lines()
             .filter { it.isNotBlank() }
+
+    /**
+     * Cumulative unresolved files. Conflict-arm commits clear the unmerged
+     * index, so also inspect tracked content for conflict-start markers while
+     * excluding patch-edit templates (`<<<<<<< SEARCH`). This catches both
+     * merge markers (`HEAD`) and `git apply --3way` markers (`ours`).
+     */
+    private fun conflictFiles(): List<String> {
+        val markerFiles = git("grep", "-l", "^<<<<<<< ", "--")
+            .output.trim().lines().filter { path ->
+                path.isNotBlank() && File(repoDir, path).takeIf { it.isFile }?.useLines { lines ->
+                    lines.any { it.startsWith("<<<<<<< ") && it != "<<<<<<< SEARCH" }
+                } == true
+            }
+        return (unmergedFiles() + markerFiles).distinct()
+    }
 
     /**
      * Resolve conflict markers using n=2+ distance resolution: consider both
@@ -1259,9 +1227,9 @@ class FlywheelDriver(
         val settled: Boolean = false,
         /** Which [FlywheelPhase] the cycle last reached before returning (the priority manifest). */
         val phase: FlywheelPhase = FlywheelPhase.POLL,
-        /** Conflict markers committed this cycle — QaLaguna resolves externally. */
+        /** Conflict markers still unresolved after cumulative QaLaguna repair. */
         val conflicts: List<String> = emptyList(),
-        /** Panorama for QaLaguna: the sessions in the last octopus batch. */
+        /** Panorama for QaLaguna: every arm in the current completion set. */
         val panorama: List<QaLaguna.SessionPanorama> = emptyList(),
     )
 

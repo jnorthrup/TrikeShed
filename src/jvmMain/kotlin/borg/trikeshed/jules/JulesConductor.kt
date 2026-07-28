@@ -111,8 +111,8 @@ class JulesConductor(
      * Approve the latest plan of an AWAITING_PLAN_APPROVAL session and record
      * the sign-off as [JulesCause.HumanAnswered], so the flywheel approves each
      * plan exactly once even while Jules lingers in the approval state across
-     * polls. The TDD gate at drain time is the quality barrier; plan review is
-     * not a second gate.
+     * polls. The integrated JVM build at drain time is the quality barrier;
+     * plan review is not a second gate.
      */
     suspend fun approvePlan(sessionId: String) {
         client.approvePlan(sessionId)
@@ -141,12 +141,25 @@ class JulesConductor(
         store?.append(updated.snapshot, drained = true, cause = cause)
     }
 
-    /** Record a drain outcome on the card and the log. */
+    data class DrainRecord(val sessionId: String, val commitSha: String, val rejects: Int)
+
+    /** Persist a whole completion set before publishing any drained card in memory. */
+    suspend fun recordDrains(records: List<DrainRecord>) {
+        val updates = records.map { record ->
+            val card = requireNotNull(cards[record.sessionId]) {
+                "missing Jules card ${record.sessionId} during drain close"
+            }
+            record.sessionId to card.markDrained(record.commitSha, record.rejects)
+        }
+        store?.appendDrainBatch(updates.map { it.second })
+        for ((sessionId, updated) in updates) {
+            cards[sessionId] = updated
+        }
+    }
+
+    /** Record one drain outcome through the same durable batch boundary. */
     suspend fun recordDrain(sessionId: String, commitSha: String, rejects: Int) {
-        val card = cards[sessionId] ?: return
-        val updated = card.markDrained(commitSha, rejects)
-        cards[sessionId] = updated
-        store?.append(updated.snapshot, drained = true, cause = updated.causes.last())
+        recordDrains(listOf(DrainRecord(sessionId, commitSha, rejects)))
     }
 
     /** Record a failed drain without marking the session successfully drained. */

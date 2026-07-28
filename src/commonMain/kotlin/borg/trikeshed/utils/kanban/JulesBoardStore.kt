@@ -28,6 +28,8 @@ class JulesBoardStore(
     companion object {
         /** Canonical WAL filename under the forge home directory. */
         const val WAL_FILENAME = "jules-board.wal"
+        private const val DRAIN_BATCH_KEY = "__jules_drain_batch__"
+        private const val DRAIN_BATCH_MAGIC = 0x4A444231 // JDB1
     }
 
     /**
@@ -48,6 +50,40 @@ class JulesBoardStore(
     }
 
     /**
+     * Atomically append every drained card in one binary WAL record. The
+     * payload contains length-prefixed snapshot/cause records and projects
+     * through [records] as if each nested record had been appended separately.
+     */
+    suspend fun appendDrainBatch(cards: List<JulesSessionCard>) {
+        if (cards.isEmpty()) return
+        val nested = mutableListOf<Pair<ByteArray, ByteArray>>()
+        for (card in cards) {
+            val sid = card.snapshot.sessionId.encodeToByteArray()
+            val cause = requireNotNull(card.causes.lastOrNull()) {
+                "drained card ${card.snapshot.sessionId} has no cause"
+            }
+            nested += sid to KanbanEventCodec.encodeSnapshot(card.snapshot, drained = true).encodeToByteArray()
+            nested += sid to KanbanEventCodec.encodeCause(card.snapshot.sessionId, cause).encodeToByteArray()
+        }
+        val size = nested.fold(8L) { total, (key, payload) ->
+            total + 4L + key.size + 4L + payload.size
+        }
+        require(size <= Int.MAX_VALUE) { "drain batch exceeds WAL record limit: $size bytes" }
+        val bytes = ByteArray(size.toInt())
+        var offset = bytes.putInt(0, DRAIN_BATCH_MAGIC)
+        offset = bytes.putInt(offset, nested.size)
+        for ((key, payload) in nested) {
+            offset = bytes.putInt(offset, key.size)
+            key.copyInto(bytes, offset)
+            offset += key.size
+            offset = bytes.putInt(offset, payload.size)
+            payload.copyInto(bytes, offset)
+            offset += payload.size
+        }
+        wal.append(DRAIN_BATCH_KEY, bytes)
+    }
+
+    /**
      * Append a work-queue cause (WorkQueued/WorkDispatched/WorkDrained) under the
      * workId as the WAL key. Idempotent on (workId, kind): a second WorkQueued for
      * the same workId is a no-op (dedup at dispatch time in the flywheel).
@@ -62,7 +98,7 @@ class JulesBoardStore(
      */
     fun replayCauses(workId: String): List<JulesCause> {
         val causes = mutableListOf<JulesCause>()
-        for ((key, payload) in wal.replay()) {
+        for ((key, payload) in records()) {
             if (key == workId) {
                 val decoded = KanbanEventCodec.decode(payload.decodeToString())
                 if (decoded is KanbanEventCodec.CauseEvent) {
@@ -73,8 +109,8 @@ class JulesBoardStore(
         return causes
     }
 
-    /** Replay all (key, payload) records in insertion order. */
-    fun replayAll(): Sequence<Pair<String, ByteArray>> = wal.replay()
+    /** Replay all logical records in insertion order, expanding drain batches. */
+    fun replayAll(): Sequence<Pair<String, ByteArray>> = records()
 
     /**
      * Fold the WAL into cards. Card state is a projection; the WAL is truth.
@@ -83,7 +119,7 @@ class JulesBoardStore(
     fun load(): MutableMap<String, JulesSessionCard> {
         val snapshots = mutableMapOf<String, KanbanEventCodec.SnapEvent>()
         val causes = mutableMapOf<String, MutableList<JulesCause>>()
-        for ((sid, payload) in wal.replay()) {
+        for ((sid, payload) in records()) {
             when (val ev = KanbanEventCodec.decode(payload.decodeToString())) {
                 is KanbanEventCodec.SnapEvent -> snapshots[sid] = ev
                 is KanbanEventCodec.CauseEvent -> causes.getOrPut(ev.sid) { mutableListOf() }.add(ev.cause)
@@ -113,7 +149,7 @@ class JulesBoardStore(
      */
     fun loadQueue(): List<QueueEntry> {
         val byWorkId = mutableMapOf<String, QueueEntry>()
-        for ((workId, payload) in wal.replay()) {
+        for ((workId, payload) in records()) {
             val ev = KanbanEventCodec.decode(payload.decodeToString()) as? KanbanEventCodec.CauseEvent ?: continue
             val c = ev.cause
             when (c) {
@@ -147,6 +183,53 @@ class JulesBoardStore(
             }
         }
         return byWorkId.values.toList()
+    }
+
+    /** Expand one atomic binary drain batch back into ordinary logical records. */
+    private fun records(): Sequence<Pair<String, ByteArray>> = sequence {
+        for ((key, payload) in wal.replay()) {
+            if (key != DRAIN_BATCH_KEY) {
+                yield(key to payload)
+                continue
+            }
+            var offset = 0
+            val magic = payload.readInt(offset)
+            offset += 4
+            require(magic == DRAIN_BATCH_MAGIC) { "invalid drain batch magic: $magic" }
+            val count = payload.readInt(offset)
+            offset += 4
+            require(count >= 0) { "negative drain batch record count: $count" }
+            repeat(count) {
+                val keySize = payload.readInt(offset)
+                offset += 4
+                require(keySize >= 0 && offset + keySize <= payload.size) { "invalid drain batch key length" }
+                val nestedKey = payload.copyOfRange(offset, offset + keySize).decodeToString()
+                offset += keySize
+                val payloadSize = payload.readInt(offset)
+                offset += 4
+                require(payloadSize >= 0 && offset + payloadSize <= payload.size) { "invalid drain batch payload length" }
+                val nestedPayload = payload.copyOfRange(offset, offset + payloadSize)
+                offset += payloadSize
+                yield(nestedKey to nestedPayload)
+            }
+            require(offset == payload.size) { "trailing bytes in drain batch: ${payload.size - offset}" }
+        }
+    }
+
+    private fun ByteArray.putInt(offset: Int, value: Int): Int {
+        this[offset] = (value ushr 24).toByte()
+        this[offset + 1] = (value ushr 16).toByte()
+        this[offset + 2] = (value ushr 8).toByte()
+        this[offset + 3] = value.toByte()
+        return offset + 4
+    }
+
+    private fun ByteArray.readInt(offset: Int): Int {
+        require(offset >= 0 && offset + 4 <= size) { "truncated drain batch integer" }
+        return ((this[offset].toInt() and 0xFF) shl 24) or
+            ((this[offset + 1].toInt() and 0xFF) shl 16) or
+            ((this[offset + 2].toInt() and 0xFF) shl 8) or
+            (this[offset + 3].toInt() and 0xFF)
     }
 }
 

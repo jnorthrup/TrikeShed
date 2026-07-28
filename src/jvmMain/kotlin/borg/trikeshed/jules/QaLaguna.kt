@@ -1,20 +1,19 @@
 package borg.trikeshed.jules
 
-import borg.trikeshed.jules.JulesRestClient.SessionInfo
 import kotlinx.coroutines.withTimeoutOrNull
 import java.io.File
 
 /**
- * QA-Laguna — external conflict resolver, runs OUTSIDE the flywheel.
+ * QA-Laguna — conflict repair component invoked after all drain arms merge.
  *
- * The flywheel commits conflict markers as-is and moves on. This component
- * reads the committed conflicts with panorama scope (all sessions in the
- * batch, their includes/imports for merge facts) and resolves them.
+ * The drain commits conflict markers between sequential 3-way arms so the
+ * remaining arms can merge. This component then reads the cumulative conflict
+ * set with panorama scope and resolves it before provenance closes.
  *
  * n=2+ distance: reads both sides' dependency links (imports, referenced
  * symbols) to understand what each side depends on before resolving.
  *
- * Invoked by the daemon after the flywheel cycle, or as a standalone CLI.
+ * Kept separate from merge mechanics so it can also be invoked by an operator.
  */
 object QaLaguna {
 
@@ -30,13 +29,14 @@ object QaLaguna {
         repoDir: File,
         brain: BrainClient?,
         panorama: List<SessionPanorama>,
+        files: List<String>? = null,
     ): List<Pair<String, Boolean>> {
         if (brain == null) {
             println("[QA-LAGUNA] no brain configured — conflict markers stay as committed")
             return emptyList()
         }
 
-        val conflicts = conflictFiles(repoDir)
+        val conflicts = files ?: conflictFiles(repoDir)
         if (conflicts.isEmpty()) return emptyList()
 
         println("[QA-LAGUNA] resolving ${conflicts.size} conflicted files with ${panorama.size} sessions in panorama")
@@ -78,7 +78,7 @@ object QaLaguna {
         }
 
         val prompt = buildString {
-            appendLine("You are QA resolving a git conflict from an octopus merge of ${panorama.size} Jules sessions.")
+            appendLine("You are QA resolving cumulative conflicts from ${panorama.size} sequential 3-way Jules merges.")
             appendLine()
             appendLine("Panorama — the sessions in this batch:")
             appendLine(panoramaText)
@@ -120,13 +120,22 @@ object QaLaguna {
 
     /** Files with unresolved conflict markers. */
     private fun conflictFiles(repoDir: File): List<String> {
-        val p = ProcessBuilder("git", "diff", "--name-only", "--diff-filter=U")
-            .directory(repoDir)
-            .redirectErrorStream(true)
-            .start()
-        p.waitFor()
-        return p.inputStream.bufferedReader().readText().trim().lines()
-            .filter { it.isNotBlank() }
+        fun git(vararg args: String): List<String> {
+            val p = ProcessBuilder("git", *args)
+                .directory(repoDir)
+                .redirectErrorStream(true)
+                .start()
+            p.waitFor()
+            return p.inputStream.bufferedReader().readText().trim().lines()
+                .filter { it.isNotBlank() }
+        }
+        val unmerged = git("diff", "--name-only", "--diff-filter=U")
+        val marked = git("grep", "-l", "^<<<<<<< ", "--").filter { path ->
+            File(repoDir, path).takeIf { it.isFile }?.useLines { lines ->
+                lines.any { it.startsWith("<<<<<<< ") && it != "<<<<<<< SEARCH" }
+            } == true
+        }
+        return (unmerged + marked).distinct()
     }
 
     /**
