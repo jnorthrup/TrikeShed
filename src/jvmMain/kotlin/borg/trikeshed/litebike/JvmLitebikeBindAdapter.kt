@@ -151,6 +151,7 @@ object JvmLitebikeBindAdapter {
                 }
             } finally {
                 connections.unregister(connId)
+                // Close the accepted-channel lifecycle around the existing respond callback
                 runCatching { ch.close() }
             }
         }
@@ -161,6 +162,7 @@ object JvmLitebikeBindAdapter {
                     if (read <= 0) {
                         // Peer closed — drop the registry entry.
                         connections.unregister(connId)
+                        runCatching { ch.close() }
                         return
                     }
                     val bytes = ByteArray(read).also { buf.flip(); buf.get(it) }
@@ -177,6 +179,7 @@ object JvmLitebikeBindAdapter {
 
                 override fun failed(t: Throwable, attached: Any?) {
                     connections.unregister(connId)
+                    runCatching { ch.close() }
                 }
             }
         )
