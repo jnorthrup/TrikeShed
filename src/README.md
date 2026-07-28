@@ -374,7 +374,7 @@ ipfs?.dhtService?.store(key, value)
 The reactor, HTX tokenizer, and kernel algebra are the single IO path. New
 protocols extend `AsyncContextElement` and route through `userspace.Channel`
 + `FunctionalUringFacade`. There is no `libs/` module layer anymore — the
-root `src/` tree is authoritative (see `doc/concepts.md` §0 and the project's
+root `src/` tree is authoritative (see `README.md` §0 and the project's
 root-only-build rule). Composite builds that need the substrate consume it via
 `includeBuild("../..")`.
 
@@ -414,7 +414,7 @@ class MyProtocolElement : AsyncContextElement() {
 ## Related
 
 - [`PRELOAD.md`](../PRELOAD.md) — kernel algebra: `Join`, `Series<T>`, `Twin`, `α`, `j`
-- [`doc/concepts.md`](../doc/concepts.md) — maintainer-facing architecture map + spine
+- [`README.md`](../README.md) — maintainer-facing architecture map + spine (concept map merged here)
 - [`doc/concepts-gap-analysis.md`](../doc/concepts-gap-analysis.md) — doc-vs-code drift audit
 - [`src/linuxMain/.../Liburing.linux.kt`](linuxMain/kotlin/borg/trikeshed/userspace/Liburing.linux.kt) — cinterop actual
 - [`src/posixMain/.../PosixUringIO.kt`](posixMain/kotlin/borg/trikeshed/PosixUringIO.kt) — uring-or-POSIX fallback

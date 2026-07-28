@@ -8,7 +8,7 @@ Source: `doc/archives/archive-2026-07-22.md` (13,066 lines, 762KB) — consolida
 
 | Doc | Purpose | Key Sections |
 |-----|---------|--------------|
-| **Concept Map** (`concepts.md`) | One-place Kotlin maintainer guide | Kernel algebra, Architecture spine (12 layers), Job Nexus, Confix, Couch, Collections, Choreography, Build/Deploy, Reading paths, Pitfalls |
+| **Concept Map** (`../README.md`) | One-place Kotlin maintainer guide (merged from `concepts.md`) | Kernel algebra, Architecture spine (12 layers), Job Nexus, Confix, Couch, Collections, Choreography, Build/Deploy, Reading paths, Pitfalls |
 | **Rewrite** (`rewire.md`) | User-centric Forge workspace architecture | Storage unification (1 CID, 5 lenses), Unified surface, Storage layer (btrfs), VCS gateway (pijul/git/IPFS), Agent layer (Modelmux/Kanban/Jules), Ingest pipeline, Mesh layer (Litebike/SSH/UPnP) |
 | **Taste** (`taste.md`) | High-performance hierarchical UI engine principles | 10 principles, Meta-finding, Cut list (T1–T10 ranked by unblocking power) |
 
@@ -83,7 +83,7 @@ Source: `doc/archives/archive-2026-07-22.md` (13,066 lines, 762KB) — consolida
 
 ## 7. Quick Navigation
 
-- **Start here (new maintainer):** `concepts.md` §0 Quick Orientation → §1 Kernel Algebra → `PRELOAD.md`
+- **Start here (new maintainer):** `../README.md` §0 Quick Orientation → §1 Kernel Algebra → `PRELOAD.md`
 - **Architecture decisions:** `rewire.md` §0 Storage Unification → §9 Immediate Cuts
 - **Performance gaps:** `taste.md` Cut list (T1–T3 core promise, T4–T6 storage/cursor, T7–T10 refinement)
 - **Current work pool:** `doc/todo.md` (39 unchecked items)

@@ -167,7 +167,7 @@ kotlin {
                 // Confix is the only portable serializer in commonMain. The kotlinx-serialization
                 // plugin stays applied (core @Serializable/@Contextual annotations need it), but the
                 // json *runtime* is not a commonMain dependency — jvmMain pulls it for the one target
-                // that legitimately needs the kotlinx JSON frontend. See doc/concepts.md §4.
+                // that legitimately needs the kotlinx JSON frontend. See README.md §4.
                 // Compose runtime annotations must be visible to every target so the
                 // compose compiler plugin (applied globally) doesn't bail on JS/WASM/Native.
                 // Full UI deps stay in jvmMain — Compose doesn't publish for macosX64.
