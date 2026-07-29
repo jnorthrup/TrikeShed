@@ -153,12 +153,26 @@ class BrainClient(
             }
         }
 
-        // Primary: NVIDIA NIM (the default brain)
+        // Primary: NVIDIA NIM — 102 free models on one key. When one model
+        // 429s (per-cluster rate limit), the brain rotates to a different
+        // architecture on a different cluster before bailing to paid providers.
+        // No llama-family — too old. Strongest current gen first.
         System.getenv("NVIDIA_API_KEY")?.let { k ->
             val base = "https://integrate.api.nvidia.com/v1"
-            add("nvidia-deepseek-coder", k, base, "deepseek-ai/deepseek-v4-pro")
-            add("nvidia", k, base, "poolside/laguna-xs-2.1")
-            add("nvidia-nemotron", k, base, "nvidia/nemotron-3-ultra-550b-a55b")
+            add("nv-deepseek-v4-pro", k, base, "deepseek-ai/deepseek-v4-pro")
+            add("nv-nemotron-super-120b", k, base, "nvidia/nemotron-3-super-120b-a12b")
+            add("nv-mistral-large-2", k, base, "mistralai/mistral-large-2-instruct")
+            add("nv-deepseek-v4-flash", k, base, "deepseek-ai/deepseek-v4-flash")
+            add("nv-nemotron-super-49b", k, base, "nvidia/llama-3.3-nemotron-super-49b-v1.5")
+            add("nv-glm-52", k, base, "z-ai/glm-5.2")
+            add("nv-kimi-k26", k, base, "moonshotai/kimi-k2.6")
+            add("nv-gpt-oss-120b", k, base, "openai/gpt-oss-120b")
+            add("nv-inkling", k, base, "thinkingmachines/inkling")
+            add("nv-minimax-m3", k, base, "minimaxai/minimax-m3")
+            add("nv-nemotron-ultra-253b", k, base, "nvidia/llama-3.1-nemotron-ultra-253b-v1")
+            add("nv-codestral-22b", k, base, "mistralai/codestral-22b-instruct-v0.1")
+            add("nv-nemotron-ultra-550b", k, base, "nvidia/nemotron-3-ultra-550b-a55b")
+            add("nv-laguna", k, base, "poolside/laguna-xs-2.1")
         }
 
         // OpenRouter (many models behind one key)
@@ -210,9 +224,10 @@ class BrainClient(
             add("moonshot", k, "https://api.moonshot.cn/v1", "moonshot-v1-32k")
         }
 
-        // MiniMax
+        // MiniMax — native API (m2.5 + m3)
         System.getenv("MINIMAX_API_KEY")?.let { k ->
-            add("minimax", k, "https://api.minimax.chat/v1", "MiniMax-Text-01")
+            add("minimax-m3", k, "https://api.minimax.chat/v1", "MiniMax-M3")
+            add("minimax-m25", k, "https://api.minimax.chat/v1", "MiniMax-Text-01")
         }
 
         return out
