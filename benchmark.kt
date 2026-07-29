@@ -1,3 +1,4 @@
+<<<<<<< ours
 Looking at the conflict in `benchmark.kt`, I need to resolve the merge between two different benchmark implementations. Let me analyze both sides:
 
 **Ours (session 114727/568010):** A benchmark for `QueryEngine.extractDoubleColumn()` with mock cursor data
@@ -17,6 +18,10 @@ import borg.trikeshed.lib.*
 import borg.trikeshed.graph.query.QueryEngine
 import kotlin.system.measureTimeMillis
 
+=======
+package borg.trikeshed.graph.query
+
+>>>>>>> theirs
 interface Graph<N, E> {
     val nodes: Set<N>
     fun outEdges(node: N): Map<N, E>
@@ -80,6 +85,7 @@ class GraphQueryOptimized<N, E>(private val graph: Graph<N, E>, private val curr
     fun toSet(): Set<N> = currentNodes
 }
 
+<<<<<<< ours
 fun main() {
     // Benchmark 1: QueryEngine.extractDoubleColumn
     val numRows = 1_000_000
@@ -114,6 +120,10 @@ fun main() {
     println("Time: $time ms")
 
     // Benchmark 2: GraphQuery.outE
+=======
+
+fun main() {
+>>>>>>> theirs
     val graph = AdjacencyListGraph<Int, String>()
     // create a dense graph where many nodes point to the same destination
     val destNodes = (0..100).toList()
@@ -133,6 +143,7 @@ fun main() {
     // warmup
     for (i in 0..10) {
         val q1 = GraphQuery(graph, startNodes)
+<<<<<<< ours
         q1.outE { it.contains("edge") }
     }
     
@@ -153,3 +164,27 @@ fun main() {
 ```
 
 The resolution combines both benchmark implementations into a single `main()` function, preserving all the graph infrastructure classes from the "theirs" side and the cursor benchmark from the "ours" side. The package declaration is included as required by the "theirs" side's code structure.
+=======
+        q1.outE { it.contains("edge") }.toSet()
+        val q2 = GraphQueryOptimized(graph, startNodes)
+        q2.outE { it.contains("edge") }.toSet()
+    }
+    
+    var time1 = 0L
+    var time2 = 0L
+    for (i in 0..50) {
+        val q1 = GraphQuery(graph, startNodes)
+        val start1 = System.nanoTime()
+        q1.outE { it.contains("edge") }.toSet()
+        time1 += (System.nanoTime() - start1)
+        
+        val q2 = GraphQueryOptimized(graph, startNodes)
+        val start2 = System.nanoTime()
+        q2.outE { it.contains("edge") }.toSet()
+        time2 += (System.nanoTime() - start2)
+    }
+    
+    println("Original outE time: " + (time1 / 1_000_000) + " ms")
+    println("Optimized outE time: " + (time2 / 1_000_000) + " ms")
+}
+>>>>>>> theirs
