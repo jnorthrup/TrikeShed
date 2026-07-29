@@ -94,8 +94,10 @@ object DuckDBTypes {
 
 // ==================== CURSOR TRANSFORMS (pure projections) ====================
 
+internal external fun duckdb_open(path: String?): Long
+
 /** Open/create database → SlabCursor of tables/views */
-fun openDatabase(path: String?): DuckDB = TODO("duckdb_open(path)")
+fun openDatabase(path: String?): DuckDB = DuckDB(duckdb_open(path))
 
 /** Open with config (pragma) → DuckDB handle */
 fun openDatabaseConfig(path: String?, config: DuckDBConfig): DuckDB = TODO("duckdb_open_ext(path, config)")
