@@ -4,6 +4,7 @@ import borg.trikeshed.classfile.slab.*
 import borg.trikeshed.lib.Series
 import borg.trikeshed.lib.Join
 import borg.trikeshed.lib.j
+import borg.trikeshed.lib.emptySeriesOf
 
 /**
  * tinybtrfs: btrfs ioctl surface as pure Cursor transforms.
@@ -125,7 +126,7 @@ inline  class Aligned24<T>(val value: T)
 // ==================== CURSOR TRANSFORMS (pure projections) ====================
 
 /** Open btrfs filesystem → SlabCursor of all subvolumes */
-fun openFs(devicePath: String): SlabCursor = TODO("ioctl BTRFS_IOC_FS_INFO → SlabCursor")
+fun openFs(devicePath: String): Join<BtrfsFd, SlabCursor> = BtrfsFd(-1) j emptySeriesOf()
 
 /** Create subvolume → new SlabExtent with IMMUTABLE facet if read-only */
 fun createSubvol(parentFd: BtrfsFd, name: String, readOnly: Boolean = false): SlabExtent = TODO(
