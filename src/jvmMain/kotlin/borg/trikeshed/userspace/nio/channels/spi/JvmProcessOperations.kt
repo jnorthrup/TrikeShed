@@ -4,12 +4,20 @@ import java.io.ByteArrayOutputStream
 
 class JvmProcessOperations : ProcessOperations {
 
+    private fun validateCommand(command: List<String>) {
+        require(command.isNotEmpty()) { "Command list must not be empty" }
+        command.forEachIndexed { index, arg ->
+            require(arg.isNotBlank()) { "Command argument at index $index must not be blank" }
+        }
+    }
+
     override suspend fun exec(
         command: String,
         args: List<String>,
         stdin: ByteArray?,
         env: Map<String, String>,
     ): ProcessResult {
+        validateCommand(listOf(command) + args)
         val pb = ProcessBuilder(command, *args.toTypedArray())
         env.forEach { (k, v) -> pb.environment()[k] = v }
 
