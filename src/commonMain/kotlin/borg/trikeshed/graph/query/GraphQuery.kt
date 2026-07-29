@@ -103,94 +103,10 @@ class GraphQuery<N, E>(private val graph: Graph<N, E>, private val currentNodes:
     fun outE(predicate: (E) -> Boolean): GraphQuery<N, E> {
         val nextNodes = mutableSetOf<N>()
         for (node in currentNodes) {
-<<<<<<< ours
-<<<<<<< ours
-<<<<<<< ours
-<<<<<<< ours
-<<<<<<< ours
-<<<<<<< ours
-<<<<<<< ours
-<<<<<<< ours
-<<<<<<< ours
-<<<<<<< ours
-<<<<<<< ours
-<<<<<<< ours
-<<<<<<< ours
             for ((target, edge) in graph.outEdges(node)) {
                 if (predicate(edge)) nextNodes.add(target)
             }
-=======
-            val edges = graph.edgeIndex[label]?.get(node) ?: emptyList()
-            // using the index as suggested
->>>>>>> theirs
-=======
-            val edges = graph.edgeIndex[label]?.get(node) ?: emptyList()
-            // using the index as suggested
->>>>>>> theirs
-=======
-            val edges = graph.edgeIndex[label]?.get(node) ?: emptyList()
-            // using the index as suggested
->>>>>>> theirs
-=======
-            val edges = graph.edgeIndex[label]?.get(node) ?: emptyList()
-            // using the index as suggested
->>>>>>> theirs
-=======
-            val edges = graph.edgeIndex[label]?.get(node) ?: emptyList()
-            // using the index as suggested
->>>>>>> theirs
-=======
-            val edges = graph.edgeIndex[label]?.get(node) ?: emptyList()
-            // using the index as suggested
->>>>>>> theirs
-=======
-            val edges = graph.edgeIndex[label]?.get(node) ?: emptyList()
-            // using the index as suggested
->>>>>>> theirs
-=======
-            val edges = graph.edgeIndex[label]?.get(node) ?: emptyList()
-            // using the index as suggested
->>>>>>> theirs
-=======
-            val edges = graph.edgeIndex[label]?.get(node) ?: emptyList()
-            // using the index as suggested
->>>>>>> theirs
-=======
-            val edges = graph.edgeIndex[label]?.get(node) ?: emptyList()
-            // using the index as suggested
->>>>>>> theirs
-=======
-            val edges = graph.edgeIndex[label]?.get(node) ?: emptyList()
-            // using the index as suggested
->>>>>>> theirs
-=======
-            val edges = graph.edgeIndex[label]?.get(node) ?: emptyList()
-            // using the index as suggested
->>>>>>> theirs
-=======
-            val edges = graph.edgeIndex[label]?.get(node) ?: emptyList()
-            // using the index as suggested
->>>>>>> theirs
         }
         return GraphQuery(graph, nextNodes)
     }
-
-    /** Return all nodes matching the query so far. */
-    fun toList(): List<N> = currentNodes.toList()
-
-    /** Return nodes as a Set. */
-    fun toSet(): Set<N> = currentNodes
-
-    /** Aggregate values over the current nodes. */
-    fun <T> aggregate(initial: T, operation: (acc: T, N) -> T): T {
-        var acc = initial
-        for (node in currentNodes) {
-            acc = operation(acc, node)
-        }
-        return acc
-    }
 }
-
-/** Start a query on the whole graph or a subset of start nodes. */
-fun <N, E> Graph<N, E>.query(startNodes: Set<N> = nodes): GraphQuery<N, E> = GraphQuery(this, startNodes)
-fun <N, E> Graph<N, E>.query(vararg startNodes: N): GraphQuery<N, E> = GraphQuery(this, startNodes.toSet())
