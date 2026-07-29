@@ -104,9 +104,14 @@ class GraphQuery<N, E>(private val graph: Graph<N, E>, private val currentNodes:
         val nextNodes = mutableSetOf<N>()
         for (node in currentNodes) {
 <<<<<<< ours
+<<<<<<< ours
             for ((target, edge) in graph.outEdges(node)) {
                 if (predicate(edge)) nextNodes.add(target)
             }
+=======
+            val edges = graph.edgeIndex[label]?.get(node) ?: emptyList()
+            // using the index as suggested
+>>>>>>> theirs
 =======
             val edges = graph.edgeIndex[label]?.get(node) ?: emptyList()
             // using the index as suggested
