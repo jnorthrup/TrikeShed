@@ -352,6 +352,7 @@ fun io_uring.asString(): String = memScoped {
 }
 
 fun main(argv1: Array<String>): Unit = memScoped {
+    borg.trikeshed.platform.NativeMainArguments.args = argv1.toList()
     val argv = argv1.takeIf { it.isNotEmpty() } ?: arrayOf("/etc/sysctl.conf")
 
     println("---setting up uring with args ${argv.toList()}")
