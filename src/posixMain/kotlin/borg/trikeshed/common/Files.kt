@@ -37,14 +37,14 @@ actual object Files {
         fileName: String,
         bufsize: Int,
     ): Sequence<Join<Long, ByteArray>> {
-        TODO("Not yet implemented")
+        return borg.trikeshed.userspace.nio.file.spi.PosixFileOperations().streamLines(fileName, bufsize)
     }
 
     actual fun iterateLines(
         fileName: String,
         bufsize: Int,
     ): Iterable<Join<Long, Series<Byte>>> {
-        TODO("Not yet implemented")
+        return borg.trikeshed.userspace.nio.file.spi.PosixFileOperations().iterateLines(fileName, bufsize)
     }
 
 
