@@ -136,6 +136,7 @@ class JobSupervisorReteIntegrationTest {
         assertEquals(0, rete.agenda.size, "Agenda should be empty because facts are in different partitions")
 
         nexus.drain() // Fix the uncompleted coroutine error
+        nexus.cancel()
     }
 
     @Test
