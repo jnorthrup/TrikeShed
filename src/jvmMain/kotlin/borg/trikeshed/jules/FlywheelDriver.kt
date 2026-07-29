@@ -876,13 +876,21 @@ class FlywheelDriver(
 
     /**
      * Run an arbitrary command in [repoDir]. Use [git] for git subcommands.
+     * 30-second timeout — a hung git (credential prompt, slow push) must not
+     * park the flywheel.
      */
     private fun shell(vararg args: String): CommandResult = try {
         val process = ProcessBuilder(*args)
             .directory(repoDir)
             .redirectErrorStream(true)
             .start()
-        CommandResult(process.waitFor(), process.inputStream.bufferedReader().readText())
+        val finished = process.waitFor(30, java.util.concurrent.TimeUnit.SECONDS)
+        if (!finished) {
+            process.destroyForcibly()
+            CommandResult(1, "timeout after 30s: ${args.joinToString(" ")}")
+        } else {
+            CommandResult(process.exitValue(), process.inputStream.bufferedReader().readText())
+        }
     } catch (t: Throwable) {
         CommandResult(1, t.message.orEmpty())
     }
