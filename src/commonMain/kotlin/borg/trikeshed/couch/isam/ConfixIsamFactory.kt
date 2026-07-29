@@ -79,7 +79,15 @@ class ConfixIsamCursorBridge(
         // using Join or SpanMatcher logic to form a unified Series<RowVec>.
         // For now, we return a stub mimicking the row representation.
         return indexCursor.size j { i ->
-            TODO("Compose Stringpool ISAM RowVec for $i")
+            val offset = indexCursor[i].second
+            val rawString = stringpool.get(offset) ?: ""
+            val rawBytes = rawString.encodeToByteArray()
+            schema.size j { colIdx ->
+                val meta = schema[colIdx]
+                val fieldBytes = rawBytes.sliceArray(meta.begin until meta.end)
+                val decodedValue = meta.decoder(fieldBytes)
+                decodedValue j meta.`↺`
+            }
         }
     }
 
