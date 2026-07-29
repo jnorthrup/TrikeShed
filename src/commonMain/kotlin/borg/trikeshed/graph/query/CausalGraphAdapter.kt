@@ -13,8 +13,11 @@ import borg.trikeshed.graph.CausalGraphNodeIndex
  */
 class CausalGraphAdapter(private val index: CausalGraphNodeIndex) : Graph<CausalGraphNode, Unit> {
 
-    // We lazily construct adjacency based on the index to provide O(1) lookups for edges.
-    private val childrenMap by lazy {
+    // We eagerly construct adjacency based on the index to provide O(1) lookups for edges
+    // and avoid blocking on first access.
+    private val childrenMap: Map<String, List<CausalGraphNode>>
+
+    init {
         val map = mutableMapOf<String, MutableList<CausalGraphNode>>()
         for (i in 0 until index.size) {
             val node = index[i]
@@ -22,7 +25,7 @@ class CausalGraphAdapter(private val index: CausalGraphNodeIndex) : Graph<Causal
                 map.getOrPut(parentId) { mutableListOf() }.add(node)
             }
         }
-        map
+        childrenMap = map
     }
 
     override val nodes: Set<CausalGraphNode>
