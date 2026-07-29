@@ -36,7 +36,140 @@ import kotlin.concurrent.Volatile
 class CharStrCached(
     internal val witness: CharSequence,
     private val hotSet: HotTextKSet = HotTextKSet.DEFAULT,
+    internal val cached: Series<CharStr>? = null,
+    internal val chunkOffsets: IntArray? = null,
+    val length: Int = cached?.let { c -> if (c.size > 0) chunkOffsets!![c.size - 1] + c[c.size - 1].raw.length else 0 } ?: witness.length
 ) : Join<TextK<*>, (TextK<*>) -> Any?> {
+
+    fun get(index: Int): Char {
+        if (cached == null) return witness[index]
+        var chunkIdx = chunkOffsets!!.binarySearch(index)
+        if (chunkIdx < 0) chunkIdx = -chunkIdx - 2
+        val offset = chunkOffsets[chunkIdx]
+        return cached[chunkIdx].raw[index - offset]
+    }
+
+    fun subSequence(start: Int, end: Int): CharStrCached {
+        require(start in 0..end && end <= length) { "Invalid range: $start..$end for length $length" }
+        if (start == end) return CharStrCached("")
+        if (cached == null) {
+            val sub = witness.subSequence(start, end)
+            return if (sub.length > CHUNK_SIZE) {
+                build(1 j { CharStrCached(sub) })
+            } else {
+                CharStrCached(sub)
+            }
+        }
+        var startIdx = chunkOffsets!!.binarySearch(start)
+        if (startIdx < 0) startIdx = -startIdx - 2
+        var endIdx = chunkOffsets.binarySearch(end - 1)
+        if (endIdx < 0) endIdx = -endIdx - 2
+        endIdx = maxOf(startIdx, endIdx)
+
+        if (startIdx == endIdx) {
+            val offset = chunkOffsets[startIdx]
+            return CharStrCached(cached[startIdx].raw.subSequence(start - offset, end - offset))
+        }
+
+        val subChunks = mutableListOf<CharStr>()
+        for (i in startIdx..endIdx) {
+            val offset = chunkOffsets[i]
+            val chunkRaw = cached[i].raw
+            val chunkStart = maxOf(0, start - offset)
+            val chunkEnd = minOf(chunkRaw.length, end - offset)
+            if (chunkStart < chunkEnd) {
+                subChunks.add(CharStrCached(chunkRaw.subSequence(chunkStart, chunkEnd)))
+            }
+        }
+        val subArray = subChunks.toTypedArray()
+        return build(subArray.size j { i: Int -> subArray[i] })
+    }
+
+    fun plus(other: CharStr): CharStrCached {
+        val otherCached = other as? CharStrCached ?: CharStrCached(other.raw)
+        val allChunks = mutableListOf<CharStr>()
+        if (this.cached != null) {
+            for (i in 0 until this.cached.size) allChunks.add(this.cached[i])
+        } else if (this.length > 0) {
+            allChunks.add(this)
+        }
+        if (otherCached.cached != null) {
+            for (i in 0 until otherCached.cached.size) allChunks.add(otherCached.cached[i])
+        } else if (otherCached.length > 0) {
+            allChunks.add(otherCached)
+        }
+        if (allChunks.isEmpty()) return CharStrCached("")
+        val allArray = allChunks.toTypedArray()
+        return build(allArray.size j { i: Int -> allArray[i] })
+    }
+
+    companion object {
+        const val CHUNK_SIZE = 512
+
+        fun build(chunks: Series<CharStr>): CharStrCached {
+            val merged = mutableListOf<CharStr>()
+            var currentStr = StringBuilder()
+
+            for (i in 0 until chunks.size) {
+                val raw = chunks[i].raw
+                if (currentStr.length + raw.length <= CHUNK_SIZE) {
+                    currentStr.append(raw)
+                } else {
+                    if (currentStr.isNotEmpty()) {
+                        merged.add(CharStrCached(currentStr.toString()))
+                        currentStr.clear()
+                    }
+                    if (raw.length > CHUNK_SIZE) {
+                        var offset = 0
+                        while (offset < raw.length) {
+                            val end = minOf(offset + CHUNK_SIZE, raw.length)
+                            merged.add(CharStrCached(raw.subSequence(offset, end).toString()))
+                            offset += CHUNK_SIZE
+                        }
+                    } else {
+                        currentStr.append(raw)
+                    }
+                }
+            }
+            if (currentStr.isNotEmpty()) {
+                merged.add(CharStrCached(currentStr.toString()))
+            }
+
+            if (merged.size == 1) {
+                return merged[0] as CharStrCached
+            }
+
+            val mergedArray = merged.toTypedArray()
+            val mergedSeries = mergedArray.size j { i: Int -> mergedArray[i] }
+            val offsets = IntArray(mergedArray.size)
+            var currentOffset = 0
+            for (i in mergedArray.indices) {
+                offsets[i] = currentOffset
+                currentOffset += mergedArray[i].raw.length
+            }
+
+            val totalLength = currentOffset
+            val witness = object : CharSequence {
+                override val length: Int = totalLength
+                override fun get(index: Int): Char {
+                    var chunkIdx = offsets.binarySearch(index)
+                    if (chunkIdx < 0) chunkIdx = -chunkIdx - 2
+                    return mergedArray[chunkIdx].raw[index - offsets[chunkIdx]]
+                }
+                override fun subSequence(startIndex: Int, endIndex: Int): CharSequence {
+                    return build(mergedSeries).subSequence(startIndex, endIndex).witness
+                }
+                override fun toString(): String {
+                    val sb = StringBuilder(length)
+                    for (chunk in mergedArray) {
+                        sb.append(chunk.raw)
+                    }
+                    return sb.toString()
+                }
+            }
+            return CharStrCached(witness, cached = mergedSeries, chunkOffsets = offsets)
+        }
+    }
 
     // ── hot fields — explicit, scalarized by C2 ─────────────────
     // Racy-but-safe: same pattern as String.hash — one lazy field, computed once.
@@ -187,11 +320,29 @@ internal fun CharStrCached.computeCaseFold(): CharStr {
     return CharStr(this.b(TextK.Raw).toString().lowercase())
 }
 
-internal fun computeRope(op: TextK.RopeK): RopeView {
+internal fun CharStrCached.computeRope(op: TextK.RopeK): RopeView {
+    if (cached != null) {
+        return object : RopeView {
+            override val chunkCount: Int = cached.size
+            override fun get(chunkIndex: Int): CharSequence = cached[chunkIndex].raw
+            override fun iterator(): Iterator<CharSequence> = object : Iterator<CharSequence> {
+                var i = 0
+                override fun hasNext(): Boolean = i < cached.size
+                override fun next(): CharSequence = cached[i++].raw
+            }
+        }
+    }
     return object : RopeView {
-        override val chunkCount: Int get() = 1
-        override fun get(chunkIndex: Int): CharSequence = TODO("rope chunking")
-        override fun iterator(): Iterator<CharSequence> = TODO("rope iteration")
+        override val chunkCount: Int = 1
+        override fun get(chunkIndex: Int): CharSequence {
+            require(chunkIndex == 0)
+            return witness
+        }
+        override fun iterator(): Iterator<CharSequence> = object : Iterator<CharSequence> {
+            var i = 0
+            override fun hasNext(): Boolean = i < 1
+            override fun next(): CharSequence = if (i++ == 0) witness else throw NoSuchElementException()
+        }
     }
 }
 
