@@ -10,6 +10,7 @@ import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
+import kotlin.test.assertFailsWith
 import kotlin.coroutines.coroutineContext
 
 class ModelMuxTest {
@@ -63,14 +64,88 @@ class ModelMuxTest {
             models.chat("gpt-4", _s["user" j "hi"].toSeries())
         }
 
-        assertEquals("hello user", result.a)
-        assertEquals(10, result.b.a)
-        assertEquals(5, result.b.b)
+        assertTrue(result.isSuccess)
+        val response = result.getOrThrow()
+        assertEquals("hello user", response.a)
+        assertEquals(10, response.b.a)
+        assertEquals(5, response.b.b)
 
         val req = requireNotNull(recordedRequest)
         assertEquals(HtxMethod.POST, req.method)
         assertTrue(req.headers.toList().any { it.a == "Authorization" && it.b == "Bearer sk-test" })
 
         htx.close()
+    }
+
+    @Test
+    fun chatCompletion_handlesHttpError() = runTest {
+        val fakeService = FakeHtxRouteService { _ ->
+            HtxResponse(
+                status = 500,
+                body = ByteSeries("Internal Server Error".encodeToByteArray())
+            )
+        }
+
+        val htx = openHtxElement(routeService = fakeService)
+        val keyMux = KeyMux {
+            bind("llm.gpt-4.key", TestKeySource())
+        }
+
+        val models = ModelMux(keyMux) {
+            model("gpt-4", caps = setOf("chat"))
+        }
+
+        val context = coroutineContext + htx
+        val result = withContext(context) {
+            models.chat("gpt-4", _s["user" j "hi"].toSeries())
+        }
+
+        assertTrue(result.isFailure)
+        val exception = result.exceptionOrNull()
+        assertTrue(exception is IllegalStateException)
+        assertTrue(exception.message!!.contains("ModelMux chat failed with HTTP 500"))
+        htx.close()
+    }
+
+    @Test
+    fun chatCompletion_handlesNetworkException() = runTest {
+        val fakeService = FakeHtxRouteService { _ ->
+            throw RuntimeException("Network Timeout")
+        }
+
+        val htx = openHtxElement(routeService = fakeService)
+        val keyMux = KeyMux {
+            bind("llm.gpt-4.key", TestKeySource())
+        }
+
+        val models = ModelMux(keyMux) {
+            model("gpt-4", caps = setOf("chat"))
+        }
+
+        val context = coroutineContext + htx
+        val result = withContext(context) {
+            models.chat("gpt-4", _s["user" j "hi"].toSeries())
+        }
+
+        assertTrue(result.isFailure)
+        val exception = result.exceptionOrNull()
+        assertTrue(exception is RuntimeException)
+        assertEquals("Network Timeout", exception.message)
+        htx.close()
+    }
+
+    @Test
+    fun chatCompletion_failsOnMissingModel() = runTest {
+        val keyMux = KeyMux {}
+        val models = ModelMux(keyMux) {
+            model("gpt-4", caps = setOf("chat"))
+        }
+
+        val result = models.chat("non-existent-model", _s["user" j "hi"].toSeries())
+
+        assertTrue(result.isFailure)
+        val exception = result.exceptionOrNull()
+        assertTrue(exception is NoSuchElementException)
+        assertEquals("Model not found: non-existent-model", exception.message)
     }
 }

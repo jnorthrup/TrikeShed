@@ -109,14 +109,14 @@ class ForgeKanbanDaemon(
                     val msg: Join<String, String> = "user" j call.prompt
                     val messages = listOf(msg).toSeries()
                     // Pass assessmentId so the LlmSession stamps the receipt.
-                    val session = mux.session(call.modelId)
-                    val response = try {
-                        mux.chat(call.modelId, messages, assessmentId = call.id.value)
-                    } catch (t: Throwable) {
+                    val sessionResult = mux.session(call.modelId)
+                    val session = sessionResult.getOrThrow()
+                    val responseResult = mux.chat(call.modelId, messages, assessmentId = call.id.value)
+                    if (responseResult.isFailure) {
                         // session may still hold a partial receipt (minted on error)
-                        throw t
+                        throw responseResult.exceptionOrNull()!!
                     }
-                    val (text, _) = response
+                    val (text, _) = responseResult.getOrThrow()
                     // After the call, the LlmSession has lastReceipt.
                     val receipt = session.lastReceipt
                     if (receipt != null && leafSnap != null) {

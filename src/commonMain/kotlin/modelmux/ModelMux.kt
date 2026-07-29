@@ -114,20 +114,20 @@ class ModelMux internal constructor(
     }
 
     /** Create a session for a specific model by ID */
-    suspend fun session(modelId: String): LlmSession {
+    suspend fun session(modelId: String): Result<LlmSession> {
         val entry = (0 until models.size).firstOrNull { models[it].a == modelId }?.let { models[it] }
-            ?: error("model not found: $modelId")
+            ?: return Result.failure(NoSuchElementException("Model not found: $modelId"))
         val card = entry.b
         val authKey = keyMux.get("llm.${card.id}.key")
             ?: keyMux.get("llm.default.key")
-            ?: error("no auth key for model: $modelId")
+            ?: return Result.failure(IllegalStateException("no auth key for model: $modelId"))
         val baseUrl = keyMux.get("llm.${card.id}.base_url")
             ?: keyMux.get("llm.default.base_url")
             ?: configuredBaseUrls[modelId]
             ?: "https://api.openai.com/v1"
         val session = LlmSession(entry, authKey, baseUrl)
         session.open()
-        return session
+        return Result.success(session)
     }
 
     /** Route to the best model for a given action + capabilities */
@@ -140,8 +140,11 @@ class ModelMux internal constructor(
         messages: Series<AcpMessage>,
         tools: Series<AcpTool> = 0 j { error("no tools") },
         assessmentId: String? = null,
-    ): AcpResponse {
-        val session = session(modelId)
+    ): Result<AcpResponse> {
+        if (modelId.isEmpty()) return Result.failure(IllegalArgumentException("modelId must be non-empty"))
+        val sessionResult = session(modelId)
+        if (sessionResult.isFailure) return Result.failure(sessionResult.exceptionOrNull()!!)
+        val session = sessionResult.getOrThrow()
         session.activate()
         val reactor = currentCoroutineContext()[MuxReactorElement.Key]
         val keyId = keyMux.get("llm.$modelId.key")
@@ -151,7 +154,7 @@ class ModelMux internal constructor(
         var inputTokens = 0
         var outputTokens = 0
         try {
-            val card = models.let { ms -> (0 until ms.size).first { ms[it].a == modelId }.let { ms[it] } }.b
+            val card = session.model.b
             val meta: AcpMeta = card.id j ("chat" j session.authHeaders())
             val body: AcpRequestBody = messages j tools
             val req: AcpRequest = meta j body
@@ -175,11 +178,11 @@ class ModelMux internal constructor(
                             assessmentId = assessmentId, sessionId = session.sessionId,
                         )
                     )
-                    return cached
+                    return Result.success(cached)
                 }
             }
 
-            val htx = currentCoroutineContext()[HtxKey] ?: error("No HtxKey found in coroutine context")
+            val htx = currentCoroutineContext()[HtxKey] ?: throw IllegalStateException("No HtxKey found in coroutine context")
             val url = "${session.baseUrl}/chat/completions"
             val htxHeaders = htxHeaders(*meta.b.b.toList().map { it.a j it.b }.toTypedArray())
             val htxReq = parseHtxRequest(
@@ -192,8 +195,8 @@ class ModelMux internal constructor(
             val respBody = resp.body.toArray().decodeToString()
             httpStatus = resp.status
 
-            check(resp.status in 200..299) {
-                "ModelMux chat failed with HTTP ${resp.status}: ${respBody.take(500)}"
+            if (resp.status !in 200..299) {
+                return Result.failure(IllegalStateException("ModelMux chat failed with HTTP ${resp.status}: ${respBody.take(500)}"))
             }
 
             val parsed = AcpCodec.parseResponse(respBody)
@@ -211,7 +214,7 @@ class ModelMux internal constructor(
                     assessmentId = assessmentId, sessionId = session.sessionId,
                 )
             )
-            return parsed
+            return Result.success(parsed)
         } catch (t: Throwable) {
             session.recordReceipt(
                 ModelResponseReceipt.mint(
@@ -222,7 +225,7 @@ class ModelMux internal constructor(
                     error = t,
                 )
             )
-            throw t
+            return Result.failure(t)
         } finally {
             session.drain(); session.close()
             if (reactor != null && keyId != null) {
@@ -240,7 +243,9 @@ class ModelMux internal constructor(
         messages: Series<AcpMessage>,
         tools: Series<AcpTool> = 0 j { error("no tools") }
     ): Flow<AcpChunk> = flow {
-        val session = session(modelId)
+        val sessionResult = session(modelId)
+        if (sessionResult.isFailure) throw sessionResult.exceptionOrNull()!!
+        val session = sessionResult.getOrThrow()
         session.activate()
         val reactor = currentCoroutineContext()[MuxReactorElement.Key]
         val keyId = keyMux.get("llm.$modelId.key")
@@ -285,7 +290,9 @@ class ModelMux internal constructor(
 
     /** Embed — routes to an embedding-capable model */
     suspend fun embed(modelId: String, texts: Series<String>): Series<Join<String, Series<Double>>> {
-        val session = session(modelId)
+        val sessionResult = session(modelId)
+        if (sessionResult.isFailure) throw sessionResult.exceptionOrNull()!!
+        val session = sessionResult.getOrThrow()
         session.activate()
         val reactor = currentCoroutineContext()[MuxReactorElement.Key]
         val keyId = keyMux.get("llm.$modelId.key")
