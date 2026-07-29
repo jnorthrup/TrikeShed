@@ -75,6 +75,7 @@ class BrainClient(
                 .uri(URI.create("${ep.base}/chat/completions"))
                 .header("Authorization", "Bearer ${ep.apiKey}")
                 .header("Content-Type", "application/json")
+                .timeout(java.time.Duration.ofSeconds(15))
                 .POST(HttpRequest.BodyPublishers.ofString(body))
                 .build()
             val resp = http.send(req, HttpResponse.BodyHandlers.ofString())
