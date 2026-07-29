@@ -10,8 +10,8 @@ user's records.
 | Anchor | Value | State |
 |--------|-------|-------|
 | Public email | forgetrikeshed@gmail.com (canonical registered form; Gmail ignores dots — forge.trikeshed@gmail.com is the SAME inbox) | created (user) |
-| Agent inbox access | — | NOT wired. Options: (a) user adds a Google app password so the agent's email tooling (gws/himalaya) can read verification codes; (b) user relays codes in chat. Chosen by acting. |
-| Phone | — | none on record for agent. Rails needing SMS: user relays, or register Google Voice under the gmail (free; becomes agent-readable once (a) is done). |
+| Agent inbox access | — | BLOCKED: Google refuses agent-browser sign-in ("browser may not be secure", 3 attempts 2026-07-28). Path: user enables 2FA + app password (myaccount.google.com/apppasswords) → agent wires IMAP/SMTP (himalaya/gws) → reads all verification mail directly. No web login needed. |
+| Phone (Voice grounding SIM) | 925-300-7136 (925 = East Bay CA) | on record. Google Voice Basic setup verifies this number by SMS — user relays the code during setup. The Voice number itself is chosen at setup. |
 | GitHub org | `trikeshed` | name AVAILABLE (checked 2026-07-28, also `trikeshed-org`). Create under the gmail; becomes the Sponsors/FUNDING target. Repo stays at jnorthrup/TrikeShed for now (transfer preserves stars; defer). |
 | Domains | trikeshed.org / .com | REGISTERED — confirm ownership; if user's, point when needed |
 | Domains open | trikeshed.dev (~$12/yr), trikeshed.fund (~$30/yr) | AVAILABLE — purchase deferred; no rail below needs one |
@@ -76,7 +76,7 @@ a line here first.
 3. [ ] user: create GitHub org `trikeshed` under the gmail (free) → then agent flips FUNDING.yml to `github: [trikeshed]`
 4. [ ] user: Polar org + Stripe connect (S-corp EIN, CP 575, bank)
 5. [ ] user (or agent once inbox wired): Liberapay
-6. [ ] user decision: gmail app password for agent — then agent can self-serve 2, 5 and all future verifications
+6. [ ] user (~10 min, own browser): log into the gmail → enable 2FA → create app password → hand to agent; then Google Voice Basic ($0) at voice.google.com — verify 925-300-7136 by SMS, pick a number (suggest 925 to match). Then agent self-serves 2, 5 and all future verifications via IMAP
 7. [ ] user→CPA: confirm whether 99-xxxxx files 1041 or 1120 — gates holding-layer placement (§1 rule 2)
 8. [ ] agent (on request): NLnet Commons proposal draft for the Oct 1 deadline
 9. [ ] deferred: domain purchase, C-corp revival, trust formation — all gated on real money events
