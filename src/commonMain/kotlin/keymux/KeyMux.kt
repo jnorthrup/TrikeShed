@@ -208,6 +208,36 @@ class TestKeySource(
 }
 
 // ═══════════════════════════════════════════
+// Utilities
+// ═══════════════════════════════════════════
+
+/**
+ * Determines whether a [path] matches a [pattern] containing variables.
+ *
+ * Paths are matched segment by segment, separated by `/`. A pattern segment starting
+ * with `:` acts as a variable and matches any corresponding segment in the path.
+ * Exact equality is required for all other segments. The paths must have the same number of segments.
+ *
+ * **Examples:**
+ * - `pathMatch("api/users", "api/users")` returns `true`
+ * - `pathMatch("api/users", "api/users/")` returns `false` (length mismatch due to trailing slash)
+ * - `pathMatch("api/users", "API/users")` returns `false` (case-sensitive)
+ * - `pathMatch("users/:id/profile", "users/123/profile")` returns `true`
+ * - `pathMatch("users/:id/profile", "users/123/settings")` returns `false`
+ * - `pathMatch("api//users", "api/users")` returns `false` (malformed consecutive slashes not normalized)
+ */
+fun pathMatch(pattern: String, path: String): Boolean {
+    val patternParts = pattern.split("/")
+    val pathParts = path.split("/")
+    if (patternParts.size != pathParts.size) return false
+    for (i in patternParts.indices) {
+        if (patternParts[i].startsWith(":")) continue
+        if (patternParts[i] != pathParts[i]) return false
+    }
+    return true
+}
+
+// ═══════════════════════════════════════════
 // Resolver — first-wins precedence across sources
 // ═══════════════════════════════════════════
 
@@ -222,6 +252,18 @@ object FirstWinsResolver : KeyResolver {
             if (pathMatch(p, path)) src.read(path)?.let { it j src.name } else null
         } ?: (null j "none")
 
+    /**
+     * Determines whether a [query] path matches a [binding] path containing wildcards.
+     *
+     * Paths are matched segment by segment. A binding segment of `*` acts as a single-segment wildcard.
+     * Exact equality is required for all other segments. The paths must have the same number of segments.
+     *
+     * **Examples:**
+     * - `pathMatch("api.*".toKeyPath(), "api.users".toKeyPath())` returns `true`
+     * - `pathMatch("api.users.*".toKeyPath(), "api.users".toKeyPath())` returns `false` (length mismatch)
+     * - `pathMatch("api.users".toKeyPath(), "API.users".toKeyPath())` returns `false` (case-sensitive)
+     * - `pathMatch("users.*.profile".toKeyPath(), "users.123.profile".toKeyPath())` returns `true`
+     */
     private fun pathMatch(binding: KeyPath, query: KeyPath): Boolean {
         if (binding.size != query.size) return false
         return (0 until binding.size).all { i ->
@@ -264,6 +306,19 @@ class KeyMux constructor(
 
     fun watch(prefix: String = ""): Flow<Join<String, String>> = emptyFlow()
 
+    /**
+     * Determines whether a [query] path matches a [binding] path prefix containing wildcards.
+     *
+     * Matches segment by segment. A binding segment of `*` acts as a single-segment wildcard.
+     * The [query] path must have at least as many segments as the [binding] path. Any trailing
+     * segments in the [query] beyond the length of the [binding] are ignored.
+     *
+     * **Examples:**
+     * - `pathMatch("api.*".toKeyPath(), "api.users".toKeyPath())` returns `true`
+     * - `pathMatch("api.users".toKeyPath(), "api.users.list".toKeyPath())` returns `true`
+     * - `pathMatch("api.users.*".toKeyPath(), "api.users".toKeyPath())` returns `false` (binding is longer)
+     * - `pathMatch("api".toKeyPath(), "api".toKeyPath())` returns `true`
+     */
     private fun pathMatch(binding: KeyPath, query: KeyPath): Boolean {
         if (binding.size > query.size) return false
         return binding.view.withIndex().all { (i, seg) -> seg == "*" || seg == query[i] }
