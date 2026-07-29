@@ -497,13 +497,20 @@ class FlywheelDriver(
         println("[FLYWHEEL] DRAIN ${landed.size}/${sessions.size} sessions merged, ${cumulativeConflicts.size} conflict files")
 
         // 3. Repair the cumulative panorama after every arm has landed.
+        //    Best-effort: if the brain is slow/429ing, conflict markers stay
+        //    committed and the wheel moves on. Never block dispatch on brain latency.
         if (cumulativeConflicts.isNotEmpty()) {
-            val resolutions = QaLaguna.resolveConflicts(
-                repoDir = repoDir,
-                brain = brain,
-                panorama = panorama,
-                files = cumulativeConflicts,
-            )
+            val resolutions = withTimeoutOrNull(45_000L) {
+                QaLaguna.resolveConflicts(
+                    repoDir = repoDir,
+                    brain = brain,
+                    panorama = panorama,
+                    files = cumulativeConflicts,
+                )
+            } ?: run {
+                println("[FLYWHEEL] QA-LAGUNA timed out after 45s — conflict markers stay committed")
+                emptyList<Pair<String, Boolean>>()
+            }
             val resolvedFiles = resolutions.filter { it.second }.map { it.first }
             if (resolvedFiles.isNotEmpty()) {
                 git("add", "--", *resolvedFiles.toTypedArray())
