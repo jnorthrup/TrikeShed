@@ -160,7 +160,57 @@ class PosixIsamOperations : IsamOperations {
         transform: ((RowVec) -> RowVec)?,
         useMonocursorGroupings: Boolean
     ) {
-        TODO("append not implemented for PosixIsamOperations")
+        val metafilename = "$datafilename.meta"
+        lateinit var meta0: Series<RecordMeta>
+        var first = true
+
+        var columnsByGroup: Map<String, List<RecordMeta>> = emptyMap()
+        var maxGroupId = 0
+
+        val groupFiles = mutableMapOf<String, PosixFile>()
+        val groupRowBuffers = mutableMapOf<String, ByteArray>()
+
+        msf.forEach { rowVec1: RowVec ->
+            val rowVec = transform?.let { it(rowVec1) } ?: rowVec1
+            if (first) {
+                meta0 = IsamMetaFileReader.write(
+                    metafilename,
+                    rowVec.right.α { it() },
+                    varChars,
+                    useMonocursorGroupings = useMonocursorGroupings
+                )
+                columnsByGroup = meta0.view.groupBy { it.groupName }
+                maxGroupId = meta0.view.map { it.groupId }.maxOrNull() ?: 0
+
+                for (gname in columnsByGroup.keys) {
+                    val cols = columnsByGroup[gname]!!
+                    val firstCol = cols.first()
+                    val gfilename = if (firstCol.groupId == maxGroupId) {
+                        datafilename
+                    } else {
+                        getGroupFilename(datafilename, gname)
+                    }
+                    val file = PosixFile(
+                        gfilename,
+                        PosixOpenOpts.withFlags(PosixOpenOpts.O_Creat, PosixOpenOpts.O_Append, PosixOpenOpts.O_Rdwr)
+                    )
+                    groupFiles[gname] = file
+
+                    val groupRecordLen = cols.sumOf { it.end - it.begin }
+                    val rowBuffer = ByteArray(groupRecordLen)
+                    groupRowBuffers[gname] = rowBuffer
+                }
+                first = false
+            }
+
+            for ((gname, cols) in columnsByGroup) {
+                val rowBuffer = groupRowBuffers[gname]!!
+                writeGroupToBuffer(rowVec, rowBuffer, cols, meta0)
+                groupFiles[gname]!!.write(rowBuffer)
+            }
+        }
+
+        groupFiles.values.forEach { it.close() }
     }
 
     private fun writeGroupToBuffer(
