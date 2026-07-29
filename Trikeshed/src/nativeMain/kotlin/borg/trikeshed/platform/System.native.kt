@@ -16,8 +16,6 @@ object NativeMainArguments {
 }
 
 actual fun getProgramArguments(): List<String> {
-    // TODO: Implement for Native. Arguments should be captured from the
-    // `main` function's parameters.
     return NativeMainArguments.args
 }
 
