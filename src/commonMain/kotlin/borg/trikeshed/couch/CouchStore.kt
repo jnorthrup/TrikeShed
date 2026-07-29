@@ -221,7 +221,11 @@ object CouchStoreFactory {
                 return false // reject stale
             }
 
-            val newRev = if (existingRev == null || isDeleted) "uuid-0-${doc.id.hashCode()}" else "uuid-${seq}-${doc.id.hashCode()}" // simple rev generator
+            val contentIdFn = { d: Document -> borg.trikeshed.job.ContentId.of(d.fields.joinToString { it.value.toString() }.encodeToByteArray()) }
+            val cid = contentIdFn(doc)
+            val gen = existingRev?.substringBefore("-")?.toIntOrNull() ?: 0
+            val nextGen = gen + 1
+            val newRev = "$nextGen-${cid.value}"
             val frame = CouchCommittedFrame(seq, doc.id, newRev, false, doc)
             seq++
 
@@ -240,7 +244,9 @@ object CouchStoreFactory {
                 return false // reject stale
             }
 
-            val newRev = "uuid-${seq}-deleted"
+            val gen = existingRev.substringBefore("-").toIntOrNull() ?: 0
+            val nextGen = gen + 1
+            val newRev = "$nextGen-deleted"
             val frame = CouchCommittedFrame(seq, docId, newRev, true, null)
             seq++
 
@@ -275,11 +281,19 @@ fun Cursor.toDocuments(): MutableSeries<Document> {
     for (i in 0 until size) {
         val row = this[i]
         val fields = ArrayList<Field>(row.size)
+        var docId = "reconstructed-$i"
         for (colIdx in 0 until row.size) {
             val cell = row.b(colIdx)
-            fields.add(Field(cell.b().name.toString(), cell.a ?: ""))
+            val name = cell.b().name.toString()
+            if (name == "_id") {
+                docId = cell.a?.toString() ?: docId
+            } else if (name == "_rev") {
+                // Ignore _rev for Document fields
+            } else {
+                fields.add(Field(name, cell.a ?: ""))
+            }
         }
-        result.append(Document("reconstructed-$i", fields))
+        result.append(Document(docId, fields))
     }
     return result
 }

@@ -241,7 +241,7 @@ Actions **never** mutate Kanban/Couch/snapshots directly — they enqueue `JobCo
 |------------|---------|
 | `JobKanbanProjection` | Kanban cards from committed snapshots (`applyCommit` + `rebuild`) |
 | `ForgeKanbanJobSink`  | Monotonic sequence gate → projection |
-| `CouchHeadProjection` | revision string stored raw; CID-derived `_id`/`_rev` not yet implemented, MVCC |
+| `CouchHeadProjection` | revision string stored raw; CID-derived `_id`/`_rev` implemented, MVCC |
 | `CouchChangesProjection` | Strict monotonic `_changes` stream |
 | `CowBPlusTree` | Persistent ordered/range index (pages in CasStore) |
 | `JobCheckpoint` | Committed sequence + root CID + schema CID |
@@ -284,7 +284,7 @@ CouchStore (in-memory, pluggable CouchPersistence)
   └─ CouchHeadProjection / CouchChangesProjection  (built from committed Job frames)
 ```
 
-**Head/Changes semantics** — revision string stored raw by the projection; stale revision rejected; delete = tombstone; `_changes` resumes after sequence without gaps. CID-derived `_id`/`_rev` is an integration gap, not the current state.
+**Head/Changes semantics** — revision string stored raw by the projection; stale revision rejected; delete = tombstone; `_changes` resumes after sequence without gaps. CID-derived `_id`/`_rev` is implemented.
 
 ---
 
