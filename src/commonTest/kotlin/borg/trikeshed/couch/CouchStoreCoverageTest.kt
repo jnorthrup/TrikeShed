@@ -174,7 +174,9 @@ class CouchStoreCoverageTest {
         
         val row0 = result.cursor.b(0)
         assertEquals("doc1", row0.b(0).a) // _id
-        assertEquals("Alice", row0.b(1).a) // name
+        assertNotNull(row0.b(1).a) // _rev
+        assertTrue((row0.b(1).a as String).startsWith("1-")) // rev should start with 1- since it was just inserted
+        assertEquals("Alice", row0.b(2).a) // name
     }
 
 
