@@ -404,9 +404,21 @@ class FlywheelDriver(
             arms.add(Arm(s, patchCid, patch, branch))
             println("[FLYWHEEL] CAS ${s.id.takeLast(6)} cid=${patchCid.value.take(16)} branch=${branch ?: "none"}")
         }
-        if (arms.size != sessions.size) {
-            println("[FLYWHEEL] DRAIN waiting for CAS deltas ${arms.size}/${sessions.size}; tree unchanged")
+        // PER-ARM DRAIN — do NOT wait for the whole completion set to CAS.
+        // Retired no-patch sessions already left the completion set via
+        // conductor.retireTerminal(); still-probing sessions remain
+        // undrained for the next cycle. Either way, drain EVERY arm that
+        // HAS a patch now. The previous `arms.size != sessions.size`
+        // gate was a dining-philosopher deadlock: one straggler starved
+        // the entire harvest queue and settle never lifted (cycle trace
+        // signature: a=0 v=15 p=0 d=0 every cycle). Partial drain unblocks
+        // the wheel — each closed provenance arm advances remainingCompleted.
+        if (arms.isEmpty()) {
+            println("[FLYWHEEL] DRAIN no CAS-ready arms out of ${sessions.size}; tree unchanged")
             return DrainBatch()
+        }
+        if (arms.size < sessions.size) {
+            println("[FLYWHEEL] DRAIN partial CAS ${arms.size}/${sessions.size} — draining ready arms")
         }
 
         // Every completed API delta is now immutable in CAS. Only now may any
@@ -481,9 +493,18 @@ class FlywheelDriver(
                 }
             }
         }
-        if (landed.size != arms.size) {
-            println("[FLYWHEEL] DRAIN waiting for all merges ${landed.size}/${arms.size}; provenance stays open")
+        // PER-ARM CLOSE — close provenance for every arm that landed.
+        // Previously, a single failed merge (conflict commit failure, patch
+        // apply failure) returned DrainBatch() empty and froze ALL arms'
+        // provenance — same dining-philosopher shape as the CAS gate above.
+        // Now: close the arms that DID land; failed arms keep their
+        // drainFail record and retry next cycle.
+        if (landed.isEmpty()) {
+            println("[FLYWHEEL] DRAIN no merges landed out of ${arms.size}; provenance stays open")
             return DrainBatch()
+        }
+        if (landed.size < arms.size) {
+            println("[FLYWHEEL] DRAIN partial merge ${landed.size}/${arms.size} — closing landed arms")
         }
 
         val panorama = landed.map { arm ->
@@ -561,7 +582,7 @@ class FlywheelDriver(
                     "Jules merge receipt\nsession=${s.id}\npatchCid=${patchCid.value}\nbranch=${branch ?: "none"}\ntaskTitle=${s.title}")
                 if (tagResult.exitCode != 0) {
                     drainFail(s, "tag create failed: ${tagResult.output.take(200)}")
-                    return DrainBatch(panorama = panorama)
+                    continue  // per-arm: don't abandon the rest of the batch
                 }
             }
             val prUrl = try { fishPrUrl(s.id, tag) } catch (_: Throwable) { null }
@@ -601,7 +622,7 @@ class FlywheelDriver(
                 ))
             } catch (t: Throwable) {
                 emitPollError("provenance WAL ${s.id}: ${t.message}", 0)
-                return DrainBatch(panorama = panorama)
+                continue  // per-arm: don't abandon the rest of the batch
             }
             prepared += PreparedClose(arm, tag)
         }
@@ -832,9 +853,20 @@ class FlywheelDriver(
         if (local.exitCode != 0 || remote.exitCode != 0 ||
             local.output.trim() != remote.output.trim()
         ) return false
+
+        // Conductor is the authority for drain completeness; queue is intake only.
+        // If conductor has no undrained COMPLETED sessions, the drain is closed.
+        val undrainedCompleted = conductor.cards.values.count {
+            it.snapshot.state == "COMPLETED" && !it.drained
+        }
+        if (undrainedCompleted != 0) {
+            println("[FLYWHEEL] SETTLE-BLOCKED $undrainedCompleted COMPLETED session(s) not yet drained in conductor")
+            return false
+        }
+
         val unclaimedDrains = store.loadQueue().count { it.isUnclaimedDrain }
         if (unclaimedDrains != 0) {
-            println("[FLYWHEEL] SETTLE-BLOCKED $unclaimedDrains drain(s) lack immutable receipts")
+            println("[FLYWHEEL] SETTLE-BLOCKED $unclaimedDrains queue drain(s) lack immutable receipts")
             return false
         }
         if (openCount != 0) println("[FLYWHEEL] SETTLE-NOTED $openCount open PR(s); branch intake remains non-gating")
