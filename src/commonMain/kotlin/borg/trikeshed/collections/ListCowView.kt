@@ -1,4 +1,4 @@
-package borg.trikeshed.common.collections
+package borg.trikeshed.collections
 
 /** a mutable listView of a List which performs a copy to MutableList on first mutation. Not threadsafe. */
 class ListCowView<T>(private var list: List<T> = emptyList()) : List<T>, AbstractMutableList<T>() {

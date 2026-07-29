@@ -2,7 +2,7 @@
 
 package borg.trikeshed.parse.json
 
-import borg.trikeshed.common.collections.s_
+import borg.trikeshed.collections.s_
 
 import borg.trikeshed.lib.CharSeries.Companion.unbrace
 import borg.trikeshed.lib.CharSeries.Companion.unquote

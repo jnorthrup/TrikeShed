@@ -1,6 +1,6 @@
 package borg.trikeshed.parse
 
-import borg.trikeshed.common.collections._l
+import borg.trikeshed.collections._l
 import borg.trikeshed.lib.Join
 import borg.trikeshed.lib.j
 import borg.trikeshed.lib.toSeries

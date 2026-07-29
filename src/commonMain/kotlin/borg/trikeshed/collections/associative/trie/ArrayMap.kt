@@ -5,7 +5,7 @@ import kotlin.collections.Map.Entry as Map_Entry
 
 
 class ArrayMap<K : Comparable<K>, V>(
-   val entre: Array<out Map_Entry<K, V>>,
+    private val entre: Array<out Map_Entry<K, V>>,
     val keyComparator: Comparator<K> = naturalOrder(),
     val valComparator: Comparator<Map_Entry<K, V>> =
         Comparator<Map_Entry<K, V>> { (o1: K), (o2: K) ->
@@ -30,12 +30,11 @@ class ArrayMap<K : Comparable<K>, V>(
     override fun containsKey(key: K): Boolean = 0 <= binIndexOf(key)
 
     override fun containsValue(value: V): Boolean = entre.any { (_, v) -> (v?.equals(value) ?: false) }
-   fun binIndexOf(key1: K) = entre.binarySearch(comparatorKeyShim(key1), valComparator)
+    private fun binIndexOf(key1: K) = entre.binarySearch(comparatorKeyShim(key1), valComparator)
 
     override fun get(key: K): V? = binIndexOf(key).takeIf { it >= 0 }?.let { ix -> entre[ix].value }
 
-    fun comparatorKeyShim(key: K): Map_Entry<K, V> =
-        borg.trikeshed.collections.associative.trie.ShimEntry(key)
+    fun comparatorKeyShim(key: K): Map_Entry<K, V> = ShimEntry(key)
 
     override fun isEmpty(): Boolean = run(entre::isEmpty)
 
@@ -50,19 +49,15 @@ class ArrayMap<K : Comparable<K>, V>(
             cmp: Comparator<K> = naturalOrder(),
             valComparator: Comparator<Map_Entry<K, V>> =
                 compareBy { it.key },
-        ): borg.trikeshed.collections.associative.trie.ArrayMap<K, V> {
+        ): ArrayMap<K, V> {
             val entre = map.entries.toTypedArray()
             entre.sortWith(valComparator)
-            return borg.trikeshed.collections.associative.trie.ArrayMap(
-                entre,
-                cmp,
-                valComparator
-            )
+            return ArrayMap(entre, cmp, valComparator)
         }
     }
 }
 
 class ShimEntry<K, V>(private val key1: K) : Map_Entry<K, V> {
     override val key: K get() = key1
-    override val value: V get() = throw NoSuchElementException("ShimEntry has no value")
+    override val value: V get() = throw UnsupportedOperationException("ShimEntry is used only for key comparison")
 }

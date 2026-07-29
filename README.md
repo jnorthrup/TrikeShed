@@ -698,7 +698,7 @@ I've also written ideas that describe (some) goals and ideals of the library:
       current with liburing.
 
 
-* [ ]  a handful of missing kotlin-common collections are scattered about, these would be about as warrantable as the
+* [x]  a handful of missing kotlin-common collections are scattered about, these would be about as warrantable as the
   unit
   tests you might find for them.
 

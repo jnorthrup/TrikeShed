@@ -2,11 +2,11 @@ package borg.trikeshed.collections
 
 import kotlin.math.max
 
-class TreeSet<E : Comparable<E>> : borg.trikeshed.collections.NavigableSet<E> {
+class TreeSet<E : Comparable<E>> : NavigableSet<E> {
     private var root: Node<E>? = null
     override var size: Int = 0
 
-   class Node<E>(var element: E) {
+    private class Node<E>(var element: E) {
         var left: Node<E>? = null
         var right: Node<E>? = null
         var height: Int = 1
@@ -18,7 +18,7 @@ class TreeSet<E : Comparable<E>> : borg.trikeshed.collections.NavigableSet<E> {
         return size != oldSize
     }
 
-   fun insert(node: Node<E>?, element: E): Node<E> {
+    private fun insert(node: Node<E>?, element: E): Node<E> {
         if (node == null) {
             size++
             return Node(element)
@@ -33,7 +33,7 @@ class TreeSet<E : Comparable<E>> : borg.trikeshed.collections.NavigableSet<E> {
         return balance(node)
     }
 
-   fun balance(node: Node<E>): Node<E> {
+    private fun balance(node: Node<E>): Node<E> {
         updateHeight(node)
         val balance = getBalance(node)
 
@@ -52,7 +52,7 @@ class TreeSet<E : Comparable<E>> : borg.trikeshed.collections.NavigableSet<E> {
         }
     }
 
-   fun rightRotate(y: Node<E>): Node<E> {
+    private fun rightRotate(y: Node<E>): Node<E> {
         val x = y.left!!
         val T2 = x.right
 
@@ -65,7 +65,7 @@ class TreeSet<E : Comparable<E>> : borg.trikeshed.collections.NavigableSet<E> {
         return x
     }
 
-   fun leftRotate(x: Node<E>): Node<E> {
+    private fun leftRotate(x: Node<E>): Node<E> {
         val y = x.right!!
         val T2 = y.left
 
@@ -78,13 +78,13 @@ class TreeSet<E : Comparable<E>> : borg.trikeshed.collections.NavigableSet<E> {
         return y
     }
 
-   fun updateHeight(node: Node<E>) {
+    private fun updateHeight(node: Node<E>) {
         node.height = max(height(node.left), height(node.right)) + 1
     }
 
-   fun height(node: Node<E>?): Int = node?.height ?: 0
+    private fun height(node: Node<E>?): Int = node?.height ?: 0
 
-   fun getBalance(node: Node<E>?): Int = if (node == null) 0 else height(node.left) - height(node.right)
+    private fun getBalance(node: Node<E>?): Int = if (node == null) 0 else height(node.left) - height(node.right)
 
     override fun remove(element: E): Boolean {
         val oldSize = size
@@ -92,7 +92,7 @@ class TreeSet<E : Comparable<E>> : borg.trikeshed.collections.NavigableSet<E> {
         return size != oldSize
     }
 
-   fun delete(node: Node<E>?, element: E): Node<E>? {
+    private fun delete(node: Node<E>?, element: E): Node<E>? {
         if (node == null) return null
 
         when {
@@ -118,7 +118,7 @@ class TreeSet<E : Comparable<E>> : borg.trikeshed.collections.NavigableSet<E> {
         return balance(node)
     }
 
-   fun minValueNode(node: Node<E>): Node<E> {
+    private fun minValueNode(node: Node<E>): Node<E> {
         var current = node
         while (current.left != null) {
             current = current.left!!
@@ -133,15 +133,15 @@ class TreeSet<E : Comparable<E>> : borg.trikeshed.collections.NavigableSet<E> {
 
     override fun comparator(): Comparator<E> = Comparator { a, b -> a.compareTo(b) }
 
-    override fun subSet(fromElement: E, toElement: E): borg.trikeshed.collections.SortedSet<E> {
+    override fun subSet(fromElement: E, toElement: E): SortedSet<E> {
         return subSet(fromElement, true, toElement, false)
     }
 
-    override fun headSet(toElement: E): borg.trikeshed.collections.SortedSet<E> {
+    override fun headSet(toElement: E): SortedSet<E> {
         return headSet(toElement, false)
     }
 
-    override fun tailSet(fromElement: E): borg.trikeshed.collections.SortedSet<E> {
+    override fun tailSet(fromElement: E): SortedSet<E> {
         return tailSet(fromElement, true)
     }
 
@@ -155,7 +155,7 @@ class TreeSet<E : Comparable<E>> : borg.trikeshed.collections.NavigableSet<E> {
         return maxValueNode(root!!).element
     }
 
-   fun maxValueNode(node: Node<E>): Node<E> {
+    private fun maxValueNode(node: Node<E>): Node<E> {
         var current = node
         while (current.right != null) {
             current = current.right!!
@@ -251,36 +251,14 @@ class TreeSet<E : Comparable<E>> : borg.trikeshed.collections.NavigableSet<E> {
         return false
     }
 
-    override fun descendingSet(): borg.trikeshed.collections.NavigableSet<E> {
+    override fun descendingSet(): NavigableSet<E> {
         // Implementing a full descending set is beyond the scope of this example
         throw UnsupportedOperationException("descendingSet not implemented")
     }
 
     override fun descendingIterator(): Iterator<E> {
-        // Reverse in-order traversal without allocating the full list
-        return object : Iterator<E> {
-            val stack = mutableListOf<Node<E>>()
-            var current = root
-
-            init { pushRight(current) }
-
-            fun pushRight(node: Node<E>?) {
-                var n = node
-                while (n != null) {
-                    stack.add(n)
-                    n = n.right
-                }
-            }
-
-            override fun hasNext(): Boolean = stack.isNotEmpty()
-
-            override fun next(): E {
-                if (!hasNext()) throw NoSuchElementException()
-                val node = stack.removeAt(stack.size - 1)
-                pushRight(node.left)
-                return node.element
-            }
-        }
+        // Implementing a full descending iterator is beyond the scope of this example
+        throw UnsupportedOperationException("descendingIterator not implemented")
     }
 
     override fun subSet(
@@ -288,31 +266,30 @@ class TreeSet<E : Comparable<E>> : borg.trikeshed.collections.NavigableSet<E> {
         fromInclusive: Boolean,
         toElement: E,
         toInclusive: Boolean
-    ): borg.trikeshed.collections.NavigableSet<E> {
+    ): NavigableSet<E> {
         // Implementing a full subset is beyond the scope of this example
         throw UnsupportedOperationException("subSet not implemented")
     }
 
-    override fun headSet(toElement: E, inclusive: Boolean): borg.trikeshed.collections.NavigableSet<E> {
+    override fun headSet(toElement: E, inclusive: Boolean): NavigableSet<E> {
         // Implementing a full headSet is beyond the scope of this example
         throw UnsupportedOperationException("headSet not implemented")
     }
 
-    override fun tailSet(fromElement: E, inclusive: Boolean): borg.trikeshed.collections.NavigableSet<E> {
+    override fun tailSet(fromElement: E, inclusive: Boolean): NavigableSet<E> {
         // Implementing a full tailSet is beyond the scope of this example
         throw UnsupportedOperationException("tailSet not implemented")
     }
 
     override fun iterator(): MutableIterator<E> = object : MutableIterator<E> {
-       val stack = mutableListOf<Node<E>>()
-       var current = root
-       var lastReturned: Node<E>? = null
+        private val stack = mutableListOf<Node<E>>()
+        private var current = root
 
         init {
             pushLeft(current)
         }
 
-       fun pushLeft(node: Node<E>?) {
+        private fun pushLeft(node: Node<E>?) {
             var current = node
             while (current != null) {
                 stack.add(current)
@@ -326,15 +303,11 @@ class TreeSet<E : Comparable<E>> : borg.trikeshed.collections.NavigableSet<E> {
             if (!hasNext()) throw NoSuchElementException()
             val node = stack.removeAt(stack.size - 1)
             pushLeft(node.right)
-            lastReturned = node
             return node.element
         }
 
         override fun remove() {
-            val node = lastReturned ?: throw IllegalStateException("next() has not been called or remove() already called")
-            // Remove the last returned element from the tree
-            this@TreeSet.remove(node.element)
-            lastReturned = null
+            throw UnsupportedOperationException("remove not implemented")
         }
     }
 
@@ -368,103 +341,6 @@ class TreeSet<E : Comparable<E>> : borg.trikeshed.collections.NavigableSet<E> {
             changed = remove(element) || changed
         }
         return changed
-    }
-}
-
-private class SnapshotNavigableSet<E : Comparable<E>>(private val elements: List<E>) : NavigableSet<E> {
-    override val size: Int get() = elements.size
-    override fun isEmpty(): Boolean = elements.isEmpty()
-    override fun contains(element: E): Boolean = elements.contains(element)
-    override fun iterator(): MutableIterator<E> = object : MutableIterator<E> {
-        var i = 0
-        override fun hasNext(): Boolean = i < elements.size
-        override fun next(): E {
-            if (!hasNext()) throw NoSuchElementException()
-            return elements[i++]
-        }
-        override fun remove() { throw UnsupportedOperationException("remove not supported on snapshot") }
-    }
-
-    override fun containsAll(elements: Collection<E>): Boolean = this.elements.containsAll(elements)
-
-    override fun add(element: E): Boolean { throw UnsupportedOperationException("snapshot is read-only") }
-    override fun addAll(elements: Collection<E>): Boolean { throw UnsupportedOperationException("snapshot is read-only") }
-    override fun clear() { throw UnsupportedOperationException("snapshot is read-only") }
-    override fun remove(element: E): Boolean { throw UnsupportedOperationException("snapshot is read-only") }
-    override fun removeAll(elements: Collection<E>): Boolean { throw UnsupportedOperationException("snapshot is read-only") }
-    override fun retainAll(elements: Collection<E>): Boolean { throw UnsupportedOperationException("snapshot is read-only") }
-
-    override fun comparator(): Comparator<E> = Comparator { a, b -> a.compareTo(b) }
-
-    override fun subSet(fromElement: E, toElement: E): SortedSet<E> {
-        if (fromElement > toElement) throw IllegalArgumentException("fromElement > toElement")
-        val r = elements.filter { it >= fromElement && it < toElement }
-        return SnapshotNavigableSet(r)
-    }
-
-    override fun headSet(toElement: E): SortedSet<E> {
-        val r = elements.filter { it < toElement }
-        return SnapshotNavigableSet(r)
-    }
-
-    override fun tailSet(fromElement: E): SortedSet<E> {
-        val r = elements.filter { it >= fromElement }
-        return SnapshotNavigableSet(r)
-    }
-
-    override fun first(): E = elements.firstOrNull() ?: throw NoSuchElementException()
-    override fun last(): E = elements.lastOrNull() ?: throw NoSuchElementException()
-
-    override fun lower(e: E): E? {
-        for (i in elements.size - 1 downTo 0) {
-            val v = elements[i]
-            if (v < e) return v
-        }
-        return null
-    }
-
-    override fun floor(e: E): E? {
-        for (i in elements.size - 1 downTo 0) {
-            val v = elements[i]
-            if (v <= e) return v
-        }
-        return null
-    }
-
-    override fun ceiling(e: E): E? {
-        for (v in elements) if (v >= e) return v
-        return null
-    }
-
-    override fun higher(e: E): E? {
-        for (v in elements) if (v > e) return v
-        return null
-    }
-
-    override fun pollFirst(): E? { throw UnsupportedOperationException("snapshot is read-only") }
-    override fun pollLast(): E? { throw UnsupportedOperationException("snapshot is read-only") }
-
-    override fun descendingSet(): NavigableSet<E> = SnapshotNavigableSet(elements.asReversed())
-    override fun descendingIterator(): Iterator<E> = elements.asReversed().iterator()
-
-    override fun subSet(fromElement: E, fromInclusive: Boolean, toElement: E, toInclusive: Boolean): NavigableSet<E> {
-        if (fromElement > toElement) throw IllegalArgumentException("fromElement > toElement")
-        val r = elements.filter {
-            val geFrom = if (fromInclusive) it >= fromElement else it > fromElement
-            val leTo = if (toInclusive) it <= toElement else it < toElement
-            geFrom && leTo
-        }
-        return SnapshotNavigableSet(r)
-    }
-
-    override fun headSet(toElement: E, inclusive: Boolean): NavigableSet<E> {
-        val r = elements.filter { if (inclusive) it <= toElement else it < toElement }
-        return SnapshotNavigableSet(r)
-    }
-
-    override fun tailSet(fromElement: E, inclusive: Boolean): NavigableSet<E> {
-        val r = elements.filter { if (inclusive) it >= fromElement else it > fromElement }
-        return SnapshotNavigableSet(r)
     }
 }
 

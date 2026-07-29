@@ -3,11 +3,11 @@ package borg.trikeshed.collections
 import kotlin.math.ln
 
 class StrictFibonacciHeap<T : Comparable<T>> {
-   var root: Node<T>? = null
-   var minNode: Node<T>? = null
-   var size = 0
-   val activeRoots = mutableListOf<Node<T>>()
-   val rankList = mutableListOf<MutableList<Node<T>>>()
+    private var root: Node<T>? = null
+    private var minNode: Node<T>? = null
+    private var size = 0
+    private val activeRoots = mutableListOf<Node<T>>()
+    private val rankList = mutableListOf<MutableList<Node<T>>>()
 
     class Node<T : Comparable<T>>(
         var key: T,
@@ -85,7 +85,7 @@ class StrictFibonacciHeap<T : Comparable<T>> {
         maintainInvariants()
     }
 
-   fun link(child: Node<T>, parent: Node<T>) {
+    private fun link(child: Node<T>, parent: Node<T>) {
         child.parent = parent
         if (parent.child == null) {
             parent.child = child
@@ -100,7 +100,7 @@ class StrictFibonacciHeap<T : Comparable<T>> {
         parent.rank++
     }
 
-   fun unlink(node: Node<T>) {
+    private fun unlink(node: Node<T>) {
         if (node.right == node) {
             node.parent?.child = null
         } else {
@@ -114,7 +114,7 @@ class StrictFibonacciHeap<T : Comparable<T>> {
         node.right = null
     }
 
-   fun cut(node: Node<T>) {
+    private fun cut(node: Node<T>) {
         unlink(node)
         link(node, root!!)
         node.loss = 0
@@ -122,9 +122,9 @@ class StrictFibonacciHeap<T : Comparable<T>> {
         activeRoots.add(node)
     }
 
-   fun cascadingCut(node: Node<T>) {
+    private fun cascadingCut(node: Node<T>) {
         val parent = node.parent
-        if (parent != null)
+        if (parent != null) {
             if (node.isActive) {
                 node.loss++
                 if (node.loss > 1) {
@@ -135,14 +135,15 @@ class StrictFibonacciHeap<T : Comparable<T>> {
                 node.isActive = true
                 node.loss = 0
             }
+        }
     }
 
-   fun consolidate() {
-        val maxRank = (log2(size.toDouble()) + 1)
+    private fun consolidate() {
+        val maxRank = (log2(size.toDouble()) + 1).toInt()
         val ranks = Array<Node<T>?>(maxRank) { null }
 
-        var x: Node<T>? = root
-        val roots: MutableList<Node<T>> = mutableListOf<Node<T>>()
+        var x = root
+        val roots = mutableListOf<Node<T>>()
         while (x != null) {
             roots.add(x)
             x = x.right
@@ -172,7 +173,7 @@ class StrictFibonacciHeap<T : Comparable<T>> {
         root = minNode
     }
 
-   fun maintainInvariants() {
+    private fun maintainInvariants() {
         while (activeRoots.size > 2 * log2(size.toDouble()) + 6) {
             val x = activeRoots.removeAt(activeRoots.lastIndex)
             val y = activeRoots.removeAt(activeRoots.lastIndex)
@@ -186,7 +187,7 @@ class StrictFibonacciHeap<T : Comparable<T>> {
         }
     }
 
-    fun meld(other: borg.trikeshed.collections.StrictFibonacciHeap<T>) {
+    fun meld(other: StrictFibonacciHeap<T>) {
         if (other.root == null) return
         if (root == null) {
             root = other.root
@@ -218,5 +219,5 @@ class StrictFibonacciHeap<T : Comparable<T>> {
         deleteMin()
     }
 
-   fun log2(n: Double): Int = (ln(n) / ln(2.0)).toInt()
+    private fun log2(n: Double): Int = (ln(n) / ln(2.0)).toInt()
 }
