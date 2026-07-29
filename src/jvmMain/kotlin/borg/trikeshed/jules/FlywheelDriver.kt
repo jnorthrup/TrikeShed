@@ -262,9 +262,7 @@ class FlywheelDriver(
         var dispatched = 0
         val alive = activeCount()
         val available = (maxSlots - alive).coerceAtLeast(0)
-        val stillAwaiting = conductor.cards.values.count {
-            it.snapshot.state == "AWAITING_USER_FEEDBACK" }
-        if (settled && available > 0 && stillAwaiting == 0) {
+        if (settled && available > 0) {
             // Build the in-flight file set from all active sessions' last patches.
             val inflightFiles = mutableSetOf<String>()
             for (card in conductor.cards.values) {
