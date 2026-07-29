@@ -90,16 +90,19 @@ class WasmIsamOperations : IsamOperations {
         val groupBuffers = mutableMapOf<String, ByteArray>()
         val groupOffsets = mutableMapOf<String, Int>()
 
+        var maxRecordSize = 0
         for ((gname, cols) in columnsByGroup) {
             val groupRecordLen = cols.sumOf { it.end - it.begin }
+            if (groupRecordLen > maxRecordSize) maxRecordSize = groupRecordLen
             groupBuffers[gname] = ByteArray(groupRecordLen * cursor.size)
             groupOffsets[gname] = 0
         }
 
+        val rowBuf = ByteArray(maxRecordSize)
+
         cursor.iterator().forEach { rowVec ->
             for ((gname, cols) in columnsByGroup) {
                 val groupRecordLen = cols.sumOf { it.end - it.begin }
-                val rowBuf = ByteArray(groupRecordLen)
                 writeGroupToBuffer(rowVec, rowBuf, cols, meta0)
                 val out = groupBuffers[gname]!!
                 val offset = groupOffsets[gname]!!
@@ -142,6 +145,7 @@ class WasmIsamOperations : IsamOperations {
         val groupBuffers = mutableMapOf<String, ByteArray>()
         val groupOffsets = mutableMapOf<String, Int>()
 
+        var maxRecordSize = 0
         for (gname in columnsByGroup.keys) {
             val cols = columnsByGroup[gname]!!
             val firstCol = cols.first()
@@ -149,6 +153,7 @@ class WasmIsamOperations : IsamOperations {
             val existing = if (fileOps.exists(gfilename)) fileOps.readAllBytes(gfilename) else ByteArray(0)
             
             val groupRecordLen = cols.sumOf { it.end - it.begin }
+            if (groupRecordLen > maxRecordSize) maxRecordSize = groupRecordLen
             val out = ByteArray(existing.size + (groupRecordLen * msf.count()))
             existing.copyInto(out, 0, 0, existing.size)
             
@@ -156,11 +161,12 @@ class WasmIsamOperations : IsamOperations {
             groupOffsets[gname] = existing.size
         }
 
+        val rowBuf = ByteArray(maxRecordSize)
+
         msf.forEach { rowVec ->
             val rv = transform?.invoke(rowVec) ?: rowVec
             for ((gname, cols) in columnsByGroup) {
                 val groupRecordLen = cols.sumOf { it.end - it.begin }
-                val rowBuf = ByteArray(groupRecordLen)
                 writeGroupToBuffer(rv, rowBuf, cols, meta0)
                 
                 val out = groupBuffers[gname]!!
