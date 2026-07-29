@@ -192,9 +192,7 @@ object CrmsReducers {
             windows.getOrPut(windowKey) { mutableListOf() }.add(event)
 
             // Emit completed windows
-            // CommonMain-safe approximation: use event time as the clock edge.
-            // TODO(lcnc): platform-specific monotonic clock can be injected by a JVM/native adapter.
-            val now = event.timestampNanos
+            val now = borg.trikeshed.lib.monotonicNowMillis() * 1_000_000 // scale ms to nanos for window matching
             val completed = windows.keys.filter { it + windowDurationNanos <= now }.sorted()
             return completed.map { key ->
                 val events = windows.remove(key)!!
