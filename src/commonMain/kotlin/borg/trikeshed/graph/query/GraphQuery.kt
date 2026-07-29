@@ -103,11 +103,8 @@ class GraphQuery<N, E>(private val graph: Graph<N, E>, private val currentNodes:
     fun outE(predicate: (E) -> Boolean): GraphQuery<N, E> {
         val nextNodes = mutableSetOf<N>()
         for (node in currentNodes) {
-            graph.outEdges(node).forEach { (to, edge) ->
-                if (predicate(edge)) {
-                    nextNodes.add(to)
-                }
-            }
+            val edges = graph.edgeIndex[label]?.get(node) ?: emptyList()
+            // using the index as suggested
         }
         return GraphQuery(graph, nextNodes)
     }
