@@ -85,7 +85,7 @@ class TreeDocPipeline(
 
         // Build canonical manifest for CID
         val manifestJson = buildManifestJson(documents, framesList)
-        val manifestDoc = confixDoc(manifestJson) // Fix: just pass string for JSON
+        val manifestDoc = confixDoc(manifestJson)
         val manifestCid = ContentId.of(manifestDoc) // This canonicalizes internally
         cas.put(manifestDoc) // Puts canonical CBOR
 
