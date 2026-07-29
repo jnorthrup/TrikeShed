@@ -304,6 +304,7 @@ class JvmTlsCodecBackend : TlsCodecBackend, KeyedService {
 
         val certs = loadCertificates(Path.of(config.certificateFile))
         val privateKey = loadPrivateKey(Path.of(config.privateKeyFile), certs.first().publicKey.algorithm)
+        // In-memory KeyStore; password never persisted or exposed — safe to hardcode
         val password = (config.privateKeyPassword ?: "changeit").toCharArray()
         val keyStore = KeyStore.getInstance(KeyStore.getDefaultType())
         keyStore.load(null, null)
