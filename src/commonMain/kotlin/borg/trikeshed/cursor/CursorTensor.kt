@@ -79,9 +79,14 @@ data class CursorTensorSnapshot(
         if (rowCount == 0) {
             return Double.NaN
         }
+        require(column in 0 until columnCount) { "column must be in [0, ${columnCount - 1}]" }
         var sum = 0.0
+        val cols = columnCount
+        val vals = values
+        var offset = column
         for (row in 0 until rowCount) {
-            sum += this[row, column]
+            sum += vals[offset]
+            offset += cols
         }
         return sum / rowCount
     }
@@ -163,9 +168,14 @@ class WasmDoubleTensor(
         if (rows == 0) {
             return Double.NaN
         }
+        require(column in 0 until columns) { "column must be in [0, ${columns - 1}]" }
         var sum = 0.0
+        val cols = columns
+        val vals = values
+        var offset = column
         for (row in 0 until rows) {
-            sum += this[row, column]
+            sum += vals[offset]
+            offset += cols
         }
         return sum / rows
     }
