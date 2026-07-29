@@ -622,6 +622,7 @@ class FlywheelDriver(
                 ))
             } catch (t: Throwable) {
                 emitPollError("provenance WAL ${s.id}: ${t.message}", 0)
+                drainFail(s, "provenance WAL failed: ${t.message?.take(200)}")  // per-arm: record drainFail so the retry/retire counter advances like the tag path
                 continue  // per-arm: don't abandon the rest of the batch
             }
             prepared += PreparedClose(arm, tag)
