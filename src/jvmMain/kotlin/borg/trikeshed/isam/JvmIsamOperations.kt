@@ -205,8 +205,11 @@ class JvmIsamOperations : IsamOperations {
         var columnsByGroup: Map<String, List<RecordMeta>> = emptyMap()
         var maxGroupId = 0
         
-                val groupFiles = mutableMapOf<String, UserspaceFile>()
+        val groupFiles = mutableMapOf<String, UserspaceFile>()
         val offsets = mutableMapOf<String, Long>()
+        val groupRowBuffers = mutableMapOf<String, ByteArray>()
+        val groupNioBufs = mutableMapOf<String, java.nio.ByteBuffer>()
+        val groupAddrs = mutableMapOf<String, Long>()
         var userData = 1L
 
         msf.forEach { rowVec1: RowVec ->
@@ -227,6 +230,15 @@ class JvmIsamOperations : IsamOperations {
                     val file = UserspaceFiles.open(gfilename, readOnly = false)
                     groupFiles[gname] = file
                     offsets[gname] = file.size().takeIf { it >= 0 } ?: 0L
+
+                    val groupRecordLen = cols.sumOf { it.end - it.begin }
+                    val rowBuffer = ByteArray(groupRecordLen)
+                    val nioBuf = java.nio.ByteBuffer.allocateDirect(groupRecordLen)
+                    val addr = nioBuf.let { java.lang.reflect.Field::class.java.getDeclaredField("address").apply { isAccessible = true } }.run { getLong(this) }
+
+                    groupRowBuffers[gname] = rowBuffer
+                    groupNioBufs[gname] = nioBuf
+                    groupAddrs[gname] = addr
                 }
                 first = false
             }
@@ -235,16 +247,17 @@ class JvmIsamOperations : IsamOperations {
 
             for ((gname, cols) in columnsByGroup) {
                 val groupRecordLen = cols.sumOf { it.end - it.begin }
-                val rowBuffer = ByteArray(groupRecordLen)
+                val rowBuffer = groupRowBuffers[gname]!!
+                val nioBuf = groupNioBufs[gname]!!
+                val addr = groupAddrs[gname]!!
                 
                 writeGroupToBuffer(rowVec, rowBuffer, cols, meta0)
                 
-                val nioBuf = java.nio.ByteBuffer.allocateDirect(groupRecordLen)
+                nioBuf.clear()
                 nioBuf.put(rowBuffer)
-                nioBuf.position(0)
+                nioBuf.flip()
                 
                 val file = groupFiles[gname]!!
-                val addr = nioBuf.let { java.lang.reflect.Field::class.java.getDeclaredField("address").apply { isAccessible = true } }.run { getLong(this) }
                 
                 val currentOffset = offsets[gname]!!
                 submissions.add(Submissions.write(
