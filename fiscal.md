@@ -11,7 +11,7 @@ user's records.
 |--------|-------|-------|
 | Public email | forgetrikeshed@gmail.com (canonical registered form; Gmail ignores dots — forge.trikeshed@gmail.com is the SAME inbox) | created (user) |
 | Agent inbox access | — | BLOCKED: Google refuses agent-browser sign-in ("browser may not be secure", 3 attempts 2026-07-28). Path: user enables 2FA + app password (myaccount.google.com/apppasswords) → agent wires IMAP/SMTP (himalaya/gws) → reads all verification mail directly. No web login needed. |
-| Phone (Voice grounding SIM) | 925-300-7136 (925 = East Bay CA) | on record. Google Voice Basic setup verifies this number by SMS — user relays the code during setup. The Voice number itself is chosen at setup. |
+| Phone (SIM on record) | 925-300-7136 (925 = East Bay CA) | on record — but it is a GOOGLE FI number, and Voice refuses Fi for grounding (hit 2026-07-28, deferred to 07-29). Options: non-Fi mobile SIM (one SMS), landline (voice-call verify), or skip Voice and use the Fi number directly on signup forms. |
 | GitHub org | `trikeshed` | name AVAILABLE (checked 2026-07-28, also `trikeshed-org`). Create under the gmail; becomes the Sponsors/FUNDING target. Repo stays at jnorthrup/TrikeShed for now (transfer preserves stars; defer). |
 | Domains | trikeshed.org / .com | REGISTERED — confirm ownership; if user's, point when needed |
 | Domains open | trikeshed.dev (~$12/yr), trikeshed.fund (~$30/yr) | AVAILABLE — purchase deferred; no rail below needs one |
