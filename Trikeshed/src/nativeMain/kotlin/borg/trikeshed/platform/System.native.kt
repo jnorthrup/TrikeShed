@@ -6,11 +6,9 @@ actual data class ProcessResult(
     actual val stderr: String
 )
 
+@OptIn(kotlinx.cinterop.ExperimentalForeignApi::class)
 actual fun getProgramName(): String {
-    // TODO: Implement for Native. This will require platform-specific APIs
-    // to access argv[0]. For example, using `kotlinx.cli.ArgParser` or
-    // by passing it down from the C `main` function.
-    return "UnknownProgramNative"
+    return platform.posix.getprogname()?.let { kotlinx.cinterop.toKString(it) } ?: "UnknownProgramNative"
 }
 
 object NativeMainArguments {
