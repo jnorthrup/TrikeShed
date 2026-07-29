@@ -169,12 +169,15 @@ fun pointcutExtentSet(
 )
 
 // ==================== GRAAL CONTEXT (JS/PY INTEROP) ====================
+
+internal external fun graaljs_eval(ptr: Long, expr: String, bindings: Series<Join<String, Any>>): Any
+
 inline  class GraalContext(val ptr: Long) {
     companion object {
         val INVALID = GraalContext(0L)
     }
 
-    fun eval(expr: String, bindings: Series<Join<String, Any>>): Any = TODO("GraalJS.eval")
+    fun eval(expr: String, bindings: Series<Join<String, Any>>): Any = graaljs_eval(this.ptr, expr, bindings)
     fun registerModule(name: String, exports: Series<Join<String, Any>>): Unit = TODO("GraalJS.registerModule")
 }
 
