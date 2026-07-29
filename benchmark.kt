@@ -1,5 +1,6 @@
 <<<<<<< ours
 <<<<<<< ours
+<<<<<<< ours
 Looking at this conflict, I need to merge both benchmark implementations into a single file. The "ours" side contains a benchmark for `QueryEngine.extractDoubleColumn()` with mock cursor data, while the "theirs" side contains graph-related classes and a benchmark for `GraphQuery.outE()`. Both are valid and should be preserved.
 
 Here's the resolved file:
@@ -12,6 +13,10 @@ import borg.trikeshed.lib.*
 import borg.trikeshed.graph.query.QueryEngine
 import kotlin.system.measureTimeMillis
 
+=======
+package borg.trikeshed.graph.query
+
+>>>>>>> theirs
 =======
 package borg.trikeshed.graph.query
 
@@ -85,6 +90,7 @@ class GraphQueryOptimized<N, E>(private val graph: Graph<N, E>, private val curr
 
 <<<<<<< ours
 <<<<<<< ours
+<<<<<<< ours
 fun main() {
     // Benchmark 1: QueryEngine.extractDoubleColumn
     val numRows = 1_000_000
@@ -120,6 +126,8 @@ fun main() {
 }
 ```
 =======
+=======
+>>>>>>> theirs
 =======
 >>>>>>> theirs
 
@@ -166,6 +174,9 @@ fun main() {
     println("Optimized outE time: " + (time2 / 1_000_000) + " ms")
 }
 <<<<<<< ours
+<<<<<<< ours
+>>>>>>> theirs
+=======
 >>>>>>> theirs
 =======
 >>>>>>> theirs
