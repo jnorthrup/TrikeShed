@@ -135,11 +135,19 @@ class CouchHeadProjection {
     private fun documentToRowVec(doc: Document): RowVec {
         val rev = frames[doc.id]?.rev ?: ""
         val n = 2 + doc.fields.size
+<<<<<<< HEAD
         val keys = Array(n) { i -> 
             if (i == 0) "_id" else if (i == 1) "_rev" else doc.fields[i - 2].name 
         }
         val cells = Array<Any?>(n) { i -> 
             if (i == 0) doc.id else if (i == 1) rev else doc.fields[i - 2].value 
+=======
+        val keys = Array(n) { i ->
+            if (i == 0) "_id" else if (i == 1) "_rev" else doc.fields[i - 2].name
+        }
+        val cells = Array<Any?>(n) { i ->
+            if (i == 0) doc.id else if (i == 1) rev else doc.fields[i - 2].value
+>>>>>>> origin/couch-head-projection-mvcc-3190538920956534771
         }
         return borg.trikeshed.cursor.cellsToRowVec(
             n j { cells[it] },
