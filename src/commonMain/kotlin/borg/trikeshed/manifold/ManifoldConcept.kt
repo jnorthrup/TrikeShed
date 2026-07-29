@@ -37,8 +37,8 @@ inline  class BudgetCoord(val packed: Long) {
     /** Geometric mean of p,d,q — the "radial" energy of the concept. */
     fun energy(): Float {
         val pv = p; val dv = d; val qv = q
-        return if (pv <= 0f || dv <= 0f || qv <= 0f) 0f
-        else (pv.toDouble().pow(1.0 / 3.0) *
+        if (pv <= 0f || dv <= 0f || qv <= 0f) return 0f
+        return (pv.toDouble().pow(1.0 / 3.0) *
               dv.toDouble().pow(1.0 / 3.0) *
               qv.toDouble().pow(1.0 / 3.0)).toFloat()
     }
