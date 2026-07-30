@@ -40,6 +40,27 @@ value class DelimitRange(val value: Int) : Twin<UShort>,ClosedRange<UShort> {
 /** forward scanner of commas, quotes, and newlines
  */
 object CSVUtil {
+
+    fun parseLine(line: String): List<String> {
+        val result = mutableListOf<String>()
+        var current = StringBuilder()
+        var inQuotes = false
+        for (i in line.indices) {
+            val c = line[i]
+            if (c == '\"') {
+                inQuotes = !inQuotes
+            } else if (c == ',' && !inQuotes) {
+                result.add(current.toString())
+                current = StringBuilder()
+            } else {
+                current.append(c)
+            }
+        }
+        result.add(current.toString())
+        return result
+    }
+
+
     /**
      * read a csv file into a series of segments
      */
