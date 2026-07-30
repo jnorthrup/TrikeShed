@@ -38,6 +38,28 @@ class CycleBody(
                 return
             }
             try {
+                // A committed conflict is a quarantine boundary. Re-entering
+                // drain while markers remain reapplies every COMPLETED delta and
+                // nests the same conflict again. QA or an in-flight locality
+                // session must resolve the marker before the next cycle mutates
+                // the tree.
+                val markerProbe = ProcessBuilder("git", "grep", "-l", "^<<<<<<< ", "--")
+                    .directory(repoDir)
+                    .redirectErrorStream(true)
+                    .start()
+                val markerProbeFinished = markerProbe.waitFor(5, java.util.concurrent.TimeUnit.SECONDS)
+                val markerFiles = if (markerProbeFinished && markerProbe.exitValue() == 0) {
+                    markerProbe.inputStream.bufferedReader().readText().trim()
+                } else {
+                    if (!markerProbeFinished) markerProbe.destroyForcibly()
+                    ""
+                }
+                if (markerFiles.isNotEmpty()) {
+                    System.err.println("[OROBOROS] conflict quarantine; cycle paused for: ${markerFiles.replace('\n', ',')}")
+                    consecutivePollErrors.incrementAndGet()
+                    return
+                }
+
                 kotlinx.coroutines.runBlocking { runCycle() }
                 consecutivePollErrors.set(0)
             } catch (t: Throwable) {
