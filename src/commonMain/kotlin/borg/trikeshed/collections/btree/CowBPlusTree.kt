@@ -3,6 +3,7 @@ package borg.trikeshed.collections.btree
 import borg.trikeshed.job.ContentId
 import borg.trikeshed.job.JobId
 import borg.trikeshed.job.CasStore
+import kotlinx.coroutines.yield
 
 /**
  * Key for CowBPlusTree
@@ -254,17 +255,19 @@ class CowBPlusTree(
         require(maxDegree >= 3) { "maxDegree must be at least 3" }
     }
 
-    private fun loadNode(cid: ContentId): BTreeNode {
+    private suspend fun loadNode(cid: ContentId): BTreeNode {
+        yield()
         val bytes = casStore.get(cid) ?: throw IllegalStateException("Node not found: $cid")
         return CowBPlusTreeCodec.decode(bytes)
     }
 
-    private fun saveNode(node: BTreeNode): ContentId {
+    private suspend fun saveNode(node: BTreeNode): ContentId {
+        yield()
         val bytes = CowBPlusTreeCodec.encode(node)
         return casStore.put(bytes)
     }
 
-    fun get(rootCid: ContentId, key: BTreeKey): BTreeValue? {
+    suspend fun get(rootCid: ContentId, key: BTreeKey): BTreeValue? {
         var currentCid = rootCid
         while (true) {
             val node = loadNode(currentCid)
@@ -286,10 +289,10 @@ class CowBPlusTree(
         }
     }
 
-    fun range(rootCid: ContentId, startKey: BTreeKey, endKey: BTreeKey): List<Pair<BTreeKey, BTreeValue>> {
+    suspend fun range(rootCid: ContentId, startKey: BTreeKey, endKey: BTreeKey): List<Pair<BTreeKey, BTreeValue>> {
         val result = mutableListOf<Pair<BTreeKey, BTreeValue>>()
 
-        fun traverse(cid: ContentId) {
+        suspend fun traverse(cid: ContentId) {
             val node = loadNode(cid)
             when (node) {
                 is BTreeNode.Leaf -> {
@@ -324,7 +327,7 @@ class CowBPlusTree(
      * Inserts a key-value pair and returns the new root ContentId.
      * If rootCid is null, creates a new root.
      */
-    fun insert(rootCid: ContentId?, key: BTreeKey, value: BTreeValue): ContentId {
+    suspend fun insert(rootCid: ContentId?, key: BTreeKey, value: BTreeValue): ContentId {
         if (rootCid == null) {
             val newRoot = BTreeNode.Leaf(listOf(key), listOf(value))
             return saveNode(newRoot)
@@ -351,7 +354,7 @@ class CowBPlusTree(
         val rightCid: ContentId
     )
 
-    private fun insertRecursive(cid: ContentId, key: BTreeKey, value: BTreeValue): InsertResult {
+    private suspend fun insertRecursive(cid: ContentId, key: BTreeKey, value: BTreeValue): InsertResult {
         val node = loadNode(cid)
         when (node) {
             is BTreeNode.Leaf -> {
@@ -431,7 +434,7 @@ class CowBPlusTree(
      * Freeze the current root into an immutable snapshot.
      * Since the tree is already COW, this just returns the CID.
      */
-    fun snapshot(rootCid: ContentId): ContentId {
+    suspend fun snapshot(rootCid: ContentId): ContentId {
         return rootCid
     }
 
@@ -439,10 +442,10 @@ class CowBPlusTree(
      * Serializes a delta between two CIDs. Returns a list of serialized blocks
      * (the nodes reachable from `toCid` that are not reachable from `fromCid`).
      */
-    fun send(fromCid: ContentId?, toCid: ContentId): List<ByteArray> {
+    suspend fun send(fromCid: ContentId?, toCid: ContentId): List<ByteArray> {
         val fromNodes = mutableSetOf<ContentId>()
         if (fromCid != null) {
-            fun collectFrom(cid: ContentId) {
+            suspend fun collectFrom(cid: ContentId) {
                 if (!fromNodes.add(cid)) return
                 val node = loadNode(cid)
                 if (node is BTreeNode.Internal) {
@@ -455,7 +458,7 @@ class CowBPlusTree(
         }
 
         val delta = mutableListOf<ByteArray>()
-        fun collectTo(cid: ContentId) {
+        suspend fun collectTo(cid: ContentId) {
             if (fromNodes.contains(cid)) return
             val bytes = casStore.get(cid) ?: throw IllegalStateException("Node not found: $cid")
             val node = CowBPlusTreeCodec.decode(bytes)
@@ -475,10 +478,11 @@ class CowBPlusTree(
      * The last block is typically the root of the delta, but we just insert all
      * blocks into the CAS. Returns the ContentId of the last block inserted.
      */
-    fun recv(delta: List<ByteArray>): ContentId {
+    suspend fun recv(delta: List<ByteArray>): ContentId {
         require(delta.isNotEmpty()) { "Delta cannot be empty" }
         var lastCid: ContentId? = null
         for (bytes in delta) {
+            yield()
             lastCid = casStore.put(bytes)
         }
         return lastCid!!
