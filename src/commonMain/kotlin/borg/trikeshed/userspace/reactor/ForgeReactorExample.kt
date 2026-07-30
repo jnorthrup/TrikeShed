@@ -18,8 +18,8 @@ import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.take
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.runBlocking
 
 /**
  * One canonical example that wires the consolidated forge framework:
@@ -38,7 +38,7 @@ import kotlinx.coroutines.runBlocking
  *   java -cp build/libs/TrikeShed-jvm-1.0.jar \
  *        borg.trikeshed.userspace.reactor.ForgeReactorExampleKt
  */
-fun main() = runBlocking {
+suspend fun main() = coroutineScope {
     val flags = listOf(
         ForgeCliArgs.Flag(
             name = "--interval-ms",
@@ -48,7 +48,7 @@ fun main() = runBlocking {
     )
     when (val parsed = ForgeCliArgs.parse(args = emptyList(), flags = flags)) {
         is ForgeCliArgs.Result.Parsed -> println("positional: ${parsed.remaining}")
-        ForgeCliArgs.Result.Help -> return@runBlocking
+        ForgeCliArgs.Result.Help -> return@coroutineScope
         is ForgeCliArgs.Result.Error -> error(parsed.message)
     }
 

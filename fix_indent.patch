@@ -1,0 +1,61 @@
+--- src/commonMain/kotlin/borg/trikeshed/userspace/reactor/ForgeReactorExample.kt
++++ src/commonMain/kotlin/borg/trikeshed/userspace/reactor/ForgeReactorExample.kt
+@@ -38,28 +38,28 @@
+ suspend fun main() {
+     coroutineScope {
+-    val flags = listOf(
+-        ForgeCliArgs.Flag(
+-            name = "--interval-ms",
+-            withValue = true,
+-            action = { _, i -> i + 1 },
+-        ),
+-    )
+-    when (val parsed = ForgeCliArgs.parse(args = emptyList(), flags = flags)) {
+-        is ForgeCliArgs.Result.Parsed -> println("positional: ${parsed.remaining}")
+-        ForgeCliArgs.Result.Help -> return@coroutineScope
+-        is ForgeCliArgs.Result.Error -> error(parsed.message)
+-    }
++        val flags = listOf(
++            ForgeCliArgs.Flag(
++                name = "--interval-ms",
++                withValue = true,
++                action = { _, i -> i + 1 },
++            ),
++        )
++        when (val parsed = ForgeCliArgs.parse(args = emptyList(), flags = flags)) {
++            is ForgeCliArgs.Result.Parsed -> println("positional: ${parsed.remaining}")
++            ForgeCliArgs.Result.Help -> return@coroutineScope
++            is ForgeCliArgs.Result.Error -> error(parsed.message)
++        }
+ 
+-    val example = ForgeReactorExample(forgeHome = ForgeHome.defaultHome)
+-    // Subscribe before synthetic cycle
+-    val collector = launch(start = CoroutineStart.UNDISPATCHED) {
+-        example.events.take(2).collect { 
+-            if (it is ForgeReactorEvent.ReactorOpened) println("ReactorOpened")
+-            if (it is ForgeReactorEvent.CycleObserved) println("CycleObserved")
++        val example = ForgeReactorExample(forgeHome = ForgeHome.defaultHome)
++        // Subscribe before synthetic cycle
++        val collector = launch(start = CoroutineStart.UNDISPATCHED) {
++            example.events.take(2).collect { 
++                if (it is ForgeReactorEvent.ReactorOpened) println("ReactorOpened")
++                if (it is ForgeReactorEvent.CycleObserved) println("CycleObserved")
++            }
+         }
+-    }
+-    example.open(parentJob = coroutineContext[Job]!!)
+-    try {
+-        example.runSyntheticCycle("hello forge")
+-        collector.join()
+-    } finally {
+-        example.close()
+-    }
++        example.open(parentJob = coroutineContext[Job]!!)
++        try {
++            example.runSyntheticCycle("hello forge")
++            collector.join()
++        } finally {
++            example.close()
++        }
+     }
+ }
