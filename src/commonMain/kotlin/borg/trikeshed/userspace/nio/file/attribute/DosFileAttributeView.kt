@@ -6,9 +6,9 @@ package borg.trikeshed.userspace.nio.file.attribute
 // Declarations intentionally mirror JDK taxonomy and contain no implementations.
 public interface DosFileAttributeView : BasicFileAttributeView {
     override fun name(): String = "dos"
-    override fun readAttributes(): DosFileAttributes = TODO("NIO common stub")
-    fun setReadOnly(p0: Boolean): Unit = TODO("NIO common stub")
-    fun setHidden(p0: Boolean): Unit = TODO("NIO common stub")
-    fun setSystem(p0: Boolean): Unit = TODO("NIO common stub")
-    fun setArchive(p0: Boolean): Unit = TODO("NIO common stub")
+    override fun readAttributes(): DosFileAttributes
+    fun setReadOnly(p0: Boolean): Unit
+    fun setHidden(p0: Boolean): Unit
+    fun setSystem(p0: Boolean): Unit
+    fun setArchive(p0: Boolean): Unit
 }

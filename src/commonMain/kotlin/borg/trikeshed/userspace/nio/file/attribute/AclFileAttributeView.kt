@@ -6,6 +6,6 @@ package borg.trikeshed.userspace.nio.file.attribute
 // Declarations intentionally mirror JDK taxonomy and contain no implementations.
 public interface AclFileAttributeView : FileOwnerAttributeView {
     override fun name(): String = "acl"
-    fun getAcl(): List<AclEntry> = TODO("NIO common stub")
-    fun setAcl(p0: List<AclEntry>): Unit = TODO("NIO common stub")
+    fun getAcl(): List<AclEntry>
+    fun setAcl(p0: List<AclEntry>): Unit
 }
