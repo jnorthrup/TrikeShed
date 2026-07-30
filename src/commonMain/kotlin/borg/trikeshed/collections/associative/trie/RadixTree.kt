@@ -47,15 +47,20 @@ class RadixTree<C : Comparable<C>> {
                 // Need to split this node
                 else -> {
                     val oldSuffix = key.drop(commonLength)
-                    val newSuffix = s.drop(commonLength)
-
                     val oldNode = Node(oldSuffix, term, children)
-                    val newNode = Node(newSuffix, true)
 
                     key = key.take(commonLength)
-                    term = false
-                    children = mutableListOf(oldNode, newNode)
-                    children.sortBy { it.key[0] }
+                    
+                    if (commonLength == s.size) {
+                        term = true
+                        children = mutableListOf(oldNode)
+                    } else {
+                        val newSuffix = s.drop(commonLength)
+                        val newNode = Node(newSuffix, true)
+                        term = false
+                        children = mutableListOf(oldNode, newNode)
+                        children.sortBy { it.key[0] }
+                    }
                 }
             }
         }
@@ -85,6 +90,47 @@ class RadixTree<C : Comparable<C>> {
     fun keys(): List<Series<C>> {
         val result = mutableListOf<Series<C>>()
         root?.collectKeys(prefix = emptySeriesOf<C>(), result = result)
+        return result
+    }
+
+    fun prefix(p: Series<C>): List<Series<C>> {
+        val result = mutableListOf<Series<C>>()
+        var currentNode = root ?: return result
+        
+        if (p.isEmpty()) {
+            currentNode.collectKeys(emptySeriesOf(), result)
+            return result
+        }
+
+        var searchPrefix = p
+        var accumulatedPrefix = emptySeriesOf<C>()
+
+        while (searchPrefix.isNotEmpty()) {
+            val commonPrefix = currentNode.key.commonPrefixWith(searchPrefix)
+            val commonLength = commonPrefix.size
+
+            when {
+                // searchPrefix is completely matched by the currentNode's key prefix
+                commonLength == searchPrefix.size -> {
+                    currentNode.collectKeys(accumulatedPrefix, result)
+                    return result
+                }
+
+                // currentNode's key is a full prefix of searchPrefix
+                commonLength == currentNode.key.size -> {
+                    searchPrefix = searchPrefix.drop(commonLength)
+                    accumulatedPrefix = accumulatedPrefix + currentNode.key
+                    val matchingChild = currentNode.children.firstOrNull { it.key.isNotEmpty() && it.key[0] == searchPrefix[0] }
+                    if (matchingChild != null) {
+                        currentNode = matchingChild
+                    } else {
+                        return result
+                    }
+                }
+
+                else -> return result
+            }
+        }
         return result
     }
 }
