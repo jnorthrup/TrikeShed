@@ -12,15 +12,15 @@ import borg.trikeshed.userspace.nio.channels.Channel
 // Declarations intentionally mirror JDK taxonomy and contain no implementations.
 public abstract class SelectorProvider {
     constructor()
-    open fun openDatagramChannel(): DatagramChannel = TODO("NIO common stub")
-    open fun openDatagramChannel(protocolFamily: String): DatagramChannel = TODO("NIO common stub")
-    open fun openPipe(): Pipe = TODO("NIO common stub")
-    open fun openSelector(): AbstractSelector = TODO("NIO common stub")
-    open fun openServerSocketChannel(): ServerSocketChannel = TODO("NIO common stub")
-    open fun openSocketChannel(): SocketChannel = TODO("NIO common stub")
-    open fun inheritedChannel(): Channel = TODO("NIO common stub")
-    open fun openSocketChannel(protocolFamily: String): SocketChannel = TODO("NIO common stub")
-    open fun openServerSocketChannel(protocolFamily: String): ServerSocketChannel = TODO("NIO common stub")
+    abstract fun openDatagramChannel(): DatagramChannel
+    abstract fun openDatagramChannel(protocolFamily: String): DatagramChannel
+    abstract fun openPipe(): Pipe
+    abstract fun openSelector(): AbstractSelector
+    abstract fun openServerSocketChannel(): ServerSocketChannel
+    abstract fun openSocketChannel(): SocketChannel
+    abstract fun inheritedChannel(): Channel
+    abstract fun openSocketChannel(protocolFamily: String): SocketChannel
+    abstract fun openServerSocketChannel(protocolFamily: String): ServerSocketChannel
     companion object {
         fun provider(): SelectorProvider = UringSelectorProvider
     }
@@ -29,11 +29,11 @@ public abstract class SelectorProvider {
 internal object UringSelectorProvider : SelectorProvider() {
     override fun openDatagramChannel(): DatagramChannel = DatagramChannel.open()
     override fun openDatagramChannel(protocolFamily: String): DatagramChannel = DatagramChannel.open(protocolFamily)
-    override fun openPipe(): Pipe = TODO("pipe")
-    override fun openSelector(): AbstractSelector = TODO("selector")
+    override fun openPipe(): Pipe = throw UnsupportedOperationException("pipe")
+    override fun openSelector(): AbstractSelector = throw UnsupportedOperationException("selector")
     override fun openServerSocketChannel(): ServerSocketChannel = ServerSocketChannel.open()
     override fun openSocketChannel(): SocketChannel = SocketChannel.open()
-    override fun inheritedChannel(): Channel = TODO("inheritedChannel")
+    override fun inheritedChannel(): Channel = throw UnsupportedOperationException("inheritedChannel")
     override fun openSocketChannel(protocolFamily: String): SocketChannel = SocketChannel.open()
     override fun openServerSocketChannel(protocolFamily: String): ServerSocketChannel = ServerSocketChannel.open()
 }

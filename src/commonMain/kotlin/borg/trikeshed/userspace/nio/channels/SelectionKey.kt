@@ -6,26 +6,26 @@ package borg.trikeshed.userspace.nio.channels
 // Declarations intentionally mirror JDK taxonomy and contain no implementations.
 public abstract class SelectionKey {
     protected constructor()
-    open fun channel(): SelectableChannel = TODO("NIO common stub")
-    open fun selector(): Selector = TODO("NIO common stub")
-    open fun isValid(): Boolean = TODO("NIO common stub")
-    open fun cancel(): Unit = TODO("NIO common stub")
-    open fun interestOps(): Int = TODO("NIO common stub")
-    open fun interestOps(ops: Int): SelectionKey = TODO("NIO common stub")
-    open fun interestOpsOr(ops: Int): Int = TODO("NIO common stub")
-    open fun interestOpsAnd(ops: Int): Int = TODO("NIO common stub")
-    open fun readyOps(): Int = TODO("NIO common stub")
-    open fun isReadable(): Boolean = TODO("NIO common stub")
-    open fun isWritable(): Boolean = TODO("NIO common stub")
-    open fun isConnectable(): Boolean = TODO("NIO common stub")
-    open fun isAcceptable(): Boolean = TODO("NIO common stub")
-    open fun attach(ob: Any): Any = TODO("NIO common stub")
-    open fun attachment(): Any = TODO("NIO common stub")
+    abstract fun channel(): SelectableChannel
+    abstract fun selector(): Selector
+    abstract fun isValid(): Boolean
+    abstract fun cancel(): Unit
+    abstract fun interestOps(): Int
+    abstract fun interestOps(ops: Int): SelectionKey
+    abstract fun interestOpsOr(ops: Int): Int
+    abstract fun interestOpsAnd(ops: Int): Int
+    abstract fun readyOps(): Int
+    abstract fun isReadable(): Boolean
+    abstract fun isWritable(): Boolean
+    abstract fun isConnectable(): Boolean
+    abstract fun isAcceptable(): Boolean
+    abstract fun attach(ob: Any): Any
+    abstract fun attachment(): Any
 
     companion object {
-        val OP_READ: Int = TODO("NIO common stub")
-        val OP_WRITE: Int = TODO("NIO common stub")
-        val OP_CONNECT: Int = TODO("NIO common stub")
-        val OP_ACCEPT: Int = TODO("NIO common stub")
+        val OP_READ: Int = 1
+        val OP_WRITE: Int = 4
+        val OP_CONNECT: Int = 8
+        val OP_ACCEPT: Int = 16
     }
 }

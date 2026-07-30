@@ -8,11 +8,11 @@ import borg.trikeshed.userspace.nio.channels.spi.SelectorProvider
 // Declarations intentionally mirror JDK taxonomy and contain no implementations.
 public abstract class Pipe {
     protected constructor()
-    fun source(): Pipe.SourceChannel = TODO("NIO common stub")
-    fun sink(): Pipe.SinkChannel = TODO("NIO common stub")
+    abstract fun source(): Pipe.SourceChannel
+    abstract fun sink(): Pipe.SinkChannel
 
     companion object {
-        fun `open`(): Pipe = TODO("NIO common stub")
+        fun `open`(): Pipe = SelectorProvider.provider().openPipe()
     }
 
     public abstract class SinkChannel : AbstractSelectableChannel, WritableByteChannel, GatheringByteChannel {
