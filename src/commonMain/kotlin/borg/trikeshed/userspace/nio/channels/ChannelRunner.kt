@@ -9,6 +9,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.yield
 import kotlinx.coroutines.withTimeoutOrNull
 import kotlin.time.Duration
 
@@ -98,6 +99,9 @@ class ChannelRunner(
         running = true
         while (isActive && running) {
             val signals = reactorOps.poll(pollTimeout)
+            if (signals.isEmpty()) {
+                yield()
+            }
             for (signal in signals) {
                 onSignal(signal)
                 if (Interest.READ in signal.ready) {
