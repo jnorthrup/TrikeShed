@@ -94,16 +94,21 @@ class GapReducer(
         // (build.gradle.kts:176-180), so they are not dispatchable product work.
 
         // ── 1. Non-slab TODO() stubs in production code ─────────────────
-        val productionDirs = listOf(
-            "commonMain/kotlin/borg/trikeshed/cursor",
-            "commonMain/kotlin/borg/trikeshed/couch/isam",
-            "posixMain/kotlin/borg/trikeshed/isam",
-            "posixMain/kotlin/borg/trikeshed/common",
-        )
+        // Scan the full production source tree (all source sets, all packages)
+        // so the reducer never exhausts while stubs remain anywhere.
+        val productionDirs = sourceRoot.listFiles()
+            ?.filter { it.isDirectory && it.name.endsWith("Main") }
+            ?.flatMap { mainDir ->
+                val kotlinDir = File(mainDir, "kotlin")
+                if (kotlinDir.exists()) kotlinDir.walkTopDown()
+                    .filter { it.isDirectory }
+                    .toList()
+                else emptyList()
+            } ?: emptyList()
         for (dir in productionDirs) {
-            val stubs = scanStubs(File(sourceRoot, dir))
+            val stubs = scanStubs(dir)
             for (stub in stubs) {
-                val relPath = "$dir/${stub.path}"
+                val relPath = dir.relativeTo(sourceRoot).path + "/" + stub.path
                 val workId = "gap:stub:${relPath.replace('/', ':')}"
                 val fileName = stub.path.substringAfterLast('/')
                 gaps.add(Gap(
@@ -236,6 +241,7 @@ class GapReducer(
         }
 
         return gaps.sortedByDescending { it.score }
+            .distinctBy { it.workId }
     }
 
     // ── helpers ────────────────────────────────────────────────────────
@@ -246,6 +252,8 @@ class GapReducer(
         if (!dir.exists()) return emptyList()
         val hits = mutableListOf<StubHit>()
         dir.walkTopDown().filter { it.isFile && it.extension == "kt" }.forEach { file ->
+            // Slab stubs are compiled out (build.gradle.kts) — not dispatchable work.
+            if (file.path.contains("/slab/")) return@forEach
             file.readLines().forEachIndexed { i, line ->
                 val match = todoPattern.find(line)
                 if (match != null) {
