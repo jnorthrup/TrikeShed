@@ -130,8 +130,12 @@ kotlin {
         tvosX64()
         tvosSimulatorArm64()
 <<<<<<< ours
+<<<<<<< ours
 
 =======
+>>>>>>> theirs
+=======
+
 >>>>>>> theirs
         macosArm64("macos") {
             compilations.getByName("main") {
