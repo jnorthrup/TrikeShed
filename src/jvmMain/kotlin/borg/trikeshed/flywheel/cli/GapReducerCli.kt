@@ -207,6 +207,22 @@ class GapReducer(
                     .joinToString("\n") { (path, hits) ->
                         "src/$path: TODO lines ${hits.map { it.line }.distinct().sorted().joinToString(",")}"
                     }
+                val contractRoots = if (context.key == "nio-spi") {
+                    listOf(
+                        "src/commonMain/kotlin/borg/trikeshed/userspace/nio/file/spi/FileOperations.kt",
+                        "src/commonMain/kotlin/borg/trikeshed/userspace/nio/file/spi/FileSystemProvider.kt",
+                        "src/commonMain/kotlin/borg/trikeshed/userspace/nio/channels/spi/SelectorProvider.kt",
+                        "src/commonMain/kotlin/borg/trikeshed/userspace/nio/channels/spi/AsynchronousChannelProvider.kt",
+                        "src/*Main/kotlin/borg/trikeshed/userspace/nio/spi/PlatformProviders.*.kt",
+                    ).joinToString("\n")
+                } else {
+                    "See the listed production definitions and callers."
+                }
+                val implementationRule = if (context.key == "nio-spi") {
+                    "Do not implement leaf file/channel facades independently. Make them delegate through the commonMain SPI; platform providers own execution."
+                } else {
+                    "Implement the basic concept coherently across the listed files."
+                }
                 val supersedes = chunkFiles.mapTo(mutableSetOf()) { path ->
                     "gap:stub:${path.replace('/', ':')}"
                 }
@@ -221,10 +237,13 @@ class GapReducer(
                         "Current executable evidence (TODO, not finished):",
                         evidence,
                         "",
+                        "Contract roots:",
+                        contractRoots,
+                        "",
                         "Read the current definitions, compositions, and every production caller",
-                        "before editing. Implement the basic concept coherently across the listed",
-                        "files; preserve members that prior agents already finished. Do not expand",
-                        "outside this exact file set. Update README only if the concept is now real.",
+                        "before editing. $implementationRule Preserve members that prior agents",
+                        "already finished. Do not expand outside this exact file set. Update README",
+                        "only if the concept is now real.",
                         "Verification: ./gradlew :jvmMainClasses --no-daemon"
                     ),
                     parent = "rga:${context.key}",
@@ -386,122 +405,23 @@ class GapReducer(
 
     private fun stubContext(stub: StubHit): StubContext {
         val path = stub.path
-        val file = path.substringAfterLast('/')
-        val posixClaim = "README.md:696 claims Posix IO utilities exist for kotlin-common, JVM, and native"
-        return when {
-            "/userspace/nio/file/attribute/" in path -> when (file) {
-                "AttributeView.kt", "FileAttributeView.kt", "FileAttribute.kt",
-                "FileStoreAttributeView.kt", "BasicFileAttributes.kt",
-                "BasicFileAttributeView.kt", "FileTime.kt" -> StubContext(
-                    "nio-attributes-basic",
-                    "basic file metadata and attribute views",
-                    posixClaim,
-                )
-                "UserPrincipal.kt", "GroupPrincipal.kt", "UserPrincipalLookupService.kt",
-                "UserPrincipalNotFoundException.kt", "FileOwnerAttributeView.kt",
-                "PosixFileAttributes.kt", "PosixFileAttributeView.kt",
-                "PosixFilePermissions.kt", "PosixFilePermission.kt" -> StubContext(
-                    "nio-attributes-posix",
-                    "POSIX ownership, principals, and permissions",
-                    posixClaim,
-                )
-                else -> StubContext(
-                    "nio-attributes-extended",
-                    "ACL, DOS, and user-defined file attributes",
-                    posixClaim,
-                )
-            }
-            "/userspace/nio/file/spi/" in path -> StubContext(
-                "nio-file-provider",
-                "file-system provider boundary",
-                posixClaim,
+        if ("/userspace/nio/" in path) {
+            return StubContext(
+                key = "nio-spi",
+                title = "commonMain userspace NIO SPI conformance",
+                claim = "README.md:696 claims portable Posix IO; every userspace NIO facade must compose through the commonMain provider SPI before platform execution",
             )
-            "/userspace/nio/file/" in path -> when {
-                file in FILE_PATH_SYSTEM_FILES -> StubContext(
-                    "nio-file-path-system",
-                    "path, file-system, and store model",
-                    posixClaim,
-                )
-                file in FILE_TRAVERSAL_FILES -> StubContext(
-                    "nio-file-traversal",
-                    "file traversal and directory streams",
-                    posixClaim,
-                )
-                file in FILE_WATCH_FILES -> StubContext(
-                    "nio-file-watch",
-                    "watch service, keys, and events",
-                    posixClaim,
-                )
-                file.endsWith("Exception.kt") -> StubContext(
-                    "nio-file-errors",
-                    "file-system error values",
-                    posixClaim,
-                )
-                else -> StubContext("nio-file-operations", "portable file operations", posixClaim)
-            }
-            "/userspace/nio/channels/" in path -> when {
-                file in CHANNEL_FILE_FILES -> StubContext(
-                    "nio-channel-file",
-                    "file channels and locks",
-                    posixClaim,
-                )
-                file.startsWith("Asynchronous") || file == "CompletionHandler.kt" -> StubContext(
-                    "nio-channel-async",
-                    "asynchronous channels and completion",
-                    posixClaim,
-                )
-                file in CHANNEL_SELECTOR_FILES || "/channels/spi/" in path -> StubContext(
-                    "nio-channel-selector",
-                    "selector, key, pipe, and provider lifecycle",
-                    posixClaim,
-                )
-                file in CHANNEL_SOCKET_FILES -> StubContext(
-                    "nio-channel-socket",
-                    "socket, datagram, and multicast channels",
-                    posixClaim,
-                )
-                else -> StubContext("nio-channel-byte", "byte-channel contracts and adapters", posixClaim)
-            }
-            "/userspace/nio/charset/" in path -> when (file) {
-                "CoderResult.kt", "CodingErrorAction.kt", "MalformedInputException.kt",
-                "UnmappableCharacterException.kt", "CharsetEncoder.kt", "CharsetDecoder.kt" -> StubContext(
-                    "nio-charset-codec",
-                    "charset codec results and error policy",
-                    posixClaim,
-                )
-                else -> StubContext("nio-charset-provider", "charset platform/provider boundary", posixClaim)
-            }
-            else -> {
-                val packagePath = path.substringBeforeLast('/').substringAfter("kotlin/")
-                StubContext(
-                    key = "pkg-" + packagePath.replace(Regex("[^A-Za-z0-9]+"), "-").trim('-').take(64),
-                    title = packagePath.substringAfterLast('/').ifBlank { "production package" },
-                    claim = "README concept map requires executable production behavior, not TODO facades",
-                )
-            }
         }
+        val packagePath = path.substringBeforeLast('/').substringAfter("kotlin/")
+        return StubContext(
+            key = "pkg-" + packagePath.replace(Regex("[^A-Za-z0-9]+"), "-").trim('-').take(64),
+            title = packagePath.substringAfterLast('/').ifBlank { "production package" },
+            claim = "README concept map requires executable production behavior, not TODO facades",
+        )
     }
 
     private companion object {
         const val MAX_CONTEXT_FILES = 6
-
-        val FILE_PATH_SYSTEM_FILES = setOf(
-            "Path.kt", "Paths.kt", "PathMatcher.kt", "FileSystem.kt", "FileSystems.kt", "FileStore.kt",
-        )
-        val FILE_TRAVERSAL_FILES = setOf(
-            "Files.kt", "FileVisitor.kt", "SimpleFileVisitor.kt", "DirectoryStream.kt", "SecureDirectoryStream.kt",
-        )
-        val FILE_WATCH_FILES = setOf(
-            "WatchService.kt", "WatchKey.kt", "WatchEvent.kt", "Watchable.kt", "StandardWatchEventKinds.kt",
-        )
-        val CHANNEL_FILE_FILES = setOf("FileChannel.kt", "FileLock.kt", "AsynchronousFileChannel.kt")
-        val CHANNEL_SELECTOR_FILES = setOf(
-            "Selector.kt", "SelectionKey.kt", "SelectableChannel.kt", "Pipe.kt", "AbstractSelector.kt",
-        )
-        val CHANNEL_SOCKET_FILES = setOf(
-            "SocketChannel.kt", "ServerSocketChannel.kt", "DatagramChannel.kt",
-            "NetworkChannel.kt", "MulticastChannel.kt", "MembershipKey.kt",
-        )
     }
 
     private fun grepProduction(
