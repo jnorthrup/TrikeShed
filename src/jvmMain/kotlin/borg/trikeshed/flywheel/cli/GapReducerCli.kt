@@ -36,7 +36,11 @@ import kotlin.system.exitProcess
 fun main(args: Array<String>) {
     // 1. Reads JSON input
     val isLegacyMode = args.size != 1 && args.getOrNull(0) != "-"
+<<<<<<< HEAD
     
+=======
+
+>>>>>>> origin/fix/pass-json-string-confixdoc-1593740257197449382
     val inputSeries: Series<Double>? = if (!isLegacyMode) {
         val jsonSource = if (args[0] == "-") readln() else File(args[0]).readText()
         // 2. Parses it into a Series<Double> using Confix
@@ -146,12 +150,20 @@ fun main(args: Array<String>) {
         for (gap in gaps.filter { it.workId in alreadyKnown }) {
             println("  = ${gap.workId} (already queued)")
         }
+<<<<<<< HEAD
         
+=======
+
+>>>>>>> origin/fix/pass-json-string-confixdoc-1593740257197449382
         if (inputSeries != null) {
             // 3. Calls the core logic
             val result = GapReducer(repoDir, readme).reduce()
             // 4. Serialises the result back to JSON and prints it
+<<<<<<< HEAD
             val resultJson = JsonSupport.stringify(result.map { 
+=======
+            val resultJson = JsonSupport.stringify(result.map {
+>>>>>>> origin/fix/pass-json-string-confixdoc-1593740257197449382
                 mapOf(
                     "workId" to it.workId,
                     "tier" to it.tier,
