@@ -6,16 +6,16 @@ package borg.trikeshed.userspace.nio.file
 // Declarations intentionally mirror JDK taxonomy and contain no implementations.
 public abstract class FileSystem {
     protected constructor()
-    fun provider(): borg.trikeshed.userspace.nio.file.spi.FileSystemProvider = TODO("NIO common stub")
-    fun close(): Unit = TODO("NIO common stub")
-    fun isOpen(): Boolean = TODO("NIO common stub")
-    fun isReadOnly(): Boolean = TODO("NIO common stub")
-    fun getSeparator(): String = TODO("NIO common stub")
-    fun getRootDirectories(): Iterable<borg.trikeshed.userspace.nio.file.Path> = TODO("NIO common stub")
-    fun getFileStores(): Iterable<borg.trikeshed.userspace.nio.file.FileStore> = TODO("NIO common stub")
-    fun supportedFileAttributeViews(): Set<String> = TODO("NIO common stub")
-    fun getPath(p0: String, vararg p1: String): borg.trikeshed.userspace.nio.file.Path = TODO("NIO common stub")
-    fun getPathMatcher(p0: String): borg.trikeshed.userspace.nio.file.PathMatcher = TODO("NIO common stub")
-    fun getUserPrincipalLookupService(): borg.trikeshed.userspace.nio.file.attribute.UserPrincipalLookupService = TODO("NIO common stub")
-    fun newWatchService(): borg.trikeshed.userspace.nio.file.WatchService = TODO("NIO common stub")
+    abstract fun provider(): borg.trikeshed.userspace.nio.file.spi.FileSystemProvider
+    abstract fun close(): Unit
+    abstract fun isOpen(): Boolean
+    abstract fun isReadOnly(): Boolean
+    abstract fun getSeparator(): String
+    abstract fun getRootDirectories(): Iterable<borg.trikeshed.userspace.nio.file.Path>
+    abstract fun getFileStores(): Iterable<borg.trikeshed.userspace.nio.file.FileStore>
+    abstract fun supportedFileAttributeViews(): Set<String>
+    abstract fun getPath(p0: String, vararg p1: String): borg.trikeshed.userspace.nio.file.Path
+    abstract fun getPathMatcher(p0: String): borg.trikeshed.userspace.nio.file.PathMatcher
+    abstract fun getUserPrincipalLookupService(): borg.trikeshed.userspace.nio.file.attribute.UserPrincipalLookupService
+    abstract fun newWatchService(): borg.trikeshed.userspace.nio.file.WatchService
 }
