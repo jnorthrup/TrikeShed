@@ -9,6 +9,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeoutOrNull
 import kotlin.time.Duration
 
 /**
@@ -57,23 +58,27 @@ class ChannelRunner(
     /** Suspend until data is available on [fd].
      *  Deferred is emplaced BEFORE the OP_READ register call so a
      *  same-tick poll cannot fire on an empty slot. */
-    suspend fun readAsync(fd: Int): Int {
+    suspend fun readAsync(fd: Int, timeoutMs: Long = 60_000L): Int? {
         reactorOps.register(fd, setOf(Interest.READ))
         val deferred = CompletableDeferred<Int>()
         readers[fd] = deferred
-        return deferred.await()
+        return withTimeoutOrNull(timeoutMs) {
+            deferred.await()
+        }.also {
+            if (it == null) readers.remove(fd)
+        }
     }
 
     /** Suspend until [fd] is writable.
      *  Enqueues a deferred; reactor completes head on each OP_WRITE.
      *  Level-triggered Selector re-fires OP_WRITE while socket writable. */
-    suspend fun writeAsync(fd: Int) {
+    suspend fun writeAsync(fd: Int, timeoutMs: Long = 60_000L): Unit? {
         reactorOps.register(fd, setOf(Interest.READ, Interest.WRITE))
         val deferred = CompletableDeferred<Unit>()
         val queue = writers.getOrPut(fd) { mutableListOf() }
         queue.add(deferred)
-        try {
-            deferred.await()
+        return try {
+            withTimeoutOrNull(timeoutMs) { deferred.await() }
         } finally {
             queue.remove(deferred)
             if (queue.isEmpty()) writers.remove(fd)
