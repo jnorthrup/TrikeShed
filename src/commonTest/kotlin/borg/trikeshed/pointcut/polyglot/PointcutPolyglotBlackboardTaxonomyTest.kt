@@ -23,4 +23,14 @@ class PointcutPolyglotBlackboardTaxonomyTest {
         val result = taxonomy.pointcutChildVm(worker, listOf("java", "-version"))
         assertNotNull(result)
     }
+
+    @Test
+    fun testPointcutKataSandbox() = runTest {
+        val taxonomy = GraalPolyglotBlackboardTaxonomy()
+        val worker = DummyProcessWorker()
+        val sandbox = PolyglotKataRegistry.JAVA
+
+        val result = taxonomy.pointcutKataSandbox(worker, sandbox, listOf("java", "-version"))
+        assertNotNull(result)
+    }
 }
