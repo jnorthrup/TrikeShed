@@ -344,6 +344,67 @@ fun run(scope, pollTimeout, onSignal) { ... }    // CQE loop → dispatch
 - Kanban FSM **consumes** `kanbanEvents`; it never owns the stream
 - External callers `ingestTaxonomyEvents` / `lookupModel` / `cacheModel` — reactor is the single writer
 
+### 7.5 CCEK → async-reactor CCEK — unfinished adaptation graph
+
+The CCEK object model is a reactive context (`Context → Element → Key →
+CoroutineContext`). The async reactor contract it must satisfy, and the
+real-world gaps where current code still violates it:
+
+```
+                      Async-reactor CCEK constraints (target)
+─────────────────────────────────────────────────────────────────────
+1. Every blocking IO call has a JVM-level timeout
+2. No ProcessBuilder().waitFor() without waitFor(N, TimeUnit)
+3. No runBlocking { suspendCall() } inside a coroutine path
+4. No CompletableFuture.get() without HttpRequest.timeout(...)
+5. file/channel ops suspend through NioSupervisor (never File/Files.* sync)
+6. CAS put/get/sync suspend through Mutex (never synchronized{})
+7. Per-call reflink + dedup measurement suspend (never ProcessBuilder("du"|"cp"))
+8. Volume.read/write/sync are the only LBA surface
+9. Coroutine launch owns a SupervisorJob; never raw thread/Thread.start
+10. Failure returns carry cause identity; never null sentinel
+```
+
+Current CCEK-role elements and their unfinished adaptation:
+
+```
+┌──────────────────────────┬────────────────────────────────────────────┬────────────────────────────────────────────┐
+│ CCEK role (element)      │ Required reactor shape                     │ Current state (gap)                        │
+├──────────────────────────┼────────────────────────────────────────────┼────────────────────────────────────────────┤
+│ MuxReactorElement        │ suspend open()/close(); open fan-out         │ Mostly correct; some sync ingest helpers.   │
+│ HtxReactorElement        │ suspend route/tls through NioSupervisor     │ Mostly correct; uses blocking waitFor().   │
+│ NioSupervisor            │ open providers as suspend async elements    │ ✅ landed (NioCapabilityReport + probe)   │
+│ ChannelRunner / CQE loop │ CompletableDeferred per fd, FIFO per fd    │ Mostly correct; no JVM-level timeout.      │
+│ JvmReactorOperations     │ suspend select/epoll via java.nio           │ Uses blocking select() in coroutine path.  │
+│ JvmFileOperations        │ suspend via NioSupervisor (io_uring/posix)  │ Mostly correct after NIO SPI cut.          │
+│ LinuxFileOperations      │ suspend via PosixUringIO.fallback           │ ✅ suspend when uring present.            │
+│ MmapCasStoreJvm          │ suspend put/get/sync; Mutex-only lock       │ ✅ landed (suspend create() + Mutex).     │
+│ BtrfsCasStore            │ suspend reflink + suspend diskUsage         │ GAP: ProcessBuilder("cp") + "du" sync.    │
+│ VolumeCasStore           │ suspend put/get/sync; Mutex-only lock       │ ✅ landed (suspend create() + Mutex).     │
+│ FlywheelDriver           │ suspend cycle, no waitFor() without timeout │ Mostly correct; drafnThreeWay ok.          │
+│ BrainClient              │ HttpRequest.timeout(...) + rotation         │ ✅ 15s timeout + 14 NIM rotation.         │
+│ QaLaguna                 │ withTimeoutOrNull(45_000) on conflict body  │ ✅ landed.                                │
+│ CycleBody                │ retransformClasses via javaagent            │ ✅ landed (rev marker accepted).          │
+│ GapReducerCli            │ external producer, no daemon coroutine       │ ✅ landed.                                │
+│ ForgeReactorExample      │ suspend runSyntheticCycle + SharedFlow      │ GAP: main() calls runBlocking; sync IO.   │
+│ LcncIngestPipeline       │ suspend ingest; Reactor Mux model           │ GAP: Runtime/System sync helpers.         │
+│ ModelCallLeaf            │ suspend onPut + flush                       │ GAP: Runtime/System/IO sync.             │
+│ Blake3Hash               │ suspend hash                                  │ GAP: System.arraycopy of memory? sync.    │
+│ ConfixEnvelopeCodec      │ suspend encode/decode + charset fns          │ GAP: java.lang.Character.                  │
+│ ModelResponse            │ suspend persist                              │ GAP: java.*/System.                       │
+│ AcpProtocol / Keymux     │ suspend key lease                            │ Correct.                                  │
+└──────────────────────────┴────────────────────────────────────────────┴────────────────────────────────────────────┘
+```
+
+The reactor is single-source-of-truth, but several still-imperative call
+sites slip through `ProcessBuilder.waitFor()`, `synchronized {}`, and
+`System.*`/`java.*` references in `commonMain`. Each is a CCEK-role element
+that needs to forward through the CCEK context (suspending coroutines)
+instead of running on the caller's stack. The merge path is to wrap every
+blocking operation in `withContext(Dispatchers.IO)` plus a real
+`waitFor/timeout`, then route its result through `NioSupervisor` /
+`MuxReactorElement` so the coroutine scheduler owns cancellation.
+
 ---
 
 ## 8. Surfaces a maintainer will touch
