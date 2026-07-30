@@ -157,7 +157,10 @@ internal class UringFileChannel(
         return buf
     }
 
-    override fun lock(position: Long, size: Long, shared: Boolean): FileLock = FileLock(this, position, size, shared)
+    override fun lock(position: Long, size: Long, shared: Boolean): FileLock = object : FileLock(this, position, size, shared) {
+        override fun isValid(): Boolean = acquiredBy().isOpen()
+        override fun release() {}
+    }
     override fun lock(): FileLock = lock(0, size(), true)
     override fun tryLock(position: Long, size: Long, shared: Boolean): FileLock? = null
     override fun tryLock(): FileLock? = null

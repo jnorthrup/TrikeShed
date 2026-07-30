@@ -12,21 +12,21 @@ import borg.trikeshed.userspace.nio.file.attribute.FileAttribute
 // Declarations intentionally mirror JDK taxonomy and contain no implementations.
 public abstract class AsynchronousFileChannel {
     protected constructor()
-    fun size(): Long = TODO("NIO common stub")
-    fun truncate(size: Long): AsynchronousFileChannel = TODO("NIO common stub")
-    fun force(metaData: Boolean): Unit = TODO("NIO common stub")
-    fun <A> lock(position: Long, size: Long, shared: Boolean, attachment: A, handler: CompletionHandler<FileLock, in A>): Unit = TODO("NIO common stub")
-    fun <A> lock(attachment: A, handler: CompletionHandler<FileLock, in A>): Unit = TODO("NIO common stub")
-    fun lock(position: Long, size: Long, shared: Boolean): FileLock = TODO("NIO common stub")
-    fun lock(): FileLock = TODO("NIO common stub")
-    fun tryLock(position: Long, size: Long, shared: Boolean): FileLock = TODO("NIO common stub")
-    fun tryLock(): FileLock = TODO("NIO common stub")
-    fun <A> read(dst: ByteBuffer, position: Long, attachment: A, handler: CompletionHandler<Int, in A>): Unit = TODO("NIO common stub")
-    fun read(dst: ByteBuffer, position: Long): Int = TODO("NIO common stub")
-    fun <A> write(src: ByteSeries, position: Long, attachment: A, handler: CompletionHandler<Int, in A>): Unit = TODO("NIO common stub")
-    fun write(src: ByteSeries, position: Long): Int = TODO("NIO common stub")
+    abstract fun size(): Long
+    abstract fun truncate(size: Long): AsynchronousFileChannel
+    abstract fun force(metaData: Boolean): Unit
+    abstract fun <A> lock(position: Long, size: Long, shared: Boolean, attachment: A, handler: CompletionHandler<FileLock, in A>): Unit
+    abstract fun <A> lock(attachment: A, handler: CompletionHandler<FileLock, in A>): Unit
+    abstract fun lock(position: Long, size: Long, shared: Boolean): FileLock
+    abstract fun lock(): FileLock
+    abstract fun tryLock(position: Long, size: Long, shared: Boolean): FileLock
+    abstract fun tryLock(): FileLock
+    abstract fun <A> read(dst: ByteBuffer, position: Long, attachment: A, handler: CompletionHandler<Int, in A>): Unit
+    abstract fun read(dst: ByteBuffer, position: Long): Int
+    abstract fun <A> write(src: ByteSeries, position: Long, attachment: A, handler: CompletionHandler<Int, in A>): Unit
+    abstract fun write(src: ByteSeries, position: Long): Int
     companion object {
-        fun `open`(path: Path, options: Set<OpenOption>, vararg attrs: FileAttribute<*>): AsynchronousFileChannel = TODO("NIO common stub")
-        fun `open`(path: Path, vararg options: OpenOption): AsynchronousFileChannel = TODO("NIO common stub")
+        fun `open`(path: Path, options: Set<OpenOption>, vararg attrs: FileAttribute<*>): AsynchronousFileChannel = TODO("NIO stub - no AsyncFileChannel")
+        fun `open`(path: Path, vararg options: OpenOption): AsynchronousFileChannel = `open`(path, options.toSet())
     }
 }
