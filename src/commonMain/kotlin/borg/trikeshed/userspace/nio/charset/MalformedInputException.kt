@@ -5,6 +5,9 @@ package borg.trikeshed.userspace.nio.charset
 // Generated from Amazon Corretto JDK 25 java.base NIO public/protected API via javap.
 // Declarations intentionally mirror JDK taxonomy and contain no implementations.
 public open class MalformedInputException(message: String = "Malformed input") : borg.trikeshed.userspace.nio.charset.CharacterCodingException(message) {
-    constructor(p0: Int) : this("Malformed input length=$p0")
-    fun getInputLength(): Int = TODO("NIO common stub")
+    private var _inputLength: Int = -1
+    constructor(p0: Int) : this("Malformed input length=$p0") {
+        _inputLength = p0
+    }
+    fun getInputLength(): Int = _inputLength
 }
