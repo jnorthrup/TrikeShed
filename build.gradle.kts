@@ -132,6 +132,7 @@ kotlin {
 <<<<<<< ours
 <<<<<<< ours
 <<<<<<< ours
+<<<<<<< ours
 
 =======
 >>>>>>> theirs
@@ -139,6 +140,9 @@ kotlin {
 
 >>>>>>> theirs
 =======
+>>>>>>> theirs
+=======
+
 >>>>>>> theirs
         macosArm64("macos") {
             compilations.getByName("main") {
