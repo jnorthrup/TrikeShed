@@ -10,6 +10,8 @@ import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
+import kotlin.test.assertTrue
+import kotlin.test.assertFalse
 import kotlin.coroutines.coroutineContext
 
 class KeyMuxTest {
@@ -98,6 +100,27 @@ class KeyMuxTest {
         assertEquals("a.b.", "a.b.".toKeyPath().asString())
         assertEquals(".a.b", ".a.b".toKeyPath().asString())
         assertEquals("a..b", "a..b".toKeyPath().asString())
+    }
+
+    @Test
+    fun pathMatch_evaluatesPatternsCorrectly() {
+        // Exact string matches
+        assertTrue(pathMatch("api/users", "api/users"))
+
+        // Path length mismatches
+        assertFalse(pathMatch("api/users", "api/users/"))
+
+        // Case sensitivity constraints
+        assertFalse(pathMatch("api/users", "API/users"))
+
+        // Variable segment matching
+        assertTrue(pathMatch("users/:id/profile", "users/123/profile"))
+
+        // Variable segment matching negative case
+        assertFalse(pathMatch("users/:id/profile", "users/123/settings"))
+
+        // Consecutive slash edge cases
+        assertFalse(pathMatch("api//users", "api/users"))
     }
 
     @Test
