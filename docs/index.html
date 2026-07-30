@@ -4,7 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <meta name="theme-color" content="#ffffff" />
-  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="default" />
   <link rel="manifest" href="./manifest.webmanifest" />
   <link rel="icon" href="./icons/forge-icon.svg" type="image/svg+xml" />
@@ -682,8 +682,6 @@ button { font: inherit; color: inherit; background: none; border: none; cursor: 
 
   // ── Seed + persistence ──────────────────────────────────────────────
   const seedEl = document.getElementById('forge-seed');
-  let seed = {};
-  try { seed = JSON.parse(seedEl ? seedEl.textContent : '{}'); } catch (e) { seed = {}; }
 
   const LS_KEY = 'forge.workspace.v2';
 
