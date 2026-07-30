@@ -3,6 +3,7 @@ package borg.trikeshed.userspace.nio.channels.spi
 import borg.trikeshed.userspace.reactor.Interest
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlin.time.Duration
@@ -11,6 +12,8 @@ import java.nio.channels.Selector
 import java.nio.channels.spi.SelectorProvider as JdkSelectorProvider
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicInteger
+import kotlin.coroutines.resume
+import kotlin.coroutines.resumeWithException
 
 /**
  * JVM implementation of [ReactorOperations] using Java NIO Selector.
@@ -62,33 +65,60 @@ class JvmReactorOperations(
     }
 
     override suspend fun poll(timeout: Duration): List<ReactorSignal> {
-        val ms = if (timeout.isInfinite()) 0L else timeout.inWholeMilliseconds
+        return withContext(Dispatchers.IO) {
+            var result: List<ReactorSignal>? = null
+            while (isActive && result == null) {
+                result = suspendCancellableCoroutine { cont ->
+                    cont.invokeOnCancellation {
+                        selector.wakeup()
+                    }
 
-        return withContext(kotlinx.coroutines.Dispatchers.IO) {
-            var n = 0
-            try {
-                n = if (ms == 0L) selector.selectNow() else selector.select(ms)
-            } catch (e: Exception) {
-                throw e
-            }
+                    var n = 0
+                    try {
+                        if (timeout == Duration.ZERO) {
+                            n = selector.selectNow()
+                        } else {
+                            // Constraint 1: Every blocking IO call has a JVM-level timeout.
+                            // We use 1000ms max timeout if duration is infinite.
+                            val ms = if (timeout.isInfinite()) 1000L else timeout.inWholeMilliseconds.coerceAtLeast(1L)
+                            n = selector.select(ms)
+                        }
+                    } catch (e: Exception) {
+                        if (cont.isActive) {
+                            cont.resumeWithException(e)
+                        }
+                        return@suspendCancellableCoroutine
+                    }
 
-            if (n == 0) {
-                emptyList()
-            } else {
-                val ready = selector.selectedKeys().mapNotNull { key ->
-                    val fd = fdRegistry.entries.firstOrNull { it.value.channel == key.channel() }?.key
-                        ?: return@mapNotNull null
-                    val sig = mutableSetOf<Interest>()
-                    if (key.isReadable) sig.add(Interest.READ)
-                    if (key.isWritable) sig.add(Interest.WRITE)
-                    if (key.isAcceptable) sig.add(Interest.ACCEPT)
-                    if (key.isConnectable) sig.add(Interest.CONNECT)
-                    val userData = fdRegistry[fd]?.userData ?: 0L
-                    ReactorSignal(fd, sig, userData)
+                    if (n == 0) {
+                        if (cont.isActive) {
+                            if (!timeout.isInfinite()) {
+                                cont.resume(emptyList())
+                            } else {
+                                // Resume with null to loop again in the while loop
+                                cont.resume(null)
+                            }
+                        }
+                    } else {
+                        val ready = selector.selectedKeys().mapNotNull { key ->
+                            val fd = fdRegistry.entries.firstOrNull { it.value.channel == key.channel() }?.key
+                                ?: return@mapNotNull null
+                            val sig = mutableSetOf<Interest>()
+                            if (key.isReadable) sig.add(Interest.READ)
+                            if (key.isWritable) sig.add(Interest.WRITE)
+                            if (key.isAcceptable) sig.add(Interest.ACCEPT)
+                            if (key.isConnectable) sig.add(Interest.CONNECT)
+                            val userData = fdRegistry[fd]?.userData ?: 0L
+                            ReactorSignal(fd, sig, userData)
+                        }
+                        selector.selectedKeys().clear()
+                        if (cont.isActive) {
+                            cont.resume(ready)
+                        }
+                    }
                 }
-                selector.selectedKeys().clear()
-                ready
             }
+            result ?: emptyList()
         }
     }
 
