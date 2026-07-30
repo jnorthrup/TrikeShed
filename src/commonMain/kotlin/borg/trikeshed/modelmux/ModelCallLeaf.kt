@@ -1,6 +1,7 @@
 package borg.trikeshed.modelmux
 
 import borg.trikeshed.lib.AppendWal
+import borg.trikeshed.cursor.currentTimeMillis
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.Dispatchers
 
@@ -29,15 +30,15 @@ class ModelCallLeaf(private val wal: AppendWal) {
         provider: String,
         action: String,
         prompt: String,
-    ): Long = withContext(Dispatchers.IO) {
+    ): Long = withContext(Dispatchers.Default) {
         wal.append(
             key = "assess:$callId",
-            payload = """{"t":"assess","callId":"${esc(callId)}","cardId":"${esc(cardId)}","modelId":"${esc(modelId)}","provider":"${esc(provider)}","action":"${esc(action)}","prompt":"${esc(prompt)}","at":${System.currentTimeMillis()}}""".encodeToByteArray()
+            payload = """{"t":"assess","callId":"${esc(callId)}","cardId":"${esc(cardId)}","modelId":"${esc(modelId)}","provider":"${esc(provider)}","action":"${esc(action)}","prompt":"${esc(prompt)}","at":${currentTimeMillis()}}""".encodeToByteArray()
         )
     }
 
     /** Append a real response receipt. */
-    suspend fun appendReceipt(receipt: ModelResponseReceipt): Long = withContext(Dispatchers.IO) {
+    suspend fun appendReceipt(receipt: ModelResponseReceipt): Long = withContext(Dispatchers.Default) {
         wal.append(
             key = "receipt:${receipt.receiptId}",
             payload = receipt.toJsonLine().encodeToByteArray()
@@ -50,10 +51,10 @@ class ModelCallLeaf(private val wal: AppendWal) {
      * row is the cheap observer-friendly audit trail in addition to
      * the field inside the receipt.
      */
-    suspend fun appendAssociation(callId: String, receiptId: String): Long = withContext(Dispatchers.IO) {
+    suspend fun appendAssociation(callId: String, receiptId: String): Long = withContext(Dispatchers.Default) {
         wal.append(
             key = "associate:$callId:$receiptId",
-            payload = """{"t":"associate","callId":"${esc(callId)}","receiptId":"${esc(receiptId)}","at":${System.currentTimeMillis()}}""".encodeToByteArray()
+            payload = """{"t":"associate","callId":"${esc(callId)}","receiptId":"${esc(receiptId)}","at":${currentTimeMillis()}}""".encodeToByteArray()
         )
     }
 
