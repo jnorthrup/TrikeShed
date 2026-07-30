@@ -171,8 +171,8 @@ class MuxReactorElement(
      * Callers submit taxonomy events here instead of emitting directly into the
      * public kanban SharedFlow.
      */
-    fun ingestTaxonomyEvents(events: List<KanbanEvent.TaxonomyNodeCreated>): Int {
-        events.forEach(::emitKanbanEvent)
+    suspend fun ingestTaxonomyEvents(events: List<KanbanEvent.TaxonomyNodeCreated>): Int {
+        events.forEach { _kanbanEvents.emit(it) }
         return events.size
     }
 
