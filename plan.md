@@ -1,3 +1,4 @@
+<<<<<<< ours
 1. **Forge Dashboards surface in `ForgeWorkspace.kt` (JVM shell)**
     - Import `currentNioCapabilityReport` and `OroborosDaemon`.
     - Retrieve the capability report using `borg.trikeshed.userspace.nio.spi.currentNioCapabilityReport()`.
@@ -18,3 +19,10 @@
 3. **Verify and Pre-commit**
     - Ensure tests pass with `./gradlew :jvmMainClasses --no-daemon`.
     - Run pre-commit checks and submit.
+=======
+1. Use `replace_with_git_merge_diff` to modify `src/nativeMain/kotlin/borg/trikeshed/cli/htx/HtxAria2CliNative.kt` to add a comment inside the `main` function stating that arguments are captured and stored in `NativeMainArguments.args`.
+2. Use `replace_with_git_merge_diff` to modify `src/linuxMain/kotlin/linux_uring/placeholder/KioUring.kt` to add a comment inside the `main` function stating that arguments are captured and stored in `NativeMainArguments.args`.
+3. Use `run_in_bash_session` to execute `./gradlew linuxX64Test --tests "*nio*"` to verify structural correctness.
+4. Complete pre-commit steps to ensure proper testing, verification, review, and reflection are done.
+5. Use the `submit` tool to finish the task.
+>>>>>>> theirs
