@@ -608,6 +608,7 @@ class FlywheelDriver(
         data class PreparedClose(
             val arm: Arm,
             val tag: String,
+            val prUrl: String?,
         )
         val prepared = mutableListOf<PreparedClose>()
         for (arm in landed) {
@@ -665,7 +666,7 @@ class FlywheelDriver(
                 drainFail(s, "provenance WAL failed: ${t.message?.take(200)}")  // per-arm: record drainFail so the retry/retire counter advances like the tag path
                 continue  // per-arm: don't abandon the rest of the batch
             }
-            prepared += PreparedClose(arm, tag)
+            prepared += PreparedClose(arm, tag, prUrl)
         }
 
         // All per-arm tags, receipts, and identity records exist before any
@@ -677,11 +678,12 @@ class FlywheelDriver(
                 rejects = conflictFiles().size,
             )
         })
-        for ((arm, tag) in prepared) {
+        for ((arm, tag, prUrl) in prepared) {
             val (s, patchCid, _, branch) = arm
             _events.emit(FlywheelEvent.Drained(s.id, commitSha, tag))
             drainFailures.remove(s.id)
             println("[FLYWHEEL] PROVENANCE ${s.id.takeLast(6)} cid=${patchCid.value.take(16)} branch=${branch ?: "none"} tag=$tag")
+            sendMergeReceipt(s.id, commitSha, tag, patchCid, branch, prUrl)
         }
         return DrainBatch(
             harvested = prepared.size,
@@ -868,6 +870,40 @@ class FlywheelDriver(
                 continue
             }
             println("[FLYWHEEL] RECONCILE ${sessionId.takeLast(6)} branch=$branch tag=$tag")
+            sendMergeReceipt(sessionId, commitSha, tag, patchCid, branch, prUrl)
+        }
+    }
+
+    /**
+     * Post the merge receipt back onto the Jules task itself: merge timestamp,
+     * commit, tag, CAS patch id, branch and PR URL. The tag/commit/URL bond is
+     * the idempotency anchor — git ancestry and tag existence already veto
+     * dupe merges upstream, so this message fires exactly once per landed
+     * merge, preventing loops and backwash. Best-effort: a send failure never
+     * revokes provenance.
+     */
+    private suspend fun sendMergeReceipt(
+        sessionId: String,
+        commitSha: String,
+        tag: String,
+        patchCid: ContentId,
+        branch: String?,
+        prUrl: String?,
+    ) {
+        val msg = buildString {
+            appendLine("FLYWHEEL MERGE RECEIPT")
+            appendLine("mergedAt=${java.time.Instant.ofEpochMilli(System.currentTimeMillis())}")
+            appendLine("commit=$commitSha")
+            appendLine("tag=$tag")
+            appendLine("patchCid=${patchCid.value}")
+            appendLine("branch=${branch ?: "none"}")
+            append("pr=${prUrl ?: "none"}")
+        }
+        try {
+            conductor.answer(sessionId, msg)
+            println("[FLYWHEEL] RECEIPT ${sessionId.takeLast(6)} -> jules task tag=$tag")
+        } catch (t: Throwable) {
+            emitPollError("receipt send $sessionId: ${t.message?.take(200)}", 0)
         }
     }
 
