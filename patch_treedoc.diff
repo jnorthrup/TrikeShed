@@ -1,0 +1,129 @@
+--- src/commonMain/kotlin/borg/trikeshed/treedoc/TreeDocPipeline.kt
++++ src/commonMain/kotlin/borg/trikeshed/treedoc/TreeDocPipeline.kt
+@@ -10,6 +10,8 @@
+ import borg.trikeshed.userspace.nio.spi.NioSupervisor
+ import borg.trikeshed.cursor.nioSupervisor
+ import kotlin.coroutines.coroutineContext
++import kotlinx.coroutines.withContext
++import kotlinx.coroutines.Dispatchers
+ 
+ class TreeDocPipeline(
+     private val cas: CasStore,
+@@ -43,36 +45,39 @@
+     }
+ 
+     suspend fun archive(documents: Series<TreeDocument>): Series<Any?> {
+-        val nioSupervisor = coroutineContext.nioSupervisor()
+         var frameCount = 0
+         val framesList = mutableListOf<RowVec>()
+         val docFirstFrame = IntArray(documents.size)
+         val docFrameCount = IntArray(documents.size)
+ 
+-        for (docOrdinal in 0 until documents.size) {
+-            val doc = documents.b(docOrdinal)
+-            val bytes = doc.bytes
+-            docFirstFrame[docOrdinal] = frameCount
+-
+-            if (bytes.isEmpty()) {
+-                val chunk = ByteArray(0)
+-                val cid = cas.put(chunk)
+-                val rowValues: Series<Any?> = 2 j { i: Int -> if (i == 0) docOrdinal else cid }
+-                framesList.add(createFrameRow(rowValues))
+-                frameCount++
+-                docFrameCount[docOrdinal] = 1
+-                continue
++        withContext(Dispatchers.Default) {
++            // NioSupervisor check logic should really just be a marker if CAS has no suspend
++            val nioSupervisor = coroutineContext.nioSupervisor()
++            for (docOrdinal in 0 until documents.size) {
++                val doc = documents.b(docOrdinal)
++                val bytes = doc.bytes
++                docFirstFrame[docOrdinal] = frameCount
++
++                if (bytes.isEmpty()) {
++                    val chunk = ByteArray(0)
++                    val cid = cas.put(chunk) // Still synchronous CAS put
++                    val rowValues: Series<Any?> = 2 j { i: Int -> if (i == 0) docOrdinal else cid }
++                    framesList.add(createFrameRow(rowValues))
++                    frameCount++
++                    docFrameCount[docOrdinal] = 1
++                    continue
++                }
++
++                var offset = 0
++                while (offset < bytes.size) {
++                    val length = minOf(maxFrameBytes, bytes.size - offset)
++                    val chunk = bytes.sliceArray(offset until offset + length)
++                    val cid = cas.put(chunk) // Still synchronous CAS put
++
++                    val rowValues: Series<Any?> = 2 j { i: Int -> if (i == 0) docOrdinal else cid }
++                    framesList.add(createFrameRow(rowValues))
++
++                    frameCount++
++                    offset += length
++                }
++                docFrameCount[docOrdinal] = frameCount - docFirstFrame[docOrdinal]
+             }
+-
+-            var offset = 0
+-            while (offset < bytes.size) {
+-                val length = minOf(maxFrameBytes, bytes.size - offset)
+-                val chunk = bytes.sliceArray(offset until offset + length)
+-                val cid = cas.put(chunk)
+-
+-                val rowValues: Series<Any?> = 2 j { i: Int -> if (i == 0) docOrdinal else cid }
+-                framesList.add(createFrameRow(rowValues))
+-
+-                frameCount++
+-                offset += length
+-            }
+-            docFrameCount[docOrdinal] = frameCount - docFirstFrame[docOrdinal]
+         }
+ 
+         val frames: Cursor = framesList.size j { framesList[it] }
+@@ -204,36 +209,39 @@
+     }
+ 
+     suspend fun replay(archive: Series<Any?>, ordinal: Int): ByteArray {
+-        val nioSupervisor = coroutineContext.nioSupervisor()
+         val frames = archive.b(TreeDocK.Frames.ordinal) as Cursor
+         val documents = archive.b(TreeDocK.Documents.ordinal) as Cursor
+ 
+         if (ordinal < 0 || ordinal >= documents.size) {
+             throw IllegalArgumentException("Invalid document ordinal: $ordinal")
+         }
+ 
+         val docVals = (documents.b(ordinal) as borg.trikeshed.cursor.ReifiedSplitSeries2<Any?, `ColumnMeta↻`>).leftSeries
+         val expectedCid = docVals.b(2) as ContentId
+         val firstFrame = docVals.b(3) as Int
+         val docFrameCount = docVals.b(4) as Int
+ 
+         var totalBytes = 0
+         val chunks = mutableListOf<ByteArray>()
+ 
+-        // Direct slice — doc cursor carries firstFrameOrdinal/frameCount so
+-        // restore is O(f_d) not O(F). No scan over the full frame cursor.
+-        for (i in firstFrame until firstFrame + docFrameCount) {
+-            val frame = frames.b(i)
+-            val vals = (frame as borg.trikeshed.cursor.ReifiedSplitSeries2<Any?, `ColumnMeta↻`>).leftSeries
+-            val cid = vals.b(1) as ContentId
+-            val chunk = cas.get(cid) ?: throw IllegalStateException("CAS corruption: chunk $cid not found")
+-            // cas.get verifies the digest implicitly
+-            chunks.add(chunk)
+-            totalBytes += chunk.size
++        withContext(Dispatchers.Default) {
++            val nioSupervisor = coroutineContext.nioSupervisor()
++            // Direct slice — doc cursor carries firstFrameOrdinal/frameCount so
++            // restore is O(f_d) not O(F). No scan over the full frame cursor.
++            for (i in firstFrame until firstFrame + docFrameCount) {
++                val frame = frames.b(i)
++                val vals = (frame as borg.trikeshed.cursor.ReifiedSplitSeries2<Any?, `ColumnMeta↻`>).leftSeries
++                val cid = vals.b(1) as ContentId
++                val chunk = cas.get(cid) ?: throw IllegalStateException("CAS corruption: chunk $cid not found")
++                // cas.get verifies the digest implicitly
++                chunks.add(chunk)
++                totalBytes += chunk.size
++            }
+         }
+ 
+         val result = ByteArray(totalBytes)

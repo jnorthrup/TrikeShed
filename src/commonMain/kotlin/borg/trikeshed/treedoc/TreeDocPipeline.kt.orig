@@ -11,7 +11,6 @@ import borg.trikeshed.parse.confix.Syntax
 import borg.trikeshed.userspace.nio.spi.NioSupervisor
 import borg.trikeshed.cursor.nioSupervisor
 import kotlin.coroutines.coroutineContext
-import kotlinx.coroutines.withContext
 
 class TreeDocPipeline(
     private val cas: CasStore,
@@ -45,7 +44,6 @@ class TreeDocPipeline(
     }
 
     suspend fun archive(documents: Series<TreeDocument>): Series<Any?> {
-        val nioSupervisor = coroutineContext.nioSupervisor()
         var frameCount = 0
         val framesList = mutableListOf<RowVec>()
         val docFirstFrame = IntArray(documents.size)
@@ -209,7 +207,6 @@ class TreeDocPipeline(
     }
 
     suspend fun replay(archive: Series<Any?>, ordinal: Int): ByteArray {
-        val nioSupervisor = coroutineContext.nioSupervisor()
         val frames = archive.b(TreeDocK.Frames.ordinal) as Cursor
         val documents = archive.b(TreeDocK.Documents.ordinal) as Cursor
 
