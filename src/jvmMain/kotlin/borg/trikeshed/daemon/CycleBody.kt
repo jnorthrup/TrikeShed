@@ -49,13 +49,25 @@ class CycleBody(
                     .start()
                 val markerProbeFinished = markerProbe.waitFor(5, java.util.concurrent.TimeUnit.SECONDS)
                 val markerFiles = if (markerProbeFinished && markerProbe.exitValue() == 0) {
-                    markerProbe.inputStream.bufferedReader().readText().trim()
+                    val actualMarkers = mutableListOf<String>()
+                    val markerPaths = markerProbe.inputStream.bufferedReader().readLines()
+                    for (path in markerPaths) {
+                        val markerFile = java.io.File(repoDir, path)
+                        if (!markerFile.isFile) continue
+                        for (line in markerFile.readLines()) {
+                            if (line.startsWith("<<<<<<< ") && line != "<<<<<<< SEARCH") {
+                                actualMarkers.add(path)
+                                break
+                            }
+                        }
+                    }
+                    actualMarkers.joinToString(",")
                 } else {
                     if (!markerProbeFinished) markerProbe.destroyForcibly()
                     ""
                 }
                 if (markerFiles.isNotEmpty()) {
-                    System.err.println("[OROBOROS] conflict quarantine; cycle paused for: ${markerFiles.replace('\n', ',')}")
+                    System.err.println("[OROBOROS] conflict quarantine; cycle paused for: $markerFiles")
                     consecutivePollErrors.incrementAndGet()
                     return
                 }
