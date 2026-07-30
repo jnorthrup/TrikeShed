@@ -14,7 +14,16 @@ actual fun platformNioProviders(): List<CoroutineContext.Element> {
     val reactorOperations = JvmReactorOperations()
     val tlsBackend = JvmTlsCodecBackend()
 
+    val report = NioCapabilityReport(
+        backendName = "jvm_nio",
+        ioUringAvailable = false,
+        capabilities = listOf("read", "write", "fsync", "poll", "net"),
+        kernelHint = "",
+        checkedAt = kotlinx.datetime.Clock.System.now().toEpochMilliseconds(),
+    )
+
     return listOf(
+        report,
         JvmFileOperations(),
         JvmSystemOperations(),
         channelOperations,

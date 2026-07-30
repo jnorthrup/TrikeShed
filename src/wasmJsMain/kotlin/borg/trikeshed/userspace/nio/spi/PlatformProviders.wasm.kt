@@ -8,6 +8,13 @@ import borg.trikeshed.userspace.nio.file.spi.WasmSystemOperations
 import kotlin.coroutines.CoroutineContext
 
 actual fun platformNioProviders(): List<CoroutineContext.Element> = listOf(
+    NioCapabilityReport(
+        backendName = "wasm_js_fetch",
+        ioUringAvailable = false,
+        capabilities = listOf("net", "read", "write"),
+        kernelHint = "",
+        checkedAt = kotlinx.datetime.Clock.System.now().toEpochMilliseconds(),
+    ),
     WasmFileOperations(),
     WasmSystemOperations(),
     WasmChannelOperations(),

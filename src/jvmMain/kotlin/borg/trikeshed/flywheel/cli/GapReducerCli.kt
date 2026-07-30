@@ -8,6 +8,10 @@ import borg.trikeshed.utils.kanban.JulesBoardStore
 import borg.trikeshed.utils.kanban.forForgeDir
 import kotlinx.coroutines.runBlocking
 import java.io.File
+import borg.trikeshed.parse.json.JsonSupport
+import borg.trikeshed.lib.Series
+import borg.trikeshed.lib.toSeries
+import kotlin.system.exitProcess
 
 /**
  * Gap reducer — the flywheel's intake producer.
@@ -30,8 +34,26 @@ import java.io.File
  *   PARTIAL  → chore    (works but incomplete/has open edges documented in README)
  */
 fun main(args: Array<String>) {
-    val repoDir = File(args.getOrElse(0) { System.getProperty("user.dir") })
-    val forgeDir = File(args.getOrElse(1) { System.getProperty("user.home") + "/.local/forge" })
+    // 1. Reads JSON input
+    val isLegacyMode = args.size != 1 && args.getOrNull(0) != "-"
+
+    val inputSeries: Series<Double>? = if (!isLegacyMode) {
+        val jsonSource = if (args[0] == "-") readln() else File(args[0]).readText()
+        // 2. Parses it into a Series<Double> using Confix
+        val parsedList = JsonSupport.parse(jsonSource) as? List<*>
+        (parsedList ?: emptyList<Any>()).mapNotNull {
+            when (it) {
+                is Number -> it.toDouble()
+                is String -> it.toDoubleOrNull()
+                else -> null
+            }
+        }.toSeries()
+    } else {
+        null
+    }
+
+    val repoDir = if (isLegacyMode) File(args.getOrElse(0) { System.getProperty("user.dir") }) else File(System.getProperty("user.dir"))
+    val forgeDir = if (isLegacyMode) File(args.getOrElse(1) { System.getProperty("user.home") + "/.local/forge" }) else File(System.getProperty("user.home") + "/.local/forge")
     val readme = File(repoDir, "README.md")
     require(readme.exists()) { "README.md not found at $readme" }
 
@@ -124,7 +146,30 @@ fun main(args: Array<String>) {
         for (gap in gaps.filter { it.workId in alreadyKnown }) {
             println("  = ${gap.workId} (already queued)")
         }
+
+        if (inputSeries != null) {
+            // 3. Calls the core logic
+            val result = GapReducer(repoDir, readme).reduce()
+            // 4. Serialises the result back to JSON and prints it
+            val resultJson = JsonSupport.stringify(result.map {
+                mapOf(
+                    "workId" to it.workId,
+                    "tier" to it.tier,
+                    "title" to it.title,
+                    "spec" to it.spec,
+                    "parent" to it.parent,
+                    "score" to it.score,
+                    "supersedes" to it.supersedes.toList()
+                )
+            })
+            println("Reducer output:")
+            println(resultJson)
+        }
     }
+}
+
+private fun printUsage() {
+    println("Usage: GapReducerCli <path/to/file.json | ->")
 }
 
 private fun gitHead(repoDir: File): String = try {
