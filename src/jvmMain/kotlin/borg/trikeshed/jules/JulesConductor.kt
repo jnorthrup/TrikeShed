@@ -162,7 +162,9 @@ class JulesConductor(
                     workId = sessionId,
                     producer = "retired",
                     producerRef = sessionId,
-                    patchCid = borg.trikeshed.job.ContentId("retired"),
+                    patchCid = borg.trikeshed.job.ContentId.of(
+                        "retired:$sessionId:$reason".encodeToByteArray()
+                    ),
                     revision = "outbox-${sessionId.take(8)}",
                     versionTag = "retired",
                     lexicalMemory = borg.trikeshed.util.oroboros.LexicalMemory(summary = reason, title = reason, content = ""),

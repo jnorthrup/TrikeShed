@@ -1,6 +1,9 @@
 package borg.trikeshed.flywheel.cli
 
+import borg.trikeshed.job.ContentId
 import borg.trikeshed.jules.JulesCause
+import borg.trikeshed.util.oroboros.LexicalMemory
+import borg.trikeshed.util.oroboros.MergeReceipt
 import borg.trikeshed.utils.kanban.JulesBoardStore
 import borg.trikeshed.utils.kanban.forForgeDir
 import kotlinx.coroutines.runBlocking
@@ -35,9 +38,65 @@ fun main(args: Array<String>) {
     val store = JulesBoardStore.forForgeDir(forgeDir)
 
     runBlocking {
-        val alreadyKnown = store.loadQueue().map { it.workId }.toSet()
+        val queueBefore = store.loadQueue()
         val gaps = GapReducer(repoDir, readme).reduce()
-        val fresh = gaps.filter { it.workId !in alreadyKnown }
+        val replacementByOldWorkId = buildMap {
+            for (gap in gaps) {
+                for (oldWorkId in gap.supersedes) put(oldWorkId, gap)
+            }
+        }
+        val revision = gitHead(repoDir)
+        val now = System.currentTimeMillis()
+        val superseded = queueBefore.mapNotNull { entry ->
+            val replacement = replacementByOldWorkId[entry.workId] ?: return@mapNotNull null
+            if (entry.isDispatched || entry.isDrained) return@mapNotNull null
+            entry to replacement
+        }
+        for ((entry, replacement) in superseded) {
+            val receipt = MergeReceipt(
+                workId = entry.workId,
+                producer = "gap-reducer-superseded",
+                producerRef = replacement.workId,
+                patchCid = ContentId.of("${entry.workId}->${replacement.workId}".encodeToByteArray()),
+                revision = revision,
+                versionTag = replacement.workId,
+                lexicalMemory = LexicalMemory(
+                    summary = "Superseded by dependency-local RGA context",
+                    title = entry.title,
+                    content = replacement.title,
+                ),
+                claimedAt = now,
+            )
+            store.appendWork(entry.workId, JulesCause.WorkDrained(
+                workId = entry.workId,
+                sessionId = "superseded:${entry.workId}",
+                commitSha = revision,
+                taskId = replacement.workId,
+                receipt = receipt,
+                at = now,
+            ))
+        }
+
+        val queue = store.loadQueue()
+        val alreadyKnown = queue.map { it.workId }.toSet()
+        val activeWorkIds = queue.asSequence()
+            .filter { it.isDispatched && !it.isDrained }
+            .map { it.workId }
+            .toSet()
+        val openGroupParents = queue.asSequence()
+            .filter { !it.isDrained && it.workId.startsWith("gap:rga:") }
+            .mapNotNull { it.parent }
+            .toSet()
+        val fresh = gaps.asSequence()
+            .filter { it.workId !in alreadyKnown }
+            .filter { gap ->
+                gap.supersedes.isEmpty() ||
+                    (gap.parent !in openGroupParents && gap.supersedes.none { it in activeWorkIds })
+            }
+            // One task per locality per reducer pass. The next pass reads the
+            // landed code and emits the next current slice for that locality.
+            .distinctBy { gap -> if (gap.supersedes.isEmpty()) gap.workId else gap.parent }
+            .toList()
 
         for (gap in fresh) {
             store.appendWork(gap.workId, JulesCause.WorkQueued(
@@ -50,14 +109,38 @@ fun main(args: Array<String>) {
                 at = System.currentTimeMillis(),
             ))
         }
-        println("[GAP-REDUCER] ${gaps.size} gaps found, ${fresh.size} new (dedup ${alreadyKnown.size} known)")
+        val deferred = gaps.count { gap -> gap.workId !in alreadyKnown && gap !in fresh }
+        println(
+            "[GAP-REDUCER] ${gaps.size} current gaps, ${fresh.size} new, " +
+                "${superseded.size} single-file entries superseded, $deferred locality slices deferred " +
+                "(dedup ${alreadyKnown.size} known)"
+        )
+        for ((entry, replacement) in superseded) {
+            println("  > ${entry.workId} -> ${replacement.parent}")
+        }
         for (gap in fresh) {
             println("  + ${gap.workId} [${gap.tier}] ${gap.title}")
         }
-        for (gap in gaps.minus(fresh.toSet())) {
+        for (gap in gaps.filter { it.workId in alreadyKnown }) {
             println("  = ${gap.workId} (already queued)")
         }
     }
+}
+
+private fun gitHead(repoDir: File): String = try {
+    val process = ProcessBuilder("git", "rev-parse", "HEAD")
+        .directory(repoDir)
+        .redirectErrorStream(true)
+        .start()
+    val finished = process.waitFor(10, java.util.concurrent.TimeUnit.SECONDS)
+    if (finished && process.exitValue() == 0) {
+        process.inputStream.bufferedReader().readText().trim()
+    } else {
+        if (!finished) process.destroyForcibly()
+        "unknown"
+    }
+} catch (_: Throwable) {
+    "unknown"
 }
 
 /**
@@ -81,51 +164,72 @@ class GapReducer(
         val spec: String,
         val parent: String? = null,
         val score: Double,
+        /** File-level workIds this dependency-local context replaces. */
+        val supersedes: Set<String> = emptySet(),
     )
 
     fun reduce(): List<Gap> {
         val gaps = mutableListOf<Gap>()
         val sourceRoot = File(repoDir, "src")
         val readmeText = readme.readText()
-        val now = System.currentTimeMillis()
         val reducerSource = File(repoDir, "src/jvmMain/kotlin/borg/trikeshed/flywheel/cli/GapReducerCli.kt")
 
         // The classfile/slab contracts are deliberately excluded from commonMain
         // (build.gradle.kts:176-180), so they are not dispatchable product work.
 
-        // ── 1. Non-slab TODO() stubs in production code ─────────────────
-        // Scan the full production source tree (all source sets, all packages)
-        // so the reducer never exhausts while stubs remain anywhere.
-        val productionDirs = sourceRoot.listFiles()
+        // ── 1. Current production TODO gaps, grouped by dependency locality ──
+        // Read each production root exactly once. The old nested-directory walk
+        // emitted one work item per file and dispatched a 15-agent thundering herd
+        // into userspace/nio/file/attribute. Context groups serialize one coherent
+        // concept at a time and their fingerprint changes as landed work removes
+        // TODOs, so the next reducer pass starts from current progress.
+        val productionRoots = sourceRoot.listFiles()
             ?.filter { it.isDirectory && it.name.endsWith("Main") }
-            ?.flatMap { mainDir ->
-                val kotlinDir = File(mainDir, "kotlin")
-                if (kotlinDir.exists()) kotlinDir.walkTopDown()
-                    .filter { it.isDirectory }
-                    .toList()
-                else emptyList()
-            } ?: emptyList()
-        for (dir in productionDirs) {
-            val stubs = scanStubs(dir)
-            for (stub in stubs) {
-                val relPath = dir.relativeTo(sourceRoot).path + "/" + stub.path
-                val workId = "gap:stub:${relPath.replace('/', ':')}"
-                val fileName = stub.path.substringAfterLast('/')
+            ?.map { File(it, "kotlin") }
+            ?.filter { it.exists() }
+            ?: emptyList()
+        val stubs = productionRoots.flatMap { root ->
+            scanStubs(root).map { stub ->
+                stub.copy(path = root.relativeTo(sourceRoot).path + "/" + stub.path)
+            }
+        }.distinctBy { "${it.path}:${it.line}:${it.source}" }
+
+        for ((context, contextStubs) in stubs.groupBy(::stubContext).entries.sortedBy { it.key.key }) {
+            val fileChunks = contextStubs.map { it.path }.distinct().sorted().chunked(MAX_CONTEXT_FILES)
+            for ((chunkIndex, chunkFiles) in fileChunks.withIndex()) {
+                val chunkStubs = contextStubs.filter { it.path in chunkFiles }
+                val signature = chunkStubs.sortedWith(compareBy(StubHit::path, StubHit::source))
+                    .joinToString("\n") { "${it.path}:${it.source}" }
+                val fingerprint = ContentId.of(signature.encodeToByteArray()).hex.take(12)
+                val slice = if (fileChunks.size == 1) context.key else "${context.key}-${chunkIndex + 1}"
+                val evidence = chunkStubs.groupBy { it.path }.entries
+                    .sortedBy { it.key }
+                    .joinToString("\n") { (path, hits) ->
+                        "src/$path: TODO lines ${hits.map { it.line }.distinct().sorted().joinToString(",")}"
+                    }
+                val supersedes = chunkFiles.mapTo(mutableSetOf()) { path ->
+                    "gap:stub:${path.replace('/', ':')}"
+                }
                 gaps.add(Gap(
-                    workId = workId,
+                    workId = "gap:rga:$slice:$fingerprint",
                     tier = "task",
-                    title = "Fill stub: $fileName:${stub.line}",
+                    title = "RGA ${context.title}: ${chunkFiles.size} files, ${chunkStubs.size} current gaps",
                     spec = buildSpec(
-                        "Fill the TODO() stub at $relPath line ${stub.line}.",
-                        "The stub says: ${stub.todoText}",
+                        "RGA dependency-local context: ${context.title}",
+                        "README concept claim: ${context.claim}",
                         "",
-                        "This is production code (not compiled out). The stub will throw",
-                        "if executed. Implement the expected behavior by reading the",
-                        "surrounding class/interface contract.",
-                        "Source: src/$relPath"
+                        "Current executable evidence (TODO, not finished):",
+                        evidence,
+                        "",
+                        "Read the current definitions, compositions, and every production caller",
+                        "before editing. Implement the basic concept coherently across the listed",
+                        "files; preserve members that prior agents already finished. Do not expand",
+                        "outside this exact file set. Update README only if the concept is now real.",
+                        "Verification: ./gradlew :jvmMainClasses --no-daemon"
                     ),
-                    parent = "stubs",
-                    score = 0.6,
+                    parent = "rga:${context.key}",
+                    score = 0.65,
+                    supersedes = supersedes,
                 ))
             }
         }
@@ -246,7 +350,17 @@ class GapReducer(
 
     // ── helpers ────────────────────────────────────────────────────────
 
-    data class StubHit(val path: String, val line: Int, val todoText: String)
+    data class StubHit(
+        val path: String,
+        val line: Int,
+        val source: String,
+    )
+
+    private data class StubContext(
+        val key: String,
+        val title: String,
+        val claim: String,
+    )
 
     private fun scanStubs(dir: File): List<StubHit> {
         if (!dir.exists()) return emptyList()
@@ -255,17 +369,140 @@ class GapReducer(
             // Slab stubs are compiled out (build.gradle.kts) — not dispatchable work.
             if (file.path.contains("/slab/")) return@forEach
             file.readLines().forEachIndexed { i, line ->
-                val match = todoPattern.find(line)
-                if (match != null) {
+                val trimmed = line.trimStart()
+                if (trimmed.startsWith("//") || trimmed.startsWith("/*") || trimmed.startsWith("*")) {
+                    return@forEachIndexed
+                }
+                if (todoPattern.containsMatchIn(line)) {
                     val rel = file.relativeTo(dir).path
-                    hits.add(StubHit(rel, i + 1, match.groupValues[1].trim()))
+                    hits.add(StubHit(rel, i + 1, line.trim()))
                 }
             }
         }
         return hits
     }
 
-    private val todoPattern = Regex("""TODO\(([^)]*)\)""")
+    private val todoPattern = Regex("""\bTODO\s*\(""")
+
+    private fun stubContext(stub: StubHit): StubContext {
+        val path = stub.path
+        val file = path.substringAfterLast('/')
+        val posixClaim = "README.md:696 claims Posix IO utilities exist for kotlin-common, JVM, and native"
+        return when {
+            "/userspace/nio/file/attribute/" in path -> when (file) {
+                "AttributeView.kt", "FileAttributeView.kt", "FileAttribute.kt",
+                "FileStoreAttributeView.kt", "BasicFileAttributes.kt",
+                "BasicFileAttributeView.kt", "FileTime.kt" -> StubContext(
+                    "nio-attributes-basic",
+                    "basic file metadata and attribute views",
+                    posixClaim,
+                )
+                "UserPrincipal.kt", "GroupPrincipal.kt", "UserPrincipalLookupService.kt",
+                "UserPrincipalNotFoundException.kt", "FileOwnerAttributeView.kt",
+                "PosixFileAttributes.kt", "PosixFileAttributeView.kt",
+                "PosixFilePermissions.kt", "PosixFilePermission.kt" -> StubContext(
+                    "nio-attributes-posix",
+                    "POSIX ownership, principals, and permissions",
+                    posixClaim,
+                )
+                else -> StubContext(
+                    "nio-attributes-extended",
+                    "ACL, DOS, and user-defined file attributes",
+                    posixClaim,
+                )
+            }
+            "/userspace/nio/file/spi/" in path -> StubContext(
+                "nio-file-provider",
+                "file-system provider boundary",
+                posixClaim,
+            )
+            "/userspace/nio/file/" in path -> when {
+                file in FILE_PATH_SYSTEM_FILES -> StubContext(
+                    "nio-file-path-system",
+                    "path, file-system, and store model",
+                    posixClaim,
+                )
+                file in FILE_TRAVERSAL_FILES -> StubContext(
+                    "nio-file-traversal",
+                    "file traversal and directory streams",
+                    posixClaim,
+                )
+                file in FILE_WATCH_FILES -> StubContext(
+                    "nio-file-watch",
+                    "watch service, keys, and events",
+                    posixClaim,
+                )
+                file.endsWith("Exception.kt") -> StubContext(
+                    "nio-file-errors",
+                    "file-system error values",
+                    posixClaim,
+                )
+                else -> StubContext("nio-file-operations", "portable file operations", posixClaim)
+            }
+            "/userspace/nio/channels/" in path -> when {
+                file in CHANNEL_FILE_FILES -> StubContext(
+                    "nio-channel-file",
+                    "file channels and locks",
+                    posixClaim,
+                )
+                file.startsWith("Asynchronous") || file == "CompletionHandler.kt" -> StubContext(
+                    "nio-channel-async",
+                    "asynchronous channels and completion",
+                    posixClaim,
+                )
+                file in CHANNEL_SELECTOR_FILES || "/channels/spi/" in path -> StubContext(
+                    "nio-channel-selector",
+                    "selector, key, pipe, and provider lifecycle",
+                    posixClaim,
+                )
+                file in CHANNEL_SOCKET_FILES -> StubContext(
+                    "nio-channel-socket",
+                    "socket, datagram, and multicast channels",
+                    posixClaim,
+                )
+                else -> StubContext("nio-channel-byte", "byte-channel contracts and adapters", posixClaim)
+            }
+            "/userspace/nio/charset/" in path -> when (file) {
+                "CoderResult.kt", "CodingErrorAction.kt", "MalformedInputException.kt",
+                "UnmappableCharacterException.kt", "CharsetEncoder.kt", "CharsetDecoder.kt" -> StubContext(
+                    "nio-charset-codec",
+                    "charset codec results and error policy",
+                    posixClaim,
+                )
+                else -> StubContext("nio-charset-provider", "charset platform/provider boundary", posixClaim)
+            }
+            else -> {
+                val packagePath = path.substringBeforeLast('/').substringAfter("kotlin/")
+                StubContext(
+                    key = "pkg-" + packagePath.replace(Regex("[^A-Za-z0-9]+"), "-").trim('-').take(64),
+                    title = packagePath.substringAfterLast('/').ifBlank { "production package" },
+                    claim = "README concept map requires executable production behavior, not TODO facades",
+                )
+            }
+        }
+    }
+
+    private companion object {
+        const val MAX_CONTEXT_FILES = 6
+
+        val FILE_PATH_SYSTEM_FILES = setOf(
+            "Path.kt", "Paths.kt", "PathMatcher.kt", "FileSystem.kt", "FileSystems.kt", "FileStore.kt",
+        )
+        val FILE_TRAVERSAL_FILES = setOf(
+            "Files.kt", "FileVisitor.kt", "SimpleFileVisitor.kt", "DirectoryStream.kt", "SecureDirectoryStream.kt",
+        )
+        val FILE_WATCH_FILES = setOf(
+            "WatchService.kt", "WatchKey.kt", "WatchEvent.kt", "Watchable.kt", "StandardWatchEventKinds.kt",
+        )
+        val CHANNEL_FILE_FILES = setOf("FileChannel.kt", "FileLock.kt", "AsynchronousFileChannel.kt")
+        val CHANNEL_SELECTOR_FILES = setOf(
+            "Selector.kt", "SelectionKey.kt", "SelectableChannel.kt", "Pipe.kt", "AbstractSelector.kt",
+        )
+        val CHANNEL_SOCKET_FILES = setOf(
+            "SocketChannel.kt", "ServerSocketChannel.kt", "DatagramChannel.kt",
+            "NetworkChannel.kt", "MulticastChannel.kt", "MembershipKey.kt",
+        )
+    }
 
     private fun grepProduction(
         sourceRoot: File,
