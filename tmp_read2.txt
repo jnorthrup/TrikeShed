@@ -1,0 +1,1316 @@
+package borg.trikeshed.userspace.reactor
+
+import borg.trikeshed.context.AsyncContextElement
+import borg.trikeshed.context.AsyncContextKey
+import borg.trikeshed.context.ElementState
+import borg.trikeshed.userspace.reactor.KanbanFSM
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.channels.BufferOverflow
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharedFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asSharedFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.launch
+import kotlinx.datetime.Clock
+import kotlinx.serialization.Serializable
+import kotlin.coroutines.CoroutineContext
+
+/**
+ * Reactor-owned key/model muxer CCEK element.
+ *
+ * Kanban does not own keymux/modelmux state. The reactor owns this element and
+ * downstream consumers (Forge UI, Kanban FSM projections, planners) observe the
+ * immutable [flowState] snapshots or apply explicit events through this element.
+ */
+class MuxReactorElement(
+    parentJob: Job? = null,
+    initialConfig: MuxReactorConfig = MuxReactorConfig(),
+) : AsyncContextElement(ElementState.CREATED, parentJob) {
+    companion object Key : AsyncContextKey<MuxReactorElement>()
+
+    override val key: CoroutineContext.Key<*> get() = Key
+
+    private var config: MuxReactorConfig = initialConfig
+    private var tickSequence: Long = 0
+    private val keysById = mutableMapOf<String, MutableMuxKey>()
+    private val modelsById = mutableMapOf<String, MuxModelEntry>()
+    private val operationalHistory = mutableListOf<MuxOperationalEntry>()
+
+    private val _flowState = MutableStateFlow(emptyState(initialConfig))
+    val flowState: StateFlow<MuxReactorState> = _flowState.asStateFlow()
+
+    /**
+     * Reactor-owned modelmux cache layer. Holds model metadata and API call
+     * results. Persists to ~/.hermes/model_cache.json via CacheStoreJvm on
+     * the JVM. Emits CacheEvent values through [cacheEvents]; the UI and
+     * the Kanban FSM consume them.
+     */
+    private val _cache: ModelApiCache = ModelApiCache()
+    val cache: ModelApiCache get() = _cache
+    val cacheEvents: SharedFlow<CacheEvent> get() = _cache.events
+
+    private val _kanbanEvents = MutableSharedFlow<KanbanEvent>(
+        replay = 64,
+        extraBufferCapacity = 64,
+        onBufferOverflow = BufferOverflow.DROP_OLDEST,
+    )
+    /** Reactor-owned kanban event stream. Kanban FSM consumes this; kanban never owns it. */
+    val kanbanEvents: SharedFlow<KanbanEvent> = _kanbanEvents.asSharedFlow()
+
+    override suspend fun open() {
+        if (state == ElementState.CREATED) {
+            super.open()
+            state = ElementState.ACTIVE
+            publishState()
+        }
+    }
+
+    override suspend fun close() {
+        keysById.clear()
+        modelsById.clear()
+        operationalHistory.clear()
+        super.close()
+    }
+
+    fun updateConfig(newConfig: MuxReactorConfig) {
+        config = newConfig
+        publishState()
+    }
+
+    fun recordAccess(
+        keyId: String,
+        provider: String,
+        label: String = keyId,
+        modelUrl: String = "",
+    ): MuxKeyEntry {
+        val now = nowMs()
+        val entry = keysById.getOrPut(keyId) {
+            MutableMuxKey(
+                keyId = keyId,
+                provider = provider,
+                label = label,
+                modelUrl = modelUrl,
+                lastUsedMs = now,
+                accessCount = 0,
+            )
+        }
+        entry.provider = provider
+        entry.label = label
+        if (modelUrl.isNotBlank()) entry.modelUrl = modelUrl
+        entry.lastUsedMs = now
+        entry.accessCount += 1
+        entry.status = MuxKeyStatus.ACTIVE
+        publishState()
+        return entry.toImmutable()
+    }
+
+    fun recordModel(
+        keyId: String,
+        modelId: String,
+        provider: String = keysById[keyId]?.provider ?: "unknown",
+        contextWindow: Int = 0,
+    ): MuxKeyEntry? {
+        val key = keysById[keyId] ?: return null
+        key.lastModel = modelId
+        key.lastUsedMs = nowMs()
+        modelsById[modelId] = MuxModelEntry(
+            modelId = modelId,
+            provider = provider,
+            contextWindow = contextWindow,
+            available = true,
+        )
+        publishState()
+        return key.toImmutable()
+    }
+
+    fun loadCredentialPool(poolData: Map<String, List<MuxCredentialRecord>>): Int {
+            var loaded = 0
+            poolData.forEach { (provider, entries) ->
+                entries.forEach { credential ->
+                    if (credential.id.isBlank()) return@forEach
+                    if (credential.lastStatus == "benched") return@forEach
+                    keysById[credential.id] = MutableMuxKey(
+                        keyId = credential.id,
+                        provider = provider,
+                        label = credential.label.ifBlank { credential.id },
+                        modelUrl = credential.baseUrl,
+                        lastModel = credential.lastModel ?: credential.lastSuccessModel,
+                        lastUsedMs = credential.lastUsedAt,
+                        accessCount = credential.requestCount,
+                        status = when (credential.lastStatus) {
+                            "exhausted" -> MuxKeyStatus.BACKOFF
+                            else -> MuxKeyStatus.ACTIVE
+                        },
+                    )
+                    emitKanbanEvent(
+                        KanbanEvent.CredentialLoaded(
+                            provider = provider,
+                            keyId = credential.id,
+                            timestampMs = nowMs(),
+                        ),
+                    )
+                    loaded++
+                }
+            }
+            publishState()
+            return loaded
+        }
+
+    private fun emitKanbanEvent(event: KanbanEvent) {
+        // SharedFlow never blocks; emit is best-effort. Replay buffer keeps
+        // late UI subscribers from missing the latest transition.
+        _kanbanEvents.tryEmit(event)
+    }
+
+    /**
+     * Reactor-owned ingress for external taxonomy creation events.
+     * Callers submit taxonomy events here instead of emitting directly into the
+     * public kanban SharedFlow.
+     */
+    fun ingestTaxonomyEvents(events: List<KanbanEvent.TaxonomyNodeCreated>): Int {
+        events.forEach(::emitKanbanEvent)
+        return events.size
+    }
+
+    /**
+     * Look up a model in the reactor-owned modelmux cache. Emits a
+     * KanbanEvent.CacheTick so the FSM records the hit/miss.
+     */
+    fun lookupModel(provider: String, modelId: String): CacheLookup {
+        val lookup = _cache.lookupModel(provider, modelId)
+        emitKanbanEvent(
+            KanbanEvent.CacheTick(
+                kind = if (lookup is CacheLookup.Hit) "Hit" else "Miss",
+                cacheKey = lookup.key,
+                timestampMs = lookup.timestampMs,
+            ),
+        )
+        publishState()
+        return lookup
+    }
+
+    /**
+     * Store a model in the reactor-owned modelmux cache.
+     */
+    fun cacheModel(provider: String, modelId: String, payload: String): CacheEntry {
+        val entry = _cache.putModel(provider, modelId, payload)
+        emitKanbanEvent(
+            KanbanEvent.CacheTick(
+                kind = "Stored",
+                cacheKey = entry.key,
+                timestampMs = entry.storedAtMs,
+            ),
+        )
+        publishState()
+        return entry
+    }
+
+    /**
+     * Look up an API call result in the reactor-owned modelmux cache.
+     */
+    fun lookupApiCall(
+        provider: String,
+        modelId: String,
+        requestHash: String,
+        ttlMs: Long,
+    ): CacheLookup {
+        val lookup = _cache.lookupApiCall(provider, modelId, requestHash, ttlMs)
+        emitKanbanEvent(
+            KanbanEvent.CacheTick(
+                kind = if (lookup is CacheLookup.Hit) "Hit" else "Miss",
+                cacheKey = lookup.key,
+                timestampMs = lookup.timestampMs,
+            ),
+        )
+        publishState()
+        return lookup
+    }
+
+    /**
+     * Store an API call result in the reactor-owned modelmux cache.
+     */
+    fun cacheApiCall(
+        provider: String,
+        modelId: String,
+        requestHash: String,
+        ttlMs: Long,
+        payload: String,
+    ): CacheEntry {
+        val entry = _cache.putApiCall(provider, modelId, requestHash, ttlMs, payload)
+        emitKanbanEvent(
+            KanbanEvent.CacheTick(
+                kind = "Stored",
+                cacheKey = entry.key,
+                timestampMs = entry.storedAtMs,
+            ),
+        )
+        publishState()
+        return entry
+    }
+
+    fun tick(): MuxDispatchResult {
+        val reclaimedCount = reclaimExpiredLeases()
+        val runningPerProvider: Map<String, Int> = activeLeases()
+            .mapNotNull { lease ->
+                keysById[lease.keyId]?.provider?.let { it to 1 }
+            }
+            .groupBy { it.first }
+            .mapValues { (_, entries) -> entries.size }
+        val available = keysById.values
+            .filter { it.status == MuxKeyStatus.ACTIVE && it.leasedTo == null }
+            .filter { runningPerProvider.get(it.provider) ?: 0 < config.maxPerProvider }
+        val running = activeLeases().size
+        val canSpawn = minOf(config.maxSpawn, config.maxInProgress - running, available.size).coerceAtLeast(0)
+        val now = nowMs()
+        var spawned = 0
+        for (entry in available.take(canSpawn)) {
+            val agentId = "reactor-agent-${tickSequence + spawned + 1}"
+            entry.leasedTo = agentId
+            entry.leaseStartedAt = now
+            entry.leaseExpiresAt = now + config.leaseTtlMs
+            spawned++
+            emitKanbanEvent(
+                KanbanEvent.KeyLeased(
+                    keyId = entry.keyId,
+                    leasedTo = agentId,
+                    leaseExpiresAt = entry.leaseExpiresAt,
+                    timestampMs = now,
+                ),
+            )
+            recordOperational(
+                poolName = MuxOperationalPool.TASK_THROUGHPUT,
+                key = "spawned_${entry.keyId}_$now",
+                labels = mapOf("agent" to agentId, "key" to entry.keyId, "provider" to entry.provider),
+                value = 1.0,
+            )
+        }
+        tickSequence++
+        recordOperational(
+            poolName = MuxOperationalPool.TASK_THROUGHPUT,
+            key = "tick_$now",
+            labels = mapOf("phase" to "tick"),
+            value = spawned.toDouble(),
+        )
+        publishState(now)
+        return MuxDispatchResult(
+            spawned = spawned,
+            reclaimed = reclaimedCount,
+            promoted = 0,
+            crashed = 0,
+            timestampMs = now,
+        )
+    }
+
+    fun releaseLease(keyId: String, leasedTo: String): Boolean {
+        val key = keysById[keyId] ?: return false
+        if (key.leasedTo != leasedTo) return false
+        key.leasedTo = null
+        key.leaseStartedAt = 0L
+        key.leaseExpiresAt = 0L
+        publishState()
+        emitKanbanEvent(
+            KanbanEvent.LeaseReclaimed(
+                keyId = keyId,
+                previousLeasee = leasedTo,
+                timestampMs = nowMs(),
+            ),
+        )
+        return true
+    }
+
+    fun startLoop(scope: CoroutineScope): Job = scope.launch {
+        while (state.isLessThan(ElementState.DRAINING)) {
+            tick()
+            delay(config.tickIntervalMs)
+        }
+    }
+
+    private fun recordOperational(
+        poolName: String,
+        key: String,
+        labels: Map<String, String> = emptyMap(),
+        value: Double = 0.0,
+        metadata: Map<String, String> = emptyMap(),
+    ): MuxOperationalEntry {
+        val entry = MuxOperationalEntry(
+            poolName = poolName,
+            key = key,
+            labels = labels,
+            value = value,
+            timestampMs = nowMs(),
+            metadata = metadata,
+        )
+        operationalHistory.add(entry)
+        if (operationalHistory.size > config.maxOperationalHistory) {
+            operationalHistory.removeAt(0)
+        }
+        return entry
+    }
+
+    private fun reclaimExpiredLeases(): Int {
+        val now = nowMs()
+        var reclaimed = 0
+        keysById.values.forEach { key ->
+            if (key.leasedTo != null && key.leaseExpiresAt > 0L && now > key.leaseExpiresAt) {
+                val previous = key.leasedTo
+                key.leasedTo = null
+                key.leaseStartedAt = 0L
+                key.leaseExpiresAt = 0L
+                emitKanbanEvent(
+                    KanbanEvent.LeaseReclaimed(
+                        keyId = key.keyId,
+                        previousLeasee = previous ?: "",
+                        timestampMs = now,
+                    ),
+                )
+                reclaimed++
+            }
+        }
+        return reclaimed
+    }
+
+    private fun activeLeases(): List<MuxLeaseInfo> {
+        val now = nowMs()
+        return keysById.values.mapNotNull { key ->
+            val leasedTo = key.leasedTo ?: return@mapNotNull null
+            MuxLeaseInfo(
+                keyId = key.keyId,
+                leasedTo = leasedTo,
+                leaseStartedAt = key.leaseStartedAt,
+                leaseExpiresAt = key.leaseExpiresAt,
+                isActiveLease = key.leaseExpiresAt == 0L || now <= key.leaseExpiresAt,
+            )
+        }
+    }
+
+    private fun publishState(timestampMs: Long = nowMs()) {
+        val keys = keysById.values.map { it.toImmutable() }
+        val leases = activeLeases()
+        _flowState.value = MuxReactorState(
+            config = config,
+            keys = keys,
+            models = modelsById.values.toList(),
+            leases = leases,
+            operationalHistory = operationalHistory.toList(),
+            draftMapping = keys
+                .filter { it.status == MuxKeyStatus.ACTIVE && it.lastModel != null }
+                .associate { it.keyId to it.lastModel.orEmpty() },
+            currentlyRunning = leases.count { it.isActiveLease },
+            availableKeys = keys.count { key -> key.status == MuxKeyStatus.ACTIVE && leases.none { it.keyId == key.keyId } },
+            queueDepth = config.queueDepth,
+            maxInProgress = config.maxInProgress,
+            maxSpawn = config.maxSpawn,
+            maxPerProvider = config.maxPerProvider,
+            tickSequence = tickSequence,
+            lastTickMs = timestampMs,
+        )
+    }
+
+    private fun MutableMuxKey.toImmutable(): MuxKeyEntry = MuxKeyEntry(
+        keyId = keyId,
+        provider = provider,
+        label = label,
+        modelUrl = modelUrl,
+        lastModel = lastModel,
+        lastUsedMs = lastUsedMs,
+        accessCount = accessCount,
+        status = status,
+        leasedTo = leasedTo,
+        leaseExpiresAt = leaseExpiresAt,
+    )
+}
+
+suspend fun openMuxReactorElement(
+    config: MuxReactorConfig = MuxReactorConfig(),
+    parentJob: Job? = null,
+): MuxReactorElement = MuxReactorElement(parentJob = parentJob, initialConfig = config)
+    .also { it.open() }
+
+@Serializable
+data class MuxReactorConfig(
+    val maxInProgress: Int = 3,
+    val maxSpawn: Int = 3,
+    val maxPerProvider: Int = 1,
+    val leaseTtlMs: Long = 300_000,
+    val tickIntervalMs: Long = 5_000,
+    val queueDepth: Int = 0,
+    val maxOperationalHistory: Int = 1_000,
+)
+
+@Serializable
+data class MuxReactorState(
+    val config: MuxReactorConfig,
+    val keys: List<MuxKeyEntry>,
+    val models: List<MuxModelEntry>,
+    val leases: List<MuxLeaseInfo>,
+    val operationalHistory: List<MuxOperationalEntry>,
+    val draftMapping: Map<String, String>,
+    val currentlyRunning: Int,
+    val availableKeys: Int,
+    val queueDepth: Int,
+    val maxInProgress: Int,
+    val maxSpawn: Int,
+    val maxPerProvider: Int,
+    val tickSequence: Long,
+    val lastTickMs: Long,
+)
+
+@Serializable
+data class MuxKeyEntry(
+    val keyId: String,
+    val provider: String,
+    val label: String,
+    val modelUrl: String = "",
+    val lastModel: String? = null,
+    val lastUsedMs: Long = 0,
+    val accessCount: Long = 0,
+    val status: MuxKeyStatus = MuxKeyStatus.ACTIVE,
+    val leasedTo: String? = null,
+    val leaseExpiresAt: Long = 0,
+)
+
+@Serializable
+enum class MuxKeyStatus { ACTIVE, BACKOFF, BENCHED }
+
+@Serializable
+data class MuxModelEntry(
+    val modelId: String,
+    val provider: String,
+    val contextWindow: Int = 0,
+    val available: Boolean = true,
+)
+
+@Serializable
+data class MuxCredentialRecord(
+    val id: String,
+    val label: String = id,
+    val baseUrl: String = "",
+    val lastStatus: String? = null,
+    val lastModel: String? = null,
+    val lastSuccessModel: String? = null,
+    val lastUsedAt: Long = 0,
+    val requestCount: Long = 0,
+)
+
+@Serializable
+data class MuxLeaseInfo(
+    val keyId: String,
+    val leasedTo: String,
+    val leaseStartedAt: Long,
+    val leaseExpiresAt: Long,
+    val isActiveLease: Boolean,
+)
+
+@Serializable
+data class MuxOperationalEntry(
+    val poolName: String,
+    val key: String,
+    val labels: Map<String, String> = emptyMap(),
+    val value: Double = 0.0,
+    val timestampMs: Long = nowMs(),
+    val metadata: Map<String, String> = emptyMap(),
+)
+
+object MuxOperationalPool {
+    const val AGENT_HEALTH = "agent_health"
+    const val TASK_THROUGHPUT = "task_throughput"
+    const val WORKER_UTILIZATION = "worker_utilization"
+    const val LATENCY_DISTRIBUTION = "latency_distribution"
+    const val ERROR_RATES = "error_rates"
+    const val QUEUE_DEPTHS = "queue_depths"
+    const val MODEL_USAGE = "model_usage"
+    const val RESOURCE_USAGE = "resource_usage"
+}
+
+@Serializable
+data class MuxDispatchResult(
+    val spawned: Int,
+    val reclaimed: Int,
+    val promoted: Int,
+    val crashed: Int,
+    val timestampMs: Long,
+)
+
+private data class MutableMuxKey(
+    var keyId: String,
+    var provider: String,
+    var label: String,
+    var modelUrl: String = "",
+    var lastModel: String? = null,
+    var lastUsedMs: Long = 0,
+    var accessCount: Long = 0,
+    var status: MuxKeyStatus = MuxKeyStatus.ACTIVE,
+    var leasedTo: String? = null,
+    var leaseStartedAt: Long = 0,
+    var leaseExpiresAt: Long = 0,
+)
+
+private fun emptyState(config: MuxReactorConfig): MuxReactorState = MuxReactorState(
+    config = config,
+    keys = emptyList(),
+    models = emptyList(),
+    leases = emptyList(),
+    operationalHistory = emptyList(),
+    draftMapping = emptyMap(),
+    currentlyRunning = 0,
+    availableKeys = 0,
+    queueDepth = config.queueDepth,
+    maxInProgress = config.maxInProgress,
+    maxSpawn = config.maxSpawn,
+    maxPerProvider = config.maxPerProvider,
+    tickSequence = 0,
+    lastTickMs = 0,
+)
+
+private fun nowMs(): Long = Clock.System.now().toEpochMilliseconds()
+package borg.trikeshed.ccek
+
+import borg.trikeshed.forge.ForgeBlockKind
+import borg.trikeshed.forge.ForgeDoc
+import borg.trikeshed.forge.ForgeDocument
+import borg.trikeshed.forge.toForgeDocument
+import borg.trikeshed.forge.toKanbanBoard
+import borg.trikeshed.kanban.KanbanBoard
+import borg.trikeshed.kanban.KanbanColumnId
+import borg.trikeshed.userspace.reactor.MuxReactorElement
+import kotlinx.coroutines.CoroutineName
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.SharedFlow
+import kotlinx.coroutines.flow.asSharedFlow
+import kotlinx.coroutines.isActive
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+
+object CCEK {
+    fun initialize(reactor: MuxReactorElement): CcekReactorBinding = CcekReactorBinding(reactor)
+
+    fun <T> inputChannel(capacity: Int = Channel.BUFFERED): Channel<T> = Channel(capacity)
+    fun <T> fanOutChannel(capacity: Int = 64): Channel<T> = Channel(capacity)
+
+    fun childScope(name: String, parentScope: CoroutineScope): CoroutineScope =
+        CoroutineScope(parentScope.coroutineContext + SupervisorJob() + CoroutineName("CCEK-$name"))
+
+    class CcekReactorBinding(val reactor: MuxReactorElement) {
+        val reactorScope: CoroutineScope = CoroutineScope(
+            reactor.supervisor + Dispatchers.Default + CoroutineName("CCEK-reactor")
+        )
+
+        fun choreograph(
+            doc: ForgeDocument,
+            record: Boolean = false,
+            enabledProjections: Set<ProjectionKind> = ProjectionKind.ALL,
+        ): ArticulatedNode = ArticulatedNode(
+            initialDoc = doc,
+            scope = reactorScope,
+            record = record,
+            enabledProjections = enabledProjections,
+        )
+
+        fun createUserContext(name: String): UserContext = UserContext(name, reactorScope)
+    }
+}
+
+enum class ProjectionKind {
+    DOCUMENT,
+    BOARD,
+    MARKDOWN;
+
+    companion object {
+        val ALL: Set<ProjectionKind> = entries.toSet()
+    }
+}
+
+sealed class ForgeSignal {
+    data class AppendBlock(
+        val kind: ForgeBlockKind,
+        val text: String,
+        val properties: Map<String, String> = emptyMap(),
+    ) : ForgeSignal()
+
+    data class UpdateText(val blockId: String, val text: String) : ForgeSignal()
+    data class DeleteBlock(val blockId: String) : ForgeSignal()
+    data class MoveCard(val cardId: String, val toColumnId: String) : ForgeSignal()
+}
+
+sealed class ForgeProjection {
+    data class DocumentChanged(val doc: ForgeDocument) : ForgeProjection()
+    data class BoardChanged(val board: KanbanBoard) : ForgeProjection()
+    data class MarkdownChanged(val markdown: String) : ForgeProjection()
+}
+
+class ArticulatedNode(
+    initialDoc: ForgeDocument,
+    private val scope: CoroutineScope,
+    private val record: Boolean = false,
+    private val enabledProjections: Set<ProjectionKind> = ProjectionKind.ALL,
+) {
+    private var doc: ForgeDocument = initialDoc
+    val signalIn: Channel<ForgeSignal> = Channel(Channel.UNLIMITED)
+
+    private val _documentProjections = MutableSharedFlow<ForgeDocument>(replay = 64, extraBufferCapacity = 64)
+    val documentProjections: SharedFlow<ForgeDocument> = _documentProjections.asSharedFlow()
+
+    private val _boardProjections = MutableSharedFlow<KanbanBoard>(replay = 64, extraBufferCapacity = 64)
+    val boardProjections: SharedFlow<KanbanBoard> = _boardProjections.asSharedFlow()
+
+    private val _markdownProjections = MutableSharedFlow<String>(replay = 64, extraBufferCapacity = 64)
+    val markdownProjections: SharedFlow<String> = _markdownProjections.asSharedFlow()
+
+    private val _projections = MutableSharedFlow<ForgeProjection>(replay = 64, extraBufferCapacity = 64)
+    val projections: SharedFlow<ForgeProjection> = _projections.asSharedFlow()
+
+    private val childScopes = linkedMapOf<String, CoroutineScope>()
+    private val agents = linkedMapOf<String, (ForgeSignal) -> Unit>()
+    private val recordedSignals = mutableListOf<ForgeSignal>()
+    private var fanOutJob: Job? = null
+    private val startMutex = Mutex()
+
+    val markdownProjectionCount: Int get() = _markdownProjections.replayCache.size
+    val childScopeCount: Int get() = childScopes.size
+    val isActive: Boolean get() = fanOutJob?.isActive == true
+
+    init {
+        start()
+    }
+
+    fun start() {
+        if (fanOutJob?.isActive == true) return
+        scope.launch {
+            startMutex.lock()
+            try {
+                if (fanOutJob?.isActive == true) {
+                    return@launch
+                }
+                fanOutJob = scope.launch {
+                    fanOutAll()
+                    for (signal in signalIn) {
+                        if (record) recordedSignals += signal
+                        val agentsSnapshot = agents.values.toList()
+                        agentsSnapshot.forEach { it(signal) }
+                        doc = applySignal(signal)
+                        registerChildScopes(doc)
+                        fanOutAll()
+                    }
+                }
+            } finally {
+                startMutex.unlock()
+            }
+        }
+    }
+
+    fun cancel() {
+        childScopes.values.forEach { it.cancel() }
+        childScopes.clear()
+        fanOutJob?.cancel()
+        fanOutJob = null
+        signalIn.close()
+    }
+
+    fun stop() = cancel()
+
+    suspend fun sendSignal(signal: ForgeSignal) {
+        if (!isActive) start()
+        signalIn.send(signal)
+    }
+
+    fun subscribeAgent(name: String, handler: (ForgeSignal) -> Unit) {
+        agents[name] = handler
+    }
+
+    fun recording(): List<ForgeSignal> = recordedSignals.toList()
+
+    /** For tests only: snapshot the post-start state under a transient scope. */
+    private val docMutex = kotlinx.coroutines.sync.Mutex()
+
+    /**
+     * Apply a signal synchronously and return the resulting document.
+     * Updates internal state so repeated applications are idempotent.
+     * Test seams only — production callers should use `sendSignal`.
+     */
+    fun applySignalForTest(signal: ForgeSignal): ForgeDocument {
+        doc = applySignal(signal)
+        return doc
+    }
+
+    private fun applySignal(signal: ForgeSignal): ForgeDocument = when (signal) {
+        is ForgeSignal.AppendBlock -> ForgeDoc.appendBlock(doc, doc.rootPageId, signal.kind, signal.text, signal.properties)
+        is ForgeSignal.UpdateText -> {
+            val blockId = doc.blocks[signal.blockId]?.id ?: return doc
+            ForgeDoc.updateText(doc, blockId, signal.text)
+        }
+        is ForgeSignal.DeleteBlock -> {
+            val blockId = doc.blocks[signal.blockId]?.id ?: return doc
+            ForgeDoc.deleteBlock(doc, blockId)
+        }
+        is ForgeSignal.MoveCard -> {
+            // In-place property edit, NOT a board round-trip: the projection
+            // layer has a fixed 3-column schema (backlog/inprog/done), so any
+            // custom column id (e.g. col-b) would be lost on re-projection.
+            // We update the underlying heading block's `kanban.column.id`
+            // (preferred) and `kanban.status` (legacy heuristic) so the
+            // round-trip is identity-stable.
+            val targetBlock = doc.blocks[signal.cardId]?.takeIf { block ->
+                block.kind == ForgeBlockKind.HEADING_2 ||
+                    block.kind == ForgeBlockKind.HEADING_1 ||
+                    block.kind == ForgeBlockKind.HEADING_3
+            } ?: return doc
+            val status = when (signal.toColumnId) {
+                "col-inprogress" -> "in-progress"
+                "col-done" -> "done"
+                else -> "backlog"
+            }
+            val withId = ForgeDoc.setProperty(doc, targetBlock.id, "kanban.column.id", signal.toColumnId)
+            ForgeDoc.setProperty(withId, targetBlock.id, "kanban.status", status)
+        }
+    }
+
+    private suspend fun fanOutAll() {
+        if (ProjectionKind.DOCUMENT in enabledProjections) {
+            _documentProjections.emit(doc)
+            _projections.emit(ForgeProjection.DocumentChanged(doc))
+        }
+        if (ProjectionKind.BOARD in enabledProjections) {
+            val board = doc.toKanbanBoard()
+            _boardProjections.emit(board)
+            _projections.emit(ForgeProjection.BoardChanged(board))
+        }
+        if (ProjectionKind.MARKDOWN in enabledProjections) {
+            val markdown = ForgeDoc.renderMarkdown(doc)
+            _markdownProjections.emit(markdown)
+            _projections.emit(ForgeProjection.MarkdownChanged(markdown))
+        }
+    }
+
+    private fun registerChildScopes(doc: ForgeDocument) {
+        val rootId = doc.rootPageId.value
+        doc.blocks.values
+            .asSequence()
+            .filter { it.id.value != rootId }
+            .forEach { block ->
+                childScopes.getOrPut(block.id.value) {
+                    CCEK.childScope(block.id.value, scope)
+                }
+            }
+
+        val liveIds = doc.blocks.keys - rootId
+        val stale = childScopes.keys - liveIds
+        stale.forEach { id ->
+            childScopes.remove(id)?.cancel()
+        }
+    }
+}
+
+class ForgeDocNode(
+    initialDoc: ForgeDocument,
+    scope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.Default + CoroutineName("ForgeDocNode")),
+) {
+    private val node = ArticulatedNode(initialDoc = initialDoc, scope = scope)
+    val signalIn: Channel<ForgeSignal> get() = node.signalIn
+    val projections: SharedFlow<ForgeProjection> get() = node.projections
+    fun start() = node.start()
+    fun stop() = node.stop()
+}
+
+class UserContext(
+    val name: String,
+    private val scope: CoroutineScope,
+) {
+    private val facts = mutableListOf<CausalAssertion>()
+    private val polyglotFacts = mutableListOf<PolyglotFact>()
+    var active: Boolean = false
+        private set
+
+    val reteTable: CausalReteTable
+        get() = CausalReteTable(facts.toList())
+
+    fun activate() {
+        active = true
+    }
+
+    fun deactivate() {
+        active = false
+    }
+
+    fun assertFact(assertion: CausalAssertion) {
+        facts += assertion
+    }
+
+    fun loadPolyglotFacts(allFacts: List<PolyglotFact>) {
+        polyglotFacts += allFacts
+    }
+
+    fun queryPolyglot(language: String, kind: String): List<PolyglotFact> =
+        polyglotFacts.filter { it.language == language && it.kind == kind }
+
+    fun predictModel(modelName: String, inputs: Map<String, Any>): Map<String, Any> {
+        val count = inputs["count"]?.toString()?.toIntOrNull() ?: 0
+        return when (inputs["method"]?.toString()) {
+            "appendBlock" -> mapOf("model" to modelName, "expectedBlocks" to count + 1)
+            else -> mapOf("model" to modelName)
+        }
+    }
+
+    fun tableTest(prediction: Map<String, Any>): TableTestResult {
+            val expected = prediction["expectedBlocks"] as? Int
+                ?: return TableTestResult(false, "no expectedBlocks in prediction")
+            // Count all facts that represent blocks (class:, method:, block:)
+            val actual = facts.count { it.kind.contains("block") || it.kind.contains("class:") || it.kind.contains("method:") }
+            val passed = actual >= expected - 1
+            return TableTestResult(passed, if (passed) "OK" else "expected $expected, found $actual")
+        }
+
+    fun createGraphicalFlow(name: String): GraphicalFlow = GraphicalFlow(name)
+    fun spreadsheetVeneer(): SpreadsheetVeneer = SpreadsheetVeneer(facts.toList())
+
+    fun adaptParadigm(paradigm: MetaLcncParadigm): AdaptedParadigm {
+        paradigm.rules.forEach { rule ->
+            facts += CausalAssertion("rule:${paradigm.name}:${rule.name}", mapOf("expr" to rule.expression))
+        }
+        return AdaptedParadigm(paradigm.name, scope, reteTable)
+    }
+
+    fun choreograph(doc: ForgeDocument): ArticulatedNode {
+        val node = ArticulatedNode(
+            initialDoc = doc,
+            scope = CoroutineScope(scope.coroutineContext + SupervisorJob() + CoroutineName("UserContext-$name")),
+        )
+        node.subscribeAgent("$name-causal-assertions") { signal ->
+            when (signal) {
+                is ForgeSignal.AppendBlock -> assertFact(CausalAssertion("block:appended", mapOf("text" to signal.text, "kind" to signal.kind.name)))
+                is ForgeSignal.UpdateText -> assertFact(CausalAssertion("block:updated", mapOf("blockId" to signal.blockId)))
+                is ForgeSignal.DeleteBlock -> assertFact(CausalAssertion("block:deleted", mapOf("blockId" to signal.blockId)))
+                is ForgeSignal.MoveCard -> assertFact(CausalAssertion("card:moved", mapOf("cardId" to signal.cardId, "to" to signal.toColumnId)))
+            }
+        }
+        return node
+    }
+}
+
+data class CausalAssertion(val kind: String, val fields: Map<String, Any>)
+data class PolyglotFact(val language: String, val opcode: String, val target: String, val kind: String)
+
+class CausalReteTable(private val facts: List<CausalAssertion>) {
+    val rowCount: Int get() = facts.size
+    fun containsFact(kind: String): Boolean = facts.any { it.kind == kind || it.kind.startsWith(kind) }
+    fun query(kind: String): List<CausalAssertion> = facts.filter { it.kind == kind || it.kind.startsWith(kind) }
+}
+
+data class TableTestResult(val passed: Boolean, val evidence: String? = null)
+
+class GraphicalFlow(val name: String) {
+    private val blocks = mutableListOf<GraphicalBlock>()
+    private val edges = mutableListOf<GraphicalEdge>()
+
+    fun addBlock(block: GraphicalBlock) {
+        blocks += block
+    }
+
+    fun connect(from: String, to: String) {
+        edges += GraphicalEdge(from, to)
+    }
+
+    fun asCursor(): GraphicalCursor = GraphicalCursor(blocks.toList())
+    fun edges(): List<GraphicalEdge> = edges.toList()
+}
+
+data class GraphicalBlock(val id: String, val label: String, val properties: Map<String, String>)
+data class GraphicalEdge(val from: String, val to: String)
+class GraphicalCursor(val blocks: List<GraphicalBlock>) { val size: Int get() = blocks.size }
+
+class SpreadsheetVeneer(private val facts: List<CausalAssertion>) {
+    val rowCount: Int get() = facts.size
+    fun facet(column: String, value: String): List<CausalAssertion> = facts.filter { fact -> fact.fields[column]?.toString() == value }
+}
+
+data class MetaLcncParadigm(val name: String, val rules: List<LcncRule>)
+data class LcncRule(val name: String, val expression: String)
+class AdaptedParadigm(val name: String, val scope: CoroutineScope, val reteTable: CausalReteTable) { val isActive: Boolean get() = true }
+package borg.trikeshed.daemon
+
+import borg.trikeshed.jules.FlywheelDriver
+import borg.trikeshed.jules.FlywheelDriver.FlywheelEvent
+import borg.trikeshed.util.io.ForgeCliArgs
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
+import java.io.BufferedWriter
+import java.io.File
+import java.io.FileOutputStream
+import java.net.StandardProtocolFamily
+import java.net.UnixDomainSocketAddress
+import java.nio.ByteBuffer
+import java.nio.channels.ServerSocketChannel
+import java.nio.channels.SocketChannel
+import kotlin.system.exitProcess
+import sun.misc.Signal
+import sun.misc.SignalHandler
+
+/**
+ * Oroboros daemon — thin entry-point over [FlywheelDriver].
+ *
+ * Env: JULES_API_KEY (required)
+ * Flags:
+ *   --once                  single cycle then exit (default: --watch loops)
+ *   --watch                 loop forever
+ *   --interval-ms <N>       poll cadence (default = 30000)
+ *   --max-slots <N>         live session cap (default = 15)
+ * Positional args (must come last):
+ *   forgeHome               default = ~/.local/forge (ForgeHome.defaultHome)
+ *   repoDir                 default = cwd
+ */
+object OroborosDaemon {
+
+    const val DEFAULT_INTERVAL_MS = 30_000L
+    const val DEFAULT_MAX_SLOTS = 15
+
+    data class DaemonConfig(
+        val watch: Boolean,
+        val intervalMs: Long,
+        val maxSlots: Int,
+        val positional: List<String>
+    )
+
+    @Volatile
+    var lastCycleReport: FlywheelDriver.CycleReport? = null
+
+    @Volatile
+    var daemonStartTime = 0L
+
+    @Volatile
+    var isRunning = true
+
+    /** Reference to the live cycle body. Held in a static field so a JVMTI
+     *  agent or external observer can locate it after retransform. */
+    @Volatile
+    var cycleBodyField: CycleBody? = null
+
+    fun parseConfig(args: Array<String>): DaemonConfig {
+        var watch = true
+        var intervalMs = DEFAULT_INTERVAL_MS
+        var maxSlots = DEFAULT_MAX_SLOTS
+        val positional = mutableListOf<String>()
+
+        val flags = listOf(
+            ForgeCliArgs.Flag(name = "--once") { _, i -> watch = false; i + 1 },
+            ForgeCliArgs.Flag(name = "--watch") { _, i -> watch = true; i + 1 },
+            ForgeCliArgs.Flag(name = "--interval-ms", withValue = true) { a, i ->
+                val v = a[i].toLongOrNull() ?: die("--interval-ms requires a positive long")
+                intervalMs = v
+                i + 1
+            },
+            ForgeCliArgs.Flag(name = "--max-slots", withValue = true) { a, i ->
+                val v = a[i].toIntOrNull() ?: die("--max-slots requires a positive int")
+                maxSlots = v
+                i + 1
+            },
+        )
+
+        when (val r = ForgeCliArgs.parse(args.toList(), flags)) {
+            is ForgeCliArgs.Result.Parsed -> positional.addAll(r.remaining)
+            ForgeCliArgs.Result.Help -> { usage(); exitProcess(0) }
+            is ForgeCliArgs.Result.Error -> die(r.message)
+        }
+        return DaemonConfig(watch, intervalMs, maxSlots, positional)
+    }
+
+    @JvmStatic
+    fun main(args: Array<String>) {
+        try {
+            runBlocking {
+                mainImpl(args)
+            }
+        } catch (e: kotlinx.coroutines.CancellationException) {
+            // JVM shutdown triggered by signal handler
+            exitProcess(0)
+        }
+    }
+
+    private suspend fun kotlinx.coroutines.CoroutineScope.mainImpl(args: Array<String>) {
+        val apiKey = System.getenv("JULES_API_KEY") ?: System.getProperty("JULES_API_KEY")
+        if (apiKey.isNullOrBlank()) {
+            System.err.println("[OROBOROS] JULES_API_KEY not set; the conductor cannot poll Jules. Aborting.")
+            exitProcess(1)
+        }
+
+        val config = parseConfig(args)
+        val watch = config.watch
+        val intervalMs = config.intervalMs
+        val maxSlots = config.maxSlots
+        val positional = config.positional
+
+        val home = System.getProperty("user.home")
+            ?: die("System property user.home not set")
+        val canonicalForge = File(home, ".local/forge")
+        val forgeHome = File(positional.getOrNull(0) ?: canonicalForge.absolutePath)
+        val repoDir = File(positional.getOrNull(1) ?: System.getProperty("user.dir"))
+        if (!repoDir.resolve(".git").exists()) {
+            System.err.println("[OROBOROS] $repoDir is not a git work tree. Aborting.")
+            exitProcess(1)
+        }
+        forgeHome.mkdirs()
+
+        val driver = FlywheelDriver(
+            apiKey = apiKey,
+            repoDir = repoDir,
+            forgeDir = forgeHome,
+            intervalMs = intervalMs,
+            maxSlots = maxSlots,
+        )
+
+        val mainJob = coroutineContext[kotlinx.coroutines.Job]
+
+        val sigHandler = SignalHandler {
+            driver.close()
+            isRunning = false
+            mainJob?.cancel()
+        }
+        Signal.handle(Signal("TERM"), sigHandler)
+        Signal.handle(Signal("INT"), sigHandler)
+
+        val traceFile = File(forgeHome, "oroboros-cycles.jsonl")
+        var traceLineCount = if (traceFile.exists()) traceFile.readLines().size else 0
+        var traceWriter: BufferedWriter? = null
+        try {
+            traceWriter = FileOutputStream(traceFile, true).bufferedWriter()
+            Runtime.getRuntime().addShutdownHook(Thread {
+                try {
+                    traceWriter?.flush()
+                    traceWriter?.close()
+                } catch (e: Exception) { /* ignore */ }
+            })
+        } catch (e: Exception) {
+            System.err.println("[OROBOROS] warning: failed to open trace file: ${e.message}")
+        }
+
+        var pollErrors = 0
+        val consecutivePollErrors = java.util.concurrent.atomic.AtomicInteger(0)
+        var pollErrOccurred = false
+        // Stdout observer so cycles are visible without a TUI, and bridge to KanbanFSM.
+        driver.subscribe { ev ->
+            println("[FLY-EVENT] $ev")
+            if (ev is FlywheelEvent.PollError) {
+                pollErrors++
+                pollErrOccurred = true
+            }
+            val now = System.currentTimeMillis()
+            when (ev) {
+                is borg.trikeshed.jules.FlywheelDriver.FlywheelEvent.Polled ->
+                    borg.trikeshed.userspace.reactor.KanbanFSM.reduce(
+                        borg.trikeshed.userspace.reactor.KanbanEvent.CycleObserved(0L, 0, 0, ev.alive, ev.available, now)
+                    )
+                is borg.trikeshed.jules.FlywheelDriver.FlywheelEvent.Drained ->
+                    borg.trikeshed.userspace.reactor.KanbanFSM.reduce(
+                        borg.trikeshed.userspace.reactor.KanbanEvent.PatchDrained(ev.sessionId, ev.sha, ev.tag, now)
+                    )
+                is borg.trikeshed.jules.FlywheelDriver.FlywheelEvent.Dispatched ->
+                    borg.trikeshed.userspace.reactor.KanbanFSM.reduce(
+                        borg.trikeshed.userspace.reactor.KanbanEvent.DispatchFired(ev.sessionId, ev.title, now)
+                    )
+                else -> {}
+            }
+        }
+        System.err.println(
+            "[OROBOROS] daemon up. forgeHome=$forgeHome repo=$repoDir " +
+                "intervalMs=$intervalMs maxSlots=$maxSlots mode=${if (watch) "watch" else "once"}"
+        )
+
+        daemonStartTime = System.currentTimeMillis()
+        lastCycleReport = null
+
+        val oroborosDir = File(forgeHome, ".oroboros")
+        oroborosDir.mkdirs()
+        val healthSock = File(oroborosDir, "health.sock")
+        if (healthSock.exists()) healthSock.delete()
+
+        // Bind with retry: a prior daemon may have left a stale socket file
+        // even after the JVM exited; the bind() then creates a regular file
+        // instead of a UNIX socket. Retry up to 3× with the file removed
+        // between attempts so we always end up with a real socket.
+        var serverSocket: ServerSocketChannel? = null
+        var bindAttempt = 0
+        while (serverSocket == null && bindAttempt < 3) {
+            try {
+                serverSocket = ServerSocketChannel.open(StandardProtocolFamily.UNIX)
+                serverSocket.bind(UnixDomainSocketAddress.of(healthSock.toPath()))
+            } catch (e: Throwable) {
+                System.err.println("[OROBOROS] health.sock bind attempt ${bindAttempt + 1} failed: ${e.message}")
+                try { serverSocket?.close() } catch (_: Exception) {}
+                serverSocket = null
+                if (healthSock.exists()) healthSock.delete()
+                bindAttempt++
+            }
+        }
+        if (serverSocket == null) {
+            System.err.println("[OROBOROS] health.sock bind FAILED after 3 attempts; aborting")
+            return
+        }
+
+        val healthJob = launch(Dispatchers.IO) {
+            while (isActive) {
+                var client: SocketChannel? = null
+                try {
+                    client = serverSocket!!.accept()
+                    val report = lastCycleReport
+                    val uptimeMs = System.currentTimeMillis() - daemonStartTime
+                    val msg = if (report != null) {
+                        "ALIVE $uptimeMs ${report.cycleMs} ${report.harvested} ${report.dispatched} ${report.alive} ${report.available}\n"
+                    } else {
+                        "ALIVE $uptimeMs -1 -1 -1 -1 -1\n"
+                    }
+                    val buf = ByteBuffer.wrap(msg.toByteArray())
+                    while (buf.hasRemaining()) {
+                        client.write(buf)
+                    }
+                } catch (e: Exception) { /* ignore */ }
+                finally {
+                    try { client?.close() } catch (_: Exception) {}
+                }
+            }
+        }
+        if (!preflight(repoDir, driver)) {
+            System.err.println("[OROBOROS] preflight failed; aborting before first cycle")
+            driver.close()
+            return
+        }
+
+        suspend fun runCycle() {
+            val t0 = System.currentTimeMillis()
+            val startPollErrors = pollErrors
+            val summary: FlywheelDriver.CycleReport = driver.cycle()
+            val cyclePollErrors = pollErrors - startPollErrors
+            println("[FLYWHEEL] phase=" + summary.phase + " cycleMs=" + summary.cycleMs + " harvested=" + summary.harvested + " dispatched=" + summary.dispatched + " alive=" + summary.alive + "/" + summary.available + " inducted=" + summary.inducted + " settled=" + summary.settled)
+
+            lastCycleReport = summary
+            val json = "{\"t\":" + t0 + ",\"c\":" + summary.cycleMs + ",\"d\":" + summary.harvested + ",\"p\":" + summary.dispatched + ",\"a\":" + summary.alive + ",\"v\":" + summary.available + ",\"e\":" + cyclePollErrors + "}"
+            try {
+                if (traceLineCount >= 10000) {
+                    traceWriter?.close()
+                    val backup = File(traceFile.parentFile, traceFile.name + ".1")
+                    traceFile.renameTo(backup)
+                    traceWriter = FileOutputStream(traceFile, false).bufferedWriter()
+                    traceLineCount = 0
+                }
+                traceWriter?.let {
+                    it.write(json)
+                    it.write("\n")
+                    it.flush() // observable progress — the trace is the operator's live signal
+                    traceLineCount++
+                }
+            } catch (e: Exception) {
+                System.err.println("[OROBOROS] warning: failed to write trace file: ${e.message}")
+            }
+        }
+
+        // Hot-swappable cycle body. Same instance, JVM retransforms the class
+        // in place — next call sees new bytecode. Edit CycleBody.kt, rebuild,
+        // agent reloads; loop continues uninterrupted.
+        val cycleBody = CycleBody(
+            driver = driver,
+            repoDir = repoDir,
+            consecutivePollErrors = consecutivePollErrors,
+            pollErrRef = { pollErrOccurred },
+            setPollErr = { pollErrOccurred = it },
+            runCycle = { runCycle() },
+            preflight = { preflight(repoDir, driver) },
+        )
+        cycleBodyField = cycleBody
+
+        try {
+            val startErrs = pollErrors
+            runCycle()
+            if (pollErrors > startErrs) {
+                consecutivePollErrors.set(1)
+            }
+            if (watch) {
+                while (isRunning) {
+                    val errors = consecutivePollErrors.get()
+                    val backoffMs = kotlin.math.min(intervalMs * (1L shl kotlin.math.min(errors, 30)), intervalMs * 5)
+                    if (errors > 0) System.err.println("[OROBOROS] backoff=${backoffMs}ms consecutiveErrors=$errors")
+                    delay(backoffMs)
+                    try {
+                        cycleBody.run()
+                    } catch (t: LinkageError) {
+                        // Botched hot-swap: the retransform produced bytecode
+                        // the JVM can't link against the loaded class
+                        // graph. The Runnable is unrunnable — bail out so the
+                        // supervisor (cron / launchctl) restarts us from a
+                        // known-clean compiled state.
+                        System.err.println("[OROBOROS] CycleBody unlinkable: ${t.javaClass.simpleName}: ${t.message?.take(200)} — bouncing")
+                        isRunning = false
+                        break
+                    } catch (t: Throwable) {
+                        // Defense in depth: CycleBody.run is itself wrapped in
+                        // a hard guard, but if anything escapes (NoClassDef,
+                        // AbstractMethodError from a future shape change)
+                        // the daemon loop must survive. Log and continue.
+                        System.err.println("[OROBOROS] cycleBody.run escaped: ${t.javaClass.simpleName}: ${t.message?.take(200)}")
+                    }
+                }
+            }
+        } finally {
+            healthJob.cancel()
+            try { serverSocket.close() } catch (_: Exception) {}
+            if (healthSock.exists()) healthSock.delete()
+            try { traceWriter?.flush(); traceWriter?.close() } catch (_: Exception) {}
+            driver.close()
+        }
+    }
+
+    private fun preflight(repoDir: File, driver: FlywheelDriver): Boolean {
+        // git fetch origin master (best-effort, 5s timeout)
+        val fetch = ProcessBuilder("git", "fetch", "origin", "master", "--dry-run")
+            .directory(repoDir).start()
+        val fetchOk = fetch.waitFor() == 0
+        if (!fetchOk) return true // offline is OK, we'll poll anyway
+
+        fun command(vararg args: String): String {
+            val p = ProcessBuilder(*args).directory(repoDir).redirectErrorStream(true).start()
+            p.waitFor()
+            return p.inputStream.bufferedReader().readText().trim()
+        }
+
+        val local = command("git", "rev-parse", "HEAD")
+        val remote = command("git", "rev-parse", "origin/master")
+        if (local == remote) return true
+        // Local AHEAD of remote is the normal flywheel state between pushes
+        // (drained patches land locally, then get pushed by settlementBarrier).
+        // Only block when truly diverged: local has commits origin doesn't
+        // AND origin has commits local doesn't (true divergence).
+        val mergeBase = command("git", "merge-base", local, remote)
+        if (mergeBase == local || mergeBase == remote) {
+            // linear: local ahead OR local behind, but not both
+            return true
+        }
+        // local is neither reachable from remote nor vice versa → diverged
+        println("[OROBOROS] UPSTREAM-DIVERGED local=$local remote=$remote mergeBase=$mergeBase")
+        driver.emitDrifted(local, remote)
+        return false
+    }
+
+    private fun die(msg: String): Nothing {
+        System.err.println("[OROBOROS] $msg")
+        usage()
+        exitProcess(2)
+    }
+
+    private fun usage() {
+        System.err.println(
+            """usage: OroborosDaemon [--once | --watch] [--interval-ms N] [--max-slots N] [forgeHome] [repoDir]
+              env: JULES_API_KEY (required)
+              forgeHome default: ~/.local/forge (ForgeHome.defaultHome)
+              repoDir  default: cwd"""
+        )
+    }
+}

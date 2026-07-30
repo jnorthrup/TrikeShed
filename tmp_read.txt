@@ -1,0 +1,2297 @@
+@file:OptIn(ExperimentalForeignApi::class)
+
+package borg.trikeshed
+
+import borg.trikeshed.userspace.Liburing
+import kotlinx.cinterop.*
+import platform.posix.*
+
+internal object PosixUringIO {
+    private var openAttemptedEntries: Int = 0
+    private var uringAvailable: Boolean = false
+    private var nextUserData: Long = 1
+
+    fun isAvailable(entries: Int = 2): Boolean = ensureOpen(entries)
+
+    fun readAt(fd: Int, bytes: ByteArray, start: Int, length: Int, offset: Long, entries: Int = 2): Int {
+        if (length <= 0) return 0
+        val uringResult = submit(entries) { address, userData ->
+            Liburing.prepRead(fd, address, length, offset, userData)
+        }(bytes, start)
+        if (uringResult != Int.MIN_VALUE) return uringResult
+        val direct = bytes.usePinned { pinned ->
+            pread(fd, pinned.addressOf(start), length.toULong(), offset).toInt()
+        }
+        if (direct >= 0) return direct
+        return if (errno == ESPIPE || errno == EINVAL) {
+            bytes.usePinned { pinned ->
+                read(fd, pinned.addressOf(start), length.toULong()).toInt()
+            }
+        } else direct
+    }
+
+    fun writeAt(fd: Int, bytes: ByteArray, start: Int, length: Int, offset: Long, entries: Int = 2): Int {
+        if (length <= 0) return 0
+        val uringResult = submit(entries) { address, userData ->
+            Liburing.prepWrite(fd, address, length, offset, userData)
+        }(bytes, start)
+        if (uringResult != Int.MIN_VALUE) return uringResult
+        val direct = bytes.usePinned { pinned ->
+            pwrite(fd, pinned.addressOf(start), length.toULong(), offset).toInt()
+        }
+        if (direct >= 0) return direct
+        return if (errno == ESPIPE || errno == EINVAL) {
+            bytes.usePinned { pinned ->
+                write(fd, pinned.addressOf(start), length.toULong()).toInt()
+            }
+        } else direct
+    }
+
+    fun closeFd(fd: Int, entries: Int = 2): Int {
+        if (fd < 0) return -1
+        val userData = nextUserData++
+        if (ensureOpen(entries) && Liburing.prepClose(fd, userData).isSuccess) {
+            val submitted = Liburing.submit().getOrNull()
+            if (submitted != null && submitted > 0) {
+                val completion = Liburing.waitCqe().getOrNull()
+                if (completion != null) return completion.res
+            }
+        }
+        return close(fd)
+    }
+
+    fun fileSize(fd: Int): Long {
+        memScoped {
+            val st: stat = alloc<stat>()
+            if (fstat(fd, st.ptr) == 0)
+                return st.st_size
+        }
+        return -1L
+    }
+
+    fun fsync(fd: Int, entries: Int = 2): Int {
+        if (fd < 0) return -1
+        val userData = nextUserData++
+        if (ensureOpen(entries) && Liburing.prepFsync(fd, userData, datasync = false).isSuccess) {
+            val submitted = Liburing.submit().getOrNull()
+            if (submitted != null && submitted > 0) {
+                return Liburing.waitCqe().getOrNull()?.res ?: -1
+            }
+        }
+        return platform.posix.fsync(fd)
+    }
+
+    fun fdatasync(fd: Int, entries: Int = 2): Int {
+        if (fd < 0) return -1
+        val userData = nextUserData++
+        if (ensureOpen(entries) && Liburing.prepFsync(fd, userData, datasync = true).isSuccess) {
+            val submitted = Liburing.submit().getOrNull()
+            if (submitted != null && submitted > 0) {
+                return Liburing.waitCqe().getOrNull()?.res ?: -1
+            }
+        }
+        return platform.posix.fsync(fd)
+    }
+
+    fun ftruncate(fd: Int, size: Long, entries: Int = 256): Int {
+        if (fd < 0) return -1
+        return platform.posix.ftruncate(fd, size)
+    }
+
+    fun mmap(addr: Long, length: Int, prot: Int, flags: Int, fd: Int, offset: Long): Long {
+        val base = if (addr == 0L) null else addr.toCPointer<ByteVar>()
+        return platform.posix.mmap(base, length.toULong(), prot, flags, fd, offset)?.toLong() ?: -1L
+    }
+
+    private fun ensureOpen(entries: Int): Boolean {
+        if (entries <= openAttemptedEntries) return uringAvailable
+        openAttemptedEntries = entries
+        uringAvailable = Liburing.open(entries, 0).isSuccess
+        return uringAvailable
+    }
+
+    private fun submit(
+        entries: Int,
+        prep: (address: Long, userData: Long) -> Result<Unit>,
+    ): (ByteArray, Int) -> Int = { bytes, start ->
+        if (!ensureOpen(entries)) {
+            Int.MIN_VALUE
+        } else {
+            bytes.usePinned { pinned ->
+                val userData = nextUserData++
+                val address = pinned.addressOf(start).rawValue.toLong()
+                if (prep(address, userData).isFailure) {
+                    Int.MIN_VALUE
+                } else {
+                    val submitted = Liburing.submit().getOrNull()
+                    if (submitted == null || submitted <= 0) {
+                        Int.MIN_VALUE
+                    } else {
+                        Liburing.waitCqe().getOrNull()?.res ?: Int.MIN_VALUE
+                    }
+                }
+            }
+        }
+    }
+}
+package borg.trikeshed.forge.shell
+
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxScope
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.material3.darkColorScheme
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Window
+import androidx.compose.ui.window.application
+import borg.trikeshed.forge.blackboard.ForgeBlackboardCornerSlot
+import borg.trikeshed.forge.blackboard.ForgeBlackboardMode
+import borg.trikeshed.forge.blackboard.ForgeBlackboardSection3D
+import borg.trikeshed.forge.blackboard.ForgeBlackboardView
+import borg.trikeshed.forge.gallery.ForgeGalleryCatalog
+import borg.trikeshed.forge.gallery.ForgeGallerySection
+import borg.trikeshed.forge.gallery.ForgeGalleryWidget
+
+/** Theme — same dark palette as the browser bundle. */
+private val ForgeDarkScheme = darkColorScheme(
+    background = Color(0xFF090D13),
+    surface = Color(0xFF111824),
+    surfaceVariant = Color(0xFF1B2635),
+    primary = Color(0xFF7AA2F7),
+    onPrimary = Color(0xFF0B0F15),
+    secondary = Color(0xFF7DCFFF),
+    onSecondary = Color(0xFF0B0F15),
+    tertiary = Color(0xFFE0AF68),
+    onTertiary = Color(0xFF0B0F15),
+    onBackground = Color(0xFFDBE7F3),
+    onSurface = Color(0xFFDBE7F3),
+    onSurfaceVariant = Color(0xFF7E8DA0),
+    outline = Color(0xFF263548),
+)
+
+/**
+ * JVM desktop entrypoint — opens the platform window and mounts the Forge
+ * workspace shell.  All model data is the same commonMain catalog +
+ * blackboard view that the browser seed carries.
+ */
+fun main() = application {
+    Window(
+        onCloseRequest = ::exitApplication,
+        title = "Forge — JVM shell",
+    ) {
+        MaterialTheme(colorScheme = ForgeDarkScheme) {
+            Surface(modifier = Modifier.fillMaxSize()) {
+                Row(modifier = Modifier.fillMaxSize()) {
+                    val view = remember { ForgeBlackboardView.DEFAULT }
+                    val catalog = remember { ForgeGalleryCatalog.widgets() }
+                    Rail(catalog = catalog)
+                    Workspace(view = view, catalog = catalog)
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun Rail(catalog: List<ForgeGalleryWidget>) {
+    Column(
+        modifier = Modifier
+            .width(260.dp)
+            .fillMaxSize()
+            .background(MaterialTheme.colorScheme.background)
+            .border(width = 1.dp, color = MaterialTheme.colorScheme.outline)
+            .padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(14.dp),
+    ) {
+        Column {
+            Text("FORGE LOCAL-FIRST", color = MaterialTheme.colorScheme.secondary, fontSize = 11.sp, fontWeight = FontWeight.ExtraBold)
+            Spacer(Modifier.height(8.dp))
+            Text("Page, board, field", color = MaterialTheme.colorScheme.onBackground, fontSize = 22.sp, fontWeight = FontWeight.ExtraBold)
+            Spacer(Modifier.height(6.dp))
+            Text(
+                "RTS-style zoom from workspace lanes into card-level detail. Same model the browser bundle renders.",
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                fontSize = 12.sp,
+            )
+        }
+
+        SectionHeader("Gallery sections", "Click a section to scroll the gallery.")
+        LazyColumn(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            items(ForgeGallerySection.values().toList()) { section ->
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                    shape = RoundedCornerShape(12.dp),
+                ) {
+                    Column(modifier = Modifier.padding(12.dp)) {
+                        Text(section.name, color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                        Text(
+                            "${catalog.count { it.section == section }} widgets",
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            fontSize = 11.sp,
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun SectionHeader(title: String, sub: String) {
+    Column {
+        Text(title, color = MaterialTheme.colorScheme.onBackground, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+        Text(sub, color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp)
+    }
+}
+
+@Composable
+private fun Workspace(view: ForgeBlackboardView, catalog: List<ForgeGalleryWidget>) {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color(0xFF0D131D))
+            .padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(14.dp),
+    ) {
+        BlackboardChrome(view = view)
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(14.dp),
+        ) {
+            BoardPanel(view = view)
+            GalleryPanel(view = view, catalog = catalog)
+        }
+
+        BlackboardView(view = view, catalog = catalog)
+    }
+}
+
+@Composable
+private fun BlackboardChrome(view: ForgeBlackboardView) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        shape = RoundedCornerShape(18.dp),
+    ) {
+        Box(modifier = Modifier.fillMaxWidth().padding(12.dp)) {
+            // Corner buttons anchored at the four edges
+            CornerSlot(ForgeBlackboardCornerSlot.TOP_LEFT, view, Alignment.TopStart)
+            CornerSlot(ForgeBlackboardCornerSlot.TOP_RIGHT, view, Alignment.TopEnd)
+            CornerSlot(ForgeBlackboardCornerSlot.BOTTOM_LEFT, view, Alignment.BottomStart)
+            CornerSlot(ForgeBlackboardCornerSlot.BOTTOM_RIGHT, view, Alignment.BottomEnd)
+
+            // Title bar — centered
+            Column(modifier = Modifier.align(Alignment.Center), horizontalAlignment = Alignment.CenterHorizontally) {
+                Text(view.surface, color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.ExtraBold, fontSize = 18.sp)
+                Text(
+                    "mode=${view.defaultMode.name}  yaw=${"%.2f".format(view.mode3D.yawRadians)}  pitch=${"%.2f".format(view.mode3D.pitchRadians)} rad",
+                    color = MaterialTheme.colorScheme.secondary,
+                    fontSize = 12.sp,
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun BoxScope.CornerSlot(slot: ForgeBlackboardCornerSlot, view: ForgeBlackboardView, alignment: Alignment) {
+    val btn = view.cornerButtons.firstOrNull { it.slot == slot } ?: return
+    Box(modifier = Modifier.align(alignment)) {
+        ChromeButton(label = btn.label, hotkey = btn.hotkey)
+    }
+}
+
+@Composable
+private fun ChromeButton(label: String, hotkey: String) {
+    Card(
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+        shape = RoundedCornerShape(10.dp),
+    ) {
+        Column(modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+            Text(label, color = MaterialTheme.colorScheme.onSurface, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+            Text("[$hotkey]", color = MaterialTheme.colorScheme.tertiary, fontSize = 10.sp)
+        }
+    }
+}
+
+@Composable
+private fun BoardPanel(view: ForgeBlackboardView) {
+    Card(
+        modifier = Modifier.fillMaxWidth().height(220.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        shape = RoundedCornerShape(18.dp),
+    ) {
+        Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text("Board", color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+            val board = view.layout3D.firstOrNull { it.sectionId == "board" }
+            Text(
+                "center=(${board?.centerX?.toInt()},${board?.centerY?.toInt()})  elevation=${board?.elevation?.toInt()}",
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                fontSize = 12.sp,
+            )
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Column1("Backlog", listOf("Setup CI", "Wire kanban bridge"))
+                Column1("In progress", listOf("Confix ingest", "Couch cascade"))
+                Column1("Done", listOf("Taxonomy", "Blackboard"))
+            }
+        }
+    }
+}
+
+@Composable
+private fun Column1(name: String, cards: List<String>) {
+    Column(
+        modifier = Modifier
+            .width(150.dp)
+            .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(12.dp))
+            .padding(10.dp),
+        verticalArrangement = Arrangement.spacedBy(6.dp),
+    ) {
+        Text(name, color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+        cards.forEach { card ->
+            Text("• $card", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 11.sp)
+        }
+    }
+}
+
+@Composable
+private fun GalleryPanel(view: ForgeBlackboardView, catalog: List<ForgeGalleryWidget>) {
+    Card(
+        modifier = Modifier.fillMaxWidth().height(220.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        shape = RoundedCornerShape(18.dp),
+    ) {
+        Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            val placement = view.layout3D.firstOrNull { it.sectionId == "gallery" }
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text("Gallery", color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                Text(
+                    "elevation=${placement?.elevation?.toInt()}  catalog=${ForgeGalleryCatalog.CATALOG_VERSION}",
+                    color = MaterialTheme.colorScheme.secondary,
+                    fontSize = 11.sp,
+                )
+            }
+            LazyColumn(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                items(catalog.take(8)) { widget -> GalleryRow(widget) }
+                if (catalog.size > 8) item {
+                    Text("… and ${catalog.size - 8} more", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 11.sp)
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun GalleryRow(widget: ForgeGalleryWidget) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Box(
+            modifier = Modifier
+                .size(width = 110.dp, height = 18.dp)
+                .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(4.dp))
+                .padding(horizontal = 6.dp, vertical = 2.dp),
+            contentAlignment = Alignment.CenterStart,
+        ) {
+            Text(widget.id, color = MaterialTheme.colorScheme.secondary, fontSize = 10.sp)
+        }
+        Text(widget.name, color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+        Text(
+            widget.synopsis.take(48),
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            fontSize = 11.sp,
+        )
+    }
+}
+
+@Composable
+private fun BlackboardView(view: ForgeBlackboardView, catalog: List<ForgeGalleryWidget>) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        shape = RoundedCornerShape(18.dp),
+    ) {
+        Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                Text("Blackboard — ${view.defaultMode.name}", color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                Text(
+                    "depth-toggle [d] cycles ${ForgeBlackboardMode.values().joinToString("→") { it.name }}",
+                    color = MaterialTheme.colorScheme.tertiary,
+                    fontSize = 11.sp,
+                )
+            }
+            // Plan-view projection of the 3D layout — simple isometric placeholder.
+            PlanProjection(view = view, catalog = catalog)
+        }
+    }
+}
+
+@Composable
+private fun PlanProjection(view: ForgeBlackboardView, catalog: List<ForgeGalleryWidget>) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(180.dp)
+            .background(Color(0xFF0B0F15), RoundedCornerShape(12.dp))
+            .border(width = 1.dp, color = MaterialTheme.colorScheme.outline, shape = RoundedCornerShape(12.dp))
+            .padding(12.dp),
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        view.layout3D.forEach { placement ->
+            SectionChip(placement = placement, catalog = catalog)
+        }
+    }
+}
+
+@Composable
+private fun SectionChip(placement: ForgeBlackboardSection3D, catalog: List<ForgeGalleryWidget>) {
+    val widgetCount = if (placement.sectionId == "gallery") catalog.size else null
+    val accent = when (placement.sectionId) {
+        "page" -> MaterialTheme.colorScheme.secondary
+        "board" -> MaterialTheme.colorScheme.primary
+        "gallery" -> MaterialTheme.colorScheme.tertiary
+        else -> MaterialTheme.colorScheme.onSurface
+    }
+    Card(
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+        shape = RoundedCornerShape(12.dp),
+    ) {
+        Column(modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp)) {
+            Text(placement.sectionId.uppercase(), color = accent, fontWeight = FontWeight.ExtraBold, fontSize = 12.sp)
+            Text(
+                "(${placement.centerX.toInt()},${placement.centerY.toInt()}) elev=${placement.elevation.toInt()}",
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                fontSize = 10.sp,
+            )
+            if (widgetCount != null) {
+                Text("$widgetCount widgets", color = MaterialTheme.colorScheme.onSurface, fontSize = 11.sp)
+            }
+        }
+    }
+}package borg.trikeshed.daemon
+
+import borg.trikeshed.jules.FlywheelDriver
+import borg.trikeshed.jules.FlywheelDriver.FlywheelEvent
+import borg.trikeshed.util.io.ForgeCliArgs
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
+import java.io.BufferedWriter
+import java.io.File
+import java.io.FileOutputStream
+import java.net.StandardProtocolFamily
+import java.net.UnixDomainSocketAddress
+import java.nio.ByteBuffer
+import java.nio.channels.ServerSocketChannel
+import java.nio.channels.SocketChannel
+import kotlin.system.exitProcess
+import sun.misc.Signal
+import sun.misc.SignalHandler
+
+/**
+ * Oroboros daemon — thin entry-point over [FlywheelDriver].
+ *
+ * Env: JULES_API_KEY (required)
+ * Flags:
+ *   --once                  single cycle then exit (default: --watch loops)
+ *   --watch                 loop forever
+ *   --interval-ms <N>       poll cadence (default = 30000)
+ *   --max-slots <N>         live session cap (default = 15)
+ * Positional args (must come last):
+ *   forgeHome               default = ~/.local/forge (ForgeHome.defaultHome)
+ *   repoDir                 default = cwd
+ */
+object OroborosDaemon {
+
+    const val DEFAULT_INTERVAL_MS = 30_000L
+    const val DEFAULT_MAX_SLOTS = 15
+
+    data class DaemonConfig(
+        val watch: Boolean,
+        val intervalMs: Long,
+        val maxSlots: Int,
+        val positional: List<String>
+    )
+
+    @Volatile
+    var lastCycleReport: FlywheelDriver.CycleReport? = null
+
+    @Volatile
+    var daemonStartTime = 0L
+
+    @Volatile
+    var isRunning = true
+
+    /** Reference to the live cycle body. Held in a static field so a JVMTI
+     *  agent or external observer can locate it after retransform. */
+    @Volatile
+    var cycleBodyField: CycleBody? = null
+
+    fun parseConfig(args: Array<String>): DaemonConfig {
+        var watch = true
+        var intervalMs = DEFAULT_INTERVAL_MS
+        var maxSlots = DEFAULT_MAX_SLOTS
+        val positional = mutableListOf<String>()
+
+        val flags = listOf(
+            ForgeCliArgs.Flag(name = "--once") { _, i -> watch = false; i + 1 },
+            ForgeCliArgs.Flag(name = "--watch") { _, i -> watch = true; i + 1 },
+            ForgeCliArgs.Flag(name = "--interval-ms", withValue = true) { a, i ->
+                val v = a[i].toLongOrNull() ?: die("--interval-ms requires a positive long")
+                intervalMs = v
+                i + 1
+            },
+            ForgeCliArgs.Flag(name = "--max-slots", withValue = true) { a, i ->
+                val v = a[i].toIntOrNull() ?: die("--max-slots requires a positive int")
+                maxSlots = v
+                i + 1
+            },
+        )
+
+        when (val r = ForgeCliArgs.parse(args.toList(), flags)) {
+            is ForgeCliArgs.Result.Parsed -> positional.addAll(r.remaining)
+            ForgeCliArgs.Result.Help -> { usage(); exitProcess(0) }
+            is ForgeCliArgs.Result.Error -> die(r.message)
+        }
+        return DaemonConfig(watch, intervalMs, maxSlots, positional)
+    }
+
+    @JvmStatic
+    fun main(args: Array<String>) {
+        try {
+            runBlocking {
+                mainImpl(args)
+            }
+        } catch (e: kotlinx.coroutines.CancellationException) {
+            // JVM shutdown triggered by signal handler
+            exitProcess(0)
+        }
+    }
+
+    private suspend fun kotlinx.coroutines.CoroutineScope.mainImpl(args: Array<String>) {
+        val apiKey = System.getenv("JULES_API_KEY") ?: System.getProperty("JULES_API_KEY")
+        if (apiKey.isNullOrBlank()) {
+            System.err.println("[OROBOROS] JULES_API_KEY not set; the conductor cannot poll Jules. Aborting.")
+            exitProcess(1)
+        }
+
+        val config = parseConfig(args)
+        val watch = config.watch
+        val intervalMs = config.intervalMs
+        val maxSlots = config.maxSlots
+        val positional = config.positional
+
+        val home = System.getProperty("user.home")
+            ?: die("System property user.home not set")
+        val canonicalForge = File(home, ".local/forge")
+        val forgeHome = File(positional.getOrNull(0) ?: canonicalForge.absolutePath)
+        val repoDir = File(positional.getOrNull(1) ?: System.getProperty("user.dir"))
+        if (!repoDir.resolve(".git").exists()) {
+            System.err.println("[OROBOROS] $repoDir is not a git work tree. Aborting.")
+            exitProcess(1)
+        }
+        forgeHome.mkdirs()
+
+        val driver = FlywheelDriver(
+            apiKey = apiKey,
+            repoDir = repoDir,
+            forgeDir = forgeHome,
+            intervalMs = intervalMs,
+            maxSlots = maxSlots,
+        )
+
+        val mainJob = coroutineContext[kotlinx.coroutines.Job]
+
+        val sigHandler = SignalHandler {
+            driver.close()
+            isRunning = false
+            mainJob?.cancel()
+        }
+        Signal.handle(Signal("TERM"), sigHandler)
+        Signal.handle(Signal("INT"), sigHandler)
+
+        val traceFile = File(forgeHome, "oroboros-cycles.jsonl")
+        var traceLineCount = if (traceFile.exists()) traceFile.readLines().size else 0
+        var traceWriter: BufferedWriter? = null
+        try {
+            traceWriter = FileOutputStream(traceFile, true).bufferedWriter()
+            Runtime.getRuntime().addShutdownHook(Thread {
+                try {
+                    traceWriter?.flush()
+                    traceWriter?.close()
+                } catch (e: Exception) { /* ignore */ }
+            })
+        } catch (e: Exception) {
+            System.err.println("[OROBOROS] warning: failed to open trace file: ${e.message}")
+        }
+
+        var pollErrors = 0
+        val consecutivePollErrors = java.util.concurrent.atomic.AtomicInteger(0)
+        var pollErrOccurred = false
+        // Stdout observer so cycles are visible without a TUI, and bridge to KanbanFSM.
+        driver.subscribe { ev ->
+            println("[FLY-EVENT] $ev")
+            if (ev is FlywheelEvent.PollError) {
+                pollErrors++
+                pollErrOccurred = true
+            }
+            val now = System.currentTimeMillis()
+            when (ev) {
+                is borg.trikeshed.jules.FlywheelDriver.FlywheelEvent.Polled ->
+                    borg.trikeshed.userspace.reactor.KanbanFSM.reduce(
+                        borg.trikeshed.userspace.reactor.KanbanEvent.CycleObserved(0L, 0, 0, ev.alive, ev.available, now)
+                    )
+                is borg.trikeshed.jules.FlywheelDriver.FlywheelEvent.Drained ->
+                    borg.trikeshed.userspace.reactor.KanbanFSM.reduce(
+                        borg.trikeshed.userspace.reactor.KanbanEvent.PatchDrained(ev.sessionId, ev.sha, ev.tag, now)
+                    )
+                is borg.trikeshed.jules.FlywheelDriver.FlywheelEvent.Dispatched ->
+                    borg.trikeshed.userspace.reactor.KanbanFSM.reduce(
+                        borg.trikeshed.userspace.reactor.KanbanEvent.DispatchFired(ev.sessionId, ev.title, now)
+                    )
+                else -> {}
+            }
+        }
+        System.err.println(
+            "[OROBOROS] daemon up. forgeHome=$forgeHome repo=$repoDir " +
+                "intervalMs=$intervalMs maxSlots=$maxSlots mode=${if (watch) "watch" else "once"}"
+        )
+
+        daemonStartTime = System.currentTimeMillis()
+        lastCycleReport = null
+
+        val oroborosDir = File(forgeHome, ".oroboros")
+        oroborosDir.mkdirs()
+        val healthSock = File(oroborosDir, "health.sock")
+        if (healthSock.exists()) healthSock.delete()
+
+        // Bind with retry: a prior daemon may have left a stale socket file
+        // even after the JVM exited; the bind() then creates a regular file
+        // instead of a UNIX socket. Retry up to 3× with the file removed
+        // between attempts so we always end up with a real socket.
+        var serverSocket: ServerSocketChannel? = null
+        var bindAttempt = 0
+        while (serverSocket == null && bindAttempt < 3) {
+            try {
+                serverSocket = ServerSocketChannel.open(StandardProtocolFamily.UNIX)
+                serverSocket.bind(UnixDomainSocketAddress.of(healthSock.toPath()))
+            } catch (e: Throwable) {
+                System.err.println("[OROBOROS] health.sock bind attempt ${bindAttempt + 1} failed: ${e.message}")
+                try { serverSocket?.close() } catch (_: Exception) {}
+                serverSocket = null
+                if (healthSock.exists()) healthSock.delete()
+                bindAttempt++
+            }
+        }
+        if (serverSocket == null) {
+            System.err.println("[OROBOROS] health.sock bind FAILED after 3 attempts; aborting")
+            return
+        }
+
+        val healthJob = launch(Dispatchers.IO) {
+            while (isActive) {
+                var client: SocketChannel? = null
+                try {
+                    client = serverSocket!!.accept()
+                    val report = lastCycleReport
+                    val uptimeMs = System.currentTimeMillis() - daemonStartTime
+                    val msg = if (report != null) {
+                        "ALIVE $uptimeMs ${report.cycleMs} ${report.harvested} ${report.dispatched} ${report.alive} ${report.available}\n"
+                    } else {
+                        "ALIVE $uptimeMs -1 -1 -1 -1 -1\n"
+                    }
+                    val buf = ByteBuffer.wrap(msg.toByteArray())
+                    while (buf.hasRemaining()) {
+                        client.write(buf)
+                    }
+                } catch (e: Exception) { /* ignore */ }
+                finally {
+                    try { client?.close() } catch (_: Exception) {}
+                }
+            }
+        }
+        if (!preflight(repoDir, driver)) {
+            System.err.println("[OROBOROS] preflight failed; aborting before first cycle")
+            driver.close()
+            return
+        }
+
+        suspend fun runCycle() {
+            val t0 = System.currentTimeMillis()
+            val startPollErrors = pollErrors
+            val summary: FlywheelDriver.CycleReport = driver.cycle()
+            val cyclePollErrors = pollErrors - startPollErrors
+            println("[FLYWHEEL] phase=" + summary.phase + " cycleMs=" + summary.cycleMs + " harvested=" + summary.harvested + " dispatched=" + summary.dispatched + " alive=" + summary.alive + "/" + summary.available + " inducted=" + summary.inducted + " settled=" + summary.settled)
+
+            lastCycleReport = summary
+            val json = "{\"t\":" + t0 + ",\"c\":" + summary.cycleMs + ",\"d\":" + summary.harvested + ",\"p\":" + summary.dispatched + ",\"a\":" + summary.alive + ",\"v\":" + summary.available + ",\"e\":" + cyclePollErrors + "}"
+            try {
+                if (traceLineCount >= 10000) {
+                    traceWriter?.close()
+                    val backup = File(traceFile.parentFile, traceFile.name + ".1")
+                    traceFile.renameTo(backup)
+                    traceWriter = FileOutputStream(traceFile, false).bufferedWriter()
+                    traceLineCount = 0
+                }
+                traceWriter?.let {
+                    it.write(json)
+                    it.write("\n")
+                    it.flush() // observable progress — the trace is the operator's live signal
+                    traceLineCount++
+                }
+            } catch (e: Exception) {
+                System.err.println("[OROBOROS] warning: failed to write trace file: ${e.message}")
+            }
+        }
+
+        // Hot-swappable cycle body. Same instance, JVM retransforms the class
+        // in place — next call sees new bytecode. Edit CycleBody.kt, rebuild,
+        // agent reloads; loop continues uninterrupted.
+        val cycleBody = CycleBody(
+            driver = driver,
+            repoDir = repoDir,
+            consecutivePollErrors = consecutivePollErrors,
+            pollErrRef = { pollErrOccurred },
+            setPollErr = { pollErrOccurred = it },
+            runCycle = { runCycle() },
+            preflight = { preflight(repoDir, driver) },
+        )
+        cycleBodyField = cycleBody
+
+        try {
+            val startErrs = pollErrors
+            runCycle()
+            if (pollErrors > startErrs) {
+                consecutivePollErrors.set(1)
+            }
+            if (watch) {
+                while (isRunning) {
+                    val errors = consecutivePollErrors.get()
+                    val backoffMs = kotlin.math.min(intervalMs * (1L shl kotlin.math.min(errors, 30)), intervalMs * 5)
+                    if (errors > 0) System.err.println("[OROBOROS] backoff=${backoffMs}ms consecutiveErrors=$errors")
+                    delay(backoffMs)
+                    try {
+                        cycleBody.run()
+                    } catch (t: LinkageError) {
+                        // Botched hot-swap: the retransform produced bytecode
+                        // the JVM can't link against the loaded class
+                        // graph. The Runnable is unrunnable — bail out so the
+                        // supervisor (cron / launchctl) restarts us from a
+                        // known-clean compiled state.
+                        System.err.println("[OROBOROS] CycleBody unlinkable: ${t.javaClass.simpleName}: ${t.message?.take(200)} — bouncing")
+                        isRunning = false
+                        break
+                    } catch (t: Throwable) {
+                        // Defense in depth: CycleBody.run is itself wrapped in
+                        // a hard guard, but if anything escapes (NoClassDef,
+                        // AbstractMethodError from a future shape change)
+                        // the daemon loop must survive. Log and continue.
+                        System.err.println("[OROBOROS] cycleBody.run escaped: ${t.javaClass.simpleName}: ${t.message?.take(200)}")
+                    }
+                }
+            }
+        } finally {
+            healthJob.cancel()
+            try { serverSocket.close() } catch (_: Exception) {}
+            if (healthSock.exists()) healthSock.delete()
+            try { traceWriter?.flush(); traceWriter?.close() } catch (_: Exception) {}
+            driver.close()
+        }
+    }
+
+    private fun preflight(repoDir: File, driver: FlywheelDriver): Boolean {
+        // git fetch origin master (best-effort, 5s timeout)
+        val fetch = ProcessBuilder("git", "fetch", "origin", "master", "--dry-run")
+            .directory(repoDir).start()
+        val fetchOk = fetch.waitFor() == 0
+        if (!fetchOk) return true // offline is OK, we'll poll anyway
+
+        fun command(vararg args: String): String {
+            val p = ProcessBuilder(*args).directory(repoDir).redirectErrorStream(true).start()
+            p.waitFor()
+            return p.inputStream.bufferedReader().readText().trim()
+        }
+
+        val local = command("git", "rev-parse", "HEAD")
+        val remote = command("git", "rev-parse", "origin/master")
+        if (local == remote) return true
+        // Local AHEAD of remote is the normal flywheel state between pushes
+        // (drained patches land locally, then get pushed by settlementBarrier).
+        // Only block when truly diverged: local has commits origin doesn't
+        // AND origin has commits local doesn't (true divergence).
+        val mergeBase = command("git", "merge-base", local, remote)
+        if (mergeBase == local || mergeBase == remote) {
+            // linear: local ahead OR local behind, but not both
+            return true
+        }
+        // local is neither reachable from remote nor vice versa → diverged
+        println("[OROBOROS] UPSTREAM-DIVERGED local=$local remote=$remote mergeBase=$mergeBase")
+        driver.emitDrifted(local, remote)
+        return false
+    }
+
+    private fun die(msg: String): Nothing {
+        System.err.println("[OROBOROS] $msg")
+        usage()
+        exitProcess(2)
+    }
+
+    private fun usage() {
+        System.err.println(
+            """usage: OroborosDaemon [--once | --watch] [--interval-ms N] [--max-slots N] [forgeHome] [repoDir]
+              env: JULES_API_KEY (required)
+              forgeHome default: ~/.local/forge (ForgeHome.defaultHome)
+              repoDir  default: cwd"""
+        )
+    }
+}
+package borg.trikeshed.ccek
+
+import borg.trikeshed.forge.ForgeBlockKind
+import borg.trikeshed.forge.ForgeDoc
+import borg.trikeshed.forge.ForgeDocument
+import borg.trikeshed.forge.toForgeDocument
+import borg.trikeshed.forge.toKanbanBoard
+import borg.trikeshed.kanban.KanbanBoard
+import borg.trikeshed.kanban.KanbanColumnId
+import borg.trikeshed.userspace.reactor.MuxReactorElement
+import kotlinx.coroutines.CoroutineName
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.SharedFlow
+import kotlinx.coroutines.flow.asSharedFlow
+import kotlinx.coroutines.isActive
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+
+object CCEK {
+    fun initialize(reactor: MuxReactorElement): CcekReactorBinding = CcekReactorBinding(reactor)
+
+    fun <T> inputChannel(capacity: Int = Channel.BUFFERED): Channel<T> = Channel(capacity)
+    fun <T> fanOutChannel(capacity: Int = 64): Channel<T> = Channel(capacity)
+
+    fun childScope(name: String, parentScope: CoroutineScope): CoroutineScope =
+        CoroutineScope(parentScope.coroutineContext + SupervisorJob() + CoroutineName("CCEK-$name"))
+
+    class CcekReactorBinding(val reactor: MuxReactorElement) {
+        val reactorScope: CoroutineScope = CoroutineScope(
+            reactor.supervisor + Dispatchers.Default + CoroutineName("CCEK-reactor")
+        )
+
+        fun choreograph(
+            doc: ForgeDocument,
+            record: Boolean = false,
+            enabledProjections: Set<ProjectionKind> = ProjectionKind.ALL,
+        ): ArticulatedNode = ArticulatedNode(
+            initialDoc = doc,
+            scope = reactorScope,
+            record = record,
+            enabledProjections = enabledProjections,
+        )
+
+        fun createUserContext(name: String): UserContext = UserContext(name, reactorScope)
+    }
+}
+
+enum class ProjectionKind {
+    DOCUMENT,
+    BOARD,
+    MARKDOWN;
+
+    companion object {
+        val ALL: Set<ProjectionKind> = entries.toSet()
+    }
+}
+
+sealed class ForgeSignal {
+    data class AppendBlock(
+        val kind: ForgeBlockKind,
+        val text: String,
+        val properties: Map<String, String> = emptyMap(),
+    ) : ForgeSignal()
+
+    data class UpdateText(val blockId: String, val text: String) : ForgeSignal()
+    data class DeleteBlock(val blockId: String) : ForgeSignal()
+    data class MoveCard(val cardId: String, val toColumnId: String) : ForgeSignal()
+}
+
+sealed class ForgeProjection {
+    data class DocumentChanged(val doc: ForgeDocument) : ForgeProjection()
+    data class BoardChanged(val board: KanbanBoard) : ForgeProjection()
+    data class MarkdownChanged(val markdown: String) : ForgeProjection()
+}
+
+class ArticulatedNode(
+    initialDoc: ForgeDocument,
+    private val scope: CoroutineScope,
+    private val record: Boolean = false,
+    private val enabledProjections: Set<ProjectionKind> = ProjectionKind.ALL,
+) {
+    private var doc: ForgeDocument = initialDoc
+    val signalIn: Channel<ForgeSignal> = Channel(Channel.UNLIMITED)
+
+    private val _documentProjections = MutableSharedFlow<ForgeDocument>(replay = 64, extraBufferCapacity = 64)
+    val documentProjections: SharedFlow<ForgeDocument> = _documentProjections.asSharedFlow()
+
+    private val _boardProjections = MutableSharedFlow<KanbanBoard>(replay = 64, extraBufferCapacity = 64)
+    val boardProjections: SharedFlow<KanbanBoard> = _boardProjections.asSharedFlow()
+
+    private val _markdownProjections = MutableSharedFlow<String>(replay = 64, extraBufferCapacity = 64)
+    val markdownProjections: SharedFlow<String> = _markdownProjections.asSharedFlow()
+
+    private val _projections = MutableSharedFlow<ForgeProjection>(replay = 64, extraBufferCapacity = 64)
+    val projections: SharedFlow<ForgeProjection> = _projections.asSharedFlow()
+
+    private val childScopes = linkedMapOf<String, CoroutineScope>()
+    private val agents = linkedMapOf<String, (ForgeSignal) -> Unit>()
+    private val recordedSignals = mutableListOf<ForgeSignal>()
+    private var fanOutJob: Job? = null
+    private val startMutex = Mutex()
+
+    val markdownProjectionCount: Int get() = _markdownProjections.replayCache.size
+    val childScopeCount: Int get() = childScopes.size
+    val isActive: Boolean get() = fanOutJob?.isActive == true
+
+    init {
+        start()
+    }
+
+    fun start() {
+        if (fanOutJob?.isActive == true) return
+        scope.launch {
+            startMutex.lock()
+            try {
+                if (fanOutJob?.isActive == true) {
+                    return@launch
+                }
+                fanOutJob = scope.launch {
+                    fanOutAll()
+                    for (signal in signalIn) {
+                        if (record) recordedSignals += signal
+                        val agentsSnapshot = agents.values.toList()
+                        agentsSnapshot.forEach { it(signal) }
+                        doc = applySignal(signal)
+                        registerChildScopes(doc)
+                        fanOutAll()
+                    }
+                }
+            } finally {
+                startMutex.unlock()
+            }
+        }
+    }
+
+    fun cancel() {
+        childScopes.values.forEach { it.cancel() }
+        childScopes.clear()
+        fanOutJob?.cancel()
+        fanOutJob = null
+        signalIn.close()
+    }
+
+    fun stop() = cancel()
+
+    suspend fun sendSignal(signal: ForgeSignal) {
+        if (!isActive) start()
+        signalIn.send(signal)
+    }
+
+    fun subscribeAgent(name: String, handler: (ForgeSignal) -> Unit) {
+        agents[name] = handler
+    }
+
+    fun recording(): List<ForgeSignal> = recordedSignals.toList()
+
+    /** For tests only: snapshot the post-start state under a transient scope. */
+    private val docMutex = kotlinx.coroutines.sync.Mutex()
+
+    /**
+     * Apply a signal synchronously and return the resulting document.
+     * Updates internal state so repeated applications are idempotent.
+     * Test seams only — production callers should use `sendSignal`.
+     */
+    fun applySignalForTest(signal: ForgeSignal): ForgeDocument {
+        doc = applySignal(signal)
+        return doc
+    }
+
+    private fun applySignal(signal: ForgeSignal): ForgeDocument = when (signal) {
+        is ForgeSignal.AppendBlock -> ForgeDoc.appendBlock(doc, doc.rootPageId, signal.kind, signal.text, signal.properties)
+        is ForgeSignal.UpdateText -> {
+            val blockId = doc.blocks[signal.blockId]?.id ?: return doc
+            ForgeDoc.updateText(doc, blockId, signal.text)
+        }
+        is ForgeSignal.DeleteBlock -> {
+            val blockId = doc.blocks[signal.blockId]?.id ?: return doc
+            ForgeDoc.deleteBlock(doc, blockId)
+        }
+        is ForgeSignal.MoveCard -> {
+            // In-place property edit, NOT a board round-trip: the projection
+            // layer has a fixed 3-column schema (backlog/inprog/done), so any
+            // custom column id (e.g. col-b) would be lost on re-projection.
+            // We update the underlying heading block's `kanban.column.id`
+            // (preferred) and `kanban.status` (legacy heuristic) so the
+            // round-trip is identity-stable.
+            val targetBlock = doc.blocks[signal.cardId]?.takeIf { block ->
+                block.kind == ForgeBlockKind.HEADING_2 ||
+                    block.kind == ForgeBlockKind.HEADING_1 ||
+                    block.kind == ForgeBlockKind.HEADING_3
+            } ?: return doc
+            val status = when (signal.toColumnId) {
+                "col-inprogress" -> "in-progress"
+                "col-done" -> "done"
+                else -> "backlog"
+            }
+            val withId = ForgeDoc.setProperty(doc, targetBlock.id, "kanban.column.id", signal.toColumnId)
+            ForgeDoc.setProperty(withId, targetBlock.id, "kanban.status", status)
+        }
+    }
+
+    private suspend fun fanOutAll() {
+        if (ProjectionKind.DOCUMENT in enabledProjections) {
+            _documentProjections.emit(doc)
+            _projections.emit(ForgeProjection.DocumentChanged(doc))
+        }
+        if (ProjectionKind.BOARD in enabledProjections) {
+            val board = doc.toKanbanBoard()
+            _boardProjections.emit(board)
+            _projections.emit(ForgeProjection.BoardChanged(board))
+        }
+        if (ProjectionKind.MARKDOWN in enabledProjections) {
+            val markdown = ForgeDoc.renderMarkdown(doc)
+            _markdownProjections.emit(markdown)
+            _projections.emit(ForgeProjection.MarkdownChanged(markdown))
+        }
+    }
+
+    private fun registerChildScopes(doc: ForgeDocument) {
+        val rootId = doc.rootPageId.value
+        doc.blocks.values
+            .asSequence()
+            .filter { it.id.value != rootId }
+            .forEach { block ->
+                childScopes.getOrPut(block.id.value) {
+                    CCEK.childScope(block.id.value, scope)
+                }
+            }
+
+        val liveIds = doc.blocks.keys - rootId
+        val stale = childScopes.keys - liveIds
+        stale.forEach { id ->
+            childScopes.remove(id)?.cancel()
+        }
+    }
+}
+
+class ForgeDocNode(
+    initialDoc: ForgeDocument,
+    scope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.Default + CoroutineName("ForgeDocNode")),
+) {
+    private val node = ArticulatedNode(initialDoc = initialDoc, scope = scope)
+    val signalIn: Channel<ForgeSignal> get() = node.signalIn
+    val projections: SharedFlow<ForgeProjection> get() = node.projections
+    fun start() = node.start()
+    fun stop() = node.stop()
+}
+
+class UserContext(
+    val name: String,
+    private val scope: CoroutineScope,
+) {
+    private val facts = mutableListOf<CausalAssertion>()
+    private val polyglotFacts = mutableListOf<PolyglotFact>()
+    var active: Boolean = false
+        private set
+
+    val reteTable: CausalReteTable
+        get() = CausalReteTable(facts.toList())
+
+    fun activate() {
+        active = true
+    }
+
+    fun deactivate() {
+        active = false
+    }
+
+    fun assertFact(assertion: CausalAssertion) {
+        facts += assertion
+    }
+
+    fun loadPolyglotFacts(allFacts: List<PolyglotFact>) {
+        polyglotFacts += allFacts
+    }
+
+    fun queryPolyglot(language: String, kind: String): List<PolyglotFact> =
+        polyglotFacts.filter { it.language == language && it.kind == kind }
+
+    fun predictModel(modelName: String, inputs: Map<String, Any>): Map<String, Any> {
+        val count = inputs["count"]?.toString()?.toIntOrNull() ?: 0
+        return when (inputs["method"]?.toString()) {
+            "appendBlock" -> mapOf("model" to modelName, "expectedBlocks" to count + 1)
+            else -> mapOf("model" to modelName)
+        }
+    }
+
+    fun tableTest(prediction: Map<String, Any>): TableTestResult {
+            val expected = prediction["expectedBlocks"] as? Int
+                ?: return TableTestResult(false, "no expectedBlocks in prediction")
+            // Count all facts that represent blocks (class:, method:, block:)
+            val actual = facts.count { it.kind.contains("block") || it.kind.contains("class:") || it.kind.contains("method:") }
+            val passed = actual >= expected - 1
+            return TableTestResult(passed, if (passed) "OK" else "expected $expected, found $actual")
+        }
+
+    fun createGraphicalFlow(name: String): GraphicalFlow = GraphicalFlow(name)
+    fun spreadsheetVeneer(): SpreadsheetVeneer = SpreadsheetVeneer(facts.toList())
+
+    fun adaptParadigm(paradigm: MetaLcncParadigm): AdaptedParadigm {
+        paradigm.rules.forEach { rule ->
+            facts += CausalAssertion("rule:${paradigm.name}:${rule.name}", mapOf("expr" to rule.expression))
+        }
+        return AdaptedParadigm(paradigm.name, scope, reteTable)
+    }
+
+    fun choreograph(doc: ForgeDocument): ArticulatedNode {
+        val node = ArticulatedNode(
+            initialDoc = doc,
+            scope = CoroutineScope(scope.coroutineContext + SupervisorJob() + CoroutineName("UserContext-$name")),
+        )
+        node.subscribeAgent("$name-causal-assertions") { signal ->
+            when (signal) {
+                is ForgeSignal.AppendBlock -> assertFact(CausalAssertion("block:appended", mapOf("text" to signal.text, "kind" to signal.kind.name)))
+                is ForgeSignal.UpdateText -> assertFact(CausalAssertion("block:updated", mapOf("blockId" to signal.blockId)))
+                is ForgeSignal.DeleteBlock -> assertFact(CausalAssertion("block:deleted", mapOf("blockId" to signal.blockId)))
+                is ForgeSignal.MoveCard -> assertFact(CausalAssertion("card:moved", mapOf("cardId" to signal.cardId, "to" to signal.toColumnId)))
+            }
+        }
+        return node
+    }
+}
+
+data class CausalAssertion(val kind: String, val fields: Map<String, Any>)
+data class PolyglotFact(val language: String, val opcode: String, val target: String, val kind: String)
+
+class CausalReteTable(private val facts: List<CausalAssertion>) {
+    val rowCount: Int get() = facts.size
+    fun containsFact(kind: String): Boolean = facts.any { it.kind == kind || it.kind.startsWith(kind) }
+    fun query(kind: String): List<CausalAssertion> = facts.filter { it.kind == kind || it.kind.startsWith(kind) }
+}
+
+data class TableTestResult(val passed: Boolean, val evidence: String? = null)
+
+class GraphicalFlow(val name: String) {
+    private val blocks = mutableListOf<GraphicalBlock>()
+    private val edges = mutableListOf<GraphicalEdge>()
+
+    fun addBlock(block: GraphicalBlock) {
+        blocks += block
+    }
+
+    fun connect(from: String, to: String) {
+        edges += GraphicalEdge(from, to)
+    }
+
+    fun asCursor(): GraphicalCursor = GraphicalCursor(blocks.toList())
+    fun edges(): List<GraphicalEdge> = edges.toList()
+}
+
+data class GraphicalBlock(val id: String, val label: String, val properties: Map<String, String>)
+data class GraphicalEdge(val from: String, val to: String)
+class GraphicalCursor(val blocks: List<GraphicalBlock>) { val size: Int get() = blocks.size }
+
+class SpreadsheetVeneer(private val facts: List<CausalAssertion>) {
+    val rowCount: Int get() = facts.size
+    fun facet(column: String, value: String): List<CausalAssertion> = facts.filter { fact -> fact.fields[column]?.toString() == value }
+}
+
+data class MetaLcncParadigm(val name: String, val rules: List<LcncRule>)
+data class LcncRule(val name: String, val expression: String)
+class AdaptedParadigm(val name: String, val scope: CoroutineScope, val reteTable: CausalReteTable) { val isActive: Boolean get() = true }
+package borg.trikeshed.forge
+
+import borg.trikeshed.common.Files
+import borg.trikeshed.cursor.blackboardContext
+import borg.trikeshed.cursor.provenance
+import borg.trikeshed.forge.blackboard.ForgeBlackboardSection3D
+import borg.trikeshed.forge.blackboard.ForgeBlackboardView
+import borg.trikeshed.forge.gallery.ForgeGalleryCatalog
+import borg.trikeshed.forge.gallery.ForgeGalleryRenderer
+import borg.trikeshed.job.ContentId
+import borg.trikeshed.kanban.ForgeKanbanIngest
+import borg.trikeshed.kanban.ForgeKanbanReduction
+import borg.trikeshed.kanban.CardPriority
+import borg.trikeshed.forge.correlationToBlock
+import borg.trikeshed.lcnc.reactor.IngestCodec
+import borg.trikeshed.lcnc.reactor.IngestFormat
+import borg.trikeshed.lcnc.reactor.IngestSource
+import borg.trikeshed.lcnc.reactor.LcncIngestPipeline
+import borg.trikeshed.lib.Series
+import borg.trikeshed.lib.j
+import kotlinx.datetime.Clock
+import borg.trikeshed.blackboard.BlackboardSurface
+import borg.trikeshed.graph.CausalGraphNodeIndex
+import borg.trikeshed.parse.json.JsonSupport
+
+/**
+ * ForgeApp — single file server-side renderable workspace shell.
+ * Static assets consolidated to src/commonMain/resources/web/; server-side render in commonMain.
+ * PWA offline-first: Forge captures projects server-free; server/mesh additive sync.
+ */
+object ForgeApp {
+
+    /** Render the complete Forge HTML shell with seeded state for PWA offline-first hydration. */
+    fun renderHtml(userId: String = "jim"): String {
+        val reduction = runCatching { ForgeKanbanIngest.load(userId) }.getOrElse { ForgeKanbanIngest.fallbackReduction() }
+        val seed = forgeSeedJson(userId, reduction)
+        return htmlShell(seed)
+    }
+
+    private fun forgeSeedJson(userId: String, reduction: ForgeKanbanReduction): String {
+        val seedMap = mapOf<String, Any?>(
+            "userId" to userId,
+            "source" to mapOf(
+                "title" to reduction.source.title,
+                "version" to reduction.source.version,
+            ),
+            "board" to mapOf(
+                "columns" to reduction.board.columns.map { col ->
+                    mapOf(
+                        "id" to col.id.value,
+                        "name" to col.name,
+                        "order" to col.order,
+                    )
+                },
+                "cards" to reduction.board.cards.map { card ->
+                    mapOf(
+                        "id" to card.id.value,
+                        "title" to card.title,
+                        "description" to card.description,
+                        "columnId" to card.columnId.value,
+                        "order" to card.order,
+                        "priority" to card.priority.name,
+                        "dependencies" to card.dependencies.map { it.value },
+                    )
+                },
+            ),
+            "causalGraph" to reduction.causalNodes.map { node ->
+                mapOf(
+                    "id" to node.nodeId,
+                    "title" to (node.opId + ":" + node.opVersion),
+                    "parents" to node.parentNodeIds,
+                    "children" to emptyList<String>(),
+                )
+            },
+            "correlations" to reduction.correlations.map { corr ->
+                mapOf(
+                    "taskId" to corr.taskId,
+                    "parentIds" to corr.parentIds,
+                    "childIds" to corr.childIds,
+                    "ready" to corr.ready,
+                    "causalKey" to corr.causalKey,
+                )
+            },
+            "blackboardSeed" to forgeBlackboardSeed(),
+            "dashboards" to forgeDashboardSeed(),
+        )
+        return JsonSupport.stringify(seedMap)
+    }
+
+    /**
+     * Dashboard seed: launch-time native I/O capability + latest flywheel cycle
+     * evidence. The server render is the authoritative launch-time snapshot.
+     */
+    private fun forgeDashboardSeed(): Map<String, Any?> {
+        val report = runCatching {
+            borg.trikeshed.userspace.nio.spi.currentNioCapabilityReport()
+        }.getOrElse {
+            borg.trikeshed.userspace.nio.spi.NioCapabilityReport(
+                backendName = "unknown",
+                ioUringAvailable = false,
+                capabilities = emptyList(),
+                kernelHint = "probe-failed",
+                checkedAt = Clock.System.now().toEpochMilliseconds(),
+            )
+        }
+        val cycleTelemetry = readCycleTelemetry()
+        return mapOf(
+            "nio" to mapOf(
+                "backendName" to report.backendName,
+                "ioUringAvailable" to report.ioUringAvailable,
+                "capabilities" to report.capabilities,
+                "kernelHint" to report.kernelHint,
+                "checkedAt" to report.checkedAt,
+            ),
+            "flywheel" to cycleTelemetry,
+        )
+    }
+
+    private fun readCycleTelemetry(): Map<String, Any?> {
+        // Dashboards read the live trace via the daemon-side binder; the
+        // commonMain renderer has no filesystem access, so it returns an
+        // empty placeholder. The browser bundle hydrates from the same shape
+        // once the websocket binder ships telemetry.
+        return mapOf("lastCycle" to null, "history" to emptyList<Any?>())
+    }
+
+    private fun htmlShell(seed: String): String = """
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Forge — Local-First Workspace</title>
+  <link rel="manifest" href="/manifest.webmanifest">
+  <meta name="theme-color" content="#090D13">
+  <style>${forgeAppStyles()}</style>
+</head>
+<body>
+  <div id="forge-root">
+    <header class="forge-header">
+      <div class="header-left">
+        <svg class="forge-logo" viewBox="0 0 32 32" width="28" height="28"><path d="M4 28V4h24v24H4Zm2-2h20V6H6v20Z"/></svg>
+        <span id="forge-title">FORGE</span>
+      </div>
+      <div class="header-center">
+        <div class="search-box"><input type="text" placeholder="Search workspace…" id="forge-search"/></div>
+      </div>
+      <div class="header-right">
+        <button class="btn" id="new-doc-btn">New Doc</button>
+        <button class="btn" id="sync-btn">Sync</button>
+      </div>
+    </header>
+    <div class="forge-body">
+      <aside id="rail" class="rail">
+        <div class="rail-section">
+          <h3>Workspace</h3>
+          <nav id="rail-nav"></nav>
+        </div>
+        <div class="rail-section">
+          <h3>Gallery</h3>
+          ${galleryHtml()}
+        </div>
+      </aside>
+      <main id="canvas" class="canvas">
+        <div id="blackboard-surface" class="blackboard-surface">
+          <div class="hud-top">
+            <span id="hud-title-left">Page</span>
+            <span id="hud-title-center">Board</span>
+            <span id="hud-title-right">Blackboard</span>
+          </div>
+        </div>
+      </main>
+    </div>
+    <div id="reactor-root" class="status-strip"></div>
+    <script id="forge-seed" type="application/json">$seed</script>
+    <script>
+${forgeAppScript()}
+    </script>
+</body>
+</html>
+    """.trimIndent()
+    }
+
+    private fun forgeAppStyles(): String = borg.trikeshed.forge.generated.ForgeAssets.stylesCss
+
+    private fun forgeAppScript(): String = forgePersistenceScript()
+
+    /** Server-rendered gallery HTML for the workspace rail. No client-side hydration needed. */
+    private fun galleryHtml(): String = ForgeGalleryRenderer.renderHtml()
+
+    private fun forgeBlackboardSeed(): Map<String, Any?> {
+        val view = ForgeBlackboardView.DEFAULT
+        val cam = view.defaultCamera
+        val cam3d = view.mode3D
+        return mapOf(
+            "surface" to view.surface,
+            "sections" to view.sections,
+            "defaultMode" to view.defaultMode.name,
+            "cornerButtons" to view.cornerButtons.map { btn ->
+                mapOf(
+                    "slot" to btn.slot.name,
+                    "id" to btn.id,
+                    "label" to btn.label,
+                    "hotkey" to btn.hotkey,
+                    "surface" to btn.surface,
+                )
+            },
+            "camera" to mapOf(
+                "x" to cam.x,
+                "y" to cam.y,
+                "zoom" to cam.zoom,
+                "tilt" to cam.tilt,
+                "vx" to cam.vx,
+                "vy" to cam.vy,
+                "vz" to cam.vz,
+                "minZoom" to cam.minZoom,
+                "maxZoom" to cam.maxZoom,
+            ),
+            "camera3D" to mapOf(
+                "yawRadians" to cam3d.yawRadians,
+                "pitchRadians" to cam3d.pitchRadians,
+                "distance" to cam3d.distance,
+                "focalLength" to cam3d.focalLength,
+                "minDistance" to cam3d.minDistance,
+                "maxDistance" to cam3d.maxDistance,
+            ),
+            "layout3D" to view.layout3D.map { section ->
+                mapOf(
+                    "sectionId" to section.sectionId,
+                    "centerX" to section.centerX,
+                    "centerY" to section.centerY,
+                    "width" to section.width,
+                    "height" to section.height,
+                    "elevation" to section.elevation,
+                )
+            },
+        )
+    }
+package borg.trikeshed.userspace.reactor
+
+import borg.trikeshed.context.AsyncContextElement
+import borg.trikeshed.context.AsyncContextKey
+import borg.trikeshed.context.ElementState
+import borg.trikeshed.userspace.reactor.KanbanFSM
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.channels.BufferOverflow
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharedFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asSharedFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.launch
+import kotlinx.datetime.Clock
+import kotlinx.serialization.Serializable
+import kotlin.coroutines.CoroutineContext
+
+/**
+ * Reactor-owned key/model muxer CCEK element.
+ *
+ * Kanban does not own keymux/modelmux state. The reactor owns this element and
+ * downstream consumers (Forge UI, Kanban FSM projections, planners) observe the
+ * immutable [flowState] snapshots or apply explicit events through this element.
+ */
+class MuxReactorElement(
+    parentJob: Job? = null,
+    initialConfig: MuxReactorConfig = MuxReactorConfig(),
+) : AsyncContextElement(ElementState.CREATED, parentJob) {
+    companion object Key : AsyncContextKey<MuxReactorElement>()
+
+    override val key: CoroutineContext.Key<*> get() = Key
+
+    private var config: MuxReactorConfig = initialConfig
+    private var tickSequence: Long = 0
+    private val keysById = mutableMapOf<String, MutableMuxKey>()
+    private val modelsById = mutableMapOf<String, MuxModelEntry>()
+    private val operationalHistory = mutableListOf<MuxOperationalEntry>()
+
+    private val _flowState = MutableStateFlow(emptyState(initialConfig))
+    val flowState: StateFlow<MuxReactorState> = _flowState.asStateFlow()
+
+    /**
+     * Reactor-owned modelmux cache layer. Holds model metadata and API call
+     * results. Persists to ~/.hermes/model_cache.json via CacheStoreJvm on
+     * the JVM. Emits CacheEvent values through [cacheEvents]; the UI and
+     * the Kanban FSM consume them.
+     */
+    private val _cache: ModelApiCache = ModelApiCache()
+    val cache: ModelApiCache get() = _cache
+    val cacheEvents: SharedFlow<CacheEvent> get() = _cache.events
+
+    private val _kanbanEvents = MutableSharedFlow<KanbanEvent>(
+        replay = 64,
+        extraBufferCapacity = 64,
+        onBufferOverflow = BufferOverflow.DROP_OLDEST,
+    )
+    /** Reactor-owned kanban event stream. Kanban FSM consumes this; kanban never owns it. */
+    val kanbanEvents: SharedFlow<KanbanEvent> = _kanbanEvents.asSharedFlow()
+
+    override suspend fun open() {
+        if (state == ElementState.CREATED) {
+            super.open()
+            state = ElementState.ACTIVE
+            publishState()
+        }
+    }
+
+    override suspend fun close() {
+        keysById.clear()
+        modelsById.clear()
+        operationalHistory.clear()
+        super.close()
+    }
+
+    fun updateConfig(newConfig: MuxReactorConfig) {
+        config = newConfig
+        publishState()
+    }
+
+    fun recordAccess(
+        keyId: String,
+        provider: String,
+        label: String = keyId,
+        modelUrl: String = "",
+    ): MuxKeyEntry {
+        val now = nowMs()
+        val entry = keysById.getOrPut(keyId) {
+            MutableMuxKey(
+                keyId = keyId,
+                provider = provider,
+                label = label,
+                modelUrl = modelUrl,
+                lastUsedMs = now,
+                accessCount = 0,
+            )
+        }
+        entry.provider = provider
+        entry.label = label
+        if (modelUrl.isNotBlank()) entry.modelUrl = modelUrl
+        entry.lastUsedMs = now
+        entry.accessCount += 1
+        entry.status = MuxKeyStatus.ACTIVE
+        publishState()
+        return entry.toImmutable()
+    }
+
+    fun recordModel(
+        keyId: String,
+        modelId: String,
+        provider: String = keysById[keyId]?.provider ?: "unknown",
+        contextWindow: Int = 0,
+    ): MuxKeyEntry? {
+        val key = keysById[keyId] ?: return null
+        key.lastModel = modelId
+        key.lastUsedMs = nowMs()
+        modelsById[modelId] = MuxModelEntry(
+            modelId = modelId,
+            provider = provider,
+            contextWindow = contextWindow,
+            available = true,
+        )
+        publishState()
+        return key.toImmutable()
+    }
+
+    fun loadCredentialPool(poolData: Map<String, List<MuxCredentialRecord>>): Int {
+            var loaded = 0
+            poolData.forEach { (provider, entries) ->
+                entries.forEach { credential ->
+                    if (credential.id.isBlank()) return@forEach
+                    if (credential.lastStatus == "benched") return@forEach
+                    keysById[credential.id] = MutableMuxKey(
+                        keyId = credential.id,
+                        provider = provider,
+                        label = credential.label.ifBlank { credential.id },
+                        modelUrl = credential.baseUrl,
+                        lastModel = credential.lastModel ?: credential.lastSuccessModel,
+                        lastUsedMs = credential.lastUsedAt,
+                        accessCount = credential.requestCount,
+                        status = when (credential.lastStatus) {
+                            "exhausted" -> MuxKeyStatus.BACKOFF
+                            else -> MuxKeyStatus.ACTIVE
+                        },
+                    )
+                    emitKanbanEvent(
+                        KanbanEvent.CredentialLoaded(
+                            provider = provider,
+                            keyId = credential.id,
+                            timestampMs = nowMs(),
+                        ),
+                    )
+                    loaded++
+                }
+            }
+            publishState()
+            return loaded
+        }
+
+    private fun emitKanbanEvent(event: KanbanEvent) {
+        // SharedFlow never blocks; emit is best-effort. Replay buffer keeps
+        // late UI subscribers from missing the latest transition.
+        _kanbanEvents.tryEmit(event)
+    }
+
+    /**
+     * Reactor-owned ingress for external taxonomy creation events.
+     * Callers submit taxonomy events here instead of emitting directly into the
+     * public kanban SharedFlow.
+     */
+    fun ingestTaxonomyEvents(events: List<KanbanEvent.TaxonomyNodeCreated>): Int {
+        events.forEach(::emitKanbanEvent)
+        return events.size
+    }
+
+    /**
+     * Look up a model in the reactor-owned modelmux cache. Emits a
+     * KanbanEvent.CacheTick so the FSM records the hit/miss.
+     */
+    fun lookupModel(provider: String, modelId: String): CacheLookup {
+        val lookup = _cache.lookupModel(provider, modelId)
+        emitKanbanEvent(
+            KanbanEvent.CacheTick(
+                kind = if (lookup is CacheLookup.Hit) "Hit" else "Miss",
+                cacheKey = lookup.key,
+                timestampMs = lookup.timestampMs,
+            ),
+        )
+        publishState()
+        return lookup
+    }
+
+    /**
+     * Store a model in the reactor-owned modelmux cache.
+     */
+    fun cacheModel(provider: String, modelId: String, payload: String): CacheEntry {
+        val entry = _cache.putModel(provider, modelId, payload)
+        emitKanbanEvent(
+            KanbanEvent.CacheTick(
+                kind = "Stored",
+                cacheKey = entry.key,
+                timestampMs = entry.storedAtMs,
+            ),
+        )
+        publishState()
+        return entry
+    }
+
+    /**
+     * Look up an API call result in the reactor-owned modelmux cache.
+     */
+    fun lookupApiCall(
+        provider: String,
+        modelId: String,
+        requestHash: String,
+        ttlMs: Long,
+    ): CacheLookup {
+        val lookup = _cache.lookupApiCall(provider, modelId, requestHash, ttlMs)
+        emitKanbanEvent(
+            KanbanEvent.CacheTick(
+                kind = if (lookup is CacheLookup.Hit) "Hit" else "Miss",
+                cacheKey = lookup.key,
+                timestampMs = lookup.timestampMs,
+            ),
+        )
+        publishState()
+        return lookup
+    }
+
+    /**
+     * Store an API call result in the reactor-owned modelmux cache.
+     */
+    fun cacheApiCall(
+        provider: String,
+        modelId: String,
+        requestHash: String,
+        ttlMs: Long,
+        payload: String,
+    ): CacheEntry {
+        val entry = _cache.putApiCall(provider, modelId, requestHash, ttlMs, payload)
+        emitKanbanEvent(
+            KanbanEvent.CacheTick(
+                kind = "Stored",
+                cacheKey = entry.key,
+                timestampMs = entry.storedAtMs,
+            ),
+        )
+        publishState()
+        return entry
+    }
+
+    fun tick(): MuxDispatchResult {
+        val reclaimedCount = reclaimExpiredLeases()
+        val runningPerProvider: Map<String, Int> = activeLeases()
+            .mapNotNull { lease ->
+                keysById[lease.keyId]?.provider?.let { it to 1 }
+            }
+            .groupBy { it.first }
+            .mapValues { (_, entries) -> entries.size }
+        val available = keysById.values
+            .filter { it.status == MuxKeyStatus.ACTIVE && it.leasedTo == null }
+            .filter { runningPerProvider.get(it.provider) ?: 0 < config.maxPerProvider }
+        val running = activeLeases().size
+        val canSpawn = minOf(config.maxSpawn, config.maxInProgress - running, available.size).coerceAtLeast(0)
+        val now = nowMs()
+        var spawned = 0
+        for (entry in available.take(canSpawn)) {
+            val agentId = "reactor-agent-${tickSequence + spawned + 1}"
+            entry.leasedTo = agentId
+            entry.leaseStartedAt = now
+            entry.leaseExpiresAt = now + config.leaseTtlMs
+            spawned++
+            emitKanbanEvent(
+                KanbanEvent.KeyLeased(
+                    keyId = entry.keyId,
+                    leasedTo = agentId,
+                    leaseExpiresAt = entry.leaseExpiresAt,
+                    timestampMs = now,
+                ),
+            )
+            recordOperational(
+                poolName = MuxOperationalPool.TASK_THROUGHPUT,
+                key = "spawned_${entry.keyId}_$now",
+                labels = mapOf("agent" to agentId, "key" to entry.keyId, "provider" to entry.provider),
+                value = 1.0,
+            )
+        }
+        tickSequence++
+        recordOperational(
+            poolName = MuxOperationalPool.TASK_THROUGHPUT,
+            key = "tick_$now",
+            labels = mapOf("phase" to "tick"),
+            value = spawned.toDouble(),
+        )
+        publishState(now)
+        return MuxDispatchResult(
+            spawned = spawned,
+            reclaimed = reclaimedCount,
+            promoted = 0,
+            crashed = 0,
+            timestampMs = now,
+        )
+    }
+
+    fun releaseLease(keyId: String, leasedTo: String): Boolean {
+        val key = keysById[keyId] ?: return false
+        if (key.leasedTo != leasedTo) return false
+        key.leasedTo = null
+        key.leaseStartedAt = 0L
+        key.leaseExpiresAt = 0L
+        publishState()
+        emitKanbanEvent(
+            KanbanEvent.LeaseReclaimed(
+                keyId = keyId,
+                previousLeasee = leasedTo,
+                timestampMs = nowMs(),
+            ),
+        )
+        return true
+    }
+
+    fun startLoop(scope: CoroutineScope): Job = scope.launch {
+        while (state.isLessThan(ElementState.DRAINING)) {
+            tick()
+            delay(config.tickIntervalMs)
+        }
+    }
+
+    private fun recordOperational(
+        poolName: String,
+        key: String,
+        labels: Map<String, String> = emptyMap(),
+        value: Double = 0.0,
+        metadata: Map<String, String> = emptyMap(),
+    ): MuxOperationalEntry {
+        val entry = MuxOperationalEntry(
+            poolName = poolName,
+            key = key,
+            labels = labels,
+            value = value,
+            timestampMs = nowMs(),
+            metadata = metadata,
+        )
+        operationalHistory.add(entry)
+        if (operationalHistory.size > config.maxOperationalHistory) {
+            operationalHistory.removeAt(0)
+        }
+        return entry
+    }
+
+    private fun reclaimExpiredLeases(): Int {
+        val now = nowMs()
+        var reclaimed = 0
+        keysById.values.forEach { key ->
+            if (key.leasedTo != null && key.leaseExpiresAt > 0L && now > key.leaseExpiresAt) {
+                val previous = key.leasedTo
+                key.leasedTo = null
+                key.leaseStartedAt = 0L
+                key.leaseExpiresAt = 0L
+                emitKanbanEvent(
+                    KanbanEvent.LeaseReclaimed(
+                        keyId = key.keyId,
+                        previousLeasee = previous ?: "",
+                        timestampMs = now,
+                    ),
+                )
+                reclaimed++
+            }
+        }
+        return reclaimed
+    }
+
+    private fun activeLeases(): List<MuxLeaseInfo> {
+        val now = nowMs()
+        return keysById.values.mapNotNull { key ->
+            val leasedTo = key.leasedTo ?: return@mapNotNull null
+            MuxLeaseInfo(
+                keyId = key.keyId,
+                leasedTo = leasedTo,
+                leaseStartedAt = key.leaseStartedAt,
+                leaseExpiresAt = key.leaseExpiresAt,
+                isActiveLease = key.leaseExpiresAt == 0L || now <= key.leaseExpiresAt,
+            )
+        }
+    }
+
+    private fun publishState(timestampMs: Long = nowMs()) {
+        val keys = keysById.values.map { it.toImmutable() }
+        val leases = activeLeases()
+        _flowState.value = MuxReactorState(
+            config = config,
+            keys = keys,
+            models = modelsById.values.toList(),
+            leases = leases,
+            operationalHistory = operationalHistory.toList(),
+            draftMapping = keys
+                .filter { it.status == MuxKeyStatus.ACTIVE && it.lastModel != null }
+                .associate { it.keyId to it.lastModel.orEmpty() },
+            currentlyRunning = leases.count { it.isActiveLease },
+            availableKeys = keys.count { key -> key.status == MuxKeyStatus.ACTIVE && leases.none { it.keyId == key.keyId } },
+            queueDepth = config.queueDepth,
+            maxInProgress = config.maxInProgress,
+            maxSpawn = config.maxSpawn,
+            maxPerProvider = config.maxPerProvider,
+            tickSequence = tickSequence,
+            lastTickMs = timestampMs,
+        )
+    }
+
+    private fun MutableMuxKey.toImmutable(): MuxKeyEntry = MuxKeyEntry(
+        keyId = keyId,
+        provider = provider,
+        label = label,
+        modelUrl = modelUrl,
+        lastModel = lastModel,
+        lastUsedMs = lastUsedMs,
+        accessCount = accessCount,
+        status = status,
+        leasedTo = leasedTo,
+        leaseExpiresAt = leaseExpiresAt,
+    )
+}
+
+suspend fun openMuxReactorElement(
+    config: MuxReactorConfig = MuxReactorConfig(),
+    parentJob: Job? = null,
+): MuxReactorElement = MuxReactorElement(parentJob = parentJob, initialConfig = config)
+    .also { it.open() }
+
+@Serializable
+data class MuxReactorConfig(
+    val maxInProgress: Int = 3,
+    val maxSpawn: Int = 3,
+    val maxPerProvider: Int = 1,
+    val leaseTtlMs: Long = 300_000,
+    val tickIntervalMs: Long = 5_000,
+    val queueDepth: Int = 0,
+    val maxOperationalHistory: Int = 1_000,
+)
+
+@Serializable
+data class MuxReactorState(
+    val config: MuxReactorConfig,
+    val keys: List<MuxKeyEntry>,
+    val models: List<MuxModelEntry>,
+    val leases: List<MuxLeaseInfo>,
+    val operationalHistory: List<MuxOperationalEntry>,
+    val draftMapping: Map<String, String>,
+    val currentlyRunning: Int,
+    val availableKeys: Int,
+    val queueDepth: Int,
+    val maxInProgress: Int,
+    val maxSpawn: Int,
+    val maxPerProvider: Int,
+    val tickSequence: Long,
+    val lastTickMs: Long,
+)
+
+@Serializable
+data class MuxKeyEntry(
+    val keyId: String,
+    val provider: String,
+    val label: String,
+    val modelUrl: String = "",
+    val lastModel: String? = null,
+    val lastUsedMs: Long = 0,
+    val accessCount: Long = 0,
+    val status: MuxKeyStatus = MuxKeyStatus.ACTIVE,
+    val leasedTo: String? = null,
+    val leaseExpiresAt: Long = 0,
+)
+
+@Serializable
+enum class MuxKeyStatus { ACTIVE, BACKOFF, BENCHED }
+
+@Serializable
+data class MuxModelEntry(
+    val modelId: String,
+    val provider: String,
+    val contextWindow: Int = 0,
+    val available: Boolean = true,
+)
+
+@Serializable
+data class MuxCredentialRecord(
+    val id: String,
+    val label: String = id,
+    val baseUrl: String = "",
+    val lastStatus: String? = null,
+    val lastModel: String? = null,
+    val lastSuccessModel: String? = null,
+    val lastUsedAt: Long = 0,
+    val requestCount: Long = 0,
+)
+
+@Serializable
+data class MuxLeaseInfo(
+    val keyId: String,
+    val leasedTo: String,
+    val leaseStartedAt: Long,
+    val leaseExpiresAt: Long,
+    val isActiveLease: Boolean,
+)
+
+@Serializable
+data class MuxOperationalEntry(
+    val poolName: String,
+    val key: String,
+    val labels: Map<String, String> = emptyMap(),
+    val value: Double = 0.0,
+    val timestampMs: Long = nowMs(),
+    val metadata: Map<String, String> = emptyMap(),
+)
+
+object MuxOperationalPool {
+    const val AGENT_HEALTH = "agent_health"
+    const val TASK_THROUGHPUT = "task_throughput"
+    const val WORKER_UTILIZATION = "worker_utilization"
+    const val LATENCY_DISTRIBUTION = "latency_distribution"
+    const val ERROR_RATES = "error_rates"
+    const val QUEUE_DEPTHS = "queue_depths"
+    const val MODEL_USAGE = "model_usage"
+    const val RESOURCE_USAGE = "resource_usage"
+}
+
+@Serializable
+data class MuxDispatchResult(
+    val spawned: Int,
+    val reclaimed: Int,
+    val promoted: Int,
+    val crashed: Int,
+    val timestampMs: Long,
+)
+
+private data class MutableMuxKey(
+    var keyId: String,
+    var provider: String,
+    var label: String,
+    var modelUrl: String = "",
+    var lastModel: String? = null,
+    var lastUsedMs: Long = 0,
+    var accessCount: Long = 0,
+    var status: MuxKeyStatus = MuxKeyStatus.ACTIVE,
+    var leasedTo: String? = null,
+    var leaseStartedAt: Long = 0,
+    var leaseExpiresAt: Long = 0,
+)
+
+private fun emptyState(config: MuxReactorConfig): MuxReactorState = MuxReactorState(
+    config = config,
+    keys = emptyList(),
+    models = emptyList(),
+    leases = emptyList(),
+    operationalHistory = emptyList(),
+    draftMapping = emptyMap(),
+    currentlyRunning = 0,
+    availableKeys = 0,
+    queueDepth = config.queueDepth,
+    maxInProgress = config.maxInProgress,
+    maxSpawn = config.maxSpawn,
+    maxPerProvider = config.maxPerProvider,
+    tickSequence = 0,
+    lastTickMs = 0,
+)
+
+private fun nowMs(): Long = Clock.System.now().toEpochMilliseconds()
+package borg.trikeshed.userspace.reactor
+
+import kotlinx.coroutines.flow.SharedFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.serialization.Serializable
+import kotlinx.coroutines.channels.BufferOverflow
+import kotlinx.coroutines.flow.MutableSharedFlow
+
+/**
+ * Kanban FSM events emitted by the reactor. Kanban consumes this stream but
+ * does not own it; the reactor is the only producer.
+ */
+@Serializable
+sealed class KanbanEvent {
+    abstract val timestampMs: Long
+
+    /** A credential was loaded from ~/.hermes and is now in the mux pool. */
+    @Serializable
+    data class CredentialLoaded(
+        val provider: String,
+        val keyId: String,
+        override val timestampMs: Long,
+    ) : KanbanEvent()
+
+    /** A mux key was leased by a synthetic dispatcher agent. */
+    @Serializable
+    data class KeyLeased(
+        val keyId: String,
+        val leasedTo: String,
+        val leaseExpiresAt: Long,
+        override val timestampMs: Long,
+    ) : KanbanEvent()
+
+    /** A mux lease expired and the slot was reclaimed. */
+    @Serializable
+    data class LeaseReclaimed(
+        val keyId: String,
+        val previousLeasee: String,
+        override val timestampMs: Long,
+    ) : KanbanEvent()
+
+    /**
+     * Cache accounting event. Emitted by the reactor when the modelmux cache
+     * observes a Hit, Miss, or Stored. The FSM rolls these into running
+     * hit/miss/stored counters so the UI can show live modelmux state.
+     */
+    @Serializable
+    data class CacheTick(
+        val kind: String,            // "Hit", "Miss", "Stored", "Evicted"
+        val cacheKey: String,
+        override val timestampMs: Long,
+    ) : KanbanEvent()
+
+    /**
+     * A taxonomy node was created by the AI taxonomical creator (or any
+     * workspace-adjacent emitter). This is the first KanbanEvent that is NOT
+     * about keymux/modelmux — it carries the creation of a taxonomy node
+     * (e.g. a workspace block, a kanban card, a graph label) into the board
+     * state, giving the kanban a consumption path for the workspace
+     * and a future AI agent's taxonomy output.
+     */
+    @Serializable
+    data class TaxonomyNodeCreated(
+        val nodeId: String,
+        val kind: String,            // "database", "row", "heading", "todo", etc.
+        val label: String,
+        val parentId: String? = null,
+        override val timestampMs: Long,
+    ) : KanbanEvent()
+
+    /** A signal facet was reduced by the lcnc reduction pipeline.
+     * Emitted when the signal spine (user-signals → lcnc → forge-ui) produces
+     * a reduced value from a FacetedSignal facet.
+     */
+    @Serializable
+    data class SignalFacetReduced(
+        val facetKey: String,
+        val reducedValue: String,
+        val sourceSignalId: String,
+        override val timestampMs: Long,
+    ) : KanbanEvent()
+
+    /** Cycle observed event from the Oroboros daemon. */
+    @Serializable
+    data class CycleObserved(val cycleMs: Long, val drained: Int, val dispatched: Int, val alive: Int, val available: Int, override val timestampMs: Long) : KanbanEvent()
+
+    /** Event when a patch is drained. */
+    @Serializable
+    data class PatchDrained(val sessionId: String, val sha: String, val tag: String, override val timestampMs: Long) : KanbanEvent()
+
+    /** Event when a dispatch fires. */
+    @Serializable
+    data class DispatchFired(val sessionId: String, val title: String, override val timestampMs: Long) : KanbanEvent()
+}
+
+/**
+ * Minimal Kanban board state derived from the reactor event stream. The FSM
+ * lives in commonMain, has no Hermes coupling, and has no Python.
+ *
+ * State is intentionally compact: only the transitions a UI needs to render
+ * "what just changed" on the board.
+ */
+@Serializable
+data class KanbanState(
+    val activeProviders: List<String> = emptyList(),
+    val leasedKeyIds: List<String> = emptyList(),
+    val reclaimedCount: Int = 0,
+    val cacheHits: Int = 0,
+    val cacheMisses: Int = 0,
+    val cacheStored: Int = 0,
+    val cacheEvicted: Int = 0,
+    val lastCacheKey: String = "",
+    val lastEventKind: String = "INIT",
+    val lastEventTimestampMs: Long = 0L,
+    /** Count of taxonomy nodes created (endgame: AI taxonomical creator → kanban). */
+    val taxonomyNodeCount: Int = 0,
+    /** Labels of the most recent taxonomy nodes (capped, for UI display). */
+    val recentTaxonomyNodes: List<String> = emptyList(),
+    val cycleCount: Int = 0,
+    val lastCycleMs: Long = 0L,
+    val drainedCount: Int = 0,
+    val dispatchedCount: Int = 0,
+    val aliveSlots: Int = 0,
+    val availableSlots: Int = 0,
+)
+
+/**
+ * Pure reducer: KanbanEvent -> KanbanState -> KanbanState.
+ *
+ * The reactor publishes events; consumers project state through this reducer.
+ * The reducer is idempotent for the same event payload, so consumers can
+ * replay the [SharedFlow] safely.
+ */
+object KanbanFSM {
+    private val _state = MutableStateFlow(KanbanState())
+    val flow: StateFlow<KanbanState> = _state.asStateFlow()
+
+    /** SharedFlow of events emitted by the reactor. Replay buffer ensures late UI subscribers see recent transitions. */
+    val kanbanEvents: MutableSharedFlow<KanbanEvent> = MutableSharedFlow(
+        replay = 64,
+        extraBufferCapacity = 64,
+        onBufferOverflow = BufferOverflow.DROP_OLDEST,
+    )
+
+    fun current(): KanbanState = _state.value
+
+    /** Apply one event to the state. Returns the new state. */
+    fun reduce(event: KanbanEvent, prior: KanbanState = current()): KanbanState {
+        val next = when (event) {
+            is KanbanEvent.CredentialLoaded -> prior.copy(
+                activeProviders = (prior.activeProviders + event.provider).distinct(),
+                lastEventKind = "CredentialLoaded",
+                lastEventTimestampMs = event.timestampMs,
+            )
+            is KanbanEvent.KeyLeased -> prior.copy(
+                leasedKeyIds = (prior.leasedKeyIds + event.keyId).distinct(),
+                lastEventKind = "KeyLeased",
+                lastEventTimestampMs = event.timestampMs,
+            )
+            is KanbanEvent.LeaseReclaimed -> prior.copy(
+                leasedKeyIds = prior.leasedKeyIds - event.keyId,
+                reclaimedCount = prior.reclaimedCount + 1,
+                lastEventKind = "LeaseReclaimed",
+                lastEventTimestampMs = event.timestampMs,
+            )
+            is KanbanEvent.CacheTick -> when (event.kind) {
+                "Hit" -> prior.copy(
+                    cacheHits = prior.cacheHits + 1,
+                    lastCacheKey = event.cacheKey,
+                    lastEventKind = "CacheHit",
+                    lastEventTimestampMs = event.timestampMs,
+                )
+                "Miss" -> prior.copy(
+                    cacheMisses = prior.cacheMisses + 1,
+                    lastCacheKey = event.cacheKey,
+                    lastEventKind = "CacheMiss",
+                    lastEventTimestampMs = event.timestampMs,
+                )
+                "Stored" -> prior.copy(
+                    cacheStored = prior.cacheStored + 1,
+                    lastCacheKey = event.cacheKey,
+                    lastEventKind = "CacheStored",
+                    lastEventTimestampMs = event.timestampMs,
+                )
+                "Evicted" -> prior.copy(
+                    cacheEvicted = prior.cacheEvicted + 1,
+                    lastCacheKey = event.cacheKey,
+                    lastEventKind = "CacheEvicted",
+                    lastEventTimestampMs = event.timestampMs,
+                )
+                else -> prior.copy(
+                    lastCacheKey = event.cacheKey,
+                    lastEventKind = "CacheTick:${event.kind}",
+                    lastEventTimestampMs = event.timestampMs,
+                )
+            }
+            is KanbanEvent.TaxonomyNodeCreated -> prior.copy(
+                taxonomyNodeCount = prior.taxonomyNodeCount + 1,
+                recentTaxonomyNodes = (prior.recentTaxonomyNodes + event.label).takeLast(16),
+                lastEventKind = "TaxonomyNodeCreated",
+                lastEventTimestampMs = event.timestampMs,
+            )
+            is KanbanEvent.SignalFacetReduced -> prior.copy(
+                lastEventKind = "SignalFacetReduced",
+                lastEventTimestampMs = event.timestampMs,
+            )
+            is KanbanEvent.CycleObserved -> prior.copy(
+                cycleCount = prior.cycleCount + 1,
+                lastCycleMs = event.cycleMs,
+                drainedCount = prior.drainedCount + event.drained,
+                dispatchedCount = prior.dispatchedCount + event.dispatched,
+                aliveSlots = event.alive,
+                availableSlots = event.available,
+                lastEventKind = "CycleObserved",
+                lastEventTimestampMs = event.timestampMs,
+            )
+            is KanbanEvent.PatchDrained -> prior.copy(
+                drainedCount = prior.drainedCount + 1,
+                lastEventKind = "PatchDrained",
+                lastEventTimestampMs = event.timestampMs,
+            )
+            is KanbanEvent.DispatchFired -> prior.copy(
+                dispatchedCount = prior.dispatchedCount + 1,
+                lastEventKind = "DispatchFired",
+                lastEventTimestampMs = event.timestampMs,
+            )
+        }
+        _state.value = next
+        return next
+    }
+
+    /** Reset the FSM to initial state. For test isolation only. */
+    fun reset() {
+        _state.value = KanbanState()
+    }
+
+    /** Convenience for folding a SharedFlow of events into the running state. */
+    suspend fun collectAndReduce(events: SharedFlow<KanbanEvent>) {
+        events.collect { event -> _state.value = reduce(event) }
+    }
+}
