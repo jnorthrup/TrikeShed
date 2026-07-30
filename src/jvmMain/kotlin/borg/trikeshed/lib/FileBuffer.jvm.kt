@@ -11,12 +11,15 @@ actual class FileBuffer actual constructor(
 ) : LongSeries<Byte>, kotlin.coroutines.CoroutineContext.Element {
     actual override val key: kotlin.coroutines.CoroutineContext.Key<*> get() = Key
     actual companion object Key : kotlin.coroutines.CoroutineContext.Key<FileBuffer>
-    actual override val a: Long get() = TODO("JvmFileBuffer.a")
-    actual override val b: (Long) -> Byte get() = { TODO("JvmFileBuffer.b") }
-    actual fun open() { TODO("JvmFileBuffer.open") }
-    actual fun close() { TODO("JvmFileBuffer.close") }
-    actual fun isOpen(): Boolean = false
-    actual fun size(): Long = 0
-    actual fun get(index: Long): Byte = TODO("JvmFileBuffer.get")
-    actual fun put(index: Long, value: Byte) { TODO("JvmFileBuffer.put") }
+
+    private val delegate = SeekFileBufferCommon(filename, initialOffset, blkSize, readOnly)
+
+    actual override val a: Long get() = delegate.a
+    actual override val b: (Long) -> Byte get() = delegate.b
+    actual fun open() { delegate.open() }
+    actual fun close() { delegate.close() }
+    actual fun isOpen(): Boolean = delegate.isOpen()
+    actual fun size(): Long = delegate.size()
+    actual fun get(index: Long): Byte = delegate.get(index)
+    actual fun put(index: Long, value: Byte) { delegate.put(index, value) }
 }

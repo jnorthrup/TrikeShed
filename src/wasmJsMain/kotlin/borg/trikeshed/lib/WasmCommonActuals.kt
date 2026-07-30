@@ -275,7 +275,7 @@ actual object Files {
     actual fun resolvePath(vararg parts: String): String =
         normalizePath(parts.joinToString("/"))
 
-    actual fun readZip(path: String): List<Pair<String, ByteArray>> = TODO("readZip WASM")
+    actual fun readZip(path: String): List<Pair<String, ByteArray>> = error("readZip WASM not supported")
 
     actual fun createTempDir(prefix: String): String =
         "/tmp/$prefix-${Random.nextLong().toString(16)}"

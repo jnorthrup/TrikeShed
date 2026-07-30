@@ -70,7 +70,7 @@ actual object Files {
     actual fun resolvePath(vararg parts: String): String =
         path.join(jsCwd(), parts.joinToString("/")) as String
 
-    actual fun readZip(path: String): List<Pair<String, ByteArray>> = TODO("readZip JS")
+    actual fun readZip(path: String): List<Pair<String, ByteArray>> = error("readZip JS not supported")
 
     actual fun createTempDir(prefix: String): String {
         val dir = path.join(os.tmpdir(), "$prefix-${Random.nextInt(1_000_000)}") as String

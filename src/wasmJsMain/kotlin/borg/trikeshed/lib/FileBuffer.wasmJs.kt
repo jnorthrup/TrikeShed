@@ -12,12 +12,15 @@ actual class FileBuffer actual constructor(
 ) : LongSeries<Byte>, CoroutineContext.Element {
     actual override val key: CoroutineContext.Key<*> get() = Key
     actual companion object Key : CoroutineContext.Key<FileBuffer>
-    actual override val a: Long get() = TODO("WasmFileBuffer.a")
-    actual override val b: (Long) -> Byte get() = { TODO("WasmFileBuffer.b") }
-    actual fun open() { TODO("WasmFileBuffer.open") }
-    actual fun close() { TODO("WasmFileBuffer.close") }
-    actual fun isOpen(): Boolean = false
-    actual fun size(): Long = 0
-    actual fun get(index: Long): Byte = TODO("WasmFileBuffer.get")
-    actual fun put(index: Long, value: Byte) { TODO("WasmFileBuffer.put") }
+    
+    private val delegate = SeekFileBufferCommon(filename, initialOffset, blkSize, readOnly)
+
+    actual override val a: Long get() = delegate.a
+    actual override val b: (Long) -> Byte get() = delegate.b
+    actual fun open() { delegate.open() }
+    actual fun close() { delegate.close() }
+    actual fun isOpen(): Boolean = delegate.isOpen()
+    actual fun size(): Long = delegate.size()
+    actual fun get(index: Long): Byte = delegate.get(index)
+    actual fun put(index: Long, value: Byte) { delegate.put(index, value) }
 }
