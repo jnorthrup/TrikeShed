@@ -182,7 +182,7 @@ class LcncIngestPipeline(
 }
 
 class IngestPipelineConfigBuilder {
-    private var maxConcurrentParses: Int = (Runtime.getRuntime().availableProcessors() * 2).coerceAtLeast(4)
+    private var maxConcurrentParses: Int = (availableProcessors() * 2).coerceAtLeast(4)
     private var fanoutBufferSize: Int = 1024
     private var publishBatchSize: Int = 64
     private var parseTimeoutNs: Long = 30_000_000_000L
@@ -201,14 +201,14 @@ class IngestPipelineConfigBuilder {
     fun minParallelChunkSize(n: Int): IngestPipelineConfigBuilder { minParallelChunkSize = n; return this }
     
     fun forHighThroughput(): IngestPipelineConfigBuilder = apply {
-        maxConcurrentParses = (Runtime.getRuntime().availableProcessors() * 4).coerceAtLeast(8)
+        maxConcurrentParses = (availableProcessors() * 4).coerceAtLeast(8)
         fanoutBufferSize = 4096
         publishBatchSize = 256
         maxPendingEntities = 50000
     }
     
     fun forLowLatency(): IngestPipelineConfigBuilder = apply {
-        maxConcurrentParses = Runtime.getRuntime().availableProcessors()
+        maxConcurrentParses = availableProcessors()
         fanoutBufferSize = 256
         publishBatchSize = 16
         parseTimeoutNs = 5_000_000_000L
