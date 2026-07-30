@@ -74,7 +74,7 @@ data class ModelResponseReceipt(
             sessionId: String? = null,
             error: Throwable? = null,
         ): ModelResponseReceipt = ModelResponseReceipt(
-            receiptId = "mrec-${java.util.UUID.randomUUID()}",
+            receiptId = "mrec-${kotlin.random.Random.nextLong().toString(16)}",
             modelId = modelId,
             providerId = providerId,
             requestHash = requestHash,
@@ -86,9 +86,9 @@ data class ModelResponseReceipt(
             inputTokens = inputTokens,
             outputTokens = outputTokens,
             cachedHit = cachedHit,
-            errorClass = error?.javaClass?.simpleName,
+            errorClass = error?.let { it::class.simpleName },
             errorMessage = error?.message?.take(500),
-            capturedAt = System.currentTimeMillis(),
+            capturedAt = kotlinx.datetime.Clock.System.now().toEpochMilliseconds(),
         )
     }
 }

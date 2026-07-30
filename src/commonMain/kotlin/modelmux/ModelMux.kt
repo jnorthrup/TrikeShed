@@ -63,7 +63,7 @@ class LlmSession(
     private val authKey: String,
     val baseUrl: String,
     /** Session id — stamped on every [ModelResponseReceipt] minted from this session. */
-    val sessionId: String = "sess-${java.util.UUID.randomUUID()}",
+    val sessionId: String = "sess-${kotlin.random.Random.nextLong().toString(16)}",
 ) {
     private var _state = SessionState.CREATED
     val state: SessionState get() = _state
@@ -148,7 +148,7 @@ class ModelMux internal constructor(
         session.activate()
         val reactor = currentCoroutineContext()[MuxReactorElement.Key]
         val keyId = keyMux.get("llm.$modelId.key")
-        val t0 = System.currentTimeMillis()
+        val t0 = kotlinx.datetime.Clock.System.now().toEpochMilliseconds()
         var httpStatus = 0
         var cachedHit = false
         var inputTokens = 0
@@ -173,7 +173,7 @@ class ModelMux internal constructor(
                     session.recordReceipt(
                         ModelResponseReceipt.mint(
                             modelId = modelId, providerId = card.id, requestHash = requestHash,
-                            action = "chat", httpStatus = 200, latencyMs = System.currentTimeMillis() - t0,
+                            action = "chat", httpStatus = 200, latencyMs = kotlinx.datetime.Clock.System.now().toEpochMilliseconds() - t0,
                             inputTokens = inputTokens, outputTokens = outputTokens, cachedHit = true,
                             assessmentId = assessmentId, sessionId = session.sessionId,
                         )
@@ -209,7 +209,7 @@ class ModelMux internal constructor(
             session.recordReceipt(
                 ModelResponseReceipt.mint(
                     modelId = modelId, providerId = card.id, requestHash = requestHash,
-                    action = "chat", httpStatus = httpStatus, latencyMs = System.currentTimeMillis() - t0,
+                    action = "chat", httpStatus = httpStatus, latencyMs = kotlinx.datetime.Clock.System.now().toEpochMilliseconds() - t0,
                     inputTokens = inputTokens, outputTokens = outputTokens, cachedHit = false,
                     assessmentId = assessmentId, sessionId = session.sessionId,
                 )
@@ -220,7 +220,7 @@ class ModelMux internal constructor(
                 ModelResponseReceipt.mint(
                     modelId = modelId, providerId = modelId, requestHash = "0",
                     action = "chat", httpStatus = httpStatus,
-                    latencyMs = System.currentTimeMillis() - t0,
+                    latencyMs = kotlinx.datetime.Clock.System.now().toEpochMilliseconds() - t0,
                     assessmentId = assessmentId, sessionId = session.sessionId,
                     error = t,
                 )
