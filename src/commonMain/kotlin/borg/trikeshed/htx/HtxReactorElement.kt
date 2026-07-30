@@ -159,7 +159,7 @@ class HtxReactorElement(
         return HtxConnection(fd, channelOperations.openChannel())
     }
 
-    private fun writeAll(
+    private suspend fun writeAll(
         handle: ChannelOperations.ChannelHandle,
         fd: Int,
         payload: ByteSeries,
@@ -168,13 +168,13 @@ class HtxReactorElement(
         while (buffer.hasRemaining()) {
             handle.writev(fd, buffer)
             handle.submit()
-            val result = await(handle, fd)
+            val result = waitFor(handle, fd, 30, TimeUnit.SECONDS)
             check(result >= 0) { "HTX reactor write failed for fd=$fd" }
             check(result != 0 || !buffer.hasRemaining()) { "HTX reactor write stalled for fd=$fd" }
         }
     }
 
-    private fun readAll(
+    private suspend fun readAll(
         handle: ChannelOperations.ChannelHandle,
         fd: Int,
     ): ByteSeries {
@@ -215,7 +215,7 @@ class HtxReactorElement(
         return plaintext.toByteSeries()
     }
 
-    private fun readChunk(
+    private suspend fun readChunk(
         handle: ChannelOperations.ChannelHandle,
         fd: Int,
         capacity: Int = 16 * 1024,
@@ -223,7 +223,7 @@ class HtxReactorElement(
         val buffer = ByteBuffer(capacity)
         handle.readv(fd, buffer)
         handle.submit()
-        val result = await(handle, fd)
+        val result = waitFor(handle, fd, 30, TimeUnit.SECONDS)
         check(result >= -1) { "HTX reactor read failed for fd=$fd" }
         if (result <= 0) {
             return null
@@ -231,7 +231,7 @@ class HtxReactorElement(
         return ByteSeries(buffer.array().copyOf(result))
     }
 
-    private fun flushTlsFrames(
+    private suspend fun flushTlsFrames(
         handle: ChannelOperations.ChannelHandle,
         fd: Int,
         frames: TlsFrames,
@@ -257,14 +257,28 @@ class HtxReactorElement(
         return plaintext.toByteSeries()
     }
 
-    private fun await(
+    private suspend fun waitFor(
         handle: ChannelOperations.ChannelHandle,
         fd: Int,
-    ): Int =
-        handle.wait(minComplete = 1)
-            .firstOrNull { it.fd == fd }
-            ?.res
-            ?: error("HTX reactor received no completion for fd=$fd")
+        timeout: Long,
+        unit: TimeUnit,
+    ): Int {
+        val timeoutMs = when (unit) {
+            TimeUnit.MILLISECONDS -> timeout
+            TimeUnit.SECONDS -> timeout * 1000
+        }
+        return kotlinx.coroutines.withTimeout(timeoutMs) {
+            while (true) {
+                val match = handle.wait(minComplete = 0).firstOrNull { it.fd == fd }
+                if (match != null) {
+                    return@withTimeout match.res
+                }
+                kotlinx.coroutines.delay(10)
+            }
+            @Suppress("UNREACHABLE_CODE")
+            error("unreachable")
+        }
+    }
 
     private fun appendBytes(
         sink: MutableList<Byte>,
