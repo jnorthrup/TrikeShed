@@ -141,7 +141,7 @@ class CouchStoreCoverageTest {
 
 
     @Test
-    fun testChangesResumeAndReplayEquivalence() = kotlinx.coroutines.test.runTest {
+    fun testChangesResumeAndReplayEquivalence() {
         val store = CouchStoreFactory.inMemory()
         
         store.put(Document("doc1", listOf(Field("name", "Alice"))))

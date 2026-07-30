@@ -4,9 +4,6 @@ import borg.trikeshed.lib.*
 import borg.trikeshed.lib.`▶`
 import borg.trikeshed.mutable.MutableSeries
 import borg.trikeshed.mutable.mutableSeriesOf
-import borg.trikeshed.userspace.nio.spi.NioSupervisor
-import kotlin.coroutines.coroutineContext
-import kotlinx.coroutines.yield
 
 /**
  * CouchChangesProjection - Maintains a strict monotonic sequence of committed frames.
@@ -41,14 +38,11 @@ class CouchChangesProjection {
      * Resume after sequence - provides an iterator or stream of frames after a sequence.
      */
     suspend fun afterSequence(sequence: Long): Series<CouchCommittedFrame> {
-        val hasSupervisor = coroutineContext[NioSupervisor.Key] != null
         // Binary search could be used if series supported it, but simple scan works for now
         var startIdx = -1
         for ((i, frame) in frames.`▶`.withIndex()) {
-            if (hasSupervisor) {
-                if (i > 0 && i % 100 == 0) {
-                    yield()
-                }
+            if (i > 0 && i % 100 == 0) {
+                kotlinx.coroutines.yield()
             }
             if (frame.sequence > sequence) {
                 startIdx = i
