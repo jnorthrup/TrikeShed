@@ -330,6 +330,18 @@ fun evidence(
 expect fun currentTimeMillis(): Long
 
 /**
+ * Monotonic nanosecond timer for benchmarking and duration measurement.
+ * Not wall-clock; suitable only for elapsed-time deltas.
+ */
+expect fun monotonicNanoTime(): Long
+
+/**
+ * Platform-visible processor count for sizing concurrency pools.
+ * Returns at least 1.
+ */
+expect fun availableProcessors(): Int
+
+/**
  * Create a cell overlay with a simple DSL.
  */
 fun <T> cellOverlay(

@@ -59,8 +59,8 @@ class Blake3Hash(val bytes: ByteArray) {
 
         private fun compress(chainingValue: IntArray, blockWords: IntArray, counter: Long, blockLen: Int, flags: Int): IntArray {
             val state = IntArray(16)
-            System.arraycopy(chainingValue, 0, state, 0, 8)
-            System.arraycopy(IV, 0, state, 8, 4)
+            chainingValue.copyInto(state, 0, 0, 8)
+            IV.copyInto(state, 8, 0, 4)
             state[12] = counter.toInt()
             state[13] = (counter ushr 32).toInt()
             state[14] = blockLen
@@ -96,7 +96,7 @@ class Blake3Hash(val bytes: ByteArray) {
 
                 val flags = if (offset + len == data.size) 0x0b else 0
                 val compressed = compress(chainingValue, blockWords, 0, len, flags)
-                System.arraycopy(compressed, 0, chainingValue, 0, 8)
+                compressed.copyInto(chainingValue, 0, 0, 8)
 
                 offset += len
                 if (data.isEmpty()) break

@@ -128,11 +128,18 @@ class ConfixEnvelopeCodec(private val config: ReactorEndpointConfig = ReactorEnd
     private fun fromHex(hex: String): ByteArray {
         val result = ByteArray(hex.length / 2)
         for (i in result.indices) {
-            val high = Character.digit(hex[i * 2], 16)
-            val low = Character.digit(hex[i * 2 + 1], 16)
+            val high = hexCharToNibble(hex[i * 2])
+            val low = hexCharToNibble(hex[i * 2 + 1])
             result[i] = ((high shl 4) + low).toByte()
         }
         return result
+    }
+
+    private fun hexCharToNibble(c: Char): Int = when (c) {
+        in '0'..'9' -> c - '0'
+        in 'a'..'f' -> c - 'a' + 10
+        in 'A'..'F' -> c - 'A' + 10
+        else -> 0
     }
 
     private fun writeInt(bytes: ByteArray, offset: Int, value: Int) {
