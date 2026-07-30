@@ -8,6 +8,7 @@ import borg.trikeshed.context.ElementState
 import borg.trikeshed.litebike.taxonomy.Protocol
 import borg.trikeshed.litebike.taxonomy.ProtocolMark
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.launch
@@ -99,6 +100,7 @@ class LitebikeListenerElement(
     /** Map: protocol id (UByte) → slot. One slot per protocol; deterministic IDs. */
     private val registry: MutableMap<UByte, ChannelWorkgroupSlot> = mutableMapOf()
     private val mutableSubscribers: MutableList<AsyncContextElement> = mutableListOf()
+    private val fanoutChannel = Channel<LitebikeFanoutEvent>(capacity = maxBatch)
 
     override val fanoutSubscribers: List<AsyncContextElement>
         get() = mutableSubscribers.toList()
@@ -132,7 +134,18 @@ class LitebikeListenerElement(
     // ── lifecycle overrides ───────────────────────────────────────
 
     override suspend fun open() {
-        if (state == ElementState.CREATED) state = ElementState.OPEN
+        if (state == ElementState.CREATED) {
+            state = ElementState.OPEN
+            CoroutineScope(supervisor).launch {
+                for (event in fanoutChannel) {
+                    for (subscriber in fanoutSubscribers.toList()) {
+                        if (subscriber is LitebikeFanoutEventSink) {
+                            runCatching { subscriber.onLitebikeFanoutEvent(event) }
+                        }
+                    }
+                }
+            }
+        }
     }
 
     /** Promote OPEN → ACTIVE. */
@@ -144,6 +157,7 @@ class LitebikeListenerElement(
         if (state.isAtLeast(ElementState.OPEN) && state.isLessThan(ElementState.CLOSED)) {
             if (state < ElementState.DRAINING) state = ElementState.DRAINING
             supervisor.cancel()
+            fanoutChannel.close()
             registryMutex.withLock {
                 registry.values.forEach { it.close() }
                 registry.clear()
@@ -257,11 +271,11 @@ class LitebikeListenerElement(
      * someone bridges the two. Keeping this KMP-safe keeps the listener
      * compilable on JS and wasm, not just JVM.
      */
-    fun fireFanoutEvent(event: LitebikeFanoutEvent) {
-        for (subscriber in fanoutSubscribers.toList()) {
-            if (subscriber is LitebikeFanoutEventSink) {
-                runCatching { subscriber.onLitebikeFanoutEvent(event) }
-            }
+    suspend fun fireFanoutEvent(event: LitebikeFanoutEvent) {
+        val result = fanoutChannel.trySend(event)
+        if (result.isFailure) {
+            println("WARNING: LitebikeFanoutEvent subscriber is slow, applying backpressure")
+            fanoutChannel.send(event)
         }
     }
 
