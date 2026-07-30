@@ -22,7 +22,7 @@ import java.nio.file.StandardCopyOption
  */
 class BtrfsCasStore(
     private val root: File,
-) : CasStore() {
+) {
     
     private val subdirs = mutableSetOf<String>()
     
@@ -41,7 +41,7 @@ class BtrfsCasStore(
         return File(dir, hash)
     }
     
-    override fun put(bytes: ByteArray): ContentId {
+    suspend fun put(bytes: ByteArray): ContentId {
         val cid = ContentId.of(bytes)
         val target = cidPath(cid)
         
@@ -72,7 +72,7 @@ class BtrfsCasStore(
         return cid
     }
     
-    override fun get(cid: ContentId): ByteArray? {
+    suspend fun get(cid: ContentId): ByteArray? {
         val target = cidPath(cid)
         if (!target.exists()) return null
         
@@ -87,7 +87,7 @@ class BtrfsCasStore(
      * Import a git tar stream directly into CAS with reflink dedup.
      * Each tar entry becomes a CAS blob. Returns manifest of (path -> CID).
      */
-    fun importGitTar(tarStream: java.io.InputStream): Series2<String, ContentId> {
+    suspend fun importGitTar(tarStream: java.io.InputStream): Series2<String, ContentId> {
         val paths = mutableListOf<String>()
         val cids = mutableListOf<ContentId>()
         
@@ -132,7 +132,7 @@ class BtrfsCasStore(
     /**
      * Export CAS blobs as a tar stream (for git fast-import or backup).
      */
-    fun exportTar(manifest: Series2<String, ContentId>, output: java.io.OutputStream) {
+    suspend fun exportTar(manifest: Series2<String, ContentId>, output: java.io.OutputStream) {
         val n = manifest.a
         for (i in 0 until n) {
             val entry = manifest.b(i)
@@ -190,14 +190,18 @@ class BtrfsCasStore(
      * btrfs reflink: clone range from src to dst (COW).
      * Returns true on success, false if not supported.
      */
-    private fun reflink(src: File, dst: File): Boolean {
+    private suspend fun reflink(src: File, dst: File): Boolean {
         return try {
-            // Linux: ioctl FICLONE / FICLONERANGE
-            // Use JNI or shell out to cp --reflink
-            val result = ProcessBuilder("cp", "--reflink=always", src.absolutePath, dst.absolutePath)
-                .start()
-                .waitFor()
-            result == 0
+            val processOps = kotlin.coroutines.coroutineContext[borg.trikeshed.userspace.nio.channels.spi.ProcessOperations]
+            if (processOps != null) {
+                val result = processOps.exec(
+                    command = "cp",
+                    args = listOf("--reflink=always", src.absolutePath, dst.absolutePath)
+                )
+                result.exitCode == 0
+            } else {
+                false
+            }
         } catch (e: Exception) {
             false
         }
@@ -207,7 +211,7 @@ class BtrfsCasStore(
      * Get physical disk usage (after dedup).
      * Uses `du -s --apparent-size` vs `du -s` to measure dedup ratio.
      */
-    fun diskUsage(): Pair<Long, Long> { // (apparent, physical)
+    suspend fun diskUsage(): Pair<Long, Long> { // (apparent, physical)
         val apparent = Files.walk(root.toPath())
             .filter { Files.isRegularFile(it) }
             .mapToLong { Files.size(it) }
@@ -215,12 +219,20 @@ class BtrfsCasStore(
         
         // Physical usage via `btrfs filesystem du` or `du -s`
         val physical = try {
-            ProcessBuilder("du", "-s", "--block-size=1", root.absolutePath)
-                .start()
-                .inputStream.readBytes()
-                .decodeToString()
-                .split("\t").first()
-                .toLongOrNull() ?: apparent
+            val processOps = kotlin.coroutines.coroutineContext[borg.trikeshed.userspace.nio.channels.spi.ProcessOperations]
+            if (processOps != null) {
+                val result = processOps.exec(
+                    command = "du",
+                    args = listOf("-s", "--block-size=1", root.absolutePath)
+                )
+                if (result.exitCode == 0) {
+                    result.stdout.decodeToString().split("\t").first().toLongOrNull() ?: apparent
+                } else {
+                    apparent
+                }
+            } else {
+                apparent
+            }
         } catch (e: Exception) {
             apparent
         }
@@ -232,9 +244,12 @@ class BtrfsCasStore(
      * Deduplication ratio: apparent / physical.
      * 1.0 = no dedup, >1.0 = dedup savings.
      */
-    fun dedupRatio(): Double {
+    suspend fun dedupRatio(): Double {
         val (apparent, physical) = diskUsage()
         return if (physical > 0) apparent.toDouble() / physical else 1.0
+    }
+
+    suspend fun sync() {
     }
 }
 
