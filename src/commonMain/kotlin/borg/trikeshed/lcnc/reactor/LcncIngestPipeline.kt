@@ -25,13 +25,15 @@ import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.currentCoroutineContext
 import kotlin.text.Regex
+import borg.trikeshed.cursor.monotonicNanoTime
+import borg.trikeshed.cursor.availableProcessors
 
 /**
  * Configuration for ingestion pipeline behavior under load.
  * Uses nanosecond durations for commonMain compatibility (no kotlin.time required).
  */
 data class IngestPipelineConfig(
-    val maxConcurrentParses: Int = (Runtime.getRuntime().availableProcessors() * 2).coerceAtLeast(4),
+    val maxConcurrentParses: Int = (availableProcessors() * 2).coerceAtLeast(4),
     val fanoutBufferSize: Int = 1024,
     val publishBatchSize: Int = 64,
     val parseTimeoutNs: Long = 30_000_000_000L,
@@ -94,11 +96,11 @@ class LcncIngestPipeline(
 
         stateElement?.fanout?.send(ReactorAction.opened(mockNuid))
         
-        val startTime = System.nanoTime()
+        val startTime = monotonicNanoTime()
         
         try {
             val entities = parse(source, format)
-            val parseDuration = System.nanoTime() - startTime
+            val parseDuration = monotonicNanoTime() - startTime
             currentMetrics = currentMetrics.recordParse(entities.a, parseDuration)
             _metrics.tryEmit(currentMetrics)
             
@@ -111,7 +113,7 @@ class LcncIngestPipeline(
                 publishedCount++
             }
             
-            val publishDuration = System.nanoTime() - startTime - parseDuration
+            val publishDuration = monotonicNanoTime() - startTime - parseDuration
             currentMetrics = currentMetrics.recordPublish(publishedCount, publishDuration)
             _metrics.tryEmit(currentMetrics)
             
