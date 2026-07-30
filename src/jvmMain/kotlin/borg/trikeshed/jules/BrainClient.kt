@@ -43,6 +43,13 @@ class BrainClient(
         discoverEndpoints()
     }
 
+    /** Last endpoint that answered a chat. Quotas on NVIDIA track disjointly
+     *  per model/cluster and per API-shape family, and busyness varies by
+     *  promotion — so one 429 says nothing about other models. Start each
+     *  call at the last known-good endpoint instead of re-paying the
+     *  head-of-list 429 tax on every request. */
+    @Volatile private var lastGood: Int = 0
+
     private val errorLog: File? = run {
         val home = System.getProperty("user.home") ?: return@run null
         val forgeDir = File(home, ".local/forge")
@@ -58,7 +65,10 @@ class BrainClient(
         if (endpoints.isEmpty()) error("Brain: no provider endpoints discovered")
 
         var lastError: String = "all providers exhausted"
-        for (ep in endpoints) {
+        val start = lastGood.coerceIn(0, endpoints.size - 1)
+        val order = (start until endpoints.size) + (0 until start)
+        for (idx in order) {
+            val ep = endpoints[idx]
             val body = buildString {
                 append("""{"model":${jsonStr(ep.model)},"messages":[""")
                 messages.forEachIndexed { i, (role, content) ->
@@ -78,8 +88,17 @@ class BrainClient(
                 .timeout(java.time.Duration.ofSeconds(15))
                 .POST(HttpRequest.BodyPublishers.ofString(body))
                 .build()
-            val resp = http.send(req, HttpResponse.BodyHandlers.ofString())
+            val resp = try {
+                http.send(req, HttpResponse.BodyHandlers.ofString())
+            } catch (t: Throwable) {
+                // A hung or refused cluster must not abort failover — quotas
+                // are disjoint, the next model family may answer immediately.
+                lastError = "Brain ${ep.name} threw: ${t.message}"
+                logError(ep.name, -1, t.message.orEmpty().take(500))
+                continue
+            }
             if (resp.statusCode() < 400) {
+                lastGood = idx
                 return extractContent(resp.body())
             }
             lastError = "Brain ${ep.name} ${resp.statusCode()}: ${resp.body().take(300)}"

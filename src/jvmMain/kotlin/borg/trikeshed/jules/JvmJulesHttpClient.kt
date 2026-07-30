@@ -2,6 +2,7 @@ package borg.trikeshed.jules
 
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeout
 import java.net.URI
 import java.net.http.HttpClient
 import java.net.http.HttpRequest
@@ -11,7 +12,10 @@ import java.net.http.HttpResponse
  * JVM actual of [JulesHttpClient] backed by java.net.http.HttpClient.
  *
  * All blocking calls run on Dispatchers.IO so the coroutine scheduler
- * is never parked by network I/O. 15s connect timeout, 30s request timeout.
+ * is never parked by network I/O. 15s connect timeout, 30s request timeout,
+ * 45s hard bound on the whole send: HttpClient.send can park indefinitely
+ * on a half-dead pooled connection without the request timeout firing, and
+ * one parked send wedges the flywheel cycle coroutine for hours.
  */
 class JvmJulesHttpClient(
     private val apiKey: String,
@@ -22,16 +26,16 @@ class JvmJulesHttpClient(
         .connectTimeout(java.time.Duration.ofSeconds(15))
         .build()
 
-    override suspend fun get(path: String): String = withContext(Dispatchers.IO) {
-        request("GET", path, null)
+    override suspend fun get(path: String): String = withTimeout(45_000) {
+        withContext(Dispatchers.IO) { request("GET", path, null) }
     }
 
-    override suspend fun post(path: String, json: String): String = withContext(Dispatchers.IO) {
-        request("POST", path, json)
+    override suspend fun post(path: String, json: String): String = withTimeout(45_000) {
+        withContext(Dispatchers.IO) { request("POST", path, json) }
     }
 
-    override suspend fun delete(path: String): String = withContext(Dispatchers.IO) {
-        request("DELETE", path, null)
+    override suspend fun delete(path: String): String = withTimeout(45_000) {
+        withContext(Dispatchers.IO) { request("DELETE", path, null) }
     }
 
     private fun request(method: String, path: String, json: String?): String {
