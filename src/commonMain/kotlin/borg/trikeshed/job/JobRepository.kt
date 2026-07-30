@@ -53,7 +53,9 @@ class JobRepository(
         val tailSnapshots = mutableMapOf<JobId, JobSnapshot>()
         var latestCheckpoint: JobCheckpoint? = null
 
+        var replayCount = 0
         val lastSequence = log.replay { _, payload ->
+            if (++replayCount % 100 == 0) kotlinx.coroutines.yield()
             val checkpoint = JobCheckpointCodec.decode(payload)
             if (checkpoint != null) {
                 latestCheckpoint = checkpoint
@@ -80,7 +82,9 @@ class JobRepository(
             casStore.get(checkpoint.schemaCid) ?: throw IllegalStateException("Checkpoint schemaCid ${checkpoint.schemaCid} not found in CAS")
 
             // Verify full B+Tree and restore snapshots
-            fun verifyAndHydrateTree(cid: ContentId) {
+            var yieldCounter = 0
+            suspend fun verifyAndHydrateTree(cid: ContentId) {
+                if (++yieldCounter % 100 == 0) kotlinx.coroutines.yield()
                 val bytes = casStore.get(cid) ?: throw IllegalStateException("Checkpoint B+Tree node $cid not found in CAS")
                 val node = CowBPlusTreeCodec.decode(bytes)
                 when (node) {
@@ -89,6 +93,7 @@ class JobRepository(
                     }
                     is BTreeNode.Leaf -> {
                         node.values.forEach { value ->
+                            if (++yieldCounter % 100 == 0) kotlinx.coroutines.yield()
                             val snapshotBytes = casStore.get(value.cid) ?: throw IllegalStateException("Checkpoint JobSnapshot ${value.cid} not found in CAS")
                             val snapshot = CanonicalCbor.decodeJobSnapshot(snapshotBytes)
                             recoveredSnapshots[snapshot.jobId] = snapshot
@@ -99,7 +104,9 @@ class JobRepository(
             verifyAndHydrateTree(checkpoint.rootCid)
 
             // Verify metadata
+            var metadataCounter = 0
             checkpoint.metadata.values.forEach { cid ->
+                if (++metadataCounter % 100 == 0) kotlinx.coroutines.yield()
                 casStore.get(cid) ?: throw IllegalStateException("Checkpoint metadata cid $cid not found in CAS")
             }
         }
