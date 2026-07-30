@@ -89,15 +89,7 @@ fun Cursor.zoom(vararg path: CharSequence): Cursor {
             continue
         }
         
-        val firstRow = current.b(0)
-        var colIndex = -1
-        for (c in 0 until firstRow.size) {
-            val meta = firstRow.b(c).b()
-            if (meta.name == colName) {
-                colIndex = c
-                break
-            }
-        }
+        val colIndex = (0 until current.width).firstOrNull { c -> current.b(0).b(c).b().name == colName } ?: -1
         
         if (colIndex == -1) {
             error("Column '$colName' not found")
@@ -117,14 +109,10 @@ fun Cursor.zoom(path: String): Cursor {
     if (this.size == 0) return emptySeries()
     
     val firstRow = this.b(0)
-    var colIndex = -1
-    for (i in 0 until firstRow.size) {
+    val colIndex = (0 until firstRow.size).firstOrNull { i ->
         val meta = firstRow.b(i).b() as? ColumnMeta ?: (firstRow.b(i).b as? Function0<*>)?.invoke() as? ColumnMeta
-        if (meta?.name == path) {
-            colIndex = i
-            break
-        }
-    }
+        meta?.name == path
+    } ?: -1
     
     if (colIndex == -1) {
         error("Column '$path' not found")

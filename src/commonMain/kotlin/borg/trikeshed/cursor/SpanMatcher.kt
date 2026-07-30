@@ -33,12 +33,9 @@ object SpanMatcher {
             val searchStart = if (hasGapBefore) aSegFirst - interval else aSegFirst - tolerance
             val searchEnd = if (hasGapAfter) aSegLast + interval else aSegLast + tolerance
 
-            val bRowsInRange = mutableListOf<Int>()
-            for (bi in 0 until b.size) {
+            val bRowsInRange = (0 until b.size).filter { bi ->
                 val bt = openTime(b, bi)
-                if (bt >= searchStart - tolerance && bt <= searchEnd + tolerance) {
-                    bRowsInRange.add(bi)
-                }
+                bt >= searchStart - tolerance && bt <= searchEnd + tolerance
             }
             if (bRowsInRange.isEmpty()) continue
 
@@ -153,16 +150,16 @@ object SpanMatcher {
         if (cursor.size == 0) return emptyList()
         val segments = mutableListOf<List<Int>>()
         var current = mutableListOf(0)
-        for (i in 1 until cursor.size) {
+        (1 until cursor.size).forEach { i ->
             val prev = openTime(cursor, i - 1)
             val cur = openTime(cursor, i)
             if (cur - prev > interval + tolerance) {
-                segments.add(current.toList())
+                segments.add(current)
                 current = mutableListOf()
             }
             current.add(i)
         }
-        segments.add(current.toList())
-        return segments.toList()
+        segments.add(current)
+        return segments
     }
 }
