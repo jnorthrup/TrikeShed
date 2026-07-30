@@ -1,0 +1,169 @@
+MAP_USAGE: src/commonMain/kotlin/borg/trikeshed/common/CSVUtil.kt:243 - it.indices.map { x ->
+MAP_USAGE: src/commonMain/kotlin/borg/trikeshed/common/CSVUtil.kt:292 - val headerNames = lineList[0].split(",").map { it.trim() }
+MAP_USAGE: src/commonMain/kotlin/borg/trikeshed/common/CSVUtil.kt:293 - val hdrMeta = headerNames.map { RecordMeta(it, IoString) }
+MAP_USAGE: src/commonMain/kotlin/borg/trikeshed/config/IsamConfigStore.kt:35 - val metaFuncs = columns.map { colName ->
+MAP_USAGE: src/commonMain/kotlin/borg/trikeshed/graph/CausalGraphKanban.kt:29 - .map { this[positions[it]] }
+MAP_USAGE: src/commonMain/kotlin/borg/trikeshed/graph/CausalGraphKanban.kt:31 - val selectedIds = selected.map { it.nodeId }.toSet()
+LOOP_USAGE: src/commonMain/kotlin/borg/trikeshed/graph/query/CausalGraphAdapter.kt:22 - for (i in 0 until index.size) {
+MAP_USAGE: src/commonMain/kotlin/borg/trikeshed/graph/query/CausalGraphAdapter.kt:32 - get() = (0 until index.size).map { index[it] }.toSet()
+LOOP_USAGE: src/commonMain/kotlin/borg/trikeshed/parse/kursive/legacy/Jursive.kt:41 - for (index in 0 until expected.size) {
+LOOP_USAGE: src/commonMain/kotlin/borg/trikeshed/parse/kursive/legacy/Jursive.kt:212 - for (index in 0 until this@toKursiveEvidence.size) this + this@toKursiveEvidence[index]
+MAP_USAGE: src/commonMain/kotlin/borg/trikeshed/parse/kursive/sql/SqlAst.kt:59 - ).map { col -> Column(ColumnRef(Identifier(col.trim().toSeries())), null) }
+MAP_USAGE: src/commonMain/kotlin/borg/trikeshed/parse/json/Json.kt:55 - return (commaIdxs.`▶` as Iterable<Int>).zipWithNext().map { (before, after) -> before.inc() j after } α { it j src }
+LOOP_USAGE: src/commonMain/kotlin/borg/trikeshed/parse/json/Json.kt:79 - for (i in 0 until src.size) {
+MAP_USAGE: src/commonMain/kotlin/borg/trikeshed/parse/json/Json.kt:150 - (combine.`▶` as Iterable<Int>).zipWithNext().map { (before, after) ->
+LOOP_USAGE: src/commonMain/kotlin/borg/trikeshed/parse/confix/ConfixSerialFormat.kt:76 - for (i in 0 until item.size) {
+LOOP_USAGE: src/commonMain/kotlin/borg/trikeshed/parse/confix/ConfixSerialFormat.kt:86 - for (i in 0 until keys.size) {
+MAP_USAGE: src/commonMain/kotlin/borg/trikeshed/parse/confix/TypeDefOracle.kt:147 - "ngram", "factory_step" -> ngram.split(" -> ").map { it.trim() }.zipWithNext().forEach { (s, p) ->
+MAP_USAGE: src/commonMain/kotlin/borg/trikeshed/parse/confix/TypeDefOracle.kt:225 - val parts = paramsStr.split(',').map { it.trim() }
+MAP_USAGE: src/commonMain/kotlin/borg/trikeshed/parse/confix/TypeDefOracle.kt:239 - .map { it.trim() }
+LOOP_USAGE: src/commonMain/kotlin/borg/trikeshed/parse/confix/Confix.kt:300 - for (index in 0 until flat.spans.size) {
+LOOP_USAGE: src/commonMain/kotlin/borg/trikeshed/parse/confix/Confix.kt:320 - for (c in 0 until children.size) {
+MAP_USAGE: src/commonMain/kotlin/borg/trikeshed/parse/interop/DescriptorFragments.kt:125 - is Map<*, *> -> value.entries.map { (childKey, childValue) ->
+MAP_USAGE: src/commonMain/kotlin/borg/trikeshed/parse/interop/DescriptorFragments.kt:151 - is YamlMappingNode -> node.entries.toList().map { entry ->
+MAP_USAGE: src/commonMain/kotlin/borg/trikeshed/parse/interop/DescriptorFragments.kt:187 - '{' -> splitObjectMembers(text, start, end).map { member ->
+MAP_USAGE: src/commonMain/kotlin/borg/trikeshed/parse/interop/DescriptorFragments.kt:245 - children.asSequence().map { child ->
+MAP_USAGE: src/commonMain/kotlin/borg/trikeshed/parse/interop/DescriptorFragments.kt:364 - return segments.map { (segmentStart, segmentEnd) ->
+MAP_USAGE: src/commonMain/kotlin/borg/trikeshed/parse/csv/CSVUtil.kt:249 - it.indices.map { x ->
+MAP_USAGE: src/commonMain/kotlin/borg/trikeshed/parse/csv/CSVUtil.kt:459 - val headerNames = lineList[0].split(",").map { it.trim() }
+MAP_USAGE: src/commonMain/kotlin/borg/trikeshed/parse/csv/CSVUtil.kt:460 - val hdrMeta = headerNames.map { RecordMeta(it, IoString) }
+LOOP_USAGE: src/commonMain/kotlin/borg/trikeshed/memvid/MemvidStoragePipeline.kt:81 - for (docOrdinal in 0 until documents.size) {
+LOOP_USAGE: src/commonMain/kotlin/borg/trikeshed/memvid/MemvidStoragePipeline.kt:143 - for (i in 0 until docManifestList.size) {
+LOOP_USAGE: src/commonMain/kotlin/borg/trikeshed/memvid/MemvidStoragePipeline.kt:148 - for (i in 0 until frameManifestList.size) {
+LOOP_USAGE: src/commonMain/kotlin/borg/trikeshed/pwa/PwaGallery.kt:19 - for (i in 0 until items.size) {
+LOOP_USAGE: src/commonMain/kotlin/borg/trikeshed/pwa/PwaGallery.kt:28 - for (i in 0 until items.size) {
+LOOP_USAGE: src/commonMain/kotlin/borg/trikeshed/pwa/PwaGallery.kt:39 - for (i in 0 until items.size) {
+LOOP_USAGE: src/commonMain/kotlin/borg/trikeshed/pwa/PwaGallery.kt:60 - for (i in 0 until items.size) {
+MAP_USAGE: src/commonMain/kotlin/borg/trikeshed/dag/ReteNetwork.kt:98 - fireStart(jobFact, jobTokens.map { it.right })
+MAP_USAGE: src/commonMain/kotlin/borg/trikeshed/dag/ReteNetwork.kt:110 - supportCids = listOf(jobFact.versionCid) + supportFacts.map { it.versionCid },
+MAP_USAGE: src/commonMain/kotlin/borg/trikeshed/dag/ReteNetwork.kt:125 - supportCids = listOf(jobFact.versionCid) + supportFacts.map { it.versionCid },
+MAP_USAGE: src/commonMain/kotlin/borg/trikeshed/dag/ReteAlphaMemory.kt:35 - .map { it.second }
+MAP_USAGE: src/commonMain/kotlin/borg/trikeshed/dag/BlackboardDagFabric.kt:454 - val ps = node.parents.map { nodes[it] }
+MAP_USAGE: src/commonMain/kotlin/borg/trikeshed/dag/BlackboardDagFabric.kt:460 - val cs = nodes[position].children.map { nodes[it] }
+MAP_USAGE: src/commonMain/kotlin/borg/trikeshed/dag/BlackboardDagFabric.kt:529 - val matched = nodes.filter { it.event.timestamp in lo..hi }.map { it.event }
+MAP_USAGE: src/commonMain/kotlin/borg/trikeshed/dag/ReteWorkingMemory.kt:75 - .map { it.second }
+MAP_USAGE: src/commonMain/kotlin/borg/trikeshed/dag/ReteAgenda.kt:49 - .map { it.first }
+MAP_USAGE: src/commonMain/kotlin/borg/trikeshed/dag/ReteBetaMemory.kt:92 - .map { it.second }
+LOOP_USAGE: src/commonMain/kotlin/borg/trikeshed/charstr/CharStrCached.kt:92 - for (i in 0 until this.cached.size) allChunks.add(this.cached[i])
+LOOP_USAGE: src/commonMain/kotlin/borg/trikeshed/charstr/CharStrCached.kt:97 - for (i in 0 until otherCached.cached.size) allChunks.add(otherCached.cached[i])
+LOOP_USAGE: src/commonMain/kotlin/borg/trikeshed/charstr/CharStrCached.kt:113 - for (i in 0 until chunks.size) {
+MAP_USAGE: src/commonMain/kotlin/borg/trikeshed/collections/ElasticHashIndex.kt:104 - return keys.map { key ->
+LOOP_USAGE: src/commonMain/kotlin/borg/trikeshed/collections/HashSeriesSet.kt:149 - for (i in 0 until oldSeries.size)
+LOOP_USAGE: src/commonMain/kotlin/borg/trikeshed/collections/HashSeriesSet.kt:150 - for (j in 0 until oldSeries[i].size)
+MAP_USAGE: src/commonMain/kotlin/borg/trikeshed/collections/associative/FunnelHashIndex.kt:163 - return keys.map { key ->
+MAP_USAGE: src/commonMain/kotlin/borg/trikeshed/collections/associative/LinearHashMap.kt:204 - return live.map { it.second }
+MAP_USAGE: src/commonMain/kotlin/borg/trikeshed/reduction/LcncKeyAlg.kt:66 - override val levels: List<KeyExtractor<Any, String>> = columns.map { col ->
+MAP_USAGE: src/commonMain/kotlin/borg/trikeshed/reduction/LcncKeyAlg.kt:74 - return levels.map { it.extract(map) }
+MAP_USAGE: src/commonMain/kotlin/borg/trikeshed/reduction/LcncReductions.kt:30 - keyHierarchy.map { (map[it] as? String) ?: "" }
+LOOP_USAGE: src/commonMain/kotlin/borg/trikeshed/reduction/LcncReductions.kt:39 - for (i in 0 until maxOf(a.size, b.size)) {
+MAP_USAGE: src/commonMain/kotlin/borg/trikeshed/reduction/LcncReductions.kt:65 - val merged = grouped.map { (key, carrier) ->
+MAP_USAGE: src/commonMain/kotlin/borg/trikeshed/reduction/LcncReductions.kt:76 - return carrier.map { (key, acc) -> CascadeOutputRow(key, acc) }.toList()
+MAP_USAGE: src/commonMain/kotlin/borg/trikeshed/reduction/LcncReductions.kt:120 - input.map { b -> ConfixStructuralKey(0, 0, 0) j b }
+MAP_USAGE: src/commonMain/kotlin/borg/trikeshed/reduction/LcncReductions.kt:124 - val reduced = grouped.map { (k, carrier) ->
+MAP_USAGE: src/commonMain/kotlin/borg/trikeshed/reduction/LcncReductions.kt:185 - val reduced = grouped.map { (hash, carrier) ->
+MAP_USAGE: src/commonMain/kotlin/borg/trikeshed/reduction/LcncReductions.kt:199 - return carrier.map { it.b }.toList()
+LOOP_USAGE: src/commonMain/kotlin/borg/trikeshed/reduction/TrajectoryReduction.kt:60 - for (i in 0 until deps.size) {
+LOOP_USAGE: src/commonMain/kotlin/borg/trikeshed/reduction/TrajectoryReduction.kt:154 - for (i in 0 until mappedSeries.size) {
+MAP_USAGE: src/commonMain/kotlin/borg/trikeshed/reduction/TrajectoryReduction.kt:166 - val last3 = attemptCauses.takeLast(3).map { parseCause(it, TrajectoryOutcome.NoPatch) }
+LOOP_USAGE: src/commonMain/kotlin/borg/trikeshed/reduction/CrmsReducers.kt:159 - for (i in 0 until ring.size) {
+MAP_USAGE: src/commonMain/kotlin/borg/trikeshed/reduction/CrmsReducers.kt:197 - return completed.map { key ->
+MAP_USAGE: src/commonMain/kotlin/borg/trikeshed/reduction/CrmsReducers.kt:201 - val cells = grouped.map { (hash, evs) ->
+LOOP_USAGE: src/commonMain/kotlin/borg/trikeshed/reduction/CrmsReducers.kt:222 - for (i in 0 until minOf(slabSize, ring.size)) slab[i] = ring[i] as Any
+MAP_USAGE: src/commonMain/kotlin/borg/trikeshed/reduction/LcncReduction.kt:86 - return input.map { v -> keyAlg.extractor.extract(v) j v }
+MAP_USAGE: src/commonMain/kotlin/borg/trikeshed/reduction/LcncReduction.kt:92 - val reduced = grouped.map { (key, carrier) ->
+LOOP_USAGE: src/commonMain/kotlin/borg/trikeshed/reduction/LcncPatchCables.kt:37 - for (i in 0 until carrier.size) {
+MAP_USAGE: src/commonMain/kotlin/borg/trikeshed/forge/ForgeDoc.kt:151 - check(!(blockId in doc.blocks.values.map { it.id })) { "blockId collision: $blockId" }
+MAP_USAGE: src/commonMain/kotlin/borg/trikeshed/forge/ForgeDoc.kt:336 - tags = block.properties["kanban.tags"]?.split(",")?.map { it.trim() }?.toSet().orEmpty(),
+MAP_USAGE: src/commonMain/kotlin/borg/trikeshed/forge/ForgeDoc.kt:348 - customColumns.map { c ->
+MAP_USAGE: src/commonMain/kotlin/borg/trikeshed/forge/ForgeApp.kt:48 - "columns" to reduction.board.columns.map { col ->
+MAP_USAGE: src/commonMain/kotlin/borg/trikeshed/forge/ForgeApp.kt:55 - "cards" to reduction.board.cards.map { card ->
+MAP_USAGE: src/commonMain/kotlin/borg/trikeshed/forge/ForgeApp.kt:63 - "dependencies" to card.dependencies.map { it.value },
+MAP_USAGE: src/commonMain/kotlin/borg/trikeshed/forge/ForgeApp.kt:67 - "causalGraph" to reduction.causalNodes.map { node ->
+MAP_USAGE: src/commonMain/kotlin/borg/trikeshed/forge/ForgeApp.kt:75 - "correlations" to reduction.correlations.map { corr ->
+MAP_USAGE: src/commonMain/kotlin/borg/trikeshed/forge/ForgeApp.kt:199 - "cornerButtons" to view.cornerButtons.map { btn ->
+MAP_USAGE: src/commonMain/kotlin/borg/trikeshed/forge/ForgeApp.kt:227 - "layout3D" to view.layout3D.map { section ->
+MAP_USAGE: src/commonMain/kotlin/borg/trikeshed/forge/gallery/ForgeGalleryCatalog.kt:257 - "sections" to ForgeGallerySection.values().map { it.name },
+MAP_USAGE: src/commonMain/kotlin/borg/trikeshed/forge/gallery/ForgeGalleryCatalog.kt:258 - "widgets" to widgets.map { widget ->
+MAP_USAGE: src/commonMain/kotlin/borg/trikeshed/forge/window/NoopForgeWindowManager.kt:23 - boundScripts = injected.map { it.id },
+MAP_USAGE: src/commonMain/kotlin/borg/trikeshed/forge/blackboard/ForgeBlackboardCamera.kt:168 - require(layout3D.map { it.sectionId }.toSet() == sections.toSet()) {
+MAP_USAGE: src/commonMain/kotlin/borg/trikeshed/forge/blackboard/ForgeBlackboardCamera.kt:169 - "3D layout sections ${layout3D.map { it.sectionId }} must match view sections $sections"
+MAP_USAGE: src/commonMain/kotlin/borg/trikeshed/litebike/LitebikeListenerElement.kt:274 - .map { ProtocolMark.forProtocol(it) }
+MAP_USAGE: src/commonMain/kotlin/borg/trikeshed/lcnc/reactor/CsvIngestCodec.kt:19 - val headers = lines.first().split(delimiter).map { it.trim() }
+MAP_USAGE: src/commonMain/kotlin/borg/trikeshed/lcnc/reactor/CsvIngestCodec.kt:25 - val values = lines[i + 1].split(delimiter).map { it.trim() }
+MAP_USAGE: src/commonMain/kotlin/borg/trikeshed/wireproto/ActionDecoder.kt:113 - val nBytes = if (nonceBytesStr.isEmpty()) ByteArray(0) else nonceBytesStr.split(",").map { it.toByte() }.toByteArray()
+MAP_USAGE: src/commonMain/kotlin/borg/trikeshed/wireproto/ConfixWorker.kt:108 - val bytes = if (bytesStr.isEmpty()) ByteArray(0) else bytesStr.split(",").map { it.toByte() }.toByteArray()
+MAP_USAGE: src/commonMain/kotlin/borg/trikeshed/blackboard/BlackboardSurface.kt:104 - .map { index[positions[it]] }
+MAP_USAGE: src/commonMain/kotlin/borg/trikeshed/blackboard/BlackboardSurface.kt:116 - val rows = orderedEntities.map { entity ->
+MAP_USAGE: src/commonMain/kotlin/borg/trikeshed/job/CanonicalCbor.kt:57 - .map { it.value }
+MAP_USAGE: src/commonMain/kotlin/borg/trikeshed/job/CanonicalCbor.kt:197 - .map { it.value }
+MAP_USAGE: src/commonMain/kotlin/borg/trikeshed/job/CanonicalCbor.kt:209 - val pairs = sorted.map { it.key to it.value.toItem() }
+MAP_USAGE: src/commonMain/kotlin/borg/trikeshed/job/JobSnapshot.kt:34 - dependencies = dependencies.map { JobId.of(it) },
+MAP_USAGE: src/commonMain/kotlin/borg/trikeshed/job/JobSupervisorElement.kt:106 - "dependencies" to snap.dependencies.map { it.value }
+LOOP_USAGE: src/commonMain/kotlin/borg/trikeshed/reactor/DhtKademliaNode.kt:21 - for (i in 0 until closestRoutes.size) {
+MAP_USAGE: src/commonMain/kotlin/borg/trikeshed/viewserver/CommonViewServer.kt:60 - mappers.map { it.map(document) }
+MAP_USAGE: src/commonMain/kotlin/borg/trikeshed/viewserver/CommonViewServer.kt:70 - "_stats" -> stats(values.map { it.numberOrZero() })
+MAP_USAGE: src/commonMain/kotlin/borg/trikeshed/viewserver/CouchDbCascadeTool.kt:52 - keyFields.map { document[it] ?: ViewValue.Null } + listOf(
+MAP_USAGE: src/commonMain/kotlin/borg/trikeshed/confix/TypeSignatureDsl.kt:180 - return m.groupValues[1].split(",").map { it.trim() }
+LOOP_USAGE: src/commonMain/kotlin/borg/trikeshed/confix/ConfixOracleService.kt:46 - for (j in 0 until supers.size) {
+MAP_USAGE: src/commonMain/kotlin/borg/trikeshed/util/oroboros/FileEWatcher.kt:106 - val batch = pendingEvents.map { FileEvent(it.key, it.value) }
+MAP_USAGE: src/commonMain/kotlin/borg/trikeshed/util/oroboros/GitCouchGateway.kt:87 - return Snapshot(maxRev, refsList.map { it.path }.sorted())
+MAP_USAGE: src/commonMain/kotlin/borg/trikeshed/util/oroboros/FlywheelGatekeeper.kt:118 - .map { it to query.overlap(it.lexicalMemory) }
+MAP_USAGE: src/commonMain/kotlin/borg/trikeshed/util/oroboros/OroborosNetwork.kt:159 - val jobs = gateways.map { (name, gateway) ->
+MAP_USAGE: src/commonMain/kotlin/borg/trikeshed/userspace/nio/charset/PlatformCharset.kt:63 - .flatMap { charset -> (listOf(charset.name) + charset.aliases).map { it.normalizedCharsetName() to charset } }
+MAP_USAGE: src/commonMain/kotlin/borg/trikeshed/userspace/nio/file/spi/InMemoryFileOperations.kt:56 - .map { it.removePrefix(prefix).substringBefore('/') }
+MAP_USAGE: src/commonMain/kotlin/borg/trikeshed/userspace/nio/file/spi/InMemoryFileOperations.kt:115 - streamLines(fileName, bufsize).map { (off, arr) -> off j arr.toSeries() }.asIterable()
+MAP_USAGE: src/commonMain/kotlin/borg/trikeshed/userspace/tensor/ir/TensorTaxonomy.kt:291 - val args = inputTypes.indices.map { entryBlock.arg(it) }
+MAP_USAGE: src/commonMain/kotlin/borg/trikeshed/userspace/reactor/MuxReactorElement.kt:391 - val keys = keysById.values.map { it.toImmutable() }
+MAP_USAGE: src/commonMain/kotlin/borg/trikeshed/userspace/reactor/MuxReactorHud.kt:68 - leasedKeys = reactorState.leases.map { lease ->
+LOOP_USAGE: src/commonMain/kotlin/borg/trikeshed/userspace/concurrency/ParseScope.kt:158 - for (i in 0 until childSpans.size) {
+LOOP_USAGE: src/commonMain/kotlin/borg/trikeshed/userspace/concurrency/ParseScope.kt:198 - for (i in 0 until childEntries.size) {
+LOOP_USAGE: src/commonMain/kotlin/borg/trikeshed/couch/ViewServer.kt:231 - for (i in 0 until cursor.size) {
+LOOP_USAGE: src/commonMain/kotlin/borg/trikeshed/couch/CouchStore.kt:285 - for (colIdx in 0 until row.size) {
+MAP_USAGE: src/commonMain/kotlin/borg/trikeshed/couch/isam/ConfixIsamFactory.kt:50 - val indexCursorList = hashIndex.entries.map { it.key to it.value }
+MAP_USAGE: src/commonMain/kotlin/borg/trikeshed/kanban/KanbanTypes.kt:178 - copy(modelCallLog = modelCallLog.map { if (it.id == callId) it.update() else it })
+MAP_USAGE: src/commonMain/kotlin/borg/trikeshed/kanban/KanbanTypes.kt:243 - val newCards = cards.map { card ->
+MAP_USAGE: src/commonMain/kotlin/borg/trikeshed/kanban/KanbanTypes.kt:275 - val newCards = cards.map { card ->
+MAP_USAGE: src/commonMain/kotlin/borg/trikeshed/kanban/KanbanTypes.kt:285 - val newCards = cards.map { card ->
+MAP_USAGE: src/commonMain/kotlin/borg/trikeshed/kanban/KanbanTypes.kt:299 - copy(cards = cards.map { if (it.id == updated.id) updated.copy(updatedAt = nowMs()) else it })
+MAP_USAGE: src/commonMain/kotlin/borg/trikeshed/kanban/KanbanVisual.kt:25 - private fun mermaidId(raw: String): String = raw.map { ch ->
+MAP_USAGE: src/commonMain/kotlin/borg/trikeshed/kanban/ForgeKanbanIngest.kt:108 - require(tasks.map { it.id }.toSet().size == tasks.size) { "duplicate work package id" }
+MAP_USAGE: src/commonMain/kotlin/borg/trikeshed/kanban/ForgeKanbanIngest.kt:110 - val knownIds = tasks.map { it.id }.toSet()
+MAP_USAGE: src/commonMain/kotlin/borg/trikeshed/kanban/ForgeKanbanIngest.kt:128 - child.parentIds.map { parentId ->
+MAP_USAGE: src/commonMain/kotlin/borg/trikeshed/kanban/ForgeKanbanIngest.kt:142 - val provisionalTaskFacts = tasks.map { task ->
+MAP_USAGE: src/commonMain/kotlin/borg/trikeshed/kanban/ForgeKanbanIngest.kt:168 - .mapValues { (_, tokens) -> tokens.map { it.right.fields["parentId"] as String }.sorted() }
+MAP_USAGE: src/commonMain/kotlin/borg/trikeshed/kanban/ForgeKanbanIngest.kt:170 - .mapValues { (_, tokens) -> tokens.map { it.right.fields["childId"] as String }.sorted() }
+MAP_USAGE: src/commonMain/kotlin/borg/trikeshed/kanban/ForgeKanbanIngest.kt:194 - val taskFacts = cards.map { card ->
+MAP_USAGE: src/commonMain/kotlin/borg/trikeshed/kanban/ForgeKanbanIngest.kt:218 - val correlations = tasks.map { task ->
+MAP_USAGE: src/commonMain/kotlin/borg/trikeshed/kanban/ForgeKanbanIngest.kt:262 - ?.let { dependencyId.findAll(it.substringAfter(':')).map { id -> id.value }.toList() }
+MAP_USAGE: src/commonMain/kotlin/borg/trikeshed/kanban/JobKanbanProjection.kt:57 - get() = commits.map { it.jobId }.distinct().size
+MAP_USAGE: src/commonMain/kotlin/borg/trikeshed/kanban/JobKanbanProjection.kt:87 - dependencies = inner.dependencies.map { it.value },
+MAP_USAGE: src/commonMain/kotlin/borg/trikeshed/graal/ConfixBlackboard.kt:92 - val pairs = keys().map { it to get(it) }
+MAP_USAGE: src/commonMain/kotlin/borg/trikeshed/mutable/MutableSeries.kt:158 - override fun sequence(): Sequence<T> = arr.asSequence().map { it as T }
+MAP_USAGE: src/commonMain/kotlin/borg/trikeshed/mutable/MutableSeries.kt:187 - fun sequence(): Sequence<T> = arr.asSequence().map { it as T }
+LOOP_USAGE: src/commonMain/kotlin/borg/trikeshed/mutable/SortedSeries.kt:48 - for (i in 0 until data.size) {
+MAP_USAGE: src/commonMain/kotlin/borg/trikeshed/mutable/SortedSeries.kt:81 - override fun sequence(): Sequence<T> = (0 until a).asSequence().map { b(it) }
+LOOP_USAGE: src/commonMain/kotlin/borg/trikeshed/mutable/MergedSeries.kt:88 - for (i in 0 until input.size) {
+MAP_USAGE: src/commonMain/kotlin/borg/trikeshed/context/nuid/NuidFanoutElement.kt:294 - .map { slot ->
+MAP_USAGE: src/commonMain/kotlin/borg/trikeshed/context/nuid/NuidFanoutElement.kt:297 - .map { slot }
+MAP_USAGE: src/commonMain/kotlin/borg/trikeshed/lib/LineByteSupport.kt:26 - .map { (offset, lineBytes) -> offset j lineBytes.toSeries() }
+LOOP_USAGE: src/commonMain/kotlin/borg/trikeshed/lib/TypeEvidence.kt:65 - for (index in 0 until src.size) {
+MAP_USAGE: src/commonMain/kotlin/borg/trikeshed/lib/descriptiveSetNotation.kt:12 - private fun <E> Set<E>.cartesianProduct(other: Set<E>) = this.flatMap { a -> other.map { b -> a to b } }.toSet()
+LOOP_USAGE: src/commonMain/kotlin/borg/trikeshed/isam/IsamDataFileDsl.kt:79 - for (i in 0 until records.size) {
+LOOP_USAGE: src/commonMain/kotlin/borg/trikeshed/isam/WireProto.kt:17 - for (x in 0 until  meta.size) {
+MAP_USAGE: src/commonMain/kotlin/borg/trikeshed/isam/meta/IsamMetaFileDsl.kt:129 - val distinctGroups = result.view.map { it.groupId }.toSet()
+MAP_USAGE: src/commonMain/kotlin/borg/trikeshed/isam/meta/IsamMetaFileDsl.kt:137 - val groupTokens = byGroup.entries.map { (gname, cols) ->
+MAP_USAGE: src/commonMain/kotlin/borg/trikeshed/isam/meta/IsamMetaFileDsl.kt:155 - recordMetas.view.map { col: ColumnMeta ->
+MAP_USAGE: src/commonMain/kotlin/borg/trikeshed/isam/meta/IsamMetaFileReader.kt:162 - val distinctGroups = result.view.map { it.groupId }.toSet()
+MAP_USAGE: src/commonMain/kotlin/borg/trikeshed/isam/meta/IsamMetaFileReader.kt:172 - val groupTokens = byGroup.entries.map { (gname, cols) ->
+MAP_USAGE: src/commonMain/kotlin/borg/trikeshed/isam/meta/IsamMetaFileReader.kt:211 - recordMetas.view.map { columnMeta: ColumnMeta ->
+MAP_USAGE: src/commonMain/kotlin/borg/trikeshed/cursor/GroupBy.kt:22 - val slabs = clusters.values.map { acc -> acc.toIntArray().also { acc.close() } }
+LOOP_USAGE: src/commonMain/kotlin/borg/trikeshed/cursor/TypeSubsumption.kt:63 - for (i in 0 until edges.size)
+LOOP_USAGE: src/commonMain/kotlin/borg/trikeshed/cursor/TypeSubsumption.kt:71 - for (i in 0 until edges.size)
+LOOP_USAGE: src/commonMain/kotlin/borg/trikeshed/cursor/TypeSubsumption.kt:89 - for (i in 0 until edges.size) {
+LOOP_USAGE: src/commonMain/kotlin/borg/trikeshed/cursor/TypeSubsumption.kt:110 - for (i in 0 until edges.size) {
+LOOP_USAGE: src/commonMain/kotlin/borg/trikeshed/cursor/Zoom.kt:125 - for (i in 0 until this.size) {
+MAP_USAGE: src/commonMain/kotlin/borg/trikeshed/cursor/CursorOps.kt:50 - val indices = names.map { name: CharSequence ->
+LOOP_USAGE: src/commonMain/kotlin/borg/trikeshed/cursor/CursorOps.kt:52 - for (i in 0 until cols.size) if (cols[i] == name) { idx = i; break }
+LOOP_USAGE: src/commonMain/kotlin/borg/trikeshed/treedoc/TreeDocPipeline.kt:53 - for (docOrdinal in 0 until documents.size) {
+LOOP_USAGE: src/commonMain/kotlin/borg/trikeshed/treedoc/TreeDocPipeline.kt:129 - for (i in 0 until documents.size) {
+LOOP_USAGE: src/commonMain/kotlin/borg/trikeshed/treedoc/TreeDocPipeline.kt:136 - for (i in 0 until frames.size) {

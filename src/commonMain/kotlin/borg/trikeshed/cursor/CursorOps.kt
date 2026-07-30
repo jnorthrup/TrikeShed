@@ -46,15 +46,11 @@ internal inline fun <A, B> join(a: A, noinline f: (Int) -> B): Join<A, (Int) -> 
 
     /** Column projection by name. */
     fun Cursor.select(vararg names: CharSequence): Cursor {
-        val self = this
-        val firstRow = self.b(0)
-        val nameToIdx = mutableMapOf<CharSequence, Int>()
-        for (c in 0 until firstRow.size) {
-            val meta = firstRow.b(c).b()
-            nameToIdx[meta.name] = c
-        }
+        val cols = this.columnNames
         val indices = names.map { name: CharSequence ->
-            nameToIdx[name] ?: error("Column '$name' not found")
+            var idx = -1
+            for (i in 0 until cols.size) if (cols[i] == name) { idx = i; break }
+            if (idx == -1) error("Column '$name' not found") else idx
         }.toIntArray()
         return select(*indices)
     }
@@ -64,11 +60,8 @@ internal inline fun <A, B> join(a: A, noinline f: (Int) -> B): Join<A, (Int) -> 
 
     /** Column exclusion by name. */
     fun Cursor.without(name: CharSequence): Cursor {
-        val self = this
-        val firstRow = self.b(0)
-        val indices = (0 until firstRow.size).filter { c: Int ->
-            firstRow.b(c).b().name != name
-        }.toIntArray()
+        val cols = this.columnNames
+        val indices = (0 until cols.size).filter { c: Int -> cols[c] != name }.toIntArray()
         return select(*indices)
     }
 

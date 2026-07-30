@@ -12,17 +12,18 @@ import borg.trikeshed.lib.*
 
 @PublishedApi internal fun Cursor.buildGroups(axis: IntArray): GroupState {
     val axisSet = if (axis.size > 16) axis.toHashSet() else axis.toList()
-    val clusters = linkedMapOf<List<Any?>, IntAccumulator>()
+    val clusters = linkedMapOf<Series<Any?>, IntAccumulator>()
     for (r in 0 until size) {
         val row = this[r] as ReifiedSplitSeries2<*, *>
-        val key = axis.map { row.leftSeries[it] }
+        val key = axis.size j { i: Int -> row.leftSeries[axis[i]] }
         clusters.getOrPut(key) { IntAccumulator() }.add(r)
     }
     val keys = clusters.keys.toList()
     val slabs = clusters.values.map { acc -> acc.toIntArray().also { acc.close() } }
     val colCount = this[0].size
     val axisPos = IntArray(colCount) { -1 }.also { a -> axis.forEachIndexed { pos, col -> a[col] = pos } }
-    return GroupState(keys, slabs, colCount, axisPos, axisSet)
+    @Suppress("UNCHECKED_CAST")
+    return GroupState(keys as List<List<Any?>>, slabs, colCount, axisPos, axisSet)
 }
 
 /** Group by axis columns; non-key columns become Series<Any?> of grouped row values. */
