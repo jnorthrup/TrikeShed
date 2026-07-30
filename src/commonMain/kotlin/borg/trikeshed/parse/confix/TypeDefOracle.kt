@@ -130,7 +130,7 @@ class TypeDefOracle {
                     val k = kCell.reify(doc.src)
                     val keyStr = if (k is String) k else {
                         val o = kCell.open; val c = kCell.close
-                        if (o < c && o >= 0 && c <= doc.src.size) String(CharArray(c - o) { j -> doc.src[o + j].toInt().toChar() }) else ""
+                        if (o < c && o >= 0 && c <= doc.src.size) CharArray(c - o) { j -> doc.src[o + j].toInt().toChar() }.concatToString() else ""
                     }
                     if (keyStr == "rows") { rows = (root.kids[i + 1] j doc.src).cellKids; break }
                 }
