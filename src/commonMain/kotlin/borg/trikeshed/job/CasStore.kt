@@ -29,6 +29,10 @@ open class CasStore protected constructor(
         return bytes.copyOf()
     }
 
+    fun project(cid: ContentId): Lens {
+        return ProjectionRegistry(this).project(cid)
+    }
+
     fun corrupt(cid: ContentId) {
         blobs[cid]?.let { original ->
             val corrupted = original.copyOf()
