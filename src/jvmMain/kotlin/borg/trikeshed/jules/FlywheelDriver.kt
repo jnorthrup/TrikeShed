@@ -548,7 +548,6 @@ class FlywheelDriver(
             )
         }
         val cumulativeConflicts = conflictFiles()
-        var unresolvedConflicts = cumulativeConflicts
         println("[FLYWHEEL] DRAIN ${landed.size}/${sessions.size} sessions merged, ${cumulativeConflicts.size} conflict files")
 
         // 3. Repair the cumulative panorama after every arm has landed.
@@ -579,7 +578,6 @@ class FlywheelDriver(
                 }
             }
             val unresolved = conflictFiles()
-            unresolvedConflicts = unresolved
             if (unresolved.isNotEmpty()) {
                 println("[FLYWHEEL] DRAIN repair incomplete — ${unresolved.size} conflict files remain; closing landed provenance")
             }
@@ -671,7 +669,7 @@ class FlywheelDriver(
             JulesConductor.DrainRecord(
                 sessionId = it.arm.session.id,
                 commitSha = commitSha,
-                rejects = unresolvedConflicts.size,
+                rejects = conflictFiles().size,
             )
         })
         for ((arm, tag) in prepared) {
@@ -682,7 +680,7 @@ class FlywheelDriver(
         }
         return DrainBatch(
             harvested = prepared.size,
-            conflicts = unresolvedConflicts,
+            conflicts = conflictFiles(),
             panorama = panorama,
         )
     }
