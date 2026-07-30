@@ -22,7 +22,7 @@ class MmapCasStoreJvm(
 
     suspend fun get(cid: ContentId): ByteArray? = store.get(cid)
 
-    fun delete(cid: ContentId): Boolean = store.delete(cid)
+    suspend fun delete(cid: ContentId): Boolean = store.delete(cid)
 
     fun manifest(cids: List<ContentId>): CasManifest = store.manifest(cids)
 

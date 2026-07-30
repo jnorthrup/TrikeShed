@@ -28,12 +28,13 @@ class VolumeCasStore internal constructor(
         require(blockSize == volume.blockSize) { "blockSize mismatch" }
     }
 
-    /** Construct a store by reading the on-volume index at LBA 0. */
-    suspend fun create(
-        volume: Volume,
-        replicationHook: CasReplicationHook = CasReplicationHook.NoOp,
-        blockSize: Int = volume.blockSize,
-    ): VolumeCasStore {
+    companion object {
+        /** Construct a store by reading the on-volume index at LBA 0. */
+        suspend fun create(
+            volume: Volume,
+            replicationHook: CasReplicationHook = CasReplicationHook.NoOp,
+            blockSize: Int = volume.blockSize,
+        ): VolumeCasStore {
         val headerBytes = volume.read(0, 1)
         val magic = if (headerBytes.size >= 4) headerBytes.readIntAt(0) else 0
         if (magic != 0xCA5B1001.toInt()) {
@@ -63,6 +64,7 @@ class VolumeCasStore internal constructor(
         val indexBlocks = (12 + decoded.getEntries().size * 80 + blockSize - 1) / blockSize
         val maxReserved = maxOf(maxLba, indexBlocks.toLong() - 1)
         return VolumeCasStore(decoded, maxReserved + 1L, volume, replicationHook, blockSize)
+        }
     }
 
     suspend fun put(bytes: ByteArray): ContentId {

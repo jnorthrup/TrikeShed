@@ -255,18 +255,23 @@ class FlywheelDriver(
         // 7. DISPATCH — take from the unified queue projection, sorted by
         //    score descending. Waiting work (AWAITING, just answered above)
         //    already holds its slot; we only fill capacity freed by drain.
-        //    Guard: never dispatch new work while any session is still
-        //    AWAITING — that would pile new conversations onto unresolved ones.
+        //
+        //    Dispatch fires when the working tree is clean and there are no
+        //    active conflicts. It does NOT require full settlement — stuck
+        //    drains (e.g. a COMPLETED session whose patch won't apply) must
+        //    not starve all dispatch and freeze the flywheel at 0/day.
         //
         //    Overlap guard: each task's file scope must not overlap any
-        //    in-flight session's touched files. Open tasks are given leeway
-        //    and clearance from overlapping.
+        //    in-flight session's touched files.
         //
         //    Spec cap: Jules submissions are capped at [SPEC_BYTE_LIMIT] bytes.
         var dispatched = 0
         val alive = activeCount()
         val available = (maxSlots - alive).coerceAtLeast(0)
-        if (settled && available > 0) {
+        val canDispatch = available > 0 &&
+            committedConflicts.isEmpty() &&
+            isWorkingTreeClean()
+        if (canDispatch) {
             // Build the in-flight file set from all active sessions' last patches.
             val inflightFiles = mutableSetOf<String>()
             for (card in conductor.cards.values) {
