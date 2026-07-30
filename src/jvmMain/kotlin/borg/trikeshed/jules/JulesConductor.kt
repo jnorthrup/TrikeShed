@@ -158,7 +158,17 @@ class JulesConductor(
                 sessionId = sessionId,
                 commitSha = "outbox-${sessionId.take(8)}",
                 taskId = "retired",
-                receipt = null,
+                receipt = borg.trikeshed.util.oroboros.MergeReceipt(
+                    workId = sessionId,
+                    producer = "retired",
+                    producerRef = sessionId,
+                    patchCid = borg.trikeshed.job.ContentId("retired"),
+                    revision = "outbox-${sessionId.take(8)}",
+                    versionTag = "retired",
+                    lexicalMemory = borg.trikeshed.util.oroboros.LexicalMemory(summary = reason, title = reason, content = ""),
+                    claimedAt = at,
+                    prUrl = null,
+                ),
                 at = at,
             ),
         )
