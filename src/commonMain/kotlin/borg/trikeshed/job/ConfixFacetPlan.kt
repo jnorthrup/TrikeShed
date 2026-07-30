@@ -13,6 +13,9 @@ import borg.trikeshed.parse.confix.reify
 import borg.trikeshed.parse.confix.value
 import borg.trikeshed.job.schema.SchemaCompiler
 import borg.trikeshed.job.schema.loadConfixSchemaBytes
+import borg.trikeshed.userspace.nio.file.spi.FileOperations
+import borg.trikeshed.userspace.nio.spi.NioSupervisor
+import kotlin.coroutines.coroutineContext
 
 /**
  * ConfixFacetPlan — compiled from job-nexus.schema.json.
@@ -25,8 +28,13 @@ data class ConfixFacetPlan(
     val schemaText: String,
 ) {
     companion object {
-        fun fromSchema(schemaPath: String): ConfixFacetPlan {
-            val schemaBytes = loadConfixSchemaBytes(schemaPath)
+        suspend fun fromSchema(schemaPath: String): ConfixFacetPlan {
+            val fileOps = coroutineContext[NioSupervisor.Key]?.service<FileOperations>()
+            val schemaBytes = if (fileOps != null && !schemaPath.startsWith("classpath:")) {
+                fileOps.readAllBytes(schemaPath)
+            } else {
+                loadConfixSchemaBytes(schemaPath)
+            }
             return SchemaCompiler.compilePlan(schemaBytes)
         }
     }
