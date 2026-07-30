@@ -108,7 +108,7 @@ object KanbanEventCodec {
             "cause" -> {
                 val sid = m.str("sid")
                 val at = m.num("at")
-                val actId = m["activityId"]?.toString()
+                val actId = m.optStr("activityId")
                 val actSeq = (m["activitySeq"] as? Number)?.toInt()
                 val cause: JulesCause = when (m["kind"]) {
                     "AgentMessaged" -> JulesCause.AgentMessaged(m.str("excerpt"), at, actId, actSeq)
@@ -123,7 +123,7 @@ object KanbanEventCodec {
                         tier = m.str("tier"),
                         title = m.str("title"),
                         spec = m.str("spec"),
-                        parent = m["parent"]?.toString(),
+                        parent = m.optStr("parent"),
                         score = m["score"]?.toString()?.toDoubleOrNull() ?: 0.5,
                         at = at,
                     )
@@ -138,7 +138,7 @@ object KanbanEventCodec {
                         sessionId = m.str("sessionId"),
                         commitSha = m.str("commitSha"),
                         taskId = m.str("taskId"),
-                        receipt = m["receiptPatchCid"]?.toString()?.let { cid ->
+                        receipt = m.optStr("receiptPatchCid")?.let { cid ->
                             MergeReceipt(
                                 workId = m.str("workId"),
                                 producer = m.str("receiptProducer"),
@@ -152,7 +152,7 @@ object KanbanEventCodec {
                                     content = m.str("receiptContent"),
                                 ),
                                 claimedAt = m.num("receiptClaimedAt"),
-                                prUrl = m["receiptPrUrl"]?.toString(),
+                                prUrl = m.optStr("receiptPrUrl"),
                             )
                         },
                         at = at,
@@ -180,8 +180,48 @@ object KanbanEventCodec {
         is JulesCause.WorkIdentitySynthesized -> "WorkIdentitySynthesized"
     }
 
-    private fun Map<*, *>.str(k: String): String = this[k]?.toString() ?: ""
+    private fun Map<*, *>.str(k: String): String = this[k]?.toString()?.let { unescape(it) } ?: ""
+    private fun Map<*, *>.optStr(k: String): String? = this[k]?.toString()?.let { unescape(it) }
     private fun Map<*, *>.num(k: String): Long = (this[k] as? Number)?.toLong() ?: 0L
+
+    private fun unescape(v: String): String {
+        if (!v.contains('\\')) return v
+        val sb = StringBuilder(v.length)
+        var i = 0
+        while (i < v.length) {
+            val ch = v[i]
+            if (ch == '\\' && i + 1 < v.length) {
+                when (val next = v[i + 1]) {
+                    '"' -> { sb.append('"'); i += 2 }
+                    '\\' -> { sb.append('\\'); i += 2 }
+                    'n' -> { sb.append('\n'); i += 2 }
+                    'r' -> { sb.append('\r'); i += 2 }
+                    't' -> { sb.append('\t'); i += 2 }
+                    'u' -> {
+                        if (i + 5 < v.length) {
+                            val hex = v.substring(i + 2, i + 6)
+                            val code = hex.toIntOrNull(16)
+                            if (code != null) {
+                                sb.append(code.toChar())
+                                i += 6
+                            } else {
+                                sb.append(ch)
+                                i++
+                            }
+                        } else {
+                            sb.append(ch)
+                            i++
+                        }
+                    }
+                    else -> { sb.append(ch); i++ }
+                }
+            } else {
+                sb.append(ch)
+                i++
+            }
+        }
+        return sb.toString()
+    }
 
     private fun StringBuilder.field(k: String, v: String) {
         append(",\"").append(k).append("\":")
