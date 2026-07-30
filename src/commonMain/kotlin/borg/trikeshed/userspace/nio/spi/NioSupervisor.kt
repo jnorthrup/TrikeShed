@@ -23,10 +23,15 @@ open class NioSupervisor : AsyncContextElement() {
     inline fun <reified T : CoroutineContext.Element> service(): T? =
         services.filterIsInstance<T>().firstOrNull()
 
+    /** Expose the launch-time I/O capability report registered by the platform. */
+    fun capabilityReport(): NioCapabilityReport? = service()
+
     override suspend fun open() {
         if (state == ElementState.CREATED) {
             super.open()
-            platformNioProviders().forEach { register(it) }
+            val providers = platformNioProviders()
+            providers.filterIsInstance<NioCapabilityReport>().firstOrNull()?.let { register(it) }
+            providers.filter { it !is NioCapabilityReport }.forEach { register(it) }
             services
                 .filterIsInstance<AsyncContextElement>()
                 .filter { it.state == ElementState.CREATED }
