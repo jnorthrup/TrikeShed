@@ -755,8 +755,7 @@ button { font: inherit; color: inherit; background: none; border: none; cursor: 
     return defaultState();
   }
 
-  let state = loadState();
-
+  // state was already declared at the top of this scope with the camera initialization.
   function saveState() {
     try { localStorage.setItem(LS_KEY, JSON.stringify(state)); } catch (e) { /* quota */ }
   }
