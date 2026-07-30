@@ -684,6 +684,12 @@ class FlywheelDriver(
             drainFailures.remove(s.id)
             println("[FLYWHEEL] PROVENANCE ${s.id.takeLast(6)} cid=${patchCid.value.take(16)} branch=${branch ?: "none"} tag=$tag")
             sendMergeReceipt(s.id, commitSha, tag, patchCid, branch, prUrl)
+            try {
+                client.deleteSession(s.id)
+                println("[FLYWHEEL] DELETE ${s.id.takeLast(6)} session cleared")
+            } catch (t: Throwable) {
+                emitPollError("delete session ${s.id}: ${t.message?.take(200)}", 0)
+            }
         }
         return DrainBatch(
             harvested = prepared.size,
@@ -871,6 +877,12 @@ class FlywheelDriver(
             }
             println("[FLYWHEEL] RECONCILE ${sessionId.takeLast(6)} branch=$branch tag=$tag")
             sendMergeReceipt(sessionId, commitSha, tag, patchCid, branch, prUrl)
+            try {
+                client.deleteSession(sessionId)
+                println("[FLYWHEEL] DELETE ${sessionId.takeLast(6)} session cleared")
+            } catch (t: Throwable) {
+                emitPollError("delete session $sessionId: ${t.message?.take(200)}", 0)
+            }
         }
     }
 
@@ -1344,6 +1356,12 @@ class FlywheelDriver(
         ))
         _events.emit(FlywheelEvent.Drained(s.id, commitSha, tag))
         drainFailures.remove(s.id)
+        try {
+            client.deleteSession(s.id)
+            println("[FLYWHEEL] DELETE ${s.id.takeLast(6)} session cleared")
+        } catch (t: Throwable) {
+            emitPollError("delete session ${s.id}: ${t.message?.take(200)}", 0)
+        }
         return DrainOutcome.Harvested
     }
 
