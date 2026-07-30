@@ -129,10 +129,6 @@ kotlin {
         watchosSimulatorArm64()
         tvosX64()
         tvosSimulatorArm64()
-<<<<<<< ours
-=======
-
->>>>>>> theirs
         macosArm64("macos") {
             compilations.getByName("main") {
                 cinterops {

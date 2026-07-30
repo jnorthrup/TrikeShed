@@ -451,6 +451,19 @@ class FlywheelDriver(
         val landed = mutableListOf<Arm>()
         for (arm in arms) {
             val (s, _, _, branch) = arm
+            val historicalSubject = if (branch == null) {
+                "flywheel: patch ${s.title.take(50)} (${s.id.takeLast(6)})"
+            } else {
+                "flywheel: merge ${s.title.take(50)} ($branch)"
+            }
+            val historicalCommit = git(
+                "log", "--format=%H", "-1", "--fixed-strings", "--grep=$historicalSubject",
+            )
+            if (historicalCommit.exitCode == 0 && historicalCommit.output.isNotBlank()) {
+                println("[FLYWHEEL] HISTORY ${s.id.takeLast(6)} already landed at ${historicalCommit.output.trim().take(12)}")
+                landed += arm
+                continue
+            }
             if (branch != null) {
                 val mergeRes = git("merge", "--no-ff", "--no-edit", branch)
                 if (mergeRes.exitCode != 0) {
@@ -535,6 +548,7 @@ class FlywheelDriver(
             )
         }
         val cumulativeConflicts = conflictFiles()
+        var unresolvedConflicts = cumulativeConflicts
         println("[FLYWHEEL] DRAIN ${landed.size}/${sessions.size} sessions merged, ${cumulativeConflicts.size} conflict files")
 
         // 3. Repair the cumulative panorama after every arm has landed.
@@ -565,21 +579,24 @@ class FlywheelDriver(
                 }
             }
             val unresolved = conflictFiles()
+            unresolvedConflicts = unresolved
             if (unresolved.isNotEmpty()) {
-                println("[FLYWHEEL] DRAIN repair incomplete — ${unresolved.size} conflict files remain")
-                return DrainBatch(conflicts = unresolved, panorama = panorama)
+                println("[FLYWHEEL] DRAIN repair incomplete — ${unresolved.size} conflict files remain; closing landed provenance")
             }
         }
 
-        // 4. The integrated tree must compile before provenance closes and the
-        //    successor queue is allowed to dispatch.
+        // 4. Compilation observes the integrated result but does not revoke a
+        //    committed merge. Closing provenance here prevents the next cycle
+        //    from reapplying every arm and compounding the same conflict. The
+        //    CycleBody conflict quarantine keeps dispatch paused while markers
+        //    remain; QA or a locality resolver advances the committed tree.
         val build = shell("./gradlew", ":jvmMainClasses", "--no-daemon")
         if (build.exitCode != 0) {
             emitPollError("cumulative build failed: ${build.output.take(400)}", 0)
-            println("[FLYWHEEL] DRAIN build red — completion set remains undrained")
-            return DrainBatch(panorama = panorama)
+            println("[FLYWHEEL] DRAIN build red — committed completion set still closes provenance")
+        } else {
+            println("[FLYWHEEL] DRAIN build green")
         }
-        println("[FLYWHEEL] DRAIN build green")
 
         // 5. PROVENANCE CLOSE — every successful arm shares the final repaired
         //    commit but retains its own CAS CID, tag, receipt, and WAL identity.
@@ -654,7 +671,7 @@ class FlywheelDriver(
             JulesConductor.DrainRecord(
                 sessionId = it.arm.session.id,
                 commitSha = commitSha,
-                rejects = cumulativeConflicts.size,
+                rejects = unresolvedConflicts.size,
             )
         })
         for ((arm, tag) in prepared) {
@@ -663,7 +680,11 @@ class FlywheelDriver(
             drainFailures.remove(s.id)
             println("[FLYWHEEL] PROVENANCE ${s.id.takeLast(6)} cid=${patchCid.value.take(16)} branch=${branch ?: "none"} tag=$tag")
         }
-        return DrainBatch(harvested = prepared.size, panorama = panorama)
+        return DrainBatch(
+            harvested = prepared.size,
+            conflicts = unresolvedConflicts,
+            panorama = panorama,
+        )
     }
 
     private fun activeCount(): Int = conductor.cards.values.count {
