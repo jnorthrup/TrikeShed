@@ -14,11 +14,11 @@ public abstract class SocketChannel : AbstractSelectableChannel, ByteChannel, Sc
     public abstract override fun validOps(): Int
     public abstract override fun bind(address: String): SocketChannel
     public abstract override fun <T> setOption(option: String, value: T): SocketChannel
-    fun shutdownInput(): SocketChannel = TODO("shutdown")
-    fun shutdownOutput(): SocketChannel = TODO("shutdown")
+    public abstract fun shutdownInput(): SocketChannel
+    public abstract fun shutdownOutput(): SocketChannel
     fun isConnected(): Boolean = false
     fun isConnectionPending(): Boolean = false
-    fun connect(address: String): Boolean = TODO("connect")
+    public abstract fun connect(address: String): Boolean
     fun finishConnect(): Boolean = false
     fun getRemoteAddress(): String = "0.0.0.0:0"
     public abstract override fun read(dst: ByteBuffer): Int
@@ -61,6 +61,12 @@ internal class UringSocketChannel(
     override fun validOps(): Int = SelectionKey.OP_READ or SelectionKey.OP_WRITE or SelectionKey.OP_CONNECT
     override fun bind(address: String): SocketChannel = this
     override fun <T> setOption(option: String, value: T): SocketChannel = this
+    override fun <T> getOption(option: String): T = throw UnsupportedOperationException("options not supported")
+    override fun supportedOptions(): Set<String> = emptySet()
+
+    override fun shutdownInput(): SocketChannel = throw UnsupportedOperationException("shutdown not supported")
+    override fun shutdownOutput(): SocketChannel = throw UnsupportedOperationException("shutdown not supported")
+    override fun connect(address: String): Boolean = false
 
     override fun read(dst: ByteBuffer): Int {
         val token = nextToken++

@@ -5,7 +5,7 @@ package borg.trikeshed.userspace.nio.channels
 // Generated from Amazon Corretto JDK 25 java.base NIO public/protected API via javap.
 // Declarations intentionally mirror JDK taxonomy and contain no implementations.
 public interface MulticastChannel : NetworkChannel {
-    override fun close(): Unit = TODO("NIO common stub")
-    fun join(group: String, networkInterface: String): MembershipKey = TODO("NIO common stub")
-    fun join(group: String, networkInterface: String, source: String): MembershipKey = TODO("NIO common stub")
+    override fun close(): Unit
+    fun join(group: String, networkInterface: String): MembershipKey
+    fun join(group: String, networkInterface: String, source: String): MembershipKey
 }

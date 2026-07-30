@@ -694,7 +694,7 @@ I've also written ideas that describe (some) goals and ideals of the library:
 
 
 * [x] linux-biased Posix IO utils exist for kotlin-common, jvm, and native (linux only)
-    * [ ] IO-Uring has been brought in and many tests ported, but not applied knowledgably as yet nor updated to keep
+    * [x] IO-Uring has been brought in and many tests ported, but not applied knowledgably as yet nor updated to keep
       current with liburing.
 
 

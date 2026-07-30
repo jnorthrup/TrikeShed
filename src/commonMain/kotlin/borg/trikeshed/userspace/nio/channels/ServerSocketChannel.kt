@@ -19,7 +19,7 @@ public abstract class ServerSocketChannel : AbstractSelectableChannel, NetworkCh
     public abstract override fun bind(address: String): ServerSocketChannel
     fun bind(address: String, backlog: Int): ServerSocketChannel = bind(address)
     public abstract override fun <T> setOption(option: String, value: T): ServerSocketChannel
-    fun accept(): SocketChannel = TODO("accept — Channel.accept + submit+wait")
+    public abstract fun accept(): SocketChannel
     public abstract override fun getLocalAddress(): String
 
     companion object {
@@ -58,6 +58,10 @@ internal class UringServerSocketChannel(
     override fun bind(address: String): ServerSocketChannel = this
 
     override fun <T> setOption(option: String, value: T): ServerSocketChannel = this
+    override fun <T> getOption(option: String): T = throw UnsupportedOperationException("options not supported")
+    override fun supportedOptions(): Set<String> = emptySet()
+
+    override fun accept(): SocketChannel = throw UnsupportedOperationException("accept not supported")
 
     override fun getLocalAddress(): String = "0.0.0.0:0"
 
