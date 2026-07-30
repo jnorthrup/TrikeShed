@@ -32,7 +32,7 @@ open class CirQlar<T>(
 
     /*override */  fun offer(e: T): Boolean {
         val i = tail % maxSize
-        val tmp: Any? = evict?.run { al.takeIf { it.size < i }?.get(i) }
+        val tmp: Any? = evict?.run { if (tail >= maxSize) al[i] else null }
         al[i] = e
         if (++tail == 2 * maxSize) tail = maxSize
         tmp?.let { t -> evict?.invoke(t as T) }
