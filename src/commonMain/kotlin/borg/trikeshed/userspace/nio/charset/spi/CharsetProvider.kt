@@ -6,6 +6,6 @@ package borg.trikeshed.userspace.nio.charset.spi
 // Declarations intentionally mirror JDK taxonomy and contain no implementations.
 public abstract class CharsetProvider {
     protected constructor()
-    fun charsets(): Iterator<borg.trikeshed.userspace.nio.charset.Charset> = TODO("NIO common stub")
-    fun charsetForName(p0: String): borg.trikeshed.userspace.nio.charset.Charset = TODO("NIO common stub")
+    abstract fun charsets(): Iterator<borg.trikeshed.userspace.nio.charset.Charset>
+    abstract fun charsetForName(p0: String): borg.trikeshed.userspace.nio.charset.Charset
 }

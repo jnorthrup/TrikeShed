@@ -14,8 +14,8 @@ internal class PlatformCharset private constructor(
     fun contains(other: PlatformCharset): Boolean = this === other
 
     private interface Codec {
-        fun decode(bytes: ByteArray, offset: Int, length: Int): String = TODO("NIO common stub")
-        fun encode(value: String): ByteArray = TODO("NIO common stub")
+        fun decode(bytes: ByteArray, offset: Int, length: Int): String
+        fun encode(value: String): ByteArray
     }
 
     companion object {
