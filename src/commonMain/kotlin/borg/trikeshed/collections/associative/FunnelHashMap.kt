@@ -25,7 +25,7 @@ import borg.trikeshed.job.Sha256Pure
 class FunnelHashMap<K : Any, V>(
     initialCapacity: Int = 16,
     private val slack: Double = 0.25,        // δ — fraction of baseCap kept free
-    private val seed: Long = System.nanoTime()
+    private val seed: Long = 0x9E3779B97F4A7C15UL.toLong(),
 ) {
 
     private data class Level(

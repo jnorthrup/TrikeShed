@@ -2,6 +2,7 @@ package borg.trikeshed.forge.blackboard
 
 import borg.trikeshed.graph.CausalGraphNodeIndex
 import borg.trikeshed.lib.get
+import kotlin.math.ceil
 import kotlin.math.sqrt
 import kotlin.math.max
 
@@ -28,7 +29,7 @@ fun forceLayout(
 
     // A simple grid initialization to break symmetry
     for (i in 0 until size) {
-        val cols = Math.ceil(sqrt(size.toDouble())).toInt()
+        val cols = ceil(sqrt(size.toDouble())).toInt()
         val r = i / cols
         val c = i % cols
         posX[i] = c * 100.0

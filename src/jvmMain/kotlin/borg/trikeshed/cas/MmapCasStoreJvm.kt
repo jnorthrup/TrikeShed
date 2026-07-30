@@ -7,6 +7,7 @@ import java.io.RandomAccessFile
 import java.nio.channels.FileChannel
 import java.nio.MappedByteBuffer
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
 
 class MmapCasStoreJvm(
@@ -15,17 +16,17 @@ class MmapCasStoreJvm(
     blockSize: Int = 4096
 ) {
     private val volume = MmapVolume(file, blockSize)
-    private val store = VolumeCasStore(volume, replicationHook, blockSize)
+    private val store = runBlocking { VolumeCasStore.create(volume, replicationHook, blockSize) }
 
-    fun put(bytes: ByteArray): ContentId = store.put(bytes)
+    suspend fun put(bytes: ByteArray): ContentId = store.put(bytes)
 
-    fun get(cid: ContentId): ByteArray? = store.get(cid)
+    suspend fun get(cid: ContentId): ByteArray? = store.get(cid)
 
     fun delete(cid: ContentId): Boolean = store.delete(cid)
 
     fun manifest(cids: List<ContentId>): CasManifest = store.manifest(cids)
 
-    fun sync() {
+    suspend fun sync() {
         store.sync()
     }
 }
