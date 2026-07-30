@@ -88,34 +88,12 @@ class GapReducer(
         val sourceRoot = File(repoDir, "src")
         val readmeText = readme.readText()
         val now = System.currentTimeMillis()
+        val reducerSource = File(repoDir, "src/jvmMain/kotlin/borg/trikeshed/flywheel/cli/GapReducerCli.kt")
 
-        // ── 1. Compiled-out slab layer (README §0 line 60) ──────────────
-        // "~20 TODO() stubs: GraalJS eval, DuckDB c-interop, FacetedCursorContract,
-        //  MiniDuckContract; files preserved on disk"
-        val slabGaps = scanStubs(File(sourceRoot, "commonMain/kotlin/borg/trikeshed/classfile/slab"))
-        for (stub in slabGaps) {
-            val workId = "gap:slab:${stub.path}"
-            val fileName = stub.path.substringAfterLast('/')
-            gaps.add(Gap(
-                workId = workId,
-                tier = "task",
-                title = "Implement stub: $fileName:${stub.line} ${stub.todoText}",
-                spec = buildSpec(
-                    "Fill the TODO() stub at ${stub.path} (line ${stub.line}).",
-                    "The slab layer is compiled out of commonMain (build.gradle.kts:180) but",
-                    "these contracts define real surfaces (Btrfs ioctls, DuckDB c-interop,",
-                    "FacetedCursor). The stub says: ${stub.todoText}",
-                    "",
-                    "Read the surrounding contract for the expected signature and types.",
-                    "Implement the body so it compiles and the contract is real, not hollow.",
-                    "Source: src/commonMain/kotlin/borg/trikeshed/classfile/slab/${stub.path}"
-                ),
-                parent = "slab",
-                score = 0.3,
-            ))
-        }
+        // The classfile/slab contracts are deliberately excluded from commonMain
+        // (build.gradle.kts:176-180), so they are not dispatchable product work.
 
-        // ── 2. Non-slab TODO() stubs in production code ─────────────────
+        // ── 1. Non-slab TODO() stubs in production code ─────────────────
         val productionDirs = listOf(
             "commonMain/kotlin/borg/trikeshed/cursor",
             "commonMain/kotlin/borg/trikeshed/couch/isam",
@@ -147,16 +125,19 @@ class GapReducer(
             }
         }
 
-        // ── 3. Dead serialization stacks (README §4 + §2 Confix layer) ──
+        // ── 2. Dead serialization stacks (README §4 + §2 Confix layer) ──
         // ConfixSerialFormat.kt exists (293 lines) but has ZERO production callers.
         // README §4 claims "single parser JSON/YAML/CBOR" and @Serializable linkage.
         val confixSerialFile = File(sourceRoot,
             "commonMain/kotlin/borg/trikeshed/parse/confix/ConfixSerialFormat.kt")
-        if (confixSerialFile.exists()) {
-            val hasCallers = grepProduction(sourceRoot,
-                "ConfixSerialFormat|ConfixFormat|ConfixElementEncoder")
-            if (hasCallers.isEmpty()) {
-                gaps.add(Gap(
+        val confixNeedsWiring = confixSerialFile.exists() &&
+            grepProduction(
+                sourceRoot,
+                "ConfixSerialFormat|ConfixFormat|ConfixElementEncoder",
+                excludedFiles = setOf(confixSerialFile, reducerSource),
+            ).isEmpty()
+        if (confixNeedsWiring) {
+            gaps.add(Gap(
                     workId = "gap:hollow:confix-serial-format",
                     tier = "feature",
                     title = "Wire ConfixSerialFormat into the serialization pipeline",
@@ -176,15 +157,18 @@ class GapReducer(
                     ),
                     parent = "confix",
                     score = 0.8,
-                ))
-            }
+            ))
         }
 
-        // ── 4. @Serializable with zero .serializer() calls (inert cost) ─
+        // ── 3. @Serializable with zero .serializer() calls (inert cost) ─
         // 19 files annotate @Serializable, 0 production .serializer() calls.
         // Either wire them through Confix (#3) or remove the annotations.
-        val serializerCallCount = grepProduction(sourceRoot, "\\.serializer\\(\\)").size
-        if (serializerCallCount == 0) {
+        val serializerCallCount = grepProduction(
+            sourceRoot,
+            "\\.serializer\\(\\)",
+            excludedFiles = setOf(reducerSource),
+        ).size
+        if (!confixNeedsWiring && serializerCallCount == 0) {
             gaps.add(Gap(
                 workId = "gap:hollow:serializable-annotations-inert",
                 tier = "chore",
@@ -206,7 +190,7 @@ class GapReducer(
             ))
         }
 
-        // ── 5. README self-declared partials ────────────────────────────
+        // ── 4. README self-declared partials ────────────────────────────
         // §3.4 CouchHeadProjection: "CID-derived _id/_rev not yet implemented"
         if (readmeText.contains("not yet implemented", ignoreCase = true)) {
             val partials = extractReadmePartials(readmeText)
@@ -230,7 +214,7 @@ class GapReducer(
             }
         }
 
-        // ── 6. Open concept checkboxes (README tail) ────────────────────
+        // ── 5. Open concept checkboxes (README tail) ────────────────────
         val openCheckboxes = extractOpenCheckboxes(readmeText)
         for (cb in openCheckboxes) {
             val workId = "gap:checkbox:${cb.slug}"
@@ -275,15 +259,25 @@ class GapReducer(
 
     private val todoPattern = Regex("""TODO\(([^)]*)\)""")
 
-    private fun grepProduction(sourceRoot: File, pattern: String): List<String> {
+    private fun grepProduction(
+        sourceRoot: File,
+        pattern: String,
+        excludedFiles: Set<File> = emptySet(),
+    ): List<String> {
         val cmd = listOf("grep", "-rn", "--include=*.kt", pattern, sourceRoot.absolutePath)
         val proc = ProcessBuilder(cmd).redirectErrorStream(true).start()
         val output = proc.inputStream.bufferedReader().readText()
         proc.waitFor()
-        return output.lines().filter {
-            it.isNotBlank() &&
-            !it.contains("/test/", ignoreCase = true) &&
-            !it.contains("Test.kt", ignoreCase = true)
+        val excludedPaths = excludedFiles.map { it.absolutePath }.toSet()
+        val productionSourceSets = setOf(
+            "commonMain", "jvmMain", "posixMain", "linuxMain", "nativeMain",
+            "macosMain", "jsMain", "wasmJsMain", "androidMain",
+        )
+        return output.lines().filter { line ->
+            val sourcePath = line.substringBefore(':')
+            line.isNotBlank() &&
+                sourcePath !in excludedPaths &&
+                productionSourceSets.any { sourcePath.contains("/$it/") }
         }
     }
 

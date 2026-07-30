@@ -108,6 +108,10 @@ class FlywheelDriver(
     private val noPatchProbes = mutableMapOf<String, Int>()
     /** Consecutive patch-bearing drain failures per session id; never tombstoned. */
     private val drainFailures = mutableMapOf<String, Int>()
+    /** Session-derived work ids are historical fallback identities, not new work
+     * once their corresponding card is already closed. Keep their WAL history
+     * visible while reporting each suppressed requeue only once per process. */
+    private val reportedClosedSessionQueueEntries = mutableSetOf<String>()
 
     /**
      * Record a drain failure on the session card and return [DrainOutcome.Skipped].
@@ -271,8 +275,24 @@ class FlywheelDriver(
                     if (patch != null) inflightFiles += parsePatchFiles(patch)
                 }
             }
-            val pending = store.loadQueue()
+            val pendingCandidates = store.loadQueue()
                 .filter { !it.isDispatched && !it.isDrained }
+            // Older drains predate WorkQueued. A later seed using that fallback
+            // `session:<id>` identity would otherwise submit an already-drained
+            // session as fresh Jules work. A real rework needs a new work id.
+            val closedSessionWorkIds = pendingCandidates.asSequence()
+                .filter { entry ->
+                    entry.workId.startsWith("session:") &&
+                        conductor.cards[entry.workId.removePrefix("session:")]?.drained == true
+                }
+                .map { it.workId }
+                .toSet()
+            val newlyReported = closedSessionWorkIds.count { reportedClosedSessionQueueEntries.add(it) }
+            if (newlyReported != 0) {
+                println("[FLYWHEEL] DISPATCH-SKIP $newlyReported already-closed session queue item(s)")
+            }
+            val pending = pendingCandidates
+                .filterNot { it.workId in closedSessionWorkIds }
                 .sortedByDescending { it.score }
                 .filter { entry ->
                     // Overlap guard: skip if this task's known file scope

@@ -54,6 +54,11 @@ object OroborosDaemon {
     @Volatile
     var isRunning = true
 
+    /** Reference to the live cycle body. Held in a static field so a JVMTI
+     *  agent or external observer can locate it after retransform. */
+    @Volatile
+    var cycleBodyField: CycleBody? = null
+
     fun parseConfig(args: Array<String>): DaemonConfig {
         var watch = true
         var intervalMs = DEFAULT_INTERVAL_MS
@@ -271,6 +276,20 @@ object OroborosDaemon {
             }
         }
 
+        // Hot-swappable cycle body. Same instance, JVM retransforms the class
+        // in place — next call sees new bytecode. Edit CycleBody.kt, rebuild,
+        // agent reloads; loop continues uninterrupted.
+        val cycleBody = CycleBody(
+            driver = driver,
+            repoDir = repoDir,
+            consecutivePollErrors = consecutivePollErrors,
+            pollErrRef = { pollErrOccurred },
+            setPollErr = { pollErrOccurred = it },
+            runCycle = { runCycle() },
+            preflight = { preflight(repoDir, driver) },
+        )
+        cycleBodyField = cycleBody
+
         try {
             val startErrs = pollErrors
             runCycle()
@@ -283,31 +302,23 @@ object OroborosDaemon {
                     val backoffMs = kotlin.math.min(intervalMs * (1L shl kotlin.math.min(errors, 30)), intervalMs * 5)
                     if (errors > 0) System.err.println("[OROBOROS] backoff=${backoffMs}ms consecutiveErrors=$errors")
                     delay(backoffMs)
-                    if (!preflight(repoDir, driver)) {
-                        System.err.println("[OROBOROS] preflight failed; skipping cycle")
-                        consecutivePollErrors.incrementAndGet()
-                        continue
-                    }
-                    pollErrOccurred = false
                     try {
-                        val beforeErrs = pollErrors
-                        runCycle()
-                        // Backoff tracks daemon-level failure only. Per-session
-                        // drain churn (apply-check fails, no-patch probes) is
-                        // routine flywheel telemetry — it already lands in the
-                        // trace as e=N — and must not throttle the wheel.
-                        consecutivePollErrors.set(0)
+                        cycleBody.run()
+                    } catch (t: LinkageError) {
+                        // Botched hot-swap: the retransform produced bytecode
+                        // the JVM can't link against the loaded class
+                        // graph. The Runnable is unrunnable — bail out so the
+                        // supervisor (cron / launchctl) restarts us from a
+                        // known-clean compiled state.
+                        System.err.println("[OROBOROS] CycleBody unlinkable: ${t.javaClass.simpleName}: ${t.message?.take(200)} — bouncing")
+                        isRunning = false
+                        break
                     } catch (t: Throwable) {
-                        // A single cycle's failure (gate timeout, drain
-                        // exception, kill -9 on the gate's children reaching
-                        // the daemon's coroutine scheduler) must not tear
-                        // down the daemon. Log and continue.
-                        System.err.println("[OROBOROS] cycle failed: ${t.javaClass.simpleName}: ${t.message?.take(200)}")
-                    }
-                    if (pollErrOccurred) {
-                        consecutivePollErrors.incrementAndGet()
-                    } else {
-                        consecutivePollErrors.set(0)
+                        // Defense in depth: CycleBody.run is itself wrapped in
+                        // a hard guard, but if anything escapes (NoClassDef,
+                        // AbstractMethodError from a future shape change)
+                        // the daemon loop must survive. Log and continue.
+                        System.err.println("[OROBOROS] cycleBody.run escaped: ${t.javaClass.simpleName}: ${t.message?.take(200)}")
                     }
                 }
             }

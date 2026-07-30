@@ -31,6 +31,8 @@ object FlywheelTui {
         val harvest: Int,
         val land: Int,
         val curate: Int,
+        val closedSessionQueue: Int,
+        val landedSessionIds: Set<String>,
         val sessions: List<JulesRestClient.SessionInfo>,
         val openCodeRunning: Int,
         val codexRunning: Int,
@@ -97,11 +99,24 @@ object FlywheelTui {
         repoDir: File,
         forgeDir: File,
     ): Snapshot {
-        val todo = File(repoDir, "doc/todo.md")
-        val queue = if (todo.exists()) todo.readLines().count { it.matches(Regex("^\\s*- \\[ \\].*")) } else 0
-        val land = runCatching {
-            JulesBoardStore.forForgeDir(forgeDir).load().values.count { it.drained }
-        }.getOrDefault(0)
+        val store = JulesBoardStore.forForgeDir(forgeDir)
+        val board = runCatching { store.load() }.getOrDefault(mutableMapOf())
+        val landedSessionIds = board.values.asSequence()
+            .filter { it.drained }
+            .map { it.snapshot.sessionId }
+            .toSet()
+        val queueEntries = runCatching { store.loadQueue() }.getOrDefault(emptyList())
+        val closedSessionQueue = queueEntries.count { entry ->
+            !entry.isDispatched && !entry.isDrained &&
+                entry.workId.startsWith("session:") &&
+                entry.workId.removePrefix("session:") in landedSessionIds
+        }
+        val queue = queueEntries.count { entry ->
+            !entry.isDispatched && !entry.isDrained &&
+                !(entry.workId.startsWith("session:") &&
+                    entry.workId.removePrefix("session:") in landedSessionIds)
+        }
+        val land = landedSessionIds.size
         val openCodeRunning = processCount("opencode")
         val codexRunning = processCount("codex")
         val openCodeAvailable = executableExists("/opt/homebrew/bin/opencode") || executableOnPath("opencode")
@@ -117,7 +132,9 @@ object FlywheelTui {
             val dispatch = sessions.count { it.state == "QUEUED" || it.state == "PLANNING" || it.state == "AWAITING_PLAN_APPROVAL" }
             val running = sessions.count { it.state == "IN_PROGRESS" }
             val guide = sessions.count { it.state == "AWAITING_USER_FEEDBACK" }
-            val harvest = sessions.count { it.state == "COMPLETED" || it.state == "FINISHED" }
+            val harvest = sessions.count {
+                (it.state == "COMPLETED" || it.state == "FINISHED") && it.id !in landedSessionIds
+            }
             val lowWater = JULES_CAPACITY * 2
             Snapshot(
                 at = System.currentTimeMillis(),
@@ -129,6 +146,8 @@ object FlywheelTui {
                 harvest = harvest,
                 land = land,
                 curate = if (queue < lowWater) 1 else 0,
+                closedSessionQueue = closedSessionQueue,
+                landedSessionIds = landedSessionIds,
                 sessions = sessions,
                 openCodeRunning = openCodeRunning,
                 codexRunning = codexRunning,
@@ -140,6 +159,7 @@ object FlywheelTui {
             Snapshot(
                 at = System.currentTimeMillis(), queue = queue, slice = 0, dispatch = 0,
                 running = 0, guide = 0, harvest = 0, land = land, curate = 0,
+                closedSessionQueue = closedSessionQueue, landedSessionIds = landedSessionIds,
                 sessions = emptyList(), openCodeRunning = openCodeRunning,
                 codexRunning = codexRunning, openCodeAvailable = openCodeAvailable,
                 codexAvailable = codexAvailable, error = t.message ?: t::class.simpleName,
@@ -163,6 +183,9 @@ object FlywheelTui {
         val bar = saturationBar(s.saturation)
         appendLine("OROBOROS FLYWHEEL   SATURATION ${s.occupied}/${s.capacity} ${s.saturation}% $bar")
         appendLine("updated ${Instant.ofEpochMilli(s.at)}${s.error?.let { "   ERROR: $it" } ?: ""}")
+        if (s.closedSessionQueue != 0) {
+            appendLine("WAL: ${s.closedSessionQueue} already-closed session queue item(s) suppressed")
+        }
         appendLine()
         appendLine("                                  ┌──────────────────┐")
         appendLine("                                  │ SLICE / INSIGHT ${padCount(s.slice)}│")
@@ -190,7 +213,7 @@ object FlywheelTui {
         appendLine()
         appendLine("LATEST JULES AGENTS")
         s.sessions.take(10).forEach { session ->
-            appendLine("  jules/${session.id.takeLast(6)}  ${stateLabel(session.state).padEnd(10)}  ${session.title.take(68)}")
+            appendLine("  jules/${session.id.takeLast(6)}  ${stateLabel(session.state, session.id in s.landedSessionIds).padEnd(10)}  ${session.title.take(68)}")
         }
         if (s.sessions.isEmpty()) appendLine("  (none)")
         appendLine()
@@ -209,7 +232,9 @@ object FlywheelTui {
     private fun latest(sessions: List<JulesRestClient.SessionInfo>): String =
         sessions.firstOrNull()?.title?.take(58) ?: "idle"
 
-    private fun stateLabel(state: String): String = when (state) {
+    private fun stateLabel(state: String, landed: Boolean): String {
+        if (landed && (state == "COMPLETED" || state == "FINISHED")) return "LANDED"
+        return when (state) {
         "AWAITING_USER_FEEDBACK" -> "GUIDE"
         "AWAITING_PLAN_APPROVAL" -> "REVIEW"
         "IN_PROGRESS" -> "RUNNING"
@@ -217,6 +242,7 @@ object FlywheelTui {
         "COMPLETED", "FINISHED" -> "HARVEST"
         "FAILED" -> "FAILED"
         else -> state.take(10)
+        }
     }
 
     private fun pulse(active: Int, tick: Int): Char = if (active > 0 && tick % 2 == 0) '●' else ' '
