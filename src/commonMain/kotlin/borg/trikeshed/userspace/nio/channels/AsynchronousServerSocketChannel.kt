@@ -7,16 +7,16 @@ import borg.trikeshed.userspace.nio.channels.spi.AsynchronousChannelProvider
 // Declarations intentionally mirror JDK taxonomy and contain no implementations.
 public abstract class AsynchronousServerSocketChannel {
     protected constructor(provider: AsynchronousChannelProvider)
-    fun provider(): AsynchronousChannelProvider = TODO("NIO common stub")
-    fun bind(address: String): AsynchronousServerSocketChannel = TODO("NIO common stub")
-    fun bind(address: String, backlog: Int): AsynchronousServerSocketChannel = TODO("NIO common stub")
-    fun <T> setOption(option: String, value: T): AsynchronousServerSocketChannel = TODO("NIO common stub")
-    fun <A> accept(attachment: A, handler: CompletionHandler<AsynchronousSocketChannel, in A>): Unit = TODO("NIO common stub")
-    fun accept(): AsynchronousSocketChannel = TODO("NIO common stub")
-    fun getLocalAddress(): String = TODO("NIO common stub")
+    abstract fun provider(): AsynchronousChannelProvider
+    abstract fun bind(address: String): AsynchronousServerSocketChannel
+    abstract fun bind(address: String, backlog: Int): AsynchronousServerSocketChannel
+    abstract fun <T> setOption(option: String, value: T): AsynchronousServerSocketChannel
+    abstract fun <A> accept(attachment: A, handler: CompletionHandler<AsynchronousSocketChannel, in A>): Unit
+    abstract fun accept(): AsynchronousSocketChannel
+    abstract fun getLocalAddress(): String
 
     companion object {
-        fun `open`(group: AsynchronousChannelGroup): AsynchronousServerSocketChannel = TODO("NIO common stub")
-        fun `open`(): AsynchronousServerSocketChannel = TODO("NIO common stub")
+        fun `open`(group: AsynchronousChannelGroup): AsynchronousServerSocketChannel = AsynchronousChannelProvider.provider().openAsynchronousServerSocketChannel(group)
+        fun `open`(): AsynchronousServerSocketChannel = throw UnsupportedOperationException("stub removed")
     }
 }
