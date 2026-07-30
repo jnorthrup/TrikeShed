@@ -13,6 +13,7 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.channels.consumeEach
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
@@ -100,8 +101,9 @@ object JvmMulticastAdapter {
         // unsupported at runtime (some platforms/JVMs), hence runCatching.
         runCatching {
             dc.setOption(StandardSocketOptions.SO_REUSEPORT, true)
+        }.onFailure {
+            dc.setOption(StandardSocketOptions.SO_REUSEADDR, true)
         }
-        dc.setOption(StandardSocketOptions.SO_REUSEADDR, true)
         dc.bind(InetSocketAddress(group.port))
         val ni = group.networkInterface?.let { NetworkInterface.getByName(it) }
             ?: NetworkInterface.getNetworkInterfaces().toList().firstOrNull { it.isUp && it.supportsMulticast() }
@@ -112,18 +114,21 @@ object JvmMulticastAdapter {
         )
         // Read loop on a dedicated dispatcher so we don't block the caller.
         // R04 — owned scope tracked via the handle, NOT leaked.
-        val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+        val rootJob = SupervisorJob()
+        val scope = CoroutineScope(rootJob + Dispatchers.IO)
         val job = scope.launch {
             val buf = ByteBuffer.allocate(2048)
             try {
-                while (true) {
+                while (isActive) {
                     buf.clear()
-                    val sender = dc.receive(buf) ?: continue
-                    buf.flip()
-                    val bytes = ByteArray(buf.remaining())
-                    buf.get(bytes)
-                    runBlocking {
+                    try {
+                        val sender = dc.receive(buf) ?: continue
+                        buf.flip()
+                        val bytes = ByteArray(buf.remaining())
+                        buf.get(bytes)
                         listener.accept(group.protocol, bytes)
+                    } catch (e: Exception) {
+                        break
                     }
                 }
             } finally {
@@ -133,7 +138,7 @@ object JvmMulticastAdapter {
                 runCatching { dc.close() }
             }
         }
-        val handle = MulticastHandle(group, key, dc, job)
+        val handle = MulticastHandle(group, key, dc, rootJob)
         synchronized(liveHandles) { liveHandles.add(handle) }
         return handle
     }
