@@ -540,8 +540,14 @@ button { font: inherit; color: inherit; background: none; border: none; cursor: 
   const REACTOR_LOG_LIMIT = 24;
   const SVG_NS = 'http://www.w3.org/2000/svg';
   const seed = JSON.parse(document.getElementById('forge-seed').textContent);
+
+  function normalizeCamera(c) {
+    c = c || {};
+    return { x: c.x||0, y: c.y||0, zoom: c.zoom||1, tilt: c.tilt||0, vx: c.vx||0, vy: c.vy||0, vz: c.vz||0, minZoom: c.minZoom||0.45, maxZoom: c.maxZoom||3.2 };
+  }
+
   let state = loadState();
-  let camera = normalizeCamera(state.spatial.camera);
+  let camera = normalizeCamera(state.spatial && state.spatial.camera);
   let dragCamera = null;
   let cameraAnimationFrame = null;
   let cameraFrameTimestamp = 0;
