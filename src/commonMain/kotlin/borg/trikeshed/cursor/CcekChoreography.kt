@@ -2,7 +2,11 @@ package borg.trikeshed.cursor
 
 import borg.trikeshed.lib.Series
 import borg.trikeshed.lib.Join
+import borg.trikeshed.lib.emptySeriesOf
 import borg.trikeshed.userspace.nio.spi.NioSupervisor
+import borg.trikeshed.blackboard.BlackboardSurface
+import borg.trikeshed.parse.confix.confixDoc
+import borg.trikeshed.parse.json.JsonSupport
 
 // ==================== LCNC FACET HANDLES ====================
 
@@ -69,10 +73,10 @@ sealed class WtkHint {
  * LCNC facet group — groups cursor facets for batch processing.
  */
 data class LcncFacetGroup(
-    val logicFacets: Series<Any?> = emptySeries(),
-    val computationFacets: Series<Any?> = emptySeries(),
-    val notificationFacets: Series<Any?> = emptySeries(),
-    val couplingFacets: Series<Any?> = emptySeries(),
+    val logicFacets: Series<Any?> = emptySeriesOf(),
+    val computationFacets: Series<Any?> = emptySeriesOf(),
+    val notificationFacets: Series<Any?> = emptySeriesOf(),
+    val couplingFacets: Series<Any?> = emptySeriesOf(),
     val layoutHint: LayoutHint = LayoutHint.None,
     val dagCoordinate: DagCoordinate? = null,
     val wtkHint: WtkHint? = null
@@ -92,19 +96,17 @@ typealias ResponseCursor = Cursor
 
 /**
  * Convert a generated request to a request cursor.
- * TODO: implement when request cursor choreography is needed.
  */
-fun convertRequestToCursor(request: Any?): RequestCursor = TODO(
-    "convertRequestToCursor: Stage 2 decision — implement when request cursor choreography is needed"
-)
+fun convertRequestToCursor(request: Any?): RequestCursor {
+    val json = JsonSupport.stringify(request)
+    val doc = confixDoc(json)
+    return BlackboardSurface.project("request", borg.trikeshed.graph.CausalGraphNodeIndex(), doc, emptyList()).asCursor()
+}
 
 /**
  * Convert a response cursor to an HTTP response.
- * TODO: implement when response cursor choreography is needed.
  */
-fun convertCursorToResponse(responseCursor: ResponseCursor): Any? = TODO(
-    "convertCursorToResponse: Stage 2 decision — implement when response cursor choreography is needed"
-)
+fun convertCursorToResponse(responseCursor: ResponseCursor): Any? = JsonSupport.stringify(responseCursor)
 
 // ==================== SUPERVISOR SCAFFOLD CONTRACT ====================
 
@@ -143,10 +145,3 @@ fun kotlin.coroutines.CoroutineContext.getOrCreateNioSupervisor(): NioSupervisor
     }
 }
 
-// ==================== HELPER FUNCTIONS ====================
-
-private fun <T> emptySeries(): Series<T> =
-    object : Join<Int, (Int) -> T> {
-        override val a: Int get() = 0
-        override val b: (Int) -> T get() = { _: Int -> throw IndexOutOfBoundsException("Empty series") }
-    }
