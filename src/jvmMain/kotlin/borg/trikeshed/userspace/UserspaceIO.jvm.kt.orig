@@ -237,10 +237,8 @@ actual fun openUserspaceChannelBackend(entries: Int): UserspaceChannelBackend =
     JvmUserspaceChannelBackend()
 
 private fun ByteBuffer.arrayAddress(): Long = java.nio.ByteBuffer.wrap(array(), arrayOffset(), capacity())
-    .let { wrapper ->
-        java.nio.Buffer::class.java.getDeclaredField("address").apply { isAccessible = true }
-            .getLong(wrapper)
-    }
+    .let { java.lang.reflect.Field::class.java.getDeclaredField("address").apply { isAccessible = true } }
+    .run { getLong(this) }
 // ^ Note: In real impl, use JNR/Unsafe/foreign.MemorySegment to get native address
 
 private fun ByteBuffer.toNioByteBuffer(): java.nio.ByteBuffer {

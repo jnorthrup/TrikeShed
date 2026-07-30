@@ -36,7 +36,7 @@ class JvmIsamDataReader(
         val primaryGname = columnsByGroup.entries.firstOrNull { entry ->
             entry.value.first().groupId == maxGroupId
         }?.key ?: "0"
-        
+
         primaryGname
     }
 
@@ -60,9 +60,9 @@ class JvmIsamDataReader(
             val file = groupFiles[gname]!!
             val groupRecordLen = cols.sumOf { it.end - it.begin }
             val nioBuf = java.nio.ByteBuffer.allocateDirect(groupRecordLen)
-            
+
             val addr = nioBuf.let { java.nio.Buffer::class.java.getDeclaredField("address").apply { isAccessible = true } }.run { getLong(nioBuf) }
-            
+
             val wrapperBuf = borg.trikeshed.userspace.nio.ByteBuffer(nioBuf.array()) // Fake wrapper for compat
             submissions.add(borg.trikeshed.userspace.UringOp.Companion.Submissions.read(
                 fd = file.id,
@@ -71,7 +71,7 @@ class JvmIsamDataReader(
                 offset = row * groupRecordLen.toLong(),
                 userData = userData++
             ).copy(buffer = wrapperBuf))
-            
+
             gnames.add(gname)
             nioBufs.add(nioBuf)
         }
@@ -99,7 +99,7 @@ class JvmIsamDataReader(
 
     override fun open() {
         metafile.open()
-        
+
         for (gname in columnsByGroup.keys) {
             val cols = columnsByGroup[gname]!!
             val firstCol = cols.first()
@@ -154,7 +154,7 @@ class JvmIsamOperations : IsamOperations {
             } else {
                 getGroupFilename(datafilename, gname)
             }
-            
+
             groupFiles[gname] = UserspaceFiles.open(gfilename, readOnly = false)
             offsets[gname] = 0L
 
@@ -173,21 +173,21 @@ class JvmIsamOperations : IsamOperations {
 
         cursor.iterator().forEach { rowVec ->
             val submissions = mutableListOf<borg.trikeshed.userspace.UringOp.Companion.UringSubmission>()
-            
+
             for ((gname, cols) in columnsByGroup) {
                 val groupRecordLen = cols.sumOf { it.end - it.begin }
                 val rowBuffer = groupRowBuffers[gname]!!
                 val nioBuf = groupNioBufs[gname]!!
                 val addr = groupAddrs[gname]!!
-                
+
                 writeGroupToBuffer(rowVec, rowBuffer, cols, meta0)
-                
+
                 nioBuf.clear()
                 nioBuf.put(rowBuffer)
                 nioBuf.flip()
-                
+
                 val file = groupFiles[gname]!!
-                
+
                 val currentOffset = offsets[gname]!!
                 submissions.add(borg.trikeshed.userspace.UringOp.Companion.Submissions.write(
                     fd = file.id,
@@ -195,7 +195,7 @@ class JvmIsamOperations : IsamOperations {
                     len = groupRecordLen,
                     offset = currentOffset,
                     userData = userData++
-                ).copy(buffer = borg.trikeshed.userspace.nio.ByteBuffer(rowBuffer)))
+                ).copy(buffer = borg.trikeshed.userspace.nio.ByteBuffer(rowBuffer.clone())))
                 offsets[gname] = currentOffset + groupRecordLen
             }
             backend.submitBatch(submissions)
@@ -217,7 +217,7 @@ class JvmIsamOperations : IsamOperations {
 
         var columnsByGroup: Map<String, List<RecordMeta>> = emptyMap()
         var maxGroupId = 0
-        
+
         val groupFiles = mutableMapOf<String, UserspaceFile>()
         val offsets = mutableMapOf<String, Long>()
         val groupRowBuffers = mutableMapOf<String, ByteArray>()
@@ -263,15 +263,15 @@ class JvmIsamOperations : IsamOperations {
                 val rowBuffer = groupRowBuffers[gname]!!
                 val nioBuf = groupNioBufs[gname]!!
                 val addr = groupAddrs[gname]!!
-                
+
                 writeGroupToBuffer(rowVec, rowBuffer, cols, meta0)
-                
+
                 nioBuf.clear()
                 nioBuf.put(rowBuffer)
                 nioBuf.flip()
-                
+
                 val file = groupFiles[gname]!!
-                
+
                 val currentOffset = offsets[gname]!!
                 submissions.add(Submissions.write(
                     fd = file.id,
