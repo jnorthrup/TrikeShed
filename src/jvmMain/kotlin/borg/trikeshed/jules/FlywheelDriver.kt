@@ -963,6 +963,9 @@ class FlywheelDriver(
             return false
         }
         if (openCount != 0) println("[FLYWHEEL] SETTLE-NOTED $openCount open PR(s); branch intake remains non-gating")
+        
+        borg.trikeshed.util.oroboros.FlywheelHistoryReaper.reapOldTags(repoDir)
+        
         return true
     }
 

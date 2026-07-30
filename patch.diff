@@ -1,0 +1,22 @@
+<<<<<<< SEARCH
+        val unclaimedDrains = store.loadQueue().count { it.isUnclaimedDrain }
+        if (unclaimedDrains != 0) {
+            println("[FLYWHEEL] SETTLE-BLOCKED $unclaimedDrains queue drain(s) lack immutable receipts")
+            return false
+        }
+        if (openCount != 0) println("[FLYWHEEL] SETTLE-NOTED $openCount open PR(s); branch intake remains non-gating")
+        return true
+    }
+=======
+        val unclaimedDrains = store.loadQueue().count { it.isUnclaimedDrain }
+        if (unclaimedDrains != 0) {
+            println("[FLYWHEEL] SETTLE-BLOCKED $unclaimedDrains queue drain(s) lack immutable receipts")
+            return false
+        }
+        if (openCount != 0) println("[FLYWHEEL] SETTLE-NOTED $openCount open PR(s); branch intake remains non-gating")
+        
+        borg.trikeshed.util.oroboros.FlywheelHistoryReaper.reapOldTags(repoDir)
+        
+        return true
+    }
+>>>>>>> REPLACE
