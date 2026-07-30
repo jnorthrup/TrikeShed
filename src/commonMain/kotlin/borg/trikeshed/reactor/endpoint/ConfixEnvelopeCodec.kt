@@ -136,10 +136,10 @@ class ConfixEnvelopeCodec(private val config: ReactorEndpointConfig = ReactorEnd
     }
 
     private fun hexCharToNibble(c: Char): Int = when (c) {
-        in '0'..'9' -> c - '0'
-        in 'a'..'f' -> c - 'a' + 10
-        in 'A'..'F' -> c - 'A' + 10
-        else -> 0
+        in '0'..'9' -> c.code - '0'.code
+        in 'a'..'f' -> c.code - 'a'.code + 10
+        in 'A'..'F' -> c.code - 'A'.code + 10
+        else -> throw IllegalArgumentException("Invalid hex digit: $c")
     }
 
     private fun writeInt(bytes: ByteArray, offset: Int, value: Int) {
