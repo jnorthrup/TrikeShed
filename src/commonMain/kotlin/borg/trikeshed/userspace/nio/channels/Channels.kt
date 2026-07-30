@@ -10,17 +10,17 @@ import borg.trikeshed.userspace.nio.charset.CharsetEncoder
 // Coerced to TrikeShed types — InputStream/OutputStream return types simplified to Any.
 public class Channels {
     companion object {
-        fun newInputStreamForReadable(channel: ReadableByteChannel): Any = TODO("NIO common stub")
-        fun newOutputStreamForWritable(channel: WritableByteChannel): Any = TODO("NIO common stub")
-        fun newInputStreamForAsync(channel: AsynchronousByteChannel): Any = TODO("NIO common stub")
-        fun newOutputStreamForAsync(channel: AsynchronousByteChannel): Any = TODO("NIO common stub")
-        fun newReadableChannel(input: Any): ReadableByteChannel = TODO("NIO common stub")
-        fun newWritableChannel(output: Any): WritableByteChannel = TODO("NIO common stub")
-        fun newReader(channel: ReadableByteChannel, decoder: CharsetDecoder, minBufferCap: Int): Any = TODO("NIO common stub")
-        fun newReaderForCharset(channel: ReadableByteChannel, charsetName: String): Any = TODO("NIO common stub")
-        fun newReaderForDecoder(channel: ReadableByteChannel, charset: Charset): Any = TODO("NIO common stub")
-        fun newWriter(channel: WritableByteChannel, encoder: CharsetEncoder, minBufferCap: Int): Any = TODO("NIO common stub")
-        fun newWriterForCharset(channel: WritableByteChannel, charsetName: String): Any = TODO("NIO common stub")
-        fun newWriterForEncoder(channel: WritableByteChannel, charset: Charset): Any = TODO("NIO common stub")
+        fun newInputStreamForReadable(channel: ReadableByteChannel): Any = throw UnsupportedOperationException("Channels operations are not supported in commonMain")
+        fun newOutputStreamForWritable(channel: WritableByteChannel): Any = throw UnsupportedOperationException("Channels operations are not supported in commonMain")
+        fun newInputStreamForAsync(channel: AsynchronousByteChannel): Any = throw UnsupportedOperationException("Channels operations are not supported in commonMain")
+        fun newOutputStreamForAsync(channel: AsynchronousByteChannel): Any = throw UnsupportedOperationException("Channels operations are not supported in commonMain")
+        fun newReadableChannel(input: Any): ReadableByteChannel = throw UnsupportedOperationException("Channels operations are not supported in commonMain")
+        fun newWritableChannel(output: Any): WritableByteChannel = throw UnsupportedOperationException("Channels operations are not supported in commonMain")
+        fun newReader(channel: ReadableByteChannel, decoder: CharsetDecoder, minBufferCap: Int): Any = throw UnsupportedOperationException("Channels operations are not supported in commonMain")
+        fun newReaderForCharset(channel: ReadableByteChannel, charsetName: String): Any = throw UnsupportedOperationException("Channels operations are not supported in commonMain")
+        fun newReaderForDecoder(channel: ReadableByteChannel, charset: Charset): Any = throw UnsupportedOperationException("Channels operations are not supported in commonMain")
+        fun newWriter(channel: WritableByteChannel, encoder: CharsetEncoder, minBufferCap: Int): Any = throw UnsupportedOperationException("Channels operations are not supported in commonMain")
+        fun newWriterForCharset(channel: WritableByteChannel, charsetName: String): Any = throw UnsupportedOperationException("Channels operations are not supported in commonMain")
+        fun newWriterForEncoder(channel: WritableByteChannel, charset: Charset): Any = throw UnsupportedOperationException("Channels operations are not supported in commonMain")
     }
 }

@@ -1,13 +1,23 @@
-1. **Add `@Volatile var isRunning = true` to `OroborosDaemon`**
-   - This flag will be checked in the `while` loop instead of `while(true)`
-2. **Wire up `sun.misc.Signal` handlers**
-   - In `main()`, after `driver` is initialized, wire up signal handlers for "TERM" and "INT".
-   - The handlers will call `driver.close()` and set `isRunning = false`.
-3. **Refactor the `while (true)` loop**
-   - Change `while (true)` to `while (isRunning)`.
-4. **Create a test file `OroborosDaemonShutdownTest.kt`**
-   - This test should verify that a `SIGTERM` handler is registered and triggers a fast shutdown (less than 2s).
-5. **Run tests**
-   - Specifically run `./gradlew jvmTest --tests "*OroborosDaemonShutdownTest" --no-daemon`.
-6. **Pre-commit checks**
-   - Complete pre commit steps to make sure proper testing, verifications, reviews and reflections are done.
+1. **Fix `Channel.kt`**:
+   - Remove `TODO()` stubs from the `Channel` interface methods (`isOpen` and `close`) making them purely abstract.
+
+2. **Fix `Channels.kt`**:
+   - Replace `TODO("NIO common stub")` implementations in `Channels.companion object` with `throw UnsupportedOperationException("Channels operations are not supported in commonMain")` to properly stub out the static methods.
+
+3. **Fix `GatheringByteChannel.kt`**:
+   - Remove `TODO()` stubs from the `GatheringByteChannel` interface methods (`write`) making them purely abstract.
+
+4. **Fix `InterruptibleChannel.kt`**:
+   - Remove the `TODO()` stub from `InterruptibleChannel.close()` making it purely abstract.
+
+5. **Fix `ReadableByteChannel.kt`**:
+   - Remove the `TODO()` stub from `ReadableByteChannel.read()` making it purely abstract.
+
+6. **Fix `ScatteringByteChannel.kt`**:
+   - Remove the `TODO()` stub from `ScatteringByteChannel.read()` making it purely abstract.
+
+7. **Test Compilation**:
+   - Use `run_in_bash_session` to execute `./gradlew :jvmMainClasses --no-daemon` to ensure compilation is unbroken.
+
+8. **Pre-commit**:
+   - Complete pre-commit steps to ensure proper testing, verification, review, and reflection are done.
