@@ -93,6 +93,10 @@ sealed class KanbanEvent {
     /** Event when a dispatch fires. */
     @Serializable
     data class DispatchFired(val sessionId: String, val title: String, override val timestampMs: Long) : KanbanEvent()
+
+    /** Slash command dispatched from the UI. */
+    @Serializable
+    data class SlashCommandDispatched(val command: String, override val timestampMs: Long) : KanbanEvent()
 }
 
 /**
@@ -124,6 +128,8 @@ data class KanbanState(
     val dispatchedCount: Int = 0,
     val aliveSlots: Int = 0,
     val availableSlots: Int = 0,
+    val slashCommandCount: Int = 0,
+    val lastSlashCommand: String = "",
 )
 
 /**
@@ -224,6 +230,12 @@ object KanbanFSM {
             is KanbanEvent.DispatchFired -> prior.copy(
                 dispatchedCount = prior.dispatchedCount + 1,
                 lastEventKind = "DispatchFired",
+                lastEventTimestampMs = event.timestampMs,
+            )
+            is KanbanEvent.SlashCommandDispatched -> prior.copy(
+                slashCommandCount = prior.slashCommandCount + 1,
+                lastSlashCommand = event.command,
+                lastEventKind = "SlashCommandDispatched",
                 lastEventTimestampMs = event.timestampMs,
             )
         }

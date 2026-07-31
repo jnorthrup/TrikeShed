@@ -86,7 +86,12 @@ object ForgeBoardFSM {
 
             is ForgeBoardEvent.CardMoved -> {
                 val board = prior.boards[event.boardId] ?: return prior
-                val newBoard = board.moveCard(event.cardId, event.toColumnId)
+                val maxOrder = board.cards.filter { it.columnId == event.toColumnId }.maxOfOrNull { it.order } ?: -1
+                val newCards = board.cards.map { card ->
+                    if (card.id == event.cardId) card.copy(columnId = event.toColumnId, order = maxOrder + 1, updatedAt = event.timestampMs)
+                    else card
+                }
+                val newBoard = board.copy(cards = newCards)
                 prior.copy(
                     boards = prior.boards + (event.boardId to newBoard),
                     lastEventKind = "CardMoved",
@@ -153,7 +158,19 @@ object ForgeBoardFSM {
             is ForgeBoardEvent.DragDropped -> {
                 val drag = prior.dragState ?: return prior
                 val board = prior.boards[drag.boardId] ?: return prior
-                val newBoard = board.moveCard(drag.cardId, drag.overColumnId ?: drag.fromColumnId)
+                val targetCol = drag.overColumnId ?: drag.fromColumnId
+                
+                val newCards = if (drag.overColumnId == null || drag.overColumnId == drag.fromColumnId) {
+                    board.cards // Aborted drag or same column, keep original order
+                } else {
+                    val maxOrder = board.cards.filter { it.columnId == targetCol }.maxOfOrNull { it.order } ?: -1
+                    board.cards.map { card ->
+                        if (card.id == drag.cardId) card.copy(columnId = targetCol, order = maxOrder + 1, updatedAt = event.timestampMs)
+                        else card
+                    }
+                }
+                
+                val newBoard = board.copy(cards = newCards)
                 prior.copy(
                     boards = prior.boards + (drag.boardId to newBoard),
                     dragState = null,
@@ -165,6 +182,11 @@ object ForgeBoardFSM {
             is ForgeBoardEvent.DragCancelled -> prior.copy(
                 dragState = null,
                 lastEventKind = "DragCancelled",
+                lastEventMs = event.timestampMs,
+            )
+
+            is ForgeBoardEvent.SlashCommandDispatched -> prior.copy(
+                lastEventKind = "SlashCommandDispatched",
                 lastEventMs = event.timestampMs,
             )
         }
@@ -308,6 +330,11 @@ sealed class ForgeBoardEvent {
     ) : ForgeBoardEvent()
 
     @Serializable data class DragCancelled(
+        override val timestampMs: Long,
+    ) : ForgeBoardEvent()
+
+    @Serializable data class SlashCommandDispatched(
+        val command: String,
         override val timestampMs: Long,
     ) : ForgeBoardEvent()
 }
