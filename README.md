@@ -719,13 +719,13 @@ I've also written ideas that describe (some) goals and ideals of the library:
 
 * [x] ISAM Columnar Dataframes Storage @see http://github.com/jnorthrup/columnar
     - now with a native port. the jvm rewrite of columnar is also a full rewrite, streamlined and simplified.
-    - the kotlin-native isam is linux-posix-64bit specific mmap code.
+    - the kotlin-native ISAM uses linux mmap with readonly memory, compatible with macOS posix until liburing integration.
     - the columnar project has a lot more bells and whistles and is battle hardened
-    - the default construction of an ISAM volume are tested to be correct in a single threaded environment
-        - [x] the jvm version employs a lock-seek-reed-unlock strategy
+    - the default construction of an IsamVolume are tested to be correct in a single threaded environment
+        - [x] the JVM version employs a lock-seek-read-unlock strategy
         - [x] the native version uses [linux] `mmap` with readonly memory.
-            - [x] in practice this is copmatible with macos posix until you look into liburing integration, so the uring
-              attempt was made a seperate linux-only class from the IsamVolume
+            - [x] in practice this is compatible with macOS posix until you look into liburing integration, so the uring
+              attempt was made a separate linux-only class from the IsamVolume
             - [ ] the posix code holds up well under mingw however the mmap calls are significantly different so this
               may warrant a seperate lock-seek-read-unlock strategy for windows, or someone with ambition to port the
               mmap calls

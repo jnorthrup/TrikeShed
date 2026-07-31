@@ -308,3 +308,5 @@ class JvmIsamOperations : IsamOperations {
 }
 
 actual fun defaultIsamOperations(): IsamOperations = JvmIsamOperations()
+
+

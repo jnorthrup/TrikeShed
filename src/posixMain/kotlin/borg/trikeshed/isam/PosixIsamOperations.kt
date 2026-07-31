@@ -232,3 +232,5 @@ class PosixIsamOperations : IsamOperations {
 }
 
 actual fun defaultIsamOperations(): IsamOperations = PosixIsamOperations()
+
+
