@@ -184,7 +184,7 @@ class ModelMux internal constructor(
 
             val htx = currentCoroutineContext()[HtxKey] ?: throw IllegalStateException("No HtxKey found in coroutine context")
             val url = "${session.baseUrl}/chat/completions"
-            val htxHeaders = htxHeaders(*meta.b.b.toList().map { it.a j it.b }.toTypedArray())
+            val htxHeaders = htxHeaders(*meta.b.b.toArray())
             val htxReq = parseHtxRequest(
                 url = url,
                 method = HtxMethod.POST,
@@ -258,7 +258,7 @@ class ModelMux internal constructor(
             val json = AcpCodec.encodeRequest(req)
             val htx = currentCoroutineContext()[HtxKey] ?: error("No HtxKey found in coroutine context")
             val url = "${session.baseUrl}/chat/completions"
-            val htxHeaders = htxHeaders(*meta.b.b.toList().map { it.a j it.b }.toTypedArray())
+            val htxHeaders = htxHeaders(*meta.b.b.toArray())
             val htxReq = parseHtxRequest(
                 url = url,
                 method = HtxMethod.POST,
@@ -312,7 +312,7 @@ class ModelMux internal constructor(
 
             val htx = currentCoroutineContext()[HtxKey] ?: error("No HtxKey found in coroutine context")
             val url = "${session.baseUrl}/embeddings"
-            val htxHeaders = htxHeaders(*meta.b.b.toList().map { it.a j it.b }.toTypedArray())
+            val htxHeaders = htxHeaders(*meta.b.b.toArray())
             val htxReq = parseHtxRequest(
                 url = url,
                 method = HtxMethod.POST,
