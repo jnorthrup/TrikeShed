@@ -1,0 +1,7 @@
+<<<<<<< SEARCH
+        for (he in hashIndexes) snap.registerHash(MultiIndexK.ByHash(he.extractor))
+        for (nhe in nonUniqueHashIndexes) snap.registerNonUniqueHash(MultiIndexK.ByNonUniqueHash(nhe.extractor))
+=======
+        for (he in hashIndexes) snap.registerHash(MultiIndexK.ByHash(he.extractor as (Any?) -> Any))
+        for (nhe in nonUniqueHashIndexes) snap.registerNonUniqueHash(MultiIndexK.ByNonUniqueHash(nhe.extractor as (Any?) -> Any))
+>>>>>>> REPLACE
