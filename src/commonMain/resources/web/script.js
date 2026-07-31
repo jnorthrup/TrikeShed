@@ -10,9 +10,14 @@
   // ── Seed + persistence ──────────────────────────────────────────────
   const seedEl = document.getElementById('forge-seed');
   let seed = {};
-  try { seed = JSON.parse(seedEl ? seedEl.textContent : '{}'); } catch (e) { seed = {}; }
+  try { 
+      const rawSeed = seedEl ? seedEl.textContent : '{}';
+      seed = (typeof parseForge === 'function') ? parseForge(rawSeed) : JSON.parse(rawSeed); 
+  } catch (e) { seed = {}; }
 
   const LS_KEY = 'forge.workspace.v2';
+  const BOARD_SEED_KEY = 'forge:seed:board';
+  const CAUSAL_SEED_KEY = 'forge:seed:causal';
 
   function uid() {
     return 'b' + Math.random().toString(36).slice(2, 10) + Date.now().toString(36).slice(-4);
@@ -74,20 +79,47 @@
   }
 
   function loadState() {
+    let loaded = null;
     try {
       const raw = localStorage.getItem(LS_KEY);
       if (raw) {
-        const parsed = JSON.parse(raw);
-        if (parsed && Array.isArray(parsed.pages) && parsed.pages.length) return parsed;
+        const parsed = (typeof parseForge === 'function') ? parseForge(raw) : JSON.parse(raw);
+        if (parsed && Array.isArray(parsed.pages) && parsed.pages.length) loaded = parsed;
       }
     } catch (e) { /* fall through to default */ }
-    return defaultState();
+    
+    loaded = loaded || defaultState();
+    
+    try {
+      const boardStr = localStorage.getItem(BOARD_SEED_KEY);
+      if (boardStr) {
+          const board = (typeof parseForge === 'function') ? parseForge(boardStr) : JSON.parse(boardStr);
+          if (board.cards && Array.isArray(board.cards)) {
+              loaded.board.cards = board.cards;
+          }
+      }
+    } catch (e) { console.error('Failed to load namespaced seed', e); }
+    
+    return loaded;
   }
 
   let state = loadState();
 
   function saveState() {
-    try { localStorage.setItem(LS_KEY, JSON.stringify(state)); } catch (e) { /* quota */ }
+    try { 
+        const stateStr = (typeof stringifyForge === 'function') ? stringifyForge(state) : JSON.stringify(state);
+        localStorage.setItem(LS_KEY, stateStr); 
+        
+        if (state.board && state.board.cards) {
+            const boardStr = (typeof stringifyForge === 'function') ? stringifyForge({ cards: state.board.cards }) : JSON.stringify({ cards: state.board.cards });
+            localStorage.setItem(BOARD_SEED_KEY, boardStr);
+        }
+        
+        if (seed.causalGraph) {
+            const causalStr = (typeof stringifyForge === 'function') ? stringifyForge(seed.causalGraph) : JSON.stringify(seed.causalGraph);
+            localStorage.setItem(CAUSAL_SEED_KEY, causalStr);
+        }
+    } catch (e) { /* quota */ }
   }
 
   // ── Command Queue ───────────────────────────────────────────────────
