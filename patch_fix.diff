@@ -1,0 +1,44 @@
+<<<<<<< SEARCH
+    private fun toCanonical(item: Item): Item = when (item) {
+        is Item.Map -> {
+            val pairs = mutableListOf<Pair<String, Item>>()
+            for (i in 0 until item.size) {
+                val e = item.entries.b(i)
+                pairs.add(e.a to toCanonical(e.b))
+            }
+            pairs.sortBy { it.first }
+            itemMapOf(*pairs.toTypedArray())
+        }
+        is Item.Arr -> {
+            val arr = mutableListOf<Item>()
+            for (i in 0 until item.size) {
+                arr.add(toCanonical(item[i]))
+            }
+            itemArrayOf(arr)
+        }
+        is Item.Tag -> Item.Tag(item.tag, toCanonical(item.item))
+        else -> item
+    }
+=======
+    private fun toCanonical(item: Item): Item = when (item) {
+        is Item.Map -> {
+            val k = item.keys()
+            val v = item.values()
+            val pairs = mutableListOf<Pair<String, Item>>()
+            for (idx in 0 until item.size) {
+                pairs.add(k[idx] to toCanonical(v[idx]))
+            }
+            pairs.sortBy { it.first }
+            itemMapOf(*pairs.toTypedArray())
+        }
+        is Item.Arr -> {
+            val arr = mutableListOf<Item>()
+            for (idx in 0 until item.size) {
+                arr.add(toCanonical(item[idx]))
+            }
+            itemArrayOf(arr)
+        }
+        is Item.Tag -> Item.Tag(item.tag, toCanonical(item.item))
+        else -> item
+    }
+>>>>>>> REPLACE

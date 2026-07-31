@@ -203,12 +203,32 @@ object CanonicalCbor {
         return encodeSortedMap(fields)
     }
 
+    private fun toCanonical(item: Item): Item = when (item) {
+        is Item.Map -> {
+            val k = item.keys()
+            val v = item.values()
+            val pairs = mutableListOf<Pair<String, Item>>()
+            for (idx in 0 until item.size) {
+                pairs.add(k[idx] to toCanonical(v[idx]))
+            }
+            pairs.sortBy { it.first }
+            itemMapOf(*pairs.toTypedArray())
+        }
+        is Item.Arr -> {
+            val arr = mutableListOf<Item>()
+            for (idx in 0 until item.size) {
+                arr.add(toCanonical(item[idx]))
+            }
+            itemArrayOf(arr)
+        }
+        is Item.Tag -> Item.Tag(item.tag, toCanonical(item.item))
+        else -> item
+    }
+
     private fun encodeSortedMap(fields: Map<String, Any?>): ByteArray {
-        val sorted = fields.entries.sortedBy { it.key }
-        // Build Item.Map with sorted keys for canonical CBOR
-        val pairs = sorted.map { it.key to it.value.toItem() }
-        val map = itemMapOf(*pairs.toTypedArray())
-        return Cbor.encode(map)
+        val pairs = fields.entries.map { it.key to toCanonical(it.value.toItem()) }.toTypedArray()
+        val sortedPairs = pairs.sortedBy { it.first }.toTypedArray()
+        return Cbor.encode(itemMapOf(*sortedPairs))
     }
 }
 
