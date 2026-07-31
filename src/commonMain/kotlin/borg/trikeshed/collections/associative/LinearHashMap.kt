@@ -25,8 +25,19 @@ abstract class OpenAddressingMap<K : Any, V, IK : Any>(
 
     // ─── sentinel markers (target-stable across JVM/JS/Wasm) ───
     companion object {
+        protected const val MAX_PROBES = 32
         protected val DELETED = Any()
         protected val ABSENT  = Any()
+
+        protected fun mix(hash: Int): Int {
+            var h = hash
+            h = h xor (h ushr 16)
+            h *= 0x85ebca6b.toInt()
+            h = h xor (h ushr 13)
+            h *= 0xc2b2ae35.toInt()
+            h = h xor (h ushr 16)
+            return h
+        }
 
         protected fun nextPowerOfTwo(n: Int): Int {
             var p = 1
@@ -56,10 +67,10 @@ abstract class OpenAddressingMap<K : Any, V, IK : Any>(
     operator fun set(key: K, value: V): V? {
         if (size + tombstones >= capacity ushr 1) resize()
         val ik = makeInternalKey(key)
-        val hash = internalKeyHash(ik)
+        val hash = mix(internalKeyHash(ik))
         var firstTomb = -1
         var i = 0
-        while (i <= capacity) {
+        while (i < MAX_PROBES) {
             val slot = triangularProbe(hash, i, capacity)
             val k = keys[slot]
             when {
@@ -83,15 +94,14 @@ abstract class OpenAddressingMap<K : Any, V, IK : Any>(
             }
             i++
         }
-        resize()
-        return set(key, value)
+        throw IllegalStateException("LinearHashMap set() exhausted: probes=$MAX_PROBES size=$size hash=${key.hashCode()}")
     }
 
     operator fun get(key: K): V? {
         val ik = makeInternalKey(key)
-        val hash = internalKeyHash(ik)
+        val hash = mix(internalKeyHash(ik))
         var i = 0
-        while (i <= capacity) {
+        while (i < MAX_PROBES) {
             val slot = triangularProbe(hash, i, capacity)
             val k = keys[slot]
             when {
@@ -107,9 +117,9 @@ abstract class OpenAddressingMap<K : Any, V, IK : Any>(
 
     fun remove(key: K): V? {
         val ik = makeInternalKey(key)
-        val hash = internalKeyHash(ik)
+        val hash = mix(internalKeyHash(ik))
         var i = 0
-        while (i <= capacity) {
+        while (i < MAX_PROBES) {
             val slot = triangularProbe(hash, i, capacity)
             val k = keys[slot]
             when {
@@ -156,7 +166,9 @@ abstract class OpenAddressingMap<K : Any, V, IK : Any>(
         for (s in 0 until oldCap) {
             val k = oldKeys[s]
             if (!isAbsent(k) && !isDeleted(k)) {
-                set(extractUserKey(k as IK), oldValues[s] as V)
+                val userKey = extractUserKey(k as IK)
+                val oldVal = oldValues[s] as V
+                set(userKey, oldVal)
             }
         }
     }
