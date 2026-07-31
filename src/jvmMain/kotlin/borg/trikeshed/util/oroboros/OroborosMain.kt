@@ -26,6 +26,7 @@ private data class IngestSummary(
 )
 
 fun main(args: Array<String>) = runBlocking {
+    borg.trikeshed.platform.jvmProgramArguments = args
     val options = parseOptions(args)
     val runtime = OroborosJvmRuntime(options)
     printSummary(runtime.ingest(), options, 0)

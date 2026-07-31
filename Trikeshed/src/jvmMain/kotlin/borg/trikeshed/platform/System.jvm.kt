@@ -1,5 +1,7 @@
 package borg.trikeshed.platform
 
+import borg.trikeshed.lib.Series
+import borg.trikeshed.lib.seriesOf
 import java.io.File
 import java.lang.management.ManagementFactory
 import java.util.concurrent.TimeUnit
@@ -10,32 +12,23 @@ actual data class ProcessResult(
     actual val stderr: String
 )
 
-/**
- * Attempts to get the program name (argv[0] equivalent) on JVM.
- * This can be tricky on the JVM. `System.getProperty("sun.java.command")`
- * often contains the main class or JAR path.
- * For robust symlink detection, a launcher script might be needed to pass
- * the invocation name as a separate system property or argument.
- */
 actual fun getProgramName(): String {
-    // This property usually gives the main class and its arguments, or path to JAR.
-    // It's the closest common thing to an argv[0] concept without a wrapper script.
     val command = System.getProperty("sun.java.command")?.split(" ")?.firstOrNull()
     return command ?: "UnknownProgram"
 }
 
-/**
- * Gets program arguments (argv[1:] equivalent) on JVM.
- * This relies on arguments being captured from the `main` method.
- * We'll need a way to store them for access here.
- * A common pattern is to store them in a global accessible object.
- */
+lateinit var jvmProgramArguments: Array<String>
+
 object MainArguments {
     var args: List<String> = emptyList()
 }
 
-actual fun getProgramArguments(): List<String> {
-    return MainArguments.args
+actual fun getProgramArguments(): Series<String> {
+    return if (::jvmProgramArguments.isInitialized) {
+        seriesOf(*jvmProgramArguments)
+    } else {
+        seriesOf(*MainArguments.args.toTypedArray())
+    }
 }
 
 actual fun executeProcess(
@@ -59,13 +52,10 @@ actual fun executeProcess(
         }
     }
 
-    // It's important to consume stdout and stderr on separate threads
-    // to prevent deadlocks if either buffer fills up.
     val stdoutFuture = process.inputStream.bufferedReader().readText()
     val stderrFuture = process.errorStream.bufferedReader().readText()
     
-    // Consider adding a timeout
-    val exited = process.waitFor(60, TimeUnit.SECONDS) // 60 second timeout
+    val exited = process.waitFor(60, TimeUnit.SECONDS)
     if (!exited) {
         process.destroyForcibly()
         return ProcessResult(-1, stdoutFuture, stderrFuture + "\nProcess timed out after 60 seconds.")
