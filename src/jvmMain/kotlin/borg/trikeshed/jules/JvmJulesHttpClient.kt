@@ -14,6 +14,13 @@ import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.withTimeout
 
 /**
+ * Typed HTTP error from the Jules REST API. Carries the status code so the
+ * flywheel can classify 429 (rate-limit) vs 4xx/5xx and surface per-cycle
+ * counters in the TUI. Thrown by [JvmJulesHttpClient] on any status >= 400.
+ */
+class JulesHttpException(val status: Int, message: String) : RuntimeException(message)
+
+/**
  * JVM actual of [JulesHttpClient] routed through the reactor HTX transport
  * ([HtxElement], keyed by [HtxKey] in the coroutine context).
  *
@@ -69,7 +76,7 @@ class JvmJulesHttpClient(
 
         val resp: HtxResponse = htx.request(req)
         val respBody = resp.body.toArray().decodeToString()
-        if (resp.status >= 400) error("Jules API ${resp.status}: ${respBody.take(300)}")
+        if (resp.status >= 400) throw JulesHttpException(resp.status, "Jules API ${resp.status}: ${respBody.take(300)}")
         return respBody
     }
 

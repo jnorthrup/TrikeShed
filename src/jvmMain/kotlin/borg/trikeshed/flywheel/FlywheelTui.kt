@@ -1,6 +1,8 @@
 package borg.trikeshed.flywheel
 
 import borg.trikeshed.jules.JulesRestClient
+import borg.trikeshed.lib.Join
+import borg.trikeshed.lib.j
 import borg.trikeshed.utils.kanban.JulesBoardStore
 import borg.trikeshed.utils.kanban.forForgeDir
 import kotlinx.coroutines.runBlocking
@@ -38,6 +40,8 @@ object FlywheelTui {
         val codexRunning: Int,
         val openCodeAvailable: Boolean,
         val codexAvailable: Boolean,
+        val http429: Int = 0,
+        val http5xx: Int = 0,
         val error: String? = null,
     ) {
         val occupied: Int get() = sessions.count { it.state !in TERMINAL } + openCodeRunning + codexRunning
@@ -79,14 +83,28 @@ object FlywheelTui {
         val apiKey = System.getenv("JULES_API_KEY")
         val client = apiKey?.let(::JulesRestClient)
         val pulses = Pulses()
+        // Accumulated HTTP error counters. Reset to zero when land (drain) or
+        // push (settle) advances — a successful drain/push clears the slate so
+        // the operator sees only errors accumulated since the last landing.
+        var acc429 = 0
+        var acc5xx = 0
+        var prevLand = -1
         var previous: Snapshot? = null
         var tick = 0
 
         do {
             val snapshot = capture(client, source, repoDir, forgeDir)
+            // Reset accumulated counters when land increases (new drain landed).
+            if (prevLand >= 0 && snapshot.land > prevLand) {
+                acc429 = 0
+                acc5xx = 0
+            }
+            acc429 += snapshot.http429
+            acc5xx += snapshot.http5xx
+            prevLand = snapshot.land
             updatePulses(previous, snapshot, pulses)
             print("\u001b[2J\u001b[H")
-            print(render(snapshot, pulses, tick++))
+            print(render(snapshot, pulses, tick++, acc429, acc5xx))
             previous = snapshot
             pulses.decay()
             if (!once) Thread.sleep(intervalMs)
@@ -121,6 +139,9 @@ object FlywheelTui {
         val codexRunning = processCount("codex")
         val openCodeAvailable = executableExists("/opt/homebrew/bin/opencode") || executableOnPath("opencode")
         val codexAvailable = executableOnPath("codex")
+        val httpErrs = readLatestHttpErrors(forgeDir)
+        val http429 = httpErrs.a
+        val http5xx = httpErrs.b
 
         return try {
             val sessions = readTrajectorySessions(forgeDir, source)
@@ -153,6 +174,8 @@ object FlywheelTui {
                 codexRunning = codexRunning,
                 openCodeAvailable = openCodeAvailable,
                 codexAvailable = codexAvailable,
+                http429 = http429,
+                http5xx = http5xx,
                 error = if (client == null) "JULES_API_KEY unset" else null,
             )
         } catch (t: Throwable) {
@@ -162,7 +185,8 @@ object FlywheelTui {
                 closedSessionQueue = closedSessionQueue, landedSessionIds = landedSessionIds,
                 sessions = emptyList(), openCodeRunning = openCodeRunning,
                 codexRunning = codexRunning, openCodeAvailable = openCodeAvailable,
-                codexAvailable = codexAvailable, error = t.message ?: t::class.simpleName,
+                codexAvailable = codexAvailable, http429 = http429, http5xx = http5xx,
+                error = t.message ?: t::class.simpleName,
             )
         }
     }
@@ -179,10 +203,13 @@ object FlywheelTui {
         if (now.slice > previous.slice) pulses.curateSlice = 4
     }
 
-    private fun render(s: Snapshot, pulses: Pulses, tick: Int): String = buildString {
+    private fun render(s: Snapshot, pulses: Pulses, tick: Int, acc429: Int, acc5xx: Int): String = buildString {
         val bar = saturationBar(s.saturation)
         appendLine("OROBOROS FLYWHEEL   SATURATION ${s.occupied}/${s.capacity} ${s.saturation}% $bar")
         appendLine("updated ${Instant.ofEpochMilli(s.at)}${s.error?.let { "   ERROR: $it" } ?: ""}")
+        if (acc429 > 0 || acc5xx > 0) {
+            appendLine("Jules HTTP errors since last drain: 429=$acc429  5xx=$acc5xx")
+        }
         if (s.closedSessionQueue != 0) {
             appendLine("WAL: ${s.closedSessionQueue} already-closed session queue item(s) suppressed")
         }
@@ -261,6 +288,20 @@ object FlywheelTui {
     private fun executableExists(path: String): Boolean = File(path).canExecute()
     private fun executableOnPath(name: String): Boolean =
         (System.getenv("PATH") ?: "").split(File.pathSeparator).any { File(it, name).canExecute() }
+
+    /** Read the latest h429/h5x counters from the cycle trace JSON. */
+    private fun readLatestHttpErrors(forgeDir: File): Join<Int, Int> {
+        val traceFile = File(forgeDir, "oroboros-cycles.jsonl")
+        if (!traceFile.exists()) return 0 j 0
+        return try {
+            val lastLine = traceFile.readLines().last { it.isNotBlank() }
+            val h429 = Regex(""""h429":(\d+)""").find(lastLine)?.groupValues?.get(1)?.toIntOrNull() ?: 0
+            val h5x = Regex(""""h5x":(\d+)""").find(lastLine)?.groupValues?.get(1)?.toIntOrNull() ?: 0
+            h429 j h5x
+        } catch (_: Throwable) {
+            0 j 0
+        }
+    }
 
     private val TERMINAL = setOf("COMPLETED", "FINISHED", "FAILED", "PAUSED", "CANCELLED")
 

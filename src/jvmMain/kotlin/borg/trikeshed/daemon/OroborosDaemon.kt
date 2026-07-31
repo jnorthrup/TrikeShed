@@ -276,7 +276,7 @@ object OroborosDaemon {
             println("[FLYWHEEL] phase=" + summary.phase + " cycleMs=" + summary.cycleMs + " harvested=" + summary.harvested + " dispatched=" + summary.dispatched + " alive=" + summary.alive + "/" + summary.available + " inducted=" + summary.inducted + " settled=" + summary.settled)
 
             lastCycleReport = summary
-            val json = "{\"t\":" + t0 + ",\"c\":" + summary.cycleMs + ",\"d\":" + summary.harvested + ",\"p\":" + summary.dispatched + ",\"a\":" + summary.alive + ",\"v\":" + summary.available + ",\"e\":" + cyclePollErrors + "}"
+            val json = "{\"t\":" + t0 + ",\"c\":" + summary.cycleMs + ",\"d\":" + summary.harvested + ",\"p\":" + summary.dispatched + ",\"a\":" + summary.alive + ",\"v\":" + summary.available + ",\"e\":" + cyclePollErrors + ",\"h429\":" + summary.http429 + ",\"h5x\":" + summary.http5xx + "}"
             try {
                 if (traceLineCount >= 10000) {
                     traceWriter?.close()

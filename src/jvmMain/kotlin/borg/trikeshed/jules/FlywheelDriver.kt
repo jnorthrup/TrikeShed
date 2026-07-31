@@ -113,6 +113,32 @@ class FlywheelDriver(
      * visible while reporting each suppressed requeue only once per process. */
     private val reportedClosedSessionQueueEntries = mutableSetOf<String>()
 
+    /** Per-cycle HTTP error counters. Reset at the start of each [cycle];
+     * bumped by [classifyHttpError] at every Jules API catch site. Read by
+     * the cycle's CycleReport and the daemon's trace JSON. Instance-level so
+     * drain/answer/dispatch helpers (separate methods) can bump them too. */
+    @Volatile var cycleHttp429: Int = 0
+        private set
+    @Volatile var cycleHttp5xx: Int = 0
+        private set
+
+    /** Classify a caught throwable and bump the per-cycle HTTP counters if
+     * it (or its root cause) is a [JulesHttpException]. Called at every Jules
+     * API catch site in the cycle, drain, answer, and dispatch paths. */
+    private fun classifyHttpError(t: Throwable) {
+        var cur: Throwable? = t
+        while (cur != null) {
+            if (cur is JulesHttpException) {
+                when (cur.status) {
+                    429 -> cycleHttp429++
+                    in 500..599 -> cycleHttp5xx++
+                }
+                return
+            }
+            cur = cur.cause
+        }
+    }
+
     /**
      * Record a drain failure on the session card and return [DrainOutcome.Skipped].
      * Patch-bearing work stays undrained and retryable regardless of attempt
@@ -156,6 +182,9 @@ class FlywheelDriver(
     /** One cycle: poll → answer → drain → induct → dispatch. */
     suspend fun cycle(): CycleReport {
         val t0 = System.currentTimeMillis()
+        cycleHttp429 = 0
+        cycleHttp5xx = 0
+
         // 1. POLL — guarded so a transient API/network failure does NOT
         //    abort the cycle and starve drain. A failed poll is a PollError
         //    event + a retry on the next interval; drain still proceeds
@@ -163,6 +192,7 @@ class FlywheelDriver(
         try {
             withTimeoutOrNull(60_000L) { conductor.pollOnce() }
         } catch (t: Throwable) {
+            classifyHttpError(t)
             _events.tryEmit(FlywheelEvent.PollError("poll ${t.javaClass.simpleName}: ${t.message?.take(200)}"))
         }
 
@@ -171,6 +201,7 @@ class FlywheelDriver(
         try {
             reconcileGitState()
         } catch (t: Throwable) {
+            classifyHttpError(t)
             _events.tryEmit(FlywheelEvent.PollError("reconcile ${t.javaClass.simpleName}: ${t.message?.take(200)}"))
         }
 
@@ -205,6 +236,7 @@ class FlywheelDriver(
                 answered++
                 println("[FLYWHEEL] APPROVE ${card.snapshot.sessionId.takeLast(6)} ${card.card.title.take(60)}")
             } catch (t: Throwable) {
+                classifyHttpError(t)
                 _events.tryEmit(FlywheelEvent.PollError("approve ${card.snapshot.sessionId}: ${t.message?.take(200)}"))
             }
         }
@@ -324,6 +356,7 @@ class FlywheelDriver(
                                 println("[FLYWHEEL] DISPATCH ${entry.title.take(60)}")
                                 1
                             } catch (t: Throwable) {
+                                classifyHttpError(t)
                                 _events.emit(FlywheelEvent.DispatchFailed(entry.title, t.message.orEmpty()))
                                 println("[FLYWHEEL] FAIL ${entry.title}: ${t.message}")
                                 0
@@ -354,6 +387,8 @@ class FlywheelDriver(
             phase = phase,
             conflicts = committedConflicts,
             panorama = drain.panorama,
+            http429 = cycleHttp429,
+            http5xx = cycleHttp5xx,
         )
     }
 
@@ -1618,6 +1653,10 @@ class FlywheelDriver(
         val conflicts: List<String> = emptyList(),
         /** Panorama for QaLaguna: every arm in the current completion set. */
         val panorama: List<QaLaguna.SessionPanorama> = emptyList(),
+        /** Jules 429 (rate-limit) responses seen this cycle. */
+        val http429: Int = 0,
+        /** Jules 5xx server-error responses seen this cycle. */
+        val http5xx: Int = 0,
     )
 
     companion object {
