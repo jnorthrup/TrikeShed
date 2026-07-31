@@ -543,3 +543,4 @@ object BlackboardFabrics {
     /** Create a new in-memory blackboard fabric. */
     fun create(): BlackboardFabric = InMemoryBlackboardFabric()
 }
+

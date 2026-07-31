@@ -104,6 +104,13 @@ class CasBackedCausalGraph(val casStore: CasStore) {
         return newCid
     }
 
+    fun retractNode(causalKey: String, oldVersionCid: ContentId): ContentId {
+        val docJson = """{"kind":"causal-node", "causalKey":"$causalKey", "tombstone":true, "retracts":"${oldVersionCid.value}"}"""
+        val newCid = casStore.put(docJson.encodeToByteArray())
+        snapshotRoot(newCid)
+        return newCid
+    }
+
     fun traverse(startCid: ContentId): List<ContentId> {
         val result = mutableListOf<ContentId>()
         val visited = mutableSetOf<ContentId>()
@@ -137,3 +144,5 @@ class CasBackedCausalGraph(val casStore: CasStore) {
         return result
     }
 }
+
+

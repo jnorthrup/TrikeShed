@@ -47,3 +47,5 @@ object BlackboardDagDemo {
         println("fabric_ok create=1 publish=2 delivered=1 slice=${slice.size}")
     }
 }
+
+
