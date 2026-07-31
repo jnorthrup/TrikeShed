@@ -5,7 +5,11 @@ import borg.trikeshed.context.ElementState
 import borg.trikeshed.userspace.Liburing
 import borg.trikeshed.userspace.UringCompletion
 import borg.trikeshed.userspace.context.AsyncContextKey
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.channels.BufferOverflow
+import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.launch
 import kotlin.coroutines.CoroutineContext
 
 /**
@@ -19,6 +23,20 @@ open class FanoutDispatcherElement(
     override val key: CoroutineContext.Key<*> get() = AsyncContextKey.FanoutDispatcherKey
 
     private val handlers = mutableMapOf<Long, MutableList<(UringCompletion) -> Unit>>()
+    
+    private val dispatchChannel = Channel<UringCompletion>(
+        capacity = 64,
+        onBufferOverflow = BufferOverflow.SUSPEND
+    )
+
+    override suspend fun open() {
+        super.open()
+        CoroutineScope(supervisor).launch {
+            for (completion in dispatchChannel) {
+                handlers[completion.userData]?.toList()?.forEach { it(completion) }
+            }
+        }
+    }
 
     /** Register a handler for completions with the given userData token. */
     fun registerHandler(userData: Long, handler: (UringCompletion) -> Unit) {
@@ -35,11 +53,16 @@ open class FanoutDispatcherElement(
     }
 
     /** Dispatch a completion to all handlers for its userData. */
-    internal fun dispatch(completion: UringCompletion) {
-        handlers[completion.userData]?.toList()?.forEach { it(completion) }
+    internal suspend fun dispatch(completion: UringCompletion) {
+        val result = dispatchChannel.trySend(completion)
+        if (result.isFailure) {
+            println("WARN: FanoutDispatcherElement channel full, suspending")
+            dispatchChannel.send(completion)
+        }
     }
 
     override suspend fun close() {
+        dispatchChannel.close()
         handlers.clear()
         super.close()
     }
