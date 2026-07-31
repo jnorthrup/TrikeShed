@@ -10,15 +10,21 @@ class ProviderRegistry {
     }
 
     fun select(rule: SelectionRule): ModelProvider = when (rule) {
-        is SelectionRule.SpecificProvider -> providers[rule.id]
-            ?: throw IllegalArgumentException("no provider with id ${rule.id}")
+        is SelectionRule.SpecificProvider -> {
+            if (rule.id in providers && descriptors[rule.id]?.id == rule.id) providers[rule.id]!!
+            else throw IllegalArgumentException("no provider with id ${rule.id}")
+        }
         is SelectionRule.MinCost -> descriptors.values.minByOrNull { it.costPer1kTokens }
             ?.let { providers[it.id]!! } ?: throw IllegalArgumentException("no providers registered")
         is SelectionRule.MinLatency -> descriptors.values.minByOrNull { it.averageLatencyMs }
             ?.let { providers[it.id]!! } ?: throw IllegalArgumentException("no providers registered")
-        is SelectionRule.Fallback -> providers[rule.primary] ?: providers[rule.secondary]
-            ?: throw IllegalArgumentException("no fallback provider found")
+        is SelectionRule.Fallback -> {
+            if (rule.primary in providers && descriptors[rule.primary]?.id == rule.primary) providers[rule.primary]!!
+            else if (rule.secondary in providers && descriptors[rule.secondary]?.id == rule.secondary) providers[rule.secondary]!!
+            else throw IllegalArgumentException("no fallback provider found")
+        }
     }
 
     fun descriptors(): List<ProviderDescriptor> = descriptors.values.toList()
 }
+

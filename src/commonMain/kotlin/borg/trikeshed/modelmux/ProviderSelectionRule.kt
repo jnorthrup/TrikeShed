@@ -6,3 +6,4 @@ sealed class SelectionRule {
     data class SpecificProvider(val id: String) : SelectionRule()
     data class Fallback(val primary: String, val secondary: String) : SelectionRule()
 }
+
