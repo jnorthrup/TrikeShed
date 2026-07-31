@@ -1,13 +1,18 @@
 package borg.trikeshed.daemon
 
+import borg.trikeshed.htx.HtxElement
+import borg.trikeshed.htx.HtxKey
+import borg.trikeshed.htx.openHtxElement
 import borg.trikeshed.jules.FlywheelDriver
 import borg.trikeshed.jules.FlywheelDriver.FlywheelEvent
+import borg.trikeshed.userspace.nio.spi.NioSupervisor
 import borg.trikeshed.util.io.ForgeCliArgs
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withContext
 import java.io.BufferedWriter
 import java.io.File
 import java.io.FileOutputStream
@@ -132,6 +137,21 @@ object OroborosDaemon {
             maxSlots = maxSlots,
         )
 
+        // HTX + TLS reactor: every Jules API call (and every ModelMux/KeyMux
+        // call) flows through HtxKey → HtxElement → HtxReactorElement →
+        // JvmTlsCodecBackend. No standalone java.net.http.HttpClient. mTLS
+        // (ClientAuth, client cert, trust store) is configured on the
+        // TlsConfig carried by the route service, not per-client. The
+        // supervisor auto-registers ChannelOperations + JvmTlsCodecBackend +
+        // HtxReactorElement via platformNioProviders().
+        val nioSupervisor = NioSupervisor()
+        nioSupervisor.open()
+        val htxElement: HtxElement = openHtxElement(
+            nioSupervisor = nioSupervisor,
+            parentJob = coroutineContext[kotlinx.coroutines.Job],
+        )
+        System.err.println("[OROBOROS] HTX reactor open: ${htxElement.state} — Jules/ModelMux via TLS codec")
+
         val mainJob = coroutineContext[kotlinx.coroutines.Job]
 
         val sigHandler = SignalHandler {
@@ -248,7 +268,7 @@ object OroborosDaemon {
             return
         }
 
-        suspend fun runCycle() {
+        suspend fun runCycle() = withContext(htxElement) {
             val t0 = System.currentTimeMillis()
             val startPollErrors = pollErrors
             val summary: FlywheelDriver.CycleReport = driver.cycle()
@@ -327,6 +347,8 @@ object OroborosDaemon {
             try { serverSocket.close() } catch (_: Exception) {}
             if (healthSock.exists()) healthSock.delete()
             try { traceWriter?.flush(); traceWriter?.close() } catch (_: Exception) {}
+            try { htxElement.close() } catch (_: Exception) {}
+            try { nioSupervisor.close() } catch (_: Exception) {}
             driver.close()
         }
     }

@@ -494,9 +494,20 @@ class FlywheelDriver(
                 landed += arm
             } else {
                 // Fallback: no branch on origin — apply the CAS'd patch.
+                // SANITIZE FIRST: Jules patches bundle sandbox scratch files
+                // (test_script.kt/patch.diff/plan_script.sh) and trailing
+                // whitespace that make `git apply --3way` reject the whole diff.
+                // sanitizeJulesPatch drops those sections and trims `+` lines so
+                // the real source hunks land. See sanitizer docstring for the
+                // permanent-retry-loop WAL signature this prevents.
+                val cleanPatch = sanitizeJulesPatch(arm.patch)
+                if (cleanPatch.isBlank()) {
+                    drainFail(s, "patch empty after sanitizing scratch sections")
+                    continue
+                }
                 val pf = File(repoDir, ".flywheel-patch-${s.id.takeLast(6)}")
                 try {
-                    pf.writeText(arm.patch)
+                    pf.writeText(cleanPatch)
                     val apply = git("apply", "--3way", pf.name)
                     val conflicted = unmergedFiles()
                     val alreadyApplied = apply.exitCode != 0 && conflicted.isEmpty() &&
@@ -511,7 +522,7 @@ class FlywheelDriver(
                         drainFail(s, "apply --3way failed: ${apply.output.take(200)}")
                         continue
                     }
-                    val touched = parsePatchFiles(arm.patch)
+                    val touched = parsePatchFiles(cleanPatch)
                     if (touched.isEmpty()) {
                         drainFail(s, "empty patch file list")
                         continue
@@ -1233,6 +1244,89 @@ class FlywheelDriver(
             }
         }
         return files.distinct()
+    }
+
+    /**
+     * Sandbox scratch files Jules leaves in its patch diffs: `test_script.kt`,
+     * `patch.diff`, `plan_script.sh`, and similar verification stubs. They are
+     * never part of the real repo tree. When Jules emits a deletion hunk for one
+     * of these, `git apply --3way` fails ("test_script.kt: does not exist in index")
+     * because we never had the file — even though the real source hunk applied
+     * cleanly. Apply rejects the whole diff and the cycle records `DrainFailed`,
+     * locking the session into a permanent retry loop (WAL signature: 5 sessions
+     * at attempt 107..173).
+     *
+     * The same patches also carry `+` content lines with trailing whitespace
+     * ("trailing whitespace" reject), which `git apply --3way` refuses outright.
+     *
+     * This sanitizer:
+     *   1. Drops whole `diff --git` sections whose target path is a known Jules
+     *      sandbox scratch file (so `git apply` never sees the index-missing hunk).
+     *   2. Strips trailing whitespace from every `+` content line (hunks starting
+     *      with `+` but not `+++`), preserving the diff metadata and context lines.
+     *
+     * The cleaned patch is what gets written to `.flywheel-patch-<id>` for apply.
+     */
+    private fun sanitizeJulesPatch(patch: String): String {
+        // Known Jules sandbox scratch base names. Match by basename of the diff path.
+        val scratchBaseNames = setOf(
+            "test_script.kt", "patch.diff", "plan_script.sh",
+            "MultiIndexContainer-patch.txt",
+        )
+        fun isScratchPath(p: String): Boolean {
+            val base = p.substringAfterLast('/').trim()
+            if (base in scratchBaseNames) return true
+            // Jules naming variants: test_script.<anything> or *_scratch.*
+            if (base.startsWith("test_script.")) return true
+            return false
+        }
+
+        // Split into [preamble, section1, section2, ...] where each section begins
+        // with a `diff --git` header line. Preserve the preamble (git header blob).
+        val lines = patch.split("\n")
+        val out = mutableListOf<String>()
+        var skipSection = false
+        var sawHeader = false
+        var inHunkContent = false
+        for (line in lines) {
+            if (line.startsWith("diff --git ")) {
+                // Begin a new diff section. Parse target path from the `+++ b/` we
+                // have not seen yet — easier: extract from the `diff --git a/X b/Y`
+                // `b/` side which appears right after the `b/` marker.
+                val mLine = line
+                // The `b/` path is the last token of `diff --git a/PATH b/PATH`.
+                // Some Jules diffs use bare names: `diff --git a/test_script.kt b/test_script.kt`.
+                val afterB = mLine.substringAfter(" b/", missingDelimiterValue = "")
+                val path = afterB.trim().ifEmpty {
+                    // Fall back to the a/ side when there is no b/ side (rare).
+                    mLine.substringAfter(" a/", missingDelimiterValue = "").trim()
+                }
+                skipSection = isScratchPath(path)
+                sawHeader = true
+                inHunkContent = false
+                if (!skipSection) out.add(line)
+                continue
+            }
+            if (line.startsWith("@@ ")) {
+                inHunkContent = true
+                if (!skipSection) out.add(line)
+                continue
+            }
+            if (skipSection) continue
+            if (!sawHeader) {
+                // Preamble (e.g. `diff --git` not yet seen) — passes through.
+                out.add(line)
+                continue
+            }
+            // Within an active section. Trim trailing whitespace ONLY on `+`
+            // content lines (not `++`, not context, not `-`).
+            if (inHunkContent && line.startsWith("+") && !line.startsWith("+++")) {
+                out.add(line.trimEnd())
+            } else {
+                out.add(line)
+            }
+        }
+        return out.joinToString("\n")
     }
 
     private fun headSha(): String = git("rev-parse", "HEAD").output.trim()
