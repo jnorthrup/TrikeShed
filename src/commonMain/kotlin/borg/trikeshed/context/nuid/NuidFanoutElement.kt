@@ -64,17 +64,39 @@ open class NuidFanoutElement(
 
     /** Per-workgroup claim slot. Claim intake belongs to the dispatcher;
      *  production workers receive accepted claims through [consume]. */
-    class WorkgroupSlot(val workgroup: Workgroup) {
+    inner class WorkgroupSlot(val workgroup: Workgroup) {
         // Buffered so a brief latency from one worker doesn't block concurrent
         // offers to its peers. Capacity scales with claim pressure.
         private val inbox: Channel<Claim> = Channel(Channel.BUFFERED)
-        internal val acceptedFlow: MutableSharedFlow<Claim> = MutableSharedFlow(replay = 1, extraBufferCapacity = 64)
+        internal val acceptedFlow: MutableSharedFlow<Long> = MutableSharedFlow(replay = 1, extraBufferCapacity = 64)
 
         /** Consume one pending claim, suspending if empty. */
         suspend fun consume(): Claim {
-            val claim = inbox.receive()
-            acceptedFlow.emit(claim)
-            return claim
+            while (true) {
+                val claim = inbox.receive()
+                if (claim(claim.claimId)) {
+                    return claim
+                }
+            }
+        }
+
+        /** CAS claim: returns true if this workgroup won the claim, false if lost. Idempotent. */
+        suspend fun claim(claimId: Long): Boolean {
+            val won = claimMutex.withLock {
+                val winner = claimedBy[claimId]
+                if (winner == workgroup.name) {
+                    true
+                } else if (winner == null) {
+                    claimedBy[claimId] = workgroup.name
+                    true
+                } else {
+                    false
+                }
+            }
+            if (won) {
+                acceptedFlow.emit(claimId)
+            }
+            return won
         }
 
         /** Enqueue a claim offer to this workgroup. */
@@ -196,9 +218,14 @@ open class NuidFanoutElement(
     /** Monotonic claim id; rolls over at [Long.MAX_VALUE]. */
     private val claimMutex: Mutex = Mutex()
     private var claimCounter: Long = 0L
+    private val claimedBy = mutableMapOf<Long, String>()
 
     private suspend fun nextClaimId(): Long = claimMutex.withLock {
         claimCounter = if (claimCounter == Long.MAX_VALUE) 0L else claimCounter + 1L
+        if (claimCounter % 1000L == 0L) {
+            val threshold = claimCounter - 5000L
+            claimedBy.keys.removeAll { it < threshold }
+        }
         claimCounter
     }
 
@@ -224,7 +251,7 @@ open class NuidFanoutElement(
         val claim = Claim(claimId, nuid, payload)
         val eligible: List<WorkgroupSlot> = snapshot()
             .filter { it.workgroup.canHandle(nuid) }
-            .sortedBy { it.workgroup.scope.level }
+            .sortedByDescending { it.workgroup.scope.level }
 
         if (eligible.isEmpty()) {
             return DispatchResult(claimId, winner = null, claimedAtSubnet = null, escalatedLevels = 0)
@@ -233,8 +260,8 @@ open class NuidFanoutElement(
         val levels: Map<Int, List<WorkgroupSlot>> = eligible.groupBy { it.workgroup.scope.level }
         val startLevel = nuid.subnet.level
         val levelsToTry: List<Int> = levels.keys
-            .filter { key -> key >= startLevel }
-            .sorted()
+            .filter { key -> key <= startLevel }
+            .sortedDescending()
             .take(escalationBudget + 1)
         var escalatedLevels = 0
 
@@ -293,17 +320,13 @@ open class NuidFanoutElement(
             candidates
                 .map { slot ->
                     slot.acceptedFlow
-                        .filter { it.claimId == claimId && acceptClaim(slot.workgroup, it) }
+                        .filter { it == claimId }
                         .map { slot }
                 }
                 .merge()
                 .first()
         }
     }
-
-    /** Default admission policy — accepts any claim whose workgroup can handle it. */
-    private fun acceptClaim(workgroup: Workgroup, claim: Claim): Boolean =
-        workgroup.canHandle(claim.nuid)
 
     /** Lift an offer directly to a named workgroup (bypass narrowing). */
     suspend fun offer(name: String, claim: Claim) {
