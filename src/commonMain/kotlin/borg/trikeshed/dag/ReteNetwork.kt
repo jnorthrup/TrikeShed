@@ -12,7 +12,7 @@ class ReteNetwork {
     val agenda = ReteAgenda()
     val refraction = ReteRefraction()
 
-    fun assert(
+    suspend fun assert(
         factId: FactId,
         fields: Map<String, Any?>,
         versionCid: borg.trikeshed.job.ContentId,
@@ -28,7 +28,7 @@ class ReteNetwork {
         }
     }
 
-    fun modify(
+    suspend fun modify(
         factId: FactId,
         fields: Map<String, Any?>,
         versionCid: borg.trikeshed.job.ContentId,
@@ -49,7 +49,7 @@ class ReteNetwork {
         signalAgenda()
     }
 
-    fun retract(factId: FactId) {
+    suspend fun retract(factId: FactId) {
         val facts = workingMemory.facts(factId)
         if (facts.isNotEmpty()) {
             val fact = facts.first()
@@ -71,7 +71,7 @@ class ReteNetwork {
         signal.trySend(Unit)
     }
 
-    fun evaluateRules(partitionId: String) {
+    suspend fun evaluateRules(partitionId: String) {
         val jobs = workingMemory.query(BlackboardContext(partitionId), "lifecycle" to "submitted")
         val tokens = betaMemory.tokens().filter { it.left.factId.partitionId == partitionId }
 

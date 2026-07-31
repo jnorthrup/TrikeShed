@@ -28,7 +28,7 @@ data class ReteAssertionResult(
 class ReteWorkingMemory {
     private val current = LinearHashMap<FactId, ReteStoredFact>()
 
-    fun assert(
+    suspend fun assert(
         factId: FactId,
         fields: Map<String, Any?>,
         versionCid: ContentId,
@@ -50,7 +50,7 @@ class ReteWorkingMemory {
         return ReteAssertionResult(isNew = true, fact = fact)
     }
 
-    fun modify(
+    suspend fun modify(
         factId: FactId,
         fields: Map<String, Any?>,
         versionCid: ContentId,
@@ -62,7 +62,7 @@ class ReteWorkingMemory {
         return modified
     }
 
-    fun retract(factId: FactId): Boolean = current.remove(factId) != null
+    suspend fun retract(factId: FactId): Boolean = current.remove(factId) != null
 
     fun facts(factId: FactId): List<ReteStoredFact> =
         current.get(factId)?.let(::listOf) ?: emptyList()

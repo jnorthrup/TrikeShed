@@ -126,12 +126,14 @@ class JobSupervisorReteIntegrationTest {
         val rete = JobNexusComponentFactories().reteFactory() // A fresh Rete network.
         val fields = mapOf("jobId" to "j-parent", "lifecycle" to "closed")
         val cid = borg.trikeshed.job.ContentId.of("v1".encodeToByteArray())
-        rete.assert(borg.trikeshed.dag.FactId("other-board", "j-parent"), fields, cid, borg.trikeshed.cursor.BlackboardContext("other-board"))
+        kotlinx.coroutines.test.runTest {
+            rete.assert(borg.trikeshed.dag.FactId("other-board", "j-parent"), fields, cid, borg.trikeshed.cursor.BlackboardContext("other-board"))
 
-        val fields2 = mapOf("jobId" to "j-child", "lifecycle" to "submitted", "dependencies" to listOf("j-parent"))
-        rete.assert(borg.trikeshed.dag.FactId("job-board", "j-child"), fields2, cid, borg.trikeshed.cursor.BlackboardContext("job-board"))
+            val fields2 = mapOf("jobId" to "j-child", "lifecycle" to "submitted", "dependencies" to listOf("j-parent"))
+            rete.assert(borg.trikeshed.dag.FactId("job-board", "j-child"), fields2, cid, borg.trikeshed.cursor.BlackboardContext("job-board"))
 
-        rete.evaluateRules("job-board")
+            rete.evaluateRules("job-board")
+        }
 
         assertEquals(0, rete.agenda.size, "Agenda should be empty because facts are in different partitions")
 

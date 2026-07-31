@@ -197,8 +197,10 @@ object ForgeKanbanIngest {
             provisionalTaskFacts.first { it.fields["taskId"] == card.id.value }.copy(fields = fields)
         }
         val workingMemory = ReteWorkingMemory()
-        (taskFacts + dependencyFacts).forEach { fact ->
-            workingMemory.assert(fact.factId, fact.fields, fact.versionCid, fact.board)
+        kotlinx.coroutines.runBlocking {
+            (taskFacts + dependencyFacts).forEach { fact ->
+                workingMemory.assert(fact.factId, fact.fields, fact.versionCid, fact.board)
+            }
         }
 
         val causalNodes = tasks.mapIndexed { order, task ->

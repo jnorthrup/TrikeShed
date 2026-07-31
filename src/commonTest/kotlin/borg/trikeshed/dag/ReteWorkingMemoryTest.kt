@@ -10,7 +10,7 @@ import kotlin.test.assertTrue
 class ReteWorkingMemoryTest {
 
     @Test
-    fun assertModifyRetractByStableFactIdAndVersionCid() {
+    fun assertModifyRetractByStableFactIdAndVersionCid() = kotlinx.coroutines.test.runTest {
         val memory = ReteWorkingMemory()
         val board = blackboardContext(id = "board-a")
         val factId = FactId("board-a", "node-1")
@@ -37,7 +37,7 @@ class ReteWorkingMemoryTest {
     }
 
     @Test
-    fun duplicateFactVersionIsNotAssertedTwice() {
+    fun duplicateFactVersionIsNotAssertedTwice() = kotlinx.coroutines.test.runTest {
         val memory = ReteWorkingMemory()
         val board = blackboardContext(id = "board-a")
         val factId = FactId("board-a", "node-1")
@@ -49,7 +49,7 @@ class ReteWorkingMemoryTest {
     }
 
     @Test
-    fun facetQueriesStayInsideBoardPartition() {
+    fun facetQueriesStayInsideBoardPartition() = kotlinx.coroutines.test.runTest {
         val memory = ReteWorkingMemory()
         val boardA = blackboardContext(id = "board-a")
         val boardB = blackboardContext(id = "board-b")
