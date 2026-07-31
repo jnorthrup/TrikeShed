@@ -32,6 +32,7 @@ class ByteRegion(
 
     fun asByteSeries(): ByteSeries {
         val length = size
+        // enforce zero-copy using lazy Join projection (j) without allocating intermediate arrays
         return ByteSeries(length j { i: Int -> buffer.get(start + i) })
     }
 

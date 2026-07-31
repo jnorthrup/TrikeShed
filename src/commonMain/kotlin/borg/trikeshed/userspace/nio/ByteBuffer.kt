@@ -93,6 +93,7 @@ public open class ByteBuffer protected constructor(
         require(p0 in 0..capacity) { "slice begin out of bounds" }
         require(p1 in p0..capacity) { "slice end out of bounds" }
         val length = p1 - p0
+        // enforce zero-copy by sharing the backing array
         return ByteBuffer(backing, base + p0, length, 0, length, -1, readOnly, order0)
     }
 

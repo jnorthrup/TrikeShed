@@ -52,6 +52,12 @@ class ByteSeries(
     var mark: Int = -1,
 ) : Series<Byte> by buf { //delegate to the underlying series
 
+    init {
+        require(pos >= 0) { "pos must be non-negative" }
+        require(limit >= pos) { "limit must be >= pos" }
+        require(limit <= buf.size) { "limit must be <= buf.size" }
+    }
+
     /** get, the verb - the char at the current position and increment position */
     inline val get: Byte
         get() {
