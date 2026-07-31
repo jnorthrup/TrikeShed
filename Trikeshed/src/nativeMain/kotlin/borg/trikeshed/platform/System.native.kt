@@ -1,5 +1,8 @@
 package borg.trikeshed.platform
 
+import borg.trikeshed.lib.Series
+import borg.trikeshed.lib.seriesOf
+
 actual data class ProcessResult(
     actual val exitCode: Int,
     actual val stdout: String,
@@ -15,8 +18,14 @@ object NativeMainArguments {
     var args: List<String> = emptyList()
 }
 
-actual fun getProgramArguments(): List<String> {
-    return NativeMainArguments.args
+actual fun getProgramArguments(): Series<String> {
+    val explicitlyCaptured = NativeMainArguments.args
+    if (explicitlyCaptured.isNotEmpty()) {
+        return seriesOf(*explicitlyCaptured.toTypedArray())
+    }
+
+    @OptIn(kotlin.ExperimentalStdlibApi::class)
+    return seriesOf(*kotlin.native.internal.Platform.getProgramArguments())
 }
 
 @OptIn(kotlinx.cinterop.ExperimentalForeignApi::class)
@@ -48,7 +57,6 @@ actual fun executeProcess(
             }
 
             if (input != null) {
-                // Ensure the template buffer is mutable and null-terminated
                 val templateStr = "/tmp/trikeshed-in-XXXXXX"
                 val templateBytes = templateStr.encodeToByteArray()
                 val templateBuf = kotlinx.cinterop.allocArray<kotlinx.cinterop.ByteVar>(templateBytes.size + 1)
@@ -79,7 +87,6 @@ actual fun executeProcess(
             if (stdoutFd >= 0) {
                 tmpStdoutPath = stdoutBuf.toKString()
                 platform.posix.close(stdoutFd)
-                // Use 420u for 0644 mode
                 platform.posix.posix_spawn_file_actions_addopen(actions.ptr, platform.posix.STDOUT_FILENO, tmpStdoutPath!!, platform.posix.O_WRONLY or platform.posix.O_CREAT or platform.posix.O_TRUNC, 420u)
             }
 
@@ -99,7 +106,6 @@ actual fun executeProcess(
             val argv = kotlinx.cinterop.allocArray<kotlinx.cinterop.CPointerVar<kotlinx.cinterop.ByteVar>>(actualArgs.size + 2)
             var argIndex = 0
 
-            // Allocate actualCommand string
             val cmdBytes = actualCommand.encodeToByteArray()
             val cmdBuf = kotlinx.cinterop.allocArray<kotlinx.cinterop.ByteVar>(cmdBytes.size + 1)
             for (i in cmdBytes.indices) cmdBuf[i] = cmdBytes[i]

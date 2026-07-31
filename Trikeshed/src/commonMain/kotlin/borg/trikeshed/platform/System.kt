@@ -1,5 +1,7 @@
 package borg.trikeshed.platform
 
+import borg.trikeshed.lib.Series
+
 /**
  * Represents the result of an executed process.
  *
@@ -18,7 +20,7 @@ expect fun getProgramName(): String
 /**
  * Gets the arguments passed to the currently running program (argv[1:]).
  */
-expect fun getProgramArguments(): List<String>
+expect fun getProgramArguments(): Series<String>
 
 /**
  * Executes an external process.
