@@ -1,5 +1,9 @@
 package borg.trikeshed.couch.isam
 
+import borg.trikeshed.userspace.nio.spi.NioSupervisor
+import kotlinx.coroutines.withContext
+import kotlin.coroutines.coroutineContext
+
 /**
  * A common contract for an append-only log providing durable storage for frames.
  */
@@ -23,6 +27,20 @@ interface DurableAppendLog {
      * Ensures all appended data is flushed/fsynced to durable storage.
      */
     fun flush()
+
+    /**
+     * Wrap flush in a suspend fun routed through NioSupervisor.
+     */
+    suspend fun flushAsync(nioSupervisor: NioSupervisor? = null) {
+        val supervisor = nioSupervisor ?: coroutineContext[NioSupervisor.Key]
+        if (supervisor != null) {
+            withContext(supervisor) {
+                flush()
+            }
+        } else {
+            flush()
+        }
+    }
 
     /**
      * Inject a corruption after a specific sequence for testing torn-frame scenarios.
