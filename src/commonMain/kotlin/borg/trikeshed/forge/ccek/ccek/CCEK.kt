@@ -127,7 +127,15 @@ class ArticulatedNode(
                     for (signal in signalIn) {
                         if (record) recordedSignals += signal
                         val agentsSnapshot = agents.values.toList()
-                        agentsSnapshot.forEach { it(signal) }
+                        agentsSnapshot.forEach { agent ->
+                            launch {
+                                try {
+                                    agent(signal)
+                                } catch (e: Throwable) {
+                                    // Catch errors so sibling agents are not cancelled
+                                }
+                            }
+                        }
                         doc = applySignal(signal)
                         registerChildScopes(doc)
                         fanOutAll()
