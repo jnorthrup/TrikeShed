@@ -1,4 +1,6 @@
 package borg.trikeshed.platform.tensor
+import borg.trikeshed.lib.Join
+import borg.trikeshed.lib.j
 
 /**
  * ORC JIT compiler for tensor operations using LLVM ORC
@@ -63,8 +65,8 @@ sealed class TensorOp {
     object Relu : TensorOp()
     object Softmax : TensorOp()
     data class Conv2d(
-        val padding: Pair<Int, Int>,
-        val stride: Pair<Int, Int>
+        val padding: Join<Int, Int>,
+        val stride: Join<Int, Int>
     ) : TensorOp()
     data class Gemm(
         val transA: Boolean,

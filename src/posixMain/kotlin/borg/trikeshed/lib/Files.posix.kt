@@ -1,6 +1,8 @@
 @file:OptIn(ExperimentalForeignApi::class)
 
 package borg.trikeshed.lib
+import borg.trikeshed.lib.Join
+import borg.trikeshed.lib.j
 
 import borg.trikeshed.common.createTempDirectory
 import kotlinx.cinterop.*
@@ -164,7 +166,7 @@ actual object Files {
 
     actual fun resolvePath(vararg parts: String): String = parts.joinToString("/")
 
-    actual fun readZip(path: String): List<Pair<String, ByteArray>> = throw UnsupportedOperationException("readZip unsupported")
+    actual fun readZip(path: String): List<Join<String, ByteArray>> = throw UnsupportedOperationException("readZip unsupported")
 
     actual fun createTempDir(prefix: String): String = createTempDirectory(prefix)
 

@@ -1,4 +1,6 @@
 package borg.trikeshed.lib
+import borg.trikeshed.lib.Join
+import borg.trikeshed.lib.j
 
 @Deprecated("Use FileOperations CCEK: coroutineContext[FileOperations.Key]")
 expect object Files {
@@ -18,6 +20,6 @@ expect object Files {
     fun mkdirs(path: String)
     fun deleteRecursively(path: String)
     fun resolvePath(vararg parts: String): String
-    fun readZip(path: String): List<Pair<String, ByteArray>>
+    fun readZip(path: String): List<Join<String, ByteArray>>
     fun createTempDir(prefix: String): String
 }

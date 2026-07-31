@@ -1,4 +1,6 @@
 package keymux
+import borg.trikeshed.lib.Join
+import borg.trikeshed.lib.j
 
 import borg.trikeshed.lib.*
 import borg.trikeshed.htx.*
@@ -35,7 +37,7 @@ class KeyMuxTest {
         override fun mkdirs(path: String) {}
         override fun deleteRecursively(path: String) {}
         override fun resolvePath(vararg parts: String): String = parts.joinToString("/")
-        override fun readZip(path: String): List<Pair<String, ByteArray>> = emptyList()
+        override fun readZip(path: String): List<Join<String, ByteArray>> = emptyList()
         override fun createTempDir(prefix: String): String = ""
         override fun close(fd: Int): Int = 0
         override fun size(fd: Int): Long = 0L

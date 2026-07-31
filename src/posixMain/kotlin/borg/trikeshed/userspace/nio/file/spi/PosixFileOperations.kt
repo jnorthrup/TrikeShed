@@ -1,6 +1,8 @@
 @file:OptIn(ExperimentalForeignApi::class)
 
 package borg.trikeshed.userspace.nio.file.spi
+import borg.trikeshed.lib.Join
+import borg.trikeshed.lib.j
 
 import borg.trikeshed.common.createTempDirectory
 import borg.trikeshed.lib.*
@@ -112,7 +114,7 @@ class PosixFileOperations : FileOperations {
         }
     }
     override fun resolvePath(vararg parts: String): String = parts.joinToString("/")
-    override fun readZip(path: String): List<Pair<String, ByteArray>> = throw UnsupportedOperationException("readZip unsupported")
+    override fun readZip(path: String): List<Join<String, ByteArray>> = throw UnsupportedOperationException("readZip unsupported")
     override fun open(path: String, readOnly: Boolean): Int {
         val flags = if (readOnly) O_RDONLY else (O_RDWR or O_CREAT)
         return platform.posix.open(path, flags,  644.fromOctal())
