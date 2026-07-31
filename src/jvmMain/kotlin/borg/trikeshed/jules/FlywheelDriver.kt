@@ -1409,6 +1409,14 @@ class FlywheelDriver(
                     lines.any { it.startsWith("<<<<<<< ") && it != "<<<<<<< SEARCH" }
                 } == true
             }
+            // Stale patch/diff/sh artifacts carry conflict markers by design
+            // (they ARE diff fragments). Exclude them so they don't block
+            // dispatch permanently — only source-tree conflicts gate the
+            // settlement barrier.
+            .filterNot { path ->
+                path.endsWith(".patch") || path.endsWith(".diff") ||
+                    path.endsWith(".sh") || path.endsWith(".txt")
+            }
         return (unmergedFiles() + markerFiles).distinct()
     }
 
