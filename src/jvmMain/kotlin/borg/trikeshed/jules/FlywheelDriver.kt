@@ -108,6 +108,8 @@ class FlywheelDriver(
     private val noPatchProbes = mutableMapOf<String, Int>()
     /** Consecutive patch-bearing drain failures per session id; never tombstoned. */
     private val drainFailures = mutableMapOf<String, Int>()
+    /** Per-arm corrupt-patch probe counter; tombstones at 3 to prevent infinite retry. */
+    private val corruptPatchProbes = mutableMapOf<String, Int>()
     /** Session-derived work ids are historical fallback identities, not new work
      * once their corresponding card is already closed. Keep their WAL history
      * visible while reporting each suppressed requeue only once per process. */
@@ -509,7 +511,16 @@ class FlywheelDriver(
                 if (mergeRes.exitCode != 0) {
                     val conflicted = unmergedFiles()
                     if (conflicted.isEmpty()) {
-                        drainFail(s, "merge $branch failed: ${mergeRes.output.take(200)}")
+                        // Corrupt patch — increment probe counter and retire after 3
+                        val probes = (corruptPatchProbes[s.id] ?: 0) + 1
+                        corruptPatchProbes[s.id] = probes
+                        if (probes >= 3) {
+                            corruptPatchProbes.remove(s.id)
+                            conductor.retireTerminal(s.id, "corrupt patch after $probes probes; nothing to land", Clock.System.now().toEpochMilliseconds())
+                            println("[FLYWHEEL] RETIRE ${s.id.takeLast(6)} corrupt patch after $probes probes")
+                        } else {
+                            emitPollError("drain ${s.id}: corrupt patch (probe $probes/3)", 0)
+                        }
                         continue
                     }
                     println("[FLYWHEEL] MERGE-CONFLICT ${s.id.takeLast(6)} ($branch): ${conflicted.size} files — committing markers")
@@ -523,10 +534,12 @@ class FlywheelDriver(
                         drainFail(s, "conflict commit failed: ${commit.output.take(200)}")
                         continue
                     }
+                    corruptPatchProbes.remove(s.id) // clear on success
                 } else {
                     println("[FLYWHEEL] MERGED ${s.id.takeLast(6)} ($branch)")
                 }
                 landed += arm
+                corruptPatchProbes.remove(s.id) // clear on success
             } else {
                 // Fallback: no branch on origin — apply the CAS'd patch.
                 // SANITIZE FIRST: Jules patches bundle sandbox scratch files
@@ -554,7 +567,16 @@ class FlywheelDriver(
                         continue
                     }
                     if (apply.exitCode != 0 && conflicted.isEmpty()) {
-                        drainFail(s, "apply --3way failed: ${apply.output.take(200)}")
+                        // Corrupt patch — increment probe counter and retire after 3
+                        val probes = (corruptPatchProbes[s.id] ?: 0) + 1
+                        corruptPatchProbes[s.id] = probes
+                        if (probes >= 3) {
+                            corruptPatchProbes.remove(s.id)
+                            conductor.retireTerminal(s.id, "corrupt patch after $probes probes; nothing to land", Clock.System.now().toEpochMilliseconds())
+                            println("[FLYWHEEL] RETIRE ${s.id.takeLast(6)} corrupt patch after $probes probes")
+                        } else {
+                            emitPollError("drain ${s.id}: corrupt patch (probe $probes/3)", 0)
+                        }
                         continue
                     }
                     val touched = parsePatchFiles(cleanPatch)
@@ -568,10 +590,20 @@ class FlywheelDriver(
                         "flywheel: patch ${s.title.take(50)} (${s.id.takeLast(6)})",
                     )
                     if (commit.exitCode != 0 && !isWorkingTreeClean()) {
-                        drainFail(s, "patch commit failed: ${commit.output.take(200)}")
+                        // Corrupt patch — increment probe counter and retire after 3
+                        val probes = (corruptPatchProbes[s.id] ?: 0) + 1
+                        corruptPatchProbes[s.id] = probes
+                        if (probes >= 3) {
+                            corruptPatchProbes.remove(s.id)
+                            conductor.retireTerminal(s.id, "corrupt patch after $probes probes; nothing to land", Clock.System.now().toEpochMilliseconds())
+                            println("[FLYWHEEL] RETIRE ${s.id.takeLast(6)} corrupt patch after $probes probes")
+                        } else {
+                            emitPollError("drain ${s.id}: corrupt patch (probe $probes/3)", 0)
+                        }
                         continue
                     }
                     landed += arm
+                    corruptPatchProbes.remove(s.id) // clear on success
                 } finally {
                     if (pf.exists()) pf.delete()
                 }
