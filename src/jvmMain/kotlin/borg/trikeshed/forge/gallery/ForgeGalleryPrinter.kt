@@ -30,7 +30,7 @@ object ForgeGalleryPrinter {
         ForgeGallerySection.values().forEach { section ->
             val widgets = ForgeGalleryCatalog.bySection(section)
             if (widgets.isEmpty()) return@forEach
-            appendLine("── ${section.name} (${widgets.size}) ".padEnd(GRID_WIDTH, '─'))
+            appendLine("── ${section.name} (${widgets.size}) ".padEndVisual(GRID_WIDTH, '─'))
             widgets.forEach { widget ->
                 appendLine(formatWidgetLine(widget))
             }
@@ -45,11 +45,16 @@ object ForgeGalleryPrinter {
         appendLine("Default mode: ${ForgeBlackboardView.DEFAULT.defaultMode}")
         appendLine("3D layout:")
         ForgeBlackboardView.DEFAULT.layout3D.forEach { placement ->
-            appendLine("  ${placement.sectionId.padEnd(10)} center=(${placement.centerX.toInt()},${placement.centerY.toInt()})  ${placement.width.toInt()}x${placement.height.toInt()}  elevation=${placement.elevation.toInt()}")
+            appendLine("  ${placement.sectionId.padEndVisual(10)} center=(${placement.centerX.toInt()},${placement.centerY.toInt()})  ${placement.width.toInt()}x${placement.height.toInt()}  elevation=${placement.elevation.toInt()}")
         }
         appendLine(rule())
         ForgeBlackboardView.DEFAULT.cornerButtons.forEach { btn ->
-            appendLine("  ${btn.slot.name.padEnd(14)} ${btn.id.padEnd(20)} hotkey=[${btn.hotkey}]  ${btn.label}")
+            appendLine("  ${btn.slot.name.padEndVisual(14)} ${btn.id.padEndVisual(20)} hotkey=[${btn.hotkey}]  ${btn.label}")
+        }
+        appendLine(rule())
+        appendLine("Catalog entries:")
+        ForgeGalleryCatalog.widgets().forEach { widget ->
+            appendLine("  " + formatWidgetLine(widget))
         }
     }
 
@@ -82,15 +87,63 @@ object ForgeGalleryPrinter {
     )
 
     private fun formatWidgetLine(widget: ForgeGalleryWidget): String {
-        val left = "${widget.id.padEnd(20)} ${widget.name.padEnd(20)}"
-        val synopsis = widget.synopsis.take(GRID_WIDTH - left.length - 2)
+        val left = "${widget.id.padEndVisual(20)} ${widget.name.padEndVisual(20)}"
+        val maxSynW = GRID_WIDTH - left.visualWidth() - 2
+        val synopsis = if (widget.synopsis.visualWidth() > maxSynW) widget.synopsis.takeVisual(maxSynW - 1) + "…" else widget.synopsis.padEndVisual(maxSynW)
         return "$left  $synopsis"
     }
 
     private fun headerLine(label: String): String =
-        "── $label ".padEnd(GRID_WIDTH, '─')
+        "── $label ".padEndVisual(GRID_WIDTH, '─')
 
     private fun rule(): String = "─".repeat(GRID_WIDTH)
+}
+
+private fun String.visualWidth(): Int {
+    var width = 0
+    var i = 0
+    while (i < this.length) {
+        val cp = this.codePointAt(i)
+        val isWide = cp >= 0x1100 &&
+            (cp <= 0x115F || cp == 0x2329 || cp == 0x232A ||
+            (cp >= 0x2E80 && cp <= 0xA4C6) || (cp >= 0xAC00 && cp <= 0xD7A3) ||
+            (cp >= 0xF900 && cp <= 0xFAFF) || (cp >= 0xFE10 && cp <= 0xFE19) ||
+            (cp >= 0xFE30 && cp <= 0xFE6F) || (cp >= 0xFF00 && cp <= 0xFF60) ||
+            (cp >= 0xFFE0 && cp <= 0xFFE6) || (cp >= 0x20000 && cp <= 0x2FFFD) ||
+            (cp >= 0x30000 && cp <= 0x3FFFD))
+        width += if (isWide) 2 else 1
+        i += Character.charCount(cp)
+    }
+    return width
+}
+
+private fun String.padEndVisual(targetWidth: Int, padChar: Char = ' '): String {
+    val currentWidth = this.visualWidth()
+    if (currentWidth >= targetWidth) return this
+    return this + padChar.toString().repeat(targetWidth - currentWidth)
+}
+
+private fun String.takeVisual(targetWidth: Int): String {
+    var width = 0
+    var i = 0
+    var charCount = 0
+    while (i < this.length) {
+        val cp = this.codePointAt(i)
+        val isWide = cp >= 0x1100 &&
+            (cp <= 0x115F || cp == 0x2329 || cp == 0x232A ||
+            (cp >= 0x2E80 && cp <= 0xA4C6) || (cp >= 0xAC00 && cp <= 0xD7A3) ||
+            (cp >= 0xF900 && cp <= 0xFAFF) || (cp >= 0xFE10 && cp <= 0xFE19) ||
+            (cp >= 0xFE30 && cp <= 0xFE6F) || (cp >= 0xFF00 && cp <= 0xFF60) ||
+            (cp >= 0xFFE0 && cp <= 0xFFE6) || (cp >= 0x20000 && cp <= 0x2FFFD) ||
+            (cp >= 0x30000 && cp <= 0x3FFFD))
+        val w = if (isWide) 2 else 1
+        if (width + w > targetWidth) break
+        width += w
+        val c = Character.charCount(cp)
+        i += c
+        charCount += c
+    }
+    return this.substring(0, charCount)
 }
 
 /**
