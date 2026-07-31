@@ -8,6 +8,14 @@ import borg.trikeshed.cursor.RowVec
 import borg.trikeshed.cursor.ColumnMeta
 import borg.trikeshed.isam.meta.IOMemento
 import kotlinx.serialization.*
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
+import borg.trikeshed.lib.emptySeries
+import borg.trikeshed.parse.json.JsonSupport
+
+val couchStoreScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
 
 /**
  * Couch K-V Document Store — minimal in-memory implementation backed by MutableSeries.
@@ -189,22 +197,22 @@ class CouchStore(
  * Persistence interface — pluggable backend for durability.
  */
 interface CouchPersistence {
-    fun persist(document: Document)
-    fun delete(docId: String)
-    fun flush(): Unit
-    fun drain(): Unit
-    fun close(): Unit
+    suspend fun persist(key: String, value: ByteArray)
+    suspend fun delete(key: String)
+    suspend fun flush()
+    suspend fun drain(): Series<String>
+    suspend fun close()
 }
 
 /**
  * No-op persistence for pure in-memory operation.
  */
 object NoOpPersistence : CouchPersistence {
-    override fun persist(document: Document) {}
-    override fun delete(docId: String) {}
-    override fun flush() {}
-    override fun drain() {}
-    override fun close() {}
+    override suspend fun persist(key: String, value: ByteArray) {}
+    override suspend fun delete(key: String) {}
+    override suspend fun flush() {}
+    override suspend fun drain(): Series<String> = emptySeries()
+    override suspend fun close() {}
 }
 
 /**
@@ -231,7 +239,9 @@ object CouchStoreFactory {
 
             head.applyCommit(frame)
             changes.applyCommit(frame)
-            persistence.persist(doc)
+            couchStoreScope.launch {
+                persistence.persist(doc.id, JsonSupport.stringify(doc).encodeToByteArray())
+            }
             return existingRev == null || isDeleted
         }
 
@@ -252,7 +262,9 @@ object CouchStoreFactory {
 
             head.applyCommit(frame)
             changes.applyCommit(frame)
-            persistence.delete(docId)
+            couchStoreScope.launch {
+                persistence.delete(docId)
+            }
             return true
         }
     }
@@ -267,7 +279,14 @@ object CouchStoreFactory {
     fun withPersistence(persistence: CouchPersistence): CouchStore {
         val head = CouchHeadProjection()
         val changes = CouchChangesProjection()
-        val ingress = ProductionCouchIngress(head, { frame -> head.applyCommit(frame); changes.applyCommit(frame); persistence.persist(frame.doc ?: Document(frame.docId, emptyList())) }, { doc -> borg.trikeshed.job.ContentId.of(doc.fields.joinToString { it.value.toString() }.encodeToByteArray()) })
+        val ingress = ProductionCouchIngress(head, { frame -> 
+            head.applyCommit(frame)
+            changes.applyCommit(frame)
+            couchStoreScope.launch {
+                val docToPersist = frame.doc ?: Document(frame.docId, emptyList())
+                persistence.persist(docToPersist.id, JsonSupport.stringify(docToPersist).encodeToByteArray())
+            }
+        }, { doc -> borg.trikeshed.job.ContentId.of(doc.fields.joinToString { it.value.toString() }.encodeToByteArray()) })
         return CouchStore(ingress, head, changes)
     }
 }
