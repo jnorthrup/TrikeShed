@@ -218,6 +218,10 @@ class ViewServer {
      * Cursor enumerates rows (and _id column); store.get supplies map body.
      * Closes S5: query algebra with a real consumer outside tests.
      */
+    suspend fun load(viewDef: ViewDefinition, store: CouchStore): ViewResult = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
+        execute(viewDef, store)
+    }
+
     fun execute(viewDef: ViewDefinition, store: CouchStore): ViewResult {
         val qr = store.query()
         val cursor = qr.cursor
@@ -239,6 +243,10 @@ class ViewServer {
     }
 
     /** Execute a view definition against a list of documents. */
+    suspend fun load(viewDef: ViewDefinition, documents: Series<Document>): ViewResult = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
+        execute(viewDef, documents.toList())
+    }
+
     fun execute(viewDef: ViewDefinition, documents: List<Document>): ViewResult {
         val rows = mutableSeriesOf<ViewRow>()
         for (doc in documents) {
