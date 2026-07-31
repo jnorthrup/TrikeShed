@@ -39,6 +39,26 @@ enum class HtxFlowStage {
     FAILURE,
 }
 
+sealed class DhtxMessage {
+    abstract val correlationId: String
+}
+
+data class DhtxReq(
+    override val correlationId: String,
+    val payload: Series<Byte>
+) : DhtxMessage()
+
+data class DhtxRes(
+    override val correlationId: String,
+    val payload: Series<Byte>
+) : DhtxMessage()
+
+data class DhtxExchange(
+    val req: DhtxReq,
+    val res: DhtxRes?,
+    val elapsedNanos: Long?
+)
+
 enum class HtxExchangeLifecycle {
     CREATED,
     REQUESTED,
