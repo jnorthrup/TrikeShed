@@ -1,5 +1,9 @@
 package borg.trikeshed.userspace
 
+import borg.trikeshed.lib.Series
+import borg.trikeshed.lib.seriesOf
+import borg.trikeshed.lib.toList
+import borg.trikeshed.userspace.UringCompletion
 import borg.trikeshed.userspace.nio.channels.spi.JvmReactorOperations
 import borg.trikeshed.userspace.nio.ByteBuffer
 import borg.trikeshed.userspace.UringOp.Companion.UringSubmission
@@ -230,6 +234,20 @@ private class JvmUserspaceChannelBackend(
         override fun executeSync(): Int = -1
         override fun executeTruncate(size: Long): Int = -1
         override fun executeClose(): Int = try { ssc.close(); 0 } catch (_: Exception) { -1 }
+    }
+    override suspend fun batchEnqueue(submissions: Series<UringOp.Companion.UringSubmission>): Series<UringCompletion> {
+        val subs = mutableListOf<UringOp.Companion.UringSubmission>()
+        for (op in submissions.toList()) {
+            subs.add(op)
+        }
+        val res = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            submitBatch(subs)
+        }
+        val comps = mutableListOf<UringCompletion>()
+        for (r in res) {
+            comps.add(UringCompletion(r.userData, r.res, 0))
+        }
+        return seriesOf<UringCompletion>(comps)
     }
 }
 

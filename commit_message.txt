@@ -1,0 +1,5 @@
+refactor(userspace): implement suspend batchEnqueue for UserspaceChannelBackend
+
+- Add suspend `batchEnqueue` method to `UserspaceChannelBackend` and `FunctionalUringFacade`.
+- `FunctionalUringFacade` implements cancellation-safe completion harvesting by using `withContext(NonCancellable)` and buffering in an ArrayDeque to ensure results are correctly managed.
+- `UserspaceIO.jvm.kt` implements the backend component leveraging the JVM's `submitBatch` synchronously bridged in `withContext(Dispatchers.IO)`.

@@ -1,5 +1,11 @@
 package borg.trikeshed.userspace
 
+import borg.trikeshed.lib.Series
+import borg.trikeshed.lib.seriesOf
+import borg.trikeshed.userspace.UringCompletion
+import kotlinx.coroutines.ensureActive
+import borg.trikeshed.lib.get
+import borg.trikeshed.lib.size
 import borg.trikeshed.userspace.UringOp.Companion.UringSubmission
 import borg.trikeshed.userspace.nio.ByteBuffer
 
@@ -48,6 +54,10 @@ public interface UserspaceChannelBackend {
         // Default: no batch support — callers must use legacy path
         return emptyList()
     }
+
+    suspend fun batchEnqueue(submissions: Series<UringSubmission>): Series<UringCompletion> {
+        return seriesOf<UringCompletion>(emptyList())
+    }
 }
 
 /**
@@ -72,6 +82,30 @@ public class FunctionalUringFacade(
     }
 
     // -- Unified API --
+
+    private val stash = ArrayDeque<borg.trikeshed.userspace.UringCompletion>()
+
+    suspend fun batchEnqueue(operations: Series<UringSubmission>): Series<UringCompletion> {
+        val res = kotlinx.coroutines.withContext(kotlinx.coroutines.NonCancellable) {
+            backend.batchEnqueue(operations)
+        }
+        
+        // Stash the results in case of cancellation
+        val list = mutableListOf<UringCompletion>()
+        val end = res.size
+        for (i in 0 until end) {
+            list.add(res[i])
+        }
+        stash.addAll(list)
+        
+        // Now if we check for cancellation, it throws, but we safely stashed them!
+        kotlinx.coroutines.currentCoroutineContext().ensureActive()
+        
+        // Return from stash if active
+        val toReturn = stash.toList()
+        stash.clear()
+        return borg.trikeshed.lib.seriesOf<UringCompletion>(toReturn)
+    }
 
     /** Enqueue a raw [UringSubmission]. */
     fun enqueue(sub: UringSubmission) {
