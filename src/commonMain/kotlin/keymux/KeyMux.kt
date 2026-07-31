@@ -143,7 +143,7 @@ class ApiSource(
     override suspend fun read(path: KeyPath): String? {
         val htx = getHtx()
         val url = "$baseUrl/${path.asString()}"
-        val htxHeaders = htxHeaders(*headers.toList().map { it.a j it.b }.toTypedArray())
+        val htxHeaders = htxHeaders(*headers.toArray())
         val req = parseHtxRequest(url = url, method = HtxMethod.GET).copy(headers = htxHeaders)
         val resp = htx.request(req)
         if (resp.status != 200) return null
@@ -153,7 +153,7 @@ class ApiSource(
     override suspend fun write(path: KeyPath, value: String) {
         val htx = getHtx()
         val url = "$baseUrl/${path.asString()}"
-        val htxHeaders = htxHeaders(*headers.toList().map { it.a j it.b }.toTypedArray())
+        val htxHeaders = htxHeaders(*headers.toArray())
         val req = parseHtxRequest(
             url = url,
             method = HtxMethod.PUT,
