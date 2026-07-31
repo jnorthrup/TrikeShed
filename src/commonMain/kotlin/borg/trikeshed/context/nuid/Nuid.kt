@@ -245,7 +245,13 @@ val Nuid.subnet: Subnet get() = b.b
 fun interface TraitSpace {
     fun capabilities(): Series<Capability>
     fun can(offer: Capability): Boolean =
-        capabilities().let { caps -> (0 until caps.size).any { i -> caps[i] matches offer } }
+        try {
+            capabilities().let { caps -> (0 until caps.size).any { i -> caps[i] matches offer } }
+        } catch (e: kotlinx.coroutines.CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            false
+        }
 
     companion object {
         /** Common empty trait space — for routers that claim no work. */
@@ -268,7 +274,13 @@ data class Workgroup(
     val traits: TraitSpace,
 ) {
     fun canHandle(request: Nuid): Boolean =
-        traits.can(request.capability) && (scope contains request.subnet)
+        try {
+            traits.can(request.capability) && (scope contains request.subnet)
+        } catch (e: kotlinx.coroutines.CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            false
+        }
 }
 
 // ── CCEK bridge: the NUID-aware bearer element ───────────────────────────
