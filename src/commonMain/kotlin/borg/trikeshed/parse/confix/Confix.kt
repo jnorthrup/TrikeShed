@@ -19,7 +19,7 @@ enum class Syntax {
         override fun recognize(first: Byte): Boolean = true
     },
     YAML {
-        override fun scan(src: Series<Byte>): Cursor = scan0(src).a
+        override fun scan(src: Series<Byte>): Cursor = scanYaml0(src).a
         override fun recognize(first: Byte): Boolean = first.toInt().toChar() !in setOf('{', '[')
     };
 
@@ -291,9 +291,122 @@ enum class Syntax {
 
     fun series(): ChunkedMutableSeries<Int> = ChunkedMutableSeries()
 
+    fun scanYaml0(src: Series<Byte>): Join<Cursor, FlatIndex> {
+        var firstNonWhitespace = -1
+        for (i in 0 until src.a) {
+            val c = src.b(i).toInt().toChar()
+            if (!c.isWhitespace()) {
+                firstNonWhitespace = i
+                break
+            }
+        }
+        if (firstNonWhitespace != -1) {
+            val firstChar = src.b(firstNonWhitespace).toInt().toChar()
+            if (firstChar == '{' || firstChar == '[') {
+                return scan0(src)
+            }
+        }
+
+        val opens = series()
+        val closes = series()
+        val tags = ChunkedMutableSeries<IOMemento>()
+
+        val srcStr = CharArray(src.a) { src.b(it).toInt().toChar() }.concatToString()
+        val doc = borg.trikeshed.parse.yaml.YamlParser.parse(srcStr)
+
+        val lines = srcStr.replace("\r\n", "\n").replace('\r', '\n').lines()
+        val lineOffsets = IntArray(lines.size + 1)
+        var offset = 0
+        for (i in lines.indices) {
+            lineOffsets[i] = offset
+            offset += lines[i].length + 1
+        }
+        lineOffsets[lines.size] = srcStr.length
+
+        fun getOffset(line: Int): Int {
+            if (line <= 0) return 0
+            if (line > lines.size) return srcStr.length
+            return lineOffsets[line - 1]
+        }
+
+        fun getEndOffset(line: Int): Int {
+            if (line <= 0) return 0
+            if (line > lines.size) return srcStr.length
+            return lineOffsets[line] - 1
+        }
+
+        fun add(open: Int, close: Int, tag: IOMemento) {
+            opens.add(open)
+            closes.add(close)
+            tags.add(tag)
+        }
+
+        fun walk(node: borg.trikeshed.parse.yaml.YamlNode) {
+            val open = getOffset(node.span.a)
+            val close = minOf(srcStr.length - 1, getEndOffset(node.span.b))
+
+            when (node) {
+                is borg.trikeshed.parse.yaml.YamlMappingNode -> {
+                    add(open, close, IOMemento.IoObject)
+                    for (i in 0 until node.entries.a) {
+                        val entry = node.entries.b(i)
+                        val kOpen = getOffset(entry.span.a)
+                        val lineText = lines[entry.span.a - 1]
+                        val indent = lineText.length - lineText.trimStart().length
+                        val kStart = kOpen + indent
+                        val kClose = kStart + entry.key.a - 1
+                        val kStartAdj = if (kStart > 0 && srcStr[kStart - 1] == '"') kStart - 1 else kStart
+                        val kCloseAdj = if (kClose + 1 < srcStr.length && srcStr[kClose + 1] == '"') kClose + 1 else kClose
+
+                        add(kStartAdj, kCloseAdj, IOMemento.IoString)
+                        walk(entry.value)
+                    }
+                }
+                is borg.trikeshed.parse.yaml.YamlSequenceNode -> {
+                    add(open, close, IOMemento.IoArray)
+                    for (i in 0 until node.items.a) {
+                        walk(node.items.b(i))
+                    }
+                }
+                is borg.trikeshed.parse.yaml.YamlScalarNode -> {
+                    val valOpen = getOffset(node.span.a)
+                    val valClose = minOf(srcStr.length - 1, getEndOffset(node.span.b))
+                    val lineText = lines[node.span.a - 1]
+                    val indent = lineText.length - lineText.trimStart().length
+                    val vStart = valOpen + indent
+                    
+                    var vEnd = valClose
+                    while (vEnd >= vStart && srcStr[vEnd].isWhitespace()) {
+                        vEnd--
+                    }
+
+                    if (node.value == null) {
+                        add(vStart, vEnd, IOMemento.IoNothing)
+                    } else {
+                        val vStr = CharArray(node.value!!.a) { node.value!!.b(it) }.concatToString()
+                        val isNum = vStr.toDoubleOrNull() != null
+                        if (isNum) {
+                            add(vStart, vEnd, IOMemento.IoDouble)
+                        } else if (vStr == "true" || vStr == "false") {
+                            add(vStart, vEnd, IOMemento.IoBoolean)
+                        } else {
+                            val vStartAdj = if (vStart > 0 && srcStr[vStart - 1] == '"') vStart - 1 else vStart
+                            val vEndAdj = if (vEnd + 1 < srcStr.length && srcStr[vEnd + 1] == '"') vEnd + 1 else vEnd
+                            add(vStartAdj, vEndAdj, IOMemento.IoString)
+                        }
+                    }
+                }
+            }
+        }
+
+        walk(doc.root)
+        return buildTree(opens, closes, tags)
+    }
+
     fun scanIndex(src: Series<Byte>): ConfixIndex {
         val (tree, flat) = when (this) {
             CBOR -> scanCbor0(src)
+            YAML -> scanYaml0(src)
             else -> scan0(src)
         }
         val keys = LinkedHashMap<String, Int>()
