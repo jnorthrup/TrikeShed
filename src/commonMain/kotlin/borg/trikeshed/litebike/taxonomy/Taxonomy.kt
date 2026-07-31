@@ -40,6 +40,11 @@ enum class Protocol(val id: UByte) {
     Bonjour(8u), Upnp(9u);
 
     companion object {
+        init {
+            val ids = entries.map { it.id }
+            require(ids.size == ids.toSet().size) { "Protocol IDs must be unique" }
+        }
+
         fun fromId(id: UByte): Protocol? = entries.firstOrNull { it.id == id }
     }
 }

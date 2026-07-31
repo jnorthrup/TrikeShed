@@ -125,6 +125,17 @@ class LitebikeListenerElement(
         slot
     }
 
+    /** Ensure all known protocols are registered and no unknown protocols are present. */
+    suspend fun verifyRegistry() = registryMutex.withLock {
+        val registeredIds = registry.keys
+        for (proto in Protocol.entries) {
+            check(registeredIds.contains(proto.id)) { "Protocol ${proto.name} is not registered in LitebikeListenerElement" }
+        }
+        for (id in registeredIds) {
+            check(Protocol.fromId(id) != null) { "Unknown protocol ID $id found in LitebikeListenerElement registry" }
+        }
+    }
+
     /** Drop the slot for [protocol.id]. */
     suspend fun unregister(protocol: Protocol) {
         val slot = registryMutex.withLock { registry.remove(protocol.id) }
@@ -136,6 +147,7 @@ class LitebikeListenerElement(
     override suspend fun open() {
         if (state == ElementState.CREATED) {
             state = ElementState.OPEN
+            verifyRegistry()
             CoroutineScope(supervisor).launch {
                 for (event in fanoutChannel) {
                     for (subscriber in fanoutSubscribers.toList()) {
