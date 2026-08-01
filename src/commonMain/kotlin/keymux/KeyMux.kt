@@ -40,6 +40,7 @@ sealed class KeySource {
     abstract val name: String
     abstract suspend fun read(path: KeyPath): String?
     abstract suspend fun write(path: KeyPath, value: String)
+    open suspend fun invalidate() {}
 }
 
 // ── ENV source ──
@@ -110,6 +111,10 @@ class PersistSource(
     override suspend fun write(path: KeyPath, value: String) {
         val ops = getFileOps()
         flush(ops, load(ops) + (path.asString() to value))
+    }
+
+    override suspend fun invalidate() {
+        cache = null
     }
 }
 
@@ -305,6 +310,12 @@ class KeyMux constructor(
         listRaw(prefix).let { s -> s.size j { i -> s[i].a j (s[i].b ?: "") } }
 
     fun watch(prefix: String = ""): Flow<Join<String, String>> = emptyFlow()
+
+    suspend fun invalidate() {
+        for ((_, src) in bindings.view) {
+            src.invalidate()
+        }
+    }
 
     /**
      * Determines whether a [query] path matches a [binding] path prefix containing wildcards.
