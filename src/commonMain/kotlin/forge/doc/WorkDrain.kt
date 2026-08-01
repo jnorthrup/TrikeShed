@@ -33,6 +33,31 @@ suspend fun drainMmapCasStoreRework(store: JulesBoardStore) {
     ))
 }
 
+suspend fun drainReactorAlgebraNecromancedWork(store: JulesBoardStore) {
+    store.appendWork("synth:15340577469777603245", JulesCause.WorkDrained(
+        workId = "synth:15340577469777603245",
+        sessionId = "necromanced",
+        commitSha = "superseded-by-review",
+        taskId = "supersede-pass",
+        receipt = MergeReceipt(
+            workId = "synth:15340577469777603245",
+            producer = "necromancer",
+            producerRef = "necromanced",
+            patchCid = ContentId("sha256:0000000000000000000000000000000000000000000000000000000000000000"),
+            revision = "superseded-by-review",
+            versionTag = "superseded-by-review",
+            lexicalMemory = LexicalMemory(
+                summary = "Superseded necromanced work",
+                title = "[rework #1] Reactor algebra in commonMain",
+                content = "Superseded via drain script."
+            ),
+            claimedAt = 0L,
+            prUrl = null
+        ),
+        at = 0L
+    ))
+}
+
 suspend fun drainReactorAlgebra(store: JulesBoardStore) {
     store.appendWork("synth:15340577469777603245#2", JulesCause.WorkDrained(
         workId = "synth:15340577469777603245#2",
