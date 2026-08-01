@@ -91,7 +91,7 @@ class FlywheelDriver(
     /** Jules Pro concurrency ceiling; configuration may lower but never raise it. */
     private val maxSlots: Int = maxSlots.coerceIn(0, 15)
     private val client = JulesRestClient(apiKey)
-    internal val brain: BrainClient? = BrainClient()
+    internal val brain: BrainClient? = BrainClient(errorSink = JvmBrainErrorSink(forgeDir))
     private val store = JulesBoardStore.forForgeDir(forgeDir)
     private val conductor = JulesConductor(
         client = client,

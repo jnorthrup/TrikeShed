@@ -1,20 +1,26 @@
 package borg.trikeshed.jules
 
+import borg.trikeshed.htx.htxHeaders
+import borg.trikeshed.lib.j
+
 /**
- * Platform HTTP client abstraction for Jules REST calls.
+ * Common HTTP shape for Jules REST calls.
  *
- * commonMain interface so the flywheel can compile against it on any target.
- * jvmMain actual: [JvmJulesHttpClient] backed by java.net.http.HttpClient.
- * Future actual: userspace NIO (ChannelOperations-based) for io_uring.
- *
- * All calls are suspend-friendly — the jvmMain impl dispatches to
- * Dispatchers.IO so blocking I/O doesn't park the calling coroutine.
+ * Its production implementation [TrikeHtxHttpClient] is commonMain and routes
+ * through the reactor HTX transport. Targets supply only their actual NIO/TLS
+ * providers to the route service; they do not supply HTTP clients.
  */
 interface JulesHttpClient {
-    /** GET a path, return the response body. Throws on transport error. */
+    /** GET a path, return the response body. Throws on transport or HTTP error. */
     suspend fun get(path: String): String
     /** POST a JSON body to a path, return the response body. */
     suspend fun post(path: String, json: String): String
     /** DELETE a resource. */
     suspend fun delete(path: String): String
 }
+
+fun julesHtxClient(apiKey: String, base: String): JulesHttpClient =
+    TrikeHtxHttpClient(
+        base = base,
+        defaultHeaders = htxHeaders("x-goog-api-key" j apiKey),
+    )

@@ -6,14 +6,14 @@ import borg.trikeshed.parse.json.JsonSupport
  * Stateless Jules REST client. Zero board state — the Kanban cards own all state.
  * This replaces every curl+jq invocation in bin/trikeshed-jules.
  *
- * Transport delegated to [JulesHttpClient] — the platform abstraction.
- * jvmMain: [JvmJulesHttpClient]. Future: userspace NIO actual.
+ * Transport is the common HTX-backed client [TrikeHtxHttpClient]; the daemon
+ * installs a TLS-backed [borg.trikeshed.htx.HtxElement] in the coroutine context.
  */
 class JulesRestClient(
     private val apiKey: String,
     private val base: String = "https://jules.googleapis.com/v1alpha",
 ) {
-    private val transport: JulesHttpClient = JvmJulesHttpClient(apiKey, base)
+    private val transport: JulesHttpClient = julesHtxClient(apiKey, base)
 
     data class SessionInfo(
         val id: String,
@@ -52,7 +52,7 @@ class JulesRestClient(
         do {
             val path = buildString {
                 append("/sessions?pageSize=100")
-                if (!pageToken.isNullOrEmpty()) append("&pageToken=${java.net.URLEncoder.encode(pageToken, Charsets.UTF_8)}")
+                if (!pageToken.isNullOrEmpty()) append("&pageToken=${percentEncode(pageToken)}")
             }
             val parsed = JsonSupport.parse(get(path)) as? Map<*, *> ?: break
             val sessions = parsed["sessions"] as? List<*> ?: emptyList<Any?>()
@@ -151,7 +151,7 @@ class JulesRestClient(
         do {
             val path = buildString {
                 append("/sessions/$sessionId/activities?pageSize=100")
-                if (!pageToken.isNullOrEmpty()) append("&pageToken=${java.net.URLEncoder.encode(pageToken, Charsets.UTF_8)}")
+                if (!pageToken.isNullOrEmpty()) append("&pageToken=${percentEncode(pageToken)}")
             }
             val raw = try { get(path) } catch (t: Throwable) { return out }
             val parsed = try { JsonSupport.parse(raw) } catch (t: Throwable) { return out } as? Map<*, *> ?: break
@@ -284,5 +284,21 @@ class JulesRestClient(
             else -> append(c)
         }
         append('"')
+    }
+
+    /** URL form encoding without the JVM-only URLEncoder boundary. */
+    private fun percentEncode(s: String): String = buildString {
+        for (byte in s.encodeToByteArray()) {
+            val unsigned = byte.toInt() and 0xff
+            when {
+                unsigned in 'A'.code..'Z'.code ||
+                    unsigned in 'a'.code..'z'.code ||
+                    unsigned in '0'.code..'9'.code ||
+                    unsigned == '-'.code || unsigned == '_'.code ||
+                    unsigned == '.'.code || unsigned == '~'.code -> append(unsigned.toChar())
+                unsigned == ' '.code -> append('+')
+                else -> append('%').append(unsigned.toString(16).uppercase().padStart(2, '0'))
+            }
+        }
     }
 }

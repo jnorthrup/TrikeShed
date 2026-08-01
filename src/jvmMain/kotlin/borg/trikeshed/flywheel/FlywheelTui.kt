@@ -86,7 +86,7 @@ object FlywheelTui {
         val forgeDir = File(System.getenv("TRIKESHED_HOME") ?: File(System.getProperty("user.home"), ".local/forge").path)
         val apiKey = System.getenv("JULES_API_KEY")
         val client = apiKey?.let(::JulesRestClient)
-        // JvmJulesHttpClient requires HtxKey in the coroutine context — the
+        // The common HTX client requires HtxKey in the coroutine context — the
         // daemon installs one around runCycle; the TUI must carry its own or
         // every direct listSessions poll fails with "No HtxKey in coroutine
         // context". One element for the process lifetime; closed on exit so

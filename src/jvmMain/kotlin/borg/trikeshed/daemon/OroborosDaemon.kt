@@ -139,7 +139,7 @@ object OroborosDaemon {
 
         // HTX + TLS reactor: every Jules API call (and every ModelMux/KeyMux
         // call) flows through HtxKey → HtxElement → HtxReactorElement →
-        // JvmTlsCodecBackend. No standalone java.net.http.HttpClient. mTLS
+        // JvmTlsCodecBackend. No standalone JDK HTTP client. mTLS
         // (ClientAuth, client cert, trust store) is configured on the
         // TlsConfig carried by the route service, not per-client. The
         // supervisor auto-registers ChannelOperations + JvmTlsCodecBackend +
