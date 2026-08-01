@@ -7,6 +7,7 @@ import borg.trikeshed.kanban.KanbanCard
 import borg.trikeshed.kanban.KanbanCardId
 import borg.trikeshed.kanban.KanbanColumn
 import borg.trikeshed.kanban.KanbanColumnId
+import borg.trikeshed.kanban.moveCard
 import kotlinx.serialization.Serializable
 import kotlin.random.Random
 
@@ -59,28 +60,25 @@ data class ForgeDocument(
     val cursor: ForgeCursor,
 ) {
     fun appendBlock(kind: ForgeBlockKind, text: String, properties: Map<String, String> = emptyMap()): ForgeDocument {
-        // Stub for appendBlock
-        return this
+        return ForgeDoc.appendBlock(this, cursor.blockId, kind, text, properties)
     }
 
     fun updateText(blockId: ForgeBlockId, text: String): ForgeDocument {
-        // Stub for updateText
-        return this
+        return ForgeDoc.updateText(this, blockId, text)
     }
 
     fun deleteBlock(blockId: ForgeBlockId): ForgeDocument {
-        // Stub for deleteBlock
-        return this
+        return ForgeDoc.deleteBlock(this, blockId)
     }
 
     fun moveCard(cardId: borg.trikeshed.kanban.KanbanCardId, toColumnId: borg.trikeshed.kanban.KanbanColumnId): ForgeDocument {
-        // Stub for moveCard
-        return this
+        val board = this.toKanbanBoard()
+        val updated = board.moveCard(cardId, toColumnId)
+        return updated.toForgeDocument()
     }
 
     fun toMarkdown(): String {
-        // Stub for toMarkdown
-        return ""
+        return ForgeDoc.renderMarkdown(this)
     }
 
     companion object {
