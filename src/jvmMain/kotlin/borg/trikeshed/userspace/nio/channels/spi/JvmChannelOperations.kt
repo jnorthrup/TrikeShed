@@ -11,7 +11,12 @@ import java.nio.channels.SelectionKey
 import java.nio.channels.SelectableChannel
 import java.nio.channels.ServerSocketChannel
 import java.nio.channels.SocketChannel
+import java.util.concurrent.ArrayBlockingQueue
 import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.ConcurrentLinkedQueue
+import java.util.concurrent.RejectedExecutionException
+import java.util.concurrent.ThreadPoolExecutor
+import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicInteger
 
 /**
@@ -28,7 +33,9 @@ private fun ByteBuffer.toNioByteBuffer(): java.nio.ByteBuffer {
  * JVM stub implementation of [ChannelOperations].
  * 
  * This is a DEV/CI stub only. Production uses Linux io_uring (kernel-level).
- * This stub just delegates to blocking NIO for local development.
+ * This stub retains blocking NIO for local development, but executes queued
+ * operations on daemon workers. `submit()` must return promptly so the common
+ * reactor's cancellable completion/timeout loop keeps control of the caller.
  */
 class JvmChannelOperations(
     private val entries: Int = 2,
@@ -40,6 +47,23 @@ class JvmChannelOperations(
     internal val socketChannels = ConcurrentHashMap<Int, SelectableChannel>()
     internal val socketInterests = ConcurrentHashMap<Int, Set<Interest>>()
     internal val fdCounter = AtomicInteger(100)
+    private val workerLimit = entries.coerceAtLeast(1)
+    internal val ioWorkers = ThreadPoolExecutor(
+        workerLimit,
+        workerLimit,
+        0L,
+        TimeUnit.MILLISECONDS,
+        ArrayBlockingQueue<Runnable>(workerLimit),
+        { runnable -> Thread(runnable, "trikeshed-jvm-channel").apply { isDaemon = true } },
+        ThreadPoolExecutor.AbortPolicy(),
+    )
+
+    internal fun schedule(work: Runnable): Boolean = try {
+        ioWorkers.execute(work)
+        true
+    } catch (_: RejectedExecutionException) {
+        false
+    }
 
     override fun openChannel(entries: Int): ChannelOperations.ChannelHandle =
         JvmChannelHandle(this, entries)
@@ -79,7 +103,7 @@ class JvmChannelOperations(
         val ch = socketChannels[fd] as? SocketChannel ?: return -1
         val address = java.net.InetSocketAddress(host, port)
         try {
-            // Configure to blocking mode so HtxReactorElement's private wait loops work properly
+            // The worker may block in NIO read/write; submit itself must not.
             ch.configureBlocking(true)
             if (!ch.connect(address)) {
                 ch.finishConnect() // might throw
@@ -141,19 +165,26 @@ class JvmChannelHandle(
 
     override val id: Int get() = ops.fdCounter.incrementAndGet()
 
+    private val pendingLock = Any()
     private val pending = java.util.ArrayDeque<PendingOp>()
-    private var lastResults: List<ChannelResult> = emptyList()
+    private val submitted = java.util.ArrayDeque<PendingOp>()
+    private var workerScheduled = false
+    private val completed = ConcurrentLinkedQueue<ChannelResult>()
 
     override fun read(buffer: ByteBuffer, offset: Long): Int = -1
     override fun write(buffer: ByteBuffer, offset: Long): Int = -1
 
     override fun readv(fd: Int, buffer: ByteBuffer, userData: Long): Int {
-        pending.add(PendingOp(fd, buffer, read = true, user = userData))
+        synchronized(pendingLock) {
+            pending.add(PendingOp(fd, buffer, read = true, user = userData))
+        }
         return 0
     }
 
     override fun writev(fd: Int, buffer: ByteBuffer, userData: Long): Int {
-        pending.add(PendingOp(fd, buffer, read = false, user = userData))
+        synchronized(pendingLock) {
+            pending.add(PendingOp(fd, buffer, read = false, user = userData))
+        }
         return 0
     }
 
@@ -162,27 +193,65 @@ class JvmChannelHandle(
     override fun recvmsg(fd: Int, msgHdrPtr: Long, userData: Long): Int = -1
 
     override fun submit(): Int {
-        val completions = mutableListOf<ChannelResult>()
+        var scheduleWorker = false
+        val submittedCount = synchronized(pendingLock) {
+            var count = 0
+            while (pending.isNotEmpty()) {
+                submitted.add(pending.removeFirst())
+                count++
+            }
+            if (submitted.isNotEmpty() && !workerScheduled) {
+                workerScheduled = true
+                scheduleWorker = true
+            }
+            count
+        }
+        if (scheduleWorker && !ops.schedule(::drainSubmitted)) {
+            rejectSubmitted()
+        }
+        return submittedCount
+    }
 
-        // Split into file I/O (direct) vs socket I/O
-        val fileOps = mutableListOf<PendingOp>()
-        val socketOps = mutableListOf<PendingOp>()
-
-        while (pending.isNotEmpty()) {
-            val op = pending.removeFirst()
-            if (ops.fileChannels[op.fd] != null) {
-                fileOps.add(op)
-            } else {
-                socketOps.add(op)
+    private fun drainSubmitted() {
+        try {
+            while (true) {
+                val op = synchronized(pendingLock) {
+                    if (submitted.isEmpty()) null else submitted.removeFirst()
+                } ?: break
+                completed.add(execute(op))
+            }
+        } finally {
+            var reschedule = false
+            synchronized(pendingLock) {
+                workerScheduled = false
+                if (submitted.isNotEmpty()) {
+                    workerScheduled = true
+                    reschedule = true
+                }
+            }
+            if (reschedule && !ops.schedule(::drainSubmitted)) {
+                rejectSubmitted()
             }
         }
+    }
 
-        // Execute file I/O directly (blocking - DEV ONLY)
-        for (op in fileOps) {
-            val fc = ops.fileChannels[op.fd] ?: run {
-                completions.add(ChannelResult(op.fd, -1, op.user))
-                continue
+    private fun rejectSubmitted() {
+        val rejected = synchronized(pendingLock) {
+            workerScheduled = false
+            buildList {
+                while (submitted.isNotEmpty()) {
+                    add(submitted.removeFirst())
+                }
             }
+        }
+        rejected.forEach { op ->
+            completed.add(ChannelResult(op.fd, -1, op.user))
+        }
+    }
+
+    private fun execute(op: PendingOp): ChannelResult {
+        val fc = ops.fileChannels[op.fd]
+        if (fc != null) {
             val nioBuf = op.buf.toNioByteBuffer()
             val res = try {
                 if (op.read) {
@@ -197,35 +266,31 @@ class JvmChannelHandle(
             } catch (e: Exception) {
                 -1
             }
-            completions.add(ChannelResult(op.fd, res, op.user))
+            return ChannelResult(op.fd, res, op.user)
         }
 
-        // Socket I/O - blocking for dev
-        for (op in socketOps) {
-            val sc = ops.socketChannels[op.fd] as? SocketChannel ?: run {
-                completions.add(ChannelResult(op.fd, -1, op.user))
-                continue
+        val sc = ops.socketChannels[op.fd] as? SocketChannel
+            ?: return ChannelResult(op.fd, -1, op.user)
+        val nioBuf = op.buf.toNioByteBuffer()
+        val res = try {
+            if (op.read) {
+                val n = sc.read(nioBuf)
+                if (n > 0) op.buf.position(op.buf.position() + n)
+                n
+            } else {
+                val n = sc.write(nioBuf)
+                if (n > 0) op.buf.position(op.buf.position() + n)
+                n
             }
-            val nioBuf = op.buf.toNioByteBuffer()
-            val res = try {
-                if (op.read) {
-                    val n = sc.read(nioBuf)
-                    if (n > 0) op.buf.position(op.buf.position() + n)
-                    n
-                } else {
-                    val n = sc.write(nioBuf)
-                    if (n > 0) op.buf.position(op.buf.position() + n)
-                    n
-                }
-            } catch (e: Exception) {
-                -1
-            }
-            completions.add(ChannelResult(op.fd, res, op.user))
+        } catch (e: Exception) {
+            -1
         }
-
-        lastResults = completions
-        return completions.size
+        return ChannelResult(op.fd, res, op.user)
     }
 
-    override fun wait(minComplete: Int): List<ChannelResult> = lastResults
+    override fun wait(minComplete: Int): List<ChannelResult> = buildList {
+        while (true) {
+            add(completed.poll() ?: break)
+        }
+    }
 }
