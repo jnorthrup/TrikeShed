@@ -281,10 +281,21 @@ class FlywheelDriver(
         //     WorkDrained under the bare numeric sessionId, so the card closed
         //     (drained=true) but the real queue entry (gap:/readme:/synth:)
         //     stayed dispatched-not-drained forever. Close any queue entry
-        //     whose session card is already drained.
+        //     whose session card is already drained. Also close entries whose
+        //     card is GONE: pollOnce evicts cards the API has rotated out
+        //     (404), and an evicted card can never drain. The 15-minute
+        //     dispatch-age margin protects sessions created so recently that
+        //     listSessions may not include them yet.
+        val orphanRepairMarginMs = 15L * 60L * 1000L
+        val nowMs = Clock.System.now().toEpochMilliseconds()
         for (entry in store.loadQueue().filter { it.isDispatched && !it.isDrained }) {
-            val card = conductor.cards[entry.sessionId] ?: continue
-            if (!card.drained) continue
+            val card = conductor.cards[entry.sessionId]
+            val isOrphan = when {
+                card == null ->
+                    (nowMs - (entry.dispatchedAt ?: 0L)) > orphanRepairMarginMs
+                else -> card.drained
+            }
+            if (!isOrphan) continue
             store.appendWork(
                 workId = entry.workId,
                 cause = JulesCause.WorkDrained(
