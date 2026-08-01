@@ -6,24 +6,6 @@ typealias Predicate<T> = (self: T) -> Boolean
 //test operator
 operator fun <T> T.get(test: Predicate<T>): Boolean = test(this)
 
-//filter method for Series
-fun <T> Series<T>.filter(test: Predicate<T>): Series<T> {
-    var indices = IntArray(if (size < 10) size else 10)
-    var count = 0
-    for (i in 0 until size) {
-        if (test(get(i))) {
-            if (count == indices.size) {
-                indices = indices.copyOf(indices.size * 2)
-            }
-            indices[count++] = i
-        }
-    }
-    
-    
-    val finalIndices = if (count == indices.size) indices else indices.copyOf(count)
-    return finalIndices.size j { i -> this[finalIndices[i]] }
-}
-
 //filter operator
 operator fun <T> Series<T>.get(test: Predicate<T>): Series<T> = filter(test)
 

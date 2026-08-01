@@ -634,9 +634,3 @@ fun Series<Char>.parseLongOrNull(): Long? {
         else -> null
     }
 }
-
-fun <T> Series<T>.filter(pred: (T) -> Boolean): Series<T> {
-    val indices = IntArray(this.size) { it }.filter { pred(this[it]) }
-    val finalIndices = indices.toIntArray()
-    return finalIndices.size j { i: Int -> this@filter[finalIndices[i]] }
-}
