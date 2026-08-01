@@ -37,7 +37,10 @@ fun main(args: Array<String>) = runBlocking {
 
     for (entry in queue) {
         val isResurrectable = when {
-            entry.isDrained && entry.taskId?.startsWith("retired:") == true -> true
+            // Writer (JulesConductor.retireTerminal) uses bare "retired" (and a
+            // non-blank outbox-* commitSha), so accept both "retired" and the
+            // documented "retired:" prefix — branch 2 alone can never match.
+            entry.isDrained && entry.taskId?.startsWith("retired") == true -> true
             entry.isDrained && entry.commitSha.isNullOrBlank() -> true
             !entry.isDispatched && !entry.isDrained &&
                 (now - entry.queuedAt) > staleAfterMs -> true
