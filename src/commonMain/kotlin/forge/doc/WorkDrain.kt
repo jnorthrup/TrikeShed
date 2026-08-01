@@ -1,7 +1,9 @@
 package forge.doc
 
-<<<<<<< ours
+import borg.trikeshed.job.ContentId
 import borg.trikeshed.jules.JulesCause
+import borg.trikeshed.util.oroboros.LexicalMemory
+import borg.trikeshed.util.oroboros.MergeReceipt
 import borg.trikeshed.utils.kanban.JulesBoardStore
 
 suspend fun drainReadmeDagReteRefraction(store: JulesBoardStore) {
@@ -29,12 +31,7 @@ suspend fun drainMmapCasStoreRework(store: JulesBoardStore) {
         taskId = "supersede-pass",
         at = 0L
     ))
-=======
-import borg.trikeshed.utils.kanban.JulesBoardStore
-import borg.trikeshed.jules.JulesCause
-import borg.trikeshed.util.oroboros.MergeReceipt
-import borg.trikeshed.util.oroboros.LexicalMemory
-import borg.trikeshed.job.ContentId
+}
 
 suspend fun drainSupersededTask(store: JulesBoardStore) {
     val targetWorkId = "synth:17160760388671804749#2"
@@ -62,5 +59,4 @@ suspend fun drainSupersededTask(store: JulesBoardStore) {
             at = 0L
         )
     )
->>>>>>> theirs
 }
