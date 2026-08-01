@@ -450,31 +450,36 @@ class FlywheelDriver(
                 }
                 .take(available)
             dispatched = withContext(Dispatchers.IO) {
-                coroutineScope {
-                    val jobs = pending.map { entry ->
-                        async(Dispatchers.IO) {
-                            try {
-                                val cappedSpec = capSpec(entry.spec)
-                                val sessionId = client.createSession(
-                                    prompt = cappedSpec, title = entry.title, source = source)
-                                store.appendWork(entry.workId, JulesCause.WorkDispatched(
-                                    workId = entry.workId,
-                                    sessionId = sessionId,
-                                    attempt = entry.attempt + 1,
-                                    at = Clock.System.now().toEpochMilliseconds(),
-                                ))
-                                _events.emit(FlywheelEvent.Dispatched(sessionId, entry.title))
-                                println("[FLYWHEEL] DISPATCH ${entry.title.take(60)}")
-                                1
-                            } catch (t: Throwable) {
-                                classifyHttpError(t)
-                                _events.emit(FlywheelEvent.DispatchFailed(entry.title, t.message.orEmpty()))
-                                println("[FLYWHEEL] FAIL ${entry.title}: ${t.message}")
-                                0
+                // The JVM HTX adapter has two bounded blocking workers. Submit
+                // sessions at that transport capacity instead of bursting every
+                // free slot into simultaneous TLS handshakes.
+                pending.chunked(2).sumOf { batch ->
+                    coroutineScope {
+                        val jobs = batch.map { entry ->
+                            async(Dispatchers.IO) {
+                                try {
+                                    val cappedSpec = capSpec(entry.spec)
+                                    val sessionId = client.createSession(
+                                        prompt = cappedSpec, title = entry.title, source = source)
+                                    store.appendWork(entry.workId, JulesCause.WorkDispatched(
+                                        workId = entry.workId,
+                                        sessionId = sessionId,
+                                        attempt = entry.attempt + 1,
+                                        at = Clock.System.now().toEpochMilliseconds(),
+                                    ))
+                                    _events.emit(FlywheelEvent.Dispatched(sessionId, entry.title))
+                                    println("[FLYWHEEL] DISPATCH ${entry.title.take(60)}")
+                                    1
+                                } catch (t: Throwable) {
+                                    classifyHttpError(t)
+                                    _events.emit(FlywheelEvent.DispatchFailed(entry.title, t.message.orEmpty()))
+                                    println("[FLYWHEEL] FAIL ${entry.title}: ${t.message}")
+                                    0
+                                }
                             }
                         }
+                        jobs.sumOf { it.await() }
                     }
-                    jobs.sumOf { it.await() }
                 }
             }
         }
