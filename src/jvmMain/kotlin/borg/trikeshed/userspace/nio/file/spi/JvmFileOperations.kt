@@ -167,10 +167,10 @@ class JvmFileOperations : FileOperations {
         }
     }
 
-    override fun readZip(path: String): List<Pair<String, ByteArray>> =
+    override fun readZip(path: String): List<Join<String, ByteArray>> =
         ZipFile(path).use { zip ->
             zip.entries().asSequence().map { entry ->
-                entry.name to zip.getInputStream(entry).use { it.readBytes() }
+                entry.name j zip.getInputStream(entry).use { it.readBytes() }
             }.toList()
         }
 

@@ -1,6 +1,8 @@
 @file:OptIn(ExperimentalTime::class)
 
 package borg.trikeshed.lib
+import borg.trikeshed.lib.Join
+import borg.trikeshed.lib.j
 
 import borg.trikeshed.userspace.nio.file.spi.JvmFileOperations
 import kotlin.time.ExperimentalTime
@@ -25,7 +27,7 @@ actual object Files {
     actual fun mkdirs(path: String) = delegate.mkdirs(path)
     actual fun deleteRecursively(path: String) = delegate.deleteRecursively(path)
     actual fun resolvePath(vararg parts: String): String = delegate.resolvePath(*parts)
-    actual fun readZip(path: String): List<Pair<String, ByteArray>> = delegate.readZip(path)
+    actual fun readZip(path: String): List<Join<String, ByteArray>> = delegate.readZip(path)
     actual fun createTempDir(prefix: String): String = delegate.createTempDir(prefix)
 }
 

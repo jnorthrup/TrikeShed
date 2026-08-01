@@ -141,7 +141,7 @@ class LinuxFileOperations : FileOperations {
         }
     }
     override fun resolvePath(vararg parts: String): String = parts.joinToString("/")
-    override fun readZip(path: String): List<Pair<String, ByteArray>> = throw UnsupportedOperationException("readZip unsupported")
+    override fun readZip(path: String): List<Join<String, ByteArray>> = throw UnsupportedOperationException("readZip unsupported")
     override fun createTempDir(prefix: String): String = createTempDirectory(prefix)
 
     override fun open(path: String, readOnly: Boolean): Int {

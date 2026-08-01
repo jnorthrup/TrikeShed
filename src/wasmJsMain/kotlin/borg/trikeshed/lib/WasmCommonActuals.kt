@@ -1,4 +1,6 @@
 package borg.trikeshed.lib
+import borg.trikeshed.lib.Join
+import borg.trikeshed.lib.j
 
 import borg.trikeshed.userspace.ByteRegion
 import borg.trikeshed.lib.long.LongSeries
@@ -275,7 +277,7 @@ actual object Files {
     actual fun resolvePath(vararg parts: String): String =
         normalizePath(parts.joinToString("/"))
 
-    actual fun readZip(path: String): List<Pair<String, ByteArray>> = error("readZip WASM not supported")
+    actual fun readZip(path: String): List<Join<String, ByteArray>> = error("readZip WASM not supported")
 
     actual fun createTempDir(prefix: String): String =
         "/tmp/$prefix-${Random.nextLong().toString(16)}"

@@ -114,7 +114,7 @@ class InMemoryFileOperations(
     override fun iterateLines(fileName: String, bufsize: Int): Iterable<Join<Long, Series<Byte>>> =
         streamLines(fileName, bufsize).map { (off, arr) -> off j arr.toSeries() }.asIterable()
 
-    override fun readZip(path: String): List<Pair<String, ByteArray>> =
+    override fun readZip(path: String): List<Join<String, ByteArray>> =
         error("readZip unsupported in InMemoryFileOperations")
 
     override val key: CoroutineContext.Key<*> get() = FileOperations.Key
