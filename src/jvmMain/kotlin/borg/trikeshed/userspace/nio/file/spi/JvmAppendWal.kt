@@ -37,9 +37,9 @@ class JvmAppendWal(private val path: File) : AppendWal {
         }
     }
 
-    override suspend fun append(key: String, payload: ByteArray): Long =
-        withContext(Dispatchers.IO) {
-            val keyBytes = key.encodeToByteArray()
+    override suspend fun append(key: String, payload: ByteArray): Long {
+        val keyBytes = key.encodeToByteArray()
+        return withContext(Dispatchers.IO) {
             synchronized(raf) {
                 val offset = raf.length()
                 raf.seek(offset)
@@ -51,6 +51,7 @@ class JvmAppendWal(private val path: File) : AppendWal {
                 offset
             }
         }
+    }
 
     override fun replay(): Sequence<Pair<String, ByteArray>> = sequence {
         val readRaf = RandomAccessFile(path, "r")
