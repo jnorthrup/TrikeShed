@@ -259,6 +259,24 @@ class FlywheelDriver(
             }
         }
 
+        // 2c. SWEEP terminal failures — a session that lands in FAILED or
+        //     CANCELLED never enters DRAIN (COMPLETED-only), so without an
+        //     explicit retire its card sits terminal-but-undrained and its
+        //     queue entry stays dispatched-not-drained forever: the workId can
+        //     never be re-queued and the wheel slowly clogs with zombies.
+        //     retireTerminal writes MergeReceipt + WorkDrained (bonded to the
+        //     original queue workId) so the slot closes cleanly.
+        for (card in conductor.cards.values.filter {
+            it.snapshot.state in setOf("FAILED", "CANCELLED") && !it.drained
+        }.sortedBy { it.snapshot.capturedAt }) {
+            conductor.retireTerminal(
+                card.snapshot.sessionId,
+                "terminal ${card.snapshot.state}",
+                Clock.System.now().toEpochMilliseconds(),
+            )
+            println("[FLYWHEEL] SWEEP ${card.snapshot.sessionId.takeLast(6)} ${card.snapshot.state}: ${card.card.title.take(60)}")
+        }
+
         // 3. DRAIN — consume the entire completed set. Sequential 3-way is
         //    the merge topology, not a limit on how many sessions advance.
         //    A tag alone is not a completed drain: the durable card/WAL close is

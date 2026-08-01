@@ -150,16 +150,22 @@ class JulesConductor(
         // Close the queue entry so loadQueue() stops seeing this work as
         // dispatched-but-undrained. Without this, a retired session occupies
         // a queue slot forever (isDispatched && !isDrained) and the wheel
-        // can't tell it's done. Uses the same outbox: pattern as ReapAppend.
+        // can't tell it's done. Bond to the ORIGINAL queue workId (gap:/readme:/
+        // synth:...) — writing WorkDrained under the bare numeric sessionId
+        // orphans the real entry and leaves it stuck dispatched forever.
+        // Uses the same outbox: pattern as ReapAppend.
+        val bondedWorkId = store?.loadQueue()
+            ?.firstOrNull { it.sessionId == sessionId && !it.isDrained }
+            ?.workId ?: sessionId
         store?.appendWork(
-            workId = sessionId,
+            workId = bondedWorkId,
             cause = JulesCause.WorkDrained(
-                workId = sessionId,
+                workId = bondedWorkId,
                 sessionId = sessionId,
                 commitSha = "outbox-${sessionId.take(8)}",
                 taskId = "retired",
                 receipt = borg.trikeshed.util.oroboros.MergeReceipt(
-                    workId = sessionId,
+                    workId = bondedWorkId,
                     producer = "retired",
                     producerRef = sessionId,
                     patchCid = borg.trikeshed.job.ContentId.of(
