@@ -114,6 +114,7 @@ class FlywheelDriver(
      * once their corresponding card is already closed. Keep their WAL history
      * visible while reporting each suppressed requeue only once per process. */
     private val reportedClosedSessionQueueEntries = mutableSetOf<String>()
+    private val reportedSpecMissing = mutableSetOf<String>()
 
     /** Per-cycle HTTP error counters. Reset at the start of each [cycle];
      * bumped by [classifyHttpError] at every Jules API catch site. Read by
@@ -179,6 +180,7 @@ class FlywheelDriver(
         data class DispatchFailed(val title: String, val reason: String) : FlywheelEvent
         data class PollError(val message: String) : FlywheelEvent
         data class UpstreamDrifted(val local: String, val remote: String) : FlywheelEvent
+        data class SpecMissing(val title: String) : FlywheelEvent
     }
 
     /**
@@ -439,8 +441,17 @@ class FlywheelDriver(
             if (newlyReported != 0) {
                 println("[FLYWHEEL] DISPATCH-SKIP $newlyReported already-closed session queue item(s)")
             }
-            val pending = pendingCandidates
+            val validCandidates = pendingCandidates
                 .filterNot { it.workId in closedSessionWorkIds }
+
+            validCandidates.filter { it.spec.isBlank() }.forEach {
+                if (it.title.isNotBlank() && reportedSpecMissing.add(it.title)) {
+                    _events.tryEmit(FlywheelEvent.SpecMissing(it.title))
+                }
+            }
+
+            val pending = validCandidates
+                .filter { it.spec.isNotBlank() }
                 .sortedByDescending { it.score }
                 .filter { entry ->
                     // Overlap guard: skip if this task's known file scope
