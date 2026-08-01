@@ -317,17 +317,17 @@ interface BlackboardFabric {
     /**
      * Subscribe to events of a specific type.
      */
-    fun TODO_subscribe(eventType: String, handler: (BlackboardEvent) -> Unit): Subscription
+    fun subscribe(eventType: String, handler: (BlackboardEvent) -> Unit): Subscription
     
     /**
      * Get events within a coordinate range.
      */
-    fun TODO_getEvents(from: DagCoordinate, to: DagCoordinate): Series<BlackboardEvent>
+    fun getEvents(from: DagCoordinate, to: DagCoordinate): Series<BlackboardEvent>
     
     /**
      * Project DAG events to user-signals.
      */
-    fun TODO_projectToUserSignals(event: BlackboardEvent): Series<Any>
+    fun projectToUserSignals(event: BlackboardEvent): Series<Any>
 }
 
 // ==================== SUBSCRIPTION ====================
@@ -510,7 +510,7 @@ class InMemoryBlackboardFabric : BlackboardFabric {
         handlers.filter { it.first == "*" || it.first == kind }.forEach { it.second(event) }
     }
 
-    override fun TODO_subscribe(eventType: String, handler: (BlackboardEvent) -> Unit): Subscription {
+    override fun subscribe(eventType: String, handler: (BlackboardEvent) -> Unit): Subscription {
         val entry = eventType to handler
         handlers.add(entry)
         val subId = "sub-${handlers.size}-${eventType}"
@@ -523,14 +523,14 @@ class InMemoryBlackboardFabric : BlackboardFabric {
         }
     }
 
-    override fun TODO_getEvents(from: DagCoordinate, to: DagCoordinate): Series<BlackboardEvent> {
+    override fun getEvents(from: DagCoordinate, to: DagCoordinate): Series<BlackboardEvent> {
         val lo = minOf(from.timestamp, to.timestamp)
         val hi = maxOf(from.timestamp, to.timestamp)
         val matched = nodes.filter { it.event.timestamp in lo..hi }.map { it.event }
         return matched.size j { matched[it] }
     }
 
-    override fun TODO_projectToUserSignals(event: BlackboardEvent): Series<Any> =
+    override fun projectToUserSignals(event: BlackboardEvent): Series<Any> =
         1 j { event as Any }
 }
 

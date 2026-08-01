@@ -13,7 +13,7 @@ object BlackboardDagDemo {
     fun main(args: Array<String>) {
         val fabric = BlackboardFabrics.create()
         val seen = mutableListOf<BlackboardEvent>()
-        val sub = fabric.TODO_subscribe("ClassLoad") { seen.add(it) }
+        val sub = fabric.subscribe("ClassLoad") { seen.add(it) }
 
         val coord = DagCoordinate(
             className = "borg/trikeshed/forge/KanbanBoard",
@@ -28,7 +28,7 @@ object BlackboardDagDemo {
 
         val lo = coord.copy(timestamp = coord.timestamp - 1)
         val hi = coord.copy(timestamp = coord.timestamp + 1)
-        val slice = fabric.TODO_getEvents(lo, hi)
+        val slice = fabric.getEvents(lo, hi)
 
         check(seen.size == 1) { "subscribe delivery failed: seen=${seen.size}" }
         check(seen[0] is BlackboardEvent.ClassLoad) { "expected ClassLoad" }
