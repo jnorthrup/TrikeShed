@@ -121,6 +121,25 @@ kotlin {
     val hostOs = System.getProperty("os.name").lowercase()
     val isMac = hostOs.contains("mac")
     val isLinux = hostOs.contains("linux")
+    val isWindowsHost = hostOs.startsWith("windows")
+
+    if (isWindowsHost) {
+        mingwX64("mingwX64") {
+            compilations.getByName("main") {
+                cinterops {
+                    val posixSpawn = create("posixSpawn") {
+                    }
+                }
+            }
+        }
+    } else {
+        mingwX64("mingwX64") {
+            compilations.getByName("main") {
+                cinterops {
+                }
+            }
+        }
+    }
 
     if (isMac) {
         iosX64()
@@ -246,6 +265,8 @@ kotlin {
             dependsOn(posixMain)
             kotlin.exclude("linux_uring/**")
         }
+        val mingwX64Main = maybeCreate("mingwX64Main").apply { dependsOn(nativeMain) }
+        val mingwX64Test = maybeCreate("mingwX64Test").apply { dependsOn(nativeTest) }
         val linuxTest = maybeCreate("linuxTest").apply { dependsOn(posixTest) }
         val macosMain = maybeCreate("macosMain").apply { dependsOn(posixMain) }
         val macosTest = maybeCreate("macosTest").apply { dependsOn(posixTest) }
@@ -266,6 +287,8 @@ kotlin {
         findByName("macosX64Test")?.dependsOn(posixTest)
         findByName("linuxMain")?.dependsOn(posixMain)
         findByName("linuxTest")?.dependsOn(posixTest)
+        findByName("mingwX64Main")?.dependsOn(mingwX64Main)
+        findByName("mingwX64Test")?.dependsOn(mingwX64Test)
         // T7 browser storage: IndexedDB test doubles for JS/Wasm storage tests.
         getByName("jsTest") {
             dependencies {
