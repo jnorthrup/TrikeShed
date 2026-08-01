@@ -780,7 +780,7 @@ class FlywheelDriver(
         //    from reapplying every arm and compounding the same conflict. The
         //    CycleBody conflict quarantine keeps dispatch paused while markers
         //    remain; QA or a locality resolver advances the committed tree.
-        val build = shell("./gradlew", ":jvmMainClasses", "--no-daemon")
+        val build = shell(300_000L, "./gradlew", ":jvmMainClasses", "--no-daemon")
         if (build.exitCode != 0) {
             emitPollError("cumulative build failed: ${build.output.take(400)}", 0)
             println("[FLYWHEEL] DRAIN build red — committed completion set still closes provenance")
@@ -1198,18 +1198,48 @@ class FlywheelDriver(
 
     /**
      * Run an arbitrary command in [repoDir]. Use [git] for git subcommands.
-     * 30-second timeout — a hung git (credential prompt, slow push) must not
-     * park the flywheel.
+     * The default 30-second timeout keeps git/GitHub prompts from parking the
+     * wheel; drain-time Gradle gates pass their own bounded build window.
      */
-    private fun shell(vararg args: String): CommandResult = try {
+    private fun shell(vararg args: String): CommandResult = shell(30_000L, *args)
+
+    private fun shell(timeoutMs: Long, vararg args: String): CommandResult = try {
         val process = ProcessBuilder(*args)
             .directory(repoDir)
             .redirectErrorStream(true)
             .start()
-        val finished = process.waitFor(30, java.util.concurrent.TimeUnit.SECONDS)
+        val finished = process.waitFor(timeoutMs, java.util.concurrent.TimeUnit.MILLISECONDS)
         if (!finished) {
+            val descendants = buildList {
+                val stream = process.toHandle().descendants()
+                try {
+                    stream.forEach { child -> add(child) }
+                } finally {
+                    stream.close()
+                }
+            }
+            val childExits = descendants.map { child -> child.onExit() }
+            descendants.forEach { child -> child.destroyForcibly() }
             process.destroyForcibly()
-            CommandResult(1, "timeout after 30s: ${args.joinToString(" ")}")
+            val reapDeadline = System.nanoTime() + java.util.concurrent.TimeUnit.SECONDS.toNanos(5)
+            try {
+                val remaining = (reapDeadline - System.nanoTime()).coerceAtLeast(0)
+                java.util.concurrent.CompletableFuture.allOf(*childExits.toTypedArray())
+                    .get(remaining, java.util.concurrent.TimeUnit.NANOSECONDS)
+            } catch (interrupted: InterruptedException) {
+                Thread.currentThread().interrupt()
+            } catch (_: Throwable) {
+            }
+            val remaining = reapDeadline - System.nanoTime()
+            try {
+                if (remaining > 0) {
+                    process.waitFor(remaining, java.util.concurrent.TimeUnit.NANOSECONDS)
+                }
+            } catch (interrupted: InterruptedException) {
+                Thread.currentThread().interrupt()
+            }
+            val survivors = descendants.count { it.isAlive } + if (process.isAlive) 1 else 0
+            CommandResult(1, "timeout after ${timeoutMs}ms: ${args.joinToString(" ")}; surviving processes=$survivors")
         } else {
             CommandResult(process.exitValue(), process.inputStream.bufferedReader().readText())
         }
@@ -1562,7 +1592,7 @@ class FlywheelDriver(
 
         var buildOk = false
         for (attempt in 1..3) {
-            val build = shell("./gradlew", ":jvmMainClasses", "--no-daemon")
+            val build = shell(300_000L, "./gradlew", ":jvmMainClasses", "--no-daemon")
             if (build.exitCode == 0) { buildOk = true; break }
             println("[FLYWHEEL] BUILD attempt $attempt failed for ${s.id.takeLast(6)}, fixing")
             val buildErrors = build.output.take(2000)
