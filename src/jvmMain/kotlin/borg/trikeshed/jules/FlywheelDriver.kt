@@ -277,6 +277,42 @@ class FlywheelDriver(
             println("[FLYWHEEL] SWEEP ${card.snapshot.sessionId.takeLast(6)} ${card.snapshot.state}: ${card.card.title.take(60)}")
         }
 
+        // 2d. REPAIR queue orphans — the pre-bonding retireTerminal wrote
+        //     WorkDrained under the bare numeric sessionId, so the card closed
+        //     (drained=true) but the real queue entry (gap:/readme:/synth:)
+        //     stayed dispatched-not-drained forever. Close any queue entry
+        //     whose session card is already drained.
+        for (entry in store.loadQueue().filter { it.isDispatched && !it.isDrained }) {
+            val card = conductor.cards[entry.sessionId] ?: continue
+            if (!card.drained) continue
+            store.appendWork(
+                workId = entry.workId,
+                cause = JulesCause.WorkDrained(
+                    workId = entry.workId,
+                    sessionId = entry.sessionId ?: continue,
+                    commitSha = "outbox-${(entry.sessionId ?: "").take(8)}",
+                    taskId = "retired",
+                    receipt = borg.trikeshed.util.oroboros.MergeReceipt(
+                        workId = entry.workId,
+                        producer = "retired",
+                        producerRef = entry.sessionId ?: "",
+                        patchCid = borg.trikeshed.job.ContentId.of(
+                            "orphan-repair:${entry.sessionId}".encodeToByteArray()
+                        ),
+                        revision = "outbox-${(entry.sessionId ?: "").take(8)}",
+                        versionTag = "retired",
+                        lexicalMemory = borg.trikeshed.util.oroboros.LexicalMemory(
+                            summary = "queue orphan repair: card already drained",
+                            title = "queue orphan repair", content = ""),
+                        claimedAt = Clock.System.now().toEpochMilliseconds(),
+                        prUrl = null,
+                    ),
+                    at = Clock.System.now().toEpochMilliseconds(),
+                ),
+            )
+            println("[FLYWHEEL] REPAIR ${entry.sessionId?.takeLast(6)} closed orphaned queue entry ${entry.workId.take(60)}")
+        }
+
         // 3. DRAIN — consume the entire completed set. Sequential 3-way is
         //    the merge topology, not a limit on how many sessions advance.
         //    A tag alone is not a completed drain: the durable card/WAL close is

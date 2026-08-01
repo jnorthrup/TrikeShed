@@ -37,7 +37,11 @@ class JulesConductor(
             sid in authoritativeIds ||
                 cards[sid]?.drained == true ||
                 (cards[sid]?.snapshot?.state == "COMPLETED" &&
-                    cards[sid]?.snapshot?.patchBytes ?: 0L > 0L)
+                    cards[sid]?.snapshot?.patchBytes ?: 0L > 0L) ||
+                // Un-drained terminal failures must survive rotation so SWEEP
+                // can retire them; evicting them here orphans their queue
+                // entries (dispatched-not-drained) forever.
+                cards[sid]?.snapshot?.state in setOf("FAILED", "CANCELLED")
         }
         val active = sessions.count { it.state == "IN_PROGRESS" || it.state == "PLANNING" || it.state == "QUEUED" }
         val awaiting = sessions.count { it.state == "AWAITING_USER_FEEDBACK" }
