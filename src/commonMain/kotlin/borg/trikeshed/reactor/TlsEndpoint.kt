@@ -16,7 +16,12 @@ import borg.trikeshed.userspace.FanoutEventSubscriber
 import borg.trikeshed.userspace.nio.spi.NioSupervisor
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.serialization.Serializable
+import kotlin.concurrent.atomics.AtomicLong
+import kotlin.concurrent.atomics.ExperimentalAtomicApi
 import kotlin.coroutines.CoroutineContext
+
+@OptIn(ExperimentalAtomicApi::class)
+private val nextTlsConnectionOrdinal = AtomicLong(1L)
 
 typealias TlsProtocols = Series<TlsProtocol>
 typealias TlsCipherSuites = Series<TlsCipherSuite>
@@ -198,6 +203,7 @@ interface TlsEndpoint : TlsFilterCodec {
         get() = flowState.lifecycle == TlsConnectionState.OPEN && session != null
 }
 
+@OptIn(ExperimentalAtomicApi::class)
 class TlsElement(
     val config: TlsConfig,
     private val backend: TlsCodecBackend,
@@ -210,7 +216,6 @@ class TlsElement(
     override val key: CoroutineContext.Key<*> get() = Key
 
     private val endpoints = linkedSetOf<BackendTlsEndpoint>()
-    private var nextConnectionOrdinal = 1L
 
     override suspend fun open() {
         if (state == ElementState.CREATED) {
@@ -232,7 +237,7 @@ class TlsElement(
             backend = backend,
             initialState = TlsFlowState(
                 route = route,
-                connectionOrdinal = nextConnectionOrdinal++,
+                connectionOrdinal = nextTlsConnectionOrdinal.fetchAndAdd(1L),
             ),
         ).also { endpoints += it }
 
