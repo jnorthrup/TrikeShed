@@ -52,6 +52,12 @@ class CycleBody(
                     val actualMarkers = mutableListOf<String>()
                     val markerPaths = markerProbe.inputStream.bufferedReader().readLines()
                     for (path in markerPaths) {
+                        // Stale patch/diff/sh/txt artifacts carry conflict-marker
+                        // text by design (they ARE diff fragments) — same exclusion
+                        // as FlywheelDriver.conflictFiles(). Without this, committed
+                        // artifacts trip the quarantine and pause every cycle forever.
+                        if (path.endsWith(".patch") || path.endsWith(".diff") ||
+                            path.endsWith(".sh") || path.endsWith(".txt")) continue
                         val markerFile = java.io.File(repoDir, path)
                         if (!markerFile.isFile) continue
                         for (line in markerFile.readLines()) {

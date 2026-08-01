@@ -108,7 +108,17 @@ cmd_start() {
     echo '{"columns":[{"id":"backlog","name":"Backlog","cards":[]}],"modelCallLog":[]}' > "$boardPath"
   fi
 
-  nohup java -cp $(./gradlew -q jvmMainJar --console=plain 2>/dev/null | tail -1) \
+  # Naked classes + staged lib/ — no fat jar, no ~/.gradle/caches glob.
+  local repoRoot
+  repoRoot="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+  local classes="$repoRoot/build/classes/kotlin/jvm/main"
+  local lib="$repoRoot/build/staging/lib"
+  if [[ ! -d "$classes" || ! -d "$lib" ]]; then
+    echo "missing staged classpath; run: ./gradlew stageDaemonLib" >&2
+    exit 1
+  fi
+  # shellcheck disable=SC2086
+  nohup java -cp "$classes:$lib/*" \
     borg.trikeshed.forge.server.KanbanHttpServerJvm \
     --modelmux --config "${CONFIG_FILE}" \
     >> "$(json_get .logPath)" 2>&1 &

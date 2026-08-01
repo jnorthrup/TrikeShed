@@ -1,13 +1,38 @@
 #!/usr/bin/env bash
+# bin/flywheel-tui — interactive flywheel console.
+#
+# Classpath layout (no fat jar, no cache glob):
+#   build/classes/kotlin/jvm/main      <- naked TrikeShed classes
+#   build/staging/lib/*.jar            <- runtime deps staged by `./gradlew stageDaemonLib`
+#
+# Recognized flags:
+#   --debug                    attach JDWP on :5006, suspend=n
+#   --suspend                  like --debug but suspend=y
 set -euo pipefail
-
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-JAR="$ROOT/build/libs/TrikeShed-jvm-1.0.jar"
+CLASSES="$ROOT/build/classes/kotlin/jvm/main"
+LIB="$ROOT/build/staging/lib"
 
-if [[ ! -f "$JAR" ]]; then
-  echo "missing $JAR; run: ./gradlew jvmJar --no-daemon" >&2
-  exit 1
+if [[ ! -d "$CLASSES" ]]; then
+    echo "missing $CLASSES; run: ./gradlew compileKotlinJvm" >&2
+    exit 1
+fi
+if [[ ! -d "$LIB" ]]; then
+    echo "missing $LIB; run: ./gradlew stageDaemonLib" >&2
+    exit 1
 fi
 
-CP="$JAR:$(find "$HOME/.gradle/caches/modules-2" -name '*.jar' 2>/dev/null | tr '\n' ':')"
-exec java -cp "$CP" borg.trikeshed.flywheel.FlywheelTui "$@" "$ROOT"
+CP="$CLASSES:$LIB/*"
+
+DEBUG_OPTS=()
+TUI_ARGS=("$ROOT")
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --debug)   DEBUG_OPTS+=("-agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=*:5006"); shift ;;
+    --suspend) DEBUG_OPTS+=("-agentlib:jdwp=transport=dt_socket,server=y,suspend=y,address=*:5006"); shift ;;
+    *)         TUI_ARGS+=("$1"); shift ;;
+  esac
+done
+
+# shellcheck disable=SC2086
+exec java "${DEBUG_OPTS[@]}" -cp $CP borg.trikeshed.flywheel.FlywheelTui "${TUI_ARGS[@]}"

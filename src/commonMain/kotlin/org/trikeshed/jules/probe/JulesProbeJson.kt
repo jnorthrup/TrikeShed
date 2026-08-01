@@ -1,5 +1,6 @@
 package org.trikeshed.jules.probe
 
+import borg.trikeshed.lib.j
 import borg.trikeshed.parse.json.JsonSupport
 
 object JulesProbeJson {
@@ -8,19 +9,16 @@ object JulesProbeJson {
         val root = JsonSupport.parse(json) as? Map<*, *> ?: emptyMap<String, Any?>()
         val id = root["id"] as? String ?: ""
         val metricsRaw = root["metrics"] as? List<*> ?: emptyList<Any?>()
-        
-        val metricList = metricsRaw.mapNotNull { 
+
+        val metricList = metricsRaw.mapNotNull {
             it as? Map<*, *> ?: return@mapNotNull null
             val timestamp = (it["timestamp"] as? Number)?.toLong() ?: 0L
             val value = (it["value"] as? Number)?.toDouble() ?: 0.0
             ProbeMetric(timestamp, value)
         }
-        
-        val metricsSeries = object : Series<ProbeMetric> {
-            override val size: Int = metricList.size
-            override fun get(index: Int): ProbeMetric = metricList[index]
-        }
-        
+
+        val metricsSeries = metricList.size j { i: Int -> metricList[i] }
+
         return ProbeHandle(id, metricsSeries)
     }
 }

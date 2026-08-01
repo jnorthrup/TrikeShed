@@ -3,10 +3,12 @@ package borg.trikeshed.jules
 import borg.trikeshed.htx.HtxElement
 import borg.trikeshed.htx.HtxKey
 import borg.trikeshed.htx.HtxMethod
+import borg.trikeshed.htx.HtxRequest
 import borg.trikeshed.htx.HtxResponse
 import borg.trikeshed.htx.emptyHtxBody
 import borg.trikeshed.htx.htxHeaders
 import borg.trikeshed.htx.parseHtxRequest
+import borg.trikeshed.htx.withHeader
 import borg.trikeshed.lib.ByteSeries
 import borg.trikeshed.lib.j
 import borg.trikeshed.lib.toArray
@@ -68,11 +70,11 @@ class JvmJulesHttpClient(
             "x-goog-api-key" j apiKey,
             "Content-Type" j "application/json",
         )
-        val req = parseHtxRequest(
+        val req = (parseHtxRequest(
             url = url,
             method = htxMethod,
             body = if (body.isEmpty()) emptyHtxBody() else ByteSeries(body),
-        ).copy(headers = headers)
+        ) as HtxRequest).copy(headers = headers).withHeader("Content-Length", body.size.toString())
 
         val resp: HtxResponse = htx.request(req)
         val respBody = resp.body.toArray().decodeToString()

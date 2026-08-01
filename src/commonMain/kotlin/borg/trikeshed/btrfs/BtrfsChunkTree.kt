@@ -1,5 +1,8 @@
 package borg.trikeshed.btrfs
 
+import borg.trikeshed.lib.Join
+import borg.trikeshed.lib.j
+
 object BtrfsChunkTree {
 
     private fun readULongLE(buf: ByteArray, offset: Int): ULong {
@@ -24,8 +27,8 @@ object BtrfsChunkTree {
         return (low or (high shl 8)).toUShort()
     }
 
-    fun parse(bytes: ByteArray, offset: Int): List<Pair<BtrfsKey, BtrfsChunkItem>> {
-        val result = mutableListOf<Pair<BtrfsKey, BtrfsChunkItem>>()
+    fun parse(bytes: ByteArray, offset: Int): List<Join<BtrfsKey, BtrfsChunkItem>> {
+        val result = mutableListOf<Join<BtrfsKey, BtrfsChunkItem>>()
         
         // nritems is at offset 96 within the btrfs_header
         val nrItems = readUIntLE(bytes, offset + 96).toInt()
@@ -66,7 +69,7 @@ object BtrfsChunkTree {
             }
             
             val chunkItem = BtrfsChunkItem(stripeLength, type, numStripes, subStripes, stripes)
-            result.add(Pair(key, chunkItem))
+            result.add(key j chunkItem)
             
             itemPtrOffset += 25 // advance to next item pointer
         }

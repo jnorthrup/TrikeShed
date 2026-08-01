@@ -1,44 +1,48 @@
 #!/usr/bin/env bash
 # bin/oroboros-daemon — launch the TrikeShed flywheel+modelmux+jules daemon
 #
+# Classpath layout (no fat jar, no cache glob):
+#   build/classes/kotlin/jvm/main      <- naked TrikeShed classes (HotSwapAgent watches this dir)
+#   build/staging/lib/*.jar            <- runtime deps staged by `./gradlew stageDaemonLib`
+#
 # Forwards all flags to OroborosDaemon. Recognized:
 #   --once / --watch           run one cycle, or loop forever (default)
 #   --interval-ms <N>          poll cadence (default: FlywheelElement.pollIntervalMs)
 #   --home <path>              forge home (default: $HOME/.local/forge per ForgeHome.defaultHome)
 #   --repo <path>              repo work tree (default: cwd)
+#   --debug                    attach JDWP on :5005, suspend=n
+#   --suspend                  like --debug but suspend=y (debugger required before main runs)
 set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-JAR="$ROOT/build/libs/TrikeShed-jvm-1.0.jar"
-if [[ ! -f "$JAR" ]]; then
-    echo "missing $JAR; run: ./gradlew jvmJar --no-daemon" >&2
+CLASSES="$ROOT/build/classes/kotlin/jvm/main"
+LIB="$ROOT/build/staging/lib"
+
+if [[ ! -d "$CLASSES" ]]; then
+    echo "missing $CLASSES; run: ./gradlew compileKotlinJvm" >&2
     exit 1
 fi
-CP="$JAR:$(find "$HOME/.gradle/caches/modules-2" -name '*.jar' 2>/dev/null | tr '\n' ':')"
+if [[ ! -d "$LIB" ]]; then
+    echo "missing $LIB; run: ./gradlew stageDaemonLib" >&2
+    exit 1
+fi
 
-# Use daemon's default interval. Override with --interval-ms if needed.
+# Wildcard expansion happens after the colon, so we quote it.
+CP="$CLASSES:$LIB/*"
+
 WATCH="--watch"
 DAEMON_ARGS=()
-
+DEBUG_OPTS=()
 while [[ $# -gt 0 ]]; do
   case "$1" in
-    --once)
-      WATCH="--once"
-      shift
-      ;;
-    --watch)
-      WATCH="--watch"
-      shift
-      ;;
-    --interval-ms)
-      DAEMON_ARGS+=("--interval-ms")
-      DAEMON_ARGS+=("$2")
-      shift 2
-      ;;
-    *)
-      DAEMON_ARGS+=("$1")
-      shift
-      ;;
+    --once)        WATCH="--once"; shift ;;
+    --watch)       WATCH="--watch"; shift ;;
+    --interval-ms) DAEMON_ARGS+=("--interval-ms" "$2"); shift 2 ;;
+    --debug)       DEBUG_OPTS+=("-agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=*:5005"); shift ;;
+    --suspend)     DEBUG_OPTS+=("-agentlib:jdwp=transport=dt_socket,server=y,suspend=y,address=*:5005"); shift ;;
+    *)             DAEMON_ARGS+=("$1"); shift ;;
   esac
 done
 
-exec java -cp "$CP" borg.trikeshed.daemon.OroborosDaemon $WATCH "${DAEMON_ARGS[@]}"
+# `-cp "$CP"` must be unquoted shell-side so the wildcard expands.
+# shellcheck disable=SC2086
+exec java "${DEBUG_OPTS[@]}" -cp $CP borg.trikeshed.daemon.OroborosDaemon $WATCH "${DAEMON_ARGS[@]}"

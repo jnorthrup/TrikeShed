@@ -148,6 +148,22 @@ class FlywheelDriver(
      */
     private suspend fun drainFail(s: JulesRestClient.SessionInfo, reason: String): DrainOutcome.Skipped {
         val attempts = (drainFailures[s.id] ?: 0) + 1
+        if (attempts >= 3) {
+            // Same 3-strike retirement as noPatchProbes/corruptPatchProbes:
+            // a session that fails drain 3 consecutive times never leaves the
+            // completion set otherwise — sessions.isEmpty() stays false,
+            // synchronizeMain() never runs, and settlement prints SETTLE-BLOCKED
+            // forever. retireTerminal writes the MergeReceipt + WorkDrained
+            // outbox entry so the queue slot closes too.
+            drainFailures.remove(s.id)
+            conductor.retireTerminal(
+                s.id,
+                "$reason (retired after $attempts consecutive drain failures)",
+                Clock.System.now().toEpochMilliseconds(),
+            )
+            println("[FLYWHEEL] RETIRE ${s.id.takeLast(6)} drain failed $attempts times: $reason")
+            return DrainOutcome.Skipped
+        }
         drainFailures[s.id] = attempts
         conductor.recordDrainFailure(s.id, "$reason (attempt $attempts)", Clock.System.now().toEpochMilliseconds())
         emitPollError("drain ${s.id}: $reason (attempt $attempts)", 0)

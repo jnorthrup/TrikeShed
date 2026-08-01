@@ -1,5 +1,7 @@
 package borg.trikeshed.crdt
 
+import borg.trikeshed.lib.Join
+import borg.trikeshed.lib.j
 import borg.trikeshed.patch.Blake3Hash
 import borg.trikeshed.pijul.*
 // import borg.trikeshed.lib.Series
@@ -49,8 +51,8 @@ class PijulCrdt {
         var lastVertex = root
 
         for (pair in topologicalSort().iterator()) {
-            val v = pair.first
-            val content = pair.second
+            val v = pair.a
+            val content = pair.b
             if (currentPos + content.length >= pos && v != root) {
                 return v
             }
@@ -65,8 +67,8 @@ class PijulCrdt {
         var currentPos = 0
 
         for (pair in topologicalSort().iterator()) {
-            val v = pair.first
-            val content = pair.second
+            val v = pair.a
+            val content = pair.b
             val vStart = currentPos
             val vEnd = currentPos + content.length
 
@@ -78,14 +80,14 @@ class PijulCrdt {
         return result
     }
 
-    private fun topologicalSort(): Sequence<Pair<VertexId, String>> = sequence {
+    private fun topologicalSort(): Sequence<Join<VertexId, String>> = sequence {
         val visited = mutableSetOf<VertexId>()
         val queue = mutableListOf(root)
 
         while (queue.isNotEmpty()) {
             val current = queue.removeAt(0)
             if (visited.add(current)) {
-                yield(Pair(current, vertexContent[current] ?: ""))
+                yield(current j (vertexContent[current] ?: ""))
 
                 for ((v, deps) in edges.entries) {
                     if (current in deps && v !in visited) {
@@ -97,7 +99,7 @@ class PijulCrdt {
 
         for ((v, content) in vertexContent.entries) {
             if (visited.add(v)) {
-                yield(Pair(v, content))
+                yield(v j content)
             }
         }
     }
@@ -105,7 +107,7 @@ class PijulCrdt {
     fun render(): String {
         val sb = StringBuilder()
         for (pair in topologicalSort().iterator()) {
-            sb.append(pair.second)
+            sb.append(pair.b)
         }
         return sb.toString()
     }

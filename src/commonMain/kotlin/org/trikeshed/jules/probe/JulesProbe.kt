@@ -1,9 +1,6 @@
 package org.trikeshed.jules.probe
 
-interface Series<T> {
-    val size: Int
-    operator fun get(index: Int): T
-}
+import borg.trikeshed.lib.Series
 
 interface JulesProbe {
     fun start(): ProbeHandle

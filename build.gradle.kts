@@ -486,6 +486,61 @@ tasks.register<JavaExec>("runForgeJvm") {
     classpath(tasks.named("jvmJar"), configurations.getByName("jvmRuntimeClasspath"))
 }
 
+// ── Staged lib/ + naked classes for debug-friendly launchers ────────────────
+// `build/staging/lib/` is populated by the runtime classpath jars so the
+// `bin/*` launchers can build a classpath from a wildcard (`lib/*`) instead of
+// fat-jar blobs or glob-walks of `~/.gradle/caches/modules-2`. TrikeShed's own
+// classes stay un-jar'd at `build/classes/kotlin/jvm/main` so HotSwapAgent can
+// watch `.class` files by mtime. The whole `build/` tree is gitignored.
+val stagingLibDir = layout.buildDirectory.dir("staging/lib")
+
+val stageDaemonLib = tasks.register<Sync>("stageDaemonLib") {
+    group = "oroboros"
+    description = "Copy the JVM runtime classpath jars into build/staging/lib/ for debug-friendly launchers."
+    dependsOn("jvmJar")
+    from(configurations.named("jvmRuntimeClasspath"))
+    into(stagingLibDir)
+}
+
+fun org.gradle.api.tasks.JavaExec.useStagedJvmClasspath() {
+    dependsOn("stageDaemonLib", "compileKotlinJvm")
+    doFirst {
+        val classes = file("build/classes/kotlin/jvm/main")
+        val lib = file(stagingLibDir)
+        if (!classes.isDirectory) throw GradleException("missing $classes; run ./gradlew compileKotlinJvm")
+        if (!lib.isDirectory) throw GradleException("missing $lib; run ./gradlew stageDaemonLib")
+        classpath = files(classes) + fileTree(lib) { include("*.jar") }
+    }
+}
+
+// Daemon — flywheel loop. HotSwapAgent watches CycleBody.class for live edits.
+tasks.register<JavaExec>("runOroborosDaemon") {
+    group = "oroboros"
+    description = "Launch OroborosDaemon from naked classes + staged lib/. Add --debug to enable JDWP on :5005."
+    mainClass.set("borg.trikeshed.daemon.OroborosDaemon")
+    useStagedJvmClasspath()
+    // Forward stdio; HotswapAgent prints to stdout.
+    standardInput = System.`in`
+}
+
+// TUI — interactive flywheel console, reads board from cwd.
+tasks.register<JavaExec>("runFlywheelTui") {
+    group = "oroboros"
+    description = "Launch FlywheelTui from naked classes + staged lib/. Add --debug to enable JDWP on :5006."
+    mainClass.set("borg.trikeshed.flywheel.FlywheelTui")
+    useStagedJvmClasspath()
+    standardInput = System.`in`
+}
+
+// Kanban HTTP server for the modelmux CLI.
+tasks.register<JavaExec>("runKanbanHttpServerJvm") {
+    group = "forge"
+    description = "Launch KanbanHttpServerJvm from naked classes + staged lib/. Add --debug to enable JDWP on :5007."
+    mainClass.set("borg.trikeshed.forge.server.KanbanHttpServerJvm")
+    useStagedJvmClasspath()
+    standardInput = System.`in`
+}
+
 // Forge pages — publish web assets to docs/ for GitHub Pages.
 // After running this, regenerate the seed-baked index.html via:
 //   ./gradlew jsNodeProductionRun --no-daemon --console=plain 2>&1 \\
