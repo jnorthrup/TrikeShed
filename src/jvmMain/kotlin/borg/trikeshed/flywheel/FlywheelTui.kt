@@ -1,14 +1,18 @@
 package borg.trikeshed.flywheel
 
+import borg.trikeshed.htx.HtxElement
+import borg.trikeshed.htx.openHtxElement
 import borg.trikeshed.jules.JulesRestClient
 import borg.trikeshed.lib.Join
 import borg.trikeshed.lib.j
 import borg.trikeshed.utils.kanban.JulesBoardStore
 import borg.trikeshed.utils.kanban.forForgeDir
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withContext
 import java.io.File
 import java.time.Duration
 import java.time.Instant
+import kotlin.coroutines.EmptyCoroutineContext
 import kotlin.math.roundToInt
 
 /**
@@ -82,6 +86,12 @@ object FlywheelTui {
         val forgeDir = File(System.getenv("TRIKESHED_HOME") ?: File(System.getProperty("user.home"), ".local/forge").path)
         val apiKey = System.getenv("JULES_API_KEY")
         val client = apiKey?.let(::JulesRestClient)
+        // JvmJulesHttpClient requires HtxKey in the coroutine context — the
+        // daemon installs one around runCycle; the TUI must carry its own or
+        // every direct listSessions poll fails with "No HtxKey in coroutine
+        // context". One element for the process lifetime; closed on exit so
+        // --once doesn't linger on supervisor selector threads.
+        val htxElement = if (client != null) runBlocking { openHtxElement() } else null
         val pulses = Pulses()
         // Accumulated HTTP error counters. Reset to zero when land (drain) or
         // push (settle) advances — a successful drain/push clears the slate so
@@ -92,27 +102,32 @@ object FlywheelTui {
         var previous: Snapshot? = null
         var tick = 0
 
-        do {
-            val snapshot = capture(client, source, repoDir, forgeDir)
-            // Reset accumulated counters when land increases (new drain landed).
-            if (prevLand >= 0 && snapshot.land > prevLand) {
-                acc429 = 0
-                acc5xx = 0
-            }
-            acc429 += snapshot.http429
-            acc5xx += snapshot.http5xx
-            prevLand = snapshot.land
-            updatePulses(previous, snapshot, pulses)
-            print("\u001b[2J\u001b[H")
-            print(render(snapshot, pulses, tick++, acc429, acc5xx))
-            previous = snapshot
-            pulses.decay()
-            if (!once) Thread.sleep(intervalMs)
-        } while (!once)
+        try {
+            do {
+                val snapshot = capture(client, htxElement, source, repoDir, forgeDir)
+                // Reset accumulated counters when land increases (new drain landed).
+                if (prevLand >= 0 && snapshot.land > prevLand) {
+                    acc429 = 0
+                    acc5xx = 0
+                }
+                acc429 += snapshot.http429
+                acc5xx += snapshot.http5xx
+                prevLand = snapshot.land
+                updatePulses(previous, snapshot, pulses)
+                print("\u001b[2J\u001b[H")
+                print(render(snapshot, pulses, tick++, acc429, acc5xx))
+                previous = snapshot
+                pulses.decay()
+                if (!once) Thread.sleep(intervalMs)
+            } while (!once)
+        } finally {
+            htxElement?.let { runBlocking { it.close() } }
+        }
     }
 
     private fun capture(
         client: JulesRestClient?,
+        htxElement: HtxElement?,
         source: String,
         repoDir: File,
         forgeDir: File,
@@ -146,9 +161,11 @@ object FlywheelTui {
         return try {
             val sessions = readTrajectorySessions(forgeDir, source)
                 ?: runBlocking {
-                    client?.listSessions()
-                        ?.filter { it.source == source }
-                        ?.sortedByDescending { it.updateTime }
+                    withContext(htxElement ?: EmptyCoroutineContext) {
+                        client?.listSessions()
+                            ?.filter { it.source == source }
+                            ?.sortedByDescending { it.updateTime }
+                    }
                 } ?: emptyList()
             val dispatch = sessions.count { it.state == "QUEUED" || it.state == "PLANNING" || it.state == "AWAITING_PLAN_APPROVAL" }
             val running = sessions.count { it.state == "IN_PROGRESS" }
