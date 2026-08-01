@@ -1,11 +1,10 @@
 package forge.doc
 
-<<<<<<< ours
 import borg.trikeshed.job.ContentId
 import borg.trikeshed.jules.JulesCause
 import borg.trikeshed.util.oroboros.LexicalMemory
 import borg.trikeshed.util.oroboros.MergeReceipt
-import borg.trikeshed.utils.kanban.JulesBoardStore
+import borg.trikeshed.utils.kanban.*
 
 suspend fun drainReadmeDagReteRefraction(store: JulesBoardStore) {
     store.appendWork("readme-dag-rete-refraction", JulesCause.WorkDrained(
@@ -17,31 +16,36 @@ suspend fun drainReadmeDagReteRefraction(store: JulesBoardStore) {
     ))
 }
 
-<<<<<<< ours
-<<<<<<< ours
-<<<<<<< ours
 suspend fun drainMmapCasStoreRework(store: JulesBoardStore) {
     store.appendWork("rework:synth:965389205015589639#2", JulesCause.WorkDrained(
         workId = "rework:synth:965389205015589639#2",
-=======
-suspend fun drainReactorAlgebra(store: JulesBoardStore) {
-    store.appendWork("synth:15340577469777603245#2", JulesCause.WorkDrained(
-        workId = "synth:15340577469777603245#2",
->>>>>>> theirs
-=======
-suspend fun drainDoubleSeriesWire(store: JulesBoardStore) {
-    store.appendWork("synth:2704096756101430624", JulesCause.WorkDrained(
-        workId = "synth:2704096756101430624",
->>>>>>> theirs
         sessionId = "necromanced",
         commitSha = "superseded-by-review",
         taskId = "supersede-pass",
         at = 0L
     ))
-<<<<<<< ours
-<<<<<<< ours
     store.appendWork("synth:965389205015589639", JulesCause.WorkDrained(
         workId = "synth:965389205015589639",
+        sessionId = "necromanced",
+        commitSha = "superseded-by-review",
+        taskId = "supersede-pass",
+        at = 0L
+    ))
+}
+
+suspend fun drainReactorAlgebra(store: JulesBoardStore) {
+    store.appendWork("synth:15340577469777603245#2", JulesCause.WorkDrained(
+        workId = "synth:15340577469777603245#2",
+        sessionId = "necromanced",
+        commitSha = "superseded-by-review",
+        taskId = "supersede-pass",
+        at = 0L
+    ))
+}
+
+suspend fun drainDoubleSeriesWire(store: JulesBoardStore) {
+    store.appendWork("synth:2704096756101430624", JulesCause.WorkDrained(
+        workId = "synth:2704096756101430624",
         sessionId = "necromanced",
         commitSha = "superseded-by-review",
         taskId = "supersede-pass",
@@ -76,12 +80,6 @@ suspend fun drainSupersededTask(store: JulesBoardStore) {
         )
     )
 }
-=======
-import borg.trikeshed.utils.kanban.*
-import borg.trikeshed.jules.JulesCause
-import borg.trikeshed.util.oroboros.MergeReceipt
-import borg.trikeshed.job.ContentId
-import borg.trikeshed.util.oroboros.LexicalMemory
 
 suspend fun drainWork(store: JulesBoardStore) {
     val workId = "synth:12224356407860756599#2"
@@ -106,25 +104,21 @@ suspend fun drainWork(store: JulesBoardStore) {
         at = 0L
     ))
 }
->>>>>>> theirs
-=======
-}
->>>>>>> theirs
-=======
+
 suspend fun drainReworkSynth3803389897151472172(store: JulesBoardStore) {
     store.appendWork("rework:synth:3803389897151472172#2", JulesCause.WorkDrained(
         workId = "rework:synth:3803389897151472172#2",
         sessionId = "necromanced",
         commitSha = "superseded-by-review",
         taskId = "supersede-pass",
-        receipt = borg.trikeshed.util.oroboros.MergeReceipt(
+        receipt = MergeReceipt(
             workId = "rework:synth:3803389897151472172#2",
             producer = "necromancer",
             producerRef = "necromanced",
-            patchCid = borg.trikeshed.job.ContentId("sha256:0000000000000000000000000000000000000000000000000000000000000000"),
+            patchCid = ContentId("sha256:0000000000000000000000000000000000000000000000000000000000000000"),
             revision = "superseded-by-review",
             versionTag = "superseded-by-review",
-            lexicalMemory = borg.trikeshed.util.oroboros.LexicalMemory(
+            lexicalMemory = LexicalMemory(
                 summary = "Superseded necromanced work",
                 title = "[rework #2] [rework #1] Wire DoubleSeries into query engine for primitive dispatch",
                 content = "Superseded via drain script."
@@ -135,7 +129,3 @@ suspend fun drainReworkSynth3803389897151472172(store: JulesBoardStore) {
         at = 0L
     ))
 }
->>>>>>> theirs
-=======
-}
->>>>>>> theirs
