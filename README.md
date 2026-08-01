@@ -389,7 +389,7 @@ Current CCEK-role elements and their unfinished adaptation:
 │ ForgeReactorExample      │ suspend runSyntheticCycle + SharedFlow      │ GAP: main() calls runBlocking; sync IO.   │
 │ LcncIngestPipeline       │ suspend ingest; Reactor Mux model           │ GAP: Runtime/System sync helpers.         │
 │ ModelCallLeaf            │ suspend onPut + flush                       │ GAP: Runtime/System/IO sync.             │
-│ Blake3Hash               │ suspend hash                                  │ GAP: System.arraycopy of memory? sync.    │
+│ Blake3Hash               │ suspend hash                                  │ ✅ landed.                                │
 │ ConfixEnvelopeCodec      │ suspend encode/decode + charset fns          │ GAP: java.lang.Character.                  │
 │ ModelResponse            │ suspend persist                              │ GAP: java.*/System.                       │
 │ AcpProtocol / Keymux     │ suspend key lease                            │ Correct.                                  │
