@@ -726,9 +726,9 @@ I've also written ideas that describe (some) goals and ideals of the library:
         - [x] the native version uses [linux] `mmap` with readonly memory.
             - [x] in practice this is compatible with macOS posix until you look into liburing integration, so the uring
               attempt was made a separate linux-only class from the IsamVolume
-            - [ ] the posix code holds up well under mingw however the mmap calls are significantly different so this
+            - [x] the posix code holds up well under mingw however the mmap calls are significantly different so this
               may warrant a seperate lock-seek-read-unlock strategy for windows, or someone with ambition to port the
-              mmap calls
+              mmap calls (resolved by MingwIsamOperations using seek-read-write)
 
 * [x] Duck-typing CSV-Cursor which includes varchar
   width sizing and narrowing numerical of types and float/integer detection on imported columns. supports
