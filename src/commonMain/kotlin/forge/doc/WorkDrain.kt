@@ -19,6 +19,7 @@ suspend fun drainReadmeDagReteRefraction(store: JulesBoardStore) {
 
 <<<<<<< ours
 <<<<<<< ours
+<<<<<<< ours
 suspend fun drainMmapCasStoreRework(store: JulesBoardStore) {
     store.appendWork("rework:synth:965389205015589639#2", JulesCause.WorkDrained(
         workId = "rework:synth:965389205015589639#2",
@@ -27,11 +28,17 @@ suspend fun drainReactorAlgebra(store: JulesBoardStore) {
     store.appendWork("synth:15340577469777603245#2", JulesCause.WorkDrained(
         workId = "synth:15340577469777603245#2",
 >>>>>>> theirs
+=======
+suspend fun drainDoubleSeriesWire(store: JulesBoardStore) {
+    store.appendWork("synth:2704096756101430624", JulesCause.WorkDrained(
+        workId = "synth:2704096756101430624",
+>>>>>>> theirs
         sessionId = "necromanced",
         commitSha = "superseded-by-review",
         taskId = "supersede-pass",
         at = 0L
     ))
+<<<<<<< ours
 <<<<<<< ours
     store.appendWork("synth:965389205015589639", JulesCause.WorkDrained(
         workId = "synth:965389205015589639",
@@ -127,5 +134,8 @@ suspend fun drainReworkSynth3803389897151472172(store: JulesBoardStore) {
         ),
         at = 0L
     ))
+}
+>>>>>>> theirs
+=======
 }
 >>>>>>> theirs
