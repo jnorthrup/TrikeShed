@@ -1,5 +1,6 @@
 package forge.doc
 
+<<<<<<< ours
 import borg.trikeshed.job.ContentId
 import borg.trikeshed.jules.JulesCause
 import borg.trikeshed.util.oroboros.LexicalMemory
@@ -60,3 +61,34 @@ suspend fun drainSupersededTask(store: JulesBoardStore) {
         )
     )
 }
+=======
+import borg.trikeshed.utils.kanban.*
+import borg.trikeshed.jules.JulesCause
+import borg.trikeshed.util.oroboros.MergeReceipt
+import borg.trikeshed.job.ContentId
+import borg.trikeshed.util.oroboros.LexicalMemory
+
+suspend fun drainWork(store: JulesBoardStore) {
+    val workId = "synth:12224356407860756599#2"
+
+    val receipt = MergeReceipt(
+        workId = workId,
+        producer = "jules",
+        producerRef = "manual-override",
+        patchCid = ContentId("sha256:0000000000000000000000000000000000000000000000000000000000000000"),
+        revision = "e299ad5e47a8bcc74b6bdd026e8c920ffc483b2a",
+        versionTag = "superseded",
+        lexicalMemory = LexicalMemory("Browser mutations lower to JobCommand", "", ""),
+        claimedAt = 0L // use any timestamp
+    )
+
+    store.appendWork(workId, JulesCause.WorkDrained(
+        workId = workId,
+        sessionId = "manual-override",
+        commitSha = "superseded",
+        taskId = "unknown",
+        receipt = receipt,
+        at = 0L
+    ))
+}
+>>>>>>> theirs
