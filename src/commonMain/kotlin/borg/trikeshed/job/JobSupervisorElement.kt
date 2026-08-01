@@ -188,20 +188,20 @@ class JobSupervisorElement private constructor(
         val operation = doc.value("operation")?.toString() ?: ""
         val jobId = JobId.of(doc.value("jobId")?.toString() ?: "")
         val idemKey = doc.value("idempotencyKey")?.toString() ?: ""
+        val expectedRev = doc.value("expectedRevision")?.toString()?.toLong() ?: 0L
         val cmd = when (operation) {
             "submit" -> JobCommand.Submit(jobId, idemKey)
-            "start" -> JobCommand.Start(jobId, idemKey, doc.value("expectedRevision")?.toString()?.toLong() ?: 0L)
-            "complete" -> JobCommand.Complete(jobId, idemKey, doc.value("expectedRevision")?.toString()?.toLong() ?: 0L)
-            "fail" -> JobCommand.Fail(jobId, idemKey, doc.value("expectedRevision")?.toString()?.toLong() ?: 0L, doc.value("reason")?.toString() ?: "")
-            "retry" -> JobCommand.Retry(jobId, idemKey, doc.value("expectedRevision")?.toString()?.toLong() ?: 0L)
-            else -> { _commands.send(JobCommand.Submit(jobId, idemKey)); return }
-        }
-        // Validate operation — invalid ops fail at schema validation
-        val knownOps = setOf("submit", "start", "progress", "block", "complete", "fail",
-            "cancel", "retry", "move", "acknowledge", "retract")
-        if (operation !in knownOps) {
-            // Schema validation fails — don't attempt CAS or WAL
-            return
+            "start" -> JobCommand.Start(jobId, idemKey, expectedRev)
+            "complete" -> JobCommand.Complete(jobId, idemKey, expectedRev)
+            "fail" -> JobCommand.Fail(jobId, idemKey, expectedRev, doc.value("reason")?.toString() ?: "")
+            "retry" -> JobCommand.Retry(jobId, idemKey, expectedRev)
+            "progress" -> JobCommand.Progress(jobId, idemKey, expectedRev, doc.value("progress")?.toString()?.toDouble() ?: 0.0)
+            "block" -> JobCommand.Block(jobId, idemKey, expectedRev, doc.value("reason")?.toString() ?: "")
+            "cancel" -> JobCommand.Cancel(jobId, idemKey, expectedRev)
+            "move" -> JobCommand.Move(jobId, idemKey, expectedRev, KanbanColumnId(doc.value("toColumn")?.toString() ?: ""))
+            "acknowledge" -> JobCommand.Acknowledge(jobId, idemKey, expectedRev)
+            "retract" -> JobCommand.Retract(jobId, idemKey, expectedRev)
+            else -> return
         }
         _commands.send(cmd)
     }
