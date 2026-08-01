@@ -504,10 +504,16 @@ class FlywheelDriver(
     }
 
     /** Drain every completed session before the next research wave. */
+    private val drainGuard = java.util.concurrent.atomic.AtomicBoolean(false)
     private suspend fun drainFanout(sessions: List<JulesRestClient.SessionInfo>): DrainBatch {
-        if (sessions.isEmpty()) return DrainBatch()
-        println("[FLYWHEEL] DRAIN-ALL sessions=${sessions.size}")
-        return drainThreeWay(sessions)
+        if (!drainGuard.compareAndSet(false, true)) return DrainBatch()
+        try {
+            if (sessions.isEmpty()) return DrainBatch()
+            println("[FLYWHEEL] DRAIN-ALL sessions=${sessions.size}")
+            return drainThreeWay(sessions)
+        } finally {
+            drainGuard.set(false)
+        }
     }
 
     private data class DrainBatch(
