@@ -32,17 +32,28 @@ CP="$CLASSES:$LIB/*"
 WATCH="--watch"
 DAEMON_ARGS=()
 DEBUG_OPTS=()
+HOME_POS=""
+REPO_POS=""
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --once)        WATCH="--once"; shift ;;
     --watch)       WATCH="--watch"; shift ;;
     --interval-ms) DAEMON_ARGS+=("--interval-ms" "$2"); shift 2 ;;
+    --home)        HOME_POS="$2"; shift 2 ;;
+    --repo)        REPO_POS="$2"; shift 2 ;;
     --debug)       DEBUG_OPTS+=("-agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=*:5005"); shift ;;
     --suspend)     DEBUG_OPTS+=("-agentlib:jdwp=transport=dt_socket,server=y,suspend=y,address=*:5005"); shift ;;
     *)             DAEMON_ARGS+=("$1"); shift ;;
   esac
 done
 
+# The daemon takes forgeHome/repoDir as POSITIONAL args (must come last, in
+# that order). Passing --repo without --home would put the repo path in the
+# forgeHome slot — that bug created the stray ./--repo/ WAL directory.
+if [[ -n "$REPO_POS" && -z "$HOME_POS" ]]; then
+  HOME_POS="${TRIKESHED_HOME:-$HOME/.local/forge}"
+fi
+
 # `-cp "$CP"` must be unquoted shell-side so the wildcard expands.
 # shellcheck disable=SC2086
-exec java "${DEBUG_OPTS[@]}" -cp $CP borg.trikeshed.daemon.OroborosDaemon $WATCH "${DAEMON_ARGS[@]}"
+exec java "${DEBUG_OPTS[@]}" -cp $CP borg.trikeshed.daemon.OroborosDaemon $WATCH "${DAEMON_ARGS[@]}" ${HOME_POS:+"$HOME_POS"} ${REPO_POS:+"$REPO_POS"}

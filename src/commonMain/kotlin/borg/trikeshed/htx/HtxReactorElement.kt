@@ -103,6 +103,11 @@ class HtxReactorElement(
         val connection = openConnection(request)
         return try {
             writeAll(connection.handle, connection.fd, ByteSeries(request.renderWireRequest()))
+            // renderWireRequest() is head-only — the body must follow on the wire
+            // or a POST with Content-Length hangs the server (and our read) forever.
+            if (request.body.rem > 0) {
+                writeAll(connection.handle, connection.fd, request.body)
+            }
             parseHtxResponse(readAll(connection.handle, connection.fd))
         } finally {
             channelOperations.close(connection.fd)
@@ -122,10 +127,19 @@ class HtxReactorElement(
             val endpoint = tls.clientEndpoint(request.target.host, request.target.port)
             try {
                 performTlsHandshake(connection.handle, connection.fd, endpoint)
+                // renderWireRequest() is head-only — append the body bytes to
+                // the TLS plaintext or a POST with Content-Length hangs the
+                // server (and our read) forever.
+                val headBytes = request.renderWireRequest().encodeToByteArray()
+                val wireBytes: ByteArray = if (request.body.rem > 0) {
+                    headBytes + request.body.toArray()
+                } else {
+                    headBytes
+                }
                 flushTlsFrames(
                     connection.handle,
                     connection.fd,
-                    endpoint.upstream(ByteSeries(request.renderWireRequest())),
+                    endpoint.upstream(ByteSeries(wireBytes)),
                 )
                 parseHtxResponse(
                     readTlsPlaintext(connection.handle, connection.fd, endpoint),
