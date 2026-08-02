@@ -238,6 +238,7 @@ suspend fun drainWork(store: JulesBoardStore) {
 <<<<<<< ours
 <<<<<<< ours
 <<<<<<< ours
+<<<<<<< ours
     drainSession12282770234900520474(store)
     drainSession12320089122017967949(store)
 }
@@ -265,6 +266,13 @@ suspend fun drainSession11727450166753680446(store: JulesBoardStore) {
 suspend fun drainSession10071466838419282986(store: JulesBoardStore) {
     val workId = "session:10071466838419282986"
 >>>>>>> theirs
+=======
+    drainSession11781258941577888716(store)
+}
+
+suspend fun drainSession11781258941577888716(store: JulesBoardStore) {
+    val workId = "session:11781258941577888716"
+>>>>>>> theirs
     store.appendWork(workId, JulesCause.WorkDrained(
         workId = workId,
         sessionId = "necromanced",
@@ -282,6 +290,7 @@ suspend fun drainSession10071466838419282986(store: JulesBoardStore) {
 <<<<<<< ours
 <<<<<<< ours
 <<<<<<< ours
+<<<<<<< ours
                 "[rework #1] Implement zoom(path): Cursor returning sub-cursor",
 =======
                 "Remove ForgeApp parallel DTO seed truth",
@@ -289,12 +298,16 @@ suspend fun drainSession10071466838419282986(store: JulesBoardStore) {
 =======
                 "[rework #1] TDD PR Deliver",
 >>>>>>> theirs
+=======
+                "Add Unit Tests for BigInt processMagnitudes",
+>>>>>>> theirs
                 "Superseded via drain script."
             ),
             claimedAt = 0L
         ),
         at = 0L
     ))
+<<<<<<< ours
 <<<<<<< ours
 <<<<<<< ours
 }
@@ -351,6 +364,8 @@ suspend fun drainSession12278373796855125845(store: JulesBoardStore) {
 >>>>>>> theirs
 =======
     drainSession12711721574152796678(store)
+>>>>>>> theirs
+=======
 >>>>>>> theirs
 =======
 >>>>>>> theirs
