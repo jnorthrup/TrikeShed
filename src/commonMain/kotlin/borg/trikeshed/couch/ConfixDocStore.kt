@@ -45,7 +45,11 @@ class ConfixDocStore(
     val size: Int get() = byId.size
 
     val entries: Series<ConfixDocStoreEntry>
-        get() = byId.size j { i -> byId.values.toList()[i] }
+        get() {
+            // ⚡ Bolt: Cache values to array to avoid calling .toList() (O(N) allocation) repeatedly inside the Series lambda mapper.
+            val cachedValues = byId.values.toTypedArray()
+            return cachedValues.size j { i -> cachedValues[i] }
+        }
 
     fun put(id: String, doc: ConfixDoc, rev: String? = null): ConfixDocStoreEntry? {
         require(id.isNotEmpty()) { "_id required" }
@@ -93,11 +97,16 @@ class ConfixDocStore(
     fun byIdPrefix(prefix: String): Series<ConfixDocStoreEntry> =
         filter { it.id.startsWith(prefix) }
 
-    fun toBlackboardEntries(): Series<BlackBoardEntry> =
-        byId.size j { i ->
-            val entry = byId.values.toList()[i]
+    fun toBlackboardEntries(): Series<BlackBoardEntry> {
+        // ⚡ Bolt: Hoist the values snapshot out of the Series O(1) mapper lambda.
+        // Previously, `byId.values.toList()[i]` created a full new List<V> on EVERY index lookup.
+        // This turns an O(N) lookup loop into O(1).
+        val cachedValues = byId.values.toTypedArray()
+        return cachedValues.size j { i ->
+            val entry = cachedValues[i]
             BlackBoardEntry(entry.doc, entry.role, entry.timestamp, entry.id)
         }
+    }
 
     fun byRole(role: ConfixRole): Series<ConfixDocStoreEntry> =
         filter { it.role == role }
