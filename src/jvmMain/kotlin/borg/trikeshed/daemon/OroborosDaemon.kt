@@ -431,6 +431,7 @@ object OroborosDaemon {
         // in place — next call sees new bytecode. Edit CycleBody.kt, rebuild,
         // agent reloads; loop continues uninterrupted.
         val cycleBody = CycleBody(
+            scope = this,
             driver = driver,
             repoDir = repoDir,
             consecutivePollErrors = consecutivePollErrors,

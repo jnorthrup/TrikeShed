@@ -1,6 +1,8 @@
 package borg.trikeshed.daemon
 
 import borg.trikeshed.jules.FlywheelDriver
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.launch
 import java.util.concurrent.atomic.AtomicInteger
 
 /**
@@ -15,6 +17,7 @@ import java.util.concurrent.atomic.AtomicInteger
  *     changes.
  */
 class CycleBody(
+    private val scope: CoroutineScope,
     private val driver: FlywheelDriver,
     private val repoDir: java.io.File,
     private val consecutivePollErrors: AtomicInteger,
@@ -78,7 +81,7 @@ class CycleBody(
                     return
                 }
 
-                kotlinx.coroutines.runBlocking { runCycle() }
+                scope.launch { runCycle() }
                 consecutivePollErrors.set(0)
             } catch (t: Throwable) {
                 System.err.println("[OROBOROS] cycle failed: ${t.javaClass.simpleName}: ${t.message?.take(200)}")
