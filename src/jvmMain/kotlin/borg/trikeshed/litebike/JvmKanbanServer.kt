@@ -168,12 +168,6 @@ object JvmKanbanServer {
         Runtime.getRuntime().addShutdownHook(Thread {
             runCatching { JvmMulticastAdapter.close() }
             runCatching { connections.closeAll() }
-            runCatching {
-                runBlocking {
-                    listener.close()
-                    fanout.close()
-                }
-            }
             serverJob.cancel()
         })
 
@@ -239,7 +233,14 @@ object JvmKanbanServer {
 
         // Bind happens here — only place outside the worker scope that
         // opens a socket. The adapter resumes this coroutine on close.
-        JvmLitebikeBindAdapter.bindAndServe(listener, port = port, connections = connections)
+        try {
+            JvmLitebikeBindAdapter.bindAndServe(listener, port = port, connections = connections)
+        } finally {
+            kotlinx.coroutines.withContext(kotlinx.coroutines.NonCancellable) {
+                listener.close()
+                fanout.close()
+            }
+        }
     }
 
     // ── routes (single worker, hand-rolled) ──────────────────────────────
