@@ -3,7 +3,10 @@
 package borg.trikeshed.litebike
 
 import borg.trikeshed.litebike.taxonomy.Protocol
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.isActive
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.runBlocking
 import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
@@ -135,35 +138,45 @@ object JvmLitebikeBindAdapter {
         connections: ConnectionRegistry,
         connId: Long,
     ) {
-        val buf = ByteBuffer.allocate(8 * 1024)
-        ch.read(
-            buf, null,
-            object : CompletionHandler<Int, Any?> {
-                override fun completed(read: Int, attached: Any?) {
-                    if (read <= 0) {
-                        // Peer closed — drop the registry entry.
-                        connections.unregister(connId)
-                        runCatching { ch.close() }
-                        return
-                    }
-                    val bytes = ByteArray(read).also { buf.flip(); buf.get(it) }
-                    val head = bytes.copyOf(minOf(bytes.size, 8))
-                    val proto: Protocol = ProtocolDetector.detect(head, bytes.size)
-                    // runBlocking is OK from a JDK CompletionHandler because
-                    // those callbacks are pure Java threads, not coroutines.
-                    val ok = runBlocking { element.accept(proto, bytes) }
-                    if (!ok) {
-                        connections.unregister(connId)
-                        runCatching { ch.close() }
-                    }
+        CoroutineScope(element.supervisor).launch {
+            val buf = ByteBuffer.allocate(8 * 1024)
+            val read = try {
+                suspendCancellableCoroutine<Int> { cont ->
+                    ch.read(
+                        buf, null,
+                        object : CompletionHandler<Int, Any?> {
+                            override fun completed(result: Int, attached: Any?) {
+                                cont.resume(result)
+                            }
+                            override fun failed(t: Throwable, attached: Any?) {
+                                if (cont.isActive) cont.resumeWithException(t)
+                            }
+                        }
+                    )
                 }
-
-                override fun failed(t: Throwable, attached: Any?) {
-                    connections.unregister(connId)
-                    runCatching { ch.close() }
-                }
+            } catch (t: Throwable) {
+                connections.unregister(connId)
+                runCatching { ch.close() }
+                return@launch
             }
-        )
+
+            if (read <= 0) {
+                // Peer closed — drop the registry entry.
+                connections.unregister(connId)
+                runCatching { ch.close() }
+                return@launch
+            }
+
+            val bytes = ByteArray(read).also { buf.flip(); buf.get(it) }
+            val head = bytes.copyOf(minOf(bytes.size, 8))
+            val proto: Protocol = ProtocolDetector.detect(head, bytes.size)
+
+            val ok = element.accept(proto, bytes)
+            if (!ok) {
+                connections.unregister(connId)
+                runCatching { ch.close() }
+            }
+        }
     }
 }
 
