@@ -241,6 +241,32 @@ suspend fun drainWork(store: JulesBoardStore) {
     drainOptimizeWasmIsamOperations(store)
     drainNecromancedWork12511514760260520345(store)
     drainSession12711721574152796678(store)
+    drainSession13434914650488484998(store)
+}
+
+suspend fun drainSession13434914650488484998(store: JulesBoardStore) {
+    val workId = "session:13434914650488484998"
+    store.appendWork(workId, JulesCause.WorkDrained(
+        workId = workId,
+        sessionId = "necromanced",
+        commitSha = "superseded-by-review",
+        taskId = "supersede-pass",
+        receipt = MergeReceipt(
+            workId = workId,
+            producer = "necromancer",
+            producerRef = "necromanced",
+            patchCid = ContentId("sha256:0000000000000000000000000000000000000000000000000000000000000000"),
+            revision = "superseded-by-review",
+            versionTag = "superseded-by-review",
+            lexicalMemory = LexicalMemory(
+                "Superseded necromanced work",
+                "Activate the BlackboardFabric factory",
+                "Superseded via drain script."
+            ),
+            claimedAt = 0L
+        ),
+        at = 0L
+    ))
 }
 
 suspend fun drainSession12282770234900520474(store: JulesBoardStore) {
