@@ -136,16 +136,10 @@ object JvmKanbanServer {
             }
         }
 
-        // Register Http + Json + Socks5 + Tls + Bonjour + Upnp.
-        // IDs are TrikeShed-local conventions (Taxonomy.kt), not FFI-stable.
-        listOf(
-            Protocol.Http,
-            Protocol.Json,
-            Protocol.Socks5,
-            Protocol.Tls,
-            Protocol.Bonjour,
-            Protocol.Upnp,
-        ).forEach { listener.register(it) }
+        // Register ALL protocols from the taxonomy before activate() —
+        // activate() calls verifyRegistry() which requires every Protocol
+        // entry to have a registered slot.
+        Protocol.entries.forEach { listener.register(it) }
         listener.activate()
 
         // R05 — register the connection registry. The bind adapter

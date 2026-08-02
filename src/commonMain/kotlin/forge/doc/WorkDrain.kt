@@ -16,24 +16,14 @@ suspend fun drainReadmeDagReteRefraction(store: JulesBoardStore) {
     ))
 }
 
-<<<<<<< ours
 suspend fun drainSynth17160760388671804749(store: JulesBoardStore) {
     store.appendWork("synth:17160760388671804749", JulesCause.WorkDrained(
         workId = "synth:17160760388671804749",
-=======
-suspend fun drainCbIoUringHasBeenBroughtInAndManyTestsPorted(store: JulesBoardStore) {
-    store.appendWork("cb-io-uring-has-been-brought-in-and-many-tests-ported", JulesCause.WorkDrained(
-        workId = "cb-io-uring-has-been-brought-in-and-many-tests-ported",
->>>>>>> theirs
         sessionId = "necromanced",
         commitSha = "superseded-by-review",
         taskId = "supersede-pass",
         receipt = MergeReceipt(
-<<<<<<< ours
             workId = "synth:17160760388671804749",
-=======
-            workId = "cb-io-uring-has-been-brought-in-and-many-tests-ported",
->>>>>>> theirs
             producer = "necromancer",
             producerRef = "necromanced",
             patchCid = ContentId("sha256:0000000000000000000000000000000000000000000000000000000000000000"),
@@ -41,11 +31,7 @@ suspend fun drainCbIoUringHasBeenBroughtInAndManyTestsPorted(store: JulesBoardSt
             versionTag = "superseded-by-review",
             lexicalMemory = LexicalMemory(
                 summary = "Superseded necromanced work",
-<<<<<<< ours
                 title = "[rework #1] NUID/authorization algebra in commonMain",
-=======
-                title = "cb-io-uring-has-been-brought-in-and-many-tests-ported",
->>>>>>> theirs
                 content = "Superseded via drain script."
             ),
             claimedAt = 0L,
@@ -55,10 +41,31 @@ suspend fun drainCbIoUringHasBeenBroughtInAndManyTestsPorted(store: JulesBoardSt
     ))
 }
 
-<<<<<<< ours
-=======
+suspend fun drainCbIoUringHasBeenBroughtInAndManyTestsPorted(store: JulesBoardStore) {
+    store.appendWork("cb-io-uring-has-been-brought-in-and-many-tests-ported", JulesCause.WorkDrained(
+        workId = "cb-io-uring-has-been-brought-in-and-many-tests-ported",
+        sessionId = "necromanced",
+        commitSha = "superseded-by-review",
+        taskId = "supersede-pass",
+        receipt = MergeReceipt(
+            workId = "cb-io-uring-has-been-brought-in-and-many-tests-ported",
+            producer = "necromancer",
+            producerRef = "necromanced",
+            patchCid = ContentId("sha256:0000000000000000000000000000000000000000000000000000000000000000"),
+            revision = "superseded-by-review",
+            versionTag = "superseded-by-review",
+            lexicalMemory = LexicalMemory(
+                summary = "Superseded necromanced work",
+                title = "cb-io-uring-has-been-brought-in-and-many-tests-ported",
+                content = "Superseded via drain script."
+            ),
+            claimedAt = 0L,
+            prUrl = null
+        ),
+        at = 0L
+    ))
+}
 
->>>>>>> theirs
 suspend fun drainMmapCasStoreRework(store: JulesBoardStore) {
     store.appendWork("rework:synth:965389205015589639#2", JulesCause.WorkDrained(
         workId = "rework:synth:965389205015589639#2",
@@ -224,7 +231,6 @@ suspend fun drainReworkSynth3803389897151472172(store: JulesBoardStore) {
     ))
 }
 
-<<<<<<< ours
 suspend fun drainSynth9667103323583014411(store: JulesBoardStore) {
     store.appendWork("synth:9667103323583014411", JulesCause.WorkDrained(
         workId = "synth:9667103323583014411",
@@ -249,5 +255,3 @@ suspend fun drainSynth9667103323583014411(store: JulesBoardStore) {
         at = 0L
     ))
 }
-=======
->>>>>>> theirs

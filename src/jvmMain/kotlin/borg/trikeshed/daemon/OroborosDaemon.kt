@@ -1,13 +1,21 @@
 package borg.trikeshed.daemon
 
+import borg.trikeshed.couch.CouchReportReactorElement
 import borg.trikeshed.htx.HtxElement
 import borg.trikeshed.htx.HtxKey
 import borg.trikeshed.htx.openHtxElement
 import borg.trikeshed.jules.FlywheelDriver
 import borg.trikeshed.jules.FlywheelDriver.FlywheelEvent
+import borg.trikeshed.litebike.JvmKanbanServer
+import borg.trikeshed.userspace.nio.file.spi.JvmFileOperations
 import borg.trikeshed.userspace.nio.spi.NioSupervisor
 import borg.trikeshed.util.io.ForgeCliArgs
+import borg.trikeshed.util.oroboros.CouchAttachmentGateway
+import borg.trikeshed.util.oroboros.FileCasStore
+import borg.trikeshed.util.oroboros.GitCouchGateway
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
@@ -42,11 +50,13 @@ object OroborosDaemon {
 
     const val DEFAULT_INTERVAL_MS = 30_000L
     const val DEFAULT_MAX_SLOTS = 15
+    const val DEFAULT_KANBAN_PORT = 8888
 
     data class DaemonConfig(
         val watch: Boolean,
         val intervalMs: Long,
         val maxSlots: Int,
+        val kanbanPort: Int,
         val positional: List<String>
     )
 
@@ -68,6 +78,7 @@ object OroborosDaemon {
         var watch = true
         var intervalMs = DEFAULT_INTERVAL_MS
         var maxSlots = DEFAULT_MAX_SLOTS
+        var kanbanPort = DEFAULT_KANBAN_PORT
         val positional = mutableListOf<String>()
 
         val flags = listOf(
@@ -83,6 +94,11 @@ object OroborosDaemon {
                 maxSlots = v
                 i + 1
             },
+            ForgeCliArgs.Flag(name = "--kanban-port", withValue = true) { a, i ->
+                val v = a[i].toIntOrNull() ?: die("--kanban-port requires a positive int")
+                kanbanPort = v
+                i + 1
+            },
         )
 
         when (val r = ForgeCliArgs.parse(args.toList(), flags)) {
@@ -90,7 +106,7 @@ object OroborosDaemon {
             ForgeCliArgs.Result.Help -> { usage(); exitProcess(0) }
             is ForgeCliArgs.Result.Error -> die(r.message)
         }
-        return DaemonConfig(watch, intervalMs, maxSlots, positional)
+        return DaemonConfig(watch, intervalMs, maxSlots, kanbanPort, positional)
     }
 
     @JvmStatic
@@ -116,6 +132,7 @@ object OroborosDaemon {
         val watch = config.watch
         val intervalMs = config.intervalMs
         val maxSlots = config.maxSlots
+        val kanbanPort = config.kanbanPort
         val positional = config.positional
 
         val home = System.getProperty("user.home")
@@ -152,10 +169,58 @@ object OroborosDaemon {
         )
         System.err.println("[OROBOROS] HTX reactor open: ${htxElement.state} — Jules/ModelMux via TLS codec")
 
+        // ── Kanban HTTP server (CCEK litebike listener, no JDK networking) ──
+        // JvmKanbanServer binds via JvmLitebikeBindAdapter → LitebikeListenerElement
+        // (the userspace.nio CCEK path), not via com.sun.net.httpserver or ktor.
+        // Only launched in --watch mode; --once is a single-cycle diagnostic.
+        val kanbanJob = SupervisorJob(coroutineContext[kotlinx.coroutines.Job])
+        if (watch) {
+            launch(CoroutineScope(kanbanJob).coroutineContext + Dispatchers.Default) {
+                try {
+                    JvmKanbanServer.run(kanbanPort, null)
+                } catch (t: Throwable) {
+                    System.err.println("[OROBOROS] Kanban server failed: ${t.message}")
+                }
+            }
+            System.err.println("[OROBOROS] Kanban HTTP server launching on :$kanbanPort (CCEK litebike)")
+        } else {
+            System.err.println("[OROBOROS] --once mode: Kanban server skipped")
+        }
+
+        // ── GitCouchGateway: mirror .git → Couch/CAS on each cycle ──
+        val fileOps = JvmFileOperations()
+        val casStore = FileCasStore(fileOps, fileOps.resolvePath(forgeHome.absolutePath, "cas"))
+        val couchStore = borg.trikeshed.couch.CouchStoreFactory.inMemory()
+        val attachmentGateway = CouchAttachmentGateway(couchStore, casStore)
+        val gitCouchGateway = GitCouchGateway(fileOps, attachmentGateway)
+        // Initial reconciliation so a restart picks up changes since last run.
+        // Blocking git call wrapped in Dispatchers.IO — never block the reactor.
+        runCatching {
+            val headSha = withContext(Dispatchers.IO) {
+                ProcessBuilder("git", "rev-parse", "HEAD")
+                    .directory(repoDir).redirectErrorStream(true).start()
+                    .let { it.waitFor(); it.inputStream.bufferedReader().readText().trim() }
+            }
+            val snap = gitCouchGateway.reconcile(
+                forgeHome = repoDir.absolutePath,
+                agentId = "oroboros",
+                revision = headSha,
+                sequence = System.currentTimeMillis(),
+            )
+            System.err.println("[OROBOROS] Git→Couch reconcile: ${snap.paths.size} paths @ $headSha")
+        }.onFailure { System.err.println("[OROBOROS] Git→Couch initial reconcile failed: ${it.message}") }
+
+        // ── Couch report reactor: CCEK element for map/reduce events ──
+        val reportReactor = CouchReportReactorElement(parentJob = kanbanJob)
+        launch { reportReactor.open() }
+        System.err.println("[OROBOROS] Couch report reactor: ${reportReactor.state}")
+
         val mainJob = coroutineContext[kotlinx.coroutines.Job]
 
+        // Shutdown: cancel Jobs only — never nest runBlocking in a signal handler.
+        // Structured concurrency unwinds the finally block in mainImpl which
+        // closes every CCEK element in scope.
         val sigHandler = SignalHandler {
-            driver.close()
             isRunning = false
             mainJob?.cancel()
         }
@@ -347,6 +412,8 @@ object OroborosDaemon {
             try { serverSocket.close() } catch (_: Exception) {}
             if (healthSock.exists()) healthSock.delete()
             try { traceWriter?.flush(); traceWriter?.close() } catch (_: Exception) {}
+            runCatching { kanbanJob.cancel() }
+            runCatching { reportReactor.close() }
             try { htxElement.close() } catch (_: Exception) {}
             try { nioSupervisor.close() } catch (_: Exception) {}
             driver.close()
@@ -392,10 +459,11 @@ object OroborosDaemon {
 
     private fun usage() {
         System.err.println(
-            """usage: OroborosDaemon [--once | --watch] [--interval-ms N] [--max-slots N] [forgeHome] [repoDir]
+            """usage: OroborosDaemon [--once | --watch] [--interval-ms N] [--max-slots N] [--kanban-port N] [forgeHome] [repoDir]
               env: JULES_API_KEY (required)
               forgeHome default: ~/.local/forge (ForgeHome.defaultHome)
-              repoDir  default: cwd"""
+              repoDir  default: cwd
+              kanban-port default: 8888"""
         )
     }
 }

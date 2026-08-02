@@ -147,7 +147,6 @@ class LitebikeListenerElement(
     override suspend fun open() {
         if (state == ElementState.CREATED) {
             state = ElementState.OPEN
-            verifyRegistry()
             CoroutineScope(supervisor).launch {
                 for (event in fanoutChannel) {
                     for (subscriber in fanoutSubscribers.toList()) {
@@ -162,7 +161,10 @@ class LitebikeListenerElement(
 
     /** Promote OPEN → ACTIVE. */
     suspend fun activate() {
-        if (state == ElementState.OPEN) state = ElementState.ACTIVE
+        if (state == ElementState.OPEN) {
+            verifyRegistry()
+            state = ElementState.ACTIVE
+        }
     }
 
     override suspend fun close() {

@@ -316,9 +316,10 @@ class FlywheelDriver(
         //     (404), and an evicted card can never drain. The 15-minute
         //     dispatch-age margin protects sessions created so recently that
         //     listSessions may not include them yet.
+        val queueSnapshot = store.loadQueue()
         val orphanRepairMarginMs = 15L * 60L * 1000L
         val nowMs = Clock.System.now().toEpochMilliseconds()
-        for (entry in store.loadQueue().filter { it.isDispatched && !it.isDrained }) {
+        for (entry in queueSnapshot.filter { it.isDispatched && !it.isDrained }) {
             val card = conductor.cards[entry.sessionId]
             val isOrphan = when {
                 card == null ->
@@ -372,7 +373,11 @@ class FlywheelDriver(
         // With no Jules deltas waiting, ordinary upstream synchronization can
         // proceed directly. A non-empty completion set synchronizes only after
         // every API delta has been written to CAS inside drainThreeWay().
-        if (sessions.isEmpty()) {
+        // Skip the conflict commit + sync + conflict commit when there are
+        // zero conflicts — this is the common idle path.
+        if (sessions.isEmpty() && conflictFiles().isEmpty()) {
+            synchronizeMain()
+        } else if (sessions.isEmpty()) {
             commitExistingConflicts()
             synchronizeMain()
             commitExistingConflicts()
