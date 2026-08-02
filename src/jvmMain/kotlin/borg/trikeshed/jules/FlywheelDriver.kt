@@ -912,7 +912,7 @@ class FlywheelDriver(
     }
 
     /** Find the GitHub branch or PR head carrying this Jules session id. */
-    private fun findSessionBranch(sessionId: String): String? {
+    private suspend fun findSessionBranch(sessionId: String): String? {
         val numericId = sessionId.substringAfterLast('/').filter { it.isDigit() }
         if (numericId.isEmpty()) return null
 
@@ -950,7 +950,7 @@ class FlywheelDriver(
      * succeeded). A non-zero exit leaves the tree dirty with conflict markers;
      * settlementBarrier decides whether to push anyway.
      */
-    private fun synchronizeMain(): Boolean {
+    private suspend fun synchronizeMain(): Boolean {
         if (!isWorkingTreeClean()) return false
         if (git("fetch", "origin", "master").exitCode != 0) return false
         // `--no-ff` preserves the synchronization edge even when a fast-forward
@@ -1138,7 +1138,7 @@ class FlywheelDriver(
      * (e.g. branch protection); the working tree is left dirty so the next
      * cycle can recover.
      */
-    private fun settlementBarrier(): Boolean {
+    private suspend fun settlementBarrier(): Boolean {
         if (!isWorkingTreeClean()) return false
         val push = git("push", "--follow-tags", "origin", "HEAD:master")
         if (push.exitCode != 0) return false
@@ -1210,75 +1210,77 @@ class FlywheelDriver(
     private fun extractSpecFiles(spec: String): Set<String> =
         specFilePattern.findAll(spec).map { it.value.trimEnd('.', ',', ':', ';', ')', ']') }.toSet()
 
-    /**
-     * Run a git command in [repoDir]. Unified shell — every git ProcessBuilder
-     * site in FlywheelDriver goes through here. Prepends `"git"` so callers
-     * write `git("commit", "-m", ...)` not `git("git", "commit", "-m", ...)`.
-     * For non-git commands (gh, ./gradlew) use [shell].
-     */
-    private fun git(vararg args: String): CommandResult = shell("git", *args)
+     /**
+      * Run a git command in [repoDir]. Unified shell — every git ProcessBuilder
+      * site in FlywheelDriver goes through here. Prepends `"git"` so callers
+      * write `git("commit", "-m", ...)` not `git("git", "commit", "-m", ...)`.
+      * For non-git commands (gh, ./gradlew) use [shell].
+      */
+     private suspend fun git(vararg args: String): CommandResult = shell("git", *args)
 
-    /**
-     * Run an arbitrary command in [repoDir]. Use [git] for git subcommands.
-     * The default 30-second timeout keeps git/GitHub prompts from parking the
-     * wheel; drain-time Gradle gates pass their own bounded build window.
-     */
-    private fun shell(vararg args: String): CommandResult = shell(30_000L, *args)
+     /**
+      * Run an arbitrary command in [repoDir]. Use [git] for git subcommands.
+      * The default 30-second timeout keeps git/GitHub prompts from parking the
+      * wheel; drain-time Gradle gates pass their own bounded build window.
+      */
+     private suspend fun shell(vararg args: String): CommandResult = shell(30_000L, *args)
 
-    private fun shell(timeoutMs: Long, vararg args: String): CommandResult = try {
-        val process = ProcessBuilder(*args)
-            .directory(repoDir)
-            .redirectErrorStream(true)
-            .start()
-        val finished = process.waitFor(timeoutMs, java.util.concurrent.TimeUnit.MILLISECONDS)
-        if (!finished) {
-            val descendants = buildList {
-                val stream = process.toHandle().descendants()
-                try {
-                    stream.forEach { child -> add(child) }
-                } finally {
-                    stream.close()
-                }
-            }
-            val childExits = descendants.map { child -> child.onExit() }
-            descendants.forEach { child -> child.destroyForcibly() }
-            process.destroyForcibly()
-            val reapDeadline = System.nanoTime() + java.util.concurrent.TimeUnit.SECONDS.toNanos(5)
-            try {
-                val remaining = (reapDeadline - System.nanoTime()).coerceAtLeast(0)
-                java.util.concurrent.CompletableFuture.allOf(*childExits.toTypedArray())
-                    .get(remaining, java.util.concurrent.TimeUnit.NANOSECONDS)
-            } catch (interrupted: InterruptedException) {
-                Thread.currentThread().interrupt()
-            } catch (_: Throwable) {
-            }
-            val remaining = reapDeadline - System.nanoTime()
-            try {
-                if (remaining > 0) {
-                    process.waitFor(remaining, java.util.concurrent.TimeUnit.NANOSECONDS)
-                }
-            } catch (interrupted: InterruptedException) {
-                Thread.currentThread().interrupt()
-            }
-            val survivors = descendants.count { it.isAlive } + if (process.isAlive) 1 else 0
-            CommandResult(1, "timeout after ${timeoutMs}ms: ${args.joinToString(" ")}; surviving processes=$survivors")
-        } else {
-            CommandResult(process.exitValue(), process.inputStream.bufferedReader().readText())
-        }
-    } catch (t: Throwable) {
-        CommandResult(1, t.message.orEmpty())
-    }
+     private suspend fun shell(timeoutMs: Long, vararg args: String): CommandResult = withContext(Dispatchers.IO) {
+         try {
+             val process = ProcessBuilder(*args)
+                 .directory(repoDir)
+                 .redirectErrorStream(true)
+                 .start()
+             val finished = process.waitFor(timeoutMs, java.util.concurrent.TimeUnit.MILLISECONDS)
+             if (!finished) {
+                 val descendants = buildList {
+                     val stream = process.toHandle().descendants()
+                     try {
+                         stream.forEach { child -> add(child) }
+                     } finally {
+                         stream.close()
+                     }
+                 }
+                 val childExits = descendants.map { child -> child.onExit() }
+                 descendants.forEach { child -> child.destroyForcibly() }
+                 process.destroyForcibly()
+                 val reapDeadline = System.nanoTime() + java.util.concurrent.TimeUnit.SECONDS.toNanos(5)
+                 try {
+                     val remaining = (reapDeadline - System.nanoTime()).coerceAtLeast(0)
+                     java.util.concurrent.CompletableFuture.allOf(*childExits.toTypedArray())
+                         .get(remaining, java.util.concurrent.TimeUnit.NANOSECONDS)
+                 } catch (interrupted: InterruptedException) {
+                     Thread.currentThread().interrupt()
+                 } catch (_: Throwable) {
+                 }
+                 val remaining = reapDeadline - System.nanoTime()
+                 try {
+                     if (remaining > 0) {
+                         process.waitFor(remaining, java.util.concurrent.TimeUnit.NANOSECONDS)
+                     }
+                 } catch (interrupted: InterruptedException) {
+                     Thread.currentThread().interrupt()
+                 }
+                 val survivors = descendants.count { it.isAlive } + if (process.isAlive) 1 else 0
+                 CommandResult(1, "timeout after ${timeoutMs}ms: ${args.joinToString(" ")}; surviving processes=$survivors")
+             } else {
+                 CommandResult(process.exitValue(), process.inputStream.bufferedReader().readText())
+             }
+         } catch (t: Throwable) {
+             CommandResult(1, t.message.orEmpty())
+         }
+     }
 
     private data class CommandResult(val exitCode: Int, val output: String)
 
-    /**
-     * True iff the working tree has no tracked modifications or staged changes.
-     * Untracked files do NOT count as dirty — Jules sessions leave artifacts
-     * behind that are harmless to merges and would otherwise permanently block
-     * the wheel.
-     */
-    private fun isWorkingTreeClean(): Boolean =
-        git("status", "--porcelain", "--untracked-files=no").output.isBlank()
+     /**
+      * True iff the working tree has no tracked modifications or staged changes.
+      * Untracked files do NOT count as dirty — Jules sessions leave artifacts
+      * behind that are harmless to merges and would otherwise permanently block
+      * the wheel.
+      */
+     private suspend fun isWorkingTreeClean(): Boolean =
+         git("status", "--porcelain", "--untracked-files=no").output.isBlank()
 
     /** Project the unified Forge×Jules board and render the saturation wheel. */
     fun renderSaturation(): String {
@@ -1352,7 +1354,7 @@ class FlywheelDriver(
      * content-addressable blob, retrievable as `casStore.get(receipt.patchCid)`,
      * not a detached hash. Internal for testability (drives a real `.git` tag).
      */
-    internal fun claimPatch(
+    internal suspend fun claimPatch(
         commitSha: String,
         patch: String,
         sessionId: String,
@@ -1406,7 +1408,7 @@ class FlywheelDriver(
      * null on no match; the receipt is provenance-complete via [MergeReceipt.patchCid]
      * + [revision]. Jules pushes branches (not PRs); null is valid for direct merges.
      */
-    private fun fishPrUrl(sessionId: String, tag: String): String? {
+    private suspend fun fishPrUrl(sessionId: String, tag: String): String? {
         val numericId = sessionId.substringAfterLast('/').filter { it.isDigit() }
         if (numericId.isEmpty()) return null
         // Probe 1: branch-on-origin.
@@ -1450,7 +1452,7 @@ class FlywheelDriver(
     internal data class ClaimedPatch(val commitSha: String, val receipt: MergeReceipt)
 
     /** Revert only the given files to HEAD. */
-    private fun revertFiles(files: List<String>) {
+    private suspend fun revertFiles(files: List<String>) {
         val cmd = mutableListOf("git", "checkout", "HEAD", "--")
         cmd.addAll(files)
         git(*cmd.toTypedArray())
@@ -1557,7 +1559,7 @@ class FlywheelDriver(
         return out.joinToString("\n")
     }
 
-    private fun headSha(): String = git("rev-parse", "HEAD").output.trim()
+     private suspend fun headSha(): String = git("rev-parse", "HEAD").output.trim()
 
     /** Subscribe a child coroutine to reactor events. Returns the subscriber's job. */
     fun subscribe(block: suspend (FlywheelEvent) -> Unit): Job =
@@ -1696,7 +1698,7 @@ class FlywheelDriver(
      * the repo forward so subsequent drains start from a clean tree. The
      * build-fix loop on the NEXT drain resolves semantic issues.
      */
-    private fun commitExistingConflicts() {
+    private suspend fun commitExistingConflicts() {
         val files = unmergedFiles()
         if (files.isEmpty()) return
         println("[FLYWHEEL] COMMIT-CONFLICTS ${files.size} files with conflict markers — keeping both sides")
@@ -1713,10 +1715,10 @@ class FlywheelDriver(
         }
     }
 
-    /** Files still unmerged in Git's index for the current 3-way arm. */
-    private fun unmergedFiles(): List<String> =
-        git("diff", "--name-only", "--diff-filter=U").output.trim().lines()
-            .filter { it.isNotBlank() }
+     /** Files still unmerged in Git's index for the current 3-way arm. */
+     private suspend fun unmergedFiles(): List<String> =
+         git("diff", "--name-only", "--diff-filter=U").output.trim().lines()
+             .filter { it.isNotBlank() }
 
     /**
      * Cumulative unresolved files. Conflict-arm commits clear the unmerged
@@ -1724,7 +1726,7 @@ class FlywheelDriver(
      * excluding patch-edit templates (`<<<<<<< SEARCH`). This catches both
      * merge markers (`HEAD`) and `git apply --3way` markers (`ours`).
      */
-    private fun conflictFiles(): List<String> {
+    private suspend fun conflictFiles(): List<String> {
         val markerFiles = git("grep", "-l", "^<<<<<<< ", "--")
             .output.trim().lines().filter { path ->
                 path.isNotBlank() && File(repoDir, path).takeIf { it.isFile }?.useLines { lines ->
