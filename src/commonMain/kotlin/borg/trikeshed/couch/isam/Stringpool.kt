@@ -30,10 +30,12 @@ class FileBackedStringpool(
     private var fd: Int = -1
     private var currentOffset: Int = 0
     private var isCorrupted: Boolean = false
+    private var fileExists: Boolean = false
 
     init {
+        fileExists = fileOps.exists(location)
         // Recover from location if it exists
-        if (fileOps.exists(location)) {
+        if (fileExists) {
             val bytes = fileOps.readAllBytes(location)
             var offset = 0
             while (offset < bytes.size) {
@@ -78,8 +80,9 @@ class FileBackedStringpool(
 
     private fun ensureOpen() {
         if (fd == -1) {
-            if (!fileOps.exists(location)) {
+            if (!fileExists) {
                 fileOps.write(location, ByteArray(0))
+                fileExists = true
             }
             fd = fileOps.open(location, readOnly = false)
         }
@@ -99,11 +102,12 @@ class FileBackedStringpool(
         val frame = WalFrame.encode(offset.toLong(), payload)
 
         // Append to file
-        val bytes = if (fileOps.exists(location)) fileOps.readAllBytes(location) else ByteArray(0)
+        val bytes = if (fileExists) fileOps.readAllBytes(location) else ByteArray(0)
         val newBytes = ByteArray(bytes.size + frame.size)
         bytes.copyInto(newBytes)
         frame.copyInto(newBytes, bytes.size)
         fileOps.write(location, newBytes)
+        fileExists = true
 
         memoizedStrings.put(value, offset)
         currentOffset += frame.size
@@ -111,7 +115,7 @@ class FileBackedStringpool(
     }
 
     override fun get(offset: Int): String? {
-        if (!fileOps.exists(location)) return null
+        if (!fileExists) return null
         val bytes = fileOps.readAllBytes(location)
         if (offset >= bytes.size) return null
 
