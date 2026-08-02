@@ -129,3 +129,6 @@ go.sum.bak
 # Bazel
 bazel-*/
 .bazelrc.local.idea/
+---
+--repo/
+.causal.wal
