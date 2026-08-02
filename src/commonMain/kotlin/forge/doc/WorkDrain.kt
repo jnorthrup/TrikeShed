@@ -233,6 +233,7 @@ suspend fun drainWork(store: JulesBoardStore) {
     drainSynth12160533431563921279(store)
 <<<<<<< ours
 <<<<<<< ours
+<<<<<<< ours
     drainSession12282770234900520474(store)
     drainSession12320089122017967949(store)
 }
@@ -312,6 +313,9 @@ suspend fun drainSession12278373796855125845(store: JulesBoardStore) {
         ),
         at = 0L
     ))
+=======
+    drainOptimizeWasmIsamOperations(store)
+>>>>>>> theirs
 }
 
 suspend fun drainSynth12160533431563921279(store: JulesBoardStore) {
@@ -379,6 +383,32 @@ suspend fun drainSynth9667103323583014411(store: JulesBoardStore) {
             lexicalMemory = LexicalMemory(
                 summary = "Superseded necromanced work",
                 title = "[rework #1] Browser mutations lower to JobCommand through bounded ingress",
+                content = "Superseded via drain script."
+            ),
+            claimedAt = 0L,
+            prUrl = null
+        ),
+        at = 0L
+    ))
+}
+
+suspend fun drainOptimizeWasmIsamOperations(store: JulesBoardStore) {
+    val targetWorkId = "session:12046113026982477527"
+    store.appendWork(targetWorkId, JulesCause.WorkDrained(
+        workId = targetWorkId,
+        sessionId = "necromanced",
+        commitSha = "superseded-by-review",
+        taskId = "supersede-pass",
+        receipt = MergeReceipt(
+            workId = targetWorkId,
+            producer = "necromancer",
+            producerRef = "necromanced",
+            patchCid = ContentId("sha256:0000000000000000000000000000000000000000000000000000000000000000"),
+            revision = "superseded-by-review",
+            versionTag = "superseded-by-review",
+            lexicalMemory = LexicalMemory(
+                summary = "Superseded necromanced work",
+                title = "Optimize WasmIsamOperations by reusing ByteArrays in loop",
                 content = "Superseded via drain script."
             ),
             claimedAt = 0L,
