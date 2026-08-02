@@ -232,6 +232,7 @@ suspend fun drainWork(store: JulesBoardStore) {
     drainSession1026611087313351737(store)
     drainSynth12160533431563921279(store)
 <<<<<<< ours
+<<<<<<< ours
     drainSession12282770234900520474(store)
     drainSession12320089122017967949(store)
 }
@@ -271,6 +272,13 @@ suspend fun drainSession12582820163300631149(store: JulesBoardStore) {
 
 suspend fun drainSession12320089122017967949(store: JulesBoardStore) {
     val workId = "session:12320089122017967949"
+=======
+    drainSession12278373796855125845(store)
+}
+
+suspend fun drainSession12278373796855125845(store: JulesBoardStore) {
+    val workId = "session:12278373796855125845"
+>>>>>>> theirs
     store.appendWork(workId, JulesCause.WorkDrained(
         workId = workId,
         sessionId = "necromanced",
@@ -284,6 +292,7 @@ suspend fun drainSession12320089122017967949(store: JulesBoardStore) {
             revision = "superseded-by-review",
             versionTag = "superseded-by-review",
             lexicalMemory = LexicalMemory(
+<<<<<<< ours
                 "Superseded necromanced work",
                 "Implement stub: TinyBtrfsContract.kt",
 =======
@@ -292,6 +301,14 @@ suspend fun drainSession12320089122017967949(store: JulesBoardStore) {
                 "Superseded via drain script."
             ),
             claimedAt = 0L
+=======
+                summary = "Superseded necromanced work",
+                title = "[rework #2] [rework #1] NUID/authorization algebra in commonMain",
+                content = "Superseded via drain script."
+            ),
+            claimedAt = 0L,
+            prUrl = null
+>>>>>>> theirs
         ),
         at = 0L
     ))
