@@ -237,6 +237,7 @@ suspend fun drainWork(store: JulesBoardStore) {
 <<<<<<< ours
 <<<<<<< ours
 <<<<<<< ours
+<<<<<<< ours
     drainSession12282770234900520474(store)
     drainSession12320089122017967949(store)
 }
@@ -257,6 +258,13 @@ suspend fun drainSession12582820163300631149(store: JulesBoardStore) {
 suspend fun drainSession11727450166753680446(store: JulesBoardStore) {
     val workId = "session:11727450166753680446"
 >>>>>>> theirs
+=======
+    drainSession10071466838419282986(store)
+}
+
+suspend fun drainSession10071466838419282986(store: JulesBoardStore) {
+    val workId = "session:10071466838419282986"
+>>>>>>> theirs
     store.appendWork(workId, JulesCause.WorkDrained(
         workId = workId,
         sessionId = "necromanced",
@@ -273,9 +281,13 @@ suspend fun drainSession11727450166753680446(store: JulesBoardStore) {
                 "Superseded necromanced work",
 <<<<<<< ours
 <<<<<<< ours
+<<<<<<< ours
                 "[rework #1] Implement zoom(path): Cursor returning sub-cursor",
 =======
                 "Remove ForgeApp parallel DTO seed truth",
+>>>>>>> theirs
+=======
+                "[rework #1] TDD PR Deliver",
 >>>>>>> theirs
                 "Superseded via drain script."
             ),
@@ -283,6 +295,7 @@ suspend fun drainSession11727450166753680446(store: JulesBoardStore) {
         ),
         at = 0L
     ))
+<<<<<<< ours
 <<<<<<< ours
 }
 
@@ -338,6 +351,8 @@ suspend fun drainSession12278373796855125845(store: JulesBoardStore) {
 >>>>>>> theirs
 =======
     drainSession12711721574152796678(store)
+>>>>>>> theirs
+=======
 >>>>>>> theirs
 }
 
