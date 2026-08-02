@@ -241,6 +241,7 @@ suspend fun drainWork(store: JulesBoardStore) {
     drainOptimizeWasmIsamOperations(store)
     drainNecromancedWork12511514760260520345(store)
     drainSession12711721574152796678(store)
+<<<<<<< ours
     drainSession13434914650488484998(store)
 }
 
@@ -267,6 +268,9 @@ suspend fun drainSession13434914650488484998(store: JulesBoardStore) {
         ),
         at = 0L
     ))
+=======
+    drainSession11949152291930230780(store)
+>>>>>>> theirs
 }
 
 suspend fun drainSession12282770234900520474(store: JulesBoardStore) {
@@ -587,6 +591,31 @@ suspend fun drainSession12711721574152796678(store: JulesBoardStore) {
             lexicalMemory = LexicalMemory(
                 "Superseded necromanced work",
                 "TDD PR Deliver TASK G10",
+                "Superseded via drain script."
+            ),
+            claimedAt = 0L
+        ),
+        at = 0L
+    ))
+}
+
+suspend fun drainSession11949152291930230780(store: JulesBoardStore) {
+    val workId = "session:11949152291930230780"
+    store.appendWork(workId, JulesCause.WorkDrained(
+        workId = workId,
+        sessionId = "necromanced",
+        commitSha = "superseded-by-review",
+        taskId = "supersede-pass",
+        receipt = MergeReceipt(
+            workId = workId,
+            producer = "necromancer",
+            producerRef = "necromanced",
+            patchCid = ContentId("sha256:0000000000000000000000000000000000000000000000000000000000000000"),
+            revision = "superseded-by-review",
+            versionTag = "superseded-by-review",
+            lexicalMemory = LexicalMemory(
+                "Superseded necromanced work",
+                "IO-Uring has been brought in and many tests ported",
                 "Superseded via drain script."
             ),
             claimedAt = 0L
