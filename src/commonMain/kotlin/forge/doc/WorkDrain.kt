@@ -242,11 +242,19 @@ suspend fun drainWork(store: JulesBoardStore) {
     drainNecromancedWork12511514760260520345(store)
     drainSession12711721574152796678(store)
 <<<<<<< ours
+<<<<<<< ours
     drainSession13434914650488484998(store)
 }
 
 suspend fun drainSession13434914650488484998(store: JulesBoardStore) {
     val workId = "session:13434914650488484998"
+=======
+    drainSession14688054800249381584(store)
+}
+
+suspend fun drainSession14688054800249381584(store: JulesBoardStore) {
+    val workId = "session:14688054800249381584"
+>>>>>>> theirs
     store.appendWork(workId, JulesCause.WorkDrained(
         workId = workId,
         sessionId = "necromanced",
@@ -261,15 +269,22 @@ suspend fun drainSession13434914650488484998(store: JulesBoardStore) {
             versionTag = "superseded-by-review",
             lexicalMemory = LexicalMemory(
                 "Superseded necromanced work",
+<<<<<<< ours
                 "Activate the BlackboardFabric factory",
+=======
+                "Infer ISAM RecordMeta from Confix facets",
+>>>>>>> theirs
                 "Superseded via drain script."
             ),
             claimedAt = 0L
         ),
         at = 0L
     ))
+<<<<<<< ours
 =======
     drainSession11949152291930230780(store)
+>>>>>>> theirs
+=======
 >>>>>>> theirs
 }
 
