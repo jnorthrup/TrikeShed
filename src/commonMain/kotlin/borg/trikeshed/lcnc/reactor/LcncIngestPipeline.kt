@@ -88,6 +88,9 @@ class LcncIngestPipeline(
     val metrics: SharedFlow<IngestMetrics> = _metrics.asSharedFlow()
     
     private var currentMetrics = IngestMetrics()
+
+    private val markdownCodec = MarkdownIngestCodec()
+    private val csvCodec = CsvIngestCodec()
     
 
     override suspend fun decode(source: IngestSource, format: IngestFormat): Series<LcncEntity> {
@@ -137,8 +140,8 @@ class LcncIngestPipeline(
         }
         
         return when (format) {
-            IngestFormat.MARKDOWN -> MarkdownIngestCodec().decodeText(text, format)
-            IngestFormat.CSV, IngestFormat.TSV -> CsvIngestCodec().decodeText(text, format)
+            IngestFormat.MARKDOWN -> markdownCodec.decodeText(text, format)
+            IngestFormat.CSV, IngestFormat.TSV -> csvCodec.decodeText(text, format)
             IngestFormat.JSON -> parseJson(text)
             IngestFormat.HTML -> parseHtml(text)
             IngestFormat.LCNC_NATIVE -> parseLcncNative(text)
