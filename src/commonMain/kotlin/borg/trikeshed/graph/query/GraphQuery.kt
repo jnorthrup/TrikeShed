@@ -101,10 +101,11 @@ class GraphQuery<N, E>(private val graph: Graph<N, E>, private val currentNodes:
 
     /** Traverse out filtering edges by a predicate. */
     fun outE(predicate: (E) -> Boolean): GraphQuery<N, E> {
+        if (currentNodes.isEmpty()) return this
         val nextNodes = mutableSetOf<N>()
         for (node in currentNodes) {
-            for ((target, edge) in graph.outEdges(node)) {
-                if (predicate(edge)) nextNodes.add(target)
+            for (entry in graph.outEdges(node)) {
+                if (predicate(entry.value)) nextNodes.add(entry.key)
             }
         }
         return GraphQuery(graph, nextNodes)
