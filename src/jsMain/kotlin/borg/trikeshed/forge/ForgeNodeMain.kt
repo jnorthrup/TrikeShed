@@ -17,7 +17,7 @@ import borg.trikeshed.kanban.ForgeKanbanIngest
  */
 fun main() {
     // Node.js: ingest /tmp/hi into the local-first persistence layer.
-    if (!isBrowserRuntime()) {
+    if (!(js("typeof window !== 'undefined' && typeof document !== 'undefined'") as Boolean)) {
 
         // Node.js: ingest /tmp/hi into the local-first persistence layer.
         // This reads all 1349 lines, parses the 13 work packages (G0..C1),
@@ -40,17 +40,13 @@ fun main() {
     }
 
     val html = ForgeApp.renderHtml()
-    if (isBrowserRuntime()) {
+    if (js("typeof window !== 'undefined' && typeof document !== 'undefined'") as Boolean) {
         renderBrowser(html)
     } else {
         println(html)
     }
 }
 
-
-private fun isBrowserRuntime(): Boolean = js(
-    "typeof window !== 'undefined' && typeof document !== 'undefined'"
-) as Boolean
 
 private fun renderBrowser(html: String) {
     js(
