@@ -24,7 +24,7 @@ import kotlin.test.assertTrue
 class FlywheelEndToEndDrainTest {
 
     @Test
-    fun `claimPatch commits, CASes, tags, pushes tag to origin, and fishes prUrl from the landed branch`() {
+    fun `claimPatch commits, CASes, tags, pushes tag to origin, and fishes prUrl from the landed branch`() = kotlinx.coroutines.runBlocking {
         // Build a bare origin + a working clone, mirror the prod layout:
         // working repo has a committed README on master, origin is the bare
         // remote the driver will push the tag into.

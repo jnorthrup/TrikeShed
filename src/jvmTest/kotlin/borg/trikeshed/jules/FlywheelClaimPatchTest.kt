@@ -20,7 +20,7 @@ import kotlin.test.assertTrue
 class FlywheelClaimPatchTest {
 
     @Test
-    fun `receipt patchCid is backed by a content-addressable CAS blob and pinned by an annotated tag`() {
+    fun `receipt patchCid is backed by a content-addressable CAS blob and pinned by an annotated tag`() = kotlinx.coroutines.runBlocking {
         // tmp repo so `git tag -a` lands on a real git object we can read back.
         val repo = Files.createTempDirectory("flywheel-claim-repo").toFile()
         git(repo, "init", "-q")
