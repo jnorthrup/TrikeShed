@@ -8,9 +8,13 @@ import borg.trikeshed.lib.j
 class MarkdownIngestCodec : IngestCodec {
     override val supportedFormats: Set<IngestFormat> = setOf(IngestFormat.MARKDOWN)
 
+    companion object {
+        private val headerRegex = Regex("^(#+)\\s+(.+)$")
+        private val idRegex = Regex("[^a-z0-9]+")
+    }
+
     override suspend fun decodeText(text: String, format: IngestFormat): Series<LcncEntity> {
         val lines = text.lines()
-        val headerRegex = Regex("^(#+)\\s+(.+)$")
         
         return lines.size j { i ->
             val line = lines[i]
@@ -18,7 +22,7 @@ class MarkdownIngestCodec : IngestCodec {
             if (match != null) {
                 val level = match.groupValues[1].length
                 val title = match.groupValues[2].trim()
-                val id = title.lowercase().replace(Regex("[^a-z0-9]+"), "-")
+                val id = title.lowercase().replace(idRegex, "-")
                 
                 LcncBlock(
                     id = id,
