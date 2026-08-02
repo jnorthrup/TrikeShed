@@ -14,6 +14,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -517,6 +518,153 @@ class FlywheelDriver(
             http429 = cycleHttp429,
             http5xx = cycleHttp5xx,
         )
+    }
+
+    // ─────────────────────────────────────────────────────────────────────
+    // REACTIVE CHOREOGRAPHY: fan-out/fan-in pipeline
+    //
+    // poll → drain → settle → dispatch run as concurrent coroutines,
+    // not sequential phases. Each reacts to events on the SharedFlow bus
+    // and signals the next via channels. A freed slot triggers dispatch
+    // in milliseconds, not on the next 30s cycle tick.
+    //
+    //     pollCoroutine ───Polled──→ drainCoroutine
+    //                                    │
+    //                                PatchLanded
+    //                                    │
+    //                                    ▼
+    //     dispatchCoroutine ←──SlotFreed── settleCoroutine
+    //
+    // The daemon calls startReactiveCycle(scope) instead of looping cycle().
+    // ─────────────────────────────────────────────────────────────────────
+
+    /** Signal channel: a slot freed, dispatch should try to fill it. */
+    private val slotFreed = kotlinx.coroutines.channels.Channel<Int>(kotlinx.coroutines.channels.Channel.CONFLATED)
+
+    /**
+     * Launch the reactive choreography. Returns immediately; the coroutines
+     * run in [scope] and die when it's cancelled. The daemon's periodicity
+     * loop becomes a simple poll trigger — everything else is reactive.
+     */
+    fun startReactiveCycle(scope: kotlinx.coroutines.CoroutineScope) {
+        // FAN-OUT: drain pipeline. Polls Jules, drains COMPLETED sessions,
+        // and signals dispatch when slots free.
+        scope.launch(Dispatchers.Default) {
+            while (true) {
+                try {
+                    withTimeoutOrNull(intervalMs) { conductor.pollOnce() }
+                } catch (t: Throwable) {
+                    classifyHttpError(t)
+                    _events.tryEmit(FlywheelEvent.PollError("reactive poll: ${t.message?.take(200)}"))
+                }
+
+                // Fan-in: drain all completed sessions concurrently
+                val completed = conductor.cards.values.filter {
+                    it.snapshot.state == "COMPLETED" && !it.drained
+                }
+                if (completed.isNotEmpty()) {
+                    val sessions = completed.map {
+                        JulesRestClient.SessionInfo(it.snapshot.sessionId, it.snapshot.state, it.card.title, 0L)
+                    }
+                    drainFanout(sessions)
+                    // Signal dispatch: slots may have freed
+                    val freed = completed.count { it.drained }
+                    if (freed > 0) {
+                        slotFreed.trySend(freed)
+                        println("[CHOREOGRAPHY] drain → dispatch signal: $freed slots freed")
+                    }
+                }
+
+                // Answer/approve waiting sessions concurrently with drain
+                val awaiting = conductor.cards.values.filter {
+                    it.snapshot.state == "AWAITING_USER_FEEDBACK" &&
+                        it.causes.lastOrNull() !is JulesCause.HumanAnswered
+                }
+                for (card in awaiting) {
+                    val answer = withTimeoutOrNull(45_000L) { buildAnswer(card) } ?: ""
+                    if (answer.isNotEmpty()) {
+                        conductor.answer(card.snapshot.sessionId, answer)
+                        _events.tryEmit(FlywheelEvent.Polled(activeCount(), (maxSlots - activeCount()).coerceAtLeast(0)))
+                        println("[CHOREOGRAPHY] answer ${card.snapshot.sessionId.takeLast(6)}")
+                    }
+                }
+
+                // Approve plans concurrently
+                for (card in conductor.cards.values.filter {
+                    it.snapshot.state == "AWAITING_PLAN_APPROVAL" &&
+                        it.causes.lastOrNull() !is JulesCause.HumanAnswered
+                }) {
+                    withTimeoutOrNull(45_000L) { conductor.approvePlan(card.snapshot.sessionId) }
+                }
+
+                // Swepp terminal failures
+                for (card in conductor.cards.values.filter {
+                    it.snapshot.state in setOf("FAILED", "CANCELLED") && !it.drained
+                }) {
+                    conductor.retireTerminal(card.snapshot.sessionId, "terminal ${card.snapshot.state}", Clock.System.now().toEpochMilliseconds())
+                    slotFreed.trySend(1)
+                    println("[CHOREOGRAPHY] sweep ${card.snapshot.sessionId.takeLast(6)} → slot freed")
+                }
+
+                // Emit poll event for observers
+                _events.tryEmit(FlywheelEvent.Polled(activeCount(), (maxSlots - activeCount()).coerceAtLeast(0)))
+
+                delay(intervalMs)
+            }
+        }
+
+        // FAN-OUT: dispatch pipeline. Reacts to SlotFreed signals and fills
+        // slots immediately — does NOT wait for the next poll cycle.
+        scope.launch(Dispatchers.Default) {
+            while (true) {
+                // Block until a slot frees (drain or sweep signaled)
+                slotFreed.receive()
+
+                val alive = activeCount()
+                val available = (maxSlots - alive).coerceAtLeast(0)
+                if (available == 0) continue
+                if (!isWorkingTreeClean()) continue
+
+                val pendingCandidates = store.loadQueue()
+                    .filter { !it.isDispatched && !it.isDrained }
+                    .filterNot { entry ->
+                        entry.workId.startsWith("session:") &&
+                            conductor.cards[entry.workId.removePrefix("session:")]?.drained == true
+                    }
+                    .filter { it.spec.isNotBlank() }
+                    .sortedByDescending { it.score }
+                    .take(available)
+
+                if (pendingCandidates.isEmpty()) continue
+
+                // Fan-out: dispatch all candidates concurrently
+                coroutineScope {
+                    val jobs = pendingCandidates.map { entry ->
+                        async(Dispatchers.IO) {
+                            try {
+                                val cappedSpec = capSpec(entry.spec)
+                                val sessionId = client.createSession(
+                                    prompt = cappedSpec, title = entry.title, source = source)
+                                store.appendWork(entry.workId, JulesCause.WorkDispatched(
+                                    workId = entry.workId,
+                                    sessionId = sessionId,
+                                    attempt = entry.attempt + 1,
+                                    at = Clock.System.now().toEpochMilliseconds(),
+                                ))
+                                _events.emit(FlywheelEvent.Dispatched(sessionId, entry.title))
+                                println("[CHOREOGRAPHY] dispatch ${entry.title.take(60)}")
+                            } catch (t: Throwable) {
+                                classifyHttpError(t)
+                                _events.emit(FlywheelEvent.DispatchFailed(entry.title, t.message.orEmpty()))
+                            }
+                        }
+                    }
+                    jobs.awaitAll()
+                }
+            }
+        }
+
+        println("[CHOREOGRAPHY] reactive cycle started — fan-out drain + reactive dispatch")
     }
 
     /** Drain every completed session before the next research wave. */

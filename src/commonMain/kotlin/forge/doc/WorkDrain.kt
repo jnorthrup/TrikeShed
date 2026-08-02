@@ -229,9 +229,7 @@ suspend fun drainWork(store: JulesBoardStore) {
         receipt = receipt,
         at = 0L
     ))
-<<<<<<< ours
     drainSession1026611087313351737(store)
-=======
     drainSynth12160533431563921279(store)
 }
 
@@ -257,7 +255,6 @@ suspend fun drainSynth12160533431563921279(store: JulesBoardStore) {
         ),
         at = 0L
     ))
->>>>>>> theirs
 }
 
 suspend fun drainReworkSynth3803389897151472172(store: JulesBoardStore) {
