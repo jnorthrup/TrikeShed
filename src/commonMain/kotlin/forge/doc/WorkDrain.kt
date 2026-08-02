@@ -235,6 +235,7 @@ suspend fun drainWork(store: JulesBoardStore) {
 <<<<<<< ours
 <<<<<<< ours
 <<<<<<< ours
+<<<<<<< ours
     drainSession12282770234900520474(store)
     drainSession12320089122017967949(store)
 }
@@ -247,6 +248,13 @@ suspend fun drainSession12282770234900520474(store: JulesBoardStore) {
 
 suspend fun drainSession12582820163300631149(store: JulesBoardStore) {
     val workId = "session:12582820163300631149"
+>>>>>>> theirs
+=======
+    drainSession11727450166753680446(store)
+}
+
+suspend fun drainSession11727450166753680446(store: JulesBoardStore) {
+    val workId = "session:11727450166753680446"
 >>>>>>> theirs
     store.appendWork(workId, JulesCause.WorkDrained(
         workId = workId,
@@ -263,13 +271,18 @@ suspend fun drainSession12582820163300631149(store: JulesBoardStore) {
             lexicalMemory = LexicalMemory(
                 "Superseded necromanced work",
 <<<<<<< ours
+<<<<<<< ours
                 "[rework #1] Implement zoom(path): Cursor returning sub-cursor",
+=======
+                "Remove ForgeApp parallel DTO seed truth",
+>>>>>>> theirs
                 "Superseded via drain script."
             ),
             claimedAt = 0L
         ),
         at = 0L
     ))
+<<<<<<< ours
 }
 
 suspend fun drainSession12320089122017967949(store: JulesBoardStore) {
@@ -319,6 +332,8 @@ suspend fun drainSession12278373796855125845(store: JulesBoardStore) {
 >>>>>>> theirs
 =======
     drainNecromancedWork12511514760260520345(store)
+>>>>>>> theirs
+=======
 >>>>>>> theirs
 }
 
