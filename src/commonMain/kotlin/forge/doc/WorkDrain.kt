@@ -231,12 +231,20 @@ suspend fun drainWork(store: JulesBoardStore) {
     ))
     drainSession1026611087313351737(store)
     drainSynth12160533431563921279(store)
+<<<<<<< ours
     drainSession12282770234900520474(store)
     drainSession12320089122017967949(store)
 }
 
 suspend fun drainSession12282770234900520474(store: JulesBoardStore) {
     val workId = "session:12282770234900520474"
+=======
+    drainSession12582820163300631149(store)
+}
+
+suspend fun drainSession12582820163300631149(store: JulesBoardStore) {
+    val workId = "session:12582820163300631149"
+>>>>>>> theirs
     store.appendWork(workId, JulesCause.WorkDrained(
         workId = workId,
         sessionId = "necromanced",
@@ -251,6 +259,7 @@ suspend fun drainSession12282770234900520474(store: JulesBoardStore) {
             versionTag = "superseded-by-review",
             lexicalMemory = LexicalMemory(
                 "Superseded necromanced work",
+<<<<<<< ours
                 "[rework #1] Implement zoom(path): Cursor returning sub-cursor",
                 "Superseded via drain script."
             ),
@@ -277,6 +286,9 @@ suspend fun drainSession12320089122017967949(store: JulesBoardStore) {
             lexicalMemory = LexicalMemory(
                 "Superseded necromanced work",
                 "Implement stub: TinyBtrfsContract.kt",
+=======
+                "Pass JSON String Directly for Manifest Doc",
+>>>>>>> theirs
                 "Superseded via drain script."
             ),
             claimedAt = 0L
