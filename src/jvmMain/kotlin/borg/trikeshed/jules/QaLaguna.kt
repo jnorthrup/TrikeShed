@@ -119,14 +119,16 @@ object QaLaguna {
     }
 
     /** Files with unresolved conflict markers. */
-    private fun conflictFiles(repoDir: File): List<String> {
-        fun git(vararg args: String): List<String> {
+    private suspend fun conflictFiles(repoDir: File): List<String> {
+        suspend fun git(vararg args: String): List<String> = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
             val p = ProcessBuilder("git", *args)
                 .directory(repoDir)
                 .redirectErrorStream(true)
                 .start()
-            p.waitFor()
-            return p.inputStream.bufferedReader().readText().trim().lines()
+            if (!p.waitFor(10_000, java.util.concurrent.TimeUnit.MILLISECONDS)) {
+                p.destroy()
+            }
+            p.inputStream.bufferedReader().readText().trim().lines()
                 .filter { it.isNotBlank() }
         }
         val unmerged = git("diff", "--name-only", "--diff-filter=U")
