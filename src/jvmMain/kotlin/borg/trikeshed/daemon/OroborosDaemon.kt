@@ -13,6 +13,7 @@ import borg.trikeshed.util.io.ForgeCliArgs
 import borg.trikeshed.util.oroboros.CouchAttachmentGateway
 import borg.trikeshed.util.oroboros.FileCasStore
 import borg.trikeshed.util.oroboros.GitCouchGateway
+import borg.trikeshed.util.oroboros.JvmFileWatchReactorElement
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -187,27 +188,92 @@ object OroborosDaemon {
             System.err.println("[OROBOROS] --once mode: Kanban server skipped")
         }
 
-        // ── GitCouchGateway: mirror .git → Couch/CAS on each cycle ──
+        // ── GitCouchGateway: mirror .git → Couch/CAS reactively ──
         val fileOps = JvmFileOperations()
         val casStore = FileCasStore(fileOps, fileOps.resolvePath(forgeHome.absolutePath, "cas"))
         val couchStore = borg.trikeshed.couch.CouchStoreFactory.inMemory()
         val attachmentGateway = CouchAttachmentGateway(couchStore, casStore)
         val gitCouchGateway = GitCouchGateway(fileOps, attachmentGateway)
-        // Initial reconciliation so a restart picks up changes since last run.
-        // Blocking git call wrapped in Dispatchers.IO — never block the reactor.
-        runCatching {
-            val headSha = withContext(Dispatchers.IO) {
-                ProcessBuilder("git", "rev-parse", "HEAD")
-                    .directory(repoDir).redirectErrorStream(true).start()
-                    .let { it.waitFor(); it.inputStream.bufferedReader().readText().trim() }
+
+        // ── Reactive git-state hub: JvmFileWatchReactorElement watches .git/**
+        //    and feeds the GitCouchGateway + git-state cache. This IS the
+        //    choreography — coroutine pipelines that react to filesystem
+        //    events, not blocking ProcessBuilder calls. ──
+        val gitState = GitStateCache(repoDir)
+        val gitWatcher = JvmFileWatchReactorElement(
+            root = repoDir.absolutePath,
+            parentJob = coroutineContext[kotlinx.coroutines.Job],
+            includeGlobs = listOf(".git/**"),
+            excludeGlobs = emptyList(),
+        )
+        launch { gitWatcher.open() }
+        System.err.println("[OROBOROS] Git watcher: ${gitWatcher.state} — reactive .git/** events")
+
+        // Choreography 1: git filesystem events → GitStateCache invalidation.
+        // The cache holds headSha, treeClean, and refHead — read from .git
+        // files directly (no ProcessBuilder). File events invalidate the
+        // relevant cache entry; the next cycle reads fresh values.
+        launch {
+            for (event in gitWatcher.events) {
+                when {
+                    event.path.startsWith(".git/HEAD") -> {
+                        gitState.invalidateHead()
+                        println("[OROBOROS] git-event: HEAD changed → headSha cache invalidated")
+                    }
+                    event.path.startsWith(".git/index") -> {
+                        gitState.invalidateTree()
+                        println("[OROBOROS] git-event: index changed → treeClean cache invalidated")
+                    }
+                    event.path.startsWith(".git/refs/") -> {
+                        gitState.invalidateHead()
+                        println("[OROBOROS] git-event: ref changed → ${event.path}")
+                    }
+                    event.path.startsWith(".git/objects/") -> {
+                        // New git object — trigger Couch reconcile if in --watch mode
+                        if (watch) {
+                            gitState.markObjectsDirty()
+                        }
+                    }
+                }
             }
+        }
+
+        // Choreography 2: git object creation → GitCouchGateway reconcile.
+        // Runs on its own coroutine; the gateway reads .git directly via
+        // JvmFileOperations, no ProcessBuilder.
+        launch {
+            var lastReconcledSha = ""
+            while (true) {
+                // Wait for object-dirty signal, then reconcile
+                gitState.awaitObjectsDirty()
+                val currentSha = gitState.headSha()
+                if (currentSha != lastReconcledSha) {
+                    runCatching {
+                        val snap = gitCouchGateway.reconcile(
+                            forgeHome = repoDir.absolutePath,
+                            agentId = "oroboros",
+                            revision = currentSha,
+                            sequence = System.currentTimeMillis(),
+                        )
+                        lastReconcledSha = currentSha
+                        println("[OROBOROS] Git→Couch reactive reconcile: ${snap.paths.size} paths @ ${currentSha.take(12)}")
+                    }.onFailure {
+                        System.err.println("[OROBOROS] Git→Couch reconcile failed: ${it.message}")
+                    }
+                }
+            }
+        }
+
+        // Initial reconcile — read HEAD directly, no ProcessBuilder
+        runCatching {
+            val headSha = gitState.headSha()
             val snap = gitCouchGateway.reconcile(
                 forgeHome = repoDir.absolutePath,
                 agentId = "oroboros",
                 revision = headSha,
                 sequence = System.currentTimeMillis(),
             )
-            System.err.println("[OROBOROS] Git→Couch reconcile: ${snap.paths.size} paths @ $headSha")
+            System.err.println("[OROBOROS] Git→Couch initial reconcile: ${snap.paths.size} paths @ ${headSha.take(12)}")
         }.onFailure { System.err.println("[OROBOROS] Git→Couch initial reconcile failed: ${it.message}") }
 
         // ── Couch report reactor: CCEK element for map/reduce events ──
@@ -414,6 +480,7 @@ object OroborosDaemon {
             try { traceWriter?.flush(); traceWriter?.close() } catch (_: Exception) {}
             runCatching { kanbanJob.cancel() }
             runCatching { reportReactor.close() }
+            runCatching { gitWatcher.close() }
             try { htxElement.close() } catch (_: Exception) {}
             try { nioSupervisor.close() } catch (_: Exception) {}
             driver.close()
