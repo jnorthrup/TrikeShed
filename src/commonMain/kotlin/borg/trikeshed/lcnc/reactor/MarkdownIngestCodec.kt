@@ -1,4 +1,3 @@
-```kotlin
 package borg.trikeshed.lcnc.reactor
 
 import borg.trikeshed.lcnc.isam.LcncBlock
@@ -42,4 +41,3 @@ class MarkdownIngestCodec : IngestCodec {
         }
     }
 }
-```

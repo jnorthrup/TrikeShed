@@ -456,7 +456,7 @@ object OroborosDaemon {
                     if (errors > 0) System.err.println("[OROBOROS] backoff=${backoffMs}ms consecutiveErrors=$errors")
                     delay(backoffMs)
                     try {
-                        cycleBody.run()
+                        (cycleBodyField ?: cycleBody).run()
                     } catch (t: LinkageError) {
                         // Botched hot-swap: the retransform produced bytecode
                         // the JVM can't link against the loaded class
