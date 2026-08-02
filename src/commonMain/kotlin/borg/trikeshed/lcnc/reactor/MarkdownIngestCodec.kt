@@ -1,3 +1,4 @@
+```kotlin
 package borg.trikeshed.lcnc.reactor
 
 import borg.trikeshed.lcnc.isam.LcncBlock
@@ -9,13 +10,8 @@ class MarkdownIngestCodec : IngestCodec {
     override val supportedFormats: Set<IngestFormat> = setOf(IngestFormat.MARKDOWN)
 
     companion object {
-<<<<<<< ours
-        private val headerRegex = Regex("^(#+)\\s+(.+)$")
-        private val idRegex = Regex("[^a-z0-9]+")
-=======
         private val HEADER_REGEX = Regex("^(#+)\\s+(.+)$")
         private val ID_CLEAN_REGEX = Regex("[^a-z0-9]+")
->>>>>>> theirs
     }
 
     override suspend fun decodeText(text: String, format: IngestFormat): Series<LcncEntity> {
@@ -27,11 +23,7 @@ class MarkdownIngestCodec : IngestCodec {
             if (match != null) {
                 val level = match.groupValues[1].length
                 val title = match.groupValues[2].trim()
-<<<<<<< ours
-                val id = title.lowercase().replace(idRegex, "-")
-=======
                 val id = title.lowercase().replace(ID_CLEAN_REGEX, "-")
->>>>>>> theirs
                 
                 LcncBlock(
                     id = id,
@@ -50,3 +42,4 @@ class MarkdownIngestCodec : IngestCodec {
         }
     }
 }
+```
