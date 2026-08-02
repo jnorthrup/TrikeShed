@@ -245,7 +245,7 @@ object JvmKanbanServer {
 
     // ── routes (single worker, hand-rolled) ──────────────────────────────
 
-    private fun routeHttp(payload: ByteArray): HttpResponse {
+    private suspend fun routeHttp(payload: ByteArray): HttpResponse {
         val text = String(payload, StandardCharsets.UTF_8)
         val firstLine = text.lineSequence().firstOrNull() ?: ""
         val parts = firstLine.split(' ')
@@ -280,7 +280,7 @@ object JvmKanbanServer {
         )
     }.getOrElse { """{"error":"load_failed","reason":"${it.message}"}""" }
 
-    private fun submit(body: String): HttpResponse {
+    private suspend fun submit(body: String): HttpResponse {
         val payload = body.substringAfter("\r\n\r\n", "").ifEmpty {
             // Some clients use \n separators; tolerate that.
             body.substringAfter("\n\n", "")
@@ -290,11 +290,9 @@ object JvmKanbanServer {
             val tmp = "/tmp/hi"
             writeStringJvm(tmp, payload)
             val reduction = ForgeKanbanIngest.persistMarkdown("jim", tmp)
-            runBlocking {
-                reduction.causalNodes.forEach { node ->
-                    causalWal.append(node.causalKey, JsonSupport.stringify(node.toWalMap()).encodeToByteArray())
-                    graphIndex.addOrGet(node)
-                }
+            reduction.causalNodes.forEach { node ->
+                causalWal.append(node.causalKey, JsonSupport.stringify(node.toWalMap()).encodeToByteArray())
+                graphIndex.addOrGet(node)
             }
             HttpResponse(
                 201,
