@@ -449,6 +449,7 @@ object OroborosDaemon {
                 consecutivePollErrors.set(1)
             }
             if (watch) {
+                driver.startReactiveCycle(this)
                 while (isRunning) {
                     val errors = consecutivePollErrors.get()
                     val backoffMs = kotlin.math.min(intervalMs * (1L shl kotlin.math.min(errors, 30)), intervalMs * 5)
