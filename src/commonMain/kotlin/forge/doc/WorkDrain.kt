@@ -236,6 +236,7 @@ suspend fun drainWork(store: JulesBoardStore) {
 <<<<<<< ours
 <<<<<<< ours
 <<<<<<< ours
+<<<<<<< ours
     drainSession12282770234900520474(store)
     drainSession12320089122017967949(store)
 }
@@ -335,6 +336,9 @@ suspend fun drainSession12278373796855125845(store: JulesBoardStore) {
 >>>>>>> theirs
 =======
 >>>>>>> theirs
+=======
+    drainSession12711721574152796678(store)
+>>>>>>> theirs
 }
 
 suspend fun drainSynth12160533431563921279(store: JulesBoardStore) {
@@ -412,6 +416,7 @@ suspend fun drainSynth9667103323583014411(store: JulesBoardStore) {
 }
 
 <<<<<<< ours
+<<<<<<< ours
 suspend fun drainOptimizeWasmIsamOperations(store: JulesBoardStore) {
     val targetWorkId = "session:12046113026982477527"
     store.appendWork(targetWorkId, JulesCause.WorkDrained(
@@ -422,12 +427,22 @@ suspend fun drainNecromancedWork12511514760260520345(store: JulesBoardStore) {
     store.appendWork(workId, JulesCause.WorkDrained(
         workId = workId,
 >>>>>>> theirs
+=======
+suspend fun drainSession12711721574152796678(store: JulesBoardStore) {
+    val workId = "session:12711721574152796678"
+    store.appendWork(workId, JulesCause.WorkDrained(
+        workId = workId,
+>>>>>>> theirs
         sessionId = "necromanced",
         commitSha = "superseded-by-review",
         taskId = "supersede-pass",
         receipt = MergeReceipt(
 <<<<<<< ours
+<<<<<<< ours
             workId = targetWorkId,
+=======
+            workId = workId,
+>>>>>>> theirs
 =======
             workId = workId,
 >>>>>>> theirs
@@ -438,6 +453,7 @@ suspend fun drainNecromancedWork12511514760260520345(store: JulesBoardStore) {
             versionTag = "superseded-by-review",
             lexicalMemory = LexicalMemory(
 <<<<<<< ours
+<<<<<<< ours
                 summary = "Superseded necromanced work",
                 title = "Optimize WasmIsamOperations by reusing ByteArrays in loop",
                 content = "Superseded via drain script."
@@ -447,6 +463,13 @@ suspend fun drainNecromancedWork12511514760260520345(store: JulesBoardStore) {
 =======
                 "Superseded necromanced work",
                 "[rework #2] [rework #1] Browser mutations lower to JobCommand",
+                "Superseded via drain script."
+            ),
+            claimedAt = 0L
+>>>>>>> theirs
+=======
+                "Superseded necromanced work",
+                "TDD PR Deliver TASK G10",
                 "Superseded via drain script."
             ),
             claimedAt = 0L
