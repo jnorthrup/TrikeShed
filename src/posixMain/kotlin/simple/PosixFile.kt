@@ -588,17 +588,26 @@ class PosixFile(
         /**
          * writes \n terminated lines to a file
          */
-        fun writeLines(filename: String, lines: List<String>): Unit = memScoped {
+        fun writeLines(filename: String, lines: List<String>): Unit {
+            if (lines.isEmpty()) {
+                val O_FLAGS = PosixOpenOpts.withFlags(PosixOpenOpts.O_Creat, PosixOpenOpts.O_Trunc, PosixOpenOpts.O_WrOnly)
+                val file = PosixFile(filename, O_FLAGS)
+                file.close()
+                return
+            }
+            // ⚡ Bolt: Join lines in memory to perform a single write system call instead of N+1 writes.
+            val content = lines.joinToString(separator = "\n", postfix = "\n")
+            val bytes = content.encodeToByteArray()
             val O_FLAGS = PosixOpenOpts.withFlags(PosixOpenOpts.O_Creat, PosixOpenOpts.O_Trunc, PosixOpenOpts.O_WrOnly)
             val file = PosixFile(filename, O_FLAGS)
-            lines.forEach { line ->
-                val len = line.length
-                val buf = line.plus('\n').cstr.getPointer(this)
-                val written = write(file.fd, buf, len.inc().convert())
-                HasPosixErr.posixRequires(written == len.inc().toLong()) { "writeLines $filename" }
-            }.also {
-                file.close()
+            if (bytes.isNotEmpty()) {
+                bytes.usePinned { pinned ->
+                    val buf = pinned.addressOf(0)
+                    val written = write(file.fd, buf, bytes.size.convert())
+                    HasPosixErr.posixRequires(written == bytes.size.toLong()) { "writeLines $filename" }
+                }
             }
+            file.close()
         }
         fun writeString(filename: String, string: String): Int = writeBytes(filename, string.encodeToByteArray())
 
