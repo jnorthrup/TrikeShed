@@ -258,7 +258,11 @@ suspend fun drainSession15466567759278489251(store: JulesBoardStore) {
 }
 
 suspend fun drainWork(store: JulesBoardStore) {
+<<<<<<< ours
     drainSession15466567759278489251(store)
+=======
+    drainSession17265457666410082720(store)
+>>>>>>> theirs
     drainSession13065137133469730772(store)
     val workId = "synth:12224356407860756599#2"
 
@@ -329,8 +333,13 @@ suspend fun drainSession13434914650488484998(store: JulesBoardStore) {
     ))
 }
 
+<<<<<<< ours
 suspend fun drainSession17099126540887000248(store: JulesBoardStore) {
     val workId = "session:17099126540887000248"
+=======
+suspend fun drainSession17265457666410082720(store: JulesBoardStore) {
+    val workId = "session:17265457666410082720"
+>>>>>>> theirs
     store.appendWork(workId, JulesCause.WorkDrained(
         workId = workId,
         sessionId = "necromanced",
@@ -345,7 +354,11 @@ suspend fun drainSession17099126540887000248(store: JulesBoardStore) {
             versionTag = "superseded-by-review",
             lexicalMemory = LexicalMemory(
                 "Superseded necromanced work",
+<<<<<<< ours
                 "Implement PosixIsamOperations.append",
+=======
+                "Implement stub: MiniDuckContract.kt:98",
+>>>>>>> theirs
                 "Superseded via drain script."
             ),
             claimedAt = 0L
