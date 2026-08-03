@@ -10,6 +10,8 @@ import java.nio.file.StandardCopyOption
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
 
 /**
  * BtrfsCasStore — CAS store backed by btrfs reflink deduplication.
@@ -220,41 +222,41 @@ class BtrfsCasStore(
      * Get physical disk usage (after dedup).
      * Uses `du -s --apparent-size` vs `du -s` to measure dedup ratio.
      */
-    suspend fun diskUsage(): Pair<Long, Long> { // (apparent, physical)
+    suspend fun diskUsage(): Pair<Long, Long> = coroutineScope { // (apparent, physical)
+        // Physical usage via `btrfs filesystem du` or `du -s`
+        val processOps = kotlin.coroutines.coroutineContext[borg.trikeshed.userspace.nio.channels.spi.ProcessOperations]
+        val physicalFuture = async(Dispatchers.IO) {
+            try {
+                if (processOps != null) {
+                    val result = processOps.exec(
+                        command = "du",
+                        args = listOf("-s", "--block-size=1", "--", root.absolutePath)
+                    )
+                    if (result.exitCode == 0) {
+                        result.stdout.decodeToString().split("\t").first().toLongOrNull()
+                    } else {
+                        null
+                    }
+                } else {
+                    null
+                }
+            } catch (e: Exception) {
+                null
+            }
+        }
+
         // ⚡ Bolt: Wrap blocking I/O operations in Dispatchers.IO to prevent coroutine starvation
-        val apparent = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+        val apparent = withContext(Dispatchers.IO) {
             Files.walk(root.toPath()).use { stream ->
                 stream.filter { Files.isRegularFile(it) }
                     .mapToLong { Files.size(it) }
                     .sum()
             }
-// alt:         val apparent = Files.walk(root.toPath()).use { stream ->
-// alt:             stream.filter { Files.isRegularFile(it) }
-// alt:                 .mapToLong { Files.size(it) }
-// alt:                 .sum()
         }
         
-        // Physical usage via `btrfs filesystem du` or `du -s`
-        val physical = try {
-            val processOps = kotlin.coroutines.coroutineContext[borg.trikeshed.userspace.nio.channels.spi.ProcessOperations]
-            if (processOps != null) {
-                val result = processOps.exec(
-                    command = "du",
-                    args = listOf("-s", "--block-size=1", "--", root.absolutePath)
-                )
-                if (result.exitCode == 0) {
-                    result.stdout.decodeToString().split("\t").first().toLongOrNull() ?: apparent
-                } else {
-                    apparent
-                }
-            } else {
-                apparent
-            }
-        } catch (e: Exception) {
-            apparent
-        }
+        val physical = physicalFuture.await() ?: apparent
         
-        return Pair(apparent, physical)
+        Pair(apparent, physical)
     }
     
     /**
