@@ -50,7 +50,7 @@ object BtrfsChunkTree {
             val dataOffsetInNode = readUIntLE(bytes, itemPtrOffset + 17).toInt()
             
             // fix: data offset is relative to the start of the node (offset) + 101 byte header 
-            val payloadOffset = offset + 101 + dataOffsetInNode
+            val payloadOffset = offset + dataOffsetInNode + 101
             
             val stripeLength = readULongLE(bytes, payloadOffset)
             val type = bytes[payloadOffset + 24].toUByte() // bitmask for single, raid0, raid1...
