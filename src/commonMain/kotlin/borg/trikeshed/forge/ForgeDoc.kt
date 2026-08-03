@@ -429,7 +429,7 @@ private fun parseKanbanColumnObject(entry: String): KanbanColumnRef? {
     val name = field(KanbanColumnRef.NAME_REGEX) ?: id
     val order = field(KanbanColumnRef.ORDER_REGEX)?.toIntOrNull() ?: 0
     val wipLimit = field(KanbanColumnRef.WIP_LIMIT_REGEX)?.toIntOrNull()
-    return KanbanColumnRef(id = id, name = name, order = order, wipLimit = wipLimit)
+    return KanbanColumnRef(name = name, id = id, order = order, wipLimit = wipLimit)
 }
 
 /** Stable JSON serialiser for `kanban.columns` page-block property. */

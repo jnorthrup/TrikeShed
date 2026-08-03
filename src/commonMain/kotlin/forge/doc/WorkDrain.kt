@@ -1439,11 +1439,16 @@ suspend fun drainSession15956094472626662213(store: JulesBoardStore) {
 }
 
 <<<<<<< ours
+<<<<<<< ours
 suspend fun drainSession3477253922518497748(store: JulesBoardStore) {
     val workId = "session:3477253922518497748"
 =======
 suspend fun drainSession4259154289188446944(store: JulesBoardStore) {
     val workId = "session:4259154289188446944"
+>>>>>>> theirs
+=======
+suspend fun drainSession3533775292045365149(store: JulesBoardStore) {
+    val workId = "session:3533775292045365149"
 >>>>>>> theirs
     store.appendWork(workId, JulesCause.WorkDrained(
         workId = workId,
@@ -1460,9 +1465,13 @@ suspend fun drainSession4259154289188446944(store: JulesBoardStore) {
             lexicalMemory = LexicalMemory(
                 "Superseded necromanced work",
 <<<<<<< ours
+<<<<<<< ours
                 "Implement Rope Chunking in CharStrCached",
 =======
                 "Superseded necromanced work",
+>>>>>>> theirs
+=======
+                "Hoist Static Regex in parseKanbanColumnObject",
 >>>>>>> theirs
                 "Superseded via drain script."
             ),
