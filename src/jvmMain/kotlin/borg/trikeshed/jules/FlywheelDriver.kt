@@ -982,16 +982,34 @@ class FlywheelDriver(
         val cumulativeConflicts = conflictFiles()
         println("[FLYWHEEL] DRAIN ${landed.size}/${sessions.size} sessions merged, ${cumulativeConflicts.size} conflict files")
 
-        // 3. Repair the cumulative panorama after every arm has landed.
-        //    Best-effort: if the brain is slow/429ing, conflict markers stay
-        //    committed and the wheel moves on. Never block dispatch on brain latency.
-        if (cumulativeConflicts.isNotEmpty()) {
+        // 3a. SOFT CAP — if conflict debt exceeds the threshold, run the
+        //     deterministic union resolver (keeps BOTH arms, no --ours/--theirs)
+        //     BEFORE attempting brain-based QaLaguna. This alternates between
+        //     merging and resolution so debt doesn't pile up infinitely.
+        //     Never gates dispatch — just prioritizes resolution when debt is high.
+        val CONFLICT_SOFT_CAP = 5
+        if (cumulativeConflicts.size >= CONFLICT_SOFT_CAP) {
+            println("[FLYWHEEL] DRAIN conflict cap ($CONFLICT_SOFT_CAP) hit — running deterministic union resolver first")
+            resolveConflicts(cumulativeConflicts)
+            val afterDeterministic = conflictFiles()
+            if (afterDeterministic.size < cumulativeConflicts.size) {
+                git("add", "--", *afterDeterministic.toTypedArray())
+                git("commit", "--no-verify", "-m",
+                    "flywheel: deterministic conflict union — ${cumulativeConflicts.size - afterDeterministic.size} files resolved")
+                println("[FLYWHEEL] DRAIN deterministic resolve: ${cumulativeConflicts.size - afterDeterministic.size} files, ${afterDeterministic.size} remain")
+            }
+        }
+
+        // 3b. Brain-based repair — best-effort, never blocks. If the brain is
+        //     slow/429ing, conflict markers stay committed and the wheel moves on.
+        val remainingConflicts = conflictFiles()
+        if (remainingConflicts.isNotEmpty()) {
             val resolutions = withTimeoutOrNull(45_000L) {
                 QaLaguna.resolveConflicts(
                     repoDir = repoDir,
                     brain = brain,
                     panorama = panorama,
-                    files = cumulativeConflicts,
+                    files = remainingConflicts,
                 )
             } ?: run {
                 println("[FLYWHEEL] QA-LAGUNA timed out after 45s — conflict markers stay committed")
@@ -1017,9 +1035,11 @@ class FlywheelDriver(
 
         // 4. Compilation observes the integrated result but does not revoke a
         //    committed merge. Closing provenance here prevents the next cycle
-        //    from reapplying every arm and compounding the same conflict. The
-        //    CycleBody conflict quarantine keeps dispatch paused while markers
-        //    remain; QA or a locality resolver advances the committed tree.
+        //    from reapplying every arm and compounding the same conflict.
+        //    Conflict markers stay committed — they are honest evidence of
+        //    varying approaches. Dispatch never stops for markers; the soft
+        //    cap (step 3a) alternates between merging and resolution so debt
+        //    doesn't pile up infinitely.
         val build = shell(300_000L, "./gradlew", ":jvmMainClasses", "--no-daemon")
         if (build.exitCode != 0) {
             emitPollError("cumulative build failed: ${build.output.take(400)}", 0)
