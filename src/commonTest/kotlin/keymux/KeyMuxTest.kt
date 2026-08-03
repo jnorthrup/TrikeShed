@@ -107,7 +107,7 @@ class KeyMuxTest {
     @Test
     fun pathMatch_evaluatesPatternsCorrectly() {
         // Exact string matches
-        assertTrue(pathMatch("api/users", "api/users"))
+        assertTrue(pathMatch(pattern = "api/users", path = "api/users"))
 
         // Path length mismatches
         assertFalse(pathMatch("api/users", "api/users/"))
