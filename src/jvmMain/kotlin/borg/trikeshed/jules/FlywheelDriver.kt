@@ -18,6 +18,8 @@ import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.asSharedFlow
@@ -549,6 +551,10 @@ class FlywheelDriver(
     /** Signal channel: a slot freed, dispatch should try to fill it. */
     private val slotFreed = kotlinx.coroutines.channels.Channel<Int>(kotlinx.coroutines.channels.Channel.CONFLATED)
 
+    /** Serializes HTX exchanges — the TLS transport uses one SSLEngine per
+     *  endpoint ordinal, so concurrent writes corrupt the engine. */
+    private val dispatchMutex = Mutex()
+
     /**
      * Launch the reactive choreography. Returns immediately; the coroutines
      * run in [scope] and die when it's cancelled. The daemon's periodicity
@@ -713,30 +719,31 @@ class FlywheelDriver(
 
                 if (pendingCandidates.isEmpty()) continue
 
-                // Fan-out: dispatch all candidates concurrently
-                coroutineScope {
-                    val jobs = pendingCandidates.map { entry ->
-                        async(Dispatchers.IO) {
-                            try {
-                                val cappedSpec = capSpec(entry.spec)
-                                val sessionId = client.createSession(
-                                    prompt = cappedSpec, title = entry.title, source = source)
-                                store.appendWork(entry.workId, JulesCause.WorkDispatched(
-                                    workId = entry.workId,
-                                    sessionId = sessionId,
-                                    attempt = entry.attempt + 1,
-                                    at = Clock.System.now().toEpochMilliseconds(),
-                                ))
-                                _events.emit(FlywheelEvent.Dispatched(sessionId, entry.title))
-                                tickDispatched.incrementAndGet()
-                                println("[CHOREOGRAPHY] dispatch ${entry.title.take(60)}")
-                            } catch (t: Throwable) {
-                                classifyHttpError(t)
-                                _events.emit(FlywheelEvent.DispatchFailed(entry.title, t.message.orEmpty()))
-                            }
+                // Sequential dispatch: the HTX TLS transport uses a single
+                // SSLEngine per endpoint ordinal — concurrent createSession
+                // calls corrupt the same engine. Serialize through a mutex
+                // so each exchange completes before the next starts. This is
+                // faster than it sounds: Jules createSession is ~1-2s each.
+                for (entry in pendingCandidates) {
+                    try {
+                        dispatchMutex.withLock {
+                            val cappedSpec = capSpec(entry.spec)
+                            val sessionId = client.createSession(
+                                prompt = cappedSpec, title = entry.title, source = source)
+                            store.appendWork(entry.workId, JulesCause.WorkDispatched(
+                                workId = entry.workId,
+                                sessionId = sessionId,
+                                attempt = entry.attempt + 1,
+                                at = Clock.System.now().toEpochMilliseconds(),
+                            ))
+                            _events.emit(FlywheelEvent.Dispatched(sessionId, entry.title))
+                            tickDispatched.incrementAndGet()
+                            println("[CHOREOGRAPHY] dispatch ${entry.title.take(60)}")
                         }
+                    } catch (t: Throwable) {
+                        classifyHttpError(t)
+                        _events.emit(FlywheelEvent.DispatchFailed(entry.title, t.message.orEmpty()))
                     }
-                    jobs.awaitAll()
                 }
             }
         }
