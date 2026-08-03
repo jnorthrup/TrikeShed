@@ -1,4 +1,8 @@
 <<<<<<< ours
+<<<<<<< ours
+=======
+
+>>>>>>> theirs
 =======
 
 >>>>>>> theirs
@@ -21,6 +25,34 @@ store.appendWork("readme-dag-rete-refraction", JulesCause.WorkDrained(
 }
 
 <<<<<<< ours
+<<<<<<< ours
+=======
+suspend fun drainSession17649787231113851990(store: JulesBoardStore) {
+    val workId = "session:17649787231113851990"
+    store.appendWork(workId, JulesCause.WorkDrained(
+        workId = workId,
+        sessionId = "necromanced",
+        commitSha = "superseded-by-review",
+        taskId = "supersede-pass",
+        receipt = MergeReceipt(
+            workId = workId,
+            producer = "necromancer",
+            producerRef = "necromanced",
+            patchCid = ContentId("sha256:0000000000000000000000000000000000000000000000000000000000000000"),
+            revision = "superseded-by-review",
+            versionTag = "superseded-by-review",
+            lexicalMemory = LexicalMemory(
+                "Superseded necromanced work",
+                "Optimize Regex Compilation in TypeDefOracle",
+                "Superseded via drain script."
+            ),
+            claimedAt = 0L
+        ),
+        at = 0L
+    ))
+}
+
+>>>>>>> theirs
 suspend fun drainSession16095675128128190509(store: JulesBoardStore) {
     val workId = "session:16095675128128190509"
 =======
@@ -151,6 +183,7 @@ store.appendWork("rework:synth:965389205015589639#2", JulesCause.WorkDrained(
         at = 0L
     ))
 }
+<<<<<<< ours
 
 <<<<<<< ours
 suspend fun drainReactorAlgebraNecromancedWork(store: JulesBoardStore) {
@@ -1057,5 +1090,7 @@ suspend fun drainSession15956094472626662213(store: JulesBoardStore) {
         at = 0L
     ))
 }
+=======
+>>>>>>> theirs
 =======
 >>>>>>> theirs
