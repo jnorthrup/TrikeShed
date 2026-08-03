@@ -7,6 +7,9 @@ import java.io.EOFException
 import java.io.File
 import java.nio.file.Files
 import java.nio.file.StandardCopyOption
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.NonCancellable
 
 /**
  * BtrfsCasStore — CAS store backed by btrfs reflink deduplication.
@@ -56,17 +59,23 @@ class BtrfsCasStore(
         }
         
         // Write to temp file first (atomic)
-        val temp = File.createTempFile("cas-", ".tmp", root)
+        val temp = withContext(Dispatchers.IO) { File.createTempFile("cas-", ".tmp", root) }
         try {
-            temp.writeBytes(bytes)
+            withContext(Dispatchers.IO) {
+                temp.writeBytes(bytes)
+            }
             
             // Try reflink (btrfs COW deduplication)
             if (!reflink(temp, target)) {
                 // Fallback: regular copy
-                Files.copy(temp.toPath(), target.toPath(), StandardCopyOption.ATOMIC_MOVE)
+                withContext(Dispatchers.IO) {
+                    Files.copy(temp.toPath(), target.toPath(), StandardCopyOption.ATOMIC_MOVE)
+                }
             }
         } finally {
-            temp.delete()
+            withContext(Dispatchers.IO + NonCancellable) {
+                temp.delete()
+            }
         }
         
         return cid
