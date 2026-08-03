@@ -16,14 +16,20 @@ class PosixProcessOperations : ProcessOperations {
     ): ProcessResult = withContext(Dispatchers.Default) {
         val stdinPath = stdin?.let { createTempFile(it) }
         val stdoutPath = createTempFile(byteArrayOf())
-            ?: return@withContext ProcessResult(-1, byteArrayOf(), "mkstemp(stdout) failed".encodeToByteArray()).also {
+        if (stdoutPath == null) {
+            withContext(Dispatchers.Default) {
                 stdinPath?.let(::unlink)
             }
+            return@withContext ProcessResult(-1, byteArrayOf(), "mkstemp(stdout) failed".encodeToByteArray())
+        }
         val stderrPath = createTempFile(byteArrayOf())
-            ?: return@withContext ProcessResult(-1, byteArrayOf(), "mkstemp(stderr) failed".encodeToByteArray()).also {
+        if (stderrPath == null) {
+            withContext(Dispatchers.Default) {
                 stdinPath?.let(::unlink)
                 unlink(stdoutPath)
             }
+            return@withContext ProcessResult(-1, byteArrayOf(), "mkstemp(stderr) failed".encodeToByteArray())
+        }
 
         val exitCode = memScoped {
             val pid = alloc<pid_tVar>()
@@ -85,40 +91,44 @@ class PosixProcessOperations : ProcessOperations {
         val stdout = readFile(stdoutPath)
         val stderr = readFile(stderrPath)
 
-        stdinPath?.let(::unlink)
-        unlink(stdoutPath)
-        unlink(stderrPath)
+        withContext(Dispatchers.Default) {
+            stdinPath?.let(::unlink)
+            unlink(stdoutPath)
+            unlink(stderrPath)
+        }
 
-        ProcessResult(exitCode, stdout, stderr)
+        ProcessResult(exitCode = exitCode, stdout = stdout, stderr = stderr)
     }
 
-    private fun createTempFile(bytes: ByteArray): String? = memScoped {
-        val template = "/tmp/trikeshed-process-XXXXXX".cstr.placeTo(this)
-        val fd = mkstemp(template)
-        if (fd < 0) {
-            return null
-        }
-        if (bytes.isNotEmpty()) {
-            bytes.usePinned { pinned ->
-                var offset = 0
-                while (offset < bytes.size) {
-                    val written = write(fd, pinned.addressOf(offset), (bytes.size - offset).convert())
-                    if (written <= 0) {
-                        close(fd)
-                        unlink(template.toKString())
-                        return null
+    private suspend fun createTempFile(bytes: ByteArray): String? = withContext(Dispatchers.Default) {
+        memScoped {
+            val template = "/tmp/trikeshed-process-XXXXXX".cstr.placeTo(this)
+            val fd = mkstemp(template)
+            if (fd < 0) {
+                return@memScoped null
+            }
+            if (bytes.isNotEmpty()) {
+                bytes.usePinned { pinned ->
+                    var offset = 0
+                    while (offset < bytes.size) {
+                        val written = write(fd, pinned.addressOf(offset), (bytes.size - offset).convert())
+                        if (written <= 0) {
+                            close(fd)
+                            unlink(template.toKString())
+                            return@memScoped null
+                        }
+                        offset += written.toInt()
                     }
-                    offset += written.toInt()
                 }
             }
+            close(fd)
+            template.toKString()
         }
-        close(fd)
-        return template.toKString()
     }
 
-    private fun readFile(path: String): ByteArray {
-        val fp = fopen(path, "rb") ?: return byteArrayOf()
-        return try {
+    private suspend fun readFile(path: String): ByteArray = withContext(Dispatchers.Default) {
+        val fp = fopen(path, "rb") ?: return@withContext byteArrayOf()
+        try {
             memScoped {
                 val out = ByteAccumulator()
                 val buf = allocArray<ByteVar>(4096)
