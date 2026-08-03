@@ -116,12 +116,12 @@ class CouchHeadProjection {
 
     fun query(fieldName: String, value: Any): QueryResult {
         val matchedIds = fieldIndex[fieldName]?.get(value) ?: emptySet()
-        val matched = ArrayList<Document>(matchedIds.size)
-        for (id in matchedIds) {
-            docIndex[id]?.let { idx -> matched.add(docs[idx]) }
-        }
-        val series: Series<Document> = matched.size j { matched[it] }
-        return QueryResult(buildCursorFromSeries(series), matched.size.toLong())
+        val matchedIndices = IntArray(matchedIds.size)
+        var i = 0
+        for (id in matchedIds) { docIndex[id]?.let { idx -> matchedIndices[i++] = idx } }
+        val count = i
+        // ⚡ Bolt: Return a Series utilizing buildSeries via buildCursorFromSeries mapping to original docs to prevent ArrayList overhead
+        return QueryResult(buildCursorFromSeries(count j { docs[matchedIndices[it]] }), count.toLong())
     }
 
     private fun buildCursorFromDocs(documents: MutableSeries<Document>): Cursor =
