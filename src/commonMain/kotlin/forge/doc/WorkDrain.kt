@@ -661,6 +661,7 @@ drainSession15466567759278489251(store)
     drainSession17099126540887000248(store)
     drainSession2570076440700784807(store)
     drainSession2712901007830641911(store)
+    drainSession4834195711327580529(store)
 }
 
 suspend fun drainSession2712901007830641911(store: JulesBoardStore) {
@@ -1452,6 +1453,7 @@ suspend fun drainSession15956094472626662213(store: JulesBoardStore) {
 
 <<<<<<< ours
 <<<<<<< ours
+<<<<<<< ours
 suspend fun drainSession3477253922518497748(store: JulesBoardStore) {
     val workId = "session:3477253922518497748"
 =======
@@ -1466,14 +1468,24 @@ suspend fun drainSession484619669717848676(store: JulesBoardStore) {
     store.appendWork(targetWorkId, JulesCause.WorkDrained(
         workId = targetWorkId,
 >>>>>>> theirs
+=======
+suspend fun drainSession4834195711327580529(store: JulesBoardStore) {
+    val workId = "rework:session:4834195711327580529#2"
+    store.appendWork(workId, JulesCause.WorkDrained(
+        workId = workId,
+>>>>>>> theirs
         sessionId = "necromanced",
         commitSha = "superseded-by-review",
         taskId = "supersede-pass",
         receipt = MergeReceipt(
 <<<<<<< ours
+<<<<<<< ours
             workId = workId,
 =======
             workId = targetWorkId,
+>>>>>>> theirs
+=======
+            workId = workId,
 >>>>>>> theirs
             producer = "necromancer",
             producerRef = "necromanced",
@@ -1481,6 +1493,7 @@ suspend fun drainSession484619669717848676(store: JulesBoardStore) {
             revision = "superseded-by-review",
             versionTag = "superseded-by-review",
             lexicalMemory = LexicalMemory(
+<<<<<<< ours
 <<<<<<< ours
 <<<<<<< ours
                 summary = "Superseded necromanced work",
@@ -1581,6 +1594,13 @@ suspend fun drainSession3392310098899296880(store: JulesBoardStore) {
             ),
             claimedAt = 0L,
             prUrl = null
+>>>>>>> theirs
+=======
+                "Superseded necromanced work",
+                "[rework #2] [rework #1] Implement zoom(path): Cursor",
+                "Superseded via drain script."
+            ),
+            claimedAt = 0L
 >>>>>>> theirs
         ),
         at = 0L
