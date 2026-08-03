@@ -615,7 +615,7 @@ class LinuxPosixFile(
             }
 
             lines.forEach { line ->
-                val bytes = line.plus("\n").encodeToByteArray()
+                val bytes = line.encodeToByteArray()
                 var bytesWritten = 0
                 while (bytesWritten < bytes.size) {
                     val space = bufferSize - offset
@@ -628,6 +628,8 @@ class LinuxPosixFile(
                         flush()
                     }
                 }
+                if (offset == bufferSize) flush()
+                buffer[offset++] = '\n'.code.toByte()
             }
             flush()
             file.close()
