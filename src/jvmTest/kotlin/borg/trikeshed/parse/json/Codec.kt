@@ -60,7 +60,6 @@ class CounterCodec : Codec<Char, Int>() {
 
     override fun decode(output: Iterable<Int>): Sequence<Char> = sequence {
         for (c in output) {
-<<<<<<< ours
             // ⚡ Bolt: Optimize decode by hoisting cumulative frequency calculation.
             // The previous implementation used firstOrNull with getCumulativeFrequency inside,
             // which resulted in an O(V^2) loop where V is the vocabulary size.
@@ -79,21 +78,19 @@ class CounterCodec : Codec<Char, Int>() {
                     cumulativeSum += entry.value
                 }
             }
-=======
-            // ⚡ Bolt: Iterate once accumulating frequencies to avoid O(V^2) lookup
-            var cumulative = 0.0
-            var foundChar: Char? = null
-            for ((key, value) in frequencyModel.frequencyTable) {
-                val lowerBound = ((cumulative / frequencyModel.totalFrequency) * 0xFFFF).toInt()
-                val upperBound = lowerBound + value
-                if (c in lowerBound until upperBound) {
-                    foundChar = key
-                    break
-                }
-                cumulative += value
-            }
-            val char = foundChar ?: flushSymbol
->>>>>>> theirs
+// alt:             // ⚡ Bolt: Iterate once accumulating frequencies to avoid O(V^2) lookup
+// alt:             var cumulative = 0.0
+// alt:             var foundChar: Char? = null
+// alt:             for ((key, value) in frequencyModel.frequencyTable) {
+// alt:                 val lowerBound = ((cumulative / frequencyModel.totalFrequency) * 0xFFFF).toInt()
+// alt:                 val upperBound = lowerBound + value
+// alt:                 if (c in lowerBound until upperBound) {
+// alt:                     foundChar = key
+// alt:                     break
+// alt:                 }
+// alt:                 cumulative += value
+// alt:             }
+// alt:             val char = foundChar ?: flushSymbol
             if (char == flushSymbol) {
                 continue
             }
