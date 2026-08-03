@@ -2,6 +2,7 @@
 <<<<<<< ours
 <<<<<<< ours
 <<<<<<< ours
+<<<<<<< ours
 =======
 
 >>>>>>> theirs
@@ -9,6 +10,9 @@
 
 >>>>>>> theirs
 =======
+>>>>>>> theirs
+=======
+
 >>>>>>> theirs
 =======
 
@@ -33,9 +37,14 @@ store.appendWork("readme-dag-rete-refraction", JulesCause.WorkDrained(
 
 <<<<<<< ours
 <<<<<<< ours
+<<<<<<< ours
 =======
 suspend fun drainSession17649787231113851990(store: JulesBoardStore) {
     val workId = "session:17649787231113851990"
+=======
+suspend fun drainSession17853614670972068880(store: JulesBoardStore) {
+    val workId = "session:17853614670972068880"
+>>>>>>> theirs
     store.appendWork(workId, JulesCause.WorkDrained(
         workId = workId,
         sessionId = "necromanced",
@@ -50,7 +59,11 @@ suspend fun drainSession17649787231113851990(store: JulesBoardStore) {
             versionTag = "superseded-by-review",
             lexicalMemory = LexicalMemory(
                 "Superseded necromanced work",
+<<<<<<< ours
                 "Optimize Regex Compilation in TypeDefOracle",
+=======
+                "Implement zoom(path): Cursor returning sub-cursor",
+>>>>>>> theirs
                 "Superseded via drain script."
             ),
             claimedAt = 0L
@@ -59,6 +72,9 @@ suspend fun drainSession17649787231113851990(store: JulesBoardStore) {
     ))
 }
 
+<<<<<<< ours
+>>>>>>> theirs
+=======
 >>>>>>> theirs
 suspend fun drainSession16095675128128190509(store: JulesBoardStore) {
     val workId = "session:16095675128128190509"
@@ -215,6 +231,7 @@ store.appendWork("rework:synth:965389205015589639#2", JulesCause.WorkDrained(
         at = 0L
     ))
 }
+<<<<<<< ours
 <<<<<<< ours
 <<<<<<< ours
 <<<<<<< ours
@@ -1141,4 +1158,7 @@ suspend fun drainSession15956094472626662213(store: JulesBoardStore) {
 =======
 >>>>>>> theirs
 =======
+>>>>>>> theirs
+=======
+
 >>>>>>> theirs
