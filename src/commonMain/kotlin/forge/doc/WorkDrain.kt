@@ -611,9 +611,13 @@ suspend fun drainSession15466567759278489251(store: JulesBoardStore) {
 
 suspend fun drainWork(store: JulesBoardStore) {
 <<<<<<< ours
+<<<<<<< ours
 drainNecromancedWork5210997431272160904(store)
 =======
     drainSession484619669717848676(store)
+>>>>>>> theirs
+=======
+    drainSession5247563452999428559(store)
 >>>>>>> theirs
 drainSession15466567759278489251(store)
     drainSession17265457666410082720(store)
@@ -1454,6 +1458,7 @@ suspend fun drainSession15956094472626662213(store: JulesBoardStore) {
 <<<<<<< ours
 <<<<<<< ours
 <<<<<<< ours
+<<<<<<< ours
 suspend fun drainSession3477253922518497748(store: JulesBoardStore) {
     val workId = "session:3477253922518497748"
 =======
@@ -1509,6 +1514,10 @@ suspend fun drainSession4834195711327580529(store: JulesBoardStore) {
 
 suspend fun drainSession4259154289188446944(store: JulesBoardStore) {
     val workId = "session:4259154289188446944"
+=======
+suspend fun drainSession5247563452999428559(store: JulesBoardStore) {
+    val workId = "session:5247563452999428559"
+>>>>>>> theirs
     store.appendWork(workId, JulesCause.WorkDrained(
         workId = workId,
         sessionId = "necromanced",
@@ -1522,6 +1531,7 @@ suspend fun drainSession4259154289188446944(store: JulesBoardStore) {
             revision = "superseded-by-review",
             versionTag = "superseded-by-review",
             lexicalMemory = LexicalMemory(
+<<<<<<< ours
                 summary = "Superseded necromanced work",
                 title = "Superseded necromanced work",
                 content = "Superseded via drain script."
@@ -1598,6 +1608,13 @@ suspend fun drainSession3392310098899296880(store: JulesBoardStore) {
 =======
                 "Superseded necromanced work",
                 "[rework #2] [rework #1] Implement zoom(path): Cursor",
+                "Superseded via drain script."
+            ),
+            claimedAt = 0L
+>>>>>>> theirs
+=======
+                "Superseded necromanced work",
+                "Implement Btrfs CAS tar export",
                 "Superseded via drain script."
             ),
             claimedAt = 0L
