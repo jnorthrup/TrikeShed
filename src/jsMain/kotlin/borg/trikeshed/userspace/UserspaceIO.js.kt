@@ -69,11 +69,13 @@ internal actual object ChannelsImpl {
 
 @PublishedApi
 internal suspend fun loadFile(path: String) {
-    val resp = jsFetch(path).await()
-    val buf = resp.arrayBuffer().await()
-    val int8Array = Int8Array(buf.unsafeCast<ArrayBuffer>())
-    val arr = int8Array.unsafeCast<ByteArray>()
-    JsFileRegistry.cache(path, arr)
+    jsFetch(path).then { resp ->
+        resp.arrayBuffer()
+    }.then { buf ->
+        val int8Array = Int8Array(buf.unsafeCast<ArrayBuffer>())
+        val arr = int8Array.unsafeCast<ByteArray>()
+        JsFileRegistry.cache(path, arr)
+    }.await()
 }
 
 @JsName("fetch")
