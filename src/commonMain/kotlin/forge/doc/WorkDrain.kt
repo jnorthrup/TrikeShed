@@ -244,6 +244,7 @@ suspend fun drainWork(store: JulesBoardStore) {
     drainSession12711721574152796678(store)
 <<<<<<< ours
 <<<<<<< ours
+<<<<<<< ours
     drainSession13434914650488484998(store)
     drainSession14688054800249381584(store)
     drainSession11949152291930230780(store)
@@ -319,6 +320,9 @@ suspend fun drainSession1379585730766540239(store: JulesBoardStore) {
         ),
         at = 0L
     ))
+=======
+    drainSession1414510366769780981(store)
+>>>>>>> theirs
 }
 
 suspend fun drainSession12282770234900520474(store: JulesBoardStore) {
@@ -648,11 +652,17 @@ suspend fun drainSession12711721574152796678(store: JulesBoardStore) {
 }
 
 <<<<<<< ours
+<<<<<<< ours
 suspend fun drainSession11949152291930230780(store: JulesBoardStore) {
     val workId = "session:11949152291930230780"
 =======
 suspend fun drainSession14439075584174324583(store: JulesBoardStore) {
     val workId = "session:14439075584174324583"
+>>>>>>> theirs
+=======
+
+suspend fun drainSession1414510366769780981(store: JulesBoardStore) {
+    val workId = "session:1414510366769780981"
 >>>>>>> theirs
     store.appendWork(workId, JulesCause.WorkDrained(
         workId = workId,
@@ -669,9 +679,13 @@ suspend fun drainSession14439075584174324583(store: JulesBoardStore) {
             lexicalMemory = LexicalMemory(
                 "Superseded necromanced work",
 <<<<<<< ours
+<<<<<<< ours
                 "IO-Uring has been brought in and many tests ported",
 =======
                 "Close Litebike connection lifecycle after response",
+>>>>>>> theirs
+=======
+                "[rework #2] [rework #1] Wire DoubleSeries into query engine for primitive dispatch",
 >>>>>>> theirs
                 "Superseded via drain script."
             ),
