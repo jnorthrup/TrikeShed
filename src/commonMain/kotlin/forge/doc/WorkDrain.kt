@@ -391,12 +391,16 @@ suspend fun drainWork(store: JulesBoardStore) {
     drainSession14162871126292114727(store)
 <<<<<<< ours
 <<<<<<< ours
+<<<<<<< ours
     drainSession17099126540887000248(store)
 =======
     drainSession14155293206313409695(store)
 >>>>>>> theirs
 =======
     drainSession16095675128128190509(store)
+>>>>>>> theirs
+=======
+    drainSession15568794059648627721(store)
 >>>>>>> theirs
 }
 
@@ -1139,6 +1143,31 @@ suspend fun drainSession15412781732592297384(store: JulesBoardStore) {
             lexicalMemory = LexicalMemory(
                 "Superseded necromanced work",
                 "Fix BTRFS Device Tree Data Offset Logic",
+                "Superseded via drain script."
+            ),
+            claimedAt = 0L
+        ),
+        at = 0L
+    ))
+}
+
+suspend fun drainSession15568794059648627721(store: JulesBoardStore) {
+    val workId = "session:15568794059648627721"
+    store.appendWork(workId, JulesCause.WorkDrained(
+        workId = workId,
+        sessionId = "necromanced",
+        commitSha = "superseded-by-review",
+        taskId = "supersede-pass",
+        receipt = MergeReceipt(
+            workId = workId,
+            producer = "necromancer",
+            producerRef = "necromanced",
+            patchCid = ContentId("sha256:0000000000000000000000000000000000000000000000000000000000000000"),
+            revision = "superseded-by-review",
+            versionTag = "superseded-by-review",
+            lexicalMemory = LexicalMemory(
+                "Superseded necromanced work",
+                "Reject stale Couch head commits",
                 "Superseded via drain script."
             ),
             claimedAt = 0L
