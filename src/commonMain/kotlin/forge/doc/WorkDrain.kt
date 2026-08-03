@@ -259,11 +259,37 @@ suspend fun drainSession15466567759278489251(store: JulesBoardStore) {
         at = 0L
     ))
 }
+suspend fun drainSession16771812025918068390(store: JulesBoardStore) {
+    val workId = "session:16771812025918068390"
+    store.appendWork(workId, JulesCause.WorkDrained(
+        workId = workId,
+        sessionId = "necromanced",
+        commitSha = "superseded-by-review",
+        taskId = "supersede-pass",
+        receipt = MergeReceipt(
+            workId = workId,
+            producer = "necromancer",
+            producerRef = "necromanced",
+            patchCid = ContentId("sha256:0000000000000000000000000000000000000000000000000000000000000000"),
+            revision = "superseded-by-review",
+            versionTag = "superseded-by-review",
+            lexicalMemory = LexicalMemory(
+                "Superseded necromanced work",
+                "Fix Unvalidated Command Execution in JvmProcessOperations",
+                "Superseded via drain script."
+            ),
+            claimedAt = 0L
+        ),
+        at = 0L
+    ))
+}
+
 
 suspend fun drainWork(store: JulesBoardStore) {
 drainSession15466567759278489251(store)
     drainSession17265457666410082720(store)
     drainSession13065137133469730772(store)
+    drainSession16771812025918068390(store)
     val workId = "synth:12224356407860756599#2"
 
     val receipt = MergeReceipt(
