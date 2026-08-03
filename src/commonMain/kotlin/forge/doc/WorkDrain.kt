@@ -17,11 +17,16 @@ store.appendWork("readme-dag-rete-refraction", JulesCause.WorkDrained(
 }
 
 <<<<<<< ours
+<<<<<<< ours
 suspend fun drainReworkSession295642302314961027(store: JulesBoardStore) {
 val workId = "rework:session:295642302314961027#2"
 =======
 suspend fun drainSession3128281449317195096(store: JulesBoardStore) {
     val workId = "session:3128281449317195096"
+>>>>>>> theirs
+=======
+suspend fun drainSession3957588300103604763(store: JulesBoardStore) {
+    val workId = "session:3957588300103604763"
 >>>>>>> theirs
     store.appendWork(workId, JulesCause.WorkDrained(
         workId = workId,
@@ -38,7 +43,11 @@ suspend fun drainSession3128281449317195096(store: JulesBoardStore) {
             lexicalMemory = LexicalMemory(
                 "Superseded necromanced work",
 <<<<<<< ours
+<<<<<<< ours
                 "[rework #2] [rework #1] ReactorEndpoint wire transport",
+=======
+                "Superseded necromanced work",
+>>>>>>> theirs
 =======
                 "Superseded necromanced work",
 >>>>>>> theirs
@@ -626,6 +635,7 @@ drainSession15466567759278489251(store)
     drainSession14162871126292114727(store)
     drainSession17099126540887000248(store)
 <<<<<<< ours
+<<<<<<< ours
     drainSession2570076440700784807(store)
     drainSession2712901007830641911(store)
 }
@@ -656,6 +666,9 @@ suspend fun drainSession2712901007830641911(store: JulesBoardStore) {
     ))
 =======
     drainSession3128281449317195096(store)
+>>>>>>> theirs
+=======
+    drainSession3957588300103604763(store)
 >>>>>>> theirs
 }
 
