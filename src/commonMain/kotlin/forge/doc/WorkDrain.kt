@@ -241,20 +241,13 @@ suspend fun drainWork(store: JulesBoardStore) {
     drainOptimizeWasmIsamOperations(store)
     drainNecromancedWork12511514760260520345(store)
     drainSession12711721574152796678(store)
-<<<<<<< ours
-<<<<<<< ours
     drainSession13434914650488484998(store)
+    drainSession14688054800249381584(store)
+    drainSession11949152291930230780(store)
 }
 
 suspend fun drainSession13434914650488484998(store: JulesBoardStore) {
     val workId = "session:13434914650488484998"
-=======
-    drainSession14688054800249381584(store)
-}
-
-suspend fun drainSession14688054800249381584(store: JulesBoardStore) {
-    val workId = "session:14688054800249381584"
->>>>>>> theirs
     store.appendWork(workId, JulesCause.WorkDrained(
         workId = workId,
         sessionId = "necromanced",
@@ -269,23 +262,38 @@ suspend fun drainSession14688054800249381584(store: JulesBoardStore) {
             versionTag = "superseded-by-review",
             lexicalMemory = LexicalMemory(
                 "Superseded necromanced work",
-<<<<<<< ours
                 "Activate the BlackboardFabric factory",
-=======
-                "Infer ISAM RecordMeta from Confix facets",
->>>>>>> theirs
                 "Superseded via drain script."
             ),
             claimedAt = 0L
         ),
         at = 0L
     ))
-<<<<<<< ours
-=======
-    drainSession11949152291930230780(store)
->>>>>>> theirs
-=======
->>>>>>> theirs
+}
+
+suspend fun drainSession14688054800249381584(store: JulesBoardStore) {
+    val workId = "session:14688054800249381584"
+    store.appendWork(workId, JulesCause.WorkDrained(
+        workId = workId,
+        sessionId = "necromanced",
+        commitSha = "superseded-by-review",
+        taskId = "supersede-pass",
+        receipt = MergeReceipt(
+            workId = workId,
+            producer = "necromancer",
+            producerRef = "necromanced",
+            patchCid = ContentId("sha256:0000000000000000000000000000000000000000000000000000000000000000"),
+            revision = "superseded-by-review",
+            versionTag = "superseded-by-review",
+            lexicalMemory = LexicalMemory(
+                "Superseded necromanced work",
+                "Infer ISAM RecordMeta from Confix facets",
+                "Superseded via drain script."
+            ),
+            claimedAt = 0L
+        ),
+        at = 0L
+    ))
 }
 
 suspend fun drainSession12282770234900520474(store: JulesBoardStore) {
