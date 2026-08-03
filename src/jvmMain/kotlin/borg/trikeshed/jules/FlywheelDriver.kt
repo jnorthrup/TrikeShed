@@ -892,12 +892,13 @@ class FlywheelDriver(
                 }
                 val pf = File(repoDir, ".flywheel-patch-${s.id.takeLast(6)}")
                 try {
-                    pf.writeText(cleanPatch)
+                    // ⚡ Bolt: Wrapped in Dispatchers.IO to prevent blocking the reactor thread with synchronous File I/O.
+                    withContext(Dispatchers.IO) { pf.writeText(cleanPatch) }
                     val apply = git("apply", "--3way", pf.name)
                     val conflicted = unmergedFiles()
                     val alreadyApplied = apply.exitCode != 0 && conflicted.isEmpty() &&
                         git("apply", "--reverse", "--check", pf.name).exitCode == 0
-                    if (pf.exists()) pf.delete()
+                    withContext(Dispatchers.IO) { if (pf.exists()) pf.delete() }
                     if (alreadyApplied) {
                         println("[FLYWHEEL] ALREADY ${s.id.takeLast(6)} API delta is present")
                         landed += arm
@@ -1798,14 +1799,19 @@ class FlywheelDriver(
         }
 
         val patchFile = File(repoDir, ".flywheel-patch")
-        patchFile.writeText(patch)
+        // ⚡ Bolt: Wrapped in Dispatchers.IO to prevent blocking the reactor thread with synchronous File I/O.
+        withContext(Dispatchers.IO) {
+            patchFile.writeText(patch)
+        }
 
         // Apply with --3way: if the patch doesn't apply cleanly, git falls back
         // to a 3-way merge and leaves conflict markers. We KEEP those markers —
         // they represent both sides' work and get resolved below. Never --ours,
         // never --theirs, never reject.
         git("apply", "--3way", ".flywheel-patch")
-        patchFile.delete()
+        withContext(Dispatchers.IO) {
+            patchFile.delete()
+        }
 
         val touchedFiles = parsePatchFiles(patch)
         if (touchedFiles.isEmpty()) {
