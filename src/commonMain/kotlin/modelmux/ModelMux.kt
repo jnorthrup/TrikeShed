@@ -9,6 +9,8 @@ import borg.trikeshed.userspace.reactor.CacheLookup
 import borg.trikeshed.modelmux.ModelResponseReceipt
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.*
+import kotlin.uuid.ExperimentalUuidApi
+import kotlin.uuid.Uuid
 
 // ═══════════════════════════════════════════
 // Type algebra
@@ -58,12 +60,13 @@ object CapabilityRouter : ModelRouter {
 
 enum class SessionState { CREATED, OPEN, ACTIVE, DRAINING, CLOSED }
 
+@OptIn(ExperimentalUuidApi::class)
 class LlmSession(
     val model: ModelEntry,
     private val authKey: String,
     val baseUrl: String,
     /** Session id — stamped on every [ModelResponseReceipt] minted from this session. */
-    val sessionId: String = "sess-${kotlin.random.Random.nextLong().toString(16)}",
+    val sessionId: String = "sess-${Uuid.random()}",
 ) {
     private var _state = SessionState.CREATED
     val state: SessionState get() = _state
