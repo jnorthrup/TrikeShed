@@ -221,7 +221,6 @@ class BtrfsCasStore(
      * Uses `du -s --apparent-size` vs `du -s` to measure dedup ratio.
      */
     suspend fun diskUsage(): Pair<Long, Long> { // (apparent, physical)
-<<<<<<< ours
         // ⚡ Bolt: Wrap blocking I/O operations in Dispatchers.IO to prevent coroutine starvation
         val apparent = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
             Files.walk(root.toPath()).use { stream ->
@@ -229,12 +228,10 @@ class BtrfsCasStore(
                     .mapToLong { Files.size(it) }
                     .sum()
             }
-=======
-        val apparent = Files.walk(root.toPath()).use { stream ->
-            stream.filter { Files.isRegularFile(it) }
-                .mapToLong { Files.size(it) }
-                .sum()
->>>>>>> theirs
+// alt:         val apparent = Files.walk(root.toPath()).use { stream ->
+// alt:             stream.filter { Files.isRegularFile(it) }
+// alt:                 .mapToLong { Files.size(it) }
+// alt:                 .sum()
         }
         
         // Physical usage via `btrfs filesystem du` or `du -s`
