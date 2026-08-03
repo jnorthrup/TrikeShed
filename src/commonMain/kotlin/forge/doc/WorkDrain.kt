@@ -626,6 +626,7 @@ drainNecromancedWork5210997431272160904(store)
 drainSession15466567759278489251(store)
     drainSession17265457666410082720(store)
     drainSession13065137133469730772(store)
+    drainSession4576503802346987228(store)
     val workId = "synth:12224356407860756599#2"
 
     val receipt = MergeReceipt(
@@ -1459,6 +1460,7 @@ suspend fun drainSession15956094472626662213(store: JulesBoardStore) {
     ))
 }
 <<<<<<< ours
+<<<<<<< ours
 
 <<<<<<< ours
 <<<<<<< ours
@@ -1561,6 +1563,11 @@ suspend fun drainSession5247563452999428559(store: JulesBoardStore) {
 
 suspend fun drainSession3533775292045365149(store: JulesBoardStore) {
     val workId = "session:3533775292045365149"
+=======
+
+suspend fun drainSession4576503802346987228(store: JulesBoardStore) {
+    val workId = "session:4576503802346987228"
+>>>>>>> theirs
     store.appendWork(workId, JulesCause.WorkDrained(
         workId = workId,
         sessionId = "necromanced",
@@ -1574,6 +1581,7 @@ suspend fun drainSession3533775292045365149(store: JulesBoardStore) {
             revision = "superseded-by-review",
             versionTag = "superseded-by-review",
             lexicalMemory = LexicalMemory(
+<<<<<<< ours
                 summary = "Superseded necromanced work",
                 title = "Superseded necromanced work",
                 content = "Superseded via drain script."
@@ -1620,10 +1628,15 @@ suspend fun drainSession3392310098899296880(store: JulesBoardStore) {
                 "Superseded necromanced work",
                 "Superseded necromanced work",
 >>>>>>> theirs
+=======
+                "Superseded necromanced work",
+                "Avoid Repeated Regex Compilation in ConfixOracleService",
+>>>>>>> theirs
                 "Superseded via drain script."
             ),
             claimedAt = 0L,
             prUrl = null
+<<<<<<< ours
 <<<<<<< ours
 >>>>>>> theirs
 =======
@@ -1639,6 +1652,8 @@ suspend fun drainSession3392310098899296880(store: JulesBoardStore) {
                 "Superseded via drain script."
             ),
             claimedAt = 0L
+>>>>>>> theirs
+=======
 >>>>>>> theirs
 =======
 >>>>>>> theirs
