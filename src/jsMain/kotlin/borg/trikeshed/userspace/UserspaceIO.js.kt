@@ -2,6 +2,10 @@ package borg.trikeshed.userspace
 
 import borg.trikeshed.userspace.nio.ByteBuffer
 import kotlin.js.JsName
+import kotlin.js.Promise
+import kotlinx.coroutines.await
+import org.khronos.webgl.ArrayBuffer
+import org.khronos.webgl.Int8Array
 
 private object JsFileRegistry {
     private var nextId = 1
@@ -65,21 +69,20 @@ internal actual object ChannelsImpl {
 
 @PublishedApi
 internal suspend fun loadFile(path: String) {
-    val resp = jsFetch(path)
-    val buf = resp.arrayBuffer()
-    val int8Array = buf.unsafeCast<dynamic>()
-    val len = int8Array.length as Int
-    val arr = ByteArray(len) { int8Array[it].unsafeCast<Byte>() }
+    val resp = jsFetch(path).await()
+    val buf = resp.arrayBuffer().await()
+    val int8Array = Int8Array(buf.unsafeCast<ArrayBuffer>())
+    val arr = int8Array.unsafeCast<ByteArray>()
     JsFileRegistry.cache(path, arr)
 }
 
 @JsName("fetch")
-external fun jsFetch(input: String): JsResponse
+external fun jsFetch(input: String): Promise<JsResponse>
 
 @JsName("Response")
 external class JsResponse {
     val ok: Boolean
     val status: Int
-    fun arrayBuffer(): dynamic
-    fun text(): String
+    fun arrayBuffer(): Promise<dynamic>
+    fun text(): Promise<String>
 }
