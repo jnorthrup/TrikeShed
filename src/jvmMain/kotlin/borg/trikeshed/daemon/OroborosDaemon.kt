@@ -470,6 +470,9 @@ object OroborosDaemon {
                 // --once: run one reactive tick synchronously.
                 driver.startReactiveCycle(this)
                 delay(intervalMs * 2)
+                isRunning = false
+                mainJob?.cancel()
+                return
             }
         } finally {
             healthJob.cancel()
