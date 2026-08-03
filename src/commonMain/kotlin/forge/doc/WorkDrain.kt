@@ -1,6 +1,7 @@
 <<<<<<< ours
 <<<<<<< ours
 <<<<<<< ours
+<<<<<<< ours
 =======
 
 >>>>>>> theirs
@@ -8,6 +9,9 @@
 
 >>>>>>> theirs
 =======
+>>>>>>> theirs
+=======
+
 >>>>>>> theirs
 package forge.doc
 
@@ -170,6 +174,31 @@ store.appendWork("cb-io-uring-has-been-brought-in-and-many-tests-ported", JulesC
     ))
 }
 
+suspend fun drainSession16232523731031475970(store: JulesBoardStore) {
+    val workId = "session:16232523731031475970"
+    store.appendWork(workId, JulesCause.WorkDrained(
+        workId = workId,
+        sessionId = "necromanced",
+        commitSha = "superseded-by-review",
+        taskId = "supersede-pass",
+        receipt = MergeReceipt(
+            workId = workId,
+            producer = "necromancer",
+            producerRef = "necromanced",
+            patchCid = ContentId("sha256:0000000000000000000000000000000000000000000000000000000000000000"),
+            revision = "superseded-by-review",
+            versionTag = "superseded-by-review",
+            lexicalMemory = LexicalMemory(
+                "Superseded necromanced work",
+                "[rework #1] Hoist repeated Regex compilation in TypeDefOracle",
+                "Superseded via drain script."
+            ),
+            claimedAt = 0L
+        ),
+        at = 0L
+    ))
+}
+
 suspend fun drainMmapCasStoreRework(store: JulesBoardStore) {
 store.appendWork("rework:synth:965389205015589639#2", JulesCause.WorkDrained(
         workId = "rework:synth:965389205015589639#2",
@@ -186,6 +215,7 @@ store.appendWork("rework:synth:965389205015589639#2", JulesCause.WorkDrained(
         at = 0L
     ))
 }
+<<<<<<< ours
 <<<<<<< ours
 <<<<<<< ours
 
@@ -1104,6 +1134,8 @@ suspend fun drainSession15956094472626662213(store: JulesBoardStore) {
         at = 0L
     ))
 }
+=======
+>>>>>>> theirs
 =======
 >>>>>>> theirs
 =======
