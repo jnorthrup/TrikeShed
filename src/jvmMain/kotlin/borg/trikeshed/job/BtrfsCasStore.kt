@@ -62,7 +62,7 @@ class BtrfsCasStore(
         val temp = withContext(Dispatchers.IO) { File.createTempFile("cas-", ".tmp", root) }
         try {
             withContext(Dispatchers.IO) {
-                temp.writeBytes(bytes)
+                temp.writeBytes(array = bytes)
             }
             
             // Try reflink (btrfs COW deduplication)
