@@ -16,8 +16,13 @@ store.appendWork("readme-dag-rete-refraction", JulesCause.WorkDrained(
     ))
 }
 
+<<<<<<< ours
 suspend fun drainReworkSession295642302314961027(store: JulesBoardStore) {
 val workId = "rework:session:295642302314961027#2"
+=======
+suspend fun drainSession3128281449317195096(store: JulesBoardStore) {
+    val workId = "session:3128281449317195096"
+>>>>>>> theirs
     store.appendWork(workId, JulesCause.WorkDrained(
         workId = workId,
         sessionId = "necromanced",
@@ -32,7 +37,11 @@ val workId = "rework:session:295642302314961027#2"
             versionTag = "superseded-by-review",
             lexicalMemory = LexicalMemory(
                 "Superseded necromanced work",
+<<<<<<< ours
                 "[rework #2] [rework #1] ReactorEndpoint wire transport",
+=======
+                "Superseded necromanced work",
+>>>>>>> theirs
                 "Superseded via drain script."
             ),
             claimedAt = 0L
@@ -616,6 +625,7 @@ drainSession15466567759278489251(store)
     drainSession15956094472626662213(store)
     drainSession14162871126292114727(store)
     drainSession17099126540887000248(store)
+<<<<<<< ours
     drainSession2570076440700784807(store)
     drainSession2712901007830641911(store)
 }
@@ -644,6 +654,9 @@ suspend fun drainSession2712901007830641911(store: JulesBoardStore) {
         ),
         at = 0L
     ))
+=======
+    drainSession3128281449317195096(store)
+>>>>>>> theirs
 }
 
 suspend fun drainSession13434914650488484998(store: JulesBoardStore) {
