@@ -223,20 +223,8 @@ object StructuredParserSupport {
         }
 }
 
-private fun String.normalizeCrLf(): String {
-    val out = StringBuilder(length)
-    var index = 0
-    while (index < length) {
-        if (this[index] == '\r' && index + 1 < length && this[index + 1] == '\n') {
-            out.append('\n')
-            index += 2
-        } else {
-            out.append(this[index])
-            index++
-        }
-    }
-    return out.toString()
-}
+// ⚡ Bolt: Optimized normalizeCrLf by using native String.replace for faster execution and less allocation overhead.
+private fun String.normalizeCrLf(): String = replace("\r\n", "\n")
 
 fun DescriptorFragment.toTreeCursor(path: String = "$"): TreeCursor =
     TreeCursor(
