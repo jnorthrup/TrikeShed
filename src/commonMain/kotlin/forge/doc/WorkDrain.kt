@@ -247,6 +247,7 @@ suspend fun drainWork(store: JulesBoardStore) {
 <<<<<<< ours
 <<<<<<< ours
 <<<<<<< ours
+<<<<<<< ours
     drainSession13434914650488484998(store)
     drainSession14688054800249381584(store)
     drainSession11949152291930230780(store)
@@ -301,6 +302,13 @@ suspend fun drainSession1379585730766540239(store: JulesBoardStore) {
 suspend fun drainSession13245870200089020847(store: JulesBoardStore) {
     val workId = "session:13245870200089020847"
 >>>>>>> theirs
+=======
+    drainSession13151782432177630490(store)
+}
+
+suspend fun drainSession13151782432177630490(store: JulesBoardStore) {
+    val workId = "session:13151782432177630490"
+>>>>>>> theirs
     store.appendWork(workId, JulesCause.WorkDrained(
         workId = workId,
         sessionId = "necromanced",
@@ -317,6 +325,7 @@ suspend fun drainSession13245870200089020847(store: JulesBoardStore) {
                 "Superseded necromanced work",
 <<<<<<< ours
 <<<<<<< ours
+<<<<<<< ours
                 "Infer ISAM RecordMeta from Confix facets",
 =======
                 "Wire queued SCTP jobs into NUID fanout",
@@ -327,6 +336,9 @@ suspend fun drainSession13245870200089020847(store: JulesBoardStore) {
 =======
                 "[rework #1] Avoid Repeated Regex Compilation in ConfixOracleService",
 >>>>>>> theirs
+=======
+                "[rework #1] TDD PR Deliver TASK G13 MED Cycle trace ring buffer for post-mortem",
+>>>>>>> theirs
                 "Superseded via drain script."
             ),
             claimedAt = 0L
@@ -334,8 +346,11 @@ suspend fun drainSession13245870200089020847(store: JulesBoardStore) {
         at = 0L
     ))
 <<<<<<< ours
+<<<<<<< ours
 =======
     drainSession1414510366769780981(store)
+>>>>>>> theirs
+=======
 >>>>>>> theirs
 =======
 >>>>>>> theirs
