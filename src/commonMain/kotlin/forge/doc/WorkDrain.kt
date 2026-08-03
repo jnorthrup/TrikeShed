@@ -678,7 +678,11 @@ drainSession15466567759278489251(store)
     drainSession17099126540887000248(store)
     drainSession2570076440700784807(store)
     drainSession2712901007830641911(store)
+<<<<<<< ours
     drainSession4834195711327580529(store)
+=======
+    drainSession435170601994580746(store)
+>>>>>>> theirs
 }
 
 suspend fun drainSession2712901007830641911(store: JulesBoardStore) {
@@ -1471,6 +1475,7 @@ suspend fun drainSession15956094472626662213(store: JulesBoardStore) {
 <<<<<<< ours
 <<<<<<< ours
 <<<<<<< ours
+<<<<<<< ours
 
 <<<<<<< ours
 <<<<<<< ours
@@ -1590,6 +1595,11 @@ suspend fun drainSession3533775292045365149(store: JulesBoardStore) {
 suspend fun drainSession4576503802346987228(store: JulesBoardStore) {
     val workId = "session:4576503802346987228"
 >>>>>>> theirs
+=======
+
+suspend fun drainSession435170601994580746(store: JulesBoardStore) {
+    val workId = "session:435170601994580746"
+>>>>>>> theirs
     store.appendWork(workId, JulesCause.WorkDrained(
         workId = workId,
         sessionId = "necromanced",
@@ -1603,6 +1613,7 @@ suspend fun drainSession4576503802346987228(store: JulesBoardStore) {
             revision = "superseded-by-review",
             versionTag = "superseded-by-review",
             lexicalMemory = LexicalMemory(
+<<<<<<< ours
 <<<<<<< ours
                 summary = "Superseded necromanced work",
                 title = "Superseded necromanced work",
@@ -1698,6 +1709,13 @@ suspend fun drainSession4558995066822757502(store: JulesBoardStore) {
 =======
 >>>>>>> theirs
 =======
+>>>>>>> theirs
+=======
+                "Superseded necromanced work",
+                "Make JobFrame fact CIDs deterministic",
+                "Superseded via drain script."
+            ),
+            claimedAt = 0L
 >>>>>>> theirs
         ),
         at = 0L
