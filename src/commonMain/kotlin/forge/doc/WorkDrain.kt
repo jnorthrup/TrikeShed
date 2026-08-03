@@ -591,6 +591,7 @@ drainSession15466567759278489251(store)
     drainSession15956094472626662213(store)
     drainSession14162871126292114727(store)
     drainSession17099126540887000248(store)
+    drainSession2570076440700784807(store)
 }
 
 suspend fun drainSession13434914650488484998(store: JulesBoardStore) {
@@ -614,6 +615,31 @@ suspend fun drainSession13434914650488484998(store: JulesBoardStore) {
             ),
             claimedAt = 0L,
             prUrl = null
+        ),
+        at = 0L
+    ))
+}
+
+suspend fun drainSession2570076440700784807(store: JulesBoardStore) {
+    val workId = "session:2570076440700784807"
+    store.appendWork(workId, JulesCause.WorkDrained(
+        workId = workId,
+        sessionId = "necromanced",
+        commitSha = "superseded-by-review",
+        taskId = "supersede-pass",
+        receipt = MergeReceipt(
+            workId = workId,
+            producer = "necromancer",
+            producerRef = "necromanced",
+            patchCid = ContentId("sha256:0000000000000000000000000000000000000000000000000000000000000000"),
+            revision = "superseded-by-review",
+            versionTag = "superseded-by-review",
+            lexicalMemory = LexicalMemory(
+                "Superseded necromanced work",
+                "Superseded necromanced work",
+                "Superseded via drain script. zoom(path): Cursor is already implemented in Zoom.kt"
+            ),
+            claimedAt = 0L
         ),
         at = 0L
     ))
