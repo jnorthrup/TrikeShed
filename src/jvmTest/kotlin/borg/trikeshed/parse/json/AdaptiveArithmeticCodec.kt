@@ -9,16 +9,24 @@ class ArithmeticCodec(val nStates: Int, private var frequencies: UIntArray = UIn
         var lower = 0.0
         var upper = 1.0
 
+        // ⚡ Bolt: maintain running totals instead of summing slices in loop
         for (state in input) {
-            val totalFreq = frequencies.sum()
-            val cumulativeFreq = frequencies.sliceArray(0 until state.toInt()).sum()
-            val freq = frequencies[state.toInt()]
+            val stateInt = state.toInt()
+            var totalFreq = 0u
+            var cumulativeFreq = 0u
+
+            for (i in frequencies.indices) {
+                if (i < stateInt) cumulativeFreq += frequencies[i]
+                totalFreq += frequencies[i]
+            }
+
+            val freq = frequencies[stateInt]
 
             val range = upper - lower
             upper = lower + range * (cumulativeFreq + freq).toDouble() / totalFreq.toDouble()
             lower = lower + range * cumulativeFreq.toDouble() / totalFreq.toDouble()
 
-            updateFrequencies(state.toInt())
+            updateFrequencies(stateInt)
         }
         yield(lower)
     }
@@ -32,9 +40,17 @@ class ArithmeticCodec(val nStates: Int, private var frequencies: UIntArray = UIn
             yield(state)
             updateFrequencies(state.toInt(), decodeFrequencies)
 
-            val totalFreq = decodeFrequencies.sum()
-            val cumulativeFreq = decodeFrequencies.sliceArray(0 until state.toInt()).sum()
-            val freq = decodeFrequencies[state.toInt()]
+            // ⚡ Bolt: iterate once to calculate sum and cumulative freq instead of allocating slice
+            val stateInt = state.toInt()
+            var totalFreq = 0u
+            var cumulativeFreq = 0u
+
+            for (i in decodeFrequencies.indices) {
+                if (i < stateInt) cumulativeFreq += decodeFrequencies[i]
+                totalFreq += decodeFrequencies[i]
+            }
+
+            val freq = decodeFrequencies[stateInt]
 
             value = (value - cumulativeFreq.toDouble() / totalFreq.toDouble()) * totalFreq.toDouble() / freq.toDouble()
         }

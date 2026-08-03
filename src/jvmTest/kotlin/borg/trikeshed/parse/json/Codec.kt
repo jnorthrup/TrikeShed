@@ -5,7 +5,7 @@ abstract class Codec<I : Comparable<I>, O> {
     abstract fun encode(input: Iterable<I>): Sequence<O>
     abstract fun decode(output: Iterable<O>): Sequence<I>
     inner class FrequencyModel : Comparable<FrequencyModel> {
-        val frequencyTable = mutableMapOf<I, Int>()
+        val frequencyTable = java.util.TreeMap<I, Int>()
         var totalFrequency = 0
 
         fun updateFrequency(c: I) {
@@ -19,13 +19,12 @@ abstract class Codec<I : Comparable<I>, O> {
         }
 
         fun getCumulativeFrequency(c: I): Double {
+            // ⚡ Bolt: Utilize TreeMap to only iterate up to 'c', avoiding full table scans
             var cumulativeFrequency = 0.0
-            for ((key, value) in frequencyTable) {
-                if (key <= c) {
-                    cumulativeFrequency += value
-                }
+            for (value in frequencyTable.headMap(c, true).values) {
+                cumulativeFrequency += value
             }
-            return cumulativeFrequency / totalFrequency
+            return if (totalFrequency == 0) 0.0 else cumulativeFrequency / totalFrequency
         }
 
         override fun compareTo(other: FrequencyModel): Int {
@@ -61,6 +60,7 @@ class CounterCodec : Codec<Char, Int>() {
 
     override fun decode(output: Iterable<Int>): Sequence<Char> = sequence {
         for (c in output) {
+<<<<<<< ours
             // ⚡ Bolt: Optimize decode by hoisting cumulative frequency calculation.
             // The previous implementation used firstOrNull with getCumulativeFrequency inside,
             // which resulted in an O(V^2) loop where V is the vocabulary size.
@@ -79,6 +79,21 @@ class CounterCodec : Codec<Char, Int>() {
                     cumulativeSum += entry.value
                 }
             }
+=======
+            // ⚡ Bolt: Iterate once accumulating frequencies to avoid O(V^2) lookup
+            var cumulative = 0.0
+            var foundChar: Char? = null
+            for ((key, value) in frequencyModel.frequencyTable) {
+                val lowerBound = ((cumulative / frequencyModel.totalFrequency) * 0xFFFF).toInt()
+                val upperBound = lowerBound + value
+                if (c in lowerBound until upperBound) {
+                    foundChar = key
+                    break
+                }
+                cumulative += value
+            }
+            val char = foundChar ?: flushSymbol
+>>>>>>> theirs
             if (char == flushSymbol) {
                 continue
             }
