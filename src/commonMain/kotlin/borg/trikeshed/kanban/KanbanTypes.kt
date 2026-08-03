@@ -195,8 +195,9 @@ fun KanbanBoard.childrenOf(cardId: KanbanCardId): List<KanbanCard> =
  * Get all parent cards (dependencies) for a card.
  */
 fun KanbanBoard.parentsOf(cardId: KanbanCardId): List<KanbanCard> {
-    val card = cards.find { it.id == cardId } ?: return emptyList()
-    return card.dependencies.mapNotNull { depId -> cards.find { it.id == depId } }
+    val cardMap = cards.associateBy { it.id }
+    val card = cardMap[cardId] ?: return emptyList()
+    return card.dependencies.mapNotNull { depId -> cardMap[depId] }
 }
 
 /**
@@ -207,13 +208,14 @@ fun KanbanBoard.topologicalSort(): List<KanbanCard>? {
     val visited = mutableSetOf<KanbanCardId>()
     val result = mutableListOf<KanbanCard>()
     val inProgress = mutableSetOf<KanbanCardId>()
+    val cardMap = cards.associateBy { it.id }
 
     fun visit(cardId: KanbanCardId): Boolean {
         if (cardId in inProgress) return false // cycle
         if (cardId in visited) return true
 
         inProgress.add(cardId)
-        val card = cards.find { it.id == cardId } ?: return true
+        val card = cardMap[cardId] ?: return true
         for (dep in card.dependencies) {
             if (!visit(dep)) return false
         }
