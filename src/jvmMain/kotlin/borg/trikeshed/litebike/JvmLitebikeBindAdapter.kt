@@ -171,7 +171,9 @@ object JvmLitebikeBindAdapter {
             val head = bytes.copyOf(minOf(bytes.size, 8))
             val proto: Protocol = ProtocolDetector.detect(head, bytes.size)
 
-            val ok = element.accept(proto, bytes)
+            val ok = element.accept(proto, bytes) { responseBytes ->
+                connections.write(connId, responseBytes)
+            }
             if (!ok) {
                 connections.unregister(connId)
                 runCatching { ch.close() }
