@@ -44,7 +44,7 @@ class QueryEngine(private val data: Cursor) {
                 is Number -> cell.toDouble()
                 else -> 0.0 // Handle non-numeric or null safely
             }
-            series.append(value)
+            series.append(item = value)
         }
         return series
     }
