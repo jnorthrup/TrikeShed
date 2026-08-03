@@ -126,6 +126,12 @@ class FlywheelDriver(
     @Volatile var cycleHttp5xx: Int = 0
         private set
 
+    /** Snapshot of the last reactive-tick outcome. Written by the reactive
+     *  poll coroutine at the end of each tick; read by the daemon's
+     *  periodicity loop (CycleBody) for telemetry/trace WITHOUT calling the
+     *  sequential [cycle] — the reactive choreography is the sole driver. */
+    @Volatile var lastReactiveReport: CycleReport? = null
+
     /** Classify a caught throwable and bump the per-cycle HTTP counters if
      * it (or its root cause) is a [JulesHttpException]. Called at every Jules
      * API catch site in the cycle, drain, answer, and dispatch paths. */
@@ -553,10 +559,24 @@ class FlywheelDriver(
         // nothing was dispatched, and nothing dispatches because nothing drained.
         slotFreed.trySend(maxSlots)
 
+        // Cross-coroutine dispatch counter. The dispatch coroutine bumps this
+        // on every successful createSession; the poll coroutine snapshots it
+        // at tick boundary into lastReactiveReport.
+        val tickDispatched = java.util.concurrent.atomic.AtomicInteger(0)
+
         // FAN-OUT: drain pipeline. Polls Jules, drains COMPLETED sessions,
         // and signals dispatch when slots free.
         scope.launch(Dispatchers.Default) {
+            var tickAnswered = 0
+            var tickHarvested = 0
             while (true) {
+                val tickStart = System.currentTimeMillis()
+                cycleHttp429 = 0
+                cycleHttp5xx = 0
+                tickAnswered = 0
+                tickHarvested = 0
+                tickDispatched.set(0)
+
                 try {
                     withTimeoutOrNull(intervalMs) { conductor.pollOnce() }
                 } catch (t: Throwable) {
@@ -572,7 +592,8 @@ class FlywheelDriver(
                     val sessions = completed.map {
                         JulesRestClient.SessionInfo(it.snapshot.sessionId, it.snapshot.state, it.card.title, 0L)
                     }
-                    drainFanout(sessions)
+                    val drain = drainFanout(sessions)
+                    tickHarvested = drain.harvested
                     // Signal dispatch: slots may have freed
                     val freed = completed.count { it.drained }
                     if (freed > 0) {
@@ -590,6 +611,7 @@ class FlywheelDriver(
                     val answer = withTimeoutOrNull(45_000L) { buildAnswer(card) } ?: ""
                     if (answer.isNotEmpty()) {
                         conductor.answer(card.snapshot.sessionId, answer)
+                        tickAnswered++
                         _events.tryEmit(FlywheelEvent.Polled(activeCount(), (maxSlots - activeCount()).coerceAtLeast(0)))
                         println("[CHOREOGRAPHY] answer ${card.snapshot.sessionId.takeLast(6)}")
                     }
@@ -601,6 +623,7 @@ class FlywheelDriver(
                         it.causes.lastOrNull() !is JulesCause.HumanAnswered
                 }) {
                     withTimeoutOrNull(45_000L) { conductor.approvePlan(card.snapshot.sessionId) }
+                    tickAnswered++
                 }
 
                 // Swepp terminal failures
@@ -625,6 +648,23 @@ class FlywheelDriver(
                 // completing.
                 val availableNow = (maxSlots - activeCount()).coerceAtLeast(0)
                 if (availableNow > 0) slotFreed.trySend(availableNow)
+
+                // Snapshot the reactive tick outcome for the daemon's
+                // telemetry loop. CycleBody reads this instead of calling
+                // driver.cycle() — the reactive choreography is the sole
+                // driver; the periodicity loop only observes and traces.
+                val alive = activeCount()
+                lastReactiveReport = CycleReport(
+                    cycleMs = System.currentTimeMillis() - tickStart,
+                    answered = tickAnswered,
+                    harvested = tickHarvested,
+                    dispatched = tickDispatched.get(),
+                    alive = alive,
+                    available = (maxSlots - alive).coerceAtLeast(0),
+                    phase = if (tickHarvested > 0) FlywheelPhase.DRAIN else FlywheelPhase.DISPATCH,
+                    http429 = cycleHttp429,
+                    http5xx = cycleHttp5xx,
+                )
 
                 delay(intervalMs)
             }
@@ -669,6 +709,7 @@ class FlywheelDriver(
                                     at = Clock.System.now().toEpochMilliseconds(),
                                 ))
                                 _events.emit(FlywheelEvent.Dispatched(sessionId, entry.title))
+                                tickDispatched.incrementAndGet()
                                 println("[CHOREOGRAPHY] dispatch ${entry.title.take(60)}")
                             } catch (t: Throwable) {
                                 classifyHttpError(t)

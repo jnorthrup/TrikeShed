@@ -7,7 +7,7 @@ import borg.trikeshed.util.oroboros.MergeReceipt
 import borg.trikeshed.utils.kanban.*
 
 suspend fun drainReadmeDagReteRefraction(store: JulesBoardStore) {
-    store.appendWork("readme-dag-rete-refraction", JulesCause.WorkDrained(
+store.appendWork("readme-dag-rete-refraction", JulesCause.WorkDrained(
         workId = "readme-dag-rete-refraction",
         sessionId = "necromanced",
         commitSha = "superseded-by-review",
@@ -17,7 +17,7 @@ suspend fun drainReadmeDagReteRefraction(store: JulesBoardStore) {
 }
 
 suspend fun drainSynth17160760388671804749(store: JulesBoardStore) {
-    store.appendWork("synth:17160760388671804749", JulesCause.WorkDrained(
+store.appendWork("synth:17160760388671804749", JulesCause.WorkDrained(
         workId = "synth:17160760388671804749",
         sessionId = "necromanced",
         commitSha = "superseded-by-review",
@@ -42,7 +42,7 @@ suspend fun drainSynth17160760388671804749(store: JulesBoardStore) {
 }
 
 suspend fun drainCbIoUringHasBeenBroughtInAndManyTestsPorted(store: JulesBoardStore) {
-    store.appendWork("cb-io-uring-has-been-brought-in-and-many-tests-ported", JulesCause.WorkDrained(
+store.appendWork("cb-io-uring-has-been-brought-in-and-many-tests-ported", JulesCause.WorkDrained(
         workId = "cb-io-uring-has-been-brought-in-and-many-tests-ported",
         sessionId = "necromanced",
         commitSha = "superseded-by-review",
@@ -67,7 +67,7 @@ suspend fun drainCbIoUringHasBeenBroughtInAndManyTestsPorted(store: JulesBoardSt
 }
 
 suspend fun drainMmapCasStoreRework(store: JulesBoardStore) {
-    store.appendWork("rework:synth:965389205015589639#2", JulesCause.WorkDrained(
+store.appendWork("rework:synth:965389205015589639#2", JulesCause.WorkDrained(
         workId = "rework:synth:965389205015589639#2",
         sessionId = "necromanced",
         commitSha = "superseded-by-review",
@@ -84,7 +84,7 @@ suspend fun drainMmapCasStoreRework(store: JulesBoardStore) {
 }
 
 suspend fun drainReactorAlgebraNecromancedWork(store: JulesBoardStore) {
-    store.appendWork("synth:15340577469777603245", JulesCause.WorkDrained(
+store.appendWork("synth:15340577469777603245", JulesCause.WorkDrained(
         workId = "synth:15340577469777603245",
         sessionId = "necromanced",
         commitSha = "superseded-by-review",
@@ -109,7 +109,7 @@ suspend fun drainReactorAlgebraNecromancedWork(store: JulesBoardStore) {
 }
 
 suspend fun drainReactorAlgebra(store: JulesBoardStore) {
-    store.appendWork("synth:15340577469777603245#2", JulesCause.WorkDrained(
+store.appendWork("synth:15340577469777603245#2", JulesCause.WorkDrained(
         workId = "synth:15340577469777603245#2",
         sessionId = "necromanced",
         commitSha = "superseded-by-review",
@@ -119,7 +119,7 @@ suspend fun drainReactorAlgebra(store: JulesBoardStore) {
 }
 
 suspend fun drainSynth3803389897151472172(store: JulesBoardStore) {
-    val workId = "synth:3803389897151472172"
+val workId = "synth:3803389897151472172"
     store.appendWork(workId, JulesCause.WorkDrained(
         workId = workId,
         sessionId = "necromanced",
@@ -145,7 +145,7 @@ suspend fun drainSynth3803389897151472172(store: JulesBoardStore) {
 }
 
 suspend fun drainDoubleSeriesWire(store: JulesBoardStore) {
-    store.appendWork("synth:2704096756101430624", JulesCause.WorkDrained(
+store.appendWork("synth:2704096756101430624", JulesCause.WorkDrained(
         workId = "synth:2704096756101430624",
         sessionId = "necromanced",
         commitSha = "superseded-by-review",
@@ -155,7 +155,7 @@ suspend fun drainDoubleSeriesWire(store: JulesBoardStore) {
 }
 
 suspend fun drainSupersededTask(store: JulesBoardStore) {
-    val targetWorkId = "synth:17160760388671804749#2"
+val targetWorkId = "synth:17160760388671804749#2"
     store.appendWork(
         targetWorkId,
         JulesCause.WorkDrained(
@@ -198,10 +198,11 @@ suspend fun drainSession1026611087313351737(store: JulesBoardStore) {
             versionTag = "superseded-by-review",
             lexicalMemory = LexicalMemory(
                 summary = "Superseded necromanced work",
-                title = "[rework #1] Implement zoom(path): Cursor returning sub-cursor",
+                title = "Superseded necromanced work",
                 content = "Superseded via drain script."
             ),
-            claimedAt = 0L
+            claimedAt = 0L,
+            prUrl = null
         ),
         at = 0L
     ))
@@ -222,11 +223,12 @@ suspend fun drainSession14162871126292114727(store: JulesBoardStore) {
             revision = "superseded-by-review",
             versionTag = "superseded-by-review",
             lexicalMemory = LexicalMemory(
-                "Superseded necromanced work",
-                "Implement native getProgramName",
-                "Superseded via drain script."
+                summary = "Superseded necromanced work",
+                title = "Superseded necromanced work",
+                content = "Superseded via drain script."
             ),
-            claimedAt = 0L
+            claimedAt = 0L,
+            prUrl = null
         ),
         at = 0L
     ))
@@ -247,22 +249,20 @@ suspend fun drainSession15466567759278489251(store: JulesBoardStore) {
             revision = "superseded-by-review",
             versionTag = "superseded-by-review",
             lexicalMemory = LexicalMemory(
-                "Superseded necromanced work",
-                "[rework #2] [rework #1] Reactor algebra in commonMain",
-                "Superseded via drain script."
+                summary = "Superseded necromanced work",
+                title = "Superseded necromanced work",
+                content = "Superseded via drain script."
             ),
-            claimedAt = 0L
+            claimedAt = 0L,
+            prUrl = null
         ),
         at = 0L
     ))
 }
 
 suspend fun drainWork(store: JulesBoardStore) {
-<<<<<<< ours
-    drainSession15466567759278489251(store)
-=======
+drainSession15466567759278489251(store)
     drainSession17265457666410082720(store)
->>>>>>> theirs
     drainSession13065137133469730772(store)
     val workId = "synth:12224356407860756599#2"
 
@@ -323,7 +323,7 @@ suspend fun drainSession13434914650488484998(store: JulesBoardStore) {
             versionTag = "superseded-by-review",
             lexicalMemory = LexicalMemory(
                 summary = "Superseded necromanced work",
-                title = "Replace BlackboardFabrics.create TODO with InMemoryBlackboardFabric",
+                title = "Superseded necromanced work",
                 content = "Superseded via drain script."
             ),
             claimedAt = 0L,
@@ -333,13 +333,8 @@ suspend fun drainSession13434914650488484998(store: JulesBoardStore) {
     ))
 }
 
-<<<<<<< ours
 suspend fun drainSession17099126540887000248(store: JulesBoardStore) {
     val workId = "session:17099126540887000248"
-=======
-suspend fun drainSession17265457666410082720(store: JulesBoardStore) {
-    val workId = "session:17265457666410082720"
->>>>>>> theirs
     store.appendWork(workId, JulesCause.WorkDrained(
         workId = workId,
         sessionId = "necromanced",
@@ -353,15 +348,38 @@ suspend fun drainSession17265457666410082720(store: JulesBoardStore) {
             revision = "superseded-by-review",
             versionTag = "superseded-by-review",
             lexicalMemory = LexicalMemory(
-                "Superseded necromanced work",
-<<<<<<< ours
-                "Implement PosixIsamOperations.append",
-=======
-                "Implement stub: MiniDuckContract.kt:98",
->>>>>>> theirs
-                "Superseded via drain script."
+                summary = "Superseded necromanced work",
+                title = "Superseded necromanced work",
+                content = "Superseded via drain script."
             ),
-            claimedAt = 0L
+            claimedAt = 0L,
+            prUrl = null
+        ),
+        at = 0L
+    ))
+}
+
+suspend fun drainSession17265457666410082720(store: JulesBoardStore) {
+    val workId = "session:17265457666410082720"
+    store.appendWork(workId, JulesCause.WorkDrained(
+        workId = workId,
+        sessionId = "necromanced",
+        commitSha = "superseded-by-review",
+        taskId = "supersede-pass",
+        receipt = MergeReceipt(
+            workId = workId,
+            producer = "necromancer",
+            producerRef = "necromanced",
+            patchCid = ContentId("sha256:0000000000000000000000000000000000000000000000000000000000000000"),
+            revision = "superseded-by-review",
+            versionTag = "superseded-by-review",
+            lexicalMemory = LexicalMemory(
+                summary = "Superseded necromanced work",
+                title = "Superseded necromanced work",
+                content = "Superseded via drain script."
+            ),
+            claimedAt = 0L,
+            prUrl = null
         ),
         at = 0L
     ))
@@ -382,11 +400,12 @@ suspend fun drainSession12787173619039374612(store: JulesBoardStore) {
             revision = "superseded-by-review",
             versionTag = "superseded-by-review",
             lexicalMemory = LexicalMemory(
-                "Superseded necromanced work",
-                "Activate the BlackboardFabric factory",
-                "Superseded via drain script."
+                summary = "Superseded necromanced work",
+                title = "Superseded necromanced work",
+                content = "Superseded via drain script."
             ),
-            claimedAt = 0L
+            claimedAt = 0L,
+            prUrl = null
         ),
         at = 0L
     ))
@@ -408,7 +427,7 @@ suspend fun drainSession14688054800249381584(store: JulesBoardStore) {
             versionTag = "superseded-by-review",
             lexicalMemory = LexicalMemory(
                 summary = "Superseded necromanced work",
-                title = "Infer ISAM RecordMeta from Confix facets",
+                title = "Superseded necromanced work",
                 content = "Superseded via drain script."
             ),
             claimedAt = 0L,
@@ -434,7 +453,7 @@ suspend fun drainSession1379585730766540239(store: JulesBoardStore) {
             versionTag = "superseded-by-review",
             lexicalMemory = LexicalMemory(
                 summary = "Superseded necromanced work",
-                title = "Testing ModelMux API Error Handling",
+                title = "Superseded necromanced work",
                 content = "Superseded via drain script."
             ),
             claimedAt = 0L,
@@ -460,7 +479,7 @@ suspend fun drainSession13245870200089020847(store: JulesBoardStore) {
             versionTag = "superseded-by-review",
             lexicalMemory = LexicalMemory(
                 summary = "Superseded necromanced work",
-                title = "IO-Uring has been brought in and many tests ported",
+                title = "Superseded necromanced work",
                 content = "Superseded via drain script."
             ),
             claimedAt = 0L,
@@ -486,7 +505,7 @@ suspend fun drainSession13151782432177630490(store: JulesBoardStore) {
             versionTag = "superseded-by-review",
             lexicalMemory = LexicalMemory(
                 summary = "Superseded necromanced work",
-                title = "Infer ISAM RecordMeta from Confix facets",
+                title = "Superseded necromanced work",
                 content = "Superseded via drain script."
             ),
             claimedAt = 0L,
@@ -511,11 +530,12 @@ suspend fun drainSession12282770234900520474(store: JulesBoardStore) {
             revision = "superseded-by-review",
             versionTag = "superseded-by-review",
             lexicalMemory = LexicalMemory(
-                "Superseded necromanced work",
-                "[rework #1] Implement zoom(path): Cursor returning sub-cursor",
-                "Superseded via drain script."
+                summary = "Superseded necromanced work",
+                title = "Superseded necromanced work",
+                content = "Superseded via drain script."
             ),
-            claimedAt = 0L
+            claimedAt = 0L,
+            prUrl = null
         ),
         at = 0L
     ))
@@ -536,11 +556,12 @@ suspend fun drainSession13065137133469730772(store: JulesBoardStore) {
             revision = "superseded-by-review",
             versionTag = "superseded-by-review",
             lexicalMemory = LexicalMemory(
-                "Superseded necromanced work",
-                "[rework #2] [rework #1] Implement Series.filter(pred): Series<T>",
-                "Superseded via drain script."
+                summary = "Superseded necromanced work",
+                title = "Superseded necromanced work",
+                content = "Superseded via drain script."
             ),
-            claimedAt = 0L
+            claimedAt = 0L,
+            prUrl = null
         ),
         at = 0L
     ))
@@ -561,11 +582,12 @@ suspend fun drainSession12320089122017967949(store: JulesBoardStore) {
             revision = "superseded-by-review",
             versionTag = "superseded-by-review",
             lexicalMemory = LexicalMemory(
-                "Superseded necromanced work",
-                "Implement stub: TinyBtrfsContract.kt",
-                "Superseded via drain script."
+                summary = "Superseded necromanced work",
+                title = "Superseded necromanced work",
+                content = "Superseded via drain script."
             ),
-            claimedAt = 0L
+            claimedAt = 0L,
+            prUrl = null
         ),
         at = 0L
     ))
@@ -586,11 +608,12 @@ suspend fun drainSession12582820163300631149(store: JulesBoardStore) {
             revision = "superseded-by-review",
             versionTag = "superseded-by-review",
             lexicalMemory = LexicalMemory(
-                "Superseded necromanced work",
-                "Implement stub",
-                "Superseded via drain script."
+                summary = "Superseded necromanced work",
+                title = "Superseded necromanced work",
+                content = "Superseded via drain script."
             ),
-            claimedAt = 0L
+            claimedAt = 0L,
+            prUrl = null
         ),
         at = 0L
     ))
@@ -611,11 +634,12 @@ suspend fun drainSession15907668603497048488(store: JulesBoardStore) {
             revision = "superseded-by-review",
             versionTag = "superseded-by-review",
             lexicalMemory = LexicalMemory(
-                "Superseded necromanced work",
-                "Remove ForgeApp parallel DTO seed truth",
-                "Superseded via drain script."
+                summary = "Superseded necromanced work",
+                title = "Superseded necromanced work",
+                content = "Superseded via drain script."
             ),
-            claimedAt = 0L
+            claimedAt = 0L,
+            prUrl = null
         ),
         at = 0L
     ))
@@ -636,11 +660,12 @@ suspend fun drainSession11727450166753680446(store: JulesBoardStore) {
             revision = "superseded-by-review",
             versionTag = "superseded-by-review",
             lexicalMemory = LexicalMemory(
-                "Superseded necromanced work",
-                "Remove ForgeApp parallel DTO seed truth",
-                "Superseded via drain script."
+                summary = "Superseded necromanced work",
+                title = "Superseded necromanced work",
+                content = "Superseded via drain script."
             ),
-            claimedAt = 0L
+            claimedAt = 0L,
+            prUrl = null
         ),
         at = 0L
     ))
@@ -661,11 +686,12 @@ suspend fun drainSession10071466838419282986(store: JulesBoardStore) {
             revision = "superseded-by-review",
             versionTag = "superseded-by-review",
             lexicalMemory = LexicalMemory(
-                "Superseded necromanced work",
-                "[rework #1] TDD PR Deliver",
-                "Superseded via drain script."
+                summary = "Superseded necromanced work",
+                title = "Superseded necromanced work",
+                content = "Superseded via drain script."
             ),
-            claimedAt = 0L
+            claimedAt = 0L,
+            prUrl = null
         ),
         at = 0L
     ))
@@ -686,11 +712,12 @@ suspend fun drainSession11781258941577888716(store: JulesBoardStore) {
             revision = "superseded-by-review",
             versionTag = "superseded-by-review",
             lexicalMemory = LexicalMemory(
-                "Superseded necromanced work",
-                "Add Unit Tests for BigInt processMagnitudes",
-                "Superseded via drain script."
+                summary = "Superseded necromanced work",
+                title = "Superseded necromanced work",
+                content = "Superseded via drain script."
             ),
-            claimedAt = 0L
+            claimedAt = 0L,
+            prUrl = null
         ),
         at = 0L
     ))
@@ -712,7 +739,7 @@ suspend fun drainSession12278373796855125845(store: JulesBoardStore) {
             versionTag = "superseded-by-review",
             lexicalMemory = LexicalMemory(
                 summary = "Superseded necromanced work",
-                title = "[rework #2] [rework #1] NUID/authorization algebra in commonMain",
+                title = "Superseded necromanced work",
                 content = "Superseded via drain script."
             ),
             claimedAt = 0L,
@@ -723,7 +750,7 @@ suspend fun drainSession12278373796855125845(store: JulesBoardStore) {
 }
 
 suspend fun drainSynth12160533431563921279(store: JulesBoardStore) {
-    store.appendWork("synth:12160533431563921279", JulesCause.WorkDrained(
+store.appendWork("synth:12160533431563921279", JulesCause.WorkDrained(
         workId = "synth:12160533431563921279",
         sessionId = "necromanced",
         commitSha = "superseded-by-review",
@@ -747,7 +774,7 @@ suspend fun drainSynth12160533431563921279(store: JulesBoardStore) {
 }
 
 suspend fun drainReworkSynth3803389897151472172(store: JulesBoardStore) {
-    store.appendWork("rework:synth:3803389897151472172#2", JulesCause.WorkDrained(
+store.appendWork("rework:synth:3803389897151472172#2", JulesCause.WorkDrained(
         workId = "rework:synth:3803389897151472172#2",
         sessionId = "necromanced",
         commitSha = "superseded-by-review",
@@ -772,7 +799,7 @@ suspend fun drainReworkSynth3803389897151472172(store: JulesBoardStore) {
 }
 
 suspend fun drainSynth9667103323583014411(store: JulesBoardStore) {
-    store.appendWork("synth:9667103323583014411", JulesCause.WorkDrained(
+store.appendWork("synth:9667103323583014411", JulesCause.WorkDrained(
         workId = "synth:9667103323583014411",
         sessionId = "necromanced",
         commitSha = "superseded-by-review",
@@ -797,7 +824,7 @@ suspend fun drainSynth9667103323583014411(store: JulesBoardStore) {
 }
 
 suspend fun drainOptimizeWasmIsamOperations(store: JulesBoardStore) {
-    val targetWorkId = "session:12046113026982477527"
+val targetWorkId = "session:12046113026982477527"
     store.appendWork(targetWorkId, JulesCause.WorkDrained(
         workId = targetWorkId,
         sessionId = "necromanced",
@@ -823,7 +850,7 @@ suspend fun drainOptimizeWasmIsamOperations(store: JulesBoardStore) {
 }
 
 suspend fun drainNecromancedWork12511514760260520345(store: JulesBoardStore) {
-    val workId = "session:12511514760260520345"
+val workId = "session:12511514760260520345"
     store.appendWork(workId, JulesCause.WorkDrained(
         workId = workId,
         sessionId = "necromanced",
@@ -862,11 +889,12 @@ suspend fun drainSession12711721574152796678(store: JulesBoardStore) {
             revision = "superseded-by-review",
             versionTag = "superseded-by-review",
             lexicalMemory = LexicalMemory(
-                "Superseded necromanced work",
-                "TDD PR Deliver TASK G10",
-                "Superseded via drain script."
+                summary = "Superseded necromanced work",
+                title = "Superseded necromanced work",
+                content = "Superseded via drain script."
             ),
-            claimedAt = 0L
+            claimedAt = 0L,
+            prUrl = null
         ),
         at = 0L
     ))
@@ -888,7 +916,7 @@ suspend fun drainSession11949152291930230780(store: JulesBoardStore) {
             versionTag = "superseded-by-review",
             lexicalMemory = LexicalMemory(
                 summary = "Superseded necromanced work",
-                title = "Close Litebike connection lifecycle after response",
+                title = "Superseded necromanced work",
                 content = "Superseded via drain script."
             ),
             claimedAt = 0L,
@@ -914,7 +942,7 @@ suspend fun drainSession14439075584174324583(store: JulesBoardStore) {
             versionTag = "superseded-by-review",
             lexicalMemory = LexicalMemory(
                 summary = "Superseded necromanced work",
-                title = "Close Litebike connection lifecycle after response",
+                title = "Superseded necromanced work",
                 content = "Superseded via drain script."
             ),
             claimedAt = 0L,
@@ -940,7 +968,7 @@ suspend fun drainSession1414510366769780981(store: JulesBoardStore) {
             versionTag = "superseded-by-review",
             lexicalMemory = LexicalMemory(
                 summary = "Superseded necromanced work",
-                title = "[rework #1] Avoid Repeated Regex Compilation in ConfixOracleService",
+                title = "Superseded necromanced work",
                 content = "Superseded via drain script."
             ),
             claimedAt = 0L,
@@ -965,11 +993,12 @@ suspend fun drainSession15956094472626662213(store: JulesBoardStore) {
             revision = "superseded-by-review",
             versionTag = "superseded-by-review",
             lexicalMemory = LexicalMemory(
-                "Superseded necromanced work",
-                "[rework #1] ReactorEndpoint wire transport",
-                "Superseded via drain script."
+                summary = "Superseded necromanced work",
+                title = "Superseded necromanced work",
+                content = "Superseded via drain script."
             ),
-            claimedAt = 0L
+            claimedAt = 0L,
+            prUrl = null
         ),
         at = 0L
     ))

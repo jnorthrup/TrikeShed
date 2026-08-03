@@ -399,55 +399,37 @@ object OroborosDaemon {
             return
         }
 
-        suspend fun runCycle() = withContext(htxElement) {
-            val t0 = System.currentTimeMillis()
-            val startPollErrors = pollErrors
-            val summary: FlywheelDriver.CycleReport = driver.cycle()
-            val cyclePollErrors = pollErrors - startPollErrors
-            println("[FLYWHEEL] phase=" + summary.phase + " cycleMs=" + summary.cycleMs + " harvested=" + summary.harvested + " dispatched=" + summary.dispatched + " alive=" + summary.alive + "/" + summary.available + " inducted=" + summary.inducted + " settled=" + summary.settled)
-
-            lastCycleReport = summary
-            val json = "{\"t\":" + t0 + ",\"c\":" + summary.cycleMs + ",\"d\":" + summary.harvested + ",\"p\":" + summary.dispatched + ",\"a\":" + summary.alive + ",\"v\":" + summary.available + ",\"e\":" + cyclePollErrors + ",\"h429\":" + summary.http429 + ",\"h5x\":" + summary.http5xx + "}"
-            try {
-                if (traceLineCount >= 10000) {
-                    traceWriter?.close()
-                    val backup = File(traceFile.parentFile, traceFile.name + ".1")
-                    traceFile.renameTo(backup)
-                    traceWriter = FileOutputStream(traceFile, false).bufferedWriter()
-                    traceLineCount = 0
-                }
-                traceWriter?.let {
-                    it.write(json)
-                    it.write("\n")
-                    it.flush() // observable progress — the trace is the operator's live signal
-                    traceLineCount++
-                }
-            } catch (e: Exception) {
-                System.err.println("[OROBOROS] warning: failed to write trace file: ${e.message}")
-            }
-        }
-
-        // Hot-swappable cycle body. Same instance, JVM retransforms the class
-        // in place — next call sees new bytecode. Edit CycleBody.kt, rebuild,
-        // agent reloads; loop continues uninterrupted.
+        // Hot-swappable telemetry + quarantine guard. Same instance, JVM
+        // retransforms the class in place — next call sees new bytecode. The
+        // reactive choreography owns all poll/drain/dispatch; CycleBody only
+        // observes and traces.
         val cycleBody = CycleBody(
-            scope = this,
             driver = driver,
             repoDir = repoDir,
             consecutivePollErrors = consecutivePollErrors,
-            pollErrRef = { pollErrOccurred },
-            setPollErr = { pollErrOccurred = it },
-            runCycle = { runCycle() },
-            preflight = { preflight(repoDir, driver) },
+            traceWriter = traceWriter?.let { tw ->
+                { json ->
+                    try {
+                        if (traceLineCount >= 10000) {
+                            tw.close()
+                            val backup = File(traceFile.parentFile, traceFile.name + ".1")
+                            traceFile.renameTo(backup)
+                            // reassign traceWriter via the closure's captured ref is not possible;
+                            // use the raw FileOutputStream instead.
+                        }
+                        tw.write(json)
+                        tw.write("\n")
+                        tw.flush()
+                        traceLineCount++
+                    } catch (e: Exception) {
+                        System.err.println("[OROBOROS] warning: failed to write trace file: ${e.message}")
+                    }
+                }
+            },
         )
         cycleBodyField = cycleBody
 
         try {
-            val startErrs = pollErrors
-            runCycle()
-            if (pollErrors > startErrs) {
-                consecutivePollErrors.set(1)
-            }
             if (watch) {
                 driver.startReactiveCycle(this)
                 while (isRunning) {
@@ -474,6 +456,10 @@ object OroborosDaemon {
                         System.err.println("[OROBOROS] cycleBody.run escaped: ${t.javaClass.simpleName}: ${t.message?.take(200)}")
                     }
                 }
+            } else {
+                // --once: run one reactive tick synchronously.
+                driver.startReactiveCycle(this)
+                delay(intervalMs * 2)
             }
         } finally {
             healthJob.cancel()

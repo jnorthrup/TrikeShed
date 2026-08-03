@@ -1,14 +1,22 @@
 package borg.trikeshed.daemon
 
 import borg.trikeshed.jules.FlywheelDriver
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.launch
 import java.util.concurrent.atomic.AtomicInteger
 
 /**
- * Hot-swappable cycle body. The daemon's periodicity loop calls [run] on a
- * single instance; while that loop is alive, JVMTI can retransform this
- * class — the next call sees the new bytecode, no daemon restart.
+ * Hot-swappable telemetry + quarantine guard. The daemon's periodicity loop
+ * calls [run] on a single instance; while that loop is alive, JVMTI can
+ * retransform this class — the next call sees the new bytecode, no daemon
+ * restart.
+ *
+ * The reactive choreography (FlywheelDriver.startReactiveCycle) is the SOLE
+ * driver of poll/drain/dispatch. This body does NOT call driver.cycle() —
+ * that would double-poll, double-gate on isWorkingTreeClean, and race the
+ * reactive coroutines. Instead it:
+ *   1. Reads [FlywheelDriver.lastReactiveReport] — the reactive tick snapshot.
+ *   2. Writes the trace JSON (the operator's live signal).
+ *   3. Quarantine-guards on committed conflict markers (safety boundary).
+ *   4. Manages backoff/error counting for the periodicity loop.
  *
  * Edit rules (kept narrow on purpose so retransform doesn't break):
  *   - This file's class shape (fields, method signatures) is stable.
@@ -17,35 +25,20 @@ import java.util.concurrent.atomic.AtomicInteger
  *     changes.
  */
 class CycleBody(
-    private val scope: CoroutineScope,
     private val driver: FlywheelDriver,
     private val repoDir: java.io.File,
     private val consecutivePollErrors: AtomicInteger,
-    private val pollErrRef: () -> Boolean,
-    private val setPollErr: (Boolean) -> Unit,
-    private val runCycle: suspend () -> Unit,
-    private val preflight: () -> Boolean,
+    private val traceWriter: ((String) -> Unit)?,
 ) : Runnable {
 
     override fun run() {
-        // The whole body is guarded: a failure here would otherwise escape
-        // the Runnable and tear down the daemon's periodicity thread. The
-        // postmortem action is always the same — log, increment the backoff
-        // counter, return — so the loop continues with a delay+retry next tick.
         try {
             println("[HOTSWAP] CycleBody.run() invoked — bytecode rev=" + System.identityHashCode(this) + " — POST-SWAP-MARKER")
-            setPollErr(false)
-            if (!preflight()) {
-                System.err.println("[OROBOROS] preflight failed; skipping cycle")
-                consecutivePollErrors.incrementAndGet()
-                return
-            }
+
+            // Quarantine boundary: a committed conflict marker means the
+            // reactive drain would re-apply every COMPLETED delta and nest
+            // the same conflict again. Pause until resolved.
             try {
-                // A committed conflict is a quarantine boundary. Re-entering
-                // drain while markers remain reapplies every COMPLETED delta and
-                // nests the same conflict again. QA or an in-flight locality
-                // session must resolve the marker before the next cycle mutates
-                // the tree.
                 val markerProbe = ProcessBuilder("git", "grep", "-l", "^<<<<<<< ", "--")
                     .directory(repoDir)
                     .redirectErrorStream(true)
@@ -55,10 +48,6 @@ class CycleBody(
                     val actualMarkers = mutableListOf<String>()
                     val markerPaths = markerProbe.inputStream.bufferedReader().readLines()
                     for (path in markerPaths) {
-                        // Stale patch/diff/sh/txt artifacts carry conflict-marker
-                        // text by design (they ARE diff fragments) — same exclusion
-                        // as FlywheelDriver.conflictFiles(). Without this, committed
-                        // artifacts trip the quarantine and pause every cycle forever.
                         if (path.endsWith(".patch") || path.endsWith(".diff") ||
                             path.endsWith(".sh") || path.endsWith(".txt")) continue
                         val markerFile = java.io.File(repoDir, path)
@@ -80,19 +69,21 @@ class CycleBody(
                     consecutivePollErrors.incrementAndGet()
                     return
                 }
-
-                scope.launch { runCycle() }
-                consecutivePollErrors.set(0)
             } catch (t: Throwable) {
-                System.err.println("[OROBOROS] cycle failed: ${t.javaClass.simpleName}: ${t.message?.take(200)}")
+                System.err.println("[OROBOROS] marker probe failed: ${t.javaClass.simpleName}: ${t.message?.take(200)}")
             }
-            if (pollErrRef()) consecutivePollErrors.incrementAndGet()
-            else consecutivePollErrors.set(0)
+
+            // Read the reactive tick snapshot and emit telemetry. The reactive
+            // coroutines own all computation; we only observe and trace.
+            val report = driver.lastReactiveReport
+            if (report != null) {
+                println("[FLYWHEEL] phase=" + report.phase + " cycleMs=" + report.cycleMs + " harvested=" + report.harvested + " dispatched=" + report.dispatched + " alive=" + report.alive + "/" + report.available + " inducted=" + report.inducted + " settled=" + report.settled)
+                val t = System.currentTimeMillis()
+                val json = "{\"t\":" + t + ",\"c\":" + report.cycleMs + ",\"d\":" + report.harvested + ",\"p\":" + report.dispatched + ",\"a\":" + report.alive + ",\"v\":" + report.available + ",\"e\":0,\"h429\":" + report.http429 + ",\"h5x\":" + report.http5xx + "}"
+                try { traceWriter?.invoke(json) } catch (_: Throwable) {}
+                consecutivePollErrors.set(0)
+            }
         } catch (t: Throwable) {
-            // Hard failure: preflight threw (stale git lock, ENOENT on
-            // repoDir), setPollErr closure blew up, or anything else escaped.
-            // The loop MUST NOT die — we are the only thing keeping the wheel
-            // turning. Log and let the next tick try again.
             System.err.println("[OROBOROS] CycleBody.run() hard failure: ${t.javaClass.simpleName}: ${t.message?.take(200)}")
             try { consecutivePollErrors.incrementAndGet() } catch (_: Throwable) {}
         }
