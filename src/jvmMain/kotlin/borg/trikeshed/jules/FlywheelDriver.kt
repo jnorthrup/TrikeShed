@@ -547,6 +547,12 @@ class FlywheelDriver(
      * loop becomes a simple poll trigger — everything else is reactive.
      */
     fun startReactiveCycle(scope: kotlinx.coroutines.CoroutineScope) {
+        // Prime the dispatch pump: free capacity may exist at startup before
+        // the first poll discovers any state. Without this, dispatch parks on
+        // slotFreed.receive() and the wheel deadlocks — nothing drains because
+        // nothing was dispatched, and nothing dispatches because nothing drained.
+        slotFreed.trySend(maxSlots)
+
         // FAN-OUT: drain pipeline. Polls Jules, drains COMPLETED sessions,
         // and signals dispatch when slots free.
         scope.launch(Dispatchers.Default) {
@@ -608,6 +614,17 @@ class FlywheelDriver(
 
                 // Emit poll event for observers
                 _events.tryEmit(FlywheelEvent.Polled(activeCount(), (maxSlots - activeCount()).coerceAtLeast(0)))
+
+                // Re-arm dispatch: every poll re-evaluates free capacity. A
+                // session may have transitioned terminal API-side, a sweep
+                // may have retired a zombie, or the previous dispatch fan-out
+                // may have left slots unfilled (createSession failures). The
+                // dispatch coroutine parks on slotFreed.receive() after each
+                // batch — without this signal it sleeps until the next drain,
+                // starving the wheel when the queue is long but nothing is
+                // completing.
+                val availableNow = (maxSlots - activeCount()).coerceAtLeast(0)
+                if (availableNow > 0) slotFreed.trySend(availableNow)
 
                 delay(intervalMs)
             }

@@ -2,7 +2,6 @@
 
 package borg.trikeshed.couch
 
-import borg.trikeshed.cursor.*
 import borg.trikeshed.lib.*
 import borg.trikeshed.parse.confix.*
 
@@ -34,12 +33,6 @@ class ConfixDocStore(
     private var seq: Long = 0L
 
     operator fun get(id: String): ConfixDocStoreEntry? = byId[id]
-
-
-    suspend fun load(id: String): ConfixDocStoreEntry? = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) { get(id) }
-
-
-
 
     fun contains(id: String): Boolean = byId.containsKey(id)
     val size: Int get() = byId.size
