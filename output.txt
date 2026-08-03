@@ -1,4 +1,0 @@
-Task :compileKotlinJvm FAILED
-e: file:///app/src/commonMain/kotlin/borg/trikeshed/couch/isam/ConfixIsamFactory.kt:40:79 No value passed for parameter 'keyNames'.
-
-Production caller reached: `ConfixIsamFactory.kt` line 40 calling `ConfixIsamIsomorphism.inferIsamSchemaFromConfixIndex(exemplarIndex!!)`
