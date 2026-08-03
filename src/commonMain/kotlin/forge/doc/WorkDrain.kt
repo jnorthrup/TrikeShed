@@ -614,6 +614,7 @@ suspend fun drainWork(store: JulesBoardStore) {
 <<<<<<< ours
 <<<<<<< ours
 <<<<<<< ours
+<<<<<<< ours
 drainNecromancedWork5210997431272160904(store)
 =======
     drainSession484619669717848676(store)
@@ -626,6 +627,9 @@ drainNecromancedWork5210997431272160904(store)
 >>>>>>> theirs
 =======
     drainSession4558995066822757502(store)
+>>>>>>> theirs
+=======
+drainSession4525004214345864406(store)
 >>>>>>> theirs
 drainSession15466567759278489251(store)
     drainSession17265457666410082720(store)
@@ -1466,6 +1470,7 @@ suspend fun drainSession15956094472626662213(store: JulesBoardStore) {
 <<<<<<< ours
 <<<<<<< ours
 <<<<<<< ours
+<<<<<<< ours
 
 <<<<<<< ours
 <<<<<<< ours
@@ -1497,10 +1502,18 @@ suspend fun drainSession4904988000626546222(store: JulesBoardStore) {
     store.appendWork(workId, JulesCause.WorkDrained(
         workId = workId,
 >>>>>>> theirs
+=======
+
+suspend fun drainSession4525004214345864406(store: JulesBoardStore) {
+    val workId = "session:4525004214345864406"
+    store.appendWork(workId, JulesCause.WorkDrained(
+        workId = workId,
+>>>>>>> theirs
         sessionId = "necromanced",
         commitSha = "superseded-by-review",
         taskId = "supersede-pass",
         receipt = MergeReceipt(
+<<<<<<< ours
 <<<<<<< ours
 <<<<<<< ours
 <<<<<<< ours
@@ -1514,12 +1527,16 @@ suspend fun drainSession4904988000626546222(store: JulesBoardStore) {
 =======
             workId = workId,
 >>>>>>> theirs
+=======
+            workId = workId,
+>>>>>>> theirs
             producer = "necromancer",
             producerRef = "necromanced",
             patchCid = ContentId("sha256:0000000000000000000000000000000000000000000000000000000000000000"),
             revision = "superseded-by-review",
             versionTag = "superseded-by-review",
             lexicalMemory = LexicalMemory(
+<<<<<<< ours
 <<<<<<< ours
 <<<<<<< ours
 <<<<<<< ours
@@ -1647,10 +1664,15 @@ suspend fun drainSession4558995066822757502(store: JulesBoardStore) {
                 "Superseded necromanced work",
                 "[rework #2] [rework #2] [rework #1] ReactorEndpoint wire transport",
 >>>>>>> theirs
+=======
+                "Superseded necromanced work",
+                "Superseded necromanced work",
+>>>>>>> theirs
                 "Superseded via drain script."
             ),
             claimedAt = 0L,
             prUrl = null
+<<<<<<< ours
 <<<<<<< ours
 <<<<<<< ours
 <<<<<<< ours
@@ -1668,6 +1690,8 @@ suspend fun drainSession4558995066822757502(store: JulesBoardStore) {
                 "Superseded via drain script."
             ),
             claimedAt = 0L
+>>>>>>> theirs
+=======
 >>>>>>> theirs
 =======
 >>>>>>> theirs
