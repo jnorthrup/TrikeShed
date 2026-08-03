@@ -588,6 +588,7 @@ class PosixFile(
         /**
          * writes \n terminated lines to a file
          */
+<<<<<<< HEAD
         fun writeLines(filename: String, lines: List<String>): Unit {
             if (lines.isEmpty()) {
                 val O_FLAGS = PosixOpenOpts.withFlags(PosixOpenOpts.O_Creat, PosixOpenOpts.O_Trunc, PosixOpenOpts.O_WrOnly)
@@ -607,6 +608,48 @@ class PosixFile(
                     HasPosixErr.posixRequires(written == bytes.size.toLong()) { "writeLines $filename" }
                 }
             }
+=======
+        fun writeLines(filename: String, lines: List<String>) {
+            // ⚡ Bolt: Buffered writes to avoid N+1 system calls while keeping O(1) memory overhead.
+            val O_FLAGS = PosixOpenOpts.withFlags(PosixOpenOpts.O_Creat, PosixOpenOpts.O_Trunc, PosixOpenOpts.O_WrOnly)
+            val file = PosixFile(filename, O_FLAGS)
+
+            val bufferSize = 8192
+            val buffer = ByteArray(bufferSize)
+            var offset = 0
+
+            fun flush() {
+                if (offset > 0) {
+                    var writtenTotal = 0
+                    buffer.usePinned { pinned ->
+                        while (writtenTotal < offset) {
+                            val ptr = pinned.addressOf(writtenTotal)
+                            val written = write(file.fd, ptr, (offset - writtenTotal).convert())
+                            HasPosixErr.posixRequires(written > 0L) { "writeLines $filename flush error" }
+                            writtenTotal += written.toInt()
+                        }
+                    }
+                    offset = 0
+                }
+            }
+
+            lines.forEach { line ->
+                val bytes = line.plus("\n").encodeToByteArray()
+                var bytesWritten = 0
+                while (bytesWritten < bytes.size) {
+                    val space = bufferSize - offset
+                    val toCopy = minOf(space, bytes.size - bytesWritten)
+                    bytes.copyInto(buffer, offset, bytesWritten, bytesWritten + toCopy)
+                    offset += toCopy
+                    bytesWritten += toCopy
+
+                    if (offset == bufferSize) {
+                        flush()
+                    }
+                }
+            }
+            flush()
+>>>>>>> origin/jules-6247409417408156363-de1c120e
             file.close()
         }
         fun writeString(filename: String, string: String): Int = writeBytes(filename, string.encodeToByteArray())

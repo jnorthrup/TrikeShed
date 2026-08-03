@@ -590,17 +590,47 @@ class LinuxPosixFile(
         /**
          * writes \n terminated lines to a file
          */
-        fun writeLines(filename: String, lines: List<String>): Unit = memScoped {
+        fun writeLines(filename: String, lines: List<String>) {
+            // ⚡ Bolt: Buffered writes to avoid N+1 system calls while keeping O(1) memory overhead.
             val O_FLAGS = PosixOpenOpts.withFlags(PosixOpenOpts.O_Creat, PosixOpenOpts.O_Trunc, PosixOpenOpts.O_WrOnly)
             val file = LinuxPosixFile(filename, O_FLAGS)
-            lines.forEach { line ->
-                val len = line.length
-                val buf = line.plus('\n').cstr.getPointer(this)
-                val written = write(file.fd, buf, len.inc().convert())
-                HasPosixErr.posixRequires(written == len.inc().toLong()) { "writeLines $filename" }
-            }.also {
-                file.close()
+
+            val bufferSize = 8192
+            val buffer = ByteArray(bufferSize)
+            var offset = 0
+
+            fun flush() {
+                if (offset > 0) {
+                    var writtenTotal = 0
+                    buffer.usePinned { pinned ->
+                        while (writtenTotal < offset) {
+                            val ptr = pinned.addressOf(writtenTotal)
+                            val written = write(file.fd, ptr, (offset - writtenTotal).convert())
+                            HasPosixErr.posixRequires(written > 0L) { "writeLines $filename flush error" }
+                            writtenTotal += written.toInt()
+                        }
+                    }
+                    offset = 0
+                }
             }
+
+            lines.forEach { line ->
+                val bytes = line.plus("\n").encodeToByteArray()
+                var bytesWritten = 0
+                while (bytesWritten < bytes.size) {
+                    val space = bufferSize - offset
+                    val toCopy = minOf(space, bytes.size - bytesWritten)
+                    bytes.copyInto(buffer, offset, bytesWritten, bytesWritten + toCopy)
+                    offset += toCopy
+                    bytesWritten += toCopy
+
+                    if (offset == bufferSize) {
+                        flush()
+                    }
+                }
+            }
+            flush()
+            file.close()
         }
         fun writeString(filename: String, string: String): Int = writeBytes(filename, string.encodeToByteArray())
 
