@@ -242,6 +242,7 @@ suspend fun drainWork(store: JulesBoardStore) {
     drainOptimizeWasmIsamOperations(store)
     drainNecromancedWork12511514760260520345(store)
     drainSession12711721574152796678(store)
+<<<<<<< ours
     drainSession13434914650488484998(store)
     drainSession14688054800249381584(store)
     drainSession11949152291930230780(store)
@@ -249,6 +250,13 @@ suspend fun drainWork(store: JulesBoardStore) {
 
 suspend fun drainSession13434914650488484998(store: JulesBoardStore) {
     val workId = "session:13434914650488484998"
+=======
+    drainSession12787173619039374612(store)
+}
+
+suspend fun drainSession12787173619039374612(store: JulesBoardStore) {
+    val workId = "session:12787173619039374612"
+>>>>>>> theirs
     store.appendWork(workId, JulesCause.WorkDrained(
         workId = workId,
         sessionId = "necromanced",
@@ -263,6 +271,7 @@ suspend fun drainSession13434914650488484998(store: JulesBoardStore) {
             versionTag = "superseded-by-review",
             lexicalMemory = LexicalMemory(
                 "Superseded necromanced work",
+<<<<<<< ours
                 "Activate the BlackboardFabric factory",
                 "Superseded via drain script."
             ),
@@ -289,6 +298,9 @@ suspend fun drainSession14688054800249381584(store: JulesBoardStore) {
             lexicalMemory = LexicalMemory(
                 "Superseded necromanced work",
                 "Infer ISAM RecordMeta from Confix facets",
+=======
+                "Wire queued SCTP jobs into NUID fanout",
+>>>>>>> theirs
                 "Superseded via drain script."
             ),
             claimedAt = 0L
