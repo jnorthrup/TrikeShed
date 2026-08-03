@@ -16,8 +16,13 @@ store.appendWork("readme-dag-rete-refraction", JulesCause.WorkDrained(
     ))
 }
 
+<<<<<<< ours
 suspend fun drainSession16095675128128190509(store: JulesBoardStore) {
     val workId = "session:16095675128128190509"
+=======
+suspend fun drainSession18375246989442433846(store: JulesBoardStore) {
+    val workId = "session:18375246989442433846"
+>>>>>>> theirs
     store.appendWork(workId, JulesCause.WorkDrained(
         workId = workId,
         sessionId = "necromanced",
@@ -31,6 +36,7 @@ suspend fun drainSession16095675128128190509(store: JulesBoardStore) {
             revision = "superseded-by-review",
             versionTag = "superseded-by-review",
             lexicalMemory = LexicalMemory(
+<<<<<<< ours
                 summary = "Superseded necromanced work",
                 title = "Superseded necromanced work",
                 content = "Superseded via drain script."
@@ -63,6 +69,13 @@ suspend fun drainSession2185492585833101483(store: JulesBoardStore) {
             ),
             claimedAt = 0L,
             prUrl = null
+=======
+                "Superseded necromanced work",
+                "[rework #1] Implement MmapCasStore returning mapped slices",
+                "Superseded via drain script."
+            ),
+            claimedAt = 0L
+>>>>>>> theirs
         ),
         at = 0L
     ))
