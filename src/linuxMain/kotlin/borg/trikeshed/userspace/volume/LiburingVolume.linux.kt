@@ -12,6 +12,22 @@ import kotlin.coroutines.resumeWithException
 import kotlinx.atomicfu.locks.synchronized
 import kotlinx.atomicfu.locks.SynchronizedObject
 
+private fun generateSecureToken(): Long {
+    return memScoped {
+        val buf = alloc<LongVar>()
+        val fd = open("/dev/urandom", O_RDONLY)
+        if (fd < 0) {
+            throw RuntimeException("Failed to open /dev/urandom")
+        }
+        val bytesRead = read(fd, buf.ptr, 8u)
+        close(fd)
+        if (bytesRead != 8L) {
+            throw RuntimeException("Failed to read 8 bytes from /dev/urandom")
+        }
+        buf.value
+    }
+}
+
 actual class LiburingVolume actual constructor(
     val path: String,
     actual override val blockSize: Int,
@@ -98,7 +114,7 @@ actual class LiburingVolume actual constructor(
         
         suspendCancellableCoroutine<Unit> { cont ->
             buf.usePinned { pinned ->
-                val token = kotlin.random.Random.nextLong()
+                val token = generateSecureToken()
                 
                 Liburing.registerFanoutHandler(token) { completion ->
                     Liburing.removeFanoutHandler(token) {}
@@ -149,7 +165,7 @@ actual class LiburingVolume actual constructor(
         
         suspendCancellableCoroutine<Unit> { cont ->
             data.usePinned { pinned ->
-                val token = kotlin.random.Random.nextLong()
+                val token = generateSecureToken()
                 
                 Liburing.registerFanoutHandler(token) { completion ->
                     Liburing.removeFanoutHandler(token) {}
@@ -181,7 +197,7 @@ actual class LiburingVolume actual constructor(
         }
         
         suspendCancellableCoroutine<Unit> { cont ->
-            val token = kotlin.random.Random.nextLong()
+            val token = generateSecureToken()
             Liburing.registerFanoutHandler(token) { completion ->
                 Liburing.removeFanoutHandler(token) {}
                 if (completion.res < 0) {
