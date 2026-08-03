@@ -44,7 +44,7 @@ object BtrfsDeviceTree {
             val itemSize = readUIntLE(bytes, itemPtrOffset + 21).toInt()
             
             // fix: data offset is relative to the start of the node (offset)
-            val payloadOffset = offset + 101 + dataOffsetInNode
+            val payloadOffset = offset + dataOffsetInNode
             
             val devid = readULongLE(bytes, payloadOffset)
             // read only the first 8 bytes of uuid for simplicity here as required by the spec
