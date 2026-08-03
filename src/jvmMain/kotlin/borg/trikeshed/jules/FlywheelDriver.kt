@@ -551,9 +551,10 @@ class FlywheelDriver(
     /** Signal channel: a slot freed, dispatch should try to fill it. */
     private val slotFreed = kotlinx.coroutines.channels.Channel<Int>(kotlinx.coroutines.channels.Channel.CONFLATED)
 
-    /** Serializes HTX exchanges — the TLS transport uses one SSLEngine per
-     *  endpoint ordinal, so concurrent writes corrupt the engine. */
-    private val dispatchMutex = Mutex()
+    /** Serializes ALL HTX exchanges — the TLS transport uses one SSLEngine per
+     *  endpoint ordinal, so ANY concurrent writes (dispatch + drain + answer)
+     *  corrupt the engine. Every HTX call site must acquire this. */
+    private val htxMutex = Mutex()
 
     /**
      * Launch the reactive choreography. Returns immediately; the coroutines
@@ -612,11 +613,13 @@ class FlywheelDriver(
                         JulesRestClient.SessionInfo(it.snapshot.sessionId, it.snapshot.state, it.card.title, 0L)
                     }
                     scope.launch(htxElement + Dispatchers.IO) {
-                        val drain = drainFanout(sessions)
-                        val freed = completed.count { it.drained }
-                        if (freed > 0) {
-                            slotFreed.trySend(freed)
-                            println("[CHOREOGRAPHY] drain → dispatch signal: $freed slots freed")
+                        htxMutex.withLock {
+                            val drain = drainFanout(sessions)
+                            val freed = completed.count { it.drained }
+                            if (freed > 0) {
+                                slotFreed.trySend(freed)
+                                println("[CHOREOGRAPHY] drain → dispatch signal: $freed slots freed")
+                            }
                         }
                     }
                 }
@@ -629,10 +632,12 @@ class FlywheelDriver(
                 }
                 for (card in awaiting) {
                     scope.launch(htxElement + Dispatchers.IO) {
-                        val answer = withTimeoutOrNull(45_000L) { buildAnswer(card) } ?: ""
-                        if (answer.isNotEmpty()) {
-                            conductor.answer(card.snapshot.sessionId, answer)
-                            println("[CHOREOGRAPHY] answer ${card.snapshot.sessionId.takeLast(6)}")
+                        htxMutex.withLock {
+                            val answer = withTimeoutOrNull(45_000L) { buildAnswer(card) } ?: ""
+                            if (answer.isNotEmpty()) {
+                                conductor.answer(card.snapshot.sessionId, answer)
+                                println("[CHOREOGRAPHY] answer ${card.snapshot.sessionId.takeLast(6)}")
+                            }
                         }
                     }
                     tickAnswered++
@@ -644,7 +649,9 @@ class FlywheelDriver(
                         it.causes.lastOrNull() !is JulesCause.HumanAnswered
                 }) {
                     scope.launch(htxElement + Dispatchers.IO) {
-                        withTimeoutOrNull(45_000L) { conductor.approvePlan(card.snapshot.sessionId) }
+                        htxMutex.withLock {
+                            withTimeoutOrNull(45_000L) { conductor.approvePlan(card.snapshot.sessionId) }
+                        }
                     }
                     tickAnswered++
                 }
@@ -726,7 +733,7 @@ class FlywheelDriver(
                 // faster than it sounds: Jules createSession is ~1-2s each.
                 for (entry in pendingCandidates) {
                     try {
-                        dispatchMutex.withLock {
+                        htxMutex.withLock {
                             val cappedSpec = capSpec(entry.spec)
                             val sessionId = client.createSession(
                                 prompt = cappedSpec, title = entry.title, source = source)
