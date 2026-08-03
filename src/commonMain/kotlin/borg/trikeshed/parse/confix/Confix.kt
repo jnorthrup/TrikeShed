@@ -429,12 +429,13 @@ enum class Syntax {
             val tag = flat.tags[i]
             val children = flat.childOf(i)
             if (tag == IOMemento.IoObject || tag == IOMemento.IoArray || children.size > 0) {
-                var hashString = "node:\n"
+                // ⚡ Bolt: Optimize string concatenation in Confix hash calculation
+                val hashStringBuilder = StringBuilder("node:\n")
                 for (c in 0 until children.size) {
                     val childIdx = children[c]
-                    hashString += "${cids[childIdx]}\n"
+                    hashStringBuilder.append(cids[childIdx]).append('\n')
                 }
-                cids[i] = borg.trikeshed.job.ContentId.of(hashString.encodeToByteArray()).value
+                cids[i] = borg.trikeshed.job.ContentId.of(hashStringBuilder.toString().encodeToByteArray()).value
             } else {
                 val span = flat.spans[i]
                 val length = maxOf(0, span.b - span.a + 1)
