@@ -444,7 +444,7 @@ object OroborosDaemon {
                 }
                 while (isRunning) {
                     val errors = consecutivePollErrors.get()
-                    val backoffMs = kotlin.math.min(intervalMs * (1L shl kotlin.math.min(errors, 30)), intervalMs * 5)
+                    val backoffMs = kotlin.math.min(a = intervalMs * (1L shl kotlin.math.min(a = errors, b = 30)), b = intervalMs * 5)
                     if (errors > 0) System.err.println("[OROBOROS] backoff=${backoffMs}ms consecutiveErrors=$errors")
                     delay(backoffMs)
                     try {
