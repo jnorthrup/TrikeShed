@@ -36,6 +36,6 @@ object ReducerRegistry {
             emptySeriesCarrier()
         }
 
-        return typedReduction.execute(carrier)
+        return typedReduction.execute(input = carrier)
     }
 }
