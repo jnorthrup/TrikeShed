@@ -1,3 +1,7 @@
+<<<<<<< ours
+=======
+
+>>>>>>> theirs
 package forge.doc
 
 import borg.trikeshed.job.ContentId
@@ -148,6 +152,7 @@ store.appendWork("rework:synth:965389205015589639#2", JulesCause.WorkDrained(
     ))
 }
 
+<<<<<<< ours
 suspend fun drainReactorAlgebraNecromancedWork(store: JulesBoardStore) {
 store.appendWork("synth:15340577469777603245", JulesCause.WorkDrained(
         workId = "synth:15340577469777603245",
@@ -916,6 +921,10 @@ val targetWorkId = "session:12046113026982477527"
 
 suspend fun drainNecromancedWork12511514760260520345(store: JulesBoardStore) {
 val workId = "session:12511514760260520345"
+=======
+suspend fun drainSession17593680915660220835(store: JulesBoardStore) {
+    val workId = "session:17593680915660220835"
+>>>>>>> theirs
     store.appendWork(workId, JulesCause.WorkDrained(
         workId = workId,
         sessionId = "necromanced",
@@ -930,14 +939,20 @@ val workId = "session:12511514760260520345"
             versionTag = "superseded-by-review",
             lexicalMemory = LexicalMemory(
                 "Superseded necromanced work",
+<<<<<<< ours
                 "Implement stub: FacetedCursorContract.kt:177",
                 "Superseded via drain script."
+=======
+                "[rework #2] [rework #2] [rework #1] Wire DoubleSeries into query engine for primitive dispatch",
+                "Superseded via drain script. Locality is already covered by QueryEngine."
+>>>>>>> theirs
             ),
             claimedAt = 0L
         ),
         at = 0L
     ))
 }
+<<<<<<< ours
 
 suspend fun drainSession14439075584174324583(store: JulesBoardStore) {
     val workId = "session:14439075584174324583"
@@ -1042,3 +1057,5 @@ suspend fun drainSession15956094472626662213(store: JulesBoardStore) {
         at = 0L
     ))
 }
+=======
+>>>>>>> theirs
