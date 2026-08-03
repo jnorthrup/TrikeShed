@@ -298,12 +298,6 @@ object OroborosDaemon {
         var traceWriter: BufferedWriter? = null
         try {
             traceWriter = FileOutputStream(traceFile, true).bufferedWriter()
-            Runtime.getRuntime().addShutdownHook(Thread {
-                try {
-                    traceWriter?.flush()
-                    traceWriter?.close()
-                } catch (e: Exception) { /* ignore */ }
-            })
         } catch (e: Exception) {
             System.err.println("[OROBOROS] warning: failed to open trace file: ${e.message}")
         }
@@ -403,27 +397,38 @@ object OroborosDaemon {
         // retransforms the class in place — next call sees new bytecode. The
         // reactive choreography owns all poll/drain/dispatch; CycleBody only
         // observes and traces.
+        // ⚡ Bolt: Offload blocking file operations (file rotation and writes) to a dedicated single-threaded IO dispatcher to guarantee sequential FIFO ordering without blocking the main event loop.
+        var currentTw = traceWriter
+        Runtime.getRuntime().addShutdownHook(Thread {
+            try {
+                currentTw?.flush()
+                currentTw?.close()
+            } catch (e: Exception) { /* ignore */ }
+        })
         val cycleBody = CycleBody(
             driver = driver,
             repoDir = repoDir,
             consecutivePollErrors = consecutivePollErrors,
-            traceWriter = traceWriter?.let { tw ->
+            traceWriter = traceWriter?.let { _ ->
                 { json ->
-                    try {
-                        if (traceLineCount >= 10000) {
-                            tw.close()
-                            val backup = File(traceFile.parentFile, traceFile.name + ".1")
-                            traceFile.renameTo(backup)
-                            // reassign traceWriter via the closure's captured ref is not possible;
-                            // use the raw FileOutputStream instead.
+                    launch(TraceIoDispatcher.asCoroutineDispatcher) {
+                        try {
+                            if (traceLineCount >= 10000) {
+                                currentTw?.close()
+                                val backup = File(traceFile.parentFile, traceFile.name + ".1")
+                                java.nio.file.Files.move(traceFile.toPath(), backup.toPath(), java.nio.file.StandardCopyOption.REPLACE_EXISTING)
+                                currentTw = FileOutputStream(traceFile, false).bufferedWriter()
+                                traceLineCount = 0
+                            }
+                            currentTw?.write(json)
+                            currentTw?.write("\n")
+                            currentTw?.flush()
+                            traceLineCount++
+                        } catch (e: Exception) {
+                            System.err.println("[OROBOROS] warning: failed to write trace file: ${e.message}")
                         }
-                        tw.write(json)
-                        tw.write("\n")
-                        tw.flush()
-                        traceLineCount++
-                    } catch (e: Exception) {
-                        System.err.println("[OROBOROS] warning: failed to write trace file: ${e.message}")
                     }
+                    Unit
                 }
             },
         )
