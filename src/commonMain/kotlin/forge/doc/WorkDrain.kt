@@ -7,6 +7,7 @@
 <<<<<<< ours
 <<<<<<< ours
 <<<<<<< ours
+<<<<<<< ours
 =======
 
 >>>>>>> theirs
@@ -26,6 +27,8 @@
 >>>>>>> theirs
 =======
 
+>>>>>>> theirs
+=======
 >>>>>>> theirs
 =======
 >>>>>>> theirs
@@ -55,6 +58,7 @@ store.appendWork("readme-dag-rete-refraction", JulesCause.WorkDrained(
 <<<<<<< ours
 <<<<<<< ours
 <<<<<<< ours
+<<<<<<< ours
 =======
 suspend fun drainSession17649787231113851990(store: JulesBoardStore) {
     val workId = "session:17649787231113851990"
@@ -74,6 +78,10 @@ suspend fun drainSession17818444061593071188(store: JulesBoardStore) {
 suspend fun drainSession2133626248980605858(store: JulesBoardStore) {
     val workId = "session:2133626248980605858"
 >>>>>>> theirs
+=======
+suspend fun drainSession2228618217205896982(store: JulesBoardStore) {
+    val workId = "session:2228618217205896982"
+>>>>>>> theirs
     store.appendWork(workId, JulesCause.WorkDrained(
         workId = workId,
         sessionId = "necromanced",
@@ -92,6 +100,7 @@ suspend fun drainSession2133626248980605858(store: JulesBoardStore) {
 <<<<<<< ours
 <<<<<<< ours
 <<<<<<< ours
+<<<<<<< ours
                 "Optimize Regex Compilation in TypeDefOracle",
 =======
                 "Implement zoom(path): Cursor returning sub-cursor",
@@ -105,6 +114,9 @@ suspend fun drainSession2133626248980605858(store: JulesBoardStore) {
 =======
                 "[rework #2] [rework #1] Browser mutations lower to JobCommand through bounded ingress",
 >>>>>>> theirs
+=======
+                "Optimize Column Traversal in CursorTensor",
+>>>>>>> theirs
                 "Superseded via drain script."
             ),
             claimedAt = 0L
@@ -117,6 +129,9 @@ suspend fun drainSession2133626248980605858(store: JulesBoardStore) {
 <<<<<<< ours
 <<<<<<< ours
 <<<<<<< ours
+<<<<<<< ours
+>>>>>>> theirs
+=======
 >>>>>>> theirs
 =======
 >>>>>>> theirs
@@ -290,6 +305,7 @@ store.appendWork("rework:synth:965389205015589639#2", JulesCause.WorkDrained(
         at = 0L
     ))
 }
+<<<<<<< ours
 <<<<<<< ours
 <<<<<<< ours
 <<<<<<< ours
@@ -1224,6 +1240,8 @@ suspend fun drainSession15956094472626662213(store: JulesBoardStore) {
 >>>>>>> theirs
 =======
 
+>>>>>>> theirs
+=======
 >>>>>>> theirs
 =======
 >>>>>>> theirs
