@@ -1,0 +1,60 @@
+<<<<<<< SEARCH
+suspend fun drainMmapCasStoreRework(store: JulesBoardStore) {
+store.appendWork("rework:synth:965389205015589639#2", JulesCause.WorkDrained(
+        workId = "rework:synth:965389205015589639#2",
+        sessionId = "necromanced",
+        commitSha = "superseded-by-review",
+        taskId = "supersede-pass",
+        at = 0L
+    ))
+    store.appendWork("synth:965389205015589639", JulesCause.WorkDrained(
+        workId = "synth:965389205015589639",
+        sessionId = "necromanced",
+        commitSha = "superseded-by-review",
+        taskId = "supersede-pass",
+        at = 0L
+    ))
+}
+=======
+suspend fun drainMmapCasStoreRework(store: JulesBoardStore) {
+store.appendWork("rework:synth:965389205015589639#2", JulesCause.WorkDrained(
+        workId = "rework:synth:965389205015589639#2",
+        sessionId = "necromanced",
+        commitSha = "superseded-by-review",
+        taskId = "supersede-pass",
+        at = 0L
+    ))
+    store.appendWork("synth:965389205015589639", JulesCause.WorkDrained(
+        workId = "synth:965389205015589639",
+        sessionId = "necromanced",
+        commitSha = "superseded-by-review",
+        taskId = "supersede-pass",
+        at = 0L
+    ))
+}
+
+suspend fun drainSession2133626248980605858(store: JulesBoardStore) {
+    val workId = "session:2133626248980605858"
+    store.appendWork(workId, JulesCause.WorkDrained(
+        workId = workId,
+        sessionId = "necromanced",
+        commitSha = "superseded-by-review",
+        taskId = "supersede-pass",
+        receipt = MergeReceipt(
+            workId = workId,
+            producer = "necromancer",
+            producerRef = "necromanced",
+            patchCid = ContentId("sha256:0000000000000000000000000000000000000000000000000000000000000000"),
+            revision = "superseded-by-review",
+            versionTag = "superseded-by-review",
+            lexicalMemory = LexicalMemory(
+                "Superseded necromanced work",
+                "[rework #2] [rework #1] Browser mutations lower to JobCommand through bounded ingress",
+                "Superseded via drain script."
+            ),
+            claimedAt = 0L
+        ),
+        at = 0L
+    ))
+}
+>>>>>>> REPLACE
