@@ -574,8 +574,9 @@ class FlywheelDriver(
         // at tick boundary into lastReactiveReport.
         val tickDispatched = java.util.concurrent.atomic.AtomicInteger(0)
 
-        // FAN-OUT: drain pipeline. Polls Jules, drains COMPLETED sessions,
-        // and signals dispatch when slots free.
+        // FAN-OUT: drain pipeline. Polls Jules, kicks off drain/answer/approve
+        // as fire-and-forget coroutines, and signals dispatch. Nothing in this
+        // loop blocks on brain/drain latency — those run concurrently.
         scope.launch(htxElement + Dispatchers.Default) {
             var tickAnswered = 0
             var tickHarvested = 0
@@ -594,7 +595,9 @@ class FlywheelDriver(
                     _events.tryEmit(FlywheelEvent.PollError("reactive poll: ${t.message?.take(200)}"))
                 }
 
-                // Fan-in: drain all completed sessions concurrently
+                // Fan-out: drain completed sessions in a child coroutine so
+                // brain/build latency never blocks the poll loop. The drain
+                // guard prevents concurrent drains.
                 val completed = conductor.cards.values.filter {
                     it.snapshot.state == "COMPLETED" && !it.drained
                 }
@@ -602,41 +605,45 @@ class FlywheelDriver(
                     val sessions = completed.map {
                         JulesRestClient.SessionInfo(it.snapshot.sessionId, it.snapshot.state, it.card.title, 0L)
                     }
-                    val drain = drainFanout(sessions)
-                    tickHarvested = drain.harvested
-                    // Signal dispatch: slots may have freed
-                    val freed = completed.count { it.drained }
-                    if (freed > 0) {
-                        slotFreed.trySend(freed)
-                        println("[CHOREOGRAPHY] drain → dispatch signal: $freed slots freed")
+                    scope.launch(htxElement + Dispatchers.IO) {
+                        val drain = drainFanout(sessions)
+                        val freed = completed.count { it.drained }
+                        if (freed > 0) {
+                            slotFreed.trySend(freed)
+                            println("[CHOREOGRAPHY] drain → dispatch signal: $freed slots freed")
+                        }
                     }
                 }
 
-                // Answer/approve waiting sessions concurrently with drain
+                // Fan-out: answer/approve waiting sessions in child coroutines
+                // so brain latency never blocks the poll loop.
                 val awaiting = conductor.cards.values.filter {
                     it.snapshot.state == "AWAITING_USER_FEEDBACK" &&
                         it.causes.lastOrNull() !is JulesCause.HumanAnswered
                 }
                 for (card in awaiting) {
-                    val answer = withTimeoutOrNull(45_000L) { buildAnswer(card) } ?: ""
-                    if (answer.isNotEmpty()) {
-                        conductor.answer(card.snapshot.sessionId, answer)
-                        tickAnswered++
-                        _events.tryEmit(FlywheelEvent.Polled(activeCount(), (maxSlots - activeCount()).coerceAtLeast(0)))
-                        println("[CHOREOGRAPHY] answer ${card.snapshot.sessionId.takeLast(6)}")
+                    scope.launch(htxElement + Dispatchers.IO) {
+                        val answer = withTimeoutOrNull(45_000L) { buildAnswer(card) } ?: ""
+                        if (answer.isNotEmpty()) {
+                            conductor.answer(card.snapshot.sessionId, answer)
+                            println("[CHOREOGRAPHY] answer ${card.snapshot.sessionId.takeLast(6)}")
+                        }
                     }
+                    tickAnswered++
                 }
 
-                // Approve plans concurrently
+                // Fan-out: approve plans concurrently
                 for (card in conductor.cards.values.filter {
                     it.snapshot.state == "AWAITING_PLAN_APPROVAL" &&
                         it.causes.lastOrNull() !is JulesCause.HumanAnswered
                 }) {
-                    withTimeoutOrNull(45_000L) { conductor.approvePlan(card.snapshot.sessionId) }
+                    scope.launch(htxElement + Dispatchers.IO) {
+                        withTimeoutOrNull(45_000L) { conductor.approvePlan(card.snapshot.sessionId) }
+                    }
                     tickAnswered++
                 }
 
-                // Swepp terminal failures
+                // Sweep terminal failures — instant, no I/O
                 for (card in conductor.cards.values.filter {
                     it.snapshot.state in setOf("FAILED", "CANCELLED") && !it.drained
                 }) {
