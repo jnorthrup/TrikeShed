@@ -142,7 +142,8 @@ object OroborosDaemon {
         val forgeHome = File(positional.getOrNull(0) ?: canonicalForge.absolutePath)
         val repoDir = File(positional.getOrNull(1) ?: System.getProperty("user.dir"))
         withContext(Dispatchers.IO) {
-            if (!repoDir.resolve(".git").exists()) {
+            val gitDir = repoDir.resolve(".git")
+            if (!gitDir.exists()) {
                 System.err.println("[OROBOROS] $repoDir is not a git work tree. Aborting.")
                 exitProcess(1)
             }
