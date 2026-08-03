@@ -425,10 +425,10 @@ private fun parseKanbanColumnObject(entry: String): KanbanColumnRef? {
         val m = regex.find(entry) ?: return null
         return m.groupValues[2].ifEmpty { m.groupValues[3] }
     }
-    val id = field(KanbanColumnRef.ID_REGEX) ?: return null
-    val name = field(KanbanColumnRef.NAME_REGEX) ?: id
-    val order = field(KanbanColumnRef.ORDER_REGEX)?.toIntOrNull() ?: 0
-    val wipLimit = field(KanbanColumnRef.WIP_LIMIT_REGEX)?.toIntOrNull()
+    val id = field(regex = KanbanColumnRef.ID_REGEX) ?: return null
+    val name = field(regex = KanbanColumnRef.NAME_REGEX) ?: id
+    val order = field(regex = KanbanColumnRef.ORDER_REGEX)?.toIntOrNull() ?: 0
+    val wipLimit = field(regex = KanbanColumnRef.WIP_LIMIT_REGEX)?.toIntOrNull()
     return KanbanColumnRef(name = name, id = id, order = order, wipLimit = wipLimit)
 }
 
