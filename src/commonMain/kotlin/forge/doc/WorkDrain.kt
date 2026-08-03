@@ -1,4 +1,3 @@
-```kotlin
 package forge.doc
 
 import borg.trikeshed.job.ContentId
@@ -17,10 +16,32 @@ store.appendWork("readme-dag-rete-refraction", JulesCause.WorkDrained(
     ))
 }
 
-<<<<<<< ours
 suspend fun drainSession16095675128128190509(store: JulesBoardStore) {
     val workId = "session:16095675128128190509"
-=======
+    store.appendWork(workId, JulesCause.WorkDrained(
+        workId = workId,
+        sessionId = "necromanced",
+        commitSha = "superseded-by-review",
+        taskId = "supersede-pass",
+        receipt = MergeReceipt(
+            workId = workId,
+            producer = "necromancer",
+            producerRef = "necromanced",
+            patchCid = ContentId("sha256:0000000000000000000000000000000000000000000000000000000000000000"),
+            revision = "superseded-by-review",
+            versionTag = "superseded-by-review",
+            lexicalMemory = LexicalMemory(
+                summary = "Superseded necromanced work",
+                title = "Superseded necromanced work",
+                content = "Superseded via drain script."
+            ),
+            claimedAt = 0L,
+            prUrl = null
+        ),
+        at = 0L
+    ))
+}
+
 suspend fun drainSession2185492585833101483(store: JulesBoardStore) {
     val workId = "session:2185492585833101483"
     store.appendWork(workId, JulesCause.WorkDrained(
@@ -36,11 +57,12 @@ suspend fun drainSession2185492585833101483(store: JulesBoardStore) {
             revision = "superseded-by-review",
             versionTag = "superseded-by-review",
             lexicalMemory = LexicalMemory(
-                "Superseded necromanced work",
-                "Superseded necromanced work",
-                "Superseded via drain script."
+                summary = "Superseded necromanced work",
+                title = "Superseded necromanced work",
+                content = "Superseded via drain script."
             ),
-            claimedAt = 0L
+            claimedAt = 0L,
+            prUrl = null
         ),
         at = 0L
     ))
@@ -881,7 +903,6 @@ val targetWorkId = "session:12046113026982477527"
 
 suspend fun drainNecromancedWork12511514760260520345(store: JulesBoardStore) {
 val workId = "session:12511514760260520345"
->>>>>>> theirs
     store.appendWork(workId, JulesCause.WorkDrained(
         workId = workId,
         sessionId = "necromanced",
@@ -905,14 +926,15 @@ val workId = "session:12511514760260520345"
     ))
 }
 
-suspend fun drainSynth17160760388671804749(store: JulesBoardStore) {
-store.appendWork("synth:17160760388671804749", JulesCause.WorkDrained(
-        workId = "synth:17160760388671804749",
+suspend fun drainSession14439075584174324583(store: JulesBoardStore) {
+    val workId = "session:14439075584174324583"
+    store.appendWork(workId, JulesCause.WorkDrained(
+        workId = workId,
         sessionId = "necromanced",
         commitSha = "superseded-by-review",
         taskId = "supersede-pass",
         receipt = MergeReceipt(
-            workId = "synth:17160760388671804749",
+            workId = workId,
             producer = "necromancer",
             producerRef = "necromanced",
             patchCid = ContentId("sha256:0000000000000000000000000000000000000000000000000000000000000000"),
@@ -920,7 +942,7 @@ store.appendWork("synth:17160760388671804749", JulesCause.WorkDrained(
             versionTag = "superseded-by-review",
             lexicalMemory = LexicalMemory(
                 summary = "Superseded necromanced work",
-                title = "[rework #1] NUID/authorization algebra in commonMain",
+                title = "Superseded necromanced work",
                 content = "Superseded via drain script."
             ),
             claimedAt = 0L,
@@ -930,14 +952,15 @@ store.appendWork("synth:17160760388671804749", JulesCause.WorkDrained(
     ))
 }
 
-suspend fun drainCbIoUringHasBeenBroughtInAndManyTestsPorted(store: JulesBoardStore) {
-store.appendWork("cb-io-uring-has-been-brought-in-and-many-tests-ported", JulesCause.WorkDrained(
-        workId = "cb-io-uring-has-been-brought-in-and-many-tests-ported",
+suspend fun drainSession12711721574152796678(store: JulesBoardStore) {
+    val workId = "session:12711721574152796678"
+    store.appendWork(workId, JulesCause.WorkDrained(
+        workId = workId,
         sessionId = "necromanced",
         commitSha = "superseded-by-review",
         taskId = "supersede-pass",
         receipt = MergeReceipt(
-            workId = "cb-io-uring-has-been-brought-in-and-many-tests-ported",
+            workId = workId,
             producer = "necromancer",
             producerRef = "necromanced",
             patchCid = ContentId("sha256:0000000000000000000000000000000000000000000000000000000000000000"),
@@ -945,7 +968,7 @@ store.appendWork("cb-io-uring-has-been-brought-in-and-many-tests-ported", JulesC
             versionTag = "superseded-by-review",
             lexicalMemory = LexicalMemory(
                 summary = "Superseded necromanced work",
-                title = "cb-io-uring-has-been-brought-in-and-many-tests-ported",
+                title = "Superseded necromanced work",
                 content = "Superseded via drain script."
             ),
             claimedAt = 0L,
@@ -955,20 +978,54 @@ store.appendWork("cb-io-uring-has-been-brought-in-and-many-tests-ported", JulesC
     ))
 }
 
-suspend fun drainMmapCasStoreRework(store: JulesBoardStore) {
-store.appendWork("rework:synth:965389205015589639#2", JulesCause.WorkDrained(
-        workId = "rework:synth:965389205015589639#2",
+suspend fun drainSession11949152291930230780(store: JulesBoardStore) {
+    val workId = "session:11949152291930230780"
+    store.appendWork(workId, JulesCause.WorkDrained(
+        workId = workId,
         sessionId = "necromanced",
         commitSha = "superseded-by-review",
         taskId = "supersede-pass",
-        at = 0L
-    ))
-    store.appendWork("synth:965389205015589639", JulesCause.WorkDrained(
-        workId = "synth:965389205015589639",
-        sessionId = "necromanced",
-        commitSha = "superseded-by-review",
-        taskId = "supersede-pass",
+        receipt = MergeReceipt(
+            workId = workId,
+            producer = "necromancer",
+            producerRef = "necromanced",
+            patchCid = ContentId("sha256:0000000000000000000000000000000000000000000000000000000000000000"),
+            revision = "superseded-by-review",
+            versionTag = "superseded-by-review",
+            lexicalMemory = LexicalMemory(
+                summary = "Superseded necromanced work",
+                title = "Superseded necromanced work",
+                content = "Superseded via drain script."
+            ),
+            claimedAt = 0L,
+            prUrl = null
+        ),
         at = 0L
     ))
 }
-```
+
+suspend fun drainSession15956094472626662213(store: JulesBoardStore) {
+    val workId = "session:15956094472626662213"
+    store.appendWork(workId, JulesCause.WorkDrained(
+        workId = workId,
+        sessionId = "necromanced",
+        commitSha = "superseded-by-review",
+        taskId = "supersede-pass",
+        receipt = MergeReceipt(
+            workId = workId,
+            producer = "necromancer",
+            producerRef = "necromanced",
+            patchCid = ContentId("sha256:0000000000000000000000000000000000000000000000000000000000000000"),
+            revision = "superseded-by-review",
+            versionTag = "superseded-by-review",
+            lexicalMemory = LexicalMemory(
+                summary = "Superseded necromanced work",
+                title = "Superseded necromanced work",
+                content = "Superseded via drain script."
+            ),
+            claimedAt = 0L,
+            prUrl = null
+        ),
+        at = 0L
+    ))
+}
