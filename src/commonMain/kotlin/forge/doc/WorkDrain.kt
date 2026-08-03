@@ -610,7 +610,11 @@ suspend fun drainSession15466567759278489251(store: JulesBoardStore) {
 }
 
 suspend fun drainWork(store: JulesBoardStore) {
+<<<<<<< ours
 drainNecromancedWork5210997431272160904(store)
+=======
+    drainSession484619669717848676(store)
+>>>>>>> theirs
 drainSession15466567759278489251(store)
     drainSession17265457666410082720(store)
     drainSession13065137133469730772(store)
@@ -1447,6 +1451,7 @@ suspend fun drainSession15956094472626662213(store: JulesBoardStore) {
 }
 
 <<<<<<< ours
+<<<<<<< ours
 suspend fun drainSession3477253922518497748(store: JulesBoardStore) {
     val workId = "session:3477253922518497748"
 =======
@@ -1455,17 +1460,28 @@ suspend fun drainNecromancedWork5210997431272160904(store: JulesBoardStore) {
 >>>>>>> theirs
     store.appendWork(workId, JulesCause.WorkDrained(
         workId = workId,
+=======
+suspend fun drainSession484619669717848676(store: JulesBoardStore) {
+    val targetWorkId = "session:484619669717848676"
+    store.appendWork(targetWorkId, JulesCause.WorkDrained(
+        workId = targetWorkId,
+>>>>>>> theirs
         sessionId = "necromanced",
         commitSha = "superseded-by-review",
         taskId = "supersede-pass",
         receipt = MergeReceipt(
+<<<<<<< ours
             workId = workId,
+=======
+            workId = targetWorkId,
+>>>>>>> theirs
             producer = "necromancer",
             producerRef = "necromanced",
             patchCid = ContentId("sha256:0000000000000000000000000000000000000000000000000000000000000000"),
             revision = "superseded-by-review",
             versionTag = "superseded-by-review",
             lexicalMemory = LexicalMemory(
+<<<<<<< ours
 <<<<<<< ours
                 summary = "Superseded necromanced work",
                 title = "Superseded necromanced work",
@@ -1557,6 +1573,14 @@ suspend fun drainSession3392310098899296880(store: JulesBoardStore) {
                 "Superseded via drain script. SpecMissing functionality was added in commit f3ac1ea2b064b94451b3304ea5ef762b7ba0661f."
             ),
             claimedAt = 0L
+>>>>>>> theirs
+=======
+                "Superseded necromanced work",
+                "Stop JobNexusFactory discarding assembled storage",
+                "Superseded via drain script."
+            ),
+            claimedAt = 0L,
+            prUrl = null
 >>>>>>> theirs
         ),
         at = 0L

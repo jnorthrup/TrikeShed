@@ -29,6 +29,9 @@ class JobSupervisorElement private constructor(
     private val instrumentationRef: Instrumentation,
     private val casStore: CasStore,
     private val jobLog: JobLog,
+    private val jobIndex: JobIndex,
+    private val projectionEngine: JobProjectionEngine,
+    private val checkpoint: Checkpoint,
     private val reteNetwork: borg.trikeshed.dag.ReteNetwork,
 ) : kotlinx.coroutines.CoroutineScope {
 
@@ -265,6 +268,10 @@ class JobSupervisorElement private constructor(
             walData: MutableMap<String, ByteArray>? = null,
             casStore: CasStore = CasStore.inMemory(),
             jobLog: JobLog = JobLog.inMemory(),
+            jobIndex: JobIndex = JobIndex(),
+            projectionEngine: JobProjectionEngine = JobProjectionEngine(),
+            checkpoint: Checkpoint = Checkpoint(),
+            reteNetwork: borg.trikeshed.dag.ReteNetwork = borg.trikeshed.dag.ReteNetwork(),
             injectCasFailure: Boolean = false,
             injectWalFailure: Boolean = false,
         ): JobSupervisorElement {
@@ -285,7 +292,10 @@ class JobSupervisorElement private constructor(
                 inst,
                 if (injectCasFailure) failCasStore else casStore,
                 if (injectWalFailure) failJobLog else jobLog,
-                borg.trikeshed.dag.ReteNetwork(),
+                jobIndex,
+                projectionEngine,
+                checkpoint,
+                reteNetwork,
             )
         }
     }
