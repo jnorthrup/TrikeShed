@@ -636,12 +636,20 @@ drainSession15466567759278489251(store)
     drainSession17099126540887000248(store)
 <<<<<<< ours
 <<<<<<< ours
+<<<<<<< ours
     drainSession2570076440700784807(store)
     drainSession2712901007830641911(store)
 }
 
 suspend fun drainSession2712901007830641911(store: JulesBoardStore) {
     val workId = "session:2712901007830641911"
+=======
+    drainSession3190538920956534771(store)
+}
+
+suspend fun drainSession3190538920956534771(store: JulesBoardStore) {
+    val workId = "session:3190538920956534771"
+>>>>>>> theirs
     store.appendWork(workId, JulesCause.WorkDrained(
         workId = workId,
         sessionId = "necromanced",
@@ -655,6 +663,7 @@ suspend fun drainSession2712901007830641911(store: JulesBoardStore) {
             revision = "superseded-by-review",
             versionTag = "superseded-by-review",
             lexicalMemory = LexicalMemory(
+<<<<<<< ours
                 summary = "Superseded necromanced work",
                 title = "Superseded necromanced work",
                 content = "Superseded via drain script."
@@ -669,6 +678,16 @@ suspend fun drainSession2712901007830641911(store: JulesBoardStore) {
 >>>>>>> theirs
 =======
     drainSession3957588300103604763(store)
+>>>>>>> theirs
+=======
+                "Superseded necromanced work",
+                "Superseded necromanced work",
+                "Superseded via drain script."
+            ),
+            claimedAt = 0L
+        ),
+        at = 0L
+    ))
 >>>>>>> theirs
 }
 

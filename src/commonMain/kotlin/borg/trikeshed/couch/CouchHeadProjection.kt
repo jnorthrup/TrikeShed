@@ -136,10 +136,18 @@ class CouchHeadProjection {
         val rev = frames[doc.id]?.rev ?: ""
         val n = 2 + doc.fields.size
         val keys = Array(n) { i ->
-            if (i == 0) "_id" else if (i == 1) "_rev" else doc.fields[i - 2].name
+            when (i) {
+                0 -> "_id"
+                1 -> "_rev"
+                else -> doc.fields[i - 2].name
+            }
         }
         val cells = Array<Any?>(n) { i ->
-            if (i == 0) doc.id else if (i == 1) rev else doc.fields[i - 2].value
+            when (i) {
+                0 -> doc.id
+                1 -> rev
+                else -> doc.fields[i - 2].value
+            }
         }
         return borg.trikeshed.cursor.cellsToRowVec(
             n j { cells[it] },
