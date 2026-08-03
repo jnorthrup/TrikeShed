@@ -4,19 +4,22 @@ import borg.trikeshed.jules.FlywheelDriver
 import java.util.concurrent.atomic.AtomicInteger
 
 /**
- * Hot-swappable telemetry + quarantine guard. The daemon's periodicity loop
- * calls [run] on a single instance; while that loop is alive, JVMTI can
- * retransform this class — the next call sees the new bytecode, no daemon
- * restart.
+ * Hot-swappable telemetry probe. The daemon's periodicity loop calls [run]
+ * on a single instance; while that loop is alive, JVMTI can retransform this
+ * class — the next call sees the new bytecode, no daemon restart.
  *
  * The reactive choreography (FlywheelDriver.startReactiveCycle) is the SOLE
  * driver of poll/drain/dispatch. This body does NOT call driver.cycle() —
- * that would double-poll, double-gate on isWorkingTreeClean, and race the
- * reactive coroutines. Instead it:
+ * that would double-poll, double-gate, and race the reactive coroutines.
+ * It is a pure observer:
  *   1. Reads [FlywheelDriver.lastReactiveReport] — the reactive tick snapshot.
  *   2. Writes the trace JSON (the operator's live signal).
- *   3. Quarantine-guards on committed conflict markers (safety boundary).
- *   4. Manages backoff/error counting for the periodicity loop.
+ *   3. Manages backoff/error counting for the periodicity loop.
+ *
+ * Conflict markers are NOT quarantined. A conflict is pure honesty of intent —
+ * two arms of a merge that vary in their approach. The wheel keeps draining
+ * and dispatching right through them; the markers are evidence of progress,
+ * not a stop condition.
  *
  * Edit rules (kept narrow on purpose so retransform doesn't break):
  *   - This file's class shape (fields, method signatures) is stable.
@@ -34,44 +37,6 @@ class CycleBody(
     override fun run() {
         try {
             println("[HOTSWAP] CycleBody.run() invoked — bytecode rev=" + System.identityHashCode(this) + " — POST-SWAP-MARKER")
-
-            // Quarantine boundary: a committed conflict marker means the
-            // reactive drain would re-apply every COMPLETED delta and nest
-            // the same conflict again. Pause until resolved.
-            try {
-                val markerProbe = ProcessBuilder("git", "grep", "-l", "^<<<<<<< ", "--")
-                    .directory(repoDir)
-                    .redirectErrorStream(true)
-                    .start()
-                val markerProbeFinished = markerProbe.waitFor(5, java.util.concurrent.TimeUnit.SECONDS)
-                val markerFiles = if (markerProbeFinished && markerProbe.exitValue() == 0) {
-                    val actualMarkers = mutableListOf<String>()
-                    val markerPaths = markerProbe.inputStream.bufferedReader().readLines()
-                    for (path in markerPaths) {
-                        if (path.endsWith(".patch") || path.endsWith(".diff") ||
-                            path.endsWith(".sh") || path.endsWith(".txt")) continue
-                        val markerFile = java.io.File(repoDir, path)
-                        if (!markerFile.isFile) continue
-                        for (line in markerFile.readLines()) {
-                            if (line.startsWith("<<<<<<< ") && line != "<<<<<<< SEARCH") {
-                                actualMarkers.add(path)
-                                break
-                            }
-                        }
-                    }
-                    actualMarkers.joinToString(",")
-                } else {
-                    if (!markerProbeFinished) markerProbe.destroyForcibly()
-                    ""
-                }
-                if (markerFiles.isNotEmpty()) {
-                    System.err.println("[OROBOROS] conflict quarantine; cycle paused for: $markerFiles")
-                    consecutivePollErrors.incrementAndGet()
-                    return
-                }
-            } catch (t: Throwable) {
-                System.err.println("[OROBOROS] marker probe failed: ${t.javaClass.simpleName}: ${t.message?.take(200)}")
-            }
 
             // Read the reactive tick snapshot and emit telemetry. The reactive
             // coroutines own all computation; we only observe and trace.

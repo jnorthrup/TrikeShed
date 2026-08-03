@@ -426,9 +426,10 @@ class FlywheelDriver(
         var dispatched = 0
         val alive = activeCount()
         val available = (maxSlots - alive).coerceAtLeast(0)
-        val canDispatch = available > 0 &&
-            committedConflicts.isEmpty() &&
-            isWorkingTreeClean()
+        // Conflicts are honest intent — dispatch right through them. The
+        // working tree may carry committed markers from a forward merge;
+        // that's progress evidence, not a stop condition.
+        val canDispatch = available > 0
         if (canDispatch) {
             // Build the in-flight file set from all active sessions' last patches.
             val inflightFiles = mutableSetOf<String>()
@@ -689,7 +690,9 @@ class FlywheelDriver(
                 val alive = activeCount()
                 val available = (maxSlots - alive).coerceAtLeast(0)
                 if (available == 0) continue
-                if (!isWorkingTreeClean()) continue
+                // Conflicts are honest intent — dispatch right through them.
+                // The working tree may carry committed markers from a forward
+                // merge; that's progress evidence, not a stop condition.
 
                 val pendingCandidates = store.loadQueue()
                     .filter { !it.isDispatched && !it.isDrained }
