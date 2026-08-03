@@ -8,7 +8,10 @@ import kotlin.random.Random
 // which would crash the browser bundle with "Cannot find module 'fs'".
 // Browser code paths never call these — only Node paths do.
 
-private fun nodeRequire(name: String): dynamic = js("eval(\"require\")(name)")
+private fun nodeRequire(name: String): dynamic {
+    require(name == "fs" || name == "os" || name == "path") { "Unauthorized Node.js module: $name" }
+    return js("eval(\"require\")(name)")
+}
 
 val fs: dynamic get() = nodeRequire("fs")
 val os: dynamic get() = nodeRequire("os")
