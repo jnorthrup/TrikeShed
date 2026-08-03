@@ -221,42 +221,45 @@ object ForgeDoc {
 
     fun renderMarkdown(doc: ForgeDocument, pageId: ForgeBlockId = doc.rootPageId): String {
         val page = doc.requireBlock(pageId)
-        val lines = mutableListOf<String>()
-        if (page.text.isNotBlank()) lines += "# ${page.text}"
-        page.children.forEach { childId -> renderBlock(doc, childId, 0, lines) }
-        return lines.joinToString("\n").trimEnd() + "\n"
+        val result = buildString {
+            if (page.text.isNotBlank()) {
+                append("# ").append(page.text).append("\n")
+            }
+            page.children.forEach { childId -> renderBlock(doc, childId, 0, this) }
+        }
+        return result.trimEnd() + "\n"
     }
 
-    private fun renderBlock(doc: ForgeDocument, blockId: ForgeBlockId, depth: Int, lines: MutableList<String>) {
+    private fun renderBlock(doc: ForgeDocument, blockId: ForgeBlockId, depth: Int, out: StringBuilder) {
         val block = doc.block(blockId) ?: return
         val indent = "  ".repeat(depth)
         when (block.kind) {
-            ForgeBlockKind.PAGE -> { if (block.text.isNotBlank()) lines += "${indent}# ${block.text}" }
-            ForgeBlockKind.TEXT -> lines += "$indent${block.text}"
-            ForgeBlockKind.HEADING_1 -> lines += "${indent}# ${block.text}"
-            ForgeBlockKind.HEADING_2 -> lines += "${indent}## ${block.text}"
-            ForgeBlockKind.HEADING_3 -> lines += "${indent}### ${block.text}"
-            ForgeBlockKind.BULLET -> lines += "$indent- ${block.text}"
-            ForgeBlockKind.NUMBERED -> lines += "${indent}1. ${block.text}"
+            ForgeBlockKind.PAGE -> { if (block.text.isNotBlank()) out.append(indent).append("# ").append(block.text).append("\n") }
+            ForgeBlockKind.TEXT -> out.append(indent).append(block.text).append("\n")
+            ForgeBlockKind.HEADING_1 -> out.append(indent).append("# ").append(block.text).append("\n")
+            ForgeBlockKind.HEADING_2 -> out.append(indent).append("## ").append(block.text).append("\n")
+            ForgeBlockKind.HEADING_3 -> out.append(indent).append("### ").append(block.text).append("\n")
+            ForgeBlockKind.BULLET -> out.append(indent).append("- ").append(block.text).append("\n")
+            ForgeBlockKind.NUMBERED -> out.append(indent).append("1. ").append(block.text).append("\n")
             ForgeBlockKind.TODO -> {
                 val checked = if (block.properties["checked"] == "true") "x" else " "
-                lines += "$indent- [$checked] ${block.text}"
+                out.append(indent).append("- [").append(checked).append("] ").append(block.text).append("\n")
             }
-            ForgeBlockKind.QUOTE -> lines += "$indent> ${block.text}"
+            ForgeBlockKind.QUOTE -> out.append(indent).append("> ").append(block.text).append("\n")
             ForgeBlockKind.CODE -> {
                 val lang = block.properties["language"].orEmpty()
-                lines += "$indent```$lang"
-                lines += block.text.lines().joinToString("\n") { "$indent$it" }
-                lines += "$indent```"
+                out.append(indent).append("```").append(lang).append("\n")
+                block.text.lines().forEach { out.append(indent).append(it).append("\n") }
+                out.append(indent).append("```").append("\n")
             }
-            ForgeBlockKind.DIVIDER -> lines += "$indent---"
-            ForgeBlockKind.CALLOUT -> lines += "$indent> ${block.properties["icon"] ?: "💡"} ${block.text}"
-            ForgeBlockKind.DATABASE -> lines += "$indent| ${block.text.ifBlank { "Database" }} |"
-            ForgeBlockKind.DATABASE_ROW -> lines += "$indent- ${block.text} ${block.properties.entries.joinToString(" ") { "${it.key}=${it.value}" }}".trimEnd()
-            ForgeBlockKind.TABLE -> lines += "$indent| ${block.text.ifBlank { "Table" }} |"
-            ForgeBlockKind.TABLE_ROW -> lines += "$indent| ${block.text} |"
+            ForgeBlockKind.DIVIDER -> out.append(indent).append("---").append("\n")
+            ForgeBlockKind.CALLOUT -> out.append(indent).append("> ").append(block.properties["icon"] ?: "💡").append(" ").append(block.text).append("\n")
+            ForgeBlockKind.DATABASE -> out.append(indent).append("| ").append(block.text.ifBlank { "Database" }).append(" |").append("\n")
+            ForgeBlockKind.DATABASE_ROW -> out.append("$indent- ${block.text} ${block.properties.entries.joinToString(" ") { "${it.key}=${it.value}" }}".trimEnd()).append("\n")
+            ForgeBlockKind.TABLE -> out.append(indent).append("| ").append(block.text.ifBlank { "Table" }).append(" |").append("\n")
+            ForgeBlockKind.TABLE_ROW -> out.append(indent).append("| ").append(block.text).append(" |").append("\n")
         }
-        block.children.forEach { child -> renderBlock(doc, child, depth + 1, lines) }
+        block.children.forEach { child -> renderBlock(doc, child, depth + 1, out) }
     }
 }
 
