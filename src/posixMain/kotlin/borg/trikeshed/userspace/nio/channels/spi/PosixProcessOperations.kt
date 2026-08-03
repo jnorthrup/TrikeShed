@@ -3,6 +3,7 @@
 package borg.trikeshed.userspace.nio.channels.spi
 import borg.trikeshed.userspace.nio.channels.spi.*
 import kotlinx.cinterop.*
+import kotlinx.coroutines.*
 import platform.posix.*
 
 class PosixProcessOperations : ProcessOperations {
@@ -12,14 +13,14 @@ class PosixProcessOperations : ProcessOperations {
         args: List<String>,
         stdin: ByteArray?,
         env: Map<String, String>,
-    ): ProcessResult {
+    ): ProcessResult = withContext(Dispatchers.Default) {
         val stdinPath = stdin?.let { createTempFile(it) }
         val stdoutPath = createTempFile(byteArrayOf())
-            ?: return ProcessResult(-1, byteArrayOf(), "mkstemp(stdout) failed".encodeToByteArray()).also {
+            ?: return@withContext ProcessResult(-1, byteArrayOf(), "mkstemp(stdout) failed".encodeToByteArray()).also {
                 stdinPath?.let(::unlink)
             }
         val stderrPath = createTempFile(byteArrayOf())
-            ?: return ProcessResult(-1, byteArrayOf(), "mkstemp(stderr) failed".encodeToByteArray()).also {
+            ?: return@withContext ProcessResult(-1, byteArrayOf(), "mkstemp(stderr) failed".encodeToByteArray()).also {
                 stdinPath?.let(::unlink)
                 unlink(stdoutPath)
             }
@@ -88,7 +89,7 @@ class PosixProcessOperations : ProcessOperations {
         unlink(stdoutPath)
         unlink(stderrPath)
 
-        return ProcessResult(exitCode, stdout, stderr)
+        ProcessResult(exitCode, stdout, stderr)
     }
 
     private fun createTempFile(bytes: ByteArray): String? = memScoped {
