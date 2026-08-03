@@ -18,11 +18,16 @@ class CausalGraphAdapter(private val index: CausalGraphNodeIndex) : Graph<Causal
     private val childrenMap: Map<String, List<CausalGraphNode>>
 
     init {
-        val map = mutableMapOf<String, MutableList<CausalGraphNode>>()
+        val map = HashMap<String, MutableList<CausalGraphNode>>(index.size)
         for (i in 0 until index.size) {
             val node = index[i]
             for (parentId in node.parentNodeIds) {
-                map.getOrPut(parentId) { mutableListOf() }.add(node)
+                var list = map[parentId]
+                if (list == null) {
+                    list = ArrayList()
+                    map[parentId] = list
+                }
+                list.add(node)
             }
         }
         childrenMap = map
