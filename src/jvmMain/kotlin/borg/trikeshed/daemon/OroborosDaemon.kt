@@ -141,11 +141,13 @@ object OroborosDaemon {
         val canonicalForge = File(home, ".local/forge")
         val forgeHome = File(positional.getOrNull(0) ?: canonicalForge.absolutePath)
         val repoDir = File(positional.getOrNull(1) ?: System.getProperty("user.dir"))
-        if (!repoDir.resolve(".git").exists()) {
-            System.err.println("[OROBOROS] $repoDir is not a git work tree. Aborting.")
-            exitProcess(1)
+        withContext(Dispatchers.IO) {
+            if (!repoDir.resolve(".git").exists()) {
+                System.err.println("[OROBOROS] $repoDir is not a git work tree. Aborting.")
+                exitProcess(1)
+            }
+            forgeHome.mkdirs()
         }
-        forgeHome.mkdirs()
 
         val driver = FlywheelDriver(
             apiKey = apiKey,
