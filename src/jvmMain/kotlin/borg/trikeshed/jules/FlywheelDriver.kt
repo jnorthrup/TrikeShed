@@ -1,5 +1,6 @@
 package borg.trikeshed.jules
 
+import borg.trikeshed.htx.HtxKey
 import borg.trikeshed.kanban.ForgeKanbanIngest
 import borg.trikeshed.job.ContentId
 import borg.trikeshed.userspace.nio.file.spi.JvmFileOperations
@@ -552,7 +553,15 @@ class FlywheelDriver(
      * run in [scope] and die when it's cancelled. The daemon's periodicity
      * loop becomes a simple poll trigger — everything else is reactive.
      */
-    fun startReactiveCycle(scope: kotlinx.coroutines.CoroutineScope) {
+    suspend fun startReactiveCycle(scope: kotlinx.coroutines.CoroutineScope) {
+        // Capture the HTX element from the calling scope so the reactive
+        // coroutines (launched on Dispatchers.Default) inherit it for all
+        // Jules/ModelMux API calls. Without this, launch(Dispatchers.Default)
+        // drops the HtxKey and every API call fails.
+        val htxElement = kotlin.coroutines.coroutineContext[HtxKey]
+        require(htxElement != null) {
+            "startReactiveCycle must be called inside a withContext(htxElement) block"
+        }
         // Prime the dispatch pump: free capacity may exist at startup before
         // the first poll discovers any state. Without this, dispatch parks on
         // slotFreed.receive() and the wheel deadlocks — nothing drains because
@@ -566,7 +575,7 @@ class FlywheelDriver(
 
         // FAN-OUT: drain pipeline. Polls Jules, drains COMPLETED sessions,
         // and signals dispatch when slots free.
-        scope.launch(Dispatchers.Default) {
+        scope.launch(htxElement + Dispatchers.Default) {
             var tickAnswered = 0
             var tickHarvested = 0
             while (true) {
@@ -672,7 +681,7 @@ class FlywheelDriver(
 
         // FAN-OUT: dispatch pipeline. Reacts to SlotFreed signals and fills
         // slots immediately — does NOT wait for the next poll cycle.
-        scope.launch(Dispatchers.Default) {
+        scope.launch(htxElement + Dispatchers.Default) {
             while (true) {
                 // Block until a slot frees (drain or sweep signaled)
                 slotFreed.receive()
