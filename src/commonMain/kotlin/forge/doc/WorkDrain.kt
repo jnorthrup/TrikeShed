@@ -288,6 +288,7 @@ suspend fun drainWork(store: JulesBoardStore) {
     drainSession12320089122017967949(store)
     drainSession12582820163300631149(store)
     drainSession11727450166753680446(store)
+    drainSession15907668603497048488(store)
     drainSession10071466838419282986(store)
     drainSession11781258941577888716(store)
     drainSession12278373796855125845(store)
@@ -574,6 +575,31 @@ suspend fun drainSession12582820163300631149(store: JulesBoardStore) {
             lexicalMemory = LexicalMemory(
                 "Superseded necromanced work",
                 "Implement stub",
+                "Superseded via drain script."
+            ),
+            claimedAt = 0L
+        ),
+        at = 0L
+    ))
+}
+
+suspend fun drainSession15907668603497048488(store: JulesBoardStore) {
+    val workId = "session:15907668603497048488"
+    store.appendWork(workId, JulesCause.WorkDrained(
+        workId = workId,
+        sessionId = "necromanced",
+        commitSha = "superseded-by-review",
+        taskId = "supersede-pass",
+        receipt = MergeReceipt(
+            workId = workId,
+            producer = "necromancer",
+            producerRef = "necromanced",
+            patchCid = ContentId("sha256:0000000000000000000000000000000000000000000000000000000000000000"),
+            revision = "superseded-by-review",
+            versionTag = "superseded-by-review",
+            lexicalMemory = LexicalMemory(
+                "Superseded necromanced work",
+                "Remove ForgeApp parallel DTO seed truth",
                 "Superseded via drain script."
             ),
             claimedAt = 0L
