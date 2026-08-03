@@ -610,6 +610,7 @@ suspend fun drainSession15466567759278489251(store: JulesBoardStore) {
 }
 
 suspend fun drainWork(store: JulesBoardStore) {
+drainNecromancedWork5210997431272160904(store)
 drainSession15466567759278489251(store)
     drainSession17265457666410082720(store)
     drainSession13065137133469730772(store)
@@ -1445,8 +1446,13 @@ suspend fun drainSession15956094472626662213(store: JulesBoardStore) {
     ))
 }
 
+<<<<<<< ours
 suspend fun drainSession3477253922518497748(store: JulesBoardStore) {
     val workId = "session:3477253922518497748"
+=======
+suspend fun drainNecromancedWork5210997431272160904(store: JulesBoardStore) {
+    val workId = "session:5210997431272160904"
+>>>>>>> theirs
     store.appendWork(workId, JulesCause.WorkDrained(
         workId = workId,
         sessionId = "necromanced",
@@ -1460,6 +1466,7 @@ suspend fun drainSession3477253922518497748(store: JulesBoardStore) {
             revision = "superseded-by-review",
             versionTag = "superseded-by-review",
             lexicalMemory = LexicalMemory(
+<<<<<<< ours
                 summary = "Superseded necromanced work",
                 title = "Superseded necromanced work",
                 content = "Superseded via drain script."
@@ -1544,6 +1551,13 @@ suspend fun drainSession3392310098899296880(store: JulesBoardStore) {
             ),
             claimedAt = 0L,
             prUrl = null
+=======
+                "Superseded necromanced work",
+                "[rework #1] TDD PR Deliver TASK G11 MED Reject empty-spec todo items before dispatch",
+                "Superseded via drain script. SpecMissing functionality was added in commit f3ac1ea2b064b94451b3304ea5ef762b7ba0661f."
+            ),
+            claimedAt = 0L
+>>>>>>> theirs
         ),
         at = 0L
     ))
