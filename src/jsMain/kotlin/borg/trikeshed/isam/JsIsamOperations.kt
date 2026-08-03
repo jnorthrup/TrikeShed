@@ -100,7 +100,17 @@ class JsIsamOperations : IsamOperations {
             for ((gname, cols) in columnsByGroup) {
                 val groupRecordLen = cols.sumOf { it.end - it.begin }
                 val rowBuf = ByteArray(groupRecordLen)
-                writeGroupToBuffer(rowVec, rowBuf, cols, meta0)
+
+                val rowData = rowVec.left
+                var localOffset = 0
+                for (colMeta in cols) {
+                    val globalIdx = meta0.view.indexOf(colMeta)
+                    val colData = rowData[globalIdx]
+                    val colBytes = colMeta.encoder(colData)
+                    colBytes.copyInto(rowBuf, localOffset, 0, colBytes.size)
+                    localOffset += colMeta.end - colMeta.begin
+                }
+
                 val out = groupBuffers[gname]!!
                 val offset = groupOffsets[gname]!!
                 rowBuf.copyInto(out, offset, 0, groupRecordLen)
@@ -161,7 +171,16 @@ class JsIsamOperations : IsamOperations {
             for ((gname, cols) in columnsByGroup) {
                 val groupRecordLen = cols.sumOf { it.end - it.begin }
                 val rowBuf = ByteArray(groupRecordLen)
-                writeGroupToBuffer(rv, rowBuf, cols, meta0)
+
+                val rowData = rv.left
+                var localOffset = 0
+                for (colMeta in cols) {
+                    val globalIdx = meta0.view.indexOf(colMeta)
+                    val colData = rowData[globalIdx]
+                    val colBytes = colMeta.encoder(colData)
+                    colBytes.copyInto(rowBuf, localOffset, 0, colBytes.size)
+                    localOffset += colMeta.end - colMeta.begin
+                }
                 
                 val out = groupBuffers[gname]!!
                 val offset = groupOffsets[gname]!!
@@ -175,23 +194,6 @@ class JsIsamOperations : IsamOperations {
             val firstCol = cols.first()
             val gfilename = if (firstCol.groupId == maxGroupId) datafilename else getGroupFilename(datafilename, gname)
             fileOps.write(gfilename, groupBuffers[gname]!!)
-        }
-    }
-
-    private fun writeGroupToBuffer(
-        rowVec: RowVec,
-        rowBuf: ByteArray,
-        groupMeta: List<RecordMeta>,
-        globalMeta: Series<RecordMeta>
-    ) {
-        val rowData = rowVec.left
-        var localOffset = 0
-        for (colMeta in groupMeta) {
-            val globalIdx = globalMeta.view.indexOf(colMeta)
-            val colData = rowData[globalIdx]
-            val colBytes = colMeta.encoder(colData)
-            colBytes.copyInto(rowBuf, localOffset, 0, colBytes.size)
-            localOffset += colMeta.end - colMeta.begin
         }
     }
 }
