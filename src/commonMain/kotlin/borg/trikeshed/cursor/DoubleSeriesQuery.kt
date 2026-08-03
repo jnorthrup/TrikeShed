@@ -9,7 +9,7 @@ import borg.trikeshed.isam.meta.IOMemento
  * Extracts a numeric column from a Cursor into a primitive-backed DoubleSeries to avoid boxing overhead.
  */
 fun Cursor.extractDoubleSeries(columnIndex: Int): DoubleSeries {
-    val series = DoubleSeries()
+    val series: DoubleSeries = DoubleSeries()
     for (i in 0 until this.a) {
         val cellValue = this.b(i).b(columnIndex).a
         val doubleValue = when (cellValue) {
