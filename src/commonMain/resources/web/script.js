@@ -20,7 +20,9 @@
   const CAUSAL_SEED_KEY = 'forge:seed:causal';
 
   function uid() {
-    return 'b' + Math.random().toString(36).slice(2, 10) + Date.now().toString(36).slice(-4);
+    const arr = new Uint32Array(2);
+    crypto.getRandomValues(arr);
+    return 'b' + (arr[0].toString(36) + arr[1].toString(36)).padEnd(8, '0').slice(0, 8) + Date.now().toString(36).slice(-4);
   }
 
   function defaultBlocks() {
