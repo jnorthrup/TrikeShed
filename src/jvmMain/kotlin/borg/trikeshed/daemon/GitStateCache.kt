@@ -1,6 +1,8 @@
 package borg.trikeshed.daemon
 
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.withContext
 import java.io.File
 
 /**
@@ -42,7 +44,7 @@ class GitStateCache(private val repoDir: File) {
      * Read HEAD directly from `.git/HEAD` → ref file.
      * Returns the 40-char hex SHA-1, or empty string if unresolvable.
      */
-    fun headSha(): String {
+    suspend fun headSha(): String {
         if (headValid) return cachedHeadSha ?: ""
         val sha = resolveHead()
         cachedHeadSha = sha
@@ -102,27 +104,27 @@ class GitStateCache(private val repoDir: File) {
      * Handles: symbolic refs (`ref: refs/heads/master`), detached HEAD
      * (direct SHA), and packed-refs fallback.
      */
-    private fun resolveHead(): String {
+    private suspend fun resolveHead(): String = withContext(Dispatchers.IO) {
         val headFile = File(repoDir, ".git/HEAD")
-        if (!headFile.exists()) return ""
+        if (!headFile.exists()) return@withContext ""
         val headContent = headFile.readText().trim()
 
         // Detached HEAD: direct SHA
-        if (headContent.matches(Regex("[0-9a-f]{40}"))) return headContent
+        if (headContent.matches(Regex("[0-9a-f]{40}"))) return@withContext headContent
 
         // Symbolic ref: `ref: refs/heads/master`
         if (headContent.startsWith("ref: ")) {
             val refPath = headContent.removePrefix("ref: ")
             val refFile = File(repoDir, ".git/$refPath")
-            if (refFile.exists()) return refFile.readText().trim()
+            if (refFile.exists()) return@withContext refFile.readText().trim()
 
             // Fallback: packed-refs
             val packedRefs = File(repoDir, ".git/packed-refs")
             if (packedRefs.exists()) {
                 val refLine = packedRefs.readLines().find { it.endsWith(" $refPath") }
-                if (refLine != null) return refLine.substringBefore(" ").trim()
+                if (refLine != null) return@withContext refLine.substringBefore(" ").trim()
             }
         }
-        return ""
+        ""
     }
 }
