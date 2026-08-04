@@ -402,7 +402,11 @@ drainSession6782365670930877266(store)
     drainSession8796422776580867101(store)
     drainSynth9541627119654770290(store)
     drainSession6767211552403505227(store)
+<<<<<<< ours
     drainSession935214278571271783(store)
+=======
+    drainSession9641589462865783879(store)
+>>>>>>> theirs
 
     val workId = "synth:12224356407860756599#2"
 
@@ -833,6 +837,7 @@ suspend fun drainSession6445047513596006594(store: JulesBoardStore) {
 <<<<<<< ours
 <<<<<<< ours
 <<<<<<< ours
+<<<<<<< ours
 suspend fun drainSession8796422776580867101(store: JulesBoardStore) {
     val workId = "session:8796422776580867101"
 =======
@@ -928,12 +933,22 @@ suspend fun drainSession935214278571271783(store: JulesBoardStore) {
     store.appendWork(workId, JulesCause.WorkDrained(
         workId,
 >>>>>>> theirs
+=======
+suspend fun drainSession9641589462865783879(store: JulesBoardStore) {
+    val workId = "session:9641589462865783879"
+    store.appendWork(workId, JulesCause.WorkDrained(
+        workId,
+>>>>>>> theirs
         "necromanced",
         "superseded-by-review",
         "supersede-pass",
         MergeReceipt(
 <<<<<<< ours
+<<<<<<< ours
             "session:9013454183282018613",
+=======
+            workId,
+>>>>>>> theirs
 =======
             workId,
 >>>>>>> theirs
@@ -945,9 +960,13 @@ suspend fun drainSession935214278571271783(store: JulesBoardStore) {
             LexicalMemory(
                 "Superseded necromanced work",
 <<<<<<< ours
+<<<<<<< ours
                 "Superseded necromanced work",
 =======
                 "[rework #2] [rework #2] [rework #1] Implement zoom(path): Cursor",
+>>>>>>> theirs
+=======
+                "Superseded necromanced work",
 >>>>>>> theirs
                 "Superseded via drain script."
             ),
@@ -958,6 +977,9 @@ suspend fun drainSession935214278571271783(store: JulesBoardStore) {
     ))
 }
 <<<<<<< ours
+<<<<<<< ours
+>>>>>>> theirs
+=======
 >>>>>>> theirs
 =======
 >>>>>>> theirs
