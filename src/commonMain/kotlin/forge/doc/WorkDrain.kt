@@ -129,3 +129,28 @@ suspend fun drainReworkSynth3803389897151472172(store: JulesBoardStore) {
         at = 0L
     ))
 }
+
+suspend fun drainRgaNioSpi(store: JulesBoardStore) {
+    store.appendWork("rga:nio-spi:7e76778050e1", JulesCause.WorkDrained(
+        workId = "rga:nio-spi:7e76778050e1",
+        sessionId = "necromanced",
+        commitSha = "superseded-by-review",
+        taskId = "supersede-pass",
+        receipt = MergeReceipt(
+            workId = "rga:nio-spi:7e76778050e1",
+            producer = "necromancer",
+            producerRef = "necromanced",
+            patchCid = ContentId("sha256:0000000000000000000000000000000000000000000000000000000000000000"),
+            revision = "superseded-by-review",
+            versionTag = "superseded-by-review",
+            lexicalMemory = LexicalMemory(
+                summary = "Superseded necromanced work",
+                title = "RGA commonMain userspace NIO SPI conformance",
+                content = "Superseded via drain script."
+            ),
+            claimedAt = 0L,
+            prUrl = null
+        ),
+        at = 0L
+    ))
+}
