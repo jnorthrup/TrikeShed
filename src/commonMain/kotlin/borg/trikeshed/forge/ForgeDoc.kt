@@ -396,7 +396,7 @@ private fun parseKanbanColumnsProperty(raw: String?): List<KanbanColumnRef> {
     if (raw.isNullOrBlank()) return emptyList()
     val trimmed = raw.trim()
     if (!trimmed.startsWith('[') || !trimmed.endsWith(']')) return emptyList()
-    val body = trimmed.substring(1, trimmed.length - 1)
+    val body = StringSlice(trimmed, 1, trimmed.length - 1)
     if (body.isBlank()) return emptyList()
     val out = mutableListOf<KanbanColumnRef>()
     var depth = 0
@@ -410,7 +410,7 @@ private fun parseKanbanColumnsProperty(raw: String?): List<KanbanColumnRef> {
             '}' -> {
                 depth--
                 if (depth == 0 && start >= 0) {
-                    val entry = body.substring(start, i + 1)
+                    val entry = StringSlice(body, start, i + 1)
                     parseKanbanColumnObject(entry)?.let { out += it }
                     start = -1
                 }
@@ -420,7 +420,9 @@ private fun parseKanbanColumnsProperty(raw: String?): List<KanbanColumnRef> {
     return out
 }
 
-private fun parseKanbanColumnObject(entry: String): KanbanColumnRef? {
+
+
+private fun parseKanbanColumnObject(entry: CharSequence): KanbanColumnRef? {
     fun field(regex: Regex): String? {
         val m = regex.find(entry) ?: return null
         return m.groupValues[2].ifEmpty { m.groupValues[3] }
@@ -520,4 +522,20 @@ private fun KanbanCard.toProperties(): Map<String, String> = buildMap {
     put("kanban.priority", priority)
     if (assignee != null) put("kanban.assignee", assignee!!)
     if (tags.isNotEmpty()) put("kanban.tags", tags.joinToString(","))
+}
+
+
+
+
+
+private class StringSlice(
+    private val source: CharSequence,
+    private val startIndex: Int,
+    private val endIndex: Int
+) : CharSequence {
+    override val length: Int get() = endIndex - startIndex
+    override fun get(index: Int): Char = source[startIndex + index]
+    override fun subSequence(startIndex: Int, endIndex: Int): CharSequence =
+        StringSlice(source, this.startIndex + startIndex, this.startIndex + endIndex)
+    override fun toString(): String = source.substring(startIndex, endIndex)
 }
