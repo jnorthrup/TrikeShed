@@ -274,6 +274,21 @@ store.appendWork("synth:2704096756101430624", JulesCause.WorkDrained(
         sessionId = "necromanced",
         commitSha = "superseded-by-review",
         taskId = "supersede-pass",
+        receipt = MergeReceipt(
+            workId = "synth:2704096756101430624",
+            producer = "necromancer",
+            producerRef = "necromanced",
+            patchCid = ContentId("sha256:0000000000000000000000000000000000000000000000000000000000000000"),
+            revision = "superseded-by-review",
+            versionTag = "superseded-by-review",
+            lexicalMemory = LexicalMemory(
+                summary = "Superseded necromanced work",
+                title = "[rework #1] Wire DoubleSeries into query engine",
+                content = "Superseded via drain script."
+            ),
+            claimedAt = 0L,
+            prUrl = null
+        ),
         at = 0L
     ))
 }
