@@ -34,11 +34,20 @@ class GalleryRenderer {
         }
     }
 
+    private fun sanitizeHtml(input: String): String {
+        return input.replace("&", "&amp;")
+            .replace("<", "&lt;")
+            .replace(">", "&gt;")
+            .replace("\"", "&quot;")
+            .replace("'", "&#039;")
+    }
+
     private fun renderTextCard(item: dynamic): Element {
         val el = createBaseCard(item)
         val content = item.content as? String ?: ""
+        val safeContent = sanitizeHtml(content)
         // Minimal markdown parser
-        val htmlContent = content
+        val htmlContent = safeContent
             .replace(Regex("\\*\\*(.*?)\\*\\*"), "<b>$1</b>")
             .replace(Regex("_(.*?)_"), "<i>$1</i>")
             .replace(Regex("`(.*?)`"), "<code>$1</code>")
@@ -87,8 +96,9 @@ class GalleryRenderer {
     private fun renderCodeCard(item: dynamic): Element {
         val el = createBaseCard(item)
         val content = item.content as? String ?: ""
+        val safeContent = sanitizeHtml(content)
         // Naive JS syntax highlighting
-        val highlighted = content
+        val highlighted = safeContent
             .replace("fun ", "<span style='color: #7aa2f7;'>fun </span>")
             .replace("val ", "<span style='color: #7aa2f7;'>val </span>")
             .replace("var ", "<span style='color: #7aa2f7;'>var </span>")
