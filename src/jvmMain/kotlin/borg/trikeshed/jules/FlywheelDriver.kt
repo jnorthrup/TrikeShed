@@ -826,7 +826,7 @@ class FlywheelDriver(
                 }
                 continue
             }
-            val patchCid = try { casStore.put(patch.encodeToByteArray()) }
+            val patchCid = try { withContext(Dispatchers.IO) { casStore.put(patch.encodeToByteArray()) } }
             catch (e: Exception) {
                 drainFail(s, "CAS put failed: ${e.message}")
                 continue
@@ -1275,7 +1275,7 @@ class FlywheelDriver(
                 "reconciled-session=$sessionId\nbranch=$branch\nrevision=$commitSha\n"
             }.encodeToByteArray()
             val patchCid = try {
-                casStore.put(patchBytes)
+                withContext(Dispatchers.IO) { casStore.put(patchBytes) }
             } catch (t: Throwable) {
                 emitPollError("reconcile $sessionId: CAS put failed: ${t.message?.take(200)}", 0)
                 continue
@@ -1624,7 +1624,7 @@ class FlywheelDriver(
     ): ClaimedPatch? {
         val patchBytes = patch.encodeToByteArray()
         val patchCid = try {
-            casStore.put(patchBytes)
+            withContext(Dispatchers.IO) { casStore.put(patchBytes) }
         } catch (e: Exception) {
             println("[FLYWHEEL] CAS-FAIL ${sessionId.takeLast(6)}: ${e.message}")
             return null
@@ -1903,7 +1903,7 @@ class FlywheelDriver(
 
         val commitSha = headSha()
         val patchBytes = patch.encodeToByteArray()
-        val patchCid = try { casStore.put(patchBytes) } catch (e: Exception) {
+        val patchCid = try { withContext(Dispatchers.IO) { casStore.put(patchBytes) } } catch (e: Exception) {
             return drainFail(s, "cas put failed: ${e.message}")
         }
         val safe = s.id.replace(Regex("[^A-Za-z0-9._-]"), "-")

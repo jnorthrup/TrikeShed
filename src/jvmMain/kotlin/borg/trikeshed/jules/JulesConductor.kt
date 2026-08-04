@@ -253,9 +253,9 @@ class JulesConductor(
             val conductor = JulesConductor(
                 client = JulesRestClient(apiKey),
                 headShaProvider = {
-                    ProcessBuilder("git", "rev-parse", "HEAD")
+                    kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { ProcessBuilder("git", "rev-parse", "HEAD")
                         .redirectErrorStream(true)
-                        .start().inputStream.bufferedReader().readText().trim()
+                        .start().inputStream.bufferedReader().readText().trim() }
                 },
                 store = store,
                 source = "sources/github/jnorthrup/TrikeShed",
