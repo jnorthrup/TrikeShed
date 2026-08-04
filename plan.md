@@ -1,6 +1,21 @@
-1. Modify `src/commonMain/kotlin/forge/doc/WorkDrain.kt` using `replace_with_git_merge_diff`
-   - Add a new function `drainSession17389565571177971407` that appends a `WorkDrained` event with dummy signature to supersede the necromanced task.
-   - Register this function inside `drainWork` to ensure it is invoked.
-2. Read the modified file to verify changes using `cat src/commonMain/kotlin/forge/doc/WorkDrain.kt`.
-3. Complete pre-commit steps to ensure proper testing, verification, review, and reflection are done.
-4. Invoke the `request_code_review` tool.
+1. **Analyze existing code in `JobReducer.kt`**
+   - The file uses `CanonicalCbor.encode(frame.doc)` when processing `JobFrame`.
+   - The current code already implements deterministic CIDs for `JobFrame` using `CanonicalCbor`.
+   - The user asked to re-read the code and if already covered by a landed session, supersede with a receipt-bearing `WorkDrained`.
+
+2. **Verify test passing**
+   - Run tests to see if tests pass.
+
+3. **Supersede necromanced work**
+   - Append to `WorkDrain.kt` a `WorkDrained` entry for `session:4465036716017209747`.
+   - The method to use is `appendWork`.
+   - Create a drain function named `drainSession4465036716017209747`.
+
+4. **Verify changes**
+   - Use `tail` on `WorkDrain.kt` to ensure changes are applied.
+
+5. **Run Pre-Commit Checks**
+   - Invoke `pre_commit_instructions` and follow the provided steps.
+
+6. **Submit Code Review**
+   - Request a code review.

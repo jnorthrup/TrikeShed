@@ -591,6 +591,7 @@ drainSession15466567759278489251(store)
     drainSession15956094472626662213(store)
     drainSession14162871126292114727(store)
     drainSession17099126540887000248(store)
+    drainSession4465036716017209747(store)
 }
 
 suspend fun drainSession13434914650488484998(store: JulesBoardStore) {
@@ -1297,6 +1298,31 @@ suspend fun drainSession15956094472626662213(store: JulesBoardStore) {
             ),
             claimedAt = 0L,
             prUrl = null
+        ),
+        at = 0L
+    ))
+}
+
+suspend fun drainSession4465036716017209747(store: JulesBoardStore) {
+    val workId = "session:4465036716017209747"
+    store.appendWork(workId, JulesCause.WorkDrained(
+        workId = workId,
+        sessionId = "necromanced",
+        commitSha = "superseded-by-review",
+        taskId = "supersede-pass",
+        receipt = MergeReceipt(
+            workId = workId,
+            producer = "necromancer",
+            producerRef = "necromanced",
+            patchCid = ContentId("sha256:0000000000000000000000000000000000000000000000000000000000000000"),
+            revision = "superseded-by-review",
+            versionTag = "superseded-by-review",
+            lexicalMemory = LexicalMemory(
+                "Superseded necromanced work",
+                "Make JobFrame fact CIDs deterministic",
+                "Superseded via drain script. Deterministic JobFrame fact CIDs are already implemented via CanonicalCbor.encode in JobReducer.kt."
+            ),
+            claimedAt = 0L
         ),
         at = 0L
     ))
