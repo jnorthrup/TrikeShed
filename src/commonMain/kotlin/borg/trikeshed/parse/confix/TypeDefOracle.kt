@@ -150,7 +150,7 @@ class TypeDefOracle {
                 "isA_edge" -> ngram.split(" -> ").takeIf { it.size >= 2 }?.let { (c, p) ->
                     addLinkCheck(c, p)
                 }
-                "topic" -> Regex("""^topic:(\w+)\s+as\s+(\w+)""").find(ngram)?.let { mr ->
+                "topic" -> topicPattern.find(ngram)?.let { mr ->
                     addEntry(mr.groupValues[2], mr.groupValues[1], null, "lda-topic")
                 }
             }
@@ -232,9 +232,9 @@ class TypeDefOracle {
 
     private fun extractBaseNames(typeExpr: String): List<String> {
         val cleaned = typeExpr
-            .replace(Regex("""<[^>]*>"""), "")
-            .replace(Regex("""\([^)]*\)"""), "")
-        return cleaned.split(Regex("""[|,\s]+"""))
+            .replace(typeParamPattern, "")
+            .replace(typeParenPattern, "")
+        return cleaned.split(typeSplitPattern)
             .filter { it.isNotBlank() && it.first().isLetter() }
             .map { it.trim() }
     }
