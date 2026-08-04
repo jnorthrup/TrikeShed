@@ -204,6 +204,32 @@ suspend fun drainWork(store: JulesBoardStore) {
         receipt = receipt,
         at = 0L
     ))
+
+    drainSynth4551364816250878875(store)
+}
+
+suspend fun drainSynth4551364816250878875(store: JulesBoardStore) {
+    store.appendWork("synth:4551364816250878875", JulesCause.WorkDrained(
+        workId = "synth:4551364816250878875",
+        sessionId = "necromanced",
+        commitSha = "superseded-by-review",
+        taskId = "supersede-pass",
+        receipt = MergeReceipt(
+            workId = "synth:4551364816250878875",
+            producer = "necromancer",
+            producerRef = "necromanced",
+            patchCid = ContentId("sha256:0000000000000000000000000000000000000000000000000000000000000000"),
+            revision = "superseded-by-review",
+            versionTag = "superseded-by-review",
+            lexicalMemory = LexicalMemory(
+                "Superseded necromanced work",
+                "[rework #1] TDD PR Deliver TASK G08",
+                "Superseded via drain script."
+            ),
+            claimedAt = 0L
+        ),
+        at = 0L
+    ))
 }
 
 suspend fun drainReworkSynth3803389897151472172(store: JulesBoardStore) {
