@@ -10,7 +10,7 @@ class JobSupervisorReteIntegrationTest {
 
     @Test
     fun orderedCommittedParentChildFactsProduceDeterministicActivationAndCommand() = runTest {
-        val nexus = JobSupervisorElement.open(this, capacity = 8)
+        val nexus = JobSupervisorElement.open(backgroundScope, capacity = 8)
         val parent = JobId.of("j-parent")
         val child = JobId.of("j-child")
 
@@ -31,7 +31,7 @@ class JobSupervisorReteIntegrationTest {
 
     @Test
     fun retractionCorrectlyInvalidatesPendingAgendaEntries() = runTest {
-        val nexus = JobSupervisorElement.open(this, capacity = 8)
+        val nexus = JobSupervisorElement.open(backgroundScope, capacity = 8)
         val parent = JobId.of("j-parent")
         val child = JobId.of("j-child")
 
@@ -51,7 +51,7 @@ class JobSupervisorReteIntegrationTest {
     fun replayEquivalenceProducesSameActivations() = runTest {
         val wal = mutableMapOf<String, ByteArray>()
 
-        val nexus1 = JobSupervisorElement.open(this, capacity = 8, walData = wal)
+        val nexus1 = JobSupervisorElement.open(backgroundScope, capacity = 8, walData = wal)
         val parent = JobId.of("j-parent")
         val child = JobId.of("j-child")
 
@@ -62,7 +62,7 @@ class JobSupervisorReteIntegrationTest {
 
         val snap1 = nexus1.snapshot("j-child")
 
-        val nexus2 = JobSupervisorElement.open(this, capacity = 8, walData = wal)
+        val nexus2 = JobSupervisorElement.open(backgroundScope, capacity = 8, walData = wal)
         nexus2.drain()
 
         val snap2 = nexus2.snapshot("j-child")
@@ -72,7 +72,7 @@ class JobSupervisorReteIntegrationTest {
 
     @Test
     fun assertingIdenticalFactVersionDoesNotTriggerDuplicateActivation() = runTest {
-        val nexus = JobSupervisorElement.open(this, capacity = 8)
+        val nexus = JobSupervisorElement.open(backgroundScope, capacity = 8)
         val parent = JobId.of("j-parent")
         val child = JobId.of("j-child")
 
@@ -95,7 +95,7 @@ class JobSupervisorReteIntegrationTest {
 
     @Test
     fun boundedBackpressureSuspendsWithoutDroppingData() = runTest {
-        val nexus = JobSupervisorElement.open(this, capacity = 8)
+        val nexus = JobSupervisorElement.open(backgroundScope, capacity = 8)
         val parent = JobId.of("j-parent")
         val child1 = JobId.of("j-child-1")
         val child2 = JobId.of("j-child-2")
@@ -116,7 +116,7 @@ class JobSupervisorReteIntegrationTest {
 
     @Test
     fun partitionIsolationPreventsCrossBoardActivations() = runTest {
-        val nexus = JobSupervisorElement.open(this, capacity = 8)
+        val nexus = JobSupervisorElement.open(backgroundScope, capacity = 8)
         val parent = JobId.of("j-parent")
         val child = JobId.of("j-child")
 
@@ -143,7 +143,7 @@ class JobSupervisorReteIntegrationTest {
 
     @Test
     fun drainSuccessfullyCompletesAllPendingReteWork() = runTest {
-        val nexus = JobSupervisorElement.open(this, capacity = 8)
+        val nexus = JobSupervisorElement.open(backgroundScope, capacity = 8)
         val parent = JobId.of("j-parent")
         val child = JobId.of("j-child")
 
