@@ -591,47 +591,23 @@ class LinuxPosixFile(
          * writes \n terminated lines to a file
          */
         fun writeLines(filename: String, lines: List<String>) {
-            // ⚡ Bolt: Buffered writes to avoid N+1 system calls while keeping O(1) memory overhead.
+            // ⚡ Bolt: Built the complete payload once and wrote it in a single system call to eliminate N+1 overhead.
             val O_FLAGS = PosixOpenOpts.withFlags(PosixOpenOpts.O_Creat, PosixOpenOpts.O_Trunc, PosixOpenOpts.O_WrOnly)
             val file = LinuxPosixFile(filename, O_FLAGS)
 
-            val bufferSize = 8192
-            val buffer = ByteArray(bufferSize)
-            var offset = 0
-
-            fun flush() {
-                if (offset > 0) {
-                    var writtenTotal = 0
-                    buffer.usePinned { pinned ->
-                        while (writtenTotal < offset) {
-                            val ptr = pinned.addressOf(writtenTotal)
-                            val written = write(file.fd, ptr, (offset - writtenTotal).convert())
-                            HasPosixErr.posixRequires(written > 0L) { "writeLines $filename flush error" }
-                            writtenTotal += written.toInt()
-                        }
-                    }
-                    offset = 0
-                }
+            if (lines.isEmpty()) {
+                file.close()
+                return
             }
 
-            lines.forEach { line ->
-                val bytes = line.encodeToByteArray()
-                var bytesWritten = 0
-                while (bytesWritten < bytes.size) {
-                    val space = bufferSize - offset
-                    val toCopy = minOf(space, bytes.size - bytesWritten)
-                    bytes.copyInto(buffer, offset, bytesWritten, bytesWritten + toCopy)
-                    offset += toCopy
-                    bytesWritten += toCopy
-
-                    if (offset == bufferSize) {
-                        flush()
-                    }
+            val payload = lines.joinToString(separator = "\n", postfix = "\n").encodeToByteArray()
+            if (payload.isNotEmpty()) {
+                payload.usePinned { pinned ->
+                    val ptr = pinned.addressOf(0)
+                    val written = write(file.fd, ptr, payload.size.convert())
+                    HasPosixErr.posixRequires(written == payload.size.toLong()) { "writeLines $filename" }
                 }
-                if (offset == bufferSize) flush()
-                buffer[offset++] = '\n'.code.toByte()
             }
-            flush()
             file.close()
         }
         fun writeString(filename: String, string: String): Int = writeBytes(filename, string.encodeToByteArray())
