@@ -105,6 +105,31 @@ suspend fun drainWork(store: JulesBoardStore) {
     ))
 }
 
+suspend fun drainSynth3803389897151472172(store: JulesBoardStore) {
+    store.appendWork("synth:3803389897151472172", JulesCause.WorkDrained(
+        workId = "synth:3803389897151472172",
+        sessionId = "necromanced",
+        commitSha = "superseded-by-review",
+        taskId = "supersede-pass",
+        receipt = MergeReceipt(
+            workId = "synth:3803389897151472172",
+            producer = "necromancer",
+            producerRef = "necromanced",
+            patchCid = ContentId("sha256:0000000000000000000000000000000000000000000000000000000000000000"),
+            revision = "superseded-by-review",
+            versionTag = "superseded-by-review",
+            lexicalMemory = LexicalMemory(
+                summary = "Superseded necromanced work",
+                title = "[rework #1] Wire DoubleSeries into query engine for primitive dispatch",
+                content = "Superseded via drain script."
+            ),
+            claimedAt = 0L,
+            prUrl = null
+        ),
+        at = 0L
+    ))
+}
+
 suspend fun drainReworkSynth3803389897151472172(store: JulesBoardStore) {
     store.appendWork("rework:synth:3803389897151472172#2", JulesCause.WorkDrained(
         workId = "rework:synth:3803389897151472172#2",
