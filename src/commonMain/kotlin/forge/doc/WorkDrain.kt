@@ -17,7 +17,18 @@ store.appendWork("readme-dag-rete-refraction", JulesCause.WorkDrained(
 }
 
 suspend fun drainReworkSession295642302314961027(store: JulesBoardStore) {
-val workId = "drainReworkSession295642302314961027"
+    val workId = "drainReworkSession295642302314961027"
+    store.appendWork(workId, JulesCause.WorkDrained(
+        workId = workId,
+        sessionId = "necromanced",
+        commitSha = "superseded-by-review",
+        taskId = "supersede-pass",
+        at = 0L
+    ))
+}
+
+suspend fun drainSynth6046650816859623792(store: JulesBoardStore) {
+    val workId = "drainSynth6046650816859623792"
     store.appendWork(workId, JulesCause.WorkDrained(
         workId = workId,
         sessionId = "necromanced",
@@ -49,6 +60,17 @@ suspend fun drainSession3128281449317195096(store: JulesBoardStore) {
             claimedAt = 0L,
             prUrl = null
         ),
+        at = 0L
+    ))
+}
+
+suspend fun drainSynth17160760388671804749(store: JulesBoardStore) {
+    val workId = "drainSynth17160760388671804749"
+    store.appendWork(workId, JulesCause.WorkDrained(
+        workId = workId,
+        sessionId = "necromanced",
+        commitSha = "superseded-by-review",
+        taskId = "supersede-pass",
         at = 0L
     ))
 }
@@ -460,7 +482,7 @@ store.appendWork("synth:9667103323583014411", JulesCause.WorkDrained(
 }
 
 suspend fun drainOptimizeWasmIsamOperations(store: JulesBoardStore) {
-    val workId = "drainOptimizeWasmIsamOperations"
+val workId = "drainOptimizeWasmIsamOperations"
     store.appendWork(workId, JulesCause.WorkDrained(
         workId = workId,
         sessionId = "necromanced",
@@ -471,7 +493,7 @@ suspend fun drainOptimizeWasmIsamOperations(store: JulesBoardStore) {
 }
 
 suspend fun drainNecromancedTaskG15(store: JulesBoardStore) {
-    val workId = "drainNecromancedTaskG15"
+val workId = "drainNecromancedTaskG15"
     store.appendWork(workId, JulesCause.WorkDrained(
         workId = workId,
         sessionId = "necromanced",
