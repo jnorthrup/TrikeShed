@@ -16,6 +16,31 @@ suspend fun drainReadmeDagReteRefraction(store: JulesBoardStore) {
     ))
 }
 
+suspend fun drainSynth6046650816859623792(store: JulesBoardStore) {
+    store.appendWork("rework:synth:6046650816859623792#1", JulesCause.WorkDrained(
+        workId = "rework:synth:6046650816859623792#1",
+        sessionId = "necromanced",
+        commitSha = "superseded-by-review",
+        taskId = "supersede-pass",
+        receipt = MergeReceipt(
+            workId = "rework:synth:6046650816859623792#1",
+            producer = "necromancer",
+            producerRef = "necromanced",
+            patchCid = ContentId("sha256:0000000000000000000000000000000000000000000000000000000000000000"),
+            revision = "superseded-by-review",
+            versionTag = "superseded-by-review",
+            lexicalMemory = LexicalMemory(
+                summary = "Superseded necromanced work",
+                title = "[rework #1] TDD PR Deliver TASK G12 MED Cycles published as KanbanEvent.CycleObserved",
+                content = "Superseded via drain script."
+            ),
+            claimedAt = 0L,
+            prUrl = null
+        ),
+        at = 0L
+    ))
+}
+
 suspend fun drainSynth17160760388671804749(store: JulesBoardStore) {
     store.appendWork("synth:17160760388671804749", JulesCause.WorkDrained(
         workId = "synth:17160760388671804749",
