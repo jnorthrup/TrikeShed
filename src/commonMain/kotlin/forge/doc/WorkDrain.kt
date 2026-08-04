@@ -16,6 +16,31 @@ suspend fun drainReadmeDagReteRefraction(store: JulesBoardStore) {
     ))
 }
 
+suspend fun drainReworkSynth2707218882414747844(store: JulesBoardStore) {
+    store.appendWork("rework:synth:2707218882414747844#1", JulesCause.WorkDrained(
+        workId = "rework:synth:2707218882414747844#1",
+        sessionId = "necromanced",
+        commitSha = "superseded-by-review",
+        taskId = "supersede-pass",
+        receipt = MergeReceipt(
+            workId = "rework:synth:2707218882414747844#1",
+            producer = "necromancer",
+            producerRef = "necromanced",
+            patchCid = ContentId("sha256:0000000000000000000000000000000000000000000000000000000000000000"),
+            revision = "superseded-by-review",
+            versionTag = "superseded-by-review",
+            lexicalMemory = LexicalMemory(
+                summary = "Superseded necromanced work",
+                title = "[rework #1] ReactorEndpoint wire transport",
+                content = "Superseded via drain script."
+            ),
+            claimedAt = 0L,
+            prUrl = null
+        ),
+        at = 0L
+    ))
+}
+
 suspend fun drainMmapCasStoreRework(store: JulesBoardStore) {
     store.appendWork("rework:synth:965389205015589639#2", JulesCause.WorkDrained(
         workId = "rework:synth:965389205015589639#2",
