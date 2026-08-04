@@ -367,6 +367,12 @@ class MuxReactorElement(
                         timestampMs = now,
                     ),
                 )
+                recordOperational(
+                    poolName = MuxOperationalPool.WORKER_UTILIZATION,
+                    key = "reclaimed_${key.keyId}_$now",
+                    labels = mapOf("key" to key.keyId, "provider" to key.provider),
+                    value = -1.0,
+                )
                 reclaimed++
             }
         }
