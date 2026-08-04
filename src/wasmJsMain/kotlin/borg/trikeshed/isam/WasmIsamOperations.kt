@@ -1,28 +1,3 @@
-I'll resolve the conflicts in this file by carefully examining both sides of the merge and understanding the context.
-
-Let me analyze the conflicts:
-
-1. **First conflict** (around line 47): The `readRow` property has conflicting implementations
-2. **Second conflict** (around line 77): The `open()` method has conflicting implementations
-3. **Third conflict** (around line 106): The `write` method has conflicting implementations
-
-Let me resolve each conflict:
-
-**Conflict 1 Analysis:**
-- Left side (JVM): Uses `ByteBuffer.allocateDirect()` for memory allocation
-- Right side (Wasm): Uses `ByteArray` and reuses buffers in a loop
-
-**Conflict 2 Analysis:**
-- Left side (JVM): Opens metafile and reads group files into buffers
-- Right side (Wasm): Similar but with different structure
-
-**Conflict 3 Analysis:**
-- Left side (JVM): Uses ByteBuffer for writing
-- Right side (Wasm): Uses ByteArray for writing
-
-Now I'll create the resolved file:
-
-```kotlin
 package borg.trikeshed.isam
 
 import borg.trikeshed.common.Usable
@@ -31,6 +6,7 @@ import borg.trikeshed.userspace.nio.file.spi.WasmFileOperations
 import borg.trikeshed.cursor.Cursor
 import borg.trikeshed.cursor.*
 import borg.trikeshed.isam.meta.IsamMetaFileReader
+import borg.trikeshed.isam.RecordMeta
 import borg.trikeshed.lib.*
 
 class WasmIsamDataReader(
@@ -69,7 +45,10 @@ class WasmIsamDataReader(
             val bytes = groupBuffers[gname]!!
             val start = row * groupRecordLen + localOffset
             val d = ByteArray(len)
-            bytes.copyInto(d, 0, start, start + len)
+            var dIdx = 0
+            for (i in start until start + len) {
+                d[dIdx++] = bytes[i]
+            }
             constraint.decoder(d) j { -> constraint }
         }
     }
@@ -109,72 +88,136 @@ class WasmIsamOperations : IsamOperations {
         val cursorMeta: Series<ColumnMeta> = row0.a j { c: Int -> row0.b(c).b() }
         val meta0 = IsamMetaFileReader.write(metafilename, cursorMeta, varChars, useMonocursorGroupings = useMonocursorGroupings)
 
-        val columnsByGroup = meta0.view.groupBy { it.groupName }
-        val maxGroupId = meta0.view.map { it.groupId }.maxOrNull() ?: 0
+        val columnsByGroup = meta0.view.groupBy { (it as RecordMeta).groupName }
+        val maxGroupId = meta0.view.map { (it as RecordMeta).groupId }.maxOrNull() ?: 0
 
-        val groupBuffers = mutableMapOf<String, ByteArray>()
-        val groupOffsets = mutableMapOf<String, Int>()
-        val groupRowBufs = mutableMapOf<String, ByteArray>()
         val groupRecordLengths = mutableMapOf<String, Int>()
 
         var maxRecordSize = 0
         for ((gname, cols) in columnsByGroup) {
-            val groupRecordLen = cols.sumOf { it.end - it.begin }
+            val groupRecordLen = cols.sumOf { (it as RecordMeta).end - (it as RecordMeta).begin }
             if (groupRecordLen > maxRecordSize) {
                 maxRecordSize = groupRecordLen
             }
-        }
-
-        for ((gname, cols) in columnsByGroup) {
-            val groupRecordLen = cols.sumOf { it.end - it.begin }
-            val groupRowBuf = ByteArray(groupRecordLen)
-            groupRowBufs[gname] = groupRowBuf
             groupRecordLengths[gname] = groupRecordLen
-            groupOffsets[gname] = 0
         }
 
-        val row = cursor.b(0)
-        val rowSize = row.a
-        for (i in 0 until rowSize) {
-            val col = row.b(i)
-            val colMeta = col.b()
-            val gname = colMeta.groupName
-            val colsInGroup = columnsByGroup[gname]!!
-            val groupRecordLen = groupRecordLengths[gname]!!
-            val groupRowBuf = groupRowBufs[gname]!!
-            val localOffset = colsInGroup.takeWhile { it != colMeta }.sumOf { it.end - it.begin }
-            val len = colMeta.end - colMeta.begin
-            
-            val bytes = col.a
-            val start = localOffset
-            bytes.copyInto(groupRowBuf, start, 0, len)
-        }
+        val rowBuf = ByteArray(maxRecordSize)
 
-        for ((gname, cols) in columnsByGroup) {
-            val groupRecordLen = groupRecordLengths[gname]!!
-            val groupRowBuf = groupRowBufs[gname]!!
-            val gfilename = if (cols.first().groupId == maxGroupId) datafilename else getGroupFilename(datafilename, gname)
-            
-            val existingBytes = if (fileOps.exists(gfilename)) fileOps.readAllBytes(gfilename) else ByteArray(0)
-            val existingRecordCount = if (groupRecordLen > 0) existingBytes.size / groupRecordLen else 0
-            val newBytes = ByteArray(existingRecordCount * groupRecordLen + groupRecordLen)
-            existingBytes.copyInto(newBytes)
-            
-            val offset = existingRecordCount * groupRecordLen
-            groupRowBuf.copyInto(newBytes, offset)
-            
-            fileOps.writeAllBytes(gfilename, newBytes)
+        cursor.iterator().forEach { rowVec ->
+            for ((gname, cols) in columnsByGroup) {
+                val groupRecordLen = groupRecordLengths[gname]!!
+                val recordMetas = cols.map { it as RecordMeta }
+
+                writeGroupToBuffer(rowVec, rowBuf, recordMetas, meta0 as Series<RecordMeta>)
+
+                val gfilename = if ((cols.first() as RecordMeta).groupId == maxGroupId) datafilename else getGroupFilename(datafilename, gname)
+
+                val existingBytes = if (fileOps.exists(gfilename)) fileOps.readAllBytes(gfilename) else ByteArray(0)
+                val existingRecordCount = if (groupRecordLen > 0) existingBytes.size / groupRecordLen else 0
+                val newBytes = ByteArray(existingRecordCount * groupRecordLen + groupRecordLen)
+                copyIntoByteArray(existingBytes, newBytes)
+
+                val offset = existingRecordCount * groupRecordLen
+                copyIntoByteArray(rowBuf, newBytes, offset, 0, groupRecordLen)
+
+                fileOps.write(gfilename, newBytes)
+            }
+        }
+    }
+
+    override fun append(
+        msf: Iterable<RowVec>,
+        datafilename: String,
+        varChars: Map<String, Int>,
+        transform: ((RowVec) -> RowVec)?,
+        useMonocursorGroupings: Boolean
+    ) {
+        val fileOps: FileOperations = WasmFileOperations()
+        val metafilename = "$datafilename.meta"
+        lateinit var meta0: Series<RecordMeta>
+        var first = true
+
+        var columnsByGroup: Map<String, List<RecordMeta>> = emptyMap()
+        var maxGroupId = 0
+
+        val groupRecordLengths = mutableMapOf<String, Int>()
+        var rowBuf = ByteArray(0)
+
+        msf.forEach { rowVec1: RowVec ->
+            val rowVec = transform?.let { it(rowVec1) } ?: rowVec1
+            if (first) {
+                val cursorMeta: Series<ColumnMeta> = rowVec.right.α { it() }
+
+                // We know IsamMetaFileReader returns RecordMeta wrapped in Series
+                val recordMetas = IsamMetaFileReader.write(metafilename, cursorMeta, varChars, useMonocursorGroupings = useMonocursorGroupings)
+                meta0 = recordMetas.size j { i -> recordMetas.b(i) as RecordMeta }
+
+                columnsByGroup = meta0.view.groupBy { it.groupName }
+                maxGroupId = meta0.view.map { it.groupId }.maxOrNull() ?: 0
+
+                var maxRecordSize = 0
+                for ((gname, cols) in columnsByGroup) {
+                    val groupRecordLen = cols.sumOf { it.end - it.begin }
+                    if (groupRecordLen > maxRecordSize) {
+                        maxRecordSize = groupRecordLen
+                    }
+                    groupRecordLengths[gname] = groupRecordLen
+                }
+                rowBuf = ByteArray(maxRecordSize)
+                first = false
+            }
+
+            for ((gname, cols) in columnsByGroup) {
+                val groupRecordLen = groupRecordLengths[gname]!!
+                val gfilename = if (cols.first().groupId == maxGroupId) datafilename else getGroupFilename(datafilename, gname)
+
+                val recordGroupMetas = cols.map { it as RecordMeta }
+                writeGroupToBuffer(rowVec, rowBuf, recordGroupMetas, meta0)
+
+                val existingBytes = if (fileOps.exists(gfilename)) fileOps.readAllBytes(gfilename) else ByteArray(0)
+                val existingRecordCount = if (groupRecordLen > 0) existingBytes.size / groupRecordLen else 0
+                val newBytes = ByteArray(existingRecordCount * groupRecordLen + groupRecordLen)
+                copyIntoByteArray(existingBytes, newBytes)
+
+                val offset = existingRecordCount * groupRecordLen
+                copyIntoByteArray(rowBuf, newBytes, offset, 0, groupRecordLen)
+
+                fileOps.write(gfilename, newBytes)
+            }
+        }
+    }
+
+    private fun writeGroupToBuffer(
+        rowVec: RowVec,
+        rowBuf: ByteArray,
+        groupMeta: List<RecordMeta>,
+        globalMeta: Series<RecordMeta>
+    ) {
+        val rowData = rowVec.left
+        var localOffset = 0
+        for (colMeta in groupMeta) {
+            var globalIdx = -1
+            for (i in 0 until globalMeta.size) {
+                if (globalMeta.b(i).name == colMeta.name) {
+                    globalIdx = i
+                    break
+                }
+            }
+            if (globalIdx == -1) continue
+            val colData = rowData.b(globalIdx)
+            val colBytes = colMeta.encoder(colData)
+            copyIntoByteArray(colBytes, rowBuf, localOffset, 0, colBytes.size)
+            localOffset += colMeta.end - colMeta.begin
+        }
+    }
+
+    private fun copyIntoByteArray(source: ByteArray, destination: ByteArray, destinationOffset: Int = 0, startIndex: Int = 0, endIndex: Int = source.size) {
+        var dIdx = destinationOffset
+        for (i in startIndex until endIndex) {
+            destination[dIdx++] = source[i]
         }
     }
 }
-```
 
-The key changes made:
-
-1. **Kept the WasmIsamDataReader implementation** from the right side (Wasm-specific) since this is a Wasm file
-2. **Kept the WasmIsamOperations.write() implementation** from the right side (Wasm-specific) since this is a Wasm file
-3. **Removed the ByteBuffer-based implementation** from the left side (JVM-specific) since this is a Wasm file
-4. **Maintained the ByteArray-based approach** throughout for consistency with the Wasm platform
-5. **Preserved all imports** as they were already correct for the Wasm implementation
-
-The resolved file now properly implements the ISAM operations using ByteArray instead of ByteBuffer, which is appropriate for the Wasm platform.
+actual fun defaultIsamOperations(): IsamOperations = WasmIsamOperations()

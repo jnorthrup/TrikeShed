@@ -1,3 +1,7 @@
+<<<<<<< ours
+=======
+
+>>>>>>> theirs
 package forge.doc
 
 import borg.trikeshed.job.ContentId
@@ -174,6 +178,7 @@ store.appendWork("rework:synth:965389205015589639#2", JulesCause.WorkDrained(
     ))
 }
 
+<<<<<<< ours
 suspend fun drainReactorAlgebraNecromancedWork(store: JulesBoardStore) {
 store.appendWork("synth:15340577469777603245", JulesCause.WorkDrained(
         workId = "synth:15340577469777603245",
@@ -488,6 +493,10 @@ val workId = "drainNecromancedWork12511514760260520345"
 
 suspend fun drainSession17593680915660220835(store: JulesBoardStore) {
     val workId = "session:17593680915660220835"
+=======
+suspend fun drainSession2395414082415991441(store: JulesBoardStore) {
+    val workId = "session:2395414082415991441"
+>>>>>>> theirs
     store.appendWork(workId, JulesCause.WorkDrained(
         workId = workId,
         sessionId = "necromanced",
@@ -501,6 +510,7 @@ suspend fun drainSession17593680915660220835(store: JulesBoardStore) {
             revision = "superseded-by-review",
             versionTag = "superseded-by-review",
             lexicalMemory = LexicalMemory(
+<<<<<<< ours
                 summary = "Superseded necromanced work",
                 title = "Superseded necromanced work",
                 content = "Superseded via drain script."
@@ -688,6 +698,13 @@ suspend fun drainSession6445047513596006594(store: JulesBoardStore) {
             ),
             claimedAt = 0L,
             prUrl = null
+>>>>>>> theirs
+=======
+                "Superseded necromanced work",
+                "Reuse ByteArray Buffers in WasmIsamOperations Loop",
+                "Superseded via drain script."
+            ),
+            claimedAt = 0L
 >>>>>>> theirs
         ),
         at = 0L
