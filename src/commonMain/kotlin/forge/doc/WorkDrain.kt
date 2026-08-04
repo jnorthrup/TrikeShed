@@ -103,6 +103,34 @@ suspend fun drainWork(store: JulesBoardStore) {
         receipt = receipt,
         at = 0L
     ))
+
+    drainReworkSynth12930517035041184470(store)
+}
+
+suspend fun drainReworkSynth12930517035041184470(store: JulesBoardStore) {
+    val targetWorkId = "rework:synth:12930517035041184470#1"
+    store.appendWork(targetWorkId, JulesCause.WorkDrained(
+        workId = targetWorkId,
+        sessionId = "necromanced",
+        commitSha = "superseded-by-review",
+        taskId = "supersede-pass",
+        receipt = MergeReceipt(
+            workId = targetWorkId,
+            producer = "necromancer",
+            producerRef = "necromanced",
+            patchCid = ContentId("sha256:0000000000000000000000000000000000000000000000000000000000000000"),
+            revision = "superseded-by-review",
+            versionTag = "superseded-by-review",
+            lexicalMemory = LexicalMemory(
+                summary = "Superseded necromanced work",
+                title = "[rework #1] Implement zoom(path): Cursor returning sub-cursor",
+                content = "Superseded via drain script. Feature already covered by landed session."
+            ),
+            claimedAt = 0L,
+            prUrl = null
+        ),
+        at = 0L
+    ))
 }
 
 suspend fun drainReworkSynth3803389897151472172(store: JulesBoardStore) {
