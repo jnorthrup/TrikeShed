@@ -7,7 +7,7 @@ import borg.trikeshed.util.oroboros.MergeReceipt
 import borg.trikeshed.utils.kanban.*
 
 suspend fun drainSynth14338112652041550984(store: JulesBoardStore) {
-    store.appendWork("synth:14338112652041550984", JulesCause.WorkDrained(
+store.appendWork("synth:14338112652041550984", JulesCause.WorkDrained(
         workId = "synth:14338112652041550984",
         sessionId = "necromanced",
         commitSha = "superseded-by-review",
@@ -499,8 +499,19 @@ suspend fun drainSession10635169297110193527(store: JulesBoardStore) {
     ))
 }
 
+suspend fun drainReworkSynth14349612850032810027(store: JulesBoardStore) {
+    val workId = "drainReworkSynth14349612850032810027"
+    store.appendWork(workId, JulesCause.WorkDrained(
+        workId = workId,
+        sessionId = "necromanced",
+        commitSha = "superseded-by-review",
+        taskId = "supersede-pass",
+        at = 0L
+    ))
+}
+
 suspend fun drainRgaNioSpi(store: JulesBoardStore) {
-    val workId = "drainRgaNioSpi"
+val workId = "drainRgaNioSpi"
     store.appendWork(workId, JulesCause.WorkDrained(
         workId = workId,
         sessionId = "necromanced",
