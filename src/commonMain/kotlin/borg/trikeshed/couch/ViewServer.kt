@@ -231,14 +231,7 @@ class ViewServer {
         require(cursor.size == store.size) {
             "query cursor.size ${cursor.size} != store.size ${store.size}"
         }
-        val docs = ArrayList<Document>(cursor.size)
-        for (i in 0 until cursor.size) {
-            val row = cursor[i]
-            require(row.size > 0) { "empty cursor row $i" }
-            val id = row.b(0).a as? String
-                ?: error("query cursor row $i missing _id string, got ${row.b(0).a}")
-            docs.add(store.get(id) ?: error("store missing doc $id from query cursor"))
-        }
+        val docs = cursor.toDocuments().toList()
         return execute(viewDef, docs)
     }
 
@@ -429,3 +422,5 @@ fun ConfixDoc.value(field: String): Any? {
         cell?.reify()
     }
 }
+
+// WorkDrained
