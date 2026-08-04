@@ -42,9 +42,37 @@ store.appendWork("readme-dag-rete-refraction", JulesCause.WorkDrained(
 }
 
 suspend fun drainReworkSession295642302314961027(store: JulesBoardStore) {
-val workId = "drainReworkSession295642302314961027"
+    val workId = "drainReworkSession295642302314961027"
     store.appendWork(workId, JulesCause.WorkDrained(
         workId = workId,
+        sessionId = "necromanced",
+        commitSha = "superseded-by-review",
+        taskId = "supersede-pass",
+        at = 0L
+    ))
+}
+
+suspend fun drainReworkSynth2707218882414747844(store: JulesBoardStore) {
+    val workId = "drainReworkSynth2707218882414747844"
+    store.appendWork(workId, JulesCause.WorkDrained(
+        workId = workId,
+        sessionId = "necromanced",
+        commitSha = "superseded-by-review",
+        taskId = "supersede-pass",
+        at = 0L
+    ))
+}
+
+suspend fun drainMmapCasStoreRework(store: JulesBoardStore) {
+store.appendWork("rework:synth:965389205015589639#2", JulesCause.WorkDrained(
+        workId = "rework:synth:965389205015589639#2",
+        sessionId = "necromanced",
+        commitSha = "superseded-by-review",
+        taskId = "supersede-pass",
+        at = 0L
+    ))
+    store.appendWork("synth:965389205015589639", JulesCause.WorkDrained(
+        workId = "synth:965389205015589639",
         sessionId = "necromanced",
         commitSha = "superseded-by-review",
         taskId = "supersede-pass",
@@ -210,51 +238,6 @@ suspend fun drainSession18361965708708568010(store: JulesBoardStore) {
             ),
             claimedAt = 0L,
             prUrl = null
-        ),
-        at = 0L
-    ))
-}
-
-suspend fun drainMmapCasStoreRework(store: JulesBoardStore) {
-store.appendWork("rework:synth:965389205015589639#2", JulesCause.WorkDrained(
-        workId = "rework:synth:965389205015589639#2",
-        sessionId = "necromanced",
-        commitSha = "superseded-by-review",
-        taskId = "supersede-pass",
-        receipt = MergeReceipt(
-            workId = "rework:synth:965389205015589639#2",
-            producer = "necromancer",
-            producerRef = "necromanced",
-            patchCid = ContentId("sha256:0000000000000000000000000000000000000000000000000000000000000000"),
-            revision = "superseded-by-review",
-            versionTag = "superseded-by-review",
-            lexicalMemory = LexicalMemory(
-                summary = "Superseded necromanced work",
-                title = "[rework #1] Implement MmapCasStore returning mapped slices",
-                content = "Superseded via drain script."
-            ),
-            claimedAt = 0L
-        ),
-        at = 0L
-    ))
-    store.appendWork("synth:965389205015589639", JulesCause.WorkDrained(
-        workId = "synth:965389205015589639",
-        sessionId = "necromanced",
-        commitSha = "superseded-by-review",
-        taskId = "supersede-pass",
-        receipt = MergeReceipt(
-            workId = "synth:965389205015589639",
-            producer = "necromancer",
-            producerRef = "necromanced",
-            patchCid = ContentId("sha256:0000000000000000000000000000000000000000000000000000000000000000"),
-            revision = "superseded-by-review",
-            versionTag = "superseded-by-review",
-            lexicalMemory = LexicalMemory(
-                summary = "Superseded necromanced work",
-                title = "[rework #1] Implement MmapCasStore returning mapped slices",
-                content = "Superseded via drain script."
-            ),
-            claimedAt = 0L
         ),
         at = 0L
     ))
@@ -500,7 +483,7 @@ suspend fun drainSession10635169297110193527(store: JulesBoardStore) {
 }
 
 suspend fun drainReworkSynth14349612850032810027(store: JulesBoardStore) {
-    val workId = "drainReworkSynth14349612850032810027"
+val workId = "drainReworkSynth14349612850032810027"
     store.appendWork(workId, JulesCause.WorkDrained(
         workId = workId,
         sessionId = "necromanced",
