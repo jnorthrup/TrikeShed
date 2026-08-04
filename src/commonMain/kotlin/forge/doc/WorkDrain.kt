@@ -352,9 +352,13 @@ store.appendWork("synth:9541627119654770290", JulesCause.WorkDrained(
 
 suspend fun drainWork(store: JulesBoardStore) {
 <<<<<<< ours
+<<<<<<< ours
     drainSession9013454183282018613(store)
 =======
 drainSession8993771901974843282(store)
+>>>>>>> theirs
+=======
+    drainSession921960418393989944(store)
 >>>>>>> theirs
 drainSession6782365670930877266(store)
     drainSession8796422776580867101(store)
@@ -786,6 +790,7 @@ suspend fun drainSession6445047513596006594(store: JulesBoardStore) {
 <<<<<<< ours
 <<<<<<< ours
 <<<<<<< ours
+<<<<<<< ours
 suspend fun drainSession8796422776580867101(store: JulesBoardStore) {
     val workId = "session:8796422776580867101"
 =======
@@ -795,6 +800,10 @@ suspend fun drainSession8205871251151966442(store: JulesBoardStore) {
 =======
 suspend fun drainSession8993771901974843282(store: JulesBoardStore) {
     val workId = "session:8993771901974843282"
+>>>>>>> theirs
+=======
+suspend fun drainSession921960418393989944(store: JulesBoardStore) {
+    val workId = "session:921960418393989944"
 >>>>>>> theirs
     store.appendWork(workId, JulesCause.WorkDrained(
         workId = workId,
@@ -808,6 +817,7 @@ suspend fun drainSession8993771901974843282(store: JulesBoardStore) {
             patchCid = ContentId("sha256:0000000000000000000000000000000000000000000000000000000000000000"),
             revision = "superseded-by-review",
             versionTag = "superseded-by-review",
+<<<<<<< ours
 <<<<<<< ours
 <<<<<<< ours
             lexicalMemory = LexicalMemory(
@@ -825,12 +835,20 @@ suspend fun drainSession8993771901974843282(store: JulesBoardStore) {
                 content = "Superseded via drain script."
             ),
 >>>>>>> theirs
+=======
+            lexicalMemory = LexicalMemory(
+                summary = "Superseded necromanced work",
+                title = "Superseded necromanced work",
+                content = "Superseded via drain script."
+            ),
+>>>>>>> theirs
             claimedAt = 0L,
             prUrl = null
         ),
         at = 0L
     ))
 }
+<<<<<<< ours
 <<<<<<< ours
 <<<<<<< ours
 >>>>>>> theirs
@@ -861,6 +879,8 @@ suspend fun drainSession9013454183282018613(store: JulesBoardStore) {
         0L
     ))
 }
+>>>>>>> theirs
+=======
 >>>>>>> theirs
 =======
 >>>>>>> theirs
