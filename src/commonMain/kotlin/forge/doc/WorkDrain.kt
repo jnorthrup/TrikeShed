@@ -276,7 +276,32 @@ val targetWorkId = "synth:17160760388671804749#2"
     )
 }
 
+suspend fun drainSynth11191049401439195892(store: JulesBoardStore) {
+    store.appendWork("synth:11191049401439195892", JulesCause.WorkDrained(
+        workId = "synth:11191049401439195892",
+        sessionId = "necromanced",
+        commitSha = "superseded-by-review",
+        taskId = "supersede-pass",
+        receipt = MergeReceipt(
+            workId = "synth:11191049401439195892",
+            producer = "necromancer",
+            producerRef = "necromanced",
+            patchCid = ContentId("sha256:0000000000000000000000000000000000000000000000000000000000000000"),
+            revision = "superseded-by-review",
+            versionTag = "superseded-by-review",
+            lexicalMemory = LexicalMemory(
+                "Superseded necromanced work",
+                "Replace Iterator-returning filter with Series-returning filter",
+                "Superseded via drain script."
+            ),
+            claimedAt = 0L
+        ),
+        at = 0L
+    ))
+}
+
 suspend fun drainWork(store: JulesBoardStore) {
+    drainSynth11191049401439195892(store)
     val workId = "synth:12224356407860756599#2"
 
     val receipt = MergeReceipt(
