@@ -7,7 +7,7 @@ import borg.trikeshed.util.oroboros.MergeReceipt
 import borg.trikeshed.utils.kanban.*
 
 suspend fun drainReadmeDagReteRefraction(store: JulesBoardStore) {
-    store.appendWork("readme-dag-rete-refraction", JulesCause.WorkDrained(
+store.appendWork("readme-dag-rete-refraction", JulesCause.WorkDrained(
         workId = "readme-dag-rete-refraction",
         sessionId = "necromanced",
         commitSha = "superseded-by-review",
@@ -17,7 +17,7 @@ suspend fun drainReadmeDagReteRefraction(store: JulesBoardStore) {
 }
 
 suspend fun drainReworkSession295642302314961027(store: JulesBoardStore) {
-    val workId = "drainReworkSession295642302314961027"
+val workId = "drainReworkSession295642302314961027"
     store.appendWork(workId, JulesCause.WorkDrained(
         workId = workId,
         sessionId = "necromanced",
@@ -53,6 +53,17 @@ suspend fun drainSession3128281449317195096(store: JulesBoardStore) {
     ))
 }
 
+suspend fun drainReworkSynth12224356407860756599(store: JulesBoardStore) {
+    val workId = "drainReworkSynth12224356407860756599"
+    store.appendWork(workId, JulesCause.WorkDrained(
+        workId = workId,
+        sessionId = "necromanced",
+        commitSha = "superseded-by-review",
+        taskId = "supersede-pass",
+        at = 0L
+    ))
+}
+
 suspend fun drainSession3957588300103604763(store: JulesBoardStore) {
     val workId = "session:3957588300103604763"
     store.appendWork(workId, JulesCause.WorkDrained(
@@ -64,7 +75,7 @@ suspend fun drainSession3957588300103604763(store: JulesBoardStore) {
             workId = workId,
             producer = "necromancer",
             producerRef = "necromanced",
-            patchCid = ContentId("sha256:000000000000000000000000000000000000000000000000000000000000000"),
+            patchCid = ContentId("sha256:0000000000000000000000000000000000000000000000000000000000000000"),
             revision = "superseded-by-review",
             versionTag = "superseded-by-review",
             lexicalMemory = LexicalMemory(
@@ -90,7 +101,7 @@ suspend fun drainSession17649787231113851990(store: JulesBoardStore) {
             workId = workId,
             producer = "necromancer",
             producerRef = "necromanced",
-            patchCid = ContentId("sha256:000000000000000000000000000000000000000000000000000000000000000"),
+            patchCid = ContentId("sha256:0000000000000000000000000000000000000000000000000000000000000000"),
             revision = "superseded-by-review",
             versionTag = "superseded-by-review",
             lexicalMemory = LexicalMemory(
@@ -116,7 +127,7 @@ suspend fun drainSession17853614670972068880(store: JulesBoardStore) {
             workId = workId,
             producer = "necromancer",
             producerRef = "necromanced",
-            patchCid = ContentId("sha256:000000000000000000000000000000000000000000000000000000000000000"),
+            patchCid = ContentId("sha256:0000000000000000000000000000000000000000000000000000000000000000"),
             revision = "superseded-by-review",
             versionTag = "superseded-by-review",
             lexicalMemory = LexicalMemory(
@@ -274,7 +285,7 @@ val targetWorkId = "synth:17160760388671804749#2"
 }
 
 suspend fun drainSynth11191049401439195892(store: JulesBoardStore) {
-    store.appendWork("synth:11191049401439195892", JulesCause.WorkDrained(
+store.appendWork("synth:11191049401439195892", JulesCause.WorkDrained(
         workId = "synth:11191049401439195892",
         sessionId = "necromanced",
         commitSha = "superseded-by-review",
@@ -298,7 +309,7 @@ suspend fun drainSynth11191049401439195892(store: JulesBoardStore) {
 }
 
 suspend fun drainSynth9541627119654770290(store: JulesBoardStore) {
-    store.appendWork("synth:9541627119654770290", JulesCause.WorkDrained(
+store.appendWork("synth:9541627119654770290", JulesCause.WorkDrained(
         workId = "synth:9541627119654770290",
         sessionId = "necromanced",
         commitSha = "superseded-by-review",
@@ -322,7 +333,7 @@ suspend fun drainSynth9541627119654770290(store: JulesBoardStore) {
 }
 
 suspend fun drainWork(store: JulesBoardStore) {
-    drainSynth9541627119654770290(store)
+drainSynth9541627119654770290(store)
 
     val workId = "synth:12224356407860756599#2"
 
@@ -388,17 +399,18 @@ suspend fun drainSession10635169297110193527(store: JulesBoardStore) {
             versionTag = "superseded-by-review",
             lexicalMemory = LexicalMemory(
                 summary = "Superseded necromanced work",
-                title = "[rework #1] [rework #1] Wire DoubleSeries into query engine",
+                title = "Superseded necromanced work",
                 content = "Superseded via drain script."
             ),
-            claimedAt = 0L
+            claimedAt = 0L,
+            prUrl = null
         ),
         at = 0L
     ))
 }
 
 suspend fun drainSynth10874136384651488584(store: JulesBoardStore) {
-    val workId = "synth:10874136384651488584"
+val workId = "synth:10874136384651488584"
     store.appendWork(workId, JulesCause.WorkDrained(
         workId = workId,
         sessionId = "necromanced",
