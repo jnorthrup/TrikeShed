@@ -368,6 +368,7 @@ drainSession6782365670930877266(store)
     drainSession8796422776580867101(store)
     drainSynth9541627119654770290(store)
     drainSession6767211552403505227(store)
+    drainSession935214278571271783(store)
 
     val workId = "synth:12224356407860756599#2"
 
@@ -796,6 +797,7 @@ suspend fun drainSession6445047513596006594(store: JulesBoardStore) {
 <<<<<<< ours
 <<<<<<< ours
 <<<<<<< ours
+<<<<<<< ours
 suspend fun drainSession8796422776580867101(store: JulesBoardStore) {
     val workId = "session:8796422776580867101"
 =======
@@ -874,11 +876,21 @@ suspend fun drainSession8881364136263100567(store: JulesBoardStore) {
 suspend fun drainSession9013454183282018613(store: JulesBoardStore) {
     store.appendWork("session:9013454183282018613", JulesCause.WorkDrained(
         "session:9013454183282018613",
+=======
+suspend fun drainSession935214278571271783(store: JulesBoardStore) {
+    val workId = "session:935214278571271783"
+    store.appendWork(workId, JulesCause.WorkDrained(
+        workId,
+>>>>>>> theirs
         "necromanced",
         "superseded-by-review",
         "supersede-pass",
         MergeReceipt(
+<<<<<<< ours
             "session:9013454183282018613",
+=======
+            workId,
+>>>>>>> theirs
             "necromancer",
             "necromanced",
             ContentId("sha256:0000000000000000000000000000000000000000000000000000000000000000"),
@@ -886,7 +898,11 @@ suspend fun drainSession9013454183282018613(store: JulesBoardStore) {
             "superseded-by-review",
             LexicalMemory(
                 "Superseded necromanced work",
+<<<<<<< ours
                 "Superseded necromanced work",
+=======
+                "[rework #2] [rework #2] [rework #1] Implement zoom(path): Cursor",
+>>>>>>> theirs
                 "Superseded via drain script."
             ),
             0L,
@@ -895,6 +911,9 @@ suspend fun drainSession9013454183282018613(store: JulesBoardStore) {
         0L
     ))
 }
+<<<<<<< ours
+>>>>>>> theirs
+=======
 >>>>>>> theirs
 =======
 >>>>>>> theirs
