@@ -129,9 +129,6 @@ suspend fun drainSession17853614670972068880(store: JulesBoardStore) {
         ),
         at = 0L
     ))
-<<<<<<< ours
-}
-=======
 }
 
 suspend fun drainSession18361965708708568010(store: JulesBoardStore) {
