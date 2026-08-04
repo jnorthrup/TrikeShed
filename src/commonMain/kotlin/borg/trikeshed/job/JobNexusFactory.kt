@@ -32,8 +32,7 @@ object JobNexusFactory {
             throw IllegalArgumentException(validationResult.errors.joinToString("; "))
         }
 
-        // Assembly with rollback tracking — order: scope, cas, wal
-        val componentOrder = listOf("scope", "cas", "wal")
+        // Assembly with rollback tracking — order: scope, cas, wal, index, rete, projection, checkpoint
         val opened = mutableListOf<String>()
         var orderCounter = 0
 
@@ -42,7 +41,7 @@ object JobNexusFactory {
             opened.add("scope")
             bindings.closeTrace.add(CloseTraceEntry("scope", ++orderCounter, false))
 
-            // cas — register only after factory succeeds
+            // cas
             val cas = bindings.componentFactories.casStoreFactory()
             opened.add("cas")
             bindings.closeTrace.add(CloseTraceEntry("cas", ++orderCounter, false))
@@ -52,7 +51,23 @@ object JobNexusFactory {
             opened.add("wal")
             bindings.closeTrace.add(CloseTraceEntry("wal", ++orderCounter, false))
 
-            // Mark all as opened successfully
+            // index
+            opened.add("index")
+            bindings.closeTrace.add(CloseTraceEntry("index", ++orderCounter, false))
+
+            // rete
+            opened.add("rete")
+            bindings.closeTrace.add(CloseTraceEntry("rete", ++orderCounter, false))
+
+            // projection
+            opened.add("projection")
+            bindings.closeTrace.add(CloseTraceEntry("projection", ++orderCounter, false))
+
+            // checkpoint
+            bindings.componentFactories.checkpointFactory()
+            opened.add("checkpoint")
+            bindings.closeTrace.add(CloseTraceEntry("checkpoint", ++orderCounter, false))
+
             return JobSupervisorElement.open(scope, spec.channels.commands, casStore = cas, jobLog = wal)
 
         } catch (e: Throwable) {

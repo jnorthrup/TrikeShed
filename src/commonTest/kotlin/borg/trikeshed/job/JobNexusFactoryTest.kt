@@ -110,7 +110,7 @@ class JobNexusFactoryTest {
         }
         assertTrue(
             bindings.closeTrace.none { it.component == "checkpoint" },
-            "checkpoint factory failed before it could register — must not appear in trace",
+            "checkpoint stage threw, so it must not appear in the close trace",
         )
     }
 

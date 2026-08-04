@@ -44,100 +44,17 @@ object CanonicalCbor {
     }
 
     /** Canonical encode a JobCommand to canonical CBOR. */
+    @Suppress("UNCHECKED_CAST")
     fun encode(cmd: JobCommand): ByteArray {
-        val fields = mutableMapOf<String, Any?>()
-        fields["operation"] = cmd.operationName
-        fields["jobId"] = cmd.jobId.value
-        fields["idempotencyKey"] = cmd.idempotencyKey
-
-        when (cmd) {
-            is JobCommand.Submit -> {
-                if (cmd.dependencies.isNotEmpty()) {
-                    fields["dependencies"] = cmd.dependencies
-                        .map { it.value }
-                        .sorted()
-                }
-                cmd.expectedRevision?.let { fields["expectedRevision"] = it }
-            }
-            is JobCommand.Start -> fields["expectedRevision"] = cmd.expectedRevision
-            is JobCommand.Complete -> fields["expectedRevision"] = cmd.expectedRevision
-            is JobCommand.Fail -> {
-                fields["expectedRevision"] = cmd.expectedRevision
-                fields["reason"] = cmd.reason
-            }
-            is JobCommand.Retry -> fields["expectedRevision"] = cmd.expectedRevision
-            is JobCommand.Progress -> {
-                fields["expectedRevision"] = cmd.expectedRevision
-                fields["progress"] = cmd.progress
-            }
-            is JobCommand.Block -> {
-                fields["expectedRevision"] = cmd.expectedRevision
-                fields["reason"] = cmd.reason
-            }
-            is JobCommand.Cancel -> fields["expectedRevision"] = cmd.expectedRevision
-            is JobCommand.Move -> {
-                fields["expectedRevision"] = cmd.expectedRevision
-                fields["toColumn"] = cmd.toColumn.value
-            }
-            is JobCommand.Acknowledge -> fields["expectedRevision"] = cmd.expectedRevision
-            is JobCommand.Retract -> fields["expectedRevision"] = cmd.expectedRevision
-        }
-
-        return encodeSortedMap(fields)
+        val serializer = JobCommand.serializer() as kotlinx.serialization.KSerializer<JobCommand>
+        return borg.trikeshed.parse.confix.ConfixFormat.encodeToByteArray(serializer, cmd)
     }
 
     /** Decode the canonical command bytes consumed by the reactor and WAL replay. */
+    @Suppress("UNCHECKED_CAST")
     fun decodeJobCommand(bytes: ByteArray): JobCommand {
-        val fields = Cbor.decode(bytes) as? Item.Map
-            ?: error("canonical job command must be a CBOR map")
-        fun string(name: String): String =
-            (fields[name] as? Item.Str)?.value ?: error("missing string field: $name")
-        fun long(name: String): Long =
-            (fields[name] as? Item.Num)?.value ?: error("missing integer field: $name")
-
-        val jobId = JobId.of(string("jobId"))
-        val idempotencyKey = string("idempotencyKey")
-        return when (val operation = string("operation")) {
-            "submit" -> {
-                val dependencies = (fields["dependencies"] as? Item.Arr)?.let { values ->
-                    List(values.size) { index ->
-                        JobId.of((values[index] as? Item.Str)?.value
-                            ?: error("dependencies[$index] must be a string"))
-                    }
-                } ?: emptyList()
-                JobCommand.Submit(
-                    jobId = jobId,
-                    idempotencyKey = idempotencyKey,
-                    dependencies = dependencies,
-                    expectedRevision = (fields["expectedRevision"] as? Item.Num)?.value,
-                )
-            }
-            "start" -> JobCommand.Start(jobId, idempotencyKey, long("expectedRevision"))
-            "complete" -> JobCommand.Complete(jobId, idempotencyKey, long("expectedRevision"))
-            "fail" -> JobCommand.Fail(jobId, idempotencyKey, long("expectedRevision"), string("reason"))
-            "retry" -> JobCommand.Retry(jobId, idempotencyKey, long("expectedRevision"))
-            "progress" -> JobCommand.Progress(
-                jobId,
-                idempotencyKey,
-                long("expectedRevision"),
-                when (val value = fields["progress"]) {
-                    is Item.Flt -> value.value
-                    is Item.Num -> value.value.toDouble()
-                    else -> error("missing numeric field: progress")
-                },
-            )
-            "block" -> JobCommand.Block(jobId, idempotencyKey, long("expectedRevision"), string("reason"))
-            "cancel" -> JobCommand.Cancel(jobId, idempotencyKey, long("expectedRevision"))
-            "move" -> JobCommand.Move(
-                jobId,
-                idempotencyKey,
-                long("expectedRevision"),
-                KanbanColumnId.of(string("toColumn")),
-            )
-            "acknowledge" -> JobCommand.Acknowledge(jobId, idempotencyKey, long("expectedRevision"))
-            "retract" -> JobCommand.Retract(jobId, idempotencyKey, long("expectedRevision"))
-            else -> error("unknown job command operation: $operation")
-        }
+        val serializer = JobCommand.serializer() as kotlinx.serialization.KSerializer<JobCommand>
+        return borg.trikeshed.parse.confix.ConfixFormat.decodeFromByteArray(serializer, bytes)
     }
 
     /** Canonical encode any string. */
@@ -149,58 +66,19 @@ object CanonicalCbor {
 
     /** Decode the canonical bytes of a JobSnapshot. */
     fun decodeJobSnapshot(bytes: ByteArray): JobSnapshot {
-        val fields = Cbor.decode(bytes) as? Item.Map
-            ?: error("canonical job snapshot must be a CBOR map")
-        fun string(name: String): String =
-            (fields[name] as? Item.Str)?.value ?: error("missing string field: $name")
-        fun long(name: String): Long =
-            (fields[name] as? Item.Num)?.value ?: error("missing integer field: $name")
-        fun int(name: String): Int = long(name).toInt()
-
-        val jobId = JobId.of(string("jobId"))
-        val revision = long("revision")
-        val causalKey = string("causalKey")
-        val lifecycle = string("lifecycle")
-        val dependencies = (fields["dependencies"] as? Item.Arr)?.let { values ->
-            List(values.size) { index ->
-                JobId.of((values[index] as? Item.Str)?.value
-                    ?: error("dependencies[$index] must be a string"))
-            }
-        } ?: emptyList()
-        val attemptCount = int("attemptCount")
-        val parentJobId = (fields["parentJobId"] as? Item.Str)?.value?.let { JobId.of(it) }
-        val attemptId = (fields["attemptId"] as? Item.Str)?.value ?: ""
-
-        return JobSnapshot(
-            jobId = jobId,
-            revision = revision,
-            causalKey = causalKey,
-            lifecycle = lifecycle,
-            dependencies = dependencies,
-            attemptCount = attemptCount,
-            parentJobId = parentJobId,
-            attemptId = attemptId
-        )
+        return borg.trikeshed.parse.confix.ConfixFormat.decodeFromByteArray(JobSnapshot.serializer(), bytes)
     }
 
     /** Canonical encode a JobSnapshot for CID computation. */
     fun encode(snapshot: JobSnapshot): ByteArray {
-        val fields = mutableMapOf<String, Any?>()
-        fields["jobId"] = snapshot.jobId.value
-        fields["revision"] = snapshot.revision
-        fields["causalKey"] = snapshot.causalKey
-        fields["lifecycle"] = snapshot.lifecycle
-        if (snapshot.dependencies.isNotEmpty()) {
-            // Sort dependencies by their underlying string value so insertion
-            // order — and per-list permutation — cannot change the canonical CID.
-            fields["dependencies"] = snapshot.dependencies
-                .map { it.value }
-                .sorted()
-        }
-        fields["attemptCount"] = snapshot.attemptCount
-        snapshot.parentJobId?.let { fields["parentJobId"] = it.value }
-        if (snapshot.attemptId.isNotEmpty()) fields["attemptId"] = snapshot.attemptId
-        return encodeSortedMap(fields)
+        // To preserve sorting of dependencies logic if required, we can rely on Confix sorting map keys.
+        // If sorting of dependencies themselves is required, it must be done before creating the JobSnapshot
+        // or we sort it here and copy. But since they're value objects, they should be created sorted or
+        // the serializer will just output what's given.
+        // We ensure dependencies are sorted here to maintain previous semantics:
+        val sortedDeps = snapshot.dependencies.sortedBy { it.value }
+        val copy = if (sortedDeps != snapshot.dependencies) snapshot.copy(dependencies = sortedDeps) else snapshot
+        return borg.trikeshed.parse.confix.ConfixFormat.encodeToByteArray(JobSnapshot.serializer(), copy)
     }
 
     private fun toCanonical(item: Item): Item = when (item) {
