@@ -371,7 +371,7 @@ object OroborosDaemon {
             pollErrRef = { pollErrOccurred },
             setPollErr = { pollErrOccurred = it },
             runCycle = { runCycle() },
-            preflight = { preflight(repoDir, driver) },
+            preflight = { kotlinx.coroutines.runBlocking { preflight(repoDir, driver) } },
         )
         cycleBodyField = cycleBody
 
@@ -420,17 +420,22 @@ object OroborosDaemon {
         }
     }
 
-    private fun preflight(repoDir: File, driver: FlywheelDriver): Boolean {
+    private suspend fun preflight(repoDir: File, driver: FlywheelDriver): Boolean {
         // git fetch origin master (best-effort, 5s timeout)
-        val fetch = ProcessBuilder("git", "fetch", "origin", "master", "--dry-run")
-            .directory(repoDir).start()
-        val fetchOk = fetch.waitFor() == 0
+        val fetchOk = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            val fetch = ProcessBuilder("git", "fetch", "origin", "master", "--dry-run")
+                .directory(repoDir).start()
+            val finished = fetch.waitFor(5, java.util.concurrent.TimeUnit.SECONDS)
+            if (!finished) fetch.destroyForcibly()
+            finished && fetch.exitValue() == 0
+        }
         if (!fetchOk) return true // offline is OK, we'll poll anyway
 
-        fun command(vararg args: String): String {
+        suspend fun command(vararg args: String): String = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
             val p = ProcessBuilder(*args).directory(repoDir).redirectErrorStream(true).start()
-            p.waitFor()
-            return p.inputStream.bufferedReader().readText().trim()
+            val finished = p.waitFor(10, java.util.concurrent.TimeUnit.SECONDS)
+            if (!finished) p.destroyForcibly()
+            p.inputStream.bufferedReader().readText().trim()
         }
 
         val local = command("git", "rev-parse", "HEAD")
