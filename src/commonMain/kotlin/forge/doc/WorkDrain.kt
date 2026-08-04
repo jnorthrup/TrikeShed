@@ -301,7 +301,6 @@ suspend fun drainSynth11191049401439195892(store: JulesBoardStore) {
 }
 
 suspend fun drainWork(store: JulesBoardStore) {
-    drainSynth11191049401439195892(store)
     val workId = "synth:12224356407860756599#2"
 
     val receipt = MergeReceipt(
@@ -882,6 +881,31 @@ store.appendWork("rework:synth:3803389897151472172#2", JulesCause.WorkDrained(
             ),
             claimedAt = 0L,
             prUrl = null
+        ),
+        at = 0L
+    ))
+}
+
+suspend fun drainSynth10874136384651488584(store: JulesBoardStore) {
+    val workId = "synth:10874136384651488584"
+    store.appendWork(workId, JulesCause.WorkDrained(
+        workId = workId,
+        sessionId = "necromanced",
+        commitSha = "superseded-by-review",
+        taskId = "supersede-pass",
+        receipt = MergeReceipt(
+            workId = workId,
+            producer = "necromancer",
+            producerRef = "necromanced",
+            patchCid = ContentId("sha256:0000000000000000000000000000000000000000000000000000000000000000"),
+            revision = "superseded-by-review",
+            versionTag = "superseded-by-review",
+            lexicalMemory = LexicalMemory(
+                "Superseded necromanced work",
+                "Fix BTRFS Chunk Tree Data Offset Logic",
+                "Superseded via drain script."
+            ),
+            claimedAt = 0L
         ),
         at = 0L
     ))
