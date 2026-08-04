@@ -403,9 +403,13 @@ drainSession6782365670930877266(store)
     drainSynth9541627119654770290(store)
     drainSession6767211552403505227(store)
 <<<<<<< ours
+<<<<<<< ours
     drainSession935214278571271783(store)
 =======
     drainSession9641589462865783879(store)
+>>>>>>> theirs
+=======
+    drainSession7295019988216699135(store)
 >>>>>>> theirs
 
     val workId = "synth:12224356407860756599#2"
@@ -838,6 +842,7 @@ suspend fun drainSession6445047513596006594(store: JulesBoardStore) {
 <<<<<<< ours
 <<<<<<< ours
 <<<<<<< ours
+<<<<<<< ours
 suspend fun drainSession8796422776580867101(store: JulesBoardStore) {
     val workId = "session:8796422776580867101"
 =======
@@ -860,6 +865,10 @@ suspend fun drainSession8881364136263100567(store: JulesBoardStore) {
 suspend fun drainSession9424664620339514590(store: JulesBoardStore) {
     val workId = "session:9424664620339514590"
 >>>>>>> theirs
+=======
+suspend fun drainSession7295019988216699135(store: JulesBoardStore) {
+    val workId = "session:7295019988216699135"
+>>>>>>> theirs
     store.appendWork(workId, JulesCause.WorkDrained(
         workId = workId,
         sessionId = "necromanced",
@@ -872,6 +881,7 @@ suspend fun drainSession9424664620339514590(store: JulesBoardStore) {
             patchCid = ContentId("sha256:0000000000000000000000000000000000000000000000000000000000000000"),
             revision = "superseded-by-review",
             versionTag = "superseded-by-review",
+<<<<<<< ours
 <<<<<<< ours
 <<<<<<< ours
 <<<<<<< ours
@@ -909,12 +919,16 @@ suspend fun drainSession9424664620339514590(store: JulesBoardStore) {
 >>>>>>> theirs
 =======
 >>>>>>> theirs
+=======
+            lexicalMemory = LexicalMemory("Superseded necromanced work", "Superseded necromanced work", "Superseded via drain script."),
+>>>>>>> theirs
             claimedAt = 0L,
             prUrl = null
         ),
         at = 0L
     ))
 }
+<<<<<<< ours
 <<<<<<< ours
 <<<<<<< ours
 <<<<<<< ours
@@ -978,6 +992,8 @@ suspend fun drainSession9641589462865783879(store: JulesBoardStore) {
 }
 <<<<<<< ours
 <<<<<<< ours
+>>>>>>> theirs
+=======
 >>>>>>> theirs
 =======
 >>>>>>> theirs
