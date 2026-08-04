@@ -22,6 +22,20 @@ suspend fun drainMmapCasStoreRework(store: JulesBoardStore) {
         sessionId = "necromanced",
         commitSha = "superseded-by-review",
         taskId = "supersede-pass",
+        receipt = MergeReceipt(
+            workId = "rework:synth:965389205015589639#2",
+            producer = "necromancer",
+            producerRef = "necromanced",
+            patchCid = ContentId("sha256:0000000000000000000000000000000000000000000000000000000000000000"),
+            revision = "superseded-by-review",
+            versionTag = "superseded-by-review",
+            lexicalMemory = LexicalMemory(
+                summary = "Superseded necromanced work",
+                title = "[rework #1] Implement MmapCasStore returning mapped slices",
+                content = "Superseded via drain script."
+            ),
+            claimedAt = 0L
+        ),
         at = 0L
     ))
     store.appendWork("synth:965389205015589639", JulesCause.WorkDrained(
@@ -29,6 +43,20 @@ suspend fun drainMmapCasStoreRework(store: JulesBoardStore) {
         sessionId = "necromanced",
         commitSha = "superseded-by-review",
         taskId = "supersede-pass",
+        receipt = MergeReceipt(
+            workId = "synth:965389205015589639",
+            producer = "necromancer",
+            producerRef = "necromanced",
+            patchCid = ContentId("sha256:0000000000000000000000000000000000000000000000000000000000000000"),
+            revision = "superseded-by-review",
+            versionTag = "superseded-by-review",
+            lexicalMemory = LexicalMemory(
+                summary = "Superseded necromanced work",
+                title = "[rework #1] Implement MmapCasStore returning mapped slices",
+                content = "Superseded via drain script."
+            ),
+            claimedAt = 0L
+        ),
         at = 0L
     ))
 }
