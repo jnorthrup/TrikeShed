@@ -350,12 +350,16 @@ suspend fun drainSession7754144918258332580(store: JulesBoardStore) {
 suspend fun drainWork(store: JulesBoardStore) {
 <<<<<<< ours
 <<<<<<< ours
+<<<<<<< ours
     drainSession6838264068941356212(store)
 =======
     drainSession6829366190909942887(store)
 >>>>>>> theirs
 =======
     drainSession7754144918258332580(store)
+>>>>>>> theirs
+=======
+    drainReworkSession8009256908240098737(store)
 >>>>>>> theirs
 drainSession6782365670930877266(store)
     drainSynth9541627119654770290(store)
@@ -809,11 +813,16 @@ suspend fun drainSession6445047513596006594(store: JulesBoardStore) {
 }
 
 <<<<<<< ours
+<<<<<<< ours
 suspend fun drainSession6838264068941356212(store: JulesBoardStore) {
     val workId = "session:6838264068941356212"
 =======
 suspend fun drainSession7116922900756237319(store: JulesBoardStore) {
     val workId = "session:7116922900756237319"
+>>>>>>> theirs
+=======
+suspend fun drainReworkSession8009256908240098737(store: JulesBoardStore) {
+    val workId = "rework:session:8009256908240098737"
 >>>>>>> theirs
     store.appendWork(workId, JulesCause.WorkDrained(
         workId = workId,
@@ -822,6 +831,9 @@ suspend fun drainSession7116922900756237319(store: JulesBoardStore) {
         taskId = "supersede-pass",
         receipt = MergeReceipt(
 <<<<<<< ours
+<<<<<<< ours
+=======
+>>>>>>> theirs
             workId = workId,
             producer = "necromancer",
             producerRef = "necromanced",
@@ -829,6 +841,7 @@ suspend fun drainSession7116922900756237319(store: JulesBoardStore) {
             revision = "superseded-by-review",
             versionTag = "superseded-by-review",
             lexicalMemory = LexicalMemory(
+<<<<<<< ours
 =======
             workId,
             "necromancer",
@@ -838,16 +851,23 @@ suspend fun drainSession7116922900756237319(store: JulesBoardStore) {
             "superseded-by-review",
             LexicalMemory(
 >>>>>>> theirs
+=======
+>>>>>>> theirs
                 "Superseded necromanced work",
                 "Superseded necromanced work",
                 "Superseded via drain script."
             ),
+<<<<<<< ours
 <<<<<<< ours
             claimedAt = 0L,
             prUrl = null
 =======
             0L,
             null
+>>>>>>> theirs
+=======
+            claimedAt = 0L,
+            prUrl = null
 >>>>>>> theirs
         ),
         at = 0L
