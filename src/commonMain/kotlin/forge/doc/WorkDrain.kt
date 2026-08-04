@@ -6,6 +6,31 @@ import borg.trikeshed.util.oroboros.LexicalMemory
 import borg.trikeshed.util.oroboros.MergeReceipt
 import borg.trikeshed.utils.kanban.*
 
+suspend fun drainSynth14338112652041550984(store: JulesBoardStore) {
+    store.appendWork("synth:14338112652041550984", JulesCause.WorkDrained(
+        workId = "synth:14338112652041550984",
+        sessionId = "necromanced",
+        commitSha = "superseded-by-review",
+        taskId = "supersede-pass",
+        receipt = MergeReceipt(
+            workId = "synth:14338112652041550984",
+            producer = "necromancer",
+            producerRef = "necromanced",
+            patchCid = ContentId("sha256:0000000000000000000000000000000000000000000000000000000000000000"),
+            revision = "superseded-by-review",
+            versionTag = "superseded-by-review",
+            lexicalMemory = LexicalMemory(
+                summary = "Superseded necromanced work",
+                title = "[rework #1] TDD PR Deliver TASK G09",
+                content = "Superseded via drain script."
+            ),
+            claimedAt = 0L,
+            prUrl = null
+        ),
+        at = 0L
+    ))
+}
+
 suspend fun drainReadmeDagReteRefraction(store: JulesBoardStore) {
     store.appendWork("readme-dag-rete-refraction", JulesCause.WorkDrained(
         workId = "readme-dag-rete-refraction",
