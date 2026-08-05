@@ -280,6 +280,7 @@
       cb.type = 'checkbox';
       cb.className = 'todo-checkbox';
       cb.checked = !!block.checked;
+      cb.setAttribute('aria-label', 'Toggle todo status');
       cb.addEventListener('change', () => {
         mutate(() => { block.checked = cb.checked; });
         el.classList.toggle('done', cb.checked);
