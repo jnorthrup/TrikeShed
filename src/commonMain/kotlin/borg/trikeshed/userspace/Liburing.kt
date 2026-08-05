@@ -72,7 +72,8 @@ internal expect object LiburingImpl : LiburingFacade {
     override fun close(): Result<Unit>
 }
 
-internal fun <T> unsupported(): Result<T> = Result.failure(UnsupportedOperationException("liburing facade is only available on linux"))
+internal fun <T> unsupported(): Result<T> =
+    Result.failure(UnsupportedOperationException("liburing facade is only available on linux"))
 
 internal fun unsupportedUnit(): Unit {
     throw UnsupportedOperationException("liburing facade is only available on linux")
