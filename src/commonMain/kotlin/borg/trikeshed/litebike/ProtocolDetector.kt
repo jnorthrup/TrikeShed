@@ -47,13 +47,23 @@ private object DefaultDetector : ProtocolDetectorStrategy {
         val length = minOf(8, firstBytes.size)
         val charArr = CharArray(length) { firstBytes[it].toInt().toChar() }
         val head = charArr.concatToString()
-        for (token in httpMethods) if (head.startsWith(token)) return Protocol.Http
+
+        // HTTP/2 preface short read check
+        val h2Prefix = "PRI * HTTP/2.0"
+        if (head.isNotEmpty() && h2Prefix.startsWith(head)) {
+            // Short read overlap. If it's just 'P', fallback to HTTP/1.x logic as POST/PUT/PATCH starts with 'P'.
+            if (head.length >= 2) {
+                return Protocol.Http2
+            }
+        }
+
+        for (token in httpMethods) {
+            if (head.startsWith(token) || token.startsWith(head)) {
+                return Protocol.Http
+            }
+        }
         // SSH banner sniff -> Socks5 (litebike style dispatch)
-        if (firstBytes.size >= 3 &&
-            firstBytes[0] == 'S'.code.toByte() &&
-            firstBytes[1] == 'S'.code.toByte() &&
-            firstBytes[2] == 'H'.code.toByte()
-        ) {
+        if (head.isNotEmpty() && (head.startsWith("SSH") || "SSH".startsWith(head))) {
             return Protocol.Socks5
         }
 
@@ -63,9 +73,13 @@ private object DefaultDetector : ProtocolDetectorStrategy {
         }
 
         // DNS header (note: litebike reserves a future Socks5 path here)
-        if (firstBytes[0] in 0x00.toByte()..0x04.toByte() && total >= 2 &&
-            (firstBytes[1].toInt() and 0x80) == 0x00
-        ) return Protocol.Dns
+        if (firstBytes[0] in 0x00.toByte()..0x04.toByte()) {
+            if (firstBytes.size >= 2 && (firstBytes[1].toInt() and 0x80) == 0x00) {
+                return Protocol.Dns
+            } else if (firstBytes.size == 1) {
+                return Protocol.Dns
+            }
+        }
         // JSON: leading '{' or '['
         if (firstBytes[0] == '{'.code.toByte() || firstBytes[0] == '['.code.toByte()) {
             return Protocol.Json
