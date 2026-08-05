@@ -16,10 +16,14 @@ import kotlin.math.max
  * Note: remove/tombstones are extensions outside the original paper's scope.
  * Used by Stringpool.
  */
+<<<<<<< HEAD
 class FunnelHashMap<K : Any, V>(
     initialCapacity: Int = 32,
     slack: Double = 0.20,
 ) {
+=======
+class FunnelHashMap<K : Any, V>(initialCapacity: Int = 32, slack: Double = 0.20) {
+>>>>>>> origin/feature-funnel-slack-beta-15875415286018948826
     private var size = 0
     private var capacity = 0
 
@@ -30,12 +34,17 @@ class FunnelHashMap<K : Any, V>(
 
     private var levels: Array<Level> = emptyArray()
 
+<<<<<<< HEAD
     /** Free-fraction δ used for load target and β sizing. */
     val slack: Double = slack.coerceIn(0.05, 0.50)
 
     /** Bucket size β derived from slack. */
     var beta: Int = betaFor(this.slack)
         private set
+=======
+    private val actualSlack = slack.coerceIn(0.05, 0.50)
+    private val beta = maxOf(8, kotlin.math.ceil(4 * kotlin.math.ln(1.0 / actualSlack)).toInt())
+>>>>>>> origin/feature-funnel-slack-beta-15875415286018948826
 
     companion object {
         private val ABSENT = Any()
@@ -84,9 +93,15 @@ class FunnelHashMap<K : Any, V>(
         var offset = 0
         val b = beta
 
+<<<<<<< HEAD
         while (currentLevelCap >= b) {
             val buckets = currentLevelCap / b
             val actualCap = buckets * b
+=======
+        while (currentLevelCap >= beta) {
+            val buckets = currentLevelCap / beta
+            val actualCap = buckets * beta
+>>>>>>> origin/feature-funnel-slack-beta-15875415286018948826
             newLevels.add(Level(offset, actualCap, buckets))
             offset += actualCap
             remaining -= actualCap
@@ -94,7 +109,11 @@ class FunnelHashMap<K : Any, V>(
         }
 
         if (remaining > 0) {
+<<<<<<< HEAD
             newLevels.add(Level(offset, remaining, (remaining + b - 1) / b))
+=======
+            newLevels.add(Level(offset, remaining, (remaining + beta - 1) / beta))
+>>>>>>> origin/feature-funnel-slack-beta-15875415286018948826
         }
 
         levels = newLevels.toTypedArray()
@@ -119,7 +138,12 @@ class FunnelHashMap<K : Any, V>(
     }
 
     fun put(key: K, value: V): V? {
+<<<<<<< HEAD
         if (size >= liveCap()) {
+=======
+        // Target max load factor based on slack
+        if (size >= (capacity * (1.0 - actualSlack)).toInt()) {
+>>>>>>> origin/feature-funnel-slack-beta-15875415286018948826
             resize(capacity * 2)
         }
 
@@ -131,8 +155,17 @@ class FunnelHashMap<K : Any, V>(
             if (level.buckets == 0) continue
             val h = hash(key, lvl)
             val bucketIdx = (h.toUInt() % level.buckets.toUInt()).toInt()
+<<<<<<< HEAD
             val startIdx = level.offset + bucketIdx * b
             val bound = minOf(startIdx + b, level.offset + level.capacity, keys.size)
+=======
+
+            // Linear probe within the bucket (or up to beta elements)
+            val startIdx = level.offset + bucketIdx * beta
+            val bound = minOf(startIdx + beta, level.offset + level.capacity, keys.size)
+
+            var firstTombstone = -1
+>>>>>>> origin/feature-funnel-slack-beta-15875415286018948826
 
             for (i in startIdx until bound) {
                 val k = keys[i]
@@ -155,8 +188,13 @@ class FunnelHashMap<K : Any, V>(
             if (level.buckets == 0) continue
             val h = hash(key, lvl)
             val bucketIdx = (h.toUInt() % level.buckets.toUInt()).toInt()
+<<<<<<< HEAD
             val startIdx = level.offset + bucketIdx * b
             val bound = minOf(startIdx + b, level.offset + level.capacity, keys.size)
+=======
+            val startIdx = level.offset + bucketIdx * beta
+            val bound = minOf(startIdx + beta, level.offset + level.capacity, keys.size)
+>>>>>>> origin/feature-funnel-slack-beta-15875415286018948826
             for (i in startIdx until bound) {
                 val k = keys[i]
                 if (k === ABSENT) break
@@ -174,8 +212,13 @@ class FunnelHashMap<K : Any, V>(
             if (level.buckets == 0) continue
             val h = hash(key, lvl)
             val bucketIdx = (h.toUInt() % level.buckets.toUInt()).toInt()
+<<<<<<< HEAD
             val startIdx = level.offset + bucketIdx * b
             val bound = minOf(startIdx + b, level.offset + level.capacity, keys.size)
+=======
+            val startIdx = level.offset + bucketIdx * beta
+            val bound = minOf(startIdx + beta, level.offset + level.capacity, keys.size)
+>>>>>>> origin/feature-funnel-slack-beta-15875415286018948826
             for (i in startIdx until bound) {
                 val k = keys[i]
                 if (k === ABSENT || k === DELETED) {
@@ -197,8 +240,14 @@ class FunnelHashMap<K : Any, V>(
             if (level.buckets == 0) continue
             val h = hash(key, lvl)
             val bucketIdx = (h.toUInt() % level.buckets.toUInt()).toInt()
+<<<<<<< HEAD
             val startIdx = level.offset + bucketIdx * b
             val bound = minOf(startIdx + b, level.offset + level.capacity, keys.size)
+=======
+
+            val startIdx = level.offset + bucketIdx * beta
+            val bound = minOf(startIdx + beta, level.offset + level.capacity, keys.size)
+>>>>>>> origin/feature-funnel-slack-beta-15875415286018948826
 
             for (i in startIdx until bound) {
                 val k = keys[i]
@@ -219,8 +268,14 @@ class FunnelHashMap<K : Any, V>(
             if (level.buckets == 0) continue
             val h = hash(key, lvl)
             val bucketIdx = (h.toUInt() % level.buckets.toUInt()).toInt()
+<<<<<<< HEAD
             val startIdx = level.offset + bucketIdx * b
             val bound = minOf(startIdx + b, level.offset + level.capacity, keys.size)
+=======
+
+            val startIdx = level.offset + bucketIdx * beta
+            val bound = minOf(startIdx + beta, level.offset + level.capacity, keys.size)
+>>>>>>> origin/feature-funnel-slack-beta-15875415286018948826
 
             for (i in startIdx until bound) {
                 val k = keys[i]
@@ -239,14 +294,22 @@ class FunnelHashMap<K : Any, V>(
     }
 
     fun probeDistribution(sample: List<K>): List<Int> {
+<<<<<<< HEAD
         val b = beta
         return sample.map { key ->
             var probes = 0
+=======
+        val result = mutableListOf<Int>()
+        for (key in sample) {
+            var probes = 0
+            var done = false
+>>>>>>> origin/feature-funnel-slack-beta-15875415286018948826
             for (lvl in levels.indices) {
                 val level = levels[lvl]
                 if (level.buckets == 0) continue
                 val h = hash(key, lvl)
                 val bucketIdx = (h.toUInt() % level.buckets.toUInt()).toInt()
+<<<<<<< HEAD
                 val startIdx = level.offset + bucketIdx * b
                 val bound = minOf(startIdx + b, level.offset + level.capacity, keys.size)
                 for (i in startIdx until bound) {
@@ -257,5 +320,24 @@ class FunnelHashMap<K : Any, V>(
             }
             probes
         }
+=======
+
+                val startIdx = level.offset + bucketIdx * beta
+                val bound = minOf(startIdx + beta, level.offset + level.capacity, keys.size)
+
+                for (i in startIdx until bound) {
+                    probes++
+                    val k = keys[i]
+                    if (k === ABSENT || k == key) {
+                        done = true
+                        break
+                    }
+                }
+                if (done) break
+            }
+            result.add(probes)
+        }
+        return result
+>>>>>>> origin/feature-funnel-slack-beta-15875415286018948826
     }
 }
