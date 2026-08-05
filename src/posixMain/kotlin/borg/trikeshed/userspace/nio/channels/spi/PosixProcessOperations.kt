@@ -13,18 +13,18 @@ class PosixProcessOperations : ProcessOperations {
         args: List<String>,
         stdin: ByteArray?,
         env: Map<String, String>,
-    ): ProcessResult = withContext(Dispatchers.IO) {
+    ): ProcessResult = withContext(Dispatchers.IO) { // OPTIMIZATION: Moved blocking I/O to Dispatchers.IO to prevent thread starvation
         val stdinPath = stdin?.let { createTempFile(it) }
         val stdoutPath = createTempFile(byteArrayOf())
         if (stdoutPath == null) {
-            withContext(Dispatchers.Default) {
+            withContext(Dispatchers.IO) { // OPTIMIZATION: Moved blocking I/O to Dispatchers.IO to prevent thread starvation
                 stdinPath?.let(::unlink)
             }
             return@withContext ProcessResult(-1, byteArrayOf(), "mkstemp(stdout) failed".encodeToByteArray())
         }
         val stderrPath = createTempFile(byteArrayOf())
         if (stderrPath == null) {
-            withContext(Dispatchers.Default) {
+            withContext(Dispatchers.IO) { // OPTIMIZATION: Moved blocking I/O to Dispatchers.IO to prevent thread starvation
                 stdinPath?.let(::unlink)
                 unlink(stdoutPath)
             }
@@ -91,7 +91,7 @@ class PosixProcessOperations : ProcessOperations {
         val stdout = readFile(stdoutPath)
         val stderr = readFile(stderrPath)
 
-        withContext(Dispatchers.Default) {
+        withContext(Dispatchers.IO) { // OPTIMIZATION: Moved blocking I/O to Dispatchers.IO to prevent thread starvation
             stdinPath?.let(::unlink)
             unlink(stdoutPath)
             unlink(stderrPath)
@@ -100,7 +100,7 @@ class PosixProcessOperations : ProcessOperations {
         ProcessResult(exitCode = exitCode, stdout = stdout, stderr = stderr)
     }
 
-    private suspend fun createTempFile(bytes: ByteArray): String? = withContext(Dispatchers.Default) {
+    private suspend fun createTempFile(bytes: ByteArray): String? = withContext(Dispatchers.IO) { // OPTIMIZATION: Moved blocking I/O to Dispatchers.IO to prevent thread starvation
         memScoped {
             val template = "/tmp/trikeshed-process-XXXXXX".cstr.placeTo(this)
             val fd = mkstemp(template)
@@ -126,7 +126,7 @@ class PosixProcessOperations : ProcessOperations {
         }
     }
 
-    private suspend fun readFile(path: String): ByteArray = withContext(Dispatchers.Default) {
+    private suspend fun readFile(path: String): ByteArray = withContext(Dispatchers.IO) { // OPTIMIZATION: Moved blocking I/O to Dispatchers.IO to prevent thread starvation
         val fp = fopen(path, "rb") ?: return@withContext byteArrayOf()
         try {
             memScoped {
