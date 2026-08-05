@@ -7,11 +7,13 @@ import borg.trikeshed.lib.*
     val slabs: List<IntArray>,
     val colCount: Int,
     val axisPos: IntArray,
-    val axisSet: Collection<Int>,
+    val axisSet: BooleanArray,
 )
 
 @PublishedApi internal fun Cursor.buildGroups(axis: IntArray): GroupState {
-    val axisSet = if (axis.size > 16) axis.toHashSet() else axis.toList()
+    val colCount = this[0].size
+    // ⚡ Bolt: Pre-build BooleanArray lookup for O(1) indexed access to prevent O(N) list scans in the Series mapping lambda below.
+    val axisSet = BooleanArray(colCount) { it in axis }
     val clusters = linkedMapOf<Series<Any?>, IntAccumulator>()
     for (r in 0 until size) {
         val row = this[r] as ReifiedSplitSeries2<*, *>
@@ -20,7 +22,6 @@ import borg.trikeshed.lib.*
     }
     val keys = clusters.keys.toList()
     val slabs = clusters.values.map { acc -> acc.toIntArray().also { acc.close() } }
-    val colCount = this[0].size
     val axisPos = IntArray(colCount) { -1 }.also { a -> axis.forEachIndexed { pos, col -> a[col] = pos } }
     @Suppress("UNCHECKED_CAST")
     return GroupState(keys as List<List<Any?>>, slabs, colCount, axisPos, axisSet)
@@ -35,7 +36,7 @@ fun Cursor.groupBy(vararg axis: Int): Cursor {
     return keys.size j { cy ->
         val rowIndices = slabs[cy]; val key = keys[cy]
         colCount j { cx ->
-            if (cx in axisSet) key[axisPos[cx]] j { cm[cx] }
+            if (axisSet[cx]) key[axisPos[cx]] j { cm[cx] }
             else (rowIndices.size j { i: Int -> this[rowIndices[i]][cx].a }) j { cm[cx] }
         }
     }
@@ -47,7 +48,7 @@ inline fun Cursor.groupBy(axis: IntArray, crossinline reducer: RowReducer): Curs
     val (keys, slabs, colCount, axisPos, axisSet) = buildGroups(axis)
     val row0 = this.b(0)
     val cm: Series<ColumnMeta> = row0.a j { c: Int -> row0.b(c).b() }
-    val valueIndices = (0 until colCount).filter { it !in axisSet }
+    val valueIndices = (0 until colCount).filter { !axisSet[it] }
     return keys.size j { cy ->
         val rowIndices = slabs[cy]; val key = keys[cy]
         val acc = arrayOfNulls<Any?>(colCount)
@@ -56,7 +57,7 @@ inline fun Cursor.groupBy(axis: IntArray, crossinline reducer: RowReducer): Curs
             acc[cx] = reducer(acc[cx], row.leftSeries[cx])
         }
         colCount j { cx ->
-            if (cx in axisSet) key[axisPos[cx]] j { cm[cx] }
+            if (axisSet[cx]) key[axisPos[cx]] j { cm[cx] }
             else acc[cx] j { cm[cx] }
         }
     }

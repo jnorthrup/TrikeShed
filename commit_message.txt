@@ -1,5 +1,6 @@
-refactor(userspace): implement suspend batchEnqueue for UserspaceChannelBackend
+⚡ Bolt: Avoid O(N) list scans during GroupBy Series mappings
 
-- Add suspend `batchEnqueue` method to `UserspaceChannelBackend` and `FunctionalUringFacade`.
-- `FunctionalUringFacade` implements cancellation-safe completion harvesting by using `withContext(NonCancellable)` and buffering in an ArrayDeque to ensure results are correctly managed.
-- `UserspaceIO.jvm.kt` implements the backend component leveraging the JVM's `submitBatch` synchronously bridged in `withContext(Dispatchers.IO)`.
+💡 What: Replaced the `Collection<Int>` used for `axisSet` in `GroupBy.kt` with a pre-built `BooleanArray`.
+🎯 Why: `axisSet` was falling back to an `axis.toList()`, causing the `if (cx in axisSet)` check inside the nested `colCount j { cx -> ... }` lambda to scan the collection linearly O(N). Because map lambdas in `Series<T>` are evaluated on every indexed access, this created a hidden O(N²) trap and severe allocation overhead.
+📊 Impact: Transforms the column axis inclusion check from O(N) into an O(1) primitive array lookup (`axisSet[cx]`). This entirely prevents the O(N²) trap on `Cursor.groupBy` evaluations, lowering CPU time and improving memory cache friendliness by avoiding boxed types.
+🔬 Measurement: Verify using the built-in query test suites (`./gradlew jvmTest --tests *GroupBy*`). CPU sampling on large grouping workloads will reflect a decrease in list iterator overhead.
