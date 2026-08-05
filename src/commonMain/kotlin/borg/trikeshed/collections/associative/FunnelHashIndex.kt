@@ -1,15 +1,13 @@
 package borg.trikeshed.collections.associative
 
-import borg.trikeshed.job.Sha256Pure
-
 /**
  * FunnelHashIndex — tiered linear probing with expanding probe bounds.
  *
  * Key properties:
  * - Append-only immutable segment (no delete/retract)
  * - Negative-query-heavy workloads (dedup, membership, frozen schema)
- * - Multi-level funnel: each level doubles probe bound, halves capacity
- * - Deterministic replay: probe entropy derived from canonical facet bytes + committed seed
+ * - Multi-level expanding probeBound geometry, NOT paper β-bucket funnel; do NOT claim O(log² 1/δ)
+ * - Deterministic replay: probe entropy derived from key hashCode + committed seed
  *
  * Usage:
  *   val idx = FunnelHashIndex.build(listOf("a", "b", "c"), seed)
@@ -55,7 +53,7 @@ class FunnelHashIndex<K : Any> internal constructor(
                 for (j in keys.indices) {
                     if (placed[j]) continue
                     val key = keys[j]
-                    val h = hash64(key, seed + probeBound.toLong())
+                    val h = mix64(key.hashCode(), seed + probeBound.toLong())
                     var placedThis = false
                     var i = 0
                     while (i < probeBound && i < cap) {
@@ -92,7 +90,7 @@ class FunnelHashIndex<K : Any> internal constructor(
                 for (j in keys.indices) {
                     if (placed[j]) continue
                     val key = keys[j]
-                    val h = hash64(key, seed + 0xdeadbeefL)
+                    val h = mix64(key.hashCode(), seed + 0xdeadbeefL)
                     var i = 0
                     while (true) {
                         val slot = ((h + i) and (cap.toLong() - 1)).toInt()
@@ -118,12 +116,8 @@ class FunnelHashIndex<K : Any> internal constructor(
             return cap
         }
 
-        private fun hash64(key: Any, seed: Long): Long {
-            val bytes = Sha256Pure.digest(key.toString().encodeToByteArray())
-            var z = seed + bytes.size.toLong()
-            for (b in bytes) {
-                z = (z + (b.toLong() and 0xFFL)) * -0x61c8864680b583ebL
-            }
+        private fun mix64(hash: Int, seed: Long): Long {
+            var z = seed + hash.toLong()
             z = (z xor (z shr 30)) * -0x40a7b892e31b1a47L
             z = (z xor (z shr 27)) * -0x6b2fb644ecced115L
             z = z xor (z shr 31)
@@ -135,7 +129,7 @@ class FunnelHashIndex<K : Any> internal constructor(
     fun get(key: K): Int? {
         for (level in levels) {
             val levelSeed = if (level.probeBound == Int.MAX_VALUE) seed + 0xdeadbeefL else seed + level.probeBound.toLong()
-            val h = hash64(key, levelSeed)
+            val h = mix64(key.hashCode(), levelSeed)
             val bound = if (level.probeBound == Int.MAX_VALUE) level.capacity else level.probeBound
             var i = 0
             while (i < bound) {
@@ -164,7 +158,7 @@ class FunnelHashIndex<K : Any> internal constructor(
             var totalProbes = 0
             for (level in levels) {
                 val levelSeed = if (level.probeBound == Int.MAX_VALUE) seed + 0xdeadbeefL else seed + level.probeBound.toLong()
-                val h = hash64(key, levelSeed)
+                val h = mix64(key.hashCode(), levelSeed)
                 val bound = if (level.probeBound == Int.MAX_VALUE) level.capacity else level.probeBound
                 var i = 0
                 while (i < bound) {
@@ -180,12 +174,8 @@ class FunnelHashIndex<K : Any> internal constructor(
         }
     }
 
-    private fun hash64(key: Any, seed: Long): Long {
-        val bytes = Sha256Pure.digest(key.toString().encodeToByteArray())
-        var z = seed + bytes.size.toLong()
-        for (b in bytes) {
-            z = (z + (b.toLong() and 0xFFL)) * -0x61c8864680b583ebL
-        }
+    private fun mix64(hash: Int, seed: Long): Long {
+        var z = seed + hash.toLong()
         z = (z xor (z shr 30)) * -0x40a7b892e31b1a47L
         z = (z xor (z shr 27)) * -0x6b2fb644ecced115L
         z = z xor (z shr 31)
