@@ -1,18 +1,10 @@
 package borg.trikeshed.collections
 
-import borg.trikeshed.job.Sha256Pure
-
 /**
- * FunnelHashIndex — tiered linear probing with expanding probe bounds.
+ * Public alias for the frozen multi-level membership index.
+ * Implementation: [borg.trikeshed.collections.associative.FunnelHashIndex].
  *
- * Key properties:
- * - Append-only immutable segment (no delete/retract)
- * - Negative-query-heavy workloads (dedup, membership, frozen schema)
- * - Multi-level funnel: each level doubles probe bound, halves capacity
- * - Deterministic replay: probe entropy derived from canonical facet bytes + committed seed
- *
- * Usage:
- *   val idx = FunnelHashIndex.build(listOf("a", "b", "c"), seed)
- *   val pos = idx.get("b")  // returns Some(1) or null
+ * Cousin of Krapivin funnel geometry (expanding probe bounds), not the paper's
+ * β-bucket funnel. No O(log² 1/δ) claim. Unit-cost mix64 probes.
  */
 typealias FunnelHashIndex<K> = borg.trikeshed.collections.associative.FunnelHashIndex<K>

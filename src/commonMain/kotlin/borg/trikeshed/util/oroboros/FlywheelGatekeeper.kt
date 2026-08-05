@@ -14,6 +14,18 @@ data class LexicalMemory(
 
     fun overlap(other: LexicalMemory): Int = terms.count { it in other.terms }
 
+    /**
+     * Line-CAS proximity against [other]: trim→CAS each line, stamp bidirectional
+     * 2-hex neighbor prefixes, score LINKED > PARTIAL > CONTENT_ONLY.
+     * Structural reuse (same line + same neighborhood) beats bare term overlap
+     * for long-form agent text where boilerplate terms collide.
+     */
+    fun lineCasProximity(other: LexicalMemory): Double {
+        val a = borg.trikeshed.cas.LineCas.spine("$summary\n$title\n$content")
+        val b = borg.trikeshed.cas.LineCas.spine("${other.summary}\n${other.title}\n${other.content}")
+        return borg.trikeshed.cas.LineCas.proximity(a, b)
+    }
+
     companion object {
         private fun tokenize(text: String): Set<String> = text
             .lowercase()

@@ -1,21 +1,34 @@
 package borg.trikeshed.collections
 
+import kotlin.math.ceil
+import kotlin.math.ln
+import kotlin.math.max
+
 /**
- * FunnelHashMap — greedy open-addressing hash map based on Krapivin et al. (2025)
- * "Optimal Bounds for Open Addressing Without Reordering".
+ * FunnelHashMap — greedy open-addressing map with Krapivin-shaped geometry.
  *
- * Implements "Funnel Hashing":
- * - The table is conceptually divided into levels A_1, A_2, ..., A_alpha of decreasing size.
- * - Each level is divided into buckets of size beta.
- * - To insert or get, we hash to a bucket in A_1 and linearly probe within that bucket.
- * - If not found/full, we hash to a bucket in A_2, and so on.
- * - A final fallback level handles overflows.
+ * Inspired by Farach-Colton, Krapivin, Kuszmaul (arXiv:2501.02305) "funnel hashing":
+ * - Levels A_1 … A_α of decreasing size (¾ decay here)
+ * - Each level split into buckets of size β = max(8, ⌈4 ln(1/δ)⌉)
+ * - Insert/get: hash → one bucket in A_i; linear probe within that bucket; else next level
+ * - Final remainder level is overflow
  *
- * This achieves O(log^2(1/delta)) worst-case expected probe complexity and
- * O(log(1/delta)) amortized, completely avoiding Yao's bound for standard linear probing,
- * without reordering elements.
+ * Parameters:
+ * - [slack] = δ ∈ [0.05, 0.50]: free fraction. Load target = 1−δ (default δ=0.20 → load 0.80).
+ * - β grows as tables run fuller (smaller δ). Default δ keeps β=8 (prior fixed constant).
+ *
+ * Honesty vs the paper:
+ * - Bound O(log² 1/δ) is not measured or proven for this implementation.
+ * - remove()/tombstones are outside the paper's insert-focused setting.
+ * - Paper elastic (non-greedy) hashing is not this type.
+ * - Use [probeDistribution] to sample probe counts under load — do not cite CACM bounds from docs alone.
+ *
+ * Production consumer: couch.isam.Stringpool (memoized string → offset).
  */
-class FunnelHashMap<K : Any, V>(initialCapacity: Int = 32) {
+class FunnelHashMap<K : Any, V>(
+    initialCapacity: Int = 32,
+    slack: Double = 0.20,
+) {
     private var size = 0
     private var capacity = 0
 
@@ -24,19 +37,37 @@ class FunnelHashMap<K : Any, V>(initialCapacity: Int = 32) {
 
     private var levels: Array<Level> = emptyArray()
 
+    /** Free-fraction δ used for load target and β sizing. */
+    val slack: Double = slack.coerceIn(0.05, 0.50)
+
+    /** Bucket size β derived from slack (recomputed on each resize). */
+    var beta: Int = betaFor(this.slack)
+        private set
+
     companion object {
         private val ABSENT = Any()
         private val DELETED = Any()
 
-        private const val BETA = 8 // bucket size
         private const val DECAY_NUM = 3
         private const val DECAY_DEN = 4 // A_{i+1} = 3/4 A_i
+        private const val MIN_BETA = 8
+        /** Scale so δ=0.20 stays at floor 8; tighter δ grows β (δ=0.10→10, δ=0.05→12). */
+        private const val BETA_LN_SCALE = 4.0
+
+        /**
+         * β ≈ Θ(log 1/δ). Floor 8 matches the prior fixed constant (Stringpool default-safe).
+         */
+        fun betaFor(slack: Double): Int {
+            val d = slack.coerceIn(0.05, 0.50)
+            val raw = BETA_LN_SCALE * ln(1.0 / d)
+            return max(MIN_BETA, ceil(raw).toInt())
+        }
     }
 
     class Level(
         val offset: Int,
         val capacity: Int,
-        val buckets: Int
+        val buckets: Int,
     )
 
     init {
@@ -44,33 +75,39 @@ class FunnelHashMap<K : Any, V>(initialCapacity: Int = 32) {
     }
 
     val count: Int get() = size
+    val tableCapacity: Int get() = capacity
+    val loadFactor: Double get() = if (capacity == 0) 0.0 else size.toDouble() / capacity
+    val levelCount: Int get() = levels.size
+
+    /** Max live entries before resize: floor(capacity * (1 − δ)). */
+    private fun liveCap(): Int = (capacity * (1.0 - slack)).toInt().coerceAtLeast(1)
 
     private fun resize(newCap: Int) {
         val oldKeys = keys
         val oldValues = values
 
         capacity = newCap
+        beta = betaFor(slack)
         keys = Array(capacity) { ABSENT }
         values = Array(capacity) { ABSENT }
 
-        // Build levels
         val newLevels = mutableListOf<Level>()
         var remaining = capacity
         var currentLevelCap = remaining / 2
         var offset = 0
+        val b = beta
 
-        while (currentLevelCap >= BETA) {
-            val buckets = currentLevelCap / BETA
-            val actualCap = buckets * BETA
+        while (currentLevelCap >= b) {
+            val buckets = currentLevelCap / b
+            val actualCap = buckets * b
             newLevels.add(Level(offset, actualCap, buckets))
             offset += actualCap
             remaining -= actualCap
             currentLevelCap = (actualCap * DECAY_NUM) / DECAY_DEN
         }
 
-        // Fallback level gets the rest
         if (remaining > 0) {
-            newLevels.add(Level(offset, remaining, (remaining + BETA - 1) / BETA))
+            newLevels.add(Level(offset, remaining, (remaining + b - 1) / b))
         }
 
         levels = newLevels.toTypedArray()
@@ -96,23 +133,22 @@ class FunnelHashMap<K : Any, V>(initialCapacity: Int = 32) {
     }
 
     fun put(key: K, value: V): V? {
-        // Target max load factor 0.8
-        if (size >= capacity * 4 / 5) {
+        if (size >= liveCap()) {
             resize(capacity * 2)
         }
 
+        val b = beta
+
+        // Fast path: insert into first free slot in funnel order when key is new.
         for (lvl in levels.indices) {
             val level = levels[lvl]
             if (level.buckets == 0) continue
             val h = hash(key, lvl)
             val bucketIdx = (h.toUInt() % level.buckets.toUInt()).toInt()
-
-            // Linear probe within the bucket (or up to BETA elements)
-            val startIdx = level.offset + bucketIdx * BETA
-            val bound = minOf(startIdx + BETA, level.offset + level.capacity, keys.size)
+            val startIdx = level.offset + bucketIdx * b
+            val bound = minOf(startIdx + b, level.offset + level.capacity, keys.size)
 
             var firstTombstone = -1
-
             for (i in startIdx until bound) {
                 val k = keys[i]
                 if (k === ABSENT) {
@@ -130,29 +166,16 @@ class FunnelHashMap<K : Any, V>(initialCapacity: Int = 32) {
                     return old
                 }
             }
-            // If bucket was fully searched (no ABSENT found) but we saw a DELETED, we can use it.
-            // But if we use it, the key still might be in a later level!
-            // According to standard open addressing, if we hit the bound without finding ABSENT,
-            // we should technically continue the search in the next level to see if it exists.
-            // However, to keep it simple and correct, we only insert into a tombstone if we reach ABSENT
-            // in THIS level, OR if we never found it at all across all levels.
-            // Actually, the Krapivin paper handles purely insert/query, not deletions.
-            // Since we need correctness on overwrites, we'll store the globally first tombstone and use it at the end.
         }
 
-        // To be completely correct with tombstones across levels:
-        // We first do a full get() like search to see if it exists to overwrite.
-        // If not, we insert at the first available slot (ABSENT or DELETED).
-        // Let's do a 2-pass for simplicity and correctness.
-
-        // Pass 1: Find existing
+        // Tombstone / dense path: find existing first, then first free.
         for (lvl in levels.indices) {
             val level = levels[lvl]
             if (level.buckets == 0) continue
             val h = hash(key, lvl)
             val bucketIdx = (h.toUInt() % level.buckets.toUInt()).toInt()
-            val startIdx = level.offset + bucketIdx * BETA
-            val bound = minOf(startIdx + BETA, level.offset + level.capacity, keys.size)
+            val startIdx = level.offset + bucketIdx * b
+            val bound = minOf(startIdx + b, level.offset + level.capacity, keys.size)
             for (i in startIdx until bound) {
                 val k = keys[i]
                 if (k === ABSENT) break
@@ -165,14 +188,13 @@ class FunnelHashMap<K : Any, V>(initialCapacity: Int = 32) {
             }
         }
 
-        // Pass 2: Insert at first free slot
         for (lvl in levels.indices) {
             val level = levels[lvl]
             if (level.buckets == 0) continue
             val h = hash(key, lvl)
             val bucketIdx = (h.toUInt() % level.buckets.toUInt()).toInt()
-            val startIdx = level.offset + bucketIdx * BETA
-            val bound = minOf(startIdx + BETA, level.offset + level.capacity, keys.size)
+            val startIdx = level.offset + bucketIdx * b
+            val bound = minOf(startIdx + b, level.offset + level.capacity, keys.size)
             for (i in startIdx until bound) {
                 val k = keys[i]
                 if (k === ABSENT || k === DELETED) {
@@ -184,25 +206,24 @@ class FunnelHashMap<K : Any, V>(initialCapacity: Int = 32) {
             }
         }
 
-        // If we fall through, the table is too dense in the hash paths, force resize
         resize(capacity * 2)
         return put(key, value)
     }
 
     fun get(key: K): V? {
+        val b = beta
         for (lvl in levels.indices) {
             val level = levels[lvl]
             if (level.buckets == 0) continue
             val h = hash(key, lvl)
             val bucketIdx = (h.toUInt() % level.buckets.toUInt()).toInt()
-
-            val startIdx = level.offset + bucketIdx * BETA
-            val bound = minOf(startIdx + BETA, level.offset + level.capacity, keys.size)
+            val startIdx = level.offset + bucketIdx * b
+            val bound = minOf(startIdx + b, level.offset + level.capacity, keys.size)
 
             for (i in startIdx until bound) {
                 val k = keys[i]
                 if (k === ABSENT) {
-                    return null // If absent, it was never here or probe chain broke
+                    return null
                 } else if (k == key) {
                     @Suppress("UNCHECKED_CAST")
                     return values[i] as V?
@@ -215,14 +236,14 @@ class FunnelHashMap<K : Any, V>(initialCapacity: Int = 32) {
     fun contains(key: K): Boolean = get(key) != null
 
     fun remove(key: K): V? {
+        val b = beta
         for (lvl in levels.indices) {
             val level = levels[lvl]
             if (level.buckets == 0) continue
             val h = hash(key, lvl)
             val bucketIdx = (h.toUInt() % level.buckets.toUInt()).toInt()
-
-            val startIdx = level.offset + bucketIdx * BETA
-            val bound = minOf(startIdx + BETA, level.offset + level.capacity, keys.size)
+            val startIdx = level.offset + bucketIdx * b
+            val bound = minOf(startIdx + b, level.offset + level.capacity, keys.size)
 
             for (i in startIdx until bound) {
                 val k = keys[i]
@@ -239,5 +260,31 @@ class FunnelHashMap<K : Any, V>(initialCapacity: Int = 32) {
             }
         }
         return null
+    }
+
+    /**
+     * Probe counts for present [sample] keys (or empty → no-op).
+     * Each entry is probes until found (or 0 if missing). For load experiments.
+     */
+    fun probeDistribution(sample: List<K>): List<Int> {
+        val b = beta
+        return sample.map { key ->
+            var probes = 0
+            for (lvl in levels.indices) {
+                val level = levels[lvl]
+                if (level.buckets == 0) continue
+                val h = hash(key, lvl)
+                val bucketIdx = (h.toUInt() % level.buckets.toUInt()).toInt()
+                val startIdx = level.offset + bucketIdx * b
+                val bound = minOf(startIdx + b, level.offset + level.capacity, keys.size)
+                for (i in startIdx until bound) {
+                    probes++
+                    val k = keys[i]
+                    if (k === ABSENT) return@map probes
+                    if (k == key) return@map probes
+                }
+            }
+            probes
+        }
     }
 }

@@ -387,10 +387,14 @@ class FlywheelDriver(
         // zero conflicts — this is the common idle path.
         if (sessions.isEmpty() && conflictFiles().isEmpty()) {
             synchronizeMain()
+            // Harvest unmerged origin/* branches on idle cycles to keep the
+            // pipeline draining even when Jules has no COMPLETED sessions.
+            harvestOrphanBranches()
         } else if (sessions.isEmpty()) {
             commitExistingConflicts()
             synchronizeMain()
             commitExistingConflicts()
+            harvestOrphanBranches()
         }
         val drain = drainFanout(sessions)
         val harvested = drain.harvested
@@ -1192,6 +1196,79 @@ class FlywheelDriver(
         )
     }
 
+    /**
+     * Merge unmerged origin branches that have no Jules session backing them —
+     * bolt, palette, refactor, perf, feat branches etc — into master using
+     * the same forward-only 3-way policy. Processes up to ORPHAN_HARVEST_BATCH
+     * branches per call so latency stays bounded. Skips branches already merged
+     * into master (fast ancestry check via `git merge-base --is-ancestor`).
+     */
+    private val ORPHAN_HARVEST_BATCH = 4
+    // Branches excluded from autonomous harvest: large structural renames and
+    // the aggregate roll-up branches land manually.
+    private val HARVEST_EXCLUDE_PREFIXES = setOf("origin/aggregate/", "origin/backup/", "origin/arena/")
+
+    private suspend fun harvestOrphanBranches() {
+        if (!isWorkingTreeClean()) return
+
+        val refs = git("for-each-ref", "--format=%(refname:short)", "refs/remotes/origin")
+            .takeIf { it.exitCode == 0 }?.output?.lineSequence()
+            ?.map { it.trim() }
+            ?.filter { ref ->
+                ref.startsWith("origin/") &&
+                ref != "origin/master" &&
+                ref != "origin/HEAD" &&
+                HARVEST_EXCLUDE_PREFIXES.none { ref.startsWith(it) }
+            }
+            ?.toList() ?: return
+
+        if (refs.isEmpty()) return
+
+        // Filter to branches not yet merged into master.
+        val unmerged = withContext(Dispatchers.IO) {
+            refs.filter { ref ->
+                val check = ProcessBuilder("git", "merge-base", "--is-ancestor", ref, "HEAD")
+                    .directory(repoDir).start()
+                check.waitFor() != 0  // exit 0 = already ancestor = already merged
+            }
+        }
+
+        if (unmerged.isEmpty()) return
+        println("[FLYWHEEL] ORPHAN-HARVEST ${unmerged.size} unmerged origin/* branches; taking up to $ORPHAN_HARVEST_BATCH")
+
+        val batch = unmerged.take(ORPHAN_HARVEST_BATCH)
+        val batchStartMs = System.currentTimeMillis()
+        var harvested = 0
+
+        for (ref in batch) {
+            if (!isWorkingTreeClean()) {
+                commitExistingConflicts()
+            }
+            val mergeRes = git("merge", "--no-ff", "--no-edit", ref)
+            if (mergeRes.exitCode == 0) {
+                println("[FLYWHEEL] ORPHAN-MERGED $ref")
+                harvested++
+            } else {
+                val conflicted = unmergedFiles()
+                if (conflicted.isNotEmpty()) {
+                    println("[FLYWHEEL] ORPHAN-CONFLICT $ref: ${conflicted.size} files — committing markers")
+                    conflicted.take(3).forEach { println("  ✗ $it") }
+                    git("add", "--", *conflicted.toTypedArray())
+                    git("commit", "--no-verify", "-m", "flywheel: merge $ref — ${conflicted.size} conflicts kept")
+                    harvested++
+                } else {
+                    println("[FLYWHEEL] ORPHAN-SKIP $ref: merge failed, no conflict markers")
+                    git("merge", "--abort").also { }
+                }
+            }
+        }
+
+        if (harvested > 0) {
+            val batchMs = System.currentTimeMillis() - batchStartMs
+            DrainPerformanceTracker.recordDrainBatch(harvested, batchMs)
+        }
+    }
+
     private fun activeCount(): Int = conductor.cards.values.count {
         it.snapshot.state !in TERMINAL_STATES && !it.drained
     }
@@ -1272,7 +1349,7 @@ class FlywheelDriver(
         }
         val mergedBranches = mergedRefs.output.lineSequence()
             .map { it.trim() }
-            .filter { it.startsWith("origin/jules-") }
+            .filter { it.startsWith("origin/") }
             .toList()
         if (mergedBranches.isEmpty()) return
 

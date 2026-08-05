@@ -1,14 +1,9 @@
 package borg.trikeshed.collections.associative
 
-import borg.trikeshed.job.Sha256Pure
-
 /**
- * FunnelHashMap — mutable open-addressing hash map with tiered funnel geometry.
+ * FunnelHashMap — mutable multi-level open addressing (cousin of Krapivin funnel).
  *
- * Based on "Optimal Bounds for Open Addressing Without Reordering"
- * (Farach-Colton, Krapivin, Kuszmaul; arXiv:2501.02305).
- *
- * Structure:
+ * Geometry (NOT the paper's β-bucket layout):
  *   Level ℓ has capacity = baseCap / 2^ℓ, probeBound = 2^ℓ.
  *   Insert greeds: try level 0 (bound 1), then level 1 (bound 2), …
  *   Final level has unbounded probes (Int.MAX_VALUE) to guarantee termination.
@@ -18,9 +13,15 @@ import borg.trikeshed.job.Sha256Pure
  *   - Resize when live >= baseCap * (1 - δ)
  *   - Tombstones per level; rebuild when tombstone ratio > 0.25
  *
- * Complexity (from paper):
- *   - Expected probes per get/put: O(log²(1/δ)) worst-case
- *   - Amortized O(1) expected probes
+ * Honesty vs Farach-Colton/Krapivin/Kuszmaul (arXiv:2501.02305):
+ *   - Paper funnel uses per-level buckets of size β ~ log(1/δ). This type expands
+ *     probeBound across the whole level — same spirit, different algorithm.
+ *   - O(log² 1/δ) is not claimed or measured here.
+ *   - Paper elastic hashing is not this type.
+ *   - Deletes/tombstones are outside the paper's insert-focused setting.
+ *
+ * Prefer [borg.trikeshed.collections.FunnelHashMap] for the β-bucket geometry
+ * (production: Stringpool). Prefer [FunnelHashIndex] for frozen membership.
  */
 class FunnelHashMap<K : Any, V>(
     initialCapacity: Int = 16,
@@ -199,16 +200,12 @@ class FunnelHashMap<K : Any, V>(
         return built
     }
 
+    /** Unit-cost mix64: key.hashCode + levelSeed. Not SHA-256. */
     private fun hash64(key: K, levelSeed: Long): Long {
-        val bytes = Sha256Pure.digest(key.toString().encodeToByteArray())
-        var z = levelSeed + bytes.size.toLong()
-        for (b in bytes) {
-            z = (z + (b.toLong() and 0xFFL)) * -0x61c8864680b583ebL
-        }
-        z = (z xor (z shr 30)) * -0x40a7b892e31b1a47L
-        z = (z xor (z shr 27)) * -0x6b2fb644ecced115L
-        z = z xor (z shr 31)
-        return z
+        var z = levelSeed xor (key.hashCode().toLong() and 0xFFFFFFFFL)
+        z = (z xor (z ushr 30)) * -0x40a7b892e31b1a47L
+        z = (z xor (z ushr 27)) * -0x6b2fb644ecced115L
+        return z xor (z ushr 31)
     }
 
     private fun nextPowerOfTwo(n: Int): Int {

@@ -1,20 +1,22 @@
 package borg.trikeshed.collections
 
-import borg.trikeshed.job.Sha256Pure
-
 /**
- * ElasticHashIndex — double-hashing open-addressing hash table.
+ * ElasticHashIndex — frozen double-hashing open-addressing membership index.
  *
- * Key properties:
+ * Name history: "elastic" here is ordinary double hashing (h1 + i*h2), load ≤ 0.5.
+ * It is NOT Farach-Colton/Krapivin/Kuszmaul elastic hashing (arXiv:2501.02305),
+ * which is a non-greedy open-addressing construction with different probe ordering.
+ * Do not cite paper elastic bounds for this type.
+ *
+ * Properties:
  * - Append-only immutable segment (no delete/retract)
- * - Positive-query-heavy workloads
- * - Load factor ≤ 0.5
- * - Probe sequence: h1 + i * h2  (ordinary double hashing)
- * - Deterministic replay: probe entropy derived from canonical facet bytes + committed seed
+ * - Positive-query-friendly; load factor ≤ 0.5
+ * - Probe sequence: h1 + i * h2 (h2 odd)
+ * - Unit-cost mix64 from key.hashCode + seed (not SHA-256)
  *
  * Usage:
  *   val idx = ElasticHashIndex.build(listOf("a", "b", "c"), seed)
- *   val pos = idx.get("b")  // returns Some(1) or null
+ *   val pos = idx.get("b")
  */
 class ElasticHashIndex<K : Any> internal constructor(
     private val keys: List<K>,
@@ -58,16 +60,12 @@ class ElasticHashIndex<K : Any> internal constructor(
         }
 
         private fun doubleHash(key: Any, seed: Long): Pair<Int, Int> {
-            val bytes = Sha256Pure.digest(key.toString().encodeToByteArray())
-            var z = seed + bytes.size.toLong()
-            for (b in bytes) {
-                z = (z + (b.toLong() and 0xFFL)) * -0x61c8864680b583ebL
-            }
-            z = (z xor (z shr 30)) * -0x40a7b892e31b1a47L
-            z = (z xor (z shr 27)) * -0x6b2fb644ecced115L
-            z = z xor (z shr 31)
+            var z = seed xor (key.hashCode().toLong() and 0xFFFFFFFFL)
+            z = (z xor (z ushr 30)) * -0x40a7b892e31b1a47L
+            z = (z xor (z ushr 27)) * -0x6b2fb644ecced115L
+            z = z xor (z ushr 31)
             val h1 = (z and 0xFFFFFFFFL).toInt()
-            val h2 = (z shr 32).toInt() or 1  // ensure odd for coprime to power-of-2
+            val h2 = (z ushr 32).toInt() or 1  // odd ⇒ coprime to power-of-2 capacity
             return h1 to h2
         }
     }
@@ -117,16 +115,12 @@ class ElasticHashIndex<K : Any> internal constructor(
     }
 
     private fun doubleHash(key: Any, seed: Long): Pair<Int, Int> {
-        val bytes = Sha256Pure.digest(key.toString().encodeToByteArray())
-        var z = seed + bytes.size.toLong()
-        for (b in bytes) {
-            z = (z + (b.toLong() and 0xFFL)) * -0x61c8864680b583ebL
-        }
-        z = (z xor (z shr 30)) * -0x40a7b892e31b1a47L
-        z = (z xor (z shr 27)) * -0x6b2fb644ecced115L
-        z = z xor (z shr 31)
+        var z = seed xor (key.hashCode().toLong() and 0xFFFFFFFFL)
+        z = (z xor (z ushr 30)) * -0x40a7b892e31b1a47L
+        z = (z xor (z ushr 27)) * -0x6b2fb644ecced115L
+        z = z xor (z ushr 31)
         val h1 = (z and 0xFFFFFFFFL).toInt()
-        val h2 = (z shr 32).toInt() or 1
+        val h2 = (z ushr 32).toInt() or 1
         return h1 to h2
     }
 }
