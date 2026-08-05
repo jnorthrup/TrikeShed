@@ -592,9 +592,11 @@ class PosixFile(
             // ⚡ Bolt: Buffered writes to avoid N+1 system calls while keeping O(1) memory overhead.
             val O_FLAGS = PosixOpenOpts.withFlags(PosixOpenOpts.O_Creat, PosixOpenOpts.O_Trunc, PosixOpenOpts.O_WrOnly)
             val file = PosixFile(filename, O_FLAGS)
+
             val bufferSize = 8192
             val buffer = ByteArray(bufferSize)
             var offset = 0
+
             fun flush() {
                 if (offset > 0) {
                     var writtenTotal = 0
@@ -609,6 +611,7 @@ class PosixFile(
                     offset = 0
                 }
             }
+
             lines.forEach { line ->
                 val bytes = line.plus("\n").encodeToByteArray()
                 var bytesWritten = 0
@@ -624,6 +627,7 @@ class PosixFile(
                 }
             }
             flush()
+
             file.close()
         }
         fun writeString(filename: String, string: String): Int = writeBytes(filename, string.encodeToByteArray())
