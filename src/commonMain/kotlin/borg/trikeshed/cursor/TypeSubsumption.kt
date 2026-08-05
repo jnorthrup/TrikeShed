@@ -52,7 +52,7 @@ inline class IsAEdge(val raw: Long) {
 // An IsALattice wraps an immutable or mutable Series<IsAEdge> and
 // provides direct-child lookup and transitive closure queries.
 // The backing store is deliberately opaque — callers can use a
-// CowSeriesHandle for the mutable blackboard case or a plain Series
+// COWArrayBackend for the mutable blackboard case or a plain Series
 // for the read-only CBOR-derived case.
 
 class IsALattice(val edges: Series<IsAEdge>) {

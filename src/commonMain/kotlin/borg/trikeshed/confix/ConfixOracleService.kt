@@ -1,7 +1,7 @@
 package borg.trikeshed.confix
 
 import borg.trikeshed.cursor.*
-import borg.trikeshed.mutable.CowSeriesHandle
+import borg.trikeshed.mutable.COWArrayBackend
 import borg.trikeshed.lib.*
 import borg.trikeshed.parse.confix.*
 
@@ -19,7 +19,7 @@ import borg.trikeshed.parse.confix.*
 class ConfixOracleService : ConfixOracleFacade {
 
     private val oracle = TypeDefOracle()
-    private val _edges = CowSeriesHandle<IsAEdge>()
+    private val _edges = COWArrayBackend<IsAEdge>()
     private var listener: TypeDefListener? = null
     private var cachedRow: TypeDefOracleRow? = null
 
@@ -129,7 +129,7 @@ class ConfixOracleService : ConfixOracleFacade {
 
     // ── observable access ──────────────────────────────────────────
 
-    val edges: CowSeriesHandle<IsAEdge> get() = _edges
+    val edges: COWArrayBackend<IsAEdge> get() = _edges
 
     /** Subscribe to edge mutations. @return cancel to unsubscribe */
     fun subscribeEdges(f: (Twin<Series<IsAEdge>>) -> Unit): () -> Unit = _edges.subscribe(f)

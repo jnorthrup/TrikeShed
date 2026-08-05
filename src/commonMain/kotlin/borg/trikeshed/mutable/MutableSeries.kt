@@ -203,15 +203,7 @@ fun <T> mutableSeriesFrom(items: Sequence<T>): MutableSeries<T> {
 
 // ── Backward compatibility aliases ────────────────────────────────────────
 
-@Deprecated("Use MutableSeries / COWArrayBackend instead")
-typealias CowSeriesHandle<T> = COWArrayBackend<T>
 
-@Deprecated("Use FrozenArray instead")
-typealias CowSeriesBody<T> = FrozenArray<T>
 
-@Deprecated("Use FrozenArray instead")
-typealias COWSeriesBody<T> = FrozenArray<T>
 
 /** Backward-compat factory. */
-@Deprecated("Use mutableSeriesOf instead")
-fun <T> cowSeriesHandle(): MutableSeries<T> = COWArrayBackend()

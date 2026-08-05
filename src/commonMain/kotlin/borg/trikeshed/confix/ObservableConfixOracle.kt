@@ -1,7 +1,7 @@
 package borg.trikeshed.confix
 
 import borg.trikeshed.cursor.*
-import borg.trikeshed.mutable.CowSeriesHandle
+import borg.trikeshed.mutable.COWArrayBackend
 import borg.trikeshed.lib.*
 
 // ── ObservableConfixOracle ─────────────────────────────────────────
@@ -61,7 +61,7 @@ class ObservableConfixOracle(
     fun getFacade(): ConfixOracleFacade = this
 
     /** Observable edges — subscribe to receive Twin snapshots on every mutation. */
-    val edges: CowSeriesHandle<IsAEdge> get() = service.edges
+    val edges: COWArrayBackend<IsAEdge> get() = service.edges
 
     /** Subscribe to edge mutations. @return cancel to unsubscribe */
     fun subscribeEdges(f: (Twin<Series<IsAEdge>>) -> Unit): () -> Unit =
@@ -72,7 +72,7 @@ class ObservableConfixOracle(
 //
 // Java-callable adapter — subscribe with int[] callbacks instead of Kotlin lambdas.
 
-class ObservableEdgesView(private val handle: CowSeriesHandle<IsAEdge>) {
+class ObservableEdgesView(private val handle: COWArrayBackend<IsAEdge>) {
     fun subscribe(callback: (oldSnapshot: IntArray, newSnapshot: IntArray) -> Unit): Subscription {
         return handle.subscribe { twin ->
             callback(intArrayOf(twin.a.a), intArrayOf(twin.b.a))

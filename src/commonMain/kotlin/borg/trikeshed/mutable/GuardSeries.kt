@@ -10,11 +10,11 @@ package borg.trikeshed.mutable
  * Delegates all other operations to the wrapped [borg.trikeshed.mutable.MutableSeries] via `by`.
  *
  * @param guard  predicate: return true to allow the mutation
- * @param inner  the wrapped MutableSeries (default: fresh CowSeriesHandle)
+ * @param inner  the wrapped MutableSeries (default: fresh COWArrayBackend)
  */
 class GuardSeries<T>(
     private val guard: (T) -> Boolean,
-    private val inner: MutableSeries<T> = CowSeriesHandle<T>(),
+    private val inner: MutableSeries<T> = COWArrayBackend<T>(),
 ) : MutableSeries<T> by inner {
 
     override fun append(item: T) {
