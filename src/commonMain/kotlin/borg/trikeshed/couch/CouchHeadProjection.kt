@@ -26,6 +26,7 @@ class CouchHeadProjection {
     private val docs = mutableSeriesOf<Document>()
     private val docIndex = mutableMapOf<String, Int>() // docId -> index in docs
     private val fieldIndex = mutableMapOf<String, MutableMap<Any, MutableSet<String>>>()
+    private val indexQueryCache = mutableMapOf<Pair<String, Any>, IntArray>()
 
     // docId -> current committed frame (including tombstones)
     private val frames = mutableMapOf<String, CouchCommittedFrame>()
@@ -41,6 +42,7 @@ class CouchHeadProjection {
         }
 
         frames[frame.docId] = frame
+        indexQueryCache.clear()
 
         if (frame.deleted) {
             val idx = docIndex.remove(frame.docId)
@@ -115,13 +117,24 @@ class CouchHeadProjection {
     }
 
     fun query(fieldName: String, value: Any): QueryResult {
-        val matchedIds = fieldIndex[fieldName]?.get(value) ?: emptySet()
-        val matchedIndices = IntArray(matchedIds.size)
-        var i = 0
-        for (id in matchedIds) { docIndex[id]?.let { idx -> matchedIndices[i++] = idx } }
-        val count = i
+        val cacheKey = Pair(fieldName, value)
+        var matchedIndices = indexQueryCache[cacheKey]
+        var count = matchedIndices?.size ?: 0
+
+        if (matchedIndices == null) {
+            val matchedIds = fieldIndex[fieldName]?.get(value) ?: emptySet()
+            matchedIndices = IntArray(matchedIds.size)
+            var i = 0
+            for (id in matchedIds) { docIndex[id]?.let { idx -> matchedIndices[i++] = idx } }
+            count = i
+            if (count < matchedIndices.size) {
+                matchedIndices = matchedIndices.copyOf(count)
+            }
+            indexQueryCache[cacheKey] = matchedIndices
+        }
+
         // ⚡ Bolt: Return a Series utilizing buildSeries via buildCursorFromSeries mapping to original docs to prevent ArrayList overhead
-        return QueryResult(buildCursorFromSeries(count j { docs[matchedIndices[it]] }), count.toLong())
+        return QueryResult(buildCursorFromSeries(count j { docs[matchedIndices!![it]] }), count.toLong())
     }
 
     private fun buildCursorFromDocs(documents: MutableSeries<Document>): Cursor =
