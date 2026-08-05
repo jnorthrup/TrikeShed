@@ -7,12 +7,12 @@ import borg.trikeshed.lib.Join
 import borg.trikeshed.lib.j
 import borg.trikeshed.utils.kanban.JulesBoardStore
 import borg.trikeshed.utils.kanban.forForgeDir
+import keymux.KeyMux
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
 import java.io.File
 import java.time.Duration
 import java.time.Instant
-import kotlin.coroutines.EmptyCoroutineContext
 import kotlin.math.roundToInt
 
 /**
@@ -25,7 +25,6 @@ import kotlin.math.roundToInt
 object FlywheelTui {
     private const val DEFAULT_SOURCE = "sources/github/jnorthrup/TrikeShed"
     private const val JULES_CAPACITY = 15
-    private const val OPENCODE_CAPACITY = 2
 
     private data class Snapshot(
         val at: Long,
@@ -40,16 +39,12 @@ object FlywheelTui {
         val closedSessionQueue: Int,
         val landedSessionIds: Set<String>,
         val sessions: List<JulesRestClient.SessionInfo>,
-        val openCodeRunning: Int,
-        val codexRunning: Int,
-        val openCodeAvailable: Boolean,
-        val codexAvailable: Boolean,
         val http429: Int = 0,
         val http5xx: Int = 0,
         val error: String? = null,
     ) {
-        val occupied: Int get() = sessions.count { it.state !in TERMINAL } + openCodeRunning + codexRunning
-        val capacity: Int get() = JULES_CAPACITY + (if (openCodeAvailable) OPENCODE_CAPACITY else 0) + (if (codexAvailable) 2 else 0)
+        val occupied: Int get() = sessions.count { it.state !in TERMINAL }
+        val capacity: Int get() = JULES_CAPACITY
         val saturation: Int get() = if (capacity == 0) 0 else ((occupied * 100.0) / capacity).roundToInt()
     }
 
@@ -84,14 +79,14 @@ object FlywheelTui {
             ?.substringAfter('=') ?: DEFAULT_SOURCE
         val repoDir = File(args.firstOrNull { !it.startsWith("--") } ?: System.getProperty("user.dir"))
         val forgeDir = File(System.getenv("TRIKESHED_HOME") ?: File(System.getProperty("user.home"), ".local/forge").path)
-        val apiKey = System.getenv("JULES_API_KEY")
-        val client = apiKey?.let(::JulesRestClient)
+        val keyMux = KeyMux { env() }
+        val client = JulesRestClient(keyMux)
         // The common HTX client requires HtxKey in the coroutine context — the
         // daemon installs one around runCycle; the TUI must carry its own or
         // every direct listSessions poll fails with "No HtxKey in coroutine
         // context". One element for the process lifetime; closed on exit so
         // --once doesn't linger on supervisor selector threads.
-        val htxElement = if (client != null) runBlocking { openHtxElement() } else null
+        val htxElement = runBlocking { openHtxElement() }
         val pulses = Pulses()
         // Accumulated HTTP error counters. Reset to zero when land (drain) or
         // push (settle) advances — a successful drain/push clears the slate so
@@ -121,13 +116,13 @@ object FlywheelTui {
                 if (!once) Thread.sleep(intervalMs)
             } while (!once)
         } finally {
-            htxElement?.let { runBlocking { it.close() } }
+            htxElement.let { runBlocking { it.close() } }
         }
     }
 
     private fun capture(
-        client: JulesRestClient?,
-        htxElement: HtxElement?,
+        client: JulesRestClient,
+        htxElement: HtxElement,
         source: String,
         repoDir: File,
         forgeDir: File,
@@ -150,10 +145,6 @@ object FlywheelTui {
                     entry.workId.removePrefix("session:") in landedSessionIds)
         }
         val land = landedSessionIds.size
-        val openCodeRunning = processCount("opencode")
-        val codexRunning = processCount("codex")
-        val openCodeAvailable = executableExists("/opt/homebrew/bin/opencode") || executableOnPath("opencode")
-        val codexAvailable = executableOnPath("codex")
         val httpErrs = readLatestHttpErrors(forgeDir)
         val http429 = httpErrs.a
         val http5xx = httpErrs.b
@@ -161,8 +152,8 @@ object FlywheelTui {
         return try {
             val sessions = readTrajectorySessions(forgeDir, source)
                 ?: runBlocking {
-                    withContext(htxElement ?: EmptyCoroutineContext) {
-                        client?.listSessions()
+                    withContext(htxElement) {
+                        client.listSessions()
                             ?.filter { it.source == source }
                             ?.sortedByDescending { it.updateTime }
                     }
@@ -187,22 +178,16 @@ object FlywheelTui {
                 closedSessionQueue = closedSessionQueue,
                 landedSessionIds = landedSessionIds,
                 sessions = sessions,
-                openCodeRunning = openCodeRunning,
-                codexRunning = codexRunning,
-                openCodeAvailable = openCodeAvailable,
-                codexAvailable = codexAvailable,
                 http429 = http429,
                 http5xx = http5xx,
-                error = if (client == null) "JULES_API_KEY unset" else null,
+                error = null,
             )
         } catch (t: Throwable) {
             Snapshot(
                 at = System.currentTimeMillis(), queue = queue, slice = 0, dispatch = 0,
                 running = 0, guide = 0, harvest = 0, land = land, curate = 0,
                 closedSessionQueue = closedSessionQueue, landedSessionIds = landedSessionIds,
-                sessions = emptyList(), openCodeRunning = openCodeRunning,
-                codexRunning = codexRunning, openCodeAvailable = openCodeAvailable,
-                codexAvailable = codexAvailable, http429 = http429, http5xx = http5xx,
+                sessions = emptyList(), http429 = http429, http5xx = http5xx,
                 error = t.message ?: t::class.simpleName,
             )
         }
@@ -252,8 +237,6 @@ object FlywheelTui {
         appendLine()
         appendLine("AGENT POOLS")
         appendLine("  Jules      ${poolBar(s.sessions.count { it.state !in TERMINAL }, JULES_CAPACITY)}  latest: ${latest(s.sessions)}")
-        appendLine("  OpenCode   ${poolBar(s.openCodeRunning, if (s.openCodeAvailable) OPENCODE_CAPACITY else 0)}  ${if (s.openCodeAvailable) "idle/brain workers" else "unavailable"}")
-        appendLine("  Codex      ${poolBar(s.codexRunning, if (s.codexAvailable) 2 else 0)}  ${if (s.codexAvailable) "local workers" else "unavailable"}")
         appendLine()
         appendLine("LATEST JULES AGENTS")
         s.sessions.take(10).forEach { session ->
@@ -293,18 +276,6 @@ object FlywheelTui {
     private fun diag(active: Int, tick: Int, up: Boolean): String = if (up) "↖${pulse(active, tick)}" else "${pulse(active, tick)}↘"
     private fun vertical(active: Int, tick: Int, up: Boolean): String = if (up) "${pulse(active, tick)}│" else "│${pulse(active, tick)}"
     private fun leftArrow(active: Int, tick: Int): String = "◀──${pulse(active, tick)}────"
-
-    private fun processCount(needle: String): Int = ProcessHandle.allProcesses()
-        .filter { p ->
-            val executable = File(p.info().command().orElse("")).name
-            executable.equals(needle, ignoreCase = true) ||
-                executable.startsWith("$needle-", ignoreCase = true)
-        }
-        .count().toInt()
-
-    private fun executableExists(path: String): Boolean = File(path).canExecute()
-    private fun executableOnPath(name: String): Boolean =
-        (System.getenv("PATH") ?: "").split(File.pathSeparator).any { File(it, name).canExecute() }
 
     /** Read the latest h429/h5x counters from the cycle trace JSON. */
     private fun readLatestHttpErrors(forgeDir: File): Join<Int, Int> {

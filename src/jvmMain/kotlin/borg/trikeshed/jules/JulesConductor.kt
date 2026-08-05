@@ -3,6 +3,7 @@ package borg.trikeshed.jules
 import borg.trikeshed.utils.kanban.JulesBoardStore
 import borg.trikeshed.utils.kanban.forForgeDir
 import java.io.File
+import keymux.KeyMux
 import kotlinx.coroutines.delay
 import kotlinx.datetime.Clock
 
@@ -246,12 +247,12 @@ class JulesConductor(
     companion object {
         @JvmStatic
         fun main(args: Array<String>) {
-            val apiKey = System.getenv("JULES_API_KEY") ?: error("JULES_API_KEY required")
+            val keyMux = KeyMux { env() }
             val once = args.contains("--once")
             val forgeDir = File(System.getProperty("user.home"), ".local/forge")
             val store = JulesBoardStore.forForgeDir(forgeDir)
             val conductor = JulesConductor(
-                client = JulesRestClient(apiKey),
+                client = JulesRestClient(keyMux),
                 headShaProvider = {
                     kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { ProcessBuilder("git", "rev-parse", "HEAD")
                         .redirectErrorStream(true)

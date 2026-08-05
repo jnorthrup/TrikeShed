@@ -14,6 +14,7 @@ import borg.trikeshed.util.oroboros.CouchAttachmentGateway
 import borg.trikeshed.util.oroboros.FileCasStore
 import borg.trikeshed.util.oroboros.GitCouchGateway
 import borg.trikeshed.util.oroboros.JvmFileWatchReactorElement
+import keymux.KeyMux
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -123,8 +124,10 @@ object OroborosDaemon {
     }
 
     private suspend fun kotlinx.coroutines.CoroutineScope.mainImpl(args: Array<String>) {
-        val apiKey = System.getenv("JULES_API_KEY") ?: System.getProperty("JULES_API_KEY")
-        if (apiKey.isNullOrBlank()) {
+        val keyMux = KeyMux { env() }
+        // Probe early so a missing key aborts before opening the HTX reactor.
+        val apiKeyPresent = kotlinx.coroutines.withContext(Dispatchers.IO) { keyMux.get("JULES_API_KEY") }
+        if (apiKeyPresent.isNullOrBlank()) {
             System.err.println("[OROBOROS] JULES_API_KEY not set; the conductor cannot poll Jules. Aborting.")
             exitProcess(1)
         }
@@ -151,7 +154,7 @@ object OroborosDaemon {
         }
 
         val driver = FlywheelDriver(
-            apiKey = apiKey,
+            keyMux = keyMux,
             repoDir = repoDir,
             forgeDir = forgeHome,
             intervalMs = intervalMs,

@@ -1,6 +1,7 @@
 package borg.trikeshed.jules
 
 import borg.trikeshed.parse.json.JsonSupport
+import keymux.KeyMux
 
 /**
  * Stateless Jules REST client. Zero board state — the Kanban cards own all state.
@@ -8,12 +9,20 @@ import borg.trikeshed.parse.json.JsonSupport
  *
  * Transport is the common HTX-backed client [TrikeHtxHttpClient]; the daemon
  * installs a TLS-backed [borg.trikeshed.htx.HtxElement] in the coroutine context.
+ *
+ * The API key is resolved from [keyMux] on every request so that KeyMux can
+ * rotate credentials when a 429 is encountered (quota containment).
  */
 class JulesRestClient(
-    private val apiKey: String,
+    private val keyMux: KeyMux,
     private val base: String = "https://jules.googleapis.com/v1alpha",
 ) {
-    private val transport: JulesHttpClient = julesHtxClient(apiKey, base)
+    /** Resolve the key from KeyMux and build a fresh transport for this call. */
+    private suspend fun transport(): JulesHttpClient {
+        val key = keyMux.get("JULES_API_KEY")
+            ?: error("JULES_API_KEY not resolved by KeyMux — add env() or persist() binding")
+        return julesHtxClient(key, base)
+    }
 
     data class SessionInfo(
         val id: String,
@@ -264,14 +273,14 @@ class JulesRestClient(
 
     /** Delete a session. */
     suspend fun deleteSession(sessionId: String) {
-        transport.delete("/sessions/$sessionId")
+        transport().delete("/sessions/$sessionId")
     }
 
-    private suspend fun get(path: String): String = transport.get(path)
+    private suspend fun get(path: String): String = transport().get(path)
 
-    private suspend fun post(path: String, json: String): String = transport.post(path, json)
+    private suspend fun post(path: String, json: String): String = transport().post(path, json)
 
-    private suspend fun delete(path: String): String = transport.delete(path)
+    private suspend fun delete(path: String): String = transport().delete(path)
 
     private fun jsonString(s: String): String = buildString {
         append('"')

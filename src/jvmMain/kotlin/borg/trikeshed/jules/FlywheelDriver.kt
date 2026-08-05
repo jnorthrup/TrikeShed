@@ -9,6 +9,7 @@ import borg.trikeshed.utils.kanban.forForgeDir
 import borg.trikeshed.util.oroboros.FileCasStore
 import borg.trikeshed.util.oroboros.LexicalMemory
 import borg.trikeshed.util.oroboros.MergeReceipt
+import keymux.KeyMux
 import kotlinx.datetime.Clock
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.CoroutineScope
@@ -80,7 +81,7 @@ enum class FlywheelPhase(val order: Int, val label: String) {
  *   ./gradlew jvmRun -PmainClass=borg.trikeshed.jules.FlywheelDriver
  */
 class FlywheelDriver(
-    private val apiKey: String,
+    private val keyMux: KeyMux,
     private val repoDir: File = File(System.getProperty("user.dir")),
     private val forgeDir: File = File(System.getProperty("user.home"), ".local/forge"),
     private val intervalMs: Long = 60_000L,
@@ -94,7 +95,7 @@ class FlywheelDriver(
 ) {
     /** Jules Pro concurrency ceiling; configuration may lower but never raise it. */
     private val maxSlots: Int = maxSlots.coerceIn(0, 15)
-    private val client = JulesRestClient(apiKey)
+    private val client = JulesRestClient(keyMux)
     internal val brain: BrainClient? = BrainClient(errorSink = JvmBrainErrorSink(forgeDir))
     private val store = JulesBoardStore.forForgeDir(forgeDir)
     private val conductor = JulesConductor(
@@ -2223,10 +2224,10 @@ class FlywheelDriver(
     companion object {
         @JvmStatic
         fun main(args: Array<String>) {
-            val apiKey = System.getenv("JULES_API_KEY") ?: error("JULES_API_KEY required")
+            val keyMux = KeyMux { env() }
             val once = args.any { it == "--once" }
             val watch = args.any { it == "--watch" }
-            val driver = FlywheelDriver(apiKey)
+            val driver = FlywheelDriver(keyMux)
             println("[FLYWHEEL] Starting driver on ${driver.repoDir}")
             if (once) {
                 runBlocking {
