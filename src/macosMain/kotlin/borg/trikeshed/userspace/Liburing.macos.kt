@@ -13,15 +13,13 @@ internal actual object LiburingImpl : LiburingFacade {
     actual override fun prepMunmap(addr: Long, len: Int, userData: Long): Result<Unit> = unsupported()
     actual override fun prepSendmsg(fd: Int, msgHdrPtr: Long, flags: Int, userData: Long): Result<Unit> = unsupported()
     actual override fun prepRecvmsg(fd: Int, msgHdrPtr: Long, flags: Int, userData: Long): Result<Unit> = unsupported()
+
     actual override fun submit(): Result<Int> = unsupported()
     actual override fun waitCqe(): Result<UringCompletion?> = unsupported()
     actual override fun peekCqe(): Result<UringCompletion?> = unsupported()
-    actual override fun cqAdvance(count: Int) {}
-    actual override fun registerFanoutHandler(token: Long, handler: (UringCompletion) -> Unit) {}
-    actual override fun removeFanoutHandler(token: Long, handler: (UringCompletion) -> Unit) {}
+    actual override fun cqAdvance(count: Int) = unsupportedUnit()
+    actual override fun registerFanoutHandler(token: Long, handler: (UringCompletion) -> Unit) = unsupportedUnit()
+    actual override fun removeFanoutHandler(token: Long, handler: (UringCompletion) -> Unit) = unsupportedUnit()
     actual override fun drain(): Result<Unit> = unsupported()
     actual override fun close(): Result<Unit> = unsupported()
 }
-
-private fun <T> unsupported(): Result<T> =
-    Result.failure(UnsupportedOperationException("liburing facade is only available on linux"))
