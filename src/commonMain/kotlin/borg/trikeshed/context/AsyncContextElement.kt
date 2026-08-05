@@ -4,7 +4,9 @@ import borg.trikeshed.context.ElementState.*
 import kotlinx.coroutines.CompletableJob
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.cancel
+import kotlinx.coroutines.cancelAndJoin
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlin.coroutines.CoroutineContext
 
 /**
@@ -26,6 +28,8 @@ abstract class AsyncContextElement(
     /** SupervisorJob for this element's coroutine scope. */
     open val supervisor: CompletableJob = SupervisorJob(parentJob)
 
+    private val stateMutex = Mutex()
+
     var state: ElementState = initialState
         protected set
 
@@ -44,8 +48,10 @@ abstract class AsyncContextElement(
 
     /** Transition CREATED -> OPEN. Idempotent if already OPEN or later. */
     open suspend fun open() {
-        if (state == CREATED) {
-            state = OPEN
+        stateMutex.withLock {
+            if (state == CREATED) {
+                state = OPEN
+            }
         }
     }
 
@@ -54,21 +60,38 @@ abstract class AsyncContextElement(
      * then transition to [ElementState.CLOSED].
      */
     open suspend fun drain() {
-        if (state.isAtLeast(OPEN) && state.isLessThan(DRAINING)) {
-            state = DRAINING
-            // Implementation specific drain logic here
+        val shouldDrain = stateMutex.withLock {
+            if (state.isAtLeast(OPEN) && state.isLessThan(DRAINING)) {
+                state = DRAINING
+                true
+            } else {
+                false
+            }
+        }
+        if (shouldDrain) {
+            supervisor.complete()
+            supervisor.join()
             close()
         }
     }
 
     /** Transition OPEN -> DRAINING -> CLOSED. */
     open suspend fun close() {
-        if (state.isAtLeast(OPEN) && state.isLessThan(CLOSED)) {
-            if (state < DRAINING) {
-                state = DRAINING
+        val shouldClose = stateMutex.withLock {
+            if (state.isAtLeast(OPEN) && state.isLessThan(CLOSED)) {
+                if (state < DRAINING) {
+                    state = DRAINING
+                }
+                true
+            } else {
+                false
             }
-            supervisor.cancel()
-            state = CLOSED
+        }
+        if (shouldClose) {
+            supervisor.cancelAndJoin()
+            stateMutex.withLock {
+                state = CLOSED
+            }
         }
     }
 
