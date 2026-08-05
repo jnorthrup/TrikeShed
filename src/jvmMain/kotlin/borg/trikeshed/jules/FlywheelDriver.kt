@@ -109,11 +109,11 @@ class FlywheelDriver(
     private val _events = MutableSharedFlow<FlywheelEvent>(extraBufferCapacity = 64)
     val events: SharedFlow<FlywheelEvent> get() = _events.asSharedFlow()
     /** Consecutive zero-patch probes per session id; tombstones at 3 (late outputs finalize async). */
-    private val noPatchProbes = mutableMapOf<String, Int>()
+    private val noPatchProbes = java.util.concurrent.ConcurrentHashMap<String, Int>()
     /** Consecutive patch-bearing drain failures per session id; never tombstoned. */
-    private val drainFailures = mutableMapOf<String, Int>()
+    private val drainFailures = java.util.concurrent.ConcurrentHashMap<String, Int>()
     /** Per-arm corrupt-patch probe counter; tombstones at 3 to prevent infinite retry. */
-    private val corruptPatchProbes = mutableMapOf<String, Int>()
+    private val corruptPatchProbes = java.util.concurrent.ConcurrentHashMap<String, Int>()
     /** Session-derived work ids are historical fallback identities, not new work
      * once their corresponding card is already closed. Keep their WAL history
      * visible while reporting each suppressed requeue only once per process. */
@@ -802,40 +802,50 @@ class FlywheelDriver(
      *   3. Build verify.
      */
     private suspend fun drainThreeWay(sessions: List<JulesRestClient.SessionInfo>): DrainBatch {
+        val drainBatchStartMs = System.currentTimeMillis()
+        DrainPerformanceTracker.initLogFile(repoDir)
+
         // 1. Fetch all branches so refs are available locally.
         git("fetch", "origin", "--prune")
 
+        val preFetchedRefs = git("for-each-ref", "--format=%(refname:short)", "refs/remotes/origin")
+            .takeIf { it.exitCode == 0 }?.output?.lineSequence()?.map { it.trim() }?.toList() ?: emptyList()
+
         // CAS-FIRST: content-address every delta before merge.
         data class Arm(val session: JulesRestClient.SessionInfo, val patchCid: ContentId, val patch: String, val branch: String?)
-        val arms = mutableListOf<Arm>()
-        for (s in sessions) {
-            val patch = withTimeoutOrNull(60_000L) { client.lastPatch(s.id) }
-            if (patch.isNullOrBlank()) {
-                val probes = (noPatchProbes[s.id] ?: 0) + 1
-                noPatchProbes[s.id] = probes
-                if (probes >= 3) {
+
+        val arms = coroutineScope {
+            sessions.map { s ->
+                async(Dispatchers.IO) {
+                    val patch = withTimeoutOrNull(60_000L) { client.lastPatch(s.id) }
+                    if (patch.isNullOrBlank()) {
+                        val probes = (noPatchProbes[s.id] ?: 0) + 1
+                        noPatchProbes[s.id] = probes
+                        if (probes >= 3) {
+                            noPatchProbes.remove(s.id)
+                            conductor.retireTerminal(
+                                s.id,
+                                "no patch after $probes probes; nothing to land",
+                                Clock.System.now().toEpochMilliseconds(),
+                            )
+                            println("[FLYWHEEL] RETIRE ${s.id.takeLast(6)} no-patch after $probes probes")
+                        } else {
+                            emitPollError("drain ${s.id}: no patch to CAS (probe $probes/3)", 0)
+                        }
+                        return@async null
+                    }
+                    val patchCid = try { casStore.put(patch.encodeToByteArray()) }
+                    catch (e: Exception) {
+                        drainFail(s, "CAS put failed: ${e.message}")
+                        return@async null
+                    }
                     noPatchProbes.remove(s.id)
-                    conductor.retireTerminal(
-                        s.id,
-                        "no patch after $probes probes; nothing to land",
-                        Clock.System.now().toEpochMilliseconds(),
-                    )
-                    println("[FLYWHEEL] RETIRE ${s.id.takeLast(6)} no-patch after $probes probes")
-                } else {
-                    emitPollError("drain ${s.id}: no patch to CAS (probe $probes/3)", 0)
+                    val branch = findSessionBranch(s.id, preFetchedRefs)
+                    println("[FLYWHEEL] CAS ${s.id.takeLast(6)} cid=${patchCid.value.take(16)} branch=${branch ?: "none"}")
+                    Arm(s, patchCid, patch, branch)
                 }
-                continue
-            }
-            val patchCid = try { withContext(Dispatchers.IO) { casStore.put(patch.encodeToByteArray()) } }
-            catch (e: Exception) {
-                drainFail(s, "CAS put failed: ${e.message}")
-                continue
-            }
-            noPatchProbes.remove(s.id)
-            val branch = findSessionBranch(s.id)
-            arms.add(Arm(s, patchCid, patch, branch))
-            println("[FLYWHEEL] CAS ${s.id.takeLast(6)} cid=${patchCid.value.take(16)} branch=${branch ?: "none"}")
-        }
+            }.awaitAll().filterNotNull()
+        }.toMutableList()
         // PER-ARM DRAIN — do NOT wait for the whole completion set to CAS.
         // Retired no-patch sessions already left the completion set via
         // conductor.retireTerminal(); still-probing sessions remain
@@ -1147,19 +1157,30 @@ class FlywheelDriver(
                 rejects = conflictFiles().size,
             )
         })
-        for ((arm, tag, prUrl) in prepared) {
-            val (s, patchCid, _, branch) = arm
-            _events.emit(FlywheelEvent.Drained(s.id, commitSha, tag))
-            drainFailures.remove(s.id)
-            println("[FLYWHEEL] PROVENANCE ${s.id.takeLast(6)} cid=${patchCid.value.take(16)} branch=${branch ?: "none"} tag=$tag")
-            sendMergeReceipt(s.id, commitSha, tag, patchCid, branch, prUrl)
-            try {
-                client.deleteSession(s.id)
-                println("[FLYWHEEL] DELETE ${s.id.takeLast(6)} session cleared")
-            } catch (t: Throwable) {
-                emitPollError("delete session ${s.id}: ${t.message?.take(200)}", 0)
-            }
+
+        coroutineScope {
+            prepared.map { (arm, tag, prUrl) ->
+                async(Dispatchers.IO) {
+                    val (s, patchCid, _, branch) = arm
+                    _events.emit(FlywheelEvent.Drained(s.id, commitSha, tag))
+                    drainFailures.remove(s.id)
+                    println("[FLYWHEEL] PROVENANCE ${s.id.takeLast(6)} cid=${patchCid.value.take(16)} branch=${branch ?: "none"} tag=$tag")
+                    sendMergeReceipt(s.id, commitSha, tag, patchCid, branch, prUrl)
+                    try {
+                        client.deleteSession(s.id)
+                        println("[FLYWHEEL] DELETE ${s.id.takeLast(6)} session cleared")
+                    } catch (t: Throwable) {
+                        emitPollError("delete session ${s.id}: ${t.message?.take(200)}", 0)
+                    }
+                }
+            }.awaitAll()
         }
+
+        val drainBatchDurationMs = System.currentTimeMillis() - drainBatchStartMs
+        if (prepared.isNotEmpty()) {
+            DrainPerformanceTracker.recordDrainBatch(prepared.size, drainBatchDurationMs)
+        }
+
         return DrainBatch(
             harvested = prepared.size,
             conflicts = conflictFiles(),
@@ -1172,17 +1193,19 @@ class FlywheelDriver(
     }
 
     /** Find the GitHub branch or PR head carrying this Jules session id. */
-    private suspend fun findSessionBranch(sessionId: String): String? {
+    private suspend fun findSessionBranch(sessionId: String, preFetchedRefs: List<String>? = null): String? {
         val numericId = sessionId.substringAfterLast('/').filter { it.isDigit() }
         if (numericId.isEmpty()) return null
 
-        // Jules branches and task branches both carry the numeric Jules id.
-        val refs = git("for-each-ref", "--format=%(refname:short)", "refs/remotes/origin")
-        if (refs.exitCode == 0) {
-            refs.output.lineSequence().map { it.trim() }.firstOrNull {
-                it.startsWith("origin/") && numericId in it
-            }?.let { return it }
+        val refsList = preFetchedRefs ?: run {
+            val refs = git("for-each-ref", "--format=%(refname:short)", "refs/remotes/origin")
+            if (refs.exitCode == 0) refs.output.lineSequence().map { it.trim() }.toList() else emptyList()
         }
+
+        // Jules branches and task branches both carry the numeric Jules id.
+        refsList.firstOrNull {
+            it.startsWith("origin/") && numericId in it
+        }?.let { return it }
 
         // A PR may carry the Jules id in its title/body while its head branch
         // has another name. Merge that PR head; pushing master closes the PR.
@@ -1193,7 +1216,7 @@ class FlywheelDriver(
         val head = pr.output.trim()
         if (pr.exitCode == 0 && head.isNotEmpty()) {
             val ref = "origin/$head"
-            if (git("show-ref", "--verify", "--quiet", "refs/remotes/$ref").exitCode == 0) return ref
+            if (refsList.contains(ref) || git("show-ref", "--verify", "--quiet", "refs/remotes/$ref").exitCode == 0) return ref
         }
         return null
     }

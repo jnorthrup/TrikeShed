@@ -155,9 +155,6 @@ suspend fun drainSession17853614670972068880(store: JulesBoardStore) {
         ),
         at = 0L
     ))
-<<<<<<< ours
-}
-=======
 }
 
 suspend fun drainSession18361965708708568010(store: JulesBoardStore) {
@@ -377,44 +374,20 @@ suspend fun drainSession8931659086090151049(store: JulesBoardStore) {
 }
 
 suspend fun drainWork(store: JulesBoardStore) {
-<<<<<<< ours
-<<<<<<< ours
-<<<<<<< ours
-<<<<<<< ours
-<<<<<<< ours
-<<<<<<< ours
     drainSession9013454183282018613(store)
-=======
-drainSession8993771901974843282(store)
->>>>>>> theirs
-=======
+    drainSession8993771901974843282(store)
     drainSession921960418393989944(store)
->>>>>>> theirs
-=======
     drainSession8881364136263100567(store)
->>>>>>> theirs
-=======
     drainSession8931659086090151049(store)
->>>>>>> theirs
-=======
     drainSession9424664620339514590(store)
->>>>>>> theirs
-=======
     drainSession9875178922791658457(store)
->>>>>>> theirs
-drainSession6782365670930877266(store)
+    drainSession6782365670930877266(store)
     drainSession8796422776580867101(store)
     drainSynth9541627119654770290(store)
     drainSession6767211552403505227(store)
-<<<<<<< ours
-<<<<<<< ours
     drainSession935214278571271783(store)
-=======
     drainSession9641589462865783879(store)
->>>>>>> theirs
-=======
     drainSession7295019988216699135(store)
->>>>>>> theirs
 
     val workId = "synth:12224356407860756599#2"
 
@@ -836,54 +809,8 @@ suspend fun drainSession6445047513596006594(store: JulesBoardStore) {
         at = 0L
     ))
 }
-<<<<<<< ours
-<<<<<<< ours
-
-<<<<<<< ours
-<<<<<<< ours
-<<<<<<< ours
-<<<<<<< ours
-<<<<<<< ours
-<<<<<<< ours
-<<<<<<< ours
-<<<<<<< ours
-<<<<<<< ours
-<<<<<<< ours
-suspend fun drainSession8796422776580867101(store: JulesBoardStore) {
-    val workId = "session:8796422776580867101"
-=======
-suspend fun drainSession8205871251151966442(store: JulesBoardStore) {
-    val workId = "session:8205871251151966442"
->>>>>>> theirs
-=======
-suspend fun drainSession8993771901974843282(store: JulesBoardStore) {
-    val workId = "session:8993771901974843282"
->>>>>>> theirs
-=======
-suspend fun drainSession921960418393989944(store: JulesBoardStore) {
-    val workId = "session:921960418393989944"
->>>>>>> theirs
-=======
-suspend fun drainSession8881364136263100567(store: JulesBoardStore) {
-    val workId = "session:8881364136263100567"
->>>>>>> theirs
-=======
-suspend fun drainSession9424664620339514590(store: JulesBoardStore) {
-    val workId = "session:9424664620339514590"
->>>>>>> theirs
-=======
-suspend fun drainSession7295019988216699135(store: JulesBoardStore) {
-    val workId = "session:7295019988216699135"
->>>>>>> theirs
-=======
-suspend fun drainSession9875178922791658457(store: JulesBoardStore) {
-    val workId = "session:9875178922791658457"
->>>>>>> theirs
-=======
-
-suspend fun drainSession9922994718117289571(store: JulesBoardStore) {
-    val workId = "session:9922994718117289571"
->>>>>>> theirs
+private suspend fun helperDrainSession(store: JulesBoardStore, sessionId: String) {
+    val workId = "session:$sessionId"
     store.appendWork(workId, JulesCause.WorkDrained(
         workId = workId,
         sessionId = "necromanced",
@@ -896,149 +823,23 @@ suspend fun drainSession9922994718117289571(store: JulesBoardStore) {
             patchCid = ContentId("sha256:0000000000000000000000000000000000000000000000000000000000000000"),
             revision = "superseded-by-review",
             versionTag = "superseded-by-review",
-<<<<<<< ours
-<<<<<<< ours
-<<<<<<< ours
-<<<<<<< ours
-<<<<<<< ours
-<<<<<<< ours
-<<<<<<< ours
-<<<<<<< ours
-            lexicalMemory = LexicalMemory(
-                "Superseded necromanced work",
-                "Superseded necromanced work",
-                "Superseded via drain script. Feature already implemented in MingwIsamOperations."
-            ),
-=======
             lexicalMemory = LexicalMemory("Superseded necromanced work", "Superseded necromanced work", "Superseded via drain script."),
->>>>>>> theirs
-=======
-            lexicalMemory = LexicalMemory(
-                summary = "Superseded necromanced work",
-                title = "[rework #1] Wire DoubleSeries into query engine",
-                content = "Superseded via drain script."
-            ),
->>>>>>> theirs
-=======
-=======
->>>>>>> theirs
-=======
->>>>>>> theirs
-=======
->>>>>>> theirs
-=======
->>>>>>> theirs
-            lexicalMemory = LexicalMemory(
-                summary = "Superseded necromanced work",
-                title = "Superseded necromanced work",
-                content = "Superseded via drain script."
-            ),
-<<<<<<< ours
-<<<<<<< ours
-<<<<<<< ours
-<<<<<<< ours
->>>>>>> theirs
-=======
->>>>>>> theirs
-=======
->>>>>>> theirs
-=======
-            lexicalMemory = LexicalMemory("Superseded necromanced work", "Superseded necromanced work", "Superseded via drain script."),
->>>>>>> theirs
-=======
->>>>>>> theirs
-=======
->>>>>>> theirs
             claimedAt = 0L,
             prUrl = null
         ),
         at = 0L
     ))
 }
-<<<<<<< ours
-<<<<<<< ours
-<<<<<<< ours
-<<<<<<< ours
-<<<<<<< ours
-<<<<<<< ours
-<<<<<<< ours
-<<<<<<< ours
->>>>>>> theirs
-=======
->>>>>>> theirs
-=======
-suspend fun drainSession9013454183282018613(store: JulesBoardStore) {
-    store.appendWork("session:9013454183282018613", JulesCause.WorkDrained(
-        "session:9013454183282018613",
-=======
-suspend fun drainSession935214278571271783(store: JulesBoardStore) {
-    val workId = "session:935214278571271783"
-    store.appendWork(workId, JulesCause.WorkDrained(
-        workId,
->>>>>>> theirs
-=======
-suspend fun drainSession9641589462865783879(store: JulesBoardStore) {
-    val workId = "session:9641589462865783879"
-    store.appendWork(workId, JulesCause.WorkDrained(
-        workId,
->>>>>>> theirs
-        "necromanced",
-        "superseded-by-review",
-        "supersede-pass",
-        MergeReceipt(
-<<<<<<< ours
-<<<<<<< ours
-            "session:9013454183282018613",
-=======
-            workId,
->>>>>>> theirs
-=======
-            workId,
->>>>>>> theirs
-            "necromancer",
-            "necromanced",
-            ContentId("sha256:0000000000000000000000000000000000000000000000000000000000000000"),
-            "superseded-by-review",
-            "superseded-by-review",
-            LexicalMemory(
-                "Superseded necromanced work",
-<<<<<<< ours
-<<<<<<< ours
-                "Superseded necromanced work",
-=======
-                "[rework #2] [rework #2] [rework #1] Implement zoom(path): Cursor",
->>>>>>> theirs
-=======
-                "Superseded necromanced work",
->>>>>>> theirs
-                "Superseded via drain script."
-            ),
-            0L,
-            null
-        ),
-        0L
-    ))
-}
-<<<<<<< ours
-<<<<<<< ours
->>>>>>> theirs
-=======
->>>>>>> theirs
-=======
->>>>>>> theirs
-=======
->>>>>>> theirs
-=======
->>>>>>> theirs
-=======
->>>>>>> theirs
-=======
->>>>>>> theirs
-=======
->>>>>>> theirs
-=======
->>>>>>> theirs
-=======
->>>>>>> theirs
-=======
->>>>>>> theirs
+
+suspend fun drainSession8796422776580867101(store: JulesBoardStore) = helperDrainSession(store, "8796422776580867101")
+suspend fun drainSession8205871251151966442(store: JulesBoardStore) = helperDrainSession(store, "8205871251151966442")
+suspend fun drainSession8993771901974843282(store: JulesBoardStore) = helperDrainSession(store, "8993771901974843282")
+suspend fun drainSession921960418393989944(store: JulesBoardStore) = helperDrainSession(store, "921960418393989944")
+suspend fun drainSession8881364136263100567(store: JulesBoardStore) = helperDrainSession(store, "8881364136263100567")
+suspend fun drainSession9424664620339514590(store: JulesBoardStore) = helperDrainSession(store, "9424664620339514590")
+suspend fun drainSession7295019988216699135(store: JulesBoardStore) = helperDrainSession(store, "7295019988216699135")
+suspend fun drainSession9875178922791658457(store: JulesBoardStore) = helperDrainSession(store, "9875178922791658457")
+suspend fun drainSession9922994718117289571(store: JulesBoardStore) = helperDrainSession(store, "9922994718117289571")
+suspend fun drainSession9013454183282018613(store: JulesBoardStore) = helperDrainSession(store, "9013454183282018613")
+suspend fun drainSession935214278571271783(store: JulesBoardStore) = helperDrainSession(store, "935214278571271783")
+suspend fun drainSession9641589462865783879(store: JulesBoardStore) = helperDrainSession(store, "9641589462865783879")
