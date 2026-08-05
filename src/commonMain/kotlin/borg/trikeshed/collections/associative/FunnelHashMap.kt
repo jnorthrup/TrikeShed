@@ -1,12 +1,12 @@
 package borg.trikeshed.collections.associative
 
-import borg.trikeshed.job.Sha256Pure
-
 /**
  * FunnelHashMap — mutable open-addressing hash map with tiered funnel geometry.
  *
- * Based on "Optimal Bounds for Open Addressing Without Reordering"
- * (Farach-Colton, Krapivin, Kuszmaul; arXiv:2501.02305).
+ * Uses a cousin geometry, not the actual paper funnel.
+ * For the β-bucket production implementations, see:
+ * - [borg.trikeshed.collections.FunnelHashMap]
+ * - [borg.trikeshed.collections.FunnelHashIndex]
  *
  * Structure:
  *   Level ℓ has capacity = baseCap / 2^ℓ, probeBound = 2^ℓ.
@@ -17,10 +17,6 @@ import borg.trikeshed.job.Sha256Pure
  *   - Total live entries < baseCap * (1 - δ)  (δ = slack, default 0.25)
  *   - Resize when live >= baseCap * (1 - δ)
  *   - Tombstones per level; rebuild when tombstone ratio > 0.25
- *
- * Complexity (from paper):
- *   - Expected probes per get/put: O(log²(1/δ)) worst-case
- *   - Amortized O(1) expected probes
  */
 class FunnelHashMap<K : Any, V>(
     initialCapacity: Int = 16,
@@ -200,14 +196,10 @@ class FunnelHashMap<K : Any, V>(
     }
 
     private fun hash64(key: K, levelSeed: Long): Long {
-        val bytes = Sha256Pure.digest(key.toString().encodeToByteArray())
-        var z = levelSeed + bytes.size.toLong()
-        for (b in bytes) {
-            z = (z + (b.toLong() and 0xFFL)) * -0x61c8864680b583ebL
-        }
-        z = (z xor (z shr 30)) * -0x40a7b892e31b1a47L
-        z = (z xor (z shr 27)) * -0x6b2fb644ecced115L
-        z = z xor (z shr 31)
+        var z = key.hashCode().toLong() xor levelSeed
+        z = (z xor (z ushr 30)) * -0x40a7b892e31b1a47L
+        z = (z xor (z ushr 27)) * -0x6b2fb644ecced115L
+        z = z xor (z ushr 31)
         return z
     }
 
