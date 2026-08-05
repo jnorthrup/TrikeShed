@@ -7,7 +7,6 @@ import borg.trikeshed.lib.ByteSeries
 import borg.trikeshed.lib.Files
 import borg.trikeshed.lib.Join
 import borg.trikeshed.lib.SeekFileBufferCommon
-import borg.trikeshed.lib.SeekHandle
 import borg.trikeshed.lib.Series
 import borg.trikeshed.lib.Series2
 import borg.trikeshed.lib.j
@@ -108,76 +107,6 @@ fun readLinesSeq(path: String): Sequence<String> =
     Files.readAllLines(path).asSequence()
 
 fun readLines(path: String): List<String> = Files.readAllLines(path)
-data class JsHandleState(
-    val fd: Int,
-    var position: Long = 0,
-)
-
-class JsSeekHandle : SeekHandle {
-   val handles = mutableMapOf<Long, JsHandleState>()
-   var nextHandle = 1L
-
-    override fun open(filename: String, readOnly: Boolean): Long {
-        require(jsExists(filename)) { "File does not exist: $filename" }
-        val fd = jsOpen(filename, readOnly)
-        val handle = nextHandle++
-        handles[handle] = JsHandleState(fd)
-        return handle
-    }
-
-    override fun close(handle: Long) {
-        handles.remove(handle)?.let { jsClose(it.fd) }
-    }
-
-    override fun pread(handle: Long, dst: ByteRegion, fileOffset: Long): Int {
-        val state = handles[handle] ?: return -1
-        val backing = dst.buffer.array()
-        val offset = dst.buffer.arrayOffset() + dst.start
-        return jsPread(state.fd, backing, offset, dst.size, fileOffset)
-    }
-
-    override fun pwrite(handle: Long, src: ByteSeries, fileOffset: Long): Int {
-        val state = handles[handle] ?: return -1
-        val bytes = src.toArray()
-        return jsPwrite(state.fd, bytes, 0, bytes.size, fileOffset)
-    }
-
-    override fun size(handle: Long): Long {
-        val state = handles[handle] ?: return -1
-        // Get size by seeking to end
-        val buf = ByteArray(1)
-        var pos = 0L
-        while (jsPread(state.fd, buf, 0, 1, pos) == 1) pos++
-        return pos
-    }
-
-    override fun read(handle: Long, dst: ByteRegion): Int {
-        val state = handles[handle] ?: return -1
-        val backing = dst.buffer.array()
-        val offset = dst.buffer.arrayOffset() + dst.start
-        val count = jsPread(state.fd, backing, offset, dst.size, state.position)
-        if (count > 0) state.position += count
-        return count
-    }
-
-    override fun write(handle: Long, src: ByteSeries): Int {
-        val state = handles[handle] ?: return -1
-        val bytes = src.toArray()
-        val count = jsPwrite(state.fd, bytes, 0, bytes.size, state.position)
-        if (count > 0) state.position += count
-        return count
-    }
-
-    override fun seek(handle: Long, position: Long): Long {
-        val state = handles[handle] ?: return -1
-        state.position = position.coerceAtLeast(0)
-        return state.position
-    }
-}
-
-actual fun platformSeekHandle(): SeekHandle = JsSeekHandle()
-
-actual fun ioUringHandle(): SeekHandle? = null
 
 
 class SeekFileBuffer(
