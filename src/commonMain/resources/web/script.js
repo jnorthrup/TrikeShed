@@ -257,6 +257,7 @@
     addBtn.className = 'gutter-btn';
     addBtn.textContent = '+';
     addBtn.title = 'Add block below';
+    addBtn.setAttribute('aria-label', 'Add block below');
     addBtn.addEventListener('click', () => {
       insertBlock(idx + 1, { id: uid(), type: 'p', text: '' });
       focusBlock(activePage().blocks[idx + 1].id, true);
@@ -265,6 +266,7 @@
     dragBtn.className = 'gutter-btn gutter-drag';
     dragBtn.textContent = '⋮⋮';
     dragBtn.title = 'Drag to reorder';
+    dragBtn.setAttribute('aria-label', 'Drag to reorder');
     gutter.append(addBtn, dragBtn);
     el.appendChild(gutter);
 
@@ -278,6 +280,7 @@
       cb.type = 'checkbox';
       cb.className = 'todo-checkbox';
       cb.checked = !!block.checked;
+      cb.setAttribute('aria-label', 'Toggle todo status');
       cb.addEventListener('change', () => {
         mutate(() => { block.checked = cb.checked; });
         el.classList.toggle('done', cb.checked);
