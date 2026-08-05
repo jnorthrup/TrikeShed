@@ -187,8 +187,8 @@ object Cbor {
 
        fun u8(): Int = data[pos++].toInt() and 0xFF
        fun u16(): Int = (u8() shl 8) or u8()
-       fun u32(): Int = (u8() shl 24) or (u8() shl 16) or (u8() shl 8) or u8()
-       fun u64(): Long = (u32().toLong() shl 32) or (u32().toLong() and 0xFFFFFFFFL)
+       fun u32(): Long = ((u8().toLong() shl 24) or (u8().toLong() shl 16) or (u8().toLong() shl 8) or u8().toLong()) and 0xFFFFFFFFL
+       fun u64(): Long = (u32() shl 32) or u32()
 
        fun readBytes(n: Int): ByteArray {
             val result = data.copyOfRange(pos, pos + n)

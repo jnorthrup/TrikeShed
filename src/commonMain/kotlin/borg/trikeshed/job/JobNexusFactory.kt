@@ -51,37 +51,8 @@ object JobNexusFactory {
             opened.add("wal")
             bindings.closeTrace.add(CloseTraceEntry("wal", ++orderCounter, false))
 
-            // index
-            val index = bindings.componentFactories.indexFactory()
-            opened.add("index")
-            bindings.closeTrace.add(CloseTraceEntry("index", ++orderCounter, false))
-
-            // rete
-            val rete = bindings.componentFactories.reteFactory()
-            opened.add("rete")
-            bindings.closeTrace.add(CloseTraceEntry("rete", ++orderCounter, false))
-
-            // projection
-            val projection = bindings.componentFactories.projectionFactory()
-            opened.add("projection")
-            bindings.closeTrace.add(CloseTraceEntry("projection", ++orderCounter, false))
-
-            // checkpoint
-            val checkpoint = bindings.componentFactories.checkpointFactory()
-            opened.add("checkpoint")
-            bindings.closeTrace.add(CloseTraceEntry("checkpoint", ++orderCounter, false))
-
             // Mark all as opened successfully
-            return JobSupervisorElement.open(
-                scope,
-                spec.channels.commands,
-                casStore = cas,
-                jobLog = wal,
-                jobIndex = index,
-                projectionEngine = projection,
-                checkpoint = checkpoint,
-                reteNetwork = rete,
-            )
+            return JobSupervisorElement.open(scope, spec.channels.commands, casStore = cas, jobLog = wal)
 
         } catch (e: Throwable) {
             // Rollback: close all previously opened components in reverse order

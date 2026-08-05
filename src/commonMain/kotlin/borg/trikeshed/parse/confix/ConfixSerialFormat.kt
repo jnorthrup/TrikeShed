@@ -105,14 +105,12 @@ class ConfixItemEncoder : AbstractEncoder() {
     override val serializersModule: SerializersModule = EmptySerializersModule()
 
     private sealed class Frame {
-        class Obj(val entries: MutableList<Join<String, Item>>) : Frame()
+        class Obj(val entries: MutableList<Join<String, Item>>, var pendingKey: String? = null) : Frame()
         class Arr(val items: MutableList<Item>) : Frame()
-        class MMap(val pairs: MutableList<Join<String, Item>>) : Frame()
+        class MMap(val pairs: MutableList<Join<String, Item>>, var mapKey: String? = null) : Frame()
     }
 
     private val frames = ArrayDeque<Frame>()
-    private var pendingKey: String? = null
-    private var mapKey: String? = null
     private var root: Item? = null
 
     val result: Item get() = root ?: Item.Nil
@@ -121,18 +119,18 @@ class ConfixItemEncoder : AbstractEncoder() {
         val f = frames.lastOrNull()
         when {
             f == null -> root = item
-            f is Frame.Obj -> { f.entries.add((pendingKey ?: error("no key")) j item); pendingKey = null }
+            f is Frame.Obj -> { f.entries.add((f.pendingKey ?: error("no key")) j item); f.pendingKey = null }
             f is Frame.Arr -> f.items.add(item)
             f is Frame.MMap -> {
-                if (mapKey == null) mapKey = (item as? Item.Str)?.value ?: error("map key must be string")
-                else { f.pairs.add(mapKey!! j item); mapKey = null }
+                if (f.mapKey == null) f.mapKey = (item as? Item.Str)?.value ?: error("map key must be string")
+                else { f.pairs.add(f.mapKey!! j item); f.mapKey = null }
             }
         }
     }
 
     override fun encodeElement(descriptor: SerialDescriptor, index: Int): Boolean {
         val f = frames.lastOrNull()
-        if (f is Frame.Obj) pendingKey = descriptor.getElementName(index)
+        if (f is Frame.Obj) f.pendingKey = descriptor.getElementName(index)
         return true
     }
 

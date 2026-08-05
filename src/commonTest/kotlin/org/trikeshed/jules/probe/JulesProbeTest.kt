@@ -1,5 +1,8 @@
 package org.trikeshed.jules.probe
 
+import borg.trikeshed.lib.get
+import borg.trikeshed.lib.size
+
 import borg.trikeshed.lib.emptySeriesOf
 import kotlin.test.Test
 import kotlin.test.assertEquals

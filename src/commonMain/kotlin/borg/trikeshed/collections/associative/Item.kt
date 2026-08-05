@@ -30,11 +30,49 @@ sealed interface Item {
         fun keys(): Series<String> = entries.a j { entries.b(it).a }
         fun values(): Series<Item> = entries.a j { entries.b(it).b }
         fun containsKey(key: String): Boolean = get(key) != null
+
+        override fun equals(other: Any?): Boolean {
+            if (this === other) return true
+            if (other !is Map) return false
+            if (size != other.size) return false
+            for (i in 0 until size) {
+                val key = entries.b(i).a
+                val val1 = entries.b(i).b
+                val val2 = other[key]
+                if (val1 != val2) return false
+            }
+            return true
+        }
+        override fun hashCode(): Int {
+            var result = 0
+            for (i in 0 until size) {
+                val e = entries.b(i)
+                result += e.a.hashCode() xor e.b.hashCode()
+            }
+            return result
+        }
     }
 
     data class Arr(val items: Series<Item>) : Item {
         val size: Int get() = items.a
         operator fun get(index: Int): Item = items.b(index)
+
+        override fun equals(other: Any?): Boolean {
+            if (this === other) return true
+            if (other !is Arr) return false
+            if (size != other.size) return false
+            for (i in 0 until size) {
+                if (items.b(i) != other.items.b(i)) return false
+            }
+            return true
+        }
+        override fun hashCode(): Int {
+            var result = 1
+            for (i in 0 until size) {
+                result = 31 * result + items.b(i).hashCode()
+            }
+            return result
+        }
     }
 
     data class Str(val value: String) : Item
