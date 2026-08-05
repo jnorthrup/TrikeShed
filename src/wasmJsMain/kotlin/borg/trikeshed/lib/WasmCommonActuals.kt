@@ -147,81 +147,6 @@ fun streamByteLines(bytes: ByteArray): Sequence<Join<Long, ByteArray>> = sequenc
         yield(lineStart j line.toByteArray())
     }
 }
-object WasmBrowserSeekHandle : SeekHandle {
-   data class HandleState(
-        val filename: String,
-        var position: Long = 0,
-    )
-
-   val handles = mutableMapOf<Long, HandleState>()
-   var nextHandle = 1L
-
-    override fun open(filename: String, readOnly: Boolean): Long {
-        val handle = nextHandle++
-        handles[handle] = HandleState(filename = normalizePath(filename))
-        return handle
-    }
-
-    override fun close(handle: Long) {
-        handles.remove(handle)
-    }
-
-    override fun pread(handle: Long, dst: ByteRegion, fileOffset: Long): Int {
-        val state = handles[handle] ?: return -1
-        val bytes = readBlob(state.filename) ?: return -1
-        val decoded = decodeHex(bytes)
-        val start = fileOffset.toInt().coerceAtLeast(0)
-        if (start >= decoded.size) return -1
-        val count = minOf(dst.size, decoded.size - start)
-        val backing = dst.buffer.array()
-        val offset = dst.buffer.arrayOffset() + dst.start
-        for (index in 0 until count) {
-            backing[offset + index] = decoded[start + index]
-        }
-        return count
-    }
-
-    override fun pwrite(handle: Long, src: ByteSeries, fileOffset: Long): Int {
-        val state = handles[handle] ?: return -1
-        val bytes = src.toArray()
-        // Read-modify-write: localStorage has no partial overwrite
-        val existing = decodeHex(readBlob(state.filename) ?: "")
-        val start = fileOffset.toInt().coerceAtLeast(0)
-        val endExclusive = start + bytes.size
-        val updated = ByteArray(maxOf(existing.size, endExclusive))
-        existing.copyInto(updated)
-        for (i in bytes.indices) {
-            updated[start + i] = bytes[i]
-        }
-        writeBlob(state.filename, encodeHex(updated))
-        return bytes.size
-    }
-
-    override fun size(handle: Long): Long {
-        val state = handles[handle] ?: return -1
-        return decodeHex(readBlob(state.filename) ?: "").size.toLong()
-    }
-
-    override fun read(handle: Long, dst: ByteRegion): Int {
-        val state = handles[handle] ?: return -1
-        val bytesRead = pread(handle, dst, state.position)
-        if (bytesRead > 0) state.position += bytesRead.toLong()
-        return bytesRead
-    }
-
-    override fun write(handle: Long, src: ByteSeries): Int {
-        val state = handles[handle] ?: return -1
-        val bytesWritten = pwrite(handle, src, state.position)
-        if (bytesWritten > 0) state.position += bytesWritten.toLong()
-        return bytesWritten
-    }
-
-    override fun seek(handle: Long, position: Long): Long {
-        val state = handles[handle] ?: return -1
-        state.position = position.coerceAtLeast(0)
-        return state.position
-    }
-}
 
 
 actual object Files {
@@ -347,9 +272,6 @@ fun mkdir(path: String): Boolean {
 fun readLinesSeq(path: String): Sequence<String> = Files.readAllLines(path).asSequence()
 
 fun readLines(path: String): List<String> = Files.readAllLines(path)
-actual fun platformSeekHandle(): SeekHandle = WasmBrowserSeekHandle
-
-actual fun ioUringHandle(): SeekHandle? = null
 
 
 class SeekFileBuffer(
