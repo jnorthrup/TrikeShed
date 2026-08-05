@@ -114,7 +114,7 @@ actual class LiburingVolume actual constructor(
         
         suspendCancellableCoroutine<Unit> { cont ->
             buf.usePinned { pinned ->
-                val token = generateSecureToken()
+                val token: Long = generateSecureToken()
                 
                 Liburing.registerFanoutHandler(token) { completion ->
                     Liburing.removeFanoutHandler(token) {}
@@ -165,7 +165,7 @@ actual class LiburingVolume actual constructor(
         
         suspendCancellableCoroutine<Unit> { cont ->
             data.usePinned { pinned ->
-                val token = generateSecureToken()
+                val token: Long = generateSecureToken()
                 
                 Liburing.registerFanoutHandler(token) { completion ->
                     Liburing.removeFanoutHandler(token) {}
@@ -197,7 +197,7 @@ actual class LiburingVolume actual constructor(
         }
         
         suspendCancellableCoroutine<Unit> { cont ->
-            val token = generateSecureToken()
+            val token: Long = generateSecureToken()
             Liburing.registerFanoutHandler(token) { completion ->
                 Liburing.removeFanoutHandler(token) {}
                 if (completion.res < 0) {
