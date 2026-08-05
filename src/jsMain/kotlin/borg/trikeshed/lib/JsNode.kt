@@ -4,20 +4,20 @@ import kotlin.js.Date
 import kotlin.random.Random
 
 // Node.js module access that is invisible to webpack's static analysis.
-// eval("require(...)") prevents webpack from generating a static require stub,
+// module.require(...) prevents webpack from generating a static require stub,
 // which would crash the browser bundle with "Cannot find module 'fs'".
 // Browser code paths never call these — only Node paths do.
 
 private fun nodeRequire(name: String): dynamic {
     require(name == "fs" || name == "os" || name == "path") { "Unauthorized Node.js module: $name" }
-    return js("eval(\"require\")(name)")
+    return js("typeof module !== 'undefined' ? module.require(name) : null")
 }
 
 val fs: dynamic get() = nodeRequire("fs")
 val os: dynamic get() = nodeRequire("os")
 val path: dynamic get() = nodeRequire("path")
-val processObj: dynamic get() = js("eval(\"process\")")
-val Buffer: dynamic get() = js("eval(\"globalThis.Buffer\")")
+val processObj: dynamic get() = js("typeof process !== 'undefined' ? process : null")
+val Buffer: dynamic get() = js("typeof globalThis !== 'undefined' ? globalThis.Buffer : null")
 
 internal fun jsCwd(): String = processObj.cwd() as String
 
