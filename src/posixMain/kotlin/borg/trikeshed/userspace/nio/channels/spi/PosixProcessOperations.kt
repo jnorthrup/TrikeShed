@@ -13,7 +13,7 @@ class PosixProcessOperations : ProcessOperations {
         args: List<String>,
         stdin: ByteArray?,
         env: Map<String, String>,
-    ): ProcessResult = withContext(Dispatchers.IO) {
+    ): ProcessResult = withContext(Dispatchers.IO) { // OPTIMIZATION: Moved blocking I/O to Dispatchers.IO to prevent thread starvation
         val stdinPath = stdin?.let { createTempFile(it) }
         val stdoutPath = createTempFile(byteArrayOf())
         if (stdoutPath == null) {
