@@ -822,38 +822,35 @@ class FlywheelDriver(
         // CAS-FIRST: content-address every delta before merge.
         data class Arm(val session: JulesRestClient.SessionInfo, val patchCid: ContentId, val patch: String, val branch: String?)
 
-        val arms = coroutineScope {
-            sessions.map { s ->
-                async(Dispatchers.IO) {
-                    val patch = withTimeoutOrNull(60_000L) { client.lastPatch(s.id) }
-                    if (patch.isNullOrBlank()) {
-                        val probes = (noPatchProbes[s.id] ?: 0) + 1
-                        noPatchProbes[s.id] = probes
-                        if (probes >= 3) {
-                            noPatchProbes.remove(s.id)
-                            conductor.retireTerminal(
-                                s.id,
-                                "no patch after $probes probes; nothing to land",
-                                Clock.System.now().toEpochMilliseconds(),
-                            )
-                            println("[FLYWHEEL] RETIRE ${s.id.takeLast(6)} no-patch after $probes probes")
-                        } else {
-                            emitPollError("drain ${s.id}: no patch to CAS (probe $probes/3)", 0)
-                        }
-                        return@async null
-                    }
-                    val patchCid = try { casStore.put(patch.encodeToByteArray()) }
-                    catch (e: Exception) {
-                        drainFail(s, "CAS put failed: ${e.message}")
-                        return@async null
-                    }
+        val arms = mutableListOf<Arm>()
+        for (s in sessions) {
+            val patch = withTimeoutOrNull(60_000L) { client.lastPatch(s.id) }
+            if (patch.isNullOrBlank()) {
+                val probes = (noPatchProbes[s.id] ?: 0) + 1
+                noPatchProbes[s.id] = probes
+                if (probes >= 3) {
                     noPatchProbes.remove(s.id)
-                    val branch = findSessionBranch(s.id, preFetchedRefs)
-                    println("[FLYWHEEL] CAS ${s.id.takeLast(6)} cid=${patchCid.value.take(16)} branch=${branch ?: "none"}")
-                    Arm(s, patchCid, patch, branch)
+                    conductor.retireTerminal(
+                        s.id,
+                        "no patch after $probes probes; nothing to land",
+                        Clock.System.now().toEpochMilliseconds(),
+                    )
+                    println("[FLYWHEEL] RETIRE ${s.id.takeLast(6)} no-patch after $probes probes")
+                } else {
+                    emitPollError("drain ${s.id}: no patch to CAS (probe $probes/3)", 0)
                 }
-            }.awaitAll().filterNotNull()
-        }.toMutableList()
+                continue
+            }
+            val patchCid = try { casStore.put(patch.encodeToByteArray()) }
+            catch (e: Exception) {
+                drainFail(s, "CAS put failed: ${e.message}")
+                continue
+            }
+            noPatchProbes.remove(s.id)
+            val branch = findSessionBranch(s.id, preFetchedRefs)
+            println("[FLYWHEEL] CAS ${s.id.takeLast(6)} cid=${patchCid.value.take(16)} branch=${branch ?: "none"}")
+            arms.add(Arm(s, patchCid, patch, branch))
+        }
         // PER-ARM DRAIN — do NOT wait for the whole completion set to CAS.
         // Retired no-patch sessions already left the completion set via
         // conductor.retireTerminal(); still-probing sessions remain
@@ -1166,22 +1163,18 @@ class FlywheelDriver(
             )
         })
 
-        coroutineScope {
-            prepared.map { (arm, tag, prUrl) ->
-                async(Dispatchers.IO) {
-                    val (s, patchCid, _, branch) = arm
-                    _events.emit(FlywheelEvent.Drained(s.id, commitSha, tag))
-                    drainFailures.remove(s.id)
-                    println("[FLYWHEEL] PROVENANCE ${s.id.takeLast(6)} cid=${patchCid.value.take(16)} branch=${branch ?: "none"} tag=$tag")
-                    sendMergeReceipt(s.id, commitSha, tag, patchCid, branch, prUrl)
-                    try {
-                        client.deleteSession(s.id)
-                        println("[FLYWHEEL] DELETE ${s.id.takeLast(6)} session cleared")
-                    } catch (t: Throwable) {
-                        emitPollError("delete session ${s.id}: ${t.message?.take(200)}", 0)
-                    }
-                }
-            }.awaitAll()
+        for ((arm, tag, prUrl) in prepared) {
+            val (s, patchCid, _, branch) = arm
+            _events.emit(FlywheelEvent.Drained(s.id, commitSha, tag))
+            drainFailures.remove(s.id)
+            println("[FLYWHEEL] PROVENANCE ${s.id.takeLast(6)} cid=${patchCid.value.take(16)} branch=${branch ?: "none"} tag=$tag")
+            sendMergeReceipt(s.id, commitSha, tag, patchCid, branch, prUrl)
+            try {
+                client.deleteSession(s.id)
+                println("[FLYWHEEL] DELETE ${s.id.takeLast(6)} session cleared")
+            } catch (t: Throwable) {
+                emitPollError("delete session ${s.id}: ${t.message?.take(200)}", 0)
+            }
         }
 
         val drainBatchDurationMs = System.currentTimeMillis() - drainBatchStartMs
