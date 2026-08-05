@@ -21,7 +21,7 @@ import platform.posix.*
 /**
 opens file for syncronous read  /write
  */
-class PosixFile(
+open class PosixFile(
     val path: String?,
     O_FLAGS: __u32 = PosixOpenOpts.withFlags(PosixOpenOpts.OpenReadOnly, PosixOpenOpts.OpenSync),
     override val fd: Int = run {
@@ -592,50 +592,44 @@ class PosixFile(
             // ⚡ Bolt: Buffered writes to avoid N+1 system calls while keeping O(1) memory overhead.
             val O_FLAGS = PosixOpenOpts.withFlags(PosixOpenOpts.O_Creat, PosixOpenOpts.O_Trunc, PosixOpenOpts.O_WrOnly)
             val file = PosixFile(filename, O_FLAGS)
-            if (bytes.isNotEmpty()) {
-                bytes.usePinned { pinned ->
-                    val buf = pinned.addressOf(0)
-                    val written = write(file.fd, buf, bytes.size.convert())
-                    HasPosixErr.posixRequires(written == bytes.size.toLong()) { "writeLines $filename" }
+
+            val bufferSize = 8192
+            val buffer = ByteArray(bufferSize)
+            var offset = 0
+
+            fun flush() {
+                if (offset > 0) {
+                    var writtenTotal = 0
+                    buffer.usePinned { pinned ->
+                        while (writtenTotal < offset) {
+                            val ptr = pinned.addressOf(writtenTotal)
+                            val written = write(file.fd, ptr, (offset - writtenTotal).convert())
+                            HasPosixErr.posixRequires(written > 0L) { "writeLines $filename flush error" }
+                            writtenTotal += written.toInt()
+                        }
                     }
                     offset = 0
                 }
-// alt:         fun writeLines(filename: String, lines: List<String>) {
-// alt:             // ⚡ Bolt: Buffered writes to avoid N+1 system calls while keeping O(1) memory overhead.
-// alt:             val O_FLAGS = PosixOpenOpts.withFlags(PosixOpenOpts.O_Creat, PosixOpenOpts.O_Trunc, PosixOpenOpts.O_WrOnly)
-// alt:             val file = PosixFile(filename, O_FLAGS)
-// alt:             val bufferSize = 8192
-// alt:             val buffer = ByteArray(bufferSize)
-// alt:             var offset = 0
-// alt:             fun flush() {
-// alt:                 if (offset > 0) {
-// alt:                     var writtenTotal = 0
-// alt:                     buffer.usePinned { pinned ->
-// alt:                         while (writtenTotal < offset) {
-// alt:                             val ptr = pinned.addressOf(writtenTotal)
-// alt:                             val written = write(file.fd, ptr, (offset - writtenTotal).convert())
-// alt:                             HasPosixErr.posixRequires(written > 0L) { "writeLines $filename flush error" }
-// alt:                             writtenTotal += written.toInt()
-// alt:                         }
-// alt:                     }
-// alt:                     offset = 0
-// alt:                 }
-// alt:             }
-// alt:             lines.forEach { line ->
-// alt:                 val bytes = line.plus("\n").encodeToByteArray()
-// alt:                 var bytesWritten = 0
-// alt:                 while (bytesWritten < bytes.size) {
-// alt:                     val space = bufferSize - offset
-// alt:                     val toCopy = minOf(space, bytes.size - bytesWritten)
-// alt:                     bytes.copyInto(buffer, offset, bytesWritten, bytesWritten + toCopy)
-// alt:                     offset += toCopy
-// alt:                     bytesWritten += toCopy
-// alt:                     if (offset == bufferSize) {
-// alt:                         flush()
-// alt:                     }
-// alt:                 }
-// alt:             }
-// alt:             flush()
+            }
+
+            lines.forEach { line ->
+                val bytes = line.encodeToByteArray()
+                var bytesWritten = 0
+                while (bytesWritten < bytes.size) {
+                    val space = bufferSize - offset
+                    val toCopy = minOf(space, bytes.size - bytesWritten)
+                    bytes.copyInto(buffer, offset, bytesWritten, bytesWritten + toCopy)
+                    offset += toCopy
+                    bytesWritten += toCopy
+
+                    if (offset == bufferSize) {
+                        flush()
+                    }
+                }
+                if (offset == bufferSize) flush()
+                buffer[offset++] = '\n'.code.toByte()
+            }
+            flush()
             file.close()
         }
         fun writeString(filename: String, string: String): Int = writeBytes(filename, string.encodeToByteArray())
