@@ -1,7 +1,11 @@
 package borg.trikeshed.lib
 
+import kotlin.contracts.ExperimentalContracts
+import kotlin.contracts.InvocationKind
+import kotlin.contracts.contract
+
 /**
- * a horrible hack to enable use() macro in kotlin mpp for our file messes
+ * Interface for resources that can be opened and closed.
  */
 interface Usable : Closeable {
     /**
@@ -14,12 +18,32 @@ interface Usable : Closeable {
     override fun close()
 }
 
-/** this is not present in stdlib for kotlin mpp, we extend the functionality to return a value as needed.*/
-fun <T : Usable, R> T.use(block: (T) -> R): R {
+/**
+ * Executes the given [block] function on this resource and then closes it down correctly whether an exception
+ * is thrown or not.
+ */
+@OptIn(ExperimentalContracts::class)
+inline fun <T : Usable, R> T.use(block: (T) -> R): R {
+    contract {
+        callsInPlace(block, InvocationKind.EXACTLY_ONCE)
+    }
     open()
+    var exception: Throwable? = null
     try {
         return block(this)
+    } catch (e: Throwable) {
+        exception = e
+        throw e
     } finally {
-        close()
+        when (exception) {
+            null -> close()
+            else -> {
+                try {
+                    close()
+                } catch (closeException: Throwable) {
+                    exception.addSuppressed(closeException)
+                }
+            }
+        }
     }
 }
