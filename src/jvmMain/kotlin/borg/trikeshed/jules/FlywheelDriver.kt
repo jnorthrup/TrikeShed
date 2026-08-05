@@ -439,9 +439,12 @@ class FlywheelDriver(
             if (newlyReported != 0) {
                 println("[FLYWHEEL] DISPATCH-SKIP $newlyReported already-closed session queue item(s)")
             }
+            val unified = unifyBoard(getKanbanBoard(), conductor.cards.values)
+            val wheel = saturationWheel(unified)
+            val bot = bottleneck(wheel)?.paddle?.name
             val pending = pendingCandidates
                 .filterNot { it.workId in closedSessionWorkIds }
-                .sortedByDescending { it.score }
+                .sortedByDescending { it.score + if (bot != null && it.tier.equals(bot, ignoreCase = true)) 100.0 else 0.0 }
                 .filter { entry ->
                     // Overlap guard: skip if this task's known file scope
                     // intersects any in-flight session's files.
@@ -1228,9 +1231,8 @@ class FlywheelDriver(
     private fun isWorkingTreeClean(): Boolean =
         git("status", "--porcelain", "--untracked-files=no").output.isBlank()
 
-    /** Project the unified Forge×Jules board and render the saturation wheel. */
-    fun renderSaturation(): String {
-        val kanban = try { ForgeKanbanIngest.load("jim").board }
+    private fun getKanbanBoard(): borg.trikeshed.kanban.KanbanBoard {
+        return try { ForgeKanbanIngest.load("jim").board }
         catch (_: Throwable) { borg.trikeshed.kanban.KanbanBoard(
             id = borg.trikeshed.kanban.KanbanBoardId("flywheel"),
             name = "flywheel",
@@ -1238,6 +1240,11 @@ class FlywheelDriver(
                 borg.trikeshed.kanban.KanbanColumnId(it.columnName), it.columnName, it.order) },
             cards = emptyList(),
         ) }
+    }
+
+    /** Project the unified Forge×Jules board and render the saturation wheel. */
+    fun renderSaturation(): String {
+        val kanban = getKanbanBoard()
         val unified = unifyBoard(kanban, conductor.cards.values)
         val aliveCount = conductor.cards.values.count {
             it.snapshot.state !in TERMINAL_STATES && !it.drained }
