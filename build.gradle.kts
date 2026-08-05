@@ -274,6 +274,12 @@ kotlin {
         val androidMain = maybeCreate("androidMain").apply { dependsOn(commonMain) }
         val androidTest = maybeCreate("androidTest").apply { dependsOn(commonTest) }
 
+        val nonPosixMain = maybeCreate("nonPosixMain").apply { dependsOn(commonMain) }
+        findByName("jvmMain")?.dependsOn(nonPosixMain)
+        findByName("jsMain")?.dependsOn(nonPosixMain)
+        findByName("wasmJsMain")?.dependsOn(nonPosixMain)
+        findByName("androidMain")?.dependsOn(nonPosixMain)
+
         // Source Set Hierarchy Documentation:
         // - posixMain: Code shared across posix platforms (macOS, Linux)
         // - macosMain: macOS-specific code
