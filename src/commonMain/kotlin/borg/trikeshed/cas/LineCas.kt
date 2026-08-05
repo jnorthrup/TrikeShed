@@ -1,5 +1,6 @@
 package borg.trikeshed.cas
 
+<<<<<<< HEAD
 import borg.trikeshed.job.CasStore
 import borg.trikeshed.job.ContentId
 import borg.trikeshed.lib.Join
@@ -381,3 +382,33 @@ data class LineCasSpine(
     val ordinal: Int,
     val linkedKey: String? = null
 )
+=======
+enum class MatchGrade {
+    CONTENT_ONLY,
+    PARTIAL_LEFT,
+    PARTIAL_RIGHT,
+    LINKED
+}
+
+enum class LinkConfidence {
+    CANDIDATE,
+    PROVISIONAL,
+    CONFIRMED
+}
+
+fun confidenceOf(grade: MatchGrade): LinkConfidence = when (grade) {
+    MatchGrade.CONTENT_ONLY -> LinkConfidence.CANDIDATE
+    MatchGrade.PARTIAL_LEFT, MatchGrade.PARTIAL_RIGHT -> LinkConfidence.PROVISIONAL
+    MatchGrade.LINKED -> LinkConfidence.CONFIRMED
+}
+
+/**
+ * Returns a log-ish spaced confidence score based on match grade.
+ * Note: This score is a prior confidence, not a probability proof.
+ */
+fun rampScore(grade: MatchGrade): Double = when (grade) {
+    MatchGrade.CONTENT_ONLY -> 0.12
+    MatchGrade.PARTIAL_LEFT, MatchGrade.PARTIAL_RIGHT -> 0.45
+    MatchGrade.LINKED -> 1.0
+}
+>>>>>>> origin/cas-line-cas-2416106438265065004
