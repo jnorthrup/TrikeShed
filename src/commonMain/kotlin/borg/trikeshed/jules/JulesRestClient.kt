@@ -286,18 +286,27 @@ class JulesRestClient(
         append('"')
     }
 
+    private val hexChars = "0123456789ABCDEF"
+
     /** URL form encoding without the JVM-only URLEncoder boundary. */
-    private fun percentEncode(s: String): String = buildString {
-        for (byte in s.encodeToByteArray()) {
-            val unsigned = byte.toInt() and 0xff
-            when {
-                unsigned in 'A'.code..'Z'.code ||
-                    unsigned in 'a'.code..'z'.code ||
-                    unsigned in '0'.code..'9'.code ||
-                    unsigned == '-'.code || unsigned == '_'.code ||
-                    unsigned == '.'.code || unsigned == '~'.code -> append(unsigned.toChar())
-                unsigned == ' '.code -> append('+')
-                else -> append('%').append(unsigned.toString(16).uppercase().padStart(2, '0'))
+    private fun percentEncode(s: String): String {
+        val bytes = s.encodeToByteArray()
+        return buildString(bytes.size + 16) {
+            for (i in bytes.indices) {
+                val unsigned = bytes[i].toInt() and 0xff
+                when {
+                    unsigned in 'A'.code..'Z'.code ||
+                        unsigned in 'a'.code..'z'.code ||
+                        unsigned in '0'.code..'9'.code ||
+                        unsigned == '-'.code || unsigned == '_'.code ||
+                        unsigned == '.'.code || unsigned == '~'.code -> append(unsigned.toChar())
+                    unsigned == ' '.code -> append('+')
+                    else -> {
+                        append('%')
+                        append(hexChars[unsigned shr 4])
+                        append(hexChars[unsigned and 0x0F])
+                    }
+                }
             }
         }
     }
