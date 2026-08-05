@@ -468,7 +468,9 @@ object OroborosDaemon {
                 }
             } else {
                 // --once: run one reactive tick synchronously.
-                driver.startReactiveCycle(this)
+                withContext(htxElement) {
+                    driver.startReactiveCycle(this)
+                }
                 delay(intervalMs * 2)
                 isRunning = false
                 mainJob?.cancel()
