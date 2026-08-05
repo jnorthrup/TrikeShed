@@ -3,10 +3,6 @@
 package borg.trikeshed.litebike
 
 import borg.trikeshed.litebike.taxonomy.Protocol
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.isActive
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.runBlocking
 import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
