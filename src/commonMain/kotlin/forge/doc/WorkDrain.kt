@@ -382,6 +382,7 @@ suspend fun drainWork(store: JulesBoardStore) {
 <<<<<<< ours
 <<<<<<< ours
 <<<<<<< ours
+<<<<<<< ours
     drainSession9013454183282018613(store)
 =======
 drainSession8993771901974843282(store)
@@ -397,6 +398,9 @@ drainSession8993771901974843282(store)
 >>>>>>> theirs
 =======
     drainSession9424664620339514590(store)
+>>>>>>> theirs
+=======
+    drainSession9875178922791658457(store)
 >>>>>>> theirs
 drainSession6782365670930877266(store)
     drainSession8796422776580867101(store)
@@ -832,6 +836,7 @@ suspend fun drainSession6445047513596006594(store: JulesBoardStore) {
         at = 0L
     ))
 }
+<<<<<<< ours
 
 <<<<<<< ours
 <<<<<<< ours
@@ -869,6 +874,10 @@ suspend fun drainSession9424664620339514590(store: JulesBoardStore) {
 suspend fun drainSession7295019988216699135(store: JulesBoardStore) {
     val workId = "session:7295019988216699135"
 >>>>>>> theirs
+=======
+suspend fun drainSession9875178922791658457(store: JulesBoardStore) {
+    val workId = "session:9875178922791658457"
+>>>>>>> theirs
     store.appendWork(workId, JulesCause.WorkDrained(
         workId = workId,
         sessionId = "necromanced",
@@ -881,6 +890,7 @@ suspend fun drainSession7295019988216699135(store: JulesBoardStore) {
             patchCid = ContentId("sha256:0000000000000000000000000000000000000000000000000000000000000000"),
             revision = "superseded-by-review",
             versionTag = "superseded-by-review",
+<<<<<<< ours
 <<<<<<< ours
 <<<<<<< ours
 <<<<<<< ours
@@ -907,11 +917,14 @@ suspend fun drainSession7295019988216699135(store: JulesBoardStore) {
 >>>>>>> theirs
 =======
 >>>>>>> theirs
+=======
+>>>>>>> theirs
             lexicalMemory = LexicalMemory(
                 summary = "Superseded necromanced work",
                 title = "Superseded necromanced work",
                 content = "Superseded via drain script."
             ),
+<<<<<<< ours
 <<<<<<< ours
 <<<<<<< ours
 >>>>>>> theirs
@@ -922,12 +935,15 @@ suspend fun drainSession7295019988216699135(store: JulesBoardStore) {
 =======
             lexicalMemory = LexicalMemory("Superseded necromanced work", "Superseded necromanced work", "Superseded via drain script."),
 >>>>>>> theirs
+=======
+>>>>>>> theirs
             claimedAt = 0L,
             prUrl = null
         ),
         at = 0L
     ))
 }
+<<<<<<< ours
 <<<<<<< ours
 <<<<<<< ours
 <<<<<<< ours
@@ -992,6 +1008,8 @@ suspend fun drainSession9641589462865783879(store: JulesBoardStore) {
 }
 <<<<<<< ours
 <<<<<<< ours
+>>>>>>> theirs
+=======
 >>>>>>> theirs
 =======
 >>>>>>> theirs
