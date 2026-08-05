@@ -3,7 +3,10 @@
 package borg.trikeshed.litebike
 
 import borg.trikeshed.litebike.taxonomy.Protocol
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.runBlocking
+import kotlin.coroutines.resume
+import kotlin.coroutines.resumeWithException
 import java.net.InetSocketAddress
 import java.net.StandardSocketOptions
 import java.nio.ByteBuffer
@@ -97,28 +100,32 @@ object JvmLitebikeBindAdapter {
         server: AsynchronousServerSocketChannel,
         element: LitebikeListenerElement,
         connections: ConnectionRegistry,
-    ) = kotlinx.coroutines.suspendCancellableCoroutine<Unit> { cont ->
-        val handler = object : CompletionHandler<AsynchronousSocketChannel, Any?> {
-            override fun completed(ch: AsynchronousSocketChannel, attached: Any?) {
-                // Continue accepting the next connection immediately.
-                server.accept(null, this)
-                // R05 — register the channel up front. The drain loop
-                // attaches the sequence id once the listener assigns
-                // one, so the HTTP worker can route responses back
-                // through the originating socket.
-                val connId = connections.register(ch)
-                // Read all bytes from the channel asynchronously, then
-                // forward to the listener with the detected protocol.
-                drainOne(ch, element, connections, connId)
+    ) {
+        while (kotlinx.coroutines.currentCoroutineContext().isActive) {
+            val ch = kotlinx.coroutines.suspendCancellableCoroutine<AsynchronousSocketChannel> { cont ->
+                val handler = object : CompletionHandler<AsynchronousSocketChannel, Any?> {
+                    override fun completed(result: AsynchronousSocketChannel, attached: Any?) {
+                        cont.resume(result)
+                    }
+
+                    override fun failed(t: Throwable, attached: Any?) {
+                        if (cont.isActive) cont.resumeWithException(t)
+                    }
+                }
+                server.accept(null, handler)
+                cont.invokeOnCancellation {
+                    runCatching { server.close() }
+                }
             }
 
-            override fun failed(t: Throwable, attached: Any?) {
-                if (cont.isActive) cont.cancel(t)
-            }
-        }
-        server.accept(null, handler)
-        cont.invokeOnCancellation {
-            runCatching { server.close() }
+            // R05 — register the channel up front. The drain loop
+            // attaches the sequence id once the listener assigns
+            // one, so the HTTP worker can route responses back
+            // through the originating socket.
+            val connId = connections.register(ch)
+            // Read all bytes from the channel asynchronously, then
+            // forward to the listener with the detected protocol.
+            drainOne(ch, element, connections, connId)
         }
     }
 
