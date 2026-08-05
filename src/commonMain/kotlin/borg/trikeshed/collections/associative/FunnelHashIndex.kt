@@ -6,12 +6,17 @@ package borg.trikeshed.collections.associative
  * Geometry (cousin of Krapivin funnel, not the paper's β-bucket layout):
  * - Append-only immutable segment (no delete/retract)
  * - Negative-query-heavy workloads (dedup, membership, frozen schema)
+<<<<<<< ours
  * - Each level: capacity halves, probeBound doubles (1, 2, 4, …); final level unbounded
  * - Deterministic: mix64(key.hashCode, seed + levelSalt) — unit-cost probes, not SHA-256
  *
  * This is NOT Farach-Colton/Krapivin/Kuszmaul funnel hashing (arXiv:2501.02305):
  * that construction uses per-level buckets of size β ~ log(1/δ). Here probe bound
  * expands across the whole level. O(log² 1/δ) is not claimed.
+=======
+ * - Multi-level expanding probeBound geometry, NOT paper β-bucket funnel; do NOT claim O(log² 1/δ)
+ * - Deterministic replay: probe entropy derived from key hashCode + committed seed
+>>>>>>> theirs
  *
  * Usage:
  *   val idx = FunnelHashIndex.build(listOf("a", "b", "c"), seed)
@@ -57,7 +62,7 @@ class FunnelHashIndex<K : Any> internal constructor(
                 for (j in keys.indices) {
                     if (placed[j]) continue
                     val key = keys[j]
-                    val h = hash64(key, seed + probeBound.toLong())
+                    val h = mix64(key.hashCode(), seed + probeBound.toLong())
                     var placedThis = false
                     var i = 0
                     while (i < probeBound && i < cap) {
@@ -94,7 +99,7 @@ class FunnelHashIndex<K : Any> internal constructor(
                 for (j in keys.indices) {
                     if (placed[j]) continue
                     val key = keys[j]
-                    val h = hash64(key, seed + 0xdeadbeefL)
+                    val h = mix64(key.hashCode(), seed + 0xdeadbeefL)
                     var i = 0
                     while (true) {
                         val slot = ((h + i) and (cap.toLong() - 1)).toInt()
@@ -120,12 +125,21 @@ class FunnelHashIndex<K : Any> internal constructor(
             return cap
         }
 
+<<<<<<< ours
         /** Unit-cost 64-bit mix: key.hashCode + seed. One hash per level, not crypto. */
         private fun hash64(key: Any, seed: Long): Long {
             var z = seed xor (key.hashCode().toLong() and 0xFFFFFFFFL)
             z = (z xor (z ushr 30)) * -0x40a7b892e31b1a47L
             z = (z xor (z ushr 27)) * -0x6b2fb644ecced115L
             return z xor (z ushr 31)
+=======
+        private fun mix64(hash: Int, seed: Long): Long {
+            var z = seed + hash.toLong()
+            z = (z xor (z shr 30)) * -0x40a7b892e31b1a47L
+            z = (z xor (z shr 27)) * -0x6b2fb644ecced115L
+            z = z xor (z shr 31)
+            return z
+>>>>>>> theirs
         }
     }
 
@@ -133,7 +147,7 @@ class FunnelHashIndex<K : Any> internal constructor(
     fun get(key: K): Int? {
         for (level in levels) {
             val levelSeed = if (level.probeBound == Int.MAX_VALUE) seed + 0xdeadbeefL else seed + level.probeBound.toLong()
-            val h = hash64(key, levelSeed)
+            val h = mix64(key.hashCode(), levelSeed)
             val bound = if (level.probeBound == Int.MAX_VALUE) level.capacity else level.probeBound
             var i = 0
             while (i < bound) {
@@ -162,7 +176,7 @@ class FunnelHashIndex<K : Any> internal constructor(
             var totalProbes = 0
             for (level in levels) {
                 val levelSeed = if (level.probeBound == Int.MAX_VALUE) seed + 0xdeadbeefL else seed + level.probeBound.toLong()
-                val h = hash64(key, levelSeed)
+                val h = mix64(key.hashCode(), levelSeed)
                 val bound = if (level.probeBound == Int.MAX_VALUE) level.capacity else level.probeBound
                 var i = 0
                 while (i < bound) {
@@ -178,10 +192,19 @@ class FunnelHashIndex<K : Any> internal constructor(
         }
     }
 
+<<<<<<< ours
     private fun hash64(key: Any, seed: Long): Long {
         var z = seed xor (key.hashCode().toLong() and 0xFFFFFFFFL)
         z = (z xor (z ushr 30)) * -0x40a7b892e31b1a47L
         z = (z xor (z ushr 27)) * -0x6b2fb644ecced115L
         return z xor (z ushr 31)
+=======
+    private fun mix64(hash: Int, seed: Long): Long {
+        var z = seed + hash.toLong()
+        z = (z xor (z shr 30)) * -0x40a7b892e31b1a47L
+        z = (z xor (z shr 27)) * -0x6b2fb644ecced115L
+        z = z xor (z shr 31)
+        return z
+>>>>>>> theirs
     }
 }
