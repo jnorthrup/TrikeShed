@@ -35,12 +35,12 @@ class BtrfsCasStore(
         root.mkdirs()
     }
     
-    private fun cidPath(cid: ContentId): File {
+    private suspend fun cidPath(cid: ContentId): File {
         val hash = cid.value
         val prefix = hash.substring(0, 2)
         val dir = File(root, prefix)
         if (!subdirs.contains(prefix)) {
-            dir.mkdirs()
+            withContext(Dispatchers.IO) { dir.mkdirs() }
             subdirs.add(prefix)
         }
         return File(dir, hash)
@@ -50,9 +50,11 @@ class BtrfsCasStore(
         val cid = ContentId.of(bytes)
         val target = cidPath(cid)
         
-        if (target.exists()) {
+        val exists = withContext(Dispatchers.IO) { target.exists() }
+        if (exists) {
             // Verify existing content matches (integrity check)
-            val existing = target.readBytes()
+            // ⚡ Bolt: Wrap blocking I/O operations in Dispatchers.IO to prevent coroutine starvation
+            val existing = withContext(Dispatchers.IO) { target.readBytes() }
             if (ContentId.of(existing) == cid) {
                 return cid // Already stored, deduplicated
             }
@@ -61,10 +63,13 @@ class BtrfsCasStore(
         }
         
         // Write to temp file first (atomic)
-        val temp = withContext(Dispatchers.IO) { File.createTempFile("cas-", ".tmp", root) }
+        // ⚡ Bolt: ensure File.createTempFile and writeBytes are wrapped in IO dispatcher
+        val temp = withContext(Dispatchers.IO) {
+            File.createTempFile("cas-", ".tmp", root)
+        }
         try {
             withContext(Dispatchers.IO) {
-                temp.writeBytes(array = bytes)
+                temp.writeBytes(bytes)
             }
             
             // Try reflink (btrfs COW deduplication)
@@ -85,9 +90,11 @@ class BtrfsCasStore(
     
     suspend fun get(cid: ContentId): ByteArray? {
         val target = cidPath(cid)
-        if (!target.exists()) return null
+        val exists = withContext(Dispatchers.IO) { target.exists() }
+        if (!exists) return null
         
-        val bytes = target.readBytes()
+        // ⚡ Bolt: Wrap blocking I/O operations in Dispatchers.IO to prevent coroutine starvation
+        val bytes = withContext(Dispatchers.IO) { target.readBytes() }
         if (ContentId.of(bytes) != cid) {
             throw IllegalStateException("CAS integrity failure: stored blob for $cid does not match hash")
         }
