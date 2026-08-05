@@ -3,14 +3,19 @@ package borg.trikeshed.cas
 <<<<<<< HEAD
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
 import borg.trikeshed.job.CasStore
 import borg.trikeshed.job.ContentId
 import borg.trikeshed.lib.Join
+=======
+import borg.trikeshed.job.ContentId
+>>>>>>> origin/add-line-cas-5264137680086730403
 import borg.trikeshed.lib.Series
 import borg.trikeshed.lib.get
 import borg.trikeshed.lib.j
 import borg.trikeshed.lib.size
 
+<<<<<<< HEAD
 /**
  * Line CAS taxonomy.
  *
@@ -545,3 +550,23 @@ object LineCas {
     }
 }
 >>>>>>> origin/feat-line-cas-5991803418324279377
+=======
+data class LineNode(
+    val contentCid: ContentId,
+    val ordinal: Int
+)
+
+fun contentOf(line: String): ContentId =
+    ContentId.of(line.trim().encodeToByteArray())
+
+fun spine(text: String): Series<LineNode> {
+    val validLines = text.lines()
+        .map { it.trim() }
+        .filter { it.isNotEmpty() }
+        .toList()
+
+    return validLines.size j { i ->
+        LineNode(contentOf(validLines[i]), i)
+    }
+}
+>>>>>>> origin/add-line-cas-5264137680086730403
