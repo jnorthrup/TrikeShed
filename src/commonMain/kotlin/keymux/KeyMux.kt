@@ -200,6 +200,18 @@ class ReactorSource(
     }
 }
 
+// ── FIXED source ──
+
+class FixedKeySource(
+    private val fixedValue: String,
+    override val name: String = "fixed",
+) : KeySource() {
+    override suspend fun read(path: KeyPath): String? = fixedValue
+    override suspend fun write(path: KeyPath, value: String) {
+        throw UnsupportedOperationException("fixed source is read-only")
+    }
+}
+
 // ── TEST source ──
 
 class TestKeySource(

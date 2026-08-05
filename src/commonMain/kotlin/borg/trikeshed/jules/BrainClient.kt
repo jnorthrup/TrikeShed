@@ -3,12 +3,16 @@ package borg.trikeshed.jules
 import borg.trikeshed.htx.htxHeaders
 import borg.trikeshed.lib.Series
 import borg.trikeshed.lib.get
-import borg.trikeshed.lib.j
 import borg.trikeshed.lib.size
-import borg.trikeshed.lib.toSeries
-import borg.trikeshed.userspace.nio.platform.spi.SystemOperations
+import borg.trikeshed.lib.toArray
+import keymux.EnvVarSource
+import keymux.FixedKeySource
+import keymux.KeyMux
+import modelmux.ModelEntry
+import modelmux.ModelMux
 import kotlinx.coroutines.withTimeout
 import kotlinx.datetime.Clock
+import borg.trikeshed.userspace.nio.platform.spi.SystemOperations
 
 /** Target adapter for the optional durable brain-error audit trail. */
 fun interface BrainErrorSink {
@@ -26,9 +30,9 @@ object DiscardingBrainErrorSink : BrainErrorSink {
  * failover. The flywheel's [FlywheelDriver.buildAnswer] calls this to answer
  * Jules sessions with project conventions as the system prompt.
  *
- * The brain must fire a real model. A string template is not a brain. HTTP is
- * always [TrikeHtxHttpClient]; target code supplies NIO/TLS and, optionally,
- * a [BrainErrorSink] for durable diagnostics.
+ * The routing/key design is authoritative here: provider selection goes through
+ * ModelMux and credential resolution goes through KeyMux. Environment variables
+ * are used only to discover which bootstrap bindings exist.
  */
 class BrainClient(
     /** If non-null, overrides auto-discovery and uses a single endpoint. */
@@ -37,37 +41,51 @@ class BrainClient(
     model: String = "poolside/laguna-xs-2.1",
     private val errorSink: BrainErrorSink = DiscardingBrainErrorSink,
 ) {
-    /** One OpenAI-compatible endpoint with credentials and a default model. */
-    data class Endpoint(
+    /** One OpenAI-compatible endpoint + the env var that KeyMux resolves. */
+    data class EndpointSpec(
         val name: String,
-        val apiKey: String,
+        val envVar: String,
         val base: String,
         val model: String,
     )
 
-    private val endpoints: Series<Endpoint> = if (apiKey != null) {
-        1 j { _: Int -> Endpoint("override", apiKey, base, model) }
+    private val endpoints: List<EndpointSpec> = if (apiKey != null) {
+        listOf(EndpointSpec("override", "BRAIN_OVERRIDE", base, model))
     } else {
         discoverEndpoints()
     }
+    private val endpointByModel: Map<String, EndpointSpec> = endpoints.associateBy { it.model }
+    private val keyMux: KeyMux = buildKeyMux(apiKey, model)
+    private val modelMux: ModelMux = ModelMux(keyMux) {
+        endpoints.forEach { endpoint ->
+            model(id = endpoint.model, caps = setOf("chat"), baseUrl = endpoint.base)
+        }
+    }
 
-    /** Last endpoint that answered a chat. */
-    @Volatile private var lastGood: Int = 0
+    /** Last model id that answered a chat. */
+    @Volatile private var lastGoodModelId: String? = endpoints.firstOrNull()?.model
 
     /** True if at least one provider endpoint was discovered. */
-    fun hasEndpoints(): Boolean = endpoints.size != 0
+    fun hasEndpoints(): Boolean = endpoints.isNotEmpty()
 
     /** Non-streaming chat completion with multi-provider failover. */
     suspend fun chat(messages: List<Pair<String, String>>, maxTokens: Int = 256, temperature: Double = 0.2): String {
-        if (endpoints.size == 0) error("Brain: no provider endpoints discovered")
+        if (endpoints.isEmpty()) error("Brain: no provider endpoints discovered")
 
         var lastError = "all providers exhausted"
-        val start = lastGood.coerceIn(0, endpoints.size - 1)
-        for (offset in 0 until endpoints.size) {
-            val idx = (start + offset) % endpoints.size
-            val ep = endpoints[idx]
+        val routed = modelMux.route("chat").a
+        for (modelId in orderedModelIds(routed)) {
+            val endpoint = endpointByModel[modelId] ?: continue
+            val session = try {
+                modelMux.session(modelId).getOrThrow()
+            } catch (t: Throwable) {
+                lastError = "Brain ${endpoint.name} session failed: ${t.message}"
+                logError(endpoint.name, -1, t.message.orEmpty().take(500))
+                continue
+            }
+            session.activate()
             val body = buildString {
-                append("""{"model":${jsonStr(ep.model)},"messages":[""")
+                append("""{"model":${jsonStr(modelId)},"messages":[""")
                 messages.forEachIndexed { index, (role, content) ->
                     if (index > 0) append(',')
                     append("""{"role":${jsonStr(role)},"content":${jsonStr(content)}}""")
@@ -78,28 +96,51 @@ class BrainClient(
                 append("\"top_p\":0.9")
                 append('}')
             }
-            val response = try {
-                withTimeout(15_000) {
-                    TrikeHtxHttpClient(
-                        base = ep.base,
-                        defaultHeaders = htxHeaders("Authorization" j "Bearer ${ep.apiKey}"),
-                    ).post("/chat/completions", body)
+            try {
+                val response = try {
+                    withTimeout(15_000) {
+                        TrikeHtxHttpClient(
+                            base = session.baseUrl,
+                            defaultHeaders = htxHeaders(*session.authHeaders().toArray()),
+                        ).post("/chat/completions", body)
+                    }
+                } catch (t: HtxHttpException) {
+                    lastError = "Brain ${endpoint.name} ${t.status}: ${t.message}"
+                    logError(endpoint.name, t.status, t.message.orEmpty().take(500))
+                    continue
+                } catch (t: Throwable) {
+                    // A hung or refused cluster must not abort failover — quotas
+                    // are disjoint, so the next model family may answer immediately.
+                    lastError = "Brain ${endpoint.name} threw: ${t.message}"
+                    logError(endpoint.name, -1, t.message.orEmpty().take(500))
+                    continue
                 }
-            } catch (t: HtxHttpException) {
-                lastError = "Brain ${ep.name} ${t.status}: ${t.message}"
-                logError(ep.name, t.status, t.message.orEmpty().take(500))
-                continue
-            } catch (t: Throwable) {
-                // A hung or refused cluster must not abort failover — quotas
-                // are disjoint, so the next model family may answer immediately.
-                lastError = "Brain ${ep.name} threw: ${t.message}"
-                logError(ep.name, -1, t.message.orEmpty().take(500))
-                continue
+                lastGoodModelId = modelId
+                return extractContent(response)
+            } finally {
+                session.drain()
+                session.close()
             }
-            lastGood = idx
-            return extractContent(response)
         }
         error(lastError)
+    }
+
+    private fun orderedModelIds(routed: Series<ModelEntry>): List<String> {
+        val modelIds = (0 until routed.size).map { routed[it].a }
+        val preferred = lastGoodModelId ?: return modelIds
+        val start = modelIds.indexOf(preferred)
+        if (start < 0) return modelIds
+        return (0 until modelIds.size).map { offset -> modelIds[(start + offset) % modelIds.size] }
+    }
+
+    private fun buildKeyMux(overrideKey: String?, overrideModel: String): KeyMux = KeyMux {
+        if (overrideKey != null) {
+            bind("llm.$overrideModel.key", FixedKeySource(overrideKey, name = "brain-override"))
+        } else {
+            endpoints.forEach { endpoint ->
+                bind("llm.${endpoint.model}.key", EnvVarSource(endpoint.envVar))
+            }
+        }
     }
 
     private fun logError(provider: String, statusCode: Int, bodySnippet: String) {
@@ -141,76 +182,59 @@ class BrainClient(
                     k += 2
                 }
                 c == '"' -> return out.toString()
-                else -> { out.append(c); k++ }
+                else -> {
+                    out.append(c)
+                    k++
+                }
             }
         }
         error("Brain: unterminated content")
     }
 
     /** Discover all configured OpenAI-compatible endpoints. */
-    private fun discoverEndpoints(): Series<Endpoint> {
-        val out = mutableListOf<Endpoint>()
+    private fun discoverEndpoints(): List<EndpointSpec> {
+        val out = mutableListOf<EndpointSpec>()
         val seen = mutableSetOf<String>()
 
-        fun add(name: String, key: String, base: String, model: String) {
+        fun add(name: String, envVar: String, base: String, model: String) {
+            val key = SystemOperations.default.getenv(envVar)
             val id = "$name:$base:$model"
-            if (key.isNotBlank() && seen.add(id)) {
-                out.add(Endpoint(name, key.trim(), base.trim(), model.trim()))
+            if (!key.isNullOrBlank() && seen.add(id)) {
+                out.add(EndpointSpec(name, envVar, base.trim(), model.trim()))
             }
         }
 
-        SystemOperations.default.getenv("NVIDIA_API_KEY")?.let { key ->
-            val nvidia = "https://integrate.api.nvidia.com/v1"
-            add("nv-deepseek-v4-pro", key, nvidia, "deepseek-ai/deepseek-v4-pro")
-            add("nv-nemotron-super-120b", key, nvidia, "nvidia/nemotron-3-super-120b-a12b")
-            add("nv-mistral-large-2", key, nvidia, "mistralai/mistral-large-2-instruct")
-            add("nv-deepseek-v4-flash", key, nvidia, "deepseek-ai/deepseek-v4-flash")
-            add("nv-nemotron-super-49b", key, nvidia, "nvidia/llama-3.3-nemotron-super-49b-v1.5")
-            add("nv-glm-52", key, nvidia, "z-ai/glm-5.2")
-            add("nv-kimi-k26", key, nvidia, "moonshotai/kimi-k2.6")
-            add("nv-gpt-oss-120b", key, nvidia, "openai/gpt-oss-120b")
-            add("nv-inkling", key, nvidia, "thinkingmachines/inkling")
-            add("nv-minimax-m3", key, nvidia, "minimaxai/minimax-m3")
-            add("nv-nemotron-ultra-253b", key, nvidia, "nvidia/llama-3.1-nemotron-ultra-253b-v1")
-            add("nv-codestral-22b", key, nvidia, "mistralai/codestral-22b-instruct-v0.1")
-            add("nv-nemotron-ultra-550b", key, nvidia, "nvidia/nemotron-3-ultra-550b-a55b")
-            add("nv-laguna", key, nvidia, "poolside/laguna-xs-2.1")
+        val nvidia = "https://integrate.api.nvidia.com/v1"
+        add("nv-deepseek-v4-pro", "NVIDIA_API_KEY", nvidia, "deepseek-ai/deepseek-v4-pro")
+        add("nv-nemotron-super-120b", "NVIDIA_API_KEY", nvidia, "nvidia/nemotron-3-super-120b-a12b")
+        add("nv-mistral-large-2", "NVIDIA_API_KEY", nvidia, "mistralai/mistral-large-2-instruct")
+        add("nv-deepseek-v4-flash", "NVIDIA_API_KEY", nvidia, "deepseek-ai/deepseek-v4-flash")
+        add("nv-nemotron-super-49b", "NVIDIA_API_KEY", nvidia, "nvidia/llama-3.3-nemotron-super-49b-v1.5")
+        add("nv-glm-52", "NVIDIA_API_KEY", nvidia, "z-ai/glm-5.2")
+        add("nv-kimi-k26", "NVIDIA_API_KEY", nvidia, "moonshotai/kimi-k2.6")
+        add("nv-gpt-oss-120b", "NVIDIA_API_KEY", nvidia, "openai/gpt-oss-120b")
+        add("nv-inkling", "NVIDIA_API_KEY", nvidia, "thinkingmachines/inkling")
+        add("nv-minimax-m3", "NVIDIA_API_KEY", nvidia, "minimaxai/minimax-m3")
+        add("nv-nemotron-ultra-253b", "NVIDIA_API_KEY", nvidia, "nvidia/llama-3.1-nemotron-ultra-253b-v1")
+        add("nv-codestral-22b", "NVIDIA_API_KEY", nvidia, "mistralai/codestral-22b-instruct-v0.1")
+        add("nv-nemotron-ultra-550b", "NVIDIA_API_KEY", nvidia, "nvidia/nemotron-3-ultra-550b-a55b")
+        add("nv-laguna", "NVIDIA_API_KEY", nvidia, "poolside/laguna-xs-2.1")
+        add("openrouter-glm52", "OPENROUTER_API_KEY", "https://openrouter.ai/api/v1", "z-ai/glm-5.2")
+        add("openrouter-nemotron", "OPENROUTER_API_KEY", "https://openrouter.ai/api/v1", "nvidia/nemotron-3-ultra-550b-a55b:free")
+        add("zai", "ZAI_API_KEY", "https://api.z.ai/api/paas/v4", "glm-5.2")
+        add("groq", "GROQ_API_KEY", "https://api.groq.com/openai/v1", "llama-3.3-70b-versatile")
+        add("deepseek", "DEEPSEEK_API_KEY", "https://api.deepseek.com/v1", "deepseek-chat")
+        add("cerebras", "CEREBRAS_API_KEY", "https://api.cerebras.ai/v1", "llama-3.3-70b")
+        val openAiBase = SystemOperations.default.getenv("OPENAI_API_BASE") ?: "https://api.openai.com/v1"
+        if ((SystemOperations.default.getenv("OPENAI_API_KEY") ?: "").startsWith("sk-")) {
+            add("openai", "OPENAI_API_KEY", openAiBase, "gpt-4o-mini")
         }
-        SystemOperations.default.getenv("OPENROUTER_API_KEY")?.let { key ->
-            add("openrouter-glm52", key, "https://openrouter.ai/api/v1", "z-ai/glm-5.2")
-            add("openrouter-nemotron", key, "https://openrouter.ai/api/v1", "nvidia/nemotron-3-ultra-550b-a55b:free")
-        }
-        SystemOperations.default.getenv("ZAI_API_KEY")?.let { key ->
-            add("zai", key, "https://api.z.ai/api/paas/v4", "glm-5.2")
-        }
-        SystemOperations.default.getenv("GROQ_API_KEY")?.let { key ->
-            add("groq", key, "https://api.groq.com/openai/v1", "llama-3.3-70b-versatile")
-        }
-        SystemOperations.default.getenv("DEEPSEEK_API_KEY")?.let { key ->
-            add("deepseek", key, "https://api.deepseek.com/v1", "deepseek-chat")
-        }
-        SystemOperations.default.getenv("CEREBRAS_API_KEY")?.let { key ->
-            add("cerebras", key, "https://api.cerebras.ai/v1", "llama-3.3-70b")
-        }
-        SystemOperations.default.getenv("OPENAI_API_KEY")?.let { key ->
-            if (key.startsWith("sk-")) {
-                add("openai", key, SystemOperations.default.getenv("OPENAI_API_BASE") ?: "https://api.openai.com/v1", "gpt-4o-mini")
-            }
-        }
-        SystemOperations.default.getenv("PERPLEXITY_API_KEY")?.let { key ->
-            add("perplexity", key, "https://api.perplexity.ai", "llama-3.1-sonar-small-128k-online")
-        }
-        SystemOperations.default.getenv("XAI_API_KEY")?.let { key ->
-            add("xai", key, "https://api.x.ai/v1", "grok-2-latest")
-        }
-        SystemOperations.default.getenv("MOONSHOT_API_KEY")?.let { key ->
-            add("moonshot", key, "https://api.moonshot.cn/v1", "moonshot-v1-32k")
-        }
-        SystemOperations.default.getenv("MINIMAX_API_KEY")?.let { key ->
-            add("minimax-m3", key, "https://api.minimax.chat/v1", "MiniMax-M3")
-            add("minimax-m25", key, "https://api.minimax.chat/v1", "MiniMax-Text-01")
-        }
-        return out.toSeries()
+        add("perplexity", "PERPLEXITY_API_KEY", "https://api.perplexity.ai", "llama-3.1-sonar-small-128k-online")
+        add("xai", "XAI_API_KEY", "https://api.x.ai/v1", "grok-2-latest")
+        add("moonshot", "MOONSHOT_API_KEY", "https://api.moonshot.cn/v1", "moonshot-v1-32k")
+        add("minimax-m3", "MINIMAX_API_KEY", "https://api.minimax.chat/v1", "MiniMax-M3")
+        add("minimax-m25", "MINIMAX_API_KEY", "https://api.minimax.chat/v1", "MiniMax-Text-01")
+        return out
     }
 
     private fun jsonStr(s: String): String = buildString {
