@@ -25,91 +25,10 @@ object SpanMatcher {
         val spans = mutableListOf<SpanRecord>()
 
         for ((segIdx, aSeg) in aSegments.withIndex()) {
-            val aSegFirst = openTime(a, aSeg[0])
-            val aSegLast = openTime(a, aSeg[aSeg.size - 1])
-            val hasGapBefore = segIdx > 0
-            val hasGapAfter = segIdx < aSegments.size - 1
-
-            val searchStart = if (hasGapBefore) aSegFirst - interval else aSegFirst - tolerance
-            val searchEnd = if (hasGapAfter) aSegLast + interval else aSegLast + tolerance
-
-            val bRowsInRange = (0 until b.size).filter { bi ->
-                val bt = openTime(b, bi)
-                bt >= searchStart - tolerance && bt <= searchEnd + tolerance
+            val record = processSegment(a, b, aSeg, segIdx, aSegments.size, interval, tolerance)
+            if (record != null) {
+                spans.add(record)
             }
-            if (bRowsInRange.isEmpty()) continue
-
-            val aStart = if (hasGapBefore) {
-                val candidate = aSegFirst - interval
-                if (bRowsInRange.any { openTime(b, it) == candidate }) candidate else aSegFirst
-            } else {
-                aSegFirst
-            }
-
-            val aEnd = if (hasGapAfter) {
-                val candidate = aSegLast + interval
-                if (bRowsInRange.any { openTime(b, it) == candidate }) candidate else aSegLast
-            } else {
-                aSegLast
-            }
-
-            val aRowsInRange = aSeg.filter { ai ->
-                val at = openTime(a, ai)
-                at >= aStart - tolerance && at <= aEnd + tolerance
-            }
-            if (aRowsInRange.isEmpty()) continue
-
-            val bRowsFinal = bRowsInRange.filter { bi ->
-                val bt = openTime(b, bi)
-                bt >= aStart - tolerance && bt <= aEnd + tolerance
-            }
-
-            val bStart = bRowsFinal.minOfOrNull { openTime(b, it) } ?: continue
-            val bEnd = bRowsFinal.maxOfOrNull { openTime(b, it) } ?: continue
-
-            val finalAStart: Long
-            val finalAEnd: Long
-            if (!hasGapBefore && !hasGapAfter) {
-                val aRowsInOverlap = aSeg.filter { ai ->
-                    val at = openTime(a, ai)
-                    at >= bStart - tolerance && at <= bEnd + tolerance
-                }
-                finalAStart = if (aRowsInOverlap.isNotEmpty()) openTime(a, aRowsInOverlap[0]) else aStart
-                finalAEnd = if (aRowsInOverlap.isNotEmpty()) openTime(a, aRowsInOverlap[aRowsInOverlap.size - 1]) else aEnd
-            } else {
-                finalAStart = aStart
-                finalAEnd = aEnd
-            }
-
-            val aRowsFinal = aSeg.count { ai ->
-                val at = openTime(a, ai)
-                at >= finalAStart - tolerance && at <= finalAEnd + tolerance
-            }
-            val bRowsCount = bRowsInRange.count { bi ->
-                val bt = openTime(b, bi)
-                bt >= finalAStart - tolerance && bt <= finalAEnd + tolerance
-            }
-
-            val finalBStart = bRowsInRange.filter { bi ->
-                val bt = openTime(b, bi)
-                bt >= finalAStart - tolerance && bt <= finalAEnd + tolerance
-            }.minOfOrNull { openTime(b, it) } ?: bStart
-
-            val finalBEnd = bRowsInRange.filter { bi ->
-                val bt = openTime(b, bi)
-                bt >= finalAStart - tolerance && bt <= finalAEnd + tolerance
-            }.maxOfOrNull { openTime(b, it) } ?: bEnd
-
-            spans.add(
-                SpanRecord(
-                    aStart = finalAStart,
-                    aEnd = finalAEnd,
-                    bStart = finalBStart,
-                    bEnd = finalBEnd,
-                    aRows = aRowsFinal,
-                    bRows = bRowsCount,
-                )
-            )
         }
 
         val spanData = spans.toList()
@@ -120,6 +39,100 @@ object SpanMatcher {
                 keys = listOf("aStart", "aEnd", "bStart", "bEnd", "aRows", "bRows").toSeries(),
             )
         }
+    }
+
+    private fun processSegment(
+        a: Cursor,
+        b: Cursor,
+        aSeg: List<Int>,
+        segIdx: Int,
+        totalSegments: Int,
+        interval: Long,
+        tolerance: Long
+    ): SpanRecord? {
+        val aSegFirst = openTime(a, aSeg[0])
+        val aSegLast = openTime(a, aSeg[aSeg.size - 1])
+        val hasGapBefore = segIdx > 0
+        val hasGapAfter = segIdx < totalSegments - 1
+
+        val searchStart = if (hasGapBefore) aSegFirst - interval else aSegFirst - tolerance
+        val searchEnd = if (hasGapAfter) aSegLast + interval else aSegLast + tolerance
+
+        val bRowsInRange = (0 until b.size).filter { bi ->
+            val bt = openTime(b, bi)
+            bt >= searchStart - tolerance && bt <= searchEnd + tolerance
+        }
+        if (bRowsInRange.isEmpty()) return null
+
+        val aStart = if (hasGapBefore) {
+            val candidate = aSegFirst - interval
+            if (bRowsInRange.any { openTime(b, it) == candidate }) candidate else aSegFirst
+        } else {
+            aSegFirst
+        }
+
+        val aEnd = if (hasGapAfter) {
+            val candidate = aSegLast + interval
+            if (bRowsInRange.any { openTime(b, it) == candidate }) candidate else aSegLast
+        } else {
+            aSegLast
+        }
+
+        val aRowsInRange = aSeg.filter { ai ->
+            val at = openTime(a, ai)
+            at >= aStart - tolerance && at <= aEnd + tolerance
+        }
+        if (aRowsInRange.isEmpty()) return null
+
+        val bRowsFinal = bRowsInRange.filter { bi ->
+            val bt = openTime(b, bi)
+            bt >= aStart - tolerance && bt <= aEnd + tolerance
+        }
+
+        val bStart = bRowsFinal.minOfOrNull { openTime(b, it) } ?: return null
+        val bEnd = bRowsFinal.maxOfOrNull { openTime(b, it) } ?: return null
+
+        val finalAStart: Long
+        val finalAEnd: Long
+        if (!hasGapBefore && !hasGapAfter) {
+            val aRowsInOverlap = aSeg.filter { ai ->
+                val at = openTime(a, ai)
+                at >= bStart - tolerance && at <= bEnd + tolerance
+            }
+            finalAStart = if (aRowsInOverlap.isNotEmpty()) openTime(a, aRowsInOverlap[0]) else aStart
+            finalAEnd = if (aRowsInOverlap.isNotEmpty()) openTime(a, aRowsInOverlap[aRowsInOverlap.size - 1]) else aEnd
+        } else {
+            finalAStart = aStart
+            finalAEnd = aEnd
+        }
+
+        val aRowsFinal = aSeg.count { ai ->
+            val at = openTime(a, ai)
+            at >= finalAStart - tolerance && at <= finalAEnd + tolerance
+        }
+        val bRowsCount = bRowsInRange.count { bi ->
+            val bt = openTime(b, bi)
+            bt >= finalAStart - tolerance && bt <= finalAEnd + tolerance
+        }
+
+        val finalBStart = bRowsInRange.filter { bi ->
+            val bt = openTime(b, bi)
+            bt >= finalAStart - tolerance && bt <= finalAEnd + tolerance
+        }.minOfOrNull { openTime(b, it) } ?: bStart
+
+        val finalBEnd = bRowsInRange.filter { bi ->
+            val bt = openTime(b, bi)
+            bt >= finalAStart - tolerance && bt <= finalAEnd + tolerance
+        }.maxOfOrNull { openTime(b, it) } ?: bEnd
+
+        return SpanRecord(
+            aStart = finalAStart,
+            aEnd = finalAEnd,
+            bStart = finalBStart,
+            bEnd = finalBEnd,
+            aRows = aRowsFinal,
+            bRows = bRowsCount,
+        )
     }
 
     private data class SpanRecord(
