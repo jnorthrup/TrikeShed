@@ -3,19 +3,15 @@ package borg.trikeshed.cas
 <<<<<<< HEAD
 <<<<<<< HEAD
 <<<<<<< HEAD
-<<<<<<< HEAD
 import borg.trikeshed.job.CasStore
 import borg.trikeshed.job.ContentId
 import borg.trikeshed.lib.Join
-=======
 import borg.trikeshed.job.ContentId
->>>>>>> origin/add-line-cas-5264137680086730403
 import borg.trikeshed.lib.Series
 import borg.trikeshed.lib.get
 import borg.trikeshed.lib.j
 import borg.trikeshed.lib.size
 
-<<<<<<< HEAD
 /**
  * Line CAS taxonomy.
  *
@@ -389,7 +385,6 @@ data class LineCasSpine(
     val ordinal: Int,
     val linkedKey: String? = null
 )
-=======
 enum class MatchGrade {
     CONTENT_ONLY,
     PARTIAL_LEFT,
@@ -418,7 +413,6 @@ fun rampScore(grade: MatchGrade): Double = when (grade) {
     MatchGrade.PARTIAL_LEFT, MatchGrade.PARTIAL_RIGHT -> 0.45
     MatchGrade.LINKED -> 1.0
 }
->>>>>>> origin/cas-line-cas-2416106438265065004
 =======
 import borg.trikeshed.job.ContentId
 import borg.trikeshed.lib.Series
