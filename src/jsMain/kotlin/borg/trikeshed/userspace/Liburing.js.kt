@@ -23,6 +23,3 @@ internal actual object LiburingImpl : LiburingFacade {
     actual override fun drain(): Result<Unit> = unsupported()
     actual override fun close(): Result<Unit> = unsupported()
 }
-
-private fun <T> unsupported(): Result<T> =
-    Result.failure(UnsupportedOperationException("liburing facade is only available on linux"))
