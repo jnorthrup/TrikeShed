@@ -3,7 +3,11 @@
 package borg.trikeshed.litebike
 
 import borg.trikeshed.litebike.taxonomy.Protocol
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.isActive
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
 import java.net.InetSocketAddress
@@ -128,7 +132,7 @@ object JvmLitebikeBindAdapter {
         }
     }
 
-    private fun drainOne(
+    private suspend fun drainOne(
         ch: AsynchronousSocketChannel,
         element: LitebikeListenerElement,
         connections: ConnectionRegistry,

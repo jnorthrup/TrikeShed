@@ -1501,12 +1501,6 @@ class FlywheelDriver(
         val push = git("push", "--follow-tags", "origin", "HEAD:master")
         if (push.exitCode != 0) return false
 
-        val openPrs = shell(
-            "gh", "pr", "list", "--state", "open", "--limit", "100",
-            "--json", "number", "--jq", "length",
-        )
-        val openCount = openPrs.output.trim().toIntOrNull() ?: 0
-
         if (git("fetch", "origin", "master").exitCode != 0) return false
         val local = git("rev-parse", "HEAD")
         val remote = git("rev-parse", "origin/master")
@@ -1529,10 +1523,9 @@ class FlywheelDriver(
             println("[FLYWHEEL] SETTLE-BLOCKED $unclaimedDrains queue drain(s) lack immutable receipts")
             return false
         }
-        if (openCount != 0) println("[FLYWHEEL] SETTLE-NOTED $openCount open PR(s); branch intake remains non-gating")
-        
+
         borg.trikeshed.util.oroboros.FlywheelHistoryReaper.reapOldTags(repoDir)
-        
+
         return true
     }
 
