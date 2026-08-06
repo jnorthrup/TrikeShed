@@ -66,7 +66,7 @@ class LlmSession(
     private val authKey: String,
     val baseUrl: String,
     /** Session id — stamped on every [ModelResponseReceipt] minted from this session. */
-    val sessionId: String = "sess-${Uuid.random()}",
+    val sessionId: String = defaultSecureIdGenerator.generateHexId("sess", 16),
 ) {
     private var _state = SessionState.CREATED
     val state: SessionState get() = _state
