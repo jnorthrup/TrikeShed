@@ -19,6 +19,15 @@ fun forceLayout(
     camera: ForgeBlackboardCamera,
     iterations: Int = 100
 ): Pair<ForgeBlackboardCamera, Map<String, ProjectedPoint>> {
+    return forceLayoutWeighted(graph, camera, iterations) { _, _ -> 1.0 }
+}
+
+fun forceLayoutWeighted(
+    graph: CausalGraphNodeIndex,
+    camera: ForgeBlackboardCamera,
+    iterations: Int = 100,
+    edgeWeight: (parentId: String, childId: String) -> Double = { _, _ -> 1.0 }
+): Pair<ForgeBlackboardCamera, Map<String, ProjectedPoint>> {
     val size = graph.size
     if (size == 0) return Pair(camera, emptyMap())
 
@@ -81,7 +90,8 @@ fun forceLayout(
                 val dy = posY[parentIndex] - posY[i]
                 val dist = sqrt(dx * dx + dy * dy)
                 if (dist > 0.0) {
-                    val force = kSpring * (dist - restingLength)
+                    val weight = edgeWeight(parentId, node.nodeId)
+                    val force = kSpring * weight * (dist - restingLength)
                     val fx = (dx / dist) * force
                     val fy = (dy / dist) * force
                     forceX[i] += fx
