@@ -1,21 +1,12 @@
-1. **Analyze existing code in `JobReducer.kt`**
-   - The file uses `CanonicalCbor.encode(frame.doc)` when processing `JobFrame`.
-   - The current code already implements deterministic CIDs for `JobFrame` using `CanonicalCbor`.
-   - The user asked to re-read the code and if already covered by a landed session, supersede with a receipt-bearing `WorkDrained`.
+1. **Optimize Hash Function in FunnelHashMap**
+   - Replace the expensive `Sha256Pure` cryptographic hash in `FunnelHashMap.hash64` with a fast, deterministic bitwise mix (e.g., `mix64(key.hashCode(), seed)`). This adheres to "Collections DRY: use honest names and cheap hashing for probes" and avoids expensive allocations.
+   - Use `ushr` for bitwise operations as per memory guidelines.
 
-2. **Verify test passing**
-   - Run tests to see if tests pass.
+2. **Verify changes**
+   - Ensure the modified code is correct and the hash function works properly.
 
-3. **Supersede necromanced work**
-   - Append to `WorkDrain.kt` a `WorkDrained` entry for `session:4465036716017209747`.
-   - The method to use is `appendWork`.
-   - Create a drain function named `drainSession4465036716017209747`.
+3. **Run Pre-Commit Checks**
+   - Run tests specifically for `FunnelHashMap` using `./gradlew jvmTest --tests "*FunnelHashMapTest*" --no-daemon`.
 
-4. **Verify changes**
-   - Use `tail` on `WorkDrain.kt` to ensure changes are applied.
-
-5. **Run Pre-Commit Checks**
-   - Invoke `pre_commit_instructions` and follow the provided steps.
-
-6. **Submit Code Review**
-   - Request a code review.
+4. **Submit PR**
+   - Create PR with required Bolt format.
