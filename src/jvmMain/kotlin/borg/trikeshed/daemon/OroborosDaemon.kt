@@ -526,10 +526,19 @@ object OroborosDaemon {
                 }
             } else {
                 // --once: run one reactive tick synchronously.
+<<<<<<< ours
                 withContext(htxElement + muxReactor) {
+=======
+                withContext(htxElement) {
+>>>>>>> theirs
                     driver.startReactiveCycle(this)
                 }
                 delay(intervalMs * 2)
+                try {
+                    (cycleBodyField ?: cycleBody).run()
+                } catch (t: Throwable) {
+                    System.err.println("[OROBOROS] cycleBody.run escaped: ${t.javaClass.simpleName}: ${t.message?.take(200)}")
+                }
                 isRunning = false
                 mainJob?.cancel()
                 return
