@@ -6,6 +6,7 @@ import zlinux_uring.*
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
+import kotlin.test.assertFailsWith
 import platform.posix.memset
 import platform.posix.close
 import platform.posix.io_uring_setup
@@ -13,6 +14,10 @@ import platform.posix.io_uring_params
 import platform.posix.sizeOf
 import platform.posix.open
 import platform.posix.O_RDONLY
+import platform.posix.MAP_FAILED
+import platform.posix.MAP_SHARED
+import platform.posix.PROT_READ
+import platform.posix.munmap
 import linux_uring.*
 import linux_uring.UringSqeFlags
 import linux_uring.UringOpcode
@@ -63,5 +68,35 @@ class KioUringTest {
         assertEquals(initialTail + 1u, newTail, "opReadWholeFile should increment sqRing tail")
 
         close(file_fd)
+    }
+
+    @Test
+    fun mapIORingQueueSuccess() = memScoped {
+        val uring = KioUring()
+        val len = 4096uL
+        val ptr = uring.mapIORingQueue(
+            __len = len,
+            __prot = PROT_READ,
+            __flags = MAP_SHARED,
+            __offset = IORING_OFF_SQ_RING.toLong()
+        )
+        assertTrue(ptr != MAP_FAILED)
+        munmap(ptr, len)
+        close(uring.ring_fd)
+    }
+
+    @Test
+    fun mapIORingQueueInvalidArgs() = memScoped {
+        val uring = KioUring()
+        val exception = assertFailsWith<IllegalArgumentException> {
+            uring.mapIORingQueue(
+                __len = ULong.MAX_VALUE,
+                __prot = PROT_READ,
+                __flags = MAP_SHARED,
+                __offset = 0L
+            )
+        }
+        assertTrue(exception.message!!.contains("mmap"))
+        close(uring.ring_fd)
     }
 }
