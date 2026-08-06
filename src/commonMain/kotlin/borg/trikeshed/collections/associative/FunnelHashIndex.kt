@@ -118,15 +118,9 @@ class FunnelHashIndex<K : Any> internal constructor(
 
         private fun mix64(hash: Int, seed: Long): Long {
             var z = seed + hash.toLong()
-<<<<<<< HEAD
             z = (z xor (z ushr 30)) * -0x40a7b892e31b1a47L
             z = (z xor (z ushr 27)) * -0x6b2fb644ecced115L
             z = z xor (z ushr 31)
-=======
-            z = (z xor (z shr 30)) * -0x40a7b892e31b1a47L
-            z = (z xor (z shr 27)) * -0x6b2fb644ecced115L
-            z = z xor (z shr 31)
->>>>>>> origin/bolt-funnel-hash-index-optimization-3357337025277533537
             return z
         }
     }
@@ -179,16 +173,4 @@ class FunnelHashIndex<K : Any> internal constructor(
             totalProbes
         }
     }
-<<<<<<< HEAD
 }
-=======
-
-    private fun mix64(hash: Int, seed: Long): Long {
-        var z = seed + hash.toLong()
-        z = (z xor (z shr 30)) * -0x40a7b892e31b1a47L
-        z = (z xor (z shr 27)) * -0x6b2fb644ecced115L
-        z = z xor (z shr 31)
-        return z
-    }
-}
->>>>>>> origin/bolt-funnel-hash-index-optimization-3357337025277533537

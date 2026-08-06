@@ -14,6 +14,8 @@ import borg.trikeshed.util.oroboros.CouchAttachmentGateway
 import borg.trikeshed.util.oroboros.FileCasStore
 import borg.trikeshed.util.oroboros.GitCouchGateway
 import borg.trikeshed.util.oroboros.JvmFileWatchReactorElement
+import borg.trikeshed.userspace.reactor.MuxReactorElement
+import borg.trikeshed.userspace.reactor.MuxReactorConfig
 import keymux.KeyMux
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -175,6 +177,46 @@ object OroborosDaemon {
             parentJob = coroutineContext[kotlinx.coroutines.Job],
         )
         System.err.println("[OROBOROS] HTX reactor open: ${htxElement.state} — Jules/ModelMux via TLS codec")
+
+        // ── MuxReactorElement: the live key+quota surface ────────────────
+        // Owns lease/quota state for both ModelMux.chat/stream/embed and the
+        // Brain/Jules dispatch paths. Before this wiring, the KeyMux
+        // ReactorSource and ModelMux lease/release calls were unreachable:
+        // no MuxReactorElement.Key was ever present in any coroutine context,
+        // so every quota edge was dead code in production.
+        val muxReactor = MuxReactorElement(
+            initialConfig = MuxReactorConfig(),
+            parentJob = coroutineContext[kotlinx.coroutines.Job],
+        )
+        muxReactor.open()
+        // Seed from already-resolved KeyMux env keys so the ReactorSource
+        // (read path `llm.*.key`) returns real keyIds the very first cycle.
+        // Each resolved key becomes one MuxCredentialRecord; later calls to
+        // ModelMux.session(...).authKey() reach the pool via the ReactorSource.
+        kotlinx.coroutines.withContext(Dispatchers.IO) {
+            for (provider in listOf(
+                "jules", "brain"
+            )) {
+                val v = keyMux.get("$provider.default.key") ?: continue
+                muxReactor.loadCredentialPool(
+                    mapOf(provider to listOf(
+                        borg.trikeshed.userspace.reactor.MuxCredentialRecord(
+                            id = "$provider-default",
+                            label = "$provider-default",
+                            baseUrl = "",
+                            lastStatus = "active",
+                        )
+                    ))
+                )
+                // store the resolved value on the entry for ReactorSource reads
+                muxReactor.recordAccess(
+                    keyId = "$provider-default",
+                    provider = provider,
+                    label = "$provider-default",
+                )
+            }
+        }
+        System.err.println("[OROBOROS] MuxReactor open: ${muxReactor.state} — KeyMux/ModelMux live")
 
         // ── Kanban HTTP server (CCEK litebike listener, no JDK networking) ──
         // JvmKanbanServer binds via JvmLitebikeBindAdapter → LitebikeListenerElement
@@ -442,7 +484,7 @@ object OroborosDaemon {
 
         try {
             if (watch) {
-                withContext(htxElement) {
+                withContext(htxElement + muxReactor) {
                     driver.startReactiveCycle(this)
                 }
                 while (isRunning) {
@@ -471,7 +513,7 @@ object OroborosDaemon {
                 }
             } else {
                 // --once: run one reactive tick synchronously.
-                withContext(htxElement) {
+                withContext(htxElement + muxReactor) {
                     driver.startReactiveCycle(this)
                 }
                 delay(intervalMs * 2)
@@ -488,6 +530,7 @@ object OroborosDaemon {
             runCatching { reportReactor.close() }
             runCatching { gitWatcher.close() }
             try { htxElement.close() } catch (_: Exception) {}
+            try { muxReactor.close() } catch (_: Exception) {}
             try { nioSupervisor.close() } catch (_: Exception) {}
             driver.close()
         }

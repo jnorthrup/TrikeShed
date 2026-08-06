@@ -322,6 +322,42 @@ class MuxReactorElement(
         return true
     }
 
+    /**
+     * Acquire a lease on an ACTIVE, non-leased key for [leasedTo]. Returns the
+     * leased [MuxKeyEntry] (keyId usable as credential), or null when no key
+     * is available. Optional [provider] restricts the pool. The lease is
+     * time-bounded by [ttlMs] (0 = no expiry).
+     *
+     * Production callers: ModelMux.chat/stream/embed (per-keyId quota) and
+     * the brain/Jules dispatch paths (provider-scoped failover).
+     */
+    fun acquireLease(
+        leasedTo: String,
+        provider: String? = null,
+        ttlMs: Long = 0L,
+    ): MuxKeyEntry? {
+        val now = nowMs()
+        val candidate = keysById.values.firstOrNull { key ->
+            key.status == MuxKeyStatus.ACTIVE &&
+                key.leasedTo == null &&
+                (provider == null || key.provider == provider)
+        } ?: return null
+        candidate.leasedTo = leasedTo
+        candidate.leaseStartedAt = now
+        candidate.leaseExpiresAt = if (ttlMs > 0L) now + ttlMs else 0L
+        candidate.accessCount += 1
+        publishState()
+        emitKanbanEvent(
+            KanbanEvent.KeyLeased(
+                keyId = candidate.keyId,
+                leasedTo = leasedTo,
+                leaseExpiresAt = candidate.leaseExpiresAt,
+                timestampMs = now,
+            ),
+        )
+        return candidate.toImmutable()
+    }
+
     fun startLoop(scope: CoroutineScope): Job = scope.launch {
         while (state.isLessThan(ElementState.DRAINING)) {
             tick()

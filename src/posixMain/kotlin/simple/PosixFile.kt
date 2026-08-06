@@ -613,11 +613,7 @@ open class PosixFile(
             }
 
             lines.forEach { line ->
-<<<<<<< HEAD
-                val bytes = line.plus("\n").encodeToByteArray()
-=======
                 val bytes = line.encodeToByteArray()
->>>>>>> origin/reconcile-posix-file-37840626846623408
                 var bytesWritten = 0
                 while (bytesWritten < bytes.size) {
                     val space = bufferSize - offset
@@ -625,24 +621,15 @@ open class PosixFile(
                     bytes.copyInto(buffer, offset, bytesWritten, bytesWritten + toCopy)
                     offset += toCopy
                     bytesWritten += toCopy
-<<<<<<< HEAD
-=======
 
->>>>>>> origin/reconcile-posix-file-37840626846623408
                     if (offset == bufferSize) {
                         flush()
                     }
                 }
-<<<<<<< HEAD
-            }
-            flush()
-
-=======
                 if (offset == bufferSize) flush()
                 buffer[offset++] = '\n'.code.toByte()
             }
             flush()
->>>>>>> origin/reconcile-posix-file-37840626846623408
             file.close()
         }
         fun writeString(filename: String, string: String): Int = writeBytes(filename, string.encodeToByteArray())

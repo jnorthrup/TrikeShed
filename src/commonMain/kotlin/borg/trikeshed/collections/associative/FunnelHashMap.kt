@@ -3,16 +3,7 @@ package borg.trikeshed.collections.associative
 /**
  * FunnelHashMap — mutable multi-level open addressing (cousin of Krapivin funnel).
  *
-<<<<<<< HEAD
  * Geometry (NOT the paper's β-bucket layout):
-=======
- * Uses a cousin geometry, not the actual paper funnel.
- * For the β-bucket production implementations, see:
- * - [borg.trikeshed.collections.FunnelHashMap]
- * - [borg.trikeshed.collections.FunnelHashIndex]
- *
- * Structure:
->>>>>>> origin/fix-associative-funnelhashmap-7267228450544224665
  *   Level ℓ has capacity = baseCap / 2^ℓ, probeBound = 2^ℓ.
  *   Insert greeds: try level 0 (bound 1), then level 1 (bound 2), …
  *   Final level has unbounded probes (Int.MAX_VALUE) to guarantee termination.
@@ -21,7 +12,6 @@ package borg.trikeshed.collections.associative
  *   - Total live entries < baseCap * (1 - δ)  (δ = slack, default 0.25)
  *   - Resize when live >= baseCap * (1 - δ)
  *   - Tombstones per level; rebuild when tombstone ratio > 0.25
-<<<<<<< HEAD
  *
  * Honesty vs Farach-Colton/Krapivin/Kuszmaul (arXiv:2501.02305):
  *   - Paper funnel uses per-level buckets of size β ~ log(1/δ). This type expands
@@ -32,8 +22,6 @@ package borg.trikeshed.collections.associative
  *
  * Prefer [borg.trikeshed.collections.FunnelHashMap] for the β-bucket geometry
  * (production: Stringpool). Prefer [FunnelHashIndex] for frozen membership.
-=======
->>>>>>> origin/fix-associative-funnelhashmap-7267228450544224665
  */
 class FunnelHashMap<K : Any, V>(
     initialCapacity: Int = 16,
@@ -214,18 +202,10 @@ class FunnelHashMap<K : Any, V>(
 
     /** Unit-cost mix64: key.hashCode + levelSeed. Not SHA-256. */
     private fun hash64(key: K, levelSeed: Long): Long {
-<<<<<<< HEAD
         var z = levelSeed xor (key.hashCode().toLong() and 0xFFFFFFFFL)
         z = (z xor (z ushr 30)) * -0x40a7b892e31b1a47L
         z = (z xor (z ushr 27)) * -0x6b2fb644ecced115L
         return z xor (z ushr 31)
-=======
-        var z = key.hashCode().toLong() xor levelSeed
-        z = (z xor (z ushr 30)) * -0x40a7b892e31b1a47L
-        z = (z xor (z ushr 27)) * -0x6b2fb644ecced115L
-        z = z xor (z ushr 31)
-        return z
->>>>>>> origin/fix-associative-funnelhashmap-7267228450544224665
     }
 
     private fun nextPowerOfTwo(n: Int): Int {

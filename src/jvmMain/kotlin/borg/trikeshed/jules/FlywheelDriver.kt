@@ -371,7 +371,7 @@ class FlywheelDriver(
         //    A tag alone is not a completed drain: the durable card/WAL close is
         //    authoritative so an interrupted provenance write remains retryable.
         val completed = conductor.cards.values.filter {
-            it.snapshot.state == "COMPLETED" && !it.drained
+            it.snapshot.state in DRAINABLE_STATES && !it.drained
         }
         val sessions = completed.map {
             JulesRestClient.SessionInfo(
@@ -405,7 +405,7 @@ class FlywheelDriver(
         //    still returns normally on an incomplete drain; the next cycle
         //    retries it instead of dispatching a successor wave onto a red tree.
         val remainingCompleted = conductor.cards.values.count {
-            it.snapshot.state == "COMPLETED" && !it.drained
+            it.snapshot.state in DRAINABLE_STATES && !it.drained
         }
         val committedConflicts = (drain.conflicts + conflictFiles()).distinct()
         val readyToSettle = remainingCompleted == 0 &&
@@ -615,7 +615,7 @@ class FlywheelDriver(
                 // brain/build latency never blocks the poll loop. The drain
                 // guard prevents concurrent drains.
                 val completed = conductor.cards.values.filter {
-                    it.snapshot.state == "COMPLETED" && !it.drained
+                    it.snapshot.state in DRAINABLE_STATES && !it.drained
                 }
                 if (completed.isNotEmpty()) {
                     val sessions = completed.map {
@@ -1517,7 +1517,7 @@ class FlywheelDriver(
         // Conductor is the authority for drain completeness; queue is intake only.
         // If conductor has no undrained COMPLETED sessions, the drain is closed.
         val undrainedCompleted = conductor.cards.values.count {
-            it.snapshot.state == "COMPLETED" && !it.drained
+            it.snapshot.state in DRAINABLE_STATES && !it.drained
         }
         if (undrainedCompleted != 0) {
             println("[FLYWHEEL] SETTLE-BLOCKED $undrainedCompleted COMPLETED session(s) not yet drained in conductor")
@@ -1542,7 +1542,8 @@ class FlywheelDriver(
     private val SPEC_BYTE_LIMIT = 4000
 
     /** Jules session states that no longer occupy a slot. */
-    private val TERMINAL_STATES = setOf("COMPLETED", "FINISHED", "FAILED", "CANCELLED")
+    private val DRAINABLE_STATES = setOf("COMPLETED", "FINISHED")
+    private val TERMINAL_STATES = DRAINABLE_STATES + setOf("FAILED", "CANCELLED")
 
     /**
      * Cap a spec at [SPEC_BYTE_LIMIT] bytes. Truncates cleanly at a word

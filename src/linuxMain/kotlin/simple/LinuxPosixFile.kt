@@ -34,7 +34,6 @@ class LinuxPosixFile(
                 file_path.substring(tail + 1)
             )
         }
-<<<<<<< HEAD
 
         fun exists(fname: String): Boolean = access(fname, F_OK).z
 
@@ -163,9 +162,6 @@ class LinuxPosixFile(
             file.close()
         }
         fun writeString(filename: String, string: String): Int = writeBytes(filename, string.encodeToByteArray())
-
-=======
->>>>>>> origin/reconcile-posix-file-37840626846623408
     }
 }
 

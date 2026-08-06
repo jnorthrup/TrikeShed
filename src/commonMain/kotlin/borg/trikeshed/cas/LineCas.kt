@@ -1,12 +1,8 @@
 package borg.trikeshed.cas
 
-<<<<<<< HEAD
-<<<<<<< HEAD
-<<<<<<< HEAD
 import borg.trikeshed.job.CasStore
 import borg.trikeshed.job.ContentId
 import borg.trikeshed.lib.Join
-import borg.trikeshed.job.ContentId
 import borg.trikeshed.lib.Series
 import borg.trikeshed.lib.get
 import borg.trikeshed.lib.j
@@ -385,12 +381,6 @@ data class LineCasSpine(
     val ordinal: Int,
     val linkedKey: String? = null
 )
-enum class MatchGrade {
-    CONTENT_ONLY,
-    PARTIAL_LEFT,
-    PARTIAL_RIGHT,
-    LINKED
-}
 
 enum class LinkConfidence {
     CANDIDATE,
@@ -400,7 +390,7 @@ enum class LinkConfidence {
 
 fun confidenceOf(grade: MatchGrade): LinkConfidence = when (grade) {
     MatchGrade.CONTENT_ONLY -> LinkConfidence.CANDIDATE
-    MatchGrade.PARTIAL_LEFT, MatchGrade.PARTIAL_RIGHT -> LinkConfidence.PROVISIONAL
+    MatchGrade.PARTIAL_PREV, MatchGrade.PARTIAL_NEXT -> LinkConfidence.PROVISIONAL
     MatchGrade.LINKED -> LinkConfidence.CONFIRMED
 }
 
@@ -410,157 +400,6 @@ fun confidenceOf(grade: MatchGrade): LinkConfidence = when (grade) {
  */
 fun rampScore(grade: MatchGrade): Double = when (grade) {
     MatchGrade.CONTENT_ONLY -> 0.12
-    MatchGrade.PARTIAL_LEFT, MatchGrade.PARTIAL_RIGHT -> 0.45
+    MatchGrade.PARTIAL_PREV, MatchGrade.PARTIAL_NEXT -> 0.45
     MatchGrade.LINKED -> 1.0
 }
-=======
-import borg.trikeshed.job.ContentId
-import borg.trikeshed.lib.Series
-import borg.trikeshed.lib.toSeries
-import borg.trikeshed.lib.emptySeries
-import borg.trikeshed.lib.forEach
-import borg.trikeshed.collections.associative.FunnelHashIndex
-
-data class LineLocation(val documentId: Int, val lineIndex: Int)
-
-class LineCasIndex {
-    private val hexToLocations = mutableMapOf<String, MutableList<LineLocation>>()
-    private var docCount = 0
-    private var funnel: FunnelHashIndex<String>? = null
-    private var funnelSize = 0
-
-    val documentCount: Int get() = docCount
-
-    fun ingest(text: String) {
-        val lines = text.split("\n")
-        val docId = docCount++
-        for ((lineIndex, line) in lines.withIndex()) {
-            val cid = ContentId.of(line.encodeToByteArray())
-            hexToLocations.getOrPut(cid.hex) { mutableListOf() }.add(LineLocation(docId, lineIndex))
-        }
-    }
-
-    fun ingestSpine(spine: Series<ContentId>) {
-        val docId = docCount++
-        var lineIndex = 0
-        spine.forEach { cid ->
-            hexToLocations.getOrPut(cid.hex) { mutableListOf() }.add(LineLocation(docId, lineIndex))
-            lineIndex++
-        }
-    }
-
-    fun ingestSpine(spine: CasManifest) {
-        val docId = docCount++
-        for ((lineIndex, cid) in spine.cids.withIndex()) {
-            hexToLocations.getOrPut(cid.hex) { mutableListOf() }.add(LineLocation(docId, lineIndex))
-        }
-    }
-
-    fun linkMatch(probe: String, minGrade: Double): Series<LineLocation> {
-        val probeCid = ContentId.of(probe.encodeToByteArray())
-        val hex = probeCid.hex
-
-        if (funnel == null || funnelSize != hexToLocations.size) {
-            funnel = FunnelHashIndex.build(hexToLocations.keys.toList(), 0L)
-            funnelSize = hexToLocations.size
-        }
-
-        if (funnel?.contains(hex) == false) {
-            return emptySeries()
-        }
-
-        val matches = hexToLocations[hex] ?: return emptySeries()
-        return matches.toSeries()
-    }
-}
->>>>>>> origin/add-line-cas-index-13589905834897446752
-=======
-import borg.trikeshed.job.ContentId
-import borg.trikeshed.lib.Series
-import borg.trikeshed.lib.j
-import kotlin.jvm.JvmInline
-import borg.trikeshed.lib.size
-import borg.trikeshed.lib.get
-
-enum class MatchGrade {
-    CONTENT_ONLY,
-    PARTIAL_PREV,
-    PARTIAL_NEXT,
-    LINKED;
-
-    fun meets(other: MatchGrade): Boolean {
-        if (this == LINKED) return true
-        if (other == CONTENT_ONLY) return true
-        return this == other
-    }
-}
-
-object LineCas {
-    const val NEIGHBOR_HEX_LEN = 2
-    const val EDGE_HEX = "00"
-
-    @JvmInline
-    value class NeighborStamp(val hex: String) {
-        init {
-            require(hex.length == 4) { "NeighborStamp must be exactly 4 hex chars" }
-            require(hex.all { it.isLowerCase() || it.isDigit() }) { "NeighborStamp must be lowercase hex" }
-        }
-    }
-
-    data class LineNode(
-        val contentCid: ContentId,
-        val stamp: NeighborStamp,
-        val ordinal: Int
-    ) {
-        val linkedKey: String get() = "${stamp.hex}:${contentCid.hex}"
-    }
-
-    private fun getPrefix(cid: ContentId?): String {
-        return cid?.hex?.take(NEIGHBOR_HEX_LEN) ?: EDGE_HEX
-    }
-
-    fun spine(text: Series<ContentId>): Series<LineNode> {
-        val sz = text.size
-        if (sz == 0) return 0 j { _ -> throw IndexOutOfBoundsException() }
-
-        return sz j { index: Int ->
-            val prev = if (index > 0) text[index - 1] else null
-            val next = if (index < sz - 1) text[index + 1] else null
-            val stampHex = getPrefix(prev) + getPrefix(next)
-            LineNode(text[index], NeighborStamp(stampHex), index)
-        }
-    }
-
-    fun matchGrade(a: LineNode, b: LineNode): MatchGrade? {
-        if (a.contentCid != b.contentCid) return null
-        val prevMatch = a.stamp.hex.substring(0, NEIGHBOR_HEX_LEN) == b.stamp.hex.substring(0, NEIGHBOR_HEX_LEN)
-        val nextMatch = a.stamp.hex.substring(NEIGHBOR_HEX_LEN) == b.stamp.hex.substring(NEIGHBOR_HEX_LEN)
-        return when {
-            prevMatch && nextMatch -> MatchGrade.LINKED
-            prevMatch -> MatchGrade.PARTIAL_PREV
-            nextMatch -> MatchGrade.PARTIAL_NEXT
-            else -> MatchGrade.CONTENT_ONLY
-        }
-    }
-}
->>>>>>> origin/feat-line-cas-5991803418324279377
-=======
-data class LineNode(
-    val contentCid: ContentId,
-    val ordinal: Int
-)
-
-fun contentOf(line: String): ContentId =
-    ContentId.of(line.trim().encodeToByteArray())
-
-fun spine(text: String): Series<LineNode> {
-    val validLines = text.lines()
-        .map { it.trim() }
-        .filter { it.isNotEmpty() }
-        .toList()
-
-    return validLines.size j { i ->
-        LineNode(contentOf(validLines[i]), i)
-    }
-}
->>>>>>> origin/add-line-cas-5264137680086730403

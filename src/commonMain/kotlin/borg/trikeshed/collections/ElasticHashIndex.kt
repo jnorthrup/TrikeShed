@@ -3,7 +3,6 @@ package borg.trikeshed.collections
 /**
  * ElasticHashIndex — frozen double-hashing open-addressing membership index.
  *
-<<<<<<< HEAD
  * Name history: "elastic" here is ordinary double hashing (h1 + i*h2), load ≤ 0.5.
  * It is NOT Farach-Colton/Krapivin/Kuszmaul elastic hashing (arXiv:2501.02305),
  * which is a non-greedy open-addressing construction with different probe ordering.
@@ -14,16 +13,6 @@ package borg.trikeshed.collections
  * - Positive-query-friendly; load factor ≤ 0.5
  * - Probe sequence: h1 + i * h2 (h2 odd)
  * - Unit-cost mix64 from key.hashCode + seed (not SHA-256)
-=======
- * Note: Explicitly NOT Farach-Colton/Krapivin elastic hashing.
- * Kept class name ElasticHashIndex for API stability (it is a misnomer).
- *
- * Key properties:
- * - Append-only immutable segment (no delete/retract)
- * - Positive-query-heavy workloads
- * - ordinary double hash h1+i*h2 load≤0.5
- * - Deterministic replay: probe entropy derived from canonical facet bytes + committed seed
->>>>>>> origin/bolt-elastichash-optimization-10817387463383101425
  *
  * Usage:
  *   val idx = ElasticHashIndex.build(listOf("a", "b", "c"), seed)
@@ -70,24 +59,11 @@ class ElasticHashIndex<K : Any> internal constructor(
             return cap
         }
 
-<<<<<<< HEAD
         private fun doubleHash(key: Any, seed: Long): Pair<Int, Int> {
             var z = seed xor (key.hashCode().toLong() and 0xFFFFFFFFL)
             z = (z xor (z ushr 30)) * -0x40a7b892e31b1a47L
             z = (z xor (z ushr 27)) * -0x6b2fb644ecced115L
             z = z xor (z ushr 31)
-=======
-        private fun mix64(hashCode: Int, seed: Long): Long {
-            var z = hashCode.toLong() xor seed
-            z = (z xor (z shr 30)) * -0x40a7b892e31b1a47L
-            z = (z xor (z shr 27)) * -0x6b2fb644ecced115L
-            z = z xor (z shr 31)
-            return z
-        }
-
-        private fun doubleHash(key: Any, seed: Long): Pair<Int, Int> {
-            val z = mix64(key.hashCode(), seed)
->>>>>>> origin/bolt-elastichash-optimization-10817387463383101425
             val h1 = (z and 0xFFFFFFFFL).toInt()
             val h2 = (z ushr 32).toInt() or 1  // odd ⇒ coprime to power-of-2 capacity
             return h1 to h2
@@ -138,24 +114,11 @@ class ElasticHashIndex<K : Any> internal constructor(
         }
     }
 
-<<<<<<< HEAD
     private fun doubleHash(key: Any, seed: Long): Pair<Int, Int> {
         var z = seed xor (key.hashCode().toLong() and 0xFFFFFFFFL)
         z = (z xor (z ushr 30)) * -0x40a7b892e31b1a47L
         z = (z xor (z ushr 27)) * -0x6b2fb644ecced115L
         z = z xor (z ushr 31)
-=======
-    private fun mix64(hashCode: Int, seed: Long): Long {
-        var z = hashCode.toLong() xor seed
-        z = (z xor (z shr 30)) * -0x40a7b892e31b1a47L
-        z = (z xor (z shr 27)) * -0x6b2fb644ecced115L
-        z = z xor (z shr 31)
-        return z
-    }
-
-    private fun doubleHash(key: Any, seed: Long): Pair<Int, Int> {
-        val z = mix64(key.hashCode(), seed)
->>>>>>> origin/bolt-elastichash-optimization-10817387463383101425
         val h1 = (z and 0xFFFFFFFFL).toInt()
         val h2 = (z ushr 32).toInt() or 1
         return h1 to h2
