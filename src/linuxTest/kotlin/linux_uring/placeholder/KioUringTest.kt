@@ -99,4 +99,13 @@ class KioUringTest {
         assertTrue(exception.message!!.contains("mmap"))
         close(uring.ring_fd)
     }
+
+    @Test
+    fun testSqeSubmit() = memScoped {
+        val s = KioUring()
+        val triple = with(s) { sqePreamble() }
+        s.sqeSubmit(triple)
+        assertEquals(triple.third, s.sqRing.array[triple.third.toInt()])
+        assertEquals(triple.second, s.sqRing.tail.pointed.value)
+    }
 }
