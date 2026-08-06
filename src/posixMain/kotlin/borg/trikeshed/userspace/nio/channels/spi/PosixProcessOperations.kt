@@ -17,14 +17,14 @@ class PosixProcessOperations : ProcessOperations {
         val stdinPath = stdin?.let { createTempFile(it) }
         val stdoutPath = createTempFile(byteArrayOf())
         if (stdoutPath == null) {
-            withContext(Dispatchers.Default) {
+            withContext(Dispatchers.IO) {
                 stdinPath?.let(::unlink)
             }
             return@withContext ProcessResult(-1, byteArrayOf(), "mkstemp(stdout) failed".encodeToByteArray())
         }
         val stderrPath = createTempFile(byteArrayOf())
         if (stderrPath == null) {
-            withContext(Dispatchers.Default) {
+            withContext(Dispatchers.IO) {
                 stdinPath?.let(::unlink)
                 unlink(stdoutPath)
             }
@@ -91,7 +91,7 @@ class PosixProcessOperations : ProcessOperations {
         val stdout = readFile(stdoutPath)
         val stderr = readFile(stderrPath)
 
-        withContext(Dispatchers.Default) {
+        withContext(Dispatchers.IO) {
             stdinPath?.let(::unlink)
             unlink(stdoutPath)
             unlink(stderrPath)
@@ -100,7 +100,7 @@ class PosixProcessOperations : ProcessOperations {
         ProcessResult(exitCode = exitCode, stdout = stdout, stderr = stderr)
     }
 
-    private suspend fun createTempFile(bytes: ByteArray): String? = withContext(Dispatchers.Default) {
+    private suspend fun createTempFile(bytes: ByteArray): String? = withContext(Dispatchers.IO) {
         memScoped {
             val template = "/tmp/trikeshed-process-XXXXXX".cstr.placeTo(this)
             val fd = mkstemp(template)
@@ -126,7 +126,7 @@ class PosixProcessOperations : ProcessOperations {
         }
     }
 
-    private suspend fun readFile(path: String): ByteArray = withContext(Dispatchers.Default) {
+    private suspend fun readFile(path: String): ByteArray = withContext(Dispatchers.IO) {
         val fp = fopen(path, "rb") ?: return@withContext byteArrayOf()
         try {
             memScoped {
