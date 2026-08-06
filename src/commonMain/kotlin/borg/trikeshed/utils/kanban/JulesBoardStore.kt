@@ -203,7 +203,7 @@ class JulesBoardStore(
                 val keySize = payload.readInt(offset)
                 offset += 4
                 require(keySize >= 0 && offset + keySize <= payload.size) { "invalid drain batch key length" }
-                val nestedKey = payload.copyOfRange(offset, offset + keySize).decodeToString()
+                val nestedKey = payload.decodeToString(offset, offset + keySize)
                 offset += keySize
                 val payloadSize = payload.readInt(offset)
                 offset += 4

@@ -30,7 +30,7 @@ class ProtocolDetector {
     private fun detectProtocol(): Protocol? {
         if (buffer.size < 4) return null
 
-        val prefix = buffer.copyOfRange(0, 4).decodeToString()
+        val prefix = buffer.decodeToString(0, 4)
         return when {
             prefix.startsWith("GET ") || prefix.startsWith("POST") ||
             prefix.startsWith("PUT ") || prefix.startsWith("HEAD") ||
