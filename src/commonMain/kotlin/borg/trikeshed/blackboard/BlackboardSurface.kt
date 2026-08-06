@@ -70,6 +70,7 @@ class BlackboardSurface private constructor(
     /** Cursor over the projected rows so UI code can read it via the canonical algebra. */
     fun asCursor(): Cursor = rows.size j { i -> rowToRowVec(rows[i]) }
 
+    @Suppress("LongMethod")
     fun cards(): List<KanbanCard> = board.cards
 
     fun columns(): List<KanbanColumn> = board.columns
