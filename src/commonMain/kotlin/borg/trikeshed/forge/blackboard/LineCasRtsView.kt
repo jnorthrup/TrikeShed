@@ -2,10 +2,31 @@ package borg.trikeshed.forge.blackboard
 
 import borg.trikeshed.lib.Series
 import borg.trikeshed.lib.take
+<<<<<<< ours
 import borg.trikeshed.collections.LineAperture
 import kotlin.math.ln
 
 /**
+=======
+import kotlin.math.ln
+
+/**
+ * Zoom aperture bands for the RTS view.
+ *
+ * Maps continuous zoom levels into discrete bands to control LOD (Level of Detail)
+ * in the HUD and gallery.
+ *
+ * - [L0]: Macro view (furthest out, whole board visible).
+ * - [L1]: Region view (clusters of nodes/content).
+ * - [L2]: Focused view (reading distance for nodes).
+ * - [L3]: Micro view (closest zoom, inspecting details).
+ */
+enum class LineAperture {
+    L0, L1, L2, L3
+}
+
+/**
+>>>>>>> theirs
  * Computes the [LineAperture] for a given [zoom] level within the [minZoom] to [maxZoom] bounds.
  * Uses a logarithmic scale to map the zoom space evenly into the 4 aperture bands.
  * Band thresholds in normalized log-space [0.0, 1.0]:
