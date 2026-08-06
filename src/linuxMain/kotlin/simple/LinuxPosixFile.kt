@@ -487,64 +487,36 @@ class LinuxPosixFile(
         fun exists(fname: String): Boolean = access(fname, F_OK).z
 
         /** lean on getline to read a file into a sequence of CharSeries */
-        fun readLinesSeq(path: String): Sequence<String> = Sequence {
-            object : Iterator<String> {
-                val file = LinuxPosixFile(path)
-                val fp = fdopen(file.fd, "r")
-                val lineArena = Arena()
-                val line: CPointerVarOf<CPointer<ByteVarOf<Byte>>> = lineArena.alloc()
-                val len: ULongVarOf<size_t> = lineArena.alloc()
-
-                init {
-                    HasPosixErr.posixRequires(fp != null) { "fdopen $path" }
-                    line.value = null
-                    len.value = 0u
-                }
-
-                var nextLine: String? = null
-                var isClosed = false
-
-                private fun fetchNext() {
-                    if (isClosed || nextLine != null) return
-                    val read = getline(line.ptr, len.ptr, fp)
-                    if (read != -1L) {
-                        nextLine = line.value!!.toKString().trim()
-                    } else {
-                        if (ferror(fp) != 0) {
-                            perror("ferror")
-                            close()
-                            exit(1)
-                        }
-                        close()
+        fun readLinesSeq(path: String): Sequence<String> = sequence {
+            val fp = fopen(path, "r") ?: return@sequence
+            try {
+                val line: CPointerVarOf<CPointer<ByteVarOf<Byte>>> = nativeHeap.alloc()
+                val len: ULongVarOf<size_t> = nativeHeap.alloc()
+                line.value = null
+                len.value = 0u
+                try {
+                    while (true) {
+                        val read = getline(line.ptr, len.ptr, fp)
+                        if (read == -1L) break
+                        yield(line.value!!.toKString().trim())
                     }
-                }
-
-                private fun close() {
-                    if (isClosed) return
-                    isClosed = true
+                    if (ferror(fp) != 0) {
+                        perror("ferror")
+                        exit(1)
+                    }
+                } finally {
                     free(line.value)
-                    lineArena.clear()
-                    if (fp != null) fclose(fp)
+                    nativeHeap.free(line)
+                    nativeHeap.free(len)
                 }
-
-                override fun hasNext(): Boolean {
-                    fetchNext()
-                    return nextLine != null
-                }
-
-                override fun next(): String {
-                    fetchNext()
-                    val result = nextLine ?: throw NoSuchElementException()
-                    nextLine = null
-                    return result
-                }
+            } finally {
+                fclose(fp)
             }
         }
 
         fun readLines(path: String): List<String> = memScoped {
-            val file = LinuxPosixFile(path)
-            val fp = fdopen(file.fd, "r")
-            HasPosixErr.posixRequires(fp != null) { "fdopen $path" }
+            val fp = fopen(path, "r")
+            HasPosixErr.posixRequires(fp != null) { "fopen $path" }
             try {
                 val line: CPointerVarOf<CPointer<ByteVarOf<Byte>>> = alloc()
                 val len: ULongVarOf<size_t> = alloc()
@@ -567,6 +539,7 @@ class LinuxPosixFile(
                 fclose(fp)
             }
         }
+
         fun readAllBytes(filename: String): ByteArray = memScoped {
             val file = LinuxPosixFile(filename)
             val stat = statk(filename)
@@ -590,48 +563,24 @@ class LinuxPosixFile(
         /**
          * writes \n terminated lines to a file
          */
-        fun writeLines(filename: String, lines: List<String>) {
-            // ⚡ Bolt: Buffered writes to avoid N+1 system calls while keeping O(1) memory overhead.
+        fun writeLines(filename: String, lines: List<String>): Unit = memScoped {
+            // ⚡ Bolt: Built the complete payload once and wrote it in a single system call to eliminate N+1 overhead.
             val O_FLAGS = PosixOpenOpts.withFlags(PosixOpenOpts.O_Creat, PosixOpenOpts.O_Trunc, PosixOpenOpts.O_WrOnly)
             val file = LinuxPosixFile(filename, O_FLAGS)
 
-            val bufferSize = 8192
-            val buffer = ByteArray(bufferSize)
-            var offset = 0
-
-            fun flush() {
-                if (offset > 0) {
-                    var writtenTotal = 0
-                    buffer.usePinned { pinned ->
-                        while (writtenTotal < offset) {
-                            val ptr = pinned.addressOf(writtenTotal)
-                            val written = write(file.fd, ptr, (offset - writtenTotal).convert())
-                            HasPosixErr.posixRequires(written > 0L) { "writeLines $filename flush error" }
-                            writtenTotal += written.toInt()
-                        }
-                    }
-                    offset = 0
-                }
+            if (lines.isEmpty()) {
+                file.close()
+                return@memScoped
             }
 
-            lines.forEach { line ->
-                val bytes = line.encodeToByteArray()
-                var bytesWritten = 0
-                while (bytesWritten < bytes.size) {
-                    val space = bufferSize - offset
-                    val toCopy = minOf(space, bytes.size - bytesWritten)
-                    bytes.copyInto(buffer, offset, bytesWritten, bytesWritten + toCopy)
-                    offset += toCopy
-                    bytesWritten += toCopy
-
-                    if (offset == bufferSize) {
-                        flush()
-                    }
+            val payload = lines.joinToString(separator = "\n", postfix = "\n").encodeToByteArray()
+            if (payload.isNotEmpty()) {
+                payload.usePinned { pinned ->
+                    val ptr = pinned.addressOf(0)
+                    val written = write(file.fd, ptr, payload.size.convert())
+                    HasPosixErr.posixRequires(written == payload.size.toLong()) { "writeLines $filename" }
                 }
-                if (offset == bufferSize) flush()
-                buffer[offset++] = '\n'.code.toByte()
             }
-            flush()
             file.close()
         }
         fun writeString(filename: String, string: String): Int = writeBytes(filename, string.encodeToByteArray())
