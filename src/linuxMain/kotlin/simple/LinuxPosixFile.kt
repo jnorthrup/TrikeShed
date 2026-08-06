@@ -560,7 +560,7 @@ class LinuxPosixFile(
                 free(line.value)
                 if (ferror(fp) != 0) {
                     perror("ferror")
-                    exit(1)
+                    error("readLines ferror on $path")
                 }
                 return list
             } finally {
