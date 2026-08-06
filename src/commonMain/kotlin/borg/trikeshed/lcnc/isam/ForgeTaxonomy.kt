@@ -1,7 +1,6 @@
 package borg.trikeshed.lcnc.isam
 
 import borg.trikeshed.lib.Series
-import borg.trikeshed.lib.j
 
 /**
  * Represents random access gems (ID-based, hierarchical structures) for the Forge taxonomy.
