@@ -1,5 +1,6 @@
 package borg.trikeshed.kanban
 
+import borg.trikeshed.cursor.BlackboardContext
 import borg.trikeshed.cursor.blackboardContext
 import borg.trikeshed.cursor.provenance
 import borg.trikeshed.dag.BetaJoin
@@ -104,14 +105,7 @@ object ForgeKanbanIngest {
 
     fun reduce(source: ForgeKanbanSource): ForgeKanbanReduction {
         val tasks = parseWorkPackages(source.description)
-        require(tasks.isNotEmpty()) { "no work packages found in source description" }
-        require(tasks.map { it.id }.toSet().size == tasks.size) { "duplicate work package id" }
-
-        val knownIds = tasks.map { it.id }.toSet()
-        tasks.forEach { task ->
-            val unknown = task.parentIds.filterNot { it in knownIds }
-            require(unknown.isEmpty()) { "${task.id} has unknown parents: $unknown" }
-        }
+        validateTasks(tasks)
 
         val boardId = "forge-${source.userId}"
         val context = blackboardContext(
@@ -124,7 +118,62 @@ object ForgeKanbanIngest {
             tags = mapOf("sourceContentId" to source.contentId),
         )
 
-        val dependencyFacts = tasks.flatMap { child ->
+        val dependencyFacts = buildDependencyFacts(tasks, boardId, context)
+        val provisionalTaskFacts = buildProvisionalTaskFacts(tasks, boardId, context)
+
+        val parents = ReteBetaMemory(BetaJoin("taskId", "childId"))
+        val children = ReteBetaMemory(BetaJoin("taskId", "parentId"))
+        provisionalTaskFacts.forEach {
+            parents.acceptLeft(it)
+            children.acceptLeft(it)
+        }
+        dependencyFacts.forEach {
+            parents.acceptRight(it)
+            children.acceptRight(it)
+        }
+
+        val parentIdsByTask = computeParentIdsByTask(parents)
+        val childIdsByTask = computeChildIdsByTask(children)
+
+        val cards = buildCards(tasks, parentIdsByTask, source)
+        val taskFacts = updateTaskFactsWithStatus(cards, provisionalTaskFacts)
+
+        assertFacts(taskFacts, dependencyFacts)
+
+        val causalNodes = buildCausalNodes(tasks, parentIdsByTask, context)
+        val correlations = buildCorrelations(tasks, parentIdsByTask, childIdsByTask, causalNodes)
+
+        return ForgeKanbanReduction(
+            source = source,
+            board = KanbanBoard(
+                id = KanbanBoardId(boardId),
+                name = source.title,
+                columns = columns,
+                cards = cards,
+                metadata = mapOf(
+                    "sourcePath" to source.sourcePath,
+                    "sourceContentId" to source.contentId,
+                    "reducer" to "ForgeKanbanIngest/v1",
+                ),
+            ),
+            causalNodes = causalNodes,
+            reteFacts = taskFacts + dependencyFacts,
+            correlations = correlations,
+        )
+    }
+
+    private fun validateTasks(tasks: List<SourceTask>) {
+        require(tasks.isNotEmpty()) { "no work packages found in source description" }
+        require(tasks.map { it.id }.toSet().size == tasks.size) { "duplicate work package id" }
+        val knownIds = tasks.map { it.id }.toSet()
+        tasks.forEach { task ->
+            val unknown = task.parentIds.filterNot { it in knownIds }
+            require(unknown.isEmpty()) { "${task.id} has unknown parents: $unknown" }
+        }
+    }
+
+    private fun buildDependencyFacts(tasks: List<SourceTask>, boardId: String, context: BlackboardContext): List<ReteStoredFact> {
+        return tasks.flatMap { child ->
             child.parentIds.map { parentId ->
                 ReteStoredFact(
                     factId = FactId(boardId, "link:$parentId->${child.id}"),
@@ -138,8 +187,10 @@ object ForgeKanbanIngest {
                 )
             }
         }
+    }
 
-        val provisionalTaskFacts = tasks.map { task ->
+    private fun buildProvisionalTaskFacts(tasks: List<SourceTask>, boardId: String, context: BlackboardContext): List<ReteStoredFact> {
+        return tasks.map { task ->
             ReteStoredFact(
                 factId = FactId(boardId, "task:${task.id}"),
                 fields = mapOf(
@@ -152,24 +203,20 @@ object ForgeKanbanIngest {
                 board = context,
             )
         }
+    }
 
-        val parents = ReteBetaMemory(BetaJoin("taskId", "childId"))
-        val children = ReteBetaMemory(BetaJoin("taskId", "parentId"))
-        provisionalTaskFacts.forEach {
-            parents.acceptLeft(it)
-            children.acceptLeft(it)
-        }
-        dependencyFacts.forEach {
-            parents.acceptRight(it)
-            children.acceptRight(it)
-        }
-
-        val parentIdsByTask = parents.tokens().groupBy { it.left.fields["taskId"] as String }
+    private fun computeParentIdsByTask(parents: ReteBetaMemory): Map<String, List<String>> {
+        return parents.tokens().groupBy { it.left.fields["taskId"] as String }
             .mapValues { (_, tokens) -> tokens.map { it.right.fields["parentId"] as String }.sorted() }
-        val childIdsByTask = children.tokens().groupBy { it.left.fields["taskId"] as String }
-            .mapValues { (_, tokens) -> tokens.map { it.right.fields["childId"] as String }.sorted() }
+    }
 
-        val cards = tasks.mapIndexed { order, task ->
+    private fun computeChildIdsByTask(children: ReteBetaMemory): Map<String, List<String>> {
+        return children.tokens().groupBy { it.left.fields["taskId"] as String }
+            .mapValues { (_, tokens) -> tokens.map { it.right.fields["childId"] as String }.sorted() }
+    }
+
+    private fun buildCards(tasks: List<SourceTask>, parentIdsByTask: Map<String, List<String>>, source: ForgeKanbanSource): List<KanbanCard> {
+        return tasks.mapIndexed { order, task ->
             val parentIds = parentIdsByTask[task.id].orEmpty()
             val status = if (parentIds.isEmpty()) "ready" else "todo"
             KanbanCard(
@@ -190,20 +237,27 @@ object ForgeKanbanIngest {
                 updatedAt = 0L,
             )
         }
+    }
 
-        val taskFacts = cards.map { card ->
+    private fun updateTaskFactsWithStatus(cards: List<KanbanCard>, provisionalTaskFacts: List<ReteStoredFact>): List<ReteStoredFact> {
+        return cards.map { card ->
             val fields = provisionalTaskFacts.first { it.fields["taskId"] == card.id.value }.fields +
                 mapOf("status" to card.columnId.value)
             provisionalTaskFacts.first { it.fields["taskId"] == card.id.value }.copy(fields = fields)
         }
+    }
+
+    private fun assertFacts(taskFacts: List<ReteStoredFact>, dependencyFacts: List<ReteStoredFact>) {
         val workingMemory = ReteWorkingMemory()
         kotlinx.coroutines.runBlocking {
             (taskFacts + dependencyFacts).forEach { fact ->
                 workingMemory.assert(fact.factId, fact.fields, fact.versionCid, fact.board)
             }
         }
+    }
 
-        val causalNodes = tasks.mapIndexed { order, task ->
+    private fun buildCausalNodes(tasks: List<SourceTask>, parentIdsByTask: Map<String, List<String>>, context: BlackboardContext): List<CausalGraphNode> {
+        return tasks.mapIndexed { order, task ->
             causalGraphNode(
                 nodeId = task.id,
                 opId = "kanban-work-package",
@@ -216,8 +270,16 @@ object ForgeKanbanIngest {
                 outputHash = null,
             )
         }
+    }
+
+    private fun buildCorrelations(
+        tasks: List<SourceTask>,
+        parentIdsByTask: Map<String, List<String>>,
+        childIdsByTask: Map<String, List<String>>,
+        causalNodes: List<CausalGraphNode>
+    ): List<ForgeKanbanCorrelation> {
         val causalById = causalNodes.associateBy { it.nodeId }
-        val correlations = tasks.map { task ->
+        return tasks.map { task ->
             ForgeKanbanCorrelation(
                 taskId = task.id,
                 parentIds = parentIdsByTask[task.id].orEmpty(),
@@ -226,24 +288,6 @@ object ForgeKanbanIngest {
                 causalKey = causalById.getValue(task.id).causalKey,
             )
         }
-
-        return ForgeKanbanReduction(
-            source = source,
-            board = KanbanBoard(
-                id = KanbanBoardId(boardId),
-                name = source.title,
-                columns = columns,
-                cards = cards,
-                metadata = mapOf(
-                    "sourcePath" to source.sourcePath,
-                    "sourceContentId" to source.contentId,
-                    "reducer" to "ForgeKanbanIngest/v1",
-                ),
-            ),
-            causalNodes = causalNodes,
-            reteFacts = taskFacts + dependencyFacts,
-            correlations = correlations,
-        )
     }
 
     private fun parseWorkPackages(markdown: String): List<SourceTask> {
