@@ -48,12 +48,10 @@ class CounterCodec : Codec<Char, Int>() {
     override fun encode(input: Iterable<Char>): Sequence<Int> = sequence {
         for (c in input) {
             val cumulativeFrequency = frequencyModel.getCumulativeFrequency(c)
-            val range = IntRange(
-                (cumulativeFrequency * 0xFFFF).toInt(),
-                (cumulativeFrequency * 0xFFFF).toInt() + frequencyModel.getFrequency(c)
-            )
+            // ⚡ Bolt: Removed redundant IntRange allocation and duplicate math
+            val lowerBound = (cumulativeFrequency * 0xFFFF).toInt()
             frequencyModel.updateFrequency(c)
-            yield(range.first)
+            yield(lowerBound)
         }
         yield(flushSymbol.code)
     }
