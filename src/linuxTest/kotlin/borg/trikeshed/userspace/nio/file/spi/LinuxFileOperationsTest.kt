@@ -6,6 +6,7 @@ import platform.posix.chmod
 import kotlin.test.Test
 import kotlin.test.assertTrue
 import kotlin.test.assertFailsWith
+import kotlin.test.assertEquals
 
 class LinuxFileOperationsTest {
 
@@ -44,5 +45,32 @@ class LinuxFileOperationsTest {
         // opendir on a file or non-existent dir should return emptyList()
         val result = ops.listDir("/this/path/does/not/exist/hopefully")
         assertTrue(result.isEmpty())
+    }
+
+    @Test
+    fun `readAllBytes fails on non-existent file`() {
+        val ops = LinuxFileOperations()
+        val exception = assertFailsWith<IllegalArgumentException> {
+            ops.readAllBytes("/does/not/exist/foo.txt")
+        }
+        assertEquals("open(/does/not/exist/foo.txt) failed", exception.message)
+    }
+
+    @Test
+    fun `write fails on invalid path`() {
+        val ops = LinuxFileOperations()
+        val exception = assertFailsWith<IllegalArgumentException> {
+            ops.write("/does/not/exist/foo.txt", ByteArray(0))
+        }
+        assertEquals("open(/does/not/exist/foo.txt) failed", exception.message)
+    }
+
+    @Test
+    fun `write fails on full device`() {
+        val ops = LinuxFileOperations()
+        val exception = assertFailsWith<IllegalArgumentException> {
+            ops.write("/dev/full", ByteArray(10) { 1 })
+        }
+        assertTrue(exception.message!!.startsWith("short write on /dev/full:"))
     }
 }
