@@ -245,3 +245,14 @@ same principle: **keep the result a `Series` so downstream `α`/`get(range)`/
              if (e.name == "Tuple") { tupleEntry = e; break }
 -            }
  ```
+
+## Taxonomical self-doc 
+
+as code is maintained or created move abstractions into their own scaffolding hierarchy of enums, typealiases, and inline value classes, potentially closed hierarchies to support taxonomy DSL's which have stricter typing rules with negligable  runtime overheads 
+
+typealias Tick = Int
+typealias Lightyear = Double 
+typealias Serializer = Confix 
+
+alternate: 
+value class LightYear (it:Double){...} 

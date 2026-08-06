@@ -526,11 +526,7 @@ object OroborosDaemon {
                 }
             } else {
                 // --once: run one reactive tick synchronously.
-<<<<<<< ours
                 withContext(htxElement + muxReactor) {
-=======
-                withContext(htxElement) {
->>>>>>> theirs
                     driver.startReactiveCycle(this)
                 }
                 delay(intervalMs * 2)
