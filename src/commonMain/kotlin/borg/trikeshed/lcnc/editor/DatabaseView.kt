@@ -74,8 +74,8 @@ class DatabaseView(var database: LcncDatabase, val ingestState: IngestStateEleme
             for (prop in schema.properties.values) {
                 text("<th>")
                 text("<button class=\"lcnc-database-sort\" data-column=\"${prop.id}\" onclick=\"window.lcncSortColumn('${database.id}', '${prop.id}')\">${prop.name}</button>")
-                text("<button class=\"lcnc-col-delete\" onclick=\"window.lcncDeleteColumn('${database.id}', '${prop.id}')\">x</button>")
-                text("<button class=\"lcnc-col-rename\" onclick=\"window.lcncRenameColumn('${database.id}', '${prop.id}')\">✎</button>")
+                text("<button class=\"lcnc-col-delete\" onclick=\"window.lcncDeleteColumn('${database.id}', '${prop.id}')\" aria-label=\"Delete column\" title=\"Delete column\">x</button>")
+                text("<button class=\"lcnc-col-rename\" onclick=\"window.lcncRenameColumn('${database.id}', '${prop.id}')\" aria-label=\"Rename column\" title=\"Rename column\">✎</button>")
                 text("</th>")
             }
             text("<th>Actions</th>")

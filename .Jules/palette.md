@@ -1,3 +1,7 @@
 ## 2024-08-04 - Palette Journal Initialization
 **Learning:** Initializing the journal for tracking critical UX and accessibility learnings.
 **Action:** Use this file to record specific insights related to accessibility and UX patterns in the TrikeShed app.
+
+## 2025-01-20 - Adding ARIA attributes to generated HTML in Kotlin React-like DSLs
+**Learning:** When using Kotlin string-builder-based DSLs (like `text("<button...")`) to generate HTML elements, ARIA attributes and titles need to be explicitly added as escaped strings (e.g., `aria-label="My Label"`). Icon-only buttons used in inline editors (like BlockEditor and DatabaseView) often lack these attributes by default because they are generated programmatically for brevity.
+**Action:** Always check programmatic HTML generation for missing accessibility attributes, especially for UI controls represented only by symbols (↑, ↓, +, x, ✎).

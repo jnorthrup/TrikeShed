@@ -54,14 +54,14 @@ class BlockEditor(var block: LcncBlock, val ingestState: IngestStateElement) {
             
             // Block Controls (Move up, move down, insert, delete, indent, outdent)
             div(classes = "lcnc-block-controls") {
-                text("<button onclick=\"window.lcncMoveBlockUp('${block.id}')\">↑</button>")
-                text("<button onclick=\"window.lcncMoveBlockDown('${block.id}')\">↓</button>")
-                text("<button onclick=\"window.lcncIndentBlock('${block.id}')\">→</button>")
-                text("<button onclick=\"window.lcncOutdentBlock('${block.id}')\">←</button>")
+                text("<button onclick=\"window.lcncMoveBlockUp('${block.id}')\" aria-label=\"Move block up\" title=\"Move block up\">↑</button>")
+                text("<button onclick=\"window.lcncMoveBlockDown('${block.id}')\" aria-label=\"Move block down\" title=\"Move block down\">↓</button>")
+                text("<button onclick=\"window.lcncIndentBlock('${block.id}')\" aria-label=\"Indent block\" title=\"Indent block\">→</button>")
+                text("<button onclick=\"window.lcncOutdentBlock('${block.id}')\" aria-label=\"Outdent block\" title=\"Outdent block\">←</button>")
                 
                 // Block creation menu
                 text("<div class=\"lcnc-block-menu\">")
-                text("<button onclick=\"window.lcncInsertBlock('${block.id}')\">+</button>")
+                text("<button onclick=\"window.lcncInsertBlock('${block.id}')\" aria-label=\"Insert new block\" title=\"Insert new block\">+</button>")
                 text("<select onchange=\"window.lcncChangeBlockType('${block.id}', this.value)\">")
                 text("<option value=\"paragraph\"${if(block.type=="paragraph") " selected" else ""}>Text</option>")
                 text("<option value=\"heading_1\"${if(block.type=="heading_1") " selected" else ""}>Heading 1</option>")
@@ -72,7 +72,7 @@ class BlockEditor(var block: LcncBlock, val ingestState: IngestStateElement) {
                 text("</select>")
                 text("</div>")
 
-                text("<button onclick=\"window.lcncDeleteBlock('${block.id}')\">x</button>")
+                text("<button onclick=\"window.lcncDeleteBlock('${block.id}')\" aria-label=\"Delete block\" title=\"Delete block\">x</button>")
             }
 
             // Block Content editable area
