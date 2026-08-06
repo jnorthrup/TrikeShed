@@ -1457,7 +1457,7 @@ class FlywheelDriver(
         // Walk back to a safe boundary within the limit.
         var cut = SPEC_BYTE_LIMIT - 20 // leave room for marker
         while (cut > 0 && bytes[cut].toInt() and 0xC0 == 0x80) cut-- // skip UTF-8 continuation bytes
-        return spec.encodeToByteArray().copyOfRange(0, cut).decodeToString().trim() +
+        return spec.encodeToByteArray().decodeToString(0, cut).trim() +
             "\n\n[spec truncated at $SPEC_BYTE_LIMIT bytes]"
     }
 

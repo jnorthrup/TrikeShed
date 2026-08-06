@@ -163,7 +163,7 @@ fun parseHtxResponse(payload: HtxBody): HtxResponse {
         return HtxResponse(status = 0, body = ByteSeries(bytes))
     }
 
-    val headerText = bytes.copyOfRange(0, boundary).decodeToString()
+    val headerText = bytes.decodeToString(0, boundary)
     val lines = headerText.split("\r\n")
     val status = lines.firstOrNull()
         ?.split(' ')
@@ -289,7 +289,7 @@ private fun decodeChunkedBody(encodedBody: ByteArray): ByteArray {
         if (lineEnd < 0) {
             return encodedBody
         }
-        val chunkLine = encodedBody.copyOfRange(offset, lineEnd).decodeToString()
+        val chunkLine = encodedBody.decodeToString(offset, lineEnd)
         val chunkSize = chunkLine.substringBefore(';').trim().toIntOrNull(16) ?: return encodedBody
         offset = lineEnd + 2
 
