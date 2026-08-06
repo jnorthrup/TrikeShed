@@ -104,7 +104,7 @@ class GitStateCache(private val repoDir: File) {
      * Handles: symbolic refs (`ref: refs/heads/master`), detached HEAD
      * (direct SHA), and packed-refs fallback.
      */
-    private suspend fun resolveHead(): String = withContext(Dispatchers.IO) {
+    private suspend fun resolveHead(): String = withContext(context = Dispatchers.IO) {
         val headFile = File(repoDir, ".git/HEAD")
         if (!headFile.exists()) return@withContext ""
         val headContent = headFile.readText().trim()
