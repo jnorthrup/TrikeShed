@@ -62,8 +62,8 @@ class TypeDefOracle {
         )
 
         private val topicPattern = Regex("""^topic:(\w+)\s+as\s+(\w+)""")
-        private val typeParamPattern = Regex("""<[^>]*>""")
-        private val typeParenPattern = Regex("""\([^)]*\)""")
+        private val typeParamPattern = Regex("<[^>]*>")
+        private val typeParenPattern = Regex("\\([^)]*\\)")
         private val typeSplitPattern = Regex("""[|,\s]+""")
     }
 

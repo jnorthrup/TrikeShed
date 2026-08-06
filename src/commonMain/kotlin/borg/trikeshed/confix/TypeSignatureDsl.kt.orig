@@ -172,7 +172,6 @@ fun typeSignature(block: TypeSignatureBuilder.() -> Unit): PatchSpec {
 // ── Helpers ───────────────────────────────────────────────────────
 
 private val paramPattern = Regex("<([^>]+)>")
-private val TypeParamStripRegex = Regex("<.*>")
 
 /** Extract type parameters from a type expression like "Join<T,T>". */
 fun extractParams(typeExpr: String): List<String> {
@@ -183,7 +182,7 @@ fun extractParams(typeExpr: String): List<String> {
 
 /** Extract the type name from an expression like "Join<T,T>" → "Join". */
 fun extractName(typeExpr: String): String =
-    TypeParamStripRegex.replace(typeExpr, "").substringAfterLast('.')
+    typeExpr.substringBefore('<').substringAfterLast('.')
 
 // ── JSON serialization ────────────────────────────────────────────
 

@@ -166,7 +166,7 @@ class ConfixOracleService : ConfixOracleFacade {
     }
 
     companion object {
-        private val typeParamRegex = Regex("""<[^>]+>""")
+        private val typeParamRegex = Regex("<[^>]+>")
         private val delimiterRegex = Regex("""[|(\s]""")
     }
 }
