@@ -193,8 +193,10 @@ internal fun decodeWireProtoInternal(spec: WireProtoSpec, bytes: ByteArray): Fie
 
 fun fnv1aHash(data: String): UInt {
     var hash: UInt = 0x811c9dc5.toUInt()
-    for (c in data.encodeToByteArray()) {
-        hash = hash xor c.toUByte().toUInt()
+    // ⚡ Bolt: Extract to avoid iterator allocation in tight loop
+    val bytes = data.encodeToByteArray()
+    for (i in bytes.indices) {
+        hash = hash xor bytes[i].toUByte().toUInt()
         hash *= 0x01000193.toUInt()
     }
     return hash
