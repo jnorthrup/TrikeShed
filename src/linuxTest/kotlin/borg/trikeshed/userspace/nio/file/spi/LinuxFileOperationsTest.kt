@@ -37,4 +37,12 @@ class LinuxFileOperationsTest {
             ops.readAllBytes("/does/not/exist/very/unlikely/to/exist.txt")
         }
     }
+
+    @Test
+    fun testListDirErrorPath() {
+        val ops = LinuxFileOperations()
+        // opendir on a file or non-existent dir should return emptyList()
+        val result = ops.listDir("/this/path/does/not/exist/hopefully")
+        assertTrue(result.isEmpty())
+    }
 }
