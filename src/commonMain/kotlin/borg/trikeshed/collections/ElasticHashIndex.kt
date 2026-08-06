@@ -1,15 +1,15 @@
 package borg.trikeshed.collections
 
-import borg.trikeshed.job.Sha256Pure
-
 /**
  * ElasticHashIndex — double-hashing open-addressing hash table.
+ *
+ * Note: Explicitly NOT Farach-Colton/Krapivin elastic hashing.
+ * Kept class name ElasticHashIndex for API stability (it is a misnomer).
  *
  * Key properties:
  * - Append-only immutable segment (no delete/retract)
  * - Positive-query-heavy workloads
- * - Load factor ≤ 0.5
- * - Probe sequence: h1 + i * h2  (ordinary double hashing)
+ * - ordinary double hash h1+i*h2 load≤0.5
  * - Deterministic replay: probe entropy derived from canonical facet bytes + committed seed
  *
  * Usage:
@@ -57,15 +57,16 @@ class ElasticHashIndex<K : Any> internal constructor(
             return cap
         }
 
-        private fun doubleHash(key: Any, seed: Long): Pair<Int, Int> {
-            val bytes = Sha256Pure.digest(key.toString().encodeToByteArray())
-            var z = seed + bytes.size.toLong()
-            for (b in bytes) {
-                z = (z + (b.toLong() and 0xFFL)) * -0x61c8864680b583ebL
-            }
+        private fun mix64(hashCode: Int, seed: Long): Long {
+            var z = hashCode.toLong() xor seed
             z = (z xor (z shr 30)) * -0x40a7b892e31b1a47L
             z = (z xor (z shr 27)) * -0x6b2fb644ecced115L
             z = z xor (z shr 31)
+            return z
+        }
+
+        private fun doubleHash(key: Any, seed: Long): Pair<Int, Int> {
+            val z = mix64(key.hashCode(), seed)
             val h1 = (z and 0xFFFFFFFFL).toInt()
             val h2 = (z shr 32).toInt() or 1  // ensure odd for coprime to power-of-2
             return h1 to h2
@@ -116,15 +117,16 @@ class ElasticHashIndex<K : Any> internal constructor(
         }
     }
 
-    private fun doubleHash(key: Any, seed: Long): Pair<Int, Int> {
-        val bytes = Sha256Pure.digest(key.toString().encodeToByteArray())
-        var z = seed + bytes.size.toLong()
-        for (b in bytes) {
-            z = (z + (b.toLong() and 0xFFL)) * -0x61c8864680b583ebL
-        }
+    private fun mix64(hashCode: Int, seed: Long): Long {
+        var z = hashCode.toLong() xor seed
         z = (z xor (z shr 30)) * -0x40a7b892e31b1a47L
         z = (z xor (z shr 27)) * -0x6b2fb644ecced115L
         z = z xor (z shr 31)
+        return z
+    }
+
+    private fun doubleHash(key: Any, seed: Long): Pair<Int, Int> {
+        val z = mix64(key.hashCode(), seed)
         val h1 = (z and 0xFFFFFFFFL).toInt()
         val h2 = (z shr 32).toInt() or 1
         return h1 to h2
