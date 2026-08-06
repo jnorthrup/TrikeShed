@@ -148,96 +148,6 @@ fun streamByteLines(bytes: ByteArray): Sequence<Join<Long, ByteArray>> = sequenc
     }
 }
 
-
-actual object Files {
-    actual fun readAllLines(filename: String): List<String> =
-        readString(filename).normalizeCrLf().split('\n').let { parts ->
-            if (parts.isNotEmpty() && parts.last().isEmpty()) parts.dropLast(1) else parts
-        }
-
-    actual fun readAllBytes(filename: String): ByteArray =
-        readBlob(filename)?.let(::decodeHex) ?: ByteArray(0)
-
-    actual fun readString(filename: String): String = readAllBytes(filename).decodeToString()
-
-    actual fun write(filename: String, bytes: ByteArray) {
-        ensureParentDirectories(filename)
-        writeBlob(filename, encodeHex(bytes))
-    }
-
-    actual fun write(filename: String, lines: List<String>) {
-        write(filename, lines.joinToString("\n"))
-    }
-
-    actual fun write(filename: String, string: String) {
-        write(filename, string.encodeToByteArray())
-    }
-
-    actual fun cwd(): String = "/"
-
-    actual fun exists(filename: String): Boolean =
-        readBlob(filename) != null || directoryExists(filename)
-
-    actual fun streamLines(fileName: String, bufsize: Int): Sequence<Join<Long, ByteArray>> =
-        streamByteLines(readAllBytes(fileName))
-
-    actual fun iterateLines(fileName: String, bufsize: Int): Iterable<Join<Long, Series<Byte>>> =
-        streamLines(fileName, bufsize).map { (offset, bytes) -> offset j bytes.toSeries() }.asIterable()
-
-    actual fun listDir(path: String): List<String> {
-        val normalized = normalizePath(path).trimEnd('/') + "/"
-        val fileKeys = storageKeys(fileKey(normalized)) + blobFallback.keys.filter { it.startsWith(fileKey(normalized)) }
-        val dirKeys = storageKeys(dirKey(normalized)) + dirFallback.map(::dirKey).filter { it.startsWith(dirKey(normalized)) }
-        val entries = mutableListOf<String>()
-        for (key in fileKeys) entries.add(key.removePrefix(fileKey(normalized)).substringBefore('/'))
-        for (key in dirKeys) entries.add(key.removePrefix(dirKey(normalized)).substringBefore('/'))
-        return entries.distinct()
-    }
-
-    actual fun isDir(path: String): Boolean = directoryExists(path)
-    actual fun isFile(path: String): Boolean = readBlob(path) != null
-    actual fun mkdirs(path: String) { ensureParentDirectories(path) }
-    actual fun deleteRecursively(path: String) { rm(path) }
-
-    actual fun resolvePath(vararg parts: String): String =
-        normalizePath(parts.joinToString("/"))
-
-    actual fun readZip(path: String): List<Join<String, ByteArray>> = error("readZip WASM not supported")
-
-    actual fun createTempDir(prefix: String): String =
-        "/tmp/$prefix-${Random.nextLong().toString(16)}"
-}
-
-private fun String.replaceChar(old: Char, new: Char): String {
-    val out = StringBuilder(length)
-    for (index in indices) {
-        val c = this[index]
-        out.append(if (c == old) new else c)
-    }
-    return out.toString()
-}
-
-private fun String.normalizeCrLf(): String {
-    val out = StringBuilder(length)
-    var index = 0
-    while (index < length) {
-        if (this[index] == '\r' && index + 1 < length && this[index + 1] == '\n') {
-            out.append('\n')
-            index += 2
-        } else {
-            out.append(this[index])
-            index++
-        }
-    }
-    return out.toString()
-}
-
-fun mktemp(): String {
-    val name = "/tmp/wasm-${Random.nextLong().toString(16)}.tmp"
-    Files.write(name, ByteArray(0))
-    return name
-}
-
 fun rm(path: String): Boolean {
     val normalized = normalizePath(path)
     val fileRemoved = removeBlob(normalized)
@@ -269,9 +179,16 @@ fun mkdir(path: String): Boolean {
     return true
 }
 
-fun readLinesSeq(path: String): Sequence<String> = Files.readAllLines(path).asSequence()
+fun readLinesSeq(path: String): Sequence<String> = borg.trikeshed.common.Files.readAllLines(path).asSequence()
 
+<<<<<<< ours
 fun readLines(path: String): List<String> = Files.readAllLines(path)
+=======
+fun readLines(path: String): List<String> = borg.trikeshed.common.Files.readAllLines(path)
+actual fun platformSeekHandle(): SeekHandle = WasmBrowserSeekHandle
+
+actual fun ioUringHandle(): SeekHandle? = null
+>>>>>>> theirs
 
 
 class SeekFileBuffer(
@@ -311,4 +228,19 @@ class SeekFileBuffer(
     }
 
     fun readv(requests: Series2<Long, ByteRegion>): IntArray = delegate.readv(requests)
+}
+
+fun mktemp(): String {
+    val name = "/tmp/wasm-${kotlin.random.Random.nextLong().toString(16)}.tmp"
+    borg.trikeshed.common.Files.write(name, ByteArray(0))
+    return name
+}
+
+private fun String.replaceChar(old: Char, new: Char): String {
+    val out = StringBuilder(length)
+    for (index in indices) {
+        val c = this[index]
+        out.append(if (c == old) new else c)
+    }
+    return out.toString()
 }

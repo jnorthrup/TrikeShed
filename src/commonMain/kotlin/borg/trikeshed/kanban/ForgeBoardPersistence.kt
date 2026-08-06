@@ -2,7 +2,7 @@ package borg.trikeshed.kanban
 
 import borg.trikeshed.common.Files
 import borg.trikeshed.job.ContentId
-import borg.trikeshed.lib.Files as LibFiles
+import borg.trikeshed.common.Files as LibFiles
 import borg.trikeshed.parse.json.JsonSupport
 import borg.trikeshed.userspace.nio.platform.spi.SystemOperations
 

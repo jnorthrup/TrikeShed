@@ -1,6 +1,6 @@
 package borg.trikeshed.userspace.nio.file.spi
 
-import borg.trikeshed.lib.Files
+import borg.trikeshed.common.Files
 
 class JsFileOperations : FileOperations {
 

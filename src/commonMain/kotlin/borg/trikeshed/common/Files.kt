@@ -29,6 +29,12 @@ expect object Files {
         bufsize: Int = 12, //for testing
     ): Iterable<Join<Long, Series<Byte>>>
 
-
+    fun listDir(path: String): List<String>
+    fun isDir(path: String): Boolean
+    fun isFile(path: String): Boolean
+    fun mkdirs(path: String)
+    fun deleteRecursively(path: String)
+    fun resolvePath(vararg parts: String): String
+    fun readZip(path: String): List<Join<String, ByteArray>>
+    fun createTempDir(prefix: String): String
 }
-
