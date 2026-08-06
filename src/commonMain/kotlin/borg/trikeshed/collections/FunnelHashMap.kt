@@ -1,7 +1,7 @@
 package borg.trikeshed.collections
 
 /**
- * FunnelHashMap — greedy open-addressing hash map based on Krapivin et al. (2025)
+ * FunnelHashMap — greedy open-addressing hash map inspired by Krapivin et al. (2025)
  * "Optimal Bounds for Open Addressing Without Reordering".
  *
  * Implements "Funnel Hashing":
@@ -11,11 +11,10 @@ package borg.trikeshed.collections
  * - If not found/full, we hash to a bucket in A_2, and so on.
  * - A final fallback level handles overflows.
  *
- * This achieves O(log^2(1/delta)) worst-case expected probe complexity and
- * O(log(1/delta)) amortized, completely avoiding Yao's bound for standard linear probing,
- * without reordering elements.
+ * Note: remove/tombstones are extensions outside the original paper's scope.
+ * Used by Stringpool.
  */
-class FunnelHashMap<K : Any, V>(initialCapacity: Int = 32) {
+class FunnelHashMap<K : Any, V>(initialCapacity: Int = 32, slack: Double = 0.20) {
     private var size = 0
     private var capacity = 0
 
@@ -24,11 +23,13 @@ class FunnelHashMap<K : Any, V>(initialCapacity: Int = 32) {
 
     private var levels: Array<Level> = emptyArray()
 
+    private val actualSlack = slack.coerceIn(0.05, 0.50)
+    private val beta = maxOf(8, kotlin.math.ceil(4 * kotlin.math.ln(1.0 / actualSlack)).toInt())
+
     companion object {
         private val ABSENT = Any()
         private val DELETED = Any()
 
-        private const val BETA = 8 // bucket size
         private const val DECAY_NUM = 3
         private const val DECAY_DEN = 4 // A_{i+1} = 3/4 A_i
     }
@@ -59,9 +60,9 @@ class FunnelHashMap<K : Any, V>(initialCapacity: Int = 32) {
         var currentLevelCap = remaining / 2
         var offset = 0
 
-        while (currentLevelCap >= BETA) {
-            val buckets = currentLevelCap / BETA
-            val actualCap = buckets * BETA
+        while (currentLevelCap >= beta) {
+            val buckets = currentLevelCap / beta
+            val actualCap = buckets * beta
             newLevels.add(Level(offset, actualCap, buckets))
             offset += actualCap
             remaining -= actualCap
@@ -70,7 +71,7 @@ class FunnelHashMap<K : Any, V>(initialCapacity: Int = 32) {
 
         // Fallback level gets the rest
         if (remaining > 0) {
-            newLevels.add(Level(offset, remaining, (remaining + BETA - 1) / BETA))
+            newLevels.add(Level(offset, remaining, (remaining + beta - 1) / beta))
         }
 
         levels = newLevels.toTypedArray()
@@ -96,8 +97,8 @@ class FunnelHashMap<K : Any, V>(initialCapacity: Int = 32) {
     }
 
     fun put(key: K, value: V): V? {
-        // Target max load factor 0.8
-        if (size >= capacity * 4 / 5) {
+        // Target max load factor based on slack
+        if (size >= (capacity * (1.0 - actualSlack)).toInt()) {
             resize(capacity * 2)
         }
 
@@ -107,9 +108,9 @@ class FunnelHashMap<K : Any, V>(initialCapacity: Int = 32) {
             val h = hash(key, lvl)
             val bucketIdx = (h.toUInt() % level.buckets.toUInt()).toInt()
 
-            // Linear probe within the bucket (or up to BETA elements)
-            val startIdx = level.offset + bucketIdx * BETA
-            val bound = minOf(startIdx + BETA, level.offset + level.capacity, keys.size)
+            // Linear probe within the bucket (or up to beta elements)
+            val startIdx = level.offset + bucketIdx * beta
+            val bound = minOf(startIdx + beta, level.offset + level.capacity, keys.size)
 
             var firstTombstone = -1
 
@@ -151,8 +152,8 @@ class FunnelHashMap<K : Any, V>(initialCapacity: Int = 32) {
             if (level.buckets == 0) continue
             val h = hash(key, lvl)
             val bucketIdx = (h.toUInt() % level.buckets.toUInt()).toInt()
-            val startIdx = level.offset + bucketIdx * BETA
-            val bound = minOf(startIdx + BETA, level.offset + level.capacity, keys.size)
+            val startIdx = level.offset + bucketIdx * beta
+            val bound = minOf(startIdx + beta, level.offset + level.capacity, keys.size)
             for (i in startIdx until bound) {
                 val k = keys[i]
                 if (k === ABSENT) break
@@ -171,8 +172,8 @@ class FunnelHashMap<K : Any, V>(initialCapacity: Int = 32) {
             if (level.buckets == 0) continue
             val h = hash(key, lvl)
             val bucketIdx = (h.toUInt() % level.buckets.toUInt()).toInt()
-            val startIdx = level.offset + bucketIdx * BETA
-            val bound = minOf(startIdx + BETA, level.offset + level.capacity, keys.size)
+            val startIdx = level.offset + bucketIdx * beta
+            val bound = minOf(startIdx + beta, level.offset + level.capacity, keys.size)
             for (i in startIdx until bound) {
                 val k = keys[i]
                 if (k === ABSENT || k === DELETED) {
@@ -196,8 +197,8 @@ class FunnelHashMap<K : Any, V>(initialCapacity: Int = 32) {
             val h = hash(key, lvl)
             val bucketIdx = (h.toUInt() % level.buckets.toUInt()).toInt()
 
-            val startIdx = level.offset + bucketIdx * BETA
-            val bound = minOf(startIdx + BETA, level.offset + level.capacity, keys.size)
+            val startIdx = level.offset + bucketIdx * beta
+            val bound = minOf(startIdx + beta, level.offset + level.capacity, keys.size)
 
             for (i in startIdx until bound) {
                 val k = keys[i]
@@ -221,8 +222,8 @@ class FunnelHashMap<K : Any, V>(initialCapacity: Int = 32) {
             val h = hash(key, lvl)
             val bucketIdx = (h.toUInt() % level.buckets.toUInt()).toInt()
 
-            val startIdx = level.offset + bucketIdx * BETA
-            val bound = minOf(startIdx + BETA, level.offset + level.capacity, keys.size)
+            val startIdx = level.offset + bucketIdx * beta
+            val bound = minOf(startIdx + beta, level.offset + level.capacity, keys.size)
 
             for (i in startIdx until bound) {
                 val k = keys[i]
@@ -239,5 +240,34 @@ class FunnelHashMap<K : Any, V>(initialCapacity: Int = 32) {
             }
         }
         return null
+    }
+
+    fun probeDistribution(sample: List<K>): List<Int> {
+        val result = mutableListOf<Int>()
+        for (key in sample) {
+            var probes = 0
+            var done = false
+            for (lvl in levels.indices) {
+                val level = levels[lvl]
+                if (level.buckets == 0) continue
+                val h = hash(key, lvl)
+                val bucketIdx = (h.toUInt() % level.buckets.toUInt()).toInt()
+
+                val startIdx = level.offset + bucketIdx * beta
+                val bound = minOf(startIdx + beta, level.offset + level.capacity, keys.size)
+
+                for (i in startIdx until bound) {
+                    probes++
+                    val k = keys[i]
+                    if (k === ABSENT || k == key) {
+                        done = true
+                        break
+                    }
+                }
+                if (done) break
+            }
+            result.add(probes)
+        }
+        return result
     }
 }
