@@ -138,16 +138,17 @@ object OroborosDaemon {
 
         val home = System.getProperty("user.home")
             ?: die("System property user.home not set")
-        val canonicalForge = File(home, ".local/forge")
-        val forgeHome = File(positional.getOrNull(0) ?: canonicalForge.absolutePath)
-        val repoDir = File(positional.getOrNull(1) ?: System.getProperty("user.dir"))
-        withContext(Dispatchers.IO) {
-            val gitDir = repoDir.resolve(".git")
+        val (forgeHome, repoDir) = withContext(Dispatchers.IO) {
+            val canonicalForge = File(home, ".local/forge")
+            val fHome = File(positional.getOrNull(0) ?: canonicalForge.absolutePath)
+            val rDir = File(positional.getOrNull(1) ?: System.getProperty("user.dir"))
+            val gitDir = rDir.resolve(".git")
             if (!gitDir.exists()) {
-                System.err.println("[OROBOROS] $repoDir is not a git work tree. Aborting.")
+                System.err.println("[OROBOROS] $rDir is not a git work tree. Aborting.")
                 exitProcess(1)
             }
-            forgeHome.mkdirs()
+            fHome.mkdirs()
+            Pair(fHome, rDir)
         }
 
         val driver = FlywheelDriver(
