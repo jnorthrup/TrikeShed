@@ -1,5 +1,8 @@
 package borg.trikeshed.modelmux
 
+import borg.trikeshed.lib.Series
+import borg.trikeshed.lib.j
+
 class ProviderRegistry {
     private val providers = mutableMapOf<String, ModelProvider>()
     private val descriptors = mutableMapOf<String, ProviderDescriptor>()
@@ -25,6 +28,6 @@ class ProviderRegistry {
         }
     }
 
-    fun descriptors(): List<ProviderDescriptor> = descriptors.values.toList()
+    fun descriptors(): Series<ProviderDescriptor> = descriptors.values.toList().let { list -> list.size j list::get }
 }
 

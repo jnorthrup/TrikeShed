@@ -181,25 +181,6 @@ Read this as:
 5. side effects belong at the userspace boundary with explicit lifecycle and fanout
 6. the goal is dense readable composition, not ceremonial abstraction
 
-## Modelmux Scaffold & Harness algebra
-
-The `modelmux` package shifts away from monolithic LLM-based systems toward a modular design where the LLM acts as the core engine, while external structures handle reasoning, memory, and control. This follows the unifying **'Scaffold & Harness' paradigm** for next-generation AI agents.
-
-### The Centroid Architecture:
-
-1.  **Core (The Engine):** The **LLM** (e.g., accessed via `ModelProvider` / `ModelWorker`) provides the base reasoning capabilities, but its weights are considered insufficient on their own for long-term, reliable task completion in high-entropy environments (13:04, 14:44).
-
-2.  **Scaffold (The Geometric Medium):** This is the deterministic, non-parametric component that provides a stable structure for information (e.g., `Prompt`, `PromptMessage`). It serves as the 'detection medium' or 'topological map' of the problem space, effectively freezing systemic entropy. Examples include:
-    *   **Knowledge Graphs:** (16:59)
-    *   **Skill Banks/Memory:** (24:07)
-    *   **Tool Ontologies:** (27:26)
-
-3.  **Harness (The Experimental Apparatus):** This is the control loop that surrounds both the LLM and the scaffold (e.g., `ModelCallLeaf`, `ProviderRegistry`, `ProviderSelectionRule`). It acts as the 'statistical gating' mechanism for information flow, governing time, budget (`ModelUsage`), and reward evaluation (28:09).
-    *   **Function:** It directs the LLM (the 'active beam') to interact with the scaffold (the 'detection medium'), determining whether to exploit known paths or explore new ones (29:28).
-
-### Why this architecture matters:
-Instead of relying on the LLM's internal weights to remember everything, the harness-scaffold structure allows for **mathematical stabilization**. By converting raw text into structured geometric invariants, the agent can perform reliable logical operations without drowning in the noise of unconstrained text histories (13:27, 21:18, 26:12).
-
 # REFACTOR RECIPES
 
 These are the two canonical loop-elimination strategies. Both close on the
