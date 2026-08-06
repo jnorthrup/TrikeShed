@@ -5,6 +5,7 @@ import kotlinx.cinterop.convert
 import platform.posix.chmod
 import kotlin.test.Test
 import kotlin.test.assertTrue
+import kotlin.test.assertFailsWith
 
 class LinuxFileOperationsTest {
 
@@ -26,6 +27,14 @@ class LinuxFileOperationsTest {
             // Restore permissions so we can clean up
             chmod(path, 0x1FFu.convert())
             files.deleteRecursively(baseDir)
+        }
+    }
+
+    @Test
+    fun testReadAllBytesFileNotFound() {
+        val ops = LinuxFileOperations()
+        assertFailsWith<IllegalArgumentException> {
+            ops.readAllBytes("/does/not/exist/very/unlikely/to/exist.txt")
         }
     }
 }
