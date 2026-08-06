@@ -210,7 +210,6 @@ class FunnelHashMap<K : Any, V>(
         z = z xor (z ushr 31)
         return z
     }
-    }
 
     private fun nextPowerOfTwo(n: Int): Int {
         var p = 1
