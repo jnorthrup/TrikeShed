@@ -11,6 +11,8 @@ import platform.posix.close
 import platform.posix.io_uring_setup
 import platform.posix.io_uring_params
 import platform.posix.sizeOf
+import platform.posix.open
+import platform.posix.O_RDONLY
 import linux_uring.*
 import linux_uring.UringSqeFlags
 import linux_uring.UringOpcode
@@ -45,5 +47,21 @@ class KioUringTest {
         if (ret >= 0) {
             close(ret)
         }
+    }
+
+    @Test
+    fun testOpReadWholeFile() = memScoped {
+        val s = KioUring()
+        val file_fd = open("/dev/null", O_RDONLY)
+        assertTrue(file_fd >= 0, "Failed to open /dev/null")
+
+        val initialTail = s.sqRing.tail.pointed.value
+
+        s.opReadWholeFile(file_fd)
+
+        val newTail = s.sqRing.tail.pointed.value
+        assertEquals(initialTail + 1u, newTail, "opReadWholeFile should increment sqRing tail")
+
+        close(file_fd)
     }
 }

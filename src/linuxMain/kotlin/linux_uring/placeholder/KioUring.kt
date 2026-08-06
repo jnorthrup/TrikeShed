@@ -124,7 +124,9 @@ class KioUring {
         return qringPtr
     }
 
-    fun opReadWholeFile(file_fd: Int): Unit = memScoped {
+    fun opReadWholeFile(
+        file_fd: Int
+    ): Unit = memScoped {
         val triple = sqePreamble()
         val sqe: CPointer<io_uring_sqe> = sqes[triple.third.toInt()].ptr
         // ---opcode
