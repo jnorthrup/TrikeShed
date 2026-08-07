@@ -188,6 +188,8 @@
     state.pages.forEach((page) => {
       const item = document.createElement('div');
       item.className = 'page-tree-item' + (page.id === state.activePageId ? ' active' : '');
+      item.role = 'button';
+      item.tabIndex = 0;
       const toggle = document.createElement('span');
       toggle.className = 'tree-toggle';
       toggle.textContent = page.children && page.children.length ? '▾' : '▸';
@@ -201,6 +203,13 @@
       item.addEventListener('click', () => {
         mutate((s) => { s.activePageId = page.id; });
         renderAll();
+      });
+      item.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          mutate((s) => { s.activePageId = page.id; });
+          renderAll();
+        }
       });
       pageTreeEl.appendChild(item);
     });
@@ -342,7 +351,11 @@
         if (page.blocks.length === 0) page.blocks.push({ id: uid(), type: 'p', text: '' });
       });
       renderBlocks();
-      if (focusTarget) focusBlock(focusTarget, false, true);
+      if (focusTarget) {
+        focusBlock(focusTarget, false, true);
+      } else {
+        titleEl.focus();
+      }
     } else if (e.key === 'Escape') {
       closeSlashMenu();
     } else if (slashMenuEl.hidden === false && (e.key === 'ArrowDown' || e.key === 'ArrowUp')) {
@@ -494,6 +507,8 @@
       cards.forEach((card) => {
         const cardEl = document.createElement('div');
         cardEl.className = 'board-card' + (col.id === 'done' ? ' done-card' : '');
+        cardEl.role = 'button';
+        cardEl.tabIndex = 0;
         const title = document.createElement('div');
         title.className = 'board-card-title';
         title.textContent = card.title;
@@ -510,6 +525,15 @@
           const next = order[(order.indexOf(card.column) + 1) % order.length];
           mutate(() => { card.column = next; });
           renderBoard();
+        });
+        cardEl.addEventListener('keydown', (e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            const order = state.board.columns.map((c) => c.id);
+            const next = order[(order.indexOf(card.column) + 1) % order.length];
+            mutate(() => { card.column = next; });
+            renderBoard();
+          }
         });
         cardsEl.appendChild(cardEl);
       });
@@ -547,6 +571,7 @@
   document.getElementById('btn-new-page').addEventListener('click', () => {
     newPage();
     renderAll();
+    titleEl.focus();
   });
 
   // ── Seed note ───────────────────────────────────────────────────────
