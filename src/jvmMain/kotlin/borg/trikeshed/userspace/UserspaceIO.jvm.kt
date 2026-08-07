@@ -29,37 +29,6 @@ private class JvmUserspaceChannelBackend(
     private val channels = ConcurrentHashMap<Int, ChannelWrapper>()
     private val fdCounter = AtomicInteger(3000)
 
-    override fun read(file: FileImpl, buffer: ByteBuffer, offset: Long): Int =
-        submitBatch(listOf(UringOp.Companion.Submissions.read(file.id, buffer.arrayAddress(), buffer.capacity(), offset, 0)))
-            .firstOrNull()?.res ?: -1
-
-    override fun write(file: FileImpl, buffer: ByteBuffer, offset: Long): Int =
-        submitBatch(listOf(UringOp.Companion.Submissions.write(file.id, buffer.arrayAddress(), buffer.capacity(), offset, 0)))
-            .firstOrNull()?.res ?: -1
-
-    override fun accept(file: FileImpl): Int = -1
-    override fun connect(file: FileImpl, address: String, port: Int): Int = -1
-
-    override fun close(file: FileImpl): Int {
-        val wrapper = channels.remove(file.id)
-        wrapper?.close()
-        return 0
-    }
-
-    override fun sync(file: FileImpl, metaData: Boolean): Int {
-        val ch = channels[file.id] ?: return -1
-        return ch.sync(metaData)
-    }
-
-    override fun truncate(file: FileImpl, size: Long): Int {
-        val ch = channels[file.id] ?: return -1
-        return ch.truncate(size)
-    }
-
-    override fun map(file: FileImpl, mode: String, position: Long, size: Long): Int {
-        val ch = channels[file.id] ?: return -1
-        return ch.map(mode, position, size)
-    }
 
     override fun submitBatch(submissions: List<UringSubmission>): List<SelectionResult> {
         if (submissions.isEmpty()) return emptyList()

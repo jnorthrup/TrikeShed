@@ -13,39 +13,6 @@ import platform.posix.open
 private class PosixUserspaceChannelBackend(
     private val entries: Int,
 ) : UserspaceChannelBackend {
-    override fun read(file: FileImpl, buffer: ByteBuffer, offset: Long): Int {
-        val bytes = buffer.array()
-        val start = buffer.arrayOffset() + buffer.position()
-        val length = buffer.remaining()
-        if (length <= 0) return 0
-        val result = PosixUringIO.readAt(file.id, bytes, start, length, offset, entries)
-        if (result > 0) buffer.position(buffer.position() + result)
-        return result
-    }
-
-    override fun write(file: FileImpl, buffer: ByteBuffer, offset: Long): Int {
-        val bytes = buffer.array()
-        val start = buffer.arrayOffset() + buffer.position()
-        val length = buffer.remaining()
-        if (length <= 0) return 0
-        val result = PosixUringIO.writeAt(file.id, bytes, start, length, offset, entries)
-        if (result > 0) buffer.position(buffer.position() + result)
-        return result
-    }
-
-    override fun accept(file: FileImpl): Int = -1
-    override fun connect(file: FileImpl, address: String, port: Int): Int = -1
-    override fun close(file: FileImpl): Int = PosixUringIO.closeFd(file.id, entries)
-    override fun sync(file: FileImpl, metaData: Boolean): Int = if (metaData) PosixUringIO.fsync(file.id, entries) else PosixUringIO.fdatasync(file.id, entries)
-    override fun truncate(file: FileImpl, size: Long): Int = PosixUringIO.ftruncate(file.id, size, entries)
-    override fun map(file: FileImpl, mode: String, position: Long, size: Long): Int {
-        if (file.id < 0) return -1
-        val prot = when (mode) {
-            "r" -> 1 // PROT_READ
-            "rw" -> 3 // PROT_READ | PROT_WRITE
-            else -> return -1
-        }
-        val flags = 0x01 // MAP_SHARED
         return PosixUringIO.mmap(0, size.toInt(), prot, flags, file.id, position).toInt()
     }
 
@@ -72,34 +39,3 @@ private class PosixUserspaceChannelBackend(
                     val n = PosixUringIO.fsync(sub.fd, entries)
                     results.add(SelectionResult(n, sub.userData))
                 }
-                UringOp.FTRUNCATE -> {
-                    val n = PosixUringIO.ftruncate(sub.fd, sub.offset, entries)
-                    results.add(SelectionResult(n, sub.userData))
-                }
-                else -> results.add(SelectionResult(-1, sub.userData))
-            }
-        }
-        return results
-    }
-}
-
-actual fun openUserspaceChannelBackend(entries: Int): UserspaceChannelBackend = PosixUserspaceChannelBackend(entries)
-
-actual class FileImpl actual constructor(actual val id: Int) {
-    actual fun isOpen(): Boolean = id >= 0
-    actual fun close() {
-        if (id >= 0) PosixUringIO.closeFd(id)
-    }
-    actual fun size(): Long = PosixUringIO.fileSize(id)
-}
-
-internal actual object FilesImpl {
-    actual fun open(path: String, readOnly: Boolean): FileImpl {
-        val flags = if (readOnly) O_RDONLY else (O_RDWR or O_CREAT)
-        return FileImpl(open(path, flags, 438u))
-    }
-}
-
-internal actual object ChannelsImpl {
-    actual fun socket(domain: Int, type: Int, protocol: Int): FileImpl = FileImpl(platform.posix.socket(domain, type, protocol))
-}

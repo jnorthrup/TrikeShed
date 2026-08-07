@@ -1,160 +1,89 @@
 package borg.trikeshed.userspace
 
 import borg.trikeshed.lib.Series
-import borg.trikeshed.lib.seriesOf
-import borg.trikeshed.userspace.UringCompletion
-import kotlinx.coroutines.ensureActive
-import borg.trikeshed.lib.get
-import borg.trikeshed.lib.size
-import borg.trikeshed.userspace.UringOp.Companion.UringSubmission
 import borg.trikeshed.userspace.nio.ByteBuffer
+import borg.trikeshed.userspace.UringOp.Companion.UringSubmission
 
 /**
- * Platform backend for the unified submission queue.
+ * Interface abstracting the underlying polling/completion logic.
  *
- * Implementations translate [UringSubmission] instances to platform-native I/O:
- *   Linux → liburing SQEs (or pread/pwrite fallback)
- *   JVM   → java.nio.channels.FileChannel / AsynchronousFileChannel
- *   JS    → fetch / Blob / ArrayBuffer
- *   Wasm  → similar
- *
- * The [submit] method executes a batch of submissions and returns completions
+ * Implemented natively (Posix, Wasm, JS) or via JvmReactorOperations.
+ * All completions are guaranteed to return via [submitBatch]
  * in the same order (userData preserved).
  */
 public interface UserspaceChannelBackend {
-    /** Legacy typed API — will be removed once all callers use [submitBatch]. */
-    @Deprecated("Use submitBatch with UringSubmission")
-    fun read(file: FileImpl, buffer: ByteBuffer, offset: Long): Int
-    @Deprecated("Use submitBatch with UringSubmission")
-    fun write(file: FileImpl, buffer: ByteBuffer, offset: Long): Int
-    @Deprecated("Use submitBatch with UringSubmission")
-    fun accept(file: FileImpl): Int
-    @Deprecated("Use submitBatch with UringSubmission")
-    fun connect(file: FileImpl, address: String, port: Int): Int
-    @Deprecated("Use submitBatch with UringSubmission")
-    fun close(file: FileImpl): Int
-    @Deprecated("Use submitBatch with UringSubmission")
-    fun sync(file: FileImpl, metaData: Boolean): Int
-    @Deprecated("Use submitBatch with UringSubmission")
-    fun truncate(file: FileImpl, size: Long): Int
-    @Deprecated("Use submitBatch with UringSubmission")
-    fun map(file: FileImpl, mode: String, position: Long, size: Long): Int
-
     /**
      * Submit a batch of [UringSubmission] entries and return completions.
      *
-     * Each [UringSubmission.userData] is echoed back in the matching
-     * [SelectionResult.userData].  [SelectionResult.res] holds the
-     * syscall return value (bytes read/written, fd for accept, 0 for close, etc.)
-     *
-     * Default implementation dispatches to the legacy typed methods.
-     * Platform backends SHOULD override this for native batching.
+     * In an ideal implementation, this maps directly to io_uring_submit().
+     * In compatibility layers, this multiplexes Java NIO / JS Fetch / Wasm IO.
      */
-    fun submitBatch(submissions: List<UringSubmission>): List<SelectionResult> {
-        // Default: no batch support — callers must use legacy path
-        return emptyList()
-    }
+    fun submitBatch(submissions: List<UringSubmission>): List<SelectionResult>
 
-    suspend fun batchEnqueue(submissions: Series<UringSubmission>): Series<UringCompletion> {
-        return seriesOf<UringCompletion>(emptyList())
-    }
+    suspend fun batchEnqueue(submissions: Series<UringSubmission>): Series<UringCompletion>
 }
 
 /**
- * Unified io_uring-style submission queue facade.
+ * Core dispatch layer for userspace channels.
+ * Maintains an internal [entries] queue similar to a `ring`.
  *
- * Two APIs coexist:
- * 1. **Typed** — [read], [write], [accept], [connect], [close] + [submit]/[wait]/[peek]
- * 2. **Unified** — [enqueue] any [UringSubmission], then [submit]/[wait]/[peek]
- *
- * The typed API is sugar that creates [UringSubmission] internally.
- * New code should use the unified path exclusively.
+ * Callers enqueue operations using `facade.enqueue(submission)`
+ * or legacy typed methods, then call `submit()` to drain the queue.
  */
 public class FunctionalUringFacade(
     private val entries: Int,
     private val backend: UserspaceChannelBackend,
 ) {
-    private val pending = ArrayDeque<Any>()  // UringSubmission or PreparedChannelOp
+    private val pending = ArrayDeque<UringSubmission>()
     private val completions = ArrayDeque<SelectionResult>()
 
     init {
         require(entries > 0) { "entries must be positive" }
     }
 
-    // -- Unified API --
+    // -- Unified UringSubmission API --
 
-    private val stash = ArrayDeque<borg.trikeshed.userspace.UringCompletion>()
-
-    suspend fun batchEnqueue(operations: Series<UringSubmission>): Series<UringCompletion> {
-        val res = kotlinx.coroutines.withContext(kotlinx.coroutines.NonCancellable) {
-            backend.batchEnqueue(operations)
-        }
-        
-        // Stash the results in case of cancellation
-        val list = mutableListOf<UringCompletion>()
-        val end = res.size
-        for (i in 0 until end) {
-            list.add(res[i])
-        }
-        stash.addAll(list)
-        
-        // Now if we check for cancellation, it throws, but we safely stashed them!
-        kotlinx.coroutines.currentCoroutineContext().ensureActive()
-        
-        // Return from stash if active
-        val toReturn = stash.toList()
-        stash.clear()
-        return borg.trikeshed.lib.seriesOf<UringCompletion>(toReturn)
-    }
-
-    /** Enqueue a raw [UringSubmission]. */
-    fun enqueue(sub: UringSubmission) {
+    /**
+     * Enqueue a raw io_uring submission.
+     * Throws if the queue is full.
+     */
+    fun enqueue(submission: UringSubmission) {
         require(pending.size < entries) { "submission queue full" }
-        pending.addLast(sub)
+        pending.addLast(submission)
     }
 
-    /** Convenience: enqueue multiple submissions. */
-    fun enqueueAll(subs: List<UringSubmission>) {
-        subs.forEach { enqueue(it) }
-    }
-
-    // -- Typed legacy API (sugar) --
-
-    private fun pushAny(op: Any) {
-        require(pending.size < entries) { "submission queue full" }
-        pending.addLast(op)
-    }
+    // -- Typed API (sugar) --
 
     fun read(file: FileImpl, buffer: ByteBuffer, offset: Long, userData: Long) {
-        pushAny(PreparedChannelOp.Read(file, buffer, offset, userData))
+        enqueue(UringOp.Companion.Submissions.read(file.id, 0L, buffer.remaining(), offset, userData).copy(buffer = buffer))
     }
 
     fun write(file: FileImpl, buffer: ByteBuffer, offset: Long, userData: Long) {
-        pushAny(PreparedChannelOp.Write(file, buffer, offset, userData))
+        enqueue(UringOp.Companion.Submissions.write(file.id, 0L, buffer.remaining(), offset, userData).copy(buffer = buffer))
     }
 
     fun accept(file: FileImpl, userData: Long) {
-        pushAny(PreparedChannelOp.Accept(file, userData))
+        enqueue(UringOp.Companion.Submissions.accept(file.id, 0L, 0, userData))
     }
 
     fun connect(file: FileImpl, address: String, port: Int, userData: Long) {
-        pushAny(PreparedChannelOp.Connect(file, address, port, userData))
+        enqueue(UringOp.Companion.Submissions.connect(file.id, 0L, port, userData))
     }
 
     fun close(file: FileImpl, userData: Long) {
-        pushAny(PreparedChannelOp.Close(file, userData))
+        enqueue(UringOp.Companion.Submissions.close(file.id, userData))
     }
 
     fun sync(file: FileImpl, userData: Long, metaData: Boolean) {
-        pushAny(PreparedChannelOp.Sync(file, userData, metaData))
+        enqueue(UringOp.Companion.Submissions.fsync(file.id, userData))
     }
 
     fun truncate(file: FileImpl, size: Long, userData: Long) {
-        pushAny(PreparedChannelOp.Truncate(file, size, userData))
+        enqueue(UringOp.Companion.Submissions.nop(userData))
     }
 
     fun map(file: FileImpl, mode: String, position: Long, size: Long, userData: Long) {
-        pushAny(PreparedChannelOp.Map(file, mode, position, size, userData))
+        enqueue(UringOp.Companion.Submissions.nop(userData))
     }
 
     // -- Completion drain --
@@ -163,37 +92,14 @@ public class FunctionalUringFacade(
         val submitted = pending.size
         if (submitted == 0) return 0
 
-        // Partition into unified vs legacy
         val unified = mutableListOf<UringSubmission>()
-        val legacy = mutableListOf<PreparedChannelOp>()
         while (pending.isNotEmpty()) {
-            when (val op = pending.removeFirst()) {
-                is UringSubmission -> unified.add(op)
-                is PreparedChannelOp -> legacy.add(op)
-                else -> error("unexpected op type: $op")
-            }
+            unified.add(pending.removeFirst())
         }
 
-        // Batch-submit unified ops if backend supports it
         if (unified.isNotEmpty()) {
             val results = backend.submitBatch(unified)
             completions.addAll(results)
-        }
-
-        // Legacy dispatch
-        for (op in legacy) {
-            @Suppress("DEPRECATION")
-            val res = when (op) {
-                is PreparedChannelOp.Read -> backend.read(op.file, op.buffer, op.offset)
-                is PreparedChannelOp.Write -> backend.write(op.file, op.buffer, op.offset)
-                is PreparedChannelOp.Accept -> backend.accept(op.file)
-                is PreparedChannelOp.Connect -> backend.connect(op.file, op.address, op.port)
-                is PreparedChannelOp.Close -> backend.close(op.file)
-                is PreparedChannelOp.Sync -> backend.sync(op.file, op.metaData)
-                is PreparedChannelOp.Truncate -> backend.truncate(op.file, op.size)
-                is PreparedChannelOp.Map -> backend.map(op.file, op.mode, op.position, op.size)
-            }
-            completions.addLast(SelectionResult(res, op.userData))
         }
         return submitted
     }
@@ -201,66 +107,17 @@ public class FunctionalUringFacade(
     fun wait(minComplete: Int = 1): List<SelectionResult> {
         require(minComplete >= 0) { "minComplete must be non-negative" }
         if (completions.size < minComplete && pending.isNotEmpty()) submit()
-        return peek()
+
+        return buildList {
+            while (completions.isNotEmpty()) {
+                add(completions.removeFirst())
+            }
+        }
     }
 
-    fun peek(): List<SelectionResult> = buildList(completions.size) {
-        while (completions.isNotEmpty()) add(completions.removeFirst())
+    fun peek(): List<SelectionResult> = buildList {
+        while (completions.isNotEmpty()) {
+            add(completions.removeFirst())
+        }
     }
-}
-
-/** Legacy typed op — kept for backward compat while callers migrate. */
-internal sealed interface PreparedChannelOp {
-    val userData: Long
-
-    data class Read(
-        val file: FileImpl,
-        val buffer: ByteBuffer,
-        val offset: Long,
-        override val userData: Long,
-    ) : PreparedChannelOp
-
-    data class Write(
-        val file: FileImpl,
-        val buffer: ByteBuffer,
-        val offset: Long,
-        override val userData: Long,
-    ) : PreparedChannelOp
-
-    data class Accept(
-        val file: FileImpl,
-        override val userData: Long,
-    ) : PreparedChannelOp
-
-    data class Connect(
-        val file: FileImpl,
-        val address: String,
-        val port: Int,
-        override val userData: Long,
-    ) : PreparedChannelOp
-
-    data class Close(
-        val file: FileImpl,
-        override val userData: Long,
-    ) : PreparedChannelOp
-
-    data class Sync(
-        val file: FileImpl,
-        override val userData: Long,
-        val metaData: Boolean,
-    ) : PreparedChannelOp
-
-    data class Truncate(
-        val file: FileImpl,
-        val size: Long,
-        override val userData: Long,
-    ) : PreparedChannelOp
-
-    data class Map(
-        val file: FileImpl,
-        val mode: String,
-        val position: Long,
-        val size: Long,
-        override val userData: Long,
-    ) : PreparedChannelOp
 }
