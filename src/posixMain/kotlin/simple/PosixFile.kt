@@ -593,11 +593,9 @@ open class PosixFile(
             val O_FLAGS = PosixOpenOpts.withFlags(PosixOpenOpts.O_Creat, PosixOpenOpts.O_Trunc, PosixOpenOpts.O_WrOnly)
             val file = PosixFile(filename, O_FLAGS)
 
-<<<<<<< HEAD
             if (lines.isEmpty()) {
                 file.close()
                 return
-=======
             val bufferSize = 8192
             val buffer = ByteArray(bufferSize)
             var offset = 0
@@ -615,7 +613,6 @@ open class PosixFile(
                     }
                     offset = 0
                 }
->>>>>>> origin/bolt-fix-eviction-bottleneck-10214478095107572222
             }
 
             val payload = lines.joinToString(separator = "\n", postfix = "\n").encodeToByteArray()

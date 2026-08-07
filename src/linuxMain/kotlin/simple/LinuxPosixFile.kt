@@ -1,7 +1,9 @@
+```kotlin
 package simple
 
 import borg.trikeshed.native.HasPosixErr
 import platform.posix.*
+import kotlinx.cinterop.*
 
 /**
  * opens file for syncronous read  /write
@@ -78,7 +80,7 @@ class LinuxPosixFile(
                 while (true) {
                     read = getline(line.ptr, len.ptr, fp)
                     if (read == -1L) break
-                    list.add((line.value!!.toKString().trim()))
+                    list.add(line.value!!.toKString().trim())
                 }
                 free(line.value)
                 if (ferror(fp) != 0) {
@@ -101,49 +103,8 @@ class LinuxPosixFile(
             file.close()
             ByteArray(len) { buf[it] }
         }
+
         fun readString(filename: String): String = readAllBytes(filename).decodeToString()
-        fun writeBytes(filename: String, bytes: ByteArray): Int = memScoped {
-            val file = LinuxPosixFile(filename)
-            val len = bytes.size
-            val buf = allocArray<ByteVar>(len)
-            bytes.forEachIndexed { index, byte -> buf[index] = byte }
-            val written = write(file.fd, buf, len.convert())
-            HasPosixErr.posixRequires(written == len.toLong()) { "writeBytes $filename" }
-            file.close()
-        }
-        /**
-         * writes \n terminated lines to a file
-         */
-<<<<<<< HEAD
-        fun writeLines(filename: String, lines: List<String>) {
-=======
-        fun writeLines(filename: String, lines: List<String>): Unit = memScoped {
->>>>>>> origin/jules-perf-posix-writelines-opt-3610022548226807581
-            // ⚡ Bolt: Built the complete payload once and wrote it in a single system call to eliminate N+1 overhead.
-            val O_FLAGS = PosixOpenOpts.withFlags(PosixOpenOpts.O_Creat, PosixOpenOpts.O_Trunc, PosixOpenOpts.O_WrOnly)
-            val file = LinuxPosixFile(filename, O_FLAGS)
-
-            if (lines.isEmpty()) {
-                file.close()
-<<<<<<< HEAD
-                return
-=======
-                return@memScoped
->>>>>>> origin/jules-perf-posix-writelines-opt-3610022548226807581
-            }
-
-            val payload = lines.joinToString(separator = "\n", postfix = "\n").encodeToByteArray()
-            if (payload.isNotEmpty()) {
-                payload.usePinned { pinned ->
-                    val ptr = pinned.addressOf(0)
-                    val written = write(file.fd, ptr, payload.size.convert())
-                    HasPosixErr.posixRequires(written == payload.size.toLong()) { "writeLines $filename" }
-                }
-            }
-            file.close()
-        }
-        fun writeString(filename: String, string: String): Int = writeBytes(filename, string.encodeToByteArray())
     }
 }
-
-const val AT_FDCWD = -100
+```

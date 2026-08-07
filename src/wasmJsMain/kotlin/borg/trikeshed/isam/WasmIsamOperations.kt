@@ -95,28 +95,23 @@ class WasmIsamOperations : IsamOperations {
 
         var maxRecordSize = 0
         for ((gname, cols) in columnsByGroup) {
-<<<<<<< ours
             val groupRecordLen = cols.sumOf { (it as RecordMeta).end - (it as RecordMeta).begin }
             if (groupRecordLen > maxRecordSize) {
                 maxRecordSize = groupRecordLen
             }
             groupRecordLengths[gname] = groupRecordLen
-=======
             val groupRecordLen = cols.sumOf { it.end - it.begin }
             if (groupRecordLen > maxRecordSize) maxRecordSize = groupRecordLen
             groupBuffers[gname] = ByteArray(groupRecordLen * cursor.size)
             groupOffsets[gname] = 0
->>>>>>> theirs
         }
 
         val rowBuf = ByteArray(maxRecordSize)
 
         cursor.iterator().forEach { rowVec ->
             for ((gname, cols) in columnsByGroup) {
-<<<<<<< ours
                 val groupRecordLen = groupRecordLengths[gname]!!
                 val recordMetas = cols.map { it as RecordMeta }
-=======
                 val groupRecordLen = cols.sumOf { it.end - it.begin }
                 writeGroupToBuffer(rowVec, rowBuf, cols, meta0)
                 val out = groupBuffers[gname]!!
@@ -125,7 +120,6 @@ class WasmIsamOperations : IsamOperations {
                 groupOffsets[gname] = offset + groupRecordLen
             }
         }
->>>>>>> theirs
 
                 writeGroupToBuffer(rowVec, rowBuf, recordMetas, meta0 as Series<RecordMeta>)
 
@@ -193,7 +187,6 @@ class WasmIsamOperations : IsamOperations {
                 val recordGroupMetas = cols.map { it as RecordMeta }
                 writeGroupToBuffer(rowVec, rowBuf, recordGroupMetas, meta0)
 
-<<<<<<< ours
                 val existingBytes = if (fileOps.exists(gfilename)) fileOps.readAllBytes(gfilename) else ByteArray(0)
                 val existingRecordCount = if (groupRecordLen > 0) existingBytes.size / groupRecordLen else 0
                 val newBytes = ByteArray(existingRecordCount * groupRecordLen + groupRecordLen)
@@ -201,7 +194,6 @@ class WasmIsamOperations : IsamOperations {
 
                 val offset = existingRecordCount * groupRecordLen
                 copyIntoByteArray(rowBuf, newBytes, offset, 0, groupRecordLen)
-=======
         var maxRecordSize = 0
         for (gname in columnsByGroup.keys) {
             val cols = columnsByGroup[gname]!!
@@ -232,7 +224,6 @@ class WasmIsamOperations : IsamOperations {
                 groupOffsets[gname] = offset + groupRecordLen
             }
         }
->>>>>>> theirs
 
                 fileOps.write(gfilename, newBytes)
             }
