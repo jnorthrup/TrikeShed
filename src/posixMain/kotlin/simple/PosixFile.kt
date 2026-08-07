@@ -593,9 +593,29 @@ open class PosixFile(
             val O_FLAGS = PosixOpenOpts.withFlags(PosixOpenOpts.O_Creat, PosixOpenOpts.O_Trunc, PosixOpenOpts.O_WrOnly)
             val file = PosixFile(filename, O_FLAGS)
 
+<<<<<<< HEAD
             if (lines.isEmpty()) {
                 file.close()
                 return
+=======
+            val bufferSize = 8192
+            val buffer = ByteArray(bufferSize)
+            var offset = 0
+
+            fun flush() {
+                if (offset != 0) {
+                    var writtenTotal = 0
+                    buffer.usePinned { pinned ->
+                        while (writtenTotal < offset) {
+                            val ptr = pinned.addressOf(writtenTotal)
+                            val written = write(file.fd, ptr, (offset - writtenTotal).convert())
+                            HasPosixErr.posixRequires(written > 0L) { "writeLines $filename flush error" }
+                            writtenTotal += written.toInt()
+                        }
+                    }
+                    offset = 0
+                }
+>>>>>>> origin/bolt-fix-eviction-bottleneck-10214478095107572222
             }
 
             val payload = lines.joinToString(separator = "\n", postfix = "\n").encodeToByteArray()
