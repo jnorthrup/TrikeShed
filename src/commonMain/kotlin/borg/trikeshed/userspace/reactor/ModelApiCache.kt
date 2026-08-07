@@ -248,8 +248,13 @@ class ModelApiCache(
         val overflow = total - maxEntries
         for (entry in all.take(overflow)) {
             val key = entry.key
-            models.entries.removeAll { it.value.key == key }
-            apiCalls.entries.removeAll { it.value.key == key }
+            if (key.contains("#")) {
+                val requestHash = key.substringAfter('#').substringBefore(':')
+                val ttlMs = key.substringAfter(':').toLong()
+                apiCalls.remove(ApiCallCacheKey(entry.provider, entry.modelId, requestHash, ttlMs))
+            } else {
+                models.remove(ModelCacheKey(entry.provider, entry.modelId))
+            }
             _events.tryEmit(CacheEvent.Evicted(key, clock()))
         }
     }

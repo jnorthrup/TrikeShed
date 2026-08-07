@@ -598,7 +598,7 @@ open class PosixFile(
             var offset = 0
 
             fun flush() {
-                if (offset > 0) {
+                if (offset != 0) {
                     var writtenTotal = 0
                     buffer.usePinned { pinned ->
                         while (writtenTotal < offset) {
