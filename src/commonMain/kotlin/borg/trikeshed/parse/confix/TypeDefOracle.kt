@@ -61,10 +61,17 @@ class TypeDefOracle {
             setOf(RegexOption.MULTILINE)
         )
 
+<<<<<<< ours
         private val topicPattern = Regex("""^topic:(\w+)\s+as\s+(\w+)""")
         private val typeParamPattern = Regex("<[^>]*>")
         private val typeParenPattern = Regex("\\([^)]*\\)")
         private val typeSplitPattern = Regex("""[|,\s]+""")
+=======
+        private val topicRegex = Regex("""^topic:(\w+)\s+as\s+(\w+)""")
+        private val typeParamsRemoveRegex = Regex("""<[^>]*>""")
+        private val parenthesesRemoveRegex = Regex("""\([^)]*\)""")
+        private val baseNamesSplitRegex = Regex("""[|,\s]+""")
+>>>>>>> theirs
     }
 
     fun parseTypeDefs(text: String, source: String = "<unknown>") {
@@ -150,7 +157,11 @@ class TypeDefOracle {
                 "isA_edge" -> ngram.split(" -> ").takeIf { it.size >= 2 }?.let { (c, p) ->
                     addLinkCheck(c, p)
                 }
+<<<<<<< ours
                 "topic" -> topicPattern.find(ngram)?.let { mr ->
+=======
+                "topic" -> topicRegex.find(ngram)?.let { mr ->
+>>>>>>> theirs
                     addEntry(mr.groupValues[2], mr.groupValues[1], null, "lda-topic")
                 }
             }
@@ -232,9 +243,15 @@ class TypeDefOracle {
 
     private fun extractBaseNames(typeExpr: String): List<String> {
         val cleaned = typeExpr
+<<<<<<< ours
             .replace(typeParamPattern, "")
             .replace(typeParenPattern, "")
         return cleaned.split(typeSplitPattern)
+=======
+            .replace(typeParamsRemoveRegex, "")
+            .replace(parenthesesRemoveRegex, "")
+        return cleaned.split(baseNamesSplitRegex)
+>>>>>>> theirs
             .filter { it.isNotBlank() && it.first().isLetter() }
             .map { it.trim() }
     }
