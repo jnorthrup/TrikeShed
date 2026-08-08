@@ -388,3 +388,21 @@ re-entering add() (which re-checks the threshold and cascades).
 - `.toString()` comparison for CoroutineContext.Key identity — use reference eq
 - String domain IDs in-process — use value-class packed primitives
 - God object daemon — decompose into CCEK elements
+
+# Open gaps (RGA Aug 08 2026 — factual observations, not spec changes)
+
+These are things PRELOAD describes that the code does not yet implement.
+They are TODOs for the code, not corrections to PRELOAD.
+
+- ConfixIndexK<R>: referenced in comments (ConfixIsamFactory.kt:23) but no
+  type definition exists. The lineage table claims it; codify it.
+- Cursor fancy indexing: `cursor[range]`, `cursor[IntArray]`,
+  `cursor["name","age"]`, `cursor[-"debug"]`, `join()`, `combine()` — zero
+  operator implementations in cursor/. Cursor typealias exists (Cursor.kt:103)
+  but the algebraic indexing layer is not built.
+- `↺` (leftIdentity): no standalone definition on Series<T>. Referenced in
+  RowVecSupport.kt:62 as `.leftIdentity` on ColumnMeta. The anchor symbol
+  exists in the doc but not as a usable operator.
+- Series.filter exists (Predicate.kt:10, Series.kt:638) but materializes an
+  IntArray before wrapping as Series. K's `&` is lazy. The port gap PRELOAD
+  describes is still open — the return type is correct but the laziness is not.
