@@ -189,7 +189,7 @@ object JsonParser {
             }
 
             't', 'f' -> 't' == c
-//            'n' -> null
+            'n' -> null
             else -> src.res.slice.parseDoubleOrNull()
         }
     }
