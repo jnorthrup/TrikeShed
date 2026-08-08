@@ -2,6 +2,7 @@ package borg.trikeshed.forge.gallery
 
 import borg.trikeshed.parse.json.JsonSupport
 import borg.trikeshed.lcnc.editor.*
+import borg.trikeshed.forge.blackboard.LineCasRtsSnapshot
 
 /**
  * Gallery renderer shared by JVM printer, Node.js, and browser targets.
@@ -21,7 +22,7 @@ object ForgeGalleryRenderer {
      * Render the gallery as an HTML string. This is the "kitchen sink" view
      * that the browser shell mounts into #gallery-root.
      */
-    fun renderHtml(): String {
+    fun renderHtml(snapshot: LineCasRtsSnapshot? = null): String {
         val spec = ForgeGalleryCatalog.toJsonValue()
         val widgets = (spec["widgets"] as? List<Any>) ?: emptyList()
         val sections = widgets.groupBy { (it as Map<String, Any>)["section"] as String }
@@ -45,6 +46,25 @@ object ForgeGalleryRenderer {
             """)
             append("</style>")
 
+
+            if (snapshot != null) {
+                append("<section class=\"gallery-section\">")
+                append("<h3>LineCas RTS Snapshot</h3>")
+                append("<div style=\"margin-bottom: 12px; font-size: 12px; color: #7e8da0;\">")
+                append("Aperture: <strong>${snapshot.apertureName}</strong><br/>")
+                append("Legend: CANDIDATE | PROVISIONAL | CONFIRMED")
+                append("</div>")
+                append("<div class=\"gallery-list\">")
+                snapshot.topKBuckets.forEach { bucket ->
+                    val count = snapshot.counts[bucket] ?: 0
+                    append("<article class=\"gallery-card\">")
+                    append("<div class=\"name\">\$bucket</div>")
+                    append("<div class=\"meta\">Count: \$count</div>")
+                    append("</article>")
+                }
+                append("</div>")
+                append("</section>")
+            }
             sections.toList().sortedBy { it.first }.forEach { (sectionName, widgets) ->
                 append("<section class=\"gallery-section\">")
                 append("<h3>$sectionName</h3>")
