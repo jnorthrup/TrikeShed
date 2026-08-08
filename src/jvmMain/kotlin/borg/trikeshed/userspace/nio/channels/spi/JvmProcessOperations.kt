@@ -1,6 +1,7 @@
 package borg.trikeshed.userspace.nio.channels.spi
 
 import java.io.ByteArrayOutputStream
+import kotlinx.coroutines.async
 
 class JvmProcessOperations : ProcessOperations {
 
@@ -21,27 +22,35 @@ class JvmProcessOperations : ProcessOperations {
         val pb = ProcessBuilder(command, *args.toTypedArray())
         env.forEach { (k, v) -> pb.environment()[k] = v }
 
-        val proc = pb.start()
+        return kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { kotlinx.coroutines.coroutineScope {
+            val proc = pb.start()
 
-        // Feed stdin if provided
-        proc.outputStream.use {
-            if (stdin != null) {
-                it.write(stdin)
-                it.flush()
+            // Feed stdin if provided
+            proc.outputStream.use {
+                if (stdin != null) {
+                    it.write(stdin)
+                    it.flush()
+                }
             }
-        }
 
-        // Read stdout
-        val stdoutOut = ByteArrayOutputStream()
-        proc.inputStream.use { it.copyTo(stdoutOut) }
+            // Read stdout asynchronously to prevent deadlocks
+            val stdoutDeferred = this.async {
+                val stdoutOut = ByteArrayOutputStream()
+                proc.inputStream.use { it.copyTo(stdoutOut) }
+                stdoutOut.toByteArray()
+            }
 
-        // Read stderr
-        val stderrOut = ByteArrayOutputStream()
-        if (!pb.redirectErrorStream()) {
-            proc.errorStream.use { it.copyTo(stderrOut) }
-        }
+            // Read stderr asynchronously
+            val stderrDeferred = this.async {
+                val stderrOut = ByteArrayOutputStream()
+                if (!pb.redirectErrorStream()) {
+                    proc.errorStream.use { it.copyTo(stderrOut) }
+                }
+                stderrOut.toByteArray()
+            }
 
-        val exitCode = proc.waitFor()
-        return ProcessResult(exitCode, stdoutOut.toByteArray(), stderrOut.toByteArray())
+            val exitCode = proc.waitFor()
+            ProcessResult(exitCode, stdoutDeferred.await(), stderrDeferred.await())
+        } }
     }
 }
