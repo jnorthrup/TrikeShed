@@ -364,7 +364,7 @@ private fun traitSpaceOf(vararg capabilities: Capability): TraitSpace = TraitSpa
  * bind adapter. R05: the bind adapter hands each accepted
  * [AsynchronousSocketChannel] to [register]; the HTTP worker looks up
  * the originating channel by [ChannelMessage.sequenceId][LitebikeListenerElement.ChannelMessage.sequenceId]
- * via [consumeForSequence] and writes the response back via [write].
+ * and writes the response back via [write].
  *
  * Why a JVM-only registry? [LitebikeListenerElement.ChannelMessage]
  * lives in commonMain and adding a JVM-specific socket field there
@@ -400,30 +400,11 @@ class ConnectionRegistry {
 
     /**
      * Stamp a [sequenceId] onto an existing connection so the worker
-     * can find the originating channel via [consumeForSequence].
+     * can find the originating channel.
      */
     fun attachSequence(connectionId: Long, sequenceId: Long) {
         val entry = connections[connectionId] ?: return
         entry.pendingSequenceId = sequenceId
-    }
-
-    /**
-     * Pop the [connectionId] associated with [sequenceId]. Returns
-     * null if no mapping exists (worker message did not originate
-     * from a registered socket, e.g. an in-process emit).
-     *
-     * The mapping is one-shot: the next write is expected to be the
-     * response. Callers that need to keep the connection alive for
-     * further traffic should not consume here.
-     */
-    fun consumeForSequence(sequenceId: Long): Long? {
-        for ((id, entry) in connections) {
-            if (entry.pendingSequenceId == sequenceId) {
-                entry.pendingSequenceId = null
-                return id
-            }
-        }
-        return null
     }
 
     /**
