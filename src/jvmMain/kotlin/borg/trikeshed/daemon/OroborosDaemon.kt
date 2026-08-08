@@ -4,6 +4,7 @@ import borg.trikeshed.couch.CouchReportReactorElement
 import borg.trikeshed.htx.HtxElement
 import borg.trikeshed.htx.HtxKey
 import borg.trikeshed.htx.openHtxElement
+import borg.trikeshed.torrent.TorrentElement
 import borg.trikeshed.jules.FlywheelDriver
 import borg.trikeshed.jules.FlywheelDriver.FlywheelEvent
 import borg.trikeshed.litebike.JvmKanbanServer
@@ -219,6 +220,18 @@ object OroborosDaemon {
             }
         }
         System.err.println("[OROBOROS] MuxReactor open: ${muxReactor.state} — KeyMux/ModelMux live")
+
+        // ── TorrentElement: BitTorrent v2 + uTP transport sharing HTX/TLS ──
+        // Tracker announces flow through the same HtxElement → HtxReactorElement
+        // → JvmTlsCodecBackend path as Jules/ModelMux. Piece data lands in the
+        // BlockStore (content-addressed, same CID contract as IPFS blocks).
+        // The TorrentElement owns its own CoroutineScope(supervisor) internally;
+        // cleanup is via close() in the finally block.
+        val torrentElement = TorrentElement(
+            parentJob = coroutineContext[kotlinx.coroutines.Job],
+        )
+        torrentElement.open()
+        System.err.println("[OROBOROS] TorrentElement open: ${torrentElement.state} — torrent:// via HTX/TLS + uTP datagrams")
 
         // ── Kanban HTTP server (CCEK litebike listener, no JDK networking) ──
         // JvmKanbanServer binds via JvmLitebikeBindAdapter → LitebikeListenerElement
@@ -548,6 +561,7 @@ object OroborosDaemon {
             runCatching { reportReactor.close() }
             runCatching { gitWatcher.close() }
             try { htxElement.close() } catch (_: Exception) {}
+            try { torrentElement.close() } catch (_: Exception) {}
             try { muxReactor.close() } catch (_: Exception) {}
             try { nioSupervisor.close() } catch (_: Exception) {}
             driver.close()
