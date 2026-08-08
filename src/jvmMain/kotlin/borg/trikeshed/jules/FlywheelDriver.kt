@@ -560,11 +560,6 @@ class FlywheelDriver(
     /** Signal channel: a slot freed, dispatch should try to fill it. */
     private val slotFreed = kotlinx.coroutines.channels.Channel<Int>(kotlinx.coroutines.channels.Channel.CONFLATED)
 
-    /** Serializes ALL HTX exchanges — the TLS transport uses one SSLEngine per
-     *  endpoint ordinal, so ANY concurrent writes (dispatch + drain + answer)
-     *  corrupt the engine. Every HTX call site must acquire this. */
-    private val htxMutex = Mutex()
-
     /**
      * Launch the reactive choreography. Returns immediately; the coroutines
      * run in [scope] and die when it's cancelled. The daemon's periodicity
@@ -622,13 +617,11 @@ class FlywheelDriver(
                         JulesRestClient.SessionInfo(it.snapshot.sessionId, it.snapshot.state, it.card.title, 0L)
                     }
                     scope.launch(htxElement + Dispatchers.IO) {
-                        htxMutex.withLock {
-                            val drain = drainFanout(sessions)
-                            val freed = completed.count { it.drained }
-                            if (freed > 0) {
-                                slotFreed.trySend(freed)
-                                println("[CHOREOGRAPHY] drain → dispatch signal: $freed slots freed")
-                            }
+                        val drain = drainFanout(sessions)
+                        val freed = completed.count { it.drained }
+                        if (freed > 0) {
+                            slotFreed.trySend(freed)
+                            println("[CHOREOGRAPHY] drain → dispatch signal: $freed slots freed")
                         }
                     }
                 }
@@ -641,12 +634,10 @@ class FlywheelDriver(
                 }
                 for (card in awaiting) {
                     scope.launch(htxElement + Dispatchers.IO) {
-                        htxMutex.withLock {
-                            val answer = withTimeoutOrNull(45_000L) { buildAnswer(card) } ?: ""
-                            if (answer.isNotEmpty()) {
-                                conductor.answer(card.snapshot.sessionId, answer)
-                                println("[CHOREOGRAPHY] answer ${card.snapshot.sessionId.takeLast(6)}")
-                            }
+                        val answer = withTimeoutOrNull(45_000L) { buildAnswer(card) } ?: ""
+                        if (answer.isNotEmpty()) {
+                            conductor.answer(card.snapshot.sessionId, answer)
+                            println("[CHOREOGRAPHY] answer ${card.snapshot.sessionId.takeLast(6)}")
                         }
                     }
                     tickAnswered++
@@ -658,9 +649,7 @@ class FlywheelDriver(
                         it.causes.lastOrNull() !is JulesCause.HumanAnswered
                 }) {
                     scope.launch(htxElement + Dispatchers.IO) {
-                        htxMutex.withLock {
-                            withTimeoutOrNull(45_000L) { conductor.approvePlan(card.snapshot.sessionId) }
-                        }
+                        withTimeoutOrNull(45_000L) { conductor.approvePlan(card.snapshot.sessionId) }
                     }
                     tickAnswered++
                 }
@@ -742,20 +731,18 @@ class FlywheelDriver(
                 // faster than it sounds: Jules createSession is ~1-2s each.
                 for (entry in pendingCandidates) {
                     try {
-                        htxMutex.withLock {
-                            val cappedSpec = capSpec(entry.spec)
-                            val sessionId = client.createSession(
-                                prompt = cappedSpec, title = entry.title, source = source)
-                            store.appendWork(entry.workId, JulesCause.WorkDispatched(
-                                workId = entry.workId,
-                                sessionId = sessionId,
-                                attempt = entry.attempt + 1,
-                                at = Clock.System.now().toEpochMilliseconds(),
-                            ))
-                            _events.emit(FlywheelEvent.Dispatched(sessionId, entry.title))
-                            tickDispatched.incrementAndGet()
-                            println("[CHOREOGRAPHY] dispatch ${entry.title.take(60)}")
-                        }
+                        val cappedSpec = capSpec(entry.spec)
+                        val sessionId = client.createSession(
+                            prompt = cappedSpec, title = entry.title, source = source)
+                        store.appendWork(entry.workId, JulesCause.WorkDispatched(
+                            workId = entry.workId,
+                            sessionId = sessionId,
+                            attempt = entry.attempt + 1,
+                            at = Clock.System.now().toEpochMilliseconds(),
+                        ))
+                        _events.emit(FlywheelEvent.Dispatched(sessionId, entry.title))
+                        tickDispatched.incrementAndGet()
+                        println("[CHOREOGRAPHY] dispatch ${entry.title.take(60)}")
                     } catch (t: Throwable) {
                         classifyHttpError(t)
                         _events.emit(FlywheelEvent.DispatchFailed(entry.title, t.message.orEmpty()))
