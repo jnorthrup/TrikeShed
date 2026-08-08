@@ -439,7 +439,7 @@ class ConnectionRegistry {
      * HTTP/1.1 per-connection semantics. If you want keep-alive,
      * replace the `unregister` call with a reset of `pendingSequenceId`.
      */
-    fun write(connectionId: Long, bytes: ByteArray): Boolean {
+    suspend fun write(connectionId: Long, bytes: ByteArray): Boolean {
         val entry = connections[connectionId] ?: return false
         val channel = entry.channel
         val buf = ByteBuffer.wrap(bytes)
@@ -463,7 +463,7 @@ class ConnectionRegistry {
         // the boolean to decide whether to log failure. We don't want
         // to spin: the JDK NIO group completes writes in microseconds
         // for local sockets, and the daemon doesn't have latency SLOs.
-        val ok = runBlocking { done.await() }
+        val ok = done.await()
         unregister(connectionId)
         return ok
     }
