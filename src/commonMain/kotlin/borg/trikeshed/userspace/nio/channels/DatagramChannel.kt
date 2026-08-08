@@ -4,8 +4,6 @@ package borg.trikeshed.userspace.nio.channels
 
 import borg.trikeshed.userspace.ByteRegion
 import borg.trikeshed.userspace.nio.ByteBuffer
-import borg.trikeshed.userspace.Channel
-import borg.trikeshed.userspace.Channels
 import borg.trikeshed.userspace.nio.channels.spi.AbstractSelectableChannel
 import borg.trikeshed.userspace.nio.channels.spi.SelectorProvider
 import borg.trikeshed.userspace.nio.file.File
@@ -34,8 +32,8 @@ public abstract class DatagramChannel : AbstractSelectableChannel, ByteChannel, 
 
     companion object {
         fun `open`(): DatagramChannel {
-            val file = Channels.socket(SocketDomain.AF_INET.posix, SocketType.SOCK_DGRAM.mask, SocketProtocol.IPPROTO_UDP.posix)
-            val channel = Channels.open()
+            val file = UringChannels.socket(SocketDomain.AF_INET.posix, SocketType.SOCK_DGRAM.mask, SocketProtocol.IPPROTO_UDP.posix)
+            val channel = UringChannels.open()
             return UringDatagramChannel(file, channel)
         }
         fun `open`(protocolFamily: String): DatagramChannel = `open`()
@@ -44,7 +42,7 @@ public abstract class DatagramChannel : AbstractSelectableChannel, ByteChannel, 
 
 internal class UringDatagramChannel(
     private val file: File,
-    private val channel: Channel,
+    private val channel: UringChannel,
 ) : DatagramChannel(SelectorProvider.provider()) {
     private var nextToken: Long = 1
     private var open: Boolean = true

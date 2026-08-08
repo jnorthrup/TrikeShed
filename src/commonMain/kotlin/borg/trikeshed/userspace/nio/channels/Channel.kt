@@ -8,7 +8,7 @@ import borg.trikeshed.lib.Closeable
 // Declarations intentionally mirror JDK taxonomy and contain no implementations.
 //
 // COMPATIBILITY SURFACE ONLY. The transport substrate is:
-//   borg.trikeshed.userspace.nio.channel.Channel         — operation queue (submit/wait/peek)
+//   borg.trikeshed.userspace.nio.channels.UringChannel         — operation queue (submit/wait/peek)
 //   borg.trikeshed.userspace.nio.file.File            — handle lifecycle (open/close/isOpen)
 //   borg.trikeshed.userspace.FunctionalUringFacade — SQE/CQE plumbing
 //   borg.trikeshed.userspace.ByteRegion      — mutable read sink

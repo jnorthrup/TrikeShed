@@ -1,12 +1,11 @@
 package borg.trikeshed.userspace.nio.channels
 
-import borg.trikeshed.userspace.Channel
 import borg.trikeshed.userspace.nio.file.File
 import borg.trikeshed.userspace.nio.ByteBuffer
 
 internal class UringFileChannel(
     private val file: File,
-    private val channel: Channel,
+    private val channel: UringChannel,
 ) : FileChannel() {
     private var pos: Long = 0
     private var nextToken: Long = 1
