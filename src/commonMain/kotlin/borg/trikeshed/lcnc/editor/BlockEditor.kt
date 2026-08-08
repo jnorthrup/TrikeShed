@@ -66,9 +66,11 @@ class BlockEditor(var block: LcncBlock, val ingestState: IngestStateElement) {
                 text("<option value=\"paragraph\"${if(block.type=="paragraph") " selected" else ""}>Text</option>")
                 text("<option value=\"heading_1\"${if(block.type=="heading_1") " selected" else ""}>Heading 1</option>")
                 text("<option value=\"heading_2\"${if(block.type=="heading_2") " selected" else ""}>Heading 2</option>")
+                text("<option value=\"heading_3\"${if(block.type=="heading_3") " selected" else ""}>Heading 3</option>")
+                text("<option value=\"to_do\"${if(block.type=="to_do") " selected" else ""}>TODO</option>")
                 text("<option value=\"bulleted_list_item\"${if(block.type=="bulleted_list_item") " selected" else ""}>List</option>")
+                text("<option value=\"quote\"${if(block.type=="quote") " selected" else ""}>Quote</option>")
                 text("<option value=\"code\"${if(block.type=="code") " selected" else ""}>Code</option>")
-                text("<option value=\"divider\"${if(block.type=="divider") " selected" else ""}>Divider</option>")
                 text("</select>")
                 text("</div>")
 
