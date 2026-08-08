@@ -333,7 +333,7 @@ class JvmTlsCodecBackend : TlsCodecBackend, KeyedService {
         return factory.trustManagers
     }
 
-    private fun unwrapDownstream(
+    private suspend fun unwrapDownstream(
         engine: SSLEngine,
         ciphertext: ByteArray,
     ): DownstreamOutcome {
@@ -398,7 +398,7 @@ class JvmTlsCodecBackend : TlsCodecBackend, KeyedService {
         )
     }
 
-    private fun wrapApplicationCiphertext(
+    private suspend fun wrapApplicationCiphertext(
         engine: SSLEngine,
         plaintext: ByteArray,
     ): ByteArray {
@@ -414,7 +414,7 @@ class JvmTlsCodecBackend : TlsCodecBackend, KeyedService {
         return ciphertext.toByteArray()
     }
 
-    private fun drainHandshakeCiphertext(engine: SSLEngine): ByteArray {
+    private suspend fun drainHandshakeCiphertext(engine: SSLEngine): ByteArray {
         val ciphertext = ByteArrayOutputStream()
         while (true) {
             runDelegatedTasks(engine)
@@ -548,10 +548,12 @@ class JvmTlsCodecBackend : TlsCodecBackend, KeyedService {
             Base64.getMimeDecoder().decode(match.groupValues[1])
         }.toList()
 
-    private fun runDelegatedTasks(engine: SSLEngine) {
+    private suspend fun runDelegatedTasks(engine: SSLEngine) {
         while (engine.handshakeStatus == SSLEngineResult.HandshakeStatus.NEED_TASK) {
             val task = engine.delegatedTask ?: break
-            task.run()
+            kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                task.run()
+            }
         }
     }
 

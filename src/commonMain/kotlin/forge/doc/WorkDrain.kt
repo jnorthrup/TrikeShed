@@ -1,7 +1,6 @@
 package forge.doc
 
 import borg.trikeshed.job.ContentId
-import borg.trikeshed.jules.JulesCause
 import borg.trikeshed.util.oroboros.LexicalMemory
 import borg.trikeshed.util.oroboros.MergeReceipt
 import borg.trikeshed.utils.kanban.*

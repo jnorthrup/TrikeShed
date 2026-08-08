@@ -101,19 +101,19 @@ class JvmChannelOperations(
 
     override fun connect(fd: Int, host: String, port: Int): Int {
         val ch = socketChannels[fd] as? SocketChannel ?: return -1
-        val address = java.net.InetSocketAddress(host, port)
-        try {
-            // The worker may block in NIO read/write; submit itself must not.
-            ch.configureBlocking(true)
-            if (!ch.connect(address)) {
-                ch.finishConnect() // might throw
+        schedule {
+            try {
+                val address = java.net.InetSocketAddress(host, port)
+                ch.configureBlocking(false)
+                if (!ch.connect(address)) {
+                    ch.finishConnect()
+                }
+                socketInterests[fd] = setOf(Interest.READ, Interest.WRITE, Interest.CONNECT)
+            } catch (e: Exception) {
+                println("JvmChannelOperations connect exception: ${e.message}")
+                e.printStackTrace()
             }
-        } catch (e: Exception) {
-            println("JvmChannelOperations connect exception: ${e.message}")
-            e.printStackTrace()
-            return -1
         }
-        socketInterests[fd] = setOf(Interest.READ, Interest.WRITE, Interest.CONNECT)
         return 0
     }
 
