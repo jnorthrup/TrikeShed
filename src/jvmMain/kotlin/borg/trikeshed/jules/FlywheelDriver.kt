@@ -10,6 +10,11 @@ import borg.trikeshed.util.oroboros.FileCasStore
 import borg.trikeshed.util.oroboros.LexicalMemory
 import borg.trikeshed.util.oroboros.MergeReceipt
 import keymux.KeyMux
+import borg.trikeshed.causal.rankByProximity
+import borg.trikeshed.lib.j
+import borg.trikeshed.lib.Series
+import borg.trikeshed.lib.get
+import borg.trikeshed.lib.size
 import kotlinx.datetime.Clock
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.CoroutineScope
@@ -477,7 +482,18 @@ class FlywheelDriver(
 
             val pending = validCandidates
                 .filter { it.spec.isNotBlank() }
-                .sortedByDescending { it.score + if (bot != null && it.tier.equals(bot, ignoreCase = true)) 100.0 else 0.0 }
+                .let { candidates ->
+                    val graph = store.buildCausalGraph()
+                    val query = LexicalMemory(summary = "bottleneck dispatch", title = bot ?: "idle", content = "")
+                    val wids = candidates.size j { i: Int -> candidates[i].workId }
+                    val scored = graph.rankByProximity(query, wids)
+                    val widToScore = (0 until scored.size).associate { i: Int -> scored[i].a to scored[i].b }
+                    candidates.sortedByDescending {
+                        it.score +
+                        (if (bot != null && it.tier.equals(bot, ignoreCase = true)) 100.0 else 0.0) +
+                        (widToScore[it.workId] ?: 0.0)
+                    }
+                }
                 .filter { entry ->
                     // Overlap guard: skip if this task's known file scope
                     // intersects any in-flight session's files.
@@ -730,7 +746,14 @@ class FlywheelDriver(
                             conductor.cards[entry.workId.removePrefix("session:")]?.drained == true
                     }
                     .filter { it.spec.isNotBlank() }
-                    .sortedByDescending { it.score }
+                    .let { candidates ->
+                        val graph = store.buildCausalGraph()
+                        val query = LexicalMemory(summary = "fan-out dispatch", title = "idle", content = "")
+                        val wids = candidates.size j { i: Int -> candidates[i].workId }
+                        val scored = graph.rankByProximity(query, wids)
+                        val widToScore = (0 until scored.size).associate { i: Int -> scored[i].a to scored[i].b }
+                        candidates.sortedByDescending { it.score + (widToScore[it.workId] ?: 0.0) }
+                    }
                     .take(available)
 
                 if (pendingCandidates.isEmpty()) continue
