@@ -59,18 +59,15 @@ data class ForgeDocument(
     val cursor: ForgeCursor,
 ) {
     fun appendBlock(kind: ForgeBlockKind, text: String, properties: Map<String, String> = emptyMap()): ForgeDocument {
-        // Stub for appendBlock
-        return this
+        return ForgeDoc.appendBlock(this, this.cursor.blockId, kind, text, properties)
     }
 
     fun updateText(blockId: ForgeBlockId, text: String): ForgeDocument {
-        // Stub for updateText
-        return this
+        return ForgeDoc.updateText(this, blockId, text)
     }
 
     fun deleteBlock(blockId: ForgeBlockId): ForgeDocument {
-        // Stub for deleteBlock
-        return this
+        return ForgeDoc.deleteBlock(this, blockId)
     }
 
     fun moveCard(cardId: borg.trikeshed.kanban.KanbanCardId, toColumnId: borg.trikeshed.kanban.KanbanColumnId): ForgeDocument {
@@ -205,12 +202,28 @@ object ForgeDoc {
         val block = doc.requireBlock(blockId)
         if (blockId == doc.rootPageId) return doc
         val parentId = block.parentId ?: return doc
+
         val parent = doc.requireBlock(parentId)
         val idx = parent.children.indexOf(blockId)
         val newFocus = parent.children.getOrNull(idx - 1) ?: parentId
-        val updatedParent = parent.copy(children = parent.children.filterNot { it == blockId })
+
+        val toDelete = mutableSetOf<String>()
+        fun collectDescendants(id: ForgeBlockId) {
+            toDelete.add(id.value)
+            doc.block(id)?.children?.forEach { collectDescendants(it) }
+        }
+        collectDescendants(blockId)
+
+        val survivingBlocks = doc.blocks.filterKeys { it !in toDelete }.toMutableMap()
+        for ((id, survivingBlock) in survivingBlocks) {
+            val filteredChildren = survivingBlock.children.filterNot { it.value in toDelete }
+            if (filteredChildren.size != survivingBlock.children.size) {
+                survivingBlocks[id] = survivingBlock.copy(children = filteredChildren)
+            }
+        }
+
         return doc.copy(
-            blocks = doc.blocks + (updatedParent.id.value to updatedParent) - blockId.value,
+            blocks = survivingBlocks,
             cursor = doc.cursor.copy(blockId = newFocus),
         )
     }
