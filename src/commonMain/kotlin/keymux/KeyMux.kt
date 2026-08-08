@@ -69,8 +69,13 @@ class EnvVarSource(private val variable: String) : KeySource() {
 class PersistSource(
     val root: String,
     val explicitFileOps: FileOperations? = null,
-    private val codec: (ByteArray) -> Map<String, String> = ::defaultCodecRead,
-    private val encode: (Map<String, String>) -> ByteArray = ::defaultCodecWrite
+    private val codec: (ByteArray) -> Map<String, String> = { bytes ->
+        val text = bytes.decodeToString()
+        (borg.trikeshed.parse.json.JsonSupport.parse(text) as? Map<*, *>)?.entries?.associate { it.key.toString() to it.value.toString() } ?: emptyMap()
+    },
+    private val encode: (Map<String, String>) -> ByteArray = { m ->
+        borg.trikeshed.parse.json.JsonSupport.stringify(m).encodeToByteArray()
+    }
 ) : KeySource() {
     override val name = "persist"
 
@@ -96,7 +101,7 @@ class PersistSource(
     }
 
     private suspend fun flush(ops: FileOperations, m: Map<String, String>) {
-        cache = m
+        cache = null
         ops.mkdirs(root)
         val file = ops.resolvePath(root, "keymux.conf")
         ops.write(file, encode(m))
