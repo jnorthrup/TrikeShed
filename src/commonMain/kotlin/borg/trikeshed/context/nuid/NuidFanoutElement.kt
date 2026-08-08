@@ -224,7 +224,10 @@ open class NuidFanoutElement(
         claimCounter = if (claimCounter == Long.MAX_VALUE) 0L else claimCounter + 1L
         if (claimCounter % 1000L == 0L) {
             val threshold = claimCounter - 5000L
-            claimedBy.keys.removeAll { it < threshold }
+            // Avoid O(N²) eviction freeze by explicitly removing the oldest 1000 keys
+            for (i in 0L until 1000L) {
+                claimedBy.remove(threshold - 1000L + i)
+            }
         }
         claimCounter
     }
