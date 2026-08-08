@@ -1,0 +1,394 @@
+src/commonMain/kotlin/keymux/KeyMux.kt:class EnvSource(private val prefix: String = "") : KeySource() {
+src/commonMain/kotlin/keymux/KeyMux.kt:class EnvVarSource(private val variable: String) : KeySource() {
+src/commonMain/kotlin/keymux/KeyMux.kt:class PersistSource(
+src/commonMain/kotlin/keymux/KeyMux.kt:class ApiSource(
+src/commonMain/kotlin/keymux/KeyMux.kt:class ReactorSource(
+src/commonMain/kotlin/keymux/KeyMux.kt:class FixedKeySource(
+src/commonMain/kotlin/keymux/KeyMux.kt:class TestKeySource(
+src/commonMain/kotlin/keymux/KeyMux.kt:class KeyMux constructor(
+src/commonMain/kotlin/keymux/KeyMux.kt:class KeyMuxBuilder {
+src/commonMain/kotlin/borg/trikeshed/splat/EmpiricalMotionModel.kt:class EmpiricalMotionModel<Context, T> : SplatModel<Context, T> {
+src/commonMain/kotlin/borg/trikeshed/num/BigInt.kt:class BigInt internal constructor(internal val sign: Boolean?, internal val magnitude: Series<UInt>) : Number(),
+src/commonMain/kotlin/borg/trikeshed/test/TODOError.kt:class TODOError(message: String = "Not yet implemented") : AssertionError(message)
+src/commonMain/kotlin/borg/trikeshed/export/ExportAdapters.kt:class PrometheusExporter : MetricsExporter {
+src/commonMain/kotlin/borg/trikeshed/export/ExportAdapters.kt:class JsonExporter : MetricsExporter {
+src/commonMain/kotlin/borg/trikeshed/export/ExportAdapters.kt:class OpenTelemetryExporter : MetricsExporter {
+src/commonMain/kotlin/borg/trikeshed/manifold/ManifoldConcept.kt:class ManifoldConcept<out P>(
+src/commonMain/kotlin/borg/trikeshed/manifold/ManifoldConcept.kt:class MutableNarsBag : NarsBag() {
+src/commonMain/kotlin/borg/trikeshed/manifold/ManifoldConcept.kt:class SealedNarsBag(private val concepts: List<ManifoldConcept<*>>) : NarsBag() {
+src/commonMain/kotlin/borg/trikeshed/causal/CausalKernel.kt:class CausalGraphBuilder {
+src/commonMain/kotlin/borg/trikeshed/crdt/PijulCrdt.kt:class PijulCrdt {
+src/commonMain/kotlin/borg/trikeshed/grpc/GrpcClient.kt:class GrpcClient(private val transport: (Flow<ByteArray>) -> Flow<ByteArray>) {
+src/commonMain/kotlin/borg/trikeshed/sctp/TlvChunkParser.kt:class TlvChunkParser {
+src/commonMain/kotlin/borg/trikeshed/sctp/PartialReliability.kt:class PartialReliabilityBuffer(val capacity: Int) {
+src/commonMain/kotlin/borg/trikeshed/sctp/SctpBoundedStream.kt:class SctpBoundedStream(val capacity: Int = 10) {
+src/commonMain/kotlin/borg/trikeshed/sctp/BoundedChannelStream.kt:class BoundedChannelStream(capacity: Int) {
+src/commonMain/kotlin/borg/trikeshed/browser/storage/OpfsVolume.kt:class OpfsVolume(
+src/commonMain/kotlin/borg/trikeshed/browser/storage/IndexedDbVolume.kt:class IndexedDbVolume(
+src/commonMain/kotlin/borg/trikeshed/profile/Profiler.kt:class DefaultGradleProfilerIntegration : GradleProfilerIntegration {
+src/commonMain/kotlin/borg/trikeshed/config/IsamConfigStore.kt:class IsamConfigStore(
+src/commonMain/kotlin/borg/trikeshed/graph/CausalGraphNode.kt:class CausalGraphNodeIndex {
+src/commonMain/kotlin/borg/trikeshed/graph/query/CausalGraphAdapter.kt:class CausalGraphAdapter(private val index: CausalGraphNodeIndex) : Graph<CausalGraphNode, Unit> {
+src/commonMain/kotlin/borg/trikeshed/graph/query/GraphQuery.kt:class AdjacencyListGraph<N, E> : MutableGraph<N, E> {
+src/commonMain/kotlin/borg/trikeshed/graph/query/GraphQuery.kt:class GraphQuery<N, E>(private val graph: Graph<N, E>, private val currentNodes: Set<N>) {
+src/commonMain/kotlin/borg/trikeshed/graph/query/QueryEngine.kt:class QueryEngine(private val data: Cursor) {
+src/commonMain/kotlin/borg/trikeshed/parse/kursive/legacy/Jursive.kt:class JursiveCharSeries constructor(
+src/commonMain/kotlin/borg/trikeshed/parse/kursive/sql/SqlAst.kt:class Identifier(val name: Series<Char>) : SqlNode {
+src/commonMain/kotlin/borg/trikeshed/parse/kursive/sql/SqlAst.kt:class StringLiteral(val value: Series<Char>) : SqlNode {
+src/commonMain/kotlin/borg/trikeshed/parse/kursive/sql/SqlAst.kt:class NumericLiteral(val value: Number) : SqlNode
+src/commonMain/kotlin/borg/trikeshed/parse/kursive/sql/SqlAst.kt:class ColumnRef(val id: Identifier) : Expr
+src/commonMain/kotlin/borg/trikeshed/parse/kursive/sql/SqlAst.kt:class LitExpr(val lit: SqlNode) : Expr
+src/commonMain/kotlin/borg/trikeshed/parse/kursive/sql/SqlAst.kt:class SqlParser(private val cs: CharSeries) {
+src/commonMain/kotlin/borg/trikeshed/parse/json/AdaptiveArithmeticCodec.kt:class ArithmeticCodec(val nStates: Int, private var frequencies: UIntArray = UIntArray(nStates) { 1u }) {
+src/commonMain/kotlin/borg/trikeshed/parse/json/JsonIndex.kt:class JsonIndex {
+src/commonMain/kotlin/borg/trikeshed/parse/json/Codec.kt:class CounterCodec : Codec<Char, Int>() {
+src/commonMain/kotlin/borg/trikeshed/parse/confix/ConfixSaxJax.kt:class JaxElement(val tag: IOMemento, val startIndex: Int, val endIndex: Int, val children: Series<JaxElement>) {
+src/commonMain/kotlin/borg/trikeshed/parse/confix/RowVecBuilder.kt:class RowVecBuilder {
+src/commonMain/kotlin/borg/trikeshed/parse/confix/ConfixSerialFormat.kt:class ConfixItemEncoder : AbstractEncoder() {
+src/commonMain/kotlin/borg/trikeshed/parse/confix/ConfixSerialFormat.kt:class ConfixItemDecoder(private val root: Item) : AbstractDecoder() {
+src/commonMain/kotlin/borg/trikeshed/parse/confix/TypeDefOracle.kt:class TypeDefOracle {
+src/commonMain/kotlin/borg/trikeshed/parse/confix/ConfixElement.kt:class ConfixPrimitive(
+src/commonMain/kotlin/borg/trikeshed/parse/confix/ConfixElement.kt:class ConfixArray(
+src/commonMain/kotlin/borg/trikeshed/parse/confix/ConfixElement.kt:class ConfixObject(
+src/commonMain/kotlin/borg/trikeshed/parse/yaml/Yaml.kt:class DirectYamlParser(val lines: List<String>) {
+src/commonMain/kotlin/borg/trikeshed/classfile/slab/facet/FacetedCursorContract.kt:class FacetElement(
+src/commonMain/kotlin/borg/trikeshed/classfile/slab/facet/FacetedCursorContract.kt:class FacetControlContext(
+src/commonMain/kotlin/borg/trikeshed/classfile/slab/facet/FacetedCursorContract.kt:class FacetEngine(
+src/commonMain/kotlin/borg/trikeshed/memvid/MemvidStoragePipeline.kt:class MemvidStoragePipeline(
+src/commonMain/kotlin/borg/trikeshed/reload/HotReload.kt:class HotReloader(
+src/commonMain/kotlin/borg/trikeshed/manimwm/manim/RtsUI.kt:class SelectionBox(var startPoint: Point = pt(0.0, 0.0), var endPoint: Point = pt(0.0, 0.0)) : Rectangle(0.0, 0.0) {
+src/commonMain/kotlin/borg/trikeshed/manimwm/manim/RtsUI.kt:class Waypoint(val target: Point) : Dot(target, 0.1) {
+src/commonMain/kotlin/borg/trikeshed/manimwm/manim/RtsUI.kt:class CommandNode(val text: String, position: Point) : Group() {
+src/commonMain/kotlin/borg/trikeshed/manimwm/manim/Animation.kt:class Transform(val mobject1: Mobject, val mobject2: Mobject, override val runTime: Double = 1.0) : Animation {
+src/commonMain/kotlin/borg/trikeshed/manimwm/manim/Camera.kt:class Camera {
+src/commonMain/kotlin/borg/trikeshed/manimwm/manim/ValueTracker.kt:class ValueTracker(var value: Double = 0.0) : VMobject() {
+src/commonMain/kotlin/borg/trikeshed/manimwm/manim/ValueTracker.kt:class DecimalNumber(var value: Double = 0.0) : VMobject() {
+src/commonMain/kotlin/borg/trikeshed/manimwm/manim/GeometryMobjects.kt:class Arrow(start: Point, end: Point) : Line(start, end)
+src/commonMain/kotlin/borg/trikeshed/manimwm/manim/GeometryMobjects.kt:class RegularPolygon(val n: Int) : VMobject()
+src/commonMain/kotlin/borg/trikeshed/manimwm/manim/GeometryMobjects.kt:class Triangle : VMobject()
+src/commonMain/kotlin/borg/trikeshed/manimwm/manim/GeometryMobjects.kt:class Square(side_length: Double = 2.0) : Rectangle(side_length, side_length)
+src/commonMain/kotlin/borg/trikeshed/manimwm/manim/GeometryMobjects.kt:class SurroundingRectangle(mobject: Mobject, buff: Double = 0.1) : Rectangle()
+src/commonMain/kotlin/borg/trikeshed/manimwm/manim/GeometryMobjects.kt:class Brace(mobject: Mobject, direction: Point = DOWN.vector, buff: Double = 0.2) : VMobject()
+src/commonMain/kotlin/borg/trikeshed/manimwm/manim/GeometryMobjects.kt:class Arc(val radius: Double = 1.0, val angle: Double = 1.0) : VMobject()
+src/commonMain/kotlin/borg/trikeshed/manimwm/manim/RtsInteraction.kt:class RtsInteractionController(val scene: Scene) {
+src/commonMain/kotlin/borg/trikeshed/manimwm/manim/AnimationBuilder.kt:class AnimationBuilder(val mobject: Mobject) {
+src/commonMain/kotlin/borg/trikeshed/manimwm/manim/AnimationBuilder.kt:class AnimationGroup(vararg val animations: Animation) : Animation {
+src/commonMain/kotlin/borg/trikeshed/manimwm/manim/AnimationBuilder.kt:class LaggedStart(vararg val animations: Animation, val lag_ratio: Double = 0.05) : Animation {
+src/commonMain/kotlin/borg/trikeshed/manimwm/manim/AnimationBuilder.kt:class ReplacementTransform(val mobject1: Mobject, val mobject2: Mobject, override val runTime: Double = 1.0) : Animation {
+src/commonMain/kotlin/borg/trikeshed/manimwm/manim/AnimationBuilder.kt:class Write(override val mobject: Mobject, override val runTime: Double = 1.0) : Animation {
+src/commonMain/kotlin/borg/trikeshed/manimwm/CausalityEvents.kt:class CausalityEventCursor {
+src/commonMain/kotlin/borg/trikeshed/manimwm/ManimWindow.kt:class ManimWindowElement(
+src/commonMain/kotlin/borg/trikeshed/dht/id/WorkerNUID.kt:class WorkerNUID(id: Byte? = null) : borg.trikeshed.dht.id.impl.ByteNUID(id) {
+src/commonMain/kotlin/borg/trikeshed/dht/id/ElectionNUID.kt:class ElectionNUID(id: Byte? = null) : ByteNUID(id) {
+src/commonMain/kotlin/borg/trikeshed/dht/id/SupportNUID.kt:class SupportNUID(override var id: ULong? = null) : ULongNUID(id) {
+src/commonMain/kotlin/borg/trikeshed/dht/routing/RoutingEvent.kt:class RoutingEventElement<TNum : Comparable<TNum>>(
+src/commonMain/kotlin/borg/trikeshed/dht/agent/Agent.kt:class WorldAgent(
+src/commonMain/kotlin/borg/trikeshed/dht/agent/Agent.kt:class WorldRouter(agentNUID: borg.trikeshed.dht.id.NUID<BigInteger>) : borg.trikeshed.dht.routing.RoutingTable<BigInteger, borg.trikeshed.dht.agent.WorldNetwork>(agentNUID)
+src/commonMain/kotlin/borg/trikeshed/pwa/PwaGallery.kt:class PwaGallery(val items: Series<GalleryItem>, val id: String = "gallery") {
+src/commonMain/kotlin/borg/trikeshed/dag/ReteNetwork.kt:class ReteNetwork {
+src/commonMain/kotlin/borg/trikeshed/dag/ReteAlphaMemory.kt:class ReteAlphaNode internal constructor(
+src/commonMain/kotlin/borg/trikeshed/dag/ReteAlphaMemory.kt:class ReteAlphaMemory {
+src/commonMain/kotlin/borg/trikeshed/dag/BlackboardDagCausalGraph.kt:class CasBackedCausalGraph(val casStore: CasStore) {
+src/commonMain/kotlin/borg/trikeshed/dag/ReteRefraction.kt:class ReteRefraction {
+src/commonMain/kotlin/borg/trikeshed/dag/BlackboardDagFabric.kt:class InMemoryBlackboardFabric : BlackboardFabric {
+src/commonMain/kotlin/borg/trikeshed/dag/ReteWorkingMemory.kt:class ReteWorkingMemory {
+src/commonMain/kotlin/borg/trikeshed/dag/ReteAgenda.kt:class ReteAgenda {
+src/commonMain/kotlin/borg/trikeshed/dag/ReteBetaMemory.kt:class ReteBetaMemory(
+src/commonMain/kotlin/borg/trikeshed/utils/kanban/TimeseriesWalCursor.kt:class TimeseriesWalCursor(
+src/commonMain/kotlin/borg/trikeshed/utils/kanban/JulesBoardStore.kt:class JulesBoardStore(
+src/commonMain/kotlin/borg/trikeshed/charstr/CharStrCached.kt:class CharStrCached(
+src/commonMain/kotlin/borg/trikeshed/collections/ElasticHashIndex.kt:class ElasticHashIndex<K : Any> internal constructor(
+src/commonMain/kotlin/borg/trikeshed/collections/Stack.kt:class Stack<T>(src: List<T> = listOf()) {
+src/commonMain/kotlin/borg/trikeshed/collections/ListCowView.kt:class ListCowView<T>(private var list: List<T> = emptyList()) : List<T>, AbstractMutableList<T>() {
+src/commonMain/kotlin/borg/trikeshed/collections/HashSet.kt:class HashSet<T> : Set<T> {
+src/commonMain/kotlin/borg/trikeshed/collections/multiindex/MultiIndexContainer.kt:class MultiIndexContainer<E : Any> {
+src/commonMain/kotlin/borg/trikeshed/collections/ArraySet.kt:class ArraySet<T> : Set<T> {
+src/commonMain/kotlin/borg/trikeshed/collections/StrictFibonacciHeap.kt:class StrictFibonacciHeap<T : Comparable<T>> {
+src/commonMain/kotlin/borg/trikeshed/collections/Heap.kt:class Heap<T> {
+src/commonMain/kotlin/borg/trikeshed/collections/btree/CowBPlusTree.kt:class CowBPlusTree(
+src/commonMain/kotlin/borg/trikeshed/collections/associative/trie/Trie.kt:class Trie(var root: Map<String, Node> = linkedMapOf()) {
+src/commonMain/kotlin/borg/trikeshed/collections/associative/trie/ArrayMap.kt:class ArrayMap<K : Comparable<K>, V>(
+src/commonMain/kotlin/borg/trikeshed/collections/associative/trie/ArrayMap.kt:class ShimEntry<K, V>(private val key1: K) : Map_Entry<K, V> {
+src/commonMain/kotlin/borg/trikeshed/collections/associative/trie/RadixTree.kt:class RadixTree<C : Comparable<C>> {
+src/commonMain/kotlin/borg/trikeshed/collections/associative/Cbor.kt:class ByteBuf {
+src/commonMain/kotlin/borg/trikeshed/collections/associative/FunnelHashIndex.kt:class FunnelHashIndex<K : Any> internal constructor(
+src/commonMain/kotlin/borg/trikeshed/collections/associative/ContextEvictingMap.kt:class ContextEvictingMap<K : Any, V : Any>(
+src/commonMain/kotlin/borg/trikeshed/collections/associative/LinearHashMap.kt:class LinearHashMap<K : Any, V>(initialCapacity: Int = 16)
+src/commonMain/kotlin/borg/trikeshed/collections/associative/LinearHashMap.kt:class LinkedLinearHashMap<K : Any, V>(initialCapacity: Int = 16)
+src/commonMain/kotlin/borg/trikeshed/collections/associative/FunnelHashMap.kt:class FunnelHashMap<K : Any, V>(
+src/commonMain/kotlin/borg/trikeshed/collections/FunnelHashMap.kt:class FunnelHashMap<K : Any, V>(
+src/commonMain/kotlin/borg/trikeshed/collections/TreeSet.kt:class TreeSet<E : Comparable<E>> : NavigableSet<E> {
+src/commonMain/kotlin/borg/trikeshed/reduction/TrajectoryReduction.kt:class TrajectoryCarrier(val payload: TrajectoryPayload) : ReductionCarrier<JulesCause> by SeriesCarrier(payload.causes)
+src/commonMain/kotlin/borg/trikeshed/reduction/TrajectoryReduction.kt:class TrajectoryReduction : LcncReduction<String, JulesCause, TrajectoryOutcome, TrajectoryVerdict> {
+src/commonMain/kotlin/borg/trikeshed/reduction/LcncCarrierAlg.kt:class SeriesCarrier<T>(private val series: Series<T>) : ReductionCarrier<T> {
+src/commonMain/kotlin/borg/trikeshed/reduction/LcncCarrierAlg.kt:class RingCarrier<T>(private val ring: Series<T>, private val slabSize: Int) : ReductionCarrier<T> {
+src/commonMain/kotlin/borg/trikeshed/reduction/LcncCarrierAlg.kt:class ArrayCarrier<T>(private val arr: Array<T>) : ReductionCarrier<T> {
+src/commonMain/kotlin/borg/trikeshed/reduction/LcncCarrierAlg.kt:class CursorCarrier(private val cursor: Cursor) : ReductionCarrier<RowVec> {
+src/commonMain/kotlin/borg/trikeshed/reduction/LcncPatchCables.kt:class LcncPatchCableBinding<C : Any>(
+src/commonMain/kotlin/borg/trikeshed/forge/window/NoopForgeWindowManager.kt:class NoopForgeWindowManager : ForgeWindowManager {
+src/commonMain/kotlin/borg/trikeshed/forge/ccek/ccek/CCEK.kt:class ArticulatedNode(
+src/commonMain/kotlin/borg/trikeshed/forge/ccek/ccek/CCEK.kt:class ForgeDocNode(
+src/commonMain/kotlin/borg/trikeshed/forge/ccek/ccek/CCEK.kt:class UserContext(
+src/commonMain/kotlin/borg/trikeshed/forge/ccek/ccek/CCEK.kt:class CausalReteTable(private val facts: List<CausalAssertion>) {
+src/commonMain/kotlin/borg/trikeshed/forge/ccek/ccek/CCEK.kt:class GraphicalFlow(val name: String) {
+src/commonMain/kotlin/borg/trikeshed/forge/ccek/ccek/CCEK.kt:class GraphicalCursor(val blocks: List<GraphicalBlock>) { val size: Int get() = blocks.size }
+src/commonMain/kotlin/borg/trikeshed/forge/ccek/ccek/CCEK.kt:class SpreadsheetVeneer(private val facts: List<CausalAssertion>) {
+src/commonMain/kotlin/borg/trikeshed/forge/ccek/ccek/CCEK.kt:class AdaptedParadigm(val name: String, val scope: CoroutineScope, val reteTable: CausalReteTable) { val isActive: Boolean get() = true }
+src/commonMain/kotlin/borg/trikeshed/forge/ccek/ccek/SupervisorJob.kt:class MutableObservable<T>(initial: T) : Observable<T> {
+src/commonMain/kotlin/borg/trikeshed/forge/ccek/ccek/SupervisorJob.kt:class RealSupervisorJob(override val key: Any) : SupervisorJob {
+src/commonMain/kotlin/borg/trikeshed/forge/net/kanban/ForgeKanbanJobSink.kt:class ForgeKanbanJobSink(private val projection: JobKanbanProjection) {
+src/commonMain/kotlin/borg/trikeshed/forge/net/kanban/ForgeKanbanConduit.kt:class ForgeKanbanConduit(
+src/commonMain/kotlin/borg/trikeshed/forge/net/kanban/ForgeKanbanSignalProjector.kt:class ForgeKanbanSignalProjector {
+src/commonMain/kotlin/borg/trikeshed/forge/shell/ShellAssetRegistry.kt:class ShellAssetRegistry(private val config: ShellConfig) {
+src/commonMain/kotlin/borg/trikeshed/ws/WebSocketFrame.kt:class FrameHeader {
+src/commonMain/kotlin/borg/trikeshed/ws/mux/WsHttp3Mux.kt:class WsHttp3Mux(
+src/commonMain/kotlin/borg/trikeshed/litebike/tunnel/TunnelBackend.kt:class MockTunnel(
+src/commonMain/kotlin/borg/trikeshed/litebike/LitebikeListenerElement.kt:class LitebikeListenerElement(
+src/commonMain/kotlin/borg/trikeshed/lcnc/ccek/IngestStateElement.kt:class IngestStateElement(
+src/commonMain/kotlin/borg/trikeshed/lcnc/reactor/IngestConsumer.kt:class IngestConsumer(val ingestStateElement: IngestStateElement) {
+src/commonMain/kotlin/borg/trikeshed/lcnc/reactor/LcncIngestPipeline.kt:class LcncIngestPipeline(
+src/commonMain/kotlin/borg/trikeshed/lcnc/reactor/LcncIngestPipeline.kt:class IngestPipelineConfigBuilder {
+src/commonMain/kotlin/borg/trikeshed/lcnc/reactor/CsvIngestCodec.kt:class CsvIngestCodec : IngestCodec {
+src/commonMain/kotlin/borg/trikeshed/lcnc/reactor/MarkdownIngestCodec.kt:class MarkdownIngestCodec : IngestCodec {
+src/commonMain/kotlin/borg/trikeshed/lcnc/editor/HtmlBuilder.kt:class HtmlBuilder {
+src/commonMain/kotlin/borg/trikeshed/lcnc/editor/PropertyEditor.kt:class TextPropertyEditor(
+src/commonMain/kotlin/borg/trikeshed/lcnc/editor/PropertyEditor.kt:class MultiSelectPropertyEditor(
+src/commonMain/kotlin/borg/trikeshed/lcnc/editor/PropertyEditor.kt:class SelectPropertyEditor(
+src/commonMain/kotlin/borg/trikeshed/lcnc/editor/PropertyEditor.kt:class CheckboxPropertyEditor(
+src/commonMain/kotlin/borg/trikeshed/lcnc/editor/PropertyEditor.kt:class NumberPropertyEditor(
+src/commonMain/kotlin/borg/trikeshed/lcnc/editor/PropertyEditor.kt:class DatePropertyEditor(
+src/commonMain/kotlin/borg/trikeshed/lcnc/editor/PropertyEditor.kt:class UrlPropertyEditor(
+src/commonMain/kotlin/borg/trikeshed/lcnc/editor/PropertyEditor.kt:class EmailPropertyEditor(
+src/commonMain/kotlin/borg/trikeshed/lcnc/editor/PropertyEditor.kt:class PhonePropertyEditor(
+src/commonMain/kotlin/borg/trikeshed/lcnc/editor/DatabaseView.kt:class DatabaseView(var database: LcncDatabase, val ingestState: IngestStateElement, val schema: DatabaseSchema) {
+src/commonMain/kotlin/borg/trikeshed/lcnc/editor/BlockEditor.kt:class BlockEditor(var block: LcncBlock, val ingestState: IngestStateElement) {
+src/commonMain/kotlin/borg/trikeshed/lcnc/LcncGrid.kt:class LcncGrid(
+src/commonMain/kotlin/borg/trikeshed/lcnc/rollup/RereduceStage.kt:class DefaultRereduceStage : RereduceStage {
+src/commonMain/kotlin/borg/trikeshed/lcnc/rollup/RollupReducer.kt:class RollupReducer(private val stage: RereduceStage = DefaultRereduceStage()) {
+src/commonMain/kotlin/borg/trikeshed/lcnc/formula/LcncFormula.kt:class FormulaParser(val source: String) {
+src/commonMain/kotlin/borg/trikeshed/lcnc/formula/LcncFormula.kt:class FormulaReducer(source: String) {
+src/commonMain/kotlin/borg/trikeshed/wireproto/WireprotoFormatException.kt:class WireprotoFormatException(message: String) : RuntimeException(message) {
+src/commonMain/kotlin/borg/trikeshed/wireproto/ActionEncoder.kt:class ActionEncoder {
+src/commonMain/kotlin/borg/trikeshed/wireproto/PathCursorTransport.kt:class PathCursorTransport(
+src/commonMain/kotlin/borg/trikeshed/wireproto/ActionDecoder.kt:class ActionDecoder {
+src/commonMain/kotlin/borg/trikeshed/wireproto/ConfixWorker.kt:class ConfixWorker : ReactorEndpoint {
+src/commonMain/kotlin/borg/trikeshed/btrfs/BtrfsReflinkStore.kt:class BtrfsReflinkStore(
+src/commonMain/kotlin/borg/trikeshed/blackboard/BlackboardSurface.kt:class BlackboardSurface private constructor(
+src/commonMain/kotlin/borg/trikeshed/cas/LineCas.kt:class LineCasIndex {
+src/commonMain/kotlin/borg/trikeshed/cas/BlockIndex.kt:class BlockIndex {
+src/commonMain/kotlin/borg/trikeshed/cas/IpfsBridge.kt:class IpfsBridge(private val cas: CasStore) {
+src/commonMain/kotlin/borg/trikeshed/cas/VolumeCasStore.kt:class VolumeCasStore internal constructor(
+src/commonMain/kotlin/borg/trikeshed/platform/tensor/Mlir.kt:class MLIRContext {
+src/commonMain/kotlin/borg/trikeshed/platform/tensor/Mlir.kt:class MLIRTensor(
+src/commonMain/kotlin/borg/trikeshed/platform/tensor/Mlir.kt:class MLIROpBuilder(
+src/commonMain/kotlin/borg/trikeshed/platform/tensor/MlirSys.kt:class MlirContext {
+src/commonMain/kotlin/borg/trikeshed/platform/tensor/Core.kt:class TensorShape(val dims: List<Int>) {
+src/commonMain/kotlin/borg/trikeshed/platform/tensor/Core.kt:class Tensor constructor(
+src/commonMain/kotlin/borg/trikeshed/http3/Http3Session.kt:class Http3Session(
+src/commonMain/kotlin/borg/trikeshed/perf/Perf.kt:class DefaultPerfAnalyzer : PerfAnalyzer {
+src/commonMain/kotlin/borg/trikeshed/cli/htx/HtxAria2Engine.kt:class HtxAria2Engine(
+src/commonMain/kotlin/borg/trikeshed/metrics/Metrics.kt:class DefaultCounter(override val name: String, override val tags: Map<String, String> = emptyMap()) : Counter {
+src/commonMain/kotlin/borg/trikeshed/metrics/Metrics.kt:class DefaultGauge(override val name: String, override val tags: Map<String, String> = emptyMap()) : Gauge {
+src/commonMain/kotlin/borg/trikeshed/metrics/Metrics.kt:class DefaultHistogram(
+src/commonMain/kotlin/borg/trikeshed/metrics/Metrics.kt:class DefaultTimer(override val name: String, override val tags: Map<String, String> = emptyMap()) : Timer {
+src/commonMain/kotlin/borg/trikeshed/job/JobNexusBindings.kt:class JobNexusBindings(
+src/commonMain/kotlin/borg/trikeshed/job/JobNexusBindings.kt:class JobNexusComponentFactories(
+src/commonMain/kotlin/borg/trikeshed/job/JobNexusBindings.kt:class FailingCasStoreFactory : CasStoreFactory {
+src/commonMain/kotlin/borg/trikeshed/job/JobNexusBindings.kt:class FailingJobLogFactory(val stage: String = "wal") : JobLogFactory {
+src/commonMain/kotlin/borg/trikeshed/job/JobNexusBindings.kt:class FailingJobIndexFactory(val stage: String = "index") : JobIndexFactory {
+src/commonMain/kotlin/borg/trikeshed/job/JobNexusBindings.kt:class FailingReteNetworkFactory(val stage: String = "rete") : ReteNetworkFactory {
+src/commonMain/kotlin/borg/trikeshed/job/JobNexusBindings.kt:class FailingProjectionFactory(val stage: String = "projection") : ProjectionFactory {
+src/commonMain/kotlin/borg/trikeshed/job/JobNexusBindings.kt:class FailingCheckpointFactory(val stage: String = "checkpoint") : CheckpointFactory {
+src/commonMain/kotlin/borg/trikeshed/job/ProjectionRegistry.kt:class ProjectionRegistry(val store: CasStore) {
+src/commonMain/kotlin/borg/trikeshed/job/JobReducer.kt:class JobReducer {
+src/commonMain/kotlin/borg/trikeshed/job/JobRepository.kt:class JobRepository(
+src/commonMain/kotlin/borg/trikeshed/job/JobNexusSpec.kt:class ChannelBuilder {
+src/commonMain/kotlin/borg/trikeshed/job/JobNexusSpec.kt:class StorageBuilder {
+src/commonMain/kotlin/borg/trikeshed/job/JobNexusSpec.kt:class SupervisionBuilder {
+src/commonMain/kotlin/borg/trikeshed/job/JobNexusSpec.kt:class ReteBuilder {
+src/commonMain/kotlin/borg/trikeshed/job/JobNexusSpec.kt:class JobNexusSpecDsl {
+src/commonMain/kotlin/borg/trikeshed/job/JobSupervisorElement.kt:class JobSupervisorElement private constructor(
+src/commonMain/kotlin/borg/trikeshed/job/JobSupervisorElement.kt:class Instrumentation {
+src/commonMain/kotlin/borg/trikeshed/htx/HtxReactorElement.kt:class HtxReactorElement(
+src/commonMain/kotlin/borg/trikeshed/htx/HtxClientReactorElement.kt:class HtxTransferElement(
+src/commonMain/kotlin/borg/trikeshed/htx/HtxClientReactorElement.kt:class HtxChannelWorkerElement(
+src/commonMain/kotlin/borg/trikeshed/reactor/DhtKademliaNode.kt:class DhtKademliaNode<TNum : Comparable<TNum>, Sz : NetMask<TNum>>(
+src/commonMain/kotlin/borg/trikeshed/reactor/wireproto/ReactorEndpoint.kt:class LoopbackReactorEndpoint : ReactorEndpoint {
+src/commonMain/kotlin/borg/trikeshed/reactor/MeshActionFrame.kt:class MeshActionFrame(val payload: ByteArray) {
+src/commonMain/kotlin/borg/trikeshed/reactor/openapi/OpenApiCallPipeline.kt:class OpenApiCallPipeline {
+src/commonMain/kotlin/borg/trikeshed/reactor/SshMeshTransport.kt:class SshMeshTransport(
+src/commonMain/kotlin/borg/trikeshed/reactor/ngsctp/SctpReactorSpine.kt:class SctpAssociationScope : CoroutineScope {
+src/commonMain/kotlin/borg/trikeshed/reactor/ngsctp/SctpReactorSpine.kt:class SubnetJobBuffer(
+src/commonMain/kotlin/borg/trikeshed/reactor/ngsctp/SctpReactorSpine.kt:class SubnetJobAssembly(
+src/commonMain/kotlin/borg/trikeshed/reactor/ngsctp/SctpReactorSpine.kt:class SctpReactorSpine(
+src/commonMain/kotlin/borg/trikeshed/reactor/endpoint/ConfixEnvelopeCodec.kt:class ConfixEnvelopeCodec(private val config: ReactorEndpointConfig = ReactorEndpointConfig()) {
+src/commonMain/kotlin/borg/trikeshed/reactor/endpoint/ConfixWireTransport.kt:class ConfixWireTransport(
+src/commonMain/kotlin/borg/trikeshed/reactor/TlsEndpoint.kt:class TlsElement(
+src/commonMain/kotlin/borg/trikeshed/reflink/ReferenceCounter.kt:class InMemoryReferenceCounter : ReferenceCounter {
+src/commonMain/kotlin/borg/trikeshed/reflink/ReflinkScanner.kt:class FixedBlockReflinkScanner(val blockSize: Int = 4096) : ReflinkScanner {
+src/commonMain/kotlin/borg/trikeshed/viewserver/CommonViewServer.kt:class CommonViewServer(
+src/commonMain/kotlin/borg/trikeshed/k8s/operator/TrikeShedOperator.kt:class TrikeShedOperator(private val scope: CoroutineScope) : BaseOperatorSdk<TrikeShedResource>(scope) {
+src/commonMain/kotlin/borg/trikeshed/tilting/sorting/SortChooser.kt:class FlatFileSortingStrategy(
+src/commonMain/kotlin/borg/trikeshed/tilting/zran/Point.kt:class Point(
+src/commonMain/kotlin/borg/trikeshed/jules/TrikeHtxHttpClient.kt:class HtxHttpException(val status: Int, message: String) : RuntimeException(message)
+src/commonMain/kotlin/borg/trikeshed/jules/TrikeHtxHttpClient.kt:class TrikeHtxHttpClient(
+src/commonMain/kotlin/borg/trikeshed/jules/JulesRestClient.kt:class JulesRestClient(
+src/commonMain/kotlin/borg/trikeshed/jules/BrainClient.kt:class BrainClient(
+src/commonMain/kotlin/borg/trikeshed/chronicle/Chronicle.kt:class CircularQueue<T>(private val capacity: Int) {
+src/commonMain/kotlin/borg/trikeshed/patch/Blake3Hash.kt:class Blake3Hash(val bytes: ByteArray) {
+src/commonMain/kotlin/borg/trikeshed/patch/ConfixPatchEmitter.kt:class ConfixPatchEmitter {
+src/commonMain/kotlin/borg/trikeshed/confix/ObservableConfixOracle.kt:class ObservableConfixOracle(
+src/commonMain/kotlin/borg/trikeshed/confix/ObservableConfixOracle.kt:class ObservableEdgesView(private val handle: COWArrayBackend<IsAEdge>) {
+src/commonMain/kotlin/borg/trikeshed/confix/TypeSignatureDsl.kt:class TypeSignatureBuilder {
+src/commonMain/kotlin/borg/trikeshed/confix/TypeSignatureDsl.kt:class TypedefBuilder(private val modulePath: String) {
+src/commonMain/kotlin/borg/trikeshed/confix/ConfixOracleService.kt:class ConfixOracleService : ConfixOracleFacade {
+src/commonMain/kotlin/borg/trikeshed/util/oroboros/FileEWatcher.kt:class FileEWatcher(
+src/commonMain/kotlin/borg/trikeshed/util/oroboros/OroborosCoordinator.kt:class OroborosCoordinator(
+src/commonMain/kotlin/borg/trikeshed/util/oroboros/NgSctpGateway.kt:class NgSctpGateway(
+src/commonMain/kotlin/borg/trikeshed/util/oroboros/CouchAttachmentGateway.kt:class CouchAttachmentGateway(
+src/commonMain/kotlin/borg/trikeshed/util/oroboros/GitCouchGateway.kt:class GitCouchGateway(
+src/commonMain/kotlin/borg/trikeshed/util/oroboros/VersionGateway.kt:class GitVersionGateway(val processOps: ProcessOperations) : VersionGateway {
+src/commonMain/kotlin/borg/trikeshed/util/oroboros/VersionGateway.kt:class PijulVersionGateway(val processOps: ProcessOperations) : VersionGateway {
+src/commonMain/kotlin/borg/trikeshed/util/oroboros/Sha2CasBus.kt:class FileCasStore(
+src/commonMain/kotlin/borg/trikeshed/util/oroboros/Sha2CasBus.kt:class Sha2CasBus(
+src/commonMain/kotlin/borg/trikeshed/util/oroboros/OroborosNetwork.kt:class DhtContentGateway<TNum : Comparable<TNum>, Sz : NetMask<TNum>>(
+src/commonMain/kotlin/borg/trikeshed/util/oroboros/OroborosNetwork.kt:class StreamContentGateway(private val transport: StreamTransport) : ContentGateway {
+src/commonMain/kotlin/borg/trikeshed/util/oroboros/OroborosNetwork.kt:class HtxContentGateway(private val htxElement: HtxElement) {
+src/commonMain/kotlin/borg/trikeshed/util/oroboros/OroborosNetwork.kt:class FanoutFailure(message: String, val failures: Map<String, Throwable>) : Exception(message)
+src/commonMain/kotlin/borg/trikeshed/util/oroboros/OroborosNetwork.kt:class ContentGatewayFanout(
+src/commonMain/kotlin/borg/trikeshed/modelmux/ProviderRegistry.kt:class ProviderRegistry {
+src/commonMain/kotlin/borg/trikeshed/modelmux/ModelCallLeaf.kt:class ModelCallLeaf(private val wal: AppendWal) {
+src/commonMain/kotlin/borg/trikeshed/userspace/nio/process/ProcessCapability.kt:class SecurityException(message: String) : RuntimeException(message)
+src/commonMain/kotlin/borg/trikeshed/userspace/nio/platform/spi/CacheTopology.kt:class CacheTopology(
+src/commonMain/kotlin/borg/trikeshed/userspace/nio/platform/spi/PlatformCodec.kt:class CommonPlatformCodec(private val littleEndian: Boolean) : PlatformCodec {
+src/commonMain/kotlin/borg/trikeshed/userspace/nio/file/spi/InMemoryFileOperations.kt:class InMemoryFileOperations(
+src/commonMain/kotlin/borg/trikeshed/userspace/nio/file/spi/InMemoryFileOperations.kt:class NoSuchFileException(path: String) : RuntimeException("No such file: $path")
+src/commonMain/kotlin/borg/trikeshed/userspace/nio/file/File.kt:class File internal constructor(internal val impl: FileImpl) {
+src/commonMain/kotlin/borg/trikeshed/userspace/nio/channels/ChannelRunner.kt:class ChannelRunner(
+src/commonMain/kotlin/borg/trikeshed/userspace/nio/Volume.kt:class BlockArray(private val volume: Volume) {
+src/commonMain/kotlin/borg/trikeshed/userspace/nio/Volume.kt:class BootBlock(private val volume: Volume) {
+src/commonMain/kotlin/borg/trikeshed/userspace/nio/Volume.kt:class InMemoryVolume(override val blockSize: Int, override val capacity: Long) : Volume {
+src/commonMain/kotlin/borg/trikeshed/userspace/tensor/ir/IR.kt:class Block {
+src/commonMain/kotlin/borg/trikeshed/userspace/tensor/ir/IR.kt:class Region {
+src/commonMain/kotlin/borg/trikeshed/userspace/tensor/ir/IR.kt:class Operation(
+src/commonMain/kotlin/borg/trikeshed/userspace/tensor/ir/TensorTaxonomy.kt:class TensorTaxonomy {
+src/commonMain/kotlin/borg/trikeshed/userspace/tensor/Mlir.kt:class MLIRContext {
+src/commonMain/kotlin/borg/trikeshed/userspace/tensor/Mlir.kt:class MLIRTensor(
+src/commonMain/kotlin/borg/trikeshed/userspace/tensor/Mlir.kt:class MLIROpBuilder(
+src/commonMain/kotlin/borg/trikeshed/userspace/tensor/MlirSys.kt:class MlirContext {
+src/commonMain/kotlin/borg/trikeshed/userspace/tensor/Core.kt:class TensorShape(val dims: List<Int>) {
+src/commonMain/kotlin/borg/trikeshed/userspace/tensor/Core.kt:class Tensor constructor(
+src/commonMain/kotlin/borg/trikeshed/userspace/tensor/MlirJit.kt:class OrcJit {
+src/commonMain/kotlin/borg/trikeshed/userspace/tensor/MlirJit.kt:class JitSession(val name: String) {
+src/commonMain/kotlin/borg/trikeshed/userspace/tensor/MlirJit.kt:class CompileRequest(
+src/commonMain/kotlin/borg/trikeshed/userspace/tensor/MlirJit.kt:class MlirOrcBuilder(
+src/commonMain/kotlin/borg/trikeshed/userspace/tensor/MlirJit.kt:class JitExecutor {
+src/commonMain/kotlin/borg/trikeshed/userspace/tensor/MlirJit.kt:class TensorGraph {
+src/commonMain/kotlin/borg/trikeshed/userspace/volume/BootBlock.kt:class BootBlock(val volume: Volume) {
+src/commonMain/kotlin/borg/trikeshed/userspace/volume/BlockArray.kt:class BlockArray(val volume: Volume, val startLba: Long, val endLba: Long) {
+src/commonMain/kotlin/borg/trikeshed/userspace/network/Channels.kt:class ChannelMetadata(
+src/commonMain/kotlin/borg/trikeshed/userspace/network/Protocols.kt:class ProtocolDetector {
+src/commonMain/kotlin/borg/trikeshed/userspace/UserspaceWrappers.kt:class ChannelRunner(
+src/commonMain/kotlin/borg/trikeshed/userspace/reactor/MuxReactorElement.kt:class MuxReactorElement(
+src/commonMain/kotlin/borg/trikeshed/userspace/reactor/process/ProcessReactorEndpoint.kt:class ProcessReactorEndpoint(
+src/commonMain/kotlin/borg/trikeshed/userspace/reactor/ModelApiCache.kt:class ModelApiCache(
+src/commonMain/kotlin/borg/trikeshed/userspace/reactor/ForgeReactorExample.kt:class ForgeReactorExample(
+src/commonMain/kotlin/borg/trikeshed/userspace/UserspaceIO.kt:class File internal constructor(internal val impl: FileImpl) {
+src/commonMain/kotlin/borg/trikeshed/userspace/Channels.kt:class Channel(
+src/commonMain/kotlin/borg/trikeshed/userspace/LiburingElement.kt:class LiburingElement(
+src/commonMain/kotlin/borg/trikeshed/userspace/LiburingElement.kt:class FanoutDispatcherElement(
+src/commonMain/kotlin/borg/trikeshed/userspace/ChannelRunner.kt:class SplatChannelRunner(
+src/commonMain/kotlin/borg/trikeshed/userspace/kernel/Uring.kt:class KernelSQE(
+src/commonMain/kotlin/borg/trikeshed/userspace/kernel/Uring.kt:class KernelCQE(
+src/commonMain/kotlin/borg/trikeshed/userspace/concurrency/MonoChannel.kt:class MonoChannel(
+src/commonMain/kotlin/borg/trikeshed/userspace/concurrency/Channel.kt:class Channel<T>(val capacity: ChannelCapacity, val bufferSize: Int = 0) {
+src/commonMain/kotlin/borg/trikeshed/userspace/concurrency/ParseScope.kt:class ParseScope(
+src/commonMain/kotlin/borg/trikeshed/userspace/concurrency/Concurrency.kt:class CancellationError(message: String) : CancellationException(message)
+src/commonMain/kotlin/borg/trikeshed/userspace/concurrency/Concurrency.kt:class SuspendToken<T>(initial: T? = null) {
+src/commonMain/kotlin/borg/trikeshed/userspace/ByteRegion.kt:class ByteRegion(
+src/commonMain/kotlin/borg/trikeshed/couch/ProductionCouchIngress.kt:class ProductionCouchIngress(
+src/commonMain/kotlin/borg/trikeshed/couch/CouchHeadProjection.kt:class CouchHeadProjection {
+src/commonMain/kotlin/borg/trikeshed/couch/ConfixDocStore.kt:class ConfixDocStore(
+src/commonMain/kotlin/borg/trikeshed/couch/CouchChangesProjection.kt:class CouchChangesProjection {
+src/commonMain/kotlin/borg/trikeshed/couch/CouchReportReactorElement.kt:class CouchReportReactorElement(
+src/commonMain/kotlin/borg/trikeshed/couch/ViewServer.kt:class ViewServer {
+src/commonMain/kotlin/borg/trikeshed/couch/CouchStore.kt:class CouchStore(
+src/commonMain/kotlin/borg/trikeshed/couch/isam/ConfixIsamFactory.kt:class ConfixIsamStoreBuilder {
+src/commonMain/kotlin/borg/trikeshed/couch/isam/ConfixIsamFactory.kt:class ConfixIsamCursorBridge(
+src/commonMain/kotlin/borg/trikeshed/couch/isam/Stringpool.kt:class FileBackedStringpool(
+src/commonMain/kotlin/borg/trikeshed/couch/isam/ConfixWal.kt:class ConfixWal(
+src/commonMain/kotlin/borg/trikeshed/mplex/Mplex.kt:class StreamWindow(initialSize: Int = 65535) : FlowWindow(initialSize)
+src/commonMain/kotlin/borg/trikeshed/mplex/Mplex.kt:class SessionWindow(initialSize: Int = 65535) : FlowWindow(initialSize)
+src/commonMain/kotlin/borg/trikeshed/mplex/Mplex.kt:class MplexStream(
+src/commonMain/kotlin/borg/trikeshed/flags/FeatureFlags.kt:class FeatureFlagManager {
+src/commonMain/kotlin/borg/trikeshed/kanban/JiraQueueAdapter.kt:class JiraQueueAdapter(val appendWal: AppendWal) {
+src/commonMain/kotlin/borg/trikeshed/kanban/ForgeKanbanDaemon.kt:class ForgeKanbanDaemon(
+src/commonMain/kotlin/borg/trikeshed/kanban/ModelMuxKanbanAgent.kt:class ModelMuxKanbanAgent(private val modelMux: ModelMux) {
+src/commonMain/kotlin/borg/trikeshed/kanban/JobKanbanProjection.kt:class JobKanbanProjection internal constructor(
+src/commonMain/kotlin/borg/trikeshed/pijul/PatchStorage.kt:class PatchStorage {
+src/commonMain/kotlin/borg/trikeshed/pijul/PatchPrimitives.kt:class DependencyDag {
+src/commonMain/kotlin/borg/trikeshed/pijul/PijulChannel.kt:class PijulChannel(
+src/commonMain/kotlin/borg/trikeshed/graal/ConfixBlackboard.kt:class ConfixBlackboard {
+src/commonMain/kotlin/borg/trikeshed/mutable/ReduxMutableSeries.kt:class ReduxMutableSeries<A, S>(
+src/commonMain/kotlin/borg/trikeshed/mutable/MutableSeries.kt:class COWArrayBackend<T>(
+src/commonMain/kotlin/borg/trikeshed/mutable/MutableSeries.kt:class FrozenArray<T>(internal val arr: Array<Any?>) : Series<T> {
+src/commonMain/kotlin/borg/trikeshed/mutable/SortedSeries.kt:class SortedSeries<T>(
+src/commonMain/kotlin/borg/trikeshed/mutable/CollectorReducer.kt:class CollectorReducer<T> : Reducer<T, Series<T>> {
+src/commonMain/kotlin/borg/trikeshed/mutable/DequeSeries.kt:class DequeSeries<T> : MutableSeries<T> {
+src/commonMain/kotlin/borg/trikeshed/mutable/MergedSeries.kt:class MergedSeries<T>(
+src/commonMain/kotlin/borg/trikeshed/mutable/RingSeries.kt:class RingSeries<T>(
+src/commonMain/kotlin/borg/trikeshed/mutable/PointcutMutableSeries.kt:class PointcutMutableSeries<T>(
+src/commonMain/kotlin/borg/trikeshed/mutable/JournalSeries.kt:class JournalSeries<T>(
+src/commonMain/kotlin/borg/trikeshed/mutable/RecursiveMutableSeries.kt:class RecursiveMutableSeries<T>(var data: Series<T>) : MutableSeries<T>, Series<T> {
+src/commonMain/kotlin/borg/trikeshed/mutable/ChunkedMutableSeries.kt:class ChunkedMutableSeries<T>(
+src/commonMain/kotlin/borg/trikeshed/mutable/GuardSeries.kt:class GuardSeries<T>(
+src/commonMain/kotlin/borg/trikeshed/context/sctp/SctpElement.kt:class SctpElement(
+src/commonMain/kotlin/borg/trikeshed/context/SplatFanoutDispatcherElement.kt:class SplatFanoutDispatcherElement : SplatAsyncContextElement() {
+src/commonMain/kotlin/borg/trikeshed/context/lcnc/LcncFanoutElement.kt:class LcncFanoutElement(
+src/commonMain/kotlin/borg/trikeshed/context/nuid/Nuid.kt:class NuidElement(
+src/commonMain/kotlin/borg/trikeshed/lib/Series.kt:class IntHeap(series: Series<Int>) {
+src/commonMain/kotlin/borg/trikeshed/lib/Tensor.kt:class CoTensor<T>(private val fn: () -> T) {
+src/commonMain/kotlin/borg/trikeshed/lib/CharSeries.kt:class CharSeries(
+src/commonMain/kotlin/borg/trikeshed/lib/AutoTwinContext.kt:class AutoTwinContext<T> {
+src/commonMain/kotlin/borg/trikeshed/lib/ColumnarAlias.kt:class DoubleSeries {
+src/commonMain/kotlin/borg/trikeshed/lib/ColumnarAlias.kt:class LongBackingSeries {
+src/commonMain/kotlin/borg/trikeshed/lib/ColumnarAlias.kt:class IntSeries {
+src/commonMain/kotlin/borg/trikeshed/lib/ColumnarAlias.kt:class FloatSeries {
+src/commonMain/kotlin/borg/trikeshed/lib/FibonacciReporter.kt:class FibonacciReporter(
+src/commonMain/kotlin/borg/trikeshed/lib/ReifiedSplitSeries2.kt:class ReifiedSplitSeries2<A, B>(val leftSeries: Series<A>, val rightSeries: Series<B>) : Series2<A, B> {
+src/commonMain/kotlin/borg/trikeshed/lib/CowSeriesHandle.kt:class COWArrayBackend<T>(
+src/commonMain/kotlin/borg/trikeshed/lib/CowSeriesHandle.kt:class FrozenArray<T>(
+src/commonMain/kotlin/borg/trikeshed/lib/SeekFileBufferCommon.kt:class SeekFileBufferCommon(
+src/commonMain/kotlin/borg/trikeshed/lib/SeriesBuffer.kt:class SeriesBuffer<T>(
+src/commonMain/kotlin/borg/trikeshed/lib/PackedIntBuf.kt:class PackedIntBuf(
+src/commonMain/kotlin/borg/trikeshed/lib/PackedIntBuf.kt:class PackedIntSeries(
+src/commonMain/kotlin/borg/trikeshed/lib/PackedIntBuf.kt:class DeltaPositionSeries(
+src/commonMain/kotlin/borg/trikeshed/lib/ByteSeries.kt:class ByteSeries(
+src/commonMain/kotlin/borg/trikeshed/isam/IsamWireProtoDsl.kt:class RingJournal<Synapse> private constructor(
+src/commonMain/kotlin/borg/trikeshed/isam/IsamColumnGroupings.kt:class KanbanColumnGrouping(
+src/commonMain/kotlin/borg/trikeshed/isam/IsamColumnGroupings.kt:class KanbanCardGrouping(
+src/commonMain/kotlin/borg/trikeshed/isam/IsamColumnGroupings.kt:class CascadeNodeGrouping(
+src/commonMain/kotlin/borg/trikeshed/isam/IsamColumnGroupings.kt:class OverlayAclGrouping(
+src/commonMain/kotlin/borg/trikeshed/isam/IsamColumnGroupings.kt:class LcncFacetGrouping(
+src/commonMain/kotlin/borg/trikeshed/isam/meta/IsamMetaFileDsl.kt:class MetafileReader(val config: MetafileConfig) : Usable {
+src/commonMain/kotlin/borg/trikeshed/isam/meta/IsamMetaFileDsl.kt:class MetafileWriter(val config: MetafileWriteConfig) {
+src/commonMain/kotlin/borg/trikeshed/isam/meta/IsamMetaFileDsl.kt:class Meta<T>(var groupId: Int = 0, var groupName: String = "0") : ColumnMeta by ColumnMeta("meta", IOMemento.IoString, null)
+src/commonMain/kotlin/borg/trikeshed/isam/meta/IsamMetaFileReader.kt:class IsamMetaFileReader(
+src/commonMain/kotlin/borg/trikeshed/isam/MonoCursor.kt:class MonoCursor<T>(
+src/commonMain/kotlin/borg/trikeshed/isam/IsamUtil.kt:class IsamDataFileBuilder {
+src/commonMain/kotlin/borg/trikeshed/isam/IsamDataFile.kt:class IsamDataFile(
+src/commonMain/kotlin/borg/trikeshed/isam/RecordMeta.kt:class RecordMeta(
+src/commonMain/kotlin/borg/trikeshed/pointcut/polyglot/PointcutPolyglotBlackboardTaxonomy.kt:class GraalPolyglotBlackboardTaxonomy(
+src/commonMain/kotlin/borg/trikeshed/pointcut/polyglot/BasicPolyglotPointcut.kt:class BasicPolyglotPointcut {
+src/commonMain/kotlin/borg/trikeshed/cursor/BlackboardOverlay.kt:class ProvenanceBuilder(
+src/commonMain/kotlin/borg/trikeshed/cursor/SimpleCursor.kt:class SimpleCursor @JvmOverloads constructor(
+src/commonMain/kotlin/borg/trikeshed/cursor/DenseTwins.kt:class AutoTwinContext<T>(private var locked: ((T, T) -> Twin<T>)? = null) {
+src/commonMain/kotlin/borg/trikeshed/cursor/ReifiedSplitSeries2.kt:class ReifiedSplitSeries2<A, B>(
+src/commonMain/kotlin/borg/trikeshed/cursor/TypeSubsumption.kt:class IsALattice(val edges: Series<IsAEdge>) {
+src/commonMain/kotlin/borg/trikeshed/cursor/CursorTensor.kt:class WasmDoubleTensor(
+src/commonMain/kotlin/borg/trikeshed/animation/AnimationSpec.kt:class AnimationSpec {
+src/commonMain/kotlin/borg/trikeshed/animation/AnimationSpec.kt:class AnimationTrigger(val action: () -> Unit) {
+src/commonMain/kotlin/borg/trikeshed/treedoc/TreeDocPipeline.kt:class TreeDocPipeline(
+src/commonMain/kotlin/modelmux/ModelMux.kt:class LlmSession(
+src/commonMain/kotlin/modelmux/ModelMux.kt:class ModelMux internal constructor(
+src/commonMain/kotlin/modelmux/ModelMux.kt:class ModelMuxBuilder(private val keyMux: KeyMux) {

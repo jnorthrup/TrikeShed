@@ -58,7 +58,7 @@ class BrainClient(
     private val keyMux: KeyMux = buildKeyMux(apiKey, model)
     private val modelMux: ModelMux = ModelMux(keyMux) {
         endpoints.forEach { endpoint ->
-            model(id = endpoint.model, caps = setOf("chat"), baseUrl = endpoint.base)
+            model(id = endpoint.model, caps = setOf("chat", "conflict-resolve"), baseUrl = endpoint.base)
         }
     }
 
@@ -73,7 +73,7 @@ class BrainClient(
         if (endpoints.isEmpty()) error("Brain: no provider endpoints discovered")
 
         var lastError = "all providers exhausted"
-        val routed = modelMux.route("chat").a
+        val routed = modelMux.route("conflict-resolve").a
         for (modelId in orderedModelIds(routed)) {
             val endpoint = endpointByModel[modelId] ?: continue
             val session = try {

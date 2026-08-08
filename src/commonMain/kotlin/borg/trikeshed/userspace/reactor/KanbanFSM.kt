@@ -16,7 +16,7 @@ import kotlinx.coroutines.flow.MutableSharedFlow
 sealed class KanbanEvent {
     abstract val timestampMs: Long
 
-    /** A credential was loaded from ~/.hermes and is now in the mux pool. */
+    /** A credential was loaded from ~/.local/forge/modelmux/models.json and is now in the mux pool. */
     @Serializable
     data class CredentialLoaded(
         val provider: String,

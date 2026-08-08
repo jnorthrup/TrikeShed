@@ -45,7 +45,7 @@ class MuxReactorElement(
 
     /**
      * Reactor-owned modelmux cache layer. Holds model metadata and API call
-     * results. Persists to ~/.hermes/model_cache.json via CacheStoreJvm on
+     * results. Persists to ~/.local/forge/modelmux/models.json via CacheStoreJvm on
      * the JVM. Emits CacheEvent values through [cacheEvents]; the UI and
      * the Kanban FSM consume them.
      */

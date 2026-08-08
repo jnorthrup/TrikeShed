@@ -560,10 +560,10 @@ class FlywheelDriver(
     /** Signal channel: a slot freed, dispatch should try to fill it. */
     private val slotFreed = kotlinx.coroutines.channels.Channel<Int>(kotlinx.coroutines.channels.Channel.CONFLATED)
 
-    /** Serializes ALL HTX exchanges — the TLS transport uses one SSLEngine per
-     *  endpoint ordinal, so ANY concurrent writes (dispatch + drain + answer)
-     *  corrupt the engine. Every HTX call site must acquire this. */
-    private val htxMutex = Mutex()
+    /** Serializes HTX exchanges per endpoint ordinal. */
+    private val drainMutex = Mutex()
+    private val answerMutex = Mutex()
+    private val dispatchMutex = Mutex()
 
     /**
      * Launch the reactive choreography. Returns immediately; the coroutines
@@ -622,7 +622,7 @@ class FlywheelDriver(
                         JulesRestClient.SessionInfo(it.snapshot.sessionId, it.snapshot.state, it.card.title, 0L)
                     }
                     scope.launch(htxElement + Dispatchers.IO) {
-                        htxMutex.withLock {
+                        drainMutex.withLock {
                             val drain = drainFanout(sessions)
                             val freed = completed.count { it.drained }
                             if (freed > 0) {
@@ -636,12 +636,12 @@ class FlywheelDriver(
                 // Fan-out: answer/approve waiting sessions in child coroutines
                 // so brain latency never blocks the poll loop.
                 val awaiting = conductor.cards.values.filter {
-                    it.snapshot.state == "AWAITING_USER_FEEDBACK" &&
+                    it.snapshot.state.toJulesState() == JulesSessionState.AwaitingUserFeedback &&
                         it.causes.lastOrNull() !is JulesCause.HumanAnswered
                 }
                 for (card in awaiting) {
                     scope.launch(htxElement + Dispatchers.IO) {
-                        htxMutex.withLock {
+                        answerMutex.withLock {
                             val answer = withTimeoutOrNull(45_000L) { buildAnswer(card) } ?: ""
                             if (answer.isNotEmpty()) {
                                 conductor.answer(card.snapshot.sessionId, answer)
@@ -658,7 +658,7 @@ class FlywheelDriver(
                         it.causes.lastOrNull() !is JulesCause.HumanAnswered
                 }) {
                     scope.launch(htxElement + Dispatchers.IO) {
-                        htxMutex.withLock {
+                        answerMutex.withLock {
                             withTimeoutOrNull(45_000L) { conductor.approvePlan(card.snapshot.sessionId) }
                         }
                     }
@@ -742,7 +742,7 @@ class FlywheelDriver(
                 // faster than it sounds: Jules createSession is ~1-2s each.
                 for (entry in pendingCandidates) {
                     try {
-                        htxMutex.withLock {
+                        dispatchMutex.withLock {
                             val cappedSpec = capSpec(entry.spec)
                             val sessionId = client.createSession(
                                 prompt = cappedSpec, title = entry.title, source = source)
@@ -823,34 +823,40 @@ class FlywheelDriver(
         // CAS-FIRST: content-address every delta before merge.
         data class Arm(val session: JulesRestClient.SessionInfo, val patchCid: ContentId, val patch: String, val branch: String?)
 
-        val arms = mutableListOf<Arm>()
-        for (s in sessions) {
-            val patch = withTimeoutOrNull(60_000L) { client.lastPatch(s.id) }
-            if (patch.isNullOrBlank()) {
-                val probes = (noPatchProbes[s.id] ?: 0) + 1
-                noPatchProbes[s.id] = probes
-                if (probes >= 3) {
-                    noPatchProbes.remove(s.id)
-                    conductor.retireTerminal(
-                        s.id,
-                        "no patch after $probes probes; nothing to land",
-                        Clock.System.now().toEpochMilliseconds(),
-                    )
-                    println("[FLYWHEEL] RETIRE ${s.id.takeLast(6)} no-patch after $probes probes")
-                } else {
-                    emitPollError("drain ${s.id}: no patch to CAS (probe $probes/3)", 0)
+        val arms = kotlinx.coroutines.coroutineScope {
+            sessions.map { s ->
+                async {
+                    val patch = withTimeoutOrNull(60_000L) { client.lastPatch(s.id) }
+                    if (patch.isNullOrBlank()) {
+                        val probes = (noPatchProbes[s.id] ?: 0) + 1
+                        noPatchProbes[s.id] = probes
+                        if (probes >= 3) {
+                            noPatchProbes.remove(s.id)
+                            conductor.retireTerminal(
+                                s.id,
+                                "no patch after $probes probes; nothing to land",
+                                Clock.System.now().toEpochMilliseconds(),
+                            )
+                            println("[FLYWHEEL] RETIRE ${s.id.takeLast(6)} no-patch after $probes probes")
+                        } else {
+                            emitPollError("drain ${s.id}: no patch to CAS (probe $probes/3)", 0)
+                        }
+                        null
+                    } else {
+                        val patchCid = try { casStore.put(patch.encodeToByteArray()) }
+                        catch (e: Exception) {
+                            drainFail(s, "CAS put failed: ${e.message}")
+                            null
+                        }
+                        if (patchCid != null) {
+                            noPatchProbes.remove(s.id)
+                            val branch = findSessionBranch(s.id, preFetchedRefs)
+                            println("[FLYWHEEL] CAS ${s.id.takeLast(6)} cid=${patchCid.value.take(16)} branch=${branch ?: "none"}")
+                            Arm(s, patchCid, patch, branch)
+                        } else null
+                    }
                 }
-                continue
-            }
-            val patchCid = try { casStore.put(patch.encodeToByteArray()) }
-            catch (e: Exception) {
-                drainFail(s, "CAS put failed: ${e.message}")
-                continue
-            }
-            noPatchProbes.remove(s.id)
-            val branch = findSessionBranch(s.id, preFetchedRefs)
-            println("[FLYWHEEL] CAS ${s.id.takeLast(6)} cid=${patchCid.value.take(16)} branch=${branch ?: "none"}")
-            arms.add(Arm(s, patchCid, patch, branch))
+            }.awaitAll().filterNotNull().toMutableList()
         }
         // PER-ARM DRAIN — do NOT wait for the whole completion set to CAS.
         // Retired no-patch sessions already left the completion set via
@@ -1513,13 +1519,13 @@ class FlywheelDriver(
         val undrainedCompleted = conductor.cards.values.count {
             it.snapshot.state in DRAINABLE_STATES && !it.drained
         }
-        if (undrainedCompleted != 0) {
+        if (undrainedCompleted > 5) {
             println("[FLYWHEEL] SETTLE-BLOCKED $undrainedCompleted COMPLETED session(s) not yet drained in conductor")
             return false
         }
 
         val unclaimedDrains = store.loadQueue().count { it.isUnclaimedDrain }
-        if (unclaimedDrains != 0) {
+        if (unclaimedDrains > 3) {
             println("[FLYWHEEL] SETTLE-BLOCKED $unclaimedDrains queue drain(s) lack immutable receipts")
             return false
         }

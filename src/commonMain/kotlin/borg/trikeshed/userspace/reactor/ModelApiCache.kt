@@ -81,7 +81,7 @@ sealed class CacheLookup {
  * events into the kanbanEvents SharedFlow so the Kanban FSM can reduce them
  * into the live KanbanState.
  *
- * Persistence is JVM-only: CacheStoreJvm writes to ~/.hermes/model_cache.json.
+ * Persistence is JVM-only: CacheStoreJvm writes to ~/.local/forge/modelmux/models.json.
  * The cache itself lives in commonMain so it can be reasoned about without
  * the JVM stdlib.
  */
@@ -220,7 +220,7 @@ class ModelApiCache(
 
     /**
      * Replace in-memory state from a persisted snapshot. Used at startup to
-     * hydrate from ~/.hermes/model_cache.json. Does NOT emit events.
+     * hydrate from ~/.local/forge/modelmux/models.json. Does NOT emit events.
      */
     fun hydrate(entries: List<CacheEntry>) {
         models.clear()

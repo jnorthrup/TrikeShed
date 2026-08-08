@@ -1,2 +1,2 @@
 #!/bin/bash
-echo "Plan for LineCasGraph"
+./gradlew :jvmMainClasses --no-daemon

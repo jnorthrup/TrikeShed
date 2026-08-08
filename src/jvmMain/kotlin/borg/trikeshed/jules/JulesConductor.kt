@@ -98,7 +98,7 @@ class JulesConductor(
                         val anchor = acts.lastOrNull { it.patchBytes > 0 }
                         JulesCause.PatchArrived(snap.patchBytes, snap.capturedAt, anchor?.id, anchor?.seq)
                     }
-                    s.state == "AWAITING_USER_FEEDBACK" -> {
+                    s.state.toJulesState() == JulesSessionState.AwaitingUserFeedback -> {
                         val anchor = acts.lastOrNull { it.kind == "agentMessaged" } ?: acts.lastOrNull()
                         JulesCause.AgentMessaged(anchor?.excerpt ?: "", snap.capturedAt, anchor?.id, anchor?.seq)
                     }
