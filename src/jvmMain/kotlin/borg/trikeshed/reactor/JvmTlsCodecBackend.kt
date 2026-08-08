@@ -3,6 +3,10 @@ package borg.trikeshed.reactor
 import borg.trikeshed.ccek.KeyedService
 import borg.trikeshed.lib.ByteSeries
 import borg.trikeshed.lib.toList
+import borg.trikeshed.lib.size
+import borg.trikeshed.lib.get
+import borg.trikeshed.lib.j
+import borg.trikeshed.lib.toArray
 import java.io.ByteArrayInputStream
 import java.io.ByteArrayOutputStream
 import java.nio.ByteBuffer
@@ -253,11 +257,11 @@ class JvmTlsCodecBackend : TlsCodecBackend, KeyedService {
         }
 
         val parameters = engine.sslParameters
-        val alpnProtocols = config.alpnProtocols.toList().map(::applicationProtocolNameOf).toTypedArray()
+        val alpnProtocols = (config.alpnProtocols.size j { i: Int -> applicationProtocolNameOf(config.alpnProtocols[i]) }).toArray()
         if (alpnProtocols.isNotEmpty()) {
             parameters.applicationProtocols = alpnProtocols
         }
-        val namedGroups = config.supportedGroups.toList().map(::namedGroupOf).toTypedArray()
+        val namedGroups = (config.supportedGroups.size j { i: Int -> namedGroupOf(config.supportedGroups[i]) }).toArray()
         if (namedGroups.isNotEmpty()) {
             parameters.namedGroups = namedGroups
         }
