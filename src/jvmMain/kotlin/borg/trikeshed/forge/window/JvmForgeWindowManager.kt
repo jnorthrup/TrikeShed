@@ -1,13 +1,18 @@
 package borg.trikeshed.forge.window
 
+import borg.trikeshed.common.Files
 import java.awt.Desktop
 import java.net.URI
-import com.sun.net.httpserver.HttpServer
-import java.net.InetSocketAddress
 
 /**
  * JVM-based Window Manager.
- * Serves the HTML over local HTTP and opens it in the system's default browser.
+ * Writes the HTML to a temp file and opens it in the system's default browser.
+ *
+ * Uses the project's own [borg.trikeshed.common.Files] expect/actual abstraction
+ * (posix-implemented, JVM-facaded over [borg.trikeshed.userspace.nio.file.spi.JvmFileOperations]).
+ * No raw java.nio.file / com.sun.net.httpserver — those are forbidden by
+ * AGENTS.md ("userspace.nio only"). The reactor Litebike path (JvmKanbanServer)
+ * is the only sanctioned HTTP server.
  */
 class JvmForgeWindowManager : ForgeWindowManager {
     private var currentHtml: String = ""
@@ -16,24 +21,15 @@ class JvmForgeWindowManager : ForgeWindowManager {
 
     override fun launch(html: String) {
         currentHtml = html
-        val server = HttpServer.create(InetSocketAddress(0), 0)
-        server.createContext("/") { exchange ->
-            val bytes = html.toByteArray(Charsets.UTF_8)
-            exchange.sendResponseHeaders(200, bytes.size.toLong())
-            exchange.responseBody.use { os ->
-                os.write(bytes)
-            }
-        }
-        server.start()
-
-        val port = server.address.port
-        val url = "http://localhost:$port/"
-        println("JvmForgeWindowManager: Serving HTML on $url")
+        val tempDir = Files.createTempDir("forgeApp_jvm_")
+        val tempPath = Files.resolvePath(tempDir, "index.html")
+        Files.write(tempPath, html)
+        println("JvmForgeWindowManager: Wrote HTML to file://$tempPath")
 
         if (Desktop.isDesktopSupported() && Desktop.getDesktop().isSupported(Desktop.Action.BROWSE)) {
-            Desktop.getDesktop().browse(URI(url))
+            Desktop.getDesktop().browse(URI("file://$tempPath"))
         } else {
-            println("Desktop browsing not supported. Open this URL manually: $url")
+            println("Desktop browsing not supported. Open this URL manually: file://$tempPath")
         }
     }
 

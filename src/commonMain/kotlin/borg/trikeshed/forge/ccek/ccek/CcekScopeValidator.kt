@@ -71,7 +71,7 @@ suspend fun requireCcekScope(
         acc + element.key
     }
     val missingKeys = requiredKeys.filter { required ->
-        providedKeys.none { it.toString() == required.toString() }
+        providedKeys.none { it === required }
     }.toSet()
 
     if (missingKeys.isNotEmpty()) {

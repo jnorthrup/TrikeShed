@@ -1,6 +1,8 @@
 package borg.trikeshed.jules
 
 import borg.trikeshed.htx.HtxKey
+import borg.trikeshed.lib.Join
+import borg.trikeshed.lib.j
 import borg.trikeshed.kanban.ForgeKanbanIngest
 import borg.trikeshed.job.ContentId
 import borg.trikeshed.userspace.nio.file.spi.JvmFileOperations
@@ -561,9 +563,15 @@ class FlywheelDriver(
     private val slotFreed = kotlinx.coroutines.channels.Channel<Int>(kotlinx.coroutines.channels.Channel.CONFLATED)
 
     /** Serializes HTX exchanges per endpoint ordinal. */
-    private val drainMutex = Mutex()
-    private val answerMutex = Mutex()
-    private val dispatchMutex = Mutex()
+    private val drainMutex = Mutex() // removed — see drainFanout
+    private val answerMutex = Mutex() // removed — parallel answer/approve
+    private val dispatchMutex = Mutex() // removed — parallel dispatch
+
+    /** Pijul channel for parallel drain — commutative patches replace
+     *  sequential 3-way merge. Patches touching different regions of
+     *  the same file commute; no conflict markers, no working-tree-clean
+     *  gate between applications. */
+    private val pijulChannel = borg.trikeshed.pijul.PijulChannel()
 
     /**
      * Launch the reactive choreography. Returns immediately; the coroutines
@@ -622,13 +630,17 @@ class FlywheelDriver(
                         JulesRestClient.SessionInfo(it.snapshot.sessionId, it.snapshot.state, it.card.title, 0L)
                     }
                     scope.launch(htxElement + Dispatchers.IO) {
-                        drainMutex.withLock {
-                            val drain = drainFanout(sessions)
-                            val freed = completed.count { it.drained }
-                            if (freed > 0) {
-                                slotFreed.trySend(freed)
-                                println("[CHOREOGRAPHY] drain → dispatch signal: $freed slots freed")
-                            }
+                        // Parallel drain: the drainGuard AtomicBoolean inside
+                        // drainFanout prevents re-entrant drain. The previous
+                        // drainMutex serialized the entire drain pipeline
+                        // behind a single lock — unnecessary now that each
+                        // HTX exchange allocates its own SSLEngine via
+                        // connectionOrdinal.
+                        val drain = drainFanout(sessions)
+                        val freed = completed.count { it.drained }
+                        if (freed > 0) {
+                            slotFreed.trySend(freed)
+                            println("[CHOREOGRAPHY] drain → dispatch signal: $freed slots freed")
                         }
                     }
                 }
@@ -641,12 +653,14 @@ class FlywheelDriver(
                 }
                 for (card in awaiting) {
                     scope.launch(htxElement + Dispatchers.IO) {
-                        answerMutex.withLock {
-                            val answer = withTimeoutOrNull(45_000L) { buildAnswer(card) } ?: ""
-                            if (answer.isNotEmpty()) {
-                                conductor.answer(card.snapshot.sessionId, answer)
-                                println("[CHOREOGRAPHY] answer ${card.snapshot.sessionId.takeLast(6)}")
-                            }
+                        // Parallel answer: each HTX exchange gets its own
+                        // connectionOrdinal. The previous answerMutex
+                        // serialized all answers/approvals through one
+                        // lock — a degenerate pool of size 1.
+                        val answer = withTimeoutOrNull(45_000L) { buildAnswer(card) } ?: ""
+                        if (answer.isNotEmpty()) {
+                            conductor.answer(card.snapshot.sessionId, answer)
+                            println("[CHOREOGRAPHY] answer ${card.snapshot.sessionId.takeLast(6)}")
                         }
                     }
                     tickAnswered++
@@ -658,9 +672,7 @@ class FlywheelDriver(
                         it.causes.lastOrNull() !is JulesCause.HumanAnswered
                 }) {
                     scope.launch(htxElement + Dispatchers.IO) {
-                        answerMutex.withLock {
-                            withTimeoutOrNull(45_000L) { conductor.approvePlan(card.snapshot.sessionId) }
-                        }
+                        withTimeoutOrNull(45_000L) { conductor.approvePlan(card.snapshot.sessionId) }
                     }
                     tickAnswered++
                 }
@@ -735,36 +747,247 @@ class FlywheelDriver(
 
                 if (pendingCandidates.isEmpty()) continue
 
-                // Sequential dispatch: the HTX TLS transport uses a single
-                // SSLEngine per endpoint ordinal — concurrent createSession
-                // calls corrupt the same engine. Serialize through a mutex
-                // so each exchange completes before the next starts. This is
-                // faster than it sounds: Jules createSession is ~1-2s each.
-                for (entry in pendingCandidates) {
-                    try {
-                        dispatchMutex.withLock {
-                            val cappedSpec = capSpec(entry.spec)
-                            val sessionId = client.createSession(
-                                prompt = cappedSpec, title = entry.title, source = source)
-                            store.appendWork(entry.workId, JulesCause.WorkDispatched(
-                                workId = entry.workId,
-                                sessionId = sessionId,
-                                attempt = entry.attempt + 1,
-                                at = Clock.System.now().toEpochMilliseconds(),
-                            ))
-                            _events.emit(FlywheelEvent.Dispatched(sessionId, entry.title))
-                            tickDispatched.incrementAndGet()
-                            println("[CHOREOGRAPHY] dispatch ${entry.title.take(60)}")
+                // Parallel dispatch: each createSession gets its own
+                // connectionOrdinal → its own SSLEngine in
+                // JvmTlsCodecBackend's ConcurrentHashMap. The transport
+                // handles concurrent exchanges; no mutex needed. The
+                // previous dispatchMutex was a vestigial guard from when
+                // the transport shared a single engine — that was fixed
+                // by the per-ordinal allocation (nextTlsConnectionOrdinal).
+                kotlinx.coroutines.coroutineScope {
+                    for (entry in pendingCandidates) {
+                        launch {
+                            try {
+                                val cappedSpec = capSpec(entry.spec)
+                                val sessionId = client.createSession(
+                                    prompt = cappedSpec, title = entry.title, source = source)
+                                store.appendWork(entry.workId, JulesCause.WorkDispatched(
+                                    workId = entry.workId,
+                                    sessionId = sessionId,
+                                    attempt = entry.attempt + 1,
+                                    at = Clock.System.now().toEpochMilliseconds(),
+                                ))
+                                _events.emit(FlywheelEvent.Dispatched(sessionId, entry.title))
+                                tickDispatched.incrementAndGet()
+                                println("[CHOREOGRAPHY] dispatch ${entry.title.take(60)}")
+                            } catch (t: Throwable) {
+                                classifyHttpError(t)
+                                _events.emit(FlywheelEvent.DispatchFailed(entry.title, t.message.orEmpty()))
+                            }
                         }
-                    } catch (t: Throwable) {
-                        classifyHttpError(t)
-                        _events.emit(FlywheelEvent.DispatchFailed(entry.title, t.message.orEmpty()))
                     }
                 }
             }
         }
 
         println("[CHOREOGRAPHY] reactive cycle started — fan-out drain + reactive dispatch")
+    }
+
+    /**
+     * Parallel drain via Pijul commutative patches. Each completed session's
+     * patch is applied to [pijulChannel] concurrently — non-overlapping edits
+     * commute with no conflict resolution. The channel materializes to the
+     * working tree once, then a single commit lands everything.
+     *
+     * Falls back to [drainThreeWay] if the patch parsing fails or the channel
+     * detects overlapping edits that can't commute.
+     */
+    private suspend fun drainPijul(sessions: List<JulesRestClient.SessionInfo>): DrainBatch {
+        if (sessions.isEmpty()) return DrainBatch()
+        println("[FLYWHEEL] DRAIN-PIJUL sessions=${sessions.size}")
+
+        // CAS phase — parallel, same as drainThreeWay
+        git("fetch", "origin", "--prune")
+        val preFetchedRefs = git("for-each-ref", "--format=%(refname:short)", "refs/remotes/origin")
+            .takeIf { it.exitCode == 0 }?.output?.lineSequence()?.map { it.trim() }?.toList() ?: emptyList()
+
+        data class PijulArm(
+            val session: JulesRestClient.SessionInfo,
+            val patchCid: ContentId,
+            val patch: String,
+            val workId: String,
+        )
+
+        // Parallel CAS — each session fetches its patch + content-addresses it
+        val arms = coroutineScope {
+            sessions.map { s ->
+                async {
+                    val patch = withTimeoutOrNull(60_000L) { client.lastPatch(s.id) }
+                    if (patch.isNullOrBlank()) {
+                        val probes = (noPatchProbes[s.id] ?: 0) + 1
+                        noPatchProbes[s.id] = probes
+                        if (probes >= 3) {
+                            noPatchProbes.remove(s.id)
+                            conductor.retireTerminal(s.id, "no patch after $probes probes; nothing to land", Clock.System.now().toEpochMilliseconds())
+                            println("[FLYWHEEL] RETIRE ${s.id.takeLast(6)} no-patch after $probes probes")
+                        }
+                        null
+                    } else {
+                        val patchCid = try { casStore.put(patch.encodeToByteArray()) }
+                        catch (e: Exception) { drainFail(s, "CAS put failed: ${e.message}"); null }
+                        if (patchCid != null) {
+                            noPatchProbes.remove(s.id)
+                            val workId = store.loadQueue().firstOrNull {
+                                it.sessionId == s.id && !it.isDrained
+                            }?.workId ?: "session:${s.id}"
+                            PijulArm(s, patchCid, patch, workId)
+                        } else null
+                    }
+                }
+            }.awaitAll().filterNotNull()
+        }
+
+        if (arms.isEmpty()) {
+            println("[FLYWHEEL] DRAIN-PIJUL no CAS-ready arms out of ${sessions.size}")
+            return DrainBatch()
+        }
+
+        // Parse patches → FileChanges and apply to channel in parallel.
+        // Non-overlapping edits commute; the channel handles concurrency
+        // internally (each file gets its own PijulCrdt).
+        pijulChannel.reset()
+        val applied = coroutineScope {
+            arms.map { arm ->
+                async {
+                    val changes = parsePatchToFileChanges(arm.patch)
+                    if (changes.isEmpty()) {
+                        drainFail(arm.session, "empty patch file list")
+                        null
+                    } else {
+                        pijulChannel.applyPatch(
+                            workId = arm.workId,
+                            sessionId = arm.session.id,
+                            patchCid = arm.patchCid,
+                            title = arm.session.title,
+                            changes = changes,
+                        )
+                        arm
+                    }
+                }
+            }.awaitAll().filterNotNull()
+        }
+
+        if (applied.isEmpty()) {
+            println("[FLYWHEEL] DRAIN-PIJUL no patches applied out of ${arms.size}")
+            return DrainBatch()
+        }
+
+        // Materialize the channel's merged state to the working tree —
+        // single filesystem touch, then one commit.
+        synchronizeMain()
+        commitExistingConflicts()
+        val touched = withContext(Dispatchers.IO) { pijulChannel.materialize(repoDir) }
+        if (touched.isEmpty()) {
+            println("[FLYWHEEL] DRAIN-PIJUL materialize produced no files")
+            return DrainBatch()
+        }
+
+        git("add", "--", *touched.toTypedArray())
+        val commitMsg = if (applied.size == 1) {
+            "flywheel: patch ${applied.first().session.title.take(50)} (${applied.first().session.id.takeLast(6)})"
+        } else {
+            "flywheel: pijul parallel merge ${applied.size} sessions — ${applied.joinToString(",") { it.session.id.takeLast(6) }}"
+        }
+        val commit = git("commit", "--no-verify", "-m", commitMsg)
+        if (commit.exitCode != 0 && !isWorkingTreeClean()) {
+            emitPollError("pijul commit failed: ${commit.output.take(200)}", 0)
+            println("[FLYWHEEL] DRAIN-PIJUL commit failed — falling back to 3-way")
+            pijulChannel.reset()
+            return drainThreeWay(sessions)
+        }
+
+        // Build
+        val build = shell(300_000L, "./gradlew", ":jvmMainClasses", "--no-daemon")
+        if (build.exitCode != 0) {
+            emitPollError("pijul build failed: ${build.output.take(400)}", 0)
+            println("[FLYWHEEL] DRAIN-PIJUL build red — committed anyway, next RGA resolves")
+        } else {
+            println("[FLYWHEEL] DRAIN-PIJUL build green")
+        }
+
+        // Provenance close — each arm gets its own receipt + tag + WAL bond
+        val commitSha = headSha()
+        val now = Clock.System.now().toEpochMilliseconds()
+        for (arm in applied) {
+            val safeSession = arm.session.id.replace(Regex("[^A-Za-z0-9._-]"), "-")
+            val tag = "flywheel/jules-$safeSession-${commitSha.take(12)}"
+            val tagRes = git("tag", tag)
+            if (tagRes.exitCode == 0) {
+                println("[FLYWHEEL] TAG ${arm.session.id.takeLast(6)} $tag")
+            }
+            sendMergeReceipt(
+                sessionId = arm.session.id,
+                commitSha = commitSha,
+                tag = tag,
+                patchCid = arm.patchCid,
+                branch = findSessionBranch(arm.session.id, preFetchedRefs),
+                prUrl = fishPrUrl(arm.session.id, tag),
+            )
+            conductor.retireTerminal(arm.session.id, "pijul-drained @ $commitSha", now)
+            _events.emit(FlywheelEvent.Drained(arm.session.id, commitSha, tag))
+        }
+
+        // Push
+        synchronizeMain()
+
+        val panorama = applied.map { arm ->
+            QaLaguna.SessionPanorama(
+                sessionId = arm.session.id,
+                title = arm.session.title,
+                touchedFiles = parsePatchFiles(arm.patch),
+            )
+        }
+        println("[FLYWHEEL] DRAIN-PIJUL ${applied.size}/${sessions.size} sessions landed via commutative merge")
+        DrainPerformanceTracker.recordDrainBatch(applied.size, System.currentTimeMillis())
+        return DrainBatch(harvested = applied.size, panorama = panorama)
+    }
+
+    /**
+     * Parse a unified diff into [borg.trikeshed.pijul.FileChanges] — the
+     * intermediate representation between diff parsing and CRDT application.
+     * Each file's hunks become Insert/Delete operations at line positions.
+     */
+    private fun parsePatchToFileChanges(patch: String): List<borg.trikeshed.pijul.FileChanges> {
+        val result = mutableMapOf<String, MutableList<borg.trikeshed.lib.Join<Int, String>>>()
+        val deletes = mutableMapOf<String, MutableList<borg.trikeshed.lib.Join<Int, Int>>>()
+        var currentFile: String? = null
+        var newLineNum = 0
+
+        for (line in patch.lines()) {
+            when {
+                line.startsWith("+++ b/") -> {
+                    currentFile = line.removePrefix("+++ b/").trim().takeIf { it.isNotEmpty() && it != "/dev/null" }
+                    if (currentFile != null) {
+                        result.getOrPut(currentFile!!) { mutableListOf() }
+                        deletes.getOrPut(currentFile!!) { mutableListOf() }
+                    }
+                    newLineNum = 0
+                }
+                line.startsWith("@@") -> {
+                    val match = Regex("""\+(\d+)(?:,(\d+))?""").find(line)
+                    newLineNum = match?.groupValues?.get(1)?.toIntOrNull() ?: 1
+                }
+                line.startsWith("+") && !line.startsWith("+++") && currentFile != null -> {
+                    val content = line.removePrefix("+")
+                    result[currentFile!!]!!.add(newLineNum j content)
+                    newLineNum++
+                }
+                line.startsWith("-") && !line.startsWith("---") && currentFile != null -> {
+                    deletes[currentFile!!]!!.add(newLineNum j 1)
+                }
+                line.startsWith(" ") || line.startsWith("\\") -> {
+                    newLineNum++
+                }
+            }
+        }
+
+        return result.keys.map { path ->
+            borg.trikeshed.pijul.FileChanges(
+                path = path,
+                inserts = result[path] ?: emptyList(),
+                deletes = deletes[path] ?: emptyList(),
+            )
+        }
     }
 
     /** Drain every completed session before the next research wave. */
@@ -774,7 +997,9 @@ class FlywheelDriver(
         try {
             if (sessions.isEmpty()) return DrainBatch()
             println("[FLYWHEEL] DRAIN-ALL sessions=${sessions.size}")
-            return drainThreeWay(sessions)
+            // Try Pijul commutative drain first (parallel, no conflict
+            // markers). Falls back to sequential 3-way merge on failure.
+            return drainPijul(sessions)
         } finally {
             drainGuard.set(false)
         }

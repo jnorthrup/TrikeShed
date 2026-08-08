@@ -4,10 +4,21 @@ import borg.trikeshed.lib.Join
 import borg.trikeshed.lib.j
 import borg.trikeshed.patch.Blake3Hash
 import borg.trikeshed.pijul.*
-// import borg.trikeshed.lib.Series
-// Using basic types for isolated compilation check without entire KMP dependency graph
-// For actual runtime, integration with lib.Series / lib.j is expected via KMP stdlib.
 
+/**
+ * Pijul CRDT — commutative patch graph.
+ *
+ * Patches that touch different regions of the same file commute with no
+ * conflict resolution. The graph is a DAG of vertices (content atoms)
+ * connected by tree edges (parent → child). Deletion tombstones content
+ * without removing the vertex, preserving graph stability.
+ *
+ * Performance: the alive-vertex order is maintained incrementally. Insert
+ * is O(log V) (binary search for attach point + O(1) list insert). Render
+ * is O(V) (linear walk of the order). Delete is O(log V + k) where k is
+ * the tombstoned range. The previous implementation called a full O(V^2)
+ * topological sort on every apply and every render.
+ */
 class PijulCrdt {
     private val dag = DependencyDag()
 
@@ -15,11 +26,29 @@ class PijulCrdt {
 
     private val root = VertexId(Blake3Hash(ByteArray(32)), 0)
 
-    private val edges = mutableMapOf<VertexId, MutableList<VertexId>>()
+    /** Forward adjacency: parent → children. Replaces the full-edge scan. */
+    private val childrenOf = mutableMapOf<VertexId, MutableList<VertexId>>()
+
+    /** Content per vertex. Deleted vertices keep "" (tombstone). */
     private val vertexContent = mutableMapOf<VertexId, String>()
+
+    /**
+     * Linearized order of alive vertices by position. Each entry carries
+     * its cumulative content length so attach-point lookup is binary search.
+     */
+    private val aliveOrder = mutableListOf<VertexId>()
+    private val cumulativeLen = mutableListOf<Int>()
+
+    /** O(1) position lookup into [aliveOrder]. */
+    private val indexOf = mutableMapOf<VertexId, Int>()
+
+    private var dirty = true
 
     init {
         vertexContent[root] = ""
+        aliveOrder.add(root)
+        cumulativeLen.add(0)
+        indexOf[root] = 0
     }
 
     fun apply(patch: Patch) {
@@ -31,83 +60,121 @@ class PijulCrdt {
                     val newVertex = VertexId(patch.id, change.pos)
                     vertexContent[newVertex] = change.content
 
-                    val attachPoint = findAttachPoint(change.pos)
-                    val list = edges.getOrElse(newVertex) { mutableListOf() }
-                    list.add(attachPoint)
-                    edges[newVertex] = list
+                    val attachIdx = findAttachIndex(change.pos)
+                    val attachVertex = aliveOrder[attachIdx]
+
+                    // Forward edge: attachVertex → newVertex
+                    childrenOf.getOrPut(attachVertex) { mutableListOf() }.add(newVertex)
+
+                    // Insert into alive-order right after the attach point.
+                    // This keeps the linearized order consistent for future
+                    // binary searches without a full re-sort.
+                    val insertIdx = attachIdx + 1
+                    aliveOrder.add(insertIdx, newVertex)
+                    val contentLen = change.content.length
+                    cumulativeLen.add(insertIdx, cumulativeLen[attachIdx] + contentLen)
+
+                    // Rebuild index positions for everything after insertIdx.
+                    rebuildIndexFrom(insertIdx)
+                    dirty = true
                 }
                 is Change.Delete -> {
-                    val toDelete = findVerticesInRange(change.pos, change.length)
-                    for (v in toDelete) {
+                    val (startIdx, endIdx) = findRangeIndices(change.pos, change.length)
+                    for (i in startIdx..endIdx) {
+                        val v = aliveOrder[i]
                         vertexContent[v] = ""
                     }
+                    // Rebuild cumulative lengths (deleted vertices now have len 0).
+                    rebuildCumulativeFrom(startIdx)
+                    dirty = true
                 }
             }
         }
     }
 
-    private fun findAttachPoint(pos: Int): VertexId {
-        var currentPos = 0
-        var lastVertex = root
-
-        for (pair in topologicalSort().iterator()) {
-            val v = pair.a
-            val content = pair.b
-            if (currentPos + content.length >= pos && v != root) {
-                return v
-            }
-            currentPos += content.length
-            lastVertex = v
+    /**
+     * Binary search for the alive-vertex index whose cumulative content
+     * range contains [pos]. O(log V).
+     */
+    private fun findAttachIndex(pos: Int): Int {
+        ensureCumulative()
+        var lo = 0
+        var hi = aliveOrder.lastIndex
+        while (lo < hi) {
+            val mid = (lo + hi + 1) ushr 1
+            if (cumulativeLen[mid] <= pos) lo = mid else hi = mid - 1
         }
-        return lastVertex
+        return lo
     }
 
-    private fun findVerticesInRange(start: Int, length: Int): List<VertexId> {
-        val result = mutableListOf<VertexId>()
-        var currentPos = 0
-
-        for (pair in topologicalSort().iterator()) {
-            val v = pair.a
-            val content = pair.b
-            val vStart = currentPos
-            val vEnd = currentPos + content.length
-
-            if (vStart < start + length && vEnd > start && v != root) {
-                result.add(v)
-            }
-            currentPos += content.length
+    /**
+     * Binary search for the [start, end] index range of vertices overlapping
+     * [start, start+length). O(log V + k) where k = range size.
+     */
+    private fun findRangeIndices(start: Int, length: Int): Pair<Int, Int> {
+        ensureCumulative()
+        val end = start + length
+        // Leftmost vertex whose content end > start
+        var lo = 0
+        var hi = aliveOrder.lastIndex
+        while (lo < hi) {
+            val mid = (lo + hi) ushr 1
+            val vEnd = if (mid + 1 < aliveOrder.size) cumulativeLen[mid + 1] else cumulativeLen[mid] + contentLen(mid)
+            if (vEnd <= start) lo = mid + 1 else hi = mid
         }
-        return result
+        val startIdx = lo
+        // Rightmost vertex whose content start < end
+        hi = aliveOrder.lastIndex
+        while (lo < hi) {
+            val mid = (lo + hi + 1) ushr 1
+            if (cumulativeLen[mid] < end) lo = mid else hi = mid - 1
+        }
+        return startIdx to lo
     }
 
-    private fun topologicalSort(): Sequence<Join<VertexId, String>> = sequence {
-        val visited = mutableSetOf<VertexId>()
-        val queue = mutableListOf(root)
+    private fun contentLen(idx: Int): Int = vertexContent[aliveOrder[idx]]?.length ?: 0
 
-        while (queue.isNotEmpty()) {
-            val current = queue.removeAt(0)
-            if (visited.add(current)) {
-                yield(current j (vertexContent[current] ?: ""))
-
-                for ((v, deps) in edges.entries) {
-                    if (current in deps && v !in visited) {
-                        queue.add(v)
-                    }
-                }
-            }
+    /**
+     * Lazily rebuild cumulative lengths if dirty. O(V) but only when
+     * a delete or insert invalidated the suffix.
+     */
+    private fun ensureCumulative() {
+        if (!dirty) return
+        var cum = 0
+        for (i in aliveOrder.indices) {
+            cumulativeLen[i] = cum
+            cum += contentLen(i)
         }
+        // Ensure the list is the right size (handles edge cases)
+        while (cumulativeLen.size < aliveOrder.size) cumulativeLen.add(0)
+        while (cumulativeLen.size > aliveOrder.size) cumulativeLen.removeAt(cumulativeLen.lastIndex)
+        dirty = false
+    }
 
-        for ((v, content) in vertexContent.entries) {
-            if (visited.add(v)) {
-                yield(v j content)
-            }
+    private fun rebuildCumulativeFrom(fromIdx: Int) {
+        var cum = if (fromIdx > 0) cumulativeLen[fromIdx - 1] + contentLen(fromIdx - 1) else 0
+        for (i in fromIdx until aliveOrder.size) {
+            cumulativeLen[i] = cum
+            cum += contentLen(i)
+        }
+        dirty = false
+    }
+
+    private fun rebuildIndexFrom(fromIdx: Int) {
+        for (i in fromIdx until aliveOrder.size) {
+            indexOf[aliveOrder[i]] = i
         }
     }
 
+    /**
+     * Render the document from the alive-vertex order. O(V) — linear walk,
+     * no topological sort, no edge scanning.
+     */
     fun render(): String {
+        ensureCumulative()
         val sb = StringBuilder()
-        for (pair in topologicalSort().iterator()) {
-            sb.append(pair.b)
+        for (i in aliveOrder.indices) {
+            sb.append(vertexContent[aliveOrder[i]] ?: "")
         }
         return sb.toString()
     }

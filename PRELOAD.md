@@ -394,8 +394,6 @@ re-entering add() (which re-checks the threshold and cascades).
 These are things PRELOAD describes that the code does not yet implement.
 They are TODOs for the code, not corrections to PRELOAD.
 
-- ConfixIndexK<R>: referenced in comments (ConfixIsamFactory.kt:23) but no
-  type definition exists. The lineage table claims it; codify it.
 - Cursor fancy indexing: `cursor[range]`, `cursor[IntArray]`,
   `cursor["name","age"]`, `cursor[-"debug"]`, `join()`, `combine()` — zero
   operator implementations in cursor/. Cursor typealias exists (Cursor.kt:103)

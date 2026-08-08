@@ -14,6 +14,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.SharedFlow
@@ -77,6 +78,7 @@ sealed class ForgeProjection {
     data class DocumentChanged(val doc: ForgeDocument) : ForgeProjection()
     data class BoardChanged(val board: KanbanBoard) : ForgeProjection()
     data class MarkdownChanged(val markdown: String) : ForgeProjection()
+    data class Error(val cause: Throwable) : ForgeProjection()
 }
 
 class ArticulatedNode(
@@ -86,18 +88,18 @@ class ArticulatedNode(
     private val enabledProjections: Set<ProjectionKind> = ProjectionKind.ALL,
 ) {
     private var doc: ForgeDocument = initialDoc
-    val signalIn: Channel<ForgeSignal> = Channel(Channel.UNLIMITED)
+    val signalIn: Channel<ForgeSignal> = Channel(Channel.BUFFERED)
 
-    private val _documentProjections = MutableSharedFlow<ForgeDocument>(replay = 64, extraBufferCapacity = 64)
+    private val _documentProjections = MutableSharedFlow<ForgeDocument>(extraBufferCapacity = 1, onBufferOverflow = BufferOverflow.DROP_OLDEST)
     val documentProjections: SharedFlow<ForgeDocument> = _documentProjections.asSharedFlow()
 
-    private val _boardProjections = MutableSharedFlow<KanbanBoard>(replay = 64, extraBufferCapacity = 64)
+    private val _boardProjections = MutableSharedFlow<KanbanBoard>(extraBufferCapacity = 1, onBufferOverflow = BufferOverflow.DROP_OLDEST)
     val boardProjections: SharedFlow<KanbanBoard> = _boardProjections.asSharedFlow()
 
-    private val _markdownProjections = MutableSharedFlow<String>(replay = 64, extraBufferCapacity = 64)
+    private val _markdownProjections = MutableSharedFlow<String>(extraBufferCapacity = 1, onBufferOverflow = BufferOverflow.DROP_OLDEST)
     val markdownProjections: SharedFlow<String> = _markdownProjections.asSharedFlow()
 
-    private val _projections = MutableSharedFlow<ForgeProjection>(replay = 64, extraBufferCapacity = 64)
+    private val _projections = MutableSharedFlow<ForgeProjection>(extraBufferCapacity = 1, onBufferOverflow = BufferOverflow.DROP_OLDEST)
     val projections: SharedFlow<ForgeProjection> = _projections.asSharedFlow()
 
     private val childScopes = linkedMapOf<String, CoroutineScope>()
@@ -132,7 +134,9 @@ class ArticulatedNode(
                                 try {
                                     agent(signal)
                                 } catch (e: Throwable) {
-                                    // Catch errors so sibling agents are not cancelled
+                                    if (scope.coroutineContext[Job]?.isActive == true) {
+                                        _projections.emit(ForgeProjection.Error(e))
+                                    }
                                 }
                             }
                         }
@@ -147,12 +151,18 @@ class ArticulatedNode(
         }
     }
 
+    /**
+     * Graceful drain: close the input channel so the fan-out loop processes
+     * all enqueued signals, then cancel child scopes after in-flight work
+     * completes. This is a DRAINING transition, not a hard cancel.
+     */
     fun cancel() {
-        childScopes.values.forEach { it.cancel() }
-        childScopes.clear()
-        fanOutJob?.cancel()
-        fanOutJob = null
         signalIn.close()
+        fanOutJob?.invokeOnCompletion {
+            childScopes.values.forEach { it.cancel() }
+            childScopes.clear()
+            fanOutJob = null
+        }
     }
 
     fun stop() = cancel()
