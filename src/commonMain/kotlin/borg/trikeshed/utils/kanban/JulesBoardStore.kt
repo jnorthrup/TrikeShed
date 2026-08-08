@@ -1,5 +1,7 @@
 package borg.trikeshed.utils.kanban
 
+import borg.trikeshed.lib.j
+
 import borg.trikeshed.jules.JulesCause
 import borg.trikeshed.jules.JulesSessionCard
 import borg.trikeshed.jules.JulesSnapshot
@@ -147,6 +149,61 @@ class JulesBoardStore(
      * Priority is [QueueEntry.score] descending — caller sorts before dispatch.
      * Idempotent: same workId seen twice → first entry wins (getOrPut).
      */
+    fun buildCausalGraph(): borg.trikeshed.causal.CausalGraph {
+        val builder = borg.trikeshed.causal.CausalGraphBuilder()
+        for ((_, payload) in records()) {
+            val ev = KanbanEventCodec.decode(payload.decodeToString()) as? KanbanEventCodec.CauseEvent ?: continue
+            val c = ev.cause
+            val epochMs = c.at
+            when (c) {
+                is JulesCause.WorkQueued -> builder.append(
+                    workId = c.workId,
+                    epochMs = epochMs,
+                    edgeKind = borg.trikeshed.causal.CausalEdgeKind.Inducted,
+                    payload = borg.trikeshed.causal.EventPayload.Queued(
+                        tier = c.tier, title = c.title, spec = c.spec,
+                        score = c.score, lexicalMemory = borg.trikeshed.util.oroboros.LexicalMemory(summary = c.title, title = c.title, content = ""), parentWorkId = c.parent
+                    )
+                )
+                is JulesCause.WorkDispatched -> builder.append(
+                    workId = c.workId,
+                    epochMs = epochMs,
+                    edgeKind = borg.trikeshed.causal.CausalEdgeKind.Dispatched,
+                    payload = borg.trikeshed.causal.EventPayload.Dispatched(
+                        sessionId = c.sessionId, attempt = c.attempt
+                    )
+                )
+                is JulesCause.PatchArrived -> {
+                    val wid = c.workId
+                    if (wid != null) {
+                        builder.append(
+                            workId = wid,
+                            epochMs = epochMs,
+                            edgeKind = borg.trikeshed.causal.CausalEdgeKind.Delivered,
+                            payload = borg.trikeshed.causal.EventPayload.Delivered(
+                                patchCid = borg.trikeshed.job.ContentId("todo"),
+                                touchedFiles = 0 j { _: Int -> "" }
+                            )
+                        )
+                    }
+                }
+                is JulesCause.WorkDrained -> builder.append(
+                    workId = c.workId,
+                    epochMs = epochMs,
+                    edgeKind = borg.trikeshed.causal.CausalEdgeKind.Settled,
+                    payload = borg.trikeshed.causal.EventPayload.Settled(
+                        commitSha = c.commitSha, versionTag = "unknown",
+                        receiptCid = c.receipt?.patchCid ?: borg.trikeshed.job.ContentId(""),
+                        lexicalMemory = c.receipt?.lexicalMemory ?: borg.trikeshed.util.oroboros.LexicalMemory("","",""),
+                        prUrl = c.receipt?.prUrl
+                    )
+                )
+                else -> {}
+            }
+        }
+        return builder.toGraph()
+    }
+
     fun loadQueue(): List<QueueEntry> {
         val byWorkId = mutableMapOf<String, QueueEntry>()
         for ((workId, payload) in records()) {
