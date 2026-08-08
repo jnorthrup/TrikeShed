@@ -5,7 +5,41 @@ data class JobCheckpoint(
     val rootCid: ContentId,
     val schemaCid: ContentId,
     val metadata: Map<String, ContentId>
-)
+) {
+    suspend fun audit(casStore: CasStore, log: borg.trikeshed.couch.isam.DurableAppendLog, currentPlan: ConfixFacetPlan): RecoveryResult {
+        val rootBytes = casStore.get(rootCid) ?: throw IllegalStateException("Audit failed: rootCid $rootCid not found in CasStore")
+        borg.trikeshed.collections.btree.CowBPlusTreeCodec.decode(rootBytes)
+
+        val expectedSchemaCid = ContentId.of(currentPlan.schemaText.encodeToByteArray())
+        if (schemaCid != expectedSchemaCid) {
+            throw IllegalStateException("Audit failed: schemaCid $schemaCid does not match current plan's schema")
+        }
+        casStore.get(schemaCid) ?: throw IllegalStateException("Audit failed: schemaCid $schemaCid not found in CasStore")
+
+        val auditLog = object : borg.trikeshed.couch.isam.DurableAppendLog {
+            override fun append(sequence: Long, payload: ByteArray): Long = log.append(sequence, payload)
+            override fun flush() = log.flush()
+            override fun injectCorruptionAfter(sequence: Long) = log.injectCorruptionAfter(sequence)
+            override suspend fun replay(onFrame: suspend (Long, ByteArray) -> Unit): Long {
+                onFrame(this@JobCheckpoint.committedSequence, JobCheckpointCodec.encode(this@JobCheckpoint))
+                var lastSeq = this@JobCheckpoint.committedSequence
+                log.replay { seq, payload ->
+                    if (seq > this@JobCheckpoint.committedSequence) {
+                        onFrame(seq, payload)
+                        lastSeq = seq
+                    }
+                }
+                return lastSeq
+            }
+        }
+        val repo = JobRepository(auditLog, casStore)
+        val recoveryResult = repo.recover()
+        if (recoveryResult.committedSequence < this.committedSequence) {
+             throw IllegalStateException("Audit failed: recovered sequence ${recoveryResult.committedSequence} is behind checkpoint sequence ${this.committedSequence}")
+        }
+        return recoveryResult
+    }
+}
 
 object JobCheckpointCodec {
     private val MAGIC = byteArrayOf(0x4A, 0x43, 0x31, 0x00) // JC1\0
