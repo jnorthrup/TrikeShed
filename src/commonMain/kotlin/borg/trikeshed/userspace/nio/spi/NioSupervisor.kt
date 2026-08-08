@@ -11,7 +11,23 @@ import kotlin.coroutines.CoroutineContext
  * Owns the lifecycle FSM ([AsyncContextElement]) and a service registry.
  * Platform providers are registered at [open] time and resolved via [service].
  */
-open class NioSupervisor : AsyncContextElement() {
+open class NioSupervisor(
+    private val maxConcurrentIo: Int = 10000,
+) : AsyncContextElement() {
+    private val ioSemaphore = kotlinx.coroutines.sync.Semaphore(maxConcurrentIo)
+
+    suspend fun acquireIo() {
+        ioSemaphore.acquire()
+    }
+
+    fun tryAcquireIo(): Boolean {
+        return ioSemaphore.tryAcquire()
+    }
+
+    fun releaseIo() {
+        ioSemaphore.release()
+    }
+
     companion object Key : AsyncContextKey<NioSupervisor>()
     override val key: CoroutineContext.Key<*> get() = Key
 

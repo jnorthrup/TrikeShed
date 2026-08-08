@@ -104,21 +104,49 @@ object JvmLitebikeBindAdapter {
         element: LitebikeListenerElement,
         connections: ConnectionRegistry,
     ) {
+        val supervisor = kotlinx.coroutines.currentCoroutineContext()[borg.trikeshed.userspace.nio.spi.NioSupervisor.Key]
         while (kotlinx.coroutines.currentCoroutineContext().isActive) {
-            val ch = kotlinx.coroutines.suspendCancellableCoroutine<AsynchronousSocketChannel> { cont ->
-                val handler = object : CompletionHandler<AsynchronousSocketChannel, Any?> {
-                    override fun completed(result: AsynchronousSocketChannel, attached: Any?) {
-                        cont.resume(result)
+            // NioSupervisor backpressure: acquire permit before accepting
+            if (supervisor?.tryAcquireIo() == false) {
+                // back-pressure: close the socket immediately
+                // Since this is AsynchronousServerSocketChannel, we must accept and then close
+                val ch = kotlinx.coroutines.suspendCancellableCoroutine<AsynchronousSocketChannel> { cont ->
+                    val handler = object : CompletionHandler<AsynchronousSocketChannel, Any?> {
+                        override fun completed(result: AsynchronousSocketChannel, attached: Any?) {
+                            cont.resume(result)
+                        }
+                        override fun failed(t: Throwable, attached: Any?) {
+                            if (cont.isActive) cont.resumeWithException(t)
+                        }
                     }
+                    server.accept(null, handler)
+                    cont.invokeOnCancellation {
+                        runCatching { server.close() }
+                    }
+                }
+                runCatching { ch.close() }
+                continue
+            }
 
-                    override fun failed(t: Throwable, attached: Any?) {
-                        if (cont.isActive) cont.resumeWithException(t)
+            val ch = try {
+                kotlinx.coroutines.suspendCancellableCoroutine<AsynchronousSocketChannel> { cont ->
+                    val handler = object : CompletionHandler<AsynchronousSocketChannel, Any?> {
+                        override fun completed(result: AsynchronousSocketChannel, attached: Any?) {
+                            cont.resume(result)
+                        }
+
+                        override fun failed(t: Throwable, attached: Any?) {
+                            if (cont.isActive) cont.resumeWithException(t)
+                        }
+                    }
+                    server.accept(null, handler)
+                    cont.invokeOnCancellation {
+                        runCatching { server.close() }
                     }
                 }
-                server.accept(null, handler)
-                cont.invokeOnCancellation {
-                    runCatching { server.close() }
-                }
+            } catch (e: Throwable) {
+                supervisor?.releaseIo()
+                throw e
             }
 
             // R05 — register the channel up front. The drain loop
@@ -128,59 +156,72 @@ object JvmLitebikeBindAdapter {
             val connId = connections.register(ch)
             // Read all bytes from the channel asynchronously, then
             // forward to the listener with the detected protocol.
-            drainOne(ch, element, connections, connId)
+            CoroutineScope(element.supervisor).launch {
+                drainOne(ch, element, connections, connId, supervisor)
+            }
         }
     }
 
     private suspend fun drainOne(
-        ch: AsynchronousSocketChannel,
-        element: LitebikeListenerElement,
-        connections: ConnectionRegistry,
-        connId: Long,
-    ) {
-        CoroutineScope(element.supervisor).launch {
+            ch: AsynchronousSocketChannel,
+            element: LitebikeListenerElement,
+            connections: ConnectionRegistry,
+            connId: Long,
+            supervisor: borg.trikeshed.userspace.nio.spi.NioSupervisor? = null,
+        ) {
             val buf = ByteBuffer.allocate(8 * 1024)
-            val read = try {
-                suspendCancellableCoroutine<Int> { cont ->
-                    ch.read(
-                        buf, null,
-                        object : CompletionHandler<Int, Any?> {
-                            override fun completed(result: Int, attached: Any?) {
-                                cont.resume(result)
+            
+            // Use a CompletableDeferred to wait for channel closure
+            val done = kotlinx.coroutines.CompletableDeferred<Unit>()
+            
+            fun readLoop() {
+                ch.read(
+                    buf, null,
+                    object : CompletionHandler<Int, Any?> {
+                        override fun completed(read: Int, attached: Any?) {
+                            if (read <= 0) {
+                                // Peer closed — drop the registry entry.
+                                connections.unregister(connId)
+                                runCatching { ch.close() }
+                                supervisor?.releaseIo()
+                                done.complete(Unit)
+                                return
                             }
-                            override fun failed(t: Throwable, attached: Any?) {
-                                if (cont.isActive) cont.resumeWithException(t)
+                            val bytes = ByteArray(read).also { buf.flip(); buf.get(it) }
+                            val head = bytes.copyOf(minOf(bytes.size, 8))
+                            val proto: Protocol = ProtocolDetector.detect(head, bytes.size)
+                            // runBlocking is OK from a JDK CompletionHandler because
+                            // those callbacks are pure Java threads, not coroutines.
+                            val ok = runBlocking { element.accept(proto, bytes) }
+                            if (!ok) {
+                                connections.unregister(connId)
+                                runCatching { ch.close() }
+                                done.complete(Unit)
+                                return
                             }
+                            supervisor?.releaseIo()
+                            // Continue reading
+                            buf.clear()
+                            readLoop()
                         }
-                    )
-                }
-            } catch (t: Throwable) {
-                connections.unregister(connId)
-                runCatching { ch.close() }
-                return@launch
-            }
 
-            if (read <= 0) {
-                // Peer closed — drop the registry entry.
-                connections.unregister(connId)
-                runCatching { ch.close() }
-                return@launch
+                        override fun failed(t: Throwable, attached: Any?) {
+                            connections.unregister(connId)
+                            runCatching { ch.close() }
+                            supervisor?.releaseIo()
+                            done.completeExceptionally(t)
+                        }
+                    }
+                )
             }
-
-            val bytes = ByteArray(read).also { buf.flip(); buf.get(it) }
-            val head = bytes.copyOf(minOf(bytes.size, 8))
-            val proto: Protocol = ProtocolDetector.detect(head, bytes.size)
-
-            val ok = element.accept(proto, bytes) { responseBytes ->
-                connections.write(connId, responseBytes)
-            }
-            if (!ok) {
-                connections.unregister(connId)
-                runCatching { ch.close() }
-            }
+        
+            // Start the read loop
+            buf.clear()
+            readLoop()
+            
+            // Wait for completion
+            done.await()
         }
-    }
-}
 
 /** Companion helper for users who want a fire-and-forget lifecycle. */
 suspend fun LitebikeListenerElement.serveOnPort(
@@ -188,4 +229,5 @@ suspend fun LitebikeListenerElement.serveOnPort(
     connections: ConnectionRegistry = ConnectionRegistry(),
 ) {
     JvmLitebikeBindAdapter.bindAndServe(this, port = port, connections = connections)
+}
 }
