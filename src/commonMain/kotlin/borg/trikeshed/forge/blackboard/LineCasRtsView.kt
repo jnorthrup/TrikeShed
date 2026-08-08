@@ -58,3 +58,10 @@ fun <T> regionalTopK(spine: Series<T>, camera: ForgeBlackboardCamera, k: Int): S
     // filtered by the calculated LineAperture limit.
     return spine.take(k)
 }
+
+
+data class LineCasRtsSnapshot(
+    val topKBuckets: List<String>,
+    val counts: Map<String, Int>,
+    val apertureName: String
+)

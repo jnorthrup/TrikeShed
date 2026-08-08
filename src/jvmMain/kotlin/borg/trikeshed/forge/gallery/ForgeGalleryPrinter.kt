@@ -2,6 +2,7 @@ package borg.trikeshed.forge.gallery
 
 import borg.trikeshed.forge.blackboard.ForgeBlackboardView
 import borg.trikeshed.parse.json.JsonSupport
+import borg.trikeshed.forge.blackboard.LineCasRtsSnapshot
 
 /**
  * JVM printer for the gallery catalog + blackboard view.  Mirrors the data
@@ -22,7 +23,7 @@ object ForgeGalleryPrinter {
      * line is a header; the body is grouped by section, and ends with the
      * blackboard corner/title button map.
      */
-    fun render(): String = buildString {
+    fun render(snapshot: LineCasRtsSnapshot? = null): String = buildString {
         appendLine(headerLine("Forge widget gallery — ${ForgeGalleryCatalog.CATALOG_VERSION}"))
         appendLine("Catalog: ${ForgeGalleryCatalog.widgets().size} widgets across " +
             "${ForgeGallerySection.values().size} sections")
@@ -33,6 +34,18 @@ object ForgeGalleryPrinter {
             appendLine("── ${section.name} (${widgets.size}) ".padEndVisual(GRID_WIDTH, '─'))
             widgets.forEach { widget ->
                 appendLine(formatWidgetLine(widget))
+            }
+            appendLine(rule())
+        }
+
+        if (snapshot != null) {
+            appendLine(headerLine("LineCas RTS Snapshot"))
+            appendLine("Aperture: ${snapshot.apertureName}")
+            appendLine("Legend: CANDIDATE | PROVISIONAL | CONFIRMED")
+            appendLine("Top-K Buckets:")
+            snapshot.topKBuckets.forEach { bucket ->
+                val count = snapshot.counts[bucket] ?: 0
+                appendLine("  $bucket ($count)")
             }
             appendLine(rule())
         }
