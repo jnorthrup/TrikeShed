@@ -1,4 +1,4 @@
-package borg.trikeshed.userspace.nio.channel
+package borg.trikeshed.userspace.nio.channels
 
 import borg.trikeshed.userspace.nio.file.File
 import borg.trikeshed.userspace.FunctionalUringFacade
@@ -15,7 +15,7 @@ import borg.trikeshed.userspace.nio.ByteBuffer
  * The typed API is sugar that creates [UringSubmission] internally.
  * New code should use the unified path exclusively.
  */
-class Channel(
+class UringChannel(
     private val facade: FunctionalUringFacade,
 ) {
     fun read(file: File, buffer: ByteBuffer, offset: Long, userData: Long) =

@@ -2,8 +2,8 @@ package borg.trikeshed.lib
 
 import borg.trikeshed.lib.long.LongSeries
 import borg.trikeshed.userspace.ByteRegion
-import borg.trikeshed.userspace.nio.channel.Channel
-import borg.trikeshed.userspace.nio.channel.Channels
+import borg.trikeshed.userspace.nio.channels.UringChannel
+import borg.trikeshed.userspace.nio.channels.UringChannels
 import borg.trikeshed.userspace.nio.file.File
 import borg.trikeshed.userspace.nio.file.Files
 import borg.trikeshed.userspace.nio.ByteBuffer
@@ -25,7 +25,7 @@ class SeekFileBufferCommon(
 ) : LongSeries<Byte>, Usable {
 
     private var file: File? = null
-    private var channel: Channel? = null
+    private var channel: UringChannel? = null
     private var fileSize: Long = 0
 
     /** Windowed read buffer — 64KB amortizes syscalls, stays in L3. */
@@ -54,7 +54,7 @@ class SeekFileBufferCommon(
         if (isOpen()) return
         val f = Files.open(filename, readOnly)
         file = f
-        channel = Channels.open()
+        channel = UringChannels.open()
         fileSize = f.size()
         windowBase = -1
         windowLimit = -1

@@ -3,7 +3,6 @@
 package borg.trikeshed.userspace.nio.channels
 
 import borg.trikeshed.userspace.nio.ByteBuffer
-import borg.trikeshed.userspace.nio.channel.Channels
 import borg.trikeshed.userspace.nio.file.Path
 import borg.trikeshed.userspace.nio.file.OpenOption
 import borg.trikeshed.userspace.nio.file.StandardOpenOption
@@ -44,7 +43,7 @@ public abstract class FileChannel protected constructor() : AbstractInterruptibl
         fun open(path: Path, options: Set<OpenOption>, vararg attrs: FileAttribute<*>): FileChannel {
             val readOnly = !options.any { it is StandardOpenOption && it == StandardOpenOption.WRITE }
             val file = Files.open(path.toString(), readOnly)
-            val channel = Channels.open()
+            val channel = UringChannels.open()
             return UringFileChannel(file, channel)
         }
         fun open(path: Path, vararg options: OpenOption): FileChannel = open(path, options.toSet())

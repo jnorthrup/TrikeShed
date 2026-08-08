@@ -5,7 +5,7 @@ import borg.trikeshed.userspace.FileImpl
 /**
  * Open file handle — backed by [FileImpl] (expect/actual).
  *
- * Used by [borg.trikeshed.userspace.nio.channel.Channel] operations.
+ * Used by [borg.trikeshed.userspace.nio.channels.UringChannel] operations.
  * For directory-level operations use [Files].
  */
 class File internal constructor(internal val impl: FileImpl) {

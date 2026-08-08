@@ -8,7 +8,7 @@ import kotlin.coroutines.CoroutineContext
 /**
  * An openable, closeable, mmap-style file buffer.
  *
- * @deprecated Use [SeekFileBufferCommon] routed through [borg.trikeshed.userspace.nio.channel.Channel].
+ * @deprecated Use [SeekFileBufferCommon] routed through [borg.trikeshed.userspace.nio.channels.UringChannel].
  * FileBuffer's CoroutineContext.Element coupling is being removed —
  * all file I/O now goes through the unified UringFacade.
  */

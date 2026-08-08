@@ -2,8 +2,6 @@
 
 package borg.trikeshed.userspace.nio.channels
 
-import borg.trikeshed.userspace.nio.channel.Channel
-import borg.trikeshed.userspace.nio.channel.Channels
 import borg.trikeshed.userspace.nio.file.File
 import borg.trikeshed.userspace.nio.channels.spi.AbstractSelectableChannel
 import borg.trikeshed.userspace.nio.channels.spi.SelectorProvider
@@ -24,8 +22,8 @@ public abstract class ServerSocketChannel : AbstractSelectableChannel, NetworkCh
 
     companion object {
         fun open(): ServerSocketChannel {
-            val file = Channels.socket(SocketDomain.AF_INET.posix, SocketType.SOCK_STREAM.mask, SocketProtocol.IPPROTO_TCP.posix)
-            val channel = Channels.open()
+            val file = UringChannels.socket(SocketDomain.AF_INET.posix, SocketType.SOCK_STREAM.mask, SocketProtocol.IPPROTO_TCP.posix)
+            val channel = UringChannels.open()
             return UringServerSocketChannel(file, channel)
         }
 
@@ -35,7 +33,7 @@ public abstract class ServerSocketChannel : AbstractSelectableChannel, NetworkCh
 
 internal class UringServerSocketChannel(
     private val file: File,
-    private val channel: Channel,
+    private val channel: UringChannel,
 ) : ServerSocketChannel(SelectorProvider.provider()) {
     private var nextToken: Long = 1
     private var open: Boolean = true
