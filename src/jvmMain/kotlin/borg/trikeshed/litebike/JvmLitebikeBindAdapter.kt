@@ -101,21 +101,49 @@ object JvmLitebikeBindAdapter {
         element: LitebikeListenerElement,
         connections: ConnectionRegistry,
     ) {
+        val supervisor = kotlinx.coroutines.currentCoroutineContext()[borg.trikeshed.userspace.nio.spi.NioSupervisor.Key]
         while (kotlinx.coroutines.currentCoroutineContext().isActive) {
-            val ch = kotlinx.coroutines.suspendCancellableCoroutine<AsynchronousSocketChannel> { cont ->
-                val handler = object : CompletionHandler<AsynchronousSocketChannel, Any?> {
-                    override fun completed(result: AsynchronousSocketChannel, attached: Any?) {
-                        cont.resume(result)
+            // NioSupervisor backpressure: acquire permit before accepting
+            if (supervisor?.tryAcquireIo() == false) {
+                // back-pressure: close the socket immediately
+                // Since this is AsynchronousServerSocketChannel, we must accept and then close
+                val ch = kotlinx.coroutines.suspendCancellableCoroutine<AsynchronousSocketChannel> { cont ->
+                    val handler = object : CompletionHandler<AsynchronousSocketChannel, Any?> {
+                        override fun completed(result: AsynchronousSocketChannel, attached: Any?) {
+                            cont.resume(result)
+                        }
+                        override fun failed(t: Throwable, attached: Any?) {
+                            if (cont.isActive) cont.resumeWithException(t)
+                        }
                     }
+                    server.accept(null, handler)
+                    cont.invokeOnCancellation {
+                        runCatching { server.close() }
+                    }
+                }
+                runCatching { ch.close() }
+                continue
+            }
 
-                    override fun failed(t: Throwable, attached: Any?) {
-                        if (cont.isActive) cont.resumeWithException(t)
+            val ch = try {
+                kotlinx.coroutines.suspendCancellableCoroutine<AsynchronousSocketChannel> { cont ->
+                    val handler = object : CompletionHandler<AsynchronousSocketChannel, Any?> {
+                        override fun completed(result: AsynchronousSocketChannel, attached: Any?) {
+                            cont.resume(result)
+                        }
+
+                        override fun failed(t: Throwable, attached: Any?) {
+                            if (cont.isActive) cont.resumeWithException(t)
+                        }
+                    }
+                    server.accept(null, handler)
+                    cont.invokeOnCancellation {
+                        runCatching { server.close() }
                     }
                 }
-                server.accept(null, handler)
-                cont.invokeOnCancellation {
-                    runCatching { server.close() }
-                }
+            } catch (e: Throwable) {
+                supervisor?.releaseIo()
+                throw e
             }
 
             // R05 — register the channel up front. The drain loop
@@ -125,7 +153,7 @@ object JvmLitebikeBindAdapter {
             val connId = connections.register(ch)
             // Read all bytes from the channel asynchronously, then
             // forward to the listener with the detected protocol.
-            drainOne(ch, element, connections, connId)
+            drainOne(ch, element, connections, connId, supervisor)
         }
     }
 
@@ -134,6 +162,7 @@ object JvmLitebikeBindAdapter {
         element: LitebikeListenerElement,
         connections: ConnectionRegistry,
         connId: Long,
+        supervisor: borg.trikeshed.userspace.nio.spi.NioSupervisor? = null,
     ) {
         val buf = ByteBuffer.allocate(8 * 1024)
         ch.read(
@@ -144,6 +173,7 @@ object JvmLitebikeBindAdapter {
                         // Peer closed — drop the registry entry.
                         connections.unregister(connId)
                         runCatching { ch.close() }
+                        supervisor?.releaseIo()
                         return
                     }
                     val bytes = ByteArray(read).also { buf.flip(); buf.get(it) }
@@ -156,11 +186,13 @@ object JvmLitebikeBindAdapter {
                         connections.unregister(connId)
                         runCatching { ch.close() }
                     }
+                    supervisor?.releaseIo()
                 }
 
                 override fun failed(t: Throwable, attached: Any?) {
                     connections.unregister(connId)
                     runCatching { ch.close() }
+                    supervisor?.releaseIo()
                 }
             }
         )

@@ -482,6 +482,7 @@ class ConnectionRegistry {
     fun unregister(connectionId: Long) {
         val entry = connections.remove(connectionId) ?: return
         runCatching { entry.channel.close() }
+        // NioSupervisor permit is released gracefully during drain or explicitly by adapter.
     }
 
     /**
