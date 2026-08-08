@@ -1,0 +1,86 @@
+To honour the JVM settings for this build a single-use Daemon process will be forked. For more on this, please refer to https://docs.gradle.org/9.6.1/userguide/gradle_daemon.html#sec:disabling_the_daemon in the Gradle documentation.
+Daemon will be stopped at the end of the build
+
+> Configure project :
+w: [33m[1m⚠️ Native task 'iosX64Test' is disabled[0m[0m
+Task 'iosX64Test' for target 'ios_x64' cannot run on the current host (linux-x86_64).
+Reason: simulator tests require macOS
+[32m[1mSolution:[0m[0m
+[32m[3mTo suppress this warning, add 'kotlin.native.ignoreDisabledTargets=true' to gradle.properties.[0m[0m
+
+w: [33m[1m⚠️ Native task 'iosSimulatorArm64Test' is disabled[0m[0m
+Task 'iosSimulatorArm64Test' for target 'ios_simulator_arm64' cannot run on the current host (linux-x86_64).
+Reason: simulator tests require macOS
+[32m[1mSolution:[0m[0m
+[32m[3mTo suppress this warning, add 'kotlin.native.ignoreDisabledTargets=true' to gradle.properties.[0m[0m
+
+w: [33m[1m⚠️ Native task 'watchosX64Test' is disabled[0m[0m
+Task 'watchosX64Test' for target 'watchos_x64' cannot run on the current host (linux-x86_64).
+Reason: simulator tests require macOS
+[32m[1mSolution:[0m[0m
+[32m[3mTo suppress this warning, add 'kotlin.native.ignoreDisabledTargets=true' to gradle.properties.[0m[0m
+
+w: [33m[1m⚠️ Native task 'watchosSimulatorArm64Test' is disabled[0m[0m
+Task 'watchosSimulatorArm64Test' for target 'watchos_simulator_arm64' cannot run on the current host (linux-x86_64).
+Reason: simulator tests require macOS
+[32m[1mSolution:[0m[0m
+[32m[3mTo suppress this warning, add 'kotlin.native.ignoreDisabledTargets=true' to gradle.properties.[0m[0m
+
+w: [33m[1m⚠️ Native task 'tvosX64Test' is disabled[0m[0m
+Task 'tvosX64Test' for target 'tvos_x64' cannot run on the current host (linux-x86_64).
+Reason: simulator tests require macOS
+[32m[1mSolution:[0m[0m
+[32m[3mTo suppress this warning, add 'kotlin.native.ignoreDisabledTargets=true' to gradle.properties.[0m[0m
+
+w: [33m[1m⚠️ Native task 'tvosSimulatorArm64Test' is disabled[0m[0m
+Task 'tvosSimulatorArm64Test' for target 'tvos_simulator_arm64' cannot run on the current host (linux-x86_64).
+Reason: simulator tests require macOS
+[32m[1mSolution:[0m[0m
+[32m[3mTo suppress this warning, add 'kotlin.native.ignoreDisabledTargets=true' to gradle.properties.[0m[0m
+
+w: [33m[1m⚠️ Unused Kotlin Source Sets[0m[0m
+The following Kotlin source sets were configured but not added to any Kotlin compilation:
+ * linuxMain
+ * linuxTest
+ * macosMain
+ * macosTest
+ * nativeMain
+ * nativeTest
+ * posixMain
+ * posixTest
+[32m[1mSolution:[0m[0m
+[32m[3mYou can add a source set to a target's compilation by connecting it with the compilation's default source set using 'dependsOn'.[0m[0m
+[36mSee [0m[34mhttps://kotl.in/connecting-source-sets[0m[36m[0m
+
+
+> Task :checkJvmMainComposeLibrariesCompatibility
+> Task :kmpPartiallyResolvedDependenciesChecker SKIPPED
+> Task :checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :convertXmlValueResourcesForCommonMain NO-SOURCE
+> Task :copyNonXmlValueResourcesForCommonMain NO-SOURCE
+> Task :prepareComposeResourcesTaskForCommonMain NO-SOURCE
+> Task :generateResourceAccessorsForCommonMain SKIPPED
+> Task :convertXmlValueResourcesForJvmMain NO-SOURCE
+> Task :copyNonXmlValueResourcesForJvmMain NO-SOURCE
+> Task :prepareComposeResourcesTaskForJvmMain NO-SOURCE
+> Task :generateResourceAccessorsForJvmMain SKIPPED
+> Task :generateActualResourceCollectorsForJvmMain SKIPPED
+> Task :generateComposeResClass SKIPPED
+> Task :generateExpectResourceCollectorsForCommonMain SKIPPED
+> Task :generateForgeAssets
+> Task :assembleJvmMainResources
+> Task :jvmProcessResources
+> Task :checkJvmTestComposeLibrariesCompatibility
+> Task :convertXmlValueResourcesForCommonTest NO-SOURCE
+> Task :copyNonXmlValueResourcesForCommonTest NO-SOURCE
+> Task :prepareComposeResourcesTaskForCommonTest NO-SOURCE
+> Task :generateResourceAccessorsForCommonTest SKIPPED
+> Task :convertXmlValueResourcesForJvmTest NO-SOURCE
+> Task :copyNonXmlValueResourcesForJvmTest NO-SOURCE
+> Task :prepareComposeResourcesTaskForJvmTest NO-SOURCE
+> Task :generateResourceAccessorsForJvmTest SKIPPED
+> Task :processJvmMainResources SKIPPED
+> Task :assembleJvmTestResources
+> Task :jvmTestProcessResources
+> Task :processJvmTestResources SKIPPED
+> Task :compileKotlinJvm
