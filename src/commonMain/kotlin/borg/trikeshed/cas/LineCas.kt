@@ -5,6 +5,7 @@ import borg.trikeshed.job.ContentId
 import borg.trikeshed.lib.Join
 import borg.trikeshed.lib.Series
 import borg.trikeshed.lib.get
+import borg.trikeshed.collections.associative.FunnelHashIndex
 import borg.trikeshed.lib.j
 import borg.trikeshed.lib.size
 
@@ -286,6 +287,7 @@ data class LinkHit(
 class LineCasIndex {
     private val byContent = linkedMapOf<String, MutableList<Join<ContentId, LineNode>>>()
     private val docs = linkedMapOf<String, LineSpine>()
+    private var funnel: FunnelHashIndex<String>? = null
 
     val documentCount: Int get() = docs.size
     val contentKeyCount: Int get() = byContent.size
@@ -304,6 +306,7 @@ class LineCasIndex {
             val n = spine[i]
             byContent.getOrPut(n.contentCid.hex) { mutableListOf() }.add(doc j n)
         }
+        funnel = FunnelHashIndex.build(byContent.keys.toList(), 0L)
         return doc
     }
 
@@ -316,6 +319,9 @@ class LineCasIndex {
         probe: LineNode,
         minGrade: MatchGrade = MatchGrade.LINKED,
     ): Series<LinkHit> {
+        if (funnel?.contains(probe.contentCid.hex) == false) {
+            return 0 j { _: Int -> error("empty") }
+        }
         val candidates = byContent[probe.contentCid.hex].orEmpty()
         if (candidates.isEmpty()) return 0 j { _: Int -> error("empty") }
 
@@ -334,6 +340,18 @@ class LineCasIndex {
      * Returns Series of (docCid j OverlapCounts) for docs with any content hit.
      */
     fun linkDensity(probe: LineSpine): Series<Join<ContentId, OverlapCounts>> {
+        var hasHits = false
+        val f = funnel
+        if (f != null) {
+            for (i in 0 until probe.size) {
+                if (f.contains(probe[i].contentCid.hex)) {
+                    hasHits = true
+                    break
+                }
+            }
+            if (!hasHits) return 0 j { _: Int -> error("empty") }
+        }
+
         val acc = linkedMapOf<String, IntArray>() // hex -> [linked, partial, content]
         for (i in 0 until probe.size) {
             val n = probe[i]
@@ -358,6 +376,59 @@ class LineCasIndex {
     }
 
     fun spineOf(docCid: ContentId): LineSpine? = docs[docCid.hex]
+
+    /**
+     * Regional top-k density per aperture band.
+     * Computes the residual density (novel content hits and overlap) grouped by
+     * chunks matching the provided aperture zoom level, avoiding full probe loads.
+     */
+    fun residualDensity(probe: LineSpine, aperture: borg.trikeshed.collections.LineAperture): Series<Join<Int, Series<Join<ContentId, OverlapCounts>>>> {
+        if (probe.size == 0) return 0 j { _: Int -> error("empty") }
+
+        val regions = when (aperture) {
+            borg.trikeshed.collections.LineAperture.L0 -> 1
+            borg.trikeshed.collections.LineAperture.L1 -> 4
+            borg.trikeshed.collections.LineAperture.L2 -> 16
+            borg.trikeshed.collections.LineAperture.L3 -> 64
+        }
+        val chunks = minOf(regions, probe.size)
+
+        val result: Series<Join<Int, Series<Join<ContentId, OverlapCounts>>>> = chunks j { i: Int ->
+            val start = i * probe.size / chunks
+            val end = (i + 1) * probe.size / chunks
+            val chunk: Series<LineNode> = end - start j { j: Int -> probe[start + j] }
+            val res = residualsOf(chunk)
+            val density: Series<Join<ContentId, OverlapCounts>> = if (chunk.size > 0) {
+                try { linkDensity(chunk) } catch (e: Exception) { 0 j { _: Int -> error("empty") } }
+            } else {
+                0 j { _: Int -> error("empty") }
+            }
+            res.size j density
+        }
+        return result as Series<Join<Int, Series<Join<ContentId, OverlapCounts>>>>
+    }
+
+    /**
+     * Residual extraction for the Funnel N-way merge.
+     * Returns nodes from the probe whose contentCid.hex are MISSES in the index.
+     */
+    fun residualsOf(probe: LineSpine): Series<LineNode> {
+        val f = funnel ?: return probe
+
+        var missCount = 0
+        var missIndices = IntArray(minOf(probe.size, 16))
+        for (i in 0 until probe.size) {
+            if (!f.contains(probe[i].contentCid.hex)) {
+                if (missCount == missIndices.size) {
+                    missIndices = missIndices.copyOf(missIndices.size * 2)
+                }
+                missIndices[missCount++] = i
+            }
+        }
+
+        val finalIndices = if (missCount == missIndices.size) missIndices else missIndices.copyOf(missCount)
+        return missCount j { i: Int -> probe[finalIndices[i]] }
+    }
 }
 
 enum class LineCasNeighbor {
