@@ -103,7 +103,6 @@ object ForgeApp {
                 checkedAt = Clock.System.now().toEpochMilliseconds(),
             )
         }
-        val cycleTelemetry = readCycleTelemetry()
         return mapOf(
             "nio" to mapOf(
                 "backendName" to report.backendName,
@@ -112,16 +111,8 @@ object ForgeApp {
                 "kernelHint" to report.kernelHint,
                 "checkedAt" to report.checkedAt,
             ),
-            "flywheel" to cycleTelemetry,
+            "flywheel" to emptyMap<String, Any?>(),
         )
-    }
-
-    private fun readCycleTelemetry(): Map<String, Any?> {
-        // Dashboards read the live trace via the daemon-side binder; the
-        // commonMain renderer has no filesystem access, so it returns an
-        // empty placeholder. The browser bundle hydrates from the same shape
-        // once the websocket binder ships telemetry.
-        return mapOf("lastCycle" to null, "history" to emptyList<Any?>())
     }
 
     private fun htmlShell(seed: String): String = """
