@@ -12,10 +12,12 @@ below is the project's kernel fp concepts we use in our kotlin-common projects.
 >
 > The design bias below (composition over inheritance; ranges and projections
 > over mutable loops; lazy views first; typealiases compress semantics) is the
-> K/Arrow house style. Where a primitive here diverges from its original — e.g.
-> `Series.filter` is missing and `%`/`[Predicate]` return `Iterator` not `Series`
-> (K's `&` and Arrow's `filter(mask)` both return same-typed lazy structures) —
-> that is a port gap, not a design choice. Fix by matching the original.
+> K/Arrow house style. `Series.filter` and the `%` (`rem`) index-selector both
+> return `Series<T>` / `Series<Int>` respectively (Predicate.kt), matching K's
+> `&` and Arrow's `filter(mask)`. The filter implementation currently
+> materializes a dynamic IntArray of indices before wrapping as Series —
+> a lazy two-pass implementation (indices first, then project) would be closer
+> to K's `where` + `@` composition, but the return types are correct.
 
 ## Kernel algebra
 
@@ -33,7 +35,7 @@ interface Join<A, B> {
 inline infix fun <A, B> A.j(b: B): Join<A, B> = Join(this, b)
 
 typealias Twin<T> = Join<T, T>
-typealias Series<T> = Join<Int, (Int) -> T>
+typealias Series<T> = MetaSeries<Int, T>  // MetaSeries extends Join; Join.kt:48
 
 val <T> Series<T>.size: Int get() = a
 operator fun <T> Series<T>.get(i: Int): T = b(i)
@@ -70,6 +72,7 @@ Read this algebra as:
 - `α` = lazy map / projection
 - `↺` = visible constant / left identity anchor
 - literals like `_l`, `_a`, `_s`, `s_` keep composition dense without hiding type shape
+  (all four defined at Join.kt:99-116: `_l`→List, `_a`→Array, `_s`→Set, `s_`→Series)
 
 Design bias:
 1. composition over inheritance
@@ -193,8 +196,7 @@ same principle: **keep the result a `Series` so downstream `α`/`get(range)`/
 > Don't follow this with `.toList()` to satisfy an `assertEquals(listOf(...))`;
 > that's materialization ceremony that throws away the laziness α just bought.
 > Use α when the result is consumed by another Series combinator or by a
-> Series-typed `contains`/`in` check. Use `.view.map { }` (stdlib) when you
-> genuinely need a List at the boundary.
+> Series-typed `contains`/`in` check. Use `.view.map { }` (stdlib) when you reify but `.toList()` when a SeriesWrapper is cheaper without positional mutability to preserve the laziness 
 
 ```kotlin
          val supers = o.lattice.supertypes(cursor)
@@ -381,10 +383,26 @@ re-entering add() (which re-checks the threshold and cascades).
 - `when(path)` string switch for routing — use typed key facet lookup
 - `mutableListOf` built and never mutated — use Series / s_[] / α projection
 - Per-record fsync — use group commit
-- `@Volatile var` on a data class field inside ConcurrentHashMap — race condition
 - `Channel.UNLIMITED` for back-pressured pipelines — use bounded channels
 - SharedFlow with `replay=64` for real-time projections — use CONFLATED
 - Swallowed `catch (e: Throwable) {}` — errors are first-class projections
 - `.toString()` comparison for CoroutineContext.Key identity — use reference eq
 - String domain IDs in-process — use value-class packed primitives
 - God object daemon — decompose into CCEK elements
+
+# Open gaps (RGA Aug 08 2026)
+
+- ConfixIndexK<R> GADT-key pattern: referenced in comments (ConfixIsamFactory.kt:23)
+  but no `class ConfixIndexK` or `interface ConfixIndexK` definition exists.
+  The lineage table claims it; the type isn't codified.
+- Cursor fancy indexing: PRELOAD lists `cursor[range]`, `cursor[IntArray]`,
+  `cursor["name","age"]`, `cursor[-"debug"]`, `join()`, `combine()`. Zero
+  operator functions implementing these exist in cursor/. The Cursor typealias
+  exists (Cursor.kt:103) but the algebraic indexing layer is aspirational.
+- `↺` (leftIdentity): no standalone definition in lib/. Referenced in
+  RowVecSupport.kt:62 as `.leftIdentity` on ColumnMeta (a different type) and
+  in Series.kt:66 as a comment. The anchor symbol exists in the doc but not
+  as a usable operator on Series<T>.
+- Series.filter materializes: Predicate.kt grows a dynamic IntArray before
+  wrapping as Series. Correct return type, but not lazy — diverges from K's
+  composition-first `where` + `@` pattern.
