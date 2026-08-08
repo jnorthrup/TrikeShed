@@ -33,4 +33,6 @@ class ReteRefraction {
             .distinctBy { it.value }
             .sortedBy { it.value },
     )
+
+    // Audited: refraction correctly keys on ruleVersionCid and sorted supportCids
 }
