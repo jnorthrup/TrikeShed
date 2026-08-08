@@ -11,6 +11,7 @@ import borg.trikeshed.userspace.FileImpl
 class File internal constructor(internal val impl: FileImpl) {
     companion object {
         internal fun fromFd(fd: Int): File = File(FileImpl(fd))
+        internal fun fromImpl(impl: FileImpl): File = File(impl)
     }
 
     val id: Int get() = impl.id

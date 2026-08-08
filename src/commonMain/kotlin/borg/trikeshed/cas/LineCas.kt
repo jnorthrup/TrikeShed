@@ -2,12 +2,8 @@ package borg.trikeshed.cas
 
 import borg.trikeshed.job.CasStore
 import borg.trikeshed.job.ContentId
-import borg.trikeshed.lib.Join
-import borg.trikeshed.lib.Series
-import borg.trikeshed.lib.get
+import borg.trikeshed.lib.*
 import borg.trikeshed.collections.associative.FunnelHashIndex
-import borg.trikeshed.lib.j
-import borg.trikeshed.lib.size
 
 /**
  * Line CAS taxonomy.
@@ -306,7 +302,7 @@ class LineCasIndex {
             val n = spine[i]
             byContent.getOrPut(n.contentCid.hex) { mutableListOf() }.add(doc j n)
         }
-        funnel = FunnelHashIndex.build(byContent.keys.toList(), 0L)
+        funnel = FunnelHashIndex.build(byContent.keys.toList().toSeries(), 0L)
         return doc
     }
 
