@@ -29,12 +29,19 @@ class CouchHeadProjection {
 
     // docId -> current committed frame (including tombstones)
     private val frames = mutableMapOf<String, CouchCommittedFrame>()
+    private var lastSequence: Long = -1L
 
     fun applyCommit(frame: CouchCommittedFrame) {
         val existingFrame = frames[frame.docId]
-        if (existingFrame != null && (frame.sequence <= existingFrame.sequence || frame.rev == existingFrame.rev)) {
-            return
+        if (existingFrame != null) {
+            require(frame.sequence > existingFrame.sequence) { "stale revision rejected" }
+            require(frame.rev != existingFrame.rev) { "duplicate rev rejected" }
         }
+
+        require(lastSequence == -1L || frame.sequence == lastSequence + 1 || frame.sequence == 0L) {
+            "_changes resumes after the sequence without gaps"
+        }
+        lastSequence = frame.sequence
 
         require(frame.deleted || frame.doc?.id == frame.docId) {
             "Insert/Update frame docId must match document id"
@@ -43,11 +50,14 @@ class CouchHeadProjection {
         frames[frame.docId] = frame
 
         if (frame.deleted) {
-            val idx = docIndex.remove(frame.docId)
-            if (idx != null) {
-                removeFromFieldIndex(docs[idx])
-                docs.removeAt(idx)
-                rebuildDocIndex()
+            val tombstone = Document(frame.docId, listOf(Field("_deleted", true)))
+            val existingIndex = docIndex[frame.docId]
+            if (existingIndex != null) {
+                removeFromFieldIndex(docs[existingIndex])
+                docs.set(existingIndex, tombstone)
+            } else {
+                docs.append(tombstone)
+                docIndex[frame.docId] = docs.a - 1
             }
         } else {
             val doc = frame.doc ?: error("Insert/Update frame must contain a document")
