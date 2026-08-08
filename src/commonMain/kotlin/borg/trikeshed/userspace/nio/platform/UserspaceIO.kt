@@ -1,6 +1,6 @@
 package borg.trikeshed.userspace.nio.platform
 
-import borg.trikeshed.userspace.nio.channel.Channel
+import borg.trikeshed.userspace.Channel
 import borg.trikeshed.userspace.nio.file.File
 import borg.trikeshed.userspace.SelectionResult
 import borg.trikeshed.userspace.nio.ByteBuffer

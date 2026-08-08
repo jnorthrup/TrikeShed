@@ -1,6 +1,6 @@
 package borg.trikeshed.userspace
 
-import borg.trikeshed.userspace.nio.channel.Channel
+import borg.trikeshed.userspace.Channel
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
