@@ -246,10 +246,10 @@ class BtrfsCasStore(
         }
 
         // ⚡ Bolt: Wrap blocking I/O operations in Dispatchers.IO to prevent coroutine starvation
-        val apparent = withContext(Dispatchers.IO) {
-            Files.walk(root.toPath()).use { stream ->
-                stream.filter { Files.isRegularFile(it) }
-                    .mapToLong { Files.size(it) }
+        val apparent = withContext(kotlinx.coroutines.Dispatchers.IO) {
+            java.nio.file.Files.walk(root.toPath()).use { stream ->
+                stream.filter { java.nio.file.Files.isRegularFile(it) }
+                    .mapToLong { java.nio.file.Files.size(it) }
                     .sum()
             }
         }
