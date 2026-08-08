@@ -1,9 +1,18 @@
-package borg.trikeshed.userspace.nio.channel
+package borg.trikeshed.userspace
 
 import borg.trikeshed.userspace.nio.file.File
-import borg.trikeshed.userspace.FunctionalUringFacade
-import borg.trikeshed.userspace.SelectionResult
 import borg.trikeshed.userspace.nio.ByteBuffer
+
+/**
+ * Channel factory — backed by expect/actual [ChannelsImpl].
+ */
+object Channels {
+    fun open(entries: Int = 256): Channel =
+        Channel(FunctionalUringFacade(entries, openUserspaceChannelBackend(entries)))
+
+    fun socket(domain: Int, type: Int, protocol: Int): File =
+        File.fromImpl(ChannelsImpl.socket(domain, type, protocol))
+}
 
 /**
  * Unified io_uring-style submission queue.

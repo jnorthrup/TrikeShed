@@ -1,0 +1,5 @@
+# SPI descriptor for UserspaceNioSpi.
+# Add concrete implementation class names here, one per line.
+# Example:
+# borg.trikeshed.userspace.nio.jvm.EpollUserspaceNioSpi
+# borg.trikeshed.userspace.nio.jvm.IoUringUserspaceNioSpi

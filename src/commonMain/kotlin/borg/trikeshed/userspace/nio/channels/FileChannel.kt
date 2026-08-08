@@ -3,7 +3,7 @@
 package borg.trikeshed.userspace.nio.channels
 
 import borg.trikeshed.userspace.nio.ByteBuffer
-import borg.trikeshed.userspace.nio.channel.Channels
+import borg.trikeshed.userspace.Channels
 import borg.trikeshed.userspace.nio.file.Path
 import borg.trikeshed.userspace.nio.file.OpenOption
 import borg.trikeshed.userspace.nio.file.StandardOpenOption
