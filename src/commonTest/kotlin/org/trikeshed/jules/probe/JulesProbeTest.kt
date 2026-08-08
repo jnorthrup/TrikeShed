@@ -10,8 +10,8 @@ class JulesProbeTest {
         val handle = ProbeHandle("id", emptySeriesOf())
         val parsed = handle.decode("""{"id": "id", "metrics": [{"timestamp": 123, "value": 1.0}]}""")
         assertEquals("id", parsed.id)
-        assertEquals(1, parsed.metrics.size)
-        assertEquals(123L, parsed.metrics[0].timestamp)
-        assertEquals(1.0, parsed.metrics[0].value)
+        assertEquals(1, parsed.metrics.a)
+        assertEquals(123L, parsed.metrics.b(0).timestamp)
+        assertEquals(1.0, parsed.metrics.b(0).value)
     }
 }
