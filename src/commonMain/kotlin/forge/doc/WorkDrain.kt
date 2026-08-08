@@ -6,7 +6,6 @@ import borg.trikeshed.util.oroboros.LexicalMemory
 import borg.trikeshed.util.oroboros.MergeReceipt
 import borg.trikeshed.utils.kanban.*
 import borg.trikeshed.utils.kanban.JulesBoardStore
-import borg.trikeshed.jules.JulesCause
 import kotlinx.datetime.Clock
 
 suspend fun drainReadmeDagReteRefraction(store: JulesBoardStore) {
