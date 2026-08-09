@@ -17,3 +17,7 @@
 ## 2026-08-04 - Avoid O(N²) memory/eviction bottlenecks
 **Learning:** Replacing chunked buffered I/O with `joinToString` causes OOM regressions. Map eviction using `removeAll` inside a loop causes O(N²) freezing.
 **Action:** Always reconstruct map keys and use `.remove(key)` for O(1) cache eviction.
+
+## 2024-06-25 - map.keys.removeAll triggers O(N²) bottleneck
+**Learning:** In Kotlin, using `map.keys.removeAll { ... }` or `map.entries.removeAll { ... }` triggers a linear scan over the map elements, which can create a severe O(N²) bottleneck during cache eviction loops if called frequently.
+**Action:** When removing specific, mathematically predictable entries from a Kotlin Map (like during chronological cache eviction or rollover), reconstruct the map keys directly and use `map.remove(key)` within a loop to ensure O(1) deletion per key.
