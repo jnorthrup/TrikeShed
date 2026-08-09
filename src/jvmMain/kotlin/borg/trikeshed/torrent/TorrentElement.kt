@@ -156,7 +156,7 @@ class TorrentElement(
         val body = uri.removePrefix("magnet:?")
         body.split("&").forEach { pair ->
             val (k, v) = pair.split("=", limit = 2)
-            params[k] = java.net.URLDecoder.decode(v, Charsets.UTF_8.name())
+            params[k] = percentDecode(v)
         }
         return params
     }

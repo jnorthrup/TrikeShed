@@ -5,7 +5,6 @@ import borg.trikeshed.htx.openHtxElement
 import borg.trikeshed.htx.parseHtxRequest
 import borg.trikeshed.htx.HtxMethod
 import kotlinx.coroutines.*
-import java.net.URLEncoder
 
 /**
  * BitTorrent Tracker Protocol (BEP 3) client.
@@ -35,8 +34,8 @@ open class TrackerClient(private val scope: CoroutineScope) {
         val trackerUrl = torrentFile.announce ?: return@withContext emptyList()
 
         val params = buildList {
-            add("info_hash" to urlEncode(infoHash))
-            add("peer_id" to urlEncode(peerId))
+            add("info_hash" to percentEncodeBinary(infoHash))
+            add("peer_id" to percentEncodeBinary(peerId))
             add("port" to port.toString())
             add("uploaded" to uploaded.toString())
             add("downloaded" to downloaded.toString())
@@ -84,10 +83,6 @@ open class TrackerClient(private val scope: CoroutineScope) {
             offset += 6
         }
         return peers
-    }
-
-    private fun urlEncode(data: ByteArray): String {
-        return data.joinToString("") { "%%%02X".format(it) }
     }
 
     fun close() { /* No resources to close in this stub */ }
