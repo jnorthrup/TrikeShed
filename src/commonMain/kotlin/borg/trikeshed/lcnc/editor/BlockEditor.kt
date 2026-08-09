@@ -62,7 +62,7 @@ class BlockEditor(var block: LcncBlock, val ingestState: IngestStateElement) {
                 // Block creation menu
                 text("<div class=\"lcnc-block-menu\">")
                 text("<button onclick=\"window.lcncInsertBlock('${block.id}')\" aria-label=\"Insert new block\" title=\"Insert new block\">+</button>")
-                text("<select onchange=\"window.lcncChangeBlockType('${block.id}', this.value)\">")
+                text("<select onchange=\"window.lcncChangeBlockType('${block.id}', this.value)\" aria-label=\"Change block type\">")
                 text("<option value=\"paragraph\"${if(block.type=="paragraph") " selected" else ""}>Text</option>")
                 text("<option value=\"heading_1\"${if(block.type=="heading_1") " selected" else ""}>Heading 1</option>")
                 text("<option value=\"heading_2\"${if(block.type=="heading_2") " selected" else ""}>Heading 2</option>")
