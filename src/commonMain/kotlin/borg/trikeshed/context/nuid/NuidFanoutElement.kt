@@ -222,9 +222,15 @@ open class NuidFanoutElement(
 
     private suspend fun nextClaimId(): Long = claimMutex.withLock {
         claimCounter = if (claimCounter == Long.MAX_VALUE) 0L else claimCounter + 1L
-        if (claimCounter % 1000L == 0L) {
+        if (claimCounter == 0L) {
+            // Handle rollover explicitly to avoid relative eviction failures
+            claimedBy.clear()
+        } else if (claimCounter % 1000L == 0L) {
             val threshold = claimCounter - 5000L
-            claimedBy.keys.removeAll { it < threshold }
+            // Optimization: Replace O(N) iteration via removeAll with O(1) hash removals
+            for (i in 1L..1000L) {
+                claimedBy.remove(threshold - i)
+            }
         }
         claimCounter
     }
