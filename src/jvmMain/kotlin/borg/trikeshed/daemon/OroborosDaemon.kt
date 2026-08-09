@@ -8,6 +8,7 @@ import borg.trikeshed.torrent.TorrentElement
 import borg.trikeshed.jules.FlywheelDriver
 import borg.trikeshed.jules.FlywheelDriver.FlywheelEvent
 import borg.trikeshed.litebike.JvmKanbanServer
+import borg.trikeshed.lib.j
 import borg.trikeshed.userspace.nio.file.spi.JvmFileOperations
 import borg.trikeshed.userspace.nio.spi.NioSupervisor
 import borg.trikeshed.util.io.ForgeCliArgs
@@ -15,6 +16,7 @@ import borg.trikeshed.util.oroboros.CouchAttachmentGateway
 import borg.trikeshed.util.oroboros.FileCasStore
 import borg.trikeshed.util.oroboros.GitCouchGateway
 import borg.trikeshed.util.oroboros.JvmFileWatchReactorElement
+import borg.trikeshed.util.oroboros.WorktreeCouchGateway
 import borg.trikeshed.userspace.reactor.MuxReactorElement
 import borg.trikeshed.userspace.reactor.MuxReactorConfig
 import keymux.KeyMux
@@ -26,6 +28,7 @@ import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.sync.withLock
 import java.io.BufferedWriter
 import java.io.File
@@ -258,6 +261,7 @@ object OroborosDaemon {
         val couchStore = borg.trikeshed.couch.CouchStoreFactory.inMemory()
         val attachmentGateway = CouchAttachmentGateway(couchStore, casStore)
         val gitCouchGateway = GitCouchGateway(fileOps, attachmentGateway)
+        val worktreeCouchGateway = WorktreeCouchGateway(fileOps, attachmentGateway)
 
         // ── Memory store + ISAM index layer (fs-memory Prongs 1+2) ──
         // MemoryStore composes the existing CAS+Couch into the paper's
@@ -265,7 +269,18 @@ object OroborosDaemon {
         // maintains taxonomy/temporal/provenance ISAM routes.
         val memoryStore = borg.trikeshed.memory.MemoryStore(casStore, couchStore)
         val memoryIndex = borg.trikeshed.memory.MemoryIndexLayer(memoryStore)
+        val couchIndexBridge = borg.trikeshed.memory.CouchIndexBridge(attachmentGateway, memoryIndex)
+        driver.attachMemoryIndexLayer(memoryIndex)
         System.err.println("[OROBOROS] MemoryStore + MemoryIndexLayer: ${memoryIndex.route(borg.trikeshed.memory.IndexKind.Taxonomy).entryCount} taxonomy entries")
+
+        // ── Memory bridge: routes memory-eligible reconcile files through
+        //    MemoryStore.put() so they get per-line spines + IPFS publication.
+        val ipfsBridge = borg.trikeshed.cas.IpfsBridge(casStore)
+        val memoryBridge = borg.trikeshed.util.oroboros.MemoryBridge(
+            memoryStore,
+            attachmentGateway,
+            ipfsBridge,
+        )
 
         // ── Reactive git-state hub: JvmFileWatchReactorElement watches .git/**
         //    and feeds the GitCouchGateway + git-state cache. This IS the
@@ -278,8 +293,59 @@ object OroborosDaemon {
             includeGlobs = listOf(".git/**"),
             excludeGlobs = emptyList(),
         )
-        launch { gitWatcher.open() }
+        launch(Dispatchers.IO) { gitWatcher.open() }
         System.err.println("[OROBOROS] Git watcher: ${gitWatcher.state} — reactive .git/** events")
+
+        // Working-tree plane: source and document files live under Couch/CAS,
+        // independently of the `.git/**` identity plane above.
+        val worktreeWatcher = JvmFileWatchReactorElement(
+            root = repoDir.absolutePath,
+            parentJob = coroutineContext[kotlinx.coroutines.Job],
+            includeGlobs = emptyList(),
+            excludeGlobs = listOf(
+                ".git/**", ".gradle/**", ".idea/**", "build/**", "node_modules/**",
+            ),
+        )
+        launch(Dispatchers.IO) { worktreeWatcher.open() }
+        System.err.println("[OROBOROS] Worktree watcher: ${worktreeWatcher.state} — reactive source/document events")
+
+        val worktreeDirty = Channel<Unit>(Channel.CONFLATED)
+        launch {
+            for (event in worktreeWatcher.events) {
+                worktreeDirty.trySend(Unit)
+                println("[OROBOROS] worktree-event: ${event.type} ${event.path}")
+            }
+        }
+
+        // Debounced worktree reconciliation. File reads and CAS writes run on
+        // Dispatchers.IO, never on the reactor event loop.
+        launch(Dispatchers.IO) {
+            while (isActive) {
+                worktreeDirty.receive()
+                delay(250)
+                while (worktreeDirty.tryReceive().isSuccess) { /* coalesce */ }
+                val currentSha = gitState.headSha()
+                runCatching {
+                    val snap = worktreeCouchGateway.reconcile(
+                        repoRoot = repoDir.absolutePath,
+                        agentId = "oroboros",
+                        revision = currentSha,
+                        sequence = System.currentTimeMillis(),
+                    )
+                    couchIndexBridge.indexReconciliation(
+                        WorktreeCouchGateway.WORKTREE_PREFIX,
+                        snap.paths.size j { i: Int -> snap.paths[i] },
+                    )
+                    val bridged = memoryBridge.bridge(snap, agentId = "oroboros")
+                    println(
+                        "[OROBOROS] Worktree→Couch reconcile: ${snap.paths.size} paths, " +
+                            "$bridged memory updates @ ${currentSha.take(12)}"
+                    )
+                }.onFailure {
+                    System.err.println("[OROBOROS] Worktree→Couch reconcile failed: ${it.message}")
+                }
+            }
+        }
 
         // Choreography 1: git filesystem events → GitStateCache invalidation.
         // The cache holds headSha, treeClean, and refHead — read from .git
@@ -313,7 +379,7 @@ object OroborosDaemon {
         // Choreography 2: git object creation → GitCouchGateway reconcile.
         // Runs on its own coroutine; the gateway reads .git directly via
         // JvmFileOperations, no ProcessBuilder.
-        launch {
+        launch(Dispatchers.IO) {
             var lastReconcledSha = ""
             while (true) {
                 // Wait for object-dirty signal, then reconcile
@@ -327,6 +393,10 @@ object OroborosDaemon {
                             revision = currentSha,
                             sequence = System.currentTimeMillis(),
                         )
+                        couchIndexBridge.indexReconciliation(
+                            GitCouchGateway.GIT_PREFIX,
+                            snap.paths.size j { i: Int -> snap.paths[i] },
+                        )
                         lastReconcledSha = currentSha
                         println("[OROBOROS] Git→Couch reactive reconcile: ${snap.paths.size} paths @ ${currentSha.take(12)}")
                     }.onFailure {
@@ -336,17 +406,40 @@ object OroborosDaemon {
             }
         }
 
-        // Initial reconcile — read HEAD directly, no ProcessBuilder
-        runCatching {
-            val headSha = gitState.headSha()
-            val snap = gitCouchGateway.reconcile(
-                forgeHome = repoDir.absolutePath,
-                agentId = "oroboros",
-                revision = headSha,
-                sequence = System.currentTimeMillis(),
-            )
-            System.err.println("[OROBOROS] Git→Couch initial reconcile: ${snap.paths.size} paths @ ${headSha.take(12)}")
-        }.onFailure { System.err.println("[OROBOROS] Git→Couch initial reconcile failed: ${it.message}") }
+        // Initial two-plane reconcile. File reads and CAS writes stay off the
+        // reactor thread.
+        withContext(Dispatchers.IO) {
+            runCatching {
+                val headSha = gitState.headSha()
+                val snap = gitCouchGateway.reconcile(
+                    forgeHome = repoDir.absolutePath,
+                    agentId = "oroboros",
+                    revision = headSha,
+                    sequence = System.currentTimeMillis(),
+                )
+                couchIndexBridge.indexReconciliation(
+                    GitCouchGateway.GIT_PREFIX,
+                    snap.paths.size j { i: Int -> snap.paths[i] },
+                )
+                System.err.println("[OROBOROS] Git→Couch initial reconcile: ${snap.paths.size} paths @ ${headSha.take(12)}")
+
+                val worktreeSnap = worktreeCouchGateway.reconcile(
+                    repoRoot = repoDir.absolutePath,
+                    agentId = "oroboros",
+                    revision = headSha,
+                    sequence = System.currentTimeMillis(),
+                )
+                couchIndexBridge.indexReconciliation(
+                    WorktreeCouchGateway.WORKTREE_PREFIX,
+                    worktreeSnap.paths.size j { i: Int -> worktreeSnap.paths[i] },
+                )
+                val bridged = memoryBridge.bridge(worktreeSnap, agentId = "oroboros")
+                System.err.println(
+                    "[OROBOROS] Worktree→Couch initial reconcile: ${worktreeSnap.paths.size} paths, " +
+                        "$bridged memory files bridged (spines + IPFS)"
+                )
+            }.onFailure { System.err.println("[OROBOROS] initial reconcile failed: ${it.message}") }
+        }
 
         // ── Couch report reactor: CCEK element for map/reduce events ──
         val reportReactor = CouchReportReactorElement(parentJob = kanbanJob)
@@ -569,6 +662,8 @@ object OroborosDaemon {
             runCatching { kanbanJob.cancel() }
             runCatching { reportReactor.close() }
             runCatching { memoryIndex.close() }
+            worktreeDirty.close()
+            runCatching { worktreeWatcher.close() }
             runCatching { gitWatcher.close() }
             try { htxElement.close() } catch (_: Exception) {}
             try { torrentElement.close() } catch (_: Exception) {}

@@ -93,6 +93,7 @@ class MemoryStore(
     fun get(path: String): MemoryFile? {
         val doc = couch.get(path) ?: return null
         if (doc.fields.any { it.name == "deleted" && it.value == "true" }) return null
+        if (doc.fields.none { it.name == "kind" }) return null
 
         val description = doc.fields.find { it.name == "description" }?.value as? String ?: ""
         val cidStr = doc.fields.find { it.name == "contentId" }?.value as? String ?: return null
@@ -164,7 +165,10 @@ class MemoryStore(
         for (i in 0 until ids.size) {
             val id = ids[i]
             val doc = couch.get(id)
-            if (doc != null && doc.fields.none { it.name == "deleted" && it.value == "true" }) {
+            if (doc != null &&
+                doc.fields.any { it.name == "kind" } &&
+                doc.fields.none { it.name == "deleted" && it.value == "true" }
+            ) {
                 valid.add(id)
             }
         }

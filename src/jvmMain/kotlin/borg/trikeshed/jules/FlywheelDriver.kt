@@ -5,6 +5,7 @@ import borg.trikeshed.lib.Join
 import borg.trikeshed.lib.j
 import borg.trikeshed.kanban.ForgeKanbanIngest
 import borg.trikeshed.job.ContentId
+import borg.trikeshed.memory.MemoryIndexLayer
 import borg.trikeshed.userspace.nio.file.spi.JvmFileOperations
 import borg.trikeshed.utils.kanban.JulesBoardStore
 import borg.trikeshed.utils.kanban.forForgeDir
@@ -106,6 +107,27 @@ class FlywheelDriver(
         store = store,
         source = source,
     )
+    private val sessionBarriers = java.util.concurrent.ConcurrentHashMap<String, SettlementBarrier>()
+    @Volatile private var memoryIndexLayer: MemoryIndexLayer? = null
+
+    /** Attach the daemon's live memory index so eviction can flush it first. */
+    fun attachMemoryIndexLayer(indexLayer: MemoryIndexLayer) {
+        memoryIndexLayer = indexLayer
+    }
+
+    private fun barrierFor(sessionId: String): SettlementBarrier =
+        sessionBarriers.computeIfAbsent(sessionId) { SettlementBarrier() }
+
+    private suspend fun evictQuiescent(
+        sessionId: String,
+        reason: String,
+        at: Long,
+    ): Boolean = evictStalledSession(
+        sessionId = sessionId,
+        barrier = barrierFor(sessionId),
+        flushIndex = { memoryIndexLayer?.flush() },
+        evict = { conductor.retireTerminal(sessionId, reason, at) },
+    ).also { sessionBarriers.remove(sessionId) }
     // CCEK context: SupervisorJob + SharedFlow event bus. Dispatch concurrency
     // is bounded by the queue slice (`take(available)`) and structured async.
     private val parentJob: Job = SupervisorJob()
@@ -347,12 +369,16 @@ class FlywheelDriver(
         }.sortedBy { it.snapshot.capturedAt }) {
             val age = nowQuiescent - card.snapshot.capturedAt
             if (age < quiescentEvictMs) continue
-            conductor.retireTerminal(
-                card.snapshot.sessionId,
-                "quiescent eviction: ${card.snapshot.state} for ${age / 60000}min with no queue entry",
-                nowQuiescent,
+            val reason = "quiescent eviction: ${card.snapshot.state} for ${age / 60000}min with no queue entry"
+            val settled = evictQuiescent(
+                sessionId = card.snapshot.sessionId,
+                reason = reason,
+                at = nowQuiescent,
             )
-            println("[FLYWHEEL] QUIESCENT-EVICT ${card.snapshot.sessionId.takeLast(6)} ${card.snapshot.state} age=${age / 60000}min: ${card.card.title.take(60)}")
+            println(
+                "[FLYWHEEL] QUIESCENT-EVICT ${card.snapshot.sessionId.takeLast(6)} " +
+                    "${card.snapshot.state} age=${age / 60000}min settled=$settled: ${card.card.title.take(60)}"
+            )
         }
 
         // 2d. REPAIR queue orphans — the pre-bonding retireTerminal wrote
@@ -687,15 +713,20 @@ class FlywheelDriver(
                         it.causes.lastOrNull() !is JulesCause.HumanAnswered
                 }
                 for (card in awaiting) {
+                    val releaseTurn = barrierFor(card.snapshot.sessionId).enter()
                     scope.launch(htxElement + Dispatchers.IO) {
-                        // Parallel answer: each HTX exchange gets its own
-                        // connectionOrdinal. The previous answerMutex
-                        // serialized all answers/approvals through one
-                        // lock — a degenerate pool of size 1.
-                        val answer = withTimeoutOrNull(45_000L) { buildAnswer(card) } ?: ""
-                        if (answer.isNotEmpty()) {
-                            conductor.answer(card.snapshot.sessionId, answer)
-                            println("[CHOREOGRAPHY] answer ${card.snapshot.sessionId.takeLast(6)}")
+                        try {
+                            // Parallel answer: each HTX exchange gets its own
+                            // connectionOrdinal. The previous answerMutex
+                            // serialized all answers/approvals through one
+                            // lock — a degenerate pool of size 1.
+                            val answer = withTimeoutOrNull(45_000L) { buildAnswer(card) } ?: ""
+                            if (answer.isNotEmpty()) {
+                                conductor.answer(card.snapshot.sessionId, answer)
+                                println("[CHOREOGRAPHY] answer ${card.snapshot.sessionId.takeLast(6)}")
+                            }
+                        } finally {
+                            releaseTurn()
                         }
                     }
                     tickAnswered++
@@ -706,8 +737,13 @@ class FlywheelDriver(
                     it.snapshot.state == "AWAITING_PLAN_APPROVAL" &&
                         it.causes.lastOrNull() !is JulesCause.HumanAnswered
                 }) {
+                    val releaseTurn = barrierFor(card.snapshot.sessionId).enter()
                     scope.launch(htxElement + Dispatchers.IO) {
-                        withTimeoutOrNull(45_000L) { conductor.approvePlan(card.snapshot.sessionId) }
+                        try {
+                            withTimeoutOrNull(45_000L) { conductor.approvePlan(card.snapshot.sessionId) }
+                        } finally {
+                            releaseTurn()
+                        }
                     }
                     tickAnswered++
                 }
@@ -719,6 +755,32 @@ class FlywheelDriver(
                     conductor.retireTerminal(card.snapshot.sessionId, "terminal ${card.snapshot.state}", Clock.System.now().toEpochMilliseconds())
                     slotFreed.trySend(1)
                     println("[CHOREOGRAPHY] sweep ${card.snapshot.sessionId.takeLast(6)} → slot freed")
+                }
+
+                // Quiescent eviction participates in the reactive driver too.
+                // Await any answer/approval turn for this session, flush the
+                // memory index, then retire and release its dispatch slot.
+                val quiescentNow = Clock.System.now().toEpochMilliseconds()
+                val liveQueueSessions = store.loadQueue()
+                    .filter { it.isDispatched && !it.isDrained }
+                    .mapNotNull { it.sessionId }
+                    .toSet()
+                for (card in conductor.cards.values.filter {
+                    it.snapshot.state in setOf("IN_PROGRESS", "PAUSED", "AWAITING_USER_FEEDBACK") &&
+                        !it.drained && it.snapshot.sessionId !in liveQueueSessions &&
+                        quiescentNow - it.snapshot.capturedAt >= 2L * 60L * 60L * 1000L
+                }) {
+                    val ageMinutes = (quiescentNow - card.snapshot.capturedAt) / 60_000L
+                    val settled = evictQuiescent(
+                        sessionId = card.snapshot.sessionId,
+                        reason = "quiescent eviction: ${card.snapshot.state} for ${ageMinutes}min with no queue entry",
+                        at = quiescentNow,
+                    )
+                    slotFreed.trySend(1)
+                    println(
+                        "[CHOREOGRAPHY] quiescent-evict ${card.snapshot.sessionId.takeLast(6)} " +
+                            "settled=$settled → slot freed"
+                    )
                 }
 
                 // Emit poll event for observers

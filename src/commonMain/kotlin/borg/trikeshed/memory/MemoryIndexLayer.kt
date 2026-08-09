@@ -7,6 +7,7 @@ import borg.trikeshed.lib.Series
 import borg.trikeshed.lib.get
 import borg.trikeshed.lib.j
 import borg.trikeshed.lib.size
+import borg.trikeshed.lib.view
 import borg.trikeshed.memory.MemoryStore
 import kotlin.concurrent.Volatile
 
@@ -36,7 +37,16 @@ sealed class IndexKind {
     data object Taxonomy : IndexKind()
     data object Temporal : IndexKind()
     data object Provenance : IndexKind()
+    /** Raw Git/worktree Couch attachments, kept separate from memory documents. */
+    data object RepositoryTaxonomy : IndexKind()
 }
+
+data class CouchIndexEntry(
+    val path: String,
+    val hash: ContentId,
+    val taxonomy: Series<String>,
+    val timestamp: Long,
+)
 
 /**
  * One ISAM route: a kind paired with an index map.
@@ -70,6 +80,11 @@ data class MemoryIndexRoute(
         index.entries.removeAll { it.value.isEmpty() }
     }
 
+    internal fun removePrefix(prefix: String) {
+        for ((_, paths) in index) paths.removeAll { it.startsWith(prefix) }
+        index.entries.removeAll { it.value.isEmpty() }
+    }
+
     /** Total indexed entries across all keys. */
     val entryCount: Int get() = index.values.sumOf { it.size }
 }
@@ -83,6 +98,7 @@ class MemoryIndexLayer(store: MemoryStore) {
     private val taxonomyRoute = MemoryIndexRoute(IndexKind.Taxonomy)
     private val temporalRoute = MemoryIndexRoute(IndexKind.Temporal)
     private val provenanceRoute = MemoryIndexRoute(IndexKind.Provenance)
+    private val repositoryTaxonomyRoute = MemoryIndexRoute(IndexKind.RepositoryTaxonomy)
 
     /** The mutation subscription handle — call to unsubscribe. */
     private val unsubscribe: () -> Unit
@@ -106,11 +122,40 @@ class MemoryIndexLayer(store: MemoryStore) {
     /** Stop indexing. */
     fun close() = unsubscribe()
 
+    /**
+     * Mutation observers update routes synchronously inside CouchStore.put(),
+     * so returning from this suspend boundary guarantees index parity.
+     */
+    suspend fun flush() = Unit
+
     /** Get a route by kind. */
     fun route(kind: IndexKind): MemoryIndexRoute = when (kind) {
         IndexKind.Taxonomy -> taxonomyRoute
         IndexKind.Temporal -> temporalRoute
         IndexKind.Provenance -> provenanceRoute
+        IndexKind.RepositoryTaxonomy -> repositoryTaxonomyRoute
+    }
+
+    /** Replace one reconciled repository partition without MemoryStore writes. */
+    fun replaceRepositoryBatch(prefix: String, entries: Series<CouchIndexEntry>) {
+        repositoryTaxonomyRoute.removePrefix(prefix)
+        for (entry in entries.view) {
+            val key = entry.taxonomy.view.joinToString("/").ifEmpty { "root" }
+            repositoryTaxonomyRoute.add(key, entry.path)
+        }
+    }
+
+    fun queryRepositoryPath(prefix: String): Series<String> {
+        val results = mutableListOf<String>()
+        for (i in 0 until repositoryTaxonomyRoute.keys.size) {
+            val key = repositoryTaxonomyRoute.keys[i]
+            val paths = repositoryTaxonomyRoute.lookup(key)
+            for (j in 0 until paths.size) {
+                val path = paths[j]
+                if (path.startsWith(prefix)) results.add(path)
+            }
+        }
+        return results.size j { i -> results[i] }
     }
 
     /**
@@ -164,7 +209,10 @@ class MemoryIndexLayer(store: MemoryStore) {
         }
 
         // Extract fields from the Couch document.
-        val description = doc.fields.find { it.name == "description" }?.value as? String ?: ""
+        // Raw Git/worktree attachment documents share this CouchStore but do
+        // not belong in memory routes. MemoryStore documents are identified by
+        // their explicit `kind` field.
+        if (doc.fields.none { it.name == "kind" }) return
         val agentId = doc.fields.find { it.name == "agentId" }?.value as? String ?: "system"
         val seqStr = doc.fields.find { it.name == "sequence" }?.value as? String
 

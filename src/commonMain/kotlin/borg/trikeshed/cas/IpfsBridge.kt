@@ -25,6 +25,8 @@ class IpfsBridge(private val cas: CasStore) {
         ipnsRegistry[name] = manifestCid
     }
 
+    fun unpublishIpns(name: String): Boolean = ipnsRegistry.remove(name) != null
+
     fun resolveIpns(name: String): ContentId? {
         return ipnsRegistry[name]
     }
