@@ -25,7 +25,7 @@ memory and skills unify into one store.
 
 ## Layer Stack
 
-The five concentric rings ("lillypads"). Each is a network processing
+The six concentric layers ("lillypads"). Each is a network processing
 center that branches off the CAS blobs at a different granularity:
 
 ```
@@ -37,8 +37,22 @@ Ring 2 (logical)    ConfixBlackboard + BlackboardOverlay + CellOverlay
                      epistemic metadata (role, provenance, evidence, dependencies)
 Ring 1 (per-line)   LineCas + LineCasIndex + FunnelHashIndex
                      each line content-addressed with neighbor stamps [Prong 1+2]
-Ring 0 (physical)   BtrfsReflinkStore (CasStore, reflink CoW) + userspace.nio [Prong 1]
+Ring 0 (physical)   BtrfsReflinkStore / VolumeCasStore (block-level CAS) [Prong 1]
+Ring -1 (mesh)      NUID concentric routing + Kademlia DHT + CasReplicationHook
+                     ContentId is the universal address; subnets are lillypads
+                     core < process < local < lan < mesh.worker < global.relay
 ```
+
+The ContentId is the SAME address space across all rings. A whole-file CID,
+a per-line CID, and a block CID are all sha256:hex. The DHT routes by NUID
+subnet, but content is addressed by CID at any ring. A memory write:
+
+  1. Ring 0: CasStore.put(bytes) -> ContentId; CasReplicationHook.onPut
+     fires -> CID advertised to mesh DHT
+  2. Ring 1: LineCas.spineInto -> each line CID also CAS-put + replicated
+  3. spineCid = CasManifest identity -> publishable via IpfsBridge.publishIpns
+  4. Ring -1: NUID with Capability.Cas("memory") routes the write to the
+     correct subnet via DHT lookup
 
 The paper's three roles operate at specific ring depths:
 - Management: writes Ring 1, observed Ring 3, intercepted Ring 4
