@@ -227,6 +227,16 @@ class PeerSession(
             }
             utpConn = socket
             socket.connect()
+            // Send the BitTorrent peer wire handshake immediately after uTP
+            // establishes. Without this the remote peer doesn't know which
+            // torrent we want and will close the connection.
+            val handshake = PeerHandshake(
+                infoHash = infoHashBytes,
+                peerId = peerIdBytes,
+            )
+            socket.send(handshake.encode())
+            // Announce interest so the peer knows to unchoke us.
+            socket.send(PeerWireMessage.Interested.encode())
         }
     }
 

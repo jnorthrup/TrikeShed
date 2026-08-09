@@ -110,7 +110,7 @@ sealed class PeerWireMessage {
                 7  -> Piece(
                     (payload[1].toInt() shl 24) or (payload[2].toInt() shl 16) or (payload[3].toInt() shl 8) or payload[4].toInt(),
                     (payload[5].toInt() shl 24) or (payload[6].toInt() shl 16) or (payload[7].toInt() shl 8) or payload[8].toInt(),
-                    payload.copyOfRange(13, payload.size),
+                    payload.copyOfRange(9, payload.size),
                 )
                 8  -> Cancel(
                     (payload[1].toInt() shl 24) or (payload[2].toInt() shl 16) or (payload[3].toInt() shl 8) or payload[4].toInt(),
@@ -164,18 +164,21 @@ data class PeerHandshake(
         require(peerId.size == 20) { "PeerId must be 20 bytes" }
     }
 
-    /** Build a handshake byte array. */
-    fun encode(): ByteArray = protocol + reservedBytes + infoHash + peerId
+    /** Build a handshake byte array: <pstrlen:1><pstr:19><reserved:8><info_hash:20><peer_id:20> = 68 bytes */
+    fun encode(): ByteArray = byteArrayOf(protocol.size.toByte()) + protocol + reservedBytes + infoHash + peerId
 
     companion object {
         const val PROTOCOL_LEN = 19
+        const val HANDSHAKE_SIZE = 68
 
         fun decode(data: ByteArray): PeerHandshake? {
-            if (data.size < 68) return null
-            val proto = data.copyOfRange(0, 19)
-            val reserved = data.copyOfRange(19, 27)
-            val infoHash = data.copyOfRange(27, 47)
-            val peerId = data.copyOfRange(47, 67)
+            if (data.size < HANDSHAKE_SIZE) return null
+            val pstrlen = data[0].toInt() and 0xFF
+            if (pstrlen != PROTOCOL_LEN) return null
+            val proto = data.copyOfRange(1, 1 + PROTOCOL_LEN)
+            val reserved = data.copyOfRange(20, 28)
+            val infoHash = data.copyOfRange(28, 48)
+            val peerId = data.copyOfRange(48, 68)
             if (!proto.contentEquals("BitTorrent protocol".toByteArray())) return null
             return PeerHandshake(proto, reserved, infoHash, peerId)
         }
