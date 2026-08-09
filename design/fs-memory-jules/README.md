@@ -25,14 +25,25 @@ memory and skills unify into one store.
 
 ## Layer Stack
 
+The five concentric rings ("lillypads"). Each is a network processing
+center that branches off the CAS blobs at a different granularity:
+
 ```
-Layer 4 (roles)     ModelMux.route("manage"|"search"|"execute") + ACP tools  [Prong 3]
-Layer 3 (index)     ConfixIsamIsomorphism + FunnelHashIndex + ConfixWal      [Prong 2]
-Layer 2 (docs)      CouchStore + CouchAttachmentGateway                       [shared]
-Layer 1 (physical)  BtrfsReflinkStore (CasStore, reflink CoW) + userspace.nio [Prong 1]
-Layer 5 (external)  McpServerElement (citation-backed search)                 [Prong 5]
-Layer 6 (skills)    TrajectoryReduction -> SkillFile distillation             [Prong 4]
+Ring 4 (pointcut)   PointcutMutableSeries + FieldSynapse + PolyglotBlackboardTaxonomy
+                     intercepts every mutation with Evidence; GraalVM child VMs
+Ring 3 (causal)     ReteNetwork + CausalGraphNodeIndex + BlackboardDagCausalGraph
+                     production rules over the store trajectory M_1..M_T
+Ring 2 (logical)    ConfixBlackboard + BlackboardOverlay + CellOverlay
+                     epistemic metadata (role, provenance, evidence, dependencies)
+Ring 1 (per-line)   LineCas + LineCasIndex + FunnelHashIndex
+                     each line content-addressed with neighbor stamps [Prong 1+2]
+Ring 0 (physical)   BtrfsReflinkStore (CasStore, reflink CoW) + userspace.nio [Prong 1]
 ```
+
+The paper's three roles operate at specific ring depths:
+- Management: writes Ring 1, observed Ring 3, intercepted Ring 4
+- Search: reads Ring 1, ranked Ring 2, proximity-scored Ring 3
+- Execution: distills Ring 1, gated Ring 2, causal-linked Ring 3
 
 ## Five Prongs
 
