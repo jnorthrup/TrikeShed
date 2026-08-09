@@ -185,7 +185,7 @@ sealed class Nonce(val bytes: ByteArray) {
     override fun hashCode(): Int = bytes.contentHashCode()
 
     /** Random nonce — length bytes from a Random source. */
-    class RandomBytes(length: Int = 16, rng: Random = Random(0L)) :
+    class RandomBytes(length: Int = 16, rng: Random = Random.Default) :
         Nonce(ByteArray(length) { rng.nextInt(0, 256).toByte() })
 
     /** Deterministic nonce — derived from a prior causalKey, so refreshes
