@@ -320,6 +320,41 @@ class FlywheelDriver(
             println("[FLYWHEEL] SWEEP ${card.snapshot.sessionId.takeLast(6)} ${card.snapshot.state}: ${card.card.title.take(60)}")
         }
 
+        // 2c-bis. QUIESCENT_EVICT — a session that sits IN_PROGRESS, PAUSED, or
+        //         AWAITING_USER_FEEDBACK with no recent Jules API activity is a
+        //         stalled slot: it counts against activeCount() (holds a dispatch
+        //         slot) but never transitions to DRAINABLE_STATES, so SWEEP
+        //         never touches it. The wheel reports alive=N but dispatched=0
+        //         forever and settles nothing. This is the sandbagger: the
+        //         flywheel has free capacity it can never reclaim.
+        //
+        //         A session is quiescent if its last captured snapshot is older
+        //         than QUIESCENT_EVICT_MS and no WorkQueued entry references it
+        //         as dispatched-but-undrained (the queue is the authority for
+        //         pending work; a session with no queue entry has no pending work).
+        //         We retire it the same way SWEEP does: retireTerminal closes
+        //         the card and bonds a WorkDrained to its queue entry.
+        val quiescentEvictMs = 2L * 60L * 60L * 1000L // 2 hours
+        val nowQuiescent = Clock.System.now().toEpochMilliseconds()
+        val activeStates = setOf("IN_PROGRESS", "PAUSED", "AWAITING_USER_FEEDBACK")
+        val dispatchedSessionIds = store.loadQueue()
+            .filter { it.isDispatched && !it.isDrained }
+            .mapNotNull { it.sessionId }
+            .toSet()
+        for (card in conductor.cards.values.filter {
+            it.snapshot.state in activeStates && !it.drained &&
+                it.snapshot.sessionId !in dispatchedSessionIds
+        }.sortedBy { it.snapshot.capturedAt }) {
+            val age = nowQuiescent - card.snapshot.capturedAt
+            if (age < quiescentEvictMs) continue
+            conductor.retireTerminal(
+                card.snapshot.sessionId,
+                "quiescent eviction: ${card.snapshot.state} for ${age / 60000}min with no queue entry",
+                nowQuiescent,
+            )
+            println("[FLYWHEEL] QUIESCENT-EVICT ${card.snapshot.sessionId.takeLast(6)} ${card.snapshot.state} age=${age / 60000}min: ${card.card.title.take(60)}")
+        }
+
         // 2d. REPAIR queue orphans — the pre-bonding retireTerminal wrote
         //     WorkDrained under the bare numeric sessionId, so the card closed
         //     (drained=true) but the real queue entry (gap:/readme:/synth:)
