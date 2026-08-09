@@ -104,11 +104,23 @@ class JvmChannelOperations(
         schedule {
             try {
                 val address = java.net.InetSocketAddress(host, port)
-                ch.configureBlocking(false)
+                // Non-blocking connect returns false if the connection is
+                // still pending; finishConnect() blocks until established.
+                // Guard the entire sequence against close() racing the fd
+                // out from under us — a reactor teardown can close(fd)
+                // between socketChannels[fd] lookup and this scheduled task.
+                if (!ch.isOpen) return@schedule
                 if (!ch.connect(address)) {
-                    ch.finishConnect()
+                    while (ch.isOpen && !ch.finishConnect()) {
+                        // spin briefly — non-blocking socket should complete
+                        // on first or second finishConnect call
+                    }
                 }
                 socketInterests[fd] = setOf(Interest.READ, Interest.WRITE, Interest.CONNECT)
+            } catch (_: java.nio.channels.ClosedChannelException) {
+                // fd was closed by reactor teardown — not an error
+            } catch (e: java.nio.channels.AsynchronousCloseException) {
+                // same race, different exception
             } catch (e: Exception) {
                 println("JvmChannelOperations connect exception: ${e.message}")
                 e.printStackTrace()
