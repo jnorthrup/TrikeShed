@@ -29,13 +29,22 @@ class TorrentElement(
     private val blockStore: BlockStore = MemoryBlockStore(),
     private val downloadDir: String? = null,
     parentJob: Job? = null,
+    /**
+     * The reactor coroutine context to propagate into the TorrentEngine's
+     * internal scope. When the daemon wires this element, it passes
+     * `htxElement + muxReactor` so that [TrackerClient] — which calls
+     * `openHtxElement()` — finds the real HtxRouteService (backed by
+     * JvmTlsCodecBackend) in the coroutine context instead of falling
+     * back to the in-memory DefaultHtxRouteService stub.
+     */
+    private val reactorContext: CoroutineContext = EmptyCoroutineContext,
 ) : AsyncContextElement(ElementState.CREATED, parentJob) {
 
     override val key: CoroutineContext.Key<*> get() = TorrentElementKey
 
     private val engine = TorrentEngine(
         blockStore = blockStore,
-        scope = CoroutineScope(supervisor),
+        scope = CoroutineScope(supervisor + reactorContext),
     )
 
     /** Active torrent handles: info-hash hex → handle. */

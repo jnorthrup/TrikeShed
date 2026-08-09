@@ -229,6 +229,7 @@ object OroborosDaemon {
         // cleanup is via close() in the finally block.
         val torrentElement = TorrentElement(
             parentJob = coroutineContext[kotlinx.coroutines.Job],
+            reactorContext = htxElement + muxReactor + nioSupervisor,
         )
         torrentElement.open()
         System.err.println("[OROBOROS] TorrentElement open: ${torrentElement.state} — torrent:// via HTX/TLS + uTP datagrams")
