@@ -138,7 +138,8 @@ class TorrentSession(
     override suspend fun downloadPiece(pieceIndex: Int): ByteArray {
         val pieceLen = min(pieceSize.toLong(), totalSize - pieceIndex * pieceSize).toInt()
         return withTimeout(300_000) {
-            val peer = peers.values.firstOrNull { it.hasPiece(pieceIndex) }
+            val peer = peers.values.firstOrNull { it.hasPiece(pieceIndex) && !it.isRemoteChoked() }
+                ?: peers.values.firstOrNull { it.hasPiece(pieceIndex) }
                 ?: throw IllegalStateException("No peer has piece $pieceIndex")
             peer.requestPiece(pieceIndex, 0, pieceLen)
         }
@@ -218,6 +219,9 @@ class PeerSession(
     private val havePieces = ConcurrentHashMap.newKeySet<Int>()
 
     fun hasPiece(piece: Int) = havePieces.contains(piece)
+
+    /** Whether the remote peer has choked us (skip for requesting). */
+    fun isRemoteChoked(): Boolean = peerWireHandler.isChoked(address)
 
     fun connect() {
         scope.launch {
