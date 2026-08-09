@@ -259,6 +259,14 @@ object OroborosDaemon {
         val attachmentGateway = CouchAttachmentGateway(couchStore, casStore)
         val gitCouchGateway = GitCouchGateway(fileOps, attachmentGateway)
 
+        // ── Memory store + ISAM index layer (fs-memory Prongs 1+2) ──
+        // MemoryStore composes the existing CAS+Couch into the paper's
+        // memory store M. MemoryIndexLayer subscribes to mutations and
+        // maintains taxonomy/temporal/provenance ISAM routes.
+        val memoryStore = borg.trikeshed.memory.MemoryStore(casStore, couchStore)
+        val memoryIndex = borg.trikeshed.memory.MemoryIndexLayer(memoryStore)
+        System.err.println("[OROBOROS] MemoryStore + MemoryIndexLayer: ${memoryIndex.route(borg.trikeshed.memory.IndexKind.Taxonomy).entryCount} taxonomy entries")
+
         // ── Reactive git-state hub: JvmFileWatchReactorElement watches .git/**
         //    and feeds the GitCouchGateway + git-state cache. This IS the
         //    choreography — coroutine pipelines that react to filesystem
@@ -560,6 +568,7 @@ object OroborosDaemon {
             try { traceWriter?.flush(); traceWriter?.close() } catch (_: Exception) {}
             runCatching { kanbanJob.cancel() }
             runCatching { reportReactor.close() }
+            runCatching { memoryIndex.close() }
             runCatching { gitWatcher.close() }
             try { htxElement.close() } catch (_: Exception) {}
             try { torrentElement.close() } catch (_: Exception) {}
