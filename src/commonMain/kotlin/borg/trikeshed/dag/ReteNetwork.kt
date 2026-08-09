@@ -10,6 +10,17 @@ class ReteNetwork {
     val alphaMemory = ReteAlphaMemory()
     val betaMemory = ReteBetaMemory(BetaJoin("dependsOn", "jobId"))
     val agenda = ReteAgenda()
+
+    /**
+     * Attach a causal landmark index for differential-heuristic ordering.
+     * The landmark index is built from a [borg.trikeshed.graph.CausalGraphNodeIndex]
+     * that tracks the causal graph of facts asserted into this network.
+     * Once attached, the agenda uses A* f-value ordering to prefer
+     * activations causally closer to a reconciled landmark.
+     */
+    fun attachLandmarkIndex(index: CausalLandmarkIndex) {
+        agenda.landmarkIndex = index
+    }
     val refraction = ReteRefraction()
 
     suspend fun assert(
