@@ -16,4 +16,6 @@
 
 ## 2026-08-04 - Avoid O(N²) memory/eviction bottlenecks
 **Learning:** Replacing chunked buffered I/O with `joinToString` causes OOM regressions. Map eviction using `removeAll` inside a loop causes O(N²) freezing.
-**Action:** Always reconstruct map keys and use `.remove(key)` for O(1) cache eviction.
+**Action:** Always reconstruct map keys and use `.remove(key)` for O(1) cache eviction.## 2024-05-18 - Removing redundant list allocation when mapping arrays
+**Learning:** When mapping `vararg` parameters or `Array` types in Kotlin, calling `.toList().map { ... }` creates a redundant intermediate `ArrayList` which is immediately discarded. Kotlin standard library has `.map { ... }` extension on Arrays.
+**Action:** Avoid calling `.toList()` before `.map { ... }` on varargs or arrays to prevent unnecessary memory allocation and reduce GC overhead.
