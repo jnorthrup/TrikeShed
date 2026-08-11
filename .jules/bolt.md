@@ -22,6 +22,7 @@
 <<<<<<< HEAD
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
 **Action:** Always reconstruct map keys and use `.remove(key)` for O(1) cache eviction.## 2024-05-18 - Removing redundant list allocation when mapping arrays
 **Learning:** When mapping `vararg` parameters or `Array` types in Kotlin, calling `.toList().map { ... }` creates a redundant intermediate `ArrayList` which is immediately discarded. Kotlin standard library has `.map { ... }` extension on Arrays.
 **Action:** Avoid calling `.toList()` before `.map { ... }` on varargs or arrays to prevent unnecessary memory allocation and reduce GC overhead.
@@ -44,3 +45,10 @@
 **Learning:** When implementing mathematical cache eviction logic based on monotonic counter thresholds (e.g., `counter % 1000 == 0`), relative loop-based eviction formulas may fail to fire or calculate incorrectly immediately after the counter rolls over.
 **Action:** Ensure you explicitly handle the counter rollover state (e.g., `counter == 0L`) by clearing the cache (`map.clear()`).
 >>>>>>> origin/bolt/nuid-fanout-eviction-optimization-1126253336503657440
+=======
+**Action:** Always reconstruct map keys and use `.remove(key)` for O(1) cache eviction.
+
+## 2024-06-25 - map.keys.removeAll triggers O(N²) bottleneck
+**Learning:** In Kotlin, using `map.keys.removeAll { ... }` or `map.entries.removeAll { ... }` triggers a linear scan over the map elements, which can create a severe O(N²) bottleneck during cache eviction loops if called frequently.
+**Action:** When removing specific, mathematically predictable entries from a Kotlin Map (like during chronological cache eviction or rollover), reconstruct the map keys directly and use `map.remove(key)` within a loop to ensure O(1) deletion per key.
+>>>>>>> origin/bolt/optimize-claim-eviction-16750401730855570029
