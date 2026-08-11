@@ -200,7 +200,7 @@ interface CouchPersistence {
     suspend fun persist(key: String, value: ByteArray)
     suspend fun delete(key: String)
     suspend fun flush()
-    suspend fun drain(): Series<String>
+    suspend fun drainStore(): Series<String>
     suspend fun close()
 }
 
@@ -211,7 +211,7 @@ object NoOpPersistence : CouchPersistence {
     override suspend fun persist(key: String, value: ByteArray) {}
     override suspend fun delete(key: String) {}
     override suspend fun flush() {}
-    override suspend fun drain(): Series<String> = emptySeries()
+    override suspend fun drainStore(): Series<String> = emptySeries()
     override suspend fun close() {}
 }
 

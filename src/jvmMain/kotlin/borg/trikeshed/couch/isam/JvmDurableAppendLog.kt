@@ -38,6 +38,8 @@ class JvmDurableAppendLog(private val file: File) : DurableAppendLog {
             }
             if (read < WalFrame.HEADER_SIZE) {
                 // Incomplete header, stop replay
+                // Truncate partial frame to maintain integrity
+                channel.truncate(startPos)
                 break
             }
 
@@ -50,7 +52,10 @@ class JvmDurableAppendLog(private val file: File) : DurableAppendLog {
             for (i in 0..3) {
                 if (magic[i] != WalFrame.MAGIC[i]) validMagic = false
             }
-            if (!validMagic) break
+            if (!validMagic) {
+                channel.truncate(startPos)
+                break
+            }
 
             // Version
             val version = headerBuf.short
@@ -64,6 +69,7 @@ class JvmDurableAppendLog(private val file: File) : DurableAppendLog {
             if (payloadLen < 0 || payloadLen > 10 * 1024 * 1024) {
                 // Sanity check, prevent out of memory on corrupt length
                 // Bounded to 10MB
+                channel.truncate(startPos)
                 break
             }
 
@@ -78,6 +84,7 @@ class JvmDurableAppendLog(private val file: File) : DurableAppendLog {
 
             if (restRead < payloadLen + 4) {
                 // Incomplete frame, stop replay
+                channel.truncate(startPos)
                 break
             }
 
@@ -98,6 +105,7 @@ class JvmDurableAppendLog(private val file: File) : DurableAppendLog {
                 lastValidSequence = sequence
             } else {
                 // CRC failed, stop replay
+                channel.truncate(startPos)
                 break
             }
         }
@@ -107,6 +115,17 @@ class JvmDurableAppendLog(private val file: File) : DurableAppendLog {
 
     override fun flush() {
         channel.force(true)
+        // Directory fsync for complete durability
+        try {
+            val dir = file.parentFile
+            if (dir != null && dir.exists()) {
+                val dirChannel = FileChannel.open(dir.toPath(), java.nio.file.StandardOpenOption.READ)
+                dirChannel.force(true)
+                dirChannel.close()
+            }
+        } catch (e: Exception) {
+            // Ignore if OS does not support
+        }
     }
 
     override fun injectCorruptionAfter(sequence: Long) {
