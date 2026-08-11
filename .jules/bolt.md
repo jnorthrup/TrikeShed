@@ -17,3 +17,6 @@
 ## 2026-08-04 - Avoid O(N²) memory/eviction bottlenecks
 **Learning:** Replacing chunked buffered I/O with `joinToString` causes OOM regressions. Map eviction using `removeAll` inside a loop causes O(N²) freezing.
 **Action:** Always reconstruct map keys and use `.remove(key)` for O(1) cache eviction.
+## 2024-05-18 - Optimize SctpSackChunk Serialization with ByteBuffer
+**Learning:** Using manual offset variables and primitive shifts for byte array serialization leads to less robust code compared to structured approaches. However, `borg.trikeshed.userspace.nio.ByteBuffer` provides a clean, fluent API that performs comparably for encoding and decoding while significantly improving maintainability. When migrating network serialization to `ByteBuffer`, careful attention must be paid to unsigned types. Using `.toInt()` directly on `.getShort()` causes sign-extension bugs for values >= 32768, which can break chunk bounds. Using `and 0xFFFF` correctly preserves the unsigned 16-bit integer representation.
+**Action:** Replaced primitive offset-based encoding and decoding in `SctpSackChunk` with `borg.trikeshed.userspace.nio.ByteBuffer`'s fluent read/write methods (`put`, `putShort`, `putInt`, `getShort`, `getInt`), applying `and 0xFFFF` masks to prevent sign extension bugs on unsigned shorts.
