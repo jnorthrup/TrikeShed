@@ -231,8 +231,7 @@ object PanamaKanbanMovie {
         process.waitFor()
         
         // Cleanup temp frames
-        tempDir.listFiles()?.forEach { it.delete() }
-        tempDir.delete()
+        Thread { tempDir.deleteRecursively() }.start()
         
         println("Encoded to: ${outputFile.absolutePath}")
         println("File size: ${outputFile.length()} bytes")

@@ -23,6 +23,7 @@
 <<<<<<< HEAD
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
 **Action:** Always reconstruct map keys and use `.remove(key)` for O(1) cache eviction.## 2024-05-18 - Removing redundant list allocation when mapping arrays
 **Learning:** When mapping `vararg` parameters or `Array` types in Kotlin, calling `.toList().map { ... }` creates a redundant intermediate `ArrayList` which is immediately discarded. Kotlin standard library has `.map { ... }` extension on Arrays.
 **Action:** Avoid calling `.toList()` before `.map { ... }` on varargs or arrays to prevent unnecessary memory allocation and reduce GC overhead.
@@ -52,3 +53,9 @@
 **Learning:** In Kotlin, using `map.keys.removeAll { ... }` or `map.entries.removeAll { ... }` triggers a linear scan over the map elements, which can create a severe O(N²) bottleneck during cache eviction loops if called frequently.
 **Action:** When removing specific, mathematically predictable entries from a Kotlin Map (like during chronological cache eviction or rollover), reconstruct the map keys directly and use `map.remove(key)` within a loop to ensure O(1) deletion per key.
 >>>>>>> origin/bolt/optimize-claim-eviction-16750401730855570029
+=======
+**Action:** Always reconstruct map keys and use `.remove(key)` for O(1) cache eviction.
+## 2024-11-25 - Async I/O for Temp File Cleanup
+**Learning:** Iterative file deletion (`tempDir.listFiles()?.forEach { it.delete() }`) is a blocking N+1 I/O operation which can stall the main execution thread, especially if there are many files (like video frames).
+**Action:** Replaced iterative deletion with `Thread { tempDir.deleteRecursively() }.start()` to offload the I/O work to a background thread, resolving the stall.
+>>>>>>> origin/async-file-delete-4598793832052409559
