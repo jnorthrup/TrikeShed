@@ -474,7 +474,7 @@ class GapReducer(
         pattern: String,
         excludedFiles: Set<File> = emptySet(),
     ): List<String> {
-        val cmd = listOf("grep", "-rn", "--include=*.kt", pattern, sourceRoot.absolutePath)
+        val cmd = listOf("grep", "-rn", "--include=*.kt", "-e", pattern, "--", sourceRoot.absolutePath)
         val proc = ProcessBuilder(cmd).redirectErrorStream(true).start()
         val output = proc.inputStream.bufferedReader().readText()
         proc.waitFor()
