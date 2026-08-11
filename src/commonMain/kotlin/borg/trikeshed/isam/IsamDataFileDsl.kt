@@ -199,10 +199,20 @@ fun batchAppend(
     config: DataFileConfig,
     records: List<ByteArray>,
 ): Long {
-    val totalSize = records.sumOf { it.size }
+    val size = records.size
+    if (size == 0) return 0L
+    var totalSize = 0
+    for (i in 0 until size) {
+        totalSize += records[i].size
+    }
     val combined = ByteArray(totalSize)
     var pos = 0
-    for (r in records) { r.copyInto(combined, pos); pos += r.size }
+    for (i in 0 until size) {
+        val r = records[i]
+        val s = r.size
+        r.copyInto(combined, pos)
+        pos += s
+    }
     return config.fileOps.appendAll(config.filename, combined)
 }
 
