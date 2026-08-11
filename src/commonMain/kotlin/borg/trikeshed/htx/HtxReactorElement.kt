@@ -241,6 +241,7 @@ class HtxReactorElement(
             handle.submit()
             val result = waitFor(handle, fd, 30, TimeUnit.SECONDS)
             check(result >= -1) { "HTX reactor read failed for fd=$fd" }
+<<<<<<< ours
             // Non-blocking read: 0 = EAGAIN (no data yet, keep waiting);
             // -1 = EOF (peer closed). Previously 0 was misread as EOF, killing
             // every TLS handshake before the server's ServerHello could arrive.
@@ -251,6 +252,16 @@ class HtxReactorElement(
                 return ByteSeries(buffer.array().copyOf(result))
             }
             kotlinx.coroutines.delay(10)
+=======
+            if (result == -1) {
+                return null
+            }
+            if (result == 0) {
+                kotlinx.coroutines.delay(10)
+                continue
+            }
+            return ByteSeries(buffer.array().copyOf(result))
+>>>>>>> theirs
         }
     }
 
