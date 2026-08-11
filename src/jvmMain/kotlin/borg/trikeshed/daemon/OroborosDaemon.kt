@@ -651,6 +651,7 @@ object OroborosDaemon {
                     System.err.println("[OROBOROS] cycleBody.run escaped: ${t.javaClass.simpleName}: ${t.message?.take(200)}")
                 }
                 isRunning = false
+                try { currentTw?.flush(); currentTw?.close() } catch (_: Exception) {}
                 mainJob?.cancel()
                 return
             }
