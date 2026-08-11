@@ -383,7 +383,7 @@ class KeyMuxBuilder {
     }
 
     fun api(baseUrl: String, vararg hdrs: Pair<String, String>): KeyMuxBuilder = apply {
-        val h = hdrs.toList().map { it.first j it.second }.toSeries()
+        val h = hdrs.map { it.first j it.second }.toSeries()
         sources.add("*".toKeyPath() j ApiSource(baseUrl, h))
     }
 
