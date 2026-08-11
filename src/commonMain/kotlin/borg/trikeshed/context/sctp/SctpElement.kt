@@ -199,23 +199,22 @@ data class SctpSackChunk(
         get() = SctpChunkHeader(SctpChunkType.SACK, length = chunkLength)
 
     fun encode(): ByteArray {
-        val buf = ByteArray(chunkLength.toInt())
-        var off = 0
-        buf[off++] = SctpChunkType.SACK.ordinal.toByte()   // type
-        buf[off++] = 0                                       // flags
-        putUShort(buf, off, chunkLength); off += 2          // length
-        putUInt(buf, off, cumulativeTsnAck); off += 4
-        putUInt(buf, off, aRwnd); off += 4
-        putUShort(buf, off, gapAckBlocks.size.toUShort()); off += 2
-        putUShort(buf, off, duplicateTsns.size.toUShort()); off += 2
+        val buf = borg.trikeshed.userspace.nio.ByteBuffer.allocate(chunkLength.toInt())
+        buf.put(SctpChunkType.SACK.ordinal.toByte())   // type
+        buf.put(0)                                       // flags
+        buf.putShort(chunkLength.toShort())          // length
+        buf.putInt(cumulativeTsnAck.toInt())
+        buf.putInt(aRwnd.toInt())
+        buf.putShort(gapAckBlocks.size.toShort())
+        buf.putShort(duplicateTsns.size.toShort())
         gapAckBlocks.view.forEach { gap ->
-            putUShort(buf, off, gap.start); off += 2
-            putUShort(buf, off, gap.end); off += 2
+            buf.putShort(gap.start.toShort())
+            buf.putShort(gap.end.toShort())
         }
         duplicateTsns.view.forEach { dup ->
-            putUInt(buf, off, dup); off += 4
+            buf.putInt(dup.toInt())
         }
-        return buf
+        return buf.array()
     }
 
     companion object {
@@ -223,20 +222,19 @@ data class SctpSackChunk(
 
         fun decode(bytes: ByteArray): SctpSackChunk {
             require(bytes.size >= FIXED_LENGTH) { "SACK too short: ${bytes.size} < $FIXED_LENGTH" }
-            var off = 4  // skip type+flags+length
-            val cumulativeTsnAck = getUInt(bytes, off); off += 4
-            val aRwnd           = getUInt(bytes, off); off += 4
-            val numGaps         = getUShort(bytes, off).toInt(); off += 2
-            val numDups         = getUShort(bytes, off).toInt(); off += 2
+            val buf = borg.trikeshed.userspace.nio.ByteBuffer.wrap(bytes).position(4) // skip type+flags+length
+            val cumulativeTsnAck = buf.getInt().toUInt()
+            val aRwnd           = buf.getInt().toUInt()
+            val numGaps         = buf.getShort().toInt() and 0xFFFF
+            val numDups         = buf.getShort().toInt() and 0xFFFF
 
             val gaps: Series<SctpGapAckBlock> = numGaps j {
-                val start = getUShort(bytes, off); off += 2
-                val end   = getUShort(bytes, off); off += 2
+                val start = buf.getShort().toUShort()
+                val end   = buf.getShort().toUShort()
                 SctpGapAckBlock(start, end)
             }
             val dups: Series<UInt> = numDups j {
-                val res = getUInt(bytes, off); off += 4
-                res
+                buf.getInt().toUInt()
             }
             return SctpSackChunk(cumulativeTsnAck, aRwnd, gaps, dups)
         }
