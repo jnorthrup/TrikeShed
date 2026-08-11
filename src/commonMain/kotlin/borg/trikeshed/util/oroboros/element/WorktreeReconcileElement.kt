@@ -1,6 +1,4 @@
-<<<<<<< ours
 // Rejected malformed Pijul materialization; intentionally inert pending a complete CCEK implementation.
-=======
 package borg.trikeshed.util.oroboros.element
 
 import borg.trikeshed.context.AsyncContextElement
@@ -74,4 +72,3 @@ class WorktreeReconcileElement(
         super.drain()
     }
 }
->>>>>>> theirs

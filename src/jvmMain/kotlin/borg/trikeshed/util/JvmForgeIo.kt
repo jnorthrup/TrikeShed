@@ -4,9 +4,9 @@ import borg.trikeshed.context.nuid.Capability
 import borg.trikeshed.context.nuid.TraitSpace
 import borg.trikeshed.lib.j
 import borg.trikeshed.util.io.ForgeCliArgs
-import borg.trikeshed.userspace.nio.file.Files as NioFiles
-import borg.trikeshed.userspace.nio.file.Paths
-import borg.trikeshed.userspace.nio.file.StandardOpenOption
+import java.nio.file.Files as NioFiles
+import java.nio.file.Paths
+import java.nio.file.StandardOpenOption
 import kotlin.system.exitProcess
 
 /**
@@ -28,8 +28,8 @@ object JvmForgeIo {
      */
     fun writeStringJvm(path: String, text: String) {
         val p = Paths.get(path)
-        p.parent?.let { borg.trikeshed.userspace.nio.file.Files.createDirectories(it) }
-        borg.trikeshed.userspace.nio.file.Files.writeString(
+        p.parent?.let { NioFiles.createDirectories(it) }
+        NioFiles.writeString(
             p, text,
             StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING, StandardOpenOption.WRITE,
         )

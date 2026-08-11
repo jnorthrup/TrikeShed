@@ -67,7 +67,6 @@ fun extractHtxPayloadBytes(response: HtxExchangeResult): ByteArray {
 }
 
 open class IpfsContentGateway(private val htxElement: HtxElement) : ContentGateway {
-    private val HEX_CHARS = "0123456789abcdef".toCharArray()
 
     override suspend fun fetch(contentId: ContentId): ByteArray {
         val request = parseHtxRequest("ipfs://${contentId.value}")

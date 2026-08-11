@@ -1,6 +1,4 @@
-<<<<<<< HEAD
 // Rejected malformed Pijul materialization; intentionally inert pending a complete CCEK implementation.
-=======
 package borg.trikeshed.cas
 
 import borg.trikeshed.context.ElementState
@@ -75,4 +73,3 @@ class CasReplicationElement(
         super.close()
     }
 }
->>>>>>> origin/cas-replication-ccek-2482633503551345018

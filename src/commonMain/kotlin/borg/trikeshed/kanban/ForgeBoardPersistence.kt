@@ -88,30 +88,5 @@ object ForgeBoardPersistence {
         return source
     }
 
-    private fun jsonUnescape(value: String): String = buildString(value.length) {
-        var index = 0
-        while (index < value.length) {
-            val char = value[index++]
-            if (char != '\\' || index >= value.length) {
-                append(char)
-                continue
-            }
-            when (val escaped = value[index++]) {
-                '"' -> append('"')
-                '\\' -> append('\\')
-                '/' -> append('/')
-                'b' -> append('\b')
-                'f' -> append('\u000C')
-                'n' -> append('\n')
-                'r' -> append('\r')
-                't' -> append('\t')
-                'u' -> {
-                    require(index + 4 <= value.length) { "truncated JSON unicode escape" }
-                    append(value.substring(index, index + 4).toInt(16).toChar())
-                    index += 4
-                }
-                else -> error("invalid JSON escape: \\$escaped")
-            }
-        }
-    }
+    private fun jsonUnescape(value: String): String = borg.trikeshed.util.jsonUnescape(value)
 }

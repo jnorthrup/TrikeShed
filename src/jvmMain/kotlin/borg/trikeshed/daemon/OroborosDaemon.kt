@@ -35,9 +35,9 @@ import java.io.File
 import java.io.FileOutputStream
 import java.net.StandardProtocolFamily
 import java.net.UnixDomainSocketAddress
-import borg.trikeshed.userspace.nio.ByteBuffer
-import borg.trikeshed.userspace.nio.channels.ServerSocketChannel
-import borg.trikeshed.userspace.nio.channels.SocketChannel
+import java.nio.ByteBuffer
+import java.nio.channels.ServerSocketChannel
+import java.nio.channels.SocketChannel
 import kotlin.system.exitProcess
 import sun.misc.Signal
 import sun.misc.SignalHandler
@@ -183,6 +183,7 @@ object OroborosDaemon {
             parentJob = coroutineContext[kotlinx.coroutines.Job],
         )
         System.err.println("[OROBOROS] HTX reactor open: ${htxElement.state} — Jules/ModelMux via TLS codec")
+        driver.attachHtxElement(htxElement)
 
         // ── MuxReactorElement: the live key+quota surface ────────────────
         // Owns lease/quota state for both ModelMux.chat/stream/embed and the
@@ -475,8 +476,8 @@ object OroborosDaemon {
         var bindAttempt = 0
         while (serverSocket == null && bindAttempt < 3) {
             try {
-                serverSocket = ServerSocketChannel.open(StandardProtocolFamily.UNIX.name)
-                serverSocket.bind(healthSock.absolutePath)
+                serverSocket = ServerSocketChannel.open(StandardProtocolFamily.UNIX)
+                serverSocket.bind(UnixDomainSocketAddress.of(healthSock.toPath()))
             } catch (e: Throwable) {
                 System.err.println("[OROBOROS] health.sock bind attempt ${bindAttempt + 1} failed: ${e.message}")
                 try { serverSocket?.close() } catch (_: Exception) {}
@@ -546,7 +547,7 @@ object OroborosDaemon {
                                         val backup = File(traceFile.parentFile, traceFile.name + ".1")
                                         if (traceFile.exists()) {
                                             try {
-                                                borg.trikeshed.userspace.nio.file.Files.move(borg.trikeshed.userspace.nio.file.Path.of(traceFile.absolutePath), borg.trikeshed.userspace.nio.file.Path.of(backup.absolutePath), borg.trikeshed.userspace.nio.file.StandardCopyOption.REPLACE_EXISTING)
+                                                java.nio.file.Files.move(traceFile.toPath(), backup.toPath(), java.nio.file.StandardCopyOption.REPLACE_EXISTING)
                                             } catch (e: Exception) {}
                                         }
                                         currentTw = FileOutputStream(traceFile, false).bufferedWriter()

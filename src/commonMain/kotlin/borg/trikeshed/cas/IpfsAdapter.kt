@@ -1,6 +1,4 @@
-<<<<<<< ours
 // Rejected malformed Pijul materialization; intentionally inert pending a complete CCEK implementation.
-=======
 package borg.trikeshed.cas
 
 import borg.trikeshed.htx.HtxKey
@@ -95,4 +93,3 @@ class HtxIpfsAdapter(
         return ContentId(cidStr)
     }
 }
->>>>>>> theirs

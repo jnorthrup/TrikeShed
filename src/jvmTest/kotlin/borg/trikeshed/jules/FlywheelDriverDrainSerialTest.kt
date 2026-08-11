@@ -5,6 +5,8 @@ import java.io.File
 import java.net.InetSocketAddress
 import java.nio.file.Files
 import java.util.concurrent.atomic.AtomicInteger
+import keymux.KeyMuxBuilder
+import keymux.TestKeySource
 import kotlin.test.AfterTest
 import kotlin.test.BeforeTest
 import kotlin.test.Test
@@ -147,14 +149,18 @@ class FlywheelDriverDrainSerialTest {
             runGitCmd(repoDir, "commit", "-q", "-m", "initial")
             File(repoDir, "src").mkdirs()
 
+            val keyMux = KeyMuxBuilder().apply {
+                bind("llm.api.key", TestKeySource(value = "test-api-key"))
+            }.build()
+
             val driver = FlywheelDriver(
-                apiKey = "test-key",
+                keyMux = keyMux,
                 repoDir = repoDir,
                 forgeDir = forgeDir,
                 intervalMs = 100,
             )
 
-            val customClient = JulesRestClient("test-key", "http://localhost:${mockPort}/v1alpha")
+            val customClient = JulesRestClient(keyMux, "http://localhost:${mockPort}/v1alpha")
             val clientField = FlywheelDriver::class.java.getDeclaredField("client")
             clientField.isAccessible = true
             clientField.set(driver, customClient)

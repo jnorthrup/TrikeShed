@@ -3,11 +3,11 @@ import org.jetbrains.kotlin.gradle.ExperimentalWasmDsl
 import org.jetbrains.kotlin.gradle.plugin.KotlinPlatformType
 
 plugins {
-    kotlin("multiplatform") version "2.4.10"
+    kotlin("multiplatform") version "2.4.20-Beta2"
     id("com.github.ben-manes.versions") version "0.54.0"
     `maven-publish`
-    kotlin("plugin.serialization") version "2.4.10"
-    kotlin("plugin.compose") version "2.4.10"
+    kotlin("plugin.serialization") version "2.4.20-Beta2"
+    kotlin("plugin.compose") version "2.4.20-Beta2"
     id("org.jetbrains.compose") version "1.11.1"
 }
 
@@ -790,5 +790,15 @@ tasks.register("metrics") {
                 println("All metrics within acceptable bounds of baseline.")
             }
         }
+    }
+
+    tasks.register<JavaExec>("queueGraphWork") {
+        group = "trikeshed"
+        description = "Queue Graphify + pgGraph merged work to Jules board"
+        classpath = files(
+            layout.buildDirectory.dir("classes/kotlin/jvm/main"),
+            configurations.named("jvmRuntimeClasspath")
+        )
+        mainClass.set("borg.trikeshed.utils.ingress.QueueGraphWorkKt")
     }
 }

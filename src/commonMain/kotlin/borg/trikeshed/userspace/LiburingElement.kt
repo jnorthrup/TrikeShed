@@ -60,49 +60,12 @@ class LiburingElement(
 }
 
 /**
- * FanoutDispatcherElement — Pattern A CCEK element for channelized completion dispatch.
+ * FanoutDispatcherElement — pattern A CCEK element for channelized completion dispatch.
  *
- * Central dispatch point for all io_uring completions. Elements register
- * handlers by userData token; completions are fanned out to all subscribers
- * for that token.
- *
- * PRELOAD.md contract:
- * - Single-threaded dispatch via reactor CQE loop
- * - Structured concurrency: handlers run in parent SupervisorJob scope
- * - Cold Series α-projection: handlers receive cold completion Series
+ * Canonical implementation: [borg.trikeshed.userspace.reactor.FanoutDispatcherElement].
+ * This is a forward alias to keep existing imports of `borg.trikeshed.userspace.FanoutDispatcherElement` working.
  */
-class FanoutDispatcherElement(
-    parentJob: kotlinx.coroutines.Job? = null,
-) : AsyncContextElement(ElementState.CREATED, parentJob) {
-
-    override val key: CoroutineContext.Key<*> get() = borg.trikeshed.userspace.context.AsyncContextKey.FanoutDispatcherKey
-
-    private val handlers = mutableMapOf<Long, MutableList<(UringCompletion) -> Unit>>()
-
-    /** Register a handler for completions with the given userData token. */
-    fun registerHandler(userData: Long, handler: (UringCompletion) -> Unit) {
-        handlers.getOrPut(userData) { mutableListOf() }.add(handler)
-        // Also register with liburing facade
-        Liburing.registerFanoutHandler(userData, handler)
-    }
-
-    /** Remove a handler. */
-    fun removeHandler(userData: Long, handler: (UringCompletion) -> Unit) {
-        handlers[userData]?.remove(handler)
-        if (handlers[userData].isNullOrEmpty()) handlers.remove(userData)
-        Liburing.removeFanoutHandler(userData, handler)
-    }
-
-    /** Dispatch a completion to all handlers for its userData. */
-    internal fun dispatch(completion: UringCompletion) {
-        handlers[completion.userData]?.toList()?.forEach { it(completion) }
-    }
-
-    override suspend fun close() {
-        handlers.clear()
-        super.close()
-    }
-}
+typealias FanoutDispatcherElement = borg.trikeshed.userspace.reactor.FanoutDispatcherElement
 
 /** Companion object for LiburingInstallement key access. */
 object LiburingKey : CoroutineContext.Key<LiburingElement>

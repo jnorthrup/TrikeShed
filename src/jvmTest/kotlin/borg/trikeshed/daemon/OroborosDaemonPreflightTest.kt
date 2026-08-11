@@ -1,6 +1,9 @@
 package borg.trikeshed.daemon
 
 import borg.trikeshed.jules.FlywheelDriver
+import keymux.KeyMux
+import keymux.KeyMuxBuilder
+import keymux.TestKeySource
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.runTest
@@ -50,8 +53,13 @@ class OroborosDaemonPreflightTest {
             val forgeHome = File(root, "forgeHome")
             forgeHome.mkdirs()
 
+            // Create KeyMux with TestKeySource providing API key
+            val keyMux = KeyMuxBuilder().apply {
+                bind("llm.api.key", TestKeySource(value = "test-api-key"))
+            }.build()
+
             val driver = FlywheelDriver(
-                apiKey = "dummy",
+                keyMux = keyMux,
                 repoDir = clone,
                 forgeDir = forgeHome,
                 intervalMs = 1000L,

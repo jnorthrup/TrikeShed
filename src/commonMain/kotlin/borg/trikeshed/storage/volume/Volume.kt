@@ -1,10 +1,4 @@
 package borg.trikeshed.storage.volume
 
-interface Volume {
-    val blockSize: Int
-    val capacity: Long
-
-    suspend fun read(lba: Long, count: Int): ByteArray
-    suspend fun write(lba: Long, data: ByteArray)
-    suspend fun sync()
-}
+// Fork-identical Volume interface under userspace.volume.Volume. Alias for back-compat.
+typealias Volume = borg.trikeshed.userspace.volume.Volume

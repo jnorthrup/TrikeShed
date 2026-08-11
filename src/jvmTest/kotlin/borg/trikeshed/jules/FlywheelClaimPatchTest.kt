@@ -3,6 +3,8 @@ package borg.trikeshed.jules
 import borg.trikeshed.job.ContentId
 import borg.trikeshed.userspace.nio.file.spi.JvmFileOperations
 import borg.trikeshed.util.oroboros.FileCasStore
+import keymux.KeyMuxBuilder
+import keymux.TestKeySource
 import java.io.File
 import java.nio.file.Files
 import kotlin.test.Test
@@ -35,11 +37,25 @@ class FlywheelClaimPatchTest {
         val forge = Files.createTempDirectory("flywheel-claim-forge").toFile()
         val casPath = JvmFileOperations().resolvePath(forge.absolutePath, "cas")
 
+        val keyMux = KeyMuxBuilder().apply {
+            bind("llm.poolside/laguna-xs-2.1.key", TestKeySource(value = "test-api-key"))
+        }.build()
+
         val driver = FlywheelDriver(
-            apiKey = "test-key",
-            repoDir = repo,
+            keyMux = keyMux,
+            repoDir = forge,
             forgeDir = forge,
         )
+
+        // Create mock HTX element for brain HTTP context
+        val mockHtx = object : borg.trikeshed.htx.HtxElement(
+            parentJob = null,
+        ) {
+            override suspend fun request(req: borg.trikeshed.htx.HtxRequest): borg.trikeshed.htx.HtxResponse {
+                error("Mock HtxElement not implemented for test")
+            }
+        }
+        driver.attachHtxElement(mockHtx)
 
         val patch = """
             diff --git a/src/Foo.kt b/src/Foo.kt

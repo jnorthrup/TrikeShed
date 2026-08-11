@@ -101,6 +101,13 @@ class FlywheelDriver(
         JvmFileOperations().resolvePath(forgeDir.absolutePath, "cas"),
     ),
 ) {
+    @Volatile private var htxElement: borg.trikeshed.htx.HtxElement? = null
+
+    /** Wire the HTX element after daemon construction (circular dep). */
+    fun attachHtxElement(htx: borg.trikeshed.htx.HtxElement) {
+        htxElement = htx
+    }
+
     /** Jules Pro concurrency ceiling; configuration may lower but never raise it. */
     private val maxSlots: Int = maxSlots.coerceIn(0, 15)
     private val client = JulesRestClient(keyMux)
@@ -2043,15 +2050,23 @@ class FlywheelDriver(
             println("[FLYWHEEL] WARN no brain endpoints discovered — GUIDE offline, skipping ${card.snapshot.sessionId.takeLast(6)}")
             return ""
         }
+        val htx = htxElement
+        if (htx == null) {
+            println("[FLYWHEEL] WARN htxElement not attached — GUIDE offline, skipping ${card.snapshot.sessionId.takeLast(6)}")
+            return ""
+        }
         return try {
-            b.chat(
-                messages = listOf(
-                    "system" to conventions,
-                    "user" to "Task title: $title\n\nInquiry from the coding agent:\n$inquiry",
-                ),
-                maxTokens = 400,
-                temperature = 0.2,
-            )
+            // Call brain.chat() with HtxElement context so HTTP requests work
+            withContext(Dispatchers.IO + htx) {
+                b.chat(
+                    messages = listOf(
+                        "system" to conventions,
+                        "user" to "Task title: $title\n\nInquiry from the coding agent:\n$inquiry",
+                    ),
+                    maxTokens = 400,
+                    temperature = 0.2,
+                )
+            }
         } catch (t: Throwable) {
             println("[FLYWHEEL] BRAIN-ERROR ${card.snapshot.sessionId.takeLast(6)}: ${t.message}")
             ""

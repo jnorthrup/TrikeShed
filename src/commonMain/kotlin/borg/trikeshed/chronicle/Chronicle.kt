@@ -10,39 +10,21 @@ import borg.trikeshed.lib.view
 import borg.trikeshed.splat.Splat
 import borg.trikeshed.splat.toChronology
 
-class CircularQueue<T>(private val capacity: Int) {
-    private var head = 0
-    private var tail = 0
-    private var count = 0
-    private val buffer = arrayOfNulls<Any?>(capacity)
-
-    fun enqueue(item: T) {
-        if (count == capacity) {
-            head = (head + 1) % capacity
-        } else {
-            count++
-        }
-        buffer[tail] = item
-        tail = (tail + 1) % capacity
-    }
-
-    val size: Int get() = count
-
-    @Suppress("UNCHECKED_CAST")
-    operator fun get(index: Int): T {
-        if (index >= count) throw IndexOutOfBoundsException("Index $index out of bounds for size $count")
-        return buffer[(head + index) % capacity] as T
-    }
-}
+// CircularQueue dedup: borg.trikeshed.collections.CircularQueue is the canonical
+// typealias for CirQlar; the inline class here was a parallel implementation.
+typealias CircularQueue<T> = borg.trikeshed.collections.CircularQueue<T>
 
 object Chronicle {
-    private val buffer = CircularQueue<ChronicleEvent>(capacity = 1_000_000)
+    private val buffer = CircularQueue<ChronicleEvent>(maxSize = 1_000_000)
 
     fun emit(event: ChronicleEvent) {
-        buffer.enqueue(event)
+        buffer.offer(event)
     }
 
-    fun flushToSeries(): Series<String> = buffer.size.j { i -> buffer[i].toJson() }
+    fun flushToSeries(): Series<String> {
+        val vect = buffer.toVect0r()
+        return vect.size.j { i -> vect.b(i).toJson() }
+    }
 }
 
 sealed class ChronicleEvent {

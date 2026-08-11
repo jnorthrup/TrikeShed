@@ -7,8 +7,8 @@ import org.apache.tika.parser.AutoDetectParser
 import org.apache.tika.parser.ParseContext
 import org.apache.tika.sax.BodyContentHandler
 import java.io.InputStream
-import borg.trikeshed.userspace.nio.file.Files
-import borg.trikeshed.userspace.nio.file.Path
+import java.nio.file.Files
+import java.nio.file.Path
 import kotlin.io.path.extension
 import kotlin.io.path.inputStream
 import kotlin.io.path.name
@@ -43,7 +43,7 @@ object JvmTikaIngestAdapter {
                 val stream: InputStream? = javaClass.getResourceAsStream("/tika/tika-config.xml")
                 stream?.use { s ->
                     val tmp = Files.createTempFile("tika-config", ".xml")
-                    Files.copy(s, tmp, borg.trikeshed.userspace.nio.file.StandardCopyOption.REPLACE_EXISTING)
+                    Files.copy(s, tmp, java.nio.file.StandardCopyOption.REPLACE_EXISTING)
                     AutoDetectParser(TikaConfig(tmp))
                 }
             }

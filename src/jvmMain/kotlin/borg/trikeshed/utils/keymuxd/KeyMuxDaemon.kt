@@ -31,8 +31,8 @@ import kotlin.coroutines.CoroutineContext
 import java.io.File
 import java.net.StandardProtocolFamily
 import java.net.UnixDomainSocketAddress
-import borg.trikeshed.userspace.nio.channels.ServerSocketChannel
-import borg.trikeshed.userspace.nio.file.Path
+import java.nio.channels.ServerSocketChannel
+import java.nio.file.Path
 
 /**
  * KeyMux Daemon — standalone CCEK reactor for key+quota+modelmux state.
@@ -50,16 +50,6 @@ import borg.trikeshed.userspace.nio.file.Path
  *   JULES_API_KEY (optional, for Jules integration)
  *   KEYMUX_PERSIST_ROOT (optional, default ~/.local/forge/keymux)
  */
-private val DEFAULT_PROVIDERS = listOf(
-    "jules" to "jules.default.key",
-    "brain" to "brain.default.key",
-    "openai" to "openai.default.key",
-    "anthropic" to "anthropic.default.key",
-    "google" to "google.default.key",
-    "nvidia" to "nvidia.default.key",
-    "xai" to "xai.default.key"
-)
-
 object KeyMuxDaemon {
 
     @JvmStatic
@@ -138,8 +128,8 @@ object KeyMuxDaemon {
         
         // Seed from already-resolved KeyMux env keys
         withContext(Dispatchers.IO) {
-            for ((provider, keyPath) in DEFAULT_PROVIDERS) {
-                val v = keyMux.get(keyPath) ?: continue
+            for (provider in listOf("jules", "brain", "openai", "anthropic", "google", "nvidia", "xai")) {
+                val v = keyMux.get("$provider.default.key") ?: continue
                 muxReactor.loadCredentialPool(
                     mapOf(provider to listOf(
                         MuxCredentialRecord(
@@ -186,13 +176,13 @@ object KeyMuxDaemon {
         
         val healthJob = CoroutineScope(Dispatchers.IO).launch {
             while (isActive) {
-                var client: borg.trikeshed.userspace.nio.channels.SocketChannel? = null
+                var client: java.nio.channels.SocketChannel? = null
                 try {
-                    client = serverSocket!!.accept() as borg.trikeshed.userspace.nio.channels.SocketChannel
+                    client = serverSocket!!.accept()
                     val state = muxReactor.flowState.value
                     val uptimeMs = System.currentTimeMillis() - daemonStartTime
                     val msg = "ALIVE $uptimeMs ${state.currentlyRunning} ${state.availableKeys} ${state.maxInProgress} ${state.maxSpawn} ${state.tickSequence}\n"
-                    val buf = borg.trikeshed.userspace.nio.ByteBuffer.wrap(msg.toByteArray())
+                    val buf = java.nio.ByteBuffer.wrap(msg.toByteArray())
                     while (buf.hasRemaining()) {
                         client.write(buf)
                     }

@@ -1,5 +1,7 @@
 package borg.trikeshed.job
 
+import borg.trikeshed.util.toLowerHex
+
 /**
  * ContentId — SHA-256 over canonical bytes.
  * Format: "sha256:<64 lowercase hex chars>"
@@ -18,12 +20,7 @@ data class ContentId(val value: String) {
     companion object {
         fun of(bytes: ByteArray): ContentId {
             val digest = sha256(bytes)
-            val hex = buildString {
-                for (b in digest) {
-                    append(HEX_CHARS[(b.toInt() shr 4) and 0x0F])
-                    append(HEX_CHARS[b.toInt() and 0x0F])
-                }
-            }
+            val hex = digest.toLowerHex()
             return ContentId(SHA256_PREFIX + hex)
         }
 
@@ -35,7 +32,6 @@ data class ContentId(val value: String) {
     val hex: String get() = value.removePrefix("sha256:")
 }
 
-private val HEX_CHARS = "0123456789abcdef".toCharArray()
 private const val LOWER_HEX = "0123456789abcdef"
 private const val SHA256_PREFIX = "sha256:"
 private const val SHA256_TEXT_LENGTH = 71

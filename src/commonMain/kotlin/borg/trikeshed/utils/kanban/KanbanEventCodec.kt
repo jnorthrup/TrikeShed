@@ -184,44 +184,8 @@ object KanbanEventCodec {
     private fun Map<*, *>.optStr(k: String): String? = this[k]?.toString()?.let { unescape(it) }
     private fun Map<*, *>.num(k: String): Long = (this[k] as? Number)?.toLong() ?: 0L
 
-    private fun unescape(v: String): String {
-        if (!v.contains('\\')) return v
-        val sb = StringBuilder(v.length)
-        var i = 0
-        while (i < v.length) {
-            val ch = v[i]
-            if (ch == '\\' && i + 1 < v.length) {
-                when (val next = v[i + 1]) {
-                    '"' -> { sb.append('"'); i += 2 }
-                    '\\' -> { sb.append('\\'); i += 2 }
-                    'n' -> { sb.append('\n'); i += 2 }
-                    'r' -> { sb.append('\r'); i += 2 }
-                    't' -> { sb.append('\t'); i += 2 }
-                    'u' -> {
-                        if (i + 5 < v.length) {
-                            val hex = v.substring(i + 2, i + 6)
-                            val code = hex.toIntOrNull(16)
-                            if (code != null) {
-                                sb.append(code.toChar())
-                                i += 6
-                            } else {
-                                sb.append(ch)
-                                i++
-                            }
-                        } else {
-                            sb.append(ch)
-                            i++
-                        }
-                    }
-                    else -> { sb.append(ch); i++ }
-                }
-            } else {
-                sb.append(ch)
-                i++
-            }
-        }
-        return sb.toString()
-    }
+    private fun unescape(v: String): String =
+        if (!v.contains('\\')) v else borg.trikeshed.util.jsonUnescape(v)
 
     private fun StringBuilder.field(k: String, v: String) {
         append(",\"").append(k).append("\":")

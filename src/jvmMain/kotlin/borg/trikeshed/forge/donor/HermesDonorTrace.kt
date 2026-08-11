@@ -3,9 +3,9 @@ package borg.trikeshed.forge.donor
 import borg.trikeshed.kanban.ForgeBoardPersistence
 import borg.trikeshed.kanban.ForgeKanbanIngest
 import borg.trikeshed.kanban.ForgeKanbanReduction
-import borg.trikeshed.userspace.nio.file.Files
-import borg.trikeshed.userspace.nio.file.Path
-import borg.trikeshed.userspace.nio.file.Paths
+import java.nio.file.Files
+import java.nio.file.Path
+import java.nio.file.Paths
 import org.sqlite.SQLiteDataSource
 import java.sql.Connection
 import java.sql.ResultSet
@@ -67,8 +67,8 @@ object HermesDonorTrace {
                 while (rs.next()) {
                     hasWorkPackages = true
                     val id = rs.getString("id")
-                    val title = escapeMarkdown(rs.getString("title"))
-                    val body = escapeMarkdown(rs.getString("body"))
+                    val title = rs.getString("title")
+                    val body = rs.getString("body")
                     val parentIds = rs.getString("parent_ids")
 
                     // id needs to match "^([A-Z][0-9]+)$"
@@ -114,10 +114,5 @@ object HermesDonorTrace {
         val tmp = Files.createTempFile("sqlite-donor", ".md")
         Files.writeString(tmp, sourceDescription)
         return ForgeKanbanIngest.persistMarkdown(userId, tmp.toString())
-    }
-
-    private fun escapeMarkdown(text: String?): String? {
-        if (text == null) return null
-        return text.replace(Regex("""([\\`*_{}\[\]()#+\-.!])"""), "\\\\$1")
     }
 }

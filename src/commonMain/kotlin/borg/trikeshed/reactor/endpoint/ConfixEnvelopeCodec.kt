@@ -7,6 +7,7 @@ import borg.trikeshed.context.nuid.nuid
 import borg.trikeshed.context.nuid.Nuid
 import borg.trikeshed.lib.Join
 import borg.trikeshed.lib.j
+import borg.trikeshed.util.toLowerHex
 
 class ConfixEnvelopeCodec(private val config: ReactorEndpointConfig = ReactorEndpointConfig()) {
 
@@ -114,16 +115,7 @@ class ConfixEnvelopeCodec(private val config: ReactorEndpointConfig = ReactorEnd
         }
     }
 
-    private fun toHex(bytes: ByteArray): String {
-        val hexChars = "0123456789abcdef"
-        val result = StringBuilder(bytes.size * 2)
-        for (b in bytes) {
-            val i = b.toInt()
-            result.append(hexChars[(i shr 4) and 0x0f])
-            result.append(hexChars[i and 0x0f])
-        }
-        return result.toString()
-    }
+    private fun toHex(bytes: ByteArray): String = bytes.toLowerHex()
 
     private fun fromHex(hex: String): ByteArray {
         val result = ByteArray(hex.length / 2)

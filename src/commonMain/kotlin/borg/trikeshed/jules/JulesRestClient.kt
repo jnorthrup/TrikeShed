@@ -1,6 +1,7 @@
 package borg.trikeshed.jules
 
 import borg.trikeshed.parse.json.JsonSupport
+import borg.trikeshed.util.toUpperHex
 import keymux.KeyMux
 
 /**
@@ -202,35 +203,9 @@ class JulesRestClient(
      * rework. HARVEST could not have ever landed through this path.
      */
     private fun jsonUnescape(s: String): String {
-        var actualS = s
-        if (s.startsWith("\"") && s.endsWith("\"") && s.length >= 2) {
-            actualS = s.substring(1, s.length - 1)
-        }
-        if ('\\' !in actualS) return actualS
-        val out = StringBuilder(actualS.length)
-        var i = 0
-        while (i < actualS.length) {
-            val c = actualS[i]
-            if (c == '\\' && i + 1 < actualS.length) {
-                when (actualS[i + 1]) {
-                    '"' -> { out.append('"'); i += 2 }
-                    '\\' -> { out.append('\\'); i += 2 }
-                    '/' -> { out.append('/'); i += 2 }
-                    'b' -> { out.append('\b'); i += 2 }
-                    'f' -> { out.append('\u000C'); i += 2 }
-                    'n' -> { out.append('\n'); i += 2 }
-                    'r' -> { out.append('\r'); i += 2 }
-                    't' -> { out.append('\t'); i += 2 }
-                    'u' -> {
-                        val code = actualS.substring(i + 2, minOf(i + 6, actualS.length)).toIntOrNull(16)
-                        if (code != null && i + 6 <= actualS.length) { out.append(code.toChar()); i += 6 }
-                        else { out.append(c); i += 1 }
-                    }
-                    else -> { out.append(c); i += 1 }
-                }
-            } else { out.append(c); i += 1 }
-        }
-        return out.toString()
+        val inner = if (s.startsWith("\"") && s.endsWith("\"") && s.length >= 2)
+            s.substring(1, s.length - 1) else s
+        return borg.trikeshed.util.jsonUnescape(inner)
     }
 
     /**
@@ -295,8 +270,6 @@ class JulesRestClient(
         append('"')
     }
 
-    private val HEX_CHARS = "0123456789ABCDEF".toCharArray()
-
     /** URL form encoding without the JVM-only URLEncoder boundary. */
     private fun percentEncode(s: String): String {
         // ⚡ Bolt: Optimize by caching encoded bytes to avoid iterator allocations and using bitwise ops for hex encoding
@@ -313,8 +286,7 @@ class JulesRestClient(
                     unsigned == ' '.code -> append('+')
                     else -> {
                         append('%')
-                        append(HEX_CHARS[unsigned shr 4])
-                        append(HEX_CHARS[unsigned and 0x0F])
+                        append(byteArrayOf(bytes[i]).toUpperHex())
                     }
                 }
             }

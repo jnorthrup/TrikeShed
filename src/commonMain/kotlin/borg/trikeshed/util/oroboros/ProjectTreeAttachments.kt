@@ -2,6 +2,7 @@ package borg.trikeshed.util.oroboros
 
 import borg.trikeshed.job.Sha256Pure
 import borg.trikeshed.userspace.nio.file.spi.FileOperations
+import borg.trikeshed.util.toLowerHex
 
 /**
  * CouchDB attachment metadata representing one tracked file in the managed repository tree.
@@ -37,9 +38,7 @@ data class ProjectTreeAttachment(
  */
 object ProjectTreeAttachments {
     
-    private fun toHex(bytes: ByteArray): String = bytes.joinToString("") {
-        it.toInt().and(0xFF).toString(16).padStart(2, '0')
-    }
+    private fun toHex(bytes: ByteArray): String = bytes.toLowerHex()
 
     private fun inferContentType(path: String): String {
         return when {

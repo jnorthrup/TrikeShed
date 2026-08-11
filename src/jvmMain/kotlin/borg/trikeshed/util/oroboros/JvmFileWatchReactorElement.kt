@@ -10,13 +10,13 @@ import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.channels.ReceiveChannel
 import kotlinx.coroutines.launch
-import borg.trikeshed.userspace.nio.file.ClosedWatchServiceException
-import borg.trikeshed.userspace.nio.file.FileSystems
-import borg.trikeshed.userspace.nio.file.Files
-import borg.trikeshed.userspace.nio.file.Path
-import borg.trikeshed.userspace.nio.file.StandardWatchEventKinds
-import borg.trikeshed.userspace.nio.file.WatchKey
-import borg.trikeshed.userspace.nio.file.WatchService
+import java.nio.file.ClosedWatchServiceException
+import java.nio.file.FileSystems
+import java.nio.file.Files
+import java.nio.file.Path
+import java.nio.file.StandardWatchEventKinds
+import java.nio.file.WatchKey
+import java.nio.file.WatchService
 import kotlin.coroutines.CoroutineContext
 
 /** JVM bind for the Oroboros file-event reactor. WatchService blocks only on Dispatchers.IO. */
@@ -86,7 +86,7 @@ class JvmFileWatchReactorElement(
                         if (rawEvent.kind() == StandardWatchEventKinds.OVERFLOW) continue
                         @Suppress("UNCHECKED_CAST")
                         val relative = (rawEvent.context() as? Path) ?: continue
-                        val path = directory.resolve(relative.toString()).normalize()
+                        val path = directory.resolve(relative).normalize()
                         val relStr = rootPath.relativize(path).toString().replace('\\', '/')
                         if (!glob.accepts(relStr)) continue
                         if (rawEvent.kind() == StandardWatchEventKinds.ENTRY_CREATE && Files.isDirectory(path)) {
@@ -109,7 +109,7 @@ class JvmFileWatchReactorElement(
         }
     }
 
-    private fun registerTree(start: borg.trikeshed.userspace.nio.file.Path, service: WatchService) {
+    private fun registerTree(start: java.nio.file.Path, service: WatchService) {
         Files.walk(start).use { paths ->
             paths.filter { Files.isDirectory(it) && !isIgnored(it) }.forEach { directory ->
                 val key = directory.register(
@@ -123,7 +123,7 @@ class JvmFileWatchReactorElement(
         }
     }
 
-    private fun isIgnored(path: borg.trikeshed.userspace.nio.file.Path): Boolean {
+    private fun isIgnored(path: java.nio.file.Path): Boolean {
         val relative = if (path.startsWith(rootPath)) rootPath.relativize(path) else path
         return relative.any { it.toString() in WALKER_BLOCKED_SEGMENTS }
     }
