@@ -50,6 +50,16 @@ import java.nio.file.Path
  *   JULES_API_KEY (optional, for Jules integration)
  *   KEYMUX_PERSIST_ROOT (optional, default ~/.local/forge/keymux)
  */
+private val DEFAULT_PROVIDERS = listOf(
+    "jules" to "jules.default.key",
+    "brain" to "brain.default.key",
+    "openai" to "openai.default.key",
+    "anthropic" to "anthropic.default.key",
+    "google" to "google.default.key",
+    "nvidia" to "nvidia.default.key",
+    "xai" to "xai.default.key"
+)
+
 object KeyMuxDaemon {
 
     @JvmStatic
@@ -128,8 +138,8 @@ object KeyMuxDaemon {
         
         // Seed from already-resolved KeyMux env keys
         withContext(Dispatchers.IO) {
-            for (provider in listOf("jules", "brain", "openai", "anthropic", "google", "nvidia", "xai")) {
-                val v = keyMux.get("$provider.default.key") ?: continue
+            for ((provider, keyPath) in DEFAULT_PROVIDERS) {
+                val v = keyMux.get(keyPath) ?: continue
                 muxReactor.loadCredentialPool(
                     mapOf(provider to listOf(
                         MuxCredentialRecord(

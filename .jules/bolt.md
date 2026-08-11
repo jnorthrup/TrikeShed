@@ -17,3 +17,6 @@
 ## 2026-08-04 - Avoid O(N²) memory/eviction bottlenecks
 **Learning:** Replacing chunked buffered I/O with `joinToString` causes OOM regressions. Map eviction using `removeAll` inside a loop causes O(N²) freezing.
 **Action:** Always reconstruct map keys and use `.remove(key)` for O(1) cache eviction.
+## 2024-05-18 - Avoid repeated list and string allocations in hot paths
+**Learning:** Instantiating inline lists (e.g. `listOf("a", "b")`) and performing string interpolation inside hot loops or frequently executed coroutine blocks (like in KeyMuxDaemon) causes severe GC pressure and object allocations in Kotlin.
+**Action:** Extract static collections and pre-compute interpolated string constants into top-level private properties (e.g., `DEFAULT_PROVIDERS`) so they are allocated only once.
