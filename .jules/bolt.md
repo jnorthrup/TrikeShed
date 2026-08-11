@@ -25,6 +25,7 @@
 <<<<<<< HEAD
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
 **Action:** Always reconstruct map keys and use `.remove(key)` for O(1) cache eviction.## 2024-05-18 - Removing redundant list allocation when mapping arrays
 **Learning:** When mapping `vararg` parameters or `Array` types in Kotlin, calling `.toList().map { ... }` creates a redundant intermediate `ArrayList` which is immediately discarded. Kotlin standard library has `.map { ... }` extension on Arrays.
 **Action:** Avoid calling `.toList()` before `.map { ... }` on varargs or arrays to prevent unnecessary memory allocation and reduce GC overhead.
@@ -66,3 +67,9 @@
 **Learning:** Using manual offset variables and primitive shifts for byte array serialization leads to less robust code compared to structured approaches. However, `borg.trikeshed.userspace.nio.ByteBuffer` provides a clean, fluent API that performs comparably for encoding and decoding while significantly improving maintainability. When migrating network serialization to `ByteBuffer`, careful attention must be paid to unsigned types. Using `.toInt()` directly on `.getShort()` causes sign-extension bugs for values >= 32768, which can break chunk bounds. Using `and 0xFFFF` correctly preserves the unsigned 16-bit integer representation.
 **Action:** Replaced primitive offset-based encoding and decoding in `SctpSackChunk` with `borg.trikeshed.userspace.nio.ByteBuffer`'s fluent read/write methods (`put`, `putShort`, `putInt`, `getShort`, `getInt`), applying `and 0xFFFF` masks to prevent sign extension bugs on unsigned shorts.
 >>>>>>> origin/jules-performance-sctpsackchunk-4402318700950035386
+=======
+**Action:** Always reconstruct map keys and use `.remove(key)` for O(1) cache eviction.
+## 2024-05-18 - Avoid repeated list and string allocations in hot paths
+**Learning:** Instantiating inline lists (e.g. `listOf("a", "b")`) and performing string interpolation inside hot loops or frequently executed coroutine blocks (like in KeyMuxDaemon) causes severe GC pressure and object allocations in Kotlin.
+**Action:** Extract static collections and pre-compute interpolated string constants into top-level private properties (e.g., `DEFAULT_PROVIDERS`) so they are allocated only once.
+>>>>>>> origin/perf/keymux-daemon-lookup-7382083278518723629
