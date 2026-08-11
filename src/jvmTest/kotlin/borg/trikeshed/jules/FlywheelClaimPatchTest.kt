@@ -55,7 +55,7 @@ class FlywheelClaimPatchTest {
             commitSha = headSha,
             patch = patch,
             sessionId = "sessions/7395203169723873685",
-            workId = "todo:abc",
+            workId = "w-claim-test",
             title = "Wire CAS receipt",
             content = "Wire the CAS receipt so patchCid is backed by a blob",
         )
@@ -86,7 +86,7 @@ class FlywheelClaimPatchTest {
             commitSha = headSha,
             patch = patch,
             sessionId = "sessions/7395203169723873685",
-            workId = "todo:abc",
+            workId = "w-claim-test",
             title = "Wire CAS receipt",
             content = "Wire the CAS receipt so patchCid is backed by a blob",
         )
