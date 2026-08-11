@@ -48,12 +48,16 @@ class JvmChannelOperations(
     internal val socketInterests = ConcurrentHashMap<Int, Set<Interest>>()
     internal val fdCounter = AtomicInteger(100)
     private val workerLimit = entries.coerceAtLeast(1)
+    // Unbounded queue: with parallel HTX fan-out, a bounded ArrayBlockingQueue
+    // plus AbortPolicy rejects submissions mid-exchange; JvmChannelHandle then
+    // fails the pending ops with -1 ("HTX reactor write failed"). Rejection is
+    // never the right answer for the reactor — queue growth is the backpressure.
     internal val ioWorkers = ThreadPoolExecutor(
         workerLimit,
         workerLimit,
         0L,
         TimeUnit.MILLISECONDS,
-        ArrayBlockingQueue<Runnable>(workerLimit),
+        java.util.concurrent.LinkedBlockingQueue<Runnable>(),
         { runnable -> Thread(runnable, "trikeshed-jvm-channel").apply { isDaemon = true } },
         ThreadPoolExecutor.AbortPolicy(),
     )
@@ -101,32 +105,26 @@ class JvmChannelOperations(
 
     override fun connect(fd: Int, host: String, port: Int): Int {
         val ch = socketChannels[fd] as? SocketChannel ?: return -1
-        schedule {
-            try {
-                val address = java.net.InetSocketAddress(host, port)
-                // Non-blocking connect returns false if the connection is
-                // still pending; finishConnect() blocks until established.
-                // Guard the entire sequence against close() racing the fd
-                // out from under us — a reactor teardown can close(fd)
-                // between socketChannels[fd] lookup and this scheduled task.
-                if (!ch.isOpen) return@schedule
-                if (!ch.connect(address)) {
-                    while (ch.isOpen && !ch.finishConnect()) {
-                        // spin briefly — non-blocking socket should complete
-                        // on first or second finishConnect call
-                    }
+        // The caller (HtxReactorElement.openConnection) treats a >= 0 return as
+        // "connected and ready to write". Scheduling finishConnect() on a worker
+        // races the first TLS ClientHello write, which then throws
+        // NotYetConnectedException and kills every exchange (observed Aug 09:
+        // 565 DispatchFailed / 0 Dispatched). Run connect+finishConnect inline —
+        // the worker version was already effectively blocking, just unordered.
+        return try {
+            val address = java.net.InetSocketAddress(host, port)
+            if (!ch.connect(address)) {
+                while (ch.isOpen && !ch.finishConnect()) {
+                    // non-blocking connect completes on first or second finishConnect
                 }
-                socketInterests[fd] = setOf(Interest.READ, Interest.WRITE, Interest.CONNECT)
-            } catch (_: java.nio.channels.ClosedChannelException) {
-                // fd was closed by reactor teardown — not an error
-            } catch (e: java.nio.channels.AsynchronousCloseException) {
-                // same race, different exception
-            } catch (e: Exception) {
-                println("JvmChannelOperations connect exception: ${e.message}")
-                e.printStackTrace()
             }
+            if (!ch.isOpen) return -1
+            socketInterests[fd] = setOf(Interest.READ, Interest.WRITE, Interest.CONNECT)
+            0
+        } catch (e: Exception) {
+            println("JvmChannelOperations connect exception: ${e.message}")
+            -1
         }
-        return 0
     }
 
     override fun close(fd: Int): Int {

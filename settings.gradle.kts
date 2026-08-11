@@ -24,25 +24,12 @@ dependencyResolutionManagement {
 
 rootProject.name = "TrikeShed"
 
-// Dynamically include every library under libs/ so each subproject can be built autonomously
-// Note: ng-sctp, classfile (nested gradle), miniduck-memory (depends on classfile), ipfs (build errors) excluded
-val libsDir = rootDir.resolve("libs")
-if (libsDir.exists() && libsDir.isDirectory) {
-    libsDir.listFiles()!!
-        .filter { it.isDirectory }
-        .filter { it.name != "ng-sctp" && it.name != "classfile" && it.name != "miniduck-memory" }
-        .forEach { include(":libs:${it.name}") }
-}
-
-// Include lib_cursor explicitly only when the classfile tree is present.
-if (libsDir.resolve("classfile").exists()) {
-    include(":libs:classfile:lib_cursor")
-}
+// libs/ is forbidden. All code lives in src/ source sets. The historical
+// libs/ tree was deleted at 7afd1e055, deep-cleaned at e9d65f870, and purged
+// at eef1c40e4. Do not recreate it; restore historical code via
+// `git show <commit>:<path>` into the matching src/ source set.
 
 // Support hybrid kotlin xvm build if ../xvm exists
 if (java.io.File("../xvm").exists()) {
     includeBuild("../xvm")
-}
-if (libsDir.resolve("lcnc").exists()) {
-    include(":libs:lcnc")
 }

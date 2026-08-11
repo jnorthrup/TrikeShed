@@ -1,1 +1,71 @@
-        }}    }            assertEquals(ContentId(fakeCid), resolved)            val resolved = adapter.resolveIpns("myname")            adapter.publishIpns("myname", cid)                        assertEquals("hello network", read.decodeToString())            assertNotNull(read)            val read = adapter.getBlock(cid)                        assertEquals(ContentId(fakeCid), cid)            val cid = adapter.putBlock("hello network".encodeToByteArray())        withContext(openHtxElement(routeService = mockService)) {        }            }                return HtxExchangeResult(state.copy(response = response), htxFrames())                val response = HtxResponse(200, ByteSeries(responseBody.encodeToByteArray()))                }                    else -> "{}"                    path.contains("/name/resolve") -> """{"Path":"/ipfs/$fakeCid"}"""                    path.endsWith("/name/publish") -> """{"Name":"myname","Value":"$fakeCid"}"""                    path.contains("/block/get") -> "hello network"                    path.endsWith("/block/put") -> """{"Key":"$fakeCid","Size":11}"""                val responseBody = when {                val path = request.target.requestPath            override suspend fun exchange(state: HtxExchangeState, request: HtxRequest): HtxExchangeResult {        val mockService = object : HtxRouteService {        val fakeCid = "sha256:fakecid123123123123123123123123123123123123123123123123123123123"                val adapter = HtxIpfsAdapter(bridge)        val bridge = IpfsBridge(cas)        val cas = CasStore.inMemory()    fun testNetworkWhenHtxPresent() = runTest {    @Test    }        assertEquals("hello world", read.decodeToString())        assertNotNull(read)        val read = adapter.getBlock(cid)                val cid = adapter.putBlock(data)        val data = "hello world".encodeToByteArray()                val bridge = IpfsBridge(cas)        val cas = CasStore.inMemory()    fun testFallbackWhenNoHtx() = runTest {    @Testclass HtxIpfsAdapterTest {import kotlin.test.assertNotNullimport kotlin.test.assertEqualsimport kotlin.test.Testimport kotlinx.coroutines.withContextimport kotlinx.coroutines.test.runTestimport borg.trikeshed.lib.ByteSeriesimport borg.trikeshed.job.ContentIdimport borg.trikeshed.job.CasStoreimport borg.trikeshed.htx.openHtxElementimport borg.trikeshed.htx.htxFramesimport borg.trikeshed.htx.HtxRouteServiceimport borg.trikeshed.htx.HtxResponseimport borg.trikeshed.htx.HtxRequestimport borg.trikeshed.htx.HtxExchangeStateimport borg.trikeshed.htx.HtxExchangeResult
+package borg.trikeshed.cas
+
+import borg.trikeshed.htx.HtxExchangeResult
+import borg.trikeshed.htx.HtxExchangeState
+import borg.trikeshed.htx.HtxRequest
+import borg.trikeshed.htx.HtxResponse
+import borg.trikeshed.htx.HtxRouteService
+import borg.trikeshed.htx.htxFrames
+import borg.trikeshed.htx.openHtxElement
+import borg.trikeshed.job.CasStore
+import borg.trikeshed.job.ContentId
+import borg.trikeshed.lib.ByteSeries
+import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.withContext
+import kotlin.test.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertNotNull
+
+class HtxIpfsAdapterTest {
+
+    @Test
+    fun testFallbackWhenNoHtx() = runTest {
+        val cas = CasStore.inMemory()
+        val bridge = IpfsBridge(cas)
+        val adapter = HtxIpfsAdapter(bridge)
+
+        val data = "hello world".encodeToByteArray()
+        val cid = adapter.putBlock(data)
+
+        val read = adapter.getBlock(cid)
+        assertNotNull(read)
+        assertEquals("hello world", read.decodeToString())
+    }
+
+    @Test
+    fun testNetworkWhenHtxPresent() = runTest {
+        val cas = CasStore.inMemory()
+        val bridge = IpfsBridge(cas)
+        val adapter = HtxIpfsAdapter(bridge)
+
+        val fakeCid = "sha256:fakecid123123123123123123123123123123123123123123123123123123123"
+
+        val mockService = object : HtxRouteService {
+            override suspend fun exchange(state: HtxExchangeState, request: HtxRequest): HtxExchangeResult {
+                val path = request.target.requestPath
+                val responseBody = when {
+                    path.endsWith("/block/put") -> """{"Key":"$fakeCid","Size":11}"""
+                    path.contains("/block/get") -> "hello network"
+                    path.endsWith("/name/publish") -> """{"Name":"myname","Value":"$fakeCid"}"""
+                    path.contains("/name/resolve") -> """{"Path":"/ipfs/$fakeCid"}"""
+                    else -> "{}"
+                }
+                val response = HtxResponse(200, ByteSeries(responseBody.encodeToByteArray()))
+                return HtxExchangeResult(state.copy(response = response), htxFrames())
+            }
+        }
+
+        withContext(openHtxElement(routeService = mockService)) {
+            val cid = adapter.putBlock("hello network".encodeToByteArray())
+            assertEquals(ContentId(fakeCid), cid)
+
+            val read = adapter.getBlock(cid)
+            assertNotNull(read)
+            assertEquals("hello network", read.decodeToString())
+
+            adapter.publishIpns("myname", cid)
+            val resolved = adapter.resolveIpns("myname")
+            assertEquals(ContentId(fakeCid), resolved)
+        }
+    }
+}

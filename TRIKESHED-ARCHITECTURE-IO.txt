@@ -1,0 +1,224 @@
+TRIKESHED ARCHITECTURAL I/O MAP
+===============================
+
+Scope: package-grouped map of the production-facing units and their principal
+I/O. This is not a module list: arrows name the artifacts crossing boundaries.
+Canonical identity is ContentId = sha256:hex across all six lillypad rings.
+
+LEGEND
+  ───> durable / primary data flow       - - -> asynchronous observation
+  <───> bidirectional protocol flow      [pkg] package group / implementation
+  {…}  artifact shape                    (!) current lifecycle pressure point
+
+
+                                     EXTERNAL INPUTS
+  ┌──────────────────────┬──────────────────────┬──────────────────────────┐
+  │ repository/worktree  │ Jules / model APIs   │ browser / local documents│
+  │ .git refs + objects  │ tasks, replies, diffs│ Markdown, uploads, events│
+  └──────────┬───────────┴──────────┬───────────┴────────────┬─────────────┘
+             │                      │                        │
+             │ file events          │ HtxRequest/HtxResponse │ ingest request
+             v                      v                        v
+  ┌───────────────────────┐  ┌───────────────────────┐  ┌───────────────────┐
+  │ [daemon]              │  │ [htx]                 │  │ [kanban]          │
+  │ GitStateCache          │  │ HtxKey                │  │ JvmTikaIngest...  │
+  │ JvmFileWatchReactor    │  │ HtxElement            │  │ ForgeKanbanIngest │
+  │ Git/Worktree gateways  │  │ HtxReactorElement     │  └─────────┬─────────┘
+  └──────────┬────────────┘  │ JvmTlsCodecBackend     │            │
+             │               └───────┬───────────────┘            │ source bytes
+             │ Git/worktree snapshot         │                     │
+             │                               │                     │
+             │                               v                     v
+             │                   ┌─────────────────────────┐ ┌────────────────┐
+             │                   │ [jules] + [modelmux]    │ │ [forge]        │
+             │                   │ FlywheelDriver           │ │ ForgeApp       │
+             │                   │ JulesConductor/RestClient│ │ blackboard/UI  │
+             │                   │ Brain / KeyMux routing   │ │ gallery/shell  │
+             │                   └──────────┬──────────────┘ └───────┬────────┘
+             │                              │                         │
+             │                              │ work/session events     │ user-visible
+             │                              │                         │ board/graph/gallery
+             v                              v                         │
+
+================================================================================
+RING 4 — POINTCUT / INTERCEPTION
+================================================================================
+  [pointcut] [mutable] [forge.blackboard] [kanban]
+
+  source event / tool call / board action
+                    │
+                    v
+  ┌──────────────────────────────────────────────────────────────────────────┐
+  │ PointcutMutableSeries · FieldSynapse · policy / tool boundary            │
+  │ ForgeKanbanSignalProjector / ForgeKanbanConduit                           │
+  │ Output: {intercepted mutation, policy context, source ContentIds}        │
+  └───────────────────────────────────────┬──────────────────────────────────┘
+                                          │ typed evidence / projection intent
+                                          v
+
+================================================================================
+RING 3 — CAUSAL / SCHEDULING
+================================================================================
+  [dag] [graph] [causal] [jules] [pijul] [daemon]
+
+  ┌──────────────────────────────────────────────────────────────────────────┐
+  │ ReteNetwork / ReteAgenda / BlackboardDagFabric                            │
+  │ CausalGraphNodeIndex -> Cursor projection                                 │
+  │ CausalKernel event graph                                                   │
+  │ FlywheelDriver reactive poll | drain | answer | dispatch fan-out          │
+  │ PijulChannel: patch -> FileChanges -> materialize                         │
+  └───────┬──────────────────────┬───────────────────────────┬───────────────┘
+          │                      │                           │
+          │ causal node          │ executor / patch artifact │ master/ref state
+          │ {parents, op, input, │ {session, patch CID,       │ {!contained refs}
+          │  output, clock}      │  branch, receipt}          │
+          v                      v                           v
+  ┌───────────────┐       ┌──────────────────┐      ┌────────────────────────┐
+  │ [graph]       │       │ [jules]          │      │ [daemon]               │
+  │ causal Cursor │       │ board WAL fold   │      │ GitStateCache / refs   │
+  │ causal query  │       │ queue projection │      │ branch frontier input  │
+  └──────┬────────┘       └────────┬─────────┘      └──────────┬─────────────┘
+         │                         │                            │
+         └───────────────┬─────────┴─────────────┬──────────────┘
+                         │                       │
+                         │ (!) required closure: branch/patch/session/work must
+                         │     become one receipt-backed canonical continuation.
+                         v
+
+================================================================================
+RING 2 — LOGICAL / EVIDENCE / PROVENANCE
+================================================================================
+  [memory] [couch] [graal] [confix] [cursor] [job] [utils.kanban]
+
+  ┌──────────────────────────────────────────────────────────────────────────┐
+  │ ConfixBlackboard / BlackboardOverlay / CellOverlay                        │
+  │ CouchStore + CouchAttachmentGateway                                       │
+  │ MemoryStore: path + description + bytes                                   │
+  │ MemoryIndexLayer: taxonomy | temporal | provenance routes                 │
+  │ JulesBoardStore: snapshots + causes -> card / QueueEntry projections      │
+  └──────┬───────────────────────┬───────────────────────┬───────────────────┘
+         │                       │                       │
+         │ metadata / provenance │ path-indexed memory   │ durable event frame
+         v                       v                       v
+
+================================================================================
+RING 1 — PER-LINE TAXONOMY / STRUCTURAL EVIDENCE
+================================================================================
+  [cas] [collections.associative] [forge.blackboard]
+
+  ┌──────────────────────────────────────────────────────────────────────────┐
+  │ LineCas.spineInto(text)                                                    │
+  │   text -> trimmed lines -> content CID + NeighborStamp -> LineSpine       │
+  │ LineCasIndex                                                              │
+  │   LineSpine -> LINKED | PARTIAL | CONTENT_ONLY matches / residuals        │
+  │ FunnelHashIndex                                                           │
+  │   candidate / residual routing                                            │
+  └───────────────────────────────────────┬──────────────────────────────────┘
+                                          │ {line CID, linked key, spine CID}
+                                          v
+
+================================================================================
+RING 0 — PHYSICAL CONTENT-ADDRESSED STORAGE
+================================================================================
+  [cas] [job] [userspace.nio.file.spi] [btrfs] [volume] [reflink]
+
+  ┌──────────────────────────────────────────────────────────────────────────┐
+  │ CasStore / FileCasStore / MmapCasStore                                    │
+  │ JvmAppendWal / CausalWal / Confix WAL                                     │
+  │ BtrfsReflinkStore | VolumeCasStore                                       │
+  │ Output: immutable blobs, patch bytes, source bytes, manifests, receipts  │
+  └───────────────────────────────────────┬──────────────────────────────────┘
+                                          │ ContentId-addressed blobs
+                                          v
+
+================================================================================
+RING -1 — MESH / REPLICATION / ROUTING
+================================================================================
+  [context.nuid] [dht] [cas.IpfsBridge] [torrent] [litebike] [userspace.nio]
+
+  ┌──────────────────────────────────────────────────────────────────────────┐
+  │ NuidFanoutElement / NUID concentric routing                               │
+  │ Kademlia DHT / CasReplicationHook / IpfsBridge                            │
+  │ TorrentElement + uTP peer-wire path                                       │
+  │ LitebikeListenerElement -> JvmLitebikeBindAdapter -> fanoutChannels       │
+  └──────────────────────────────────────────────────────────────────────────┘
+
+
+                               CCEK PROCESS / NETWORK PATHS
+
+  OROBOROS DAEMON (JVM entry)
+  ┌──────────────────────────────────────────────────────────────────────────┐
+  │ [daemon.OroborosDaemon]                                                   │
+  │  NioSupervisor                                                            │
+  │    ├── HtxElement context ------------------------------------------------┐│
+  │    ├── MuxReactorElement                                                  ││
+  │    ├── Git + worktree watch/reconcile                                    ││
+  │    ├── MemoryStore / index bridge                                        ││
+  │    ├── Couch report reactor                                               ││
+  │    ├── Kanban server in --watch mode                                     ││
+  │    └── CycleBody telemetry observer                                      ││
+  └──────────────────────────────────────────────────────────────────────────┘│
+                                                                             │
+  outbound Jules / ModelMux / Brain request                                 │
+  ┌──────────────────────────────────────────────────────────────────────────┘
+  │ HtxKey                                                                    │
+  │   -> HtxElement                                                          │
+  │      -> HtxReactorElement                                                 │
+  │         -> JvmTlsCodecBackend                                             │
+  │            -> SSLEngine[connectionOrdinal / TlsFlowState]                │
+  │               <--> remote HTTPS endpoint                                  │
+  └──────────────────────────────────────────────────────────────────────────┘
+
+  inbound Forge / Kanban request
+  ┌──────────────────────────────────────────────────────────────────────────┐
+  │ LitebikeListenerElement                                                    │
+  │   -> JvmLitebikeBindAdapter                                                │
+  │      -> fanoutChannels                                                     │
+  │         -> Forge/Kanban route + projection                                │
+  └──────────────────────────────────────────────────────────────────────────┘
+
+
+                           FORGE-OBSERVABLE PRODUCT LOOP
+
+  source / repo / document
+      ───> Ring 0 blob CID
+      ───> Ring 1 LineSpine + structural evidence
+      ───> Ring 2 logical provenance / memory index
+      ───> Ring 3 causal work / patch / branch state
+      ───> Ring 4 board / graph / gallery projection
+      ───> user inspects evidence and starts next action
+
+  Required canonical closure:
+
+  worker branch or raw patch
+      ───> CAS patch CID
+      ───> branch/patch ingress record
+      ───> confluence/materialization
+      ───> canonical master
+      ───> MergeReceipt or SupersessionReceipt
+      ───> Forge-visible CLOSED work state
+
+  A branch that is not contained by master and has no terminal receipt is a
+  live unresolved causal unit. It must be visible and actionable in Forge.
+
+
+PACKAGE GROUPING NOTES
+  lib / collections / cursor / common
+    Kernel algebra: Join, Series, Cursor, lazy projections, indexed shapes.
+
+  cas / job / userspace.nio.file.spi / couch
+    Durable bytes, content identity, WAL, logical attachments and projections.
+
+  context.nuid / dht / litebike / userspace.nio / htx
+    CCEK element context, routing, bind/accept, and userspace network I/O.
+
+  dag / graph / causal / pointcut / mutable
+    Rete evaluation, causal graph projection, interception, mutation routing.
+
+  jules / daemon / pijul / modelmux
+    Remote executor adaptation, orchestration, patch materialization, model/key
+    routing. These must converge through receipts, not independent counters.
+
+  forge / kanban / forge.blackboard / forge.gallery
+    Product boundary: source ingest, canonical board, causal graph, RTS/gallery,
+    inspection surface.

@@ -83,8 +83,11 @@ class InMemoryFileOperations(
 
     override fun cwd(): String = cwd
 
-    override fun resolvePath(vararg parts: String): String =
-        parts.fold(cwd) { acc, seg -> "$acc/$seg" }.replace("//", "/")
+    override fun resolvePath(vararg parts: String): String {
+        if (parts.isEmpty()) return cwd
+        val start = if (parts.first().startsWith('/')) parts.first() else "$cwd/${parts.first()}"
+        return parts.drop(1).fold(start) { acc, seg -> "$acc/$seg" }.replace("//", "/")
+    }
 
     override fun createTempDir(prefix: String): String {
         val path = "/tmp/$prefix-${files.size}"

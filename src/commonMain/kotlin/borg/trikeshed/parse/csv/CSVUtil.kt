@@ -89,14 +89,13 @@ object CSVUtil {
         var escape = false
         var ordinal = 0
         var x = start
-        val input = file[x]
-        while (x != end && input.toInt().toChar().isWhitespace()) x++ //trim
+        while (x != end && file[x].toInt().toChar().isWhitespace()) x++ //trim
         var since = x
 
         val rlist = mutableListOf<DelimitRange>()
         val size = file.a
         while (x != end && x < size) {
-            val c = input
+            val c = file[x]
             val char = c.toInt().toChar()
             lineEvidence?.apply {
                 //test deduce length and add if needed

@@ -205,7 +205,8 @@ class HtxReactorElement(
         fd: Int,
         endpoint: TlsEndpoint,
     ) {
-        flushTlsFrames(handle, fd, endpoint.handshake())
+        val hello = endpoint.handshake()
+        flushTlsFrames(handle, fd, hello)
         while (!endpoint.isHandshakeComplete) {
             val chunk = requireNotNull(readChunk(handle, fd)) {
                 "TLS handshake failed for ${endpoint.remoteHost}:${endpoint.remotePort}: remote peer closed the channel."
@@ -235,14 +236,22 @@ class HtxReactorElement(
         capacity: Int = 16 * 1024,
     ): ByteSeries? {
         val buffer = ByteBuffer(capacity)
-        handle.readv(fd, buffer)
-        handle.submit()
-        val result = waitFor(handle, fd, 30, TimeUnit.SECONDS)
-        check(result >= -1) { "HTX reactor read failed for fd=$fd" }
-        if (result <= 0) {
-            return null
+        while (true) {
+            handle.readv(fd, buffer)
+            handle.submit()
+            val result = waitFor(handle, fd, 30, TimeUnit.SECONDS)
+            check(result >= -1) { "HTX reactor read failed for fd=$fd" }
+            // Non-blocking read: 0 = EAGAIN (no data yet, keep waiting);
+            // -1 = EOF (peer closed). Previously 0 was misread as EOF, killing
+            // every TLS handshake before the server's ServerHello could arrive.
+            if (result == -1) {
+                return null
+            }
+            if (result > 0) {
+                return ByteSeries(buffer.array().copyOf(result))
+            }
+            kotlinx.coroutines.delay(10)
         }
-        return ByteSeries(buffer.array().copyOf(result))
     }
 
     private suspend fun flushTlsFrames(

@@ -21,4 +21,9 @@ class PatchStorage {
     fun getAll(): List<Patch> {
         return wal.toList()
     }
+
+    fun clear() {
+        store.clear()
+        wal.clear()
+    }
 }

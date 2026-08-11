@@ -42,6 +42,7 @@ class CycleBody(
             // coroutines own all computation; we only observe and trace.
             val report = driver.lastReactiveReport
             if (report != null) {
+                OroborosDaemon.lastCycleReport = report
                 println("[FLYWHEEL] phase=" + report.phase + " cycleMs=" + report.cycleMs + " harvested=" + report.harvested + " dispatched=" + report.dispatched + " alive=" + report.alive + "/" + report.available + " inducted=" + report.inducted + " settled=" + report.settled)
                 val t = System.currentTimeMillis()
                 val json = "{\"t\":" + t + ",\"c\":" + report.cycleMs + ",\"d\":" + report.harvested + ",\"p\":" + report.dispatched + ",\"a\":" + report.alive + ",\"v\":" + report.available + ",\"e\":0,\"h429\":" + report.http429 + ",\"h5x\":" + report.http5xx + "}"

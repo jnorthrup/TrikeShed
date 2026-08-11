@@ -23,6 +23,8 @@ class JvmAppendWal(private val path: File) : AppendWal {
     companion object {
         private const val MAGIC = 0xCA05A101.toInt()
         private const val VERSION = 1
+        /** A corrupt frame must not allocate attacker-sized arrays during replay. */
+        private const val MAX_RECORD_BYTES = 64 * 1024 * 1024
     }
 
     override val key: CoroutineContext.Key<*> get() = AppendWal
@@ -64,12 +66,32 @@ class JvmAppendWal(private val path: File) : AppendWal {
                 error("Invalid WAL header: magic=$magic version=$version")
             }
 
-            while (readRaf.filePointer < readRaf.length()) {
+            val fileLength = readRaf.length()
+            while (readRaf.filePointer < fileLength) {
+                val recordOffset = readRaf.filePointer
+                if (fileLength - recordOffset < Int.SIZE_BYTES) {
+                    reportTornTail(recordOffset, fileLength, "missing key length")
+                    break
+                }
                 val keyLen = readRaf.readInt()
+                if (keyLen < 0 || keyLen > MAX_RECORD_BYTES) {
+                    error("Invalid WAL key length $keyLen at offset $recordOffset")
+                }
+                if (fileLength - readRaf.filePointer < keyLen.toLong() + Int.SIZE_BYTES) {
+                    reportTornTail(recordOffset, fileLength, "incomplete key or missing payload length")
+                    break
+                }
                 val keyBytes = ByteArray(keyLen)
                 readRaf.readFully(keyBytes)
 
                 val payloadLen = readRaf.readInt()
+                if (payloadLen < 0 || payloadLen > MAX_RECORD_BYTES) {
+                    error("Invalid WAL payload length $payloadLen at offset $recordOffset")
+                }
+                if (fileLength - readRaf.filePointer < payloadLen.toLong()) {
+                    reportTornTail(recordOffset, fileLength, "incomplete payload")
+                    break
+                }
                 val payloadBytes = ByteArray(payloadLen)
                 readRaf.readFully(payloadBytes)
 
@@ -82,5 +104,18 @@ class JvmAppendWal(private val path: File) : AppendWal {
 
     override fun close() {
         raf.close()
+    }
+
+    /**
+     * An append can be torn after a process crash even when every completed
+     * frame was synced. Replay keeps the proven prefix available; the caller
+     * can start and surface repair work instead of dying before its lifecycle
+     * reaches ACTIVE. The original bytes remain untouched for forensics.
+     */
+    private fun reportTornTail(recordOffset: Long, fileLength: Long, detail: String) {
+        System.err.println(
+            "[APPEND-WAL] torn trailing frame path=${path.absolutePath} " +
+                "offset=$recordOffset retainedPrefix=$recordOffset tailBytes=${fileLength - recordOffset}: $detail"
+        )
     }
 }

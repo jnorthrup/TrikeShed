@@ -1,11 +1,13 @@
 package borg.trikeshed.pijul
 
 import borg.trikeshed.crdt.PijulCrdt
+import borg.trikeshed.cursor.currentTimeMillis
 import borg.trikeshed.job.ContentId
 import borg.trikeshed.lib.Join
 import borg.trikeshed.lib.Series
 import borg.trikeshed.lib.j
 import borg.trikeshed.patch.Blake3Hash
+import borg.trikeshed.userspace.nio.file.spi.FileOperations
 import borg.trikeshed.util.oroboros.MergeReceipt
 
 /**
@@ -55,7 +57,7 @@ class PijulChannel(
         changes: List<FileChanges>,
     ): List<String> {
         val patchId = Blake3Hash.hash(
-            (workId + sessionId + patchCid.value + System.nanoTime()).encodeToByteArray()
+            (workId + sessionId + patchCid.value).encodeToByteArray()
         )
         val touched = mutableListOf<String>()
         for (fc in changes) {
@@ -71,9 +73,10 @@ class PijulChannel(
                 dependencies = emptyList(),
             )
             crdt.apply(patch)
+            patchStore.store(patch)
             touched.add(fc.path)
         }
-        provenance[patchId] = PatchProvenance(workId, sessionId, patchCid, title, System.currentTimeMillis())
+        provenance[patchId] = PatchProvenance(workId, sessionId, patchCid, title, currentTimeMillis())
         return touched.distinct()
     }
 
@@ -89,13 +92,14 @@ class PijulChannel(
      * This is the single filesystem touch point — call once after all
      * patches are applied, then git-add + git-commit the result.
      */
-    fun materialize(targetDir: java.io.File): List<String> {
+    fun materialize(targetDir: String, fileOps: FileOperations): List<String> {
         val written = mutableListOf<String>()
         for ((path, crdt) in files) {
             val content = crdt.render()
-            val target = java.io.File(targetDir, path)
-            target.parentFile?.mkdirs()
-            target.writeText(content)
+            val target = fileOps.resolvePath(targetDir, path)
+            val parent = target.substringBeforeLast('/', missingDelimiterValue = "")
+            if (parent.isNotEmpty()) fileOps.mkdirs(parent)
+            fileOps.write(target, content)
             written.add(path)
         }
         return written.sorted()
@@ -140,6 +144,7 @@ class PijulChannel(
     fun reset() {
         files.clear()
         provenance.clear()
+        patchStore.clear()
     }
 }
 
