@@ -70,9 +70,9 @@ class ContextEvictingMap<K : Any, V : Any>(
             return removed
         }
 
-        val dead = backing.filterValues { !it.isLive }.keys.toList()
-        dead.forEach(backing::remove)
-        return dead.size
+        val initialSize = backing.size
+        backing.entries.removeAll { !it.value.isLive }
+        return initialSize - backing.size
     }
 
     fun size(): Int {

@@ -17,3 +17,6 @@
 ## 2026-08-04 - Avoid O(N²) memory/eviction bottlenecks
 **Learning:** Replacing chunked buffered I/O with `joinToString` causes OOM regressions. Map eviction using `removeAll` inside a loop causes O(N²) freezing.
 **Action:** Always reconstruct map keys and use `.remove(key)` for O(1) cache eviction.
+## 2024-08-11 - Replace filterValues().keys.toList() with entries.removeAll() for zero-allocation map eviction
+**Learning:** In Kotlin, replacing functional chains like `map.filterValues { ... }.keys.toList()` followed by map removal inside a loop with the in-place iterator method `map.entries.removeAll { ... }` changes the operation to an efficient O(N) zero-allocation removal, avoiding redundant intermediate collection instances.
+**Action:** Always refactor iterative functional map evictions to use `.entries.removeAll { ... }` instead of building intermediate Lists and HashMaps.
