@@ -298,6 +298,27 @@ object OroborosDaemon {
 
         // Working-tree plane: source and document files live under Couch/CAS,
         // independently of the `.git/**` identity plane above.
+        // ── Composable Reconcile Elements (CCEK) ──
+        val worktreeReconcileElement = borg.trikeshed.util.oroboros.element.WorktreeReconcileElement(
+            repoRoot = repoDir.absolutePath,
+            worktreeCouchGateway = worktreeCouchGateway,
+            couchIndexBridge = couchIndexBridge,
+            memoryBridge = memoryBridge,
+            headShaProvider = { gitState.headSha() },
+            parentJob = coroutineContext[kotlinx.coroutines.Job]
+        )
+        launch(Dispatchers.IO) { worktreeReconcileElement.open() }
+
+        val gitReconcileElement = borg.trikeshed.util.oroboros.element.GitReconcileElement(
+            forgeHome = repoDir.absolutePath,
+            gitCouchGateway = gitCouchGateway,
+            couchIndexBridge = couchIndexBridge,
+            headShaProvider = { gitState.headSha() },
+            awaitObjectsDirty = { gitState.awaitObjectsDirty() },
+            parentJob = coroutineContext[kotlinx.coroutines.Job]
+        )
+        launch(Dispatchers.IO) { gitReconcileElement.open() }
+
         val worktreeWatcher = JvmFileWatchReactorElement(
             root = repoDir.absolutePath,
             parentJob = coroutineContext[kotlinx.coroutines.Job],
@@ -309,41 +330,10 @@ object OroborosDaemon {
         launch(Dispatchers.IO) { worktreeWatcher.open() }
         System.err.println("[OROBOROS] Worktree watcher: ${worktreeWatcher.state} — reactive source/document events")
 
-        val worktreeDirty = Channel<Unit>(Channel.CONFLATED)
         launch {
             for (event in worktreeWatcher.events) {
-                worktreeDirty.trySend(Unit)
+                worktreeReconcileElement.worktreeDirty.trySend(Unit)
                 println("[OROBOROS] worktree-event: ${event.type} ${event.path}")
-            }
-        }
-
-        // Debounced worktree reconciliation. File reads and CAS writes run on
-        // Dispatchers.IO, never on the reactor event loop.
-        launch(Dispatchers.IO) {
-            while (isActive) {
-                worktreeDirty.receive()
-                delay(250)
-                while (worktreeDirty.tryReceive().isSuccess) { /* coalesce */ }
-                val currentSha = gitState.headSha()
-                runCatching {
-                    val snap = worktreeCouchGateway.reconcile(
-                        repoRoot = repoDir.absolutePath,
-                        agentId = "oroboros",
-                        revision = currentSha,
-                        sequence = System.currentTimeMillis(),
-                    )
-                    couchIndexBridge.indexReconciliation(
-                        WorktreeCouchGateway.WORKTREE_PREFIX,
-                        snap.paths.size j { i: Int -> snap.paths[i] },
-                    )
-                    val bridged = memoryBridge.bridge(snap, agentId = "oroboros")
-                    println(
-                        "[OROBOROS] Worktree→Couch reconcile: ${snap.paths.size} paths, " +
-                            "$bridged memory updates @ ${currentSha.take(12)}"
-                    )
-                }.onFailure {
-                    System.err.println("[OROBOROS] Worktree→Couch reconcile failed: ${it.message}")
-                }
             }
         }
 
@@ -371,36 +361,6 @@ object OroborosDaemon {
                         if (watch) {
                             gitState.markObjectsDirty()
                         }
-                    }
-                }
-            }
-        }
-
-        // Choreography 2: git object creation → GitCouchGateway reconcile.
-        // Runs on its own coroutine; the gateway reads .git directly via
-        // JvmFileOperations, no ProcessBuilder.
-        launch(Dispatchers.IO) {
-            var lastReconcledSha = ""
-            while (true) {
-                // Wait for object-dirty signal, then reconcile
-                gitState.awaitObjectsDirty()
-                val currentSha = gitState.headSha()
-                if (currentSha != lastReconcledSha) {
-                    runCatching {
-                        val snap = gitCouchGateway.reconcile(
-                            forgeHome = repoDir.absolutePath,
-                            agentId = "oroboros",
-                            revision = currentSha,
-                            sequence = System.currentTimeMillis(),
-                        )
-                        couchIndexBridge.indexReconciliation(
-                            GitCouchGateway.GIT_PREFIX,
-                            snap.paths.size j { i: Int -> snap.paths[i] },
-                        )
-                        lastReconcledSha = currentSha
-                        println("[OROBOROS] Git→Couch reactive reconcile: ${snap.paths.size} paths @ ${currentSha.take(12)}")
-                    }.onFailure {
-                        System.err.println("[OROBOROS] Git→Couch reconcile failed: ${it.message}")
                     }
                 }
             }
@@ -666,7 +626,8 @@ object OroborosDaemon {
             runCatching { kanbanJob.cancel() }
             runCatching { reportReactor.close() }
             runCatching { memoryIndex.close() }
-            worktreeDirty.close()
+            runCatching { worktreeReconcileElement.close() }
+            runCatching { gitReconcileElement.close() }
             runCatching { worktreeWatcher.close() }
             runCatching { gitWatcher.close() }
             try { htxElement.close() } catch (_: Exception) {}
