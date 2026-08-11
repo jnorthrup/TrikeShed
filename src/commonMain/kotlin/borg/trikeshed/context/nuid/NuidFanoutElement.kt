@@ -223,7 +223,6 @@ open class NuidFanoutElement(
     private suspend fun nextClaimId(): Long = claimMutex.withLock {
         claimCounter = if (claimCounter == Long.MAX_VALUE) 0L else claimCounter + 1L
 <<<<<<< HEAD
-<<<<<<< HEAD
         if (claimCounter % 1000L == 0L) {
             if (claimCounter == 0L) {
                 claimedBy.clear()
@@ -232,7 +231,6 @@ open class NuidFanoutElement(
                 for (i in (threshold - 1000L) until threshold) {
                     claimedBy.remove(i)
                 }
-=======
         if (claimCounter == 0L) {
             // Handle rollover explicitly to avoid relative eviction failures
             claimedBy.clear()
@@ -241,7 +239,6 @@ open class NuidFanoutElement(
             // Optimization: Replace O(N) iteration via removeAll with O(1) hash removals
             for (i in 1L..1000L) {
                 claimedBy.remove(threshold - i)
->>>>>>> origin/bolt/nuid-fanout-eviction-optimization-1126253336503657440
             }
 =======
         if (claimCounter > 0L && claimCounter % 1000L == 0L) {

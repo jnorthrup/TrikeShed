@@ -1,12 +1,10 @@
 package borg.trikeshed.utils.keymuxd
 
-<<<<<<< HEAD
 // Canonical implementation lives in `keymux` (commonMain) and is re-exported via
 // src/commonMain/kotlin/borg/trikeshed/utils/keymuxd/KeyMux.kt (typealiases).
 // A duplicate set of aliases here causes a redeclaration conflict with commonMain
 // when both source sets are merged for the JVM target. Keep this file as a marker
 // only — do not add declarations.
-=======
 import borg.trikeshed.htx.*
 import borg.trikeshed.lib.*
 import borg.trikeshed.userspace.nio.file.spi.FileOperations
@@ -350,7 +348,6 @@ class KeyMuxBuilder {
 <<<<<<< HEAD
 =======
         // Bolt: avoid intermediate list allocations from .toList().map
->>>>>>> origin/bolt/remove-tolist-map-array-17707417310673242503
         val h = hdrs.map { it.first j it.second }.toSeries()
         sources.add("*".toKeyPath() j ApiSource(baseUrl, h))
     }
