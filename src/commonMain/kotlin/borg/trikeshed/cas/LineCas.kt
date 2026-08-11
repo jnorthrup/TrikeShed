@@ -283,7 +283,7 @@ data class LinkHit(
 class LineCasIndex {
     private val byContent = linkedMapOf<String, MutableList<Join<ContentId, LineNode>>>()
     private val docs = linkedMapOf<String, LineSpine>()
-    private var funnel: FunnelHashIndex<String>? = null
+    internal var funnel: FunnelHashIndex<String>? = null
 
     val documentCount: Int get() = docs.size
     val contentKeyCount: Int get() = byContent.size
