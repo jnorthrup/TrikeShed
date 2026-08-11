@@ -67,8 +67,8 @@ object HermesDonorTrace {
                 while (rs.next()) {
                     hasWorkPackages = true
                     val id = rs.getString("id")
-                    val title = rs.getString("title")
-                    val body = rs.getString("body")
+                    val title = escapeMarkdown(rs.getString("title"))
+                    val body = escapeMarkdown(rs.getString("body"))
                     val parentIds = rs.getString("parent_ids")
 
                     // id needs to match "^([A-Z][0-9]+)$"
@@ -114,5 +114,10 @@ object HermesDonorTrace {
         val tmp = Files.createTempFile("sqlite-donor", ".md")
         Files.writeString(tmp, sourceDescription)
         return ForgeKanbanIngest.persistMarkdown(userId, tmp.toString())
+    }
+
+    private fun escapeMarkdown(text: String?): String? {
+        if (text == null) return null
+        return text.replace(Regex("""([\\`*_{}\[\]()#+\-.!])"""), "\\\\$1")
     }
 }
