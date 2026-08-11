@@ -1,1 +1,19 @@
+<<<<<<< ours
 --- src/jvmMain/kotlin/borg/trikeshed/litebike/JvmKanbanServer.kt                 graphIndex.addOrGet(node)                 causalWal.append(node.causalKey, JsonSupport.stringify(node.toWalMap()).encodeToByteArray())             reduction.causalNodes.forEach { node ->+            }+                ForgeKanbanIngest.persistMarkdown("jim", tmp)+                writeStringJvm(tmp, payload)+            val reduction = kotlinx.coroutines.withContext(Dispatchers.IO) {-            val reduction = ForgeKanbanIngest.persistMarkdown("jim", tmp)-            writeStringJvm(tmp, payload)             val tmp = "/tmp/hi"         return runCatching {         if (payload.isBlank()) return HttpResponse(400, """{"error":"empty_body"}""")@@ -336,8 +336,10 @@
+=======
+--- src/jvmMain/kotlin/borg/trikeshed/litebike/JvmKanbanServer.kt
++++ src/jvmMain/kotlin/borg/trikeshed/litebike/JvmKanbanServer.kt
+@@ -336,8 +336,10 @@
+         if (payload.isBlank()) return HttpResponse(400, """{"error":"empty_body"}""")
+         return runCatching {
+             val tmp = "/tmp/hi"
+-            writeStringJvm(tmp, payload)
+-            val reduction = ForgeKanbanIngest.persistMarkdown("jim", tmp)
++            val reduction = kotlinx.coroutines.withContext(Dispatchers.IO) {
++                writeStringJvm(tmp, payload)
++                ForgeKanbanIngest.persistMarkdown("jim", tmp)
++            }
+             reduction.causalNodes.forEach { node ->
+                 causalWal.append(node.causalKey, JsonSupport.stringify(node.toWalMap()).encodeToByteArray())
+                 graphIndex.addOrGet(node)
+>>>>>>> theirs

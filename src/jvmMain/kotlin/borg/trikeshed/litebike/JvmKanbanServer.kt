@@ -288,8 +288,10 @@ object JvmKanbanServer {
         if (payload.isBlank()) return HttpResponse(400, """{"error":"empty_body"}""")
         return runCatching {
             val tmp = "/tmp/hi"
-            writeStringJvm(tmp, payload)
-            val reduction = ForgeKanbanIngest.persistMarkdown("jim", tmp)
+            val reduction = kotlinx.coroutines.withContext(Dispatchers.IO) {
+                writeStringJvm(tmp, payload)
+                ForgeKanbanIngest.persistMarkdown("jim", tmp)
+            }
             reduction.causalNodes.forEach { node ->
                 causalWal.append(node.causalKey, JsonSupport.stringify(node.toWalMap()).encodeToByteArray())
                 graphIndex.addOrGet(node)
