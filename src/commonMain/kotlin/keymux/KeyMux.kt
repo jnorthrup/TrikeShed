@@ -383,6 +383,10 @@ class KeyMuxBuilder {
     }
 
     fun api(baseUrl: String, vararg hdrs: Pair<String, String>): KeyMuxBuilder = apply {
+<<<<<<< HEAD
+=======
+        // Bolt: avoid intermediate list allocations from .toList().map
+>>>>>>> origin/bolt/remove-tolist-map-array-17707417310673242503
         val h = hdrs.map { it.first j it.second }.toSeries()
         sources.add("*".toKeyPath() j ApiSource(baseUrl, h))
     }
