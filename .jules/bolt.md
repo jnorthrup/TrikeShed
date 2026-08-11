@@ -21,6 +21,7 @@
 **Learning:** Replacing chunked buffered I/O with `joinToString` causes OOM regressions. Map eviction using `removeAll` inside a loop causes O(N²) freezing.
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
 **Action:** Always reconstruct map keys and use `.remove(key)` for O(1) cache eviction.## 2024-05-18 - Removing redundant list allocation when mapping arrays
 **Learning:** When mapping `vararg` parameters or `Array` types in Kotlin, calling `.toList().map { ... }` creates a redundant intermediate `ArrayList` which is immediately discarded. Kotlin standard library has `.map { ... }` extension on Arrays.
 **Action:** Avoid calling `.toList()` before `.map { ... }` on varargs or arrays to prevent unnecessary memory allocation and reduce GC overhead.
@@ -37,3 +38,9 @@
 **Learning:** Using `map.keys.removeAll` with lambda predicates on continuously growing maps causes linear scanning and acts as an O(N²) bottleneck over time.
 **Action:** Compute/reconstruct the sequence of map keys directly using loop-based math and use `map.remove(key)` for deterministic O(1) removal, and explicitly handle rollover zero-state with `map.clear()`.
 >>>>>>> origin/bolt/optimize-cache-eviction-9081893584752006795
+=======
+**Action:** Always reconstruct map keys and use `.remove(key)` for O(1) cache eviction.
+## 2026-08-09 - Handle rollover explicitly in relative eviction formulas
+**Learning:** When implementing mathematical cache eviction logic based on monotonic counter thresholds (e.g., `counter % 1000 == 0`), relative loop-based eviction formulas may fail to fire or calculate incorrectly immediately after the counter rolls over.
+**Action:** Ensure you explicitly handle the counter rollover state (e.g., `counter == 0L`) by clearing the cache (`map.clear()`).
+>>>>>>> origin/bolt/nuid-fanout-eviction-optimization-1126253336503657440
