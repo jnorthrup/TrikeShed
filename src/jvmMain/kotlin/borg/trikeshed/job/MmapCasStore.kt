@@ -1,10 +1,10 @@
 package borg.trikeshed.job
 
-import java.nio.channels.FileChannel
-import java.nio.file.Path
-import java.nio.file.StandardOpenOption
-import java.nio.ByteBuffer
-import java.nio.MappedByteBuffer
+import borg.trikeshed.userspace.nio.channels.FileChannel
+import borg.trikeshed.userspace.nio.file.Path
+import borg.trikeshed.userspace.nio.file.StandardOpenOption
+import borg.trikeshed.userspace.nio.ByteBuffer
+import borg.trikeshed.userspace.nio.MappedByteBuffer
 import borg.trikeshed.lib.Series
 import borg.trikeshed.lib.j
 import java.io.RandomAccessFile
@@ -16,7 +16,7 @@ import java.lang.foreign.ValueLayout
 
 class MmapCasStore(val file: Path) {
     private val randomAccessFile = RandomAccessFile(file.toFile(), "rw")
-    private val channel = randomAccessFile.channel
+    private val channel = FileChannel.open(borg.trikeshed.userspace.nio.file.Path.of(file.toAbsolutePath().toString()), StandardOpenOption.READ, StandardOpenOption.WRITE)
 
     // We parse the file contents on initialization to rebuild the index.
     // Format per blob: [4 bytes length][N bytes content]

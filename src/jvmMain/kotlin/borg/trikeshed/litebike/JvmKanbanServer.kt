@@ -27,13 +27,13 @@ import kotlinx.coroutines.channels.ClosedReceiveChannelException
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import java.io.File
-import java.nio.ByteBuffer
-import java.nio.channels.AsynchronousSocketChannel
-import java.nio.channels.CompletionHandler
+import borg.trikeshed.userspace.nio.ByteBuffer
+import borg.trikeshed.userspace.nio.channels.AsynchronousSocketChannel
+import borg.trikeshed.userspace.nio.channels.CompletionHandler
 import java.nio.charset.StandardCharsets
-import java.nio.file.Files as NioFiles
-import java.nio.file.Paths
-import java.nio.file.StandardOpenOption
+import borg.trikeshed.userspace.nio.file.Files as NioFiles
+import borg.trikeshed.userspace.nio.file.Paths
+import borg.trikeshed.userspace.nio.file.StandardOpenOption
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicLong
 import kotlin.system.exitProcess
@@ -171,16 +171,16 @@ object JvmKanbanServer {
             serverJob.cancel()
         })
 
-        if (donorPath != null && NioFiles.exists(Paths.get(donorPath))) {
+        if (donorPath != null && borg.trikeshed.userspace.nio.file.Files.exists(borg.trikeshed.userspace.nio.file.Path.of(donorPath))) {
             // Replay donor on startup; mirrors prior daemon behavior.
             try {
-                val donor = Paths.get(donorPath)
+                val donor = borg.trikeshed.userspace.nio.file.Path.of(donorPath)
                 val ingestPath = if (borg.trikeshed.kanban.JvmTikaIngestAdapter.isTikaCandidate(donor)) {
                     // Non-markdown donor (PDF/DOCX/image) — extract text via Tika
                     // (tika4all tweaked config: Tesseract OCR + ffmpeg preprocessing).
                     val md = borg.trikeshed.kanban.JvmTikaIngestAdapter.extractToMarkdown(donor)
-                    val tmp = NioFiles.createTempFile("tika-donor", ".md")
-                    NioFiles.writeString(tmp, md)
+                    val tmp = borg.trikeshed.userspace.nio.file.Files.createTempFile("tika-donor", ".md")
+                    borg.trikeshed.userspace.nio.file.Files.writeString(tmp, md)
                     tmp.toString()
                 } else {
                     donorPath
@@ -472,9 +472,9 @@ class ConnectionRegistry {
 }
 
 private fun writeStringJvm(path: String, text: String) {
-    val p = Paths.get(path)
-    if (p.parent != null) NioFiles.createDirectories(p.parent)
-    NioFiles.writeString(
+    val p = borg.trikeshed.userspace.nio.file.Path.of(path)
+    if (p.parent != null) borg.trikeshed.userspace.nio.file.Files.createDirectories(p.parent)
+    borg.trikeshed.userspace.nio.file.Files.writeString(
         p, text,
         StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING, StandardOpenOption.WRITE,
     )

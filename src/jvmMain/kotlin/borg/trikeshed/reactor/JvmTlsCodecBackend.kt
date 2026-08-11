@@ -9,9 +9,9 @@ import borg.trikeshed.lib.j
 import borg.trikeshed.lib.toArray
 import java.io.ByteArrayInputStream
 import java.io.ByteArrayOutputStream
-import java.nio.ByteBuffer
-import java.nio.file.Files
-import java.nio.file.Path
+import borg.trikeshed.userspace.nio.ByteBuffer
+import borg.trikeshed.userspace.nio.file.Files
+import borg.trikeshed.userspace.nio.file.Path
 import java.security.KeyFactory
 import java.security.KeyStore
 import java.security.PrivateKey

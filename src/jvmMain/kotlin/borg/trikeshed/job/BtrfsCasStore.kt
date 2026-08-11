@@ -5,8 +5,8 @@ import borg.trikeshed.lib.Series2
 import borg.trikeshed.lib.j
 import java.io.EOFException
 import java.io.File
-import java.nio.file.Files
-import java.nio.file.StandardCopyOption
+import borg.trikeshed.userspace.nio.file.Files
+import borg.trikeshed.userspace.nio.file.StandardCopyOption
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.NonCancellable
@@ -254,9 +254,9 @@ class BtrfsCasStore(
 
         // ⚡ Bolt: Wrap blocking I/O operations in Dispatchers.IO to prevent coroutine starvation
         val apparent = withContext(kotlinx.coroutines.Dispatchers.IO) {
-            java.nio.file.Files.walk(root.toPath()).use { stream ->
-                stream.filter { java.nio.file.Files.isRegularFile(it) }
-                    .mapToLong { java.nio.file.Files.size(it) }
+            borg.trikeshed.userspace.nio.file.Files.walk(root.toPath()).use { stream ->
+                stream.filter { borg.trikeshed.userspace.nio.file.Files.isRegularFile(it) }
+                    .mapToLong { borg.trikeshed.userspace.nio.file.Files.size(it) }
                     .sum()
             }
         }

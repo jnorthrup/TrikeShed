@@ -31,8 +31,8 @@ import kotlin.coroutines.CoroutineContext
 import java.io.File
 import java.net.StandardProtocolFamily
 import java.net.UnixDomainSocketAddress
-import java.nio.channels.ServerSocketChannel
-import java.nio.file.Path
+import borg.trikeshed.userspace.nio.channels.ServerSocketChannel
+import borg.trikeshed.userspace.nio.file.Path
 
 /**
  * KeyMux Daemon — standalone CCEK reactor for key+quota+modelmux state.
@@ -176,13 +176,13 @@ object KeyMuxDaemon {
         
         val healthJob = CoroutineScope(Dispatchers.IO).launch {
             while (isActive) {
-                var client: java.nio.channels.SocketChannel? = null
+                var client: borg.trikeshed.userspace.nio.channels.SocketChannel? = null
                 try {
-                    client = serverSocket!!.accept()
+                    client = serverSocket!!.accept() as borg.trikeshed.userspace.nio.channels.SocketChannel
                     val state = muxReactor.flowState.value
                     val uptimeMs = System.currentTimeMillis() - daemonStartTime
                     val msg = "ALIVE $uptimeMs ${state.currentlyRunning} ${state.availableKeys} ${state.maxInProgress} ${state.maxSpawn} ${state.tickSequence}\n"
-                    val buf = java.nio.ByteBuffer.wrap(msg.toByteArray())
+                    val buf = borg.trikeshed.userspace.nio.ByteBuffer.wrap(msg.toByteArray())
                     while (buf.hasRemaining()) {
                         client.write(buf)
                     }

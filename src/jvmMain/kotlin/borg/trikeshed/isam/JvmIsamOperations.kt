@@ -8,10 +8,10 @@ import borg.trikeshed.isam.meta.IOMemento
 import borg.trikeshed.isam.meta.IsamMetaFileReader
 import borg.trikeshed.lib.*
 import java.io.RandomAccessFile
-import java.nio.ByteBuffer
-import java.nio.file.Files
-import java.nio.file.Paths
-import java.nio.file.StandardOpenOption.*
+import borg.trikeshed.userspace.nio.ByteBuffer
+import borg.trikeshed.userspace.nio.file.Files
+import borg.trikeshed.userspace.nio.file.Paths
+import borg.trikeshed.userspace.nio.file.StandardOpenOption.*
 import borg.trikeshed.userspace.openUserspaceChannelBackend
 import borg.trikeshed.userspace.UringOp.Companion.Submissions
 import borg.trikeshed.userspace.nio.file.Files as UserspaceFiles
@@ -54,14 +54,14 @@ class JvmIsamDataReader(
 
         var userData = 1L
         val gnames = mutableListOf<String>()
-        val nioBufs = mutableListOf<java.nio.ByteBuffer>()
+        val nioBufs = mutableListOf<borg.trikeshed.userspace.nio.ByteBuffer>()
 
         for ((gname, cols) in columnsByGroup) {
             val file = groupFiles[gname]!!
             val groupRecordLen = cols.sumOf { it.end - it.begin }
-            val nioBuf = java.nio.ByteBuffer.allocateDirect(groupRecordLen)
+            val nioBuf = borg.trikeshed.userspace.nio.ByteBuffer.allocateDirect(groupRecordLen)
             
-            val addr = nioBuf.let { java.nio.Buffer::class.java.getDeclaredField("address").apply { isAccessible = true } }.run { getLong(nioBuf) }
+            val addr = nioBuf.let { borg.trikeshed.userspace.nio.Buffer::class.java.getDeclaredField("address").apply { isAccessible = true } }.run { getLong(nioBuf) }
             
             val wrapperBuf = borg.trikeshed.userspace.nio.ByteBuffer(nioBuf.array()) // Fake wrapper for compat
             submissions.add(borg.trikeshed.userspace.UringOp.Companion.Submissions.read(
@@ -108,7 +108,7 @@ class JvmIsamDataReader(
             } else {
                 getGroupFilename(datafileFilename, gname)
             }
-            groupFiles[gname] = UserspaceFiles.open(gfilename, readOnly = true)
+            groupFiles[gname] = borg.trikeshed.userspace.nio.file.Files.open(gfilename, readOnly = true)
         }
     }
 
@@ -143,7 +143,7 @@ class JvmIsamOperations : IsamOperations {
         val groupFiles = mutableMapOf<String, UserspaceFile>()
         val offsets = mutableMapOf<String, Long>()
         val groupRowBuffers = mutableMapOf<String, ByteArray>()
-        val groupNioBufs = mutableMapOf<String, java.nio.ByteBuffer>()
+        val groupNioBufs = mutableMapOf<String, borg.trikeshed.userspace.nio.ByteBuffer>()
         val groupAddrs = mutableMapOf<String, Long>()
 
         for (gname in columnsByGroup.keys) {
@@ -155,13 +155,13 @@ class JvmIsamOperations : IsamOperations {
                 getGroupFilename(datafilename, gname)
             }
             
-            groupFiles[gname] = UserspaceFiles.open(gfilename, readOnly = false)
+            groupFiles[gname] = borg.trikeshed.userspace.nio.file.Files.open(gfilename, readOnly = false)
             offsets[gname] = 0L
 
             val groupRecordLen = cols.sumOf { it.end - it.begin }
             val rowBuffer = ByteArray(groupRecordLen)
-            val nioBuf = java.nio.ByteBuffer.allocateDirect(groupRecordLen)
-            val addr = nioBuf.let { java.nio.Buffer::class.java.getDeclaredField("address").apply { isAccessible = true } }.run { getLong(nioBuf) }
+            val nioBuf = borg.trikeshed.userspace.nio.ByteBuffer.allocateDirect(groupRecordLen)
+            val addr = nioBuf.let { borg.trikeshed.userspace.nio.Buffer::class.java.getDeclaredField("address").apply { isAccessible = true } }.run { getLong(nioBuf) }
 
             groupRowBuffers[gname] = rowBuffer
             groupNioBufs[gname] = nioBuf
@@ -221,7 +221,7 @@ class JvmIsamOperations : IsamOperations {
         val groupFiles = mutableMapOf<String, UserspaceFile>()
         val offsets = mutableMapOf<String, Long>()
         val groupRowBuffers = mutableMapOf<String, ByteArray>()
-        val groupNioBufs = mutableMapOf<String, java.nio.ByteBuffer>()
+        val groupNioBufs = mutableMapOf<String, borg.trikeshed.userspace.nio.ByteBuffer>()
         val groupAddrs = mutableMapOf<String, Long>()
         var userData = 1L
 
@@ -240,13 +240,13 @@ class JvmIsamOperations : IsamOperations {
                     } else {
                         getGroupFilename(datafilename, gname)
                     }
-                    val file = UserspaceFiles.open(gfilename, readOnly = false)
+                    val file = borg.trikeshed.userspace.nio.file.Files.open(gfilename, readOnly = false)
                     groupFiles[gname] = file
                     offsets[gname] = file.size().takeIf { it >= 0 } ?: 0L
 
                     val groupRecordLen = cols.sumOf { it.end - it.begin }
                     val rowBuffer = ByteArray(groupRecordLen)
-                    val nioBuf = java.nio.ByteBuffer.allocateDirect(groupRecordLen)
+                    val nioBuf = borg.trikeshed.userspace.nio.ByteBuffer.allocateDirect(groupRecordLen)
                     val addr = nioBuf.let { java.lang.reflect.Field::class.java.getDeclaredField("address").apply { isAccessible = true } }.run { getLong(this) }
 
                     groupRowBuffers[gname] = rowBuffer
