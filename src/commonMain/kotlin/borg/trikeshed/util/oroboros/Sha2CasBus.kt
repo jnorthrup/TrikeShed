@@ -1,5 +1,6 @@
 package borg.trikeshed.util.oroboros
 
+import borg.trikeshed.cas.CasReplicationElement
 import borg.trikeshed.job.CasStore
 import borg.trikeshed.job.ContentId
 import borg.trikeshed.userspace.nio.file.spi.FileOperations
@@ -62,7 +63,8 @@ class FileCasStore(
  */
 class Sha2CasBus(
     private val fileCasStore: FileCasStore,
-    capacity: Int = 64
+    capacity: Int = 64,
+    private val replicationElement: CasReplicationElement? = null
 ) {
     // Channel is finite and suspending. bounded backpressure.
     private val eventChannel = Channel<ByteArray>(capacity = capacity)
@@ -70,6 +72,9 @@ class Sha2CasBus(
     suspend fun put(bytes: ByteArray): ContentId {
         // durable put
         val cid = fileCasStore.put(bytes)
+
+        // replicate if wired
+        replicationElement?.replicate(cid, bytes)
 
         // visible event
         // channel is finite, send will suspend if full
