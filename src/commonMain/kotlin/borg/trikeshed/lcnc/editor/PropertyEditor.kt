@@ -35,7 +35,8 @@ class TextPropertyEditor(
             value = value?.toString() ?: "",
             classes = "lcnc-prop-text",
             id = "prop-${schema.id}",
-            onChange = "window.lcncPropChange('${schema.id}', this.value)"
+            onChange = "window.lcncPropChange('${schema.id}', this.value)",
+            ariaLabel = schema.name
         )
     }
 
@@ -56,7 +57,7 @@ class MultiSelectPropertyEditor(
             // multiple select elements need a script to extract values. We'll simplify to string match or pass an array literal.
             // But lcncPropChange accepts `this.value`. For a multi-select, we need to collect selected options.
             // Using a basic select multiple logic:
-            text("<select multiple onchange=\"window.lcncPropChange('${schema.id}', Array.from(this.selectedOptions).map(o => o.value))\">")
+            text("<select multiple onchange=\"window.lcncPropChange('${schema.id}', Array.from(this.selectedOptions).map(o => o.value))\" aria-label=\"${schema.name}\">")
             for (opt in options) {
                 val selected = if (selectedValues.contains(opt)) " selected" else ""
                 text("<option value=\"$opt\"$selected>$opt</option>")
@@ -83,7 +84,7 @@ class SelectPropertyEditor(
         val options = (schema.configuration?.get("options") as? List<*>)?.filterIsInstance<String>() ?: emptyList()
         val builder = HtmlBuilder()
         builder.div(classes = "lcnc-prop-select", id = "prop-${schema.id}") {
-            text("<select onchange=\"window.lcncPropChange('${schema.id}', this.value)\">")
+            text("<select onchange=\"window.lcncPropChange('${schema.id}', this.value)\" aria-label=\"${schema.name}\">")
             for (opt in options) {
                 val selected = if (opt == value?.toString()) " selected" else ""
                 text("<option value=\"$opt\"$selected>$opt</option>")
@@ -107,7 +108,7 @@ class CheckboxPropertyEditor(
     override fun renderHtml(): String = html {
         val isChecked = value as? Boolean ?: false
         val checkedAttr = if (isChecked) " checked" else ""
-        text("<input type=\"checkbox\" class=\"lcnc-prop-checkbox\" id=\"prop-${schema.id}\" onchange=\"window.lcncPropChange('${schema.id}', this.checked)\"$checkedAttr/>")
+        text("<input type=\"checkbox\" class=\"lcnc-prop-checkbox\" id=\"prop-${schema.id}\" onchange=\"window.lcncPropChange('${schema.id}', this.checked)\" aria-label=\"${schema.name}\"$checkedAttr/>")
     }
 
     override fun validate(input: Any?): Boolean = input is Boolean
@@ -124,7 +125,8 @@ class NumberPropertyEditor(
             value = value?.toString() ?: "",
             classes = "lcnc-prop-number",
             id = "prop-${schema.id}",
-            onChange = "window.lcncPropChange('${schema.id}', this.value)"
+            onChange = "window.lcncPropChange('${schema.id}', this.value)",
+            ariaLabel = schema.name
         )
     }
 
@@ -146,7 +148,8 @@ class DatePropertyEditor(
             value = value?.toString() ?: "",
             classes = "lcnc-prop-date",
             id = "prop-${schema.id}",
-            onChange = "window.lcncPropChange('${schema.id}', this.value)"
+            onChange = "window.lcncPropChange('${schema.id}', this.value)",
+            ariaLabel = schema.name
         )
     }
 
@@ -164,7 +167,8 @@ class UrlPropertyEditor(
             value = value?.toString() ?: "",
             classes = "lcnc-prop-url",
             id = "prop-${schema.id}",
-            onChange = "window.lcncPropChange('${schema.id}', this.value)"
+            onChange = "window.lcncPropChange('${schema.id}', this.value)",
+            ariaLabel = schema.name
         )
     }
 
@@ -186,7 +190,8 @@ class EmailPropertyEditor(
             value = value?.toString() ?: "",
             classes = "lcnc-prop-email",
             id = "prop-${schema.id}",
-            onChange = "window.lcncPropChange('${schema.id}', this.value)"
+            onChange = "window.lcncPropChange('${schema.id}', this.value)",
+            ariaLabel = schema.name
         )
     }
 
@@ -208,7 +213,8 @@ class PhonePropertyEditor(
             value = value?.toString() ?: "",
             classes = "lcnc-prop-phone",
             id = "prop-${schema.id}",
-            onChange = "window.lcncPropChange('${schema.id}', this.value)"
+            onChange = "window.lcncPropChange('${schema.id}', this.value)",
+            ariaLabel = schema.name
         )
     }
 

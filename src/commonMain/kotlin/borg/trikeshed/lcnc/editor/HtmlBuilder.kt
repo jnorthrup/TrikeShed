@@ -7,11 +7,12 @@ class HtmlBuilder {
         tag("div", classes, id, block)
     }
     
-    fun input(type: String, value: String, classes: String = "", id: String = "", onChange: String = "") {
+    fun input(type: String, value: String, classes: String = "", id: String = "", onChange: String = "", ariaLabel: String = "") {
         sb.append("<input type=\"$type\" value=\"$value\"")
         if (classes.isNotEmpty()) sb.append(" class=\"$classes\"")
         if (id.isNotEmpty()) sb.append(" id=\"$id\"")
         if (onChange.isNotEmpty()) sb.append(" onchange=\"$onChange\"")
+        if (ariaLabel.isNotEmpty()) sb.append(" aria-label=\"$ariaLabel\"")
         sb.append("/>")
     }
     
