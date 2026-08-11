@@ -11,7 +11,7 @@ import java.nio.channels.SelectionKey
 import java.nio.channels.SelectableChannel
 import java.nio.channels.ServerSocketChannel
 import java.nio.channels.SocketChannel
-import java.util.concurrent.ArrayBlockingQueue
+import java.util.concurrent.LinkedBlockingQueue
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.ConcurrentLinkedQueue
 import java.util.concurrent.RejectedExecutionException
@@ -57,7 +57,11 @@ class JvmChannelOperations(
         workerLimit,
         0L,
         TimeUnit.MILLISECONDS,
+<<<<<<< ours
         java.util.concurrent.LinkedBlockingQueue<Runnable>(),
+=======
+        LinkedBlockingQueue<Runnable>(),
+>>>>>>> theirs
         { runnable -> Thread(runnable, "trikeshed-jvm-channel").apply { isDaemon = true } },
         ThreadPoolExecutor.AbortPolicy(),
     )
@@ -105,6 +109,7 @@ class JvmChannelOperations(
 
     override fun connect(fd: Int, host: String, port: Int): Int {
         val ch = socketChannels[fd] as? SocketChannel ?: return -1
+<<<<<<< ours
         // The caller (HtxReactorElement.openConnection) treats a >= 0 return as
         // "connected and ready to write". Scheduling finishConnect() on a worker
         // races the first TLS ClientHello write, which then throws
@@ -116,14 +121,42 @@ class JvmChannelOperations(
             if (!ch.connect(address)) {
                 while (ch.isOpen && !ch.finishConnect()) {
                     // non-blocking connect completes on first or second finishConnect
+=======
+        try {
+            val address = java.net.InetSocketAddress(host, port)
+            // Non-blocking connect returns false if the connection is
+            // still pending; finishConnect() blocks until established.
+            // Guard the entire sequence against close() racing the fd
+            // out from under us — a reactor teardown can close(fd)
+            // between socketChannels[fd] lookup and this inline task.
+            if (!ch.isOpen) return -1
+            if (!ch.connect(address)) {
+                while (ch.isOpen && !ch.finishConnect()) {
+                    // spin briefly — non-blocking socket should complete
+                    // on first or second finishConnect call
+>>>>>>> theirs
                 }
             }
             if (!ch.isOpen) return -1
             socketInterests[fd] = setOf(Interest.READ, Interest.WRITE, Interest.CONNECT)
+<<<<<<< ours
             0
         } catch (e: Exception) {
             println("JvmChannelOperations connect exception: ${e.message}")
             -1
+=======
+            return 0
+        } catch (_: java.nio.channels.ClosedChannelException) {
+            // fd was closed by reactor teardown
+            return -1
+        } catch (e: java.nio.channels.AsynchronousCloseException) {
+            // same race, different exception
+            return -1
+        } catch (e: Exception) {
+            println("JvmChannelOperations connect exception: ${e.message}")
+            e.printStackTrace()
+            return -1
+>>>>>>> theirs
         }
     }
 
