@@ -132,7 +132,7 @@ public object Files {
     public fun move(src: Path, dst: Path, vararg options: CopyOption): Path = TODO("rename")
     public fun createLink(link: Path, existing: Path): Path = TODO("link")
     public fun createSymbolicLink(link: Path, target: Path, vararg attrs: FileAttribute<*>): Path = TODO("symlink")
-    public fun readSymbolicLink(link: Path): Path = TODO("readlink")
+    public fun readSymbolicLink(link: Path): Path = link.getFileSystem().provider().readSymbolicLink(link)
 
     // Attributes
     public fun <A : BasicFileAttributes> readAttributes(path: Path, type: kotlin.reflect.KClass<A>, vararg options: LinkOption): A = TODO("stat")
