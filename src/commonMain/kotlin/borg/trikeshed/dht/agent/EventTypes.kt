@@ -24,14 +24,12 @@ enum class EventTypes(
     /** sends random address proposal or pubkey modulo to all known Routes in
      * cache with random ms intervals
      *
-     * todo: include pubkey
-     *
      * 1. random timer starts to accept only one closest response favoring even-higher or odd-lower
      * 1. accepts first concurring pair of responses and ends timer. ( voter_count=strength+1)
      * 1. timesout and uses the  proposal NUID as strength=1 on empty dance floor. (assumes netsplit)
      * 1. sends a ping with new address
      */
-    JOIN(proposed, former, mypubkey),
+    JOIN(proposed, former, mypubkey, pubkey),
 
     /** weakest possible NUID record removal
      */
@@ -44,6 +42,11 @@ enum class EventTypes(
      *  BuhBye now!
      */
     BUBY(address, addrpattern, evictpubkey),
+
+    /**
+     * Represents a request to create a new topic in the DHT.
+     */
+    TOPIC_CREATE(topic_create, pubkey),
     ;
 
     /**
@@ -65,6 +68,8 @@ enum class EventTypes(
         address,
         addrpattern,
         evictpubkey,
+        topic_create,
+        pubkey,
         ;
     }
 }
