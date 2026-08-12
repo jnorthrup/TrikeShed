@@ -6,19 +6,19 @@ import kotlin.test.BeforeTest
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.delay
 
-@JsFun("""() => {
-    // polyfill hack
-    try {
-        globalThis.indexedDB = require('fake-indexeddb').indexedDB;
-        globalThis.IDBKeyRange = require('fake-indexeddb').IDBKeyRange;
-    } catch(e) { }
-}""")
-private external fun setupPolyfill()
+@JsModule("fake-indexeddb")
+private external object FakeIndexedDb {
+    val indexedDB: JsAny
+    val IDBKeyRange: JsAny
+}
+
+@JsFun("(indexedDB, IDBKeyRange) => { globalThis.indexedDB = indexedDB; globalThis.IDBKeyRange = IDBKeyRange; }")
+private external fun setupPolyfill(indexedDB: JsAny, IDBKeyRange: JsAny)
 
 class IndexedDbVolumeTest {
     @BeforeTest
     fun setup() {
-        setupPolyfill()
+        setupPolyfill(FakeIndexedDb.indexedDB, FakeIndexedDb.IDBKeyRange)
     }
 
     @Test
