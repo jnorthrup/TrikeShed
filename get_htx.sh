@@ -1,1 +1,0 @@
-grep -rn "openHtxElement" src/
