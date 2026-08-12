@@ -53,7 +53,7 @@ object HermesDonorTrace {
         require(Files.exists(dbPath)) { "SQLite donor db not found at: $dbPath" }
 
         val dataSource = SQLiteDataSource().apply {
-            url = "jdbc:sqlite:${dbPath.toAbsolutePath()}"
+            url = "jdbc:sqlite:${dbPath.toUri()}"
         }
 
         var sourceDescription = ""
