@@ -122,7 +122,7 @@ class JulesRestClientTest {
         }
         server.start()
         try {
-            runBlocking { block("http://127.0.0.1:${server.address.port}", requests) }
+            runBlocking { kotlinx.coroutines.withContext(borg.trikeshed.htx.openHtxElement()) { block("http://127.0.0.1:${server.address.port}", requests) } }
         } finally {
             server.stop(0)
         }
