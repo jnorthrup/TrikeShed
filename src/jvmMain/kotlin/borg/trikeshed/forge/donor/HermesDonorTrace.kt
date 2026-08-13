@@ -118,6 +118,7 @@ object HermesDonorTrace {
 
     private fun escapeMarkdown(text: String?): String? {
         if (text == null) return null
-        return text.replace(Regex("""([\\`*_{}\[\]()#+\-.!])"""), "\\\\$1")
+        val sanitized = text.replace("\r", " ").replace("\n", " ")
+        return sanitized.replace(Regex("""([\\`*_{}\[\]()#+\-.!])"""), "\\\\$1")
     }
 }
