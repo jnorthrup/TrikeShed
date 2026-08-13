@@ -1,0 +1,101 @@
+To honour the JVM settings for this build a single-use Daemon process will be forked. For more on this, please refer to https://docs.gradle.org/9.6.1/userguide/gradle_daemon.html#sec:disabling_the_daemon in the Gradle documentation.
+Daemon will be stopped at the end of the build
+
+> Configure project :
+w: [33m[1m⚠️ Native task 'mingwX64Test' is disabled[0m[0m
+Task 'mingwX64Test' for target 'mingw_x64' cannot run on the current host (linux_x64).
+Reason: tests can only run on mingw_x64
+[32m[1mSolution:[0m[0m
+[32m[3mTo suppress this warning, add 'kotlin.native.ignoreDisabledTargets=true' to gradle.properties.[0m[0m
+
+w: [33m[1m⚠️ Unused Kotlin Source Sets[0m[0m
+The following Kotlin source sets were configured but not added to any Kotlin compilation:
+ * linuxMain
+ * linuxTest
+ * macosMain
+ * macosTest
+ * posixMain
+ * posixTest
+[32m[1mSolution:[0m[0m
+[32m[3mYou can add a source set to a target's compilation by connecting it with the compilation's default source set using 'dependsOn'.[0m[0m
+[36mSee [0m[34mhttps://kotl.in/connecting-source-sets[0m[36m[0m
+
+
+> Task :checkJvmMainComposeLibrariesCompatibility
+> Task :kmpPartiallyResolvedDependenciesChecker SKIPPED
+> Task :checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :convertXmlValueResourcesForCommonMain NO-SOURCE
+> Task :copyNonXmlValueResourcesForCommonMain NO-SOURCE
+> Task :prepareComposeResourcesTaskForCommonMain NO-SOURCE
+> Task :generateResourceAccessorsForCommonMain SKIPPED
+> Task :convertXmlValueResourcesForJvmMain NO-SOURCE
+> Task :copyNonXmlValueResourcesForJvmMain NO-SOURCE
+> Task :prepareComposeResourcesTaskForJvmMain NO-SOURCE
+> Task :generateResourceAccessorsForJvmMain SKIPPED
+> Task :convertXmlValueResourcesForNonPosixMain NO-SOURCE
+> Task :copyNonXmlValueResourcesForNonPosixMain NO-SOURCE
+> Task :prepareComposeResourcesTaskForNonPosixMain NO-SOURCE
+> Task :generateResourceAccessorsForNonPosixMain SKIPPED
+> Task :generateActualResourceCollectorsForJvmMain SKIPPED
+> Task :generateComposeResClass SKIPPED
+> Task :generateExpectResourceCollectorsForCommonMain SKIPPED
+> Task :generateForgeAssets UP-TO-DATE
+> Task :assembleJvmMainResources UP-TO-DATE
+> Task :jvmProcessResources UP-TO-DATE
+> Task :compileKotlinJvm UP-TO-DATE
+> Task :compileJvmMainJava UP-TO-DATE
+> Task :checkJvmTestComposeLibrariesCompatibility
+> Task :convertXmlValueResourcesForCommonTest NO-SOURCE
+> Task :copyNonXmlValueResourcesForCommonTest NO-SOURCE
+> Task :prepareComposeResourcesTaskForCommonTest NO-SOURCE
+> Task :generateResourceAccessorsForCommonTest SKIPPED
+> Task :convertXmlValueResourcesForJvmTest NO-SOURCE
+> Task :copyNonXmlValueResourcesForJvmTest NO-SOURCE
+> Task :prepareComposeResourcesTaskForJvmTest NO-SOURCE
+> Task :generateResourceAccessorsForJvmTest SKIPPED
+> Task :processJvmMainResources SKIPPED
+> Task :jvmMainClasses UP-TO-DATE
+> Task :jvmJar UP-TO-DATE
+> Task :assembleJvmTestResources UP-TO-DATE
+> Task :jvmTestProcessResources UP-TO-DATE
+> Task :processJvmTestResources SKIPPED
+
+> Task :compileTestKotlinJvm
+e: file:///app/src/jvmTest/kotlin/borg/trikeshed/daemon/OroborosDaemonPreflightTest.kt:54:17 No parameter with name 'apiKey' found.
+e: file:///app/src/jvmTest/kotlin/borg/trikeshed/daemon/OroborosDaemonPreflightTest.kt:58:17 No value passed for parameter 'keyMux'.
+e: file:///app/src/jvmTest/kotlin/borg/trikeshed/jules/FlywheelClaimPatchTest.kt:39:13 No parameter with name 'apiKey' found.
+e: file:///app/src/jvmTest/kotlin/borg/trikeshed/jules/FlywheelClaimPatchTest.kt:41:13 No value passed for parameter 'keyMux'.
+e: file:///app/src/jvmTest/kotlin/borg/trikeshed/jules/FlywheelDriverDrainSerialTest.kt:151:17 No parameter with name 'apiKey' found.
+e: file:///app/src/jvmTest/kotlin/borg/trikeshed/jules/FlywheelDriverDrainSerialTest.kt:154:17 No value passed for parameter 'keyMux'.
+e: file:///app/src/jvmTest/kotlin/borg/trikeshed/jules/FlywheelDriverDrainSerialTest.kt:157:48 Argument type mismatch: actual type is 'String', but 'KeyMux' was expected.
+e: file:///app/src/jvmTest/kotlin/borg/trikeshed/jules/FlywheelEndToEndDrainTest.kt:51:13 No parameter with name 'apiKey' found.
+e: file:///app/src/jvmTest/kotlin/borg/trikeshed/jules/FlywheelEndToEndDrainTest.kt:53:13 No value passed for parameter 'keyMux'.
+e: file:///app/src/jvmTest/kotlin/borg/trikeshed/jules/JulesRestClientTest.kt:27:38 Argument type mismatch: actual type is 'String', but 'KeyMux' was expected.
+e: file:///app/src/jvmTest/kotlin/borg/trikeshed/jules/JulesRestClientTest.kt:53:38 Argument type mismatch: actual type is 'String', but 'KeyMux' was expected.
+e: file:///app/src/jvmTest/kotlin/borg/trikeshed/jules/JulesRestClientTest.kt:94:38 Argument type mismatch: actual type is 'String', but 'KeyMux' was expected.
+
+> Task :compileTestKotlinJvm FAILED
+
+[Incubating] Problems report is available at: file:///app/build/reports/problems/problems-report.html
+
+FAILURE: Build failed with an exception.
+
+* What went wrong:
+Execution failed for task ':compileTestKotlinJvm' (registered in build file 'build.gradle.kts').
+> A failure occurred while executing org.jetbrains.kotlin.compilerRunner.btapi.BuildToolsApiCompilationWork
+   > Compilation error. See log for more details
+
+* Try:
+> Run with --stacktrace option to get the stack trace.
+> Run with --info or --debug option to get more log output.
+> Run with --scan to get full insights from a Build Scan (powered by Develocity).
+> Get more help at https://help.gradle.org.
+
+Deprecated Gradle features were used in this build, making it incompatible with Gradle 10.
+
+You can use '--warning-mode all' to show the individual deprecation warnings and determine if they come from your own scripts or plugins.
+
+For more on this, please refer to https://docs.gradle.org/9.6.1/userguide/command_line_interface.html#sec:command_line_warnings in the Gradle documentation.
+
+BUILD FAILED in 41s
+11 actionable tasks: 3 executed, 8 up-to-date
