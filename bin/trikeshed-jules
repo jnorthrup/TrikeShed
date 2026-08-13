@@ -287,6 +287,45 @@ cmd_session() {
     api_call GET "/${name}"
 }
 
+# Emit the exact latest cumulative Jules patch bytes. Activity artifacts are
+# authoritative even when the session created no output, PR, or branch.
+cmd_patch() {
+    [[ -n "${1:-}" ]] || die "Session name required"
+    local name="$1"
+    [[ "${name}" == sessions/* ]] || name="sessions/${name}"
+    local activities_json session_json
+    activities_json=$(api_list_activities "${name}")
+    local selector='[
+          .activities[]?
+          | .artifacts[]?
+          | .changeSet.gitPatch?
+          | if type == "object" then .unidiffPatch else . end
+          | select(type == "string" and length > 0)
+          | select(contains("diff --git a/.gradle/") | not)
+          | select(contains("diff --git a/build/") | not)
+          | select(contains("diff --git a/.git/") | not)
+        ] | last'
+    if printf '%s' "${activities_json}" | jq -e "${selector} != null" >/dev/null; then
+        printf '%s' "${activities_json}" | jq -j "${selector}"
+        return
+    fi
+    session_json=$(api_request GET "/${name}")
+    selector='[
+        .outputs[]?
+        | .changeSet.gitPatch?
+        | if type == "object" then .unidiffPatch else . end
+        | select(type == "string" and length > 0)
+        | select(contains("diff --git a/.gradle/") | not)
+        | select(contains("diff --git a/build/") | not)
+        | select(contains("diff --git a/.git/") | not)
+    ] | last'
+    if printf '%s' "${session_json}" | jq -e "${selector} != null" >/dev/null; then
+        printf '%s' "${session_json}" | jq -j "${selector}"
+        return
+    fi
+    die "No cumulative patch found for ${name}"
+}
+
 cmd_create() {
     local prompt="" title=""
     
@@ -553,6 +592,7 @@ shift || true
 case "${CMD}" in
     sessions|list) cmd_sessions "$@" ;;
     session|get)   cmd_session "$@" ;;
+    patch)         cmd_patch "$@" ;;
     create)       cmd_create "$@" ;;
     send|chat)    cmd_send "$@" ;;
     approve)      cmd_approve "$@" ;;
@@ -575,6 +615,7 @@ trikeshed-jules v2 - TrikeShed Jules CLI with predicates
 Commands:
   sessions, list               List all sessions
   session <id>                 Get session details
+  patch <id>                   Emit exact latest cumulative patch bytes
   create "prompt" [title]      Create new session (PREDICATES REQUIRED)
   send <id> "message"         Send message to awaiting session
   approve <id>                Approve pending plan

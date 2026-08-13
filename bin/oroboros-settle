@@ -1,0 +1,13 @@
+#!/usr/bin/env bash
+# Durable settlement bridge for Jules patches delivered without a PR or branch.
+set -euo pipefail
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+CLASSES="$ROOT/build/classes/kotlin/jvm/main"
+LIB="$ROOT/build/staging/lib"
+
+[[ -d "$CLASSES" ]] || { echo "missing $CLASSES; run ./gradlew jvmMainClasses" >&2; exit 1; }
+[[ -d "$LIB" ]] || { echo "missing $LIB; run ./gradlew stageDaemonLib" >&2; exit 1; }
+
+CP="$CLASSES:$LIB/*"
+# shellcheck disable=SC2086
+exec java -cp $CP borg.trikeshed.jules.JulesSettlementCli "$@"

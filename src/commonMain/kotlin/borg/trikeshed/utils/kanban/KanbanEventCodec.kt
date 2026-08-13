@@ -78,7 +78,14 @@ object KanbanEventCodec {
                 }
             }
             is JulesCause.WorkIdentitySynthesized -> {
-                field("workId", c.workId); field("identity", c.identity.workId)
+                field("workId", c.workId)
+                field("identityWorkId", c.identity.workId)
+                field("identitySessionId", c.identity.sessionId)
+                field("identitySessionUrl", c.identity.sessionUrl)
+                c.identity.gitBranch?.let { field("identityGitBranch", it) }
+                c.identity.prUrl?.let { field("identityPrUrl", it) }
+                c.identity.gitTag?.let { field("identityGitTag", it) }
+                c.identity.commitSha?.let { field("identityCommitSha", it) }
             }
         }
         append('}')
@@ -157,6 +164,26 @@ object KanbanEventCodec {
                                 prUrl = m.optStr("receiptPrUrl"),
                             )
                         },
+                        at = at,
+                    )
+                    "WorkIdentitySynthesized" -> JulesCause.WorkIdentitySynthesized(
+                        workId = m.str("workId"),
+                        identity = borg.trikeshed.jules.WorkIdentity(
+                            workId = m.optStr("identityWorkId") ?: m.str("workId"),
+                            sessionId = m.optStr("identitySessionId")
+                                ?: m.optStr("identity")
+                                ?: sid.substringAfter("session:", sid),
+                            sessionUrl = m.optStr("identitySessionUrl")
+                                ?: "https://jules.google.com/session/${
+                                    m.optStr("identitySessionId")
+                                        ?: m.optStr("identity")
+                                        ?: sid.substringAfter("session:", sid)
+                                }",
+                            gitBranch = m.optStr("identityGitBranch"),
+                            prUrl = m.optStr("identityPrUrl"),
+                            gitTag = m.optStr("identityGitTag"),
+                            commitSha = m.optStr("identityCommitSha"),
+                        ),
                         at = at,
                     )
                     else -> JulesCause.StateObserved(m.str("from"), m.str("to"), at)
