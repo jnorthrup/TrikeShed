@@ -1,3 +1,5 @@
+package borg.trikeshed.flywheel.cli
+
 import borg.trikeshed.jules.JulesCause
 import borg.trikeshed.utils.kanban.JulesBoardStore
 import borg.trikeshed.utils.kanban.forForgeDir

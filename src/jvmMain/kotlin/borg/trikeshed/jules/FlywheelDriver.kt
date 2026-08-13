@@ -1554,6 +1554,7 @@ class FlywheelDriver(
         )
     }
 
+<<<<<<< HEAD
     /**
      * Merge unmerged origin branches that have no Jules session backing them —
      * bolt, palette, refactor, perf, feat branches etc — into master using
@@ -1628,11 +1629,18 @@ class FlywheelDriver(
     }
 
     private fun activeCount(): Int = conductor.cards.values.count {
+=======
+    private suspend fun activeCount(): Int = conductor.cards.values.count {
+>>>>>>> origin/jules-15846685841436352340-ea46ff13
         it.snapshot.state !in TERMINAL_STATES && !it.drained
     }
 
     /** Find the GitHub branch or PR head carrying this Jules session id. */
+<<<<<<< HEAD
     private suspend fun findSessionBranch(sessionId: String, preFetchedRefs: List<String>? = null): String? {
+=======
+    private suspend fun findSessionBranch(sessionId: String): String? {
+>>>>>>> origin/jules-15846685841436352340-ea46ff13
         val numericId = sessionId.substringAfterLast('/').filter { it.isDigit() }
         if (numericId.isEmpty()) return null
 
@@ -1926,6 +1934,7 @@ class FlywheelDriver(
     private fun extractSpecFiles(spec: String): Set<String> =
         specFilePattern.findAll(spec).map { it.value.trimEnd('.', ',', ':', ';', ')', ']') }.toSet()
 
+<<<<<<< HEAD
      /**
       * Run a git command in [repoDir]. Unified shell — every git ProcessBuilder
       * site in FlywheelDriver goes through here. Prepends `"git"` so callers
@@ -1997,6 +2006,49 @@ class FlywheelDriver(
       */
      private suspend fun isWorkingTreeClean(): Boolean =
          git("status", "--porcelain", "--untracked-files=no").output.isBlank()
+=======
+    /**
+     * Run a git command in [repoDir]. Unified shell — every git ProcessBuilder
+     * site in FlywheelDriver goes through here. Prepends `"git"` so callers
+     * write `git("commit", "-m", ...)` not `git("git", "commit", "-m", ...)`.
+     * For non-git commands (gh, ./gradlew) use [shell].
+     */
+    private suspend fun git(vararg args: String): CommandResult = shell("git", *args)
+
+    /**
+     * Run an arbitrary command in [repoDir]. Use [git] for git subcommands.
+     * The default 30-second timeout keeps git/GitHub prompts from parking the
+     * wheel; drain-time Gradle gates pass their own bounded build window.
+     */
+    private suspend fun shell(vararg args: String): CommandResult = shell(args.toList())
+
+    private suspend fun shell(timeoutMs: Long, vararg args: String): CommandResult = shell(args.toList())
+
+    private suspend fun shell(command: List<String>): CommandResult = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+        try {
+            val pb = ProcessBuilder(command)
+            pb.directory(repoDir)
+            pb.redirectErrorStream(true)
+            val process = pb.start()
+            val output = process.inputStream.readBytes().decodeToString()
+            val exitCode = process.waitFor()
+            CommandResult(exitCode, output)
+        } catch (t: Throwable) {
+            CommandResult(1, t.message.orEmpty())
+        }
+    }
+
+    private data class CommandResult(val exitCode: Int, val output: String)
+
+    /**
+     * True iff the working tree has no tracked modifications or staged changes.
+     * Untracked files do NOT count as dirty — Jules sessions leave artifacts
+     * behind that are harmless to merges and would otherwise permanently block
+     * the wheel.
+     */
+    private suspend fun isWorkingTreeClean(): Boolean =
+        git("status", "--porcelain", "--untracked-files=no").output.isBlank()
+>>>>>>> origin/jules-15846685841436352340-ea46ff13
 
     private fun getKanbanBoard(): borg.trikeshed.kanban.KanbanBoard {
         return try { ForgeKanbanIngest.load("jim").board }
@@ -2162,7 +2214,7 @@ class FlywheelDriver(
 
     /** Convert a git remote URL (`git@github.com:foo/bar.git` or `https://.../foo/bar.git`)
      *  and a commit sha into the canonical HTML commit URL. null on unknown shapes. */
-    private fun originToHtmlUrl(remote: String, sha: String): String? {
+    private suspend fun originToHtmlUrl(remote: String, sha: String): String? {
         val cleaned = remote.removeSuffix(".git")
         return when {
             cleaned.startsWith("git@github.com:") -> {
@@ -2187,7 +2239,7 @@ class FlywheelDriver(
     }
 
     /** Parse unidiff headers (--- a/path, +++ b/path) to extract touched file paths. */
-    private fun parsePatchFiles(patch: String): List<String> {
+    private suspend fun parsePatchFiles(patch: String): List<String> {
         val files = mutableListOf<String>()
         for (line in patch.lines()) {
             if (line.startsWith("+++ b/")) {
@@ -2287,7 +2339,11 @@ class FlywheelDriver(
         return out.joinToString("\n")
     }
 
+<<<<<<< HEAD
      private suspend fun headSha(): String = git("rev-parse", "HEAD").output.trim()
+=======
+    private suspend fun headSha(): String = git("rev-parse", "HEAD").output.trim()
+>>>>>>> origin/jules-15846685841436352340-ea46ff13
 
     /** Subscribe a child coroutine to reactor events. Returns the subscriber's job. */
     fun subscribe(block: suspend (FlywheelEvent) -> Unit): Job =
@@ -2448,10 +2504,17 @@ class FlywheelDriver(
         }
     }
 
+<<<<<<< HEAD
      /** Files still unmerged in Git's index for the current 3-way arm. */
      private suspend fun unmergedFiles(): List<String> =
          git("diff", "--name-only", "--diff-filter=U").output.trim().lines()
              .filter { it.isNotBlank() }
+=======
+    /** Files still unmerged in Git's index for the current 3-way arm. */
+    private suspend fun unmergedFiles(): List<String> =
+        git("diff", "--name-only", "--diff-filter=U").output.trim().lines()
+            .filter { it.isNotBlank() }
+>>>>>>> origin/jules-15846685841436352340-ea46ff13
 
     /**
      * Cumulative unresolved files. Conflict-arm commits clear the unmerged
@@ -2482,7 +2545,7 @@ class FlywheelDriver(
      * sides plus their common ancestor context to produce a semantically
      * correct merge. The build-fix loop then makes it compile.
      */
-    private fun resolveConflicts(files: List<String>) {
+    private suspend fun resolveConflicts(files: List<String>) {
         for (file in files) {
             val f = File(repoDir, file)
             if (!f.exists()) continue

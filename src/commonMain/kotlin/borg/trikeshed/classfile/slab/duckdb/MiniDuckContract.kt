@@ -117,9 +117,11 @@ fun query(conn: DuckDBConnection, sql: String): DuckDBResult = TODO(
 )
 
 /** Execute with auto-checkpoint pragmas → result + WAL facet */
-fun queryDurable(conn: DuckDBConnection, sql: String): DuckDBResult = TODO(
-    "SET disable_checkpoint_on_shutdown=false; SET wal_autocheckpoint='1GB'; query → result{WAL_BUFFER}"
-)
+fun queryDurable(conn: DuckDBConnection, sql: String): DuckDBResult {
+    query(conn, "SET disable_checkpoint_on_shutdown=false")
+    query(conn, "SET wal_autocheckpoint='1GB'")
+    return query(conn, sql)
+}
 
 /** Checkpoint (flush WAL to data file) → WAL facet cleared */
 fun checkpoint(db: DuckDB): Unit = TODO("CHECKPOINT → facet = facet andNot WAL_BUFFER")

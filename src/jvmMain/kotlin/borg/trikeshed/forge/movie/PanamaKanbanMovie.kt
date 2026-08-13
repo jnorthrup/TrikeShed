@@ -210,6 +210,16 @@ object PanamaKanbanMovie {
         }
         
         val outputFile = File("causal-movie.mp4")
+
+        // Validate outputFile path to prevent command/parameter injection
+        if (outputFile.name.startsWith("-")) {
+            throw IllegalArgumentException("Output file name cannot start with '-' to prevent parameter injection")
+        }
+        val shellMetachars = setOf(';', '&', '|', '>', '<', '$', '\\', '\n', '\r', '\'', '"', '`')
+        if (outputFile.name.any { it in shellMetachars }) {
+            throw IllegalArgumentException("Output file name contains invalid shell metacharacters")
+        }
+
         val tempDir = File("temp-frames")
         tempDir.mkdirs()
         

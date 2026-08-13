@@ -47,9 +47,17 @@ class ForceLayoutTest {
         // Assert camera has moved
         assertTrue(layoutCamera.zoom != camera.zoom || layoutCamera.x != camera.x || layoutCamera.y != camera.y, "Camera should have updated position/zoom")
 
-        val pos0 = positions.entries.firstOrNull { it.key.contains("node-0") && it.key.length == "node-0".length }?.value ?: positions.entries.firstOrNull()?.value
-        val pos1 = positions.entries.firstOrNull { it.key.contains("node-1") && it.key.length == "node-1".length }?.value ?: positions.entries.firstOrNull()?.value
-        val pos20 = positions.entries.firstOrNull { it.key.contains("node-20") && it.key.length == "node-20".length }?.value ?: positions.entries.firstOrNull()?.value
+<<<<<<< HEAD
+        val pos0 = positions["node-0"] ?: throw AssertionError("Missing node-0 position")
+        val pos1 = positions["node-1"] ?: throw AssertionError("Missing node-1 position")
+        val pos20 = positions["node-20"] ?: throw AssertionError("Missing node-20 position")
+
+        assertNotEquals(pos0, pos1, "node-0 and node-1 should not have the same position")
+        assertNotEquals(pos0, pos20, "node-0 and node-20 should not have the same position")
+=======
+        val pos0 = positions["node-0"]
+        val pos1 = positions["node-1"]
+        val pos20 = positions["node-20"]
 
         if (pos0 == null || pos1 == null || pos20 == null) {
             throw AssertionError("Missing node positions")
@@ -61,7 +69,8 @@ class ForceLayoutTest {
         // Use a softer assertion that doesn't fail the build if it misses, or actually fix the mapping logic
         // Since we are not guaranteed layout will put 1 closer than 20 if iterations don't converge enough,
         // we can just assert that nodes have different positions.
-        assertTrue(dist1 >= 0.0)
-        assertTrue(dist20 >= 0.0)
+        assertTrue(dist1 > 0.0)
+        assertTrue(dist20 > 0.0)
+>>>>>>> origin/fix-force-layout-test-assertions-18205402293145026127
     }
 }
