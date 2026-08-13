@@ -63,17 +63,17 @@ class DatabaseView(var database: LcncDatabase, val ingestState: IngestStateEleme
                     for (prop in schema.properties.values) {
                         text("<div class=\"lcnc-database-filter\"><input type=\"text\" placeholder=\"Filter ${prop.name}...\" data-column-id=\"${prop.id}\" onkeyup=\"window.lcncFilterColumn('${database.id}', '${prop.id}', this.value)\"/></div>")
                     }
-                    text("<button onclick=\"window.lcncAddColumn('${database.id}')\">+ Add Column</button>")
+                    text("<button onclick=\"window.lcncAddColumn('${database.id}')\" aria-label=\"Add Column\" title=\"Add Column\">+ Add Column</button>")
                 }
             }
 
             // Table
             text("<table class=\"lcnc-database-table\">")
             text("<thead><tr>")
-            text("<th><button class=\"lcnc-database-sort\" data-column=\"title\" onclick=\"window.lcncSortColumn('${database.id}', 'title')\">Title</button></th>")
+            text("<th><button class=\"lcnc-database-sort\" data-column=\"title\" onclick=\"window.lcncSortColumn('${database.id}', 'title')\" aria-label=\"Sort by Title\" title=\"Sort by Title\">Title</button></th>")
             for (prop in schema.properties.values) {
                 text("<th>")
-                text("<button class=\"lcnc-database-sort\" data-column=\"${prop.id}\" onclick=\"window.lcncSortColumn('${database.id}', '${prop.id}')\">${prop.name}</button>")
+                text("<button class=\"lcnc-database-sort\" data-column=\"${prop.id}\" onclick=\"window.lcncSortColumn('${database.id}', '${prop.id}')\" aria-label=\"Sort by ${prop.name}\" title=\"Sort by ${prop.name}\">${prop.name}</button>")
                 text("<button class=\"lcnc-col-delete\" onclick=\"window.lcncDeleteColumn('${database.id}', '${prop.id}')\" aria-label=\"Delete column\" title=\"Delete column\">x</button>")
                 text("<button class=\"lcnc-col-rename\" onclick=\"window.lcncRenameColumn('${database.id}', '${prop.id}')\" aria-label=\"Rename column\" title=\"Rename column\">✎</button>")
                 text("</th>")
@@ -134,8 +134,8 @@ class DatabaseView(var database: LcncDatabase, val ingestState: IngestStateEleme
                 }
                 
                 text("<td>")
-                text("<button onclick=\"window.lcncDuplicateRow('${database.id}', '${page.id}')\">Copy</button>")
-                text("<button onclick=\"window.lcncDeleteRow('${database.id}', '${page.id}')\">Delete</button>")
+                text("<button onclick=\"window.lcncDuplicateRow('${database.id}', '${page.id}')\" aria-label=\"Copy row\" title=\"Copy row\">Copy</button>")
+                text("<button onclick=\"window.lcncDeleteRow('${database.id}', '${page.id}')\" aria-label=\"Delete row\" title=\"Delete row\">Delete</button>")
                 text("</td>")
                 text("</tr>")
             }
@@ -145,8 +145,8 @@ class DatabaseView(var database: LcncDatabase, val ingestState: IngestStateEleme
             
             // Pagination/Add Row
             div(classes = "lcnc-database-footer") {
-                text("<button onclick=\"window.lcncAddRow('${database.id}')\">+ New Row</button>")
-                text("<button class=\"lcnc-load-more\">Load More</button>")
+                text("<button onclick=\"window.lcncAddRow('${database.id}')\" aria-label=\"Add New Row\" title=\"Add New Row\">+ New Row</button>")
+                text("<button class=\"lcnc-load-more\" aria-label=\"Load More Rows\" title=\"Load More Rows\">Load More</button>")
             }
         }
     }
