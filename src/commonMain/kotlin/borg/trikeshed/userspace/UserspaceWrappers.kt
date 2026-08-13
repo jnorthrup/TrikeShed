@@ -38,6 +38,3 @@ class ChannelRunner(
         return deferred.await()
     }
 }
-
-@Deprecated("Use ChannelRunner.", ReplaceWith("ChannelRunner"))
-typealias UserspaceIORunner = ChannelRunner
