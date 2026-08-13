@@ -1,6 +1,8 @@
 package borg.trikeshed.userspace
 
+import borg.trikeshed.lib.Series
 import borg.trikeshed.userspace.nio.ByteBuffer
+import borg.trikeshed.userspace.UringOp.Companion.UringSubmission
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
@@ -34,11 +36,13 @@ class FunctionalUringFacadeTest {
         }
 
         override fun sync(file: FileImpl, metaData: Boolean): Int {
-            TODO("Not yet implemented")
+            ops += "sync:${file.id}:$metaData"
+            return 66
         }
 
         override fun truncate(file: FileImpl, size: Long): Int {
-            TODO("Not yet implemented")
+            ops += "truncate:${file.id}:$size"
+            return 77
         }
 
         override fun map(
@@ -47,8 +51,48 @@ class FunctionalUringFacadeTest {
             position: Long,
             size: Long
         ): Int {
-            TODO("Not yet implemented")
+            ops += "map:${file.id}:$mode:$position:$size"
+            return 88
         }
+
+        override fun submitBatch(submissions: List<UringSubmission>): List<SelectionResult> {
+            return submissions.map { sub ->
+                val result = when (sub.opcode) {
+                    UringOp.READV -> {
+                        ops += "read:${sub.fd}:${sub.offset}:${sub.buffer?.remaining()}"
+                        11
+                    }
+                    UringOp.WRITEV -> {
+                        ops += "write:${sub.fd}:${sub.offset}:${sub.buffer?.remaining()}"
+                        22
+                    }
+                    UringOp.ACCEPT -> {
+                        ops += "accept:${sub.fd}"
+                        33
+                    }
+                    UringOp.CONNECT -> {
+                        ops += "connect:${sub.fd}:127.0.0.1:${sub.len}"
+                        44
+                    }
+                    UringOp.CLOSE -> {
+                        ops += "close:${sub.fd}"
+                        55
+                    }
+                    UringOp.FSYNC -> {
+                        ops += "sync:${sub.fd}:true"
+                        66
+                    }
+                    UringOp.NOP -> {
+                        ops += "nop:${sub.fd}"
+                        99
+                    }
+                    else -> 0
+                }
+                SelectionResult(result, sub.userData)
+            }
+        }
+
+        override suspend fun batchEnqueue(submissions: Series<UringSubmission>): Series<UringCompletion> = TODO()
     }
 
     @Test
@@ -104,5 +148,26 @@ class FunctionalUringFacadeTest {
             backend.ops,
         )
         assertEquals(emptyList(), facade.peek())
+    }
+
+    @Test
+    fun enqueue_maps_sync_truncate_and_map_ops() {
+        val backend = RecordingBackend()
+        val facade = FunctionalUringFacade(entries = 8, backend = backend)
+        val file = FileImpl(11)
+
+        facade.sync(file, metaData = true, userData = 301L)
+        facade.truncate(file, size = 1024L, userData = 302L)
+        facade.map(file, mode = "rw", position = 0L, size = 4096L, userData = 303L)
+
+        assertEquals(3, facade.submit())
+        assertEquals(
+            listOf(
+                "sync:11:true",
+                "nop:-1", // from truncate which calls nop(-1)
+                "nop:-1", // from map which calls nop(-1)
+            ),
+            backend.ops,
+        )
     }
 }
