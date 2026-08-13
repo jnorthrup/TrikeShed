@@ -520,6 +520,7 @@ class FlywheelDriver(
         val readyToSettle = remainingCompleted == 0 &&
             committedConflicts.isEmpty() && isWorkingTreeClean()
         val settled = readyToSettle && settlementBarrier()
+        if (settled) archiveSettledSessions()
 
         // 6. INDUCT — the WAL is the only induction surface. External agents
         //    CAS-put a ≤4000-byte spec and appendWork(workId, WorkQueued).
@@ -680,8 +681,8 @@ class FlywheelDriver(
     /** Signal channel: a slot freed, dispatch should try to fill it. */
     private val slotFreed = kotlinx.coroutines.channels.Channel<Int>(kotlinx.coroutines.channels.Channel.CONFLATED)
 
-    /** Serializes HTX exchanges per endpoint ordinal. */
-    private val drainMutex = Mutex() // removed — see drainFanout
+    /** Serializes the one Git worktree/reconcile/settlement lane. */
+    private val drainMutex = Mutex()
     private val answerMutex = Mutex() // removed — parallel answer/approve
     private val dispatchMutex = Mutex() // removed — parallel dispatch
 
@@ -737,30 +738,57 @@ class FlywheelDriver(
                     _events.tryEmit(FlywheelEvent.PollError("reactive poll: ${t.message?.take(200)}"))
                 }
 
-                // Fan-out: drain completed sessions in a child coroutine so
-                // brain/build latency never blocks the poll loop. The drain
-                // guard prevents concurrent drains.
-                val completed = conductor.cards.values.filter {
-                    it.snapshot.state in DRAINABLE_STATES && !it.drained
-                }
-                if (completed.isNotEmpty()) {
-                    val sessions = completed.map {
-                        JulesRestClient.SessionInfo(it.snapshot.sessionId, it.snapshot.state, it.card.title, 0L)
-                    }
-                    scope.launch(htxElement + Dispatchers.IO) {
-                        // Parallel drain: the drainGuard AtomicBoolean inside
-                        // drainFanout prevents re-entrant drain. The previous
-                        // drainMutex serialized the entire drain pipeline
-                        // behind a single lock — unnecessary now that each
-                        // HTX exchange allocates its own SSLEngine via
-                        // connectionOrdinal.
+                // One serialized Git lane owns reconcile → drain → settle.
+                // API/brain work remains fan-out, but the worktree and refs are
+                // one mutable resource and therefore cannot be concurrent.
+                scope.launch(htxElement + Dispatchers.IO) {
+                    if (!drainMutex.tryLock()) return@launch
+                    try {
+                        try {
+                            reconcileGitState()
+                        } catch (t: Throwable) {
+                            classifyHttpError(t)
+                            _events.tryEmit(FlywheelEvent.PollError("reactive reconcile: ${t.message?.take(200)}"))
+                        }
+
+                        val completed = conductor.cards.values.filter {
+                            it.snapshot.state in DRAINABLE_STATES && !it.drained
+                        }
+                        val sessions = completed.map {
+                            JulesRestClient.SessionInfo(
+                                it.snapshot.sessionId,
+                                it.snapshot.state,
+                                it.card.title,
+                                0L,
+                            )
+                        }
+                        if (sessions.isEmpty() && conflictFiles().isEmpty()) {
+                            synchronizeMain()
+                            harvestOrphanBranches()
+                        } else if (sessions.isEmpty()) {
+                            commitExistingConflicts()
+                            synchronizeMain()
+                            commitExistingConflicts()
+                            harvestOrphanBranches()
+                        }
+
                         val drain = drainFanout(sessions)
                         tickHarvested.addAndGet(drain.harvested)
+                        val remaining = conductor.cards.values.count {
+                            it.snapshot.state in DRAINABLE_STATES && !it.drained
+                        }
+                        val conflicts = (drain.conflicts + conflictFiles()).distinct()
+                        val ready = remaining == 0 && conflicts.isEmpty() && isWorkingTreeClean()
+                        val settled = ready && settlementBarrier()
+                        if (settled) archiveSettledSessions()
+
                         val freed = drain.harvested
                         if (freed > 0) {
                             slotFreed.trySend(freed)
-                            println("[CHOREOGRAPHY] drain → dispatch signal: $freed slots freed")
+                            println("[CHOREOGRAPHY] drain → settle → dispatch: $freed slots freed")
                         }
+                    } finally {
+                        drainMutex.unlock()
                     }
                 }
 
@@ -942,7 +970,7 @@ class FlywheelDriver(
             }
         }
 
-        println("[CHOREOGRAPHY] reactive cycle started — fan-out drain + reactive dispatch")
+        println("[CHOREOGRAPHY] reactive cycle started — serialized Git settlement + fan-out API work")
     }
 
     /**
@@ -1568,12 +1596,6 @@ class FlywheelDriver(
             drainFailures.remove(s.id)
             println("[FLYWHEEL] PROVENANCE ${s.id.takeLast(6)} cid=${patchCid.value.take(16)} branch=${branch ?: "none"} tag=$tag")
             sendMergeReceipt(s.id, commitSha, tag, patchCid, branch, prUrl)
-            try {
-                client.deleteSession(s.id)
-                println("[FLYWHEEL] DELETE ${s.id.takeLast(6)} session cleared")
-            } catch (t: Throwable) {
-                emitPollError("delete session ${s.id}: ${t.message?.take(200)}", 0)
-            }
         }
 
         val drainBatchDurationMs = System.currentTimeMillis() - drainBatchStartMs
@@ -1603,6 +1625,11 @@ class FlywheelDriver(
     private suspend fun harvestOrphanBranches() {
         if (!isWorkingTreeClean()) return
 
+        val backedSessionIds = conductor.cards.keys.asSequence()
+            .map { it.substringAfterLast('/').filter(Char::isDigit) }
+            .filter { it.isNotEmpty() }
+            .toSet()
+
         val refs = git("for-each-ref", "--format=%(refname:short)", "refs/remotes/origin")
             .takeIf { it.exitCode == 0 }?.output?.lineSequence()
             ?.map { it.trim() }
@@ -1610,6 +1637,7 @@ class FlywheelDriver(
                 ref.startsWith("origin/") &&
                 ref != "origin/master" &&
                 ref != "origin/HEAD" &&
+                backedSessionIds.none { it in ref } &&
                 HARVEST_EXCLUDE_PREFIXES.none { ref.startsWith(it) }
             }
             ?.toList() ?: return
@@ -1722,9 +1750,7 @@ class FlywheelDriver(
      * annotated tag, queue receipt, identity, and drained card in that order.
      */
     private suspend fun reconcileGitState() {
-        val candidates = conductor.cards.values.filter { card ->
-            !card.drained && card.snapshot.state !in TERMINAL_STATES
-        }
+        val candidates = conductor.cards.values.filter { card -> !card.drained }
         if (candidates.isEmpty()) return
 
         val fetch = git("fetch", "origin", "--prune")
@@ -1842,12 +1868,6 @@ class FlywheelDriver(
             }
             println("[FLYWHEEL] RECONCILE ${sessionId.takeLast(6)} branch=$branch tag=$tag")
             sendMergeReceipt(sessionId, commitSha, tag, patchCid, branch, prUrl)
-            try {
-                client.deleteSession(sessionId)
-                println("[FLYWHEEL] DELETE ${sessionId.takeLast(6)} session cleared")
-            } catch (t: Throwable) {
-                emitPollError("delete session $sessionId: ${t.message?.take(200)}", 0)
-            }
         }
     }
 
@@ -1925,6 +1945,30 @@ class FlywheelDriver(
         borg.trikeshed.util.oroboros.FlywheelHistoryReaper.reapOldTags(repoDir)
 
         return true
+    }
+
+    /**
+     * Move durable, upstream-settled sessions out of Jules' review inbox while
+     * preserving their complete conversation and output history. This runs only
+     * after [settlementBarrier] proves local HEAD == origin/master.
+     */
+    private suspend fun archiveSettledSessions() {
+        val candidates = conductor.cards.values.filter { card ->
+            card.drained &&
+                card.snapshot.state in TERMINAL_STATES &&
+                card.snapshot.sessionId in conductor.visibleSessionIds &&
+                card.causes.none { it is JulesCause.SessionArchived }
+        }.sortedBy { it.snapshot.capturedAt }.take(8)
+        for (card in candidates) {
+            val sessionId = card.snapshot.sessionId
+            try {
+                conductor.archive(sessionId)
+                println("[FLYWHEEL] ARCHIVE ${sessionId.takeLast(6)} settled session preserved")
+            } catch (t: Throwable) {
+                classifyHttpError(t)
+                emitPollError("archive session $sessionId: ${t.message?.take(200)}", 0)
+            }
+        }
     }
 
     // ─── Dispatch helpers ───────────────────────────────────────────────────
@@ -2457,12 +2501,6 @@ class FlywheelDriver(
         ))
         _events.emit(FlywheelEvent.Drained(s.id, commitSha, tag))
         drainFailures.remove(s.id)
-        try {
-            client.deleteSession(s.id)
-            println("[FLYWHEEL] DELETE ${s.id.takeLast(6)} session cleared")
-        } catch (t: Throwable) {
-            emitPollError("delete session ${s.id}: ${t.message?.take(200)}", 0)
-        }
         return DrainOutcome.Harvested
     }
 

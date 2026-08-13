@@ -49,6 +49,7 @@ object KanbanEventCodec {
             is JulesCause.DrainFailed -> field("reason", c.reason)
             is JulesCause.PredicateFlipped -> { field("predicate", c.predicate); append(",\"nowPassing\":").append(c.nowPassing) }
             is JulesCause.SessionFailed -> field("reason", c.reason)
+            is JulesCause.SessionArchived -> Unit
             is JulesCause.StateObserved -> { field("from", c.from); field("to", c.to) }
             is JulesCause.WorkQueued -> {
                 field("workId", c.workId); field("tier", c.tier); field("title", c.title)
@@ -118,6 +119,7 @@ object KanbanEventCodec {
                     "DrainFailed" -> JulesCause.DrainFailed(m.str("reason"), at)
                     "PredicateFlipped" -> JulesCause.PredicateFlipped(m.str("predicate"), m["nowPassing"]?.toString() == "true", at)
                     "SessionFailed" -> JulesCause.SessionFailed(m.str("reason"), at)
+                    "SessionArchived" -> JulesCause.SessionArchived(at)
                     "WorkQueued" -> JulesCause.WorkQueued(
                         workId = m.str("workId"),
                         tier = m.str("tier"),
@@ -173,6 +175,7 @@ object KanbanEventCodec {
         is JulesCause.DrainFailed -> "DrainFailed"
         is JulesCause.PredicateFlipped -> "PredicateFlipped"
         is JulesCause.SessionFailed -> "SessionFailed"
+        is JulesCause.SessionArchived -> "SessionArchived"
         is JulesCause.StateObserved -> "StateObserved"
         is JulesCause.WorkQueued -> "WorkQueued"
         is JulesCause.WorkDispatched -> "WorkDispatched"

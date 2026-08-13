@@ -100,7 +100,7 @@ check_correct_branch() {
 # Predicate 4: No Awaiting User Feedback sessions
 check_no_awaiting_sessions() {
     local current
-    current=$(api_request GET "/sessions?pageSize=100" 2>/dev/null | \
+    current=$(api_list_sessions 2>/dev/null | \
         jq -r --arg src "sources/github/jnorthrup/TrikeShed" \
         '[.sessions[]? | select(.state == "AWAITING_USER_FEEDBACK" and .sourceContext.source == $src)] | length' 2>/dev/null || echo "0")
     
@@ -113,7 +113,7 @@ check_no_awaiting_sessions() {
 # Predicate 5: Concurrent quota check
 check_concurrent_quota() {
     local active
-    active=$(api_request GET "/sessions?pageSize=100" 2>/dev/null | \
+    active=$(api_list_sessions 2>/dev/null | \
         jq -r '[.sessions[]? | select(.state == "IN_PROGRESS" or .state == "PLANNING" or .state == "QUEUED")] | length' 2>/dev/null || echo "0")
     
     if [[ "${active}" -ge "${MAX_CONCURRENT}" ]]; then
@@ -218,6 +218,45 @@ api_call() {
     echo "${out}" | jq .
 }
 
+# Emit one JSON object containing every item across a paginated Jules list.
+# Pages stream through jq instead of accumulating in shell arguments, so large
+# prompts and activity patches cannot exceed the platform argv limit.
+api_list_all() {
+    local path="$1" key="$2"
+    local token="" page request_path encoded
+    {
+        while true; do
+            request_path="${path}"
+            if [[ -n "${token}" ]]; then
+                encoded=$(jq -nr --arg token "${token}" '$token | @uri')
+                if [[ "${request_path}" == *\?* ]]; then
+                    request_path="${request_path}&pageToken=${encoded}"
+                else
+                    request_path="${request_path}?pageToken=${encoded}"
+                fi
+            fi
+            page=$(api_request GET "${request_path}")
+            if echo "${page}" | jq -e '.error' >/dev/null 2>&1; then
+                echo "${page}" | jq . >&2
+                return 1
+            fi
+            printf '%s\n' "${page}"
+            token=$(echo "${page}" | jq -r '.nextPageToken // empty')
+            [[ -n "${token}" ]] || break
+        done
+    } | jq -sc --arg key "${key}" '{($key): [ .[] | .[$key][]? ]}'
+}
+
+api_list_sessions() {
+    api_list_all "/sessions?pageSize=100" "sessions"
+}
+
+api_list_activities() {
+    local name="$1"
+    [[ "${name}" == sessions/* ]] || name="sessions/${name}"
+    api_list_all "/${name}/activities?pageSize=100" "activities"
+}
+
 resolve_source_name() {
     local owner_repo="${TRIKESHED_JULES_SOURCE:-github/jnorthrup/TrikeShed}"
     local full="sources/${owner_repo}"
@@ -238,7 +277,7 @@ resolve_source_name() {
 # COMMANDS
 # =============================================================================
 cmd_sessions() {
-    api_call GET "/sessions?pageSize=100"
+    api_list_sessions | jq .
 }
 
 cmd_session() {
@@ -324,14 +363,14 @@ cmd_responses() {
     [[ -n "${1:-}" ]] || die "Session name required"
     local name="$1"
     [[ "${name}" == sessions/* ]] || name="sessions/${name}"
-    api_call GET "/${name}/activities?pageSize=100"
+    api_list_activities "${name}" | jq .
 }
 
 cmd_activities_classify() {
     [[ -n "${1:-}" ]] || die "Session name required"
     local name="$1"
     [[ "${name}" == sessions/* ]] || name="sessions/${name}"
-    api_request GET "/${name}/activities?pageSize=100" \
+    api_list_activities "${name}" \
         | jq '[.activities[]? | {
               id, originator, description, createTime,
               kind: (
@@ -368,6 +407,20 @@ cmd_delete() {
     api_call DELETE "/${name}"
 }
 
+cmd_archive() {
+    [[ -n "${1:-}" ]] || die "Session name required"
+    local name="$1"
+    [[ "${name}" == sessions/* ]] || name="sessions/${name}"
+    api_call POST "/${name}:archive" "{}"
+}
+
+cmd_unarchive() {
+    [[ -n "${1:-}" ]] || die "Session name required"
+    local name="$1"
+    [[ "${name}" == sessions/* ]] || name="sessions/${name}"
+    api_call POST "/${name}:unarchive" "{}"
+}
+
 cmd_pull() {
     [[ -n "${1:-}" ]] || die "Session id required"
     local sid="$1"
@@ -393,7 +446,7 @@ cmd_status() {
     echo "======================"
     
     local sessions_json
-    sessions_json=$(api_request GET "/sessions?pageSize=100" 2>/dev/null)
+    sessions_json=$(api_list_sessions 2>/dev/null)
     
     local total active planning queued awaiting completed failed
     total=$(echo "${sessions_json}" | jq -r '[.sessions[]?] | length')
@@ -418,7 +471,7 @@ cmd_status() {
 cmd_nudge() {
     # Nudge all awaiting sessions
     local sessions_json
-    sessions_json=$(api_request GET "/sessions?pageSize=100" 2>/dev/null)
+    sessions_json=$(api_list_sessions 2>/dev/null)
     
     local awaiting_sessions
     awaiting_sessions=$(echo "${sessions_json}" | jq -r '[.sessions[]? | select(.state == "AWAITING_USER_FEEDBACK")]')
@@ -441,7 +494,7 @@ cmd_nudge() {
 cmd_merge_completed() {
     # Pull and merge all completed sessions with artifacts
     local sessions_json
-    sessions_json=$(api_request GET "/sessions?pageSize=100" 2>/dev/null)
+    sessions_json=$(api_list_sessions 2>/dev/null)
     
     local completed_sessions
     completed_sessions=$(echo "${sessions_json}" | jq -r '[.sessions[]? | select(.state == "COMPLETED")]')
@@ -467,7 +520,7 @@ cmd_merge_completed() {
     
     echo "${completed_sessions}" | jq -r '.[] | .id' | while read -r sid; do
         local patch_len
-        patch_len=$(api_request GET "/sessions/${sid}/activities?pageSize=100" 2>/dev/null | \
+        patch_len=$(api_list_activities "${sid}" 2>/dev/null | \
             jq -r '[.activities[]? | select(.artifacts != null) | .artifacts[]? | .changeSet.gitPatch.unidiffPatch] | map(length) | add // 0')
         
         if [[ "${patch_len}" -gt 0 ]]; then
@@ -507,6 +560,8 @@ case "${CMD}" in
     activities-classify) cmd_activities_classify "$@" ;;
     sources)      cmd_sources "$@" ;;
     source)       cmd_source_get "$@" ;;
+    archive)     cmd_archive "$@" ;;
+    unarchive)   cmd_unarchive "$@" ;;
     delete)      cmd_delete "$@" ;;
     pull)        cmd_pull "$@" ;;
     check)       cmd_check "$@" ;;
@@ -526,7 +581,9 @@ Commands:
   responses <id>              Get session activities
   activities-classify <id>    Get classified activities
   sources                     List sources
-  delete <id>                 Delete session
+  archive <id>                Archive session while preserving history
+  unarchive <id>              Restore an archived session
+  delete <id>                 Permanently delete session
   pull <id>                   Pull and apply patch
   check                       Run predicates without creating task
   status                      Show session status summary

@@ -203,6 +203,7 @@ class TimeseriesWalCursor(
             is JulesCause.DrainFailed,
             is JulesCause.PredicateFlipped,
             is JulesCause.SessionFailed,
+            is JulesCause.SessionArchived,
             is JulesCause.StateObserved -> listOf(event.sid to SynonymOps.Empty)
             is JulesCause.WorkQueued -> listOf(c.workId to SynonymOps.Empty)
         }

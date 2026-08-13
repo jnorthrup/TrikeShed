@@ -88,6 +88,9 @@ sealed class JulesCause {
     /** Session failed on the Jules side. */
     data class SessionFailed(val reason: String, override val at: Long) : JulesCause()
 
+    /** Settled session archived through the Jules API after origin/master parity. */
+    data class SessionArchived(override val at: Long) : JulesCause()
+
     /** Poll observed a state change with no finer-grained cause. */
     data class StateObserved(val from: String, val to: String, override val at: Long) : JulesCause()
 

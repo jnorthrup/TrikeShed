@@ -229,7 +229,7 @@ object FlywheelTui {
         appendLine("                 └────────▲─────────┘             └────────┬─────────┘")
         appendLine("                          ${vertical(pulses.harvestLand, tick, true)}                            ${vertical(pulses.dispatchRun, tick, false)}")
         appendLine("                 ┌────────┴─────────┐  ${leftArrow(pulses.runHarvest, tick)}  ┌────────▼─────────┐")
-        appendLine("                 │ HARVEST / REVIEW${padCount(s.harvest)}│             │ RUNNING         ${padCount(s.running)}│")
+        appendLine("                 │ COMPLETED/DRAIN ${padCount(s.harvest)}│             │ RUNNING         ${padCount(s.running)}│")
         appendLine("                 └──────────────────┘  ${leftArrow(pulses.runGuide, tick)}  └────────┬─────────┘")
         appendLine("                                                ┌────────▼─────────┐")
         appendLine("                                                │ GUIDE / AWAITING${padCount(s.guide)}│")

@@ -25,6 +25,10 @@ class JulesConductor(
     /** Cards keyed by session id. The board. Projection of the causal log. */
     val cards: MutableMap<String, JulesSessionCard> = store?.load() ?: mutableMapOf()
 
+    /** Non-archived session ids returned by the most recent complete API poll. */
+    var visibleSessionIds: Set<String> = emptySet()
+        private set
+
     /** One poll cycle: snapshot surroundings, diff, record causes, persist. */
     suspend fun pollOnce() {
         val sessions = client.listSessions(source)
@@ -34,6 +38,7 @@ class JulesConductor(
         // cards whose receipts anchor settlement. Only drop cards the API
         // actively reports as absent AND that have no pending drain work.
         val authoritativeIds = sessions.mapTo(mutableSetOf()) { it.id }
+        visibleSessionIds = authoritativeIds
         cards.keys.retainAll { sid ->
             sid in authoritativeIds ||
                 cards[sid]?.drained == true ||
@@ -137,6 +142,21 @@ class JulesConductor(
         )
         cards[sessionId] = card.copy(causes = card.causes + cause)
         store?.append(card.snapshot, card.drained, cause)
+    }
+
+    /**
+     * Archive a settled session without deleting its Jules conversation.
+     * The API transition happens first; the durable cause then makes retries
+     * idempotent across daemon restarts.
+     */
+    suspend fun archive(sessionId: String) {
+        val card = cards[sessionId] ?: return
+        if (card.causes.any { it is JulesCause.SessionArchived }) return
+        client.archiveSession(sessionId)
+        val cause = JulesCause.SessionArchived(Clock.System.now().toEpochMilliseconds())
+        val updated = card.copy(causes = card.causes + cause)
+        cards[sessionId] = updated
+        store?.append(updated.snapshot, updated.drained, cause)
     }
 
     /**

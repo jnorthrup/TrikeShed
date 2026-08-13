@@ -248,7 +248,12 @@ class JulesRestClient(
         return parsed["name"]?.toString()?.substringAfterLast('/') ?: error("createSession: no id in $resp")
     }
 
-    /** Delete a session. */
+    /** Archive a settled session while preserving its conversation and outputs. */
+    suspend fun archiveSession(sessionId: String) {
+        post("/sessions/$sessionId:archive", "{}")
+    }
+
+    /** Permanently delete a session. Reserved for explicit operator actions. */
     suspend fun deleteSession(sessionId: String) {
         transport().delete("/sessions/$sessionId")
     }

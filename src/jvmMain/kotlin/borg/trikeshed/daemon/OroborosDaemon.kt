@@ -22,7 +22,9 @@ import borg.trikeshed.userspace.reactor.MuxReactorConfig
 import keymux.KeyMux
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
@@ -408,6 +410,8 @@ object OroborosDaemon {
         System.err.println("[OROBOROS] Couch report reactor: ${reportReactor.state}")
 
         val mainJob = coroutineContext[kotlinx.coroutines.Job]
+        val reactiveJob = SupervisorJob(mainJob)
+        val reactiveScope = CoroutineScope(coroutineContext + reactiveJob)
 
         // Shutdown: cancel Jobs only — never nest runBlocking in a signal handler.
         // Structured concurrency unwinds the finally block in mainImpl which
@@ -478,6 +482,7 @@ object OroborosDaemon {
             try {
                 serverSocket = ServerSocketChannel.open(StandardProtocolFamily.UNIX)
                 serverSocket.bind(UnixDomainSocketAddress.of(healthSock.toPath()))
+                serverSocket.configureBlocking(false)
             } catch (e: Throwable) {
                 System.err.println("[OROBOROS] health.sock bind attempt ${bindAttempt + 1} failed: ${e.message}")
                 try { serverSocket?.close() } catch (_: Exception) {}
@@ -496,6 +501,10 @@ object OroborosDaemon {
                 var client: SocketChannel? = null
                 try {
                     client = serverSocket!!.accept()
+                    if (client == null) {
+                        delay(100)
+                        continue
+                    }
                     val report = lastCycleReport
                     val uptimeMs = System.currentTimeMillis() - daemonStartTime
                     val msg = if (report != null) {
@@ -578,7 +587,7 @@ object OroborosDaemon {
                     // child it owns, including the infinite reactive loops.
                     // Launch them under mainImpl's parent scope while this
                     // context supplies HtxKey for capture.
-                    driver.startReactiveCycle(this@mainImpl)
+                    driver.startReactiveCycle(reactiveScope)
                 }
                 while (isRunning) {
                     val errors = consecutivePollErrors.get()
@@ -607,7 +616,7 @@ object OroborosDaemon {
             } else {
                 // --once: run one reactive tick synchronously.
                 withContext(htxElement + muxReactor) {
-                    driver.startReactiveCycle(this@mainImpl)
+                    driver.startReactiveCycle(reactiveScope)
                 }
                 delay(intervalMs * 2)
                 try {
@@ -617,26 +626,30 @@ object OroborosDaemon {
                 }
                 isRunning = false
                 try { currentTw?.flush(); currentTw?.close() } catch (_: Exception) {}
-                mainJob?.cancel()
+                reactiveJob.cancelAndJoin()
                 return
             }
         } finally {
-            healthJob.cancel()
-            try { serverSocket.close() } catch (_: Exception) {}
-            if (healthSock.exists()) healthSock.delete()
-            try { traceWriter?.flush(); traceWriter?.close() } catch (_: Exception) {}
-            runCatching { kanbanJob.cancel() }
-            runCatching { reportReactor.close() }
-            runCatching { memoryIndex.close() }
-            runCatching { worktreeReconcileElement.close() }
-            runCatching { gitReconcileElement.close() }
-            runCatching { worktreeWatcher.close() }
-            runCatching { gitWatcher.close() }
-            try { htxElement.close() } catch (_: Exception) {}
-            try { torrentElement.close() } catch (_: Exception) {}
-            try { muxReactor.close() } catch (_: Exception) {}
-            try { nioSupervisor.close() } catch (_: Exception) {}
-            driver.close()
+            withContext(NonCancellable) {
+                reactiveJob.cancelAndJoin()
+                healthJob.cancel()
+                try { serverSocket.close() } catch (_: Exception) {}
+                healthJob.cancelAndJoin()
+                if (healthSock.exists()) healthSock.delete()
+                try { traceWriter?.flush(); traceWriter?.close() } catch (_: Exception) {}
+                runCatching { kanbanJob.cancel() }
+                runCatching { reportReactor.close() }
+                runCatching { memoryIndex.close() }
+                runCatching { worktreeReconcileElement.close() }
+                runCatching { gitReconcileElement.close() }
+                runCatching { worktreeWatcher.close() }
+                runCatching { gitWatcher.close() }
+                try { htxElement.close() } catch (_: Exception) {}
+                try { torrentElement.close() } catch (_: Exception) {}
+                try { muxReactor.close() } catch (_: Exception) {}
+                try { nioSupervisor.close() } catch (_: Exception) {}
+                driver.close()
+            }
         }
     }
 
