@@ -179,12 +179,23 @@ class HtxReactorElement(
         payload: ByteSeries,
     ) {
         val buffer = ByteBuffer(payload.toArray())
-        while (buffer.hasRemaining()) {
-            handle.writev(fd, buffer)
-            handle.submit()
-            val result = waitFor(handle, fd, 30, TimeUnit.SECONDS)
-            check(result >= 0) { "HTX reactor write failed for fd=$fd" }
-            check(result != 0 || !buffer.hasRemaining()) { "HTX reactor write stalled for fd=$fd" }
+        val completed = kotlinx.coroutines.withTimeoutOrNull(30_000L) {
+            while (buffer.hasRemaining()) {
+                handle.writev(fd, buffer)
+                handle.submit()
+                val result = waitFor(handle, fd, 30, TimeUnit.SECONDS)
+                check(result >= 0) { "HTX reactor write failed for fd=$fd" }
+                if (result == 0) {
+                    // Non-blocking connect/write readiness is still pending.
+                    // Preserve the buffer position and retry without occupying
+                    // the reactor thread.
+                    kotlinx.coroutines.delay(10)
+                }
+            }
+            true
+        } ?: false
+        check(completed) {
+            "HTX reactor write timed out for fd=$fd with ${buffer.remaining()} bytes remaining"
         }
     }
 
@@ -244,21 +255,14 @@ class HtxReactorElement(
             // Non-blocking read: 0 = EAGAIN (no data yet, keep waiting);
             // -1 = EOF (peer closed). Previously 0 was misread as EOF, killing
             // every TLS handshake before the server's ServerHello could arrive.
-            if (result == -1) {
-                return null
+            when {
+                result == -1 -> return null
+                result == 0 -> {
+                    kotlinx.coroutines.delay(10)
+                    continue
+                }
+                result > 0 -> return ByteSeries(buffer.array().copyOf(result))
             }
-            if (result > 0) {
-                return ByteSeries(buffer.array().copyOf(result))
-            }
-            kotlinx.coroutines.delay(10)
-            if (result == -1) {
-                return null
-            }
-            if (result == 0) {
-                kotlinx.coroutines.delay(10)
-                continue
-            }
-            return ByteSeries(buffer.array().copyOf(result))
         }
     }
 

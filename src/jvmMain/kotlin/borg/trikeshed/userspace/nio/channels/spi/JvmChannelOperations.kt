@@ -11,9 +11,9 @@ import java.nio.channels.SelectionKey
 import java.nio.channels.SelectableChannel
 import java.nio.channels.ServerSocketChannel
 import java.nio.channels.SocketChannel
-import java.util.concurrent.ArrayBlockingQueue
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.ConcurrentLinkedQueue
+import java.util.concurrent.LinkedBlockingQueue
 import java.util.concurrent.RejectedExecutionException
 import java.util.concurrent.ThreadPoolExecutor
 import java.util.concurrent.TimeUnit
@@ -47,13 +47,15 @@ class JvmChannelOperations(
     internal val socketChannels = ConcurrentHashMap<Int, SelectableChannel>()
     internal val socketInterests = ConcurrentHashMap<Int, Set<Interest>>()
     internal val fdCounter = AtomicInteger(100)
+    private val connectionPhases = ConcurrentHashMap<Int, ConnectionPhase>()
+    private val connectionFailures = ConcurrentHashMap<Int, String>()
     private val workerLimit = entries.coerceAtLeast(1)
     internal val ioWorkers = ThreadPoolExecutor(
         workerLimit,
         workerLimit,
         0L,
         TimeUnit.MILLISECONDS,
-        ArrayBlockingQueue<Runnable>(workerLimit),
+        LinkedBlockingQueue<Runnable>(),
         { runnable -> Thread(runnable, "trikeshed-jvm-channel").apply { isDaemon = true } },
         ThreadPoolExecutor.AbortPolicy(),
     )
@@ -101,20 +103,33 @@ class JvmChannelOperations(
 
     override fun connect(fd: Int, host: String, port: Int): Int {
         val ch = socketChannels[fd] as? SocketChannel ?: return -1
+        connectionFailures.remove(fd)
+        connectionPhases[fd] = ConnectionPhase.QUEUED
         if (!schedule {
             try {
                 val address = java.net.InetSocketAddress(host, port)
+                if (socketChannels[fd] !== ch || !ch.isOpen) return@schedule
                 ch.configureBlocking(false)
-                ch.connect(address)
+                connectionPhases[fd] = ConnectionPhase.CONNECTING
+                val connected = ch.connect(address)
+                if (socketChannels[fd] !== ch) return@schedule
+                connectionPhases[fd] = if (connected || ch.isConnected) {
+                    ConnectionPhase.CONNECTED
+                } else {
+                    ConnectionPhase.CONNECTING
+                }
                 socketInterests[fd] = setOf(Interest.READ, Interest.WRITE, Interest.CONNECT)
-            } catch (e: java.nio.channels.ClosedChannelException) {
-                // Ignore: cancelled/closed fd fails gracefully without stack-tracing
-            } catch (e: java.nio.channels.AsynchronousCloseException) {
-                // Ignore: cancelled/closed fd fails gracefully without stack-tracing
             } catch (e: Exception) {
-                // Ignore gracefully
+                if (socketChannels[fd] === ch) {
+                    recordFailure(fd, "connect to $host:$port", e)
+                }
             }
         }) {
+            recordFailure(
+                fd,
+                "schedule connect to $host:$port",
+                RejectedExecutionException("JVM channel worker is closed"),
+            )
             return -1
         }
         return 0
@@ -124,7 +139,68 @@ class JvmChannelOperations(
         socketChannels.remove(fd)?.close()
         fileChannels.remove(fd)?.close()
         socketInterests.remove(fd)
+        connectionPhases.remove(fd)
+        connectionFailures.remove(fd)
         return 0
+    }
+
+    /**
+     * Resolve the non-blocking connect state for an operation worker.
+     *
+     * `0` is EAGAIN: DNS/connect initiation is queued or finishConnect has not
+     * completed yet. `-1` is a durable failure whose cause has already been
+     * emitted. The caller never blocks a coroutine waiting for connect.
+     */
+    internal fun connectionReadiness(fd: Int, channel: SocketChannel): Int {
+        if (channel.isConnected) {
+            connectionPhases[fd] = ConnectionPhase.CONNECTED
+            return 1
+        }
+        if (connectionPhases[fd] == ConnectionPhase.FAILED) return -1
+        if (channel.isConnectionPending) {
+            return try {
+                if (channel.finishConnect()) {
+                    connectionPhases[fd] = ConnectionPhase.CONNECTED
+                    1
+                } else {
+                    0
+                }
+            } catch (e: Exception) {
+                recordFailure(fd, "finish connect", e)
+                -1
+            }
+        }
+        return when (connectionPhases[fd]) {
+            ConnectionPhase.QUEUED,
+            ConnectionPhase.CONNECTING -> 0
+            ConnectionPhase.CONNECTED -> {
+                recordFailure(fd, "validate connection", IllegalStateException("channel is not connected"))
+                -1
+            }
+            ConnectionPhase.FAILED -> -1
+            null -> {
+                recordFailure(fd, "perform channel operation", IllegalStateException("connect was not initiated"))
+                -1
+            }
+        }
+    }
+
+    internal fun recordFailure(fd: Int, operation: String, cause: Throwable) {
+        connectionPhases[fd] = ConnectionPhase.FAILED
+        val detail = buildString {
+            append(operation)
+            append(" failed for fd=")
+            append(fd)
+            append(": ")
+            append(cause.javaClass.simpleName)
+            cause.message?.takeIf { it.isNotBlank() }?.let {
+                append(": ")
+                append(it)
+            }
+        }
+        if (connectionFailures.putIfAbsent(fd, detail) == null) {
+            System.err.println("[JvmChannelOperations] $detail")
+        }
     }
 
     /**
@@ -276,10 +352,9 @@ class JvmChannelHandle(
             ?: return ChannelResult(op.fd, -1, op.user)
         val nioBuf = op.buf.toNioByteBuffer()
         val res = try {
-            if (sc.isConnectionPending) {
-                if (!sc.finishConnect()) {
-                    return ChannelResult(op.fd, 0, op.user)
-                }
+            val readiness = ops.connectionReadiness(op.fd, sc)
+            if (readiness <= 0) {
+                return ChannelResult(op.fd, readiness, op.user)
             }
             if (op.read) {
                 val n = sc.read(nioBuf)
@@ -291,6 +366,7 @@ class JvmChannelHandle(
                 n
             }
         } catch (e: Exception) {
+            ops.recordFailure(op.fd, if (op.read) "read" else "write", e)
             -1
         }
         return ChannelResult(op.fd, res, op.user)
@@ -301,4 +377,11 @@ class JvmChannelHandle(
             add(completed.poll() ?: break)
         }
     }
+}
+
+private enum class ConnectionPhase {
+    QUEUED,
+    CONNECTING,
+    CONNECTED,
+    FAILED,
 }
