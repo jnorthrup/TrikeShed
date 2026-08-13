@@ -101,18 +101,21 @@ class JvmChannelOperations(
 
     override fun connect(fd: Int, host: String, port: Int): Int {
         val ch = socketChannels[fd] as? SocketChannel ?: return -1
-        schedule {
+        if (!schedule {
             try {
                 val address = java.net.InetSocketAddress(host, port)
                 ch.configureBlocking(false)
-                if (!ch.connect(address)) {
-                    ch.finishConnect()
-                }
+                ch.connect(address)
                 socketInterests[fd] = setOf(Interest.READ, Interest.WRITE, Interest.CONNECT)
+            } catch (e: java.nio.channels.ClosedChannelException) {
+                // Ignore: cancelled/closed fd fails gracefully without stack-tracing
+            } catch (e: java.nio.channels.AsynchronousCloseException) {
+                // Ignore: cancelled/closed fd fails gracefully without stack-tracing
             } catch (e: Exception) {
-                println("JvmChannelOperations connect exception: ${e.message}")
-                e.printStackTrace()
+                // Ignore gracefully
             }
+        }) {
+            return -1
         }
         return 0
     }
@@ -273,6 +276,11 @@ class JvmChannelHandle(
             ?: return ChannelResult(op.fd, -1, op.user)
         val nioBuf = op.buf.toNioByteBuffer()
         val res = try {
+            if (sc.isConnectionPending) {
+                if (!sc.finishConnect()) {
+                    return ChannelResult(op.fd, 0, op.user)
+                }
+            }
             if (op.read) {
                 val n = sc.read(nioBuf)
                 if (n > 0) op.buf.position(op.buf.position() + n)
