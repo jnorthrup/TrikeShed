@@ -36,7 +36,12 @@ class LcncFanoutElementTest {
 
         val stubReduction = object : LcncReduction<Any, Any, Any, Any> {
             override val keyAlg: KeyAlg<Any> get() = TODO("Not yet implemented")
-            override val valueAlg: ValueAlg<Any, Any> get() = TODO("Not yet implemented")
+            override val valueAlg: ValueAlg<Any, Any>
+                get() = object : ValueAlg<Any, Any> {
+                    override val folder = borg.trikeshed.reduction.Folder<Any, Any> { acc, _ -> acc }
+                    override val merger = borg.trikeshed.reduction.Merger<Any> { _ -> Any() }
+                    override val initial = Any()
+                }
             override val phaseAlg: PhaseAlg get() = TODO("Not yet implemented")
             override val carrierAlg: CarrierAlg<Any>
                 get() = object : CarrierAlg<Any> {

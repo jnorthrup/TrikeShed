@@ -1,2 +1,2 @@
 #!/bin/bash
-./gradlew :jvmMainClasses --no-daemon
+./gradlew check --no-daemon
