@@ -6,6 +6,8 @@ import borg.trikeshed.lib.Series
 import borg.trikeshed.lib.get
 import borg.trikeshed.lib.j
 import borg.trikeshed.lib.size
+import borg.trikeshed.lib.α
+import borg.trikeshed.lib.view
 
 /**
  * Funnel residual merge — the N-way topology pipeline.
@@ -135,8 +137,7 @@ object FunnelResidualMerge {
         sourceIdx: SourceIdx,
     ): ResidualSpine {
         val atoms = ArrayList<LineAtom>(source.size)
-        for (i in 0 until source.size) {
-            val node = source[i]
+        for (node in source.view) {
             if (masterFunnel.contains(node.contentCid.hex)) continue // hit = inherited
             val prev = node.prevHex
             val next = node.nextHex
@@ -217,9 +218,7 @@ object FunnelResidualMerge {
         topology: Topology,
         masterFunnel: FunnelHashIndex<String>,
     ): GradedTopology {
-        val graded = ArrayList<GradedCluster>(topology.size)
-        for (i in 0 until topology.size) {
-            val cluster = topology[i]
+        return topology α { cluster ->
             val inMaster = masterFunnel.contains(cluster.contentCid.hex)
             val grade = when {
                 inMaster -> ClusterGrade.INHERITED
@@ -236,9 +235,8 @@ object FunnelResidualMerge {
                     if (allEqual) ClusterGrade.INHERITED_CROSS else ClusterGrade.RELOCATED
                 }
             }
-            graded.add(GradedCluster(cluster, grade))
+            GradedCluster(cluster, grade)
         }
-        return graded.size j { i: Int -> graded[i] }
     }
 
     // ── Stage 6: residual merge on survivors ─────────────────────────────
@@ -255,23 +253,22 @@ object FunnelResidualMerge {
      * This is the O(|residual|) settlement, not O(N × |tree|).
      */
     fun mergeResiduals(graded: GradedTopology): MergeReceipt {
-        val kept = ArrayList<GradedCluster>(graded.size)
-        val dropped = ArrayList<GradedCluster>(graded.size)
+        val keptList = ArrayList<GradedCluster>(graded.size)
+        val droppedList = ArrayList<GradedCluster>(graded.size)
         var novel = 0; var relocated = 0; var inherited = 0
 
-        for (i in 0 until graded.size) {
-            val gc = graded[i]
+        for (gc in graded.view) {
             when (gc.grade) {
-                ClusterGrade.NOVEL -> { kept.add(gc); novel++ }
-                ClusterGrade.RELOCATED -> { kept.add(gc); relocated++ }
-                ClusterGrade.INHERITED -> { dropped.add(gc); inherited++ }
-                ClusterGrade.INHERITED_CROSS -> { dropped.add(gc); inherited++ }
+                ClusterGrade.NOVEL -> { keptList.add(gc); novel++ }
+                ClusterGrade.RELOCATED -> { keptList.add(gc); relocated++ }
+                ClusterGrade.INHERITED -> { droppedList.add(gc); inherited++ }
+                ClusterGrade.INHERITED_CROSS -> { droppedList.add(gc); inherited++ }
             }
         }
 
         return MergeReceipt(
-            kept = kept.size j { i: Int -> kept[i] },
-            dropped = dropped.size j { i: Int -> dropped[i] },
+            kept = keptList.size j { i: Int -> keptList[i] },
+            dropped = droppedList.size j { i: Int -> droppedList[i] },
             novelCount = novel,
             relocatedCount = relocated,
             inheritedCount = inherited,
@@ -325,11 +322,7 @@ object FunnelResidualMerge {
      * frozen after build). For a static master baseline, build once.
      */
     fun buildMasterFunnel(masterSpine: LineSpine, seed: Long = 0L): FunnelHashIndex<String> {
-        val keys = ArrayList<String>(masterSpine.size)
-        for (i in 0 until masterSpine.size) {
-            keys.add(masterSpine[i].contentCid.hex)
-        }
-        val keySeries = keys.size j { i: Int -> keys[i] }
+        val keySeries = masterSpine α { it.contentCid.hex }
         return FunnelHashIndex.build(keySeries, seed)
     }
 
@@ -346,10 +339,10 @@ object FunnelResidualMerge {
         seed: Long = 0L,
     ): FunnelHashIndex<String> {
         val keys = ArrayList<String>(masterTexts.size * 10)
-        for (i in 0 until masterTexts.size) {
-            val spine = LineCas.spine(masterTexts[i])
-            for (j in 0 until spine.size) {
-                keys.add(spine[j].contentCid.hex)
+        for (text in masterTexts.view) {
+            val spine = LineCas.spine(text)
+            for (node in spine.view) {
+                keys.add(node.contentCid.hex)
             }
         }
         val keySeries = keys.size j { i: Int -> keys[i] }

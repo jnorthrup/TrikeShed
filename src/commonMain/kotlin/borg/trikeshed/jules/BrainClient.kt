@@ -5,6 +5,9 @@ import borg.trikeshed.lib.Series
 import borg.trikeshed.lib.get
 import borg.trikeshed.lib.size
 import borg.trikeshed.lib.toArray
+import borg.trikeshed.lib.α
+import borg.trikeshed.lib.view
+import borg.trikeshed.lib.j
 import keymux.EnvVarSource
 import keymux.FixedKeySource
 import keymux.KeyMux
@@ -126,11 +129,13 @@ class BrainClient(
     }
 
     private fun orderedModelIds(routed: Series<ModelEntry>): List<String> {
-        val modelIds = (0 until routed.size).map { routed[it].a }
-        val preferred = lastGoodModelId ?: return modelIds
-        val start = modelIds.indexOf(preferred)
-        if (start < 0) return modelIds
-        return (0 until modelIds.size).map { offset -> modelIds[(start + offset) % modelIds.size] }
+        val modelIds = routed α { it.a }
+        val preferred = lastGoodModelId ?: return modelIds.view.toList() // stdlib-boundary: List return
+        val start = modelIds.view.indexOf(preferred)
+        if (start < 0) return modelIds.view.toList() // stdlib-boundary: List return
+
+        val series = modelIds.size j { offset: Int -> modelIds[(start + offset) % modelIds.size] }
+        return series.view.toList() // stdlib-boundary: List return
     }
 
     private fun buildKeyMux(overrideKey: String?, overrideModel: String): KeyMux = KeyMux {
