@@ -103,39 +103,8 @@ public object Files {
     public fun mismatch(path: Path, other: Path): Long = TODO("memcmp")
 
     // Directory operations
-    public fun createDirectory(path: Path, vararg attrs: FileAttribute<*>): Path {
-        path.getFileSystem().provider().createDirectory(path, *attrs)
-        return path
-    }
-
-    public fun createDirectories(path: Path, vararg attrs: FileAttribute<*>): Path {
-        var parent: Path? = path.getParent()
-        while (parent != null) {
-            try {
-                parent.getFileSystem().provider().checkAccess(parent)
-                break
-            } catch (_: Exception) {}
-            parent = parent.getParent()
-        }
-        var dir: Path? = path
-        val stack = mutableListOf<Path>()
-        while (dir != null && dir != parent) {
-            stack.add(dir)
-            dir = dir.getParent()
-        }
-        for (d in stack.reversed()) {
-            try {
-                createDirectory(d, *attrs)
-            } catch (e: Exception) {
-                var isDir = false
-                try {
-                    isDir = isDirectory(d)
-                } catch (_: Exception) {}
-                if (!isDir) throw e
-            }
-        }
-        return path
-    }
+    public fun createDirectory(path: Path, vararg attrs: FileAttribute<*>): Path = throw UnsupportedOperationException("createDirectory requires hooking into system provider across platforms")
+    public fun createDirectories(path: Path, vararg attrs: FileAttribute<*>): Path = throw UnsupportedOperationException("createDirectories requires hooking into system provider across platforms")
     public fun createFile(path: Path, vararg attrs: FileAttribute<*>): Path = TODO("creat")
     public fun createTempFile(dir: Path?, prefix: String?, suffix: String?, vararg attrs: FileAttribute<*>): Path = TODO("mkstemp")
     public fun createTempFile(prefix: String?, suffix: String?, vararg attrs: FileAttribute<*>): Path = createTempFile(null, prefix, suffix, *attrs)
