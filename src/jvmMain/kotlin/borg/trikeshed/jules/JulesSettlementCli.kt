@@ -18,21 +18,29 @@ import java.io.File
  * a PR and remote branch are optional identity synonyms, never prerequisites.
  */
 object JulesSettlementCli {
+    private enum class ArtifactKind(val wireName: String) {
+        PATCH("patch"),
+        REPORT("report"),
+    }
+
     @JvmStatic
     fun main(args: Array<String>) = runBlocking {
         when (args.firstOrNull()) {
-            "settle" -> settle(args.drop(1))
+            "settle" -> settle(args.drop(1), ArtifactKind.PATCH)
+            "settle-report" -> settle(args.drop(1), ArtifactKind.REPORT)
             "archive-record" -> recordArchive(args.drop(1))
             else -> error(
                 "usage:\n" +
                     "  JulesSettlementCli settle <session-id> <commit> <state> <disposition> <title> [forge-dir] [repo-dir] [pr-url]\n" +
                     "    (reads the exact Jules cumulative patch from stdin)\n" +
+                    "  JulesSettlementCli settle-report <session-id> <commit> <state> <disposition> <title> [forge-dir] [repo-dir] [pr-url]\n" +
+                    "    (reads the exact final Jules agent report from stdin)\n" +
                     "  JulesSettlementCli archive-record <session-id> [forge-dir]"
             )
         }
     }
 
-    private suspend fun settle(args: List<String>) {
+    private suspend fun settle(args: List<String>, artifactKind: ArtifactKind) {
         require(args.size >= 5) { "settle requires session-id, commit, state, disposition, and title" }
         val sessionId = args[0].substringAfterLast('/')
         require(sessionId.isNotBlank()) { "empty session id" }
@@ -43,8 +51,8 @@ object JulesSettlementCli {
         val forgeDir = File(args.getOrNull(5) ?: defaultForgeDir())
         val repoDir = File(args.getOrNull(6) ?: System.getProperty("user.dir"))
         val prUrl = args.getOrNull(7)?.takeIf { it.isNotBlank() && it != "none" }
-        val patch = withContext(Dispatchers.IO) { System.`in`.readBytes() }
-        require(patch.isNotEmpty()) { "stdin carried no Jules patch bytes" }
+        val artifact = withContext(Dispatchers.IO) { System.`in`.readBytes() }
+        require(artifact.isNotEmpty()) { "stdin carried no Jules ${artifactKind.wireName} bytes" }
 
         val commit = git(repoDir, "rev-parse", "$requestedCommit^{commit}").requireSuccess().trim()
         require(git(repoDir, "merge-base", "--is-ancestor", commit, "origin/master").exitCode == 0) {
@@ -52,10 +60,10 @@ object JulesSettlementCli {
         }
 
         val cas = FileCasStore(JvmFileOperations(), File(forgeDir, "cas").absolutePath)
-        val patchCid = withContext(Dispatchers.IO) { cas.put(patch) }
+        val artifactCid = withContext(Dispatchers.IO) { cas.put(artifact) }
         val safeSession = sessionId.replace(Regex("[^A-Za-z0-9._-]"), "-")
         val tag = "flywheel/jules-$safeSession-${commit.take(12)}"
-        ensureTag(repoDir, tag, commit, sessionId, patchCid, disposition, title)
+        ensureTag(repoDir, tag, commit, sessionId, artifactCid, artifactKind, disposition, title)
 
         val store = JulesBoardStore.forForgeDir(forgeDir)
         val existingQueue = store.loadQueue().firstOrNull { it.sessionId == sessionId }
@@ -63,12 +71,19 @@ object JulesSettlementCli {
             val receipt = requireNotNull(existingQueue.receipt) {
                 "session $sessionId already has a hollow WorkDrained record"
             }
-            require(receipt.patchCid == patchCid && receipt.revision == commit) {
+            require(receipt.patchCid == artifactCid && receipt.revision == commit) {
                 "session $sessionId already settled to ${receipt.revision}/${receipt.patchCid}"
             }
             ensureIdentity(store, existingQueue.workId, sessionId, prUrl, tag, commit)
-            ensureCardDrained(store, sessionId, state, title, patch.size.toLong(), commit)
-            println(receiptJson(sessionId, disposition, commit, tag, patchCid, existingQueue.workId, true))
+            ensureCardDrained(
+                store,
+                sessionId,
+                state,
+                title,
+                if (artifactKind == ArtifactKind.PATCH) artifact.size.toLong() else 0L,
+                commit,
+            )
+            println(receiptJson(sessionId, disposition, commit, tag, artifactCid, artifactKind, existingQueue.workId, true))
             return
         }
 
@@ -94,13 +109,16 @@ object JulesSettlementCli {
             workId = workId,
             producer = "jules-api",
             producerRef = sessionId,
-            patchCid = patchCid,
+            patchCid = artifactCid,
             revision = commit,
             versionTag = tag,
             lexicalMemory = LexicalMemory(
                 summary = disposition,
                 title = title,
-                content = "Settled from the Jules API cumulative patch stream; PR/branch optional.",
+                content = when (artifactKind) {
+                    ArtifactKind.PATCH -> "Settled from the Jules API cumulative patch stream; PR/branch optional."
+                    ArtifactKind.REPORT -> "Settled from the exact final Jules API agent report; no patch, PR, or branch required."
+                },
             ),
             claimedAt = now,
             prUrl = prUrl,
@@ -114,8 +132,15 @@ object JulesSettlementCli {
             at = now,
         ))
         ensureIdentity(store, workId, sessionId, prUrl, tag, commit, now)
-        ensureCardDrained(store, sessionId, state, title, patch.size.toLong(), commit)
-        println(receiptJson(sessionId, disposition, commit, tag, patchCid, workId, false))
+        ensureCardDrained(
+            store,
+            sessionId,
+            state,
+            title,
+            if (artifactKind == ArtifactKind.PATCH) artifact.size.toLong() else 0L,
+            commit,
+        )
+        println(receiptJson(sessionId, disposition, commit, tag, artifactCid, artifactKind, workId, false))
     }
 
     /** Call only after the Jules API archive transition succeeds. */
@@ -212,7 +237,8 @@ object JulesSettlementCli {
         tag: String,
         commit: String,
         sessionId: String,
-        patchCid: ContentId,
+        artifactCid: ContentId,
+        artifactKind: ArtifactKind,
         disposition: String,
         title: String,
     ) {
@@ -223,7 +249,7 @@ object JulesSettlementCli {
         }
         git(
             repoDir, "tag", "-a", tag, commit, "-m",
-            "Jules settlement receipt\nsession=$sessionId\npatchCid=${patchCid.value}\ndisposition=$disposition\ntaskTitle=$title",
+            "Jules settlement receipt\nsession=$sessionId\nartifactKind=${artifactKind.wireName}\nartifactCid=${artifactCid.value}\ndisposition=$disposition\ntaskTitle=$title",
         ).requireSuccess()
     }
 
@@ -249,6 +275,7 @@ object JulesSettlementCli {
         commit: String,
         tag: String,
         cid: ContentId,
+        artifactKind: ArtifactKind,
         workId: String,
         idempotent: Boolean,
     ): String = "{" +
@@ -256,6 +283,8 @@ object JulesSettlementCli {
         "\"disposition\":\"$disposition\"," +
         "\"commit\":\"$commit\"," +
         "\"tag\":\"$tag\"," +
+        "\"artifactKind\":\"${artifactKind.wireName}\"," +
+        "\"artifactCid\":\"${cid.value}\"," +
         "\"patchCid\":\"${cid.value}\"," +
         "\"workId\":\"$workId\"," +
         "\"idempotent\":$idempotent}"

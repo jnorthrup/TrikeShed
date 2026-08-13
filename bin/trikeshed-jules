@@ -326,6 +326,26 @@ cmd_patch() {
     die "No cumulative patch found for ${name}"
 }
 
+# Emit the exact latest Jules agent report bytes. This is the causal artifact
+# for completed no-op investigations that correctly produce no code patch.
+cmd_report() {
+    [[ -n "${1:-}" ]] || die "Session name required"
+    local name="$1"
+    [[ "${name}" == sessions/* ]] || name="sessions/${name}"
+    local activities_json selector
+    activities_json=$(api_list_activities "${name}")
+    selector='[
+        .activities[]?
+        | .agentMessaged.agentMessage?
+        | select(type == "string" and length > 0)
+    ] | last'
+    if printf '%s' "${activities_json}" | jq -e "${selector} != null" >/dev/null; then
+        printf '%s' "${activities_json}" | jq -j "${selector}"
+        return
+    fi
+    die "No agent report found for ${name}"
+}
+
 cmd_create() {
     local prompt="" title=""
     
@@ -593,6 +613,7 @@ case "${CMD}" in
     sessions|list) cmd_sessions "$@" ;;
     session|get)   cmd_session "$@" ;;
     patch)         cmd_patch "$@" ;;
+    report)        cmd_report "$@" ;;
     create)       cmd_create "$@" ;;
     send|chat)    cmd_send "$@" ;;
     approve)      cmd_approve "$@" ;;
@@ -616,6 +637,7 @@ Commands:
   sessions, list               List all sessions
   session <id>                 Get session details
   patch <id>                   Emit exact latest cumulative patch bytes
+  report <id>                  Emit exact latest agent report bytes
   create "prompt" [title]      Create new session (PREDICATES REQUIRED)
   send <id> "message"         Send message to awaiting session
   approve <id>                Approve pending plan
