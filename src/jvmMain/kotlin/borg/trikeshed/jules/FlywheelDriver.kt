@@ -1618,6 +1618,7 @@ class FlywheelDriver(
      * into master (fast ancestry check via `git merge-base --is-ancestor`).
      */
     private val ORPHAN_HARVEST_BATCH = 4
+    private val JULES_SESSION_ID_IN_REF = Regex("""\d{15,20}""")
     // Branches excluded from autonomous harvest: large structural renames and
     // the aggregate roll-up branches land manually.
     private val HARVEST_EXCLUDE_PREFIXES = setOf("origin/aggregate/", "origin/backup/", "origin/arena/")
@@ -1637,6 +1638,7 @@ class FlywheelDriver(
                 ref.startsWith("origin/") &&
                 ref != "origin/master" &&
                 ref != "origin/HEAD" &&
+                !JULES_SESSION_ID_IN_REF.containsMatchIn(ref) &&
                 backedSessionIds.none { it in ref } &&
                 HARVEST_EXCLUDE_PREFIXES.none { ref.startsWith(it) }
             }
