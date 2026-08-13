@@ -2,6 +2,9 @@ package borg.trikeshed.graph.query
 
 import borg.trikeshed.graph.CausalGraphNode
 import borg.trikeshed.graph.CausalGraphNodeIndex
+import borg.trikeshed.lib.α
+import borg.trikeshed.lib.view
+import borg.trikeshed.lib.j
 
 /**
  * Connects the Graph Query Engine to the CausalGraphNodeIndex.
@@ -34,7 +37,7 @@ class CausalGraphAdapter(private val index: CausalGraphNodeIndex) : Graph<Causal
     }
 
     override val nodes: Set<CausalGraphNode>
-        get() = (0 until index.size).map { index[it] }.toSet()
+        get() = (index.size j { i: Int -> index[i] }).view.toSet() // stdlib-boundary: Set required by CausalGraphAdapter
 
     override fun outEdges(node: N): Map<CausalGraphNode, Unit> {
         val children = childrenMap[node.nodeId] ?: emptyList()
