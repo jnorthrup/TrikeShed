@@ -170,7 +170,8 @@ class BigInt internal constructor(internal val sign: Boolean?, internal val magn
 
     @Deprecated(
         "Direct conversion to Char is deprecated. Use toInt().toChar() or Char constructor instead.\nIf you override toChar() function in your Number inheritor, it's recommended to gradually deprecate the overriding function and then remove it.\nSee https://youtrack.jetbrains.com/issue/KT-46465 for details about the migration",
-        replaceWith = ReplaceWith("this.toInt().toChar()")
+        replaceWith = ReplaceWith("this.toInt().toChar()"),
+        level = DeprecationLevel.ERROR
     )
     override fun toChar(): Char = toInt().toChar()
     override fun toDouble(): Double = toLong().toDouble()
