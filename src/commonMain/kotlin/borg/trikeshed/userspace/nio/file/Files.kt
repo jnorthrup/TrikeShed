@@ -87,8 +87,8 @@ public object Files {
         return ch.use { it.size() }
     }
 
-    public fun isDirectory(path: Path, vararg options: LinkOption): Boolean = TODO("fstat S_ISDIR")
-    public fun isRegularFile(path: Path, vararg options: LinkOption): Boolean = TODO("fstat S_ISREG")
+    public fun isDirectory(path: Path, vararg options: LinkOption): Boolean = throw UnsupportedOperationException("Requires actual low-level FFI code to hook into standard stat functionality, which is complex and platform-specific.")
+    public fun isRegularFile(path: Path, vararg options: LinkOption): Boolean = throw UnsupportedOperationException("Requires actual low-level FFI code to hook into standard stat functionality, which is complex and platform-specific.")
     public fun isHidden(path: Path): Boolean = path.toString().startsWith(".")
     public fun isReadable(path: Path): Boolean = exists(path)
     public fun isWritable(path: Path): Boolean = exists(path)
