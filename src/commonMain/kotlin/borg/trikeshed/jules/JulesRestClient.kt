@@ -48,6 +48,7 @@ class JulesRestClient(
         val kind: String,       // agentMessaged | userMessaged | planGenerated | progressUpdated | artifacts
         val patchBytes: Long,   // unidiff bytes carried by this activity, 0 if none
         val excerpt: String,    // first 140 chars of the message body, if any
+        val message: String,    // full message body; GUIDE selects its final question-bearing paragraph
     )
 
     /**
@@ -115,6 +116,7 @@ class JulesRestClient(
                 kind = kind,
                 patchBytes = patches.lastOrNull()?.length?.toLong() ?: 0L,
                 excerpt = msgBody?.take(140) ?: "",
+                message = msgBody.orEmpty(),
             )
         }
         return out

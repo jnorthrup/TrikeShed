@@ -41,8 +41,7 @@ class OpenApiRawParserTest {
         }
         """.trimIndent()
 
-        // This simulates the test requirement dynamically using the mocked compiler output
-        val ops = OpenApiRawParser.parse(null)
+        val ops = OpenApiRawParser.parse(spec)
 
         val operations = ops.operations()
         assertEquals(1, operations.size)
@@ -51,5 +50,25 @@ class OpenApiRawParserTest {
         val refs = ops.refs()
         assertEquals(1, refs.size)
         assertEquals("#/components/schemas/Widget", refs[0])
+    }
+
+    @Test
+    fun rawParserRejectsOperationWithoutOperationId() {
+        val spec = """
+        openapi: 3.1.0
+        info:
+          title: Missing operation id
+          version: v1
+        paths:
+          /health:
+            get:
+              responses:
+                '200':
+                  description: ok
+        """.trimIndent()
+
+        val gaps = OpenApiRawParser.parse(spec).gapAnalysis().gaps
+
+        assertEquals("missing-operation-id", gaps.single().code)
     }
 }

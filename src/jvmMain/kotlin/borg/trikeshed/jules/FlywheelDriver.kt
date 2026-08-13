@@ -241,6 +241,40 @@ class FlywheelDriver(
         return returnValue
     }
 
+    /** Close legacy Necromancer entries before either dispatch path can post them.
+     * Reanimation creates a new work identity for a receipt-bearing terminal
+     * entry, so it defeats the unified queue's first-wins deduplication. */
+    private suspend fun suppressLegacyNecromance(entries: List<borg.trikeshed.utils.kanban.QueueEntry>): List<borg.trikeshed.utils.kanban.QueueEntry> {
+        val legacy = entries.filter { it.workId.startsWith("gap:necromance:") && !it.isDrained }
+        for (entry in legacy) {
+            val now = Clock.System.now().toEpochMilliseconds()
+            store.appendWork(entry.workId, JulesCause.WorkDrained(
+                workId = entry.workId,
+                sessionId = entry.sessionId ?: "superseded:${entry.workId}",
+                commitSha = "outbox-${entry.workId.takeLast(8)}",
+                taskId = "superseded",
+                receipt = MergeReceipt(
+                    workId = entry.workId,
+                    producer = "queue-supersession",
+                    producerRef = entry.parent ?: "",
+                    patchCid = ContentId.of("superseded:${entry.workId}".encodeToByteArray()),
+                    revision = "outbox-${entry.workId.takeLast(8)}",
+                    versionTag = "superseded",
+                    lexicalMemory = LexicalMemory(
+                        summary = "legacy Necromancer requeue suppressed",
+                        title = entry.title,
+                        content = "The parent WorkDrained receipt is terminal; a new reducer cut is required for follow-up work.",
+                    ),
+                    claimedAt = now,
+                    prUrl = null,
+                ),
+                at = now,
+            ))
+        }
+        if (legacy.isNotEmpty()) println("[FLYWHEEL] SUPPRESS ${legacy.size} legacy Necromancer requeue(s)")
+        return entries.filterNot { it.workId.startsWith("gap:necromance:") && !it.isDrained }
+    }
+
     /** Emits an UpstreamDrifted event for preflight checks without exposing the raw bus. */
     fun emitDrifted(local: String, remote: String) {
         _events.tryEmit(FlywheelEvent.UpstreamDrifted(local, remote))
@@ -521,7 +555,7 @@ class FlywheelDriver(
                     if (patch != null) inflightFiles += parsePatchFiles(patch)
                 }
             }
-            val pendingCandidates = store.loadQueue()
+            val pendingCandidates = suppressLegacyNecromance(store.loadQueue())
                 .filter { !it.isDispatched && !it.isDrained }
             // Older drains predate WorkQueued. A later seed using that fallback
             // `session:<id>` identity would otherwise submit an already-drained
@@ -856,7 +890,7 @@ class FlywheelDriver(
                 // The working tree may carry committed markers from a forward
                 // merge; that's progress evidence, not a stop condition.
 
-                val pendingCandidates = store.loadQueue()
+                val pendingCandidates = suppressLegacyNecromance(store.loadQueue())
                     .filter { !it.isDispatched && !it.isDrained }
                     .filterNot { entry ->
                         entry.workId.startsWith("session:") &&
@@ -1554,7 +1588,6 @@ class FlywheelDriver(
         )
     }
 
-<<<<<<< HEAD
     /**
      * Merge unmerged origin branches that have no Jules session backing them —
      * bolt, palette, refactor, perf, feat branches etc — into master using
@@ -1629,18 +1662,11 @@ class FlywheelDriver(
     }
 
     private fun activeCount(): Int = conductor.cards.values.count {
-=======
-    private suspend fun activeCount(): Int = conductor.cards.values.count {
->>>>>>> origin/jules-15846685841436352340-ea46ff13
         it.snapshot.state !in TERMINAL_STATES && !it.drained
     }
 
     /** Find the GitHub branch or PR head carrying this Jules session id. */
-<<<<<<< HEAD
     private suspend fun findSessionBranch(sessionId: String, preFetchedRefs: List<String>? = null): String? {
-=======
-    private suspend fun findSessionBranch(sessionId: String): String? {
->>>>>>> origin/jules-15846685841436352340-ea46ff13
         val numericId = sessionId.substringAfterLast('/').filter { it.isDigit() }
         if (numericId.isEmpty()) return null
 
@@ -1934,7 +1960,6 @@ class FlywheelDriver(
     private fun extractSpecFiles(spec: String): Set<String> =
         specFilePattern.findAll(spec).map { it.value.trimEnd('.', ',', ':', ';', ')', ']') }.toSet()
 
-<<<<<<< HEAD
      /**
       * Run a git command in [repoDir]. Unified shell — every git ProcessBuilder
       * site in FlywheelDriver goes through here. Prepends `"git"` so callers
@@ -2006,49 +2031,7 @@ class FlywheelDriver(
       */
      private suspend fun isWorkingTreeClean(): Boolean =
          git("status", "--porcelain", "--untracked-files=no").output.isBlank()
-=======
-    /**
-     * Run a git command in [repoDir]. Unified shell — every git ProcessBuilder
-     * site in FlywheelDriver goes through here. Prepends `"git"` so callers
-     * write `git("commit", "-m", ...)` not `git("git", "commit", "-m", ...)`.
-     * For non-git commands (gh, ./gradlew) use [shell].
-     */
-    private suspend fun git(vararg args: String): CommandResult = shell("git", *args)
 
-    /**
-     * Run an arbitrary command in [repoDir]. Use [git] for git subcommands.
-     * The default 30-second timeout keeps git/GitHub prompts from parking the
-     * wheel; drain-time Gradle gates pass their own bounded build window.
-     */
-    private suspend fun shell(vararg args: String): CommandResult = shell(args.toList())
-
-    private suspend fun shell(timeoutMs: Long, vararg args: String): CommandResult = shell(args.toList())
-
-    private suspend fun shell(command: List<String>): CommandResult = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
-        try {
-            val pb = ProcessBuilder(command)
-            pb.directory(repoDir)
-            pb.redirectErrorStream(true)
-            val process = pb.start()
-            val output = process.inputStream.readBytes().decodeToString()
-            val exitCode = process.waitFor()
-            CommandResult(exitCode, output)
-        } catch (t: Throwable) {
-            CommandResult(1, t.message.orEmpty())
-        }
-    }
-
-    private data class CommandResult(val exitCode: Int, val output: String)
-
-    /**
-     * True iff the working tree has no tracked modifications or staged changes.
-     * Untracked files do NOT count as dirty — Jules sessions leave artifacts
-     * behind that are harmless to merges and would otherwise permanently block
-     * the wheel.
-     */
-    private suspend fun isWorkingTreeClean(): Boolean =
-        git("status", "--porcelain", "--untracked-files=no").output.isBlank()
->>>>>>> origin/jules-15846685841436352340-ea46ff13
 
     private fun getKanbanBoard(): borg.trikeshed.kanban.KanbanBoard {
         return try { ForgeKanbanIngest.load("jim").board }
@@ -2078,15 +2061,21 @@ class FlywheelDriver(
     private suspend fun buildAnswer(card: JulesSessionCard): String {
         val title = card.card.title
         val lastCause = card.causes.lastOrNull()
-        val lastAct = client.activities(card.snapshot.sessionId).lastOrNull()
-        val inquiry = lastAct?.excerpt?.take(400) ?: lastCause?.let { when (it) {
-            is JulesCause.AgentMessaged -> it.excerpt.take(400)
-            else -> null
-        } } ?: return ""
+        val activities = client.activities(card.snapshot.sessionId)
+        val inquiry = activities.asReversed()
+            .firstOrNull { '?' in it.message }
+            ?.message
+            ?.split(Regex("\\n\\s*\\n"))
+            ?.lastOrNull { '?' in it }
+            ?.trim()
+            ?: lastCause?.let { when (it) {
+                is JulesCause.AgentMessaged -> it.excerpt.take(400)
+                else -> null
+            } } ?: return ""
 
         val conventions = buildString {
             appendLine("You are the GUIDE for the TrikeShed KMP project.")
-            appendLine("Answer coding-agent questions with concrete, decisive guidance (<200 words).")
+            appendLine("Answer the final question-bearing paragraph only. State the boolean decision explicitly (yes/no or proceed/do-not-proceed), then give the minimal concrete condition or next action. Do not send a generic nudge.")
             appendLine("Project conventions:")
             appendLine("  - domain logic goes in commonMain/kotlin/; platform adapters in jvmMain/jsMain/nativeMain")
             appendLine("  - use Series<T> over List<T> for read-only indexed data")
@@ -2339,11 +2328,7 @@ class FlywheelDriver(
         return out.joinToString("\n")
     }
 
-<<<<<<< HEAD
-     private suspend fun headSha(): String = git("rev-parse", "HEAD").output.trim()
-=======
     private suspend fun headSha(): String = git("rev-parse", "HEAD").output.trim()
->>>>>>> origin/jules-15846685841436352340-ea46ff13
 
     /** Subscribe a child coroutine to reactor events. Returns the subscriber's job. */
     fun subscribe(block: suspend (FlywheelEvent) -> Unit): Job =
@@ -2504,17 +2489,10 @@ class FlywheelDriver(
         }
     }
 
-<<<<<<< HEAD
-     /** Files still unmerged in Git's index for the current 3-way arm. */
-     private suspend fun unmergedFiles(): List<String> =
-         git("diff", "--name-only", "--diff-filter=U").output.trim().lines()
-             .filter { it.isNotBlank() }
-=======
     /** Files still unmerged in Git's index for the current 3-way arm. */
     private suspend fun unmergedFiles(): List<String> =
         git("diff", "--name-only", "--diff-filter=U").output.trim().lines()
             .filter { it.isNotBlank() }
->>>>>>> origin/jules-15846685841436352340-ea46ff13
 
     /**
      * Cumulative unresolved files. Conflict-arm commits clear the unmerged

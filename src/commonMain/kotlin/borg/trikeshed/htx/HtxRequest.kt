@@ -135,6 +135,11 @@ fun HtxRequest.renderWireRequest(): String {
             append(header.b)
             append("\r\n")
         }
+        if (body.rem > 0 && headerValue("Content-Length") == null) {
+            append("Content-Length: ")
+            append(body.rem)
+            append("\r\n")
+        }
         append("Connection: close\r\n")
         range?.let {
             append("Range: bytes=${it.startInclusive}-${it.endInclusive}\r\n")

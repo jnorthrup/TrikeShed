@@ -1,79 +1,66 @@
 package borg.trikeshed.flywheel.cli
 
 import borg.trikeshed.jules.JulesCause
+import borg.trikeshed.job.ContentId
+import borg.trikeshed.util.oroboros.LexicalMemory
+import borg.trikeshed.util.oroboros.MergeReceipt
 import borg.trikeshed.utils.kanban.JulesBoardStore
 import borg.trikeshed.utils.kanban.forForgeDir
 import kotlinx.coroutines.runBlocking
 import java.io.File
 
 /**
- * Necromancer — reanimates drained or stale flywheel cards whose real work
- * has not yet landed.
+ * Report obsolete rework candidates without re-queuing them.
  *
- * Reads the authoritative WAL, projects the queue, and resurrects any workId
- * that:
- *   1. has been drained (WorkDrained recorded) but whose drain did not ship
- *      a non-zero commit (the drain record's taskId starts with "retired:" or
- *      is empty)
- *   2. is still the parent of another active workId (its successors may
- *      have landed but the parent never completed)
- *   3. has been queued for longer than `staleAfterMs` without dispatch
- *
- * Each resurrection appends a fresh `WorkQueued` with a new fingerprint so
- * the reducer's idempotency check accepts it.  When the work has been
- * superseded by a tighter locality cut, the new workId carries a supersession
- * receipt.
- *
- * Usage:
- *   NecromancerCli <repoDir> <forgeDir>
+ * A WorkDrained receipt is terminal: resurrecting it under a fresh work id
+ * bypasses the queue's idempotency and posts duplicate Jules sessions.
+ * Follow-up work must be deliberately produced by a current reducer cut.
  */
 fun main(args: Array<String>) = runBlocking {
-    val repoDir = File(args.getOrElse(0) { System.getProperty("user.dir") })
     val forgeDir = File(args.getOrElse(1) { System.getProperty("user.home") + "/.local/forge" })
     val store = JulesBoardStore.forForgeDir(forgeDir)
     val queue = store.loadQueue()
 
-    val now = System.currentTimeMillis()
     val staleAfterMs = 1000L * 60 * 60 * 6
-    val resurrected = mutableListOf<String>()
+    val suppressed = mutableListOf<String>()
+
+    for (entry in queue.filter { it.workId.startsWith("gap:necromance:") && !it.isDrained }) {
+        val now = System.currentTimeMillis()
+        store.appendWork(entry.workId, JulesCause.WorkDrained(
+            workId = entry.workId,
+            sessionId = entry.sessionId ?: "superseded:${entry.workId}",
+            commitSha = "outbox-${entry.workId.takeLast(8)}",
+            taskId = "superseded",
+            receipt = MergeReceipt(
+                workId = entry.workId,
+                producer = "queue-supersession",
+                producerRef = entry.parent ?: "",
+                patchCid = ContentId.of("superseded:${entry.workId}".encodeToByteArray()),
+                revision = "outbox-${entry.workId.takeLast(8)}",
+                versionTag = "superseded",
+                lexicalMemory = LexicalMemory(
+                    summary = "legacy Necromancer requeue suppressed",
+                    title = entry.title,
+                    content = "The parent WorkDrained receipt is terminal; a new reducer cut is required for follow-up work.",
+                ),
+                claimedAt = now,
+                prUrl = null,
+            ),
+            at = now,
+        ))
+        suppressed.add(entry.workId)
+    }
 
     for (entry in queue) {
-        val isResurrectable = when {
-            // Writer (JulesConductor.retireTerminal) uses bare "retired" (and a
-            // non-blank outbox-* commitSha), so accept both "retired" and the
-            // documented "retired:" prefix — branch 2 alone can never match.
+        val isSuppressed = when {
             entry.isDrained && entry.taskId?.startsWith("retired") == true -> true
             entry.isDrained && entry.commitSha.isNullOrBlank() -> true
             !entry.isDispatched && !entry.isDrained &&
-                (now - entry.queuedAt) > staleAfterMs -> true
+                (System.currentTimeMillis() - entry.queuedAt) > staleAfterMs -> true
             else -> false
         }
-        if (!isResurrectable) continue
-
-        val reincarnation = "gap:necromance:${entry.workId.substringAfterLast(':')}:${(now / 1000).toInt()}"
-        val spec = buildString {
-            appendLine("Necromanced work — original ${entry.workId} (${entry.title})")
-            appendLine()
-            appendLine("Reason: ${if (entry.isDrained) "drain without landed commit" else "stale queue entry beyond ${staleAfterMs / 1000}s"}")
-            appendLine("Original tier: ${entry.tier}  score: ${entry.score}")
-            appendLine("Original parent: ${entry.parent ?: "(none)"}")
-            appendLine()
-            appendLine("Re-read the current code at the original locality before editing.")
-            appendLine("If the original locality is already covered by a landed session, supersede with a")
-            appendLine("receipt-bearing WorkDrained and stop. Otherwise, generate the missing production")
-            appendLine("edges with a single bounded cut.")
-        }.trim()
-        store.appendWork(reincarnation, JulesCause.WorkQueued(
-            workId = reincarnation,
-            tier = entry.tier,
-            title = "Necromance: ${entry.title}",
-            spec = spec,
-            parent = entry.parent ?: entry.workId,
-            score = (entry.score - 0.05).coerceAtLeast(0.1),
-            at = now,
-        ))
-        resurrected.add(reincarnation)
+        if (isSuppressed && entry.workId !in suppressed) suppressed.add(entry.workId)
     }
-    println("[NECROMANCER] resurrected ${resurrected.size} stale work entries")
-    resurrected.forEach { println("  + $it") }
+    println("[NECROMANCER] suppressed ${suppressed.size} terminal/stale rework candidate(s); appended 0 WorkQueued entries")
+    suppressed.forEach { println("  = $it") }
 }

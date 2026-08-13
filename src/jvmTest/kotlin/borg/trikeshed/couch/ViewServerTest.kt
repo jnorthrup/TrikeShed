@@ -1,8 +1,11 @@
 package borg.trikeshed.couch
 
 import borg.trikeshed.mutable.mutableSeriesOf
+import borg.trikeshed.viewserver.ReducerIdentity
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
+import kotlin.test.assertNotEquals
 import kotlin.test.assertTrue
 
 
@@ -308,6 +311,71 @@ class ViewServerTest {
         assertEquals(80.0, aRow!!.value)
         // (20 * 2) = 40
         assertEquals(40.0, bRow!!.value)
+    }
+
+    @Test
+    fun `proof replay binds real map reduce execution to definition ordered documents reducer and result`() {
+        val server = ViewServer()
+        val definition = ViewDefinition(
+            ddoc = "_design/proof",
+            viewName = "byType",
+            mapFn = MapFunction.Emit(KeyExpr.DocField("type"), ValueExpr.DocField("value")),
+            reduceFn = ReduceFunction.Builtin("_sum")
+        )
+        val documents = listOf(
+            Document("one", listOf(Field("type", "A"), Field("value", 2))),
+            Document("two", listOf(Field("type", "A"), Field("value", 3)))
+        )
+
+        val proof = server.executeWithProof(definition, documents)
+
+        assertEquals(1, proof.result.size)
+        assertEquals(5.0, proof.result[0].value)
+        assertEquals(2, proof.receipt.sourceDocumentCids.size)
+        assertNotEquals(proof.receipt.sourceDocumentCids[0], proof.receipt.sourceDocumentCids[1])
+        assertTrue(proof.receipt.viewDefinition.canonicalBytes.isNotEmpty())
+        assertEquals(ReducerIdentity("_sum", "builtin-v1"), proof.receipt.reducer)
+        assertTrue(proof.receipt.outputBytes.isNotEmpty())
+        assertEquals(proof.receipt.contentId, borg.trikeshed.job.ContentId.of(proof.receipt.canonicalBytes))
+        assertNotEquals(proof.receipt.contentId, borg.trikeshed.job.ContentId.of(proof.receipt.outputBytes))
+        assertTrue(server.verifyReplay(definition, documents, proof.result, proof.receipt))
+        assertFalse(server.verifyReplay(
+            definition,
+            listOf(documents[1], documents[0]),
+            proof.result,
+            proof.receipt
+        ))
+        assertFalse(server.verifyReplay(
+            definition.copy(mapFn = MapFunction.Emit(KeyExpr.DocId, ValueExpr.DocField("value"))),
+            documents,
+            proof.result,
+            proof.receipt
+        ))
+        assertFalse(server.verifyReplay(
+            definition.copy(reduceFn = ReduceFunction.Builtin("_count")),
+            documents,
+            proof.result,
+            proof.receipt
+        ))
+        assertFalse(server.verifyReplay(
+            definition,
+            listOf(documents[0].copy(fields = listOf(Field("type", "A"), Field("value", 99))), documents[1]),
+            proof.result,
+            proof.receipt
+        ))
+        assertFalse(server.verifyReplay(
+            definition,
+            documents,
+            ViewResult(mutableSeriesOf(ViewRow("A", 99.0, "_sum", "_sum"))),
+            proof.receipt
+        ))
+        assertFalse(server.verifyReplay(
+            definition,
+            documents,
+            proof.result,
+            proof.receipt,
+            reducer = ReducerIdentity("_sum", "builtin-v2")
+        ))
     }
 
 }

@@ -43,4 +43,19 @@ class HtxRequestTest {
         assertEquals("TrikeShed/1.0", normalized.headerValue("User-Agent"))
         assertEquals("identity", normalized.headerValue("Accept-Encoding"))
     }
+
+    @Test
+    fun renderWireRequestDeclaresLengthForNonEmptyBody() {
+        val request = parseHtxRequest(
+            url = "https://jules.googleapis.com/v1alpha/sessions",
+            method = HtxMethod.POST,
+            body = ByteSeries("{}"),
+        )
+
+        val wire = request.renderWireRequest()
+
+        assertEquals("2", wire.lineSequence()
+            .first { it.startsWith("Content-Length: ") }
+            .substringAfter(": "))
+    }
 }

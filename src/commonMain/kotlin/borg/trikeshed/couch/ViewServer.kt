@@ -1,11 +1,15 @@
 package borg.trikeshed.couch
 
+import borg.trikeshed.job.ContentId
 import borg.trikeshed.lib.*
 import borg.trikeshed.mutable.MutableSeries
 import borg.trikeshed.mutable.mutableSeriesOf
 import borg.trikeshed.parse.confix.ConfixDoc
 import borg.trikeshed.parse.confix.docAt
 import borg.trikeshed.parse.confix.reify
+import borg.trikeshed.viewserver.MapReduceProofReceipt
+import borg.trikeshed.viewserver.ReducerIdentity
+import borg.trikeshed.viewserver.ViewDefinitionIdentity
 import kotlinx.serialization.Contextual
 import kotlinx.serialization.Serializable
 
@@ -139,6 +143,12 @@ data class ViewDefinition(
     val fullName: String get() = "$ddoc/$viewName"
 }
 
+/** A real ViewServer result paired with replay-verifiable execution evidence. */
+data class ViewProofExecution(
+    val result: ViewResult,
+    val receipt: MapReduceProofReceipt,
+)
+
 /**
  * MapFunction — Confix DSL representation of a map function.
  *
@@ -214,6 +224,41 @@ sealed interface ReduceFunction {
 class ViewServer {
 
     /**
+     * Executes this server's native map/reduce path and binds its canonical output to the
+     * supplied document sequence. No cached rows or reducer state participates in the receipt.
+     */
+    fun executeWithProof(viewDef: ViewDefinition, documents: List<Document>): ViewProofExecution {
+        val result = execute(viewDef, documents)
+        return ViewProofExecution(result, receiptFor(viewDef, documents, result))
+    }
+
+    /**
+     * Pure replay verification: re-executes [viewDef] against the provided ordered documents,
+     * then independently re-mints the receipt to validate source CIDs, reducer, output, and CID.
+     */
+    fun verifyReplay(
+        viewDef: ViewDefinition,
+        documents: List<Document>,
+        result: ViewResult,
+        receipt: MapReduceProofReceipt,
+        reducer: ReducerIdentity = reducerIdentity(viewDef),
+    ): Boolean {
+        if (reducer != reducerIdentity(viewDef)) return false
+        if (receipt.viewDefinition.canonicalBytes.toList() != definitionBytes(viewDef).toList()) return false
+        if (receipt.reducer != reducer) return false
+        val replayBytes = resultBytes(execute(viewDef, documents))
+        if (replayBytes.toList() != receipt.outputBytes.toList()) return false
+        if (resultBytes(result).toList() != receipt.outputBytes.toList()) return false
+        val reminted = MapReduceProofReceipt.mint(
+            ViewDefinitionIdentity(definitionBytes(viewDef)),
+            documents.map { ContentId.of(documentBytes(it)) },
+            reducer,
+            replayBytes,
+        )
+        return reminted.contentId == receipt.contentId && reminted.canonicalBytes.toList() == receipt.canonicalBytes.toList()
+    }
+
+    /**
      * Production path: view map over [CouchStore] via [CouchStore.query] Cursor.
      * Cursor enumerates rows (and _id column); store.get supplies map body.
      * Closes S5: query algebra with a real consumer outside tests.
@@ -254,6 +299,17 @@ class ViewServer {
         }
         return result
     }
+
+    private fun receiptFor(
+        viewDef: ViewDefinition,
+        documents: List<Document>,
+        result: ViewResult,
+    ): MapReduceProofReceipt = MapReduceProofReceipt.mint(
+        viewDefinition = ViewDefinitionIdentity(definitionBytes(viewDef)),
+        sourceDocumentCids = documents.map { ContentId.of(documentBytes(it)) },
+        reducer = reducerIdentity(viewDef),
+        outputBytes = resultBytes(result),
+    )
 
     /** Map one [Document] — DocField reads store fields; JsPath uses Confix when needed. */
     private fun executeMap(mapFn: MapFunction, doc: Document, rows: MutableSeries<ViewRow>) {
@@ -409,6 +465,75 @@ private fun Any?.toDoubleValue(default: Double = 0.0): Double = when (this) {
     is Number -> this.toDouble()
     is String -> this.toDoubleOrNull() ?: default
     else -> default
+}
+
+private fun reducerIdentity(viewDef: ViewDefinition): ReducerIdentity = when (val reduce = viewDef.reduceFn) {
+    null -> ReducerIdentity("_map", "builtin-v1")
+    is ReduceFunction.Builtin -> ReducerIdentity(reduce.name, "builtin-v1")
+    is ReduceFunction.Custom -> ReducerIdentity("confix:${reduce.dsl}", "confix-v1")
+}
+
+private fun definitionBytes(viewDef: ViewDefinition): ByteArray = canonicalFields(
+    "view-definition-v1",
+    viewDef.ddoc,
+    viewDef.viewName,
+    mapFunctionValue(viewDef.mapFn),
+    reduceFunctionValue(viewDef.reduceFn),
+).encodeToByteArray()
+
+private fun documentBytes(document: Document): ByteArray = canonicalFields(
+    "document-v1",
+    document.id,
+    *document.fields.map { field -> canonicalFields(field.name, canonicalValue(field.value)) }.toTypedArray(),
+).encodeToByteArray()
+
+private fun resultBytes(result: ViewResult): ByteArray = canonicalFields(
+    "view-result-v1",
+    *result.rows.sequence().map { row ->
+        canonicalFields(row.docId, row.jsPath, canonicalValue(row.key), canonicalValue(row.value))
+    }.toList().toTypedArray(),
+).encodeToByteArray()
+
+private fun mapFunctionValue(map: MapFunction): String = when (map) {
+    is MapFunction.Emit -> canonicalFields("emit", keyExprValue(map.key), valueExprValue(map.value))
+    is MapFunction.EmitEach -> canonicalFields("emit-each", map.arrayField, keyExprValue(map.keyExpr), valueExprValue(map.valueExpr))
+}
+
+private fun reduceFunctionValue(reduce: ReduceFunction?): String = when (reduce) {
+    null -> "none"
+    is ReduceFunction.Builtin -> canonicalFields("builtin", reduce.name)
+    is ReduceFunction.Custom -> canonicalFields("custom", reduce.dsl)
+}
+
+private fun keyExprValue(expression: KeyExpr): String = when (expression) {
+    is KeyExpr.DocField -> canonicalFields("field", expression.fieldName)
+    is KeyExpr.DocId -> "doc-id"
+    is KeyExpr.Const -> canonicalFields("const", canonicalValue(expression.value))
+    is KeyExpr.JsPathExpr -> canonicalFields("path", expression.path)
+}
+
+private fun valueExprValue(expression: ValueExpr): String = when (expression) {
+    is ValueExpr.DocField -> canonicalFields("field", expression.fieldName)
+    is ValueExpr.DocValue -> "doc-value"
+    is ValueExpr.Const -> canonicalFields("const", canonicalValue(expression.value))
+    is ValueExpr.JsPathExpr -> canonicalFields("path", expression.path)
+}
+
+private fun canonicalValue(value: Any?): String = when (value) {
+    null -> "null"
+    is String -> canonicalFields("string", value)
+    is Boolean -> canonicalFields("boolean", value.toString())
+    is Byte, is Short, is Int, is Long, is Float, is Double -> canonicalFields("number", value.toString())
+    is List<*> -> canonicalFields("list", *value.map(::canonicalValue).toTypedArray())
+    is Map<*, *> -> canonicalFields("map", *value.entries.map { entry ->
+        canonicalFields(canonicalValue(entry.key), canonicalValue(entry.value))
+    }.sorted().toTypedArray())
+    is Document -> canonicalFields("document", documentBytes(value).decodeToString())
+    else -> canonicalFields("other", value::class.toString(), value.toString())
+}
+
+private fun canonicalFields(vararg fields: String): String = buildString {
+    fields.forEach { field -> append(field.length).append(':').append(field) }
 }
 
 /**
