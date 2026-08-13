@@ -1,10 +1,12 @@
 package borg.trikeshed.jules
 
 import borg.trikeshed.utils.kanban.JulesBoardStore
-import borg.trikeshed.utils.kanban.forForgeDir
-import java.io.File
-import keymux.KeyMux
+import borg.trikeshed.lib.view
+import borg.trikeshed.lib.get
+import borg.trikeshed.lib.size
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.withContext
 import kotlinx.datetime.Clock
 
 /**
@@ -21,50 +23,63 @@ class JulesConductor(
     private val headShaProvider: suspend () -> String,
     private val store: JulesBoardStore? = null,
     private val source: String = "sources/github/jnorthrup/TrikeShed",
+    private val patchContinuity: JulesPatchContinuityStore? = null,
 ) {
     /** Cards keyed by session id. The board. Projection of the causal log. */
-    val cards: MutableMap<String, JulesSessionCard> = store?.load() ?: mutableMapOf()
+    val cards: MutableMap<String, JulesSessionCard> = mutableMapOf()
 
     /** Non-archived session ids returned by the most recent complete API poll. */
     var visibleSessionIds: Set<String> = emptySet()
         private set
 
+    /** Complete latest API projection, used only for deterministic dispatch reconciliation. */
+    var visibleSessions: List<JulesRestClient.SessionInfo> = emptyList()
+        private set
+
     /** One poll cycle: snapshot surroundings, diff, record causes, persist. */
     suspend fun pollOnce() {
+        // The WAL is the reducer's authority, including review selections made
+        // by an external operator while the daemon is live. Rehydrate before
+        // reading the API so no stale in-memory card can ignore such a cause.
+        val durable = withContext(Dispatchers.IO) {
+            store?.let { it.load() to it.loadQueue() }
+        }
+        if (durable != null) {
+            cards.clear()
+            cards.putAll(durable.first)
+        }
         val sessions = client.listSessions(source)
-        // WAL-rehydrated cards survive API rotation. The Jules API expires or
-        // rotates sessions out of its listing; deleting them here erases
-        // COMPLETED-with-patch cards that still need draining, plus drained
-        // cards whose receipts anchor settlement. Only drop cards the API
-        // actively reports as absent AND that have no pending drain work.
+        val settledQueueSessions = durable?.second.orEmpty().asSequence()
+            .filter { it.receipt?.isImmutableSettlement() == true }
+            .mapNotNull { it.sessionId }
+            .toSet()
+        fun hasImmutableSettlement(sessionId: String, card: JulesSessionCard?): Boolean =
+            card?.causes?.filterIsInstance<JulesCause.WorkDrained>()
+                ?.any { it.receipt?.isImmutableSettlement() == true } == true ||
+                sessionId in settledQueueSessions
+        // API absence is not a lifecycle transition. Keep every WAL-rehydrated
+        // card so rotation, pagination changes, or archive visibility cannot
+        // erase an active conversation or free a duplicate dispatch slot.
         val authoritativeIds = sessions.mapTo(mutableSetOf()) { it.id }
         visibleSessionIds = authoritativeIds
-        cards.keys.retainAll { sid ->
-            sid in authoritativeIds ||
-                cards[sid]?.drained == true ||
-                (cards[sid]?.snapshot?.state == "COMPLETED" &&
-                    cards[sid]?.snapshot?.patchBytes ?: 0L > 0L) ||
-                // Un-drained terminal failures must survive rotation so SWEEP
-                // can retire them; evicting them here orphans their queue
-                // entries (dispatched-not-drained) forever.
-                cards[sid]?.snapshot?.state in setOf("FAILED", "CANCELLED")
-        }
+        visibleSessions = sessions
         val active = sessions.count { it.state == "IN_PROGRESS" || it.state == "PLANNING" || it.state == "QUEUED" }
         val awaiting = sessions.count { it.state == "AWAITING_USER_FEEDBACK" }
         val headSha = headShaProvider()
         for (s in sessions) {
-            val existing = cards[s.id]
-            val stateChanged = existing != null && existing.snapshot.state != s.state
-            // COMPLETED and AWAITING sessions can carry cumulative patches.
-            // A drained card is immutable: its CAS/tag receipt already closed it,
-            // so downloading its activity stream again is duplicate work.
-            val acts = if (
-                existing?.drained != true &&
-                (s.state == "COMPLETED" || s.state == "AWAITING_USER_FEEDBACK")
-            )
-                client.activities(s.id) else emptyList()
-            // changeSets are cumulative per activity — the last non-zero carries the total.
-            val patchBytes = acts.lastOrNull { it.patchBytes > 0 }?.patchBytes
+            var existing = cards[s.id]
+            val immutableSettlement = hasImmutableSettlement(s.id, existing)
+            // A settlement closes one observed artifact, not the producer's
+            // future timeline. Continue polling settled sessions so a late API
+            // patch/report is CAS-observed and reopens review instead of being
+            // hidden forever by an old drained bit.
+            val timeline = client.activityTimeline(s.id)
+            val acts = timeline.activities.view
+            // changeSets are cumulative; outputs-only artifacts are included in
+            // timeline.patches and must make a new card visibly patch-bearing.
+            val patchBytes = if (timeline.patches.size > 0) {
+                timeline.patches[timeline.patches.size - 1].patch.encodeToByteArray().size.toLong()
+            } else acts.lastOrNull { it.patchBytes > 0 }?.patchBytes
                 ?: existing?.snapshot?.patchBytes
                 ?: 0L
             val snap = JulesSnapshot(
@@ -76,21 +91,62 @@ class JulesConductor(
                 activeCount = active,
                 awaitingCount = awaiting,
             )
+            // A snapshot must exist before any CAS observation cause. Otherwise
+            // a crash after observation but before capture leaves orphan causes
+            // that board replay cannot materialize and the next poll duplicates.
+            if (existing == null) {
+                val captured = JulesSessionCard.capture(snap)
+                store?.append(snap, drained = false, cause = captured.causes.last())
+                cards[s.id] = captured
+                existing = captured
+            }
+            val patchCauses = patchContinuity?.observe(
+                sessionId = s.id,
+                patches = timeline.patches,
+                priorCauses = existing.causes,
+            ).orEmpty()
+            if (patchCauses.isNotEmpty()) {
+                existing = existing.copy(causes = existing.causes + patchCauses)
+                cards[s.id] = existing
+            }
+            val reportCauses = patchContinuity?.observeReports(
+                sessionId = s.id,
+                reports = timeline.reports,
+                priorCauses = existing.causes,
+            ).orEmpty()
+            if (reportCauses.isNotEmpty()) {
+                existing = existing.copy(causes = existing.causes + reportCauses)
+                cards[s.id] = existing
+            }
+            // Late producer output reopens even a legitimate prior settlement;
+            // a hollow legacy retirement reopens unconditionally. Persist the
+            // drained=false transition after the new CAS facts so replay sees
+            // the exact reason the prior close ceased to be current.
+            if (existing.drained &&
+                (!immutableSettlement || patchCauses.isNotEmpty() || reportCauses.isNotEmpty())
+            ) {
+                val cause = JulesCause.StateObserved(
+                    from = if (immutableSettlement) "SETTLED_OUTPUT_ADVANCED" else
+                        "HOLLOW_RETIRED:${existing.snapshot.state}",
+                    to = snap.state,
+                    at = snap.capturedAt,
+                )
+                existing = existing.copy(drained = false).transition(snap, cause)
+                cards[s.id] = existing
+                store?.append(snap, drained = false, cause = cause)
+            }
+            val stateChanged = existing != null && existing.snapshot.state != s.state
             val latestInquiry = acts.lastOrNull { it.kind == "agentMessaged" }
                 ?: acts.lastOrNull { it.kind == "progressUpdated" && '?' in it.excerpt }
             val unseenInquiry = latestInquiry?.takeIf { inquiry ->
-                existing?.causes?.none { it.activityId == inquiry.id } != false
-            }
-            if (existing == null) {
-                val captured = JulesSessionCard.capture(snap)
-                val inquiryCause = unseenInquiry?.let {
-                    JulesCause.AgentMessaged(it.excerpt, snap.capturedAt, it.id, it.seq)
+                // CAS-backed report/patch observations share this activity id,
+                // but they do not mean GUIDE handled the inquiry.  Only the
+                // conversational cause consumes it for answer deduplication.
+                existing.causes.none {
+                    it is JulesCause.AgentMessaged && it.activityId == inquiry.id
                 }
-                val card = if (inquiryCause == null) captured
-                    else captured.copy(causes = captured.causes + inquiryCause)
-                cards[s.id] = card
-                store?.append(snap, drained = false, cause = inquiryCause ?: captured.causes.last())
-            } else if (unseenInquiry != null) {
+            }
+            if (unseenInquiry != null) {
                 // A conversation can advance while Jules remains AWAITING. Record
                 // the new inquiry by activity id so GUIDE answers it exactly once.
                 val cause = JulesCause.AgentMessaged(
@@ -115,6 +171,11 @@ class JulesConductor(
             }
         }
     }
+
+    private fun borg.trikeshed.util.oroboros.MergeReceipt.isImmutableSettlement(): Boolean =
+        producer != "retired" &&
+            revision.isNotBlank() && !revision.startsWith("outbox-") &&
+            versionTag.isNotBlank() && versionTag != "retired"
 
     /** Answer an AWAITING session; the returned activity id anchors the cause. */
     suspend fun answer(sessionId: String, message: String) {
@@ -157,54 +218,6 @@ class JulesConductor(
         val updated = card.copy(causes = card.causes + cause)
         cards[sessionId] = updated
         store?.append(updated.snapshot, updated.drained, cause)
-    }
-
-    /**
-     * Tombstone a terminal drain candidate: the failure is recorded as a
-     * [JulesCause.DrainFailed] cause AND the card leaves the drain set
-     * (drained=true). For sessions that can never produce a landable patch
-     * (e.g. concluded with zero patch bytes after repeated probes) — without
-     * this the wheel re-probes them every cycle forever.
-     */
-    suspend fun retireTerminal(sessionId: String, reason: String, at: Long) {
-        val card = cards[sessionId] ?: return
-        val cause = JulesCause.DrainFailed(reason, at)
-        val updated = card.copy(causes = card.causes + cause, drained = true)
-        cards[sessionId] = updated
-        store?.append(updated.snapshot, drained = true, cause = cause)
-        // Close the queue entry so loadQueue() stops seeing this work as
-        // dispatched-but-undrained. Without this, a retired session occupies
-        // a queue slot forever (isDispatched && !isDrained) and the wheel
-        // can't tell it's done. Bond to the ORIGINAL queue workId (gap:/readme:/
-        // synth:...) — writing WorkDrained under the bare numeric sessionId
-        // orphans the real entry and leaves it stuck dispatched forever.
-        // Uses the same outbox: pattern as ReapAppend.
-        val bondedWorkId = store?.loadQueue()
-            ?.firstOrNull { it.sessionId == sessionId && !it.isDrained }
-            ?.workId ?: sessionId
-        store?.appendWork(
-            workId = bondedWorkId,
-            cause = JulesCause.WorkDrained(
-                workId = bondedWorkId,
-                sessionId = sessionId,
-                commitSha = "outbox-${sessionId.take(8)}",
-                taskId = "retired",
-                receipt = borg.trikeshed.util.oroboros.MergeReceipt(
-                    workId = bondedWorkId,
-                    producer = "retired",
-                    producerRef = sessionId,
-                    patchCid = borg.trikeshed.job.ContentId.of(
-                        "retired:$sessionId:$reason".encodeToByteArray()
-                    ),
-                    revision = "outbox-${sessionId.take(8)}",
-                    versionTag = "retired",
-                    lexicalMemory = borg.trikeshed.util.oroboros.LexicalMemory(summary = reason, title = reason, content = ""),
-                    claimedAt = at,
-                    prUrl = null,
-                ),
-                at = at,
-            ),
-        )
     }
 
     data class DrainRecord(val sessionId: String, val commitSha: String, val rejects: Int)
@@ -264,31 +277,4 @@ class JulesConductor(
         }
     }
 
-    companion object {
-        @JvmStatic
-        fun main(args: Array<String>) {
-            val keyMux = KeyMux { env() }
-            val once = args.contains("--once")
-            val forgeDir = File(System.getProperty("user.home"), ".local/forge")
-            val store = JulesBoardStore.forForgeDir(forgeDir)
-            val conductor = JulesConductor(
-                client = JulesRestClient(keyMux),
-                headShaProvider = {
-                    kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { ProcessBuilder("git", "rev-parse", "HEAD")
-                        .redirectErrorStream(true)
-                        .start().inputStream.bufferedReader().readText().trim() }
-                },
-                store = store,
-                source = "sources/github/jnorthrup/TrikeShed",
-            )
-            kotlinx.coroutines.runBlocking {
-                if (once) {
-                    conductor.pollOnce()
-                    print(conductor.renderBoard())
-                } else {
-                    conductor.run()
-                }
-            }
-        }
-    }
 }

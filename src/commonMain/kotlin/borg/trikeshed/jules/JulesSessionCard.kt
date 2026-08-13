@@ -3,6 +3,7 @@ package borg.trikeshed.jules
 import borg.trikeshed.kanban.KanbanCard
 import borg.trikeshed.kanban.KanbanCardId
 import borg.trikeshed.kanban.KanbanColumnId
+import borg.trikeshed.job.ContentId
 import borg.trikeshed.util.oroboros.MergeReceipt
 import kotlinx.datetime.Clock
 
@@ -74,6 +75,77 @@ sealed class JulesCause {
         override val at: Long,
         override val activityId: String? = null,
         override val activitySeq: Int? = null,
+    ) : JulesCause()
+
+    /**
+     * One immutable Jules activity-patch snapshot after its bytes are in CAS.
+     * [causalOrdinal] is the position in the current ordered activity stream;
+     * [patchCid] makes ordinal shifts or repeated snapshots unambiguous.
+     *
+     * A snapshot is a new automatic review candidate only when
+     * [reviewCandidate] is true.  [missingFromCandidate] records a file-set
+     * regression against the retained last-known-good candidate.
+     */
+    data class PatchSnapshotObserved(
+        val patchCid: ContentId,
+        val causalOrdinal: Int,
+        val artifactSeq: Int,
+        val touchedFiles: List<String>,
+        val missingFromCandidate: List<String>,
+        val reviewCandidate: Boolean,
+        override val at: Long,
+        override val activityId: String,
+        override val activitySeq: Int,
+    ) : JulesCause()
+
+    /**
+     * Explicit operator review of one observed snapshot.  The receipt reference
+     * is mandatory provenance (ticket, review log, or settlement receipt); it
+     * lets a regressed latest snapshot be selected without trusting recency.
+     */
+    data class PatchReviewSelected(
+        val patchCid: ContentId,
+        val causalOrdinal: Int,
+        /** Latest producer artifacts visible to the reviewer (CAS watermark). */
+        val latestPatchCid: ContentId? = null,
+        val latestReportCid: ContentId? = null,
+        val reviewedBy: String,
+        val receiptRef: String,
+        override val at: Long,
+    ) : JulesCause()
+
+    /**
+     * One complete Jules agent message after its exact UTF-8 bytes are durable
+     * in CAS.  This is deliberately separate from [AgentMessaged], whose
+     * excerpt exists only for the operator board.  Together the WAL key,
+     * [activityId], [activitySeq], [causalOrdinal], and [reportCid] preserve the
+     * report's position and identity even when a completed session has no patch.
+     */
+    data class AgentReportObserved(
+        val reportCid: ContentId,
+        val causalOrdinal: Int,
+        val bytes: Long,
+        val apiCreateTime: String,
+        override val at: Long,
+        override val activityId: String,
+        override val activitySeq: Int,
+    ) : JulesCause()
+
+    /**
+     * Explicit semantic review of one observed report.  Observation alone does
+     * not mean that an agent's no-op claim is correct; settlement must name the
+     * reviewed disposition and receipt that authorized it.
+     */
+    data class AgentReportReviewSelected(
+        val reportCid: ContentId,
+        val causalOrdinal: Int,
+        /** Latest producer artifacts visible to the reviewer (CAS watermark). */
+        val latestPatchCid: ContentId? = null,
+        val latestReportCid: ContentId? = null,
+        val disposition: String,
+        val reviewedBy: String,
+        val receiptRef: String,
+        override val at: Long,
     ) : JulesCause()
 
     /** Drain applied the patch locally and committed. */
@@ -181,7 +253,11 @@ fun laneFor(snapshot: JulesSnapshot, drained: Boolean): JulesLane = when (snapsh
     "IN_PROGRESS" -> JulesLane.AGENTIC_WORK
     "AWAITING_USER_FEEDBACK" -> JulesLane.CAUSAL_BLOCKED
     "AWAITING_PLAN_APPROVAL" -> JulesLane.REVIEW
-    "COMPLETED" -> if (drained || snapshot.patchBytes == 0L) JulesLane.DONE else JulesLane.CAUSAL_READY
+    "COMPLETED" -> when {
+        drained -> JulesLane.DONE
+        snapshot.patchBytes == 0L -> JulesLane.REVIEW
+        else -> JulesLane.CAUSAL_READY
+    }
     "FAILED" -> JulesLane.FAILED
     else -> JulesLane.TO_DO
 }
@@ -250,6 +326,8 @@ data class JulesSessionCard(
 
 /** Render one card as a ≤10-line agent-scannable block, `$ ---` terminated. */
 fun JulesSessionCard.renderBlock(): String = buildString {
+    val finalReport = causes.filterIsInstance<JulesCause.AgentReportObserved>()
+        .maxByOrNull { it.causalOrdinal }
     appendLine("id: ${snapshot.sessionId}")
     appendLine("title: ${card.title.take(80)}")
     appendLine("lane: ${lane.columnName}")
@@ -257,7 +335,7 @@ fun JulesSessionCard.renderBlock(): String = buildString {
     appendLine("patchBytes: ${snapshot.patchBytes}")
     appendLine("headSha: ${snapshot.headSha.take(9)}")
     appendLine("drained: $drained")
-    appendLine("causes: ${causes.size}")
-    causes.lastOrNull()?.let { appendLine("lastCause: ${it::class.simpleName}") }
+    appendLine("causes: ${causes.size} last=${causes.lastOrNull()?.let { it::class.simpleName } ?: "none"}")
+    finalReport?.let { appendLine("report: ${it.causalOrdinal}/${it.reportCid.value}") }
     append("$ ---")
 }

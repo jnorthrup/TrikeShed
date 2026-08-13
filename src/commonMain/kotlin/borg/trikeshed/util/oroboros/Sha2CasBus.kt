@@ -27,17 +27,33 @@ class FileCasStore(
         val cid = ContentId.of(bytes)
         val path = getShardedPath(cid)
 
-        if (!fileOps.exists(path)) {
-            val dirPath = fileOps.resolvePath(casRoot, "sha256", cid.hex.substring(0, 2))
-            if (!fileOps.exists(dirPath)) {
-                fileOps.mkdirs(dirPath)
+        val existingIsValid = if (fileOps.exists(path)) {
+            val existing = fileOps.readAllBytes(path)
+            val existingCid = ContentId.of(existing)
+            if (existingCid == cid) {
+                check(existing.contentEquals(bytes)) {
+                    "CAS collision: stored blob for CID $cid has different bytes"
+                }
+                true
+            } else {
+                false
             }
-            fileOps.write(path, bytes)
+        } else {
+            false
         }
 
-        // verification
-        val reread = get(cid)
-        if (reread == null || !reread.contentEquals(bytes)) {
+        if (!existingIsValid) {
+            val dirPath = fileOps.resolvePath(casRoot, "sha256", cid.hex.substring(0, 2))
+            if (!fileOps.exists(dirPath)) fileOps.mkdirs(dirPath)
+            // A corrupt object at the expected CID path is repaired from the
+            // caller-provided bytes without ever exposing a partial object.
+            fileOps.writeAtomically(path, bytes)
+        }
+
+        // Publication is not visible until the exact bytes are re-read and
+        // checked against both the requested payload and its address.
+        val reread = fileOps.readAllBytes(path)
+        if (!reread.contentEquals(bytes) || ContentId.of(reread) != cid) {
             throw IllegalStateException("digest mismatch: failed to verify stored blob for CID $cid")
         }
 

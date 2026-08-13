@@ -1,7 +1,6 @@
 package borg.trikeshed.jules
 
 import borg.trikeshed.htx.HtxKey
-import borg.trikeshed.lib.Join
 import borg.trikeshed.lib.j
 import borg.trikeshed.kanban.ForgeKanbanIngest
 import borg.trikeshed.job.ContentId
@@ -14,8 +13,6 @@ import borg.trikeshed.util.oroboros.LexicalMemory
 import borg.trikeshed.util.oroboros.MergeReceipt
 import keymux.KeyMux
 import borg.trikeshed.causal.rankByProximity
-import borg.trikeshed.lib.j
-import borg.trikeshed.lib.Series
 import borg.trikeshed.lib.get
 import borg.trikeshed.lib.size
 import kotlinx.datetime.Clock
@@ -27,13 +24,11 @@ import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.sync.Mutex
-import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.asSharedFlow
+import kotlinx.coroutines.channels.ReceiveChannel
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 import java.io.File
@@ -76,8 +71,8 @@ enum class FlywheelPhase(val order: Int, val label: String) {
  * 1. POLL Jules sessions via [JulesConductor.pollOnce]
  * 2. ANSWER every AWAITING_USER_FEEDBACK session (GUIDE brain + conventions)
  * 3. SYNC local master to origin/master before applying delivered patches
- * 4. DRAIN the entire COMPLETED set: CAS → sequential 3-way → cumulative repair
- * 5. SETTLE the repaired commits and provenance tags to origin/master
+ * 4. DRAIN COMPLETED artifacts: observed bytes → CAS → isolated build preflight
+ * 5. SETTLE validated fast-forward commits and provenance tags to origin/master
  * 6. INDUCT is a no-op: coordinated RGA producers append partitioned WorkQueued causes
  * 7. DISPATCH up to [maxSlots] non-overlapping queue entries after settlement
  *
@@ -85,8 +80,8 @@ enum class FlywheelPhase(val order: Int, val label: String) {
  * dispatch surface. The daemon never scans the repository or a todo file for
  * work; the upstream RGA coordinator owns partitioning before WorkQueued.
  *
- * Run with:
- *   ./gradlew jvmRun -PmainClass=borg.trikeshed.jules.FlywheelDriver
+ * Network execution is owned by `bin/oroboros-daemon`; this reducer has no
+ * standalone main because Jules HTTP requires the daemon's inherited HtxKey.
  */
 class FlywheelDriver(
     private val keyMux: KeyMux,
@@ -113,13 +108,14 @@ class FlywheelDriver(
     private val client = JulesRestClient(keyMux)
     internal val brain: BrainClient? = BrainClient(errorSink = JvmBrainErrorSink(forgeDir))
     private val store = JulesBoardStore.forForgeDir(forgeDir)
+    private val patchContinuity = JulesPatchContinuityStore(casStore, store)
     private val conductor = JulesConductor(
         client = client,
         headShaProvider = { headSha() },
         store = store,
         source = source,
+        patchContinuity = patchContinuity,
     )
-    private val sessionBarriers = java.util.concurrent.ConcurrentHashMap<String, SettlementBarrier>()
     @Volatile private var memoryIndexLayer: MemoryIndexLayer? = null
 
     /** Attach the daemon's live memory index so eviction can flush it first. */
@@ -127,30 +123,13 @@ class FlywheelDriver(
         memoryIndexLayer = indexLayer
     }
 
-    private fun barrierFor(sessionId: String): SettlementBarrier =
-        sessionBarriers.computeIfAbsent(sessionId) { SettlementBarrier() }
-
-    private suspend fun evictQuiescent(
-        sessionId: String,
-        reason: String,
-        at: Long,
-    ): Boolean = evictStalledSession(
-        sessionId = sessionId,
-        barrier = barrierFor(sessionId),
-        flushIndex = { memoryIndexLayer?.flush() },
-        evict = { conductor.retireTerminal(sessionId, reason, at) },
-    ).also { sessionBarriers.remove(sessionId) }
     // CCEK context: SupervisorJob + SharedFlow event bus. Dispatch concurrency
     // is bounded by the queue slice (`take(available)`) and structured async.
     private val parentJob: Job = SupervisorJob()
     private val _events = MutableSharedFlow<FlywheelEvent>(extraBufferCapacity = 64)
     val events: SharedFlow<FlywheelEvent> get() = _events.asSharedFlow()
-    /** Consecutive zero-patch probes per session id; tombstones at 3 (late outputs finalize async). */
-    private val noPatchProbes = java.util.concurrent.ConcurrentHashMap<String, Int>()
-    /** Consecutive patch-bearing drain failures per session id; never tombstoned. */
+    /** Consecutive patch-bearing drain failures per session id; telemetry only. */
     private val drainFailures = java.util.concurrent.ConcurrentHashMap<String, Int>()
-    /** Per-arm corrupt-patch probe counter; tombstones at 3 to prevent infinite retry. */
-    private val corruptPatchProbes = java.util.concurrent.ConcurrentHashMap<String, Int>()
     /** Session-derived work ids are historical fallback identities, not new work
      * once their corresponding card is already closed. Keep their WAL history
      * visible while reporting each suppressed requeue only once per process. */
@@ -190,32 +169,27 @@ class FlywheelDriver(
     }
 
     /**
-     * Record a drain failure on the session card and return [DrainOutcome.Skipped].
-     * Patch-bearing work stays undrained and retryable regardless of attempt
-     * count: the full completion set cannot advance by tombstoning a failed arm.
+     * Record a drain review gate without closing patch-bearing provenance.
+     * Automatic failure never permits a synthetic settlement receipt.
      */
-    private suspend fun drainFail(s: JulesRestClient.SessionInfo, reason: String): DrainOutcome.Skipped {
+    private suspend fun drainFail(s: JulesRestClient.SessionInfo, reason: String) {
         val attempts = (drainFailures[s.id] ?: 0) + 1
-        if (attempts >= 3) {
-            // Same 3-strike retirement as noPatchProbes/corruptPatchProbes:
-            // a session that fails drain 3 consecutive times never leaves the
-            // completion set otherwise — sessions.isEmpty() stays false,
-            // synchronizeMain() never runs, and settlement prints SETTLE-BLOCKED
-            // forever. retireTerminal writes the MergeReceipt + WorkDrained
-            // outbox entry so the queue slot closes too.
-            drainFailures.remove(s.id)
-            conductor.retireTerminal(
-                s.id,
-                "$reason (retired after $attempts consecutive drain failures)",
-                Clock.System.now().toEpochMilliseconds(),
-            )
-            println("[FLYWHEEL] RETIRE ${s.id.takeLast(6)} drain failed $attempts times: $reason")
-            return DrainOutcome.Skipped
-        }
         drainFailures[s.id] = attempts
-        conductor.recordDrainFailure(s.id, "$reason (attempt $attempts)", Clock.System.now().toEpochMilliseconds())
+        recordReviewBlockOnce(
+            s,
+            "$reason; exact producer artifact retained for explicit review",
+        )
         emitPollError("drain ${s.id}: $reason (attempt $attempts)", 0)
-        return DrainOutcome.Skipped
+    }
+
+    /** Append one durable review gate per distinct causal reason, not per poll. */
+    private suspend fun recordReviewBlockOnce(s: JulesRestClient.SessionInfo, reason: String) {
+        val alreadyRecorded = conductor.cards[s.id]?.causes?.any {
+            it is JulesCause.DrainFailed && it.reason == reason
+        } == true
+        if (!alreadyRecorded) {
+            conductor.recordDrainFailure(s.id, reason, Clock.System.now().toEpochMilliseconds())
+        }
     }
     private val reactorScope = CoroutineScope(Dispatchers.IO + parentJob)
 
@@ -232,7 +206,7 @@ class FlywheelDriver(
 
     /**
      * Emit a [FlywheelEvent.PollError] and return [returnValue] in one statement.
-     * The dominant shape across [drainOne] / [drainFanout] is "report and exit" —
+     * The dominant shape across drain helpers is "report and exit" —
      * without this, each site expands to two lines (emit + return) and the
      * emit-message-and-return-value pair becomes invisible to the eye.
      */
@@ -241,40 +215,20 @@ class FlywheelDriver(
         return returnValue
     }
 
-    /** Close legacy Necromancer entries before either dispatch path can post them.
-     * Reanimation creates a new work identity for a receipt-bearing terminal
-     * entry, so it defeats the unified queue's first-wins deduplication. */
-    private suspend fun suppressLegacyNecromance(entries: List<borg.trikeshed.utils.kanban.QueueEntry>): List<borg.trikeshed.utils.kanban.QueueEntry> {
+    /**
+     * Keep legacy Necromancer requeues out of automatic dispatch without
+     * fabricating settlement. Their unfinished WAL entries remain visible for
+     * explicit review and a new reducer cut.
+     */
+    private suspend fun suppressLegacyNecromance(
+        entries: List<borg.trikeshed.utils.kanban.QueueEntry>,
+    ): List<borg.trikeshed.utils.kanban.QueueEntry> {
         val legacy = entries.filter { it.workId.startsWith("gap:necromance:") && !it.isDrained }
-        for (entry in legacy) {
-            val now = Clock.System.now().toEpochMilliseconds()
-            store.appendWork(entry.workId, JulesCause.WorkDrained(
-                workId = entry.workId,
-                sessionId = entry.sessionId ?: "superseded:${entry.workId}",
-                commitSha = "outbox-${entry.workId.takeLast(8)}",
-                taskId = "superseded",
-                receipt = MergeReceipt(
-                    workId = entry.workId,
-                    producer = "queue-supersession",
-                    producerRef = entry.parent ?: "",
-                    patchCid = ContentId.of("superseded:${entry.workId}".encodeToByteArray()),
-                    revision = "outbox-${entry.workId.takeLast(8)}",
-                    versionTag = "superseded",
-                    lexicalMemory = LexicalMemory(
-                        summary = "legacy Necromancer requeue suppressed",
-                        title = entry.title,
-                        content = "The parent WorkDrained receipt is terminal; a new reducer cut is required for follow-up work.",
-                    ),
-                    claimedAt = now,
-                    prUrl = null,
-                ),
-                at = now,
-            ))
+        if (legacy.isNotEmpty()) {
+            println("[FLYWHEEL] REVIEW-BLOCK ${legacy.size} legacy Necromancer requeue(s); WAL remains open")
         }
-        if (legacy.isNotEmpty()) println("[FLYWHEEL] SUPPRESS ${legacy.size} legacy Necromancer requeue(s)")
-        return entries.filterNot { it.workId.startsWith("gap:necromance:") && !it.isDrained }
+        return entries.filterNot { it in legacy }
     }
-
     /** Emits an UpstreamDrifted event for preflight checks without exposing the raw bus. */
     fun emitDrifted(local: String, remote: String) {
         _events.tryEmit(FlywheelEvent.UpstreamDrifted(local, remote))
@@ -290,17 +244,30 @@ class FlywheelDriver(
         //    abort the cycle and starve drain. A failed poll is a PollError
         //    event + a retry on the next interval; drain still proceeds
         //    against the cards the previous cycle rehydrated from WAL.
-        try {
-            withTimeoutOrNull(60_000L) { conductor.pollOnce() }
+        val pollComplete = try {
+            withTimeoutOrNull(60_000L) { conductor.pollOnce(); true } == true
         } catch (t: Throwable) {
             classifyHttpError(t)
             _events.tryEmit(FlywheelEvent.PollError("poll ${t.javaClass.simpleName}: ${t.message?.take(200)}"))
+            false
+        }
+        if (!pollComplete) {
+            val alive = activeCount()
+            return CycleReport(
+                cycleMs = System.currentTimeMillis() - t0,
+                alive = alive,
+                available = (maxSlots - alive).coerceAtLeast(0),
+                settled = false,
+                phase = FlywheelPhase.POLL,
+                http429 = cycleHttp429,
+                http5xx = cycleHttp5xx,
+            )
         }
 
-        // Jules can keep reporting an externally landed branch as active. Close
-        // that card through the normal provenance path before it consumes a slot.
+        // Refresh optional branch/PR identity metadata. Producer refs never
+        // close a card; exact Jules API/CAS bytes remain mutation authority.
         try {
-            reconcileGitState()
+            harvestOrphanBranches()
         } catch (t: Throwable) {
             classifyHttpError(t)
             _events.tryEmit(FlywheelEvent.PollError("reconcile ${t.javaClass.simpleName}: ${t.message?.take(200)}"))
@@ -315,11 +282,26 @@ class FlywheelDriver(
                 it.causes.lastOrNull() !is JulesCause.HumanAnswered
         }.sortedBy { it.snapshot.capturedAt }
         for (card in awaiting) {
-            val answer = withTimeoutOrNull(45_000L) { buildAnswer(card) } ?: ""
-            if (answer.isNotEmpty()) {
-                conductor.answer(card.snapshot.sessionId, answer)
-                answered++
-                println("[FLYWHEEL] ANSWER ${card.snapshot.sessionId.takeLast(6)} ${card.card.title.take(60)}")
+            try {
+                val answer = withTimeoutOrNull(45_000L) { buildAnswer(card) } ?: ""
+                if (answer.isNotEmpty()) {
+                    conductor.answer(card.snapshot.sessionId, answer)
+                    answered++
+                    println("[FLYWHEEL] ANSWER ${card.snapshot.sessionId.takeLast(6)} ${card.card.title.take(60)}")
+                }
+            } catch (t: Throwable) {
+                if (t is kotlinx.coroutines.CancellationException) throw t
+                classifyHttpError(t)
+                recordReviewBlockOnce(
+                    JulesRestClient.SessionInfo(
+                        id = card.snapshot.sessionId,
+                        state = card.snapshot.state,
+                        title = card.snapshot.title,
+                        patchBytes = card.snapshot.patchBytes,
+                    ),
+                    "response failed: ${t.message?.take(200)}",
+                )
+                _events.emit(FlywheelEvent.PollError("answer ${card.snapshot.sessionId}: ${t.message?.take(200)}"))
             }
         }
 
@@ -361,122 +343,42 @@ class FlywheelDriver(
                 it.causes.lastOrNull() !is JulesCause.HumanAnswered
         }.sortedBy { it.snapshot.capturedAt }) {
             try {
-                withTimeoutOrNull(45_000L) { conductor.approvePlan(card.snapshot.sessionId) }
+                val approved = withTimeoutOrNull(45_000L) {
+                    conductor.approvePlan(card.snapshot.sessionId)
+                    true
+                } == true
+                if (!approved) {
+                    _events.emit(FlywheelEvent.PollError("approve ${card.snapshot.sessionId}: timed out"))
+                    continue
+                }
                 answered++
                 println("[FLYWHEEL] APPROVE ${card.snapshot.sessionId.takeLast(6)} ${card.card.title.take(60)}")
             } catch (t: Throwable) {
+                if (t is kotlinx.coroutines.CancellationException) throw t
                 classifyHttpError(t)
                 _events.tryEmit(FlywheelEvent.PollError("approve ${card.snapshot.sessionId}: ${t.message?.take(200)}"))
             }
         }
 
-        // 2c. SWEEP terminal failures — a session that lands in FAILED or
-        //     CANCELLED never enters DRAIN (COMPLETED-only), so without an
-        //     explicit retire its card sits terminal-but-undrained and its
-        //     queue entry stays dispatched-not-drained forever: the workId can
-        //     never be re-queued and the wheel slowly clogs with zombies.
-        //     retireTerminal writes MergeReceipt + WorkDrained (bonded to the
-        //     original queue workId) so the slot closes cleanly.
+        // 2c. Terminal API failures require a reviewed disposition.  FAILED or
+        //     CANCELLED is producer state, not evidence that no late report or
+        //     patch exists, and therefore cannot synthesize a MergeReceipt.
         for (card in conductor.cards.values.filter {
             it.snapshot.state in setOf("FAILED", "CANCELLED") && !it.drained
         }.sortedBy { it.snapshot.capturedAt }) {
-            conductor.retireTerminal(
-                card.snapshot.sessionId,
-                "terminal ${card.snapshot.state}",
-                Clock.System.now().toEpochMilliseconds(),
-            )
-            println("[FLYWHEEL] SWEEP ${card.snapshot.sessionId.takeLast(6)} ${card.snapshot.state}: ${card.card.title.take(60)}")
-        }
-
-        // 2c-bis. QUIESCENT_EVICT — a session that sits IN_PROGRESS, PAUSED, or
-        //         AWAITING_USER_FEEDBACK with no recent Jules API activity is a
-        //         stalled slot: it counts against activeCount() (holds a dispatch
-        //         slot) but never transitions to DRAINABLE_STATES, so SWEEP
-        //         never touches it. The wheel reports alive=N but dispatched=0
-        //         forever and settles nothing. This is the sandbagger: the
-        //         flywheel has free capacity it can never reclaim.
-        //
-        //         A session is quiescent if its last captured snapshot is older
-        //         than QUIESCENT_EVICT_MS and no WorkQueued entry references it
-        //         as dispatched-but-undrained (the queue is the authority for
-        //         pending work; a session with no queue entry has no pending work).
-        //         We retire it the same way SWEEP does: retireTerminal closes
-        //         the card and bonds a WorkDrained to its queue entry.
-        val quiescentEvictMs = 2L * 60L * 60L * 1000L // 2 hours
-        val nowQuiescent = Clock.System.now().toEpochMilliseconds()
-        val activeStates = setOf("IN_PROGRESS", "PAUSED", "AWAITING_USER_FEEDBACK")
-        val dispatchedSessionIds = store.loadQueue()
-            .filter { it.isDispatched && !it.isDrained }
-            .mapNotNull { it.sessionId }
-            .toSet()
-        for (card in conductor.cards.values.filter {
-            it.snapshot.state in activeStates && !it.drained &&
-                it.snapshot.sessionId !in dispatchedSessionIds
-        }.sortedBy { it.snapshot.capturedAt }) {
-            val age = nowQuiescent - card.snapshot.capturedAt
-            if (age < quiescentEvictMs) continue
-            val reason = "quiescent eviction: ${card.snapshot.state} for ${age / 60000}min with no queue entry"
-            val settled = evictQuiescent(
-                sessionId = card.snapshot.sessionId,
-                reason = reason,
-                at = nowQuiescent,
-            )
-            println(
-                "[FLYWHEEL] QUIESCENT-EVICT ${card.snapshot.sessionId.takeLast(6)} " +
-                    "${card.snapshot.state} age=${age / 60000}min settled=$settled: ${card.card.title.take(60)}"
-            )
-        }
-
-        // 2d. REPAIR queue orphans — the pre-bonding retireTerminal wrote
-        //     WorkDrained under the bare numeric sessionId, so the card closed
-        //     (drained=true) but the real queue entry (gap:/readme:/synth:)
-        //     stayed dispatched-not-drained forever. Close any queue entry
-        //     whose session card is already drained. Also close entries whose
-        //     card is GONE: pollOnce evicts cards the API has rotated out
-        //     (404), and an evicted card can never drain. The 15-minute
-        //     dispatch-age margin protects sessions created so recently that
-        //     listSessions may not include them yet.
-        val queueSnapshot = store.loadQueue()
-        val orphanRepairMarginMs = 15L * 60L * 1000L
-        val nowMs = Clock.System.now().toEpochMilliseconds()
-        for (entry in queueSnapshot.filter { it.isDispatched && !it.isDrained }) {
-            val card = conductor.cards[entry.sessionId]
-            val isOrphan = when {
-                card == null ->
-                    (nowMs - (entry.dispatchedAt ?: 0L)) > orphanRepairMarginMs
-                else -> card.drained
-            }
-            if (!isOrphan) continue
-            store.appendWork(
-                workId = entry.workId,
-                cause = JulesCause.WorkDrained(
-                    workId = entry.workId,
-                    sessionId = entry.sessionId ?: continue,
-                    commitSha = "outbox-${(entry.sessionId ?: "").take(8)}",
-                    taskId = "retired",
-                    receipt = borg.trikeshed.util.oroboros.MergeReceipt(
-                        workId = entry.workId,
-                        producer = "retired",
-                        producerRef = entry.sessionId ?: "",
-                        patchCid = borg.trikeshed.job.ContentId.of(
-                            "orphan-repair:${entry.sessionId}".encodeToByteArray()
-                        ),
-                        revision = "outbox-${(entry.sessionId ?: "").take(8)}",
-                        versionTag = "retired",
-                        lexicalMemory = borg.trikeshed.util.oroboros.LexicalMemory(
-                            summary = "queue orphan repair: card already drained",
-                            title = "queue orphan repair", content = ""),
-                        claimedAt = Clock.System.now().toEpochMilliseconds(),
-                        prUrl = null,
-                    ),
-                    at = Clock.System.now().toEpochMilliseconds(),
+            recordReviewBlockOnce(
+                JulesRestClient.SessionInfo(
+                    id = card.snapshot.sessionId,
+                    state = card.snapshot.state,
+                    title = card.card.title,
+                    patchBytes = card.snapshot.patchBytes,
                 ),
+                "terminal ${card.snapshot.state} requires explicit reviewed settlement",
             )
-            println("[FLYWHEEL] REPAIR ${entry.sessionId?.takeLast(6)} closed orphaned queue entry ${entry.workId.take(60)}")
+            println("[FLYWHEEL] REVIEW-BLOCK ${card.snapshot.sessionId.takeLast(6)} ${card.snapshot.state}")
         }
 
-        // 3. DRAIN — consume the entire completed set. Sequential 3-way is
-        //    the merge topology, not a limit on how many sessions advance.
+        // 3. DRAIN — consume the completed set through exact CAS artifacts.
         //    A tag alone is not a completed drain: the durable card/WAL close is
         //    authoritative so an interrupted provenance write remains retryable.
         val completed = conductor.cards.values.filter {
@@ -490,34 +392,29 @@ class FlywheelDriver(
                 patchBytes = 0L,
             )
         }
-        // With no Jules deltas waiting, ordinary upstream synchronization can
-        // proceed directly. A non-empty completion set synchronizes only after
-        // every API delta has been written to CAS inside drainThreeWay().
-        // Skip the conflict commit + sync + conflict commit when there are
-        // zero conflicts — this is the common idle path.
+        // With no Jules deltas waiting, origin refresh can proceed directly. A
+        // non-empty completion set synchronizes only after every exact API
+        // artifact has been written to CAS inside drainExactArtifacts().
         if (sessions.isEmpty() && conflictFiles().isEmpty()) {
             synchronizeMain()
-            // Harvest unmerged origin/* branches on idle cycles to keep the
-            // pipeline draining even when Jules has no COMPLETED sessions.
+            // Refresh optional origin ref identities on the idle path.
             harvestOrphanBranches()
         } else if (sessions.isEmpty()) {
-            commitExistingConflicts()
-            synchronizeMain()
-            commitExistingConflicts()
+            // Existing conflict markers are a review gate; never normalize
+            // them into history merely to make the tree appear clean.
             harvestOrphanBranches()
         }
         val drain = drainFanout(sessions)
         val harvested = drain.harvested
         val reworked = drain.reworked
 
-        // 5. SETTLE — only the complete, repaired drain set advances. The cycle
-        //    still returns normally on an incomplete drain; the next cycle
-        //    retries it instead of dispatching a successor wave onto a red tree.
-        val remainingCompleted = conductor.cards.values.count {
-            it.snapshot.state in DRAINABLE_STATES && !it.drained
+        // 5. SETTLE — only a complete, conflict-free drain set advances. The
+        // next cycle retries a review-blocked artifact without closing it.
+        val remainingTerminal = conductor.cards.values.count {
+            it.snapshot.state in TERMINAL_STATES && !it.drained
         }
         val committedConflicts = (drain.conflicts + conflictFiles()).distinct()
-        val readyToSettle = remainingCompleted == 0 &&
+        val readyToSettle = remainingTerminal == 0 &&
             committedConflicts.isEmpty() && isWorkingTreeClean()
         val settled = readyToSettle && settlementBarrier()
         if (settled) archiveSettledSessions()
@@ -532,9 +429,8 @@ class FlywheelDriver(
         //    already holds its slot; we only fill capacity freed by drain.
         //
         //    Dispatch fires when the working tree is clean and there are no
-        //    active conflicts. It does NOT require full settlement — stuck
-        //    drains (e.g. a COMPLETED session whose patch won't apply) must
-        //    not starve all dispatch and freeze the flywheel at 0/day.
+        //    active conflicts. Dispatch settlement gating is applied by the
+        //    cycle coordinator after this drain-safety pass.
         //
         //    Overlap guard: each task's file scope must not overlap any
         //    in-flight session's touched files.
@@ -543,20 +439,27 @@ class FlywheelDriver(
         var dispatched = 0
         val alive = activeCount()
         val available = (maxSlots - alive).coerceAtLeast(0)
-        // Conflicts are honest intent — dispatch right through them. The
-        // working tree may carry committed markers from a forward merge;
-        // that's progress evidence, not a stop condition.
-        val canDispatch = available > 0
+        // A new Jules task always starts at upstream master. Dispatch is legal
+        // only after every prior completion is causally settled and origin is
+        // byte-for-byte current, otherwise the new task forks stale history.
+        val canDispatch = available > 0 && settled && remainingTerminal == 0 &&
+            committedConflicts.isEmpty() && isWorkingTreeClean()
         if (canDispatch) {
             // Build the in-flight file set from all active sessions' last patches.
             val inflightFiles = mutableSetOf<String>()
+            var activeScopeUnknown = false
             for (card in conductor.cards.values) {
                 if (card.snapshot.state !in TERMINAL_STATES) {
-                    val patch = runCatching { client.lastPatch(card.snapshot.sessionId) }.getOrNull()
-                    if (patch != null) inflightFiles += parsePatchFiles(patch)
+                    val observed = card.causes.filterIsInstance<JulesCause.PatchSnapshotObserved>()
+                        .maxByOrNull { it.causalOrdinal }
+                    if (card.snapshot.patchBytes > 0 && observed == null) activeScopeUnknown = true
+                    if (observed != null) inflightFiles += observed.touchedFiles
                 }
             }
-            val pendingCandidates = suppressLegacyNecromance(store.loadQueue())
+            if (activeScopeUnknown) {
+                emitPollError("dispatch blocked: active Jules file scope is not WAL-observed", 0)
+            }
+            val pendingCandidates = suppressLegacyNecromance(loadQueueIo())
                 .filter { !it.isDispatched && !it.isDrained }
             // Older drains predate WorkQueued. A later seed using that fallback
             // `session:<id>` identity would otherwise submit an already-drained
@@ -585,10 +488,12 @@ class FlywheelDriver(
                 }
             }
 
-            val pending = validCandidates
+            val rankedCandidates = validCandidates
+                .takeUnless { activeScopeUnknown }
+                .orEmpty()
                 .filter { it.spec.isNotBlank() }
                 .let { candidates ->
-                    val graph = store.buildCausalGraph()
+                    val graph = withContext(Dispatchers.IO) { store.buildCausalGraph() }
                     val query = LexicalMemory(summary = "bottleneck dispatch", title = bot ?: "idle", content = "")
                     val wids = candidates.size j { i: Int -> candidates[i].workId }
                     val scored = graph.rankByProximity(query, wids)
@@ -599,21 +504,36 @@ class FlywheelDriver(
                         (widToScore[it.workId] ?: 0.0)
                     }
                 }
-                .filter { entry ->
-                    // Overlap guard: skip if this task's known file scope
-                    // intersects any in-flight session's files.
-                    val taskFiles = extractSpecFiles(entry.spec)
-                    taskFiles.intersect(inflightFiles).isEmpty()
-                }
-                .take(available)
+            // Greedy deterministic packing prevents two newly admitted tasks
+            // from splitting the same file in one wave. Unknown scope is
+            // exclusive until WorkQueued carries a typed path Series.
+            val selectedScopes = inflightFiles.toMutableSet()
+            val pending = mutableListOf<borg.trikeshed.utils.kanban.QueueEntry>()
+            for (entry in rankedCandidates) {
+                if (pending.size >= available) break
+                val taskFiles = extractSpecFiles(entry.spec)
+                val unknown = taskFiles.isEmpty()
+                if (unknown && (pending.isNotEmpty() || selectedScopes.isNotEmpty())) continue
+                if (!unknown && taskFiles.intersect(selectedScopes).isNotEmpty()) continue
+                pending += entry
+                selectedScopes += taskFiles
+                if (unknown) break
+            }
             dispatched = withContext(Dispatchers.IO) {
                 coroutineScope {
                     val jobs = pending.map { entry ->
                         async(Dispatchers.IO) {
                             try {
                                 val cappedSpec = capSpec(entry.spec)
-                                val sessionId = client.createSession(
-                                    prompt = cappedSpec, title = entry.title, source = source)
+                                // Deterministic work identity is present in the
+                                // request, so an ambiguous POST can reconcile on
+                                // the next cycle instead of splitting a duplicate.
+                                val dispatchTitle = dispatchTitle(entry.workId, entry.title)
+                                val existingSession = conductor.visibleSessions.firstOrNull {
+                                    it.title == dispatchTitle
+                                }
+                                val sessionId = existingSession?.id ?: client.createSession(
+                                    prompt = cappedSpec, title = dispatchTitle, source = source)
                                 store.appendWork(entry.workId, JulesCause.WorkDispatched(
                                     workId = entry.workId,
                                     sessionId = sessionId,
@@ -637,7 +557,7 @@ class FlywheelDriver(
         }
 
         val phase = when {
-            remainingCompleted > 0 || committedConflicts.isNotEmpty() -> FlywheelPhase.DRAIN
+            remainingTerminal > 0 || committedConflicts.isNotEmpty() -> FlywheelPhase.DRAIN
             !settled -> FlywheelPhase.SETTLE
             else -> FlywheelPhase.DISPATCH
         }
@@ -660,541 +580,53 @@ class FlywheelDriver(
         )
     }
 
-    // ─────────────────────────────────────────────────────────────────────
-    // REACTIVE CHOREOGRAPHY: fan-out/fan-in pipeline
-    //
-    // poll → drain → settle → dispatch run as concurrent coroutines,
-    // not sequential phases. Each reacts to events on the SharedFlow bus
-    // and signals the next via channels. A freed slot triggers dispatch
-    // in milliseconds, not on the next 30s cycle tick.
-    //
-    //     pollCoroutine ───Polled──→ drainCoroutine
-    //                                    │
-    //                                PatchLanded
-    //                                    │
-    //                                    ▼
-    //     dispatchCoroutine ←──SlotFreed── settleCoroutine
-    //
-    // The daemon calls startReactiveCycle(scope) instead of looping cycle().
-    // ─────────────────────────────────────────────────────────────────────
-
-    /** Signal channel: a slot freed, dispatch should try to fill it. */
-    private val slotFreed = kotlinx.coroutines.channels.Channel<Int>(kotlinx.coroutines.channels.Channel.CONFLATED)
-
-    /** Serializes the one Git worktree/reconcile/settlement lane. */
-    private val drainMutex = Mutex()
-    private val answerMutex = Mutex() // removed — parallel answer/approve
-    private val dispatchMutex = Mutex() // removed — parallel dispatch
-
-    /** Pijul channel for parallel drain — commutative patches replace
-     *  sequential 3-way merge. Patches touching different regions of
-     *  the same file commute; no conflict markers, no working-tree-clean
-     *  gate between applications. */
-    private val pijulChannel = borg.trikeshed.pijul.PijulChannel()
-
     /**
-     * Launch the reactive choreography. Returns immediately; the coroutines
-     * run in [scope] and die when it's cancelled. The daemon's periodicity
-     * loop becomes a simple poll trigger — everything else is reactive.
+     * Start one serialized reducer loop. API transport and subprocess/file
+     * effects move to their IO contexts inside [cycle], while every card/WAL
+     * decision remains ordered on this single CCEK lane. This prevents poll,
+     * drain, answer, and dispatch from observing a torn mutable board.
      */
-    suspend fun startReactiveCycle(scope: kotlinx.coroutines.CoroutineScope) {
-        // Capture the HTX element from the calling scope so the reactive
-        // coroutines (launched on Dispatchers.Default) inherit it for all
-        // Jules/ModelMux API calls. Without this, launch(Dispatchers.Default)
-        // drops the HtxKey and every API call fails.
+    suspend fun startReactiveCycle(
+        scope: kotlinx.coroutines.CoroutineScope,
+        triggers: ReceiveChannel<Unit>? = null,
+    ) {
         val htxElement = kotlin.coroutines.coroutineContext[HtxKey]
         require(htxElement != null) {
             "startReactiveCycle must be called inside a withContext(htxElement) block"
         }
-        // Prime the dispatch pump: free capacity may exist at startup before
-        // the first poll discovers any state. Without this, dispatch parks on
-        // slotFreed.receive() and the wheel deadlocks — nothing drains because
-        // nothing was dispatched, and nothing dispatches because nothing drained.
-        slotFreed.trySend(maxSlots)
-
-        // Cross-coroutine dispatch counter. The dispatch coroutine bumps this
-        // on every successful createSession; the poll coroutine snapshots it
-        // at tick boundary into lastReactiveReport.
-        val tickDispatched = java.util.concurrent.atomic.AtomicInteger(0)
-        val tickHarvested = java.util.concurrent.atomic.AtomicInteger(0)
-
-        // FAN-OUT: drain pipeline. Polls Jules, kicks off drain/answer/approve
-        // as fire-and-forget coroutines, and signals dispatch. Nothing in this
-        // loop blocks on brain/drain latency — those run concurrently.
         scope.launch(htxElement + Dispatchers.Default) {
-            var tickAnswered = 0
             while (true) {
-                val tickStart = System.currentTimeMillis()
-                cycleHttp429 = 0
-                cycleHttp5xx = 0
-                tickAnswered = 0
-                tickDispatched.set(0)
-                tickHarvested.set(0)
-
                 try {
-                    withTimeoutOrNull(intervalMs) { conductor.pollOnce() }
+                    lastReactiveReport = cycle()
                 } catch (t: Throwable) {
+                    if (t is kotlinx.coroutines.CancellationException) throw t
                     classifyHttpError(t)
-                    _events.tryEmit(FlywheelEvent.PollError("reactive poll: ${t.message?.take(200)}"))
+                    _events.emit(FlywheelEvent.PollError("serialized cycle: ${t.message?.take(200)}"))
                 }
-
-                // One serialized Git lane owns reconcile → drain → settle.
-                // API/brain work remains fan-out, but the worktree and refs are
-                // one mutable resource and therefore cannot be concurrent.
-                scope.launch(htxElement + Dispatchers.IO) {
-                    if (!drainMutex.tryLock()) return@launch
-                    try {
-                        try {
-                            reconcileGitState()
-                        } catch (t: Throwable) {
-                            classifyHttpError(t)
-                            _events.tryEmit(FlywheelEvent.PollError("reactive reconcile: ${t.message?.take(200)}"))
-                        }
-
-                        val completed = conductor.cards.values.filter {
-                            it.snapshot.state in DRAINABLE_STATES && !it.drained
-                        }
-                        val sessions = completed.map {
-                            JulesRestClient.SessionInfo(
-                                it.snapshot.sessionId,
-                                it.snapshot.state,
-                                it.card.title,
-                                0L,
-                            )
-                        }
-                        if (sessions.isEmpty() && conflictFiles().isEmpty()) {
-                            synchronizeMain()
-                            harvestOrphanBranches()
-                        } else if (sessions.isEmpty()) {
-                            commitExistingConflicts()
-                            synchronizeMain()
-                            commitExistingConflicts()
-                            harvestOrphanBranches()
-                        }
-
-                        val drain = drainFanout(sessions)
-                        tickHarvested.addAndGet(drain.harvested)
-                        val remaining = conductor.cards.values.count {
-                            it.snapshot.state in DRAINABLE_STATES && !it.drained
-                        }
-                        val conflicts = (drain.conflicts + conflictFiles()).distinct()
-                        val ready = remaining == 0 && conflicts.isEmpty() && isWorkingTreeClean()
-                        val settled = ready && settlementBarrier()
-                        if (settled) archiveSettledSessions()
-
-                        val freed = drain.harvested
-                        if (freed > 0) {
-                            slotFreed.trySend(freed)
-                            println("[CHOREOGRAPHY] drain → settle → dispatch: $freed slots freed")
-                        }
-                    } finally {
-                        drainMutex.unlock()
-                    }
-                }
-
-                // Fan-out: answer/approve waiting sessions in child coroutines
-                // so brain latency never blocks the poll loop.
-                val awaiting = conductor.cards.values.filter {
-                    it.snapshot.state.toJulesState() == JulesSessionState.AwaitingUserFeedback &&
-                        it.causes.lastOrNull() !is JulesCause.HumanAnswered
-                }
-                for (card in awaiting) {
-                    val releaseTurn = barrierFor(card.snapshot.sessionId).enter()
-                    scope.launch(htxElement + Dispatchers.IO) {
-                        try {
-                            // Parallel answer: each HTX exchange gets its own
-                            // connectionOrdinal. The previous answerMutex
-                            // serialized all answers/approvals through one
-                            // lock — a degenerate pool of size 1.
-                            val answer = withTimeoutOrNull(45_000L) { buildAnswer(card) } ?: ""
-                            if (answer.isNotEmpty()) {
-                                conductor.answer(card.snapshot.sessionId, answer)
-                                println("[CHOREOGRAPHY] answer ${card.snapshot.sessionId.takeLast(6)}")
-                            }
-                        } finally {
-                            releaseTurn()
-                        }
-                    }
-                    tickAnswered++
-                }
-
-                // Fan-out: approve plans concurrently
-                for (card in conductor.cards.values.filter {
-                    it.snapshot.state == "AWAITING_PLAN_APPROVAL" &&
-                        it.causes.lastOrNull() !is JulesCause.HumanAnswered
-                }) {
-                    val releaseTurn = barrierFor(card.snapshot.sessionId).enter()
-                    scope.launch(htxElement + Dispatchers.IO) {
-                        try {
-                            withTimeoutOrNull(45_000L) { conductor.approvePlan(card.snapshot.sessionId) }
-                        } finally {
-                            releaseTurn()
-                        }
-                    }
-                    tickAnswered++
-                }
-
-                // Sweep terminal failures — instant, no I/O
-                for (card in conductor.cards.values.filter {
-                    it.snapshot.state in setOf("FAILED", "CANCELLED") && !it.drained
-                }) {
-                    conductor.retireTerminal(card.snapshot.sessionId, "terminal ${card.snapshot.state}", Clock.System.now().toEpochMilliseconds())
-                    slotFreed.trySend(1)
-                    println("[CHOREOGRAPHY] sweep ${card.snapshot.sessionId.takeLast(6)} → slot freed")
-                }
-
-                // Quiescent eviction participates in the reactive driver too.
-                // Await any answer/approval turn for this session, flush the
-                // memory index, then retire and release its dispatch slot.
-                val quiescentNow = Clock.System.now().toEpochMilliseconds()
-                val liveQueueSessions = store.loadQueue()
-                    .filter { it.isDispatched && !it.isDrained }
-                    .mapNotNull { it.sessionId }
-                    .toSet()
-                for (card in conductor.cards.values.filter {
-                    it.snapshot.state in setOf("IN_PROGRESS", "PAUSED", "AWAITING_USER_FEEDBACK") &&
-                        !it.drained && it.snapshot.sessionId !in liveQueueSessions &&
-                        quiescentNow - it.snapshot.capturedAt >= 2L * 60L * 60L * 1000L
-                }) {
-                    val ageMinutes = (quiescentNow - card.snapshot.capturedAt) / 60_000L
-                    val settled = evictQuiescent(
-                        sessionId = card.snapshot.sessionId,
-                        reason = "quiescent eviction: ${card.snapshot.state} for ${ageMinutes}min with no queue entry",
-                        at = quiescentNow,
-                    )
-                    slotFreed.trySend(1)
-                    println(
-                        "[CHOREOGRAPHY] quiescent-evict ${card.snapshot.sessionId.takeLast(6)} " +
-                            "settled=$settled → slot freed"
-                    )
-                }
-
-                // Emit poll event for observers
-                _events.tryEmit(FlywheelEvent.Polled(activeCount(), (maxSlots - activeCount()).coerceAtLeast(0)))
-
-                // Re-arm dispatch: every poll re-evaluates free capacity. A
-                // session may have transitioned terminal API-side, a sweep
-                // may have retired a zombie, or the previous dispatch fan-out
-                // may have left slots unfilled (createSession failures). The
-                // dispatch coroutine parks on slotFreed.receive() after each
-                // batch — without this signal it sleeps until the next drain,
-                // starving the wheel when the queue is long but nothing is
-                // completing.
-                val availableNow = (maxSlots - activeCount()).coerceAtLeast(0)
-                if (availableNow > 0) slotFreed.trySend(availableNow)
-
-                // Snapshot the reactive tick outcome for the daemon's
-                // telemetry loop. CycleBody reads this instead of calling
-                // driver.cycle() — the reactive choreography is the sole
-                // driver; the periodicity loop only observes and traces.
-                val alive = activeCount()
-                lastReactiveReport = CycleReport(
-                    cycleMs = System.currentTimeMillis() - tickStart,
-                    answered = tickAnswered,
-                    harvested = tickHarvested.get(),
-                    dispatched = tickDispatched.get(),
-                    alive = alive,
-                    available = (maxSlots - alive).coerceAtLeast(0),
-                    phase = if (tickHarvested.get() > 0) FlywheelPhase.DRAIN else FlywheelPhase.DISPATCH,
-                    http429 = cycleHttp429,
-                    http5xx = cycleHttp5xx,
-                )
-
-                delay(intervalMs)
-            }
-        }
-
-        // FAN-OUT: dispatch pipeline. Reacts to SlotFreed signals and fills
-        // slots immediately — does NOT wait for the next poll cycle.
-        scope.launch(htxElement + Dispatchers.Default) {
-            while (true) {
-                // Block until a slot frees (drain or sweep signaled)
-                slotFreed.receive()
-
-                val alive = activeCount()
-                val available = (maxSlots - alive).coerceAtLeast(0)
-                if (available == 0) continue
-                // Conflicts are honest intent — dispatch right through them.
-                // The working tree may carry committed markers from a forward
-                // merge; that's progress evidence, not a stop condition.
-
-                val pendingCandidates = suppressLegacyNecromance(store.loadQueue())
-                    .filter { !it.isDispatched && !it.isDrained }
-                    .filterNot { entry ->
-                        entry.workId.startsWith("session:") &&
-                            conductor.cards[entry.workId.removePrefix("session:")]?.drained == true
-                    }
-                    .filter { it.spec.isNotBlank() }
-                    .let { candidates ->
-                        val graph = store.buildCausalGraph()
-                        val query = LexicalMemory(summary = "fan-out dispatch", title = "idle", content = "")
-                        val wids = candidates.size j { i: Int -> candidates[i].workId }
-                        val scored = graph.rankByProximity(query, wids)
-                        val widToScore = (0 until scored.size).associate { i: Int -> scored[i].a to scored[i].b }
-                        candidates.sortedByDescending { it.score + (widToScore[it.workId] ?: 0.0) }
-                    }
-                    .take(available)
-
-                if (pendingCandidates.isEmpty()) continue
-
-                // Parallel dispatch: each createSession gets its own
-                // connectionOrdinal → its own SSLEngine in
-                // JvmTlsCodecBackend's ConcurrentHashMap. The transport
-                // handles concurrent exchanges; no mutex needed. The
-                // previous dispatchMutex was a vestigial guard from when
-                // the transport shared a single engine — that was fixed
-                // by the per-ordinal allocation (nextTlsConnectionOrdinal).
-                kotlinx.coroutines.coroutineScope {
-                    for (entry in pendingCandidates) {
-                        launch {
-                            try {
-                                val cappedSpec = capSpec(entry.spec)
-                                val sessionId = client.createSession(
-                                    prompt = cappedSpec, title = entry.title, source = source)
-                                store.appendWork(entry.workId, JulesCause.WorkDispatched(
-                                    workId = entry.workId,
-                                    sessionId = sessionId,
-                                    attempt = entry.attempt + 1,
-                                    at = Clock.System.now().toEpochMilliseconds(),
-                                ))
-                                _events.emit(FlywheelEvent.Dispatched(sessionId, entry.title))
-                                tickDispatched.incrementAndGet()
-                                println("[CHOREOGRAPHY] dispatch ${entry.title.take(60)}")
-                            } catch (t: Throwable) {
-                                classifyHttpError(t)
-                                _events.emit(FlywheelEvent.DispatchFailed(entry.title, t.message.orEmpty()))
-                            }
-                        }
-                    }
+                if (triggers == null) {
+                    delay(intervalMs)
+                } else {
+                    // Timer and file/WAL events feed one serialized reducer;
+                    // the conflated channel never launches overlapping cycles.
+                    withTimeoutOrNull(intervalMs) { triggers.receive() }
                 }
             }
         }
-
-        println("[CHOREOGRAPHY] reactive cycle started — serialized Git settlement + fan-out API work")
+        println("[CHOREOGRAPHY] serialized CCEK cycle started")
     }
 
     /**
-     * Parallel drain via Pijul commutative patches. Each completed session's
-     * patch is applied to [pijulChannel] concurrently — non-overlapping edits
-     * commute with no conflict resolution. The channel materializes to the
-     * working tree once, then a single commit lands everything.
-     *
-     * Falls back to [drainThreeWay] if the patch parsing fails or the channel
-     * detects overlapping edits that can't commute.
+     * Serialize the exact-artifact settlement lane before the next research
+     * wave. Every completed session is selected from durable Jules activity /
+     * CAS observations and validated in a disposable Git worktree.
      */
-    private suspend fun drainPijul(sessions: List<JulesRestClient.SessionInfo>): DrainBatch {
-        if (sessions.isEmpty()) return DrainBatch()
-        println("[FLYWHEEL] DRAIN-PIJUL sessions=${sessions.size}")
-
-        // CAS phase — parallel, same as drainThreeWay
-        git("fetch", "origin", "--prune")
-        val preFetchedRefs = git("for-each-ref", "--format=%(refname:short)", "refs/remotes/origin")
-            .takeIf { it.exitCode == 0 }?.output?.lineSequence()?.map { it.trim() }?.toList() ?: emptyList()
-
-        data class PijulArm(
-            val session: JulesRestClient.SessionInfo,
-            val patchCid: ContentId,
-            val patch: String,
-            val workId: String,
-        )
-
-        // Parallel CAS — each session fetches its patch + content-addresses it
-        val arms = coroutineScope {
-            sessions.map { s ->
-                async {
-                    val patch = withTimeoutOrNull(60_000L) { client.lastPatch(s.id) }
-                    if (patch.isNullOrBlank()) {
-                        val probes = (noPatchProbes[s.id] ?: 0) + 1
-                        noPatchProbes[s.id] = probes
-                        if (probes >= 3) {
-                            noPatchProbes.remove(s.id)
-                            conductor.retireTerminal(s.id, "no patch after $probes probes; nothing to land", Clock.System.now().toEpochMilliseconds())
-                            println("[FLYWHEEL] RETIRE ${s.id.takeLast(6)} no-patch after $probes probes")
-                        }
-                        null
-                    } else {
-                        val patchCid = try { casStore.put(patch.encodeToByteArray()) }
-                        catch (e: Exception) { drainFail(s, "CAS put failed: ${e.message}"); null }
-                        if (patchCid != null) {
-                            noPatchProbes.remove(s.id)
-                            val workId = store.loadQueue().firstOrNull {
-                                it.sessionId == s.id && !it.isDrained
-                            }?.workId ?: "session:${s.id}"
-                            PijulArm(s, patchCid, patch, workId)
-                        } else null
-                    }
-                }
-            }.awaitAll().filterNotNull()
-        }
-
-        if (arms.isEmpty()) {
-            println("[FLYWHEEL] DRAIN-PIJUL no CAS-ready arms out of ${sessions.size}")
-            return DrainBatch()
-        }
-
-        // Parse patches → FileChanges and apply to channel in parallel.
-        // Non-overlapping edits commute; the channel handles concurrency
-        // internally (each file gets its own PijulCrdt).
-        pijulChannel.reset()
-        val applied = coroutineScope {
-            arms.map { arm ->
-                async {
-                    val changes = parsePatchToFileChanges(arm.patch)
-                    if (changes.isEmpty()) {
-                        drainFail(arm.session, "empty patch file list")
-                        null
-                    } else {
-                        pijulChannel.applyPatch(
-                            workId = arm.workId,
-                            sessionId = arm.session.id,
-                            patchCid = arm.patchCid,
-                            title = arm.session.title,
-                            changes = changes,
-                        )
-                        arm
-                    }
-                }
-            }.awaitAll().filterNotNull()
-        }
-
-        if (applied.isEmpty()) {
-            println("[FLYWHEEL] DRAIN-PIJUL no patches applied out of ${arms.size}")
-            return DrainBatch()
-        }
-
-        // Materialize the channel's merged state to the working tree —
-        // single filesystem touch, then one commit.
-        synchronizeMain()
-        commitExistingConflicts()
-        val touched = withContext(Dispatchers.IO) {
-            pijulChannel.materialize(repoDir.absolutePath, JvmFileOperations())
-        }
-        if (touched.isEmpty()) {
-            println("[FLYWHEEL] DRAIN-PIJUL materialize produced no files")
-            return DrainBatch()
-        }
-
-        git("add", "--", *touched.toTypedArray())
-        val commitMsg = if (applied.size == 1) {
-            "flywheel: patch ${applied.first().session.title.take(50)} (${applied.first().session.id.takeLast(6)})"
-        } else {
-            "flywheel: pijul parallel merge ${applied.size} sessions — ${applied.joinToString(",") { it.session.id.takeLast(6) }}"
-        }
-        val commit = git("commit", "--no-verify", "-m", commitMsg)
-        if (commit.exitCode != 0 && !isWorkingTreeClean()) {
-            emitPollError("pijul commit failed: ${commit.output.take(200)}", 0)
-            println("[FLYWHEEL] DRAIN-PIJUL commit failed — falling back to 3-way")
-            pijulChannel.reset()
-            return drainThreeWay(sessions)
-        }
-
-        // Build
-        val build = shell(300_000L, "./gradlew", ":jvmMainClasses", "--no-daemon")
-        if (build.exitCode != 0) {
-            emitPollError("pijul build failed: ${build.output.take(400)}", 0)
-            println("[FLYWHEEL] DRAIN-PIJUL build red — committed anyway, next RGA resolves")
-        } else {
-            println("[FLYWHEEL] DRAIN-PIJUL build green")
-        }
-
-        // Provenance close — each arm gets its own receipt + tag + WAL bond
-        val commitSha = headSha()
-        val now = Clock.System.now().toEpochMilliseconds()
-        for (arm in applied) {
-            val safeSession = arm.session.id.replace(Regex("[^A-Za-z0-9._-]"), "-")
-            val tag = "flywheel/jules-$safeSession-${commitSha.take(12)}"
-            val tagRes = git("tag", tag)
-            if (tagRes.exitCode == 0) {
-                println("[FLYWHEEL] TAG ${arm.session.id.takeLast(6)} $tag")
-            }
-            sendMergeReceipt(
-                sessionId = arm.session.id,
-                commitSha = commitSha,
-                tag = tag,
-                patchCid = arm.patchCid,
-                branch = findSessionBranch(arm.session.id, preFetchedRefs),
-                prUrl = fishPrUrl(arm.session.id, tag),
-            )
-            conductor.retireTerminal(arm.session.id, "pijul-drained @ $commitSha", now)
-            _events.emit(FlywheelEvent.Drained(arm.session.id, commitSha, tag))
-        }
-
-        // Push
-        synchronizeMain()
-
-        val panorama = applied.map { arm ->
-            QaLaguna.SessionPanorama(
-                sessionId = arm.session.id,
-                title = arm.session.title,
-                touchedFiles = parsePatchFiles(arm.patch),
-            )
-        }
-        println("[FLYWHEEL] DRAIN-PIJUL ${applied.size}/${sessions.size} sessions landed via commutative merge")
-        DrainPerformanceTracker.recordDrainBatch(applied.size, System.currentTimeMillis())
-        return DrainBatch(harvested = applied.size, panorama = panorama)
-    }
-
-    /**
-     * Parse a unified diff into [borg.trikeshed.pijul.FileChanges] — the
-     * intermediate representation between diff parsing and CRDT application.
-     * Each file's hunks become Insert/Delete operations at line positions.
-     */
-    private fun parsePatchToFileChanges(patch: String): List<borg.trikeshed.pijul.FileChanges> {
-        val result = mutableMapOf<String, MutableList<borg.trikeshed.lib.Join<Int, String>>>()
-        val deletes = mutableMapOf<String, MutableList<borg.trikeshed.lib.Join<Int, Int>>>()
-        var currentFile: String? = null
-        var newLineNum = 0
-
-        for (line in patch.lines()) {
-            when {
-                line.startsWith("+++ b/") -> {
-                    currentFile = line.removePrefix("+++ b/").trim().takeIf { it.isNotEmpty() && it != "/dev/null" }
-                    if (currentFile != null) {
-                        result.getOrPut(currentFile!!) { mutableListOf() }
-                        deletes.getOrPut(currentFile!!) { mutableListOf() }
-                    }
-                    newLineNum = 0
-                }
-                line.startsWith("@@") -> {
-                    val match = Regex("""\+(\d+)(?:,(\d+))?""").find(line)
-                    newLineNum = match?.groupValues?.get(1)?.toIntOrNull() ?: 1
-                }
-                line.startsWith("+") && !line.startsWith("+++") && currentFile != null -> {
-                    val content = line.removePrefix("+")
-                    result[currentFile!!]!!.add(newLineNum j content)
-                    newLineNum++
-                }
-                line.startsWith("-") && !line.startsWith("---") && currentFile != null -> {
-                    deletes[currentFile!!]!!.add(newLineNum j 1)
-                }
-                line.startsWith(" ") || line.startsWith("\\") -> {
-                    newLineNum++
-                }
-            }
-        }
-
-        return result.keys.map { path ->
-            borg.trikeshed.pijul.FileChanges(
-                path = path,
-                inserts = result[path] ?: emptyList(),
-                deletes = deletes[path] ?: emptyList(),
-            )
-        }
-    }
-
-    /** Drain every completed session before the next research wave. */
     private val drainGuard = java.util.concurrent.atomic.AtomicBoolean(false)
     private suspend fun drainFanout(sessions: List<JulesRestClient.SessionInfo>): DrainBatch {
         if (!drainGuard.compareAndSet(false, true)) return DrainBatch()
         try {
             if (sessions.isEmpty()) return DrainBatch()
             println("[FLYWHEEL] DRAIN-ALL sessions=${sessions.size}")
-            // PijulChannel models only patch operations; it does not seed its
-            // CRDT with the current worktree. Materializing it therefore
-            // replaces an existing file with the patch's inserted fragments
-            // and can destroy every untouched line. Do not use it as a drain
-            // target until it has a verified baseline-import transition.
-            return drainThreeWay(sessions)
+            return drainExactArtifacts(sessions)
         } finally {
             drainGuard.set(false)
         }
@@ -1207,30 +639,179 @@ class FlywheelDriver(
         val panorama: List<QaLaguna.SessionPanorama> = emptyList(),
     )
 
-    /** One drain's terminal outcome. [Skipped] covers no-patch / dirty tree / infra errors. */
-    private sealed interface DrainOutcome {
-        data object Harvested : DrainOutcome
-        data object Skipped   : DrainOutcome
+    /** Automatic patch probe distinguishes absent output from a regression gate. */
+    private sealed interface AutomaticPatch {
+        data class Available(val text: String, val patchCid: ContentId? = null) : AutomaticPatch
+        data class ReviewBlocked(val reason: String) : AutomaticPatch
+    }
+
+    /** Result of validating one exact CAS artifact in an isolated worktree. */
+    private sealed interface PatchPreflight {
+        data class Ready(val commitSha: String) : PatchPreflight
+        data object AlreadyPresent : PatchPreflight
+        data class ReviewBlocked(val reason: String) : PatchPreflight
     }
 
     /**
-     * 3-way branch merge: merge every Jules-pushed branch into master
-     * sequentially. There is no drain batch limit; the full completion set
-     * lands and its cumulative conflicts are resolved before research advances.
-     *
-     * CAS-FIRST: every delta is content-addressed BEFORE it touches the tree.
-     * The patch bytes fetched from the API go into the CAS store first; the
-     * resulting CID is the provenance anchor for the merge. Only AFTER the
-     * CID exists does the branch merge (or patch apply) run.
-     *
-     * Flow:
-     *   1. git fetch origin (prune stale refs)
-     *   2. For each session: fetch patch → CAS put → CID → merge branch.
-     *      On conflict: git add -A + commit (concludes merge WITH markers).
-     *      Never --ours/--theirs, never abort.
-     *   3. Build verify.
+     * Resolve drain bytes from durable activity history.  Only an unobserved
+     * activity stream falls back to the session output resource; a known
+     * regression never falls through to `lastPatch()` and therefore cannot be
+     * laundered by a Jules branch or PR.
      */
-    private suspend fun drainThreeWay(sessions: List<JulesRestClient.SessionInfo>): DrainBatch {
+    private suspend fun automaticPatch(s: JulesRestClient.SessionInfo): AutomaticPatch =
+        when (val selected = selectJulesPatchForDrain(conductor.cards[s.id]?.causes.orEmpty())) {
+            JulesPatchDrainSelection.Unobserved -> AutomaticPatch.ReviewBlocked(
+                "completed session has no WAL-bonded API patch artifact; retain the final agent report " +
+                    "for explicit reviewed no-op settlement instead of hollow retirement",
+            )
+            is JulesPatchDrainSelection.Selected -> {
+                val bytes = patchContinuity.bytes(selected)
+                AutomaticPatch.Available(bytes.decodeToString(), selected.snapshot.patchCid)
+            }
+            is JulesPatchDrainSelection.ReviewRequired -> AutomaticPatch.ReviewBlocked(
+                "latest activity patch ${selected.regressedLatest.causalOrdinal}/" +
+                    "${selected.regressedLatest.patchCid.value} dropped " +
+                    selected.missingFiles.joinToString(",") +
+                    "; retained candidate ${selected.retainedCandidate.causalOrdinal}/" +
+                    selected.retainedCandidate.patchCid.value +
+                    " requires explicit reviewed selection/receipt",
+            )
+        }
+
+    /**
+     * Apply and build the exact CAS/API patch away from master.  A failed
+     * apply, an introduced conflict marker, an unexpected path, or a red build
+     * destroys only this temporary worktree and returns a durable review gate.
+     * The caller may fast-forward the resulting child commit only while its
+     * original [baseSha] is still HEAD.
+     */
+    private suspend fun preflightExactPatch(
+        s: JulesRestClient.SessionInfo,
+        patch: String,
+        baseSha: String,
+    ): PatchPreflight {
+        val touched = parsePatchFiles(patch)
+        if (touched.isEmpty()) return PatchPreflight.ReviewBlocked("exact patch names no repository files")
+        val unsafe = touched.firstOrNull(::isUnsafeAutomaticPatchPath)
+        if (unsafe != null) {
+            return PatchPreflight.ReviewBlocked("exact patch contains review-only path $unsafe")
+        }
+
+        val tempRoot = withContext(Dispatchers.IO) {
+            java.nio.file.Files.createTempDirectory("oroboros-jules-${s.id.takeLast(6)}-").toFile()
+        }
+        val worktree = File(tempRoot, "worktree")
+        val patchFile = File(tempRoot, "artifact.patch")
+        try {
+            withContext(Dispatchers.IO) { patchFile.writeBytes(patch.encodeToByteArray()) }
+            val added = git("worktree", "add", "--detach", worktree.absolutePath, baseSha)
+            if (added.exitCode != 0) {
+                return PatchPreflight.ReviewBlocked("temporary worktree failed: ${added.output.take(200)}")
+            }
+
+            val apply = gitIn(worktree, "apply", "--3way", patchFile.absolutePath)
+            if (apply.exitCode != 0) {
+                val reverse = gitIn(worktree, "apply", "--reverse", "--check", patchFile.absolutePath)
+                if (reverse.exitCode != 0) {
+                    return PatchPreflight.ReviewBlocked("exact patch does not apply cleanly: ${apply.output.take(300)}")
+                }
+                val build = shellIn(
+                    worktree,
+                    300_000L,
+                    "./gradlew", "jvmMainClasses", "--console=plain",
+                )
+                return if (build.exitCode == 0 &&
+                    gitIn(worktree, "status", "--porcelain", "--untracked-files=no").output.isBlank()
+                ) PatchPreflight.AlreadyPresent
+                else PatchPreflight.ReviewBlocked(
+                    "exact patch appears present but the base tree is not clean/build-green: ${build.output.takeLast(500)}",
+                )
+            }
+            val unmerged = gitIn(worktree, "diff", "--name-only", "--diff-filter=U")
+            if (unmerged.output.isNotBlank()) {
+                return PatchPreflight.ReviewBlocked(
+                    "exact patch produced conflicts in ${unmerged.output.lineSequence().take(4).joinToString(",")}",
+                )
+            }
+
+            val staged = gitIn(worktree, "add", "-A", "--", *touched.toTypedArray())
+            if (staged.exitCode != 0) {
+                return PatchPreflight.ReviewBlocked("could not stage exact patch: ${staged.output.take(300)}")
+            }
+            val stagedNames = gitIn(worktree, "diff", "--cached", "--name-only").output
+                .lineSequence().filter(String::isNotBlank).toSet()
+            if (stagedNames.isEmpty()) return PatchPreflight.ReviewBlocked("exact patch produced no staged delta")
+            if (!touched.toSet().containsAll(stagedNames)) {
+                return PatchPreflight.ReviewBlocked(
+                    "exact patch mutated undeclared paths: ${(stagedNames - touched.toSet()).joinToString(",")}",
+                )
+            }
+            if (gitIn(worktree, "diff", "--quiet").exitCode != 0) {
+                return PatchPreflight.ReviewBlocked("exact patch left unstaged tracked mutations")
+            }
+            val stagedDiff = gitIn(
+                worktree, "diff", "--cached", "--unified=0", "--", *touched.toTypedArray(),
+            )
+            val introducedMarker = stagedDiff.output.lineSequence().firstOrNull { line ->
+                line.startsWith("+<<<<<<< ") || line == "+=======" || line.startsWith("+>>>>>>> ")
+            }
+            if (introducedMarker != null) {
+                return PatchPreflight.ReviewBlocked("exact patch introduces conflict markers")
+            }
+            val whitespace = gitIn(worktree, "diff", "--cached", "--check")
+            if (whitespace.exitCode != 0) {
+                return PatchPreflight.ReviewBlocked("exact patch fails git diff --check: ${whitespace.output.take(300)}")
+            }
+
+            val build = shellIn(
+                worktree,
+                300_000L,
+                "./gradlew", "jvmMainClasses", "--console=plain",
+            )
+            if (build.exitCode != 0) {
+                return PatchPreflight.ReviewBlocked("required build is red: ${build.output.takeLast(500)}")
+            }
+            if (gitIn(worktree, "diff", "--quiet").exitCode != 0) {
+                return PatchPreflight.ReviewBlocked("required build mutated tracked files")
+            }
+
+            val subject = "flywheel: patch ${s.title.take(50)} (${s.id.takeLast(6)})"
+            val commit = gitIn(worktree, "commit", "--no-verify", "-m", subject)
+            if (commit.exitCode != 0) {
+                return PatchPreflight.ReviewBlocked("validated patch commit failed: ${commit.output.take(300)}")
+            }
+            val revision = gitIn(worktree, "rev-parse", "HEAD")
+            return if (revision.exitCode == 0 && revision.output.isNotBlank()) {
+                PatchPreflight.Ready(revision.output.trim())
+            } else PatchPreflight.ReviewBlocked("validated patch commit has no revision")
+        } finally {
+            if (worktree.exists()) {
+                git("worktree", "remove", "--force", worktree.absolutePath)
+            }
+            git("worktree", "prune")
+            withContext(Dispatchers.IO) {
+                if (tempRoot.exists()) tempRoot.deleteRecursively()
+            }
+        }
+    }
+
+    private fun isUnsafeAutomaticPatchPath(path: String): Boolean {
+        val parts = path.replace('\\', '/').split('/')
+        val base = parts.lastOrNull().orEmpty()
+        return path.isBlank() || path.startsWith('/') || path.startsWith(".Jules/") ||
+            parts.any { it == ".." || it == ".git" || it == ".gradle" } ||
+            parts.firstOrNull() == "build" ||
+            base in setOf("test_script.kt", "patch.diff", "plan_script.sh", "MultiIndexContainer-patch.txt") ||
+            base.startsWith("test_script.")
+    }
+
+    /**
+     * Settle exact Jules activity bytes without trusting a branch or PR.
+     * Each artifact is CAS-pinned, applied and built in a disposable detached
+     * worktree, then integrated only by a clean fast-forward. A failed preflight
+     * leaves master untouched and records a durable review gate.
+     */
+    private suspend fun drainExactArtifacts(sessions: List<JulesRestClient.SessionInfo>): DrainBatch {
         val drainBatchStartMs = System.currentTimeMillis()
         DrainPerformanceTracker.initLogFile(repoDir)
 
@@ -1240,36 +821,33 @@ class FlywheelDriver(
         val preFetchedRefs = git("for-each-ref", "--format=%(refname:short)", "refs/remotes/origin")
             .takeIf { it.exitCode == 0 }?.output?.lineSequence()?.map { it.trim() }?.toList() ?: emptyList()
 
-        // CAS-FIRST: content-address every delta before merge.
+        // CAS-FIRST: content-address every exact delta before any preflight.
         data class Arm(val session: JulesRestClient.SessionInfo, val patchCid: ContentId, val patch: String, val branch: String?)
 
         val arms = kotlinx.coroutines.coroutineScope {
             sessions.map { s ->
                 async {
-                    val patch = withTimeoutOrNull(60_000L) { client.lastPatch(s.id) }
-                    if (patch.isNullOrBlank()) {
-                        val probes = (noPatchProbes[s.id] ?: 0) + 1
-                        noPatchProbes[s.id] = probes
-                        if (probes >= 3) {
-                            noPatchProbes.remove(s.id)
-                            conductor.retireTerminal(
-                                s.id,
-                                "no patch after $probes probes; nothing to land",
-                                Clock.System.now().toEpochMilliseconds(),
-                            )
-                            println("[FLYWHEEL] RETIRE ${s.id.takeLast(6)} no-patch after $probes probes")
-                        } else {
-                            emitPollError("drain ${s.id}: no patch to CAS (probe $probes/3)", 0)
-                        }
+                    val automatic = withTimeoutOrNull(60_000L) { automaticPatch(s) }
+                    if (automatic is AutomaticPatch.ReviewBlocked) {
+                        recordReviewBlockOnce(s, automatic.reason)
+                        emitPollError("drain ${s.id}: ${automatic.reason}", 0)
+                        println("[FLYWHEEL] REVIEW-BLOCK ${s.id.takeLast(6)} ${automatic.reason}")
+                        null
+                    } else if (automatic !is AutomaticPatch.Available) {
+                        emitPollError("drain ${s.id}: patch continuity probe timed out", 0)
                         null
                     } else {
-                        val patchCid = try { casStore.put(patch.encodeToByteArray()) }
+                        val patch = automatic.text
+                        val patchCid = try {
+                            automatic.patchCid ?: withContext(Dispatchers.IO) {
+                                casStore.put(patch.encodeToByteArray())
+                            }
+                        }
                         catch (e: Exception) {
                             drainFail(s, "CAS put failed: ${e.message}")
                             null
                         }
                         if (patchCid != null) {
-                            noPatchProbes.remove(s.id)
                             val branch = findSessionBranch(s.id, preFetchedRefs)
                             println("[FLYWHEEL] CAS ${s.id.takeLast(6)} cid=${patchCid.value.take(16)} branch=${branch ?: "none"}")
                             Arm(s, patchCid, patch, branch)
@@ -1279,10 +857,9 @@ class FlywheelDriver(
             }.awaitAll().filterNotNull().toMutableList()
         }
         // PER-ARM DRAIN — do NOT wait for the whole completion set to CAS.
-        // Retired no-patch sessions already left the completion set via
-        // conductor.retireTerminal(); still-probing sessions remain
-        // undrained for the next cycle. Either way, drain EVERY arm that
-        // HAS a patch now. The previous `arms.size != sessions.size`
+        // No-patch and regressed sessions remain review-blocked; CAS-ready
+        // sessions still drain independently. Drain EVERY arm that HAS an
+        // explicitly safe patch now. The previous `arms.size != sessions.size`
         // gate was a dining-philosopher deadlock: one straggler starved
         // the entire harvest queue and settle never lifted (cycle trace
         // signature: a=0 v=15 p=0 d=0 every cycle). Partial drain unblocks
@@ -1295,145 +872,59 @@ class FlywheelDriver(
             println("[FLYWHEEL] DRAIN partial CAS ${arms.size}/${sessions.size} — draining ready arms")
         }
 
-        // Every completed API delta is now immutable in CAS. Only now may any
-        // synchronization or conflict commit mutate the working tree.
-        commitExistingConflicts()
-        synchronizeMain()
-        commitExistingConflicts()
+        // Every completed API delta is now immutable in CAS.  Master must be
+        // clean and conflict-free before the safe fast-forward lane begins.
+        // synchronizeMain() itself is ancestry-only and cannot create a merge.
+        if (!isWorkingTreeClean() || conflictFiles().isNotEmpty()) {
+            for (arm in arms) drainFail(arm.session, "master is dirty or contains conflict markers")
+            return DrainBatch(conflicts = conflictFiles())
+        }
+        if (!synchronizeMain() || !isWorkingTreeClean() || conflictFiles().isNotEmpty()) {
+            for (arm in arms) drainFail(arm.session, "origin/master cannot be synchronized by fast-forward")
+            return DrainBatch(conflicts = conflictFiles())
+        }
 
-        // 2. Merge each arm. Branch → git merge; no branch → patch apply.
+        // 2. Validate exact CAS bytes in a disposable worktree, then move
+        // master only by fast-forward. A discovered branch or PR is identity
+        // metadata and never supplies mutation bytes.
         val landed = mutableListOf<Arm>()
         for (arm in arms) {
-            val (s, _, _, branch) = arm
-            val historicalSubject = if (branch == null) {
-                "flywheel: patch ${s.title.take(50)} (${s.id.takeLast(6)})"
-            } else {
-                "flywheel: merge ${s.title.take(50)} ($branch)"
-            }
-            val historicalCommit = git(
-                "log", "--format=%H", "-1", "--fixed-strings", "--grep=$historicalSubject",
-            )
-            if (historicalCommit.exitCode == 0 && historicalCommit.output.isNotBlank()) {
-                println("[FLYWHEEL] HISTORY ${s.id.takeLast(6)} already landed at ${historicalCommit.output.trim().take(12)}")
-                landed += arm
-                continue
-            }
-            if (branch != null) {
-                val mergeRes = git("merge", "--no-ff", "--no-edit", branch)
-                if (mergeRes.exitCode != 0) {
-                    val conflicted = unmergedFiles()
-                    if (conflicted.isEmpty()) {
-                        // Corrupt patch — increment probe counter and retire after 3
-                        val probes = (corruptPatchProbes[s.id] ?: 0) + 1
-                        corruptPatchProbes[s.id] = probes
-                        if (probes >= 3) {
-                            corruptPatchProbes.remove(s.id)
-                            conductor.retireTerminal(s.id, "corrupt patch after $probes probes; nothing to land", Clock.System.now().toEpochMilliseconds())
-                            println("[FLYWHEEL] RETIRE ${s.id.takeLast(6)} corrupt patch after $probes probes")
-                        } else {
-                            emitPollError("drain ${s.id}: corrupt patch (probe $probes/3)", 0)
-                        }
-                        continue
-                    }
-                    println("[FLYWHEEL] MERGE-CONFLICT ${s.id.takeLast(6)} ($branch): ${conflicted.size} files — committing markers")
-                    conflicted.take(3).forEach { println("  ✗ $it") }
-                    git("add", "--", *conflicted.toTypedArray())
-                    val commit = git(
-                        "commit", "--no-verify", "-m",
-                        "flywheel: merge ${s.title.take(50)} ($branch) — ${conflicted.size} conflicts kept",
-                    )
-                    if (commit.exitCode != 0) {
-                        drainFail(s, "conflict commit failed: ${commit.output.take(200)}")
-                        continue
-                    }
-                    corruptPatchProbes.remove(s.id) // clear on success
-                } else {
-                    println("[FLYWHEEL] MERGED ${s.id.takeLast(6)} ($branch)")
-                }
-                landed += arm
-                corruptPatchProbes.remove(s.id) // clear on success
-            } else {
-                // Fallback: no branch on origin — apply the CAS'd patch.
-                // SANITIZE FIRST: Jules patches bundle sandbox scratch files
-                // (test_script.kt/patch.diff/plan_script.sh) and trailing
-                // whitespace that make `git apply --3way` reject the whole diff.
-                // sanitizeJulesPatch drops those sections and trims `+` lines so
-                // the real source hunks land. See sanitizer docstring for the
-                // permanent-retry-loop WAL signature this prevents.
-                val cleanPatch = sanitizeJulesPatch(arm.patch)
-                if (cleanPatch.isBlank()) {
-                    drainFail(s, "patch empty after sanitizing scratch sections")
-                    continue
-                }
-                val pf = File(repoDir, ".flywheel-patch-${s.id.takeLast(6)}")
-                try {
-                    // ⚡ Bolt: Wrapped in Dispatchers.IO to prevent blocking the reactor thread with synchronous File I/O.
-                    withContext(Dispatchers.IO) { pf.writeText(cleanPatch) }
-                    val apply = git("apply", "--3way", pf.name)
-                    val conflicted = unmergedFiles()
-                    val alreadyApplied = apply.exitCode != 0 && conflicted.isEmpty() &&
-                        git("apply", "--reverse", "--check", pf.name).exitCode == 0
-                    withContext(Dispatchers.IO) { if (pf.exists()) pf.delete() }
-                    if (alreadyApplied) {
-                        println("[FLYWHEEL] ALREADY ${s.id.takeLast(6)} API delta is present")
-                        landed += arm
-                        continue
-                    }
-                    if (apply.exitCode != 0 && conflicted.isEmpty()) {
-                        // Corrupt patch — increment probe counter and retire after 3
-                        val probes = (corruptPatchProbes[s.id] ?: 0) + 1
-                        corruptPatchProbes[s.id] = probes
-                        if (probes >= 3) {
-                            corruptPatchProbes.remove(s.id)
-                            conductor.retireTerminal(s.id, "corrupt patch after $probes probes; nothing to land", Clock.System.now().toEpochMilliseconds())
-                            println("[FLYWHEEL] RETIRE ${s.id.takeLast(6)} corrupt patch after $probes probes")
-                        } else {
-                            emitPollError("drain ${s.id}: corrupt patch (probe $probes/3)", 0)
-                        }
-                        continue
-                    }
-                    val touched = parsePatchFiles(cleanPatch)
-                    if (touched.isEmpty()) {
-                        drainFail(s, "empty patch file list")
-                        continue
-                    }
-                    git("add", "--", *touched.toTypedArray())
-                    val commit = git(
-                        "commit", "--no-verify", "-m",
-                        "flywheel: patch ${s.title.take(50)} (${s.id.takeLast(6)})",
-                    )
-                    if (commit.exitCode != 0 && !isWorkingTreeClean()) {
-                        // Corrupt patch — increment probe counter and retire after 3
-                        val probes = (corruptPatchProbes[s.id] ?: 0) + 1
-                        corruptPatchProbes[s.id] = probes
-                        if (probes >= 3) {
-                            corruptPatchProbes.remove(s.id)
-                            conductor.retireTerminal(s.id, "corrupt patch after $probes probes; nothing to land", Clock.System.now().toEpochMilliseconds())
-                            println("[FLYWHEEL] RETIRE ${s.id.takeLast(6)} corrupt patch after $probes probes")
-                        } else {
-                            emitPollError("drain ${s.id}: corrupt patch (probe $probes/3)", 0)
-                        }
-                        continue
-                    }
+            val s = arm.session
+            val baseSha = headSha()
+            when (val preflight = preflightExactPatch(s, arm.patch, baseSha)) {
+                PatchPreflight.AlreadyPresent -> {
+                    println("[FLYWHEEL] ALREADY ${s.id.takeLast(6)} exact API delta is present and build-green")
                     landed += arm
-                    corruptPatchProbes.remove(s.id) // clear on success
-                } finally {
-                    if (pf.exists()) pf.delete()
+                }
+                is PatchPreflight.ReviewBlocked -> drainFail(s, preflight.reason)
+                is PatchPreflight.Ready -> {
+                    val headUnchanged = headSha() == baseSha && isWorkingTreeClean() && conflictFiles().isEmpty()
+                    if (!headUnchanged) {
+                        drainFail(s, "master changed during isolated preflight")
+                        continue
+                    }
+                    val integrate = git("merge", "--ff-only", preflight.commitSha)
+                    if (integrate.exitCode != 0) {
+                        drainFail(s, "validated commit could not fast-forward master: ${integrate.output.take(200)}")
+                        continue
+                    }
+                    println(
+                        "[FLYWHEEL] LANDED ${s.id.takeLast(6)} exact CAS artifact " +
+                            "branch=${arm.branch ?: "none"} (identity only)",
+                    )
+                    landed += arm
                 }
             }
         }
         // PER-ARM CLOSE — close provenance for every arm that landed.
-        // Previously, a single failed merge (conflict commit failure, patch
-        // apply failure) returned DrainBatch() empty and froze ALL arms'
-        // provenance — same dining-philosopher shape as the CAS gate above.
-        // Now: close the arms that DID land; failed arms keep their
-        // drainFail record and retry next cycle.
+        // Close only arms that passed isolated preflight and landed. Failed
+        // arms keep their exact CAS object and review gate for a later cycle.
         if (landed.isEmpty()) {
-            println("[FLYWHEEL] DRAIN no merges landed out of ${arms.size}; provenance stays open")
+            println("[FLYWHEEL] DRAIN no exact artifacts landed out of ${arms.size}; provenance stays open")
             return DrainBatch()
         }
         if (landed.size < arms.size) {
-            println("[FLYWHEEL] DRAIN partial merge ${landed.size}/${arms.size} — closing landed arms")
+            println("[FLYWHEEL] DRAIN partial validation ${landed.size}/${arms.size} — closing landed arms")
         }
 
         val panorama = landed.map { arm ->
@@ -1444,91 +935,39 @@ class FlywheelDriver(
             )
         }
         val cumulativeConflicts = conflictFiles()
-        println("[FLYWHEEL] DRAIN ${landed.size}/${sessions.size} sessions merged, ${cumulativeConflicts.size} conflict files")
-
-        // 3a. SOFT CAP — if conflict debt exceeds the threshold, run the
-        //     deterministic union resolver (keeps BOTH arms, no --ours/--theirs)
-        //     BEFORE attempting brain-based QaLaguna. This alternates between
-        //     merging and resolution so debt doesn't pile up infinitely.
-        //     Never gates dispatch — just prioritizes resolution when debt is high.
-        val CONFLICT_SOFT_CAP = 5
-        if (cumulativeConflicts.size >= CONFLICT_SOFT_CAP) {
-            println("[FLYWHEEL] DRAIN conflict cap ($CONFLICT_SOFT_CAP) hit — running deterministic union resolver first")
-            resolveConflicts(cumulativeConflicts)
-            val afterDeterministic = conflictFiles()
-            if (afterDeterministic.size < cumulativeConflicts.size) {
-                git("add", "--", *afterDeterministic.toTypedArray())
-                git("commit", "--no-verify", "-m",
-                    "flywheel: deterministic conflict union — ${cumulativeConflicts.size - afterDeterministic.size} files resolved")
-                println("[FLYWHEEL] DRAIN deterministic resolve: ${cumulativeConflicts.size - afterDeterministic.size} files, ${afterDeterministic.size} remain")
-            }
+        if (cumulativeConflicts.isNotEmpty() || !isWorkingTreeClean()) {
+            for (arm in landed) drainFail(arm.session, "post-preflight master integrity check failed")
+            return DrainBatch(conflicts = cumulativeConflicts, panorama = panorama)
         }
+        println("[FLYWHEEL] DRAIN ${landed.size}/${sessions.size} exact artifacts landed build-green")
 
-        // 3b. Brain-based repair — best-effort, never blocks. If the brain is
-        //     slow/429ing, conflict markers stay committed and the wheel moves on.
-        val remainingConflicts = conflictFiles()
-        if (remainingConflicts.isNotEmpty()) {
-            val resolutions = withTimeoutOrNull(45_000L) {
-                QaLaguna.resolveConflicts(
-                    repoDir = repoDir,
-                    brain = brain,
-                    panorama = panorama,
-                    files = remainingConflicts,
-                )
-            } ?: run {
-                println("[FLYWHEEL] QA-LAGUNA timed out after 45s — conflict markers stay committed")
-                emptyList<Pair<String, Boolean>>()
-            }
-            val resolvedFiles = resolutions.filter { it.second }.map { it.first }
-            if (resolvedFiles.isNotEmpty()) {
-                git("add", "--", *resolvedFiles.toTypedArray())
-                val repair = git(
-                    "commit", "--no-verify", "-m",
-                    "flywheel: resolve cumulative ${landed.size}-session conflicts",
-                )
-                if (repair.exitCode != 0 && !isWorkingTreeClean()) {
-                    emitPollError("cumulative repair commit failed: ${repair.output.take(200)}", 0)
-                    return DrainBatch(conflicts = cumulativeConflicts, panorama = panorama)
-                }
-            }
-            val unresolved = conflictFiles()
-            if (unresolved.isNotEmpty()) {
-                println("[FLYWHEEL] DRAIN repair incomplete — ${unresolved.size} conflict files remain; closing landed provenance")
-            }
-        }
-
-        // 4. Compilation observes the integrated result but does not revoke a
-        //    committed merge. Closing provenance here prevents the next cycle
-        //    from reapplying every arm and compounding the same conflict.
-        //    Conflict markers stay committed — they are honest evidence of
-        //    varying approaches. Dispatch never stops for markers; the soft
-        //    cap (step 3a) alternates between merging and resolution so debt
-        //    doesn't pile up infinitely.
-        val build = shell(300_000L, "./gradlew", ":jvmMainClasses", "--no-daemon")
-        if (build.exitCode != 0) {
-            emitPollError("cumulative build failed: ${build.output.take(400)}", 0)
-            println("[FLYWHEEL] DRAIN build red — committed completion set still closes provenance")
-        } else {
-            println("[FLYWHEEL] DRAIN build green")
-        }
-
-        // 5. PROVENANCE CLOSE — every successful arm shares the final repaired
-        //    commit but retains its own CAS CID, tag, receipt, and WAL identity.
+        // PROVENANCE CLOSE — every successful arm retains its exact CAS CID,
+        // accepted revision, tag, receipt, and optional branch/PR synonyms.
         val commitSha = headSha()
         val now = Clock.System.now().toEpochMilliseconds()
         data class PreparedClose(
             val arm: Arm,
             val tag: String,
             val prUrl: String?,
+            val workId: String,
+            val receipt: MergeReceipt,
         )
         val prepared = mutableListOf<PreparedClose>()
+        val queueBySession = withContext(Dispatchers.IO) {
+            store.loadQueue().mapNotNull { entry -> entry.sessionId?.let { it to entry } }.toMap()
+        }
         for (arm in landed) {
             val (s, patchCid, _, branch) = arm
             val safeSession = s.id.replace(Regex("[^A-Za-z0-9._-]"), "-")
             val tag = "flywheel/jules-$safeSession-${commitSha.take(12)}"
             val existingTagCommit = git("rev-parse", "$tag^{commit}")
             val tagReady = existingTagCommit.exitCode == 0 &&
-                existingTagCommit.output.trim() == commitSha
+                existingTagCommit.output.trim() == commitSha &&
+                git("for-each-ref", "--format=%(contents)", "refs/tags/$tag").let { message ->
+                    message.exitCode == 0 &&
+                        "session=${s.id}" in message.output &&
+                        "patchCid=${patchCid.value}" in message.output
+                }
             if (!tagReady) {
                 val tagResult = git("tag", "-a", tag, commitSha, "-m",
                     "Jules merge receipt\nsession=${s.id}\npatchCid=${patchCid.value}\nbranch=${branch ?: "none"}\ntaskTitle=${s.title}")
@@ -1537,8 +976,14 @@ class FlywheelDriver(
                     continue  // per-arm: don't abandon the rest of the batch
                 }
             }
-            val prUrl = try { fishPrUrl(s.id, tag) } catch (_: Throwable) { null }
-            val workId = store.loadQueue().firstOrNull { it.sessionId == s.id }?.workId
+            val prUrl = try {
+                fishPrUrl(s.id, tag)
+            } catch (t: Throwable) {
+                if (t is kotlinx.coroutines.CancellationException) throw t
+                emitPollError("optional branch identity ${s.id}: ${t.message?.take(200)}", 0)
+                null
+            }
+            val workId = queueBySession[s.id]?.workId
                 ?: "session:${s.id.replace(Regex("[^A-Za-z0-9._-]"), "-")}"
             val receipt = MergeReceipt(
                 workId = workId,
@@ -1551,7 +996,80 @@ class FlywheelDriver(
                 claimedAt = now,
                 prUrl = prUrl,
             )
+            prepared += PreparedClose(arm, tag, prUrl, workId, receipt)
+        }
+
+        // A direct Jules API session may not have entered through WorkQueued.
+        // Materialize that identity before publication so its immutable receipt
+        // remains projectable from loadQueue() after a restart.
+        for (close in prepared) {
+            if (queueBySession[close.arm.session.id] != null) continue
+            val s = close.arm.session
+            store.appendWork(close.workId, JulesCause.WorkQueued(
+                workId = close.workId,
+                tier = "jules-api",
+                title = s.title,
+                spec = "Observed Jules API artifact; mutation bytes are CAS-addressed.",
+                score = 0.5,
+                at = now,
+            ))
+            store.appendWork(close.workId, JulesCause.WorkDispatched(
+                workId = close.workId,
+                sessionId = s.id,
+                attempt = 1,
+                at = now,
+            ))
+        }
+
+        // Tags are local preparation. Publish the accepted commit/tag prefix
+        // before declaring WorkDrained or telling Jules it merged upstream.
+        // Re-poll immediately before publication: a terminal Jules timeline
+        // can still acquire a late patch/report while isolated builds run.
+        for (close in prepared) {
+            val sessionId = close.arm.session.id
+            val timeline = client.activityTimeline(sessionId)
+            val card = requireNotNull(conductor.cards[sessionId])
+            val patchFacts = patchContinuity.observe(sessionId, timeline.patches, card.causes)
+            val reportFacts = patchContinuity.observeReports(
+                sessionId,
+                timeline.reports,
+                card.causes + patchFacts,
+            )
+            if (patchFacts.isNotEmpty() || reportFacts.isNotEmpty()) {
+                val advanced = card.copy(causes = card.causes + patchFacts + reportFacts, drained = false)
+                conductor.cards[sessionId] = advanced
+                drainFail(close.arm.session, "Jules artifact watermark advanced during preflight")
+                return DrainBatch(harvested = 0, panorama = panorama)
+            }
+        }
+        if (prepared.isNotEmpty() && !pushOriginParity()) {
+            prepared.forEach { drainFail(it.arm.session, "landed locally but origin/master push/parity failed") }
+            return DrainBatch(
+                harvested = 0,
+                conflicts = conflictFiles(),
+                panorama = panorama,
+            )
+        }
+
+        val receipted = mutableListOf<PreparedClose>()
+        for (close in prepared) {
+            val (arm, tag, _, workId, receipt) = close
+            val (s, _, _, branch) = arm
             try {
+                // Identity precedes terminal receipt so a crash cannot create a
+                // settled queue entry whose session/tag synonyms were lost.
+                store.appendWork(workId, JulesCause.WorkIdentitySynthesized(
+                    workId = workId,
+                    identity = WorkIdentity(
+                        workId = workId,
+                        sessionId = s.id,
+                        gitBranch = branch,
+                        prUrl = receipt.prUrl,
+                        gitTag = tag,
+                        commitSha = commitSha,
+                    ),
+                    at = now,
+                ))
                 store.appendWork(workId, JulesCause.WorkDrained(
                     workId = workId,
                     sessionId = s.id,
@@ -1560,29 +1078,17 @@ class FlywheelDriver(
                     receipt = receipt,
                     at = now,
                 ))
-                store.appendWork(workId, JulesCause.WorkIdentitySynthesized(
-                    workId = workId,
-                    identity = WorkIdentity(
-                        workId = workId,
-                        sessionId = s.id,
-                        gitBranch = branch,
-                        prUrl = prUrl,
-                        gitTag = tag,
-                        commitSha = commitSha,
-                    ),
-                    at = now,
-                ))
             } catch (t: Throwable) {
                 emitPollError("provenance WAL ${s.id}: ${t.message}", 0)
-                drainFail(s, "provenance WAL failed: ${t.message?.take(200)}")  // per-arm: record drainFail so the retry/retire counter advances like the tag path
+                drainFail(s, "provenance WAL failed: ${t.message?.take(200)}")
                 continue  // per-arm: don't abandon the rest of the batch
             }
-            prepared += PreparedClose(arm, tag, prUrl)
+            receipted += close
         }
 
         // All per-arm tags, receipts, and identity records exist before any
         // card leaves the completion set. A failure above closes no card.
-        conductor.recordDrains(prepared.map {
+        conductor.recordDrains(receipted.map {
             JulesConductor.DrainRecord(
                 sessionId = it.arm.session.id,
                 commitSha = commitSha,
@@ -1590,7 +1096,7 @@ class FlywheelDriver(
             )
         })
 
-        for ((arm, tag, prUrl) in prepared) {
+        for ((arm, tag, prUrl) in receipted) {
             val (s, patchCid, _, branch) = arm
             _events.emit(FlywheelEvent.Drained(s.id, commitSha, tag))
             drainFailures.remove(s.id)
@@ -1599,96 +1105,25 @@ class FlywheelDriver(
         }
 
         val drainBatchDurationMs = System.currentTimeMillis() - drainBatchStartMs
-        if (prepared.isNotEmpty()) {
-            DrainPerformanceTracker.recordDrainBatch(prepared.size, drainBatchDurationMs)
+        if (receipted.isNotEmpty()) {
+            DrainPerformanceTracker.recordDrainBatch(receipted.size, drainBatchDurationMs)
         }
 
         return DrainBatch(
-            harvested = prepared.size,
+            harvested = receipted.size,
             conflicts = conflictFiles(),
             panorama = panorama,
         )
     }
 
     /**
-     * Merge unmerged origin branches that have no Jules session backing them —
-     * bolt, palette, refactor, perf, feat branches etc — into master using
-     * the same forward-only 3-way policy. Processes up to ORPHAN_HARVEST_BATCH
-     * branches per call so latency stays bounded. Skips branches already merged
-     * into master (fast ancestry check via `git merge-base --is-ancestor`).
+     * Branches without an observed producer artifact are not autonomous
+     * mutation authority. Keep origin refs fresh for identity reconciliation;
+     * exact Jules API/CAS artifacts enter through [drainExactArtifacts].
      */
-    private val ORPHAN_HARVEST_BATCH = 4
-    private val JULES_SESSION_ID_IN_REF = Regex("""\d{15,20}""")
-    // Branches excluded from autonomous harvest: large structural renames and
-    // the aggregate roll-up branches land manually.
-    private val HARVEST_EXCLUDE_PREFIXES = setOf("origin/aggregate/", "origin/backup/", "origin/arena/")
-
     private suspend fun harvestOrphanBranches() {
-        if (!isWorkingTreeClean()) return
-
-        val backedSessionIds = conductor.cards.keys.asSequence()
-            .map { it.substringAfterLast('/').filter(Char::isDigit) }
-            .filter { it.isNotEmpty() }
-            .toSet()
-
-        val refs = git("for-each-ref", "--format=%(refname:short)", "refs/remotes/origin")
-            .takeIf { it.exitCode == 0 }?.output?.lineSequence()
-            ?.map { it.trim() }
-            ?.filter { ref ->
-                ref.startsWith("origin/") &&
-                ref != "origin/master" &&
-                ref != "origin/HEAD" &&
-                !JULES_SESSION_ID_IN_REF.containsMatchIn(ref) &&
-                backedSessionIds.none { it in ref } &&
-                HARVEST_EXCLUDE_PREFIXES.none { ref.startsWith(it) }
-            }
-            ?.toList() ?: return
-
-        if (refs.isEmpty()) return
-
-        // Filter to branches not yet merged into master.
-        val unmerged = withContext(Dispatchers.IO) {
-            refs.filter { ref ->
-                val check = ProcessBuilder("git", "merge-base", "--is-ancestor", ref, "HEAD")
-                    .directory(repoDir).start()
-                check.waitFor() != 0  // exit 0 = already ancestor = already merged
-            }
-        }
-
-        if (unmerged.isEmpty()) return
-        println("[FLYWHEEL] ORPHAN-HARVEST ${unmerged.size} unmerged origin/* branches; taking up to $ORPHAN_HARVEST_BATCH")
-
-        val batch = unmerged.take(ORPHAN_HARVEST_BATCH)
-        val batchStartMs = System.currentTimeMillis()
-        var harvested = 0
-
-        for (ref in batch) {
-            if (!isWorkingTreeClean()) {
-                commitExistingConflicts()
-            }
-            val mergeRes = git("merge", "--no-ff", "--no-edit", ref)
-            if (mergeRes.exitCode == 0) {
-                println("[FLYWHEEL] ORPHAN-MERGED $ref")
-                harvested++
-            } else {
-                val conflicted = unmergedFiles()
-                if (conflicted.isNotEmpty()) {
-                    println("[FLYWHEEL] ORPHAN-CONFLICT $ref: ${conflicted.size} files — committing markers")
-                    conflicted.take(3).forEach { println("  ✗ $it") }
-                    git("add", "--", *conflicted.toTypedArray())
-                    git("commit", "--no-verify", "-m", "flywheel: merge $ref — ${conflicted.size} conflicts kept")
-                    harvested++
-                } else {
-                    println("[FLYWHEEL] ORPHAN-SKIP $ref: merge failed, no conflict markers")
-                    git("merge", "--abort").also { }
-                }
-            }
-        }
-
-        if (harvested > 0) {
-            val batchMs = System.currentTimeMillis() - batchStartMs
-            DrainPerformanceTracker.recordDrainBatch(harvested, batchMs)
-        }
+        val fetch = git("fetch", "origin", "--prune")
+        if (fetch.exitCode != 0) emitPollError("origin ref refresh failed: ${fetch.output.take(200)}", 0)
     }
 
     private fun activeCount(): Int = conductor.cards.values.count {
@@ -1697,188 +1132,42 @@ class FlywheelDriver(
 
     /** Find the GitHub branch or PR head carrying this Jules session id. */
     private suspend fun findSessionBranch(sessionId: String, preFetchedRefs: List<String>? = null): String? {
-        val numericId = sessionId.substringAfterLast('/').filter { it.isDigit() }
-        if (numericId.isEmpty()) return null
+        val exactId = sessionId.substringAfterLast('/').takeIf { it.isNotBlank() } ?: return null
 
         val refsList = preFetchedRefs ?: run {
             val refs = git("for-each-ref", "--format=%(refname:short)", "refs/remotes/origin")
             if (refs.exitCode == 0) refs.output.lineSequence().map { it.trim() }.toList() else emptyList()
         }
 
-        // Jules branches and task branches both carry the numeric Jules id.
-        refsList.firstOrNull {
-            it.startsWith("origin/") && numericId in it
-        }?.let { return it }
-
-        // A PR may carry the Jules id in its title/body while its head branch
-        // has another name. Merge that PR head; pushing master closes the PR.
-        val pr = shell(
-            "gh", "pr", "list", "--state", "open", "--search", numericId,
-            "--json", "headRefName", "--jq", ".[0].headRefName // \"\"",
-        )
-        val head = pr.output.trim()
-        if (pr.exitCode == 0 && head.isNotEmpty()) {
-            val ref = "origin/$head"
-            if (refsList.contains(ref) || git("show-ref", "--verify", "--quiet", "refs/remotes/$ref").exitCode == 0) return ref
+        // Optional identity must carry the complete id as a delimiter-bounded
+        // branch token. An ambiguous PR search is worse than null provenance.
+        val token = Regex("(^|[^A-Za-z0-9])${Regex.escape(exactId)}([^A-Za-z0-9]|$)")
+        return refsList.firstOrNull { ref ->
+            ref.startsWith("origin/") && token.containsMatchIn(ref.removePrefix("origin/"))
         }
-        return null
     }
 
 
     /**
-     * Sync local master to origin/master with one ordinary 3-way merge.
-     * Conflicts are NOT resolved — neither `--ours` nor `--theirs`, no
-     * auto-resolution; conflict markers stay in the working tree and the
-     * barrier reports drift. Throughput > purity: 40 dirty merges beat 4× the
-     * wall clock of a curator round-trip.
-     *
-     * Returns true iff the merge command exited 0 (fast-forward or merge
-     * succeeded). A non-zero exit leaves the tree dirty with conflict markers;
-     * settlementBarrier decides whether to push anyway.
+     * Refresh origin/master and advance local master only by fast-forward.
+     * Divergence or a dirty worktree is a review gate; this helper never creates
+     * a merge commit or conflict markers.
      */
     private suspend fun synchronizeMain(): Boolean {
         if (!isWorkingTreeClean()) return false
+        if (!isCanonicalMaster()) return false
         if (git("fetch", "origin", "master").exitCode != 0) return false
-        // `--no-ff` preserves the synchronization edge even when a fast-forward
-        // is possible. Jules branches are merged later by drainThreeWay().
-        return git("merge", "--no-ff", "origin/master").exitCode == 0
+        // Origin freshness is allowed to move local master only when no local
+        // continuity exists to merge. Divergence remains review-blocked.
+        return git("merge", "--ff-only", "origin/master").exitCode == 0
     }
 
     /**
-     * Close non-terminal cards whose Jules branch is already an ancestor of
-     * HEAD. Jules can leave the API state at IN_PROGRESS after an external PR
-     * merge, which otherwise occupies a slot forever. Git ancestry is the
-     * authority; every reconciliation still records an immutable CAS artifact,
-     * annotated tag, queue receipt, identity, and drained card in that order.
-     */
-    private suspend fun reconcileGitState() {
-        val candidates = conductor.cards.values.filter { card -> !card.drained }
-        if (candidates.isEmpty()) return
-
-        val fetch = git("fetch", "origin", "--prune")
-        if (fetch.exitCode != 0) {
-            emitPollError("reconcile fetch failed: ${fetch.output.take(200)}", 0)
-            return
-        }
-        val mergedRefs = git(
-            "for-each-ref", "--format=%(refname:short)", "--merged=HEAD", "refs/remotes/origin",
-        )
-        if (mergedRefs.exitCode != 0) {
-            emitPollError("reconcile merged-ref query failed: ${mergedRefs.output.take(200)}", 0)
-            return
-        }
-        val mergedBranches = mergedRefs.output.lineSequence()
-            .map { it.trim() }
-            .filter { it.startsWith("origin/") }
-            .toList()
-        if (mergedBranches.isEmpty()) return
-
-        val workIds = store.loadQueue().mapNotNull { entry ->
-            entry.sessionId?.let { it to entry.workId }
-        }.toMap()
-        for (card in candidates) {
-            val sessionId = card.snapshot.sessionId
-            val numericId = sessionId.substringAfterLast('/').filter { it.isDigit() }
-            if (numericId.isEmpty()) continue
-            // Jules uses both jules-<id>-<hash> and jules-<slug>-<id>-<hash>.
-            val branch = mergedBranches.firstOrNull { numericId in it } ?: continue
-            val revision = git("rev-parse", branch)
-            if (revision.exitCode != 0 || revision.output.isBlank()) {
-                emitPollError("reconcile $sessionId: cannot resolve $branch", 0)
-                continue
-            }
-            val commitSha = revision.output.trim()
-            val gitDelta = git("show", "--format=", "--binary", commitSha)
-            if (gitDelta.exitCode != 0) {
-                emitPollError("reconcile $sessionId: cannot read $commitSha", 0)
-                continue
-            }
-            // A merge commit can have no default show diff; its ref+revision are
-            // still durable Git evidence rather than a hollow empty CID.
-            val patchBytes = gitDelta.output.ifBlank {
-                "reconciled-session=$sessionId\nbranch=$branch\nrevision=$commitSha\n"
-            }.encodeToByteArray()
-            val patchCid = try {
-                withContext(Dispatchers.IO) { casStore.put(patchBytes) }
-            } catch (t: Throwable) {
-                emitPollError("reconcile $sessionId: CAS put failed: ${t.message?.take(200)}", 0)
-                continue
-            }
-
-            val safeSession = sessionId.replace(Regex("[^A-Za-z0-9._-]"), "-")
-            val tag = "flywheel/jules-$safeSession-${commitSha.take(12)}"
-            val existingTag = git("rev-parse", "--verify", "$tag^{commit}")
-            if (existingTag.exitCode == 0 && existingTag.output.trim() != commitSha) {
-                emitPollError("reconcile $sessionId: existing tag $tag targets ${existingTag.output.trim()}", 0)
-                continue
-            }
-            if (existingTag.exitCode != 0) {
-                val tagged = git(
-                    "tag", "-a", tag, commitSha, "-m",
-                    "Jules reconciliation receipt\nsession=$sessionId\nbranch=$branch\npatchCid=${patchCid.value}",
-                )
-                if (tagged.exitCode != 0) {
-                    emitPollError("reconcile $sessionId: tag create failed: ${tagged.output.take(200)}", 0)
-                    continue
-                }
-            }
-
-            val workId = workIds[sessionId]
-                ?: "session:${sessionId.replace(Regex("[^A-Za-z0-9._-]"), "-")}"
-            val now = Clock.System.now().toEpochMilliseconds()
-            val prUrl = runCatching { fishPrUrl(sessionId, tag) }.getOrNull()
-            val receipt = MergeReceipt(
-                workId = workId,
-                producer = "jules",
-                producerRef = sessionId,
-                patchCid = patchCid,
-                revision = commitSha,
-                versionTag = tag,
-                lexicalMemory = LexicalMemory(
-                    summary = card.card.title,
-                    title = card.card.title,
-                    content = "reconciled from $branch at $commitSha",
-                ),
-                claimedAt = now,
-                prUrl = prUrl,
-            )
-            try {
-                store.appendWork(workId, JulesCause.WorkDrained(
-                    workId = workId,
-                    sessionId = sessionId,
-                    commitSha = commitSha,
-                    taskId = tag,
-                    receipt = receipt,
-                    at = now,
-                ))
-                store.appendWork(workId, JulesCause.WorkIdentitySynthesized(
-                    workId = workId,
-                    identity = WorkIdentity(
-                        workId = workId,
-                        sessionId = sessionId,
-                        gitBranch = branch,
-                        prUrl = prUrl,
-                        gitTag = tag,
-                        commitSha = commitSha,
-                    ),
-                    at = now,
-                ))
-                conductor.recordDrain(sessionId, commitSha, rejects = 0)
-            } catch (t: Throwable) {
-                emitPollError("reconcile $sessionId: provenance WAL failed: ${t.message?.take(200)}", 0)
-                continue
-            }
-            println("[FLYWHEEL] RECONCILE ${sessionId.takeLast(6)} branch=$branch tag=$tag")
-            sendMergeReceipt(sessionId, commitSha, tag, patchCid, branch, prUrl)
-        }
-    }
-
-    /**
-     * Post the merge receipt back onto the Jules task itself: merge timestamp,
+     * Post the settlement receipt back onto the Jules task itself: timestamp,
      * commit, tag, CAS patch id, branch and PR URL. The tag/commit/URL bond is
      * the idempotency anchor — git ancestry and tag existence already veto
-     * dupe merges upstream, so this message fires exactly once per landed
-     * merge, preventing loops and backwash. Best-effort: a send failure never
+     * duplicate settlement upstream, so this message fires once per landed
+     * artifact, preventing loops and backwash. Best-effort: a send failure never
      * revokes provenance.
      */
     private suspend fun sendMergeReceipt(
@@ -1888,7 +1177,7 @@ class FlywheelDriver(
         patchCid: ContentId,
         branch: String?,
         prUrl: String?,
-    ) {
+    ): Boolean {
         val msg = buildString {
             appendLine("FLYWHEEL MERGE RECEIPT")
             appendLine("mergedAt=${java.time.Instant.ofEpochMilli(System.currentTimeMillis())}")
@@ -1901,50 +1190,71 @@ class FlywheelDriver(
         try {
             conductor.answer(sessionId, msg)
             println("[FLYWHEEL] RECEIPT ${sessionId.takeLast(6)} -> jules task tag=$tag")
+            return true
         } catch (t: Throwable) {
+            if (t is kotlinx.coroutines.CancellationException) throw t
             emitPollError("receipt send $sessionId: ${t.message?.take(200)}", 0)
+            return false
         }
     }
 
     /**
-     * Push all locally drained commits to origin/master, then surface the
-     * current local/remote state. Divergence is observable and the
-     * next synchronizeMain() cycle resolves it. PRs do not block (Jules
-     * pushes branches; PRs are operator surface, not gate surface).
-     *
-     * Returns true iff push succeeded. A false return means origin rejected
-     * (e.g. branch protection); the working tree is left dirty so the next
-     * cycle can recover.
+     * Immediate-mode publication adapter. Git is not causal authority: this
+     * only projects the already validated CAS/WAL prefix to origin and proves
+     * byte-for-byte master parity before terminal receipts become visible.
      */
-    private suspend fun settlementBarrier(): Boolean {
-        if (!isWorkingTreeClean()) return false
-        val push = git("push", "--follow-tags", "origin", "HEAD:master")
+    private suspend fun pushOriginParity(): Boolean {
+        if (!isWorkingTreeClean() || !isCanonicalMaster()) return false
+        val push = git("push", "origin", "HEAD:master")
         if (push.exitCode != 0) return false
-
         if (git("fetch", "origin", "master").exitCode != 0) return false
         val local = git("rev-parse", "HEAD")
         val remote = git("rev-parse", "origin/master")
-        if (local.exitCode != 0 || remote.exitCode != 0 ||
-            local.output.trim() != remote.output.trim()
-        ) return false
+        return local.exitCode == 0 && remote.exitCode == 0 &&
+            local.output.trim() == remote.output.trim()
+    }
+
+    private suspend fun isCanonicalMaster(): Boolean {
+        val branch = git("symbolic-ref", "--short", "HEAD")
+        if (branch.exitCode != 0 || branch.output.trim() != "master") return false
+        val remote = git("config", "--get", "remote.origin.url")
+        if (remote.exitCode != 0) return false
+        val remoteText = remote.output.trim()
+        val cleaned = remoteText.removeSuffix(".git").removePrefix("git@github.com:")
+        val normalized = if ("github.com/" in cleaned) cleaned.substringAfter("github.com/") else cleaned
+            .trim('/')
+        val expected = source.removePrefix("sources/github/").trim('/')
+        return normalized == expected
+    }
+
+    /**
+     * Push all locally drained commits to origin/master, then surface the
+     * current local/remote state. Divergence remains review-blocked. PRs do
+     * not block (Jules
+     * pushes branches; PRs are operator surface, not gate surface).
+     *
+     * Returns true iff push succeeded and local HEAD matches origin/master.
+     * A false return leaves the local continuity history intact for retry or
+     * explicit review.
+     */
+    private suspend fun settlementBarrier(): Boolean {
+        if (!pushOriginParity()) return false
 
         // Conductor is the authority for drain completeness; queue is intake only.
         // If conductor has no undrained COMPLETED sessions, the drain is closed.
         val undrainedCompleted = conductor.cards.values.count {
-            it.snapshot.state in DRAINABLE_STATES && !it.drained
+            it.snapshot.state in TERMINAL_STATES && !it.drained
         }
-        if (undrainedCompleted > 5) {
+        if (undrainedCompleted != 0) {
             println("[FLYWHEEL] SETTLE-BLOCKED $undrainedCompleted COMPLETED session(s) not yet drained in conductor")
             return false
         }
 
-        val unclaimedDrains = store.loadQueue().count { it.isUnclaimedDrain }
-        if (unclaimedDrains > 3) {
+        val unclaimedDrains = loadQueueIo().count { it.isUnclaimedDrain }
+        if (unclaimedDrains != 0) {
             println("[FLYWHEEL] SETTLE-BLOCKED $unclaimedDrains queue drain(s) lack immutable receipts")
             return false
         }
-
-        borg.trikeshed.util.oroboros.FlywheelHistoryReaper.reapOldTags(repoDir)
 
         return true
     }
@@ -1955,28 +1265,66 @@ class FlywheelDriver(
      * after [settlementBarrier] proves local HEAD == origin/master.
      */
     private suspend fun archiveSettledSessions() {
+        val immutableBySession = loadQueueIo().asSequence()
+            .filter { entry -> entry.receipt?.let(::isImmutableReceipt) == true }
+            .mapNotNull { entry -> entry.sessionId?.let { it to entry } }
+            .toMap()
         val candidates = conductor.cards.values.filter { card ->
             card.drained &&
                 card.snapshot.state in TERMINAL_STATES &&
                 card.snapshot.sessionId in conductor.visibleSessionIds &&
+                card.causes.any { it is JulesCause.DrainApplied } &&
+                card.snapshot.sessionId in immutableBySession &&
                 card.causes.none { it is JulesCause.SessionArchived }
         }.sortedBy { it.snapshot.capturedAt }.take(8)
         for (card in candidates) {
             val sessionId = card.snapshot.sessionId
+            val entry = immutableBySession.getValue(sessionId)
+            val receipt = requireNotNull(entry.receipt)
+            val receiptAlreadyAnswered = card.causes.filterIsInstance<JulesCause.HumanAnswered>().any {
+                it.message.startsWith("FLYWHEEL MERGE RECEIPT\n") &&
+                    "tag=${receipt.versionTag}" in it.message &&
+                    "patchCid=${receipt.patchCid.value}" in it.message
+            }
             try {
+                if (!receiptAlreadyAnswered) {
+                    val identity = withContext(Dispatchers.IO) { store.replayCauses(entry.workId) }
+                        .filterIsInstance<JulesCause.WorkIdentitySynthesized>()
+                        .lastOrNull()?.identity
+                    if (!sendMergeReceipt(
+                            sessionId = sessionId,
+                            commitSha = receipt.revision,
+                            tag = receipt.versionTag,
+                            patchCid = receipt.patchCid,
+                            branch = identity?.gitBranch,
+                            prUrl = receipt.prUrl,
+                        )
+                    ) continue
+                }
                 conductor.archive(sessionId)
                 println("[FLYWHEEL] ARCHIVE ${sessionId.takeLast(6)} settled session preserved")
             } catch (t: Throwable) {
+                if (t is kotlinx.coroutines.CancellationException) throw t
                 classifyHttpError(t)
                 emitPollError("archive session $sessionId: ${t.message?.take(200)}", 0)
             }
         }
     }
 
+    private fun isImmutableReceipt(receipt: MergeReceipt): Boolean =
+        receipt.producer != "retired" &&
+            receipt.revision.isNotBlank() && !receipt.revision.startsWith("outbox-") &&
+            receipt.versionTag.isNotBlank() && receipt.versionTag != "retired"
+
+    private suspend fun loadQueueIo() = withContext(Dispatchers.IO) { store.loadQueue() }
+
     // ─── Dispatch helpers ───────────────────────────────────────────────────
 
     /** Maximum Jules submission prompt size in UTF-8 bytes. */
     private val SPEC_BYTE_LIMIT = 4000
+
+    private fun dispatchTitle(workId: String, title: String): String =
+        "[work:$workId] $title"
 
     /** Jules session states that no longer occupy a slot. */
     private val DRAINABLE_STATES = setOf("COMPLETED", "FINISHED")
@@ -2001,7 +1349,9 @@ class FlywheelDriver(
      * Extract file paths mentioned in a task spec — the task's file scope.
      * Matches `src/...`, `doc/...`, `bin/...`, `build.gradle.kts` etc.
      */
-    private val specFilePattern = Regex("""(?:src|doc|bin|build\.gradle\.kts|settings\.gradle\.kts)/[A-Za-z0-9_./-]+""")
+    private val specFilePattern = Regex(
+        """(?:src|doc|bin)/[A-Za-z0-9_./-]+|(?:build|settings)\.gradle\.kts""",
+    )
 
     private fun extractSpecFiles(spec: String): Set<String> =
         specFilePattern.findAll(spec).map { it.value.trimEnd('.', ',', ':', ';', ')', ']') }.toSet()
@@ -2011,8 +1361,12 @@ class FlywheelDriver(
       * site in FlywheelDriver goes through here. Prepends `"git"` so callers
       * write `git("commit", "-m", ...)` not `git("git", "commit", "-m", ...)`.
       * For non-git commands (gh, ./gradlew) use [shell].
-      */
+     */
      private suspend fun git(vararg args: String): CommandResult = shell("git", *args)
+
+     /** Run Git against an isolated temporary worktree. */
+     private suspend fun gitIn(directory: File, vararg args: String): CommandResult =
+         shellIn(directory, 30_000L, "git", *args)
 
      /**
       * Run an arbitrary command in [repoDir]. Use [git] for git subcommands.
@@ -2021,12 +1375,30 @@ class FlywheelDriver(
       */
      private suspend fun shell(vararg args: String): CommandResult = shell(30_000L, *args)
 
-     private suspend fun shell(timeoutMs: Long, vararg args: String): CommandResult = withContext(Dispatchers.IO) {
+     private suspend fun shell(timeoutMs: Long, vararg args: String): CommandResult =
+         shellIn(repoDir, timeoutMs, *args)
+
+     private suspend fun shellIn(
+         directory: File,
+         timeoutMs: Long,
+         vararg args: String,
+     ): CommandResult = withContext(Dispatchers.IO) {
          try {
              val process = ProcessBuilder(*args)
-                 .directory(repoDir)
+                 .directory(directory)
                  .redirectErrorStream(true)
                  .start()
+             val output = StringBuilder()
+             val readerThread = Thread({
+                 process.inputStream.bufferedReader().useLines { lines ->
+                     lines.forEach { line ->
+                         synchronized(output) { output.appendLine(line) }
+                     }
+                 }
+             }, "flywheel-process-output").apply {
+                 isDaemon = true
+                 start()
+             }
              val finished = process.waitFor(timeoutMs, java.util.concurrent.TimeUnit.MILLISECONDS)
              if (!finished) {
                  val descendants = buildList {
@@ -2047,8 +1419,8 @@ class FlywheelDriver(
                          .get(remaining, java.util.concurrent.TimeUnit.NANOSECONDS)
                  } catch (interrupted: InterruptedException) {
                      Thread.currentThread().interrupt()
-                 } catch (_: Throwable) {
-                 }
+                } catch (_: java.util.concurrent.TimeoutException) {
+                }
                  val remaining = reapDeadline - System.nanoTime()
                  try {
                      if (remaining > 0) {
@@ -2058,9 +1430,15 @@ class FlywheelDriver(
                      Thread.currentThread().interrupt()
                  }
                  val survivors = descendants.count { it.isAlive } + if (process.isAlive) 1 else 0
-                 CommandResult(1, "timeout after ${timeoutMs}ms: ${args.joinToString(" ")}; surviving processes=$survivors")
+                 readerThread.join(1_000L)
+                 CommandResult(
+                     1,
+                     synchronized(output) { output.toString() } +
+                         "timeout after ${timeoutMs}ms: ${args.joinToString(" ")}; surviving processes=$survivors",
+                 )
              } else {
-                 CommandResult(process.exitValue(), process.inputStream.bufferedReader().readText())
+                 readerThread.join(5_000L)
+                 CommandResult(process.exitValue(), synchronized(output) { output.toString() })
              }
          } catch (t: Throwable) {
              CommandResult(1, t.message.orEmpty())
@@ -2160,62 +1538,6 @@ class FlywheelDriver(
         }
     }
 
-
-    /**
-     * Content-address the exact cumulative patch bytes and pin the protected
-     * release tag onto the commit. The CAS put ([FileCasStore.put]) verifies by
-     * re-reading, so a backing-store failure throws here and the tag is never
-     * created on a hollow receipt. The returned [MergeReceipt.patchCid] is a real
-     * content-addressable blob, retrievable as `casStore.get(receipt.patchCid)`,
-     * not a detached hash. Internal for testability (drives a real `.git` tag).
-     */
-    internal suspend fun claimPatch(
-        commitSha: String,
-        patch: String,
-        sessionId: String,
-        workId: String,
-        title: String,
-        content: String,
-    ): ClaimedPatch? {
-        val patchBytes = patch.encodeToByteArray()
-        val patchCid = try {
-            withContext(Dispatchers.IO) { casStore.put(patchBytes) }
-        } catch (e: Exception) {
-            println("[FLYWHEEL] CAS-FAIL ${sessionId.takeLast(6)}: ${e.message}")
-            return null
-        }
-        val safeSession = sessionId.replace(Regex("[^A-Za-z0-9._-]"), "-")
-        val tag = "flywheel/jules-$safeSession-${commitSha.take(12)}"
-        val tagMessage =
-            "Jules merge receipt\nsession=$sessionId\nwork=$workId\npatchCid=${patchCid.value}"
-        if (git("tag", "-a", tag, commitSha, "-m", tagMessage).exitCode != 0) {
-            return null
-        }
-
-        // Best-effort PR/branch URL fishing. The Jules session id is the ticket;
-        // this url is the optional upstream surface that ties the receipt to the
-        // human-visible PR or branch. null is a valid result — the receipt stands
-        // with or without a PR (Jules pushes branches, not PRs).
-        val prUrl = fishPrUrl(sessionId, tag)
-
-        val receipt = MergeReceipt(
-            workId = workId,
-            producer = "jules",
-            producerRef = sessionId,
-            patchCid = patchCid,
-            revision = commitSha,
-            versionTag = tag,
-            lexicalMemory = LexicalMemory(
-                summary = title,
-                title = title,
-                content = content,
-            ),
-            claimedAt = Clock.System.now().toEpochMilliseconds(),
-            prUrl = prUrl,
-        )
-        return ClaimedPatch(commitSha, receipt)
-    }
-
     /**
      * Fish an optional PR/branch URL tying this receipt to the upstream
      * surface. Probes: (1) `git ls-remote origin 'refs/heads/jules-<numericId>-*'`,
@@ -2224,17 +1546,16 @@ class FlywheelDriver(
      * + [revision]. Jules pushes branches (not PRs); null is valid for direct merges.
      */
     private suspend fun fishPrUrl(sessionId: String, tag: String): String? {
-        val numericId = sessionId.substringAfterLast('/').filter { it.isDigit() }
-        if (numericId.isEmpty()) return null
+        val exactId = sessionId.substringAfterLast('/').takeIf { it.isNotBlank() } ?: return null
         // Probe 1: branch-on-origin.
-        val ls = git("ls-remote", "origin", "refs/heads/jules-$numericId-*")
+        val ls = git("ls-remote", "origin", "refs/heads/jules-$exactId-*")
         if (ls.exitCode == 0) {
             for (line in ls.output.lineSequence()) {
                 val parts = line.trim().split("\t")
                 if (parts.size == 2) {
                     val sha = parts[0]
                     val ref = parts[1]
-                    if (ref.startsWith("refs/heads/jules-$numericId-") && sha.length == 40) {
+                    if (ref.startsWith("refs/heads/jules-$exactId-") && sha.length == 40) {
                         val remote = git("config", "--get", "remote.origin.url")
                         if (remote.exitCode == 0) {
                             val url = originToHtmlUrl(remote.output.trim(), sha)
@@ -2264,115 +1585,8 @@ class FlywheelDriver(
         }
     }
 
-    internal data class ClaimedPatch(val commitSha: String, val receipt: MergeReceipt)
-
-    /** Revert only the given files to HEAD. */
-    private suspend fun revertFiles(files: List<String>) {
-        val cmd = mutableListOf("git", "checkout", "HEAD", "--")
-        cmd.addAll(files)
-        git(*cmd.toTypedArray())
-    }
-
     /** Parse unidiff headers (--- a/path, +++ b/path) to extract touched file paths. */
-    private suspend fun parsePatchFiles(patch: String): List<String> {
-        val files = mutableListOf<String>()
-        for (line in patch.lines()) {
-            if (line.startsWith("+++ b/")) {
-                val path = line.removePrefix("+++ b/").trim()
-                if (path.isNotEmpty() && path != "/dev/null") files.add(path)
-            } else if (line.startsWith("+++ ") && !line.startsWith("+++ /dev/null")) {
-                // fallback: bare path without b/ prefix
-                val path = line.removePrefix("+++ ").trim()
-                if (path.isNotEmpty() && path != "/dev/null" && !path.startsWith("a/") && !path.startsWith("b/")) {
-                    files.add(path)
-                }
-            }
-        }
-        return files.distinct()
-    }
-
-    /**
-     * Sandbox scratch files Jules leaves in its patch diffs: `test_script.kt`,
-     * `patch.diff`, `plan_script.sh`, and similar verification stubs. They are
-     * never part of the real repo tree. When Jules emits a deletion hunk for one
-     * of these, `git apply --3way` fails ("test_script.kt: does not exist in index")
-     * because we never had the file — even though the real source hunk applied
-     * cleanly. Apply rejects the whole diff and the cycle records `DrainFailed`,
-     * locking the session into a permanent retry loop (WAL signature: 5 sessions
-     * at attempt 107..173).
-     *
-     * The same patches also carry `+` content lines with trailing whitespace
-     * ("trailing whitespace" reject), which `git apply --3way` refuses outright.
-     *
-     * This sanitizer:
-     *   1. Drops whole `diff --git` sections whose target path is a known Jules
-     *      sandbox scratch file (so `git apply` never sees the index-missing hunk).
-     *   2. Strips trailing whitespace from every `+` content line (hunks starting
-     *      with `+` but not `+++`), preserving the diff metadata and context lines.
-     *
-     * The cleaned patch is what gets written to `.flywheel-patch-<id>` for apply.
-     */
-    private fun sanitizeJulesPatch(patch: String): String {
-        // Known Jules sandbox scratch base names. Match by basename of the diff path.
-        val scratchBaseNames = setOf(
-            "test_script.kt", "patch.diff", "plan_script.sh",
-            "MultiIndexContainer-patch.txt",
-        )
-        fun isScratchPath(p: String): Boolean {
-            val base = p.substringAfterLast('/').trim()
-            if (base in scratchBaseNames) return true
-            // Jules naming variants: test_script.<anything> or *_scratch.*
-            if (base.startsWith("test_script.")) return true
-            return false
-        }
-
-        // Split into [preamble, section1, section2, ...] where each section begins
-        // with a `diff --git` header line. Preserve the preamble (git header blob).
-        val lines = patch.split("\n")
-        val out = mutableListOf<String>()
-        var skipSection = false
-        var sawHeader = false
-        var inHunkContent = false
-        for (line in lines) {
-            if (line.startsWith("diff --git ")) {
-                // Begin a new diff section. Parse target path from the `+++ b/` we
-                // have not seen yet — easier: extract from the `diff --git a/X b/Y`
-                // `b/` side which appears right after the `b/` marker.
-                val mLine = line
-                // The `b/` path is the last token of `diff --git a/PATH b/PATH`.
-                // Some Jules diffs use bare names: `diff --git a/test_script.kt b/test_script.kt`.
-                val afterB = mLine.substringAfter(" b/", missingDelimiterValue = "")
-                val path = afterB.trim().ifEmpty {
-                    // Fall back to the a/ side when there is no b/ side (rare).
-                    mLine.substringAfter(" a/", missingDelimiterValue = "").trim()
-                }
-                skipSection = isScratchPath(path)
-                sawHeader = true
-                inHunkContent = false
-                if (!skipSection) out.add(line)
-                continue
-            }
-            if (line.startsWith("@@ ")) {
-                inHunkContent = true
-                if (!skipSection) out.add(line)
-                continue
-            }
-            if (skipSection) continue
-            if (!sawHeader) {
-                // Preamble (e.g. `diff --git` not yet seen) — passes through.
-                out.add(line)
-                continue
-            }
-            // Within an active section. Trim trailing whitespace ONLY on `+`
-            // content lines (not `++`, not context, not `-`).
-            if (inHunkContent && line.startsWith("+") && !line.startsWith("+++")) {
-                out.add(line.trimEnd())
-            } else {
-                out.add(line)
-            }
-        }
-        return out.joinToString("\n")
-    }
+    private suspend fun parsePatchFiles(patch: String): List<String> = julesPatchFiles(patch)
 
     private suspend fun headSha(): String = git("rev-parse", "HEAD").output.trim()
 
@@ -2383,265 +1597,26 @@ class FlywheelDriver(
     /** Cancel the supervisor; children propagate. Idempotent. */
     fun close() { parentJob.cancel() }
 
-    /**
-     * Drain a single completed session: apply patch (--3way, keep both sides),
-     * resolve conflicts, build-fix until green, commit, CAS-pin, tag.
-     *
-     * No reverts. No reworks. No --ours/--theirs. Jules is a task tree — its
-     * patches cause no corruption, only conflicts. Conflicts compound across
-     * parallel drains and get resolved by editing code, never by discarding work.
-     */
-    private suspend fun drainOne(s: JulesRestClient.SessionInfo): DrainOutcome {
-        val patch = client.lastPatch(s.id)
-        if (patch.isNullOrBlank()) {
-            val probes = (noPatchProbes[s.id] ?: 0) + 1
-            noPatchProbes[s.id] = probes
-            if (probes >= 3) {
-                noPatchProbes.remove(s.id)
-                conductor.retireTerminal(s.id, "no patch after $probes probes; nothing to land", Clock.System.now().toEpochMilliseconds())
-                println("[FLYWHEEL] RETIRE ${s.id.takeLast(6)} no-patch after $probes probes")
-            } else {
-                emitPollError("drain ${s.id}: no patch from lastPatch() (probe $probes/3)", 0)
-            }
-            return DrainOutcome.Skipped
-        }
-
-        val patchFile = File(repoDir, ".flywheel-patch")
-        // ⚡ Bolt: Wrapped in Dispatchers.IO to prevent blocking the reactor thread with synchronous File I/O.
-        withContext(Dispatchers.IO) {
-            patchFile.writeText(patch)
-        }
-
-        // Apply with --3way: if the patch doesn't apply cleanly, git falls back
-        // to a 3-way merge and leaves conflict markers. We KEEP those markers —
-        // they represent both sides' work and get resolved below. Never --ours,
-        // never --theirs, never reject.
-        git("apply", "--3way", ".flywheel-patch")
-        withContext(Dispatchers.IO) {
-            patchFile.delete()
-        }
-
-        val touchedFiles = parsePatchFiles(patch)
-        if (touchedFiles.isEmpty()) {
-            return drainFail(s, "empty patch file list")
-        }
-
-        // CONFLICT RESOLUTION + BUILD-FIX LOOP: resolve conflict markers, then
-        // build. If red, fix and rebuild. Up to 3 passes. Never revert.
-        val conflicts = conflictFiles()
-        if (conflicts.isNotEmpty()) {
-            println("[FLYWHEEL] CONFLICTS ${conflicts.size} files from ${s.id.takeLast(6)} — resolving")
-            resolveConflicts(conflicts)
-        }
-
-        var buildOk = false
-        for (attempt in 1..3) {
-            val build = shell(300_000L, "./gradlew", ":jvmMainClasses", "--no-daemon")
-            if (build.exitCode == 0) { buildOk = true; break }
-            println("[FLYWHEEL] BUILD attempt $attempt failed for ${s.id.takeLast(6)}, fixing")
-            val buildErrors = build.output.take(2000)
-            if (!fixBuildErrors(buildErrors, touchedFiles)) {
-                println("[FLYWHEEL] BUILD could not auto-fix, committing with errors — next RGA resolves")
-                break
-            }
-        }
-
-        // Stage ONLY the touched files + any conflict-resolved files, then commit.
-        val addCmd = mutableListOf("git", "add")
-        addCmd.addAll(touchedFiles)
-        addCmd.addAll(conflicts)
-        git(*addCmd.toTypedArray())
-        val commitRes = git("commit", "-m", "flywheel: ${s.title}")
-        if (commitRes.exitCode != 0) {
-            return drainFail(s, "commit failed: ${commitRes.output.take(200)}")
-        }
-
-        val commitSha = headSha()
-        val patchBytes = patch.encodeToByteArray()
-        val patchCid = try { withContext(Dispatchers.IO) { casStore.put(patchBytes) } } catch (e: Exception) {
-            return drainFail(s, "cas put failed: ${e.message}")
-        }
-        val safe = s.id.replace(Regex("[^A-Za-z0-9._-]"), "-")
-        val tag = "flywheel/jules-" + safe + "-" + commitSha.take(12)
-        val msg = "Jules receipt\n" +
-            "session=" + s.id + "\n" +
-            "patchCid=" + patchCid.value + "\n" +
-            "taskTitle=" + s.title
-        val tagRes = git("tag", "-a", tag, commitSha, "-m", msg)
-        if (tagRes.exitCode != 0) {
-            return drainFail(s, "tag create failed: ${tagRes.output.take(200)}")
-        }
-
-        // CLOSE THE DRAIN — without these two writes the wheel re-drains this
-        // same COMPLETED session every cycle (drained flag never flips) and
-        // loadQueue's isDrained/isUnclaimedDrain never clear (no WorkDrained
-        // cause), so settlementBarrier's unclaimedDrains != 0 sticks forever.
-        // The receipt carries the CAS patchCid + fished prUrl so the queue
-        // entry is a claimed drain, not an unclaimed one.
-        val prUrl = try { fishPrUrl(s.id, tag) } catch (_: Throwable) { null }
-        val receipt = MergeReceipt(
-            workId = "",               // bonded below from the queue projection
-            producer = "jules",
-            producerRef = s.id,
-            patchCid = patchCid,
-            revision = commitSha,
-            versionTag = tag,
-            lexicalMemory = LexicalMemory(summary = s.title, title = s.title, content = ""),
-            claimedAt = Clock.System.now().toEpochMilliseconds(),
-            prUrl = prUrl,
-        )
-        conductor.recordDrain(s.id, commitSha, conflicts.size)
-        val workId = store.loadQueue().firstOrNull { it.sessionId == s.id }?.workId
-            ?: "session:${s.id.replace(Regex("[^A-Za-z0-9._-]"), "-")}"
-        store.appendWork(workId, JulesCause.WorkDrained(
-            workId = workId,
-            sessionId = s.id,
-            commitSha = commitSha,
-            taskId = tag,
-            receipt = receipt.copy(workId = workId),
-            at = Clock.System.now().toEpochMilliseconds(),
-        ))
-        _events.emit(FlywheelEvent.Drained(s.id, commitSha, tag))
-        drainFailures.remove(s.id)
-        return DrainOutcome.Harvested
-    }
-
-    /**
-     * Commit any unresolved conflict markers in the working tree as-is.
-     * Both sides are kept (the markers stay in the file); the commit moves
-     * the repo forward so subsequent drains start from a clean tree. The
-     * build-fix loop on the NEXT drain resolves semantic issues.
-     */
-    private suspend fun commitExistingConflicts() {
-        val files = unmergedFiles()
-        if (files.isEmpty()) return
-        println("[FLYWHEEL] COMMIT-CONFLICTS ${files.size} files with conflict markers — keeping both sides")
-        files.take(5).forEach { println("  ✗ $it") }
-        val addCmd = mutableListOf("git", "add")
-        addCmd.addAll(files)
-        git(*addCmd.toTypedArray())
-        val msg = "flywheel: conflict — kept both sides (${files.size} files)"
-        val res = git("commit", "-m", msg)
-        if (res.exitCode != 0) {
-            println("[FLYWHEEL] COMMIT-CONFLICTS failed: ${res.output.take(200)}")
-        } else {
-            println("[FLYWHEEL] COMMIT-CONFLICTS ok — ${files.size} files committed with markers")
-        }
-    }
-
-    /** Files still unmerged in Git's index for the current 3-way arm. */
+    /** Files still unmerged in Git's index; any result blocks automatic drain. */
     private suspend fun unmergedFiles(): List<String> =
         git("diff", "--name-only", "--diff-filter=U").output.trim().lines()
             .filter { it.isNotBlank() }
 
     /**
-     * Cumulative unresolved files. Conflict-arm commits clear the unmerged
-     * index, so also inspect tracked content for conflict-start markers while
-     * excluding patch-edit templates (`<<<<<<< SEARCH`). This catches both
-     * merge markers (`HEAD`) and `git apply --3way` markers (`ours`).
+     * Detect unresolved source conflicts without modifying them. Both Git's
+     * index and tracked marker content gate CAS preflight and settlement.
      */
     private suspend fun conflictFiles(): List<String> {
-        val markerFiles = git("grep", "-l", "^<<<<<<< ", "--")
-            .output.trim().lines().filter { path ->
-                path.isNotBlank() && File(repoDir, path).takeIf { it.isFile }?.useLines { lines ->
+        val markerPaths = git("grep", "-l", "^<<<<<<< ", "--")
+            .output.trim().lines().filter { it.isNotBlank() }
+        val markerFiles = withContext(Dispatchers.IO) {
+            markerPaths.filter { path ->
+                File(repoDir, path).takeIf { it.isFile }?.useLines { lines ->
                     lines.any { it.startsWith("<<<<<<< ") && it != "<<<<<<< SEARCH" }
                 } == true
             }
-            // Stale patch/diff/sh artifacts carry conflict markers by design
-            // (they ARE diff fragments). Exclude them so they don't block
-            // dispatch permanently — only source-tree conflicts gate the
-            // settlement barrier.
-            .filterNot { path ->
-                path.endsWith(".patch") || path.endsWith(".diff") ||
-                    path.endsWith(".sh") || path.endsWith(".txt")
-            }
+        }
         return (unmergedFiles() + markerFiles).distinct()
-    }
-
-    /**
-     * Resolve conflict markers using n=2+ distance resolution: consider both
-     * sides plus their common ancestor context to produce a semantically
-     * correct merge. The build-fix loop then makes it compile.
-     */
-    private suspend fun resolveConflicts(files: List<String>) {
-        for (file in files) {
-            val f = File(repoDir, file)
-            if (!f.exists()) continue
-            val content = f.readText()
-            val resolved = resolveConflictMarkers(content)
-            if (resolved != content) {
-                f.writeText(resolved)
-                println("[FLYWHEEL]   resolved $file")
-            }
-        }
-    }
-
-    private val conflictStart = Regex("""(?m)^<{7} .+$""")
-    private val conflictMid = Regex("""(?m)^={7}$""")
-    private val conflictEnd = Regex("""(?m)^>{7} .+$""")
-
-    /**
-     * n=2+ distance resolution: keep both sides' code regions (ours then
-     * theirs), preserving all work from both branches. The build-fix loop
-     * then resolves any semantic issues (duplicate declarations, etc.) by
-     * editing the merged result. This guarantees no work is lost — the
-     * distance from each side to the resolution is ≥2 (both sides present).
-     */
-
-    private fun resolveConflictMarkers(content: String): String {
-        if (!content.contains("<<<<<<<")) return content
-        val lines = content.lines().toMutableList()
-        val result = mutableListOf<String>()
-        var i = 0
-        while (i < lines.size) {
-            val line = lines[i]
-            if (conflictStart.matches(line)) {
-                // Keep both sides: ours (between <<< and ===) then theirs (between === and >>>)
-                i++
-                while (i < lines.size && !conflictMid.matches(lines[i])) {
-                    result.add(lines[i]); i++
-                }
-                i++ // skip the ======= line
-                while (i < lines.size && !conflictEnd.matches(lines[i])) {
-                    result.add(lines[i]); i++
-                }
-                i++ // skip the >>>>>>> line
-            } else {
-                result.add(line)
-                i++
-            }
-        }
-        return result.joinToString("\n")
-    }
-
-    /**
-     * Attempt to fix build errors using the Laguna brain. Returns true if a
-     * fix was applied. Never reverts — always moves forward.
-     */
-    private suspend fun fixBuildErrors(errors: String, touchedFiles: List<String>): Boolean {
-        val b = brain ?: return false
-        val fileContents = touchedFiles.joinToString("\n\n") { path ->
-            val f = File(repoDir, path)
-            if (f.exists()) "=== $path ===\n${f.readText().take(2000)}" else ""
-        }
-        val prompt = buildString {
-            appendLine("Fix these build errors. Output the COMPLETE corrected file contents.")
-            appendLine("Build errors:")
-            appendLine(errors)
-            appendLine("Files:")
-            appendLine(fileContents)
-        }.trim()
-        return try {
-            val response = withTimeoutOrNull(60_000L) {
-                b.chat(messages = listOf("user" to prompt), maxTokens = 2000, temperature = 0.1)
-            }
-            response != null && response.isNotEmpty().also {
-                if (it) println("[FLYWHEEL] BUILD-FIX brain applied ${response.length} chars")
-            }
-        } catch (t: Throwable) {
-            println("[FLYWHEEL] BUILD-FIX brain-error: ${t.message}")
-            false
-        }
     }
 
     data class CycleReport(
@@ -2658,7 +1633,7 @@ class FlywheelDriver(
         val settled: Boolean = false,
         /** Which [FlywheelPhase] the cycle last reached before returning (the priority manifest). */
         val phase: FlywheelPhase = FlywheelPhase.POLL,
-        /** Conflict markers still unresolved after cumulative QaLaguna repair. */
+        /** Conflict markers that review-block exact-artifact settlement. */
         val conflicts: List<String> = emptyList(),
         /** Panorama for QaLaguna: every arm in the current completion set. */
         val panorama: List<QaLaguna.SessionPanorama> = emptyList(),
@@ -2668,37 +1643,4 @@ class FlywheelDriver(
         val http5xx: Int = 0,
     )
 
-    companion object {
-        @JvmStatic
-        fun main(args: Array<String>) {
-            val keyMux = KeyMux { env() }
-            val once = args.any { it == "--once" }
-            val watch = args.any { it == "--watch" }
-            val driver = FlywheelDriver(keyMux)
-            println("[FLYWHEEL] Starting driver on ${driver.repoDir}")
-            if (once) {
-                runBlocking {
-                    val report = driver.cycle()
-                    println(driver.renderSaturation())
-                    println("[FLYWHEEL] Cycle: answered=${report.answered} harvested=${report.harvested} inducted=${report.inducted} dispatched=${report.dispatched} alive=${report.alive} settled=${report.settled}")
-                }
-                return
-            }
-            runBlocking {
-                while (true) {
-                    val start = System.currentTimeMillis()
-                    val report = driver.cycle()
-                    println(driver.renderSaturation())
-                    println("[FLYWHEEL] Cycle: answered=${report.answered} harvested=${report.harvested} inducted=${report.inducted} dispatched=${report.dispatched} alive=${report.alive} settled=${report.settled}")
-                    if (!watch) {
-                        println("[FLYWHEEL] one-shot (no --watch); exiting")
-                        return@runBlocking
-                    }
-                    val elapsed = System.currentTimeMillis() - start
-                    val delay = (driver.intervalMs - elapsed).coerceAtLeast(5_000)
-                    delay(delay)
-                }
-            }
-        }
-    }
 }

@@ -45,6 +45,37 @@ object KanbanEventCodec {
             is JulesCause.AgentMessaged -> field("excerpt", c.excerpt)
             is JulesCause.HumanAnswered -> field("message", c.message)
             is JulesCause.PatchArrived -> append(",\"bytes\":").append(c.bytes)
+            is JulesCause.PatchSnapshotObserved -> {
+                field("patchCid", c.patchCid.value)
+                append(",\"causalOrdinal\":").append(c.causalOrdinal)
+                append(",\"artifactSeq\":").append(c.artifactSeq)
+                stringArray("touchedFiles", c.touchedFiles)
+                stringArray("missingFromCandidate", c.missingFromCandidate)
+                append(",\"reviewCandidate\":").append(c.reviewCandidate)
+            }
+            is JulesCause.PatchReviewSelected -> {
+                field("patchCid", c.patchCid.value)
+                append(",\"causalOrdinal\":").append(c.causalOrdinal)
+                c.latestPatchCid?.let { field("latestPatchCid", it.value) }
+                c.latestReportCid?.let { field("latestReportCid", it.value) }
+                field("reviewedBy", c.reviewedBy)
+                field("receiptRef", c.receiptRef)
+            }
+            is JulesCause.AgentReportObserved -> {
+                field("reportCid", c.reportCid.value)
+                append(",\"causalOrdinal\":").append(c.causalOrdinal)
+                append(",\"bytes\":").append(c.bytes)
+                field("apiCreateTime", c.apiCreateTime)
+            }
+            is JulesCause.AgentReportReviewSelected -> {
+                field("reportCid", c.reportCid.value)
+                append(",\"causalOrdinal\":").append(c.causalOrdinal)
+                c.latestPatchCid?.let { field("latestPatchCid", it.value) }
+                c.latestReportCid?.let { field("latestReportCid", it.value) }
+                field("disposition", c.disposition)
+                field("reviewedBy", c.reviewedBy)
+                field("receiptRef", c.receiptRef)
+            }
             is JulesCause.DrainApplied -> { field("commitSha", c.commitSha); append(",\"rejects\":").append(c.rejects) }
             is JulesCause.DrainFailed -> field("reason", c.reason)
             is JulesCause.PredicateFlipped -> { field("predicate", c.predicate); append(",\"nowPassing\":").append(c.nowPassing) }
@@ -98,7 +129,9 @@ object KanbanEventCodec {
     data class CauseEvent(val sid: String, val cause: JulesCause) : KanbanEvent
 
     fun decode(record: String): KanbanEvent? {
-        val m = JsonSupport.parse(record) as? Map<*, *> ?: return null
+        val m = requireNotNull(JsonSupport.parse(record) as? Map<*, *>) {
+            "Kanban WAL record is not a Confix object"
+        }
         return when (m["t"]) {
             "snap" -> SnapEvent(
                 JulesSnapshot(
@@ -122,11 +155,51 @@ object KanbanEventCodec {
                     "AgentMessaged" -> JulesCause.AgentMessaged(m.str("excerpt"), at, actId, actSeq)
                     "HumanAnswered" -> JulesCause.HumanAnswered(m.str("message"), at, actId, actSeq)
                     "PatchArrived" -> JulesCause.PatchArrived(m.num("bytes"), at, actId, actSeq)
+                    "PatchSnapshotObserved" -> JulesCause.PatchSnapshotObserved(
+                        patchCid = ContentId(m.str("patchCid")),
+                        causalOrdinal = m.num("causalOrdinal").toInt(),
+                        artifactSeq = m.num("artifactSeq").toInt(),
+                        touchedFiles = m.strings("touchedFiles"),
+                        missingFromCandidate = m.strings("missingFromCandidate"),
+                        reviewCandidate = m["reviewCandidate"]?.toString() == "true",
+                        at = at,
+                        activityId = actId.orEmpty(),
+                        activitySeq = actSeq ?: -1,
+                    )
+                    "PatchReviewSelected" -> JulesCause.PatchReviewSelected(
+                        patchCid = ContentId(m.str("patchCid")),
+                        causalOrdinal = m.num("causalOrdinal").toInt(),
+                        latestPatchCid = m.optStr("latestPatchCid")?.let(::ContentId),
+                        latestReportCid = m.optStr("latestReportCid")?.let(::ContentId),
+                        reviewedBy = m.str("reviewedBy"),
+                        receiptRef = m.str("receiptRef"),
+                        at = at,
+                    )
+                    "AgentReportObserved" -> JulesCause.AgentReportObserved(
+                        reportCid = ContentId(m.str("reportCid")),
+                        causalOrdinal = m.num("causalOrdinal").toInt(),
+                        bytes = m.num("bytes"),
+                        apiCreateTime = m.str("apiCreateTime"),
+                        at = at,
+                        activityId = actId.orEmpty(),
+                        activitySeq = actSeq ?: -1,
+                    )
+                    "AgentReportReviewSelected" -> JulesCause.AgentReportReviewSelected(
+                        reportCid = ContentId(m.str("reportCid")),
+                        causalOrdinal = m.num("causalOrdinal").toInt(),
+                        latestPatchCid = m.optStr("latestPatchCid")?.let(::ContentId),
+                        latestReportCid = m.optStr("latestReportCid")?.let(::ContentId),
+                        disposition = m.str("disposition"),
+                        reviewedBy = m.str("reviewedBy"),
+                        receiptRef = m.str("receiptRef"),
+                        at = at,
+                    )
                     "DrainApplied" -> JulesCause.DrainApplied(m.str("commitSha"), m.num("rejects").toInt(), at)
                     "DrainFailed" -> JulesCause.DrainFailed(m.str("reason"), at)
                     "PredicateFlipped" -> JulesCause.PredicateFlipped(m.str("predicate"), m["nowPassing"]?.toString() == "true", at)
                     "SessionFailed" -> JulesCause.SessionFailed(m.str("reason"), at)
                     "SessionArchived" -> JulesCause.SessionArchived(at)
+                    "StateObserved" -> JulesCause.StateObserved(m.str("from"), m.str("to"), at)
                     "WorkQueued" -> JulesCause.WorkQueued(
                         workId = m.str("workId"),
                         tier = m.str("tier"),
@@ -186,11 +259,11 @@ object KanbanEventCodec {
                         ),
                         at = at,
                     )
-                    else -> JulesCause.StateObserved(m.str("from"), m.str("to"), at)
+                    else -> error("Unknown Jules cause kind: ${m["kind"]}")
                 }
                 CauseEvent(sid, cause)
             }
-            else -> null
+            else -> error("Unknown Kanban WAL record type: ${m["t"]}")
         }
     }
 
@@ -198,6 +271,10 @@ object KanbanEventCodec {
         is JulesCause.AgentMessaged -> "AgentMessaged"
         is JulesCause.HumanAnswered -> "HumanAnswered"
         is JulesCause.PatchArrived -> "PatchArrived"
+        is JulesCause.PatchSnapshotObserved -> "PatchSnapshotObserved"
+        is JulesCause.PatchReviewSelected -> "PatchReviewSelected"
+        is JulesCause.AgentReportObserved -> "AgentReportObserved"
+        is JulesCause.AgentReportReviewSelected -> "AgentReportReviewSelected"
         is JulesCause.DrainApplied -> "DrainApplied"
         is JulesCause.DrainFailed -> "DrainFailed"
         is JulesCause.PredicateFlipped -> "PredicateFlipped"
@@ -213,6 +290,8 @@ object KanbanEventCodec {
     private fun Map<*, *>.str(k: String): String = this[k]?.toString()?.let { unescape(it) } ?: ""
     private fun Map<*, *>.optStr(k: String): String? = this[k]?.toString()?.let { unescape(it) }
     private fun Map<*, *>.num(k: String): Long = (this[k] as? Number)?.toLong() ?: 0L
+    private fun Map<*, *>.strings(k: String): List<String> =
+        (this[k] as? List<*>)?.mapNotNull { it?.toString()?.let(::unescape) } ?: emptyList()
 
     private fun unescape(v: String): String =
         if (!v.contains('\\')) v else borg.trikeshed.util.jsonUnescape(v)
@@ -229,5 +308,23 @@ object KanbanEventCodec {
             else -> append(ch)
         }
         append('"')
+    }
+
+    private fun StringBuilder.stringArray(k: String, values: List<String>) {
+        append(",\"").append(k).append("\":[")
+        values.forEachIndexed { index, value ->
+            if (index != 0) append(',')
+            append('"')
+            for (ch in value) when (ch) {
+                '"' -> append("\\\"")
+                '\\' -> append("\\\\")
+                '\n' -> append("\\n")
+                '\r' -> append("\\r")
+                '\t' -> append("\\t")
+                else -> append(ch)
+            }
+            append('"')
+        }
+        append(']')
     }
 }

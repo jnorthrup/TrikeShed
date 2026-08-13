@@ -22,11 +22,15 @@ made it through settlement). The flywheel must not dispatch to them or attempt
 to harvest them — they are stale deliverables. Viable branches are recent activity
 that came in during the current session and are still actionable.
 
-## Enforcement
+## Current status
 
-- `FlywheelDriver.filterViableBranches()` reads this threshold and skips harvest/merge for poison branches.
-- `bin/trikeshed-jules` (CLI) honors the same rule.
-- `JulesBoardStore` persists a `viableAfterMs` field on receipt; receipts created before that wallclock are quarantined.
+This page records a historical operator policy, not an implemented reducer.
+The current Oroboros funnel does not infer artifact validity from branch age:
+it observes Jules API bytes into CAS/WAL and requires causal review plus an
+exact build/integration gate. There is no parallel direct-HTTP Jules CLI.
+
+Do not automate branch deletion from this document. A future typed retention
+reducer must preserve immutable settlement tags and emit an explicit receipt.
 
 ## Last applied
 

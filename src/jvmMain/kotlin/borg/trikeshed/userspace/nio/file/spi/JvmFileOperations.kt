@@ -5,6 +5,8 @@ import borg.trikeshed.lib.Series
 import borg.trikeshed.lib.j
 import borg.trikeshed.lib.toSeries
 import java.nio.channels.SeekableByteChannel
+import java.nio.ByteBuffer
+import java.nio.channels.FileChannel
 import java.nio.charset.StandardCharsets
 import java.nio.file.FileVisitResult
 import java.nio.file.Files as NioFiles
@@ -73,6 +75,44 @@ class JvmFileOperations : FileOperations {
 
     override fun write(filename: String, bytes: ByteArray) {
         NioFiles.write(pathOf(filename), bytes)
+    }
+
+    /**
+     * Publish immutable bytes through a same-directory temporary file. Forcing
+     * the temporary file before the atomic move makes the content durable;
+     * forcing the parent afterwards makes the directory entry durable.
+     */
+    override fun writeAtomically(filename: String, bytes: ByteArray) {
+        val target = pathOf(filename).toAbsolutePath().normalize()
+        val parent = requireNotNull(target.parent) {
+            "Atomic write target has no parent: $target"
+        }
+        NioFiles.createDirectories(parent)
+        val temp = NioFiles.createTempFile(parent, ".${target.fileName}.", ".tmp")
+        try {
+            FileChannel.open(
+                temp,
+                StandardOpenOption.WRITE,
+                StandardOpenOption.TRUNCATE_EXISTING,
+            ).use { channel ->
+                val buffer = ByteBuffer.wrap(bytes)
+                while (buffer.hasRemaining()) {
+                    check(channel.write(buffer) > 0) { "Short atomic write to $temp" }
+                }
+                channel.force(true)
+            }
+            NioFiles.move(
+                temp,
+                target,
+                java.nio.file.StandardCopyOption.REPLACE_EXISTING,
+                java.nio.file.StandardCopyOption.ATOMIC_MOVE,
+            )
+            FileChannel.open(parent, StandardOpenOption.READ).use { directory ->
+                directory.force(true)
+            }
+        } finally {
+            NioFiles.deleteIfExists(temp)
+        }
     }
 
     override fun write(filename: String, lines: List<String>) {

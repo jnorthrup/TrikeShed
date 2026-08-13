@@ -290,6 +290,7 @@ object OroborosDaemon {
         //    choreography — coroutine pipelines that react to filesystem
         //    events, not blocking ProcessBuilder calls. ──
         val gitState = GitStateCache(repoDir)
+        val cycleTriggers = Channel<Unit>(Channel.CONFLATED)
         val gitWatcher = JvmFileWatchReactorElement(
             root = repoDir.absolutePath,
             parentJob = coroutineContext[kotlinx.coroutines.Job],
@@ -298,6 +299,24 @@ object OroborosDaemon {
         )
         launch(Dispatchers.IO) { gitWatcher.open() }
         System.err.println("[OROBOROS] Git watcher: ${gitWatcher.state} — reactive .git/** events")
+
+        // The Jules causal WAL is an event source, not an out-of-band operator
+        // surface. External queue/review appends wake the same serialized cycle
+        // that owns API polling, drain, settlement, and dispatch.
+        val julesWalWatcher = JvmFileWatchReactorElement(
+            root = forgeHome.absolutePath,
+            parentJob = coroutineContext[kotlinx.coroutines.Job],
+            includeGlobs = listOf("jules-board.wal"),
+            excludeGlobs = emptyList(),
+        )
+        launch(Dispatchers.IO) { julesWalWatcher.open() }
+        launch {
+            for (event in julesWalWatcher.events) {
+                cycleTriggers.trySend(Unit)
+                println("[OROBOROS] jules-wal-event: ${event.type}")
+            }
+        }
+        System.err.println("[OROBOROS] Jules WAL watcher: ${julesWalWatcher.state} — serialized cycle trigger")
 
         // Working-tree plane: source and document files live under Couch/CAS,
         // independently of the `.git/**` identity plane above.
@@ -336,6 +355,7 @@ object OroborosDaemon {
         launch {
             for (event in worktreeWatcher.events) {
                 worktreeReconcileElement.worktreeDirty.trySend(Unit)
+                cycleTriggers.trySend(Unit)
                 println("[OROBOROS] worktree-event: ${event.type} ${event.path}")
             }
         }
@@ -346,6 +366,7 @@ object OroborosDaemon {
         // relevant cache entry; the next cycle reads fresh values.
         launch {
             for (event in gitWatcher.events) {
+                cycleTriggers.trySend(Unit)
                 when {
                     event.path.startsWith(".git/HEAD") -> {
                         gitState.invalidateHead()
@@ -587,7 +608,7 @@ object OroborosDaemon {
                     // child it owns, including the infinite reactive loops.
                     // Launch them under mainImpl's parent scope while this
                     // context supplies HtxKey for capture.
-                    driver.startReactiveCycle(reactiveScope)
+                    driver.startReactiveCycle(reactiveScope, cycleTriggers)
                 }
                 while (isRunning) {
                     val errors = consecutivePollErrors.get()
@@ -616,7 +637,7 @@ object OroborosDaemon {
             } else {
                 // --once: run one reactive tick synchronously.
                 withContext(htxElement + muxReactor) {
-                    driver.startReactiveCycle(reactiveScope)
+                    driver.startReactiveCycle(reactiveScope, cycleTriggers)
                 }
                 delay(intervalMs * 2)
                 try {
@@ -643,6 +664,7 @@ object OroborosDaemon {
                 runCatching { gitReconcileElement.close() }
                 runCatching { worktreeWatcher.close() }
                 runCatching { gitWatcher.close() }
+                runCatching { julesWalWatcher.close() }
                 try { htxElement.close() } catch (_: Exception) {}
                 try { torrentElement.close() } catch (_: Exception) {}
                 try { muxReactor.close() } catch (_: Exception) {}

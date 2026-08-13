@@ -39,16 +39,27 @@ class JulesBoardStore(
      * Both records are appended under the sessionId key so replay folds correctly.
      */
     suspend fun append(snapshot: JulesSnapshot, drained: Boolean, cause: JulesCause?) {
-        wal.append(
-            snapshot.sessionId,
-            KanbanEventCodec.encodeSnapshot(snapshot, drained).encodeToByteArray()
-        )
-        if (cause != null) {
-            wal.append(
-                snapshot.sessionId,
-                KanbanEventCodec.encodeCause(snapshot.sessionId, cause).encodeToByteArray()
-            )
+        val snapshotRecord = KanbanEventCodec.encodeSnapshot(snapshot, drained).encodeToByteArray()
+        if (cause == null) {
+            wal.append(snapshot.sessionId, snapshotRecord)
+            return
         }
+        appendLogicalBatch(listOf(
+            snapshot.sessionId to snapshotRecord,
+            snapshot.sessionId to KanbanEventCodec.encodeCause(snapshot.sessionId, cause).encodeToByteArray(),
+        ))
+    }
+
+    /**
+     * Append an immutable causal fact without duplicating the card snapshot.
+     * Patch-continuity observations use this path: their bytes already live in
+     * CAS and the WAL carries only the session/ordinal/hash ordering bond.
+     */
+    suspend fun appendCause(sessionId: String, cause: JulesCause) {
+        wal.append(
+            sessionId,
+            KanbanEventCodec.encodeCause(sessionId, cause).encodeToByteArray(),
+        )
     }
 
     /**
@@ -58,15 +69,21 @@ class JulesBoardStore(
      */
     suspend fun appendDrainBatch(cards: List<JulesSessionCard>) {
         if (cards.isEmpty()) return
-        val nested = mutableListOf<Pair<ByteArray, ByteArray>>()
+        val nested = mutableListOf<Pair<String, ByteArray>>()
         for (card in cards) {
-            val sid = card.snapshot.sessionId.encodeToByteArray()
+            val sid = card.snapshot.sessionId
             val cause = requireNotNull(card.causes.lastOrNull()) {
                 "drained card ${card.snapshot.sessionId} has no cause"
             }
             nested += sid to KanbanEventCodec.encodeSnapshot(card.snapshot, drained = true).encodeToByteArray()
             nested += sid to KanbanEventCodec.encodeCause(card.snapshot.sessionId, cause).encodeToByteArray()
         }
+        appendLogicalBatch(nested)
+    }
+
+    /** One physical WAL frame for one logical state transition. */
+    private suspend fun appendLogicalBatch(records: List<Pair<String, ByteArray>>) {
+        val nested = records.map { (key, payload) -> key.encodeToByteArray() to payload }
         val size = nested.fold(8L) { total, (key, payload) ->
             total + 4L + key.size + 4L + payload.size
         }
@@ -104,6 +121,7 @@ class JulesBoardStore(
             if (key == workId) {
                 val decoded = KanbanEventCodec.decode(payload.decodeToString())
                 if (decoded is KanbanEventCodec.CauseEvent) {
+                    require(key == decoded.sid) { "WAL key/cause mismatch: $key != ${decoded.sid}" }
                     causes.add(decoded.cause)
                 }
             }
@@ -123,8 +141,14 @@ class JulesBoardStore(
         val causes = mutableMapOf<String, MutableList<JulesCause>>()
         for ((sid, payload) in records()) {
             when (val ev = KanbanEventCodec.decode(payload.decodeToString())) {
-                is KanbanEventCodec.SnapEvent -> snapshots[sid] = ev
-                is KanbanEventCodec.CauseEvent -> causes.getOrPut(ev.sid) { mutableListOf() }.add(ev.cause)
+                is KanbanEventCodec.SnapEvent -> {
+                    require(sid == ev.snapshot.sessionId) { "WAL key/session mismatch: $sid" }
+                    snapshots[sid] = ev
+                }
+                is KanbanEventCodec.CauseEvent -> {
+                    require(sid == ev.sid) { "WAL key/cause mismatch: $sid != ${ev.sid}" }
+                    causes.getOrPut(ev.sid) { mutableListOf() }.add(ev.cause)
+                }
                 null -> {} // forward-compat: skip unknown record shapes
             }
         }
@@ -151,8 +175,9 @@ class JulesBoardStore(
      */
     fun buildCausalGraph(): borg.trikeshed.causal.CausalGraph {
         val builder = borg.trikeshed.causal.CausalGraphBuilder()
-        for ((_, payload) in records()) {
+        for ((recordKey, payload) in records()) {
             val ev = KanbanEventCodec.decode(payload.decodeToString()) as? KanbanEventCodec.CauseEvent ?: continue
+            require(recordKey == ev.sid) { "WAL key/cause mismatch: $recordKey != ${ev.sid}" }
             val c = ev.cause
             val epochMs = c.at
             when (c) {
@@ -208,9 +233,12 @@ class JulesBoardStore(
         val byWorkId = mutableMapOf<String, QueueEntry>()
         for ((workId, payload) in records()) {
             val ev = KanbanEventCodec.decode(payload.decodeToString()) as? KanbanEventCodec.CauseEvent ?: continue
+            require(workId == ev.sid) { "WAL key/cause mismatch: $workId != ${ev.sid}" }
             val c = ev.cause
             when (c) {
-                is JulesCause.WorkQueued -> byWorkId.getOrPut(c.workId) {
+                is JulesCause.WorkQueued -> {
+                    require(workId == c.workId) { "WAL key/work mismatch: $workId != ${c.workId}" }
+                    byWorkId.getOrPut(c.workId) {
                     QueueEntry(
                         workId = c.workId,
                         tier = c.tier,
@@ -220,21 +248,28 @@ class JulesBoardStore(
                         score = c.score,
                         queuedAt = c.at,
                     )
+                    }
                 }
-                is JulesCause.WorkDispatched -> byWorkId[c.workId]?.let {
+                is JulesCause.WorkDispatched -> {
+                    require(workId == c.workId) { "WAL key/work mismatch: $workId != ${c.workId}" }
+                    byWorkId[c.workId]?.let {
                     byWorkId[c.workId] = it.copy(
                         sessionId = c.sessionId,
                         attempt = c.attempt,
                         dispatchedAt = c.at
                     )
+                    }
                 }
-                is JulesCause.WorkDrained -> byWorkId[c.workId]?.let {
+                is JulesCause.WorkDrained -> {
+                    require(workId == c.workId) { "WAL key/work mismatch: $workId != ${c.workId}" }
+                    byWorkId[c.workId]?.let {
                     byWorkId[c.workId] = it.copy(
                         commitSha = c.commitSha,
                         taskId = c.taskId,
                         receipt = c.receipt,
                         drainedAt = c.at,
                     )
+                    }
                 }
                 else -> {} // session-cause records do not carry workId; skip
             }

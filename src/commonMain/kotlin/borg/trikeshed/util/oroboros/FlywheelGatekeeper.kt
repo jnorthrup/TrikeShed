@@ -44,11 +44,19 @@ data class LexicalMemory(
  * cites this receipt as parent evidence; it never resumes the mutable producer
  * session after merge.
  */
+/** The exact producer artifact whose bytes authorize this receipt. */
+enum class ReceiptArtifactKind { PATCH, REPORT }
+
 data class MergeReceipt(
     val workId: String,
     val producer: String,
     val producerRef: String,
     val patchCid: ContentId,
+    /**
+     * Structured artifact identity. [patchCid] is retained as the historical
+     * wire/property name; [artifactCid] is the kind-neutral projection.
+     */
+    val artifactKind: ReceiptArtifactKind = ReceiptArtifactKind.PATCH,
     val revision: String,
     val versionTag: String,
     val lexicalMemory: LexicalMemory,
@@ -64,7 +72,9 @@ data class MergeReceipt(
      * [patchCid] + [revision] + [versionTag].
      */
     val prUrl: String? = null,
-)
+) {
+    val artifactCid: ContentId get() = patchCid
+}
 
 /**
  * Immutable claim over one historical agent artifact stored in Oroboros CAS.

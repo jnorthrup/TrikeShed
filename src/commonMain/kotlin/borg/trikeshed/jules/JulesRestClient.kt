@@ -2,11 +2,18 @@ package borg.trikeshed.jules
 
 import borg.trikeshed.parse.json.JsonSupport
 import borg.trikeshed.util.toUpperHex
+import borg.trikeshed.lib.Series
+import borg.trikeshed.lib.get
+import borg.trikeshed.lib.size
+import borg.trikeshed.lib.toSeries
+import borg.trikeshed.lib.view
 import keymux.KeyMux
 
 /**
  * Stateless Jules REST client. Zero board state — the Kanban cards own all state.
- * This replaces every curl+jq invocation in bin/trikeshed-jules.
+ * This is the sole Jules HTTP boundary. The former curl+jq shell control plane
+ * was removed so polling, messages, creation, and archive all share HTX,
+ * KeyMux, and the causal WAL/CAS funnel.
  *
  * Transport is the common HTX-backed client [TrikeHtxHttpClient]; the daemon
  * installs a TLS-backed [borg.trikeshed.htx.HtxElement] in the coroutine context.
@@ -52,6 +59,43 @@ class JulesRestClient(
     )
 
     /**
+     * One immutable cumulative-patch observation from the activity stream.
+     *
+     * Jules does not promise that a later cumulative snapshot contains the
+     * same file set as an earlier one.  [causalOrdinal] therefore identifies
+     * the observation order while [activityId] remains the stable API anchor;
+     * the CAS content hash is minted by the JVM continuity store before drain.
+     */
+    data class ActivityPatch(
+        val activityId: String,
+        val activitySeq: Int,
+        val artifactSeq: Int,
+        val causalOrdinal: Int,
+        val createTime: String,
+        val patch: String,
+    )
+
+    /**
+     * One complete agent message as observed in the chronological activity
+     * stream.  [message] is never excerpted: the continuity store puts these
+     * exact UTF-8 bytes in CAS before bonding the activity to the WAL.
+     */
+    data class ActivityReport(
+        val activityId: String,
+        val activitySeq: Int,
+        val causalOrdinal: Int,
+        val createTime: String,
+        val message: String,
+    )
+
+    /** One HTTP projection supplies conversation metadata, reports, and patches. */
+    data class ActivityTimeline(
+        val activities: Series<ActivityInfo>,
+        val reports: Series<ActivityReport>,
+        val patches: Series<ActivityPatch>,
+    )
+
+    /**
      * List sessions across every API page, optionally constrained to one exact
      * Jules source. Empty/missing source values never match a requested source:
      * adopting them would let patches from another repository cross the tenant
@@ -60,16 +104,21 @@ class JulesRestClient(
     suspend fun listSessions(source: String? = null): List<SessionInfo> {
         val out = mutableListOf<SessionInfo>()
         var pageToken: String? = null
+        val seenPageTokens = mutableSetOf<String>()
         do {
             val path = buildString {
                 append("/sessions?pageSize=100")
                 if (!pageToken.isNullOrEmpty()) append("&pageToken=${percentEncode(pageToken)}")
             }
-            val parsed = JsonSupport.parse(get(path)) as? Map<*, *> ?: break
-            val sessions = parsed["sessions"] as? List<*> ?: emptyList<Any?>()
+            val parsed = requireNotNull(JsonSupport.parse(get(path)) as? Map<*, *>) {
+                "Jules session page is not an object"
+            }
+            val sessions = parsed.optionalList("sessions", "Jules session page")
             for (s in sessions) {
-                val m = s as? Map<*, *> ?: continue
-                val name = m["name"]?.toString() ?: continue
+                val m = requireNotNull(s as? Map<*, *>) { "Jules session entry is not an object" }
+                val name = requireNotNull(m["name"]?.toString()?.takeIf { it.isNotBlank() }) {
+                    "Jules session entry has no name"
+                }
                 val sessionSource = ((m["sourceContext"] as? Map<*, *>)?.get("source"))?.toString() ?: ""
                 if (source != null && sessionSource != source) continue
                 out += SessionInfo(
@@ -81,76 +130,135 @@ class JulesRestClient(
                     updateTime = m["updateTime"]?.toString() ?: m["createTime"]?.toString() ?: "",
                 )
             }
-            pageToken = parsed["nextPageToken"]?.toString()?.takeIf { it.isNotBlank() }
+            pageToken = parsed["nextPageToken"]?.toString()?.let(::jsonUnescape)?.takeIf { it.isNotBlank() }
+            require(pageToken == null || seenPageTokens.add(pageToken)) {
+                "Jules session pagination repeated token"
+            }
         } while (pageToken != null)
         return out
     }
 
     /** Ordered activities for a session, each carrying its minted serial. */
-    suspend fun activities(sessionId: String): List<ActivityInfo> {
+    suspend fun activities(sessionId: String): List<ActivityInfo> =
+        activityTimeline(sessionId).activities.view.toList()
+
+    /**
+     * Fetch the activity stream once and preserve every task-delta snapshot.
+     * Every producer artifact is retained here. Unsafe repository/build paths
+     * are review policy at drain time; filtering them before CAS would destroy
+     * the exact evidence needed to diagnose a mixed source+scratch snapshot.
+     */
+    suspend fun activityTimeline(sessionId: String): ActivityTimeline {
         val raw = activityMaps(sessionId)
-        val out = ArrayList<ActivityInfo>(raw.size)
-        for ((seq, m) in raw.withIndex()) {
-            val name = m["name"]?.toString() ?: continue
-            var kind = "unknown"
-            for (k in listOf("agentMessaged", "userMessaged", "planGenerated", "progressUpdated")) {
-                if (m.containsKey(k)) { kind = k; break }
+        val activityList = raw.mapIndexed { seq, m -> activityInfo(seq, m) }
+        val reportList = activityList.asSequence()
+            .filter { it.kind == "agentMessaged" && it.message.isNotEmpty() }
+            .mapIndexed { causalOrdinal, activity ->
+                ActivityReport(
+                    activityId = activity.id,
+                    activitySeq = activity.seq,
+                    causalOrdinal = causalOrdinal,
+                    createTime = activity.createTime,
+                    message = activity.message,
+                )
             }
-            val msgBody = when (kind) {
-                "agentMessaged" -> (m["agentMessaged"] as? Map<*, *>)?.get("agentMessage")?.toString()
-                "userMessaged" -> (m["userMessaged"] as? Map<*, *>)?.get("userMessage")?.toString()
-                "progressUpdated" -> (m["progressUpdated"] as? Map<*, *>)?.let { p ->
-                    listOfNotNull(p["title"]?.toString(), p["description"]?.toString())
-                        .joinToString(": ")
-                        .takeIf { it.isNotBlank() }
-                }
-                else -> null
+            .toList()
+        val activityPatches = raw.flatMapIndexed { seq, m ->
+            val activityId = requireNotNull(
+                m["name"]?.toString()?.substringAfterLast('/')?.takeIf { it.isNotBlank() },
+            ) { "Jules activity entry for $sessionId has no name" }
+            patchTexts(m).mapIndexed { artifactSeq, patch ->
+                ActivityPatch(
+                    activityId = activityId,
+                    activitySeq = seq,
+                    artifactSeq = artifactSeq,
+                    causalOrdinal = 0,
+                    createTime = m["createTime"]?.toString() ?: "",
+                    patch = patch,
+                )
             }
-            val patches = patchTexts(m)
-            if (patches.isNotEmpty() && kind == "unknown") kind = "artifacts"
-            out += ActivityInfo(
-                id = name.substringAfterLast('/'),
-                seq = seq,
-                createTime = m["createTime"]?.toString() ?: "",
-                originator = m["originator"]?.toString() ?: "unknown",
-                kind = kind,
-                patchBytes = patches.lastOrNull()?.length?.toLong() ?: 0L,
-                excerpt = msgBody?.take(140) ?: "",
-                message = msgBody.orEmpty(),
-            )
         }
-        return out
+        val outputPatches = sessionOutputsPatches(sessionId)
+            .filterNot { output -> activityPatches.any { it.patch == output } }
+            .mapIndexed { outputSeq, patch ->
+                ActivityPatch(
+                    activityId = "session-output-$outputSeq",
+                    activitySeq = raw.size + outputSeq,
+                    artifactSeq = outputSeq,
+                    causalOrdinal = 0,
+                    createTime = "",
+                    patch = patch,
+                )
+            }
+        val patchList = (activityPatches + outputPatches)
+            .mapIndexed { causalOrdinal, patch -> patch.copy(causalOrdinal = causalOrdinal) }
+        return ActivityTimeline(
+            activities = activityList.toSeries(),
+            reports = reportList.toSeries(),
+            patches = patchList.toSeries(),
+        )
+    }
+
+    private fun activityInfo(seq: Int, m: Map<*, *>): ActivityInfo {
+        val activityId = requireNotNull(
+            m["name"]?.toString()?.substringAfterLast('/')?.takeIf { it.isNotBlank() },
+        ) { "Jules activity entry at sequence $seq has no name" }
+        val kindWithoutPatch = listOf("agentMessaged", "userMessaged", "planGenerated", "progressUpdated")
+            .firstOrNull(m::containsKey) ?: "unknown"
+        val msgBody = when (kindWithoutPatch) {
+            "agentMessaged" -> (m["agentMessaged"] as? Map<*, *>)
+                ?.get("agentMessage")?.toString()?.let(::jsonUnescape)
+            "userMessaged" -> (m["userMessaged"] as? Map<*, *>)
+                ?.get("userMessage")?.toString()?.let(::jsonUnescape)
+            "progressUpdated" -> (m["progressUpdated"] as? Map<*, *>)?.let { p ->
+                listOfNotNull(
+                    p["title"]?.toString()?.let(::jsonUnescape),
+                    p["description"]?.toString()?.let(::jsonUnescape),
+                )
+                    .joinToString(": ")
+                    .takeIf { it.isNotBlank() }
+            }
+            else -> null
+        }
+        val activityPatches = patchTexts(m)
+        val kind = if (activityPatches.isNotEmpty() && kindWithoutPatch == "unknown") "artifacts"
+            else kindWithoutPatch
+        return ActivityInfo(
+            id = activityId,
+            seq = seq,
+            createTime = m["createTime"]?.toString() ?: "",
+            originator = m["originator"]?.toString() ?: "unknown",
+            kind = kind,
+            patchBytes = activityPatches.lastOrNull()?.length?.toLong() ?: 0L,
+            excerpt = msgBody?.take(140) ?: "",
+            message = msgBody.orEmpty(),
+        )
     }
 
     /** Byte length of the latest cumulative patch. */
     suspend fun patchProbe(sessionId: String): Long = lastPatch(sessionId)?.length?.toLong() ?: 0L
 
-    /** Latest task delta; repository snapshots containing build caches are not task deltas. */
+    /** Latest exact API patch, including session-output fallback observations. */
     suspend fun lastPatch(sessionId: String): String? {
-        val activityDelta = activityMaps(sessionId).asSequence()
-            .flatMap { patchTexts(it).asSequence() }
-            .filterNot(::isRepositorySnapshot)
-            .lastOrNull()
-        if (!activityDelta.isNullOrEmpty()) return activityDelta
-        return sessionOutputsPatches(sessionId).lastOrNull { !isRepositorySnapshot(it) }
+        val patches = activityTimeline(sessionId).patches
+        return if (patches.size == 0) null else patches[patches.size - 1].patch
     }
-
-    private fun isRepositorySnapshot(patch: String): Boolean =
-        "diff --git a/.gradle/" in patch ||
-            "diff --git a/build/" in patch ||
-            "diff --git a/.git/" in patch
 
     /** Fetch the session resource and read outputs[*].changeSet.gitPatch.unidiffPatch. */
     private suspend fun sessionOutputsPatches(sessionId: String): List<String> {
         val out = mutableListOf<String>()
-        val parsed = try {
-            JsonSupport.parse(get("/sessions/$sessionId")) as? Map<*, *> ?: return out
-        } catch (t: Throwable) {
-            return out
+        val parsed = requireNotNull(JsonSupport.parse(get("/sessions/$sessionId")) as? Map<*, *>) {
+            "Jules session $sessionId response is not an object"
         }
-        val outputs = parsed["outputs"] as? List<*> ?: return out
+        val outputs = parsed.optionalList("outputs", "Jules session $sessionId")
         for (output in outputs) {
-            val changeSet = (output as? Map<*, *>)?.get("changeSet") as? Map<*, *> ?: continue
+            val outputMap = requireNotNull(output as? Map<*, *>) {
+                "Jules session output for $sessionId is not an object"
+            }
+            val rawChangeSet = outputMap["changeSet"] ?: continue
+            val changeSet = requireNotNull(rawChangeSet as? Map<*, *>) {
+                "Jules session output changeSet for $sessionId is not an object"
+            }
             gitPatchText(changeSet)?.let { out += it }
         }
         return out
@@ -160,26 +268,44 @@ class JulesRestClient(
     private suspend fun activityMaps(sessionId: String): List<Map<*, *>> {
         val out = mutableListOf<Map<*, *>>()
         var pageToken: String? = null
+        val seenPageTokens = mutableSetOf<String>()
         do {
             val path = buildString {
                 append("/sessions/$sessionId/activities?pageSize=100")
                 if (!pageToken.isNullOrEmpty()) append("&pageToken=${percentEncode(pageToken)}")
             }
-            val raw = try { get(path) } catch (t: Throwable) { return out }
-            val parsed = try { JsonSupport.parse(raw) } catch (t: Throwable) { return out } as? Map<*, *> ?: break
-            val page = parsed["activities"] as? List<*> ?: emptyList<Any?>()
-            page.mapNotNullTo(out) { it as? Map<*, *> }
-            pageToken = parsed["nextPageToken"]?.toString()?.takeIf { it.isNotBlank() }
+            val parsed = requireNotNull(JsonSupport.parse(get(path)) as? Map<*, *>) {
+                "Jules activity page for $sessionId is not an object"
+            }
+            val page = parsed.optionalList("activities", "Jules activity page for $sessionId")
+            page.forEach { activity ->
+                out += requireNotNull(activity as? Map<*, *>) {
+                    "Jules activity entry for $sessionId is not an object"
+                }
+            }
+            pageToken = parsed["nextPageToken"]?.toString()?.let(::jsonUnescape)?.takeIf { it.isNotBlank() }
+            require(pageToken == null || seenPageTokens.add(pageToken)) {
+                "Jules activity pagination for $sessionId repeated token"
+            }
         } while (pageToken != null)
-        return out
+        return out.sortedWith(compareBy<Map<*, *>>(
+            { it["createTime"]?.toString().orEmpty() },
+            { it["name"]?.toString().orEmpty() },
+        ))
     }
 
     /** Normalize both live gitPatch shapes via [gitPatchText]. */
     private fun patchTexts(activity: Map<*, *>): List<String> {
         val out = mutableListOf<String>()
-        val artifacts = activity["artifacts"] as? List<*> ?: return out
+        val artifacts = activity.optionalList("artifacts", "Jules activity")
         for (artifact in artifacts) {
-            val changeSet = (artifact as? Map<*, *>)?.get("changeSet") as? Map<*, *> ?: continue
+            val artifactMap = requireNotNull(artifact as? Map<*, *>) {
+                "Jules activity artifact is not an object"
+            }
+            val rawChangeSet = artifactMap["changeSet"] ?: continue
+            val changeSet = requireNotNull(rawChangeSet as? Map<*, *>) {
+                "Jules activity changeSet is not an object"
+            }
             gitPatchText(changeSet)?.let { out += it }
         }
         return out
@@ -188,11 +314,19 @@ class JulesRestClient(
     /** Extract the diff text from a changeSet map: string or {unidiffPatch: string}. */
     private fun gitPatchText(changeSet: Map<*, *>): String? {
         val patch = when (val gitPatch = changeSet["gitPatch"]) {
+            null -> null
             is String -> gitPatch
-            is Map<*, *> -> gitPatch["unidiffPatch"]?.toString()
-            else -> null
+            is Map<*, *> -> requireNotNull(gitPatch["unidiffPatch"] as? String) {
+                "Jules gitPatch object has no string unidiffPatch"
+            }
+            else -> error("Jules gitPatch has unsupported shape ${gitPatch::class.simpleName}")
         }
         return patch?.takeIf { it.isNotEmpty() }?.let(::jsonUnescape)
+    }
+
+    private fun Map<*, *>.optionalList(key: String, owner: String): List<*> {
+        val value = this[key] ?: return emptyList<Any?>()
+        return requireNotNull(value as? List<*>) { "$owner field '$key' is not an array" }
     }
 
     /**

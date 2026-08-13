@@ -21,6 +21,17 @@ interface FileOperations : CoroutineContext.Element {
     fun readAllBytes(filename: String): ByteArray
     fun readString(filename: String): String
     fun write(filename: String, bytes: ByteArray)
+
+    /**
+     * Replace [filename] with [bytes] without exposing a partial destination.
+     *
+     * Durable filesystem adapters override this with a same-directory temporary
+     * file, file fsync, atomic rename, and parent-directory fsync. The default is
+     * deliberately the in-memory/non-durable fallback so existing test and
+     * browser adapters retain their ordinary [write] semantics.
+     */
+    fun writeAtomically(filename: String, bytes: ByteArray) = write(filename, bytes)
+
     fun write(filename: String, lines: List<String>)
     fun write(filename: String, string: String)
     fun cwd(): String

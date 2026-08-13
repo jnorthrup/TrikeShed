@@ -8,9 +8,11 @@ import borg.trikeshed.util.oroboros.MergeReceipt
 import borg.trikeshed.utils.kanban.JulesBoardStore
 import borg.trikeshed.utils.kanban.forForgeDir
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
 import java.io.File
+import java.nio.file.Files
 
 /**
  * Operator bridge for a Jules result delivered only through the API activity
@@ -53,20 +55,58 @@ object JulesSettlementCli {
         val prUrl = args.getOrNull(7)?.takeIf { it.isNotBlank() && it != "none" }
         val artifact = withContext(Dispatchers.IO) { System.`in`.readBytes() }
         require(artifact.isNotEmpty()) { "stdin carried no Jules ${artifactKind.wireName} bytes" }
+        val artifactCid = ContentId.of(artifact)
+
+        requireCanonicalRepository(repoDir)
+        val originMaster = fetchAndVerifyOriginMaster(repoDir)
 
         val commit = git(repoDir, "rev-parse", "$requestedCommit^{commit}").requireSuccess().trim()
-        require(git(repoDir, "merge-base", "--is-ancestor", commit, "origin/master").exitCode == 0) {
-            "settlement commit $commit is not contained in origin/master"
+        when (artifactKind) {
+            ArtifactKind.PATCH -> require(
+                git(repoDir, "merge-base", "--is-ancestor", commit, originMaster).exitCode == 0,
+            ) {
+                "settlement commit $commit is not contained in verified origin/master $originMaster"
+            }
+            ArtifactKind.REPORT -> require(commit == originMaster) {
+                "report settlement must anchor verified origin/master $originMaster, not $commit"
+            }
         }
 
         val cas = FileCasStore(JvmFileOperations(), File(forgeDir, "cas").absolutePath)
-        val artifactCid = withContext(Dispatchers.IO) { cas.put(artifact) }
+        val store = JulesBoardStore.forForgeDir(forgeDir)
+        val durable = withContext(Dispatchers.IO) { store.load() to store.loadQueue() }
+        val card = requireNotNull(durable.first[sessionId]) {
+            "session $sessionId has no observed API timeline; poll Jules before settlement"
+        }
+        val allowedStates = when (artifactKind) {
+            ArtifactKind.PATCH -> PATCH_TERMINAL_STATES
+            ArtifactKind.REPORT -> REPORT_TERMINAL_STATES
+        }
+        require(card.snapshot.state in allowedStates) {
+            "session $sessionId is ${card.snapshot.state}, not terminal for ${artifactKind.wireName} settlement"
+        }
+        require(state == card.snapshot.state) {
+            "requested state $state differs from observed ${card.snapshot.state}"
+        }
+        require(title == card.snapshot.title) {
+            "requested title differs from the observed Jules title"
+        }
+        val existingQueue = durable.second.firstOrNull { it.sessionId == sessionId }
         val safeSession = sessionId.replace(Regex("[^A-Za-z0-9._-]"), "-")
         val tag = "flywheel/jules-$safeSession-${commit.take(12)}"
-        ensureTag(repoDir, tag, commit, sessionId, artifactCid, artifactKind, disposition, title)
-
-        val store = JulesBoardStore.forForgeDir(forgeDir)
-        val existingQueue = store.loadQueue().firstOrNull { it.sessionId == sessionId }
+        validateSelectedArtifact(
+            sessionId = sessionId,
+            state = state,
+            disposition = disposition,
+            artifactKind = artifactKind,
+            artifactCid = artifactCid,
+            artifact = artifact,
+            commit = commit,
+            repoDir = repoDir,
+            cas = cas,
+            store = store,
+            card = card,
+        )
         if (existingQueue?.isDrained == true) {
             val receipt = requireNotNull(existingQueue.receipt) {
                 "session $sessionId already has a hollow WorkDrained record"
@@ -74,7 +114,19 @@ object JulesSettlementCli {
             require(receipt.patchCid == artifactCid && receipt.revision == commit) {
                 "session $sessionId already settled to ${receipt.revision}/${receipt.patchCid}"
             }
-            ensureIdentity(store, existingQueue.workId, sessionId, prUrl, tag, commit)
+            val settledBytes = withContext(Dispatchers.IO) { cas.get(artifactCid) }
+            require(settledBytes?.contentEquals(artifact) == true) {
+                "settled CAS bytes are missing or differ for $artifactCid"
+            }
+            ensureTag(repoDir, tag, commit, sessionId, artifactCid, artifactKind, disposition, title)
+            ensureTagPublished(repoDir, tag, commit)
+            requireIdentityPrecedesWorkDrained(
+                store = store,
+                workId = existingQueue.workId,
+                sessionId = sessionId,
+                tag = tag,
+                commit = commit,
+            )
             ensureCardDrained(
                 store,
                 sessionId,
@@ -86,6 +138,9 @@ object JulesSettlementCli {
             println(receiptJson(sessionId, disposition, commit, tag, artifactCid, artifactKind, existingQueue.workId, true))
             return
         }
+
+        ensureTag(repoDir, tag, commit, sessionId, artifactCid, artifactKind, disposition, title)
+        ensureTagPublished(repoDir, tag, commit)
 
         val now = System.currentTimeMillis()
         val workId = existingQueue?.workId ?: "session:$safeSession"
@@ -105,6 +160,10 @@ object JulesSettlementCli {
                 at = now,
             ))
         }
+        // Identity is a premise of settlement, not a synonym repaired after
+        // the fact.  Append it before WorkDrained so replay never observes a
+        // terminal receipt whose session/tag/commit identity is still absent.
+        ensureIdentity(store, workId, sessionId, prUrl, tag, commit, now)
         val receipt = MergeReceipt(
             workId = workId,
             producer = "jules-api",
@@ -131,7 +190,6 @@ object JulesSettlementCli {
             receipt = receipt,
             at = now,
         ))
-        ensureIdentity(store, workId, sessionId, prUrl, tag, commit, now)
         ensureCardDrained(
             store,
             sessionId,
@@ -143,14 +201,157 @@ object JulesSettlementCli {
         println(receiptJson(sessionId, disposition, commit, tag, artifactCid, artifactKind, workId, false))
     }
 
+    /**
+     * Validate the exact durable activity artifact before any tag or terminal
+     * WAL write.  A failed/cancelled patch is evidence from an unsuccessful
+     * run, so only an explicit operator review can select it for settlement.
+     */
+    private suspend fun validateSelectedArtifact(
+        sessionId: String,
+        state: String,
+        disposition: String,
+        artifactKind: ArtifactKind,
+        artifactCid: ContentId,
+        artifact: ByteArray,
+        commit: String,
+        repoDir: File,
+        cas: FileCasStore,
+        store: JulesBoardStore,
+        card: JulesSessionCard,
+    ) {
+        val continuity = JulesPatchContinuityStore(cas, store)
+        when (artifactKind) {
+            ArtifactKind.PATCH -> {
+                val selected = when (val selection = selectJulesPatchForDrain(card.causes)) {
+                    is JulesPatchDrainSelection.Selected -> selection
+                    is JulesPatchDrainSelection.ReviewRequired -> error(
+                        "session $sessionId patch regressed and needs explicit review; " +
+                            "missing=${selection.missingFiles.joinToString(",")}",
+                    )
+                    JulesPatchDrainSelection.Unobserved -> error(
+                        "session $sessionId has no observed API patch snapshot",
+                    )
+                }
+                if (state == "FAILED" || state == "CANCELLED") {
+                    require(selected.reviewed && !selected.receiptRef.isNullOrBlank()) {
+                        "$state patch settlement requires an explicit reviewed snapshot and receipt"
+                    }
+                }
+                require(selected.snapshot.patchCid == artifactCid) {
+                    "stdin patch $artifactCid is not selected ${selected.snapshot.patchCid}"
+                }
+                require(continuity.bytes(selected).contentEquals(artifact)) {
+                    "stdin patch bytes differ from selected CAS object $artifactCid"
+                }
+                provePatchEmbodied(repoDir, commit, artifact)
+            }
+            ArtifactKind.REPORT -> {
+                val selected = when (val selection = selectJulesReportForSettlement(card.causes)) {
+                    is JulesReportSettlementSelection.Selected -> selection
+                    is JulesReportSettlementSelection.ReviewRequired -> error(
+                        "session $sessionId report ${selection.finalReport.reportCid} needs explicit semantic review",
+                    )
+                    JulesReportSettlementSelection.Unobserved -> error(
+                        "session $sessionId has no observed full Jules agent report",
+                    )
+                }
+                require(selected.disposition == disposition) {
+                    "settlement disposition '$disposition' differs from reviewed '${selected.disposition}'"
+                }
+                require(selected.report.reportCid == artifactCid) {
+                    "stdin report $artifactCid is not selected ${selected.report.reportCid}"
+                }
+                require(continuity.reportBytes(selected).contentEquals(artifact)) {
+                    "stdin report bytes differ from selected CAS object $artifactCid"
+                }
+            }
+        }
+    }
+
+    /**
+     * Prove that [commit] contains the exact selected patch.  The reverse check
+     * runs against a disposable detached worktree so neither local master nor
+     * any user worktree/index participates in the proof.  `--check` performs no
+     * mutation; the worktree and exact temporary patch file are removed even
+     * when the proof fails.
+     */
+    private suspend fun provePatchEmbodied(repoDir: File, commit: String, patch: ByteArray) {
+        val tempRoot = withContext(Dispatchers.IO) {
+            Files.createTempDirectory("oroboros-settle-patch-").toFile()
+        }
+        val checkout = File(tempRoot, "detached")
+        val patchFile = File(tempRoot, "selected.patch")
+        var worktreeAdded = false
+        try {
+            withContext(Dispatchers.IO) { patchFile.writeBytes(patch) }
+            git(
+                repoDir,
+                "worktree", "add", "--detach", checkout.absolutePath, commit,
+            ).requireSuccess()
+            worktreeAdded = true
+            val proof = git(
+                checkout,
+                "apply", "--reverse", "--check", "--whitespace=nowarn", patchFile.absolutePath,
+            )
+            require(proof.exitCode == 0) {
+                "selected Jules patch is not embodied by commit $commit: ${proof.output.take(500)}"
+            }
+        } finally {
+            withContext(NonCancellable + Dispatchers.IO) {
+                if (worktreeAdded) {
+                    git(
+                        repoDir,
+                        "worktree", "remove", "--force", checkout.absolutePath,
+                    ).requireSuccess()
+                }
+                if (tempRoot.exists()) {
+                    require(tempRoot.deleteRecursively() && !tempRoot.exists()) {
+                        "failed to remove disposable settlement worktree root ${tempRoot.absolutePath}"
+                    }
+                }
+            }
+        }
+    }
+
+    /** Fetch origin/master and confirm the server still advertises that SHA. */
+    private suspend fun fetchAndVerifyOriginMaster(repoDir: File): String {
+        git(
+            repoDir,
+            "fetch", "--no-tags", "origin",
+            "+refs/heads/master:refs/remotes/origin/master",
+        ).requireSuccess()
+        val fetched = git(
+            repoDir,
+            "rev-parse", "refs/remotes/origin/master^{commit}",
+        ).requireSuccess().trim()
+        val advertised = git(
+            repoDir,
+            "ls-remote", "--heads", "origin", "refs/heads/master",
+        ).requireSuccess().lineSequence()
+            .firstOrNull { it.substringAfter('\t', "") == "refs/heads/master" }
+            ?.substringBefore('\t')
+            ?: error("origin does not advertise refs/heads/master")
+        require(advertised == fetched) {
+            "origin/master moved during verification: fetched=$fetched advertised=$advertised"
+        }
+        return fetched
+    }
+
     /** Call only after the Jules API archive transition succeeds. */
     private suspend fun recordArchive(args: List<String>) {
         require(args.isNotEmpty()) { "archive-record requires session-id" }
         val sessionId = args[0].substringAfterLast('/')
         val forgeDir = File(args.getOrNull(1) ?: defaultForgeDir())
         val store = JulesBoardStore.forForgeDir(forgeDir)
-        val card = requireNotNull(store.load()[sessionId]) { "no WAL card for session $sessionId" }
+        val durable = withContext(Dispatchers.IO) { store.load() to store.loadQueue() }
+        val card = requireNotNull(durable.first[sessionId]) { "no WAL card for session $sessionId" }
         require(card.drained) { "session $sessionId has no durable drain receipt" }
+        require(card.causes.any { it is JulesCause.DrainApplied }) {
+            "session $sessionId lacks a DrainApplied card cause"
+        }
+        require(durable.second.any { entry ->
+            entry.sessionId == sessionId && entry.receipt?.let(::isImmutableReceipt) == true
+        }) { "session $sessionId lacks an immutable WorkDrained receipt" }
         if (card.causes.any { it is JulesCause.SessionArchived }) {
             println("{\"sessionId\":\"$sessionId\",\"archivedRecorded\":true,\"idempotent\":true}")
             return
@@ -168,7 +369,7 @@ object JulesSettlementCli {
         commit: String,
         at: Long = System.currentTimeMillis(),
     ) {
-        if (store.replayCauses(workId).any { cause ->
+        if (withContext(Dispatchers.IO) { store.replayCauses(workId) }.any { cause ->
                 cause is JulesCause.WorkIdentitySynthesized &&
                     cause.identity.sessionId == sessionId &&
                     cause.identity.gitTag == tag &&
@@ -196,7 +397,7 @@ object JulesSettlementCli {
         patchBytes: Long,
         commit: String,
     ) {
-        val existing = store.load()[sessionId]
+        val existing = withContext(Dispatchers.IO) { store.load()[sessionId] }
         val refreshedAt = System.currentTimeMillis()
         val refreshedSnapshot = existing?.snapshot?.copy(
             state = state,
@@ -245,6 +446,10 @@ object JulesSettlementCli {
         val existing = git(repoDir, "rev-parse", "$tag^{commit}")
         if (existing.exitCode == 0) {
             require(existing.output.trim() == commit) { "tag $tag targets ${existing.output.trim()}, not $commit" }
+            val message = git(repoDir, "for-each-ref", "--format=%(contents)", "refs/tags/$tag").requireSuccess()
+            require("session=$sessionId" in message && "artifactKind=${artifactKind.wireName}" in message &&
+                "artifactCid=${artifactCid.value}" in message
+            ) { "tag $tag annotation does not match this exact Jules artifact" }
             return
         }
         git(
@@ -252,6 +457,32 @@ object JulesSettlementCli {
             "Jules settlement receipt\nsession=$sessionId\nartifactKind=${artifactKind.wireName}\nartifactCid=${artifactCid.value}\ndisposition=$disposition\ntaskTitle=$title",
         ).requireSuccess()
     }
+
+    /** Publish and verify the exact annotated receipt tag before terminal WAL. */
+    private suspend fun ensureTagPublished(repoDir: File, tag: String, commit: String) {
+        git(repoDir, "push", "origin", "refs/tags/$tag:refs/tags/$tag").requireSuccess()
+        val remote = git(repoDir, "ls-remote", "--tags", "origin", "refs/tags/$tag^{}").requireSuccess()
+        require(remote.lineSequence().any { it.substringBefore('\t') == commit }) {
+            "origin does not expose annotated tag $tag peeled to $commit"
+        }
+    }
+
+    private suspend fun requireCanonicalRepository(repoDir: File) {
+        val branch = git(repoDir, "symbolic-ref", "--short", "HEAD").requireSuccess().trim()
+        require(branch == "master") { "settlement requires local master, found $branch" }
+        val remote = git(repoDir, "config", "--get", "remote.origin.url").requireSuccess().trim()
+        val cleaned = remote.removeSuffix(".git").removePrefix("git@github.com:")
+        val normalized = (if ("github.com/" in cleaned) cleaned.substringAfter("github.com/") else cleaned)
+            .trim('/')
+        require(normalized == "jnorthrup/TrikeShed") {
+            "origin $normalized does not match Jules source jnorthrup/TrikeShed"
+        }
+    }
+
+    private fun isImmutableReceipt(receipt: MergeReceipt): Boolean =
+        receipt.producer != "retired" &&
+            receipt.revision.isNotBlank() && !receipt.revision.startsWith("outbox-") &&
+            receipt.versionTag.isNotBlank() && receipt.versionTag != "retired"
 
     private data class CommandResult(val exitCode: Int, val output: String) {
         fun requireSuccess(): String {
@@ -291,4 +522,7 @@ object JulesSettlementCli {
 
     private fun defaultForgeDir(): String =
         System.getenv("TRIKESHED_HOME") ?: File(System.getProperty("user.home"), ".local/forge").path
+
+    private val PATCH_TERMINAL_STATES = setOf("COMPLETED", "FINISHED", "FAILED", "CANCELLED")
+    private val REPORT_TERMINAL_STATES = PATCH_TERMINAL_STATES
 }
