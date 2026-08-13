@@ -33,6 +33,10 @@ sealed interface MemorySubstrate {
     sealed interface ExternalNonParametric : MemorySubstrate
 }
 
+/** Zero-cost semantic aliases retained for the public ontology vocabulary. */
+typealias InternalParametric = MemorySubstrate.InternalParametric
+typealias ExternalNonParametric = MemorySubstrate.ExternalNonParametric
+
 // ── Internal parametric leaves ──────────────────────────────────────
 
 /** Tuned model weights — the persistent parametric memory updated by training. */

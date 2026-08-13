@@ -28,6 +28,10 @@ sealed interface MemorySubject {
     sealed interface AgentCentricMemory : MemorySubject
 }
 
+/** Zero-cost semantic aliases retained for the public ontology vocabulary. */
+typealias UserCentricMemory = MemorySubject.UserCentricMemory
+typealias AgentCentricMemory = MemorySubject.AgentCentricMemory
+
 // ── User-centric leaves ─────────────────────────────────────────────
 
 /** Memory management in dialogues — continuity and coherence across turns. */

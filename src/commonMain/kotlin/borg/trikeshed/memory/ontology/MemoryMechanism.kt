@@ -31,6 +31,10 @@ sealed interface MemoryMechanism {
     sealed interface LongTermMemory : MemoryMechanism
 }
 
+/** Zero-cost semantic aliases retained for the public ontology vocabulary. */
+typealias ShortTermMemory = MemoryMechanism.ShortTermMemory
+typealias LongTermMemory = MemoryMechanism.LongTermMemory
+
 // ── Short-term atomic leaves ────────────────────────────────────────
 
 /** Sensory memory — brief retention of perceptual signals before higher processing. */
