@@ -5,6 +5,9 @@ import borg.trikeshed.reduction.LcncReduction
 import borg.trikeshed.reduction.ReductionCarrier
 import borg.trikeshed.reduction.ReductionResult
 import borg.trikeshed.reduction.KeyAlg
+import borg.trikeshed.reduction.KeyExtractor
+import borg.trikeshed.reduction.KeyHierarchy
+import borg.trikeshed.reduction.KeyOrder
 import borg.trikeshed.reduction.ValueAlg
 import borg.trikeshed.reduction.PhaseAlg
 import borg.trikeshed.reduction.CarrierAlg
@@ -35,7 +38,17 @@ class LcncFanoutElementTest {
         var runForCalled = false
 
         val stubReduction = object : LcncReduction<Any, Any, Any, Any> {
-            override val keyAlg: KeyAlg<Any> get() = TODO("Not yet implemented")
+            override val keyAlg: KeyAlg<Any> get() = object : KeyAlg<Any> {
+                override val extractor: KeyExtractor<Any, Any> = KeyExtractor { it }
+                override val hierarchy: KeyHierarchy<Any> = object : KeyHierarchy<Any> {
+                    override val levels: List<KeyExtractor<Any, Any>> = emptyList()
+                    override fun compositeKey(input: Any): List<Any> = emptyList()
+                    override fun prefix(key: List<Any>, depth: Int): List<Any> = emptyList()
+                }
+                override val order: KeyOrder<Any> = object : KeyOrder<Any> {
+                    override fun compare(a: Any, b: Any): Int = 0
+                }
+            }
             override val valueAlg: ValueAlg<Any, Any> get() = TODO("Not yet implemented")
             override val phaseAlg: PhaseAlg get() = TODO("Not yet implemented")
             override val carrierAlg: CarrierAlg<Any>
