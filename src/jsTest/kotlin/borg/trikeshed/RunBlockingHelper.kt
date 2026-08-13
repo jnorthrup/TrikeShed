@@ -1,7 +1,8 @@
 package borg.trikeshed
 
-import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.GlobalScope
+import kotlinx.coroutines.promise
 
-actual fun <T> runBlocking(block: suspend CoroutineScope.() -> T): T {
-    TODO("nodejs platform mismatch")
+actual fun runBlockingTest(block: suspend () -> Unit): dynamic {
+    return GlobalScope.promise { block() }
 }
