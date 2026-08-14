@@ -252,16 +252,12 @@ class FlywheelDriver(
             false
         }
         if (!pollComplete) {
-            val alive = activeCount()
-            return CycleReport(
-                cycleMs = System.currentTimeMillis() - t0,
-                alive = alive,
-                available = (maxSlots - alive).coerceAtLeast(0),
-                settled = false,
-                phase = FlywheelPhase.POLL,
-                http429 = cycleHttp429,
-                http5xx = cycleHttp5xx,
-            )
+            // pollOnce rehydrates cards from WAL before any API call, so the
+            // cards map is current even when the API hung. Fall through to
+            // DRAIN/SETTLE against WAL state — returning here starves drain
+            // and the wheel spins at POLL forever (the documented contract at
+            // the top of this block says drain proceeds on rehydrated cards).
+            _events.tryEmit(FlywheelEvent.PollError("poll incomplete; draining WAL-rehydrated cards"))
         }
 
         // Refresh optional branch/PR identity metadata. Producer refs never
