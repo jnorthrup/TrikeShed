@@ -1,16 +1,15 @@
-## 2025-01-20 - Adding ARIA attributes to generic HTML Builder inputs**Action:** When auditing custom UI DSLs or HTML builder utilities, verify that accessibility attributes are exposed as top-level arguments, not just classes or IDs. Update upstream builder functions to accept and properly render these attributes.**Learning:** When creating general-purpose HTML builder functions (like `HtmlBuilder.input()` in TrikeShed), it's crucial to include explicit parameter support for accessibility attributes like `aria-label`. Without this generic support, downstream property editors (Text, Number, Date, Url, Email, Phone) that rely on these builders will implicitly fail to provide accessible names, causing widespread a11y gaps across dynamic forms.
-## 2024-08-04 - Palette Journal Initialization
+## 2025-01-20 - Palette Journal Initialization
 **Learning:** Initializing the journal for tracking critical UX and accessibility learnings.
 **Action:** Use this file to record specific insights related to accessibility and UX patterns in the TrikeShed app.
-
-## 2025-01-20 - Adding ARIA attributes to generated HTML in Kotlin React-like DSLs
-**Learning:** When using Kotlin string-builder-based DSLs (like `text("<button...")`) to generate HTML elements, ARIA attributes and titles need to be explicitly added as escaped strings (e.g., `aria-label="My Label"`). Icon-only buttons used in inline editors (like BlockEditor and DatabaseView) often lack these attributes by default because they are generated programmatically for brevity.
-**Action:** Always check programmatic HTML generation for missing accessibility attributes, especially for UI controls represented only by symbols (↑, ↓, +, x, ✎).
-
-## 2025-01-20 - Adding ARIA attributes to generic HTML Builder inputs
-**Learning:** When creating general-purpose HTML builder functions (like `HtmlBuilder.input()` in TrikeShed), it's crucial to include explicit parameter support for accessibility attributes like `aria-label`. Without this generic support, downstream property editors (Text, Number, Date, Url, Email, Phone) that rely on these builders will implicitly fail to provide accessible names, causing widespread a11y gaps across dynamic forms.
-**Action:** When auditing custom UI DSLs or HTML builder utilities, verify that accessibility attributes are exposed as top-level arguments, not just classes or IDs. Update upstream builder functions to accept and properly render these attributes.
 
 ## 2025-01-20 - Adding ARIA attributes to placeholders and contenteditable regions
 **Learning:** Inputs that only use the `placeholder` attribute for context (like a search bar or a column filter input) lack a reliable accessible name for screen readers, as the placeholder often disappears during typing or isn't spoken properly. Additionally, `contenteditable` elements, acting essentially as rich-text textareas, are opaque to screen readers if they lack an explicit label or `aria-label`.
 **Action:** Ensure that standalone inputs (especially search or filter fields without explicit `<label>` elements) always carry an `aria-label`. For interactive editor components like `contenteditable` divs, treat them as input regions and explicitly annotate them with an `aria-label` (e.g., `aria-label="Block content"`) to provide necessary context for screen reader users.
+
+## 2025-01-20 - WCAG 2.5.3 Label in Name rule
+**Learning:** When adding `aria-label` for accessibility, it overrides the accessible name of an element. If an `aria-label` is added to a button that contains visible text, it can violate WCAG 2.5.3 (Label in Name) if the `aria-label` doesn't contain the visible text. This breaks voice dictation software for users.
+**Action:** Never add `aria-label` attributes to buttons that already contain visible, descriptive text (like 'Share' or 'New Doc'). Reserve `aria-label` for icon-only buttons, standalone inputs without labels, or generic interactive regions like `contenteditable` tags.
+
+## 2025-01-20 - Hiding decorative icons with aria-hidden
+**Learning:** When using Unicode symbols (like ⌕, ⌂, ▦, ⬇, ▤) purely for visual decoration next to descriptive text, screen readers will try to announce the symbol. This creates unnecessary auditory noise and degrades the user experience.
+**Action:** Always apply `aria-hidden="true"` to decorative elements, especially Unicode symbols or SVGs, when they are paired with actual accessible text or contained within a parent element that already provides an adequate `aria-label`.
