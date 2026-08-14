@@ -115,4 +115,10 @@ object HermesDonorTrace {
         Files.writeString(tmp, sourceDescription)
         return ForgeKanbanIngest.persistMarkdown(userId, tmp.toString())
     }
+
+    private fun escapeMarkdown(text: String?): String? {
+        if (text == null) return null
+        val sanitized = text.replace("\r", " ").replace("\n", " ")
+        return sanitized.replace(Regex("""([\\`*_{}\[\]()#+\-.!])"""), "\\\\$1")
+    }
 }
