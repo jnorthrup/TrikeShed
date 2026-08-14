@@ -91,7 +91,8 @@ class LcncFanoutElementTest {
         val result = lcncFanout.dispatch(nuid, testPayload)
 
         assertTrue(runForCalled, "execute should have been called on the reduction")
-        assertEquals("success", result)
+        // dispatch returns MarkedResult (SpineMark j value) — project the value.
+        assertEquals("success", (result as? borg.trikeshed.lib.Join<*, *>)?.b)
 
         job.cancel()
     }

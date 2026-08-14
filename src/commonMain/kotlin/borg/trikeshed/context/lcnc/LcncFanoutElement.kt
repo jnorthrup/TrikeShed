@@ -40,6 +40,25 @@ class LcncFanoutElement(
             borg.trikeshed.reduction.emptySeriesCarrier()
         }
 
-        return typedReduction.execute(carrier)
+        // Execute the reduction, then land it on the forge semantics surface:
+        // a completed reduction is a SignalFacetReduced kanban event carrying
+        // the zero-cost spine mark (facet j causal j pointcut).
+        val result = typedReduction.execute(carrier)
+        val facetMark = FacetMark.fromCategory(winningCapability.category)
+        val marked: MarkedResult<Any?> = marked(
+            result,
+            facet = facetMark,
+            causal = CausalMark.Dispatched,
+            pointcut = PointcutMark.AfterGet,
+        )
+        borg.trikeshed.userspace.reactor.KanbanFSM.kanbanEvents.tryEmit(
+            borg.trikeshed.userspace.reactor.KanbanEvent.SignalFacetReduced(
+                facetKey = winningCapability.category,
+                reducedValue = result?.toString() ?: "null",
+                sourceSignalId = "lcnc:" + facetMark.raw + ":" + CausalMark.Dispatched.raw + ":" + PointcutMark.AfterGet.raw,
+                timestampMs = kotlinx.datetime.Clock.System.now().toEpochMilliseconds(),
+            )
+        )
+        return marked
     }
 }
