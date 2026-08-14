@@ -366,6 +366,18 @@ fun ClosedRange<Int>.toSeries(): Series<Int> = (endInclusive - start + 1) j { i:
 fun <T> Sequence<T>.toSeries(): Series<T> = toList().toSeries()
 fun <T> Series<T>.toSequence(): Sequence<T> = Sequence { iterator() }
 
+// Bolt: inline map extensions to avoid allocating intermediate lists for Series operations.
+inline fun <T, R> Series<T>.map(transform: (T) -> R): List<R> {
+    val result = ArrayList<R>(size)
+    for (i in 0 until size) result.add(transform(this[i]))
+    return result
+}
+inline fun <T, R> Series<T>.mapIndexed(transform: (Int, T) -> R): List<R> {
+    val result = ArrayList<R>(size)
+    for (i in 0 until size) result.add(transform(i, this[i]))
+    return result
+}
+
 /** Materialize any Collection into a Series by copying into a List first. */
 fun <T> Collection<T>.toSeries(): Series<T> = toList().let { list -> list.size j list::get }
 

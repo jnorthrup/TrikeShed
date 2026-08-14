@@ -775,14 +775,15 @@ tasks.register("metrics") {
             }
         }
     }
-
-    tasks.register<JavaExec>("queueGraphWork") {
-        group = "trikeshed"
-        description = "Queue Graphify + pgGraph merged work to Jules board"
-        classpath = files(
-            layout.buildDirectory.dir("classes/kotlin/jvm/main"),
-            configurations.named("jvmRuntimeClasspath")
-        )
-        mainClass.set("borg.trikeshed.utils.ingress.QueueGraphWorkKt")
-    }
 }
+
+tasks.register<JavaExec>("queueGraphWork") {
+    group = "trikeshed"
+    description = "Queue Graphify + pgGraph merged work to Jules board"
+    classpath = files(
+        layout.buildDirectory.dir("classes/kotlin/jvm/main"),
+        configurations.named("jvmRuntimeClasspath")
+    )
+    mainClass.set("borg.trikeshed.utils.ingress.QueueGraphWorkKt")
+}
+
