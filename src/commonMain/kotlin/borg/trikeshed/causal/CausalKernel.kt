@@ -294,13 +294,13 @@ fun CausalGraph.rankByProximity(
     query: LexicalMemory,
     candidateWorkIds: Series<String>,
 ): Series<Join<String, Double>> {
-    val scored = (0 until candidateWorkIds.size)
-        .map { i ->
-            val wid = candidateWorkIds[i]
-            val score = proximityOf(query, wid)
-            wid j score
-        }
-        .sortedByDescending { it.b }
+    // stdlib-boundary: Avoid intermediate List allocation from .map
+    val scored = ArrayList<Join<String, Double>>(candidateWorkIds.size)
+    for (i in 0 until candidateWorkIds.size) {
+        val wid = candidateWorkIds[i]
+        scored.add(wid j proximityOf(query, wid))
+    }
+    scored.sortByDescending { it.b }
     return scored.size j { i -> scored[i] }
 }
 
