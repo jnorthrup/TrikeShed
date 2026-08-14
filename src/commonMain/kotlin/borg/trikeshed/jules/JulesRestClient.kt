@@ -316,9 +316,7 @@ class JulesRestClient(
         val patch = when (val gitPatch = changeSet["gitPatch"]) {
             null -> null
             is String -> gitPatch
-            is Map<*, *> -> requireNotNull(gitPatch["unidiffPatch"] as? String) {
-                "Jules gitPatch object has no string unidiffPatch"
-            }
+            is Map<*, *> -> gitPatch["unidiffPatch"] as? String
             else -> error("Jules gitPatch has unsupported shape ${gitPatch::class.simpleName}")
         }
         return patch?.takeIf { it.isNotEmpty() }?.let(::jsonUnescape)

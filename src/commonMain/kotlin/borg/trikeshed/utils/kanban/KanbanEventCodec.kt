@@ -129,9 +129,11 @@ object KanbanEventCodec {
     data class CauseEvent(val sid: String, val cause: JulesCause) : KanbanEvent
 
     fun decode(record: String): KanbanEvent? {
-        val m = requireNotNull(JsonSupport.parse(record) as? Map<*, *>) {
-            "Kanban WAL record is not a Confix object"
-        }
+        // Return null (not throw) when a record isn't a JSON object. decode is
+        // declared KanbanEvent? and callers (load/loadQueue/buildCausalGraph)
+        // have explicit null-skip branches for forward-compat. Throwing here
+        // aborts the entire WAL replay on a single malformed record.
+        val m = JsonSupport.parse(record) as? Map<*, *> ?: return null
         return when (m["t"]) {
             "snap" -> SnapEvent(
                 JulesSnapshot(
@@ -263,7 +265,7 @@ object KanbanEventCodec {
                 }
                 CauseEvent(sid, cause)
             }
-            else -> error("Unknown Kanban WAL record type: ${m["t"]}")
+            else -> return null
         }
     }
 

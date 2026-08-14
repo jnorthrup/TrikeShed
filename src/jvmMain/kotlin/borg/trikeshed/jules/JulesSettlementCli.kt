@@ -120,10 +120,11 @@ object JulesSettlementCli {
             }
             ensureTag(repoDir, tag, commit, sessionId, artifactCid, artifactKind, disposition, title)
             ensureTagPublished(repoDir, tag, commit)
-            requireIdentityPrecedesWorkDrained(
+            ensureIdentity(
                 store = store,
                 workId = existingQueue.workId,
                 sessionId = sessionId,
+                prUrl = receipt.prUrl,
                 tag = tag,
                 commit = commit,
             )
