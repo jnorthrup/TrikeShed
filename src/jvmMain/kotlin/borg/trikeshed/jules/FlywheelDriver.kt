@@ -1534,6 +1534,64 @@ class FlywheelDriver(
         }
     }
 
+    data class ClaimedPatch(val commitSha: String, val receipt: MergeReceipt)
+
+    /**
+     * Content-address the exact cumulative patch bytes and pin the protected
+     * release tag onto the commit. The CAS put ([FileCasStore.put]) verifies by
+     * re-reading, so a backing-store failure throws here and the tag is never
+     * created on a hollow receipt. The returned [MergeReceipt.patchCid] is a real
+     * content-addressable blob, retrievable as `casStore.get(receipt.patchCid)`,
+     * not a detached hash. Internal for testability (drives a real `.git` tag).
+     */
+    internal suspend fun claimPatch(
+        commitSha: String,
+        patch: String,
+        sessionId: String,
+        workId: String,
+        title: String,
+        content: String,
+    ): ClaimedPatch? {
+        val patchBytes = patch.encodeToByteArray()
+        val patchCid = try {
+            casStore.put(patchBytes)
+        } catch (e: Exception) {
+            println("[FLYWHEEL] CAS-FAIL ${sessionId.takeLast(6)}: ${e.message}")
+            return null
+        }
+        val safeSession = sessionId.replace(Regex("[^A-Za-z0-9._-]"), "-")
+        val tag = "flywheel/jules-$safeSession-${commitSha.take(12)}"
+        val tagMessage =
+            "Jules merge receipt\nsession=$sessionId\nwork=$workId\npatchCid=${patchCid.value}"
+        if (git("tag", "-a", tag, commitSha, "-m", tagMessage).exitCode != 0) {
+            return null
+        }
+
+        val prUrl = try {
+            fishPrUrl(sessionId, tag)
+        } catch (t: Throwable) {
+            if (t is kotlinx.coroutines.CancellationException) throw t
+            null
+        }
+
+        val receipt = MergeReceipt(
+            workId = workId,
+            producer = "jules",
+            producerRef = sessionId,
+            patchCid = patchCid,
+            revision = commitSha,
+            versionTag = tag,
+            lexicalMemory = LexicalMemory(
+                summary = title,
+                title = title,
+                content = content,
+            ),
+            claimedAt = Clock.System.now().toEpochMilliseconds(),
+            prUrl = prUrl,
+        )
+        return ClaimedPatch(commitSha, receipt)
+    }
+
     /**
      * Fish an optional PR/branch URL tying this receipt to the upstream
      * surface. Probes: (1) `git ls-remote origin 'refs/heads/jules-<numericId>-*'`,

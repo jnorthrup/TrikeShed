@@ -7,8 +7,12 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 import kotlinx.coroutines.runBlocking
+import keymux.KeyMux
+import keymux.FixedKeySource
 
 class JulesRestClientTest {
+    private val testKeyMux = KeyMux { bind("*", FixedKeySource("test-key")) }
+
     @Test
     fun sessionsAndActivitiesUseTheConsolidatedRestShape() = withServer(
         responder = { exchange ->
@@ -24,7 +28,7 @@ class JulesRestClientTest {
             }
         },
     ) { base, requests ->
-        val client = JulesRestClient("test-key", "$base/v1alpha")
+        val client = JulesRestClient(testKeyMux, "$base/v1alpha")
 
         val sessions = client.listSessions()
         assertEquals(1, sessions.size)
@@ -50,7 +54,7 @@ class JulesRestClientTest {
             }
         },
     ) { base, requests ->
-        val client = JulesRestClient("test-key", "$base/v1alpha")
+        val client = JulesRestClient(testKeyMux, "$base/v1alpha")
 
         assertEquals("new-session", client.createSession("implement", "title"))
         assertEquals("answer-1", client.sendMessage("new-session", "Use Confix"))
@@ -91,7 +95,7 @@ class JulesRestClientTest {
             }
         },
     ) { base, requests ->
-        val client = JulesRestClient("test-key", "$base/v1alpha")
+        val client = JulesRestClient(testKeyMux, "$base/v1alpha")
         val patch = client.lastPatch("s-outputs")
         assertTrue(patch != null, "lastPatch must return non-null when outputs has a patch; got null")
         assertTrue(patch!!.startsWith("diff --git a/A b/A"), "patch must be the unidiffPatch from outputs[0]; got: \${patch.take(80)}")

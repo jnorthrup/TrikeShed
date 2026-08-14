@@ -3,8 +3,7 @@ package borg.trikeshed.memory
 
 import borg.trikeshed.couch.CouchStoreFactory
 import borg.trikeshed.job.ContentId
-import borg.trikeshed.lib.j
-import borg.trikeshed.lib.size
+import borg.trikeshed.lib.*
 import borg.trikeshed.userspace.nio.file.spi.JvmFileOperations
 import borg.trikeshed.util.oroboros.CouchAttachmentGateway
 import borg.trikeshed.util.oroboros.FileCasStore
@@ -45,14 +44,13 @@ class CouchIndexBridgeTest {
             )
 
             // Series inputs & initial Git batch
-            val initialBatch = 2 j { i -> if (i == 0) "repo1/file1.txt" else "repo1/dir/file2.txt" }
+            val initialBatch: Series<String> = 2 j { i: Int -> if (i == 0) "repo1/file1.txt" else "repo1/dir/file2.txt" }
             bridge.indexReconciliation("repo1/", initialBatch)
 
             val repoPaths1 = indexes.queryRepositoryPath("repo1/")
             assertEquals(2, repoPaths1.size)
-            val list1 = (0 until repoPaths1.size).map { repoPaths1[it] }
-            assertTrue(list1.contains("repo1/file1.txt"))
-            assertTrue(list1.contains("repo1/dir/file2.txt"))
+            assertTrue("repo1/file1.txt" in repoPaths1.view)
+            assertTrue("repo1/dir/file2.txt" in repoPaths1.view)
 
             // separation from memory-document taxonomy
             val memoryPaths = indexes.queryByPath("repo1/")
@@ -69,7 +67,7 @@ class CouchIndexBridgeTest {
                 data3
             )
 
-            val worktreeBatch = 1 j { "repo1/file3.txt" }
+            val worktreeBatch: Series<String> = 1 j { _: Int -> "repo1/file3.txt" }
             bridge.indexReconciliation("repo1/", worktreeBatch)
 
             val repoPaths2 = indexes.queryRepositoryPath("repo1/")
@@ -77,7 +75,7 @@ class CouchIndexBridgeTest {
             assertEquals("repo1/file3.txt", repoPaths2[0])
 
             // deletion removal (partition replaced by empty)
-            val emptyBatch = 0 j { _: Int -> error("empty") }
+            val emptyBatch: Series<String> = 0 j { _: Int -> "" }
             bridge.indexReconciliation("repo1/", emptyBatch)
 
             val repoPaths3 = indexes.queryRepositoryPath("repo1/")
