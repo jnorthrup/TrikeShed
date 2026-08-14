@@ -57,24 +57,56 @@ enum class CouchCascadeView(
                 "created_at": {}
               };
 
+              // O(N) optimization: Calculate min, max, and sum in a single pass.
+              // This avoids intermediate array allocations from values.map() and prevents
+              // "RangeError: Maximum call stack size exceeded" caused by Math.max.apply() on large datasets.
+              var length = values.length;
               if (!rereduce) {
-                var length = values.length;
+                if (length > 0) {
+                  var first = values[0];
+                  for (var k in o) {
+                    o[k].sum = first[k];
+                    o[k].min = first[k];
+                    o[k].max = first[k];
+                  }
+                  for (var i = 1; i < length; i++) {
+                    var v = values[i];
+                    for (var k in o) {
+                      var val = v[k];
+                      o[k].sum += val;
+                      if (val < o[k].min) o[k].min = val;
+                      if (val > o[k].max) o[k].max = val;
+                    }
+                  }
+                }
                 for (var k in o) {
-                  var attrValue = values.map(function (v) { return v[k]; });
-                  o[k].sum = sum(attrValue);
                   o[k].avg = o[k].sum / length;
-                  o[k].min = Math.min.apply(null, attrValue);
-                  o[k].max = Math.max.apply(null, attrValue);
                 }
                 return [o, length];
               }
 
-              var count = sum(values.map(function (v) { return v[1]; }));
+              var count = 0;
+              if (length > 0) {
+                count = values[0][1];
+                var firstObj = values[0][0];
+                for (var k in o) {
+                  o[k].sum = firstObj[k].sum;
+                  o[k].min = firstObj[k].min;
+                  o[k].max = firstObj[k].max;
+                }
+                for (var i = 1; i < length; i++) {
+                  var v = values[i];
+                  count += v[1];
+                  var vObj = v[0];
+                  for (var k in o) {
+                    o[k].sum += vObj[k].sum;
+                    if (vObj[k].min < o[k].min) o[k].min = vObj[k].min;
+                    if (vObj[k].max > o[k].max) o[k].max = vObj[k].max;
+                  }
+                }
+              }
               for (var k in o) {
-                o[k].sum = sum(values.map(function (v) { return v[0][k].sum; }));
                 o[k].avg = o[k].sum / count;
-                o[k].min = Math.min.apply(null, values.map(function (v) { return v[0][k].min; }));
-                o[k].max = Math.max.apply(null, values.map(function (v) { return v[0][k].max; }));
               }
               return [o, count];
             }
