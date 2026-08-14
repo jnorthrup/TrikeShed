@@ -294,13 +294,13 @@ fun CausalGraph.rankByProximity(
     query: LexicalMemory,
     candidateWorkIds: Series<String>,
 ): Series<Join<String, Double>> {
-    val scored = (0 until candidateWorkIds.size)
-        .map { i ->
-            val wid = candidateWorkIds[i]
-            val score = proximityOf(query, wid)
-            wid j score
-        }
-        .sortedByDescending { it.b }
+    // stdlib-boundary: Avoid intermediate List allocation from .map
+    val scored = ArrayList<Join<String, Double>>(candidateWorkIds.size)
+    for (i in 0 until candidateWorkIds.size) {
+        val wid = candidateWorkIds[i]
+        scored.add(wid j proximityOf(query, wid))
+    }
+    scored.sortByDescending { it.b }
     return scored.size j { i -> scored[i] }
 }
 
@@ -342,10 +342,18 @@ fun CausalGraph.phaseOf(workId: String): CausalPhase {
 
 /** All workIds in a given phase. Stays Series<String>. */
 fun CausalGraph.inPhase(phase: CausalPhase): Series<String> {
-    // Collect distinct workIds, then filter by phase. This is O(n²) but n is
-    // bounded by WAL size and the distinct set is small (≤ hundreds).
-    val wids = (0 until size).map { this[it].workId }.toSet()
-    val matches = wids.filter { phaseOf(it) == phase }
+    // stdlib-boundary: Optimize O(N²) phase lookups to a single O(N) pass.
+    val latestMap = LinkedHashMap<String, EventNode>()
+    for (i in 0 until size) {
+        val node = this[i]
+        latestMap[node.workId] = node
+    }
+    val matches = ArrayList<String>()
+    for ((workId, node) in latestMap) {
+        if (CausalPhase.fromLatestKind(node.kind) == phase) {
+            matches.add(workId)
+        }
+    }
     return matches.size j { i -> matches[i] }
 }
 
