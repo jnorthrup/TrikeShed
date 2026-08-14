@@ -12,6 +12,7 @@ object FlywheelHistoryReaper {
 
             val tagsToDelete = tags.drop(keepLatest)
             for (tag in tagsToDelete) {
+                if (tag.isBlank() || !tag.startsWith("flywheel/jules-") || tag.contains("..") || tag.startsWith("-")) continue
                 ProcessBuilder("git", "-C", repoDir.path, "tag", "-d", tag).start().waitFor()
                 ProcessBuilder("git", "-C", repoDir.path, "push", "origin", "--delete", tag).start().waitFor()
             }
