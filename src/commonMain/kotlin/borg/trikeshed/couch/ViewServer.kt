@@ -489,9 +489,10 @@ private fun documentBytes(document: Document): ByteArray = canonicalFields(
 
 private fun resultBytes(result: ViewResult): ByteArray = canonicalFields(
     "view-result-v1",
-    *result.rows.sequence().map { row ->
+    *(result.rows.size j { i: Int ->
+        val row = result.rows[i]
         canonicalFields(row.docId, row.jsPath, canonicalValue(row.key), canonicalValue(row.value))
-    }.toList().toTypedArray(),
+    }).toArray<String>(),
 ).encodeToByteArray()
 
 private fun mapFunctionValue(map: MapFunction): String = when (map) {
