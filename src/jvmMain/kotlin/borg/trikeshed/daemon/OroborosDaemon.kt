@@ -462,6 +462,9 @@ object OroborosDaemon {
             if (ev is FlywheelEvent.PollError) {
                 pollErrors++
                 pollErrOccurred = true
+                consecutivePollErrors.incrementAndGet()
+            } else if (ev is FlywheelEvent.Polled) {
+                consecutivePollErrors.set(0)
             }
             val now = System.currentTimeMillis()
             when (ev) {
