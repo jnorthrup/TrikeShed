@@ -1,11 +1,12 @@
 package borg.trikeshed.cas
 
 /*
- * MEASURED
+ * MEASURED (post receipt-split: strict-INHERITED vs INHERITED_CROSS)
  * sources.size = 57
  * receipt.novelCount = 7
- * receipt.relocatedCount = 0
- * receipt.inheritedCount = 1
+ * receipt.relocatedCount = 0   // RED at :82 — master-line relocation invisible (queued)
+ * receipt.inheritedCount = 0   // theorem: provably 0 via merge()
+ * receipt.inheritedCrossCount = 1
  * receipt.kept.size = 7
  * receipt.dropped.size = 1
  * residualAtoms = 14
@@ -72,12 +73,17 @@ class FunnelResidualMerge57WayEvidenceTest {
         println("receipt.novelCount = ${receipt.novelCount}")
         println("receipt.relocatedCount = ${receipt.relocatedCount}")
         println("receipt.inheritedCount = ${receipt.inheritedCount}")
+        println("receipt.inheritedCrossCount = ${receipt.inheritedCrossCount}")
         println("receipt.kept.size = ${receipt.kept.size}")
         println("receipt.dropped.size = ${receipt.dropped.size}")
         println("residualAtoms = $residualAtoms")
         println("totalSourceAtoms = $totalSourceAtoms")
 
         assertEquals(7, receipt.novelCount)
+        // Theorem (see FunnelResidualMerge.ClusterGrade): via merge(), strict-INHERITED
+        // is provably unreachable — residualsOf emits only funnel misses and
+        // gradeClusters re-queries the same frozen index.
+        assertEquals(0, receipt.inheritedCount, "merge() must never produce strict-INHERITED drops")
         // Red test: Expected relocated behavior according to the 57-way test spec.
         assertTrue(receipt.relocatedCount >= 1, "receipt.relocatedCount should be >= 1 but was ${receipt.relocatedCount}")
         assertTrue(receipt.inheritedCount >= 1 || receipt.dropped.size > 0)

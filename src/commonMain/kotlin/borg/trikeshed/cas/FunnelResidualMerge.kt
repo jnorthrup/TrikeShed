@@ -95,6 +95,19 @@ object FunnelResidualMerge {
      *  NOVEL            — singleton, not in master (keep).
      *  INHERITED_CROSS  — all stamps equal across copies (drop — same line, no relocation).
      *  RELOCATED        — stamps differ across copies (surface — context moved).
+     *
+     * Reachability contract: INHERITED is provably unreachable through [merge].
+     * [residualsOf] emits only atoms whose contentCid MISSED the master funnel
+     * (so [topologyOf]'s first-wins cidByMini only ever records a missed CID,
+     * even under a mini64 collision), and [gradeClusters] re-queries the same
+     * frozen index — `contains` is deterministic, so every cluster in a
+     * merge-produced topology answers false and the INHERITED arm never fires
+     * (hence [MergeReceipt.inheritedCount] == 0 via that path; the proof runs
+     * on determinism + frozenness, not on funnel perfection). The arm survives
+     * because [gradeClusters] is total over ANY (topology, funnel) pair:
+     * grading a persisted topology against a funnel that did not produce it
+     * (master has since advanced) must absorb contained content or stale
+     * clusters re-apply as NOVEL.
      */
     enum class ClusterGrade { INHERITED, NOVEL, INHERITED_CROSS, RELOCATED }
 
@@ -115,7 +128,11 @@ object FunnelResidualMerge {
         val dropped: Series<GradedCluster>,
         val novelCount: Int,
         val relocatedCount: Int,
+        /** Strict-INHERITED drop count. Via [merge]: provably 0 — see [ClusterGrade]. */
         val inheritedCount: Int,
+        /** INHERITED_CROSS drop count — content novel to master but shared (equal
+         *  stamps) across sources; the cross-source-boilerplate harvest. */
+        val inheritedCrossCount: Int,
     )
 
     // ── Stage 4: build per-source residual spines ─────────────────────────
@@ -213,6 +230,12 @@ object FunnelResidualMerge {
      * INHERITED_CROSS) vs when to surface to a 3-way (RELOCATED) vs when to
      * fast-apply (NOVEL). The funnel is the INHERITED oracle; the stamp diff
      * is the RELOCATION signal.
+     *
+     * Totality: a pure function of (topology, masterFunnel) — merge
+     * provenance is never consulted. When the topology came from
+     * [residualsOf] against the SAME funnel the INHERITED arm is unreachable
+     * (see [ClusterGrade]); when the funnel is newer than the topology it is
+     * the absorption path and MUST fire.
      */
     fun gradeClusters(
         topology: Topology,
@@ -255,14 +278,14 @@ object FunnelResidualMerge {
     fun mergeResiduals(graded: GradedTopology): MergeReceipt {
         val keptList = ArrayList<GradedCluster>(graded.size)
         val droppedList = ArrayList<GradedCluster>(graded.size)
-        var novel = 0; var relocated = 0; var inherited = 0
+        var novel = 0; var relocated = 0; var inherited = 0; var inheritedCross = 0
 
         for (gc in graded.view) {
             when (gc.grade) {
                 ClusterGrade.NOVEL -> { keptList.add(gc); novel++ }
                 ClusterGrade.RELOCATED -> { keptList.add(gc); relocated++ }
                 ClusterGrade.INHERITED -> { droppedList.add(gc); inherited++ }
-                ClusterGrade.INHERITED_CROSS -> { droppedList.add(gc); inherited++ }
+                ClusterGrade.INHERITED_CROSS -> { droppedList.add(gc); inheritedCross++ }
             }
         }
 
@@ -272,6 +295,7 @@ object FunnelResidualMerge {
             novelCount = novel,
             relocatedCount = relocated,
             inheritedCount = inherited,
+            inheritedCrossCount = inheritedCross,
         )
     }
 
