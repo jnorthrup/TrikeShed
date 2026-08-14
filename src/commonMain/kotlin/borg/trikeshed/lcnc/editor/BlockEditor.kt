@@ -80,7 +80,7 @@ class BlockEditor(var block: LcncBlock, val ingestState: IngestStateElement) {
             // Block Content editable area
             val contentStr = block.content?.toString() ?: ""
             div(classes = "lcnc-block-content") {
-                text("<div contenteditable=\"true\" onblur=\"window.lcncUpdateBlockContent('${block.id}', this.innerText)\">$contentStr</div>")
+                text("<div contenteditable=\"true\" aria-label=\"Block content\" onblur=\"window.lcncUpdateBlockContent('${block.id}', this.innerText)\">$contentStr</div>")
             }
 
             // Render children recursively
