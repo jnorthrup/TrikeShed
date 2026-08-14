@@ -61,7 +61,7 @@ class DatabaseView(var database: LcncDatabase, val ingestState: IngestStateEleme
                 text("<h2>${database.title} <span class=\"lcnc-row-count\">(${database.pages.a} rows)</span></h2>")
                 div(classes = "lcnc-database-controls") {
                     for (prop in schema.properties.values) {
-                        text("<div class=\"lcnc-database-filter\"><input type=\"text\" placeholder=\"Filter ${prop.name}...\" data-column-id=\"${prop.id}\" onkeyup=\"window.lcncFilterColumn('${database.id}', '${prop.id}', this.value)\"/></div>")
+                        text("<div class=\"lcnc-database-filter\"><input type=\"text\" placeholder=\"Filter ${prop.name}...\" aria-label=\"Filter ${prop.name}\" data-column-id=\"${prop.id}\" onkeyup=\"window.lcncFilterColumn('${database.id}', '${prop.id}', this.value)\"/></div>")
                     }
                     text("<button onclick=\"window.lcncAddColumn('${database.id}')\" aria-label=\"Add Column\" title=\"Add Column\">+ Add Column</button>")
                 }

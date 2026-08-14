@@ -134,7 +134,7 @@ object ForgeApp {
         <span id="forge-title">FORGE</span>
       </div>
       <div class="header-center">
-        <div class="search-box"><input type="text" placeholder="Search workspace…" id="forge-search"/></div>
+        <div class="search-box"><input type="text" placeholder="Search workspace…" aria-label="Search workspace" id="forge-search"/></div>
       </div>
       <div class="header-right">
         <button class="btn" id="new-doc-btn">New Doc</button>
