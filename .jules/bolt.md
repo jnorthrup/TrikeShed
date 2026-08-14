@@ -53,3 +53,7 @@
 ## 2024-08-11 - Replace filterValues().keys.toList() with entries.removeAll() for zero-allocation map eviction
 **Learning:** In Kotlin, replacing functional chains like `map.filterValues { ... }.keys.toList()` followed by map removal inside a loop with the in-place iterator method `map.entries.removeAll { ... }` changes the operation to an efficient O(N) zero-allocation removal, avoiding redundant intermediate collection instances.
 **Action:** Always refactor iterative functional map evictions to use `.entries.removeAll { ... }` instead of building intermediate Lists and HashMaps.
+
+## 2024-05-18 - Avoid O(N^2) bottlenecks when resolving causal phases
+**Learning:** `CausalGraph.inPhase` previously resolved the distinct set of `workId`s and mapped each one individually using a backwards scan `phaseOf(it)`, producing an O(N^2) time complexity.
+**Action:** When deriving phase maps over a casual graph or continuous event stream, use a single-pass `LinkedHashMap` to maintain the causal ordinal order while maintaining O(N) linear time execution.
