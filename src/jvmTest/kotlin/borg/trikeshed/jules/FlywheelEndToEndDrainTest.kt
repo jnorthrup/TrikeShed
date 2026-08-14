@@ -74,7 +74,7 @@ class FlywheelEndToEndDrainTest {
             commitSha = headSha,
             patch = patch,
             sessionId = "sessions/7395203169723873685",
-            workId = "todo:e2e-drain",
+            workId = "w-e2e-drain",
             title = "E2E drain",
             content = "end-to-end drain against file:// origin",
         )
@@ -126,7 +126,7 @@ class FlywheelEndToEndDrainTest {
             commitSha = headSha,
             patch = patch,
             sessionId = "sessions/$numericId",
-            workId = "todo:e2e-drain",
+            workId = "w-e2e-drain",
             title = "E2E drain",
             content = "end-to-end drain against file:// origin",
         )
