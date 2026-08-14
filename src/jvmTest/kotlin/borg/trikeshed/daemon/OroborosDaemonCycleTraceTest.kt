@@ -26,6 +26,7 @@ class OroborosDaemonCycleTraceTest {
 
     @After
     fun teardown() {
+        borg.trikeshed.userspace.nio.platform.spi.SystemOperations.register(borg.trikeshed.userspace.nio.platform.spi.loadDefaultSystemOperations())
         tempDir.deleteRecursively()
     }
 
@@ -37,28 +38,15 @@ class OroborosDaemonCycleTraceTest {
     // We can also use a custom wrapper or patch OroborosDaemon to allow passing an API key.
     // Wait, let's just use reflection to inject the ENV for the test.
 
-    @Suppress("UNCHECKED_CAST")
-    private fun setEnv(key: String, value: String) {
-        try {
-            val env = System.getenv()
-            val cl = env.javaClass
-            val field = cl.getDeclaredField("m")
-            field.isAccessible = true
-            val map = field.get(env) as MutableMap<String, String>
-            map[key] = value
-        } catch (e: Exception) {
-            // JVM 17+ might block this, but we can try other methods or assume JULES_API_KEY is exported
-            // by the environment running this test.
-        }
-
-        try {
-            val clazz = Class.forName("java.lang.ProcessEnvironment")
-            val field = clazz.getDeclaredField("theEnvironment")
-            field.isAccessible = true
-            val map = field.get(null) as MutableMap<String, String>
-            map[key] = value
-        } catch (e: Exception) {
-        }
+    private fun setEnv(envKey: String, value: String) {
+        borg.trikeshed.userspace.nio.platform.spi.SystemOperations.register(
+            object : borg.trikeshed.userspace.nio.platform.spi.SystemOperations {
+                override val key: kotlin.coroutines.CoroutineContext.Key<*> get() = borg.trikeshed.userspace.nio.platform.spi.SystemOperations.Key
+                override fun getenv(name: String, defaultVal: String?): String? = if (name == envKey) value else java.lang.System.getenv(name) ?: defaultVal
+                override fun getProperty(name: String, defaultVal: String?): String? = java.lang.System.getProperty(name) ?: defaultVal
+                override val homedir: String get() = java.lang.System.getProperty("user.home") ?: "/"
+            }
+        )
     }
 
     @Test
@@ -66,7 +54,7 @@ class OroborosDaemonCycleTraceTest {
         val traceFile = File(forgeHome, "oroboros-cycles.jsonl")
 
         // Mock api key
-        System.setProperty("JULES_API_KEY", "test-key-mock")
+        setEnv("JULES_API_KEY", "test-key-mock")
 
         for (i in 1..5) {
             try {
