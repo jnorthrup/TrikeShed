@@ -15,6 +15,7 @@ import java.nio.file.Path
 import java.security.KeyFactory
 import java.security.KeyStore
 import java.security.PrivateKey
+import java.security.SecureRandom
 import java.security.cert.CertificateFactory
 import java.security.cert.X509Certificate
 import java.security.spec.PKCS8EncodedKeySpec
@@ -309,7 +310,11 @@ class JvmTlsCodecBackend : TlsCodecBackend, KeyedService {
         val certs = loadCertificates(Path.of(config.certificateFile))
         val privateKey = loadPrivateKey(Path.of(config.privateKeyFile), certs.first().publicKey.algorithm)
         // In-memory KeyStore; use a randomly generated password if none provided
-        val password = (config.privateKeyPassword ?: java.util.UUID.randomUUID().toString()).toCharArray()
+        val password = (config.privateKeyPassword ?: run {
+            val bytes = ByteArray(16)
+            SecureRandom().nextBytes(bytes)
+            Base64.getEncoder().encodeToString(bytes)
+        }).toCharArray()
         val keyStore = KeyStore.getInstance(KeyStore.getDefaultType())
         keyStore.load(null, null)
         keyStore.setKeyEntry("tls", privateKey, password, certs.toTypedArray())
