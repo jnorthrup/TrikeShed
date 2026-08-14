@@ -342,10 +342,15 @@ fun CausalGraph.phaseOf(workId: String): CausalPhase {
 
 /** All workIds in a given phase. Stays Series<String>. */
 fun CausalGraph.inPhase(phase: CausalPhase): Series<String> {
-    // Collect distinct workIds, then filter by phase. This is O(n²) but n is
-    // bounded by WAL size and the distinct set is small (≤ hundreds).
-    val wids = (0 until size).map { this[it].workId }.toSet()
-    val matches = wids.filter { phaseOf(it) == phase }
+    val phaseByWid = LinkedHashMap<String, CausalPhase>()
+    for (i in 0 until size) {
+        val node = this[i]
+        phaseByWid[node.workId] = CausalPhase.fromLatestKind(node.kind)
+    }
+    val matches = ArrayList<String>()
+    for ((wid, p) in phaseByWid) {
+        if (p == phase) matches.add(wid)
+    }
     return matches.size j { i -> matches[i] }
 }
 
