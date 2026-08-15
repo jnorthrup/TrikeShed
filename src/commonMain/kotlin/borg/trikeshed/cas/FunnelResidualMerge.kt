@@ -91,23 +91,19 @@ object FunnelResidualMerge {
     /**
      * Cluster grade — what the topology says about a cluster of copies.
      *
-     *  INHERITED        — master has it (drop).
+     *  INHERITED        — in master, stamps match (drop, unreachable via merge).
      *  NOVEL            — singleton, not in master (keep).
      *  INHERITED_CROSS  — all stamps equal across copies (drop — same line, no relocation).
-     *  RELOCATED        — stamps differ across copies (surface — context moved).
+     *  RELOCATED        — relocated master content, OR stamps differ across copies (surface).
      *
      * Reachability contract: INHERITED is provably unreachable through [merge].
-     * [residualsOf] emits only atoms whose contentCid MISSED the master funnel
-     * (so [topologyOf]'s first-wins cidByMini only ever records a missed CID,
-     * even under a mini64 collision), and [gradeClusters] re-queries the same
-     * frozen index — `contains` is deterministic, so every cluster in a
-     * merge-produced topology answers false and the INHERITED arm never fires
-     * (hence [MergeReceipt.inheritedCount] == 0 via that path; the proof runs
-     * on determinism + frozenness, not on funnel perfection). The arm survives
-     * because [gradeClusters] is total over ANY (topology, funnel) pair:
-     * grading a persisted topology against a funnel that did not produce it
-     * (master has since advanced) must absorb contained content or stale
-     * clusters re-apply as NOVEL.
+     * [residualsOf] emits only atoms that miss the master funnel OR have a
+     * different neighbor stamp than the master baseline. [topologyOf] groups these
+     * atoms, and [gradeClusters] re-queries the same frozen index. For master
+     * hits, it verifies the stamp against the master baseline. Since any identical
+     * stamp was dropped in [residualsOf], any master hit reaching [gradeClusters]
+     * must have a differing stamp and is graded RELOCATED. The INHERITED arm survives
+     * only because [gradeClusters] is total over ANY (topology, baseline) pair.
      */
     enum class ClusterGrade { INHERITED, NOVEL, INHERITED_CROSS, RELOCATED }
 
@@ -138,29 +134,38 @@ object FunnelResidualMerge {
     // ── Stage 4: build per-source residual spines ─────────────────────────
 
     /**
-     * Extract a residual spine from one source spine against a master funnel.
+     * Extract a residual spine from one source spine against a master baseline.
      *
      * Stage 1 (spine) + Stage 3 (probe) composed: each source line that MISSES
-     * the master funnel becomes a [LineAtom]. Hits are inherited and dropped.
+     * the master funnel OR has a different neighbor stamp than master becomes
+     * a [LineAtom]. True hits (content + context match) are inherited and dropped.
      * This is the DRY harvest primitive — the cells that are novel relative
-     * to the frozen master baseline.
+     * to the frozen master baseline (either new content or moved content).
      *
-     * The master funnel is the [FunnelHashIndex] built from master's
-     * contentCid.hex keys (see [buildMasterFunnel]). A miss = novel residual.
+     * The master baseline is built from master's contentCid.hex keys
+     * and neighbor stamps (see [buildMasterFunnel]).
      */
     fun residualsOf(
         source: LineSpine,
-        masterFunnel: FunnelHashIndex<String>,
+        masterBaseline: MasterBaseline,
         sourceIdx: SourceIdx,
     ): ResidualSpine {
         val atoms = ArrayList<LineAtom>(source.size)
         for (node in source.view) {
-            if (masterFunnel.contains(node.contentCid.hex)) continue // hit = inherited
+            val hex = node.contentCid.hex
             val prev = node.prevHex
             val next = node.nextHex
             val prefix = NeighborPrefix(
                 ((hexNibble(prev) shl 4) or hexNibble(next)).toShort()
             )
+            
+            if (masterBaseline.contains(hex)) {
+                val masterStamp = masterBaseline.stamps[hex]
+                if (masterStamp != null && masterStamp.raw == prefix.raw) {
+                    continue // hit = strict inherited
+                }
+            }
+            
             atoms.add(LineAtom(
                 mini64 = mini64Of(node.contentCid),
                 neighborPrefix = prefix,
@@ -219,32 +224,48 @@ object FunnelResidualMerge {
     // ── Stage 5: grade clusters ───────────────────────────────────────────
 
     /**
-     * Grade every cluster against the master funnel.
+     * Grade every cluster against the master baseline.
      *
-     *  INHERITED        — master funnel has the contentCid (drop, regardless of copies).
-     *  NOVEL            — not in master, single copy (keep).
-     *  INHERITED_CROSS  — not in master, multiple copies, all neighborPrefix equal (drop — shared boilerplate).
-     *  RELOCATED        — not in master, multiple copies, neighborPrefix differs (surface — context moved).
+     *  INHERITED        — in master, stamps match (drop, unreachable via merge).
+     *  NOVEL            — singleton, not in master (keep).
+     *  INHERITED_CROSS  — all stamps equal across copies (drop — same line, no relocation).
+     *  RELOCATED        — relocated master content, OR stamps differ across copies (surface).
      *
      * The grade tells the merge driver when to DRY-collapse (INHERITED,
      * INHERITED_CROSS) vs when to surface to a 3-way (RELOCATED) vs when to
      * fast-apply (NOVEL). The funnel is the INHERITED oracle; the stamp diff
      * is the RELOCATION signal.
      *
-     * Totality: a pure function of (topology, masterFunnel) — merge
+     * Totality: a pure function of (topology, masterBaseline) — merge
      * provenance is never consulted. When the topology came from
-     * [residualsOf] against the SAME funnel the INHERITED arm is unreachable
-     * (see [ClusterGrade]); when the funnel is newer than the topology it is
+     * [residualsOf] against the SAME baseline the INHERITED arm is unreachable
+     * (see [ClusterGrade]); when the baseline is newer than the topology it is
      * the absorption path and MUST fire.
      */
     fun gradeClusters(
         topology: Topology,
-        masterFunnel: FunnelHashIndex<String>,
+        masterBaseline: MasterBaseline,
     ): GradedTopology {
         return topology α { cluster ->
-            val inMaster = masterFunnel.contains(cluster.contentCid.hex)
+            val hex = cluster.contentCid.hex
+            val inMaster = masterBaseline.contains(hex)
+            
             val grade = when {
-                inMaster -> ClusterGrade.INHERITED
+                inMaster -> {
+                    // It's in the funnel, but since it's in the residual topology,
+                    // its stamp MUST differ from the master baseline's stamp 
+                    // (otherwise residualsOf would have dropped it). 
+                    // This explicitly signals a RELOCATED master line.
+                    val masterStamp = masterBaseline.stamps[hex]
+                    val clusterStamp = cluster.copies[0].neighborPrefix
+                    
+                    if (masterStamp != null && masterStamp.raw != clusterStamp.raw) {
+                        ClusterGrade.RELOCATED
+                    } else {
+                        // Fallback for absorption path (stale topology vs new baseline).
+                        ClusterGrade.INHERITED
+                    }
+                }
                 cluster.copies.size == 1 -> ClusterGrade.NOVEL
                 else -> {
                     val first = cluster.copies[0].neighborPrefix.raw
@@ -305,9 +326,9 @@ object FunnelResidualMerge {
      * Run the full 57-way (N-way) funnel residual merge.
      *
      * Composes all six stages:
-     *   1. (caller) build master funnel from master contentCid.hex keys
+     *   1. (caller) build master baseline from master contentCid.hex keys
      *   2. (caller) build source spines via [LineCas.spine]
-     *   3. [residualsOf] — per-source probe, misses = residual atoms
+     *   3. [residualsOf] — per-source probe, misses + relocations = residual atoms
      *   4. [topologyOf]  — group-by mini64 across N residual spines
      *   5. [gradeClusters] — INHERITED / NOVEL / INHERITED_CROSS / RELOCATED
      *   6. [mergeResiduals] — forward merge on NOVEL + RELOCATED survivors
@@ -317,22 +338,89 @@ object FunnelResidualMerge {
      * residual|), not Σ |patch|.
      *
      * @param sources the N source spines (already built via [LineCas.spine])
-     * @param masterFunnel frozen membership index built from master's
-     *   contentCid.hex keys (see [buildMasterFunnel])
+     * @param masterBaseline frozen membership index and stamps built from master
+     *   (see [buildMasterFunnel])
      */
     fun merge(
         sources: Series<LineSpine>,
-        masterFunnel: FunnelHashIndex<String>,
+        masterBaseline: MasterBaseline,
     ): MergeReceipt {
         val residuals = sources.size j { s: Int ->
-            residualsOf(sources[s], masterFunnel, SourceIdx(s))
+            residualsOf(sources[s], masterBaseline, SourceIdx(s))
         }
         val topology = topologyOf(residuals)
-        val graded = gradeClusters(topology, masterFunnel)
+        val graded = gradeClusters(topology, masterBaseline)
         return mergeResiduals(graded)
     }
 
-    // ── master funnel builder ─────────────────────────────────────────────
+    // ── master baseline builder ───────────────────────────────────────────
+
+    /**
+     * The frozen master baseline containing both the fast membership funnel
+     * and the exact master-topology neighbor stamps for relocation detection.
+     */
+    class MasterBaseline(
+        val funnel: FunnelHashIndex<String>,
+        val stamps: Map<String, NeighborPrefix>,
+    ) {
+        fun contains(hex: String): Boolean = funnel.contains(hex)
+    }
+
+    /**
+     * Build the master baseline: frozen [FunnelHashIndex] over master's
+     * contentCid.hex keys, plus their exact neighbor stamps.
+     *
+     * This is the frozen baseline. Every source probe is a batch of membership
+     * queries against this index. Almost all probes are "already have it" —
+     * the negative-query-heavy workload FunnelHashIndex is built for. The stamps
+     * map makes master-content relocation visible.
+     */
+    fun buildMasterBaseline(masterSpine: LineSpine, seed: Long = 0L): MasterBaseline {
+        val keySeries = masterSpine α { it.contentCid.hex }
+        val funnel = FunnelHashIndex.build(keySeries, seed)
+        val stamps = LinkedHashMap<String, NeighborPrefix>(masterSpine.size)
+        for (node in masterSpine.view) {
+            val prev = node.prevHex
+            val next = node.nextHex
+            val prefix = NeighborPrefix(
+                ((hexNibble(prev) shl 4) or hexNibble(next)).toShort()
+            )
+            stamps[node.contentCid.hex] = prefix
+        }
+        return MasterBaseline(funnel, stamps)
+    }
+
+    /**
+     * Build the master baseline from raw master texts.
+     *
+     * Stays on the public [LineCas] API (no private-field reach into
+     * [LineCasIndex]). O(|master|) once. Prefer [buildMasterBaseline] when you
+     * hold the master spine directly.
+     */
+    fun buildMasterBaselineFromTexts(
+        masterTexts: Series<String>,
+        seed: Long = 0L,
+    ): MasterBaseline {
+        val keys = ArrayList<String>(masterTexts.size * 10)
+        val stamps = LinkedHashMap<String, NeighborPrefix>(masterTexts.size * 10)
+        for (text in masterTexts.view) {
+            val spine = LineCas.spine(text)
+            for (node in spine.view) {
+                keys.add(node.contentCid.hex)
+                val prev = node.prevHex
+                val next = node.nextHex
+                val prefix = NeighborPrefix(
+                    ((hexNibble(prev) shl 4) or hexNibble(next)).toShort()
+                )
+                stamps[node.contentCid.hex] = prefix
+            }
+        }
+        val keySeries = keys.size j { i: Int -> keys[i] }
+        val funnel = FunnelHashIndex.build(keySeries, seed)
+        return MasterBaseline(funnel, stamps)
+    }
+
+    // ── master funnel builder (deprecated) ────────────────────────────────
 
     /**
      * Build the master funnel: frozen [FunnelHashIndex] over master's
@@ -345,6 +433,7 @@ object FunnelResidualMerge {
      * The index is rebuilt on each new master ingest (paper FunnelHashIndex is
      * frozen after build). For a static master baseline, build once.
      */
+    @Deprecated("Use buildMasterBaseline instead")
     fun buildMasterFunnel(masterSpine: LineSpine, seed: Long = 0L): FunnelHashIndex<String> {
         val keySeries = masterSpine α { it.contentCid.hex }
         return FunnelHashIndex.build(keySeries, seed)
@@ -358,6 +447,7 @@ object FunnelResidualMerge {
      * hold the master spine directly; this overload is for callers that have
      * the texts but not the spines.
      */
+    @Deprecated("Use buildMasterBaselineFromTexts instead")
     fun buildMasterFunnelFromTexts(
         masterTexts: Series<String>,
         seed: Long = 0L,

@@ -38,7 +38,7 @@ class HtxIpfsAdapterTest {
         val bridge = IpfsBridge(cas)
         val adapter = HtxIpfsAdapter(bridge)
 
-        val fakeCid = "sha256:fakecid123123123123123123123123123123123123123123123123123123123"
+        val fakeCid = "sha256:0000000000000000000000000000000000000000000000000000000000000000"
 
         val mockService = object : HtxRouteService {
             override suspend fun exchange(state: HtxExchangeState, request: HtxRequest): HtxExchangeResult {

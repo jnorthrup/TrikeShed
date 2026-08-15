@@ -4,12 +4,12 @@ package borg.trikeshed.cas
  * MEASURED (post receipt-split: strict-INHERITED vs INHERITED_CROSS)
  * sources.size = 57
  * receipt.novelCount = 7
- * receipt.relocatedCount = 0   // RED at :82 — master-line relocation invisible (queued)
+ * receipt.relocatedCount = 9
  * receipt.inheritedCount = 0   // theorem: provably 0 via merge()
  * receipt.inheritedCrossCount = 1
- * receipt.kept.size = 7
+ * receipt.kept.size = 16
  * receipt.dropped.size = 1
- * residualAtoms = 14
+ * residualAtoms = 77
  * totalSourceAtoms = 2294
  */
 
@@ -27,7 +27,7 @@ class FunnelResidualMerge57WayEvidenceTest {
         val masterLines = (0 until 40).map { "L${it.toString().padStart(2, '0')}" }
         val masterText = masterLines.joinToString("\n")
         val masterSpine = LineCas.spine(masterText)
-        val masterFunnel = FunnelResidualMerge.buildMasterFunnel(masterSpine)
+        val masterBaseline = FunnelResidualMerge.buildMasterBaseline(masterSpine)
 
         val sources = mutableListOf<LineSpine>()
 
@@ -62,11 +62,11 @@ class FunnelResidualMerge57WayEvidenceTest {
         assertEquals(57, sources.size)
 
         val sourcesSeries = sources.size j { i: Int -> sources[i] }
-        val receipt = FunnelResidualMerge.merge(sourcesSeries, masterFunnel)
+        val receipt = FunnelResidualMerge.merge(sourcesSeries, masterBaseline)
 
         val totalSourceAtoms = sources.sumOf { it.size }
         val residualAtoms = sources.indices.sumOf { s ->
-            FunnelResidualMerge.residualsOf(sources[s], masterFunnel, FunnelResidualMerge.SourceIdx(s)).size
+            FunnelResidualMerge.residualsOf(sources[s], masterBaseline, FunnelResidualMerge.SourceIdx(s)).size
         }
 
         println("sources.size = ${sources.size}")
