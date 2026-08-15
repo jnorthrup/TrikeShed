@@ -20,7 +20,7 @@ class WasmIsamDataReader(
         constraints.view.groupBy { it.groupName }
     }
     private val maxGroupId: Int by lazy {
-        constraints.view.map { it.groupId }.maxOrNull() ?: 0
+        constraints.view.maxOfOrNull { it.groupId } ?: 0
     }
     private val groupBuffers = mutableMapOf<String, ByteArray>()
 
@@ -89,7 +89,7 @@ class WasmIsamOperations : IsamOperations {
         val meta0 = IsamMetaFileReader.write(metafilename, cursorMeta, varChars, useMonocursorGroupings = useMonocursorGroupings)
 
         val columnsByGroup = meta0.view.groupBy { (it as RecordMeta).groupName }
-        val maxGroupId = meta0.view.map { (it as RecordMeta).groupId }.maxOrNull() ?: 0
+        val maxGroupId = meta0.view.maxOfOrNull { (it as RecordMeta).groupId } ?: 0
 
         val groupRecordLengths = mutableMapOf<String, Int>()
 
@@ -166,7 +166,7 @@ class WasmIsamOperations : IsamOperations {
                 meta0 = recordMetas.size j { i -> recordMetas.b(i) as RecordMeta }
 
                 columnsByGroup = meta0.view.groupBy { it.groupName }
-                maxGroupId = meta0.view.map { it.groupId }.maxOrNull() ?: 0
+                maxGroupId = meta0.view.maxOfOrNull { it.groupId } ?: 0
 
                 var maxRecordSize = 0
                 for ((gname, cols) in columnsByGroup) {

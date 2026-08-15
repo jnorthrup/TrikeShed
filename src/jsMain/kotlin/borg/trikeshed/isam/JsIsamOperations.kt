@@ -19,7 +19,7 @@ class JsIsamDataReader(
         constraints.view.groupBy { it.groupName }
     }
     private val maxGroupId: Int by lazy {
-        constraints.view.map { it.groupId }.maxOrNull() ?: 0
+        constraints.view.maxOfOrNull { it.groupId } ?: 0
     }
     private val groupBuffers = mutableMapOf<String, ByteArray>()
 
@@ -85,7 +85,7 @@ class JsIsamOperations : IsamOperations {
         val meta0 = IsamMetaFileReader.write(metafilename, cursorMeta, varChars, useMonocursorGroupings = useMonocursorGroupings)
 
         val columnsByGroup = meta0.view.groupBy { it.groupName }
-        val maxGroupId = meta0.view.map { it.groupId }.maxOrNull() ?: 0
+        val maxGroupId = meta0.view.maxOfOrNull { it.groupId } ?: 0
 
         val groupBuffers = mutableMapOf<String, ByteArray>()
         val groupOffsets = mutableMapOf<String, Int>()
@@ -147,7 +147,7 @@ class JsIsamOperations : IsamOperations {
         }
 
         val columnsByGroup = meta0.view.groupBy { it.groupName }
-        val maxGroupId = meta0.view.map { it.groupId }.maxOrNull() ?: 0
+        val maxGroupId = meta0.view.maxOfOrNull { it.groupId } ?: 0
 
         val groupBuffers = mutableMapOf<String, ByteArray>()
         val groupOffsets = mutableMapOf<String, Int>()

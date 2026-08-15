@@ -128,7 +128,7 @@ class MetafileWriter(val config: MetafileWriteConfig) {
 
         val distinctGroups = result.view.map { it.groupId }.toSet()
         if (distinctGroups.size > 1) {
-            val maxGroupId = distinctGroups.max()
+            val maxGroupId = distinctGroups.maxOrNull() ?: 0
             val byGroup = linkedMapOf<String, MutableList<Int>>()
             result.view.forEachIndexed { idx, rm ->
                 if (rm.groupId != maxGroupId)
