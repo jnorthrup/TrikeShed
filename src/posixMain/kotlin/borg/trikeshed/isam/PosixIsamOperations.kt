@@ -29,7 +29,7 @@ class PosixIsamDataReader(
         constraints.view.groupBy { it.groupName }
     }
     private val maxGroupId: Int by lazy {
-        constraints.view.map { it.groupId }.maxOrNull() ?: 0
+        constraints.view.maxOfOrNull { it.groupId } ?: 0
     }
     
     private val groupMmaps = mutableMapOf<String, PosixMmapInfo>()
@@ -123,7 +123,7 @@ class PosixIsamOperations : IsamOperations {
         val meta0 = IsamMetaFileReader.write(metafilename, cursorMeta, varChars, useMonocursorGroupings = useMonocursorGroupings)
 
         val columnsByGroup = meta0.view.groupBy { it.groupName }
-        val maxGroupId = meta0.view.map { it.groupId }.maxOrNull() ?: 0
+        val maxGroupId = meta0.view.maxOfOrNull { it.groupId } ?: 0
 
         val groupFiles = mutableMapOf<String, PosixFile>()
 
@@ -180,7 +180,7 @@ class PosixIsamOperations : IsamOperations {
                     useMonocursorGroupings = useMonocursorGroupings
                 )
                 columnsByGroup = meta0.view.groupBy { it.groupName }
-                maxGroupId = meta0.view.map { it.groupId }.maxOrNull() ?: 0
+                maxGroupId = meta0.view.maxOfOrNull { it.groupId } ?: 0
 
                 for (gname in columnsByGroup.keys) {
                     val cols = columnsByGroup[gname]!!
