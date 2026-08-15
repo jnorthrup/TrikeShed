@@ -24,16 +24,16 @@
         </div>
         <div class="sidebar-actions">
           <button class="sidebar-item" id="btn-search" title="Search" aria-label="Search workspace">
-            <span class="sidebar-item-icon">⌕</span><span>Search</span>
+            <span class="sidebar-item-icon" aria-hidden="true">⌕</span><span>Search</span>
           </button>
           <button class="sidebar-item" id="btn-home" title="Home" aria-label="Go to Home">
-            <span class="sidebar-item-icon">⌂</span><span>Home</span>
+            <span class="sidebar-item-icon" aria-hidden="true">⌂</span><span>Home</span>
           </button>
           <button class="sidebar-item" id="btn-board" title="Board" aria-label="Go to Board view">
-            <span class="sidebar-item-icon">▦</span><span>Board</span>
+            <span class="sidebar-item-icon" aria-hidden="true">▦</span><span>Board</span>
           </button>
           <button class="sidebar-item" id="btn-graph" title="Graph" aria-label="Go to Graph view">
-            <span class="sidebar-item-icon">◉</span><span>Graph</span>
+            <span class="sidebar-item-icon" aria-hidden="true">◉</span><span>Graph</span>
           </button>
         </div>
       </div>
@@ -41,13 +41,13 @@
         <div class="sidebar-section-label">Private</div>
         <div id="page-tree" class="page-tree"></div>
         <button class="sidebar-item sidebar-add" id="btn-new-page" aria-label="Add a new page">
-          <span class="sidebar-item-icon">+</span><span>Add a page</span>
+          <span class="sidebar-item-icon" aria-hidden="true">+</span><span>Add a page</span>
         </button>
       </div>
       <div class="sidebar-section">
         <div class="sidebar-section-label">Ingest</div>
         <div class="drop-zone" id="drop-zone" role="button" tabindex="0" aria-label="Drop files or click to upload">
-          <span class="drop-zone-icon">⬇</span>
+          <span class="drop-zone-icon" aria-hidden="true">⬇</span>
           <span class="drop-zone-text">Drag resumes, job postings, PDFs, DOCX<br>or click to select files</span>
           <input type="file" id="file-input" multiple accept=".pdf,.docx,.txt,.md,.html,.json" hidden />
         </div>
@@ -74,8 +74,8 @@
         <div class="doc-page" id="doc-page">
           <div class="doc-cover-spacer"></div>
           <div class="doc-title-row">
-            <div class="doc-icon" id="doc-icon">▤</div>
-            <h1 class="doc-title" id="doc-title" contenteditable="true" spellcheck="false" data-placeholder="Untitled" aria-label="Document title"></h1>
+            <div class="doc-icon" id="doc-icon" aria-hidden="true">▤</div>
+            <h1 class="doc-title" id="doc-title" contenteditable="true" spellcheck="false" data-placeholder="Untitled"></h1>
           </div>
           <div class="doc-blocks" id="doc-blocks"></div>
           <div class="doc-hint" id="doc-hint">Type <span class="doc-hint-key">/</span> for commands</div>
