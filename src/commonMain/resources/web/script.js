@@ -307,6 +307,7 @@
     content.contentEditable = 'true';
     content.spellcheck = false;
     content.dataset.placeholder = def.placeholder;
+    content.setAttribute('aria-label', 'Block content');
     content.textContent = block.text || '';
     el.appendChild(content);
 
