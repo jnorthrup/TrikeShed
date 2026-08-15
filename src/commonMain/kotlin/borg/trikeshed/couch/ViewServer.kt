@@ -59,64 +59,66 @@ data class ViewResult(
 
     /** _count reducer: group by key, count emissions per key. */
     fun reduceCount(): ViewResult {
-        val groups = mutableMapOf<Any?, MutableList<ViewRow>>()
+        // ⚡ Bolt: Accumulate count directly instead of allocating a List<ViewRow> per key
+        val counts = mutableMapOf<Any?, Long>()
         for (row in rows) {
             val key = row.key
-            groups.getOrPut(key) { mutableListOf() }.add(row)
+            val current = counts[key] ?: 0L
+            counts[key] = current + 1L
         }
         val reduced = mutableSeriesOf<ViewRow>()
-        for ((key, group) in groups) {
-            reduced.append(ViewRow(key = key, value = group.size.toLong(), docId = "_count", jsPath = "_count"))
+        for ((key, count) in counts) {
+            reduced.append(ViewRow(key = key, value = count, docId = "_count", jsPath = "_count"))
         }
         return ViewResult(reduced)
     }
 
     /** _sum reducer: group by key, sum numeric values per key. */
     fun reduceSum(): ViewResult {
-        val groups = mutableMapOf<Any?, MutableList<ViewRow>>()
+        // ⚡ Bolt: Accumulate sum directly instead of allocating a List<ViewRow> per key
+        val sums = mutableMapOf<Any?, Double>()
         for (row in rows) {
             val key = row.key
-            groups.getOrPut(key) { mutableListOf() }.add(row)
+            val currentSum = sums[key] ?: 0.0
+            sums[key] = currentSum + row.value.toDoubleValue()
         }
         val reduced = mutableSeriesOf<ViewRow>()
-        for ((key, group) in groups) {
-            var sum: Double = 0.0
-            for (row in group) {
-                sum += row.value.toDoubleValue()
-            }
+        for ((key, sum) in sums) {
             reduced.append(ViewRow(key = key, value = sum, docId = "_sum", jsPath = "_sum"))
         }
         return ViewResult(reduced)
     }
 
     /** _stats reducer: group by key, compute count/sum/min/max/sumSqr per key. */
+    private class StatsAcc(
+        var count: Long = 0L,
+        var sum: Double = 0.0,
+        var minVal: Double? = null,
+        var maxVal: Double? = null,
+        var sumSqr: Double = 0.0
+    )
+
     fun reduceStats(): ViewResult {
-        val groups = mutableMapOf<Any?, MutableList<ViewRow>>()
+        // ⚡ Bolt: Accumulate stats directly instead of allocating a List<ViewRow> per key
+        val statsMap = mutableMapOf<Any?, StatsAcc>()
         for (row in rows) {
             val key = row.key
-            groups.getOrPut(key) { mutableListOf() }.add(row)
+            val acc = statsMap.getOrPut(key) { StatsAcc() }
+            val v = row.value.toDoubleValue()
+            acc.count++
+            acc.sum += v
+            acc.minVal = if (acc.minVal == null) v else kotlin.math.min(acc.minVal!!, v)
+            acc.maxVal = if (acc.maxVal == null) v else kotlin.math.max(acc.maxVal!!, v)
+            acc.sumSqr += v * v
         }
         val reduced = mutableSeriesOf<ViewRow>()
-        for ((key, group) in groups) {
-            var count = 0L
-            var sum = 0.0
-            var minVal: Double? = null
-            var maxVal: Double? = null
-            var sumSqr = 0.0
-            for (row in group) {
-                val v = row.value.toDoubleValue()
-                count++
-                sum += v
-                minVal = if (minVal == null) v else kotlin.math.min(minVal, v)
-                maxVal = if (maxVal == null) v else kotlin.math.max(maxVal, v)
-                sumSqr += v * v
-            }
+        for ((key, acc) in statsMap) {
             val stats = mapOf<String, Any>(
-                "count"  to count,
-                "sum"    to sum,
-                "min"    to (minVal ?: 0.0),
-                "max"    to (maxVal ?: 0.0),
-                "sumsqr" to sumSqr
+                "count"  to acc.count,
+                "sum"    to acc.sum,
+                "min"    to (acc.minVal ?: 0.0),
+                "max"    to (acc.maxVal ?: 0.0),
+                "sumsqr" to acc.sumSqr
             )
             reduced.append(ViewRow(key = key, value = stats, docId = "_stats", jsPath = "_stats"))
         }
