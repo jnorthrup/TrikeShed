@@ -80,6 +80,16 @@ then pass `$(echo <b64> | base64 -d)` as the title argument.
 
 ## Known traps
 
+- **Adding a WAL cause kind bricks older running daemons.** The codec decode
+  is strict (`else -> error("Unknown Jules cause kind")`,
+  KanbanEventCodec.kt): a running daemon built before the new kind throws on
+  EVERY WAL replay once the kind first appears in the WAL — it spins at high
+  CPU and stops appending (observed: PatchRejected vs an Aug-14 daemon,
+  17-minute stall). After committing any new JulesCause variant that a CLI
+  can append, cold-restart the daemon (`kill <pid>`; relaunch
+  `bin/oroboros-daemon --watch`) so it picks up the new codec. Verify: CPU
+  settles to the poll rhythm and the WAL's newest `"at"` timestamp keeps
+  advancing.
 - DrainFailed with "bad revision": the session's patch chain references a
   revision absent from the repo — re-pull the session, or settle-report /
   settle-reject.
