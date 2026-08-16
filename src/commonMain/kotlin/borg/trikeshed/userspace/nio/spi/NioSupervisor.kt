@@ -37,7 +37,7 @@ open class NioSupervisor(
     fun register(provider: CoroutineContext.Element) { services.add(provider) }
 
     inline fun <reified T : CoroutineContext.Element> service(): T? =
-        services.filterIsInstance<T>().firstOrNull()
+        services.firstOrNull { it is T } as? T
 
     /** Expose the launch-time I/O capability report registered by the platform. */
     fun capabilityReport(): NioCapabilityReport? = service()
@@ -46,7 +46,7 @@ open class NioSupervisor(
         if (state == ElementState.CREATED) {
             super.open()
             val providers = platformNioProviders()
-            providers.filterIsInstance<NioCapabilityReport>().firstOrNull()?.let { register(it) }
+            (providers.firstOrNull { it is NioCapabilityReport } as? NioCapabilityReport)?.let { register(it) }
             providers.filter { it !is NioCapabilityReport }.forEach { register(it) }
             services
                 .filterIsInstance<AsyncContextElement>()
