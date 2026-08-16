@@ -3,7 +3,8 @@
 
 ++(Bike)Shed library
 
-many things
+<img width="1168" height="784" alt="image" src="https://github.com/user-attachments/assets/8af71944-b802-4a2d-883d-7e25208cbc5f" />
+
 
 ## tldr 
 this is the backbone of the json scanner and the fast-enough single-threaded database within trappings.
