@@ -137,8 +137,8 @@ object ForgeApp {
         <div class="search-box"><input type="text" placeholder="Search workspace…" aria-label="Search workspace" id="forge-search"/></div>
       </div>
       <div class="header-right">
-        <button class="btn" id="new-doc-btn">New Doc</button>
-        <button class="btn" id="sync-btn">Sync</button>
+        <button class="btn" id="new-doc-btn" aria-label="Create new document">New Doc</button>
+        <button class="btn" id="sync-btn" aria-label="Synchronize workspace">Sync</button>
       </div>
     </header>
     <div class="forge-body">
