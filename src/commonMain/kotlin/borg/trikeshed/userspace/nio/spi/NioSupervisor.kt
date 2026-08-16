@@ -47,12 +47,8 @@ open class NioSupervisor(
         if (state == ElementState.CREATED) {
             super.open()
             val providers = platformNioProviders()
-
-            // Bolt: Short-circuit capability lookup and avoid intermediate List allocations by using firstOrNull
-            providers.firstOrNull { it is NioCapabilityReport }?.let { register(it) }
-            // Bolt: Avoid intermediate List allocation from filter by filtering within forEach
-            providers.forEach { if (it !is NioCapabilityReport) register(it) }
-
+            (providers.firstOrNull { it is NioCapabilityReport } as? NioCapabilityReport)?.let { register(it) }
+            providers.filter { it !is NioCapabilityReport }.forEach { register(it) }
             services
                 .filterIsInstance<AsyncContextElement>()
                 .filter { it.state == ElementState.CREATED }
