@@ -407,7 +407,7 @@ class FlywheelDriver(
         val readyToSettle = remainingTerminal == 0 &&
             committedConflicts.isEmpty() && isWorkingTreeClean()
         val settled = readyToSettle && settlementBarrier()
-        if (settled) archiveSettledSessions()
+        val archived = if (settled) archiveSettledSessions() else 0
 
         // 6. INDUCT — the WAL is the only induction surface. External agents
         //    CAS-put a ≤4000-byte spec and appendWork(workId, WorkQueued).
@@ -562,6 +562,7 @@ class FlywheelDriver(
             available = (maxSlots - alive).coerceAtLeast(0),
             inducted = inducted,
             settled = settled,
+            archived = archived,
             phase = phase,
             conflicts = committedConflicts,
             panorama = drain.panorama,
@@ -1267,7 +1268,8 @@ class FlywheelDriver(
      * preserving their complete conversation and output history. This runs only
      * after [settlementBarrier] proves local HEAD == origin/master.
      */
-    private suspend fun archiveSettledSessions() {
+    private suspend fun archiveSettledSessions(): Int {
+        var archiveCount = 0
         val immutableBySession = loadQueueIo().asSequence()
             .filter { entry -> entry.receipt?.let(::isImmutableReceipt) == true }
             .mapNotNull { entry -> entry.sessionId?.let { it to entry } }
@@ -1305,6 +1307,7 @@ class FlywheelDriver(
                     ) continue
                 }
                 conductor.archive(sessionId)
+                archiveCount++
                 println("[FLYWHEEL] ARCHIVE ${sessionId.takeLast(6)} settled session preserved")
             } catch (t: Throwable) {
                 if (t is kotlinx.coroutines.CancellationException) throw t
@@ -1312,6 +1315,7 @@ class FlywheelDriver(
                 emitPollError("archive session $sessionId: ${t.message?.take(200)}", 0)
             }
         }
+        return archiveCount
     }
 
     private fun isImmutableReceipt(receipt: MergeReceipt): Boolean =
@@ -1692,6 +1696,7 @@ class FlywheelDriver(
         val available: Int = 0,
         val inducted: Int = 0,
         val settled: Boolean = false,
+        val archived: Int = 0,
         /** Which [FlywheelPhase] the cycle last reached before returning (the priority manifest). */
         val phase: FlywheelPhase = FlywheelPhase.POLL,
         /** Conflict markers that review-block exact-artifact settlement. */
