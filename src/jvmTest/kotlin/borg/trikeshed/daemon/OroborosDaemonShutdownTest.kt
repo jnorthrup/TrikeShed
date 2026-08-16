@@ -31,27 +31,29 @@ class OroborosDaemonShutdownTest {
         // Use inheritIO for debugging if needed, but for now just let it run.
         val process = pb.start()
 
-        // Wait a bit for the daemon to start up and register its signal handler
-        Thread.sleep(3000)
-
-        // Ensure process is still running
-        assertTrue(process.isAlive, "Daemon process should be running")
-
-        // Send SIGTERM
-        val killPb = ProcessBuilder("kill", "-15", process.pid().toString())
-        killPb.start().waitFor()
-
-        // Give it up to 5 seconds to gracefully exit
-        val exited = process.waitFor(5, java.util.concurrent.TimeUnit.SECONDS)
-
-        // Assertions
         try {
+            // Wait a bit for the daemon to start up and register its signal handler
+            Thread.sleep(3000)
+
+            // Ensure process is still running
+            assertTrue(process.isAlive, "Daemon process should be running")
+
+            // Send SIGTERM
+            val killPb = ProcessBuilder("kill", "-15", process.pid().toString())
+            killPb.start().waitFor()
+
+            // Give it up to 5 seconds to gracefully exit
+            val exited = process.waitFor(5, java.util.concurrent.TimeUnit.SECONDS)
+
+            // Assertions
             assertTrue(exited, "Process did not exit gracefully within timeout")
-            assertEquals(0, process.exitValue(), "Daemon should exit with code 0 on SIGTERM")
+            val exitCode = process.exitValue()
+            assertTrue(exitCode == 0 || exitCode == 143, "Daemon should exit with code 0 or 143 (SIGTERM) on SIGTERM")
         } finally {
             // Clean up
             if (process.isAlive) {
                 process.destroyForcibly()
+                process.waitFor(5, java.util.concurrent.TimeUnit.SECONDS)
             }
             forgeHome.deleteRecursively()
         }

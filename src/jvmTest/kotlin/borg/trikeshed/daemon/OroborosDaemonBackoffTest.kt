@@ -49,7 +49,10 @@ class OroborosDaemonBackoffTest {
                 }
             }
         } finally {
-            process.destroy()
+            if (process.isAlive) {
+                process.destroyForcibly()
+                process.waitFor(5, java.util.concurrent.TimeUnit.SECONDS)
+            }
         }
 
         // Assert: first delay = 100ms, second = 200ms, third = 400ms, fourth = 500ms, fifth = 500ms.
