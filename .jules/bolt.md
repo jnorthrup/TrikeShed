@@ -57,3 +57,6 @@
 ## 2024-05-18 - Avoid O(N^2) bottlenecks when resolving causal phases
 **Learning:** `CausalGraph.inPhase` previously resolved the distinct set of `workId`s and mapped each one individually using a backwards scan `phaseOf(it)`, producing an O(N^2) time complexity.
 **Action:** When deriving phase maps over a casual graph or continuous event stream, use a single-pass `LinkedHashMap` to maintain the causal ordinal order while maintaining O(N) linear time execution.
+## 2026-07-22 - CouchDB JavaScript view reduce function memory limits
+**Learning:** CouchDB JavaScript view reduce functions in `ViewServer.kt` (executed via GraalVM in Trikeshed) can cause excessive allocations and `RangeError: Maximum call stack size exceeded` if intermediate arrays are created via `.map` and grouped into `.add(row)`.
+**Action:** Replaced allocating a whole list per key in `.reduceCount()`, `.reduceSum()`, and `.reduceStats()` and iterating over them in `ViewServer.kt`.
