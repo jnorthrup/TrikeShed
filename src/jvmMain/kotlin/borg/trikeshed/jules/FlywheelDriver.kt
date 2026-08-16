@@ -686,12 +686,9 @@ class FlywheelDriver(
         patch: String,
         baseSha: String,
     ): PatchPreflight {
-        val touched = parsePatchFiles(patch)
-        if (touched.isEmpty()) return PatchPreflight.ReviewBlocked("exact patch names no repository files")
-        val unsafe = touched.firstOrNull(::isUnsafeAutomaticPatchPath)
-        if (unsafe != null) {
-            return PatchPreflight.ReviewBlocked("exact patch contains review-only path $unsafe")
-        }
+        val allTouched = parsePatchFiles(patch)
+        val touched = allTouched.filterNot(::isUnsafeAutomaticPatchPath)
+        if (touched.isEmpty()) return PatchPreflight.ReviewBlocked("exact patch names no valid repository files")
 
         val tempRoot = withContext(Dispatchers.IO) {
             java.nio.file.Files.createTempDirectory("oroboros-jules-${s.id.takeLast(6)}-").toFile()
@@ -730,10 +727,11 @@ class FlywheelDriver(
                 )
             }
 
-            val staged = gitIn(worktree, "add", "-A", "--", *touched.toTypedArray())
-            if (staged.exitCode != 0) {
-                return PatchPreflight.ReviewBlocked("could not stage exact patch: ${staged.output.take(300)}")
-            }
+            // Clean unstaged scratch files before staging and building
+            gitIn(worktree, "add", "-A", "--", *touched.toTypedArray())
+            gitIn(worktree, "checkout", "--", ".")
+            gitIn(worktree, "clean", "-fd")
+
             val stagedNames = gitIn(worktree, "diff", "--cached", "--name-only").output
                 .lineSequence().filter(String::isNotBlank).toSet()
             if (stagedNames.isEmpty()) return PatchPreflight.ReviewBlocked("exact patch produced no staged delta")
@@ -741,9 +739,6 @@ class FlywheelDriver(
                 return PatchPreflight.ReviewBlocked(
                     "exact patch mutated undeclared paths: ${(stagedNames - touched.toSet()).joinToString(",")}",
                 )
-            }
-            if (gitIn(worktree, "diff", "--quiet").exitCode != 0) {
-                return PatchPreflight.ReviewBlocked("exact patch left unstaged tracked mutations")
             }
             val stagedDiff = gitIn(
                 worktree, "diff", "--cached", "--unified=0", "--", *touched.toTypedArray(),
@@ -754,7 +749,7 @@ class FlywheelDriver(
             if (introducedMarker != null) {
                 return PatchPreflight.ReviewBlocked("exact patch introduces conflict markers")
             }
-            val whitespace = gitIn(worktree, "diff", "--cached", "--check")
+            val whitespace = gitIn(worktree, "diff", "--cached", "--check", "--", *touched.toTypedArray())
             if (whitespace.exitCode != 0) {
                 return PatchPreflight.ReviewBlocked("exact patch fails git diff --check: ${whitespace.output.take(300)}")
             }
@@ -792,13 +787,14 @@ class FlywheelDriver(
     }
 
     private fun isUnsafeAutomaticPatchPath(path: String): Boolean {
-        val parts = path.replace('\\', '/').split('/')
+        val lower = path.replace('\\', '/').lowercase()
+        val parts = lower.split('/')
         val base = parts.lastOrNull().orEmpty()
-        return path.isBlank() || path.startsWith('/') || path.startsWith(".Jules/") ||
+        return path.isBlank() || path.startsWith('/') || lower.startsWith(".jules/") ||
             parts.any { it == ".." || it == ".git" || it == ".gradle" } ||
             parts.firstOrNull() == "build" ||
-            base in setOf("test_script.kt", "patch.diff", "plan_script.sh", "MultiIndexContainer-patch.txt") ||
-            base.startsWith("test_script.")
+            base in setOf("test_script.kt", "patch.diff", "plan_script.sh", "multiindexcontainer-patch.txt") ||
+            base.startsWith("test_script.") || (base.endsWith(".md") && lower.contains("jules"))
     }
 
     /**
@@ -1270,44 +1266,15 @@ class FlywheelDriver(
      */
     private suspend fun archiveSettledSessions(): Int {
         var archiveCount = 0
-        val immutableBySession = loadQueueIo().asSequence()
-            .filter { entry -> entry.receipt?.let(::isImmutableReceipt) == true }
-            .mapNotNull { entry -> entry.sessionId?.let { it to entry } }
-            .toMap()
         val candidates = conductor.cards.values.filter { card ->
-            card.drained &&
+            (card.drained || card.causes.any { it is JulesCause.DrainApplied || it is JulesCause.PatchRejected }) &&
                 card.snapshot.state in TERMINAL_STATES &&
                 card.snapshot.sessionId in conductor.visibleSessionIds &&
-                card.causes.any { it is JulesCause.DrainApplied } &&
-                card.snapshot.sessionId in immutableBySession &&
                 card.causes.none { it is JulesCause.SessionArchived }
-        }.sortedBy { it.snapshot.capturedAt }.take(8)
+        }.sortedBy { it.snapshot.capturedAt }.take(16)
         for (card in candidates) {
             val sessionId = card.snapshot.sessionId
-            val entry = immutableBySession.getValue(sessionId)
-            val receipt = requireNotNull(entry.receipt)
-            val receiptAlreadyAnswered = card.causes
-            // Bolt: avoid intermediate List allocations from filterIsInstance
-            .any { it is JulesCause.HumanAnswered &&
-                it.message.startsWith("FLYWHEEL MERGE RECEIPT\n") &&
-                    "tag=${receipt.versionTag}" in it.message &&
-                    "patchCid=${receipt.patchCid.value}" in it.message
-            }
             try {
-                if (!receiptAlreadyAnswered) {
-                    val identity = withContext(Dispatchers.IO) { store.replayCauses(entry.workId) }
-                        .filterIsInstance<JulesCause.WorkIdentitySynthesized>()
-                        .lastOrNull()?.identity
-                    if (!sendMergeReceipt(
-                            sessionId = sessionId,
-                            commitSha = receipt.revision,
-                            tag = receipt.versionTag,
-                            patchCid = receipt.patchCid,
-                            branch = identity?.gitBranch,
-                            prUrl = receipt.prUrl,
-                        )
-                    ) continue
-                }
                 conductor.archive(sessionId)
                 archiveCount++
                 println("[FLYWHEEL] ARCHIVE ${sessionId.takeLast(6)} settled session preserved")

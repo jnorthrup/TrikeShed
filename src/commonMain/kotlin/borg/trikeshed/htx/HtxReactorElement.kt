@@ -207,6 +207,7 @@ class HtxReactorElement(
         while (true) {
             val chunk = readChunk(handle, fd) ?: break
             appendBytes(response, chunk)
+            if (isCompleteResponse(response)) break
         }
         return response.toByteSeries()
     }
@@ -237,8 +238,44 @@ class HtxReactorElement(
             val frames = endpoint.downstream(chunk)
             appendBytes(plaintext, extractPlaintext(frames))
             flushTlsFrames(handle, fd, frames)
+            if (isCompleteResponse(plaintext)) break
         }
         return plaintext.toByteSeries()
+    }
+
+    private fun isCompleteResponse(sink: List<Byte>): Boolean {
+        if (sink.size < 4) return false
+        val bytes = ByteArray(sink.size) { sink[it] }
+        val boundary = indexOfHeaderBoundary(bytes)
+        if (boundary < 0) return false
+        val headerText = bytes.decodeToString(0, boundary)
+        val contentLength = headerText.lineSequence()
+            .firstOrNull { it.startsWith("Content-Length:", ignoreCase = true) }
+            ?.substringAfter(":")?.trim()?.toIntOrNull()
+        if (contentLength != null) {
+            return bytes.size >= boundary + 4 + contentLength
+        }
+        val isChunked = headerText.lineSequence()
+            .any { it.startsWith("Transfer-Encoding:", ignoreCase = true) && it.contains("chunked", ignoreCase = true) }
+        if (isChunked) {
+            val body = bytes.copyOfRange(boundary + 4, bytes.size)
+            val text = body.decodeToString()
+            return text.contains("0\r\n\r\n") || text.endsWith("0\r\n")
+        }
+        return false
+    }
+
+    private fun indexOfHeaderBoundary(bytes: ByteArray): Int {
+        for (i in 0..bytes.size - 4) {
+            if (bytes[i] == '\r'.code.toByte() &&
+                bytes[i + 1] == '\n'.code.toByte() &&
+                bytes[i + 2] == '\r'.code.toByte() &&
+                bytes[i + 3] == '\n'.code.toByte()
+            ) {
+                return i
+            }
+        }
+        return -1
     }
 
     private suspend fun readChunk(
