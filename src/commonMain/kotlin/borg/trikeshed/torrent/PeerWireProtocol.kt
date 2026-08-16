@@ -187,7 +187,7 @@ data class PeerHandshake(
         fun azureusPeerId(client: String = "TR", version: String = "0.01"): ByteArray {
             val s = "-${client}${version}-"
             val random = ByteArray(20 - s.length)
-            java.security.SecureRandom().nextBytes(random)
+            java.security.SecureRandom.getInstanceStrong().nextBytes(random)
             return (s.toByteArray() + random).copyOf(20)
         }
     }
