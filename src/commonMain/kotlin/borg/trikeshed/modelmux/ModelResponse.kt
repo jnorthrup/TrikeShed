@@ -1,5 +1,7 @@
 package borg.trikeshed.modelmux
 
+import modelmux.defaultSecureIdGenerator
+
 data class ModelResponse(
     val content: String,
     val usage: ModelUsage,
@@ -74,7 +76,7 @@ data class ModelResponseReceipt(
             sessionId: String? = null,
             error: Throwable? = null,
         ): ModelResponseReceipt = ModelResponseReceipt(
-            receiptId = "mrec-${kotlin.random.Random.nextLong().toString(16)}",
+            receiptId = defaultSecureIdGenerator.generateHexId("mrec", 8),
             modelId = modelId,
             providerId = providerId,
             requestHash = requestHash,
