@@ -4,15 +4,20 @@ import borg.trikeshed.cursor.ColumnMeta
 import borg.trikeshed.cursor.Cursor
 import borg.trikeshed.cursor.IOMemento
 import borg.trikeshed.cursor.RowVec
+import borg.trikeshed.cursor.ColK
+import borg.trikeshed.cursor.asFaceted
 import borg.trikeshed.cursor.`ColumnMeta↻`
 import borg.trikeshed.lib.*
 import org.graalvm.polyglot.Context
 import org.graalvm.polyglot.HostAccess
 import org.graalvm.polyglot.Value
 import org.graalvm.polyglot.proxy.ProxyArray
+import org.graalvm.polyglot.proxy.ProxyExecutable
 import org.graalvm.polyglot.proxy.ProxyObject
+import org.graalvm.polyglot.proxy.ProxyHashMap
+import org.graalvm.polyglot.proxy.ProxyIterator
 
-class RowVecProxy(private val row: RowVec) : ProxyObject {
+class RowVecProxy(private val row: RowVec) : ProxyObject, ProxyHashMap {
     private val metaList: List<ColumnMeta> by lazy {
         val list = mutableListOf<ColumnMeta>()
         val metaSupplier: () -> ColumnMeta = row.b as () -> ColumnMeta
@@ -29,6 +34,12 @@ class RowVecProxy(private val row: RowVec) : ProxyObject {
     }
 
     override fun getMember(key: String): Any? {
+        if (key == "value_at") {
+            return ProxyExecutable { args ->
+                val op = args[0].asHostObject<ColK<*>>()
+                row.asFaceted()[op]
+            }
+        }
         val index = metaNames.indexOf(key)
         val aVal: Series<Any?> = row.a as Series<Any?>
         if (index == -1 || index >= aVal.size) return null
@@ -36,16 +47,43 @@ class RowVecProxy(private val row: RowVec) : ProxyObject {
     }
 
     override fun getMemberKeys(): Any {
-        return ProxyArray.fromArray(*metaNames.toTypedArray())
+        val keys = metaNames.toMutableList()
+        keys.add("value_at")
+        return ProxyArray.fromArray(*keys.toTypedArray())
     }
 
     override fun hasMember(key: String): Boolean {
-        return metaNames.contains(key)
+        return key == "value_at" || metaNames.contains(key)
     }
 
     override fun putMember(key: String, value: Value?) {
         throw UnsupportedOperationException("Cursor proxy is read-only")
     }
+
+    // ProxyHashMap — expose row columns as a Python dict over metaName -> value
+    override fun getHashSize(): Long = metaNames.size.toLong()
+
+    override fun hasHashEntry(key: Value): Boolean = metaNames.contains(key.asString())
+
+    override fun getHashValue(key: Value): Any? {
+        val name = key.asString()
+        val index = metaNames.indexOf(name)
+        if (index == -1) return null
+        val aVal: Series<Any?> = row.a as Series<Any?>
+        return if (index < aVal.size) aVal[index] else null
+    }
+
+    override fun putHashEntry(key: Value, value: Value?) {
+        throw UnsupportedOperationException("Cursor proxy is read-only")
+    }
+
+    override fun getHashEntriesIterator(): Any =
+        ProxyIterator.from(
+            metaList.indices.asSequence()
+                .map { i -> metaNames[i] to row.a.let { s -> (s as Series<Any?>).getOrNull(i) } }
+                .map { (n, v) -> ProxyArray.fromArray(n, v) }
+                .iterator()
+        )
 }
 
 class CursorProxy(private val cursor: Cursor) : ProxyArray {

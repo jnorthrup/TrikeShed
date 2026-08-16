@@ -32,9 +32,11 @@ data class FieldSynapse(
         const val TPL_BEFORE_SET = 2
         const val TPL_AFTER_SET  = 3
 
-        const val OP_L_GET = 4
-        const val OP_L_SET = 5
-        const val OP_P_GET = 6
-        const val OP_P_SET = 7
+        // Compatibility Note: Opcodes are aligned with Python (0xA5-0xA8) to prevent cross-boundary events mapping to garbage.
+        // Preferring Python 0xA5 over TypedefProductionSystem 0x10-0x15 range.
+        const val OP_L_GET = 0xA5
+        const val OP_L_SET = 0xA6
+        const val OP_P_GET = 0xA7
+        const val OP_P_SET = 0xA8
     }
 }

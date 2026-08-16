@@ -29,7 +29,19 @@ class SubgraalPointcutRunner(
                 .statementLimit(statementLimit, null)
                 .build()
         )
-        .build()
+        .build().apply {
+            getBindings("python").putMember("java_trikeshed_publish", org.graalvm.polyglot.proxy.ProxyExecutable { args ->
+                // opcode: Byte, typedefName: String, methodName: String, siteIdx: Int, depth: Byte, isAfter: Boolean
+                val opcode = args[0].asByte()
+                val typedefName = args[1].asString()
+                val methodName = args[2].asString()
+                val siteIdx = args[3].asInt()
+                val depth = args[4].asByte()
+                val isAfter = args[5].asBoolean()
+                TypedefProductionSystem.publish(opcode, typedefName, methodName, siteIdx, depth, isAfter)
+                null
+            })
+        }
 
     private val listener = ExecutionListener.newBuilder()
         .onEnter(::handleEventEnter)
@@ -57,7 +69,7 @@ class SubgraalPointcutRunner(
         val name = event.rootName ?: "expr"
         val methodIdx = TypedefProductionSystem.InternPool.intern(name)
 
-        val templateIdx = when (opcode.toInt()) {
+        val templateIdx = when (opcode.toInt() and 0xFF) {
             FieldSynapse.OP_L_GET -> if (isEnter) FieldSynapse.TPL_BEFORE_GET else FieldSynapse.TPL_AFTER_GET
             FieldSynapse.OP_L_SET -> if (isEnter) FieldSynapse.TPL_BEFORE_SET else FieldSynapse.TPL_AFTER_SET
             FieldSynapse.OP_P_GET -> if (isEnter) FieldSynapse.TPL_BEFORE_GET else FieldSynapse.TPL_AFTER_GET

@@ -56,14 +56,13 @@ interface PolyglotBlackboardTaxonomy {
  * Implementation of the polyglot blackboard taxonomy.
  */
 class GraalPolyglotBlackboardTaxonomy(
-    override val blackboard: ConfixBlackboard = ConfixBlackboard.empty()
+    override val blackboard: ConfixBlackboard = ConfixBlackboard.empty(),
+    private val tspyPolyglotHost: TspyPolyglotHost? = null
 ) : PolyglotBlackboardTaxonomy {
 
     override suspend fun pointcutChildVm(worker: ProcessWorker, commandArgs: List<String>): PointcutCoordinateSeries {
-        // Here we would use the ProcessWorker to run a GraalCE child process,
-        // intercept polyglot execution, and map the output back to PointcutCoordinateSeries.
-        // For now, we return empty due to missing runtime ProcessSpec dependencies.
-        return borg.trikeshed.classfile.model.emptyPointcutCoordinates()
+        val host = tspyPolyglotHost ?: throw UnsupportedOperationException("Blocked by complex, platform-specific FFI requirements: evaluating python source via TspyPolyglotHost and mapping ExecutionListener-derived coordinates into PointcutCoordinateSeries is not currently supported.")
+        return host.evaluatePython(commandArgs.joinToString(" "))
     }
 
     override suspend fun pointcutKataSandbox(worker: ProcessWorker, sandbox: PolyglotKataSandbox, commandArgs: List<String>): PointcutCoordinateSeries {
