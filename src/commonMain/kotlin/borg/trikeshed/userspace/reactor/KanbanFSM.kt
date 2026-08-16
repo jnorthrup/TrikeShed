@@ -41,6 +41,14 @@ sealed class KanbanEvent {
         override val timestampMs: Long,
     ) : KanbanEvent()
 
+    /** A causal event emitted once per terminal lease transition (Expired or Revoked). */
+    @Serializable
+    data class LeaseExpired(
+        val keyId: String,
+        val reason: String,
+        override val timestampMs: Long,
+    ) : KanbanEvent()
+
     /**
      * Cache accounting event. Emitted by the reactor when the modelmux cache
      * observes a Hit, Miss, or Stored. The FSM rolls these into running
@@ -169,6 +177,10 @@ object KanbanFSM {
                 leasedKeyIds = prior.leasedKeyIds - event.keyId,
                 reclaimedCount = prior.reclaimedCount + 1,
                 lastEventKind = "LeaseReclaimed",
+                lastEventTimestampMs = event.timestampMs,
+            )
+            is KanbanEvent.LeaseExpired -> prior.copy(
+                lastEventKind = "LeaseExpired",
                 lastEventTimestampMs = event.timestampMs,
             )
             is KanbanEvent.CacheTick -> when (event.kind) {

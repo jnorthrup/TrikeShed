@@ -18,6 +18,8 @@ import kotlinx.coroutines.launch
 import kotlinx.datetime.Clock
 import kotlinx.serialization.Serializable
 import kotlin.coroutines.CoroutineContext
+import borg.trikeshed.lib.Series
+import borg.trikeshed.lib.j
 
 /**
  * Reactor-owned key/model muxer CCEK element.
@@ -42,6 +44,26 @@ class MuxReactorElement(
 
     private val _flowState = MutableStateFlow(emptyState(initialConfig))
     val flowState: StateFlow<MuxReactorState> = _flowState.asStateFlow()
+
+    private val providerHealthMap = mutableMapOf<String, modelmux.ProviderHealth>()
+    val providerHealth: Series<modelmux.ProviderHealth>
+        get() = providerHealthMap.size j { i: Int ->
+            providerHealthMap.values.elementAt(i)
+        }
+
+    internal fun recordProviderHealth(provider: String, success: Boolean, latencyMs: Long) {
+        val now = nowMs()
+        val existing = providerHealthMap[provider]
+        val currentRate = existing?.successRate ?: if (success) 1.0 else 0.0
+        val newRate = if (existing == null) currentRate else currentRate * 0.9 + (if (success) 1.0 else 0.0) * 0.1
+        
+        providerHealthMap[provider] = modelmux.ProviderHealth(
+            provider = provider,
+            successRate = newRate,
+            recentLatencyMs = latencyMs,
+            updatedAt = now
+        )
+    }
 
     /**
      * Reactor-owned modelmux cache layer. Holds model metadata and API call
@@ -319,6 +341,13 @@ class MuxReactorElement(
                 timestampMs = nowMs(),
             ),
         )
+        emitKanbanEvent(
+            KanbanEvent.LeaseExpired(
+                keyId = keyId,
+                reason = "Revoked",
+                timestampMs = nowMs(),
+            ),
+        )
         return true
     }
 
@@ -400,6 +429,13 @@ class MuxReactorElement(
                     KanbanEvent.LeaseReclaimed(
                         keyId = key.keyId,
                         previousLeasee = previous ?: "",
+                        timestampMs = now,
+                    ),
+                )
+                emitKanbanEvent(
+                    KanbanEvent.LeaseExpired(
+                        keyId = key.keyId,
+                        reason = "Expired",
                         timestampMs = now,
                     ),
                 )

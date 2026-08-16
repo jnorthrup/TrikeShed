@@ -4,6 +4,7 @@ import borg.trikeshed.htx.*
 import borg.trikeshed.lib.*
 import borg.trikeshed.userspace.nio.file.spi.FileOperations
 import borg.trikeshed.userspace.nio.platform.spi.SystemOperations
+import borg.trikeshed.userspace.reactor.MuxKeyEntry
 import borg.trikeshed.userspace.reactor.MuxKeyStatus
 import borg.trikeshed.userspace.reactor.MuxReactorElement
 import kotlinx.coroutines.currentCoroutineContext
@@ -16,6 +17,10 @@ fun <T> Series<T>.iterable(): Iterable<T> = view
 // ═══════════════════════════════════════════
 // Type algebra
 // ═══════════════════════════════════════════
+
+typealias KeyId = String
+
+data class LeaseMetadata(val leasedTo: String, val leaseExpiresAt: Long)
 
 /** Dotted-path key: "llm.openai.key" → ["llm","openai","key"] */
 typealias KeyPath = Series<String>
@@ -260,6 +265,59 @@ fun pathMatch(pattern: String, path: String): Boolean {
 }
 
 // ═══════════════════════════════════════════
+// Free-tier Projection
+// ═══════════════════════════════════════════
+
+val MuxKeyEntry.isFreeTier: Boolean
+    get() = provider.contains("free", ignoreCase = true) || label.contains("free", ignoreCase = true)
+
+class FreeTierKeyProjection(private val base: Series<MuxKeyEntry>) : Sequence<MuxKeyEntry> {
+    private var cursor: Int = 0
+
+    fun nextFreeKey(excluding: Series<String> = emptySeries()): MuxKeyEntry? {
+        while (cursor < base.size) {
+            val key = base[cursor]
+            cursor++
+            if (key.isFreeTier && key.status == MuxKeyStatus.ACTIVE) {
+                var isExcluded = false
+                for (ex in excluding.iterable()) {
+                    if (ex == key.keyId) {
+                        isExcluded = true
+                        break
+                    }
+                }
+                if (!isExcluded) return key
+            }
+        }
+        return null
+    }
+
+    override fun iterator(): Iterator<MuxKeyEntry> = object : Iterator<MuxKeyEntry> {
+        private var nextElement: MuxKeyEntry? = null
+
+        private fun advance() {
+            if (nextElement == null) {
+                nextElement = nextFreeKey()
+            }
+        }
+
+        override fun hasNext(): Boolean {
+            advance()
+            return nextElement != null
+        }
+
+        override fun next(): MuxKeyEntry {
+            if (!hasNext()) throw NoSuchElementException()
+            val result = nextElement!!
+            nextElement = null
+            return result
+        }
+    }
+}
+
+fun Series<MuxKeyEntry>.freeTierProjection(): FreeTierKeyProjection = FreeTierKeyProjection(this)
+
+// ═══════════════════════════════════════════
 // Resolver — first-wins precedence across sources
 // ═══════════════════════════════════════════
 
@@ -303,6 +361,24 @@ class KeyMux constructor(
 ) {
     private val bindings: Series<KeyBinding> get() = core.a
     private val resolver: KeyResolver get() = core.b
+
+    // Single-writer invariant: mutable map stays as private backing, modified by reactor/test
+    private val leaseBacking = mutableMapOf<KeyId, LeaseMetadata>()
+    
+    // Visit counter to verify laziness in tests
+    internal var leaseVisits = 0
+
+    // Test-only setter since reactor mutation is not fully mocked here
+    internal fun setLeaseForTest(keyId: KeyId, metadata: LeaseMetadata) {
+        leaseBacking[keyId] = metadata
+    }
+
+    /** Lease-view API returning Series<Pair<KeyId, LeaseMetadata>> — lazy, no copying */
+    val activeLeases: Series<Pair<KeyId, LeaseMetadata>> get() = leaseBacking.size j { i ->
+        leaseVisits++
+        val entry = leaseBacking.entries.elementAt(i)
+        Pair(entry.key, entry.value)
+    }
 
     companion object {
         operator fun invoke(block: KeyMuxBuilder.() -> Unit): KeyMux =

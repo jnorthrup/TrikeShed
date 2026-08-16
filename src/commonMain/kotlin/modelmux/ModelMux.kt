@@ -198,6 +198,14 @@ class ModelMux internal constructor(
             val respBody = resp.body.toArray().decodeToString()
             httpStatus = resp.status
 
+            if (reactor != null) {
+                reactor.recordProviderHealth(
+                    provider = card.id,
+                    success = resp.status in 200..299,
+                    latencyMs = kotlinx.datetime.Clock.System.now().toEpochMilliseconds() - t0
+                )
+            }
+
             if (resp.status !in 200..299) {
                 return Result.failure(IllegalStateException("ModelMux chat failed with HTTP ${resp.status}: ${respBody.take(500)}"))
             }
@@ -322,11 +330,22 @@ class ModelMux internal constructor(
                 body = ByteSeries(json.encodeToByteArray())
             ).copy(headers = htxHeaders)
 
+            val t0 = kotlinx.datetime.Clock.System.now().toEpochMilliseconds()
             val resp = htx.request(htxReq)
             val respBody = resp.body.toArray().decodeToString()
 
             if (reactor != null) {
-                reactor.cacheApiCall(provider = card.id, modelId = modelId, requestHash = requestHash, ttlMs = 3600_000, payload = respBody)
+                reactor.recordProviderHealth(
+                    provider = card.id,
+                    success = resp.status in 200..299,
+                    latencyMs = kotlinx.datetime.Clock.System.now().toEpochMilliseconds() - t0
+                )
+                if (resp.status in 200..299) {
+                    reactor.cacheApiCall(provider = card.id, modelId = modelId, requestHash = requestHash, ttlMs = 3600_000, payload = respBody)
+                }
+            }
+            if (resp.status !in 200..299) {
+                throw IllegalStateException("ModelMux embed failed with HTTP ${resp.status}: ${respBody.take(500)}")
             }
             return parseEmbeddings(respBody, texts)
         } finally {

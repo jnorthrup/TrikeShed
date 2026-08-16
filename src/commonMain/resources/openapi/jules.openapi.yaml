@@ -26,6 +26,26 @@ paths:
       operationId: createSession
       summary: Creates a new session.
       x-trikeshed-supervisor: true
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                prompt:
+                  type: string
+                title:
+                  type: string
+                sourceContext:
+                  type: object
+                  properties:
+                    source:
+                      type: string
+                    githubRepoContext:
+                      type: object
+                      properties:
+                        startingBranch:
+                          type: string
       responses:
         '200':
           description: A successful response containing the created session.
