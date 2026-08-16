@@ -191,26 +191,33 @@ class FieldSynapse:
     OP_P_SET = 0xA8
     
     def encode(self) -> bytes:
-        """Encode to 24-byte wire frame (big-endian)"""
+        """Encode to 24-byte little-endian wire frame — matches JVM FieldSynapse.kt:6-14 exactly.
+
+        offset  0: opcode       u8
+        offset  1: phase        u8   (0=BEFORE, 1=AFTER)
+        offset  2: methodIdx    u16
+        offset  4: addr         i32
+        offset  8: seq          i32
+        offset 12: nano         i64
+        offset 20: callsiteHash u16
+        offset 22: templateIdx  u16
+        """
         import struct
-        # JVM: phase(1) + opcode(1) + methodIdx(4) + addr(4) + seq(4) + nano(8) + callsiteHash(4) + templateIdx(4) = 30 bytes
-        # Packed as: bbiiiqii (2 bytes + 30 bytes = 32 bytes with alignment)
-        # In Python: 'b' is signed char (-128 to 127), 'B' is unsigned (0 to 255)
-        return struct.pack('>BBiiiqii',
-            self.phase & 0xFF,
+        return struct.pack('<BBHIIQHH',
             self.opcode & 0xFF,
-            self.method_idx,
+            self.phase & 0xFF,
+            self.method_idx & 0xFFFF,
             self.addr,
             self.seq,
             self.nano,
-            self.callsite_hash,
-            self.template_idx
+            self.callsite_hash & 0xFFFF,
+            self.template_idx & 0xFFFF
         )
-    
+
     @classmethod
     def decode(cls, buf: bytes) -> 'FieldSynapse':
         import struct
-        phase, opcode, method_idx, addr, seq, nano, callsite_hash, template_idx = struct.unpack('>BBiiiqii', buf[:32])
+        opcode, phase, method_idx, addr, seq, nano, callsite_hash, template_idx = struct.unpack('<BBHIIQHH', buf[:24])
         return cls(phase, opcode, method_idx, addr, seq, nano, callsite_hash, template_idx)
 
 

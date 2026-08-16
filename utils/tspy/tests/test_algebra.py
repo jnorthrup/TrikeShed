@@ -83,9 +83,8 @@ def test_fieldsynapse_encode_decode():
         callsite_hash=999, template_idx=5
     )
     encoded = fs.encode()
-    # JVM FieldSynapse encodes to 30 bytes (phase+opcode+methodIdx+addr+seq+nano+callsiteHash+templateIdx = 30)
-    # Python struct with alignment produces 32 bytes
-    assert len(encoded) in (30, 32)
+    # JVM FieldSynapse contract (FieldSynapse.kt:6-14): 24-byte little-endian frame
+    assert len(encoded) == 24
     decoded = FieldSynapse.decode(encoded)
     assert decoded.phase == fs.phase
     assert decoded.opcode == fs.opcode
