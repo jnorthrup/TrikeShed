@@ -161,6 +161,47 @@ class JulesPatchContinuityStore(
     }
 
     /**
+     * Record a typed reject of one observed snapshot chain.  Like a reviewed
+     * selection this never settles the session; it makes the named chain
+     * eligible for receipt-producing reject settlement, which retires the
+     * session without applying any patch.
+     */
+    suspend fun selectRejected(
+        sessionId: String,
+        patchCid: ContentId,
+        causalOrdinal: Int,
+        reason: String,
+        reviewedBy: String,
+        receiptRef: String,
+        causes: Iterable<JulesCause>,
+    ): JulesCause.PatchRejected {
+        require(reason.isNotBlank()) { "reason must not be blank" }
+        require(reviewedBy.isNotBlank()) { "reviewedBy must not be blank" }
+        require(receiptRef.isNotBlank()) { "receiptRef must not be blank" }
+        require(causes.filterIsInstance<JulesCause.PatchSnapshotObserved>().any {
+            it.patchCid == patchCid && it.causalOrdinal == causalOrdinal
+        }) { "snapshot $causalOrdinal/$patchCid was not observed for session $sessionId" }
+        val latestPatchCid = causes.filterIsInstance<JulesCause.PatchSnapshotObserved>()
+            .maxWithOrNull(compareBy({ it.causalOrdinal }, { it.activitySeq }, { it.artifactSeq }))
+            ?.patchCid
+        val latestReportCid = causes.filterIsInstance<JulesCause.AgentReportObserved>()
+            .maxWithOrNull(compareBy({ it.causalOrdinal }, { it.activitySeq }, { it.activityId }))
+            ?.reportCid
+        val cause = JulesCause.PatchRejected(
+            patchCid = patchCid,
+            causalOrdinal = causalOrdinal,
+            latestPatchCid = latestPatchCid,
+            latestReportCid = latestReportCid,
+            reason = reason,
+            reviewedBy = reviewedBy,
+            receiptRef = receiptRef,
+            at = System.currentTimeMillis(),
+        )
+        boardStore.appendCause(sessionId, cause)
+        return cause
+    }
+
+    /**
      * Record the operator's semantic disposition for one observed full report.
      * This does not settle the session; it only makes the exact report eligible
      * for a receipt-producing report settlement command.

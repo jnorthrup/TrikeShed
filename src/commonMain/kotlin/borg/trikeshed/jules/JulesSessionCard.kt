@@ -115,6 +115,25 @@ sealed class JulesCause {
     ) : JulesCause()
 
     /**
+     * Typed reject of one observed snapshot chain.  A completed session whose
+     * every candidate is superseded (or otherwise unusable) cannot settle the
+     * patch path honestly; this cause names the rejected chain head and the
+     * durable reason, bonded to a receipt, so settlement can retire it without
+     * laundering a regressed patch or discarding CAS evidence.
+     */
+    data class PatchRejected(
+        val patchCid: ContentId,
+        val causalOrdinal: Int,
+        /** Latest producer artifacts visible to the reviewer (CAS watermark). */
+        val latestPatchCid: ContentId? = null,
+        val latestReportCid: ContentId? = null,
+        val reason: String,
+        val reviewedBy: String,
+        val receiptRef: String,
+        override val at: Long,
+    ) : JulesCause()
+
+    /**
      * One complete Jules agent message after its exact UTF-8 bytes are durable
      * in CAS.  This is deliberately separate from [AgentMessaged], whose
      * excerpt exists only for the operator board.  Together the WAL key,

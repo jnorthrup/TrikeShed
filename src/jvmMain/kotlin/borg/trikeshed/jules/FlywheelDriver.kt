@@ -636,6 +636,11 @@ class FlywheelDriver(
                 val bytes = patchContinuity.bytes(selected)
                 AutomaticPatch.Available(bytes.decodeToString(), selected.snapshot.patchCid)
             }
+            is JulesPatchDrainSelection.Rejected -> AutomaticPatch.ReviewBlocked(
+                "chain rejected ${selected.rejectedSnapshot.causalOrdinal}/" +
+                    "${selected.rejectedSnapshot.patchCid.value} (${selected.reason}); " +
+                    "settle with JulesSettlementCli settle-reject",
+            )
             is JulesPatchDrainSelection.ReviewRequired -> AutomaticPatch.ReviewBlocked(
                 "latest activity patch ${selected.regressedLatest.causalOrdinal}/" +
                     "${selected.regressedLatest.patchCid.value} dropped " +

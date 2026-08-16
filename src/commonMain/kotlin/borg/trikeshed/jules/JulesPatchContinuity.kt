@@ -24,6 +24,17 @@ sealed interface JulesPatchDrainSelection {
         val regressedLatest: JulesCause.PatchSnapshotObserved,
         val missingFiles: List<String>,
     ) : JulesPatchDrainSelection
+
+    /**
+     * A typed reject, bonded to an operator receipt, closed the chain: the
+     * session settles as rejected without applying any observed patch.
+     */
+    data class Rejected(
+        val rejectedSnapshot: JulesCause.PatchSnapshotObserved,
+        val reason: String,
+        val reviewedBy: String,
+        val receiptRef: String,
+    ) : JulesPatchDrainSelection
 }
 
 /**
@@ -60,8 +71,37 @@ fun selectJulesPatchForDrain(causes: Iterable<JulesCause>): JulesPatchDrainSelec
     val observations = causalList.filterIsInstance<JulesCause.PatchSnapshotObserved>()
     if (observations.isEmpty()) return JulesPatchDrainSelection.Unobserved
 
-    val explicitIndex = causalList.indexOfLast { it is JulesCause.PatchReviewSelected }
+    // A typed reject, bonded to a receipt and posted after every producer
+    // artifact, closes the chain: the session settles as rejected without
+    // applying any observed patch.  Recency never launders a reject away and
+    // a reject never discards the observed evidence it names.
+    val rejectIndex = causalList.indexOfLast { it is JulesCause.PatchRejected }
     val latestObservationIndex = causalList.indexOfLast { it is JulesCause.PatchSnapshotObserved }
+    val reject = causalList.getOrNull(rejectIndex) as? JulesCause.PatchRejected
+    if (reject != null && rejectIndex > latestObservationIndex) {
+        val latestPatchCid = observations.maxWith(snapshotCausalOrder).patchCid
+        val latestReportCid = causalList.filterIsInstance<JulesCause.AgentReportObserved>()
+            .maxWithOrNull(reportCausalOrder)?.reportCid
+        val rejected = observations.lastOrNull {
+            it.patchCid == reject.patchCid && it.causalOrdinal == reject.causalOrdinal
+        }
+        if (rejected != null &&
+            reject.latestPatchCid == latestPatchCid &&
+            reject.latestReportCid == latestReportCid &&
+            reject.reason.isNotBlank() &&
+            reject.reviewedBy.isNotBlank() &&
+            reject.receiptRef.isNotBlank()
+        ) {
+            return JulesPatchDrainSelection.Rejected(
+                rejectedSnapshot = rejected,
+                reason = reject.reason,
+                reviewedBy = reject.reviewedBy,
+                receiptRef = reject.receiptRef,
+            )
+        }
+    }
+
+    val explicitIndex = causalList.indexOfLast { it is JulesCause.PatchReviewSelected }
     val explicit = causalList.getOrNull(explicitIndex) as? JulesCause.PatchReviewSelected
     if (explicit != null && explicitIndex > latestObservationIndex) {
         val latestPatchCid = observations.maxWith(snapshotCausalOrder).patchCid

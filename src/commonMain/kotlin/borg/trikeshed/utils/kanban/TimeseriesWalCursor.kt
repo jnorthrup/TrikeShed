@@ -202,6 +202,7 @@ class TimeseriesWalCursor(
             is JulesCause.PatchArrived,
             is JulesCause.PatchSnapshotObserved,
             is JulesCause.PatchReviewSelected,
+            is JulesCause.PatchRejected,
             is JulesCause.AgentReportObserved,
             is JulesCause.AgentReportReviewSelected,
             is JulesCause.DrainFailed,

@@ -61,6 +61,15 @@ object KanbanEventCodec {
                 field("reviewedBy", c.reviewedBy)
                 field("receiptRef", c.receiptRef)
             }
+            is JulesCause.PatchRejected -> {
+                field("patchCid", c.patchCid.value)
+                append(",\"causalOrdinal\":").append(c.causalOrdinal)
+                c.latestPatchCid?.let { field("latestPatchCid", it.value) }
+                c.latestReportCid?.let { field("latestReportCid", it.value) }
+                field("reason", c.reason)
+                field("reviewedBy", c.reviewedBy)
+                field("receiptRef", c.receiptRef)
+            }
             is JulesCause.AgentReportObserved -> {
                 field("reportCid", c.reportCid.value)
                 append(",\"causalOrdinal\":").append(c.causalOrdinal)
@@ -177,6 +186,16 @@ object KanbanEventCodec {
                         receiptRef = m.str("receiptRef"),
                         at = at,
                     )
+                    "PatchRejected" -> JulesCause.PatchRejected(
+                        patchCid = ContentId(m.str("patchCid")),
+                        causalOrdinal = m.num("causalOrdinal").toInt(),
+                        latestPatchCid = m.optStr("latestPatchCid")?.let(::ContentId),
+                        latestReportCid = m.optStr("latestReportCid")?.let(::ContentId),
+                        reason = m.str("reason"),
+                        reviewedBy = m.str("reviewedBy"),
+                        receiptRef = m.str("receiptRef"),
+                        at = at,
+                    )
                     "AgentReportObserved" -> JulesCause.AgentReportObserved(
                         reportCid = ContentId(m.str("reportCid")),
                         causalOrdinal = m.num("causalOrdinal").toInt(),
@@ -275,6 +294,7 @@ object KanbanEventCodec {
         is JulesCause.PatchArrived -> "PatchArrived"
         is JulesCause.PatchSnapshotObserved -> "PatchSnapshotObserved"
         is JulesCause.PatchReviewSelected -> "PatchReviewSelected"
+        is JulesCause.PatchRejected -> "PatchRejected"
         is JulesCause.AgentReportObserved -> "AgentReportObserved"
         is JulesCause.AgentReportReviewSelected -> "AgentReportReviewSelected"
         is JulesCause.DrainApplied -> "DrainApplied"

@@ -23,6 +23,7 @@ object JulesSettlementCli {
     private enum class ArtifactKind(val wireName: String) {
         PATCH("patch"),
         REPORT("report"),
+        REJECT("reject"),
     }
 
     @JvmStatic
@@ -30,6 +31,7 @@ object JulesSettlementCli {
         when (args.firstOrNull()) {
             "settle" -> settle(args.drop(1), ArtifactKind.PATCH)
             "settle-report" -> settle(args.drop(1), ArtifactKind.REPORT)
+            "settle-reject" -> settleReject(args.drop(1))
             "archive-record" -> recordArchive(args.drop(1))
             else -> error(
                 "usage:\n" +
@@ -37,9 +39,126 @@ object JulesSettlementCli {
                     "    (reads the exact Jules cumulative patch from stdin)\n" +
                     "  JulesSettlementCli settle-report <session-id> <commit> <state> <disposition> <title> [forge-dir] [repo-dir] [pr-url]\n" +
                     "    (reads the exact final Jules agent report from stdin)\n" +
+                    "  JulesSettlementCli settle-reject <session-id> <commit> <state> <disposition> <title> [forge-dir] [repo-dir] [pr-url]\n" +
+                    "    (retires a terminal session via the reviewed PatchRejected cause; no stdin bytes)\n" +
                     "  JulesSettlementCli archive-record <session-id> [forge-dir]"
             )
         }
+    }
+
+    /**
+     * Reject settlement: retire a terminal session through the reviewed
+     * [borg.trikeshed.jules.JulesCause.PatchRejected] cause.  No patch is
+     * applied and no stdin bytes are read; the durable reject reason and the
+     * observed snapshot's CAS bytes are the evidence, so the receipt pins the
+     * rejected patch CID and the reject settlement commit (verified
+     * origin/master) without laundering the patch into the tree.
+     */
+    private suspend fun settleReject(args: List<String>) {
+        require(args.size >= 5) { "settle-reject requires session-id, commit, state, disposition, and title" }
+        val sessionId = args[0].substringAfterLast('/')
+        require(sessionId.isNotBlank()) { "empty session id" }
+        val requestedCommit = args[1]
+        val state = args[2]
+        val disposition = args[3]
+        val title = args[4]
+        val forgeDir = File(args.getOrNull(5) ?: defaultForgeDir())
+        val repoDir = File(args.getOrNull(6) ?: System.getProperty("user.dir"))
+        val prUrl = args.getOrNull(7)?.takeIf { it.isNotBlank() && it != "none" }
+
+        requireCanonicalRepository(repoDir)
+        val originMaster = fetchAndVerifyOriginMaster(repoDir)
+        val commit = git(repoDir, "rev-parse", "$requestedCommit^{commit}").requireSuccess().trim()
+        require(commit == originMaster) {
+            "reject settlement must anchor verified origin/master $originMaster, not $commit"
+        }
+
+        val cas = FileCasStore(JvmFileOperations(), File(forgeDir, "cas").absolutePath)
+        val store = JulesBoardStore.forForgeDir(forgeDir)
+        val durable = withContext(Dispatchers.IO) { store.load() to store.loadQueue() }
+        val card = requireNotNull(durable.first[sessionId]) {
+            "session $sessionId has no observed API timeline; poll Jules before settlement"
+        }
+        require(card.snapshot.state in PATCH_TERMINAL_STATES) {
+            "session $sessionId is ${card.snapshot.state}, not terminal for reject settlement"
+        }
+        require(state == card.snapshot.state) {
+            "requested state $state differs from observed ${card.snapshot.state}"
+        }
+        require(title == card.snapshot.title) {
+            "requested title differs from the observed Jules title"
+        }
+        val rejected = requireNotNull(
+            selectJulesPatchForDrain(card.causes) as? JulesPatchDrainSelection.Rejected
+        ) {
+            "session $sessionId has no reviewed reject cause; run JulesPatchReviewCli reject first"
+        }
+        val artifactCid = rejected.rejectedSnapshot.patchCid
+        val existingQueue = durable.second.firstOrNull { it.sessionId == sessionId }
+        val safeSession = sessionId.replace(Regex("[^A-Za-z0-9._-]"), "-")
+        val tag = "flywheel/jules-$safeSession-${commit.take(12)}"
+        val artifact = withContext(Dispatchers.IO) {
+            requireNotNull(cas.get(artifactCid)) { "missing rejected patch CAS object $artifactCid" }
+        }
+
+        if (existingQueue?.isDrained == true) {
+            val receipt = requireNotNull(existingQueue.receipt) {
+                "session $sessionId already has a hollow WorkDrained record"
+            }
+            require(receipt.patchCid == artifactCid && receipt.revision == commit) {
+                "session $sessionId already settled to ${receipt.revision}/${receipt.patchCid}"
+            }
+            println(receiptJson(sessionId, disposition, commit, tag, artifactCid, ArtifactKind.REJECT, existingQueue.workId, true))
+            return
+        }
+
+        ensureTag(repoDir, tag, commit, sessionId, artifactCid, ArtifactKind.REJECT, disposition, title)
+        ensureTagPublished(repoDir, tag, commit)
+
+        val now = System.currentTimeMillis()
+        val workId = existingQueue?.workId ?: "session:$safeSession"
+        if (existingQueue == null) {
+            store.appendWork(workId, JulesCause.WorkQueued(
+                workId = workId,
+                tier = "operator",
+                title = title,
+                spec = "API-only Jules reject settlement: $disposition",
+                score = 0.5,
+                at = now,
+            ))
+            store.appendWork(workId, JulesCause.WorkDispatched(
+                workId = workId,
+                sessionId = sessionId,
+                attempt = 1,
+                at = now,
+            ))
+        }
+        ensureIdentity(store, workId, sessionId, prUrl, tag, commit, now)
+        val receipt = MergeReceipt(
+            workId = workId,
+            producer = "jules-api",
+            producerRef = sessionId,
+            patchCid = artifactCid,
+            revision = commit,
+            versionTag = tag,
+            lexicalMemory = LexicalMemory(
+                summary = disposition,
+                title = title,
+                content = "Settled by typed reject; observed patch CAS bytes retained, not applied.",
+            ),
+            claimedAt = now,
+            prUrl = prUrl,
+        )
+        store.appendWork(workId, JulesCause.WorkDrained(
+            workId = workId,
+            sessionId = sessionId,
+            commitSha = commit,
+            taskId = tag,
+            receipt = receipt,
+            at = now,
+        ))
+        ensureCardDrained(store, sessionId, state, title, 0L, commit)
+        println(receiptJson(sessionId, disposition, commit, tag, artifactCid, ArtifactKind.REJECT, workId, false))
     }
 
     private suspend fun settle(args: List<String>, artifactKind: ArtifactKind) {
@@ -70,6 +189,9 @@ object JulesSettlementCli {
             ArtifactKind.REPORT -> require(commit == originMaster) {
                 "report settlement must anchor verified origin/master $originMaster, not $commit"
             }
+            ArtifactKind.REJECT -> require(commit == originMaster) {
+                "reject settlement must anchor verified origin/master $originMaster, not $commit"
+            }
         }
 
         val cas = FileCasStore(JvmFileOperations(), File(forgeDir, "cas").absolutePath)
@@ -81,6 +203,7 @@ object JulesSettlementCli {
         val allowedStates = when (artifactKind) {
             ArtifactKind.PATCH -> PATCH_TERMINAL_STATES
             ArtifactKind.REPORT -> REPORT_TERMINAL_STATES
+            ArtifactKind.REJECT -> PATCH_TERMINAL_STATES
         }
         require(card.snapshot.state in allowedStates) {
             "session $sessionId is ${card.snapshot.state}, not terminal for ${artifactKind.wireName} settlement"
@@ -178,6 +301,7 @@ object JulesSettlementCli {
                 content = when (artifactKind) {
                     ArtifactKind.PATCH -> "Settled from the Jules API cumulative patch stream; PR/branch optional."
                     ArtifactKind.REPORT -> "Settled from the exact final Jules API agent report; no patch, PR, or branch required."
+                    ArtifactKind.REJECT -> "Settled by typed reject; observed patch CAS bytes retained, not applied."
                 },
             ),
             claimedAt = now,
@@ -229,6 +353,9 @@ object JulesSettlementCli {
                         "session $sessionId patch regressed and needs explicit review; " +
                             "missing=${selection.missingFiles.joinToString(",")}",
                     )
+                    is JulesPatchDrainSelection.Rejected -> error(
+                        "session $sessionId chain is rejected; use settle-reject",
+                    )
                     JulesPatchDrainSelection.Unobserved -> error(
                         "session $sessionId has no observed API patch snapshot",
                     )
@@ -264,6 +391,16 @@ object JulesSettlementCli {
                 }
                 require(continuity.reportBytes(selected).contentEquals(artifact)) {
                     "stdin report bytes differ from selected CAS object $artifactCid"
+                }
+            }
+            ArtifactKind.REJECT -> {
+                val rejected = requireNotNull(
+                    selectJulesPatchForDrain(card.causes) as? JulesPatchDrainSelection.Rejected,
+                ) {
+                    "session $sessionId has no reviewed reject cause; run JulesPatchReviewCli reject first"
+                }
+                require(rejected.rejectedSnapshot.patchCid == artifactCid) {
+                    "rejected chain head $artifactCid is not the reviewed ${rejected.rejectedSnapshot.patchCid}"
                 }
             }
         }
