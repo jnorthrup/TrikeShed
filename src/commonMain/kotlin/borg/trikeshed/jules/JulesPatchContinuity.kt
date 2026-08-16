@@ -125,11 +125,16 @@ fun selectJulesPatchForDrain(causes: Iterable<JulesCause>): JulesPatchDrainSelec
     }
 
     val latest = observations.maxWith(snapshotCausalOrder)
-    // The first immutable snapshot is eligible automatically. Once the
-    // producer emits a different CID, filename inclusion is diagnostic only:
-    // it cannot prove that earlier hunks survived inside the same file.
-    val distinctCids = observations.map { it.patchCid }.distinct()
-    if (distinctCids.size == 1 && latest.reviewCandidate) {
+    // The automatic gate is file-set monotonicity against the previous
+    // CANDIDATE, exactly as documented: a snapshot is eligible when its file
+    // set contains the retained candidate's file set (reviewCandidate).
+    // Global CID distinctness is NOT the gate — a cumulative patch stream
+    // legitimately emits new bytes each activity, and requiring a single CID
+    // forever blocks every evolved session even when the latest snapshot is
+    // byte-identical to the retained candidate (same CID, empty drop set).
+    // A latest snapshot that actually dropped files keeps reviewCandidate
+    // false and stays review-blocked below.
+    if (latest.reviewCandidate) {
         return JulesPatchDrainSelection.Selected(latest, reviewed = false)
     }
 
