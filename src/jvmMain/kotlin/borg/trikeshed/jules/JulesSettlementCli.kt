@@ -109,10 +109,26 @@ object JulesSettlementCli {
                 receipt.revision.isNotBlank() && !receipt.revision.startsWith("outbox-") &&
                 receipt.versionTag.isNotBlank() && receipt.versionTag != "retired"
             val exactMatch = receipt.patchCid == artifactCid && receipt.revision == commit
-            if (immutable) {
-                require(exactMatch) {
+            if (immutable && !exactMatch) {
+                // An immutable receipt may still be stale: the conductor reopens a
+                // settled card when output advanced past the settlement
+                // (SETTLED_OUTPUT_ADVANCED), and a typed reject of the newer chain
+                // must be able to supersede it. Without this, the drain lane
+                // demands settle-reject while the idempotence guard throws —
+                // a permanent operator-exit deadlock.
+                val reopened = withContext(Dispatchers.IO) {
+                    val card = store.load()[sessionId]
+                    card != null && !card.drained && card.causes.any {
+                        (it is JulesCause.StateObserved && it.from == "SETTLED_OUTPUT_ADVANCED") ||
+                            it is JulesCause.PatchRejected
+                    }
+                }
+                require(reopened) {
                     "session $sessionId already settled to ${receipt.revision}/${receipt.patchCid}"
                 }
+                println("superseding stale settlement ${receipt.revision.take(12)}/${receipt.patchCid.value.take(20)} (output advanced past settlement)")
+            }
+            if (immutable && exactMatch) {
                 println(receiptJson(sessionId, disposition, commit, tag, artifactCid, ArtifactKind.REJECT, existingQueue.workId, true))
                 return
             }
