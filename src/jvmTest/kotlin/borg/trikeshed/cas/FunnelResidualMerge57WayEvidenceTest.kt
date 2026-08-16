@@ -87,7 +87,11 @@ class FunnelResidualMerge57WayEvidenceTest {
         // Red test: Expected relocated behavior according to the 57-way test spec.
         assertTrue(receipt.relocatedCount >= 1, "receipt.relocatedCount should be >= 1 but was ${receipt.relocatedCount}")
         assertTrue(receipt.inheritedCount >= 1 || receipt.dropped.size > 0)
-        assertEquals(receipt.novelCount + receipt.relocatedCount, receipt.kept.size)
+        // RELOCATED clusters are posted as conflicts (no resolver supplied);
+        // kept holds only NOVEL survivors.
+        assertEquals(receipt.novelCount, receipt.kept.size, "kept should hold only NOVEL; RELOCATED is in conflicts")
+        assertEquals(receipt.relocatedCount, receipt.conflicts.size, "conflicts should hold all RELOCATED posts")
+        assertEquals(0, receipt.resolvedCount, "no resolver supplied → nothing resolved")
 
         // Assert every kept NOVEL cluster comes from a single SourceIdx
         for (i in 0 until receipt.kept.size) {
