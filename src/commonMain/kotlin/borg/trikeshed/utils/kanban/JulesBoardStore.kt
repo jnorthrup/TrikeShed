@@ -262,14 +262,20 @@ class JulesBoardStore(
                 }
                 is JulesCause.WorkDrained -> {
                     require(workId == c.workId) { "WAL key/work mismatch: $workId != ${c.workId}" }
-                    byWorkId[c.workId]?.let {
-                    byWorkId[c.workId] = it.copy(
+                    val entry = byWorkId.getOrPut(c.workId) {
+                        QueueEntry(
+                            workId = c.workId,
+                            tier = "drained",
+                            title = "CLI Settled",
+                            spec = ""
+                        )
+                    }
+                    byWorkId[c.workId] = entry.copy(
                         commitSha = c.commitSha,
                         taskId = c.taskId,
                         receipt = c.receipt,
                         drainedAt = c.at,
                     )
-                    }
                 }
                 else -> {} // session-cause records do not carry workId; skip
             }
