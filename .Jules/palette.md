@@ -17,3 +17,11 @@
 ## 2025-01-20 - Hiding decorative icons with aria-hidden
 **Learning:** When using Unicode symbols (like ⌕, ⌂, ▦, ⬇, ▤) purely for visual decoration next to descriptive text, screen readers will try to announce the symbol. This creates unnecessary auditory noise and degrades the user experience.
 **Action:** Always apply `aria-hidden="true"` to decorative elements, especially Unicode symbols or SVGs, when they are paired with actual accessible text or contained within a parent element that already provides an adequate `aria-label`.
+
+## 2026-08-16 - Expanded context on aria-label for text buttons
+**Learning:** While WCAG 2.5.3 (Label in Name) dictates that an `aria-label` should contain the visible text of a button, it's often a mistake to remove an `aria-label` simply because the button has visible text. In many cases, the visible text is short (e.g., "New Doc", "Sync") to save UI space, while the `aria-label` provides crucial expanded context for screen reader users (e.g., "Create new document", "Synchronize workspace"). Removing the `aria-label` degrades accessibility in these scenarios.
+**Action:** Do not remove existing `aria-label` attributes from buttons with short visible text if the `aria-label` provides expanded, helpful context. Only remove them if they are truly redundant or negatively conflict with the visible text in a way that breaks accessibility tools.
+
+## 2026-08-16 - Accessible loading states
+**Learning:** When displaying a loading indicator (like a spinner or progress bar) that replaces the main content, keyboard users and screen readers might not immediately perceive the change in state.
+**Action:** When creating a Compose loading indicator that takes over the view, add a `FocusRequester`, apply the `focusable()` modifier to the indicator, and use a `LaunchedEffect` to request focus on the indicator when it becomes visible. This ensures the user's focus is directed to the loading state.
