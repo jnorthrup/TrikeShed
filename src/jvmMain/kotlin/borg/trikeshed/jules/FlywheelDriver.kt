@@ -301,34 +301,6 @@ class FlywheelDriver(
             }
         }
 
-        // 2a. NUDGE stalled conversations — Jules sometimes never resumes after
-        //     a user message: the session parks in AWAITING_USER_FEEDBACK with
-        //     our answer as its last activity, and the exactly-once guard above
-        //     then correctly never re-answers, so the slot stays held forever.
-        //     After stallNudgeMs with no reply, send one nudge; the fresh
-        //     HumanAnswered cause self-throttles to once per interval.
-        val stallNudgeMs = 2L * 60L * 60L * 1000L
-        val nudgeNowMs = Clock.System.now().toEpochMilliseconds()
-        for (card in conductor.cards.values.filter {
-            it.snapshot.state == "AWAITING_USER_FEEDBACK" &&
-                (it.causes.lastOrNull() as? JulesCause.HumanAnswered)?.let { cause ->
-                    nudgeNowMs - cause.at > stallNudgeMs
-                } == true
-        }.sortedBy { it.snapshot.capturedAt }) {
-            try {
-                conductor.answer(
-                    card.snapshot.sessionId,
-                    "Please proceed with the implementation based on my previous answer. " +
-                        "Run the JVM build to verify, and commit when green.",
-                )
-                answered++
-                println("[FLYWHEEL] NUDGE ${card.snapshot.sessionId.takeLast(6)} ${card.card.title.take(60)}")
-            } catch (t: Throwable) {
-                classifyHttpError(t)
-                _events.tryEmit(FlywheelEvent.PollError("nudge ${card.snapshot.sessionId}: ${t.message?.take(200)}"))
-            }
-        }
-
         // 2b. APPROVE — a session parked in AWAITING_PLAN_APPROVAL holds its
         //     slot forever unless the wheel signs off; no other phase ever
         //     unblocks it. Auto-approve: the integrated JVM build at drain time
