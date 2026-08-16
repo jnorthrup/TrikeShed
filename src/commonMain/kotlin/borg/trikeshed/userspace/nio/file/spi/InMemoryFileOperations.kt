@@ -80,7 +80,7 @@ class InMemoryFileOperations(
 
     override fun deleteRecursively(path: String) {
         val prefix = path.trimEnd('/') + "/"
-        files.keys.removeAll { it == path || it.startsWith(prefix) }
+        files.entries.removeAll { it.key == path || it.key.startsWith(prefix) }
         dirs.removeAll { it == path || it.startsWith(prefix) }
     }
 

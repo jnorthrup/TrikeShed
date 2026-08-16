@@ -1,0 +1,3 @@
+rootProject {
+    kotlin.sourceSets.jvmMain.kotlin.exclude("**/JulesSettlementCli.kt")
+}
