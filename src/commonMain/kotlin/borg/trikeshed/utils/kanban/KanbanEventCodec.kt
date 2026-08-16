@@ -280,7 +280,7 @@ object KanbanEventCodec {
                         ),
                         at = at,
                     )
-                    else -> error("Unknown Jules cause kind: ${m["kind"]}")
+                    else -> return null // tolerant decode: skip-unknown-kind
                 }
                 CauseEvent(sid, cause)
             }
