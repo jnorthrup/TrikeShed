@@ -193,9 +193,11 @@
       const toggle = document.createElement('span');
       toggle.className = 'tree-toggle';
       toggle.textContent = page.children && page.children.length ? '▾' : '▸';
+      toggle.setAttribute('aria-hidden', 'true');
       const icon = document.createElement('span');
       icon.className = 'tree-icon';
       icon.textContent = page.icon || '▤';
+      icon.setAttribute('aria-hidden', 'true');
       const label = document.createElement('span');
       label.className = 'tree-label' + (page.title ? '' : ' untitled');
       label.textContent = page.title || 'Untitled';
@@ -299,6 +301,7 @@
       const marker = document.createElement('span');
       marker.className = 'bullet-marker';
       marker.textContent = block.type === 'bullet' ? '•' : (numberedIndex(idx) + '.');
+      marker.setAttribute('aria-hidden', 'true');
       el.appendChild(marker);
     }
 
@@ -434,6 +437,7 @@
       const icon = document.createElement('span');
       icon.className = 'slash-item-icon';
       icon.textContent = d.icon;
+      icon.setAttribute('aria-hidden', 'true');
       const text = document.createElement('span');
       text.className = 'slash-item-text';
       const name = document.createElement('span');

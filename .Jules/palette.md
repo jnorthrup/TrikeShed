@@ -17,3 +17,7 @@
 ## 2025-01-20 - Hiding decorative icons with aria-hidden
 **Learning:** When using Unicode symbols (like ⌕, ⌂, ▦, ⬇, ▤) purely for visual decoration next to descriptive text, screen readers will try to announce the symbol. This creates unnecessary auditory noise and degrades the user experience.
 **Action:** Always apply `aria-hidden="true"` to decorative elements, especially Unicode symbols or SVGs, when they are paired with actual accessible text or contained within a parent element that already provides an adequate `aria-label`.
+
+## 2025-01-22 - Reducing screen reader noise for decorative elements
+**Learning:** Dynamically created DOM elements used purely for visual styling or as decorative markers (such as tree toggles '▾' / '▸', tree icons '▤', bullet markers '•', or slash menu icons) can create significant noise for screen reader users if left unannotated. Screen readers may read out the literal characters (e.g., "black right-pointing small triangle") which interrupts the flow and doesn't add semantic value when the adjacent text already describes the item.
+**Action:** When dynamically generating decorative icon or marker elements via JavaScript (e.g., `document.createElement('span')`), explicitly set `aria-hidden="true"` via `setAttribute('aria-hidden', 'true')` to silence them for assistive technologies, allowing the screen reader to focus on the meaningful sibling content.
