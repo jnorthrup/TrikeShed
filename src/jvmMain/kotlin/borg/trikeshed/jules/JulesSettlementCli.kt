@@ -105,11 +105,22 @@ object JulesSettlementCli {
             val receipt = requireNotNull(existingQueue.receipt) {
                 "session $sessionId already has a hollow WorkDrained record"
             }
-            require(receipt.patchCid == artifactCid && receipt.revision == commit) {
-                "session $sessionId already settled to ${receipt.revision}/${receipt.patchCid}"
+            val immutable = receipt.producer != "retired" &&
+                receipt.revision.isNotBlank() && !receipt.revision.startsWith("outbox-") &&
+                receipt.versionTag.isNotBlank() && receipt.versionTag != "retired"
+            val exactMatch = receipt.patchCid == artifactCid && receipt.revision == commit
+            if (immutable) {
+                require(exactMatch) {
+                    "session $sessionId already settled to ${receipt.revision}/${receipt.patchCid}"
+                }
+                println(receiptJson(sessionId, disposition, commit, tag, artifactCid, ArtifactKind.REJECT, existingQueue.workId, true))
+                return
             }
-            println(receiptJson(sessionId, disposition, commit, tag, artifactCid, ArtifactKind.REJECT, existingQueue.workId, true))
-            return
+            // Hollow prior drain (e.g. daemon no-delta retirement pinned to a stale
+            // head): the conductor reopens it every poll and the drain lane demands
+            // settle-reject, which previously deadlocked here.  Supersede it: the
+            // typed reject WorkDrained appended below becomes the last receipt and
+            // the queue entry turns immutable.
         }
 
         ensureTag(repoDir, tag, commit, sessionId, artifactCid, ArtifactKind.REJECT, disposition, title)
