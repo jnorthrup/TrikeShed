@@ -138,7 +138,9 @@ class JulesPatchContinuityStore(
     ): JulesCause.PatchReviewSelected {
         require(reviewedBy.isNotBlank()) { "reviewedBy must not be blank" }
         require(receiptRef.isNotBlank()) { "receiptRef must not be blank" }
-        require(causes.filterIsInstance<JulesCause.PatchSnapshotObserved>().any {
+        require(causes
+            // Bolt: avoid intermediate List allocations from filterIsInstance
+            .any { it is JulesCause.PatchSnapshotObserved &&
             it.patchCid == patchCid && it.causalOrdinal == causalOrdinal
         }) { "snapshot $causalOrdinal/$patchCid was not observed for session $sessionId" }
         val latestPatchCid = causes.filterIsInstance<JulesCause.PatchSnapshotObserved>()
@@ -178,7 +180,9 @@ class JulesPatchContinuityStore(
         require(reason.isNotBlank()) { "reason must not be blank" }
         require(reviewedBy.isNotBlank()) { "reviewedBy must not be blank" }
         require(receiptRef.isNotBlank()) { "receiptRef must not be blank" }
-        require(causes.filterIsInstance<JulesCause.PatchSnapshotObserved>().any {
+        require(causes
+            // Bolt: avoid intermediate List allocations from filterIsInstance
+            .any { it is JulesCause.PatchSnapshotObserved &&
             it.patchCid == patchCid && it.causalOrdinal == causalOrdinal
         }) { "snapshot $causalOrdinal/$patchCid was not observed for session $sessionId" }
         val latestPatchCid = causes.filterIsInstance<JulesCause.PatchSnapshotObserved>()
@@ -218,7 +222,9 @@ class JulesPatchContinuityStore(
         require(disposition.isNotBlank()) { "disposition must not be blank" }
         require(reviewedBy.isNotBlank()) { "reviewedBy must not be blank" }
         require(receiptRef.isNotBlank()) { "receiptRef must not be blank" }
-        require(causes.filterIsInstance<JulesCause.AgentReportObserved>().any {
+        require(causes
+            // Bolt: avoid intermediate List allocations from filterIsInstance
+            .any { it is JulesCause.AgentReportObserved &&
             it.reportCid == reportCid && it.causalOrdinal == causalOrdinal
         }) { "agent report $causalOrdinal/$reportCid was not observed for session $sessionId" }
         require(causes.none { it is JulesCause.PatchSnapshotObserved }) {

@@ -60,3 +60,7 @@
 ## 2026-07-22 - CouchDB JavaScript view reduce function memory limits
 **Learning:** CouchDB JavaScript view reduce functions in `ViewServer.kt` (executed via GraalVM in Trikeshed) can cause excessive allocations and `RangeError: Maximum call stack size exceeded` if intermediate arrays are created via `.map` and grouped into `.add(row)`.
 **Action:** Replaced allocating a whole list per key in `.reduceCount()`, `.reduceSum()`, and `.reduceStats()` and iterating over them in `ViewServer.kt`.
+
+## 2024-05-24 - Avoiding intermediate List allocations in `filterIsInstance` followed by `any`, `all`, `none`, `firstOrNull`
+**Learning:** Using `.filterIsInstance<T>()` before short-circuiting operations like `.any { ... }`, `.all { ... }`, `.none { ... }`, or `.firstOrNull { ... }` generates an intermediate `ArrayList` containing all elements of type `T`. This creates unnecessary memory overhead, particularly on large sequences or frequently updated collections (like event buses or AST parsing).
+**Action:** Replace `.filterIsInstance<T>().any { ... }` with `.any { it is T && ... }`, and apply analogous transformations for `all` (with `it !is T || ...`), `none`, and `firstOrNull`. This preserves the short-circuiting behavior while eliminating the intermediate collection allocation.
