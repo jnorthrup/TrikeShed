@@ -148,11 +148,9 @@ object StructuredParserSupport {
         val value = node.reify()
         val children =
             when (node) {
-                // ⚡ Bolt: Removed .toList() before .map to avoid creating intermediate ArrayLists during AST traversal.
                 is YamlMappingNode -> node.entries.map { entry ->
                     describeYamlNode(entry.key.asString(), entry.value, depth + 1, totalLines)
                 }
-                // ⚡ Bolt: Removed .toList() before .mapIndexed to prevent O(N) allocation per YAML sequence element.
                 is YamlSequenceNode -> node.items.mapIndexed { index, child ->
                     describeYamlNode(index.toString(), child, depth + 1, totalLines)
                 }
