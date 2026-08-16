@@ -130,6 +130,12 @@ class FlywheelDriver(
     val events: SharedFlow<FlywheelEvent> get() = _events.asSharedFlow()
     /** Consecutive patch-bearing drain failures per session id; telemetry only. */
     private val drainFailures = java.util.concurrent.ConcurrentHashMap<String, Int>()
+    /** Drain attempts after which a session is parked for explicit review
+     * instead of re-preflighting every cycle. The counter is in-memory: a
+     * daemon restart re-arms parked sessions, and any successful drain clears
+     * it — the cap bounds wasted preflight burn, not the review debt. */
+    private val drainAttemptCap = 25
+    private val parkedDrainSessions = mutableSetOf<String>()
     /** Session-derived work ids are historical fallback identities, not new work
      * once their corresponding card is already closed. Keep their WAL history
      * visible while reporting each suppressed requeue only once per process. */
@@ -175,6 +181,22 @@ class FlywheelDriver(
     private suspend fun drainFail(s: JulesRestClient.SessionInfo, reason: String) {
         val attempts = (drainFailures[s.id] ?: 0) + 1
         drainFailures[s.id] = attempts
+        if (attempts >= drainAttemptCap) {
+            // Park: stop re-preflighting; the durable WAL gate and the log
+            // line below name the operator exits (reviewed selection/reject
+            // via JulesPatchReviewCli, or settle-report/settle-reject).
+            if (parkedDrainSessions.add(s.id)) {
+                println(
+                    "[FLYWHEEL] PARK ${s.id.takeLast(6)} after $attempts drain attempts: " +
+                        "$reason; parked for explicit review (select/reject/settle-report)",
+                )
+                recordReviewBlockOnce(
+                    s,
+                    "drain attempts exhausted ($attempts): $reason; parked for explicit review",
+                )
+            }
+            return
+        }
         recordReviewBlockOnce(
             s,
             "$reason; exact producer artifact retained for explicit review",
@@ -800,6 +822,14 @@ class FlywheelDriver(
         val arms = kotlinx.coroutines.coroutineScope {
             sessions.map { s ->
                 async {
+                    // Parked sessions burned their attempt budget; their exact
+                    // producer artifact and WAL review gate already exist.
+                    // Skip the continuity probe until an operator verb
+                    // (select/reject/settle-*) or a restart re-arms them.
+                    if (s.id in parkedDrainSessions) {
+                        println("[FLYWHEEL] PARKED-SKIP ${s.id.takeLast(6)} continuity probe skipped; awaiting operator review verb")
+                        return@async null
+                    }
                     val automatic = withTimeoutOrNull(60_000L) { automaticPatch(s) }
                     if (automatic is AutomaticPatch.ReviewBlocked) {
                         recordReviewBlockOnce(s, automatic.reason)
