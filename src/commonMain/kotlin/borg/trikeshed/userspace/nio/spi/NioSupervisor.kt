@@ -36,8 +36,9 @@ open class NioSupervisor(
 
     fun register(provider: CoroutineContext.Element) { services.add(provider) }
 
+    // Bolt: Prevent intermediate List allocations and short-circuit by using firstOrNull { it is T } instead of filterIsInstance<T>().firstOrNull()
     inline fun <reified T : CoroutineContext.Element> service(): T? =
-        services.filterIsInstance<T>().firstOrNull()
+        services.firstOrNull { it is T } as? T
 
     /** Expose the launch-time I/O capability report registered by the platform. */
     fun capabilityReport(): NioCapabilityReport? = service()
@@ -46,8 +47,12 @@ open class NioSupervisor(
         if (state == ElementState.CREATED) {
             super.open()
             val providers = platformNioProviders()
-            providers.filterIsInstance<NioCapabilityReport>().firstOrNull()?.let { register(it) }
-            providers.filter { it !is NioCapabilityReport }.forEach { register(it) }
+
+            // Bolt: Short-circuit capability lookup and avoid intermediate List allocations by using firstOrNull
+            providers.firstOrNull { it is NioCapabilityReport }?.let { register(it) }
+            // Bolt: Avoid intermediate List allocation from filter by filtering within forEach
+            providers.forEach { if (it !is NioCapabilityReport) register(it) }
+
             services
                 .filterIsInstance<AsyncContextElement>()
                 .filter { it.state == ElementState.CREATED }
