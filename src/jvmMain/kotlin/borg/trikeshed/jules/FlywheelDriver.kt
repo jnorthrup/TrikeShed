@@ -1286,7 +1286,9 @@ class FlywheelDriver(
             val sessionId = card.snapshot.sessionId
             val entry = immutableBySession.getValue(sessionId)
             val receipt = requireNotNull(entry.receipt)
-            val receiptAlreadyAnswered = card.causes.filterIsInstance<JulesCause.HumanAnswered>().any {
+            val receiptAlreadyAnswered = card.causes
+            // Bolt: avoid intermediate List allocations from filterIsInstance
+            .any { it is JulesCause.HumanAnswered &&
                 it.message.startsWith("FLYWHEEL MERGE RECEIPT\n") &&
                     "tag=${receipt.versionTag}" in it.message &&
                     "patchCid=${receipt.patchCid.value}" in it.message
