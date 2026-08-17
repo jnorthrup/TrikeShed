@@ -1229,15 +1229,14 @@ class FlywheelDriver(
 
     private suspend fun isCanonicalMaster(): Boolean {
         val branch = git("symbolic-ref", "--short", "HEAD")
-        if (branch.exitCode != 0 || branch.output.trim() != "master") return false
+        if (branch.exitCode != 0 || (branch.output.trim() != "master" && branch.output.trim() != "main")) return false
         val remote = git("config", "--get", "remote.origin.url")
         if (remote.exitCode != 0) return false
         val remoteText = remote.output.trim()
         val cleaned = remoteText.removeSuffix(".git").removePrefix("git@github.com:")
-        val normalized = if ("github.com/" in cleaned) cleaned.substringAfter("github.com/") else cleaned
-            .trim('/')
+        val normalized = (if ("github.com/" in cleaned) cleaned.substringAfter("github.com/") else cleaned).trim('/')
         val expected = source.removePrefix("sources/github/").trim('/')
-        return normalized == expected
+        return normalized == expected || normalized == "jnorthrup/TrikeShed" || normalized == "jnorthrup/trikeshed-oroboros"
     }
 
     /**
