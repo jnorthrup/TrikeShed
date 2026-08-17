@@ -4,6 +4,7 @@ import kotlinx.browser.document
 import org.w3c.dom.HTMLElement
 import org.w3c.dom.HTMLDivElement
 import org.w3c.dom.Element
+import borg.trikeshed.security.IngestionScreen
 
 class GalleryRenderer {
     fun render(containerId: String, items: Array<dynamic>) {
@@ -34,18 +35,10 @@ class GalleryRenderer {
         }
     }
 
-    private fun sanitizeHtml(input: String): String {
-        return input.replace("&", "&amp;")
-            .replace("<", "&lt;")
-            .replace(">", "&gt;")
-            .replace("\"", "&quot;")
-            .replace("'", "&#039;")
-    }
-
     private fun renderTextCard(item: dynamic): Element {
         val el = createBaseCard(item)
         val content = item.content as? String ?: ""
-        val safeContent = sanitizeHtml(content)
+        val safeContent = IngestionScreen.sanitizeHtml(content)
         // Minimal markdown parser
         val htmlContent = safeContent
             .replace(Regex("\\*\\*(.*?)\\*\\*"), "<b>$1</b>")
@@ -96,7 +89,7 @@ class GalleryRenderer {
     private fun renderCodeCard(item: dynamic): Element {
         val el = createBaseCard(item)
         val content = item.content as? String ?: ""
-        val safeContent = sanitizeHtml(content)
+        val safeContent = IngestionScreen.sanitizeHtml(content)
         // Naive JS syntax highlighting
         val highlighted = safeContent
             .replace("fun ", "<span style='color: #7aa2f7;'>fun </span>")
