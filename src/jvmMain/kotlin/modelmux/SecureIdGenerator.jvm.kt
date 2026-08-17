@@ -3,7 +3,7 @@ package modelmux
 import java.security.SecureRandom
 
 actual val defaultSecureIdGenerator: SecureIdGenerator = object : SecureIdGenerator {
-    private val random = SecureRandom.getInstanceStrong()
+    private val random = SecureRandom()
 
     override fun generateHexId(prefix: String, byteLength: Int): String {
         val bytes = ByteArray(byteLength)
