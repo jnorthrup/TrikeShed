@@ -280,13 +280,17 @@ open class HtxClientReactorElement(
 
     internal suspend fun channelize(frame: HtxClientFrame) {
         fanoutMutex.withLock {
-            fanoutSubscribers
-                .filterIsInstance<HtxClientFrameSubscriber>()
-                .forEach { it.onHtxClientFrame(frame) }
+            fanoutSubscribers.forEach {
+                if (it is HtxClientFrameSubscriber) {
+                    it.onHtxClientFrame(frame)
+                }
+            }
 
-            fanoutSubscribers
-                .filterIsInstance<FanoutEventSubscriber>()
-                .forEach { it.onFanoutEvent(frame) }
+            fanoutSubscribers.forEach {
+                if (it is FanoutEventSubscriber) {
+                    it.onFanoutEvent(frame)
+                }
+            }
         }
     }
 

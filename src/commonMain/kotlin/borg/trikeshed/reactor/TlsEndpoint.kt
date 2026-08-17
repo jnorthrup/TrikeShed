@@ -248,13 +248,21 @@ class TlsElement(
     }
 
     internal suspend fun channelize(frames: TlsFrames) {
-        fanoutSubscribers
-            .filterIsInstance<TlsChannelSubscriber>()
-            .forEach { it.onTlsFrames(frames) }
-        val subscribers = fanoutSubscribers.filterIsInstance<FanoutEventSubscriber>()
-        if (subscribers.isNotEmpty()) {
+        fanoutSubscribers.forEach {
+            if (it is TlsChannelSubscriber) {
+                it.onTlsFrames(frames)
+            }
+        }
+
+        val hasFanout = fanoutSubscribers.any { it is FanoutEventSubscriber }
+
+        if (hasFanout) {
             frames.toList().forEach { frame ->
-                subscribers.forEach { it.onFanoutEvent(frame) }
+                fanoutSubscribers.forEach { subscriber ->
+                    if (subscriber is FanoutEventSubscriber) {
+                        subscriber.onFanoutEvent(frame)
+                    }
+                }
             }
         }
     }
