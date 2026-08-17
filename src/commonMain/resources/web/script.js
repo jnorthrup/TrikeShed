@@ -547,6 +547,7 @@
       const addBtn = document.createElement('button');
       addBtn.className = 'board-add-card';
       addBtn.textContent = '+ New';
+      addBtn.setAttribute('aria-label', 'Add new card to ' + col.name);
       addBtn.addEventListener('click', () => {
         mutate((s) => { s.board.cards.push({ id: uid(), title: '', column: col.id, meta: '' }); });
         renderBoard();

@@ -21,3 +21,6 @@
 ## 2025-01-22 - Reducing screen reader noise for decorative elements
 **Learning:** Dynamically created DOM elements used purely for visual styling or as decorative markers (such as tree toggles '▾' / '▸', tree icons '▤', bullet markers '•', or slash menu icons) can create significant noise for screen reader users if left unannotated. Screen readers may read out the literal characters (e.g., "black right-pointing small triangle") which interrupts the flow and doesn't add semantic value when the adjacent text already describes the item.
 **Action:** When dynamically generating decorative icon or marker elements via JavaScript (e.g., `document.createElement('span')`), explicitly set `aria-hidden="true"` via `setAttribute('aria-hidden', 'true')` to silence them for assistive technologies, allowing the screen reader to focus on the meaningful sibling content.
+## 2024-08-17 - Context for identical buttons
+**Learning:** Identical buttons like "+ New" across multiple columns in a kanban board lack context for screen reader users. The screen reader would just say "button, + New" multiple times, without indicating which column it belongs to.
+**Action:** When adding identical action buttons to lists or columns, always add an `aria-label` that includes the parent context, e.g. `aria-label="Add new card to ' + col.name"`.
