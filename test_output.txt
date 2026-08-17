@@ -1,0 +1,114 @@
+To honour the JVM settings for this build a single-use Daemon process will be forked. For more on this, please refer to https://docs.gradle.org/9.6.1/userguide/gradle_daemon.html#sec:disabling_the_daemon in the Gradle documentation.
+Daemon will be stopped at the end of the build
+
+> Configure project :
+w: file:///app/build.gradle.kts:147:9: 'fun watchosX64(): KotlinNativeTargetWithSimulatorTests' is deprecated. Target will be removed in a future release. See: https://kotl.in/native-targets-tiers.
+w: file:///app/build.gradle.kts:149:9: 'fun tvosX64(): KotlinNativeTargetWithSimulatorTests' is deprecated. Target will be removed in a future release. See: https://kotl.in/native-targets-tiers.
+w: file:///app/build.gradle.kts:155:25: 'var defFile: File' is deprecated. Deprecated because it is a non-lazy property.
+w: file:///app/build.gradle.kts:160:9: 'fun macosX64(name: String = ..., configure: KotlinNativeTargetWithHostTests.() -> Unit = ...): KotlinNativeTargetWithHostTests' is deprecated. Target will be removed in a future release. See: https://kotl.in/native-targets-tiers.
+w: file:///app/build.gradle.kts:164:25: 'var defFile: File' is deprecated. Deprecated because it is a non-lazy property.
+w: file:///app/build.gradle.kts:235:40: 'val foundation: String' is deprecated. Specify dependency directly.
+w: file:///app/build.gradle.kts:236:40: 'val material3: String' is deprecated. Specify dependency directly.
+w: file:///app/build.gradle.kts:237:40: 'val materialIconsExtended: String' is deprecated. This artifact is pinned to version 1.7.3 and will not receive updates. Either use this version explicitly or migrate to Material Symbols (vector resources). See https://kotlinlang.org/docs/multiplatform/whats-new-compose-180.html.
+w: file:///app/build.gradle.kts:238:40: 'val ui: String' is deprecated. Specify dependency directly.
+w: file:///app/build.gradle.kts:333:37: 'fun provideDelegate(thisRef: Any?, property: KProperty<*>): ExistingDomainObjectDelegate<DefaultCInteropSettings>' is deprecated. Use 'val element = create(name)' instead. See the Gradle 9.6 upgrading guide.
+w: file:///app/build.gradle.kts:333:37: 'fun <T : Any> NamedDomainObjectContainer<T>.creating(configuration: T.() -> Unit): NamedDomainObjectContainerCreatingDelegateProvider<T>' is deprecated. Use 'val element = create(name) { }' instead. See the Gradle 9.6 upgrading guide.
+w: file:///app/build.gradle.kts:333:37: 'fun <T> ExistingDomainObjectDelegate<out T>.getValue(receiver: Any?, property: KProperty<*>): T' is deprecated. Use the named() API instead. See the Gradle 9.6 upgrading guide.
+w: file:///app/build.gradle.kts:334:21: 'var defFile: File' is deprecated. Deprecated because it is a non-lazy property.
+w: [33m[1m⚠️ Native task 'mingwX64Test' is disabled[0m[0m
+Task 'mingwX64Test' for target 'mingw_x64' cannot run on the current host (linux_x64).
+Reason: tests can only run on mingw_x64
+[32m[1mSolution:[0m[0m
+[32m[3mTo suppress this warning, add 'kotlin.native.ignoreDisabledTargets=true' to gradle.properties.[0m[0m
+
+w: [33m[1m⚠️ Unused Kotlin Source Sets[0m[0m
+The following Kotlin source sets were configured but not added to any Kotlin compilation:
+ * linuxMain
+ * linuxTest
+ * macosMain
+ * macosTest
+ * posixMain
+ * posixTest
+[32m[1mSolution:[0m[0m
+[32m[3mYou can add a source set to a target's compilation by connecting it with the compilation's default source set using 'dependsOn'.[0m[0m
+[36mSee [0m[34mhttps://kotl.in/connecting-source-sets[0m[36m[0m
+
+
+> Task :checkJvmMainComposeLibrariesCompatibility
+> Task :kmpPartiallyResolvedDependenciesChecker SKIPPED
+> Task :checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :convertXmlValueResourcesForCommonMain NO-SOURCE
+> Task :copyNonXmlValueResourcesForCommonMain NO-SOURCE
+> Task :prepareComposeResourcesTaskForCommonMain NO-SOURCE
+> Task :generateResourceAccessorsForCommonMain SKIPPED
+> Task :convertXmlValueResourcesForJvmMain NO-SOURCE
+> Task :copyNonXmlValueResourcesForJvmMain NO-SOURCE
+> Task :prepareComposeResourcesTaskForJvmMain NO-SOURCE
+> Task :generateResourceAccessorsForJvmMain SKIPPED
+> Task :convertXmlValueResourcesForNonPosixMain NO-SOURCE
+> Task :copyNonXmlValueResourcesForNonPosixMain NO-SOURCE
+> Task :prepareComposeResourcesTaskForNonPosixMain NO-SOURCE
+> Task :generateResourceAccessorsForNonPosixMain SKIPPED
+> Task :generateActualResourceCollectorsForJvmMain SKIPPED
+> Task :generateComposeResClass SKIPPED
+> Task :generateExpectResourceCollectorsForCommonMain SKIPPED
+> Task :generateForgeAssets
+> Task :assembleJvmMainResources UP-TO-DATE
+> Task :jvmProcessResources UP-TO-DATE
+> Task :compileKotlinJvm UP-TO-DATE
+> Task :compileJvmMainJava UP-TO-DATE
+> Task :checkJvmTestComposeLibrariesCompatibility
+> Task :convertXmlValueResourcesForCommonTest NO-SOURCE
+> Task :copyNonXmlValueResourcesForCommonTest NO-SOURCE
+> Task :prepareComposeResourcesTaskForCommonTest NO-SOURCE
+> Task :generateResourceAccessorsForCommonTest SKIPPED
+> Task :convertXmlValueResourcesForJvmTest NO-SOURCE
+> Task :copyNonXmlValueResourcesForJvmTest NO-SOURCE
+> Task :prepareComposeResourcesTaskForJvmTest NO-SOURCE
+> Task :generateResourceAccessorsForJvmTest SKIPPED
+> Task :processJvmMainResources SKIPPED
+> Task :jvmMainClasses UP-TO-DATE
+> Task :jvmJar UP-TO-DATE
+> Task :assembleJvmTestResources UP-TO-DATE
+> Task :jvmTestProcessResources UP-TO-DATE
+> Task :processJvmTestResources SKIPPED
+
+> Task :compileTestKotlinJvm
+e: file:///app/src/jvmTest/kotlin/borg/trikeshed/daemon/OroborosDaemonPreflightTest.kt:54:17 No parameter with name 'apiKey' found.
+e: file:///app/src/jvmTest/kotlin/borg/trikeshed/daemon/OroborosDaemonPreflightTest.kt:58:17 No value passed for parameter 'keyMux'.
+e: file:///app/src/jvmTest/kotlin/borg/trikeshed/jules/FlywheelClaimPatchTest.kt:39:13 No parameter with name 'apiKey' found.
+e: file:///app/src/jvmTest/kotlin/borg/trikeshed/jules/FlywheelClaimPatchTest.kt:41:13 No value passed for parameter 'keyMux'.
+e: file:///app/src/jvmTest/kotlin/borg/trikeshed/jules/FlywheelDriverDrainSerialTest.kt:151:17 No parameter with name 'apiKey' found.
+e: file:///app/src/jvmTest/kotlin/borg/trikeshed/jules/FlywheelDriverDrainSerialTest.kt:154:17 No value passed for parameter 'keyMux'.
+e: file:///app/src/jvmTest/kotlin/borg/trikeshed/jules/FlywheelDriverDrainSerialTest.kt:157:48 Argument type mismatch: actual type is 'String', but 'KeyMux' was expected.
+e: file:///app/src/jvmTest/kotlin/borg/trikeshed/jules/FlywheelEndToEndDrainTest.kt:51:13 No parameter with name 'apiKey' found.
+e: file:///app/src/jvmTest/kotlin/borg/trikeshed/jules/FlywheelEndToEndDrainTest.kt:53:13 No value passed for parameter 'keyMux'.
+e: file:///app/src/jvmTest/kotlin/borg/trikeshed/jules/JulesRestClientTest.kt:27:38 Argument type mismatch: actual type is 'String', but 'KeyMux' was expected.
+e: file:///app/src/jvmTest/kotlin/borg/trikeshed/jules/JulesRestClientTest.kt:53:38 Argument type mismatch: actual type is 'String', but 'KeyMux' was expected.
+e: file:///app/src/jvmTest/kotlin/borg/trikeshed/jules/JulesRestClientTest.kt:94:38 Argument type mismatch: actual type is 'String', but 'KeyMux' was expected.
+
+> Task :compileTestKotlinJvm FAILED
+
+[Incubating] Problems report is available at: file:///app/build/reports/problems/problems-report.html
+
+FAILURE: Build failed with an exception.
+
+* What went wrong:
+Execution failed for task ':compileTestKotlinJvm' (registered in build file 'build.gradle.kts').
+> A failure occurred while executing org.jetbrains.kotlin.compilerRunner.btapi.BuildToolsApiCompilationWork
+   > Compilation error. See log for more details
+
+* Try:
+> Run with --stacktrace option to get the stack trace.
+> Run with --info or --debug option to get more log output.
+> Run with --scan to get full insights from a Build Scan (powered by Develocity).
+> Get more help at https://help.gradle.org.
+
+Deprecated Gradle features were used in this build, making it incompatible with Gradle 10.
+
+You can use '--warning-mode all' to show the individual deprecation warnings and determine if they come from your own scripts or plugins.
+
+For more on this, please refer to https://docs.gradle.org/9.6.1/userguide/command_line_interface.html#sec:command_line_warnings in the Gradle documentation.
+
+BUILD FAILED in 57s
+11 actionable tasks: 4 executed, 7 up-to-date
