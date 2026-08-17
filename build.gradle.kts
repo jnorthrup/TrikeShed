@@ -19,8 +19,8 @@ composeCompiler {
     targetKotlinPlatforms.set(setOf(KotlinPlatformType.jvm))
 }
 
-group = "org.bereft"
-version = "1.0"
+group = "borg.trikeshed"
+version = "0.1.0-SNAPSHOT"
 val enableNativeSharedLib = providers.gradleProperty("native.sharedLib").orNull == "true"
 val enableBrowserTests = providers.gradleProperty("browserTests").orNull == "true"
 val focusedTransportSlice = providers.gradleProperty("focusedTransportSlice").orNull == "true"

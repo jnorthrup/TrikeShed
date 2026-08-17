@@ -1,7 +1,7 @@
 package borg.trikeshed.cursor
 
-import borg.trikeshed.mutable.EvictionListener
-import borg.trikeshed.mutable.RingSeries
+import borg.trikeshed.collections.EvictionListener
+import borg.trikeshed.collections.RingSeries
 
 import java.nio.ByteBuffer
 import java.nio.ByteOrder

@@ -1,6 +1,6 @@
 @file:Suppress("UNCHECKED_CAST")
 
-package borg.trikeshed.mutable
+package borg.trikeshed.collections
 
 import borg.trikeshed.lib.Series
 import borg.trikeshed.lib.Twin
@@ -14,7 +14,7 @@ import borg.trikeshed.lib.j
  * MutableSeries — the canonical mutable series type.
  * A MutableSeries IS a Series<T> = Join<Int, (Int) -> T>.
  */
-interface MutableSeries<T> : Series<T> {
+interface MutableSeries<T> : Series<T>, Snapshotable<T> {
 
 
     fun append(item: T): Unit
@@ -26,7 +26,7 @@ interface MutableSeries<T> : Series<T> {
 
     // ── COW / freeze ─────────────────────────────────────────────
     fun freeze(): Series<T>
-    fun cowSnapshot(): MutableSeries<T>
+    override fun snapshot(): MutableSeries<T>
     fun subscribe(observer: (Twin<Series<T>>) -> Unit): () -> Unit
     fun version(): Long
     val isFrozen: Boolean
@@ -137,7 +137,7 @@ class COWArrayBackend<T>(
 
     // ── COWOnly ───────────────────────────────────────────────────
 
-    override fun cowSnapshot(): MutableSeries<T> = COWArrayBackend(arr.copyOf(), false, ver, observer)
+    override fun snapshot(): MutableSeries<T> = COWArrayBackend(arr.copyOf(), false, ver, observer)
 
     override fun subscribe(observer: (Twin<Series<T>>) -> Unit): () -> Unit {
         val prior = this.observer

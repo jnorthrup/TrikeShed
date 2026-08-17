@@ -1,7 +1,7 @@
 package borg.trikeshed.reduction
 
 import borg.trikeshed.cursor.Cursor
-import borg.trikeshed.mutable.RingSeries
+import borg.trikeshed.collections.RingSeries
 import borg.trikeshed.lib.*
 
 /**

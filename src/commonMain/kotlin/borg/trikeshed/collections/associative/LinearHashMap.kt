@@ -213,7 +213,7 @@ class LinkedLinearHashMap<K : Any, V>(initialCapacity: Int = 16)
             }
         }
         live.sortBy { it.first }
-        return live.map { it.second }
+        return live.map { it.second } // stdlib-boundary:
     }
 
     /** Reverse lookup by value (for entriesInOrder) — override in subclass if needed. */

@@ -1,6 +1,6 @@
 package borg.trikeshed.couch
 
-import borg.trikeshed.mutable.mutableSeriesOf
+import borg.trikeshed.collections.mutableSeriesOf
 import borg.trikeshed.viewserver.ReducerIdentity
 import kotlin.test.Test
 import kotlin.test.assertEquals

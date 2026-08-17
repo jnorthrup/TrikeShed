@@ -1,4 +1,4 @@
-package borg.trikeshed.mutable
+package borg.trikeshed.collections
 
 import borg.trikeshed.lib.Series
 import borg.trikeshed.lib.Twin
@@ -121,7 +121,7 @@ class RingSeries<T>(
         val flat = Array<Any?>(count) { i -> buf[(head + i) and mask] }
         return FrozenArray(flat)
     }
-    override fun cowSnapshot(): MutableSeries<T> {
+    override fun snapshot(): MutableSeries<T> {
         val snap = RingSeries<T>(mask + 1, evict)
         for (i in 0 until count) snap.append(buf[(head + i) and mask] as T)
         return snap

@@ -1,11 +1,11 @@
-package borg.trikeshed.mutable
+package borg.trikeshed.collections
 
 import borg.trikeshed.cursor.Evidence
 
 /**
  * Represents a discrete mutation on a MutableSeries.
- * These actions are captured by a PointcutMutableSeries and dispatched
- * to an event sink (like a ReduxMutableSeries) to provide an audit log/firehose.
+ * These actions are captured by a JournalSeries and dispatched
+ * to an event sink (like a JournalSeries) to provide an audit log/firehose.
  */
 sealed class MutationAction<T> {
     abstract val evidence: Evidence? // Optional confidence/errorMargin metadata

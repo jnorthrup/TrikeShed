@@ -1,55 +1,59 @@
 @file:Suppress("UNCHECKED_CAST")
 
-package borg.trikeshed.mutable
+package borg.trikeshed.collections
 
 import borg.trikeshed.lib.Series
 import borg.trikeshed.lib.Twin
 import borg.trikeshed.lib.get
 import borg.trikeshed.lib.j
+import kotlinx.datetime.Clock
 
 /**
  * A MutableSeries that records every mutation in a journal, enabling rollback.
  *
- * Each mutation produces a [Delta] entry in the journal. [commit] clears the
+ * Each mutation produces a [JournalEntry] entry in the journal. [commit] clears the
  * journal (irreversible). [rollback] replays the journal in reverse to undo
  * all uncommitted mutations.
  */
 
-/** One recorded mutation. */
-sealed class Delta<out T> {
-    data class Set<T>(val index: Int, val old: T, val new: T) : Delta<T>()
-    data class Add<T>(val index: Int, val item: T) : Delta<T>()
-    data class Remove<T>(val index: Int, val old: T) : Delta<T>()
-}
+data class JournalEntry<T>(
+    val op: String,
+    val index: Int,
+    val old: T?,
+    val new: T?,
+    val timestamp: Long
+)
 
 class JournalSeries<T>(
     private val backing: COWArrayBackend<T> = COWArrayBackend(),
 ) : MutableSeries<T> {
 
-    private val journal: RecursiveMutableSeries<Delta<T>> = RecursiveMutableSeries.create()
+    private val _journal: RecursiveMutableSeries<JournalEntry<T>> = RecursiveMutableSeries.create()
+
+    fun journal(): Series<JournalEntry<T>> = _journal
 
     override val a: Int get() = backing.a
     override val b: (Int) -> T get() = backing.b
 
     override fun set(index: Int, item: T) {
         val old = backing[index]
-        journal.append(Delta.Set(index, old, item))
+        _journal.append(JournalEntry("SET", index, old, item, Clock.System.now().toEpochMilliseconds()))
         backing.set(index, item)
     }
 
     override fun append(item: T) {
-        journal.append(Delta.Add(backing.a, item))
+        _journal.append(JournalEntry("ADD", backing.a, null, item, Clock.System.now().toEpochMilliseconds()))
         backing.append(item)
     }
 
     override fun insert(index: Int, item: T) {
-        journal.append(Delta.Add(index, item))
+        _journal.append(JournalEntry("ADD", index, null, item, Clock.System.now().toEpochMilliseconds()))
         backing.insert(index, item)
     }
 
     override fun removeAt(index: Int): T {
         val old = backing.removeAt(index)
-        journal.append(Delta.Remove(index, old))
+        _journal.append(JournalEntry("REMOVE", index, old, null, Clock.System.now().toEpochMilliseconds()))
         return old
     }
 
@@ -60,16 +64,17 @@ class JournalSeries<T>(
     }
 
     override fun clear() {
-        journal.clear()
+        _journal.clear()
+        val ts = Clock.System.now().toEpochMilliseconds()
         for (i in backing.a - 1 downTo 0) {
-            journal.append(Delta.Remove(i, backing[i]))
+            _journal.append(JournalEntry("REMOVE", i, backing[i], null, ts))
         }
         backing.clear()
     }
 
     override fun freeze(): Series<T> = backing.freeze()
-    override fun cowSnapshot(): MutableSeries<T> {
-        val snap = JournalSeries(backing.cowSnapshot() as COWArrayBackend<T>); return snap
+    override fun snapshot(): MutableSeries<T> {
+        val snap = JournalSeries(backing.snapshot() as COWArrayBackend<T>); return snap
     }
     override fun subscribe(observer: (Twin<Series<T>>) -> Unit): () -> Unit = {}
     override fun version(): Long = 0L
@@ -89,19 +94,20 @@ class JournalSeries<T>(
     override fun plus(item: T): MutableSeries<T> { append(item); return this }
     override fun minus(item: T): MutableSeries<T> { remove(item); return this }
 
-    fun commit() { journal.clear() }
+    fun commit() { _journal.clear() }
 
     fun rollback() {
-        for (j in journal.a - 1 downTo 0) {
-            when (val d = journal[j]) {
-                is Delta.Set -> backing.set(d.index, d.old)
-                is Delta.Add -> backing.removeAt(d.index)
-                is Delta.Remove -> backing.insert(d.index, d.old)
+        for (j in _journal.a - 1 downTo 0) {
+            val d = _journal[j]
+            when (d.op) {
+                "SET" -> backing.set(d.index, d.old as T)
+                "ADD" -> backing.removeAt(d.index)
+                "REMOVE" -> backing.insert(d.index, d.old as T)
             }
         }
-        journal.clear()
+        _journal.clear()
     }
 
-    val pendingCount: Int get() = journal.a
-    val hasPending: Boolean get() = journal.a > 0
+    val pendingCount: Int get() = _journal.a
+    val hasPending: Boolean get() = _journal.a > 0
 }

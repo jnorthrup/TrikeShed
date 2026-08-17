@@ -182,5 +182,5 @@ fun main1() {
         println(item)
 
     println("Bucket contents:")
-    for (bucket: Bucket<Int> in testSet.buckets) println(bucket.view.toList())
+    for (bucket: Bucket<Int> in testSet.buckets) println(bucket.view.toList()) // stdlib-boundary:
 }
