@@ -960,6 +960,16 @@ class FlywheelDriver(
                 }
             }.awaitAll().filterNotNull().toMutableList()
         }
+
+        // Counter-Threat Layer 5: sock-puppet consensus detection
+        val collusionDetector = borg.trikeshed.userspace.containment.CrossInstanceCollusionDetector()
+        val detectorInput = arms.map { Triple(it.session, it.branch, it.patch) }
+        val collusionReport = collusionDetector.detect(detectorInput)
+        if (collusionReport.flaggedSessions.isNotEmpty()) {
+            println("[FLYWHEEL] COLLUSION DETECTED: innocence=${collusionReport.innocenceScore}, evidence=${collusionReport.evidence}")
+            arms.removeAll { it.session.id in collusionReport.flaggedSessions }
+        }
+
         // PER-ARM DRAIN — do NOT wait for the whole completion set to CAS.
         // No-patch and regressed sessions remain review-blocked; CAS-ready
         // sessions still drain independently. Drain EVERY arm that HAS an
