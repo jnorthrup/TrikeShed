@@ -312,7 +312,7 @@ class JvmTlsCodecBackend : TlsCodecBackend, KeyedService {
         // In-memory KeyStore; use a randomly generated password if none provided
         val password = (config.privateKeyPassword ?: run {
             val bytes = ByteArray(16)
-            SecureRandom.getInstanceStrong().nextBytes(bytes)
+            SecureRandom().nextBytes(bytes)
             Base64.getEncoder().encodeToString(bytes)
         }).toCharArray()
         val keyStore = KeyStore.getInstance(KeyStore.getDefaultType())
