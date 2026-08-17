@@ -71,6 +71,9 @@ class JulesConductor(
         val headSha = headShaProvider()
         for (s in sessions) {
             var existing = cards[s.id]
+            // Skip sessions already marked archived — the API may still list
+            // them but activityTimeline will 404. Don't re-process.
+            if (existing?.causes?.any { it is JulesCause.SessionArchived } == true) continue
             val immutableSettlement = hasImmutableSettlement(s.id, existing)
             // A settlement closes one observed artifact, not the producer's
             // future timeline. Continue polling settled sessions so a late API
