@@ -81,6 +81,21 @@ class PijulChannel(
     }
 
     /**
+     * Seed the channel with initial base content for a file from repository HEAD.
+     */
+    fun seedFile(path: String, baseContent: String) {
+        val crdt = files.getOrPut(path) { PijulCrdt() }
+        val lines = baseContent.lineSequence().toList()
+        val seedChanges = lines.mapIndexed { idx, line ->
+            Change.Insert(idx, line + "\n")
+        }
+        if (seedChanges.isNotEmpty()) {
+            val seedId = Blake3Hash.hash("seed:$path".encodeToByteArray())
+            crdt.apply(Patch(seedId, seedChanges, emptyList()))
+        }
+    }
+
+    /**
      * Render a file's current content from the CRDT graph.
      * This is pure — no filesystem touch.
      */

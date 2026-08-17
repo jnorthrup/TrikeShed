@@ -810,8 +810,101 @@ class FlywheelDriver(
             base.startsWith("test_script.")
     }
 
+    private data class Arm(
+        val session: JulesRestClient.SessionInfo,
+        val patchCid: ContentId,
+        val patch: String,
+        val branch: String?,
+    )
+
     /**
-     * Settle exact Jules activity bytes without trusting a branch or PR.
+     * Attempts a commutative Pijul parallel merge across all candidate arms.
+     * Materializes all merged files to an isolated disposable worktree and
+     * runs the full build gate. On success, returns the list of landed arms
+     * and the resulting commit SHA.
+     */
+    private suspend fun preflightPijulBatch(
+        arms: List<Arm>,
+        baseSha: String,
+    ): Pair<List<Arm>, String>? {
+        if (arms.size <= 1) return null
+        val channel = borg.trikeshed.pijul.PijulChannel()
+        val fileOps = JvmFileOperations()
+
+        // 1. Collect all valid touched paths
+        val validArms = arms.filter { arm ->
+            val touched = parsePatchFiles(arm.patch).filterNot(::isUnsafeAutomaticPatchPath)
+            touched.isNotEmpty()
+        }
+        if (validArms.size <= 1) return null
+
+        val allTouched = validArms.flatMap { parsePatchFiles(it.patch).filterNot(::isUnsafeAutomaticPatchPath) }.distinct()
+
+        // 2. Seed channel with baseline from repo HEAD
+        withContext(Dispatchers.IO) {
+            for (path in allTouched) {
+                val f = File(repoDir, path)
+                if (f.isFile) {
+                    channel.seedFile(path, f.readText())
+                }
+            }
+        }
+
+        // 3. Apply all arms in parallel to the Pijul CRDT
+        for (arm in validArms) {
+            val changes = borg.trikeshed.pijul.PijulDiffParser.parse(arm.patch)
+            if (changes.isNotEmpty()) {
+                val workId = "session:${arm.session.id.replace(Regex("[^A-Za-z0-9._-]"), "-")}"
+                channel.applyPatch(workId, arm.session.id, arm.patchCid, arm.session.title, changes)
+            }
+        }
+
+        // 4. Materialize to isolated temporary worktree and run build gate
+        val tempRoot = withContext(Dispatchers.IO) {
+            java.nio.file.Files.createTempDirectory("oroboros-pijul-batch-").toFile()
+        }
+        val worktree = File(tempRoot, "worktree")
+        try {
+            val added = git("worktree", "add", "--detach", worktree.absolutePath, baseSha)
+            if (added.exitCode != 0) return null
+
+            channel.materialize(worktree.absolutePath, fileOps)
+
+            // Stage materialized changes
+            gitIn(worktree, "add", "-A", "--", *allTouched.toTypedArray())
+            val stagedDiff = gitIn(worktree, "diff", "--cached", "--unified=0")
+            if (stagedDiff.output.lineSequence().any { it.startsWith("+<<<<<<< ") || it == "+=======" || it.startsWith("+>>>>>>> ") }) {
+                return null
+            }
+
+            val build = shellIn(worktree, 300_000L, "./gradlew", "jvmMainClasses", "--console=plain")
+            if (build.exitCode != 0) return null
+
+            val titleList = validArms.joinToString(",") { it.session.id.takeLast(6) }
+            val subject = "flywheel: pijul parallel merge ${validArms.size} sessions — $titleList"
+            val commit = gitIn(worktree, "commit", "--no-verify", "-m", subject)
+            if (commit.exitCode != 0) return null
+
+            val revision = gitIn(worktree, "rev-parse", "HEAD")
+            if (revision.exitCode == 0 && revision.output.isNotBlank()) {
+                return Pair(validArms, revision.output.trim())
+            }
+            return null
+        } catch (_: Throwable) {
+            return null
+        } finally {
+            if (worktree.exists()) {
+                git("worktree", "remove", "--force", worktree.absolutePath)
+            }
+            git("worktree", "prune")
+            withContext(Dispatchers.IO) {
+                if (tempRoot.exists()) tempRoot.deleteRecursively()
+            }
+        }
+    }
+
+    /**
+     * Drain exact CAS-pinned artifacts produced by completed Jules sessions.
      * Each artifact is CAS-pinned, applied and built in a disposable detached
      * worktree, then integrated only by a clean fast-forward. A failed preflight
      * leaves master untouched and records a durable review gate.
@@ -827,8 +920,6 @@ class FlywheelDriver(
             .takeIf { it.exitCode == 0 }?.output?.lineSequence()?.map { it.trim() }?.toList() ?: emptyList()
 
         // CAS-FIRST: content-address every exact delta before any preflight.
-        data class Arm(val session: JulesRestClient.SessionInfo, val patchCid: ContentId, val patch: String, val branch: String?)
-
         val arms = kotlinx.coroutines.coroutineScope {
             sessions.map { s ->
                 async {
@@ -897,21 +988,36 @@ class FlywheelDriver(
             return DrainBatch(conflicts = conflictFiles())
         }
 
-        // 2. Validate exact CAS bytes in a disposable worktree, then move
-        // master only by fast-forward. A discovered branch or PR is identity
-        // metadata and never supplies mutation bytes.
+        // 2. Validate exact CAS bytes: try parallel Pijul merge first for multi-arm batches,
+        // falling back to isolated per-arm preflight if parallel merge encounters conflicts.
         val landed = mutableListOf<Arm>()
-        for (arm in arms) {
+        val baseSha = headSha()
+
+        val pijulBatchResult = if (arms.size > 1) preflightPijulBatch(arms, baseSha) else null
+        if (pijulBatchResult != null) {
+            val (batchArms, commitSha) = pijulBatchResult
+            val headUnchanged = headSha() == baseSha && isWorkingTreeClean() && conflictFiles().isEmpty()
+            if (headUnchanged) {
+                val integrate = git("merge", "--ff-only", commitSha)
+                if (integrate.exitCode == 0) {
+                    println("[FLYWHEEL] PIJUL-LANDED ${batchArms.size} sessions in single parallel merge commit: ${commitSha.take(12)}")
+                    landed.addAll(batchArms)
+                }
+            }
+        }
+
+        val remainingArms = arms.filterNot { it in landed }
+        for (arm in remainingArms) {
             val s = arm.session
-            val baseSha = headSha()
-            when (val preflight = preflightExactPatch(s, arm.patch, baseSha)) {
+            val curBase = headSha()
+            when (val preflight = preflightExactPatch(s, arm.patch, curBase)) {
                 PatchPreflight.AlreadyPresent -> {
                     println("[FLYWHEEL] ALREADY ${s.id.takeLast(6)} exact API delta is present and build-green")
                     landed += arm
                 }
                 is PatchPreflight.ReviewBlocked -> drainFail(s, preflight.reason)
                 is PatchPreflight.Ready -> {
-                    val headUnchanged = headSha() == baseSha && isWorkingTreeClean() && conflictFiles().isEmpty()
+                    val headUnchanged = headSha() == curBase && isWorkingTreeClean() && conflictFiles().isEmpty()
                     if (!headUnchanged) {
                         drainFail(s, "master changed during isolated preflight")
                         continue
@@ -1236,7 +1342,7 @@ class FlywheelDriver(
         val cleaned = remoteText.removeSuffix(".git").removePrefix("git@github.com:")
         val normalized = (if ("github.com/" in cleaned) cleaned.substringAfter("github.com/") else cleaned).trim('/')
         val expected = source.removePrefix("sources/github/").trim('/')
-        return normalized == expected || normalized == "jnorthrup/TrikeShed" || normalized == "jnorthrup/trikeshed-oroboros"
+        return normalized == expected || normalized == "jnorthrup/trikeshed-oroboros" || normalized == "jnorthrup/TrikeShed"
     }
 
     /**
