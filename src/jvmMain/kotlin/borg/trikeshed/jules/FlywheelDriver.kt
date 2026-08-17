@@ -799,16 +799,8 @@ class FlywheelDriver(
         }
     }
 
-    private fun isUnsafeAutomaticPatchPath(path: String): Boolean {
-        val lower = path.replace('\\', '/').lowercase()
-        val parts = lower.split('/')
-        val base = parts.lastOrNull().orEmpty()
-        return path.isBlank() || path.startsWith('/') || lower.startsWith(".jules/") ||
-            parts.any { it == ".." || it == ".git" || it == ".gradle" } ||
-            parts.firstOrNull() == "build" ||
-            base in setOf("test_script.kt", "patch.diff", "plan_script.sh", "multiindexcontainer-patch.txt") ||
-            base.startsWith("test_script.")
-    }
+    private fun isUnsafeAutomaticPatchPath(path: String): Boolean =
+        borg.trikeshed.jules.isScratchPatchPath(path)
 
     private data class Arm(
         val session: JulesRestClient.SessionInfo,

@@ -42,7 +42,7 @@ class JulesPatchContinuityStore(
             }
             if (alreadyObserved) continue
 
-            val touchedFiles = julesPatchFiles(patch.patch)
+            val touchedFiles = julesPatchFiles(patch.patch).filterNot(::isScratchPatchPath)
             val retainedBefore = causalFacts.asSequence()
                 .filter { it.reviewCandidate && it.causalOrdinal < patch.causalOrdinal }
                 .maxWithOrNull(compareBy({ it.causalOrdinal }, { it.activitySeq }, { it.artifactSeq }))

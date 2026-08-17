@@ -213,7 +213,31 @@ private val reportCausalOrder = compareBy<JulesCause.AgentReportObserved>(
 )
 
 /**
- * Parse every repository path named by a unified diff without materialization
+ * Returns true for scratch/test/plan paths that Jules subagents include in
+ * patches but that must not participate in the file-set monotonicity gate.
+ * An earlier snapshot containing these files should not cause a later
+ * snapshot that omits them to be review-blocked.
+ */
+fun isScratchPatchPath(path: String): Boolean {
+    val lower = path.replace('\\', '/').lowercase()
+    val parts = lower.split('/')
+    val base = parts.lastOrNull().orEmpty()
+    return path.isBlank() || path.startsWith('/') ||
+        lower.startsWith(".jules/") ||
+        parts.any { it == ".." || it == ".git" || it == ".gradle" } ||
+        parts.firstOrNull() == "build" ||
+        base in setOf(
+            "test_script.kt", "patch.diff", "plan_script.sh",
+            "multiindexcontainer-patch.txt",
+        ) ||
+        base.startsWith("test_script.") ||
+        base.startsWith("test_") ||
+        base.startsWith("plan") && base.endsWith(".md") ||
+        base.startsWith("fix_") && base.endsWith(".sh") ||
+        base == "patch.diff"
+}
+
+/** Parse every repository path named by a unified diff without materialization
  * state.  Both sides are retained so deletions and renames cannot masquerade
  * as a file-set regression merely because `+++` is `/dev/null` or a rename has
  * no hunk body.
