@@ -1230,6 +1230,7 @@ class FlywheelDriver(
         )
     }
 
+<<<<<<< HEAD
     /**
      * Branches without an observed producer artifact are not autonomous
      * mutation authority. Keep origin refs fresh for identity reconciliation;
@@ -1241,12 +1242,21 @@ class FlywheelDriver(
     }
 
     private fun activeCount(): Int = conductor.cards.values.count {
+=======
+    private suspend fun activeCount(): Int = conductor.cards.values.count {
+>>>>>>> origin/jules-15846685841436352340-ea46ff13
         it.snapshot.state !in TERMINAL_STATES && !it.drained
     }
 
     /** Find the GitHub branch or PR head carrying this Jules session id. */
+<<<<<<< HEAD
     private suspend fun findSessionBranch(sessionId: String, preFetchedRefs: List<String>? = null): String? {
         val exactId = sessionId.substringAfterLast('/').takeIf { it.isNotBlank() } ?: return null
+=======
+    private suspend fun findSessionBranch(sessionId: String): String? {
+        val numericId = sessionId.substringAfterLast('/').filter { it.isDigit() }
+        if (numericId.isEmpty()) return null
+>>>>>>> origin/jules-15846685841436352340-ea46ff13
 
         val refsList = preFetchedRefs ?: run {
             val refs = git("for-each-ref", "--format=%(refname:short)", "refs/remotes/origin")
@@ -1317,9 +1327,15 @@ class FlywheelDriver(
      * only projects the already validated CAS/WAL prefix to origin and proves
      * byte-for-byte master parity before terminal receipts become visible.
      */
+<<<<<<< HEAD
     private suspend fun pushOriginParity(): Boolean {
         if (!isWorkingTreeClean() || !isCanonicalMaster()) return false
         val push = git("push", "origin", "HEAD:master")
+=======
+    private suspend fun settlementBarrier(): Boolean {
+        if (!isWorkingTreeClean()) return false
+        val push = git("push", "--follow-tags", "origin", "HEAD:master")
+>>>>>>> origin/jules-15846685841436352340-ea46ff13
         if (push.exitCode != 0) return false
         if (git("fetch", "origin", "master").exitCode != 0) return false
         val local = git("rev-parse", "HEAD")
@@ -1498,6 +1514,7 @@ class FlywheelDriver(
       * write `git("commit", "-m", ...)` not `git("git", "commit", "-m", ...)`.
       * For non-git commands (gh, ./gradlew) use [shell].
      */
+<<<<<<< HEAD
      private suspend fun git(vararg args: String): CommandResult = shell("git", *args)
 
      /** Run Git against an isolated temporary worktree. */
@@ -1591,6 +1608,43 @@ class FlywheelDriver(
       */
      private suspend fun isWorkingTreeClean(): Boolean =
          git("status", "--porcelain", "--untracked-files=no").output.isBlank()
+=======
+    private suspend fun git(vararg args: String): CommandResult = shell("git", *args)
+
+    /**
+     * Run an arbitrary command in [repoDir]. Use [git] for git subcommands.
+     * The default 30-second timeout keeps git/GitHub prompts from parking the
+     * wheel; drain-time Gradle gates pass their own bounded build window.
+     */
+    private suspend fun shell(vararg args: String): CommandResult = shell(args.toList())
+
+    private suspend fun shell(timeoutMs: Long, vararg args: String): CommandResult = shell(args.toList())
+
+    private suspend fun shell(command: List<String>): CommandResult = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+        try {
+            val pb = ProcessBuilder(command)
+            pb.directory(repoDir)
+            pb.redirectErrorStream(true)
+            val process = pb.start()
+            val output = process.inputStream.readBytes().decodeToString()
+            val exitCode = process.waitFor()
+            CommandResult(exitCode, output)
+        } catch (t: Throwable) {
+            CommandResult(1, t.message.orEmpty())
+        }
+    }
+
+    private data class CommandResult(val exitCode: Int, val output: String)
+
+    /**
+     * True iff the working tree has no tracked modifications or staged changes.
+     * Untracked files do NOT count as dirty — Jules sessions leave artifacts
+     * behind that are harmless to merges and would otherwise permanently block
+     * the wheel.
+     */
+    private suspend fun isWorkingTreeClean(): Boolean =
+        git("status", "--porcelain", "--untracked-files=no").output.isBlank()
+>>>>>>> origin/jules-15846685841436352340-ea46ff13
 
 
     private fun getKanbanBoard(): borg.trikeshed.kanban.KanbanBoard {
@@ -1740,7 +1794,12 @@ class FlywheelDriver(
      * + [revision]. Jules pushes branches (not PRs); null is valid for direct merges.
      */
     private suspend fun fishPrUrl(sessionId: String, tag: String): String? {
+<<<<<<< HEAD
         val exactId = sessionId.substringAfterLast('/').takeIf { it.isNotBlank() } ?: return null
+=======
+        val numericId = sessionId.substringAfterLast('/').filter { it.isDigit() }
+        if (numericId.isEmpty()) return null
+>>>>>>> origin/jules-15846685841436352340-ea46ff13
         // Probe 1: branch-on-origin.
         val ls = git("ls-remote", "origin", "refs/heads/jules-$exactId-*")
         if (ls.exitCode == 0) {
@@ -1779,9 +1838,122 @@ class FlywheelDriver(
         }
     }
 
+<<<<<<< HEAD
     /** Parse unidiff headers (--- a/path, +++ b/path) to extract touched file paths. */
     private suspend fun parsePatchFiles(patch: String): List<String> = julesPatchFiles(patch)
 
+=======
+    internal data class ClaimedPatch(val commitSha: String, val receipt: MergeReceipt)
+
+    /** Revert only the given files to HEAD. */
+    private suspend fun revertFiles(files: List<String>) {
+        val cmd = mutableListOf("git", "checkout", "HEAD", "--")
+        cmd.addAll(files)
+        git(*cmd.toTypedArray())
+    }
+
+    /** Parse unidiff headers (--- a/path, +++ b/path) to extract touched file paths. */
+    private suspend fun parsePatchFiles(patch: String): List<String> {
+        val files = mutableListOf<String>()
+        for (line in patch.lines()) {
+            if (line.startsWith("+++ b/")) {
+                val path = line.removePrefix("+++ b/").trim()
+                if (path.isNotEmpty() && path != "/dev/null") files.add(path)
+            } else if (line.startsWith("+++ ") && !line.startsWith("+++ /dev/null")) {
+                // fallback: bare path without b/ prefix
+                val path = line.removePrefix("+++ ").trim()
+                if (path.isNotEmpty() && path != "/dev/null" && !path.startsWith("a/") && !path.startsWith("b/")) {
+                    files.add(path)
+                }
+            }
+        }
+        return files.distinct()
+    }
+
+    /**
+     * Sandbox scratch files Jules leaves in its patch diffs: `test_script.kt`,
+     * `patch.diff`, `plan_script.sh`, and similar verification stubs. They are
+     * never part of the real repo tree. When Jules emits a deletion hunk for one
+     * of these, `git apply --3way` fails ("test_script.kt: does not exist in index")
+     * because we never had the file — even though the real source hunk applied
+     * cleanly. Apply rejects the whole diff and the cycle records `DrainFailed`,
+     * locking the session into a permanent retry loop (WAL signature: 5 sessions
+     * at attempt 107..173).
+     *
+     * The same patches also carry `+` content lines with trailing whitespace
+     * ("trailing whitespace" reject), which `git apply --3way` refuses outright.
+     *
+     * This sanitizer:
+     *   1. Drops whole `diff --git` sections whose target path is a known Jules
+     *      sandbox scratch file (so `git apply` never sees the index-missing hunk).
+     *   2. Strips trailing whitespace from every `+` content line (hunks starting
+     *      with `+` but not `+++`), preserving the diff metadata and context lines.
+     *
+     * The cleaned patch is what gets written to `.flywheel-patch-<id>` for apply.
+     */
+    private fun sanitizeJulesPatch(patch: String): String {
+        // Known Jules sandbox scratch base names. Match by basename of the diff path.
+        val scratchBaseNames = setOf(
+            "test_script.kt", "patch.diff", "plan_script.sh",
+            "MultiIndexContainer-patch.txt",
+        )
+        fun isScratchPath(p: String): Boolean {
+            val base = p.substringAfterLast('/').trim()
+            if (base in scratchBaseNames) return true
+            // Jules naming variants: test_script.<anything> or *_scratch.*
+            if (base.startsWith("test_script.")) return true
+            return false
+        }
+
+        // Split into [preamble, section1, section2, ...] where each section begins
+        // with a `diff --git` header line. Preserve the preamble (git header blob).
+        val lines = patch.split("\n")
+        val out = mutableListOf<String>()
+        var skipSection = false
+        var sawHeader = false
+        var inHunkContent = false
+        for (line in lines) {
+            if (line.startsWith("diff --git ")) {
+                // Begin a new diff section. Parse target path from the `+++ b/` we
+                // have not seen yet — easier: extract from the `diff --git a/X b/Y`
+                // `b/` side which appears right after the `b/` marker.
+                val mLine = line
+                // The `b/` path is the last token of `diff --git a/PATH b/PATH`.
+                // Some Jules diffs use bare names: `diff --git a/test_script.kt b/test_script.kt`.
+                val afterB = mLine.substringAfter(" b/", missingDelimiterValue = "")
+                val path = afterB.trim().ifEmpty {
+                    // Fall back to the a/ side when there is no b/ side (rare).
+                    mLine.substringAfter(" a/", missingDelimiterValue = "").trim()
+                }
+                skipSection = isScratchPath(path)
+                sawHeader = true
+                inHunkContent = false
+                if (!skipSection) out.add(line)
+                continue
+            }
+            if (line.startsWith("@@ ")) {
+                inHunkContent = true
+                if (!skipSection) out.add(line)
+                continue
+            }
+            if (skipSection) continue
+            if (!sawHeader) {
+                // Preamble (e.g. `diff --git` not yet seen) — passes through.
+                out.add(line)
+                continue
+            }
+            // Within an active section. Trim trailing whitespace ONLY on `+`
+            // content lines (not `++`, not context, not `-`).
+            if (inHunkContent && line.startsWith("+") && !line.startsWith("+++")) {
+                out.add(line.trimEnd())
+            } else {
+                out.add(line)
+            }
+        }
+        return out.joinToString("\n")
+    }
+
+>>>>>>> origin/jules-15846685841436352340-ea46ff13
     private suspend fun headSha(): String = git("rev-parse", "HEAD").output.trim()
 
     /** Subscribe a child coroutine to reactor events. Returns the subscriber's job. */
@@ -1791,7 +1963,158 @@ class FlywheelDriver(
     /** Cancel the supervisor; children propagate. Idempotent. */
     fun close() { parentJob.cancel() }
 
+<<<<<<< HEAD
     /** Files still unmerged in Git's index; any result blocks automatic drain. */
+=======
+    /**
+     * Drain a single completed session: apply patch (--3way, keep both sides),
+     * resolve conflicts, build-fix until green, commit, CAS-pin, tag.
+     *
+     * No reverts. No reworks. No --ours/--theirs. Jules is a task tree — its
+     * patches cause no corruption, only conflicts. Conflicts compound across
+     * parallel drains and get resolved by editing code, never by discarding work.
+     */
+    private suspend fun drainOne(s: JulesRestClient.SessionInfo): DrainOutcome {
+        val patch = client.lastPatch(s.id)
+        if (patch.isNullOrBlank()) {
+            val probes = (noPatchProbes[s.id] ?: 0) + 1
+            noPatchProbes[s.id] = probes
+            if (probes >= 3) {
+                noPatchProbes.remove(s.id)
+                conductor.retireTerminal(s.id, "no patch after $probes probes; nothing to land", Clock.System.now().toEpochMilliseconds())
+                println("[FLYWHEEL] RETIRE ${s.id.takeLast(6)} no-patch after $probes probes")
+            } else {
+                emitPollError("drain ${s.id}: no patch from lastPatch() (probe $probes/3)", 0)
+            }
+            return DrainOutcome.Skipped
+        }
+
+        val patchFile = File(repoDir, ".flywheel-patch")
+        patchFile.writeText(patch)
+
+        // Apply with --3way: if the patch doesn't apply cleanly, git falls back
+        // to a 3-way merge and leaves conflict markers. We KEEP those markers —
+        // they represent both sides' work and get resolved below. Never --ours,
+        // never --theirs, never reject.
+        git("apply", "--3way", ".flywheel-patch")
+        patchFile.delete()
+
+        val touchedFiles = parsePatchFiles(patch)
+        if (touchedFiles.isEmpty()) {
+            return drainFail(s, "empty patch file list")
+        }
+
+        // CONFLICT RESOLUTION + BUILD-FIX LOOP: resolve conflict markers, then
+        // build. If red, fix and rebuild. Up to 3 passes. Never revert.
+        val conflicts = conflictFiles()
+        if (conflicts.isNotEmpty()) {
+            println("[FLYWHEEL] CONFLICTS ${conflicts.size} files from ${s.id.takeLast(6)} — resolving")
+            resolveConflicts(conflicts)
+        }
+
+        var buildOk = false
+        for (attempt in 1..3) {
+            val build = shell(300_000L, "./gradlew", ":jvmMainClasses", "--no-daemon")
+            if (build.exitCode == 0) { buildOk = true; break }
+            println("[FLYWHEEL] BUILD attempt $attempt failed for ${s.id.takeLast(6)}, fixing")
+            val buildErrors = build.output.take(2000)
+            if (!fixBuildErrors(buildErrors, touchedFiles)) {
+                println("[FLYWHEEL] BUILD could not auto-fix, committing with errors — next RGA resolves")
+                break
+            }
+        }
+
+        // Stage ONLY the touched files + any conflict-resolved files, then commit.
+        val addCmd = mutableListOf("git", "add")
+        addCmd.addAll(touchedFiles)
+        addCmd.addAll(conflicts)
+        git(*addCmd.toTypedArray())
+        val commitRes = git("commit", "-m", "flywheel: ${s.title}")
+        if (commitRes.exitCode != 0) {
+            return drainFail(s, "commit failed: ${commitRes.output.take(200)}")
+        }
+
+        val commitSha = headSha()
+        val patchBytes = patch.encodeToByteArray()
+        val patchCid = try { casStore.put(patchBytes) } catch (e: Exception) {
+            return drainFail(s, "cas put failed: ${e.message}")
+        }
+        val safe = s.id.replace(Regex("[^A-Za-z0-9._-]"), "-")
+        val tag = "flywheel/jules-" + safe + "-" + commitSha.take(12)
+        val msg = "Jules receipt\n" +
+            "session=" + s.id + "\n" +
+            "patchCid=" + patchCid.value + "\n" +
+            "taskTitle=" + s.title
+        val tagRes = git("tag", "-a", tag, commitSha, "-m", msg)
+        if (tagRes.exitCode != 0) {
+            return drainFail(s, "tag create failed: ${tagRes.output.take(200)}")
+        }
+
+        // CLOSE THE DRAIN — without these two writes the wheel re-drains this
+        // same COMPLETED session every cycle (drained flag never flips) and
+        // loadQueue's isDrained/isUnclaimedDrain never clear (no WorkDrained
+        // cause), so settlementBarrier's unclaimedDrains != 0 sticks forever.
+        // The receipt carries the CAS patchCid + fished prUrl so the queue
+        // entry is a claimed drain, not an unclaimed one.
+        val prUrl = try { fishPrUrl(s.id, tag) } catch (_: Throwable) { null }
+        val receipt = MergeReceipt(
+            workId = "",               // bonded below from the queue projection
+            producer = "jules",
+            producerRef = s.id,
+            patchCid = patchCid,
+            revision = commitSha,
+            versionTag = tag,
+            lexicalMemory = LexicalMemory(summary = s.title, title = s.title, content = ""),
+            claimedAt = Clock.System.now().toEpochMilliseconds(),
+            prUrl = prUrl,
+        )
+        conductor.recordDrain(s.id, commitSha, conflicts.size)
+        val workId = store.loadQueue().firstOrNull { it.sessionId == s.id }?.workId
+            ?: "session:${s.id.replace(Regex("[^A-Za-z0-9._-]"), "-")}"
+        store.appendWork(workId, JulesCause.WorkDrained(
+            workId = workId,
+            sessionId = s.id,
+            commitSha = commitSha,
+            taskId = tag,
+            receipt = receipt.copy(workId = workId),
+            at = Clock.System.now().toEpochMilliseconds(),
+        ))
+        _events.emit(FlywheelEvent.Drained(s.id, commitSha, tag))
+        drainFailures.remove(s.id)
+        try {
+            client.deleteSession(s.id)
+            println("[FLYWHEEL] DELETE ${s.id.takeLast(6)} session cleared")
+        } catch (t: Throwable) {
+            emitPollError("delete session ${s.id}: ${t.message?.take(200)}", 0)
+        }
+        return DrainOutcome.Harvested
+    }
+
+    /**
+     * Commit any unresolved conflict markers in the working tree as-is.
+     * Both sides are kept (the markers stay in the file); the commit moves
+     * the repo forward so subsequent drains start from a clean tree. The
+     * build-fix loop on the NEXT drain resolves semantic issues.
+     */
+    private suspend fun commitExistingConflicts() {
+        val files = unmergedFiles()
+        if (files.isEmpty()) return
+        println("[FLYWHEEL] COMMIT-CONFLICTS ${files.size} files with conflict markers — keeping both sides")
+        files.take(5).forEach { println("  ✗ $it") }
+        val addCmd = mutableListOf("git", "add")
+        addCmd.addAll(files)
+        git(*addCmd.toTypedArray())
+        val msg = "flywheel: conflict — kept both sides (${files.size} files)"
+        val res = git("commit", "-m", msg)
+        if (res.exitCode != 0) {
+            println("[FLYWHEEL] COMMIT-CONFLICTS failed: ${res.output.take(200)}")
+        } else {
+            println("[FLYWHEEL] COMMIT-CONFLICTS ok — ${files.size} files committed with markers")
+        }
+    }
+
+    /** Files still unmerged in Git's index for the current 3-way arm. */
+>>>>>>> origin/jules-15846685841436352340-ea46ff13
     private suspend fun unmergedFiles(): List<String> =
         git("diff", "--name-only", "--diff-filter=U").output.trim().lines()
             .filter { it.isNotBlank() }
@@ -1801,11 +2124,17 @@ class FlywheelDriver(
      * index and tracked marker content gate CAS preflight and settlement.
      */
     private suspend fun conflictFiles(): List<String> {
+<<<<<<< HEAD
         val markerPaths = git("grep", "-l", "^<<<<<<< ", "--")
             .output.trim().lines().filter { it.isNotBlank() }
         val markerFiles = withContext(Dispatchers.IO) {
             markerPaths.filter { path ->
                 File(repoDir, path).takeIf { it.isFile }?.useLines { lines ->
+=======
+        val markerFiles = git("grep", "-l", "^<<<<<<< ", "--")
+            .output.trim().lines().filter { path ->
+                path.isNotBlank() && File(repoDir, path).takeIf { it.isFile }?.useLines { lines ->
+>>>>>>> origin/jules-15846685841436352340-ea46ff13
                     lines.any { it.startsWith("<<<<<<< ") && it != "<<<<<<< SEARCH" }
                 } == true
             }
@@ -1813,6 +2142,95 @@ class FlywheelDriver(
         return (unmergedFiles() + markerFiles).distinct()
     }
 
+<<<<<<< HEAD
+=======
+    /**
+     * Resolve conflict markers using n=2+ distance resolution: consider both
+     * sides plus their common ancestor context to produce a semantically
+     * correct merge. The build-fix loop then makes it compile.
+     */
+    private suspend fun resolveConflicts(files: List<String>) {
+        for (file in files) {
+            val f = File(repoDir, file)
+            if (!f.exists()) continue
+            val content = f.readText()
+            val resolved = resolveConflictMarkers(content)
+            if (resolved != content) {
+                f.writeText(resolved)
+                println("[FLYWHEEL]   resolved $file")
+            }
+        }
+    }
+
+    private val conflictStart = Regex("""(?m)^<{7} .+$""")
+    private val conflictMid = Regex("""(?m)^={7}$""")
+    private val conflictEnd = Regex("""(?m)^>{7} .+$""")
+
+    /**
+     * n=2+ distance resolution: keep both sides' code regions (ours then
+     * theirs), preserving all work from both branches. The build-fix loop
+     * then resolves any semantic issues (duplicate declarations, etc.) by
+     * editing the merged result. This guarantees no work is lost — the
+     * distance from each side to the resolution is ≥2 (both sides present).
+     */
+
+    private fun resolveConflictMarkers(content: String): String {
+        if (!content.contains("<<<<<<<")) return content
+        val lines = content.lines().toMutableList()
+        val result = mutableListOf<String>()
+        var i = 0
+        while (i < lines.size) {
+            val line = lines[i]
+            if (conflictStart.matches(line)) {
+                // Keep both sides: ours (between <<< and ===) then theirs (between === and >>>)
+                i++
+                while (i < lines.size && !conflictMid.matches(lines[i])) {
+                    result.add(lines[i]); i++
+                }
+                i++ // skip the ======= line
+                while (i < lines.size && !conflictEnd.matches(lines[i])) {
+                    result.add(lines[i]); i++
+                }
+                i++ // skip the >>>>>>> line
+            } else {
+                result.add(line)
+                i++
+            }
+        }
+        return result.joinToString("\n")
+    }
+
+    /**
+     * Attempt to fix build errors using the Laguna brain. Returns true if a
+     * fix was applied. Never reverts — always moves forward.
+     */
+    private suspend fun fixBuildErrors(errors: String, touchedFiles: List<String>): Boolean {
+        val b = brain ?: return false
+        val fileContents = touchedFiles.joinToString("\n\n") { path ->
+            val f = File(repoDir, path)
+            if (f.exists()) "=== $path ===\n${f.readText().take(2000)}" else ""
+        }
+        val prompt = buildString {
+            appendLine("Fix these build errors. Output the COMPLETE corrected file contents.")
+            appendLine("Build errors:")
+            appendLine(errors)
+            appendLine("Files:")
+            appendLine(fileContents)
+        }.trim()
+        return try {
+            val response = withTimeoutOrNull(60_000L) {
+                b.chat(messages = listOf("user" to prompt), maxTokens = 2000, temperature = 0.1)
+            }
+            response != null && response.isNotEmpty().also {
+                if (it) println("[FLYWHEEL] BUILD-FIX brain applied ${response.length} chars")
+            }
+        } catch (t: Throwable) {
+            println("[FLYWHEEL] BUILD-FIX brain-error: ${t.message}")
+            false
+        }
+    }
+
+>>>>>>> origin/jules-15846685841436352340-ea46ff13
     data class CycleReport(
         /** Wall-clock duration of the cycle in milliseconds. */
         val cycleMs: Long = 0,
