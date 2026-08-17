@@ -88,17 +88,16 @@ data class SctpInitChunk(
         get() = SctpChunkHeader(SctpChunkType.INIT, length = CHUNK_FIXED_LENGTH)
 
     fun encode(): ByteArray {
-        val buf = ByteArray(CHUNK_FIXED_LENGTH.toInt())
-        var off = 0
-        buf[off++] = SctpChunkType.INIT.ordinal.toByte()  // type
-        buf[off++] = 0                                      // flags
-        putUShort(buf, off, CHUNK_FIXED_LENGTH); off += 2  // length
-        putUInt(buf, off, initiateTag); off += 4
-        putUInt(buf, off, aRwnd); off += 4
-        putUShort(buf, off, outboundStreams); off += 2
-        putUShort(buf, off, inboundStreams); off += 2
-        putUInt(buf, off, initialTsn)
-        return buf
+        val buf = borg.trikeshed.userspace.nio.ByteBuffer.allocate(CHUNK_FIXED_LENGTH.toInt())
+        buf.put(SctpChunkType.INIT.ordinal.toByte())  // type
+        buf.put(0)                                      // flags
+        buf.putShort(CHUNK_FIXED_LENGTH.toShort())      // length
+        buf.putInt(initiateTag.toInt())
+        buf.putInt(aRwnd.toInt())
+        buf.putShort(outboundStreams.toShort())
+        buf.putShort(inboundStreams.toShort())
+        buf.putInt(initialTsn.toInt())
+        return buf.array()
     }
 
     companion object {
@@ -106,12 +105,12 @@ data class SctpInitChunk(
 
         fun decode(bytes: ByteArray): SctpInitChunk {
             require(bytes.size >= CHUNK_FIXED_LENGTH.toInt()) { "INIT too short: ${bytes.size} < $CHUNK_FIXED_LENGTH" }
-            var off = 4  // skip type+flags+length
-            val initiateTag = getUInt(bytes, off); off += 4
-            val aRwnd       = getUInt(bytes, off); off += 4
-            val outStreams  = getUShort(bytes, off); off += 2
-            val inStreams   = getUShort(bytes, off); off += 2
-            val initialTsn  = getUInt(bytes, off)
+            val buf = borg.trikeshed.userspace.nio.ByteBuffer.wrap(bytes).position(4) // skip type+flags+length
+            val initiateTag = buf.getInt().toUInt()
+            val aRwnd       = buf.getInt().toUInt()
+            val outStreams  = (buf.getShort().toInt() and 0xFFFF).toUShort()
+            val inStreams   = (buf.getShort().toInt() and 0xFFFF).toUShort()
+            val initialTsn  = buf.getInt().toUInt()
             return SctpInitChunk(initiateTag, aRwnd, outStreams, inStreams, initialTsn)
         }
     }
@@ -133,17 +132,16 @@ data class SctpInitAckChunk(
         get() = SctpChunkHeader(SctpChunkType.INIT_ACK, length = CHUNK_FIXED_LENGTH)
 
     fun encode(): ByteArray {
-        val buf = ByteArray(CHUNK_FIXED_LENGTH.toInt())
-        var off = 0
-        buf[off++] = SctpChunkType.INIT_ACK.ordinal.toByte()  // type
-        buf[off++] = 0                                          // flags
-        putUShort(buf, off, CHUNK_FIXED_LENGTH); off += 2      // length
-        putUInt(buf, off, initiateTag); off += 4
-        putUInt(buf, off, aRwnd); off += 4
-        putUShort(buf, off, outboundStreams); off += 2
-        putUShort(buf, off, inboundStreams); off += 2
-        putUInt(buf, off, initialTsn)
-        return buf
+        val buf = borg.trikeshed.userspace.nio.ByteBuffer.allocate(CHUNK_FIXED_LENGTH.toInt())
+        buf.put(SctpChunkType.INIT_ACK.ordinal.toByte())  // type
+        buf.put(0)                                          // flags
+        buf.putShort(CHUNK_FIXED_LENGTH.toShort())          // length
+        buf.putInt(initiateTag.toInt())
+        buf.putInt(aRwnd.toInt())
+        buf.putShort(outboundStreams.toShort())
+        buf.putShort(inboundStreams.toShort())
+        buf.putInt(initialTsn.toInt())
+        return buf.array()
     }
 
     companion object {
@@ -151,12 +149,12 @@ data class SctpInitAckChunk(
 
         fun decode(bytes: ByteArray): SctpInitAckChunk {
             require(bytes.size >= CHUNK_FIXED_LENGTH.toInt()) { "INIT_ACK too short: ${bytes.size} < $CHUNK_FIXED_LENGTH" }
-            var off = 4
-            val initiateTag = getUInt(bytes, off); off += 4
-            val aRwnd       = getUInt(bytes, off); off += 4
-            val outStreams  = getUShort(bytes, off); off += 2
-            val inStreams   = getUShort(bytes, off); off += 2
-            val initialTsn  = getUInt(bytes, off)
+            val buf = borg.trikeshed.userspace.nio.ByteBuffer.wrap(bytes).position(4)
+            val initiateTag = buf.getInt().toUInt()
+            val aRwnd       = buf.getInt().toUInt()
+            val outStreams  = (buf.getShort().toInt() and 0xFFFF).toUShort()
+            val inStreams   = (buf.getShort().toInt() and 0xFFFF).toUShort()
+            val initialTsn  = buf.getInt().toUInt()
             return SctpInitAckChunk(initiateTag, aRwnd, outStreams, inStreams, initialTsn)
         }
     }
@@ -258,13 +256,12 @@ data class SctpCookieEchoChunk(
         get() = SctpChunkHeader(SctpChunkType.COOKIE_ECHO, length = chunkLength)
 
     fun encode(): ByteArray {
-        val buf = ByteArray(chunkLength.toInt())
-        var off = 0
-        buf[off++] = SctpChunkType.COOKIE_ECHO.ordinal.toByte()  // type
-        buf[off++] = 0                                              // flags
-        putUShort(buf, off, chunkLength); off += 2                 // length
-        cookie.forEachIndexed { i, b -> buf[off + i] = b }
-        return buf
+        val buf = borg.trikeshed.userspace.nio.ByteBuffer.allocate(chunkLength.toInt())
+        buf.put(SctpChunkType.COOKIE_ECHO.ordinal.toByte())  // type
+        buf.put(0)                                              // flags
+        buf.putShort(chunkLength.toShort())                     // length
+        buf.put(cookie)
+        return buf.array()
     }
 
     override fun equals(other: Any?): Boolean {
@@ -280,7 +277,8 @@ data class SctpCookieEchoChunk(
 
         fun decode(bytes: ByteArray): SctpCookieEchoChunk {
             require(bytes.size >= HEADER_LENGTH.toInt()) { "COOKIE_ECHO too short: ${bytes.size} < $HEADER_LENGTH" }
-            val totalLen = getUShort(bytes, 2).toInt()
+            val buf = borg.trikeshed.userspace.nio.ByteBuffer.wrap(bytes).position(2)
+            val totalLen = buf.getShort().toInt() and 0xFFFF
             require(bytes.size >= totalLen) { "COOKIE_ECHO truncated: ${bytes.size} < $totalLen" }
             val cookie = bytes.copyOfRange(HEADER_LENGTH.toInt(), totalLen)
             return SctpCookieEchoChunk(cookie)
@@ -309,24 +307,6 @@ object SctpCookieAckChunk {
     fun decode(bytes: ByteArray) {
         require(bytes.size >= CHUNK_LENGTH.toInt()) { "COOKIE_ACK too short: ${bytes.size} < $CHUNK_LENGTH" }
     }
-}
-
-// ── Primitive encoding helpers (big-endian) ─────────────────────────────────
-fun putUShort(buf: ByteArray, off: Int, value: UShort) {
-    val v = value.toInt()
-    buf[off]     = (v shr 8).toByte()
-    buf[off + 1] = v.toByte()
-}
-fun putUInt(buf: ByteArray, off: Int, value: UInt) {
-    var v = value
-    repeat(4) { i -> buf[off + 3 - i] = v.toByte(); v = v shr 8 }
-}
-fun getUShort(buf: ByteArray, off: Int): UShort =
-    ((buf[off].toInt() and 0xFF) shl 8 or (buf[off + 1].toInt() and 0xFF)).toUShort()
-fun getUInt(buf: ByteArray, off: Int): UInt {
-    var v = 0u
-    repeat(4) { i -> v = (v shl 8) or (buf[off + i].toInt() and 0xFF).toUInt() }
-    return v
 }
 
 val SctpKey: AsyncContextKey<SctpElement> = SctpElement.Key
