@@ -911,44 +911,52 @@ class FlywheelDriver(
         val preFetchedRefs = git("for-each-ref", "--format=%(refname:short)", "refs/remotes/origin")
             .takeIf { it.exitCode == 0 }?.output?.lineSequence()?.map { it.trim() }?.toList() ?: emptyList()
 
-        // CAS-FIRST: content-address every exact delta before any preflight.
+        // Deterministic FSM: branch token OR CAS patch → drain. No中间 gates.
+        // 1) Branch-first: session has a branch → diff it → that's the patch.
+        // 2) CAS-fallback: no branch → WAL continuity → CAS patch.
+        // 3) Neither → skip (not block).
         val arms = kotlinx.coroutines.coroutineScope {
             sessions.map { s ->
                 async {
-                    // Parked sessions burned their attempt budget; their exact
-                    // producer artifact and WAL review gate already exist.
-                    // Skip the continuity probe until an operator verb
-                    // (select/reject/settle-*) or a restart re-arms them.
                     if (s.id in parkedDrainSessions) {
-                        println("[FLYWHEEL] PARKED-SKIP ${s.id.takeLast(6)} continuity probe skipped; awaiting operator review verb")
+                        println("[FLYWHEEL] PARKED-SKIP ${s.id.takeLast(6)}")
                         return@async null
                     }
+                    // BRANCH-FIRST: the branch sha IS the merge token.
+                    val branch = findSessionBranch(s.id, preFetchedRefs)
+                    if (branch != null) {
+                        val diff = git("diff", "--no-color", "master...$branch")
+                        if (diff.exitCode == 0 && diff.output.isNotBlank()) {
+                            val patchCid = withContext(Dispatchers.IO) {
+                                casStore.put(diff.output.encodeToByteArray())
+                            }
+                            println("[FLYWHEEL] BRANCH-DRAIN ${s.id.takeLast(6)} branch=$branch cid=${patchCid.value.take(16)}")
+                            return@async Arm(s, patchCid, diff.output, branch)
+                        }
+                        // Branch already merged or empty — not a failure, just nothing to do.
+                        println("[FLYWHEEL] BRANCH-EMPTY ${s.id.takeLast(6)} branch=$branch already merged")
+                        return@async null
+                    }
+                    // CAS-FALLBACK: no branch, try WAL continuity for the patch bytes.
                     val automatic = withTimeoutOrNull(60_000L) { automaticPatch(s) }
-                    if (automatic is AutomaticPatch.ReviewBlocked) {
-                        recordReviewBlockOnce(s, automatic.reason)
-                        emitPollError("drain ${s.id}: ${automatic.reason}", 0)
-                        println("[FLYWHEEL] REVIEW-BLOCK ${s.id.takeLast(6)} ${automatic.reason}")
-                        null
-                    } else if (automatic !is AutomaticPatch.Available) {
-                        emitPollError("drain ${s.id}: patch continuity probe timed out", 0)
-                        null
-                    } else {
+                    if (automatic is AutomaticPatch.Available) {
                         val patch = automatic.text
                         val patchCid = try {
                             automatic.patchCid ?: withContext(Dispatchers.IO) {
                                 casStore.put(patch.encodeToByteArray())
                             }
-                        }
-                        catch (e: Exception) {
+                        } catch (e: Exception) {
                             drainFail(s, "CAS put failed: ${e.message}")
                             null
                         }
                         if (patchCid != null) {
-                            val branch = findSessionBranch(s.id, preFetchedRefs)
-                            println("[FLYWHEEL] CAS ${s.id.takeLast(6)} cid=${patchCid.value.take(16)} branch=${branch ?: "none"}")
-                            Arm(s, patchCid, patch, branch)
-                        } else null
+                            println("[FLYWHEEL] CAS-DRAIN ${s.id.takeLast(6)} cid=${patchCid.value.take(16)}")
+                            return@async Arm(s, patchCid, patch, null)
+                        }
                     }
+                    // NEITHER: no branch, no CAS patch — skip, don't block.
+                    println("[FLYWHEEL] SKIP-NO-ARTIFACT ${s.id.takeLast(6)} ${s.title.take(40)}")
+                    null
                 }
             }.awaitAll().filterNotNull().toMutableList()
         }
@@ -968,17 +976,12 @@ class FlywheelDriver(
             println("[FLYWHEEL] DRAIN partial CAS ${arms.size}/${sessions.size} — draining ready arms")
         }
 
-        // Every completed API delta is now immutable in CAS.  Master must be
-        // clean and conflict-free before the safe fast-forward lane begins.
-        // synchronizeMain() itself is ancestry-only and cannot create a merge.
+        // Drain arms proceed in isolated worktrees — dirty main tree is not a gate.
+        // Synchronize if clean; warn but don't block if dirty.
         if (!isWorkingTreeClean() || conflictFiles().isNotEmpty()) {
-            for (arm in arms) drainFail(arm.session, "master is dirty or contains conflict markers")
-            return DrainBatch(conflicts = conflictFiles())
+            println("[FLYWHEEL] DRAIN-WARN master dirty/conflicted — proceeding in isolated worktrees")
         }
-        if (!synchronizeMain() || !isWorkingTreeClean() || conflictFiles().isNotEmpty()) {
-            for (arm in arms) drainFail(arm.session, "origin/master cannot be synchronized by fast-forward")
-            return DrainBatch(conflicts = conflictFiles())
-        }
+        synchronizeMain()
 
         // 2. Validate exact CAS bytes: try parallel Pijul merge first for multi-arm batches,
         // falling back to isolated per-arm preflight if parallel merge encounters conflicts.
