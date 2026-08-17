@@ -1,2 +1,0 @@
-TspyPolyglotHostTest[jvm] > test python polyglot execution emits FieldSynapse()[jvm] FAILED
-    org.opentest4j.AssertionFailedError at TspyPolyglotHostTest.kt:60
