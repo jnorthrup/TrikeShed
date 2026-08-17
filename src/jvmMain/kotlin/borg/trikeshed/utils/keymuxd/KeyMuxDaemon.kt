@@ -52,6 +52,17 @@ import java.nio.file.Path
  */
 object KeyMuxDaemon {
 
+    private data class ProviderConfig(val provider: String, val key: String, val id: String)
+
+    private val DEFAULT_PROVIDERS = listOf("jules", "brain", "openai", "anthropic", "google", "nvidia", "xai")
+        .map { provider ->
+            ProviderConfig(
+                provider = provider,
+                key = "$provider.default.key",
+                id = "$provider-default"
+            )
+        }
+
     @JvmStatic
     fun main(args: Array<String>) {
         val config = parseConfig(args)
@@ -128,22 +139,22 @@ object KeyMuxDaemon {
         
         // Seed from already-resolved KeyMux env keys
         withContext(Dispatchers.IO) {
-            for (provider in listOf("jules", "brain", "openai", "anthropic", "google", "nvidia", "xai")) {
-                val v = keyMux.get("$provider.default.key") ?: continue
+            for (providerConfig in DEFAULT_PROVIDERS) {
+                val v = keyMux.get(providerConfig.key) ?: continue
                 muxReactor.loadCredentialPool(
-                    mapOf(provider to listOf(
+                    mapOf(providerConfig.provider to listOf(
                         MuxCredentialRecord(
-                            id = "$provider-default",
-                            label = "$provider-default",
+                            id = providerConfig.id,
+                            label = providerConfig.id,
                             baseUrl = "",
                             lastStatus = "active",
                         )
                     ))
                 )
                 muxReactor.recordAccess(
-                    keyId = "$provider-default",
-                    provider = provider,
-                    label = "$provider-default",
+                    keyId = providerConfig.id,
+                    provider = providerConfig.provider,
+                    label = providerConfig.id,
                 )
             }
         }
