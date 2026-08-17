@@ -5,6 +5,7 @@ import borg.trikeshed.userspace.nio.file.spi.JvmFileOperations
 import borg.trikeshed.util.oroboros.FileCasStore
 import borg.trikeshed.utils.kanban.JulesBoardStore
 import borg.trikeshed.utils.kanban.forForgeDir
+import borg.trikeshed.userspace.containment.PatchAstLinter
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
@@ -49,9 +50,15 @@ object JulesPatchReviewCli {
         }
         require(!card.drained) { "session $sessionId is already drained" }
         val cas = FileCasStore(JvmFileOperations(), File(forgeDir, "cas").absolutePath)
-        require(withContext(Dispatchers.IO) { cas.get(patchCid) } != null) {
+        val patchBytes = withContext(Dispatchers.IO) { cas.get(patchCid) }
+        require(patchBytes != null) {
             "CAS object does not exist: $patchCid"
         }
+
+        val patchStr = patchBytes.decodeToString()
+        val lintResult = PatchAstLinter.lint(patchStr)
+        require(lintResult.clean) { "Patch blocked by AST Linter: ${lintResult.reason}" }
+
         val continuity = JulesPatchContinuityStore(cas, store)
         continuity.selectReviewed(
             sessionId = sessionId,
