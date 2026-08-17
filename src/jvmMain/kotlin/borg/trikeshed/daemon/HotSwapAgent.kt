@@ -59,7 +59,7 @@ object HotSwapAgent {
         private val classFile: File,
         private val inst: Instrumentation,
     ) : Thread("hotswap-watcher-${className.takeLast(20)}") {
-        @Volatile private var lastMtime = classFile.lastModified()
+        @Volatile private var lastMtime = ((classFile.lastModified() / 1000L) * 1000L)
 
         init { isDaemon = true }
 
@@ -67,7 +67,7 @@ object HotSwapAgent {
             while (!currentThread().isInterrupted) {
                 try {
                     sleep(200)
-                    val mtime = classFile.lastModified()
+                    val mtime = ((classFile.lastModified() / 1000L) * 1000L)
                     if (mtime != lastMtime && mtime > 0) {
                         lastMtime = mtime
                         redefine()

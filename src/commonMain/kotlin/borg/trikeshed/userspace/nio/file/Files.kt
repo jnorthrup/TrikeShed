@@ -137,8 +137,8 @@ public object Files {
     // Attributes
     public fun <A : BasicFileAttributes> readAttributes(path: Path, type: kotlin.reflect.KClass<A>, vararg options: LinkOption): A = TODO("stat")
     public fun readAttributes(path: Path, attributes: String, vararg options: LinkOption): Map<String, Any> = TODO("stat")
-    public fun setAttribute(path: Path, attribute: String, value: Any, vararg options: LinkOption): Path = TODO("setxattr")
-    public fun getAttribute(path: Path, attribute: String, vararg options: LinkOption): Any = TODO("getxattr")
+    public fun setAttribute(path: Path, attribute: String, value: Any, vararg options: LinkOption): Path = throw UnsupportedOperationException("xattr channel is closed by substrate")
+    public fun getAttribute(path: Path, attribute: String, vararg options: LinkOption): Any = throw UnsupportedOperationException("xattr channel is closed by substrate")
     public fun getPosixFilePermissions(path: Path, vararg options: LinkOption): Set<PosixFilePermission> = TODO("stat mode")
     public fun setPosixFilePermissions(path: Path, perms: Set<PosixFilePermission>): Path = TODO("chmod")
     public fun <V : FileAttributeView> getFileAttributeView(path: Path, type: kotlin.reflect.KClass<V>, vararg options: LinkOption): V = TODO("attribute view")
