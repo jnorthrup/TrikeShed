@@ -1,0 +1,66 @@
+TAXONOMY: Establish a taxonomical set of typealiases for all git and Pijul data formats, all common hash and cipher types, with causal isomorphisms between them. Create src/commonMain/kotlin/borg/trikeshed/taxonomy/CryptoAndFormatTaxonomy.kt as the single source of truth. Follow the PRELOAD algebra: Join, Series, value classes, @JvmInline where appropriate. No data class wrappers where a typealias suffices.
+
+SCOPE — Git data formats (currently raw Strings scattered across daemon/ and job/):
+- GitObjectId = Join<String, GitObjectType> (40-char SHA-1 hex + enum BLOB/TREE/COMMIT/TAG)
+- GitBlobHash = @JvmInline value class wrapping String (the 40-char SHA-1 hex for blobs)
+- GitTreeHash = @JvmInline value class wrapping String (for trees)
+- GitCommitHash = @JvmInline value class wrapping String (for commits — see GitStateCache.resolveHead() at daemon/GitStateCache.kt:107 which returns raw String)
+- GitRefName = @JvmInline value class wrapping String (e.g. "refs/heads/master")
+- GitRef = Join<GitRefName, GitCommitHash> (ref → commit mapping)
+- GitPackIndexEntry = Join<GitObjectId, Join<Int, Long>> (offset + size in pack file)
+- GitIndexMtime = @JvmInline value class wrapping Long (see GitStateCache.lastKnownIndexMtime at daemon/GitStateCache.kt:39)
+- GitTreeClean = Boolean (heuristic mtime match)
+
+SCOPE — Pijul data formats (currently in pijul/PatchPrimitives.kt, pijul/PatchStorage.kt, pijul/PijulChannel.kt, crdt/PijulCrdt.kt):
+- PijulPatchId = Blake3Hash (re-alias for semantic clarity — see patch/Blake3Hash.kt:4)
+- PijulChangePos = Int (line position in Change.Insert/Delete)
+- PijulEdge = Join<PijulPatchId, Join<PijulPatchId, EdgeFlag>> (source j (target j flag))
+- PijulDependency = @JvmInline value class wrapping PijulPatchId (see PatchPrimitives.kt:10)
+- PijulVertexId = Join<PijulPatchId, Int> (patch j offset — see PijulCrdt.kt:25)
+- PijulCrdtFile = Join<String, Series<PijulVertexId>> (path j vertex order)
+
+SCOPE — Hash algorithm taxonomy (currently ad-hoc MessageDigest.getInstance calls in CidAndStore.kt:13, Sha256.kt jvmMain:6, TorrentEngine.kt:9, Rfc6455Handshake.kt:70):
+- HashAlgorithm = sealed class: SHA256, SHA1, BLAKE3 (each carries outputSizeBytes, wireLabel)
+- HashDigest = Join<HashAlgorithm, ByteArray> (algorithm j raw bytes — the universal digest shape)
+- HashHex = @JvmInline value class wrapping String (lowercase hex encoding of a digest)
+- ContentAddressable = Join<HashAlgorithm, HashHex> (the universal CAS key — unifies ContentId, CID, InfoHash, Blake3Hash under one roof)
+
+SCOPE — Wire identity types (currently scattered: InfoHash at torrent/TorrentHandle.kt:41, CID at ipfs/CidAndStore.kt:7, PeerId = raw 20-byte ByteArray in PeerWireProtocol.kt:158, PeerAddress at torrent/TorrentHandle.kt:81):
+- WirePeerId = @JvmInline value class wrapping ByteArray (20 bytes, Azureus-style — see PeerHandshake.peerId)
+- WirePeerAddress = Join<String, Int> (host j port — see PeerAddress at TorrentHandle.kt:81)
+- WireInfoHash = @JvmInline value class wrapping ByteArray (20 bytes v1 / 32 bytes v2 — see InfoHash at TorrentHandle.kt:41)
+- WireCID = @JvmInline value class wrapping ByteArray (IPFS content identifier — see CID at CidAndStore.kt:7)
+
+SCOPE — Cipher suite taxonomy (currently TlsCipherSuites at TlsEndpoint.kt:27 is a raw Series<TlsCipherSuite>):
+- TlsCipherSuiteId = @JvmInline value class wrapping UShort (the 2-byte cipher suite ID on the wire)
+- TlsSignatureAlgorithm = @JvmInline value class wrapping UShort (signature scheme ID — RSA-PKCS1-SHA256, ECDSA-SECP256-SHA256, Ed25519, etc.)
+- TlsNamedGroup = @JvmInline value class wrapping UShort (named group ID — x25519, secp256r1, secp384r1)
+- StreamCipherKey = @JvmInline value class wrapping ByteArray (AEAD key for TLS/uTP session encryption)
+- Nonce = @JvmInline value class wrapping ByteArray (96-bit nonce for AEAD — TLS 1.3 / uTP)
+
+SCOPE — Serialization format taxonomy (currently CanonicalCbor at job/CanonicalCbor.kt:27, Cbor at collections/associative/Cbor.kt, ConfixDoc at parse/confix/ConfixKit.kt:39):
+- SerializationFormat = sealed class: CBOR, JSON, CONFIX, PROTOBUF (each carries mimeLabel, isCanonical: Boolean)
+- SerializedBytes = Join<SerializationFormat, ByteArray> (format j canonical bytes)
+- CanonicalDocument = Join<ContentAddressable, SerializedBytes> (CAS address j serialized form — the universal "content-addressed document" shape)
+
+SCOPE — Causal isomorphisms: document (in KDoc on the sealed classes) how the SAME conceptual role maps across protocols:
+- ContentIdentity = the pattern where each protocol uses a different hash to identify content: Git uses SHA-1 (GitBlobHash/GitCommitHash), Pijul uses BLAKE3 (PijulPatchId), BitTorrent v2 uses SHA-256 (WireInfoHash), IPFS uses SHA-256 (WireCID), TrikeShed CAS uses SHA-256 (ContentId). The isomorphism is Join<HashAlgorithm, ByteArray> = HashDigest, with protocol-specific typealiases narrowing the shape.
+- DocumentIdentity = the pattern where each protocol identifies a "version of the world": Git HEAD is GitCommitHash, Pijul channel head is PijulPatchId, IPFS root is CID, TrikeShed is ContentId (ContentAddressable). All four are Join<HashAlgorithm, HashHex>.
+- WireEndpoint = the pattern for "who am I talking to": TCP is PeerAddress(host, port), uTP is PeerAddress + ConnectionId, WebSocket is Host + Path. The isomorphism is Join<String, Int> (host/port) extended with protocol-specific nonce.
+- EncryptedPayload = the pattern for "sealed bytes": TLS record is Join<TlsCipherSuiteId, ByteArray>, uTP payload is Join<StreamCipherKey, ByteArray>, Pijul patch is Blake3Hash + changes. The isomorphism is Join<KeyType, ByteArray>.
+
+CONSTRAINTS:
+- Put everything in ONE file: src/commonMain/kotlin/borg/trikeshed/taxonomy/CryptoAndFormatTaxonomy.kt
+- Package: borg.trikeshed.taxonomy
+- Import Blake3Hash from borg.trikeshed.patch, ContentId from borg.trikeshed.job, Join/Series/j from borg.trikeshed.lib
+- All @JvmInline value classes for zero-allocation protocol IDs
+- All sealed classes must be exhaustively documented with RFC/spec references
+- Do NOT modify existing files — the taxonomy file is additive-only; callers migrate at their own pace
+- Gate: ./gradlew jvmMainClasses --console=plain
+- Test: create src/commonTest/kotlin/borg/trikeshed/taxonomy/CryptoAndFormatTaxonomyTest.kt verifying: (1) each value class roundtrips its underlying type, (2) HashDigest factory functions produce correct byte counts (SHA-256=32, SHA-1=20, BLAKE3=32), (3) ContentAddressable.fromContentId / fromCID / fromInfoHash produce valid instances, (4) the isomorphism KDoc compiles (KDoc-only, no runtime check needed)
+
+AVOID:
+- Do not touch daemon/, flywheel/, pijul/, torrent/, htx/, reactor/, job/, cas/, or any existing package
+- Do not change Blake3Hash, ContentId, InfoHash, CID, or any existing type — only re-alias them
+- No new dependencies — commonMain only, no JVM-specific crypto
+- No throwaway scripts — the deliverable is a .kt file that compiles
