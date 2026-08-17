@@ -44,10 +44,24 @@ public class FunctionalUringFacade(
     // -- Unified UringSubmission API --
 
     /**
+     * Ops that are deterministically rejected to close covert signaling
+     * channels (Legion Modelling Doc 04, Layer 2 — xattr is a documented
+     * malleable surface for steganographic coordination per Doc 02 §1).
+     * These are never submitted to the kernel; they fail immediately.
+     */
+    private val REJECTED_OPS: Set<UringOp> = setOf(
+        UringOp.FSETXATTR, UringOp.SETXATTR,
+        UringOp.FGETXATTR, UringOp.GETXATTR,
+    )
+
+    /**
      * Enqueue a raw io_uring submission.
-     * Throws if the queue is full.
+     * Throws if the queue is full or if the op is a rejected xattr channel.
      */
     fun enqueue(submission: UringSubmission) {
+        require(submission.opcode !in REJECTED_OPS) {
+            "xattr ops are deterministically rejected to close covert signaling channels: ${submission.opcode}"
+        }
         require(pending.size < entries) { "submission queue full" }
         pending.addLast(submission)
     }
