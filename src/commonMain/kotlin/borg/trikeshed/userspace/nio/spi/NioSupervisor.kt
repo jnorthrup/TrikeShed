@@ -49,28 +49,33 @@ open class NioSupervisor(
             val providers = platformNioProviders()
             (providers.firstOrNull { it is NioCapabilityReport } as? NioCapabilityReport)?.let { register(it) }
             providers.filter { it !is NioCapabilityReport }.forEach { register(it) }
-            services
-                .filterIsInstance<AsyncContextElement>()
-                .filter { it.state == ElementState.CREATED }
-                .forEach { it.open() }
+            // Bolt: Prevent intermediate List allocations and short-circuit by using a single forEach loop instead of chained filterIsInstance<T>().filter { ... }
+            services.forEach {
+                if (it is AsyncContextElement && it.state == ElementState.CREATED) {
+                    it.open()
+                }
+            }
             state = ElementState.ACTIVE
         }
     }
 
     override suspend fun drain() {
-        services
-            .filterIsInstance<AsyncContextElement>()
-            .filter { it.state.isAtLeast(ElementState.OPEN) && it.state.isLessThan(ElementState.DRAINING) }
-            .forEach { it.drain() }
+        // Bolt: Prevent intermediate List allocations by using a single forEach loop instead of chained filterIsInstance<T>().filter { ... }
+        services.forEach {
+            if (it is AsyncContextElement && it.state.isAtLeast(ElementState.OPEN) && it.state.isLessThan(ElementState.DRAINING)) {
+                it.drain()
+            }
+        }
         super.drain()
     }
 
     override suspend fun close() {
-        services
-            .asReversed()
-            .filterIsInstance<AsyncContextElement>()
-            .filter { it.state.isLessThan(ElementState.CLOSED) }
-            .forEach { it.close() }
+        // Bolt: Prevent intermediate List allocations by using a single forEach loop instead of chained filterIsInstance<T>().filter { ... }
+        services.asReversed().forEach {
+            if (it is AsyncContextElement && it.state.isLessThan(ElementState.CLOSED)) {
+                it.close()
+            }
+        }
         super.close()
     }
 }
