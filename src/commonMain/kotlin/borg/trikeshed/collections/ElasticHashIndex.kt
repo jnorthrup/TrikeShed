@@ -99,7 +99,7 @@ class ElasticHashIndex<K : Any> internal constructor(
 
     /** Returns probe counts for all keys (for statistical analysis). */
     fun probeDistribution(): List<Int> {
-        return keys.map { key ->
+        return keys.map { key -> // stdlib-boundary:
             val (h1, h2) = doubleHash(key, seed)
             val capacity = table.size
             var probe = 0

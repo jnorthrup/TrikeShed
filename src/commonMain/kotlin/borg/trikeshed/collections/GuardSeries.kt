@@ -1,4 +1,4 @@
-package borg.trikeshed.mutable
+package borg.trikeshed.collections
 
 /**
  * A MutableSeries that gates [append] and [set] operations behind a predicate.
@@ -7,7 +7,7 @@ package borg.trikeshed.mutable
  * inserting, set leaves the element unchanged). [remove], [removeAt], and
  * [clear] always pass through.
  *
- * Delegates all other operations to the wrapped [borg.trikeshed.mutable.MutableSeries] via `by`.
+ * Delegates all other operations to the wrapped [borg.trikeshed.collections.MutableSeries] via `by`.
  *
  * @param guard  predicate: return true to allow the mutation
  * @param inner  the wrapped MutableSeries (default: fresh COWArrayBackend)

@@ -2,8 +2,8 @@ package borg.trikeshed.couch
 
 import borg.trikeshed.job.ContentId
 import borg.trikeshed.lib.*
-import borg.trikeshed.mutable.MutableSeries
-import borg.trikeshed.mutable.mutableSeriesOf
+import borg.trikeshed.collections.MutableSeries
+import borg.trikeshed.collections.mutableSeriesOf
 import borg.trikeshed.parse.confix.ConfixDoc
 import borg.trikeshed.parse.confix.docAt
 import borg.trikeshed.parse.confix.reify
@@ -408,7 +408,7 @@ class ViewServer {
             groups.getOrPut(row.key) { mutableListOf() }.add(row)
         }
 
-        val reduced = borg.trikeshed.mutable.mutableSeriesOf<ViewRow>()
+        val reduced = borg.trikeshed.collections.mutableSeriesOf<ViewRow>()
         for ((key, group) in groups) {
             val reducedValue = evaluateReducerAst(doc, group)
             reduced.append(ViewRow(key = key, value = reducedValue, docId = "_custom", jsPath = "_custom"))

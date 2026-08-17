@@ -2,8 +2,8 @@ package borg.trikeshed.couch
 
 import borg.trikeshed.lib.*
 import borg.trikeshed.lib.`▶`
-import borg.trikeshed.mutable.MutableSeries
-import borg.trikeshed.mutable.mutableSeriesOf
+import borg.trikeshed.collections.MutableSeries
+import borg.trikeshed.collections.mutableSeriesOf
 import borg.trikeshed.userspace.nio.spi.NioSupervisor
 import kotlin.coroutines.coroutineContext
 import kotlinx.coroutines.yield

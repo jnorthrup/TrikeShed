@@ -1,4 +1,4 @@
-package borg.trikeshed.mutable
+package borg.trikeshed.collections
 
 import borg.trikeshed.collections.s_
 import borg.trikeshed.lib.*
@@ -60,7 +60,7 @@ class RecursiveMutableSeries<T>(var data: Series<T>) : MutableSeries<T>, Series<
     override fun freeze(): Series<T> =
         FrozenArray<T>(Array<Any?>(data.a) { i -> data[i] })
 
-    override fun cowSnapshot(): MutableSeries<T> = RecursiveMutableSeries(data)
+    override fun snapshot(): MutableSeries<T> = RecursiveMutableSeries(data)
 
     override fun subscribe(observer: (Twin<Series<T>>) -> Unit): () -> Unit = {}
 

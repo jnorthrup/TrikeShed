@@ -1,8 +1,8 @@
 package borg.trikeshed.couch
 
 import borg.trikeshed.lib.*
-import borg.trikeshed.mutable.MutableSeries
-import borg.trikeshed.mutable.mutableSeriesOf
+import borg.trikeshed.collections.MutableSeries
+import borg.trikeshed.collections.mutableSeriesOf
 import borg.trikeshed.cursor.Cursor
 import borg.trikeshed.cursor.RowVec
 import borg.trikeshed.cursor.ColumnMeta

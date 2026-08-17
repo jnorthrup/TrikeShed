@@ -60,7 +60,7 @@ class MultiIndexContainer<E : Any> {
                 if (kOld != null) {
                     val arr = nhe.map[kOld]
                     if (arr != null) {
-                        val newArr = arr.filter { it != pos }.toIntArray()
+                        val newArr = arr.filter { it != pos }.toIntArray() // stdlib-boundary:
                         if (newArr.isEmpty()) nhe.map.remove(kOld) else nhe.map[kOld] = newArr
                     }
                 }
@@ -95,7 +95,7 @@ class MultiIndexContainer<E : Any> {
             if (kOld != null) {
                 val arr = nhe.map[kOld]
                 if (arr != null) {
-                    val newArr = arr.filter { it != pos }.toIntArray()
+                    val newArr = arr.filter { it != pos }.toIntArray() // stdlib-boundary:
                     if (newArr.isEmpty()) nhe.map.remove(kOld) else nhe.map[kOld] = newArr
                 }
             }
@@ -160,11 +160,11 @@ class MultiIndexContainer<E : Any> {
             fn as R
         }
         MultiIndexK.BySequence -> {
-            val valid = store.indices.filter { store[it] != null }.toIntArray()
+            val valid = store.indices.filter { store[it] != null }.toIntArray() // stdlib-boundary:
             (valid.size j { i: Int -> valid[i] }) as R
         }
         MultiIndexK.Elements -> {
-            val valid = store.indices.filter { store[it] != null }.toIntArray()
+            val valid = store.indices.filter { store[it] != null }.toIntArray() // stdlib-boundary:
             (valid.size j { i: Int -> store[valid[i]] as Any? }) as R
         }
     }
@@ -191,7 +191,7 @@ class MultiIndexContainer<E : Any> {
     }
 
     private fun buildSortIndex(extractor: (Any?) -> Comparable<Any?>): SortEntry {
-        val valid = store.indices.filter { store[it] != null }.toIntArray()
+        val valid = store.indices.filter { store[it] != null }.toIntArray() // stdlib-boundary:
         val positions = valid.sortedWith(Comparator { a, b -> compareValues(extractor(store[a]), extractor(store[b])) }).toIntArray()
         return SortEntry(extractor, positions)
     }

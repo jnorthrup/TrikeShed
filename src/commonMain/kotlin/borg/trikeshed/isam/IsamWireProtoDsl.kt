@@ -105,11 +105,11 @@ class RingJournal<Synapse> private constructor(
 }
 
 // ---------------------------------------------------------------------------
-// ReduxMutableSeries journal (capture -> checkpoint)
+// JournalSeries journal (capture -> checkpoint)
 // ---------------------------------------------------------------------------
 
 /**
- * Journal body for ReduxMutableSeries — ISAM wireproto format.
+ * Journal body for JournalSeries — ISAM wireproto format.
  * Used for checkpoint/restore of state machine.
  */
 enum class JournalBody {

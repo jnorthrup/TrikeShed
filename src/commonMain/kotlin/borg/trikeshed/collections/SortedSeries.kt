@@ -1,6 +1,6 @@
 @file:Suppress("UNCHECKED_CAST")
 
-package borg.trikeshed.mutable
+package borg.trikeshed.collections
 
 import borg.trikeshed.lib.*
 
@@ -64,7 +64,7 @@ class SortedSeries<T>(
 
     override fun freeze(): Series<T> = FrozenArray(Array<Any?>(data.a) { i -> data[i] })
 
-    override fun cowSnapshot(): MutableSeries<T> {
+    override fun snapshot(): MutableSeries<T> {
         val snap = SortedSeries(comparator)
         for (i in 0 until data.a) snap.append(data[i])
         return snap

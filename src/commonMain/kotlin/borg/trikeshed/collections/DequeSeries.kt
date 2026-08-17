@@ -1,4 +1,4 @@
-package borg.trikeshed.mutable
+package borg.trikeshed.collections
 
 import borg.trikeshed.collections.s_
 import borg.trikeshed.lib.Series
@@ -176,7 +176,7 @@ class DequeSeries<T> : MutableSeries<T> {
         for (i in 0 until n) arr[i] = b(i)
         return FrozenArray(arr)
     }
-    override fun cowSnapshot(): MutableSeries<T> {
+    override fun snapshot(): MutableSeries<T> {
         val snap = DequeSeries<T>(); snap.front = front; snap.back = back; return snap
     }
     override fun subscribe(observer: (Twin<Series<T>>) -> Unit): () -> Unit = {}

@@ -4,7 +4,7 @@ package borg.trikeshed.parse.confix
 import borg.trikeshed.charstr.CharStr
 import borg.trikeshed.cursor.*
 import borg.trikeshed.lib.*
-import borg.trikeshed.mutable.*
+import borg.trikeshed.collections.*
 
 interface ConfixLifecycle
 typealias ConfixIndex = FacetedRow<Any>

@@ -28,7 +28,6 @@ import borg.trikeshed.lib.size
  *   Ring 2 (logical):    Couch document metadata (description, kind, sequence)
  *   Ring 3 (causal):     the mutation stream feeds ReteNetwork (subscribed
  *                        externally — this store emits, does not own the Rete)
- *   Ring 4 (pointcut):   PointcutMutableSeries wraps the Couch ingress
  *                        externally — this store's [subscribeMutations] is
  *                        the observation point
  *

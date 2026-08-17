@@ -2,7 +2,7 @@ package borg.trikeshed.hermes.tool
 
 import borg.trikeshed.lib.*
 import borg.trikeshed.lib.Series
-import borg.trikeshed.mutable.RingSeries
+import borg.trikeshed.collections.RingSeries
 
 /**
  * og1 RingTool — exposes RingSeries to hermes agent.

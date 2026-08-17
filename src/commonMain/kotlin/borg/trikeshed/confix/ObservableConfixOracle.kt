@@ -1,7 +1,7 @@
 package borg.trikeshed.confix
 
 import borg.trikeshed.cursor.*
-import borg.trikeshed.mutable.COWArrayBackend
+import borg.trikeshed.collections.COWArrayBackend
 import borg.trikeshed.lib.*
 
 // ── ObservableConfixOracle ─────────────────────────────────────────

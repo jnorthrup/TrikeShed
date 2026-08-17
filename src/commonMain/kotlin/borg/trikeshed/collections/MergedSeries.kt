@@ -1,4 +1,4 @@
-package borg.trikeshed.mutable
+package borg.trikeshed.collections
 
 import borg.trikeshed.lib.*
 
@@ -57,9 +57,9 @@ class MergedSeries<T>(
 
     override fun freeze(): Series<T> = sorted.freeze()
 
-    override fun cowSnapshot(): MutableSeries<T> {
+    override fun snapshot(): MutableSeries<T> {
         flush()
-        return sorted.cowSnapshot()
+        return sorted.snapshot()
     }
 
     override fun subscribe(observer: (Twin<Series<T>>) -> Unit): () -> Unit = {}

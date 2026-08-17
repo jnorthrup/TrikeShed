@@ -1,5 +1,5 @@
 @file:Suppress("UNCHECKED_CAST")
-package borg.trikeshed.mutable
+package borg.trikeshed.collections
 
 import borg.trikeshed.lib.*
 
@@ -117,7 +117,7 @@ class ChunkedMutableSeries<T>(
         val flat = Array<Any?>(totalSize) { i -> b(i) }
         return FrozenArray(flat)
     }
-    override fun cowSnapshot(): MutableSeries<T> {
+    override fun snapshot(): MutableSeries<T> {
         val snap = ChunkedMutableSeries<T>(chunkSize)
         snap.chunks = chunks; snap.totalSize = totalSize; return snap
     }
