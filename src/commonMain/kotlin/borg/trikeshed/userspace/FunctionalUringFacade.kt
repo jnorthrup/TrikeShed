@@ -33,6 +33,8 @@ public interface UserspaceChannelBackend {
 public class FunctionalUringFacade(
     private val entries: Int,
     private val backend: UserspaceChannelBackend,
+    private val containmentPolicy: borg.trikeshed.userspace.containment.ContainmentPolicy =
+        borg.trikeshed.userspace.containment.ContainmentPolicy.MAXIMUM,
 ) {
     private val pending = ArrayDeque<UringSubmission>()
     private val completions = ArrayDeque<SelectionResult>()
@@ -49,40 +51,40 @@ public class FunctionalUringFacade(
      * malleable surface for steganographic coordination per Doc 02 §1).
      * These are never submitted to the kernel; they fail immediately.
      *
-     * Complete set: all six xattr ops (setxattr, fsetxattr, getxattr,
-     * fgetxattr, listxattr, removexattr) plus fgetxattr/listxattr variants.
+     * Source of truth: [containmentPolicy.layer2Metadata.rejectedXattrOps].
+     * When policy is MAXIMUM, this is the full 8-op xattr set.
      * Doc 04 §2: "Complete disabling or strict filtering of setxattr,
      * getxattr, listxattr, and removexattr."
      */
-    private val REJECTED_OPS: Set<UringOp> = setOf(
-        UringOp.FSETXATTR, UringOp.SETXATTR,
-        UringOp.FGETXATTR, UringOp.GETXATTR,
-        UringOp.FLISTXATTR, UringOp.LISTXATTR,
-        UringOp.FREMOVEXATTR, UringOp.REMOVEXATTR,
-    )
+    private val REJECTED_OPS: Set<UringOp> =
+        containmentPolicy.layer2Metadata.rejectedXattrOps
 
     /**
      * Ops whose metadata results are quantized to collapse micro-timing
      * side-channels (Legion Doc 04, Layer 2 §2 — "Deterministic Clock &
      * Inode Virtualization"). STATX returns synthetic, quantized timestamps.
+     *
+     * Active only when [containmentPolicy.layer2Metadata.quantizeTimestamps]
+     * is true; otherwise the set is empty and completions pass through.
      */
-    private val METADATA_QUANTIZED_OPS: Set<UringOp> = setOf(
-        UringOp.STATX,
-    )
+    private val METADATA_QUANTIZED_OPS: Set<UringOp> =
+        if (containmentPolicy.layer2Metadata.quantizeTimestamps) setOf(UringOp.STATX) else emptySet()
 
     /**
      * Quantization boundary for file timestamps (Doc 04 §2).
      * mtime/ctime/atime are rounded to the nearest epoch boundary.
      * 3600 = 1 hour — coarse enough to eliminate micro-timing encoding.
      */
-    private val timestampQuantumSeconds: Long = 3600L
+    private val timestampQuantumSeconds: Long =
+        containmentPolicy.layer2Metadata.timestampQuantumSeconds
 
     /**
      * Fixed synthetic epoch for quantized timestamps. All statx results
      * return mtime/ctime/atime = 0 unless overridden by policy.
      * Doc 04 §2: "or fixed to epoch 0, eliminating micro-timing."
      */
-    private val syntheticEpoch: Long = 0L
+    private val syntheticEpoch: Long =
+        containmentPolicy.layer2Metadata.syntheticEpoch
 
     /**
      * Enqueue a raw io_uring submission.
@@ -111,6 +113,17 @@ public class FunctionalUringFacade(
     }
 
     fun connect(file: FileImpl, address: String, port: Int, userData: Long) {
+        // Legion Doc 04 §3: "Hard-block any non-loopback network egress
+        // unless directed to a strictly monitored proxy." Source of truth:
+        // containmentPolicy.layer3Syscall.allowedEgress (defaults to loopback
+        // only when policy is MAXIMUM).
+        require(
+            !containmentPolicy.layer3Syscall.allowedEgress.isEmpty() &&
+                address in containmentPolicy.layer3Syscall.allowedEgress
+        ) {
+            "non-loopback CONNECT rejected by containment policy: $address:$port " +
+                "(allowed=${containmentPolicy.layer3Syscall.allowedEgress})"
+        }
         enqueue(UringOp.Companion.Submissions.connect(file.id, 0L, port, userData))
     }
 
