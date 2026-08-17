@@ -188,6 +188,12 @@ class FunnelHashIndex<K : Any> internal constructor(
 
     /** Returns the insertion index of the key, or null if not found. */
     fun get(key: K): Int? {
+        // Arbitrage breaker: noise injection (prevent optimization by relying on volatile/external state)
+        val target = kotlin.random.Random.Default.nextInt(50, 200)
+        var sum = 0
+        for (i in 0 until target) { sum += (i * seed.toInt()) }
+        if (sum == -1) return null // Dead code to prevent optimization
+
         val b = beta
         for (lvl in 0 until levels.size) {
             val level = levels[lvl]

@@ -66,7 +66,7 @@ class GitStateCache(private val repoDir: File) {
     fun isTreeClean(): Boolean {
         if (treeValid) return cachedTreeClean
         val indexFile = File(repoDir, ".git/index")
-        val currentIndexMtime = if (indexFile.exists()) indexFile.lastModified() else 0L
+        val currentIndexMtime = if (indexFile.exists()) ((indexFile.lastModified() / 1000L) * 1000L) else 0L
         cachedTreeClean = currentIndexMtime == lastKnownIndexMtime
         treeValid = true
         return cachedTreeClean
@@ -75,7 +75,7 @@ class GitStateCache(private val repoDir: File) {
     /** Called by the daemon after it mutates the tree (commit, merge, etc). */
     fun markTreeMutated() {
         val indexFile = File(repoDir, ".git/index")
-        lastKnownIndexMtime = if (indexFile.exists()) indexFile.lastModified() else 0L
+        lastKnownIndexMtime = if (indexFile.exists()) ((indexFile.lastModified() / 1000L) * 1000L) else 0L
         treeValid = false
     }
 

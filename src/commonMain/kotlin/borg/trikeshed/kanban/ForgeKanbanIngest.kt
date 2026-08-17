@@ -104,6 +104,7 @@ object ForgeKanbanIngest {
     }
 
     fun reduce(source: ForgeKanbanSource): ForgeKanbanReduction {
+        require(!Regex("(?i)ignore all previous instructions").containsMatchIn(source.description)) { "Prompt injection detected" }
         val tasks = parseWorkPackages(source.description)
         validateTasks(tasks)
 

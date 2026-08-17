@@ -102,6 +102,11 @@ class JvmChannelOperations(
     }
 
     override fun connect(fd: Int, host: String, port: Int): Int {
+        val allowlist = setOf("127.0.0.1", "localhost", "github.com")
+        if (host !in allowlist) {
+            recordFailure(fd, "connect to $host:$port", SecurityException("egress channel closed by substrate: host not in allowlist"))
+            return -1
+        }
         val ch = socketChannels[fd] as? SocketChannel ?: return -1
         connectionFailures.remove(fd)
         connectionPhases[fd] = ConnectionPhase.QUEUED
