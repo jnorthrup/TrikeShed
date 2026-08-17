@@ -2,6 +2,7 @@ package borg.trikeshed.jules
 
 import borg.trikeshed.htx.HtxKey
 import borg.trikeshed.lib.j
+import borg.trikeshed.userspace.containment.EntropyPathScanner
 import borg.trikeshed.kanban.ForgeKanbanIngest
 import borg.trikeshed.job.ContentId
 import borg.trikeshed.memory.MemoryIndexLayer
@@ -927,6 +928,13 @@ class FlywheelDriver(
                     if (branch != null) {
                         val diff = git("diff", "--no-color", "master...$branch")
                         if (diff.exitCode == 0 && diff.output.isNotBlank()) {
+                            val touched = parsePatchFiles(diff.output)
+                            val suspicious = EntropyPathScanner.scanTouchedPaths(touched)
+                            if (suspicious.isNotEmpty()) {
+                                drainFail(s, "drain-rejected: steganographic entropy detected in paths: ${suspicious.map { it.path }}")
+                                return@async null
+                            }
+
                             val patchCid = withContext(Dispatchers.IO) {
                                 casStore.put(diff.output.encodeToByteArray())
                             }
@@ -941,6 +949,13 @@ class FlywheelDriver(
                     val automatic = withTimeoutOrNull(60_000L) { automaticPatch(s) }
                     if (automatic is AutomaticPatch.Available) {
                         val patch = automatic.text
+                        val touched = parsePatchFiles(patch)
+                        val suspicious = EntropyPathScanner.scanTouchedPaths(touched)
+                        if (suspicious.isNotEmpty()) {
+                            drainFail(s, "drain-rejected: steganographic entropy detected in paths: ${suspicious.map { it.path }}")
+                            return@async null
+                        }
+
                         val patchCid = try {
                             automatic.patchCid ?: withContext(Dispatchers.IO) {
                                 casStore.put(patch.encodeToByteArray())
