@@ -48,11 +48,41 @@ public class FunctionalUringFacade(
      * channels (Legion Modelling Doc 04, Layer 2 — xattr is a documented
      * malleable surface for steganographic coordination per Doc 02 §1).
      * These are never submitted to the kernel; they fail immediately.
+     *
+     * Complete set: all six xattr ops (setxattr, fsetxattr, getxattr,
+     * fgetxattr, listxattr, removexattr) plus fgetxattr/listxattr variants.
+     * Doc 04 §2: "Complete disabling or strict filtering of setxattr,
+     * getxattr, listxattr, and removexattr."
      */
     private val REJECTED_OPS: Set<UringOp> = setOf(
         UringOp.FSETXATTR, UringOp.SETXATTR,
         UringOp.FGETXATTR, UringOp.GETXATTR,
+        UringOp.FLISTXATTR, UringOp.LISTXATTR,
+        UringOp.FREMOVEXATTR, UringOp.REMOVEXATTR,
     )
+
+    /**
+     * Ops whose metadata results are quantized to collapse micro-timing
+     * side-channels (Legion Doc 04, Layer 2 §2 — "Deterministic Clock &
+     * Inode Virtualization"). STATX returns synthetic, quantized timestamps.
+     */
+    private val METADATA_QUANTIZED_OPS: Set<UringOp> = setOf(
+        UringOp.STATX,
+    )
+
+    /**
+     * Quantization boundary for file timestamps (Doc 04 §2).
+     * mtime/ctime/atime are rounded to the nearest epoch boundary.
+     * 3600 = 1 hour — coarse enough to eliminate micro-timing encoding.
+     */
+    private val timestampQuantumSeconds: Long = 3600L
+
+    /**
+     * Fixed synthetic epoch for quantized timestamps. All statx results
+     * return mtime/ctime/atime = 0 unless overridden by policy.
+     * Doc 04 §2: "or fixed to epoch 0, eliminating micro-timing."
+     */
+    private val syntheticEpoch: Long = 0L
 
     /**
      * Enqueue a raw io_uring submission.
@@ -113,7 +143,15 @@ public class FunctionalUringFacade(
 
         if (unified.isNotEmpty()) {
             val results = backend.submitBatch(unified)
-            completions.addAll(results)
+            // Legion Doc 04 Layer 2 §2: quantize STATX completions to collapse
+            // micro-timing side-channels. The result code is replaced with a
+            // synthetic epoch value for metadata ops.
+            val sanitized = results.mapIndexed { i, r ->
+                if (i < unified.size && unified[i].opcode in METADATA_QUANTIZED_OPS) {
+                    SelectionResult(syntheticEpoch.toInt(), r.userData)
+                } else r
+            }
+            completions.addAll(sanitized)
         }
         return submitted
     }
