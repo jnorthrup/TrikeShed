@@ -57,8 +57,7 @@ class JulesConductor(
             .mapNotNull { it.sessionId }
             .toSet()
         fun hasImmutableSettlement(sessionId: String, card: JulesSessionCard?): Boolean =
-            card?.causes?.filterIsInstance<JulesCause.WorkDrained>()
-                ?.any { it.receipt?.isImmutableSettlement() == true } == true ||
+            card?.causes?.any { it is JulesCause.WorkDrained && it.receipt?.isImmutableSettlement() == true } == true ||
                 sessionId in settledQueueSessions
         // API absence is not a lifecycle transition. Keep every WAL-rehydrated
         // card so rotation, pagination changes, or archive visibility cannot

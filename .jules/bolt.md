@@ -67,3 +67,7 @@
 ## 2024-05-24 - Avoiding intermediate List allocations in `filterIsInstance` followed by `firstOrNull`
 **Learning:** Using `services.filterIsInstance<T>().firstOrNull()` creates an intermediate `ArrayList` containing all instances of `T` in the collection before taking the first element and discarding the list. This creates unnecessary memory overhead and GC pressure, especially when the collection is large or updated frequently, like service registries.
 **Action:** Replace `.filterIsInstance<T>().firstOrNull()` with `.firstOrNull { it is T } as? T`. This iterates over the collection, stops immediately when it finds the first match, and avoids creating any intermediate lists.
+
+## 2024-05-24 - Avoiding intermediate List allocations in filterIsInstance followed by any, all, none, firstOrNull
+**Learning:** Using `.filterIsInstance<T>()` before short-circuiting operations like `.any { ... }`, `.all { ... }`, `.none { ... }`, or `.firstOrNull { ... }` generates an intermediate `ArrayList` containing all elements of type `T`. This creates unnecessary memory overhead, particularly on large sequences or frequently updated collections (like event buses or AST parsing).
+**Action:** Replace `.filterIsInstance<T>().any { ... }` with `.any { it is T && ... }`, and apply analogous transformations for `all` (with `it !is T || ...`), `none`, and `firstOrNull`. This preserves the short-circuiting behavior while eliminating the intermediate collection allocation.
