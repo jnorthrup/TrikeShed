@@ -32,6 +32,9 @@ class JulesConductor(
     var visibleSessionIds: Set<String> = emptySet()
         private set
 
+    /** States where a 404 on activityTimeline means the session is gone. */
+    private val TERMINAL_STATES_FOR_SKIP = setOf("COMPLETED", "FAILED", "CANCELLED")
+
     /** Complete latest API projection, used only for deterministic dispatch reconciliation. */
     var visibleSessions: List<JulesRestClient.SessionInfo> = emptyList()
         private set
@@ -73,7 +76,30 @@ class JulesConductor(
             // future timeline. Continue polling settled sessions so a late API
             // patch/report is CAS-observed and reopens review instead of being
             // hidden forever by an old drained bit.
-            val timeline = client.activityTimeline(s.id)
+            //
+            // A 404 on activityTimeline (session archived/deleted on the cloud
+            // side) must not abort the entire poll — skip that session and
+            // continue building cards for the rest so they can be archived.
+            val timeline = try {
+                client.activityTimeline(s.id)
+            } catch (t: Throwable) {
+                if (t is kotlinx.coroutines.CancellationException) throw t
+                // Session is gone from the API (archived/deleted). If it's
+                // terminal, mark it archived locally and skip.
+                if (s.state in TERMINAL_STATES_FOR_SKIP) {
+                    val cause = JulesCause.SessionArchived(System.currentTimeMillis())
+                    existing = (existing ?: JulesSessionCard.capture(
+                        JulesSnapshot(s.id, s.state, s.title, 0L, headSha, 0, 0)
+                    )).transition(
+                        JulesSnapshot(s.id, s.state, s.title, existing?.snapshot?.patchBytes ?: 0L, headSha, 0, 0),
+                        cause,
+                    )
+                    cards[s.id] = existing
+                    store?.append(existing.snapshot, drained = true, cause = cause)
+                    println("[FLYWHEEL] SKIP-ARCHIVE ${s.id.takeLast(6)} session 404 on API, marked archived")
+                }
+                continue
+            }
             val acts = timeline.activities.view
             // changeSets are cumulative; outputs-only artifacts are included in
             // timeline.patches and must make a new card visibly patch-bearing.
