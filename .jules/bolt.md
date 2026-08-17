@@ -71,3 +71,7 @@
 ## 2024-05-24 - Avoiding intermediate List allocations in filterIsInstance followed by any, all, none, firstOrNull
 **Learning:** Using `.filterIsInstance<T>()` before short-circuiting operations like `.any { ... }`, `.all { ... }`, `.none { ... }`, or `.firstOrNull { ... }` generates an intermediate `ArrayList` containing all elements of type `T`. This creates unnecessary memory overhead, particularly on large sequences or frequently updated collections (like event buses or AST parsing).
 **Action:** Replace `.filterIsInstance<T>().any { ... }` with `.any { it is T && ... }`, and apply analogous transformations for `all` (with `it !is T || ...`), `none`, and `firstOrNull`. This preserves the short-circuiting behavior while eliminating the intermediate collection allocation.
+
+## 2024-05-24 - Intermediate List allocations in channelize methods
+**Learning:** `filterIsInstance<T>().forEach { ... }` creates intermediate `ArrayList`s, causing unnecessary Garbage Collection pressure in high-throughput hot paths like `channelize` methods in reactive messaging buses.
+**Action:** Replace chained sequence allocations with a single `forEach` or `for` loop accompanied by an inline `if (it is T)` check to achieve zero-allocation routing. Avoid similar intermediate allocations (like checking `filterIsInstance<T>().isNotEmpty()`) by using `any { it is T }`.
