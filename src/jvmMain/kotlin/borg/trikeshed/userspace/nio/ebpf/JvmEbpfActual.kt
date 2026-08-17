@@ -6,3 +6,7 @@ import borg.trikeshed.userspace.nio.ebpf.engine.JitCode
 actual fun runNative(code: JitCode, args: LongArray): Long {
     return 0L
 }
+
+actual fun bpfProbeAttach(progFd: Int, tracepoint: String): Int {
+    return -1 // No-op on JVM
+}
