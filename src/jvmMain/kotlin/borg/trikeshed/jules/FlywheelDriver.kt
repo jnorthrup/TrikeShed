@@ -1280,8 +1280,7 @@ class FlywheelDriver(
     private suspend fun archiveSettledSessions(queueBySession: Map<String, borg.trikeshed.utils.kanban.QueueEntry>): Int {
         var archiveCount = 0
         val candidates = conductor.cards.values.filter { card ->
-            (card.drained || card.causes.any { it is JulesCause.DrainApplied || it is JulesCause.PatchRejected }) &&
-                card.snapshot.state in TERMINAL_STATES &&
+            card.snapshot.state in TERMINAL_STATES &&
                 card.snapshot.sessionId in conductor.visibleSessionIds &&
                 card.causes.none { it is JulesCause.SessionArchived }
         }.sortedBy { it.snapshot.capturedAt }.take(16)
