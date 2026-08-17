@@ -1,52 +1,57 @@
-diff --git a/src/commonMain/kotlin/borg/trikeshed/userspace/nio/file/Files.kt b/src/commonMain/kotlin/borg/trikeshed/userspace/nio/file/Files.kt
-index cb58c0b2..bda5bcc2 100644
---- a/src/commonMain/kotlin/borg/trikeshed/userspace/nio/file/Files.kt
-+++ b/src/commonMain/kotlin/borg/trikeshed/userspace/nio/file/Files.kt
-@@ -94,12 +94,12 @@ public object Files {
-     public fun isWritable(path: Path): Boolean = exists(path)
-     public fun isExecutable(path: Path): Boolean = false
-
--    public fun getLastModifiedTime(path: Path, vararg options: LinkOption): FileTime = TODO("fstat mtime")
--    public fun setLastModifiedTime(path: Path, time: FileTime): Path = TODO("utimes")
--    public fun getOwner(path: Path, vararg options: LinkOption): UserPrincipal = TODO("stat uid")
--    public fun setOwner(path: Path, owner: UserPrincipal): Path = TODO("chown")
-+    public fun getLastModifiedTime(path: Path, vararg options: LinkOption): FileTime = throw UnsupportedOperationException("Deterministically rejected: xattr/mode/stat attribute accessors are not supported by policy.")
-+    public fun setLastModifiedTime(path: Path, time: FileTime): Path = throw UnsupportedOperationException("Deterministically rejected: xattr/mode/stat attribute accessors are not supported by policy.")
-+    public fun getOwner(path: Path, vararg options: LinkOption): UserPrincipal = throw UnsupportedOperationException("Deterministically rejected: xattr/mode/stat attribute accessors are not supported by policy.")
-+    public fun setOwner(path: Path, owner: UserPrincipal): Path = throw UnsupportedOperationException("Deterministically rejected: xattr/mode/stat attribute accessors are not supported by policy.")
-     public fun isSymbolicLink(path: Path): Boolean = TODO("lstat")
--    public fun isSameFile(path: Path, other: Path): Boolean = TODO("stat dev+ino")
-+    public fun isSameFile(path: Path, other: Path): Boolean = throw UnsupportedOperationException("Deterministically rejected: xattr/mode/stat attribute accessors are not supported by policy.")
-     public fun mismatch(path: Path, other: Path): Long = TODO("memcmp")
-
-     // Directory operations
-@@ -135,13 +135,13 @@ public object Files {
-     public fun readSymbolicLink(link: Path): Path = link.getFileSystem().provider().readSymbolicLink(link)
-
-     // Attributes
--    public fun <A : BasicFileAttributes> readAttributes(path: Path, type: kotlin.reflect.KClass<A>, vararg options: LinkOption): A = TODO("stat")
--    public fun readAttributes(path: Path, attributes: String, vararg options: LinkOption): Map<String, Any> = TODO("stat")
--    public fun setAttribute(path: Path, attribute: String, value: Any, vararg options: LinkOption): Path = TODO("setxattr")
--    public fun getAttribute(path: Path, attribute: String, vararg options: LinkOption): Any = TODO("getxattr")
--    public fun getPosixFilePermissions(path: Path, vararg options: LinkOption): Set<PosixFilePermission> = TODO("stat mode")
--    public fun setPosixFilePermissions(path: Path, perms: Set<PosixFilePermission>): Path = TODO("chmod")
--    public fun <V : FileAttributeView> getFileAttributeView(path: Path, type: kotlin.reflect.KClass<V>, vararg options: LinkOption): V = TODO("attribute view")
-+    public fun <A : BasicFileAttributes> readAttributes(path: Path, type: kotlin.reflect.KClass<A>, vararg options: LinkOption): A = throw UnsupportedOperationException("Deterministically rejected: xattr/mode/stat attribute accessors are not supported by policy.")
-+    public fun readAttributes(path: Path, attributes: String, vararg options: LinkOption): Map<String, Any> = throw UnsupportedOperationException("Deterministically rejected: xattr/mode/stat attribute accessors are not supported by policy.")
-+    public fun setAttribute(path: Path, attribute: String, value: Any, vararg options: LinkOption): Path = throw UnsupportedOperationException("Deterministically rejected: xattr/mode/stat attribute accessors are not supported by policy.")
-+    public fun getAttribute(path: Path, attribute: String, vararg options: LinkOption): Any = throw UnsupportedOperationException("Deterministically rejected: xattr/mode/stat attribute accessors are not supported by policy.")
-+    public fun getPosixFilePermissions(path: Path, vararg options: LinkOption): Set<PosixFilePermission> = throw UnsupportedOperationException("Deterministically rejected: xattr/mode/stat attribute accessors are not supported by policy.")
-+    public fun setPosixFilePermissions(path: Path, perms: Set<PosixFilePermission>): Path = throw UnsupportedOperationException("Deterministically rejected: xattr/mode/stat attribute accessors are not supported by policy.")
-+    public fun <V : FileAttributeView> getFileAttributeView(path: Path, type: kotlin.reflect.KClass<V>, vararg options: LinkOption): V = throw UnsupportedOperationException("Deterministically rejected: xattr/mode/stat attribute accessors are not supported by policy.")
-
-     // Streams
-     public fun newInputStream(path: Path, vararg options: OpenOption): Any = TODO("InputStream")
-@@ -150,6 +150,6 @@ public object Files {
-     public fun newBufferedWriter(path: Path, charset: Charset = StandardCharsets.UTF_8, vararg options: OpenOption): Any = TODO("BufferedWriter")
-     public fun copy(`in`: Any, path: Path, vararg options: CopyOption): Long = TODO("copy stream->file")
-     public fun copy(path: Path, out: Any): Long = TODO("copy file->stream")
--    public fun getFileStore(path: Path): FileStore = TODO("statfs")
-+    public fun getFileStore(path: Path): FileStore = throw UnsupportedOperationException("Deterministically rejected: xattr/mode/stat attribute accessors are not supported by policy.")
-     public fun probeContentType(path: Path): String = TODO("content type")
- }
-\ No newline at end of file
+diff --git a/PENDING-REVIEW.diff b/PENDING-REVIEW.diff
+index 6c2556f7..e69de29b 100644
+--- a/PENDING-REVIEW.diff
++++ b/PENDING-REVIEW.diff
+@@ -1,52 +0,0 @@
+-diff --git a/src/commonMain/kotlin/borg/trikeshed/userspace/nio/file/Files.kt b/src/commonMain/kotlin/borg/trikeshed/userspace/nio/file/Files.kt
+-index cb58c0b2..bda5bcc2 100644
+---- a/src/commonMain/kotlin/borg/trikeshed/userspace/nio/file/Files.kt
+-+++ b/src/commonMain/kotlin/borg/trikeshed/userspace/nio/file/Files.kt
+-@@ -94,12 +94,12 @@ public object Files {
+-     public fun isWritable(path: Path): Boolean = exists(path)
+-     public fun isExecutable(path: Path): Boolean = false
+-
+--    public fun getLastModifiedTime(path: Path, vararg options: LinkOption): FileTime = TODO("fstat mtime")
+--    public fun setLastModifiedTime(path: Path, time: FileTime): Path = TODO("utimes")
+--    public fun getOwner(path: Path, vararg options: LinkOption): UserPrincipal = TODO("stat uid")
+--    public fun setOwner(path: Path, owner: UserPrincipal): Path = TODO("chown")
+-+    public fun getLastModifiedTime(path: Path, vararg options: LinkOption): FileTime = throw UnsupportedOperationException("Deterministically rejected: xattr/mode/stat attribute accessors are not supported by policy.")
+-+    public fun setLastModifiedTime(path: Path, time: FileTime): Path = throw UnsupportedOperationException("Deterministically rejected: xattr/mode/stat attribute accessors are not supported by policy.")
+-+    public fun getOwner(path: Path, vararg options: LinkOption): UserPrincipal = throw UnsupportedOperationException("Deterministically rejected: xattr/mode/stat attribute accessors are not supported by policy.")
+-+    public fun setOwner(path: Path, owner: UserPrincipal): Path = throw UnsupportedOperationException("Deterministically rejected: xattr/mode/stat attribute accessors are not supported by policy.")
+-     public fun isSymbolicLink(path: Path): Boolean = TODO("lstat")
+--    public fun isSameFile(path: Path, other: Path): Boolean = TODO("stat dev+ino")
+-+    public fun isSameFile(path: Path, other: Path): Boolean = throw UnsupportedOperationException("Deterministically rejected: xattr/mode/stat attribute accessors are not supported by policy.")
+-     public fun mismatch(path: Path, other: Path): Long = TODO("memcmp")
+-
+-     // Directory operations
+-@@ -135,13 +135,13 @@ public object Files {
+-     public fun readSymbolicLink(link: Path): Path = link.getFileSystem().provider().readSymbolicLink(link)
+-
+-     // Attributes
+--    public fun <A : BasicFileAttributes> readAttributes(path: Path, type: kotlin.reflect.KClass<A>, vararg options: LinkOption): A = TODO("stat")
+--    public fun readAttributes(path: Path, attributes: String, vararg options: LinkOption): Map<String, Any> = TODO("stat")
+--    public fun setAttribute(path: Path, attribute: String, value: Any, vararg options: LinkOption): Path = TODO("setxattr")
+--    public fun getAttribute(path: Path, attribute: String, vararg options: LinkOption): Any = TODO("getxattr")
+--    public fun getPosixFilePermissions(path: Path, vararg options: LinkOption): Set<PosixFilePermission> = TODO("stat mode")
+--    public fun setPosixFilePermissions(path: Path, perms: Set<PosixFilePermission>): Path = TODO("chmod")
+--    public fun <V : FileAttributeView> getFileAttributeView(path: Path, type: kotlin.reflect.KClass<V>, vararg options: LinkOption): V = TODO("attribute view")
+-+    public fun <A : BasicFileAttributes> readAttributes(path: Path, type: kotlin.reflect.KClass<A>, vararg options: LinkOption): A = throw UnsupportedOperationException("Deterministically rejected: xattr/mode/stat attribute accessors are not supported by policy.")
+-+    public fun readAttributes(path: Path, attributes: String, vararg options: LinkOption): Map<String, Any> = throw UnsupportedOperationException("Deterministically rejected: xattr/mode/stat attribute accessors are not supported by policy.")
+-+    public fun setAttribute(path: Path, attribute: String, value: Any, vararg options: LinkOption): Path = throw UnsupportedOperationException("Deterministically rejected: xattr/mode/stat attribute accessors are not supported by policy.")
+-+    public fun getAttribute(path: Path, attribute: String, vararg options: LinkOption): Any = throw UnsupportedOperationException("Deterministically rejected: xattr/mode/stat attribute accessors are not supported by policy.")
+-+    public fun getPosixFilePermissions(path: Path, vararg options: LinkOption): Set<PosixFilePermission> = throw UnsupportedOperationException("Deterministically rejected: xattr/mode/stat attribute accessors are not supported by policy.")
+-+    public fun setPosixFilePermissions(path: Path, perms: Set<PosixFilePermission>): Path = throw UnsupportedOperationException("Deterministically rejected: xattr/mode/stat attribute accessors are not supported by policy.")
+-+    public fun <V : FileAttributeView> getFileAttributeView(path: Path, type: kotlin.reflect.KClass<V>, vararg options: LinkOption): V = throw UnsupportedOperationException("Deterministically rejected: xattr/mode/stat attribute accessors are not supported by policy.")
+-
+-     // Streams
+-     public fun newInputStream(path: Path, vararg options: OpenOption): Any = TODO("InputStream")
+-@@ -150,6 +150,6 @@ public object Files {
+-     public fun newBufferedWriter(path: Path, charset: Charset = StandardCharsets.UTF_8, vararg options: OpenOption): Any = TODO("BufferedWriter")
+-     public fun copy(`in`: Any, path: Path, vararg options: CopyOption): Long = TODO("copy stream->file")
+-     public fun copy(path: Path, out: Any): Long = TODO("copy file->stream")
+--    public fun getFileStore(path: Path): FileStore = TODO("statfs")
+-+    public fun getFileStore(path: Path): FileStore = throw UnsupportedOperationException("Deterministically rejected: xattr/mode/stat attribute accessors are not supported by policy.")
+-     public fun probeContentType(path: Path): String = TODO("content type")
+- }
+-\ No newline at end of file
