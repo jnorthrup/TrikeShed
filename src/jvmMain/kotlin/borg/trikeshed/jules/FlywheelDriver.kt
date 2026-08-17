@@ -417,7 +417,10 @@ class FlywheelDriver(
         // counter never drops.  Run it unconditionally so the cloud
         // POST /sessions/$sid:archive fires as soon as a session is
         // settled, regardless of other stuck sessions.
-        val archived = archiveSettledSessions()
+        val queueBySession = loadQueueIo().mapNotNull { entry ->
+            entry.sessionId?.let { it to entry }
+        }.toMap()
+        val archived = archiveSettledSessions(queueBySession)
 
         // 6. INDUCT — the WAL is the only induction surface. External agents
         //    CAS-put a ≤4000-byte spec and appendWork(workId, WorkQueued).
@@ -804,7 +807,7 @@ class FlywheelDriver(
             parts.any { it == ".." || it == ".git" || it == ".gradle" } ||
             parts.firstOrNull() == "build" ||
             base in setOf("test_script.kt", "patch.diff", "plan_script.sh", "multiindexcontainer-patch.txt") ||
-            base.startsWith("test_script.") || (base.endsWith(".md") && lower.contains("jules"))
+            base.startsWith("test_script.")
     }
 
     /**
@@ -1274,7 +1277,7 @@ class FlywheelDriver(
      * preserving their complete conversation and output history. This runs only
      * after [settlementBarrier] proves local HEAD == origin/master.
      */
-    private suspend fun archiveSettledSessions(): Int {
+    private suspend fun archiveSettledSessions(queueBySession: Map<String, borg.trikeshed.utils.kanban.QueueEntry>): Int {
         var archiveCount = 0
         val candidates = conductor.cards.values.filter { card ->
             (card.drained || card.causes.any { it is JulesCause.DrainApplied || it is JulesCause.PatchRejected }) &&
@@ -1282,9 +1285,57 @@ class FlywheelDriver(
                 card.snapshot.sessionId in conductor.visibleSessionIds &&
                 card.causes.none { it is JulesCause.SessionArchived }
         }.sortedBy { it.snapshot.capturedAt }.take(16)
+
         for (card in candidates) {
             val sessionId = card.snapshot.sessionId
             try {
+                // Post the merge receipt to the Jules conversation before archiving,
+                // so the provenance (commit, tag, patchCid, branch, PR) is visible
+                // on the cloud API's activity timeline.  This is the idempotency
+                // anchor — skip only if a receipt was already posted.
+                val receiptAlreadySent = card.causes.any {
+                    it is JulesCause.HumanAnswered &&
+                        it.message.startsWith("FLYWHEEL MERGE RECEIPT\n")
+                }
+                if (!receiptAlreadySent) {
+                    val entry = queueBySession[sessionId]
+                    val receipt = entry?.receipt
+                    if (receipt != null && isImmutableReceipt(receipt)) {
+                        val identity = entry.workId.let { wid ->
+                            withContext(Dispatchers.IO) { store.replayCauses(wid) }
+                                .filterIsInstance<JulesCause.WorkIdentitySynthesized>()
+                                .lastOrNull()?.identity
+                        }
+                        sendMergeReceipt(
+                            sessionId = sessionId,
+                            commitSha = receipt.revision,
+                            tag = receipt.versionTag,
+                            patchCid = receipt.patchCid,
+                            branch = identity?.gitBranch,
+                            prUrl = receipt.prUrl,
+                        )
+                    } else {
+                        // No immutable receipt in the queue (e.g. settle-reject
+                        // path).  Post a minimal provenance receipt anchored
+                        // to the current origin/master HEAD so the conversation
+                        // carries the settlement evidence.
+                        val originSha = withContext(Dispatchers.IO) {
+                            val pb = ProcessBuilder("git", "rev-parse", "origin/master")
+                            pb.directory(repoDir).redirectErrorStream(true).start()
+                                .let { it.waitFor(); it.inputStream.bufferedReader().readText().trim() }
+                        }
+                        val rejectTag = "flywheel/jules-${sessionId}-${originSha.take(12)}"
+                        conductor.answer(sessionId, buildString {
+                            appendLine("FLYWHEEL MERGE RECEIPT")
+                            appendLine("mergedAt=${java.time.Instant.ofEpochMilli(System.currentTimeMillis())}")
+                            appendLine("commit=$originSha")
+                            appendLine("tag=$rejectTag")
+                            appendLine("patchCid=rejected")
+                            appendLine("branch=none")
+                            append("pr=none")
+                        })
+                    }
+                }
                 conductor.archive(sessionId)
                 archiveCount++
                 println("[FLYWHEEL] ARCHIVE ${sessionId.takeLast(6)} settled session preserved")
