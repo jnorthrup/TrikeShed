@@ -17,7 +17,7 @@ import kotlinx.datetime.Clock
  */
 class JulesConductor(
     private val client: JulesRestClient,
-    private val headShaProvider: () -> String,
+    private val headShaProvider: suspend () -> String,
     private val store: JulesBoardStore? = null,
     private val source: String = "sources/github/jnorthrup/TrikeShed",
 ) {
