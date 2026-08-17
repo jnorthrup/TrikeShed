@@ -439,7 +439,7 @@ button:focus-visible,
       <div class="sidebar-section">
         <div class="sidebar-section-label">Ingest</div>
         <div class="drop-zone" id="drop-zone" role="button" tabindex="0" aria-label="Drop files or click to upload">
-          <span class="drop-zone-icon">⬇</span>
+          <span class="drop-zone-icon" aria-hidden="true">⬇</span>
           <span class="drop-zone-text">Drag resumes, job postings, PDFs, DOCX<br>or click to select files</span>
           <input type="file" id="file-input" multiple accept=".pdf,.docx,.txt,.md,.html,.json" hidden />
         </div>
@@ -466,8 +466,8 @@ button:focus-visible,
         <div class="doc-page" id="doc-page">
           <div class="doc-cover-spacer"></div>
           <div class="doc-title-row">
-            <div class="doc-icon" id="doc-icon">▤</div>
-            <h1 class="doc-title" id="doc-title" contenteditable="true" spellcheck="false" data-placeholder="Untitled"></h1>
+            <div class="doc-icon" id="doc-icon" aria-hidden="true">▤</div>
+            <h1 class="doc-title" id="doc-title" contenteditable="true" spellcheck="false" aria-label="Document title" data-placeholder="Untitled"></h1>
           </div>
           <div class="doc-blocks" id="doc-blocks"></div>
           <div class="doc-hint" id="doc-hint">Type <span class="doc-hint-key">/</span> for commands</div>
@@ -680,9 +680,11 @@ button:focus-visible,
       const toggle = document.createElement('span');
       toggle.className = 'tree-toggle';
       toggle.textContent = page.children && page.children.length ? '▾' : '▸';
+      toggle.setAttribute('aria-hidden', 'true');
       const icon = document.createElement('span');
       icon.className = 'tree-icon';
       icon.textContent = page.icon || '▤';
+      icon.setAttribute('aria-hidden', 'true');
       const label = document.createElement('span');
       label.className = 'tree-label' + (page.title ? '' : ' untitled');
       label.textContent = page.title || 'Untitled';
@@ -786,6 +788,7 @@ button:focus-visible,
       const marker = document.createElement('span');
       marker.className = 'bullet-marker';
       marker.textContent = block.type === 'bullet' ? '•' : (numberedIndex(idx) + '.');
+      marker.setAttribute('aria-hidden', 'true');
       el.appendChild(marker);
     }
 
@@ -794,6 +797,7 @@ button:focus-visible,
     content.contentEditable = 'true';
     content.spellcheck = false;
     content.dataset.placeholder = def.placeholder;
+    content.setAttribute('aria-label', 'Block content');
     content.textContent = block.text || '';
     el.appendChild(content);
 
@@ -920,6 +924,7 @@ button:focus-visible,
       const icon = document.createElement('span');
       icon.className = 'slash-item-icon';
       icon.textContent = d.icon;
+      icon.setAttribute('aria-hidden', 'true');
       const text = document.createElement('span');
       text.className = 'slash-item-text';
       const name = document.createElement('span');
