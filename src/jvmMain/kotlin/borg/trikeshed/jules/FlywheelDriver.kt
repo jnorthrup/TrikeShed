@@ -96,6 +96,7 @@ class FlywheelDriver(
         JvmFileOperations(),
         JvmFileOperations().resolvePath(forgeDir.absolutePath, "cas"),
     ),
+    private val containmentPolicy: borg.trikeshed.userspace.containment.ContainmentPolicy = borg.trikeshed.userspace.containment.ContainmentPolicy.MAXIMUM,
 ) {
     private val behavioralAuditor = borg.trikeshed.userspace.containment.BehavioralGraphAuditor(
         borg.trikeshed.userspace.containment.ContainmentPolicy.MAXIMUM
@@ -732,7 +733,16 @@ class FlywheelDriver(
         val worktree = File(tempRoot, "worktree")
         val patchFile = File(tempRoot, "artifact.patch")
         try {
-            withContext(Dispatchers.IO) { patchFile.writeBytes(patch.encodeToByteArray()) }
+            val processedPatch = if (containmentPolicy.layer4Artifact.stripAuthorMetadata) {
+                patch.lineSequence().filterNot { line ->
+                    val lower = line.lowercase()
+                    lower.startsWith("author:") ||
+                    lower.startsWith("co-authored-by:") ||
+                    lower.startsWith("signed-off-by:")
+                }.joinToString("\n")
+            } else patch
+
+            withContext(Dispatchers.IO) { patchFile.writeBytes(processedPatch.encodeToByteArray()) }
             val added = git("worktree", "add", "--detach", worktree.absolutePath, baseSha)
             if (added.exitCode != 0) {
                 return PatchPreflight.ReviewBlocked("temporary worktree failed: ${added.output.take(200)}")
@@ -803,7 +813,11 @@ class FlywheelDriver(
             }
 
             val subject = "flywheel: patch ${s.title.take(50)} (${s.id.takeLast(6)})"
-            val commit = gitIn(worktree, "commit", "--no-verify", "-m", subject)
+            val commitArgs = mutableListOf("commit", "--no-verify", "-m", subject)
+            if (containmentPolicy.layer4Artifact.stripAuthorMetadata) {
+                commitArgs.add("--author=oroboros-drain <noreply@trikeshed.local>")
+            }
+            val commit = gitIn(worktree, *commitArgs.toTypedArray())
             if (commit.exitCode != 0) {
                 return PatchPreflight.ReviewBlocked("validated patch commit failed: ${commit.output.take(300)}")
             }
@@ -867,7 +881,15 @@ class FlywheelDriver(
 
         // 3. Apply all arms in parallel to the Pijul CRDT
         for (arm in validArms) {
-            val changes = borg.trikeshed.pijul.PijulDiffParser.parse(arm.patch)
+            val processedPatch = if (containmentPolicy.layer4Artifact.stripAuthorMetadata) {
+                arm.patch.lineSequence().filterNot { line ->
+                    val lower = line.lowercase()
+                    lower.startsWith("author:") ||
+                    lower.startsWith("co-authored-by:") ||
+                    lower.startsWith("signed-off-by:")
+                }.joinToString("\n")
+            } else arm.patch
+            val changes = borg.trikeshed.pijul.PijulDiffParser.parse(processedPatch)
             if (changes.isNotEmpty()) {
                 val workId = "session:${arm.session.id.replace(Regex("[^A-Za-z0-9._-]"), "-")}"
                 channel.applyPatch(workId, arm.session.id, arm.patchCid, arm.session.title, changes)
@@ -897,7 +919,11 @@ class FlywheelDriver(
 
             val titleList = validArms.joinToString(",") { it.session.id.takeLast(6) }
             val subject = "flywheel: pijul parallel merge ${validArms.size} sessions — $titleList"
-            val commit = gitIn(worktree, "commit", "--no-verify", "-m", subject)
+            val commitArgs = mutableListOf("commit", "--no-verify", "-m", subject)
+            if (containmentPolicy.layer4Artifact.stripAuthorMetadata) {
+                commitArgs.add("--author=oroboros-drain <noreply@trikeshed.local>")
+            }
+            val commit = gitIn(worktree, *commitArgs.toTypedArray())
             if (commit.exitCode != 0) return null
 
             val revision = gitIn(worktree, "rev-parse", "HEAD")
