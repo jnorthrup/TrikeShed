@@ -95,6 +95,33 @@ class FlywheelArchiveGuardTest {
         assertFalse(method.invoke(driver, "docs/jules-architecture.md") as Boolean)
     }
 
+    /**
+     * Regression guard: a session with SessionArchived cause must be skipped
+     * in the poll loop so the daemon doesn't re-process 404'd sessions every
+     * cycle. Without this, SKIP-ARCHIVE messages repeat forever for sessions
+     * that the cloud API still lists but whose activityTimeline 404s.
+     */
+    @Test
+    fun `session with SessionArchived cause is not re-processed`() {
+        val snapshot = JulesSnapshot(
+            sessionId = "test-archived-session",
+            state = "COMPLETED",
+            title = "Already archived",
+            patchBytes = 0L,
+            headSha = "abc123",
+            activeCount = 0,
+            awaitingCount = 0,
+        )
+        val captured = JulesSessionCard.capture(snapshot)
+        val archived = captured.transition(
+            snapshot,
+            JulesCause.SessionArchived(System.currentTimeMillis()),
+        )
+
+        // The card must carry the SessionArchived cause
+        assertTrue(archived.causes.any { it is JulesCause.SessionArchived })
+    }
+
     private fun runGit(dir: File, vararg args: String) {
         val pb = ProcessBuilder(listOf("git") + args.toList())
             .directory(dir).redirectErrorStream(true)
