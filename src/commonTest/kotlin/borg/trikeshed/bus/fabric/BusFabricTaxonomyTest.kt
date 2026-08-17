@@ -5,6 +5,7 @@ package borg.trikeshed.bus.fabric
 import borg.trikeshed.lib.Join
 import borg.trikeshed.lib.Series
 import borg.trikeshed.lib.j
+import borg.trikeshed.lib.get
 import borg.trikeshed.lib.size
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -136,7 +137,7 @@ class ReactorActionBusTest {
     /** ACP isomorph: Opened → Opened envelope shape. */
     @Test
     fun acp_opened_matches_ReactorAction() {
-        val action: BusEnvelope = BusEnvelope.opened("nuid-1")
+        val action: BusEnvelope = BusEnvelopeFactory.opened("nuid-1")
         assertEquals(BusVerb.Opened, action.verb)
         assertEquals("nuid-1", action.nuid)
     }
@@ -145,7 +146,7 @@ class ReactorActionBusTest {
     @Test
     fun fastmcpp_toolCall_matches_envelope() {
         val payload = mapOf("name" to "view", "arguments" to mapOf("path" to "/tmp"))
-        val envelope = BusEnvelope.toolCall("req-1", payload)
+        val envelope = BusEnvelopeFactory.toolCall("req-1", payload)
         assertEquals(BusVerb.ToolCall, envelope.verb)
         assertEquals("req-1", envelope.requestId)
     }
@@ -154,7 +155,7 @@ class ReactorActionBusTest {
     @Test
     fun pyo3_publishEntity_join_payload() {
         val entity = ByteArray(16) { it.toByte() }
-        val envelope = BusEnvelope.publishEntity("nuid-2", entity)
+        val envelope = BusEnvelopeFactory.publishEntity("nuid-2", entity)
         assertEquals(BusVerb.PublishEntity, envelope.verb)
         assertEquals(16, (envelope.payload as ByteArray).size)
     }
@@ -240,13 +241,17 @@ class NuidRoutingTest {
         assertEquals("put", cap.verb)
     }
 
-    /** fastmcpp isomorph: URI + method ≅ NUID routing. */
+    /** fastmcpp isomorph: URI + method ≅ NUID routing (tree containment). */
     @Test
     fun fastmcpp_uri_matches_subnet() {
-        val subnet = BusSubnet.of("lan.localhost")
-        assertEquals(2, subnet.level)
-        assertTrue(BusSubnet.local contains subnet,
-            "local scope must contain lan.localhost")
+        val lan = BusSubnet.of("lan")
+        val lanHost = BusSubnet.of("lan.localhost")
+        assertEquals(1, lan.level)
+        assertEquals(2, lanHost.level)
+        assertTrue(lan contains lanHost,
+            "lan scope must contain lan.localhost (prefix match, deeper)")
+        assertTrue(lan contains lanHost,
+            "Exact match: lan.localhost contains lan.localhost")
     }
 
     /** Concentric: inner contains outer is false. */
@@ -270,7 +275,7 @@ class CasReplicationTest {
     fun cas_put_fans_out_to_hooks() {
         val bus = CasReplicationBus()
         var hookFired = false
-        bus.registerHook { _, _ -> hookFired = true }
+        bus.registerHook { _ -> hookFired = true }
         bus.replicate(ByteArray(8))
         assertTrue(hookFired, "Hook must fire on replicate")
     }
@@ -280,9 +285,9 @@ class CasReplicationTest {
     fun cas_replication_multicast() {
         val bus = CasReplicationBus()
         var count = 0
-        bus.registerHook { _, _ -> count++ }
-        bus.registerHook { _, _ -> count++ }
-        bus.registerHook { _, _ -> count++ }
+        bus.registerHook { _ -> count++ }
+        bus.registerHook { _ -> count++ }
+        bus.registerHook { _ -> count++ }
         bus.replicate(ByteArray(4))
         assertEquals(3, count, "All 3 hooks must fire")
     }
