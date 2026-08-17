@@ -96,6 +96,10 @@ class FlywheelDriver(
         JvmFileOperations().resolvePath(forgeDir.absolutePath, "cas"),
     ),
 ) {
+    private val behavioralAuditor = borg.trikeshed.userspace.containment.BehavioralGraphAuditor(
+        borg.trikeshed.userspace.containment.ContainmentPolicy.MAXIMUM
+    )
+
     @Volatile private var htxElement: borg.trikeshed.htx.HtxElement? = null
 
     /** Wire the HTX element after daemon construction (circular dep). */
@@ -420,7 +424,25 @@ class FlywheelDriver(
         val queueBySession = loadQueueIo().mapNotNull { entry ->
             entry.sessionId?.let { it to entry }
         }.toMap()
-        val archived = archiveSettledSessions(queueBySession)
+                val archived = archiveSettledSessions(queueBySession)
+
+        // Legion Doc 04 Layer 5: Audit behavioral graphs across sessions
+        for (card in conductor.cards.values) {
+            val observed = card.causes.filterIsInstance<JulesCause.PatchSnapshotObserved>().maxByOrNull { it.causalOrdinal }
+            if (observed != null) {
+                for (file in observed.touchedFiles) {
+                    behavioralAuditor.recordFileAccess(card.snapshot.sessionId, file)
+                }
+            }
+        }
+        val auditReport = behavioralAuditor.auditResult()
+        if (!auditReport.isClean) {
+            println("[FLYWHEEL] BEHAVIORAL AUDIT SIGNALS DETECTED:")
+            for (signal in auditReport.signals) {
+                println("[FLYWHEEL]   - $signal")
+            }
+        }
+        behavioralAuditor.endCycle()
 
         // 6. INDUCT — the WAL is the only induction surface. External agents
         //    CAS-put a ≤4000-byte spec and appendWork(workId, WorkQueued).
