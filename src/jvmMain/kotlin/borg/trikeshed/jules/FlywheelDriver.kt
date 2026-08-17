@@ -407,7 +407,17 @@ class FlywheelDriver(
         val readyToSettle = remainingTerminal == 0 &&
             committedConflicts.isEmpty() && isWorkingTreeClean()
         val settled = readyToSettle && settlementBarrier()
-        val archived = if (settled) archiveSettledSessions() else 0
+
+        // ARCHIVE — fire every cycle, not only when fully settled. The
+        // archive path is idempotent (checks SessionArchived cause) and
+        // only touches sessions that already have DrainApplied or
+        // PatchRejected.  Gating it behind `settled` means a single
+        // stuck review-blocked session prevents *every* settled session
+        // from ever being archived on the cloud API — the dashboard
+        // counter never drops.  Run it unconditionally so the cloud
+        // POST /sessions/$sid:archive fires as soon as a session is
+        // settled, regardless of other stuck sessions.
+        val archived = archiveSettledSessions()
 
         // 6. INDUCT — the WAL is the only induction surface. External agents
         //    CAS-put a ≤4000-byte spec and appendWork(workId, WorkQueued).
