@@ -18,8 +18,8 @@ execve denial + 35b787ea5 build unbreak + d107ab682 ProcessWorker basename match
 | X11| Red-Green tests Layer 5 drain detectors         | 3686455973728984503   | Planning           |
 | X12| eBPF kprobe → daemon startup                    | 11380832347750396798  | Planning           |
 | X13| FUSE content-hash namespace masking             | 15378520016874031539  | Planning           |
-| X14| CollusionDetector drain tests (wave 2)          | — pending slot        | queued             |
-| X15| Deterministic clock all stat ops (wave 2)       | — pending slot        | queued             |
+| X14| CollusionDetector drain tests (wave 2)          | 3932338514890529272   | dispatched 2026-08-18 |
+| X15| Deterministic clock all stat ops (wave 2)       | 2250640878427217467   | dispatched 2026-08-18 |
 | X16| eBPF-JIT → Truffle pointcuts, polyglot contain. | 1517397739843069751  | Planning (user-added) |
 
 Disjoint file ownership enforced across all briefs (FlywheelDriver regions,
