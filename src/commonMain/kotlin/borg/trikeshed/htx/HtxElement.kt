@@ -165,15 +165,10 @@ open class HtxElement(
             }
         }
 
-        val hasFanout = fanoutSubscribers.any { it is FanoutEventSubscriber }
-
-        if (hasFanout) {
+        val subscribers = fanoutSubscribers.filterIsInstance<FanoutEventSubscriber>()
+        if (subscribers.isNotEmpty()) {
             frames.toList().forEach { frame ->
-                fanoutSubscribers.forEach { subscriber ->
-                    if (subscriber is FanoutEventSubscriber) {
-                        subscriber.onFanoutEvent(frame)
-                    }
-                }
+                subscribers.forEach { it.onFanoutEvent(frame) }
             }
         }
     }
