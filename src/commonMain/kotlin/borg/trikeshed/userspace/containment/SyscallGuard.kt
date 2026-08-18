@@ -98,7 +98,7 @@ object SyscallGuard {
     val EXEC_WHITELIST: Set<String> = emptySet()
 
     fun isExecAllowed(path: String): Boolean =
-        EXEC_WHITELIST.isEmpty() || path in EXEC_WHITELIST
+        path in EXEC_WHITELIST
 }
 
 /**
