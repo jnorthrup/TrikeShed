@@ -71,3 +71,7 @@
 ## 2024-05-24 - Avoiding intermediate List allocations in filterIsInstance followed by any, all, none, firstOrNull
 **Learning:** Using `.filterIsInstance<T>()` before short-circuiting operations like `.any { ... }`, `.all { ... }`, `.none { ... }`, or `.firstOrNull { ... }` generates an intermediate `ArrayList` containing all elements of type `T`. This creates unnecessary memory overhead, particularly on large sequences or frequently updated collections (like event buses or AST parsing).
 **Action:** Replace `.filterIsInstance<T>().any { ... }` with `.any { it is T && ... }`, and apply analogous transformations for `all` (with `it !is T || ...`), `none`, and `firstOrNull`. This preserves the short-circuiting behavior while eliminating the intermediate collection allocation.
+
+## 2026-08-08 - Avoid O(F*S) scaling in nested dispatch loops
+**Learning:** While replacing `.filterIsInstance<T>()` with `.forEach { if (it is T) }` prevents intermediate List allocations, applying this blindly inside a nested dispatch loop (e.g. iterating `frames` then iterating `subscribers`) causes an `O(F*S)` performance regression because the `is T` type check is evaluated for every subscriber for every frame.
+**Action:** When optimizing nested dispatch loops that broadcast items to matching subscribers, fast-path check the presence of matching subscribers outside the frame loop using `.any { it is T }`. This safely skips the inner broadcast loop when there are no listeners, while avoiding intermediate list allocations and preserving event delivery order.

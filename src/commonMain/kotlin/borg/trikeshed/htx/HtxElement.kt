@@ -159,14 +159,19 @@ open class HtxElement(
         )
 
     internal suspend fun channelize(frames: HtxFrames) {
-        fanoutSubscribers
-            .filterIsInstance<HtxFrameSubscriber>()
-            .forEach { it.onHtxFrames(frames) }
+        fanoutSubscribers.forEach {
+            if (it is HtxFrameSubscriber) {
+                it.onHtxFrames(frames)
+            }
+        }
 
-        val subscribers = fanoutSubscribers.filterIsInstance<FanoutEventSubscriber>()
-        if (subscribers.isNotEmpty()) {
+        if (fanoutSubscribers.any { it is FanoutEventSubscriber }) {
             frames.toList().forEach { frame ->
-                subscribers.forEach { it.onFanoutEvent(frame) }
+                fanoutSubscribers.forEach {
+                    if (it is FanoutEventSubscriber) {
+                        it.onFanoutEvent(frame)
+                    }
+                }
             }
         }
     }
