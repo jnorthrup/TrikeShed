@@ -11,6 +11,8 @@ import borg.trikeshed.litebike.JvmKanbanServer
 import borg.trikeshed.lib.j
 import borg.trikeshed.userspace.nio.file.spi.JvmFileOperations
 import borg.trikeshed.userspace.nio.spi.NioSupervisor
+import borg.trikeshed.userspace.nio.ebpf.bpfProbeAttach
+import borg.trikeshed.userspace.nio.ebpf.Tracepoints
 import borg.trikeshed.util.io.ForgeCliArgs
 import borg.trikeshed.util.oroboros.CouchAttachmentGateway
 import borg.trikeshed.util.oroboros.FileCasStore
@@ -161,6 +163,13 @@ object OroborosDaemon {
             }
             fHome.mkdirs()
             Pair(fHome, rDir)
+        }
+
+        if (System.getProperty("os.name").lowercase().contains("linux")) {
+            bpfProbeAttach(-1, Tracepoints.SYS_ENTER_SOCKET)
+            bpfProbeAttach(-1, Tracepoints.SYS_ENTER_CONNECT)
+            bpfProbeAttach(-1, Tracepoints.SYS_ENTER_EXECVE)
+            bpfProbeAttach(-1, Tracepoints.SYS_ENTER_OPENAT)
         }
 
         val driver = FlywheelDriver(
