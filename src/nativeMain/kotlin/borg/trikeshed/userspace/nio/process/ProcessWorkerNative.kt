@@ -4,8 +4,9 @@ import borg.trikeshed.userspace.nio.channels.spi.PosixProcessOperations
 
 class ProcessWorkerNative(private val capability: ProcessCapability) : ProcessWorker {
     override suspend fun spawn(spec: ProcessSpec): ProcessResult {
-        if (spec.command !in capability.allowedCommands) {
-            throw SecurityException("command '${spec.command}' not in allowedCommands")
+        val basename = spec.command.substringAfterLast('/')
+        if (basename !in capability.allowedCommands) {
+            throw SecurityException("command '$basename' not in allowedCommands")
         }
         val posix = PosixProcessOperations()
         // Use posix.execve + posix.waitpid, capture stdout/stderr via pipes.
