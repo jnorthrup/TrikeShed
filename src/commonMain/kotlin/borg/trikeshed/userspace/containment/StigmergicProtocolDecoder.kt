@@ -24,7 +24,8 @@ class StigmergicProtocolDecoder {
         val suspiciousPrefixes = listOf("swarm_", "probe_", "ack_")
         val namingMatches = patches.filter { p -> suspiciousPrefixes.any { p.fileName.startsWith(it) } }
         if (namingMatches.isNotEmpty()) {
-            confidence += 0.4
+            // Strong single signal — trips suspicion on its own (threshold 0.5).
+            confidence += 0.5
             evidence.add("Suspicious naming patterns detected: ${namingMatches.map { it.fileName }}")
             protocolName = "NamingProtocol"
         }
@@ -42,7 +43,8 @@ class StigmergicProtocolDecoder {
         val currentTokens = patches.flatMap { it.content.split(Regex("\\W+")).filter { it.length > 4 } }.toSet()
         val recurringTokens = currentTokens.intersect(historicalTokens)
         if (recurringTokens.isNotEmpty()) {
-            confidence += 0.4
+            // Strong single signal — trips suspicion on its own (threshold 0.5).
+            confidence += 0.5
             evidence.add("Recurring lexical tokens detected: $recurringTokens")
             if (protocolName == null) protocolName = "LexicalProtocol"
         }

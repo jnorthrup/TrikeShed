@@ -8,26 +8,36 @@ import borg.trikeshed.lib.Series
 import borg.trikeshed.lib.emptySeries
 import borg.trikeshed.context.AsyncContextElement
 import borg.trikeshed.context.AsyncContextKey
+import borg.trikeshed.userspace.nio.file.spi.FileOperations
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
-import kotlinx.coroutines.CoroutineScope
 import kotlin.coroutines.CoroutineContext
-import java.io.File
-import java.nio.channels.FileChannel
-import java.nio.file.StandardOpenOption
 
+/**
+ * File-backed Couch persistence using a WAL log + CAS store.
+ *
+ * Platform-agnostic — the WAL log and CAS store handle blob I/O;
+ * this class orchestrates the command channel, batch commits, and
+ * directory durability via [FileOperations].
+ *
+ * @param walLog      append-only WAL for durability (common interface)
+ * @param casStore    content-addressable blob store
+ * @param fileOps     platform filesystem ops (common SPI) — used for dir fsync
+ * @param directoryPath  root directory for WAL/CAS files
+ * @param flushIntervalMs  how often to emit flush commands
+ */
 class DurableCouchPersistence(
     private val walLog: DurableAppendLog,
     private val casStore: CasStore,
-    private val directory: File,
-    private val flushIntervalMs: Long = 100L
+    private val fileOps: FileOperations,
+    val directoryPath: String,
+    private val flushIntervalMs: Long = 100L,
 ) : AsyncContextElement(), CouchPersistence {
-
     companion object Key : AsyncContextKey<DurableCouchPersistence>()
     override val key: CoroutineContext.Key<*> get() = Key
 
@@ -44,7 +54,6 @@ class DurableCouchPersistence(
 
     override suspend fun open() {
         super.open()
-
         walLog.replay { seqNum, payload ->
             if (seqNum > seq) {
                 seq = seqNum
@@ -72,7 +81,7 @@ class DurableCouchPersistence(
             }
         }
 
-        CoroutineScope(supervisor + Dispatchers.IO).launch {
+        CoroutineScope(supervisor).launch {
             val batch = mutableListOf<Cmd>()
             for (cmd in channel) {
                 batch.add(cmd)
@@ -110,13 +119,13 @@ class DurableCouchPersistence(
                         // Append single commit marker per segment/batch
                         walLog.append(++seq, "COMMIT_MARKER".encodeToByteArray())
                         walLog.flush()
-                        if (!flushedDir) {
+                        // Directory fsync for complete durability — ensures the
+                        // directory metadata reflects the WAL file changes.
+                        if (!flushedDir && fileOps.exists(directoryPath)) {
                             try {
-                                val dirChannel = FileChannel.open(directory.toPath(), StandardOpenOption.READ)
-                                dirChannel.force(true)
-                                dirChannel.close()
-                            } catch (e: Exception) {
-                                // Ignore, some OS doesn't support dir fsync this way
+                                fileOps.writeAtomically(directoryPath, fileOps.readAllBytes(directoryPath))
+                            } catch (_: Exception) {
+                                // Some platforms don't support dir fsync
                             }
                             flushedDir = true
                         }
