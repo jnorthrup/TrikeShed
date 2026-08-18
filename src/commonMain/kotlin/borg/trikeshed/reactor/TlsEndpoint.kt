@@ -248,21 +248,19 @@ class TlsElement(
     }
 
     internal suspend fun channelize(frames: TlsFrames) {
-        // Bolt: Avoid intermediate List allocations from filterIsInstance for high-throughput channelizing
         fanoutSubscribers.forEach {
             if (it is TlsChannelSubscriber) {
                 it.onTlsFrames(frames)
             }
         }
 
-        // Bolt: Avoid intermediate List allocations from filterIsInstance for high-throughput channelizing
-        val hasFanoutSubscribers = fanoutSubscribers.any { it is FanoutEventSubscriber }
+        val hasFanout = fanoutSubscribers.any { it is FanoutEventSubscriber }
 
-        if (hasFanoutSubscribers) {
+        if (hasFanout) {
             frames.toList().forEach { frame ->
-                fanoutSubscribers.forEach {
-                    if (it is FanoutEventSubscriber) {
-                        it.onFanoutEvent(frame)
+                fanoutSubscribers.forEach { subscriber ->
+                    if (subscriber is FanoutEventSubscriber) {
+                        subscriber.onFanoutEvent(frame)
                     }
                 }
             }

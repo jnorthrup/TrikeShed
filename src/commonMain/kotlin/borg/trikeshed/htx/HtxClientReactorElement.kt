@@ -280,14 +280,12 @@ open class HtxClientReactorElement(
 
     internal suspend fun channelize(frame: HtxClientFrame) {
         fanoutMutex.withLock {
-            // Bolt: Avoid intermediate List allocations from filterIsInstance for high-throughput channelizing
             fanoutSubscribers.forEach {
                 if (it is HtxClientFrameSubscriber) {
                     it.onHtxClientFrame(frame)
                 }
             }
 
-            // Bolt: Avoid intermediate List allocations from filterIsInstance for high-throughput channelizing
             fanoutSubscribers.forEach {
                 if (it is FanoutEventSubscriber) {
                     it.onFanoutEvent(frame)
