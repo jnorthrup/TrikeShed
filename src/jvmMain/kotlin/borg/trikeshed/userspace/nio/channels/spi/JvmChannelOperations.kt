@@ -102,7 +102,8 @@ class JvmChannelOperations(
     }
 
     override fun connect(fd: Int, host: String, port: Int): Int {
-        val allowlist = setOf("127.0.0.1", "localhost", "github.com")
+        val allowlist = setOf("127.0.0.1", "localhost", "github.com") +
+            (System.getenv("TRIKESHED_EGRESS_ALLOWLIST")?.split(',')?.map { it.trim() }?.filter { it.isNotEmpty() } ?: emptyList())
         if (host !in allowlist) {
             recordFailure(fd, "connect to $host:$port", SecurityException("egress channel closed by substrate: host not in allowlist"))
             return -1
