@@ -4,8 +4,9 @@ import kotlinx.coroutines.async
 
 class ProcessWorkerJvm(private val capability: ProcessCapability) : ProcessWorker {
     override suspend fun spawn(spec: ProcessSpec): ProcessResult {
-        if (spec.command !in capability.allowedCommands) {
-            throw SecurityException("command '${spec.command}' not in allowedCommands")
+        val basename = spec.command.substringAfterLast('/')
+        if (basename !in capability.allowedCommands) {
+            throw SecurityException("command '$basename' not in allowedCommands")
         }
         val pb = ProcessBuilder(spec.command, *spec.args.toTypedArray())
         if (spec.cwd != null) pb.directory(java.io.File(spec.cwd))

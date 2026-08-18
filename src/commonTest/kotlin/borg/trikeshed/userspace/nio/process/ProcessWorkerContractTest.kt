@@ -19,10 +19,11 @@ class ProcessWorkerContractTest {
 
     @Test
     fun spawnFailingCommandReturnsNonZeroExit() = runBlocking {
-        // verifies: ProcessSpec("/bin/false") → exitCode != 0
+        // verifies: ProcessSpec(falsePath) → exitCode != 0 (false lives in /usr/bin on macOS, /bin on Linux)
         val cap = ProcessCapability("test", setOf("false"))
         val worker = ProcessWorkerFactory.create(cap)
-        val spec = ProcessSpec("/bin/false")
+        val falsePath = sequenceOf("/bin/false", "/usr/bin/false").first { java.io.File(it).exists() }
+        val spec = ProcessSpec(falsePath)
         val result = worker.spawn(spec)
         assertNotEquals(0, result.exitCode)
     }
