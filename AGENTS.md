@@ -109,3 +109,34 @@ first; typealiases compress semantics.
 - `jvmMainClasses` is the gate.
 - Edits → build → next cycle (cold restart only when needed).
 - `retireTerminal` must write a MergeReceipt (not null).
+
+## Jules state: stateless blackboard projection (stateful Jules is OBSOLETE)
+
+The previous stateful Jules wiring is obsolete. Jules session/blackboard state
+is NOT held in mutable adapters, session caches, or daemon-side registries —
+it is projected onto the Forge blackboard by coherent, working commonMain code:
+
+- `JulesBlackboardAdapter` (commonMain) — pure projection of session/activity
+  lists into `ForgeBlackboardView`. The adapter polls nothing, stores nothing.
+- `ConfixBlackboard` (commonMain) — the only blackboard state holder:
+  content-addressed ConfixDoc values; `subscribe` handlers are the sole side
+  effect.
+- `ForgeKanbanSignalProjector` (commonMain) — pure `ForgeKanbanEvent` →
+  `ForgeKanbanSignal` ADT switch.
+
+Rules:
+
+- Never reintroduce stateful Jules adapters (mutable session registries,
+  polling adapters, daemon-held per-session state). Adapters are stateless
+  `object`s; the caller owns all mutable state.
+- Jules blackboard state lives in commonMain only — no jvmMain/wasmJs state
+  holders duplicating it.
+- Projections are pure value transformers: no network, no filesystem, no
+  mutation inside the adapter.
+
+
+## vast expanse 
+
+ - rod doc/concepts.md in order to avoid low entropy 
+
+
