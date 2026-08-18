@@ -24,3 +24,6 @@
 ## 2024-08-17 - Context for identical buttons
 **Learning:** Identical buttons like "+ New" across multiple columns in a kanban board lack context for screen reader users. The screen reader would just say "button, + New" multiple times, without indicating which column it belongs to.
 **Action:** When adding identical action buttons to lists or columns, always add an `aria-label` that includes the parent context, e.g. `aria-label="Add new card to ' + col.name"`.
+## 2025-01-22 - Contextual ARIA labels for grouped dynamic buttons
+**Learning:** Buttons created dynamically within grouped structures (like Kanban board columns) often have generic visible text like "+ New" or "Add". While visual users infer context from the surrounding column or list grouping, screen reader users exploring by tab order or elements list lose this visual context, hearing only "Add, button".
+**Action:** When creating interactive elements inside visual groupings, dynamically generate a contextual `aria-label` that includes the grouping's name (e.g., `addBtn.setAttribute('aria-label', 'Add new card to ' + col.name);`) to restore context for assistive technologies.
