@@ -347,7 +347,18 @@ if (!focusedTransportSlice) {
     kotlin {
         sourceSets.getByName("commonTest") {
             kotlin.exclude("**/transport/**")
-            kotlin.exclude("**/userspace/**")
+            // userspace transport tests excluded; containment detector tests re-enabled
+            // (they are pure commonMain value tests, no CInterop linkage).
+            // btrfs facet/context/ebpf suites reference slab code that commonMain
+            // excludes (see **/classfile/slab/** above) — keep them out too.
+            kotlin.exclude("**/userspace/btrfs/**")
+            kotlin.exclude("**/userspace/context/**")
+            kotlin.exclude("**/userspace/nio/ebpf/**")
+            kotlin.exclude("**/userspace/network/**")
+            kotlin.exclude("**/userspace/reactor/**")
+            kotlin.exclude("**/userspace/FunctionalUringFacadeTest.kt")
+            kotlin.exclude("**/userspace/FunctionalUringFacadeXattrTest.kt")
+            kotlin.exclude("**/userspace/ByteRegionTest.kt")
             kotlin.exclude("**/ipfs/**")
             kotlin.exclude("**/quic/**")
             // kotlin.exclude("**/sctp/**")

