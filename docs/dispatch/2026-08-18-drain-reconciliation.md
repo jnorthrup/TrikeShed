@@ -10,6 +10,7 @@ WAL was wiped 15:19 (8 bytes) — reconciliation is against git + cloud board + 
 | 10373835449454975939 | LANDED | origin/bolt-zero-allocation-channelize-… merged (ancestor of master) |
 | 11325156128887202285 | LANDED | origin/jules-blackboard-adapter-… merged |
 | 11380832347750396798 | LANDED | CAS patch applied, commit d27b170d3 (OroborosDaemon eBPF kprobes) |
+| 11600634411112371934 | LANDED | CAS patch applied, commit 760784910 (StigmergicProtocolDecoder quarantine in preflightPijulBatch, X8) |
 | 11953326023123964330 | LANDED | origin/palette/contextual-aria-label-board-… merged |
 | 12529349414495707220 | LANDED | CAS patch applied, commit f39cf6f47 (DeterministicFormatter) |
 | 13181807474373252458 | LANDED | origin/feature-directory-entropy-monitor-… merged |
@@ -49,4 +50,4 @@ CAS bytes retained (never applied): the three sha256 CIDs above.
 X14 → 3932338514890529272, X15 → 2250640878427217467 dispatched after drain.
 Map updated: docs/dispatch/2026-08-18-legion-counter-threat.session-map.md.
 
-Rows: 29. Terminal sessions reconciled: 29. INCOMPLETE: none.
+Rows: 30. Terminal sessions reconciled: 30. INCOMPLETE: none. (X8 added post-drain: CAS patch landed 760784910)
