@@ -3,6 +3,7 @@ package borg.trikeshed.jules
 import borg.trikeshed.htx.HtxKey
 import borg.trikeshed.lib.j
 import borg.trikeshed.userspace.containment.EntropyPathScanner
+import borg.trikeshed.userspace.containment.PatchAstLinter
 import borg.trikeshed.kanban.ForgeKanbanIngest
 import borg.trikeshed.job.ContentId
 import borg.trikeshed.memory.MemoryIndexLayer
@@ -980,6 +981,12 @@ class FlywheelDriver(
                             val suspicious = EntropyPathScanner.scanTouchedPaths(touched)
                             if (suspicious.isNotEmpty()) {
                                 drainFail(s, "drain-rejected: steganographic entropy detected in paths: ${suspicious.map { it.path }}")
+                                return@async null
+                            }
+
+                            val lintResult = PatchAstLinter.lint(diff.output)
+                            if (!lintResult.clean) {
+                                drainFail(s, "drain-rejected: REVIEW-BLOCK ${lintResult.reason}")
                                 return@async null
                             }
 
