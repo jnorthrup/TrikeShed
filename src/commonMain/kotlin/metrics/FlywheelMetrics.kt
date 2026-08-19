@@ -106,6 +106,17 @@ object FlywheelMetrics {
     private var _ringIndex = 0
     private val _ringLock = Any()
 
+    // ── Phase latency histograms ──────────────────────────────────────────────────
+
+    /**
+     * Exponential histogram buckets for cycle latency (ms).
+     * Buckets: 10, 50, 100, 250, 500, 1000, 2500, 5000, 10000 ms.
+     */
+    private val _latencyBuckets = longArrayOf(10, 50, 100, 250, 500, 1000, 2500, 5000, 10000)
+    private val _histogramCounters = LongArray(_latencyBuckets.size + 1) // +Inf bucket
+    private val _histogramSum = java.util.concurrent.atomic.AtomicLong(0)
+    private val _histogramLock = Any()
+
     /** Timestamp (epoch ms) of the most recent cycle start. */
     private var _lastCycleTimestampMs: Long = 0L
 
@@ -136,12 +147,35 @@ object FlywheelMetrics {
             }
         }
 
+    // ── Slot utilization ─────────────────────────────────────────────────────────
+
+    /** Active (non-terminal) Jules sessions at last update. */
+    @Volatile
+    var activeSlots: Int = 0
+        private set
+
+    /** Maximum concurrent slots (15). */
+    const val TARGET_SLOTS = 15
+
+    /** Call from CycleBody or JvmKanbanServer to record current slot utilization. */
+    fun recordSlots(active: Int) {
+        activeSlots = active.coerceIn(0, TARGET_SLOTS)
+    }
+
     fun recordPhaseLatencies(latencies: List<PhaseLatency>, totalMs: Long, phase: String) {
         synchronized(_ringLock) {
             lastPhaseLatencies = latencies
             lastPhase = phase
             lastCycleMs = totalMs
             _cyclesPerDayRing[_ringIndex] = cyclesToday
+        }
+        // Record total cycle time in histogram for percentile queries.
+        val total = totalMs.coerceAtLeast(0)
+        _histogramSum.addAndGet(total)
+        synchronized(_histogramLock) {
+            val bucketIdx = _latencyBuckets.indexOfFirst { total <= it }
+            val idx = if (bucketIdx >= 0) bucketIdx else _latencyBuckets.size
+            _histogramCounters[idx]++
         }
     }
 
@@ -160,6 +194,11 @@ object FlywheelMetrics {
             _cyclesPerDayRing.fill(0L)
             _ringIndex = 0
         }
+        synchronized(_histogramLock) {
+            _histogramCounters.fill(0L)
+        }
+        _histogramSum.set(0L)
+        activeSlots = 0
         _lastCycleTimestampMs = 0L
         lastPhaseLatencies = emptyList()
         lastPhase = "POLL"
@@ -187,6 +226,8 @@ object FlywheelMetrics {
         put("cyclesToday", cyclesToday)
         put("cyclesPerSecond", cyclesPerSecond)
         put("cyclesAt100PerDay", cyclesAt100PerDay)
+        put("activeSlots", activeSlots)
+        put("targetSlots", TARGET_SLOTS)
         put("lastPhase", lastPhase)
         put("lastCycleMs", lastCycleMs)
         put("lastUpdated", System.currentTimeMillis())
@@ -196,6 +237,15 @@ object FlywheelMetrics {
 
         // Phase latencies as list of {phase,ms} maps
         put("phaseLatencies", lat.map { mapOf("phase" to it.phase, "ms" to it.ms) })
+
+        // Histogram bucket counts and sum for percentiles
+        val hc: LongArray
+        val hSum: Long
+        synchronized(_histogramLock) { hc = _histogramCounters.copyOf() }
+        hSum = _histogramSum.get()
+        put("histogramBuckets", _latencyBuckets.toList())
+        put("histogramCounts", hc.toList())
+        put("histogramSumMs", hSum)
 
         // Last 7 days cycles-per-day
         val ringList = cpd.toList()
@@ -246,6 +296,11 @@ object FlywheelMetrics {
         appendLine("# TYPE flywheel_cycles_at_100_per_day gauge")
         appendLine("flywheel_cycles_at_100_per_day ${if (cyclesAt100PerDay) "1" else "0"}")
 
+        // flywheel_slots_active
+        appendLine("# HELP flywheel_slots_active Number of active (non-terminal) Jules sessions")
+        appendLine("# TYPE flywheel_slots_active gauge")
+        appendLine("flywheel_slots_active $activeSlots")
+
         // flywheel_last_cycle_ms
         appendLine("# HELP flywheel_last_cycle_ms Wall-clock milliseconds of the last completed cycle")
         appendLine("# TYPE flywheel_last_cycle_ms gauge")
@@ -262,6 +317,20 @@ object FlywheelMetrics {
         for (l in lat) {
             appendLine("flywheel_phase_latency_ms{phase=\"${l.phase}\"} ${l.ms}")
         }
+
+        // flywheel_cycle_latency_seconds (histogram for P50/P95/P99)
+        appendLine("# HELP flywheel_cycle_latency_seconds_cycle Cycle wall-clock latency histogram")
+        appendLine("# TYPE flywheel_cycle_latency_seconds_cycle histogram")
+        val hc: LongArray
+        val hSum = _histogramSum.get()
+        synchronized(_histogramLock) { hc = _histogramCounters.copyOf() }
+        val hTotal = hc.sum()
+        for ((i, bound) in _latencyBuckets.withIndex()) {
+            appendLine("flywheel_cycle_latency_seconds_cycle_bucket{le=\"$bound\"} ${hc.getOrElse(i) { 0L }}")
+        }
+        appendLine("flywheel_cycle_latency_seconds_cycle_bucket{le=\"+Inf\"} $hTotal")
+        appendLine("flywheel_cycle_latency_seconds_cycle_sum $hSum")
+        appendLine("flywheel_cycle_latency_seconds_cycle_count $hTotal")
 
         // flywheel_transition_total
         appendLine("# HELP flywheel_transition_total State machine transitions")

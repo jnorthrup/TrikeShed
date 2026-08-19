@@ -50,13 +50,12 @@ class CycleBody(
                 val hadErrors = report.http429 > 0 || report.http5xx > 0
                 FlywheelMetrics.recordCycle(hadErrors)
 
-                // Phase latencies: we only have total cycleMs here, not per-phase.
-                // The phase-level timing lives in FlywheelDriver.cycle() which
-                // records directly into FlywheelMetrics via recordPhaseLatencies().
-                val phaseLatencies = listOf(
-                    FlywheelMetrics.PhaseLatency(report.phase.name, report.cycleMs),
-                )
+                // Phase latencies from FlywheelDriver's per-phase timing.
+                val phaseLatencies = report.phaseLatencies.map { (phase, ms) ->
+                    FlywheelMetrics.PhaseLatency(phase, ms)
+                }
                 FlywheelMetrics.recordPhaseLatencies(phaseLatencies, report.cycleMs, report.phase.name)
+                FlywheelMetrics.recordSlots(report.alive)
 
                 println(
                     "[FLYWHEEL] phase=" + report.phase + " cycleMs=" + report.cycleMs +

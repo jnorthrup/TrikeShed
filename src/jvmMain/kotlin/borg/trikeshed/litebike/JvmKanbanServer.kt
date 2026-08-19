@@ -365,16 +365,21 @@ class JvmKanbanServer(
                     }.getOrElse { ex ->
                         """{"error":"surface_projection_failed","reason":"${ex.message?.take(200)}"}"""
                     }
+                    val phaseLatenciesJson = report?.phaseLatencies?.joinToString(",", "[", "]") { (phase, ms) ->
+                        """["$phase",$ms]"""
+                    } ?: "[]"
+                    val auditSignalsJson = report?.auditSignals?.joinToString(",", "[", "]") { "\"${it.replace("\\", "\\\\").replace("\"", "\\\"")}\"" } ?: "[]"
                     val reportJson = if (report != null) {
-                        ""","cycle":{"cycleMs":${report.cycleMs},"phase":"${report.phase.name}","answered":${report.answered},"dispatched":${report.dispatched},"alive":${report.alive},"available":${report.available},"settled":${report.settled},"archived":${report.archived}}"""
+                        ""","cycle":{"cycleMs":${report.cycleMs},"phase":"${report.phase.name}","answered":${report.answered},"dispatched":${report.dispatched},"alive":${report.alive},"available":${report.available},"settled":${report.settled},"archived":${report.archived},"phaseLatencies":$phaseLatenciesJson,"auditSignals":$auditSignalsJson}"""
                     } else {
                         ""
                     }
                     val metricsMap = FlywheelMetrics.toJsonMap()
                     val cyclesPerSecond = metricsMap["cyclesPerSecond"]
                     val cyclesAt100PerDay = metricsMap["cyclesAt100PerDay"]
-                    val targetSlots = driver.slotCap
-                    HttpResponse(200, """{"surface":$surface$reportJson,"throughput":{"cyclesPerSecond":$cyclesPerSecond,"cyclesAt100PerDay":$cyclesAt100PerDay},"slots":{"cap":$targetSlots,"alive":${report?.alive ?: 0},"available":${report?.available ?: 0}}}""")
+                    val activeSlots = FlywheelMetrics.activeSlots
+                    val targetSlots = FlywheelMetrics.TARGET_SLOTS
+                    HttpResponse(200, """{"surface":$surface$reportJson,"throughput":{"cyclesPerSecond":$cyclesPerSecond,"cyclesAt100PerDay":$cyclesAt100PerDay},"slots":{"cap":$targetSlots,"alive":$activeSlots,"available":${(targetSlots - activeSlots).coerceAtLeast(0)}}}""")
                 }
             }
             "/api/submit" -> if (method == "POST") submit(text) else HttpResponse(405, """{"error":"method_not_allowed"}""")

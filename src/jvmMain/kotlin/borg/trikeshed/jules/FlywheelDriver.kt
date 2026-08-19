@@ -124,6 +124,9 @@ class FlywheelDriver(
         }
     }
 
+    /** Current number of non-terminal, non-drained sessions. */
+    fun activeSlotCount(): Int = activeCount()
+
     /** Exposed for JvmKanbanServer to fetch activity timelines for the surface projection. */
     val julesClient: JulesRestClient get() = client
     internal val brain: BrainClient? = BrainClient(errorSink = JvmBrainErrorSink(forgeDir))
@@ -285,6 +288,8 @@ class FlywheelDriver(
     /** One cycle: poll → answer → drain → induct → dispatch. */
     suspend fun cycle(): CycleReport {
         val t0 = System.currentTimeMillis()
+        val tPoll = t0
+        val phaseTimestamps = mutableListOf<Pair<String, Long>>()
         cycleHttp429 = 0
         cycleHttp5xx = 0
 
@@ -305,8 +310,9 @@ class FlywheelDriver(
             // DRAIN/SETTLE against WAL state — returning here starves drain
             // and the wheel spins at POLL forever (the documented contract at
             // the top of this block says drain proceeds on rehydrated cards).
-            _events.tryEmit(FlywheelEvent.PollError("poll incomplete; draining WAL-rehydrated cards"))
+            _events.emit(FlywheelEvent.PollError("poll incomplete; draining WAL-rehydrated cards"))
         }
+        phaseTimestamps.add("POLL" to (System.currentTimeMillis() - tPoll))
 
         // Refresh optional branch/PR identity metadata. Producer refs never
         // close a card; exact Jules API/CAS bytes remain mutation authority.
@@ -375,6 +381,8 @@ class FlywheelDriver(
                 _events.tryEmit(FlywheelEvent.PollError("approve ${card.snapshot.sessionId}: ${t.message?.take(200)}"))
             }
         }
+        val tAnswer = System.currentTimeMillis()
+        phaseTimestamps.add("ANSWER" to (tAnswer - tPoll))
 
         // 2c. Terminal API failures require a reviewed disposition.  FAILED or
         //     CANCELLED is producer state, not evidence that no late report or
@@ -423,6 +431,8 @@ class FlywheelDriver(
         val drain = drainFanout(sessions)
         val harvested = drain.harvested
         val reworked = drain.reworked
+        val tDrain = System.currentTimeMillis()
+        phaseTimestamps.add("DRAIN" to (tDrain - tPoll))
 
         // 5. SETTLE — only a complete, conflict-free drain set advances. The
         // next cycle retries a review-blocked artifact without closing it.
@@ -465,6 +475,8 @@ class FlywheelDriver(
             }
         }
         behavioralAuditor.endCycle()
+        val tSettle = System.currentTimeMillis()
+        phaseTimestamps.add("SETTLE" to (tSettle - tPoll))
 
         // 6. INDUCT — the WAL is the only induction surface. External agents
         //    CAS-put a ≤4000-byte spec and appendWork(workId, WorkQueued).
@@ -608,6 +620,13 @@ class FlywheelDriver(
             !settled -> FlywheelPhase.SETTLE
             else -> FlywheelPhase.DISPATCH
         }
+        phaseTimestamps.add("DISPATCH" to (System.currentTimeMillis() - tPoll))
+        // Extract audit signals from the behavioral report.
+        val auditSignals = if (!auditReport.isClean) {
+            auditReport.signals
+        } else {
+            emptyList()
+        }
 
         return CycleReport(
             cycleMs = System.currentTimeMillis() - t0,
@@ -625,6 +644,8 @@ class FlywheelDriver(
             panorama = drain.panorama,
             http429 = cycleHttp429,
             http5xx = cycleHttp5xx,
+            phaseLatencies = phaseTimestamps.toList(),
+            auditSignals = auditSignals,
         )
     }
 
@@ -1958,6 +1979,10 @@ class FlywheelDriver(
         val http429: Int = 0,
         /** Jules 5xx server-error responses seen this cycle. */
         val http5xx: Int = 0,
+        /** Per-phase wall-clock milliseconds for poll, answer, drain, settle, dispatch. */
+        val phaseLatencies: List<Pair<String, Long>> = emptyList(),
+        /** Behavioral containment signals from [behavioralAuditor]. */
+        val auditSignals: List<String> = emptyList(),
     )
 
 }
