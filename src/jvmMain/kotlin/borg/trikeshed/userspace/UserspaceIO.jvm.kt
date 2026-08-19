@@ -128,19 +128,21 @@ private class JvmUserspaceChannelBackend(
         } catch (_: Exception) { -1 }
 
         override fun executeRead(sub: UringSubmission): Int {
-            val nioBuf = sub.buffer?.toNioByteBuffer() ?: return -1
+            val buf = sub.buffer ?: return -1
+            val nioBuf = buf.toNioByteBuffer()
             return try {
                 val n = fc.read(nioBuf, sub.offset)
-                if (n > 0) sub.buffer?.position(sub.buffer?.position()?.plus(n) ?: n)
+                if (n > 0) buf.position(buf.position() + n)
                 n
             } catch (_: Exception) { -1 }
         }
 
         override fun executeWrite(sub: UringSubmission): Int {
-            val nioBuf = sub.buffer?.toNioByteBuffer() ?: return -1
+            val buf = sub.buffer ?: return -1
+            val nioBuf = buf.toNioByteBuffer()
             return try {
                 val n = fc.write(nioBuf, sub.offset)
-                if (n > 0) sub.buffer?.position(sub.buffer?.position()?.plus(n) ?: n)
+                if (n > 0) buf.position(buf.position() + n)
                 n
             } catch (_: Exception) { -1 }
         }
@@ -166,19 +168,21 @@ private class JvmUserspaceChannelBackend(
         override fun map(mode: String, position: Long, size: Long): Int = -1
 
         override fun executeRead(sub: UringSubmission): Int {
-            val nioBuf = sub.buffer?.toNioByteBuffer() ?: return -1
+            val buf = sub.buffer ?: return -1
+            val nioBuf = buf.toNioByteBuffer()
             return try {
                 val n = sc.read(nioBuf)
-                if (n > 0) sub.buffer?.position(sub.buffer?.position()?.plus(n) ?: n)
+                if (n > 0) buf.position(buf.position() + n)
                 n
             } catch (_: Exception) { -1 }
         }
 
         override fun executeWrite(sub: UringSubmission): Int {
-            val nioBuf = sub.buffer?.toNioByteBuffer() ?: return -1
+            val buf = sub.buffer ?: return -1
+            val nioBuf = buf.toNioByteBuffer()
             return try {
                 val n = sc.write(nioBuf)
-                if (n > 0) sub.buffer?.position(sub.buffer?.position()?.plus(n) ?: n)
+                if (n > 0) buf.position(buf.position() + n)
                 n
             } catch (_: Exception) { -1 }
         }
