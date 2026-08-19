@@ -81,3 +81,7 @@
 ## 2026-08-18 - Avoid O(F*S) scaling in nested dispatch loops
 **Learning:** While replacing `.filterIsInstance<T>()` with `.forEach { if (it is T) }` prevents intermediate List allocations, applying this blindly inside a nested dispatch loop (e.g. iterating `frames` then iterating `subscribers`) causes an `O(F*S)` performance regression because the `is T` type check is evaluated for every subscriber for every frame.
 **Action:** When optimizing nested dispatch loops that broadcast items to matching subscribers, fast-path check the presence of matching subscribers outside the frame loop using `.any { it is T }`. This safely skips the inner broadcast loop when there are no listeners, while avoiding intermediate list allocations and preserving event delivery order.
+
+## 2024-12-10 - Avoid O(N) boxing allocation when comparing ByteArray
+**Learning:** Comparing ByteArray objects using .toList() == other.toList() causes an O(N) memory allocation because each Byte gets boxed into an object within a new ArrayList. This can introduce unexpected GC pressure, especially when frequently hashing or comparing proofs.
+**Action:** Replace a.toList() == b.toList() on ByteArray with a.contentEquals(b) for a fast, zero-allocation byte-level comparison.
