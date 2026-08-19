@@ -112,7 +112,20 @@ class FlywheelDriver(
 
     /** Jules Pro concurrency ceiling; configuration may lower but never raise it. */
     private val maxSlots: Int = maxSlots.coerceIn(0, 15)
+
+    /** Publicly readable slot cap — exposed for SSE clients and surface JSON. */
+    val slotCap: Int get() = maxSlots
     private val client = JulesRestClient(keyMux)
+
+    /** Exposed for JvmKanbanServer to emit TTL eviction signals to SSE clients. */
+    fun emitTtlEvicted(sessionIds: List<String>) {
+        if (sessionIds.isNotEmpty()) {
+            _events.tryEmit(FlywheelEvent.TtlEvicted(sessionIds))
+        }
+    }
+
+    /** Exposed for JvmKanbanServer to fetch activity timelines for the surface projection. */
+    val julesClient: JulesRestClient get() = client
     internal val brain: BrainClient? = BrainClient(errorSink = JvmBrainErrorSink(forgeDir))
     private val store = JulesBoardStore.forForgeDir(forgeDir)
     private val patchContinuity = JulesPatchContinuityStore(casStore, store)
@@ -124,6 +137,10 @@ class FlywheelDriver(
         patchContinuity = patchContinuity,
     )
     @Volatile private var memoryIndexLayer: MemoryIndexLayer? = null
+
+    /** Live session list from the conductor, for HTTP server surface projection. */
+    val activeSessions: List<JulesRestClient.SessionInfo>
+        get() = conductor.visibleSessions
 
     /** Attach the daemon's live memory index so eviction can flush it first. */
     fun attachMemoryIndexLayer(indexLayer: MemoryIndexLayer) {
@@ -231,6 +248,8 @@ class FlywheelDriver(
         data class PollError(val message: String) : FlywheelEvent
         data class UpstreamDrifted(val local: String, val remote: String) : FlywheelEvent
         data class SpecMissing(val title: String) : FlywheelEvent
+        /** Session cache evicted entries from JulesBlackboardAdapter. */
+        data class TtlEvicted(val sessionIds: List<String>) : FlywheelEvent
     }
 
     /**

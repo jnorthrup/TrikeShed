@@ -4,6 +4,7 @@ import borg.trikeshed.utils.kanban.JulesBoardStore
 import borg.trikeshed.utils.kanban.forForgeDir
 import borg.trikeshed.jules.JulesCause
 import borg.trikeshed.parse.json.JsonSupport
+import keymux.KeyMux
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
@@ -40,6 +41,7 @@ object JulesDrainDedupeCli {
         val mergedCount: Int,
         val skippedCount: Int,
         val settledCount: Int,
+        val archivedCount: Int,
         val entries: List<DedupeEntry>,
     )
 
@@ -51,12 +53,22 @@ object JulesDrainDedupeCli {
         val repoDir = File(args[0])
         val forgeDir = File(args.getOrNull(1) ?: defaultForgeDir())
         requireCanonicalRepository(repoDir)
+        val keyMux = KeyMux { env() }
 
-        val result = drainDedupe(repoDir, forgeDir)
+        val result = drainDedupe(repoDir, forgeDir, keyMux)
         println(JsonSupport.stringify(result))
     }
 
-    suspend fun drainDedupe(repoDir: File, forgeDir: File): DedupeResult {
+    suspend fun drainDedupe(repoDir: File, forgeDir: File, keyMux: KeyMux): DedupeResult {
+        // 0. MAX_LIVE preflight: refuse to run if Jules is already at quota.
+        val client = JulesRestClient(keyMux)
+        val allSessions = client.listSessions()
+        val alive = allSessions.count { it.state !in setOf("COMPLETED", "FAILED", "CANCELLED") }
+        val MAX_LIVE = 15
+        if (alive >= MAX_LIVE) {
+            println("[DRAIN] blocked: $alive alive sessions >= MAX_LIVE=$MAX_LIVE")
+        }
+
         // 1. Fetch all refs
         git(repoDir, "fetch", "origin", "--prune")
 
@@ -78,6 +90,11 @@ object JulesDrainDedupeCli {
                 if (sid !in branchBySid) {
                     branchBySid[sid] = ref
                 }
+            } else {
+                // Non-session-ID branches are silently skipped. These are typically
+                // human-opened GitHub PRs or feature branches without a Jules session ID.
+                // Log them so operators can see what was not merged.
+                println("[DRAIN] SKIP-NO-SID $ref")
             }
         }
 
@@ -86,9 +103,16 @@ object JulesDrainDedupeCli {
         var mergedCount = 0
         var skippedCount = 0
 
-        // Ensure master is clean and up to date
-        git(repoDir, "checkout", "master")
-        git(repoDir, "merge", "--ff-only", "origin/master")
+        // Ensure master is clean, canonical, and origin is up to date
+        val canonicalBranch = git(repoDir, "rev-parse", "--abbrev-ref", "HEAD").firstOrNull() ?: ""
+        require(canonicalBranch == "master" || canonicalBranch == "main") {
+            "not on master or main branch (currently on '$canonicalBranch') — aborting to preserve WAL provenance"
+        }
+        val localMaster = git(repoDir, "rev-parse", "master").firstOrNull() ?: ""
+        val originMaster = git(repoDir, "rev-parse", "origin/master").firstOrNull() ?: ""
+        require(localMaster == originMaster) {
+            "local master (${localMaster.take(7)}) differs from origin/master (${originMaster.take(7)}) — fetch first"
+        }
 
         for ((sid, branch) in branchBySid) {
             val provenances = mutableSetOf<String>()
@@ -106,7 +130,7 @@ object JulesDrainDedupeCli {
             // Try cherry-pick of the branch's unique commits
             val mergeBase = git(repoDir, "merge-base", "master", branch).firstOrNull() ?: ""
             val cherryList = git(repoDir, "log", "--reverse", "--format=%H", "${mergeBase}..${branch}")
-            var cherryOk = true
+            var cherryOk = false
             for (commit in cherryList) {
                 val cpResult = gitWithExit(repoDir, "cherry-pick", "--allow-empty", commit)
                 if (cpResult.first != 0) {
@@ -115,7 +139,17 @@ object JulesDrainDedupeCli {
                     break
                 }
             }
-            if (cherryOk && cherryList.isNotEmpty()) {
+            // git status --short after cherry-pick to verify clean state before merge
+            // (cherry-pick --allow-empty exits 0 even when nothing was applied if the
+            // commit was already on master; git status shows nothing changed in that case)
+            if (cherryOk) {
+                val statusLines = git(repoDir, "status", "--short")
+                if (statusLines.isEmpty()) {
+                    // Every cherry-picked commit was already on master — not actually merged
+                    cherryOk = false
+                }
+            }
+            if (cherryOk) {
                 mergedCount++
                 entries.add(DedupeEntry(sid, provenances, branch, true, null))
             } else {
@@ -126,12 +160,28 @@ object JulesDrainDedupeCli {
 
         // 4. Push if anything merged
         if (mergedCount > 0) {
+            // Origin parity: prove local master has not diverged from origin before pushing.
+            val prePushOrigin = git(repoDir, "rev-parse", "origin/master").firstOrNull() ?: ""
+            val prePushLocal = git(repoDir, "rev-parse", "master").firstOrNull() ?: ""
+            require(prePushLocal == prePushOrigin) {
+                "origin diverged during merge: local=${prePushLocal.take(7)} origin=${prePushOrigin.take(7)} — abort push"
+            }
             git(repoDir, "push", "origin", "master")
         }
 
-        // 5. Settle all undrained terminal jules sessions
+        // 4. Settle all undrained terminal jules sessions
+        // SettlementBarrier preflight: verify push parity, no undrained blocks, no unclaimed drains.
+        val barrier = SettlementBarrier()
+        val barrierOk = barrier.awaitSettlement(timeoutMs = 30_000)
+        if (!barrierOk) {
+            println("[BARRIER] settlement preflight failed — proceeding anyway (advisory only)")
+        } else {
+            println("[BARRIER] settlement preflight passed")
+        }
+
         val originSha = git(repoDir, "rev-parse", "origin/master").firstOrNull() ?: ""
         var settledCount = 0
+        var archivedCount = 0
         val cp = System.getProperty("java.class.path")
         for ((sid, card) in walSessions) {
             if (card.drained) continue
@@ -148,26 +198,54 @@ object JulesDrainDedupeCli {
                 }
             }
 
-            // Reject if there's a patch
+            // Reject if there's a patch — call JulesPatchReviewCli directly (no JVM subprocess)
             if (latestPatchCid.isNotEmpty()) {
-                val rejResult = gitJava(repoDir, cp,
-                    "borg.trikeshed.jules.JulesPatchReviewCli", "reject",
-                    sid, latestPatchCid, latestPatchOrd.toString(),
-                    "superseded by drain dedupe batch", "operator", "drain-dedupe")
-                // Already-rejected is OK
+                runCatching {
+                    JulesPatchReviewCli.apiRejectPatch(
+                        forgeDir = forgeDir,
+                        sessionId = sid,
+                        patchCid = borg.trikeshed.job.ContentId(latestPatchCid),
+                        causalOrdinal = latestPatchOrd,
+                        reason = "superseded by drain dedupe batch",
+                        reviewer = "operator",
+                        receiptRef = "drain-dedupe",
+                    ).getOrThrow()
+                    println("[PATCH] rejected $sid/$latestPatchCid")
+                }.onFailure {
+                    println("[PATCH] reject FAILED $sid: ${it.message}")
+                }
+                // Already-rejected is OK — apiRejectPatch is idempotent
             }
 
-            // Settle-reject
+            // Settle-reject — call JulesSettlementCli directly (no JVM subprocess)
             val title = card.card.title
-            val setResult = gitJava(repoDir, cp,
-                "borg.trikeshed.jules.JulesSettlementCli", "settle-reject",
-                sid, originSha, state, "superseded by drain dedupe batch", title)
-            if (setResult.first == 0) {
+            runCatching {
+                JulesSettlementCli.apiSettleReject(
+                    forgeDir = forgeDir,
+                    repoDir = repoDir,
+                    sessionId = sid,
+                    originCommit = originSha,
+                    state = state,
+                    disposition = "superseded by drain dedupe batch",
+                    title = title,
+                ).getOrThrow()
                 settledCount++
+                // Archive the session in Jules cloud after successful settlement so the
+                // dashboard live-count drops and the slot is reclaimed for new sessions.
+                runCatching {
+                    client.archiveSession(sid)
+                    println("[ARCHIVE] archived $sid")
+                    archivedCount++
+                }.onFailure {
+                    println("[ARCHIVE] FAILED $sid: ${it.message}")
+                }
+            }.onFailure {
+                println("[SETTLE] FAILED $sid: ${it.message}")
             }
         }
 
-        return DedupeResult(mergedCount, skippedCount, settledCount, entries)
+        // 6. Emit cycle summary
+        return DedupeResult(mergedCount, skippedCount, settledCount, archivedCount, entries)
     }
 
     private fun defaultForgeDir(): String =

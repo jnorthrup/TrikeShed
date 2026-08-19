@@ -14,6 +14,8 @@ import keymux.KeyMux
 import modelmux.ModelEntry
 import modelmux.ModelMux
 import kotlinx.coroutines.withTimeout
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.Dispatchers
 import kotlinx.datetime.Clock
 import borg.trikeshed.userspace.nio.platform.spi.SystemOperations
 
@@ -44,6 +46,14 @@ class BrainClient(
     model: String = "poolside/laguna-xs-2.1",
     private val errorSink: BrainErrorSink = DiscardingBrainErrorSink,
 ) {
+    /** Outer timeout for the entire multi-provider failover loop. */
+    companion object {
+        /** Outer timeout: if every provider fails to respond within this window, abort the whole call. */
+        const val OUTER_TIMEOUT_MS = 60_000L
+        /** Per-provider HTTP timeout. */
+        const val HTTP_TIMEOUT_MS = 15_000L
+    }
+
     /** One OpenAI-compatible endpoint + the env var that KeyMux resolves. */
     data class EndpointSpec(
         val name: String,
@@ -71,37 +81,45 @@ class BrainClient(
     /** True if at least one provider endpoint was discovered. */
     fun hasEndpoints(): Boolean = endpoints.isNotEmpty()
 
-    /** Non-streaming chat completion with multi-provider failover. */
+    /**
+     * Non-streaming chat completion with multi-provider failover.
+     *
+     * Outer timeout ([OUTER_TIMEOUT_MS]) bounds the entire failover loop —
+     * every `modelMux.route()`, `modelMux.session()`, and HTTP call across
+     * all providers must complete within 60 seconds or the call aborts.
+     * Per-provider HTTP timeout is [HTTP_TIMEOUT_MS].
+     *
+     * If every provider fails, throws with the last error message.
+     */
     suspend fun chat(messages: List<Pair<String, String>>, maxTokens: Int = 256, temperature: Double = 0.2): String {
         if (endpoints.isEmpty()) error("Brain: no provider endpoints discovered")
 
+        // Outer timeout: bounds the entire multi-provider failover sequence.
+        // modelMux.route() and modelMux.session() are blocking get() calls —
+        // without this, they can hang indefinitely on a quota-starved provider.
+        return withTimeout(OUTER_TIMEOUT_MS) {
+            chatInner(messages, maxTokens, temperature)
+        }
+    }
+
+    /** Inner loop: called inside the outer timeout. */
+    private suspend fun chatInner(messages: List<Pair<String, String>>, maxTokens: Int, temperature: Double): String {
         var lastError = "all providers exhausted"
-        val routed = modelMux.route("conflict-resolve").a
+        val routed = withContext(Dispatchers.IO) { modelMux.route("conflict-resolve").a }
         for (modelId in orderedModelIds(routed)) {
             val endpoint = endpointByModel[modelId] ?: continue
             val session = try {
-                modelMux.session(modelId).getOrThrow()
+                withContext(Dispatchers.IO) { modelMux.session(modelId).getOrThrow() }
             } catch (t: Throwable) {
                 lastError = "Brain ${endpoint.name} session failed: ${t.message}"
                 logError(endpoint.name, -1, t.message.orEmpty().take(500))
                 continue
             }
             session.activate()
-            val body = buildString {
-                append("""{"model":${jsonStr(modelId)},"messages":[""")
-                messages.forEachIndexed { index, (role, content) ->
-                    if (index > 0) append(',')
-                    append("""{"role":${jsonStr(role)},"content":${jsonStr(content)}}""")
-                }
-                append("],")
-                append("\"max_tokens\":$maxTokens,")
-                append("\"temperature\":$temperature,")
-                append("\"top_p\":0.9")
-                append('}')
-            }
             try {
+                val body = buildChatBody(modelId, messages, maxTokens, temperature)
                 val response = try {
-                    withTimeout(15_000) {
+                    withTimeout(HTTP_TIMEOUT_MS) {
                         TrikeHtxHttpClient(
                             base = session.baseUrl,
                             defaultHeaders = htxHeaders(*session.authHeaders().toArray()),
@@ -119,13 +137,49 @@ class BrainClient(
                     continue
                 }
                 lastGoodModelId = modelId
-                return extractContent(response)
+                return try {
+                    extractContent(response)
+                } catch (t: Throwable) {
+                    // Malformed response body (missing field, truncated gzip, etc.)
+                    // — try the next provider instead of failing the whole call.
+                    val snippet = response.take(200)
+                    logError(endpoint.name, -1, "extractContent failed: ${t.message} body=${snippet}")
+                    lastError = "Brain ${endpoint.name} extractContent failed: ${t.message}"
+                    continue
+                }
             } finally {
                 session.drain()
                 session.close()
             }
         }
         error(lastError)
+    }
+
+    /**
+     * Build the OpenAI-compatible chat completions JSON body with proper string escaping.
+     */
+    private fun buildChatBody(
+        modelId: String,
+        messages: List<Pair<String, String>>,
+        maxTokens: Int,
+        temperature: Double,
+    ): String = buildString {
+        append("{\"model\":")
+        append(jsonStr(modelId))
+        append(",\"messages\":[")
+        messages.forEachIndexed { index, (role, content) ->
+            if (index > 0) append(',')
+            append("{\"role\":")
+            append(jsonStr(role))
+            append(",\"content\":")
+            append(jsonStr(content))
+            append('}')
+        }
+        append("],\"max_tokens\":")
+        append(maxTokens.toString())
+        append(",\"temperature\":")
+        append(temperature.toString())
+        append(",\"top_p\":0.9}")
     }
 
     private fun orderedModelIds(routed: Series<ModelEntry>): List<String> {
@@ -163,7 +217,10 @@ class BrainClient(
         errorSink.append(entry)
     }
 
-    /** Pull choices[0].message.content out of the OpenAI-compatible JSON. */
+    /**
+     * Pull choices[0].message.content out of the OpenAI-compatible JSON.
+     * Throws on malformed input — callers must wrap in try/catch for graceful failover.
+     */
     private fun extractContent(json: String): String {
         val key = """"content""""
         val i = json.indexOf(key)
@@ -242,6 +299,7 @@ class BrainClient(
         return out
     }
 
+    /** JSON string escaping — handles ", \, \n, \r, \t. Used for both log entries and chat body. */
     private fun jsonStr(s: String): String = buildString {
         append('"')
         for (c in s) when (c) {

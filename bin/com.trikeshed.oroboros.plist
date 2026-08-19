@@ -1,0 +1,78 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  ~/Library/LaunchAgents/com.trikeshed.oroboros.plist
+  macOS LaunchAgent for the TrikeShed flywheel daemon.
+
+  Install:
+    cp bin/com.trikeshed.oroboros.plist ~/Library/LaunchAgents/
+    # Edit TRIKESHED_HOME and TRIKESHED_REPO if needed
+    launchctl load ~/Library/LaunchAgents/com.trikeshed.oroboros.plist
+
+  Uninstall:
+    launchctl unload ~/Library/LaunchAgents/com.trikeshed.oroboros.plist
+    rm ~/Library/LaunchAgents/com.trikeshed.oroboros.plist
+
+  The plist sets FLYWHEEL_CYCLE_INTERVAL (e.g. "30m", "2h", "900000")
+  so the script's unit parser converts it to milliseconds and passes
+  --interval-ms to the daemon.  You can also override via:
+    defaults write com.trikeshed.oroboros FLYWHEEL_CYCLE_INTERVAL -string "30m"
+-->
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.trikeshed.oroboros</string>
+
+    <!-- Path to this directory (contains bin/, build/, src/) -->
+    <key>ProgramArguments</key>
+    <array>
+        <string>/bin/bash</string>
+        <string>SET_THIS_TO_YOUR_TRIKESHED_ROOT/bin/oroboros-daemon</string>
+        <string>--watch</string>
+    </array>
+
+    <!-- Set TRIKESHED_HOME and FLYWHEEL_CYCLE_INTERVAL in the daemon environment.
+         Override FLYWHEEL_CYCLE_INTERVAL via defaults:
+           defaults write com.trikeshed.oroboros FLYWHEEL_CYCLE_INTERVAL -string "30m"
+         Then: launchctl unload + load to pick up the change. -->
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>TRIKESHED_HOME</key>
+        <string>SET_THIS_TO_YOUR_FORGE_HOME_DIR</string>
+        <!--
+          Cycle interval: parsed by bin/oroboros-daemon.
+          Supported units: ms, s, m, h  (e.g. "30000", "30s", "30m", "2h")
+          Default: 30000ms (30 seconds)
+          Target: 100 tasks/day → ~30s cycle OK (2880 cycles/day >> 100/day)
+        -->
+        <key>FLYWHEEL_CYCLE_INTERVAL</key>
+        <string>30m</string>
+    </dict>
+
+    <!-- Start immediately on load. -->
+    <key>RunAtLoad</key>
+    <true/>
+
+    <!-- Restart on unexpected exit. -->
+    <key>KeepAlive</key>
+    <true/>
+
+    <!-- Working directory: the TrikeShed root (must contain bin/ and build/). -->
+    <key>WorkingDirectory</key>
+    <string>SET_THIS_TO_YOUR_TRIKESHED_ROOT</string>
+
+    <!--
+      Standard output / error go to the script's tee (log rotation in bin/oroboros-daemon).
+      KeepAlive does not suppress them; macOS still captures them.
+      To disable logging to files: remove the exec > >(tee ...) line from bin/oroboros-daemon
+      or set OROBOROS_NO_TEE=1 before launch.
+    -->
+
+    <!-- Informational only — your label is the unique key. -->
+    <key>ProcessType</key>
+    <string>Background</string>
+
+    <key>LowPriorityIO</key>
+    <true/>
+</dict>
+</plist>

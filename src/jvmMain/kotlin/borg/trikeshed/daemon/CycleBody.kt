@@ -1,6 +1,8 @@
 package borg.trikeshed.daemon
 
 import borg.trikeshed.jules.FlywheelDriver
+import borg.trikeshed.jules.FlywheelPhase
+import metrics.FlywheelMetrics
 import java.util.concurrent.atomic.AtomicInteger
 
 /**
@@ -13,8 +15,9 @@ import java.util.concurrent.atomic.AtomicInteger
  * that would double-poll, double-gate, and race the reactive coroutines.
  * It is a pure observer:
  *   1. Reads [FlywheelDriver.lastReactiveReport] — the reactive tick snapshot.
- *   2. Writes the trace JSON (the operator's live signal).
- *   3. Manages backoff/error counting for the periodicity loop.
+ *   2. Records per-phase latency into [FlywheelMetrics].
+ *   3. Writes the trace JSON (the operator's live signal).
+ *   4. Manages backoff/error counting for the periodicity loop.
  *
  * Conflict markers are NOT quarantined. A conflict is pure honesty of intent —
  * two arms of a merge that vary in their approach. The wheel keeps draining
@@ -36,21 +39,54 @@ class CycleBody(
 
     override fun run() {
         try {
-            println("[HOTSWAP] CycleBody.run() invoked — bytecode rev=" + System.identityHashCode(this) + " — POST-SWAP-MARKER")
-
             // Read the reactive tick snapshot and emit telemetry. The reactive
             // coroutines own all computation; we only observe and trace.
             val report = driver.lastReactiveReport
             if (report != null) {
                 OroborosDaemon.lastCycleReport = report
-                println("[FLYWHEEL] phase=" + report.phase + " cycleMs=" + report.cycleMs + " harvested=" + report.harvested + " dispatched=" + report.dispatched + " alive=" + report.alive + "/" + report.available + " inducted=" + report.inducted + " settled=" + report.settled + " archived=" + report.archived)
+
+                // Record metrics — must happen before trace write so metrics
+                // reflect the current cycle even on write failure.
+                val hadErrors = report.http429 > 0 || report.http5xx > 0
+                FlywheelMetrics.recordCycle(hadErrors)
+
+                // Phase latencies: we only have total cycleMs here, not per-phase.
+                // The phase-level timing lives in FlywheelDriver.cycle() which
+                // records directly into FlywheelMetrics via recordPhaseLatencies().
+                val phaseLatencies = listOf(
+                    FlywheelMetrics.PhaseLatency(report.phase.name, report.cycleMs),
+                )
+                FlywheelMetrics.recordPhaseLatencies(phaseLatencies, report.cycleMs, report.phase.name)
+
+                println(
+                    "[FLYWHEEL] phase=" + report.phase + " cycleMs=" + report.cycleMs +
+                        " harvested=" + report.harvested + " dispatched=" + report.dispatched +
+                        " alive=" + report.alive + "/" + report.available +
+                        " inducted=" + report.inducted + " settled=" + report.settled +
+                        " archived=" + report.archived
+                )
+
                 val t = System.currentTimeMillis()
-                val json = "{\"t\":" + t + ",\"c\":" + report.cycleMs + ",\"d\":" + report.harvested + ",\"p\":" + report.dispatched + ",\"a\":" + report.alive + ",\"v\":" + report.available + ",\"e\":0,\"h429\":" + report.http429 + ",\"h5x\":" + report.http5xx + "}"
+                val json = ("{" +
+                    "\"t\":" + t + "," +
+                    "\"c\":" + report.cycleMs + "," +
+                    "\"d\":" + report.harvested + "," +
+                    "\"p\":" + report.dispatched + "," +
+                    "\"a\":" + report.alive + "," +
+                    "\"v\":" + report.available + "," +
+                    "\"e\":0," +
+                    "\"h429\":" + report.http429 + "," +
+                    "\"h5x\":" + report.http5xx + "," +
+                    "\"phase\":\"" + report.phase.name + "\"" +
+                    "}")
                 try { traceWriter?.invoke(json) } catch (_: Throwable) {}
                 consecutivePollErrors.set(0)
             }
         } catch (t: Throwable) {
-            System.err.println("[OROBOROS] CycleBody.run() hard failure: ${t.javaClass.simpleName}: ${t.message?.take(200)}")
+            System.err.println(
+                "[OROBOS] CycleBody.run() hard failure: " + t.javaClass.simpleName +
+                    ": " + (t.message?.take(200) ?: "null")
+            )
             try { consecutivePollErrors.incrementAndGet() } catch (_: Throwable) {}
         }
     }

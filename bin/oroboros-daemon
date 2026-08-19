@@ -63,6 +63,21 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
+# FLYWHEEL_CYCLE_INTERVAL overrides --interval-ms and the daemon default.
+# Value is in milliseconds; "2h", "30m", "15m" etc are converted here.
+_INTERVAL_MS=""
+if [[ -n "${FLYWHEEL_CYCLE_INTERVAL:-}" ]]; then
+  case "${FLYWHEEL_CYCLE_INTERVAL}" in
+    *h)  _INTERVAL_MS=$(( ${FLYWHEEL_CYCLE_INTERVAL%h} * 3600 * 1000 )) ;;
+    *m)  _INTERVAL_MS=$(( ${FLYWHEEL_CYCLE_INTERVAL%m} * 60 * 1000 )) ;;
+    *s)  _INTERVAL_MS=$(( ${FLYWHEEL_CYCLE_INTERVAL%s} * 1000 )) ;;
+    *ms) _INTERVAL_MS=${FLYWHEEL_CYCLE_INTERVAL%ms} ;;
+    *)   _INTERVAL_MS=$FLYWHEEL_CYCLE_INTERVAL ;;
+  esac
+  DAEMON_ARGS+=("--interval-ms" "$_INTERVAL_MS")
+  echo "[oroboros-daemon] FLYWHEEL_CYCLE_INTERVAL=${FLYWHEEL_CYCLE_INTERVAL} -> ${_INTERVAL_MS}ms"
+fi
+
 # The daemon takes forgeHome/repoDir as POSITIONAL args (must come last, in
 # that order). Passing --repo without --home would put the repo path in the
 # forgeHome slot — that bug created the stray ./--repo/ WAL directory.

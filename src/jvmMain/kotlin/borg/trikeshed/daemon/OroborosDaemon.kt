@@ -14,6 +14,8 @@ import borg.trikeshed.userspace.nio.spi.NioSupervisor
 import borg.trikeshed.userspace.nio.ebpf.bpfProbeAttach
 import borg.trikeshed.userspace.nio.ebpf.Tracepoints
 import borg.trikeshed.util.io.ForgeCliArgs
+import borg.trikeshed.parse.json.JsonSupport
+import metrics.FlywheelMetrics
 import borg.trikeshed.util.oroboros.CouchAttachmentGateway
 import borg.trikeshed.util.oroboros.FileCasStore
 import borg.trikeshed.util.oroboros.GitCouchGateway
@@ -143,9 +145,24 @@ object OroborosDaemon {
             exitProcess(1)
         }
 
+        // Reset metrics before each daemon start so counters are fresh.
+        FlywheelMetrics.reset()
+
         val config = parseConfig(args)
+        // FLYWHEEL_CYCLE_INTERVAL env overrides CLI --interval-ms.
+        val envInterval = System.getenv("FLYWHEEL_CYCLE_INTERVAL")
+        val intervalMs = if (envInterval != null) {
+            val ms = envInterval.toLongOrNull()
+            if (ms != null && ms > 0) {
+                System.err.println("[OROBOROS] FLYWHEEL_CYCLE_INTERVAL=${ms}ms (env override)")
+                ms
+            } else {
+                config.intervalMs
+            }
+        } else {
+            config.intervalMs
+        }
         val watch = config.watch
-        val intervalMs = config.intervalMs
         val maxSlots = config.maxSlots
         val kanbanPort = config.kanbanPort
         val positional = config.positional
@@ -249,15 +266,14 @@ object OroborosDaemon {
         torrentElement.open()
         System.err.println("[OROBOROS] TorrentElement open: ${torrentElement.state} — torrent:// via HTX/TLS + uTP datagrams")
 
-        // ── Kanban HTTP server (CCEK litebike listener, no JDK networking) ──
-        // JvmKanbanServer binds via JvmLitebikeBindAdapter → LitebikeListenerElement
-        // (the userspace.nio CCEK path), not via com.sun.net.httpserver or ktor.
-        // Only launched in --watch mode; --once is a single-cycle diagnostic.
+        // Kanban HTTP server (CCEK litebike listener, no JDK networking) — starts before
+        // the reactive cycle so the port is bound. Driver is available at this point.
+        val kanbanServer = JvmKanbanServer(driver)
         val kanbanJob = SupervisorJob(coroutineContext[kotlinx.coroutines.Job])
         if (watch) {
             launch(CoroutineScope(kanbanJob).coroutineContext + Dispatchers.Default) {
                 try {
-                    JvmKanbanServer.run(kanbanPort, null)
+                    kanbanServer.run(kanbanPort, null)
                 } catch (t: Throwable) {
                     System.err.println("[OROBOROS] Kanban server failed: ${t.message}")
                 }
@@ -540,12 +556,64 @@ object OroborosDaemon {
                     }
                     val report = lastCycleReport
                     val uptimeMs = System.currentTimeMillis() - daemonStartTime
-                    val msg = if (report != null) {
-                        "ALIVE $uptimeMs ${report.cycleMs} ${report.harvested} ${report.dispatched} ${report.alive} ${report.available}\n"
+                    val (alive, avail, phase) = if (report != null) {
+                        Triple(report.alive, report.available, report.phase.name)
                     } else {
-                        "ALIVE $uptimeMs -1 -1 -1 -1 -1\n"
+                        Triple(-1, -1, "NONE")
                     }
-                    val buf = ByteBuffer.wrap(msg.toByteArray())
+
+                    // Backward-compatible ALIVE line
+                    val aliveLine = "ALIVE $uptimeMs ${report?.cycleMs ?: -1} ${report?.harvested ?: -1} ${report?.dispatched ?: -1} $alive $avail\n"
+
+                    // Full metrics as JSON on subsequent lines
+                    val metricsJson = try {
+                        val merged = buildMap<String, Any?> {
+                            put("uptimeMs", uptimeMs)
+                            if (report != null) {
+                                put("cycleMs", report.cycleMs)
+                                put("answered", report.answered)
+                                put("harvested", report.harvested)
+                                put("reworked", report.reworked)
+                                put("dispatched", report.dispatched)
+                                put("alive", report.alive)
+                                put("available", report.available)
+                                put("inducted", report.inducted)
+                                put("settled", report.settled)
+                                put("archived", report.archived)
+                                put("phase", report.phase.name)
+                                put("conflicts", report.conflicts)
+                                put("panoramaSize", report.panorama.size)
+                                put("http429", report.http429)
+                                put("http5xx", report.http5xx)
+                            } else {
+                                put("cycleMs", -1L)
+                                put("answered", -1)
+                                put("harvested", -1)
+                                put("reworked", -1)
+                                put("dispatched", -1)
+                                put("alive", -1)
+                                put("available", -1)
+                                put("inducted", -1)
+                                put("settled", false)
+                                put("archived", -1)
+                                put("phase", "NONE")
+                                put("conflicts", emptyList<String>())
+                                put("panoramaSize", 0)
+                                put("http429", -1)
+                                put("http5xx", -1)
+                            }
+                            // FlywheelMetrics summary
+                            put("metrics", FlywheelMetrics.toJsonMap())
+                        }
+                        "METRICS " + JsonSupport.stringify(merged) + "\n"
+                    } catch (e: Exception) {
+                        "METRICS {}\n"
+                    }
+
+                    val metricsBytes = (aliveLine + metricsJson).toByteArray()
+                    val buf = ByteBuffer.allocate(metricsBytes.size)
+                    buf.put(metricsBytes)
+                    buf.flip()
                     while (buf.hasRemaining()) {
                         client.write(buf)
                     }
@@ -627,6 +695,16 @@ object OroborosDaemon {
                     val backoffMs = kotlin.math.min(a = intervalMs * (1L shl kotlin.math.min(a = errors, b = 30)), b = intervalMs * 5)
                     if (errors > 0) System.err.println("[OROBOROS] backoff=${backoffMs}ms consecutiveErrors=$errors")
                     delay(backoffMs)
+
+                    // Adaptive throughput backpressure: when the flywheel is sustaining
+                    // ≥ 100 cycles/day, throttle the poll cadence by doubling the
+                    // backoff interval. This prevents unnecessary Jules API calls
+                    // and reduces daemon CPU overhead without starving pending tasks.
+                    if (FlywheelMetrics.cyclesAt100PerDay) {
+                        System.err.println("[OROBOROS] throughput ≥ 100/day — throttling cadence (double backoff)")
+                        delay(intervalMs)
+                    }
+
                     try {
                         (cycleBodyField ?: cycleBody).run()
                     } catch (t: LinkageError) {

@@ -690,4 +690,104 @@ object JulesSettlementCli {
 
     private val PATCH_TERMINAL_STATES = setOf("COMPLETED", "FINISHED", "FAILED", "CANCELLED")
     private val REPORT_TERMINAL_STATES = PATCH_TERMINAL_STATES
+
+    /**
+     * Public API: settle-reject a terminal Jules session directly within the same JVM process.
+     * Replaces the `gitJava(repoDir, cp, "JulesSettlementCli", "settle-reject", ...)` subprocess call.
+     * Eliminates per-session JVM startup overhead in batch drain operations.
+     *
+     * @param forgeDir The forge directory (contains cas/ and wal/)
+     * @param repoDir The git repository root
+     * @param sessionId The Jules session ID (16-20 digits)
+     * @param originCommit Verified origin/master SHA (already proven equal to local master)
+     * @param state The terminal state (COMPLETED, FAILED, CANCELLED)
+     * @param disposition Human-readable reason for the rejection
+     * @param title The Jules session title
+     * @param prUrl Optional PR URL
+     */
+    suspend fun apiSettleReject(
+        forgeDir: File,
+        repoDir: File,
+        sessionId: String,
+        originCommit: String,
+        state: String,
+        disposition: String,
+        title: String,
+        prUrl: String? = null,
+    ): Result<MergeReceipt> = runCatching {
+        require(state in PATCH_TERMINAL_STATES) {
+            "session $sessionId is $state, not terminal for reject settlement"
+        }
+        val cas = FileCasStore(JvmFileOperations(), File(forgeDir, "cas").absolutePath)
+        val store = JulesBoardStore.forForgeDir(forgeDir)
+        val durable = withContext(Dispatchers.IO) { store.load() to store.loadQueue() }
+        val card = requireNotNull(durable.first[sessionId]) {
+            "session $sessionId has no observed API timeline"
+        }
+        val rejected = requireNotNull(
+            selectJulesPatchForDrain(card.causes) as? JulesPatchDrainSelection.Rejected
+        ) { "session $sessionId has no reviewed reject cause" }
+        val artifactCid = rejected.rejectedSnapshot.patchCid
+        val existingQueue = durable.second.firstOrNull { it.sessionId == sessionId }
+        val safeSession = sessionId.replace(Regex("[^A-Za-z0-9._-]"), "-")
+        val tag = "flywheel/jules-$safeSession-${originCommit.take(12)}"
+        val artifact = withContext(Dispatchers.IO) {
+            requireNotNull(cas.get(artifactCid)) { "missing rejected patch CAS object $artifactCid" }
+        }
+        if (existingQueue?.isDrained == true) {
+            val receipt = requireNotNull(existingQueue.receipt) { "hollow drain record" }
+            if (isImmutableReceipt(receipt)) {
+                val reopened = withContext(Dispatchers.IO) {
+                    val c = store.load()[sessionId]
+                    c != null && !c.drained && c.causes.any {
+                        (it is JulesCause.StateObserved && it.from == "SETTLED_OUTPUT_ADVANCED") ||
+                            it is JulesCause.PatchRejected
+                    }
+                }
+                require(reopened) {
+                    "session $sessionId already settled to ${receipt.revision.take(12)}/${receipt.patchCid.value.take(20)}"
+                }
+            }
+        }
+        val now = System.currentTimeMillis()
+        val workId = existingQueue?.workId ?: "session:$safeSession"
+        if (existingQueue == null) {
+            store.appendWork(workId, JulesCause.WorkQueued(
+                workId = workId,
+                tier = "operator",
+                title = title,
+                spec = "API settle-reject: $disposition",
+                parent = null,
+                score = 0.5,
+                at = now,
+            ))
+            store.appendWork(workId, JulesCause.WorkDispatched(
+                workId = workId,
+                sessionId = sessionId,
+                attempt = 1,
+                at = now,
+            ))
+        }
+        val receipt = MergeReceipt(
+            workId = workId,
+            producer = "jules-api",
+            producerRef = sessionId,
+            patchCid = artifactCid,
+            revision = originCommit,
+            versionTag = tag,
+            lexicalMemory = LexicalMemory(summary = disposition, title = title, content = "Settled by typed reject"),
+            claimedAt = now,
+            prUrl = prUrl,
+        )
+        store.appendWork(workId, JulesCause.WorkDrained(
+            workId = workId,
+            sessionId = sessionId,
+            commitSha = originCommit,
+            taskId = artifactCid.value,
+            receipt = receipt,
+            at = now,
+        ))
+        println(receiptJson(sessionId, disposition, originCommit, tag, artifactCid, ArtifactKind.REJECT, workId, existingQueue?.isDrained == true))
+        receipt
+    }
 }

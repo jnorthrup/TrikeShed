@@ -18,6 +18,7 @@ class JulesRestClientTest {
         responder = { exchange ->
             when (exchange.requestURI.path) {
                 "/v1alpha/sessions" -> """{"sessions":[{"name":"sessions/s1","state":"IN_PROGRESS","title":"work"}]}"""
+                "/v1alpha/sessions/s1" -> """{"name":"sessions/s1","state":"IN_PROGRESS","title":"work","outputs":[]}"""
                 "/v1alpha/sessions/s1/activities" -> """
                     {"activities":[
                       {"name":"sessions/s1/activities/a1","createTime":"2026-07-22T00:00:00Z","originator":"agent","agentMessaged":{"agentMessage":"Which codec?"}},

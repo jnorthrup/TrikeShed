@@ -399,6 +399,53 @@ class KeyMux constructor(
         error("no writable source for key: $key")
     }
 
+    /**
+     * Rotate to the next credential for [key] in persistent storage.
+     *
+     * Jules API calls consume quota; when a 429 fires the next key is used.
+     * Rotation cycles through the `persist` source (keymux.conf): each entry
+     * after the current one becomes the new value.  If no persist source holds
+     * the key, this is a no-op and the current binding is retained.
+     *
+     * @return the new value after rotation, or null if no next value existed
+     */
+    suspend fun rotate(key: String): String? {
+        val path = key.toKeyPath()
+        val keyStr = key
+        // Find all PersistSource instances that have this key
+        val candidates = mutableListOf<Pair<PersistSource, String>>()
+        for ((p, src) in bindings.view) {
+            if (src is PersistSource && pathMatch(p, path)) {
+                val ops = src.explicitFileOps
+                    ?: currentCoroutineContext()[FileOperations.Key]
+                    ?: continue
+                val file = ops.resolvePath(src.root, "keymux.conf")
+                if (!ops.exists(file)) continue
+                val map = defaultCodecRead(ops.readAllBytes(file))
+                map[keyStr]?.let { candidates.add(src to it) }
+            }
+        }
+        if (candidates.isEmpty()) {
+            println("[KEYMUX] rotate($keyStr): no persist source has this key; retaining current value")
+            return null
+        }
+        // Rotate: the second candidate becomes the new value for all
+        val nextValue = candidates.getOrNull(1)?.second ?: candidates[0].second
+        for ((src, _) in candidates) {
+            src.invalidate()
+        }
+        for ((p, src) in bindings.view) {
+            if (src is PersistSource && pathMatch(p, path)) {
+                try {
+                    src.write(path, nextValue)
+                    src.invalidate()
+                    return nextValue
+                } catch (_: UnsupportedOperationException) { /* skip */ }
+            }
+        }
+        return null
+    }
+
     suspend fun list(prefix: String): Series<Join<String, String>> =
         listRaw(prefix).let { s -> s.size j { i -> s[i].a j (s[i].b ?: "") } }
 

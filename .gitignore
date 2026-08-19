@@ -133,3 +133,4 @@ bazel-*/
 --repo/
 .causal.wal
 logs/
+nal_projection.txt

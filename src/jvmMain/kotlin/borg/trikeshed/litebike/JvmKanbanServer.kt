@@ -8,6 +8,7 @@ import borg.trikeshed.graph.CausalGraphNode
 import borg.trikeshed.graph.CausalGraphNodeIndex
 import borg.trikeshed.graph.causalGraphNode
 import borg.trikeshed.kanban.ForgeKanbanIngest
+import metrics.FlywheelMetrics
 import borg.trikeshed.context.nuid.Capability
 import borg.trikeshed.context.nuid.Nonce
 import borg.trikeshed.context.nuid.Nuid
@@ -17,6 +18,7 @@ import borg.trikeshed.context.nuid.TraitSpace
 import borg.trikeshed.context.nuid.Workgroup
 import borg.trikeshed.context.nuid.nuid
 import borg.trikeshed.lib.j
+import borg.trikeshed.jules.JulesRestClient
 import borg.trikeshed.litebike.taxonomy.Protocol
 import borg.trikeshed.parse.json.JsonSupport
 import kotlinx.coroutines.CompletableDeferred
@@ -50,14 +52,29 @@ import kotlin.system.exitProcess
  * is the HTTP branch of [LitebikeListenerElement.fanoutChannels]. Its job:
  * parse the request line + headers, derive a NUID, dispatch it through
  * [NuidFanoutElement], route to `/api/health`, `/api/cap`, `/api/board`,
- * `/api/submit`, etc., and write back the JSON.
+ * `/api/metrics`, `/api/jules/surface`, etc., and write back the JSON.
  *
  * The litebike taxonomy file (`borg.trikeshed.litebike.taxonomy.Taxonomy.kt`)
  * is the wire-stable identifier table — same numeric IDs as the Rust
  * side — and is the input that the ProtocolDetector uses to choose the
  * per-request channel.
  */
-object JvmKanbanServer {
+class JvmKanbanServer(
+    /** FlywheelDriver for live Jules surface and cycle report. Nullable so the server can start before the driver. */
+    private val flywheelDriver: borg.trikeshed.jules.FlywheelDriver? = null,
+) {
+    /** SSE event stream path — collects FlywheelDriver.events as text/event-stream. */
+    private companion object {
+        private const val SSE_PATH = "/api/jules/events"
+    }
+
+    // Mutable driver slot so the daemon can swap in the driver after construction.
+    private var _driver: borg.trikeshed.jules.FlywheelDriver? = flywheelDriver
+
+    /** Atomically swap the live driver reference. Called from OroborosDaemon after FlywheelDriver construction. */
+    fun attachDriver(driver: borg.trikeshed.jules.FlywheelDriver) {
+        _driver = driver
+    }
 
     private val causalWal = CausalWal(File(".causal.wal"))
     private val graphIndex = CausalGraphNodeIndex()
@@ -77,7 +94,6 @@ object JvmKanbanServer {
         val headers: Map<String, String>,
     )
 
-    @JvmStatic
     fun main(args: Array<String>) {
         var port = 8888
         var donor: String? = null
@@ -92,7 +108,7 @@ object JvmKanbanServer {
                 }
             }
         }
-        runBlocking { run(port, donor) }
+        runBlocking { JvmKanbanServer().run(port, donor) }
     }
 
     suspend fun run(port: Int, donorPath: String?) {
@@ -206,6 +222,55 @@ object JvmKanbanServer {
                 val wireNuid = nuid(Capability.Wireproto("http"), Nonce.RandomBytes(), Subnet.lanLocalhost)
                 fanout.dispatch(wireNuid, payload)
 
+                // SSE — intercept before routeHttp to stream events without
+                // Content-Length (SSE has no end, client closes on disconnect).
+                val text = String(payload, StandardCharsets.UTF_8)
+                val reqLine = text.lineSequence().firstOrNull() ?: ""
+                val reqParts = reqLine.split(' ')
+                val reqPath = reqParts.getOrNull(1) ?: "/"
+                val isSse = reqPath == SSE_PATH &&
+                    (reqParts.getOrNull(0) == "GET") &&
+                    (text.lineSequence().any { it.startsWith("Accept:") && it.contains("text/event-stream") } ||
+                        text.contains("Accept: */*"))
+
+                if (isSse) {
+                    val driver = _driver
+                    if (driver == null) {
+                        val err = "HTTP/1.1 503 Service Unavailable\r\nContent-Length: 0\r\n\r\n"
+                        msg.respond?.invoke(err.toByteArray(StandardCharsets.UTF_8))
+                    } else {
+                        // Send SSE headers immediately — no Content-Length, connection: keep-alive
+                        val headers = "HTTP/1.1 200 OK\r\n" +
+                            "Content-Type: text/event-stream\r\n" +
+                            "Cache-Control: no-cache\r\n" +
+                            "Connection: keep-alive\r\n" +
+                            "Access-Control-Allow-Origin: *\r\n\r\n"
+                        msg.respond?.invoke(headers.toByteArray(StandardCharsets.UTF_8))
+
+                        // Stream events until client disconnects
+                        val driver0 = driver
+                        scope.launch {
+                            try {
+                                driver0.events.collect { event ->
+                                    val data = "data: ${JsonSupport.stringify(event)}\r\n\r\n"
+                                    try {
+                                        msg.respond?.invoke(data.toByteArray(StandardCharsets.UTF_8))
+                                    } catch (_: Throwable) {
+                                        // Connection dropped — normal SSE termination
+                                        throw kotlinx.coroutines.CancellationException("SSE client disconnected")
+                                    }
+                                }
+                            } catch (_: kotlinx.coroutines.CancellationException) {
+                                // Client disconnected — expected
+                            } catch (t: Throwable) {
+                                System.err.println("SSE stream error: ${t.message}")
+                            }
+                        }
+                    }
+                    // Consume but do NOT call routeHttp for SSE
+                    continue
+                }
+
                 val resp = routeHttp(payload)
                 val out = buildString {
                     append("HTTP/1.1 ${resp.status} ${statusReason(resp.status)}\r\n")
@@ -229,7 +294,7 @@ object JvmKanbanServer {
         }
 
         System.err.println("trikeshed-kanban: listening on :$port  donor=${donorPath ?: "<none>"}")
-        System.err.println("Endpoints (CCEK): GET /api/health /api/cap /api/board POST /api/submit /api/donor")
+        System.err.println("Endpoints (CCEK): GET /api/health /api/cap /api/board /api/metrics /api/jules/surface /api/jules/events POST /api/submit /api/donor")
 
         // Bind happens here — only place outside the worker scope that
         // opens a socket. The adapter resumes this coroutine on close.
@@ -255,6 +320,63 @@ object JvmKanbanServer {
             "/api/health" -> HttpResponse(200, """{"ok":true,"server":"kanban","now":${System.currentTimeMillis()}}""")
             "/api/cap"    -> HttpResponse(200, """{"protocols":["Http","Json","Socks5","Tls","Bonjour","Upnp"],"capabilities":["Process@local","Cas@local","Wireproto@lan.localhost"]}""")
             "/api/board"  -> HttpResponse(200, boardJson())
+            "/api/metrics" -> {
+                // Prometheus text-format metrics scrape endpoint.
+                // Also supports JSON ?format=json query param.
+                val acceptJson = text.contains("format=json", ignoreCase = true)
+                if (acceptJson) {
+                    val json = runCatching { JsonSupport.stringify(FlywheelMetrics.toJsonMap()) }
+                        .getOrElse { """{"error":"metrics_unavailable"}""" }
+                    HttpResponse(200, json)
+                } else {
+                    val prom = runCatching { FlywheelMetrics.toPrometheusFormat() }
+                        .getOrElse { "# ERROR: metrics unavailable\n" }
+                    HttpResponse(200, prom, "text/plain; version=0.0.4; charset=utf-8")
+                }
+            }
+            "/api/jules/surface" -> {
+                // Live Jules blackboard surface from the flywheel driver.
+                val driver = _driver
+                if (driver == null) {
+                    HttpResponse(503, """{"error":"driver_not_ready","message":"flywheel driver not yet attached"}""")
+                } else {
+                    val report = driver.lastReactiveReport
+                    val surface = runCatching {
+                        val sessions = driver.activeSessions
+                        val client = driver.julesClient
+                        // Fetch activity timelines for each session; tolerate individual failures with empty list.
+                        val activitiesBySession: Map<String, List<JulesRestClient.ActivityInfo>> = runBlocking {
+                            sessions.associate { session ->
+                                session.id to runCatching {
+                                    kotlinx.coroutines.withTimeout(5_000L) {
+                                        client.activities(session.id)
+                                    }
+                                }.getOrElse { emptyList() }
+                            }
+                        }
+                        // Evict expired entries and emit TTL eviction events to SSE clients.
+                        val evicted = borg.trikeshed.jules.ui.JulesBlackboardAdapter.evictExpired()
+                        driver.emitTtlEvicted(evicted)
+                        val (_, surf, _) = borg.trikeshed.jules.ui.JulesBlackboardAdapter.projectFullSurface(
+                            sessions = sessions,
+                            activitiesBySession = activitiesBySession,
+                        )
+                        JsonSupport.stringify(surf)
+                    }.getOrElse { ex ->
+                        """{"error":"surface_projection_failed","reason":"${ex.message?.take(200)}"}"""
+                    }
+                    val reportJson = if (report != null) {
+                        ""","cycle":{"cycleMs":${report.cycleMs},"phase":"${report.phase.name}","answered":${report.answered},"dispatched":${report.dispatched},"alive":${report.alive},"available":${report.available},"settled":${report.settled},"archived":${report.archived}}"""
+                    } else {
+                        ""
+                    }
+                    val metricsMap = FlywheelMetrics.toJsonMap()
+                    val cyclesPerSecond = metricsMap["cyclesPerSecond"]
+                    val cyclesAt100PerDay = metricsMap["cyclesAt100PerDay"]
+                    val targetSlots = driver.slotCap
+                    HttpResponse(200, """{"surface":$surface$reportJson,"throughput":{"cyclesPerSecond":$cyclesPerSecond,"cyclesAt100PerDay":$cyclesAt100PerDay},"slots":{"cap":$targetSlots,"alive":${report?.alive ?: 0},"available":${report?.available ?: 0}}}""")
+                }
+            }
             "/api/submit" -> if (method == "POST") submit(text) else HttpResponse(405, """{"error":"method_not_allowed"}""")
             "/api/donor"  -> if (method == "POST") submit(text) else HttpResponse(405, """{"error":"method_not_allowed"}""")
             "/"           -> HttpResponse(200, "<html><body>Forge litebike listener — see /api/health</body></html>", "text/html; charset=utf-8")
@@ -357,118 +479,6 @@ private fun Map<String, Any?>.toCausalNode(): CausalGraphNode = causalGraphNode(
 
 private fun traitSpaceOf(vararg capabilities: Capability): TraitSpace = TraitSpace {
     capabilities.size j { index -> capabilities[index] }
-}
-
-/**
- * ConnectionRegistry — JVM-side per-connection state for the litebike
- * bind adapter. R05: the bind adapter hands each accepted
- * [AsynchronousSocketChannel] to [register]; the HTTP worker looks up
- * the originating channel by [ChannelMessage.sequenceId][LitebikeListenerElement.ChannelMessage.sequenceId]
- * and writes the response back via [write].
- *
- * Why a JVM-only registry? [LitebikeListenerElement.ChannelMessage]
- * lives in commonMain and adding a JVM-specific socket field there
- * would poison the KMP source set. The sequence id already exists in
- * the message; we map it to a socket in JVM space.
- *
- * Concurrency: backed by [ConcurrentHashMap]; safe under arbitrary
- * reader/writer concurrency. Writes are issued on the JVM NIO group
- * via [AsynchronousSocketChannel.write], so workers never block on I/O.
- */
-class ConnectionRegistry {
-
-    private val nextId = AtomicLong(0L)
-
-    private data class Entry(
-        val channel: AsynchronousSocketChannel,
-        /** SequenceId of the in-flight request, if any. */
-        @Volatile var pendingSequenceId: Long? = null,
-    )
-
-    private val connections: ConcurrentHashMap<Long, Entry> = ConcurrentHashMap()
-
-    /**
-     * Register a freshly accepted channel. Returns a stable
-     * connectionId that the caller can later use with [write] or
-     * [unregister].
-     */
-    fun register(channel: AsynchronousSocketChannel): Long {
-        val id = nextId.incrementAndGet()
-        connections[id] = Entry(channel)
-        return id
-    }
-
-    /**
-     * Stamp a [sequenceId] onto an existing connection so the worker
-     * can find the originating channel.
-     */
-    fun attachSequence(connectionId: Long, sequenceId: Long) {
-        val entry = connections[connectionId] ?: return
-        entry.pendingSequenceId = sequenceId
-    }
-
-    /**
-     * Write [bytes] back through the channel registered as
-     * [connectionId]. Returns true on success, false if the write
-     * completes with a negative result (peer closed) or throws.
-     *
-     * Asynchronous — completes via the supplied [CompletionHandler]
-     * or the channel group's default executor. Does not block the
-     * calling worker.
-     *
-     * On completion the channel is closed and unregistered; this is
-     * HTTP/1.1 per-connection semantics. If you want keep-alive,
-     * replace the `unregister` call with a reset of `pendingSequenceId`.
-     */
-    suspend fun write(connectionId: Long, bytes: ByteArray): Boolean {
-        val entry = connections[connectionId] ?: return false
-        val channel = entry.channel
-        val buf = ByteBuffer.wrap(bytes)
-        val done = CompletableDeferred<Boolean>()
-        try {
-            channel.write(buf, null, object : CompletionHandler<Int, Any?> {
-                override fun completed(written: Int, attached: Any?) {
-                    done.complete(written >= 0)
-                }
-                override fun failed(t: Throwable, attached: Any?) {
-                    done.complete(false)
-                }
-            })
-        } catch (t: Throwable) {
-            // Channel already closed or in invalid state.
-            unregister(connectionId)
-            return false
-        }
-        // Block briefly for the write to finish — the worker is on a
-        // Default dispatcher so a short park here is fine, and we need
-        // the boolean to decide whether to log failure. We don't want
-        // to spin: the JDK NIO group completes writes in microseconds
-        // for local sockets, and the daemon doesn't have latency SLOs.
-        val ok = done.await()
-        unregister(connectionId)
-        return ok
-    }
-
-    /**
-     * Drop [connectionId] from the registry and close the underlying
-     * channel. Idempotent.
-     */
-    fun unregister(connectionId: Long) {
-        val entry = connections.remove(connectionId) ?: return
-        runCatching { entry.channel.close() }
-        // NioSupervisor permit is released gracefully during drain or explicitly by adapter.
-    }
-
-    /**
-     * Close every registered channel. Called from the JVM shutdown
-     * hook so the daemon doesn't leak sockets on exit.
-     */
-    fun closeAll() {
-        for (id in connections.keys.toList()) unregister(id)
-    }
-
-    /** Live connection count — useful for `/api/cap` and tests. */
-    fun activeCount(): Int = connections.size
 }
 
 private fun writeStringJvm(path: String, text: String) {

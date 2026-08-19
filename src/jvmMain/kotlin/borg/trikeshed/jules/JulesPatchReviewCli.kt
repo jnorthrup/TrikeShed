@@ -17,6 +17,10 @@ import java.io.File
  * observation must already exist, and reviewer plus receipt are mandatory.
  */
 object JulesPatchReviewCli {
+
+    private val PATCH_TERMINAL_STATES = setOf("COMPLETED", "FINISHED")
+    private val REPORT_TERMINAL_STATES = PATCH_TERMINAL_STATES + setOf("FAILED", "CANCELLED")
+
     @JvmStatic
     fun main(args: Array<String>) = runBlocking {
         if (args.firstOrNull() == "report") {
@@ -167,9 +171,89 @@ object JulesPatchReviewCli {
         )
     }
 
+    /**
+     * Public API: reject a patch directly within the same JVM process.
+     * Replaces the `gitJava(repoDir, cp, "JulesPatchReviewCli", "reject", ...)` subprocess call.
+     * Eliminates per-session JVM startup overhead in batch drain operations.
+     */
+    suspend fun apiRejectPatch(
+        forgeDir: File,
+        sessionId: String,
+        patchCid: ContentId,
+        causalOrdinal: Int,
+        reason: String,
+        reviewer: String,
+        receiptRef: String,
+    ): Result<Unit> = runCatching {
+        require(causalOrdinal >= 0) { "causal ordinal must be non-negative" }
+        val store = JulesBoardStore.forForgeDir(forgeDir)
+        val card = requireNotNull(withContext(Dispatchers.IO) { store.load()[sessionId] }) {
+            "no causal card for Jules session $sessionId"
+        }
+        require(card.snapshot.state in PATCH_TERMINAL_STATES) {
+            "patch reject requires a terminal Jules session; ${card.snapshot.state} is still mutable"
+        }
+        require(!card.drained) { "session $sessionId is already drained" }
+        val cas = FileCasStore(JvmFileOperations(), File(forgeDir, "cas").absolutePath)
+        require(withContext(Dispatchers.IO) { cas.get(patchCid) } != null) {
+            "CAS object does not exist: $patchCid"
+        }
+        val continuity = JulesPatchContinuityStore(cas, store)
+        continuity.selectRejected(
+            sessionId = sessionId,
+            patchCid = patchCid,
+            causalOrdinal = causalOrdinal,
+            reason = reason,
+            reviewedBy = reviewer,
+            receiptRef = receiptRef,
+            causes = card.causes,
+        )
+        println("""{"sessionId":"$sessionId","patchCid":"${patchCid.value}","causalOrdinal":$causalOrdinal,"rejected":true}""")
+    }
+
+    /**
+     * Public API: review a patch directly within the same JVM process.
+     * Eliminates per-session JVM startup overhead in batch drain operations.
+     */
+    suspend fun apiReviewPatch(
+        forgeDir: File,
+        sessionId: String,
+        patchCid: ContentId,
+        causalOrdinal: Int,
+        reviewer: String,
+        receiptRef: String,
+    ): Result<Unit> = runCatching {
+        require(causalOrdinal >= 0) { "causal ordinal must be non-negative" }
+        val store = JulesBoardStore.forForgeDir(forgeDir)
+        val card = requireNotNull(withContext(Dispatchers.IO) { store.load()[sessionId] }) {
+            "no causal card for Jules session $sessionId"
+        }
+        require(card.snapshot.state in PATCH_TERMINAL_STATES) {
+            "patch review requires a completed Jules session; ${card.snapshot.state} is still mutable"
+        }
+        require(!card.drained) { "session $sessionId is already drained" }
+        val cas = FileCasStore(JvmFileOperations(), File(forgeDir, "cas").absolutePath)
+        val patchBytes = withContext(Dispatchers.IO) { cas.get(patchCid) }
+        require(patchBytes != null) { "CAS object does not exist: $patchCid" }
+        val patchStr = patchBytes.decodeToString()
+        val lintResult = PatchAstLinter.lint(patchStr)
+        require(lintResult.clean) { "Patch blocked by AST Linter: ${lintResult.reason}" }
+        val continuity = JulesPatchContinuityStore(cas, store)
+        continuity.selectReviewed(
+            sessionId = sessionId,
+            patchCid = patchCid,
+            causalOrdinal = causalOrdinal,
+            reviewedBy = reviewer,
+            receiptRef = receiptRef,
+            causes = card.causes,
+        )
+        println("""{"sessionId":"$sessionId","patchCid":"${patchCid.value}","causalOrdinal":$causalOrdinal,"reviewedBy":${jsonString(reviewer)},"receiptRef":${jsonString(receiptRef)},"selected":true}""")
+    }
+
     private fun defaultForgeDir(): String =
         System.getenv("TRIKESHED_HOME") ?: File(System.getProperty("user.home"), ".local/forge").path
 
+    /** JSON string escaping. */
     private fun jsonString(value: String): String = buildString {
         append('"')
         value.forEach { ch ->
@@ -184,7 +268,4 @@ object JulesPatchReviewCli {
         }
         append('"')
     }
-
-    private val PATCH_TERMINAL_STATES = setOf("COMPLETED", "FINISHED")
-    private val REPORT_TERMINAL_STATES = PATCH_TERMINAL_STATES + setOf("FAILED", "CANCELLED")
 }

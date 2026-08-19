@@ -7,21 +7,24 @@ import borg.trikeshed.forge.blackboard.ForgeBlackboardSection3D
 import borg.trikeshed.forge.blackboard.ForgeBlackboardView
 import borg.trikeshed.forge.gallery.ForgeGalleryCatalog
 import borg.trikeshed.forge.gallery.ForgeGalleryRenderer
+import borg.trikeshed.jules.ui.JulesBlackboardAdapter
+import borg.trikeshed.jules.ui.JulesBlackboardSurface
+import borg.trikeshed.jules.ui.ForgeSurfaceSession
+import borg.trikeshed.jules.ui.ForgeSurfaceActivity
 import borg.trikeshed.job.ContentId
+import borg.trikeshed.kanban.CardPriority
 import borg.trikeshed.kanban.ForgeKanbanIngest
 import borg.trikeshed.kanban.ForgeKanbanReduction
-import borg.trikeshed.kanban.CardPriority
-import borg.trikeshed.forge.correlationToBlock
 import borg.trikeshed.lcnc.reactor.IngestCodec
 import borg.trikeshed.lcnc.reactor.IngestFormat
 import borg.trikeshed.lcnc.reactor.IngestSource
 import borg.trikeshed.lcnc.reactor.LcncIngestPipeline
 import borg.trikeshed.lib.Series
 import borg.trikeshed.lib.j
-import kotlinx.datetime.Clock
 import borg.trikeshed.blackboard.BlackboardSurface
 import borg.trikeshed.graph.CausalGraphNodeIndex
 import borg.trikeshed.parse.json.JsonSupport
+import kotlinx.datetime.Clock
 
 /**
  * ForgeApp — single file server-side renderable workspace shell.
@@ -30,14 +33,74 @@ import borg.trikeshed.parse.json.JsonSupport
  */
 object ForgeApp {
 
+    /**
+     * Flat snapshot of FlywheelDriver.lastReactiveReport, flattened to plain
+     * primitives so it lives in commonMain and serializes into the dashboard seed.
+     * Constructed by the caller in jvmMain where CycleReport is defined:
+     * ```
+     * val report = flywheelDriver.lastReactiveReport ?: return@runBlocking null
+     * val snapshot = ForgeApp.FlywheelReportSnapshot(
+     *     cycleMs = report.cycleMs, answered = report.answered, harvested = report.harvested,
+     *     reworked = report.reworked, dispatched = report.dispatched, alive = report.alive,
+     *     available = report.available, inducted = report.inducted, settled = report.settled,
+     *     archived = report.archived, phase = report.phase.name, conflicts = report.conflicts,
+     *     http429 = report.http429, http5xx = report.http5xx,
+     * )
+     * ```
+     */
+    data class FlywheelReportSnapshot(
+        val cycleMs: Long,
+        val answered: Int,
+        val harvested: Int,
+        val reworked: Int,
+        val dispatched: Int,
+        val alive: Int,
+        val available: Int,
+        val inducted: Int,
+        val settled: Boolean,
+        val archived: Int,
+        val phase: String,
+        val conflicts: List<String>,
+        val http429: Int,
+        val http5xx: Int,
+        val updatedAt: Long = Clock.System.now().toEpochMilliseconds(),
+    ) {
+        fun toMap(): Map<String, Any?> = mapOf(
+            "cycleMs" to cycleMs,
+            "answered" to answered,
+            "harvested" to harvested,
+            "reworked" to reworked,
+            "dispatched" to dispatched,
+            "alive" to alive,
+            "available" to available,
+            "inducted" to inducted,
+            "settled" to settled,
+            "archived" to archived,
+            "phase" to phase,
+            "conflicts" to conflicts,
+            "http429" to http429,
+            "http5xx" to http5xx,
+            "updatedAt" to updatedAt,
+        )
+    }
+
     /** Render the complete Forge HTML shell with seeded state for PWA offline-first hydration. */
-    fun renderHtml(userId: String = "jim"): String {
+    fun renderHtml(
+        userId: String = "jim",
+        julesSurface: JulesBlackboardSurface? = null,
+        flywheelReport: FlywheelReportSnapshot? = null,
+    ): String {
         val reduction = runCatching { ForgeKanbanIngest.load(userId) }.getOrElse { ForgeKanbanIngest.fallbackReduction() }
-        val seed = forgeSeedJson(userId, reduction)
+        val seed = forgeSeedJson(userId, reduction, julesSurface, flywheelReport)
         return htmlShell(seed)
     }
 
-    private fun forgeSeedJson(userId: String, reduction: ForgeKanbanReduction): String {
+    private fun forgeSeedJson(
+        userId: String,
+        reduction: ForgeKanbanReduction,
+        julesSurface: JulesBlackboardSurface?,
+        flywheelReport: FlywheelReportSnapshot?,
+    ): String {
         val seedMap = mapOf<String, Any?>(
             "userId" to userId,
             "source" to mapOf(
@@ -81,18 +144,18 @@ object ForgeApp {
                     "causalKey" to corr.causalKey,
                 )
             },
-            "blackboardSeed" to forgeBlackboardSeed(),
-            "dashboards" to forgeDashboardSeed(),
+            "blackboardSeed" to forgeBlackboardSeed(julesSurface),
+            "dashboards" to forgeDashboardSeed(flywheelReport),
         )
         return JsonSupport.stringify(seedMap)
     }
 
     /**
-     * Dashboard seed: launch-time native I/O capability + latest flywheel cycle
-     * evidence. The server render is the authoritative launch-time snapshot.
+     * Dashboard seed: launch-time native I/O capability + latest flywheel cycle evidence.
+     * The server render is the authoritative launch-time snapshot.
      */
-    private fun forgeDashboardSeed(): Map<String, Any?> {
-        val report = runCatching {
+    private fun forgeDashboardSeed(flywheelReport: FlywheelReportSnapshot?): Map<String, Any?> {
+        val nioReport = runCatching {
             borg.trikeshed.userspace.nio.spi.currentNioCapabilityReport()
         }.getOrElse {
             borg.trikeshed.userspace.nio.spi.NioCapabilityReport(
@@ -105,13 +168,13 @@ object ForgeApp {
         }
         return mapOf(
             "nio" to mapOf(
-                "backendName" to report.backendName,
-                "ioUringAvailable" to report.ioUringAvailable,
-                "capabilities" to report.capabilities,
-                "kernelHint" to report.kernelHint,
-                "checkedAt" to report.checkedAt,
+                "backendName" to nioReport.backendName,
+                "ioUringAvailable" to nioReport.ioUringAvailable,
+                "capabilities" to nioReport.capabilities,
+                "kernelHint" to nioReport.kernelHint,
+                "checkedAt" to nioReport.checkedAt,
             ),
-            "flywheel" to emptyMap<String, Any?>(),
+            "flywheel" to (flywheelReport?.toMap() ?: emptyMap<String, Any?>()),
         )
     }
 
@@ -170,7 +233,6 @@ ${forgeAppScript()}
 </body>
 </html>
     """.trimIndent()
-    }
 
     private fun forgeAppStyles(): String = borg.trikeshed.forge.generated.ForgeAssets.stylesCss
 
@@ -179,13 +241,52 @@ ${forgeAppScript()}
     /** Server-rendered gallery HTML for the workspace rail. No client-side hydration needed. */
     private fun galleryHtml(): String = ForgeGalleryRenderer.renderHtml()
 
-    private fun forgeBlackboardSeed(): Map<String, Any?> {
+    private fun forgeBlackboardSeed(julesSurface: JulesBlackboardSurface?): Map<String, Any?> {
         val view = ForgeBlackboardView.DEFAULT
         val cam = view.defaultCamera
         val cam3d = view.mode3D
+
+        // Build the 3D layout: default sections + Jules session sections + Jules activity sections.
+        val sessionSections: List<Map<String, Any?>> = julesSurface?.sessions?.map { s: ForgeSurfaceSession ->
+            mapOf(
+                "sectionId" to s.sectionId,
+                "centerX" to s.centerX,
+                "centerY" to s.centerY,
+                "width" to s.width,
+                "height" to s.height,
+                "elevation" to s.elevation,
+            )
+        } ?: emptyList()
+
+        val activitySections: List<Map<String, Any?>> = julesSurface?.activities?.map { a: ForgeSurfaceActivity ->
+            mapOf(
+                "sectionId" to a.sectionId,
+                "centerX" to a.centerX,
+                "centerY" to a.centerY,
+                "width" to a.width,
+                "height" to a.height,
+                "elevation" to a.elevation,
+            )
+        } ?: emptyList()
+
+        val baseLayout: List<Map<String, Any?>> = view.layout3D.map { section: ForgeBlackboardSection3D ->
+            mapOf(
+                "sectionId" to section.sectionId,
+                "centerX" to section.centerX,
+                "centerY" to section.centerY,
+                "width" to section.width,
+                "height" to section.height,
+                "elevation" to section.elevation,
+            )
+        }
+        val layout3D: List<Map<String, Any?>> = baseLayout + sessionSections + activitySections
+
+        // Derive the full sections list from the layout to satisfy the init constraint.
+        val sectionIds: List<String> = layout3D.mapNotNull { it["sectionId"] as? String }
+
         return mapOf(
             "surface" to view.surface,
-            "sections" to view.sections,
+            "sections" to sectionIds,
             "defaultMode" to view.defaultMode.name,
             "cornerButtons" to view.cornerButtons.map { btn ->
                 mapOf(
@@ -215,15 +316,41 @@ ${forgeAppScript()}
                 "minDistance" to cam3d.minDistance,
                 "maxDistance" to cam3d.maxDistance,
             ),
-            "layout3D" to view.layout3D.map { section ->
+            "layout3D" to layout3D,
+            // Jules surface projection — emitted even when null so the JS renderer
+            // knows the field exists and can handle absence gracefully.
+            "jules" to if (julesSurface != null) {
+                val s = julesSurface
                 mapOf(
-                    "sectionId" to section.sectionId,
-                    "centerX" to section.centerX,
-                    "centerY" to section.centerY,
-                    "width" to section.width,
-                    "height" to section.height,
-                    "elevation" to section.elevation,
+                    "sessions" to s.sessions.map { sess: ForgeSurfaceSession ->
+                        mapOf(
+                            "id" to sess.id,
+                            "state" to sess.state,
+                            "title" to sess.title,
+                            "patchBytes" to sess.patchBytes,
+                            "source" to sess.source,
+                            "updateTime" to sess.updateTime,
+                            "sectionId" to sess.sectionId,
+                        )
+                    },
+                    "activities" to s.activities.map { act: ForgeSurfaceActivity ->
+                        mapOf(
+                            "id" to act.id,
+                            "sessionId" to act.sessionId,
+                            "seq" to act.seq,
+                            "createTime" to act.createTime,
+                            "originator" to act.originator,
+                            "kind" to act.kind,
+                            "patchBytes" to act.patchBytes,
+                            "excerpt" to act.excerpt,
+                            "sectionId" to act.sectionId,
+                        )
+                    },
+                    "updatedAt" to s.updatedAt,
+                    "ttlMs" to s.ttlMs,
+                    "stale" to JulesBlackboardAdapter.isStale(s),
                 )
-            },
+            } else null,
         )
     }
+}
