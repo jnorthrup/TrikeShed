@@ -209,9 +209,8 @@ fun batchAppend(
     var pos = 0
     for (i in 0 until size) {
         val r = records[i]
-        val s = r.size
         r.copyInto(combined, pos)
-        pos += s
+        pos += r.size
     }
     return config.fileOps.appendAll(config.filename, combined)
 }
