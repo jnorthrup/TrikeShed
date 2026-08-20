@@ -580,6 +580,20 @@
     titleEl.focus();
   });
 
+
+  // ── Drop zone accessibility ───────────────────────────────────────────
+  const dropZoneEl = document.getElementById('drop-zone');
+  const fileInputEl = document.getElementById('file-input');
+  if (dropZoneEl && fileInputEl) {
+    dropZoneEl.addEventListener('click', () => fileInputEl.click());
+    dropZoneEl.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        fileInputEl.click();
+      }
+    });
+  }
+
   // ── Seed note ───────────────────────────────────────────────────────
   (function renderSeedNote() {
     const parts = [];
