@@ -1,39 +1,57 @@
 package borg.trikeshed.lcnc.formula
 
-import borg.trikeshed.lcnc.collections.associative.PropertyType
+import borg.trikeshed.cursor.RowVec
+import borg.trikeshed.cursor.getValue
 import borg.trikeshed.lcnc.collections.associative.PropertyValue
 
 /**
  * Basic AST for LCNC Formulas.
+ *
+ * A node evaluates against a *property resolver* — `(String) -> Any?`, null when the
+ * property is absent. The two substrates are therefore two resolvers over one
+ * evaluator, so neither can drift from the other as nodes are added:
+ *  - `Map<String, PropertyValue>` — the associative LCNC page-property form.
+ *  - [RowVec] — the Cursor substrate; names resolve against each cell's `ColumnMeta`
+ *    `name` via the meta supplier, and [PropertyValue] cells are unwrapped so a boxed
+ *    cell and a raw cell agree with the Map form.
  */
 sealed class FormulaAST {
-    abstract fun evaluate(row: Map<String, PropertyValue>): Any?
-}
+    /** The single evaluator. [resolve] maps a property name to its raw value, or null when absent. */
+    abstract fun eval(resolve: (String) -> Any?): Any?
 
-data class NumberLiteral(val value: Double) : FormulaAST() {
-    override fun evaluate(row: Map<String, PropertyValue>): Any? = value
-}
+    /** Evaluate against the associative page-property form. */
+    fun evaluate(row: Map<String, PropertyValue>): Any? = eval { name -> row[name]?.value }
 
-data class StringLiteral(val value: String) : FormulaAST() {
-    override fun evaluate(row: Map<String, PropertyValue>): Any? = value
-}
-
-data class BooleanLiteral(val value: Boolean) : FormulaAST() {
-    override fun evaluate(row: Map<String, PropertyValue>): Any? = value
-}
-
-data class PropFunction(val propertyName: String) : FormulaAST() {
-    override fun evaluate(row: Map<String, PropertyValue>): Any? {
-        val prop = row[propertyName] ?: return null
-        return prop.value
+    /** Evaluate against a Cursor row — the dispatch-algebra substrate. */
+    fun evaluate(row: RowVec): Any? = eval { name ->
+        when (val cell = row.getValue(name)) {
+            is PropertyValue -> cell.value
+            else -> cell
+        }
     }
 }
 
+data class NumberLiteral(val value: Double) : FormulaAST() {
+    override fun eval(resolve: (String) -> Any?): Any? = value
+}
+
+data class StringLiteral(val value: String) : FormulaAST() {
+    override fun eval(resolve: (String) -> Any?): Any? = value
+}
+
+data class BooleanLiteral(val value: Boolean) : FormulaAST() {
+    override fun eval(resolve: (String) -> Any?): Any? = value
+}
+
+data class PropFunction(val propertyName: String) : FormulaAST() {
+    override fun eval(resolve: (String) -> Any?): Any? = resolve(propertyName)
+}
+
 data class IfFunction(val condition: FormulaAST, val thenExpr: FormulaAST, val elseExpr: FormulaAST) : FormulaAST() {
-    override fun evaluate(row: Map<String, PropertyValue>): Any? {
-        val condValue = condition.evaluate(row)
+    override fun eval(resolve: (String) -> Any?): Any? {
+        val condValue = condition.eval(resolve)
         val isTrue = condValue == true || (condValue is Number && condValue.toDouble() != 0.0)
-        return if (isTrue) thenExpr.evaluate(row) else elseExpr.evaluate(row)
+        return if (isTrue) thenExpr.eval(resolve) else elseExpr.eval(resolve)
     }
 }
 
@@ -142,4 +160,7 @@ class FormulaReducer(source: String) {
     fun reduce(row: Map<String, PropertyValue>): Any? {
         return ast.evaluate(row)
     }
+
+    /** RowVec overload — same formula, Cursor substrate. */
+    fun reduce(row: RowVec): Any? = ast.evaluate(row)
 }

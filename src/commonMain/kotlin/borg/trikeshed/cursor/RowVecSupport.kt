@@ -13,9 +13,11 @@ fun RowVec.getValue(key: String): Any? {
             is Function0<*> -> raw.invoke()
             else -> null
         }
+        // Names are CharSequence in ColumnMeta, so compare by text: CharSequence.equals(String)
+        // is false for equal content unless the instance happens to be a String.
         when (meta) {
             is RecordMeta -> if (meta.name == key) return cell.a
-            is Join<*, *> -> if (meta.a == key) return cell.a
+            is Join<*, *> -> if ((meta.a as? CharSequence)?.toString() == key) return cell.a
         }
     }
     return null
