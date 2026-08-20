@@ -111,6 +111,35 @@ class ModelMux internal constructor(
     private val models: Series<ModelEntry> get() = core.a
     private val router: ModelRouter get() = core.b
 
+    /**
+     * Observer sink for [ModelSelectionEvent]. Null by default. Single-writer: set once, before
+     * routing. The sink is called inline on the routing path but is isolated from it — a sink
+     * that throws must not fail the route it is merely observing.
+     */
+    var selectionObserver: ((ModelSelectionEvent) -> Unit)? = null
+
+    /**
+     * The most recent [ModelSelectionEvent.ModelSelected] this mux emitted, or null before the
+     * first non-empty route. Recorded because [route] does not return the event's `requestId`
+     * — a caller that wants to reconcile a downstream [ModelResponseReceipt] against the
+     * selection that produced it reads the id from here.
+     */
+    var lastSelection: ModelSelectionEvent.ModelSelected? = null
+        private set
+
+    /**
+     * Label naming the ranking discipline behind a selection; stamped onto
+     * [ModelSelectionEvent.ModelSelected.strategy].
+     *
+     * This is a declaration, not a derivation: nothing verifies it. It defaults to
+     * `"capability"`, which is what [CapabilityRouter] — the router [ModelMuxBuilder] installs
+     * — actually does, namely filter by capability and preserve catalog order. An owner that
+     * ranks the route result through a [RoutingStrategy] should set this to that strategy's
+     * [RoutingStrategy.strategyName]; setting it to a discipline that did not run makes the
+     * event stream lie.
+     */
+    var strategyName: String = "capability"
+
     companion object {
         operator fun invoke(keyMux: KeyMux, block: ModelMuxBuilder.() -> Unit): ModelMux =
             ModelMuxBuilder(keyMux).apply(block).build()
@@ -133,9 +162,43 @@ class ModelMux internal constructor(
         return Result.success(session)
     }
 
-    /** Route to the best model for a given action + capabilities */
-    fun route(action: AcpAction, vararg requiredCaps: String): RouteResult =
-        router.route(models, action, requiredCaps.toList().toSeries())
+    /**
+     * Route to the best model for a given action + capabilities.
+     *
+     * This is the selection point. The result is a ranked candidate list, and its head is the
+     * selection this mux is reporting: on a non-empty route a [ModelSelectionEvent.ModelSelected]
+     * naming `result.a[0]` is recorded as [lastSelection] and handed to [selectionObserver].
+     * An empty route selects nothing and emits nothing.
+     *
+     * A caller free to ignore the ranking and call [chat] with some other candidate will find
+     * the event stream disagreeing with what it did; the event describes the head of the
+     * ranking, which is the only selection this method makes.
+     */
+    fun route(action: AcpAction, vararg requiredCaps: String): RouteResult {
+        val result = router.route(models, action, requiredCaps.toList().toSeries())
+        if (result.a.size > 0) {
+            val chosen = result.a[0]
+            val event = ModelSelectionEvent.ModelSelected(
+                // A card carries one identity; provider and model coincide until cards split them.
+                provider = chosen.b.id,
+                model = chosen.a,
+                strategy = strategyName,
+                requestId = defaultSecureIdGenerator.generateHexId("req", 8),
+                at = kotlinx.datetime.Clock.System.now().toEpochMilliseconds(),
+            )
+            lastSelection = event
+            val observer = selectionObserver
+            if (observer != null) {
+                // An observability hook must never fail the operation it observes: a closed
+                // appender or a full queue costs the event, not the route.
+                try {
+                    observer(event)
+                } catch (_: Throwable) {
+                }
+            }
+        }
+        return result
+    }
 
     /** Non-streaming chat completion */
     suspend fun chat(
