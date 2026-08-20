@@ -514,6 +514,10 @@
         cardEl.className = 'board-card' + (col.id === 'done' ? ' done-card' : '');
         cardEl.role = 'button';
         cardEl.tabIndex = 0;
+        const order = state.board.columns.map((c) => c.id);
+        const nextColId = order[(order.indexOf(card.column) + 1) % order.length];
+        const nextColName = state.board.columns.find((c) => c.id === nextColId)?.name || 'next column';
+        cardEl.setAttribute('aria-label', `Move card '${card.title}' from '${col.name}' to '${nextColName}'`);
         const title = document.createElement('div');
         title.className = 'board-card-title';
         title.textContent = card.title;

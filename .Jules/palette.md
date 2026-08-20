@@ -27,3 +27,6 @@
 ## 2025-01-22 - Contextual ARIA labels for grouped dynamic buttons
 **Learning:** Buttons created dynamically within grouped structures (like Kanban board columns) often have generic visible text like "+ New" or "Add". While visual users infer context from the surrounding column or list grouping, screen reader users exploring by tab order or elements list lose this visual context, hearing only "Add, button".
 **Action:** When creating interactive elements inside visual groupings, dynamically generate a contextual `aria-label` that includes the grouping's name (e.g., `addBtn.setAttribute('aria-label', 'Add new card to ' + col.name);`) to restore context for assistive technologies.
+## 2025-01-22 - Contextual ARIA labels for interactive Kanban cards
+**Learning:** Kanban cards that double as buttons (e.g., clicking moves them to the next column) are disorienting for screen reader users if they lack context. A screen reader will just read the card's text, without indicating its current status/column or what action activating it performs.
+**Action:** When creating interactive items like Kanban cards, dynamically generate an `aria-label` that includes the card's name, its current column, and the action triggered upon interaction (e.g., "Move card 'Task' from 'To Do' to 'In Progress'").
