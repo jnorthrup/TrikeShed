@@ -514,6 +514,7 @@
         cardEl.className = 'board-card' + (col.id === 'done' ? ' done-card' : '');
         cardEl.role = 'button';
         cardEl.tabIndex = 0;
+        cardEl.setAttribute('aria-label', card.title + ' (in ' + col.name + ') - activate to move to next column');
         const title = document.createElement('div');
         title.className = 'board-card-title';
         title.textContent = card.title;
