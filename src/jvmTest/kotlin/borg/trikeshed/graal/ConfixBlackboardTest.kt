@@ -1,9 +1,13 @@
 package borg.trikeshed.graal
 
+import borg.trikeshed.lib.asString
+import borg.trikeshed.parse.confix.root
+import borg.trikeshed.parse.confix.src
 import kotlinx.coroutines.flow.take
 import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.async
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.yield
 import kotlin.test.Test
@@ -14,6 +18,7 @@ import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
 @Suppress("DEPRECATION") // legacy subscribe shim is exercised deliberately
+@OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class) // advanceUntilIdle
 class ConfixBlackboardTest {
     
     @Test
@@ -160,18 +165,57 @@ class ConfixBlackboardTest {
     }
 
     @Test
-    fun `a stalled collector never stalls the mutators`() = runTest {
+    fun `DROP_OLDEST keeps the newest snapshots when a collector lags`() = runTest {
         val bb = ConfixBlackboard.empty()
-        val overflow = ConfixBlackboard.CHANGE_BUFFER_CAPACITY * 4
+        val burst = ConfixBlackboard.CHANGE_BUFFER_CAPACITY * 4
+        val received = mutableListOf<Any?>()
 
-        // Collector subscribes but does not drain until after every mutation has run;
-        // DROP_OLDEST means tryEmit always succeeds and the mutators never block.
-        val collected = async { bb.changes.take(1).toList() }
-        yield()
+        val collector = launch { bb.changes.collect { received.add(it) } }
+        yield() // collector is subscribed, but StandardTestDispatcher will not resume it
 
-        repeat(overflow) { bb.put("k$it", it, "host") }
-        assertEquals(overflow, bb.keys().size, "mutators completed without suspending")
+        repeat(burst) { bb.put("k$it", it, "host") }
+        assertTrue(received.isEmpty(), "collector must still be lagging mid-burst")
+        assertEquals(burst, bb.keys().size, "mutators ran to completion without suspending")
 
-        assertEquals(1, collected.await().size)
+        advanceUntilIdle() // now let the lagging collector drain whatever survived
+        collector.cancel()
+
+        assertTrue(
+            received.size < burst,
+            "back-pressure must have discarded snapshots (got ${'$'}{received.size} of ${'$'}burst)",
+        )
+        // The discriminating assertion: under SUSPEND or DROP_LATEST the collector would
+        // hold the *earliest* snapshots and this would be some stale doc instead.
+        assertSame(bb.state, received.last(), "the newest snapshot survives; the oldest are dropped")
+    }
+
+    @Test
+    fun `replay hands a late subscriber the current snapshot`() = runTest {
+        val bb = ConfixBlackboard.empty()
+
+        bb.put("k", "v", "host") // mutation happens with nobody listening
+
+        val collected = async { bb.changes.take(1).toList().single() }
+        advanceUntilIdle()
+
+        assertSame(bb.state, collected.await(), "subscribe-after-mutate must not miss current truth")
+    }
+    @Test
+    fun `put escapes JSON-special characters in keys and string values`() {
+        val bb = ConfixBlackboard.empty()
+        val key = "say \"hi\""
+        val value = "back\\slash\nnewline"
+
+        bb.put(key, value, "host")
+
+        // The store keeps the raw text ...
+        assertEquals(value, bb.get(key))
+        // ... while the emitted doc is well-formed JSON. Unescaped interpolation
+        // produced {"say "hi"":"back\slash<LF>newline"}, which is not parseable.
+        assertEquals(
+            """{"say \"hi\"":"back\\slash\nnewline"}""",
+            bb.state.src.asString(),
+        )
+        assertNotNull(bb.state.root, "a quote-bearing key must still yield a parseable doc")
     }
 }
