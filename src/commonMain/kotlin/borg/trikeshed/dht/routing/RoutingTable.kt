@@ -76,8 +76,10 @@ open class RoutingTable<TNum : Comparable<TNum>, Sz : borg.trikeshed.dht.net.Net
                 allRoutes.add(value)
             }
         }
-        // Sort by XOR distance to target
-        allRoutes.sortBy { agentNUID.netmask.distance(agentNUID.id!!, it.a.id!!) }
+        // Sort by XOR distance to the *target*, not to this agent — otherwise
+        // every lookup returns the identical peer list regardless of key and
+        // the Kademlia dispersion collapses onto whichever peers sort first.
+        allRoutes.sortBy { agentNUID.netmask.distance(target, it.a.id!!) }
         return allRoutes.take(k)
     }
 }
