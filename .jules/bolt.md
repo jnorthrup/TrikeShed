@@ -81,3 +81,6 @@
 ## 2026-08-18 - Avoid O(F*S) scaling in nested dispatch loops
 **Learning:** While replacing `.filterIsInstance<T>()` with `.forEach { if (it is T) }` prevents intermediate List allocations, applying this blindly inside a nested dispatch loop (e.g. iterating `frames` then iterating `subscribers`) causes an `O(F*S)` performance regression because the `is T` type check is evaluated for every subscriber for every frame.
 **Action:** When optimizing nested dispatch loops that broadcast items to matching subscribers, fast-path check the presence of matching subscribers outside the frame loop using `.any { it is T }`. This safely skips the inner broadcast loop when there are no listeners, while avoiding intermediate list allocations and preserving event delivery order.
+## 2025-02-22 - ByteArray Comparison Optimization
+**Learning:** In Kotlin, replacing `.toList() == .toList()` on `ByteArray` with `.contentEquals()` removes unnecessary boxing/allocation. However, `.contentEquals()` requires exactly matching typed arrays. Using it generically (e.g., trying to use `UIntArray.contentEquals(Sequence<UInt>)`) causes compiler errors due to receiver type mismatches.
+**Action:** When optimizing byte/primitive array comparisons, explicitly use `.contentEquals()` for identical array types, but do not blindly apply it across mismatched sequence or collection bounds.

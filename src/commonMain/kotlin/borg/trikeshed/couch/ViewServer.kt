@@ -246,18 +246,18 @@ class ViewServer {
         reducer: ReducerIdentity = reducerIdentity(viewDef),
     ): Boolean {
         if (reducer != reducerIdentity(viewDef)) return false
-        if (receipt.viewDefinition.canonicalBytes.toList() != definitionBytes(viewDef).toList()) return false
+        if (!receipt.viewDefinition.canonicalBytes.contentEquals(definitionBytes(viewDef))) return false
         if (receipt.reducer != reducer) return false
         val replayBytes = resultBytes(execute(viewDef, documents))
-        if (replayBytes.toList() != receipt.outputBytes.toList()) return false
-        if (resultBytes(result).toList() != receipt.outputBytes.toList()) return false
+        if (!replayBytes.contentEquals(receipt.outputBytes)) return false
+        if (!resultBytes(result).contentEquals(receipt.outputBytes)) return false
         val reminted = MapReduceProofReceipt.mint(
             ViewDefinitionIdentity(definitionBytes(viewDef)),
             documents.map { ContentId.of(documentBytes(it)) },
             reducer,
             replayBytes,
         )
-        return reminted.contentId == receipt.contentId && reminted.canonicalBytes.toList() == receipt.canonicalBytes.toList()
+        return reminted.contentId == receipt.contentId && reminted.canonicalBytes.contentEquals(receipt.canonicalBytes)
     }
 
     /**

@@ -46,7 +46,7 @@ class MapReduceProofReceiptTest {
             output = byteArrayOf(),
         )
 
-        assertNotEquals(left.canonicalBytes.toList(), right.canonicalBytes.toList())
+        kotlin.test.assertFalse(left.canonicalBytes.contentEquals(right.canonicalBytes))
         assertNotEquals(left.contentId, right.contentId)
     }
 
