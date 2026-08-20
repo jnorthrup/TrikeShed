@@ -27,3 +27,6 @@
 ## 2025-01-22 - Contextual ARIA labels for grouped dynamic buttons
 **Learning:** Buttons created dynamically within grouped structures (like Kanban board columns) often have generic visible text like "+ New" or "Add". While visual users infer context from the surrounding column or list grouping, screen reader users exploring by tab order or elements list lose this visual context, hearing only "Add, button".
 **Action:** When creating interactive elements inside visual groupings, dynamically generate a contextual `aria-label` that includes the grouping's name (e.g., `addBtn.setAttribute('aria-label', 'Add new card to ' + col.name);`) to restore context for assistive technologies.
+## 2024-08-20 - Adding focus states for drag and drop drop zones
+**Learning:** For elements handling drag-and-drop file ingestions natively created as semantic `role="button"` placeholders like `.drop-zone` in index.html templates, ensuring they receive `:focus-visible` styling is crucial for keyboard users attempting to access upload functions.
+**Action:** Always add interactive form and UI upload containers defined with tabindex to the globally applied `:focus-visible` CSS selector lists.

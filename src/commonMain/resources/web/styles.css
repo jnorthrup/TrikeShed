@@ -380,7 +380,8 @@ button { font: inherit; color: inherit; background: none; border: none; cursor: 
 button:focus-visible,
 .page-tree-item:focus-visible,
 .board-card:focus-visible,
-.workspace-switcher:focus-visible {
+.workspace-switcher:focus-visible,
+.drop-zone:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: -2px;
 }
