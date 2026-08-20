@@ -81,3 +81,7 @@
 ## 2026-08-18 - Avoid O(F*S) scaling in nested dispatch loops
 **Learning:** While replacing `.filterIsInstance<T>()` with `.forEach { if (it is T) }` prevents intermediate List allocations, applying this blindly inside a nested dispatch loop (e.g. iterating `frames` then iterating `subscribers`) causes an `O(F*S)` performance regression because the `is T` type check is evaluated for every subscriber for every frame.
 **Action:** When optimizing nested dispatch loops that broadcast items to matching subscribers, fast-path check the presence of matching subscribers outside the frame loop using `.any { it is T }`. This safely skips the inner broadcast loop when there are no listeners, while avoiding intermediate list allocations and preserving event delivery order.
+
+## 2024-05-24 - Avoiding intermediate List allocations in filter followed by forEach
+**Learning:** In Kotlin, chaining `.filter { ... }` and `.forEach { ... }` generates an intermediate `ArrayList` containing all matched elements, leading to unnecessary memory allocation and GC pressure, especially when the collection is large or processed frequently.
+**Action:** Iterate with `.forEach { if (condition(it)) { ... } }` to avoid intermediate list allocations and improve performance in hot paths.

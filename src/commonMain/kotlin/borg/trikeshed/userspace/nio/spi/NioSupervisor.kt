@@ -48,7 +48,7 @@ open class NioSupervisor(
             super.open()
             val providers = platformNioProviders()
             (providers.firstOrNull { it is NioCapabilityReport } as? NioCapabilityReport)?.let { register(it) }
-            providers.filter { it !is NioCapabilityReport }.forEach { register(it) }
+            providers.forEach { if (it !is NioCapabilityReport) register(it) }
             // Bolt: Prevent intermediate List allocations and short-circuit by using a single forEach loop instead of chained filterIsInstance<T>().filter { ... }
             services.forEach {
                 if (it is AsyncContextElement && it.state == ElementState.CREATED) {
