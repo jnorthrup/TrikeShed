@@ -2,7 +2,6 @@ package borg.trikeshed.util
 
 import borg.trikeshed.context.nuid.Capability
 import borg.trikeshed.context.nuid.TraitSpace
-import borg.trikeshed.lib.j
 import borg.trikeshed.util.io.ForgeCliArgs
 import java.nio.file.Files as NioFiles
 import java.nio.file.Paths
@@ -16,10 +15,14 @@ import kotlin.system.exitProcess
  */
 object JvmForgeIo {
 
-    /** Build a [TraitSpace] from a vararg of capabilities. */
-    fun traitSpaceOf(vararg capabilities: Capability): TraitSpace = TraitSpace {
-        capabilities.size j { index -> capabilities[index] }
-    }
+    /**
+     * Build a [TraitSpace] from a vararg of capabilities.
+     *
+     * Delegates to the commonMain helper so every target shares one definition
+     * (including its defensive copy of the vararg array).
+     */
+    fun traitSpaceOf(vararg capabilities: Capability): TraitSpace =
+        borg.trikeshed.context.nuid.traitSpaceOf(*capabilities)
 
     /**
      * Atomically write [text] to [path], creating parent directories as
