@@ -74,8 +74,8 @@ class DatabaseView(var database: LcncDatabase, val ingestState: IngestStateEleme
             for (prop in schema.properties.values) {
                 text("<th>")
                 text("<button class=\"lcnc-database-sort\" data-column=\"${prop.id}\" onclick=\"window.lcncSortColumn('${database.id}', '${prop.id}')\" aria-label=\"Sort by ${prop.name}\" title=\"Sort by ${prop.name}\">${prop.name}</button>")
-                text("<button class=\"lcnc-col-delete\" onclick=\"window.lcncDeleteColumn('${database.id}', '${prop.id}')\" aria-label=\"Delete column\" title=\"Delete column\"><span aria-hidden=\"true\">x</span></button>")
-                text("<button class=\"lcnc-col-rename\" onclick=\"window.lcncRenameColumn('${database.id}', '${prop.id}')\" aria-label=\"Rename column\" title=\"Rename column\"><span aria-hidden=\"true\">✎</span></button>")
+                text("<button class=\"lcnc-col-delete\" onclick=\"window.lcncDeleteColumn('${database.id}', '${prop.id}')\" aria-label=\"Delete column ${prop.name}\" title=\"Delete column\"><span aria-hidden=\"true\">x</span></button>")
+                text("<button class=\"lcnc-col-rename\" onclick=\"window.lcncRenameColumn('${database.id}', '${prop.id}')\" aria-label=\"Rename column ${prop.name}\" title=\"Rename column\"><span aria-hidden=\"true\">✎</span></button>")
                 text("</th>")
             }
             text("<th>Actions</th>")
@@ -134,8 +134,8 @@ class DatabaseView(var database: LcncDatabase, val ingestState: IngestStateEleme
                 }
                 
                 text("<td>")
-                text("<button onclick=\"window.lcncDuplicateRow('${database.id}', '${page.id}')\" aria-label=\"Copy row\" title=\"Copy row\">Copy</button>")
-                text("<button onclick=\"window.lcncDeleteRow('${database.id}', '${page.id}')\" aria-label=\"Delete row\" title=\"Delete row\">Delete</button>")
+                text("<button onclick=\"window.lcncDuplicateRow('${database.id}', '${page.id}')\" aria-label=\"Copy row ${page.title}\" title=\"Copy row\">Copy</button>")
+                text("<button onclick=\"window.lcncDeleteRow('${database.id}', '${page.id}')\" aria-label=\"Delete row ${page.title}\" title=\"Delete row\">Delete</button>")
                 text("</td>")
                 text("</tr>")
             }
