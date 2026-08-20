@@ -49,7 +49,12 @@ class JvmProcessOperations : ProcessOperations {
                 stderrOut.toByteArray()
             }
 
-            val exitCode = proc.waitFor()
+            val finished = proc.waitFor(30, java.util.concurrent.TimeUnit.SECONDS)
+            if (!finished) {
+                proc.destroyForcibly()
+                throw RuntimeException("process timed out after 30 seconds")
+            }
+            val exitCode = proc.exitValue()
             ProcessResult(exitCode, stdoutDeferred.await(), stderrDeferred.await())
         } }
     }
