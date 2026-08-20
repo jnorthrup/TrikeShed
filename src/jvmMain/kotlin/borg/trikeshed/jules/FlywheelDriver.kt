@@ -460,7 +460,15 @@ class FlywheelDriver(
 
         // Legion Doc 04 Layer 5: Audit behavioral graphs across sessions
         for (card in conductor.cards.values) {
-            val observed = card.causes.filterIsInstance<JulesCause.PatchSnapshotObserved>().maxByOrNull { it.causalOrdinal }
+            // Bolt: Avoid intermediate List allocations from filterIsInstance<T>().maxByOrNull { ... }
+            var observed: JulesCause.PatchSnapshotObserved? = null
+            for (cause in card.causes) {
+                if (cause is JulesCause.PatchSnapshotObserved) {
+                    if (observed == null || cause.causalOrdinal > observed.causalOrdinal) {
+                        observed = cause
+                    }
+                }
+            }
             if (observed != null) {
                 for (file in observed.touchedFiles) {
                     behavioralAuditor.recordFileAccess(card.snapshot.sessionId, file)
@@ -509,8 +517,15 @@ class FlywheelDriver(
             var activeScopeUnknown = false
             for (card in conductor.cards.values) {
                 if (card.snapshot.state !in TERMINAL_STATES) {
-                    val observed = card.causes.filterIsInstance<JulesCause.PatchSnapshotObserved>()
-                        .maxByOrNull { it.causalOrdinal }
+                    // Bolt: Avoid intermediate List allocations from filterIsInstance<T>().maxByOrNull { ... }
+                    var observed: JulesCause.PatchSnapshotObserved? = null
+                    for (cause in card.causes) {
+                        if (cause is JulesCause.PatchSnapshotObserved) {
+                            if (observed == null || cause.causalOrdinal > observed.causalOrdinal) {
+                                observed = cause
+                            }
+                        }
+                    }
                     if (card.snapshot.patchBytes > 0 && observed == null) activeScopeUnknown = true
                     if (observed != null) inflightFiles += observed.touchedFiles
                 }
@@ -1544,10 +1559,10 @@ class FlywheelDriver(
                     val receipt = entry?.receipt
                     if (receipt != null && isImmutableReceipt(receipt)) {
                         val identity = entry.workId.let { wid ->
+                            // Bolt: Avoid intermediate List allocations from filterIsInstance<T>().lastOrNull()
                             withContext(Dispatchers.IO) { store.replayCauses(wid) }
-                                .filterIsInstance<JulesCause.WorkIdentitySynthesized>()
-                                .lastOrNull()?.identity
-                        }
+                                .lastOrNull { it is JulesCause.WorkIdentitySynthesized } as? JulesCause.WorkIdentitySynthesized
+                        }?.identity
                         sendMergeReceipt(
                             sessionId = sessionId,
                             commitSha = receipt.revision,
