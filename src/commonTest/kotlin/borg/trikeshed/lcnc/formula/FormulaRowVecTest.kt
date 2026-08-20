@@ -1,11 +1,17 @@
 package borg.trikeshed.lcnc.formula
 
+import borg.trikeshed.cursor.ColumnMeta
 import borg.trikeshed.cursor.RowVec
+import borg.trikeshed.cursor.`ColumnMeta↻`
 import borg.trikeshed.cursor.cellsToRowVec
+import borg.trikeshed.isam.meta.IOMemento
 import borg.trikeshed.lcnc.collections.associative.PropertyType
 import borg.trikeshed.lcnc.collections.associative.PropertyValue
+import borg.trikeshed.lib.ReifiedSplitSeries2
 import borg.trikeshed.lib.Series
 import borg.trikeshed.lib.j
+import borg.trikeshed.lib.leftIdentity
+import borg.trikeshed.reduction.FormulaReduction
 import borg.trikeshed.reduction.ReducerRegistry
 import borg.trikeshed.reduction.registerFormulaReduction
 import kotlin.test.Test
@@ -73,6 +79,33 @@ class FormulaRowVecTest {
         assertEquals(1.0, reducer.reduce(rowVec(true)))
         assertEquals(reducer.reduce(mapRow(true)), reducer.reduce(rowVec(true)))
         assertEquals(reducer.reduce(mapRow(false)), reducer.reduce(rowVec(false)))
+    }
+
+    /**
+     * `ColumnMeta.name` is a CharSequence, so a column named by something other than a String
+     * must still resolve — otherwise `prop("Done")` silently yields null instead of the value.
+     */
+    @Test
+    fun nonStringColumnNamesStillResolve() {
+        val values: Series<Any?> = 1 j { _: Int -> true }
+        val meta: Series<`ColumnMeta↻`> = 1 j { _: Int ->
+            ColumnMeta(StringBuilder("Done"), IOMemento.IoBoolean).leftIdentity
+        }
+        val row: RowVec = ReifiedSplitSeries2(values, meta)
+
+        assertEquals(true, PropFunction("Done").evaluate(row))
+        assertEquals(1.0, FormulaParser(source).parse().evaluate(row))
+    }
+
+    /** The fast `execute` path and the introspectable checkpoint pipeline must agree. */
+    @Test
+    fun executeMatchesCheckpointPipeline() {
+        val reduction = FormulaReduction(source)
+        val rows: Series<RowVec> = 3 j { i: Int -> rowVec(i != 1) }
+        val carrier = reduction.carrierAlg.carrier(rows)
+
+        assertEquals(listOf<Any?>(1.0, 0.0, 1.0), reduction.execute(carrier))
+        assertEquals(reduction.execute(carrier), reduction.executeWithCheckpoints(carrier).output)
     }
 
     @Test

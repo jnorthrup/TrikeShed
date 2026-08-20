@@ -18,10 +18,15 @@ import borg.trikeshed.lib.toList
  *
  * The carrier input is a `Series<RowVec>` (i.e. a Cursor) or an `Array<RowVec>`,
  * per [LcncCarrierAlg.seriesCarrierAlg].
+ *
+ * **Carrier caveat.** `seriesCarrierAlg` dispatches on `is Join<*, *>`, and a [RowVec] is
+ * *itself* a `Join` — so passing a single row where a Cursor is expected is not rejected;
+ * each cell-`Join` is then treated as a row and the output is garbage. The collision is
+ * structural and cannot be resolved at runtime: always hand this a `Series<RowVec>`.
  */
 class FormulaReduction private constructor(
     val source: String,
-    ast: FormulaAST,
+    private val ast: FormulaAST,
 ) : AbstractLcncReduction<String, RowVec, List<Any?>, List<Any?>>(
     keyAlg = formulaKeyAlg(source),
     valueAlg = formulaValueAlg(ast),
@@ -30,8 +35,19 @@ class FormulaReduction private constructor(
 ) {
     constructor(source: String) : this(source, FormulaParser(source).parse())
 
+    /**
+     * Every row carries the same key, so the MAP/REDUCE/REREDUCE grouping is a no-op here and the
+     * result is exactly the per-row projection. Taking it directly keeps the hot path a single lazy
+     * `α` projection; going through the template's persistent-list fold would copy the accumulator
+     * once per row (O(n²)). [executeWithCheckpoints] still runs the full pipeline for inspection,
+     * and `executeMatchesCheckpointPipeline` in FormulaRowVecTest pins the two to the same answer.
+     */
     @Suppress("UNCHECKED_CAST")
+    override fun execute(input: ReductionCarrier<*>): List<Any?> =
+        (input as ReductionCarrier<RowVec>).map { ast.evaluate(it) }.toList()
+
     override fun formatOutput(reduced: Any): List<Any?> {
+        @Suppress("UNCHECKED_CAST")
         val carrier = reduced as ReductionCarrier<Join<String, List<Any?>>>
         return carrier.map { it.b }.toList().flatten()
     }
@@ -62,12 +78,24 @@ private fun formulaValueAlg(ast: FormulaAST): ValueAlg<RowVec, List<Any?>> =
  * Registration = copy + reassign of [ReducerRegistry.registry] (the object carries a
  * plain `var` map and no register() method). Additive: existing keys are preserved,
  * an existing binding under [key] is replaced.
+ *
+ * **Bootstrap only.** The read-modify-write is not atomic and `registry` cannot be `@Volatile`
+ * in commonMain, so concurrent registrations may lose one another or go unseen by other threads.
+ * Call this during single-threaded startup, not from running pipelines.
  */
 fun registerReduction(key: String, reduction: LcncReduction<*, *, *, *>): LcncReduction<*, *, *, *> {
     ReducerRegistry.registry = ReducerRegistry.registry + (key to reduction)
     return reduction
 }
 
-/** Parse [source] into a [FormulaReduction] and admit it to the registry under [key]. */
+/**
+ * Parse [source] into a [FormulaReduction] and admit it to the registry under [key].
+ *
+ * [key] is a **direct-lookup** key (`ReducerRegistry.registry[key]`), not a dispatch category:
+ * [ReducerRegistry.runFor] resolves by `Capability.category`, and no `Capability` yields
+ * `"formula"`, so a formula is not reachable through `runFor` until a category is minted for it.
+ * The default key means two different formulas registered without an explicit [key] collide —
+ * pass a distinct [key] (e.g. the block id) when registering more than one.
+ */
 fun registerFormulaReduction(source: String, key: String = "formula"): FormulaReduction =
     FormulaReduction(source).also { registerReduction(key, it) }
