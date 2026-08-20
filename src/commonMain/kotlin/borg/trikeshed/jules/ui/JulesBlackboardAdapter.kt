@@ -2,6 +2,8 @@ package borg.trikeshed.jules.ui
 
 import borg.trikeshed.forge.blackboard.ForgeBlackboardSection3D
 import borg.trikeshed.forge.blackboard.ForgeBlackboardView
+import borg.trikeshed.forge.blackboard.ForgeDomainSurface
+import borg.trikeshed.forge.blackboard.ForgeSurfaceGeometry
 import borg.trikeshed.jules.JulesRestClient
 import kotlinx.datetime.Clock
 
@@ -17,13 +19,13 @@ data class ForgeSurfaceSession(
     val patchBytes: Long,
     val source: String,
     val updateTime: String,
-    val sectionId: String,
-    val centerX: Double,
-    val centerY: Double,
-    val width: Double,
-    val height: Double,
-    val elevation: Double,
-)
+    override val sectionId: String,
+    override val centerX: Double,
+    override val centerY: Double,
+    override val width: Double,
+    override val height: Double,
+    override val elevation: Double,
+) : ForgeSurfaceGeometry
 
 /**
  * Projected surface content emitted into the Forge blackboard for one Jules activity.
@@ -38,13 +40,13 @@ data class ForgeSurfaceActivity(
     val kind: String,
     val patchBytes: Long,
     val excerpt: String,
-    val sectionId: String,
-    val centerX: Double,
-    val centerY: Double,
-    val width: Double,
-    val height: Double,
-    val elevation: Double,
-)
+    override val sectionId: String,
+    override val centerX: Double,
+    override val centerY: Double,
+    override val width: Double,
+    override val height: Double,
+    override val elevation: Double,
+) : ForgeSurfaceGeometry
 
 /**
  * Aggregated surface projection of all Jules sessions and activities.
@@ -59,9 +61,16 @@ data class ForgeSurfaceActivity(
 data class JulesBlackboardSurface(
     val sessions: List<ForgeSurfaceSession>,
     val activities: List<ForgeSurfaceActivity>,
-    val updatedAt: Long = Clock.System.now().toEpochMilliseconds(),
-    val ttlMs: Long = TTL_MS,
-)
+    override val updatedAt: Long = Clock.System.now().toEpochMilliseconds(),
+    override val ttlMs: Long = TTL_MS,
+) : ForgeDomainSurface {
+    /**
+     * Every tile this surface puts on the board: sessions first, then their
+     * activities. Concatenated once at construction — a `get()` would reallocate
+     * on every read and break identity for callers that cache it.
+     */
+    override val items: List<ForgeSurfaceGeometry> = sessions + activities
+}
 
 /**
  * TTL for a JulesBlackboardSurface projection in milliseconds.
