@@ -143,10 +143,11 @@ class JulesPatchContinuityStore(
             .any { it is JulesCause.PatchSnapshotObserved &&
             it.patchCid == patchCid && it.causalOrdinal == causalOrdinal
         }) { "snapshot $causalOrdinal/$patchCid was not observed for session $sessionId" }
-        val latestPatchCid = causes.filterIsInstance<JulesCause.PatchSnapshotObserved>()
+        // Bolt: avoid intermediate List allocations from filterIsInstance by using sequence for terminal ops
+        val latestPatchCid = causes.asSequence().filterIsInstance<JulesCause.PatchSnapshotObserved>()
             .maxWithOrNull(compareBy({ it.causalOrdinal }, { it.activitySeq }, { it.artifactSeq }))
             ?.patchCid
-        val latestReportCid = causes.filterIsInstance<JulesCause.AgentReportObserved>()
+        val latestReportCid = causes.asSequence().filterIsInstance<JulesCause.AgentReportObserved>()
             .maxWithOrNull(compareBy({ it.causalOrdinal }, { it.activitySeq }, { it.activityId }))
             ?.reportCid
         val cause = JulesCause.PatchReviewSelected(
@@ -185,10 +186,11 @@ class JulesPatchContinuityStore(
             .any { it is JulesCause.PatchSnapshotObserved &&
             it.patchCid == patchCid && it.causalOrdinal == causalOrdinal
         }) { "snapshot $causalOrdinal/$patchCid was not observed for session $sessionId" }
-        val latestPatchCid = causes.filterIsInstance<JulesCause.PatchSnapshotObserved>()
+        // Bolt: avoid intermediate List allocations from filterIsInstance by using sequence for terminal ops
+        val latestPatchCid = causes.asSequence().filterIsInstance<JulesCause.PatchSnapshotObserved>()
             .maxWithOrNull(compareBy({ it.causalOrdinal }, { it.activitySeq }, { it.artifactSeq }))
             ?.patchCid
-        val latestReportCid = causes.filterIsInstance<JulesCause.AgentReportObserved>()
+        val latestReportCid = causes.asSequence().filterIsInstance<JulesCause.AgentReportObserved>()
             .maxWithOrNull(compareBy({ it.causalOrdinal }, { it.activitySeq }, { it.activityId }))
             ?.reportCid
         val cause = JulesCause.PatchRejected(
@@ -237,7 +239,7 @@ class JulesPatchContinuityStore(
             reportCid = reportCid,
             causalOrdinal = causalOrdinal,
             latestPatchCid = null,
-            latestReportCid = causes.filterIsInstance<JulesCause.AgentReportObserved>()
+            latestReportCid = causes.asSequence().filterIsInstance<JulesCause.AgentReportObserved>()
                 .maxWithOrNull(compareBy({ it.causalOrdinal }, { it.activitySeq }, { it.activityId }))
                 ?.reportCid,
             disposition = disposition,

@@ -431,7 +431,8 @@ class FlywheelDriver(
 
         // Legion Doc 04 Layer 5: Audit behavioral graphs across sessions
         for (card in conductor.cards.values) {
-            val observed = card.causes.filterIsInstance<JulesCause.PatchSnapshotObserved>().maxByOrNull { it.causalOrdinal }
+            // Bolt: avoid intermediate List allocations from filterIsInstance by using sequence for terminal ops
+            val observed = card.causes.asSequence().filterIsInstance<JulesCause.PatchSnapshotObserved>().maxByOrNull { it.causalOrdinal }
             if (observed != null) {
                 for (file in observed.touchedFiles) {
                     behavioralAuditor.recordFileAccess(card.snapshot.sessionId, file)
@@ -478,7 +479,8 @@ class FlywheelDriver(
             var activeScopeUnknown = false
             for (card in conductor.cards.values) {
                 if (card.snapshot.state !in TERMINAL_STATES) {
-                    val observed = card.causes.filterIsInstance<JulesCause.PatchSnapshotObserved>()
+                    // Bolt: avoid intermediate List allocations from filterIsInstance by using sequence for terminal ops
+                    val observed = card.causes.asSequence().filterIsInstance<JulesCause.PatchSnapshotObserved>()
                         .maxByOrNull { it.causalOrdinal }
                     if (card.snapshot.patchBytes > 0 && observed == null) activeScopeUnknown = true
                     if (observed != null) inflightFiles += observed.touchedFiles
@@ -1504,7 +1506,8 @@ class FlywheelDriver(
                     val receipt = entry?.receipt
                     if (receipt != null && isImmutableReceipt(receipt)) {
                         val identity = entry.workId.let { wid ->
-                            withContext(Dispatchers.IO) { store.replayCauses(wid) }
+                            // Bolt: avoid intermediate List allocations from filterIsInstance by using sequence for terminal ops
+                            withContext(Dispatchers.IO) { store.replayCauses(wid) }.asSequence()
                                 .filterIsInstance<JulesCause.WorkIdentitySynthesized>()
                                 .lastOrNull()?.identity
                         }
