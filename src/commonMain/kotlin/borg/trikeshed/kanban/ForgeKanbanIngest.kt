@@ -50,14 +50,29 @@ object ForgeKanbanIngest {
         KanbanColumn(KanbanColumnId("archived"), "Archived", 6),
     )
 
-    fun persistMarkdown(userId: String, markdownPath: String): ForgeKanbanReduction {
+    /**
+     * Persist the markdown envelope, then reduce it and assert the derived facts into
+     * [workingMemory].  The default is a fresh memory, which reproduces the historical
+     * behaviour of an assertion pass whose memory is immediately discarded; callers that
+     * care about the facts pass their own.
+     */
+    suspend fun persistMarkdown(
+        userId: String,
+        markdownPath: String,
+        workingMemory: ReteWorkingMemory = ReteWorkingMemory(),
+    ): ForgeKanbanReduction {
         val markdown = borg.trikeshed.common.Files.readString(markdownPath)
         val source = ForgeBoardPersistence.source(userId, markdown, markdownPath)
         ForgeBoardPersistence.persist(source).getOrThrow()
-        return reduce(source)
+        return reduce(source, workingMemory)
     }
 
-    fun persistArchive(userId: String, archive: borg.trikeshed.lib.Series<Any?>, pipeline: borg.trikeshed.treedoc.TreeDocPipeline): ForgeKanbanReduction {
+    suspend fun persistArchive(
+        userId: String,
+        archive: borg.trikeshed.lib.Series<Any?>,
+        pipeline: borg.trikeshed.treedoc.TreeDocPipeline,
+        workingMemory: ReteWorkingMemory = ReteWorkingMemory(),
+    ): ForgeKanbanReduction {
         val documents = archive.b(borg.trikeshed.treedoc.TreeDocK.Documents.ordinal) as borg.trikeshed.cursor.Cursor
         val allMarkdown = StringBuilder()
         for (i in 0 until documents.a) {
@@ -65,16 +80,28 @@ object ForgeKanbanIngest {
             allMarkdown.append(bytes.decodeToString()).append("\n\n")
         }
         val source = ForgeBoardPersistence.source(userId, allMarkdown.toString(), "archive:${(archive.b(borg.trikeshed.treedoc.TreeDocK.ArchiveId.ordinal) as borg.trikeshed.job.ContentId).value}")
-        return reduce(source)
+        return reduce(source, workingMemory)
     }
 
-    fun load(userId: String): ForgeKanbanReduction =
-        reduce(ForgeBoardPersistence.load(userId).getOrThrow())
+    suspend fun load(
+        userId: String,
+        workingMemory: ReteWorkingMemory = ReteWorkingMemory(),
+    ): ForgeKanbanReduction =
+        reduce(ForgeBoardPersistence.load(userId).getOrThrow(), workingMemory)
+
+    /**
+     * Read-only sibling of [load] for render/report paths that only want the projection
+     * and cannot suspend (e.g. the `@JsExport` wasm shell entry point).  It performs no
+     * working-memory assertion, so it stays a pure function of the persisted envelope.
+     */
+    fun loadProjection(userId: String): ForgeKanbanReduction =
+        project(ForgeBoardPersistence.load(userId).getOrThrow())
 
     /**
      * Browser-safe fallback — builds a minimal reduction entirely in memory
-     * without touching disk.  Used when [load] and [persistMarkdown] both fail
-     * (e.g. browser bundle where require('fs') is unavailable).
+     * without touching disk.  Used when [loadProjection] and [persistMarkdown] both fail
+     * (e.g. browser bundle where require('fs') is unavailable).  Like [loadProjection]
+     * it is a pure projection, so render paths stay non-suspending.
      */
     fun fallbackReduction(): ForgeKanbanReduction {
         val source = ForgeKanbanSource(
@@ -100,10 +127,23 @@ object ForgeKanbanIngest {
             """.trimIndent(),
             contentId = "fallback",
         )
-        return reduce(source)
+        return project(source)
     }
 
-    fun reduce(source: ForgeKanbanSource): ForgeKanbanReduction {
+    /**
+     * Reduce [source] and assert the derived facts into [workingMemory].
+     *
+     * RGA N3 note: this path still bypasses `JobSupervisor` — the JobCommand bridge is a
+     * sibling concern and is deliberately untouched here.
+     */
+    suspend fun reduce(
+        source: ForgeKanbanSource,
+        workingMemory: ReteWorkingMemory = ReteWorkingMemory(),
+    ): ForgeKanbanReduction =
+        project(source).also { assertFacts(workingMemory, it.reteFacts) }
+
+    /** Pure deterministic projection — no suspension and no working-memory writes. */
+    fun project(source: ForgeKanbanSource): ForgeKanbanReduction {
         require(!Regex("(?i)ignore all previous instructions").containsMatchIn(source.description)) { "Prompt injection detected" }
         val tasks = parseWorkPackages(source.description)
         validateTasks(tasks)
@@ -114,7 +154,7 @@ object ForgeKanbanIngest {
             provenance = provenance(
                 source = source.sourcePath,
                 timestamp = 0L,
-                transformations = listOf("ForgeKanbanIngest.reduce"),
+                transformations = listOf("ForgeKanbanIngest.project"),
             ),
             tags = mapOf("sourceContentId" to source.contentId),
         )
@@ -138,8 +178,6 @@ object ForgeKanbanIngest {
 
         val cards = buildCards(tasks, parentIdsByTask, source)
         val taskFacts = updateTaskFactsWithStatus(cards, provisionalTaskFacts)
-
-        assertFacts(taskFacts, dependencyFacts)
 
         val causalNodes = buildCausalNodes(tasks, parentIdsByTask, context)
         val correlations = buildCorrelations(tasks, parentIdsByTask, childIdsByTask, causalNodes)
@@ -248,12 +286,9 @@ object ForgeKanbanIngest {
         }
     }
 
-    private fun assertFacts(taskFacts: List<ReteStoredFact>, dependencyFacts: List<ReteStoredFact>) {
-        val workingMemory = ReteWorkingMemory()
-        kotlinx.coroutines.runBlocking {
-            (taskFacts + dependencyFacts).forEach { fact ->
-                workingMemory.assert(fact.factId, fact.fields, fact.versionCid, fact.board)
-            }
+    private suspend fun assertFacts(workingMemory: ReteWorkingMemory, facts: List<ReteStoredFact>) {
+        facts.forEach { fact ->
+            workingMemory.assert(fact.factId, fact.fields, fact.versionCid, fact.board)
         }
     }
 

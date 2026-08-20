@@ -1,5 +1,6 @@
 package borg.trikeshed.forge.donor
 
+import kotlinx.coroutines.runBlocking
 import java.nio.file.Files
 import java.nio.file.Paths
 import java.sql.DriverManager
@@ -30,7 +31,7 @@ class HermesDonorTraceTest {
             }
             conn.close()
 
-            val reduction = HermesDonorTrace.ingestDonor("test-user", "sqlite", null)
+            val reduction = runBlocking { HermesDonorTrace.ingestDonor("test-user", "sqlite", null) }
 
             assertTrue(reduction.board.cards.size >= 1)
         } finally {
@@ -59,7 +60,7 @@ class HermesDonorTraceTest {
             }
             conn.close()
 
-            val reduction = HermesDonorTrace.ingestDonor("test-user", "sqlite", null)
+            val reduction = runBlocking { HermesDonorTrace.ingestDonor("test-user", "sqlite", null) }
 
             assertTrue(reduction.board.cards.size >= 1)
         } finally {
@@ -89,7 +90,7 @@ class HermesDonorTraceTest {
             }
             conn.close()
 
-            val reduction = HermesDonorTrace.ingestDonor("test-user", "sqlite", null)
+            val reduction = runBlocking { HermesDonorTrace.ingestDonor("test-user", "sqlite", null) }
 
             // The structural elements should be escaped, preventing FAKE-99 and FAKE-98 from becoming cards
             val cards = reduction.board.cards

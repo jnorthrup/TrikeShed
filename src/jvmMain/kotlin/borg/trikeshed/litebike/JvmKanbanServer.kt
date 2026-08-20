@@ -203,6 +203,8 @@ class JvmKanbanServer(
                 }
                 ForgeKanbanIngest.persistMarkdown("jim", ingestPath)
                 System.err.println("donor replayed: $donorPath")
+            } catch (c: kotlinx.coroutines.CancellationException) {
+                throw c
             } catch (t: Throwable) {
                 System.err.println("donor replay failed: ${t.message}")
             }
@@ -390,7 +392,7 @@ class JvmKanbanServer(
     }
 
     private fun boardJson(): String = runCatching {
-        val reduction = ForgeKanbanIngest.load("jim")
+        val reduction = ForgeKanbanIngest.loadProjection("jim")
         JsonSupport.stringify(
             linkedMapOf(
                 "title" to reduction.source.title,
@@ -431,7 +433,10 @@ class JvmKanbanServer(
                     )
                 ),
             )
-        }.getOrElse { HttpResponse(500, """{"error":"submit_failed","reason":"${it.message}"}""") }
+        }.getOrElse {
+            if (it is kotlinx.coroutines.CancellationException) throw it
+            HttpResponse(500, """{"error":"submit_failed","reason":"${it.message}"}""")
+        }
     }
 
     private fun statusReason(code: Int): String = when (code) {

@@ -90,7 +90,7 @@ object ForgeApp {
         julesSurface: JulesBlackboardSurface? = null,
         flywheelReport: FlywheelReportSnapshot? = null,
     ): String {
-        val reduction = runCatching { ForgeKanbanIngest.load(userId) }.getOrElse { ForgeKanbanIngest.fallbackReduction() }
+        val reduction = runCatching { ForgeKanbanIngest.loadProjection(userId) }.getOrElse { ForgeKanbanIngest.fallbackReduction() }
         val seed = forgeSeedJson(userId, reduction, julesSurface, flywheelReport)
         return htmlShell(seed)
     }
