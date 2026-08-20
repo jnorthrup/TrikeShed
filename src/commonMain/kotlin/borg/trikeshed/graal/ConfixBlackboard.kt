@@ -3,15 +3,29 @@ package borg.trikeshed.graal
 import borg.trikeshed.parse.confix.*
 import borg.trikeshed.cursor.*
 import borg.trikeshed.lib.*
+import kotlinx.coroutines.channels.BufferOverflow
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.SharedFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.datetime.Clock
 
 /**
  * ConfixBlackboard — content-addressed blackboard backed by ConfixDoc.
- * 
+ *
  * Provides a shared workspace for polyglot language communication with:
  * - Content-addressed storage (ConfixDoc as key)
- * - Event subscription via CursorFacet pattern
+ * - Reactor-form change stream via [changes] (SharedFlow<ConfixDoc>)
  * - Provenance tracking for each entry
+ *
+ * Reactor/lifecycle notes (CCEK-style):
+ * - [state] is the single source of truth; every mutator ([put], [remove], [merge])
+ *   emits the post-mutation ConfixDoc snapshot into [changes].
+ * - Emission uses `tryEmit` against `extraBufferCapacity`, so mutators stay
+ *   synchronous and never suspend; slow collectors may drop intermediate
+ *   snapshots but always converge on a later (newer) [state].
+ * - The blackboard owns no coroutine scope: collectors bring their own scope
+ *   and simply stop collecting to detach — no close/shutdown is required.
+ * - The legacy callback [subscribe] remains as a deprecated synchronous shim.
  */
 class ConfixBlackboard {
     
@@ -32,7 +46,21 @@ class ConfixBlackboard {
         val sourceLocation: String? = null
     )
     
-    /** Subscribe to blackboard changes */
+    /**
+     * Reactor-form change stream. Each mutation emits the post-mutation [state].
+     * `extraBufferCapacity` + `DROP_OLDEST` guarantee `tryEmit` always succeeds
+     * without suspending in the synchronous mutators: under back-pressure the
+     * *oldest* buffered snapshot is discarded, never the newest one.
+     */
+    private val _changes = MutableSharedFlow<ConfixDoc>(
+        extraBufferCapacity = CHANGE_BUFFER_CAPACITY,
+        onBufferOverflow = BufferOverflow.DROP_OLDEST,
+    )
+
+    /** Hot stream of ConfixDoc snapshots, one per mutation. Collect to observe the blackboard. */
+    val changes: SharedFlow<ConfixDoc> = _changes.asSharedFlow()
+
+    /** Legacy synchronous shim — see [subscribe]. */
     private val subscribers = mutableListOf<(ConfixDoc) -> Unit>()
     
     // ─────────────────────────────────────────────────────────────────
@@ -77,13 +105,23 @@ class ConfixBlackboard {
         return this
     }
     
-    /** Subscribe to changes */
+    /**
+     * Subscribe to changes (legacy synchronous shim).
+     *
+     * Handlers are invoked synchronously inside each mutator, mirroring the
+     * pre-reactor behavior, and receive the same snapshots emitted on [changes].
+     */
+    @Deprecated(
+        message = "Collect the changes SharedFlow instead; this synchronous shim exists only for legacy callers.",
+        replaceWith = ReplaceWith("changes"),
+    )
     fun subscribe(handler: (ConfixDoc) -> Unit): () -> Unit {
         subscribers.add(handler)
         return { subscribers.remove(handler) }
     }
-    
+
     private fun notifySubscribers() {
+        _changes.tryEmit(doc)
         subscribers.forEach { it(doc) }
     }
     
@@ -98,6 +136,9 @@ class ConfixBlackboard {
     // ─────────────────────────────────────────────────────────────────
     
     companion object {
+        /** Buffered snapshots per collector before the oldest is dropped. */
+        const val CHANGE_BUFFER_CAPACITY: Int = 64
+
         fun empty(): ConfixBlackboard = ConfixBlackboard()
         
         fun fromMap(map: Map<String, Any?>, language: String = "init"): ConfixBlackboard {
