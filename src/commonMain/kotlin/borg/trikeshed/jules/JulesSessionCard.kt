@@ -345,7 +345,8 @@ data class JulesSessionCard(
 
 /** Render one card as a ≤10-line agent-scannable block, `$ ---` terminated. */
 fun JulesSessionCard.renderBlock(): String = buildString {
-    val finalReport = causes.filterIsInstance<JulesCause.AgentReportObserved>()
+    // Bolt: avoid intermediate List allocations from filterIsInstance by using sequence for terminal ops
+    val finalReport = causes.asSequence().filterIsInstance<JulesCause.AgentReportObserved>()
         .maxByOrNull { it.causalOrdinal }
     appendLine("id: ${snapshot.sessionId}")
     appendLine("title: ${card.title.take(80)}")

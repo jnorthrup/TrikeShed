@@ -80,7 +80,8 @@ fun selectJulesPatchForDrain(causes: Iterable<JulesCause>): JulesPatchDrainSelec
     val reject = causalList.getOrNull(rejectIndex) as? JulesCause.PatchRejected
     if (reject != null && rejectIndex > latestObservationIndex) {
         val latestPatchCid = observations.maxWith(snapshotCausalOrder).patchCid
-        val latestReportCid = causalList.filterIsInstance<JulesCause.AgentReportObserved>()
+        // Bolt: avoid intermediate List allocations from filterIsInstance by using sequence for terminal ops
+        val latestReportCid = causalList.asSequence().filterIsInstance<JulesCause.AgentReportObserved>()
             .maxWithOrNull(reportCausalOrder)?.reportCid
         val rejected = observations.lastOrNull {
             it.patchCid == reject.patchCid && it.causalOrdinal == reject.causalOrdinal
@@ -105,7 +106,8 @@ fun selectJulesPatchForDrain(causes: Iterable<JulesCause>): JulesPatchDrainSelec
     val explicit = causalList.getOrNull(explicitIndex) as? JulesCause.PatchReviewSelected
     if (explicit != null && explicitIndex > latestObservationIndex) {
         val latestPatchCid = observations.maxWith(snapshotCausalOrder).patchCid
-        val latestReportCid = causalList.filterIsInstance<JulesCause.AgentReportObserved>()
+        // Bolt: avoid intermediate List allocations from filterIsInstance by using sequence for terminal ops
+        val latestReportCid = causalList.asSequence().filterIsInstance<JulesCause.AgentReportObserved>()
             .maxWithOrNull(reportCausalOrder)?.reportCid
         val selected = observations.lastOrNull {
             it.patchCid == explicit.patchCid && it.causalOrdinal == explicit.causalOrdinal
@@ -169,7 +171,8 @@ fun selectJulesReportForSettlement(causes: Iterable<JulesCause>): JulesReportSet
         it is JulesCause.AgentReportObserved || it is JulesCause.PatchSnapshotObserved
     }
     val review = causalList.getOrNull(reviewIndex) as? JulesCause.AgentReportReviewSelected
-    val latestPatchCid = causalList.filterIsInstance<JulesCause.PatchSnapshotObserved>()
+    // Bolt: avoid intermediate List allocations from filterIsInstance by using sequence for terminal ops
+    val latestPatchCid = causalList.asSequence().filterIsInstance<JulesCause.PatchSnapshotObserved>()
         .maxWithOrNull(snapshotCausalOrder)?.patchCid
     if (review != null && reviewIndex > latestProducerArtifactIndex &&
         // Report-only settlement cannot discard a delivered patch. Such a
