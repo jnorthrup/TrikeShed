@@ -29,7 +29,7 @@ class ForgeKanbanDaemon(
     /**
      * The user's board (loaded on demand).
      */
-    private var board: KanbanBoard = ForgeKanbanIngest.load(userId).board
+    private var board: KanbanBoard = ForgeKanbanIngest.loadProjection(userId).board
     
     init {
         walReplay?.invoke()?.forEach { (causalKey, _) ->
@@ -202,7 +202,7 @@ class ForgeKanbanDaemon(
      * Reload board from disk.
      */
     fun reload() {
-        board = ForgeKanbanIngest.load(userId).board
+        board = ForgeKanbanIngest.loadProjection(userId).board
     }
     
     /**

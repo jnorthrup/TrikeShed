@@ -2,6 +2,8 @@ package borg.trikeshed.forge
 
 import borg.trikeshed.common.Files
 import borg.trikeshed.kanban.ForgeKanbanIngest
+import kotlinx.coroutines.MainScope
+import kotlinx.coroutines.launch
 
 /**
  * JS entry point for the Forge local-first workspace.
@@ -16,6 +18,22 @@ import borg.trikeshed.kanban.ForgeKanbanIngest
  * → seed and saves mutations back to localStorage + IndexedDB permanently.
  */
 fun main() {
+    // Ingest is a suspending contract (the Rete assertion pass suspends) and Kotlin/JS has
+    // no runBlocking, so the whole entry point runs as a single coroutine on the JS event
+    // loop.  One coroutine keeps the persist -> render ordering that the seed JSON depends on.
+    MainScope().launch {
+        try {
+            forgeNodeMain()
+        } catch (t: Throwable) {
+            // The detached coroutine cannot propagate out of main(); mark the process failed
+            // so `node forge.js > out.html` still aborts a pipeline instead of emitting nothing.
+            System.err.println("Forge node main failed: ${t.message}")
+            js("if (typeof process !== 'undefined') { process.exitCode = 1; }")
+        }
+    }
+}
+
+private suspend fun forgeNodeMain() {
     // Node.js: ingest /tmp/hi into the local-first persistence layer.
     if (!(js("typeof window !== 'undefined' && typeof document !== 'undefined'") as Boolean)) {
 

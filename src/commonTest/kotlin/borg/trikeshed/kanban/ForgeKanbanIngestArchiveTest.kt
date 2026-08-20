@@ -4,6 +4,7 @@ import borg.trikeshed.job.CasStore
 import borg.trikeshed.lib.seriesOf
 import borg.trikeshed.treedoc.TreeDocPipeline
 import borg.trikeshed.treedoc.TreeDocument
+import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -34,7 +35,7 @@ class ForgeKanbanIngestArchiveTest {
     """.trimIndent()
 
     @Test
-    fun ingestReducesArchive() {
+    fun ingestReducesArchive() = runTest {
         val cas = CasStore.inMemory()
         val pipeline = TreeDocPipeline(cas, 1024)
         val docs = seriesOf(listOf(

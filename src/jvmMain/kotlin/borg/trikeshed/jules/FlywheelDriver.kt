@@ -1737,7 +1737,7 @@ class FlywheelDriver(
 
 
     private fun getKanbanBoard(): borg.trikeshed.kanban.KanbanBoard {
-        return try { ForgeKanbanIngest.load("jim").board }
+        return try { ForgeKanbanIngest.loadProjection("jim").board }
         catch (_: Throwable) { borg.trikeshed.kanban.KanbanBoard(
             id = borg.trikeshed.kanban.KanbanBoardId("flywheel"),
             name = "flywheel",

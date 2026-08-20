@@ -11,7 +11,7 @@ import java.sql.Connection
 import java.sql.ResultSet
 
 object HermesDonorTrace {
-    fun ingestDonor(userId: String, format: String, donorPath: String? = null): ForgeKanbanReduction {
+    suspend fun ingestDonor(userId: String, format: String, donorPath: String? = null): ForgeKanbanReduction {
         return when (format.lowercase()) {
             "sqlite" -> {
                 val path = if (donorPath == null) {
@@ -37,7 +37,7 @@ object HermesDonorTrace {
         }
     }
 
-    private fun ingestMarkdown(userId: String, donorPath: Path): ForgeKanbanReduction {
+    private suspend fun ingestMarkdown(userId: String, donorPath: Path): ForgeKanbanReduction {
         val ingestPath = if (borg.trikeshed.kanban.JvmTikaIngestAdapter.isTikaCandidate(donorPath)) {
             val md = borg.trikeshed.kanban.JvmTikaIngestAdapter.extractToMarkdown(donorPath)
             val tmp = Files.createTempFile("tika-donor", ".md")
@@ -49,7 +49,7 @@ object HermesDonorTrace {
         return ForgeKanbanIngest.persistMarkdown(userId, ingestPath)
     }
 
-    private fun ingestSqlite(userId: String, dbPath: Path): ForgeKanbanReduction {
+    private suspend fun ingestSqlite(userId: String, dbPath: Path): ForgeKanbanReduction {
         require(Files.exists(dbPath)) { "SQLite donor db not found at: $dbPath" }
 
         val dataSource = SQLiteDataSource().apply {

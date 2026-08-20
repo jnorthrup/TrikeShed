@@ -1,5 +1,7 @@
 package borg.trikeshed.kanban
 
+import borg.trikeshed.dag.ReteWorkingMemory
+import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -44,7 +46,7 @@ class ForgeKanbanIngestTest {
     }
 
     @Test
-    fun ingestReducesHermesStyleTasksLinksReteCorrelationsAndCausality() {
+    fun ingestReducesHermesStyleTasksLinksReteCorrelationsAndCausality() = runTest {
         val reduction = ForgeKanbanIngest.reduce(
             ForgeBoardPersistence.source("jim", markdown, "/tmp/hi")
         )
@@ -64,5 +66,36 @@ class ForgeKanbanIngestTest {
         assertEquals(2, reduction.reteFacts.count { it.fields["kind"] == "link" })
         assertEquals(listOf("G0"), reduction.causalNodes.first { it.nodeId == "F0" }.parentNodeIds)
         assertEquals(f0.causalKey, reduction.causalNodes.first { it.nodeId == "F0" }.causalKey)
+    }
+
+    @Test
+    fun reduceAssertsEveryDerivedFactIntoTheCallerSuppliedWorkingMemory() = runTest {
+        val source = ForgeBoardPersistence.source("jim", markdown, "/tmp/hi")
+        val workingMemory = ReteWorkingMemory()
+
+        val reduction = ForgeKanbanIngest.reduce(source, workingMemory)
+
+        // reduce == the pure projection plus an assertion pass; the reduction is unchanged.
+        assertEquals(ForgeKanbanIngest.project(source), reduction)
+
+        val board = reduction.reteFacts.first().board
+        assertEquals(3, workingMemory.query(board, "kind" to "task").size)
+        assertEquals(2, workingMemory.query(board, "kind" to "link").size)
+        reduction.reteFacts.forEach { fact ->
+            assertEquals(listOf(fact), workingMemory.facts(fact.factId))
+        }
+    }
+
+    @Test
+    fun projectionPathPerformsNoWorkingMemoryAssertion() = runTest {
+        val source = ForgeBoardPersistence.source("jim", markdown, "/tmp/hi")
+        val workingMemory = ReteWorkingMemory()
+
+        val projected = ForgeKanbanIngest.project(source)
+
+        assertTrue(projected.reteFacts.isNotEmpty())
+        projected.reteFacts.forEach { fact ->
+            assertTrue(workingMemory.facts(fact.factId).isEmpty())
+        }
     }
 }
