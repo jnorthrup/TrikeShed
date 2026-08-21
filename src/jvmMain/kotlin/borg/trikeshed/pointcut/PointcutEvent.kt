@@ -9,10 +9,13 @@ data class PointcutEvent(
     val target: Any?,
     val propertyName: String,
     val newValue: Any?,
-    val timestamp: Long = System.currentTimeMillis()
+    val timestamp: Long = System.currentTimeMillis(),
+    val sourcePath: String? = null,
+    val line: Int = -1,
+    val column: Int = -1,
+    val isRoot: Boolean = false
 ) {
     fun toFieldSynapse(): FieldSynapse {
-        require(vmFacet == VmFacet.GRAAL_PYTHON) { "Expected GRAAL_PYTHON, got $vmFacet" }
         val methodIdx = TypedefProductionSystem.InternPool.intern(coordinate)
         val opcode = FieldSynapse.OP_L_GET.toByte()
         val cHash = TypedefProductionSystem.callsiteHash(opcode, methodIdx, 0)

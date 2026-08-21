@@ -6,9 +6,13 @@ import org.graalvm.polyglot.Context
 import org.graalvm.polyglot.HostAccess
 import org.graalvm.polyglot.ResourceLimits
 import org.graalvm.polyglot.Source
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.SharedFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import org.graalvm.polyglot.management.ExecutionEvent
 import org.graalvm.polyglot.management.ExecutionListener
 import java.io.InputStream
+import java.util.concurrent.ConcurrentHashMap
 import java.io.OutputStream
 
 class SubgraalPointcutRunner(
@@ -17,6 +21,19 @@ class SubgraalPointcutRunner(
     errStream: OutputStream = System.err,
     inStream: InputStream = System.`in`
 ) : AutoCloseable {
+
+    private val _events = MutableSharedFlow<PointcutEvent>(extraBufferCapacity = 10000)
+    val events: SharedFlow<PointcutEvent> = _events.asSharedFlow()
+
+    private val armedPaths = ConcurrentHashMap.newKeySet<String>()
+
+    fun arm(path: String) {
+        armedPaths.add(path)
+    }
+
+    fun disarm(path: String) {
+        armedPaths.remove(path)
+    }
 
     private val context: Context = Context.newBuilder("python", "js")
         .allowHostAccess(HostAccess.NONE)
@@ -46,7 +63,10 @@ class SubgraalPointcutRunner(
     private val listener = ExecutionListener.newBuilder()
         .onEnter(::handleEventEnter)
         .onReturn(::handleEventReturn)
-        .expressions(true)
+        .statements(true)
+        .roots(true)
+        .collectReturnValue(true)
+        .sourceFilter { armedPaths.isEmpty() || it.path in armedPaths }
         .attach(context.engine)
 
     private fun handleEventEnter(event: ExecutionEvent) {
@@ -60,14 +80,30 @@ class SubgraalPointcutRunner(
     private fun handleEvent(event: ExecutionEvent, isEnter: Boolean) {
         val phase = if (isEnter) 0.toByte() else 1.toByte()
 
-        // Since we are restricted to Polyglot ExecutionListener and cannot reliably filter or map
-        // AST tags directly without Truffle API integration (which is not configured for this project),
-        // we'll record generic expression evaluation events as L_GET to avoid fragile string parsing heuristics.
+        val location = event.location
+        val source = location?.source
+        val languageId = source?.language ?: "python"
+
+        val vmFacet = VmFacet.values().find { it.id == languageId } ?: VmFacet.GRAAL_PYTHON
+
+        val rootName = event.rootName ?: "unknown"
+        val pointcutEvent = PointcutEvent(
+            vmFacet = vmFacet,
+            coordinate = rootName,
+            target = null,
+            propertyName = "",
+            newValue = if (!isEnter) event.returnValue?.takeIf { !it.isNull }?.toString() else null,
+            timestamp = System.currentTimeMillis(),
+            sourcePath = source?.path,
+            line = location?.startLine ?: -1,
+            column = location?.startColumn ?: -1,
+            isRoot = event.isRoot
+        )
+        _events.tryEmit(pointcutEvent)
 
         val opcode = FieldSynapse.OP_L_GET.toByte()
 
-        val name = event.rootName ?: "expr"
-        val methodIdx = TypedefProductionSystem.InternPool.intern(name)
+        val methodIdx = TypedefProductionSystem.InternPool.intern(rootName)
 
         val templateIdx = when (opcode.toInt() and 0xFF) {
             FieldSynapse.OP_L_GET -> if (isEnter) FieldSynapse.TPL_BEFORE_GET else FieldSynapse.TPL_AFTER_GET
