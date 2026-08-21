@@ -108,7 +108,7 @@
   function saveState() {
     try { 
         const stateStr = (typeof stringifyForge === 'function') ? stringifyForge(state) : JSON.stringify(state);
-        localStorage.setItem(LS_KEY, stateStr); 
+        localStorage.setItem(LS_KEY, JSON.stringify(state));
         
         if (state.board && state.board.cards) {
             const boardStr = (typeof stringifyForge === 'function') ? stringifyForge({ cards: state.board.cards }) : JSON.stringify({ cards: state.board.cards });
@@ -514,6 +514,9 @@
         cardEl.className = 'board-card' + (col.id === 'done' ? ' done-card' : '');
         cardEl.role = 'button';
         cardEl.tabIndex = 0;
+        const nextColIndex = (state.board.columns.indexOf(col) + 1) % state.board.columns.length;
+        const nextColName = state.board.columns[nextColIndex].name;
+        cardEl.setAttribute('aria-label', card.title + ' in ' + col.name + '. Activate to move to ' + nextColName);
         const title = document.createElement('div');
         title.className = 'board-card-title';
         title.textContent = card.title;
