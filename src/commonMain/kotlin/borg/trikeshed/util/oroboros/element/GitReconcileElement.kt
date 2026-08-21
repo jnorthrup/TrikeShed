@@ -5,6 +5,7 @@ import borg.trikeshed.context.AsyncContextElement
 import borg.trikeshed.context.AsyncContextKey
 import borg.trikeshed.context.ElementState
 import borg.trikeshed.lib.j
+import borg.trikeshed.cursor.currentTimeMillis
 import borg.trikeshed.memory.CouchIndexBridge
 import borg.trikeshed.util.oroboros.GitCouchGateway
 import kotlinx.coroutines.Dispatchers
@@ -32,7 +33,7 @@ class GitReconcileElement(
         if (state != ElementState.CREATED) return
         super.open()
 
-        kotlinx.coroutines.CoroutineScope(supervisor).launch(Dispatchers.IO) {
+        kotlinx.coroutines.CoroutineScope(supervisor).launch(Dispatchers.Default) {
             var lastReconcledSha = ""
             while (isActive) {
                 // Wait for object-dirty signal, then reconcile
@@ -44,7 +45,7 @@ class GitReconcileElement(
                             forgeHome = forgeHome,
                             agentId = "oroboros",
                             revision = currentSha,
-                            sequence = System.currentTimeMillis(),
+                            sequence = currentTimeMillis(),
                         )
                         couchIndexBridge.indexReconciliation(
                             GitCouchGateway.GIT_PREFIX,
@@ -53,7 +54,8 @@ class GitReconcileElement(
                         lastReconcledSha = currentSha
                         println("[OROBOROS] Git→Couch reactive reconcile: ${snap.paths.size} paths @ ${currentSha.take(12)}")
                     }.onFailure {
-                        System.err.println("[OROBOROS] Git→Couch reconcile failed: ${it.message}")
+                        // note stdout
+                        println("[OROBOROS] Git→Couch reconcile failed: ${it.message}")
                     }
                 }
             }

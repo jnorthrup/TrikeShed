@@ -4,6 +4,7 @@ import borg.trikeshed.collections.associative.FunnelHashIndex
 import borg.trikeshed.job.ContentId
 import borg.trikeshed.lib.Series
 import borg.trikeshed.lib.get
+import borg.trikeshed.cursor.monotonicNanoTime
 import borg.trikeshed.lib.j
 import borg.trikeshed.lib.size
 import borg.trikeshed.lib.α
@@ -566,7 +567,7 @@ object FunnelResidualMerge {
 
             if (changes.isNotEmpty()) {
                 val patchId = borg.trikeshed.patch.Blake3Hash.hash(
-                    ("pijul-merge-$s-${System.nanoTime()}").encodeToByteArray()
+                    ("pijul-merge-$s-${monotonicNanoTime()}").encodeToByteArray()
                 )
                 val patch = borg.trikeshed.pijul.Patch(
                     id = patchId,
