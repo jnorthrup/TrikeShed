@@ -327,19 +327,19 @@ fun evidence(
 /**
  * Get current time in milliseconds (platform-specific).
  */
-expect fun currentTimeMillis(): Long
+fun currentTimeMillis(): Long = borg.trikeshed.platform.PlatformHost.default.clock.nowMillis()
 
 /**
  * Monotonic nanosecond timer for benchmarking and duration measurement.
  * Not wall-clock; suitable only for elapsed-time deltas.
  */
-expect fun monotonicNanoTime(): Long
+fun monotonicNanoTime(): Long = borg.trikeshed.platform.PlatformHost.default.clock.monotonicNanos()
 
 /**
  * Platform-visible processor count for sizing concurrency pools.
  * Returns at least 1.
  */
-expect fun availableProcessors(): Int
+fun availableProcessors(): Int = borg.trikeshed.platform.PlatformHost.default.processors
 
 /**
  * Create a cell overlay with a simple DSL.
