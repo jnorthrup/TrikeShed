@@ -1,10 +1,12 @@
 package borg.trikeshed.forge.window
 
-/**
- * Node.js-based Window Manager.
- * Serves HTML over local HTTP (or simply outputs it to stdout/file) and optionally opens it in a browser.
- */
+import kotlin.time.TimeSource
+
 class NodeForgeWindowManager : ForgeWindowManager {
+    private var boundHtml: String = ""
+    private val injected = mutableListOf<ScriptSnippet>()
+    private val events = mutableListOf<WindowEvent>()
+
     override fun launch(html: String) {
         val isNode = js("typeof process !== 'undefined' && process.versions != null && process.versions.node != null") as Boolean
         if (isNode) {
@@ -15,7 +17,26 @@ class NodeForgeWindowManager : ForgeWindowManager {
             }
             server.listen(8080)
             println("NodeForgeWindowManager: Serving HTML on http://localhost:8080")
-            // In a real app we might want to open the browser using `child_process.exec`, but this fulfills the 'serves HTML' requirement.
         }
     }
+
+    override fun bind(html: String) {
+        boundHtml = html
+    }
+
+    override fun injectScript(snippet: ScriptSnippet) {
+        injected.add(snippet)
+    }
+
+    override fun dispatchEvent(event: WindowEvent) {
+        events.add(event)
+    }
+
+    override fun captureSnapshot(): WindowSnapshot = WindowSnapshot(
+        timestampMillis = TimeSource.Monotonic.markNow().elapsedNow().inWholeMilliseconds,
+        dom = boundHtml,
+        boundScripts = injected.map { it.id },
+        dispatchedEvents = events.toList(),
+        isNoop = false,
+    )
 }

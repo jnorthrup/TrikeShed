@@ -17,7 +17,7 @@ class GalleryReactorClient(private val endpointUrl: String = "/api/invoke") {
         init.body = actionPayload
         
         return window.fetch(endpointUrl, init as RequestInit)
-            .then { response -> 
+            .then<dynamic> { response ->
                 if (response.ok) {
                     response.json()
                 } else {
@@ -31,7 +31,7 @@ class GalleryReactorClient(private val endpointUrl: String = "/api/invoke") {
         window.setInterval({
             if (window.navigator.onLine) {
                 val action = """{"verb":"subscribe","nuid":{"capabilityCat":"blackboard","nonceBytes":"","subnet":"global.mesh"},"payload":""}"""
-                sendAction(action).then { response ->
+                sendAction(action).then<Unit> { response ->
                     onEvent(response)
                 }.catch { err ->
                     console.log("Subscription poll failed: \$err")
