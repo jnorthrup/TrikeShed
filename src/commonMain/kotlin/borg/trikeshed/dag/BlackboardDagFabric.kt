@@ -2,6 +2,7 @@ package borg.trikeshed.dag
 
 import borg.trikeshed.cursor.*
 import borg.trikeshed.lib.Series
+import borg.trikeshed.pointcut.coord.confixPath
 import borg.trikeshed.lib.j
 import borg.trikeshed.lib.size
 
@@ -257,7 +258,49 @@ sealed class ReteFact {
     ) : ReteFact() {
         override val factId: String = "node:$boardId:$nodeId"
     }
+
+    data class SiteFact(
+        val site: borg.trikeshed.pointcut.coord.SiteKey,
+        val pointcut: borg.trikeshed.classfile.model.PointcutCoordinate
+    ) : ReteFact() {
+        override val factId: String = "site:${site.confixPath}"
+    }
+
+    data class TraceFact(
+        val site: borg.trikeshed.pointcut.coord.SiteKey,
+        val facet: borg.trikeshed.pointcut.VmFacet,
+        val kind: borg.trikeshed.classfile.model.BytecodePointcutKind,
+        val phase: Phase,
+        val value: Any?,
+        val nano: Long,
+        val threadId: Long
+    ) : ReteFact() {
+        override val factId: String = "trace:${site.confixPath}:$nano:$threadId"
+    }
+
+    data class SiteHeat(
+        val site: borg.trikeshed.pointcut.coord.SiteKey,
+        val count: Long,
+        val lastNano: Long,
+        val lastValue: Any?
+    ) : ReteFact() {
+        override val factId: String = "heat:${site.confixPath}"
+    }
+
+    sealed class IdeFact : ReteFact() {
+        data object Focus : IdeFact() {
+            override val factId: String = "ide:focus"
+        }
+        data object Diagnostic : IdeFact() {
+            override val factId: String = "ide:diagnostic"
+        }
+        data object PointcutRequest : IdeFact() {
+            override val factId: String = "ide:request"
+        }
+    }
 }
+
+enum class Phase { BEFORE, AFTER }
 
 // ==================== RETE PROJECTION ====================
 
