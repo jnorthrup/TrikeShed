@@ -96,7 +96,7 @@ class ForgeBlackboardCameraTest {
         val view = ForgeBlackboardView.DEFAULT
         assertEquals("forge.blackboard", view.surface)
         assertTrue("gallery" in view.sections, "gallery must be a section of the default blackboard")
-        assertEquals(4, view.sections.size)
+        assertEquals(6, view.sections.size)
         assertEquals(forgeBlackboardCornerButtons, view.cornerButtons)
         assertTrue(view.defaultCamera.tilt > 0.0, "default blackboard must carry 2.5D tilt")
     }
