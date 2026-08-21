@@ -1,37 +1,29 @@
 package borg.trikeshed.userspace
 
+import borg.trikeshed.lib.Series
 import borg.trikeshed.userspace.nio.ByteBuffer
-import kotlin.js.JsName
-import kotlin.js.Promise
-import kotlinx.coroutines.await
-import org.khronos.webgl.ArrayBuffer
-import org.khronos.webgl.Int8Array
+import borg.trikeshed.userspace.UringOp.Companion.UringSubmission
 
-private object JsFileRegistry {
+actual class FileImpl actual constructor(actual val id: Int) {
+    actual fun isOpen(): Boolean = id >= 0
+    actual fun close() {}
+    actual fun size(): Long = -1L
+}
+
+internal actual object FilesImpl {
     private var nextId = 1
-    private val contentCache = mutableMapOf<String, ByteArray>()
-
-    fun open(path: String, readOnly: Boolean): FileImpl {
-
-@PublishedApi
-internal suspend fun loadFile(path: String) {
-    // Optimized: Replace Promise .then() chain with consecutive .await() calls
-    // to ensure we yield to the JS event loop properly through Kotlin's coroutine dispatcher,
-    // preventing blocking microtask accumulation.
-    val resp = jsFetch(path).await()
-    val buf = resp.arrayBuffer().await()
-    val int8Array = Int8Array(buf.unsafeCast<ArrayBuffer>())
-    val arr = int8Array.unsafeCast<ByteArray>()
-    JsFileRegistry.cache(path, arr)
+    actual fun open(path: String, readOnly: Boolean): FileImpl {
+        return FileImpl(nextId++)
+    }
 }
 
-@JsName("fetch")
-external fun jsFetch(input: String): Promise<JsResponse>
-
-@JsName("Response")
-external class JsResponse {
-    val ok: Boolean
-    val status: Int
-    fun arrayBuffer(): Promise<dynamic>
-    fun text(): Promise<String>
+internal actual object ChannelsImpl {
+    actual fun socket(domain: Int, type: Int, protocol: Int): FileImpl = FileImpl(-1)
 }
+
+private class JsUserspaceChannelBackend : UserspaceChannelBackend {
+    override fun submitBatch(submissions: List<UringSubmission>): List<SelectionResult> = emptyList()
+    override suspend fun batchEnqueue(submissions: Series<UringSubmission>): Series<UringCompletion> = borg.trikeshed.lib.EmptySeries as Series<UringCompletion>
+}
+
+actual fun openUserspaceChannelBackend(entries: Int): UserspaceChannelBackend = JsUserspaceChannelBackend()
