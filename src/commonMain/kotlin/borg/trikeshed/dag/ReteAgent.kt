@@ -49,6 +49,17 @@ object ReteAgent {
         val agentId: String,
     )
 
+    data class ReteFactRule(
+        val name: String,
+        val predicate: (ReteFact) -> Boolean,
+        val transform: (ReteFact) -> Fire,
+    )
+
+    data class FactAgent(
+        val job: Job,
+        val sink: Channel<ReteFact>,
+    )
+
     /**
      * Result of [run]: the agent's [Job] and the [Channel] used to feed it
      * nodes. Callers push a node into [sink] every time they call
@@ -83,8 +94,31 @@ object ReteAgent {
         return Agent(job = job, sink = sink)
     }
 
+    fun runFacts(
+        rules: List<ReteFactRule>,
+        scope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.Default),
+        agentId: String = "rete-fact-agent",
+        onFire: (Fire) -> Unit,
+    ): FactAgent {
+        val sink = Channel<ReteFact>(capacity = Channel.UNLIMITED)
+        val job = scope.launch {
+            for (fact in sink) {
+                for (rule in rules) {
+                    if (rule.predicate(fact)) {
+                        onFire(rule.transform(fact).copy(agentId = agentId))
+                    }
+                }
+            }
+        }
+        return FactAgent(job = job, sink = sink)
+    }
+
     /** Cancel [agent.job]. The [Agent.sink] is closed by the caller if desired. */
     fun stop(agent: Agent) {
+        agent.job.cancel()
+    }
+
+    fun stop(agent: FactAgent) {
         agent.job.cancel()
     }
 }
