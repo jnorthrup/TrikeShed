@@ -49,7 +49,13 @@ class JvmProcessOperations : ProcessOperations {
                 stderrOut.toByteArray()
             }
 
-            val exitCode = proc.waitFor()
+            // Security: Prevent thread starvation and DoS by using bounded waitFor
+            val finished = proc.waitFor(60, java.util.concurrent.TimeUnit.SECONDS)
+            if (!finished) {
+                proc.destroyForcibly()
+                throw java.util.concurrent.TimeoutException("Process timed out: $command")
+            }
+            val exitCode = proc.exitValue()
             ProcessResult(exitCode, stdoutDeferred.await(), stderrDeferred.await())
         } }
     }
