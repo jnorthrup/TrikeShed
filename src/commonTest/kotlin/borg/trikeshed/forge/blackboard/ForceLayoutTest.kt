@@ -33,7 +33,7 @@ class ForceLayoutTest {
                 opId = "test",
                 opVersion = "1.0",
                 parentNodeIds = parents,
-                inputFingerprint = "test",
+                inputFingerprint = "test-$i",
                 blackboard = blackboardContext("test-board"),
                 causalClock = i.toLong(),
                 topoOrdinal = i,

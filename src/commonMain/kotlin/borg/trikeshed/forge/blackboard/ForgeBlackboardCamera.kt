@@ -104,6 +104,8 @@ val forgeBlackboardDefault3DLayout: List<ForgeBlackboardSection3D> = listOf(
     ForgeBlackboardSection3D("board", 640.0, -380.0, 620.0, 360.0, 16.0),
     ForgeBlackboardSection3D("gallery", -640.0, 380.0, 620.0, 360.0, 28.0),
     ForgeBlackboardSection3D("graph", 640.0, 380.0, 620.0, 360.0, 22.0),
+    ForgeBlackboardSection3D("bytecode", -640.0, 1140.0, 620.0, 360.0, 22.0),
+    ForgeBlackboardSection3D("vm", 640.0, 1140.0, 620.0, 360.0, 22.0),
 )
 
 /**
@@ -175,7 +177,7 @@ data class ForgeBlackboardView(
          *  Boots in 3D mode so the depth-toggle corner button can cycle back to 2.5D / flat. */
         val DEFAULT: ForgeBlackboardView = ForgeBlackboardView(
             surface = "forge.blackboard",
-            sections = listOf("page", "board", "gallery", "graph"),
+            sections = listOf("page", "board", "gallery", "graph", "bytecode", "vm"),
             defaultCamera = ForgeBlackboardCamera(tilt = 0.18),
             cornerButtons = forgeBlackboardCornerButtons,
             defaultMode = ForgeBlackboardMode.WORLD_3D,

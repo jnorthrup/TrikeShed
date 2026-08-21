@@ -136,7 +136,8 @@ class ForgeSurfaceProjectionTest {
             now = fixedNow,
         )
         // No tile may reach up into the page/board/gallery/graph band.
-        val quadrantFloor = ForgeBlackboardView.DEFAULT.layout3D.maxOf { it.centerY + it.height / 2.0 }
+        val defaultQuadrants = ForgeBlackboardView.DEFAULT.layout3D.filter { it.sectionId in listOf("page", "board", "gallery", "graph") }
+        val quadrantFloor = defaultQuadrants.maxOf { it.centerY + it.height / 2.0 }
         assertTrue(
             surface.envelopes.all { it.centerY - it.height / 2.0 > quadrantFloor },
             "a full strip must stay below y=$quadrantFloor",
