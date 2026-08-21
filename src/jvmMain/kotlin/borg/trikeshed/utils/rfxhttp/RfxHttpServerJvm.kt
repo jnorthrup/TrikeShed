@@ -26,7 +26,7 @@ import kotlinx.coroutines.runBlocking
 class RfxHttpServerJvm(
     override val store: ConfixDocStore = ConfixDocStoreFactory.create(),
     override val viewServer: ViewServer = ViewServer(),
-    private val rfAdapter: RelaxFactoryAdapter = RelaxFactoryAdapter(store, viewServer),
+    private val requestFactory: RequestFactoryHandler = CouchRequestFactory(store, viewServer),
     private val nioSupervisor: NioSupervisor? = null
 ) : RfxHttpServer {
 
@@ -46,9 +46,9 @@ class RfxHttpServerJvm(
         }
     }
 
-    private fun handlePost(request: HtxRequest): HtxResponse {
+    private suspend fun handlePost(request: HtxRequest): HtxResponse {
         val payload = request.body?.asString() ?: ""
-        val responsePayload = rfAdapter.processIncomingRF(payload)
+        val responsePayload = requestFactory.processRequest(payload)
         return createResponse(200, responsePayload, "application/json")
     }
 

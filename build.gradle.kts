@@ -798,3 +798,18 @@ tasks.register<JavaExec>("queueGraphWork") {
     mainClass.set("borg.trikeshed.utils.ingress.QueueGraphWorkKt")
 }
 
+
+// ─────────────────────────────────────────────────────────────────
+// commonMain Purity Check — detect JVM-specific patterns
+// ─────────────────────────────────────────────────────────────────
+
+tasks.register<Exec>("commonMainPurity") {
+    group = "verification"
+    description = "Check commonMain for JVM-specific imports and patterns"
+    commandLine("bash", "scripts/common-purity.sh")
+    isIgnoreExitValue = true
+}
+
+tasks.named("check") {
+    dependsOn("commonMainPurity")
+}
