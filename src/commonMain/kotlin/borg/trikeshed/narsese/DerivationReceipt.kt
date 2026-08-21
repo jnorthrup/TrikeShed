@@ -1,5 +1,7 @@
 package borg.trikeshed.narsese
 
+import kotlin.jvm.JvmInline
+
 import borg.trikeshed.job.ContentId
 import borg.trikeshed.lib.Join
 import borg.trikeshed.lib.j

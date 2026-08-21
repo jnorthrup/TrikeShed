@@ -13,7 +13,12 @@ import kotlinx.coroutines.launch
  * The seed carries all 13 work packages, Rete facts, causal graph,
  * correlations, and Kanban cards so the browser can hydrate from it.
  *
- * Browser mode: renders the baked HTML into the document. The persistence
+ * Browser mode: if the document already has `#forge-seed` (Pages / JVM-baked shell) this is hydrate-only;
+ * otherwise (bare webpack dev bundle) renders the HTML into the document.
+ *
+ * Entry-point note: several `fun main()`s exist on the JS classpath (this one, `viewserver.NodeViewServer`, …);
+ * the compiler's JsMainFunctionDetector keeps the one in the lexicographically smallest package, which is
+ * `borg.trikeshed.forge`. Adding a `main` in a package that sorts earlier would silently hijack the bundle. The persistence
  * script in [ForgePersistenceScript] hydrates from IndexedDB → localStorage
  * → seed and saves mutations back to localStorage + IndexedDB permanently.
  */
@@ -57,8 +62,16 @@ private suspend fun forgeNodeMain() {
         }
     }
 
+    val inBrowser = js("typeof window !== 'undefined' && typeof document !== 'undefined'") as Boolean
+    if (inBrowser && (js("document.getElementById('forge-seed') !== null") as Boolean)) {
+        // GitHub Pages / JVM server: the page already carries the baked seed (ForgeBakePages). In a browser
+        // loadProjection has no fs and would fall back to the demo seed, so never document.write over it —
+        // the bundle is hydrate-only here and just announces itself to script.js.
+        js("window.forgeKotlin = Object.assign(window.forgeKotlin || {}, { loaded: true })")
+        return
+    }
     val html = ForgeApp.renderHtml()
-    if (js("typeof window !== 'undefined' && typeof document !== 'undefined'") as Boolean) {
+    if (inBrowser) {
         renderBrowser(html)
     } else {
         println(html)

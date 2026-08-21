@@ -2,6 +2,8 @@
 
 package borg.trikeshed.memory.ontology
 
+import kotlin.jvm.JvmInline
+
 import borg.trikeshed.lib.Join
 import borg.trikeshed.lib.Series
 import borg.trikeshed.lib.j

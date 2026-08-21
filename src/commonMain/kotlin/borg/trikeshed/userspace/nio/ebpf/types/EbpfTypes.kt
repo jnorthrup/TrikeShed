@@ -1,5 +1,7 @@
 package borg.trikeshed.userspace.nio.ebpf.types
 
+import kotlin.jvm.JvmInline
+
 /**
  * eBPF register — zero overhead wrapper around index.
  */

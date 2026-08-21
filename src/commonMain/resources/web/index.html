@@ -35,6 +35,9 @@
           <button class="sidebar-item" id="btn-graph" title="Graph" aria-label="Go to Graph view">
             <span class="sidebar-item-icon" aria-hidden="true">◉</span><span>Graph</span>
           </button>
+          <button class="sidebar-item" id="btn-sheet" title="Sheet" aria-label="Go to Sheet view">
+            <span class="sidebar-item-icon" aria-hidden="true">▤</span><span>Sheet</span>
+          </button>
         </div>
       </div>
       <div class="sidebar-section">
@@ -73,6 +76,7 @@
           <button class="topbar-btn" id="btn-view-doc" aria-label="View Document">Document</button>
           <button class="topbar-btn" id="btn-view-board" aria-label="View Board">Board</button>
           <button class="topbar-btn" id="btn-view-graph" aria-label="View Graph">Graph</button>
+          <button class="topbar-btn" id="btn-view-sheet" aria-label="View Sheet">Sheet</button>
           <button class="topbar-btn" id="btn-share" aria-label="Share">Share</button>
         </div>
       </div>
@@ -92,11 +96,22 @@
       </div>
       <div class="graph-scroll" id="graph-scroll" hidden>
         <div class="graph-hud" id="graph-hud">
+          <span class="graph-mode" role="group" aria-label="Graph source">
+            <button class="topbar-btn" id="graph-mode-causal" aria-label="Causal graph">Causal</button>
+            <button class="topbar-btn" id="graph-mode-concept" aria-label="Concept lattice: lib → cursor → confix → facets → surface → widgets">Concepts</button>
+          </span>
           <button class="topbar-btn" id="graph-fit" aria-label="Fit graph to viewport" title="Fit (f)">Fit</button>
           <span class="graph-zoom-pill" id="graph-zoom-pill" aria-live="polite">100%</span>
         </div>
+        <div class="graph-inspector" id="graph-inspector" hidden aria-live="polite"></div>
         <svg class="graph-canvas" id="graph-canvas" role="img" aria-label="Causal graph"></svg>
         <div class="graph-empty" id="graph-empty" hidden>No causal nodes in the seed yet — ingest a donor to populate the graph.</div>
+      </div>
+      <div class="sheet-scroll" id="sheet-scroll" hidden>
+        <div class="sheet-tabs" id="sheet-tabs" role="tablist" aria-label="Sheets"></div>
+        <div class="sheet-crumbs" id="sheet-crumbs"></div>
+        <div class="sheet-grid-wrap" id="sheet-grid-wrap"></div>
+        <div class="sheet-empty" id="sheet-empty" hidden>No sheets in the seed.</div>
       </div>
     </main>
   </div>
@@ -107,6 +122,7 @@
   <script>
 {{SCRIPT}}
   </script>
+{{BUNDLES}}
   <script>
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => {

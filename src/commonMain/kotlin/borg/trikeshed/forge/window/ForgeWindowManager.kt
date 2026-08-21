@@ -1,6 +1,7 @@
 package borg.trikeshed.forge.window
 
 import kotlin.coroutines.CoroutineContext
+import kotlinx.datetime.Clock
 
 /**
  * Unified Forge window manager — the single CCEK-aware interface for
@@ -35,7 +36,7 @@ interface ForgeWindowManager : CoroutineContext.Element {
 
     /** Dispatch a raw event by type and payload string (CCEK convenience). */
     fun dispatchEvent(event: String, payload: String) =
-        dispatchEvent(WindowEvent(type = event, payload = payload, timestampMillis = System.currentTimeMillis()))
+        dispatchEvent(WindowEvent(type = event, payload = payload, timestampMillis = Clock.System.now().toEpochMilliseconds()))
 
     /**
      * Capture a snapshot of the current surface state — for tests and

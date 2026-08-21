@@ -17,7 +17,7 @@ class ForgeAppShellTest {
 
     @Test
     fun everyTemplateSlotIsFilled() {
-        for (slot in listOf(ForgeApp.SEED_SLOT, ForgeApp.STYLES_SLOT, ForgeApp.SCRIPT_SLOT, ForgeApp.GALLERY_SLOT)) {
+        for (slot in listOf(ForgeApp.SEED_SLOT, ForgeApp.STYLES_SLOT, ForgeApp.SCRIPT_SLOT, ForgeApp.GALLERY_SLOT, ForgeApp.BUNDLES_SLOT)) {
             assertFalse(html.contains(slot), "unfilled slot $slot")
         }
         assertFalse(html.contains("{{"), "stray mustache in rendered shell")
@@ -57,7 +57,8 @@ class ForgeAppShellTest {
         assertTrue((board["columns"] as List<*>).isNotEmpty())
         val layout = assertNotNull(seed["graphLayout"] as? Map<*, *>)
         val nodes = layout["nodes"] as List<*>
-        val edges = layout["edges"] as List<*>
+        // JsonSupport.parse reifies an empty "[]" as Array, a non-empty one as List.
+        val edges = (layout["edges"] as? List<*>) ?: (layout["edges"] as Array<*>).toList()
         val causal = seed["causalGraph"] as List<*>
         assertEquals(causal.size, nodes.size, "one laid-out node per causal node")
         val ids = nodes.map { (it as Map<*, *>)["id"] }.toSet()
@@ -69,7 +70,20 @@ class ForgeAppShellTest {
     }
 
     @Test
+    fun bundlesAreRelativeDeferredScriptsAfterTheSeed() {
+        assertFalse(html.contains("<script src="), "stage jvm ships no bundle tags")
+        val withBundle = ForgeApp.renderHtml(userId = "forge-shell-test", bundles = listOf("./js/TrikeShed.js"))
+        val tag = "<script src=\"./js/TrikeShed.js\" defer></script>"
+        val tagAt = withBundle.indexOf(tag)
+        assertTrue(tagAt >= 0, "bundle tag present, relative, deferred")
+        assertTrue(withBundle.indexOf("id=\"forge-seed\"") < tagAt, "bundle runs after the seed is in the DOM")
+        assertTrue(tagAt < withBundle.indexOf("register('./sw.js')"), "bundle tag precedes SW registration")
+    }
+
+    @Test
     fun renderIsDeterministicForTheSameUser() {
-        assertEquals(html.length, ForgeApp.renderHtml(userId = "forge-shell-test").length)
+        // dashboards.nio.checkedAt / flywheel.updatedAt are launch-time clocks; everything else must be stable.
+        fun stable(h: String) = h.replace(Regex("\"(checkedAt|updatedAt)\":\\d+"), "\"$1\":0")
+        assertEquals(stable(html), stable(ForgeApp.renderHtml(userId = "forge-shell-test")))
     }
 }

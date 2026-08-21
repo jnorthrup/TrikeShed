@@ -1,5 +1,7 @@
 package borg.trikeshed.userspace.nio.ebpf.types
 
+import kotlin.jvm.JvmInline
+
 /**
  * Single inline eBPF instruction — the raw 8-byte wire format encoded as a Long.
  *

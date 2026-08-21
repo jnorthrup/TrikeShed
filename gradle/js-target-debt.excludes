@@ -1,0 +1,13 @@
+# Ant globs excluded from compileKotlinJs / compileKotlinWasmJs (and their test compiles) ONLY.
+# The JVM build is untouched. Delete a line once the file compiles on the JS target = ratchet.
+# Probe readiness with: ./gradlew forgePagesProbe
+**/torrent/**
+**/taxonomy/CryptoAndFormatTaxonomy.kt
+**/htx/client/ipfs/CidAndStore.kt
+**/parse/json/Codec.kt
+**/ui/palette/**
+# expect declarations with no JS actual (eBPF/JIT, process workers, oroboros daemon) and their commonMain consumers
+**/userspace/nio/ebpf/**
+**/userspace/nio/process/ProcessWorkerFactory.kt
+**/org/trikeshed/oroboros/OroborosDaemon.kt
+**/pointcut/polyglot/PointcutPolyglotBlackboardTaxonomy.kt

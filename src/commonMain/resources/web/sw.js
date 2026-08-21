@@ -1,6 +1,6 @@
 // Forge service worker — hand-written, no Workbox/NPM. Registered with a RELATIVE url from
 // index.html, so its scope is the directory the page is served from (never the whole origin).
-const CACHE_NAME = 'forge-cache-v2';
+const CACHE_NAME = 'forge-cache-v3';
 const SYNC_STORE_NAME = 'sync-queue';
 const DB_NAME = 'forge-db';
 const INVOKE_PATH = 'api/invoke';
@@ -17,7 +17,7 @@ self.addEventListener('install', (event) => {
         './script.js',
         './manifest.webmanifest',
         './icons/forge-icon.svg',
-        './icons/forge-icon-maskable.svg'
+        './icons/forge-icon-maskable.svg'/*FORGE_PRECACHE_EXTRA*/
       ]);
     }).then(() => self.skipWaiting())
   );

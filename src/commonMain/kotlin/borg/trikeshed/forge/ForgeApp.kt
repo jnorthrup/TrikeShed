@@ -9,6 +9,11 @@ import borg.trikeshed.forge.blackboard.ForgeBlackboardView
 import borg.trikeshed.forge.blackboard.forceLayout
 import borg.trikeshed.forge.gallery.ForgeGalleryCatalog
 import borg.trikeshed.forge.gallery.ForgeGalleryRenderer
+import borg.trikeshed.forge.concept.ConceptGraph
+import borg.trikeshed.forge.sheet.confixSheets
+import borg.trikeshed.forge.sheet.sheetSeed
+import borg.trikeshed.job.schema.loadConfixSchemaBytes
+import borg.trikeshed.parse.confix.confixDoc
 import borg.trikeshed.jules.ui.JulesBlackboardAdapter
 import borg.trikeshed.jules.ui.JulesBlackboardSurface
 import borg.trikeshed.jules.ui.ForgeSurfaceSession
@@ -91,10 +96,11 @@ object ForgeApp {
         userId: String = "jim",
         julesSurface: JulesBlackboardSurface? = null,
         flywheelReport: FlywheelReportSnapshot? = null,
+        bundles: List<String> = emptyList(),
     ): String {
         val reduction = runCatching { ForgeKanbanIngest.loadProjection(userId) }.getOrElse { ForgeKanbanIngest.fallbackReduction() }
         val seed = forgeSeedJson(userId, reduction, julesSurface, flywheelReport)
-        return htmlShell(seed)
+        return htmlShell(seed, bundles)
     }
 
     private fun forgeSeedJson(
@@ -147,6 +153,8 @@ object ForgeApp {
                 )
             },
             "graphLayout" to forgeGraphLayoutSeed(reduction),
+            "conceptGraph" to ConceptGraph.layoutSeed(),
+            "sheets" to forgeSheetsSeed(reduction),
             "blackboardSeed" to forgeBlackboardSeed(julesSurface),
             "dashboards" to forgeDashboardSeed(flywheelReport),
         )
@@ -162,13 +170,16 @@ object ForgeApp {
         val index = CausalGraphNodeIndex()
         reduction.causalNodes.forEach { index.addOrGet(it) }
         val (camera, positions) = forceLayout(index, ForgeBlackboardCamera(), iterations = 120)
+        // Causal node ids are the kanban task ids, so the card title is the human label;
+        // opId:opVersion is the same string for every node of one ingest and says nothing.
+        val cardTitles = reduction.board.cards.associate { it.id.value to it.title }
         val nodes = reduction.causalNodes.map { node ->
             val p = positions[node.nodeId]
             mapOf(
                 "id" to node.nodeId,
-                "title" to (node.opId + ":" + node.opVersion),
-                "x" to (p?.screenX ?: 0.0),
-                "y" to (p?.screenY ?: 0.0),
+                "title" to (cardTitles[node.nodeId] ?: (node.opId + ":" + node.opVersion)),
+                "x" to (p?.screenX ?: 0.0) * GRAPH_SPREAD,
+                "y" to (p?.screenY ?: 0.0) * GRAPH_SPREAD,
                 "topo" to node.topoOrdinal,
             )
         }
@@ -179,8 +190,37 @@ object ForgeApp {
         return mapOf(
             "nodes" to nodes,
             "edges" to edges,
-            "camera" to mapOf("x" to camera.x, "y" to camera.y, "zoom" to camera.zoom),
+            "camera" to mapOf("x" to camera.x * GRAPH_SPREAD, "y" to camera.y * GRAPH_SPREAD, "zoom" to camera.zoom / GRAPH_SPREAD),
         )
+    }
+
+    /**
+     * [forceLayout] rests springs at 50 world px (tuned for the blackboard's dot nodes); the
+     * graph view draws ~200 px cards, so the same positions are spread uniformly (camera too)
+     * rather than retuning the shared layout.
+     */
+    private const val GRAPH_SPREAD = 2.6
+
+    /**
+     * Sheet view seed: the blackboard surface as a flat Cursor sheet (`BlackboardSurface.asCursor`, the one
+     * Cursor-shaped UI projection) plus the Confix job-nexus schema as nested sheets (grid-in-cell).
+     * Each source is independent; a failing one is dropped rather than blanking the view.
+     */
+    private fun forgeSheetsSeed(reduction: ForgeKanbanReduction): List<Map<String, Any?>> {
+        val sheets = ArrayList<Map<String, Any?>>()
+        runCatching {
+            val cardById = reduction.board.cards.associateBy { it.id.value }
+            val entities = reduction.correlations.mapNotNull { corr -> cardById[corr.taskId]?.let { correlationToBlock(corr, it) } }
+            val index = CausalGraphNodeIndex()
+            reduction.causalNodes.forEach { index.addOrGet(it) }
+            val surface = BlackboardSurface.project("forge-sheet", index, entities)
+            sheetSeed("blackboard", "Blackboard surface · " + reduction.source.title, surface.asCursor())
+        }.onSuccess { sheets.add(it.toMap()) }
+        runCatching {
+            val json = loadConfixSchemaBytes("classpath:/confix/job-nexus.schema.json").decodeToString()
+            confixSheets("confix", "Confix · job-nexus.schema.json", confixDoc(json))
+        }.onSuccess { family -> family.forEach { sheets.add(it.toMap()) } }
+        return sheets
     }
 
     /**
@@ -216,18 +256,25 @@ object ForgeApp {
     const val STYLES_SLOT = "{{STYLES}}"
     const val SCRIPT_SLOT = "{{SCRIPT}}"
     const val GALLERY_SLOT = "{{GALLERY}}"
+    /** Kotlin/JS / wasmJs bundle `<script>` tags published by `generateForgePages` stages; empty for the pure static shell. */
+    const val BUNDLES_SLOT = "{{BUNDLES}}"
 
     /**
      * The one shell: the web template with its slots filled. Relative asset paths (`./sw.js`,
      * `./manifest.webmanifest`, `./icons/…`) keep the PWA scope at wherever the page is served —
      * a sub-path on GitHub Pages, `/` on the JVM server — never a root-scoped service worker by accident.
      */
-    private fun htmlShell(seed: String): String =
+    private fun htmlShell(seed: String, bundles: List<String>): String =
         borg.trikeshed.forge.generated.ForgeAssets.indexHtml
             .replace(STYLES_SLOT, forgeAppStyles())
             .replace(GALLERY_SLOT, galleryHtml())
             .replace(SCRIPT_SLOT, forgeAppScript())
+            .replace(BUNDLES_SLOT, bundleTags(bundles))
             .replace(SEED_SLOT, seed)
+
+    /** Relative `src` + `defer`: the bundle runs after script.js has hydrated and the PWA scope stays wherever the page is served. */
+    private fun bundleTags(bundles: List<String>): String =
+        bundles.joinToString("\n") { "  <script src=\"$it\" defer></script>" }
 
     private fun forgeAppStyles(): String = borg.trikeshed.forge.generated.ForgeAssets.stylesCss
 

@@ -1,5 +1,7 @@
 package borg.trikeshed.cas
 
+import kotlin.jvm.JvmInline
+
 import borg.trikeshed.job.CasStore
 import borg.trikeshed.job.ContentId
 import borg.trikeshed.lib.*

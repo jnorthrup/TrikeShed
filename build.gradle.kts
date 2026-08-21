@@ -1,6 +1,7 @@
 import org.jetbrains.kotlin.gradle.ExperimentalKotlinGradlePluginApi
 import org.jetbrains.kotlin.gradle.ExperimentalWasmDsl
 import org.jetbrains.kotlin.gradle.plugin.KotlinPlatformType
+import org.jetbrains.kotlin.gradle.tasks.Kotlin2JsCompile
 
 plugins {
     kotlin("multiplatform") version "2.4.20-Beta2"
@@ -526,8 +527,17 @@ val stageDaemonLib = tasks.register<Sync>("stageDaemonLib") {
     into(stagingLibDir)
 }
 
+// `-Pjdwp=5005` attaches a JDWP listener (suspend=n); `-Pjdwp=5005,suspend` waits for the debugger
+// before main runs. Replaces the --debug/--suspend flags the old bin/* wrappers parsed.
+val jdwpSpec: String? = providers.gradleProperty("jdwp").orNull
+
 fun org.gradle.api.tasks.JavaExec.useStagedJvmClasspath() {
     dependsOn("stageDaemonLib", "compileKotlinJvm")
+    jdwpSpec?.let { spec ->
+        val port = spec.substringBefore(',').trim()
+        val suspend = if (spec.substringAfter(',', "").trim() == "suspend") "y" else "n"
+        jvmArgs("-agentlib:jdwp=transport=dt_socket,server=y,suspend=$suspend,address=*:$port")
+    }
     doFirst {
         val classes = file("build/classes/kotlin/jvm/main")
         val lib = file(stagingLibDir)
@@ -537,10 +547,26 @@ fun org.gradle.api.tasks.JavaExec.useStagedJvmClasspath() {
     }
 }
 
+// Jules CAS bridges (formerly bin/oroboros-artifact, -settle, -review-patch, -review-report).
+// Pass CLI args with --args, e.g. ./gradlew julesReviewPatch --args="<activity-id>".
+fun registerJulesCli(taskName: String, cliMain: String, desc: String, vararg fixedArgs: String) =
+    tasks.register<JavaExec>(taskName) {
+        group = "jules"
+        description = desc
+        mainClass.set(cliMain)
+        useStagedJvmClasspath()
+        if (fixedArgs.isNotEmpty()) args(*fixedArgs)
+        standardInput = System.`in`
+    }
+registerJulesCli("julesArtifact", "borg.trikeshed.jules.JulesArtifactCli", "Emit exact, already-observed Jules CAS bytes; no API or repository mutations.")
+registerJulesCli("julesSettle", "borg.trikeshed.jules.JulesSettlementCli", "Durable settlement bridge for Jules patches delivered without a PR or branch.")
+registerJulesCli("julesReviewPatch", "borg.trikeshed.jules.JulesPatchReviewCli", "Select one already-CASed Jules activity patch for drain after explicit review.")
+registerJulesCli("julesReviewReport", "borg.trikeshed.jules.JulesPatchReviewCli", "Bond one already-CASed full Jules agent report to an explicit disposition.", "report")
+
 // Daemon — flywheel loop. HotSwapAgent watches CycleBody.class for live edits.
 tasks.register<JavaExec>("runOroborosDaemon") {
     group = "oroboros"
-    description = "Launch OroborosDaemon from naked classes + staged lib/. Add --debug to enable JDWP on :5005."
+    description = "Launch OroborosDaemon from naked classes + staged lib/. -Pjdwp=5005[,suspend] attaches a debugger; --args forwards daemon flags (--once/--watch/--interval-ms/--home/--repo)."
     mainClass.set("borg.trikeshed.daemon.OroborosDaemon")
     useStagedJvmClasspath()
     // Forward stdio; HotswapAgent prints to stdout.
@@ -550,7 +576,7 @@ tasks.register<JavaExec>("runOroborosDaemon") {
 // TUI — interactive flywheel console, reads board from cwd.
 tasks.register<JavaExec>("runFlywheelTui") {
     group = "oroboros"
-    description = "Launch FlywheelTui from naked classes + staged lib/. Add --debug to enable JDWP on :5006."
+    description = "Launch FlywheelTui from naked classes + staged lib/. -Pjdwp=5006[,suspend] attaches a debugger."
     mainClass.set("borg.trikeshed.flywheel.FlywheelTui")
     useStagedJvmClasspath()
     standardInput = System.`in`
@@ -559,42 +585,138 @@ tasks.register<JavaExec>("runFlywheelTui") {
 // Kanban HTTP server for the modelmux CLI.
 tasks.register<JavaExec>("runKanbanHttpServerJvm") {
     group = "forge"
-    description = "Launch KanbanHttpServerJvm from naked classes + staged lib/. Add --debug to enable JDWP on :5007."
+    description = "Launch KanbanHttpServerJvm from naked classes + staged lib/. -Pjdwp=5007[,suspend] attaches a debugger."
     mainClass.set("borg.trikeshed.forge.server.KanbanHttpServerJvm")
     useStagedJvmClasspath()
     standardInput = System.`in`
 }
 
-// Forge pages — publish web assets to docs/ for GitHub Pages.
-// After running this, regenerate the seed-baked index.html via:
-//   ./gradlew jsNodeProductionRun --no-daemon --console=plain 2>&1 \\
-//     | awk '/^<!doctype html>/,/^<\\/html>/' > docs/index.html
-// (kept as a shell step because re-invoking jsNodeProductionRun inside the same
-// Gradle build deadlocks task graph ordering).
+// Forge pages — publish the static PWA to docs/ (GitHub Pages root, branch master + /docs).
+//
+//   ./gradlew generateForgePages                        # stage jvm: JVM-baked index.html + sw/manifest/icons/css/js
+//   ./gradlew generateForgePages -PforgePagesStages=jvm,js,wasm   # + Kotlin/JS and wasmJs bundles under docs/js, docs/wasm
+//   ./gradlew forgePagesProbe                           # is the next stage green? (compiles JS + wasm targets)
+//   ./gradlew serveForgePages [-PforgePort=8765]        # serve docs/ at http://localhost:8765/ (JDK jdk.httpserver)
+//   ./gradlew forgePwa                                  # generate + serve
+//   Deploy = generate, commit docs/, push. Pages = branch master, folder /docs; no Actions workflows.
+//
+// Ratchet: gradle/js-target-debt.excludes lists commonMain files cut from the JS-target compiles only;
+// delete a line when it compiles. Unselected stages never enter the task graph, so a red stage cannot
+// fail a publish of the green ones.
+fun debtExcludes(name: String): List<String> =
+    providers.fileContents(layout.projectDirectory.file("gradle/$name")).asText
+        .map { text -> text.lines().map { it.substringBefore('#').trim() }.filter { it.isNotEmpty() } }
+        .getOrElse(emptyList())
+
+val jsTargetDebt = debtExcludes("js-target-debt.excludes")
+val wasmTargetDebt = debtExcludes("wasm-target-debt.excludes")
+
+tasks.withType<Kotlin2JsCompile>().configureEach {
+    val globs = jsTargetDebt + (if (name.contains("WasmJs")) wasmTargetDebt else emptyList())
+    exclude(globs)
+    inputs.property("forgeDebtExcludes", globs)
+}
+
+val forgePagesStages: Set<String> = providers.gradleProperty("forgePagesStages").orElse("jvm").get()
+    .split(',').map(String::trim).filter(String::isNotEmpty).toSet()
+require(forgePagesStages.all { it in setOf("jvm", "js", "wasm") }) { "forgePagesStages must be a subset of jvm,js,wasm; got $forgePagesStages" }
+require("jvm" in forgePagesStages) { "forgePagesStages must include jvm (the baker)" }
+
+val forgeBundleScripts: List<String> = buildList {
+    if ("js" in forgePagesStages) add("./js/TrikeShed.js")
+    if ("wasm" in forgePagesStages) add("./wasm/TrikeShed.js")
+}
+
+tasks.register<JavaExec>("bakeForgePages") {
+    group = "documentation"
+    description = "Render ForgeApp.renderHtml() with the real seed into docs/index.html (donor: /tmp/hi if present)."
+    mainClass.set("borg.trikeshed.forge.ForgeBakePages")
+    useStagedJvmClasspath()
+    args(
+        project.layout.projectDirectory.file("docs/index.html").asFile.path,
+        providers.gradleProperty("forgeDonor").orElse("/tmp/hi").get(),
+        // jnorthrup.json is the intact persisted plan; jim.json was clobbered by a non-kanban /tmp/hi on 2026-08-21.
+        providers.gradleProperty("forgeUser").orElse("jnorthrup").get(),
+        forgeBundleScripts.joinToString(","),
+    )
+}
+
 tasks.register<Sync>("generateForgePages") {
     group = "documentation"
-    description = "Publishes web assets (wasm, icons, manifest, sw.js) to docs/. Index.html regenerated separately via jsNodeProductionRun."
-    dependsOn("wasmJsBrowserProductionWebpack")
+    description = "Publishes the Forge PWA to docs/ for the stages in forgePagesStages (currently: ${forgePagesStages.sorted()})."
+    dependsOn("bakeForgePages")
 
-    from(project.layout.buildDirectory.dir("kotlin-webpack/wasmJs/productionExecutable")) {
-        exclude("index.html")
-    }
     from(project.layout.projectDirectory.dir("src/commonMain/resources/web")) {
         exclude("index.html")
     }
+    // Only the compiled bundle files: the distribution also carries every processed resource
+    // (web/, confix/, openapi/, …) and, if a webpack SW plugin were present, its own sw.js.
+    val bundleFiles = listOf("*.js", "*.mjs", "*.wasm", "*.LICENSE.txt")
+    if ("js" in forgePagesStages) {
+        dependsOn("jsBrowserDistribution")
+        from(project.layout.buildDirectory.dir("dist/js/productionExecutable")) { into("js"); include(bundleFiles); exclude("sw.js", "workbox-*.js") }
+    }
+    if ("wasm" in forgePagesStages) {
+        dependsOn("wasmJsBrowserDistribution")
+        from(project.layout.buildDirectory.dir("dist/wasmJs/productionExecutable")) { into("wasm"); include(bundleFiles); exclude("sw.js", "workbox-*.js") }
+    }
     into(project.layout.projectDirectory.dir("docs"))
 
-    // Preserve the seed-baked index.html (regenerated via jsNodeProductionRun)
+    // docs/ is also the markdown doc root and holds the baked index.html: never sweep those.
     preserve {
         include("index.html")
+        include(".nojekyll")
+        include("*.md")
+        include("dispatch/**")
+    }
+
+    // Hand-written sw.js: expand the precache token with the selected bundles; stamp the cache name per stage set.
+    val precacheExtra = forgeBundleScripts.joinToString("") { ",\n        '$it'" }
+    val stageStamp = forgePagesStages.sorted().joinToString("-")
+    inputs.property("forgePagesStages", forgePagesStages.sorted())
+    filesMatching("sw.js") {
+        filter { line ->
+            line.replace("/*FORGE_PRECACHE_EXTRA*/", precacheExtra)
+                .replace("forge-cache-v3'", "forge-cache-v3-$stageStamp'")
+        }
     }
 
     doLast {
         val noJekyll = project.layout.projectDirectory.file("docs/.nojekyll").asFile
         if (!noJekyll.exists()) noJekyll.writeText("\n")
-        println("Published web assets to docs/. Regenerate index.html with:")
-        println("  ./gradlew jsNodeProductionRun --no-daemon --console=plain 2>&1 | awk '/^<!doctype html>/,/^<\\/html>/' > docs/index.html")
+        println("Forge PWA published to docs/ (stages: $stageStamp). Serve: ./gradlew serveForgePages  |  Pages: https://jnorthrup.github.io/TrikeShed/  |  Now: git add docs && git commit && git push")
     }
+}
+
+// Local preview of the published tree, served from the JDK's built-in static server — no python, no npm.
+// Binds 127.0.0.1 so the service worker scope matches what GitHub Pages serves under /TrikeShed/… relative urls.
+val forgePort: String = providers.gradleProperty("forgePort").orElse("8765").get()
+val forgeServeLauncher = javaToolchains.launcherFor { languageVersion.set(JavaLanguageVersion.of(25)) }
+
+tasks.register<Exec>("serveForgePages") {
+    group = "documentation"
+    description = "Serve docs/ at http://localhost:$forgePort/ via `java -m jdk.httpserver` (Ctrl-C to stop). -PforgePort=N to change the port."
+    val docsDir = project.layout.projectDirectory.dir("docs").asFile
+    workingDir = docsDir
+    doFirst {
+        if (!docsDir.resolve("index.html").isFile) throw GradleException("docs/index.html missing; run ./gradlew generateForgePages first")
+        println("Forge PWA: serving ${docsDir} at http://localhost:$forgePort/  (Ctrl-C to stop)")
+    }
+    executable = forgeServeLauncher.get().executablePath.asFile.path
+    args("-m", "jdk.httpserver", "-b", "127.0.0.1", "-p", forgePort, "-d", docsDir.path)
+}
+
+tasks.register("forgePwa") {
+    group = "documentation"
+    description = "generateForgePages then serveForgePages (the old `bin/forge-pwa.sh all`)."
+    dependsOn("generateForgePages", "serveForgePages")
+}
+tasks.named("serveForgePages") { mustRunAfter("generateForgePages") }
+
+tasks.register("forgePagesProbe") {
+    group = "documentation"
+    description = "Compile the JS and wasmJs targets under gradle/*-target-debt.excludes; green = ready to add that stage."
+    dependsOn("compileKotlinJs", "compileKotlinWasmJs")
 }
 
 // Config cache

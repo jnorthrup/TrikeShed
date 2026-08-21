@@ -2,6 +2,8 @@
 
 package borg.trikeshed.context.lcnc
 
+import kotlin.jvm.JvmInline
+
 import borg.trikeshed.causal.CausalEdgeKind
 import borg.trikeshed.dag.FacetTransitionType
 import borg.trikeshed.lib.Join

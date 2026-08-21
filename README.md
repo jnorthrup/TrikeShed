@@ -51,7 +51,7 @@ TrikeShed/
 ├── build.gradle.kts        ← locked: Kotlin 2.4.10, Gradle 9.6.1, JDK 25, GraalVM CE 25.0.2
 ├── settings.gradle.kts     ← compose plugin, prefer-project repos
 ├── gradle.properties       ← jvmargs, native ignore
-├── docs/                   ← GitHub Pages output (wasmJsBrowserProductionWebpack)
+├── docs/                   ← GitHub Pages output (./gradlew generateForgePages; -PforgePagesStages=jvm,js,wasm)
 └── PRELOAD.md              ← kernel algebra cheatsheet (read first)
 ```
 
@@ -440,8 +440,10 @@ ForgePersistenceScript.kt ← browser IndexedDB/localStorage/Cache persistence
 editor (no server at runtime). It hydrates from a baked seed JSON
 (`<script id="forge-seed">`) and persists all edits to `localStorage`.
 The seed is injected server-side by `ForgeApp.kt` via `{{SEED}}`
-placeholder; `jsNodeProductionRun` captures the fully-baked HTML into
-`docs/index.html` for gh-pages deployment.
+placeholder; `./gradlew generateForgePages` bakes the fully-baked HTML into
+`docs/index.html` on the JVM (`ForgeBakePages`) for gh-pages deployment, and
+with `-PforgePagesStages=jvm,js` also publishes the Kotlin/JS bundle to
+`docs/js/TrikeShed.js` (`{{BUNDLES}}` slot; hydrate-only in the browser).
 
 **Block types and slash commands** — typing `/` at the start of a block
 opens a slash menu with: Text, Heading 1/2/3, To-do, Bulleted list,
@@ -463,10 +465,11 @@ list in the document + cards on the board), `causalNodes` (→ causal
 graph), and `gallery` (→ widget catalog). The shell note in the sidebar
 bottom shows the seed summary ("13 entities · 13 causal nodes · gallery").
 
-**Gallery on GitHub Pages** — `jsNodeProductionRun` prints exact HTML
-to stdout; awk-extract `<!doctype`..`</html>` into `docs/index.html`.
-Seed is ~200KB baked. `kotlinUpgradeYarnLock` may be needed if yarn
-lock drifts.
+**Gallery on GitHub Pages** — `./gradlew generateForgePages` (stage `jvm`
+is the seed bake; `js`/`wasm` add bundles as `./gradlew forgePagesProbe`
+turns green — ratchet list in `gradle/js-target-debt.excludes`). Serve
+locally with `./gradlew serveForgePages`. `kotlinUpgradeYarnLock` may be needed if
+the yarn lock drifts.
 
 **Blackboard-as-Confix-cursor** — the target architecture. A single JSON
 file is the blackboard; `confixDoc(json)` → `Cursor` →
@@ -580,14 +583,13 @@ export PATH="$JAVA_HOME/bin:$PATH"
 ./gradlew jvmTest --tests "borg.trikeshed.job.*"
 ./gradlew jvmTest --tests "borg.trikeshed.collections.multiindex.*"
 
-# GitHub Pages deploy (manual capture)
-./gradlew jsNodeProductionRun --no-daemon --console=plain 2>&1 \
-  | awk '/^<!doctype html>/,/^<\/html>/' > docs/index.html
-git add docs/index.html && git commit -m "feat: deploy Forge workspace" && git push
+# GitHub Pages deploy (docs/ is the hosted directory on master)
+./gradlew generateForgePages -PforgePagesStages=jvm,js   # bake docs/ (jvm seed + Kotlin/JS bundle)
+./gradlew serveForgePages                                 # preview http://localhost:8765/ (-PforgePort=N)
+git add docs && git commit -m "feat: deploy Forge workspace" && git push
 
-# Verify deploy
-gh api repos/jnorthrup/TrikeShed/pages/builds -X POST
-gh api repos/jnorthrup/TrikeShed/pages/builds/latest
+# Verify deploy (Pages serves master:/docs directly — dump, commit, push; no CI)
+gh api repos/jnorthrup/TrikeShed/pages/builds -X POST && gh api repos/jnorthrup/TrikeShed/pages/builds/latest
 ```
 
 **Common tasks registered** (`build.gradle.kts`):
@@ -595,7 +597,9 @@ gh api repos/jnorthrup/TrikeShed/pages/builds/latest
 - `benchmarkJoin`, `benchmarkSequence`, `benchmarkVector`, `benchmarkMath`, `benchmarkConfix`
 - `printForgeGallery` — JVM text grid of catalog + blackboard
 - `runForgeJvm` — Compose Desktop shell
-- `generateForgePages` — Sync task (WASM target → docs/)
+- `generateForgePages` — Sync task (stages `jvm`[,`js`,`wasm`] → docs/); `serveForgePages` previews docs/ on the JDK http server; `forgePwa` = both
+- `julesArtifact`, `julesSettle`, `julesReviewPatch`, `julesReviewReport` — Jules CAS bridges (`--args="…"`)
+- `runOroborosDaemon`, `runFlywheelTui`, `runKanbanHttpServerJvm` — staged-classpath launchers; `-Pjdwp=PORT[,suspend]` attaches a debugger
 - `generateForgeAssets` — bakes `src/commonMain/resources/web/{index.html,styles.css,script.js}` into `borg.trikeshed.forge.generated.ForgeAssets` (ByteArray chunk objects, 5000 bytes each) so the Forge HTML/CSS/JS shell ships as a Kotlin-internal asset, not a resource lookup. `commonMain` consumes the generated object; `ForgeApp.kt` / `ForgePersistenceScript.kt` / `index.html` template all reference it via `{{SEED}}`/`{{STYLES}}`/`{{GALLERY}}`/`{{SCRIPT}}` placeholders.
 
 ---
@@ -682,9 +686,7 @@ cat src/commonMain/kotlin/borg/trikeshed/job/JobReducer.kt
 cat src/commonMain/kotlin/borg/trikeshed/job/JobNexusFactory.kt
 
 # 5. Browse the gallery (local)
-./gradlew jsNodeProductionRun --no-daemon --console=plain 2>&1 \
-  | awk '/^<!doctype html>/,/^<\/html>/' > /tmp/index.html
-open /tmp/index.html
+./gradlew forgePwa            # bakes docs/ then serves http://localhost:8765/
 ```
 
 ---

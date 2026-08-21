@@ -75,7 +75,7 @@ class StigmergicProtocolDecoder {
     private fun calculateChiSquared(text: String): Double {
         val charCounts = mutableMapOf<Char, Int>()
         for (char in text) {
-            charCounts[char] = charCounts.getOrDefault(char, 0) + 1
+            charCounts[char] = (charCounts[char] ?: 0) + 1
         }
 
         val uniqueChars = charCounts.keys.size

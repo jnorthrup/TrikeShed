@@ -1,5 +1,7 @@
 package borg.trikeshed.narsese
 
+import kotlin.jvm.JvmInline
+
 /**
  * TruthCoord — NARS truth value packed in a Long.
  *

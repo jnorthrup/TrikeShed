@@ -10,6 +10,8 @@ import borg.trikeshed.couch.Document
 import borg.trikeshed.couch.Field
 import borg.trikeshed.job.CasStore
 import borg.trikeshed.job.ContentId
+import kotlin.concurrent.atomics.AtomicLong
+import kotlin.concurrent.atomics.ExperimentalAtomicApi
 import borg.trikeshed.lib.Series
 import borg.trikeshed.lib.get
 import borg.trikeshed.lib.j
@@ -40,6 +42,7 @@ import borg.trikeshed.lib.size
  *   - "kind": "declarative" | "skill" | "note" (paper's metadata.type)
  *   - "sequence": monotonic write sequence (leak-free protocol guard)
  */
+@OptIn(ExperimentalAtomicApi::class)
 class MemoryStore(
     val cas: CasStore,
     val couch: CouchStore,
@@ -183,6 +186,6 @@ class MemoryStore(
         couch.subscribeMutations(observer)
 
     /** Monotonic sequence for write ordering (leak-free protocol guard). */
-    private val seqCounter = java.util.concurrent.atomic.AtomicLong(0)
-    private fun nextSequence(): Long = seqCounter.incrementAndGet()
+    private val seqCounter = AtomicLong(0)
+    private fun nextSequence(): Long = seqCounter.addAndFetch(1L)
 }
