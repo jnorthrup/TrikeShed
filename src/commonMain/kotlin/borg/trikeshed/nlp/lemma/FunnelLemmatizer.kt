@@ -19,29 +19,61 @@ data class LemmaObservation(
     val prevLemma: String?,
     val nextLemma: String?,
     val lemma: String,
+    /** How many times this exact observation occurred (aggregated dictionaries carry counts). */
+    val weight: Int = 1,
 )
 
 /**
- * FunnelLemmatizer — a frozen word→lemma index under the Line CAS algebra.
+ * A suffix-stripping rule: drop the last [strip] chars of the word, append [append].
+ * Derived from (word, lemma) by their common prefix — so `running→run` is (4, ""), `flies→fly` is (3, "y"),
+ * `ran→run` is the degenerate whole-word rule (3, "run"). Prefix morphology is deliberately out of scope.
+ */
+data class SuffixRule(val strip: Int, val append: String) {
+    fun applies(word: String): Boolean = strip <= word.length
+    fun apply(word: String): String = word.substring(0, word.length - strip) + append
+
+    val encoded: String get() = "$strip|$append"
+
+    companion object {
+        fun derive(word: String, lemma: String): SuffixRule {
+            var p = 0
+            val n = minOf(word.length, lemma.length)
+            while (p < n && word[p] == lemma[p]) p++
+            return SuffixRule(strip = word.length - p, append = lemma.substring(p))
+        }
+
+        fun decode(s: String): SuffixRule {
+            val bar = s.indexOf('|')
+            return SuffixRule(s.substring(0, bar).toInt(), s.substring(bar + 1))
+        }
+    }
+}
+
+/**
+ * FunnelLemmatizer — frozen **suffix-rule** index under the Line CAS algebra.
  *
- * The spine is the sentence's words; each word is a [LineNode] whose `contentCid` is the normalized
- * surface form and whose [borg.trikeshed.cas.NeighborStamp] is built from the neighbor *lemmas*
- * (`LineCas.stamp(prevLemmaCid, nextLemmaCid)`). Lookup walks the [MatchGrade] ladder:
+ * The spine is the sentence's words. Each word is a [LineNode] whose `contentCid` is a *suffix* of the
+ * normalized surface form and whose [borg.trikeshed.cas.NeighborStamp] is built from the neighbor
+ * *lemmas* (`LineCas.stamp(prevLemmaCid, nextLemmaCid)`). What the index stores per key is not a lemma but
+ * a [SuffixRule]; lemmatizing is "find the most specific rule whose context matches, apply it".
  *
- *   LINKED        stamp + word      ("saw" between "i" and "the"  → see)
- *   PARTIAL_PREV  prev + word
- *   PARTIAL_NEXT  word + next
- *   CONTENT_ONLY  word              (majority lemma for the word, context-free)
- *   identity      word itself       (unseen: a funnel MISS is authoritative)
+ * Specificity order at lookup (first hit wins):
  *
- * Four frozen [FunnelHashIndex] generations back the four rungs; each index slot is an insertion index
- * into a parallel lemma array. Freezing is a majority vote per key over the observations, so refreezing
- * the same observations with the same seed yields byte-identical tables.
+ *   k = word length   whole-word rule (irregulars: ran→run, is→be)
+ *   k = MAX_SUFFIX…1  suffix of length k
+ *     and within each k the [MatchGrade] ladder:
+ *       LINKED (prev+next lemma stamp) → PARTIAL_PREV → PARTIAL_NEXT → CONTENT_ONLY (no context)
+ *   identity          no rule applies — a funnel MISS is authoritative
  *
- * Neighbor lemmas are not known before lemmatizing, so [lemmatize] is iterative: pass 1 is
- * CONTENT_ONLY for every token; later passes re-resolve each token with its neighbors' current lemmas
- * until a fixpoint (typically 2 passes). That iteration is the word-scale "fractal"; [LemmaSpines] and
- * [ResidualLemmaCache] carry the same algebra up to sentences and paragraphs.
+ * Four frozen [FunnelHashIndex] rungs back the four grades; each index slot is an insertion index into a
+ * parallel rule array. Freezing is a weighted majority vote per key, so re-freezing the same observations
+ * with the same seed is byte-identical. Suffix rungs (k < word length) require [minSupport] votes so a
+ * one-off typo does not become a rule; whole-word rungs accept a single observation.
+ *
+ * Neighbor lemmas are unknown before lemmatizing, so [lemmatize] iterates: pass 1 is CONTENT_ONLY for
+ * every token, later passes re-resolve with the neighbors' current lemmas until a fixpoint. That is the
+ * word-scale "fractal"; [LemmaSpines] and [ResidualLemmaCache] carry the same algebra up to sentences
+ * and paragraphs.
  */
 class FunnelLemmatizer private constructor(
     private val linked: Rung,
@@ -49,33 +81,56 @@ class FunnelLemmatizer private constructor(
     private val nextOnly: Rung,
     private val content: Rung,
     val seed: Long,
+    val maxSuffix: Int,
+    val minSupport: Int,
 ) {
-    /** A frozen funnel plus the lemma each slot resolves to. */
-    class Rung internal constructor(val index: FunnelHashIndex<String>, val lemmas: Array<String>) {
-        val size: Int get() = lemmas.size
-        fun lookup(key: String): String? = index.get(key)?.let { lemmas[it] }
+    /** A frozen funnel plus the rule each slot resolves to. */
+    class Rung internal constructor(val index: FunnelHashIndex<String>, val rules: Array<SuffixRule>) {
+        val size: Int get() = rules.size
+        fun lookup(key: String): SuffixRule? = index.get(key)?.let { rules[it] }
     }
 
-    data class Resolution(val lemma: String, val grade: MatchGrade?)
+    data class Resolution(val lemma: String, val grade: MatchGrade?, val suffixLength: Int, val rule: SuffixRule?)
 
-    /** Distinct normalized surface forms known context-free. */
+    /** Distinct keys in the context-free rung (whole-word + suffix keys). */
     val vocabulary: Int get() = content.size
 
-    /** Distinct (prevLemma, word, nextLemma) contexts frozen. */
+    /** Distinct (prevLemma, key, nextLemma) contexts frozen. */
     val linkedContexts: Int get() = linked.size
 
     fun resolve(word: String, prevLemma: String?, nextLemma: String?): Resolution {
-        linked.lookup(linkedKey(word, prevLemma, nextLemma))?.let { return Resolution(it, MatchGrade.LINKED) }
-        prevOnly.lookup(prevKey(word, prevLemma))?.let { return Resolution(it, MatchGrade.PARTIAL_PREV) }
-        nextOnly.lookup(nextKey(word, nextLemma))?.let { return Resolution(it, MatchGrade.PARTIAL_NEXT) }
-        content.lookup(contentKey(word))?.let { return Resolution(it, MatchGrade.CONTENT_ONLY) }
-        return Resolution(normalize(word), null)
+        val w = normalize(word)
+        if (w.isEmpty()) return Resolution(w, null, 0, null)
+        val lengths = suffixLengths(w)
+        for (k in lengths) {
+            val suffix = w.takeLast(k)
+            val keyed = suffixKey(k, suffix)
+            linked.lookup(stampKey(keyed, prevLemma, nextLemma))?.takeIf { it.applies(w) }
+                ?.let { return Resolution(it.apply(w), MatchGrade.LINKED, k, it) }
+            prevOnly.lookup(prevKey(keyed, prevLemma))?.takeIf { it.applies(w) }
+                ?.let { return Resolution(it.apply(w), MatchGrade.PARTIAL_PREV, k, it) }
+            nextOnly.lookup(nextKey(keyed, nextLemma))?.takeIf { it.applies(w) }
+                ?.let { return Resolution(it.apply(w), MatchGrade.PARTIAL_NEXT, k, it) }
+            content.lookup(keyed)?.takeIf { it.applies(w) }
+                ?.let { return Resolution(it.apply(w), MatchGrade.CONTENT_ONLY, k, it) }
+        }
+        return Resolution(w, null, 0, null)
+    }
+
+    /** Context-free resolution (pass 1 of [lemmatize]). */
+    fun resolveContentOnly(word: String): String {
+        val w = normalize(word)
+        if (w.isEmpty()) return w
+        for (k in suffixLengths(w)) {
+            content.lookup(suffixKey(k, w.takeLast(k)))?.takeIf { it.applies(w) }?.let { return it.apply(w) }
+        }
+        return w
     }
 
     /** Lemmatize one sentence. [maxPasses] bounds the neighbor-refinement iteration. */
     fun lemmatize(words: List<String>, maxPasses: Int = 3): List<String> {
         if (words.isEmpty()) return emptyList()
-        var lemmas = words.map { content.lookup(contentKey(it)) ?: normalize(it) }
+        var lemmas = words.map(::resolveContentOnly)
         var pass = 1
         while (pass < maxPasses) {
             val next = List(words.size) { i ->
@@ -90,71 +145,132 @@ class FunnelLemmatizer private constructor(
         return lemmas
     }
 
-    /** Per-grade histogram for one sentence at its fixpoint — how much context the index actually used. */
-    fun gradeHistogram(words: List<String>): Map<MatchGrade?, Int> {
+    /** Per-(grade, suffixLength) histogram for one sentence at its fixpoint. */
+    fun resolutionHistogram(words: List<String>): Map<Pair<MatchGrade?, Int>, Int> {
         val lemmas = lemmatize(words)
-        val counts = mutableMapOf<MatchGrade?, Int>()
+        val counts = mutableMapOf<Pair<MatchGrade?, Int>, Int>()
         for (i in words.indices) {
             val prev = if (i > 0) lemmas[i - 1] else null
             val nxt = if (i < words.lastIndex) lemmas[i + 1] else null
-            val g = resolve(words[i], prev, nxt).grade
-            counts[g] = (counts[g] ?: 0) + 1
+            val r = resolve(words[i], prev, nxt)
+            val key = r.grade to r.suffixLength
+            counts[key] = (counts[key] ?: 0) + 1
         }
         return counts
     }
 
+    /** Whole word first, then suffixes from [maxSuffix] down to 1 (only those shorter than the word). */
+    private fun suffixLengths(w: String): List<Int> {
+        val out = ArrayList<Int>(maxSuffix + 1)
+        out += w.length
+        var k = minOf(maxSuffix, w.length - 1)
+        while (k >= 1) { out += k; k-- }
+        return out
+    }
+
     companion object {
+        const val DEFAULT_MAX_SUFFIX: Int = 5
+        const val DEFAULT_MIN_SUPPORT: Int = 2
+
         fun normalize(word: String): String = word.trim().lowercase()
 
-        fun wordCid(word: String): ContentId = ContentId.of(normalize(word).encodeToByteArray())
         fun lemmaCid(lemma: String?): ContentId? = lemma?.let { ContentId.of(normalize(it).encodeToByteArray()) }
 
-        fun linkedKey(word: String, prevLemma: String?, nextLemma: String?): String =
-            LineCas.stamp(lemmaCid(prevLemma), lemmaCid(nextLemma)).hex + ":" + wordCid(word).hex
+        /** Key for a suffix of length [k]; `k == word.length` marks the whole-word (irregular) rung. */
+        fun suffixKey(k: Int, suffix: String): String =
+            "$k:" + ContentId.of(suffix.encodeToByteArray()).hex
 
-        fun prevKey(word: String, prevLemma: String?): String =
-            LineCas.neighborHex(lemmaCid(prevLemma)) + "**:" + wordCid(word).hex
+        fun stampKey(keyed: String, prevLemma: String?, nextLemma: String?): String =
+            LineCas.stamp(lemmaCid(prevLemma), lemmaCid(nextLemma)).hex + ":" + keyed
 
-        fun nextKey(word: String, nextLemma: String?): String =
-            "**" + LineCas.neighborHex(lemmaCid(nextLemma)) + ":" + wordCid(word).hex
+        fun prevKey(keyed: String, prevLemma: String?): String =
+            LineCas.neighborHex(lemmaCid(prevLemma)) + "**:" + keyed
 
-        fun contentKey(word: String): String = wordCid(word).hex
+        fun nextKey(keyed: String, nextLemma: String?): String =
+            "**" + LineCas.neighborHex(lemmaCid(nextLemma)) + ":" + keyed
 
         /**
-         * Freeze a reference corpus into the four rungs. Majority vote per key; ties resolve to the
-         * first-seen lemma so the result is deterministic for a given observation order.
+         * Freeze a reference corpus into the four rungs. For each observation, one vote per suffix length
+         * (whole word, then [maxSuffix]..1) for the [SuffixRule] derived from (word, lemma). Weighted
+         * majority per key; ties resolve to the first-seen rule so the result is deterministic.
          */
-        fun freeze(observations: List<LemmaObservation>, seed: Long = 0L, slack: Double = 0.20): FunnelLemmatizer =
-            FunnelLemmatizer(
-                linked = rung(observations, seed, slack) { linkedKey(it.word, it.prevLemma, it.nextLemma) },
-                prevOnly = rung(observations, seed, slack) { prevKey(it.word, it.prevLemma) },
-                nextOnly = rung(observations, seed, slack) { nextKey(it.word, it.nextLemma) },
-                content = rung(observations, seed, slack) { contentKey(it.word) },
-                seed = seed,
-            )
-
-        private fun rung(
+        fun freeze(
             observations: List<LemmaObservation>,
-            seed: Long,
-            slack: Double,
-            keyOf: (LemmaObservation) -> String,
-        ): Rung {
-            val votes = LinkedHashMap<String, LinkedHashMap<String, Int>>()
-            for (o in observations) {
-                val perKey = votes.getOrPut(keyOf(o)) { LinkedHashMap() }
-                val lemma = normalize(o.lemma)
-                perKey[lemma] = (perKey[lemma] ?: 0) + 1
+            seed: Long = 0L,
+            slack: Double = 0.20,
+            maxSuffix: Int = DEFAULT_MAX_SUFFIX,
+            minSupport: Int = DEFAULT_MIN_SUPPORT,
+        ): FunnelLemmatizer {
+            val votes = Votes(maxSuffix, minSupport)
+            for (o in observations) votes.add(o)
+            return FunnelLemmatizer(
+                linked = votes.linked.freeze(seed, slack),
+                prevOnly = votes.prevOnly.freeze(seed, slack),
+                nextOnly = votes.nextOnly.freeze(seed, slack),
+                content = votes.content.freeze(seed, slack),
+                seed = seed,
+                maxSuffix = maxSuffix,
+                minSupport = minSupport,
+            )
+        }
+
+        private class Table(private val minSupport: Int) {
+            // key → (ruleEncoded → weight), insertion-ordered for determinism
+            private val byKey = LinkedHashMap<String, LinkedHashMap<String, Int>>()
+            private val wholeWord = HashSet<String>()
+
+            fun vote(key: String, rule: SuffixRule, weight: Int, isWholeWord: Boolean) {
+                val perKey = byKey.getOrPut(key) { LinkedHashMap() }
+                perKey[rule.encoded] = (perKey[rule.encoded] ?: 0) + weight
+                if (isWholeWord) wholeWord += key
             }
-            val keys = votes.keys.toList()
-            val lemmas = Array(keys.size) { i ->
-                var best: String? = null
-                var bestCount = -1
-                for ((lemma, count) in votes.getValue(keys[i])) {
-                    if (count > bestCount) { best = lemma; bestCount = count }
+
+            fun freeze(seed: Long, slack: Double): Rung {
+                val keys = ArrayList<String>()
+                val rules = ArrayList<SuffixRule>()
+                for ((key, perKey) in byKey) {
+                    var best: String? = null
+                    var bestCount = -1
+                    var total = 0
+                    for ((rule, count) in perKey) {
+                        total += count
+                        if (count > bestCount) { best = rule; bestCount = count }
+                    }
+                    if (best == null) continue
+                    if (key !in wholeWord && total < minSupport) continue
+                    keys += key
+                    rules += SuffixRule.decode(best)
                 }
-                best ?: keys[i]
+                return Rung(FunnelHashIndex.build(keys.toSeries(), seed, slack), rules.toTypedArray())
             }
-            return Rung(FunnelHashIndex.build(keys.toSeries(), seed, slack), lemmas)
+        }
+
+        private class Votes(private val maxSuffix: Int, minSupport: Int) {
+            val linked = Table(minSupport)
+            val prevOnly = Table(minSupport)
+            val nextOnly = Table(minSupport)
+            val content = Table(minSupport)
+
+            fun add(o: LemmaObservation) {
+                val w = normalize(o.word)
+                if (w.isEmpty()) return
+                val rule = SuffixRule.derive(w, normalize(o.lemma))
+                val lengths = ArrayList<Int>().apply {
+                    add(w.length)
+                    var k = minOf(maxSuffix, w.length - 1)
+                    while (k >= 1) { add(k); k-- }
+                }
+                for (k in lengths) {
+                    // a suffix shorter than the strip cannot carry this rule: skip (prevents "s"→"run")
+                    if (k < w.length && rule.strip > k) continue
+                    val keyed = suffixKey(k, w.takeLast(k))
+                    val whole = k == w.length
+                    linked.vote(stampKey(keyed, o.prevLemma, o.nextLemma), rule, o.weight, whole)
+                    prevOnly.vote(prevKey(keyed, o.prevLemma), rule, o.weight, whole)
+                    nextOnly.vote(nextKey(keyed, o.nextLemma), rule, o.weight, whole)
+                    content.vote(keyed, rule, o.weight, whole)
+                }
+            }
         }
     }
 }

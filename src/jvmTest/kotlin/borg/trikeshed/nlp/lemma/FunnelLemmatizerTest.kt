@@ -26,42 +26,71 @@ class FunnelLemmatizerTest {
         LemmaObservation("dogs", null, "run", "dog"),
         LemmaObservation("ran", "dog", ".", "run"),
         LemmaObservation(".", "run", null, "."),
+        // regular -ed / -ing / -s evidence, each rule supported ≥ 2 times
+        LemmaObservation("walked", "he", "home", "walk", weight = 3),
+        LemmaObservation("jumped", "she", "high", "jump", weight = 3),
+        LemmaObservation("walking", "be", "home", "walk", weight = 2),
+        LemmaObservation("jumping", "be", "high", "jump", weight = 2),
+        LemmaObservation("cats", "the", "run", "cat", weight = 2),
+        LemmaObservation("flies", "the", "buzz", "fly", weight = 2),
+        LemmaObservation("tries", "he", "hard", "try", weight = 2),
     )
 
     private val lemmatizer = FunnelLemmatizer.freeze(corpus, seed = 42L)
 
     @Test
-    fun contextDisambiguatesSawViaLinkedRung() {
+    fun suffixRulesAreDerivedByCommonPrefix() {
+        assertEquals(SuffixRule(4, ""), SuffixRule.derive("running", "run"))
+        assertEquals(SuffixRule(3, "y"), SuffixRule.derive("flies", "fly"))
+        assertEquals(SuffixRule(3, "run"), SuffixRule.derive("ran", "run"))   // whole-word degenerate rule
+        assertEquals(SuffixRule(0, ""), SuffixRule.derive("dog", "dog"))
+        assertEquals("fly", SuffixRule(3, "y").apply("flies"))
+    }
+
+    @Test
+    fun contextDisambiguatesSawViaWholeWordLinkedRung() {
         assertEquals(listOf("i", "see", "the", "dog", "."), lemmatizer.lemmatize(listOf("I", "saw", "the", "dog", ".")))
         assertEquals(listOf("the", "saw", "be", "sharp", "."), lemmatizer.lemmatize(listOf("the", "saw", "is", "sharp", ".")))
         val verb = lemmatizer.resolve("saw", "i", "the")
         assertEquals("see", verb.lemma)
         assertEquals(MatchGrade.LINKED, verb.grade)
+        assertEquals(3, verb.suffixLength)   // whole word
     }
 
     @Test
-    fun unseenWordFallsThroughToIdentityWithNullGrade() {
+    fun unseenRegularFormsGeneralizeThroughSuffixRules() {
+        // never observed; must come from the "-ed"/"-ing"/"-s"/"-ies" rules with suffix length < word length
+        val talked = lemmatizer.resolve("talked", null, null)
+        assertEquals("talk", talked.lemma)
+        assertTrue(talked.suffixLength < "talked".length)
+        assertEquals("talk", lemmatizer.resolveContentOnly("talking"))
+        assertEquals("hat", lemmatizer.resolveContentOnly("hats"))
+        assertEquals("cry", lemmatizer.resolveContentOnly("cries"))
+    }
+
+    @Test
+    fun unseenWordWithNoApplicableRuleFallsThroughToIdentity() {
         val r = lemmatizer.resolve("Zebra", "the", ".")
         assertEquals("zebra", r.lemma)
         assertNull(r.grade)
+        assertNull(r.rule)
     }
 
     @Test
-    fun contentOnlyRungHoldsMajorityLemma() {
-        // "saw" seen once as see, once as saw → first-seen wins the tie deterministically
-        val r = lemmatizer.resolve("saw", "zzz", "yyy")
-        assertEquals(MatchGrade.CONTENT_ONLY, r.grade)
-        assertTrue(r.lemma == "see" || r.lemma == "saw")
-        // distinct normalized surface forms: i, saw, the, dog, ., is, sharp, dogs, ran
-        assertEquals(9, lemmatizer.vocabulary)
+    fun singletonSuffixEvidenceIsNotARule() {
+        // "sharp" alone would suggest "-p"→"" nothing; more to the point "dogs"(1 vote) alone cannot make "s"→"" — cats(2) does.
+        val lone = FunnelLemmatizer.freeze(listOf(LemmaObservation("dogs", null, null, "dog")), seed = 1L)
+        assertEquals("hats", lone.resolveContentOnly("hats"))   // minSupport=2 rejects the single vote
+        assertEquals("dog", lone.resolveContentOnly("dogs"))    // but the whole-word rung accepts it
     }
 
     @Test
     fun freezingIsDeterministic() {
         val again = FunnelLemmatizer.freeze(corpus, seed = 42L)
-        val words = listOf("I", "saw", "the", "dogs", "ran", ".")
+        val words = listOf("I", "saw", "the", "dogs", "ran", "and", "talked", ".")
         assertEquals(lemmatizer.lemmatize(words), again.lemmatize(words))
         assertEquals(lemmatizer.linkedContexts, again.linkedContexts)
+        assertEquals(lemmatizer.vocabulary, again.vocabulary)
     }
 
     @Test
@@ -76,12 +105,12 @@ class FunnelLemmatizerTest {
         assertEquals(listOf("i", "see", "the", "dog", "."), lemmas[0][0])
         assertEquals(lemmas[0], lemmas[2])
         assertEquals(3, stats.paragraphs)
-        assertEquals(1, stats.paragraphsSkipped)          // third paragraph served by paragraph CID
+        assertEquals(1, stats.paragraphsSkipped)
         assertEquals(6, stats.sentences)
-        assertEquals(4, stats.sentencesSkipped)           // 2 via paragraph skip + 2 via sentence CIDs
-        assertEquals(8, stats.tokensLemmatized)           // only s1 and s2 once: 5 + 3
+        assertEquals(4, stats.sentencesSkipped)
+        assertEquals(8, stats.tokensLemmatized)
         assertTrue(stats.tokenReduction > 0.6)
-        assertTrue(cache.generationCount >= 1)            // staging froze at least once (freezeAt = 2)
+        assertTrue(cache.generationCount >= 1)
     }
 
     @Test
