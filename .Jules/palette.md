@@ -34,3 +34,7 @@
 ## 2026-08-20 - Global keyboard handlers for custom buttons
 **Learning:** When using custom DOM elements (like \`div\` or \`span\`) as interactive buttons by adding \`role="button"\` and \`tabindex="0"\`, they do not natively respond to \`Enter\` or \`Space\` keys like standard \`<button>\` elements do. Adding individual \`keydown\` listeners to every custom button creates redundant code, risks inconsistency, and is easy to miss on new components.
 **Action:** Implement a global event delegation listener on the \`document\` for the \`keydown\` event. When \`Enter\` or \`Space\` is pressed, check if the \`e.target.getAttribute('role') === 'button'\`, and if so, call \`e.target.click()\`. This ensures all current and future custom buttons are automatically keyboard accessible without duplicate logic.
+
+## 2025-10-24 - Adding aria-selected to dynamic tab elements
+**Learning:** When dynamically generating components with `role="tab"`, adding an `active` CSS class is not enough for screen readers. Without the `aria-selected` attribute, screen reader users cannot tell which tab in the `tablist` is currently active.
+**Action:** Always pair visual active states (like `.active` classes) on `role="tab"` elements with `aria-selected="true"` or `aria-selected="false"` to ensure the active state is programmatically announced by assistive technologies.

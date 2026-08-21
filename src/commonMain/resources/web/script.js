@@ -907,8 +907,10 @@
     let rootOf = cur; while (rootOf && rootOf.parent && sheetById[rootOf.parent]) rootOf = sheetById[rootOf.parent];
     rootSheets.forEach((sh) => {
       const b = document.createElement('button');
-      b.className = 'sheet-tab' + (rootOf && rootOf.id === sh.id ? ' active' : '');
+      const isActive = rootOf && rootOf.id === sh.id;
+      b.className = 'sheet-tab' + (isActive ? ' active' : '');
       b.setAttribute('role', 'tab');
+      b.setAttribute('aria-selected', isActive ? 'true' : 'false');
       b.textContent = sh.title;
       const n = document.createElement('span'); n.className = 'sheet-count'; n.textContent = sh.rows.length + ' × ' + sh.columns.length; b.appendChild(n);
       b.addEventListener('click', () => openSheet(sh.id));
