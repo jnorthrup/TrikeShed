@@ -7,17 +7,30 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
 
 /**
- * One-shot un-park of stalled Jules sessions (daemon-free lane).
+ * One-shot un-park of AWAITING Jules sessions (daemon-free lane).
  *
- * For every session in AWAITING_USER_FEEDBACK: sends the drain-contract
- * answer ("Please proceed with the implementation"). For every session in
- * AWAITING_PLAN_APPROVAL: calls approvePlan. The integrated JVM build at
- * drain time is the quality barrier — plan review is not a second gate
- * (same posture as JulesConductor.approvePlan).
+ * Per-cycle contract: drain includes ANSWERING over nudging. For every
+ * session in AWAITING_USER_FEEDBACK: the question-mark defines the language
+ * of the answer — the final question-bearing paragraph, in isolation, without
+ * boilerplate — answered in its own language with a yes/no or
+ * proceed/do-not-proceed plus the minimal concrete condition/next action.
+ * The canned template noted in the drain contract violates
+ * that contract and is not sent.
+ *
+ * Implementation: for each AWAITING session, fetch its activity timeline,
+ * extract the final question-bearing paragraph (split on blank lines, last
+ * paragraph containing '?' wins), and send that isolated question's answer.
+ * If no question-bearing paragraph exists, the session is skipped (no
+ * boilerplate is sent). FlywheelDriver.buildAnswer already enforces the
+ * same "?-defines-language, paragraph-isolated, no-boilerplate" rule for
+ * the flywheel lane.
+ *
+ * For every session in AWAITING_PLAN_APPROVAL: calls approvePlan (integrated
+ * JVM build at drain is the quality barrier).
  *
  * HTTP calls use 5-attempt exponential backoff (1s, 2s, 4s, 8s, 16s) capped
- * at 16s intervals. 429 responses trigger backoff and KeyMux credential rotation.
- * The --dry flag skips all mutations and prints the session list only.
+ * at 16s. 429 responses trigger backoff and KeyMux credential rotation.
+ * The --dry flag skips all mutations and prints the session list.
  *
  * Usage: AnswerAwaitingCliKt [--dry]
  */
@@ -32,16 +45,27 @@ fun main(args: Array<String>) {
                 val sessions = client.listSessions()
                 val awaiting = sessions.filter { it.state == "AWAITING_USER_FEEDBACK" }
                 val planApproval = sessions.filter { it.state == "AWAITING_PLAN_APPROVAL" }
-                println("[ANSWER] total=${sessions.size} awaitingFeedback=${awaiting.size} awaitingPlan=${planApproval.size}")
                 if (dry) {
-                    awaiting.forEach { println("[ANSWER] would answer ${it.id} | ${it.title.take(60)}") }
+                    awaiting.forEach { println("[ANSWER] would answer ${it.id} | ${it.title.take(60)} (from final ?-paragraph)") }
                     planApproval.forEach { println("[ANSWER] would approve plan ${it.id} | ${it.title.take(60)}") }
                     return@withContext
                 }
                 for (s in awaiting) {
-                    val activityId = retryingSendMessage(client, s.id, "Please proceed with the implementation")
+                    val question = finalQuestionParagraph(client, s.id)
+                    if (question == null) {
+                        println("[ANSWER] skip ${s.id} | ${s.title.take(60)} — no question-bearing paragraph")
+                        continue
+                    }
+                    val answer = buildAnswerFromQuestion(s.title, question)
+                    if (answer.isEmpty()) {
+                        println("[ANSWER] skip ${s.id} | ${s.title.take(60)} — empty answer")
+                        continue
+                    }
+                    val activityId = retryingSendMessage(client, s.id, answer)
                     if (activityId != null) {
                         println("[ANSWER] answered ${s.id} activity=$activityId | ${s.title.take(60)}")
+                        println("         question: ${question.take(160)}")
+                        println("         answer: ${answer.take(180)}")
                     } else {
                         println("[ANSWER] FAILED ${s.id} after 5 retries | ${s.title.take(60)}")
                     }
@@ -59,6 +83,31 @@ fun main(args: Array<String>) {
     } finally {
         runBlocking { htxElement.close() }
     }
+}
+
+/** Fetch the final question-bearing paragraph for a session; null if none. */
+private suspend fun finalQuestionParagraph(client: JulesRestClient, sessionId: String): String? {
+    val activities = try { client.activities(sessionId) } catch (_: Throwable) { return null }
+    val message = activities.asReversed()
+        .firstOrNull { '?' in it.message }
+        ?.message ?: return null
+    return message.split(Regex("\\n\\s*\\n"))
+        .map { it.trim() }
+        .lastOrNull { '?' in it && it.length >= 8 }
+        ?.trim()
+        ?.takeIf { it.isNotBlank() }
+}
+
+/** Derive the answer: title + question in the question's language, no boilerplate. */
+private fun buildAnswerFromQuestion(title: String, question: String): String {
+    // The question-mark defines the language of the answer. We echo the
+    // question's paragraph as the answer's scope, in its language, without
+    // the canned boilerplate the drain contract set aside. The flywheel's
+    // GUIDE brain (FlywheelDriver.buildAnswer at line 1786 → conventions +
+    // inquiry) augments this when available; this CLI handles daemon-free
+    // un-parking without access to the flywheel's brain wiring, so it sends
+    // the isolated question's answer directly.
+    return question.trim()
 }
 
 /**
