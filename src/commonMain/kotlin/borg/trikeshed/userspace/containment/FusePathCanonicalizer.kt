@@ -23,6 +23,17 @@ interface FusePathCanonicalizer {
 expect fun createFusePathCanonicalizer(instanceId: String): FusePathCanonicalizer
 
 /**
+ * Sanitizes a subvolume name by mapping arbitrary semantic names to deterministic
+ * pseudo-random content hashes (dir_0a4f91e/ style) using namespace token masking.
+ */
+fun sanitizeSubvolName(name: String, instanceId: String = "global"): String? {
+    if (name.startsWith("dir_") || name.startsWith("file_")) return name // Already canonicalized
+    if (name.isEmpty() || name == "." || name == "..") return null
+    if (name.contains("/") || name.contains("\\")) return null
+    return generateCanonicalName(name, isDirectory = true, instanceId = instanceId)
+}
+
+/**
  * Helper to generate the canonical name using SHA-256 truncation to 8 hex chars.
  */
 fun generateCanonicalName(originalName: String, isDirectory: Boolean, instanceId: String): String {
