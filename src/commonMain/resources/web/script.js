@@ -270,13 +270,6 @@
         mutate((s) => { s.activePageId = page.id; });
         renderAll();
       });
-      item.addEventListener('keydown', (e) => {
-        if (e.key === 'Enter' || e.key === ' ') {
-          e.preventDefault();
-          mutate((s) => { s.activePageId = page.id; });
-          renderAll();
-        }
-      });
       pageTreeEl.appendChild(item);
     });
   }
@@ -597,15 +590,6 @@
           const next = order[(order.indexOf(card.column) + 1) % order.length];
           mutate(() => { card.column = next; });
           renderBoard();
-        });
-        cardEl.addEventListener('keydown', (e) => {
-          if (e.key === 'Enter' || e.key === ' ') {
-            e.preventDefault();
-            const order = state.board.columns.map((c) => c.id);
-            const next = order[(order.indexOf(card.column) + 1) % order.length];
-            mutate(() => { card.column = next; });
-            renderBoard();
-          }
         });
         cardsEl.appendChild(cardEl);
       });
@@ -1018,6 +1002,20 @@
     if (sheets.length) parts.push(sheets.length + ' sheets');
     seedNoteEl.textContent = parts.length ? 'Seed: ' + parts.join(' · ') : 'Local-first workspace';
   })();
+
+  // ── Global interactions ─────────────────────────────────────────────
+  document.addEventListener('keydown', (e) => {
+    if ((e.key === 'Enter' || e.key === ' ') && e.target.getAttribute('role') === 'button') {
+      e.preventDefault();
+      e.target.click();
+    }
+  });
+
+  const dropZoneEl = document.getElementById('drop-zone');
+  const fileInputEl = document.getElementById('file-input');
+  if (dropZoneEl && fileInputEl) {
+    dropZoneEl.addEventListener('click', () => fileInputEl.click());
+  }
 
   // ── Render all ──────────────────────────────────────────────────────
   function renderAll() {

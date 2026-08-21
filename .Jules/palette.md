@@ -30,3 +30,7 @@
 ## 2025-01-22 - Contextual ARIA labels for interactive Kanban cards
 **Learning:** Kanban cards that double as buttons (e.g., clicking moves them to the next column) are disorienting for screen reader users if they lack context. A screen reader will just read the card's text, without indicating its current status/column or what action activating it performs.
 **Action:** When creating interactive items like Kanban cards, dynamically generate an `aria-label` that includes the card's name, its current column, and the action triggered upon interaction (e.g., "Move card 'Task' from 'To Do' to 'In Progress'").
+
+## 2026-08-20 - Global keyboard handlers for custom buttons
+**Learning:** When using custom DOM elements (like \`div\` or \`span\`) as interactive buttons by adding \`role="button"\` and \`tabindex="0"\`, they do not natively respond to \`Enter\` or \`Space\` keys like standard \`<button>\` elements do. Adding individual \`keydown\` listeners to every custom button creates redundant code, risks inconsistency, and is easy to miss on new components.
+**Action:** Implement a global event delegation listener on the \`document\` for the \`keydown\` event. When \`Enter\` or \`Space\` is pressed, check if the \`e.target.getAttribute('role') === 'button'\`, and if so, call \`e.target.click()\`. This ensures all current and future custom buttons are automatically keyboard accessible without duplicate logic.
