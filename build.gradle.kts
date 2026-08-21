@@ -314,6 +314,16 @@ kotlin {
     }
 }
 
+tasks.register<Exec>("commonMainPurity") {
+    group = "verification"
+    description = "Checks that commonMain is free of platform-specific bindings"
+    commandLine(project.layout.projectDirectory.file("scripts/common-purity.sh").asFile.absolutePath)
+}
+
+tasks.named("check") {
+    dependsOn("commonMainPurity")
+}
+
 // ─────────────────────────────────────────────────────────────────
 // Gradle Configuration Cache / Deprecation Suppression Hooks
 // ─────────────────────────────────────────────────────────────────
