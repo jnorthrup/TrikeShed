@@ -76,7 +76,7 @@ class BrainClient(
     }
 
     /** Last model id that answered a chat. */
-    @Volatile private var lastGoodModelId: String? = endpoints.firstOrNull()?.model
+    private var lastGoodModelId: String? = endpoints.firstOrNull()?.model
 
     /** True if at least one provider endpoint was discovered. */
     fun hasEndpoints(): Boolean = endpoints.isNotEmpty()
@@ -105,11 +105,13 @@ class BrainClient(
     /** Inner loop: called inside the outer timeout. */
     private suspend fun chatInner(messages: List<Pair<String, String>>, maxTokens: Int, temperature: Double): String {
         var lastError = "all providers exhausted"
-        val routed = withContext(Dispatchers.IO) { modelMux.route("conflict-resolve").a }
+        // IO is JVM/Native-only; revisit via PlatformHost
+        val routed = withContext(Dispatchers.Default) { modelMux.route("conflict-resolve").a }
         for (modelId in orderedModelIds(routed)) {
             val endpoint = endpointByModel[modelId] ?: continue
             val session = try {
-                withContext(Dispatchers.IO) { modelMux.session(modelId).getOrThrow() }
+                // IO is JVM/Native-only; revisit via PlatformHost
+                withContext(Dispatchers.Default) { modelMux.session(modelId).getOrThrow() }
             } catch (t: Throwable) {
                 lastError = "Brain ${endpoint.name} session failed: ${t.message}"
                 logError(endpoint.name, -1, t.message.orEmpty().take(500))

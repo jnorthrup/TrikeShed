@@ -5,6 +5,7 @@ import borg.trikeshed.forge.blackboard.ForgeBlackboardView
 import borg.trikeshed.forge.blackboard.ForgeDomainSurface
 import borg.trikeshed.forge.blackboard.ForgeSurfaceGeometry
 import borg.trikeshed.jules.JulesRestClient
+import borg.trikeshed.userspace.nio.platform.spi.SystemOperations
 import kotlinx.datetime.Clock
 
 /**
@@ -78,7 +79,7 @@ data class JulesBlackboardSurface(
  * Override with system property: -Djules.blackboard.ttl.ms=<millis>
  */
 val TTL_MS: Long = run {
-    val override = System.getProperty("jules.blackboard.ttl.ms")
+    val override = SystemOperations.default.getProperty("jules.blackboard.ttl.ms")
     if (override != null) override.toLongOrNull() ?: 300_000L else 300_000L
 }
 
@@ -330,7 +331,7 @@ object JulesBlackboardAdapter {
     fun evictExpired(): List<String> {
         val now = Clock.System.now().toEpochMilliseconds()
         val evicted = sessionCache.entries.filter { (_, entry) -> now > entry.expiresAt }.map { it.key }
-        sessionCache.entries.removeIf { (_, entry) -> now > entry.expiresAt }
+        sessionCache.entries.removeAll { (_, entry) -> now > entry.expiresAt }
         return evicted
     }
 

@@ -45,7 +45,7 @@ class JulesRestClient(
                 .onSuccess { return it }
                 .onFailure { ex: Throwable ->
                     // Empty/truncated response body — treat as retryable server malfunction
-                    val isParseEx = ex is IndexOutOfBoundsException || ex is java.lang.StringIndexOutOfBoundsException
+                    val isParseEx = ex is IndexOutOfBoundsException
                     val is5xx = ex.message?.contains("500") == true || ex.message?.contains("502") == true ||
                             ex.message?.contains("503") == true || ex.message?.contains("504") == true
                     val is429 = ex.message?.contains("429") == true ||
@@ -69,7 +69,7 @@ class JulesRestClient(
             runCatching { transport().post(path, json) }
                 .onSuccess { return it }
                 .onFailure { ex: Throwable ->
-                    val isParseEx = ex is IndexOutOfBoundsException || ex is java.lang.StringIndexOutOfBoundsException
+                    val isParseEx = ex is IndexOutOfBoundsException
                     val is5xx = ex.message?.contains("500") == true || ex.message?.contains("502") == true ||
                             ex.message?.contains("503") == true || ex.message?.contains("504") == true
                     val is429 = ex.message?.contains("429") == true ||
