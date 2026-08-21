@@ -168,7 +168,7 @@ open class HtxElement(
         // Bolt: Prevent intermediate List allocations with filterIsInstance<T>()
         // and avoid O(F*S) scaling by fast-path checking subscriber presence first
         if (fanoutSubscribers.any { it is FanoutEventSubscriber }) {
-            frames.toList().forEach { frame ->
+            frames.forEach { frame ->
                 fanoutSubscribers.forEach {
                     if (it is FanoutEventSubscriber) {
                         it.onFanoutEvent(frame)
