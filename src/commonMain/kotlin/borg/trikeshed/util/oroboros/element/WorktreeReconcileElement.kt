@@ -5,6 +5,7 @@ import borg.trikeshed.context.AsyncContextElement
 import borg.trikeshed.context.AsyncContextKey
 import borg.trikeshed.context.ElementState
 import borg.trikeshed.lib.j
+import borg.trikeshed.cursor.currentTimeMillis
 import borg.trikeshed.memory.CouchIndexBridge
 import borg.trikeshed.util.oroboros.MemoryBridge
 import borg.trikeshed.util.oroboros.WorktreeCouchGateway
@@ -37,7 +38,7 @@ class WorktreeReconcileElement(
         if (state != ElementState.CREATED) return
         super.open()
 
-        kotlinx.coroutines.CoroutineScope(supervisor).launch(Dispatchers.IO) {
+        kotlinx.coroutines.CoroutineScope(supervisor).launch(Dispatchers.Default) {
             while (isActive) {
                 worktreeDirty.receive()
                 delay(250)
@@ -49,7 +50,7 @@ class WorktreeReconcileElement(
                         repoRoot = repoRoot,
                         agentId = "oroboros",
                         revision = currentSha,
-                        sequence = System.currentTimeMillis(),
+                        sequence = currentTimeMillis(),
                     )
                     couchIndexBridge.indexReconciliation(
                         WorktreeCouchGateway.WORKTREE_PREFIX,
@@ -61,7 +62,8 @@ class WorktreeReconcileElement(
                             "$bridged memory updates @ ${currentSha.take(12)}"
                     )
                 }.onFailure {
-                    System.err.println("[OROBOROS] Worktree→Couch reconcile failed: ${it.message}")
+                    // note stdout
+                    println("[OROBOROS] Worktree→Couch reconcile failed: ${it.message}")
                 }
             }
         }
