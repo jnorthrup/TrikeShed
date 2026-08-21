@@ -1,0 +1,38 @@
+# source	tokens
+../../doc/archives/archive-2026-07-22.md	60007
+../../doc/analysis/concepts_usnavy_ste.md	10623
+../../README.md	10070
+../../doc/analysis/concepts_ste100.md	9836
+../../doc/taste.md	7704
+../../doc/rewire.md	6300
+../../doc/sapling/SPEC.md	6585
+../../src/README.md	4151
+../../doc/funnelhash-sapling-spec.md	4203
+../../docs/intellij-blackboard-vm-view.md	4191
+../../docs/forge-substrate-plan.md	3693
+../../doc/funnel-residual-merge.md	2227
+../../doc/midpoint-map.md	2542
+../../doc/analysis/ste100_report.md	2477
+../../doc/work-stealing-map.md	1678
+../../doc/analysis/usnavy_lexicon.md	1542
+../../doc/archives/injected-into-living-docs-2026-07-25.md	1462
+../../docs/dispatch/2026-08-18-legion-counter-threat.tasks.txt	1205
+../../docs/htx-token-spine.md	1567
+../../docs/FETCHING_SYMLINK_REACTOR.md	1281
+../../docs/JULES_DRAIN_CONTRACT.md	1156
+../../doc/ccek-consistency-pass.md	1129
+../../docs/forge-ui-gap-analysis.md	940
+../../doc/INDEX.md	1206
+../../docs/counter-threat-gap-analysis.md	922
+../../doc/mesh-choreography.md	907
+../../docs/dispatch/2026-08-18-drain-reconciliation.md	757
+../../docs/dispatch/2026-08-18-legion-counter-threat.session-map.md	371
+../../docs/gates.md	500
+../../doc/archives/g09-rework.md	339
+../../doc/todo.md	249
+../../docs/TrikeShed.js.LICENSE.txt	272
+../../doc/concepts.md	57
+/usr/share/dict/words	120005
+# total	272154
+# extraction-ms	111374
+# aggregated-observations	181750

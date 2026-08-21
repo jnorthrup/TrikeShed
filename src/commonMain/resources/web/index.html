@@ -56,8 +56,13 @@
           <div class="ingest-items" id="ingest-items"></div>
         </div>
       </div>
+      <details class="sidebar-section sidebar-gallery">
+        <summary class="sidebar-section-label">Gallery</summary>
+        <div class="sidebar-gallery-body">{{GALLERY}}</div>
+      </details>
       <div class="sidebar-bottom">
         <div class="sidebar-seed-note" id="seed-note"></div>
+        <div class="sidebar-sync-note" id="sync-note" aria-live="polite"></div>
       </div>
     </aside>
 
@@ -67,6 +72,7 @@
         <div class="topbar-actions">
           <button class="topbar-btn" id="btn-view-doc" aria-label="View Document">Document</button>
           <button class="topbar-btn" id="btn-view-board" aria-label="View Board">Board</button>
+          <button class="topbar-btn" id="btn-view-graph" aria-label="View Graph">Graph</button>
           <button class="topbar-btn" id="btn-share" aria-label="Share">Share</button>
         </div>
       </div>
@@ -83,6 +89,14 @@
       </div>
       <div class="board-scroll" id="board-scroll" hidden>
         <div class="board-canvas" id="board-canvas"></div>
+      </div>
+      <div class="graph-scroll" id="graph-scroll" hidden>
+        <div class="graph-hud" id="graph-hud">
+          <button class="topbar-btn" id="graph-fit" aria-label="Fit graph to viewport" title="Fit (f)">Fit</button>
+          <span class="graph-zoom-pill" id="graph-zoom-pill" aria-live="polite">100%</span>
+        </div>
+        <svg class="graph-canvas" id="graph-canvas" role="img" aria-label="Causal graph"></svg>
+        <div class="graph-empty" id="graph-empty" hidden>No causal nodes in the seed yet — ingest a donor to populate the graph.</div>
       </div>
     </main>
   </div>

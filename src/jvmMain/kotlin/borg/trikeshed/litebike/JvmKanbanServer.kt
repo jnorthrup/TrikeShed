@@ -296,7 +296,7 @@ class JvmKanbanServer(
         }
 
         System.err.println("trikeshed-kanban: listening on :$port  donor=${donorPath ?: "<none>"}")
-        System.err.println("Endpoints (CCEK): GET /api/health /api/cap /api/board /api/metrics /api/jules/surface /api/jules/events POST /api/submit /api/donor")
+        System.err.println("Endpoints (CCEK): GET / (Forge PWA) /api/health /api/cap /api/board /api/metrics /api/jules/surface /api/jules/events POST /api/submit /api/donor /api/invoke")
 
         // Bind happens here — only place outside the worker scope that
         // opens a socket. The adapter resumes this coroutine on close.
@@ -386,9 +386,70 @@ class JvmKanbanServer(
             }
             "/api/submit" -> if (method == "POST") submit(text) else HttpResponse(405, """{"error":"method_not_allowed"}""")
             "/api/donor"  -> if (method == "POST") submit(text) else HttpResponse(405, """{"error":"method_not_allowed"}""")
-            "/"           -> HttpResponse(200, "<html><body>Forge litebike listener — see /api/health</body></html>", "text/html; charset=utf-8")
-            else           -> HttpResponse(404, """{"error":"not_found","path":"$path"}""")
+            "/api/invoke" -> if (method == "POST") invoke(text) else HttpResponse(405, """{"error":"method_not_allowed"}""")
+            "/", "/index.html" -> HttpResponse(200, forgeShellHtml(), "text/html; charset=utf-8")
+            else -> staticAsset(path) ?: HttpResponse(404, """{"error":"not_found","path":"$path"}""")
         }
+    }
+
+    // ── Forge PWA: the shell and its static assets ───────────────────────
+
+    /** The seed-baked shell: ForgeApp renders the web template from commonMain; we only serve it. */
+    private fun forgeShellHtml(): String = runCatching {
+        borg.trikeshed.forge.ForgeApp.renderHtml(userId = "jim")
+    }.getOrElse { ex ->
+        "<html><body><h1>Forge shell failed to render</h1><pre>${ex.message}</pre><p>see /api/health</p></body></html>"
+    }
+
+    /** Static PWA assets straight from `src/commonMain/resources/web/` on the classpath. Paths are fixed — no traversal. */
+    private val staticAssets: Map<String, Pair<String, String>> = mapOf(
+        "/styles.css" to ("web/styles.css" to "text/css; charset=utf-8"),
+        "/script.js" to ("web/script.js" to "application/javascript; charset=utf-8"),
+        "/sw.js" to ("web/sw.js" to "application/javascript; charset=utf-8"),
+        "/manifest.webmanifest" to ("web/manifest.webmanifest" to "application/manifest+json; charset=utf-8"),
+        "/icons/forge-icon.svg" to ("web/icons/forge-icon.svg" to "image/svg+xml"),
+        "/icons/forge-icon-maskable.svg" to ("web/icons/forge-icon-maskable.svg" to "image/svg+xml"),
+    )
+
+    private fun staticAsset(path: String): HttpResponse? {
+        val (resource, contentType) = staticAssets[path.substringBefore('?')] ?: return null
+        val bytes = JvmKanbanServer::class.java.classLoader.getResourceAsStream(resource)?.use { it.readBytes() }
+            ?: return HttpResponse(404, """{"error":"asset_missing","resource":"$resource"}""")
+        return HttpResponse(200, String(bytes, StandardCharsets.UTF_8), contentType)
+    }
+
+    /** Monotonic ingress sequence for accepted command batches — the watermark the browser echoes back. */
+    private val invokeSequence = AtomicLong(0)
+
+    /**
+     * Reactor ingress for the browser command queue (and the service worker's offline replay):
+     * `{ userId, commands:[{type, kind, jobId, idempotencyKey, …}] }`. Each batch is accepted under one
+     * sequence number; the accepted count and sequence are the receipt. Commands are currently
+     * acknowledged, not yet lowered to JobCommand (see docs/forge-ui-gap-analysis.md item 7).
+     */
+    private fun invoke(body: String): HttpResponse {
+        val payload = body.substringAfter("\r\n\r\n", "").ifEmpty { body.substringAfter("\n\n", "") }
+        if (payload.isBlank()) return HttpResponse(400, """{"error":"empty_body"}""")
+        val parsed = runCatching { JsonSupport.parse(payload) }.getOrNull()
+            ?: return HttpResponse(400, """{"error":"bad_json"}""")
+        val commands: List<*> = when (parsed) {
+            is Map<*, *> -> (parsed["commands"] as? List<*>) ?: listOf(parsed)
+            is List<*> -> parsed
+            else -> emptyList<Any?>()
+        }
+        val seq = invokeSequence.incrementAndGet()
+        val keys = commands.mapNotNull { (it as? Map<*, *>)?.get("idempotencyKey") as? String }
+        return HttpResponse(
+            202,
+            JsonSupport.stringify(
+                linkedMapOf(
+                    "ok" to true,
+                    "accepted" to commands.size,
+                    "sequence" to seq,
+                    "idempotencyKeys" to keys,
+                )
+            ),
+        )
     }
 
     private fun boardJson(): String = runCatching {
@@ -442,6 +503,7 @@ class JvmKanbanServer(
     private fun statusReason(code: Int): String = when (code) {
         200 -> "OK"
         201 -> "Created"
+        202 -> "Accepted"
         400 -> "Bad Request"
         404 -> "Not Found"
         405 -> "Method Not Allowed"

@@ -3,8 +3,10 @@ package borg.trikeshed.forge
 import borg.trikeshed.common.Files
 import borg.trikeshed.cursor.blackboardContext
 import borg.trikeshed.cursor.provenance
+import borg.trikeshed.forge.blackboard.ForgeBlackboardCamera
 import borg.trikeshed.forge.blackboard.ForgeBlackboardSection3D
 import borg.trikeshed.forge.blackboard.ForgeBlackboardView
+import borg.trikeshed.forge.blackboard.forceLayout
 import borg.trikeshed.forge.gallery.ForgeGalleryCatalog
 import borg.trikeshed.forge.gallery.ForgeGalleryRenderer
 import borg.trikeshed.jules.ui.JulesBlackboardAdapter
@@ -144,10 +146,41 @@ object ForgeApp {
                     "causalKey" to corr.causalKey,
                 )
             },
+            "graphLayout" to forgeGraphLayoutSeed(reduction),
             "blackboardSeed" to forgeBlackboardSeed(julesSurface),
             "dashboards" to forgeDashboardSeed(flywheelReport),
         )
-        return JsonSupport.stringify(seedMap)
+        // The seed lives inside <script type="application/json">; a literal "</" must not end that element.
+        return JsonSupport.stringify(seedMap).replace("</", "<\\/")
+    }
+
+    /**
+     * Graph view seed: the causal graph laid out by [forceLayout] in commonMain, so the browser
+     * renderer only draws (nodes in world px, edges parent→child, and the camera that frames them).
+     */
+    private fun forgeGraphLayoutSeed(reduction: ForgeKanbanReduction): Map<String, Any?> {
+        val index = CausalGraphNodeIndex()
+        reduction.causalNodes.forEach { index.addOrGet(it) }
+        val (camera, positions) = forceLayout(index, ForgeBlackboardCamera(), iterations = 120)
+        val nodes = reduction.causalNodes.map { node ->
+            val p = positions[node.nodeId]
+            mapOf(
+                "id" to node.nodeId,
+                "title" to (node.opId + ":" + node.opVersion),
+                "x" to (p?.screenX ?: 0.0),
+                "y" to (p?.screenY ?: 0.0),
+                "topo" to node.topoOrdinal,
+            )
+        }
+        val known = reduction.causalNodes.map { it.nodeId }.toSet()
+        val edges = reduction.causalNodes.flatMap { node ->
+            node.parentNodeIds.filter { it in known }.map { parent -> mapOf("from" to parent, "to" to node.nodeId) }
+        }
+        return mapOf(
+            "nodes" to nodes,
+            "edges" to edges,
+            "camera" to mapOf("x" to camera.x, "y" to camera.y, "zoom" to camera.zoom),
+        )
     }
 
     /**
@@ -178,68 +211,30 @@ object ForgeApp {
         )
     }
 
-    private fun htmlShell(seed: String): String = """
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Forge — Local-First Workspace</title>
-  <link rel="manifest" href="/manifest.webmanifest">
-  <meta name="theme-color" content="#090D13">
-  <style>${forgeAppStyles()}</style>
-</head>
-<body>
-  <div id="forge-root">
-    <header class="forge-header">
-      <div class="header-left">
-        <svg class="forge-logo" viewBox="0 0 32 32" width="28" height="28"><path d="M4 28V4h24v24H4Zm2-2h20V6H6v20Z"/></svg>
-        <span id="forge-title">FORGE</span>
-      </div>
-      <div class="header-center">
-        <div class="search-box"><input type="text" placeholder="Search workspace…" aria-label="Search workspace" id="forge-search"/></div>
-      </div>
-      <div class="header-right">
-        <button class="btn" id="new-doc-btn" aria-label="Create new document">New Doc</button>
-        <button class="btn" id="sync-btn" aria-label="Synchronize workspace">Sync</button>
-      </div>
-    </header>
-    <div class="forge-body">
-      <aside id="rail" class="rail">
-        <div class="rail-section">
-          <h3>Workspace</h3>
-          <nav id="rail-nav"></nav>
-        </div>
-        <div class="rail-section">
-          <h3>Gallery</h3>
-          ${galleryHtml()}
-        </div>
-      </aside>
-      <main id="canvas" class="canvas">
-        <div id="blackboard-surface" class="blackboard-surface">
-          <div class="hud-top">
-            <span id="hud-title-left">Page</span>
-            <span id="hud-title-center">Board</span>
-            <span id="hud-title-right">Blackboard</span>
-          </div>
-        </div>
-      </main>
-    </div>
-    <div id="reactor-root" class="status-strip"></div>
-    <script id="forge-seed" type="application/json">$seed</script>
-    <script>
-${forgeAppScript()}
-    </script>
-</body>
-</html>
-    """.trimIndent()
+    /** Placeholders in `src/commonMain/resources/web/index.html`; the shell and `script.js` share one DOM. */
+    const val SEED_SLOT = "{{SEED}}"
+    const val STYLES_SLOT = "{{STYLES}}"
+    const val SCRIPT_SLOT = "{{SCRIPT}}"
+    const val GALLERY_SLOT = "{{GALLERY}}"
+
+    /**
+     * The one shell: the web template with its slots filled. Relative asset paths (`./sw.js`,
+     * `./manifest.webmanifest`, `./icons/…`) keep the PWA scope at wherever the page is served —
+     * a sub-path on GitHub Pages, `/` on the JVM server — never a root-scoped service worker by accident.
+     */
+    private fun htmlShell(seed: String): String =
+        borg.trikeshed.forge.generated.ForgeAssets.indexHtml
+            .replace(STYLES_SLOT, forgeAppStyles())
+            .replace(GALLERY_SLOT, galleryHtml())
+            .replace(SCRIPT_SLOT, forgeAppScript())
+            .replace(SEED_SLOT, seed)
 
     private fun forgeAppStyles(): String = borg.trikeshed.forge.generated.ForgeAssets.stylesCss
 
     private fun forgeAppScript(): String = forgePersistenceScript()
 
-    /** Server-rendered gallery HTML for the workspace rail. No client-side hydration needed. */
-    private fun galleryHtml(): String = ForgeGalleryRenderer.renderHtml()
+    /** Server-rendered gallery HTML for the sidebar. No client-side hydration needed. */
+    private fun galleryHtml(): String = runCatching { ForgeGalleryRenderer.renderHtml() }.getOrElse { "" }
 
     private fun forgeBlackboardSeed(julesSurface: JulesBlackboardSurface?): Map<String, Any?> {
         val view = ForgeBlackboardView.DEFAULT

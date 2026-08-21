@@ -1,8 +1,12 @@
-const CACHE_NAME = 'forge-cache-v1';
+// Forge service worker — hand-written, no Workbox/NPM. Registered with a RELATIVE url from
+// index.html, so its scope is the directory the page is served from (never the whole origin).
+const CACHE_NAME = 'forge-cache-v2';
 const SYNC_STORE_NAME = 'sync-queue';
 const DB_NAME = 'forge-db';
+const INVOKE_PATH = 'api/invoke';
 
-// Install event: cache assets
+// Install: precache the shell. index.html carries styles + script inline (server-baked), but the
+// standalone files are cached too for the GitHub Pages / static layout.
 self.addEventListener('install', (event) => {
   event.waitUntil(
     caches.open(CACHE_NAME).then((cache) => {
@@ -11,15 +15,30 @@ self.addEventListener('install', (event) => {
         './index.html',
         './styles.css',
         './script.js',
-        './manifest.webmanifest'
+        './manifest.webmanifest',
+        './icons/forge-icon.svg',
+        './icons/forge-icon-maskable.svg'
       ]);
-    })
+    }).then(() => self.skipWaiting())
   );
 });
 
-// Fetch event: serve from cache if offline
+// Activate: drop previous cache generations, take over open clients.
+self.addEventListener('activate', (event) => {
+  event.waitUntil(
+    caches.keys()
+      .then((keys) => Promise.all(keys.filter((k) => k !== CACHE_NAME).map((k) => caches.delete(k))))
+      .then(() => self.clients.claim())
+  );
+});
+
+// Fetch: queue reactor POSTs while offline; shell assets cache-first with background refresh;
+// everything else (API GETs) network-first falling back to cache.
 self.addEventListener('fetch', (event) => {
-  if (event.request.url.includes('/api/invoke') && event.request.method === 'POST') {
+  const url = new URL(event.request.url);
+  const isInvoke = url.pathname.endsWith('/' + INVOKE_PATH) && event.request.method === 'POST';
+  const isApi = url.pathname.includes('/api/');
+  if (isInvoke) {
     event.respondWith(
       fetch(event.request.clone()).catch(() => {
         // If offline, queue the action
@@ -31,10 +50,29 @@ self.addEventListener('fetch', (event) => {
         });
       })
     );
-  } else {
+  } else if (isApi || event.request.method !== 'GET') {
+    // Live data: network first, cached copy only when offline.
     event.respondWith(
-      caches.match(event.request).then((response) => {
-        return response || fetch(event.request);
+      fetch(event.request).then((response) => {
+        if (event.request.method === 'GET' && response.ok) {
+          const copy = response.clone();
+          caches.open(CACHE_NAME).then((cache) => cache.put(event.request, copy));
+        }
+        return response;
+      }).catch(() => caches.match(event.request))
+    );
+  } else {
+    // Shell: cache first, refresh in the background (stale-while-revalidate).
+    event.respondWith(
+      caches.match(event.request).then((cached) => {
+        const refresh = fetch(event.request).then((response) => {
+          if (response && response.ok) {
+            const copy = response.clone();
+            caches.open(CACHE_NAME).then((cache) => cache.put(event.request, copy));
+          }
+          return response;
+        }).catch(() => cached);
+        return cached || refresh;
       })
     );
   }
@@ -81,7 +119,8 @@ function flushSyncQueue() {
         if (items.length === 0) return resolve();
         
         const promises = items.map(item => {
-          return fetch('/api/invoke', {
+          // Relative to the worker's own location — same directory index.html registered it from.
+          return fetch(new URL(INVOKE_PATH, self.location.href).toString(), {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(item)

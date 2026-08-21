@@ -49,6 +49,24 @@
     return blocks;
   }
 
+  // The seed is ForgeApp.renderHtml()'s JSON: { userId, source, board:{columns,cards}, causalGraph,
+  // correlations, graphLayout, blackboardSeed, dashboards }. Older seeds carried lcncEntities.
+  const seedBoard = (seed.board && Array.isArray(seed.board.columns) && seed.board.columns.length) ? seed.board : null;
+
+  function seedColumns() {
+    if (seedBoard) {
+      return seedBoard.columns
+        .slice()
+        .sort((a, b) => (a.order || 0) - (b.order || 0))
+        .map((c) => ({ id: c.id, name: c.name }));
+    }
+    return [
+      { id: 'todo', name: 'To do' },
+      { id: 'doing', name: 'Doing' },
+      { id: 'done', name: 'Done' },
+    ];
+  }
+
   function defaultState() {
     const homeId = uid();
     return {
@@ -58,17 +76,25 @@
       activePageId: homeId,
       view: 'doc',
       board: {
-        columns: [
-          { id: 'todo', name: 'To do' },
-          { id: 'doing', name: 'Doing' },
-          { id: 'done', name: 'Done' },
-        ],
+        columns: seedColumns(),
         cards: seedCards(),
       },
     };
   }
 
   function seedCards() {
+    if (seedBoard && Array.isArray(seedBoard.cards)) {
+      return seedBoard.cards
+        .slice()
+        .sort((a, b) => (a.order || 0) - (b.order || 0))
+        .map((c) => ({
+          id: c.id || uid(),
+          title: c.title || 'Untitled',
+          column: c.columnId,
+          meta: [c.priority, (c.dependencies && c.dependencies.length) ? '← ' + c.dependencies.join(', ') : '']
+            .filter(Boolean).join('  ·  '),
+        }));
+    }
     const entities = Array.isArray(seed.lcncEntities) ? seed.lcncEntities : [];
     return entities.slice(0, 12).map((e, i) => ({
       id: uid(),
@@ -122,10 +148,41 @@
     } catch (e) { /* quota */ }
   }
 
-  // ── Command Queue ───────────────────────────────────────────────────
+  // ── Command Queue → reactor ingress ─────────────────────────────────
+  // Every mutation is a command. Commands batch for a short window and POST to ./api/invoke
+  // (relative: the same directory the shell was served from). Offline, the service worker
+  // answers {status:'queued'} and replays the batch on background sync — local state is
+  // already persisted, so the page never waits on the network.
   window.__forgeCommandQueue = window.__forgeCommandQueue || [];
+  const INVOKE_URL = new URL('api/invoke', document.baseURI).toString();
+  const BOARD_URL = new URL('api/board', document.baseURI).toString();
+  const syncNoteEl = document.getElementById('sync-note');
+  let flushTimer = null;
+  let flushedCount = 0;
 
-  function mutate(updater) {
+  function noteSync(text) { if (syncNoteEl) syncNoteEl.textContent = text; }
+
+  function flushCommands() {
+    flushTimer = null;
+    const batch = window.__forgeCommandQueue.splice(0, window.__forgeCommandQueue.length);
+    if (!batch.length) return;
+    const body = JSON.stringify({ userId: seed.userId || 'jim', commands: batch });
+    fetch(INVOKE_URL, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body })
+      .then((r) => r.json().catch(() => ({})))
+      .then((res) => {
+        if (res && res.status === 'queued') { noteSync('Offline — ' + batch.length + ' queued for sync'); return; }
+        flushedCount += batch.length;
+        noteSync('Synced ' + flushedCount + (res && res.sequence != null ? '  ·  seq ' + res.sequence : ''));
+      })
+      .catch(() => noteSync('Local only — reactor unreachable'));
+  }
+
+  function scheduleFlush() {
+    if (flushTimer) return;
+    flushTimer = setTimeout(flushCommands, 400);
+  }
+
+  function mutate(updater, kind) {
     updater(state);
     saveState();
 
@@ -133,12 +190,19 @@
     const idempotencyKey = jobId + '-' + Date.now();
     window.__forgeCommandQueue.push({
       type: 'Submit',
+      kind: kind || 'mutate',
       jobId: jobId,
       idempotencyKey: idempotencyKey,
       dependencies: [],
-      expectedRevision: null
+      expectedRevision: null,
+      activePageId: state.activePageId,
+      view: state.view
     });
+    scheduleFlush();
   }
+
+  window.addEventListener('online', () => { noteSync('Back online'); scheduleFlush(); });
+  window.addEventListener('offline', () => noteSync('Offline — edits stay local'));
 
 
   // ── Element refs ────────────────────────────────────────────────────
@@ -560,22 +624,155 @@
     });
   }
 
+  // ── Render: graph (SVG over the commonMain force layout) ────────────
+  // seed.graphLayout = { nodes:[{id,title,x,y,topo}], edges:[{from,to}], camera:{x,y,zoom} }
+  // The layout math ran server-side (ForceLayout.kt); here we only draw and move the camera.
+  const graphScrollEl = document.getElementById('graph-scroll');
+  const graphSvg = document.getElementById('graph-canvas');
+  const graphEmptyEl = document.getElementById('graph-empty');
+  const graphZoomPill = document.getElementById('graph-zoom-pill');
+  const SVG_NS = 'http://www.w3.org/2000/svg';
+  const layout = (seed.graphLayout && Array.isArray(seed.graphLayout.nodes)) ? seed.graphLayout : { nodes: [], edges: [], camera: { x: 0, y: 0, zoom: 1 } };
+  const cam = { x: layout.camera ? layout.camera.x : 0, y: layout.camera ? layout.camera.y : 0, zoom: layout.camera ? layout.camera.zoom : 1 };
+  const NODE_W = 150, NODE_H = 36;
+  let graphBuilt = false;
+  let graphViewport = null;
+
+  function svgEl(tag, attrs) {
+    const el = document.createElementNS(SVG_NS, tag);
+    Object.keys(attrs || {}).forEach((k) => el.setAttribute(k, attrs[k]));
+    return el;
+  }
+
+  function buildGraph() {
+    if (graphBuilt) return;
+    graphBuilt = true;
+    graphSvg.innerHTML = '';
+    if (!layout.nodes.length) { graphEmptyEl.hidden = false; return; }
+    graphEmptyEl.hidden = true;
+    const defs = svgEl('defs');
+    const marker = svgEl('marker', { id: 'graph-arrow', viewBox: '0 0 10 10', refX: '10', refY: '5', markerWidth: '7', markerHeight: '7', orient: 'auto-start-reverse' });
+    marker.appendChild(svgEl('path', { d: 'M 0 0 L 10 5 L 0 10 z', fill: '#aeaca6' }));
+    defs.appendChild(marker);
+    graphSvg.appendChild(defs);
+    graphViewport = svgEl('g', { id: 'graph-viewport' });
+    graphSvg.appendChild(graphViewport);
+
+    const byId = {};
+    layout.nodes.forEach((n) => { byId[n.id] = n; });
+    const edgesG = svgEl('g', { class: 'graph-edges' });
+    (layout.edges || []).forEach((e) => {
+      const a = byId[e.from], b = byId[e.to];
+      if (!a || !b) return;
+      const mx = (a.x + b.x) / 2;
+      edgesG.appendChild(svgEl('path', {
+        class: 'graph-edge',
+        d: 'M ' + a.x + ' ' + (a.y + NODE_H / 2) + ' C ' + mx + ' ' + (a.y + NODE_H / 2) + ', ' + mx + ' ' + (b.y - NODE_H / 2) + ', ' + b.x + ' ' + (b.y - NODE_H / 2),
+      }));
+    });
+    graphViewport.appendChild(edgesG);
+
+    const nodesG = svgEl('g', { class: 'graph-nodes' });
+    layout.nodes.forEach((n) => {
+      const g = svgEl('g', { class: 'graph-node', transform: 'translate(' + (n.x - NODE_W / 2) + ',' + (n.y - NODE_H / 2) + ')', tabindex: '0' });
+      g.setAttribute('aria-label', n.title + ' (topo ' + n.topo + ')');
+      g.appendChild(svgEl('rect', { width: NODE_W, height: NODE_H }));
+      const label = svgEl('text', { x: 10, y: 22 });
+      label.textContent = n.title.length > 18 ? n.title.slice(0, 17) + '…' : n.title;
+      g.appendChild(label);
+      const topo = svgEl('text', { x: NODE_W - 8, y: 12, 'text-anchor': 'end', class: 'graph-node-topo' });
+      topo.textContent = '#' + n.topo;
+      g.appendChild(topo);
+      const title = svgEl('title');
+      title.textContent = n.title + '\n' + n.id;
+      g.appendChild(title);
+      nodesG.appendChild(g);
+    });
+    graphViewport.appendChild(nodesG);
+    applyCamera();
+  }
+
+  // world → screen: translate(-cam) → scale(zoom) → center in viewport (ForgeBlackboardCamera convention)
+  function applyCamera() {
+    if (!graphViewport) return;
+    const w = graphScrollEl.clientWidth || 800, h = graphScrollEl.clientHeight || 600;
+    graphViewport.setAttribute('transform',
+      'translate(' + (w / 2) + ',' + (h / 2) + ') scale(' + cam.zoom + ') translate(' + (-cam.x) + ',' + (-cam.y) + ')');
+    if (graphZoomPill) graphZoomPill.textContent = Math.round(cam.zoom * 100) + '%';
+  }
+
+  function fitGraph() {
+    if (!layout.nodes.length) return;
+    let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+    layout.nodes.forEach((n) => {
+      minX = Math.min(minX, n.x - NODE_W); maxX = Math.max(maxX, n.x + NODE_W);
+      minY = Math.min(minY, n.y - NODE_H); maxY = Math.max(maxY, n.y + NODE_H);
+    });
+    const w = graphScrollEl.clientWidth || 800, h = graphScrollEl.clientHeight || 600;
+    cam.x = (minX + maxX) / 2; cam.y = (minY + maxY) / 2;
+    cam.zoom = Math.max(0.1, Math.min(3.2, Math.min(w / (maxX - minX), h / (maxY - minY)) * 0.9));
+    applyCamera();
+  }
+
+  (function wireGraphGestures() {
+    let dragging = false, lastX = 0, lastY = 0;
+    graphSvg.addEventListener('pointerdown', (e) => {
+      dragging = true; lastX = e.clientX; lastY = e.clientY;
+      graphSvg.classList.add('dragging'); graphSvg.setPointerCapture(e.pointerId);
+    });
+    graphSvg.addEventListener('pointermove', (e) => {
+      if (!dragging) return;
+      cam.x -= (e.clientX - lastX) / cam.zoom; cam.y -= (e.clientY - lastY) / cam.zoom;
+      lastX = e.clientX; lastY = e.clientY; applyCamera();
+    });
+    const end = () => { dragging = false; graphSvg.classList.remove('dragging'); };
+    graphSvg.addEventListener('pointerup', end);
+    graphSvg.addEventListener('pointercancel', end);
+    graphSvg.addEventListener('wheel', (e) => {
+      e.preventDefault();
+      const factor = Math.exp(-e.deltaY * 0.0015);
+      const rect = graphSvg.getBoundingClientRect();
+      const w = rect.width, h = rect.height;
+      // zoom around the pointer: keep the world point under the cursor fixed
+      const wx = cam.x + (e.clientX - rect.left - w / 2) / cam.zoom;
+      const wy = cam.y + (e.clientY - rect.top - h / 2) / cam.zoom;
+      const next = Math.max(0.1, Math.min(3.2, cam.zoom * factor));
+      const ratio = cam.zoom / next;
+      cam.x = wx - (wx - cam.x) * ratio; cam.y = wy - (wy - cam.y) * ratio; cam.zoom = next;
+      applyCamera();
+    }, { passive: false });
+    document.getElementById('graph-fit').addEventListener('click', fitGraph);
+    window.addEventListener('resize', applyCamera);
+    document.addEventListener('keydown', (e) => {
+      if (graphScrollEl.hidden || e.target.isContentEditable) return;
+      if (e.key === 'f') fitGraph();
+      if (e.key === '+' || e.key === '=') { cam.zoom = Math.min(3.2, cam.zoom * 1.2); applyCamera(); }
+      if (e.key === '-') { cam.zoom = Math.max(0.1, cam.zoom / 1.2); applyCamera(); }
+    });
+  })();
+
   // ── View switching ──────────────────────────────────────────────────
   const viewDocBtn = document.getElementById('btn-view-doc');
   const viewBoardBtn = document.getElementById('btn-view-board');
+  const viewGraphBtn = document.getElementById('btn-view-graph');
 
   function setView(view) {
-    mutate((s) => { s.view = view; });
+    mutate((s) => { s.view = view; }, 'view');
     docScrollEl.hidden = view !== 'doc';
     boardScrollEl.hidden = view !== 'board';
+    graphScrollEl.hidden = view !== 'graph';
     viewDocBtn.classList.toggle('active', view === 'doc');
     viewBoardBtn.classList.toggle('active', view === 'board');
+    viewGraphBtn.classList.toggle('active', view === 'graph');
     if (view === 'board') renderBoard();
+    if (view === 'graph') { buildGraph(); applyCamera(); }
   }
 
   viewDocBtn.addEventListener('click', () => setView('doc'));
   viewBoardBtn.addEventListener('click', () => setView('board'));
+  viewGraphBtn.addEventListener('click', () => setView('graph'));
   document.getElementById('btn-board').addEventListener('click', () => setView('board'));
+  document.getElementById('btn-graph').addEventListener('click', () => setView('graph'));
   document.getElementById('btn-home').addEventListener('click', () => setView('doc'));
   document.getElementById('btn-new-page').addEventListener('click', () => {
     newPage();
@@ -586,13 +783,16 @@
   // ── Seed note ───────────────────────────────────────────────────────
   (function renderSeedNote() {
     const parts = [];
+    if (seed.source && seed.source.title) parts.push(seed.source.title);
+    if (seedBoard && Array.isArray(seedBoard.cards) && seedBoard.cards.length) {
+      parts.push(seedBoard.cards.length + ' cards');
+    }
     if (Array.isArray(seed.lcncEntities) && seed.lcncEntities.length) {
       parts.push(seed.lcncEntities.length + ' entities');
     }
-    if (Array.isArray(seed.causalNodes) && seed.causalNodes.length) {
-      parts.push(seed.causalNodes.length + ' causal nodes');
-    }
-    if (seed.gallery) parts.push('gallery');
+    const causal = Array.isArray(seed.causalGraph) ? seed.causalGraph : (Array.isArray(seed.causalNodes) ? seed.causalNodes : []);
+    if (causal.length) parts.push(causal.length + ' causal nodes');
+    if (Array.isArray(seed.correlations) && seed.correlations.length) parts.push(seed.correlations.length + ' correlations');
     seedNoteEl.textContent = parts.length ? 'Seed: ' + parts.join(' · ') : 'Local-first workspace';
   })();
 
