@@ -50,8 +50,16 @@ public class ClassfileTaxonomy {
     }
 
     private final List<Row> rows;
+    private final List<borg.trikeshed.classfile.model.PointcutCoordinate> pointcuts;
 
-    public ClassfileTaxonomy() { this.rows = new ArrayList<>(); }
+    public ClassfileTaxonomy() {
+        this.rows = new ArrayList<>();
+        this.pointcuts = new ArrayList<>();
+    }
+
+    public List<borg.trikeshed.classfile.model.PointcutCoordinate> pointcuts() {
+        return pointcuts;
+    }
 
     public void addClass(String thisClass, String superClass,
                          int majorVersion, int minorVersion,
@@ -137,6 +145,12 @@ public class ClassfileTaxonomy {
 
         ClassfileTaxonomy ct = new ClassfileTaxonomy();
 
+        String sourceFile = classModel.findAttribute(java.lang.classfile.Attributes.sourceFile())
+            .map(sfa -> sfa.sourceFile().stringValue())
+            .orElse("Unknown");
+        String language = sourceFile.endsWith(".kt") ? "kotlin" :
+                          sourceFile.endsWith(".java") ? "java" : "unknown";
+
         // class header
         String thisClass = classModel.thisClass().asInternalName();
         String superClass = classModel.superclass()
@@ -166,6 +180,9 @@ public class ClassfileTaxonomy {
             int maxLocals = 0;
             int insnCount = 0;
 
+            String methodName = mm.methodName().stringValue();
+            String methodDesc = mm.methodType().stringValue();
+
             Optional<CodeModel> codeOpt = mm.code();
             if (codeOpt.isPresent()) {
                 CodeModel code = codeOpt.get();
@@ -179,22 +196,74 @@ public class ClassfileTaxonomy {
                     }
                 }
 
+                int currentLine = -1;
+                int bytecodeOffset = 0;
+
                 // CodeModel is Iterable<CodeElement> via CompoundElement
                 for (CodeElement ce : code) {
-                    if (ce instanceof Instruction inst) {
+                    if (ce instanceof java.lang.classfile.instruction.LineNumber ln) {
+                        currentLine = ln.line();
+                    } else if (ce instanceof Instruction inst) {
                         insnCount++;
                         String owner = "";
                         String name = "";
+                        String desc = "";
+
                         if (inst instanceof FieldInstruction fi) {
                             owner = fi.owner().asInternalName();
+                            name = fi.name().stringValue();
+                            desc = fi.type().stringValue();
                         } else if (inst instanceof InvokeInstruction ii) {
                             owner = ii.owner().asInternalName();
                             name = ii.name().stringValue();
+                            desc = ii.type().stringValue();
+                        } else if (inst instanceof java.lang.classfile.instruction.NewObjectInstruction noi) {
+                            owner = noi.className().asInternalName();
+                        } else if (inst instanceof java.lang.classfile.instruction.TypeCheckInstruction tci) {
+                            owner = tci.type().asInternalName();
                         }
+
                         // Instruction doesn't have position() - skip offset for now
                         int opCode = inst.opcode().bytecode();
                         String mnem = inst.opcode().name();
                         ct.addInstruction(-1, opCode, mnem, owner, name);
+
+                        borg.trikeshed.classfile.model.BytecodePointcutKind kind = switch (inst) {
+                            case FieldInstruction fi -> {
+                                java.lang.classfile.Opcode op = fi.opcode();
+                                yield op == java.lang.classfile.Opcode.GETSTATIC ? borg.trikeshed.classfile.model.BytecodePointcutKind.STATIC_FIELD_READ :
+                                      op == java.lang.classfile.Opcode.PUTSTATIC ? borg.trikeshed.classfile.model.BytecodePointcutKind.STATIC_FIELD_WRITE :
+                                      op == java.lang.classfile.Opcode.GETFIELD ? borg.trikeshed.classfile.model.BytecodePointcutKind.INSTANCE_FIELD_READ :
+                                      borg.trikeshed.classfile.model.BytecodePointcutKind.INSTANCE_FIELD_WRITE;
+                            }
+                            case InvokeInstruction ii -> borg.trikeshed.classfile.model.BytecodePointcutKind.INVOKE;
+                            case java.lang.classfile.instruction.LoadInstruction li -> borg.trikeshed.classfile.model.BytecodePointcutKind.LOCAL_READ;
+                            case java.lang.classfile.instruction.StoreInstruction si -> borg.trikeshed.classfile.model.BytecodePointcutKind.LOCAL_WRITE;
+                            case java.lang.classfile.instruction.ReturnInstruction ri -> borg.trikeshed.classfile.model.BytecodePointcutKind.RETURN;
+                            case java.lang.classfile.instruction.NewObjectInstruction noi -> borg.trikeshed.classfile.model.BytecodePointcutKind.NEW_VALUE;
+                            case java.lang.classfile.instruction.TypeCheckInstruction tci -> borg.trikeshed.classfile.model.BytecodePointcutKind.TYPE_CHECK;
+                            case java.lang.classfile.instruction.BranchInstruction bi -> borg.trikeshed.classfile.model.BytecodePointcutKind.BRANCH;
+                            case java.lang.classfile.instruction.ArrayLoadInstruction ali -> borg.trikeshed.classfile.model.BytecodePointcutKind.ARRAY_READ;
+                            case java.lang.classfile.instruction.ArrayStoreInstruction asi -> borg.trikeshed.classfile.model.BytecodePointcutKind.ARRAY_WRITE;
+                            case java.lang.classfile.instruction.ConstantInstruction ci -> borg.trikeshed.classfile.model.BytecodePointcutKind.CONSTANT;
+                            default -> null;
+                        };
+
+                        if (kind != null) {
+                            borg.trikeshed.classfile.model.SourceCoordinate srcCoord =
+                                new borg.trikeshed.classfile.model.SourceCoordinate(
+                                    sourceFile, currentLine, 0, language, bytecodeOffset
+                                );
+                            borg.trikeshed.classfile.model.SymbolCoordinate symCoord =
+                                new borg.trikeshed.classfile.model.SymbolCoordinate(
+                                    owner, name, desc, methodName, methodDesc
+                                );
+                            ct.pointcuts.add(new borg.trikeshed.classfile.model.PointcutCoordinate(
+                                kind, mnem, bytecodeOffset, srcCoord, symCoord
+                            ));
+                        }
+
+                        bytecodeOffset += inst.sizeInBytes();
                     }
                 }
             }
