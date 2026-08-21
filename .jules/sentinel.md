@@ -16,3 +16,8 @@
 **Vulnerability:** The codebase was using `java.security.SecureRandom.getInstanceStrong()` to generate random bytes for temporary passwords and peer IDs.
 **Learning:** On Linux/Unix systems, `getInstanceStrong()` often defaults to the blocking `/dev/random` pool. If system entropy is depleted, any thread calling `nextBytes()` on this instance will block indefinitely, leading to a Denial of Service (DoS) and application hang.
 **Prevention:** Use the default `SecureRandom()` constructor instead. It utilizes the non-blocking CSPRNG (`/dev/urandom`), which is cryptographically strong enough for general application use and immune to entropy-depletion blocking.
+
+## 2023-11-20 - [Denial of Service via Unbounded waitFor]
+**Vulnerability:** Found `waitFor()` being called on a `Process` without a timeout in `JvmProcessOperations.kt`.
+**Learning:** `Process.waitFor()` without a timeout can lead to thread starvation and Denial of Service (DoS) if the subprocess hangs. This violates the "Fail securely" and "Do not expose system resources" principles.
+**Prevention:** Always use bounded `waitFor(timeout, TimeUnit)` and explicitly terminate the process via `destroyForcibly()` if the timeout occurs.
