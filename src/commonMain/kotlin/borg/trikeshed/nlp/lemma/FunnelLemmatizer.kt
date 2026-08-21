@@ -32,9 +32,18 @@ data class SuffixRule(val strip: Int, val append: String) {
     fun applies(word: String): Boolean = strip <= word.length
     fun apply(word: String): String = word.substring(0, word.length - strip) + append
 
+    /**
+     * A genuine stripping rule removes more than it appends (`-ies→-y`, `-ed→`, `-ning→`). Anything else —
+     * `ran→run` (2,"un"), `sang→sing` (3,"ing") — is a vowel change, not a suffix, and must not generalize.
+     */
+    val isStripping: Boolean get() = strip > append.length
+
     val encoded: String get() = "$strip|$append"
 
     companion object {
+        /** The whole-word exception: replace [word] by [lemma] outright. */
+        fun exception(word: String, lemma: String): SuffixRule = SuffixRule(word.length, lemma)
+
         fun derive(word: String, lemma: String): SuffixRule {
             var p = 0
             val n = minOf(word.length, lemma.length)
@@ -57,9 +66,14 @@ data class SuffixRule(val strip: Int, val append: String) {
  * *lemmas* (`LineCas.stamp(prevLemmaCid, nextLemmaCid)`). What the index stores per key is not a lemma but
  * a [SuffixRule]; lemmatizing is "find the most specific rule whose context matches, apply it".
  *
+ * Two mechanisms, deliberately separate — this approximates Stanford, it does not reproduce Morpha:
+ *   - whole-word **exceptions**: `ran→run`, `is→be` — "replace the word", learned from one observation;
+ *   - **suffix rules**: `-ies→-y`, `-ed→`, `-s→` — only rules that strip more than they append
+ *     ([SuffixRule.isStripping]), and only with ≥ [minSupport] votes. Vowel changes never become rules.
+ *
  * Specificity order at lookup (first hit wins):
  *
- *   k = word length   whole-word rule (irregulars: ran→run, is→be)
+ *   k = word length   whole-word exception
  *   k = MAX_SUFFIX…1  suffix of length k
  *     and within each k the [MatchGrade] ladder:
  *       LINKED (prev+next lemma stamp) → PARTIAL_PREV → PARTIAL_NEXT → CONTENT_ONLY (no context)
@@ -104,7 +118,7 @@ class FunnelLemmatizer private constructor(
         val lengths = suffixLengths(w)
         for (k in lengths) {
             val suffix = w.takeLast(k)
-            val keyed = suffixKey(k, suffix)
+            val keyed = suffixKey(k, suffix, whole = k == w.length)
             linked.lookup(stampKey(keyed, prevLemma, nextLemma))?.takeIf { it.applies(w) }
                 ?.let { return Resolution(it.apply(w), MatchGrade.LINKED, k, it) }
             prevOnly.lookup(prevKey(keyed, prevLemma))?.takeIf { it.applies(w) }
@@ -122,7 +136,7 @@ class FunnelLemmatizer private constructor(
         val w = normalize(word)
         if (w.isEmpty()) return w
         for (k in suffixLengths(w)) {
-            content.lookup(suffixKey(k, w.takeLast(k)))?.takeIf { it.applies(w) }?.let { return it.apply(w) }
+            content.lookup(suffixKey(k, w.takeLast(k), whole = k == w.length))?.takeIf { it.applies(w) }?.let { return it.apply(w) }
         }
         return w
     }
@@ -176,9 +190,12 @@ class FunnelLemmatizer private constructor(
 
         fun lemmaCid(lemma: String?): ContentId? = lemma?.let { ContentId.of(normalize(it).encodeToByteArray()) }
 
-        /** Key for a suffix of length [k]; `k == word.length` marks the whole-word (irregular) rung. */
-        fun suffixKey(k: Int, suffix: String): String =
-            "$k:" + ContentId.of(suffix.encodeToByteArray()).hex
+        /**
+         * Key for a suffix of length [k]. The whole-word rung ([whole]) lives in its own namespace: the
+         * exception `his→he` must not be found by "this" probing its 3-char suffix "-his".
+         */
+        fun suffixKey(k: Int, suffix: String, whole: Boolean): String =
+            (if (whole) "w:" else "$k:") + ContentId.of(suffix.encodeToByteArray()).hex
 
         fun stampKey(keyed: String, prevLemma: String?, nextLemma: String?): String =
             LineCas.stamp(lemmaCid(prevLemma), lemmaCid(nextLemma)).hex + ":" + keyed
@@ -254,17 +271,19 @@ class FunnelLemmatizer private constructor(
             fun add(o: LemmaObservation) {
                 val w = normalize(o.word)
                 if (w.isEmpty()) return
-                val rule = SuffixRule.derive(w, normalize(o.lemma))
+                val lemma = normalize(o.lemma)
+                val derived = SuffixRule.derive(w, lemma)
                 val lengths = ArrayList<Int>().apply {
                     add(w.length)
                     var k = minOf(maxSuffix, w.length - 1)
                     while (k >= 1) { add(k); k-- }
                 }
                 for (k in lengths) {
-                    // a suffix shorter than the strip cannot carry this rule: skip (prevents "s"→"run")
-                    if (k < w.length && rule.strip > k) continue
-                    val keyed = suffixKey(k, w.takeLast(k))
                     val whole = k == w.length
+                    // whole word: an explicit exception. suffix: only a genuine stripping rule the suffix can carry.
+                    val rule = if (whole) SuffixRule.exception(w, lemma) else derived
+                    if (!whole && (!rule.isStripping || rule.strip > k)) continue
+                    val keyed = suffixKey(k, w.takeLast(k), whole)
                     linked.vote(stampKey(keyed, o.prevLemma, o.nextLemma), rule, o.weight, whole)
                     prevOnly.vote(prevKey(keyed, o.prevLemma), rule, o.weight, whole)
                     nextOnly.vote(nextKey(keyed, o.nextLemma), rule, o.weight, whole)

@@ -34,6 +34,8 @@ class FunnelLemmatizerTest {
         LemmaObservation("cats", "the", "run", "cat", weight = 2),
         LemmaObservation("flies", "the", "buzz", "fly", weight = 2),
         LemmaObservation("tries", "he", "hard", "try", weight = 2),
+        // a function word that the "-s" rule would mangle: whole-word exception must win
+        LemmaObservation("his", "on", "way", "he"),
     )
 
     private val lemmatizer = FunnelLemmatizer.freeze(corpus, seed = 42L)
@@ -42,7 +44,8 @@ class FunnelLemmatizerTest {
     fun suffixRulesAreDerivedByCommonPrefix() {
         assertEquals(SuffixRule(4, ""), SuffixRule.derive("running", "run"))
         assertEquals(SuffixRule(3, "y"), SuffixRule.derive("flies", "fly"))
-        assertEquals(SuffixRule(3, "run"), SuffixRule.derive("ran", "run"))   // whole-word degenerate rule
+        assertEquals(SuffixRule(2, "un"), SuffixRule.derive("ran", "run"))    // irregulars still share a prefix
+        assertEquals(SuffixRule(2, "be"), SuffixRule.derive("is", "be"))      // none shared: whole-word rule
         assertEquals(SuffixRule(0, ""), SuffixRule.derive("dog", "dog"))
         assertEquals("fly", SuffixRule(3, "y").apply("flies"))
     }
@@ -66,6 +69,20 @@ class FunnelLemmatizerTest {
         assertEquals("talk", lemmatizer.resolveContentOnly("talking"))
         assertEquals("hat", lemmatizer.resolveContentOnly("hats"))
         assertEquals("cry", lemmatizer.resolveContentOnly("cries"))
+    }
+
+    @Test
+    fun irregularsAreWholeWordExceptionsAndNeverGeneralize() {
+        val ran = lemmatizer.resolve("ran", "dog", ".")
+        assertEquals("run", ran.lemma)
+        assertEquals("ran".length, ran.suffixLength)                 // whole-word exception
+        assertEquals(SuffixRule.exception("ran", "run"), ran.rule)
+        assertEquals("man", lemmatizer.resolveContentOnly("man"))    // ablaut did not become an "-an" rule
+        assertEquals("be", lemmatizer.resolve("is", "saw", "sharp").lemma)
+        // pure suffix stripping would say "this"→"thi"; that is the accepted approximation for UNSEEN words…
+        assertEquals("thi", lemmatizer.resolveContentOnly("this"))
+        // …while a seen function word is a whole-word exception and beats the "-s" rule
+        assertEquals("he", lemmatizer.resolveContentOnly("his"))
     }
 
     @Test
