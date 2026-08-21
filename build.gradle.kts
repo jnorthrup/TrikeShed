@@ -313,6 +313,10 @@ kotlin {
             languageSettings.optIn("kotlin.RequiresOptIn")
         }
     }
+
+    val commonMain = getByName("commonMain") {
+        kotlin.srcDir(generateForgeAssets.map { it.outputs.files })
+    }
 }
 
 // ─────────────────────────────────────────────────────────────────
@@ -797,12 +801,6 @@ val generateForgeAssets = tasks.register("generateForgeAssets") {
             "    val scriptJs: String by lazy { ForgeAssetsJs.data.decodeToString() }\n" +
             "}\n"
         )
-    }
-}
-
-kotlin {
-    sourceSets.getByName("commonMain") {
-        kotlin.srcDir(generateForgeAssets.map { it.outputs.files })
     }
 }
 

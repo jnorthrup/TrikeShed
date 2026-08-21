@@ -47,6 +47,18 @@ find "$REPO_ROOT/src/commonMain" -name "*.kt" -type f | sort | while read -r fil
         done
     done < "$file"
 
+    # Extra guard from fbc9f2: @JvmInline without proper import
+    if grep -q "@JvmInline" "$file" 2>/dev/null && ! grep -q "import kotlin\.jvm\.JvmInline" "$file" 2>/dev/null; then
+        TMP2=$(mktemp)
+        grep -n "@JvmInline" "$file" | grep -v "// purity:allow" > "$TMP2" || true
+        if [ -s "$TMP2" ]; then
+            echo "Purity violation (@JvmInline without import kotlin.jvm.JvmInline) in $file:" >> "$VIOLATIONS_FILE"
+            cat "$TMP2" >> "$VIOLATIONS_FILE"
+            FILE_VIOLATIONS=$((FILE_VIOLATIONS + 1))
+        fi
+        rm -f "$TMP2"
+    fi
+
     if [ $FILE_VIOLATIONS -gt 0 ]; then
         TOTAL_VIOLATIONS=$((TOTAL_VIOLATIONS + FILE_VIOLATIONS))
     fi
