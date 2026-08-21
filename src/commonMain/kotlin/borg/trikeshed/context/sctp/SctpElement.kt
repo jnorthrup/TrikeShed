@@ -318,7 +318,8 @@ class SctpElement(
    val streams: MutableMap<Int, StreamHandle> = mutableMapOf(),
    val associations: MutableMap<Long, SctpState> = mutableMapOf(),
    val paths: List<String> = emptyList(),          // multi-homing: active path addresses
-   val congestionControl: String = "cubic"          // cubic | hstcp | rack — deterministic only
+   val congestionControl: String = "cubic",         // cubic | hstcp | rack — deterministic only
+   val wire: SctpWire = SctpWire.default,           // packet boundary SPI; loopback unless registered
 ) : AsyncContextElement(), StreamTransport {
     companion object Key : AsyncContextKey<SctpElement>()
 
@@ -384,6 +385,7 @@ class SctpElement(
     /** Begin listening — server stays CLOSED per RFC 4960 §5.2.2 cookie mechanism. */
     suspend fun bind(port: Int): SctpAssociation {
         requireState(ElementState.OPEN)
+        wire.bind(port)
         val id = port.toLong()
         associations[id] = SctpState.CLOSED
         return SctpAssociation(associationId = id, state = SctpState.CLOSED)
