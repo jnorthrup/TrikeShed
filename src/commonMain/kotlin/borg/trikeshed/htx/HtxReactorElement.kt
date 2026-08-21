@@ -308,7 +308,7 @@ class HtxReactorElement(
         fd: Int,
         frames: TlsFrames,
     ) {
-        frames.toList().forEach { frame ->
+        frames.forEach { frame ->
             when (frame.stage) {
                 TlsFlowStage.UPSTREAM_CIPHERTEXT,
                 TlsFlowStage.CLOSE_NOTIFY -> {

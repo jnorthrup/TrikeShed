@@ -90,3 +90,7 @@
 ## 2024-12-10 - Avoid O(N) boxing allocation when comparing ByteArray
 **Learning:** Comparing ByteArray objects using .toList() == other.toList() causes an O(N) memory allocation because each Byte gets boxed into an object within a new ArrayList. This can introduce unexpected GC pressure, especially when frequently hashing or comparing proofs.
 **Action:** Replace a.toList() == b.toList() on ByteArray with a.contentEquals(b) for a fast, zero-allocation byte-level comparison.
+
+## 2024-12-11 - Differentiate Safe vs Unsafe .toList() Iteration Optimizations
+**Learning:** Removing `.toList().forEach()` chaining avoids intermediate `ArrayList` allocations. While this is a safe and critical optimization for iterating over immutable structures or custom cursors (like `Series`), doing this blindly on mutable collections (like event subscribers, callbacks, or TLS endpoints) can cause fatal `ConcurrentModificationException`s if handlers remove themselves during the dispatch loop.
+**Action:** When optimizing collection iterations in Kotlin, distinguish between safe optimizations on immutable structures (like `Series`) and necessary defensive copies on mutable collections. Do not remove `.toList()` on mutable collections if they might be modified during iteration.
