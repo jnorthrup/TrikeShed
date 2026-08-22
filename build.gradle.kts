@@ -736,8 +736,30 @@ tasks.withType<Test>().configureEach {
         events("passed", "skipped", "failed")
         showStandardStreams = true
     }
+    dependsOn("hotswapAgentJar")
 }
 
+
+tasks.register<Jar>("hotswapAgentJar") {
+    group = "build"
+    description = "Package HotSwapAgent as a javaagent"
+    dependsOn("compileKotlinJvm")
+    
+    archiveFileName.set("hotswap-agent.jar")
+    destinationDirectory.set(layout.buildDirectory.dir("libs"))
+    
+    from(layout.buildDirectory.dir("classes/kotlin/jvm/main")) {
+        include("borg/trikeshed/daemon/HotSwapAgent*.class")
+    }
+    
+    manifest {
+        attributes(
+            "Premain-Class" to "borg.trikeshed.daemon.HotSwapAgent",
+            "Can-Retransform-Classes" to "true",
+            "Can-Redefine-Classes" to "true"
+        )
+    }
+}
 
 val generateForgeAssets = tasks.register("generateForgeAssets") {
     group = "build"

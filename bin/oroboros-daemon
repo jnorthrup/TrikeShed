@@ -45,6 +45,8 @@ fi
 # Wildcard expansion happens after the colon, so we quote it.
 CP="$CLASSES:$LIB/*"
 
+DAEMON_JVM_ARGS=("-javaagent:$ROOT/build/libs/hotswap-agent.jar=$ROOT/build/live")
+
 # HTX egress allowlist (see JvmChannelOperations.connect): BrainClient fails
 # over across these provider hosts; without them the GUIDE brain cannot
 # connect and every AWAITING Jules session stalls unanswered each cycle.
@@ -95,4 +97,4 @@ fi
 
 # `-cp "$CP"` must be unquoted shell-side so the wildcard expands.
 # shellcheck disable=SC2086
-exec java "${DEBUG_OPTS[@]}" -cp $CP borg.trikeshed.daemon.OroborosDaemon $WATCH "${DAEMON_ARGS[@]}" ${HOME_POS:+"$HOME_POS"} ${REPO_POS:+"$REPO_POS"}
+exec java "${DAEMON_JVM_ARGS[@]}" "${DEBUG_OPTS[@]}" -cp $CP borg.trikeshed.daemon.OroborosDaemon $WATCH "${DAEMON_ARGS[@]}" ${HOME_POS:+"$HOME_POS"} ${REPO_POS:+"$REPO_POS"}

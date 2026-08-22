@@ -24,53 +24,44 @@ object HotSwapAgent {
 
     @JvmStatic
     fun premain(args: String?, inst: Instrumentation) {
-        val parsed = parseArgs(args)
-        if (parsed.isEmpty()) {
-            System.err.println("[HOTSWAP-AGENT] no class:path pairs; agent idle")
+        val dir = args?.let { File(it) }
+        if (dir == null) {
+            System.err.println("[HOTSWAP-AGENT] no directory specified; agent idle")
             return
         }
         if (!inst.isRetransformClassesSupported) {
             System.err.println("[HOTSWAP-AGENT] retransformClasses not supported on this JVM; agent idle")
             return
         }
-        for ((className, classFile) in parsed) {
-            val watcher = FileWatcher(className, classFile, inst)
-            watcher.start()
-            System.err.println("[HOTSWAP-AGENT] watching $className <= $classFile")
-        }
+        val watcher = DirectoryWatcher(dir, inst)
+        watcher.start()
+        System.err.println("[HOTSWAP-AGENT] watching ${dir.absolutePath}/.generation")
     }
 
-    private data class Target(val className: String, val classFile: File)
-
-    private fun parseArgs(args: String?): List<Target> {
-        if (args.isNullOrBlank()) return emptyList()
-        return args.split(',').mapNotNull { spec ->
-            val parts = spec.split(':')
-            if (parts.size != 2) return@mapNotNull null
-            val cls = parts[0].trim()
-            val file = File(parts[1].trim()).absoluteFile
-            if (cls.isEmpty() || !file.exists()) return@mapNotNull null
-            Target(cls, file)
-        }
-    }
-
-    private class FileWatcher(
-        private val className: String,
-        private val classFile: File,
+    private class DirectoryWatcher(
+        private val watchDir: File,
         private val inst: Instrumentation,
-    ) : Thread("hotswap-watcher-${className.takeLast(20)}") {
-        @Volatile private var lastMtime = ((classFile.lastModified() / 1000L) * 1000L)
+    ) : Thread("hotswap-watcher") {
+        private val genFile = File(watchDir, ".generation")
+        @Volatile private var lastMtime = 0L
 
-        init { isDaemon = true }
+        init { 
+            isDaemon = true
+            if (genFile.exists()) {
+                lastMtime = (genFile.lastModified() / 1000L) * 1000L
+            }
+        }
 
         override fun run() {
             while (!currentThread().isInterrupted) {
                 try {
                     sleep(200)
-                    val mtime = ((classFile.lastModified() / 1000L) * 1000L)
+                    if (!genFile.exists()) continue
+                    val mtime = (genFile.lastModified() / 1000L) * 1000L
                     if (mtime != lastMtime && mtime > 0) {
+                        val prevMtime = lastMtime
                         lastMtime = mtime
-                        redefine()
+                        redefineAll(prevMtime)
                     }
                 } catch (_: InterruptedException) {
                     return
@@ -80,28 +71,48 @@ object HotSwapAgent {
             }
         }
 
-        private fun redefine() {
+        private fun redefineAll(prevGenMtime: Long) {
             try {
-                val cls = Class.forName(className)
-                val bytes = classFile.readBytes()
-                val transformer = object : ClassFileTransformer {
-                    override fun transform(
-                        loader: ClassLoader?,
-                        name: String?,
-                        classBeingRedefined: Class<*>?,
-                        protectionDomain: ProtectionDomain?,
-                        classfileBuffer: ByteArray?,
-                    ): ByteArray = if (name == className.replace('.', '/')) bytes else classfileBuffer!!
+                val generation = genFile.readText().trim()
+                
+                var retransformed = 0
+                var skipped = 0
+
+                val loadedClasses = inst.allLoadedClasses
+
+                watchDir.walkTopDown().filter { it.isFile && it.name.endsWith(".class") }.forEach { classFile ->
+                    val classMtime = (classFile.lastModified() / 1000L) * 1000L
+                    if (classMtime > prevGenMtime) {
+                        val relativePath = classFile.relativeTo(watchDir).path
+                        val className = relativePath.removeSuffix(".class").replace(File.separatorChar, '.')
+
+                        val cls = loadedClasses.find { it.name == className }
+                        if (cls != null) {
+                            val bytes = classFile.readBytes()
+                            val transformer = object : ClassFileTransformer {
+                                override fun transform(
+                                    loader: ClassLoader?,
+                                    name: String?,
+                                    classBeingRedefined: Class<*>?,
+                                    protectionDomain: ProtectionDomain?,
+                                    classfileBuffer: ByteArray?,
+                                ): ByteArray? = if (name == className.replace('.', '/')) bytes else null
+                            }
+                            inst.addTransformer(transformer, true)
+                            try {
+                                inst.retransformClasses(cls)
+                                retransformed++
+                            } catch (e: UnsupportedOperationException) {
+                                skipped++
+                            } finally {
+                                inst.removeTransformer(transformer)
+                            }
+                        }
+                    }
                 }
-                inst.addTransformer(transformer, true)
-                try {
-                    inst.retransformClasses(cls)
-                    println("[HOTSWAP-AGENT] retransformed $className (${bytes.size} bytes, mtime=$lastMtime)")
-                } finally {
-                    inst.removeTransformer(transformer)
-                }
+                println("[HOTSWAP-AGENT] generation $generation: retransformed $retransformed classes, skipped $skipped (schema change).")
             } catch (t: Throwable) {
-                System.err.println("[HOTSWAP-AGENT] redefine FAILED for $className: ${t.javaClass.simpleName}: ${t.message?.take(200)}")
+                System.err.println("[HOTSWAP-AGENT] redefineAll FAILED: ${t.javaClass.simpleName}: ${t.message?.take(200)}")
             }
         }
     }
