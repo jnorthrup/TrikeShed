@@ -926,7 +926,7 @@
       b.setAttribute('aria-selected', isActive ? 'true' : 'false');
       b.textContent = sh.title;
       const n = document.createElement('span'); n.className = 'sheet-count'; n.textContent = sh.rows.length + ' × ' + sh.columns.length; b.appendChild(n);
-      b.addEventListener('click', () => openSheet(sh.id));
+      b.addEventListener('click', () => { openSheet(sh.id); Array.from(sheetTabsEl.children).forEach(c => c.setAttribute('aria-selected', 'false')); b.setAttribute('aria-selected', 'true'); });
       sheetTabsEl.appendChild(b);
     });
     // breadcrumb = parent chain (zoom path)
