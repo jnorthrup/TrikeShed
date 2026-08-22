@@ -144,12 +144,23 @@ class JulesPatchContinuityStore(
             it.patchCid == patchCid && it.causalOrdinal == causalOrdinal
         }) { "snapshot $causalOrdinal/$patchCid was not observed for session $sessionId" }
         // Bolt: avoid intermediate List allocations from filterIsInstance by using sequence for terminal ops
-        val latestPatchCid = causes.asSequence().filterIsInstance<JulesCause.PatchSnapshotObserved>()
-            .maxWithOrNull(compareBy({ it.causalOrdinal }, { it.activitySeq }, { it.artifactSeq }))
-            ?.patchCid
-        val latestReportCid = causes.asSequence().filterIsInstance<JulesCause.AgentReportObserved>()
-            .maxWithOrNull(compareBy({ it.causalOrdinal }, { it.activitySeq }, { it.activityId }))
-            ?.reportCid
+        val patchOrder = compareBy<JulesCause.PatchSnapshotObserved>({ it.causalOrdinal }, { it.activitySeq }, { it.artifactSeq })
+        var maxPatch: JulesCause.PatchSnapshotObserved? = null
+        val reportOrder = compareBy<JulesCause.AgentReportObserved>({ it.causalOrdinal }, { it.activitySeq }, { it.activityId })
+        var maxReport: JulesCause.AgentReportObserved? = null
+        for (item in causes) {
+            if (item is JulesCause.PatchSnapshotObserved) {
+                if (maxPatch == null || patchOrder.compare(item, maxPatch) > 0) {
+                    maxPatch = item
+                }
+            } else if (item is JulesCause.AgentReportObserved) {
+                if (maxReport == null || reportOrder.compare(item, maxReport) > 0) {
+                    maxReport = item
+                }
+            }
+        }
+        val latestPatchCid = maxPatch?.patchCid
+        val latestReportCid = maxReport?.reportCid
         val cause = JulesCause.PatchReviewSelected(
             patchCid = patchCid,
             causalOrdinal = causalOrdinal,
@@ -187,12 +198,23 @@ class JulesPatchContinuityStore(
             it.patchCid == patchCid && it.causalOrdinal == causalOrdinal
         }) { "snapshot $causalOrdinal/$patchCid was not observed for session $sessionId" }
         // Bolt: avoid intermediate List allocations from filterIsInstance by using sequence for terminal ops
-        val latestPatchCid = causes.asSequence().filterIsInstance<JulesCause.PatchSnapshotObserved>()
-            .maxWithOrNull(compareBy({ it.causalOrdinal }, { it.activitySeq }, { it.artifactSeq }))
-            ?.patchCid
-        val latestReportCid = causes.asSequence().filterIsInstance<JulesCause.AgentReportObserved>()
-            .maxWithOrNull(compareBy({ it.causalOrdinal }, { it.activitySeq }, { it.activityId }))
-            ?.reportCid
+        val patchOrder = compareBy<JulesCause.PatchSnapshotObserved>({ it.causalOrdinal }, { it.activitySeq }, { it.artifactSeq })
+        var maxPatch: JulesCause.PatchSnapshotObserved? = null
+        val reportOrder = compareBy<JulesCause.AgentReportObserved>({ it.causalOrdinal }, { it.activitySeq }, { it.activityId })
+        var maxReport: JulesCause.AgentReportObserved? = null
+        for (item in causes) {
+            if (item is JulesCause.PatchSnapshotObserved) {
+                if (maxPatch == null || patchOrder.compare(item, maxPatch) > 0) {
+                    maxPatch = item
+                }
+            } else if (item is JulesCause.AgentReportObserved) {
+                if (maxReport == null || reportOrder.compare(item, maxReport) > 0) {
+                    maxReport = item
+                }
+            }
+        }
+        val latestPatchCid = maxPatch?.patchCid
+        val latestReportCid = maxReport?.reportCid
         val cause = JulesCause.PatchRejected(
             patchCid = patchCid,
             causalOrdinal = causalOrdinal,
@@ -239,9 +261,18 @@ class JulesPatchContinuityStore(
             reportCid = reportCid,
             causalOrdinal = causalOrdinal,
             latestPatchCid = null,
-            latestReportCid = causes.asSequence().filterIsInstance<JulesCause.AgentReportObserved>()
-                .maxWithOrNull(compareBy({ it.causalOrdinal }, { it.activitySeq }, { it.activityId }))
-                ?.reportCid,
+            latestReportCid = run {
+                val reportOrder = compareBy<JulesCause.AgentReportObserved>({ it.causalOrdinal }, { it.activitySeq }, { it.activityId })
+                var maxReport: JulesCause.AgentReportObserved? = null
+                for (item in causes) {
+                    if (item is JulesCause.AgentReportObserved) {
+                        if (maxReport == null || reportOrder.compare(item, maxReport) > 0) {
+                            maxReport = item
+                        }
+                    }
+                }
+                maxReport?.reportCid
+            },
             disposition = disposition,
             reviewedBy = reviewedBy,
             receiptRef = receiptRef,

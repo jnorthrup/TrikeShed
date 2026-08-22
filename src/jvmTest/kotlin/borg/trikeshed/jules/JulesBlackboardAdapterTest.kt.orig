@@ -188,7 +188,7 @@ class JulesBlackboardAdapterTest {
         assertEquals(1, bySession["s1"]?.size)
         assertEquals(2, bySession["s2"]?.size)
         // View: 4 default + 2 session + 3 activity = 9
-        assertEquals(11, view.sections.size)
+        assertEquals(9, view.sections.size)
     }
 
     @Test
