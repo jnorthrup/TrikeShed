@@ -68,7 +68,16 @@ public class FunctionalUringFacade(
      * is true; otherwise the set is empty and completions pass through.
      */
     private val METADATA_QUANTIZED_OPS: Set<UringOp> =
-        if (containmentPolicy.layer2Metadata.quantizeTimestamps) setOf(UringOp.STATX) else emptySet()
+        if (containmentPolicy.layer2Metadata.quantizeTimestamps) {
+            setOf(
+                UringOp.STATX,
+                UringOp.FGETXATTR,
+                UringOp.GETXATTR,
+                UringOp.FLISTXATTR,
+                UringOp.LISTXATTR,
+                UringOp.GETDENTS
+            )
+        } else emptySet()
 
     /**
      * Quantization boundary for file timestamps (Doc 04 §2).
