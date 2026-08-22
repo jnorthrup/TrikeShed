@@ -1,0 +1,19 @@
+--- JulesSessionCard.kt
++++ JulesSessionCard.kt
+@@ -346,8 +346,14 @@
+ /** Render one card as a ≤10-line agent-scannable block, `$ ---` terminated. */
+ fun JulesSessionCard.renderBlock(): String = buildString {
+     // Bolt: avoid intermediate List allocations from filterIsInstance by using sequence for terminal ops
+-    val finalReport = causes.asSequence().filterIsInstance<JulesCause.AgentReportObserved>()
+-        .maxByOrNull { it.causalOrdinal }
++    var finalReport: JulesCause.AgentReportObserved? = null
++    for (item in causes) {
++        if (item is JulesCause.AgentReportObserved) {
++            if (finalReport == null || item.causalOrdinal > finalReport.causalOrdinal) {
++                finalReport = item
++            }
++        }
++    }
+     appendLine("id: ${snapshot.sessionId}")
+     appendLine("title: ${card.title.take(80)}")
+     appendLine("lane: ${lane.columnName}")
