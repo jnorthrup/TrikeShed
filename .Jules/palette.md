@@ -55,3 +55,6 @@
 ## 2024-05-19 - Keyboard Accessibility for Interactive Elements
 **Learning:** UI elements designated as buttons via `role="button"` and `tabindex="0"` (like `#drop-zone`) must explicitly handle keyboard events (`Enter` and `Space`) in JavaScript to be fully accessible, especially when wrapping native inputs like file uploaders. Without this, keyboard-only or screen reader users cannot activate the element.
 **Action:** Always attach both `click` and `keydown` listeners to custom interactive elements that do not use native `<button>` tags.
+## 2025-01-22 - Adding focus-visible styles to custom interactive elements
+**Learning:** Elements that use `role="button"` and `tabindex="0"` for custom interactivity (such as a drop zone or custom toggles) often lack native focus states. If their focus-visible styles are not explicitly defined in CSS, keyboard users will not know when these elements receive focus, violating accessibility guidelines.
+**Action:** When making custom elements interactive by adding `tabindex="0"`, ensure that a `:focus-visible` CSS rule (e.g., `outline: 2px solid var(--accent);`) is applied to them to provide clear visual feedback during keyboard navigation.
