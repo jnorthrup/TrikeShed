@@ -8,7 +8,27 @@ import borg.trikeshed.context.StreamTransport
 import borg.trikeshed.lib.*
 import kotlinx.coroutines.channels.Channel
 
-enum class SctpChunkType { DATA, INIT, INIT_ACK, SACK, HEARTBEAT, COOKIE_ECHO, COOKIE_ACK }
+enum class SctpChunkType(val code: Byte) {
+    DATA(0),
+    INIT(1),
+    INIT_ACK(2),
+    SACK(3),
+    HEARTBEAT(4),
+    HEARTBEAT_ACK(5),
+    ABORT(6),
+    SHUTDOWN(7),
+    SHUTDOWN_ACK(8),
+    ERROR(9),
+    COOKIE_ECHO(10),
+    COOKIE_ACK(11),
+    ECNE(12),
+    CWR(13),
+    SHUTDOWN_COMPLETE(14);
+
+    companion object {
+        fun fromCode(code: Byte): SctpChunkType? = values().firstOrNull { it.code == code }
+    }
+}
 
 /** Multi-homing path state for SCTP failover (RFC 4960 §6.4). */
 enum class PathState {
@@ -89,7 +109,7 @@ data class SctpInitChunk(
 
     fun encode(): ByteArray {
         val buf = borg.trikeshed.userspace.nio.ByteBuffer.allocate(CHUNK_FIXED_LENGTH.toInt())
-        buf.put(SctpChunkType.INIT.ordinal.toByte())  // type
+        buf.put(SctpChunkType.INIT.code)  // type
         buf.put(0)                                      // flags
         buf.putShort(CHUNK_FIXED_LENGTH.toShort())      // length
         buf.putInt(initiateTag.toInt())
@@ -133,7 +153,7 @@ data class SctpInitAckChunk(
 
     fun encode(): ByteArray {
         val buf = borg.trikeshed.userspace.nio.ByteBuffer.allocate(CHUNK_FIXED_LENGTH.toInt())
-        buf.put(SctpChunkType.INIT_ACK.ordinal.toByte())  // type
+        buf.put(SctpChunkType.INIT_ACK.code)  // type
         buf.put(0)                                          // flags
         buf.putShort(CHUNK_FIXED_LENGTH.toShort())          // length
         buf.putInt(initiateTag.toInt())
@@ -198,7 +218,7 @@ data class SctpSackChunk(
 
     fun encode(): ByteArray {
         val buf = borg.trikeshed.userspace.nio.ByteBuffer.allocate(chunkLength.toInt())
-        buf.put(SctpChunkType.SACK.ordinal.toByte())   // type
+        buf.put(SctpChunkType.SACK.code)   // type
         buf.put(0)                                       // flags
         buf.putShort(chunkLength.toShort())          // length
         buf.putInt(cumulativeTsnAck.toInt())
@@ -257,7 +277,7 @@ data class SctpCookieEchoChunk(
 
     fun encode(): ByteArray {
         val buf = borg.trikeshed.userspace.nio.ByteBuffer.allocate(chunkLength.toInt())
-        buf.put(SctpChunkType.COOKIE_ECHO.ordinal.toByte())  // type
+        buf.put(SctpChunkType.COOKIE_ECHO.code)  // type
         buf.put(0)                                              // flags
         buf.putShort(chunkLength.toShort())                     // length
         buf.put(cookie)
@@ -299,13 +319,85 @@ object SctpCookieAckChunk {
         get() = SctpChunkHeader(SctpChunkType.COOKIE_ACK, length = CHUNK_LENGTH)
 
     fun encode(): ByteArray = byteArrayOf(
-        SctpChunkType.COOKIE_ACK.ordinal.toByte(),  // type
+        SctpChunkType.COOKIE_ACK.code,  // type
         0,                                            // flags
         0, 4,                                         // length = 4 (big-endian)
     )
 
     fun decode(bytes: ByteArray) {
         require(bytes.size >= CHUNK_LENGTH.toInt()) { "COOKIE_ACK too short: ${bytes.size} < $CHUNK_LENGTH" }
+    }
+}
+
+// ── SHUTDOWN / SHUTDOWN_ACK / SHUTDOWN_COMPLETE chunks (RFC 4960 §3.3.12-3.3.14) ──
+
+/**
+ * SCTP SHUTDOWN chunk (RFC 4960 §3.3.12).
+ */
+data class SctpShutdownChunk(
+    val cumulativeTsnAck: UInt,
+) {
+    val header: SctpChunkHeader
+        get() = SctpChunkHeader(SctpChunkType.SHUTDOWN, length = CHUNK_LENGTH)
+
+    fun encode(): ByteArray {
+        val buf = borg.trikeshed.userspace.nio.ByteBuffer.allocate(CHUNK_LENGTH.toInt())
+        buf.put(SctpChunkType.SHUTDOWN.code)
+        buf.put(0)
+        buf.putShort(CHUNK_LENGTH.toShort())
+        buf.putInt(cumulativeTsnAck.toInt())
+        return buf.array()
+    }
+
+    companion object {
+        const val CHUNK_LENGTH: UShort = 8u
+
+        fun decode(bytes: ByteArray): SctpShutdownChunk {
+            require(bytes.size >= CHUNK_LENGTH.toInt()) { "SHUTDOWN too short: ${bytes.size} < $CHUNK_LENGTH" }
+            val buf = borg.trikeshed.userspace.nio.ByteBuffer.wrap(bytes).position(4)
+            val cumulativeTsnAck = buf.getInt().toUInt()
+            return SctpShutdownChunk(cumulativeTsnAck)
+        }
+    }
+}
+
+/**
+ * SCTP SHUTDOWN_ACK chunk (RFC 4960 §3.3.13).
+ */
+object SctpShutdownAckChunk {
+    const val CHUNK_LENGTH: UShort = 4u
+
+    val header: SctpChunkHeader
+        get() = SctpChunkHeader(SctpChunkType.SHUTDOWN_ACK, length = CHUNK_LENGTH)
+
+    fun encode(): ByteArray = byteArrayOf(
+        SctpChunkType.SHUTDOWN_ACK.code,
+        0,
+        0, 4,
+    )
+
+    fun decode(bytes: ByteArray) {
+        require(bytes.size >= CHUNK_LENGTH.toInt()) { "SHUTDOWN_ACK too short: ${bytes.size} < $CHUNK_LENGTH" }
+    }
+}
+
+/**
+ * SCTP SHUTDOWN_COMPLETE chunk (RFC 4960 §3.3.14).
+ */
+object SctpShutdownCompleteChunk {
+    const val CHUNK_LENGTH: UShort = 4u
+
+    val header: SctpChunkHeader
+        get() = SctpChunkHeader(SctpChunkType.SHUTDOWN_COMPLETE, length = CHUNK_LENGTH)
+
+    fun encode(): ByteArray = byteArrayOf(
+        SctpChunkType.SHUTDOWN_COMPLETE.code,
+        0,
+        0, 4,
+    )
+
+    fun decode(bytes: ByteArray) {
+        require(bytes.size >= CHUNK_LENGTH.toInt()) { "SHUTDOWN_COMPLETE too short: ${bytes.size} < $CHUNK_LENGTH" }
     }
 }
 
@@ -437,5 +529,35 @@ class SctpElement(
         check(current == SctpState.COOKIE_ECHOED) { "Expected COOKIE_ECHOED, got $current" }
         associations[associationId] = SctpState.ESTABLISHED
         return SctpState.ESTABLISHED
+    }
+
+    // ── Teardown (RFC 4960 §9.2) ─────────────────────────────────────────
+
+    suspend fun shutdown(associationId: Long): SctpState {
+        val current = associations[associationId] ?: error("Unknown association: $associationId")
+        check(current == SctpState.ESTABLISHED || current == SctpState.SHUTDOWN_PENDING) { "Expected ESTABLISHED or SHUTDOWN_PENDING, got $current" }
+        associations[associationId] = SctpState.SHUTDOWN_SENT
+        return SctpState.SHUTDOWN_SENT
+    }
+
+    suspend fun handleShutdown(associationId: Long, chunk: SctpShutdownChunk): SctpState {
+        val current = associations[associationId] ?: error("Unknown association: $associationId")
+        check(current == SctpState.ESTABLISHED || current == SctpState.SHUTDOWN_SENT) { "Expected ESTABLISHED or SHUTDOWN_SENT, got $current" }
+        associations[associationId] = SctpState.SHUTDOWN_ACK_SENT
+        return SctpState.SHUTDOWN_ACK_SENT
+    }
+
+    suspend fun handleShutdownAck(associationId: Long, chunk: SctpShutdownAckChunk): SctpState {
+        val current = associations[associationId] ?: error("Unknown association: $associationId")
+        check(current == SctpState.SHUTDOWN_SENT || current == SctpState.SHUTDOWN_ACK_SENT) { "Expected SHUTDOWN_SENT or SHUTDOWN_ACK_SENT, got $current" }
+        associations[associationId] = SctpState.CLOSED
+        return SctpState.CLOSED
+    }
+
+    suspend fun handleShutdownComplete(associationId: Long, chunk: SctpShutdownCompleteChunk): SctpState {
+        val current = associations[associationId] ?: error("Unknown association: $associationId")
+        check(current == SctpState.SHUTDOWN_ACK_SENT) { "Expected SHUTDOWN_ACK_SENT, got $current" }
+        associations[associationId] = SctpState.CLOSED
+        return SctpState.CLOSED
     }
 }
