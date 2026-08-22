@@ -48,14 +48,14 @@ private object DefaultDetector : ProtocolDetectorStrategy {
         val charArr = CharArray(length) { firstBytes[it].toInt().toChar() }
         val head = charArr.concatToString()
 
-        // HTTP/2 preface short read check
+        // HTTP/2 preface check — compare the available prefix both ways:
+        // a full read must match all 14 bytes; a short read must be a prefix of the preface.
         val h2Prefix = "PRI * HTTP/2.0"
-        if (head.isNotEmpty() && h2Prefix.startsWith(head)) {
-            // Short read overlap. If it's just 'P', fallback to HTTP/1.x logic as POST/PUT/PATCH starts with 'P'.
-            if (head.length >= 2) {
-                return Protocol.Http2
-            }
-        }
+        val h2Len = minOf(h2Prefix.length, firstBytes.size)
+        val h2Head = CharArray(h2Len) { firstBytes[it].toInt().toChar() }.concatToString()
+        val h2Match = if (firstBytes.size >= h2Prefix.length) h2Head == h2Prefix else h2Prefix.startsWith(h2Head)
+        // If it's just 'P', fall through to HTTP/1.x logic as POST/PUT/PATCH also start with 'P'.
+        if (h2Match && h2Len >= 2) return Protocol.Http2
 
         for (token in httpMethods) {
             if (head.startsWith(token) || token.startsWith(head)) {

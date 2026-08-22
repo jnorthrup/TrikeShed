@@ -25,4 +25,22 @@ class ProtocolDetectorTest {
         val result = ProtocolDetector.detect(bytes, bytes.size)
         assertEquals(Protocol.Http, result)
     }
+
+    @Test
+    fun testDetectHttp2FullPreface() {
+        val bytes = "PRI * HTTP/2.0\r\n\r\nSM\r\n\r\n".encodeToByteArray()
+        assertEquals(Protocol.Http2, ProtocolDetector.detect(bytes, bytes.size))
+    }
+
+    @Test
+    fun testDetectHttp2PartialPreface() {
+        val bytes = "PRI * ".encodeToByteArray()
+        assertEquals(Protocol.Http2, ProtocolDetector.detect(bytes, bytes.size))
+    }
+
+    @Test
+    fun testSingleP_isHttpNotHttp2() {
+        val bytes = "P".encodeToByteArray()
+        assertEquals(Protocol.Http, ProtocolDetector.detect(bytes, bytes.size))
+    }
 }

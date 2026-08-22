@@ -6,6 +6,15 @@ import borg.trikeshed.lib.cascade.fibTicks
 import borg.trikeshed.lib.toList
 import borg.trikeshed.lib.α
 import borg.trikeshed.media.boxes
+import borg.trikeshed.media.ocrPrepassRgba
+import borg.trikeshed.media.officeText
+import kotlinx.coroutines.DelicateCoroutinesApi
+import kotlinx.coroutines.GlobalScope
+import kotlinx.coroutines.await
+import kotlinx.coroutines.promise
+import org.khronos.webgl.ArrayBuffer
+import org.khronos.webgl.Int8Array
+import kotlin.js.Promise
 import kotlinx.coroutines.MainScope
 import kotlinx.coroutines.launch
 
@@ -42,6 +51,7 @@ fun main() {
     }
 }
 
+@OptIn(DelicateCoroutinesApi::class)
 private suspend fun forgeNodeMain() {
     // Node.js: ingest /tmp/hi into the local-first persistence layer.
     if (!(js("typeof window !== 'undefined' && typeof document !== 'undefined'") as Boolean)) {
@@ -76,7 +86,9 @@ private suspend fun forgeNodeMain() {
         val isPlan: (String) -> Boolean = ForgeKanbanIngest::isPlan
         val fib: (Int) -> Array<Int> = { n -> fibTicks(n).toList().toTypedArray() }
         val boxes: (ByteArray) -> Array<String> = { b -> (b.boxes() α { "${it.a.toList().joinToString("/")}:${it.b.sum.toLong()}" }).toList().toTypedArray() }
-        js("window.forgeKotlin = Object.assign(window.forgeKotlin || {}, { loaded: true, runs: runs, isPlan: isPlan, fib: fib, boxes: boxes })")
+        val office: (ByteArray) -> Promise<String> = { b -> GlobalScope.promise { b.officeText(::inflateRaw) } }
+        val prepass: (ByteArray) -> ByteArray = { it.ocrPrepassRgba() }
+        js("window.forgeKotlin = Object.assign(window.forgeKotlin || {}, { loaded: true, runs: runs, isPlan: isPlan, fib: fib, boxes: boxes, office: office, prepass: prepass })")
         return
     }
     val html = ForgeApp.renderHtml()
@@ -101,4 +113,11 @@ private object System {
             js("typeof process !== 'undefined' && process.stderr && process.stderr.write(msg + '\\n')")
         }
     }
+}
+
+/** Raw deflate via the browser's DecompressionStream — the `inflate` for [officeText] on this target. */
+private suspend fun inflateRaw(data: ByteArray): ByteArray {
+    val buf = js("new Response(new Blob([data]).stream().pipeThrough(new DecompressionStream('deflate-raw'))).arrayBuffer()")
+        .unsafeCast<Promise<ArrayBuffer>>().await()
+    return Int8Array(buf).unsafeCast<ByteArray>()
 }

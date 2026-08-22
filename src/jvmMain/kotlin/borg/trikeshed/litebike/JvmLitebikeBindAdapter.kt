@@ -54,6 +54,22 @@ import java.util.concurrent.Executors
 object JvmLitebikeBindAdapter {
 
     /**
+     * Reassembly cap, in units of [LitebikeListenerElement.maxBatch]:
+     * an incomplete HTTP frame may hold at most
+     * `maxBatch * PENDING_FRAMES_PER_BATCH` bytes (64 KiB at the
+     * default maxBatch of 64) before the connection is answered with
+     * 413 and closed. Bounds the per-connection `pending` buffer.
+     */
+    const val PENDING_FRAMES_PER_BATCH: Int = 1024
+
+    /** Minimal reply for a frame that outgrew the reassembly cap. */
+    internal val PAYLOAD_TOO_LARGE: ByteArray =
+        "HTTP/1.1 413 Payload Too Large\r\nContent-Length: 0\r\nConnection: close\r\n\r\n".encodeToByteArray()
+
+    /** Effective reassembly cap for [element]. */
+    internal fun pendingCap(element: LitebikeListenerElement): Int = element.maxBatch * PENDING_FRAMES_PER_BATCH
+
+    /**
      * Bind + accept-loop on [port] and pipe every accepted byte stream
      * into [element]'s fanout. The bind + accept loop suspends the
      * current coroutine; cancel to stop.
@@ -154,6 +170,7 @@ object JvmLitebikeBindAdapter {
             // one, so the HTTP worker can route responses back
             // through the originating socket.
             val connId = connections.register(ch)
+            System.err.println("[BIND] accepted conn=$connId")
             // Read all bytes from the channel asynchronously, then
             // forward to the listener with the detected protocol.
             CoroutineScope(element.supervisor).launch {
@@ -170,6 +187,8 @@ object JvmLitebikeBindAdapter {
             supervisor: borg.trikeshed.userspace.nio.spi.NioSupervisor? = null,
         ) {
             val buf = ByteBuffer.allocate(8 * 1024)
+            var pending = ByteArray(0)
+            val cap = pendingCap(element)
             
             // Use a CompletableDeferred to wait for channel closure
             val done = kotlinx.coroutines.CompletableDeferred<Unit>()
@@ -187,12 +206,46 @@ object JvmLitebikeBindAdapter {
                                 done.complete(Unit)
                                 return
                             }
-                            val bytes = ByteArray(read).also { buf.flip(); buf.get(it) }
-                            val head = bytes.copyOf(minOf(bytes.size, 8))
-                            val proto: Protocol = ProtocolDetector.detect(head, bytes.size)
+                            val chunk = ByteArray(read).also { buf.flip(); buf.get(it) }
+                            // Reassemble: one TCP read is not one request. An HTX
+                            // client writes the head and the body as two writes, so
+                            // frame HTTP/1.1 on Content-Length before dispatching —
+                            // otherwise the body fragment is sniffed as its own
+                            // protocol (Json) and the connection is dropped.
+                            pending = pending + chunk
+                            val head = pending.copyOf(minOf(pending.size, 8))
+                            val proto: Protocol = ProtocolDetector.detect(head, pending.size)
+                            if (proto == Protocol.Http && !httpFrameComplete(pending)) {
+                                if (pending.size > cap) {
+                                    // Frame outgrew the reassembly cap: answer 413 on
+                                    // this connection only (the registry write closes
+                                    // and unregisters it); the listener keeps serving.
+                                    pending = ByteArray(0)
+                                    runBlocking { connections.write(connId, PAYLOAD_TOO_LARGE) }
+                                    runCatching { ch.close() }
+                                    supervisor?.releaseIo()
+                                    done.complete(Unit)
+                                    return
+                                }
+                                // Incomplete frame: keep the accumulated bytes and read
+                                // the next chunk into a cleared buffer; re-check on append.
+                                buf.clear()
+                                readLoop()
+                                return
+                            }
+                            val bytes = pending
+                            pending = ByteArray(0)
+                            System.err.println("[BIND] conn=$connId frame complete proto=$proto bytes=${bytes.size} seq-alloc")
+                            // R05 — the worker answers through the originating
+                            // socket; the registry write closes the connection
+                            // (HTTP/1.1 Connection: close semantics).
+                            val respond: suspend (ByteArray) -> Unit = { out ->
+                                connections.write(connId, out)
+                            }
                             // runBlocking is OK from a JDK CompletionHandler because
                             // those callbacks are pure Java threads, not coroutines.
-                            val ok = runBlocking { element.accept(proto, bytes) }
+                            val ok = runBlocking { element.accept(proto, bytes, respond) }
+                            System.err.println("[BIND] conn=$connId accept ok=$ok")
                             if (!ok) {
                                 connections.unregister(connId)
                                 runCatching { ch.close() }
@@ -209,7 +262,13 @@ object JvmLitebikeBindAdapter {
                             connections.unregister(connId)
                             runCatching { ch.close() }
                             supervisor?.releaseIo()
-                            done.completeExceptionally(t)
+                            // The registry closes the socket after the worker's
+                            // reply (Connection: close); the pending read then
+                            // fails with AsynchronousCloseException. That is the
+                            // normal end of an exchange, not an error.
+                            if (t is java.nio.channels.AsynchronousCloseException ||
+                                t is java.nio.channels.ClosedChannelException
+                            ) done.complete(Unit) else done.completeExceptionally(t)
                         }
                     }
                 )
@@ -222,6 +281,31 @@ object JvmLitebikeBindAdapter {
             // Wait for completion
             done.await()
         }
+
+    /**
+     * True once [bytes] hold a complete HTTP/1.1 request: the header
+     * boundary is present and, if a Content-Length is declared, that
+     * many body bytes follow it. Chunked request bodies are not framed
+     * here (no caller sends them).
+     */
+    internal fun httpFrameComplete(bytes: ByteArray): Boolean {
+        val boundary = indexOfHeaderBoundary(bytes)
+        if (boundary < 0) return false
+        val headText = bytes.decodeToString(0, boundary)
+        val contentLength = headText.split("\r\n")
+            .firstOrNull { it.startsWith("Content-Length:", ignoreCase = true) }
+            ?.substringAfter(':')?.trim()?.toIntOrNull() ?: 0
+        return bytes.size - (boundary + 4) >= contentLength
+    }
+
+    private fun indexOfHeaderBoundary(bytes: ByteArray): Int {
+        for (i in 0..bytes.size - 4) {
+            if (bytes[i] == '\r'.code.toByte() && bytes[i + 1] == '\n'.code.toByte() &&
+                bytes[i + 2] == '\r'.code.toByte() && bytes[i + 3] == '\n'.code.toByte()
+            ) return i
+        }
+        return -1
+    }
 
 /** Companion helper for users who want a fire-and-forget lifecycle. */
 suspend fun LitebikeListenerElement.serveOnPort(

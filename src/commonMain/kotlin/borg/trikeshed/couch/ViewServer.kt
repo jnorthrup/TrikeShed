@@ -4,9 +4,16 @@ import borg.trikeshed.job.ContentId
 import borg.trikeshed.lib.*
 import borg.trikeshed.collections.MutableSeries
 import borg.trikeshed.collections.mutableSeriesOf
+import borg.trikeshed.cursor.IOMemento
+import borg.trikeshed.parse.confix.ConfixCell
 import borg.trikeshed.parse.confix.ConfixDoc
+import borg.trikeshed.parse.confix.cellKids
 import borg.trikeshed.parse.confix.docAt
+import borg.trikeshed.parse.confix.get
 import borg.trikeshed.parse.confix.reify
+import borg.trikeshed.parse.confix.row
+import borg.trikeshed.parse.confix.tag
+import borg.trikeshed.parse.confix.value
 import borg.trikeshed.viewserver.MapReduceProofReceipt
 import borg.trikeshed.viewserver.ReducerIdentity
 import borg.trikeshed.viewserver.ViewDefinitionIdentity
@@ -419,7 +426,7 @@ class ViewServer {
 
     private fun evaluateReducerAst(ast: ConfixDoc, group: List<ViewRow>): Any? {
         val op = ast.value("op") as? String ?: return null
-        val mapExpr = ast.value("map")
+        val mapExpr: ConfixCell? = ast.docAt("map")
 
         val values: Series<Any?> = if (mapExpr != null) {
             group.size j { i: Int -> evaluateExpr(mapExpr, group[i].value) }
@@ -442,21 +449,25 @@ class ViewServer {
         }
     }
 
-    private fun evaluateExpr(expr: Any?, rowValue: Any?): Any? {
-        if (expr is String && expr == "\$value") return rowValue
-        if (expr !is Map<*, *>) return expr
-
-        val op = expr["op"] as? String ?: return null
-        val args = expr["args"] as? List<*> ?: emptyList<Any?>()
+    /**
+     * Evaluate one Confix DSL expression cell against a row value. Objects are
+     * `{"op": "+"|"*"|"value", "args": [...]}`; the string `"$value"` and the
+     * `{"op":"value"}` form both read the row value; any other scalar is a literal.
+     */
+    private fun evaluateExpr(expr: ConfixCell, rowValue: Any?): Any? {
+        if (expr.row.tag != IOMemento.IoObject) {
+            val literal = expr.reify()
+            return if (literal == "\$value") rowValue else literal
+        }
+        val op = expr["op"]?.reify() as? String ?: return null
+        val args: Series<ConfixCell> = expr["args"]?.cellKids ?: (0 j { _: Int -> expr })
 
         return when (op) {
-            "+" -> {
-                val evaluated: Series<Any?> = args.size j { i: Int -> evaluateExpr(args[i], rowValue) }
-                evaluated.view.sumOf { it.toDoubleValue() }
-            }
+            "+" -> args.view.sumOf { evaluateExpr(it, rowValue).toDoubleValue() }
             "*" -> {
-                val evaluated: Series<Any?> = args.size j { i: Int -> evaluateExpr(args[i], rowValue) }
-                evaluated.view.fold(1.0) { acc, e -> acc * e.toDoubleValue(1.0) }
+                var acc = 1.0
+                for (i in 0 until args.size) acc *= evaluateExpr(args[i], rowValue).toDoubleValue(1.0)
+                acc
             }
             "value" -> rowValue
             else -> null

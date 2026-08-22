@@ -1073,13 +1073,42 @@
     shapeScrollEl.appendChild(legend);
   }
 
-  // Everything that is not text or box media goes to the local ingester (ForgeIngestServer: Tika, ffmpeg+tesseract for scans).
+  // Everything that is not text or box media goes to the local ingester (ForgeIngestServer: Tika, ffmpeg+tesseract for scans);
+  // with no server (Pages) the browser does it: office parts via commonMain, images and thin PDF pages via the same pre-pass → tesseract.js.
+  const SHAPE_OFFICE = /\.(docx|pptx|xlsx)$/i, SHAPE_IMAGE = /\.(png|jpe?g|gif|bmp|webp|tiff?)$/i, SHAPE_PDF = /\.pdf$/i;
+  const CDN = { tesseract: 'https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js',
+    pdfjs: 'https://cdn.jsdelivr.net/npm/pdfjs-dist@4.10.38/build/pdf.min.mjs', pdfjsWorker: 'https://cdn.jsdelivr.net/npm/pdfjs-dist@4.10.38/build/pdf.worker.min.mjs' };
+  const loadScript = (src) => new Promise((ok, no) => { const s = document.createElement('script'); s.src = src; s.onload = ok; s.onerror = no; document.head.appendChild(s); });
+  async function ocrCanvas(canvas) {
+    const ctx = canvas.getContext('2d'), img = ctx.getImageData(0, 0, canvas.width, canvas.height);
+    kotlin().prepass(new Int8Array(img.data.buffer)); ctx.putImageData(img, 0, 0);
+    if (!window.Tesseract) await loadScript(CDN.tesseract);
+    return (await Tesseract.recognize(canvas, 'eng')).data.text;
+  }
+  async function imageText(f) {
+    const bmp = await createImageBitmap(f), c = document.createElement('canvas'); c.width = bmp.width; c.height = bmp.height;
+    c.getContext('2d').drawImage(bmp, 0, 0); return ocrCanvas(c);
+  }
+  async function pdfText(f) {
+    const pdfjs = await import(CDN.pdfjs); pdfjs.GlobalWorkerOptions.workerSrc = CDN.pdfjsWorker;
+    const doc = await pdfjs.getDocument({ data: await f.arrayBuffer() }).promise, pages = [];
+    for (let i = 1; i <= doc.numPages; i++) {
+      const page = await doc.getPage(i), text = (await page.getTextContent()).items.map((t) => t.str).join(' ');
+      if (text.replace(/\s/g, '').length >= 10) { pages.push(text); continue; }   // OCR_STRATEGY auto: thin text layer ⇒ rasterise
+      const vp = page.getViewport({ scale: 2 }), c = document.createElement('canvas'); c.width = vp.width; c.height = vp.height;
+      await page.render({ canvasContext: c.getContext('2d'), viewport: vp }).promise; pages.push(await ocrCanvas(c));
+    }
+    return pages.join('\n\n');
+  }
+  const browserText = (f) => SHAPE_OFFICE.test(f.name) ? f.arrayBuffer().then((b) => kotlin().office(new Int8Array(b)))
+    : SHAPE_IMAGE.test(f.name) ? imageText(f) : SHAPE_PDF.test(f.name) ? pdfText(f) : Promise.reject('unsupported');
   function tikaIngest(f) {
     shapePending++; setView('shape');
     return fetch('/ingest', { method: 'POST', body: f, headers: { 'X-Forge-Name': f.name } })
       .then((r) => r.ok ? r.json() : Promise.reject(r.status))
       .then((j) => Object.assign(shapeOf(f.name, j.markdown), { via: 'tika' + (j.persisted ? ' · persisted' : '') }))
-      .catch(() => ({ name: f.name, lines: [], runs: [], key: [], sep: '', kind: 'needs local server', unit: 'lines', via: './gradlew serveForgePages' }))
+      .catch(() => browserText(f).then((t) => Object.assign(shapeOf(f.name, '# ' + f.name + '\n\n' + t + '\n'), { via: 'browser' })))
+      .catch(() => ({ name: f.name, lines: [], runs: [], key: [], sep: '', kind: 'unsupported here', unit: 'lines', via: './gradlew serveForgePages' }))
       .finally(() => shapePending--);
   }
   function shapeIngest(files) {

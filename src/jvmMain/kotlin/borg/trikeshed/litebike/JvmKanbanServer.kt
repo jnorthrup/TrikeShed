@@ -26,6 +26,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.channels.ClosedReceiveChannelException
+import kotlinx.coroutines.async
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import java.io.File
@@ -63,13 +64,29 @@ class JvmKanbanServer(
     /** FlywheelDriver for live Jules surface and cycle report. Nullable so the server can start before the driver. */
     private val flywheelDriver: borg.trikeshed.jules.FlywheelDriver? = null,
 ) {
-    /** SSE event stream path — collects FlywheelDriver.events as text/event-stream. */
+    /** SSE event stream path — collects FlywheelDriver.events as text/event-stream. SURFACE_TTL_MS bounds /api/jules/surface cache life. */
     private companion object {
         private const val SSE_PATH = "/api/jules/events"
+        private const val SURFACE_TTL_MS = 10_000L
     }
 
     // Mutable driver slot so the daemon can swap in the driver after construction.
     private var _driver: borg.trikeshed.jules.FlywheelDriver? = flywheelDriver
+
+    /** Detached scope for best-effort surface fetches: a timed-out fetch is abandoned, not awaited. */
+    private val surfaceScope = kotlinx.coroutines.CoroutineScope(
+        kotlinx.coroutines.SupervisorJob() + Dispatchers.Default,
+    )
+
+    /**
+     * Last computed /api/jules/surface body with its birth time. The GUI polls
+     * continuously and each recompute can cost up to 8s of the single HTTP
+     * worker's time; a short-lived cache keeps polls O(1) so requests never
+     * queue behind each other. Sessions in the cached body are refreshed by
+     * the flywheel cycle (30s cadence), so a 10s TTL never serves data staler
+     * than the cycle itself.
+     */
+    @Volatile private var surfaceCache: Pair<Long, String>? = null
 
     /** Atomically swap the live driver reference. Called from OroborosDaemon after FlywheelDriver construction. */
     fun attachDriver(driver: borg.trikeshed.jules.FlywheelDriver) {
@@ -191,7 +208,7 @@ class JvmKanbanServer(
             // Replay donor on startup; mirrors prior daemon behavior.
             try {
                 val donor = Paths.get(donorPath)
-                val ingestPath = if (borg.trikeshed.kanban.JvmTikaIngestAdapter.isTikaCandidate(donor)) {
+                val ingestPath = if (borg.trikeshed.kanban.ingestRoute(donor.fileName.toString()) != borg.trikeshed.kanban.IngestRoute.Text) {
                     // Non-markdown donor (PDF/DOCX/image) — extract text via Tika
                     // (tika4all tweaked config: Tesseract OCR + ffmpeg preprocessing).
                     val md = borg.trikeshed.kanban.JvmTikaIngestAdapter.extractToMarkdown(donor)
@@ -273,27 +290,32 @@ class JvmKanbanServer(
                     continue
                 }
 
-                val resp = routeHttp(payload)
-                val out = buildString {
-                    append("HTTP/1.1 ${resp.status} ${statusReason(resp.status)}\r\n")
-                    append("Content-Length: ${resp.body.toByteArray(StandardCharsets.UTF_8).size}\r\n")
-                    append("Content-Type: ${resp.contentType}\r\n")
-                    append("Access-Control-Allow-Origin: *\r\n\r\n")
-                    append(resp.body)
+                // Each connection is handled in its own coroutine: the slot must
+                // re-arm immediately so an idle keep-alive connection (browsers
+                // hold them open) cannot serialize — and so freeze — every other
+                // client behind it. The single-consumer slot stays the only
+                // reader; handling is forked per message.
+                httpScope.launch {
+                    val resp = routeHttp(payload)
+                    val out = buildString {
+                        append("HTTP/1.1 ${resp.status} ${statusReason(resp.status)}\r\n")
+                        append("Content-Length: ${resp.body.toByteArray(StandardCharsets.UTF_8).size}\r\n")
+                        append("Content-Type: ${resp.contentType}\r\n")
+                        append("Access-Control-Allow-Origin: *\r\n\r\n")
+                        append(resp.body)
+                    }
+                    val outBytes = out.toByteArray(StandardCharsets.UTF_8)
+                    // Write back through the listener's response callback
+                    runCatching { msg.respond?.invoke(outBytes) }
                 }
-                val outBytes = out.toByteArray(StandardCharsets.UTF_8)
-                // Write back through the listener's response callback
-                msg.respond?.invoke(outBytes)
             }
         }
 
-        // Fanout channels
-        scope.launch {
-            listener.fanoutChannels { protocol, msg ->
-                System.err.println("fanout: $protocol seq=${msg.sequenceId} ${msg.payload.size} bytes")
-                true // keep listening
-            }
-        }
+        // NOTE: no fanoutChannels consumer here. fanoutChannels() competes with
+        // the httpSlot worker for the same per-protocol Channel — a Channel hands
+        // each message to exactly ONE receiver, so a second consumer silently
+        // stole every other HTTP request (GUI freeze: polls randomly unanswered).
+        // Inbound-traffic observability is the LitebikeFanoutEvent stream.
 
         System.err.println("trikeshed-kanban: listening on :$port  donor=${donorPath ?: "<none>"}")
         System.err.println("Endpoints (CCEK): GET / (Forge PWA) /api/health /api/cap /api/board /api/metrics /api/jules/surface /api/jules/events POST /api/submit /api/donor /api/invoke")
@@ -342,46 +364,55 @@ class JvmKanbanServer(
                 if (driver == null) {
                     HttpResponse(503, """{"error":"driver_not_ready","message":"flywheel driver not yet attached"}""")
                 } else {
-                    val report = driver.lastReactiveReport
-                    val surface = runCatching {
-                        val sessions = driver.activeSessions
-                        val client = driver.julesClient
-                        // Fetch activity timelines for each session; tolerate individual failures with empty list.
-                        val activitiesBySession: Map<String, List<JulesRestClient.ActivityInfo>> = runBlocking {
-                            sessions.associate { session ->
-                                session.id to runCatching {
-                                    kotlinx.coroutines.withTimeout(5_000L) {
-                                        client.activities(session.id)
-                                    }
-                                }.getOrElse { emptyList() }
-                            }
-                        }
-                        // Evict expired entries and emit TTL eviction events to SSE clients.
-                        val evicted = borg.trikeshed.jules.ui.JulesBlackboardAdapter.evictExpired()
-                        driver.emitTtlEvicted(evicted)
-                        val (_, surf, _) = borg.trikeshed.jules.ui.JulesBlackboardAdapter.projectFullSurface(
-                            sessions = sessions,
-                            activitiesBySession = activitiesBySession,
-                        )
-                        JsonSupport.stringify(surf)
-                    }.getOrElse { ex ->
-                        """{"error":"surface_projection_failed","reason":"${ex.message?.take(200)}"}"""
-                    }
-                    val phaseLatenciesJson = report?.phaseLatencies?.joinToString(",", "[", "]") { (phase, ms) ->
-                        """["$phase",$ms]"""
-                    } ?: "[]"
-                    val auditSignalsJson = report?.auditSignals?.joinToString(",", "[", "]") { "\"${it.replace("\\", "\\\\").replace("\"", "\\\"")}\"" } ?: "[]"
-                    val reportJson = if (report != null) {
-                        ""","cycle":{"cycleMs":${report.cycleMs},"phase":"${report.phase.name}","answered":${report.answered},"dispatched":${report.dispatched},"alive":${report.alive},"available":${report.available},"settled":${report.settled},"archived":${report.archived},"phaseLatencies":$phaseLatenciesJson,"auditSignals":$auditSignalsJson}"""
+                    // Serve from cache while fresh: the GUI polls continuously and every
+                    // recompute can cost seconds of the single HTTP worker's time, making
+                    // polls queue behind each other (GUI freezes on its last frame).
+                    val now = System.currentTimeMillis()
+                    val cached = surfaceCache
+                    val body: String
+                    if (cached != null && now - cached.first < SURFACE_TTL_MS) {
+                        body = cached.second
                     } else {
-                        ""
+                        val report = driver.lastReactiveReport
+                        val surface = runCatching {
+                            val sessions = driver.activeSessions
+                            // Sessions come from the driver's in-memory projection (no reactor, no
+                            // fetch) — that is what the GUI counts. Activity timelines are NOT
+                            // fetched here: the shared HTX reactor is held by the flywheel cycle,
+                            // every timed-out fetch still occupies the reactor's queue (cancel
+                            // cannot evict it), so per-request fetches self-poison the reactor and
+                            // wedge the single HTTP worker (GUI frozen on its last frame). The
+                            // cycle persists timelines to the WAL; the surface stays sessions-only.
+                            val activitiesBySession: Map<String, List<JulesRestClient.ActivityInfo>> = emptyMap()
+                            // Evict expired entries and emit TTL eviction events to SSE clients.
+                            val evicted = borg.trikeshed.jules.ui.JulesBlackboardAdapter.evictExpired()
+                            driver.emitTtlEvicted(evicted)
+                            val (_, surf, _) = borg.trikeshed.jules.ui.JulesBlackboardAdapter.projectFullSurface(
+                                sessions = sessions,
+                                activitiesBySession = activitiesBySession,
+                            )
+                            JsonSupport.stringify(surf)
+                        }.getOrElse { ex ->
+                            """{"error":"surface_projection_failed","reason":"${ex.message?.take(200)}"}"""
+                        }
+                        val phaseLatenciesJson = report?.phaseLatencies?.joinToString(",", "[", "]") { (phase, ms) ->
+                            """["$phase",$ms]"""
+                        } ?: "[]"
+                        val auditSignalsJson = report?.auditSignals?.joinToString(",", "[", "]") { "\"${it.replace("\\", "\\\\").replace("\"", "\\\"")}\"" } ?: "[]"
+                        val reportJson = if (report != null) {
+                            ""","cycle":{"cycleMs":${report.cycleMs},"phase":"${report.phase.name}","answered":${report.answered},"dispatched":${report.dispatched},"alive":${report.alive},"available":${report.available},"settled":${report.settled},"archived":${report.archived},"phaseLatencies":$phaseLatenciesJson,"auditSignals":$auditSignalsJson}"""
+                        } else {
+                            ""
+                        }
+                        val metricsMap = FlywheelMetrics.toJsonMap()
+                        val cyclesPerSecond = metricsMap["cyclesPerSecond"]
+                        val cyclesAt100PerDay = metricsMap["cyclesAt100PerDay"]
+                        val activeSlots = FlywheelMetrics.activeSlots
+                        val targetSlots = FlywheelMetrics.TARGET_SLOTS
+                        body = """{"surface":$surface$reportJson,"throughput":{"cyclesPerSecond":$cyclesPerSecond,"cyclesAt100PerDay":$cyclesAt100PerDay},"slots":{"cap":$targetSlots,"alive":$activeSlots,"available":${(targetSlots - activeSlots).coerceAtLeast(0)}}}"""
+                        surfaceCache = now to body
                     }
-                    val metricsMap = FlywheelMetrics.toJsonMap()
-                    val cyclesPerSecond = metricsMap["cyclesPerSecond"]
-                    val cyclesAt100PerDay = metricsMap["cyclesAt100PerDay"]
-                    val activeSlots = FlywheelMetrics.activeSlots
-                    val targetSlots = FlywheelMetrics.TARGET_SLOTS
-                    HttpResponse(200, """{"surface":$surface$reportJson,"throughput":{"cyclesPerSecond":$cyclesPerSecond,"cyclesAt100PerDay":$cyclesAt100PerDay},"slots":{"cap":$targetSlots,"alive":$activeSlots,"available":${(targetSlots - activeSlots).coerceAtLeast(0)}}}""")
+                    HttpResponse(200, body)
                 }
             }
             "/api/submit" -> if (method == "POST") submit(text) else HttpResponse(405, """{"error":"method_not_allowed"}""")

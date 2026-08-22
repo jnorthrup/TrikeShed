@@ -105,6 +105,9 @@ class FlywheelDriver(
 
     @Volatile private var htxElement: borg.trikeshed.htx.HtxElement? = null
 
+    /** Read-only view of the reactor element for HTTP surfaces (Jules activity fetches need its HtxKey). */
+    val htx: borg.trikeshed.htx.HtxElement? get() = htxElement
+
     /** Wire the HTX element after daemon construction (circular dep). */
     fun attachHtxElement(htx: borg.trikeshed.htx.HtxElement) {
         htxElement = htx

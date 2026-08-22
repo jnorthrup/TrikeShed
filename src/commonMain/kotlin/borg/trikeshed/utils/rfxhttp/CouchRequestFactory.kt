@@ -13,7 +13,6 @@ import borg.trikeshed.couch.ViewServer
 import borg.trikeshed.job.ContentId
 import borg.trikeshed.lib.get
 import borg.trikeshed.lib.size
-import borg.trikeshed.parse.confix.reify
 import borg.trikeshed.parse.json.JsonSupport
 
 /**
@@ -29,7 +28,10 @@ import borg.trikeshed.parse.json.JsonSupport
  *
  * view spec: { "ddoc"?: "_design/x", "name": "v", "key"?: "field" | {"field"|"path"|"const"} (default doc id),
  *              "value"?: "doc" | "field" | {"field"|"path"|"const"} (default 1),
- *              "reduce"?: "_count"|"_sum"|"_stats" | {"dsl": "<confix reducer>"}, "prefix"?: "<id prefix>" }
+ *              "reduce"?: "_count"|"_sum"|"_stats" | {"dsl": "<confix reducer>"}, "prefix"?: "<id prefix>",
+ *              plus the 1.6.2 view params via [ViewQuery.fromEnvelope]: startkey, endkey, inclusive_end,
+ *              descending, skip, limit, group, group_level, include_docs; exact key under "params": {"key": …} }
+ * query receipt: { ok, view, rows:[{key,value,id[,doc]}], total_rows, offset, proofCid }
  */
 class CouchRequestFactory(
     val store: ConfixDocStore,
@@ -86,7 +88,7 @@ class CouchRequestFactory(
 
     private fun get(id: String): Map<String, Any?> {
         val entry = store[id] ?: return failure(id, "not_found", "no such document")
-        return ok(entry) + ("doc" to entry.doc.reify(ROOT_TOKEN))
+        return ok(entry) + ("doc" to entry.jsonBody())
     }
 
     private fun delete(id: String, rev: String): Map<String, Any?> =
@@ -103,21 +105,38 @@ class CouchRequestFactory(
 
     private fun query(view: Map<*, *>): Map<String, Any?> {
         val name = view["name"] as? String ?: return failure(null, "query", "view.name required")
+        val reduceFn = reduceFn(view["reduce"])
+        val q = ViewQuery.fromEnvelope(view)
+        val wantReduce = q.wantReduce(reduceFn != null)
+        if (wantReduce && reduceFn == null) return failure(null, "query_parse_error", "Reduce is invalid for map-only views.")
         val def = ViewDefinition(
             ddoc = view["ddoc"] as? String ?: "_design/rf",
             viewName = name,
             mapFn = MapFunction.Emit(keyExpr(view["key"]), valueExpr(view["value"])),
-            reduceFn = reduceFn(view["reduce"]),
+            reduceFn = if (wantReduce) reduceFn else null,
         )
-        val proof = viewServer.executeWithProof(def, documents(view["prefix"] as? String ?: ""))
-        val result = proof.result
+        val docs = documents(view["prefix"] as? String ?: "")
+        val proof = viewServer.executeWithProof(def, docs)
+        val mapped = if (wantReduce) viewServer.execute(def.copy(reduceFn = null), docs) else proof.result
+        val selected = q.select(mapped)
+        val rows: List<Map<String, Any?>> = if (!wantReduce) {
+            q.page(selected).map { row ->
+                val base = mapOf("key" to row.key, "value" to row.value, "id" to row.docId)
+                if (q.include_docs) base + ("doc" to store[row.docId]?.jsonBody()) else base
+            }
+        } else {
+            val byId = docs.associateBy { it.id }
+            val reduced = viewServer.execute(def, selected.map { it.docId }.distinct().mapNotNull(byId::get))
+            if (q.grouped)
+                List(reduced.size) { i -> val row = reduced[i]; mapOf("key" to row.key, "value" to row.value, "id" to row.docId) }
+            else listOf(mapOf("key" to null, "value" to ViewQuery.rereduce(reduceFn!!, reduced), "id" to null))
+        }
         return mapOf(
             "ok" to true,
             "view" to def.fullName,
-            "rows" to List(result.size) { i ->
-                val row = result[i]
-                mapOf("key" to row.key, "value" to row.value, "id" to row.docId)
-            },
+            "rows" to rows,
+            "total_rows" to mapped.size,
+            "offset" to q.offset(selected),
             "proofCid" to proof.receipt.contentId.hex,
         )
     }
@@ -128,7 +147,7 @@ class CouchRequestFactory(
     }
 
     private fun ConfixDocStoreEntry.toDocument(): Document {
-        val body = doc.reify(ROOT_TOKEN) as? Map<*, *> ?: emptyMap<Any?, Any?>()
+        val body = jsonBody()
         return Document(
             id,
             body.entries
@@ -174,9 +193,4 @@ class CouchRequestFactory(
 
     private fun failure(id: String?, error: String, reason: String): Map<String, Any?> =
         mapOf("ok" to false, "id" to id, "error" to error, "reason" to reason)
-
-    private companion object {
-        /** Token index of a ConfixDoc's root value (`ConfixKit.kt:203`, TreeCursor[0]). */
-        const val ROOT_TOKEN = 0
-    }
 }

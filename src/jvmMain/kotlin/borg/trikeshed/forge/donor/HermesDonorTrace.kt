@@ -38,7 +38,7 @@ object HermesDonorTrace {
     }
 
     private suspend fun ingestMarkdown(userId: String, donorPath: Path): ForgeKanbanReduction {
-        val ingestPath = if (borg.trikeshed.kanban.JvmTikaIngestAdapter.isTikaCandidate(donorPath)) {
+        val ingestPath = if (borg.trikeshed.kanban.ingestRoute(donorPath.fileName.toString()) != borg.trikeshed.kanban.IngestRoute.Text) {
             val md = borg.trikeshed.kanban.JvmTikaIngestAdapter.extractToMarkdown(donorPath)
             val tmp = Files.createTempFile("tika-donor", ".md")
             Files.writeString(tmp, md)

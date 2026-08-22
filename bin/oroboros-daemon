@@ -45,6 +45,14 @@ fi
 # Wildcard expansion happens after the colon, so we quote it.
 CP="$CLASSES:$LIB/*"
 
+# HTX egress allowlist (see JvmChannelOperations.connect): BrainClient fails
+# over across these provider hosts; without them the GUIDE brain cannot
+# connect and every AWAITING Jules session stalls unanswered each cycle.
+# Operator-set values win; this default covers all BrainClient providers.
+if [[ -z "${TRIKESHED_EGRESS_ALLOWLIST:-}" ]]; then
+    export TRIKESHED_EGRESS_ALLOWLIST="integrate.api.nvidia.com,openrouter.ai,api.z.ai,api.groq.com,api.deepseek.com,api.cerebras.ai,api.openai.com,api.perplexity.ai,api.x.ai,api.moonshot.cn,api.minimax.chat"
+fi
+
 WATCH="--watch"
 DAEMON_ARGS=()
 DEBUG_OPTS=()

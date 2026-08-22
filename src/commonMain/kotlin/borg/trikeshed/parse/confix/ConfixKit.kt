@@ -226,11 +226,12 @@ fun ConfixIndex.resolve(parentTokenIdx: Int, arrayIdx: Int): Int? {
 
 fun RowVec.step(key: CharSequence, src: Series<Byte>): RowVec? {
     val ch = kids
-    // Confix flat-kid order: (value, key) pairs — keys follow values, not precede them.
+    // Confix flat-kid order for objects: (key, value) pairs — JSON and CBOR scanners both
+    // emit the key token before its value token (see TreeCursor kids in Confix.kt).
     var i = 0
     while (i + 1 < ch.size) {
-        val v = ch[i]
-        val k = ch[i + 1]
+        val k = ch[i]
+        val v = ch[i + 1]
         if (k.tag == borg.trikeshed.cursor.IOMemento.IoString) {
             val kOpen  = k.open  + 1
             val kClose = k.close - 1

@@ -243,8 +243,6 @@ kotlin {
         }
 
         val jvmTest = getByName("jvmTest") {
-            // ViewServerTest has pre-existing compile errors unrelated to current work
-            kotlin.exclude("**/ViewServerTest.kt")
             kotlin.exclude("**/strategy/SignalValidationTest.kt")
             kotlin.exclude("**/demos/SignalBlackboardDemoTest.kt")
             kotlin.exclude("**/lib/ReduxListBridgeTest.kt")
