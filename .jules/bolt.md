@@ -90,6 +90,7 @@
 ## 2024-12-10 - Avoid O(N) boxing allocation when comparing ByteArray
 **Learning:** Comparing ByteArray objects using .toList() == other.toList() causes an O(N) memory allocation because each Byte gets boxed into an object within a new ArrayList. This can introduce unexpected GC pressure, especially when frequently hashing or comparing proofs.
 **Action:** Replace a.toList() == b.toList() on ByteArray with a.contentEquals(b) for a fast, zero-allocation byte-level comparison.
-## 2025-02-27 - [Optimize FileCasStore put path]
-**Learning:** Using `fileOps.readAllBytes(path)` on the critical path of `FileCasStore.put` to verify already-existing CAS entries causes massive I/O overhead (~2929 µs/put vs ~35 µs for CouchStore), especially on repeated document saves. Since CAS guarantees content addressing, we can trust the path existence for the fast path and avoid re-reading and re-hashing the payload.
-**Action:** Always rely on `fileOps.exists(path)` to short-circuit repeated CAS ingestion unless explicit corruption repair is required by the product logic.
+
+## 2026-08-22 - Avoid redundant `.toList()` allocation after `.map { ... }` on Iterables
+**Learning:** In Kotlin, the `.map` extension function on Iterables natively returns a `List`. Chaining `.toList()` immediately after `.map { ... }` (e.g., `iterable.map { ... }.toList()`) is fully redundant. This practice negatively impacts performance by triggering a secondary, unnecessary shallow copy allocation of the entire collection, increasing GC pressure and CPU overhead for larger collections.
+**Action:** Remove trailing `.toList()` calls from functional `.map { ... }` chains operating on Iterables or standard collections.

@@ -140,7 +140,7 @@ class JsIsamOperations : IsamOperations {
             reader.open()
             reader.constraints
         } else {
-            val rows = msf.map { transform?.invoke(it) ?: it }.toList()
+            val rows = msf.map { transform?.invoke(it) ?: it }
             val cursor = rows.toSeries()
             write(cursor, datafilename, varChars, useMonocursorGroupings)
             return
