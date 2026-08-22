@@ -68,3 +68,6 @@
 **Learning:** For elements handling drag-and-drop file ingestions natively created as semantic `role="button"` placeholders like `.drop-zone` in index.html templates, ensuring they receive `:focus-visible` styling is crucial for keyboard users attempting to access upload functions.
 **Action:** Always add interactive form and UI upload containers defined with tabindex to the globally applied `:focus-visible` CSS selector lists.
 >>>>>>> theirs
+## 2025-02-23 - Announcing active states for single-page application navigation
+**Learning:** Single-page applications often use custom buttons to switch views instead of actual `<a>` tags with `href`s. While visual users see an active state (like a background color change), screen reader users hear no change in state unless explicitly announced.
+**Action:** When building custom view switchers (like tabs or navigation sidebar items) that aren't native links, always apply `aria-current="page"` via JavaScript when the view changes.
