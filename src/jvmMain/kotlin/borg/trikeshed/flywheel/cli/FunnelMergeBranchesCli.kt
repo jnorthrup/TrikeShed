@@ -240,6 +240,46 @@ private class FunnelMergeBranchesCli(
         (path.startsWith(".jules/") || path.startsWith(".Jules/")) && path.endsWith(".md")
 
     /**
+     * Split a unified diff into (ledger sections, production sections).
+     * Scratch sections (test_*.py, fix_*.sh, *.orig, *.rej, plan*.md — the
+     * same class isScratchPatchPath filters) are dropped from both.
+     */
+    private fun splitPatchSections(patch: String): Pair<String, String> {
+        val ledger = StringBuilder()
+        val production = StringBuilder()
+        val current = StringBuilder()
+        var currentPath: String? = null
+        var inHeader = false
+        fun flush() {
+            val p = currentPath ?: return
+            val text = current.toString()
+            when {
+                borg.trikeshed.jules.isScratchPatchPath(p) -> {} // dropped
+                isLedgerPath(p) -> ledger.append(text)
+                else -> production.append(text)
+            }
+            current.setLength(0)
+        }
+        for (line in patch.lineSequence()) {
+            if (line.startsWith("diff --git ")) {
+                flush()
+                inHeader = true
+                current.appendLine(line)
+                currentPath = line.removePrefix("diff --git a/").substringBefore(" b/")
+            } else {
+                if (line.startsWith("--- ")) inHeader = false
+                if (inHeader && line.startsWith("new file mode")) {
+                    current.appendLine(line)
+                } else {
+                    current.appendLine(line)
+                }
+            }
+        }
+        flush()
+        return ledger.toString() to production.toString()
+    }
+
+    /**
      * Union a ledger-only patch: extract every added block (## headers and
      * their bodies) and append the ones the target does not already contain.
      * Returns the number of entries appended.
@@ -360,36 +400,39 @@ private class FunnelMergeBranchesCli(
             withContext(Dispatchers.IO) { patchFile.writeText(arm.patch) }
             val apply = gitIn(worktree, "apply", "--3way", patchFile.absolutePath)
             if (apply.first != 0) {
-                // Ledger-union fallback: .jules/.Jules markdown ledgers are
-                // append-only session journals. Patches recorded against a
-                // base where the ledger was untracked ("does not exist in
-                // index") still carry pure appends — union them in instead
-                // of failing the arm. Union-safe for .md ledgers only.
-                if (arm.touched.all { isLedgerPath(it) }) {
-                    val unioned = unionLedgerPatch(worktree, arm.patch)
+                // Section-filtered retry: drop ledger file-sections (union them
+                // separately — they are append-only journals whose patches were
+                // recorded when the file was untracked) and scratch sections
+                // (test_*.py etc. — never production content), then apply the
+                // remaining production hunks.
+                val (ledgerPatch, productionPatch) = splitPatchSections(arm.patch)
+                var unioned = 0
+                if (ledgerPatch.isNotEmpty()) {
+                    unioned = unionLedgerPatch(worktree, ledgerPatch)
+                }
+                if (productionPatch.isBlank()) {
                     if (unioned > 0) {
                         println("[FUNNEL-MERGE] ledger-union applied $unioned entries for ${arm.label}")
                     } else {
-                        println("[FUNNEL-MERGE] ledger-union: nothing new for ${arm.label}")
+                        println("[FUNNEL-MERGE] no production delta and no new ledger entries for ${arm.label}")
                         tagAndClose(listOf(arm), headShaNow(), alreadyPresent = true)
                         return
                     }
                 } else {
-                    // Retry with reduced context: stale-base WAL patches carry
-                    // context lines from a tree master has since moved. --recount
-                    // with 1-line context tolerates the drift where 3-way cannot.
-                    val reduced = withContext(Dispatchers.IO) { reducePatchContext(arm.patch, 1) }
-                    if (reduced != null) {
-                        withContext(Dispatchers.IO) { patchFile.writeText(reduced) }
-                        val retry = gitIn(worktree, "apply", "--3way", "--recount", patchFile.absolutePath)
-                        if (retry.first != 0) {
+                    withContext(Dispatchers.IO) { patchFile.writeText(productionPatch) }
+                    val retry = gitIn(worktree, "apply", "--3way", patchFile.absolutePath)
+                    if (retry.first != 0) {
+                        val reduced = withContext(Dispatchers.IO) { reducePatchContext(productionPatch, 1) }
+                        val ok = if (reduced != null) {
+                            withContext(Dispatchers.IO) { patchFile.writeText(reduced) }
+                            gitIn(worktree, "apply", "--3way", "--recount", patchFile.absolutePath).first == 0
+                        } else false
+                        if (!ok) {
                             System.err.println("[FUNNEL-MERGE] single-arm apply failed (3way + reduced context): ${(retry.second.take(300))}")
                             return
                         }
-                    } else {
-                        System.err.println("[FUNNEL-MERGE] single-arm apply failed: ${apply.second.take(300)}")
-                        return
                     }
+                    if (unioned > 0) println("[FUNNEL-MERGE] ledger-union applied $unioned entries alongside production delta for ${arm.label}")
                 }
             }
             if (gitIn(worktree, "status", "--porcelain").second.isBlank()) {
