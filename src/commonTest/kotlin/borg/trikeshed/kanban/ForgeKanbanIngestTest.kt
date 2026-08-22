@@ -4,6 +4,7 @@ import borg.trikeshed.dag.ReteWorkingMemory
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
@@ -97,5 +98,20 @@ class ForgeKanbanIngestTest {
         projected.reteFacts.forEach { fact ->
             assertTrue(workingMemory.facts(fact.factId).isEmpty())
         }
+    }
+
+    @Test
+    fun shapeGateAdmitsPlansAndRefusesProseBeforePersist() {
+        assertEquals("P_S_6_WP_P_WD_P_WD_P_7", ForgeKanbanIngest.planShape(markdown))
+        ForgeKanbanIngest.requirePlanShape(markdown, "/tmp/plan.md")
+
+        val hi = "hi\n\nthis is the file that was at /tmp/hi that day. it is not a plan.\n"
+        assertEquals("P_P_", ForgeKanbanIngest.planShape(hi))
+        val e = assertFailsWith<IllegalArgumentException> { ForgeKanbanIngest.requirePlanShape(hi, "/tmp/hi") }
+        assertTrue(e.message!!.contains("shape `P_P_`"))
+
+        // packages outside any work-packages section: no `6` ⇒ refused
+        val orphan = "1. Goal\nx\n\nG0 — Orphan\nbody\n\n7. Acceptance\n"
+        assertFailsWith<IllegalArgumentException> { ForgeKanbanIngest.requirePlanShape(orphan, "orphan.md") }
     }
 }

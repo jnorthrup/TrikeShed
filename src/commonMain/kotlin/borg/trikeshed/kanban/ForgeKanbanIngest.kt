@@ -11,6 +11,10 @@ import borg.trikeshed.dag.ReteWorkingMemory
 import borg.trikeshed.graph.CausalGraphNode
 import borg.trikeshed.graph.causalGraphNode
 import borg.trikeshed.job.ContentId
+import borg.trikeshed.lib.cascade.key
+import borg.trikeshed.lib.cascade.shape
+import borg.trikeshed.lib.toList
+import borg.trikeshed.lib.toSeries
 
 data class ForgeKanbanCorrelation(
     val taskId: String,
@@ -38,6 +42,7 @@ private data class SourceTask(
 /** Deterministic ingest reducer. It performs no model call and stores no derived board dump. */
 object ForgeKanbanIngest {
     private val packageHeader = Regex("^([A-Z][0-9]+)\\s+[—-]\\s+(.+)$")
+    private val planRules = listOf('_' to Regex("^$"), '6' to Regex("^6\\. Work packages$"), '7' to Regex("^7\\. "), 'S' to Regex("^\\d+\\.\\s"), 'W' to packageHeader, 'D' to Regex("^Depends on:"))
     private val dependencyId = Regex("\\b[A-Z][0-9]+\\b")
 
     private val columns = listOf(
@@ -62,9 +67,29 @@ object ForgeKanbanIngest {
         workingMemory: ReteWorkingMemory = ReteWorkingMemory(),
     ): ForgeKanbanReduction {
         val markdown = borg.trikeshed.common.Files.readString(markdownPath)
+        requirePlanShape(markdown, markdownPath)
         val source = ForgeBoardPersistence.source(userId, markdown, markdownPath)
         ForgeBoardPersistence.persist(source).getOrThrow()
         return reduce(source, workingMemory)
+    }
+
+    // ── Shape gate: classify lines, run-length collapse, match the key BEFORE anything touches disk. ──
+
+    /** One symbol per line: `6` work-packages header, `7` next section, `S` numbered section, `W` package header, `D` depends, `_` blank, `P` anything else. */
+    fun classifyPlanLine(line: String): Char = line.trim().let { t -> planRules.firstOrNull { it.second.containsMatchIn(t) }?.first ?: 'P' }
+
+    /** The run-length key of a plan source, e.g. `SP_6_WP_WDP_SP`. */
+    fun planShape(markdown: String): String =
+        markdown.lines().toSeries().shape(::classifyPlanLine).key.toList().joinToString("")
+
+    /** A plan has a `6` followed by at least one `W` before any `7`. Everything [parseWorkPackages] needs, and nothing it doesn't. */
+    private val planShapeGrammar = Regex("^[^67]*6[^7W]*W[^7]*(7.*)?$")
+
+    fun requirePlanShape(markdown: String, sourcePath: String) {
+        val shape = planShape(markdown)
+        require(planShapeGrammar.matches(shape)) {
+            "$sourcePath is not a kanban plan — shape `$shape`, want `…6…W…[7…]`; refusing to persist"
+        }
     }
 
     suspend fun persistArchive(
@@ -328,18 +353,15 @@ object ForgeKanbanIngest {
 
     private fun parseWorkPackages(markdown: String): List<SourceTask> {
         val lines = markdown.lines()
-        val start = lines.indexOfFirst { it.trim() == "6. Work packages" }
+        val cls = lines.map(::classifyPlanLine)
+        val start = cls.indexOf('6')
         require(start >= 0) { "source description has no '6. Work packages' section" }
-        val relativeEnd = lines.drop(start + 1).indexOfFirst { it.trim().startsWith("7. ") }
-        val end = if (relativeEnd < 0) lines.size else start + 1 + relativeEnd
-
-        val headers = (start + 1 until end).mapNotNull { index ->
-            packageHeader.matchEntire(lines[index].trim())?.let { index to it }
-        }
+        val end = (start + 1 until lines.size).firstOrNull { cls[it] == '7' } ?: lines.size
+        val headers = (start + 1 until end).filter { cls[it] == 'W' }.map { it to packageHeader.matchEntire(lines[it].trim())!! }
         return headers.mapIndexed { position, (lineIndex, match) ->
             val next = headers.getOrNull(position + 1)?.first ?: end
             val bodyLines = lines.subList(lineIndex, next)
-            val dependsLine = bodyLines.firstOrNull { it.trim().startsWith("Depends on:") }
+            val dependsLine = bodyLines.indices.firstOrNull { cls[lineIndex + it] == 'D' }?.let(bodyLines::get)
             val parents = dependsLine
                 ?.let { dependencyId.findAll(it.substringAfter(':')).map { id -> id.value }.toList() }
                 .orEmpty()

@@ -270,13 +270,6 @@
         mutate((s) => { s.activePageId = page.id; });
         renderAll();
       });
-      item.addEventListener('keydown', (e) => {
-        if (e.key === 'Enter' || e.key === ' ') {
-          e.preventDefault();
-          mutate((s) => { s.activePageId = page.id; });
-          renderAll();
-        }
-      });
       pageTreeEl.appendChild(item);
     });
   }
@@ -550,6 +543,19 @@
     slashAnchor = null;
   }
 
+
+  // ── Global keyboard accessibility for role="button" ───────────────────
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' || e.key === ' ') {
+      if (document.activeElement &&
+          document.activeElement.getAttribute('role') === 'button' &&
+          document.activeElement.getAttribute('tabindex') === '0') {
+        e.preventDefault();
+        document.activeElement.click();
+      }
+    }
+  });
+
   document.addEventListener('mousedown', (e) => {
     if (!slashMenuEl.hidden && !slashMenuEl.contains(e.target)) closeSlashMenu();
   });
@@ -597,15 +603,6 @@
           const next = order[(order.indexOf(card.column) + 1) % order.length];
           mutate(() => { card.column = next; });
           renderBoard();
-        });
-        cardEl.addEventListener('keydown', (e) => {
-          if (e.key === 'Enter' || e.key === ' ') {
-            e.preventDefault();
-            const order = state.board.columns.map((c) => c.id);
-            const next = order[(order.indexOf(card.column) + 1) % order.length];
-            mutate(() => { card.column = next; });
-            renderBoard();
-          }
         });
         cardsEl.appendChild(cardEl);
       });
@@ -923,8 +920,10 @@
     let rootOf = cur; while (rootOf && rootOf.parent && sheetById[rootOf.parent]) rootOf = sheetById[rootOf.parent];
     rootSheets.forEach((sh) => {
       const b = document.createElement('button');
-      b.className = 'sheet-tab' + (rootOf && rootOf.id === sh.id ? ' active' : '');
+      const isActive = rootOf && rootOf.id === sh.id;
+      b.className = 'sheet-tab' + (isActive ? ' active' : '');
       b.setAttribute('role', 'tab');
+      b.setAttribute('aria-selected', isActive ? 'true' : 'false');
       b.textContent = sh.title;
       const n = document.createElement('span'); n.className = 'sheet-count'; n.textContent = sh.rows.length + ' × ' + sh.columns.length; b.appendChild(n);
       b.addEventListener('click', () => openSheet(sh.id));
@@ -972,25 +971,124 @@
   const viewGraphBtn = document.getElementById('btn-view-graph');
   const viewSheetBtn = document.getElementById('btn-view-sheet');
 
+  // ── Drop zone interaction ───────────────────────────────────────────
+  const dropZoneEl = document.getElementById('drop-zone');
+  const fileInputEl = document.getElementById('file-input');
+
+  if (dropZoneEl && fileInputEl) {
+    dropZoneEl.addEventListener('click', () => {
+      fileInputEl.click();
+    });
+
+    dropZoneEl.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        fileInputEl.click();
+      }
+    });
+  }
+
+
+  // ── Shape strip (ingest motif) ──────────────────────────────────────
+  const shapeScrollEl = document.getElementById('shape-scroll');
+  const viewShapeBtn = document.getElementById('btn-view-shape');
+  // Shared symbols mirror the Kotlin gate (ForgeKanbanIngest.planRules) exactly, in order; the generic tail may grow.
+  const SHAPE_RULES = [['_', /^$/], ['6', /^6\. Work packages$/], ['7', /^7\. /], ['S', /^\d+\.\s/], ['W', /^[A-Z][0-9]+\s+[—-]\s+.+$/], ['D', /^Depends on:/],
+    ['H', /^#{1,6}\s/], ['B', /^[-*+]\s/], ['T', /^\|/], ['C', /^```/], ['J', /^[{}[\]]|[;{}]$|^"[^"]+":/]];
+  const SHAPE_NAMES = { _: 'blank', 6: 'work packages', 7: 'section 7', S: 'section', H: 'heading', W: 'package', D: 'depends', B: 'bullet', T: 'table', C: 'fence', J: 'code', P: 'prose' };
+  const SHAPE_FIB = new Set([0, 1, 2, 4, 7, 12, 20, 33, 54, 88, 143, 232, 376, 609, 986]);
+  const SHAPE_PLAN = /^[^67]*6[^7W]*W[^7]*(7.*)?$/;
+  const shapeDocs = [];
+  let shapeDepth = Infinity, shapePick = null;
+  const shapeEl = (tag, cls, text) => { const e = document.createElement(tag); e.className = cls; if (text != null) e.textContent = text; return e; };
+  const shapeClass = (t) => (SHAPE_RULES.find(([, re]) => re.test(t)) || ['P'])[0];
+
+  function shapeOf(name, text) {
+    const lines = text.split(/\r?\n/), runs = [];
+    lines.forEach((l, i) => {
+      const c = shapeClass(l.trim()), last = runs[runs.length - 1];
+      if (last && last.c === c) { last.end = i; last.n++; } else runs.push({ c, start: i, end: i, n: 1 });
+    });
+    const key = runs.map((r) => r.c).join('');
+    const kind = SHAPE_PLAN.test(key) ? 'plan' : /T/.test(key) ? 'table' : /[CJ]/.test(key) ? 'code' : /[HS]/.test(key) ? 'note' : 'prose';
+    return { name, lines, runs, key, kind };
+  }
+
+  function shapeStrip(doc, di) {
+    const strip = shapeEl('div', 'shape-strip');
+    strip.setAttribute('role', 'group'); strip.setAttribute('aria-label', 'Shape of ' + doc.name);
+    doc.runs.forEach((r, ri) => {
+      const cell = shapeEl('button', 'shape-cell');
+      cell.style.setProperty('--c', 'var(--shape-' + r.c + ')');
+      cell.style.flex = r.n + ' 0 2px';
+      cell.classList.toggle('fib', SHAPE_FIB.has(ri));
+      cell.classList.toggle('picked', !!shapePick && shapePick.doc === di && shapePick.run === ri);
+      cell.title = SHAPE_NAMES[r.c] + ' ×' + r.n + ' · lines ' + (r.start + 1) + '–' + (r.end + 1) + (SHAPE_FIB.has(ri) ? ' · depth ' + ri : '');
+      cell.setAttribute('aria-label', cell.title);
+      cell.addEventListener('click', () => { shapePick = { doc: di, run: ri }; renderShape(); });
+      strip.appendChild(cell);
+    });
+    return strip;
+  }
+
+  // One group = one Couch group_level=depth row; ids[0] is the representative doc.
+  function shapeDocEl(prefix, ids) {
+    const di = ids[0], doc = shapeDocs[di], group = ids.length > 1;
+    const box = shapeEl('div', 'shape-doc');
+    const head = shapeEl('div', 'shape-doc-head');
+    head.append(shapeEl('span', 'shape-name', group ? '×' + ids.length + '  ' + prefix : doc.name),
+      shapeEl('span', 'shape-chip ' + doc.kind, doc.kind === 'plan' ? 'kanban plan · persist' : doc.kind + ' · rejected'),
+      shapeEl('span', 'shape-meta', doc.lines.length + ' lines · ' + doc.runs.length + ' runs'));
+    box.append(head, shapeStrip(doc, di), shapeEl('code', 'shape-key', doc.key));
+    if (group) box.appendChild(shapeEl('div', 'shape-members', ids.map((i) => shapeDocs[i].name).join(', ')));
+    if (shapePick && shapePick.doc === di) {
+      const r = doc.runs[shapePick.run];
+      box.appendChild(shapeEl('pre', 'block-code shape-src', doc.lines.slice(r.start, r.end + 1).map((l, k) => String(r.start + k + 1).padStart(4) + '  ' + l).join('\n')));
+    }
+    return box;
+  }
+
+  function renderShape() {
+    shapeScrollEl.textContent = '';
+    const hud = shapeEl('div', 'shape-hud');
+    hud.setAttribute('role', 'group'); hud.setAttribute('aria-label', 'Shape depth (group level)');
+    const maxKey = Math.max(0, ...shapeDocs.map((d) => d.key.length));
+    [...SHAPE_FIB].filter((f) => f > 0 && f <= maxKey).concat(Infinity).forEach((f) => {
+      const label = f === Infinity ? '∞' : String(f);
+      const b = shapeEl('button', 'topbar-btn' + (shapeDepth === f ? ' active' : ''), label);
+      b.title = 'group_level=' + label; b.setAttribute('aria-label', 'Depth ' + label);
+      b.addEventListener('click', () => { shapeDepth = f; renderShape(); });
+      hud.appendChild(b);
+    });
+    hud.appendChild(shapeEl('span', 'shape-count', shapeDocs.length + ' files · drop files anywhere'));
+    shapeScrollEl.appendChild(hud);
+    const groups = new Map();
+    shapeDocs.forEach((d, i) => { const k = d.key.slice(0, shapeDepth); if (!groups.has(k)) groups.set(k, []); groups.get(k).push(i); });
+    [...groups].sort((a, b) => b[1].length - a[1].length).forEach(([prefix, ids]) => shapeScrollEl.appendChild(shapeDocEl(prefix, ids)));
+    const legend = shapeEl('div', 'shape-legend');
+    Object.keys(SHAPE_NAMES).forEach((c) => { const s = shapeEl('span', '', c + ' ' + SHAPE_NAMES[c]); s.prepend(shapeEl('i', '')); s.firstChild.style.setProperty('--c', 'var(--shape-' + c + ')'); legend.appendChild(s); });
+    shapeScrollEl.appendChild(legend);
+  }
+
+  function shapeIngest(files) {
+    Promise.all([...files].map((f) => f.text().then((t) => shapeOf(f.name, t))))
+      .then((docs) => { shapeDocs.push(...docs); shapePick = null; setView('shape'); });
+  }
+  document.addEventListener('dragover', (e) => e.preventDefault());
+  document.addEventListener('drop', (e) => { e.preventDefault(); if (e.dataTransfer.files.length) shapeIngest(e.dataTransfer.files); });
+  fileInputEl.addEventListener('change', () => { shapeIngest(fileInputEl.files); fileInputEl.value = ''; });
+
+  const VIEWS = { doc: [docScrollEl, viewDocBtn], board: [boardScrollEl, viewBoardBtn], graph: [graphScrollEl, viewGraphBtn], sheet: [sheetScrollEl, viewSheetBtn], shape: [shapeScrollEl, viewShapeBtn] };
   function setView(view) {
     mutate((s) => { s.view = view; }, 'view');
-    docScrollEl.hidden = view !== 'doc';
-    boardScrollEl.hidden = view !== 'board';
-    graphScrollEl.hidden = view !== 'graph';
-    sheetScrollEl.hidden = view !== 'sheet';
-    viewDocBtn.classList.toggle('active', view === 'doc');
-    viewBoardBtn.classList.toggle('active', view === 'board');
-    viewGraphBtn.classList.toggle('active', view === 'graph');
-    viewSheetBtn.classList.toggle('active', view === 'sheet');
+    for (const [k, [el, btn]] of Object.entries(VIEWS)) { el.hidden = k !== view; btn.classList.toggle('active', k === view); }
     if (view === 'board') renderBoard();
     if (view === 'graph') { setGraphMode(graphMode); }
     if (view === 'sheet') renderSheet();
+    if (view === 'shape') renderShape();
   }
 
-  viewDocBtn.addEventListener('click', () => setView('doc'));
-  viewBoardBtn.addEventListener('click', () => setView('board'));
-  viewGraphBtn.addEventListener('click', () => setView('graph'));
-  viewSheetBtn.addEventListener('click', () => setView('sheet'));
+  for (const [k, [, btn]] of Object.entries(VIEWS)) btn.addEventListener('click', () => setView(k));
   document.getElementById('btn-board').addEventListener('click', () => setView('board'));
   document.getElementById('btn-graph').addEventListener('click', () => setView('graph'));
   document.getElementById('btn-sheet').addEventListener('click', () => setView('sheet'));
@@ -1018,6 +1116,14 @@
     if (sheets.length) parts.push(sheets.length + ' sheets');
     seedNoteEl.textContent = parts.length ? 'Seed: ' + parts.join(' · ') : 'Local-first workspace';
   })();
+
+  // ── Global interactions ─────────────────────────────────────────────
+  document.addEventListener('keydown', (e) => {
+    if ((e.key === 'Enter' || e.key === ' ') && e.target.getAttribute('role') === 'button') {
+      e.preventDefault();
+      e.target.click();
+    }
+  });
 
   // ── Render all ──────────────────────────────────────────────────────
   function renderAll() {
