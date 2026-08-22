@@ -429,7 +429,8 @@ class GapReducer(
     private fun scanStubs(dir: File): List<StubHit> {
         if (!dir.exists()) return emptyList()
         val hits = mutableListOf<StubHit>()
-        dir.walkTopDown().filter { it.isFile && it.extension == "kt" }.forEach { file ->
+        dir.walkTopDown().forEach { file ->
+            if (file.isFile && file.extension == "kt") {
             // Slab stubs are compiled out (build.gradle.kts) — not dispatchable work.
             if (file.path.contains("/slab/")) return@forEach
             file.readLines().forEachIndexed { i, line ->
@@ -441,6 +442,7 @@ class GapReducer(
                     val rel = file.relativeTo(dir).path
                     hits.add(StubHit(rel, i + 1, line.trim()))
                 }
+            }
             }
         }
         return hits

@@ -101,3 +101,6 @@
 ## 2025-02-22 - ByteArray Comparison Optimization
 **Learning:** In Kotlin, replacing `.toList() == .toList()` on `ByteArray` with `.contentEquals()` removes unnecessary boxing/allocation. However, `.contentEquals()` requires exactly matching typed arrays. Using it generically (e.g., trying to use `UIntArray.contentEquals(Sequence<UInt>)`) causes compiler errors due to receiver type mismatches.
 **Action:** When optimizing byte/primitive array comparisons, explicitly use `.contentEquals()` for identical array types, but do not blindly apply it across mismatched sequence or collection bounds.
+## 2024-05-24 - Avoiding intermediate List allocations in filter followed by forEach
+**Learning:** In Kotlin, chaining `.filter { ... }` and `.forEach { ... }` generates an intermediate `ArrayList` containing all matched elements, leading to unnecessary memory allocation and GC pressure, especially when the collection is large or processed frequently.
+**Action:** Iterate with `.forEach { if (condition(it)) { ... } }` to avoid intermediate list allocations and improve performance in hot paths.

@@ -108,6 +108,12 @@ class ReteBetaMemory(
     }
 
     private fun removeTokens(predicate: (BetaTokenId) -> Boolean) {
-        tokenMemory.entries().filter { predicate(it.first) }.forEach { tokenMemory.remove(it.first) }
+        val toRemove = mutableListOf<BetaTokenId>()
+        tokenMemory.entries().forEach {
+            if (predicate(it.first)) {
+                toRemove.add(it.first)
+            }
+        }
+        toRemove.forEach { tokenMemory.remove(it) }
     }
 }

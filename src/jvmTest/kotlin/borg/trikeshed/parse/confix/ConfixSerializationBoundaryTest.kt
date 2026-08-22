@@ -22,7 +22,8 @@ class ConfixSerializationBoundaryTest {
         val rootDir = File(System.getProperty("user.dir"))
         val srcDir = File(rootDir, "src/commonMain")
         if (srcDir.exists()) {
-            srcDir.walkTopDown().filter { it.extension == "kt" }.forEach { file ->
+            srcDir.walkTopDown().forEach { file ->
+                if (file.extension == "kt") {
                 val lines = file.readLines()
                 lines.forEachIndexed { i, line ->
                     if (line.contains("import kotlinx.serialization.json.")) {
@@ -35,6 +36,7 @@ class ConfixSerializationBoundaryTest {
                         }
                     }
                 }
+                }
             }
         }
     }
@@ -46,9 +48,8 @@ class ConfixSerializationBoundaryTest {
         for (dirName in platformDirs) {
             val srcDir = File(rootDir, "src/$dirName/kotlin/borg/trikeshed/parse/confix")
             if (srcDir.exists()) {
-                val hasFormatCode = srcDir.walkTopDown().filter { it.extension == "kt" }.any { file ->
-                    val content = file.readText()
-                    content.contains("ConfixFormat") || content.contains("ConfixSerialization")
+                val hasFormatCode = srcDir.walkTopDown().any { file ->
+                    file.extension == "kt" && (file.readText().contains("ConfixFormat") || file.readText().contains("ConfixSerialization"))
                 }
                 if (hasFormatCode) {
                     fail("Confix serialization code found in platform module: $dirName")

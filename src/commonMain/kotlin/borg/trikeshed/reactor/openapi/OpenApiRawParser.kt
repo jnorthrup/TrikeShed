@@ -68,8 +68,10 @@ data class OpenApiRawDocument(val root: OpenApiMap) {
                     add(OpenApiGap("missing-responses", "paths.${operation.path}.${operation.method}.responses", "Operation responses are required"))
                 }
             }
-            refs().filter { resolveRef(it) == null }.forEach { ref ->
-                add(OpenApiGap("unresolved-ref", ref, "Reference cannot be resolved"))
+            refs().forEach { ref ->
+                if (resolveRef(ref) == null) {
+                    add(OpenApiGap("unresolved-ref", ref, "Reference cannot be resolved"))
+                }
             }
         }
         val tokens = operations.flatMap { operation ->
