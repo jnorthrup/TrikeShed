@@ -61,4 +61,44 @@ class SctpReactorSpineTest {
         element.close()
         assertEquals(ElementState.CLOSED, element.lifecycleState)
     }
+
+    @Test
+    fun testConnectionTeardownExchange() = runTest {
+        val serverElement = openSctpElement()
+        val clientElement = openSctpElement()
+
+        val serverAssoc = serverElement.bind(8081)
+        val clientAssoc = clientElement.connect("127.0.0.1", 8081)
+
+        // Setup ESTABLISHED
+        val initAck = SctpInitAckChunk(0u, 0u, 10u, 10u, 0u)
+        clientElement.handleInitAck(clientAssoc.associationId, initAck, byteArrayOf(1,2,3))
+
+        val cookieEcho = SctpCookieEchoChunk(byteArrayOf(1,2,3))
+        serverElement.handleCookieEcho(serverAssoc.associationId, cookieEcho)
+
+        clientElement.handleCookieAck(clientAssoc.associationId)
+
+        assertEquals(SctpState.ESTABLISHED, serverElement.associations[serverAssoc.associationId])
+        assertEquals(SctpState.ESTABLISHED, clientElement.associations[clientAssoc.associationId])
+
+        // 1. Client initiates shutdown
+        val clientState1 = clientElement.shutdown(clientAssoc.associationId)
+        assertEquals(SctpState.SHUTDOWN_SENT, clientState1)
+
+        // 2. Server receives SHUTDOWN
+        val serverState1 = serverElement.handleShutdown(serverAssoc.associationId, SctpShutdownChunk(0u))
+        assertEquals(SctpState.SHUTDOWN_ACK_SENT, serverState1)
+
+        // 3. Client receives SHUTDOWN_ACK
+        val clientState2 = clientElement.handleShutdownAck(clientAssoc.associationId, SctpShutdownAckChunk)
+        assertEquals(SctpState.CLOSED, clientState2)
+
+        // 4. Server receives SHUTDOWN_COMPLETE
+        val serverState2 = serverElement.handleShutdownComplete(serverAssoc.associationId, SctpShutdownCompleteChunk)
+        assertEquals(SctpState.CLOSED, serverState2)
+
+        serverElement.close()
+        clientElement.close()
+    }
 }
