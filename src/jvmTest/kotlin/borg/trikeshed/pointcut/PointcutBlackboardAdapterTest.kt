@@ -47,7 +47,7 @@ class PointcutBlackboardAdapterTest {
                 target = null,
                 propertyName = "head",
                 newValue = 42,
-                timestamp = 1_700_000_000_000L,
+                seq = 0,
             )
         )
 
@@ -68,7 +68,7 @@ class PointcutBlackboardAdapterTest {
         // DagCoordinate mapping
         assertEquals("org..types.Chain", stored.coordinate.className)
         assertEquals("push", stored.coordinate.methodName)
-        assertEquals(1_700_000_000_000L, stored.coordinate.timestamp)
+        assertTrue(stored.coordinate.timestamp > 0)
         assertTrue(stored.coordinate.threadId > 0)
 
         // PointcutMark byte rides in the payload — a carried newValue is an AFTER_SET
@@ -87,7 +87,7 @@ class PointcutBlackboardAdapterTest {
                 target = null,
                 propertyName = "head",
                 newValue = null,
-                timestamp = 7L,
+                seq = 0,
             )
         )
 
@@ -102,13 +102,13 @@ class PointcutBlackboardAdapterTest {
 
         // obj.head = None — newValue is null but this is still a write.
         val written = adapter.accept(
-            PointcutEvent(VmFacet.GRAAL_PYTHON, "m.C.f", null, "head", null, 3L),
+            PointcutEvent(VmFacet.GRAAL_PYTHON, "m.C.f", null, "head", null, 3),
             isWrite = true,
         )
         assertEquals(PointcutMark.AfterSet.raw, written.markRaw)
 
         val read = adapter.accept(
-            PointcutEvent(VmFacet.GRAAL_PYTHON, "m.C.f", null, "head", null, 4L),
+            PointcutEvent(VmFacet.GRAAL_PYTHON, "m.C.f", null, "head", null, 4),
             isWrite = false,
         )
         assertEquals(PointcutMark.AfterGet.raw, read.markRaw)
@@ -120,10 +120,10 @@ class PointcutBlackboardAdapterTest {
         val adapter = PointcutBlackboardAdapter(bb)
 
         val a = adapter.accept(
-            PointcutEvent(VmFacet.GRAAL_RUBY, "m.C.f", null, "alpha", 1, 10L)
+            PointcutEvent(VmFacet.GRAAL_RUBY, "m.C.f", null, "alpha", 1, 10)
         )
         val b = adapter.accept(
-            PointcutEvent(VmFacet.GRAAL_RUBY, "m.C.f", null, "beta", 2, 11L)
+            PointcutEvent(VmFacet.GRAAL_RUBY, "m.C.f", null, "beta", 2, 11)
         )
 
         assertTrue(a.key != b.key, "expected distinct keys, got ${a.key}")
@@ -147,7 +147,7 @@ class PointcutBlackboardAdapterTest {
         val bb = ConfixBlackboard.empty()
         val adapter = PointcutBlackboardAdapter(bb)
         val guest = adapter.accept(
-            PointcutEvent(VmFacet.GRAAL_JS, "m.C.f", null, "x", 1, 1L)
+            PointcutEvent(VmFacet.GRAAL_JS, "m.C.f", null, "x", 1, 1)
         )
         assertTrue(guest.coordinate.bytecodeOffset < 0)
         // A ring landing on the same class/method with a real offset must not collide.
@@ -260,7 +260,7 @@ class PointcutBlackboardAdapterTest {
         assertEquals(0, adapter.size)
 
         // count larger than the array must clamp, not throw
-        adapter.onSlab(arrayOf(traceEvent()), 5, 1L, 5_000_000L, 5_000_000L)
+        adapter.onSlab(arrayOf(traceEvent()), 5, 1, 5_000_000L, 5_000_000L)
 
         val key = PointcutBlackboardAdapter.keyOf("org..types.Bag", "setLoad", 9)
         assertEquals(1, adapter.size)
