@@ -58,8 +58,8 @@ object HermesDonorTrace {
 
         var sourceDescription = ""
         dataSource.connection.use { conn ->
-            conn.createStatement().use { stmt ->
-                val rs = stmt.executeQuery("SELECT id, title, body, status, parent_ids FROM tasks ORDER BY id ASC")
+            conn.prepareStatement("SELECT id, title, body, status, parent_ids FROM tasks ORDER BY id ASC").use { stmt ->
+                val rs = stmt.executeQuery()
                 val sb = java.lang.StringBuilder()
                 sb.append("TARGET: SQLite Donor Replay\n\n6. Work packages\n\n")
 
