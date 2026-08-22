@@ -90,6 +90,7 @@
 ## 2024-12-10 - Avoid O(N) boxing allocation when comparing ByteArray
 **Learning:** Comparing ByteArray objects using .toList() == other.toList() causes an O(N) memory allocation because each Byte gets boxed into an object within a new ArrayList. This can introduce unexpected GC pressure, especially when frequently hashing or comparing proofs.
 **Action:** Replace a.toList() == b.toList() on ByteArray with a.contentEquals(b) for a fast, zero-allocation byte-level comparison.
+<<<<<<< ours
 
 ## 2026-08-22 - Avoid redundant `.toList()` allocation after `.map { ... }` on Iterables
 **Learning:** In Kotlin, the `.map` extension function on Iterables natively returns a `List`. Chaining `.toList()` immediately after `.map { ... }` (e.g., `iterable.map { ... }.toList()`) is fully redundant. This practice negatively impacts performance by triggering a secondary, unnecessary shallow copy allocation of the entire collection, increasing GC pressure and CPU overhead for larger collections.
@@ -112,3 +113,5 @@
 ## 2026-10-25 - Avoid intermediate Sequence allocations before filterIsInstance
 **Learning:** Using `.asSequence().filterIsInstance<T>().maxWithOrNull(...)` in hot paths introduces significant memory allocation and execution overhead due to the creation of the `Sequence` wrapper and the stateful, lazy iterators required to evaluate it. Performance benchmarks show that a direct `for` loop with an `if (item is T)` check achieves a 46% latency reduction and zero object allocations compared to the Sequence approach.
 **Action:** To avoid intermediate Sequence allocations and lazy iterator overhead in Kotlin hot paths, replace chained collection operations like `.asSequence().filterIsInstance<T>().maxWithOrNull(...)` with direct, zero-allocation `for` loops that use `if (item is T)` checks.
+=======
+>>>>>>> theirs
