@@ -17,19 +17,25 @@
 **Learning:** On Linux/Unix systems, `getInstanceStrong()` often defaults to the blocking `/dev/random` pool. If system entropy is depleted, any thread calling `nextBytes()` on this instance will block indefinitely, leading to a Denial of Service (DoS) and application hang.
 **Prevention:** Use the default `SecureRandom()` constructor instead. It utilizes the non-blocking CSPRNG (`/dev/urandom`), which is cryptographically strong enough for general application use and immune to entropy-depletion blocking.
 
+<<<<<<< ours
 <<<<<<< HEAD
 ## 2023-11-20 - [Denial of Service via Unbounded waitFor]
 **Vulnerability:** Found `waitFor()` being called on a `Process` without a timeout in `JvmProcessOperations.kt`.
 **Learning:** `Process.waitFor()` without a timeout can lead to thread starvation and Denial of Service (DoS) if the subprocess hangs. This violates the "Fail securely" and "Do not expose system resources" principles.
 **Prevention:** Always use bounded `waitFor(timeout, TimeUnit)` and explicitly terminate the process via `destroyForcibly()` if the timeout occurs.
 
+=======
+>>>>>>> theirs
 ## 2025-05-24 - SQL Injection Prevention
 **Vulnerability:** In `HermesDonorTrace.kt`, queries to the `tasks` table were constructed manually via `createStatement().executeQuery(...)`. Although currently executing a hardcoded `SELECT id, title, body, status, parent_ids FROM tasks ORDER BY id ASC` string, constructing statements statically leaves room for future SQL injections if filters/where clauses are appended dynamically without migration to safe query methods.
 **Learning:** Hardcoded query strings in `executeQuery` expose applications to a high risk of SQL injection if developer changes ever append user parameters. Using prepared statements prevents injection via parameter binding separation.
 **Prevention:** Always use `prepareStatement` over `createStatement` when executing queries, even for initially parameter-less queries, to ensure the safest default posture.
+<<<<<<< ours
 
 ## 2024-05-24 - [Unchecked Casts on JsonSupport.parse lead to ClassCastException/DoS]
 **Vulnerability:** Core JSON deserialization logic (`JsonSupport.parse`) returns unvalidated `Any?`, which callers universally cast directly using unchecked casts (`as Map<String, Any?>` or similar). This creates an immediate exception and potential DoS vulnerability if the payload structure changes or is manipulated (e.g., in WAL replay).
 **Learning:** Kotlin Multiplatform `Any?` deserialization without strict schema wrappers or inline type bounds checking creates brittle boundaries that violate fail-secure principles. A simple structural mismatch crashes the execution thread.
 **Prevention:** Introduce and enforce explicitly typed validator functions (e.g., `parseMap(text: String): Map<String, Any?>`) at the library boundary (`JsonSupport`) that safely validate structure and type using `require` blocks before applying casts, throwing standardized descriptive exceptions that callers can catch cleanly.
 >>>>>>> origin/sentinel/fix-json-unsafe-deserialization-13206169233468597183
+=======
+>>>>>>> theirs
