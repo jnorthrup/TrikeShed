@@ -104,3 +104,6 @@
 ## 2024-05-24 - Avoiding intermediate List allocations in filter followed by forEach
 **Learning:** In Kotlin, chaining `.filter { ... }` and `.forEach { ... }` generates an intermediate `ArrayList` containing all matched elements, leading to unnecessary memory allocation and GC pressure, especially when the collection is large or processed frequently.
 **Action:** Iterate with `.forEach { if (condition(it)) { ... } }` to avoid intermediate list allocations and improve performance in hot paths.
+## 2025-02-18 - Avoid Unnecessary List Allocations on Iterables
+**Learning:** Calling `.toList()` on an `Iterable` that is already a collection (like a `List`) creates a full copy, allocating an intermediate `ArrayList` and incurring an O(N) penalty.
+**Action:** When a function accepts an `Iterable<T>` but needs a `List<T>` (e.g. for indexed access or multiple iterations), use safe casting to avoid the copy if it's already a list: `iterable as? List<T> ?: iterable.toList()`.
