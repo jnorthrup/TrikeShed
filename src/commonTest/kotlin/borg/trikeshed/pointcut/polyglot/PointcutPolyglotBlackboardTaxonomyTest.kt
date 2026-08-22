@@ -55,13 +55,21 @@ class PointcutPolyglotBlackboardTaxonomyTest {
     @Test
     fun testPointcutKataSandbox() = runTest {
         val taxonomy = GraalPolyglotBlackboardTaxonomy()
-        val worker = DummyProcessWorker()
         val sandbox = PolyglotKataRegistry.JAVA
 
         try {
-            val result = taxonomy.pointcutKataSandbox(worker, sandbox, listOf("java", "-version"))
+            val result = taxonomy.pointcutKataSandbox(sandbox, listOf("java", "-version"))
         } catch (e: IndexOutOfBoundsException) {
             // expected from emptyPointcutCoordinates()
         }
+    }
+
+    @Test
+    fun testPointcutKataSandboxInfiniteLoopKilled() = runTest {
+        val taxonomy = GraalPolyglotBlackboardTaxonomy()
+        val sandbox = PolyglotKataRegistry.PYTHON
+
+        val result = taxonomy.pointcutKataSandbox(sandbox, listOf("i = 0\nwhile True:\n    i += 1"))
+        assertTrue(result.a > 0, "Should have returned coordinates captured before being killed")
     }
 }
