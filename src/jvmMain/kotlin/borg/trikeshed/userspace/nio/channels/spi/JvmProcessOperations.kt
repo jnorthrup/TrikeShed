@@ -50,7 +50,7 @@ class JvmProcessOperations : ProcessOperations {
             }
 
             // Security: Prevent thread starvation and DoS by using bounded waitFor
-            val finished = proc.waitFor(60, java.util.concurrent.TimeUnit.SECONDS)
+            val finished = proc.waitFor(1, java.util.concurrent.TimeUnit.HOURS)
             if (!finished) {
                 proc.destroyForcibly()
                 throw java.util.concurrent.TimeoutException("Process timed out: $command")
