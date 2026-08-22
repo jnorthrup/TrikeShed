@@ -34,3 +34,7 @@
 ## 2026-08-20 - Global keyboard handlers for custom buttons
 **Learning:** When using custom DOM elements (like \`div\` or \`span\`) as interactive buttons by adding \`role="button"\` and \`tabindex="0"\`, they do not natively respond to \`Enter\` or \`Space\` keys like standard \`<button>\` elements do. Adding individual \`keydown\` listeners to every custom button creates redundant code, risks inconsistency, and is easy to miss on new components.
 **Action:** Implement a global event delegation listener on the \`document\` for the \`keydown\` event. When \`Enter\` or \`Space\` is pressed, check if the \`e.target.getAttribute('role') === 'button'\`, and if so, call \`e.target.click()\`. This ensures all current and future custom buttons are automatically keyboard accessible without duplicate logic.
+
+## 2025-01-22 - Adding focus-visible styles to custom interactive elements
+**Learning:** Elements that use `role="button"` and `tabindex="0"` for custom interactivity (such as a drop zone or custom toggles) often lack native focus states. If their focus-visible styles are not explicitly defined in CSS, keyboard users will not know when these elements receive focus, violating accessibility guidelines.
+**Action:** When making custom elements interactive by adding `tabindex="0"`, ensure that a `:focus-visible` CSS rule (e.g., `outline: 2px solid var(--accent);`) is applied to them to provide clear visual feedback during keyboard navigation.
