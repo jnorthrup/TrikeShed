@@ -223,6 +223,7 @@ kotlin {
                 implementation("org.graalvm.polyglot:polyglot:$graalVersion")
                 implementation("org.graalvm.polyglot:js-community:$graalVersion")
                 implementation("org.graalvm.polyglot:python-community:$graalVersion")
+                implementation("org.graalvm.polyglot:llvm-community:25.0.2")
                 implementation("org.graalvm.truffle:truffle-api:$graalVersion")
 
                 // Apache Tika — document text extraction (PDF/DOCX/images via Tesseract OCR).

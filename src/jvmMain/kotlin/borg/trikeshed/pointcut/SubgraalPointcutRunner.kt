@@ -11,6 +11,7 @@ import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import org.graalvm.polyglot.management.ExecutionEvent
 import org.graalvm.polyglot.management.ExecutionListener
+import java.io.File
 import java.io.InputStream
 import java.util.concurrent.ConcurrentHashMap
 import java.io.OutputStream
@@ -35,9 +36,18 @@ class SubgraalPointcutRunner(
         armedPaths.remove(path)
     }
 
-    private val context: Context = Context.newBuilder("python", "js")
+    /**
+     * Note on LLVM / MLIR:
+     * MLIR stays out of tree. The external lowering process requires:
+     * `mlir-opt --convert-to-llvm | mlir-translate --mlir-to-llvmir | llvm-as`
+     * which produces the `.bc` file that Sulong consumes.
+     */
+    private val context: Context = Context.newBuilder("python", "js", "llvm")
         .allowHostAccess(HostAccess.NONE)
+        .allowNativeAccess(true)
         .allowHostClassLookup { false }
+        .allowExperimentalOptions(true)
+        .option("llvm.verifyBitcode", "false")
         .out(outStream)
         .err(errStream)
         .`in`(inStream)
@@ -131,6 +141,11 @@ class SubgraalPointcutRunner(
 
     fun eval(language: String, sourceCode: String): org.graalvm.polyglot.Value {
         val source = Source.newBuilder(language, sourceCode, "eval.\$language").build()
+        return context.eval(source)
+    }
+
+    fun evalFile(language: String, file: File): org.graalvm.polyglot.Value {
+        val source = Source.newBuilder(language, file).build()
         return context.eval(source)
     }
 

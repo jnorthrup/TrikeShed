@@ -5,5 +5,6 @@ enum class VmFacet(val id: String) {
     GRAAL_JS("js"),
     GRAAL_PYTHON("python"),
     GRAAL_RUBY("ruby"),
-    GRAAL_CLOJURE("clojure")
+    GRAAL_CLOJURE("clojure"),
+    GRAAL_LLVM("llvm")
 }
