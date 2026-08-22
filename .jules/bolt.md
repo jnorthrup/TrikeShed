@@ -92,6 +92,7 @@
 **Learning:** Comparing ByteArray objects using .toList() == other.toList() causes an O(N) memory allocation because each Byte gets boxed into an object within a new ArrayList. This can introduce unexpected GC pressure, especially when frequently hashing or comparing proofs.
 **Action:** Replace a.toList() == b.toList() on ByteArray with a.contentEquals(b) for a fast, zero-allocation byte-level comparison.
 <<<<<<< ours
+<<<<<<< ours
 
 ## 2026-08-22 - Avoid redundant `.toList()` allocation after `.map { ... }` on Iterables
 **Learning:** In Kotlin, the `.map` extension function on Iterables natively returns a `List`. Chaining `.toList()` immediately after `.map { ... }` (e.g., `iterable.map { ... }.toList()`) is fully redundant. This practice negatively impacts performance by triggering a secondary, unnecessary shallow copy allocation of the entire collection, increasing GC pressure and CPU overhead for larger collections.
@@ -120,4 +121,9 @@
 ## 2024-05-24 - Avoiding intermediate List allocations in filter followed by forEach
 **Learning:** In Kotlin, chaining `.filter { ... }` and `.forEach { ... }` generates an intermediate `ArrayList` containing all matched elements, leading to unnecessary memory allocation and GC pressure, especially when the collection is large or processed frequently.
 **Action:** Iterate with `.forEach { if (condition(it)) { ... } }` to avoid intermediate list allocations and improve performance in hot paths.
+>>>>>>> theirs
+=======
+## 2025-02-27 - [Optimize FileCasStore put path]
+**Learning:** Using `fileOps.readAllBytes(path)` on the critical path of `FileCasStore.put` to verify already-existing CAS entries causes massive I/O overhead (~2929 µs/put vs ~35 µs for CouchStore), especially on repeated document saves. Since CAS guarantees content addressing, we can trust the path existence for the fast path and avoid re-reading and re-hashing the payload.
+**Action:** Always rely on `fileOps.exists(path)` to short-circuit repeated CAS ingestion unless explicit corruption repair is required by the product logic.
 >>>>>>> theirs
