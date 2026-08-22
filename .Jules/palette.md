@@ -44,3 +44,7 @@
 ## $(date +%Y-%m-%d) - Keyboard accessibility for pseudo-buttons
 **Learning:** Elements using `role="button"` and `tabindex="0"` do not natively fire click events on `Enter` or `Space` like standard `<button>` elements do.
 **Action:** Always add a generic or specific `keydown` event listener to these elements to translate `Enter` and `Space` key presses into `.click()` calls.
+
+## 2025-01-22 - Adding context to interactive board cards
+**Learning:** Kanban board cards acting as buttons (`role="button"`) without an `aria-label` only announce their visible contents (title and meta text) when navigated via a screen reader. This leaves the user without any hint that the card is interactive, what action activating it performs (e.g., cycling to the next column), or which column the card currently resides in when exploring via a flat element list.
+**Action:** When custom components like board cards act as interactive buttons, explicitly provide an `aria-label` that includes the card's name, its current contextual state (e.g., the column it is in), and the action that will occur upon activation (e.g., `card.title + ' (in ' + col.name + ') - activate to move to next column'`).

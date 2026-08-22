@@ -587,6 +587,7 @@
         const nextColIndex = (state.board.columns.indexOf(col) + 1) % state.board.columns.length;
         const nextColName = state.board.columns[nextColIndex].name;
         cardEl.setAttribute('aria-label', card.title + ' in ' + col.name + '. Activate to move to ' + nextColName);
+        cardEl.setAttribute('aria-label', card.title + ' (in ' + col.name + ') - activate to move to next column');
         const title = document.createElement('div');
         title.className = 'board-card-title';
         title.textContent = card.title;
