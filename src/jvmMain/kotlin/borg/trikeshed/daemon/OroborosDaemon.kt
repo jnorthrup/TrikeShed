@@ -447,7 +447,10 @@ object OroborosDaemon {
                     "[OROBOROS] Worktree→Couch initial reconcile: ${worktreeSnap.paths.size} paths, " +
                         "$bridged memory files bridged (spines + IPFS)"
                 )
-            }.onFailure { System.err.println("[OROBOROS] initial reconcile failed: ${it.message}") }
+            }.onFailure {
+                System.err.println("[OROBOROS] initial reconcile failed: ${it.message}")
+                it.printStackTrace()
+            }
         }
 
         // ── Couch report reactor: CCEK element for map/reduce events ──

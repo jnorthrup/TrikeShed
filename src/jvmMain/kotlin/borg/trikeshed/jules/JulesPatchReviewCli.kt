@@ -18,7 +18,11 @@ import java.io.File
  */
 object JulesPatchReviewCli {
 
-    private val PATCH_TERMINAL_STATES = setOf("COMPLETED", "FINISHED")
+    // Must match JulesSettlementCli.PATCH_TERMINAL_STATES: the reject lane runs
+    // for FAILED/CANCELLED sessions too (a failed session can still have an
+    // observed patch that must be explicitly reviewed before settle-reject —
+    // otherwise terminal FAILED sessions with patches are undrainable forever).
+    private val PATCH_TERMINAL_STATES = setOf("COMPLETED", "FINISHED", "FAILED", "CANCELLED")
     private val REPORT_TERMINAL_STATES = PATCH_TERMINAL_STATES + setOf("FAILED", "CANCELLED")
 
     @JvmStatic

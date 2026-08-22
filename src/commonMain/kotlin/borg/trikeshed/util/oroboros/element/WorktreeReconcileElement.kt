@@ -62,8 +62,11 @@ class WorktreeReconcileElement(
                             "$bridged memory updates @ ${currentSha.take(12)}"
                     )
                 }.onFailure {
-                    // note stdout
+                    // note stdout — full trace: the null-key NPE and vanished-file
+                    // races were previously reduced to a one-line message, hiding
+                    // the offending map/path from every dump.
                     println("[OROBOROS] Worktree→Couch reconcile failed: ${it.message}")
+                    it.printStackTrace()
                 }
             }
         }

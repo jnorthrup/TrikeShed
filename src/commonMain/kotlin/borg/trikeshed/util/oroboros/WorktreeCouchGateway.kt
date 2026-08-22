@@ -34,7 +34,15 @@ class WorktreeCouchGateway(
 
         for ((relativePath, physicalPath) in current) {
             val logicalPath = WORKTREE_PREFIX + relativePath
-            val bytes = fileOps.readAllBytes(physicalPath)
+            // TOCTOU guard: the walk and the read are separate syscalls; a file
+            // deleted between them (reactive editor, daemon self-write, git
+            // checkout) used to abort the whole reconcile with FileNotFound —
+            // and per-path tombstoning below keeps the next pass consistent.
+            val bytes = try {
+                fileOps.readAllBytes(physicalPath)
+            } catch (_: Exception) {
+                null
+            } ?: continue
             val cid = ContentId.of(bytes)
             if (existing[logicalPath]?.contentId == cid) continue
 
