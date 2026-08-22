@@ -3,7 +3,16 @@ package borg.trikeshed.pointcut.polyglot
 import borg.trikeshed.classfile.model.PointcutCoordinateSeries
 import borg.trikeshed.graal.ConfixBlackboard
 import borg.trikeshed.lib.Series
+import borg.trikeshed.lib.toSeries
 import borg.trikeshed.userspace.nio.process.ProcessWorker
+import borg.trikeshed.userspace.nio.process.ProcessWorkerFactory
+import borg.trikeshed.userspace.nio.process.ProcessCapability
+import borg.trikeshed.userspace.nio.process.ProcessSpec
+import borg.trikeshed.userspace.nio.platform.spi.SystemOperations
+import borg.trikeshed.classfile.model.PointcutCoordinate
+import borg.trikeshed.classfile.model.BytecodePointcutKind
+import borg.trikeshed.classfile.model.SourceCoordinate
+import borg.trikeshed.classfile.model.SymbolCoordinate
 
 /**
  * Defines a Kata Container-based sandbox specification for a polyglot language,
@@ -49,7 +58,7 @@ interface PolyglotBlackboardTaxonomy {
      * Spawns a child Kata container sandbox to resolve or intercept pointcuts for a specific language,
      * leveraging lighter-than-docker hypervisor capabilities.
      */
-    suspend fun pointcutKataSandbox(worker: ProcessWorker, sandbox: PolyglotKataSandbox, commandArgs: List<String>): PointcutCoordinateSeries
+    suspend fun pointcutKataSandbox(sandbox: PolyglotKataSandbox, commandArgs: List<String>): PointcutCoordinateSeries
 }
 
 /**
@@ -65,8 +74,53 @@ class GraalPolyglotBlackboardTaxonomy(
         return host.evaluatePython(commandArgs.joinToString(" "))
     }
 
-    override suspend fun pointcutKataSandbox(worker: ProcessWorker, sandbox: PolyglotKataSandbox, commandArgs: List<String>): PointcutCoordinateSeries {
-        // Spawns a Kata-isolated hypervisor process for the requested language sandbox
-        return borg.trikeshed.classfile.model.emptyPointcutCoordinates()
+    override suspend fun pointcutKataSandbox(sandbox: PolyglotKataSandbox, commandArgs: List<String>): PointcutCoordinateSeries {
+        val worker = ProcessWorkerFactory.create(ProcessCapability("pointcut-kata", setOf("java")))
+        val classpath = SystemOperations.default.getProperty("java.class.path") ?: "."
+        val spec = ProcessSpec(
+            command = "java",
+            args = listOf("-cp", classpath, "borg.trikeshed.pointcut.KataSandboxRunner", sandbox.language) + commandArgs
+        )
+        val result = worker.spawn(spec)
+        val buf = result.stdout
+
+        // Find magic prefix "KATA"
+        var offset = 0
+        val magic = "KATA".encodeToByteArray()
+        while (offset <= buf.size - magic.size) {
+            if (buf[offset] == magic[0] && buf[offset+1] == magic[1] && buf[offset+2] == magic[2] && buf[offset+3] == magic[3]) {
+                offset += 4
+                break
+            }
+            offset++
+        }
+
+        val coords = mutableListOf<PointcutCoordinate>()
+        while (offset + 24 <= buf.size) {
+            val opcode = buf[offset]
+            val phase = buf[offset + 1]
+            val methodIdx = (buf[offset + 2].toInt() and 0xFF) or ((buf[offset + 3].toInt() and 0xFF) shl 8)
+            val addr = (buf[offset + 4].toInt() and 0xFF) or
+                       ((buf[offset + 5].toInt() and 0xFF) shl 8) or
+                       ((buf[offset + 6].toInt() and 0xFF) shl 16) or
+                       ((buf[offset + 7].toInt() and 0xFF) shl 24)
+            val seq = (buf[offset + 8].toInt() and 0xFF) or
+                      ((buf[offset + 9].toInt() and 0xFF) shl 8) or
+                      ((buf[offset + 10].toInt() and 0xFF) shl 16) or
+                      ((buf[offset + 11].toInt() and 0xFF) shl 24)
+
+            // Map the unpacked struct to a PointcutCoordinate.
+            // Since we lack the original string table in the parent JVM, we synthesize the coordinates
+            // based on the raw wire protocol IDs.
+            coords.add(PointcutCoordinate(
+                kind = BytecodePointcutKind.INVOKE,
+                jvmOpcode = "OP_0x${opcode.toUByte().toString(16).padStart(2, '0').uppercase()}",
+                bytecodeOffset = addr,
+                source = SourceCoordinate("kata-sandbox", seq, 0, sandbox.language, 0),
+                symbol = SymbolCoordinate("method$methodIdx", "method$methodIdx", "phase$phase", "unknown", "unknown")
+            ))
+            offset += 24
+        }
+        return coords.toSeries()
     }
 }
