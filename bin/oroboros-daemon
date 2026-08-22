@@ -30,11 +30,11 @@ fi
 
 exec > >(tee -a "$LOG_FILE") 2>&1
 
-CLASSES="$ROOT/build/classes/kotlin/jvm/main"
+CLASSES="$ROOT/build/live/classes"
 LIB="$ROOT/build/staging/lib"
 
 if [[ ! -d "$CLASSES" ]]; then
-    echo "missing $CLASSES; run: ./gradlew compileKotlinJvm" >&2
+    echo "missing $CLASSES; run: ./gradlew hotswapFeed" >&2
     exit 1
 fi
 if [[ ! -d "$LIB" ]]; then

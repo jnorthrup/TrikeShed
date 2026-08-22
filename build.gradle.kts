@@ -934,3 +934,32 @@ tasks.register<Exec>("commonMainPurity") {
 tasks.named("check") {
     dependsOn("commonMainPurity")
 }
+
+
+tasks.register<Exec>("hotswapFeed") {
+    group = "build"
+    description = "Atomic compile feed for the live dir (replaces wrong 17; hot-swap stays)"
+    dependsOn("compileKotlinJvm", "jvmProcessResources")
+
+    val buildDir = project.layout.buildDirectory.get().asFile
+    val srcDir = File(buildDir, "classes/kotlin/jvm/main")
+    val liveDir = File(buildDir, "live")
+    val destDir = File(liveDir, "classes")
+
+    doFirst {
+        destDir.mkdirs()
+    }
+    
+    commandLine("rsync", "-a", "--delay-updates", "--delete", "${srcDir.absolutePath}/", "${destDir.absolutePath}/")
+
+    doLast {
+        val genFile = File(liveDir, ".generation")
+        val currentGen = if (genFile.exists()) {
+            genFile.readText().trim().toLongOrNull() ?: 0L
+        } else {
+            0L
+        }
+        genFile.writeText((currentGen + 1).toString() + "\n")
+    }
+}
+
