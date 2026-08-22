@@ -1,22 +1,7 @@
-package borg.trikeshed.forge.server
+with open("src/jvmMain/kotlin/borg/trikeshed/forge/server/KanbanHttpServerJvm.kt", "r") as f:
+    code = f.read()
 
-import borg.trikeshed.litebike.JvmKanbanServer
-import borg.trikeshed.util.JvmForgeIo
-import kotlinx.coroutines.runBlocking
-
-object KanbanServerMain {
-
-    @JvmStatic
-    fun main(args: Array<String>) {
-        val parsed = JvmForgeIo.parseKanbanServerArgs(
-            args = args,
-            programName = "KanbanServerMain",
-            usage = "Usage: KanbanServerMain [--port N] [--donor path]",
-        )
-        runBlocking { run(parsed.port, parsed.donor) }
-    }
-
-    suspend fun run(port: Int, donorPath: String?) {
+patch = """    suspend fun run(port: Int, donorPath: String?) {
         // Out-of-scope finding: JvmKanbanServer binds the port internally and its HTTP routing 
         // logic is closed for extension. It is impossible to intercept or inject BlackboardWire
         // routes without modifying JvmKanbanServer.kt (which violates the strict Owns constraint).
@@ -28,5 +13,13 @@ object KanbanServerMain {
         
         // Delegates to canonical Litebike Kanban server boundary
         JvmKanbanServer().run(port = port, donorPath = donorPath)
-    }
-}
+    }"""
+    
+code = code.replace("""    suspend fun run(port: Int, donorPath: String?) {
+        // Delegates to canonical Litebike Kanban server boundary
+        JvmKanbanServer().run(port = port, donorPath = donorPath)
+    }""", patch)
+
+with open("src/jvmMain/kotlin/borg/trikeshed/forge/server/KanbanHttpServerJvm.kt", "w") as f:
+    f.write(code)
+
