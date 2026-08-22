@@ -70,10 +70,15 @@ class ReteWorkingMemory {
     fun query(
         board: BlackboardContext,
         facet: Pair<String, Any?>,
-    ): List<ReteStoredFact> = current.entries()
-        .asSequence()
-        .map { it.second }
-        .filter { it.factId.partitionId == board.id && it.fields[facet.first] == facet.second }
-        .sortedWith(compareBy({ it.factId.partitionId }, { it.factId.localId }))
-        .toList()
+    ): List<ReteStoredFact> {
+        val results = ArrayList<ReteStoredFact>()
+        for (entry in current.entries()) {
+            val fact = entry.second
+            if (fact.factId.partitionId == board.id && fact.fields[facet.first] == facet.second) {
+                results.add(fact)
+            }
+        }
+        results.sortWith(compareBy({ it.factId.partitionId }, { it.factId.localId }))
+        return results
+    }
 }
