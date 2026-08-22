@@ -103,7 +103,7 @@ class SubgraalPointcutRunner(
             target = null,
             propertyName = "",
             newValue = if (!isEnter) event.returnValue?.takeIf { !it.isNull }?.toString() else null,
-            timestamp = System.currentTimeMillis(),
+            seq = TypedefProductionSystem.synapseRing.nextSeq(),
             sourcePath = source?.path,
             line = location?.startLine ?: -1,
             column = location?.startColumn ?: -1,
@@ -111,7 +111,8 @@ class SubgraalPointcutRunner(
         )
         _events.tryEmit(pointcutEvent)
 
-        val opcode = FieldSynapse.OP_L_GET.toByte()
+        val isWrite = (!isEnter) && (!event.isExpression || event.returnValue != null) && (!event.isRoot)
+        val opcode = if (isWrite) FieldSynapse.OP_L_SET.toByte() else FieldSynapse.OP_L_GET.toByte()
 
         val methodIdx = TypedefProductionSystem.InternPool.intern(rootName)
 
@@ -131,7 +132,7 @@ class SubgraalPointcutRunner(
             opcode = opcode,
             methodIdx = methodIdx,
             addr = 0,
-            seq = 0,
+            seq = pointcutEvent.seq,
             nano = tm,
             callsiteHash = callsiteHash,
             templateIdx = templateIdx

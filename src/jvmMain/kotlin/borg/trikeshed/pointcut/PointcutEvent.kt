@@ -9,7 +9,7 @@ data class PointcutEvent(
     val target: Any?,
     val propertyName: String,
     val newValue: Any?,
-    val timestamp: Long = System.currentTimeMillis(),
+    val seq: Int = 0,
     val sourcePath: String? = null,
     val line: Int = -1,
     val column: Int = -1,
@@ -24,8 +24,8 @@ data class PointcutEvent(
             opcode = opcode,
             methodIdx = methodIdx,
             addr = 0,
-            seq = 0,
-            nano = timestamp * 1_000_000L,
+            seq = seq,
+            nano = 0L,
             callsiteHash = cHash,
             templateIdx = FieldSynapse.TPL_BEFORE_GET
         )
@@ -40,7 +40,7 @@ data class PointcutEvent(
                 target = null,
                 propertyName = "",
                 newValue = null,
-                timestamp = synapse.nano / 1_000_000L
+                seq = synapse.seq
             )
         }
     }

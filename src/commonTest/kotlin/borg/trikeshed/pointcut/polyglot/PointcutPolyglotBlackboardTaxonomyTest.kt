@@ -21,6 +21,9 @@ class DummyTspyPolyglotHost : TspyPolyglotHost {
     override suspend fun evaluatePython(source: String): PointcutCoordinateSeries {
         return emptyPointcutCoordinates()
     }
+    override suspend fun evaluateJs(source: String): PointcutCoordinateSeries {
+        return emptyPointcutCoordinates()
+    }
 }
 
 class PointcutPolyglotBlackboardTaxonomyTest {
