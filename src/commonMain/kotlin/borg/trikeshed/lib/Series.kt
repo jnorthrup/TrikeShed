@@ -397,9 +397,11 @@ fun <B> Series<B>.dropLast(back: Int): Series<B> = get(0 until max(0, size - bac
 fun <B> Series<B>.take(exclusiveEnd: Int): Series<B> = get(0 until min(exclusiveEnd, size))
 
 //series foreachIndexed
+// Bolt: inline to prevent lambda object allocations
 inline fun <T> Series<T>.forEachIndexed(action: (index: Int, T) -> Unit): Unit { var index = 0; for (item in this.view) action(index++, item) }
 
 //series foreach
+// Bolt: inline to prevent lambda object allocations
 inline fun <T> Series<T>.forEach(action: (T) -> Unit): Unit { for (item in this.view) action(item) }
 
 fun <T> Series<T>.isEmpty(): Boolean = a == 0

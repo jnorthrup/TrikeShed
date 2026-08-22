@@ -93,3 +93,7 @@
 ## 2024-05-18 - Avoid O(N) allocation when iterating Series
 **Learning:** In Kotlin, using `.toList().forEach` to iterate over custom data structures like `Series` causes an unnecessary O(N) intermediate `ArrayList` allocation.
 **Action:** Use the `inline` extension `.forEach` directly on the `Series` (e.g. `series.forEach { ... }`) to avoid both list and lambda heap allocations in hot paths like network parsing.
+
+## 2024-12-11 - Differentiate Safe vs Unsafe .toList() Iteration Optimizations
+**Learning:** Removing `.toList().forEach()` chaining avoids intermediate `ArrayList` allocations. While this is a safe and critical optimization for iterating over immutable structures or custom cursors (like `Series`), doing this blindly on mutable collections (like event subscribers, callbacks, or TLS endpoints) can cause fatal `ConcurrentModificationException`s if handlers remove themselves during the dispatch loop.
+**Action:** When optimizing collection iterations in Kotlin, distinguish between safe optimizations on immutable structures (like `Series`) and necessary defensive copies on mutable collections. Do not remove `.toList()` on mutable collections if they might be modified during iteration.
