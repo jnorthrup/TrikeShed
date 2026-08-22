@@ -134,8 +134,9 @@ fun <S, T> Run<S>.pull(source: Series<T>): Series<T> = source[b.a until b.b]
  * without co-location — but it is NOT bounded, so it is an Emit, never a reduce.
  */
 fun <S> shapeMonoid(): Monoid<Shape<S>> = monoid<Shape<S>>(emptySeriesOf()) { l, r ->
-    if (l.size == 0 || r.size == 0 || l.last().a != r[0].a) (l.toList() + r.toList()).toSeries()
-    else (l.toList().dropLast(1) + (r[0].a j (l.last().b.a j r[0].b.b)) + r.toList().drop(1)).toSeries()
+    val seam = l.size > 0 && r.size > 0 && l.last().a == r[0].a
+    if (!seam) (l.size + r.size) j { i -> if (i < l.size) l[i] else r[i - l.size] }
+    else (l.size + r.size - 1) j { i -> when { i < l.size - 1 -> l[i]; i == l.size - 1 -> r[0].a j (l.last().b.a j r[0].b.b); else -> r[i - l.size + 1] } }
 }
 
 // ── Schedule ─────────────────────────────────────────────────────────────────────────────────
@@ -165,7 +166,7 @@ fun <S> Key<S>.prefix(depth: Depth): Prefix<S> = this[0 until minOf(depth, size)
 
 /** `startkey=p, endkey=p{` — everything whose key begins with [p]. O(n) over an unsorted emit list. */
 fun <S : Comparable<S>, V> Series<Emit<S, V>>.prefixRange(p: Prefix<S>): Series<Emit<S, V>> =
-    toList().filter { it.a.startsWith(p) }.toSeries()
+    filter { it.a.startsWith(p) }
 
 // ── group_level over an emit list (delivery-time sum) ────────────────────────────────────────
 

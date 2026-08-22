@@ -11,6 +11,7 @@ import borg.trikeshed.dag.ReteWorkingMemory
 import borg.trikeshed.graph.CausalGraphNode
 import borg.trikeshed.graph.causalGraphNode
 import borg.trikeshed.job.ContentId
+import borg.trikeshed.lib.cascade.Shape
 import borg.trikeshed.lib.cascade.key
 import borg.trikeshed.lib.cascade.shape
 import borg.trikeshed.lib.toList
@@ -42,7 +43,12 @@ private data class SourceTask(
 /** Deterministic ingest reducer. It performs no model call and stores no derived board dump. */
 object ForgeKanbanIngest {
     private val packageHeader = Regex("^([A-Z][0-9]+)\\s+[—-]\\s+(.+)$")
-    private val planRules = listOf('_' to Regex("^$"), '6' to Regex("^6\\. Work packages$"), '7' to Regex("^7\\. "), 'S' to Regex("^\\d+\\.\\s"), 'W' to packageHeader, 'D' to Regex("^Depends on:"))
+    /** Line alphabet. Gate symbols first (the plan grammar reads only 6/7/W); the generic tail grows with new formats. */
+    private val planRules = listOf(
+        '_' to Regex("^$"), '6' to Regex("^6\\. Work packages$"), '7' to Regex("^7\\. "), 'S' to Regex("^\\d+\\.\\s"),
+        'W' to packageHeader, 'D' to Regex("^Depends on:"),
+        'H' to Regex("^#{1,6}\\s"), 'B' to Regex("^[-*+]\\s"), 'T' to Regex("^\\|"), 'C' to Regex("^```"), 'J' to Regex("^[{}\\[\\]]|[;{}]$|^\"[^\"]+\":"),
+    )
     private val dependencyId = Regex("\\b[A-Z][0-9]+\\b")
 
     private val columns = listOf(
@@ -78,16 +84,20 @@ object ForgeKanbanIngest {
     /** One symbol per line: `6` work-packages header, `7` next section, `S` numbered section, `W` package header, `D` depends, `_` blank, `P` anything else. */
     fun classifyPlanLine(line: String): Char = line.trim().let { t -> planRules.firstOrNull { it.second.containsMatchIn(t) }?.first ?: 'P' }
 
+    /** The run-length facet of a plan source — runs with spans, addressable back into the lines. */
+    fun planRuns(markdown: String): Shape<Char> = markdown.lines().toSeries().shape(::classifyPlanLine)
+
     /** The run-length key of a plan source, e.g. `SP_6_WP_WDP_SP`. */
-    fun planShape(markdown: String): String =
-        markdown.lines().toSeries().shape(::classifyPlanLine).key.toList().joinToString("")
+    fun planShape(markdown: String): String = planRuns(markdown).key.toList().joinToString("")
+
+    fun isPlan(markdown: String): Boolean = planShapeGrammar.matches(planShape(markdown))
 
     /** A plan has a `6` followed by at least one `W` before any `7`. Everything [parseWorkPackages] needs, and nothing it doesn't. */
     private val planShapeGrammar = Regex("^[^67]*6[^7W]*W[^7]*(7.*)?$")
 
     fun requirePlanShape(markdown: String, sourcePath: String) {
         val shape = planShape(markdown)
-        require(planShapeGrammar.matches(shape)) {
+        require(isPlan(markdown)) {
             "$sourcePath is not a kanban plan — shape `$shape`, want `…6…W…[7…]`; refusing to persist"
         }
     }

@@ -2,6 +2,10 @@ package borg.trikeshed.forge
 
 import borg.trikeshed.common.Files
 import borg.trikeshed.kanban.ForgeKanbanIngest
+import borg.trikeshed.lib.cascade.fibTicks
+import borg.trikeshed.lib.toList
+import borg.trikeshed.lib.α
+import borg.trikeshed.media.boxes
 import kotlinx.coroutines.MainScope
 import kotlinx.coroutines.launch
 
@@ -67,7 +71,12 @@ private suspend fun forgeNodeMain() {
         // GitHub Pages / JVM server: the page already carries the baked seed (ForgeBakePages). In a browser
         // loadProjection has no fs and would fall back to the demo seed, so never document.write over it —
         // the bundle is hydrate-only here and just announces itself to script.js.
-        js("window.forgeKotlin = Object.assign(window.forgeKotlin || {}, { loaded: true })")
+        // The page's Shape view calls these; the alphabet, gate and box walker live in commonMain only.
+        val runs: (String) -> Array<String> = { md -> (ForgeKanbanIngest.planRuns(md) α { "${it.a}:${it.b.a}:${it.b.b}" }).toList().toTypedArray() }
+        val isPlan: (String) -> Boolean = ForgeKanbanIngest::isPlan
+        val fib: (Int) -> Array<Int> = { n -> fibTicks(n).toList().toTypedArray() }
+        val boxes: (ByteArray) -> Array<String> = { b -> (b.boxes() α { "${it.a.toList().joinToString("/")}:${it.b.sum.toLong()}" }).toList().toTypedArray() }
+        js("window.forgeKotlin = Object.assign(window.forgeKotlin || {}, { loaded: true, runs: runs, isPlan: isPlan, fib: fib, boxes: boxes })")
         return
     }
     val html = ForgeApp.renderHtml()

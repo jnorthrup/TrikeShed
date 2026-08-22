@@ -992,26 +992,28 @@
   // ── Shape strip (ingest motif) ──────────────────────────────────────
   const shapeScrollEl = document.getElementById('shape-scroll');
   const viewShapeBtn = document.getElementById('btn-view-shape');
-  // Shared symbols mirror the Kotlin gate (ForgeKanbanIngest.planRules) exactly, in order; the generic tail may grow.
-  const SHAPE_RULES = [['_', /^$/], ['6', /^6\. Work packages$/], ['7', /^7\. /], ['S', /^\d+\.\s/], ['W', /^[A-Z][0-9]+\s+[—-]\s+.+$/], ['D', /^Depends on:/],
-    ['H', /^#{1,6}\s/], ['B', /^[-*+]\s/], ['T', /^\|/], ['C', /^```/], ['J', /^[{}[\]]|[;{}]$|^"[^"]+":/]];
+  // The alphabet, gate and box walker are commonMain (ForgeKanbanIngest.planRules, IsoBmff); ForgeNodeMain publishes them on
+  // window.forgeKotlin when the js bundle hydrates. This file only draws.
   const SHAPE_NAMES = { _: 'blank', 6: 'work packages', 7: 'section 7', S: 'section', H: 'heading', W: 'package', D: 'depends', B: 'bullet', T: 'table', C: 'fence', J: 'code', P: 'prose' };
-  const SHAPE_FIB = new Set([0, 1, 2, 4, 7, 12, 20, 33, 54, 88, 143, 232, 376, 609, 986]);
-  const SHAPE_PLAN = /^[^67]*6[^7W]*W[^7]*(7.*)?$/;
+  const SHAPE_MEDIA = /\.(mp4|m4a|m4v|mov|3gp|heic|heif|avif|mj2)$/i;
   const shapeDocs = [];
-  let shapeDepth = Infinity, shapePick = null;
+  let shapeDepth = Infinity, shapePick = null, shapeFib = null;
+  const kotlin = () => window.forgeKotlin && window.forgeKotlin.runs ? window.forgeKotlin : null;
+  const fibSet = () => (shapeFib ||= new Set(kotlin().fib(1024)));
   const shapeEl = (tag, cls, text) => { const e = document.createElement(tag); e.className = cls; if (text != null) e.textContent = text; return e; };
-  const shapeClass = (t) => (SHAPE_RULES.find(([, re]) => re.test(t)) || ['P'])[0];
 
+  // Lines: runs come back as "sym:start:end" (half-open, absolute) — the Kotlin Shape<Char> facet.
   function shapeOf(name, text) {
-    const lines = text.split(/\r?\n/), runs = [];
-    lines.forEach((l, i) => {
-      const c = shapeClass(l.trim()), last = runs[runs.length - 1];
-      if (last && last.c === c) { last.end = i; last.n++; } else runs.push({ c, start: i, end: i, n: 1 });
-    });
-    const key = runs.map((r) => r.c).join('');
-    const kind = SHAPE_PLAN.test(key) ? 'plan' : /T/.test(key) ? 'table' : /[CJ]/.test(key) ? 'code' : /[HS]/.test(key) ? 'note' : 'prose';
-    return { name, lines, runs, key, kind };
+    const k = kotlin(), lines = text.split(/\r?\n/);
+    const runs = k.runs(text).map((s) => { const [c, a, b] = s.split(':'); return { c, start: +a, end: +b - 1, n: +b - +a }; });
+    const key = runs.map((r) => r.c), kind = k.isPlan(text) ? 'plan' : key.includes('T') ? 'table' : key.some((c) => c === 'C' || c === 'J') ? 'code' : key.some((c) => c === 'H' || c === 'S') ? 'note' : 'prose';
+    return { name, lines, runs, key, sep: '', kind, unit: 'lines' };
+  }
+  // Boxes: "path:bytes" per ISO BMFF box in walk order — the Kotlin boxes() emit; width ∝ bytes, symbol = box type.
+  function shapeOfBoxes(name, buf) {
+    const rows = kotlin().boxes(new Int8Array(buf));
+    const runs = rows.map((s, i) => { const j = s.lastIndexOf(':'), path = s.slice(0, j); return { c: path.split('/').pop(), path, start: i, end: i, n: +s.slice(j + 1) }; });
+    return { name, lines: rows.map((s) => s.replace(/:(\d+)$/, '  $1 B')), runs, key: runs.map((r) => r.c), sep: ' ', kind: 'box media', unit: 'bytes' };
   }
 
   function shapeStrip(doc, di) {
@@ -1019,11 +1021,11 @@
     strip.setAttribute('role', 'group'); strip.setAttribute('aria-label', 'Shape of ' + doc.name);
     doc.runs.forEach((r, ri) => {
       const cell = shapeEl('button', 'shape-cell');
-      cell.style.setProperty('--c', 'var(--shape-' + r.c + ')');
+      cell.style.setProperty('--c', 'var(--shape-' + r.c + ', var(--shape-P))');
       cell.style.flex = r.n + ' 0 2px';
-      cell.classList.toggle('fib', SHAPE_FIB.has(ri));
+      cell.classList.toggle('fib', fibSet().has(ri));
       cell.classList.toggle('picked', !!shapePick && shapePick.doc === di && shapePick.run === ri);
-      cell.title = SHAPE_NAMES[r.c] + ' ×' + r.n + ' · lines ' + (r.start + 1) + '–' + (r.end + 1) + (SHAPE_FIB.has(ri) ? ' · depth ' + ri : '');
+      cell.title = (r.path || SHAPE_NAMES[r.c] || r.c) + ' · ' + r.n + ' ' + doc.unit + (r.path ? '' : ' ' + (r.start + 1) + '–' + (r.end + 1)) + (fibSet().has(ri) ? ' · depth ' + ri : '');
       cell.setAttribute('aria-label', cell.title);
       cell.addEventListener('click', () => { shapePick = { doc: di, run: ri }; renderShape(); });
       strip.appendChild(cell);
@@ -1037,9 +1039,9 @@
     const box = shapeEl('div', 'shape-doc');
     const head = shapeEl('div', 'shape-doc-head');
     head.append(shapeEl('span', 'shape-name', group ? '×' + ids.length + '  ' + prefix : doc.name),
-      shapeEl('span', 'shape-chip ' + doc.kind, doc.kind === 'plan' ? 'kanban plan · persist' : doc.kind + ' · rejected'),
-      shapeEl('span', 'shape-meta', doc.lines.length + ' lines · ' + doc.runs.length + ' runs'));
-    box.append(head, shapeStrip(doc, di), shapeEl('code', 'shape-key', doc.key));
+      shapeEl('span', 'shape-chip ' + doc.kind.split(' ')[0], doc.kind === 'plan' ? 'kanban plan · persist' : doc.kind + (doc.kind === 'box media' ? '' : ' · rejected')),
+      shapeEl('span', 'shape-meta', doc.lines.length + ' ' + (doc.unit === 'bytes' ? 'boxes' : 'lines') + ' · ' + doc.runs.length + ' runs'));
+    box.append(head, shapeStrip(doc, di), shapeEl('code', 'shape-key', doc.key.join(doc.sep)));
     if (group) box.appendChild(shapeEl('div', 'shape-members', ids.map((i) => shapeDocs[i].name).join(', ')));
     if (shapePick && shapePick.doc === di) {
       const r = doc.runs[shapePick.run];
@@ -1050,10 +1052,11 @@
 
   function renderShape() {
     shapeScrollEl.textContent = '';
+    if (!kotlin()) { shapeScrollEl.appendChild(shapeEl('span', 'shape-count', 'Kotlin bundle not loaded — bake with -PforgePagesStages=jvm,js')); return; }
     const hud = shapeEl('div', 'shape-hud');
     hud.setAttribute('role', 'group'); hud.setAttribute('aria-label', 'Shape depth (group level)');
     const maxKey = Math.max(0, ...shapeDocs.map((d) => d.key.length));
-    [...SHAPE_FIB].filter((f) => f > 0 && f <= maxKey).concat(Infinity).forEach((f) => {
+    [...fibSet()].filter((f) => f > 0 && f <= maxKey).concat(Infinity).forEach((f) => {
       const label = f === Infinity ? '∞' : String(f);
       const b = shapeEl('button', 'topbar-btn' + (shapeDepth === f ? ' active' : ''), label);
       b.title = 'group_level=' + label; b.setAttribute('aria-label', 'Depth ' + label);
@@ -1063,7 +1066,7 @@
     hud.appendChild(shapeEl('span', 'shape-count', shapeDocs.length + ' files · drop files anywhere'));
     shapeScrollEl.appendChild(hud);
     const groups = new Map();
-    shapeDocs.forEach((d, i) => { const k = d.key.slice(0, shapeDepth); if (!groups.has(k)) groups.set(k, []); groups.get(k).push(i); });
+    shapeDocs.forEach((d, i) => { const k = d.key.slice(0, shapeDepth).join(d.sep); if (!groups.has(k)) groups.set(k, []); groups.get(k).push(i); });
     [...groups].sort((a, b) => b[1].length - a[1].length).forEach(([prefix, ids]) => shapeScrollEl.appendChild(shapeDocEl(prefix, ids)));
     const legend = shapeEl('div', 'shape-legend');
     Object.keys(SHAPE_NAMES).forEach((c) => { const s = shapeEl('span', '', c + ' ' + SHAPE_NAMES[c]); s.prepend(shapeEl('i', '')); s.firstChild.style.setProperty('--c', 'var(--shape-' + c + ')'); legend.appendChild(s); });
@@ -1071,7 +1074,8 @@
   }
 
   function shapeIngest(files) {
-    Promise.all([...files].map((f) => f.text().then((t) => shapeOf(f.name, t))))
+    if (!kotlin()) { setView('shape'); return; }
+    Promise.all([...files].map((f) => SHAPE_MEDIA.test(f.name) ? f.arrayBuffer().then((b) => shapeOfBoxes(f.name, b)) : f.text().then((t) => shapeOf(f.name, t))))
       .then((docs) => { shapeDocs.push(...docs); shapePick = null; setView('shape'); });
   }
   document.addEventListener('dragover', (e) => e.preventDefault());

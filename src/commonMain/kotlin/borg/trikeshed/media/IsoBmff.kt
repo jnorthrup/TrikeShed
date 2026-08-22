@@ -46,7 +46,7 @@ fun ByteArray.boxes(): Series<Emit<String, Stats>> {
 }
 
 /** `trie[["moov","trak"]].sum` = bytes under every trak, `leaf(...)` = the trak boxes themselves; `level(1)` = top-level boxes; `unseen(p)` = first sighting. */
-fun ByteArray.boxTrie(): Trie<String, Stats> = Trie<String, Stats>(Stats).also { t -> boxes().toList().forEach { t.add(it.a, it.b) } }
+fun ByteArray.boxTrie(): Trie<String, Stats> = Trie<String, Stats>(Stats).also { t -> for (e in boxes().view) t.add(e.a, e.b) }
 
 /** The box types in walk order — the file's shape signature at box granularity. */
 fun ByteArray.boxKey(): Key<String> = boxes() α { it.a.last() }

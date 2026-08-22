@@ -23,7 +23,7 @@ inline fun <V> Cursor.emits(key: ColK<*>, crossinline value: (RowVec) -> V): Ser
     this α { row -> row.charKey(key) j value(row) }
 
 /** startkey=p, endkey=p{ — rows whose key begins with [p]. */
-fun Cursor.prefixRange(key: ColK<*>, p: CharSequence): Cursor = toList().filter { it.charKey(key).startsWith(p.toString()) }.toSeries()
+fun Cursor.prefixRange(key: ColK<*>, p: CharSequence): Cursor = filter { it.charKey(key).startsWith(p.toString()) }
 
 /** Couch `?group_level=depth` over a Cursor — delivery-time fold. */
 inline fun <V> Cursor.groupLevel(key: ColK<*>, depth: Depth, m: Monoid<V>, crossinline value: (RowVec) -> V): Cursor =
