@@ -90,20 +90,6 @@
 ## 2024-12-10 - Avoid O(N) boxing allocation when comparing ByteArray
 **Learning:** Comparing ByteArray objects using .toList() == other.toList() causes an O(N) memory allocation because each Byte gets boxed into an object within a new ArrayList. This can introduce unexpected GC pressure, especially when frequently hashing or comparing proofs.
 **Action:** Replace a.toList() == b.toList() on ByteArray with a.contentEquals(b) for a fast, zero-allocation byte-level comparison.
-
-## 2024-05-18 - Avoid O(N) allocation when iterating Series
-**Learning:** In Kotlin, using `.toList().forEach` to iterate over custom data structures like `Series` causes an unnecessary O(N) intermediate `ArrayList` allocation.
-**Action:** Use the `inline` extension `.forEach` directly on the `Series` (e.g. `series.forEach { ... }`) to avoid both list and lambda heap allocations in hot paths like network parsing.
-
-## 2024-12-11 - Differentiate Safe vs Unsafe .toList() Iteration Optimizations
-**Learning:** Removing `.toList().forEach()` chaining avoids intermediate `ArrayList` allocations. While this is a safe and critical optimization for iterating over immutable structures or custom cursors (like `Series`), doing this blindly on mutable collections (like event subscribers, callbacks, or TLS endpoints) can cause fatal `ConcurrentModificationException`s if handlers remove themselves during the dispatch loop.
-**Action:** When optimizing collection iterations in Kotlin, distinguish between safe optimizations on immutable structures (like `Series`) and necessary defensive copies on mutable collections. Do not remove `.toList()` on mutable collections if they might be modified during iteration.
-## 2025-02-22 - ByteArray Comparison Optimization
-**Learning:** In Kotlin, replacing `.toList() == .toList()` on `ByteArray` with `.contentEquals()` removes unnecessary boxing/allocation. However, `.contentEquals()` requires exactly matching typed arrays. Using it generically (e.g., trying to use `UIntArray.contentEquals(Sequence<UInt>)`) causes compiler errors due to receiver type mismatches.
-**Action:** When optimizing byte/primitive array comparisons, explicitly use `.contentEquals()` for identical array types, but do not blindly apply it across mismatched sequence or collection bounds.
-## 2024-05-24 - Avoiding intermediate List allocations in filter followed by forEach
-**Learning:** In Kotlin, chaining `.filter { ... }` and `.forEach { ... }` generates an intermediate `ArrayList` containing all matched elements, leading to unnecessary memory allocation and GC pressure, especially when the collection is large or processed frequently.
-**Action:** Iterate with `.forEach { if (condition(it)) { ... } }` to avoid intermediate list allocations and improve performance in hot paths.
-## 2025-02-18 - Avoid Unnecessary List Allocations on Iterables
-**Learning:** Calling `.toList()` on an `Iterable` that is already a collection (like a `List`) creates a full copy, allocating an intermediate `ArrayList` and incurring an O(N) penalty.
-**Action:** When a function accepts an `Iterable<T>` but needs a `List<T>` (e.g. for indexed access or multiple iterations), use safe casting to avoid the copy if it's already a list: `iterable as? List<T> ?: iterable.toList()`.
+## 2025-02-27 - [Optimize FileCasStore put path]
+**Learning:** Using `fileOps.readAllBytes(path)` on the critical path of `FileCasStore.put` to verify already-existing CAS entries causes massive I/O overhead (~2929 µs/put vs ~35 µs for CouchStore), especially on repeated document saves. Since CAS guarantees content addressing, we can trust the path existence for the fast path and avoid re-reading and re-hashing the payload.
+**Action:** Always rely on `fileOps.exists(path)` to short-circuit repeated CAS ingestion unless explicit corruption repair is required by the product logic.

@@ -27,28 +27,15 @@ class FileCasStore(
         val cid = ContentId.of(bytes)
         val path = getShardedPath(cid)
 
-        val existingIsValid = if (fileOps.exists(path)) {
-            val existing = fileOps.readAllBytes(path)
-            val existingCid = ContentId.of(existing)
-            if (existingCid == cid) {
-                check(existing.contentEquals(bytes)) {
-                    "CAS collision: stored blob for CID $cid has different bytes"
-                }
-                true
-            } else {
-                false
-            }
-        } else {
-            false
+        if (fileOps.exists(path)) {
+            return cid
         }
 
-        if (!existingIsValid) {
-            val dirPath = fileOps.resolvePath(casRoot, "sha256", cid.hex.substring(0, 2))
-            if (!fileOps.exists(dirPath)) fileOps.mkdirs(dirPath)
-            // A corrupt object at the expected CID path is repaired from the
-            // caller-provided bytes without ever exposing a partial object.
-            fileOps.writeAtomically(path, bytes)
-        }
+        val dirPath = fileOps.resolvePath(casRoot, "sha256", cid.hex.substring(0, 2))
+        if (!fileOps.exists(dirPath)) fileOps.mkdirs(dirPath)
+        // A corrupt object at the expected CID path is repaired from the
+        // caller-provided bytes without ever exposing a partial object.
+        fileOps.writeAtomically(path, bytes)
 
         // Publication is not visible until the exact bytes are re-read and
         // checked against both the requested payload and its address.
