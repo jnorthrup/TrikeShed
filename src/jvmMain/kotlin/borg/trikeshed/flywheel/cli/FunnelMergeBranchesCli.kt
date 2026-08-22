@@ -387,14 +387,20 @@ private class FunnelMergeBranchesCli(
      * not English words.
      */
     private fun steganographicPaths(paths: List<String>): List<String> {
-        val digitRun = Regex("\\d{10,}")
-        val hexishRun = Regex("(?i)[0-9a-f]{16,}")
-        val base64ish = Regex("[A-Za-z0-9+/]{24,}={0,2}")
+        val digitRun = Regex("\\d{12,}")
+        val pureHexName = Regex("(?i)^[0-9a-f]{16,}(\\.[a-z]+)?$")
         return paths.filter { path ->
             path.split('/').any { seg ->
-                digitRun.containsMatchIn(seg) && !seg.contains('-') ||
-                    hexishRun.containsMatchIn(seg) && !seg.contains('-') ||
-                    base64ish.containsMatchIn(seg) && !seg.contains('-')
+                if (digitRun.containsMatchIn(seg)) return@any true
+                if (pureHexName.containsMatchIn(seg)) return@any true
+                // Payload-like basename: long, alpha-only, no CamelCase word
+                // structure. Word-like identifiers (JulesPatchContinuityStore,
+                // humps=3) pass; base64 payloads (humps<=1) flag.
+                val base = seg.substringBeforeLast('.')
+                if (base.length >= 24 && base.all { it.isLetter() }) {
+                    val humps = base.zipWithNext().count { (a, b) -> a.isLowerCase() && b.isUpperCase() }
+                    humps <= 1
+                } else false
             }
         }
     }
