@@ -38,3 +38,6 @@
 ## 2025-10-24 - Adding aria-selected to dynamic tab elements
 **Learning:** When dynamically generating components with `role="tab"`, adding an `active` CSS class is not enough for screen readers. Without the `aria-selected` attribute, screen reader users cannot tell which tab in the `tablist` is currently active.
 **Action:** Always pair visual active states (like `.active` classes) on `role="tab"` elements with `aria-selected="true"` or `aria-selected="false"` to ensure the active state is programmatically announced by assistive technologies.
+## 2024-08-20 - Adding focus states for drag and drop drop zones
+**Learning:** For elements handling drag-and-drop file ingestions natively created as semantic `role="button"` placeholders like `.drop-zone` in index.html templates, ensuring they receive `:focus-visible` styling is crucial for keyboard users attempting to access upload functions.
+**Action:** Always add interactive form and UI upload containers defined with tabindex to the globally applied `:focus-visible` CSS selector lists.
