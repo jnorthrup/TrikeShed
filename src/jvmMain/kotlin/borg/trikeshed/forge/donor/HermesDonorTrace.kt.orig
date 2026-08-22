@@ -38,7 +38,7 @@ object HermesDonorTrace {
     }
 
     private suspend fun ingestMarkdown(userId: String, donorPath: Path): ForgeKanbanReduction {
-        val ingestPath = if (borg.trikeshed.kanban.ingestRoute(donorPath.fileName.toString()) != borg.trikeshed.kanban.IngestRoute.Text) {
+        val ingestPath = if (borg.trikeshed.kanban.JvmTikaIngestAdapter.isTikaCandidate(donorPath)) {
             val md = borg.trikeshed.kanban.JvmTikaIngestAdapter.extractToMarkdown(donorPath)
             val tmp = Files.createTempFile("tika-donor", ".md")
             Files.writeString(tmp, md)
@@ -58,8 +58,8 @@ object HermesDonorTrace {
 
         var sourceDescription = ""
         dataSource.connection.use { conn ->
-            conn.prepareStatement("SELECT id, title, body, status, parent_ids FROM tasks ORDER BY id ASC").use { stmt ->
-                val rs = stmt.executeQuery()
+            conn.createStatement().use { stmt ->
+                val rs = stmt.executeQuery("SELECT id, title, body, status, parent_ids FROM tasks ORDER BY id ASC")
                 val sb = java.lang.StringBuilder()
                 sb.append("TARGET: SQLite Donor Replay\n\n6. Work packages\n\n")
 
