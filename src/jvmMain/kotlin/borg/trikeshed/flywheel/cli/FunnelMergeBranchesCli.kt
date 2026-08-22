@@ -167,12 +167,10 @@ private class FunnelMergeBranchesCli(
                 pb.waitFor() to out
             }
             if (build.first != 0) {
-                System.err.println("[FUNNEL-MERGE] BUILD RED in isolated worktree — nothing landed:")
+                System.err.println("[FUNNEL-MERGE] BUILD RED in isolated worktree — N-way result rejected:")
                 System.err.println(build.second.takeLast(3000))
-                if (solo.isNotEmpty()) {
-                    System.err.println("[FUNNEL-MERGE] continuing with ${solo.size} solo-lane arms")
-                    runSolo(solo, baseSha)
-                }
+                System.err.println("[FUNNEL-MERGE] falling back to per-arm solo lane for all ${batch.size} batch arms + ${solo.size} sensitive")
+                runSolo(solo + batch, baseSha)
                 return
             }
             println("[FUNNEL-MERGE] build gate green")
@@ -310,8 +308,21 @@ private class FunnelMergeBranchesCli(
             withContext(Dispatchers.IO) { patchFile.writeText(arm.patch) }
             val apply = gitIn(worktree, "apply", "--3way", patchFile.absolutePath)
             if (apply.first != 0) {
-                System.err.println("[FUNNEL-MERGE] single-arm apply failed: ${apply.second.take(300)}")
-                return
+                // Retry with reduced context: stale-base WAL patches carry
+                // context lines from a tree master has since moved. --recount
+                // with 1-line context tolerates the drift where 3-way cannot.
+                val reduced = withContext(Dispatchers.IO) { reducePatchContext(arm.patch, 1) }
+                if (reduced != null) {
+                    withContext(Dispatchers.IO) { patchFile.writeText(reduced) }
+                    val retry = gitIn(worktree, "apply", "--3way", "--recount", patchFile.absolutePath)
+                    if (retry.first != 0) {
+                        System.err.println("[FUNNEL-MERGE] single-arm apply failed (3way + reduced context): ${(retry.second.take(300))}")
+                        return
+                    }
+                } else {
+                    System.err.println("[FUNNEL-MERGE] single-arm apply failed: ${apply.second.take(300)}")
+                    return
+                }
             }
             if (gitIn(worktree, "status", "--porcelain").second.isBlank()) {
                 println("[FUNNEL-MERGE] single arm already present on master")
@@ -441,6 +452,28 @@ private class FunnelMergeBranchesCli(
                 } else false
             }
         }
+    }
+
+    /** Rewrite a unified diff keeping only [keep] context lines per hunk side. */
+    private fun reducePatchContext(patch: String, keep: Int): String? {
+        val out = StringBuilder()
+        var inHunk = false
+        var kept = 0
+        for (line in patch.lineSequence()) {
+            if (line.startsWith("@@")) {
+                inHunk = true; kept = 0
+                out.appendLine(line)
+                continue
+            }
+            if (!inHunk) { out.appendLine(line); continue }
+            if (line.startsWith(" ")) {
+                if (kept < keep) { out.appendLine(line); kept++ }
+                // else: drop excess context
+            } else {
+                out.appendLine(line)
+            }
+        }
+        return out.toString().ifBlank { null }
     }
 
     /** Minimal unified-diff file list parser (same tolerance as the daemon's). */
