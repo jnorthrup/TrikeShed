@@ -18,7 +18,7 @@ class ForgePersistenceDurabilityTest {
     @Test
     fun everyWorkspaceMutationPersistsBeforeItEnqueuesACommand() {
         val script = forgePersistenceScript()
-        val mutate = script.substringAfter("function mutate(updater)").substringBefore("// ── Element refs")
+        val mutate = script.substringAfter("function mutate(updater, kind)").substringBefore("// ── Element refs")
 
         assertTrue(mutate.indexOf("updater(state)") < mutate.indexOf("saveState()"))
         assertTrue(mutate.indexOf("saveState()") < mutate.indexOf("__forgeCommandQueue.push"))

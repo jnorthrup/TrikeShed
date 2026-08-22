@@ -58,3 +58,7 @@
 ## 2025-01-22 - Adding focus-visible styles to custom interactive elements
 **Learning:** Elements that use `role="button"` and `tabindex="0"` for custom interactivity (such as a drop zone or custom toggles) often lack native focus states. If their focus-visible styles are not explicitly defined in CSS, keyboard users will not know when these elements receive focus, violating accessibility guidelines.
 **Action:** When making custom elements interactive by adding `tabindex="0"`, ensure that a `:focus-visible` CSS rule (e.g., `outline: 2px solid var(--accent);`) is applied to them to provide clear visual feedback during keyboard navigation.
+
+## 2025-02-23 - Announcing active states for single-page application navigation
+**Learning:** Single-page applications often use custom buttons to switch views instead of actual `<a>` tags with `href`s. While visual users see an active state (like a background color change), screen reader users hear no change in state unless explicitly announced.
+**Action:** When building custom view switchers (like tabs or navigation sidebar items) that aren't native links, always apply `aria-current="true"` (or `aria-current="page"` for navigation menus) or `aria-pressed="true"` (for toggle buttons) via JavaScript when the view changes.
