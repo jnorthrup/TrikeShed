@@ -428,6 +428,16 @@ private class FunnelMergeBranchesCli(
                             gitIn(worktree, "apply", "--3way", "--recount", patchFile.absolutePath).first == 0
                         } else false
                         if (!ok) {
+                            // Content-level already-present: the patch's own
+                            // additions may already live on master at a moved
+                            // location (stale base). If every non-trivial added
+                            // line exists verbatim in the target file, the arm
+                            // is satisfied — close it, don't fail it.
+                            if (patchContentAlreadyPresent(worktree, productionPatch)) {
+                                println("[FUNNEL-MERGE] single arm content already present on master (moved anchors): ${arm.label}")
+                                tagAndClose(listOf(arm), headShaNow(), alreadyPresent = true)
+                                return
+                            }
                             System.err.println("[FUNNEL-MERGE] single-arm apply failed (3way + reduced context): ${(retry.second.take(300))}")
                             return
                         }
@@ -573,6 +583,35 @@ private class FunnelMergeBranchesCli(
                 } else false
             }
         }
+    }
+
+    /**
+     * True when every non-trivial added line of the patch already exists
+     * verbatim in its target file inside [worktree] — the stale-base
+     * already-satisfied case git apply cannot detect positionally.
+     */
+    private fun patchContentAlreadyPresent(worktree: File, patch: String): Boolean {
+        var currentPath: String? = null
+        val addedByFile = LinkedHashMap<String, MutableList<String>>()
+        for (line in patch.lineSequence()) {
+            when {
+                line.startsWith("+++ b/") -> currentPath = line.removePrefix("+++ b/").trim()
+                line.startsWith("+") && !line.startsWith("+++") -> {
+                    val body = line.removePrefix("+").trimEnd()
+                    currentPath?.let { f -> addedByFile.getOrPut(f) { mutableListOf() }.add(body) }
+                }
+            }
+        }
+        if (addedByFile.isEmpty()) return false
+        for ((path, added) in addedByFile) {
+            val target = File(worktree, path)
+            if (!target.isFile) return false
+            val content = target.readText()
+            val nonTrivial = added.filter { it.length >= 12 }
+            if (nonTrivial.isEmpty()) continue
+            if (nonTrivial.any { it !in content }) return false
+        }
+        return true
     }
 
     /** Rewrite a unified diff keeping only [keep] context lines per hunk side. */
