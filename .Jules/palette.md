@@ -48,3 +48,7 @@
 ## 2025-01-22 - Adding context to interactive board cards
 **Learning:** Kanban board cards acting as buttons (`role="button"`) without an `aria-label` only announce their visible contents (title and meta text) when navigated via a screen reader. This leaves the user without any hint that the card is interactive, what action activating it performs (e.g., cycling to the next column), or which column the card currently resides in when exploring via a flat element list.
 **Action:** When custom components like board cards act as interactive buttons, explicitly provide an `aria-label` that includes the card's name, its current contextual state (e.g., the column it is in), and the action that will occur upon activation (e.g., `card.title + ' (in ' + col.name + ') - activate to move to next column'`).
+
+## 2024-05-24 - Add interactive and focus styles to unstyled drop zone
+**Learning:** The drop zone for the file ingest feature (`#drop-zone`) lacked CSS styling and interactive handlers, making it appear as unstyled inline text without any keyboard interactivity. This is a common pattern where newer features in the app shell get added to the HTML but corresponding CSS/JS are missed.
+**Action:** Added proper styles (`.drop-zone`, `:hover`, `:focus-visible`) and wired up a click/keydown event listener in `script.js` to correctly forward interactions to the hidden file input. In the future, verify that new features using `aria-label` and `role="button"` also have corresponding keyboard handlers (`Enter`/`Space`) and visible focus states.

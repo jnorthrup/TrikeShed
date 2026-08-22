@@ -97,6 +97,37 @@ button { font: inherit; color: inherit; background: none; border: none; cursor: 
   user-select: none;
 }
 .sidebar-add { color: var(--text-secondary); margin-top: 2px; }
+
+.drop-zone {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  margin-top: 8px;
+  border: 1px dashed var(--border);
+  border-radius: var(--radius);
+  background: var(--bg);
+  cursor: pointer;
+  text-align: center;
+  transition: all 0.2s;
+}
+.drop-zone:hover, .drop-zone:focus-visible {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  outline: none;
+}
+.drop-zone-icon {
+  font-size: 20px;
+  color: var(--text-secondary);
+  margin-bottom: 4px;
+}
+.drop-zone-text {
+  font-size: 12px;
+  color: var(--text-faint);
+  line-height: 1.4;
+}
+
 .sidebar-bottom { padding: 8px 16px; }
 .sidebar-seed-note { font-size: 11px; color: var(--text-faint); line-height: 1.4; }
 
