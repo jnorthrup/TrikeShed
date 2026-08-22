@@ -290,6 +290,14 @@ object OroborosDaemon {
         val attachmentGateway = CouchAttachmentGateway(couchStore, casStore)
         val gitCouchGateway = GitCouchGateway(fileOps, attachmentGateway)
         val worktreeCouchGateway = WorktreeCouchGateway(fileOps, attachmentGateway)
+        
+        // ── Pointcut Subsystem ──
+        // Connect the pointcut adapter to the actual process-wide ConfixBlackboard instance if it existed globally. 
+        // Currently, we'll continue providing an empty blackboard here as there's no pre-existing global ConfixBlackboard exposed to OroborosDaemon.
+        // And PointcutCouchProjection ensures it propagates pointcut landings to couch.
+        val pointcutAdapter = borg.trikeshed.pointcut.PointcutBlackboardAdapter(borg.trikeshed.graal.ConfixBlackboard.empty())
+        pointcutAdapter.install()
+        val pointcutProjection = borg.trikeshed.pointcut.PointcutCouchProjection(couchStore, pointcutAdapter, CoroutineScope(Dispatchers.Default))
 
         // ── Memory store + ISAM index layer (fs-memory Prongs 1+2) ──
         // MemoryStore composes the existing CAS+Couch into the paper's
