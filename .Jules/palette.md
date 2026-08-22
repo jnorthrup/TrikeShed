@@ -41,3 +41,6 @@
 ## 2024-08-20 - Adding focus states for drag and drop drop zones
 **Learning:** For elements handling drag-and-drop file ingestions natively created as semantic `role="button"` placeholders like `.drop-zone` in index.html templates, ensuring they receive `:focus-visible` styling is crucial for keyboard users attempting to access upload functions.
 **Action:** Always add interactive form and UI upload containers defined with tabindex to the globally applied `:focus-visible` CSS selector lists.
+## $(date +%Y-%m-%d) - Keyboard accessibility for pseudo-buttons
+**Learning:** Elements using `role="button"` and `tabindex="0"` do not natively fire click events on `Enter` or `Space` like standard `<button>` elements do.
+**Action:** Always add a generic or specific `keydown` event listener to these elements to translate `Enter` and `Space` key presses into `.click()` calls.

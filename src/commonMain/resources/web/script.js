@@ -543,6 +543,19 @@
     slashAnchor = null;
   }
 
+
+  // ── Global keyboard accessibility for role="button" ───────────────────
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' || e.key === ' ') {
+      if (document.activeElement &&
+          document.activeElement.getAttribute('role') === 'button' &&
+          document.activeElement.getAttribute('tabindex') === '0') {
+        e.preventDefault();
+        document.activeElement.click();
+      }
+    }
+  });
+
   document.addEventListener('mousedown', (e) => {
     if (!slashMenuEl.hidden && !slashMenuEl.contains(e.target)) closeSlashMenu();
   });
