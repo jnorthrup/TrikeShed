@@ -995,9 +995,9 @@
   // The alphabet, gate and box walker are commonMain (ForgeKanbanIngest.planRules, IsoBmff); ForgeNodeMain publishes them on
   // window.forgeKotlin when the js bundle hydrates. This file only draws.
   const SHAPE_NAMES = { _: 'blank', 6: 'work packages', 7: 'section 7', S: 'section', H: 'heading', W: 'package', D: 'depends', B: 'bullet', T: 'table', C: 'fence', J: 'code', P: 'prose' };
-  const SHAPE_MEDIA = /\.(mp4|m4a|m4v|mov|3gp|heic|heif|avif|mj2)$/i;
+  const SHAPE_MEDIA = /\.(mp4|m4a|m4v|mov|3gp|heic|heif|avif|mj2)$/i, SHAPE_TEXT = /\.(md|markdown|txt)$/i;
   const shapeDocs = [];
-  let shapeDepth = Infinity, shapePick = null, shapeFib = null;
+  let shapeDepth = Infinity, shapePick = null, shapeFib = null, shapePending = 0;
   const kotlin = () => window.forgeKotlin && window.forgeKotlin.runs ? window.forgeKotlin : null;
   const fibSet = () => (shapeFib ||= new Set(kotlin().fib(1024)));
   const shapeEl = (tag, cls, text) => { const e = document.createElement(tag); e.className = cls; if (text != null) e.textContent = text; return e; };
@@ -1040,7 +1040,7 @@
     const head = shapeEl('div', 'shape-doc-head');
     head.append(shapeEl('span', 'shape-name', group ? '×' + ids.length + '  ' + prefix : doc.name),
       shapeEl('span', 'shape-chip ' + doc.kind.split(' ')[0], doc.kind === 'plan' ? 'kanban plan · persist' : doc.kind + (doc.kind === 'box media' ? '' : ' · rejected')),
-      shapeEl('span', 'shape-meta', doc.lines.length + ' ' + (doc.unit === 'bytes' ? 'boxes' : 'lines') + ' · ' + doc.runs.length + ' runs'));
+      shapeEl('span', 'shape-meta', doc.lines.length + ' ' + (doc.unit === 'bytes' ? 'boxes' : 'lines') + ' · ' + doc.runs.length + ' runs' + (doc.via ? ' · ' + doc.via : '')));
     box.append(head, shapeStrip(doc, di), shapeEl('code', 'shape-key', doc.key.join(doc.sep)));
     if (group) box.appendChild(shapeEl('div', 'shape-members', ids.map((i) => shapeDocs[i].name).join(', ')));
     if (shapePick && shapePick.doc === di) {
@@ -1063,7 +1063,7 @@
       b.addEventListener('click', () => { shapeDepth = f; renderShape(); });
       hud.appendChild(b);
     });
-    hud.appendChild(shapeEl('span', 'shape-count', shapeDocs.length + ' files · drop files anywhere'));
+    hud.appendChild(shapeEl('span', 'shape-count', shapeDocs.length + ' files' + (shapePending ? ' · ' + shapePending + ' processing' : '') + ' · drop files anywhere'));
     shapeScrollEl.appendChild(hud);
     const groups = new Map();
     shapeDocs.forEach((d, i) => { const k = d.key.slice(0, shapeDepth).join(d.sep); if (!groups.has(k)) groups.set(k, []); groups.get(k).push(i); });
@@ -1073,9 +1073,18 @@
     shapeScrollEl.appendChild(legend);
   }
 
+  // Everything that is not text or box media goes to the local ingester (ForgeIngestServer: Tika, ffmpeg+tesseract for scans).
+  function tikaIngest(f) {
+    shapePending++; setView('shape');
+    return fetch('/ingest', { method: 'POST', body: f, headers: { 'X-Forge-Name': f.name } })
+      .then((r) => r.ok ? r.json() : Promise.reject(r.status))
+      .then((j) => Object.assign(shapeOf(f.name, j.markdown), { via: 'tika' + (j.persisted ? ' · persisted' : '') }))
+      .catch(() => ({ name: f.name, lines: [], runs: [], key: [], sep: '', kind: 'needs local server', unit: 'lines', via: './gradlew serveForgePages' }))
+      .finally(() => shapePending--);
+  }
   function shapeIngest(files) {
     if (!kotlin()) { setView('shape'); return; }
-    Promise.all([...files].map((f) => SHAPE_MEDIA.test(f.name) ? f.arrayBuffer().then((b) => shapeOfBoxes(f.name, b)) : f.text().then((t) => shapeOf(f.name, t))))
+    Promise.all([...files].map((f) => SHAPE_MEDIA.test(f.name) ? f.arrayBuffer().then((b) => shapeOfBoxes(f.name, b)) : SHAPE_TEXT.test(f.name) ? f.text().then((t) => shapeOf(f.name, t)) : tikaIngest(f)))
       .then((docs) => { shapeDocs.push(...docs); shapePick = null; setView('shape'); });
   }
   document.addEventListener('dragover', (e) => e.preventDefault());

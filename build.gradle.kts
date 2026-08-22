@@ -600,7 +600,7 @@ tasks.register<JavaExec>("runKanbanHttpServerJvm") {
 //   ./gradlew generateForgePages                        # stage jvm: JVM-baked index.html + sw/manifest/icons/css/js
 //   ./gradlew generateForgePages -PforgePagesStages=jvm,js,wasm   # + Kotlin/JS and wasmJs bundles under docs/js, docs/wasm
 //   ./gradlew forgePagesProbe                           # is the next stage green? (compiles JS + wasm targets)
-//   ./gradlew serveForgePages [-PforgePort=8765]        # serve docs/ at http://localhost:8765/ (JDK jdk.httpserver)
+//   ./gradlew serveForgePages [-PforgePort=8765]        # serve docs/ at http://localhost:8765/ + POST /ingest (ForgeIngestServer)
 //   ./gradlew forgePwa                                  # generate + serve
 //   Deploy = generate, commit docs/, push. Pages = branch master, folder /docs; no Actions workflows.
 //
@@ -695,19 +695,15 @@ tasks.register<Sync>("generateForgePages") {
 // Local preview of the published tree, served from the JDK's built-in static server — no python, no npm.
 // Binds 127.0.0.1 so the service worker scope matches what GitHub Pages serves under /TrikeShed/… relative urls.
 val forgePort: String = providers.gradleProperty("forgePort").orElse("8765").get()
-val forgeServeLauncher = javaToolchains.launcherFor { languageVersion.set(JavaLanguageVersion.of(25)) }
 
-tasks.register<Exec>("serveForgePages") {
+tasks.register<JavaExec>("serveForgePages") {
     group = "documentation"
-    description = "Serve docs/ at http://localhost:$forgePort/ via `java -m jdk.httpserver` (Ctrl-C to stop). -PforgePort=N to change the port."
+    description = "Serve docs/ at http://localhost:$forgePort/ plus POST /ingest (Tika; ffmpeg+tesseract for scans) via ForgeIngestServer (Ctrl-C to stop). -PforgePort=N."
+    mainClass.set("borg.trikeshed.forge.server.ForgeIngestServer")
+    useStagedJvmClasspath()
     val docsDir = project.layout.projectDirectory.dir("docs").asFile
-    workingDir = docsDir
-    doFirst {
-        if (!docsDir.resolve("index.html").isFile) throw GradleException("docs/index.html missing; run ./gradlew generateForgePages first")
-        println("Forge PWA: serving ${docsDir} at http://localhost:$forgePort/  (Ctrl-C to stop)")
-    }
-    executable = forgeServeLauncher.get().executablePath.asFile.path
-    args("-m", "jdk.httpserver", "-b", "127.0.0.1", "-p", forgePort, "-d", docsDir.path)
+    doFirst { if (!docsDir.resolve("index.html").isFile) throw GradleException("docs/index.html missing; run ./gradlew generateForgePages first") }
+    args(docsDir.path, forgePort)
 }
 
 tasks.register("forgePwa") {

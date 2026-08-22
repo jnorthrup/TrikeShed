@@ -46,4 +46,18 @@ class JvmTikaIngestAdapterTest {
         val out = JvmTikaIngestAdapter.extract(tmp)
         assertTrue(out.contains("zqxw"), "expected DOCX body text via Tika, got: ${out.take(200)}")
     }
+
+    @Test
+    fun ffmpegPrepassGraysTheImage() {
+        val png = Files.createTempFile("tika-test", ".png")
+        val img = java.awt.image.BufferedImage(16, 16, java.awt.image.BufferedImage.TYPE_INT_RGB)
+        for (y in 0 until 16) for (x in 0 until 16) img.setRGB(x, y, 0xCC2200)
+        javax.imageio.ImageIO.write(img, "png", png.toFile())
+        val out = kotlinx.coroutines.runBlocking { JvmTikaIngestAdapter.preprocess(png) }
+        val gray = javax.imageio.ImageIO.read(out.toFile())
+        val p = gray.getRGB(8, 8)
+        val (r, g, b) = listOf(p shr 16 and 0xFF, p shr 8 and 0xFF, p and 0xFF)
+        assertTrue(r == g && g == b, "expected gray, got $r/$g/$b")
+        Files.deleteIfExists(out); Files.deleteIfExists(png)
+    }
 }
