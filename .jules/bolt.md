@@ -90,3 +90,6 @@
 ## 2024-12-10 - Avoid O(N) boxing allocation when comparing ByteArray
 **Learning:** Comparing ByteArray objects using .toList() == other.toList() causes an O(N) memory allocation because each Byte gets boxed into an object within a new ArrayList. This can introduce unexpected GC pressure, especially when frequently hashing or comparing proofs.
 **Action:** Replace a.toList() == b.toList() on ByteArray with a.contentEquals(b) for a fast, zero-allocation byte-level comparison.
+## 2024-05-18 - Avoid O(N) allocation when iterating Series
+**Learning:** In Kotlin, using `.toList().forEach` to iterate over custom data structures like `Series` causes an unnecessary O(N) intermediate `ArrayList` allocation.
+**Action:** Use the `inline` extension `.forEach` directly on the `Series` (e.g. `series.forEach { ... }`) to avoid both list and lambda heap allocations in hot paths like network parsing.

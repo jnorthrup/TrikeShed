@@ -129,7 +129,7 @@ fun HtxRequest.renderWireRequest(): String {
         append("Host: ")
         append(hostHeader)
         append("\r\n")
-        headers.toList().forEach { header ->
+        headers.forEach { header ->
             append(header.a)
             append(": ")
             append(header.b)
