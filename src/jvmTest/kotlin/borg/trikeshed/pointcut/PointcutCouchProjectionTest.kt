@@ -16,6 +16,7 @@ import borg.trikeshed.couch.ViewDefinition
 import borg.trikeshed.couch.MapFunction
 import borg.trikeshed.couch.KeyExpr
 import borg.trikeshed.couch.ValueExpr
+import borg.trikeshed.couch.ReduceFunction
 
 class PointcutCouchProjectionTest {
 
@@ -27,7 +28,6 @@ class PointcutCouchProjectionTest {
         val projection = PointcutCouchProjection(store, adapter, CoroutineScope(Dispatchers.Default))
 
         val event = PointcutEvent(
-            timestamp = 1000L,
             coordinate = "TestClass.testMethod",
             vmFacet = VmFacet.JVM,
             target = null,
@@ -53,8 +53,8 @@ class PointcutCouchProjectionTest {
         
         // Drive second slab same site
         val event2 = PointcutEvent(
-            timestamp = 1005L,
             coordinate = "TestClass.testMethod",
+            seq = 1,
             vmFacet = VmFacet.JVM,
             target = null,
             propertyName = "prop",
@@ -67,25 +67,24 @@ class PointcutCouchProjectionTest {
         val secondRev = store.head.getRev(docId)
         assertNotEquals(initialRev, secondRev, "Revision should be bumped")
         
-        // Use ViewServer to execute map/reduce manually since memory store doesn't inherently trigger it on string AST query out-of-the-box easily
+        // by_typedef: the projection stores `coordinate` as a nested map; ViewServer's JsPath is flat, so key on the
+        // map itself and read className out of the grouped key. execute() applies the _count reducer itself.
         val vs = ViewServer()
         val viewDef = ViewDefinition(
             ddoc = "_design/pointcut",
             viewName = "by_typedef",
             mapFn = MapFunction.Emit(
-                key = KeyExpr.DocFieldPath("coordinate", "className"),
+                key = KeyExpr.DocField("coordinate"),
                 value = ValueExpr.Const(1)
             ),
-            reduceFn = borg.trikeshed.viewserver.ReducerIdentity.COUNT
+            reduceFn = ReduceFunction.Builtin("_count")
         )
-        
-        val result = vs.execute(viewDef, store.all().filter { it.id.startsWith("pointcut/") })
-        
-        val grouped = vs.group(result)
-        val reduced = vs.reduce(viewDef, grouped)
-        
-        val testClassCount = reduced.find { it.key == "TestClass" }
-        assertNotNull(testClassCount)
-        assertEquals(1, testClassCount!!.value)
+
+        val reduced = vs.execute(viewDef, store.all().filter { it.id.startsWith("pointcut/") })
+
+        val rows = (0 until reduced.size).map { reduced[it] }
+        val testClassCount = rows.find { (it.key as? Map<*, *>)?.get("className") == "TestClass" }
+        assertNotNull(testClassCount, "expected a _count row whose coordinate.className is TestClass; keys=${rows.map { it.key }}")
+        assertEquals(1, (testClassCount!!.value as Number).toInt())
     }
 }
