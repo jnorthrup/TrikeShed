@@ -12,6 +12,17 @@ import borg.trikeshed.parse.confix.*
 object JsonSupport {
     fun parse(text: String): Any? = JsonParser.reify(CharSeries(text))
 
+    /**
+     * Parses the given text and safely validates it is a Map.
+     * Prevents unchecked ClassCastExceptions during deserialization.
+     */
+    fun parseMap(text: String): Map<String, Any?> {
+        val parsed = parse(text)
+        require(parsed is Map<*, *>) { "Expected JSON object but got ${parsed?.let { it::class.simpleName } ?: "null"}" }
+        @Suppress("UNCHECKED_CAST")
+        return parsed as Map<String, Any?>
+    }
+
     /** Confix-compatible JSON rendering without a second serialization runtime. */
     fun stringify(value: Any?): String = when (value) {
         null -> "null"

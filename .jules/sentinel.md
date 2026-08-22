@@ -16,3 +16,8 @@
 **Vulnerability:** The codebase was using `java.security.SecureRandom.getInstanceStrong()` to generate random bytes for temporary passwords and peer IDs.
 **Learning:** On Linux/Unix systems, `getInstanceStrong()` often defaults to the blocking `/dev/random` pool. If system entropy is depleted, any thread calling `nextBytes()` on this instance will block indefinitely, leading to a Denial of Service (DoS) and application hang.
 **Prevention:** Use the default `SecureRandom()` constructor instead. It utilizes the non-blocking CSPRNG (`/dev/urandom`), which is cryptographically strong enough for general application use and immune to entropy-depletion blocking.
+
+## 2024-05-24 - [Unchecked Casts on JsonSupport.parse lead to ClassCastException/DoS]
+**Vulnerability:** Core JSON deserialization logic (`JsonSupport.parse`) returns unvalidated `Any?`, which callers universally cast directly using unchecked casts (`as Map<String, Any?>` or similar). This creates an immediate exception and potential DoS vulnerability if the payload structure changes or is manipulated (e.g., in WAL replay).
+**Learning:** Kotlin Multiplatform `Any?` deserialization without strict schema wrappers or inline type bounds checking creates brittle boundaries that violate fail-secure principles. A simple structural mismatch crashes the execution thread.
+**Prevention:** Introduce and enforce explicitly typed validator functions (e.g., `parseMap(text: String): Map<String, Any?>`) at the library boundary (`JsonSupport`) that safely validate structure and type using `require` blocks before applying casts, throwing standardized descriptive exceptions that callers can catch cleanly.

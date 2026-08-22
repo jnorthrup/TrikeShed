@@ -320,8 +320,7 @@ object JvmKanbanServer {
     private fun replayCausalWal() {
         causalWal.replay().forEach { (_, bytes) ->
             runCatching {
-                @Suppress("UNCHECKED_CAST")
-                val map = JsonSupport.parse(bytes.decodeToString()) as Map<String, Any?>
+                val map = JsonSupport.parseMap(bytes.decodeToString())
                 graphIndex.addOrGet(map.toCausalNode())
             }.onFailure { error ->
                 System.err.println("causal WAL replay skipped corrupt record: ${error.message}")
