@@ -133,3 +133,6 @@
 **Learning:** Calling `.toList()` on an `Iterable` that is already a collection (like a `List`) creates a full copy, allocating an intermediate `ArrayList` and incurring an O(N) penalty.
 **Action:** When a function accepts an `Iterable<T>` but needs a `List<T>` (e.g. for indexed access or multiple iterations), use safe casting to avoid the copy if it's already a list: `iterable as? List<T> ?: iterable.toList()`.
 >>>>>>> theirs
+## 2026-08-25 - Avoid Sequence Overhead Before Terminal List Operations
+**Learning:** In Kotlin hot paths, using `.asSequence()` on a collection is only beneficial when followed by short-circuiting operations. Chaining `.asSequence()` before operations that ultimately collect into a list (like `.toList()` or `.sortedWith()`) is a performance anti-pattern. The object allocation overhead for the `Sequence` wrapper and its stateful lazy iterators outweighs the cost of eager direct collection.
+**Action:** When eliminating intermediate allocations caused by chained collection operations (like `.asSequence().map { ... }.filter { ... }.sortedWith(...)`), replace the sequence chain with a direct `for` loop that conditionally appends to an `ArrayList` and sorts in-place. Do not wrap collections in sequences just to immediately collect them back into a list.
