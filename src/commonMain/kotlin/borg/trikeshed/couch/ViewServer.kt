@@ -236,7 +236,7 @@ class ViewServer {
      * Executes this server's native map/reduce path and binds its canonical output to the
      * supplied document sequence. No cached rows or reducer state participates in the receipt.
      */
-    fun executeWithProof(viewDef: ViewDefinition, documents: List<Document>): ViewProofExecution {
+    fun executeWithProof(viewDef: ViewDefinition, documents: Iterable<Document>): ViewProofExecution {
         val result = execute(viewDef, documents)
         return ViewProofExecution(result, receiptFor(viewDef, documents, result))
     }
@@ -247,7 +247,7 @@ class ViewServer {
      */
     fun verifyReplay(
         viewDef: ViewDefinition,
-        documents: List<Document>,
+        documents: Iterable<Document>,
         result: ViewResult,
         receipt: MapReduceProofReceipt,
         reducer: ReducerIdentity = reducerIdentity(viewDef),
@@ -286,16 +286,16 @@ class ViewServer {
         require(cursor.size == store.size) {
             "query cursor.size ${cursor.size} != store.size ${store.size}"
         }
-        val docs = cursor.toDocuments().toList()
-        return execute(viewDef, docs)
+        val docs = cursor.toDocuments()
+        return execute(viewDef, docs.view)
     }
 
     /** Execute a view definition against a list of documents. */
     suspend fun load(viewDef: ViewDefinition, documents: Series<Document>): ViewResult = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
-        execute(viewDef, documents.toList())
+        execute(viewDef, documents.view)
     }
 
-    fun execute(viewDef: ViewDefinition, documents: List<Document>): ViewResult {
+    fun execute(viewDef: ViewDefinition, documents: Iterable<Document>): ViewResult {
         val rows = mutableSeriesOf<ViewRow>()
         for (doc in documents) {
             executeMap(viewDef.mapFn, doc, rows)
@@ -312,7 +312,7 @@ class ViewServer {
 
     private fun receiptFor(
         viewDef: ViewDefinition,
-        documents: List<Document>,
+        documents: Iterable<Document>,
         result: ViewResult,
     ): MapReduceProofReceipt = MapReduceProofReceipt.mint(
         viewDefinition = ViewDefinitionIdentity(definitionBytes(viewDef)),
