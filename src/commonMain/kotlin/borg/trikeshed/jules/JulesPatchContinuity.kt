@@ -81,8 +81,15 @@ fun selectJulesPatchForDrain(causes: Iterable<JulesCause>): JulesPatchDrainSelec
     if (reject != null && rejectIndex > latestObservationIndex) {
         val latestPatchCid = observations.maxWith(snapshotCausalOrder).patchCid
         // Bolt: avoid intermediate List allocations from filterIsInstance by using sequence for terminal ops
-        val latestReportCid = causalList.asSequence().filterIsInstance<JulesCause.AgentReportObserved>()
-            .maxWithOrNull(reportCausalOrder)?.reportCid
+        var maxReport: JulesCause.AgentReportObserved? = null
+        for (item in causalList) {
+            if (item is JulesCause.AgentReportObserved) {
+                if (maxReport == null || reportCausalOrder.compare(item, maxReport) > 0) {
+                    maxReport = item
+                }
+            }
+        }
+        val latestReportCid = maxReport?.reportCid
         val rejected = observations.lastOrNull {
             it.patchCid == reject.patchCid && it.causalOrdinal == reject.causalOrdinal
         }
@@ -107,8 +114,15 @@ fun selectJulesPatchForDrain(causes: Iterable<JulesCause>): JulesPatchDrainSelec
     if (explicit != null && explicitIndex > latestObservationIndex) {
         val latestPatchCid = observations.maxWith(snapshotCausalOrder).patchCid
         // Bolt: avoid intermediate List allocations from filterIsInstance by using sequence for terminal ops
-        val latestReportCid = causalList.asSequence().filterIsInstance<JulesCause.AgentReportObserved>()
-            .maxWithOrNull(reportCausalOrder)?.reportCid
+        var maxReport: JulesCause.AgentReportObserved? = null
+        for (item in causalList) {
+            if (item is JulesCause.AgentReportObserved) {
+                if (maxReport == null || reportCausalOrder.compare(item, maxReport) > 0) {
+                    maxReport = item
+                }
+            }
+        }
+        val latestReportCid = maxReport?.reportCid
         val selected = observations.lastOrNull {
             it.patchCid == explicit.patchCid && it.causalOrdinal == explicit.causalOrdinal
         }
@@ -172,8 +186,15 @@ fun selectJulesReportForSettlement(causes: Iterable<JulesCause>): JulesReportSet
     }
     val review = causalList.getOrNull(reviewIndex) as? JulesCause.AgentReportReviewSelected
     // Bolt: avoid intermediate List allocations from filterIsInstance by using sequence for terminal ops
-    val latestPatchCid = causalList.asSequence().filterIsInstance<JulesCause.PatchSnapshotObserved>()
-        .maxWithOrNull(snapshotCausalOrder)?.patchCid
+    var maxSnapshot: JulesCause.PatchSnapshotObserved? = null
+    for (item in causalList) {
+        if (item is JulesCause.PatchSnapshotObserved) {
+            if (maxSnapshot == null || snapshotCausalOrder.compare(item, maxSnapshot) > 0) {
+                maxSnapshot = item
+            }
+        }
+    }
+    val latestPatchCid = maxSnapshot?.patchCid
     if (review != null && reviewIndex > latestProducerArtifactIndex &&
         // Report-only settlement cannot discard a delivered patch. Such a
         // session must settle the patch path (or receive a future typed reject).
