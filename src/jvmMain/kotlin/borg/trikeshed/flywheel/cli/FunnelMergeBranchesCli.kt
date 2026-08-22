@@ -457,6 +457,16 @@ private class FunnelMergeBranchesCli(
             }
             val workId = queueBySession[sid] ?: "funnel:$sid"
             runCatching {
+                // Close BOTH surfaces: the queue entry (appendWork under the
+                // workId) AND the card (append snapshot with drained=true —
+                // load() derives card.drained ONLY from SnapEvents, so a
+                // WorkDrained cause alone leaves the card open and the arm
+                // rebuilds every pass).
+                val cardNow = withContext(Dispatchers.IO) { store.load()[sid] }
+                val snap = cardNow?.snapshot
+                if (snap != null) {
+                    store.append(snap.copy(state = "COMPLETED", headSha = sha), drained = true, cause = null)
+                }
                 store.appendWork(workId, borg.trikeshed.jules.JulesCause.WorkDrained(
                     workId = workId,
                     sessionId = sid,
