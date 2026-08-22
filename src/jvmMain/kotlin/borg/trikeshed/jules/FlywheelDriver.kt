@@ -1084,7 +1084,14 @@ class FlywheelDriver(
                     // CAS-FALLBACK: no branch, try WAL continuity for the patch bytes.
                     val automatic = withTimeoutOrNull(60_000L) { automaticPatch(s) }
                     if (automatic is AutomaticPatch.Available) {
-                        val patch = automatic.text
+                        val patch = if (containmentPolicy.layer4Artifact.stripAuthorMetadata) {
+                            automatic.text.lineSequence().filterNot { line ->
+                                val lower = line.lowercase()
+                                lower.startsWith("author:") ||
+                                lower.startsWith("co-authored-by:") ||
+                                lower.startsWith("signed-off-by:")
+                            }.joinToString("\n")
+                        } else automatic.text
                         val touched = parsePatchFiles(patch)
                         val suspicious = EntropyPathScanner.scanTouchedPaths(touched)
                         if (suspicious.isNotEmpty()) {
