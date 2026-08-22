@@ -67,7 +67,7 @@ sealed interface JulesReportSettlementSelection {
  * overrides this monotonicity gate without losing either CAS object.
  */
 fun selectJulesPatchForDrain(causes: Iterable<JulesCause>): JulesPatchDrainSelection {
-    val causalList = causes.toList()
+    val causalList = causes as? List<JulesCause> ?: causes.toList()
     val observations = causalList.filterIsInstance<JulesCause.PatchSnapshotObserved>()
     if (observations.isEmpty()) return JulesPatchDrainSelection.Unobserved
 
@@ -158,7 +158,7 @@ fun selectJulesPatchForDrain(causes: Iterable<JulesCause>): JulesPatchDrainSelec
  * not interpreted as "no-op", "already landed", or any other disposition.
  */
 fun selectJulesReportForSettlement(causes: Iterable<JulesCause>): JulesReportSettlementSelection {
-    val causalList = causes.toList()
+    val causalList = causes as? List<JulesCause> ?: causes.toList()
     val reports = causalList.filterIsInstance<JulesCause.AgentReportObserved>()
     if (reports.isEmpty()) return JulesReportSettlementSelection.Unobserved
 
