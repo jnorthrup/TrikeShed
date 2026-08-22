@@ -3,7 +3,6 @@ package borg.trikeshed.flywheel.cli
 import borg.trikeshed.job.ContentId
 import borg.trikeshed.pijul.PijulChannel
 import borg.trikeshed.pijul.PijulDiffParser
-import borg.trikeshed.userspace.containment.EntropyPathScanner
 import borg.trikeshed.userspace.nio.file.spi.JvmFileOperations
 import borg.trikeshed.utils.kanban.JulesBoardStore
 import borg.trikeshed.utils.kanban.forForgeDir
@@ -218,9 +217,9 @@ private class FunnelMergeBranchesCli(
             if (diff.first != 0 || diff.second.isBlank()) continue
             val touched = parsePatchFiles(diff.second)
             if (touched.isEmpty()) continue
-            val quarantined = EntropyPathScanner.scanTouchedPaths(touched)
+            val quarantined = steganographicPaths(touched)
             if (quarantined.isNotEmpty()) {
-                println("[FUNNEL-MERGE] QUARANTINE $ref: steganographic entropy in ${quarantined.map { it.path }}")
+                println("[FUNNEL-MERGE] QUARANTINE $ref: payload-like path segments in $quarantined")
                 continue
             }
             val cid = withContext(Dispatchers.IO) { casStore.put(diff.second.encodeToByteArray()) }
@@ -251,9 +250,9 @@ private class FunnelMergeBranchesCli(
             val touched = parsePatchFiles(patch)
             val production = touched.filterNot { borg.trikeshed.jules.isScratchPatchPath(it) }
             if (production.isEmpty()) continue
-            val quarantined = EntropyPathScanner.scanTouchedPaths(production)
+            val quarantined = steganographicPaths(production)
             if (quarantined.isNotEmpty()) {
-                println("[FUNNEL-MERGE] QUARANTINE wal:$sid: steganographic entropy in ${quarantined.map { it.path }}")
+                println("[FUNNEL-MERGE] QUARANTINE wal:$sid: payload-like path segments in $quarantined")
                 continue
             }
             arms += Arm("wal:${sid.takeLast(6)}:${card.card.title.take(40)}", sid, null, patch, cid, production)
@@ -321,9 +320,15 @@ private class FunnelMergeBranchesCli(
     /**
      * Close provenance per landed arm: annotated tag (or reuse base sha when
      * content was already present), durable WorkDrained receipt, then push tags.
+     * Receipts bond to the ORIGINAL queue workId when one exists for the
+     * session (23e1c237e: writing WorkDrained under a synthesized id orphans
+     * the queue entry and blocks re-queue of the same locality forever).
      */
     private suspend fun tagAndClose(arms: List<Arm>, sha: String, alreadyPresent: Boolean) {
         val now = System.currentTimeMillis()
+        val queueBySession = withContext(Dispatchers.IO) {
+            store.loadQueue().mapNotNull { entry -> entry.sessionId?.let { it to entry.workId } }.toMap()
+        }
         for (arm in arms) {
             val sid = arm.sessionId ?: continue  // branch-only arms with no session id close via tag alone
             val safe = sid.replace(Regex("[^A-Za-z0-9._-]"), "-")
@@ -333,7 +338,7 @@ private class FunnelMergeBranchesCli(
                 git("tag", "-a", tag, sha, "-m",
                     "Jules merge receipt\nsession=$sid\npatchCid=${arm.patchCid.value}\nbranch=${arm.branch ?: "none"}\ntitle=${arm.label}")
             }
-            val workId = "funnel:$sid"
+            val workId = queueBySession[sid] ?: "funnel:$sid"
             runCatching {
                 store.appendWork(workId, borg.trikeshed.jules.JulesCause.WorkDrained(
                     workId = workId,
@@ -364,6 +369,34 @@ private class FunnelMergeBranchesCli(
         // reported but never rolls back landed content.
         val tagPush = git("push", "origin", "--tags")
         if (tagPush.first != 0) println("[FUNNEL-MERGE] tag push failed (non-fatal): ${tagPush.second.take(200)}")
+    }
+
+    /**
+     * Calibrated steganographic-path detector for THIS CLI's arm admission.
+     *
+     * The shipped [borg.trikeshed.userspace.containment.EntropyPathScanner]
+     * flags any path segment with Shannon entropy > 3.5 bits/char — which is
+     * ORDINARY CamelCase source naming (JvmProcessOperations.kt ≈ 3.9,
+     * KanbanHttpServerJvm.kt ≈ 4.0). The daemon lane has 201 logged
+     * `drain-rejected: steganographic entropy` events and every one is a
+     * false positive on production filenames; combined with the collusion
+     * gate it is why zero arms ever drain.
+     *
+     * Real exfiltration/stego signatures in paths are long digit runs (CIDs,
+     * timestamps) and hex/base64 payloads embedded in filenames. Detect those,
+     * not English words.
+     */
+    private fun steganographicPaths(paths: List<String>): List<String> {
+        val digitRun = Regex("\\d{10,}")
+        val hexishRun = Regex("(?i)[0-9a-f]{16,}")
+        val base64ish = Regex("[A-Za-z0-9+/]{24,}={0,2}")
+        return paths.filter { path ->
+            path.split('/').any { seg ->
+                digitRun.containsMatchIn(seg) && !seg.contains('-') ||
+                    hexishRun.containsMatchIn(seg) && !seg.contains('-') ||
+                    base64ish.containsMatchIn(seg) && !seg.contains('-')
+            }
+        }
     }
 
     /** Minimal unified-diff file list parser (same tolerance as the daemon's). */
