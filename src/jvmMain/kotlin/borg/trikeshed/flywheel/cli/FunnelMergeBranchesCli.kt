@@ -93,26 +93,32 @@ private class FunnelMergeBranchesCli(
             println("[FUNNEL-MERGE] --dry: no merge attempted")
             return
         }
-        if (arms.size == 1) {
-            println("[FUNNEL-MERGE] single arm — merging directly via git merge --no-edit")
-            val arm = arms.first()
-            val target = arm.branch ?: run {
-                println("[FUNNEL-MERGE] single CAS arm without branch — applying patch in isolated worktree")
-                applySinglePatch(arm, baseSha)
-                return
-            }
-            val merged = git("merge", "--no-edit", target)
-            if (merged.first != 0) {
-                git("merge", "--abort")
-                System.err.println("[FUNNEL-MERGE] single merge conflicted — falling back to patch application")
-                applySinglePatch(arm, baseSha)
-            }
+
+        // Build scripts merge by LINE POSITION in the CRDT and stale-base WAL
+        // patches land inserts at dead offsets (observed: imports at line 998
+        // of a 936-line build.gradle.kts). Route any arm touching a gradle
+        // script / launcher / CI yaml through the solo git-3way lane instead.
+        val solo = arms.filter { arm -> arm.touched.any { isSensitiveMergePath(it) } }
+        val batch = arms.filterNot { it in solo }
+        if (solo.isNotEmpty()) {
+            println("[FUNNEL-MERGE] ${solo.size} sensitive arms routed to solo lane: ${solo.map { it.label }}")
+        }
+
+        if (batch.size == 1) {
+            val arm = batch.first()
+            val soloList = solo + arm
+            println("[FUNNEL-MERGE] single batch arm — everything via solo lane")
+            runSolo(soloList, baseSha)
+            return
+        }
+        if (batch.isEmpty()) {
+            runSolo(solo, baseSha)
             return
         }
 
         // ── N-way commutative merge ──────────────────────────────────────
         val channel = PijulChannel()
-        val allTouched = arms.flatMap { it.touched }.distinct()
+        val allTouched = batch.flatMap { it.touched }.distinct()
         withContext(Dispatchers.IO) {
             for (path in allTouched) {
                 val f = File(repoDir, path)
@@ -120,7 +126,7 @@ private class FunnelMergeBranchesCli(
             }
         }
         var applied = 0
-        for (arm in arms) {
+        for (arm in batch) {
             val changes = PijulDiffParser.parse(arm.patch)
             if (changes.isEmpty()) continue
             val workId = "funnel:${arm.sessionId ?: arm.branch?.substringAfterLast('/') ?: arm.patchCid.value.take(12)}"
@@ -163,12 +169,16 @@ private class FunnelMergeBranchesCli(
             if (build.first != 0) {
                 System.err.println("[FUNNEL-MERGE] BUILD RED in isolated worktree — nothing landed:")
                 System.err.println(build.second.takeLast(3000))
+                if (solo.isNotEmpty()) {
+                    System.err.println("[FUNNEL-MERGE] continuing with ${solo.size} solo-lane arms")
+                    runSolo(solo, baseSha)
+                }
                 return
             }
             println("[FUNNEL-MERGE] build gate green")
 
-            val titleList = arms.joinToString(",") { (it.sessionId ?: it.branch)?.takeLast(6) ?: "?" }
-            val subject = "flywheel: funnel N-way merge ${arms.size} arms — $titleList"
+            val titleList = batch.joinToString(",") { (it.sessionId ?: it.branch)?.takeLast(6) ?: "?" }
+            val subject = "flywheel: funnel N-way merge ${batch.size} arms — $titleList"
             val commit = gitIn(worktree, "commit", "--no-verify", "-m", subject,
                 "--author=oroboros-drain <noreply@trikeshed.local>")
             if (commit.first != 0) {
@@ -188,16 +198,44 @@ private class FunnelMergeBranchesCli(
                 System.err.println("[FUNNEL-MERGE] ff-merge failed: ${ff.second.take(300)}")
                 return
             }
-            println("[FUNNEL-MERGE] LANDED $revision on master (${arms.size} arms in one commit)")
+            println("[FUNNEL-MERGE] LANDED $revision on master (${batch.size} arms in one commit)")
 
             git("push", "origin", "master")
-            tagAndClose(arms, revision, alreadyPresent = false)
+            tagAndClose(batch, revision, alreadyPresent = false)
         } finally {
             git("worktree", "remove", "--force", worktree.absolutePath)
             git("worktree", "prune")
             withContext(Dispatchers.IO) { if (tempRoot.exists()) tempRoot.deleteRecursively() }
         }
+        if (solo.isNotEmpty()) runSolo(solo, headShaNow())
     }
+
+    /** Sequential git-3way lane for arms whose files must not enter the CRDT. */
+    private suspend fun runSolo(arms: List<Arm>, baseSha: String) {
+        for (arm in arms) {
+            if (arm.branch != null) {
+                val before = headShaNow()
+                val merged = git("merge", "--no-edit", arm.branch)
+                if (merged.first == 0) {
+                    println("[FUNNEL-MERGE] SOLO-LANDED branch ${arm.branch?.substringAfterLast('/')}")
+                    git("push", "origin", "master")
+                    tagAndClose(listOf(arm), headShaNow(), alreadyPresent = false)
+                    continue
+                }
+                git("merge", "--abort")
+                System.err.println("[FUNNEL-MERGE] SOLO branch merge conflicted — trying patch lane")
+            }
+            applySinglePatch(arm, headShaNow())
+        }
+    }
+
+    private suspend fun headShaNow(): String = git("rev-parse", "HEAD").second.trim()
+
+    /** Paths whose merges are position-sensitive: build scripts, launchers, CI. */
+    private fun isSensitiveMergePath(path: String): Boolean =
+        path.endsWith(".gradle.kts") || path.endsWith(".gradle") ||
+            path.startsWith("bin/") || path.startsWith(".github/workflows/") ||
+            path == "settings.gradle.kts" || path == "gradle.properties"
 
     /** Arms = unmerged origin branches ∪ undrained terminal WAL cards with CAS patches. */
     private suspend fun buildArms(): List<Arm> {
