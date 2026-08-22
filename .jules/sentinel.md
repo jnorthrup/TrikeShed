@@ -21,3 +21,8 @@
 **Vulnerability:** Found `waitFor()` being called on a `Process` without a timeout in `JvmProcessOperations.kt`.
 **Learning:** `Process.waitFor()` without a timeout can lead to thread starvation and Denial of Service (DoS) if the subprocess hangs. This violates the "Fail securely" and "Do not expose system resources" principles.
 **Prevention:** Always use bounded `waitFor(timeout, TimeUnit)` and explicitly terminate the process via `destroyForcibly()` if the timeout occurs.
+
+## 2025-05-24 - SQL Injection Prevention
+**Vulnerability:** In `HermesDonorTrace.kt`, queries to the `tasks` table were constructed manually via `createStatement().executeQuery(...)`. Although currently executing a hardcoded `SELECT id, title, body, status, parent_ids FROM tasks ORDER BY id ASC` string, constructing statements statically leaves room for future SQL injections if filters/where clauses are appended dynamically without migration to safe query methods.
+**Learning:** Hardcoded query strings in `executeQuery` expose applications to a high risk of SQL injection if developer changes ever append user parameters. Using prepared statements prevents injection via parameter binding separation.
+**Prevention:** Always use `prepareStatement` over `createStatement` when executing queries, even for initially parameter-less queries, to ensure the safest default posture.
