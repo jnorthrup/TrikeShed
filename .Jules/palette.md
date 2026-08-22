@@ -52,3 +52,6 @@
 ## 2024-05-24 - Add interactive and focus styles to unstyled drop zone
 **Learning:** The drop zone for the file ingest feature (`#drop-zone`) lacked CSS styling and interactive handlers, making it appear as unstyled inline text without any keyboard interactivity. This is a common pattern where newer features in the app shell get added to the HTML but corresponding CSS/JS are missed.
 **Action:** Added proper styles (`.drop-zone`, `:hover`, `:focus-visible`) and wired up a click/keydown event listener in `script.js` to correctly forward interactions to the hidden file input. In the future, verify that new features using `aria-label` and `role="button"` also have corresponding keyboard handlers (`Enter`/`Space`) and visible focus states.
+## 2024-05-19 - Keyboard Accessibility for Interactive Elements
+**Learning:** UI elements designated as buttons via `role="button"` and `tabindex="0"` (like `#drop-zone`) must explicitly handle keyboard events (`Enter` and `Space`) in JavaScript to be fully accessible, especially when wrapping native inputs like file uploaders. Without this, keyboard-only or screen reader users cannot activate the element.
+**Action:** Always attach both `click` and `keydown` listeners to custom interactive elements that do not use native `<button>` tags.
