@@ -87,6 +87,7 @@
 **Learning:** While replacing `.filterIsInstance<T>()` with `.forEach { if (it is T) }` prevents intermediate List allocations, applying this blindly inside a nested dispatch loop (e.g. iterating `frames` then iterating `subscribers`) causes an `O(F*S)` performance regression because the `is T` type check is evaluated for every subscriber for every frame.
 **Action:** When optimizing nested dispatch loops that broadcast items to matching subscribers, fast-path check the presence of matching subscribers outside the frame loop using `.any { it is T }`. This safely skips the inner broadcast loop when there are no listeners, while avoiding intermediate list allocations and preserving event delivery order.
 
+<<<<<<< ours
 ## 2024-12-10 - Avoid O(N) boxing allocation when comparing ByteArray
 **Learning:** Comparing ByteArray objects using .toList() == other.toList() causes an O(N) memory allocation because each Byte gets boxed into an object within a new ArrayList. This can introduce unexpected GC pressure, especially when frequently hashing or comparing proofs.
 **Action:** Replace a.toList() == b.toList() on ByteArray with a.contentEquals(b) for a fast, zero-allocation byte-level comparison.
@@ -114,4 +115,9 @@
 **Learning:** Using `.asSequence().filterIsInstance<T>().maxWithOrNull(...)` in hot paths introduces significant memory allocation and execution overhead due to the creation of the `Sequence` wrapper and the stateful, lazy iterators required to evaluate it. Performance benchmarks show that a direct `for` loop with an `if (item is T)` check achieves a 46% latency reduction and zero object allocations compared to the Sequence approach.
 **Action:** To avoid intermediate Sequence allocations and lazy iterator overhead in Kotlin hot paths, replace chained collection operations like `.asSequence().filterIsInstance<T>().maxWithOrNull(...)` with direct, zero-allocation `for` loops that use `if (item is T)` checks.
 =======
+>>>>>>> theirs
+=======
+## 2024-05-24 - Avoiding intermediate List allocations in filter followed by forEach
+**Learning:** In Kotlin, chaining `.filter { ... }` and `.forEach { ... }` generates an intermediate `ArrayList` containing all matched elements, leading to unnecessary memory allocation and GC pressure, especially when the collection is large or processed frequently.
+**Action:** Iterate with `.forEach { if (condition(it)) { ... } }` to avoid intermediate list allocations and improve performance in hot paths.
 >>>>>>> theirs
