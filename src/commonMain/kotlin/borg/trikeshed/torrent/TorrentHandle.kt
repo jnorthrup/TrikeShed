@@ -4,7 +4,6 @@ import borg.trikeshed.htx.client.ipfs.CID
 import borg.trikeshed.htx.client.ipfs.BlockStore
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
-import java.security.MessageDigest
 
 /**
  * BitTorrent v2 (BEP 52) Torrent Handle.
@@ -40,7 +39,7 @@ interface TorrentHandle {
  */
 data class InfoHash(val bytes: ByteArray) {
     init { require(bytes.size == 32) { "InfoHash must be exactly 32 bytes (SHA-256)" } }
-    fun hex(): String = bytes.joinToString("") { "%02x".format(it) }
+    fun hex(): String = bytes.joinToString("") { it.toUByte().toString(16).padStart(2, '0') }
     override fun toString(): String = "InfoHash(" + hex() + ")"
 }
 
@@ -66,7 +65,7 @@ class BitField(val bits: ByteArray) {
                      else (bits[byte].toInt() and mask.inv()).toByte()
     }
 
-    fun numSet(): Int = bits.sumOf { Integer.bitCount(it.toInt() and 0xFF) }
+    fun numSet(): Int = bits.sumOf { (it.toInt() and 0xFF).countOneBits() }
 
     companion object {
         fun empty(numPieces: Int): BitField {

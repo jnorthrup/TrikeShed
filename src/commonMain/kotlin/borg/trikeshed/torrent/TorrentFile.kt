@@ -1,6 +1,8 @@
 package borg.trikeshed.torrent
 
-import java.security.MessageDigest
+import borg.trikeshed.job.sha256
+
+internal fun ByteArray.decodeLatin1(): String = buildString(size) { for (b in this@decodeLatin1) append((b.toInt() and 0xFF).toChar()) }
 
 /**
  * BitTorrent v2 (BEP 52) Torrent File — bencode decode + info-hash computation.
@@ -24,14 +26,12 @@ data class TorrentFile(
 
     /** v2 info-hash: SHA-256 of info-bytes (40 bytes zero-padded). */
     fun infoHashV2(): InfoHash {
-        val digest = MessageDigest.getInstance("SHA-256")
-        return InfoHash(digest.digest(infoBytes()))
+        return InfoHash(sha256(infoBytes()))
     }
 
     /** v1 info-hash: SHA-1 of info-bytes (20 bytes). */
     fun infoHashV1(): ByteArray {
-        val digest = MessageDigest.getInstance("SHA-1")
-        return digest.digest(infoBytes())
+        return Sha1.digest(infoBytes())
     }
 
     val isHybrid: Boolean get() = info.pieces.rootSha256 != null && info.sha1RootTree != null
@@ -204,7 +204,7 @@ private class Tokenizer(private val data: ByteArray) {
             'i' -> {
                 val start = pos
                 while (pos < data.size && data[pos].toInt().toChar() != 'e') pos++
-                val num = data.copyOfRange(start, pos).toString(Charsets.ISO_8859_1).toLong()
+                val num = data.copyOfRange(start, pos).decodeLatin1().toLong()
                 pos++ // skip 'e'
                 Token.BInt(num)
             }
@@ -214,7 +214,7 @@ private class Tokenizer(private val data: ByteArray) {
             in '0'..'9' -> {
                 val start = pos - 1
                 while (pos < data.size && data[pos].toInt().toChar() in '0'..'9') pos++
-                val len = data.copyOfRange(start, pos).toString(Charsets.ISO_8859_1).toInt()
+                val len = data.copyOfRange(start, pos).decodeLatin1().toInt()
                 pos++ // skip ':'
                 val bytes = data.copyOfRange(pos, pos + len)
                 pos += len
@@ -233,7 +233,7 @@ private class Decoder(private val it: Iterator<Tokenizer.Token>) {
         while (it.hasNext()) {
             val t = it.next()
             if (t == Tokenizer.Token.BEnd) break
-            val key = (t as Tokenizer.Token.BStr).bytes.toString(Charsets.ISO_8859_1)
+            val key = (t as Tokenizer.Token.BStr).bytes.decodeLatin1()
             map[key] = decodeNext()
         }
         return map
@@ -270,7 +270,7 @@ private sealed class Node {
     abstract val entries: Map<String, Node>?
 
     class Str(val bytes: ByteArray) : Node() {
-        override val value: String? = bytes.toString(Charsets.ISO_8859_1)
+        override val value: String? = bytes.decodeLatin1()
         override val intValue: Long? = value?.toLongOrNull()
         override val items: List<Node>? get() = null
         override val entries: Map<String, Node>? get() = null
@@ -340,7 +340,7 @@ object BencodeEncoder {
         info.private?.let { encodeInt(out, "private", it.toLong()) }
 
         out.append("e")
-        return out.toString().toByteArray(Charsets.UTF_8)
+        return out.toString().encodeToByteArray()
     }
 
     private fun encodeStr(sb: StringBuilder, s: String) {

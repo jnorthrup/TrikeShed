@@ -1,7 +1,6 @@
 package borg.trikeshed.torrent
 
 import borg.trikeshed.htx.client.ipfs.CID
-import java.security.MessageDigest
 
 /**
  * BitTorrent Peer Wire Protocol (BEP 3) message types and wire-format codec.
@@ -137,8 +136,8 @@ private fun byteOf(v: Int): ByteArray = byteArrayOf(v.toByte())
 
 private operator fun ByteArray.plus(other: ByteArray): ByteArray {
     val result = ByteArray(this.size + other.size)
-    System.arraycopy(this, 0, result, 0, this.size)
-    System.arraycopy(other, 0, result, this.size, other.size)
+    this.copyInto(result, 0, 0, this.size)
+    other.copyInto(result, this.size, 0, other.size)
     return result
 }
 
@@ -152,7 +151,7 @@ private operator fun ByteArray.plus(other: ByteArray): ByteArray {
  *   This handshake is only used for the v1-compatible TCP peers.
  */
 data class PeerHandshake(
-    val protocol: ByteArray = "BitTorrent protocol".toByteArray(),
+    val protocol: ByteArray = "BitTorrent protocol".encodeToByteArray(),
     val reservedBytes: ByteArray = ByteArray(8),
     val infoHash: ByteArray,
     val peerId: ByteArray,
@@ -179,7 +178,7 @@ data class PeerHandshake(
             val reserved = data.copyOfRange(20, 28)
             val infoHash = data.copyOfRange(28, 48)
             val peerId = data.copyOfRange(48, 68)
-            if (!proto.contentEquals("BitTorrent protocol".toByteArray())) return null
+            if (!proto.contentEquals("BitTorrent protocol".encodeToByteArray())) return null
             return PeerHandshake(proto, reserved, infoHash, peerId)
         }
 
@@ -187,8 +186,9 @@ data class PeerHandshake(
         fun azureusPeerId(client: String = "TR", version: String = "0.01"): ByteArray {
             val s = "-${client}${version}-"
             val random = ByteArray(20 - s.length)
-            java.security.SecureRandom().nextBytes(random)
-            return (s.toByteArray() + random).copyOf(20)
+            // peer-id is not a secret
+            kotlin.random.Random.nextBytes(random)
+            return (s.encodeToByteArray() + random).copyOf(20)
         }
     }
 }

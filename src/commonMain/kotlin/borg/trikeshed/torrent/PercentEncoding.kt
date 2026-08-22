@@ -34,7 +34,7 @@ fun percentEncodeBinary(data: ByteArray): String =
  */
 fun percentEncode(text: String): String =
     buildString(text.length * 2) {
-        for (byte in text.toByteArray(Charsets.UTF_8)) {
+        for (byte in text.encodeToByteArray()) {
             val v = byte.toInt() and 0xFF
             if (v < 128 && UNRESERVED[v]) {
                 append(v.toChar())
@@ -74,12 +74,12 @@ fun percentDecode(text: String): String {
         if (c == '+') {
             bytes[pos++] = ' '.code.toByte()
         } else {
-            val src = c.toString().toByteArray(Charsets.UTF_8)
+            val src = c.toString().encodeToByteArray()
             for (b in src) bytes[pos++] = b
         }
         i++
     }
-    return bytes.copyOf(pos).toString(Charsets.UTF_8)
+    return bytes.copyOf(pos).decodeToString()
 }
 
 /**
@@ -103,7 +103,7 @@ fun percentDecodeBytes(text: String): ByteArray {
         if (c == '+') {
             bytes[pos++] = ' '.code.toByte()
         } else {
-            val src = c.toString().toByteArray(Charsets.UTF_8)
+            val src = c.toString().encodeToByteArray()
             for (b in src) bytes[pos++] = b
         }
         i++

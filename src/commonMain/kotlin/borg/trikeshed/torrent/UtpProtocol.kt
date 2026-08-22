@@ -2,10 +2,9 @@ package borg.trikeshed.torrent
 
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
-import java.security.MessageDigest
-import java.util.Random
 import kotlin.math.max
 import kotlin.math.min
+import borg.trikeshed.cursor.monotonicNanoTime
 
 /**
  * uTP (Micro Torrent Protocol) — BEP 29 / µTP.
@@ -154,8 +153,7 @@ class UtpSocket(
     // Timestamp tracking
     private var lastAckTime: Long = 0
 
-    private val random = Random()
-
+    
     data class UtpPacket(
         val seqNr: Int,
         val payload: ByteArray,
@@ -239,7 +237,7 @@ class UtpSocket(
 
     private fun handleSyn(header: UtpHeader, recvTime: Long) {
         // recvTime is in μs from socket receive timestamp
-        val ourTimestamp = System.nanoTime() / 1000
+        val ourTimestamp = monotonicNanoTime() / 1000
         ackNr = header.seqNr - 1
         state = UtpState.SYN_ACKED
         val ackPkt = makePacket(UtpType.STATE, ByteArray(0))
@@ -348,7 +346,7 @@ class UtpSocket(
     // ── Packet helpers ───────────────────────────────────────────────────────
 
     private fun makePacket(type: UtpType, payload: ByteArray): UtpPacket {
-        val sentAt = System.nanoTime() / 1000
+        val sentAt = monotonicNanoTime() / 1000
         return UtpPacket(
             seqNr = seqNr,
             payload = payload,
@@ -358,7 +356,7 @@ class UtpSocket(
     }
 
     private fun send(pkt: UtpPacket) {
-        val now = System.nanoTime() / 1000
+        val now = monotonicNanoTime() / 1000
         val header = UtpHeader(
             type = pkt.type,
             version = 1,
@@ -379,7 +377,7 @@ class UtpSocket(
     companion object {
         fun deriveConnId(infoHash: ByteArray, secret: ByteArray, initiator: Boolean): Int {
             val data = if (initiator) infoHash + secret else secret + infoHash
-            val digest = MessageDigest.getInstance("SHA-1").digest(data)
+            val digest = Sha1.digest(data)
             return ((digest[0].toInt() and 0xFF) shl 8) or (digest[1].toInt() and 0xFF)
         }
     }
