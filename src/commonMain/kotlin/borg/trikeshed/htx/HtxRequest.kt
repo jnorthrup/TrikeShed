@@ -1,6 +1,7 @@
 package borg.trikeshed.htx
 
 import borg.trikeshed.lib.ByteSeries
+import borg.trikeshed.lib.forEach
 import borg.trikeshed.lib.Join
 import borg.trikeshed.lib.Series
 import borg.trikeshed.lib.emptySeriesOf

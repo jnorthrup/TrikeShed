@@ -3,6 +3,7 @@ package borg.trikeshed.htx
 import borg.trikeshed.context.AsyncContextElement
 import borg.trikeshed.context.ElementState
 import borg.trikeshed.lib.ByteSeries
+import borg.trikeshed.lib.forEach
 import borg.trikeshed.lib.toList
 import borg.trikeshed.lib.toSeries
 import borg.trikeshed.reactor.TlsApplicationProtocol

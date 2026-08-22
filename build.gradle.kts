@@ -314,9 +314,9 @@ kotlin {
         }
     }
 
-    val commonMain = getByName("commonMain") {
-        kotlin.srcDir(generateForgeAssets.map { it.outputs.files })
-    }
+    // NOTE: commonMain srcDir for generated Forge assets is wired after
+    // generateForgeAssets is registered (see below) — a forward reference
+    // here cannot resolve at configuration time.
 }
 
 // ─────────────────────────────────────────────────────────────────
@@ -802,6 +802,13 @@ val generateForgeAssets = tasks.register("generateForgeAssets") {
             "}\n"
         )
     }
+}
+
+// Wire the generated Forge assets into commonMain. Must come AFTER
+// generateForgeAssets is registered above — the kotlin { sourceSets { } }
+// block near the top of this file cannot forward-reference it.
+kotlin.sourceSets.getByName("commonMain") {
+    kotlin.srcDir(generateForgeAssets.map { it.outputs.files })
 }
 
 tasks.register("metrics") {
