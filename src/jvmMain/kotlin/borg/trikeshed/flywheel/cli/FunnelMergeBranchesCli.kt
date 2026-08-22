@@ -235,6 +235,58 @@ private class FunnelMergeBranchesCli(
             path.startsWith("bin/") || path.startsWith(".github/workflows/") ||
             path == "settings.gradle.kts" || path == "gradle.properties"
 
+    /** Append-only session ledgers — union-safe on merge conflict. */
+    private fun isLedgerPath(path: String): Boolean =
+        (path.startsWith(".jules/") || path.startsWith(".Jules/")) && path.endsWith(".md")
+
+    /**
+     * Union a ledger-only patch: extract every added block (## headers and
+     * their bodies) and append the ones the target does not already contain.
+     * Returns the number of entries appended.
+     */
+    private suspend fun unionLedgerPatch(worktree: File, patch: String): Int {
+        var appended = 0
+        var currentFile: String? = null
+        val addedByFile = LinkedHashMap<String, StringBuilder>()
+        for (line in patch.lineSequence()) {
+            when {
+                line.startsWith("+++ b/") -> currentFile = line.removePrefix("+++ b/").trim()
+                line.startsWith("+") && !line.startsWith("+++") -> {
+                    val body = line.removePrefix("+")
+                    currentFile?.let { f -> addedByFile.getOrPut(f) { StringBuilder() }.appendLine(body) }
+                }
+            }
+        }
+        for ((path, added) in addedByFile) {
+            val target = File(worktree, path)
+            val existing = if (target.isFile) target.readText() else ""
+            // Split into header-delimited entries; append any whose header line
+            // is absent from the existing text.
+            val entries = mutableListOf<String>()
+            val buf = StringBuilder()
+            for (l in added.lines()) {
+                if (l.startsWith("## ")) {
+                    if (buf.isNotBlank()) entries += buf.toString().trimEnd()
+                    buf.setLength(0)
+                }
+                buf.appendLine(l)
+            }
+            if (buf.isNotBlank()) entries += buf.toString().trimEnd()
+            val out = StringBuilder(existing.trimEnd()).appendLine()
+            for (e in entries) {
+                val header = e.lineSequence().firstOrNull { it.startsWith("## ") } ?: continue
+                val headerKey = header.substringAfter("## ").take(20)
+                if (existing.lines().none { it.startsWith("## ") && it.substringAfter("## ").take(20) == headerKey }) {
+                    out.appendLine().append(e).appendLine()
+                    appended++
+                }
+            }
+            target.parentFile?.mkdirs()
+            target.writeText(out.toString())
+        }
+        return appended
+    }
+
     /** Arms = unmerged origin branches ∪ undrained terminal WAL cards with CAS patches. */
     private suspend fun buildArms(): List<Arm> {
         val arms = mutableListOf<Arm>()
@@ -308,20 +360,36 @@ private class FunnelMergeBranchesCli(
             withContext(Dispatchers.IO) { patchFile.writeText(arm.patch) }
             val apply = gitIn(worktree, "apply", "--3way", patchFile.absolutePath)
             if (apply.first != 0) {
-                // Retry with reduced context: stale-base WAL patches carry
-                // context lines from a tree master has since moved. --recount
-                // with 1-line context tolerates the drift where 3-way cannot.
-                val reduced = withContext(Dispatchers.IO) { reducePatchContext(arm.patch, 1) }
-                if (reduced != null) {
-                    withContext(Dispatchers.IO) { patchFile.writeText(reduced) }
-                    val retry = gitIn(worktree, "apply", "--3way", "--recount", patchFile.absolutePath)
-                    if (retry.first != 0) {
-                        System.err.println("[FUNNEL-MERGE] single-arm apply failed (3way + reduced context): ${(retry.second.take(300))}")
+                // Ledger-union fallback: .jules/.Jules markdown ledgers are
+                // append-only session journals. Patches recorded against a
+                // base where the ledger was untracked ("does not exist in
+                // index") still carry pure appends — union them in instead
+                // of failing the arm. Union-safe for .md ledgers only.
+                if (arm.touched.all { isLedgerPath(it) }) {
+                    val unioned = unionLedgerPatch(worktree, arm.patch)
+                    if (unioned > 0) {
+                        println("[FUNNEL-MERGE] ledger-union applied $unioned entries for ${arm.label}")
+                    } else {
+                        println("[FUNNEL-MERGE] ledger-union: nothing new for ${arm.label}")
+                        tagAndClose(listOf(arm), headShaNow(), alreadyPresent = true)
                         return
                     }
                 } else {
-                    System.err.println("[FUNNEL-MERGE] single-arm apply failed: ${apply.second.take(300)}")
-                    return
+                    // Retry with reduced context: stale-base WAL patches carry
+                    // context lines from a tree master has since moved. --recount
+                    // with 1-line context tolerates the drift where 3-way cannot.
+                    val reduced = withContext(Dispatchers.IO) { reducePatchContext(arm.patch, 1) }
+                    if (reduced != null) {
+                        withContext(Dispatchers.IO) { patchFile.writeText(reduced) }
+                        val retry = gitIn(worktree, "apply", "--3way", "--recount", patchFile.absolutePath)
+                        if (retry.first != 0) {
+                            System.err.println("[FUNNEL-MERGE] single-arm apply failed (3way + reduced context): ${(retry.second.take(300))}")
+                            return
+                        }
+                    } else {
+                        System.err.println("[FUNNEL-MERGE] single-arm apply failed: ${apply.second.take(300)}")
+                        return
+                    }
                 }
             }
             if (gitIn(worktree, "status", "--porcelain").second.isBlank()) {
