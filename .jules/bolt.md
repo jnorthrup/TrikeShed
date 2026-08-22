@@ -111,6 +111,7 @@
 ## 2024-05-24 - Avoiding intermediate List allocations in filter followed by forEach
 **Learning:** In Kotlin, chaining `.filter { ... }` and `.forEach { ... }` generates an intermediate `ArrayList` containing all matched elements, leading to unnecessary memory allocation and GC pressure, especially when the collection is large or processed frequently.
 **Action:** Iterate with `.forEach { if (condition(it)) { ... } }` to avoid intermediate list allocations and improve performance in hot paths.
+<<<<<<< ours
 
 ## 2026-10-25 - Avoid intermediate Sequence allocations before filterIsInstance
 **Learning:** Using `.asSequence().filterIsInstance<T>().maxWithOrNull(...)` in hot paths introduces significant memory allocation and execution overhead due to the creation of the `Sequence` wrapper and the stateful, lazy iterators required to evaluate it. Performance benchmarks show that a direct `for` loop with an `if (item is T)` check achieves a 46% latency reduction and zero object allocations compared to the Sequence approach.
@@ -126,4 +127,9 @@
 ## 2025-02-27 - [Optimize FileCasStore put path]
 **Learning:** Using `fileOps.readAllBytes(path)` on the critical path of `FileCasStore.put` to verify already-existing CAS entries causes massive I/O overhead (~2929 µs/put vs ~35 µs for CouchStore), especially on repeated document saves. Since CAS guarantees content addressing, we can trust the path existence for the fast path and avoid re-reading and re-hashing the payload.
 **Action:** Always rely on `fileOps.exists(path)` to short-circuit repeated CAS ingestion unless explicit corruption repair is required by the product logic.
+>>>>>>> theirs
+=======
+## 2025-02-18 - Avoid Unnecessary List Allocations on Iterables
+**Learning:** Calling `.toList()` on an `Iterable` that is already a collection (like a `List`) creates a full copy, allocating an intermediate `ArrayList` and incurring an O(N) penalty.
+**Action:** When a function accepts an `Iterable<T>` but needs a `List<T>` (e.g. for indexed access or multiple iterations), use safe casting to avoid the copy if it's already a list: `iterable as? List<T> ?: iterable.toList()`.
 >>>>>>> theirs
