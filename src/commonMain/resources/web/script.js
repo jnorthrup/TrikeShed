@@ -708,7 +708,7 @@
 
     const nodesG = svgEl('g', { class: 'graph-nodes' });
     layout.nodes.forEach((n) => {
-      const g = svgEl('g', { class: 'graph-node' + (n.layer ? ' layer-' + n.layer : ''), 'data-id': n.id, transform: 'translate(' + (n.x - NODE_W / 2) + ',' + (n.y - NODE_H / 2) + ')', tabindex: '0' });
+      const g = svgEl('g', { class: 'graph-node' + (n.layer ? ' layer-' + n.layer : ''), 'data-id': n.id, transform: 'translate(' + (n.x - NODE_W / 2) + ',' + (n.y - NODE_H / 2) + ')', tabindex: '0', role: 'button' });
       g.setAttribute('aria-label', n.title + ' (topo ' + n.topo + ')');
       g.addEventListener('click', (ev) => { ev.stopPropagation(); inspectNode(n); });
       g.addEventListener('keydown', (ev) => { if (ev.key === 'Enter') inspectNode(n); });

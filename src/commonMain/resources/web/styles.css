@@ -412,7 +412,8 @@ button { font: inherit; color: inherit; background: none; border: none; cursor: 
 }
 .graph-edge { stroke: #aeaca6; stroke-width: 1.5; fill: none; marker-end: url(#graph-arrow); }
 .graph-node rect { fill: var(--bg); stroke: var(--border); stroke-width: 1; rx: 8; }
-.graph-node:hover rect, .graph-node:focus rect { stroke: var(--accent); stroke-width: 1.5; }
+.graph-node:hover rect, .graph-node:focus rect, .graph-node:focus-visible rect { stroke: var(--accent); stroke-width: 1.5; }
+.graph-node:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 8px; }
 .graph-node text { font-size: 12px; fill: var(--text); font-family: var(--mono); pointer-events: none; }
 .graph-node .graph-node-topo { font-size: 10px; fill: var(--text-faint); }
 .graph-empty {
