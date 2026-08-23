@@ -105,7 +105,13 @@ object HeatSoak {
 
             // ── findings ───────────────────────────────────────────────
             val findings = ArrayList<String>()
-            fun thirds(ph: String): Pair<List<Sample>, List<Sample>> { val s = samples.filter { it.phase == ph }; val k = maxOf(1, s.size / 3); return s.take(k) to s.takeLast(k) }
+            // drift windows: first vs last third of the STEADY part of a phase — the first seconds are JIT and
+            // promotion warm-up (throughput ramps 10k → 500k/s), not temperature
+            fun thirds(ph: String): Pair<List<Sample>, List<Sample>> {
+                val all = samples.filter { it.phase == ph }
+                val s = if (all.size >= 9) all.drop(3) else all
+                val k = maxOf(1, s.size / 3); return s.take(k) to s.takeLast(k)
+            }
             for (ph in listOf("soak", "hot")) {
                 val (a, b) = thirds(ph)
                 if (a.isEmpty() || b.isEmpty()) continue
@@ -131,7 +137,8 @@ object HeatSoak {
             val refutations = hv.receipts.count { it.refuted }.toLong()
             if (refutations > 0) findings += "refuted receipts: $refutations"
 
-            val text = render(samples, heatmap2, hot, findings, phase1, ticks.get(), hv)
+            val histo = if (System.getProperty("subvm.soak.histo") == "true" || System.getenv("SUBVM_SOAK_HISTO") == "true") classHistogram(25) else ""
+            val text = render(samples, heatmap2, hot, findings, phase1, ticks.get(), hv) + histo
             out(text)
             return Report(samples, hot, heatmap2, findings, refutations, demoted, text)
         } finally {
@@ -170,8 +177,18 @@ object HeatSoak {
         return total.get()
     }
 
+    /**
+     * Live set, not garbage: the heap's usage *after the last collection* summed over the heap pools.
+     * `totalMemory - freeMemory` at 500k allocations/s mostly measures how lazy the collector is being.
+     */
+    fun liveHeapMb(): Long {
+        val pools = java.lang.management.ManagementFactory.getMemoryPoolMXBeans().filter { it.type == java.lang.management.MemoryType.HEAP }
+        val afterGc = pools.mapNotNull { it.collectionUsage?.used }
+        val bytes = if (afterGc.isNotEmpty() && afterGc.sum() > 0) afterGc.sum() else Runtime.getRuntime().let { it.totalMemory() - it.freeMemory() }
+        return bytes / (1024 * 1024)
+    }
+
     private fun sample(hv: Hypervisor, t: Int, phase: String, cps: Long, lat: Map<String, Lat>, calls: Map<String, AtomicLong>): Sample {
-        val rt = Runtime.getRuntime()
         val snap = hv.snapshot()
         @Suppress("UNCHECKED_CAST") val profiles = snap["profiles"] as Map<String, List<String>>
         val memoMax = profiles.values.flatten().maxOfOrNull { line -> Regex("memo=(\\d+)").find(line)?.groupValues?.get(1)?.toInt() ?: 0 } ?: 0
@@ -180,7 +197,7 @@ object HeatSoak {
             ZoneHeat(k, calls.getValue(k).get(), lat.getValue(k).pct(0.5), lat.getValue(k).pct(0.99), hv.trainer(iso)?.profiles?.get(root)?.phase?.name ?: "-", hv.trainer(iso)?.profiles?.get(root)?.memo?.size ?: 0)
         }
         return Sample(
-            t, phase, cps, (rt.totalMemory() - rt.freeMemory()) / (1024 * 1024), subVmThreads(),
+            t, phase, cps, liveHeapMb(), subVmThreads(),
             snap["receipts"] as Int, snap["landings"] as Int, hv.blackboard.keys().size, memoMax, hv.fires.size, zones,
         )
     }
@@ -189,7 +206,16 @@ object HeatSoak {
         zones.map { z -> ZoneHeat(z.key, calls.getValue(z.key).get(), lat.getValue(z.key).pct(0.5), lat.getValue(z.key).pct(0.99), hv.trainer(z.isolate)?.profiles?.get(z.root)?.phase?.name ?: "-", hv.trainer(z.isolate)?.profiles?.get(z.root)?.memo?.size ?: 0) }
             .sortedByDescending { it.calls }
 
-    fun subVmThreads(): Int = Thread.getAllStackTraces().keys.count { it.name.startsWith("leaf-host:") || it.name.startsWith("subvm-") || it.name.startsWith("soak-driver-") }
+    /** `jcmd <pid> GC.class_histogram` top [n] lines — the evidence behind any heap claim (-Dsubvm.soak.histo=true). */
+    fun classHistogram(n: Int): String = runCatching {
+        val jcmd = java.io.File(System.getProperty("java.home"), "bin/jcmd").path
+        val p = ProcessBuilder(jcmd, ProcessHandle.current().pid().toString(), "GC.class_histogram").redirectErrorStream(true).start()
+        val lines = p.inputStream.bufferedReader().readLines(); p.waitFor()
+        "\n── class histogram (live, top $n) ──\n" + lines.take(n + 3).joinToString("\n") { it.take(140) }
+    }.getOrElse { "\n── class histogram unavailable: $it" }
+
+    /** Per-isolate threads only: leaf hosts, process readers, drivers. `subvm-watchdog` is a JVM-wide idle singleton and is excluded. */
+    fun subVmThreads(): Int = Thread.getAllStackTraces().keys.count { it.name.startsWith("leaf-host:") || it.name.startsWith("subvm-reader-") || it.name.startsWith("soak-driver-") }
 
     private fun render(samples: List<Sample>, heatmap: List<ZoneHeat>, hot: List<String>, findings: List<String>, soakCalls: Long, ticks: Long, hv: Hypervisor): String = buildString {
         appendLine("══ heat soak report ══")
@@ -201,7 +227,7 @@ object HeatSoak {
         }
         val first = samples.first(); val last = samples.last()
         appendLine("soak calls=$soakCalls  host ticks=$ticks  fires=${last.fires}  receipts=${last.receipts}  landings=${last.landings}  blackboard keys=${last.blackboardKeys}")
-        appendLine("heap ${first.heapMb}MB → ${last.heapMb}MB   sub-VM threads ${first.subVmThreads} → ${last.subVmThreads}   memoMax=${last.memoMax} (cap ${LeafTrainer.MEMO_CAP})   receipt cap ${Hypervisor.RECEIPT_LOG_CAP}")
+        appendLine("live heap (post-GC) ${first.heapMb}MB → ${last.heapMb}MB   sub-VM threads ${first.subVmThreads} → ${last.subVmThreads}   memoMax=${last.memoMax} (cap ${LeafTrainer.MEMO_CAP})   receipt cap ${Hypervisor.RECEIPT_LOG_CAP}")
         appendLine("throughput by second: " + samples.joinToString(" ") { "${it.phase.first()}${it.callsPerSec}" })
         appendLine(if (findings.isEmpty()) "findings: none — steady at temperature" else "findings:\n" + findings.joinToString("\n") { "  ! $it" })
     }

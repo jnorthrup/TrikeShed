@@ -60,12 +60,25 @@ class LeafTrainer(
             override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, Teleported>?): Boolean = size > MEMO_CAP
         }
         internal var original: Value? = null
-        internal var leafHost: LeafHost? = null
+        /** The shared per-isolate [LeafHost] while this root is promoted (null once demoted — the host itself stays). */
+        @Volatile var leafHost: LeafHost? = null
+            internal set
         val avgNanos: Long get() = if (calls == 0L) 0 else totalNanos / calls
         override fun toString() = "$root[$phase calls=$calls self=$selfContained/$notSelfContained opaque=$opaqueReturns memo=${memo.size} ok=$consistent bad=$inconsistent avg=${avgNanos / 1000}µs]"
     }
 
     val profiles = ConcurrentHashMap<String, RootProfile>()
+
+    /**
+     * ONE leaf host per isolate, shared by every promoted root. A per-root host means a Truffle
+     * Engine + Context (tens of MB warming on the Java heap, its own thread) per promoted root — the
+     * heat soak showed exactly that as live-heap growth proportional to promotions. Roots are
+     * materialized into the shared host by name; the program namespace is shared in the guest too.
+     */
+    @Volatile private var sharedHost: LeafHost? = null
+    private fun host(): LeafHost = sharedHost ?: synchronized(this) { sharedHost ?: LeafHost(isolate.bounds, isolate.id, isolate.budget).also { sharedHost = it } }
+    /** The shared leaf host, if any root has been promoted (diagnostics). */
+    val leafHost: LeafHost? get() = sharedHost
 
     /** Listener feed from [InProcessIsolate.onRootReturn]. Runs on the guest thread under the isolate lock. */
     fun observe(o: RootObservation) {
@@ -103,7 +116,7 @@ class LeafTrainer(
                 // host then mirrors the whole program, and any dependence on mutable guest state is caught by
                 // the shadow comparison, not assumed away.
                 val materialize = p.characters ?: isolate.program
-                val host = runCatching { LeafHost(isolate.bounds, materialize, root, isolate.budget) }.getOrNull()
+                val host = runCatching { host().also { it.materialize(root, materialize) } }.getOrNull()
                 p.original = original
                 p.leafHost = host
                 isolate.rebind(root, ProxyExecutable { args -> serve(p, args) })
@@ -119,7 +132,7 @@ class LeafTrainer(
             synchronized(p) {
                 if (p.phase == Phase.DEMOTED) return@onGuestThread
                 p.original?.let { isolate.restore(root, it) }
-                p.leafHost?.close(); p.leafHost = null
+                p.leafHost?.forget(root); p.leafHost = null
                 p.demotedReason = reason
                 transition(p, Phase.DEMOTED)
             }
@@ -150,7 +163,7 @@ class LeafTrainer(
                 val guest = original.execute(*args.map { it as Any }.toTypedArray())
                 val guestT = Teleported.of(guest)
                 var hostFailure: String? = null
-                val hostT = p.leafHost?.let { h -> runCatching { h.call(targs) }.onFailure { hostFailure = it.toString() }.getOrNull() }
+                val hostT = p.leafHost?.let { h -> runCatching { h.call(p.root, targs) }.onFailure { hostFailure = it.toString() }.getOrNull() }
                     ?: run { if (hostFailure == null) hostFailure = "no leaf host"; null }
                 val agree = hostT != null && hostT.cid == guestT.cid && !guestT.isOpaque
                 if (agree) p.consistent++ else p.inconsistent++
@@ -169,7 +182,7 @@ class LeafTrainer(
                 }
                 val host = p.leafHost
                 if (host != null) {
-                    val r = runCatching { host.call(targs) }.getOrNull()
+                    val r = runCatching { host.call(p.root, targs) }.getOrNull()
                     if (r != null && !r.isOpaque) {
                         p.memo[argsCid.hex] = r
                         isolate.hostServed.incrementAndGet()
@@ -192,47 +205,59 @@ class LeafTrainer(
         onReceipt(DelegationReceipt(isolate.id, p.root, argsCid, resultCid, served, nanos, isolate.nextSeq(), refuted))
     }
 
-    override fun close() { profiles.values.forEach { it.leafHost?.close() } }
+    override fun close() { sharedHost?.close(); sharedHost = null }
 
     /**
-     * The warm host-side isolate a promoted leaf is teleported into: a second [Context] on its own
-     * [Engine] with NO listener (instrumentation off = the fast path), parsed once from the root's
-     * captured source characters. Self-recursion inside the leaf resolves to the leaf host's own
-     * global, so it runs natively and gets JIT-hot here while the guest stays instrumented.
+     * The warm host-side isolate promoted leaves are teleported into: one [Context] per ISOLATE on its
+     * own [Engine] with NO listener (instrumentation off = the fast path). Each promoted root is
+     * [materialize]d into it by name from its captured characters (listener pointcuts) or the whole
+     * program (binding pointcuts). Self-recursion inside a leaf resolves to the host's own global, so
+     * it runs natively and gets JIT-hot here while the guest stays instrumented.
      */
-    class LeafHost(bounds: FacetBounds, characters: String, root: String, budget: Budget) : AutoCloseable {
+    class LeafHost(private val bounds: FacetBounds, isolateId: String, budget: Budget) : AutoCloseable {
         private val lock = ReentrantLock()
         /**
          * The leaf runs on its own thread: the caller is the guest thread with the GUEST context entered,
          * and GraalPy refuses to enter a second context on a thread that already holds one (JS tolerates
          * it). Off-thread is also the point — the guest is not blocked by the leaf's execution model.
          */
-        private val worker = java.util.concurrent.Executors.newSingleThreadExecutor { r -> Thread(r, "leaf-host:$root").apply { isDaemon = true } }
+        private val worker = java.util.concurrent.Executors.newSingleThreadExecutor { r -> Thread(r, "leaf-host:$isolateId").apply { isDaemon = true } }
         private val engine = Engine.newBuilder().option("engine.WarnInterpreterOnly", "false").build()
         private val context: Context = Context.newBuilder(bounds.languageId).engine(engine)
             .allowHostAccess(HostAccess.NONE).allowHostClassLookup { false }
             .allowIO(IOAccess.NONE).allowCreateThread(false).allowNativeAccess(false)
             .allowCreateProcess(false).allowEnvironmentAccess(EnvironmentAccess.NONE).allowPolyglotAccess(PolyglotAccess.NONE)
             .build()
-        private val fn: Value
+        private val fns = ConcurrentHashMap<String, Value>()
+        private val materializedSources = HashSet<Int>()
         private val wallMillis = if (budget.wallMillis > 0) budget.wallMillis else GuestBounds.DEFAULT_WALL_MILLIS
 
-        init {
-            fn = worker.submit<Value> {
-                val evaluated = context.eval(Source.newBuilder(bounds.languageId, characters, "leaf:$root").buildLiteral())
-                val f = when {
+        /** Number of roots currently materialized (diagnostics). */
+        val size: Int get() = fns.size
+
+        /** Parse [source] once (by content) and resolve [root] in the host; idempotent per root. */
+        fun materialize(root: String, source: String) {
+            if (fns.containsKey(root)) return
+            val f = worker.submit<Value> {
+                val b = context.getBindings(bounds.languageId)
+                val evaluated = if (materializedSources.add(source.hashCode())) context.eval(Source.newBuilder(bounds.languageId, source, "leaf:$root").buildLiteral()) else null
+                val fn = when {
                     evaluated != null && evaluated.canExecute() -> evaluated
-                    else -> context.getBindings(bounds.languageId).getMember(root)?.takeIf { it.canExecute() }
-                        ?: error("leaf host could not materialize '$root' from its source")
+                    else -> b.getMember(root)?.takeIf { it.canExecute() } ?: error("leaf host could not materialize '$root' from its source")
                 }
                 // arrow/lambda roots evaluate to a function value but leave no global: bind it so self-recursion resolves
-                if (context.getBindings(bounds.languageId).getMember(root) == null) context.getBindings(bounds.languageId).putMember(root, f)
-                f
+                if (b.getMember(root) == null) b.putMember(root, fn)
+                fn
             }.get()
+            fns[root] = f
         }
 
+        /** A demoted root is dropped from the serving table; its definition stays in the host (harmless, and another root may depend on it). */
+        fun forget(root: String) { fns.remove(root) }
+
         /** Execute on the leaf thread; the wall budget bounds it (interrupt on timeout) so a runaway leaf cannot hang the guest. */
-        fun call(args: Teleported.Arr): Teleported = lock.withLock {
+        fun call(root: String, args: Teleported.Arr): Teleported = lock.withLock {
+            val fn = fns[root] ?: throw GuestException(GuestFailure.GUEST_ERROR, "'$root' is not materialized in the leaf host")
             val task = worker.submit<Teleported> { Teleported.of(fn.execute(*args.v.map { it.toGuest() }.toTypedArray())) }
             try {
                 task.get(wallMillis, java.util.concurrent.TimeUnit.MILLISECONDS)

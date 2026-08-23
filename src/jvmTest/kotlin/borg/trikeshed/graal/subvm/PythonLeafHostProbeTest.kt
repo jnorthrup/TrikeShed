@@ -11,8 +11,9 @@ class PythonLeafHostProbeTest {
         val program = "def fib(n):\n    return n if n < 2 else fib(n-1) + fib(n-2)\n"
         // 1. can a LeafHost materialize fib from the whole program and agree with a fresh guest?
         runCatching {
-            LeafTrainer.LeafHost(GuestBounds.PYTHON, program, "fib", Budget()).use { h ->
-                out.append("leafhost fib(10) = ").append(h.call(Teleported.Arr(listOf(Teleported.Num(10))))).append('\n')
+            LeafTrainer.LeafHost(GuestBounds.PYTHON, "probe", Budget()).use { h ->
+                h.materialize("fib", program)
+                out.append("leafhost fib(10) = ").append(h.call("fib", Teleported.Arr(listOf(Teleported.Num(10))))).append('\n')
             }
         }.onFailure { out.append("leafhost FAILED: ").append(it.toString()).append('\n').append(it.stackTrace.take(8).joinToString("\n")).append('\n') }
         // 2. drive the trainer and read the demotion reason + receipts

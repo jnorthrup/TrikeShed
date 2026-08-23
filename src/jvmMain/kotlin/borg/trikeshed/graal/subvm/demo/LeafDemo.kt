@@ -121,7 +121,7 @@ object LeafDemo {
         if (profile != null && profile.phase == LeafTrainer.Phase.DEMOTED) {
             s.notes += "demoted: reason='${profile.demotedReason}' captured characters (${profile.sourceName}:${profile.line}:${profile.column}) = ${profile.characters?.let { "«${it.replace("\n", "\\n")}»" } ?: "<null>"}"
             profile.characters?.let { chars ->
-                val rebuilt = runCatching { LeafTrainer.LeafHost(GuestBounds.of(facet), chars, root, Budget()).use { it.call(Teleported.Arr(listOf(Teleported.Num(arg)))) } }
+                val rebuilt = runCatching { LeafTrainer.LeafHost(GuestBounds.of(facet), "$id-rebuild", Budget()).use { h -> h.materialize(root, chars); h.call(root, Teleported.Arr(listOf(Teleported.Num(arg)))) } }
                 s.notes += "LeafHost rebuilt from those characters: " + rebuilt.fold({ "ok, $root($arg) = $it" }, { "FAILED ${it::class.simpleName}: ${it.message?.lineSequence()?.firstOrNull()}" })
             }
         }

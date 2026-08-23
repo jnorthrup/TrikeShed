@@ -530,6 +530,39 @@ val stageDaemonLib = tasks.register<Sync>("stageDaemonLib") {
     into(stagingLibDir)
 }
 
+// ── Sub-VM capability harness ──────────────────────────────────────────────
+// `subvmHarness` runs the probe suite on the JVM and writes docs/subvm/capabilities-<host>.json +
+// capability-matrix.md. `subvmHarnessNative` builds the same harness as a native-image binary
+// (build/native/subvm-harness) so the macOS-native and linux-native columns are measured by the
+// identical probes; run it inside a linux GraalVM container for the linux row.
+tasks.register<JavaExec>("subvmHarness") {
+    group = "subvm"
+    description = "Measure the sub-VM capability matrix on this JVM (docs/subvm/)."
+    useStagedJvmClasspath()
+    mainClass.set("borg.trikeshed.graal.subvm.harness.HarnessMain")
+    args(listOf("docs/subvm"))
+}
+
+tasks.register<Exec>("subvmHarnessNative") {
+    group = "subvm"
+    description = "native-image the sub-VM harness (GraalVM CE; Truffle languages + execution-listener instrument included)."
+    dependsOn("stageDaemonLib", "compileKotlinJvm")
+    val nativeImage = file(System.getProperty("java.home")).resolve("bin/native-image")
+    val outDir = layout.buildDirectory.dir("native").get().asFile
+    doFirst {
+        outDir.mkdirs()
+        if (!nativeImage.exists()) throw GradleException("no native-image at $nativeImage — run Gradle on GraalVM (sdk use java 25.0.2-graalce)")
+        val cp = (listOf(file("build/classes/kotlin/jvm/main")) + fileTree(stagingLibDir) { include("*.jar") }.files).joinToString(File.pathSeparator)
+        commandLine(
+            nativeImage.path, "--no-fallback", "-O1",
+            "-H:+UnlockExperimentalVMOptions", "-H:+IncludeAllInstruments",
+            "--initialize-at-build-time=kotlin",
+            "-cp", cp, "borg.trikeshed.graal.subvm.harness.HarnessMain",
+            "-o", outDir.resolve("subvm-harness").path,
+        )
+    }
+}
+
 // `-Pjdwp=5005` attaches a JDWP listener (suspend=n); `-Pjdwp=5005,suspend` waits for the debugger
 // before main runs. Replaces the --debug/--suspend flags the old bin/* wrappers parsed.
 val jdwpSpec: String? = providers.gradleProperty("jdwp").orNull

@@ -71,7 +71,12 @@ class InProcessIsolate(
     private val lock = ReentrantLock()
     private val engine: Engine = Engine.newBuilder().option("engine.WarnInterpreterOnly", "false").build()
     private val context: Context
-    private val listener: ExecutionListener
+    /**
+     * Only for languages whose function roots the listener actually reports. GraalPy reports none —
+     * but it does emit stray roots (generator expressions: `strs.<locals>.<genexpr>`) which would mark
+     * every enclosing binding-pointcut frame "foreign" and block promotion. A partial view is worse than none.
+     */
+    private val listener: ExecutionListener?
     private val delegates = ConcurrentHashMap<String, (List<Teleported>) -> Teleported>()
 
     private class Frame(val root: String, val enterNanos: Long) { var foreign = false; var host = false }
@@ -97,13 +102,13 @@ class InProcessIsolate(
             b.resourceLimits(ResourceLimits.newBuilder().statementLimit(budget.statements, null).build())
         }
         context = b.build()
-        listener = ExecutionListener.newBuilder()
+        listener = if (bounds.rootEventsObservable) ExecutionListener.newBuilder()
             .roots(true)
             .collectReturnValue(true)
             .rootNameFilter { !bounds.rootNameNoise(it) }
             .onEnter { onEnter(it) }
             .onReturn { onReturn(it) }
-            .attach(engine)
+            .attach(engine) else null
         context.getBindings(bounds.languageId).putMember(HOST_BINDING, ProxyObject.fromMap(mapOf(
             "call" to ProxyExecutable { args -> hostCall(args) },
         )))
@@ -165,10 +170,18 @@ class InProcessIsolate(
             if (name.startsWith("_") || name == HOST_BINDING || name in bindingWrapped) continue
             val v = b.getMember(name) ?: continue
             if (!v.canExecute() || v.isMetaObject) continue
+            // GraalPy's main-module bindings also expose the BUILTINS (chr, len, sum…) as executable
+            // members; wrapping those would make every program root that calls a builtin look "foreign"
+            // and tax every builtin call. Only roots the program defined are pointcuts.
+            val meta = runCatching { v.metaObject?.metaSimpleName }.getOrNull() ?: ""
+            if (meta in BINDING_NOISE_META) continue
             bindingWrapped += name
             b.putMember(name, ProxyExecutable { args -> observedCall(name, v, args) })
         }
     }
+
+    /** Names of the roots currently under binding pointcuts (diagnostics). */
+    val wrappedRoots: Set<String> get() = bindingWrapped.toSet()
 
     private fun observedCall(name: String, original: Value, args: Array<Value>): Any? {
         stack.lastOrNull()?.let { top -> if (top.root != name) top.foreign = true }
@@ -223,7 +236,7 @@ class InProcessIsolate(
 
     override fun close() {
         alive = false
-        runCatching { listener.close() }
+        runCatching { listener?.close() }
         runCatching { context.close(true) }
         runCatching { engine.close(true) }
     }
@@ -317,6 +330,8 @@ class InProcessIsolate(
     companion object {
         const val HOST_BINDING = "host"
         const val INTERRUPT_GRACE_MS = 2_000L
+        /** Meta-object names of executables that are runtime furniture, not program roots. */
+        val BINDING_NOISE_META = setOf("builtin_function_or_method", "builtin_method", "method-wrapper", "wrapper_descriptor", "method_descriptor", "type", "module", "classmethod_descriptor")
         private val WATCHDOG = Executors.newSingleThreadScheduledExecutor { r -> Thread(r, "subvm-watchdog").apply { isDaemon = true } }
     }
 }
