@@ -81,9 +81,17 @@ class ConnectionRegistry {
         val buf = ByteBuffer.wrap(bytes)
         val done = CompletableDeferred<Boolean>()
         try {
+            // One async write is a PARTIAL write: it returns once the kernel socket buffer took
+            // what it could (~300 KiB on loopback). Re-arm until the buffer is drained, otherwise a
+            // 3 MB `_all_docs` or a jar attachment arrives truncated under a truthful Content-Length.
             channel.write(buf, null, object : CompletionHandler<Int, Any?> {
                 override fun completed(written: Int, attached: Any?) {
-                    done.complete(written >= 0)
+                    if (written < 0) { done.complete(false); return }
+                    if (buf.hasRemaining()) {
+                        try { channel.write(buf, null, this) } catch (t: Throwable) { done.complete(false) }
+                    } else {
+                        done.complete(true)
+                    }
                 }
                 override fun failed(t: Throwable, attached: Any?) {
                     done.complete(false)

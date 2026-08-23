@@ -37,12 +37,23 @@ sealed interface CouchReportEvent {
         val newValue: String,
         override val timestampMs: Long = nowMs(),
     ) : CouchReportEvent
+
+    /** A revision committed to the store (`_changes` frame) — the bus form of a document event. */
+    data class Committed(
+        val docId: String,
+        val rev: String,
+        val seq: Long,
+        val deleted: Boolean,
+        override val timestampMs: Long = nowMs(),
+    ) : CouchReportEvent
 }
 
 data class CouchReportState(
     val mapEmissions: Long = 0,
     val reductions: Long = 0,
     val pointcuts: Long = 0,
+    val commits: Long = 0,
+    val lastSeq: Long = 0,
     val lastViewName: String = "",
     val lastTimestampMs: Long = 0,
 )
@@ -86,6 +97,11 @@ class CouchReportReactorElement(
             )
             is CouchReportEvent.PointcutObserved -> _reportState.value.copy(
                 pointcuts = _reportState.value.pointcuts + 1,
+                lastTimestampMs = event.timestampMs,
+            )
+            is CouchReportEvent.Committed -> _reportState.value.copy(
+                commits = _reportState.value.commits + 1,
+                lastSeq = event.seq,
                 lastTimestampMs = event.timestampMs,
             )
         }

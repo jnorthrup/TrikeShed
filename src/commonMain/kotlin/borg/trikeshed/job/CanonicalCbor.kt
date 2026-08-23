@@ -5,6 +5,7 @@ import borg.trikeshed.collections.associative.Item
 import borg.trikeshed.collections.associative.itemArrayOf
 import borg.trikeshed.collections.associative.itemMapOf
 import borg.trikeshed.collections.associative.toItem
+import borg.trikeshed.collections.associative.toAny
 import borg.trikeshed.lib.get
 import borg.trikeshed.lib.size
 import borg.trikeshed.parse.confix.ConfixDoc
@@ -101,6 +102,17 @@ object CanonicalCbor {
         }
         is Item.Tag -> Item.Tag(item.tag, toCanonical(item.item))
         else -> item
+    }
+
+    /** Canonical CBOR of a JSON-shaped map (sorted keys, definite lengths). The Couch body-blob format. */
+    fun encodeMap(fields: Map<String, Any?>): ByteArray = encodeSortedMap(fields)
+
+    /** Inverse of [encodeMap]: CBOR bytes → JSON-shaped map (String keys, plain values). */
+    @Suppress("UNCHECKED_CAST")
+    fun decodeMap(bytes: ByteArray): Map<String, Any?> {
+        val any = Cbor.decode(bytes).toAny()
+        val m = any as? Map<*, *> ?: return emptyMap()
+        return m.entries.associate { it.key.toString() to it.value }
     }
 
     private fun encodeSortedMap(fields: Map<String, Any?>): ByteArray {

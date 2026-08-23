@@ -61,6 +61,21 @@ import sun.misc.SignalHandler
  *   forgeHome               default = ~/.local/forge (ForgeHome.defaultHome)
  *   repoDir                 default = cwd
  */
+/** The one database this daemon serves; also the first path segment of the Couch surface. */
+const val COUCH_DB_NAME: String = "trikeshed"
+
+/** Absorb the live classpath into the store; returns the attachment count. Skips directories that do not exist yet. */
+internal fun reconcileBuildPlane(
+    classesGateway: WorktreeCouchGateway, classesDir: File,
+    libGateway: WorktreeCouchGateway, libDir: File,
+    revision: String,
+): Int {
+    var n = 0
+    if (classesDir.isDirectory) n += classesGateway.reconcile(classesDir.absolutePath, "oroboros", revision, System.currentTimeMillis()).paths.size
+    if (libDir.isDirectory) n += libGateway.reconcile(libDir.absolutePath, "oroboros", revision, System.currentTimeMillis()).paths.size
+    return n
+}
+
 object OroborosDaemon {
 
     const val DEFAULT_INTERVAL_MS = 30_000L
@@ -266,9 +281,57 @@ object OroborosDaemon {
         torrentElement.open()
         System.err.println("[OROBOROS] TorrentElement open: ${torrentElement.state} — torrent:// via HTX/TLS + uTP datagrams")
 
+        // ── The store: CAS-collapsed Couch (rev hash = body blob CID) over the forge-home CAS ──
+        // Built before the HTTP tier so the server can host the PWA and the build out of it.
+        val fileOps = JvmFileOperations()
+        val casStore = FileCasStore(fileOps, fileOps.resolvePath(forgeHome.absolutePath, "cas"))
+        val couchStore = borg.trikeshed.couch.CouchStoreFactory.casBacked(casStore)
+        val attachmentGateway = CouchAttachmentGateway(couchStore, casStore)
+        val gitCouchGateway = GitCouchGateway(fileOps, attachmentGateway)
+        val worktreeCouchGateway = WorktreeCouchGateway(fileOps, attachmentGateway)
+        // The running build is an attachment set too (rxf-rsync lineage: classes and jars served
+        // from the store). `build/…` is excluded from the worktree plane, so two narrow gateways
+        // absorb exactly the live classpath: build/live/classes and build/staging/lib.
+        val buildClassesDir = File(repoDir, "build/live/classes")
+        val stagingLibDir = File(repoDir, "build/staging/lib")
+        val buildClassesGateway = WorktreeCouchGateway(
+            fileOps, attachmentGateway,
+            prefix = WorktreeCouchGateway.WORKTREE_PREFIX + "build/live/classes/",
+            excludedSegments = emptySet(), excludedRelativePrefixes = emptySet(),
+        )
+        val stagingLibGateway = WorktreeCouchGateway(
+            fileOps, attachmentGateway,
+            prefix = WorktreeCouchGateway.WORKTREE_PREFIX + "build/staging/lib/",
+            excludedSegments = emptySet(), excludedRelativePrefixes = emptySet(),
+        )
+        val couchDb = borg.trikeshed.couch.CouchDatabase(COUCH_DB_NAME, couchStore, casStore)
+        couchDb.ensureDesignDoc(vhostRoot = "docs/")
+        // Peer exchange for _replicate rides the same HTX reactor as Jules/ModelMux — no JDK client.
+        val peerHttp = borg.trikeshed.couch.replicate.HttpExchange { method, url, body, contentType ->
+            val req = borg.trikeshed.htx.parseHtxRequest(
+                url = url,
+                method = borg.trikeshed.htx.HtxMethod.valueOf(method.uppercase()),
+                body = body?.let { borg.trikeshed.lib.ByteSeries(it) } ?: borg.trikeshed.htx.emptyHtxBody(),
+            ).let { r -> if (contentType != null) r.copy(headers = borg.trikeshed.htx.htxHeaders("Content-Type" j contentType)) else r }
+            val resp = htxElement.request(req)
+            borg.trikeshed.couch.replicate.HttpReply(resp.status, resp.body.toArray())
+        }
+        val couchWire = borg.trikeshed.forge.server.CouchWire(
+            router = borg.trikeshed.couch.CouchWireRouter(couchDb, WorktreeCouchGateway.WORKTREE_PREFIX),
+            replicator = borg.trikeshed.couch.replicate.CouchReplicator(couchDb, peerHttp),
+            scope = this,
+        )
+
         // Kanban HTTP server (CCEK litebike listener, no JDK networking) — starts before
         // the reactive cycle so the port is bound. Driver is available at this point.
-        val kanbanServer = JvmKanbanServer(driver)
+        // The Couch wire is mounted on the same listener: `/` is the store-hosted PWA, `/trikeshed/…`
+        // the 1.6/1.7 surface, `/api/…` the built-ins — one port, one reactor.
+        val kanbanServer = JvmKanbanServer(
+            driver,
+            rawRoutes = listOf(couchWire::route),
+            streamingPaths = borg.trikeshed.forge.server.CouchWire.streamingPaths(COUCH_DB_NAME),
+            maxRequestBatch = 4096,
+        )
         val kanbanJob = SupervisorJob(coroutineContext[kotlinx.coroutines.Job])
         if (watch) {
             launch(CoroutineScope(kanbanJob).coroutineContext + Dispatchers.Default) {
@@ -278,18 +341,10 @@ object OroborosDaemon {
                     System.err.println("[OROBOROS] Kanban server failed: ${t.message}")
                 }
             }
-            System.err.println("[OROBOROS] Kanban HTTP server launching on :$kanbanPort (CCEK litebike)")
+            System.err.println("[OROBOROS] Kanban HTTP server launching on :$kanbanPort (CCEK litebike) — Couch 1.6 surface at /$COUCH_DB_NAME, PWA hoisted at /")
         } else {
             System.err.println("[OROBOROS] --once mode: Kanban server skipped")
         }
-
-        // ── GitCouchGateway: mirror .git → Couch/CAS reactively ──
-        val fileOps = JvmFileOperations()
-        val casStore = FileCasStore(fileOps, fileOps.resolvePath(forgeHome.absolutePath, "cas"))
-        val couchStore = borg.trikeshed.couch.CouchStoreFactory.inMemory()
-        val attachmentGateway = CouchAttachmentGateway(couchStore, casStore)
-        val gitCouchGateway = GitCouchGateway(fileOps, attachmentGateway)
-        val worktreeCouchGateway = WorktreeCouchGateway(fileOps, attachmentGateway)
         
         // ── Pointcut Subsystem ──
         // Connect the pointcut adapter to the actual process-wide ConfixBlackboard instance if it existed globally. 
@@ -393,6 +448,30 @@ object OroborosDaemon {
             }
         }
 
+        // Build plane: the hot-swap feed rewrites build/live/classes (and stageDaemonLib the jars);
+        // each generation is re-absorbed so the store always serves the classes that are running.
+        val buildDirty = Channel<Unit>(Channel.CONFLATED)
+        for (dir in listOf(buildClassesDir, stagingLibDir)) {
+            if (!dir.isDirectory) continue
+            val w = JvmFileWatchReactorElement(
+                root = dir.absolutePath,
+                parentJob = coroutineContext[kotlinx.coroutines.Job],
+                includeGlobs = emptyList(),
+                excludeGlobs = emptyList(),
+            )
+            launch(Dispatchers.IO) { w.open() }
+            launch { for (e in w.events) buildDirty.trySend(Unit) }
+        }
+        launch(Dispatchers.IO) {
+            for (unit in buildDirty) {
+                kotlinx.coroutines.delay(750) // coalesce a generation's burst of class writes
+                runCatching {
+                    val n = reconcileBuildPlane(buildClassesGateway, buildClassesDir, stagingLibGateway, stagingLibDir, gitState.headSha())
+                    println("[OROBOROS] build-event: classpath re-absorbed ($n attachments)")
+                }.onFailure { println("[OROBOROS] build-event: reconcile failed ${it.message}") }
+            }
+        }
+
         // Choreography 1: git filesystem events → GitStateCache invalidation.
         // The cache holds headSha, treeClean, and refHead — read from .git
         // files directly (no ProcessBuilder). File events invalidate the
@@ -455,6 +534,8 @@ object OroborosDaemon {
                     "[OROBOROS] Worktree→Couch initial reconcile: ${worktreeSnap.paths.size} paths, " +
                         "$bridged memory files bridged (spines + IPFS)"
                 )
+                val buildPaths = reconcileBuildPlane(buildClassesGateway, buildClassesDir, stagingLibGateway, stagingLibDir, headSha)
+                System.err.println("[OROBOROS] Build→Couch initial reconcile: $buildPaths classpath attachments (build/live/classes + build/staging/lib)")
             }.onFailure {
                 System.err.println("[OROBOROS] initial reconcile failed: ${it.message}")
                 it.printStackTrace()
@@ -465,6 +546,22 @@ object OroborosDaemon {
         val reportReactor = CouchReportReactorElement(parentJob = kanbanJob)
         launch { reportReactor.open() }
         System.err.println("[OROBOROS] Couch report reactor: ${reportReactor.state}")
+
+        // ── Tendon: _changes → report bus + Rete facts. Every committed revision (local write,
+        //    reconcile, or a peer's replication) is a fact in the production system; the git object
+        //    plane stays out (opaque blobs carry no fields worth matching).
+        val rete = borg.trikeshed.dag.ReteNetwork()
+        val changesFacts = borg.trikeshed.couch.CouchChangesFactElement(
+            db = couchDb,
+            rete = rete,
+            report = reportReactor,
+            admit = { !it.docId.startsWith("_design/") && !it.docId.startsWith(GitCouchGateway.GIT_PREFIX) },
+            parentJob = kanbanJob,
+        )
+        launch {
+            changesFacts.open()
+            System.err.println("[OROBOROS] Changes→Rete tendon: ${changesFacts.state} — ${changesFacts.factsApplied} facts from the initial reconcile, commits=${reportReactor.reportState.value.commits}")
+        }
 
         val mainJob = coroutineContext[kotlinx.coroutines.Job]
         val reactiveJob = SupervisorJob(mainJob)

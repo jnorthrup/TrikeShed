@@ -40,7 +40,9 @@ class CouchAttachmentGateway(
                 Field("sequence", ref.sequence.toString())
             )
         )
-        couchStore.put(doc)
+        // The head rev is required once the path exists (ProductionCouchIngress semantics);
+        // without it every re-reconcile of a changed file was a silent conflict.
+        couchStore.put(doc, couchStore.head.getRev(ref.path))
     }
 
     fun getAttachment(path: String): Pair<OroborosAttachmentRef, ByteArray>? {
@@ -81,7 +83,7 @@ class CouchAttachmentGateway(
                     Field("revision", revision)
                 )
             )
-            couchStore.put(tombstone)
+            couchStore.put(tombstone, couchStore.head.getRev(path))
         }
     }
 

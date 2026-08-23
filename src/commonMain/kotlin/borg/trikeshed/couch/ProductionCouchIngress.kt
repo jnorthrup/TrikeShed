@@ -6,6 +6,14 @@ import borg.trikeshed.job.ContentId
  * Production Ingress that generates CAS-based revisions and submits to an injected
  * commit boundary, ensuring no pre-commit visibility and avoiding direct projection mutation.
  */
+/** CouchDB 1.x deterministic winner: higher generation, then lexicographically greater hash. */
+fun revWins(candidate: String, incumbent: String): Boolean {
+    val cg = candidate.substringBefore("-").toLongOrNull() ?: 0L
+    val ig = incumbent.substringBefore("-").toLongOrNull() ?: 0L
+    if (cg != ig) return cg > ig
+    return candidate.substringAfter("-") > incumbent.substringAfter("-")
+}
+
 class ProductionCouchIngress(
     private val head: CouchHeadProjection,
     private val commitBoundary: (CouchCommittedFrame) -> Unit,
@@ -40,6 +48,16 @@ class ProductionCouchIngress(
         commitBoundary(frame)
 
         return true // Success for both inserts and updates
+    }
+
+    override fun putReplicated(doc: Document?, docId: String, rev: String, deleted: Boolean): Boolean {
+        val existingRev = head.getRev(docId)
+        if (existingRev == rev) return true // already the head: idempotent
+        if (existingRev != null && !revWins(rev, existingRev)) return false
+        require(deleted || (doc != null && doc.id == docId)) { "replicated frame needs a document" }
+        val frame = CouchCommittedFrame(sequence++, docId, rev, deleted, if (deleted) null else doc)
+        commitBoundary(frame)
+        return true
     }
 
     override fun deleteIntent(docId: String, expectedRev: String?): Boolean {

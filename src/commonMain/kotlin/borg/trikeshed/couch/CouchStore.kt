@@ -50,6 +50,14 @@ data class QueryResult(
 interface CouchIngress {
     fun putIntent(doc: Document, expectedRev: String?): Boolean
     fun deleteIntent(docId: String, expectedRev: String?): Boolean
+
+    /**
+     * Replication target lane (`_bulk_docs` with `new_edits=false`): commit [doc] under a revision
+     * minted elsewhere. CouchDB 1.x winner rule — higher generation wins, ties break on the hash.
+     * Returns true when the rev is now (or already was) the head; false when a newer head exists.
+     * Default: not supported.
+     */
+    fun putReplicated(doc: Document?, docId: String, rev: String, deleted: Boolean): Boolean = false
 }
 
 /**
@@ -78,10 +86,15 @@ class CouchStore(
         return ingress.putIntent(document, expectedRev)
     }
     
+    /** Replication lane — see [CouchIngress.putReplicated]. */
+    fun putReplicated(doc: Document?, docId: String, rev: String, deleted: Boolean): Boolean =
+        ingress.putReplicated(doc, docId, rev, deleted)
+
     /**
      * Get a document by id.
      */
     fun get(docId: String): Document? {
+        if (head.isDeleted(docId)) return null // 1.x: a deleted document reads as missing; the tombstone stays in head/_changes
         return head.get(docId)
     }
     
@@ -95,7 +108,7 @@ class CouchStore(
     /**
      * Check if document exists.
      */
-    fun contains(docId: String): Boolean = head.contains(docId)
+    fun contains(docId: String): Boolean = head.contains(docId) && !head.isDeleted(docId)
     
     /**
      * Total document count.
@@ -274,6 +287,37 @@ object CouchStoreFactory {
         val changes = CouchChangesProjection()
         val ingress = ProductionCouchIngress(head, { frame -> head.applyCommit(frame); changes.applyCommit(frame); }, { doc -> borg.trikeshed.job.ContentId.of(doc.fields.joinToString { it.value.toString() }.encodeToByteArray()) })
         return CouchStore(ingress, head, changes)
+    }
+
+    /**
+     * CAS-collapsed store: every committed body is written to [cas] as canonical CBOR and the
+     * revision hash IS that blob's ContentId (`gen-<sha256 hex>`). Replication of a revision is
+     * then a block fetch; nothing about a document exists outside the CAS. JSON is only the wire
+     * commutation ([CouchDatabase] renders it in and out).
+     */
+    fun casBacked(cas: borg.trikeshed.job.CasStore): CouchStore {
+        val head = CouchHeadProjection()
+        val changes = CouchChangesProjection()
+        val ingress = ProductionCouchIngress(
+            head,
+            { frame -> head.applyCommit(frame); changes.applyCommit(frame) },
+            { doc -> cas.put(canonicalBody(doc)) },
+        )
+        return CouchStore(ingress, head, changes)
+    }
+
+    /** Canonical body bytes: CBOR, `_id` plus fields, sorted keys — stable across nodes. */
+    fun canonicalBody(doc: Document): ByteArray {
+        val m = linkedMapOf<String, Any?>("_id" to doc.id)
+        for (f in doc.fields) m[f.name] = f.value
+        return borg.trikeshed.job.CanonicalCbor.encodeMap(m)
+    }
+
+    /** Inverse of [canonicalBody]. */
+    fun documentFromBody(bytes: ByteArray): Document? {
+        val m = borg.trikeshed.job.CanonicalCbor.decodeMap(bytes)
+        val id = m["_id"] as? String ?: return null
+        return Document(id, m.entries.filter { it.key != "_id" && it.value != null }.map { Field(it.key, it.value!!) })
     }
 
     fun withPersistence(persistence: CouchPersistence): CouchStore {

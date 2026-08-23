@@ -63,13 +63,28 @@ import kotlin.system.exitProcess
 /** A fallthrough route: answers a request this server does not own, or returns null to decline. Streaming routes receive `respond`. */
 typealias ExtraRoute = suspend (method: String, path: String, text: String, respond: (suspend (ByteArray) -> Unit)?) -> JvmKanbanServer.HttpResponse?
 
+/**
+ * A binary-safe route: receives the raw request bytes (head + body) and may answer with bytes.
+ * Tried before the static assets and the Forge shell so a store-hosted app can own `/`.
+ * Streaming entries (see `streamingPaths`) receive `respond` and write their own headers.
+ */
+typealias RawRoute = suspend (method: String, path: String, payload: ByteArray, respond: (suspend (ByteArray) -> Unit)?) -> JvmKanbanServer.HttpResponse?
+
 class JvmKanbanServer(
     /** FlywheelDriver for live Jules surface and cycle report. Nullable so the server can start before the driver. */
     private val flywheelDriver: borg.trikeshed.jules.FlywheelDriver? = null,
     /** Extension seam: tried after the built-in routes and static assets, first non-null wins (BlackboardWire, VmWire, …). */
     private val extraRoutes: List<ExtraRoute> = emptyList(),
-    /** Paths (without query) an extra route streams on (SSE): headers + body go straight to `respond`, no Content-Length. */
+    /**
+     * Paths an extra/raw route streams on (SSE, `_changes?feed=`): headers + body go straight to
+     * `respond`, no Content-Length. An entry without '?' matches the path exactly; an entry with
+     * '?' matches the path exactly and requires the query to contain the part after '?'.
+     */
     private val streamingPaths: Set<String> = emptySet(),
+    /** Binary-safe routes (CouchWire). Tried after `/api/…` built-ins, before static assets and the shell. */
+    private val rawRoutes: List<RawRoute> = emptyList(),
+    /** Listener batch/reassembly unit: request cap is `maxRequestBatch * 1024` bytes (64 KiB at the default). */
+    private val maxRequestBatch: Int = 64,
 ) {
     /** SSE event stream path — collects FlywheelDriver.events as text/event-stream. SURFACE_TTL_MS bounds /api/jules/surface cache life. */
     private companion object {
@@ -108,7 +123,11 @@ class JvmKanbanServer(
         val status: Int,
         val body: String,
         val contentType: String = "application/json; charset=utf-8",
-    )
+        /** Binary payload; when set it is written instead of [body]. */
+        val bytes: ByteArray? = null,
+    ) {
+        val payloadBytes: ByteArray get() = bytes ?: body.toByteArray(StandardCharsets.UTF_8)
+    }
 
     /** Marker carrier passed between workers when a request must cross the listener boundary (e.g. submit → board projection). */
     data class HttpWorkItem(
@@ -139,7 +158,7 @@ class JvmKanbanServer(
         replayCausalWal()
         val serverJob = SupervisorJob()
         val scope = CoroutineScope(serverJob + Dispatchers.Default)
-        val listener = LitebikeListenerElement(parentJob = serverJob).also { it.open() }
+        val listener = LitebikeListenerElement(parentJob = serverJob, maxBatch = maxRequestBatch).also { it.open() }
         val fanout = NuidFanoutElement(parentJob = serverJob).also { it.open() }
 
         val processWorkgroup = Workgroup(
@@ -259,13 +278,15 @@ class JvmKanbanServer(
                     (text.lineSequence().any { it.startsWith("Accept:") && it.contains("text/event-stream") } ||
                         text.contains("Accept: */*"))
 
-                val isExtraStream = reqParts.getOrNull(0) == "GET" && reqPath.substringBefore('?') in streamingPaths
+                val isExtraStream = reqParts.getOrNull(0) == "GET" && isStreamingRequest(reqPath)
                 if (isExtraStream) {
-                    // Extension streams (/blackboard/facts, /api/vm/events): the route writes its own headers and events.
+                    // Extension streams (/blackboard/facts, /api/vm/events, _changes?feed=): the route writes its own headers and events.
                     val respond: suspend (ByteArray) -> Unit = { bytes -> msg.respond?.invoke(bytes) }
                     scope.launch {
                         try {
-                            for (route in extraRoutes) { route("GET", reqPath, text, respond) ?: continue; break }
+                            var handled = false
+                            for (route in rawRoutes) { route("GET", reqPath, payload, respond) ?: continue; handled = true; break }
+                            if (!handled) for (route in extraRoutes) { route("GET", reqPath, text, respond) ?: continue; break }
                         } catch (_: kotlinx.coroutines.CancellationException) {
                         } catch (t: Throwable) {
                             System.err.println("extra stream error: ${t.message}")
@@ -319,14 +340,14 @@ class JvmKanbanServer(
                 // reader; handling is forked per message.
                 httpScope.launch {
                     val resp = routeHttp(payload)
-                    val out = buildString {
+                    val payloadOut = resp.payloadBytes
+                    val head = buildString {
                         append("HTTP/1.1 ${resp.status} ${statusReason(resp.status)}\r\n")
-                        append("Content-Length: ${resp.body.toByteArray(StandardCharsets.UTF_8).size}\r\n")
+                        append("Content-Length: ${payloadOut.size}\r\n")
                         append("Content-Type: ${resp.contentType}\r\n")
                         append("Access-Control-Allow-Origin: *\r\n\r\n")
-                        append(resp.body)
-                    }
-                    val outBytes = out.toByteArray(StandardCharsets.UTF_8)
+                    }.toByteArray(StandardCharsets.UTF_8)
+                    val outBytes = head + payloadOut
                     // Write back through the listener's response callback
                     runCatching { msg.respond?.invoke(outBytes) }
                 }
@@ -356,13 +377,26 @@ class JvmKanbanServer(
 
     // ── routes (single worker, hand-rolled) ──────────────────────────────
 
+    private fun isStreamingRequest(reqPath: String): Boolean {
+        val p = reqPath.substringBefore('?')
+        val q = reqPath.substringAfter('?', "")
+        return streamingPaths.any { entry ->
+            if ('?' in entry) p == entry.substringBefore('?') && q.contains(entry.substringAfter('?')) else p == entry
+        }
+    }
+
     internal suspend fun routeHttp(payload: ByteArray): HttpResponse {
         val text = String(payload, StandardCharsets.UTF_8)
         val firstLine = text.lineSequence().firstOrNull() ?: ""
         val parts = firstLine.split(' ')
         val method = parts.getOrNull(0) ?: "GET"
         val path = parts.getOrNull(1) ?: "/"
-        return when (path) {
+        // Store-hosted app first: a raw route (CouchWire) that owns `/` or an asset wins over the
+        // classpath shell, exactly as a CouchApp vhost would. `/api/…` built-ins stay authoritative.
+        if (!path.startsWith("/api/") || path.startsWith("/api/v0/")) {
+            rawRoutes.firstNotNullOfOrNull { it(method, path, payload, null) }?.let { return it }
+        }
+        return when (path.substringBefore('?')) {
             "/api/health" -> HttpResponse(200, """{"ok":true,"server":"kanban","now":${System.currentTimeMillis()}}""")
             "/api/cap"    -> HttpResponse(200, """{"protocols":["Http","Json","Socks5","Tls","Bonjour","Upnp"],"capabilities":["Process@local","Cas@local","Wireproto@lan.localhost"]}""")
             "/api/board"  -> HttpResponse(200, boardJson())

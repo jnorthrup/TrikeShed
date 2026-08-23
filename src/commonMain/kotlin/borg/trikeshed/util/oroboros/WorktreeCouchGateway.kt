@@ -14,6 +14,12 @@ import borg.trikeshed.util.io.ContentTypes
 class WorktreeCouchGateway(
     private val fileOps: FileOperations,
     private val attachments: CouchAttachmentGateway,
+    /** Logical prefix every absorbed path is filed under. */
+    private val prefix: String = WORKTREE_PREFIX,
+    /** Directory/file names skipped at any depth. */
+    private val excludedSegments: Set<String> = EXCLUDED_SEGMENTS,
+    /** Relative paths (from the root) skipped as subtrees, e.g. `.claude/worktrees`. */
+    private val excludedRelativePrefixes: Set<String> = EXCLUDED_RELATIVE_PREFIXES,
 ) {
     data class Snapshot(
         val revision: String,
@@ -30,10 +36,10 @@ class WorktreeCouchGateway(
         if (!fileOps.isDir(repoRoot)) return Snapshot(revision, emptyList())
 
         val current = collectFiles(repoRoot)
-        val existing = attachments.listAttachments(WORKTREE_PREFIX).associateBy { it.path }
+        val existing = attachments.listAttachments(prefix).associateBy { it.path }
 
         for ((relativePath, physicalPath) in current) {
-            val logicalPath = WORKTREE_PREFIX + relativePath
+            val logicalPath = prefix + relativePath
             // TOCTOU guard: the walk and the read are separate syscalls; a file
             // deleted between them (reactive editor, daemon self-write, git
             // checkout) used to abort the whole reconcile with FileNotFound —
@@ -60,7 +66,7 @@ class WorktreeCouchGateway(
             )
         }
 
-        val currentLogicalPaths = current.keys.mapTo(mutableSetOf()) { WORKTREE_PREFIX + it }
+        val currentLogicalPaths = current.keys.mapTo(mutableSetOf()) { prefix + it }
         val deletedPaths = mutableListOf<String>()
         for ((path, ref) in existing) {
             if (path !in currentLogicalPaths) {
@@ -78,9 +84,10 @@ class WorktreeCouchGateway(
         while (queue.isNotEmpty()) {
             val (directory, relativeDirectory) = queue.removeAt(0)
             for (name in fileOps.listDir(directory).sorted()) {
-                if (name in EXCLUDED_SEGMENTS) continue
+                if (name in excludedSegments) continue
                 val fullPath = fileOps.resolvePath(directory, name)
                 val relative = if (relativeDirectory.isEmpty()) name else "$relativeDirectory/$name"
+                if (excludedRelativePrefixes.any { relative == it || relative.startsWith("$it/") }) continue
                 if (fileOps.isDir(fullPath)) {
                     queue.add(fullPath to relative)
                 } else if (fileOps.isFile(fullPath)) {
@@ -94,8 +101,11 @@ class WorktreeCouchGateway(
     companion object {
         const val WORKTREE_PREFIX = "projects/trikeshed/"
 
-        private val EXCLUDED_SEGMENTS = setOf(
+        val EXCLUDED_SEGMENTS = setOf(
             ".git", ".gradle", ".idea", "build", "node_modules",
         )
+
+        /** Agent worktree clones are other checkouts, not this project's history. */
+        val EXCLUDED_RELATIVE_PREFIXES = setOf(".claude/worktrees")
     }
 }

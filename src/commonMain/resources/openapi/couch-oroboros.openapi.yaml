@@ -1,0 +1,157 @@
+openapi: 3.0.3
+info:
+  title: Oroboros Couch surface
+  version: "1.6.2"
+  description: |
+    The CouchDB 1.6/1.7-shaped surface the oroboros daemon mounts on its one HTTP listener
+    (JvmKanbanServer raw-route seam), beside `/api/*`. One database, `trikeshed`.
+
+    Everything is a CAS blob or an index over blobs: a revision `gen-sha256:<hex>` names the
+    canonical-CBOR body blob; attachment documents reference their bytes by `contentId`; the
+    `_cas` and `/api/v0/block` lanes move blobs; `_changes` → `_revs_diff` → `_bulk_docs`
+    (`new_edits=false`) with `_local` checkpoints is replication. `_design/forge.rewrites` hoists
+    attachments to `/` (CouchApp vhost). Source of truth: `borg.trikeshed.couch.CouchWireRouter`,
+    `CouchDatabase`, `replicate.CouchReplicator`, `forge.server.CouchWire`.
+servers:
+  - url: http://127.0.0.1:8888
+paths:
+  /:
+    get:
+      summary: Vhost root — `_design/forge.rewrites["/"]` attachment, else the welcome document
+      responses:
+        "200": { description: attachment bytes or `{couchdb, version, vendor}` }
+  /{path}:
+    get:
+      summary: Vhost — any path not owned by `/api/…` or `/{db}` is rewritten to an attachment
+      parameters: [{ name: path, in: path, required: true, schema: { type: string } }]
+      responses:
+        "200": { description: attachment bytes with its stored content type }
+        "404": { description: no rewrite matched }
+  /trikeshed:
+    get:
+      summary: Database info
+      responses:
+        "200":
+          description: "`{db_name, doc_count, update_seq, instance_start_time}`"
+    post:
+      summary: Bare document put (id from `_id` or the body's ContentId)
+      responses:
+        "201": { description: "`{ok, id, rev}`" }
+        "409": { description: conflict }
+  /trikeshed/_all_docs:
+    get:
+      summary: All live document ids in collation order
+      parameters:
+        - { name: startkey, in: query, schema: { type: string } }
+        - { name: endkey, in: query, schema: { type: string } }
+        - { name: limit, in: query, schema: { type: integer } }
+        - { name: skip, in: query, schema: { type: integer } }
+        - { name: descending, in: query, schema: { type: boolean } }
+        - { name: include_docs, in: query, schema: { type: boolean } }
+      responses:
+        "200": { description: "`{total_rows, offset, rows:[{id, key, value:{rev}, doc?}]}`" }
+    post:
+      summary: Same, restricted to `{keys:[…]}`
+      responses:
+        "200": { description: rows }
+  /trikeshed/_changes:
+    get:
+      summary: Committed-frame log; `feed=continuous|longpoll` streams on the connection
+      parameters:
+        - { name: since, in: query, schema: { type: integer }, description: 1-based; 0 = everything }
+        - { name: limit, in: query, schema: { type: integer } }
+        - { name: include_docs, in: query, schema: { type: boolean } }
+        - { name: feed, in: query, schema: { type: string, enum: [normal, longpoll, continuous] } }
+        - { name: heartbeat, in: query, schema: { type: integer }, description: ms between blank keep-alive lines }
+      responses:
+        "200": { description: "`{results:[{seq, id, changes:[{rev}], deleted?, doc?}], last_seq}`; continuous = one row per line" }
+  /trikeshed/_revs_diff:
+    post:
+      summary: Which offered revisions this node lacks (head-only rev tree)
+      requestBody: { content: { application/json: { schema: { type: object, additionalProperties: { type: array, items: { type: string } } } } } }
+      responses:
+        "200": { description: "`{id: {missing:[rev…]}}`" }
+  /trikeshed/_bulk_docs:
+    post:
+      summary: Batch write; `new_edits=false` lands foreign revisions (winner = higher gen, then hash)
+      requestBody: { content: { application/json: { schema: { type: object, properties: { docs: { type: array }, new_edits: { type: boolean } } } } } }
+      responses:
+        "201": { description: "`[{ok, id, rev} | {id, error, reason}]`" }
+  /trikeshed/_local/{id}:
+    get: { summary: Read a checkpoint (never replicated), responses: { "200": { description: document }, "404": { description: missing } } }
+    put: { summary: Write a checkpoint, responses: { "201": { description: "`{ok, id, rev}`" } } }
+    delete: { summary: Remove a checkpoint, responses: { "200": { description: ok } } }
+  /trikeshed/_cas:
+    post:
+      summary: Put one raw block; body is the block
+      requestBody: { content: { application/octet-stream: {} } }
+      responses:
+        "201": { description: "`{ok, cid, size}`" }
+  /trikeshed/_cas/{cid}:
+    get:
+      summary: Get one raw block
+      parameters: [{ name: cid, in: path, required: true, schema: { type: string, pattern: "^sha256:[0-9a-f]{64}$" } }]
+      responses:
+        "200": { description: bytes, content: { application/octet-stream: {} } }
+        "404": { description: no such block }
+  /trikeshed/_cas/_bulk:
+    post:
+      summary: Many blocks in one exchange
+      requestBody: { content: { application/json: { schema: { type: object, properties: { cids: { type: array, items: { type: string } } } } } } }
+      responses:
+        "200":
+          description: "`application/x-trikeshed-cas-bulk` — repeated `<cid>\\n<length>\\n<bytes>` frames; absent blocks are omitted, the reader verifies each cid"
+  /trikeshed/_replicate:
+    get: { summary: Live continuous replication jobs, responses: { "200": { description: "`{jobs:[…]}`" } } }
+    post:
+      summary: Run (or start continuous) replication between this database and a peer
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [source, target]
+              properties:
+                source: { type: string, description: "'trikeshed' or a peer URL like http://host:port/trikeshed" }
+                target: { type: string }
+                continuous: { type: boolean }
+                interval_ms: { type: integer, default: 5000 }
+                since: { type: integer }
+                cancel: { type: boolean }
+      responses:
+        "200": { description: "`{ok, direction, peer, start_seq, last_seq, docs_read, docs_written, blobs_transferred, conflicts, _local_id}`" }
+        "202": { description: continuous job started }
+        "502": { description: replication failed }
+  /trikeshed/_design/forge:
+    get:
+      summary: The app design document (`language`, `rewrites`, `vhost_root`)
+      responses: { "200": { description: document } }
+  /trikeshed/_design/forge/_rewrite/{path}:
+    get:
+      summary: CouchApp rewrite — resolves `path` through the design doc's `rewrites` to an attachment
+      parameters: [{ name: path, in: path, required: true, schema: { type: string } }]
+      responses: { "200": { description: attachment bytes }, "404": { description: no rewrite matched } }
+  /trikeshed/{id}:
+    get:
+      summary: Document JSON with `_attachments` stubs (`{content:{content_type, length, digest, cid, stub}}`)
+      parameters: [{ name: id, in: path, required: true, schema: { type: string }, description: may contain slashes (`projects/trikeshed/docs/index.html`) }]
+      responses: { "200": { description: document }, "404": { description: missing } }
+    put:
+      summary: Create or update (`?rev=` or `_rev` required once the id exists)
+      responses: { "201": { description: "`{ok, id, rev}`" }, "409": { description: conflict } }
+    delete:
+      summary: Delete with `?rev=`
+      responses: { "200": { description: ok }, "409": { description: conflict }, "404": { description: missing } }
+  /trikeshed/{id}/content:
+    get:
+      summary: Attachment bytes of a path document (the CAS blob its `contentId` names)
+      responses: { "200": { description: bytes with the stored content type }, "404": { description: missing } }
+  /api/v0/block/get:
+    get:
+      summary: IPFS-shaped alias of `_cas/{cid}`
+      parameters: [{ name: arg, in: query, required: true, schema: { type: string } }]
+      responses: { "200": { description: bytes }, "404": { description: no such block } }
+  /api/v0/block/put:
+    post:
+      summary: IPFS-shaped alias of `POST _cas`
+      responses: { "200": { description: "`{Key, Size}`" } }
