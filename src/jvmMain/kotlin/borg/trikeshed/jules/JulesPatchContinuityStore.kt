@@ -43,9 +43,16 @@ class JulesPatchContinuityStore(
             if (alreadyObserved) continue
 
             val touchedFiles = julesPatchFiles(patch.patch).filterNot(::isScratchPatchPath)
-            val retainedBefore = causalFacts.asSequence()
-                .filter { it.reviewCandidate && it.causalOrdinal < patch.causalOrdinal }
-                .maxWithOrNull(compareBy({ it.causalOrdinal }, { it.activitySeq }, { it.artifactSeq }))
+            // Bolt: avoid intermediate Sequence allocations and lazy iterator overhead in hot paths
+            var retainedBefore: JulesCause.PatchSnapshotObserved? = null
+            val patchOrder = compareBy<JulesCause.PatchSnapshotObserved>({ it.causalOrdinal }, { it.activitySeq }, { it.artifactSeq })
+            for (item in causalFacts) {
+                if (item.reviewCandidate && item.causalOrdinal < patch.causalOrdinal) {
+                    if (retainedBefore == null || patchOrder.compare(item, retainedBefore) > 0) {
+                        retainedBefore = item
+                    }
+                }
+            }
             val missing = retainedBefore?.touchedFiles
                 ?.filterNot(touchedFiles.toSet()::contains)
                 ?.distinct()

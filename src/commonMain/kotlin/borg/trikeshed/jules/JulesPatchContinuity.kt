@@ -154,11 +154,18 @@ fun selectJulesPatchForDrain(causes: Iterable<JulesCause>): JulesPatchDrainSelec
         return JulesPatchDrainSelection.Selected(latest, reviewed = false)
     }
 
-    val retained = observations
-        .asSequence()
-        .filter { it.reviewCandidate && it.causalOrdinal < latest.causalOrdinal }
-        .maxWithOrNull(snapshotCausalOrder)
-        ?: return JulesPatchDrainSelection.ReviewRequired(latest, latest, latest.missingFromCandidate)
+    // Bolt: avoid intermediate Sequence allocations and lazy iterator overhead in hot paths
+    var retained: JulesCause.PatchSnapshotObserved? = null
+    for (item in observations) {
+        if (item.reviewCandidate && item.causalOrdinal < latest.causalOrdinal) {
+            if (retained == null || snapshotCausalOrder.compare(item, retained) > 0) {
+                retained = item
+            }
+        }
+    }
+    if (retained == null) {
+        return JulesPatchDrainSelection.ReviewRequired(latest, latest, latest.missingFromCandidate)
+    }
     return JulesPatchDrainSelection.ReviewRequired(
         retainedCandidate = retained,
         regressedLatest = latest,
