@@ -212,18 +212,21 @@ class JulesRestClient(
     suspend fun activityTimeline(sessionId: String): ActivityTimeline {
         val raw = activityMaps(sessionId)
         val activityList = raw.mapIndexed { seq, m -> activityInfo(seq, m) }
-        val reportList = activityList.asSequence()
-            .filter { it.kind == "agentMessaged" && it.message.isNotEmpty() }
-            .mapIndexed { causalOrdinal, activity ->
-                ActivityReport(
-                    activityId = activity.id,
-                    activitySeq = activity.seq,
-                    causalOrdinal = causalOrdinal,
-                    createTime = activity.createTime,
-                    message = activity.message,
+        val reportList = ArrayList<ActivityReport>()
+        var causalOrdinal = 0
+        for (activity in activityList) {
+            if (activity.kind == "agentMessaged" && activity.message.isNotEmpty()) {
+                reportList.add(
+                    ActivityReport(
+                        activityId = activity.id,
+                        activitySeq = activity.seq,
+                        causalOrdinal = causalOrdinal++,
+                        createTime = activity.createTime,
+                        message = activity.message,
+                    )
                 )
             }
-            .toList()
+        }
         val activityPatches = raw.flatMapIndexed { seq, m ->
             val activityId = requireNotNull(
                 m["name"]?.toString()?.substringAfterLast('/')?.takeIf { it.isNotBlank() },

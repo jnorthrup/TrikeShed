@@ -541,13 +541,13 @@ class FlywheelDriver(
             // Older drains predate WorkQueued. A later seed using that fallback
             // `session:<id>` identity would otherwise submit an already-drained
             // session as fresh Jules work. A real rework needs a new work id.
-            val closedSessionWorkIds = pendingCandidates.asSequence()
-                .filter { entry ->
-                    entry.workId.startsWith("session:") &&
-                        conductor.cards[entry.workId.removePrefix("session:")]?.drained == true
+            val closedSessionWorkIds = HashSet<String>()
+            for (entry in pendingCandidates) {
+                if (entry.workId.startsWith("session:") &&
+                    conductor.cards[entry.workId.removePrefix("session:")]?.drained == true) {
+                    closedSessionWorkIds.add(entry.workId)
                 }
-                .map { it.workId }
-                .toSet()
+            }
             val newlyReported = closedSessionWorkIds.count { reportedClosedSessionQueueEntries.add(it) }
             if (newlyReported != 0) {
                 println("[FLYWHEEL] DISPATCH-SKIP $newlyReported already-closed session queue item(s)")
