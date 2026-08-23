@@ -36,19 +36,10 @@ object Rfc6455Handshake {
     /**
      * Generate a base64-encoded 16-byte nonce for `Sec-WebSocket-Key`.
      *
-     * Uses a simple shift-xor PRNG since `kotlin.random.Random` is available
-     * in commonMain.  For production, wire in a platform-secure RNG.
+     * Uses Kotlin's built-in `Random.Default` to generate the nonce.
      */
     fun generateKey(seed: Long = kotlinx.datetime.Clock.System.now().toEpochMilliseconds()): String {
-        val bytes = ByteArray(16)
-        var s = seed
-        for (i in bytes.indices) {
-            s = s xor (s shl 13)
-            s = s xor (s ushr 7)
-            s = s xor (s shl 17)
-            bytes[i] = (s and 0xFF).toByte()
-        }
-        return bytes.encodeBase64()
+        return kotlin.random.Random.Default.nextBytes(16).encodeBase64()
     }
 
     /**
