@@ -23,7 +23,6 @@
 ## 2025-01-22 - Contextual ARIA labels for grouped dynamic buttons
 **Learning:** Buttons created dynamically within grouped structures (like Kanban board columns) often have generic visible text like "+ New" or "Add". While visual users infer context from the surrounding column or list grouping, screen reader users exploring by tab order or elements list lose this visual context, hearing only "Add, button".
 **Action:** When creating interactive elements inside visual groupings, dynamically generate a contextual `aria-label` that includes the grouping's name (e.g., `addBtn.setAttribute('aria-label', 'Add new card to ' + col.name);`) to restore context for assistive technologies.
-<<<<<<< ours
 ## 2026-08-20 - Global keyboard handlers for custom buttons
 **Learning:** When using custom DOM elements (like \`div\` or \`span\`) as interactive buttons by adding \`role="button"\` and \`tabindex="0"\`, they do not natively respond to \`Enter\` or \`Space\` keys like standard \`<button>\` elements do. Adding individual \`keydown\` listeners to every custom button creates redundant code, risks inconsistency, and is easy to miss on new components.
 **Action:** Implement a global event delegation listener on the \`document\` for the \`keydown\` event. When \`Enter\` or \`Space\` is pressed, check if the \`e.target.getAttribute('role') === 'button'\`, and if so, call \`e.target.click()\`. This ensures all current and future custom buttons are automatically keyboard accessible without duplicate logic.
@@ -55,8 +54,6 @@
 ## 2025-02-23 - Announcing active states for single-page application navigation
 **Learning:** Single-page applications often use custom buttons to switch views instead of actual `<a>` tags with `href`s. While visual users see an active state (like a background color change), screen reader users hear no change in state unless explicitly announced.
 **Action:** When building custom view switchers (like tabs or navigation sidebar items) that aren't native links, always apply `aria-current="true"` (or `aria-current="page"` for navigation menus) or `aria-pressed="true"` (for toggle buttons) via JavaScript when the view changes.
-=======
->>>>>>> theirs
 ## 2024-05-23 - Context-Specific ARIA Labels for Kanban Cards
  **Learning:** Screen readers lose visual grouping context on dynamically created interactive components like Kanban cards, leading to ambiguity for users navigating via keyboard.
  **Action:** Always add context-specific aria-labels that explicitly include the column/list name and explain the interaction that will happen upon activation.
