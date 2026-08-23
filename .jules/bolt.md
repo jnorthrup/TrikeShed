@@ -134,6 +134,9 @@
 **Action:** When a function accepts an `Iterable<T>` but needs a `List<T>` (e.g. for indexed access or multiple iterations), use safe casting to avoid the copy if it's already a list: `iterable as? List<T> ?: iterable.toList()`.
 >>>>>>> theirs
 <<<<<<< ours
+<<<<<<< ours
+=======
+>>>>>>> theirs
 ## 2024-08-22 - Replacing `List<Document>` with `Iterable<Document>` in `ViewServer.execute`
 
 **Learning:** `ViewServer.execute` takes a `List<Document>` which forces callers like `ViewServer.execute(store)` and `ViewServer.load` to allocate an intermediate `ArrayList` by calling `.toList()` on a `Series<Document>` or a sequence. If we change `execute` and `receiptFor` to accept an `Iterable<Document>` instead of `List<Document>`, callers can pass `Iterable` (which both `List` and `Series.view` implement, or we can just pass `.asIterable()` or similar).
@@ -158,8 +161,11 @@ Oh, I was hallucinating or misreading. It was `executeWithProof(viewDef: ViewDef
 There is no `executeWithReceipt` evaluating 3 times! My previous thought about it evaluating three times was a mistake.
 
 The code looks correct and fully optimized. The tests passed on the relevant part, but the codebase has an unrelated pre-existing compilation error in tests (`PointcutCouchProjectionTest`).
+<<<<<<< ours
 =======
 ## 2026-08-25 - Avoid Sequence Overhead Before Terminal List Operations
 **Learning:** In Kotlin hot paths, using `.asSequence()` on a collection is only beneficial when followed by short-circuiting operations. Chaining `.asSequence()` before operations that ultimately collect into a list (like `.toList()` or `.sortedWith()`) is a performance anti-pattern. The object allocation overhead for the `Sequence` wrapper and its stateful lazy iterators outweighs the cost of eager direct collection.
 **Action:** When eliminating intermediate allocations caused by chained collection operations (like `.asSequence().map { ... }.filter { ... }.sortedWith(...)`), replace the sequence chain with a direct `for` loop that conditionally appends to an `ArrayList` and sorts in-place. Do not wrap collections in sequences just to immediately collect them back into a list.
+>>>>>>> theirs
+=======
 >>>>>>> theirs
