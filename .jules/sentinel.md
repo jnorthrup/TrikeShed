@@ -39,3 +39,8 @@
 >>>>>>> origin/sentinel/fix-json-unsafe-deserialization-13206169233468597183
 =======
 >>>>>>> theirs
+
+## 2024-06-25 - [Predictable PRNG in WebSocket Handshake]
+**Vulnerability:** The `generateKey()` method in `Rfc6455Handshake.kt` used a highly predictable linear shift-XOR algorithm seeded by the system clock (`Clock.System.now().toEpochMilliseconds()`) to generate the `Sec-WebSocket-Key`.
+**Learning:** Using predictable, time-based PRNGs for cryptographic nonces like `Sec-WebSocket-Key` makes the handshake susceptible to prediction or replay attacks. While the RFC 6455 states this key is not meant for authentication, it is meant to prove the request is actually a WebSocket request and to prevent caching proxy issues, so it should still be robustly random.
+**Prevention:** Always use standard, secure-by-default libraries for random number generation (e.g., `kotlin.random.Random.Default.nextBytes` or `SecureRandom`) instead of rolling custom cryptographic algorithms or using simple PRNGs.
