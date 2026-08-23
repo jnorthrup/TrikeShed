@@ -3,6 +3,7 @@ package borg.trikeshed.htx
 import borg.trikeshed.context.AsyncContextElement
 import borg.trikeshed.context.ElementState
 import borg.trikeshed.lib.ByteSeries
+import borg.trikeshed.lib.get
 import borg.trikeshed.lib.forEach
 import borg.trikeshed.lib.toList
 import borg.trikeshed.lib.toSeries
@@ -204,11 +205,11 @@ class HtxReactorElement(
         handle: ChannelOperations.ChannelHandle,
         fd: Int,
     ): ByteSeries {
-        val response = ArrayList<Byte>()
+        val response = ResponseAccumulator()
         while (true) {
             val chunk = readChunk(handle, fd) ?: break
-            appendBytes(response, chunk)
-            if (isCompleteResponse(response)) break
+            response.append(chunk)
+            if (response.isComplete()) break
         }
         return response.toByteSeries()
     }
@@ -233,15 +234,82 @@ class HtxReactorElement(
         fd: Int,
         endpoint: TlsEndpoint,
     ): ByteSeries {
-        val plaintext = ArrayList<Byte>()
+        val plaintext = ResponseAccumulator()
         while (true) {
             val chunk = readChunk(handle, fd) ?: break
             val frames = endpoint.downstream(chunk)
-            appendBytes(plaintext, extractPlaintext(frames))
+            plaintext.append(extractPlaintext(frames))
             flushTlsFrames(handle, fd, frames)
-            if (isCompleteResponse(plaintext)) break
+            if (plaintext.isComplete()) break
         }
         return plaintext.toByteSeries()
+    }
+
+    /**
+     * Growable byte accumulator with O(1) amortized append and cached header parse.
+     * The previous ArrayList<Byte> shape re-boxed every byte and [isCompleteResponse]
+     * re-materialized and re-scanned the WHOLE buffer after every 16 KiB chunk — O(n²)
+     * per response, which throttled replication pages and starved multi-megabyte
+     * `_cas` blob fetches into the 30 s read deadline.
+     */
+    private class ResponseAccumulator {
+        private var buf = ByteArray(32 * 1024)
+        private var size = 0
+        private var boundary = -1        // index of CRLFCRLF once seen
+        private var contentLength = -2   // -2 unknown, -1 none declared
+        private var chunked = false
+
+        fun append(chunk: ByteSeries) {
+            val n = chunk.rem
+            if (size + n > buf.size) {
+                var cap = buf.size
+                while (cap < size + n) cap = cap shl 1
+                buf = buf.copyOf(cap)
+            }
+            for (i in 0 until n) buf[size + i] = chunk[chunk.pos + i]
+            size += n
+            if (boundary < 0) scanBoundary()
+        }
+
+        private fun scanBoundary() {
+            val start = maxOf(0, size - lastScan - 3)
+            var i = start
+            while (i <= size - 4) {
+                if (buf[i] == CR && buf[i + 1] == LF && buf[i + 2] == CR && buf[i + 3] == LF) {
+                    boundary = i
+                    val headerText = buf.decodeToString(0, i)
+                    contentLength = headerText.lineSequence()
+                        .firstOrNull { it.startsWith("Content-Length:", ignoreCase = true) }
+                        ?.substringAfter(":")?.trim()?.toIntOrNull() ?: -1
+                    chunked = headerText.lineSequence()
+                        .any { it.startsWith("Transfer-Encoding:", ignoreCase = true) && it.contains("chunked", ignoreCase = true) }
+                    return
+                }
+                i++
+            }
+            lastScan = size
+        }
+
+        private var lastScan = 0
+
+        fun isComplete(): Boolean {
+            if (boundary < 0) return false
+            if (contentLength >= 0) return size >= boundary + 4 + contentLength
+            if (chunked) {
+                // terminal chunk marker in the tail
+                val from = maxOf(boundary + 4, size - 7)
+                val text = buf.decodeToString(from, size)
+                return text.contains("0\r\n\r\n") || text.endsWith("0\r\n")
+            }
+            return false
+        }
+
+        fun toByteSeries(): ByteSeries = ByteSeries(buf.copyOf(size))
+
+        companion object {
+            private const val CR = '\r'.code.toByte()
+            private const val LF = '\n'.code.toByte()
+        }
     }
 
     private fun isCompleteResponse(sink: List<Byte>): Boolean {
@@ -282,9 +350,13 @@ class HtxReactorElement(
     private suspend fun readChunk(
         handle: ChannelOperations.ChannelHandle,
         fd: Int,
-        capacity: Int = 16 * 1024,
+        // 16 KiB chunks made every response pay one readv/submit/waitFor round trip per 16 KiB;
+        // with the flat 10 ms EAGAIN sleep below that capped the client near 1.6 MB/s and turned
+        // replication pages and _cas blob fetches into multi-second exchanges.
+        capacity: Int = 256 * 1024,
     ): ByteSeries? {
         val buffer = ByteBuffer(capacity)
+        var idle = 0
         while (true) {
             handle.readv(fd, buffer)
             handle.submit()
@@ -296,7 +368,14 @@ class HtxReactorElement(
             when {
                 result == -1 -> return null
                 result == 0 -> {
-                    kotlinx.coroutines.delay(10)
+                    // Progressive backoff: on a live exchange the next bytes land within
+                    // microseconds; sleep only when the peer is genuinely quiet.
+                    when {
+                        idle < 3 -> kotlinx.coroutines.yield()
+                        idle < 20 -> kotlinx.coroutines.delay(1)
+                        else -> kotlinx.coroutines.delay(10)
+                    }
+                    idle++
                     continue
                 }
                 result > 0 -> return ByteSeries(buffer.array().copyOf(result))

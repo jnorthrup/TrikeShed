@@ -47,9 +47,9 @@ data class ReplicationReport(
 class CouchReplicator(
     private val local: CouchDatabase,
     private val http: HttpExchange,
-    private val batch: Int = 200,
-    /** Blocks per `_cas/_bulk` exchange; bounds one reply's size for the peer's listener. */
-    private val bulkChunk: Int = 64,
+    private val batch: Int = 500,
+    /** Upper bound of cids offered per `_cas/_bulk` exchange; the SERVER caps each reply by bytes. */
+    private val bulkChunk: Int = 4096,
 ) {
     // ── pull: remote → local ───────────────────────────────────────
 
@@ -60,68 +60,58 @@ class CouchReplicator(
         var since = start
         var read = 0; var written = 0; var blobs = 0; var conflicts = 0
         while (true) {
-            val page = getJson("$src/_changes?since=$since&limit=$batch&include_docs=true") ?: break
+            val page = getJson("$src/_changes?since=$since&limit=$batch") ?: break
             val results = CouchDatabase.asList(page["results"]) ?: emptyList()
             if (results.isEmpty()) break
             read += results.size
-            // Ask ourselves what we lack (local _revs_diff), then fetch only that.
-            val offered = results.mapNotNull { r ->
+            // Ask ourselves what we lack (local _revs_diff), then move only blobs.
+            data class Row(val id: String, val rev: String, val deleted: Boolean)
+            val rows = results.mapNotNull { r ->
                 val m = r as? Map<*, *> ?: return@mapNotNull null
                 val id = m["id"] as? String ?: return@mapNotNull null
                 val rev = (CouchDatabase.asList(m["changes"])?.firstOrNull() as? Map<*, *>)?.get("rev") as? String ?: return@mapNotNull null
-                id to rev
+                Row(id, rev, m["deleted"] == true)
             }
-            val missing = local.revsDiff(offered.groupBy({ it.first }, { it.second }))
-            // One exchange for every blob this page needs (bodies + attachments) — then the per-doc
-            // loop finds them locally; single GETs remain as the fallback for anything the peer omitted.
-            val wanted = linkedSetOf<String>()
-            for (r in results) {
-                val m = r as? Map<*, *> ?: continue
-                val id = m["id"] as? String ?: continue
-                if (!missing.containsKey(id) || m["deleted"] == true) continue
-                val rev = (CouchDatabase.asList(m["changes"])?.firstOrNull() as? Map<*, *>)?.get("rev") as? String ?: continue
-                CouchDatabase.revToCid(rev)?.let { if (local.cas.get(it) == null) wanted += it.value }
-                @Suppress("UNCHECKED_CAST")
-                for (c in local.referencedCids((m["doc"] as? Map<String, Any?>) ?: emptyMap())) if (local.cas.get(ContentId(c)) == null) wanted += c
+            val missing = local.revsDiff(rows.groupBy({ it.id }, { it.rev }))
+            val wantedRows = rows.filter { missing.containsKey(it.id) }
+            // Stage 1: body blobs (the rev names them). Stage 2: whatever the bodies reference.
+            blobs += fetchBlobs(src, wantedRows.filter { !it.deleted }
+                .mapNotNull { CouchDatabase.revToCid(it.rev)?.value }
+                .filter { local.cas.get(ContentId(it)) == null })
+            val decoded = HashMap<String, borg.trikeshed.couch.Document?>()
+            for (row in wantedRows) {
+                if (row.deleted) continue
+                decoded[row.id] = CouchDatabase.revToCid(row.rev)
+                    ?.let { local.cas.get(it) ?: fetchBlob(src, it)?.also { _ -> blobs++ } }
+                    ?.let { CouchStoreFactory.documentFromBody(it) }
             }
-            if (wanted.isNotEmpty()) blobs += fetchBlobs(src, wanted.toList())
-            for (r in results) {
-                val m = r as? Map<*, *> ?: continue
-                val id = m["id"] as? String ?: continue
-                val rev = (CouchDatabase.asList(m["changes"])?.firstOrNull() as? Map<*, *>)?.get("rev") as? String ?: continue
-                if (!missing.containsKey(id)) continue
-                val deleted = m["deleted"] == true
-                if (deleted) {
-                    if (local.store.putReplicated(null, id, rev, true)) written++ else conflicts++
+            blobs += fetchBlobs(src, decoded.values.filterNotNull()
+                .flatMap { local.referencedCids(it) }
+                .filter { local.cas.get(ContentId(it)) == null }.distinct())
+            for (row in wantedRows) {
+                if (row.deleted) {
+                    if (local.store.putReplicated(null, row.id, row.rev, true)) written++ else conflicts++
                     continue
                 }
-                @Suppress("UNCHECKED_CAST")
-                val wireDoc = m["doc"] as? Map<String, Any?>
-                // Body: prefer the canonical blob the rev names (bit-exact, hashed); fall back to wire JSON.
-                val bodyCid = CouchDatabase.revToCid(rev)
-                var doc = bodyCid?.let { cid ->
-                    val bytes = local.cas.get(cid) ?: fetchBlob(src, cid)?.also { blobs++ } ?: return@let null
-                    CouchStoreFactory.documentFromBody(bytes)
-                }
-                if (doc == null && wireDoc != null) doc = local.toDocument(id, wireDoc)
+                val doc = decoded[row.id]
                 if (doc == null) { conflicts++; continue }
-                // Referenced blobs (attachments) must land before the revision is visible.
+                // Every referenced blob must be local before the revision becomes visible.
                 var complete = true
-                for (cidText in local.referencedCids(wireDoc ?: emptyMap())) {
+                for (cidText in local.referencedCids(doc)) {
                     val cid = ContentId(cidText)
                     if (local.cas.get(cid) != null) continue
                     if (fetchBlob(src, cid) == null) { complete = false; break }
                     blobs++
                 }
                 if (!complete) { conflicts++; continue }
-                if (bodyCid == null) local.cas.put(CouchStoreFactory.canonicalBody(doc))
-                if (local.store.putReplicated(doc, id, rev, false)) written++ else conflicts++
+                if (local.store.putReplicated(doc, row.id, row.rev, false)) written++ else conflicts++
             }
             val last = (page["last_seq"] as? Number)?.toLong() ?: break
             if (last <= since) break
             since = last
-            saveCheckpoint(replId, since, src)
+            local.localPut(replId, mapOf("last_seq" to since, "peer" to src))
         }
+        if (since > start) saveCheckpoint(replId, since, src) // remote side once, not per page
         return ReplicationReport("pull", src, start, since, read, written, blobs, conflicts)
     }
 
@@ -164,24 +154,36 @@ class CouchReplicator(
                 for (r in list) if ((r as? Map<*, *>)?.get("ok") == true) written++ else conflicts++
             }
             since = frames.last().sequence + 1
-            saveCheckpoint(replId, since, dst)
+            local.localPut(replId, mapOf("last_seq" to since, "peer" to dst))
         }
+        if (since > start) saveCheckpoint(replId, since, dst)
         return ReplicationReport("push", dst, start, since, read, written, blobs, conflicts)
     }
 
     // ── blobs ─────────────────────────────────────────────────────
 
-    /** Bulk lane: returns how many blocks landed (each verified against its cid). */
+    /**
+     * Bulk lane: offer every cid at once; the peer caps each reply by bytes, so repeat with
+     * whatever is still missing until a round makes no progress. Exchange count scales with total
+     * BYTES, not blob count — each HTX exchange has a fixed connect/poll cost that dominated
+     * replication when tiny body blobs went 64 to a call. Every block is verified against its cid.
+     */
     private suspend fun fetchBlobs(peer: String, cids: List<String>): Int {
         var landed = 0
-        for (chunk in cids.chunked(bulkChunk)) {
-            val r = http.call("POST", "$peer/_cas/_bulk", JsonSupport.stringify(mapOf("cids" to chunk)).encodeToByteArray(), "application/json")
-            if (!r.ok) continue
-            for ((cid, bytes) in borg.trikeshed.couch.CasBulkCodec.decode(r.body)) {
-                val expect = runCatching { ContentId(cid) }.getOrNull() ?: continue
-                if (ContentId.of(bytes) != expect) continue
-                local.cas.put(bytes); landed++
+        var want = cids.distinct()
+        while (want.isNotEmpty()) {
+            var progressed = 0
+            for (chunk in want.chunked(bulkChunk)) {
+                val r = http.call("POST", "$peer/_cas/_bulk", JsonSupport.stringify(mapOf("cids" to chunk)).encodeToByteArray(), "application/json")
+                if (!r.ok) continue
+                for ((cid, bytes) in borg.trikeshed.couch.CasBulkCodec.decode(r.body)) {
+                    val expect = runCatching { ContentId(cid) }.getOrNull() ?: continue
+                    if (ContentId.of(bytes) != expect) continue
+                    local.cas.put(bytes); landed++; progressed++
+                }
             }
+            if (progressed == 0) break
+            want = want.filter { local.cas.get(ContentId(it)) == null }
         }
         return landed
     }

@@ -38,7 +38,7 @@ class CouchWire(
 ) {
     val db: CouchDatabase get() = router.db
 
-    private data class Continuous(val job: Job, val spec: Map<String, Any?>, @Volatile var last: ReplicationReport?)
+    private class Continuous(@Volatile var job: Job, val spec: Map<String, Any?>, @Volatile var last: ReplicationReport?)
     private val continuous = ConcurrentHashMap<String, Continuous>()
 
     companion object {
@@ -162,14 +162,22 @@ class CouchWire(
             val interval = (spec["interval_ms"] as? Number)?.toLong()?.coerceAtLeast(250) ?: 5_000L
             continuous[id]?.job?.cancel()
             val holder = Continuous(Job(), spec, null)
-            val job = scope.launch {
+            holder.job = scope.launch {
                 while (true) {
                     holder.last = runCatching { run() }.getOrElse { ReplicationReport(direction, peer, 0, 0, 0, 0, 0, -1) }
                     delay(interval)
                 }
             }
-            continuous[id] = holder.copy(job = job)
+            continuous[id] = holder
             return json(202, mapOf("ok" to true, "_local_id" to id, "direction" to direction, "peer" to peer, "interval_ms" to interval))
+        }
+        if (spec["async"] == true) {
+            // Big teleports outlive an HTTP client's patience: hand back the id now, run in the
+            // reactor, read the outcome later via GET _replicate.
+            val holder = Continuous(Job(), spec, null)
+            holder.job = scope.launch { holder.last = runCatching { run() }.getOrElse { ReplicationReport(direction, peer, 0, 0, 0, 0, 0, -1) } }
+            continuous[id] = holder
+            return json(202, mapOf("ok" to true, "_local_id" to id, "direction" to direction, "peer" to peer, "async" to true))
         }
         val report = runCatching { run() }.getOrElse { return json(502, mapOf("error" to "replication_failed", "reason" to (it.message ?: it.toString()))) }
         return json(200, report.toMap() + ("_local_id" to id))

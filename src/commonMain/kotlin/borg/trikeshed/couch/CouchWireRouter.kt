@@ -128,7 +128,18 @@ class CouchWireRouter(
     private fun cas(m: String, cid: String?, body: ByteArray): WireReply = when {
         m == "POST" && cid == "_bulk" -> {
             val want = CouchDatabase.asList(parseMap(body)?.get("cids"))?.map { it.toString() } ?: return WireReply.badRequest("cids required")
-            WireReply(200, CasBulkCodec.CONTENT_TYPE, CasBulkCodec.encode(want.mapNotNull { c -> db.blockGet(c)?.let { c to it } }))
+            // Cap one reply by BYTES, not block count: jar-sized blobs make a 64-block reply tens of
+            // megabytes. Omitted blocks are re-requested (bulk again or singles) by the reader.
+            var budget = 8 * 1024 * 1024
+            val blocks = mutableListOf<Pair<String, ByteArray>>()
+            for (c in want) {
+                val b = db.blockGet(c) ?: continue
+                if (blocks.isNotEmpty() && b.size > budget) break
+                blocks += c to b
+                budget -= b.size
+                if (budget <= 0) break
+            }
+            WireReply(200, CasBulkCodec.CONTENT_TYPE, CasBulkCodec.encode(blocks))
         }
         m == "GET" && cid != null -> db.blockGet(cid)?.let { WireReply(200, "application/octet-stream", it) } ?: WireReply.notFound("no such block")
         m == "POST" && cid == null -> db.blockPut(body).let { WireReply.json(201, mapOf("ok" to true, "cid" to it.value, "size" to body.size)) }

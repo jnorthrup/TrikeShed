@@ -319,7 +319,9 @@ object OroborosDaemon {
         val couchWire = borg.trikeshed.forge.server.CouchWire(
             router = borg.trikeshed.couch.CouchWireRouter(couchDb, WorktreeCouchGateway.WORKTREE_PREFIX),
             replicator = borg.trikeshed.couch.replicate.CouchReplicator(couchDb, peerHttp),
-            scope = this,
+            // NOT the runBlocking scope: async/continuous replication must run on real workers,
+            // not queued behind the daemon's single-threaded root event loop.
+            scope = CoroutineScope(SupervisorJob(coroutineContext[kotlinx.coroutines.Job]) + Dispatchers.Default),
         )
 
         // Kanban HTTP server (CCEK litebike listener, no JDK networking) — starts before

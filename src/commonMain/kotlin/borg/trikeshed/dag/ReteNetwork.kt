@@ -23,6 +23,21 @@ class ReteNetwork {
     }
     val refraction = ReteRefraction()
 
+    /**
+     * Facts with `lifecycle == "submitted"` per partition. The only production rules today key on
+     * submitted jobs, and [evaluateRules] is a full working-memory scan + sort — at document-store
+     * scale (10⁴ facts from the oroboros `_changes` tendon) running it on every assert is O(n²).
+     * Partitions holding no submitted fact skip evaluation entirely.
+     */
+    private val submittedCount = mutableMapOf<String, Int>()
+
+    private fun countLifecycle(partitionId: String, old: Map<String, Any?>?, new: Map<String, Any?>?) {
+        val was = old?.get("lifecycle") == "submitted"
+        val now = new?.get("lifecycle") == "submitted"
+        if (was == now) return
+        submittedCount[partitionId] = (submittedCount[partitionId] ?: 0) + (if (now) 1 else -1)
+    }
+
     suspend fun assert(
         factId: FactId,
         fields: Map<String, Any?>,
@@ -31,6 +46,7 @@ class ReteNetwork {
     ) {
         val result = workingMemory.assert(factId, fields, versionCid, board)
         if (result.isNew) {
+            countLifecycle(board.id, null, fields)
             alphaMemory.accept(result.fact)
             betaMemory.acceptLeft(result.fact)
             betaMemory.acceptRight(result.fact)
@@ -50,6 +66,9 @@ class ReteNetwork {
             val oldFact = oldFacts.first()
             agenda.removeBySupport(oldFact.versionCid)
             refraction.invalidateBySupport(oldFact.versionCid)
+            countLifecycle(factId.partitionId, oldFact.fields, fields)
+        } else {
+            countLifecycle(factId.partitionId, null, fields)
         }
 
         val fact = workingMemory.modify(factId, fields, versionCid)
@@ -65,6 +84,7 @@ class ReteNetwork {
         if (facts.isNotEmpty()) {
             val fact = facts.first()
             if (workingMemory.retract(factId)) {
+                countLifecycle(factId.partitionId, fact.fields, null)
                 alphaMemory.retract(factId)
                 betaMemory.retractLeft(factId)
                 betaMemory.retractRight(factId)
@@ -83,6 +103,7 @@ class ReteNetwork {
     }
 
     suspend fun evaluateRules(partitionId: String) {
+        if ((submittedCount[partitionId] ?: 0) == 0) return // no submitted jobs → no rule can fire
         val jobs = workingMemory.query(BlackboardContext(partitionId), "lifecycle" to "submitted")
         val tokens = betaMemory.tokens().filter { it.left.factId.partitionId == partitionId }
 

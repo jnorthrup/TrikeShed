@@ -204,6 +204,10 @@ class CouchDatabase(
     fun referencedCids(body: Map<String, Any?>): List<String> =
         listOfNotNull((body["contentId"] as? String)?.takeIf { it.startsWith("sha256:") })
 
+    /** Same, from a decoded [Document]. */
+    fun referencedCids(doc: Document): List<String> =
+        listOfNotNull((doc.fields.firstOrNull { it.name == "contentId" }?.value as? String)?.takeIf { it.startsWith("sha256:") })
+
     // ── rewrites (CouchApp) ───────────────────────────────────────
 
     /** Seed `_design/forge` with the rewrite table that hoists `docs/` to `/`. Idempotent. */
