@@ -71,3 +71,6 @@
 ## 2025-02-23 - Announcing active states for single-page application navigation
 **Learning:** Single-page applications often use custom buttons to switch views instead of actual `<a>` tags with `href`s. While visual users see an active state (like a background color change), screen reader users hear no change in state unless explicitly announced.
 **Action:** When building custom view switchers (like tabs or navigation sidebar items) that aren't native links, always apply `aria-current="page"` via JavaScript when the view changes.
+## 2024-10-27 - Added aria-labels to main toolbar buttons
+**Learning:** In dynamically toggled views and fixed main toolbars, ensure text or icon buttons have explicitly descriptive `aria-label` attributes.
+**Action:** Use standard `aria-label` attributes consistently for all interactive elements in custom toolbars.

@@ -23,22 +23,22 @@
           <div class="workspace-name">Forge workspace</div>
         </div>
         <div class="sidebar-actions">
-          <button class="sidebar-item" id="btn-search" title="Search">
+          <button class="sidebar-item" id="btn-search" title="Search" aria-label="Search">
             <span class="sidebar-item-icon" aria-hidden="true">⌕</span><span>Search</span>
           </button>
-          <button class="sidebar-item" id="btn-home" title="Home">
+          <button class="sidebar-item" id="btn-home" title="Home" aria-label="Home">
             <span class="sidebar-item-icon" aria-hidden="true">⌂</span><span>Home</span>
           </button>
-          <button class="sidebar-item" id="btn-board" title="Board">
+          <button class="sidebar-item" id="btn-board" title="Board" aria-label="Board">
             <span class="sidebar-item-icon" aria-hidden="true">▦</span><span>Board</span>
           </button>
-          <button class="sidebar-item" id="btn-graph" title="Graph">
+          <button class="sidebar-item" id="btn-graph" title="Graph" aria-label="Graph">
             <span class="sidebar-item-icon" aria-hidden="true">◉</span><span>Graph</span>
           </button>
-          <button class="sidebar-item" id="btn-sheet" title="Sheet">
+          <button class="sidebar-item" id="btn-sheet" title="Sheet" aria-label="Sheet">
             <span class="sidebar-item-icon" aria-hidden="true">▤</span><span>Sheet</span>
           </button>
-          <button class="sidebar-item" id="btn-host" title="Host">
+          <button class="sidebar-item" id="btn-host" title="Host" aria-label="Host">
             <span class="sidebar-item-icon" aria-hidden="true">⬢</span><span>Host</span>
           </button>
         </div>
@@ -72,13 +72,13 @@
       <div class="main-topbar" id="main-topbar">
         <div class="breadcrumb" id="breadcrumb"></div>
         <div class="topbar-actions">
-          <button class="topbar-btn" id="btn-view-doc">Document</button>
-          <button class="topbar-btn" id="btn-view-board">Board</button>
-          <button class="topbar-btn" id="btn-view-graph">Graph</button>
-          <button class="topbar-btn" id="btn-view-sheet">Sheet</button>
+          <button class="topbar-btn" id="btn-view-doc" aria-label="View Document">Document</button>
+          <button class="topbar-btn" id="btn-view-board" aria-label="View Board">Board</button>
+          <button class="topbar-btn" id="btn-view-graph" aria-label="View Graph">Graph</button>
+          <button class="topbar-btn" id="btn-view-sheet" aria-label="View Sheet">Sheet</button>
           <button class="topbar-btn" id="btn-view-shape" aria-label="View Shape">Shape</button>
           <button class="topbar-btn" id="btn-view-host" aria-label="View Host">Host</button>
-          <button class="topbar-btn" id="btn-share">Share</button>
+          <button class="topbar-btn" id="btn-share" aria-label="Share">Share</button>
         </div>
       </div>
       <div class="doc-scroll" id="doc-scroll">
@@ -98,7 +98,7 @@
       <div class="graph-scroll" id="graph-scroll" hidden>
         <div class="graph-hud" id="graph-hud">
           <span class="graph-mode" role="group" aria-label="Graph source">
-            <button class="topbar-btn" id="graph-mode-causal">Causal</button>
+            <button class="topbar-btn" id="graph-mode-causal" aria-label="Causal">Causal</button>
             <button class="topbar-btn" id="graph-mode-concept" aria-label="Concept lattice: lib → cursor → confix → facets → surface → widgets">Concepts</button>
           </span>
           <button class="topbar-btn" id="graph-fit" title="Fit (f)">Fit</button>
@@ -124,7 +124,7 @@
           <select id="host-vm-facet" aria-label="Language facet"></select>
           <select id="host-vm-trust" aria-label="Trust"><option value="OWN">OWN · in-process</option><option value="UNTRUSTED">UNTRUSTED · fenced process</option></select>
           <textarea id="host-vm-src" placeholder="source, e.g. 1+1" aria-label="Source"></textarea>
-          <button type="submit" class="topbar-btn" id="host-vm-run">Spawn + eval</button>
+          <button type="submit" class="topbar-btn" id="host-vm-run" aria-label="Spawn and evaluate">Spawn + eval</button>
           <span class="host-live-note" id="host-live-note"></span>
         </form>
         <h3 class="host-h">Events</h3>
