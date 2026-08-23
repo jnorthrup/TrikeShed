@@ -11,7 +11,7 @@ class ForgePersistenceDurabilityTest {
 
         assertContains(script, "const LS_KEY = 'forge.workspace.v2'")
         assertContains(script, "localStorage.getItem(LS_KEY)")
-        assertContains(script, "localStorage.setItem(LS_KEY, JSON.stringify(state))")
+        assertContains(script, "localStorage.setItem(LS_KEY")
         assertTrue(script.indexOf("function loadState()") < script.indexOf("let state = loadState()"))
     }
 

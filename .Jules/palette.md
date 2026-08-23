@@ -28,6 +28,7 @@
 **Learning:** Buttons created dynamically within grouped structures (like Kanban board columns) often have generic visible text like "+ New" or "Add". While visual users infer context from the surrounding column or list grouping, screen reader users exploring by tab order or elements list lose this visual context, hearing only "Add, button".
 **Action:** When creating interactive elements inside visual groupings, dynamically generate a contextual `aria-label` that includes the grouping's name (e.g., `addBtn.setAttribute('aria-label', 'Add new card to ' + col.name);`) to restore context for assistive technologies.
 <<<<<<< ours
+<<<<<<< ours
 ## 2025-01-22 - Contextual ARIA labels for interactive Kanban cards
 **Learning:** Kanban cards that double as buttons (e.g., clicking moves them to the next column) are disorienting for screen reader users if they lack context. A screen reader will just read the card's text, without indicating its current status/column or what action activating it performs.
 **Action:** When creating interactive items like Kanban cards, dynamically generate an `aria-label` that includes the card's name, its current column, and the action triggered upon interaction (e.g., "Move card 'Task' from 'To Do' to 'In Progress'").
@@ -71,3 +72,8 @@
 ## 2025-02-23 - Announcing active states for single-page application navigation
 **Learning:** Single-page applications often use custom buttons to switch views instead of actual `<a>` tags with `href`s. While visual users see an active state (like a background color change), screen reader users hear no change in state unless explicitly announced.
 **Action:** When building custom view switchers (like tabs or navigation sidebar items) that aren't native links, always apply `aria-current="page"` via JavaScript when the view changes.
+=======
+## 2024-05-23 - Context-Specific ARIA Labels for Kanban Cards
+ **Learning:** Screen readers lose visual grouping context on dynamically created interactive components like Kanban cards, leading to ambiguity for users navigating via keyboard.
+ **Action:** Always add context-specific aria-labels that explicitly include the column/list name and explain the interaction that will happen upon activation.
+>>>>>>> theirs

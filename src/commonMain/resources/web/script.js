@@ -134,7 +134,7 @@
   function saveState() {
     try { 
         const stateStr = (typeof stringifyForge === 'function') ? stringifyForge(state) : JSON.stringify(state);
-        localStorage.setItem(LS_KEY, JSON.stringify(state));
+        localStorage.setItem(LS_KEY, stateStr);
         
         if (state.board && state.board.cards) {
             const boardStr = (typeof stringifyForge === 'function') ? stringifyForge({ cards: state.board.cards }) : JSON.stringify({ cards: state.board.cards });
