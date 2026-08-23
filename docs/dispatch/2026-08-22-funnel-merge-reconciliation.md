@@ -75,3 +75,23 @@ no undrained CAS patches"). Gate green on master throughout; every push verified
 Rows: arms processed across runs 51→49→49→49→28→28→22→0. INCOMPLETE: none —
 every arm reached exactly one disposition (LANDED / already-present / ledger-
 union / validated-reject via build gate).
+
+## Run 2 — 2026-08-23 (second invocation)
+
+9 new arms (1 branch + 8 WAL/CAS from sessions completed since run 1). All landed:
+
+- N-way CRDT batch REJECTED at the conflict-marker gate (7 arms overlapped on
+  script.js/palette.md — correctly rejected, no markers landed via that lane).
+- Solo lane: 4 validated commits (652bcd93b, 7661903b7, 58342f830, eb7327a70)
+  + 4 content-already-present closes (348095 et al.). 9/9 closed.
+- Hygiene found + fixed en route:
+  - conflict-marker abort in the CLI fell back to solo lane now (was hard
+    abort) — b49d6a502
+  - 652bcd93b (branch solo landing) carried nested `<<<<<<< ours` markers into
+    .Jules/palette.md — union-resolved + deduped (7399c609e), unrendered
+    `$(date)` header expanded (f5335148c)
+  - residual branch palette/kanban-card-aria-labels-12858081585401491229 had
+    all three deltas already verbatim on master but no ancestry — merged with
+    union-resolved ledger (c2a2130fe); 0 unmerged branches.
+- Final sentinel: `nothing to merge — no unmerged branches, no undrained CAS
+  patches`, EXIT=0. Gate green, master = origin = c2a2130fe.
