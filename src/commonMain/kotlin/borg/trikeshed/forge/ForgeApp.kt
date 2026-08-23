@@ -10,6 +10,12 @@ import borg.trikeshed.forge.blackboard.forceLayout
 import borg.trikeshed.forge.gallery.ForgeGalleryCatalog
 import borg.trikeshed.forge.gallery.ForgeGalleryRenderer
 import borg.trikeshed.forge.concept.ConceptGraph
+import borg.trikeshed.platform.Discontinued
+import borg.trikeshed.platform.PlatformHost
+import borg.trikeshed.vm.VmHost
+import borg.trikeshed.vm.VmSupervisor
+import borg.trikeshed.vm.isDead
+import borg.trikeshed.vm.vmHost
 import borg.trikeshed.forge.sheet.confixSheets
 import borg.trikeshed.forge.sheet.sheetSeed
 import borg.trikeshed.job.schema.loadConfixSchemaBytes
@@ -97,9 +103,10 @@ object ForgeApp {
         julesSurface: JulesBlackboardSurface? = null,
         flywheelReport: FlywheelReportSnapshot? = null,
         bundles: List<String> = emptyList(),
+        vmHost: VmHost = PlatformHost.default.vmHost,
     ): String {
         val reduction = runCatching { ForgeKanbanIngest.loadProjection(userId) }.getOrElse { ForgeKanbanIngest.fallbackReduction() }
-        val seed = forgeSeedJson(userId, reduction, julesSurface, flywheelReport)
+        val seed = forgeSeedJson(userId, reduction, julesSurface, flywheelReport, vmHost)
         return htmlShell(seed, bundles)
     }
 
@@ -108,6 +115,7 @@ object ForgeApp {
         reduction: ForgeKanbanReduction,
         julesSurface: JulesBlackboardSurface?,
         flywheelReport: FlywheelReportSnapshot?,
+        vmHost: VmHost,
     ): String {
         val seedMap = mapOf<String, Any?>(
             "userId" to userId,
@@ -157,6 +165,7 @@ object ForgeApp {
             "sheets" to forgeSheetsSeed(reduction),
             "blackboardSeed" to forgeBlackboardSeed(julesSurface),
             "dashboards" to forgeDashboardSeed(flywheelReport),
+            "hosts" to forgeHostsSeed(vmHost),
         )
         // The seed lives inside <script type="application/json">; a literal "</" must not end that element.
         return JsonSupport.stringify(seedMap).replace("</", "<\\/")
@@ -227,7 +236,32 @@ object ForgeApp {
      * Dashboard seed: launch-time native I/O capability + latest flywheel cycle evidence.
      * The server render is the authoritative launch-time snapshot.
      */
-    private fun forgeDashboardSeed(flywheelReport: FlywheelReportSnapshot?): Map<String, Any?> {
+    /**
+     * Host view seed: what this host can run. The VM tiers come from the common VM API
+     * (`borg.trikeshed.vm`): the bound host's rows as a sheet, every provider's capability report,
+     * and the features that are dead on this target (interface chokepoints hit or declared) — the
+     * static Pages build bakes whatever the JVM baker had, and the live server re-renders per request.
+     */
+    private fun forgeHostsSeed(vmHost: VmHost): Map<String, Any?> {
+        val reports = runCatching { VmSupervisor.reports }.getOrElse { emptyList() }
+        if (vmHost.isDead) listOf("vm.spawn", "vm.eval", "vm.call", "vm.revoke").forEach { Discontinued.declare(it) }
+        val vmColumns = borg.trikeshed.vm.VM_COLUMNS.map { borg.trikeshed.forge.sheet.SheetColumn(it.first, it.second.name) }
+        val vms = runCatching { sheetSeed("vms", "Sub-VMs", vmHost.rows(), columns = vmColumns).toMap() }.getOrNull()
+        return mapOf(
+            "host" to mapOf(
+                "platform" to vmHost.platform,
+                "subVm" to !vmHost.isDead,
+                "languages" to vmHost.languages.map { it.id },
+                "vms" to vmHost.ids().size,
+                "nio" to nioSeed(),
+                "discontinued" to (Discontinued.features + Discontinued.declaredDead).sorted(),
+            ),
+            "providers" to reports.map { it.toMap() },
+            "vms" to vms,
+        )
+    }
+
+    private fun nioSeed(): Map<String, Any?> {
         val nioReport = runCatching {
             borg.trikeshed.userspace.nio.spi.currentNioCapabilityReport()
         }.getOrElse {
@@ -240,16 +274,18 @@ object ForgeApp {
             )
         }
         return mapOf(
-            "nio" to mapOf(
-                "backendName" to nioReport.backendName,
-                "ioUringAvailable" to nioReport.ioUringAvailable,
-                "capabilities" to nioReport.capabilities,
-                "kernelHint" to nioReport.kernelHint,
-                "checkedAt" to nioReport.checkedAt,
-            ),
-            "flywheel" to (flywheelReport?.toMap() ?: emptyMap<String, Any?>()),
+            "backendName" to nioReport.backendName,
+            "ioUringAvailable" to nioReport.ioUringAvailable,
+            "capabilities" to nioReport.capabilities,
+            "kernelHint" to nioReport.kernelHint,
+            "checkedAt" to nioReport.checkedAt,
         )
     }
+
+    private fun forgeDashboardSeed(flywheelReport: FlywheelReportSnapshot?): Map<String, Any?> = mapOf(
+        "nio" to nioSeed(),
+        "flywheel" to (flywheelReport?.toMap() ?: emptyMap<String, Any?>()),
+    )
 
     /** Placeholders in `src/commonMain/resources/web/index.html`; the shell and `script.js` share one DOM. */
     const val SEED_SLOT = "{{SEED}}"

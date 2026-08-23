@@ -4,7 +4,7 @@ import borg.trikeshed.graal.subvm.Budget
 import borg.trikeshed.graal.subvm.GuestIsolate
 import borg.trikeshed.graal.subvm.Hypervisor
 import borg.trikeshed.graal.subvm.LeafTrainer
-import borg.trikeshed.graal.subvm.Teleported
+import borg.trikeshed.vm.Teleported
 import borg.trikeshed.pointcut.VmFacet
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicBoolean

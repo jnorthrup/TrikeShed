@@ -1,5 +1,7 @@
 package borg.trikeshed.graal.subvm
 
+import borg.trikeshed.vm.Teleported
+
 import borg.trikeshed.pointcut.VmFacet
 import java.io.File
 import kotlin.test.Test

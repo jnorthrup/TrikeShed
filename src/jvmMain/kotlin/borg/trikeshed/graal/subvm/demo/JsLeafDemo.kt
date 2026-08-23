@@ -2,7 +2,7 @@ package borg.trikeshed.graal.subvm.demo
 
 import borg.trikeshed.graal.subvm.Hypervisor
 import borg.trikeshed.graal.subvm.ProcessIsolate
-import borg.trikeshed.graal.subvm.Teleported
+import borg.trikeshed.vm.Teleported
 import borg.trikeshed.lib.toList
 import borg.trikeshed.pointcut.VmFacet
 

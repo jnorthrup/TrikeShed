@@ -12,7 +12,7 @@ import borg.trikeshed.forge.blackboard.ForgeBlackboardView
 @Serializable
 enum class ForgeGallerySection {
     LAYOUT, INPUT, DISPLAY, FEEDBACK, DATA, CANVAS,
-    FORGE, KANBAN, CONFIX, COUCH, CAS,
+    FORGE, KANBAN, CONFIX, COUCH, CAS, HOST,
 }
 
 /**
@@ -238,6 +238,43 @@ object ForgeGalleryCatalog {
             previewToken = "cas-attachment-row",
             supportTargets = setOf("JVM_DESKTOP", "JS_BROWSER", "JS_NODE", "WASM_JS_BROWSER", "WASM_JS_NODE"),
         ),
+
+        // ── HOST — the sub-VM hosting substrate (borg.trikeshed.vm) ──
+        host("host.capabilities", "Host Capabilities",
+            synopsis = "NIO backend, VM tiers per provider (in-process Graal, process isolate, node vm, Worker) and the features dead on this target.",
+            previewToken = "host-tiles",
+            supportTargets = setOf("JVM_DESKTOP", "JS_BROWSER", "JS_NODE", "WASM_JS_BROWSER"),
+            apiSignature = "VmSupervisor.reports / Discontinued.features",
+        ),
+        host("host.vms", "Sub-VMs",
+            synopsis = "Every guest as a Cursor row (VM_COLUMNS): id, facet, trust, tier, phase, budget, calls, heat, receipts.",
+            previewToken = "sheet",
+            supportTargets = setOf("JVM_DESKTOP", "JS_BROWSER", "JS_NODE"),
+            apiSignature = "VmHost.rows(): Cursor",
+        ),
+        host("host.events", "VM Events",
+            synopsis = "Spawned / Evaluated / Revoked / Landed as an SSE log when served live (/api/vm/events).",
+            previewToken = "event-log",
+            supportTargets = setOf("JVM_DESKTOP"),
+            apiSignature = "VmHost.events: Flow<VmEvent>",
+        ),
+    )
+
+    private fun host(
+        id: String,
+        name: String,
+        synopsis: String,
+        previewToken: String,
+        supportTargets: Set<String>,
+        apiSignature: String? = null,
+    ): ForgeGalleryWidget = ForgeGalleryWidget(
+        id = id,
+        section = ForgeGallerySection.HOST,
+        name = name,
+        synopsis = synopsis,
+        supportTargets = supportTargets,
+        previewToken = previewToken,
+        apiSignature = apiSignature,
     )
 
     fun widgets(): List<ForgeGalleryWidget> = widgets

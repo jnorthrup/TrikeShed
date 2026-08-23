@@ -4,7 +4,7 @@ import borg.trikeshed.graal.subvm.Budget
 import borg.trikeshed.graal.subvm.GuestException
 import borg.trikeshed.graal.subvm.GuestFailure
 import borg.trikeshed.graal.subvm.Hypervisor
-import borg.trikeshed.graal.subvm.Teleported
+import borg.trikeshed.vm.Teleported
 import borg.trikeshed.graal.subvm.Trust
 import borg.trikeshed.pointcut.VmFacet
 

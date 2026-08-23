@@ -8,6 +8,7 @@ import borg.trikeshed.lcnc.isam.LcncPage
 import borg.trikeshed.lib.j
 import borg.trikeshed.lib.emptySeriesOf
 import kotlin.test.Test
+import kotlin.test.assertTrue
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
 
@@ -143,7 +144,7 @@ class RollupReducerTest {
         assertEquals(RollupFunction.Stddev, result.function)
         val value = result.value ?: 0.0
         val diff = kotlin.math.abs(value - 2.138)
-        assert(diff < 0.01) { "Expected ~2.138, got $value" }
+        assertTrue(diff < 0.01, "Expected ~2.138, got $value")
         assertEquals(8, result.sampleSize)
     }
 

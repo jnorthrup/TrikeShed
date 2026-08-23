@@ -1,7 +1,9 @@
 package borg.trikeshed.graal.subvm
 
+import borg.trikeshed.vm.Teleported
+
 import borg.trikeshed.graal.subvm.LeafTrainer.Phase
-import borg.trikeshed.graal.subvm.Teleported.Num
+import borg.trikeshed.vm.Teleported.Num
 import borg.trikeshed.pointcut.VmFacet
 import org.junit.jupiter.api.Timeout
 import java.util.concurrent.CopyOnWriteArrayList

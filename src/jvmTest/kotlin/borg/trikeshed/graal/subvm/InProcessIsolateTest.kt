@@ -1,9 +1,11 @@
 package borg.trikeshed.graal.subvm
 
-import borg.trikeshed.graal.subvm.Teleported.Arr
-import borg.trikeshed.graal.subvm.Teleported.Num
-import borg.trikeshed.graal.subvm.Teleported.Real
-import borg.trikeshed.graal.subvm.Teleported.Str
+import borg.trikeshed.vm.Teleported
+
+import borg.trikeshed.vm.Teleported.Arr
+import borg.trikeshed.vm.Teleported.Num
+import borg.trikeshed.vm.Teleported.Real
+import borg.trikeshed.vm.Teleported.Str
 import borg.trikeshed.pointcut.VmFacet
 import org.junit.jupiter.api.Timeout
 import java.util.concurrent.CopyOnWriteArrayList

@@ -1,5 +1,7 @@
 package borg.trikeshed.graal.subvm
 
+import borg.trikeshed.vm.Teleported
+
 import borg.trikeshed.pointcut.VmFacet
 import org.graalvm.polyglot.Context
 import org.graalvm.polyglot.Engine

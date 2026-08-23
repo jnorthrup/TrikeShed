@@ -622,7 +622,7 @@ tasks.register<JavaExec>("runFlywheelTui") {
 tasks.register<JavaExec>("runKanbanHttpServerJvm") {
     group = "forge"
     description = "Launch KanbanHttpServerJvm from naked classes + staged lib/. -Pjdwp=5007[,suspend] attaches a debugger."
-    mainClass.set("borg.trikeshed.forge.server.KanbanHttpServerJvm")
+    mainClass.set("borg.trikeshed.forge.server.KanbanServerMain")
     useStagedJvmClasspath()
     standardInput = System.`in`
 }
@@ -806,9 +806,15 @@ val generateForgeAssets = tasks.register("generateForgeAssets") {
 
     val outputDir = layout.buildDirectory.dir("generated/source/forgeAssets/kotlin/borg/trikeshed/forge/generated")
 
+    // Common resources baked for every target (CommonResources layer 1). Keys are bundle paths under
+    // src/commonMain/resources; missing files are skipped so the allowlist can name future assets.
+    val bundleAllowlist = listOf("confix/job-nexus.schema.json", "openapi/htx-general.openapi.yaml", "openapi/jules.openapi.yaml", "openapi/forge-host.openapi.yaml")
+    val resourcesDir = file("src/commonMain/resources")
     inputs.file(htmlFile)
     inputs.file(cssFile)
     inputs.file(jsFile)
+    inputs.files(bundleAllowlist.map { File(resourcesDir, it) }.filter { it.isFile })
+    inputs.property("bundleAllowlist", bundleAllowlist)
     outputs.dir(outputDir)
 
     doLast {
@@ -851,7 +857,26 @@ val generateForgeAssets = tasks.register("generateForgeAssets") {
             "    val scriptJs: String by lazy { ForgeAssetsJs.data.decodeToString() }\n" +
             "}\n"
         )
+
+        val baked = bundleAllowlist.mapIndexedNotNull { i, key ->
+            val f = File(resourcesDir, key)
+            if (!f.isFile) null else key to createByteArray("ForgeResource_$i", f.readBytes())
+        }
+        File(outDirFile, "ForgeResourceBundle.kt").writeText(
+            "package borg.trikeshed.forge.generated\n\n" +
+            "/** Common resources baked by generateForgeAssets (CommonResources layer 1). */\n" +
+            "internal object ForgeResourceBundle {\n" +
+            "    val map: Map<String, ByteArray> by lazy { mapOf(\n" +
+            baked.joinToString("") { (k, obj) -> "        \"$k\" to $obj.data,\n" } +
+            "    ) }\n}\n"
+        )
     }
+}
+
+// Keep the JS/wasm distributions to what the browser needs: the dictionary (6.6 MB), the dead
+// bin/run.cmd and the vestigial shell/ are not web assets (CommonResources bakes what they need).
+listOf("jsProcessResources", "wasmJsProcessResources").forEach { name ->
+    tasks.matching { it.name == name }.configureEach { (this as org.gradle.language.jvm.tasks.ProcessResources).exclude("nlp/**", "bin/**", "shell/**") }
 }
 
 // Wire the generated Forge assets into commonMain. Must come AFTER

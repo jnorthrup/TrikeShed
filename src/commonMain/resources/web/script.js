@@ -963,6 +963,7 @@
     const id = (card.querySelector('.id') || {}).textContent || '';
     if (id.trim().startsWith('confix.')) { setView('sheet'); openSheet('confix'); }
     else if (id.trim() === 'forge.graph') { setView('graph'); }
+    else if (id.trim().startsWith('host.')) { setView('host'); }
   });
 
   // ── View switching ──────────────────────────────────────────────────
@@ -1120,7 +1121,107 @@
   document.addEventListener('drop', (e) => { e.preventDefault(); if (e.dataTransfer.files.length) shapeIngest(e.dataTransfer.files); });
   fileInputEl.addEventListener('change', () => { shapeIngest(fileInputEl.files); fileInputEl.value = ''; });
 
-  const VIEWS = { doc: [docScrollEl, viewDocBtn], board: [boardScrollEl, viewBoardBtn], graph: [graphScrollEl, viewGraphBtn], sheet: [sheetScrollEl, viewSheetBtn], shape: [shapeScrollEl, viewShapeBtn] };
+  // ── Render: host (the sub-VM substrate — borg.trikeshed.vm) ─────────
+  // seed.hosts = { host:{platform,subVm,languages,vms,nio,discontinued}, providers:[report], vms:<sheet> }
+  const hostScrollEl = document.getElementById('host-scroll');
+  const viewHostBtn = document.getElementById('btn-view-host');
+  const hostTilesEl = document.getElementById('host-tiles');
+  const hostVmsEl = document.getElementById('host-vms');
+  const hostVmCountEl = document.getElementById('host-vm-count');
+  const hostForm = document.getElementById('host-spawn');
+  const hostFacetSel = document.getElementById('host-vm-facet');
+  const hostLiveNote = document.getElementById('host-live-note');
+  const hostLog = document.getElementById('host-log');
+  const hosts = (seed.hosts && seed.hosts.host) ? seed.hosts : { host: { platform: 'none', subVm: false, languages: [], vms: 0, nio: {}, discontinued: [] }, providers: [], vms: null };
+  let hostLiveProbe = null;   // null = unknown, true = /api/vm answered, false = static dump
+  let hostEvents = null;
+
+  function tile(k, v, sub, cls) {
+    const d = document.createElement('div'); d.className = 'host-tile' + (cls ? ' ' + cls : '');
+    d.innerHTML = '<div class="ht-k"></div><div class="ht-v"></div><div class="ht-sub"></div>';
+    d.children[0].textContent = k; d.children[1].textContent = v; d.children[2].textContent = sub || '';
+    return d;
+  }
+
+  function hostLogLine(text) {
+    hostLog.textContent += text + '\n';
+    hostLog.scrollTop = hostLog.scrollHeight;
+  }
+
+  function renderHostTiles(live) {
+    hostTilesEl.innerHTML = '';
+    const h = hosts.host, nio = h.nio || (seed.dashboards && seed.dashboards.nio) || {};
+    hostTilesEl.appendChild(tile('platform', h.platform || 'none', live === true ? 'live server' : (live === false ? 'static dump (baked on ' + (h.platform || '?') + ')' : 'probing…')));
+    hostTilesEl.appendChild(tile('sub-vm host', h.subVm ? 'bound' : 'dead', h.subVm ? (h.languages || []).join(', ') + ' · ' + (h.vms || 0) + ' vms' : 'vm.spawn is discontinued on this target', h.subVm ? 'live' : 'dead'));
+    hostTilesEl.appendChild(tile('nio backend', nio.backendName || 'unknown', (nio.ioUringAvailable ? 'io_uring · ' : '') + (nio.capabilities || []).join(' ')));
+    (hosts.providers || []).forEach((p) => {
+      hostTilesEl.appendChild(tile('tier · ' + p.providerId, p.available ? p.sandboxKind : 'unavailable',
+        (p.languages || []).join(',') + (p.wallBudgetSupported ? ' · wall budget' : ' · no wall budget') + (p.callSupported ? ' · call' : ' · no call') + (p.note ? ' — ' + p.note : ''),
+        p.available ? 'live' : 'dead'));
+    });
+    const dead = h.discontinued || [];
+    const dt = tile('dead features', String(dead.length), '', dead.length ? 'dead' : 'live');
+    const ul = document.createElement('div'); ul.className = 'host-dead-list'; ul.textContent = dead.join('\n'); dt.appendChild(ul);
+    hostTilesEl.appendChild(dt);
+  }
+
+  function renderHostVms(sheet) {
+    hostVmsEl.innerHTML = '';
+    const sh = sheet || hosts.vms;
+    if (sh && Array.isArray(sh.columns) && sh.columns.length) {
+      hostVmsEl.appendChild(buildSheetTable(sh, 0));
+      hostVmCountEl.textContent = sh.rows.length + ' rows';
+    } else {
+      hostVmsEl.textContent = 'no VM rows (host dead)';
+      hostVmCountEl.textContent = '';
+    }
+  }
+
+  function hostApi(path, body) {
+    return fetch(path, body === undefined ? { method: 'GET' } : { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
+      .then((r) => r.ok ? r.json() : r.text().then((t) => { throw new Error(r.status + ' ' + t); }));
+  }
+
+  function probeHostLive() {
+    if (hostLiveProbe !== null) return Promise.resolve(hostLiveProbe);
+    return hostApi('./api/vm').then((sheet) => { hostLiveProbe = true; renderHostVms(sheet); return true; })
+      .catch(() => { hostLiveProbe = false; return false; });
+  }
+
+  function renderHost() {
+    hostFacetSel.innerHTML = '';
+    (hosts.host.languages && hosts.host.languages.length ? hosts.host.languages : ['js']).forEach((l) => {
+      const o = document.createElement('option'); o.value = l; o.textContent = l; hostFacetSel.appendChild(o);
+    });
+    renderHostTiles(hostLiveProbe);
+    renderHostVms();
+    probeHostLive().then((live) => {
+      renderHostTiles(live);
+      hostForm.setAttribute('aria-disabled', live ? 'false' : 'true');
+      hostLiveNote.textContent = live ? 'served live — spawn/eval round-trip to /api/vm' : 'static Pages build — no live host; spawn/eval need the JVM server (runKanbanHttpServerJvm)';
+      if (live && !hostEvents && typeof EventSource !== 'undefined') {
+        hostEvents = new EventSource('./api/vm/events');
+        hostEvents.onmessage = (e) => hostLogLine(e.data);
+        hostEvents.onerror = () => hostLogLine('[events] stream closed');
+      }
+    });
+  }
+
+  hostForm.addEventListener('submit', (e) => {
+    e.preventDefault();
+    const id = document.getElementById('host-vm-id').value.trim() || ('vm-' + uid().slice(0, 6));
+    const facet = hostFacetSel.value;
+    const trust = document.getElementById('host-vm-trust').value;
+    const source = document.getElementById('host-vm-src').value;
+    hostLogLine('> spawn ' + id + ' (' + facet + ', ' + trust + ')');
+    hostApi('./api/vm/spawn', { id, facet, trust })
+      .then(() => source.trim() ? hostApi('./api/vm/' + encodeURIComponent(id) + '/eval', { source }) : { value: null })
+      .then((r) => { hostLogLine('< ' + JSON.stringify(r)); return hostApi('./api/vm'); })
+      .then((sheet) => renderHostVms(sheet))
+      .catch((err) => hostLogLine('! ' + err.message));
+  });
+
+  const VIEWS = { doc: [docScrollEl, viewDocBtn], board: [boardScrollEl, viewBoardBtn], graph: [graphScrollEl, viewGraphBtn], sheet: [sheetScrollEl, viewSheetBtn], shape: [shapeScrollEl, viewShapeBtn], host: [hostScrollEl, viewHostBtn] };
   function setView(view) {
     mutate((s) => { s.view = view; }, 'view');
     for (const [k, [el, btn]] of Object.entries(VIEWS)) {
@@ -1136,12 +1237,14 @@
     if (view === 'graph') { setGraphMode(graphMode); }
     if (view === 'sheet') renderSheet();
     if (view === 'shape') renderShape();
+    if (view === 'host') renderHost();
   }
 
   for (const [k, [, btn]] of Object.entries(VIEWS)) btn.addEventListener('click', () => setView(k));
   document.getElementById('btn-board').addEventListener('click', () => setView('board'));
   document.getElementById('btn-graph').addEventListener('click', () => setView('graph'));
   document.getElementById('btn-sheet').addEventListener('click', () => setView('sheet'));
+  document.getElementById('btn-host').addEventListener('click', () => setView('host'));
   document.getElementById('btn-home').addEventListener('click', () => setView('doc'));
   document.getElementById('btn-new-page').addEventListener('click', () => {
     newPage();
@@ -1164,6 +1267,7 @@
     if (Array.isArray(seed.correlations) && seed.correlations.length) parts.push(seed.correlations.length + ' correlations');
     if (seed.conceptGraph && Array.isArray(seed.conceptGraph.nodes) && seed.conceptGraph.nodes.length) parts.push(seed.conceptGraph.nodes.length + ' concepts');
     if (sheets.length) parts.push(sheets.length + ' sheets');
+    if (seed.hosts && seed.hosts.host) parts.push(seed.hosts.host.subVm ? 'host: ' + seed.hosts.host.platform : 'host: dead');
     seedNoteEl.textContent = parts.length ? 'Seed: ' + parts.join(' · ') : 'Local-first workspace';
   })();
 

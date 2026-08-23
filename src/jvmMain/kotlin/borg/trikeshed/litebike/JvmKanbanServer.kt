@@ -60,9 +60,16 @@ import kotlin.system.exitProcess
  * side — and is the input that the ProtocolDetector uses to choose the
  * per-request channel.
  */
+/** A fallthrough route: answers a request this server does not own, or returns null to decline. Streaming routes receive `respond`. */
+typealias ExtraRoute = suspend (method: String, path: String, text: String, respond: (suspend (ByteArray) -> Unit)?) -> JvmKanbanServer.HttpResponse?
+
 class JvmKanbanServer(
     /** FlywheelDriver for live Jules surface and cycle report. Nullable so the server can start before the driver. */
     private val flywheelDriver: borg.trikeshed.jules.FlywheelDriver? = null,
+    /** Extension seam: tried after the built-in routes and static assets, first non-null wins (BlackboardWire, VmWire, …). */
+    private val extraRoutes: List<ExtraRoute> = emptyList(),
+    /** Paths (without query) an extra route streams on (SSE): headers + body go straight to `respond`, no Content-Length. */
+    private val streamingPaths: Set<String> = emptySet(),
 ) {
     /** SSE event stream path — collects FlywheelDriver.events as text/event-stream. SURFACE_TTL_MS bounds /api/jules/surface cache life. */
     private companion object {
@@ -252,6 +259,21 @@ class JvmKanbanServer(
                     (text.lineSequence().any { it.startsWith("Accept:") && it.contains("text/event-stream") } ||
                         text.contains("Accept: */*"))
 
+                val isExtraStream = reqParts.getOrNull(0) == "GET" && reqPath.substringBefore('?') in streamingPaths
+                if (isExtraStream) {
+                    // Extension streams (/blackboard/facts, /api/vm/events): the route writes its own headers and events.
+                    val respond: suspend (ByteArray) -> Unit = { bytes -> msg.respond?.invoke(bytes) }
+                    scope.launch {
+                        try {
+                            for (route in extraRoutes) { route("GET", reqPath, text, respond) ?: continue; break }
+                        } catch (_: kotlinx.coroutines.CancellationException) {
+                        } catch (t: Throwable) {
+                            System.err.println("extra stream error: ${t.message}")
+                        }
+                    }
+                    continue
+                }
+
                 if (isSse) {
                     val driver = _driver
                     if (driver == null) {
@@ -334,7 +356,7 @@ class JvmKanbanServer(
 
     // ── routes (single worker, hand-rolled) ──────────────────────────────
 
-    private suspend fun routeHttp(payload: ByteArray): HttpResponse {
+    internal suspend fun routeHttp(payload: ByteArray): HttpResponse {
         val text = String(payload, StandardCharsets.UTF_8)
         val firstLine = text.lineSequence().firstOrNull() ?: ""
         val parts = firstLine.split(' ')
@@ -419,7 +441,9 @@ class JvmKanbanServer(
             "/api/donor"  -> if (method == "POST") submit(text) else HttpResponse(405, """{"error":"method_not_allowed"}""")
             "/api/invoke" -> if (method == "POST") invoke(text) else HttpResponse(405, """{"error":"method_not_allowed"}""")
             "/", "/index.html" -> HttpResponse(200, forgeShellHtml(), "text/html; charset=utf-8")
-            else -> staticAsset(path) ?: HttpResponse(404, """{"error":"not_found","path":"$path"}""")
+            else -> staticAsset(path)
+                ?: extraRoutes.firstNotNullOfOrNull { it(method, path, text, null) }
+                ?: HttpResponse(404, """{"error":"not_found","path":"$path"}""")
         }
     }
 

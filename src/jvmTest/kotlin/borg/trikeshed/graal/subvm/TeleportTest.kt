@@ -1,13 +1,14 @@
 package borg.trikeshed.graal.subvm
 
-import borg.trikeshed.graal.subvm.Teleported.Arr
-import borg.trikeshed.graal.subvm.Teleported.Bool
-import borg.trikeshed.graal.subvm.Teleported.Bytes
-import borg.trikeshed.graal.subvm.Teleported.Num
-import borg.trikeshed.graal.subvm.Teleported.Obj
-import borg.trikeshed.graal.subvm.Teleported.Opaque
-import borg.trikeshed.graal.subvm.Teleported.Real
-import borg.trikeshed.graal.subvm.Teleported.Str
+import borg.trikeshed.vm.Teleported
+import borg.trikeshed.vm.Teleported.Arr
+import borg.trikeshed.vm.Teleported.Bool
+import borg.trikeshed.vm.Teleported.Bytes
+import borg.trikeshed.vm.Teleported.Num
+import borg.trikeshed.vm.Teleported.Obj
+import borg.trikeshed.vm.Teleported.Opaque
+import borg.trikeshed.vm.Teleported.Real
+import borg.trikeshed.vm.Teleported.Str
 import borg.trikeshed.parse.json.JsonSupport
 import org.graalvm.polyglot.Context
 import org.graalvm.polyglot.HostAccess

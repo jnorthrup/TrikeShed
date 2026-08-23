@@ -38,6 +38,9 @@
           <button class="sidebar-item" id="btn-sheet" title="Sheet">
             <span class="sidebar-item-icon" aria-hidden="true">▤</span><span>Sheet</span>
           </button>
+          <button class="sidebar-item" id="btn-host" title="Host">
+            <span class="sidebar-item-icon" aria-hidden="true">⬢</span><span>Host</span>
+          </button>
         </div>
       </div>
       <div class="sidebar-section">
@@ -74,6 +77,7 @@
           <button class="topbar-btn" id="btn-view-graph">Graph</button>
           <button class="topbar-btn" id="btn-view-sheet">Sheet</button>
           <button class="topbar-btn" id="btn-view-shape" aria-label="View Shape">Shape</button>
+          <button class="topbar-btn" id="btn-view-host" aria-label="View Host">Host</button>
           <button class="topbar-btn" id="btn-share">Share</button>
         </div>
       </div>
@@ -111,6 +115,21 @@
         <div class="sheet-empty" id="sheet-empty" hidden>No sheets in the seed.</div>
       </div>
       <div class="shape-scroll" id="shape-scroll" hidden></div>
+      <div class="host-scroll" id="host-scroll" hidden>
+        <div class="host-tiles" id="host-tiles"></div>
+        <h3 class="host-h">Sub-VMs <span class="sheet-count" id="host-vm-count"></span></h3>
+        <div id="host-vms"></div>
+        <form class="host-form" id="host-spawn" autocomplete="off">
+          <input id="host-vm-id" placeholder="id" aria-label="VM id" />
+          <select id="host-vm-facet" aria-label="Language facet"></select>
+          <select id="host-vm-trust" aria-label="Trust"><option value="OWN">OWN · in-process</option><option value="UNTRUSTED">UNTRUSTED · fenced process</option></select>
+          <textarea id="host-vm-src" placeholder="source, e.g. 1+1" aria-label="Source"></textarea>
+          <button type="submit" class="topbar-btn" id="host-vm-run">Spawn + eval</button>
+          <span class="host-live-note" id="host-live-note"></span>
+        </form>
+        <h3 class="host-h">Events</h3>
+        <pre class="host-log" id="host-log" aria-live="polite"></pre>
+      </div>
     </main>
   </div>
 

@@ -1,5 +1,7 @@
 package borg.trikeshed.graal.subvm
 
+import borg.trikeshed.vm.Teleported
+
 import borg.trikeshed.cursor.TypedefProductionSystem
 import borg.trikeshed.dag.ReteFact
 import borg.trikeshed.graal.ConfixBlackboard
@@ -121,6 +123,10 @@ class Hypervisor(
     }
 
     operator fun get(id: String): GuestIsolate = isolates[id] ?: throw IllegalArgumentException("no isolate '$id'")
+    fun find(id: String): GuestIsolate? = isolates[id]
+    fun ids(): List<String> = isolates.keys.sorted()
+    /** Total root-enter heat recorded for an isolate (keys are "<isolate>/<root>"). */
+    fun heat(id: String): Long = heat.entries.sumOf { (k, v) -> if (k.startsWith("$id/")) v else 0L }
     fun trainer(id: String): LeafTrainer? = trainers[id]
     fun lease(id: String): Lease? = leases[id]
 

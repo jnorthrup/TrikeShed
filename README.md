@@ -465,6 +465,12 @@ list in the document + cards on the board), `causalNodes` (→ causal
 graph), and `gallery` (→ widget catalog). The shell note in the sidebar
 bottom shows the seed summary ("13 entities · 13 causal nodes · gallery").
 
+**Host view / sub-VMs** — the common VM API (`borg.trikeshed.vm`: `VmHost` with
+interface-default `discontinued(...)` chokepoints, providers per target, `Teleported` ABI)
+surfaces in the PWA as the Host view and, when served by `./gradlew runKanbanHttpServerJvm`,
+as `/api/vm` (`spawn`, `{id}/eval`, `{id}/revoke`, SSE `events`). Spec = `openapi/forge-host.openapi.yaml`
+(parity-tested against the route table).
+
 **Gallery on GitHub Pages** — `./gradlew generateForgePages` (stage `jvm`
 is the seed bake; `js`/`wasm` add bundles as `./gradlew forgePagesProbe`
 turns green — ratchet list in `gradle/js-target-debt.excludes`). Serve

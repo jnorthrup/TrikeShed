@@ -41,11 +41,11 @@ data class SheetSeed(
     )
 }
 
-/** Any Cursor as one flat sheet. */
-fun sheetSeed(id: String, title: String, cursor: Cursor, parent: String? = null): SheetSeed {
-    if (cursor.size == 0) return SheetSeed(id, title, emptyList(), emptyList(), parent)
+/** Any Cursor as one flat sheet. [columns] names the schema when the cursor is empty (no row-0 exemplar). */
+fun sheetSeed(id: String, title: String, cursor: Cursor, parent: String? = null, columns: List<SheetColumn>? = null): SheetSeed {
+    if (cursor.size == 0) return SheetSeed(id, title, columns ?: emptyList(), emptyList(), parent)
     val exemplar = cursor[0]
-    val columns = (0 until exemplar.size).map { c ->
+    val columns = columns ?: (0 until exemplar.size).map { c ->
         val meta = exemplar[c].b()
         SheetColumn(meta.name.toString(), meta.type.toString())
     }

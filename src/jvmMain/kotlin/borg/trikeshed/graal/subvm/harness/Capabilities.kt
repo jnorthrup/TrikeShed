@@ -8,7 +8,7 @@ import borg.trikeshed.graal.subvm.InProcessIsolate
 import borg.trikeshed.graal.subvm.LeafTrainer
 import borg.trikeshed.graal.subvm.ProcessIsolate
 import borg.trikeshed.graal.subvm.Served
-import borg.trikeshed.graal.subvm.Teleported
+import borg.trikeshed.vm.Teleported
 import borg.trikeshed.pointcut.VmFacet
 import java.io.File
 

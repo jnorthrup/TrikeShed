@@ -1,0 +1,186 @@
+openapi: 3.1.0
+info:
+  title: Forge Host API
+  version: 0.1.0
+  description: The Forge host server (KanbanServerMain = litebike JvmKanbanServer + BlackboardWire + VmWire). Written from the working routes - this file is the refactoring sink, not the source. ForgeHostSpecParityTest fails when the server and this spec disagree.
+servers:
+  - url: http://127.0.0.1:8888
+paths:
+  /api/health:
+    get:
+      operationId: health
+      summary: liveness
+      responses:
+        "200":
+          description: ok
+  /api/cap:
+    get:
+      operationId: capabilities
+      summary: protocols and capabilities of this server
+      responses:
+        "200":
+          description: ok
+  /api/board:
+    get:
+      operationId: board
+      summary: the kanban board projection
+      responses:
+        "200":
+          description: ok
+  /api/metrics:
+    get:
+      operationId: metrics
+      summary: subsystem metrics
+      responses:
+        "200":
+          description: ok
+  /api/jules/surface:
+    get:
+      operationId: julesSurface
+      summary: Jules blackboard surface (sessions and activities)
+      responses:
+        "200":
+          description: ok
+  /api/jules/events:
+    get:
+      operationId: julesEvents
+      summary: FlywheelDriver events as text/event-stream
+      responses:
+        "200":
+          description: SSE
+        "503":
+          description: no driver
+  /api/submit:
+    post:
+      operationId: submit
+      summary: submit a donor markdown for ingest
+      responses:
+        "200":
+          description: ok
+  /api/donor:
+    post:
+      operationId: donor
+      summary: alias of submit
+      responses:
+        "200":
+          description: ok
+  /api/invoke:
+    post:
+      operationId: invoke
+      summary: reactor invoke
+      responses:
+        "200":
+          description: ok
+  /api/vm:
+    get:
+      operationId: vmList
+      summary: every guest as a sheet (VM_COLUMNS rows)
+      responses:
+        "200":
+          description: sheet JSON with id, title, columns and rows
+  /api/vm/spawn:
+    post:
+      operationId: vmSpawn
+      summary: spawn a guest - OWN is an in-process Graal DAG leaf, UNTRUSTED a fenced process isolate
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - id
+                - facet
+              properties:
+                id:
+                  type: string
+                facet:
+                  type: string
+                trust:
+                  type: string
+                statements:
+                  type: integer
+                wallMillis:
+                  type: integer
+      responses:
+        "200":
+          description: id, facet, tier
+        "400":
+          description: bad request
+        "409":
+          description: exists or host dead
+  /api/vm/{id}/eval:
+    post:
+      operationId: vmEval
+      summary: evaluate source in a guest - the value is a canonical Teleported
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - source
+              properties:
+                source:
+                  type: string
+                name:
+                  type: string
+      responses:
+        "200":
+          description: id, cid, value
+        "404":
+          description: no such vm
+        "422":
+          description: guest error
+  /api/vm/{id}/revoke:
+    post:
+      operationId: vmRevoke
+      summary: revoke a guest's lease
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: ok
+        "404":
+          description: no such vm
+  /api/vm/events:
+    get:
+      operationId: vmEvents
+      summary: VmEvent stream (spawned, evaluated, revoked, landed) as text/event-stream
+      responses:
+        "200":
+          description: SSE
+  /blackboard/facts:
+    get:
+      operationId: blackboardFacts
+      summary: blackboard landings since a sequence, as text/event-stream
+      responses:
+        "200":
+          description: SSE
+  /blackboard/assert:
+    post:
+      operationId: blackboardAssert
+      summary: assert facts onto the blackboard
+      responses:
+        "200":
+          description: ok
+        "400":
+          description: empty body
+  /blackboard/sites:
+    get:
+      operationId: blackboardSites
+      summary: site tiles by owner
+      responses:
+        "200":
+          description: ok

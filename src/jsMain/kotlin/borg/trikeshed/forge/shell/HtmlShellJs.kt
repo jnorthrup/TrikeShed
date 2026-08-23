@@ -1,15 +1,17 @@
 package borg.trikeshed.forge.shell
 
+import borg.trikeshed.platform.discontinued
+
 actual object HtmlShell {
     actual fun load(): String {
-        throw UnsupportedOperationException("Synchronous fetch not supported in JS. Use async.")
+        discontinued("shell.load")
     }
 
     actual fun cssAsset(name: String): String {
-        throw UnsupportedOperationException("Synchronous fetch not supported in JS. Use async.")
+        discontinued("shell.load")
     }
 
     actual fun jsAsset(name: String): String {
-        throw UnsupportedOperationException("Synchronous fetch not supported in JS. Use async.")
+        discontinued("shell.load")
     }
 }

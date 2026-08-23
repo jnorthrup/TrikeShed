@@ -240,6 +240,11 @@ object JvmLitebikeBindAdapter {
                             // socket; the registry write closes the connection
                             // (HTTP/1.1 Connection: close semantics).
                             val respond: suspend (ByteArray) -> Unit = { out ->
+                                // An SSE response header turns this connection into a stream: it stays open across
+                                // writes (VmWire /api/vm/events, BlackboardWire /blackboard/facts, Jules events).
+                                if (out.size > 12 && out[0] == 'H'.code.toByte() && String(out, 0, minOf(out.size, 256), Charsets.ISO_8859_1).contains("text/event-stream")) {
+                                    connections.markStreaming(connId)
+                                }
                                 connections.write(connId, out)
                             }
                             // runBlocking is OK from a JDK CompletionHandler because

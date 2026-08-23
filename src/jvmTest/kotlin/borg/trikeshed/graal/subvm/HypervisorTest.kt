@@ -1,8 +1,10 @@
 package borg.trikeshed.graal.subvm
 
+import borg.trikeshed.vm.Teleported
+
 import borg.trikeshed.graal.subvm.LeafTrainer.Phase
-import borg.trikeshed.graal.subvm.Teleported.Num
-import borg.trikeshed.graal.subvm.Teleported.Str
+import borg.trikeshed.vm.Teleported.Num
+import borg.trikeshed.vm.Teleported.Str
 import borg.trikeshed.lib.toList
 import borg.trikeshed.pointcut.PointcutBlackboardAdapter.PointcutLanding
 import borg.trikeshed.pointcut.VmFacet

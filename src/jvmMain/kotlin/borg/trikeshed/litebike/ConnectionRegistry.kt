@@ -69,6 +69,12 @@ class ConnectionRegistry {
      * HTTP/1.1 per-connection semantics. If you want keep-alive,
      * replace the `unregister` call with a reset of `pendingSequenceId`.
      */
+    /** Connections answering a `text/event-stream` response: writes keep them open until one fails. */
+    private val streaming = java.util.concurrent.ConcurrentHashMap.newKeySet<Long>()
+
+    /** Mark [connectionId] as a server-sent-event stream: subsequent [write]s do not close it. */
+    fun markStreaming(connectionId: Long) { if (connections.containsKey(connectionId)) streaming += connectionId }
+
     suspend fun write(connectionId: Long, bytes: ByteArray): Boolean {
         val entry = connections[connectionId] ?: return false
         val channel = entry.channel
@@ -94,6 +100,8 @@ class ConnectionRegistry {
         // to spin: the JDK NIO group completes writes in microseconds
         // for local sockets, and the daemon doesn't have latency SLOs.
         val ok = done.await()
+        if (ok && connectionId in streaming) return true   // SSE: the stream ends when the peer goes away (write fails)
+        streaming.remove(connectionId)
         unregister(connectionId)
         return ok
     }
@@ -103,6 +111,7 @@ class ConnectionRegistry {
      * channel. Idempotent.
      */
     fun unregister(connectionId: Long) {
+        streaming.remove(connectionId)
         val entry = connections.remove(connectionId) ?: return
         runCatching { entry.channel.close() }
         // NioSupervisor permit is released gracefully during drain or explicitly by adapter.

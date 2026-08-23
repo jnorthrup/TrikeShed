@@ -81,6 +81,27 @@ class ForgeAppShellTest {
     }
 
     @Test
+    fun hostsSeedReportsADeadHostHonestlyAndALiveOneAsRows() {
+        fun seedOf(h: String): Map<String, Any?> {
+            val start = h.indexOf("<script id=\"forge-seed\" type=\"application/json\">") + "<script id=\"forge-seed\" type=\"application/json\">".length
+            @Suppress("UNCHECKED_CAST")
+            return JsonSupport.parse(h.substring(start, h.indexOf("</script>", start)).replace("<\\/", "</")) as Map<String, Any?>
+        }
+        fun list(x: Any?): List<*> = (x as? List<*>) ?: (x as Array<*>).toList()
+        val dead = seedOf(ForgeApp.renderHtml(userId = "forge-shell-test", vmHost = borg.trikeshed.vm.VmHost.NONE))["hosts"] as Map<*, *>
+        val deadHost = dead["host"] as Map<*, *>
+        assertEquals(false, deadHost["subVm"])
+        assertEquals("none", deadHost["platform"])
+        assertTrue(list(deadHost["discontinued"]).contains("vm.spawn"), "dead host lists vm.spawn: ${deadHost["discontinued"]}")
+        val live = seedOf(html)["hosts"] as Map<*, *>
+        val liveHost = live["host"] as Map<*, *>
+        assertEquals(true, liveHost["subVm"], "the JVM bake binds the Graal hypervisor")
+        val vms = live["vms"] as Map<*, *>
+        assertEquals(borg.trikeshed.vm.VM_COLUMNS.map { it.first }, list(vms["columns"]).map { (it as Map<*, *>)["name"] })
+        assertTrue(list(live["providers"]).isNotEmpty())
+    }
+
+    @Test
     fun renderIsDeterministicForTheSameUser() {
         // dashboards.nio.checkedAt / flywheel.updatedAt are launch-time clocks; everything else must be stable.
         fun stable(h: String) = h.replace(Regex("\"(checkedAt|updatedAt)\":\\d+"), "\"$1\":0")

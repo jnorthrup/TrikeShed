@@ -11,6 +11,10 @@ import kotlinx.coroutines.launch
 import java.nio.charset.StandardCharsets
 
 class BlackboardWire(val blackboard: ConfixBlackboard, scope: CoroutineScope) {
+    companion object {
+        val ROUTES: List<Pair<String, String>> = listOf("GET" to "/blackboard/facts", "POST" to "/blackboard/assert", "GET" to "/blackboard/sites")
+    }
+
     private val assertChannel = Channel<String>(Channel.UNLIMITED)
     private var sequence = 0L
     

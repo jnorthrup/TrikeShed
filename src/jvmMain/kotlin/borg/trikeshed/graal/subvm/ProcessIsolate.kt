@@ -1,10 +1,11 @@
 package borg.trikeshed.graal.subvm
 
-import borg.trikeshed.graal.subvm.Teleported.Companion.bool
-import borg.trikeshed.graal.subvm.Teleported.Companion.field
-import borg.trikeshed.graal.subvm.Teleported.Companion.int
-import borg.trikeshed.graal.subvm.Teleported.Companion.obj
-import borg.trikeshed.graal.subvm.Teleported.Companion.str
+import borg.trikeshed.vm.Teleported
+
+import borg.trikeshed.vm.bool
+import borg.trikeshed.vm.field
+import borg.trikeshed.vm.int
+import borg.trikeshed.vm.str
 import borg.trikeshed.parse.json.JsonSupport
 import borg.trikeshed.pointcut.VmFacet
 import borg.trikeshed.userspace.nio.process.ProcessCapability
@@ -19,40 +20,8 @@ import java.util.concurrent.atomic.AtomicLong
 import java.util.concurrent.locks.ReentrantLock
 import kotlin.concurrent.withLock
 
-/**
- * Line protocol between a [ProcessIsolate] and its child. One envelope per line, both directions,
- * and the envelope IS a [Teleported.Obj] in canonical form — one encoder, one exact parser, no
- * second JSON library on the wire (a generic parser collapses Num/Real and mangles escapes).
- *
- *   parent → child : {"id":n,"op":"eval","source":..,"name":..} | {"id":n,"op":"call","root":..,"args":[T..]}
- *                    | {"id":n,"op":"delegate","name":..} | {"id":n,"op":"interrupt"} | {"id":n,"op":"stats"} | {"id":n,"op":"close"}
- *                    | {"id":m,"value":T}  /  {"id":m,"error":".."}                          (reply to a host call)
- *   child → parent : {"id":n,"ok":true,"value":T} | {"id":n,"ok":false,"kind":"GUEST_ERROR","error":".."}
- *                    | {"op":"host","id":m,"name":..,"args":[T..]}                          (guest → host delegation)
- *
- * Strictly request/response on the parent side; while a host call is outstanding the parent
- * answers it before sending anything else, so one reader thread and one lock are the whole story.
- */
-object SubVmProtocol {
-    fun encode(envelope: Teleported.Obj): String = envelope.canonical()
-    fun decode(line: String): Teleported.Obj = Teleported.parseCanonical(line) as? Teleported.Obj
-        ?: throw IllegalArgumentException("envelope must be an object: $line")
-
-    /** Lossy adapter for foreign speakers that send generic JSON; a canonical STRING is parsed exactly. */
-    fun teleportOf(v: Any?): Teleported = when (v) {
-        null -> Teleported.Null
-        is Teleported -> v
-        is String -> runCatching { Teleported.parseCanonical(v) }.getOrElse { Teleported.Str(v) }
-        is Boolean -> Teleported.Bool(v)
-        is Number -> if (v is Double || v is Float) Teleported.Real(v.toDouble()) else Teleported.Num(v.toLong())
-        is List<*> -> Teleported.Arr(v.map { teleportOf(it) })
-        is Map<*, *> -> Teleported.Obj(v.entries.associate { it.key.toString() to teleportOf(it.value) })
-        else -> Teleported.Opaque(v.toString())
-    }
-
-    /** The canonical string form — what [teleportOf] parses back exactly. */
-    fun jsonOf(t: Teleported): String = t.canonical()
-}
+/** The wire protocol is common code now; this alias keeps jvm call sites and tests unchanged. */
+typealias SubVmProtocol = borg.trikeshed.vm.SubVmProtocol
 
 /**
  * A guest behind a process wall. The child is either a JVM running [SubVmMain] (the same
@@ -119,8 +88,8 @@ class ProcessIsolate(
         val args = (msg.field("args") as? Teleported.Arr)?.v ?: emptyList()
         val reply = try {
             val fn = delegates[name] ?: error("no host delegate named '$name'")
-            obj("id" to msg.int("id"), "value" to fn(args))
-        } catch (t: Throwable) { obj("id" to msg.int("id"), "error" to (t.message ?: t.toString())) }
+            Teleported.obj("id" to msg.int("id"), "value" to fn(args))
+        } catch (t: Throwable) { Teleported.obj("id" to msg.int("id"), "error" to (t.message ?: t.toString())) }
         send(reply)
     }
 
@@ -129,7 +98,7 @@ class ProcessIsolate(
     private fun roundTrip(vararg fields: Pair<String, Any?>): Teleported = lock.withLock {
         if (!alive) throw GuestException(GuestFailure.DEAD, "child of isolate $id is gone")
         val rid = ids.incrementAndGet()
-        send(obj("id" to rid, *fields))
+        send(Teleported.obj("id" to rid, *fields))
         var reply: Teleported.Obj
         do {
             reply = inbox.poll(replyTimeoutMillis, TimeUnit.MILLISECONDS)
@@ -155,7 +124,7 @@ class ProcessIsolate(
     override fun interrupt(): Boolean {
         if (!alive) return false
         interrupted.incrementAndGet()
-        runCatching { send(obj("id" to ids.incrementAndGet(), "op" to "interrupt")) }
+        runCatching { send(Teleported.obj("id" to ids.incrementAndGet(), "op" to "interrupt")) }
         val answered = inbox.poll(InProcessIsolate.INTERRUPT_GRACE_MS * 2, TimeUnit.MILLISECONDS) != null
         if (!answered) { process.destroyForcibly(); alive = false }
         return true
@@ -165,7 +134,7 @@ class ProcessIsolate(
     override val isAlive: Boolean get() = alive && process.isAlive
 
     override fun close() {
-        runCatching { send(obj("id" to ids.incrementAndGet(), "op" to "close")) }
+        runCatching { send(Teleported.obj("id" to ids.incrementAndGet(), "op" to "close")) }
         if (!process.waitFor(1, TimeUnit.SECONDS)) process.destroyForcibly()
         alive = false
     }
@@ -212,7 +181,7 @@ object SubVmMain {
         val hostBridge: (String) -> ((List<Teleported>) -> Teleported) = { name ->
             { targs ->
                 val hid = ++hostSeq
-                send(obj("op" to "host", "id" to hid, "name" to name, "args" to Teleported.Arr(targs)))
+                send(Teleported.obj("op" to "host", "id" to hid, "name" to name, "args" to Teleported.Arr(targs)))
                 val line = stdin.readLine() ?: error("parent closed")
                 val reply = SubVmProtocol.decode(line)
                 reply.str("error")?.let { error(it) }
@@ -226,21 +195,21 @@ object SubVmMain {
             val rid = m.int("id")
             try {
                 when (m.str("op")) {
-                    "eval" -> send(obj("id" to rid, "ok" to true, "value" to iso.eval(m.str("source") ?: "", m.str("name") ?: "<eval>")))
+                    "eval" -> send(Teleported.obj("id" to rid, "ok" to true, "value" to iso.eval(m.str("source") ?: "", m.str("name") ?: "<eval>")))
                     "call" -> {
                         val targs = (m.field("args") as? Teleported.Arr)?.v ?: emptyList()
-                        send(obj("id" to rid, "ok" to true, "value" to iso.call(m.str("root") ?: "", *targs.toTypedArray())))
+                        send(Teleported.obj("id" to rid, "ok" to true, "value" to iso.call(m.str("root") ?: "", *targs.toTypedArray())))
                     }
-                    "delegate" -> { val name = m.str("name") ?: ""; iso.delegate(name, hostBridge(name)); send(obj("id" to rid, "ok" to true, "value" to null)) }
-                    "interrupt" -> send(obj("id" to rid, "ok" to true, "value" to iso.interrupt()))
-                    "stats" -> send(obj("id" to rid, "ok" to true, "value" to iso.stats().toString()))
-                    "close" -> { send(obj("id" to rid, "ok" to true, "value" to null)); iso.close(); return }
-                    else -> send(obj("id" to rid, "ok" to false, "kind" to "GUEST_ERROR", "error" to "unknown op ${m.str("op")}"))
+                    "delegate" -> { val name = m.str("name") ?: ""; iso.delegate(name, hostBridge(name)); send(Teleported.obj("id" to rid, "ok" to true, "value" to null)) }
+                    "interrupt" -> send(Teleported.obj("id" to rid, "ok" to true, "value" to iso.interrupt()))
+                    "stats" -> send(Teleported.obj("id" to rid, "ok" to true, "value" to iso.stats().toString()))
+                    "close" -> { send(Teleported.obj("id" to rid, "ok" to true, "value" to null)); iso.close(); return }
+                    else -> send(Teleported.obj("id" to rid, "ok" to false, "kind" to "GUEST_ERROR", "error" to "unknown op ${m.str("op")}"))
                 }
             } catch (e: GuestException) {
-                send(obj("id" to rid, "ok" to false, "kind" to e.kind.name, "error" to (e.message ?: e.kind.name)))
+                send(Teleported.obj("id" to rid, "ok" to false, "kind" to e.kind.name, "error" to (e.message ?: e.kind.name)))
             } catch (t: Throwable) {
-                send(obj("id" to rid, "ok" to false, "kind" to "GUEST_ERROR", "error" to (t.message ?: t.toString())))
+                send(Teleported.obj("id" to rid, "ok" to false, "kind" to "GUEST_ERROR", "error" to (t.message ?: t.toString())))
             }
         }
     }

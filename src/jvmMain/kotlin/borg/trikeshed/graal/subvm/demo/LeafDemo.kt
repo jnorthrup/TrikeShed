@@ -8,7 +8,7 @@ import borg.trikeshed.graal.subvm.InProcessIsolate
 import borg.trikeshed.graal.subvm.IsolateStats
 import borg.trikeshed.graal.subvm.LeafTrainer
 import borg.trikeshed.graal.subvm.Served
-import borg.trikeshed.graal.subvm.Teleported
+import borg.trikeshed.vm.Teleported
 import borg.trikeshed.job.ContentId
 import borg.trikeshed.lib.toList
 import borg.trikeshed.pointcut.VmFacet

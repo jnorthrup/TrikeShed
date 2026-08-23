@@ -6,4 +6,5 @@ actual fun loadPlatformHost(): PlatformHost = object : PlatformHost {
         override fun monotonicNanos(): Long = System.now().toEpochMilliseconds() * 1000000L
     }
     override val processors: Int = 1
+    override val resources: Any? get() = PosixResourceSource
 }

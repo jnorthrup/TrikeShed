@@ -1,9 +1,21 @@
 package borg.trikeshed.forge.server
 
+import borg.trikeshed.graal.ConfixBlackboard
+import borg.trikeshed.graal.subvm.Hypervisor
 import borg.trikeshed.litebike.JvmKanbanServer
 import borg.trikeshed.util.JvmForgeIo
+import borg.trikeshed.vm.HypervisorVmHost
+import borg.trikeshed.vm.VmSupervisor
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.runBlocking
 
+/**
+ * The Forge host server: the litebike kanban server plus the two extension wires —
+ * `/blackboard/…` ([BlackboardWire]) and `/api/vm/…` ([VmWire]) — sharing ONE blackboard, so every
+ * sub-VM spawn/revoke/delegation lands where the IDE and the PWA already read facts.
+ */
 object KanbanServerMain {
 
     @JvmStatic
@@ -17,16 +29,15 @@ object KanbanServerMain {
     }
 
     suspend fun run(port: Int, donorPath: String?) {
-        // Out-of-scope finding: JvmKanbanServer binds the port internally and its HTTP routing 
-        // logic is closed for extension. It is impossible to intercept or inject BlackboardWire
-        // routes without modifying JvmKanbanServer.kt (which violates the strict Owns constraint).
-        // Instantiating BlackboardWire here as requested, but it cannot be wired to the port.
-        val wire = BlackboardWire(
-            borg.trikeshed.graal.ConfixBlackboard.empty(), 
-            kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.Default)
-        )
-        
-        // Delegates to canonical Litebike Kanban server boundary
-        JvmKanbanServer().run(port = port, donorPath = donorPath)
+        val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+        val blackboard = ConfixBlackboard.empty()
+        val wire = BlackboardWire(blackboard, scope)
+        val host = HypervisorVmHost(Hypervisor(blackboard = blackboard))
+        VmSupervisor.install(host)   // ForgeApp.renderHtml (served at /) sees the same host the wire serves
+        val vmWire = VmWire(host, scope)
+        JvmKanbanServer(
+            extraRoutes = listOf(vmWire::route, wire::route),
+            streamingPaths = setOf(VmWire.EVENTS_PATH, "/blackboard/facts"),
+        ).run(port = port, donorPath = donorPath)
     }
 }
