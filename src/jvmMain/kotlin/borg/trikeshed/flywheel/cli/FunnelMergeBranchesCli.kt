@@ -150,7 +150,9 @@ private class FunnelMergeBranchesCli(
             gitIn(worktree, "add", "-A", "--", *allTouched.toTypedArray())
             val staged = gitIn(worktree, "diff", "--cached", "--unified=0")
             if (staged.second.lineSequence().any { it.startsWith("+<<<<<<< ") || it == "+=======" || it.startsWith("+>>>>>>> ") }) {
-                System.err.println("[FUNNEL-MERGE] materialized result contains conflict markers — aborting")
+                System.err.println("[FUNNEL-MERGE] materialized result contains conflict markers — N-way result rejected")
+                System.err.println("[FUNNEL-MERGE] falling back to per-arm solo lane for all ${batch.size} batch arms + ${solo.size} sensitive")
+                runSolo(solo + batch, baseSha)
                 return
             }
             if (gitIn(worktree, "diff", "--cached", "--name-only").second.isBlank()) {
