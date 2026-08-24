@@ -46,14 +46,14 @@ td.rev{color:var(--dim);max-width:130px}
 <header><b>Futon</b><span>· trikeshed — the couch, plainly</span><a href="/graal">→ commander console</a></header>
 <div id="bar">
   <input id="prefix" placeholder="id prefix filter (e.g. dropzone/, projects/trikeshed/docs/)" size="42">
-  <button onclick="firstPage()">go</button>
+  <button onclick="firstPage()" title="Apply filter">go</button>
   <button onclick="newDoc()">new document</button>
   <span id="info">…</span>
 </div>
 <div id="wrap">
   <div id="list">
     <table id="docs"><tr><th style="width:66%">_id</th><th>_rev</th></tr></table>
-    <div id="pager"><button onclick="prevPage()" id="prevB">‹ prev</button><button onclick="nextPage()" id="nextB">next ›</button><span id="pageinfo"></span></div>
+    <div id="pager"><button onclick="prevPage()" id="prevB"><span aria-hidden="true">‹</span> prev</button><button onclick="nextPage()" id="nextB">next <span aria-hidden="true">›</span></button><span id="pageinfo"></span></div>
   </div>
   <div id="edit">
     <div class="head">
