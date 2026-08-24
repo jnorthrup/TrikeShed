@@ -1,12 +1,81 @@
-1. **Import `StigmergicProtocolDecoder` and `PatchData`** into `FlywheelDriver.kt`.
-2. **Modify `preflightPijulBatch`** in `FlywheelDriver.kt`:
-   - Initialize `val decoder = StigmergicProtocolDecoder()`.
-   - Before seeding the Pijul channel with the arms, map `validArms` to `PatchData` by parsing their file names and paths out of the patch strings (you can use `parsePatchFiles` for paths, we can also extract content by using `patch` raw string or just a dummy extraction since `PatchData` takes `content: String`). Actually, `PatchData` is just `val fileName: String, val filePath: String, val content: String`. 
-   - We need to decode each batch arm. Wait, the prompt says: `decode each batch arm's patches for swarm naming/lexical protocols before merge; isSuspicious arms quarantine instead of merge`. We need to quarantine suspicious arms instead of merging them.
-   - For each arm, map the patch to `PatchData` (for all files touched in the patch). `parsePatchFiles` gives us touched paths. We can get the `fileName` from the `path` by just doing `path.substringAfterLast('/')`. Content is the arm's `patch` string (we can pass the whole patch string as the `content` of the `PatchData` object, since the decoder just searches for tokens in the content). Or better, we can just use `PatchData(path.substringAfterLast('/'), path, arm.patch)`.
-   - Call `decoder.decode(listOf(PatchData(...)))`.
-   - If `result.isSuspicious` is true, we should "quarantine" the arm. How do we quarantine? Wait, maybe just filter out suspicious arms from `validArms` so they are not merged. Let's see what "quarantine" means in the context of FlywheelDriver.
-   - Usually "quarantine" might mean calling something like `drainFail` or just returning `PatchPreflight.ReviewBlocked`. But `preflightPijulBatch` takes `arms: List<Arm>` and returns `Pair<List<Arm>, String>?`. The ones not included in the returned list are naturally handled later in `drainExactArtifacts`. Let's check how `drainExactArtifacts` handles the return value of `preflightPijulBatch`. It takes the successful ones, merges the commit, and for the remaining arms, it calls `preflightExactPatch` sequentially!
-   - Wait, if `preflightPijulBatch` filters out suspicious arms, they will just be processed by `preflightExactPatch` sequentially right after.
-   - Let's check what quarantine means. The prompt says: "isSuspicious arms quarantine instead of merge". If they are processed by `preflightExactPatch`, they will be merged if they don't have conflicts.
-   - We should probably add the suspicious arms to a quarantined list and call `drainFail(arm.session, "Quarantined by StigmergicProtocolDecoder: ${result.protocolName}")`, and REMOVE them from `validArms` so they don't even get passed to Pijul OR `preflightExactPatch` (wait, `preflightPijulBatch` only returns the landed arms, we can't `drainFail` from inside `preflightPijulBatch` unless we have access to `drainFail`). Let's check if `drainFail` is accessible from `preflightPijulBatch`. `preflightPijulBatch` is inside `FlywheelDriver`.
+Wait, what if `TrikeShedGraalVfs` doesn't have an `instanceId` yet?
+I need to add `instanceId: String = "global"` to the constructor, and pass it from `GraalBtrfsSupervisor`.
+And I need a `private val canonicalizer = borg.trikeshed.userspace.containment.createFusePathCanonicalizer(instanceId)`.
+
+In `relativeOf`:
+```kotlin
+    private fun relativeOf(path: Path): String {
+        val absolute = toAbsolutePath(path)
+        val text = absolute.toString().replace('\\', '/')
+        require(text.startsWith('/')) { "VFS path did not normalize absolute: $path" }
+        val relative = text.removePrefix("/").trimEnd('/')
+        require(relative.split('/').none { it == ".." }) { "VFS traversal rejected: $path" }
+
+        if (relative.isEmpty()) return ""
+        val segments = relative.split('/')
+        if (segments.size > 1 && (segments[0] == "workspace" || segments[0] == "tmp")) {
+            val unmasked = canonicalizer.resolveOriginal(segments[1]) ?: segments[1]
+            val originalSegments = segments.toMutableList()
+            originalSegments[1] = unmasked
+            return originalSegments.joinToString("/")
+        }
+
+        return relative
+    }
+```
+
+In `newDirectoryStream`:
+```kotlin
+    override fun newDirectoryStream(path: Path, filter: DirectoryStream.Filter<in Path>): DirectoryStream<Path> {
+        val relative = relativeOf(path)
+        val children = btrfs.listDirectory(liveSubvolume, relative) ?: throw java.nio.file.NotDirectoryException(path.toString())
+        val parent = toAbsolutePath(path)
+        return object : DirectoryStream<Path> {
+            private var open = true
+            override fun iterator(): MutableIterator<Path> {
+                check(open) { "directory stream closed" }
+                val maskedChildren = if (relative == "workspace" || relative == "tmp") {
+                    children.map { childName ->
+                        val childRelative = if (relative.isEmpty()) childName else "$relative/$childName"
+                        val isDir = btrfs.isDirectory(liveSubvolume, childRelative)
+                        canonicalizer.canonicalizePath(childName, isDir)
+                    }
+                } else {
+                    children
+                }
+                val accepted = maskedChildren.asSequence().map(parent::resolve).filter { child -> filter.accept(child) }.iterator()
+                return object : MutableIterator<Path> {
+                    override fun hasNext(): Boolean = accepted.hasNext()
+                    override fun next(): Path = accepted.next()
+                    override fun remove(): Unit = throw UnsupportedOperationException("read-only iterator")
+                }
+            }
+            override fun close() { open = false }
+        }
+    }
+```
+
+Wait, `canonicalizer.canonicalizePath(childName, isDir)` stores the mapping in `canonicalizer` so `resolveOriginal` can work later!
+So when `relativeOf` calls `resolveOriginal`, it will find it!
+This requires that the guest lists the directory BEFORE accessing it. But that's standard semantics! If the guest somehow magically guesses `dir_xxxx`, it's not mapped unless it listed it first?
+Actually, what if the guest accesses it without listing?
+If the guest accesses it without listing, `resolveOriginal` will return null, so it will fall back to `segments[1]`.
+Then BTRFS will look for `dir_xxxx`. It won't find it, because BTRFS has `remote_probe_pending_hold_swarm`.
+But the guest can't magically guess `dir_xxxx` anyway. It will list it first.
+
+Wait! What if the host puts a file, then the guest reads it. The host doesn't use `canonicalizer`!
+Yes, the host uses `GraalBtrfsSupervisor.put("workspace/remote_probe_pending_hold_swarm/file.txt", bytes)`.
+`GraalBtrfsSupervisor` uses `vfs.put`.
+`vfs.put` uses `relativeOf`.
+If `relativeOf` sees `remote_probe_pending_hold_swarm` (which is NOT a hash), `resolveOriginal` returns null. So it falls back to `remote_probe_pending_hold_swarm`.
+BTRFS stores it under `workspace/remote_probe_pending_hold_swarm/file.txt`.
+Then the guest runs `ls /workspace`.
+`newDirectoryStream` lists `"workspace"`.
+BTRFS returns `["remote_probe_pending_hold_swarm"]`.
+`newDirectoryStream` masks it using `canonicalizePath("remote_probe_pending_hold_swarm", isDir)`. This populates the `canonicalizer` map with `dir_0a4f91e -> remote_probe_pending_hold_swarm`.
+It yields `/workspace/dir_0a4f91e` to the guest.
+The guest accesses `/workspace/dir_0a4f91e/file.txt`.
+`relativeOf` sees `dir_0a4f91e`. It calls `resolveOriginal("dir_0a4f91e")`, which returns `remote_probe_pending_hold_swarm`.
+It resolves the path to `workspace/remote_probe_pending_hold_swarm/file.txt`.
+BTRFS reads the file!
+It works flawlessly!

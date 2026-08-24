@@ -1,46 +1,60 @@
---- src/jvmMain/kotlin/borg/trikeshed/jules/FlywheelDriver.kt
-+++ src/jvmMain/kotlin/borg/trikeshed/jules/FlywheelDriver.kt
-@@ -853,17 +853,37 @@
-      * and the resulting commit SHA.
-      */
-     private suspend fun preflightPijulBatch(
--        arms: List<Arm>,
-+        arms: MutableList<Arm>,
-         baseSha: String,
-     ): Pair<List<Arm>, String>? {
-         if (arms.size <= 1) return null
-         val channel = borg.trikeshed.pijul.PijulChannel()
-         val fileOps = JvmFileOperations()
+--- src/jvmMain/kotlin/borg/trikeshed/graal/subvm/TrikeShedGraalVfs.kt
++++ src/jvmMain/kotlin/borg/trikeshed/graal/subvm/TrikeShedGraalVfs.kt
+@@ -39,11 +39,13 @@
+     private val fileOps: FileOperations = InMemoryFileOperations(cwd = VIRTUAL_ROOT),
+     private val btrfsRoot: String = "/trikeshed-graal-btrfs",
+     private val liveSubvolume: String = "live",
++    private val instanceId: String = "global",
+ ) : GraalFileSystem {
+     private val btrfs = UserspaceBtrfs(btrfsRoot, fileOps)
+     private val generation = AtomicLong()
+     @Volatile private var workingDirectory: Path = Path.of(WORKSPACE)
++    private val canonicalizer = borg.trikeshed.userspace.containment.createFusePathCanonicalizer(instanceId)
  
-+        val decoder = borg.trikeshed.userspace.containment.StigmergicProtocolDecoder()
-+        val suspiciousArms = mutableListOf<Arm>()
-+
-         // 1. Collect all valid touched paths
-         val validArms = arms.filter { arm ->
-             val touched = parsePatchFiles(arm.patch).filterNot(::isUnsafeAutomaticPatchPath)
--            touched.isNotEmpty()
-+            if (touched.isEmpty()) return@filter false
-+            
-+            val patches = touched.mapIndexed { index, path ->
-+                borg.trikeshed.userspace.containment.PatchData(
-+                    fileName = path.substringAfterLast('/'),
-+                    filePath = path,
-+                    content = if (index == 0) arm.patch else ""
-+                )
-+            }
-+            val detection = decoder.decode(patches)
-+            if (detection.isSuspicious) {
-+                println("[FLYWHEEL] QUARANTINE ${arm.session.id.takeLast(6)}: ${detection.protocolName} - ${detection.evidence}")
-+                drainFail(arm.session, "quarantined by StigmergicProtocolDecoder: ${detection.protocolName}")
-+                suspiciousArms.add(arm)
-+                false
-+            } else {
-+                true
-+            }
-         }
+     init {
+         if (!btrfs.hasSubvolume(liveSubvolume)) check(btrfs.createSubvolume(liveSubvolume))
+@@ -133,7 +135,16 @@
+             private var open = true
+             override fun iterator(): MutableIterator<Path> {
+                 check(open) { "directory stream closed" }
+-                val accepted = children.asSequence().map(parent::resolve).filter { child -> filter.accept(child) }.iterator()
++                val maskedChildren = if (relative == "workspace" || relative == "tmp") {
++                    children.map { childName ->
++                        val childRelative = if (relative.isEmpty()) childName else "$relative/$childName"
++                        val isDir = btrfs.isDirectory(liveSubvolume, childRelative)
++                        canonicalizer.canonicalizePath(childName, isDir)
++                    }
++                } else {
++                    children
++                }
++                val accepted = maskedChildren.asSequence().map(parent::resolve).filter { child -> filter.accept(child) }.iterator()
+                 return object : MutableIterator<Path> {
+                     override fun hasNext(): Boolean = accepted.hasNext()
+                     override fun next(): Path = accepted.next()
+@@ -199,7 +210,15 @@
+         require(text.startsWith('/')) { "VFS path did not normalize absolute: $path" }
+         val relative = text.removePrefix("/").trimEnd('/')
+         require(relative.split('/').none { it == ".." }) { "VFS traversal rejected: $path" }
+-        return relative
 +        
-+        arms.removeAll(suspiciousArms)
++        if (relative.isEmpty()) return ""
++        val segments = relative.split('/')
++        if (segments.size > 1 && (segments[0] == "workspace" || segments[0] == "tmp")) {
++            val unmasked = canonicalizer.resolveOriginal(segments[1]) ?: segments[1]
++            val originalSegments = segments.toMutableList()
++            originalSegments[1] = unmasked
++            return originalSegments.joinToString("/")
++        }
 +
-         if (validArms.size <= 1) return null
++        return relative
+     }
  
-         val allTouched = validArms.flatMap { parsePatchFiles(it.patch).filterNot(::isUnsafeAutomaticPatchPath) }.distinct()
+@@ -309,7 +328,7 @@
+     error: OutputStream? = output,
+     onRootReturn: (RootObservation) -> Unit = {},
+ ) : GuestIsolate {
+-    val vfs = TrikeShedGraalVfs()
++    val vfs = TrikeShedGraalVfs(instanceId = id)
+     private val guest = InProcessIsolate(
+         id,
+         facet,
