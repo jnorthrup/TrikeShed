@@ -12,6 +12,9 @@
 #   --repo <path>              repo work tree (default: cwd)
 #   --debug                    attach JDWP on :5005, suspend=n
 #   --suspend                  like --debug but suspend=y (debugger required before main runs)
+#   --hermes-root <path>       Hermes source checkout for /hermes
+#   --hermes-sleeve <path>     GraalPy-safe overlay for /hermes
+#   --hermes-console           eagerly boot the VT220 panel (otherwise lazy)
 #   --aot-cache <file>         load an existing JDK 25 JEP 483 cache
 #   --aot-record <file>        train and write a cache when this daemon exits
 set -euo pipefail

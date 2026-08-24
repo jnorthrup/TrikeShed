@@ -4,6 +4,7 @@ import borg.trikeshed.couch.CouchReportEvent
 import borg.trikeshed.couch.CouchReportReactorElement
 import borg.trikeshed.couch.CouchStore
 import borg.trikeshed.couch.CouchDatabase
+import borg.trikeshed.graal.subvm.HermesCapsule
 import borg.trikeshed.graal.vitals.JvmVitals
 import borg.trikeshed.litebike.JvmKanbanServer
 import borg.trikeshed.lib.get
@@ -37,6 +38,10 @@ import java.nio.charset.StandardCharsets
  *   GET /api/graal/events         SSE: compile / deopt / gc / cpu flourishes, plus store commits
  *   POST /api/graal/ingest?name=… raw bytes → Tika/OCR when binary → store citizen under dropzone/…
  *                                 → plan-shape gate → board cards when it parses as a plan
+ *   POST /api/graal/capsule/spawn {id?}              a hermes sleeve: GraalPy + its own btrfs subvolume
+ *   POST /api/graal/capsule/{id}/stdin {text}         one line typed at the captured shell
+ *   GET  /api/graal/capsule/{id}/output               the VT scrollback so far (poll, not stream)
+ *   POST /api/graal/capsule/{id}/kill                 interrupt + close the guest
  *
  * CLI twin: `borg.trikeshed.graal.vitals.GraalConsoleCli` (vitals | watch) reads the same
  * instrument cluster for a JVM you are inside of.
@@ -146,6 +151,7 @@ class GraalWire(
      */
     suspend fun ingestRoute(method: String, path: String, payload: ByteArray, respond: (suspend (ByteArray) -> Unit)?): JvmKanbanServer.HttpResponse? {
         val p = path.substringBefore('?')
+        if (p == "/api/graal/capsule/list" || p == "/api/graal/capsule/spawn" || p.startsWith("/api/graal/capsule/")) return capsuleRoute(method, p, payload)
         if (p != "/api/graal/ingest") return null
         if (method != "POST") return JvmKanbanServer.HttpResponse(405, """{"error":"method_not_allowed"}""")
         val database = couchDatabase ?: return JvmKanbanServer.HttpResponse(501, """{"error":"no store mounted"}""")
@@ -194,6 +200,43 @@ class GraalWire(
             )))
         } catch (t: Throwable) {
             JvmKanbanServer.HttpResponse(500, JsonSupport.stringify(mapOf("error" to (t.message ?: t.toString()))))
+        }
+    }
+
+    // ── capsule: the hermes sleeve's captured VT shell ────────────
+
+    private fun json(status: Int, v: Any?) = JvmKanbanServer.HttpResponse(status, JsonSupport.stringify(v))
+
+    private fun capsuleRoute(method: String, p: String, payload: ByteArray): JvmKanbanServer.HttpResponse {
+        val tail = p.removePrefix("/api/graal/capsule/")
+        if (tail == "list") {
+            return json(200, mapOf("capsules" to HermesCapsule.registry.map { (id, c) -> mapOf("id" to id, "alive" to c.alive) }))
+        }
+        if (tail == "spawn") {
+            if (method != "POST") return json(405, mapOf("error" to "method_not_allowed"))
+            @Suppress("UNCHECKED_CAST")
+            val body = runCatching { JsonSupport.parse(CouchWire.bodyOf(payload).decodeToString()) as? Map<String, Any?> }.getOrNull().orEmpty()
+            val id = (body["id"] as? String)?.takeIf { it.isNotBlank() } ?: "hermes-${System.currentTimeMillis() % 100000}"
+            if (HermesCapsule.registry[id]?.alive == true) return json(409, mapOf("error" to "already running", "id" to id))
+            val capsule = HermesCapsule(id)
+            HermesCapsule.registry[id] = capsule
+            capsule.start(scope)
+            return json(202, mapOf("ok" to true, "id" to id))
+        }
+        val parts = tail.split('/')
+        val id = parts.getOrNull(0) ?: return json(404, mapOf("error" to "missing capsule id"))
+        val capsule = HermesCapsule.registry[id] ?: return json(404, mapOf("error" to "no such capsule", "id" to id))
+        return when (parts.getOrNull(1)) {
+            "stdin" -> {
+                if (method != "POST") return json(405, mapOf("error" to "method_not_allowed"))
+                @Suppress("UNCHECKED_CAST")
+                val body = runCatching { JsonSupport.parse(CouchWire.bodyOf(payload).decodeToString()) as? Map<String, Any?> }.getOrNull().orEmpty()
+                capsule.type((body["text"] as? String).orEmpty())
+                json(200, mapOf("ok" to true))
+            }
+            "output" -> json(200, mapOf("id" to id, "alive" to capsule.alive, "text" to capsule.output()))
+            "kill" -> { capsule.kill(); json(200, mapOf("ok" to true)) }
+            else -> json(404, mapOf("error" to "unknown capsule route"))
         }
     }
 

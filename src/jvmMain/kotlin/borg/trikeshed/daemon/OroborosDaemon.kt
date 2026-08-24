@@ -57,6 +57,9 @@ import sun.misc.SignalHandler
  *   --watch                 loop forever
  *   --interval-ms <N>       poll cadence (default = 30000)
  *   --max-slots <N>         live session cap (default = 15)
+ *   --hermes-root <path>    Hermes Python source checkout
+ *   --hermes-sleeve <path>  GraalPy-safe overlay root
+ *   --hermes-console        eagerly boot the VT220 Hermes VM panel
  * Positional args (must come last):
  *   forgeHome               default = ~/.local/forge (ForgeHome.defaultHome)
  *   repoDir                 default = cwd
@@ -87,6 +90,9 @@ object OroborosDaemon {
         val intervalMs: Long,
         val maxSlots: Int,
         val kanbanPort: Int,
+        val hermesRoot: String?,
+        val hermesSleeve: String?,
+        val hermesConsole: Boolean,
         val positional: List<String>
     )
 
@@ -109,6 +115,9 @@ object OroborosDaemon {
         var intervalMs = DEFAULT_INTERVAL_MS
         var maxSlots = DEFAULT_MAX_SLOTS
         var kanbanPort = DEFAULT_KANBAN_PORT
+        var hermesRoot: String? = null
+        var hermesSleeve: String? = null
+        var hermesConsole = false
         val positional = mutableListOf<String>()
 
         val flags = listOf(
@@ -129,6 +138,18 @@ object OroborosDaemon {
                 kanbanPort = v
                 i + 1
             },
+            ForgeCliArgs.Flag(name = "--hermes-root", withValue = true) { a, i ->
+                hermesRoot = a[i]
+                i + 1
+            },
+            ForgeCliArgs.Flag(name = "--hermes-sleeve", withValue = true) { a, i ->
+                hermesSleeve = a[i]
+                i + 1
+            },
+            ForgeCliArgs.Flag(name = "--hermes-console") { _, i ->
+                hermesConsole = true
+                i + 1
+            },
         )
 
         when (val r = ForgeCliArgs.parse(args.toList(), flags)) {
@@ -136,7 +157,7 @@ object OroborosDaemon {
             ForgeCliArgs.Result.Help -> { usage(); exitProcess(0) }
             is ForgeCliArgs.Result.Error -> die(r.message)
         }
-        return DaemonConfig(watch, intervalMs, maxSlots, kanbanPort, positional)
+        return DaemonConfig(watch, intervalMs, maxSlots, kanbanPort, hermesRoot, hermesSleeve, hermesConsole, positional)
     }
 
     @JvmStatic
@@ -337,6 +358,18 @@ object OroborosDaemon {
         borg.trikeshed.vm.VmSupervisor.install(vmHost)
         val wireScope = CoroutineScope(SupervisorJob(coroutineContext[kotlinx.coroutines.Job]) + Dispatchers.Default)
         val vmWire = borg.trikeshed.forge.server.VmWire(vmHost, wireScope)
+        val hermesConsole = borg.trikeshed.hermes.HermesVmConsole(
+            root = File(
+                config.hermesRoot ?: System.getenv("HERMES_SOURCE_ROOT")
+                ?: File(home, ".hermes/hermes-agent").absolutePath,
+            ).toPath(),
+            sleeve = File(
+                config.hermesSleeve ?: System.getenv("HERMES_GRAAL_SLEEVE")
+                ?: File(repoDir, "graalpy-sleeve/hermes").absolutePath,
+            ).toPath(),
+        )
+        val hermesWire = borg.trikeshed.forge.server.HermesConsoleWire(hermesConsole, wireScope)
+        if (config.hermesConsole) wireScope.launch(Dispatchers.IO) { hermesConsole.open() }
         val reportReactorForWires = CouchReportReactorElement(parentJob = coroutineContext[kotlinx.coroutines.Job])
         launch { reportReactorForWires.open() }
         val graalWire = borg.trikeshed.forge.server.GraalWire(
@@ -350,11 +383,12 @@ object OroborosDaemon {
 
         val kanbanServer = JvmKanbanServer(
             driver,
-            extraRoutes = listOf(graalWire::route, vmWire::route),
+            extraRoutes = listOf(graalWire::route, vmWire::route, hermesWire::route),
             rawRoutes = listOf(graalWire::ingestRoute, couchWire::route),
             streamingPaths = borg.trikeshed.forge.server.CouchWire.streamingPaths(COUCH_DB_NAME) +
                 borg.trikeshed.forge.server.GraalWire.STREAMING +
-                setOf(borg.trikeshed.forge.server.VmWire.EVENTS_PATH),
+                setOf(borg.trikeshed.forge.server.VmWire.EVENTS_PATH) +
+                borg.trikeshed.forge.server.HermesConsoleWire.STREAMING,
             maxRequestBatch = 4096,
         )
         val kanbanJob = SupervisorJob(coroutineContext[kotlinx.coroutines.Job])
@@ -905,6 +939,7 @@ object OroborosDaemon {
                 if (healthSock.exists()) healthSock.delete()
                 try { traceWriter?.flush(); traceWriter?.close() } catch (_: Exception) {}
                 runCatching { kanbanJob.cancel() }
+                runCatching { hermesConsole.close() }
                 runCatching { reportReactor.close() }
                 runCatching { memoryIndex.close() }
                 runCatching { worktreeReconcileElement.close() }
@@ -965,8 +1000,10 @@ object OroborosDaemon {
 
     private fun usage() {
         System.err.println(
-            """usage: OroborosDaemon [--once | --watch] [--interval-ms N] [--max-slots N] [--kanban-port N] [forgeHome] [repoDir]
+            """usage: OroborosDaemon [--once | --watch] [--interval-ms N] [--max-slots N] [--kanban-port N]
+              [--hermes-root PATH] [--hermes-sleeve PATH] [--hermes-console] [forgeHome] [repoDir]
               env: JULES_API_KEY (required)
+                   HERMES_SOURCE_ROOT / HERMES_GRAAL_SLEEVE (optional)
               forgeHome default: ~/.local/forge (ForgeHome.defaultHome)
               repoDir  default: cwd
               kanban-port default: 8888"""

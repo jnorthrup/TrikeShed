@@ -195,11 +195,15 @@ class Vt220MediaPatchPanel(
             timestampMs = timestampMs,
             lane = lane,
             kind = kind,
-            payload = payload,
+            payload = payload.take(MAX_SIGNAL_PAYLOAD),
             causeSignalId = causeSignalId,
         )
         history.addLast(signal)
         while (history.size > signalLimit) history.removeFirst()
         return signal
+    }
+
+    companion object {
+        const val MAX_SIGNAL_PAYLOAD: Int = 4_096
     }
 }

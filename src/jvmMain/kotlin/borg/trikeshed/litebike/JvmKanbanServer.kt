@@ -393,7 +393,8 @@ class JvmKanbanServer(
         val path = parts.getOrNull(1) ?: "/"
         // Store-hosted app first: a raw route (CouchWire) that owns `/` or an asset wins over the
         // classpath shell, exactly as a CouchApp vhost would. `/api/…` built-ins stay authoritative.
-        if (!path.startsWith("/api/") || path.startsWith("/api/v0/") || path.startsWith("/api/graal/ingest")) {
+        if (!path.startsWith("/api/") || path.startsWith("/api/v0/") ||
+            path.startsWith("/api/graal/ingest") || path.startsWith("/api/graal/capsule")) {
             rawRoutes.firstNotNullOfOrNull { it(method, path, payload, null) }?.let { return it }
         }
         return when (path.substringBefore('?')) {

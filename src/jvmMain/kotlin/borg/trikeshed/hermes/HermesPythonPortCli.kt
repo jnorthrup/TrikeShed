@@ -18,6 +18,26 @@ object HermesPythonPortCli {
         val queue = Path.of(value(options, "--queue") ?: "build/reports/hermes-graalpy-sleeve-queue.json").toAbsolutePath().normalize()
         val sleeve = Path.of(value(options, "--sleeve") ?: "graalpy-sleeve/hermes").toAbsolutePath().normalize()
         val entry = value(options, "--entry")
+        val consoleMode = "--console" in options
+        val command = value(options, "--command")
+        if (consoleMode || command != null) {
+            val columns = value(options, "--columns")?.toIntOrNull()?.coerceIn(20, 300) ?: 100
+            val rows = value(options, "--rows")?.toIntOrNull()?.coerceIn(4, 120) ?: 32
+            HermesVmConsole(root, sleeve, columns, rows).use { console ->
+                console.open()
+                if (command != null) console.submit(command)
+                renderConsole(console)
+                if (consoleMode && command == null) {
+                    while (true) {
+                        val line = readlnOrNull() ?: break
+                        if (line == ":quit" || line == ":exit") break
+                        console.submit(line)
+                        renderConsole(console)
+                    }
+                }
+            }
+            return
+        }
         val previous = previousOntology(report)
         Files.createDirectories(sleeve)
 
@@ -90,5 +110,11 @@ object HermesPythonPortCli {
         val index = args.indexOf(name)
         require(index < 0 || index + 1 < args.size) { "$name requires a value" }
         return if (index < 0) null else args[index + 1]
+    }
+
+    private fun renderConsole(console: HermesVmConsole) {
+        print("\u001b[2J\u001b[H")
+        println(console.panel.terminal.plainText())
+        System.out.flush()
     }
 }

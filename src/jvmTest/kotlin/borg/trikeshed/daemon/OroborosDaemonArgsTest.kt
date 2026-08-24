@@ -19,5 +19,17 @@ class OroborosDaemonArgsTest {
         val config = OroborosDaemon.parseConfig(args)
         assertEquals(5000L, config.intervalMs)
     }
+
+    @Test
+    fun hermesVt220PathsAndEagerBootAreExplicitDaemonParameters() {
+        val config = OroborosDaemon.parseConfig(arrayOf(
+            "--hermes-root", "/source/hermes",
+            "--hermes-sleeve", "/sleeve/hermes",
+            "--hermes-console",
+        ))
+        assertEquals("/source/hermes", config.hermesRoot)
+        assertEquals("/sleeve/hermes", config.hermesSleeve)
+        assertEquals(true, config.hermesConsole)
+    }
 }
  

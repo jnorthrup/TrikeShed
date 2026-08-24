@@ -601,7 +601,7 @@ registerJulesCli("julesReviewReport", "borg.trikeshed.jules.JulesPatchReviewCli"
 
 tasks.register<JavaExec>("portHermesPython") {
     group = "subvm"
-    description = "Project Hermes Python modules into the no-native GraalPy blackboard VM; --args forwards --root/--report/--entry."
+    description = "Project Hermes into no-native GraalPy; --args forwards --root/--sleeve/--entry or --console/--command/--columns/--rows."
     mainClass.set("borg.trikeshed.hermes.HermesPythonPortCli")
     dependsOn("jvmJar")
     classpath(tasks.named("jvmJar"), configurations.getByName("jvmRuntimeClasspath"))

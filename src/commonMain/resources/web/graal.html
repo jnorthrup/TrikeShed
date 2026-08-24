@@ -100,6 +100,13 @@ canvas.spark{display:block;margin-top:3px}
 #vms{right:320px;top:78px;width:430px;max-height:50%}
 #sheet{left:10px;top:78px;width:480px;max-height:74%}
 #ledger{right:320px;top:78px;width:560px;max-height:74%}
+#vt{left:50%;top:12%;transform:translateX(-50%);width:min(720px,86vw);height:60vh}
+#vt .body{display:flex;flex-direction:column;height:100%}
+#vtScroll{flex:1;overflow:auto;margin:0;padding:10px 12px;background:#0a0c0a;color:#c8f7c5;font:12px/1.5 "SF Mono","JetBrains Mono",ui-monospace,monospace;white-space:pre-wrap;word-break:break-all}
+#vtLine{display:flex;align-items:center;gap:6px;background:#0a0c0a;border-top:1px solid #1c2a1c;padding:6px 12px}
+#vtPrompt{color:#5fe86a;font:12px monospace}
+#vtInput{flex:1;background:transparent;border:0;outline:0;color:#eafcea;font:12px "SF Mono","JetBrains Mono",ui-monospace,monospace}
+#vt.dead #vtScroll{color:#f7c5c5}
 #aot{right:320px;top:78px;width:560px;max-height:74%}
 #sheet td:first-child{white-space:pre}
 .dagchip{display:inline-block;border:1px solid var(--line);border-radius:3px;padding:0 6px;margin:2px 3px 0 0;cursor:pointer;font-size:10px}
@@ -140,6 +147,7 @@ html[data-skin="marker"] #crumb{text-shadow:none}
   <div class="chip" id="cVm"><b>–</b><span>sub-vms</span></div>
   <div class="chip" id="cDocs"><b>–</b><span>documents</span></div>
   <div class="chip" id="cAot" onclick="toggleAot()" style="cursor:pointer"><b>–</b><span>aot cache</span></div>
+  <div class="chip" id="cHermes" onclick="hermesRunner()" style="cursor:pointer"><b>VT220</b><span>hermes vm</span></div>
 </div>
 <div id="river"></div>
 <div class="panel" id="doc"><header><b id="docTitle">document</b><span class="x" onclick="hide('doc')">✕</span></header><div class="body"><div id="docBody"></div></div></div>
@@ -151,7 +159,8 @@ html[data-skin="marker"] #crumb{text-shadow:none}
 <div id="notion"><div class="nhead"><input id="nfilter" placeholder="filter entries…"><span id="nscope"></span></div><div class="nbody" id="nbody"></div></div>
 <canvas id="mini" width="200" height="124"></canvas>
 <div id="crumb">loading terrain…</div>
-<div id="help"><b>wheel</b> zoom · <b>drag</b> pan · <b>dblclick</b> dive · <b>click</b> inspect+edges · <b>0</b> fit · <b>T</b> tree sheet · <b>L</b> ledger · <b>P</b> pointcuts · <b>V</b> vms · <b>A</b> AOT · <b>M</b> mode · <b>1/2/3</b> layer · <b>F</b> fog · <b>B</b> skin · <a href="/futon" style="color:var(--dim)">futon ↗</a></div>
+<div id="help"><b>wheel</b> zoom · <b>drag</b> pan · <b>dblclick</b> dive · <b>click</b> inspect+edges · <b>0</b> fit · <b>T</b> tree sheet · <b>L</b> ledger · <b>P</b> pointcuts · <b>V</b> vms · <b>H</b> Hermes VT220 · <b>A</b> AOT · <b>M</b> mode · <b>1/2/3</b> layer · <b>F</b> fog · <b>B</b> skin · <a href="/futon" style="color:var(--dim)">futon ↗</a></div>
+<div class="panel" id="vt"><header><b id="vtTitle">hermes vt</b><span><span class="x" onclick="vtKill()" title="interrupt + close the guest" style="margin-right:10px">⏻ kill</span><span class="x" onclick="hide('vt')">✕</span></span></header><div class="body" id="vtBody" style="padding:0"><pre id="vtScroll"></pre><div id="vtLine"><span id="vtPrompt">#</span><input id="vtInput" autocomplete="off" spellcheck="false"></div></div></div>
 <script>
 'use strict';
 const $=id=>document.getElementById(id);
@@ -563,6 +572,7 @@ addEventListener('keydown',e=>{
   if(e.key==='0')fit();
   if(e.key==='p'||e.key==='P')togglePoints();
   if(e.key==='v'||e.key==='V')toggleVms();
+  if(e.key==='h'||e.key==='H')hermesRunner();
   if(e.key==='a'||e.key==='A')toggleAot();
   if(e.key==='t'||e.key==='T')treeSheet();
   if(e.key==='l'||e.key==='L')ledger();
@@ -876,14 +886,7 @@ async function vmEval(id){
 }
 async function vmRevoke(id){vmBusyStart('revoking '+id);await vmPost('/api/vm/'+encodeURIComponent(id)+'/revoke',{reason:'console'});vmBusyEnd();}
 async function hermesRunner(){
-  const id='hermes-'+(Date.now()%1000);
-  $('vmId').value=id;$('vmFacet').value='python';
-  vmBusyStart('launching hermes runner '+id);
-  const ok=await vmPost('/api/vm/spawn',{id,facet:'python',statements:200000,wallMillis:30000});
-  if(ok){$('vmSrc').value="import sys\n'hermes sleeve alive on graalpy ' + sys.version.split()[0]";
-    vmBusyStart('probing hermes runner '+id);
-    await vmPost('/api/vm/'+encodeURIComponent(id)+'/eval',{source:$('vmSrc').value,name:'console'});}
-  vmBusyEnd();
+  window.location.href='/hermes';
 }
 function renderVms(){
   const cols=(vmSheet.columns||[]).map(c=>c.name);
@@ -891,16 +894,54 @@ function renderVms(){
   $('vmsBody').innerHTML=
     '<div class="vmctl"><input id="vmId" placeholder="id" size="8"><select id="vmFacet"><option value="js">js</option><option value="python">python</option></select>'+
     '<input id="vmStmts" value="10000" size="7" title="statement budget"><button onclick="vmSpawn()">spawn</button>'+
-    '<button class="vmbtn" onclick="hermesRunner()" title="spawn a GraalPy sleeve and probe it">⚗ hermes runner</button></div>'+
+    '<button class="vmbtn" onclick="hermesRunner()" title="open the real supervised Hermes VT220 console">▣ hermes VT220</button></div>'+
     (rows.length?'<table><tr>'+cols.map(c=>'<th>'+esc(c)+'</th>').join('')+'<th></th></tr>'+
       rows.map(r=>{const id=r[0];return '<tr>'+r.map(v=>'<td>'+esc((v??'').toString().slice(0,26))+'</td>').join('')+
         '<td><button class="vmbtn" onclick="vmEval(\''+esc(id)+'\')">eval</button> <button class="vmbtn" onclick="vmRevoke(\''+esc(id)+'\')">revoke</button></td></tr>';}).join('')+'</table>'
-      :'<i style="color:var(--dim)">no guests — spawn one, or hit the hermes runner</i>')+
+      :'<i style="color:var(--dim)">no generic guests — Hermes has its own VT220 panel</i>')+
     '<div class="vmctl" style="margin-top:8px"><textarea id="vmSrc" placeholder="source to eval on a guest…"></textarea><span id="vmSpinner" class="vmspin" style="display:none" title="run in flight"></span></div>'+
     '<div id="vmOut"></div><div style="color:var(--dim);font-size:10px;margin:6px 0 2px">run log</div><div id="vmLog"></div>';
   $('vmLog').innerHTML=vmLog.map(x=>'<div class="vmline '+x.vmKind+'"><span class="t">'+new Date(x.at||Date.now()).toTimeString().slice(0,8)+'</span><span class="k">'+x.vmKind+'</span><span>'+esc(x.vmId||'')+'</span><span style="color:var(--dim)">'+esc(vmDetail(x))+'</span></div>').join('');
 }
 function toggleVms(){const p=$('vms');if(p.style.display==='flex')return hide('vms');renderVms();show('vms');}
+/* ── the hermes VT: a home-grown terminal over HermesCapsule (no PTY, no CDN — offline-safe) ── */
+let vtId=null,vtPoll=null,vtLastLen=-1;
+async function vtOpen(id){
+  vtId=id;$('vtTitle').textContent='hermes vt — '+id;$('vt').classList.remove('dead');
+  $('vtScroll').textContent='';vtLastLen=-1;show('vt');$('vtInput').focus();
+  if(vtPoll)clearInterval(vtPoll);
+  vtPoll=setInterval(vtTick,350);vtTick();
+}
+async function vtTick(){
+  if(!vtId)return;
+  try{
+    const r=await fetch('/api/graal/capsule/'+encodeURIComponent(vtId)+'/output');
+    const j=await r.json();
+    if(j.text!==undefined&&j.text.length!==vtLastLen){
+      vtLastLen=j.text.length;
+      const el=$('vtScroll');const atBottom=el.scrollTop+el.clientHeight>=el.scrollHeight-6;
+      el.textContent=j.text;
+      if(atBottom)el.scrollTop=el.scrollHeight;
+    }
+    if(j.alive===false){$('vt').classList.add('dead');clearInterval(vtPoll);vtPoll=null;}
+  }catch(e){}
+}
+async function vtSend(){
+  const inp=$('vtInput');const text=inp.value;inp.value='';
+  if(!vtId||!text)return;
+  await fetch('/api/graal/capsule/'+encodeURIComponent(vtId)+'/stdin',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({text})});
+  vtTick();
+}
+async function vtKill(){
+  if(!vtId)return;
+  await fetch('/api/graal/capsule/'+encodeURIComponent(vtId)+'/kill',{method:'POST'});
+  vtTick();
+}
+$('vtInput').addEventListener('keydown',e=>{
+  if(e.key==='Enter')vtSend();
+  else if(e.key==='Escape')hide('vt');
+  e.stopPropagation(); // don't let the map's global keydown (1/2/3/M/F/B…) eat terminal keystrokes
+});
 async function togglePoints(){const p=$('points');if(p.style.display==='flex')return hide('points');
   try{const r=await (await fetch('/api/graal/pointcuts')).json();
     const routes=r.routes||[];

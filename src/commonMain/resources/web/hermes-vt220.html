@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Hermes VT220 · TrikeShed</title>
+<style>
+:root{--bg:#090b10;--panel:#11151e;--line:#293142;--ink:#d8dce6;--dim:#7d879a;--amber:#f2a011;--green:#3ddc84;--red:#ff5964;--cyan:#3fd0ff}
+*{box-sizing:border-box} html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font:13px/1.4 ui-monospace,SFMono-Regular,Menlo,monospace}
+body{display:grid;grid-template-rows:auto 1fr auto;overflow:hidden}
+header{display:flex;align-items:center;gap:10px;padding:7px 10px;background:var(--panel);border-bottom:1px solid var(--line)}
+header b{color:var(--amber)} .badge{border:1px solid var(--line);border-radius:3px;padding:2px 6px;color:var(--dim)}
+button,input{font:inherit;color:var(--ink);background:#171d28;border:1px solid var(--line);border-radius:3px;padding:4px 8px} button{cursor:pointer} button:hover{border-color:var(--amber);color:var(--amber)}
+main{min-height:0;display:grid;grid-template-columns:minmax(500px,1fr) 310px;gap:1px;background:var(--line)}
+#terminalPanel{min-width:0;background:#050607;display:flex;flex-direction:column}
+#screenWrap{flex:1;min-height:0;overflow:auto;padding:10px;display:flex;align-items:flex-start;justify-content:center}
+#screen{outline:none;background:#000;color:#d8dce6;padding:5px 6px;box-shadow:0 0 0 1px #222,0 0 28px rgba(63,208,255,.05);font:14px/1.15 ui-monospace,SFMono-Regular,Menlo,monospace;font-variant-ligatures:none;user-select:text}
+.termrow{height:1.15em;white-space:pre}.cell{display:inline-block;width:.61em;height:1.15em;overflow:visible;vertical-align:top}.cursor{outline:1px solid var(--amber);background:rgba(242,160,17,.35)!important}.blink{animation:blink 1s steps(1) infinite}@keyframes blink{50%{opacity:.15}}
+#rails{min-height:0;background:var(--panel);display:grid;grid-template-rows:auto 1fr 1fr}
+#rails h2{font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--dim);margin:0;padding:8px 10px;border-bottom:1px solid var(--line)}
+.rail{overflow:auto;border-bottom:1px solid var(--line);padding:5px}.sig{padding:5px 7px;margin:3px 0;border-left:3px solid var(--dim);background:#161b25;font-size:10px;word-break:break-word}.sig.manual{border-color:var(--amber)}.sig.causal{border-color:var(--cyan)}.sig.failed{border-color:var(--red)}.sig .id{color:var(--dim)}.sig .cause{color:var(--cyan)}
+footer{display:flex;gap:8px;padding:8px 10px;background:var(--panel);border-top:1px solid var(--line)}#command{flex:1}.help{color:var(--dim);padding:4px}.ok{color:var(--green)}.bad{color:var(--red)}
+@media(max-width:900px){main{grid-template-columns:1fr}#rails{display:none}}
+@media(prefers-reduced-motion:reduce){.blink{animation:none}}
+</style>
+</head>
+<body>
+<header><b>HERMES · VT220</b><span id="state" class="badge">closed</span><span id="geometry" class="badge">–</span><span id="revision" class="badge">rev 0</span><button id="open">boot GraalPy sleeve</button><a href="/graal" style="color:var(--dim);margin-left:auto">Graal console ↗</a></header>
+<main>
+  <section id="terminalPanel"><div id="screenWrap"><div id="screen" tabindex="0" role="application" aria-label="Hermes VT220 terminal"></div></div></section>
+  <aside id="rails"><h2>manual ↔ causal LCNC patch panel</h2><div id="manualRail" class="rail"></div><div id="causalRail" class="rail"></div></aside>
+</main>
+<footer><input id="command" autocomplete="off" spellcheck="false" placeholder="Hermes prompt or :help"><button id="send">send</button><span class="help">Enter send · ↑ history · Ctrl-L clear</span></footer>
+<script>
+'use strict';
+const $=id=>document.getElementById(id);
+let model={rows:24,columns:80,revision:0,cursor:{row:0,column:0,visible:true},lines:[],state:'closed'},lastCursor={row:-1,column:-1},history=[],historyAt=0;
+const ANSI16=['#000000','#cd3131','#0dbc79','#e5e510','#2472c8','#bc3fbc','#11a8cd','#e5e5e5','#666666','#f14c4c','#23d18b','#f5f543','#3b8eea','#d670d6','#29b8db','#ffffff'];
+function color(index,rgb,fallback){if(rgb!=null)return '#'+Number(rgb).toString(16).padStart(6,'0');if(index<0)return fallback;if(index<16)return ANSI16[index];if(index>=232){const v=8+(index-232)*10;return `rgb(${v},${v},${v})`}const n=index-16,r=Math.floor(n/36),g=Math.floor(n%36/6),b=n%6,f=x=>x?55+x*40:0;return `rgb(${f(r)},${f(g)},${f(b)})`}
+function blank(){return{text:' ',continuation:false,fg:-1,bg:-1,bold:false,faint:false,italic:false,underline:false,blink:false,inverse:false,concealed:false,crossedOut:false}}
+function normalize(){while(model.lines.length<model.rows)model.lines.push(Array.from({length:model.columns},blank));for(let r=0;r<model.rows;r++){while(model.lines[r].length<model.columns)model.lines[r].push(blank());model.lines[r].length=model.columns}}
+function cellSpan(cell,r,c){const s=document.createElement('span');s.className='cell'+(cell.blink?' blink':'')+(model.cursor.visible&&model.cursor.row===r&&model.cursor.column===c?' cursor':'');let fg=color(cell.fg,cell.fgRgb,'#d8dce6'),bg=color(cell.bg,cell.bgRgb,'#000');if(cell.inverse){const t=fg;fg=bg;bg=t}s.style.color=cell.concealed?bg:fg;s.style.backgroundColor=bg;s.style.fontWeight=cell.bold?'700':'400';s.style.opacity=cell.faint?'.65':'1';s.style.fontStyle=cell.italic?'italic':'normal';s.style.textDecoration=[cell.underline?'underline':'',cell.crossedOut?'line-through':''].filter(Boolean).join(' ');s.textContent=cell.continuation?'':(cell.text||' ');return s}
+function renderRows(rows){normalize();for(const r of rows){if(r<0||r>=model.rows)continue;let line=$('screen').children[r];if(!line){line=document.createElement('div');line.className='termrow';$('screen').appendChild(line)}line.replaceChildren(...model.lines[r].map((c,i)=>cellSpan(c,r,i)))}while($('screen').children.length>model.rows)$('screen').lastChild.remove();$('geometry').textContent=model.columns+'×'+model.rows;$('revision').textContent='rev '+model.revision}
+function snapshot(x){const p=x.panel||x;model.state=x.state||model.state;model.rows=p.rows||model.rows;model.columns=p.columns||model.columns;model.revision=p.revision||0;model.cursor=p.cursor||model.cursor;model.lines=p.lines||[];$('state').textContent=model.state;$('state').className='badge '+(model.state==='ready'?'ok':model.state==='failed'?'bad':'');renderRows(Array.from({length:model.rows},(_,i)=>i));lastCursor={...model.cursor};for(const s of x.signals||[])signal(s)}
+function patches(ps){const touched=new Set([lastCursor.row,model.cursor.row]);for(const p of ps||[]){model.revision=Math.max(model.revision,p.revision||0);if(!model.lines[p.y])model.lines[p.y]=Array.from({length:model.columns},blank);for(let i=0;i<(p.cells||[]).length;i++)if(p.x+i<model.columns)model.lines[p.y][p.x+i]=p.cells[i];touched.add(p.y)}renderRows([...touched]);lastCursor={...model.cursor}}
+function signal(s){if(!s||document.querySelector('[data-signal="'+CSS.escape(s.id)+'"]'))return;const div=document.createElement('div');div.className='sig '+s.lane+(s.kind==='failed'?' failed':'');div.dataset.signal=s.id;const preview=(s.payload||'').replace(/[\x00-\x1f\x7f]/g,' ').slice(0,160);div.innerHTML='<b>'+escapeHtml(s.kind)+'</b> <span class="id">#'+escapeHtml((s.id||'').replace('sha256:','').slice(0,10))+'</span>'+(s.causeSignalId?'<div class="cause">← '+escapeHtml(s.causeSignalId.replace('sha256:','').slice(0,10))+'</div>':'')+'<div>'+escapeHtml(preview)+'</div>';const rail=s.lane==='manual'?$('manualRail'):$('causalRail');rail.prepend(div);while(rail.children.length>100)rail.lastChild.remove()}
+function escapeHtml(x){return String(x??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/"/g,'&quot;')}
+async function load(){try{const r=await fetch('/api/hermes/terminal');snapshot(await r.json())}catch(e){$('state').textContent='offline'}}
+async function boot(){await fetch('/api/hermes/terminal/open',{method:'POST'});$('state').textContent='booting'}
+async function send(){const command=$('command').value;if(!command)return;history.push(command);historyAt=history.length;$('command').value='';await fetch('/api/hermes/terminal/input',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({command})})}
+$('open').onclick=boot;$('send').onclick=send;$('command').onkeydown=e=>{if(e.key==='Enter'){e.preventDefault();send()}else if(e.key==='ArrowUp'){e.preventDefault();if(historyAt>0)$('command').value=history[--historyAt]||''}else if(e.key==='ArrowDown'){e.preventDefault();if(historyAt<history.length)$('command').value=history[++historyAt]||''}else if(e.ctrlKey&&e.key.toLowerCase()==='l'){e.preventDefault();$('command').value=':clear';send()}};$('screen').onclick=()=>$('command').focus();
+let resizeTimer;function fitGeometry(){clearTimeout(resizeTimer);resizeTimer=setTimeout(async()=>{const wrap=$('screenWrap').getBoundingClientRect(),probe=document.createElement('span');probe.className='cell';probe.textContent='M';$('screen').appendChild(probe);const box=probe.getBoundingClientRect();probe.remove();const columns=Math.max(20,Math.min(220,Math.floor((wrap.width-32)/(box.width||8.5)))),rows=Math.max(6,Math.min(80,Math.floor((wrap.height-30)/(box.height||16))));if(columns!==model.columns||rows!==model.rows)await fetch('/api/hermes/terminal/resize',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({columns,rows})})},250)}addEventListener('resize',fitGeometry);
+function connect(){const es=new EventSource('/api/hermes/terminal/events');es.onmessage=e=>{const x=JSON.parse(e.data);if(x.kind==='state'){$('state').textContent=x.state;$('state').className='badge '+(x.state==='ready'?'ok':x.state==='failed'?'bad':'')}else if(x.kind==='manual')signal(x.signal);else if(x.kind==='causal'){signal(x.signal);if(x.terminal){model.cursor=x.terminal.cursor||model.cursor;model.revision=x.terminal.revision||model.revision;model.columns=x.terminal.columns||model.columns;model.rows=x.terminal.rows||model.rows;if(x.terminal.title)document.title=x.terminal.title}patches(x.patches)}};es.onerror=()=>{es.close();load();setTimeout(connect,1500)}}
+load().then(fitGeometry);setInterval(load,10000);connect();$('command').focus();
+</script>
+</body>
+</html>

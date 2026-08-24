@@ -49,20 +49,24 @@ class HermesVmConsole(
     val events: SharedFlow<Event> = _events.asSharedFlow()
     @Volatile var state: State = State.CLOSED; private set
     @Volatile var detail: String = "not started"; private set
-    private var inventory: HermesPortInventory? = null
+    @Volatile private var inventory: HermesPortInventory? = null
+    private var stdoutEndedWithCr = false
+    private var stderrEndedWithCr = false
 
-    private val stdout = IncrementalUtf8OutputStream { text -> causalOutput(text, currentCause.get()) }
-    private val stderr = IncrementalUtf8OutputStream { text -> causalOutput("\u001b[31m$text\u001b[0m", currentCause.get()) }
+    private val stdout = IncrementalUtf8OutputStream { text -> causalOutput(ttyNewlines(text, stderr = false), currentCause.get()) }
+    private val stderr = IncrementalUtf8OutputStream { text -> causalOutput("\u001b[31m${ttyNewlines(text, stderr = true)}\u001b[0m", currentCause.get()) }
     private val port = HermesPythonPort(output = stdout, error = stderr)
     internal var inventoryLoader: (HermesPythonPort) -> HermesPortInventory = { p ->
         require(Files.isDirectory(root)) { "Hermes source root missing: $root" }
         p.inventory(root, sleeve.takeIf(Files::isDirectory))
     }
 
-    fun open(timestampMs: Long = System.currentTimeMillis()): State = synchronized(lock) {
-        if (state == State.READY || state == State.BOOTING) return state
-        transition(State.BOOTING, "inventorying ${root.toAbsolutePath()}")
-        causalOutput("\u001b[2J\u001b[H\u001b[1;38;5;208mTrikeShed Hermes VM · VT220\u001b[0m\r\n", null, timestampMs)
+    fun open(timestampMs: Long = System.currentTimeMillis()): State {
+        synchronized(lock) {
+            if (state == State.READY || state == State.BOOTING) return state
+            transition(State.BOOTING, "inventorying ${root.toAbsolutePath()}")
+            causalOutput("\u001b[2J\u001b[H\u001b[1;38;5;208mTrikeShed Hermes VM · VT220\u001b[0m\r\n", null, timestampMs)
+        }
         return try {
             val scanned = inventoryLoader(port)
             inventory = scanned
@@ -85,9 +89,16 @@ class HermesVmConsole(
     }
 
     /** Complete line submission. Web/TUI/desktop line disciplines all converge here. */
-    fun submit(command: String, timestampMs: Long = System.currentTimeMillis()): LcncUserSignal = synchronized(lock) {
-        val manual = panel.manualCommand(command, timestampMs)
-        emitManual(manual)
+    fun submit(command: String, timestampMs: Long = System.currentTimeMillis()): LcncUserSignal =
+        execute(prepareCommand(command, timestampMs), timestampMs)
+
+    fun prepareCommand(command: String, timestampMs: Long = System.currentTimeMillis()): ManualMediaInput = synchronized(lock) {
+        require(command.length <= Vt220MediaPatchPanel.MAX_SIGNAL_PAYLOAD) { "command exceeds ${Vt220MediaPatchPanel.MAX_SIGNAL_PAYLOAD} characters" }
+        panel.manualCommand(command, timestampMs).also(::emitManual)
+    }
+
+    fun execute(manual: ManualMediaInput, timestampMs: Long = System.currentTimeMillis()): LcncUserSignal {
+        val command = manual.signal.payload
         currentCause.set(manual.signal.id)
         causalOutput(command + "\r\n", manual.signal.id, timestampMs)
         if (state == State.CLOSED) open(timestampMs)
@@ -108,7 +119,11 @@ class HermesVmConsole(
             causalOutput("\u001b[38;5;208mhermes>\u001b[0m ", manual.signal.id, timestampMs)
             currentCause.set(null)
         }
-        manual.signal
+        return manual.signal
+    }
+
+    fun reject(manual: ManualMediaInput, detail: String, timestampMs: Long = System.currentTimeMillis()) = synchronized(lock) {
+        emitCausal(panel.causalFailed(manual.signal.id, timestampMs, detail))
     }
 
     fun manualText(text: String, timestampMs: Long = System.currentTimeMillis(), paste: Boolean = false): ManualMediaInput = synchronized(lock) {
@@ -155,8 +170,18 @@ class HermesVmConsole(
                 "blockedTransitive" to scanned.blockedTransitive,
                 "ontologySpineCid" to scanned.ontology.cid.value,
             ),
-            "signals" to panel.signals().view.map(LcncUserSignal::toMap),
+            "signals" to panel.signals().view.toList().takeLast(128).map(LcncUserSignal::toMap),
         )
+    }
+
+    fun terminalMetaMap(): Map<String, Any?> = synchronized(lock) {
+        panel.snapshot(scrollbackRows = 0).let { snapshot -> mapOf(
+            "revision" to snapshot.revision,
+            "columns" to snapshot.columns,
+            "rows" to snapshot.rows,
+            "title" to snapshot.title,
+            "cursor" to mapOf("row" to snapshot.cursor.row, "column" to snapshot.cursor.column, "visible" to snapshot.cursor.visible),
+        ) }
     }
 
     private fun dispatch(command: String, cause: String, timestampMs: Long) {
@@ -211,6 +236,20 @@ class HermesVmConsole(
     private fun causalOutput(text: String, cause: String?, timestampMs: Long = System.currentTimeMillis()) = synchronized(lock) {
         if (text.isEmpty()) return@synchronized
         emitCausal(panel.causalOutput(text, cause, timestampMs))
+    }
+
+    /** A real PTY defaults to OPOST+ONLCR; Graal OutputStream does not, so supply that waist. */
+    private fun ttyNewlines(text: String, stderr: Boolean): String = synchronized(lock) {
+        var previousCr = if (stderr) stderrEndedWithCr else stdoutEndedWithCr
+        val normalized = buildString(text.length + 8) {
+            for (ch in text) {
+                if (ch == '\n' && !previousCr) append('\r')
+                append(ch)
+                previousCr = ch == '\r'
+            }
+        }
+        if (stderr) stderrEndedWithCr = previousCr else stdoutEndedWithCr = previousCr
+        normalized
     }
 
     private fun emitManual(input: ManualMediaInput) {
