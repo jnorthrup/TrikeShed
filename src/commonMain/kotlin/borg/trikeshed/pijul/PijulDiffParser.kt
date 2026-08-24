@@ -62,7 +62,7 @@ object PijulDiffParser {
                     deletes.add(oldLine j 1)
                     oldLine++
                 }
-                line.startsWith(" ") -> {
+                line.startsWith(" ") || line.isEmpty() -> {
                     oldLine++
                 }
             }
