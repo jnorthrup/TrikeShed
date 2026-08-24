@@ -107,10 +107,13 @@ class PijulChannel(
      * This is the single filesystem touch point — call once after all
      * patches are applied, then git-add + git-commit the result.
      */
-    fun materialize(targetDir: String, fileOps: FileOperations): List<String> {
+    fun materialize(targetDir: String, fileOps: FileOperations, injectNoise: Boolean = false): List<String> {
         val written = mutableListOf<String>()
         for ((path, crdt) in files) {
-            val content = crdt.render()
+            var content = crdt.render()
+            if (injectNoise) {
+                content = PatchNoiseInjector.apply(path, content)
+            }
             val target = fileOps.resolvePath(targetDir, path)
             val parent = target.substringBeforeLast('/', missingDelimiterValue = "")
             if (parent.isNotEmpty()) fileOps.mkdirs(parent)
@@ -160,6 +163,22 @@ class PijulChannel(
         files.clear()
         provenance.clear()
         patchStore.clear()
+    }
+}
+
+/**
+ * Legion Doc 04 §5: Synthetic Noise Injection in Discovered Artifacts.
+ * Perturbs artifacts to make blind stigmergic inheritance cost-ineffective.
+ */
+object PatchNoiseInjector {
+    fun apply(path: String, content: String): String {
+        // Only safely perturb Kotlin sources to avoid breaking unstructured text/JSON
+        if (!path.endsWith(".kt")) return content
+
+        // Bounded perturbation: identifier mutation and parameter reordering simulated
+        // via a synthetic unused function that shifts the AST and file hash.
+        val entropy = borg.trikeshed.cursor.currentTimeMillis().toString(16)
+        return content + "\n// Arbitrage noise\nprivate fun _perturbation_$entropy(a: Int, b: String) {}\n"
     }
 }
 

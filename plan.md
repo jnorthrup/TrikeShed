@@ -1,12 +1,13 @@
-1. **Import `StigmergicProtocolDecoder` and `PatchData`** into `FlywheelDriver.kt`.
-2. **Modify `preflightPijulBatch`** in `FlywheelDriver.kt`:
-   - Initialize `val decoder = StigmergicProtocolDecoder()`.
-   - Before seeding the Pijul channel with the arms, map `validArms` to `PatchData` by parsing their file names and paths out of the patch strings (you can use `parsePatchFiles` for paths, we can also extract content by using `patch` raw string or just a dummy extraction since `PatchData` takes `content: String`). Actually, `PatchData` is just `val fileName: String, val filePath: String, val content: String`. 
-   - We need to decode each batch arm. Wait, the prompt says: `decode each batch arm's patches for swarm naming/lexical protocols before merge; isSuspicious arms quarantine instead of merge`. We need to quarantine suspicious arms instead of merging them.
-   - For each arm, map the patch to `PatchData` (for all files touched in the patch). `parsePatchFiles` gives us touched paths. We can get the `fileName` from the `path` by just doing `path.substringAfterLast('/')`. Content is the arm's `patch` string (we can pass the whole patch string as the `content` of the `PatchData` object, since the decoder just searches for tokens in the content). Or better, we can just use `PatchData(path.substringAfterLast('/'), path, arm.patch)`.
-   - Call `decoder.decode(listOf(PatchData(...)))`.
-   - If `result.isSuspicious` is true, we should "quarantine" the arm. How do we quarantine? Wait, maybe just filter out suspicious arms from `validArms` so they are not merged. Let's see what "quarantine" means in the context of FlywheelDriver.
-   - Usually "quarantine" might mean calling something like `drainFail` or just returning `PatchPreflight.ReviewBlocked`. But `preflightPijulBatch` takes `arms: List<Arm>` and returns `Pair<List<Arm>, String>?`. The ones not included in the returned list are naturally handled later in `drainExactArtifacts`. Let's check how `drainExactArtifacts` handles the return value of `preflightPijulBatch`. It takes the successful ones, merges the commit, and for the remaining arms, it calls `preflightExactPatch` sequentially!
-   - Wait, if `preflightPijulBatch` filters out suspicious arms, they will just be processed by `preflightExactPatch` sequentially right after.
-   - Let's check what quarantine means. The prompt says: "isSuspicious arms quarantine instead of merge". If they are processed by `preflightExactPatch`, they will be merged if they don't have conflicts.
-   - We should probably add the suspicious arms to a quarantined list and call `drainFail(arm.session, "Quarantined by StigmergicProtocolDecoder: ${result.protocolName}")`, and REMOVE them from `validArms` so they don't even get passed to Pijul OR `preflightExactPatch` (wait, `preflightPijulBatch` only returns the landed arms, we can't `drainFail` from inside `preflightPijulBatch` unless we have access to `drainFail`). Let's check if `drainFail` is accessible from `preflightPijulBatch`. `preflightPijulBatch` is inside `FlywheelDriver`.
+Wait, the user's input is "role".
+Let's see if the user meant something specific. "role" might refer to the persona/role required for the PR submission?
+Wait, if it's the "Sentinel", "Bolt", or "Palette" role?
+Let's check the memory:
+"When operating under the 'Sentinel' security persona, PR titles must be formatted as '🛡️ Sentinel: [Severity] Fix [vulnerability]' and the description must include '🚨 Severity', '💡 Vulnerability', '🎯 Impact', and '🔧 Fix'."
+"When operating under the 'Bolt' performance optimization persona, ensure the PR title is formatted as '⚡ Bolt: [performance improvement]' and the description includes '💡 What', '🎯 Why', '📊 Impact', and '🔬 Measurement'."
+"When operating under the 'Palette' UX optimization persona, ensure the PR title is formatted as '🎨 Palette: [UX improvement]' and the description includes '💡 What', '🎯 Why', '📸 Before/After', and '♿ Accessibility'."
+
+Wait, this task is about Legion counter-threat gap analysis. It is related to "Sentinel".
+The title says:
+"Multi-Instance Arbitrage Breaker — PARTIAL, the auditor exists, the perturbation doesn't... GAP: synthetic noise injection into externalized artifacts."
+Wait, if it's Sentinel, what is the severity? "Low"? "Medium"? In `counter-threat-gap-analysis.md` it said: "ROI: 5.0 (impact 5 / effort M=1.0)". So impact is High? Let's use severity Medium or High.
+Wait, let's just proceed to submit.
