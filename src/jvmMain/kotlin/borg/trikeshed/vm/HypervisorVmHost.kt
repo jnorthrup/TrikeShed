@@ -20,6 +20,7 @@ import java.util.concurrent.atomic.AtomicLong
 class HypervisorVmHost(
     val hypervisor: Hypervisor = Hypervisor(),
     override val languages: Set<VmFacet> = setOf(VmFacet.GRAAL_JS, VmFacet.GRAAL_PYTHON),
+    val terminals: VmTerminalRegistry = VmTerminalRegistry(),
 ) : VmHost {
     override val platform: String get() = "jvm"
     private val seq = AtomicLong()
@@ -36,7 +37,14 @@ class HypervisorVmHost(
             wallMillis = if (spec.budget.wallMillis > 0) spec.budget.wallMillis else Budget().wallMillis,
             calls = spec.budget.calls,
         )
-        val iso = hypervisor.spawn(spec.id, spec.facet, trust, budget)
+        val terminal = terminals.open(spec.id, spec.facet, if (trust == Trust.UNTRUSTED) "process" else "in-process")
+        val iso = hypervisor.spawn(
+            spec.id, spec.facet, trust, budget,
+            input = terminal.input,
+            output = terminal.output,
+            error = terminal.error,
+        )
+        if (iso is ProcessIsolate) terminal.bindInput(iso::pushInput)
         specs[spec.id] = spec
         emit(VmEvent.Spawned(spec.id, seq.incrementAndGet(), spec))
         return Handle(iso)
@@ -47,6 +55,7 @@ class HypervisorVmHost(
 
     override fun revoke(id: String, reason: String) {
         hypervisor.revoke(id, reason)
+        terminals.close(id, reason)
         emit(VmEvent.Revoked(id, seq.incrementAndGet(), reason))
     }
 
@@ -73,7 +82,7 @@ class HypervisorVmHost(
         )
     }.asCursor()
 
-    override fun close() = hypervisor.close()
+    override fun close() { terminals.close(); hypervisor.close() }
 
     private inner class Handle(private val iso: GuestIsolate) : VmHandle {
         override val id: String get() = iso.id
@@ -94,7 +103,7 @@ class HypervisorVmHost(
             VmStats(evals = it.evals, calls = it.calls, hostCalls = it.hostCalls, refutations = it.refutations, interrupted = it.interrupted)
         }
 
-        override fun close() = hypervisor.revoke(id, "closed")
+        override fun close() = this@HypervisorVmHost.revoke(id, "closed")
     }
 }
 

@@ -1,8 +1,8 @@
 package borg.trikeshed.forge.server
 
 import borg.trikeshed.hermes.HermesVmConsole
-import borg.trikeshed.hermes.toMap
 import borg.trikeshed.lcnc.media.ManualMediaInput
+import borg.trikeshed.lcnc.media.toMap
 import borg.trikeshed.lib.view
 import borg.trikeshed.litebike.JvmKanbanServer
 import borg.trikeshed.parse.json.JsonSupport

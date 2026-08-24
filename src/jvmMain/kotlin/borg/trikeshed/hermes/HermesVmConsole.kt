@@ -3,21 +3,20 @@ package borg.trikeshed.hermes
 import borg.trikeshed.lcnc.media.CausalMediaEmission
 import borg.trikeshed.lcnc.media.LcncUserSignal
 import borg.trikeshed.lcnc.media.ManualMediaInput
-import borg.trikeshed.lcnc.media.MediaPatch
 import borg.trikeshed.lcnc.media.MediaPatchPanelDescriptor
 import borg.trikeshed.lcnc.media.MediaPatchPanelId
-import borg.trikeshed.lcnc.media.MediaPatchPayload
 import borg.trikeshed.lcnc.media.Vt220MediaPatchPanel
+import borg.trikeshed.lcnc.media.toKanbanEvent
+import borg.trikeshed.lcnc.media.toMap
 import borg.trikeshed.lib.get
 import borg.trikeshed.lib.size
 import borg.trikeshed.lib.view
 import borg.trikeshed.terminal.VtCell
 import borg.trikeshed.terminal.VtKey
-import borg.trikeshed.userspace.reactor.KanbanEvent
+import borg.trikeshed.terminal.TerminalOutputStream
 import borg.trikeshed.userspace.reactor.KanbanFSM
 import borg.trikeshed.vm.Teleported
-import java.io.ByteArrayOutputStream
-import java.io.OutputStream
+
 import java.nio.file.Files
 import java.nio.file.Path
 import java.util.concurrent.atomic.AtomicReference
@@ -41,7 +40,7 @@ class HermesVmConsole(
     }
 
     val panel = Vt220MediaPatchPanel(
-        MediaPatchPanelDescriptor(MediaPatchPanelId("hermes/vt220"), "vt220", "Hermes GraalPy", columns, rows),
+        MediaPatchPanelDescriptor(MediaPatchPanelId("hermes/vt220"), "xterm-256color", "Hermes GraalPy", columns, rows),
     )
     private val lock = Any()
     private val currentCause = AtomicReference<String?>(null)
@@ -50,11 +49,8 @@ class HermesVmConsole(
     @Volatile var state: State = State.CLOSED; private set
     @Volatile var detail: String = "not started"; private set
     @Volatile private var inventory: HermesPortInventory? = null
-    private var stdoutEndedWithCr = false
-    private var stderrEndedWithCr = false
-
-    private val stdout = IncrementalUtf8OutputStream { text -> causalOutput(ttyNewlines(text, stderr = false), currentCause.get()) }
-    private val stderr = IncrementalUtf8OutputStream { text -> causalOutput("\u001b[31m${ttyNewlines(text, stderr = true)}\u001b[0m", currentCause.get()) }
+    private val stdout = TerminalOutputStream { text -> causalOutput(text, currentCause.get()) }
+    private val stderr = TerminalOutputStream { text -> causalOutput("\u001b[31m$text\u001b[0m", currentCause.get()) }
     private val port = HermesPythonPort(output = stdout, error = stderr)
     internal var inventoryLoader: (HermesPythonPort) -> HermesPortInventory = { p ->
         require(Files.isDirectory(root)) { "Hermes source root missing: $root" }
@@ -188,6 +184,21 @@ class HermesVmConsole(
         when {
             command.isEmpty() -> Unit
             command == ":help" -> causalOutput(HELP, cause, timestampMs)
+            command == ":env" || command == "env" -> {
+                val curated = borg.trikeshed.graal.subvm.GuestEnvironment.curated()
+                val survey = borg.trikeshed.graal.subvm.GuestEnvironment.surveyHostEnvironment()
+                causalOutput("curated guest env (${curated.size}):\r\n", cause, timestampMs)
+                for ((k, v) in curated.entries.sortedBy { it.key }) causalOutput("  $k=$v\r\n", cause, timestampMs)
+                val blocked = survey[borg.trikeshed.graal.subvm.GuestEnvironment.Disposition.BLOCKED].orEmpty().sorted().take(20)
+                val deferred = survey[borg.trikeshed.graal.subvm.GuestEnvironment.Disposition.DEFERRED].orEmpty().sorted().take(20)
+                causalOutput("host blocked (sample): ${blocked.joinToString()}\r\n", cause, timestampMs)
+                causalOutput("host deferred (sample): ${deferred.joinToString()}\r\n", cause, timestampMs)
+                // Prove the sleeve is live in the same GraalPy context
+                runCatching {
+                    val r = port.evalInVm("import os, json; json.dumps(dict(os.environ))", "diag-env.py")
+                    causalOutput("guest os.environ: $r\r\n", cause, timestampMs)
+                }.onFailure { causalOutput("guest os.environ unavailable: ${it.message}\r\n", cause, timestampMs) }
+            }
             command == ":status" -> {
                 val scanned = inventory
                 causalOutput(
@@ -238,19 +249,6 @@ class HermesVmConsole(
         emitCausal(panel.causalOutput(text, cause, timestampMs))
     }
 
-    /** A real PTY defaults to OPOST+ONLCR; Graal OutputStream does not, so supply that waist. */
-    private fun ttyNewlines(text: String, stderr: Boolean): String = synchronized(lock) {
-        var previousCr = if (stderr) stderrEndedWithCr else stdoutEndedWithCr
-        val normalized = buildString(text.length + 8) {
-            for (ch in text) {
-                if (ch == '\n' && !previousCr) append('\r')
-                append(ch)
-                previousCr = ch == '\r'
-            }
-        }
-        if (stderr) stderrEndedWithCr = previousCr else stdoutEndedWithCr = previousCr
-        normalized
-    }
 
     private fun emitManual(input: ManualMediaInput) {
         land(input.signal)
@@ -279,16 +277,18 @@ class HermesVmConsole(
 
     companion object {
         private val MODULE = Regex("[A-Za-z_][A-Za-z0-9_.]*")
-        private val HELP = """
-            \u001b[1m:status\u001b[0m        VM and sleeve state
-            \u001b[1m:modules\u001b[0m       first 200 module dispositions
-            \u001b[1m:gaps\u001b[0m          ranked native dependency gaps
-            \u001b[1m:eval PYTHON\u001b[0m   evaluate inside the supervised GraalPy context
-            \u001b[1m:import MODULE\u001b[0m  import one module through the sleeve
-            \u001b[1m:hermes PROMPT\u001b[0m run a real Hermes one-shot turn
-            \u001b[1m:clear\u001b[0m         reset the VT220 viewport
-            Any other line is a Hermes prompt.
-        """.trimIndent() + "\r\n"
+        // Use real ESC (\u001B) via string template — triple-quoted raw strings do not interpret \u escapes,
+        // which previously rendered as literal "\u001b[1m" and broke the two-column VT layout.
+        private val ESC = "\u001B"
+        private val HELP = "${ESC}[1m:status${ESC}[0m        VM and sleeve state\r\n" +
+            "${ESC}[1m:modules${ESC}[0m       first 200 module dispositions\r\n" +
+            "${ESC}[1m:gaps${ESC}[0m          ranked native dependency gaps\r\n" +
+            "${ESC}[1m:eval PYTHON${ESC}[0m   evaluate inside the supervised GraalPy context\r\n" +
+            "${ESC}[1m:import MODULE${ESC}[0m  import one module through the sleeve\r\n" +
+            "${ESC}[1m:hermes PROMPT${ESC}[0m run a real Hermes one-shot turn\r\n" +
+            "${ESC}[1m:clear${ESC}[0m         reset the VT220 viewport\r\n" +
+            "Any other line is a Hermes prompt.\r\n" +
+            "${ESC}[1m:env${ESC}[0m            curated guest environment (diagnostic)\r\n"
         private val CONSOLE_BOOTSTRAP = """
             def __trikeshed_hermes(prompt):
                 from hermes_cli.oneshot import run_oneshot
@@ -307,103 +307,5 @@ class HermesVmConsole(
             }
             append('\'')
         }
-    }
-}
-
-fun LcncUserSignal.toMap(): Map<String, Any?> = linkedMapOf(
-    "id" to id,
-    "panelId" to panelId.value,
-    "sequence" to sequence,
-    "timestampMs" to timestampMs,
-    "lane" to lane.name.lowercase(),
-    "kind" to kind,
-    "payload" to payload,
-    "causeSignalId" to causeSignalId,
-)
-
-fun LcncUserSignal.toKanbanEvent(): KanbanEvent.LcncUserSignaled = KanbanEvent.LcncUserSignaled(
-    panelId = panelId.value,
-    signalId = id,
-    lane = lane.name.lowercase(),
-    kind = kind,
-    causeSignalId = causeSignalId,
-    payload = payload.take(512),
-    timestampMs = timestampMs,
-)
-
-fun MediaPatch.toMap(): Map<String, Any?> = linkedMapOf(
-    "panelId" to panelId.value,
-    "kind" to kind.name.lowercase(),
-    "revision" to revision,
-    "x" to x,
-    "y" to y,
-    "width" to width,
-    "height" to height,
-    "causeSignalId" to causeSignalId,
-    "cells" to ((payload as? MediaPatchPayload.TerminalCells)?.cells?.view?.map(VtCell::toMap) ?: emptyList()),
-)
-
-fun VtCell.toMap(): Map<String, Any?> = linkedMapOf(
-    "text" to text,
-    "continuation" to continuation,
-    "fg" to style.foreground.index,
-    "fgRgb" to style.foreground.rgb,
-    "bg" to style.background.index,
-    "bgRgb" to style.background.rgb,
-    "bold" to style.bold,
-    "faint" to style.faint,
-    "italic" to style.italic,
-    "underline" to style.underline,
-    "blink" to style.blink,
-    "inverse" to style.inverse,
-    "concealed" to style.concealed,
-    "crossedOut" to style.crossedOut,
-)
-
-/** Correctly preserves UTF-8 characters when Graal writes a multibyte sequence across calls. */
-private class IncrementalUtf8OutputStream(private val sink: (String) -> Unit) : OutputStream() {
-    private val pending = ByteArrayOutputStream()
-
-    @Synchronized
-    override fun write(value: Int) {
-        pending.write(value)
-        emitComplete()
-    }
-
-    @Synchronized
-    override fun write(bytes: ByteArray, offset: Int, length: Int) {
-        pending.write(bytes, offset, length)
-        emitComplete()
-    }
-
-    @Synchronized
-    override fun flush() = emitComplete(force = true)
-
-    @Synchronized
-    override fun close() = emitComplete(force = true)
-
-    private fun emitComplete(force: Boolean = false) {
-        val bytes = pending.toByteArray()
-        if (bytes.isEmpty()) return
-        var index = 0
-        var complete = 0
-        while (index < bytes.size) {
-            val unsigned = bytes[index].toInt() and 0xff
-            val width = when {
-                unsigned < 0x80 -> 1
-                unsigned in 0xC2..0xDF -> 2
-                unsigned in 0xE0..0xEF -> 3
-                unsigned in 0xF0..0xF4 -> 4
-                else -> 1
-            }
-            if (index + width > bytes.size) break
-            complete = index + width
-            index += width
-        }
-        if (force) complete = bytes.size
-        if (complete == 0) return
-        sink(bytes.copyOfRange(0, complete).toString(Charsets.UTF_8))
-        pending.reset()
-        if (complete < bytes.size) pending.write(bytes, complete, bytes.size - complete)
     }
 }

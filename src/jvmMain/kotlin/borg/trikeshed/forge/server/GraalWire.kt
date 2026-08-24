@@ -217,11 +217,17 @@ class GraalWire(
             @Suppress("UNCHECKED_CAST")
             val body = runCatching { JsonSupport.parse(CouchWire.bodyOf(payload).decodeToString()) as? Map<String, Any?> }.getOrNull().orEmpty()
             val id = (body["id"] as? String)?.takeIf { it.isNotBlank() } ?: "hermes-${System.currentTimeMillis() % 100000}"
+            if (!id.matches(Regex("[A-Za-z0-9._:-]{1,128}"))) return json(400, mapOf("error" to "invalid capsule id"))
             if (HermesCapsule.registry[id]?.alive == true) return json(409, mapOf("error" to "already running", "id" to id))
-            val capsule = HermesCapsule(id)
+            val terminal = (vmHost as? borg.trikeshed.vm.HypervisorVmHost)?.terminals?.open(
+                id,
+                borg.trikeshed.pointcut.VmFacet.GRAAL_PYTHON,
+                "capsule",
+            )
+            val capsule = HermesCapsule(id, terminal)
             HermesCapsule.registry[id] = capsule
             capsule.start(scope)
-            return json(202, mapOf("ok" to true, "id" to id))
+            return json(202, mapOf("ok" to true, "id" to id, "terminal" to "/vm-terminal?id=$id"))
         }
         val parts = tail.split('/')
         val id = parts.getOrNull(0) ?: return json(404, mapOf("error" to "missing capsule id"))

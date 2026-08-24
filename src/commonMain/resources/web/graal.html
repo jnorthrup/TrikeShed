@@ -897,7 +897,7 @@ function renderVms(){
     '<button class="vmbtn" onclick="hermesRunner()" title="open the real supervised Hermes VT220 console">▣ hermes VT220</button></div>'+
     (rows.length?'<table><tr>'+cols.map(c=>'<th>'+esc(c)+'</th>').join('')+'<th></th></tr>'+
       rows.map(r=>{const id=r[0];return '<tr>'+r.map(v=>'<td>'+esc((v??'').toString().slice(0,26))+'</td>').join('')+
-        '<td><button class="vmbtn" onclick="vmEval(\''+esc(id)+'\')">eval</button> <button class="vmbtn" onclick="vmRevoke(\''+esc(id)+'\')">revoke</button></td></tr>';}).join('')+'</table>'
+        '<td><a class="vmbtn" href="/vm-terminal?id='+encodeURIComponent(id)+'">terminal</a> <button class="vmbtn" onclick="vmEval(\''+esc(id)+'\')">eval</button> <button class="vmbtn" onclick="vmRevoke(\''+esc(id)+'\')">revoke</button></td></tr>';}).join('')+'</table>'
       :'<i style="color:var(--dim)">no generic guests — Hermes has its own VT220 panel</i>')+
     '<div class="vmctl" style="margin-top:8px"><textarea id="vmSrc" placeholder="source to eval on a guest…"></textarea><span id="vmSpinner" class="vmspin" style="display:none" title="run in flight"></span></div>'+
     '<div id="vmOut"></div><div style="color:var(--dim);font-size:10px;margin:6px 0 2px">run log</div><div id="vmLog"></div>';

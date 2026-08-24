@@ -34,10 +34,17 @@ class VmWireTest {
             val spawned = wire.route("POST", "/api/vm/spawn", http("POST", "/api/vm/spawn", """{"id":"a","facet":"js"}"""), null)!!
             assertEquals(200, spawned.status)
             assertEquals("in-process", obj(spawned.body)["tier"])
+            assertEquals("/vm-terminal?id=a", obj(spawned.body)["terminal"])
 
             val evaluated = wire.route("POST", "/api/vm/a/eval", http("POST", "/api/vm/a/eval", """{"source":"6*7"}"""), null)!!
             assertEquals(200, evaluated.status, evaluated.body)
             assertTrue(evaluated.body.contains("\"value\":42"), evaluated.body)
+            val terminal = wire.route("GET", "/api/vm/a/terminal", http("GET", "/api/vm/a/terminal"), null)!!
+            assertEquals(200, terminal.status)
+            assertTrue(terminal.body.contains("\"vmId\":\"a\""))
+            val terminalPage = wire.route("GET", "/vm-terminal?id=a", http("GET", "/vm-terminal?id=a"), null)!!
+            assertEquals(200, terminalPage.status)
+            assertTrue(terminalPage.payloadBytes.decodeToString().contains("PROCESS TERMINALS"))
 
             val rows = list(obj(wire.route("GET", "/api/vm", http("GET", "/api/vm"), null)!!.body)["rows"])
             assertEquals(1, rows.size)
@@ -57,7 +64,7 @@ class VmWireTest {
     fun extraRoutesReachTheWireThroughTheServerSeam() = runBlocking {
         val host = HypervisorVmHost()
         val wire = VmWire(host, CoroutineScope(Dispatchers.Default))
-        val server = JvmKanbanServer(extraRoutes = listOf(wire::route), streamingPaths = setOf(VmWire.EVENTS_PATH))
+        val server = JvmKanbanServer(extraRoutes = listOf(wire::route), streamingPaths = VmWire.STREAMING)
         try {
             val r = server.routeHttp(http("GET", "/api/vm").toByteArray())
             assertEquals(200, r.status)

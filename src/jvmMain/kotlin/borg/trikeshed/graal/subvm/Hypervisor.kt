@@ -17,6 +17,8 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicInteger
+import java.io.InputStream
+import java.io.OutputStream
 
 /**
  * The hypervisor: every isolate is a node on the blackboard, every crossing is a receipt, and the
@@ -102,19 +104,30 @@ class Hypervisor(
     }
 
     // ── lifecycle ─────────────────────────────────────────────────────────
-    fun spawn(id: String, facet: VmFacet, trust: Trust = Trust.OWN, budget: Budget = Budget()): GuestIsolate {
+    fun spawn(
+        id: String,
+        facet: VmFacet,
+        trust: Trust = Trust.OWN,
+        budget: Budget = Budget(),
+        input: InputStream? = null,
+        output: OutputStream? = null,
+        error: OutputStream? = output,
+    ): GuestIsolate {
         require(!isolates.containsKey(id)) { "isolate '$id' exists" }
         val iso: GuestIsolate = when (trust) {
             Trust.OWN -> {
                 lateinit var trainer: LeafTrainer
-                val inproc = InProcessIsolate(id, facet, budget) { obs -> trainer.observe(obs); observed(id, facet, obs) }
+                val inproc = InProcessIsolate(
+                    id, facet, budget,
+                    input = input, output = output, error = error,
+                ) { obs -> trainer.observe(obs); observed(id, facet, obs) }
                 trainer = LeafTrainer(inproc, trainCalls, shadowCalls,
                     onTransition = { p, from, to -> land(id, facet, p.root, "phase", "$from→$to${p.demotedReason?.let { " ($it)" } ?: ""}", p.line, p.column, p.sourceName) },
                     onReceipt = { r -> record(r)?.let { land(id, facet, it.root, "delegate", it.toString(), -1, -1, null) } })
                 trainers[id] = trainer
                 inproc
             }
-            Trust.UNTRUSTED -> ProcessIsolate(id, facet, budget)
+            Trust.UNTRUSTED -> ProcessIsolate(id, facet, budget, terminalOutput = output, terminalError = error)
         }
         isolates[id] = iso
         leases[id] = Lease(id, budget, seq.incrementAndGet())

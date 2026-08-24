@@ -1,22 +1,333 @@
 package borg.trikeshed.btrfs
 
+import borg.trikeshed.job.ContentId
 import borg.trikeshed.userspace.nio.file.spi.FileOperations
 
+/**
+ * MiniBtrfs — a userspace filesystem matching btrfs's three defining properties, not its on-disk
+ * B-tree format:
+ *
+ *  - **Copy-on-write extents.** Content lands in an append-only, content-addressed extent store
+ *    (SHA-256 via [ContentId], the same convention as the rest of TrikeShed's CAS). An extent is
+ *    written once, under its own hash, and never mutated; writing back unchanged content is a
+ *    dedup no-op, exactly as btrfs's own CoW never overwrites a live extent in place.
+ *  - **Snapshots cheap in DATA, not files.** A subvolume's tree is a `path -> Entry` index; a
+ *    snapshot copies that index (one small structure, sized by file COUNT), never the bytes behind
+ *    it. Two subvolumes sharing every byte of a 2 GB tree cost the same to snapshot as two sharing
+ *    nothing. This is the actual guarantee btrfs snapshots give — btrfs's own cost is O(tree nodes
+ *    touched), not literally O(1) either — and nothing here claims more.
+ *  - **Checksummed reads and a send/receive that fails closed.** Every extent fetch is verified
+ *    against the hash it was stored under; [send] emits a manifest plus the extents it references,
+ *    and [receive] verifies every extent against its declared hash BEFORE committing anything — a
+ *    truncated or corrupted stream lands no partial subvolume, matching btrfs send/receive's own
+ *    guarantee against a torn transfer.
+ *
+ * Unreferenced extents are reclaimed (mark-and-sweep across all live subvolumes) when a subvolume
+ * is deleted — real btrfs defers this to a background cleaner; doing it eagerly here is the
+ * honest choice for a toy with no cleaner thread, not a shortcut.
+ *
+ * One live [UserspaceBtrfs] instance is one mount: its index is loaded from [fileOps] once at
+ * construction and kept in memory thereafter, exactly the assumption a live mounted filesystem
+ * makes about the block device under it. Extent bytes and subvolume manifests are the only things
+ * durable in [fileOps] — a second instance pointed at the same [rootDir] on the same backing store
+ * sees prior state (manifests replay), never a *live* peer's uncommitted writes.
+ */
 class UserspaceBtrfs(val rootDir: String, val fileOps: FileOperations) {
 
+    private data class Entry(val isDir: Boolean, val extentId: String?, val length: Long)
+
+    private class Subvolume(var readOnly: Boolean) {
+        var entries: Map<String, Entry> = emptyMap()
+    }
+
+    private val subvolumes = LinkedHashMap<String, Subvolume>()
+    private val extentsDir get() = fileOps.resolvePath(rootDir, "extents")
+    private val subvolDir get() = fileOps.resolvePath(rootDir, "subvolumes")
+
     init {
-        if (!fileOps.exists(rootDir)) {
-            fileOps.mkdirs(rootDir)
-        }
-        val subvolDir = fileOps.resolvePath(rootDir, "subvolumes")
-        if (!fileOps.exists(subvolDir)) {
-            fileOps.mkdirs(subvolDir)
+        if (!fileOps.exists(rootDir)) fileOps.mkdirs(rootDir)
+        if (!fileOps.exists(extentsDir)) fileOps.mkdirs(extentsDir)
+        if (!fileOps.exists(subvolDir)) fileOps.mkdirs(subvolDir)
+        for (fileName in fileOps.listDir(subvolDir).map { it.substringBefore('/') }.distinct()) {
+            val name = fileName.removeSuffix(".manifest")
+            if (name == fileName || !isValidName(name)) continue // not a manifest file, or an invalid name
+            runCatching { loadManifest(name) }
         }
     }
 
-    private fun getSubvolPath(name: String): String? {
-        if (!isValidName(name)) return null
-        return fileOps.resolvePath(rootDir, "subvolumes", name)
+    // ── subvolumes ────────────────────────────────────────────────
+
+    fun createSubvolume(name: String): Boolean {
+        if (!isValidName(name) || subvolumes.containsKey(name)) return false
+        subvolumes[name] = Subvolume(readOnly = false)
+        persistManifest(name)
+        return true
+    }
+
+    fun deleteSubvolume(name: String): Boolean {
+        if (!isValidName(name)) return false
+        subvolumes.remove(name) ?: return false
+        runCatching { fileOps.deleteRecursively(manifestPathOf(name)) }
+        sweepUnreferencedExtents()
+        return true
+    }
+
+    fun hasSubvolume(name: String): Boolean = subvolumes.containsKey(name)
+
+    fun listSubvolumes(): List<String> = subvolumes.keys.sorted()
+
+    /** O(entries), never O(bytes): the index is copied, the extent store is shared by reference. */
+    fun snapshot(sourceName: String, destName: String): Boolean {
+        val src = subvolumes[sourceName] ?: return false
+        if (!isValidName(destName) || subvolumes.containsKey(destName)) return false
+        val dst = Subvolume(readOnly = true)
+        dst.entries = src.entries // structural sharing: the NEXT write on either side copies, not this call
+        subvolumes[destName] = dst
+        persistManifest(destName)
+        return true
+    }
+
+    // ── files ─────────────────────────────────────────────────────
+
+    fun writeFile(subvol: String, file: String, content: ByteArray): Boolean {
+        val sv = subvolumes[subvol] ?: return false
+        if (sv.readOnly || !isValidFilePath(file)) return false
+        val extentId = putExtent(content)
+        val next = LinkedHashMap(sv.entries)
+        ensureAncestors(next, file)
+        next[file] = Entry(isDir = false, extentId = extentId, length = content.size.toLong())
+        sv.entries = next // the copy-on-write: this subvolume's index moves forward; any snapshot's does not
+        persistManifest(subvol)
+        return true
+    }
+
+    fun fetchFile(subvol: String, file: String): ByteArray? {
+        val sv = subvolumes[subvol] ?: return null
+        val entry = sv.entries[file] ?: return null
+        if (entry.isDir || entry.extentId == null) return null
+        return getExtent(entry.extentId)
+    }
+
+    fun deleteFile(subvol: String, file: String): Boolean {
+        val sv = subvolumes[subvol] ?: return false
+        if (sv.readOnly || !isValidFilePath(file)) return false
+        if (sv.entries[file]?.isDir != false) return false
+        val next = LinkedHashMap(sv.entries)
+        next.remove(file)
+        sv.entries = next
+        persistManifest(subvol)
+        return true
+    }
+
+    // ── directories ───────────────────────────────────────────────
+
+    fun createDirectory(subvol: String, directory: String): Boolean {
+        val sv = subvolumes[subvol] ?: return false
+        if (sv.readOnly) return false
+        if (directory.isEmpty()) return true // root always exists
+        if (!isValidFilePath(directory)) return false
+        if (sv.entries[directory]?.isDir == true) return false // already exists
+        val next = LinkedHashMap(sv.entries)
+        ensureAncestors(next, "$directory/.")
+        next[directory] = Entry(isDir = true, extentId = null, length = 0)
+        sv.entries = next
+        persistManifest(subvol)
+        return true
+    }
+
+    fun listDirectory(subvol: String, directory: String = ""): List<String>? {
+        val sv = subvolumes[subvol] ?: return null
+        if (directory.isNotEmpty()) {
+            if (!isValidFilePath(directory)) return null
+            if (sv.entries[directory]?.isDir != true) return null
+        }
+        val prefix = if (directory.isEmpty()) "" else "$directory/"
+        return sv.entries.keys.asSequence()
+            .filter { it.startsWith(prefix) && it != directory }
+            .map { it.removePrefix(prefix).substringBefore('/') }
+            .filter { it.isNotEmpty() }
+            .distinct().sorted().toList()
+    }
+
+    fun isDirectory(subvol: String, path: String = ""): Boolean {
+        if (path.isEmpty()) return subvolumes.containsKey(subvol)
+        return subvolumes[subvol]?.entries?.get(path)?.isDir == true
+    }
+
+    fun isFile(subvol: String, path: String): Boolean =
+        subvolumes[subvol]?.entries?.get(path)?.isDir == false
+
+    // ── send / receive ────────────────────────────────────────────
+
+    /** Deterministic, checksummed wire form: manifest lines, then each referenced extent once. */
+    fun send(sourceName: String): ByteArray? {
+        val sv = subvolumes[sourceName] ?: return null
+        val lines = StringBuilder(MAGIC).append('\n')
+        val hashes = LinkedHashSet<String>()
+        for ((path, entry) in sv.entries.entries.sortedBy { it.key }) {
+            if (entry.isDir) {
+                lines.append("D\t").append(path).append('\n')
+            } else {
+                lines.append("F\t").append(path).append('\t').append(entry.extentId).append('\t').append(entry.length).append('\n')
+                entry.extentId?.let(hashes::add)
+            }
+        }
+        lines.append("END\n")
+        val header = lines.toString().encodeToByteArray()
+        val extentBlocks = ArrayList<ByteArray>(hashes.size * 2)
+        var total = header.size
+        for (hash in hashes) {
+            val bytes = getExtent(hash) ?: return null // internal inconsistency: refuse to emit a lie
+            val head = "EXT\t$hash\t${bytes.size}\n".encodeToByteArray()
+            extentBlocks += head; extentBlocks += bytes
+            total += head.size + bytes.size + 1 // +1 for the trailing newline
+        }
+        // A single pre-sized buffer, not a boxed ArrayList<Byte>: extent bytes can be large and
+        // per-byte boxing would be exactly the naive-copy inefficiency this rewrite exists to avoid.
+        val out = ByteArray(total)
+        var pos = 0
+        header.copyInto(out, pos); pos += header.size
+        // extentBlocks alternates head/body; a trailing newline follows each body block only.
+        var idx = 0
+        while (idx < extentBlocks.size) {
+            val head = extentBlocks[idx]; val body = extentBlocks[idx + 1]
+            head.copyInto(out, pos); pos += head.size
+            body.copyInto(out, pos); pos += body.size
+            out[pos] = '\n'.code.toByte(); pos++
+            idx += 2
+        }
+        return out
+    }
+
+    fun receive(destName: String, stream: ByteArray): Boolean {
+        if (!isValidName(destName) || subvolumes.containsKey(destName)) return false
+        return runCatching {
+            val text = stream.decodeToString()
+            if (!text.startsWith("$MAGIC\n")) return false
+            val lines = text.split('\n')
+            var i = 1
+            data class Pending(val isDir: Boolean, val extentId: String?, val length: Long)
+            val staged = LinkedHashMap<String, Pending>()
+            while (i < lines.size && lines[i] != "END") {
+                val cols = lines[i].split('\t')
+                when (cols[0]) {
+                    "D" -> staged[cols[1]] = Pending(true, null, 0)
+                    "F" -> staged[cols[1]] = Pending(false, cols[2], cols[3].toLong())
+                    else -> return false
+                }
+                i++
+            }
+            if (i >= lines.size) return false // no END: truncated
+            i++ // past END
+            // Extent blocks come as raw bytes with a text header; re-scan the ORIGINAL byte array
+            // from the header's byte offset onward — text.split() already lost byte-exactness.
+            var offset = indexOfLine(stream, "END\n") ?: return false
+            offset += "END\n".toByteArray().size
+            val stagedExtents = HashMap<String, ByteArray>()
+            while (offset < stream.size) {
+                val headerEnd = indexOfByte(stream, '\n'.code.toByte(), offset) ?: return false
+                val header = stream.decodeToString(offset, headerEnd)
+                val cols = header.split('\t')
+                if (cols.size != 3 || cols[0] != "EXT") return false
+                val hash = cols[1]
+                val length = cols[2].toIntOrNull() ?: return false
+                val bodyStart = headerEnd + 1
+                val bodyEnd = bodyStart + length
+                if (bodyEnd > stream.size) return false // truncated body: fail closed
+                val bytes = stream.copyOfRange(bodyStart, bodyEnd)
+                if (ContentId.of(bytes).value != hash) return false // corrupted: fail closed
+                stagedExtents[hash] = bytes
+                offset = bodyEnd + 1 // skip the trailing newline
+            }
+            // Every referenced hash must have arrived as a verified extent — no dangling references.
+            for (p in staged.values) if (!p.isDir && (p.extentId == null || p.extentId !in stagedExtents)) return false
+            // All-or-nothing: only now do we touch real state.
+            for ((hash, bytes) in stagedExtents) putExtentVerified(hash, bytes)
+            val sv = Subvolume(readOnly = true)
+            sv.entries = staged.mapValues { (_, p) -> Entry(p.isDir, p.extentId, p.length) }
+            subvolumes[destName] = sv
+            persistManifest(destName)
+            true
+        }.getOrDefault(false)
+    }
+
+    // ── extent store (content-addressed, CoW) ───────────────────────
+
+    private fun putExtent(bytes: ByteArray): String {
+        val id = ContentId.of(bytes).value
+        putExtentVerified(id, bytes)
+        return id
+    }
+
+    private fun putExtentVerified(id: String, bytes: ByteArray) {
+        val path = extentPathOf(id)
+        if (!fileOps.exists(path)) fileOps.write(path, bytes.copyOf())
+    }
+
+    private fun getExtent(id: String): ByteArray? {
+        val path = extentPathOf(id)
+        if (!fileOps.exists(path)) return null
+        val bytes = fileOps.readAllBytes(path)
+        return if (ContentId.of(bytes).value == id) bytes else null // silent corruption caught, not served
+    }
+
+    private fun sweepUnreferencedExtents() {
+        val live = HashSet<String>()
+        for (sv in subvolumes.values) for (e in sv.entries.values) e.extentId?.let(live::add)
+        for (name in fileOps.listDir(extentsDir).map { it.substringBefore('/') }.distinct()) {
+            if (name !in live) runCatching { fileOps.deleteRecursively(extentPathOf(rawExtentName(name))) }
+        }
+    }
+
+    // ── manifest persistence ─────────────────────────────────────
+
+    private fun manifestPathOf(name: String) = fileOps.resolvePath(subvolDir, "$name.manifest")
+    private fun extentPathOf(id: String) = fileOps.resolvePath(extentsDir, fileSafe(id))
+    private fun fileSafe(id: String) = id.replace(':', '_')
+    private fun rawExtentName(fileSafeName: String) = fileSafeName.replace('_', ':')
+
+    private fun persistManifest(name: String) {
+        val sv = subvolumes[name] ?: return
+        val sb = StringBuilder(MAGIC).append('\n')
+        sb.append(if (sv.readOnly) "RO\t1\n" else "RO\t0\n")
+        for ((path, entry) in sv.entries.entries.sortedBy { it.key }) {
+            sb.append(if (entry.isDir) "D\t$path\n" else "F\t$path\t${entry.extentId}\t${entry.length}\n")
+        }
+        fileOps.write(manifestPathOf(name), sb.toString().encodeToByteArray())
+    }
+
+    private fun loadManifest(name: String) {
+        val text = fileOps.readAllBytes(manifestPathOf(name)).decodeToString()
+        val lines = text.split('\n')
+        if (lines.isEmpty() || lines[0] != MAGIC) return
+        var readOnly = false
+        val entries = LinkedHashMap<String, Entry>()
+        for (i in 1 until lines.size) {
+            val line = lines[i]
+            if (line.isEmpty()) continue
+            val cols = line.split('\t')
+            when (cols[0]) {
+                "RO" -> readOnly = cols.getOrNull(1) == "1"
+                "D" -> entries[cols[1]] = Entry(true, null, 0)
+                "F" -> entries[cols[1]] = Entry(false, cols.getOrNull(2), cols.getOrNull(3)?.toLongOrNull() ?: 0)
+            }
+        }
+        val sv = Subvolume(readOnly)
+        sv.entries = entries
+        subvolumes[name] = sv
+    }
+
+    // ── path bookkeeping ──────────────────────────────────────────
+
+    /** Every ancestor directory of [path] gets an explicit `D` entry — matches directories that
+     *  actually contain files always being listable, without a separate "implicit dir" pass. */
+    private fun ensureAncestors(entries: MutableMap<String, Entry>, path: String) {
+        val parts = path.split('/').dropLast(1)
+        var acc = ""
+        for (p in parts) {
+            acc = if (acc.isEmpty()) p else "$acc/$p"
+            if (acc !in entries) entries[acc] = Entry(isDir = true, extentId = null, length = 0)
+        }
     }
 
     private fun isValidName(name: String): Boolean {
@@ -32,261 +343,21 @@ class UserspaceBtrfs(val rootDir: String, val fileOps: FileOperations) {
         return true
     }
 
-    fun createSubvolume(name: String): Boolean {
-        val path = getSubvolPath(name) ?: return false
-        if (fileOps.exists(path)) return false
-        fileOps.mkdirs(path)
-
-        fileOps.write(fileOps.resolvePath(path, ".subvol_meta"), ByteArray(0))
-
-        return true
-    }
-
-    fun deleteSubvolume(name: String): Boolean {
-        val path = getSubvolPath(name) ?: return false
-        if (!fileOps.exists(path)) return false
-        fileOps.deleteRecursively(path)
-        return true
-    }
-
-    private fun copyRecursively(src: String, dest: String) {
-        if (fileOps.isDir(src)) {
-            fileOps.mkdirs(dest)
-            val list = fileOps.listDir(src)
-            val children = list.map { it.split("/").first() }.distinct()
-            for (child in children) {
-                if (child.isEmpty()) continue
-                copyRecursively(fileOps.resolvePath(src, child), fileOps.resolvePath(dest, child))
-            }
-        } else if (fileOps.isFile(src)) {
-            val bytes = fileOps.readAllBytes(src)
-            fileOps.write(dest, bytes.copyOf()) // defensive copy
+    private fun indexOfLine(haystack: ByteArray, needle: String): Int? {
+        val n = needle.toByteArray()
+        outer@ for (i in 0..haystack.size - n.size) {
+            for (j in n.indices) if (haystack[i + j] != n[j]) continue@outer
+            return i
         }
+        return null
     }
 
-    fun snapshot(sourceName: String, destName: String): Boolean {
-        val srcPath = getSubvolPath(sourceName) ?: return false
-        val destPath = getSubvolPath(destName) ?: return false
-
-        if (!fileOps.exists(srcPath)) return false
-        if (fileOps.exists(destPath)) return false
-
-        copyRecursively(srcPath, destPath)
-
-        // Mark as snapshot by creating a meta file.
-        fileOps.write(fileOps.resolvePath(destPath, ".snapshot"), ByteArray(0))
-        // And subvol meta
-        fileOps.write(fileOps.resolvePath(destPath, ".subvol_meta"), ByteArray(0))
-
-        return true
+    private fun indexOfByte(haystack: ByteArray, byte: Byte, from: Int): Int? {
+        for (i in from until haystack.size) if (haystack[i] == byte) return i
+        return null
     }
 
-    private fun isSnapshot(path: String): Boolean {
-        return fileOps.exists(fileOps.resolvePath(path, ".snapshot"))
-    }
-
-    // A simple deterministic serialization for send/receive
-    // Format:
-    // [1 byte marker: 0=file, 1=dir] [2 bytes path length] [path bytes] [4 bytes content length] [content bytes] (only for files)
-    private fun serializeRecursively(path: String, relPath: String, out: MutableList<Byte>) {
-        if (fileOps.isFile(path)) {
-            if (relPath == ".snapshot" || relPath == ".subvol_meta") return // skip meta files
-            out.add(0)
-            val pathBytes = relPath.encodeToByteArray()
-            out.add((pathBytes.size shr 8).toByte())
-            out.add(pathBytes.size.toByte())
-            out.addAll(pathBytes.toList())
-
-            val content = fileOps.readAllBytes(path)
-            out.add((content.size shr 24).toByte())
-            out.add((content.size shr 16).toByte())
-            out.add((content.size shr 8).toByte())
-            out.add(content.size.toByte())
-            out.addAll(content.toList())
-        } else if (fileOps.isDir(path)) {
-            if (relPath.isNotEmpty()) {
-                out.add(1)
-                val pathBytes = relPath.encodeToByteArray()
-                out.add((pathBytes.size shr 8).toByte())
-                out.add(pathBytes.size.toByte())
-                out.addAll(pathBytes.toList())
-            }
-
-            // deterministic order
-            val children = fileOps.listDir(path).map { it.split("/").first() }.distinct().filter { it.isNotEmpty() }.sorted()
-            for (child in children) {
-                if (child == ".snapshot" || child == ".subvol_meta") continue
-                val nextRel = if (relPath.isEmpty()) child else "$relPath/$child"
-                serializeRecursively(fileOps.resolvePath(path, child), nextRel, out)
-            }
-        }
-    }
-
-    fun send(sourceName: String): ByteArray? {
-        val srcPath = getSubvolPath(sourceName) ?: return null
-        if (!fileOps.exists(srcPath)) return null
-
-        val out = mutableListOf<Byte>()
-        // add a magic header to prevent corruption
-        out.addAll("BTRFS_SEND_V1".encodeToByteArray().toList())
-        serializeRecursively(srcPath, "", out)
-        return out.toByteArray()
-    }
-
-    fun receive(destName: String, stream: ByteArray): Boolean {
-        val destPath = getSubvolPath(destName) ?: return false
-        if (fileOps.exists(destPath)) return false
-
-        val magic = "BTRFS_SEND_V1".encodeToByteArray()
-        if (stream.size < magic.size) return false
-        for (i in magic.indices) {
-            if (stream[i] != magic[i]) return false
-        }
-
-        val tempDest = fileOps.resolvePath(rootDir, "subvolumes", "$destName.tmp")
-        if (fileOps.exists(tempDest)) {
-            fileOps.deleteRecursively(tempDest)
-        }
-        fileOps.mkdirs(tempDest)
-
-        try {
-            var i = magic.size
-            while (i < stream.size) {
-                val type = stream[i++]
-                val pathLen = ((stream[i++].toInt() and 0xFF) shl 8) or (stream[i++].toInt() and 0xFF)
-                val pathBytes = stream.copyOfRange(i, i + pathLen)
-                i += pathLen
-                val relPath = pathBytes.decodeToString()
-
-                if (!isValidFilePath(relPath)) throw IllegalArgumentException("Invalid path in send stream")
-                val fullPath = fileOps.resolvePath(tempDest, relPath)
-
-                if (type == 1.toByte()) {
-                    fileOps.mkdirs(fullPath)
-                } else if (type == 0.toByte()) {
-                    val contentLen = ((stream[i++].toInt() and 0xFF) shl 24) or
-                                     ((stream[i++].toInt() and 0xFF) shl 16) or
-                                     ((stream[i++].toInt() and 0xFF) shl 8) or
-                                     (stream[i++].toInt() and 0xFF)
-                    val contentBytes = stream.copyOfRange(i, i + contentLen)
-                    i += contentLen
-
-                    val parentDir = fullPath.substringBeforeLast('/')
-                    if (!fileOps.exists(parentDir)) fileOps.mkdirs(parentDir)
-
-                    fileOps.write(fullPath, contentBytes)
-                } else {
-                    throw IllegalArgumentException("Unknown type in send stream")
-                }
-            }
-            // Add snapshot meta
-            fileOps.write(fileOps.resolvePath(tempDest, ".snapshot"), ByteArray(0))
-            // And subvol meta
-            fileOps.write(fileOps.resolvePath(tempDest, ".subvol_meta"), ByteArray(0))
-
-            fileOps.mkdirs(destPath)
-            copyRecursively(tempDest, destPath)
-            fileOps.deleteRecursively(tempDest)
-
-            return true
-        } catch (e: Exception) {
-            fileOps.deleteRecursively(tempDest)
-            return false
-        }
-    }
-
-    fun hasSubvolume(name: String): Boolean {
-        val path = getSubvolPath(name) ?: return false
-        return fileOps.exists(path) && fileOps.exists(fileOps.resolvePath(path, ".subvol_meta"))
-    }
-
-    fun listSubvolumes(): List<String> {
-        val subvolDir = fileOps.resolvePath(rootDir, "subvolumes")
-        if (!fileOps.exists(subvolDir)) return emptyList()
-        val all = fileOps.listDir(subvolDir)
-        // InMemoryFileOperations listDir returns things like "alpha" and "alpha/.dir"
-        // we just want top level distinct names
-        val topLevel = all.map { it.split("/").first() }.distinct()
-        return topLevel.filter { it.isNotEmpty() && !it.endsWith(".tmp") && fileOps.exists(fileOps.resolvePath(subvolDir, it, ".subvol_meta")) }
-    }
-
-    fun writeFile(subvol: String, file: String, content: ByteArray): Boolean {
-        val subvolPath = getSubvolPath(subvol) ?: return false
-        if (!fileOps.exists(subvolPath)) return false
-        if (isSnapshot(subvolPath)) return false // immutable
-        if (!isValidFilePath(file)) return false
-
-        val fullPath = fileOps.resolvePath(subvolPath, file)
-
-        val parentDir = fullPath.substringBeforeLast('/')
-        if (!fileOps.exists(parentDir)) fileOps.mkdirs(parentDir)
-
-        fileOps.write(fullPath, content.copyOf())
-        return true
-    }
-
-    fun fetchFile(subvol: String, file: String): ByteArray? {
-        val subvolPath = getSubvolPath(subvol) ?: return null
-        if (!fileOps.exists(subvolPath)) return null
-        if (!isValidFilePath(file)) return null
-
-        val fullPath = fileOps.resolvePath(subvolPath, file)
-        if (!fileOps.exists(fullPath) || fileOps.isDir(fullPath) || fullPath.endsWith(".snapshot") || fullPath.endsWith(".subvol_meta")) return null
-
-        return fileOps.readAllBytes(fullPath).copyOf()
-    }
-
-    /** Create one directory inside a mutable subvolume. Empty/root is already present. */
-    fun createDirectory(subvol: String, directory: String): Boolean {
-        val subvolPath = getSubvolPath(subvol) ?: return false
-        if (!fileOps.exists(subvolPath) || isSnapshot(subvolPath)) return false
-        if (directory.isEmpty()) return true
-        if (!isValidFilePath(directory)) return false
-        val fullPath = fileOps.resolvePath(subvolPath, directory)
-        if (fileOps.exists(fullPath)) return false
-        fileOps.mkdirs(fullPath)
-        return true
-    }
-
-    /** Direct children only, in deterministic order; null means missing/not-a-directory. */
-    fun listDirectory(subvol: String, directory: String = ""): List<String>? {
-        val subvolPath = getSubvolPath(subvol) ?: return null
-        if (!fileOps.exists(subvolPath)) return null
-        val fullPath = if (directory.isEmpty()) subvolPath else {
-            if (!isValidFilePath(directory)) return null
-            fileOps.resolvePath(subvolPath, directory)
-        }
-        if (!fileOps.isDir(fullPath)) return null
-        return fileOps.listDir(fullPath).asSequence().map { it.substringBefore('/') }
-            .filter { it.isNotEmpty() && it != ".subvol_meta" && it != ".snapshot" }
-            .distinct().sorted().toList()
-    }
-
-    fun isDirectory(subvol: String, path: String = ""): Boolean {
-        val subvolPath = getSubvolPath(subvol) ?: return false
-        val fullPath = if (path.isEmpty()) subvolPath else {
-            if (!isValidFilePath(path)) return false
-            fileOps.resolvePath(subvolPath, path)
-        }
-        return fileOps.isDir(fullPath)
-    }
-
-    fun isFile(subvol: String, path: String): Boolean {
-        val subvolPath = getSubvolPath(subvol) ?: return false
-        if (!isValidFilePath(path)) return false
-        return fileOps.isFile(fileOps.resolvePath(subvolPath, path))
-    }
-
-    fun deleteFile(subvol: String, file: String): Boolean {
-        val subvolPath = getSubvolPath(subvol) ?: return false
-        if (!fileOps.exists(subvolPath)) return false
-        if (isSnapshot(subvolPath)) return false // immutable
-        if (!isValidFilePath(file)) return false
-
-        val fullPath = fileOps.resolvePath(subvolPath, file)
-        if (!fileOps.exists(fullPath)) return false
-
-        fileOps.deleteRecursively(fullPath)
-        return true
+    companion object {
+        private const val MAGIC = "BTRFS_SEND_V2"
     }
 }

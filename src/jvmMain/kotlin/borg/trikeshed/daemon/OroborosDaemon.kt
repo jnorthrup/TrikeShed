@@ -325,6 +325,22 @@ object OroborosDaemon {
             prefix = WorktreeCouchGateway.WORKTREE_PREFIX + "build/staging/lib/",
             excludedSegments = emptySet(), excludedRelativePrefixes = emptySet(),
         )
+        // ── Agent home: ~/.hermes is colocated history, not repo state — a fourth narrow gateway,
+        // same shape as the build planes. Excludes are the agent's OWN install/cache material
+        // (venv, tool binaries, thumbnail/image/audio caches, scratch, per-profile sandboxes) —
+        // reinstallable, not "history". Everything else (sessions, skills, state.db, logs, kanban,
+        // memories, cron, config) is what "teleport a clone" means: the agent's memory, not its jar.
+        // ONE-SHOT, no watcher: a home directory's caches/logs churn constantly and a live watch on
+        // 2.7GB of it would dwarf the repo's own file-event volume for no replication benefit.
+        val hermesHomeDir = File(System.getProperty("user.home"), ".hermes")
+        val hermesHomeGateway = WorktreeCouchGateway(
+            fileOps, attachmentGateway,
+            prefix = "homes/hermes/",
+            excludedSegments = setOf(
+                "hermes-agent", "bin", "cache", "image_cache", "audio_cache", "lsp", "plugins",
+                "scratch", "sandboxes", "venv", "node_modules", "__pycache__", ".git", ".curator_backups",
+            ),
+        )
         val couchDb = borg.trikeshed.couch.CouchDatabase(COUCH_DB_NAME, couchStore, casStore)
         couchDb.ensureDesignDoc(vhostRoot = "docs/")
         // Peer exchange for _replicate rides the same HTX reactor as Jules/ModelMux — no JDK client.
@@ -387,7 +403,7 @@ object OroborosDaemon {
             rawRoutes = listOf(graalWire::ingestRoute, couchWire::route),
             streamingPaths = borg.trikeshed.forge.server.CouchWire.streamingPaths(COUCH_DB_NAME) +
                 borg.trikeshed.forge.server.GraalWire.STREAMING +
-                setOf(borg.trikeshed.forge.server.VmWire.EVENTS_PATH) +
+                borg.trikeshed.forge.server.VmWire.STREAMING +
                 borg.trikeshed.forge.server.HermesConsoleWire.STREAMING,
             maxRequestBatch = 4096,
         )
@@ -620,6 +636,12 @@ object OroborosDaemon {
                 )
                 val buildPaths = reconcileBuildPlane(buildClassesGateway, buildClassesDir, stagingLibGateway, stagingLibDir, headSha)
                 System.err.println("[OROBOROS] Build→Couch initial reconcile: $buildPaths classpath attachments (build/live/classes + build/staging/lib)")
+                if (hermesHomeDir.isDirectory) {
+                    val hermesSnap = hermesHomeGateway.reconcile(hermesHomeDir.absolutePath, "oroboros", headSha, System.currentTimeMillis())
+                    System.err.println("[OROBOROS] Hermes home→Couch initial reconcile: ${hermesSnap.paths.size} paths (teleportable clone of ~/.hermes)")
+                } else {
+                    System.err.println("[OROBOROS] Hermes home skipped: $hermesHomeDir not found")
+                }
             }.onFailure {
                 System.err.println("[OROBOROS] initial reconcile failed: ${it.message}")
                 it.printStackTrace()

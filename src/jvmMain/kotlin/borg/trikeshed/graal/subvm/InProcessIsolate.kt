@@ -115,6 +115,10 @@ class InProcessIsolate(
             .allowCreateProcess(false)
             .allowEnvironmentAccess(EnvironmentAccess.NONE)
             .allowPolyglotAccess(PolyglotAccess.NONE)
+        // EnvironmentAccess.NONE still lets specific vars through via .environment(k,v) — the
+        // guest's os.environ carries exactly GuestEnvironment.curated(), the SAME whitelist the
+        // process tier (ProcessIsolate) enforces, nothing host-sourced either way.
+        for ((k, v) in GuestEnvironment.curated()) b.environment(k, v)
         input?.let { b.`in`(it) }
         output?.let { b.out(it) }
         error?.let { b.err(it) }

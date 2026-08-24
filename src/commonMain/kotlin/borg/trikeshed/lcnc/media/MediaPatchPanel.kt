@@ -96,7 +96,13 @@ class Vt220MediaPatchPanel(
     private val history = ArrayDeque<LcncUserSignal>()
 
     init {
-        require(descriptor.kind == "vt220")
+        // "vt220" is accepted for continuity with panels created before the capability upgrade;
+        // "xterm-256color" is what new panels declare — real VT220 hardware never had ANSI SGR
+        // color, and this parser's `sgr()` handles 16/256/truecolor regardless of which label a
+        // caller uses, so self-reporting the lesser class only made well-behaved clients downgrade.
+        require(descriptor.kind == "vt220" || descriptor.kind == "xterm-256color") {
+            "unsupported panel kind: ${descriptor.kind}"
+        }
         require(signalLimit > 0)
     }
 

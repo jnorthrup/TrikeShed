@@ -20,6 +20,7 @@ import borg.trikeshed.context.nuid.nuid
 import borg.trikeshed.lib.j
 import borg.trikeshed.jules.JulesRestClient
 import borg.trikeshed.litebike.taxonomy.Protocol
+import borg.trikeshed.forge.server.ForgeRoutes
 import borg.trikeshed.parse.json.JsonSupport
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
@@ -391,10 +392,27 @@ class JvmKanbanServer(
         val parts = firstLine.split(' ')
         val method = parts.getOrNull(0) ?: "GET"
         val path = parts.getOrNull(1) ?: "/"
+        // ── commonMain PORTABLE tier (ForgeRoutes) — no VM required ──
+        ForgeRoutes.match(method, path)?.let { meta ->
+            if (meta.tier == ForgeRoutes.Tier.PORTABLE) {
+                val fr: borg.trikeshed.forge.server.HttpForwarderResponse? = when (meta.path) {
+                    "/api/health" -> ForgeRoutes.healthJson()
+                    "/api/cap" -> ForgeRoutes.capJson()
+                    "/api/board" -> ForgeRoutes.boardJson()
+                    "/api/metrics" -> ForgeRoutes.metricsResponse(text.contains("format=json", ignoreCase = true))
+                    "/api/invoke" -> if (method == "POST") ForgeRoutes.invokeJson(text) else null
+                    "/", "/index.html" -> ForgeRoutes.shellHtml()
+                    else -> null
+                }
+                if (fr != null) return HttpResponse(fr.status, fr.body.decodeToString(), fr.headers["Content-Type"] ?: "application/json; charset=utf-8", fr.body)
+            }
+        }
         // Store-hosted app first: a raw route (CouchWire) that owns `/` or an asset wins over the
-        // classpath shell, exactly as a CouchApp vhost would. `/api/…` built-ins stay authoritative.
-        if (!path.startsWith("/api/") || path.startsWith("/api/v0/") ||
-            path.startsWith("/api/graal/ingest") || path.startsWith("/api/graal/capsule")) {
+        // classpath shell, exactly as a CouchApp vhost would. `/api/…` built-ins stay authoritative,
+        // EXCEPT the whole `/api/graal/…` namespace and `/api/v0/…` (IPFS block aliases), which
+        // GraalWire's binary-safe raw routes own outright — widened once, generally, rather than
+        // adding one more literal prefix here every time a new POST endpoint lands under /api/graal/.
+        if (!path.startsWith("/api/") || path.startsWith("/api/v0/") || path.startsWith("/api/graal/")) {
             rawRoutes.firstNotNullOfOrNull { it(method, path, payload, null) }?.let { return it }
         }
         return when (path.substringBefore('?')) {

@@ -80,7 +80,7 @@ class HermesVmConsoleTest {
                 assertEquals(200, page?.status)
                 assertTrue(page?.bytes?.decodeToString()?.contains("HERMES · VT220") == true)
                 val snapshot = wire.route("GET", "/api/hermes/terminal", "", null)
-                assertTrue(snapshot?.body?.contains("\"kind\":\"vt220\"") == true)
+                assertTrue(snapshot?.body?.contains("\"kind\":\"xterm-256color\"") == true)
                 val resized = wire.route(
                     "POST", "/api/hermes/terminal/resize",
                     "POST / HTTP/1.1\r\n\r\n{\"columns\":52,\"rows\":9}", null,

@@ -1,6 +1,7 @@
 package borg.trikeshed.graal.subvm
 
 import borg.trikeshed.pointcut.VmFacet
+import borg.trikeshed.vm.VmTerminalSession
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -15,6 +16,26 @@ private class QueueInputStream : InputStream() {
     private val q = LinkedBlockingQueue<Int>()
     fun push(text: String) { for (b in text.toByteArray(Charsets.UTF_8)) q.put(b.toInt() and 0xFF) }
     override fun read(): Int = q.take()
+
+    /**
+     * The JDK's default bulk read blocks trying to fill the WHOLE buffer — one single-byte read()
+     * per slot, no early return — which deadlocks a line-buffered reader like GraalPy's
+     * `sys.stdin.readline()` forever after the first short push (e.g. "pwd\n", 4 bytes) once it
+     * asks for an 8 KiB chunk. Correct blocking-queue-backed contract: block for the FIRST byte,
+     * then drain whatever is already queued without blocking, and return.
+     */
+    override fun read(b: ByteArray, off: Int, len: Int): Int {
+        if (len <= 0) return 0
+        val first = q.take()
+        b[off] = first.toByte()
+        var n = 1
+        while (n < len) {
+            val next = q.poll() ?: break
+            b[off + n] = next.toByte()
+            n++
+        }
+        return n
+    }
 }
 
 /** Captured stdout+stderr as one VT-shaped scrollback the console polls whole; trimmed, not diffed. */
@@ -39,9 +60,11 @@ private class RingOutputStream(private val cap: Int = 400_000) : OutputStream() 
  * `print()` reading and writing exactly those streams — POSIX emulation is GraalPy's `os`/`pathlib`
  * against [TrikeShedGraalVfs], not a hand-rolled syscall layer.
  */
-class HermesCapsule(val id: String) {
-    private val stdin = QueueInputStream()
-    private val stdout = RingOutputStream()
+class HermesCapsule(val id: String, private val terminal: VmTerminalSession? = null) {
+    private val fallbackStdin = QueueInputStream()
+    private val fallbackStdout = RingOutputStream()
+    private val stdin: InputStream = terminal?.input ?: fallbackStdin
+    private val stdout: OutputStream = terminal?.output ?: fallbackStdout
     private val guest = GraalBtrfsSupervisor(id, VmFacet.GRAAL_PYTHON, budget = Budget(statements = 0, wallMillis = 0), input = stdin, output = stdout, error = stdout)
 
     /** Wall-clock stamp of the last read/write, so idle capsules can be reaped without a policy of their own. */
@@ -61,9 +84,16 @@ class HermesCapsule(val id: String) {
         }
     }
 
-    fun type(text: String) { lastActiveMs = System.currentTimeMillis(); stdin.push(if (text.endsWith("\n")) text else "$text\n") }
-    fun output(): String { lastActiveMs = System.currentTimeMillis(); return stdout.snapshot() }
-    fun kill() { alive = false; job?.cancel(); runCatching { guest.close() } }
+    fun type(text: String) {
+        lastActiveMs = System.currentTimeMillis()
+        val line = if (text.endsWith("\n")) text else "$text\n"
+        if (terminal != null) terminal.pushInput(line) else fallbackStdin.push(line)
+    }
+    fun output(): String {
+        lastActiveMs = System.currentTimeMillis()
+        return terminal?.panel?.terminal?.plainText() ?: fallbackStdout.snapshot()
+    }
+    fun kill() { alive = false; job?.cancel(); runCatching { guest.close() }; terminal?.close("capsule killed") }
 
     companion object {
         val registry = ConcurrentHashMap<String, HermesCapsule>()
