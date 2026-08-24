@@ -42,6 +42,7 @@ class TrikeShedGraalVfs(
 ) : GraalFileSystem {
     private val btrfs = UserspaceBtrfs(btrfsRoot, fileOps)
     private val generation = AtomicLong()
+    private val inodeSalt = kotlin.random.Random.Default.nextLong()
     @Volatile private var workingDirectory: Path = Path.of(WORKSPACE)
 
     init {
@@ -159,18 +160,19 @@ class TrikeShedGraalVfs(
         val directory = isDirectory(relative)
         val size = if (directory) 0L else (btrfs.fetchFile(liveSubvolume, relative)?.size?.toLong() ?: 0L)
         val zeroTime = FileTime.fromMillis(0)
+        val inode = inodeOf(relative)
         val all = linkedMapOf<String, Any>(
             "isRegularFile" to !directory,
             "isDirectory" to directory,
             "isSymbolicLink" to false,
             "isOther" to false,
             "size" to size,
-            "fileKey" to relative.hashCode().toLong(),
+            "fileKey" to inode,
             "lastModifiedTime" to zeroTime,
             "lastAccessTime" to zeroTime,
             "creationTime" to zeroTime,
             "mode" to if (directory) 16877 else 33188, // 040755 | 0100644
-            "ino" to relative.hashCode().toLong(),
+            "ino" to inode,
             "dev" to 0L,
             "nlink" to 1,
             "uid" to 0,
@@ -202,6 +204,14 @@ class TrikeShedGraalVfs(
         val relative = text.removePrefix("/").trimEnd('/')
         require(relative.split('/').none { it == ".." }) { "VFS traversal rejected: $path" }
         return relative
+    }
+
+    private fun inodeOf(relative: String): Long {
+        var hash = inodeSalt
+        for (i in relative.indices) {
+            hash = hash * 31 + relative[i].code.toLong()
+        }
+        return hash
     }
 
     private fun exists(relative: String): Boolean =
