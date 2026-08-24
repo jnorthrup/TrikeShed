@@ -881,6 +881,8 @@
           ref.innerHTML = '<span>' + (sheetExpanded[key] ? '▾' : '▸') + '</span><span>▦ ' + (child ? child.title.split('/').pop() : cell.sheet) + '</span>' +
             '<span class="sheet-count">' + (child ? child.rows.length + ' rows' : '') + '</span>';
           ref.title = 'Click: expand in place · Open: zoom into ' + cell.sheet;
+          ref.setAttribute('aria-expanded', sheetExpanded[key] ? 'true' : 'false');
+          ref.setAttribute('aria-label', (sheetExpanded[key] ? 'Collapse ' : 'Expand ') + (child ? child.title.split('/').pop() : cell.sheet));
           ref.addEventListener('click', (ev) => {
             ev.stopPropagation();
             sheetExpanded[key] = !sheetExpanded[key];
