@@ -29,8 +29,15 @@ class JulesPatchContinuityStore(
         patches: Series<JulesRestClient.ActivityPatch>,
         priorCauses: Iterable<JulesCause>,
     ): List<JulesCause.PatchSnapshotObserved> {
-        var causalFacts = priorCauses.filterIsInstance<JulesCause.PatchSnapshotObserved>()
-        var appended = emptyList<JulesCause.PatchSnapshotObserved>()
+        // Bolt: Use ArrayList to avoid O(N^2) copying on append
+        val causalFacts = ArrayList<JulesCause.PatchSnapshotObserved>()
+        for (item in priorCauses) {
+            if (item is JulesCause.PatchSnapshotObserved) {
+                causalFacts.add(item)
+            }
+        }
+        val appended = ArrayList<JulesCause.PatchSnapshotObserved>()
+        val patchOrder = compareBy<JulesCause.PatchSnapshotObserved>({ it.causalOrdinal }, { it.activitySeq }, { it.artifactSeq })
         for (index in 0 until patches.size) {
             val patch = patches[index]
             val bytes = patch.patch.encodeToByteArray()
@@ -43,9 +50,15 @@ class JulesPatchContinuityStore(
             if (alreadyObserved) continue
 
             val touchedFiles = julesPatchFiles(patch.patch).filterNot(::isScratchPatchPath)
-            val retainedBefore = causalFacts.asSequence()
-                .filter { it.reviewCandidate && it.causalOrdinal < patch.causalOrdinal }
-                .maxWithOrNull(compareBy({ it.causalOrdinal }, { it.activitySeq }, { it.artifactSeq }))
+            // Bolt: Replace sequence allocation with zero-allocation for loop
+            var retainedBefore: JulesCause.PatchSnapshotObserved? = null
+            for (item in causalFacts) {
+                if (item.reviewCandidate && item.causalOrdinal < patch.causalOrdinal) {
+                    if (retainedBefore == null || patchOrder.compare(item, retainedBefore) > 0) {
+                        retainedBefore = item
+                    }
+                }
+            }
             val missing = retainedBefore?.touchedFiles
                 ?.filterNot(touchedFiles.toSet()::contains)
                 ?.distinct()
@@ -62,8 +75,8 @@ class JulesPatchContinuityStore(
                 activitySeq = patch.activitySeq,
             )
             boardStore.appendCause(sessionId, fact)
-            causalFacts = causalFacts + fact
-            appended = appended + fact
+            causalFacts.add(fact)
+            appended.add(fact)
         }
         return appended
     }
@@ -78,8 +91,14 @@ class JulesPatchContinuityStore(
         reports: Series<JulesRestClient.ActivityReport>,
         priorCauses: Iterable<JulesCause>,
     ): List<JulesCause.AgentReportObserved> {
-        var causalFacts = priorCauses.filterIsInstance<JulesCause.AgentReportObserved>()
-        var appended = emptyList<JulesCause.AgentReportObserved>()
+        // Bolt: Use ArrayList to avoid O(N^2) copying on append
+        val causalFacts = ArrayList<JulesCause.AgentReportObserved>()
+        for (item in priorCauses) {
+            if (item is JulesCause.AgentReportObserved) {
+                causalFacts.add(item)
+            }
+        }
+        val appended = ArrayList<JulesCause.AgentReportObserved>()
         for (index in 0 until reports.size) {
             val report = reports[index]
             val bytes = report.message.encodeToByteArray()
@@ -100,8 +119,8 @@ class JulesPatchContinuityStore(
                 activitySeq = report.activitySeq,
             )
             boardStore.appendCause(sessionId, fact)
-            causalFacts = causalFacts + fact
-            appended = appended + fact
+            causalFacts.add(fact)
+            appended.add(fact)
         }
         return appended
     }
