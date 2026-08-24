@@ -27,7 +27,7 @@ import kotlin.test.assertTrue
 @Timeout(value = 180, unit = TimeUnit.SECONDS)
 class InProcessIsolateTest {
     private fun js(budget: Budget = Budget(), onRoot: (RootObservation) -> Unit = {}) =
-        InProcessIsolate("js-${System.nanoTime()}", VmFacet.GRAAL_JS, budget, onRoot)
+        InProcessIsolate("js-${System.nanoTime()}", VmFacet.GRAAL_JS, budget, onRootReturn = onRoot)
 
     private fun py(budget: Budget = Budget()) =
         InProcessIsolate("py-${System.nanoTime()}", VmFacet.GRAAL_PYTHON, budget)

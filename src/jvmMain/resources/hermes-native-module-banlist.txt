@@ -1,0 +1,40 @@
+# Python module root | reason | replacement seam
+_cffi_backend|CPython C extension|replace with a pure guest implementation
+_ctypes|native FFI bridge|route the capability through a CCEK host delegate
+_sqlite3|CPython SQLite extension|project persistence through the TrikeShed blackboard/CAS
+aiohttp|compiled multidict/yarl/frozenlist dependency chain|route HTTP through userspace.nio
+ai_edge_litert|native TensorFlow Lite runtime|host-delegate inference
+brotli|native compression extension|host-delegate compression
+brotlicffi|CFFI compression extension|host-delegate compression
+cffi|native FFI bridge|route the capability through a CCEK host delegate
+cryptography|Rust/C/OpenSSL extension|host-delegate signing and TLS
+ctypes|public native FFI module|route the capability through a CCEK host delegate
+ctranslate2|native inference runtime|host-delegate inference
+fastapi|pydantic-core native dependency chain|replace request DTO validation with Confix
+frozenlist|compiled container extension|replace with immutable guest tuples
+httptools|compiled HTTP parser|use TrikeShed HTX parsing
+multidict|compiled container extension|replace with a pure guest mapping
+nacl|libsodium extension|host-delegate signing
+nemo_relay|wheel-only native runtime|replace with a blackboard lifecycle projection
+numpy|native array runtime|project numeric work through a host leaf
+olm|native libolm bindings|host-delegate Matrix encryption
+onnxruntime|native inference runtime|host-delegate inference
+openwakeword|native inference dependency chain|host-delegate wake-word inference
+openai|pydantic-core native dependency chain|route model calls through ModelMux
+orjson|Rust JSON extension|use Python json or Confix host projection
+PIL|native image codecs|host-delegate media transforms
+propcache|compiled cache extension|replace with a pure guest cache
+psutil|native process inspection|route through ProcessReactorEndpoint
+pvporcupine|native wake-word runtime|host-delegate wake-word inference
+pydantic|pydantic-core Rust dependency|replace with Confix validation or pure DTO checks
+pydantic_core|Rust validation runtime|replace with Confix validation or pure DTO checks
+sentencepiece|native tokenizer|host-delegate tokenization
+sherpa_onnx|native inference runtime|host-delegate inference
+sounddevice|PortAudio CFFI binding|host-delegate audio IO
+socket|CPython native socket module|route networking through userspace.nio
+sqlite3|CPython native SQLite module|project persistence through the TrikeShed blackboard/CAS
+ssl|CPython OpenSSL module|route TLS through JvmTlsCodecBackend
+tflite_runtime|native TensorFlow Lite runtime|host-delegate inference
+tokenizers|Rust tokenizer runtime|host-delegate tokenization
+uvloop|libuv Cython extension|use the CCEK reactor
+yarl|compiled URL extension|use a pure URL value or HTX

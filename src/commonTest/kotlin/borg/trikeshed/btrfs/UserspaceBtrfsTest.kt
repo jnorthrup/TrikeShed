@@ -19,9 +19,14 @@ class UserspaceBtrfsTest {
         assertFalse(btrfs.createSubvolume("alpha")) // Duplicate fails
         assertTrue(btrfs.hasSubvolume("alpha"))
         assertEquals(listOf("alpha"), btrfs.listSubvolumes())
+        assertTrue(btrfs.createDirectory("alpha", "workspace/pkg"))
+        assertTrue(btrfs.isDirectory("alpha", "workspace"))
+        assertEquals(listOf("pkg"), btrfs.listDirectory("alpha", "workspace"))
 
         // 2. write alpha/a.txt and alpha/remove.txt; deleteFile alpha/remove.txt removes it; fetch returns null/rejects it while alpha/a.txt survives.
         btrfs.writeFile("alpha", "a.txt", "content A".encodeToByteArray())
+        btrfs.writeFile("alpha", "workspace/pkg/module.py", "VALUE = 1".encodeToByteArray())
+        assertTrue(btrfs.isFile("alpha", "workspace/pkg/module.py"))
         btrfs.writeFile("alpha", "remove.txt", "content B".encodeToByteArray())
         btrfs.deleteFile("alpha", "remove.txt")
         assertNull(btrfs.fetchFile("alpha", "remove.txt"))

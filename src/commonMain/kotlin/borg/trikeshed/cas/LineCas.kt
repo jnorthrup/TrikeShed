@@ -98,8 +98,12 @@ object LineCas {
      * Ingest known trimmed lines: CAS-put each, return spine with neighbor stamps.
      * Prefer this when you already hold the line list and want recoverable blobs.
      */
-    fun ingestLines(cas: CasStore, lines: List<String>): LineSpine {
-        val trimmed = lines.map { it.trim() }.filter { it.isNotEmpty() }
+    fun ingestLines(cas: CasStore, lines: List<String>): LineSpine = ingestLines(cas, lines.toSeries())
+
+    /** Series-native overload: retain the source category until the filtering boundary. */
+    fun ingestLines(cas: CasStore, lines: Series<String>): LineSpine {
+        val trimmed = ArrayList<String>(lines.size)
+        for (line in lines.view) line.trim().takeIf(String::isNotEmpty)?.let(trimmed::add)
         if (trimmed.isEmpty()) return emptySpine()
         val cids = Array(trimmed.size) { i -> cas.put(trimmed[i].encodeToByteArray()) }
         return trimmed.size j { i: Int ->

@@ -1,8 +1,8 @@
 
+<img width="1536" height="2752" alt="image" src="https://github.com/user-attachments/assets/71d3a139-1f0b-40d4-8e4c-ad0e1252dd7f" />
 
-
-++(Bike)Shed library
-<img width="1536" height="2752" alt="image" src="https://gist.github.com/user-attachments/assets/116aacb6-df24-4fcc-b3b9-7b1e0d339c0b" />
+ 
+# TrikeShed  
 
 
 ## tldr 
@@ -777,5 +777,6 @@ I've also written ideas that describe (some) goals and ideals of the library:
 ---
 
 *End of concept map. When you land a change, update the relevant section above — this doc is the maintenance lineage.*
+
 
 <img width="1168" height="784" alt="image" src="https://github.com/user-attachments/assets/8af71944-b802-4a2d-883d-7e25208cbc5f" />

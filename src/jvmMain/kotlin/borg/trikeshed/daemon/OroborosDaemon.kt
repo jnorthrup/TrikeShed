@@ -328,10 +328,26 @@ object OroborosDaemon {
         // the reactive cycle so the port is bound. Driver is available at this point.
         // The Couch wire is mounted on the same listener: `/` is the store-hosted PWA, `/trikeshed/…`
         // the 1.6/1.7 surface, `/api/…` the built-ins — one port, one reactor.
+        // ── Graal console: JFR/JMX instrument cluster + sub-VM host + reactor-served RTS view.
+        //    All of it rides the SAME litebike listener (extraRoutes/SSE respond seam) — the
+        //    userspace uring stack stays the only channelization substrate; JFR/JMX are in-process.
+        val daemonBlackboard = borg.trikeshed.graal.ConfixBlackboard.empty()
+        val jvmVitals = borg.trikeshed.graal.vitals.JvmVitals().also { it.start() }
+        val vmHost = borg.trikeshed.vm.HypervisorVmHost(borg.trikeshed.graal.subvm.Hypervisor(blackboard = daemonBlackboard))
+        borg.trikeshed.vm.VmSupervisor.install(vmHost)
+        val wireScope = CoroutineScope(SupervisorJob(coroutineContext[kotlinx.coroutines.Job]) + Dispatchers.Default)
+        val vmWire = borg.trikeshed.forge.server.VmWire(vmHost, wireScope)
+        val reportReactorForWires = CouchReportReactorElement(parentJob = coroutineContext[kotlinx.coroutines.Job])
+        launch { reportReactorForWires.open() }
+        val graalWire = borg.trikeshed.forge.server.GraalWire(jvmVitals, couchStore, reportReactorForWires, wireScope)
+
         val kanbanServer = JvmKanbanServer(
             driver,
+            extraRoutes = listOf(graalWire::route, vmWire::route),
             rawRoutes = listOf(couchWire::route),
-            streamingPaths = borg.trikeshed.forge.server.CouchWire.streamingPaths(COUCH_DB_NAME),
+            streamingPaths = borg.trikeshed.forge.server.CouchWire.streamingPaths(COUCH_DB_NAME) +
+                borg.trikeshed.forge.server.GraalWire.STREAMING +
+                setOf(borg.trikeshed.forge.server.VmWire.EVENTS_PATH),
             maxRequestBatch = 4096,
         )
         val kanbanJob = SupervisorJob(coroutineContext[kotlinx.coroutines.Job])
@@ -352,7 +368,7 @@ object OroborosDaemon {
         // Connect the pointcut adapter to the actual process-wide ConfixBlackboard instance if it existed globally. 
         // Currently, we'll continue providing an empty blackboard here as there's no pre-existing global ConfixBlackboard exposed to OroborosDaemon.
         // And PointcutCouchProjection ensures it propagates pointcut landings to couch.
-        val pointcutAdapter = borg.trikeshed.pointcut.PointcutBlackboardAdapter(borg.trikeshed.graal.ConfixBlackboard.empty())
+        val pointcutAdapter = borg.trikeshed.pointcut.PointcutBlackboardAdapter(daemonBlackboard)
         pointcutAdapter.install()
         val pointcutProjection = borg.trikeshed.pointcut.PointcutCouchProjection(couchStore, pointcutAdapter, CoroutineScope(Dispatchers.Default))
 
@@ -545,9 +561,8 @@ object OroborosDaemon {
         }
 
         // ── Couch report reactor: CCEK element for map/reduce events ──
-        val reportReactor = CouchReportReactorElement(parentJob = kanbanJob)
-        launch { reportReactor.open() }
-        System.err.println("[OROBOROS] Couch report reactor: ${reportReactor.state}")
+        val reportReactor = reportReactorForWires
+        System.err.println("[OROBOROS] Couch report reactor: ${reportReactor.state} — feeding the Graal console flourish feed")
 
         // ── Tendon: _changes → report bus + Rete facts. Every committed revision (local write,
         //    reconcile, or a peer's replication) is a fact in the production system; the git object

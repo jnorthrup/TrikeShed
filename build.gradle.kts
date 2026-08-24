@@ -599,6 +599,14 @@ registerJulesCli("julesSettle", "borg.trikeshed.jules.JulesSettlementCli", "Dura
 registerJulesCli("julesReviewPatch", "borg.trikeshed.jules.JulesPatchReviewCli", "Select one already-CASed Jules activity patch for drain after explicit review.")
 registerJulesCli("julesReviewReport", "borg.trikeshed.jules.JulesPatchReviewCli", "Bond one already-CASed full Jules agent report to an explicit disposition.", "report")
 
+tasks.register<JavaExec>("portHermesPython") {
+    group = "subvm"
+    description = "Project Hermes Python modules into the no-native GraalPy blackboard VM; --args forwards --root/--report/--entry."
+    mainClass.set("borg.trikeshed.hermes.HermesPythonPortCli")
+    dependsOn("jvmJar")
+    classpath(tasks.named("jvmJar"), configurations.getByName("jvmRuntimeClasspath"))
+}
+
 // Daemon — flywheel loop. HotSwapAgent watches CycleBody.class for live edits.
 tasks.register<JavaExec>("runOroborosDaemon") {
     group = "oroboros"

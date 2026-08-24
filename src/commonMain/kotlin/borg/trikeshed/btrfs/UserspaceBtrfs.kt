@@ -236,6 +236,47 @@ class UserspaceBtrfs(val rootDir: String, val fileOps: FileOperations) {
         return fileOps.readAllBytes(fullPath).copyOf()
     }
 
+    /** Create one directory inside a mutable subvolume. Empty/root is already present. */
+    fun createDirectory(subvol: String, directory: String): Boolean {
+        val subvolPath = getSubvolPath(subvol) ?: return false
+        if (!fileOps.exists(subvolPath) || isSnapshot(subvolPath)) return false
+        if (directory.isEmpty()) return true
+        if (!isValidFilePath(directory)) return false
+        val fullPath = fileOps.resolvePath(subvolPath, directory)
+        if (fileOps.exists(fullPath)) return false
+        fileOps.mkdirs(fullPath)
+        return true
+    }
+
+    /** Direct children only, in deterministic order; null means missing/not-a-directory. */
+    fun listDirectory(subvol: String, directory: String = ""): List<String>? {
+        val subvolPath = getSubvolPath(subvol) ?: return null
+        if (!fileOps.exists(subvolPath)) return null
+        val fullPath = if (directory.isEmpty()) subvolPath else {
+            if (!isValidFilePath(directory)) return null
+            fileOps.resolvePath(subvolPath, directory)
+        }
+        if (!fileOps.isDir(fullPath)) return null
+        return fileOps.listDir(fullPath).asSequence().map { it.substringBefore('/') }
+            .filter { it.isNotEmpty() && it != ".subvol_meta" && it != ".snapshot" }
+            .distinct().sorted().toList()
+    }
+
+    fun isDirectory(subvol: String, path: String = ""): Boolean {
+        val subvolPath = getSubvolPath(subvol) ?: return false
+        val fullPath = if (path.isEmpty()) subvolPath else {
+            if (!isValidFilePath(path)) return false
+            fileOps.resolvePath(subvolPath, path)
+        }
+        return fileOps.isDir(fullPath)
+    }
+
+    fun isFile(subvol: String, path: String): Boolean {
+        val subvolPath = getSubvolPath(subvol) ?: return false
+        if (!isValidFilePath(path)) return false
+        return fileOps.isFile(fileOps.resolvePath(subvolPath, path))
+    }
+
     fun deleteFile(subvol: String, file: String): Boolean {
         val subvolPath = getSubvolPath(subvol) ?: return false
         if (!fileOps.exists(subvolPath)) return false

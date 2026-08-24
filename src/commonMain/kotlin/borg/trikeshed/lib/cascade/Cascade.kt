@@ -171,16 +171,35 @@ fun <S : Comparable<S>, V> Series<Emit<S, V>>.prefixRange(p: Prefix<S>): Series<
 // ── group_level over an emit list (delivery-time sum) ────────────────────────────────────────
 
 /** Sort by collation once. */
-fun <S : Comparable<S>, V> Series<Emit<S, V>>.collated(): Series<Emit<S, V>> =
-    toList().sortedWith { x, y -> compareKeys(x.a, y.a) }.toSeries()
+fun <S : Comparable<S>, V> Series<Emit<S, V>>.collated(): Series<Emit<S, V>> {
+    val ordered = Array(size) { i: Int -> this[i] }
+    ordered.sortWith { x, y -> compareKeys(x.a, y.a) }
+    return ordered α { it }
+}
 
 /**
  * Couch `?group_level=depth`: one walk over the collated emits, folding while the prefix is
  * unchanged. The collated Series IS the prefix tree — equal prefixes are contiguous — so no
  * second structure is needed; a dinged row is a re-collate.
  */
-fun <S : Comparable<S>, V> Series<Emit<S, V>>.groupLevel(depth: Depth, m: Monoid<V>): Level<S, V> =
-    collated().toList().groupBy { it.a.prefix(depth).toList() }.map { (p, es) -> p.toSeries() j es.fold(m.zero) { a, e -> m.combine(a, e.b) } }.toSeries()
+fun <S : Comparable<S>, V> Series<Emit<S, V>>.groupLevel(depth: Depth, m: Monoid<V>): Level<S, V> {
+    val ordered = collated()
+    if (ordered.size == 0) return emptySeriesOf()
+    val nodes = ArrayList<Node<S, V>>() // genuinely mutable reduction output
+    var prefix = ordered[0].a.prefix(depth)
+    var acc = m.zero
+    for (emit in ordered.view) {
+        val next = emit.a.prefix(depth)
+        if (compareKeys(prefix, next) != 0) {
+            nodes += prefix j acc
+            prefix = next
+            acc = m.zero
+        }
+        acc = m.combine(acc, emit.b)
+    }
+    nodes += prefix j acc
+    return nodes.size j { i: Int -> nodes[i] }
+}
 
 fun <S : Comparable<S>, V> Series<Emit<S, V>>.view(m: Monoid<V>): View<S, V> = { groupLevel(it, m) }
 

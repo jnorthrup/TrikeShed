@@ -18,11 +18,14 @@ class EmpiricalMotionModel<Context, T> : SplatModel<Context, T> {
         val outcomes = counts[context] ?: return emptySplat()
         val total = totalRuns[context] ?: 0
 
-        val entries = outcomes.keys.toList()
+        val entries = arrayOfNulls<Any?>(outcomes.size)
+        var entryIndex = 0
+        for (outcome in outcomes.keys) entries[entryIndex++] = outcome
+        entries.sortBy { it.toString() }
         val size = entries.size
 
-        return size.j { i ->
-            val outcome = entries[i]
+        return size.j { i: Int ->
+            @Suppress("UNCHECKED_CAST") val outcome = entries[i] as T
             val count = outcomes[outcome] ?: 0
             val prob = (count + laplaceSmoothing) / (total + laplaceSmoothing * size)
             outcome.j(prob)

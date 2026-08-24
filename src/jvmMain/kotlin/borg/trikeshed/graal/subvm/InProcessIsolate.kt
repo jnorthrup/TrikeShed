@@ -13,6 +13,7 @@ import org.graalvm.polyglot.ResourceLimits
 import org.graalvm.polyglot.Source
 import org.graalvm.polyglot.Value
 import org.graalvm.polyglot.io.IOAccess
+import org.graalvm.polyglot.io.FileSystem as GraalFileSystem
 import org.graalvm.polyglot.management.ExecutionEvent
 import org.graalvm.polyglot.management.ExecutionListener
 import org.graalvm.polyglot.proxy.ProxyExecutable
@@ -65,6 +66,7 @@ class InProcessIsolate(
     override val id: String,
     override val facet: VmFacet,
     val budget: Budget = Budget(),
+    private val fileSystem: GraalFileSystem? = null,
     private val onRootReturn: (RootObservation) -> Unit = {},
 ) : GuestIsolate {
     override val trust = Trust.OWN
@@ -91,10 +93,18 @@ class InProcessIsolate(
     @Volatile private var alive = true
 
     init {
+        val ioAccess = fileSystem?.let { fs ->
+            val guestFs = GraalFileSystem.allowInternalResourceAccess(fs)
+            IOAccess.newBuilder()
+                .allowHostFileAccess(false)
+                .allowHostSocketAccess(false)
+                .fileSystem(guestFs)
+                .build()
+        } ?: IOAccess.NONE
         val b = Context.newBuilder(bounds.languageId).engine(engine)
             .allowHostAccess(HostAccess.NONE)
             .allowHostClassLookup { false }
-            .allowIO(IOAccess.NONE)
+            .allowIO(ioAccess)
             .allowCreateThread(false)
             .allowNativeAccess(false)
             .allowCreateProcess(false)

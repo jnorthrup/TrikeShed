@@ -1,0 +1,355 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Graal Console</title>
+<link rel="manifest" href="/graal.webmanifest">
+<link rel="icon" href="/icons/forge-icon.svg">
+<style>
+/* Committed single-theme: a dark ops console. Every color painted explicitly. */
+:root{
+  --bg:#0b0e14; --panel:#11151e; --panel2:#161b26; --line:#232a38; --ink:#d8dce6; --dim:#7b8496;
+  --graal:#f29111;            /* GraalVM ember */
+  --compile:#3ddc84; --deopt:#ff4f58; --gc:#ffb02e; --commit:#3fd0ff; --vm:#b07aff; --cpu:#6ea8fe;
+}
+*{box-sizing:border-box;margin:0}
+html,body{height:100%}
+body{background:var(--bg);color:var(--ink);font:13px/1.45 "SF Mono","JetBrains Mono",ui-monospace,Menlo,monospace;overflow:hidden}
+#map{position:absolute;inset:0;cursor:grab}
+#map.drag{cursor:grabbing}
+/* ── HUD top bar ─────────────────────────────────────────── */
+#hud{position:absolute;top:0;left:0;right:0;display:flex;align-items:stretch;gap:1px;background:linear-gradient(180deg,rgba(11,14,20,.96),rgba(11,14,20,.82) 75%,transparent);padding:8px 10px 14px;pointer-events:none;z-index:5}
+.chip{pointer-events:auto;background:var(--panel);border:1px solid var(--line);border-radius:4px;padding:5px 10px;margin-right:6px;min-width:86px}
+.chip b{display:block;font-size:17px;font-variant-numeric:tabular-nums;letter-spacing:.02em}
+.chip span{font-size:10px;color:var(--dim);text-transform:uppercase;letter-spacing:.08em}
+.chip.flash-compile{box-shadow:0 0 0 1px var(--compile),0 0 14px rgba(61,220,132,.45)}
+.chip.flash-deopt{box-shadow:0 0 0 1px var(--deopt),0 0 14px rgba(255,79,88,.5)}
+.chip.flash-gc{box-shadow:0 0 0 1px var(--gc),0 0 14px rgba(255,176,46,.45)}
+#ident{background:var(--panel);border:1px solid var(--graal);border-radius:4px;padding:5px 12px;margin-right:10px;pointer-events:auto}
+#ident b{color:var(--graal);font-size:15px;letter-spacing:.03em}
+#ident span{display:block;font-size:10px;color:var(--dim)}
+.bar{height:4px;background:var(--line);border-radius:2px;margin-top:4px;overflow:hidden}
+.bar i{display:block;height:100%;width:0%;background:var(--cpu);transition:width .5s}
+canvas.spark{display:block;margin-top:3px}
+/* ── right rail: event river ─────────────────────────────── */
+#river{position:absolute;top:78px;right:10px;width:300px;bottom:150px;overflow:hidden;display:flex;flex-direction:column;gap:3px;pointer-events:none;z-index:4}
+.evt{background:rgba(17,21,30,.92);border-left:3px solid var(--dim);border-radius:3px;padding:3px 8px;font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;animation:drop .25s ease-out}
+.evt small{color:var(--dim)}
+@keyframes drop{from{transform:translateY(-8px);opacity:0}to{transform:none;opacity:1}}
+/* ── panels ──────────────────────────────────────────────── */
+.panel{position:absolute;background:var(--panel);border:1px solid var(--line);border-radius:6px;z-index:6;display:none;flex-direction:column}
+.panel header{padding:6px 10px;border-bottom:1px solid var(--line);font-size:11px;text-transform:uppercase;letter-spacing:.1em;color:var(--dim);display:flex;justify-content:space-between}
+.panel header b{color:var(--ink)}
+.panel .body{overflow:auto;padding:8px 10px;font-size:11px}
+#doc{left:10px;top:78px;width:430px;max-height:70%}
+#doc pre{white-space:pre-wrap;word-break:break-all;color:var(--ink)}
+#points{left:10px;bottom:36px;width:560px;max-height:46%}
+#vms{right:320px;top:78px;width:430px;max-height:50%}
+table{border-collapse:collapse;width:100%}
+td,th{padding:2px 8px 2px 0;text-align:left;border-bottom:1px solid var(--line);font-variant-numeric:tabular-nums}
+th{color:var(--dim);font-weight:normal;font-size:10px;text-transform:uppercase}
+.x{cursor:pointer;color:var(--dim)} .x:hover{color:var(--ink)}
+/* ── minimap + footer ────────────────────────────────────── */
+#mini{position:absolute;right:10px;bottom:36px;border:1px solid var(--line);border-radius:4px;background:var(--panel);z-index:5;cursor:crosshair}
+#crumb{position:absolute;left:10px;bottom:8px;color:var(--dim);font-size:11px;z-index:5;text-shadow:0 1px 2px #000}
+#help{position:absolute;right:10px;bottom:8px;color:var(--dim);font-size:10px;z-index:5}
+#help b{color:var(--ink)}
+@media (prefers-reduced-motion: reduce){.evt{animation:none}}
+</style>
+</head>
+<body>
+<canvas id="map"></canvas>
+<div id="hud">
+  <div id="ident"><b>GraalVM</b><span id="identSub">connecting…</span></div>
+  <div class="chip" id="cComp"><b>0</b><span>jit compiles</span><canvas class="spark" width="86" height="14"></canvas></div>
+  <div class="chip" id="cDeopt"><b>0</b><span>deopts</span></div>
+  <div class="chip" id="cGc"><b>0</b><span>gc · pause ms</span></div>
+  <div class="chip" id="cHeap"><b>–</b><span>heap</span><div class="bar"><i></i></div></div>
+  <div class="chip" id="cCpu"><b>–</b><span>cpu jvm/host</span><div class="bar"><i></i></div></div>
+  <div class="chip" id="cCls"><b>–</b><span>classes</span></div>
+  <div class="chip" id="cThr"><b>–</b><span>threads</span></div>
+  <div class="chip" id="cPoint"><b>–</b><span>pointcut routes</span></div>
+  <div class="chip" id="cVm"><b>–</b><span>sub-vms</span></div>
+  <div class="chip" id="cDocs"><b>–</b><span>documents</span></div>
+</div>
+<div id="river"></div>
+<div class="panel" id="doc"><header><b id="docTitle">document</b><span class="x" onclick="hide('doc')">✕</span></header><div class="body"><pre id="docBody"></pre></div></div>
+<div class="panel" id="points"><header><b>pointcut routes</b><span class="x" onclick="hide('points')">✕</span></header><div class="body" id="pointsBody"></div></div>
+<div class="panel" id="vms"><header><b>graal sub-vms</b><span class="x" onclick="hide('vms')">✕</span></header><div class="body" id="vmsBody"></div></div>
+<canvas id="mini" width="200" height="124"></canvas>
+<div id="crumb">loading terrain…</div>
+<div id="help"><b>wheel</b> zoom · <b>drag</b> pan · <b>dblclick</b> dive · <b>click</b> inspect · <b>0</b> fit · <b>P</b> pointcuts · <b>V</b> vms</div>
+<script>
+'use strict';
+const $=id=>document.getElementById(id);
+const reduced=matchMedia('(prefers-reduced-motion: reduce)').matches;
+const DB='trikeshed';
+/* ── world & camera ─────────────────────────────────────── */
+const W=1600,H=1000;
+let cam={s:1,ox:0,oy:0};                 // screen = (world - o) * s
+const map=$('map'),ctx=map.getContext('2d');
+const mini=$('mini'),mctx=mini.getContext('2d');
+function resize(){map.width=innerWidth*devicePixelRatio;map.height=innerHeight*devicePixelRatio;
+  map.style.width=innerWidth+'px';map.style.height=innerHeight+'px';fit();}
+addEventListener('resize',resize);
+function fit(){const s=Math.min(innerWidth/W,innerHeight/H)*0.96;
+  cam={s,ox:W/2-innerWidth/(2*s),oy:H/2-innerHeight/(2*s)+30/s};}
+/* ── terrain tree from /api/graal/map ───────────────────── */
+let root=null,byId=new Map();
+const HUES={'projects':172,'.git':262,'pointcut':8,'_design':318,'memories':210,'lost-found':48,'jules':132,'vms':282};
+function hueOf(name){if(name in HUES)return HUES[name];let h=0;for(const c of name)h=(h*31+c.charCodeAt(0))>>>0;return h%360;}
+function node(name,parent){return{name,parent,children:new Map(),bytes:0,docs:0,leaf:false,rect:null,laid:false,hue:parent?parent.hue:hueOf(name)};}
+function buildTree(rows){
+  root=node('trikeshed',null);root.rect={x:0,y:0,w:W,h:H};byId=new Map();
+  for(const [id,bytes] of rows){
+    const parts=id.split('/').filter(p=>p.length);let n=root;
+    for(let i=0;i<parts.length;i++){
+      let c=n.children.get(parts[i]);
+      if(!c){c=node(parts[i],n===root?null:n);if(n===root)c.hue=hueOf(parts[i]);else c.hue=n.hue;c.parent=n;n.children.set(parts[i],c);}
+      n=c;n.bytes+=bytes;n.docs++;
+    }
+    n.leaf=true;n.id=id;byId.set(id,n);
+    root.bytes+=bytes;root.docs++;
+  }
+  invalidate(root);
+  $('cDocs').firstChild.textContent=root.docs.toLocaleString();
+}
+function invalidate(n){n.laid=false;for(const c of n.children.values())invalidate(c);}
+/* squarified-ish treemap: rows of children sorted by mass, laid into the node rect */
+function layout(n){
+  if(n.laid)return;n.laid=true;
+  const kids=[...n.children.values()].sort((a,b)=>b.bytes-a.bytes);
+  if(!kids.length)return;
+  const pad=Math.min(n.rect.w,n.rect.h)*0.015, title=(n.rect.h>40&&n!==root)?Math.min(16/camPx(1),n.rect.h*0.12):0;
+  let x=n.rect.x+pad,y=n.rect.y+pad+title,w=n.rect.w-2*pad,h=n.rect.h-2*pad-title;
+  if(w<=0||h<=0){for(const k of kids)k.rect={x:n.rect.x,y:n.rect.y,w:0,h:0};return;}
+  const total=kids.reduce((s,k)=>s+k.bytes,0)||1;
+  let i=0;
+  while(i<kids.length){
+    const vert=w<h; const side=vert?w:h;
+    let take=[],mass=0,best=Infinity;
+    for(let j=i;j<kids.length;j++){
+      const m2=mass+kids[j].bytes, frac=m2/total, breadth=(vert?h:w)*frac;
+      const worst=Math.max(...[...take,kids[j]].map(k=>{const a=(k.bytes/m2)*side*breadth;const s1=(k.bytes/m2)*side;return Math.max(s1/ (breadth||1e-9),(breadth||1e-9)/s1);}));
+      if(worst<=best||take.length===0){take.push(kids[j]);mass=m2;best=worst;}else break;
+    }
+    const frac=mass/total, breadth=(vert?h:w)*frac;
+    let off=0;
+    for(const k of take){const kf=k.bytes/mass;
+      if(vert){k.rect={x:x+off*w,y:y,w:w*kf,h:breadth};off+=kf;}
+      else{k.rect={x:x,y:y+off*h,w:breadth,h:h*kf};off+=kf;}
+    }
+    if(vert)y+=breadth,h-=breadth;else x+=breadth,w-=breadth;
+    total-mass; i+=take.length;
+    const rem=kids.slice(i).reduce((s,k)=>s+k.bytes,0);
+    if(rem<=0){for(let j=i;j<kids.length;j++)kids[j].rect={x,y,w:0,h:0};break;}
+  }
+}
+function camPx(worldLen){return worldLen*cam.s;}
+/* ── render ─────────────────────────────────────────────── */
+let hover=null,pings=[],shake=0;
+function draw(){
+  const dpr=devicePixelRatio;ctx.setTransform(dpr,0,0,dpr,0,0);
+  ctx.fillStyle='#0b0e14';ctx.fillRect(0,0,innerWidth,innerHeight);
+  let sx=0,sy=0;
+  if(shake>0&&!reduced){sx=(Math.random()-0.5)*shake;sy=(Math.random()-0.5)*shake;shake*=0.85;if(shake<0.4)shake=0;}
+  ctx.save();ctx.translate(sx,sy);
+  if(root)drawNode(root,0);
+  // pings
+  const now=performance.now();
+  pings=pings.filter(p=>now-p.t0<1400);
+  for(const p of pings){
+    const t=(now-p.t0)/1400, r=6+t*46, a=1-t;
+    const x=(p.x-cam.ox)*cam.s, y=(p.y-cam.oy)*cam.s;
+    ctx.strokeStyle=p.color;ctx.globalAlpha=a*0.9;ctx.lineWidth=2;
+    ctx.beginPath();ctx.arc(x,y,r,0,7);ctx.stroke();
+    ctx.globalAlpha=a;ctx.fillStyle=p.color;ctx.beginPath();ctx.arc(x,y,3,0,7);ctx.fill();
+    if(p.label&&t<0.6){ctx.font='10px monospace';ctx.fillText(p.label,x+8,y-8);}
+    ctx.globalAlpha=1;
+  }
+  ctx.restore();
+  drawMini();
+  requestAnimationFrame(draw);
+}
+function drawNode(n,depth){
+  const r=n.rect;if(!r)return;
+  const x=(r.x-cam.ox)*cam.s,y=(r.y-cam.oy)*cam.s,w=r.w*cam.s,h=r.h*cam.s;
+  if(x>innerWidth||y>innerHeight||x+w<0||y+h<0||w<1.2||h<1.2)return;
+  const light=n.leaf?18:10+Math.min(depth*2,8);
+  ctx.fillStyle=`hsl(${n.hue} 42% ${light}%)`;
+  ctx.strokeStyle=`hsl(${n.hue} 45% ${Math.min(light+14,40)}%)`;
+  ctx.lineWidth=n===hover?2:0.75;
+  ctx.beginPath();ctx.rect(x,y,w,h);ctx.fill();ctx.stroke();
+  if(n===hover){ctx.strokeStyle=`hsl(${n.hue} 90% 60%)`;ctx.stroke();}
+  const showKids=n.children.size&&w>26&&h>18;
+  if(showKids){layout(n);for(const c of n.children.values())drawNode(c,depth+1);}
+  if(w>64&&h>15){
+    ctx.font=(depth<2?'bold ':'')+Math.min(13,Math.max(9,h*0.08))+'px monospace';
+    ctx.fillStyle=depth<2?`hsl(${n.hue} 70% 72%)`:'rgba(216,220,230,.82)';
+    const label=n.name+(showKids?'':n.leaf?'':' ·'+n.docs);
+    ctx.fillText(label.slice(0,Math.floor(w/7)),x+5,y+12);
+    if(!showKids&&h>34){ctx.font='9px monospace';ctx.fillStyle='rgba(123,132,150,.9)';
+      ctx.fillText(n.leaf?fmtBytes(n.bytes):n.docs.toLocaleString()+' docs · '+fmtBytes(n.bytes),x+5,y+24);}
+    if(n.leaf&&w>170&&h>56){ctx.font='9px monospace';ctx.fillStyle='rgba(216,220,230,.55)';
+      ctx.fillText((n.id||'').slice(-Math.floor(w/6)),x+5,y+h-6);}
+  }
+}
+function fmtBytes(b){return b>1048576?(b/1048576).toFixed(1)+'M':b>1024?(b/1024).toFixed(1)+'K':b+'B';}
+function drawMini(){
+  mctx.setTransform(1,0,0,1,0,0);mctx.fillStyle='#11151e';mctx.fillRect(0,0,200,124);
+  if(!root)return;const kx=200/W,ky=124/H;
+  for(const c of root.children.values()){if(!c.rect)continue;
+    mctx.fillStyle=`hsl(${c.hue} 40% 22%)`;
+    mctx.fillRect(c.rect.x*kx+1,c.rect.y*ky+1,Math.max(1,c.rect.w*kx-2),Math.max(1,c.rect.h*ky-2));}
+  mctx.strokeStyle='#f29111';mctx.lineWidth=1;
+  mctx.strokeRect(cam.ox*kx,cam.oy*ky,(innerWidth/cam.s)*kx,(innerHeight/cam.s)*ky);
+}
+/* ── input ──────────────────────────────────────────────── */
+let dragging=false,lx=0,ly=0,moved=0;
+map.addEventListener('mousedown',e=>{dragging=true;moved=0;lx=e.clientX;ly=e.clientY;map.classList.add('drag');});
+addEventListener('mouseup',()=>{dragging=false;map.classList.remove('drag');});
+map.addEventListener('mousemove',e=>{
+  if(dragging){const dx=e.clientX-lx,dy=e.clientY-ly;moved+=Math.abs(dx)+Math.abs(dy);
+    cam.ox-=dx/cam.s;cam.oy-=dy/cam.s;lx=e.clientX;ly=e.clientY;}
+  hover=hit(e.clientX,e.clientY);
+  $('crumb').textContent=hover?pathOf(hover)+'  ·  '+(hover.leaf?fmtBytes(hover.bytes):hover.docs.toLocaleString()+' docs, '+fmtBytes(hover.bytes)):'';
+});
+map.addEventListener('wheel',e=>{e.preventDefault();
+  const f=e.deltaY<0?1.18:1/1.18, wx=cam.ox+e.clientX/cam.s, wy=cam.oy+e.clientY/cam.s;
+  cam.s=Math.min(Math.max(cam.s*f,0.2),4000);
+  cam.ox=wx-e.clientX/cam.s;cam.oy=wy-e.clientY/cam.s;},{passive:false});
+map.addEventListener('dblclick',e=>{const n=hit(e.clientX,e.clientY);if(n)flyTo(n.leaf?(n.parent||n):n);});
+map.addEventListener('click',e=>{if(moved>4)return;const n=hit(e.clientX,e.clientY);if(n&&n.leaf)openDoc(n.id);});
+mini.addEventListener('click',e=>{const r=mini.getBoundingClientRect();
+  cam.ox=(e.clientX-r.left)/ (200/W)-innerWidth/(2*cam.s);cam.oy=(e.clientY-r.top)/(124/H)-innerHeight/(2*cam.s);});
+addEventListener('keydown',e=>{
+  if(e.key==='0')fit();
+  if(e.key==='p'||e.key==='P')togglePoints();
+  if(e.key==='v'||e.key==='V')toggleVms();
+});
+function hit(cx,cy){
+  if(!root)return null;const wx=cam.ox+cx/cam.s, wy=cam.oy+cy/cam.s;
+  let n=root,found=null;
+  while(n){found=n;let next=null;
+    if(n.children.size&&n.rect.w*cam.s>26){layout(n);
+      for(const c of n.children.values()){const r=c.rect;
+        if(r&&wx>=r.x&&wx<=r.x+r.w&&wy>=r.y&&wy<=r.y+r.h){next=c;break;}}}
+    n=next;}
+  return found===root?null:found;
+}
+function pathOf(n){const parts=[];while(n&&n!==root){parts.unshift(n.name);n=n.parent;}return parts.join('/');}
+function flyTo(n){
+  const r=n.rect,margin=0.94;
+  const s=Math.min(innerWidth/r.w,innerHeight/r.h)*margin;
+  const tx=r.x+r.w/2-innerWidth/(2*s), ty=r.y+r.h/2-innerHeight/(2*s);
+  if(reduced){cam={s,ox:tx,oy:ty};return;}
+  const from={...cam},t0=performance.now();
+  (function step(){const t=Math.min(1,(performance.now()-t0)/320),e=1-Math.pow(1-t,3);
+    cam.s=from.s+(s-from.s)*e;cam.ox=from.ox+(tx-from.ox)*e;cam.oy=from.oy+(ty-from.oy)*e;
+    if(t<1)requestAnimationFrame(step);})();
+}
+/* ── atomic inspect ─────────────────────────────────────── */
+async function openDoc(id){
+  $('docTitle').textContent=id;$('docBody').textContent='…';show('doc');
+  try{const r=await fetch('/'+DB+'/'+id.split('/').map(encodeURIComponent).join('/'));
+    $('docBody').textContent=JSON.stringify(await r.json(),null,2);}
+  catch(e){$('docBody').textContent='fetch failed: '+e;}
+}
+function show(id){$(id).style.display='flex';}
+function hide(id){$(id).style.display='none';}
+/* ── HUD vitals ─────────────────────────────────────────── */
+let lastComp=0,compHist=[];
+const sparkCtx=$('cComp').querySelector('canvas').getContext('2d');
+async function pollVitals(){
+  try{
+    const v=await (await fetch('/api/graal/vitals')).json();
+    const g=v.graal||{};
+    $('identSub').textContent=(g.vmName||'?')+' '+(g.vmVersion||'')+' · pid '+(g.pid||'?')+' · up '+Math.floor((g.uptimeMs||0)/60000)+'m'+(v.jfr&&v.jfr.live?' · jfr live':' · jfr OFF');
+    const jit=v.jit||{},de=v.deopt||{},gc=v.gc||{},mem=v.memory||{},cls=v.classes||{},thr=v.threads||{},cpu=v.cpu||{},pts=v.pointcuts||{};
+    $('cComp').firstChild.textContent=(jit.compilations||0).toLocaleString();
+    $('cDeopt').firstChild.textContent=(de.count||0).toLocaleString();
+    $('cGc').firstChild.textContent=(gc.collections||0)+' · '+(gc.pauseMsTotal||0);
+    const hu=mem.heapUsed||0,hm=mem.heapMax||1;
+    $('cHeap').firstChild.textContent=fmtBytes(hu)+'/'+fmtBytes(hm);
+    $('cHeap').querySelector('.bar i').style.width=Math.min(100,100*hu/hm)+'%';
+    $('cCpu').firstChild.textContent=Math.round((cpu.jvm||0)*100)+'% / '+Math.round((cpu.machine||0)*100)+'%';
+    $('cCpu').querySelector('.bar i').style.width=Math.min(100,(cpu.jvm||0)*100)+'%';
+    $('cCls').firstChild.textContent=(cls.loaded||0).toLocaleString();
+    $('cThr').firstChild.textContent=(thr.live||0)+' ('+(thr.daemon||0)+'d)';
+    $('cPoint').firstChild.textContent=(pts.routes||0).toLocaleString();
+    const rate=Math.max(0,(jit.compilations||0)-lastComp);lastComp=jit.compilations||0;
+    compHist.push(rate);if(compHist.length>43)compHist.shift();
+    sparkCtx.clearRect(0,0,86,14);sparkCtx.strokeStyle='#3ddc84';sparkCtx.beginPath();
+    const mx=Math.max(1,...compHist);
+    compHist.forEach((r,i)=>{const x=i*2,y=13-11*r/mx;i?sparkCtx.lineTo(x,y):sparkCtx.moveTo(x,y);});
+    sparkCtx.stroke();
+  }catch(e){}
+  setTimeout(pollVitals,2000);
+}
+async function pollVms(){
+  try{const r=await fetch('/api/vm');
+    if(r.ok){const s=await r.json();const rows=(s.rows||s.cells||[]);vmRows=rows;
+      $('cVm').firstChild.textContent=Array.isArray(rows)?rows.length:'?';}
+    else $('cVm').firstChild.textContent='–';
+  }catch(e){$('cVm').firstChild.textContent='–';}
+  setTimeout(pollVms,5000);
+}
+let vmRows=[];
+function toggleVms(){const p=$('vms');if(p.style.display==='flex')return hide('vms');
+  $('vmsBody').innerHTML=vmRows.length?('<table><tr><th>row</th></tr>'+vmRows.map(r=>'<tr><td>'+JSON.stringify(r)+'</td></tr>').join('')+'</table>'):'<i>no hypervisor rows — spawn via POST /api/vm/spawn</i>';
+  show('vms');}
+async function togglePoints(){const p=$('points');if(p.style.display==='flex')return hide('points');
+  try{const r=await (await fetch('/api/graal/pointcuts')).json();
+    const routes=r.routes||[];
+    $('pointsBody').innerHTML=routes.length?
+      '<table><tr><th>route</th><th>facet</th><th>class.method@bci</th><th>prop</th><th>value</th></tr>'+
+      routes.map(x=>'<tr><td>'+x.route+'</td><td>'+(x.facet||'')+'</td><td>'+(x.className||'')+'.'+(x.methodName||'')+'@'+(x.bci||'')+'</td><td>'+(x.property||'')+'</td><td>'+(x.value||'')+'</td></tr>').join('')+'</table>'
+      :'<i>no pointcut landings yet — the routes appear as the instrumented code runs</i>';
+  }catch(e){$('pointsBody').textContent='fetch failed: '+e;}
+  show('points');}
+/* ── the flourish feed ──────────────────────────────────── */
+const COLORS={compile:'var(--compile)',deopt:'var(--deopt)',gc:'var(--gc)',commit:'var(--commit)',cpu:'var(--cpu)',vm:'var(--vm)'};
+const PING={compile:'#3ddc84',deopt:'#ff4f58',gc:'#ffb02e',commit:'#3fd0ff'};
+function river(kind,text){
+  const d=document.createElement('div');d.className='evt';d.style.borderLeftColor=COLORS[kind]||'var(--dim)';
+  d.innerHTML='<small>'+new Date().toTimeString().slice(0,8)+'</small> <b style="color:'+(COLORS[kind]||'#fff')+'">'+kind+'</b> '+text;
+  const r=$('river');r.prepend(d);while(r.children.length>34)r.lastChild.remove();
+}
+function flash(chip,cls){if(reduced)return;chip.classList.add(cls);setTimeout(()=>chip.classList.remove(cls),450);}
+function pingAt(n,color,label){
+  if(!n||!n.rect)n=root;if(!n||!n.rect)return;
+  pings.push({x:n.rect.x+n.rect.w/2,y:n.rect.y+n.rect.h/2,color,label,t0:performance.now()});
+}
+function nodeFor(id){
+  if(byId.has(id))return byId.get(id);
+  const parts=id.split('/').filter(p=>p.length);let n=root,best=root;
+  for(const p of parts){if(!n)break;n=n.children.get(p);if(n)best=n;}
+  return best;
+}
+function connectSse(){
+  const es=new EventSource('/api/graal/events');
+  es.onmessage=m=>{try{
+    const e=JSON.parse(m.data);
+    switch(e.kind){
+      case 'compile':river('compile',(e.method||'?')+' L'+(e.level??'?')+' '+fmtBytes(e.codeSize||0));flash($('cComp'),'flash-compile');break;
+      case 'deopt':river('deopt',(e.reason||'?')+' → '+(e.action||'?')+' #'+(e.compileId??''));flash($('cDeopt'),'flash-deopt');shake=Math.min(shake+5,9);pingAt(nodeFor('pointcut'),PING.deopt,e.reason);break;
+      case 'gc':river('gc',(e.name||'?')+' '+(e.cause||'')+' '+(e.pauseMs||0)+'ms');flash($('cGc'),'flash-gc');break;
+      case 'commit':river('commit',(e.deleted?'✕ ':'')+e.id);pingAt(nodeFor(e.id),PING.commit);break;
+      case 'cpu':break;
+      default:river(e.kind||'?',JSON.stringify(e).slice(0,90));
+    }
+  }catch(_){}};
+  es.onerror=()=>{es.close();setTimeout(connectSse,3000);};
+}
+/* ── boot ───────────────────────────────────────────────── */
+async function loadMap(){
+  try{const m=await (await fetch('/api/graal/map')).json();
+    buildTree(m.rows||[]);$('crumb').textContent='terrain: '+((m.rows||[]).length.toLocaleString())+' documents — wheel to dive';}
+  catch(e){$('crumb').textContent='map fetch failed: '+e;}
+  setTimeout(loadMap,30000);
+}
+resize();loadMap();pollVitals();pollVms();connectSse();requestAnimationFrame(draw);
+</script>
+</body>
+</html>

@@ -31,6 +31,7 @@ fi
 exec > >(tee -a "$LOG_FILE") 2>&1
 
 CLASSES="$ROOT/build/live/classes"
+RESOURCES="$ROOT/build/processedResources/jvm/main"
 LIB="$ROOT/build/staging/lib"
 
 if [[ ! -d "$CLASSES" ]]; then
@@ -43,7 +44,9 @@ if [[ ! -d "$LIB" ]]; then
 fi
 
 # Wildcard expansion happens after the colon, so we quote it.
-CP="$CLASSES:$LIB/*"
+# hotswapFeed rsyncs only compiled classes; jvm resources (web/*, META-INF/services) ride the
+# processedResources dir directly so the Graal console page and static assets resolve.
+CP="$CLASSES:$RESOURCES:$LIB/*"
 
 DAEMON_JVM_ARGS=("-javaagent:$ROOT/build/libs/hotswap-agent.jar=$ROOT/build/live")
 
