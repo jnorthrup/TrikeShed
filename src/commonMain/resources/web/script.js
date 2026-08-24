@@ -251,9 +251,11 @@
     pageTreeEl.innerHTML = '';
     state.pages.forEach((page) => {
       const item = document.createElement('div');
-      item.className = 'page-tree-item' + (page.id === state.activePageId ? ' active' : '');
+      const isActive = page.id === state.activePageId;
+      item.className = 'page-tree-item' + (isActive ? ' active' : '');
       item.role = 'button';
       item.tabIndex = 0;
+      item.setAttribute('aria-label', (isActive ? 'Active page: ' : 'Page: ') + (page.title || 'Untitled'));
       const toggle = document.createElement('span');
       toggle.className = 'tree-toggle';
       toggle.textContent = page.children && page.children.length ? '▾' : '▸';
@@ -490,7 +492,9 @@
     );
     items.forEach((d, i) => {
       const item = document.createElement('button');
-      item.className = 'slash-item' + (i === activeSlashIndex ? ' active' : '');
+      const isActive = i === activeSlashIndex;
+      item.className = 'slash-item' + (isActive ? ' active' : '');
+      item.setAttribute('aria-label', d.name + ' command' + (isActive ? ' (currently selected)' : '') + ': ' + d.desc);
       const icon = document.createElement('span');
       icon.className = 'slash-item-icon';
       icon.textContent = d.icon;
@@ -939,7 +943,9 @@
     const chain = []; let p = cur; while (p) { chain.unshift(p); p = p.parent ? sheetById[p.parent] : null; }
     chain.forEach((sh, i) => {
       if (i) sheetCrumbsEl.appendChild(document.createTextNode(' / '));
-      const b = document.createElement('button'); b.textContent = sh.id.split('/').pop() || sh.title;
+      const title = sh.id.split('/').pop() || sh.title;
+      const b = document.createElement('button'); b.textContent = title;
+      b.setAttribute('aria-label', 'Navigate to parent sheet: ' + title);
       b.addEventListener('click', () => openSheet(sh.id)); sheetCrumbsEl.appendChild(b);
     });
     sheetWrapEl.appendChild(buildSheetTable(cur, 0));
