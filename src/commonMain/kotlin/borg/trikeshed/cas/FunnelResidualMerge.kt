@@ -556,7 +556,7 @@ object FunnelResidualMerge {
         for (s in 0 until sources.size) {
             val spine = sources[s]
             val text = sourceTexts[s]
-            val lines = text.lineSequence().map { it }.toList()
+            val lines = text.lineSequence().toList()
             val sourceResiduals = residuals[s]
 
             val changes = mutableListOf<borg.trikeshed.pijul.Change>()
