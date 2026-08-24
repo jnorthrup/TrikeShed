@@ -306,9 +306,14 @@ class LineCasIndex {
         docs[doc.hex] = spine
         for (i in 0 until spine.size) {
             val n = spine[i]
+            // Splat-extrapolated spines have crossed this seam carrying null nodes/cids (Kotlin's
+            // non-null type notwithstanding — platform interop lets them through, the HashMap
+            // accepts a null key, and FunnelHashIndex.build dies on key.hashCode()).
+            @Suppress("SENSELESS_COMPARISON")
+            if (n == null || n.contentCid == null) continue
             byContent.getOrPut(n.contentCid.hex) { mutableListOf() }.add(doc j n)
         }
-        funnel = FunnelHashIndex.build(byContent.keys.toList().toSeries(), 0L)
+        funnel = FunnelHashIndex.build(byContent.keys.toList().filterNotNull().toSeries(), 0L)
         return doc
     }
 

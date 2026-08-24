@@ -42,10 +42,68 @@ canvas.spark{display:block;margin-top:3px}
 .panel header{padding:6px 10px;border-bottom:1px solid var(--line);font-size:11px;text-transform:uppercase;letter-spacing:.1em;color:var(--dim);display:flex;justify-content:space-between}
 .panel header b{color:var(--ink)}
 .panel .body{overflow:auto;padding:8px 10px;font-size:11px}
-#doc{left:10px;top:78px;width:430px;max-height:70%}
+#doc{left:10px;top:78px;width:560px;max-height:78%}
 #doc pre{white-space:pre-wrap;word-break:break-all;color:var(--ink)}
+.hashchip{display:inline-block;background:var(--panel2);border:1px solid var(--line);border-radius:3px;padding:0 5px;cursor:copy;font-size:10px;letter-spacing:.03em}
+.hashchip:hover{border-color:var(--commit);color:var(--commit)}
+.kv td:first-child{color:var(--dim);white-space:nowrap;vertical-align:top}
+.docmeta{display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-bottom:6px;font-size:11px}
+.kgauge{flex:1;min-width:120px;height:8px;background:var(--line);border-radius:4px;overflow:hidden;position:relative}
+.kgauge i{display:block;height:100%;background:linear-gradient(90deg,var(--compile),var(--gc),var(--deopt));transition:width .4s}
+.codeview{counter-reset:ln;font-size:11px;line-height:1.5;overflow:auto;max-height:52vh;background:var(--panel2);border-radius:4px;padding:6px 0}
+.codeview div{white-space:pre;padding:0 10px 0 0}
+.codeview div::before{counter-increment:ln;content:counter(ln);display:inline-block;width:3.2em;text-align:right;margin-right:10px;color:var(--dim);user-select:none}
+.codeview .kw{color:var(--commit)} .codeview .str{color:var(--compile)} .codeview .com{color:var(--dim);font-style:italic}
+.mdview{font:13px/1.55 system-ui,sans-serif;max-height:52vh;overflow:auto}
+.mdview h1,.mdview h2,.mdview h3{margin:.6em 0 .3em;line-height:1.25}
+.mdview code{background:var(--panel2);padding:0 4px;border-radius:3px;font-family:ui-monospace,monospace;font-size:.9em}
+.mdview pre{background:var(--panel2);padding:8px;border-radius:4px;overflow:auto}
+.mdview li{margin:.15em 0 .15em 1.2em}
+.mdview a{color:var(--commit)}
+.imgview{max-width:100%;max-height:48vh;background:repeating-conic-gradient(var(--panel2) 0 25%,transparent 0 50%) 0 0/16px 16px;border-radius:4px}
+.classcard td{font-variant-numeric:tabular-nums}
+#notion{position:absolute;left:10px;right:320px;top:78px;bottom:36px;background:var(--panel);border:1px solid var(--line);border-radius:6px;z-index:4;display:none;flex-direction:column}
+#notion .nhead{display:flex;gap:10px;align-items:center;padding:8px 12px;border-bottom:1px solid var(--line)}
+#notion input{background:var(--panel2);border:1px solid var(--line);border-radius:4px;color:var(--ink);padding:4px 10px;font:inherit;width:260px}
+#notion input:focus{outline:1px solid var(--commit)}
+#notion .nbody{overflow:auto;flex:1;padding:0 12px 10px}
+#notion th{cursor:pointer;position:sticky;top:0;background:var(--panel);user-select:none}
+#notion th:hover{color:var(--ink)}
+#notion tr:hover td{background:var(--panel2)}
+#notion td{cursor:pointer}
+.vmctl{display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin:6px 0}
+.vmctl input,.vmctl select,.vmctl textarea{background:var(--panel2);border:1px solid var(--line);border-radius:4px;color:var(--ink);font:inherit;padding:3px 8px}
+#vmLog{max-height:220px;overflow:auto;font-size:10px;background:var(--panel2);border-radius:4px;padding:6px 8px;margin-top:6px}
+.vmline{padding:2px 0;border-bottom:1px solid var(--line);display:flex;gap:6px}
+.vmline .t{color:var(--dim);white-space:nowrap}
+.vmline .k{font-weight:600}
+.vmline.spawned .k{color:var(--commit)} .vmline.evaluated .k{color:var(--compile)}
+.vmline.revoked .k{color:var(--deopt)} .vmline.landed .k{color:var(--gc)}
+.vmspin{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--gc);animation:vmpulse 1s infinite}
+@keyframes vmpulse{0%,100%{opacity:.3}50%{opacity:1}}
+@media (prefers-reduced-motion: reduce){.vmspin{animation:none}}
+.vmctl button,.vmbtn{background:var(--panel2);border:1px solid var(--line);border-radius:4px;color:var(--ink);font:inherit;padding:3px 10px;cursor:pointer}
+.vmctl button:hover,.vmbtn:hover{border-color:var(--commit);color:var(--commit)}
+#vmSrc{width:100%;height:60px;resize:vertical}
+#vmOut{font-size:10px;color:var(--dim);white-space:pre-wrap;word-break:break-all;max-height:120px;overflow:auto}
+.mate{margin-top:8px;border:1px solid var(--line);border-radius:4px;background:var(--panel2)}
+.mate summary{cursor:pointer;padding:6px 8px;color:var(--commit)}
+.mate .matebody{padding:0 8px 8px}
+.mate.exact{border-color:var(--compile)}
+.shape-strip{display:flex;height:20px;border-radius:3px;overflow:hidden;margin:4px 0 2px;border:1px solid var(--line)}
+.shape-cell{border:0;padding:0;min-width:2px;background:var(--c);cursor:pointer;opacity:.85}
+.shape-cell:hover{opacity:1;outline:1px solid var(--ink)}
+.shape-cell.fib{box-shadow:inset 0 -3px 0 rgba(255,255,255,.55)}
+.shape-key{display:block;font-size:9px;color:var(--dim);letter-spacing:.06em;word-break:break-all;margin-bottom:4px}
+:root{--shape-H:#f29111;--shape-S:#b07aff;--shape-P:#4a6fa5;--shape-_:#2a3140;--shape-B:#3ddc84;--shape-T:#3fd0ff;--shape-J:#ff8a5b;--shape-C:#e0c341;--shape-W:#d75fa0;--shape-D:#8a97ad}
 #points{left:10px;bottom:36px;width:560px;max-height:46%}
 #vms{right:320px;top:78px;width:430px;max-height:50%}
+#sheet{left:10px;top:78px;width:480px;max-height:74%}
+#ledger{right:320px;top:78px;width:560px;max-height:74%}
+#aot{right:320px;top:78px;width:560px;max-height:74%}
+#sheet td:first-child{white-space:pre}
+.dagchip{display:inline-block;border:1px solid var(--line);border-radius:3px;padding:0 6px;margin:2px 3px 0 0;cursor:pointer;font-size:10px}
+.dagchip:hover{border-color:var(--commit);color:var(--commit)}
 table{border-collapse:collapse;width:100%}
 td,th{padding:2px 8px 2px 0;text-align:left;border-bottom:1px solid var(--line);font-variant-numeric:tabular-nums}
 th{color:var(--dim);font-weight:normal;font-size:10px;text-transform:uppercase}
@@ -56,6 +114,15 @@ th{color:var(--dim);font-weight:normal;font-size:10px;text-transform:uppercase}
 #help{position:absolute;right:10px;bottom:8px;color:var(--dim);font-size:10px;z-index:5}
 #help b{color:var(--ink)}
 @media (prefers-reduced-motion: reduce){.evt{animation:none}}
+/* ── skins: ops (default) · chalk = AI blackboard · marker = developer whiteboard ── */
+html[data-skin="chalk"] body{--bg:#1b2420;--panel:#212b26;--panel2:#26312c;--line:#39463f;--ink:#e9efe8;--dim:#93a398;
+  --graal:#ffc46b;--compile:#8fe6b0;--deopt:#ff8a8f;--gc:#ffd27a;--commit:#8fd8ff;--cpu:#9db8e8}
+html[data-skin="chalk"] .chip,html[data-skin="chalk"] .panel,html[data-skin="chalk"] #ident,html[data-skin="chalk"] #mini{box-shadow:inset 0 0 0 1px rgba(233,239,232,.06)}
+html[data-skin="marker"] body{--bg:#f6f5f0;--panel:#ffffff;--panel2:#f0efe9;--line:#d8d5cb;--ink:#22262b;--dim:#767d88;
+  --graal:#c96a00;--compile:#0e9f5a;--deopt:#d5333c;--gc:#c07f00;--commit:#0d7fb8;--cpu:#3a6fd8}
+html[data-skin="marker"] .evt{background:rgba(255,255,255,.94)}
+html[data-skin="marker"] #hud{background:linear-gradient(180deg,rgba(246,245,240,.97),rgba(246,245,240,.85) 75%,transparent)}
+html[data-skin="marker"] #crumb{text-shadow:none}
 </style>
 </head>
 <body>
@@ -72,14 +139,19 @@ th{color:var(--dim);font-weight:normal;font-size:10px;text-transform:uppercase}
   <div class="chip" id="cPoint"><b>–</b><span>pointcut routes</span></div>
   <div class="chip" id="cVm"><b>–</b><span>sub-vms</span></div>
   <div class="chip" id="cDocs"><b>–</b><span>documents</span></div>
+  <div class="chip" id="cAot" onclick="toggleAot()" style="cursor:pointer"><b>–</b><span>aot cache</span></div>
 </div>
 <div id="river"></div>
-<div class="panel" id="doc"><header><b id="docTitle">document</b><span class="x" onclick="hide('doc')">✕</span></header><div class="body"><pre id="docBody"></pre></div></div>
+<div class="panel" id="doc"><header><b id="docTitle">document</b><span class="x" onclick="hide('doc')">✕</span></header><div class="body"><div id="docBody"></div></div></div>
 <div class="panel" id="points"><header><b>pointcut routes</b><span class="x" onclick="hide('points')">✕</span></header><div class="body" id="pointsBody"></div></div>
 <div class="panel" id="vms"><header><b>graal sub-vms</b><span class="x" onclick="hide('vms')">✕</span></header><div class="body" id="vmsBody"></div></div>
+<div class="panel" id="sheet"><header><b id="sheetTitle">tree sheet</b><span class="x" onclick="hide('sheet')">✕</span></header><div class="body" id="sheetBody"></div></div>
+<div class="panel" id="ledger"><header><b id="ledgerTitle">ledger</b><span class="x" onclick="hide('ledger')">✕</span></header><div class="body" id="ledgerBody"></div></div>
+<div class="panel" id="aot"><header><b>HotSpot AOT cache</b><span class="x" onclick="hide('aot')">✕</span></header><div class="body" id="aotBody"></div></div>
+<div id="notion"><div class="nhead"><input id="nfilter" placeholder="filter entries…"><span id="nscope"></span></div><div class="nbody" id="nbody"></div></div>
 <canvas id="mini" width="200" height="124"></canvas>
 <div id="crumb">loading terrain…</div>
-<div id="help"><b>wheel</b> zoom · <b>drag</b> pan · <b>dblclick</b> dive · <b>click</b> inspect · <b>0</b> fit · <b>P</b> pointcuts · <b>V</b> vms</div>
+<div id="help"><b>wheel</b> zoom · <b>drag</b> pan · <b>dblclick</b> dive · <b>click</b> inspect+edges · <b>0</b> fit · <b>T</b> tree sheet · <b>L</b> ledger · <b>P</b> pointcuts · <b>V</b> vms · <b>A</b> AOT · <b>M</b> mode · <b>1/2/3</b> layer · <b>F</b> fog · <b>B</b> skin · <a href="/futon" style="color:var(--dim)">futon ↗</a></div>
 <script>
 'use strict';
 const $=id=>document.getElementById(id);
@@ -97,20 +169,30 @@ function fit(){const s=Math.min(innerWidth/W,innerHeight/H)*0.96;
   cam={s,ox:W/2-innerWidth/(2*s),oy:H/2-innerHeight/(2*s)+30/s};}
 /* ── terrain tree from /api/graal/map ───────────────────── */
 let root=null,byId=new Map();
-const HUES={'projects':172,'.git':262,'pointcut':8,'_design':318,'memories':210,'lost-found':48,'jules':132,'vms':282};
+const HUES={'forge':300,'projects':172,'.git':262,'pointcut':8,'_design':318,'memories':210,'lost-found':48,'jules':132,'vms':282};
 function hueOf(name){if(name in HUES)return HUES[name];let h=0;for(const c of name)h=(h*31+c.charCodeAt(0))>>>0;return h%360;}
-function node(name,parent){return{name,parent,children:new Map(),bytes:0,docs:0,leaf:false,rect:null,laid:false,hue:parent?parent.hue:hueOf(name)};}
+function node(name,parent){return{name,parent,children:new Map(),bytes:0,mass:0,docs:0,leaf:false,rect:null,laid:false,hue:parent?parent.hue:hueOf(name)};}
+/* Nonce vaults: content-addressed storage planes. Real, divable, but they must not own the map. */
+const VAULTS=new Set(['.git','lost-found','subtree-cache','objects','worktrees']);
+function massOf(bytes,topName){const m=Math.log2(2+bytes);return VAULTS.has(topName)?m*0.18:m;}
+/* The one cursor: rows = [id, bytes, lastSeq, revGen]. Terrain, sheets, ledger and layers are
+   all projections over it — 'everything is a cursor' holds on the client too. */
+let maxSeq=1;
 function buildTree(rows){
-  root=node('trikeshed',null);root.rect={x:0,y:0,w:W,h:H};byId=new Map();
-  for(const [id,bytes] of rows){
+  root=node('trikeshed',null);root.rect={x:0,y:0,w:W,h:H};byId=new Map();maxSeq=1;
+  for(const [id,bytes,seq,gen] of rows){
     const parts=id.split('/').filter(p=>p.length);let n=root;
+    const mass=massOf(bytes,parts[0]);
     for(let i=0;i<parts.length;i++){
       let c=n.children.get(parts[i]);
       if(!c){c=node(parts[i],n===root?null:n);if(n===root)c.hue=hueOf(parts[i]);else c.hue=n.hue;c.parent=n;n.children.set(parts[i],c);}
-      n=c;n.bytes+=bytes;n.docs++;
+      n=c;n.bytes+=bytes;n.mass+=mass;n.docs++;
     }
-    n.leaf=true;n.id=id;byId.set(id,n);
-    root.bytes+=bytes;root.docs++;
+    n.leaf=true;n.id=id;n.seq=seq||0;n.gen=gen||1;n.mass=mass;byId.set(id,n);
+    if(n.seq>maxSeq)maxSeq=n.seq;
+    let a=n.parent;while(a){if((a.maxSeq||0)<n.seq)a.maxSeq=n.seq;a=a.parent;}
+    if((root.maxSeq||0)<n.seq)root.maxSeq=n.seq;
+    root.bytes+=bytes;root.mass+=mass;root.docs++;
   }
   invalidate(root);
   $('cDocs').firstChild.textContent=root.docs.toLocaleString();
@@ -119,43 +201,225 @@ function invalidate(n){n.laid=false;for(const c of n.children.values())invalidat
 /* squarified-ish treemap: rows of children sorted by mass, laid into the node rect */
 function layout(n){
   if(n.laid)return;n.laid=true;
-  const kids=[...n.children.values()].sort((a,b)=>b.bytes-a.bytes);
+  const kids=[...n.children.values()].sort((a,b)=>b.mass-a.mass);
   if(!kids.length)return;
-  const pad=Math.min(n.rect.w,n.rect.h)*0.015, title=(n.rect.h>40&&n!==root)?Math.min(16/camPx(1),n.rect.h*0.12):0;
+  // Insets are capped in SCREEN pixels (≈2px pad, ≈14px gutter) so deep nesting cannot stack
+  // fat borders into empty tracts; zoom-dependent, so layouts are invalidated on big zoom changes.
+  const pad=Math.min(Math.min(n.rect.w,n.rect.h)*0.015, 2.5/cam.s);
+  const title=(n!==root&&n.rect.h*cam.s>40)?Math.min(14/cam.s,n.rect.h*0.12):0;
   let x=n.rect.x+pad,y=n.rect.y+pad+title,w=n.rect.w-2*pad,h=n.rect.h-2*pad-title;
   if(w<=0||h<=0){for(const k of kids)k.rect={x:n.rect.x,y:n.rect.y,w:0,h:0};return;}
-  const total=kids.reduce((s,k)=>s+k.bytes,0)||1;
+  const total=kids.reduce((s,k)=>s+k.mass,0)||1;
   let i=0;
   while(i<kids.length){
     const vert=w<h; const side=vert?w:h;
     let take=[],mass=0,best=Infinity;
     for(let j=i;j<kids.length;j++){
-      const m2=mass+kids[j].bytes, frac=m2/total, breadth=(vert?h:w)*frac;
-      const worst=Math.max(...[...take,kids[j]].map(k=>{const a=(k.bytes/m2)*side*breadth;const s1=(k.bytes/m2)*side;return Math.max(s1/ (breadth||1e-9),(breadth||1e-9)/s1);}));
+      const m2=mass+kids[j].mass, frac=m2/total, breadth=(vert?h:w)*frac;
+      const worst=Math.max(...[...take,kids[j]].map(k=>{const s1=(k.mass/m2)*side;return Math.max(s1/(breadth||1e-9),(breadth||1e-9)/s1);}));
       if(worst<=best||take.length===0){take.push(kids[j]);mass=m2;best=worst;}else break;
     }
     const frac=mass/total, breadth=(vert?h:w)*frac;
     let off=0;
-    for(const k of take){const kf=k.bytes/mass;
+    for(const k of take){const kf=k.mass/mass;
       if(vert){k.rect={x:x+off*w,y:y,w:w*kf,h:breadth};off+=kf;}
       else{k.rect={x:x,y:y+off*h,w:breadth,h:h*kf};off+=kf;}
     }
     if(vert)y+=breadth,h-=breadth;else x+=breadth,w-=breadth;
     total-mass; i+=take.length;
-    const rem=kids.slice(i).reduce((s,k)=>s+k.bytes,0);
+    const rem=kids.slice(i).reduce((s,k)=>s+k.mass,0);
     if(rem<=0){for(let j=i;j<kids.length;j++)kids[j].rect={x,y,w:0,h:0};break;}
   }
 }
 function camPx(worldLen){return worldLen*cam.s;}
+/* ── skins on the canvas ────────────────────────────────── */
+const SKINS={
+  ops:{bg:'#0b0e14',fill:(h,l)=>`hsl(${h} 42% ${l}%)`,stroke:(h,l)=>`hsl(${h} 45% ${Math.min(l+14,40)}%)`,
+       hot:(h)=>`hsl(${h} 90% 60%)`,label:(h)=>`hsl(${h} 70% 72%)`,text:'rgba(216,220,230,.82)',sub:'rgba(123,132,150,.9)',faint:'rgba(216,220,230,.55)',mini:'#11151e',miniTile:h=>`hsl(${h} 40% 22%)`,lw:0.75},
+  chalk:{bg:'#1b2420',fill:(h,l)=>`hsl(${h} 18% ${Math.max(l-2,9)}%)`,stroke:(h,l)=>`hsla(${h},35%,82%,.55)`,
+       hot:(h)=>`hsla(${h},80%,88%,.95)`,label:(h)=>`hsla(${h},45%,86%,.95)`,text:'rgba(233,239,232,.85)',sub:'rgba(147,163,152,.9)',faint:'rgba(233,239,232,.5)',mini:'#212b26',miniTile:h=>`hsl(${h} 22% 26%)`,lw:1.4},
+  marker:{bg:'#f6f5f0',fill:(h,l)=>`hsl(${h} 60% ${96-Math.min(l,14)}%)`,stroke:(h,l)=>`hsl(${h} 55% 42%)`,
+       hot:(h)=>`hsl(${h} 80% 34%)`,label:(h)=>`hsl(${h} 65% 30%)`,text:'rgba(34,38,43,.88)',sub:'rgba(118,125,136,.95)',faint:'rgba(34,38,43,.5)',mini:'#ffffff',miniTile:h=>`hsl(${h} 55% 80%)`,lw:1.6},
+};
+const SKIN_ORDER=['ops','chalk','marker'];
+let skin=(()=>{try{return localStorage.getItem('graal.skin')||'ops'}catch(_){return 'ops'}})();
+if(!SKINS[skin])skin='ops';
+function applySkin(){document.documentElement.setAttribute('data-skin',skin);
+  try{localStorage.setItem('graal.skin',skin)}catch(_){}}
+function cycleSkin(){skin=SKIN_ORDER[(SKIN_ORDER.indexOf(skin)+1)%SKIN_ORDER.length];applySkin();
+  $('crumb').textContent='skin: '+skin+(skin==='chalk'?' — AI blackboard':skin==='marker'?' — developer whiteboard':' — ops console');}
+applySkin();
+/* ── modes: map (treemap) · graph (Gephi-flavor force DAG) · tree (radial, d3 flavor) ── */
+let mode='map';               // M cycles
+let fog=false;                // F toggles: dim territories with no recent activity
+const heat=new Map();         // territory path → last activity ms
+function heatUp(n){const now=performance.now();while(n&&n!==root){heat.set(pathOf(n),now);n=n.parent;}}
+function heatOf(n){const t=heat.get(pathOf(n));return t?Math.max(0,1-(performance.now()-t)/120000):0;}
+function cycleMode(){mode=mode==='map'?'graph':mode==='graph'?'tree':mode==='tree'?'notion':'map';
+  if(mode==='graph')buildGraph();
+  $('notion').style.display=mode==='notion'?'flex':'none';
+  if(mode==='notion')buildNotion();
+  $('crumb').textContent='mode: '+mode+(mode==='graph'?' — force DAG (hubs + edges), drag nodes':mode==='tree'?' — radial drilldown of '+(targetNode()===root?'/':pathOf(targetNode())):mode==='notion'?' — database flavor: sort by header, filter, click to inspect':' — territory map');}
+/* ── notion flavor: the same cursor as a sortable, filterable database ── */
+let nSort={col:2,dir:-1};
+function buildNotion(){
+  const scope=targetNode()||root;
+  $('nscope').textContent=(scope===root?'/':pathOf(scope))+' · '+scope.docs.toLocaleString()+' entries';
+  const leaves=[];
+  (function walk(x){if(x.leaf)leaves.push(x);else for(const c of x.children.values())walk(c);})(scope);
+  const f=($('nfilter').value||'').toLowerCase();
+  let rows=f?leaves.filter(l=>l.id.toLowerCase().includes(f)):leaves;
+  const cols=[['entry',l=>l.id],['plane',l=>l.id.split('/')[0]],['bytes',l=>l.bytes],['seq',l=>l.seq],['gen',l=>l.gen],['K%',l=>{const k=kCache.get(l.id);return typeof k==='number'&&k>=0?Math.round(k*100):'';}]];
+  rows=rows.slice().sort((a,b)=>{const va=cols[nSort.col][1](a),vb=cols[nSort.col][1](b);
+    return (va<vb?-1:va>vb?1:0)*nSort.dir;});
+  const cap=rows.slice(0,1500);
+  $('nbody').innerHTML='<table><tr>'+cols.map((c,i)=>'<th onclick="nSort={col:'+i+',dir:nSort.col==='+i+'?-nSort.dir:-1};buildNotion()">'+c[0]+(nSort.col===i?(nSort.dir<0?' ↓':' ↑'):'')+'</th>').join('')+'</tr>'+
+    cap.map(l=>'<tr onclick="openDoc(\''+l.id.replace(/'/g,"\\'")+'\')"><td>'+esc(l.id)+'</td><td>'+esc(l.id.split('/')[0])+'</td><td style="text-align:right">'+l.bytes.toLocaleString()+'</td><td style="text-align:right">'+l.seq+'</td><td style="text-align:right">'+l.gen+'</td><td style="text-align:right">'+(typeof kCache.get(l.id)==='number'&&kCache.get(l.id)>=0?Math.round(kCache.get(l.id)*100):'')+'</td></tr>').join('')+'</table>'+
+    (rows.length>cap.length?'<div style="color:var(--dim);padding:6px 0">…'+(rows.length-cap.length).toLocaleString()+' more — filter or scope tighter</div>':'');
+}
+/* graph mode: territories as bodies, shared-blob hubs as springs */
+let gNodes=[],gEdges=[],hubsCache=null,gDrag=null;
+async function buildGraph(){
+  if(!hubsCache){try{hubsCache=(await (await fetch('/api/graal/dag')).json()).hubs||[]}catch(e){hubsCache=[]}}
+  const depth2=new Map();     // top-2-segment prefix → terrain node
+  for(const c of root.children.values()){
+    if(c.children.size&&c.docs>40)for(const g of c.children.values())depth2.set(c.name+'/'+g.name,g);
+    else depth2.set(c.name,c);
+  }
+  const idx=new Map();gNodes=[];gEdges=[];
+  let i=0;
+  for(const [k,n] of depth2){
+    gNodes.push({k,n,x:W/2+Math.cos(i*2.4)*(160+8*i%300),y:H/2+Math.sin(i*2.4)*(120+7*i%220),vx:0,vy:0,
+      r:6+Math.log2(1+n.bytes/1024)*1.6});
+    idx.set(k,gNodes.length-1);i++;
+  }
+  const key=id=>{const p=id.split('/').filter(x=>x);return idx.has(p[0]+'/'+p[1])?p[0]+'/'+p[1]:p[0];};
+  const w=new Map();
+  for(const h of hubsCache){
+    const ks=[...new Set(h.ids.map(key))].filter(k=>idx.has(k));
+    for(let a=0;a<ks.length;a++)for(let b=a+1;b<ks.length;b++){
+      const e=ks[a]<ks[b]?ks[a]+'|'+ks[b]:ks[b]+'|'+ks[a];
+      w.set(e,(w.get(e)||0)+h.degree);
+    }
+  }
+  for(const [e,weight] of w){const [a,b]=e.split('|');gEdges.push({a:idx.get(a),b:idx.get(b),weight});}
+}
+function stepGraph(){
+  const N=gNodes.length;if(!N)return;
+  for(let i=0;i<N;i++)for(let j=i+1;j<N;j++){
+    const A=gNodes[i],B=gNodes[j];let dx=B.x-A.x,dy=B.y-A.y;let d2=dx*dx+dy*dy+40;const f=2600/d2;
+    const d=Math.sqrt(d2);dx/=d;dy/=d;
+    A.vx-=dx*f;A.vy-=dy*f;B.vx+=dx*f;B.vy+=dy*f;
+  }
+  for(const e of gEdges){
+    const A=gNodes[e.a],B=gNodes[e.b];const dx=B.x-A.x,dy=B.y-A.y;const d=Math.sqrt(dx*dx+dy*dy)+1e-3;
+    const want=140,f=(d-want)*0.004*Math.min(1,Math.log2(1+e.weight)/8);
+    A.vx+=dx/d*f*d*0.01;A.vy+=dy/d*f*d*0.01;B.vx-=dx/d*f*d*0.01;B.vy-=dy/d*f*d*0.01;
+  }
+  const cx=W/2,cy=H/2;
+  for(const n of gNodes){n.vx+=(cx-n.x)*0.0004;n.vy+=(cy-n.y)*0.0004;
+    n.vx*=0.86;n.vy*=0.86;if(n!==gDrag){n.x+=n.vx;n.y+=n.vy;}}
+}
+function drawGraph(){
+  const S=SKINS[skin];stepGraph();
+  for(const e of gEdges){
+    const A=gNodes[e.a],B=gNodes[e.b];
+    const ax=(A.x-cam.ox)*cam.s,ay=(A.y-cam.oy)*cam.s,bx=(B.x-cam.ox)*cam.s,by=(B.y-cam.oy)*cam.s;
+    ctx.strokeStyle=skin==='marker'?'rgba(60,70,90,.28)':'rgba(140,160,180,.22)';
+    ctx.lineWidth=Math.min(5,0.6+Math.log2(1+e.weight)*0.35);
+    ctx.beginPath();ctx.moveTo(ax,ay);ctx.lineTo(bx,by);ctx.stroke();
+  }
+  ctx.font='10px monospace';
+  for(const g of gNodes){
+    const x=(g.x-cam.ox)*cam.s,y=(g.y-cam.oy)*cam.s,r=g.r*Math.sqrt(cam.s);
+    const dimmed=fog&&heatOf(g.n)<=0;
+    ctx.globalAlpha=dimmed?0.16:1;
+    ctx.fillStyle=S.fill(g.n.hue,26);ctx.strokeStyle=S.stroke(g.n.hue,30);ctx.lineWidth=S.lw;
+    ctx.beginPath();ctx.arc(x,y,r,0,7);ctx.fill();ctx.stroke();
+    if(heatOf(g.n)>0){ctx.strokeStyle=S.hot(g.n.hue);ctx.globalAlpha=heatOf(g.n)*0.9;ctx.beginPath();ctx.arc(x,y,r+3,0,7);ctx.stroke();ctx.globalAlpha=dimmed?0.16:1;}
+    ctx.fillStyle=S.text;ctx.fillText(g.k,x+r+3,y+3);
+    ctx.globalAlpha=1;
+  }
+}
+/* tree mode: radial drilldown of the target territory */
+function drawTree(){
+  const S=SKINS[skin],center=targetNode()||root;
+  const cx=innerWidth/2,cy=(innerHeight+60)/2,R=Math.min(cx,cy)-70;
+  const leaves=[];
+  (function count(n,depth){if(depth===3||!n.children.size){leaves.push(n);return;}for(const c of n.children.values())count(c,depth+1);})(center,0);
+  const angleOf=new Map();
+  leaves.forEach((l,i)=>angleOf.set(l,(i/leaves.length)*Math.PI*2-Math.PI/2));
+  function place(n,depth){
+    if(angleOf.has(n))return angleOf.get(n);
+    const kids=[...n.children.values()];
+    const as=kids.map(k=>place(k,depth+1));
+    const a=as.reduce((x,y)=>x+y,0)/as.length;angleOf.set(n,a);return a;
+  }
+  place(center,0);
+  ctx.font='10px monospace';
+  (function draw(n,depth){
+    const a=angleOf.get(n),r=depth*R/3;
+    const x=cx+Math.cos(a)*r,y=cy+Math.sin(a)*r;
+    for(const c of n.children.values()){
+      if(depth>=3)break;
+      const ca=angleOf.get(c),cr=(depth+1)*R/3;
+      const cxx=cx+Math.cos(ca)*cr,cyy=cy+Math.sin(ca)*cr;
+      ctx.strokeStyle=skin==='marker'?'rgba(60,70,90,.3)':'rgba(140,160,180,.25)';ctx.lineWidth=1;
+      ctx.beginPath();ctx.moveTo(x,y);ctx.quadraticCurveTo(cx+Math.cos((a+ca)/2)*(r+cr)/2*0.72,cy+Math.sin((a+ca)/2)*(r+cr)/2*0.72,cxx,cyy);ctx.stroke();
+      draw(c,depth+1);
+    }
+    const dimmed=fog&&heatOf(n)<=0&&n!==center;
+    ctx.globalAlpha=dimmed?0.18:1;
+    ctx.fillStyle=S.fill(n.hue,26);ctx.strokeStyle=S.stroke(n.hue,32);
+    const rr=n===center?7:4+Math.min(3,Math.log2(1+n.docs)/3);
+    ctx.beginPath();ctx.arc(x,y,rr,0,7);ctx.fill();ctx.stroke();
+    if(depth<2||n.docs>50||angleOf.size<80){ctx.fillStyle=S.text;
+      const lx=x+Math.cos(a)*(rr+4),ly=y+Math.sin(a)*(rr+4);
+      ctx.save();ctx.translate(lx,ly);if(Math.cos(a)<0){ctx.rotate(a+Math.PI);ctx.textAlign='right';}else ctx.rotate(a);
+      ctx.fillText(n.name.slice(0,22),0,3);ctx.restore();ctx.textAlign='left';}
+    ctx.globalAlpha=1;
+  })(center,0);
+  ctx.fillStyle=S.sub;ctx.font='11px monospace';
+  ctx.fillText('radial drilldown — '+(center===root?'/':pathOf(center))+'  ('+leaves.length+' arms, depth 3)  ·  T for the sheet form',12,innerHeight-26);
+}
+/* ── layers over the cursor: 1 plain · 2 kolmogorov · 3 causal ── */
+let layer=1;
+const kCache=new Map();      // id → gzip ratio 0..1 (the practical K estimate)
+let kInFlight=0;
+function wantK(n){
+  if(kCache.has(n.id)||kInFlight>=3||n.bytes>1500000||typeof CompressionStream==='undefined')return;
+  kCache.set(n.id,-1);kInFlight++;
+  fetch('/'+DB+'/'+n.id.split('/').map(encodeURIComponent).join('/')+'/content')
+    .then(r=>r.ok?r.arrayBuffer():Promise.reject(r.status))
+    .then(async buf=>{
+      const c=await new Response(new Blob([buf]).stream().pipeThrough(new CompressionStream('gzip'))).arrayBuffer();
+      kCache.set(n.id,buf.byteLength?Math.min(1,c.byteLength/buf.byteLength):0);})
+    .catch(()=>kCache.set(n.id,-2)).finally(()=>kInFlight--);
+}
+const previewCache=new Map(); // id → array of first lines (or null = not text)
+let pInFlight=0;
+const TEXTY=/\.(kt|kts|java|py|js|ts|md|json|yaml|yml|css|sh|gradle|xml|txt|html|toml|properties|sql|rs|c|h|cpp|go|wal|jsonl)$/i;
+function wantPreview(n){
+  if(previewCache.has(n.id)||pInFlight>=3)return;
+  if(!TEXTY.test(n.id)||n.bytes>400000){previewCache.set(n.id,null);return;}
+  previewCache.set(n.id,[]);pInFlight++;
+  fetch('/'+DB+'/'+n.id.split('/').map(encodeURIComponent).join('/')+'/content')
+    .then(r=>r.ok?r.text():Promise.reject(r.status))
+    .then(t=>previewCache.set(n.id,t.split('\n').slice(0,16)))
+    .catch(()=>previewCache.set(n.id,null)).finally(()=>pInFlight--);
+  if(previewCache.size>400){const k=previewCache.keys().next().value;previewCache.delete(k);}
+}
 /* ── render ─────────────────────────────────────────────── */
-let hover=null,pings=[],shake=0;
+let hover=null,pings=[],shake=0,layoutScale=1;
 function draw(){
   const dpr=devicePixelRatio;ctx.setTransform(dpr,0,0,dpr,0,0);
-  ctx.fillStyle='#0b0e14';ctx.fillRect(0,0,innerWidth,innerHeight);
+  ctx.fillStyle=SKINS[skin].bg;ctx.fillRect(0,0,innerWidth,innerHeight);
   let sx=0,sy=0;
   if(shake>0&&!reduced){sx=(Math.random()-0.5)*shake;sy=(Math.random()-0.5)*shake;shake*=0.85;if(shake<0.4)shake=0;}
   ctx.save();ctx.translate(sx,sy);
-  if(root)drawNode(root,0);
+  // Re-lay when zoom moved enough that cached pixel-capped insets are stale.
+  if(root&&(cam.s/layoutScale>1.6||layoutScale/cam.s>1.6)){layoutScale=cam.s;invalidate(root);root.rect={x:0,y:0,w:W,h:H};}
+  if(root){if(mode==='map')drawNode(root,0);else if(mode==='graph')drawGraph();else drawTree();}
   // pings
   const now=performance.now();
   pings=pings.filter(p=>now-p.t0<1400);
@@ -168,6 +432,21 @@ function draw(){
     if(p.label&&t<0.6){ctx.font='10px monospace';ctx.fillText(p.label,x+8,y-8);}
     ctx.globalAlpha=1;
   }
+  // DAG edge overlay for the selection: arcs the prefix tree cannot show
+  if(sel&&selEdges.length&&sel.rect){
+    const sx0=(sel.rect.x+sel.rect.w/2-cam.ox)*cam.s, sy0=(sel.rect.y+sel.rect.h/2-cam.oy)*cam.s;
+    const dash=(performance.now()/50)%16;
+    for(const e of selEdges){
+      if(!e.to||!e.to.rect)continue;
+      const tx=(e.to.rect.x+e.to.rect.w/2-cam.ox)*cam.s, ty=(e.to.rect.y+e.to.rect.h/2-cam.oy)*cam.s;
+      ctx.strokeStyle=e.kind==='shared-blob'?'rgba(63,208,255,.65)':'rgba(255,79,88,.7)';
+      ctx.lineWidth=1.2;ctx.setLineDash([6,10]);ctx.lineDashOffset=-dash;
+      ctx.beginPath();ctx.moveTo(sx0,sy0);
+      ctx.quadraticCurveTo((sx0+tx)/2,Math.min(sy0,ty)-40,tx,ty);ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.fillStyle=ctx.strokeStyle;ctx.beginPath();ctx.arc(tx,ty,2.5,0,7);ctx.fill();
+    }
+  }
   ctx.restore();
   drawMini();
   requestAnimationFrame(draw);
@@ -177,39 +456,92 @@ function drawNode(n,depth){
   const x=(r.x-cam.ox)*cam.s,y=(r.y-cam.oy)*cam.s,w=r.w*cam.s,h=r.h*cam.s;
   if(x>innerWidth||y>innerHeight||x+w<0||y+h<0||w<1.2||h<1.2)return;
   const light=n.leaf?18:10+Math.min(depth*2,8);
-  ctx.fillStyle=`hsl(${n.hue} 42% ${light}%)`;
-  ctx.strokeStyle=`hsl(${n.hue} 45% ${Math.min(light+14,40)}%)`;
-  ctx.lineWidth=n===hover?2:0.75;
+  const S=SKINS[skin];
+  const fogged=fog&&depth>0&&heatOf(n)<=0;
+  if(fogged)ctx.globalAlpha=0.22;
+  const glow=heatOf(n);
+  ctx.fillStyle=S.fill(n.hue,light);
+  ctx.strokeStyle=S.stroke(n.hue,light);
+  ctx.lineWidth=n===hover?2:S.lw;
   ctx.beginPath();ctx.rect(x,y,w,h);ctx.fill();ctx.stroke();
-  if(n===hover){ctx.strokeStyle=`hsl(${n.hue} 90% 60%)`;ctx.stroke();}
+  if(n===hover){ctx.strokeStyle=S.hot(n.hue);ctx.stroke();}
+  if(glow>0&&depth>0){ctx.globalAlpha=(fogged?0.22:1)*glow*0.8;ctx.strokeStyle=S.hot(n.hue);ctx.lineWidth=2;ctx.strokeRect(x+1,y+1,w-2,h-2);ctx.globalAlpha=fogged?0.22:1;}
+  // ── layers: kolmogorov (2) and causal (3) tint the same cursor ──
+  if(layer===2&&n.leaf&&w>14&&h>10){
+    wantK(n);const k=kCache.get(n.id);
+    if(typeof k==='number'&&k>=0){
+      // structured→green calm, incompressible→red noise
+      ctx.globalAlpha=(fogged?0.22:1)*0.5;
+      ctx.fillStyle=k>0.92?'#ff4f58':k>0.7?'#ffb02e':'#3ddc84';
+      ctx.fillRect(x,y,w,Math.max(2,h*0.12));
+      if(k>0.92&&w>30){ctx.globalAlpha=0.18;for(let i=0;i<Math.min(60,w*h/220);i++){ctx.fillRect(x+Math.random()*w,y+Math.random()*h,1.4,1.4);}}
+      ctx.globalAlpha=fogged?0.22:1;
+      if(w>70&&h>28){ctx.font='9px monospace';ctx.fillStyle=k>0.92?'#ff8a8f':S.sub;ctx.fillText((k*100).toFixed(0)+'% K',x+w-38,y+h-5);}
+    }
+  }
+  if(layer===3&&w>14&&h>10){
+    const seq=n.leaf?n.seq:(n.maxSeq||0);
+    if(seq>0){
+      const age=seq/maxSeq; // 0 old → 1 newest
+      ctx.globalAlpha=(fogged?0.22:1)*0.45;
+      ctx.fillStyle=`hsl(${200-160*age} 70% 50%)`;
+      ctx.fillRect(x,y+h-Math.max(2,h*0.12),w,Math.max(2,h*0.12));
+      ctx.globalAlpha=fogged?0.22:1;
+      if(n.leaf&&n.gen>1&&w>44){ctx.font='9px monospace';ctx.fillStyle='#ffb02e';ctx.fillText('⟳'+n.gen,x+w-26,y+12);}
+      if(n.leaf&&w>90&&h>28){ctx.font='9px monospace';ctx.fillStyle=S.sub;ctx.fillText('seq '+seq,x+5,y+h-5);}
+    }
+  }
   const showKids=n.children.size&&w>26&&h>18;
   if(showKids){layout(n);for(const c of n.children.values())drawNode(c,depth+1);}
   if(w>64&&h>15){
     ctx.font=(depth<2?'bold ':'')+Math.min(13,Math.max(9,h*0.08))+'px monospace';
-    ctx.fillStyle=depth<2?`hsl(${n.hue} 70% 72%)`:'rgba(216,220,230,.82)';
-    const label=n.name+(showKids?'':n.leaf?'':' ·'+n.docs);
+    ctx.fillStyle=depth<2?S.label(n.hue):S.text;
+    const HEXY=/^[0-9a-f]{16,}(\.\w+)?$/;
+    const nm=HEXY.test(n.name)?'⬡'+n.name.slice(0,8):n.name;
+    const label=nm+(showKids?'':n.leaf?'':' ·'+n.docs);
     ctx.fillText(label.slice(0,Math.floor(w/7)),x+5,y+12);
-    if(!showKids&&h>34){ctx.font='9px monospace';ctx.fillStyle='rgba(123,132,150,.9)';
+    if(!showKids&&h>34){ctx.font='9px monospace';ctx.fillStyle=S.sub;
       ctx.fillText(n.leaf?fmtBytes(n.bytes):n.docs.toLocaleString()+' docs · '+fmtBytes(n.bytes),x+5,y+24);}
-    if(n.leaf&&w>170&&h>56){ctx.font='9px monospace';ctx.fillStyle='rgba(216,220,230,.55)';
+    if(n.leaf&&w>170&&h>56){ctx.font='9px monospace';ctx.fillStyle=S.faint;
       ctx.fillText((n.id||'').slice(-Math.floor(w/6)),x+5,y+h-6);}
+    if(n.leaf&&w>210&&h>90){
+      wantPreview(n);const lines=previewCache.get(n.id);
+      if(lines&&lines.length){
+        ctx.font='8px ui-monospace,monospace';ctx.fillStyle=S.faint;
+        const maxL=Math.min(lines.length,Math.floor((h-46)/9));
+        for(let i=0;i<maxL;i++)ctx.fillText(lines[i].slice(0,Math.floor((w-12)/4.6)),x+6,y+38+i*9);
+      }
+    }
+    if(!n.leaf&&!showKids&&w>120&&h>44){
+      const kids=[...n.children.values()].sort((a,b)=>b.bytes-a.bytes).slice(0,3);
+      let off=0;ctx.font='8px monospace';
+      for(const k of kids){const bw=(w-12)*(k.bytes/(n.bytes||1));
+        ctx.fillStyle=S.stroke(k.hue,30);ctx.globalAlpha=(fogged?0.22:1)*0.7;
+        ctx.fillRect(x+6+off,y+h-14,Math.max(2,bw),5);ctx.globalAlpha=fogged?0.22:1;off+=bw+2;}
+    }
   }
+  if(fogged)ctx.globalAlpha=1;
 }
 function fmtBytes(b){return b>1048576?(b/1048576).toFixed(1)+'M':b>1024?(b/1024).toFixed(1)+'K':b+'B';}
 function drawMini(){
-  mctx.setTransform(1,0,0,1,0,0);mctx.fillStyle='#11151e';mctx.fillRect(0,0,200,124);
+  mctx.setTransform(1,0,0,1,0,0);mctx.fillStyle=SKINS[skin].mini;mctx.fillRect(0,0,200,124);
   if(!root)return;const kx=200/W,ky=124/H;
   for(const c of root.children.values()){if(!c.rect)continue;
-    mctx.fillStyle=`hsl(${c.hue} 40% 22%)`;
+    mctx.fillStyle=SKINS[skin].miniTile(c.hue);
     mctx.fillRect(c.rect.x*kx+1,c.rect.y*ky+1,Math.max(1,c.rect.w*kx-2),Math.max(1,c.rect.h*ky-2));}
   mctx.strokeStyle='#f29111';mctx.lineWidth=1;
   mctx.strokeRect(cam.ox*kx,cam.oy*ky,(innerWidth/cam.s)*kx,(innerHeight/cam.s)*ky);
 }
 /* ── input ──────────────────────────────────────────────── */
 let dragging=false,lx=0,ly=0,moved=0;
-map.addEventListener('mousedown',e=>{dragging=true;moved=0;lx=e.clientX;ly=e.clientY;map.classList.add('drag');});
-addEventListener('mouseup',()=>{dragging=false;map.classList.remove('drag');});
+map.addEventListener('mousedown',e=>{
+  if(mode==='graph'){const wx=cam.ox+e.clientX/cam.s,wy=cam.oy+e.clientY/cam.s;
+    gDrag=gNodes.find(g=>{const dx=g.x-wx,dy=g.y-wy;return dx*dx+dy*dy<Math.pow(g.r+6,2);})||null;
+    if(gDrag){moved=0;return;}}
+  dragging=true;moved=0;lx=e.clientX;ly=e.clientY;map.classList.add('drag');});
+addEventListener('mouseup',()=>{dragging=false;gDrag=null;map.classList.remove('drag');});
 map.addEventListener('mousemove',e=>{
+  if(gDrag){gDrag.x=cam.ox+e.clientX/cam.s;gDrag.y=cam.oy+e.clientY/cam.s;return;}
   if(dragging){const dx=e.clientX-lx,dy=e.clientY-ly;moved+=Math.abs(dx)+Math.abs(dy);
     cam.ox-=dx/cam.s;cam.oy-=dy/cam.s;lx=e.clientX;ly=e.clientY;}
   hover=hit(e.clientX,e.clientY);
@@ -219,7 +551,11 @@ map.addEventListener('wheel',e=>{e.preventDefault();
   const f=e.deltaY<0?1.18:1/1.18, wx=cam.ox+e.clientX/cam.s, wy=cam.oy+e.clientY/cam.s;
   cam.s=Math.min(Math.max(cam.s*f,0.2),4000);
   cam.ox=wx-e.clientX/cam.s;cam.oy=wy-e.clientY/cam.s;},{passive:false});
-map.addEventListener('dblclick',e=>{const n=hit(e.clientX,e.clientY);if(n)flyTo(n.leaf?(n.parent||n):n);});
+map.addEventListener('dblclick',e=>{
+  if(mode==='graph'){const wx=cam.ox+e.clientX/cam.s,wy=cam.oy+e.clientY/cam.s;
+    const g=gNodes.find(g=>{const dx=g.x-wx,dy=g.y-wy;return dx*dx+dy*dy<Math.pow(g.r+6,2);});
+    if(g){sel=g.n;mode='map';flyTo(g.n);}return;}
+  const n=hit(e.clientX,e.clientY);if(n)flyTo(n.leaf?(n.parent||n):n);});
 map.addEventListener('click',e=>{if(moved>4)return;const n=hit(e.clientX,e.clientY);if(n&&n.leaf)openDoc(n.id);});
 mini.addEventListener('click',e=>{const r=mini.getBoundingClientRect();
   cam.ox=(e.clientX-r.left)/ (200/W)-innerWidth/(2*cam.s);cam.oy=(e.clientY-r.top)/(124/H)-innerHeight/(2*cam.s);});
@@ -227,6 +563,15 @@ addEventListener('keydown',e=>{
   if(e.key==='0')fit();
   if(e.key==='p'||e.key==='P')togglePoints();
   if(e.key==='v'||e.key==='V')toggleVms();
+  if(e.key==='a'||e.key==='A')toggleAot();
+  if(e.key==='t'||e.key==='T')treeSheet();
+  if(e.key==='l'||e.key==='L')ledger();
+  if(e.key==='b'||e.key==='B')cycleSkin();
+  if(e.key==='m'||e.key==='M')cycleMode();
+  if(e.key==='f'||e.key==='F'){fog=!fog;$('crumb').textContent='fog of war: '+(fog?'ON — only active territories lit':'off');}
+  if(e.key==='1'){layer=1;$('crumb').textContent='layer: plain terrain';}
+  if(e.key==='2'){layer=2;$('crumb').textContent='layer: kolmogorov — green structured, red incompressible (measured lazily per tile)';}
+  if(e.key==='3'){layer=3;$('crumb').textContent='layer: causal — cool old → warm recent, ⟳n = revision generation';}
 });
 function hit(cx,cy){
   if(!root)return null;const wx=cam.ox+cx/cam.s, wy=cam.oy+cy/cam.s;
@@ -249,12 +594,211 @@ function flyTo(n){
     cam.s=from.s+(s-from.s)*e;cam.ox=from.ox+(tx-from.ox)*e;cam.oy=from.oy+(ty-from.oy)*e;
     if(t<1)requestAnimationFrame(step);})();
 }
-/* ── atomic inspect ─────────────────────────────────────── */
+/* ── atomic inspect + DAG edges ─────────────────────────── */
+let sel=null,selEdges=[];
+function chip(hex,label){const t=(hex||'').toString();const short=t.replace('sha256:','').slice(0,8);
+  return '<span class="hashchip" title="'+t+'" onclick="navigator.clipboard&&navigator.clipboard.writeText(this.title)">'+(label?label+' ':'')+short+'…</span>';}
+function esc(x){return (x??'').toString().replace(/&/g,'&amp;').replace(/</g,'&lt;');}
+const KW=/\b(fun|val|var|class|object|interface|override|suspend|return|if|else|when|for|while|import|package|private|public|internal|data|companion|def|lambda|function|const|let|new|static|void|int|long|boolean|public|final|try|catch|finally|throw|async|await)\b/g;
+function codeView(text,maxLines){
+  const lines=text.split('\n').slice(0,maxLines||1200);
+  return '<div class="codeview">'+lines.map(l=>{
+    let h=esc(l);
+    h=h.replace(/(&quot;|")((?:[^"\\]|\\.)*?)(")/g,'<span class="str">"$2"</span>');
+    h=h.replace(/(\/\/.*$|#.*$)/,'<span class="com">$1</span>');
+    h=h.replace(KW,'<span class="kw">$1</span>');
+    return '<div>'+(h||' ')+'</div>';}).join('')+'</div>';
+}
+function mdView(text){
+  let h=esc(text);
+  h=h.replace(/```([\s\S]*?)```/g,(m,c)=>'<pre>'+c+'</pre>');
+  h=h.replace(/^###### (.*)$/gm,'<h3>$1</h3>').replace(/^##### (.*)$/gm,'<h3>$1</h3>').replace(/^#### (.*)$/gm,'<h3>$1</h3>')
+     .replace(/^### (.*)$/gm,'<h3>$1</h3>').replace(/^## (.*)$/gm,'<h2>$1</h2>').replace(/^# (.*)$/gm,'<h1>$1</h1>');
+  h=h.replace(/^\s*[-*] (.*)$/gm,'<li>$1</li>');
+  h=h.replace(/\*\*([^*]+)\*\*/g,'<b>$1</b>').replace(/`([^`]+)`/g,'<code>$1</code>');
+  h=h.replace(/\[([^\]]+)\]\(([^)]+)\)/g,'<a href="$2" target="_blank" rel="noopener">$1</a>');
+  h=h.replace(/\n\n+/g,'<br><br>');
+  return '<div class="mdview">'+h+'</div>';
+}
+async function kolmogorov(bytes,mount){
+  if(typeof CompressionStream==='undefined'||!bytes.byteLength)return;
+  try{
+    const cs=new CompressionStream('gzip');
+    const compressed=await new Response(new Blob([bytes]).stream().pipeThrough(cs)).arrayBuffer();
+    const ratio=Math.min(1,compressed.byteLength/bytes.byteLength);
+    const el=document.getElementById(mount);if(!el)return;
+    el.querySelector('i').style.width=Math.round(ratio*100)+'%';
+    el.title='kolmogorov gauge: gzip '+fmtBytes(compressed.byteLength)+' / raw '+fmtBytes(bytes.byteLength)+' = '+(ratio*100).toFixed(0)+'% (left=structured, right=incompressible)';
+    el.nextElementSibling.textContent=(ratio*100).toFixed(0)+'% K';
+  }catch(_){}}
+function classCard(b){
+  const dv=new DataView(b.buffer||b);
+  if(dv.getUint32(0)!==0xCAFEBABE)return null;
+  const minor=dv.getUint16(4),major=dv.getUint16(6),pool=dv.getUint16(8);
+  const jdk=major>=49?('Java '+(major-44)):'pre-1.5';
+  return '<table class="classcard"><tr><td>magic</td><td>CAFEBABE</td></tr><tr><td>class file version</td><td>'+major+'.'+minor+' ('+jdk+')</td></tr><tr><td>constant pool</td><td>'+pool+' entries</td></tr><tr><td>size</td><td>'+fmtBytes(b.byteLength)+'</td></tr></table>';
+}
+function hexHead(b,n){
+  const v=new Uint8Array(b,0,Math.min(n||128,b.byteLength));let out='';
+  for(let i=0;i<v.length;i+=16){
+    out+=Array.from(v.slice(i,i+16)).map(x=>x.toString(16).padStart(2,'0')).join(' ')+'   '+
+         Array.from(v.slice(i,i+16)).map(x=>x>=32&&x<127?String.fromCharCode(x):'·').join('')+'\n';}
+  return '<pre style="font-size:10px">'+esc(out)+'</pre><div style="color:var(--dim)">first '+v.length+' of '+fmtBytes(b.byteLength)+' — no friendlier projection for this type yet</div>';
+}
+function extOf(id){return id.split('.').pop().toLowerCase();}
+/* ── shape strip: the Cascade Shape<S> of a text, RLE runs + fib ticks — sees content
+      relationships with stochastic features. Same taxonomy as the Forge PWA strip. */
+let _fib=null;function fibSet(){if(_fib)return _fib;_fib=new Set();let a=0,b=1;while(a<100000){_fib.add(a);const t=a+b;a=b;b=t;}return _fib;}
+function classifyLine(l){
+  const t=l.trim();
+  if(!t)return '_';
+  if(/^#{1,6} /.test(t)||/^=+$|^-{3,}$/.test(t))return 'H';
+  if(/^\|.*\|/.test(t))return 'T';
+  if(/^```/.test(t))return 'C';
+  if(/^[-*+•] |^\d+\. /.test(t))return 'B';
+  if(/^(fun|val|var|class|object|import|package|def|function|const|let|public|private|#include|@)/.test(t)||/[{};]\s*$/.test(t))return 'J';
+  if(/^(##+ )?(section|chapter)\b/i.test(t))return 'S';
+  return 'P';
+}
+function shapeRuns(text){
+  const lines=text.split('\n');const runs=[];
+  let c=null,n=0,start=1;
+  lines.forEach((l,i)=>{const k=classifyLine(l);
+    if(k===c)n++;else{if(c)runs.push({c,n,start});c=k;n=1;start=i+1;}});
+  if(c)runs.push({c,n,start});
+  return {runs,lines:lines.length};
+}
+const SHAPE_NAMES={H:'heading',S:'section',P:'prose','_':'blank',B:'bullet',T:'table',J:'code',C:'fence'};
+function shapeStripHtml(text){
+  const {runs,lines}=shapeRuns(text);const fib=fibSet();
+  let depth=0;
+  const cells=runs.map((r,i)=>{
+    const isFib=fib.has(i);
+    const title=(SHAPE_NAMES[r.c]||r.c)+' · '+r.n+' lines '+r.start+'–'+(r.start+r.n-1)+(isFib?' · depth '+i:'');
+    return '<button class="shape-cell'+(isFib?' fib':'')+'" title="'+title+'" style="--c:var(--shape-'+r.c+',var(--shape-P));flex:'+r.n+' 0 2px" onclick="jumpLine('+r.start+')"></button>';
+  }).join('');
+  const key=runs.map(r=>r.c).join('');
+  return '<div class="shape-strip">'+cells+'</div><code class="shape-key">'+esc(key)+' · '+lines+' lines · '+runs.length+' runs</code>';
+}
+function jumpLine(n){const cv=document.querySelector('#proj .codeview');if(!cv)return;
+  const row=cv.children[n-1];if(row){row.scrollIntoView({block:'center'});row.style.outline='1px solid var(--commit)';setTimeout(()=>row.style.outline='',1200);}}
 async function openDoc(id){
-  $('docTitle').textContent=id;$('docBody').textContent='…';show('doc');
-  try{const r=await fetch('/'+DB+'/'+id.split('/').map(encodeURIComponent).join('/'));
-    $('docBody').textContent=JSON.stringify(await r.json(),null,2);}
-  catch(e){$('docBody').textContent='fetch failed: '+e;}
+  $('docTitle').textContent=id.split('/').pop();$('docBody').innerHTML='…';show('doc');
+  sel=nodeFor(id);selEdges=[];
+  // the forge PRODUCT projects from its own payload, not the couch harness
+  const pd=productDocs.get(id);
+  if(pd){
+    if(pd.kind==='card'){const c=pd.card;
+      $('docBody').innerHTML='<div class="docmeta"><b>'+esc(pd.title)+'</b><span class="hashchip">'+esc(pd.column)+'</span></div>'+
+        (c.priority?'<div class="docmeta">priority '+esc(c.priority)+'</div>':'')+
+        (c.description?mdView(c.description.toString()):'<i style="color:var(--dim)">no description</i>')+
+        (Array.isArray(c.dependencies)&&c.dependencies.length?'<div style="margin-top:6px;color:var(--dim)">depends: '+c.dependencies.map(esc).join(', ')+'</div>':'');
+    } else {
+      $('docBody').innerHTML='<div class="docmeta"><b>'+esc(pd.title)+'</b></div><table class="kv">'+
+        Object.entries(pd.session).filter(([k,v])=>typeof v!=='object').slice(0,14)
+          .map(([k,v])=>'<tr><td>'+esc(k)+'</td><td>'+esc((v??'').toString().slice(0,120))+'</td></tr>').join('')+'</table>';
+    }
+    return;
+  }
+  let doc=null;
+  try{doc=await (await fetch('/'+DB+'/'+id.split('/').map(encodeURIComponent).join('/'))).json();}
+  catch(e){$('docBody').textContent='fetch failed: '+e;return;}
+  const att=doc._attachments&&doc._attachments.content;
+  // ── header: path, rev/cid as chips, bytes, kolmogorov gauge ──
+  let html='<div class="docmeta"><span style="color:var(--dim)">'+esc(id)+'</span></div>'+
+    '<div class="docmeta">'+chip(doc._rev,'rev')+(att?chip(att.cid,'cid'):'')+
+    (att?'<span>'+fmtBytes(att.length||0)+'</span><span class="kgauge" id="kg"><i></i></span><span style="color:var(--dim)">…K</span>':'')+'</div>';
+  // ── field sheet (no underscore noise, hashes as chips) ──
+  const fields=Object.entries(doc).filter(([k])=>!k.startsWith('_')&&k!=='contentId'&&k!=='length'&&k!=='contentType');
+  if(fields.length){
+    html+='<table class="kv">'+fields.map(([k,v])=>{
+      let val=typeof v==='object'?esc(JSON.stringify(v,null,1)).slice(0,400):(/^(sha256:)?[0-9a-f]{40,64}$/.test(v)?chip(v):esc(v));
+      return '<tr><td>'+esc(k)+'</td><td>'+val+'</td></tr>';}).join('')+'</table>';
+  }
+  $('docBody').innerHTML=html+'<div id="proj" style="margin-top:8px;color:var(--dim)">projecting…</div>';
+  // ── content projection by type ──
+  if(att){
+    const ct=(att.content_type||'').toLowerCase(),ext=extOf(id),big=(att.length||0)>1500000;
+    const proj=document.getElementById('proj');
+    if(big){proj.innerHTML='<a style="cursor:pointer;color:var(--commit)" onclick="this.parentElement.textContent=\'…\';projectBytes(\''+id.replace(/'/g,"\\'")+'\')">'+fmtBytes(att.length)+' — project anyway</a>';}
+    else await projectBytes(id,ct,ext);
+  } else document.getElementById('proj').textContent='';
+  // ── dag edges ──
+  try{const d=await (await fetch('/api/graal/dag?id='+encodeURIComponent(id))).json();
+    selEdges=(d.edges||[]).map(e=>({to:nodeFor(e.to),kind:e.kind,id:e.to}));
+    if(selEdges.length){
+      const div=document.createElement('div');
+      div.innerHTML='<div style="margin-top:6px;color:var(--dim)">dag edges ('+selEdges.length+'):</div>'+
+        selEdges.slice(0,20).map((e,i)=>'<span class="dagchip" onclick="openDoc(selEdges['+i+'].id)">'+e.kind+' → …'+esc(e.id.slice(-38))+'</span>').join('');
+      $('docBody').appendChild(div);
+    }}catch(e){}
+}
+async function projectBytes(id,ct,ext){
+  const proj=document.getElementById('proj');if(!proj)return;
+  ct=ct||'';ext=ext||extOf(id);
+  try{
+    const r=await fetch('/'+DB+'/'+id.split('/').map(encodeURIComponent).join('/')+'/content');
+    if(!r.ok){proj.textContent='no content ('+r.status+')';return;}
+    const buf=await r.arrayBuffer();
+    kolmogorov(buf,'kg');
+    const asText=()=>new TextDecoder().decode(buf);
+    if(ct.includes('svg')||ext==='svg'){proj.innerHTML='<img class="imgview" src="data:image/svg+xml;base64,'+btoa(unescape(encodeURIComponent(asText())))+'">';}
+    else if(ct.startsWith('image/')){const b=new Blob([buf],{type:ct});proj.innerHTML='<img class="imgview" src="'+URL.createObjectURL(b)+'">';}
+    else if(ext==='md'||ct.includes('markdown')){const t=asText();proj.innerHTML=shapeStripHtml(t)+mdView(t);}
+    else if(ct.includes('html')||ext==='html'){proj.innerHTML='<iframe sandbox srcdoc="'+asText().replace(/&/g,'&amp;').replace(/"/g,'&quot;')+'" style="width:100%;height:44vh;border:1px solid var(--line);border-radius:4px;background:#fff"></iframe>';}
+    else if(ext==='class'||ct.includes('java-vm')){proj.innerHTML=classCard(buf)||hexHead(buf,128);}
+    else if(ct.startsWith('text/')||/^(kt|kts|java|py|js|ts|json|yaml|yml|css|sh|gradle|xml|txt|toml|properties|sql|rs|c|h|cpp|go)$/.test(ext)){
+      const t=ext==='json'?JSON.stringify(JSON.parse(asText()),null,2):asText();
+      proj.innerHTML=shapeStripHtml(t)+codeView(t);
+      if(/^(kt|kts|java)$/.test(ext))await sourceMates(id,proj);}
+    else proj.innerHTML=hexHead(buf,128);
+  }catch(e){proj.textContent='projection failed: '+e;}
+}
+/* JDK 25 ClassFile API over the exact compiled blobs absorbed from build/live/classes. */
+async function sourceMates(id,proj){
+  const mount=document.createElement('div');mount.innerHTML='<div style="margin-top:8px;color:var(--dim)">finding SourceFile-mated classpath blobs…</div>';proj.appendChild(mount);
+  try{
+    const r=await fetch('/api/graal/decompile?source='+encodeURIComponent(id));
+    const x=await r.json();
+    if(!r.ok){mount.innerHTML='<div style="margin-top:8px;color:var(--deopt)">decompiler: '+esc(x.error||r.status)+'</div>';return;}
+    const mates=x.mates||[];
+    if(!mates.length){mount.innerHTML='<div style="margin-top:8px;color:var(--dim)">JDK 25 ClassFile API: no SourceFile-mated build/live class blob yet</div>';return;}
+    mount.innerHTML='<div style="margin-top:8px;color:var(--dim)">JDK 25 ClassFile API · '+mates.length+' mated blob'+(mates.length===1?'':'s')+' · '+(x.mated?'byte-identical runtime classpath proven':'build blob found; runtime identity differs')+'</div>'+
+      mates.map((m,i)=>{const d=m.decompiler||{},methods=d.methods||[];
+        const status=m.exactRuntimeBlob?'exact runtime mate':m.onClasspath?'classpath bytes differ':'not on runtime classpath';
+        return '<details class="mate '+(m.exactRuntimeBlob?'exact':'')+'" '+(i===0?'open':'')+'><summary>'+esc(m.className)+' · '+status+'</summary><div class="matebody">'+
+          '<div class="docmeta">'+chip(m.blobCid,'blob')+(m.runtimeCid?chip(m.runtimeCid,'runtime'):'')+'<span>'+fmtBytes(m.blobBytes||0)+'</span><span>'+methods.length+' methods</span></div>'+
+          codeView(d.pseudoSource||'no projection',2400)+'</div></details>';}).join('');
+  }catch(e){mount.innerHTML='<div style="margin-top:8px;color:var(--deopt)">decompiler failed: '+esc(e)+'</div>';}
+}
+/* ── drilldown adaptations: tree sheet + ledger ─────────── */
+function targetNode(){return hover||sel||root;}
+function treeSheet(){
+  const n=targetNode();if(!n)return;
+  $('sheetTitle').textContent='tree sheet — '+(n===root?'/':pathOf(n));
+  const rows=[];
+  (function walk(x,depth){
+    if(depth>4)return;
+    rows.push({ind:'  '.repeat(depth)+(x.children.size?'▸ ':'· ')+x.name,docs:x.docs,bytes:x.bytes,leaf:x.leaf,node:x});
+    if(depth<4)[...x.children.values()].sort((a,b)=>b.bytes-a.bytes).slice(0,40).forEach(c=>walk(c,depth+1));
+  })(n,0);
+  window._sheetRows=rows;
+  $('sheetBody').innerHTML='<table><tr><th>territory</th><th>docs</th><th>bytes</th><th>share</th></tr>'+
+    rows.map((r,i)=>'<tr><td style="cursor:pointer" onclick="flyTo(window._sheetRows['+i+'].node);">'+r.ind+'</td><td>'+r.docs.toLocaleString()+'</td><td>'+fmtBytes(r.bytes)+'</td><td>'+(n.bytes?Math.round(100*r.bytes/n.bytes)+'%':'')+'</td></tr>').join('')+'</table>';
+  show('sheet');
+}
+function ledger(){
+  const n=targetNode();if(!n)return;
+  $('ledgerTitle').textContent='ledger — '+(n===root?'/':pathOf(n))+' ('+n.docs.toLocaleString()+' entries)';
+  const leaves=[];
+  (function walk(x){if(x.leaf)leaves.push(x);else for(const c of x.children.values())walk(c);})(n);
+  leaves.sort((a,b)=>a.id<b.id?-1:1);
+  let run=0;
+  const cap=leaves.slice(0,800);
+  $('ledgerBody').innerHTML='<table><tr><th>#</th><th>entry</th><th>bytes</th><th>balance</th></tr>'+
+    cap.map((x,i)=>{run+=x.bytes;return '<tr><td>'+(i+1)+'</td><td style="cursor:pointer" onclick="openDoc(\''+x.id.replace(/'/g,"\\'")+'\')">'+x.id+'</td><td style="text-align:right">'+x.bytes.toLocaleString()+'</td><td style="text-align:right">'+run.toLocaleString()+'</td></tr>';}).join('')+
+    '</table>'+(leaves.length>cap.length?'<div style="color:var(--dim);margin-top:4px">…'+(leaves.length-cap.length).toLocaleString()+' more entries (zoom to a smaller territory)</div>':'');
+  show('ledger');
 }
 function show(id){$(id).style.display='flex';}
 function hide(id){$(id).style.display='none';}
@@ -287,18 +831,76 @@ async function pollVitals(){
   }catch(e){}
   setTimeout(pollVitals,2000);
 }
+let vmSheet={columns:[],rows:[]};
 async function pollVms(){
   try{const r=await fetch('/api/vm');
-    if(r.ok){const s=await r.json();const rows=(s.rows||s.cells||[]);vmRows=rows;
-      $('cVm').firstChild.textContent=Array.isArray(rows)?rows.length:'?';}
+    if(r.ok){vmSheet=await r.json();vmSheet.rows=vmSheet.rows||[];
+      $('cVm').firstChild.textContent=vmSheet.rows.length;
+      if($('vms').style.display==='flex')renderVms();}
     else $('cVm').firstChild.textContent='–';
   }catch(e){$('cVm').firstChild.textContent='–';}
   setTimeout(pollVms,5000);
 }
-let vmRows=[];
-function toggleVms(){const p=$('vms');if(p.style.display==='flex')return hide('vms');
-  $('vmsBody').innerHTML=vmRows.length?('<table><tr><th>row</th></tr>'+vmRows.map(r=>'<tr><td>'+JSON.stringify(r)+'</td></tr>').join('')+'</table>'):'<i>no hypervisor rows — spawn via POST /api/vm/spawn</i>';
-  show('vms');}
+function vmOut(x){$('vmOut').textContent=typeof x==='string'?x:JSON.stringify(x,null,1);}
+/* ── VM run visibility: a live log fed by the SSE 'vm' events, plus busy state on the calling button ── */
+const vmLog=[];
+function vmLine(m){
+  vmLog.unshift(m);if(vmLog.length>200)vmLog.pop();
+  const el=$('vmLog');if(!el)return;
+  el.innerHTML=vmLog.map(x=>'<div class="vmline '+x.vmKind+'"><span class="t">'+new Date(x.at||Date.now()).toTimeString().slice(0,8)+'</span><span class="k">'+x.vmKind+'</span><span>'+esc(x.vmId||'')+'</span><span style="color:var(--dim)">'+esc(vmDetail(x))+'</span></div>').join('');
+}
+function vmDetail(x){
+  if(x.vmKind==='spawned')return x.facet+' · '+x.trust;
+  if(x.vmKind==='evaluated')return (x.nanos?Math.round(x.nanos/1e6)+'ms · ':'')+'cid '+((x.resultCid||'').slice(0,14))+'…';
+  if(x.vmKind==='revoked')return x.reason||'';
+  if(x.vmKind==='landed')return x.root+'.'+x.property+' = '+((x.value||'').toString().slice(0,60));
+  return '';
+}
+let vmBusy=null;
+function vmBusyStart(label){vmBusy=label;const b=$('vmSpinner');if(b)b.style.display='inline-block';vmOut(label+'…');}
+function vmBusyEnd(){vmBusy=null;const b=$('vmSpinner');if(b)b.style.display='none';}
+async function vmPost(path,body){
+  try{const r=await fetch(path,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body||{})});
+    const t=await r.text();vmOut(r.status+' '+t.slice(0,600));pollVms();return r.ok;}
+  catch(e){vmOut('failed: '+e);return false;}
+}
+async function vmSpawn(){
+  const id=$('vmId').value||('vm-'+Date.now()%10000);vmBusyStart('spawning '+id);
+  await vmPost('/api/vm/spawn',{id,facet:$('vmFacet').value,statements:+($('vmStmts').value||10000),wallMillis:15000});
+  vmBusyEnd();
+}
+async function vmEval(id){
+  vmBusyStart('evaluating on '+id);
+  await vmPost('/api/vm/'+encodeURIComponent(id)+'/eval',{source:$('vmSrc').value||'1+1',name:'console'});
+  vmBusyEnd();
+}
+async function vmRevoke(id){vmBusyStart('revoking '+id);await vmPost('/api/vm/'+encodeURIComponent(id)+'/revoke',{reason:'console'});vmBusyEnd();}
+async function hermesRunner(){
+  const id='hermes-'+(Date.now()%1000);
+  $('vmId').value=id;$('vmFacet').value='python';
+  vmBusyStart('launching hermes runner '+id);
+  const ok=await vmPost('/api/vm/spawn',{id,facet:'python',statements:200000,wallMillis:30000});
+  if(ok){$('vmSrc').value="import sys\n'hermes sleeve alive on graalpy ' + sys.version.split()[0]";
+    vmBusyStart('probing hermes runner '+id);
+    await vmPost('/api/vm/'+encodeURIComponent(id)+'/eval',{source:$('vmSrc').value,name:'console'});}
+  vmBusyEnd();
+}
+function renderVms(){
+  const cols=(vmSheet.columns||[]).map(c=>c.name);
+  const rows=vmSheet.rows||[];
+  $('vmsBody').innerHTML=
+    '<div class="vmctl"><input id="vmId" placeholder="id" size="8"><select id="vmFacet"><option value="js">js</option><option value="python">python</option></select>'+
+    '<input id="vmStmts" value="10000" size="7" title="statement budget"><button onclick="vmSpawn()">spawn</button>'+
+    '<button class="vmbtn" onclick="hermesRunner()" title="spawn a GraalPy sleeve and probe it">⚗ hermes runner</button></div>'+
+    (rows.length?'<table><tr>'+cols.map(c=>'<th>'+esc(c)+'</th>').join('')+'<th></th></tr>'+
+      rows.map(r=>{const id=r[0];return '<tr>'+r.map(v=>'<td>'+esc((v??'').toString().slice(0,26))+'</td>').join('')+
+        '<td><button class="vmbtn" onclick="vmEval(\''+esc(id)+'\')">eval</button> <button class="vmbtn" onclick="vmRevoke(\''+esc(id)+'\')">revoke</button></td></tr>';}).join('')+'</table>'
+      :'<i style="color:var(--dim)">no guests — spawn one, or hit the hermes runner</i>')+
+    '<div class="vmctl" style="margin-top:8px"><textarea id="vmSrc" placeholder="source to eval on a guest…"></textarea><span id="vmSpinner" class="vmspin" style="display:none" title="run in flight"></span></div>'+
+    '<div id="vmOut"></div><div style="color:var(--dim);font-size:10px;margin:6px 0 2px">run log</div><div id="vmLog"></div>';
+  $('vmLog').innerHTML=vmLog.map(x=>'<div class="vmline '+x.vmKind+'"><span class="t">'+new Date(x.at||Date.now()).toTimeString().slice(0,8)+'</span><span class="k">'+x.vmKind+'</span><span>'+esc(x.vmId||'')+'</span><span style="color:var(--dim)">'+esc(vmDetail(x))+'</span></div>').join('');
+}
+function toggleVms(){const p=$('vms');if(p.style.display==='flex')return hide('vms');renderVms();show('vms');}
 async function togglePoints(){const p=$('points');if(p.style.display==='flex')return hide('points');
   try{const r=await (await fetch('/api/graal/pointcuts')).json();
     const routes=r.routes||[];
@@ -308,6 +910,24 @@ async function togglePoints(){const p=$('points');if(p.style.display==='flex')re
       :'<i>no pointcut landings yet — the routes appear as the instrumented code runs</i>';
   }catch(e){$('pointsBody').textContent='fetch failed: '+e;}
   show('points');}
+let aotState={};
+async function loadAot(){
+  try{aotState=await (await fetch('/api/graal/aot')).json();
+    $('cAot').firstChild.textContent=aotState.exists?fmtBytes(aotState.bytes||0):(aotState.cacheOutput?'record':'off');}
+  catch(e){aotState={error:String(e)};$('cAot').firstChild.textContent='–';}
+}
+async function toggleAot(){const p=$('aot');if(p.style.display==='flex')return hide('aot');
+  await loadAot();
+  const s=aotState;
+  $('aotBody').innerHTML='<table class="kv">'+Object.entries(s).map(([k,v])=>'<tr><td>'+esc(k)+'</td><td>'+esc(v)+'</td></tr>').join('')+'</table>'+
+    (s.exists?'<div style="margin-top:8px"><a href="/api/graal/aot/blob" style="color:var(--commit)">download opaque HotSpot archive</a> · <button onclick="captureAot()">capture into Couch/CAS</button></div>':'<div style="margin-top:8px;color:var(--dim)">launch with -XX:AOTCache=… or -XX:AOTCacheOutput=… to expose an archive</div>')+
+    '<div style="margin-top:8px;color:var(--dim)">The archive is opaque VM state. Decompilation uses its mated .class blobs through java.lang.classfile, never fake parsing of the .aot container.</div>';
+  show('aot');}
+async function captureAot(){
+  const r=await fetch('/api/graal/aot/capture',{method:'POST'}),x=await r.json();
+  if(r.ok){river('commit','AOT '+x.id);$('aotBody').insertAdjacentHTML('beforeend','<div style="color:var(--compile);margin-top:6px">captured '+chip(x.cid)+' · '+fmtBytes(x.bytes)+'</div>');loadMap();}
+  else $('aotBody').insertAdjacentHTML('beforeend','<div style="color:var(--deopt);margin-top:6px">capture failed: '+esc(x.error||r.status)+'</div>');
+}
 /* ── the flourish feed ──────────────────────────────────── */
 const COLORS={compile:'var(--compile)',deopt:'var(--deopt)',gc:'var(--gc)',commit:'var(--commit)',cpu:'var(--cpu)',vm:'var(--vm)'};
 const PING={compile:'#3ddc84',deopt:'#ff4f58',gc:'#ffb02e',commit:'#3fd0ff'};
@@ -327,15 +947,36 @@ function nodeFor(id){
   for(const p of parts){if(!n)break;n=n.children.get(p);if(n)best=n;}
   return best;
 }
+/* Seismic coalescing: a re-absorption storm (build refeed, git fetch churn) is thousands of
+   commits in seconds. Individually flourished they are an earthquake in the river; coalesced they
+   are ONE seismic event per top territory with a magnitude. Quiet commits still ping one-by-one. */
+const quakeBuf=new Map();let quakeTimer=null,recentCommits=0;
+setInterval(()=>{recentCommits=0;},1000);
+function topOf(n){let t=n;while(t&&t.parent&&t.parent!==root)t=t.parent;return t||n;}
+function quake(e,n){
+  recentCommits++;
+  if(recentCommits<=12){river('commit',(e.deleted?'✕ ':'')+e.id);pingAt(n,PING.commit);return;}
+  const t=topOf(n||root),k=t===root?'/':t.name;
+  const q=quakeBuf.get(k)||{n:t,count:0};q.count++;quakeBuf.set(k,q);
+  if(!quakeTimer)quakeTimer=setTimeout(()=>{
+    for(const [k,q] of quakeBuf){
+      river('commit','⚡ quake: '+q.count.toLocaleString()+' commits in '+k);
+      pingAt(q.n,PING.commit,'⚡'+q.count);
+      if(!reduced&&q.count>200)shake=Math.min(shake+4,8);
+    }
+    quakeBuf.clear();quakeTimer=null;
+  },900);
+}
 function connectSse(){
   const es=new EventSource('/api/graal/events');
   es.onmessage=m=>{try{
     const e=JSON.parse(m.data);
     switch(e.kind){
+      case 'vm':vmLine(e);river(e.vmKind==='revoked'?'deopt':'commit','vm '+e.vmKind+' '+(e.vmId||'')+' — '+vmDetail(e));break;
       case 'compile':river('compile',(e.method||'?')+' L'+(e.level??'?')+' '+fmtBytes(e.codeSize||0));flash($('cComp'),'flash-compile');break;
       case 'deopt':river('deopt',(e.reason||'?')+' → '+(e.action||'?')+' #'+(e.compileId??''));flash($('cDeopt'),'flash-deopt');shake=Math.min(shake+5,9);pingAt(nodeFor('pointcut'),PING.deopt,e.reason);break;
       case 'gc':river('gc',(e.name||'?')+' '+(e.cause||'')+' '+(e.pauseMs||0)+'ms');flash($('cGc'),'flash-gc');break;
-      case 'commit':river('commit',(e.deleted?'✕ ':'')+e.id);pingAt(nodeFor(e.id),PING.commit);break;
+      case 'commit':{const n=nodeFor(e.id);heatUp(n);quake(e,n);}break;
       case 'cpu':break;
       default:river(e.kind||'?',JSON.stringify(e).slice(0,90));
     }
@@ -343,13 +984,39 @@ function connectSse(){
   es.onerror=()=>{es.close();setTimeout(connectSse,3000);};
 }
 /* ── boot ───────────────────────────────────────────────── */
+const productDocs=new Map();  // synthetic id → renderable payload (the forge PRODUCT, not the harness)
+async function productRows(){
+  const rows=[];productDocs.clear();
+  try{const b=await (await fetch('/api/board')).json();
+    const cols=b.columns||b.board&&b.board.columns||[];
+    const cards=b.cards||b.board&&b.board.cards||[];
+    for(const c of (Array.isArray(cards)?cards:[])){
+      const col=(c.column||c.columnId||c.status||'inbox').toString();
+      const title=(c.title||c.id||'card').toString().slice(0,60);
+      const id='forge/board/'+col+'/'+title.replace(/[^\w .-]+/g,'_');
+      rows.push([id,64+((c.description||'').length||64),0,1]);
+      productDocs.set(id,{kind:'card',title,column:col,card:c});
+    }
+  }catch(_){}
+  try{const s=await (await fetch('/api/jules/surface')).json();
+    const sess=(s.surface&&s.surface.sessions)||s.sessions||[];
+    for(const x of (Array.isArray(sess)?sess:[])){
+      const nm=(x.title||x.id||x.sessionId||'session').toString().slice(0,50);
+      const id='forge/jules/'+nm.replace(/[^\w .-]+/g,'_');
+      rows.push([id,256,0,1]);
+      productDocs.set(id,{kind:'session',title:nm,session:x});
+    }
+  }catch(_){}
+  return rows;
+}
 async function loadMap(){
   try{const m=await (await fetch('/api/graal/map')).json();
-    buildTree(m.rows||[]);$('crumb').textContent='terrain: '+((m.rows||[]).length.toLocaleString())+' documents — wheel to dive';}
+    const prod=await productRows();
+    buildTree((m.rows||[]).concat(prod));$('crumb').textContent='terrain: '+((m.rows||[]).length.toLocaleString())+' documents — wheel to dive';}
   catch(e){$('crumb').textContent='map fetch failed: '+e;}
   setTimeout(loadMap,30000);
 }
-resize();loadMap();pollVitals();pollVms();connectSse();requestAnimationFrame(draw);
+resize();loadMap();pollVitals();pollVms();loadAot();connectSse();requestAnimationFrame(draw);
 </script>
 </body>
 </html>

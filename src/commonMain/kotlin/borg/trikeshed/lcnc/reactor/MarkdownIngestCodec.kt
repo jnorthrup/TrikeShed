@@ -1,5 +1,9 @@
 package borg.trikeshed.lcnc.reactor
 
+import borg.trikeshed.cas.ContentEpistemicIngest
+import borg.trikeshed.cas.ContentEpistemicSurface
+import borg.trikeshed.collections.LineAperture
+import borg.trikeshed.job.CasStore
 import borg.trikeshed.lcnc.isam.LcncBlock
 import borg.trikeshed.lcnc.isam.LcncEntity
 import borg.trikeshed.lib.Series
@@ -40,4 +44,11 @@ class MarkdownIngestCodec : IngestCodec {
             }
         }
     }
+
+    /** Text ingest's epistemic lane: same donor bytes → CAS spine regions, metrics, schemas and links. */
+    fun ingestEpistemic(
+        cas: CasStore,
+        text: String,
+        aperture: LineAperture = LineAperture.L1,
+    ): ContentEpistemicSurface = ContentEpistemicIngest.ingest(cas, text, aperture)
 }

@@ -162,7 +162,7 @@ object JsonParser {
                             "expected colon in ${tmp.take(40).asString()}"
                         }
                         val valueContext = tmp.slice
-                        tmp.lim(closeQuote).pos(openQuote).asString() j reify(valueContext)
+                        unescapeJson(tmp.lim(closeQuote).pos(openQuote).asString()) j reify(valueContext)
                     } else reify(CharSeries(src[before.inc() until after]).trim)
                 }.let { mapped ->
                     if (isObj) mapped.associate { item ->
@@ -185,13 +185,44 @@ object JsonParser {
                 val seekTo = src.seekTo('"', '\\')
                 if (!seekTo) throw Exception("expected end of quoted string")
                 val end = src.pos - 1
-                src.lim(end).pos(beg).asString()
+                unescapeJson(src.lim(end).pos(beg).asString())
             }
 
             't', 'f' -> 't' == c
 'n' -> null
             else -> src.res.slice.parseDoubleOrNull()
         }
+    }
+
+    /**
+     * Decode JSON string escapes. reify's quote branch used to hand back the RAW span between the
+     * quotes, so every \" \n \uXXXX crossed the wire as literal backslashes — corrupting any
+     * payload with escapes (VM eval sources, _bulk_docs bodies with quotes…). Fast path: no
+     * backslash, no allocation.
+     */
+    fun unescapeJson(s: String): String {
+        if ('\\' !in s) return s
+        val sb = StringBuilder(s.length)
+        var i = 0
+        while (i < s.length) {
+            val c = s[i]
+            if (c != '\\' || i == s.length - 1) { sb.append(c); i++; continue }
+            i++
+            when (val e = s[i]) {
+                '"' -> sb.append('"'); '\\' -> sb.append('\\'); '/' -> sb.append('/')
+                'b' -> sb.append('\b'); 'f' -> sb.append('\u000C'); 'n' -> sb.append('\n')
+                'r' -> sb.append('\r'); 't' -> sb.append('\t')
+                'u' -> {
+                    if (i + 4 < s.length) {
+                        val hex = s.substring(i + 1, i + 5).toIntOrNull(16)
+                        if (hex != null) { sb.append(hex.toChar()); i += 4 } else sb.append(e)
+                    } else sb.append(e)
+                }
+                else -> { sb.append('\\'); sb.append(e) }
+            }
+            i++
+        }
+        return sb.toString()
     }
 
     /** a recursive depth-first search of the json tree, the path is a series of strings and ints,

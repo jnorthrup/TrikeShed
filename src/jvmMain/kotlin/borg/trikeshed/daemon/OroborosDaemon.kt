@@ -339,12 +339,19 @@ object OroborosDaemon {
         val vmWire = borg.trikeshed.forge.server.VmWire(vmHost, wireScope)
         val reportReactorForWires = CouchReportReactorElement(parentJob = coroutineContext[kotlinx.coroutines.Job])
         launch { reportReactorForWires.open() }
-        val graalWire = borg.trikeshed.forge.server.GraalWire(jvmVitals, couchStore, reportReactorForWires, wireScope)
+        val graalWire = borg.trikeshed.forge.server.GraalWire(
+            jvmVitals,
+            couchStore,
+            reportReactorForWires,
+            wireScope,
+            couchDb,
+            vmHost,
+        )
 
         val kanbanServer = JvmKanbanServer(
             driver,
             extraRoutes = listOf(graalWire::route, vmWire::route),
-            rawRoutes = listOf(couchWire::route),
+            rawRoutes = listOf(graalWire::ingestRoute, couchWire::route),
             streamingPaths = borg.trikeshed.forge.server.CouchWire.streamingPaths(COUCH_DB_NAME) +
                 borg.trikeshed.forge.server.GraalWire.STREAMING +
                 setOf(borg.trikeshed.forge.server.VmWire.EVENTS_PATH),
@@ -353,10 +360,22 @@ object OroborosDaemon {
         val kanbanJob = SupervisorJob(coroutineContext[kotlinx.coroutines.Job])
         if (watch) {
             launch(CoroutineScope(kanbanJob).coroutineContext + Dispatchers.Default) {
-                try {
-                    kanbanServer.run(kanbanPort, null)
-                } catch (t: Throwable) {
-                    System.err.println("[OROBOROS] Kanban server failed: ${t.message}")
+                // Boot race seen in the wild: bindAndServe dies with "Parent job is Cancelling"
+                // moments after the port binds. Until the racing job is named, the server RETRIES —
+                // a daemon whose HTTP tier can be killed once at boot must not stay headless.
+                var attempt = 0
+                while (isRunning) {
+                    try {
+                        kanbanServer.run(kanbanPort, null)
+                        break
+                    } catch (t: Throwable) {
+                        if (t is kotlinx.coroutines.CancellationException && !isRunning) break
+                        attempt++
+                        System.err.println("[OROBOROS] Kanban server failed (attempt $attempt): ${t.message}")
+                        t.printStackTrace()
+                        if (attempt >= 5) { System.err.println("[OROBOROS] Kanban server giving up after $attempt attempts"); break }
+                        kotlinx.coroutines.delay(1500L * attempt)
+                    }
                 }
             }
             System.err.println("[OROBOROS] Kanban HTTP server launching on :$kanbanPort (CCEK litebike) — Couch 1.6 surface at /$COUCH_DB_NAME, PWA hoisted at /")
@@ -459,10 +478,19 @@ object OroborosDaemon {
         System.err.println("[OROBOROS] Worktree watcher: ${worktreeWatcher.state} — reactive source/document events")
 
         launch {
+            // Seismic damping: a build refeed or git fetch is thousands of events in seconds;
+            // one line per 5s window with a magnitude, instead of an earthquake in the log.
+            var windowStart = 0L; var windowCount = 0; var lastPath = ""
             for (event in worktreeWatcher.events) {
                 worktreeReconcileElement.worktreeDirty.trySend(Unit)
                 cycleTriggers.trySend(Unit)
-                println("[OROBOROS] worktree-event: ${event.type} ${event.path}")
+                val now = System.currentTimeMillis()
+                if (now - windowStart > 5_000) {
+                    if (windowCount > 1) println("[OROBOROS] worktree-quake: $windowCount events in 5s (last: $lastPath)")
+                    else if (windowCount == 1) println("[OROBOROS] worktree-event: $lastPath")
+                    windowStart = now; windowCount = 0
+                }
+                windowCount++; lastPath = "${event.type} ${event.path}"
             }
         }
 
@@ -495,6 +523,7 @@ object OroborosDaemon {
         // files directly (no ProcessBuilder). File events invalidate the
         // relevant cache entry; the next cycle reads fresh values.
         launch {
+            var lastRefLogMs = 0L
             for (event in gitWatcher.events) {
                 cycleTriggers.trySend(Unit)
                 when {
@@ -508,7 +537,10 @@ object OroborosDaemon {
                     }
                     event.path.startsWith(".git/refs/") -> {
                         gitState.invalidateHead()
-                        println("[OROBOROS] git-event: ref changed → ${event.path}")
+                        if (System.currentTimeMillis() - lastRefLogMs > 5_000) {
+                            lastRefLogMs = System.currentTimeMillis()
+                            println("[OROBOROS] git-event: ref changed → ${event.path} (further ref churn sampled 1/5s)")
+                        }
                     }
                     event.path.startsWith(".git/objects/") -> {
                         // New git object — trigger Couch reconcile if in --watch mode

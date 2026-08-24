@@ -110,17 +110,26 @@ class JvmFileWatchReactorElement(
     }
 
     private fun registerTree(start: java.nio.file.Path, service: WatchService) {
-        Files.walk(start).use { paths ->
-            paths.filter { Files.isDirectory(it) && !isIgnored(it) }.forEach { directory ->
-                val key = directory.register(
+        // The walked tree churns underneath us (CAS atomic-write temps appear and vanish between
+        // list and stat). Files.walk's readAttributes then throws NoSuchFileException, and letting
+        // that escape open() cancelled the daemon's WHOLE job tree (the "Parent job is Cancelling"
+        // kanban deaths). Walk manually; every vanished entry is simply not a directory to watch.
+        fun walk(dir: java.nio.file.Path) {
+            if (isIgnored(dir)) return
+            runCatching {
+                dir.register(
                     service,
                     StandardWatchEventKinds.ENTRY_CREATE,
                     StandardWatchEventKinds.ENTRY_MODIFY,
                     StandardWatchEventKinds.ENTRY_DELETE,
                 )
-                directories[key] = directory
+            }.onSuccess { key -> directories[key] = dir }
+            val children = runCatching { Files.newDirectoryStream(dir).use { it.toList() } }.getOrElse { return }
+            for (child in children) {
+                if (runCatching { Files.isDirectory(child) }.getOrDefault(false)) walk(child)
             }
         }
+        if (runCatching { Files.isDirectory(start) }.getOrDefault(false)) walk(start)
     }
 
     private fun isIgnored(path: java.nio.file.Path): Boolean {

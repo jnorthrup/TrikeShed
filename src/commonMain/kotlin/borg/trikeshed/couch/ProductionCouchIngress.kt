@@ -21,6 +21,11 @@ class ProductionCouchIngress(
 ) : CouchIngress {
     private var sequence: Long = 0
 
+    // Every intent is read-rev → mint-seq → commit; two writers interleaving there corrupt the
+    // strictly-monotonic changes log ("Frame sequence N must be strictly greater than …") and, when
+    // it throws inside a reconcile element, cancel the daemon's main job (the boot-race kanban
+    // deaths). @Synchronized serializes the JVM hosts; non-JVM targets are single-writer anyway.
+    @kotlin.jvm.Synchronized
     override fun putIntent(doc: Document, expectedRev: String?): Boolean {
         val existingRev = head.getRev(doc.id)
         val isDeleted = head.isDeleted(doc.id)
@@ -50,6 +55,7 @@ class ProductionCouchIngress(
         return true // Success for both inserts and updates
     }
 
+    @kotlin.jvm.Synchronized
     override fun putReplicated(doc: Document?, docId: String, rev: String, deleted: Boolean): Boolean {
         val existingRev = head.getRev(docId)
         if (existingRev == rev) return true // already the head: idempotent
@@ -60,6 +66,7 @@ class ProductionCouchIngress(
         return true
     }
 
+    @kotlin.jvm.Synchronized
     override fun deleteIntent(docId: String, expectedRev: String?): Boolean {
         val existingRev = head.getRev(docId) ?: return false
         val isDeleted = head.isDeleted(docId)

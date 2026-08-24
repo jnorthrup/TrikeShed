@@ -12,6 +12,8 @@ enum class RelationKind {
     NEIGHBOR_NEXT,
     SAME_CONTENT,
     LINKED_CONTEXT,
+    ATTRACTION,
+    CAUSALITY,
     CUSTOM
 }
 

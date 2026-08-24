@@ -39,8 +39,11 @@ class CouchHeadProjection {
             require(frame.rev != existingFrame.rev) { "duplicate rev rejected" }
         }
 
-        require(lastSequence == -1L || frame.sequence == lastSequence + 1 || frame.sequence == 0L) {
-            "_changes resumes after the sequence without gaps"
+        // Strictly monotonic, gaps allowed: a commit that fails AFTER minting its sequence number
+        // must not poison every later commit. The no-gaps discipline lives in the ingress; the
+        // projection only refuses to run time backwards.
+        require(lastSequence == -1L || frame.sequence > lastSequence || frame.sequence == 0L) {
+            "_changes resumes after the sequence without going backwards"
         }
         lastSequence = frame.sequence
 

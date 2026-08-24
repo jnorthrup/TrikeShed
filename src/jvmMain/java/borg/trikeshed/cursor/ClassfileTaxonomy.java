@@ -22,6 +22,9 @@ import java.util.List;
 import java.util.ArrayList;
 import java.util.Set;
 import java.util.Optional;
+import java.util.LinkedHashMap;
+import java.util.TreeMap;
+import java.lang.reflect.Modifier;
 
 /**
  * ClassfileTaxonomy — JEP 484 ClassFile API, for TrikeShed cursor algebra.
@@ -32,7 +35,7 @@ import java.util.Optional;
  *   CLASS       → [thisClass, superClass, majorVersion, minorVersion, accessFlags, interfaceCount]
  *   FIELD       → [name, descriptor, accessFlags]
  *   METHOD      → [name, descriptor, accessFlags, maxStack, maxLocals, instructionCount]
- *   INSTRUCTION → [offset, opcode, mnemonic, owner, name]
+ *   INSTRUCTION → [offset, opcode, mnemonic, owner, name, descriptor, sourceLine, methodName, methodDescriptor]
  *   CONSTANT    → [index, tag, value]
  */
 public class ClassfileTaxonomy {
@@ -51,6 +54,9 @@ public class ClassfileTaxonomy {
 
     private final List<Row> rows;
     private final List<borg.trikeshed.classfile.model.PointcutCoordinate> pointcuts;
+    private String sourceFile = "Unknown";
+    private String className = "";
+    private String superClass = "";
 
     public ClassfileTaxonomy() {
         this.rows = new ArrayList<>();
@@ -60,6 +66,10 @@ public class ClassfileTaxonomy {
     public List<borg.trikeshed.classfile.model.PointcutCoordinate> pointcuts() {
         return pointcuts;
     }
+
+    public String sourceFile() { return sourceFile; }
+    public String className() { return className; }
+    public String superClass() { return superClass; }
 
     public void addClass(String thisClass, String superClass,
                          int majorVersion, int minorVersion,
@@ -82,6 +92,13 @@ public class ClassfileTaxonomy {
 
     public void addInstruction(int offset, int opcode, String mnemonic, String owner, String name) {
         rows.add(new Row(Kind.INSTRUCTION, new Object[] { offset, opcode, mnemonic, owner, name }));
+    }
+
+    public void addInstruction(int offset, int opcode, String mnemonic, String owner, String name,
+                               String descriptor, int sourceLine, String methodName, String methodDescriptor) {
+        rows.add(new Row(Kind.INSTRUCTION, new Object[] {
+            offset, opcode, mnemonic, owner, name, descriptor, sourceLine, methodName, methodDescriptor
+        }));
     }
 
     public void addConstant(int index, String tag, String value) {
@@ -124,6 +141,91 @@ public class ClassfileTaxonomy {
         return rows.stream().filter(r -> r.kind == Kind.INSTRUCTION).toList();
     }
 
+    /**
+     * JDK 25 ClassFile API projection suitable for the Graal introspection surface.
+     * This is deliberately a decompiler projection, not a claim to reconstruct original source:
+     * declarations, descriptors, source lines and bytecode remain explicit and lossless.
+     */
+    public Map<String, Object> projection() {
+        Map<String, Object> out = new LinkedHashMap<>();
+        out.put("projectionKind", "jdk25-classfile-pseudo");
+        out.put("className", className.replace('/', '.'));
+        out.put("superClass", superClass.replace('/', '.'));
+        out.put("sourceFile", sourceFile);
+        List<Map<String, Object>> fieldRows = new ArrayList<>();
+        for (Row row : rows) if (row.kind == Kind.FIELD) {
+            Map<String, Object> field = new LinkedHashMap<>();
+            field.put("name", row.get(0));
+            field.put("descriptor", row.get(1));
+            field.put("access", Modifier.toString((Integer) row.get(2)));
+            fieldRows.add(field);
+        }
+        List<Map<String, Object>> methodRows = new ArrayList<>();
+        StringBuilder pseudo = new StringBuilder();
+        pseudo.append("class ").append(className.replace('/', '.'));
+        if (!superClass.isEmpty() && !"java/lang/Object".equals(superClass)) {
+            pseudo.append(" : ").append(superClass.replace('/', '.'));
+        }
+        pseudo.append(" {\n");
+        for (Map<String, Object> field : fieldRows) {
+            pseudo.append("  ").append(field.get("access")).append(' ')
+                .append(field.get("name")).append(" : ").append(field.get("descriptor")).append("\n");
+        }
+        for (Row methodRow : methods()) {
+            String methodName = String.valueOf(methodRow.get(0));
+            String descriptor = String.valueOf(methodRow.get(1));
+            Map<String, Object> method = new LinkedHashMap<>();
+            method.put("name", methodName);
+            method.put("descriptor", descriptor);
+            method.put("access", Modifier.toString((Integer) methodRow.get(2)));
+            method.put("maxStack", methodRow.get(3));
+            method.put("maxLocals", methodRow.get(4));
+            method.put("instructionCount", methodRow.get(5));
+            List<Map<String, Object>> insns = new ArrayList<>();
+            pseudo.append("\n  ").append(method.get("access")).append(" fun ")
+                .append(methodName).append(descriptor).append(" {\n");
+            int lastLine = Integer.MIN_VALUE;
+            for (Row instruction : instructions()) {
+                if (instruction.length() < 9) continue;
+                if (!methodName.equals(String.valueOf(instruction.get(7))) ||
+                    !descriptor.equals(String.valueOf(instruction.get(8)))) continue;
+                Map<String, Object> insn = new LinkedHashMap<>();
+                insn.put("offset", instruction.get(0));
+                insn.put("opcode", instruction.get(1));
+                insn.put("mnemonic", instruction.get(2));
+                insn.put("owner", String.valueOf(instruction.get(3)).replace('/', '.'));
+                insn.put("name", instruction.get(4));
+                insn.put("descriptor", instruction.get(5));
+                insn.put("sourceLine", instruction.get(6));
+                insns.add(insn);
+                int line = (Integer) instruction.get(6);
+                if (line >= 0 && line != lastLine) {
+                    pseudo.append("    // source line ").append(line).append("\n");
+                    lastLine = line;
+                }
+                pseudo.append(String.format("    %04d  %-18s", (Integer) instruction.get(0), instruction.get(2)));
+                String owner = String.valueOf(instruction.get(3));
+                String name = String.valueOf(instruction.get(4));
+                if (!owner.isEmpty()) pseudo.append(' ').append(owner.replace('/', '.'));
+                if (!name.isEmpty()) pseudo.append('.').append(name);
+                if (instruction.get(5) != null && !String.valueOf(instruction.get(5)).isEmpty()) {
+                    pseudo.append(' ').append(instruction.get(5));
+                }
+                pseudo.append("\n");
+            }
+            pseudo.append("  }\n");
+            method.put("instructions", insns);
+            methodRows.add(method);
+        }
+        pseudo.append("}\n");
+        out.put("fields", fieldRows);
+        out.put("methods", methodRows);
+        out.put("instructionHistogram", new TreeMap<>(instructionHistogram()));
+        out.put("invokeSummary", new TreeMap<>(invokeSummary()));
+        out.put("pseudoSource", pseudo.toString());
+        return out;
+    }
+
     // ── Factory via public ClassFile API ──────────────────────────────────────
 
     public static ClassfileTaxonomy open(Path path) throws java.io.IOException {
@@ -155,6 +257,9 @@ public class ClassfileTaxonomy {
         String thisClass = classModel.thisClass().asInternalName();
         String superClass = classModel.superclass()
             .map(ClassEntry::asInternalName).orElse("");
+        ct.sourceFile = sourceFile;
+        ct.className = thisClass;
+        ct.superClass = superClass;
         ct.addClass(
             thisClass,
             superClass,
@@ -223,10 +328,11 @@ public class ClassfileTaxonomy {
                             owner = tci.type().asInternalName();
                         }
 
-                        // Instruction doesn't have position() - skip offset for now
+                        // JDK 25 exposes instruction width; the deterministic running offset is the BCI.
                         int opCode = inst.opcode().bytecode();
                         String mnem = inst.opcode().name();
-                        ct.addInstruction(-1, opCode, mnem, owner, name);
+                        ct.addInstruction(bytecodeOffset, opCode, mnem, owner, name, desc,
+                            currentLine, methodName, methodDesc);
 
                         borg.trikeshed.classfile.model.BytecodePointcutKind kind = switch (inst) {
                             case FieldInstruction fi -> {

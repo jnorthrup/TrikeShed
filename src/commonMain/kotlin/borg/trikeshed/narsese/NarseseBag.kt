@@ -34,6 +34,12 @@ data class SemanticSignal(
 
 /** Reducer-emitted relation kinds. Similarity proposes work; it never establishes truth. */
 enum class RelationKind {
+    /** Similar self-content/schema signatures pull regions into the same manifold neighborhood. */
+    ATTRACTION,
+
+    /** Ordered or provenance-backed transition from one CAS region to the next. */
+    CAUSALITY,
+
     /** Two signals share angular proximity beyond threshold */
     MATCH,
 

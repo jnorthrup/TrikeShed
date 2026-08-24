@@ -1,0 +1,142 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Futon · trikeshed</title>
+<link rel="icon" href="/icons/forge-icon.svg">
+<style>
+/* Futon lineage: utilitarian CouchDB-1.x admin — light, gray chrome, couch-red accents. */
+:root{--red:#b5382c;--bg:#f4f4f0;--chrome:#e9e9e4;--line:#c9c9c2;--ink:#2b2b28;--dim:#77776e;--link:#8a1f14;--ok:#2c5e32;--row:#ffffff;--row2:#f7f7f3}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:13px/1.5 "Helvetica Neue",Arial,sans-serif}
+header{background:linear-gradient(#fdfdfb,var(--chrome));border-bottom:1px solid var(--line);padding:10px 16px;display:flex;align-items:baseline;gap:14px}
+header b{color:var(--red);font-size:20px;letter-spacing:.02em}
+header span{color:var(--dim)}
+header a{color:var(--link);margin-left:auto}
+#bar{display:flex;gap:8px;align-items:center;padding:8px 16px;background:var(--chrome);border-bottom:1px solid var(--line);flex-wrap:wrap}
+input,textarea,select,button{font:inherit;color:var(--ink)}
+input,textarea{background:#fff;border:1px solid var(--line);border-radius:3px;padding:4px 8px}
+button{background:linear-gradient(#fff,#e4e4de);border:1px solid var(--line);border-radius:3px;padding:4px 12px;cursor:pointer}
+button:hover{border-color:var(--red);color:var(--red)}
+button.primary{background:linear-gradient(#c9503f,#a53326);color:#fff;border-color:#8a1f14}
+button.primary:hover{color:#fff;filter:brightness(1.06)}
+#wrap{display:flex;min-height:calc(100vh - 96px)}
+#list{flex:1.2;min-width:0;border-right:1px solid var(--line);background:var(--row)}
+#edit{flex:1;min-width:340px;display:flex;flex-direction:column;background:var(--row)}
+table{border-collapse:collapse;width:100%;font-family:ui-monospace,Menlo,monospace;font-size:12px}
+th{background:var(--chrome);border-bottom:1px solid var(--line);text-align:left;padding:6px 10px;font-family:"Helvetica Neue",Arial,sans-serif;color:var(--dim);font-weight:600;position:sticky;top:0}
+td{padding:4px 10px;border-bottom:1px solid #eeeee9;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:0}
+tr:nth-child(even) td{background:var(--row2)}
+tr:hover td{background:#f3e9e7;cursor:pointer}
+td.rev{color:var(--dim);max-width:130px}
+#pager{display:flex;gap:8px;align-items:center;padding:8px 12px;color:var(--dim)}
+#edit .head{display:flex;gap:8px;align-items:center;padding:8px 12px;border-bottom:1px solid var(--line);background:var(--chrome);flex-wrap:wrap}
+#docid{font-family:ui-monospace,monospace;width:100%;max-width:100%}
+#docbody{flex:1;margin:0;border:0;padding:12px;font:12px/1.5 ui-monospace,Menlo,monospace;resize:none;outline:none;background:#fffdf9}
+#status{padding:6px 12px;border-top:1px solid var(--line);font-size:12px;color:var(--dim);min-height:28px}
+#status.ok{color:var(--ok)} #status.err{color:var(--red)}
+.att{padding:6px 12px;border-top:1px solid var(--line);font-size:12px}
+.att a{color:var(--link)}
+#info{color:var(--dim);font-size:12px;padding:0 4px}
+@media (max-width:900px){#wrap{flex-direction:column}#list{border-right:0;border-bottom:1px solid var(--line)}}
+</style>
+</head>
+<body>
+<header><b>Futon</b><span>· trikeshed — the couch, plainly</span><a href="/graal">→ commander console</a></header>
+<div id="bar">
+  <input id="prefix" placeholder="id prefix filter (e.g. dropzone/, projects/trikeshed/docs/)" size="42">
+  <button onclick="firstPage()">go</button>
+  <button onclick="newDoc()">new document</button>
+  <span id="info">…</span>
+</div>
+<div id="wrap">
+  <div id="list">
+    <table id="docs"><tr><th style="width:66%">_id</th><th>_rev</th></tr></table>
+    <div id="pager"><button onclick="prevPage()" id="prevB">‹ prev</button><button onclick="nextPage()" id="nextB">next ›</button><span id="pageinfo"></span></div>
+  </div>
+  <div id="edit">
+    <div class="head">
+      <input id="docid" placeholder="_id" >
+      <button class="primary" onclick="saveDoc()">save</button>
+      <button onclick="deleteDoc()">delete</button>
+      <button onclick="loadDoc(document.getElementById('docid').value)">reload</button>
+    </div>
+    <textarea id="docbody" spellcheck="false" placeholder='{"fields":"…"}  — _rev is preserved on save; MVCC conflicts surface below'></textarea>
+    <div class="att" id="att"></div>
+    <div id="status">select a document, or create one</div>
+  </div>
+</div>
+<script>
+'use strict';
+const DB='trikeshed';const $=id=>document.getElementById(id);
+let pageStack=[null];let curStart=null;const LIMIT=100;let currentRev=null;
+const enc=id=>id.split('/').map(encodeURIComponent).join('/');
+function status(msg,cls){const s=$('status');s.textContent=msg;s.className=cls||'';}
+async function refreshInfo(){try{const i=await (await fetch('/'+DB)).json();
+  $('info').textContent=i.doc_count.toLocaleString()+' docs · seq '+i.update_seq;}catch(e){}}
+async function loadPage(startkey){
+  const p=$('prefix').value;
+  let url='/'+DB+'/_all_docs?limit='+(LIMIT+1);
+  const sk=startkey??(p||null);
+  if(sk)url+='&startkey='+encodeURIComponent('"'+sk+'"');
+  if(p)url+='&endkey='+encodeURIComponent('"'+p+'￰"');
+  const d=await (await fetch(url)).json();
+  const rows=d.rows||[];
+  const t=$('docs');t.innerHTML='<tr><th style="width:66%">_id</th><th>_rev</th></tr>';
+  rows.slice(0,LIMIT).forEach(r=>{
+    const tr=document.createElement('tr');
+    tr.innerHTML='<td>'+r.id.replace(/&/g,'&amp;').replace(/</g,'&lt;')+'</td><td class="rev">'+((r.value&&r.value.rev)||'').slice(0,18)+'…</td>';
+    tr.onclick=()=>loadDoc(r.id);
+    t.appendChild(tr);});
+  $('nextB').disabled=rows.length<=LIMIT;
+  $('prevB').disabled=pageStack.length<=1;
+  $('pageinfo').textContent=rows.length?rows[0].id.slice(0,46)+' …':'no documents';
+  window._nextKey=rows.length>LIMIT?rows[LIMIT].id:null;
+  refreshInfo();
+}
+function firstPage(){pageStack=[null];curStart=null;loadPage(null);}
+function nextPage(){if(!window._nextKey)return;pageStack.push(window._nextKey);loadPage(window._nextKey);}
+function prevPage(){if(pageStack.length<=1)return;pageStack.pop();loadPage(pageStack[pageStack.length-1]);}
+async function loadDoc(id){
+  $('docid').value=id;$('att').innerHTML='';currentRev=null;
+  try{
+    const r=await fetch('/'+DB+'/'+enc(id));
+    if(!r.ok){status('load failed: '+r.status,'err');return;}
+    const d=await r.json();currentRev=d._rev;
+    const body={};for(const [k,v] of Object.entries(d))if(k!=='_attachments')body[k]=v;
+    $('docbody').value=JSON.stringify(body,null,2);
+    if(d._attachments&&d._attachments.content){
+      const a=d._attachments.content;
+      $('att').innerHTML='attachment: <a href="/'+DB+'/'+enc(id)+'/content" target="_blank">content</a> · '+
+        (a.content_type||'')+' · '+(a.length||0).toLocaleString()+' bytes · <span style="font-family:monospace">'+(a.digest||'').slice(0,22)+'…</span>';
+    }
+    status('loaded '+(d._rev||'').slice(0,28)+'…','ok');
+  }catch(e){status('load failed: '+e,'err');}
+}
+async function saveDoc(){
+  const id=$('docid').value.trim();if(!id)return status('an _id is required','err');
+  let body;try{body=JSON.parse($('docbody').value||'{}');}catch(e){return status('not JSON: '+e.message,'err');}
+  delete body._id;if(currentRev&&!body._rev)body._rev=currentRev;
+  try{
+    const r=await fetch('/'+DB+'/'+enc(id),{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+    const d=await r.json();
+    if(d.ok){currentRev=d.rev;status('saved · '+d.rev.slice(0,28)+'…','ok');loadPage(pageStack[pageStack.length-1]);}
+    else status((d.error||'error')+': '+(d.reason||''),'err');
+  }catch(e){status('save failed: '+e,'err');}
+}
+async function deleteDoc(){
+  const id=$('docid').value.trim();if(!id||!currentRev)return status('load the doc first (need its _rev)','err');
+  if(!confirm('delete '+id+' ?'))return;
+  try{
+    const r=await fetch('/'+DB+'/'+enc(id)+'?rev='+encodeURIComponent(currentRev),{method:'DELETE'});
+    const d=await r.json();
+    if(d.ok){status('deleted','ok');$('docbody').value='';currentRev=null;loadPage(pageStack[pageStack.length-1]);}
+    else status((d.error||'error')+': '+(d.reason||''),'err');
+  }catch(e){status('delete failed: '+e,'err');}
+}
+function newDoc(){$('docid').value='';$('docbody').value='{\n  \n}';currentRev=null;$('att').innerHTML='';status('new document — set an _id and save');}
+firstPage();
+</script>
+</body>
+</html>

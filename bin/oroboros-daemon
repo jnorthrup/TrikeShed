@@ -12,6 +12,8 @@
 #   --repo <path>              repo work tree (default: cwd)
 #   --debug                    attach JDWP on :5005, suspend=n
 #   --suspend                  like --debug but suspend=y (debugger required before main runs)
+#   --aot-cache <file>         load an existing JDK 25 JEP 483 cache
+#   --aot-record <file>        train and write a cache when this daemon exits
 set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
@@ -61,6 +63,7 @@ fi
 WATCH="--watch"
 DAEMON_ARGS=()
 DEBUG_OPTS=()
+AOT_OPTS=()
 HOME_POS=""
 REPO_POS=""
 while [[ $# -gt 0 ]]; do
@@ -72,9 +75,27 @@ while [[ $# -gt 0 ]]; do
     --repo)        REPO_POS="$2"; shift 2 ;;
     --debug)       DEBUG_OPTS+=("-agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=*:5005"); shift ;;
     --suspend)     DEBUG_OPTS+=("-agentlib:jdwp=transport=dt_socket,server=y,suspend=y,address=*:5005"); shift ;;
+    --aot-cache)   AOT_OPTS=("-XX:AOTCache=$2"); shift 2 ;;
+    --aot-record)  AOT_OPTS=("-XX:AOTCacheOutput=$2"); shift 2 ;;
     *)             DAEMON_ARGS+=("$1"); shift ;;
   esac
 done
+
+# Explicit CLI wins; environment variables give launchd/systemd the same seam.
+if [[ ${#AOT_OPTS[@]} -eq 0 ]]; then
+  if [[ -n "${TRIKESHED_AOT_CACHE:-}" ]]; then
+    AOT_OPTS=("-XX:AOTCache=$TRIKESHED_AOT_CACHE")
+  elif [[ -n "${TRIKESHED_AOT_CACHE_OUTPUT:-}" ]]; then
+    AOT_OPTS=("-XX:AOTCacheOutput=$TRIKESHED_AOT_CACHE_OUTPUT")
+  fi
+fi
+if [[ ${#AOT_OPTS[@]} -gt 0 && "${AOT_OPTS[0]}" == -XX:AOTCache=* ]]; then
+  _AOT_INPUT="${AOT_OPTS[0]#-XX:AOTCache=}"
+  if [[ ! -s "$_AOT_INPUT" ]]; then
+    echo "AOT cache missing or empty: $_AOT_INPUT" >&2
+    exit 1
+  fi
+fi
 
 # FLYWHEEL_CYCLE_INTERVAL overrides --interval-ms and the daemon default.
 # Value is in milliseconds; "2h", "30m", "15m" etc are converted here.
@@ -100,4 +121,4 @@ fi
 
 # `-cp "$CP"` must be unquoted shell-side so the wildcard expands.
 # shellcheck disable=SC2086
-exec java "${DAEMON_JVM_ARGS[@]}" "${DEBUG_OPTS[@]}" -cp $CP borg.trikeshed.daemon.OroborosDaemon $WATCH "${DAEMON_ARGS[@]}" ${HOME_POS:+"$HOME_POS"} ${REPO_POS:+"$REPO_POS"}
+exec java "${DAEMON_JVM_ARGS[@]}" "${DEBUG_OPTS[@]}" "${AOT_OPTS[@]}" -cp $CP borg.trikeshed.daemon.OroborosDaemon $WATCH "${DAEMON_ARGS[@]}" ${HOME_POS:+"$HOME_POS"} ${REPO_POS:+"$REPO_POS"}
