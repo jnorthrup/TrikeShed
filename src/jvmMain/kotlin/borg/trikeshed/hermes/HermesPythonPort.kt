@@ -91,15 +91,26 @@ data class HermesPortInventory(
         val facts = ArrayList<HermesOntologyFact>(modules.size * 2)
         val orderedModules = modules.values.toTypedArray().apply { sortBy { it.name } }
         for (module in orderedModules) {
-            val roots = module.blockedBy.asSequence().filter { it in banlist }.toSortedSet()
+            // ⚡ Bolt: Replaced `.asSequence().filter { ... }.toSortedSet()` and chained sequence operations with direct iteration.
+            // Avoids O(N) intermediate wrapper allocations (Sequence, Iterator, lambda instances) per module,
+            // significantly reducing garbage collection pressure during frequent ontology regeneration.
+            val roots = sortedSetOf<String>()
+            for (blocked in module.blockedBy) {
+                if (blocked in banlist) roots.add(blocked)
+            }
             if (roots.isEmpty()) {
                 facts += HermesOntologyFact(HermesOntologyKind.READY, if (module.sleeved) "sleeve" else "upstream", module.name)
             } else {
-                roots.forEach { blocker -> facts += HermesOntologyFact(HermesOntologyKind.BLOCKED, blocker, module.name) }
+                for (blocker in roots) {
+                    facts += HermesOntologyFact(HermesOntologyKind.BLOCKED, blocker, module.name)
+                }
             }
-            val deferred = module.deferredImports.asSequence().map { it.substringBefore('.') }
-                .filter { it in banlist }.toSortedSet()
-            deferred.forEach { blocker ->
+            val deferred = sortedSetOf<String>()
+            for (imp in module.deferredImports) {
+                val prefix = imp.substringBefore('.')
+                if (prefix in banlist) deferred.add(prefix)
+            }
+            for (blocker in deferred) {
                 facts += HermesOntologyFact(HermesOntologyKind.DEFERRED, blocker, module.name)
             }
         }
