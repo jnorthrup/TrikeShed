@@ -39,11 +39,13 @@ class TrikeShedGraalVfs(
     private val fileOps: FileOperations = InMemoryFileOperations(cwd = VIRTUAL_ROOT),
     private val btrfsRoot: String = "/trikeshed-graal-btrfs",
     private val liveSubvolume: String = "live",
+    private val instanceId: String = "global",
 ) : GraalFileSystem {
     private val btrfs = UserspaceBtrfs(btrfsRoot, fileOps)
     private val generation = AtomicLong()
     private val inodeSalt = kotlin.random.Random.Default.nextLong()
     @Volatile private var workingDirectory: Path = Path.of(WORKSPACE)
+    private val canonicalizer = borg.trikeshed.userspace.containment.createFusePathCanonicalizer(instanceId)
 
     init {
         if (!btrfs.hasSubvolume(liveSubvolume)) check(btrfs.createSubvolume(liveSubvolume))
@@ -134,7 +136,16 @@ class TrikeShedGraalVfs(
             private var open = true
             override fun iterator(): MutableIterator<Path> {
                 check(open) { "directory stream closed" }
-                val accepted = children.asSequence().map(parent::resolve).filter { child -> filter.accept(child) }.iterator()
+                val maskedChildren = if (relative == "workspace" || relative == "tmp") {
+                    children.map { childName ->
+                        val childRelative = if (relative.isEmpty()) childName else "$relative/$childName"
+                        val isDir = btrfs.isDirectory(liveSubvolume, childRelative)
+                        canonicalizer.canonicalizePath(childName, isDir)
+                    }
+                } else {
+                    children
+                }
+                val accepted = maskedChildren.asSequence().map(parent::resolve).filter { child -> filter.accept(child) }.iterator()
                 return object : MutableIterator<Path> {
                     override fun hasNext(): Boolean = accepted.hasNext()
                     override fun next(): Path = accepted.next()
@@ -203,6 +214,16 @@ class TrikeShedGraalVfs(
         require(text.startsWith('/')) { "VFS path did not normalize absolute: $path" }
         val relative = text.removePrefix("/").trimEnd('/')
         require(relative.split('/').none { it == ".." }) { "VFS traversal rejected: $path" }
+
+        if (relative.isEmpty()) return ""
+        val segments = relative.split('/')
+        if (segments.size > 1 && (segments[0] == "workspace" || segments[0] == "tmp")) {
+            val unmasked = canonicalizer.resolveOriginal(segments[1]) ?: segments[1]
+            val originalSegments = segments.toMutableList()
+            originalSegments[1] = unmasked
+            return originalSegments.joinToString("/")
+        }
+
         return relative
     }
 
@@ -319,7 +340,7 @@ class GraalBtrfsSupervisor(
     error: OutputStream? = output,
     onRootReturn: (RootObservation) -> Unit = {},
 ) : GuestIsolate {
-    val vfs = TrikeShedGraalVfs()
+    val vfs = TrikeShedGraalVfs(instanceId = id)
     private val guest = InProcessIsolate(
         id,
         facet,
