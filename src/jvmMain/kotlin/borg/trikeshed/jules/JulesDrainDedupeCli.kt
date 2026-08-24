@@ -6,6 +6,7 @@ import borg.trikeshed.jules.JulesCause
 import borg.trikeshed.parse.json.JsonSupport
 import keymux.KeyMux
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
 import java.io.File
@@ -252,33 +253,50 @@ object JulesDrainDedupeCli {
         System.getenv("TRIKESHED_HOME") ?: File(System.getProperty("user.home"), ".local/forge").path
 
     private suspend fun git(repoDir: File, vararg args: String): List<String> = withContext(Dispatchers.IO) {
-        val pb = ProcessBuilder("git", *args)
-        pb.directory(repoDir)
-        pb.redirectErrorStream(true)
-        val proc = pb.start()
-        val out = proc.inputStream.bufferedReader().readLines()
-        proc.waitFor()
-        out
+        kotlinx.coroutines.coroutineScope {
+            val pb = ProcessBuilder("git", *args)
+            pb.directory(repoDir)
+            pb.redirectErrorStream(true)
+            val proc = pb.start()
+            val outDeferred = this.async { proc.inputStream.bufferedReader().readLines() }
+            if (!proc.waitFor(1, java.util.concurrent.TimeUnit.HOURS)) {
+                proc.destroyForcibly()
+                error("Process timed out")
+            }
+            outDeferred.await()
+        }
     }
 
     private suspend fun gitWithExit(repoDir: File, vararg args: String): Pair<Int, String> = withContext(Dispatchers.IO) {
-        val pb = ProcessBuilder("git", *args)
-        pb.directory(repoDir)
-        pb.redirectErrorStream(true)
-        val proc = pb.start()
-        val out = proc.inputStream.bufferedReader().readText()
-        val exit = proc.waitFor()
-        Pair(exit, out)
+        kotlinx.coroutines.coroutineScope {
+            val pb = ProcessBuilder("git", *args)
+            pb.directory(repoDir)
+            pb.redirectErrorStream(true)
+            val proc = pb.start()
+            val outDeferred = this.async { proc.inputStream.bufferedReader().readText() }
+            if (!proc.waitFor(1, java.util.concurrent.TimeUnit.HOURS)) {
+                proc.destroyForcibly()
+                error("Process timed out")
+            }
+            val exit = proc.exitValue()
+            Pair(exit, outDeferred.await())
+        }
     }
 
     private suspend fun gitJava(repoDir: File, cp: String, mainClass: String, vararg args: String): Pair<Int, String> = withContext(Dispatchers.IO) {
-        val pb = ProcessBuilder("java", "-cp", cp, mainClass, *args)
-        pb.directory(repoDir)
-        pb.redirectErrorStream(true)
-        val proc = pb.start()
-        val out = proc.inputStream.bufferedReader().readText()
-        val exit = proc.waitFor()
-        Pair(exit, out)
+        kotlinx.coroutines.coroutineScope {
+            val pb = ProcessBuilder("java", "-cp", cp, mainClass, *args)
+            pb.directory(repoDir)
+            pb.redirectErrorStream(true)
+            val proc = pb.start()
+            val outDeferred = this.async { proc.inputStream.bufferedReader().readText() }
+            if (!proc.waitFor(1, java.util.concurrent.TimeUnit.HOURS)) {
+                proc.destroyForcibly()
+                error("Process timed out")
+            }
+            val exit = proc.exitValue()
+            Pair(exit, outDeferred.await())
+        }
     }
 
     private fun requireCanonicalRepository(dir: File) {

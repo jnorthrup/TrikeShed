@@ -9,6 +9,7 @@ import borg.trikeshed.utils.kanban.JulesBoardStore
 import borg.trikeshed.utils.kanban.forForgeDir
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.async
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
 import java.io.File
@@ -657,12 +658,18 @@ object JulesSettlementCli {
     }
 
     private suspend fun git(repoDir: File, vararg args: String): CommandResult = withContext(Dispatchers.IO) {
-        val process = ProcessBuilder(listOf("git") + args)
-            .directory(repoDir)
-            .redirectErrorStream(true)
-            .start()
-        val output = process.inputStream.bufferedReader().use { it.readText() }
-        CommandResult(process.waitFor(), output)
+        kotlinx.coroutines.coroutineScope {
+            val process = ProcessBuilder(listOf("git") + args)
+                .directory(repoDir)
+                .redirectErrorStream(true)
+                .start()
+            val outputDeferred = this.async { process.inputStream.bufferedReader().use { it.readText() } }
+            if (!process.waitFor(1, java.util.concurrent.TimeUnit.HOURS)) {
+                process.destroyForcibly()
+                error("Process timed out")
+            }
+            CommandResult(process.exitValue(), outputDeferred.await())
+        }
     }
 
     private fun receiptJson(
