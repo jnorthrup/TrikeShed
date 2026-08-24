@@ -1,1 +1,1 @@
-grep -rn "pointcut.site.new" .
+cat src/commonMain/resources/web/script.js | grep "sheet-ref"

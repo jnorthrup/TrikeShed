@@ -878,7 +878,11 @@
           const child = sheetById[cell.sheet];
           const ref = document.createElement('button');
           ref.className = 'sheet-ref';
-          ref.innerHTML = '<span>' + (sheetExpanded[key] ? '▾' : '▸') + '</span><span>▦ ' + (child ? child.title.split('/').pop() : cell.sheet) + '</span>' +
+          const isExpanded = !!sheetExpanded[key];
+          ref.setAttribute('aria-expanded', isExpanded ? 'true' : 'false');
+          const sheetName = child ? child.title.split('/').pop() : cell.sheet;
+          ref.setAttribute('aria-label', (isExpanded ? 'Collapse' : 'Expand') + ' sheet reference: ' + sheetName);
+          ref.innerHTML = '<span aria-hidden="true">' + (isExpanded ? '▾' : '▸') + '</span><span>▦ ' + sheetName + '</span>' +
             '<span class="sheet-count">' + (child ? child.rows.length + ' rows' : '') + '</span>';
           ref.title = 'Click: expand in place · Open: zoom into ' + cell.sheet;
           ref.addEventListener('click', (ev) => {
