@@ -574,12 +574,17 @@ fun org.gradle.api.tasks.JavaExec.useStagedJvmClasspath() {
         val suspend = if (spec.substringAfter(',', "").trim() == "suspend") "y" else "n"
         jvmArgs("-agentlib:jdwp=transport=dt_socket,server=y,suspend=$suspend,address=*:$port")
     }
+    dependsOn("jvmProcessResources")
     doFirst {
         val classes = file("build/classes/kotlin/jvm/main")
+        val resources = file("build/processedResources/jvm/main")
         val lib = file(stagingLibDir)
         if (!classes.isDirectory) throw GradleException("missing $classes; run ./gradlew compileKotlinJvm")
         if (!lib.isDirectory) throw GradleException("missing $lib; run ./gradlew stageDaemonLib")
-        classpath = files(classes) + fileTree(lib) { include("*.jar") }
+        // Resources (web/graal.html, futon.html, META-INF/services, openapi/*) must be on the
+        // classpath or the daemon serves /graal and /futon as 404 — the exact reason the gradle
+        // launch looked broken next to the hand-rolled java invocation.
+        classpath = files(classes, resources) + fileTree(lib) { include("*.jar") }
     }
 }
 
@@ -615,6 +620,87 @@ tasks.register<JavaExec>("runOroborosDaemon") {
     useStagedJvmClasspath()
     // Forward stdio; HotswapAgent prints to stdout.
     standardInput = System.`in`
+}
+
+// ── AOT cache (JEP 483 / Leyden, JDK 25) ────────────────────────────────────
+// Two hard constraints shape these tasks, both verified against GraalVM CE 25.0.2:
+//   1. AOT create/consume REJECTS exploded-directory classpaths ("Error: non-empty directory
+//      build/live/classes") — it accepts JAR entries only. So these launch from jvmJar + the
+//      staged runtime jars, NOT the hot-swappable build/live/classes the dev launchers use.
+//   2. The archive is bound to the EXACT classpath string. stageDaemonAot writes the -cp it used
+//      to a sidecar (oroboros.aot.cp); runOroborosDaemonAot reads that same string back, so create
+//      and consume can never drift (a mismatch is silently ignored under AOTMode=auto — never fatal,
+//      but also never applied, which is the failure this sidecar prevents).
+// The archive lands at build/staging/oroboros.aot — beside the jars it is bound to, and where the
+// build-plane absorber can pick it up so the AOT cache teleports with the install (gap-analysis §7).
+val daemonAotCache = layout.buildDirectory.file("staging/oroboros.aot")
+val daemonAotCpFile = layout.buildDirectory.file("staging/oroboros.aot.cp")
+// Identical classpath construction for both tasks: app jar, then staged dependency jars in a stable
+// sorted order (glob expansion order is not guaranteed; sorting makes create == consume).
+fun daemonAotClasspath(): String {
+    val jar = tasks.named("jvmJar", org.gradle.jvm.tasks.Jar::class).flatMap { it.archiveFile }.get().asFile
+    val libs = (stagingLibDir.get().asFile.listFiles { f -> f.extension == "jar" } ?: emptyArray()).sortedBy { it.name }
+    return (listOf(jar) + libs).joinToString(File.pathSeparator) { it.path }
+}
+
+// SUGGESTION 1 — expose the archive: AOTCacheOutput on a training run.
+tasks.register<Exec>("stageDaemonAot") {
+    group = "oroboros"
+    description = "Train + write the daemon AOT cache to build/staging/oroboros.aot (JEP 483). Boots from the jar classpath, warms -PaotWarmSeconds=N (default 30), then SIGTERM -> exitProcess(0) triggers the dump. Regenerate whenever the class set changes."
+    dependsOn("jvmJar", "stageDaemonLib", "jvmProcessResources")
+    val warm = (project.findProperty("aotWarmSeconds") as String?)?.toIntOrNull() ?: 30
+    val port = (project.findProperty("aotTrainPort") as String?)?.toIntOrNull() ?: 8971
+    val aot = daemonAotCache.get().asFile
+    val cpFile = daemonAotCpFile.get().asFile
+    val trainHome = layout.buildDirectory.dir("aot/train-home").get().asFile
+    val repo = projectDir.path
+    val javaBin = File(providers.systemProperty("java.home").get(), "bin/java").path
+    doFirst {
+        aot.parentFile.mkdirs(); aot.delete()
+        trainHome.deleteRecursively(); trainHome.mkdirs()
+        val cp = daemonAotClasspath()
+        cpFile.writeText(cp)
+        // HOME is redirected to a throwaway so the ~/.hermes absorber is skipped during training
+        // (we want to link the class graph fast, not replicate 600MB of agent home).
+        commandLine("bash", "-c", """
+            set -u
+            HOME='${trainHome.path}' JULES_API_KEY="${'$'}{JULES_API_KEY:-aot-training-dummy}" \
+              '$javaBin' -XX:AOTCacheOutput='${aot.path}' -Xlog:aot=info \
+              -cp '$cp' borg.trikeshed.daemon.OroborosDaemon \
+              --watch --kanban-port $port --interval-ms 86400000 '${trainHome.path}/forge' '$repo' &
+            PID=${'$'}!
+            for i in ${'$'}(seq 1 90); do curl -sf -m 2 http://127.0.0.1:$port/api/health >/dev/null 2>&1 && break; kill -0 ${'$'}PID 2>/dev/null || break; sleep 1; done
+            echo "[aot] warmed daemon booted; holding ${warm}s to link the hot path"
+            sleep $warm
+            kill -TERM ${'$'}PID 2>/dev/null || true
+            for i in ${'$'}(seq 1 60); do kill -0 ${'$'}PID 2>/dev/null || break; sleep 1; done
+            kill -9 ${'$'}PID 2>/dev/null || true
+            test -s '${aot.path}'
+        """.trimIndent())
+    }
+    doLast { println("[aot] wrote ${aot.path} (${if (aot.exists()) aot.length() else 0} bytes); classpath pinned in ${cpFile.name}") }
+}
+
+// SUGGESTION 2 — consume the archive: AOTCache + AOTMode=auto at launch, same pinned classpath.
+tasks.register<Exec>("runOroborosDaemonAot") {
+    group = "oroboros"
+    description = "Launch OroborosDaemon consuming build/staging/oroboros.aot (AOTMode=auto: used if valid, ignored if stale/missing). JAR classpath pinned to the create run. -PdaemonArgs=\"--watch --kanban-port 8901\" forwards flags."
+    dependsOn("jvmJar", "stageDaemonLib")
+    val aot = daemonAotCache.get().asFile
+    val cpFile = daemonAotCpFile.get().asFile
+    val extra = (project.findProperty("daemonArgs") as String?) ?: "--watch --kanban-port 8901"
+    val repo = projectDir.path
+    val javaBin = File(providers.systemProperty("java.home").get(), "bin/java").path
+    standardInput = System.`in`
+    doFirst {
+        // Reuse the create run's exact -cp when present so the AOT classpath matches; otherwise
+        // rebuild it identically. Both yield the same string by construction.
+        val cp = if (cpFile.exists()) cpFile.readText().trim() else daemonAotClasspath()
+        val aotFlags = if (aot.exists()) listOf("-XX:AOTCache=${aot.path}", "-XX:AOTMode=auto")
+                       else { logger.lifecycle("[aot] no cache at ${aot.path}; run ./gradlew stageDaemonAot first (booting without it)"); emptyList() }
+        if (aot.exists()) logger.lifecycle("[aot] consuming ${aot.path} (${aot.length()} bytes)")
+        commandLine(listOf(javaBin) + aotFlags + listOf("-cp", cp, "borg.trikeshed.daemon.OroborosDaemon") + extra.split(" ").filter { it.isNotBlank() } + listOf(repo))
+    }
 }
 
 // TUI — interactive flywheel console, reads board from cwd.
