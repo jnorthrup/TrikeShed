@@ -70,4 +70,7 @@
 ## 2024-10-27 - Added aria-labels to main toolbar buttons
 **Learning:** In dynamically toggled views and fixed main toolbars, ensure text or icon buttons have explicitly descriptive `aria-label` attributes.
 **Action:** Use standard `aria-label` attributes consistently for all interactive elements in custom toolbars.
+<<<<<<< ours
+>>>>>>> theirs
+=======
 >>>>>>> theirs
