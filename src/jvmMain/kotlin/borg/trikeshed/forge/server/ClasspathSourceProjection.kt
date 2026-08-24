@@ -26,12 +26,16 @@ class ClasspathSourceProjection(
         val packageName = PACKAGE.find(sourceText)?.groupValues?.get(1).orEmpty()
         val packagePath = packageName.replace('.', '/')
         val classRoot = BUILD_CLASSES_PREFIX + if (packagePath.isEmpty()) "" else "$packagePath/"
-        val classDocs = database.store.all().asSequence()
-            .map { it.id }
-            .filter { it.startsWith(classRoot) && it.endsWith(".class") }
-            .sorted()
-            .take(MAX_CLASS_CANDIDATES)
-            .toList()
+        // Bolt: avoid materializing all documents into a List and Sequence allocations
+        // by iterating directly over the zero-allocation store.ids() view.
+        val ids = database.store.ids()
+        val classDocsList = ArrayList<String>()
+        for (i in 0 until ids.a) {
+            val id = ids.b(i)
+            if (id.startsWith(classRoot) && id.endsWith(".class")) classDocsList.add(id)
+        }
+        classDocsList.sort()
+        val classDocs = classDocsList.take(MAX_CLASS_CANDIDATES)
 
         val mates = ArrayList<Map<String, Any?>>()
         for (classId in classDocs) {

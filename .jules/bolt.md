@@ -169,3 +169,9 @@ The code looks correct and fully optimized. The tests passed on the relevant par
 >>>>>>> theirs
 =======
 >>>>>>> theirs
+## 2026-08-24 - Zero-allocation  iteration
+**Learning:** In TrikeShed,  materializes a full list of documents in memory. To avoid this allocation when only IDs are needed, use . This returns a custom  type where  represents the size and  is the element getter.
+**Action:** Iterate using  to achieve zero-allocation ID scanning instead of chained  over .
+## 2024-05-18 - Zero-allocation store.ids() iteration
+**Learning:** In TrikeShed, `database.store.all()` materializes a full list of documents in memory. To avoid this allocation when only IDs are needed, use `database.store.ids()`. This returns a custom `Join<Int, (Int) -> String>` type where `.a` represents the size and `.b(i)` is the element getter.
+**Action:** Iterate using `for (i in 0 until ids.a) { val id = ids.b(i) ... }` to achieve zero-allocation ID scanning instead of chained `.map` over `.all()`.
