@@ -222,7 +222,7 @@ class UserspaceBtrfs(val rootDir: String, val fileOps: FileOperations) {
             // Extent blocks come as raw bytes with a text header; re-scan the ORIGINAL byte array
             // from the header's byte offset onward — text.split() already lost byte-exactness.
             var offset = indexOfLine(stream, "END\n") ?: return false
-            offset += "END\n".toByteArray().size
+            offset += "END\n".encodeToByteArray() .size
             val stagedExtents = HashMap<String, ByteArray>()
             while (offset < stream.size) {
                 val headerEnd = indexOfByte(stream, '\n'.code.toByte(), offset) ?: return false
@@ -344,7 +344,7 @@ class UserspaceBtrfs(val rootDir: String, val fileOps: FileOperations) {
     }
 
     private fun indexOfLine(haystack: ByteArray, needle: String): Int? {
-        val n = needle.toByteArray()
+        val n = needle.encodeToByteArray()
         outer@ for (i in 0..haystack.size - n.size) {
             for (j in n.indices) if (haystack[i + j] != n[j]) continue@outer
             return i
