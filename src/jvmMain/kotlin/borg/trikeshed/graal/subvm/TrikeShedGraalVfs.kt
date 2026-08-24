@@ -7,6 +7,8 @@ import borg.trikeshed.userspace.nio.file.spi.InMemoryFileOperations
 import borg.trikeshed.vm.Teleported
 import org.graalvm.polyglot.io.FileSystem as GraalFileSystem
 import java.io.IOException
+import java.io.InputStream
+import java.io.OutputStream
 import java.net.URI
 import java.nio.ByteBuffer
 import java.nio.channels.ClosedChannelException
@@ -46,6 +48,8 @@ class TrikeShedGraalVfs(
         if (!btrfs.hasSubvolume(liveSubvolume)) check(btrfs.createSubvolume(liveSubvolume))
         ensureDirectory("workspace")
         ensureDirectory("tmp")
+        ensureDirectory("dev")
+        if (!btrfs.isFile(liveSubvolume, "dev/null")) check(btrfs.writeFile(liveSubvolume, "dev/null", ByteArray(0)))
     }
 
     fun put(path: String, bytes: ByteArray) {
@@ -100,6 +104,7 @@ class TrikeShedGraalVfs(
         vararg attrs: FileAttribute<*>,
     ): SeekableByteChannel {
         val relative = relativeOf(path)
+        if (relative == "dev/null") return DevNullByteChannel
         if (relative.isEmpty() || isDirectory(relative)) throw FileSystemException(path.toString(), null, "is a directory")
         val write = StandardOpenOption.WRITE in options || StandardOpenOption.APPEND in options
         val read = StandardOpenOption.READ in options || !write
@@ -210,6 +215,18 @@ class TrikeShedGraalVfs(
     }
 }
 
+/** POSIX-shaped null device required by Python redirect_stdout paths; no native file is exposed. */
+private object DevNullByteChannel : SeekableByteChannel {
+    override fun isOpen(): Boolean = true
+    override fun close() = Unit
+    override fun read(dst: ByteBuffer): Int = -1
+    override fun write(src: ByteBuffer): Int = src.remaining().also { src.position(src.limit()) }
+    override fun position(): Long = 0L
+    override fun position(newPosition: Long): SeekableByteChannel = this
+    override fun size(): Long = 0L
+    override fun truncate(size: Long): SeekableByteChannel = this
+}
+
 private class VfsByteChannel(
     initial: ByteArray,
     private val readable: Boolean,
@@ -287,10 +304,22 @@ class GraalBtrfsSupervisor(
     override val id: String,
     override val facet: VmFacet,
     budget: Budget = Budget(),
+    input: InputStream? = null,
+    output: OutputStream? = null,
+    error: OutputStream? = output,
     onRootReturn: (RootObservation) -> Unit = {},
 ) : GuestIsolate {
     val vfs = TrikeShedGraalVfs()
-    private val guest = InProcessIsolate(id, facet, budget, fileSystem = vfs, onRootReturn = onRootReturn)
+    private val guest = InProcessIsolate(
+        id,
+        facet,
+        budget,
+        fileSystem = vfs,
+        input = input,
+        output = output,
+        error = error,
+        onRootReturn = onRootReturn,
+    )
 
     fun put(path: String, bytes: ByteArray) = vfs.put(path, bytes)
     fun snapshot(name: String): Boolean = vfs.snapshot(name)

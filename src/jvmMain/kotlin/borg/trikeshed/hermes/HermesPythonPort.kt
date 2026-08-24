@@ -12,6 +12,7 @@ import borg.trikeshed.parse.json.JsonSupport
 import borg.trikeshed.vm.Teleported
 import java.nio.file.Files
 import java.nio.file.Path
+import java.io.OutputStream
 import kotlin.io.path.extension
 import kotlin.io.path.isRegularFile
 import kotlin.io.path.readText
@@ -192,6 +193,8 @@ internal fun HermesSignificantGap.toMap(): Map<String, Any?> = mapOf(
 class HermesPythonPort(
     private val blackboard: ConfixBlackboard = ConfixBlackboard.empty(),
     private val banlist: Map<String, NativeModuleBan> = HermesNativeModuleBanlist.load(),
+    private val output: OutputStream? = null,
+    private val error: OutputStream? = output,
 ) : AutoCloseable {
     private var isolate: GraalBtrfsSupervisor? = null
 
@@ -276,6 +279,8 @@ class HermesPythonPort(
             id = "hermes-python",
             facet = VmFacet.GRAAL_PYTHON,
             budget = Budget(statements = 0, wallMillis = 30_000, calls = 0),
+            output = output,
+            error = error,
         )
         isolate = guest
         for (candidate in inventory.modules.values) {
@@ -333,6 +338,12 @@ class HermesPythonPort(
     }
 
     fun blackboard(): ConfixBlackboard = blackboard
+
+    val vmStarted: Boolean get() = isolate?.isAlive == true
+
+    /** Evaluate on the already-imported Hermes isolate; used by console/dashboard front ends. */
+    fun evalInVm(source: String, name: String = "hermes-console.py"): Teleported =
+        isolate?.eval(source, name) ?: error("Hermes VM has not been imported")
 
     override fun close() {
         isolate?.close()

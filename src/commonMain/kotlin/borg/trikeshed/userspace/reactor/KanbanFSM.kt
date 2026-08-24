@@ -90,6 +90,18 @@ sealed class KanbanEvent {
         override val timestampMs: Long,
     ) : KanbanEvent()
 
+    /** Manual terminal/media input or its explicitly linked causal LCNC consequence. */
+    @Serializable
+    data class LcncUserSignaled(
+        val panelId: String,
+        val signalId: String,
+        val lane: String,
+        val kind: String,
+        val causeSignalId: String? = null,
+        val payload: String = "",
+        override val timestampMs: Long,
+    ) : KanbanEvent()
+
     /** Cycle observed event from the Oroboros daemon. */
     @Serializable
     data class CycleObserved(val cycleMs: Long, val drained: Int, val dispatched: Int, val alive: Int, val available: Int, override val timestampMs: Long) : KanbanEvent()
@@ -138,6 +150,10 @@ data class KanbanState(
     val availableSlots: Int = 0,
     val slashCommandCount: Int = 0,
     val lastSlashCommand: String = "",
+    val manualSignalCount: Int = 0,
+    val causalSignalCount: Int = 0,
+    val lastLcncPanelId: String = "",
+    val lastLcncSignalId: String = "",
 )
 
 /**
@@ -222,6 +238,14 @@ object KanbanFSM {
             )
             is KanbanEvent.SignalFacetReduced -> prior.copy(
                 lastEventKind = "SignalFacetReduced",
+                lastEventTimestampMs = event.timestampMs,
+            )
+            is KanbanEvent.LcncUserSignaled -> prior.copy(
+                manualSignalCount = prior.manualSignalCount + if (event.lane == "manual") 1 else 0,
+                causalSignalCount = prior.causalSignalCount + if (event.lane == "causal") 1 else 0,
+                lastLcncPanelId = event.panelId,
+                lastLcncSignalId = event.signalId,
+                lastEventKind = "LcncUserSignaled:${event.lane}:${event.kind}",
                 lastEventTimestampMs = event.timestampMs,
             )
             is KanbanEvent.CycleObserved -> prior.copy(

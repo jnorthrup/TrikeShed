@@ -18,6 +18,8 @@ import org.graalvm.polyglot.management.ExecutionEvent
 import org.graalvm.polyglot.management.ExecutionListener
 import org.graalvm.polyglot.proxy.ProxyExecutable
 import org.graalvm.polyglot.proxy.ProxyObject
+import java.io.InputStream
+import java.io.OutputStream
 import java.time.Duration
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.Executors
@@ -67,6 +69,9 @@ class InProcessIsolate(
     override val facet: VmFacet,
     val budget: Budget = Budget(),
     private val fileSystem: GraalFileSystem? = null,
+    private val input: InputStream? = null,
+    private val output: OutputStream? = null,
+    private val error: OutputStream? = output,
     private val onRootReturn: (RootObservation) -> Unit = {},
 ) : GuestIsolate {
     override val trust = Trust.OWN
@@ -110,6 +115,9 @@ class InProcessIsolate(
             .allowCreateProcess(false)
             .allowEnvironmentAccess(EnvironmentAccess.NONE)
             .allowPolyglotAccess(PolyglotAccess.NONE)
+        input?.let { b.`in`(it) }
+        output?.let { b.out(it) }
+        error?.let { b.err(it) }
         if (bounds.statementLimitSafe && budget.statements > 0) {
             b.resourceLimits(ResourceLimits.newBuilder().statementLimit(budget.statements, null).build())
         }
