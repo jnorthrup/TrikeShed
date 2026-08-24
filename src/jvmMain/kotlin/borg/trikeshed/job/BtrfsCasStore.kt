@@ -74,13 +74,21 @@ class BtrfsCasStore(
             
             // Try reflink (btrfs COW deduplication)
             if (!reflink(temp, target)) {
-                // Fallback: regular copy
+                // Fallback: atomic move — REPLACE_EXISTING so a concurrent writer's
+                // identical content (same CID, same bytes) doesn't fail the put.
+                // (Files.copy rejects ATOMIC_MOVE: it is a move-only option; this was
+                // the bug that made every non-reflink put throw.)
                 withContext(Dispatchers.IO) {
-                    Files.copy(temp.toPath(), target.toPath(), StandardCopyOption.ATOMIC_MOVE)
+                    java.nio.file.Files.move(
+                        temp.toPath(), target.toPath(),
+                        StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING,
+                    )
                 }
             }
         } finally {
             withContext(Dispatchers.IO + NonCancellable) {
+                // after a successful move the temp file no longer exists; delete() on a
+                // missing file is a no-op, so this stays safe for both paths.
                 temp.delete()
             }
         }

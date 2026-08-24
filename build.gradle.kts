@@ -115,9 +115,10 @@ kotlin {
         binaries.executable()
     }
 
-    linuxX64()
-
-    // ── Host-detected native targets (restored from c0e3f0fc) ────────────────
+    // ── Host-detected native targets — ACTIVE PLATFORM ONLY ─────────────────
+    // No mobile shit: ios/watchos/tvos removed (dead targets that only produced
+    // "cannot run on the current host" noise and slowed configuration). The
+    // active platform is this host; mingwX64 stays property-gated for CI.
     val hostOs = System.getProperty("os.name").lowercase()
     val isMac = hostOs.contains("mac")
     val isLinux = hostOs.contains("linux")
@@ -132,7 +133,7 @@ kotlin {
                 }
             }
         }
-    } else {
+    } else if (providers.gradleProperty("enableMingwX64").orNull == "true") {
         mingwX64("mingwX64") {
             compilations.getByName("main") {
                 cinterops {
@@ -142,12 +143,6 @@ kotlin {
     }
 
     if (isMac) {
-        iosX64()
-        iosSimulatorArm64()
-        watchosX64()
-        watchosSimulatorArm64()
-        tvosX64()
-        tvosSimulatorArm64()
         macosArm64("macos") {
             compilations.getByName("main") {
                 cinterops {
@@ -264,8 +259,8 @@ kotlin {
             dependsOn(posixMain)
             kotlin.exclude("linux_uring/**")
         }
-        val mingwX64Main = maybeCreate("mingwX64Main").apply { dependsOn(nativeMain) }
-        val mingwX64Test = maybeCreate("mingwX64Test").apply { dependsOn(nativeTest) }
+        maybeCreate("mingwX64Main").apply { dependsOn(nativeMain) }
+        maybeCreate("mingwX64Test").apply { dependsOn(nativeTest) }
         val linuxTest = maybeCreate("linuxTest").apply { dependsOn(posixTest) }
         val macosMain = maybeCreate("macosMain").apply { dependsOn(posixMain) }
         val macosTest = maybeCreate("macosTest").apply { dependsOn(posixTest) }
@@ -288,8 +283,6 @@ kotlin {
         findByName("macosX64Test")?.dependsOn(posixTest)
         findByName("linuxMain")?.dependsOn(posixMain)
         findByName("linuxTest")?.dependsOn(posixTest)
-        findByName("mingwX64Main")?.dependsOn(mingwX64Main)
-        findByName("mingwX64Test")?.dependsOn(mingwX64Test)
         // T7 browser storage: IndexedDB test doubles for JS/Wasm storage tests.
         getByName("jsTest") {
             dependencies {
