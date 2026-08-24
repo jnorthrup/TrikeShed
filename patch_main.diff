@@ -1,9 +1,0 @@
---- src/jvmMain/kotlin/borg/trikeshed/forge/donor/HermesDonorTrace.kt
-+++ src/jvmMain/kotlin/borg/trikeshed/forge/donor/HermesDonorTrace.kt
-@@ -59,4 +59,4 @@
-         dataSource.connection.use { conn ->
--            conn.createStatement().use { stmt ->
--                val rs = stmt.executeQuery("SELECT id, title, body, status, parent_ids FROM tasks ORDER BY id ASC")
-+            conn.prepareStatement("SELECT id, title, body, status, parent_ids FROM tasks ORDER BY id ASC").use { stmt ->
-+                val rs = stmt.executeQuery()
-                 val sb = java.lang.StringBuilder()

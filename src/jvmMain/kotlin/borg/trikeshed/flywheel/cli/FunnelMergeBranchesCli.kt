@@ -127,7 +127,8 @@ private class FunnelMergeBranchesCli(
         }
         var applied = 0
         for (arm in batch) {
-            val changes = PijulDiffParser.parse(arm.patch)
+            val processedPatch = borg.trikeshed.userspace.containment.CommitSynthesizer.synthesize(arm.patch, borg.trikeshed.userspace.containment.ContainmentPolicy.MAXIMUM.layer4Artifact)
+            val changes = PijulDiffParser.parse(processedPatch)
             if (changes.isEmpty()) continue
             val workId = "funnel:${arm.sessionId ?: arm.branch?.substringAfterLast('/') ?: arm.patchCid.value.take(12)}"
             channel.applyPatch(workId, arm.sessionId ?: "branch:${arm.branch}", arm.patchCid, arm.label, changes)

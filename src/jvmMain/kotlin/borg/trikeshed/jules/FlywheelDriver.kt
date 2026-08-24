@@ -792,14 +792,7 @@ class FlywheelDriver(
         val worktree = File(tempRoot, "worktree")
         val patchFile = File(tempRoot, "artifact.patch")
         try {
-            val processedPatch = if (containmentPolicy.layer4Artifact.stripAuthorMetadata) {
-                patch.lineSequence().filterNot { line ->
-                    val lower = line.lowercase()
-                    lower.startsWith("author:") ||
-                    lower.startsWith("co-authored-by:") ||
-                    lower.startsWith("signed-off-by:")
-                }.joinToString("\n")
-            } else patch
+            val processedPatch = borg.trikeshed.userspace.containment.CommitSynthesizer.synthesize(patch, containmentPolicy.layer4Artifact)
 
             withContext(Dispatchers.IO) { patchFile.writeBytes(processedPatch.encodeToByteArray()) }
             val added = git("worktree", "add", "--detach", worktree.absolutePath, baseSha)
@@ -963,14 +956,7 @@ class FlywheelDriver(
 
         // 3. Apply all arms in parallel to the Pijul CRDT
         for (arm in validArms) {
-            val processedPatch = if (containmentPolicy.layer4Artifact.stripAuthorMetadata) {
-                arm.patch.lineSequence().filterNot { line ->
-                    val lower = line.lowercase()
-                    lower.startsWith("author:") ||
-                    lower.startsWith("co-authored-by:") ||
-                    lower.startsWith("signed-off-by:")
-                }.joinToString("\n")
-            } else arm.patch
+            val processedPatch = borg.trikeshed.userspace.containment.CommitSynthesizer.synthesize(arm.patch, containmentPolicy.layer4Artifact)
             val changes = borg.trikeshed.pijul.PijulDiffParser.parse(processedPatch)
             if (changes.isNotEmpty()) {
                 val workId = "session:${arm.session.id.replace(Regex("[^A-Za-z0-9._-]"), "-")}"
@@ -1084,14 +1070,7 @@ class FlywheelDriver(
                     // CAS-FALLBACK: no branch, try WAL continuity for the patch bytes.
                     val automatic = withTimeoutOrNull(60_000L) { automaticPatch(s) }
                     if (automatic is AutomaticPatch.Available) {
-                        val patch = if (containmentPolicy.layer4Artifact.stripAuthorMetadata) {
-                            automatic.text.lineSequence().filterNot { line ->
-                                val lower = line.lowercase()
-                                lower.startsWith("author:") ||
-                                lower.startsWith("co-authored-by:") ||
-                                lower.startsWith("signed-off-by:")
-                            }.joinToString("\n")
-                        } else automatic.text
+                        val patch = borg.trikeshed.userspace.containment.CommitSynthesizer.synthesize(automatic.text, containmentPolicy.layer4Artifact)
                         val touched = parsePatchFiles(patch)
                         val suspicious = EntropyPathScanner.scanTouchedPaths(touched)
                         if (suspicious.isNotEmpty()) {
