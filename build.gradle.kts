@@ -4,11 +4,11 @@ import org.jetbrains.kotlin.gradle.plugin.KotlinPlatformType
 import org.jetbrains.kotlin.gradle.tasks.Kotlin2JsCompile
 
 plugins {
-    kotlin("multiplatform") version "2.4.20-Beta2"
+    kotlin("multiplatform") version "2.4.10"
     id("com.github.ben-manes.versions") version "0.54.0"
     `maven-publish`
-    kotlin("plugin.serialization") version "2.4.20-Beta2"
-    kotlin("plugin.compose") version "2.4.20-Beta2"
+    kotlin("plugin.serialization") version "2.4.10"
+    kotlin("plugin.compose") version "2.4.10"
     id("org.jetbrains.compose") version "1.11.1"
 }
 
@@ -318,16 +318,21 @@ tasks.named("checkKotlinGradlePluginConfigurationErrors") {
 // CInterop - Linux production actuals import this binding directly.
 // ─────────────────────────────────────────────────────────────────
 
-kotlin {
-    linuxX64 {
-        compilations.getByName("main") {
-            cinterops {
-                val zlinux_uring by creating {
-                    defFile = project.file("io_uring_interop/zlinux_uring.def")
-                    compilerOpts(
-                        "-I${project.rootDir}/liburing/src/include",
-                        "-I${project.rootDir}/io_uring_interop",
-                    )
+val enableLinuxX64Target = System.getProperty("os.name").lowercase().contains("linux")
+    || providers.gradleProperty("enableLinuxX64").orNull == "true"
+
+if (enableLinuxX64Target) {
+    kotlin {
+        linuxX64 {
+            compilations.getByName("main") {
+                cinterops {
+                    val zlinux_uring by creating {
+                        defFile = project.file("io_uring_interop/zlinux_uring.def")
+                        compilerOpts(
+                            "-I${project.rootDir}/liburing/src/include",
+                            "-I${project.rootDir}/io_uring_interop",
+                        )
+                    }
                 }
             }
         }

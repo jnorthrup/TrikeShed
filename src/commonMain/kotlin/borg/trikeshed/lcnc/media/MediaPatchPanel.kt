@@ -1,21 +1,9 @@
 package borg.trikeshed.lcnc.media
 
-import borg.trikeshed.context.lcnc.CausalMark
-import borg.trikeshed.context.lcnc.FacetMark
-import borg.trikeshed.context.lcnc.MarkedResult
-import borg.trikeshed.context.lcnc.PointcutMark
-import borg.trikeshed.context.lcnc.marked
+import borg.trikeshed.context.lcnc.*
 import borg.trikeshed.job.ContentId
-import borg.trikeshed.lib.Series
-import borg.trikeshed.lib.emptySeriesOf
-import borg.trikeshed.lib.get
-import borg.trikeshed.lib.j
-import borg.trikeshed.lib.size
-import borg.trikeshed.terminal.Vt220Terminal
-import borg.trikeshed.terminal.VtCell
-import borg.trikeshed.terminal.VtKey
-import borg.trikeshed.terminal.VtPatch
-import borg.trikeshed.terminal.VtSnapshot
+import borg.trikeshed.lib.*
+import borg.trikeshed.terminal.*
 
 @JvmInline
 value class MediaPatchPanelId(val value: String)
