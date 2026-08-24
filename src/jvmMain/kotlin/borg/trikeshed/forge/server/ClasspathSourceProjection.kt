@@ -3,6 +3,7 @@ package borg.trikeshed.forge.server
 import borg.trikeshed.couch.CouchDatabase
 import borg.trikeshed.cursor.ClassfileTaxonomy
 import borg.trikeshed.job.ContentId
+import borg.trikeshed.util.oroboros.WorktreeCouchGateway
 
 /**
  * Joins a source attachment to the compiled class blobs absorbed from `build/live/classes`.
@@ -96,8 +97,8 @@ class ClasspathSourceProjection(
     }
 
     companion object {
-        const val WORKTREE_PREFIX = "projects/trikeshed/"
-        const val BUILD_CLASSES_PREFIX = "projects/trikeshed/build/live/classes/"
+        private val WORKTREE_PREFIX: String get() = WorktreeCouchGateway.WORKTREE_PREFIX
+        private val BUILD_CLASSES_PREFIX: String get() = WORKTREE_PREFIX + "build/live/classes/"
         private const val MAX_CLASS_CANDIDATES = 1024
         private val PACKAGE = Regex("(?m)^\\s*package\\s+([A-Za-z_][A-Za-z0-9_.]*)")
     }

@@ -29,7 +29,7 @@ class ClasspathSourceProjectionTest {
         attach(
             database,
             cas,
-            ClasspathSourceProjection.BUILD_CLASSES_PREFIX + resource,
+            "build/live/classes/" + resource,
             classBytes,
             "application/java-vm",
         )

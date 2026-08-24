@@ -217,6 +217,13 @@ object OroborosDaemon {
             fHome.mkdirs()
             Pair(fHome, rDir)
         }
+        // A daemon process rooted at a repo other than TrikeShed itself (its own port +
+        // forgeHome, run standalone) must not file its worktree under "projects/trikeshed/" —
+        // that mislabels every absorbed path with this project's name instead of its own.
+        // lowercase() keeps TrikeShed's own default byte-identical to the prior hardcoded
+        // literal ("TrikeShed".lowercase() == "trikeshed"), so existing stored content stays
+        // addressable under the same prefix it was written with.
+        WorktreeCouchGateway.WORKTREE_PREFIX = "projects/${repoDir.name.lowercase()}/"
 
         if (System.getProperty("os.name").lowercase().contains("linux")) {
             bpfProbeAttach(-1, Tracepoints.SYS_ENTER_SOCKET)

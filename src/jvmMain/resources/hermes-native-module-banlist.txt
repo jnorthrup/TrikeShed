@@ -38,3 +38,10 @@ tflite_runtime|native TensorFlow Lite runtime|host-delegate inference
 tokenizers|Rust tokenizer runtime|host-delegate tokenization
 uvloop|libuv Cython extension|use the CCEK reactor
 yarl|compiled URL extension|use a pure URL value or HTX
+# ── native GUI / window toolkit — blocked so LLM ships to Jules for braille replacement ──
+PyQt5|Qt/C++ native extension (SIP) — blocked in python sleeve|braille ui — BrailleUi window/tk approximation via Unicode Braille (U+2800) + host VT
+PyQt6|Qt/C++ native extension (SIP) — blocked in python sleeve|braille ui — BrailleUi window/tk approximation via Unicode Braille (U+2800) + host VT
+PySide2|Qt/C++ native extension (shiboken) — blocked in python sleeve|braille ui — BrailleUi window/tk approximation via Unicode Braille (U+2800) + host VT
+PySide6|Qt/C++ native extension (shiboken) — blocked in python sleeve|braille ui — BrailleUi window/tk approximation via Unicode Braille (U+2800) + host VT
+_tkinter|Tk native extension — blocked in python sleeve|braille ui — BrailleUi window/tk approximation via Unicode Braille (U+2800) + host VT
+tkinter|Tk native wrapper — blocked in python sleeve|braille ui — BrailleUi window/tk approximation via Unicode Braille (U+2800) + host VT

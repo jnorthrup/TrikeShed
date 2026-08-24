@@ -99,7 +99,16 @@ class WorktreeCouchGateway(
     }
 
     companion object {
-        const val WORKTREE_PREFIX = "projects/trikeshed/"
+        /**
+         * Default logical prefix for the primary worktree gateway. Not a `const val`: a whole
+         * separate daemon PROCESS rooted at a different repo (its own `--kanban-port` and
+         * `forgeHome`, run standalone rather than absorbed via a single daemon's occupied-repo
+         * registry) sets this once at boot from its own `repoDir.name`, before any gateway is
+         * constructed — every default-prefix consumer (this class, [MemoryBridge],
+         * `ClasspathSourceProjection`, `CouchWireRouter`) then keys off that instance's own
+         * project name instead of a name borrowed from this one.
+         */
+        var WORKTREE_PREFIX = "projects/trikeshed/"
 
         val EXCLUDED_SEGMENTS = setOf(
             ".git", ".gradle", ".idea", "build", "node_modules",

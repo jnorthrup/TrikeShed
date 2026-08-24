@@ -27,7 +27,7 @@ class MemoryBridge(
         for (attachmentPath in snapshot.deletedPaths) {
             if (!isMemoryEligible(attachmentPath)) continue
             val relative = attachmentPath.removePrefix(WorktreeCouchGateway.WORKTREE_PREFIX)
-            val memoryPath = "/memories/projects/trikeshed/$relative"
+            val memoryPath = "/memories/${WorktreeCouchGateway.WORKTREE_PREFIX}$relative"
             if (memoryStore.delete(memoryPath)) bridged++
             ipfsBridge.unpublishIpns("memory:$memoryPath")
         }
@@ -35,7 +35,7 @@ class MemoryBridge(
             if (!isMemoryEligible(attachmentPath)) continue
             val stored = attachments.getAttachment(attachmentPath) ?: continue
             val relative = attachmentPath.removePrefix(WorktreeCouchGateway.WORKTREE_PREFIX)
-            val memoryPath = "/memories/projects/trikeshed/$relative"
+            val memoryPath = "/memories/${WorktreeCouchGateway.WORKTREE_PREFIX}$relative"
             val bytes = stored.second
             val currentCid = memoryStore.couch.get(memoryPath)
                 ?.fields
