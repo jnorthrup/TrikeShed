@@ -54,6 +54,20 @@
 ## 2025-02-23 - Announcing active states for single-page application navigation
 **Learning:** Single-page applications often use custom buttons to switch views instead of actual `<a>` tags with `href`s. While visual users see an active state (like a background color change), screen reader users hear no change in state unless explicitly announced.
 **Action:** When building custom view switchers (like tabs or navigation sidebar items) that aren't native links, always apply `aria-current="true"` (or `aria-current="page"` for navigation menus) or `aria-pressed="true"` (for toggle buttons) via JavaScript when the view changes.
+<<<<<<< ours
 ## 2024-05-23 - Context-Specific ARIA Labels for Kanban Cards
  **Learning:** Screen readers lose visual grouping context on dynamically created interactive components like Kanban cards, leading to ambiguity for users navigating via keyboard.
  **Action:** Always add context-specific aria-labels that explicitly include the column/list name and explain the interaction that will happen upon activation.
+=======
+=======
+## 2024-08-20 - Adding focus states for drag and drop drop zones
+**Learning:** For elements handling drag-and-drop file ingestions natively created as semantic `role="button"` placeholders like `.drop-zone` in index.html templates, ensuring they receive `:focus-visible` styling is crucial for keyboard users attempting to access upload functions.
+**Action:** Always add interactive form and UI upload containers defined with tabindex to the globally applied `:focus-visible` CSS selector lists.
+>>>>>>> theirs
+## 2025-02-23 - Announcing active states for single-page application navigation
+**Learning:** Single-page applications often use custom buttons to switch views instead of actual `<a>` tags with `href`s. While visual users see an active state (like a background color change), screen reader users hear no change in state unless explicitly announced.
+**Action:** When building custom view switchers (like tabs or navigation sidebar items) that aren't native links, always apply `aria-current="page"` via JavaScript when the view changes.
+## 2024-10-27 - Added aria-labels to main toolbar buttons
+**Learning:** In dynamically toggled views and fixed main toolbars, ensure text or icon buttons have explicitly descriptive `aria-label` attributes.
+**Action:** Use standard `aria-label` attributes consistently for all interactive elements in custom toolbars.
+>>>>>>> theirs
