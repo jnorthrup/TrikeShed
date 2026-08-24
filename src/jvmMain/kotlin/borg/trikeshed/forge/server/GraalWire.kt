@@ -10,14 +10,18 @@ import borg.trikeshed.litebike.JvmKanbanServer
 import borg.trikeshed.lib.get
 import borg.trikeshed.lib.size
 import borg.trikeshed.parse.json.JsonSupport
+import borg.trikeshed.util.oroboros.CouchAttachmentGateway
+import borg.trikeshed.util.oroboros.RepoOccupancy
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.nio.charset.StandardCharsets
+import java.util.concurrent.ConcurrentHashMap
 
 /**
  * GraalWire — the Graal console: a web console with APIs, riding the same listener as everything
@@ -42,6 +46,10 @@ import java.nio.charset.StandardCharsets
  *   POST /api/graal/capsule/{id}/stdin {text}         one line typed at the captured shell
  *   GET  /api/graal/capsule/{id}/output               the VT scrollback so far (poll, not stream)
  *   POST /api/graal/capsule/{id}/kill                 interrupt + close the guest
+ *   GET  /api/graal/occupy                            occupied repos: id, path, live path count
+ *   POST /api/graal/occupy {path}                     absorb a git repo's worktree under repos/<id>/
+ *                                                      and watch it live — [RepoOccupancy]
+ *   POST /api/graal/occupy/{id}/release                stop watching; already-absorbed content stays
  *
  * CLI twin: `borg.trikeshed.graal.vitals.GraalConsoleCli` (vitals | watch) reads the same
  * instrument cluster for a JVM you are inside of.
@@ -54,7 +62,10 @@ class GraalWire(
     private val couchDatabase: CouchDatabase? = null,
     /** Sub-VM host, when mounted: its Spawned/Evaluated/Revoked/Landed events join the flourish feed. */
     private val vmHost: borg.trikeshed.vm.VmHost? = null,
+    /** Needed only to [RepoOccupancy.occupy] a repo on demand; absent means /api/graal/occupy 503s. */
+    private val attachmentGateway: CouchAttachmentGateway? = null,
 ) {
+    private val occupancies = ConcurrentHashMap<String, RepoOccupancy>()
     companion object {
         const val EVENTS_PATH = "/api/graal/events"
         val STREAMING: Set<String> = setOf(EVENTS_PATH)
@@ -152,6 +163,7 @@ class GraalWire(
     suspend fun ingestRoute(method: String, path: String, payload: ByteArray, respond: (suspend (ByteArray) -> Unit)?): JvmKanbanServer.HttpResponse? {
         val p = path.substringBefore('?')
         if (p == "/api/graal/capsule/list" || p == "/api/graal/capsule/spawn" || p.startsWith("/api/graal/capsule/")) return capsuleRoute(method, p, payload)
+        if (p == "/api/graal/occupy" || p.startsWith("/api/graal/occupy/")) return occupyRoute(method, p, payload)
         if (p != "/api/graal/ingest") return null
         if (method != "POST") return JvmKanbanServer.HttpResponse(405, """{"error":"method_not_allowed"}""")
         val database = couchDatabase ?: return JvmKanbanServer.HttpResponse(501, """{"error":"no store mounted"}""")
@@ -243,6 +255,48 @@ class GraalWire(
             "output" -> json(200, mapOf("id" to id, "alive" to capsule.alive, "text" to capsule.output()))
             "kill" -> { capsule.kill(); json(200, mapOf("ok" to true)) }
             else -> json(404, mapOf("error" to "unknown capsule route"))
+        }
+    }
+
+    // ── occupy: absorb + live-watch an arbitrary git repo, on demand ──
+
+    private suspend fun occupyRoute(method: String, p: String, payload: ByteArray): JvmKanbanServer.HttpResponse {
+        if (p == "/api/graal/occupy") {
+            if (method == "GET") {
+                return json(200, mapOf("repos" to occupancies.values.map { it.toMap() }))
+            }
+            if (method != "POST") return json(405, mapOf("error" to "method_not_allowed"))
+            val gateway = attachmentGateway ?: return json(503, mapOf("error" to "cas_database_unavailable"))
+            @Suppress("UNCHECKED_CAST")
+            val body = runCatching { JsonSupport.parse(CouchWire.bodyOf(payload).decodeToString()) as? Map<String, Any?> }.getOrNull().orEmpty()
+            val pathStr = (body["path"] as? String)?.takeIf { it.isNotBlank() }
+                ?: return json(400, mapOf("error" to "path required"))
+            val dir = java.io.File(pathStr)
+            if (!RepoOccupancy.looksLikeGitRepo(dir)) return json(400, mapOf("error" to "not a git repo (no .git)", "path" to dir.absolutePath))
+            occupancies.values.firstOrNull { it.repoPath == dir.absolutePath }?.let {
+                return json(409, mapOf("error" to "already occupied", "id" to it.id))
+            }
+            val id = RepoOccupancy.idFor(dir, occupancies.keys)
+            return try {
+                val occ = RepoOccupancy.occupy(dir, id, gateway, scope.coroutineContext[Job])
+                occupancies[id] = occ
+                json(202, mapOf("ok" to true, "id" to id, "prefix" to occ.prefix))
+            } catch (t: Throwable) {
+                json(500, mapOf("error" to (t.message ?: t.toString())))
+            }
+        }
+        val tail = p.removePrefix("/api/graal/occupy/")
+        val parts = tail.split('/')
+        val id = parts.getOrNull(0) ?: return json(404, mapOf("error" to "missing id"))
+        val occ = occupancies[id] ?: return json(404, mapOf("error" to "no such occupancy", "id" to id))
+        return when (parts.getOrNull(1)) {
+            "release" -> {
+                if (method != "POST") return json(405, mapOf("error" to "method_not_allowed"))
+                occ.stop()
+                occupancies.remove(id)
+                json(200, mapOf("ok" to true))
+            }
+            else -> json(404, mapOf("error" to "unknown occupy route"))
         }
     }
 

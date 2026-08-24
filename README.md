@@ -779,4 +779,68 @@ I've also written ideas that describe (some) goals and ideals of the library:
 *End of concept map. When you land a change, update the relevant section above — this doc is the maintenance lineage.*
 
 
+# build
+
+```sh
+
+set -e
+export SDKMAN_DIR="$HOME/.sdkman"
+
+if [[ ! -s "$SDKMAN_DIR/bin/sdkman-init.sh" ]]; then
+curl -s "https://get.sdkman.io?ci=true" | bash
+fi
+
+set +u
+source "$SDKMAN_DIR/bin/sdkman-init.sh"
+
+sdk install java 25.0.2-graalce
+sdk install kotlin 2.4.10
+sdk install gradle 9.6.1
+hash -r
+set -u
+
+```
+
+## Build, in anger
+
+For anyone who doesn't want to know Kotlin lore, doesn't care that `Join<A,B>` is
+standing in for half the type system above, and just needs this thing to compile,
+test, and run today:
+
+```sh
+git clone https://github.com/jnorthrup/TrikeShed && cd TrikeShed
+
+export JAVA_HOME="$HOME/.sdkman/candidates/java/25.0.2-graalce"
+export PATH="$JAVA_HOME/bin:$PATH"
+
+# The gate. Not `./gradlew build` — build also drags in JS/WASM targets, some of
+# which sit behind a debt ratchet (gradle/js-target-debt.excludes) and are not
+# the thing that tells you the tree is sound. This is:
+./gradlew jvmMainClasses --console=plain
+
+# One real, fast test, to confirm the toolchain (not just the compiler) works:
+./gradlew jvmTest --tests "borg.trikeshed.lib.JoinTest" --console=plain
+
+# Something you can look at without reading a line of Kotlin — bakes and serves
+# the static console/dashboard on http://localhost:8765/:
+./gradlew forgePwa
+
+# The actual daemon (Couch-shaped store + Graal console + VM host), foreground:
+./gradlew runOroborosDaemon --console=plain
+```
+
+There is no framework here — no Spring, no DI container, no annotation
+processors, no generated code you can't read in the same file it's used. It's
+Gradle + the Kotlin/JVM compiler + hand-rolled HTTP and NIO, full stop. If
+`jvmMainClasses` is green, the JVM half of the tree compiles; that is the only
+claim "the build works" is making. `-PfocusedTransportSlice=true` is a debt
+switch, not a speed-up — it *disables* exclusions on trees that are currently
+red, so leave it off unless you're specifically chasing that debt.
+
+If you're here because someone handed you this repo and said "just get it
+running," the four commands above are the whole onboarding: gate, one test,
+static preview, live daemon. Everything else in this document is for when you
+want to know *why* it's shaped this way — start with [§1 Kernel
+Algebra](#1-kernel-algebra-the-mental-model) and `PRELOAD.md`.
+
 <img width="1168" height="784" alt="image" src="https://github.com/user-attachments/assets/8af71944-b802-4a2d-883d-7e25208cbc5f" />

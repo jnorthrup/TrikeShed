@@ -932,6 +932,46 @@ async function vtSend(){
   await fetch('/api/graal/capsule/'+encodeURIComponent(vtId)+'/stdin',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({text})});
   vtTick();
 }
+/* ── occupied repos: "projects to research/run" — arbitrary git worktrees the daemon absorbs
+   into the store (repos/<id>/) and watches live, same shape as the primary worktree it starts
+   with, just repeatable at runtime. Lives inside the vms panel: this is guest material, not a
+   separate concern from the VM guests that browse/run against it. ── */
+let projSheet=[];
+async function pollProjects(){
+  try{const r=await fetch('/api/graal/occupy');
+    if(r.ok){const j=await r.json();projSheet=j.repos||[];
+      if($('vms').style.display==='flex')renderVms();}}
+  catch(e){}
+  setTimeout(pollProjects,6000);
+}
+async function occupyRepo(){
+  const el=$('occPath');const path=(el.value||'').trim();if(!path)return;
+  $('occOut').textContent='occupying '+path+'…';
+  try{
+    const r=await fetch('/api/graal/occupy',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({path})});
+    const j=await r.json();
+    if(r.ok){river('commit','occupy '+j.id);el.value='';$('occOut').textContent='';await pollProjects();}
+    else $('occOut').textContent='failed: '+(j.error||r.status);
+  }catch(e){$('occOut').textContent='failed: '+e;}
+}
+async function releaseRepo(id){
+  $('occOut').textContent='releasing '+id+'…';
+  try{
+    const r=await fetch('/api/graal/occupy/'+encodeURIComponent(id)+'/release',{method:'POST'});
+    if(r.ok){river('deopt','release '+id);$('occOut').textContent='';await pollProjects();}
+    else $('occOut').textContent='release failed: '+r.status;
+  }catch(e){$('occOut').textContent='failed: '+e;}
+}
+function projectsSection(){
+  return '<div style="border-top:1px solid var(--line);margin-top:10px;padding-top:8px">'+
+    '<div style="color:var(--dim);font-size:10px;margin-bottom:4px">projects to research/run — point this at any local git repo (a clone or a <code>git worktree</code> checkout); its worktree is absorbed into the store under <code>repos/&lt;id&gt;/</code> and watched live, so VM guests can browse and run against it same as the daemon\'s own tree. Release stops the watcher; already-absorbed content stays.</div>'+
+    '<div class="vmctl"><input id="occPath" placeholder="/absolute/path/to/repo" style="width:260px"><button onclick="occupyRepo()">occupy</button></div>'+
+    '<div id="occOut" style="color:var(--dim);font-size:10px;margin:2px 0 6px"></div>'+
+    (projSheet.length?'<table><tr><th>id</th><th>path</th><th>paths</th><th>last reconcile</th><th></th></tr>'+
+      projSheet.map(p=>'<tr><td>'+esc(p.id)+'</td><td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="'+esc(p.path)+'">'+esc(p.path)+'</td><td style="text-align:right">'+(p.paths||0).toLocaleString()+'</td><td>'+(p.lastReconcileMs?new Date(p.lastReconcileMs).toTimeString().slice(0,8):'')+'</td><td><button class="vmbtn" onclick="releaseRepo(\''+esc(p.id)+'\')">release</button></td></tr>').join('')+'</table>'
+      :'<i style="color:var(--dim)">no repos occupied — the primary worktree and ~/.hermes are watched by the daemon itself and aren\'t listed here</i>')+
+    '</div>';
+}
 async function vtKill(){
   if(!vtId)return;
   await fetch('/api/graal/capsule/'+encodeURIComponent(vtId)+'/kill',{method:'POST'});

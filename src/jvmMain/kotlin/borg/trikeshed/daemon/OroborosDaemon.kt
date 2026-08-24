@@ -395,6 +395,7 @@ object OroborosDaemon {
             wireScope,
             couchDb,
             vmHost,
+            attachmentGateway,
         )
 
         val kanbanServer = JvmKanbanServer(
