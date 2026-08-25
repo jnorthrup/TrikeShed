@@ -138,5 +138,6 @@ async function deleteDoc(){
 function newDoc(){$('docid').value='';$('docbody').value='{\n  \n}';currentRev=null;$('att').innerHTML='';status('new document — set an _id and save');}
 firstPage();
 </script>
+<a onclick="(function(){var b='**Surface:** futon\n**URL:** '+location.href+'\n\n**What I did:**\n\n**What happened:**\n\n**What I expected:**\n';window.open('https://github.com/jnorthrup/TrikeShed/issues/new?labels=quickstart-feedback&title='+encodeURIComponent('[futon] ')+'&body='+encodeURIComponent(b),'_blank')})()" style="position:fixed;bottom:8px;right:12px;z-index:80;color:#ffb02e;cursor:pointer;font:11px monospace;opacity:.8" title="open a GitHub issue prefilled from here">&#9873; feedback</a>
 </body>
 </html>

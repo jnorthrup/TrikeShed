@@ -481,6 +481,8 @@ object OroborosDaemon {
         if (config.hermesConsole) wireScope.launch(Dispatchers.IO) { hermesConsole.open() }
         val reportReactorForWires = CouchReportReactorElement(parentJob = coroutineContext[kotlinx.coroutines.Job])
         launch { reportReactorForWires.open() }
+        // ── Project DBs: dropped hierarchies as their own couch databases (shared CAS) ──
+        val projectDbRegistry = borg.trikeshed.forge.server.ProjectDbRegistry(COUCH_DB_NAME)
         val graalWire = borg.trikeshed.forge.server.GraalWire(
             jvmVitals,
             couchStore,
@@ -489,6 +491,7 @@ object OroborosDaemon {
             couchDb,
             vmHost,
             attachmentGateway,
+            projectDbs = projectDbRegistry,
         )
 
         // ── Memory store + ISAM index layer (fs-memory Prongs 1+2) ──
@@ -576,7 +579,11 @@ object OroborosDaemon {
         // assets/<name>/ — the blackboard's taxonomy prefixes are the subscope seams).
         val projectScopes = borg.trikeshed.forge.server.ProjectScopes(
             fileOps, attachmentGateway, couchIndexBridge, casStore, beliefBag,
+            projectDbs = projectDbRegistry,
+            ledgerFile = File(forgeHome, ".oroboros/projects.tsv"),
+            filesRoot = File(forgeHome, "files"),
         )
+        val projectDbWire = borg.trikeshed.forge.server.ProjectDbWire(projectDbRegistry, uploads = projectScopes)
         val brainClient = borg.trikeshed.jules.BrainClient(
             errorSink = borg.trikeshed.jules.JvmBrainErrorSink(forgeHome),
         )
@@ -585,14 +592,9 @@ object OroborosDaemon {
             scopes = projectScopes,
             attachments = attachmentGateway,
             muxContext = htxElement + muxReactor,
+            mountScope = wireScope,
         )
-        launch(Dispatchers.IO) {
-            for (extra in config.projects) {
-                runCatching { projectScopes.mount(extra) }
-                    .onSuccess { System.err.println("[OROBOROS] scope mounted: ${it.kind} ${it.prefix} (${it.paths} paths, ${it.minted} minted)") }
-                    .onFailure { System.err.println("[OROBOROS] scope mount FAILED for $extra: ${it.message}") }
-            }
-        }
+        // (boot mounts + ledger remount happen below, once the Rete tendon hook is armed)
         // ── Dynamic modules: Rete (hoisted — the tendon below feeds it) + production
         //    registry + CoW route registry + supervisor (proxy ctors: app CP first,
         //    then a fresh URLClassLoader over build/live/classes — hotswapFeed's tree,
@@ -627,7 +629,7 @@ object OroborosDaemon {
 
         val kanbanServer = JvmKanbanServer(
             extraRoutes = listOfNotNull(graalWire::route, vmWire::route, hermesWire::route, beliefWire?.let { it::route }, patchWire::route, moduleWire::route),
-            rawRoutes = listOf(graalWire::ingestRoute, couchWire::route),
+            rawRoutes = listOf(graalWire::ingestRoute, couchWire::route, projectDbWire::route),
             streamingPaths = borg.trikeshed.forge.server.CouchWire.streamingPaths(COUCH_DB_NAME) +
                 borg.trikeshed.forge.server.GraalWire.STREAMING +
                 borg.trikeshed.forge.server.VmWire.STREAMING +
@@ -649,6 +651,33 @@ object OroborosDaemon {
                     .onSuccess { System.err.println("[OROBOROS] module attached: ${it.id} ($fqcn)") }
                     .onFailure { System.err.println("[OROBOROS] module attach FAILED for $fqcn: ${it.message}") }
             }
+        }
+
+        // ── Project dbs: every mounted db grows its own Changes→Rete tendon
+        //    (partition = db name — blackboard subscope seams by project), then
+        //    boot mounts: the --project flags and the forge-home mount ledger
+        //    (project dbs SURVIVE restarts — the ledger replays them).
+        projectDbRegistry.onMount = { pdb ->
+            val tendon = borg.trikeshed.couch.CouchChangesFactElement(
+                db = pdb.db,
+                rete = rete,
+                report = reportReactorForWires,
+                admit = { true },
+                parentJob = moduleScope.coroutineContext[kotlinx.coroutines.Job],
+            )
+            moduleScope.launch {
+                tendon.open()
+                System.err.println("[OROBOROS] project-db tendon: ${pdb.name} — ${tendon.factsApplied} facts")
+            }
+        }
+        launch(Dispatchers.IO) {
+            for (extra in config.projects) {
+                runCatching { projectScopes.mount(extra) }
+                    .onSuccess { System.err.println("[OROBOROS] project db mounted: ${it.kind} ${it.name} (${it.paths} paths, ${it.docs} docs, ${it.minted} minted)") }
+                    .onFailure { System.err.println("[OROBOROS] scope mount FAILED for $extra: ${it.message}") }
+            }
+            val remounted = runCatching { projectScopes.remountLedger() }.getOrElse { 0 }
+            if (remounted > 0) System.err.println("[OROBOROS] project dbs remounted from ledger: $remounted")
         }
         val kanbanJob = SupervisorJob(coroutineContext[kotlinx.coroutines.Job])
         if (watch) {

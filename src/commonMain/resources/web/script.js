@@ -1341,6 +1341,28 @@
 
   renderAll();
 
+  // ⚑ feedback: a GitHub issue PREFILLED with this view's coordinates.
+  (function mountFeedback() {
+    const a = document.createElement('a');
+    a.textContent = '⚑ feedback';
+    a.style.cssText = 'position:fixed;bottom:8px;right:12px;z-index:80;color:#ffb02e;cursor:pointer;font:11px monospace;opacity:.8';
+    a.title = 'open a GitHub issue prefilled with where you are right now';
+    a.addEventListener('click', () => {
+      const coords = {
+        view: state.view,
+        page: state.activePageId,
+        boardSequence: boardSequence,
+        cards: state.board && state.board.cards ? state.board.cards.length : 0,
+        columns: state.board && state.board.columns ? state.board.columns.map((c) => c.id) : [],
+      };
+      const body = '**Surface:** board\n**URL:** ' + location.href + '\n**Coordinates:**\n```json\n' +
+        JSON.stringify(coords, null, 1) + '\n```\n\n**What I did:**\n\n**What happened:**\n\n**What I expected:**\n';
+      window.open('https://github.com/jnorthrup/TrikeShed/issues/new?labels=quickstart-feedback' +
+        '&title=' + encodeURIComponent('[board] ') + '&body=' + encodeURIComponent(body), '_blank');
+    });
+    document.body.appendChild(a);
+  })();
+
   // Live board: hydrate from the WAL-backed store at load, then poll on a
   // watermark (sequence unchanged = no re-render) while the board is visible.
   hydrateBoard();

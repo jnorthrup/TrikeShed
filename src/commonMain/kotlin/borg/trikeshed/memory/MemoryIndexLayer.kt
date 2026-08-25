@@ -57,36 +57,44 @@ data class MemoryIndexRoute(
     private val index: MutableMap<String, MutableList<String>> = mutableMapOf(),
 ) {
     /** Look up paths by route key. */
-    fun lookup(key: String): Series<String> {
-        val paths = index[key] ?: emptyList()
+    // Route state is hit by CONCURRENT writers (store-mutation subscription on the
+    // putting thread, boot reconcile on IO, quake reconcile on Default) — a bare
+    // ArrayList mid-resize exposes null slots to a concurrent removeAll iterator
+    // (the "parameter it is null" NPE that aborted reconciles). Every touch of
+    // [index] holds the route's own lock; lookups COPY out so callers never hold
+    // a live list reference across mutations.
+    private val routeLock = Any()
+
+    fun lookup(key: String): Series<String> = borg.trikeshed.isam.synchronizedLock(routeLock) {
+        val paths = index[key]?.toList() ?: emptyList()
         return paths.size j { i -> paths[i] }
     }
 
     /** All keys in this route. */
-    val keys: Series<String> get() {
+    val keys: Series<String> get() = borg.trikeshed.isam.synchronizedLock(routeLock) {
         val ks = index.keys.toList()
         return ks.size j { i -> ks[i] }
     }
 
     /** Add a path under a key. */
-    internal fun add(key: String, path: String) {
-        index.getOrPut(key) { mutableListOf() }
-        if (path !in index[key]!!) index[key]!!.add(path)
+    internal fun add(key: String, path: String): Unit = borg.trikeshed.isam.synchronizedLock(routeLock) {
+        val list = index.getOrPut(key) { mutableListOf() }
+        if (path !in list) list.add(path)
     }
 
     /** Remove a path from all keys. */
-    internal fun remove(path: String) {
+    internal fun remove(path: String): Unit = borg.trikeshed.isam.synchronizedLock(routeLock) {
         for ((_, paths) in index) paths.remove(path)
         index.entries.removeAll { it.value.isEmpty() }
     }
 
-    internal fun removePrefix(prefix: String) {
+    internal fun removePrefix(prefix: String): Unit = borg.trikeshed.isam.synchronizedLock(routeLock) {
         for ((_, paths) in index) paths.removeAll { it.startsWith(prefix) }
         index.entries.removeAll { it.value.isEmpty() }
     }
 
     /** Total indexed entries across all keys. */
-    val entryCount: Int get() = index.values.sumOf { it.size }
+    val entryCount: Int get() = borg.trikeshed.isam.synchronizedLock(routeLock) { index.values.sumOf { it.size } }
 }
 
 /**

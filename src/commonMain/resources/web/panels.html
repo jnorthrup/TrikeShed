@@ -86,6 +86,7 @@ button.stop{border-color:var(--err);color:var(--err)}
   <button id="exportBtn">export</button>
   <button id="importBtn">import</button>
   <button id="clearBtn">clear</button>
+  <button id="fbBtn" title="open a GitHub issue prefilled with this construction's coordinates" style="border-color:var(--warn);color:var(--warn)">⚑</button>
   <span id="status">idle</span>
 </div>
 <div id="viewport"><div id="world"><svg id="wires"></svg></div></div>
@@ -212,6 +213,14 @@ finally:
     title:"keymux roster (presence only)", ins:["trigger?"], outs:["roster"],
     params:{},
     async run(){ const r=await api("GET","/api/mux/keys"); return {roster:r.roster||r}; }},
+  "project.kill": {
+    title:"project db kill", ins:["trigger?"], outs:["verdict"],
+    params:{ name:{v:"",ph:"project db name (hierarchy kill)"} },
+    async run(n){
+      const name=p(n,"name"); if(!name) throw "name required";
+      const r=await api("DELETE","/api/projects/"+encodeURIComponent(name));
+      return {verdict:r};
+    }},
   "project.mount": {
     title:"mount scope (git|assets)", ins:["path?"], outs:["scope"],
     params:{ path:{v:"",ph:"/absolute/dir — or drop a folder on the canvas"} },
@@ -498,6 +507,30 @@ function showMenu(cx,cy){
 }
 viewport.addEventListener("dblclick",e=>{ if(e.target===viewport||e.target.id==="world"||e.target.id==="wires") showMenu(e.clientX,e.clientY); });
 viewport.addEventListener("contextmenu",e=>{ e.preventDefault(); showMenu(e.clientX,e.clientY); });
+document.getElementById("fbBtn").addEventListener("click",()=>{
+  const coords={
+    panel:(document.getElementById("panelName").value||"(unsaved)"),
+    nodes:G.nodes.length,types:[...new Set(G.nodes.map(n=>n.type))],
+    wires:G.wires.length,status:(document.getElementById("status").textContent||"").slice(0,120),
+    view:{x:Math.round(view.x),y:Math.round(view.y),z:+view.z.toFixed(2)},
+  };
+  const body="**Surface:** panels\n**URL:** "+location.href+"\n**Coordinates:**\n```json\n"+
+    JSON.stringify(coords,null,1)+"\n```\n\n**What I did:**\n\n**What happened:**\n\n**What I expected:**\n";
+  window.open("https://github.com/jnorthrup/TrikeShed/issues/new?labels=quickstart-feedback"+
+    "&title="+encodeURIComponent("[panels] ")+"&body="+encodeURIComponent(body),"_blank");
+});
+async function panelsWalkEntries(dirEntry,prefix){
+  const out=[]; const reader=dirEntry.createReader();
+  while(true){
+    const batch=await new Promise((res,rej)=>reader.readEntries(res,rej));
+    if(!batch.length)break;
+    for(const en of batch){
+      if(en.isFile){ out.push({rel:prefix+en.name,file:await new Promise((res,rej)=>en.file(res,rej))}); }
+      else if(en.isDirectory){ out.push(...await panelsWalkEntries(en,prefix+en.name+"/")); }
+    }
+  }
+  return out;
+}
 /* drag a directory from Finder: mount as side-by-side project scope */
 let dragHint=null;
 viewport.addEventListener("dragover",e=>{
@@ -506,26 +539,41 @@ viewport.addEventListener("dragover",e=>{
     dragHint.style.cssText="position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:var(--panel);border:1px dashed var(--graal);color:var(--graal);padding:10px 18px;border-radius:8px;pointer-events:none;z-index:50;font-size:12px"; viewport.appendChild(dragHint); }
 });
 viewport.addEventListener("dragleave",e=>{ if(!viewport.contains(e.relatedTarget)){ if(dragHint) dragHint.remove(); dragHint=null; }});
-viewport.addEventListener("drop",e=>{
+viewport.addEventListener("drop",async e=>{
   e.preventDefault(); if(dragHint) dragHint.remove(); dragHint=null;
   const dt=e.dataTransfer, paths=[];
-  // PRIORITY 1: file:// URIs — the only source with absolute host paths (Finder/Safari/Chrome)
+  const say=t=>{const s=document.getElementById("status"); if(s)s.textContent=t;};
+  // PRIORITY 1: file:// URIs — sources that expose absolute host paths
   const raw=(dt.getData("text/uri-list")||dt.getData("text/plain")||"").split("\n").map(u=>u.trim()).filter(Boolean);
   for(const u of raw){
     if(u.startsWith("file://")){ try{ paths.push(decodeURIComponent(new URL(u).pathname)); }catch(_){ paths.push(decodeURIComponent(u.replace(/^file:\/\//,""))); } }
     else if(u.startsWith("/")) paths.push(u);
   }
-  // PRIORITY 2: DataTransfer files (fallback when uri-list empty) — note fullPath is sandboxed, not absolute
-  if(!paths.length){
-    const files=[...(dt.files||[])];
-    for(const f of files){ if(f.path) paths.push(f.path); } // Electron / Tauri expose real path
-    if(!paths.length && dt.items){
-      // last resort: warn — browser sandbox hides absolute paths
-      const names=[...dt.items].map(it=>it.getAsFile()?.name).filter(Boolean);
-      if(names.length){ alert("Browser hid absolute path. Drag from Finder with file:// — or type path manually:\\n"+names.join("\\n")); return; }
+  // PRIORITY 2: Chrome hides host paths — WALK the dropped hierarchy and UPLOAD the bytes
+  if(!paths.length && dt.items){
+    const entries=[...dt.items].map(it=>it.webkitGetAsEntry&&it.webkitGetAsEntry()).filter(Boolean);
+    for(const entry of entries){
+      if(!entry.isDirectory){ say("drop a FOLDER to mount a project db"); continue; }
+      say("uploading "+entry.name+"/ …");
+      try{
+        const b=await(await fetch("/_project/"+encodeURIComponent(entry.name.toLowerCase())+"/begin",{method:"POST"})).json();
+        if(b.verdict!=="ok"){ say("upload refused: "+(b.detail||"?")); continue; }
+        const files=await panelsWalkEntries(entry,"");
+        let sent=0,skipped=0;
+        for(const f of files){
+          if(f.file.size>3500000){skipped++;continue;}
+          const buf=await f.file.arrayBuffer();
+          const r=await fetch("/_project/"+encodeURIComponent(b.name)+"/put?path="+encodeURIComponent(f.rel),
+            {method:"POST",headers:{"Content-Type":"application/octet-stream"},body:buf});
+          if(r.ok){sent++; if(sent%25===0)say(b.name+": "+sent+"/"+files.length);}
+        }
+        say("project db /"+b.name+" — "+sent+" docs"+(skipped?" ("+skipped+" >3.5MB skipped)":""));
+        addNode("project.list",(e.clientX-view.x-viewport.getBoundingClientRect().left)/view.z,(e.clientY-40-view.y)/view.z);
+      }catch(err){ say("upload failed: "+err); }
     }
+    return;
   }
-  if(!paths.length) return;
+  if(!paths.length){ say("nothing mountable in that drop"); return; }
   // place side-by-side: column to the right of existing project.mount nodes
   let baseX=(e.clientX-view.x-viewport.getBoundingClientRect().left)/view.z;
   let baseY=(e.clientY-40-view.y)/view.z;

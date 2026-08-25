@@ -64,6 +64,8 @@ class GraalWire(
     private val vmHost: borg.trikeshed.vm.VmHost? = null,
     /** Needed only to [RepoOccupancy.occupy] a repo on demand; absent means /api/graal/occupy 503s. */
     private val attachmentGateway: CouchAttachmentGateway? = null,
+    /** Mounted project dbs: their docs join the terrain as top-level `<name>/…` territories. */
+    private val projectDbs: ProjectDbRegistry? = null,
 ) {
     private val occupancies = ConcurrentHashMap<String, RepoOccupancy>()
     companion object {
@@ -150,7 +152,22 @@ class GraalWire(
                 val gen = store?.head?.getRev(d.id)?.substringBefore('-')?.toIntOrNull() ?: 1
                 listOf(d.id, len ?: (d.fields.size.toLong() * 64), lastSeq[d.id] ?: 0L, gen)
             }
-        return mapOf("rows" to rows, "at" to System.currentTimeMillis())
+        // Project dbs join the terrain as top-level territories named after the db;
+        // the client resolves `<db>/<docid>` rows back to `/<db>/<docid>` fetches.
+        val projectRows = projectDbs?.all().orEmpty().flatMap { pdb ->
+            pdb.store.all()
+                .filter { d -> d.fields.none { it.name == "_deleted" && it.value == true } }
+                .map { d ->
+                    val len = (d.fields.firstOrNull { it.name == "length" }?.value as? String)?.toLongOrNull()
+                    val gen = pdb.store.head.getRev(d.id)?.substringBefore('-')?.toIntOrNull() ?: 1
+                    listOf("${pdb.name}/${d.id}", len ?: (d.fields.size.toLong() * 64), 0L, gen)
+                }
+        }
+        return mapOf(
+            "rows" to rows + projectRows,
+            "dbs" to projectDbs?.all().orEmpty().map { it.name },
+            "at" to System.currentTimeMillis(),
+        )
     }
 
     /**

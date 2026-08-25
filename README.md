@@ -33,6 +33,43 @@ typealias Cursor = Series<RowVec>
 
 ---
 
+## Run it in anger — please
+
+The best thing you can do for this project is point it at your **real** mess and
+tell us where it creaks. Not a polite demo folder — the 2GB Telegram export,
+the directory with spaces and emoji in the names, the repo with 40k files.
+That's the workload it's built for, and every place it stumbles is a bug we
+want to hear about.
+
+**Quickstart (five minutes, one port):**
+
+```bash
+git clone git@github.com:jnorthrup/TrikeShed.git && cd TrikeShed
+./gradlew hotswapFeed          # builds the live class tree (JDK 25; GraalVM CE 25 unlocks the sub-VMs)
+bin/oroboros-daemon --watch    # the daemon: store, board, console — one process, one port
+```
+
+Then open **http://localhost:8888** and poke it where it counts:
+
+| Surface | What to try in anger |
+|---|---|
+| `/graal` | **Drag a real folder onto the terrain.** It becomes its own project database — cloned into the forge home (APFS/btrfs reflink, so it costs nothing), every file a CAS-backed attachment, a new territory on the map. Wheel-dive to any single byte of it. |
+| `/panels` | Wire the ComfyUI-style patch panel to live daemon surfaces — VMs, beliefs, the board — and leave a timer running overnight. |
+| `/` | The board. Make cards, move them, kill the daemon mid-flight, restart it, and check that nothing you did was lost. (That's a promise we test; hold us to it.) |
+
+**When it breaks — and somewhere it will — that's the good part:**
+
+- 🐛 [It broke](https://github.com/jnorthrup/TrikeShed/issues/new?labels=quickstart-feedback,bug&title=%5Bquickstart%5D%20&body=**What%20I%20did:**%0A%0A**What%20happened:**%0A%0A**What%20I%20expected:**%0A%0A**Log%20tail%20(logs/oroboros-daemon.log):**%0A%60%60%60%0A%0A%60%60%60) — stack traces, log tails, and "it just sat there" reports are all equally welcome.
+- 🧗 [It fought me](https://github.com/jnorthrup/TrikeShed/issues/new?labels=quickstart-feedback,friction&title=%5Bfriction%5D%20&body=**Where%20I%20got%20stuck:**%0A%0A**What%20I%20tried:**%0A%0A**What%20would%20have%20helped:**) — confusing moments count as defects here. If you had to read source to proceed, that's an issue.
+- 💡 [It should also…](https://github.com/jnorthrup/TrikeShed/issues/new?labels=quickstart-feedback,idea&title=%5Bidea%5D%20&body=**The%20workload%20I%20care%20about:**%0A%0A**What%27s%20missing:**) — tell us about the workload you *wanted* to throw at it.
+
+No issue is too small and none needs polish — two angry sentences and a log
+line beat a week of silence. The daemon logs everything to
+`logs/oroboros-daemon.log`; the last thirty lines of that file plus what you
+dragged, clicked, or expected is a perfect report.
+
+---
+
 # TrikeShed Concept Map — for the Kotlin Maintainer
 
 > One place a new maintainer who only knows Kotlin can read end-to-end.

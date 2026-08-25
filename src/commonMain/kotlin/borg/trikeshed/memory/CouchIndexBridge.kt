@@ -14,10 +14,17 @@ class CouchIndexBridge(
     private val gateway: CouchAttachmentGateway,
     private val indexLayer: MemoryIndexLayer,
 ) {
-    fun indexReconciliation(prefix: String, paths: Series<String>) {
+    fun indexReconciliation(
+        prefix: String,
+        paths: Series<String>,
+        /** Project dbs index through their OWN gateway; default = the primary. */
+        via: CouchAttachmentGateway = gateway,
+        /** Maps the INDEXED path to the doc id in [via] (project dbs strip their name prefix). */
+        docId: (String) -> String = { it },
+    ) {
         val entries = mutableListOf<CouchIndexEntry>()
         for (path in paths.view) {
-            val stored = gateway.getAttachment(path) ?: continue
+            val stored = via.getAttachment(docId(path)) ?: continue
             val segments = path.split('/').filter(String::isNotEmpty)
             val taxonomySize = (segments.size - 1).coerceAtLeast(1)
             val taxonomy = taxonomySize j { i: Int ->
