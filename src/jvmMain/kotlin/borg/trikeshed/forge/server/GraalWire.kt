@@ -223,10 +223,21 @@ class GraalWire(
                 } finally { runCatching { java.nio.file.Files.deleteIfExists(tmpMd) } }
             }
             val shapeKey = runCatching { borg.trikeshed.kanban.ForgeKanbanIngest.planShape(markdown) }.getOrDefault("")
+            // 4) byte epistemic surface: organic Kolmogorov comprehension of raw bytes
+            val byteSurface = if (!texty) runCatching {
+                borg.trikeshed.cas.ByteEpistemicIngest.ingest(database.cas, bytes)
+            }.getOrNull() else null
             JvmKanbanServer.HttpResponse(200, JsonSupport.stringify(mapOf(
                 "ok" to true, "id" to docId, "cid" to cid.value, "bytes" to bytes.size,
                 "extracted" to extractId, "chars" to markdown.length, "shape" to shapeKey.take(80),
                 "plan" to plan, "persisted" to persisted,
+                // byte schema: organic comprehension without parser
+                "byteSchema" to byteSurface?.documentSchema?.structuralKey?.take(120),
+                "byteChunks" to byteSurface?.chunks?.size,
+                "byteLzPhrases" to byteSurface?.documentSchema?.lzPhraseCount,
+                "byteComplexity" to byteSurface?.documentSchema?.let {
+                    String.format("%.4f", it.normalizedComplexity)
+                },
             )))
         } catch (t: Throwable) {
             JvmKanbanServer.HttpResponse(500, JsonSupport.stringify(mapOf("error" to (t.message ?: t.toString()))))

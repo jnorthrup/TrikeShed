@@ -51,6 +51,8 @@ button.stop{border-color:var(--err);color:var(--err)}
 .params input,.params textarea,.params select{background:var(--bg);border:1px solid var(--line);color:var(--ink);border-radius:3px;font:11px/1.4 inherit;padding:3px 5px;width:100%;user-select:text}
 .params textarea{resize:vertical;min-height:44px;white-space:pre}
 .result{margin:0 8px 6px;padding:5px 6px;background:var(--bg);border:1px solid var(--line);border-radius:3px;font-size:10px;color:var(--dim);max-height:150px;max-width:340px;overflow:auto;white-space:pre;user-select:text}
+.ctree{white-space:pre;font-size:10px;line-height:1.5;user-select:text}
+.ctree-tw{display:inline-block;width:10px;color:#7b8496}
 .gaugeval{margin:2px 8px 8px;font-size:26px;font-variant-numeric:tabular-nums;color:var(--graal);text-align:center}
 #menu{position:fixed;display:none;background:var(--panel);border:1px solid var(--line);border-radius:6px;z-index:30;min-width:190px;box-shadow:0 8px 30px rgba(0,0,0,.6)}
 #menu h5{padding:5px 10px 3px;font-size:9px;color:var(--dim);text-transform:uppercase;letter-spacing:.08em}
@@ -84,6 +86,8 @@ button.stop{border-color:var(--err);color:var(--err)}
   <button id="exportBtn">export</button>
   <button id="importBtn">import</button>
   <button id="clearBtn">clear</button>
+  <button id="qsBtn" title="run the quickstart in anger" style="border-color:#3ddc84;color:#3ddc84">⚡</button>
+  <button id="fbBtn" title="open a GitHub issue prefilled with this construction's coordinates" style="border-color:var(--warn);color:var(--warn)">⚑</button>
   <span id="status">idle</span>
 </div>
 <div id="viewport"><div id="world"><svg id="wires"></svg></div></div>
@@ -210,6 +214,14 @@ finally:
     title:"keymux roster (presence only)", ins:["trigger?"], outs:["roster"],
     params:{},
     async run(){ const r=await api("GET","/api/mux/keys"); return {roster:r.roster||r}; }},
+  "project.kill": {
+    title:"project db kill", ins:["trigger?"], outs:["verdict"],
+    params:{ name:{v:"",ph:"project db name (hierarchy kill)"} },
+    async run(n){
+      const name=p(n,"name"); if(!name) throw "name required";
+      const r=await api("DELETE","/api/projects/"+encodeURIComponent(name));
+      return {verdict:r};
+    }},
   "project.mount": {
     title:"mount scope (git|assets)", ins:["path?"], outs:["scope"],
     params:{ path:{v:"",ph:"/absolute/dir — or drop a folder on the canvas"} },
@@ -259,6 +271,18 @@ finally:
     title:"pointcut routes", ins:["trigger?"], outs:["routes"],
     params:{},
     async run(){ const r=await api("GET","/api/graal/pointcuts"); return {routes:r.routes||r}; }},
+  "board.view": {
+    title:"kanban board (live)", ins:["trigger?"], outs:["board","alerts"],
+    params:{},
+    async run(){
+      const r=await api("GET","/api/board");
+      const cols=(r.columns||[]).map(c=>c.id+":"+(c.count!=null?c.count:"?")+(c.wipLimit?"/"+c.wipLimit:"")).join("  ");
+      const items=r.items||[];
+      const contested=items.filter(x=>x.contested).map(x=>x.id);
+      const wipAlerts=(r.columns||[]).filter(c=>c.wipLimit&&c.count>c.wipLimit).map(c=>"WIP "+c.id+" "+c.count+"/"+c.wipLimit);
+      return {board:{seq:r.sequence,cols:cols,cards:items.length},
+              alerts:{contested:contested,wip:wipAlerts}};
+    }},
   "note": {
     title:"note", ins:[], outs:[], sink:true,
     params:{ text:{v:"",ta:1,ph:"sticky note"} },
@@ -266,6 +290,10 @@ finally:
   "graal.events": {
     title:"graal event source (SSE)", ins:[], outs:["event"], source:true,
     params:{ filter:{v:"",ph:"substring filter (gc, compile, deopt, commit…)"} },
+    async run(n){ return {event:n._lastEvent||null}; }},
+  "vm.events": {
+    title:"vm event source (SSE)", ins:[], outs:["event"], source:true,
+    params:{ vmId:{v:"",ph:"empty = all vms"}, kind:{v:"",ph:"spawned|evaluated|revoked"} },
     async run(n){ return {event:n._lastEvent||null}; }},
 };
 /* ── graph state ───────────────────────────────────────────────────────── */
@@ -278,10 +306,35 @@ async function api(method,path,body){
   const r=await fetch(path,{method,headers:{"Content-Type":"application/json"},body:body!==undefined&&method!=="GET"?JSON.stringify(body):undefined});
   const t=await r.text(); try{ return JSON.parse(t); }catch(e){ return {raw:t,status:r.status}; }
 }
+/* cursor-tree widget: collapsible tree rendering of any JSON doc */
+function renderTree(v,key,depth){
+  const d=document.createElement("div"); d.className="ctree";
+  if(depth>0) d.style.marginLeft="10px";
+  const isObj=v!==null&&typeof v==="object";
+  if(!isObj){
+    const s=document.createElement("span");
+    s.textContent=(key?key+": ":"")+(typeof v==="string"?'"'+v+'"':String(v));
+    if(v===null) s.style.color="#b07aff"; else if(typeof v==="number") s.style.color="#ffb02e"; else if(typeof v==="string") s.style.color="#3ddc84";
+    d.appendChild(s); return d;
+  }
+  const arr=Array.isArray(v), entries=arr?v.map((x,i)=>[i,x]):Object.entries(v);
+  const open=depth<2;
+  const tw=document.createElement("span"); tw.className="ctree-tw"; tw.textContent=open?"▾":"▸";
+  const lb=document.createElement("span"); lb.textContent=key?(key+": "+(arr?`[${entries.length}]`:`{${entries.length}}`)):(arr?`Array[${entries.length}]`:`Object{${entries.length}}`);
+  const hd=document.createElement("span"); hd.append(tw,lb);
+  const kids=document.createElement("div");
+  for(const [k,val] of entries) kids.appendChild(renderTree(val,String(k),depth+1));
+  const sync=()=>{ kids.style.display=open?"":"none"; tw.textContent=open?"▾":"▸"; };
+  sync();
+  hd.style.cursor="pointer"; hd.onclick=()=>{ open=!open; sync(); };
+  d.append(hd,kids); return d;
+}
 function setResult(n,v){
   let el=n.el.querySelector(".result");
   if(!el){ el=document.createElement("div"); el.className="result"; n.el.appendChild(el); }
-  el.textContent = typeof v==="string" ? v : JSON.stringify(v,null,1);
+  // JSON docs render as a cursor-tree; strings stay verbatim
+  if(v!==null&&typeof v==="object"){ el.textContent=""; el.appendChild(renderTree(v,"",0)); }
+  else el.textContent = typeof v==="string" ? v : String(v);
 }
 /* ── node DOM ──────────────────────────────────────────────────────────── */
 function addNode(type,x,y,params){
@@ -455,17 +508,114 @@ function showMenu(cx,cy){
 }
 viewport.addEventListener("dblclick",e=>{ if(e.target===viewport||e.target.id==="world"||e.target.id==="wires") showMenu(e.clientX,e.clientY); });
 viewport.addEventListener("contextmenu",e=>{ e.preventDefault(); showMenu(e.clientX,e.clientY); });
-/* drag a directory from Finder: the drop carries file:// URIs — boom, a mounted scope node */
-viewport.addEventListener("dragover",e=>e.preventDefault());
-viewport.addEventListener("drop",e=>{
-  e.preventDefault();
-  const uri=(e.dataTransfer.getData("text/uri-list")||e.dataTransfer.getData("text/plain")||"").split("\n")[0].trim();
-  if(!uri) return;
-  const path=uri.startsWith("file://")?decodeURIComponent(uri.replace(/^file:\/\//,"")):uri;
-  const wx=(e.clientX-view.x-viewport.getBoundingClientRect().left)/view.z;
-  const wy=(e.clientY-40-view.y)/view.z;
-  const n=addNode("project.mount",wx,wy,{path});
-  if(n) runAll(n.id);
+document.getElementById("qsBtn").addEventListener("click",()=>{
+ var d=document.createElement("div");d.dataset.qs="1";
+ d.style.cssText="position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:99;display:flex;align-items:center;justify-content:center";
+ d.innerHTML='<div style="background:#11151e;border:1px solid #f29111;border-radius:8px;padding:18px 22px;max-width:580px;color:#d8dce6;font:13px monospace">'
+  +'<b style="color:#f29111">Run TrikeShed in anger — five minutes, one port</b>'
+  +'<pre id="qsCmds" style="background:#0b0e14;padding:10px;border-radius:4px;margin:10px 0;user-select:text;white-space:pre-wrap">git clone git@github.com:jnorthrup/TrikeShed.git && cd TrikeShed\n./gradlew hotswapFeed\nbin/oroboros-daemon --watch</pre>'
+  +'<button onclick="navigator.clipboard.writeText(document.getElementById(\'qsCmds\').textContent)" style="background:#161b26;border:1px solid #3ddc84;color:#3ddc84;border-radius:4px;padding:4px 12px;cursor:pointer;font:inherit">copy commands</button>'
+  +'<a href="https://github.com/jnorthrup/TrikeShed#run-it-in-anger--please" target="_blank" style="color:#3fd0ff;margin-left:10px">README ↗</a>'
+  +'<a onclick="document.querySelector(\'div[data-qs]\').remove()" style="color:#7b8496;margin-left:14px;cursor:pointer">close</a></div>';
+ d.onclick=function(e){if(e.target===d)d.remove()};
+ document.body.appendChild(d);
+});
+document.getElementById("fbBtn").addEventListener("click",()=>{
+  const coords={
+    panel:(document.getElementById("panelName").value||"(unsaved)"),
+    nodes:G.nodes.length,types:[...new Set(G.nodes.map(n=>n.type))],
+    wires:G.wires.length,status:(document.getElementById("status").textContent||"").slice(0,120),
+    view:{x:Math.round(view.x),y:Math.round(view.y),z:+view.z.toFixed(2)},
+  };
+  const body="**Surface:** panels\n**URL:** "+location.href+"\n**Coordinates:**\n```json\n"+
+    JSON.stringify(coords,null,1)+"\n```\n\n**What I did:**\n\n**What happened:**\n\n**What I expected:**\n";
+  window.open("https://github.com/jnorthrup/TrikeShed/issues/new?labels=quickstart-feedback"+
+    "&title="+encodeURIComponent("[panels] ")+"&body="+encodeURIComponent(body),"_blank");
+});
+const PROJECT_MARKERS=/^(settings\.gradle(\.kts)?|build\.gradle(\.kts)?|package\.json|Cargo\.toml|CMakeLists\.txt|Makefile|pom\.xml|go\.mod|pyproject\.toml|setup\.py|mix\.exs|Package\.swift|.*\.xcodeproj\/.*)$/;
+const SKIP_DIRS=new Set(['node_modules','build','target','dist','out','__pycache__','venv','.venv','.git','.gradle','.idea','DerivedData']);
+async function panelsWalkEntries(dirEntry,prefix){
+  const out=[]; const reader=dirEntry.createReader();
+  while(true){
+    const batch=await new Promise((res,rej)=>reader.readEntries(res,rej));
+    if(!batch.length)break;
+    for(const en of batch){
+      if(en.isFile){ out.push({rel:prefix+en.name,file:await new Promise((res,rej)=>en.file(res,rej))}); }
+      else if(en.isDirectory){ if(SKIP_DIRS.has(en.name))continue; out.push(...await panelsWalkEntries(en,prefix+en.name+"/")); }
+    }
+  }
+  return out;
+}
+/* drag a directory from Finder: mount as side-by-side project scope */
+let dragHint=null;
+viewport.addEventListener("dragover",e=>{
+  e.preventDefault(); e.dataTransfer.dropEffect="copy";
+  if(!dragHint){ dragHint=document.createElement("div"); dragHint.textContent="⊕ drop to mount project";
+    dragHint.style.cssText="position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:var(--panel);border:1px dashed var(--graal);color:var(--graal);padding:10px 18px;border-radius:8px;pointer-events:none;z-index:50;font-size:12px"; viewport.appendChild(dragHint); }
+});
+viewport.addEventListener("dragleave",e=>{ if(!viewport.contains(e.relatedTarget)){ if(dragHint) dragHint.remove(); dragHint=null; }});
+viewport.addEventListener("drop",async e=>{
+  e.preventDefault(); if(dragHint) dragHint.remove(); dragHint=null;
+  const dt=e.dataTransfer, paths=[];
+  const say=t=>{const s=document.getElementById("status"); if(s)s.textContent=t;};
+  // PRIORITY 1: file:// URIs — sources that expose absolute host paths
+  const raw=(dt.getData("text/uri-list")||dt.getData("text/plain")||"").split("\n").map(u=>u.trim()).filter(Boolean);
+  for(const u of raw){
+    if(u.startsWith("file://")){ try{ paths.push(decodeURIComponent(new URL(u).pathname)); }catch(_){ paths.push(decodeURIComponent(u.replace(/^file:\/\//,""))); } }
+    else if(u.startsWith("/")) paths.push(u);
+  }
+  // PRIORITY 2: Chrome hides host paths — WALK the dropped hierarchy and UPLOAD the bytes
+  if(!paths.length && dt.items){
+    const entries=[...dt.items].map(it=>it.webkitGetAsEntry&&it.webkitGetAsEntry()).filter(Boolean);
+    for(const entry of entries){
+      if(!entry.isDirectory){ say("drop a FOLDER to mount a project db"); continue; }
+      say("uploading "+entry.name+"/ …");
+      try{
+        const files=await panelsWalkEntries(entry,"");
+        const kind=files.some(f=>PROJECT_MARKERS.test(f.rel))?"project":"assets";
+        const b=await(await fetch("/_project/"+encodeURIComponent(entry.name.toLowerCase())+"/begin?kind="+kind,{method:"POST"})).json();
+        if(b.verdict!=="ok"){ say("upload refused: "+(b.detail||"?")); continue; }
+        let sent=0,skipped=0,failed=0;
+        let frames=[],packed=0;
+        async function flushBatch(){
+          if(!frames.length)return;
+          const blob=new Blob(frames);frames=[];packed=0;
+          const r=await fetch("/_project/"+encodeURIComponent(b.name)+"/putBatch",
+            {method:"POST",headers:{"Content-Type":"application/octet-stream"},body:blob});
+          if(r.ok){const j=await r.json();sent+=j.stored||0;failed+=j.failed||0;say(b.name+": "+sent+"/"+files.length);}
+          else failed++;
+        }
+        function frame(rel,buf){
+          const pb=new TextEncoder().encode(rel);
+          const h=new DataView(new ArrayBuffer(4));h.setInt32(0,pb.length);
+          const l=new DataView(new ArrayBuffer(8));l.setBigInt64(0,BigInt(buf.byteLength));
+          frames.push(h.buffer,pb,l.buffer,buf);packed+=12+pb.length+buf.byteLength;
+        }
+        for(const f of files){
+          if(f.file.size>3500000){skipped++;continue;}
+          frame(f.rel,await f.file.arrayBuffer());
+          if(packed>3000000||frames.length>=256)await flushBatch();
+        }
+        await flushBatch();
+        say("project db /"+b.name+" — "+sent+" docs"+(skipped?" ("+skipped+" >3.5MB skipped)":"")+(failed?" · "+failed+" FAILED":""));
+        addNode("project.list",(e.clientX-view.x-viewport.getBoundingClientRect().left)/view.z,(e.clientY-40-view.y)/view.z);
+      }catch(err){ say("upload failed: "+err); }
+    }
+    return;
+  }
+  if(!paths.length){ say("nothing mountable in that drop"); return; }
+  // place side-by-side: column to the right of existing project.mount nodes
+  let baseX=(e.clientX-view.x-viewport.getBoundingClientRect().left)/view.z;
+  let baseY=(e.clientY-40-view.y)/view.z;
+  const mounts=G.nodes.filter(n=>n.type==="project.mount");
+  if(mounts.length){ baseX=Math.max(...mounts.map(n=>n.x))+260; baseY=Math.min(...mounts.map(n=>n.y)); }
+  let wx=baseX, wy=baseY;
+  for(const p of paths){
+    // normalize: ensure no trailing file:// prefix shown in node
+    const path=p.startsWith("file://") ? decodeURIComponent(p.replace(/^file:\/\//,"")) : p;
+    const n=addNode("project.mount",wx,wy,{path});
+    if(n){ runAll(n.id); wx+=24; wy+=24; }
+  }
 });
 addEventListener("pointerdown",e=>{ if(!menu.contains(e.target)) menu.style.display="none"; });
 $("#addBtn").addEventListener("click",e=>showMenu(60,60));
@@ -534,6 +684,17 @@ $("#runBtn").addEventListener("click",()=>{
         runAll(n.id);
       };
     }
+    if(n.type==="vm.events"&&!n._es){
+      // sub-VM lifecycle dataflow: spawn/eval/revoke events re-fire this node's downstream
+      n._es=new EventSource("/api/vm/events");
+      n._es.onmessage=(ev)=>{
+        try{ var d=JSON.parse(ev.data); }catch(_){ return; }
+        if(p(n,"vmId") && d.vmId!==p(n,"vmId")) return;
+        if(p(n,"kind") && d.kind!==p(n,"kind")) return;
+        n._lastEvent=d;
+        runAll(n.id);
+      };
+    }
   }
   runAll();
 });
@@ -567,7 +728,7 @@ setInterval(drawMinimap, 1500);
 
 /* ── persistence ───────────────────────────────────────────────────────── */
 function serialize(){ return {view,nodes:G.nodes.map(n=>({id:n.id,type:n.type,x:n.x,y:n.y,params:n.params,collapsed:!!n.collapsed})),wires:G.wires,seq:G.seq}; }
-function save(){ try{ localStorage.setItem("trikeshed.panels", JSON.stringify(serialize())); }catch(e){} }
+function save(){ try{ localStorage.setItem("trikeshed.panels.v3", JSON.stringify(serialize())); }catch(e){} }
 function load(data){
   for(const n of G.nodes){ if(n._timer)clearInterval(n._timer); n.el.remove(); }
   G={nodes:[],wires:[],seq:data.seq||1};
@@ -609,24 +770,34 @@ $("#importBtn").addEventListener("click",()=>$("#fileIn").click());
 $("#fileIn").addEventListener("change",async e=>{ const f=e.target.files[0]; if(f) load(JSON.parse(await f.text())); });
 $("#clearBtn").addEventListener("click",()=>{ if(confirm("clear the panel?")) load({nodes:[],wires:[]}); });
 /* ── boot: restore, or seed the starter panel ──────────────────────────── */
-let stored=null; try{ stored=JSON.parse(localStorage.getItem("trikeshed.panels")); }catch(e){}
+let stored=null; try{ stored=JSON.parse(localStorage.getItem("trikeshed.panels.v3")); }catch(e){}
 if(stored&&stored.nodes&&stored.nodes.length){ load(stored); }
 else {
-  const t=addNode("timer",40,60,{seconds:"5"});
-  const v=addNode("graal.vitals",260,40);
-  const pk=addNode("pick",520,40,{path:"memory.heapUsed"});
-  const g=addNode("gauge",760,30,{label:"heap used"});
-  const pk2=addNode("pick",520,220,{path:"gc.collections"});
-  const g2=addNode("gauge",760,220,{label:"gc collections"});
-  const ls=addNode("vms.list",260,330);
-  const d=addNode("display",520,380);
-  G.wires.push({from:[t.id,"tick"],to:[v.id,"trigger?"]});
-  G.wires.push({from:[v.id,"json"],to:[pk.id,"x"]});
-  G.wires.push({from:[pk.id,"y"],to:[g.id,"x"]});
-  G.wires.push({from:[v.id,"json"],to:[pk2.id,"x"]});
-  G.wires.push({from:[pk2.id,"y"],to:[g2.id,"x"]});
-  G.wires.push({from:[t.id,"tick"],to:[ls.id,"trigger?"]});
-  G.wires.push({from:[ls.id,"rows"],to:[d.id,"x"]});
+  /* the default construction is the PRODUCTION OPS BOARD: live system state,
+     not an aspirational plan. timer drives; every column is a real surface. */
+  const t=addNode("timer",30,60,{seconds:"10"});
+  const v=addNode("graal.vitals",250,30);
+  const pk=addNode("pick",470,30,{path:"memory.heapUsed"});
+  const g=addNode("gauge",650,20,{label:"heap used"});
+  const pk2=addNode("pick",470,180,{path:"gc.collections"});
+  const g2=addNode("gauge",650,170,{label:"gc collections"});
+  const sc=addNode("project.list",250,330);
+  const scd=addNode("display",470,330);
+  const bi=addNode("beliefs.introspect",250,520);
+  const bid=addNode("display",470,520);
+  const vs=addNode("vms.list",250,700);
+  const vsd=addNode("display",470,700);
+  const ks=addNode("keys.status",250,880);
+  const ksd=addNode("display",470,880);
+  const nt=addNode("note",650,340,{text:"production ops board — live planes, no fiction.\nright-click/double-click: add nodes.\ndrop a folder anywhere: mount it as a scope."});
+  for(const [a,b,ap,bp] of [
+    [t,v,"tick","trigger?"],[v,pk,"json","x"],[pk,g,"y","x"],
+    [v,pk2,"json","x"],[pk2,g2,"y","x"],
+    [t,sc,"tick","trigger?"],[sc,scd,"scopes","x"],
+    [t,bi,"tick","trigger?"],[bi,bid,"field","x"],
+    [t,vs,"tick","trigger?"],[vs,vsd,"rows","x"],
+    [t,ks,"tick","trigger?"],[ks,ksd,"roster","x"],
+  ]) G.wires.push({from:[a.id,ap],to:[b.id,bp]});
   save();
 }
 applyView(); requestAnimationFrame(redraw);

@@ -159,13 +159,20 @@ html[data-skin="marker"] #crumb{text-shadow:none}
 <div id="notion"><div class="nhead"><input id="nfilter" placeholder="filter entries…"><span id="nscope"></span></div><div class="nbody" id="nbody"></div></div>
 <canvas id="mini" width="200" height="124"></canvas>
 <div id="crumb">loading terrain…</div>
-<div id="help"><b>wheel</b> zoom · <b>drag</b> pan · <b>dblclick</b> dive · <b>click</b> inspect+edges · <b>0</b> fit · <b>T</b> tree sheet · <b>L</b> ledger · <b>P</b> pointcuts · <b>V</b> vms · <b>H</b> Hermes VT220 · <b>A</b> AOT · <b>M</b> mode · <b>1/2/3</b> layer · <b>F</b> fog · <b>B</b> skin · <a href="/futon" style="color:var(--dim)">futon ↗</a></div>
+<div id="help"><b>wheel</b> zoom · <b>drag</b> pan · <b>drop folder</b> → project db · <b>right-click territory</b> kill db · <b>dblclick</b> dive · <b>click</b> inspect+edges · <b>0</b> fit · <b>T</b> tree sheet · <b>L</b> ledger · <b>P</b> pointcuts · <b>V</b> vms · <b>H</b> Hermes VT220 · <b>A</b> AOT · <b>M</b> mode · <b>1/2/3</b> layer · <b>F</b> fog · <b>B</b> skin · <a href="/futon" style="color:var(--dim)">futon ↗</a> · <a id="qsLink" style="color:var(--commit);cursor:pointer">⚡ install now</a> · <a id="fbLink" style="color:var(--warn);cursor:pointer">⚑ feedback</a></div>
 <div class="panel" id="vt"><header><b id="vtTitle">hermes vt</b><span><span class="x" onclick="vtKill()" title="interrupt + close the guest" style="margin-right:10px">⏻ kill</span><span class="x" onclick="hide('vt')">✕</span></span></header><div class="body" id="vtBody" style="padding:0"><pre id="vtScroll"></pre><div id="vtLine"><span id="vtPrompt">#</span><input id="vtInput" autocomplete="off" spellcheck="false"></div></div></div>
 <script>
 'use strict';
 const $=id=>document.getElementById(id);
 const reduced=matchMedia('(prefers-reduced-motion: reduce)').matches;
 const DB='trikeshed';
+/* mounted project dbs (from /api/graal/map): rows `<db>/<docid>` resolve to `/<db>/<docid>` */
+let PROJECT_DBS=new Set();
+function dbUrl(id){
+  const seg=id.split('/')[0];
+  if(PROJECT_DBS.has(seg)){const rest=id.split('/').slice(1);return '/'+seg+'/'+rest.map(encodeURIComponent).join('/');}
+  return '/'+DB+'/'+id.split('/').map(encodeURIComponent).join('/');
+}
 /* ── world & camera ─────────────────────────────────────── */
 const W=1600,H=1000;
 let cam={s:1,ox:0,oy:0};                 // screen = (world - o) * s
@@ -174,7 +181,7 @@ const mini=$('mini'),mctx=mini.getContext('2d');
 function resize(){map.width=innerWidth*devicePixelRatio;map.height=innerHeight*devicePixelRatio;
   map.style.width=innerWidth+'px';map.style.height=innerHeight+'px';fit();}
 addEventListener('resize',resize);
-function fit(){const s=Math.min(innerWidth/W,innerHeight/H)*0.96;
+function fit(){if(typeof killMomentum==='function')killMomentum();const s=Math.min(innerWidth/W,innerHeight/H)*0.96;
   cam={s,ox:W/2-innerWidth/(2*s),oy:H/2-innerHeight/(2*s)+30/s};}
 /* ── terrain tree from /api/graal/map ───────────────────── */
 let root=null,byId=new Map();
@@ -212,10 +219,15 @@ function layout(n){
   if(n.laid)return;n.laid=true;
   const kids=[...n.children.values()].sort((a,b)=>b.mass-a.mass);
   if(!kids.length)return;
-  // Insets are capped in SCREEN pixels (≈2px pad, ≈14px gutter) so deep nesting cannot stack
-  // fat borders into empty tracts; zoom-dependent, so layouts are invalidated on big zoom changes.
-  const pad=Math.min(Math.min(n.rect.w,n.rect.h)*0.015, 2.5/cam.s);
-  const title=(n!==root&&n.rect.h*cam.s>40)?Math.min(14/cam.s,n.rect.h*0.12):0;
+  // Insets are PROPORTIONAL (self-similar at every depth) and therefore
+  // zoom-INDEPENDENT: world rects never move once laid. The old pixel-capped
+  // (…/cam.s) insets forced re-layout on zoom-band crossings, which shifted
+  // every rect in world space mid-dive — the camera held the point under the
+  // mouse, but the CONTENT at that point fled ("zoom repulsion"). Whether the
+  // title TEXT is legible stays a draw-time decision; the band reservation
+  // itself is a fixed fraction (sub-pixel when zoomed out, harmless).
+  const pad=Math.min(n.rect.w,n.rect.h)*0.015;
+  const title=(n!==root)?n.rect.h*0.07:0;
   let x=n.rect.x+pad,y=n.rect.y+pad+title,w=n.rect.w-2*pad,h=n.rect.h-2*pad-title;
   if(w<=0||h<=0){for(const k of kids)k.rect={x:n.rect.x,y:n.rect.y,w:0,h:0};return;}
   const total=kids.reduce((s,k)=>s+k.mass,0)||1;
@@ -419,15 +431,16 @@ function wantPreview(n){
   if(previewCache.size>400){const k=previewCache.keys().next().value;previewCache.delete(k);}
 }
 /* ── render ─────────────────────────────────────────────── */
-let hover=null,pings=[],shake=0,layoutScale=1;
+let hover=null,pings=[],shake=0;
 function draw(){
+  tickMomentum(); // kinetic pan/zoom glide (no-op when still, off under reduced motion)
   const dpr=devicePixelRatio;ctx.setTransform(dpr,0,0,dpr,0,0);
   ctx.fillStyle=SKINS[skin].bg;ctx.fillRect(0,0,innerWidth,innerHeight);
   let sx=0,sy=0;
   if(shake>0&&!reduced){sx=(Math.random()-0.5)*shake;sy=(Math.random()-0.5)*shake;shake*=0.85;if(shake<0.4)shake=0;}
   ctx.save();ctx.translate(sx,sy);
-  // Re-lay when zoom moved enough that cached pixel-capped insets are stale.
-  if(root&&(cam.s/layoutScale>1.6||layoutScale/cam.s>1.6)){layoutScale=cam.s;invalidate(root);root.rect={x:0,y:0,w:W,h:H};}
+  // Layouts are zoom-independent now — NEVER re-lay on zoom: a re-lay moves world
+  // rects and rips the content out from under the wheel's anchored cursor point.
   if(root){if(mode==='map')drawNode(root,0);else if(mode==='graph')drawGraph();else drawTree();}
   // pings
   const now=performance.now();
@@ -543,31 +556,213 @@ function drawMini(){
 }
 /* ── input ──────────────────────────────────────────────── */
 let dragging=false,lx=0,ly=0,moved=0;
+/* momentum: pan velocity in SCREEN px/ms (converted by /cam.s at apply time so a
+   glide keeps its on-screen feel through zoom changes); zoom velocity in log-scale
+   per 16.7ms, anchored at the last wheel position so the glide keeps diving into
+   the same point the wheel math holds fixed. Off under prefers-reduced-motion. */
+const mom={vx:0,vy:0,zv:0,ax:0,ay:0};
+let velX=0,velY=0,velT=0;
+function killMomentum(){mom.vx=0;mom.vy=0;mom.zv=0;}
 map.addEventListener('mousedown',e=>{
+  killMomentum();
   if(mode==='graph'){const wx=cam.ox+e.clientX/cam.s,wy=cam.oy+e.clientY/cam.s;
     gDrag=gNodes.find(g=>{const dx=g.x-wx,dy=g.y-wy;return dx*dx+dy*dy<Math.pow(g.r+6,2);})||null;
     if(gDrag){moved=0;return;}}
-  dragging=true;moved=0;lx=e.clientX;ly=e.clientY;map.classList.add('drag');});
-addEventListener('mouseup',()=>{dragging=false;gDrag=null;map.classList.remove('drag');});
+  dragging=true;moved=0;lx=e.clientX;ly=e.clientY;velX=0;velY=0;velT=performance.now();map.classList.add('drag');});
+addEventListener('mouseup',()=>{
+  if(dragging&&!reduced&&performance.now()-velT<80){mom.vx=velX;mom.vy=velY;} // recent flick → glide
+  dragging=false;gDrag=null;map.classList.remove('drag');});
 map.addEventListener('mousemove',e=>{
   if(gDrag){gDrag.x=cam.ox+e.clientX/cam.s;gDrag.y=cam.oy+e.clientY/cam.s;return;}
   if(dragging){const dx=e.clientX-lx,dy=e.clientY-ly;moved+=Math.abs(dx)+Math.abs(dy);
-    cam.ox-=dx/cam.s;cam.oy-=dy/cam.s;lx=e.clientX;ly=e.clientY;}
+    cam.ox-=dx/cam.s;cam.oy-=dy/cam.s;lx=e.clientX;ly=e.clientY;
+    const now=performance.now(),dt=Math.max(1,now-velT);
+    velX=0.75*velX+0.25*(dx/dt);velY=0.75*velY+0.25*(dy/dt);velT=now;} // low-passed flick velocity
   hover=hit(e.clientX,e.clientY);
   $('crumb').textContent=hover?pathOf(hover)+'  ·  '+(hover.leaf?fmtBytes(hover.bytes):hover.docs.toLocaleString()+' docs, '+fmtBytes(hover.bytes)):'';
 });
 map.addEventListener('wheel',e=>{e.preventDefault();
   const f=e.deltaY<0?1.18:1/1.18, wx=cam.ox+e.clientX/cam.s, wy=cam.oy+e.clientY/cam.s;
   cam.s=Math.min(Math.max(cam.s*f,0.2),4000);
-  cam.ox=wx-e.clientX/cam.s;cam.oy=wy-e.clientY/cam.s;},{passive:false});
+  cam.ox=wx-e.clientX/cam.s;cam.oy=wy-e.clientY/cam.s;
+  if(!reduced){mom.ax=e.clientX;mom.ay=e.clientY;               // glide anchor = wheel point
+    mom.zv=Math.max(-0.12,Math.min(0.12,mom.zv+Math.log(f)*0.28));mom.vx=0;mom.vy=0;}
+},{passive:false});
+/* per-frame momentum integration — called from draw(); frame-rate independent decay */
+let momT=performance.now();
+function tickMomentum(){
+  const now=performance.now(),dt=Math.min(50,now-momT);momT=now;
+  if(reduced)return;
+  const k=dt/16.7;
+  if(!dragging&&(Math.abs(mom.vx)>0.002||Math.abs(mom.vy)>0.002)){
+    cam.ox-=mom.vx*dt/cam.s;cam.oy-=mom.vy*dt/cam.s;
+    const fr=Math.pow(0.93,k);mom.vx*=fr;mom.vy*=fr;
+    if(Math.abs(mom.vx)<=0.002&&Math.abs(mom.vy)<=0.002){mom.vx=0;mom.vy=0;}
+  }
+  if(Math.abs(mom.zv)>0.0008){
+    const f=Math.exp(mom.zv*k), wx=cam.ox+mom.ax/cam.s, wy=cam.oy+mom.ay/cam.s;
+    cam.s=Math.min(Math.max(cam.s*f,0.2),4000);
+    cam.ox=wx-mom.ax/cam.s;cam.oy=wy-mom.ay/cam.s;
+    mom.zv*=Math.pow(0.88,k);
+    if(Math.abs(mom.zv)<=0.0008)mom.zv=0;
+  }
+}
 map.addEventListener('dblclick',e=>{
   if(mode==='graph'){const wx=cam.ox+e.clientX/cam.s,wy=cam.oy+e.clientY/cam.s;
     const g=gNodes.find(g=>{const dx=g.x-wx,dy=g.y-wy;return dx*dx+dy*dy<Math.pow(g.r+6,2);});
     if(g){sel=g.n;mode='map';flyTo(g.n);}return;}
   const n=hit(e.clientX,e.clientY);if(n)flyTo(n.leaf?(n.parent||n):n);});
 map.addEventListener('click',e=>{if(moved>4)return;const n=hit(e.clientX,e.clientY);if(n&&n.leaf)openDoc(n.id);});
-mini.addEventListener('click',e=>{const r=mini.getBoundingClientRect();
+/* right-click a project-db territory: HIERARCHY KILL — unmount db + ledger + clone (CAS blobs stay) */
+map.addEventListener('contextmenu',e=>{
+  const n=hit(e.clientX,e.clientY);if(!n)return;
+  let top=n;while(top.parent&&top.parent!==root)top=top.parent;
+  if(!PROJECT_DBS.has(top.name))return;
+  e.preventDefault();
+  if(!confirm('Kill project db /'+top.name+'?\nUnmounts the db, ledger entry and forge-home clone. CAS blobs stay (content-addressed).'))return;
+  fetch('/api/projects/'+encodeURIComponent(top.name),{method:'DELETE'})
+    .then(r=>r.json())
+    .then(r=>{
+      if(r.verdict==='unmounted'){river('deopt','project db /'+top.name+' killed');sel=null;loadMap();}
+      else river('deopt','kill refused: '+(r.error||'?'));
+    })
+    .catch(err=>river('deopt','kill failed: '+err));
+});
+mini.addEventListener('click',e=>{killMomentum();const r=mini.getBoundingClientRect();
   cam.ox=(e.clientX-r.left)/ (200/W)-innerWidth/(2*cam.s);cam.oy=(e.clientY-r.top)/(124/H)-innerHeight/(2*cam.s);});
+/* ── drop a directory hierarchy → it becomes a NEW PROJECT DB and a top-level territory ── */
+addEventListener('dragover',e=>{e.preventDefault();});
+addEventListener('drop',async e=>{
+  e.preventDefault();
+  const dt=e.dataTransfer;if(!dt)return;
+  // Lane 1: sources that expose real host paths (uri-list) → server-side mount.
+  const raw=(dt.getData('text/uri-list')||dt.getData('text/plain')||'').split('\n').map(u=>u.trim()).filter(Boolean);
+  const paths=[];
+  for(const u of raw){
+    if(u.startsWith('file://')){try{paths.push(decodeURIComponent(new URL(u).pathname));}catch(_){paths.push(decodeURIComponent(u.replace(/^file:\/\//,'')));}}
+  }
+  if(paths.length){
+    for(const p of paths){
+      river('commit','mounting '+p+' …');
+      try{
+        const r=await(await fetch('/api/projects',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({path:p})})).json();
+        if(r.verdict==='ok'){river('commit','project db /'+r.name+' — '+r.docs+' docs ('+r.kind+')');await landTerritory(r.name);}
+        else if(r.verdict==='mounting'){
+          // detached mount: the daemon absorbs off-request (multi-GB safe); poll for the territory
+          const guess=(p.split('/').filter(Boolean).pop()||'').toLowerCase().replace(/[^a-z0-9._-]+/g,'-').replace(/^[-.]+|[-.]+$/g,'');
+          river('commit','mounting in the daemon — big folders take a while ('+guess+')');
+          pollTerritory(guess);
+        }
+        else river('deopt','mount refused: '+(r.detail||r.error||'?'));
+      }catch(err){river('deopt','mount failed: '+err);}
+    }
+    return;
+  }
+  // Lane 2: Chrome hides host paths — WALK the dropped hierarchy via the entry API
+  // and UPLOAD the bytes; the drop carries the hierarchy itself.
+  const entries=[...(dt.items||[])].map(it=>it.webkitGetAsEntry&&it.webkitGetAsEntry()).filter(Boolean);
+  if(!entries.length){$('crumb').textContent='nothing mountable in that drop';return;}
+  for(const entry of entries){
+    if(!entry.isDirectory){river('deopt','drop a FOLDER — single files go to the ingest lane');continue;}
+    river('commit','uploading '+entry.name+'/ …');
+    try{
+      const files=await walkEntries(entry,'');
+      // Chrome hides .git from the walker — classify by build-system markers instead
+      const kind=files.some(f=>PROJECT_MARKERS.test(f.rel))?'project':'assets';
+      const b=await(await fetch('/_project/'+encodeURIComponent(entry.name.toLowerCase())+'/begin?kind='+kind,{method:'POST'})).json();
+      if(b.verdict!=='ok'){river('deopt','upload refused: '+(b.detail||'?'));continue;}
+      const db=b.name;
+      river('commit',db+' classified '+(kind==='project'?'PROJECT (build markers)':'assets pile'));
+      let sent=0,skipped=0,failed=0;
+      // pack small files into ~3MB framed batches: one round trip per batch, not per file
+      let frames=[],packed=0;
+      async function flushBatch(){
+        if(!frames.length)return;
+        const blob=new Blob(frames);frames=[];packed=0;
+        const r=await fetch('/_project/'+encodeURIComponent(db)+'/putBatch',
+          {method:'POST',headers:{'Content-Type':'application/octet-stream'},body:blob});
+        if(r.ok){const j=await r.json();sent+=j.stored||0;failed+=j.failed||0;river('commit',db+': '+sent+'/'+files.length);}
+        else failed++;
+      }
+      function frame(rel,buf){
+        const pb=new TextEncoder().encode(rel);
+        const h=new DataView(new ArrayBuffer(4));h.setInt32(0,pb.length);
+        const l=new DataView(new ArrayBuffer(8));l.setBigInt64(0,BigInt(buf.byteLength));
+        frames.push(h.buffer,pb,l.buffer,buf);packed+=12+pb.length+buf.byteLength;
+      }
+      for(const f of files){
+        if(f.file.size>3500000){skipped++;continue;} // request cap ~4MB
+        frame(f.rel,await f.file.arrayBuffer());
+        if(packed>3000000||frames.length>=256)await flushBatch();
+      }
+      await flushBatch();
+      river('commit','project db /'+db+' — '+sent+' docs uploaded'+(skipped?' ('+skipped+' >3.5MB skipped)':'')+(failed?' · '+failed+' FAILED':''));
+      await landTerritory(db);
+    }catch(err){river('deopt','upload failed: '+err);}
+  }
+});
+const PROJECT_MARKERS=/^(settings\.gradle(\.kts)?|build\.gradle(\.kts)?|package\.json|Cargo\.toml|CMakeLists\.txt|Makefile|pom\.xml|go\.mod|pyproject\.toml|setup\.py|mix\.exs|Package\.swift|.*\.xcodeproj\/.*)$/;
+const SKIP_DIRS=new Set(['node_modules','build','target','dist','out','__pycache__','venv','.venv','.git','.gradle','.idea','DerivedData']);
+async function walkEntries(dirEntry,prefix){
+  const out=[];
+  const reader=dirEntry.createReader();
+  while(true){
+    const batch=await new Promise((res,rej)=>reader.readEntries(res,rej));
+    if(!batch.length)break;
+    for(const en of batch){
+      if(en.isFile){
+        const file=await new Promise((res,rej)=>en.file(res,rej));
+        out.push({rel:prefix+en.name,file});
+      }else if(en.isDirectory){ if(SKIP_DIRS.has(en.name))continue;
+        out.push(...await walkEntries(en,prefix+en.name+'/'));
+      }
+    }
+  }
+  return out;
+}
+async function landTerritory(name){
+  await loadMap();
+  requestAnimationFrame(()=>{layout(root);const t=root.children.get(name);if(t)flyTo(t);});
+}
+/* ── ⚑ feedback: opens a GitHub issue PREFILLED with this view's coordinates ── */
+function forgeIssue(surface,coords){
+  const body='**Surface:** '+surface+'\n**URL:** '+location.href+'\n**Coordinates:**\n```json\n'+
+    JSON.stringify(coords,null,1)+'\n```\n\n**What I did:**\n\n**What happened:**\n\n**What I expected:**\n';
+  window.open('https://github.com/jnorthrup/TrikeShed/issues/new?labels=quickstart-feedback'+
+    '&title='+encodeURIComponent('['+surface+'] ')+'&body='+encodeURIComponent(body),'_blank');
+}
+function qsInstall(){
+ const d=document.createElement('div');d.dataset.qs='1';
+ d.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:99;display:flex;align-items:center;justify-content:center';
+ d.innerHTML='<div style="background:#11151e;border:1px solid #f29111;border-radius:8px;padding:18px 22px;max-width:580px;color:#d8dce6;font:13px monospace">'
+  +'<b style="color:#f29111">Run TrikeShed in anger — five minutes, one port</b>'
+  +'<pre id="qsCmds" style="background:#0b0e14;padding:10px;border-radius:4px;margin:10px 0;user-select:text;white-space:pre-wrap">git clone git@github.com:jnorthrup/TrikeShed.git && cd TrikeShed\n./gradlew hotswapFeed\nbin/oroboros-daemon --watch</pre>'
+  +'<div style="color:#7b8496;margin-bottom:10px">then open http://localhost:8888 — drop a REAL folder on this terrain, wire /panels, abuse the board.</div>'
+  +'<button onclick="navigator.clipboard.writeText(document.getElementById(\'qsCmds\').textContent)" style="background:#161b26;border:1px solid #3ddc84;color:#3ddc84;border-radius:4px;padding:4px 12px;cursor:pointer;font:inherit">copy commands</button>'
+  +'<a href="https://github.com/jnorthrup/TrikeShed#run-it-in-anger--please" target="_blank" style="color:#3fd0ff;margin-left:10px">README ↗</a>'
+  +'<a onclick="document.querySelector(\'div[data-qs]\').remove()" style="color:#7b8496;margin-left:14px;cursor:pointer">close</a></div>';
+ d.onclick=e=>{if(e.target===d)d.remove()};
+ document.body.appendChild(d);
+}
+document.getElementById('qsLink').addEventListener('click',qsInstall);
+document.getElementById('fbLink').addEventListener('click',()=>{
+  forgeIssue('graal',{
+    mode:mode,layer:layer,skin:skin,fog:fog,
+    cam:{s:+cam.s.toFixed(3),ox:Math.round(cam.ox),oy:Math.round(cam.oy)},
+    focus:sel?pathOf(sel):(hover?pathOf(hover):null),
+    crumb:($('crumb').textContent||'').slice(0,160),
+    projectDbs:[...PROJECT_DBS],docs:root?root.docs:0,
+  });
+});
+function pollTerritory(name,tries){
+  tries=tries||0;
+  if(tries>120){river('deopt','mount of '+name+' never landed — check the daemon log');return;}
+  setTimeout(async()=>{
+    await loadMap();
+    if(PROJECT_DBS.has(name)){river('commit','project db /'+name+' landed');await landTerritory(name);}
+    else pollTerritory(name,tries+1);
+  },5000);
+}
 addEventListener('keydown',e=>{
   if(e.key==='0')fit();
   if(e.key==='p'||e.key==='P')togglePoints();
@@ -595,6 +790,7 @@ function hit(cx,cy){
 }
 function pathOf(n){const parts=[];while(n&&n!==root){parts.unshift(n.name);n=n.parent;}return parts.join('/');}
 function flyTo(n){
+  killMomentum(); // the fly animation owns the camera; a live glide would fight it
   const r=n.rect,margin=0.94;
   const s=Math.min(innerWidth/r.w,innerHeight/r.h)*margin;
   const tx=r.x+r.w/2-innerWidth/(2*s), ty=r.y+r.h/2-innerHeight/(2*s);
@@ -711,7 +907,7 @@ async function openDoc(id){
     return;
   }
   let doc=null;
-  try{doc=await (await fetch('/'+DB+'/'+id.split('/').map(encodeURIComponent).join('/'))).json();}
+  try{doc=await (await fetch(dbUrl(id))).json();}
   catch(e){$('docBody').textContent='fetch failed: '+e;return;}
   const att=doc._attachments&&doc._attachments.content;
   // ── header: path, rev/cid as chips, bytes, kolmogorov gauge ──
@@ -747,7 +943,7 @@ async function projectBytes(id,ct,ext){
   const proj=document.getElementById('proj');if(!proj)return;
   ct=ct||'';ext=ext||extOf(id);
   try{
-    const r=await fetch('/'+DB+'/'+id.split('/').map(encodeURIComponent).join('/')+'/content');
+    const r=await fetch(dbUrl(id)+'/content');
     if(!r.ok){proj.textContent='no content ('+r.status+')';return;}
     const buf=await r.arrayBuffer();
     kolmogorov(buf,'kg');
@@ -1092,12 +1288,13 @@ async function productRows(){
 }
 async function loadMap(){
   try{const m=await (await fetch('/api/graal/map')).json();
+    PROJECT_DBS=new Set(m.dbs||[]);
     const prod=await productRows();
     buildTree((m.rows||[]).concat(prod));$('crumb').textContent='terrain: '+((m.rows||[]).length.toLocaleString())+' documents — wheel to dive';}
   catch(e){$('crumb').textContent='map fetch failed: '+e;}
   setTimeout(loadMap,30000);
 }
-resize();loadMap();pollVitals();pollVms();loadAot();connectSse();requestAnimationFrame(draw);
+resize();$('crumb').textContent='drop lane v2 armed — drag a folder anywhere';loadMap();pollVitals();pollVms();loadAot();connectSse();requestAnimationFrame(draw);
 </script>
 </body>
 </html>

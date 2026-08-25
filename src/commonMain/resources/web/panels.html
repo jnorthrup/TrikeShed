@@ -86,6 +86,7 @@ button.stop{border-color:var(--err);color:var(--err)}
   <button id="exportBtn">export</button>
   <button id="importBtn">import</button>
   <button id="clearBtn">clear</button>
+  <button id="qsBtn" title="run the quickstart in anger" style="border-color:#3ddc84;color:#3ddc84">⚡</button>
   <button id="fbBtn" title="open a GitHub issue prefilled with this construction's coordinates" style="border-color:var(--warn);color:var(--warn)">⚑</button>
   <span id="status">idle</span>
 </div>
@@ -507,6 +508,18 @@ function showMenu(cx,cy){
 }
 viewport.addEventListener("dblclick",e=>{ if(e.target===viewport||e.target.id==="world"||e.target.id==="wires") showMenu(e.clientX,e.clientY); });
 viewport.addEventListener("contextmenu",e=>{ e.preventDefault(); showMenu(e.clientX,e.clientY); });
+document.getElementById("qsBtn").addEventListener("click",()=>{
+ var d=document.createElement("div");d.dataset.qs="1";
+ d.style.cssText="position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:99;display:flex;align-items:center;justify-content:center";
+ d.innerHTML='<div style="background:#11151e;border:1px solid #f29111;border-radius:8px;padding:18px 22px;max-width:580px;color:#d8dce6;font:13px monospace">'
+  +'<b style="color:#f29111">Run TrikeShed in anger — five minutes, one port</b>'
+  +'<pre id="qsCmds" style="background:#0b0e14;padding:10px;border-radius:4px;margin:10px 0;user-select:text;white-space:pre-wrap">git clone git@github.com:jnorthrup/TrikeShed.git && cd TrikeShed\n./gradlew hotswapFeed\nbin/oroboros-daemon --watch</pre>'
+  +'<button onclick="navigator.clipboard.writeText(document.getElementById(\'qsCmds\').textContent)" style="background:#161b26;border:1px solid #3ddc84;color:#3ddc84;border-radius:4px;padding:4px 12px;cursor:pointer;font:inherit">copy commands</button>'
+  +'<a href="https://github.com/jnorthrup/TrikeShed#run-it-in-anger--please" target="_blank" style="color:#3fd0ff;margin-left:10px">README ↗</a>'
+  +'<a onclick="document.querySelector(\'div[data-qs]\').remove()" style="color:#7b8496;margin-left:14px;cursor:pointer">close</a></div>';
+ d.onclick=function(e){if(e.target===d)d.remove()};
+ document.body.appendChild(d);
+});
 document.getElementById("fbBtn").addEventListener("click",()=>{
   const coords={
     panel:(document.getElementById("panelName").value||"(unsaved)"),
@@ -519,6 +532,8 @@ document.getElementById("fbBtn").addEventListener("click",()=>{
   window.open("https://github.com/jnorthrup/TrikeShed/issues/new?labels=quickstart-feedback"+
     "&title="+encodeURIComponent("[panels] ")+"&body="+encodeURIComponent(body),"_blank");
 });
+const PROJECT_MARKERS=/^(settings\.gradle(\.kts)?|build\.gradle(\.kts)?|package\.json|Cargo\.toml|CMakeLists\.txt|Makefile|pom\.xml|go\.mod|pyproject\.toml|setup\.py|mix\.exs|Package\.swift|.*\.xcodeproj\/.*)$/;
+const SKIP_DIRS=new Set(['node_modules','build','target','dist','out','__pycache__','venv','.venv','.git','.gradle','.idea','DerivedData']);
 async function panelsWalkEntries(dirEntry,prefix){
   const out=[]; const reader=dirEntry.createReader();
   while(true){
@@ -526,7 +541,7 @@ async function panelsWalkEntries(dirEntry,prefix){
     if(!batch.length)break;
     for(const en of batch){
       if(en.isFile){ out.push({rel:prefix+en.name,file:await new Promise((res,rej)=>en.file(res,rej))}); }
-      else if(en.isDirectory){ out.push(...await panelsWalkEntries(en,prefix+en.name+"/")); }
+      else if(en.isDirectory){ if(SKIP_DIRS.has(en.name))continue; out.push(...await panelsWalkEntries(en,prefix+en.name+"/")); }
     }
   }
   return out;
@@ -556,18 +571,33 @@ viewport.addEventListener("drop",async e=>{
       if(!entry.isDirectory){ say("drop a FOLDER to mount a project db"); continue; }
       say("uploading "+entry.name+"/ …");
       try{
-        const b=await(await fetch("/_project/"+encodeURIComponent(entry.name.toLowerCase())+"/begin",{method:"POST"})).json();
-        if(b.verdict!=="ok"){ say("upload refused: "+(b.detail||"?")); continue; }
         const files=await panelsWalkEntries(entry,"");
-        let sent=0,skipped=0;
+        const kind=files.some(f=>PROJECT_MARKERS.test(f.rel))?"project":"assets";
+        const b=await(await fetch("/_project/"+encodeURIComponent(entry.name.toLowerCase())+"/begin?kind="+kind,{method:"POST"})).json();
+        if(b.verdict!=="ok"){ say("upload refused: "+(b.detail||"?")); continue; }
+        let sent=0,skipped=0,failed=0;
+        let frames=[],packed=0;
+        async function flushBatch(){
+          if(!frames.length)return;
+          const blob=new Blob(frames);frames=[];packed=0;
+          const r=await fetch("/_project/"+encodeURIComponent(b.name)+"/putBatch",
+            {method:"POST",headers:{"Content-Type":"application/octet-stream"},body:blob});
+          if(r.ok){const j=await r.json();sent+=j.stored||0;failed+=j.failed||0;say(b.name+": "+sent+"/"+files.length);}
+          else failed++;
+        }
+        function frame(rel,buf){
+          const pb=new TextEncoder().encode(rel);
+          const h=new DataView(new ArrayBuffer(4));h.setInt32(0,pb.length);
+          const l=new DataView(new ArrayBuffer(8));l.setBigInt64(0,BigInt(buf.byteLength));
+          frames.push(h.buffer,pb,l.buffer,buf);packed+=12+pb.length+buf.byteLength;
+        }
         for(const f of files){
           if(f.file.size>3500000){skipped++;continue;}
-          const buf=await f.file.arrayBuffer();
-          const r=await fetch("/_project/"+encodeURIComponent(b.name)+"/put?path="+encodeURIComponent(f.rel),
-            {method:"POST",headers:{"Content-Type":"application/octet-stream"},body:buf});
-          if(r.ok){sent++; if(sent%25===0)say(b.name+": "+sent+"/"+files.length);}
+          frame(f.rel,await f.file.arrayBuffer());
+          if(packed>3000000||frames.length>=256)await flushBatch();
         }
-        say("project db /"+b.name+" — "+sent+" docs"+(skipped?" ("+skipped+" >3.5MB skipped)":""));
+        await flushBatch();
+        say("project db /"+b.name+" — "+sent+" docs"+(skipped?" ("+skipped+" >3.5MB skipped)":"")+(failed?" · "+failed+" FAILED":""));
         addNode("project.list",(e.clientX-view.x-viewport.getBoundingClientRect().left)/view.z,(e.clientY-40-view.y)/view.z);
       }catch(err){ say("upload failed: "+err); }
     }

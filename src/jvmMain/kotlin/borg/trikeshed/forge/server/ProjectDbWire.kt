@@ -98,14 +98,49 @@ class ProjectDbWire(
             // Finder names carry spaces; the client sends them percent-encoded ("My%20PDF%20Stash").
             // Decode BEFORE sanitize, or '%20' mangles into literal '-20' in the db name.
             val name = borg.trikeshed.utils.rfxhttp.CouchHttpSurface.percentDecode(segments[1])
+            val kind = borg.trikeshed.utils.rfxhttp.CouchHttpSurface
+                .parseQuery(path.substringAfter('?', ""))["kind"] ?: "assets"
             return when (segments[2]) {
-                "begin" -> runCatching { scopes.beginUpload(name) }.fold(
+                "begin" -> runCatching { scopes.beginUpload(name, kind) }.fold(
                     onSuccess = {
-                        System.err.println("[OROBOROS] project db upload begun: ${it.name}")
-                        json(200, """{"verdict":"ok","name":"${it.name}"}""")
+                        System.err.println("[OROBOROS] project db upload begun: ${it.name} (${it.kind})")
+                        json(200, """{"verdict":"ok","name":"${it.name}","kind":"${it.kind}"}""")
                     },
                     onFailure = { json(400, """{"verdict":"refused","detail":"${(it.message ?: "").replace('"', '\'')}"}""") },
                 )
+
+                // Batched puts: body = repeated [4B pathLen BE][path utf8][8B byteLen BE][bytes].
+                // One request carries ~3MB of small files — the fix for 10-files/sec
+                // sequential round-trip uploads (each frame still lands via uploadPut:
+                // CAS + manifest + mirror per entry, one HTTP turnaround total).
+                "putBatch" -> {
+                    val body = CouchWire.bodyOf(payload)
+                    if (body.isEmpty()) return json(400, """{"error":"empty body"}""")
+                    var off = 0
+                    var okCount = 0
+                    var failCount = 0
+                    fun i32(): Int {
+                        val v = ((body[off].toInt() and 0xFF) shl 24) or ((body[off + 1].toInt() and 0xFF) shl 16) or
+                            ((body[off + 2].toInt() and 0xFF) shl 8) or (body[off + 3].toInt() and 0xFF)
+                        off += 4; return v
+                    }
+                    fun i64(): Long {
+                        var v = 0L
+                        repeat(8) { v = (v shl 8) or (body[off + it].toLong() and 0xFF) }
+                        off += 8; return v
+                    }
+                    while (off + 12 <= body.size) {
+                        val pLen = i32()
+                        if (pLen <= 0 || off + pLen + 8 > body.size) { failCount++; break }
+                        val rel = body.copyOfRange(off, off + pLen).decodeToString(); off += pLen
+                        val bLen = i64().toInt()
+                        if (bLen < 0 || off + bLen > body.size) { failCount++; break }
+                        val bytes = body.copyOfRange(off, off + bLen); off += bLen
+                        runCatching { scopes.uploadPut(name, rel, bytes) }
+                            .fold({ okCount++ }, { failCount++ })
+                    }
+                    json(200, """{"verdict":"ok","stored":$okCount,"failed":$failCount}""")
+                }
 
                 "put" -> {
                     val rel = borg.trikeshed.utils.rfxhttp.CouchHttpSurface

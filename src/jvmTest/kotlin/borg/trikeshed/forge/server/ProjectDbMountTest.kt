@@ -161,13 +161,28 @@ class ProjectDbMountTest {
         val served = wire.route("GET", "/my-drop/sub/deep.pdf/content", req, null)
         assertEquals(64, served?.bytes?.size)
 
+        // batched puts: framed body = [4B pathLen][path][8B byteLen][bytes]…, one round trip
+        fun frame(rel: String, bytes: ByteArray): ByteArray {
+            val pb = rel.encodeToByteArray()
+            val out = java.io.ByteArrayOutputStream()
+            java.io.DataOutputStream(out).apply { writeInt(pb.size); write(pb); writeLong(bytes.size.toLong()); write(bytes) }
+            return out.toByteArray()
+        }
+        val batchBody = frame("batch/a.txt", ByteArray(10) { 3 }) + frame("batch/b.txt", ByteArray(20) { 4 })
+        val head = "POST /x HTTP/1.1\r\nContent-Type: application/octet-stream\r\n\r\n".toByteArray()
+        val batch = wire.route("POST", "/_project/my-drop/putBatch", head + batchBody, null)
+        assertEquals(200, batch?.status)
+        assertTrue(batch!!.body.contains("\"stored\":2"), "both framed files must land: ${batch.body}")
+        assertEquals(20, wire.route("GET", "/my-drop/batch/b.txt/content", req, null)?.bytes?.size)
+
         // uploads mirror to a browsable files/<name>/ twin (fs dedupes it against CAS)
         assertTrue(File(tmp, "files/my-drop/sub/deep.pdf").isFile, "upload must mirror under files/<name>/")
 
         // "restart": manifest + CAS rebuild the uploaded db with no source directory anywhere
         val h2 = harness(ledger, cas)
         assertTrue(h2.scopes.remountLedger() >= 1)
-        assertEquals(3, h2.registry.get("my-drop")?.docCount, "manifest replay must rebuild every uploaded doc")
+        // 2 direct puts + 1 wire put + 2 batched = 5
+        assertEquals(5, h2.registry.get("my-drop")?.docCount, "manifest replay must rebuild every uploaded doc")
     }
 
     @Test

@@ -138,5 +138,43 @@ async function deleteDoc(){
 function newDoc(){$('docid').value='';$('docbody').value='{\n  \n}';currentRev=null;$('att').innerHTML='';status('new document — set an _id and save');}
 firstPage();
 </script>
+<div style="position:fixed;bottom:8px;right:12px;z-index:80;display:flex;gap:12px;font:11px monospace">
+<a onclick="qsInstall()" style="color:#3ddc84;cursor:pointer" title="run the quickstart in anger">&#9889; install now</a>
+<a onclick="qsFeedback()" style="color:#ffb02e;cursor:pointer" title="open a GitHub issue prefilled from here">&#9873; feedback</a>
+</div>
+<script>
+function qsInstall(){
+ var d=document.createElement('div');d.dataset.qs='1';
+ d.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:99;display:flex;align-items:center;justify-content:center';
+ d.innerHTML='<div style="background:#11151e;border:1px solid #f29111;border-radius:8px;padding:18px 22px;max-width:580px;color:#d8dce6;font:13px monospace">'
+  +'<b style="color:#f29111">Run TrikeShed in anger &mdash; five minutes, one port</b>'
+  +'<pre id="qsCmds" style="background:#0b0e14;padding:10px;border-radius:4px;margin:10px 0;user-select:text;white-space:pre-wrap">git clone git@github.com:jnorthrup/TrikeShed.git &amp;&amp; cd TrikeShed
+./gradlew hotswapFeed
+bin/oroboros-daemon --watch</pre>'
+  +'<div style="color:#7b8496;margin-bottom:10px">then open http://localhost:8888 &mdash; drop a REAL folder on /graal, wire /panels, abuse the board. Every stumble is a bug we want.</div>'
+  +'<button onclick="navigator.clipboard.writeText(document.getElementById(\'qsCmds\').textContent)" style="background:#161b26;border:1px solid #3ddc84;color:#3ddc84;border-radius:4px;padding:4px 12px;cursor:pointer;font:inherit">copy commands</button> '
+  +'<a href="https://github.com/jnorthrup/TrikeShed#run-it-in-anger--please" target="_blank" style="color:#3fd0ff;margin-left:10px">README &#8599;</a>'
+  +'<a onclick="document.querySelector(\'div[data-qs]\').remove()" style="color:#7b8496;margin-left:14px;cursor:pointer">close</a></div>';
+ d.onclick=function(e){if(e.target===d)d.remove()};
+ document.body.appendChild(d);
+}
+function qsFeedback(){
+ var coords={prefix:(document.getElementById('prefix')||{}).value||'',doc:(document.getElementById('docid')||{}).value||''};
+ var b='**Surface:** futon
+**URL:** '+location.href+'
+**Coordinates:**
+```json
+'+JSON.stringify(coords,null,1)+'
+```
+
+**What I did:**
+
+**What happened:**
+
+**What I expected:**
+';
+ window.open('https://github.com/jnorthrup/TrikeShed/issues/new?labels=quickstart-feedback&title='+encodeURIComponent('[futon] ')+'&body='+encodeURIComponent(b),'_blank');
+}
+</script>
 </body>
 </html>

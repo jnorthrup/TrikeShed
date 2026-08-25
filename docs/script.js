@@ -172,7 +172,14 @@
       .then((res) => {
         if (res && res.status === 'queued') { noteSync('Offline — ' + batch.length + ' queued for sync'); return; }
         flushedCount += batch.length;
-        noteSync('Synced ' + flushedCount + (res && res.sequence != null ? '  ·  seq ' + res.sequence : ''));
+        const rejected = res && res.rejected ? res.rejected : 0;
+        noteSync('Synced ' + flushedCount +
+          (rejected ? '  ·  ' + rejected + ' rejected' : '') +
+          (res && res.sequence != null ? '  ·  seq ' + res.sequence : ''));
+        // The server verdict is the truth: reconcile optimistic board state.
+        // Force on rejection — the sequence may not have moved, but our optimism did.
+        if (res && rejected) hydrateBoard(true);
+        else if (res && res.sequence != null && res.sequence !== boardSequence) hydrateBoard();
       })
       .catch(() => noteSync('Local only — reactor unreachable'));
   }
@@ -182,23 +189,48 @@
     flushTimer = setTimeout(flushCommands, 400);
   }
 
-  function mutate(updater, kind) {
+  // Doc edits persist LOCALLY (localStorage is their store); only BOARD actions
+  // are commands — real JobCommands lowered server-side, no more ACK-and-drop
+  // Submits minted per keystroke.
+  function mutate(updater) {
     updater(state);
     saveState();
+  }
 
-    const jobId = uid();
-    const idempotencyKey = jobId + '-' + Date.now();
-    window.__forgeCommandQueue.push({
-      type: 'Submit',
-      kind: kind || 'mutate',
-      jobId: jobId,
-      idempotencyKey: idempotencyKey,
-      dependencies: [],
-      expectedRevision: null,
-      activePageId: state.activePageId,
-      view: state.view
-    });
+  // ── Board commands: the real spine (invoke → lowering → WAL → projection) ──
+  let boardSequence = null;
+
+  function queueBoardCommand(cmd) {
+    cmd.idempotencyKey = cmd.idempotencyKey || (cmd.jobId + '#ui#' + Date.now());
+    window.__forgeCommandQueue.push(cmd);
     scheduleFlush();
+  }
+
+  function hydrateBoard(force) {
+    fetch(BOARD_URL)
+      .then((r) => r.json())
+      .then((b) => {
+        if (!b || !Array.isArray(b.columns) || !Array.isArray(b.items)) return;
+        if (!force && boardSequence != null && b.sequence === boardSequence) return; // watermark: no change
+        boardSequence = b.sequence;
+        state.board = {
+          columns: b.columns.slice().sort((x, y) => (x.order || 0) - (y.order || 0))
+            .map((c) => ({ id: c.id, name: c.name, wipLimit: c.wipLimit, count: c.count })),
+          cards: b.items.map((it) => ({
+            id: it.id,
+            title: it.title || it.id,
+            column: it.status,
+            revision: it.revision,
+            meta: [
+              it.contested ? '⚡ contested' : '',
+              (it.attention != null) ? 'attn ' + Number(it.attention).toFixed(2) : '',
+            ].filter(Boolean).join('  ·  '),
+          })),
+        };
+        saveState();
+        if (state.view === 'board') renderBoard();
+      })
+      .catch(() => {}); // seed/local board stands until the daemon answers
   }
 
   window.addEventListener('online', () => { noteSync('Back online'); scheduleFlush(); });
@@ -602,9 +634,13 @@
           cardEl.appendChild(meta);
         }
         cardEl.addEventListener('click', () => {
-          // cycle columns on click for a lightweight gesture
+          // cycle columns on click — a REAL Move command now (optimistic UI,
+          // the flush verdict re-hydrates on rejection or sequence advance)
           const order = state.board.columns.map((c) => c.id);
           const next = order[(order.indexOf(card.column) + 1) % order.length];
+          if (card.revision != null) {
+            queueBoardCommand({ type: 'move', jobId: card.id, expectedRevision: card.revision, toColumn: next });
+          }
           mutate(() => { card.column = next; });
           renderBoard();
         });
@@ -617,7 +653,11 @@
       addBtn.textContent = '+ New';
       addBtn.setAttribute('aria-label', 'Add new card to ' + col.name);
       addBtn.addEventListener('click', () => {
-        mutate((s) => { s.board.cards.push({ id: uid(), title: '', column: col.id, meta: '' }); });
+        const title = (window.prompt('Card title') || '').trim();
+        if (!title) return;
+        const jobId = 'card-' + uid();
+        queueBoardCommand({ type: 'submit', jobId: jobId, title: title });
+        mutate((s) => { s.board.cards.push({ id: jobId, title: title, column: col.id, revision: 1, meta: '' }); });
         renderBoard();
       });
       colEl.appendChild(addBtn);
@@ -1245,7 +1285,7 @@
         btn.removeAttribute('aria-current');
       }
     }
-    if (view === 'board') renderBoard();
+    if (view === 'board') { renderBoard(); hydrateBoard(); }
     if (view === 'graph') { setGraphMode(graphMode); }
     if (view === 'sheet') renderSheet();
     if (view === 'shape') renderShape();
@@ -1300,4 +1340,49 @@
   }
 
   renderAll();
+
+  // ⚑ feedback: a GitHub issue PREFILLED with this view's coordinates.
+  (function mountFeedback() {
+    const a = document.createElement('a');
+    a.textContent = '⚑ feedback';
+    a.style.cssText = 'position:fixed;bottom:8px;right:12px;z-index:80;color:#ffb02e;cursor:pointer;font:11px monospace;opacity:.8';
+    a.title = 'open a GitHub issue prefilled with where you are right now';
+    a.addEventListener('click', () => {
+      const coords = {
+        view: state.view,
+        page: state.activePageId,
+        boardSequence: boardSequence,
+        cards: state.board && state.board.cards ? state.board.cards.length : 0,
+        columns: state.board && state.board.columns ? state.board.columns.map((c) => c.id) : [],
+      };
+      const body = '**Surface:** board\n**URL:** ' + location.href + '\n**Coordinates:**\n```json\n' +
+        JSON.stringify(coords, null, 1) + '\n```\n\n**What I did:**\n\n**What happened:**\n\n**What I expected:**\n';
+      window.open('https://github.com/jnorthrup/TrikeShed/issues/new?labels=quickstart-feedback' +
+        '&title=' + encodeURIComponent('[board] ') + '&body=' + encodeURIComponent(body), '_blank');
+    });
+    document.body.appendChild(a);
+    const inst = document.createElement('a');
+    inst.textContent = '\u26A1 install now';
+    inst.style.cssText = 'position:fixed;bottom:8px;right:110px;z-index:80;color:#3ddc84;cursor:pointer;font:11px monospace;opacity:.85';
+    inst.title = 'run the quickstart in anger';
+    inst.addEventListener('click', () => {
+      const d = document.createElement('div');
+      d.dataset.qs = '1';
+      d.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:99;display:flex;align-items:center;justify-content:center';
+      d.innerHTML = '<div style="background:#11151e;border:1px solid #f29111;border-radius:8px;padding:18px 22px;max-width:580px;color:#d8dce6;font:13px monospace">' +
+        '<b style="color:#f29111">Run TrikeShed in anger \u2014 five minutes, one port</b>' +
+        '<pre id="qsCmds" style="background:#0b0e14;padding:10px;border-radius:4px;margin:10px 0;user-select:text;white-space:pre-wrap">git clone git@github.com:jnorthrup/TrikeShed.git && cd TrikeShed\n./gradlew hotswapFeed\nbin/oroboros-daemon --watch</pre>' +
+        '<button onclick="navigator.clipboard.writeText(document.getElementById(\'qsCmds\').textContent)" style="background:#161b26;border:1px solid #3ddc84;color:#3ddc84;border-radius:4px;padding:4px 12px;cursor:pointer;font:inherit">copy commands</button>' +
+        '<a href="https://github.com/jnorthrup/TrikeShed#run-it-in-anger--please" target="_blank" style="color:#3fd0ff;margin-left:10px">README \u2197</a>' +
+        '<a onclick="document.querySelector(\'div[data-qs]\').remove()" style="color:#7b8496;margin-left:14px;cursor:pointer">close</a></div>';
+      d.addEventListener('click', (e) => { if (e.target === d) d.remove(); });
+      document.body.appendChild(d);
+    });
+    document.body.appendChild(inst);
+  })();
+
+  // Live board: hydrate from the WAL-backed store at load, then poll on a
+  // watermark (sequence unchanged = no re-render) while the board is visible.
+  hydrateBoard();
+  setInterval(() => { if (state.view === 'board' && !document.hidden) hydrateBoard(); }, 15000);
 })();

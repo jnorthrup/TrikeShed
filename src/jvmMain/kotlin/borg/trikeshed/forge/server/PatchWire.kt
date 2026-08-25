@@ -172,22 +172,25 @@ class ProjectScopes(
      * (relpath TAB cid TAB length) beside the ledger — blobs are already CAS
      * citizens, so boot rebuilds the db from the manifest alone.
      */
-    suspend fun beginUpload(rawName: String): Scope = mutex.withLock {
+    suspend fun beginUpload(rawName: String, kind: String = "assets"): Scope = mutex.withLock {
         val registry = projectDbs ?: throw IllegalStateException("project dbs not wired")
         val name = rawName.lowercase().replace(Regex("[^a-z0-9._-]+"), "-").trim('-', '.')
         require(name.isNotBlank()) { "name '$rawName' sanitizes to nothing" }
         require(scopes.none { it.name == name }) { "scope '$name' already mounted" }
         registry.refusalFor(name)?.let { throw IllegalArgumentException(it) }
+        // Chrome hides dot-dirs from the walker, so `.git` can never be the signal here:
+        // the CLIENT classifies by build-system markers and tells us. git|project → "git".
+        val k = if (kind == "git" || kind == "project") "git" else "assets"
         val store = borg.trikeshed.couch.CouchStoreFactory.casBacked(casStore)
         val db = borg.trikeshed.couch.CouchDatabase(name, store, casStore)
         val gateway = CouchAttachmentGateway(store, casStore)
         registry.register(
-            ProjectDb(name, "@upload", "upload", db, store, gateway,
+            ProjectDb(name, "@upload", k, db, store, gateway,
                 borg.trikeshed.couch.CouchWireRouter(db, attachmentPrefix = "")),
         )
         manifestFileFor(name)?.parentFile?.mkdirs()
-        ledgerAppend(name, "upload", "@upload")
-        val scope = Scope(name, "@upload", "upload", "$name/", 0, 0, docs = 0)
+        ledgerAppend(name, k, "@upload")
+        val scope = Scope(name, "@upload", k, "$name/", 0, 0, docs = 0)
         scopes = scopes + scope
         scope
     }
@@ -256,47 +259,56 @@ class ProjectScopes(
         return null
     }
 
-    /** Rebuild an upload-kind db from its manifest: blobs come straight out of CAS. */
-    private suspend fun remountUpload(name: String): Boolean {
+    /**
+     * Rebuild an upload-kind db from its manifest: blobs come straight out of CAS.
+     * PER-LINE tolerant: a torn tail (kill -9 mid-append) or any malformed line is
+     * SKIPPED, never allowed to abort the replay — one bad line once zeroed a
+     * whole db's remount (whisper.cpp, 2026-08-25).
+     */
+    private suspend fun remountUpload(name: String, kind: String = "assets"): Boolean {
         val mf = manifestFileFor(name) ?: return false
         if (!mf.exists()) return false
-        val scope = beginUploadInternal(name) ?: return false
+        val scope = beginUploadInternal(name, kind) ?: return false
         var docs = 0
+        var skipped = 0
         for (line in mf.readLines()) {
-            val parts = line.split('\t')
-            if (parts.size < 2) continue
-            val bytes = casStore.get(borg.trikeshed.job.ContentId(parts[1])) ?: continue
-            val pdb = projectDbs?.get(name) ?: break
-            pdb.gateway.putAttachment(
-                borg.trikeshed.util.oroboros.OroborosAttachmentRef(
-                    path = parts[0],
-                    contentType = borg.trikeshed.util.io.ContentTypes.forPath(parts[0]),
-                    length = bytes.size.toLong(),
-                    contentId = borg.trikeshed.job.ContentId(parts[1]),
-                    agentId = "manifest-replay",
-                    revision = "upload",
-                    sequence = docs.toLong() + 1,
-                ),
-                bytes,
-            )
-            docs++
+            runCatching {
+                val parts = line.split('\t')
+                if (parts.size < 2) return@runCatching
+                val bytes = casStore.get(borg.trikeshed.job.ContentId(parts[1])) ?: return@runCatching
+                val pdb = projectDbs?.get(name) ?: return@runCatching
+                pdb.gateway.putAttachment(
+                    borg.trikeshed.util.oroboros.OroborosAttachmentRef(
+                        path = parts[0],
+                        contentType = borg.trikeshed.util.io.ContentTypes.forPath(parts[0]),
+                        length = bytes.size.toLong(),
+                        contentId = borg.trikeshed.job.ContentId(parts[1]),
+                        agentId = "manifest-replay",
+                        revision = "upload",
+                        sequence = docs.toLong() + 1,
+                    ),
+                    bytes,
+                )
+                docs++
+            }.onFailure { skipped++ }
         }
+        if (skipped > 0) System.err.println("[OROBOROS] project db $name manifest replay: $docs docs, $skipped malformed/missing lines skipped")
         scopes = scopes.map { if (it.name == name) it.copy(paths = docs, docs = projectDbs?.get(name)?.docCount ?: docs) else it }
         return true
     }
 
     /** beginUpload minus the ledger write (replay path). Null when already mounted/refused. */
-    private fun beginUploadInternal(name: String): Scope? {
+    private fun beginUploadInternal(name: String, kind: String = "assets"): Scope? {
         val registry = projectDbs ?: return null
         if (scopes.any { it.name == name } || registry.refusalFor(name) != null) return null
         val store = borg.trikeshed.couch.CouchStoreFactory.casBacked(casStore)
         val db = borg.trikeshed.couch.CouchDatabase(name, store, casStore)
         val gateway = CouchAttachmentGateway(store, casStore)
         registry.register(
-            ProjectDb(name, "@upload", "upload", db, store, gateway,
+            ProjectDb(name, "@upload", kind, db, store, gateway,
                 borg.trikeshed.couch.CouchWireRouter(db, attachmentPrefix = "")),
         )
-        val scope = Scope(name, "@upload", "upload", "$name/", 0, 0)
+        val scope = Scope(name, "@upload", kind, "$name/", 0, 0)
         scopes = scopes + scope
         return scope
     }
@@ -338,8 +350,9 @@ class ProjectScopes(
             if (parts.size < 3) continue
             val (name, kind, path) = parts
             if (scopes.any { it.name == name }) continue
-            if (kind == "upload") {
-                if (runCatching { remountUpload(name) }.getOrDefault(false)) ok++
+            // uploads are path-@upload (older ledgers: kind "upload"): rebuild from manifest+CAS
+            if (path == "@upload" || kind == "upload") {
+                if (runCatching { remountUpload(name, if (kind == "upload") "assets" else kind) }.getOrDefault(false)) ok++
                 continue
             }
             if (!File(path).isDirectory) continue
