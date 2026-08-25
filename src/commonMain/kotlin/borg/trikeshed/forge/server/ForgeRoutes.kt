@@ -137,9 +137,28 @@ object ForgeRoutes {
         return HttpForwarderResponse(202, body = json.encodeToByteArray())
     }
 
+    // The shell render re-parses the sheet seed via Confix on every call — ~45s of
+    // CPU once the store holds a full worktree. The shell is a SEED page (script.js
+    // hydrates live state over the APIs), so a short-TTL memo is semantically free
+    // and turns / from a 46-second request into a byte-copy.
+    @kotlin.concurrent.Volatile
+    private var shellCache: Pair<Long, ByteArray>? = null
+    private const val SHELL_TTL_MS = 60_000L
+
     fun shellHtml(userId: String = "jim"): HttpForwarderResponse {
+        val now = Clock.System.now().toEpochMilliseconds()
+        shellCache?.let { (at, bytes) ->
+            if (now - at < SHELL_TTL_MS) {
+                return HttpForwarderResponse(200, headers = mapOf("Content-Type" to "text/html; charset=utf-8"), body = bytes)
+            }
+        }
         val html = runCatching { ForgeApp.renderHtml(userId = userId) }
             .getOrElse { ex -> "<html><body><h1>Forge shell failed</h1><pre>${ex.message}</pre></body></html>" }
-        return HttpForwarderResponse(200, headers = mapOf("Content-Type" to "text/html; charset=utf-8"), body = html.encodeToByteArray())
+        val bytes = html.encodeToByteArray()
+        shellCache = now to bytes
+        return HttpForwarderResponse(200, headers = mapOf("Content-Type" to "text/html; charset=utf-8"), body = bytes)
     }
+
+    /** Boot-time prewarm so the FIRST / request is already served from the memo. */
+    fun prewarmShell(userId: String = "jim") { shellHtml(userId) }
 }

@@ -80,18 +80,27 @@ class IsALattice(val edges: Series<IsAEdge>) {
      * in BFS order (shallowest first).  This is the "staircase" read —
      * each step climbs one level in the IS-A hierarchy.
      */
-    fun supertypes(token: TypeToken): Series<TypeToken> {
+    fun supertypes(token: TypeToken, maxDepth: Int = Int.MAX_VALUE): Series<TypeToken> {
+        // Seed rides in visited: an edge cycling back to the seed (possible once
+        // prose-mined addLinkCheck edges enter the lattice) must neither pollute
+        // the result nor re-enqueue an already-walked frontier.
         val visited = LinkedHashSet<TypeToken>()
-        val queue = ArrayDeque<TypeToken>()
-        queue.add(token)
-        while (queue.isNotEmpty()) {
-            val cur = queue.removeFirst()
-            for (i in 0 until edges.size) {
-                val e = edges[i]
-                if (e.sub == cur && visited.add(e.sup)) queue.add(e.sup)
+        visited.add(token)
+        var frontier = ArrayDeque<TypeToken>().apply { add(token) }
+        var depth = 0
+        while (frontier.isNotEmpty() && depth < maxDepth) {
+            val next = ArrayDeque<TypeToken>()
+            while (frontier.isNotEmpty()) {
+                val cur = frontier.removeFirst()
+                for (i in 0 until edges.size) {
+                    val e = edges[i]
+                    if (e.sub == cur && visited.add(e.sup)) next.add(e.sup)
+                }
             }
+            frontier = next
+            depth++
         }
-        val result = visited.toList()
+        val result = visited.drop(1) // seed is a guard, not a supertype of itself
         return result.size j { i: Int -> result[i] }
     }
 
@@ -101,8 +110,9 @@ class IsALattice(val edges: Series<IsAEdge>) {
      */
     fun isA(sub: TypeToken, sup: TypeToken): Boolean {
         if (sub == sup) return true
-        // BFS from sub
+        // BFS from sub; seed guarded so a cycle through sub can't re-enqueue it.
         val visited = HashSet<TypeToken>()
+        visited.add(sub)
         val queue = ArrayDeque<TypeToken>()
         queue.add(sub)
         while (queue.isNotEmpty()) {

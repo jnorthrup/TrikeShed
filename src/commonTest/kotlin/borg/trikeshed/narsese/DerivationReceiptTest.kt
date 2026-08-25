@@ -26,7 +26,9 @@ class DerivationReceiptTest {
         assertEquals(ruleId, receipt.ruleId)
         assertEquals(termS, receipt.conclusionSubject)
         assertEquals(termP, receipt.conclusionPredicate)
-        assertEquals(premise1.cid j premise2.cid, receipt.premises)
+        // Join is identity-equality (anonymous object); compare components.
+        assertEquals(premise1.cid, receipt.premises.a)
+        assertEquals(premise2.cid, receipt.premises.b)
         assertEquals(evidence, receipt.evidence)
         assertEquals(evaluatorCid, receipt.evaluatorCid)
 

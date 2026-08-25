@@ -23,6 +23,11 @@ import kotlin.math.pow
  *   bits 20..39 → d
  *   bits  0..19 → q
  */
+@Deprecated(
+    "Dead twin: canonical BudgetCoord lives in borg.trikeshed.cursor (DenseTwins.kt) " +
+        "with pf/df/qf float accessors. Do not construct new ones here.",
+    ReplaceWith("borg.trikeshed.cursor.BudgetCoord"),
+)
 inline  class BudgetCoord(val packed: Long) {
 
     /** Priority — unpacked from bits 40..59. */

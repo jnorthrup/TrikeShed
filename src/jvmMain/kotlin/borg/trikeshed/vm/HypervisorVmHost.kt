@@ -43,11 +43,54 @@ class HypervisorVmHost(
             input = terminal.input,
             output = terminal.output,
             error = terminal.error,
+            world = spec.world.isNotEmpty() && trust == Trust.OWN,
         )
+        if (iso is borg.trikeshed.graal.subvm.GraalBtrfsSupervisor) seedWorld(iso, spec.world)
         if (iso is ProcessIsolate) terminal.bindInput(iso::pushInput)
         specs[spec.id] = spec
         emit(VmEvent.Spawned(spec.id, seq.incrementAndGet(), spec))
         return Handle(iso)
+    }
+
+    /**
+     * Copy each host directory's source/text files into the guest world at `/workspace/<dirname>`.
+     * Pure-python by construction: native artifacts (.so/.dylib/wheels/bytecode) never cross — the
+     * guest sees only what GraalPy can actually execute.
+     */
+    private fun seedWorld(iso: borg.trikeshed.graal.subvm.GraalBtrfsSupervisor, dirs: List<String>) {
+        val exts = setOf("py", "pyi", "toml", "ini", "cfg", "json", "txt", "yaml", "yml", "md")
+        val skipDirs = setOf(
+            ".git", ".venv", "__pycache__", "node_modules", "cas", "artifacts", "logs",
+            ".oroboros", ".pytest_cache", ".ruff_cache", ".mypy_cache", "docs", "data",
+        )
+        var files = 0; var bytes = 0L
+        for (d in dirs) {
+            val root = java.io.File(d)
+            if (!root.isDirectory) continue
+            val base = root.name
+            root.walkTopDown()
+                .onEnter { it.name !in skipDirs && !it.name.endsWith(".egg-info") }
+                .filter { it.isFile && (it.extension in exts || it.name == "py.typed") && it.length() < 4_000_000 }
+                .forEach { f ->
+                    val rel = f.relativeTo(root).invariantSeparatorsPath
+                    iso.put("/workspace/$base/$rel", guestSafe(f))
+                    files++; bytes += f.length()
+                }
+        }
+        System.err.println("[VMHOST] world seeded for ${iso.id}: $files files, ${bytes / 1024}KB from ${dirs.size} dirs")
+    }
+
+    /**
+     * GraalPy-safe overlay for seeded sources. GraalPy 25 implements Python 3.12; hosts run 3.14.
+     * PEP 758 (3.14) allows `except A, B:` unparenthesized — down-level it so 3.12 parses. Applied
+     * only to the guest COPY; the host tree is never touched.
+     */
+    private val pep758 = Regex("""(\bexcept\s+)([A-Za-z_][\w.]*(?:\s*,\s*[A-Za-z_][\w.]*)+)(\s*:)""")
+    private fun guestSafe(f: java.io.File): ByteArray {
+        if (f.extension != "py") return f.readBytes()
+        val text = f.readText()
+        val safe = pep758.replace(text) { m -> "${m.groupValues[1]}(${m.groupValues[2]})${m.groupValues[3]}" }
+        return safe.toByteArray()
     }
 
     override fun get(id: String): VmHandle? = hypervisor.find(id)?.let { Handle(it) }

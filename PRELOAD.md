@@ -394,13 +394,14 @@ re-entering add() (which re-checks the threshold and cascades).
 These are things PRELOAD describes that the code does not yet implement.
 They are TODOs for the code, not corrections to PRELOAD.
 
-- Cursor fancy indexing: `cursor[range]`, `cursor[IntArray]`,
-  `cursor["name","age"]`, `cursor[-"debug"]`, `join()`, `combine()` — zero
-  operator implementations in cursor/. Cursor typealias exists (Cursor.kt:103)
-  but the algebraic indexing layer is not built.
-- `↺` (leftIdentity): no standalone definition on Series<T>. Referenced in
-  RowVecSupport.kt:62 as `.leftIdentity` on ColumnMeta. The anchor symbol
-  exists in the doc but not as a usable operator.
-- Series.filter exists (Predicate.kt:10, Series.kt:638) but materializes an
-  IntArray before wrapping as Series. K's `&` is lazy. The port gap PRELOAD
-  describes is still open — the return type is correct but the laziness is not.
+- ~~Cursor fancy indexing~~ CLOSED Aug 24 2026: operator grammar lives in
+  cursor/CursorIndexing.kt (`cursor[1,3,2]` ordinal projection, `cursor["name","age"]`,
+  `cursor[-"debug"]` via ColumnExclusion value class + CharSequence.unaryMinus) as thin
+  delegates over the named CursorOps combinators; `cursor[range]`/`cursor[IntArray]` were
+  already covered by the generic Series gets (Join.kt range view is lazy); `join()`/
+  `combine()` already existed in CursorOps. Proof: CursorIndexingTest (7 tests).
+- ~~`↺` (leftIdentity)~~ STALE: standalone `T.`↺`` exists at Join.kt:91 over
+  `leftIdentity` at Join.kt:94. The Aug 08 observation no longer holds.
+- ~~Series.filter laziness~~ CLOSED Aug 24 2026: Series.kt filter now memoizes the
+  match scan behind `lazy {}` — no work at call time, one scan on first size/element
+  access (the K `where` vector, deferred). Predicate.kt `%` (rem) still scans eagerly.

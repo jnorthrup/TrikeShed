@@ -112,20 +112,27 @@ class Hypervisor(
         input: InputStream? = null,
         output: OutputStream? = null,
         error: OutputStream? = output,
+        /** OWN only: give the guest a private btrfs world (TrikeShedGraalVfs) instead of IOAccess.NONE. */
+        world: Boolean = false,
     ): GuestIsolate {
         require(!isolates.containsKey(id)) { "isolate '$id' exists" }
         val iso: GuestIsolate = when (trust) {
             Trust.OWN -> {
                 lateinit var trainer: LeafTrainer
-                val inproc = InProcessIsolate(
+                val guest: GuestIsolate = if (world) GraalBtrfsSupervisor(
                     id, facet, budget,
                     input = input, output = output, error = error,
                 ) { obs -> trainer.observe(obs); observed(id, facet, obs) }
+                else InProcessIsolate(
+                    id, facet, budget,
+                    input = input, output = output, error = error,
+                ) { obs -> trainer.observe(obs); observed(id, facet, obs) }
+                val inproc = if (guest is GraalBtrfsSupervisor) guest.guest else guest as InProcessIsolate
                 trainer = LeafTrainer(inproc, trainCalls, shadowCalls,
                     onTransition = { p, from, to -> land(id, facet, p.root, "phase", "$from→$to${p.demotedReason?.let { " ($it)" } ?: ""}", p.line, p.column, p.sourceName) },
                     onReceipt = { r -> record(r)?.let { land(id, facet, it.root, "delegate", it.toString(), -1, -1, null) } })
                 trainers[id] = trainer
-                inproc
+                guest
             }
             Trust.UNTRUSTED -> ProcessIsolate(id, facet, budget, terminalOutput = output, terminalError = error)
         }

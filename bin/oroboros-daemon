@@ -17,8 +17,25 @@
 #   --hermes-console           eagerly boot the VT220 panel (otherwise lazy)
 #   --aot-cache <file>         load an existing JDK 25 JEP 483 cache
 #   --aot-record <file>        train and write a cache when this daemon exits
+#   --boot-forge <path>        forge home holding the TrikeShed install (classpath manifest
+#                              + CAS); default $TRIKESHED_BOOT_FORGE or ~/.local/forge.
+#                              Used when the checkout's build dirs are absent — the runtime
+#                              classpath is hydrated from cas/sha256 per
+#                              .oroboros/manifests/classpath.tsv, no gradle required.
 set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+
+# --boot-forge is consumed here (pre-scan: it decides the classpath, which is
+# resolved before the main flag loop); everything else passes through untouched.
+BOOT_FORGE="${TRIKESHED_BOOT_FORGE:-$HOME/.local/forge}"
+_PASS=()
+_PREV=""
+for _a in "$@"; do
+  if [[ "$_PREV" == "--boot-forge" ]]; then BOOT_FORGE="$_a"; _PREV=""; continue; fi
+  if [[ "$_a" == "--boot-forge" ]]; then _PREV="$_a"; continue; fi
+  _PASS+=("$_a")
+done
+set -- ${_PASS[@]+"${_PASS[@]}"}
 
 LOG_DIR="$ROOT/logs"
 mkdir -p "$LOG_DIR"
@@ -39,21 +56,75 @@ CLASSES="$ROOT/build/live/classes"
 RESOURCES="$ROOT/build/processedResources/jvm/main"
 LIB="$ROOT/build/staging/lib"
 
-if [[ ! -d "$CLASSES" ]]; then
-    echo "missing $CLASSES; run: ./gradlew hotswapFeed" >&2
-    exit 1
-fi
-if [[ ! -d "$LIB" ]]; then
-    echo "missing $LIB; run: ./gradlew stageDaemonLib" >&2
-    exit 1
+# Materialize the classpath from a forge home's CAS per its manifest. The daemon
+# writes the manifest (kind\trelpath\tsha256hex\tlength) on every build-plane
+# absorb; blobs hardlink out of cas/sha256/<xx>/<rest> into .oroboros/runtime.
+# Idempotent: a matching manifest digest stamp skips the rebuild.
+hydrate_runtime() {
+    local forge="$1"
+    local manifest="$forge/.oroboros/manifests/classpath.tsv"
+    local runtime="$forge/.oroboros/runtime"
+    [[ -f "$manifest" ]] || return 1
+    local msha
+    msha="$(shasum -a 256 "$manifest" | cut -d' ' -f1)"
+    if [[ -f "$runtime/.manifest.sha" && "$(cat "$runtime/.manifest.sha")" == "$msha" ]]; then
+        return 0
+    fi
+    local fresh="$runtime.next.$$"
+    rm -rf "$fresh"
+    mkdir -p "$fresh"
+    local kind rel hex len blob dest
+    while IFS=$'\t' read -r kind rel hex len; do
+        [[ -z "$kind" || "$kind" == "#"* ]] && continue
+        blob="$forge/cas/sha256/${hex:0:2}/${hex:2}"
+        if [[ ! -f "$blob" ]]; then
+            echo "[oroboros-daemon] CAS blob missing for $kind/$rel ($hex)" >&2
+            rm -rf "$fresh"
+            return 1
+        fi
+        dest="$fresh/$kind/$rel"
+        mkdir -p "$(dirname "$dest")"
+        ln "$blob" "$dest" 2>/dev/null || cp "$blob" "$dest"
+    done < "$manifest"
+    echo "$msha" > "$fresh/.manifest.sha"
+    rm -rf "$runtime.prev"
+    [[ -d "$runtime" ]] && mv "$runtime" "$runtime.prev"
+    mv "$fresh" "$runtime"
+}
+
+# Classpath resolution, in preference order:
+#   1. checkout build dirs (dev mode: hotswapFeed keeps them live)
+#   2. forge-home hydration (no checkout build needed — the forge IS the install)
+#   3. gradle self-heal (cold checkout with no usable forge manifest)
+AGENT_JAR="$ROOT/build/libs/hotswap-agent.jar"
+HOTSWAP_WATCH="$ROOT/build/live"
+if [[ -d "$CLASSES" && -d "$LIB" ]]; then
+    CP="$CLASSES:$RESOURCES:$LIB/*"
+    AOT_HOME="$ROOT/build/live"; AOT_LIBDIR="$LIB"
+elif hydrate_runtime "$BOOT_FORGE"; then
+    RUNTIME="$BOOT_FORGE/.oroboros/runtime"
+    echo "[oroboros-daemon] classpath hydrated from forge $BOOT_FORGE" >&2
+    CP="$RUNTIME/classes:$RUNTIME/resources:$RUNTIME/lib/*"
+    AGENT_JAR="$RUNTIME/agent/hotswap-agent.jar"
+    HOTSWAP_WATCH="$RUNTIME"
+    AOT_HOME="$RUNTIME"; AOT_LIBDIR="$RUNTIME/lib"
+else
+    echo "[oroboros-daemon] no build dirs, no forge manifest at $BOOT_FORGE — priming via ./gradlew hotswapFeed" >&2
+    (cd "$ROOT" && ./gradlew hotswapFeed --console=plain)
+    if [[ ! -d "$CLASSES" || ! -d "$LIB" ]]; then
+        echo "still missing $CLASSES or $LIB after hotswapFeed" >&2
+        exit 1
+    fi
+    CP="$CLASSES:$RESOURCES:$LIB/*"
+    AOT_HOME="$ROOT/build/live"; AOT_LIBDIR="$LIB"
 fi
 
-# Wildcard expansion happens after the colon, so we quote it.
-# hotswapFeed rsyncs only compiled classes; jvm resources (web/*, META-INF/services) ride the
-# processedResources dir directly so the Graal console page and static assets resolve.
-CP="$CLASSES:$RESOURCES:$LIB/*"
-
-DAEMON_JVM_ARGS=("-javaagent:$ROOT/build/libs/hotswap-agent.jar=$ROOT/build/live")
+DAEMON_JVM_ARGS=()
+if [[ -f "$AGENT_JAR" ]]; then
+    DAEMON_JVM_ARGS+=("-javaagent:$AGENT_JAR=$HOTSWAP_WATCH")
+else
+    echo "[oroboros-daemon] hotswap-agent.jar not found ($AGENT_JAR); running without hot-swap" >&2
+fi
 
 # HTX egress allowlist (see JvmChannelOperations.connect): BrainClient fails
 # over across these provider hosts; without them the GUIDE brain cannot
@@ -90,6 +161,30 @@ if [[ ${#AOT_OPTS[@]} -eq 0 ]]; then
     AOT_OPTS=("-XX:AOTCache=$TRIKESHED_AOT_CACHE")
   elif [[ -n "${TRIKESHED_AOT_CACHE_OUTPUT:-}" ]]; then
     AOT_OPTS=("-XX:AOTCacheOutput=$TRIKESHED_AOT_CACHE_OUTPUT")
+  fi
+fi
+# ── AOT by default (JDK 25 JEP 514 one-step). No flags needed: when the cache
+# matches the live classpath fingerprint it loads; otherwise this run TRAINS and
+# the archive lands on exit, ready for the next boot. Operator --aot-cache /
+# --aot-record / TRIKESHED_AOT_CACHE* always override; TRIKESHED_AOT_DEFAULT=0
+# disables. Fingerprint = live-classes generation + lib listing + JVM version,
+# so a hotswapFeed or toolchain bump retrains instead of loading a stale archive.
+if [[ ${#AOT_OPTS[@]} -eq 0 && "${TRIKESHED_AOT_DEFAULT:-1}" != "0" && -n "${AOT_HOME:-}" ]]; then
+  # Per-instance archive: two daemons off one classpath (trikeshed + computronium)
+  # must not train into the same file — concurrent exits would tear it.
+  _AOT_INSTANCE=$(printf '%s' "${DAEMON_ARGS[*]:-} $WATCH ${HOME_POS:-} ${REPO_POS:-}" | shasum -a 256 | cut -c1-8)
+  _AOT_DIR="${XDG_STATE_HOME:-$HOME/.local/state}/trikeshed/aot"
+  mkdir -p "$_AOT_DIR"
+  _AOT_FILE="$_AOT_DIR/oroboros-$_AOT_INSTANCE.aot"
+  _AOT_SIG_FILE="$_AOT_FILE.cpsig"
+  _CPSIG=$( { cat "$AOT_HOME/.generation" 2>/dev/null; ls -l "$AOT_LIBDIR" 2>/dev/null; java -version 2>&1; } | shasum -a 256 | cut -d' ' -f1 )
+  if [[ -s "$_AOT_FILE" && -f "$_AOT_SIG_FILE" && "$(cat "$_AOT_SIG_FILE")" == "$_CPSIG" ]]; then
+    AOT_OPTS=("-XX:AOTCache=$_AOT_FILE")
+    echo "[oroboros-daemon] AOT: loading $_AOT_FILE (classpath fingerprint match)" >&2
+  else
+    AOT_OPTS=("-XX:AOTCacheOutput=$_AOT_FILE")
+    echo "$_CPSIG" > "$_AOT_SIG_FILE"
+    echo "[oroboros-daemon] AOT: training this run → $_AOT_FILE (loads on next boot)" >&2
   fi
 fi
 if [[ ${#AOT_OPTS[@]} -gt 0 && "${AOT_OPTS[0]}" == -XX:AOTCache=* ]]; then

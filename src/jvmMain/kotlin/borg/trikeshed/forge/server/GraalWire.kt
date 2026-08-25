@@ -76,6 +76,7 @@ class GraalWire(
         return when {
             method == "GET" && (p == "/graal" || p == "/graal/") -> page()
             method == "GET" && (p == "/futon" || p == "/futon/") -> asset("web/futon.html", "text/html; charset=utf-8")
+            method == "GET" && (p == "/panels" || p == "/panels/") -> asset("web/panels.html", "text/html; charset=utf-8")
             method == "GET" && p == "/graal.webmanifest" -> JvmKanbanServer.HttpResponse(200, MANIFEST, "application/manifest+json; charset=utf-8")
             method == "GET" && p == "/api/graal/vitals" -> JvmKanbanServer.HttpResponse(200, JsonSupport.stringify(vitals.snapshot() + ("pointcuts" to pointcutSummary())))
             method == "GET" && p == "/api/graal/pointcuts" -> JvmKanbanServer.HttpResponse(200, JsonSupport.stringify(mapOf("routes" to pointcutRoutes())))

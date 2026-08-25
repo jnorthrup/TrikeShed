@@ -7,6 +7,8 @@ import borg.trikeshed.htx.openHtxElement
 import borg.trikeshed.torrent.TorrentElement
 import borg.trikeshed.litebike.JvmKanbanServer
 import borg.trikeshed.lib.j
+import borg.trikeshed.lib.get
+import borg.trikeshed.lib.size
 import borg.trikeshed.userspace.nio.file.spi.JvmFileOperations
 import borg.trikeshed.userspace.nio.spi.NioSupervisor
 import borg.trikeshed.userspace.nio.ebpf.bpfProbeAttach
@@ -67,16 +69,85 @@ import sun.misc.SignalHandler
 /** The one database this daemon serves; also the first path segment of the Couch surface. */
 const val COUCH_DB_NAME: String = "trikeshed"
 
+/**
+ * The absorbed classpath planes plus the durable manifest that makes them bootable.
+ *
+ * The Couch head projection is in-memory (CouchStoreFactory.casBacked), so blobs in the
+ * forge-home CAS are unaddressable across a restart without an index. The manifest is that
+ * index: `.oroboros/manifests/classpath.tsv` — one `kind\trelpath\tsha256hex\tlength` line
+ * per classpath file — lets bin/oroboros-daemon hydrate a runtime classpath straight out of
+ * `cas/sha256/` on a machine with no gradle build at all (a forge home replicated to a
+ * separate instance carries its own install).
+ */
+internal class BuildPlanes(
+    val attachments: CouchAttachmentGateway,
+    val classesGateway: WorktreeCouchGateway, val classesDir: File,
+    val libGateway: WorktreeCouchGateway, val libDir: File,
+    val resourcesGateway: WorktreeCouchGateway, val resourcesDir: File,
+    /** build/libs/hotswap-agent.jar — the javaagent rides the manifest under kind `agent`. */
+    val agentJar: File,
+    val manifestFile: File,
+) {
+    val classesPrefix = WorktreeCouchGateway.WORKTREE_PREFIX + "build/live/classes/"
+    val libPrefix = WorktreeCouchGateway.WORKTREE_PREFIX + "build/staging/lib/"
+    val resourcesPrefix = WorktreeCouchGateway.WORKTREE_PREFIX + "build/resources/"
+    val agentPrefix = WorktreeCouchGateway.WORKTREE_PREFIX + "build/agent/"
+}
+
 /** Absorb the live classpath into the store; returns the attachment count. Skips directories that do not exist yet. */
-internal fun reconcileBuildPlane(
-    classesGateway: WorktreeCouchGateway, classesDir: File,
-    libGateway: WorktreeCouchGateway, libDir: File,
-    revision: String,
-): Int {
+internal fun reconcileBuildPlane(planes: BuildPlanes, revision: String): Int {
     var n = 0
-    if (classesDir.isDirectory) n += classesGateway.reconcile(classesDir.absolutePath, "oroboros", revision, System.currentTimeMillis()).paths.size
-    if (libDir.isDirectory) n += libGateway.reconcile(libDir.absolutePath, "oroboros", revision, System.currentTimeMillis()).paths.size
+    with(planes) {
+        if (classesDir.isDirectory) n += classesGateway.reconcile(classesDir.absolutePath, "oroboros", revision, System.currentTimeMillis()).paths.size
+        if (libDir.isDirectory) n += libGateway.reconcile(libDir.absolutePath, "oroboros", revision, System.currentTimeMillis()).paths.size
+        if (resourcesDir.isDirectory) n += resourcesGateway.reconcile(resourcesDir.absolutePath, "oroboros", revision, System.currentTimeMillis()).paths.size
+        if (agentJar.isFile) {
+            val bytes = agentJar.readBytes()
+            val cid = borg.trikeshed.job.ContentId.of(bytes)
+            val path = agentPrefix + agentJar.name
+            if (attachments.listAttachments(path).none { it.path == path && it.contentId == cid }) {
+                attachments.putAttachment(
+                    borg.trikeshed.util.oroboros.OroborosAttachmentRef(
+                        path = path, contentType = "application/java-archive",
+                        length = bytes.size.toLong(), contentId = cid,
+                        agentId = "oroboros", revision = revision, sequence = System.currentTimeMillis(),
+                    ),
+                    bytes,
+                )
+            }
+            n += 1
+        }
+        writeClasspathManifest(planes, revision)
+    }
     return n
+}
+
+/** Atomic (tmp+rename) manifest write; an empty classpath never clobbers a previously good manifest. */
+internal fun writeClasspathManifest(planes: BuildPlanes, revision: String) {
+    val kinds = listOf(
+        "classes" to planes.classesPrefix,
+        "lib" to planes.libPrefix,
+        "resources" to planes.resourcesPrefix,
+        "agent" to planes.agentPrefix,
+    )
+    val lines = StringBuilder("# oroboros classpath manifest\n# revision $revision\n")
+    var entries = 0
+    for ((kind, prefix) in kinds) {
+        for (ref in planes.attachments.listAttachments(prefix).sortedBy { it.path }) {
+            lines.append(kind).append('\t').append(ref.path.removePrefix(prefix))
+                .append('\t').append(ref.contentId.hex).append('\t').append(ref.length).append('\n')
+            entries++
+        }
+    }
+    if (entries == 0) return
+    val file = planes.manifestFile
+    file.parentFile?.mkdirs()
+    val tmp = File(file.parentFile, file.name + ".tmp")
+    tmp.writeText(lines.toString())
+    if (!tmp.renameTo(file)) {
+        file.writeText(lines.toString())
+        tmp.delete()
+    }
 }
 
 object OroborosDaemon {
@@ -93,7 +164,9 @@ object OroborosDaemon {
         val hermesRoot: String?,
         val hermesSleeve: String?,
         val hermesConsole: Boolean,
-        val positional: List<String>
+        val positional: List<String>,
+        /** Extra scopes mounted at boot: --project <path> (repeatable). Git repo → projects/<name>/, else assets/<name>/. */
+        val projects: List<String> = emptyList(),
     )
 
     @Volatile
@@ -111,10 +184,14 @@ object OroborosDaemon {
         var hermesSleeve: String? = null
         var hermesConsole = false
         val positional = mutableListOf<String>()
+        val projects = mutableListOf<String>()
 
         val flags = listOf(
             ForgeCliArgs.Flag(name = "--once") { _, i -> watch = false; i + 1 },
             ForgeCliArgs.Flag(name = "--watch") { _, i -> watch = true; i + 1 },
+            // Consumed by mainImpl via the raw args (P2 belief-bag wiring); registered so the parser accepts it.
+            ForgeCliArgs.Flag(name = "--belief-bag") { _, i -> i + 1 },
+            ForgeCliArgs.Flag(name = "--project", withValue = true) { a, i -> projects.add(a[i]); i + 1 },
             ForgeCliArgs.Flag(name = "--interval-ms", withValue = true) { a, i ->
                 val v = a[i].toLongOrNull() ?: die("--interval-ms requires a positive long")
                 intervalMs = v
@@ -149,7 +226,7 @@ object OroborosDaemon {
             ForgeCliArgs.Result.Help -> { usage(); exitProcess(0) }
             is ForgeCliArgs.Result.Error -> die(r.message)
         }
-        return DaemonConfig(watch, intervalMs, maxSlots, kanbanPort, hermesRoot, hermesSleeve, hermesConsole, positional)
+        return DaemonConfig(watch, intervalMs, maxSlots, kanbanPort, hermesRoot, hermesSleeve, hermesConsole, positional, projects)
     }
 
     @JvmStatic
@@ -200,6 +277,15 @@ object OroborosDaemon {
             val gitDir = rDir.resolve(".git")
             if (!gitDir.exists()) {
                 System.err.println("[OROBOROS] $rDir is not a git work tree. Aborting.")
+                exitProcess(1)
+            }
+            // The bug class that dumps a gigabyte CAS into a source tree: forgeHome
+            // resolving to (or inside) the repo worktree. Refuse outright — state
+            // belongs in ~/.local forge homes, never in source.
+            val fCanon = fHome.canonicalFile
+            val rCanon = rDir.canonicalFile
+            if (fCanon.path == rCanon.path || fCanon.path.startsWith(rCanon.path + File.separator)) {
+                System.err.println("[OROBOROS] REFUSED: forgeHome $fCanon is inside the repo worktree $rCanon — daemon state never lands in source trees. Use ~/.local/forge*.")
                 exitProcess(1)
             }
             fHome.mkdirs()
@@ -311,6 +397,23 @@ object OroborosDaemon {
             prefix = WorktreeCouchGateway.WORKTREE_PREFIX + "build/staging/lib/",
             excludedSegments = emptySet(), excludedRelativePrefixes = emptySet(),
         )
+        // Third narrow plane: jvm resources (web/*, META-INF/services) — without them a
+        // forge-booted instance serves no console page. Plus the hotswap agent jar, so the
+        // hydrated runtime is launchable end-to-end from the manifest alone.
+        val processedResourcesDir = File(repoDir, "build/processedResources/jvm/main")
+        val resourcesGateway = WorktreeCouchGateway(
+            fileOps, attachmentGateway,
+            prefix = WorktreeCouchGateway.WORKTREE_PREFIX + "build/resources/",
+            excludedSegments = emptySet(), excludedRelativePrefixes = emptySet(),
+        )
+        val buildPlanes = BuildPlanes(
+            attachments = attachmentGateway,
+            classesGateway = buildClassesGateway, classesDir = buildClassesDir,
+            libGateway = stagingLibGateway, libDir = stagingLibDir,
+            resourcesGateway = resourcesGateway, resourcesDir = processedResourcesDir,
+            agentJar = File(repoDir, "build/libs/hotswap-agent.jar"),
+            manifestFile = File(forgeHome, ".oroboros/manifests/classpath.tsv"),
+        )
         // ── Agent home: ~/.hermes is colocated history, not repo state — a fourth narrow gateway,
         // same shape as the build planes. Excludes are the agent's OWN install/cache material
         // (venv, tool binaries, thumbnail/image/audio caches, scratch, per-profile sandboxes) —
@@ -384,14 +487,117 @@ object OroborosDaemon {
             attachmentGateway,
         )
 
+        // ── Memory store + ISAM index layer (fs-memory Prongs 1+2) ──
+        // MemoryStore composes the existing CAS+Couch into the paper's
+        // memory store M. MemoryIndexLayer subscribes to mutations and
+        // maintains taxonomy/temporal/provenance ISAM routes.
+        val memoryStore = borg.trikeshed.memory.MemoryStore(casStore, couchStore)
+        val memoryIndex = borg.trikeshed.memory.MemoryIndexLayer(memoryStore)
+        val couchIndexBridge = borg.trikeshed.memory.CouchIndexBridge(attachmentGateway, memoryIndex)
+        System.err.println("[OROBOROS] MemoryStore + MemoryIndexLayer: ${memoryIndex.route(borg.trikeshed.memory.IndexKind.Taxonomy).entryCount} taxonomy entries")
+
+        // ── BeliefBagElement: the daemon-owned NarseseBag (AIKR belief bound) ──
+        // Flagged (--belief-bag / TRIKESHED_BELIEF_BAG=1) while phases P3..P8 land.
+        // Evidence spills to the SAME forge-home CAS the store uses; the WAL rides
+        // .oroboros (a ForgeHome-reserved prefix). DecayTick = daily curation pulse.
+        val beliefBagEnabled = "--belief-bag" in args || System.getenv("TRIKESHED_BELIEF_BAG") == "1"
+        val beliefBag: borg.trikeshed.narsese.BeliefBagElement? = if (beliefBagEnabled) {
+            val walDir = File(forgeHome, ".oroboros").apply { mkdirs() }
+            val bag = borg.trikeshed.narsese.BeliefBagElement(
+                capacity = 4096,
+                cas = casStore,
+                wal = borg.trikeshed.couch.isam.JvmDurableAppendLog(File(walDir, "belief.wal")),
+                decayFn = { b -> borg.trikeshed.narsese.AttentionEconomy.decay(b) },
+                priorityFloor = borg.trikeshed.narsese.CurationState.STALE.floor,
+                parentJob = coroutineContext[kotlinx.coroutines.Job],
+            )
+            bag.open()
+            launch(Dispatchers.Default) {
+                while (isActive) {
+                    delay(24 * 3600 * 1000L)
+                    bag.intake.send(borg.trikeshed.narsese.BeliefIntake.DecayTick)
+                }
+            }
+            System.err.println("[OROBOROS] BeliefBag open: ${bag.state} — ${bag.size} beliefs (capacity 4096, WAL ${walDir}/belief.wal)")
+            bag
+        } else null
+
+        // The NARS curation loop, closed: review (induction) + render (bounded MEMORY
+        // file, forge-homed — the ~/.hermes swap stays an explicit later step) + the
+        // curation ledger (every belief event lands as a Rete-visible blackboard fact).
+        val turnReview: borg.trikeshed.narsese.TurnReviewElement? = beliefBag?.let { bag ->
+            val r = borg.trikeshed.narsese.TurnReviewElement(bag, parentJob = coroutineContext[kotlinx.coroutines.Job])
+            r.open()
+            r
+        }
+        val hermesMemoryFiles: borg.trikeshed.memory.HermesMemoryFiles? = beliefBag?.let { bag ->
+            val files = borg.trikeshed.memory.HermesMemoryFiles(
+                bag = bag,
+                memoriesDir = File(forgeHome, "memories"),
+                evaluatorCid = borg.trikeshed.job.ContentId.of("oroboros-session".encodeToByteArray()),
+            )
+            // session start: user edits are authoritative evidence, then freeze the render
+            launch(Dispatchers.IO) {
+                val deltas = files.ingestUserEdits()
+                if (deltas > 0) System.err.println("[OROBOROS] MEMORY.md user edits re-ingested: $deltas deltas")
+            }
+            files
+        }
+        if (beliefBag != null) {
+            launch {
+                beliefBag.beliefEvents.collect { ev ->
+                    val (kind, angular) = when (ev) {
+                        is borg.trikeshed.narsese.BeliefEvent.Minted -> "minted" to ev.angular
+                        is borg.trikeshed.narsese.BeliefEvent.Revised -> "revised" to ev.angular
+                        is borg.trikeshed.narsese.BeliefEvent.Attended -> "attended" to ev.angular
+                        is borg.trikeshed.narsese.BeliefEvent.Evicted -> "evicted" to ev.angular
+                        is borg.trikeshed.narsese.BeliefEvent.Contradicted -> "contradicted" to ev.angular
+                    }
+                    daemonBlackboard.put(
+                        "narsese/curation/$kind/${angular.toString(16)}",
+                        mapOf("event" to kind, "angular" to angular.toString(), "actor" to "curator-pure"),
+                        "oroboros",
+                    )
+                }
+            }
+        }
+
+        val beliefWire = if (beliefBag != null && turnReview != null) {
+            borg.trikeshed.forge.server.BeliefWire(beliefBag, turnReview, hermesMemoryFiles)
+        } else null
+
+        // ── PatchWire: the ComfyUI patch-panel backend — full KeyMux/ModelMux access
+        // (provider-neutral, key-leased, values never cross the wire) + multiproject
+        // scope mounting (drag a directory: git repo → projects/<name>/, else
+        // assets/<name>/ — the blackboard's taxonomy prefixes are the subscope seams).
+        val projectScopes = borg.trikeshed.forge.server.ProjectScopes(
+            fileOps, attachmentGateway, couchIndexBridge, casStore, beliefBag,
+        )
+        val brainClient = borg.trikeshed.jules.BrainClient(
+            errorSink = borg.trikeshed.jules.JvmBrainErrorSink(forgeHome),
+        )
+        val patchWire = borg.trikeshed.forge.server.PatchWire(
+            brain = brainClient,
+            scopes = projectScopes,
+            attachments = attachmentGateway,
+            muxContext = htxElement + muxReactor,
+        )
+        launch(Dispatchers.IO) {
+            for (extra in config.projects) {
+                runCatching { projectScopes.mount(extra) }
+                    .onSuccess { System.err.println("[OROBOROS] scope mounted: ${it.kind} ${it.prefix} (${it.paths} paths, ${it.minted} minted)") }
+                    .onFailure { System.err.println("[OROBOROS] scope mount FAILED for $extra: ${it.message}") }
+            }
+        }
         val kanbanServer = JvmKanbanServer(
-            extraRoutes = listOf(graalWire::route, vmWire::route, hermesWire::route),
+            extraRoutes = listOfNotNull(graalWire::route, vmWire::route, hermesWire::route, beliefWire?.let { it::route }, patchWire::route),
             rawRoutes = listOf(graalWire::ingestRoute, couchWire::route),
             streamingPaths = borg.trikeshed.forge.server.CouchWire.streamingPaths(COUCH_DB_NAME) +
                 borg.trikeshed.forge.server.GraalWire.STREAMING +
                 borg.trikeshed.forge.server.VmWire.STREAMING +
                 borg.trikeshed.forge.server.HermesConsoleWire.STREAMING,
             maxRequestBatch = 4096,
+            stateDir = forgeHome,
         )
         val kanbanJob = SupervisorJob(coroutineContext[kotlinx.coroutines.Job])
         if (watch) {
@@ -427,14 +633,6 @@ object OroborosDaemon {
         pointcutAdapter.install()
         val pointcutProjection = borg.trikeshed.pointcut.PointcutCouchProjection(couchStore, pointcutAdapter, CoroutineScope(Dispatchers.Default))
 
-        // ── Memory store + ISAM index layer (fs-memory Prongs 1+2) ──
-        // MemoryStore composes the existing CAS+Couch into the paper's
-        // memory store M. MemoryIndexLayer subscribes to mutations and
-        // maintains taxonomy/temporal/provenance ISAM routes.
-        val memoryStore = borg.trikeshed.memory.MemoryStore(casStore, couchStore)
-        val memoryIndex = borg.trikeshed.memory.MemoryIndexLayer(memoryStore)
-        val couchIndexBridge = borg.trikeshed.memory.CouchIndexBridge(attachmentGateway, memoryIndex)
-        System.err.println("[OROBOROS] MemoryStore + MemoryIndexLayer: ${memoryIndex.route(borg.trikeshed.memory.IndexKind.Taxonomy).entryCount} taxonomy entries")
 
         // ── Memory bridge: routes memory-eligible reconcile files through
         //    MemoryStore.put() so they get per-line spines + IPFS publication.
@@ -547,7 +745,7 @@ object OroborosDaemon {
             for (unit in buildDirty) {
                 kotlinx.coroutines.delay(750) // coalesce a generation's burst of class writes
                 runCatching {
-                    val n = reconcileBuildPlane(buildClassesGateway, buildClassesDir, stagingLibGateway, stagingLibDir, gitState.headSha())
+                    val n = reconcileBuildPlane(buildPlanes, gitState.headSha())
                     println("[OROBOROS] build-event: classpath re-absorbed ($n attachments)")
                 }.onFailure { println("[OROBOROS] build-event: reconcile failed ${it.message}") }
             }
@@ -615,12 +813,48 @@ object OroborosDaemon {
                     worktreeSnap.paths.size j { i: Int -> worktreeSnap.paths[i] },
                 )
                 val bridged = memoryBridge.bridge(worktreeSnap, agentId = "oroboros")
+                projectScopes.registerPrimary(repoDir, worktreeSnap.paths.size)
                 System.err.println(
                     "[OROBOROS] Worktree→Couch initial reconcile: ${worktreeSnap.paths.size} paths, " +
                         "$bridged memory files bridged (spines + IPFS)"
                 )
-                val buildPaths = reconcileBuildPlane(buildClassesGateway, buildClassesDir, stagingLibGateway, stagingLibDir, headSha)
-                System.err.println("[OROBOROS] Build→Couch initial reconcile: $buildPaths classpath attachments (build/live/classes + build/staging/lib)")
+                // ── Belief minting feed: epistemic signals from the memory plane land in the bag.
+                // FNV identity stays on the signal's CIDs; the BAG key gets the feature-coded
+                // AngularCodec coordinate so recallNear is real locality, not hash noise.
+                // Boot seed is AIKR-capped; the bag's own capacity bounds the rest.
+                if (beliefBag != null) {
+                    var mintedSignals = 0
+                    val mintCap = 2048
+                    for (i in 0 until worktreeSnap.paths.size) {
+                        if (mintedSignals >= mintCap) break
+                        val path = worktreeSnap.paths[i]
+                        if (!path.endsWith(".md") && !path.endsWith(".markdown")) continue
+                        val att = attachmentGateway.getAttachment(path) ?: continue
+                        val surface = runCatching {
+                            borg.trikeshed.cas.ContentEpistemicIngest.ingest(casStore, att.second.decodeToString())
+                        }.getOrNull() ?: continue
+                        for (si in 0 until surface.signals.size) {
+                            if (mintedSignals >= mintCap) break
+                            val s = surface.signals[si]
+                            val coord = borg.trikeshed.narsese.AngularCodec.encode(
+                                relation = s.relation,
+                                taxonomyKey = path,
+                                subjectTerm = path.substringAfterLast('/'),
+                                objectTerm = s.objectCid?.take(12),
+                            )
+                            beliefBag.intake.send(
+                                borg.trikeshed.narsese.BeliefIntake.Mint(
+                                    s.copy(angular = coord),
+                                    borg.trikeshed.cursor.BudgetCoord(0.5f, 0.3f, 0.5f),
+                                ),
+                            )
+                            mintedSignals++
+                        }
+                    }
+                    System.err.println("[OROBOROS] BeliefBag seeded: $mintedSignals epistemic signals → ${beliefBag.size} beliefs")
+                }
+                val buildPaths = reconcileBuildPlane(buildPlanes, headSha)
+                System.err.println("[OROBOROS] Build→Couch initial reconcile: $buildPaths classpath attachments → manifest ${buildPlanes.manifestFile}")
                 if (hermesHomeDir.isDirectory) {
                     val hermesSnap = hermesHomeGateway.reconcile(hermesHomeDir.absolutePath, "oroboros", headSha, System.currentTimeMillis())
                     System.err.println("[OROBOROS] Hermes home→Couch initial reconcile: ${hermesSnap.paths.size} paths (teleportable clone of ~/.hermes)")

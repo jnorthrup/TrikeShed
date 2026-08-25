@@ -80,10 +80,14 @@ object HotSwapAgent {
 
                 val loadedClasses = inst.allLoadedClasses
 
-                watchDir.walkTopDown().filter { it.isFile && it.name.endsWith(".class") }.forEach { classFile ->
+                // Class names are relative to the classes ROOT (watchDir/classes), not watchDir:
+                // relativizing against watchDir yielded "classes.borg…" names that matched no
+                // loaded class — every generation retransformed 0.
+                val classesRoot = File(watchDir, "classes")
+                classesRoot.walkTopDown().filter { it.isFile && it.name.endsWith(".class") }.forEach { classFile ->
                     val classMtime = (classFile.lastModified() / 1000L) * 1000L
                     if (classMtime > prevGenMtime) {
-                        val relativePath = classFile.relativeTo(watchDir).path
+                        val relativePath = classFile.relativeTo(classesRoot).path
                         val className = relativePath.removeSuffix(".class").replace(File.separatorChar, '.')
 
                         val cls = loadedClasses.find { it.name == className }

@@ -341,7 +341,8 @@ class GraalBtrfsSupervisor(
     onRootReturn: (RootObservation) -> Unit = {},
 ) : GuestIsolate {
     val vfs = TrikeShedGraalVfs(instanceId = id)
-    private val guest = InProcessIsolate(
+    /** Exposed so the Hypervisor's LeafTrainer can observe the same in-process guest it trains. */
+    val guest = InProcessIsolate(
         id,
         facet,
         budget,

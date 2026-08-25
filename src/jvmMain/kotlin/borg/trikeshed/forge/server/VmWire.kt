@@ -114,7 +114,8 @@ class VmWire(
                     statements = (req["statements"] as? Number)?.toLong() ?: 0,
                     wallMillis = (req["wallMillis"] as? Number)?.toLong() ?: 0,
                 )
-                runCatching { host.spawn(VmSpec(id, facet, trust, budget)) }
+                val world = (req["world"] as? List<*>)?.mapNotNull { it as? String } ?: emptyList()
+                runCatching { host.spawn(VmSpec(id, facet, trust, budget, world)) }
                     .fold({ json(200, mapOf(
                         "id" to it.id,
                         "facet" to it.facet.id,

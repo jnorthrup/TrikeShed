@@ -22,6 +22,9 @@ enum class KgFormat(val marker: String) {
     JSON_LD("\"@context\""),
     TRIPLET_JSON("\"subject\""),
     N_TRIPLES("_:"),
+
+    /** KIF / SUO-KIF s-expressions — bridged by KgNalBridge (=>, <=>, instance, subclass). */
+    KIF("(=>"),
 }
 
 /**

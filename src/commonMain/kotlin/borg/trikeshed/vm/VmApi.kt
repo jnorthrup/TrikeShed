@@ -26,6 +26,12 @@ data class VmSpec(
     val facet: VmFacet,
     val trust: VmTrust = VmTrust.OWN,
     val budget: VmBudget = VmBudget(),
+    /**
+     * Host directories seeded (text/source files only) into a private guest world at
+     * `/workspace/<dirname>` before first eval. Non-empty ⇒ the guest gets a
+     * snapshot-capable VFS instead of IOAccess.NONE. OWN trust only.
+     */
+    val world: List<String> = emptyList(),
 )
 
 data class VmStats(

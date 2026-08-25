@@ -1111,7 +1111,7 @@ tasks.named("check") {
 tasks.register<Exec>("hotswapFeed") {
     group = "build"
     description = "Atomic compile feed for the live dir (replaces wrong 17; hot-swap stays)"
-    dependsOn("compileKotlinJvm", "jvmProcessResources")
+    dependsOn("compileKotlinJvm", "jvmProcessResources", "stageDaemonLib")
 
     val buildDir = project.layout.buildDirectory.get().asFile
     val srcDir = File(buildDir, "classes/kotlin/jvm/main")

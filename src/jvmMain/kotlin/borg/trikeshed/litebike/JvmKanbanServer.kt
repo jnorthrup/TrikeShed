@@ -83,6 +83,8 @@ class JvmKanbanServer(
     private val rawRoutes: List<RawRoute> = emptyList(),
     /** Listener batch/reassembly unit: request cap is `maxRequestBatch * 1024` bytes (64 KiB at the default). */
     private val maxRequestBatch: Int = 64,
+    /** Root for server-owned state files (.causal.wal). The daemon passes forgeHome; never the worktree. */
+    private val stateDir: File = File("."),
 ) {
     /** SSE event stream path — retired with the flywheel; answers 410 Gone. SURFACE_TTL_MS bounds /api/jules/surface cache life. */
     private companion object {
@@ -105,7 +107,9 @@ class JvmKanbanServer(
      */
     @Volatile private var surfaceCache: Pair<Long, String>? = null
 
-    private val causalWal = CausalWal(File(".causal.wal"))
+    // Daemon state NEVER lands in the CWD/worktree: the causal WAL roots at stateDir
+    // (the forge home when the daemon constructs us; CWD only as a bare-server fallback).
+    private val causalWal = CausalWal(File(stateDir, ".causal.wal"))
     private val graphIndex = CausalGraphNodeIndex()
 
     /** Wire-level HTTP response built by the HTTP worker. Serialized back through the listener as bytes on the same connection. */
@@ -322,6 +326,11 @@ class JvmKanbanServer(
 
         System.err.println("trikeshed-kanban: listening on :$port  donor=${donorPath ?: "<none>"}")
         System.err.println("Endpoints (CCEK): GET / (Forge PWA) /api/health /api/cap /api/board /api/metrics /api/jules/surface /api/jules/events POST /api/submit /api/donor /api/invoke")
+        // Prewarm the shell memo off the request path: the first / must not eat the 45s seed parse.
+        kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.Default).launch {
+            runCatching { borg.trikeshed.forge.server.ForgeRoutes.prewarmShell() }
+            System.err.println("[KANBAN] forge shell prewarmed")
+        }
 
         // Bind happens here — only place outside the worker scope that
         // opens a socket. The adapter resumes this coroutine on close.

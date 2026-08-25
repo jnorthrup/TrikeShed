@@ -650,16 +650,24 @@ fun Series<Char>.parseLongOrNull(): Long? {
 }
 
 fun <T> Series<T>.filter(pred: (T) -> Boolean): Series<T> {
-    var count = 0
-    var indices = IntArray(minOf(this.size, 16))
-    for (i in 0 until this.size) {
-        if (pred(this[i])) {
-            if (count == indices.size) {
-                indices = indices.copyOf(indices.size * 2)
+    // Lazy-first (PRELOAD port gap): the match scan runs once, on first access of
+    // size or element, not at call time — filter chains compose without paying
+    // for branches never read. The memoized IntArray is the K `where` vector.
+    val matches: Lazy<IntArray> = lazy {
+        var count = 0
+        var indices = IntArray(minOf(this.size, 16).coerceAtLeast(1))
+        for (i in 0 until this.size) {
+            if (pred(this[i])) {
+                if (count == indices.size) {
+                    indices = indices.copyOf(indices.size * 2)
+                }
+                indices[count++] = i
             }
-            indices[count++] = i
         }
+        if (count == indices.size) indices else indices.copyOf(count)
     }
-    val finalIndices = if (count == indices.size) indices else indices.copyOf(count)
-    return count j { i: Int -> this@filter[finalIndices[i]] }
+    return object : Join<Int, (Int) -> T> {
+        override val a: Int get() = matches.value.size
+        override val b: (Int) -> T get() = { i: Int -> this@filter[matches.value[i]] }
+    }
 }

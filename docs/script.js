@@ -134,7 +134,7 @@
   function saveState() {
     try { 
         const stateStr = (typeof stringifyForge === 'function') ? stringifyForge(state) : JSON.stringify(state);
-        localStorage.setItem(LS_KEY, JSON.stringify(state));
+        localStorage.setItem(LS_KEY, stateStr);
         
         if (state.board && state.board.cards) {
             const boardStr = (typeof stringifyForge === 'function') ? stringifyForge({ cards: state.board.cards }) : JSON.stringify({ cards: state.board.cards });
@@ -251,9 +251,11 @@
     pageTreeEl.innerHTML = '';
     state.pages.forEach((page) => {
       const item = document.createElement('div');
-      item.className = 'page-tree-item' + (page.id === state.activePageId ? ' active' : '');
+      const isActive = page.id === state.activePageId;
+      item.className = 'page-tree-item' + (isActive ? ' active' : '');
       item.role = 'button';
       item.tabIndex = 0;
+      item.setAttribute('aria-label', (isActive ? 'Active page: ' : 'Page: ') + (page.title || 'Untitled'));
       const toggle = document.createElement('span');
       toggle.className = 'tree-toggle';
       toggle.textContent = page.children && page.children.length ? '▾' : '▸';
@@ -490,7 +492,9 @@
     );
     items.forEach((d, i) => {
       const item = document.createElement('button');
-      item.className = 'slash-item' + (i === activeSlashIndex ? ' active' : '');
+      const isActive = i === activeSlashIndex;
+      item.className = 'slash-item' + (isActive ? ' active' : '');
+      item.setAttribute('aria-label', d.name + ' command' + (isActive ? ' (currently selected)' : '') + ': ' + d.desc);
       const icon = document.createElement('span');
       icon.className = 'slash-item-icon';
       icon.textContent = d.icon;
@@ -878,9 +882,15 @@
           const child = sheetById[cell.sheet];
           const ref = document.createElement('button');
           ref.className = 'sheet-ref';
-          ref.innerHTML = '<span>' + (sheetExpanded[key] ? '▾' : '▸') + '</span><span>▦ ' + (child ? child.title.split('/').pop() : cell.sheet) + '</span>' +
+          const isExpanded = !!sheetExpanded[key];
+          ref.setAttribute('aria-expanded', isExpanded ? 'true' : 'false');
+          const sheetName = child ? child.title.split('/').pop() : cell.sheet;
+          ref.setAttribute('aria-label', (isExpanded ? 'Collapse' : 'Expand') + ' sheet reference: ' + sheetName);
+          ref.innerHTML = '<span aria-hidden="true">' + (isExpanded ? '▾' : '▸') + '</span><span>▦ ' + sheetName + '</span>' +
             '<span class="sheet-count">' + (child ? child.rows.length + ' rows' : '') + '</span>';
           ref.title = 'Click: expand in place · Open: zoom into ' + cell.sheet;
+          ref.setAttribute('aria-expanded', sheetExpanded[key] ? 'true' : 'false');
+          ref.setAttribute('aria-label', (sheetExpanded[key] ? 'Collapse ' : 'Expand ') + (child ? child.title.split('/').pop() : cell.sheet));
           ref.addEventListener('click', (ev) => {
             ev.stopPropagation();
             sheetExpanded[key] = !sheetExpanded[key];
@@ -933,7 +943,9 @@
     const chain = []; let p = cur; while (p) { chain.unshift(p); p = p.parent ? sheetById[p.parent] : null; }
     chain.forEach((sh, i) => {
       if (i) sheetCrumbsEl.appendChild(document.createTextNode(' / '));
-      const b = document.createElement('button'); b.textContent = sh.id.split('/').pop() || sh.title;
+      const title = sh.id.split('/').pop() || sh.title;
+      const b = document.createElement('button'); b.textContent = title;
+      b.setAttribute('aria-label', 'Navigate to parent sheet: ' + title);
       b.addEventListener('click', () => openSheet(sh.id)); sheetCrumbsEl.appendChild(b);
     });
     sheetWrapEl.appendChild(buildSheetTable(cur, 0));

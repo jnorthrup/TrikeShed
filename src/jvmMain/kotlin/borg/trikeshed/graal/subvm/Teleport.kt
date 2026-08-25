@@ -25,15 +25,41 @@ fun Teleported.toGuest(): Any? = when (this) {
     is Teleported.Opaque -> repr
 }
 
-fun Teleported.Companion.of(v: Value?): Teleported = when {
+fun Teleported.Companion.of(v: Value?): Teleported = teleportOf(v, 0)
+
+/** Guest object graphs are cyclic (Python: os.path.os…) and unbounded; primitives pass at any depth. */
+private const val TELEPORT_MAX_DEPTH = 5
+private const val TELEPORT_MAX_ELEMENTS = 10_000L
+
+private fun teleportOf(v: Value?, depth: Int): Teleported = when {
     v == null || v.isNull -> Teleported.Null
     v.isBoolean -> Teleported.Bool(v.asBoolean())
     v.isNumber -> if (v.fitsInLong()) Teleported.Num(v.asLong()) else Teleported.Real(v.asDouble())
     v.isString -> Teleported.Str(v.asString())
+    depth >= TELEPORT_MAX_DEPTH -> Teleported.Opaque(v.toString())
     v.hasBufferElements() -> Teleported.Bytes(ByteArray(v.bufferSize.toInt()) { v.readBufferByte(it.toLong()) })
-    v.hasArrayElements() -> Teleported.Arr((0 until v.arraySize).map { of(v.getArrayElement(it)) })
+    // Hash protocol BEFORE array: GraalPy mappings (dict, os.environ's _Environ) answer
+    // hasArrayElements() true via __getitem__ yet throw on getArrayElement(long) — the
+    // string-keyed lookup is the real shape.
+    v.hasHashEntries() -> runCatching {
+        Teleported.Obj(
+            buildMap {
+                val entries = v.hashEntriesIterator
+                while (entries.hasIteratorNextElement() && size < TELEPORT_MAX_ELEMENTS) {
+                    val e = entries.iteratorNextElement
+                    val k = e.getArrayElement(0)
+                    put(if (k.isString) k.asString() else k.toString(), teleportOf(e.getArrayElement(1), depth + 1))
+                }
+            }.toList().sortedBy { it.first }.toMap(),
+        )
+    }.getOrElse { Teleported.Opaque(v.toString()) }
+    v.hasArrayElements() -> runCatching {
+        Teleported.Arr((0 until minOf(v.arraySize, TELEPORT_MAX_ELEMENTS)).map { teleportOf(v.getArrayElement(it), depth + 1) })
+    }.getOrElse { Teleported.Opaque(v.toString()) }
     v.canExecute() -> Teleported.Opaque("fn:${v.metaObject?.metaSimpleName ?: "function"}")
-    v.hasMembers() && !v.isMetaObject -> Teleported.Obj(v.memberKeys.sorted().associateWith { of(v.getMember(it)) })
+    v.hasMembers() && !v.isMetaObject -> runCatching {
+        Teleported.Obj(v.memberKeys.sorted().associateWith { teleportOf(v.getMember(it), depth + 1) })
+    }.getOrElse { Teleported.Opaque(v.toString()) }
     else -> Teleported.Opaque(v.toString())
 }
 

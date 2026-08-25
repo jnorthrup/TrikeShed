@@ -18,6 +18,10 @@ import borg.trikeshed.lib.j
  * @param objectCid ContentId of the object; null = UNANCHORED mention
  * @param temporal optional temporal qualification
  * @param provenanceCid ContentId of the extraction receipt (parent stage's CID)
+ * @param basisBloom 64-bit Bloom/XOR-fold of the evidential basis (provenance
+ *   ancestry). Covariance-intersection preparation: overlapping blooms mean
+ *   "may share evidence, do not naively sum" — revision must treat the bases
+ *   as dependent. 0L = unknown/empty basis (legacy records).
  */
 data class SemanticSignal(
     val angular: Long,
@@ -27,6 +31,7 @@ data class SemanticSignal(
     val objectCid: String? = null,
     val temporal: TemporalSignal? = null,
     val provenanceCid: String? = null,
+    val basisBloom: Long = 0L,
 ) {
     val isAnchored: Boolean get() = objectCid != null
     fun truth(k: Float = 1f): TruthCoord = evidence.truth(k)
@@ -88,6 +93,30 @@ fun <V> Map<Join<Long, Long>, V>.recallNear(
 /** Hamming distance between two angular coordinates. Free function on Longs, never a method. */
 fun hamming(a: Long, b: Long): Int = (a xor b).countOneBits()
 
+// FNV-1a 64: offset basis 0xcbf29ce484222325 / prime 0x100000001b3 (signed literals).
+private const val FNV64_OFFSET: Long = -0x340d631b7bdddcdbL
+private const val FNV64_PRIME: Long = 0x100000001b3L
+
+/**
+ * basisBloomOf — fold evidence-source cids into a 64-bit Bloom (k=3).
+ * Per cid: FNV-1a 64 of the bytes, then 3 bit indices ((h ushr 0/21/42) mod 64)
+ * OR-combined. Union across cids = classic Bloom insert; zero false negatives,
+ * bounded false positives — a nonzero AND between two blooms means the bases
+ * MAY overlap and covariance-aware revision applies.
+ */
+fun basisBloomOf(vararg cids: String): Long {
+    var bloom = 0L
+    for (cid in cids) {
+        var h = FNV64_OFFSET
+        for (byte in cid.encodeToByteArray()) h = (h xor (byte.toLong() and 0xFFL)) * FNV64_PRIME
+        bloom = bloom or
+            (1L shl ((h ushr 0).toInt() and 63)) or
+            (1L shl ((h ushr 21).toInt() and 63)) or
+            (1L shl ((h ushr 42).toInt() and 63))
+    }
+    return bloom
+}
+
 /**
  * reviseInto: NARS revision as a map fold. Two signals with the same angular
  * identity merge their evidence bases; the result is a new signal (supersede),
@@ -106,6 +135,7 @@ fun Map<Join<Long, Long>, SemanticSignal>.reviseInto(
         objectCid = incoming.objectCid,
         temporal = incoming.temporal,
         provenanceCid = incoming.provenanceCid,
+        basisBloom = existing.basisBloom or incoming.basisBloom, // Bloom union: merged basis
     )
     return this + (key to merged)
 }

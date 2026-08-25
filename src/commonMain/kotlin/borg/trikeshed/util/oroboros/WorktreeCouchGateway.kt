@@ -112,6 +112,11 @@ class WorktreeCouchGateway(
 
         val EXCLUDED_SEGMENTS = setOf(
             ".git", ".gradle", ".idea", "build", "node_modules",
+            // Daemon-state turds must never enter the doc plane: a stray `cas/` in a
+            // worktree once snowballed self-referentially (absorbing its own output,
+            // 108k blobs / 536MB in minutes). State lives in forge homes, period.
+            "cas", ".oroboros", ".causal.wal", "oroboros-cycles.jsonl",
+            "jules-board.wal", "brain-errors.jsonl",
         )
 
         /** Agent worktree clones are other checkouts, not this project's history. */

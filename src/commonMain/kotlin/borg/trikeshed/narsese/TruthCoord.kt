@@ -26,8 +26,10 @@ value class TruthCoord(val packed: Long) {
         const val SCALE: Long = 0xFFFFFFFFL
 
         operator fun invoke(frequency: Float, confidence: Float): TruthCoord {
-            val fBits = (frequency.coerceIn(0f, 1f) * SCALE).toLong()
-            val cBits = (confidence.coerceIn(0f, 1f) * SCALE).toLong()
+            // Double math + coerce: SCALE isn't Float-representable — (1f * SCALE)
+            // rounds up to 2^32, which shl 32 silently packs f=1.0 as ZERO.
+            val fBits = (frequency.coerceIn(0f, 1f).toDouble() * SCALE).toLong().coerceIn(0L, SCALE)
+            val cBits = (confidence.coerceIn(0f, 1f).toDouble() * SCALE).toLong().coerceIn(0L, SCALE)
             return TruthCoord((fBits shl 32) or cBits)
         }
 

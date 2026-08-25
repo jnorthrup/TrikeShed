@@ -206,6 +206,8 @@ class HermesPythonPort(
     private val banlist: Map<String, NativeModuleBan> = HermesNativeModuleBanlist.load(),
     private val output: OutputStream? = null,
     private val error: OutputStream? = output,
+    /** THE PEN (HermesPenDelegates): installed beside the import waist when leased. */
+    private val pen: HermesPen? = null,
 ) : AutoCloseable {
     private var isolate: GraalBtrfsSupervisor? = null
 
@@ -339,6 +341,7 @@ class HermesPythonPort(
             blackboard.put("hermes/python/pointcut/import/$name", mapOf("module" to name, "status" to "loaded"), "graal-python")
             Teleported.Null
         }
+        pen?.install(guest)
         guest.eval(IMPORTER_BOOTSTRAP, "hermes-blackboard-importer.py")
         return try {
             guest.eval("import importlib\nimportlib.import_module(${pythonString(entry)})\nTrue", "hermes-entry.py")

@@ -81,6 +81,42 @@ class BrainClient(
     /** True if at least one provider endpoint was discovered. */
     fun hasEndpoints(): Boolean = endpoints.isNotEmpty()
 
+    /** Read-only view of the discovered roster — name/base/model, no key material. */
+    fun endpointSummaries(): List<EndpointSpec> = endpoints
+
+    /** The model id that most recently answered a chat, or null before the first success. */
+    fun lastModel(): String? = lastGoodModelId
+
+    /**
+     * Full provider-roster status regardless of discovery: every table entry with a
+     * key-PRESENCE flag only — key VALUES never leave this class. The patch-panel
+     * keymux surface reads this (quota VOLUME visibility without secret exposure).
+     */
+    fun rosterStatus(): List<Map<String, Any>> {
+        val discovered = endpoints.mapTo(mutableSetOf()) { it.name }
+        return fullRoster().map { spec ->
+            mapOf(
+                "name" to spec.name,
+                "envVar" to spec.envVar,
+                "base" to spec.base,
+                "model" to spec.model,
+                "keyPresent" to !SystemOperations.default.getenv(spec.envVar).isNullOrBlank(),
+                "discovered" to (spec.name in discovered),
+            )
+        }
+    }
+
+    /** The static provider table (ungated) — discoverEndpoints() is this, filtered by key presence. */
+    private fun fullRoster(): List<EndpointSpec> {
+        val out = mutableListOf<EndpointSpec>()
+        val seen = mutableSetOf<String>()
+        fun add(name: String, envVar: String, base: String, model: String) {
+            if (seen.add("$name:$base:$model")) out.add(EndpointSpec(name, envVar, base.trim(), model.trim()))
+        }
+        rosterInto(::add)
+        return out
+    }
+
     /**
      * Non-streaming chat completion with multi-provider failover.
      *
@@ -267,6 +303,12 @@ class BrainClient(
                 out.add(EndpointSpec(name, envVar, base.trim(), model.trim()))
             }
         }
+        rosterInto(::add)
+        return out
+    }
+
+    /** ONE provider table, two consumers: discovery (key-gated) and status (ungated). */
+    private fun rosterInto(add: (String, String, String, String) -> Unit) {
 
         val nvidia = "https://integrate.api.nvidia.com/v1"
         add("nv-deepseek-v4-pro", "NVIDIA_API_KEY", nvidia, "deepseek-ai/deepseek-v4-pro")
@@ -298,7 +340,6 @@ class BrainClient(
         add("moonshot", "MOONSHOT_API_KEY", "https://api.moonshot.cn/v1", "moonshot-v1-32k")
         add("minimax-m3", "MINIMAX_API_KEY", "https://api.minimax.chat/v1", "MiniMax-M3")
         add("minimax-m25", "MINIMAX_API_KEY", "https://api.minimax.chat/v1", "MiniMax-Text-01")
-        return out
     }
 
     /** JSON string escaping — handles ", \, \n, \r, \t. Used for both log entries and chat body. */
