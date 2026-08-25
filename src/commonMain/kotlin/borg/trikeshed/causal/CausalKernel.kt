@@ -17,7 +17,7 @@ import borg.trikeshed.util.oroboros.LexicalMemory
 // ═══════════════════════════════════════════════════════════════════════════
 // CAUSAL EVENT KERNEL — PRELOAD-native causal graph algebra
 //
-// The flywheel is a causal graph: WorkQueued → WorkDispatched → PatchDelivered
+// The work cycle is a causal graph: WorkQueued → WorkDispatched → PatchDelivered
 // → WorkSettled, with Superseded forks and Retired terminals. Every event is
 // a Join-composed node; the graph is a Series<EventNode> (lazy WAL projection).
 //
@@ -49,7 +49,7 @@ val RootOrdinal: EventOrdinal = 0L j 0L
 
 // ─── CausalEdge: parent → child with sealed kind ──────────────────────────
 
-/** Sealed causal vocabulary — the edge types in the flywheel DAG. */
+/** Sealed causal vocabulary — the edge types in the work-cycle DAG. */
 sealed class CausalEdgeKind {
     data object Inducted : CausalEdgeKind()   // external producer → queue
     data object Dispatched : CausalEdgeKind()  // queue → Jules session

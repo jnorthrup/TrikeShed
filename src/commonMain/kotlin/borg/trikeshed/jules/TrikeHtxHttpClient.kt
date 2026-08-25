@@ -23,7 +23,7 @@ class HtxHttpException(val status: Int, message: String) : RuntimeException(mess
 typealias JulesHttpException = HtxHttpException
 
 /**
- * Common outbound HTTP client for the flywheel.
+ * Common outbound HTTP client for Jules/Brain callers.
  *
  * Every request resolves the TLS-backed [HtxElement] from [HtxKey] and goes
  * through the reactor. There is no platform HTTP client or per-client TLS

@@ -20,7 +20,7 @@ import kotlin.test.assertTrue
 
 class VmTerminalRegistryTest {
     @Test
-    fun everyInProcessVmGetsAnIndependentVt220TerminalAndCausalEvalLineage() = runTest {
+    fun everyInProcessVmGetsAnIndependentXtermTerminalAndCausalEvalLineage() = runTest {
         val host = HypervisorVmHost()
         val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
         try {

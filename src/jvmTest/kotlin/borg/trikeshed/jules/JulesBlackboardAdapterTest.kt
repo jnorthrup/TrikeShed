@@ -12,7 +12,7 @@ import kotlin.test.assertTrue
  * Test suite for JulesBlackboardAdapter.
  * Validates session/activity projection, ForgeBlackboardView init constraint satisfaction,
  * TTL lifecycle, and geometry invariants.
- * Aligned with SettlementBarrierTest and FlywheelArchiveGuardTest patterns.
+ * Aligned with SettlementBarrierTest patterns.
  */
 class JulesBlackboardAdapterTest {
 

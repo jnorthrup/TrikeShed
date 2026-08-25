@@ -589,30 +589,12 @@ open class PosixFile(
          * writes \n terminated lines to a file
          */
         fun writeLines(filename: String, lines: List<String>): Unit {
-            // ⚡ Bolt: Built the complete payload once and wrote it in a single system call to eliminate N+1 overhead.
             val O_FLAGS = PosixOpenOpts.withFlags(PosixOpenOpts.O_Creat, PosixOpenOpts.O_Trunc, PosixOpenOpts.O_WrOnly)
             val file = PosixFile(filename, O_FLAGS)
 
             if (lines.isEmpty()) {
                 file.close()
                 return
-            val bufferSize = 8192
-            val buffer = ByteArray(bufferSize)
-            var offset = 0
-
-            fun flush() {
-                if (offset != 0) {
-                    var writtenTotal = 0
-                    buffer.usePinned { pinned ->
-                        while (writtenTotal < offset) {
-                            val ptr = pinned.addressOf(writtenTotal)
-                            val written = write(file.fd, ptr, (offset - writtenTotal).convert())
-                            HasPosixErr.posixRequires(written > 0L) { "writeLines $filename flush error" }
-                            writtenTotal += written.toInt()
-                        }
-                    }
-                    offset = 0
-                }
             }
 
             val payload = lines.joinToString(separator = "\n", postfix = "\n").encodeToByteArray()

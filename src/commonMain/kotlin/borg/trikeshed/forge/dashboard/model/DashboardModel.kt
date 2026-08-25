@@ -9,11 +9,6 @@ data class KanbanCard(
     val state: String
 )
 
-data class FlywheelState(
-    val lastCycleAt: Long,
-    val timeline: Series<Long> = emptySeriesOf()
-)
-
 data class CcekNode(
     val nuid: String,
     val capability: String

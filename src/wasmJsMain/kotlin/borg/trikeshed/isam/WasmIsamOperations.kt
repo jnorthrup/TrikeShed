@@ -6,7 +6,6 @@ import borg.trikeshed.userspace.nio.file.spi.WasmFileOperations
 import borg.trikeshed.cursor.Cursor
 import borg.trikeshed.cursor.*
 import borg.trikeshed.isam.meta.IsamMetaFileReader
-import borg.trikeshed.isam.RecordMeta
 import borg.trikeshed.lib.*
 
 class WasmIsamDataReader(
@@ -20,7 +19,7 @@ class WasmIsamDataReader(
         constraints.view.groupBy { it.groupName }
     }
     private val maxGroupId: Int by lazy {
-        constraints.view.maxOfOrNull { it.groupId } ?: 0
+        constraints.view.map { it.groupId }.maxOrNull() ?: 0
     }
     private val groupBuffers = mutableMapOf<String, ByteArray>()
 
@@ -45,10 +44,7 @@ class WasmIsamDataReader(
             val bytes = groupBuffers[gname]!!
             val start = row * groupRecordLen + localOffset
             val d = ByteArray(len)
-            var dIdx = 0
-            for (i in start until start + len) {
-                d[dIdx++] = bytes[i]
-            }
+            bytes.copyInto(d, 0, start, start + len)
             constraint.decoder(d) j { -> constraint }
         }
     }
@@ -88,31 +84,27 @@ class WasmIsamOperations : IsamOperations {
         val cursorMeta: Series<ColumnMeta> = row0.a j { c: Int -> row0.b(c).b() }
         val meta0 = IsamMetaFileReader.write(metafilename, cursorMeta, varChars, useMonocursorGroupings = useMonocursorGroupings)
 
-        val columnsByGroup = meta0.view.groupBy { (it as RecordMeta).groupName }
-        val maxGroupId = meta0.view.maxOfOrNull { (it as RecordMeta).groupId } ?: 0
+        val columnsByGroup = meta0.view.groupBy { it.groupName }
+        val maxGroupId = meta0.view.map { it.groupId }.maxOrNull() ?: 0
 
+        val groupBuffers = mutableMapOf<String, ByteArray>()
+        val groupOffsets = mutableMapOf<String, Int>()
+        val groupRowBufs = mutableMapOf<String, ByteArray>()
         val groupRecordLengths = mutableMapOf<String, Int>()
 
-        var maxRecordSize = 0
         for ((gname, cols) in columnsByGroup) {
-            val groupRecordLen = cols.sumOf { (it as RecordMeta).end - (it as RecordMeta).begin }
-            if (groupRecordLen > maxRecordSize) {
-                maxRecordSize = groupRecordLen
-            }
-            groupRecordLengths[gname] = groupRecordLen
             val groupRecordLen = cols.sumOf { it.end - it.begin }
-            if (groupRecordLen > maxRecordSize) maxRecordSize = groupRecordLen
             groupBuffers[gname] = ByteArray(groupRecordLen * cursor.size)
             groupOffsets[gname] = 0
+            groupRowBufs[gname] = ByteArray(groupRecordLen)
+            groupRecordLengths[gname] = groupRecordLen
         }
-
-        val rowBuf = ByteArray(maxRecordSize)
 
         cursor.iterator().forEach { rowVec ->
             for ((gname, cols) in columnsByGroup) {
                 val groupRecordLen = groupRecordLengths[gname]!!
-                val recordMetas = cols.map { it as RecordMeta }
-                val groupRecordLen = cols.sumOf { it.end - it.begin }
+                val rowBuf = groupRowBufs[gname]!!
+                rowBuf.fill(0)
                 writeGroupToBuffer(rowVec, rowBuf, cols, meta0)
                 val out = groupBuffers[gname]!!
                 val offset = groupOffsets[gname]!!
@@ -121,20 +113,11 @@ class WasmIsamOperations : IsamOperations {
             }
         }
 
-                writeGroupToBuffer(rowVec, rowBuf, recordMetas, meta0 as Series<RecordMeta>)
-
-                val gfilename = if ((cols.first() as RecordMeta).groupId == maxGroupId) datafilename else getGroupFilename(datafilename, gname)
-
-                val existingBytes = if (fileOps.exists(gfilename)) fileOps.readAllBytes(gfilename) else ByteArray(0)
-                val existingRecordCount = if (groupRecordLen > 0) existingBytes.size / groupRecordLen else 0
-                val newBytes = ByteArray(existingRecordCount * groupRecordLen + groupRecordLen)
-                copyIntoByteArray(existingBytes, newBytes)
-
-                val offset = existingRecordCount * groupRecordLen
-                copyIntoByteArray(rowBuf, newBytes, offset, 0, groupRecordLen)
-
-                fileOps.write(gfilename, newBytes)
-            }
+        for (gname in columnsByGroup.keys) {
+            val cols = columnsByGroup[gname]!!
+            val firstCol = cols.first()
+            val gfilename = if (firstCol.groupId == maxGroupId) datafilename else getGroupFilename(datafilename, gname)
+            fileOps.write(gfilename, groupBuffers[gname]!!)
         }
     }
 
@@ -147,54 +130,25 @@ class WasmIsamOperations : IsamOperations {
     ) {
         val fileOps: FileOperations = WasmFileOperations()
         val metafilename = "$datafilename.meta"
-        lateinit var meta0: Series<RecordMeta>
-        var first = true
+        val meta0: Series<RecordMeta> = if (fileOps.exists(metafilename)) {
+            val reader = IsamMetaFileReader(metafilename)
+            reader.open()
+            reader.constraints
+        } else {
+            val rows = msf.map { transform?.invoke(it) ?: it }.toList()
+            val cursor = rows.toSeries()
+            write(cursor, datafilename, varChars, useMonocursorGroupings)
+            return
+        }
 
-        var columnsByGroup: Map<String, List<RecordMeta>> = emptyMap()
-        var maxGroupId = 0
+        val columnsByGroup = meta0.view.groupBy { it.groupName }
+        val maxGroupId = meta0.view.map { it.groupId }.maxOrNull() ?: 0
 
+        val groupBuffers = mutableMapOf<String, ByteArray>()
+        val groupOffsets = mutableMapOf<String, Int>()
+        val groupRowBufs = mutableMapOf<String, ByteArray>()
         val groupRecordLengths = mutableMapOf<String, Int>()
-        var rowBuf = ByteArray(0)
 
-        msf.forEach { rowVec1: RowVec ->
-            val rowVec = transform?.let { it(rowVec1) } ?: rowVec1
-            if (first) {
-                val cursorMeta: Series<ColumnMeta> = rowVec.right.α { it() }
-
-                // We know IsamMetaFileReader returns RecordMeta wrapped in Series
-                val recordMetas = IsamMetaFileReader.write(metafilename, cursorMeta, varChars, useMonocursorGroupings = useMonocursorGroupings)
-                meta0 = recordMetas.size j { i -> recordMetas.b(i) as RecordMeta }
-
-                columnsByGroup = meta0.view.groupBy { it.groupName }
-                maxGroupId = meta0.view.maxOfOrNull { it.groupId } ?: 0
-
-                var maxRecordSize = 0
-                for ((gname, cols) in columnsByGroup) {
-                    val groupRecordLen = cols.sumOf { it.end - it.begin }
-                    if (groupRecordLen > maxRecordSize) {
-                        maxRecordSize = groupRecordLen
-                    }
-                    groupRecordLengths[gname] = groupRecordLen
-                }
-                rowBuf = ByteArray(maxRecordSize)
-                first = false
-            }
-
-            for ((gname, cols) in columnsByGroup) {
-                val groupRecordLen = groupRecordLengths[gname]!!
-                val gfilename = if (cols.first().groupId == maxGroupId) datafilename else getGroupFilename(datafilename, gname)
-
-                val recordGroupMetas = cols.map { it as RecordMeta }
-                writeGroupToBuffer(rowVec, rowBuf, recordGroupMetas, meta0)
-
-                val existingBytes = if (fileOps.exists(gfilename)) fileOps.readAllBytes(gfilename) else ByteArray(0)
-                val existingRecordCount = if (groupRecordLen > 0) existingBytes.size / groupRecordLen else 0
-                val newBytes = ByteArray(existingRecordCount * groupRecordLen + groupRecordLen)
-                copyIntoByteArray(existingBytes, newBytes)
-
-                val offset = existingRecordCount * groupRecordLen
-                copyIntoByteArray(rowBuf, newBytes, offset, 0, groupRecordLen)
-        var maxRecordSize = 0
         for (gname in columnsByGroup.keys) {
             val cols = columnsByGroup[gname]!!
             val firstCol = cols.first()
@@ -202,20 +156,21 @@ class WasmIsamOperations : IsamOperations {
             val existing = if (fileOps.exists(gfilename)) fileOps.readAllBytes(gfilename) else ByteArray(0)
             
             val groupRecordLen = cols.sumOf { it.end - it.begin }
-            if (groupRecordLen > maxRecordSize) maxRecordSize = groupRecordLen
             val out = ByteArray(existing.size + (groupRecordLen * msf.count()))
             existing.copyInto(out, 0, 0, existing.size)
             
             groupBuffers[gname] = out
             groupOffsets[gname] = existing.size
+            groupRowBufs[gname] = ByteArray(groupRecordLen)
+            groupRecordLengths[gname] = groupRecordLen
         }
-
-        val rowBuf = ByteArray(maxRecordSize)
 
         msf.forEach { rowVec ->
             val rv = transform?.invoke(rowVec) ?: rowVec
             for ((gname, cols) in columnsByGroup) {
-                val groupRecordLen = cols.sumOf { it.end - it.begin }
+                val groupRecordLen = groupRecordLengths[gname]!!
+                val rowBuf = groupRowBufs[gname]!!
+                rowBuf.fill(0)
                 writeGroupToBuffer(rv, rowBuf, cols, meta0)
                 
                 val out = groupBuffers[gname]!!
@@ -225,8 +180,11 @@ class WasmIsamOperations : IsamOperations {
             }
         }
 
-                fileOps.write(gfilename, newBytes)
-            }
+        for (gname in columnsByGroup.keys) {
+            val cols = columnsByGroup[gname]!!
+            val firstCol = cols.first()
+            val gfilename = if (firstCol.groupId == maxGroupId) datafilename else getGroupFilename(datafilename, gname)
+            fileOps.write(gfilename, groupBuffers[gname]!!)
         }
     }
 
@@ -239,25 +197,11 @@ class WasmIsamOperations : IsamOperations {
         val rowData = rowVec.left
         var localOffset = 0
         for (colMeta in groupMeta) {
-            var globalIdx = -1
-            for (i in 0 until globalMeta.size) {
-                if (globalMeta.b(i).name == colMeta.name) {
-                    globalIdx = i
-                    break
-                }
-            }
-            if (globalIdx == -1) continue
-            val colData = rowData.b(globalIdx)
+            val globalIdx = globalMeta.view.indexOf(colMeta)
+            val colData = rowData[globalIdx]
             val colBytes = colMeta.encoder(colData)
-            copyIntoByteArray(colBytes, rowBuf, localOffset, 0, colBytes.size)
+            colBytes.copyInto(rowBuf, localOffset, 0, colBytes.size)
             localOffset += colMeta.end - colMeta.begin
-        }
-    }
-
-    private fun copyIntoByteArray(source: ByteArray, destination: ByteArray, destinationOffset: Int = 0, startIndex: Int = 0, endIndex: Int = source.size) {
-        var dIdx = destinationOffset
-        for (i in startIndex until endIndex) {
-            destination[dIdx++] = source[i]
         }
     }
 }

@@ -29,10 +29,10 @@ object DiscardingBrainErrorSink : BrainErrorSink {
 }
 
 /**
- * BrainClient — the real flywheel brain.
+ * BrainClient — the answer brain.
  *
  * OpenAI-compatible chat completions over common reactor HTX with multi-provider
- * failover. The flywheel's [FlywheelDriver.buildAnswer] calls this to answer
+ * failover. Callers use this to answer
  * Jules sessions with project conventions as the system prompt.
  *
  * The routing/key design is authoritative here: provider selection goes through

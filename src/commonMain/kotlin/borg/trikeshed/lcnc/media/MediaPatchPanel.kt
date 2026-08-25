@@ -4,6 +4,7 @@ import borg.trikeshed.context.lcnc.*
 import borg.trikeshed.job.ContentId
 import borg.trikeshed.lib.*
 import borg.trikeshed.terminal.*
+import kotlin.jvm.JvmInline
 
 @JvmInline
 value class MediaPatchPanelId(val value: String)
@@ -72,23 +73,23 @@ data class CausalMediaEmission(
 
 /**
  * The terminal media patch panel. The caller owns this mutable state and decides where signals are
- * persisted or fanned out; the panel only establishes manual→causal identity and VT220 patches.
+ * persisted or fanned out; the panel only establishes manual→causal identity and terminal patches.
  */
-class Vt220MediaPatchPanel(
+class XtermMediaPatchPanel(
     val descriptor: MediaPatchPanelDescriptor,
     scrollbackLimit: Int = 2_000,
     private val signalLimit: Int = 4_096,
 ) {
-    val terminal = Vt220Terminal(descriptor.columns, descriptor.rows, scrollbackLimit)
+    val terminal = XtermTerminal(descriptor.columns, descriptor.rows, scrollbackLimit)
     private var sequence = 0L
     private val history = ArrayDeque<LcncUserSignal>()
 
     init {
-        // "vt220" is accepted for continuity with panels created before the capability upgrade;
+        // "xterm" is accepted for continuity with panels created before the capability upgrade;
         // "xterm-256color" is what new panels declare — real VT220 hardware never had ANSI SGR
         // color, and this parser's `sgr()` handles 16/256/truecolor regardless of which label a
         // caller uses, so self-reporting the lesser class only made well-behaved clients downgrade.
-        require(descriptor.kind == "vt220" || descriptor.kind == "xterm-256color") {
+        require(descriptor.kind == "xterm" || descriptor.kind == "xterm-256color") {
             "unsupported panel kind: ${descriptor.kind}"
         }
         require(signalLimit > 0)

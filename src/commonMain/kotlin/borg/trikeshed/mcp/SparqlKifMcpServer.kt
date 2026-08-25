@@ -161,7 +161,7 @@ class SparqlKifMcpServer(
                 val skel = dagSkeletons[dagId] ?: return err("no skeleton $dagId")
                 val pos = args["pos"]?.toIntOrNull() ?: return err("pos required")
                 val payload = args["payload"] ?: ""
-                val newVersion = args["version"] ?: "v${System.currentTimeMillis()}"
+                val newVersion = args["version"] ?: "v${borg.trikeshed.cursor.currentTimeMillis()}"
                 val next = skel.fill(pos, payload, newVersion)
                 dagSkeletons[dagId] = next
                 """{"ok":true,"pos":$pos,"version":"$newVersion","filled":${next.isFilled(pos)}}"""
@@ -172,7 +172,7 @@ class SparqlKifMcpServer(
                 val payloadStr = args["payload"] ?: return err("payload map required")
                 val entries = mutableMapOf<Int, String>()
                 Regex("\"(\\d+)\"\\s*:\\s*\"([^\"]*)\"").findAll(payloadStr).forEach { m -> entries[m.groupValues[1].toInt()] = m.groupValues[2] }
-                val newVersion = args["version"] ?: "v${System.currentTimeMillis()}"
+                val newVersion = args["version"] ?: "v${borg.trikeshed.cursor.currentTimeMillis()}"
                 val next = skel.fillAll(entries, newVersion)
                 dagSkeletons[dagId] = next
                 """{"ok":true,"version":"$newVersion","filled":${next.size}}"""

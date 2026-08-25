@@ -44,7 +44,7 @@ class FakeCasReplicationHook : CasReplicationHook {
 class VolumeCasStoreTest {
 
     @Test
-    fun putThenGetRoundTrip() = runBlocking {
+    fun putThenGetRoundTrip(): Unit = runBlocking {
         val volume = FakeVolume()
         val store = VolumeCasStore.create(volume)
         val data = Random.nextBytes(1024)
@@ -55,7 +55,7 @@ class VolumeCasStoreTest {
     }
 
     @Test
-    fun cidIsDeterministic() = runBlocking {
+    fun cidIsDeterministic(): Unit = runBlocking {
         val volume = FakeVolume()
         val store = VolumeCasStore.create(volume)
         val data = Random.nextBytes(1024)
@@ -65,7 +65,7 @@ class VolumeCasStoreTest {
     }
 
     @Test
-    fun getMissingReturnsNull() = runBlocking {
+    fun getMissingReturnsNull(): Unit = runBlocking {
         val volume = FakeVolume()
         val store = VolumeCasStore.create(volume)
         val cid = ContentId.of(ByteArray(10))
@@ -73,7 +73,7 @@ class VolumeCasStoreTest {
     }
 
     @Test
-    fun manifestCidIsDeterministicAcrossRuns() = runBlocking {
+    fun manifestCidIsDeterministicAcrossRuns(): Unit = runBlocking {
         val volume = FakeVolume()
         val store = VolumeCasStore.create(volume)
         val cid1 = ContentId.of(byteArrayOf(1))
@@ -87,7 +87,7 @@ class VolumeCasStoreTest {
     }
 
     @Test
-    fun manifestCidChangesWhenCidsChange() = runBlocking {
+    fun manifestCidChangesWhenCidsChange(): Unit = runBlocking {
         val volume = FakeVolume()
         val store = VolumeCasStore.create(volume)
         val cid1 = ContentId.of(byteArrayOf(1))
@@ -102,7 +102,7 @@ class VolumeCasStoreTest {
     }
 
     @Test
-    fun replicationHookCalledOnPut() = runBlocking {
+    fun replicationHookCalledOnPut(): Unit = runBlocking {
         val volume = FakeVolume()
         val hook = FakeCasReplicationHook()
         val store = VolumeCasStore.create(volume, hook)
@@ -115,7 +115,7 @@ class VolumeCasStoreTest {
     }
 
     @Test
-    fun deleteDecrementsRefcount() = runBlocking {
+    fun deleteDecrementsRefcount(): Unit = runBlocking {
         val volume = FakeVolume()
         val store = VolumeCasStore.create(volume)
         val data = Random.nextBytes(10)
@@ -131,7 +131,7 @@ class VolumeCasStoreTest {
     }
 
     @Test
-    fun syncPersistsIndex() = runBlocking {
+    fun syncPersistsIndex(): Unit = runBlocking {
         val volume = FakeVolume()
         val store1 = VolumeCasStore.create(volume)
         val data = Random.nextBytes(100)
@@ -169,7 +169,7 @@ class VolumeCasStoreTest {
     }
 
     @Test
-    fun rejectsBlockSizeMismatch() = runBlocking {
+    fun rejectsBlockSizeMismatch(): Unit = runBlocking {
         val volume = FakeVolume(4096)
         assertFailsWith<IllegalArgumentException> {
             VolumeCasStore.create(volume, blockSize = 8192)

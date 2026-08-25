@@ -1,6 +1,7 @@
 package borg.trikeshed.volume
 
 import borg.trikeshed.common.createTempDirectory
+import borg.trikeshed.userspace.volume.PosixVolume
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.joinAll
 import kotlinx.coroutines.launch

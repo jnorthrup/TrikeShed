@@ -1,16 +1,17 @@
 package borg.trikeshed.htx.client.ipfs
 
+import borg.trikeshed.job.sha256
+import borg.trikeshed.util.toLowerHex
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
-import java.security.MessageDigest
 
 data class CID(val bytes: ByteArray) {
-    override fun toString(): String = "CID(${bytes.joinToString("") { "%02x".format(it) }})"
-    fun hex(): String = bytes.joinToString("") { "%02x".format(it) }
+    override fun toString(): String = "CID(${bytes.toLowerHex()})"
+    fun hex(): String = bytes.toLowerHex()
     override fun equals(other: Any?): Boolean = other is CID && bytes.contentEquals(other.bytes)
     override fun hashCode(): Int = bytes.contentHashCode()
     companion object {
-        fun sha256(data: ByteArray): CID = CID(MessageDigest.getInstance("SHA-256").digest(data))
+        fun sha256(data: ByteArray): CID = CID(borg.trikeshed.job.sha256(data))
     }
 }
 

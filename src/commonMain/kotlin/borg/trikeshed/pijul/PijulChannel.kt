@@ -11,14 +11,14 @@ import borg.trikeshed.userspace.nio.file.spi.FileOperations
 import borg.trikeshed.util.oroboros.MergeReceipt
 
 /**
- * A Pijul channel for the flywheel's drain integration.
+ * A Pijul channel for drain integration.
  *
  * Instead of sequential git 3-way merges (drainThreeWay), completed Jules
  * sessions produce patches that are applied to this channel. Patches that
  * touch different regions of the same file commute — no conflict, no merge
  * resolution, no working-tree-clean gate between applications.
  *
- * Integration point: FlywheelDriver.drainFanout can call [applyPatch] for
+ * Integration point: a drain pipeline can call [applyPatch] for
  * each completed session in parallel instead of the sequential
  * git merge → conflict → commit cycle.
  *
@@ -137,7 +137,7 @@ class PijulChannel(
 
     /**
      * Build a MergeReceipt for every patch applied, suitable for the
-     * flywheel's WorkDrained provenance path.
+     * WorkDrained provenance path.
      */
     fun receipts(): List<MergeReceipt> = provenance.values.map { p ->
         MergeReceipt(
@@ -186,7 +186,7 @@ object PatchNoiseInjector {
  * File-level changes extracted from a Jules patch. Each file gets a set
  * of insert and delete operations expressed as line-based positions.
  *
- * The flywheel's [parsePatchFiles] already parses unified diffs; this
+ * Unified-diff parsing exists elsewhere in the drain path; this
  * type is the intermediate representation between diff parsing and CRDT
  * application.
  */

@@ -13,7 +13,7 @@ package borg.trikeshed.graal.subvm
  * replaces it with zero native deps — same tradeoff lean as NiceGUI, but VT-native and Jules-
  * replaceable.
  *
- * Common contract: no AWT, no Swing, no Qt. Host VT (`Vt220Terminal`) renders the returned
+ * Common contract: no AWT, no Swing, no Qt. Host VT (`XtermTerminal`) renders the returned
  * String; the Python sleeve (`graalpy-sleeve/hermes/braille/`) projects the same cells.
  */
 object BrailleUi {

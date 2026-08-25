@@ -181,12 +181,7 @@ fun mkdir(path: String): Boolean {
 
 fun readLinesSeq(path: String): Sequence<String> = borg.trikeshed.common.Files.readAllLines(path).asSequence()
 
-fun readLines(path: String): List<String> = Files.readAllLines(path)
 fun readLines(path: String): List<String> = borg.trikeshed.common.Files.readAllLines(path)
-actual fun platformSeekHandle(): SeekHandle = WasmBrowserSeekHandle
-
-actual fun ioUringHandle(): SeekHandle? = null
-
 
 class SeekFileBuffer(
     val filename: String,

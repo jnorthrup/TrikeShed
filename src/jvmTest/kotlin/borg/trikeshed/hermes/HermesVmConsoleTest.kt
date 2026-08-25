@@ -17,7 +17,7 @@ import kotlin.test.assertTrue
 
 class HermesVmConsoleTest {
     @Test
-    fun vt220ConsoleBootsSleeveCapturesGuestOutputAndBondsCausalSignals() {
+    fun xtermConsoleBootsSleeveCapturesGuestOutputAndBondsCausalSignals() {
         HermesVmConsole(Path.of("unused"), Path.of("unused"), columns = 64, rows = 12).use { console ->
             console.inventoryLoader = { port ->
                 port.inventorySources(
@@ -64,7 +64,7 @@ class HermesVmConsoleTest {
     }
 
     @Test
-    fun wireServesVt220PageSnapshotResizeAndAsyncCommand() = runTest {
+    fun wireServesXtermPageSnapshotResizeAndAsyncCommand() = runTest {
         val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
         try {
             HermesVmConsole(Path.of("unused"), Path.of("unused"), columns = 40, rows = 8).use { console ->

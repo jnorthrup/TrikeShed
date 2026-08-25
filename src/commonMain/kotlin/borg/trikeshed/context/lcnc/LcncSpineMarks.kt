@@ -83,7 +83,7 @@ value class FacetMark(val raw: Byte) {
 /**
  * Zero-cost causal edge tag — [Byte] ordinal aligned 1:1 with
  * [CausalEdgeKind] (CausalKernel.kt:53). A dispatch that executes a
- * reduction is the `Dispatched` edge; the whole flywheel vocabulary
+ * reduction is the `Dispatched` edge; the whole work-cycle vocabulary
  * stays addressable from the spine without heap objects.
  */
 @JvmInline

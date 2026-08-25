@@ -279,6 +279,7 @@ kotlin {
         // We explicitly connect macosMain and linuxMain to posixMain above.
         
         findByName("macosMain")?.dependsOn(posixMain)
+        findByName("macosX64Main")?.dependsOn(getByName("macosMain"))
         findByName("macosTest")?.dependsOn(posixTest)
         findByName("macosX64Test")?.dependsOn(posixTest)
         findByName("linuxMain")?.dependsOn(posixMain)
@@ -696,15 +697,6 @@ tasks.register<Exec>("runOroborosDaemonAot") {
     }
 }
 
-// TUI — interactive flywheel console, reads board from cwd.
-tasks.register<JavaExec>("runFlywheelTui") {
-    group = "oroboros"
-    description = "Launch FlywheelTui from naked classes + staged lib/. -Pjdwp=5006[,suspend] attaches a debugger."
-    mainClass.set("borg.trikeshed.flywheel.FlywheelTui")
-    useStagedJvmClasspath()
-    standardInput = System.`in`
-}
-
 // Kanban HTTP server for the modelmux CLI.
 tasks.register<JavaExec>("runKanbanHttpServerJvm") {
     group = "forge"
@@ -733,6 +725,18 @@ fun debtExcludes(name: String): List<String> =
 
 val jsTargetDebt = debtExcludes("js-target-debt.excludes")
 val wasmTargetDebt = debtExcludes("wasm-target-debt.excludes")
+val nativeTargetDebt = debtExcludes("native-target-debt.excludes")
+
+// Same ratchet, native side: cut jvm-only commonMain debt from the Kotlin/Native compiles and
+// the shared-metadata compile so `gradle build` stays green without touching the JVM path.
+tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinNativeCompile>().configureEach {
+    exclude(nativeTargetDebt)
+    inputs.property("nativeDebtExcludes", nativeTargetDebt)
+}
+tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompileCommon>().configureEach {
+    exclude(nativeTargetDebt)
+    inputs.property("nativeDebtExcludes", nativeTargetDebt)
+}
 
 tasks.withType<Kotlin2JsCompile>().configureEach {
     val globs = jsTargetDebt + (if (name.contains("WasmJs")) wasmTargetDebt else emptyList())

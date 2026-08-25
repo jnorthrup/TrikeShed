@@ -4,7 +4,6 @@ import borg.trikeshed.forge.ForgeApp
 import borg.trikeshed.kanban.ForgeKanbanIngest
 import borg.trikeshed.parse.json.JsonSupport
 import kotlinx.datetime.Clock
-import metrics.FlywheelMetrics
 
 /**
  * ForgeRoutes — commonMain-sourced route table for `runKanbanHttpServerJvm`.
@@ -48,10 +47,10 @@ object ForgeRoutes {
         RouteMeta("GET", "/api/health", Tier.PORTABLE, "liveness probe {ok,server,now}"),
         RouteMeta("GET", "/api/cap", Tier.PORTABLE, "protocols + capabilities"),
         RouteMeta("GET", "/api/board", Tier.PORTABLE, "ForgeKanbanIngest.loadProjection → {title,userId,items}"),
-        RouteMeta("GET", "/api/metrics", Tier.PORTABLE, "FlywheelMetrics Prometheus or JSON (?format=json)"),
+        RouteMeta("GET", "/api/metrics", Tier.PORTABLE, "retired flywheel metrics stub (?format=json)"),
         // ── Jules (PORTABLE projection, live driver freshens it) ──
-        RouteMeta("GET", "/api/jules/surface", Tier.PORTABLE, "JulesBlackboardAdapter.projectFullSurface + lastReactiveReport"),
-        RouteMeta("GET", "/api/jules/events", Tier.PORTABLE, "FlywheelDriver.events SSE (live); baking uses empty stream"),
+        RouteMeta("GET", "/api/jules/surface", Tier.PORTABLE, "JulesBlackboardAdapter.projectFullSurface (historical board only)"),
+        RouteMeta("GET", "/api/jules/events", Tier.PORTABLE, "retired flywheel SSE — answers 410 Gone"),
         // ── Ingest (PORTABLE gate, JVM_ONLY extract actual) ──
         RouteMeta("POST", "/api/submit", Tier.JVM_ONLY, "ingest body → ForgeKanbanIngest.persistMarkdown (Tika actual)"),
         RouteMeta("POST", "/api/donor", Tier.JVM_ONLY, "alias of /api/submit"),
@@ -117,13 +116,9 @@ object ForgeRoutes {
 
     fun metricsResponse(acceptJson: Boolean): HttpForwarderResponse =
         if (acceptJson) {
-            val json = runCatching { JsonSupport.stringify(FlywheelMetrics.toJsonMap()) }
-                .getOrElse { """{"error":"metrics_unavailable"}""" }
-            HttpForwarderResponse(200, body = json.encodeToByteArray())
+            HttpForwarderResponse(200, body = """{"retired":"flywheel metrics removed 2026-08-24"}""".encodeToByteArray())
         } else {
-            val prom = runCatching { FlywheelMetrics.toPrometheusFormat() }
-                .getOrElse { "# ERROR: metrics unavailable\n" }
-            HttpForwarderResponse(200, headers = mapOf("Content-Type" to "text/plain; version=0.0.4; charset=utf-8"), body = prom.encodeToByteArray())
+            HttpForwarderResponse(200, headers = mapOf("Content-Type" to "text/plain; version=0.0.4; charset=utf-8"), body = "# flywheel metrics retired 2026-08-24\n".encodeToByteArray())
         }
 
     fun invokeJson(payload: String): HttpForwarderResponse {

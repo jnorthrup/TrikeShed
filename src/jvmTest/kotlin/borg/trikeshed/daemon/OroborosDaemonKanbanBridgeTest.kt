@@ -19,7 +19,7 @@ class OroborosDaemonKanbanBridgeTest {
 
     @Test
     fun testBridgeMocks(): Unit = runBlocking {
-        // Simulating FlywheelDriver with JulesRestClient emitting events directly,
+        // Simulating the retired driver loop with JulesRestClient emitting events directly,
         // and bridging them via OroborosDaemon's bridge mapping logic (which is now inline).
         // Since we can't easily launch the daemon without mocking the system environment,
         // we'll directly test the outcome of KanbanFSM.reduce for CycleObserved

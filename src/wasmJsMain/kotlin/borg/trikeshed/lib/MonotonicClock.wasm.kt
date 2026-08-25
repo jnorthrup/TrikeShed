@@ -1,5 +1,7 @@
 package borg.trikeshed.lib
 
-import kotlin.js.Date
+@OptIn(kotlin.js.ExperimentalWasmJsInterop::class)
+@JsFun("() => Date.now()")
+private external fun jsDateNow(): Double
 
-actual fun monotonicNowMillis(): Long = Date.now().toLong()
+actual fun monotonicNowMillis(): Long = jsDateNow().toLong()

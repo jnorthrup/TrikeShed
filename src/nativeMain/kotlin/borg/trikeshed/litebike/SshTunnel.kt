@@ -1,5 +1,6 @@
 package borg.trikeshed.litebike
 
+import borg.trikeshed.litebike.taxonomy.Protocol
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.emptyFlow
 

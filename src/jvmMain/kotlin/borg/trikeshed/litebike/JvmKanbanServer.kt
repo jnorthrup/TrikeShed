@@ -8,7 +8,6 @@ import borg.trikeshed.graph.CausalGraphNode
 import borg.trikeshed.graph.CausalGraphNodeIndex
 import borg.trikeshed.graph.causalGraphNode
 import borg.trikeshed.kanban.ForgeKanbanIngest
-import metrics.FlywheelMetrics
 import borg.trikeshed.context.nuid.Capability
 import borg.trikeshed.context.nuid.Nonce
 import borg.trikeshed.context.nuid.Nuid
@@ -72,8 +71,6 @@ typealias ExtraRoute = suspend (method: String, path: String, text: String, resp
 typealias RawRoute = suspend (method: String, path: String, payload: ByteArray, respond: (suspend (ByteArray) -> Unit)?) -> JvmKanbanServer.HttpResponse?
 
 class JvmKanbanServer(
-    /** FlywheelDriver for live Jules surface and cycle report. Nullable so the server can start before the driver. */
-    private val flywheelDriver: borg.trikeshed.jules.FlywheelDriver? = null,
     /** Extension seam: tried after the built-in routes and static assets, first non-null wins (BlackboardWire, VmWire, …). */
     private val extraRoutes: List<ExtraRoute> = emptyList(),
     /**
@@ -87,14 +84,11 @@ class JvmKanbanServer(
     /** Listener batch/reassembly unit: request cap is `maxRequestBatch * 1024` bytes (64 KiB at the default). */
     private val maxRequestBatch: Int = 64,
 ) {
-    /** SSE event stream path — collects FlywheelDriver.events as text/event-stream. SURFACE_TTL_MS bounds /api/jules/surface cache life. */
+    /** SSE event stream path — retired with the flywheel; answers 410 Gone. SURFACE_TTL_MS bounds /api/jules/surface cache life. */
     private companion object {
         private const val SSE_PATH = "/api/jules/events"
         private const val SURFACE_TTL_MS = 10_000L
     }
-
-    // Mutable driver slot so the daemon can swap in the driver after construction.
-    private var _driver: borg.trikeshed.jules.FlywheelDriver? = flywheelDriver
 
     /** Detached scope for best-effort surface fetches: a timed-out fetch is abandoned, not awaited. */
     private val surfaceScope = kotlinx.coroutines.CoroutineScope(
@@ -110,11 +104,6 @@ class JvmKanbanServer(
      * than the cycle itself.
      */
     @Volatile private var surfaceCache: Pair<Long, String>? = null
-
-    /** Atomically swap the live driver reference. Called from OroborosDaemon after FlywheelDriver construction. */
-    fun attachDriver(driver: borg.trikeshed.jules.FlywheelDriver) {
-        _driver = driver
-    }
 
     private val causalWal = CausalWal(File(".causal.wal"))
     private val graphIndex = CausalGraphNodeIndex()
@@ -297,39 +286,9 @@ class JvmKanbanServer(
                 }
 
                 if (isSse) {
-                    val driver = _driver
-                    if (driver == null) {
-                        val err = "HTTP/1.1 503 Service Unavailable\r\nContent-Length: 0\r\n\r\n"
-                        msg.respond?.invoke(err.toByteArray(StandardCharsets.UTF_8))
-                    } else {
-                        // Send SSE headers immediately — no Content-Length, connection: keep-alive
-                        val headers = "HTTP/1.1 200 OK\r\n" +
-                            "Content-Type: text/event-stream\r\n" +
-                            "Cache-Control: no-cache\r\n" +
-                            "Connection: keep-alive\r\n" +
-                            "Access-Control-Allow-Origin: *\r\n\r\n"
-                        msg.respond?.invoke(headers.toByteArray(StandardCharsets.UTF_8))
-
-                        // Stream events until client disconnects
-                        val driver0 = driver
-                        scope.launch {
-                            try {
-                                driver0.events.collect { event ->
-                                    val data = "data: ${JsonSupport.stringify(event)}\r\n\r\n"
-                                    try {
-                                        msg.respond?.invoke(data.toByteArray(StandardCharsets.UTF_8))
-                                    } catch (_: Throwable) {
-                                        // Connection dropped — normal SSE termination
-                                        throw kotlinx.coroutines.CancellationException("SSE client disconnected")
-                                    }
-                                }
-                            } catch (_: kotlinx.coroutines.CancellationException) {
-                                // Client disconnected — expected
-                            } catch (t: Throwable) {
-                                System.err.println("SSE stream error: ${t.message}")
-                            }
-                        }
-                    }
+                    // The flywheel event stream is gone; tell clients to stop reconnecting.
+                    val err = "HTTP/1.1 410 Gone\r\nContent-Length: 0\r\n\r\n"
+                    msg.respond?.invoke(err.toByteArray(StandardCharsets.UTF_8))
                     // Consume but do NOT call routeHttp for SSE
                     continue
                 }
@@ -420,75 +379,37 @@ class JvmKanbanServer(
             "/api/cap"    -> HttpResponse(200, """{"protocols":["Http","Json","Socks5","Tls","Bonjour","Upnp"],"capabilities":["Process@local","Cas@local","Wireproto@lan.localhost"]}""")
             "/api/board"  -> HttpResponse(200, boardJson())
             "/api/metrics" -> {
-                // Prometheus text-format metrics scrape endpoint.
-                // Also supports JSON ?format=json query param.
+                // Flywheel metrics retired 2026-08-24; endpoint kept so scrapers get a clean answer.
                 val acceptJson = text.contains("format=json", ignoreCase = true)
                 if (acceptJson) {
-                    val json = runCatching { JsonSupport.stringify(FlywheelMetrics.toJsonMap()) }
-                        .getOrElse { """{"error":"metrics_unavailable"}""" }
-                    HttpResponse(200, json)
+                    HttpResponse(200, """{"retired":"flywheel metrics removed 2026-08-24"}""")
                 } else {
-                    val prom = runCatching { FlywheelMetrics.toPrometheusFormat() }
-                        .getOrElse { "# ERROR: metrics unavailable\n" }
-                    HttpResponse(200, prom, "text/plain; version=0.0.4; charset=utf-8")
+                    HttpResponse(200, "# flywheel metrics retired 2026-08-24\n", "text/plain; version=0.0.4; charset=utf-8")
                 }
             }
             "/api/jules/surface" -> {
-                // Live Jules blackboard surface from the flywheel driver.
-                val driver = _driver
-                if (driver == null) {
-                    HttpResponse(503, """{"error":"driver_not_ready","message":"flywheel driver not yet attached"}""")
+                // Historical Jules projection only — the flywheel driver that freshened
+                // live sessions is deleted; the adapter's persisted board still projects.
+                val now = System.currentTimeMillis()
+                val cached = surfaceCache
+                val body: String
+                if (cached != null && now - cached.first < SURFACE_TTL_MS) {
+                    body = cached.second
                 } else {
-                    // Serve from cache while fresh: the GUI polls continuously and every
-                    // recompute can cost seconds of the single HTTP worker's time, making
-                    // polls queue behind each other (GUI freezes on its last frame).
-                    val now = System.currentTimeMillis()
-                    val cached = surfaceCache
-                    val body: String
-                    if (cached != null && now - cached.first < SURFACE_TTL_MS) {
-                        body = cached.second
-                    } else {
-                        val report = driver.lastReactiveReport
-                        val surface = runCatching {
-                            val sessions = driver.activeSessions
-                            // Sessions come from the driver's in-memory projection (no reactor, no
-                            // fetch) — that is what the GUI counts. Activity timelines are NOT
-                            // fetched here: the shared HTX reactor is held by the flywheel cycle,
-                            // every timed-out fetch still occupies the reactor's queue (cancel
-                            // cannot evict it), so per-request fetches self-poison the reactor and
-                            // wedge the single HTTP worker (GUI frozen on its last frame). The
-                            // cycle persists timelines to the WAL; the surface stays sessions-only.
-                            val activitiesBySession: Map<String, List<JulesRestClient.ActivityInfo>> = emptyMap()
-                            // Evict expired entries and emit TTL eviction events to SSE clients.
-                            val evicted = borg.trikeshed.jules.ui.JulesBlackboardAdapter.evictExpired()
-                            driver.emitTtlEvicted(evicted)
-                            val (_, surf, _) = borg.trikeshed.jules.ui.JulesBlackboardAdapter.projectFullSurface(
-                                sessions = sessions,
-                                activitiesBySession = activitiesBySession,
-                            )
-                            JsonSupport.stringify(surf)
-                        }.getOrElse { ex ->
-                            """{"error":"surface_projection_failed","reason":"${ex.message?.take(200)}"}"""
-                        }
-                        val phaseLatenciesJson = report?.phaseLatencies?.joinToString(",", "[", "]") { (phase, ms) ->
-                            """["$phase",$ms]"""
-                        } ?: "[]"
-                        val auditSignalsJson = report?.auditSignals?.joinToString(",", "[", "]") { "\"${it.replace("\\", "\\\\").replace("\"", "\\\"")}\"" } ?: "[]"
-                        val reportJson = if (report != null) {
-                            ""","cycle":{"cycleMs":${report.cycleMs},"phase":"${report.phase.name}","answered":${report.answered},"dispatched":${report.dispatched},"alive":${report.alive},"available":${report.available},"settled":${report.settled},"archived":${report.archived},"phaseLatencies":$phaseLatenciesJson,"auditSignals":$auditSignalsJson}"""
-                        } else {
-                            ""
-                        }
-                        val metricsMap = FlywheelMetrics.toJsonMap()
-                        val cyclesPerSecond = metricsMap["cyclesPerSecond"]
-                        val cyclesAt100PerDay = metricsMap["cyclesAt100PerDay"]
-                        val activeSlots = FlywheelMetrics.activeSlots
-                        val targetSlots = FlywheelMetrics.TARGET_SLOTS
-                        body = """{"surface":$surface$reportJson,"throughput":{"cyclesPerSecond":$cyclesPerSecond,"cyclesAt100PerDay":$cyclesAt100PerDay},"slots":{"cap":$targetSlots,"alive":$activeSlots,"available":${(targetSlots - activeSlots).coerceAtLeast(0)}}}"""
-                        surfaceCache = now to body
+                    val surface = runCatching {
+                        borg.trikeshed.jules.ui.JulesBlackboardAdapter.evictExpired()
+                        val (_, surf, _) = borg.trikeshed.jules.ui.JulesBlackboardAdapter.projectFullSurface(
+                            sessions = emptyList(),
+                            activitiesBySession = emptyMap(),
+                        )
+                        JsonSupport.stringify(surf)
+                    }.getOrElse { ex ->
+                        """{"error":"surface_projection_failed","reason":"${ex.message?.take(200)}"}"""
                     }
-                    HttpResponse(200, body)
+                    body = """{"surface":$surface}"""
+                    surfaceCache = now to body
                 }
+                HttpResponse(200, body)
             }
             "/api/submit" -> if (method == "POST") submit(text) else HttpResponse(405, """{"error":"method_not_allowed"}""")
             "/api/donor"  -> if (method == "POST") submit(text) else HttpResponse(405, """{"error":"method_not_allowed"}""")

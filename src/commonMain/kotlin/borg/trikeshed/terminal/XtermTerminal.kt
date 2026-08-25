@@ -64,7 +64,7 @@ enum class VtKey {
  * Stateful VT220/ECMA-48 screen model. It consumes output text, not a host PTY, so it remains
  * commonMain and can back browser, TUI, desktop and test surfaces with one parser.
  */
-class Vt220Terminal(
+class XtermTerminal(
     columns: Int = 80,
     rows: Int = 24,
     private val scrollbackLimit: Int = 2_000,

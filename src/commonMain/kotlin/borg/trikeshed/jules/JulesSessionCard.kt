@@ -216,7 +216,7 @@ sealed class JulesCause {
 
     /** Identity synthesized for a dispatched work item. Carries the durable
      *  synonym map (sessionId → gitBranch → prUrl → gitTag → commitSha) so the
-     *  flywheel can recover the identity across restarts without re-minting. */
+     *  conductor can recover the identity across restarts without re-minting. */
     data class WorkIdentitySynthesized(
         override val workId: String,
         val identity: WorkIdentity,

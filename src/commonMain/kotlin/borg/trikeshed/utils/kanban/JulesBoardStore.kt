@@ -105,14 +105,14 @@ class JulesBoardStore(
     /**
      * Append a work-queue cause (WorkQueued/WorkDispatched/WorkDrained) under the
      * workId as the WAL key. Idempotent on (workId, kind): a second WorkQueued for
-     * the same workId is a no-op (dedup at dispatch time in the flywheel).
+     * the same workId is a no-op (dedup at dispatch time).
      */
     suspend fun appendWork(workId: String, cause: JulesCause) {
         wal.append(workId, KanbanEventCodec.encodeCause(workId, cause).encodeToByteArray())
     }
 
     /**
-     * Replay causes for a specific workId — used by the flywheel's trajectory reducer
+     * Replay causes for a specific workId — used by the trajectory reducer
      * to compute the dispatch verdict without loading the full board.
      */
     fun replayCauses(workId: String): List<JulesCause> {

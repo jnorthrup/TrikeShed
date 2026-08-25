@@ -1,0 +1,12 @@
+# Ant globs excluded from the Kotlin/Native compiles and compileCommonMainKotlinMetadata ONLY.
+# The JVM build is untouched. Delete a line once the file compiles on those targets = ratchet.
+# java.util.TreeMap in commonMain plus flywheel-patched code that only resolves on jvm
+**/parse/json/Codec.kt
+# androidx Compose UI in commonMain; Compose is not a dependency of any target here
+**/ui/palette/**
+# expect declarations with jvm-only actuals (mirrors the js ratchet's reasoning)
+**/userspace/nio/ebpf/**
+**/org/trikeshed/oroboros/OroborosDaemon.kt
+# jvm-only test debt for native test compiles
+**/userspace/nio/process/ProcessWorkerContractTest.kt
+**/forge/window/NativeForgeWindowManagerTest.kt

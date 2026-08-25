@@ -5,7 +5,7 @@ import borg.trikeshed.lcnc.media.LcncUserSignal
 import borg.trikeshed.lcnc.media.ManualMediaInput
 import borg.trikeshed.lcnc.media.MediaPatchPanelDescriptor
 import borg.trikeshed.lcnc.media.MediaPatchPanelId
-import borg.trikeshed.lcnc.media.Vt220MediaPatchPanel
+import borg.trikeshed.lcnc.media.XtermMediaPatchPanel
 import borg.trikeshed.lcnc.media.toKanbanEvent
 import borg.trikeshed.lcnc.media.toMap
 import borg.trikeshed.lib.view
@@ -36,8 +36,8 @@ class VmTerminalSession(
     rows: Int = 28,
     private val publish: (VmTerminalEvent) -> Unit = {},
 ) : AutoCloseable {
-    val panel = Vt220MediaPatchPanel(
-        MediaPatchPanelDescriptor(MediaPatchPanelId("vm/$vmId/vt220"), "xterm-256color", "$vmId · ${facet.id}", columns, rows),
+    val panel = XtermMediaPatchPanel(
+        MediaPatchPanelDescriptor(MediaPatchPanelId("vm/$vmId/xterm"), "xterm-256color", "$vmId · ${facet.id}", columns, rows),
     )
     val input = TerminalInputStream()
     @Volatile private var inputSink: (String) -> Unit = input::push
@@ -58,7 +58,7 @@ class VmTerminalSession(
     }
 
     fun prepare(command: String, timestampMs: Long = System.currentTimeMillis()): ManualMediaInput = synchronized(lock) {
-        require(command.length <= Vt220MediaPatchPanel.MAX_SIGNAL_PAYLOAD) { "command too long" }
+        require(command.length <= XtermMediaPatchPanel.MAX_SIGNAL_PAYLOAD) { "command too long" }
         panel.manualCommand(command, timestampMs).also { emit(VmTerminalEvent.Manual(vmId, it.signal)); land(it.signal) }
     }
 

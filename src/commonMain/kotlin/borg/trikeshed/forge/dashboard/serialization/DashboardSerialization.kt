@@ -13,13 +13,6 @@ object DashboardSerialization {
         )
     )
 
-    fun toJson(flywheel: FlywheelState): String = JsonSupport.stringify(
-        mapOf(
-            "lastCycleAt" to flywheel.lastCycleAt,
-            "timeline" to flywheel.timeline.toArray().toList()
-        )
-    )
-
     fun toJson(node: CcekNode): String = JsonSupport.stringify(
         mapOf(
             "nuid" to node.nuid,

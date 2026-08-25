@@ -21,7 +21,7 @@ class OroborosDaemonArgsTest {
     }
 
     @Test
-    fun hermesVt220PathsAndEagerBootAreExplicitDaemonParameters() {
+    fun hermesXtermPathsAndEagerBootAreExplicitDaemonParameters() {
         val config = OroborosDaemon.parseConfig(arrayOf(
             "--hermes-root", "/source/hermes",
             "--hermes-sleeve", "/sleeve/hermes",

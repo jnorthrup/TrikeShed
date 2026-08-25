@@ -46,67 +46,15 @@ import kotlinx.datetime.Clock
  */
 object ForgeApp {
 
-    /**
-     * Flat snapshot of FlywheelDriver.lastReactiveReport, flattened to plain
-     * primitives so it lives in commonMain and serializes into the dashboard seed.
-     * Constructed by the caller in jvmMain where CycleReport is defined:
-     * ```
-     * val report = flywheelDriver.lastReactiveReport ?: return@runBlocking null
-     * val snapshot = ForgeApp.FlywheelReportSnapshot(
-     *     cycleMs = report.cycleMs, answered = report.answered, harvested = report.harvested,
-     *     reworked = report.reworked, dispatched = report.dispatched, alive = report.alive,
-     *     available = report.available, inducted = report.inducted, settled = report.settled,
-     *     archived = report.archived, phase = report.phase.name, conflicts = report.conflicts,
-     *     http429 = report.http429, http5xx = report.http5xx,
-     * )
-     * ```
-     */
-    data class FlywheelReportSnapshot(
-        val cycleMs: Long,
-        val answered: Int,
-        val harvested: Int,
-        val reworked: Int,
-        val dispatched: Int,
-        val alive: Int,
-        val available: Int,
-        val inducted: Int,
-        val settled: Boolean,
-        val archived: Int,
-        val phase: String,
-        val conflicts: List<String>,
-        val http429: Int,
-        val http5xx: Int,
-        val updatedAt: Long = Clock.System.now().toEpochMilliseconds(),
-    ) {
-        fun toMap(): Map<String, Any?> = mapOf(
-            "cycleMs" to cycleMs,
-            "answered" to answered,
-            "harvested" to harvested,
-            "reworked" to reworked,
-            "dispatched" to dispatched,
-            "alive" to alive,
-            "available" to available,
-            "inducted" to inducted,
-            "settled" to settled,
-            "archived" to archived,
-            "phase" to phase,
-            "conflicts" to conflicts,
-            "http429" to http429,
-            "http5xx" to http5xx,
-            "updatedAt" to updatedAt,
-        )
-    }
-
     /** Render the complete Forge HTML shell with seeded state for PWA offline-first hydration. */
     fun renderHtml(
         userId: String = "jim",
         julesSurface: JulesBlackboardSurface? = null,
-        flywheelReport: FlywheelReportSnapshot? = null,
         bundles: List<String> = emptyList(),
         vmHost: VmHost = PlatformHost.default.vmHost,
     ): String {
         val reduction = runCatching { ForgeKanbanIngest.loadProjection(userId) }.getOrElse { ForgeKanbanIngest.fallbackReduction() }
-        val seed = forgeSeedJson(userId, reduction, julesSurface, flywheelReport, vmHost)
+        val seed = forgeSeedJson(userId, reduction, julesSurface, vmHost)
         return htmlShell(seed, bundles)
     }
 
@@ -114,7 +62,6 @@ object ForgeApp {
         userId: String,
         reduction: ForgeKanbanReduction,
         julesSurface: JulesBlackboardSurface?,
-        flywheelReport: FlywheelReportSnapshot?,
         vmHost: VmHost,
     ): String {
         val seedMap = mapOf<String, Any?>(
@@ -164,7 +111,7 @@ object ForgeApp {
             "conceptGraph" to ConceptGraph.layoutSeed(),
             "sheets" to forgeSheetsSeed(reduction),
             "blackboardSeed" to forgeBlackboardSeed(julesSurface),
-            "dashboards" to forgeDashboardSeed(flywheelReport),
+            "dashboards" to forgeDashboardSeed(),
             "hosts" to forgeHostsSeed(vmHost),
         )
         // The seed lives inside <script type="application/json">; a literal "</" must not end that element.
@@ -282,9 +229,8 @@ object ForgeApp {
         )
     }
 
-    private fun forgeDashboardSeed(flywheelReport: FlywheelReportSnapshot?): Map<String, Any?> = mapOf(
+    private fun forgeDashboardSeed(): Map<String, Any?> = mapOf(
         "nio" to nioSeed(),
-        "flywheel" to (flywheelReport?.toMap() ?: emptyMap<String, Any?>()),
     )
 
     /** Placeholders in `src/commonMain/resources/web/index.html`; the shell and `script.js` share one DOM. */

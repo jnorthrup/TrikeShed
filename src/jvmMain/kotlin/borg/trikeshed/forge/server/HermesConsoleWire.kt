@@ -124,8 +124,8 @@ class HermesConsoleWire(
     }
 
     private fun page(): JvmKanbanServer.HttpResponse {
-        val bytes = HermesConsoleWire::class.java.classLoader.getResourceAsStream("web/hermes-vt220.html")?.use { it.readBytes() }
-            ?: return JvmKanbanServer.HttpResponse(404, """{"error":"asset_missing","resource":"web/hermes-vt220.html"}""")
+        val bytes = HermesConsoleWire::class.java.classLoader.getResourceAsStream("web/hermes-xterm.html")?.use { it.readBytes() }
+            ?: return JvmKanbanServer.HttpResponse(404, """{"error":"asset_missing","resource":"web/hermes-xterm.html"}""")
         return JvmKanbanServer.HttpResponse(200, "", "text/html; charset=utf-8", bytes)
     }
 

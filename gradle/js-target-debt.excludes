@@ -3,7 +3,6 @@
 # Probe readiness with: ./gradlew forgePagesProbe
 **/torrent/**
 **/taxonomy/CryptoAndFormatTaxonomy.kt
-**/htx/client/ipfs/CidAndStore.kt
 **/parse/json/Codec.kt
 **/ui/palette/**
 # expect declarations with no JS actual (eBPF/JIT, process workers, oroboros daemon) and their commonMain consumers

@@ -5,7 +5,7 @@ import borg.trikeshed.lcnc.media.LcncUserSignal
 import borg.trikeshed.lcnc.media.ManualMediaInput
 import borg.trikeshed.lcnc.media.MediaPatchPanelDescriptor
 import borg.trikeshed.lcnc.media.MediaPatchPanelId
-import borg.trikeshed.lcnc.media.Vt220MediaPatchPanel
+import borg.trikeshed.lcnc.media.XtermMediaPatchPanel
 import borg.trikeshed.lcnc.media.toKanbanEvent
 import borg.trikeshed.lcnc.media.toMap
 import borg.trikeshed.lib.get
@@ -39,8 +39,8 @@ class HermesVmConsole(
         data class StateChanged(val state: State, val detail: String) : Event()
     }
 
-    val panel = Vt220MediaPatchPanel(
-        MediaPatchPanelDescriptor(MediaPatchPanelId("hermes/vt220"), "xterm-256color", "Hermes GraalPy", columns, rows),
+    val panel = XtermMediaPatchPanel(
+        MediaPatchPanelDescriptor(MediaPatchPanelId("hermes/xterm"), "xterm-256color", "Hermes GraalPy", columns, rows),
     )
     private val lock = Any()
     private val currentCause = AtomicReference<String?>(null)
@@ -73,7 +73,7 @@ class HermesVmConsole(
                 timestampMs,
             )
             port.importInVm(scanned, "hermes_cli.main")
-            port.evalInVm(CONSOLE_BOOTSTRAP, "hermes-vt220-bootstrap.py")
+            port.evalInVm(CONSOLE_BOOTSTRAP, "hermes-xterm-bootstrap.py")
             transition(State.READY, "hermes_cli.main imported in no-native GraalPy")
             causalOutput("\u001b[32mready\u001b[0m · :help for console commands\r\n\u001b[38;5;208mhermes>\u001b[0m ", null, timestampMs)
             State.READY
@@ -89,7 +89,7 @@ class HermesVmConsole(
         execute(prepareCommand(command, timestampMs), timestampMs)
 
     fun prepareCommand(command: String, timestampMs: Long = System.currentTimeMillis()): ManualMediaInput = synchronized(lock) {
-        require(command.length <= Vt220MediaPatchPanel.MAX_SIGNAL_PAYLOAD) { "command exceeds ${Vt220MediaPatchPanel.MAX_SIGNAL_PAYLOAD} characters" }
+        require(command.length <= XtermMediaPatchPanel.MAX_SIGNAL_PAYLOAD) { "command exceeds ${XtermMediaPatchPanel.MAX_SIGNAL_PAYLOAD} characters" }
         panel.manualCommand(command, timestampMs).also(::emitManual)
     }
 
@@ -267,7 +267,7 @@ class HermesVmConsole(
 
     private fun land(signal: LcncUserSignal) {
         val map = signal.toMap()
-        runCatching { port.blackboard().put("hermes/console/signal/${signal.id}", map, "vt220") }
+        runCatching { port.blackboard().put("hermes/console/signal/${signal.id}", map, "xterm") }
         KanbanFSM.kanbanEvents.tryEmit(signal.toKanbanEvent())
     }
 

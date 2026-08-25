@@ -31,7 +31,7 @@ object GuestEnvironment {
     private val FIXED: Map<String, String> = mapOf(
         // A well-behaved CLI checks TERM (or isatty()) before deciding whether ANSI SGR/256-color
         // is safe to emit; leaving it unset reads as "no color support" and guests downgrade
-        // silently even though this project's own VT parser (Vt220Terminal.sgr) handles it fine.
+        // silently even though this project's own VT parser (XtermTerminal.sgr) handles it fine.
         "TERM" to "xterm-256color",
         "LANG" to "C.UTF-8",
     )

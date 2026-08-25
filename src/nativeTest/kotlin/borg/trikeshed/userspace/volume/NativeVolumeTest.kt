@@ -10,7 +10,7 @@ import platform.posix.remove
 
 class NativeVolumeTest {
     @Test
-    fun testPosixVolumeEmpty() = runBlocking {
+    fun testPosixVolumeEmpty(): Unit = runBlocking {
         val path = "test_posix_empty.bin"
         platform.posix.remove(path)
         val volume = PosixVolume(path, blockSize = 512, capacityBytes = 1024L)
@@ -22,7 +22,7 @@ class NativeVolumeTest {
     }
 
     @Test
-    fun testLiburingVolumeEmpty() = runBlocking {
+    fun testLiburingVolumeEmpty(): Unit = runBlocking {
         val path = "test_liburing_empty.bin"
         platform.posix.remove(path)
         val volume = LiburingVolume(path, blockSize = 512, capacityBytes = 1024L)
@@ -34,7 +34,7 @@ class NativeVolumeTest {
     }
 
     @Test
-    fun testPosixVolume() = runBlocking {
+    fun testPosixVolume(): Unit = runBlocking {
         val path = "test_posix_volume.bin"
         platform.posix.remove(path)
         val volume = PosixVolume(path, blockSize = 512, capacityBytes = 1024L)
@@ -54,7 +54,7 @@ class NativeVolumeTest {
     }
 
     @Test
-    fun testLiburingVolume() = runBlocking {
+    fun testLiburingVolume(): Unit = runBlocking {
         val path = "test_liburing_volume.bin"
         platform.posix.remove(path)
         val volume = LiburingVolume(path, blockSize = 512, capacityBytes = 1024L)
@@ -74,7 +74,7 @@ class NativeVolumeTest {
     }
 
     @Test
-    fun testPosixVolumeOutOfBounds() = runBlocking {
+    fun testPosixVolumeOutOfBounds(): Unit = runBlocking {
         val path = "test_posix_oob.bin"
         platform.posix.remove(path)
         val volume = PosixVolume(path, blockSize = 512, capacityBytes = 1024L)
@@ -91,7 +91,7 @@ class NativeVolumeTest {
     }
     
     @Test
-    fun testLiburingVolumeOutOfBounds() = runBlocking {
+    fun testLiburingVolumeOutOfBounds(): Unit = runBlocking {
         val path = "test_liburing_oob.bin"
         platform.posix.remove(path)
         val volume = LiburingVolume(path, blockSize = 512, capacityBytes = 1024L)
@@ -108,7 +108,7 @@ class NativeVolumeTest {
     }
 
     @Test
-    fun testPosixConcurrency() = runBlocking {
+    fun testPosixConcurrency(): Unit = runBlocking {
         val path = "test_posix_concurrency.bin"
         platform.posix.remove(path)
         val volume = PosixVolume(path, blockSize = 512, capacityBytes = 4096L)
@@ -145,7 +145,7 @@ class NativeVolumeTest {
     }
     
     @Test
-    fun testLiburingConcurrency() = runBlocking {
+    fun testLiburingConcurrency(): Unit = runBlocking {
         val path = "test_liburing_concurrency.bin"
         platform.posix.remove(path)
         val volume = LiburingVolume(path, blockSize = 512, capacityBytes = 4096L)
@@ -182,7 +182,7 @@ class NativeVolumeTest {
     }
 
     @Test
-    fun testCcekLifecycle() = runBlocking {
+    fun testCcekLifecycle(): Unit = runBlocking {
         val path = "test_lifecycle.bin"
         platform.posix.remove(path)
         

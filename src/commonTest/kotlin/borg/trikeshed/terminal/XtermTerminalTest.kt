@@ -5,7 +5,7 @@ import borg.trikeshed.lcnc.media.CausalSignalKind
 import borg.trikeshed.lcnc.media.LcncSignalLane
 import borg.trikeshed.lcnc.media.MediaPatchPanelDescriptor
 import borg.trikeshed.lcnc.media.MediaPatchPanelId
-import borg.trikeshed.lcnc.media.Vt220MediaPatchPanel
+import borg.trikeshed.lcnc.media.XtermMediaPatchPanel
 import borg.trikeshed.lib.get
 import borg.trikeshed.lib.size
 import borg.trikeshed.lib.view
@@ -17,13 +17,13 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
-class Vt220TerminalTest {
+class XtermTerminalTest {
     @AfterTest
     fun resetKanban() = KanbanFSM.reset()
 
     @Test
-    fun cursorEraseSgrAndDeviceRepliesBehaveAsVt220() {
-        val vt = Vt220Terminal(12, 3)
+    fun cursorEraseSgrAndDeviceRepliesBehaveAsXterm() {
+        val vt = XtermTerminal(12, 3)
         vt.drainPatches()
         val patches = vt.feed("hello\u001b[2;3H\u001b[31;1mX\u001b[0m\u001b[5n\u001b[6n\u001bZ")
         val screen = vt.snapshot()
@@ -38,7 +38,7 @@ class Vt220TerminalTest {
 
     @Test
     fun alternateScreenScrollbackUnicodeAndResizePreserveTerminalState() {
-        val vt = Vt220Terminal(6, 2, scrollbackLimit = 4)
+        val vt = XtermTerminal(6, 2, scrollbackLimit = 4)
         vt.drainPatches()
         vt.feed("main")
         vt.feed("\u001b[?1049hALT\u001b[?1049l")
@@ -58,7 +58,7 @@ class Vt220TerminalTest {
 
     @Test
     fun applicationCursorModeChangesManualArrowEncoding() {
-        val vt = Vt220Terminal()
+        val vt = XtermTerminal()
         vt.drainPatches()
         assertEquals("\u001b[A", vt.encode(VtKey.UP))
         vt.feed("\u001b[?1h")
@@ -69,8 +69,8 @@ class Vt220TerminalTest {
 
     @Test
     fun mediaPanelBondsManualInputToCausalPatchesAndLcncMarks() {
-        val panel = Vt220MediaPatchPanel(
-            MediaPatchPanelDescriptor(MediaPatchPanelId("hermes/vt220"), "vt220", "Hermes", 20, 4),
+        val panel = XtermMediaPatchPanel(
+            MediaPatchPanelDescriptor(MediaPatchPanelId("hermes/xterm"), "xterm", "Hermes", 20, 4),
         )
         panel.terminal.drainPatches()
         val manual = panel.manualCommand("status", timestampMs = 10)

@@ -5,8 +5,6 @@ import borg.trikeshed.htx.HtxElement
 import borg.trikeshed.htx.HtxKey
 import borg.trikeshed.htx.openHtxElement
 import borg.trikeshed.torrent.TorrentElement
-import borg.trikeshed.jules.FlywheelDriver
-import borg.trikeshed.jules.FlywheelDriver.FlywheelEvent
 import borg.trikeshed.litebike.JvmKanbanServer
 import borg.trikeshed.lib.j
 import borg.trikeshed.userspace.nio.file.spi.JvmFileOperations
@@ -15,7 +13,6 @@ import borg.trikeshed.userspace.nio.ebpf.bpfProbeAttach
 import borg.trikeshed.userspace.nio.ebpf.Tracepoints
 import borg.trikeshed.util.io.ForgeCliArgs
 import borg.trikeshed.parse.json.JsonSupport
-import metrics.FlywheelMetrics
 import borg.trikeshed.util.oroboros.CouchAttachmentGateway
 import borg.trikeshed.util.oroboros.FileCasStore
 import borg.trikeshed.util.oroboros.GitCouchGateway
@@ -49,7 +46,10 @@ import sun.misc.Signal
 import sun.misc.SignalHandler
 
 /**
- * Oroboros daemon — thin entry-point over [FlywheelDriver].
+ * Oroboros daemon — serves the Couch/kanban/console surfaces.
+ *
+ * The Jules flywheel (FlywheelDriver + CycleBody) was deleted 2026-08-24 as a
+ * failed migration; the daemon no longer polls, drains, or dispatches sessions.
  *
  * Env: JULES_API_KEY (required)
  * Flags:
@@ -97,18 +97,10 @@ object OroborosDaemon {
     )
 
     @Volatile
-    var lastCycleReport: FlywheelDriver.CycleReport? = null
-
-    @Volatile
     var daemonStartTime = 0L
 
     @Volatile
     var isRunning = true
-
-    /** Reference to the live cycle body. Held in a static field so a JVMTI
-     *  agent or external observer can locate it after retransform. */
-    @Volatile
-    var cycleBodyField: CycleBody? = null
 
     fun parseConfig(args: Array<String>): DaemonConfig {
         var watch = true
@@ -177,12 +169,8 @@ object OroborosDaemon {
         // Probe early so a missing key aborts before opening the HTX reactor.
         val apiKeyPresent = kotlinx.coroutines.withContext(Dispatchers.IO) { keyMux.get("JULES_API_KEY") }
         if (apiKeyPresent.isNullOrBlank()) {
-            System.err.println("[OROBOROS] JULES_API_KEY not set; the conductor cannot poll Jules. Aborting.")
-            exitProcess(1)
+            System.err.println("[OROBOROS] JULES_API_KEY not set; Jules credential pool will be empty.")
         }
-
-        // Reset metrics before each daemon start so counters are fresh.
-        FlywheelMetrics.reset()
 
         val config = parseConfig(args)
         // FLYWHEEL_CYCLE_INTERVAL env overrides CLI --interval-ms.
@@ -232,14 +220,6 @@ object OroborosDaemon {
             bpfProbeAttach(-1, Tracepoints.SYS_ENTER_OPENAT)
         }
 
-        val driver = FlywheelDriver(
-            keyMux = keyMux,
-            repoDir = repoDir,
-            forgeDir = forgeHome,
-            intervalMs = intervalMs,
-            maxSlots = maxSlots,
-        )
-
         // HTX + TLS reactor: every Jules API call (and every ModelMux/KeyMux
         // call) flows through HtxKey → HtxElement → HtxReactorElement →
         // JvmTlsCodecBackend. No standalone JDK HTTP client. mTLS
@@ -254,7 +234,6 @@ object OroborosDaemon {
             parentJob = coroutineContext[kotlinx.coroutines.Job],
         )
         System.err.println("[OROBOROS] HTX reactor open: ${htxElement.state} — Jules/ModelMux via TLS codec")
-        driver.attachHtxElement(htxElement)
 
         // ── MuxReactorElement: the live key+quota surface ────────────────
         // Owns lease/quota state for both ModelMux.chat/stream/embed and the
@@ -406,7 +385,6 @@ object OroborosDaemon {
         )
 
         val kanbanServer = JvmKanbanServer(
-            driver,
             extraRoutes = listOf(graalWire::route, vmWire::route, hermesWire::route),
             rawRoutes = listOf(graalWire::ingestRoute, couchWire::route),
             streamingPaths = borg.trikeshed.forge.server.CouchWire.streamingPaths(COUCH_DB_NAME) +
@@ -456,7 +434,6 @@ object OroborosDaemon {
         val memoryStore = borg.trikeshed.memory.MemoryStore(casStore, couchStore)
         val memoryIndex = borg.trikeshed.memory.MemoryIndexLayer(memoryStore)
         val couchIndexBridge = borg.trikeshed.memory.CouchIndexBridge(attachmentGateway, memoryIndex)
-        driver.attachMemoryIndexLayer(memoryIndex)
         System.err.println("[OROBOROS] MemoryStore + MemoryIndexLayer: ${memoryIndex.route(borg.trikeshed.memory.IndexKind.Taxonomy).entryCount} taxonomy entries")
 
         // ── Memory bridge: routes memory-eligible reconcile files through
@@ -699,43 +676,12 @@ object OroborosDaemon {
             System.err.println("[OROBOROS] warning: failed to open trace file: ${e.message}")
         }
 
-        var pollErrors = 0
-        val consecutivePollErrors = java.util.concurrent.atomic.AtomicInteger(0)
-        var pollErrOccurred = false
-        // Stdout observer so cycles are visible without a TUI, and bridge to KanbanFSM.
-        driver.subscribe { ev ->
-            println("[FLY-EVENT] $ev")
-            if (ev is FlywheelEvent.PollError) {
-                pollErrors++
-                pollErrOccurred = true
-                consecutivePollErrors.incrementAndGet()
-            } else if (ev is FlywheelEvent.Polled) {
-                consecutivePollErrors.set(0)
-            }
-            val now = System.currentTimeMillis()
-            when (ev) {
-                is borg.trikeshed.jules.FlywheelDriver.FlywheelEvent.Polled ->
-                    borg.trikeshed.userspace.reactor.KanbanFSM.kanbanEvents.tryEmit(
-                        borg.trikeshed.userspace.reactor.KanbanEvent.CycleObserved(0L, 0, 0, ev.alive, ev.available, now)
-                    )
-                is borg.trikeshed.jules.FlywheelDriver.FlywheelEvent.Drained ->
-                    borg.trikeshed.userspace.reactor.KanbanFSM.kanbanEvents.tryEmit(
-                        borg.trikeshed.userspace.reactor.KanbanEvent.PatchDrained(ev.sessionId, ev.sha, ev.tag, now)
-                    )
-                is borg.trikeshed.jules.FlywheelDriver.FlywheelEvent.Dispatched ->
-                    borg.trikeshed.userspace.reactor.KanbanFSM.kanbanEvents.tryEmit(
-                        borg.trikeshed.userspace.reactor.KanbanEvent.DispatchFired(ev.sessionId, ev.title, now)
-                    )
-                else -> {}
-            }
-        }
         System.err.println(
             "[OROBOROS] daemon up. forgeHome=$forgeHome repo=$repoDir " +
                 "intervalMs=$intervalMs maxSlots=$maxSlots mode=${if (watch) "watch" else "once"}"
         )
 
         daemonStartTime = System.currentTimeMillis()
-        lastCycleReport = null
 
         val oroborosDir = File(forgeHome, ".oroboros")
         oroborosDir.mkdirs()
@@ -775,58 +721,13 @@ object OroborosDaemon {
                         delay(100)
                         continue
                     }
-                    val report = lastCycleReport
                     val uptimeMs = System.currentTimeMillis() - daemonStartTime
-                    val (alive, avail, phase) = if (report != null) {
-                        Triple(report.alive, report.available, report.phase.name)
-                    } else {
-                        Triple(-1, -1, "NONE")
-                    }
 
-                    // Backward-compatible ALIVE line
-                    val aliveLine = "ALIVE $uptimeMs ${report?.cycleMs ?: -1} ${report?.harvested ?: -1} ${report?.dispatched ?: -1} $alive $avail\n"
+                    // Backward-compatible ALIVE line (cycle fields retired with the flywheel)
+                    val aliveLine = "ALIVE $uptimeMs -1 -1 -1 -1 -1\n"
 
-                    // Full metrics as JSON on subsequent lines
                     val metricsJson = try {
-                        val merged = buildMap<String, Any?> {
-                            put("uptimeMs", uptimeMs)
-                            if (report != null) {
-                                put("cycleMs", report.cycleMs)
-                                put("answered", report.answered)
-                                put("harvested", report.harvested)
-                                put("reworked", report.reworked)
-                                put("dispatched", report.dispatched)
-                                put("alive", report.alive)
-                                put("available", report.available)
-                                put("inducted", report.inducted)
-                                put("settled", report.settled)
-                                put("archived", report.archived)
-                                put("phase", report.phase.name)
-                                put("conflicts", report.conflicts)
-                                put("panoramaSize", report.panorama.size)
-                                put("http429", report.http429)
-                                put("http5xx", report.http5xx)
-                            } else {
-                                put("cycleMs", -1L)
-                                put("answered", -1)
-                                put("harvested", -1)
-                                put("reworked", -1)
-                                put("dispatched", -1)
-                                put("alive", -1)
-                                put("available", -1)
-                                put("inducted", -1)
-                                put("settled", false)
-                                put("archived", -1)
-                                put("phase", "NONE")
-                                put("conflicts", emptyList<String>())
-                                put("panoramaSize", 0)
-                                put("http429", -1)
-                                put("http5xx", -1)
-                            }
-                            // FlywheelMetrics summary
-                            put("metrics", FlywheelMetrics.toJsonMap())
-                        }
-                        "METRICS " + JsonSupport.stringify(merged) + "\n"
+                        "METRICS " + JsonSupport.stringify(mapOf("uptimeMs" to uptimeMs)) + "\n"
                     } catch (e: Exception) {
                         "METRICS {}\n"
                     }
@@ -844,9 +745,8 @@ object OroborosDaemon {
                 }
             }
         }
-        if (!preflight(repoDir, driver)) {
-            System.err.println("[OROBOROS] preflight failed; aborting before first cycle")
-            driver.close()
+        if (!preflight(repoDir)) {
+            System.err.println("[OROBOROS] preflight failed; aborting")
             return
         }
 
@@ -862,100 +762,14 @@ object OroborosDaemon {
                 currentTw?.close()
             } catch (e: Exception) { /* ignore */ }
         })
-        val traceMutex = kotlinx.coroutines.sync.Mutex()
-        val cycleBody = CycleBody(
-            driver = driver,
-            repoDir = repoDir,
-            consecutivePollErrors = consecutivePollErrors,
-            traceWriter = traceWriter?.let { _ ->
-                { json ->
-                    launch(TraceIoDispatcher.asCoroutineDispatcher) {
-                        traceMutex.withLock {
-                            try {
-                                if (traceLineCount >= 10000) {
-                                    kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
-                                        currentTw?.close()
-                                        val backup = File(traceFile.parentFile, traceFile.name + ".1")
-                                        if (traceFile.exists()) {
-                                            try {
-                                                java.nio.file.Files.move(traceFile.toPath(), backup.toPath(), java.nio.file.StandardCopyOption.REPLACE_EXISTING)
-                                            } catch (e: Exception) {}
-                                        }
-                                        currentTw = FileOutputStream(traceFile, false).bufferedWriter()
-                                    }
-                                    traceLineCount = 0
-                                }
-                                kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
-                                    currentTw?.write(json)
-                                    currentTw?.write("\n")
-                                    currentTw?.flush()
-                                }
-                                traceLineCount++
-                            } catch (e: Exception) {
-                                System.err.println("[OROBOROS] warning: failed to write trace file: ${e.message}")
-                            }
-                        }
-                    }
-                    Unit
-                }
-            },
-        )
-        cycleBodyField = cycleBody
-
         try {
             if (watch) {
-                withContext(htxElement + muxReactor) {
-                    // Do not pass this withContext scope: it waits for every
-                    // child it owns, including the infinite reactive loops.
-                    // Launch them under mainImpl's parent scope while this
-                    // context supplies HtxKey for capture.
-                    driver.startReactiveCycle(reactiveScope, cycleTriggers)
-                }
                 while (isRunning) {
-                    val errors = consecutivePollErrors.get()
-                    val backoffMs = kotlin.math.min(a = intervalMs * (1L shl kotlin.math.min(a = errors, b = 30)), b = intervalMs * 5)
-                    if (errors > 0) System.err.println("[OROBOROS] backoff=${backoffMs}ms consecutiveErrors=$errors")
-                    delay(backoffMs)
-
-                    // Adaptive throughput backpressure: when the flywheel is sustaining
-                    // ≥ 100 cycles/day, throttle the poll cadence by doubling the
-                    // backoff interval. This prevents unnecessary Jules API calls
-                    // and reduces daemon CPU overhead without starving pending tasks.
-                    if (FlywheelMetrics.cyclesAt100PerDay) {
-                        System.err.println("[OROBOROS] throughput ≥ 100/day — throttling cadence (double backoff)")
-                        delay(intervalMs)
-                    }
-
-                    try {
-                        (cycleBodyField ?: cycleBody).run()
-                    } catch (t: LinkageError) {
-                        // Botched hot-swap: the retransform produced bytecode
-                        // the JVM can't link against the loaded class
-                        // graph. The Runnable is unrunnable — bail out so the
-                        // supervisor (cron / launchctl) restarts us from a
-                        // known-clean compiled state.
-                        System.err.println("[OROBOROS] CycleBody unlinkable: ${t.javaClass.simpleName}: ${t.message?.take(200)} — bouncing")
-                        isRunning = false
-                        break
-                    } catch (t: Throwable) {
-                        // Defense in depth: CycleBody.run is itself wrapped in
-                        // a hard guard, but if anything escapes (NoClassDef,
-                        // AbstractMethodError from a future shape change)
-                        // the daemon loop must survive. Log and continue.
-                        System.err.println("[OROBOROS] cycleBody.run escaped: ${t.javaClass.simpleName}: ${t.message?.take(200)}")
-                    }
+                    delay(intervalMs)
                 }
             } else {
-                // --once: run one reactive tick synchronously.
-                withContext(htxElement + muxReactor) {
-                    driver.startReactiveCycle(reactiveScope, cycleTriggers)
-                }
-                delay(intervalMs * 2)
-                try {
-                    (cycleBodyField ?: cycleBody).run()
-                } catch (t: Throwable) {
-                    System.err.println("[OROBOROS] cycleBody.run escaped: ${t.javaClass.simpleName}: ${t.message?.take(200)}")
-                }
+                // --once: settle the reactive elements, then exit.
+                delay(intervalMs)
                 isRunning = false
                 reactiveJob.cancelAndJoin()
                 return
@@ -981,12 +795,11 @@ object OroborosDaemon {
                 try { torrentElement.close() } catch (_: Exception) {}
                 try { muxReactor.close() } catch (_: Exception) {}
                 try { nioSupervisor.close() } catch (_: Exception) {}
-                driver.close()
             }
         }
     }
 
-    private suspend fun preflight(repoDir: File, driver: FlywheelDriver): Boolean {
+    internal suspend fun preflight(repoDir: File): Boolean {
         // git fetch origin master (best-effort, 5s timeout)
         val fetchOk = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
             val fetch = ProcessBuilder("git", "fetch", "origin", "master", "--dry-run")
@@ -1007,10 +820,8 @@ object OroborosDaemon {
         val local = command("git", "rev-parse", "HEAD")
         val remote = command("git", "rev-parse", "origin/master")
         if (local == remote) return true
-        // Local AHEAD of remote is the normal flywheel state between pushes
-        // (drained patches land locally, then get pushed by settlementBarrier).
-        // Only block when truly diverged: local has commits origin doesn't
-        // AND origin has commits local doesn't (true divergence).
+        // Local ahead of remote is normal between pushes. Only block when truly
+        // diverged: local has commits origin doesn't AND vice versa.
         val mergeBase = command("git", "merge-base", local, remote)
         if (mergeBase == local || mergeBase == remote) {
             // linear: local ahead OR local behind, but not both
@@ -1018,7 +829,6 @@ object OroborosDaemon {
         }
         // local is neither reachable from remote nor vice versa → diverged
         println("[OROBOROS] UPSTREAM-DIVERGED local=$local remote=$remote mergeBase=$mergeBase")
-        driver.emitDrifted(local, remote)
         return false
     }
 
