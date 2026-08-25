@@ -172,7 +172,14 @@
       .then((res) => {
         if (res && res.status === 'queued') { noteSync('Offline — ' + batch.length + ' queued for sync'); return; }
         flushedCount += batch.length;
-        noteSync('Synced ' + flushedCount + (res && res.sequence != null ? '  ·  seq ' + res.sequence : ''));
+        const rejected = res && res.rejected ? res.rejected : 0;
+        noteSync('Synced ' + flushedCount +
+          (rejected ? '  ·  ' + rejected + ' rejected' : '') +
+          (res && res.sequence != null ? '  ·  seq ' + res.sequence : ''));
+        // The server verdict is the truth: reconcile optimistic board state.
+        // Force on rejection — the sequence may not have moved, but our optimism did.
+        if (res && rejected) hydrateBoard(true);
+        else if (res && res.sequence != null && res.sequence !== boardSequence) hydrateBoard();
       })
       .catch(() => noteSync('Local only — reactor unreachable'));
   }
@@ -182,23 +189,48 @@
     flushTimer = setTimeout(flushCommands, 400);
   }
 
-  function mutate(updater, kind) {
+  // Doc edits persist LOCALLY (localStorage is their store); only BOARD actions
+  // are commands — real JobCommands lowered server-side, no more ACK-and-drop
+  // Submits minted per keystroke.
+  function mutate(updater) {
     updater(state);
     saveState();
+  }
 
-    const jobId = uid();
-    const idempotencyKey = jobId + '-' + Date.now();
-    window.__forgeCommandQueue.push({
-      type: 'Submit',
-      kind: kind || 'mutate',
-      jobId: jobId,
-      idempotencyKey: idempotencyKey,
-      dependencies: [],
-      expectedRevision: null,
-      activePageId: state.activePageId,
-      view: state.view
-    });
+  // ── Board commands: the real spine (invoke → lowering → WAL → projection) ──
+  let boardSequence = null;
+
+  function queueBoardCommand(cmd) {
+    cmd.idempotencyKey = cmd.idempotencyKey || (cmd.jobId + '#ui#' + Date.now());
+    window.__forgeCommandQueue.push(cmd);
     scheduleFlush();
+  }
+
+  function hydrateBoard(force) {
+    fetch(BOARD_URL)
+      .then((r) => r.json())
+      .then((b) => {
+        if (!b || !Array.isArray(b.columns) || !Array.isArray(b.items)) return;
+        if (!force && boardSequence != null && b.sequence === boardSequence) return; // watermark: no change
+        boardSequence = b.sequence;
+        state.board = {
+          columns: b.columns.slice().sort((x, y) => (x.order || 0) - (y.order || 0))
+            .map((c) => ({ id: c.id, name: c.name, wipLimit: c.wipLimit, count: c.count })),
+          cards: b.items.map((it) => ({
+            id: it.id,
+            title: it.title || it.id,
+            column: it.status,
+            revision: it.revision,
+            meta: [
+              it.contested ? '⚡ contested' : '',
+              (it.attention != null) ? 'attn ' + Number(it.attention).toFixed(2) : '',
+            ].filter(Boolean).join('  ·  '),
+          })),
+        };
+        saveState();
+        if (state.view === 'board') renderBoard();
+      })
+      .catch(() => {}); // seed/local board stands until the daemon answers
   }
 
   window.addEventListener('online', () => { noteSync('Back online'); scheduleFlush(); });
@@ -602,9 +634,13 @@
           cardEl.appendChild(meta);
         }
         cardEl.addEventListener('click', () => {
-          // cycle columns on click for a lightweight gesture
+          // cycle columns on click — a REAL Move command now (optimistic UI,
+          // the flush verdict re-hydrates on rejection or sequence advance)
           const order = state.board.columns.map((c) => c.id);
           const next = order[(order.indexOf(card.column) + 1) % order.length];
+          if (card.revision != null) {
+            queueBoardCommand({ type: 'move', jobId: card.id, expectedRevision: card.revision, toColumn: next });
+          }
           mutate(() => { card.column = next; });
           renderBoard();
         });
@@ -617,7 +653,11 @@
       addBtn.textContent = '+ New';
       addBtn.setAttribute('aria-label', 'Add new card to ' + col.name);
       addBtn.addEventListener('click', () => {
-        mutate((s) => { s.board.cards.push({ id: uid(), title: '', column: col.id, meta: '' }); });
+        const title = (window.prompt('Card title') || '').trim();
+        if (!title) return;
+        const jobId = 'card-' + uid();
+        queueBoardCommand({ type: 'submit', jobId: jobId, title: title });
+        mutate((s) => { s.board.cards.push({ id: jobId, title: title, column: col.id, revision: 1, meta: '' }); });
         renderBoard();
       });
       colEl.appendChild(addBtn);
@@ -1245,7 +1285,7 @@
         btn.removeAttribute('aria-current');
       }
     }
-    if (view === 'board') renderBoard();
+    if (view === 'board') { renderBoard(); hydrateBoard(); }
     if (view === 'graph') { setGraphMode(graphMode); }
     if (view === 'sheet') renderSheet();
     if (view === 'shape') renderShape();
@@ -1300,4 +1340,9 @@
   }
 
   renderAll();
+
+  // Live board: hydrate from the WAL-backed store at load, then poll on a
+  // watermark (sequence unchanged = no re-render) while the board is visible.
+  hydrateBoard();
+  setInterval(() => { if (state.view === 'board' && !document.hidden) hydrateBoard(); }, 15000);
 })();

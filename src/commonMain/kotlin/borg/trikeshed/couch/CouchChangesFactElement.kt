@@ -77,7 +77,13 @@ class CouchChangesFactElement(
 
     private suspend fun apply(f: CouchCommittedFrame) {
         report?.ingest(CouchReportEvent.Committed(f.docId, f.rev, f.sequence + 1, f.deleted))
-        if (!admit(f)) return
+        if (!admit(f)) {
+            // Admit-flip retraction: a doc we once admitted whose new revision the filter
+            // refuses must LEAVE working memory — otherwise a stale version keeps matching
+            // (retraction correctness, the industry's #1 sinkhole).
+            if (known.remove(f.docId)) rete.retract(FactId(db.name, f.docId))
+            return
+        }
         val factId = FactId(db.name, f.docId)
         val version = CouchDatabase.revToCid(f.rev) ?: ContentId.of(f.rev.encodeToByteArray())
         if (f.deleted) {

@@ -21,6 +21,11 @@ import kotlin.concurrent.atomics.ExperimentalAtomicApi
  * by the UI. The reactor may bridge into this stream via
  * [ForgeBoardFSM.emit].
  */
+@Deprecated(
+    "Retired as a board source (D2, 2026-08-25): the WAL-backed BoardStoreElement behind " +
+        "KanbanModule is the one card store. This global-singleton FSM (SharedFlow replay=128, " +
+        "no WAL, no HTTP) remains only for legacy visual surfaces until they migrate.",
+)
 @OptIn(ExperimentalAtomicApi::class)
 object ForgeBoardFSM {
 

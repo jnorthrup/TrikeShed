@@ -117,6 +117,9 @@ class WorktreeCouchGateway(
             // 108k blobs / 536MB in minutes). State lives in forge homes, period.
             "cas", ".oroboros", ".causal.wal", "oroboros-cycles.jsonl",
             "jules-board.wal", "brain-errors.jsonl",
+            // The daemon's own rolling logs: absorbing them re-quakes the watcher on
+            // every log line — a permanent self-reconcile loop churning store sequence.
+            "logs",
         )
 
         /** Agent worktree clones are other checkouts, not this project's history. */

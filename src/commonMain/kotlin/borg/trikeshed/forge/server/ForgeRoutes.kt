@@ -98,6 +98,12 @@ object ForgeRoutes {
     fun capJson(): HttpForwarderResponse =
         HttpForwarderResponse(200, body = """{"protocols":["Http","Json","Socks5","Tls","Bonjour","Upnp"],"capabilities":["Process@local","Cas@local","Wireproto@lan.localhost"]}""".encodeToByteArray())
 
+    /**
+     * Fossil-parser fallback — served only when no KanbanModule claims /api/board.
+     * NEVER 500s: a plan doc the parser refuses (the "6. Work packages" require)
+     * degrades to an empty canonical board with the reason attached. The live
+     * board is the module's WAL-backed store, not this re-parse.
+     */
     fun boardJson(): HttpForwarderResponse {
         val json = runCatching {
             val reduction = ForgeKanbanIngest.loadProjection("jim")
@@ -109,9 +115,15 @@ object ForgeRoutes {
                 },
                 "correlations" to reduction.correlations.size,
             ))
-        }.getOrElse { """{"error":"load_failed","reason":"${it.message}"}""" }
-        val status = if ("\"error\"" in json) 500 else 200
-        return HttpForwarderResponse(status, body = json.encodeToByteArray())
+        }.getOrElse {
+            JsonSupport.stringify(linkedMapOf(
+                "title" to "Board (degraded)",
+                "userId" to "jim",
+                "items" to emptyList<Any?>(),
+                "degraded" to (it.message ?: "plan parse failed"),
+            ))
+        }
+        return HttpForwarderResponse(200, body = json.encodeToByteArray())
     }
 
     fun metricsResponse(acceptJson: Boolean): HttpForwarderResponse =

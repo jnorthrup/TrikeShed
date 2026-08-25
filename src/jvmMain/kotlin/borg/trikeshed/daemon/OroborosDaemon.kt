@@ -167,6 +167,8 @@ object OroborosDaemon {
         val positional: List<String>,
         /** Extra scopes mounted at boot: --project <path> (repeatable). Git repo → projects/<name>/, else assets/<name>/. */
         val projects: List<String> = emptyList(),
+        /** Dynamic modules attached at boot: --module <fqcn> (repeatable). Proxy-ctor loaded (app CP, then build/live). */
+        val modules: List<String> = emptyList(),
     )
 
     @Volatile
@@ -185,6 +187,7 @@ object OroborosDaemon {
         var hermesConsole = false
         val positional = mutableListOf<String>()
         val projects = mutableListOf<String>()
+        val modules = mutableListOf<String>()
 
         val flags = listOf(
             ForgeCliArgs.Flag(name = "--once") { _, i -> watch = false; i + 1 },
@@ -192,6 +195,7 @@ object OroborosDaemon {
             // Consumed by mainImpl via the raw args (P2 belief-bag wiring); registered so the parser accepts it.
             ForgeCliArgs.Flag(name = "--belief-bag") { _, i -> i + 1 },
             ForgeCliArgs.Flag(name = "--project", withValue = true) { a, i -> projects.add(a[i]); i + 1 },
+            ForgeCliArgs.Flag(name = "--module", withValue = true) { a, i -> modules.add(a[i]); i + 1 },
             ForgeCliArgs.Flag(name = "--interval-ms", withValue = true) { a, i ->
                 val v = a[i].toLongOrNull() ?: die("--interval-ms requires a positive long")
                 intervalMs = v
@@ -226,7 +230,7 @@ object OroborosDaemon {
             ForgeCliArgs.Result.Help -> { usage(); exitProcess(0) }
             is ForgeCliArgs.Result.Error -> die(r.message)
         }
-        return DaemonConfig(watch, intervalMs, maxSlots, kanbanPort, hermesRoot, hermesSleeve, hermesConsole, positional, projects)
+        return DaemonConfig(watch, intervalMs, maxSlots, kanbanPort, hermesRoot, hermesSleeve, hermesConsole, positional, projects, modules)
     }
 
     @JvmStatic
@@ -589,8 +593,40 @@ object OroborosDaemon {
                     .onFailure { System.err.println("[OROBOROS] scope mount FAILED for $extra: ${it.message}") }
             }
         }
+        // ── Dynamic modules: Rete (hoisted — the tendon below feeds it) + production
+        //    registry + CoW route registry + supervisor (proxy ctors: app CP first,
+        //    then a fresh URLClassLoader over build/live/classes — hotswapFeed's tree,
+        //    so a class compiled after boot attaches without a bounce).
+        val reteProductions = borg.trikeshed.dag.ReteProductionRegistry()
+        val rete = borg.trikeshed.dag.ReteNetwork(reteProductions)
+        val moduleRoutes = borg.trikeshed.module.ModuleRouteRegistry()
+        val moduleScope = CoroutineScope(SupervisorJob(coroutineContext[kotlinx.coroutines.Job]) + Dispatchers.Default)
+        val moduleContext = borg.trikeshed.module.ModuleContext(
+            couchDb = couchDb,
+            rete = rete,
+            productions = reteProductions,
+            beliefBag = beliefBag,
+            turnReview = turnReview,
+            blackboard = daemonBlackboard,
+            casStore = casStore,
+            attachments = attachmentGateway,
+            routes = moduleRoutes,
+            scope = moduleScope,
+            clock = { System.currentTimeMillis() },
+            stateDir = forgeHome,
+            muxContext = htxElement + muxReactor,
+        )
+        val moduleSupervisor = borg.trikeshed.module.ModuleSupervisor(
+            ctx = moduleContext,
+            liveClassesDir = File(repoDir, "build/live/classes"),
+            receipt = { event, id, detail ->
+                daemonBlackboard.put("$event/$id", detail.mapValues { it.value?.toString() ?: "" }, "oroboros")
+            },
+        )
+        val moduleWire = borg.trikeshed.forge.server.ModuleWire(moduleSupervisor, moduleRoutes)
+
         val kanbanServer = JvmKanbanServer(
-            extraRoutes = listOfNotNull(graalWire::route, vmWire::route, hermesWire::route, beliefWire?.let { it::route }, patchWire::route),
+            extraRoutes = listOfNotNull(graalWire::route, vmWire::route, hermesWire::route, beliefWire?.let { it::route }, patchWire::route, moduleWire::route),
             rawRoutes = listOf(graalWire::ingestRoute, couchWire::route),
             streamingPaths = borg.trikeshed.forge.server.CouchWire.streamingPaths(COUCH_DB_NAME) +
                 borg.trikeshed.forge.server.GraalWire.STREAMING +
@@ -598,7 +634,22 @@ object OroborosDaemon {
                 borg.trikeshed.forge.server.HermesConsoleWire.STREAMING,
             maxRequestBatch = 4096,
             stateDir = forgeHome,
+            moduleRoutes = moduleRoutes,
         )
+        launch {
+            // KanbanModule is the point of the module system: attached by DEFAULT (the WAL-backed
+            // board replaces the fossil plan-parser). TRIKESHED_NO_KANBAN_MODULE=1 opts out.
+            if (System.getenv("TRIKESHED_NO_KANBAN_MODULE") != "1") {
+                runCatching { moduleSupervisor.attach(borg.trikeshed.kanban.module.KanbanModule()) }
+                    .onSuccess { System.err.println("[OROBOROS] module attached: ${it.id} (default) — ${it.describe()}") }
+                    .onFailure { System.err.println("[OROBOROS] KanbanModule attach FAILED: ${it.message}") }
+            }
+            for (fqcn in config.modules) {
+                runCatching { moduleSupervisor.attach(fqcn) }
+                    .onSuccess { System.err.println("[OROBOROS] module attached: ${it.id} ($fqcn)") }
+                    .onFailure { System.err.println("[OROBOROS] module attach FAILED for $fqcn: ${it.message}") }
+            }
+        }
         val kanbanJob = SupervisorJob(coroutineContext[kotlinx.coroutines.Job])
         if (watch) {
             launch(CoroutineScope(kanbanJob).coroutineContext + Dispatchers.Default) {
@@ -874,7 +925,7 @@ object OroborosDaemon {
         // ── Tendon: _changes → report bus + Rete facts. Every committed revision (local write,
         //    reconcile, or a peer's replication) is a fact in the production system; the git object
         //    plane stays out (opaque blobs carry no fields worth matching).
-        val rete = borg.trikeshed.dag.ReteNetwork()
+        // (rete hoisted above the kanban server so ModuleContext can carry it)
         val changesFacts = borg.trikeshed.couch.CouchChangesFactElement(
             db = couchDb,
             rete = rete,

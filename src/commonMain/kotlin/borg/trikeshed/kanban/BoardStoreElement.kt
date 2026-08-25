@@ -1,0 +1,343 @@
+package borg.trikeshed.kanban
+
+import borg.trikeshed.causal.CausalEdgeKind
+import borg.trikeshed.causal.CausalGraph
+import borg.trikeshed.causal.CausalGraphBuilder
+import borg.trikeshed.causal.EventPayload
+import borg.trikeshed.context.AsyncContextElement
+import borg.trikeshed.context.AsyncContextKey
+import borg.trikeshed.context.ElementState
+import borg.trikeshed.job.CasStore
+import borg.trikeshed.job.ContentId
+import borg.trikeshed.job.JobCommand
+import borg.trikeshed.job.JobReducer
+import borg.trikeshed.job.JobSnapshot
+import borg.trikeshed.parse.json.JsonSupport
+import borg.trikeshed.util.oroboros.LexicalMemory
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.SharedFlow
+import kotlinx.coroutines.launch
+import kotlin.concurrent.Volatile
+import kotlin.coroutines.CoroutineContext
+
+/**
+ * BoardWalPort — the thin ordering log under the board (durability contract:
+ * CAS payloads, the WAL carries only `jobId TAB cid` records; group commit =
+ * ONE flush per drained batch; torn tails truncate on replay).
+ * JVM implementation: JvmBoardWal over JvmDurableAppendLog.
+ */
+interface BoardWalPort {
+    /** Append one record (no flush — the element batches). Returns the sequence. */
+    fun append(record: ByteArray): Long
+
+    /** The single per-batch flush (group commit). */
+    fun flush()
+
+    suspend fun replay(onRecord: suspend (Long, ByteArray) -> Unit)
+}
+
+/** One browser/production command entering the store: the RAW map is the durable truth
+ *  (title/priority/tags ride it into CAS; replay re-lowers the same bytes). */
+class BoardIntake(
+    val raw: Map<*, *>,
+    val reply: CompletableDeferred<BoardApply>? = null,
+)
+
+sealed class BoardApply {
+    data class Committed(
+        val jobId: String,
+        val sequence: Long,
+        val revision: Long,
+        val idempotencyKey: String,
+        val cid: ContentId,
+    ) : BoardApply()
+
+    data class Rejected(
+        val idempotencyKey: String?,
+        val reason: String,
+    ) : BoardApply()
+}
+
+/** Committed fanout — live listeners only (replay is the WAL's job, never the flow's). */
+data class BoardCommitted(
+    val sequence: Long,
+    val jobId: String,
+    val snapshot: JobSnapshot,
+    val cid: ContentId,
+    val command: JobCommand,
+    val col: BoardCol,
+    val previousCol: BoardCol?,
+    /** Card's transition clock (row state) — the stall production's input. */
+    val lastMoveMs: Long = 0L,
+)
+
+/** One card = one row (the SoA projection reads these; strings only at the wire). */
+data class CardRow(
+    val jobId: String,
+    val title: String,
+    val col: BoardCol,
+    val revision: Long,
+    val lastSequence: Long,
+    val lastMoveMs: Long,
+    val priority: Int,
+    val order: Int,
+    val dependencies: List<String>,
+    val tags: List<String>,
+)
+
+/**
+ * BoardStoreElement — D2: ONE card store. `/api/invoke` maps → [InvokeLowering]
+ * → [JobCommand] → [JobReducer] (pure; idempotency dedupe + expectedRevision
+ * CAS) → group-committed WAL (CAS payloads) → [JobKanbanProjection.applyCommit]
+ * (invariant C09: only committed frames advance cards) → causal EventNode
+ * (card causal identity; CausalKernel: "This IS the kanban column") →
+ * committed fanout.
+ *
+ * Board-level guards the reducer can't see run BEFORE reduction: WIP-full Move
+ * refusal and dependency-cycle refusal (first caller of KanbanTypes.hasCycle).
+ * State is WAL-rebuildable by construction — the detach→attach upgrade
+ * contract of the module system, and the restart gate's proof obligation.
+ */
+class BoardStoreElement(
+    private val wal: BoardWalPort?,
+    private val cas: CasStore,
+    private val clock: () -> Long = { 0L },
+    parentJob: Job? = null,
+) : AsyncContextElement(ElementState.CREATED, parentJob) {
+
+    companion object Key : AsyncContextKey<BoardStoreElement>()
+
+    override val key: CoroutineContext.Key<*> get() = Key
+
+    val intake: Channel<BoardIntake> = Channel(capacity = 256)
+
+    private val _committed = MutableSharedFlow<BoardCommitted>(replay = 0, extraBufferCapacity = 1024)
+    val committed: SharedFlow<BoardCommitted> get() = _committed
+
+    // Single-writer state (the intake consumer is the only mutator).
+    private val reducer = JobReducer()
+    private val projection = JobKanbanProjection.rebuild(emptyList())
+    private val causal = CausalGraphBuilder()
+    private var sequence = 0L
+
+    /** COW row table: readers grab the volatile reference, never lock. */
+    @Volatile
+    private var rows: Map<String, CardRow> = emptyMap()
+
+    fun cards(): Collection<CardRow> = rows.values
+
+    fun card(jobId: String): CardRow? = rows[jobId]
+
+    fun projection(): JobKanbanProjection = projection
+
+    fun graph(): CausalGraph = causal.toGraph()
+
+    val lastSequence: Long get() = sequence
+
+    // ── lifecycle ─────────────────────────────────────────────────────
+
+    override suspend fun open() {
+        super.open()
+        wal?.replay { seq, record ->
+            val text = record.decodeToString()
+            val tab = text.indexOf('\t')
+            if (tab > 0) {
+                val cid = ContentId(text.substring(tab + 1))
+                val payload = cas.get(cid)
+                if (payload != null) {
+                    val raw = runCatching { JsonSupport.parse(payload.decodeToString()) as? Map<*, *> }.getOrNull()
+                    if (raw != null) applyOne(raw, durable = false, replaySeq = seq)
+                }
+            }
+        }
+        if (state == ElementState.OPEN) state = ElementState.ACTIVE
+        CoroutineScope(supervisor + Dispatchers.Default).launch {
+            for (first in intake) {
+                // Group commit: drain whatever queued behind the first, ONE flush for the batch.
+                val batch = ArrayList<BoardIntake>(4).apply { add(first) }
+                while (true) batch.add(intake.tryReceive().getOrNull() ?: break)
+                var dirty = false
+                for (cmd in batch) {
+                    val result = applyOne(cmd.raw, durable = true)
+                    if (result is BoardApply.Committed) dirty = true
+                    cmd.reply?.complete(result)
+                }
+                if (dirty) wal?.flush()
+            }
+        }
+    }
+
+    override suspend fun drain() {
+        intake.close()
+        wal?.flush()
+        super.drain()
+    }
+
+    // ── the spine (single consumer; also the replay path with durable=false) ──
+
+    private suspend fun applyOne(raw: Map<*, *>, durable: Boolean, replaySeq: Long? = null): BoardApply {
+        val lowered = when (val o = InvokeLowering.lower(raw)) {
+            is InvokeLowering.Outcome.Rejected -> return BoardApply.Rejected(o.idempotencyKey, o.reason)
+            is InvokeLowering.Outcome.Lowered -> o.command
+        }
+        val jobId = lowered.jobId.value
+
+        // Board guards the reducer can't see — refuse BEFORE reducer state mutates.
+        boardGuard(lowered)?.let { return BoardApply.Rejected(lowered.idempotencyKey, it) }
+
+        val reduced = reducer.reduce(lowered)
+        if (!reduced.accepted || reduced.snapshot == null) {
+            val reason = (reduced.event as? borg.trikeshed.job.JobEvent.Rejected)?.reason ?: "rejected"
+            return BoardApply.Rejected(lowered.idempotencyKey, reason)
+        }
+        val snapshot = reduced.snapshot!!
+
+        // Durable truth: the raw command map, canonical-serialized once, CAS-addressed.
+        val bytes = JsonSupport.stringify(raw).encodeToByteArray()
+        val cid = cas.put(bytes)
+        val seq = replaySeq
+            ?: if (durable && wal != null) wal.append("$jobId\t${cid.value}".encodeToByteArray())
+            else sequence + 1
+        if (seq > sequence) sequence = seq
+
+        projection.applyCommit(jobId, snapshot, cid)
+
+        val prev = rows[jobId]
+        val row = advanceRow(prev, jobId, raw, lowered, snapshot, seq)
+        rows = if (row == null) rows - jobId else rows + (jobId to row)
+
+        appendCausal(jobId, lowered, snapshot, cid, raw)
+
+        val event = BoardCommitted(seq, jobId, snapshot, cid, lowered, row?.col ?: BoardCol.ARCHIVED, prev?.col, row?.lastMoveMs ?: 0L)
+        _committed.tryEmit(event)
+        return BoardApply.Committed(jobId, seq, snapshot.revision, lowered.idempotencyKey, cid)
+    }
+
+    private fun boardGuard(cmd: JobCommand): String? = when (cmd) {
+        is JobCommand.Move -> {
+            val target = BoardCol.fromWire(cmd.toColumn.value)
+            val limit = target?.wipLimit
+            if (limit != null && rows.values.count { it.col == target && it.jobId != cmd.jobId.value } >= limit)
+                "WIP limit ${limit} full for '${target.wire}'" else null
+        }
+
+        is JobCommand.Start -> {
+            val limit = BoardCol.RUNNING.wipLimit
+            if (limit != null && rows.values.count { it.col == BoardCol.RUNNING && it.jobId != cmd.jobId.value } >= limit)
+                "WIP limit ${limit} full for 'running'" else null
+        }
+
+        is JobCommand.Submit -> {
+            if (cmd.dependencies.isEmpty()) null
+            else {
+                // First caller of the KanbanTypes verbs: refuse a dependency cycle at the door.
+                val board = boardOf(extra = cmd)
+                if (board.hasCycle()) "dependency cycle via ${cmd.jobId.value}" else null
+            }
+        }
+
+        else -> null
+    }
+
+    /** Materialize the current rows (+ an incoming submit) as a KanbanBoard for the DAG verbs. */
+    private fun boardOf(extra: JobCommand.Submit?): KanbanBoard {
+        val cards = ArrayList<KanbanCard>(rows.size + 1)
+        for (r in rows.values) cards.add(
+            KanbanCard(
+                id = KanbanCardId(r.jobId),
+                title = r.title,
+                columnId = KanbanColumnId(r.col.wire),
+                order = r.order,
+                dependencies = r.dependencies.map { KanbanCardId(it) },
+                createdAt = 0L,
+                updatedAt = 0L,
+            ),
+        )
+        if (extra != null && rows[extra.jobId.value] == null) cards.add(
+            KanbanCard(
+                id = KanbanCardId(extra.jobId.value),
+                title = extra.jobId.value,
+                columnId = KanbanColumnId(BoardCol.TRIAGE.wire),
+                dependencies = extra.dependencies.map { KanbanCardId(it.value) },
+                createdAt = 0L,
+                updatedAt = 0L,
+            ),
+        ) else if (extra != null) {
+            // re-submit of an existing card: splice the new dependency edges in
+            val i = cards.indexOfFirst { it.id.value == extra.jobId.value }
+            if (i >= 0) cards[i] = cards[i].copy(dependencies = extra.dependencies.map { KanbanCardId(it.value) })
+        }
+        return KanbanBoard(
+            id = KanbanBoardId("board-store"),
+            name = "board-store",
+            columns = BoardCol.entries.map { KanbanColumn(KanbanColumnId(it.wire), it.wire, it.order, wipLimit = it.wipLimit) },
+            cards = cards,
+        )
+    }
+
+    private fun advanceRow(
+        prev: CardRow?,
+        jobId: String,
+        raw: Map<*, *>,
+        cmd: JobCommand,
+        snapshot: JobSnapshot,
+        seq: Long,
+    ): CardRow? {
+        val now = clock()
+        val col = when (cmd) {
+            is JobCommand.Move -> BoardCol.fromWire(cmd.toColumn.value) ?: prev?.col ?: BoardCol.TRIAGE
+            is JobCommand.Acknowledge -> prev?.col ?: BoardCol.fromLifecycle(snapshot.lifecycle)
+            is JobCommand.Retract, is JobCommand.Cancel -> BoardCol.ARCHIVED
+            else -> BoardCol.fromLifecycle(snapshot.lifecycle)
+        }
+        val title = (raw["title"] as? String)?.takeIf { it.isNotBlank() } ?: prev?.title ?: jobId
+        val priority = (raw["priority"] as? Number)?.toInt() ?: prev?.priority ?: 2
+        val tags = InvokeLowering.listishOf(raw["tags"])?.mapNotNull { it?.toString() } ?: prev?.tags ?: emptyList()
+        val moved = prev == null || prev.col != col
+        return CardRow(
+            jobId = jobId,
+            title = title,
+            col = col,
+            revision = snapshot.revision,
+            lastSequence = seq,
+            lastMoveMs = if (moved) now else prev?.lastMoveMs ?: now,
+            priority = priority,
+            order = prev?.order ?: rows.size,
+            dependencies = snapshot.dependencies.map { it.value },
+            tags = tags,
+        )
+    }
+
+    /** Card lifecycle → the causal plane (coarse: lifecycle ops only; Move stays a board refinement). */
+    private fun appendCausal(jobId: String, cmd: JobCommand, snapshot: JobSnapshot, cid: ContentId, raw: Map<*, *>) {
+        val lex = LexicalMemory(summary = snapshot.lifecycle, title = (raw["title"] as? String) ?: jobId, content = "")
+        val (kind, payload) = when (cmd) {
+            is JobCommand.Submit -> CausalEdgeKind.Inducted to EventPayload.Queued(
+                tier = "board", title = lex.title, spec = cid.value, score = 0.0, lexicalMemory = lex,
+            )
+
+            is JobCommand.Start -> CausalEdgeKind.Dispatched to EventPayload.Dispatched(
+                sessionId = snapshot.attemptId.ifEmpty { jobId }, attempt = snapshot.attemptCount,
+            )
+
+            is JobCommand.Complete -> CausalEdgeKind.Settled to EventPayload.Settled(
+                commitSha = "", versionTag = "", receiptCid = cid, lexicalMemory = lex,
+            )
+
+            is JobCommand.Fail -> CausalEdgeKind.Retired to EventPayload.Retired(cmd.reason, snapshot.lifecycle)
+            is JobCommand.Cancel -> CausalEdgeKind.Retired to EventPayload.Retired("cancelled", snapshot.lifecycle)
+            is JobCommand.Retract -> CausalEdgeKind.Retired to EventPayload.Retired("retracted", snapshot.lifecycle)
+            is JobCommand.Retry -> CausalEdgeKind.Superseded to EventPayload.Superseded(
+                parentWorkId = jobId, reason = "retry", reworkDepth = snapshot.attemptCount,
+            )
+
+            else -> return // Move/Progress/Block/Acknowledge are board refinements, not causal events
+        }
+        causal.append(workId = jobId, epochMs = clock(), edgeKind = kind, payload = payload)
+    }
+}

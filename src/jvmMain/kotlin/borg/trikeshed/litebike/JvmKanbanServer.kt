@@ -85,6 +85,12 @@ class JvmKanbanServer(
     private val maxRequestBatch: Int = 64,
     /** Root for server-owned state files (.causal.wal). The daemon passes forgeHome; never the worktree. */
     private val stateDir: File = File("."),
+    /**
+     * Dynamic module claims (exact `/api/…` paths), consulted FIRST in routeHttp — a claimed path
+     * SHADOWS the PORTABLE tier and the built-ins (that precedence is the point: an attached
+     * KanbanModule takes /api/board away from the fossil parser). Null = no module system.
+     */
+    private val moduleRoutes: borg.trikeshed.module.ModuleRouteRegistry? = null,
 ) {
     /** SSE event stream path — retired with the flywheel; answers 410 Gone. SURFACE_TTL_MS bounds /api/jules/surface cache life. */
     private companion object {
@@ -279,7 +285,10 @@ class JvmKanbanServer(
                     scope.launch {
                         try {
                             var handled = false
-                            for (route in rawRoutes) { route("GET", reqPath, payload, respond) ?: continue; handled = true; break }
+                            moduleRoutes?.match(reqPath)?.let { c ->
+                                if (c.streaming) { c.route("GET", reqPath, text, respond); handled = true }
+                            }
+                            if (!handled) for (route in rawRoutes) { route("GET", reqPath, payload, respond) ?: continue; handled = true; break }
                             if (!handled) for (route in extraRoutes) { route("GET", reqPath, text, respond) ?: continue; break }
                         } catch (_: kotlinx.coroutines.CancellationException) {
                         } catch (t: Throwable) {
@@ -349,7 +358,7 @@ class JvmKanbanServer(
     private fun isStreamingRequest(reqPath: String): Boolean {
         val p = reqPath.substringBefore('?')
         val q = reqPath.substringAfter('?', "")
-        return streamingPaths.any { entry ->
+        return (moduleRoutes?.isStreaming(p) == true) || streamingPaths.any { entry ->
             if ('?' in entry) p == entry.substringBefore('?') && q.contains(entry.substringAfter('?')) else p == entry
         }
     }
@@ -360,6 +369,10 @@ class JvmKanbanServer(
         val parts = firstLine.split(' ')
         val method = parts.getOrNull(0) ?: "GET"
         val path = parts.getOrNull(1) ?: "/"
+        // ── dynamic module claims: exact-path, consulted before everything else ──
+        moduleRoutes?.match(path)?.let { claim ->
+            claim.route(method, path, text, null)?.let { return it }
+        }
         // ── commonMain PORTABLE tier (ForgeRoutes) — no VM required ──
         ForgeRoutes.match(method, path)?.let { meta ->
             if (meta.tier == ForgeRoutes.Tier.PORTABLE) {
@@ -386,7 +399,8 @@ class JvmKanbanServer(
         return when (path.substringBefore('?')) {
             "/api/health" -> HttpResponse(200, """{"ok":true,"server":"kanban","now":${System.currentTimeMillis()}}""")
             "/api/cap"    -> HttpResponse(200, """{"protocols":["Http","Json","Socks5","Tls","Bonjour","Upnp"],"capabilities":["Process@local","Cas@local","Wireproto@lan.localhost"]}""")
-            "/api/board"  -> HttpResponse(200, boardJson())
+            // NOTE: /api/board is answered by a module claim or the ForgeRoutes PORTABLE tier
+            // (degraded-200 fallback) before this `when` — the fossil boardJson branch is gone.
             "/api/metrics" -> {
                 // Flywheel metrics retired 2026-08-24; endpoint kept so scrapers get a clean answer.
                 val acceptJson = text.contains("format=json", ignoreCase = true)
@@ -490,23 +504,7 @@ class JvmKanbanServer(
         )
     }
 
-    private fun boardJson(): String = runCatching {
-        val reduction = ForgeKanbanIngest.loadProjection("jim")
-        JsonSupport.stringify(
-            linkedMapOf(
-                "title" to reduction.source.title,
-                "userId" to reduction.source.userId,
-                "items" to reduction.board.cards.sortedBy { it.order }.map { card ->
-                    linkedMapOf(
-                        "id" to card.id.value,
-                        "title" to card.title,
-                        "status" to card.columnId.value,
-                    )
-                },
-                "correlations" to reduction.correlations.size,
-            )
-        )
-    }.getOrElse { """{"error":"load_failed","reason":"${it.message}"}""" }
+    // (fossil boardJson deleted: /api/board is a module claim, with ForgeRoutes.boardJson as the degraded fallback)
 
     private suspend fun submit(body: String): HttpResponse {
         val payload = body.substringAfter("\r\n\r\n", "").ifEmpty {
@@ -515,7 +513,9 @@ class JvmKanbanServer(
         }
         if (payload.isBlank()) return HttpResponse(400, """{"error":"empty_body"}""")
         return runCatching {
-            val tmp = "/tmp/hi"
+            // Ingest scratch rides the forge home (stateDir), never a hardcoded /tmp path.
+            val ingestDir = File(stateDir, ".ingest").apply { mkdirs() }
+            val tmp = File(ingestDir, "last-submit.md").absolutePath
             writeStringJvm(tmp, payload)
             val reduction = ForgeKanbanIngest.persistMarkdown("jim", tmp)
             reduction.causalNodes.forEach { node ->
