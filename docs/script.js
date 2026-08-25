@@ -1341,13 +1341,35 @@
 
   renderAll();
 
-  // ⚑ feedback: a GitHub issue PREFILLED with this view's coordinates.
-  (function mountFeedback() {
-    const a = document.createElement('a');
-    a.textContent = '⚑ feedback';
-    a.style.cssText = 'position:fixed;bottom:8px;right:12px;z-index:80;color:#ffb02e;cursor:pointer;font:11px monospace;opacity:.8';
-    a.title = 'open a GitHub issue prefilled with where you are right now';
-    a.addEventListener('click', () => {
+  // CTA links live IN the sidebar footer with the seed/sync notes — same size,
+  // same muted palette, in normal flow. Never floated over the app's own chrome.
+  (function mountCta() {
+    const anchor = document.getElementById('sync-note');
+    const host = document.createElement('div');
+    host.style.cssText = 'display:flex;gap:12px;margin-top:6px;font-size:11px';
+    function link(text, title, onClick) {
+      const a = document.createElement('a');
+      a.textContent = text;
+      a.title = title;
+      a.style.cssText = 'color:var(--text-faint);cursor:pointer;text-decoration:none;border-bottom:1px dotted var(--text-faint)';
+      a.addEventListener('click', onClick);
+      host.appendChild(a);
+      return a;
+    }
+    link('\u26A1 install', 'run the quickstart in anger', () => {
+      const d = document.createElement('div');
+      d.dataset.qs = '1';
+      d.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:99;display:flex;align-items:center;justify-content:center';
+      d.innerHTML = '<div style="background:var(--bg,#fff);border:1px solid var(--border,#ccc);border-radius:8px;padding:18px 22px;max-width:580px;color:var(--text,#222);font:13px monospace;box-shadow:0 8px 30px rgba(0,0,0,.25)">' +
+        '<b>Run TrikeShed in anger \u2014 five minutes, one port</b>' +
+        '<pre id="qsCmds" style="background:rgba(127,127,127,.12);padding:10px;border-radius:4px;margin:10px 0;user-select:text;white-space:pre-wrap">git clone git@github.com:jnorthrup/TrikeShed.git && cd TrikeShed\n./gradlew hotswapFeed\nbin/oroboros-daemon --watch</pre>' +
+        '<button onclick="navigator.clipboard.writeText(document.getElementById(\'qsCmds\').textContent)" style="font:inherit;padding:4px 12px;cursor:pointer">copy commands</button>' +
+        '<a href="https://github.com/jnorthrup/TrikeShed#run-it-in-anger--please" target="_blank" style="margin-left:10px">README \u2197</a>' +
+        '<a onclick="document.querySelector(\'div[data-qs]\').remove()" style="margin-left:14px;cursor:pointer">close</a></div>';
+      d.addEventListener('click', (e) => { if (e.target === d) d.remove(); });
+      document.body.appendChild(d);
+    });
+    link('\u2691 feedback', 'open a GitHub issue prefilled with where you are right now', () => {
       const coords = {
         view: state.view,
         page: state.activePageId,
@@ -1360,25 +1382,8 @@
       window.open('https://github.com/jnorthrup/TrikeShed/issues/new?labels=quickstart-feedback' +
         '&title=' + encodeURIComponent('[board] ') + '&body=' + encodeURIComponent(body), '_blank');
     });
-    document.body.appendChild(a);
-    const inst = document.createElement('a');
-    inst.textContent = '\u26A1 install now';
-    inst.style.cssText = 'position:fixed;bottom:8px;right:110px;z-index:80;color:#3ddc84;cursor:pointer;font:11px monospace;opacity:.85';
-    inst.title = 'run the quickstart in anger';
-    inst.addEventListener('click', () => {
-      const d = document.createElement('div');
-      d.dataset.qs = '1';
-      d.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:99;display:flex;align-items:center;justify-content:center';
-      d.innerHTML = '<div style="background:#11151e;border:1px solid #f29111;border-radius:8px;padding:18px 22px;max-width:580px;color:#d8dce6;font:13px monospace">' +
-        '<b style="color:#f29111">Run TrikeShed in anger \u2014 five minutes, one port</b>' +
-        '<pre id="qsCmds" style="background:#0b0e14;padding:10px;border-radius:4px;margin:10px 0;user-select:text;white-space:pre-wrap">git clone git@github.com:jnorthrup/TrikeShed.git && cd TrikeShed\n./gradlew hotswapFeed\nbin/oroboros-daemon --watch</pre>' +
-        '<button onclick="navigator.clipboard.writeText(document.getElementById(\'qsCmds\').textContent)" style="background:#161b26;border:1px solid #3ddc84;color:#3ddc84;border-radius:4px;padding:4px 12px;cursor:pointer;font:inherit">copy commands</button>' +
-        '<a href="https://github.com/jnorthrup/TrikeShed#run-it-in-anger--please" target="_blank" style="color:#3fd0ff;margin-left:10px">README \u2197</a>' +
-        '<a onclick="document.querySelector(\'div[data-qs]\').remove()" style="color:#7b8496;margin-left:14px;cursor:pointer">close</a></div>';
-      d.addEventListener('click', (e) => { if (e.target === d) d.remove(); });
-      document.body.appendChild(d);
-    });
-    document.body.appendChild(inst);
+    if (anchor && anchor.parentElement) anchor.parentElement.appendChild(host);
+    else document.body.appendChild(host);
   })();
 
   // Live board: hydrate from the WAL-backed store at load, then poll on a
