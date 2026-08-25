@@ -44,3 +44,8 @@
 **Vulnerability:** The `generateKey()` method in `Rfc6455Handshake.kt` used a highly predictable linear shift-XOR algorithm seeded by the system clock (`Clock.System.now().toEpochMilliseconds()`) to generate the `Sec-WebSocket-Key`.
 **Learning:** Using predictable, time-based PRNGs for cryptographic nonces like `Sec-WebSocket-Key` makes the handshake susceptible to prediction or replay attacks. While the RFC 6455 states this key is not meant for authentication, it is meant to prove the request is actually a WebSocket request and to prevent caching proxy issues, so it should still be robustly random.
 **Prevention:** Always use standard, secure-by-default libraries for random number generation (e.g., `kotlin.random.Random.Default.nextBytes` or `SecureRandom`) instead of rolling custom cryptographic algorithms or using simple PRNGs.
+
+## 2024-05-27 - [Denial of Service via Unbounded waitFor and synchronous pipe reading]
+**Vulnerability:** Found `waitFor()` being called on a `Process` without a timeout and while synchronously reading from the process `InputStream` in `CouchWal.java`, `PanamaKanbanMovie.kt`, and `HeatSoak.kt`.
+**Learning:** `Process.waitFor()` without a timeout can lead to Denial of Service (DoS) if the subprocess hangs. Further, reading the input stream synchronously on the main thread before calling `waitFor` can block indefinitely if the process fills the OS pipe buffer or simply hangs, preventing the timeout from ever being reached.
+**Prevention:** Always read process streams asynchronously (e.g., using `CompletableFuture.supplyAsync`) to prevent pipe buffer deadlocks, and explicitly use bounded `waitFor(timeout, TimeUnit)` with forceful termination `destroyForcibly()` on timeout.
