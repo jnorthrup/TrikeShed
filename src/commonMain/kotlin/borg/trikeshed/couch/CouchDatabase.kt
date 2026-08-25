@@ -44,12 +44,25 @@ class CouchDatabase(
             return if (s.size == 0) 0L else s[s.size - 1].sequence + 1
         }
 
-    fun info(): Map<String, Any?> = mapOf(
-        "db_name" to name,
-        "doc_count" to store.all().count { !isTombstone(it) && !it.id.startsWith("_design/") },
-        "update_seq" to updateSeq,
-        "instance_start_time" to "0",
-    )
+    fun info(): Map<String, Any?> {
+        // ⚡ Bolt: Using store.ids() for zero-allocation ID scanning instead of store.all().
+        // Avoiding materializing full documents in memory just to count them reduces GC pressure.
+        var docCount = 0
+        val ids = store.ids()
+        for (i in 0 until ids.a) {
+            val id = ids.b(i)
+            // ⚡ Bolt: Using store.head.isDeleted(id) directly is faster than loading the doc and checking for a tombstone flag.
+            if (!store.head.isDeleted(id) && !id.startsWith("_design/")) {
+                docCount++
+            }
+        }
+        return mapOf(
+            "db_name" to name,
+            "doc_count" to docCount,
+            "update_seq" to updateSeq,
+            "instance_start_time" to "0",
+        )
+    }
 
     // ── documents ─────────────────────────────────────────────────
 
@@ -83,8 +96,17 @@ class CouchDatabase(
         includeDocs: Boolean = false,
         keys: List<String>? = null,
     ): Map<String, Any?> {
-        val live = store.all().filter { !isTombstone(it) }
-        var ids = live.map { it.id }.sorted()
+        // ⚡ Bolt: Replaced store.all().filter {...}.map {...}.sorted() with zero-allocation store.ids() scanning
+        // and direct ArrayList construction. Prevents O(N) allocation of full documents.
+        val storeIds = store.ids()
+        val liveIdsList = ArrayList<String>(storeIds.a)
+        for (i in 0 until storeIds.a) {
+            val id = storeIds.b(i)
+            if (!store.head.isDeleted(id)) {
+                liveIdsList.add(id)
+            }
+        }
+        var ids = liveIdsList.sorted()
         if (keys != null) {
             val set = keys.toSet(); ids = keys.filter { it in set }
         } else {
@@ -92,7 +114,7 @@ class CouchDatabase(
             if (endkey != null) ids = ids.filter { if (descending) it >= endkey else it <= endkey }
             if (descending) ids = ids.reversed()
         }
-        val total = live.size
+        val total = liveIdsList.size
         val page = ids.drop(skip).take(limit)
         return mapOf(
             "total_rows" to total,
