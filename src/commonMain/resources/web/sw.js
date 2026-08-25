@@ -1,6 +1,6 @@
 // Forge service worker — hand-written, no Workbox/NPM. Registered with a RELATIVE url from
 // index.html, so its scope is the directory the page is served from (never the whole origin).
-const CACHE_NAME = 'forge-cache-v3';
+const CACHE_NAME = 'forge-cache-v4'; // v4 2026-08-25: byte-bump forces SW update past months of cache-first staleness
 const SYNC_STORE_NAME = 'sync-queue';
 const DB_NAME = 'forge-db';
 const INVOKE_PATH = 'api/invoke';
