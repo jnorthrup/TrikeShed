@@ -278,6 +278,7 @@ function heatUp(n){const now=performance.now();while(n&&n!==root){heat.set(pathO
 function heatOf(n){const t=heat.get(pathOf(n));return t?Math.max(0,1-(performance.now()-t)/120000):0;}
 function cycleMode(){mode=mode==='map'?'graph':mode==='graph'?'tree':mode==='tree'?'notion':'map';
   if(mode==='graph')buildGraph();
+  if(mode==='notion'){for(const id of EXCLUSIVE_PANELS)$(id).style.display='none';}
   $('notion').style.display=mode==='notion'?'flex':'none';
   if(mode==='notion')buildNotion();
   $('crumb').textContent='mode: '+mode+(mode==='graph'?' — force DAG (hubs + edges), drag nodes':mode==='tree'?' — radial drilldown of '+(targetNode()===root?'/':pathOf(targetNode())):mode==='notion'?' — database flavor: sort by header, filter, click to inspect':' — territory map');}
@@ -1006,7 +1007,21 @@ function ledger(){
     '</table>'+(leaves.length>cap.length?'<div style="color:var(--dim);margin-top:4px">…'+(leaves.length-cap.length).toLocaleString()+' more entries (zoom to a smaller territory)</div>':'');
   show('ledger');
 }
-function show(id){$(id).style.display='flex';}
+/* ── floating panels: doc/sheet/notion share ONE screen rectangle
+   (left:10,top:78), vms/ledger/aot share ANOTHER (right:320,top:78). Nothing
+   used to close a sibling before opening another, so two panels at the same
+   z-index would sit exactly on top of each other — both "open", both
+   pointer-interactive, the top one silently eating every click meant for the
+   one underneath. That is the "non-interactive, useless" bug: the panel was
+   there, just buried under an identically-positioned twin. show()/hide() are
+   the only entry points now — every panel, and notion mode, route through
+   them, so at most one of this concentric set is ever visible at once. */
+const EXCLUSIVE_PANELS=['doc','points','vms','sheet','ledger','aot'];
+function closeExclusivePanels(){
+  for(const id of EXCLUSIVE_PANELS)$(id).style.display='none';
+  if(mode==='notion'){mode='map';$('notion').style.display='none';}
+}
+function show(id){closeExclusivePanels();$(id).style.display='flex';}
 function hide(id){$(id).style.display='none';}
 /* ── HUD vitals ─────────────────────────────────────────── */
 let lastComp=0,compHist=[];

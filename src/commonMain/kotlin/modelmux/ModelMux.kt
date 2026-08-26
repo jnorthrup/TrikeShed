@@ -157,10 +157,16 @@ class ModelMux internal constructor(
         val entry = (0 until models.size).firstOrNull { models[it].a == modelId }?.let { models[it] }
             ?: return Result.failure(NoSuchElementException("Model not found: $modelId"))
         val card = entry.b
-        val authKey = keyMux.get("llm.${card.id}.key")
+        // A provider-tagged card resolves against the provider's pooled
+        // credential (one key serves every model that provider hosts) before
+        // falling to the per-model lookup untagged cards have always used.
+        val providerTag = card.providerTag
+        val authKey = providerTag?.let { keyMux.get("llm.$it.key") }
+            ?: keyMux.get("llm.${card.id}.key")
             ?: keyMux.get("llm.default.key")
             ?: return Result.failure(IllegalStateException("no auth key for model: $modelId"))
-        val baseUrl = keyMux.get("llm.${card.id}.base_url")
+        val baseUrl = providerTag?.let { keyMux.get("llm.$it.base_url") }
+            ?: keyMux.get("llm.${card.id}.base_url")
             ?: keyMux.get("llm.default.base_url")
             ?: configuredBaseUrls[modelId]
             ?: "https://api.openai.com/v1"
@@ -490,11 +496,18 @@ class ModelMuxBuilder(private val keyMux: KeyMux) {
         id: String,
         caps: Set<String>,
         baseUrl: String? = null,
-        version: String = "1.0"
+        version: String = "1.0",
+        /** Tags this card so [ModelMux.session] resolves keys by provider, not model id. */
+        provider: String? = null,
     ): ModelMuxBuilder = apply {
         val capSeries = caps.toList().toSeries()
         val action = if ("chat" in caps) "chat" else if ("embed" in caps) "embed" else "complete"
-        val meta: AcpMeta = version j (action j (0 j { error("no headers") }))
+        val headers: Series<Join<String, String>> = if (provider != null) {
+            1 j { _: Int -> "provider" j provider }
+        } else {
+            0 j { _: Int -> error("no headers") }
+        }
+        val meta: AcpMeta = version j (action j headers)
         val card: AcpModelCard = id j (capSeries j meta)
         models.add(id j card)
         if (baseUrl != null) {

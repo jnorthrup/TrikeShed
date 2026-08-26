@@ -1,0 +1,13 @@
+# SUMO — Suggested Upper Merged Ontology (IEEE P1600.1)
+# Upstream: https://github.com/ontologyportal/sumo
+# License:  GNU GPL v3 (domain ontologies); IEEE-owned upper tier.
+#
+# Inert data dependency. Not vendored into the tree — fetched once by
+# `fetchSumoCorpus`, verified against the checksums below, cached in the
+# Gradle user home. Bump `ref` and the hashes together, never separately.
+#
+# ref = 25bb366fdffd8769e741d2e22f215c2785bddce1
+#
+# <sha256>  <path-in-repo>
+bda2f68ce375f64134c5c58656f94a50f920444b3b17b0329ee00fd0437b3cc2  Merge.kif
+9a39696fb9e8feafcd5a3f3d10bc59a7a8257a42fefda3d5684b087036fafb49  Mid-level-ontology.kif

@@ -51,6 +51,19 @@ button.stop{border-color:var(--err);color:var(--err)}
 .params input,.params textarea,.params select{background:var(--bg);border:1px solid var(--line);color:var(--ink);border-radius:3px;font:11px/1.4 inherit;padding:3px 5px;width:100%;user-select:text}
 .params textarea{resize:vertical;min-height:44px;white-space:pre}
 .result{margin:0 8px 6px;padding:5px 6px;background:var(--bg);border:1px solid var(--line);border-radius:3px;font-size:10px;color:var(--dim);max-height:150px;max-width:340px;overflow:auto;white-space:pre;user-select:text}
+.node.wide{min-width:680px}
+.kboard{display:flex;gap:6px;padding:6px 8px 8px;overflow-x:auto}
+.kcol{flex:0 0 132px;background:var(--bg);border:1px solid var(--line);border-radius:4px;min-height:60px;padding:5px;transition:outline .1s}
+.kcol.over{border-color:var(--err)}
+.kcol.dragover{outline:2px dashed var(--graal);outline-offset:-2px}
+.kcol h6{font-size:9px;text-transform:uppercase;letter-spacing:.05em;color:var(--dim);display:flex;justify-content:space-between;margin:0 0 5px;font-weight:400}
+.kcol h6 b{color:var(--ink);font-weight:600}
+.kcol.over h6 b{color:var(--err)}
+.kcard{background:var(--panel2);border:1px solid var(--line);border-radius:3px;padding:4px 6px;margin-bottom:5px;font-size:10.5px;line-height:1.35;cursor:grab;user-select:none}
+.kcard:active{cursor:grabbing;opacity:.6}
+.kcard.contested{border-color:var(--err);box-shadow:0 0 0 1px rgba(255,79,88,.3)}
+.kcard .kid{color:var(--dim);font-size:9px}
+.kboard-status{padding:2px 10px 8px;font-size:9px;color:var(--dim)}
 .ctree{white-space:pre;font-size:10px;line-height:1.5;user-select:text}
 .ctree-tw{display:inline-block;width:10px;color:#7b8496}
 .gaugeval{margin:2px 8px 8px;font-size:26px;font-variant-numeric:tabular-nums;color:var(--graal);text-align:center}
@@ -66,10 +79,27 @@ button.stop{border-color:var(--err);color:var(--err)}
 .port.t-num{border-color:#ffb02e}.port.t-trig{border-color:#3ddc84}
 .port.t-text:hover{background:#6ea8fe}.port.t-json:hover{background:#3fd0ff}.port.t-id:hover{background:#b07aff}
 .port.t-num:hover{background:#ffb02e}.port.t-trig:hover{background:#3ddc84}
-.node.collapsed .params,.node.collapsed .result,.node.collapsed .gaugeval,.node.collapsed .gaugelabel{display:none}
+.node.collapsed .params,.node.collapsed .result,.node.collapsed .gaugeval,.node.collapsed .gaugelabel,.node.collapsed .kboard,.node.collapsed .kboard-status{display:none}
 .node.note{background:#2a2410;border-color:#5c4d1a;min-width:150px}
 .node.note .hd{background:#33290f}
 #minimap{position:fixed;right:10px;bottom:26px;width:168px;height:112px;background:rgba(17,21,30,.92);border:1px solid var(--line);border-radius:5px;z-index:20;cursor:pointer}
+/* ── fractal zoom: diving into a program.ref swaps the SAME viewport to its
+   real sub-graph — the RTS camera going from strategic to tactical, not a
+   flat function call. #crumb is the way back up, one level per dive. ── */
+#crumb{position:fixed;top:40px;left:0;right:0;height:26px;display:flex;align-items:center;gap:4px;padding:0 10px;background:rgba(11,14,20,.94);border-bottom:1px solid var(--line);z-index:19;font-size:11px;color:var(--dim)}
+#crumb span.seg{cursor:pointer;color:var(--wire)}
+#crumb span.seg:hover{color:var(--graal);text-decoration:underline}
+#crumb span.sep{color:var(--dim)}
+.node.ref{border-color:var(--vm)}
+.node.ref .hd{background:linear-gradient(90deg,var(--panel2),rgba(176,122,255,.12))}
+.ref-dive{margin:0 8px 8px;padding:5px 8px;background:var(--bg);border:1px dashed var(--vm);border-radius:3px;font-size:10px;color:var(--vm);cursor:pointer;text-align:center}
+.ref-dive:hover{background:rgba(176,122,255,.1)}
+/* clickable treesheet leaves — this was the whole complaint: a JSON tree you
+   can only expand/collapse is a viewer, not a tool. Click a leaf, get its
+   value; click a panel-name leaf inside a panels.list result, get a node. */
+.ctree span.leaf{cursor:pointer;border-bottom:1px dotted transparent}
+.ctree span.leaf:hover{border-bottom-color:currentColor}
+.ctree span.leaf.copied{color:var(--ok)!important}
 #menu input{width:calc(100% - 16px);margin:6px 8px 4px;background:var(--bg);border:1px solid var(--line);color:var(--ink);border-radius:3px;font:inherit;padding:3px 6px}
 #menu .items{max-height:300px;overflow-y:auto}
 </style>
@@ -90,6 +120,7 @@ button.stop{border-color:var(--err);color:var(--err)}
   <button id="fbBtn" title="open a GitHub issue prefilled with this construction's coordinates" style="border-color:var(--warn);color:var(--warn)">⚑</button>
   <span id="status">idle</span>
 </div>
+<div id="crumb" style="display:none"></div>
 <div id="viewport"><div id="world"><svg id="wires"></svg></div></div>
 <div id="menu"></div>
 <canvas id="minimap" width="168" height="112"></canvas>
@@ -272,7 +303,7 @@ finally:
     params:{},
     async run(){ const r=await api("GET","/api/graal/pointcuts"); return {routes:r.routes||r}; }},
   "board.view": {
-    title:"kanban board (live)", ins:["trigger?"], outs:["board","alerts"],
+    title:"kanban board (summary)", ins:["trigger?"], outs:["board","alerts"],
     params:{},
     async run(){
       const r=await api("GET","/api/board");
@@ -283,6 +314,50 @@ finally:
       return {board:{seq:r.sequence,cols:cols,cards:items.length},
               alerts:{contested:contested,wip:wipAlerts}};
     }},
+  /* ── generic composition primitives: reusable for ANY grouped/draggable
+     list, not specific to kanban or to Hermes' board shape. Kanban is not
+     implemented here — it is COMPOSED from these plus http.get/pick/js/
+     http.post (already generic) in the saved "kanban" program. ── */
+  "list.groupBy": {
+    title:"group by key (generic)", ins:["x"], outs:["groups"],
+    params:{ key:{v:"status",ph:"field name (dot.path ok)"} },
+    async run(n,i){
+      const key=p(n,"key"); const out={};
+      for(const item of (i.x||[])){
+        let v=item; for(const k of key.split(".").filter(Boolean)) v=v?.[k];
+        const g=String(v); (out[g]=out[g]||[]).push(item);
+      }
+      return {groups:out};
+    }},
+  "dom.board": {
+    title:"draggable grouped board (generic)", ins:["groups","columns?"], outs:["move"],
+    wide:true,
+    params:{
+      idField:{v:"id"}, titleField:{v:"title"}, subtitleField:{v:"id"}, badgeField:{v:"priority"},
+    },
+    async run(n,i){ n._groups=i.groups||{}; n._cols=i["columns?"]||null; return {move:n._lastMove||null}; },
+    render(n){ renderGroupedBoard(n); },
+  },
+  /* ── the store as a browsable, ACTIONABLE surface — not a JSON dump you can
+     only look at. Click a program name, get a program.ref node wired to it. ── */
+  "panels.list": {
+    title:"stored programs (click → embed)", ins:["trigger?"], outs:["panels"],
+    wide:true,
+    params:{},
+    async run(){ const r=await api("GET","/api/panels"); return {panels:r.panels||[]}; },
+    render(n,out){ renderPanelsList(n,out&&out.panels||[]); },
+  },
+  /* ── a window onto another graph, not a function call. Double-click / the
+     dive-in strip to descend the SAME zoomable canvas into the referenced
+     program; ⌂ root or a breadcrumb segment climbs back out. Recursive by
+     construction: if that program also holds a program.ref, diving in again
+     just repeats this. ── */
+  "program.ref": {
+    title:"program (dive in)", ins:[], outs:[], sink:true,
+    params:{ name:{v:"",ph:"stored program name"} },
+    async run(){ return {}; },
+    render(n){ renderProgramRef(n); },
+  },
   "note": {
     title:"note", ins:[], outs:[], sink:true,
     params:{ text:{v:"",ta:1,ph:"sticky note"} },
@@ -312,9 +387,15 @@ function renderTree(v,key,depth){
   if(depth>0) d.style.marginLeft="10px";
   const isObj=v!==null&&typeof v==="object";
   if(!isObj){
-    const s=document.createElement("span");
+    const s=document.createElement("span"); s.className="leaf";
     s.textContent=(key?key+": ":"")+(typeof v==="string"?'"'+v+'"':String(v));
     if(v===null) s.style.color="#b07aff"; else if(typeof v==="number") s.style.color="#ffb02e"; else if(typeof v==="string") s.style.color="#3ddc84";
+    s.title="click to copy this value";
+    s.addEventListener("click",e=>{
+      e.stopPropagation();
+      copyText(String(v));
+      s.classList.add("copied"); setTimeout(()=>s.classList.remove("copied"),500);
+    });
     d.appendChild(s); return d;
   }
   const arr=Array.isArray(v), entries=arr?v.map((x,i)=>[i,x]):Object.entries(v);
@@ -335,6 +416,138 @@ function setResult(n,v){
   // JSON docs render as a cursor-tree; strings stay verbatim
   if(v!==null&&typeof v==="object"){ el.textContent=""; el.appendChild(renderTree(v,"",0)); }
   else el.textContent = typeof v==="string" ? v : String(v);
+}
+/* ── generic grouped/draggable board renderer — the ONE piece of this
+   composition that is unavoidably code, because SOME primitive has to touch
+   the DOM. It carries zero domain vocabulary: no kanban, no /api/invoke, no
+   "revision" or "committed". A drop only DESCRIBES the gesture — {itemId,
+   item, from, to} — on the node's `move` output; what that gesture MEANS is
+   entirely the wired graph's business (a `js` node shapes the command, an
+   `http.post` node fires it — see the "kanban" saved program). This same
+   node composes a CRM pipeline, a triage queue, a sprint board: whatever the
+   graph downstream of `move` decides to do with the gesture. */
+function renderGroupedBoard(n){
+  const groups=n._groups||{}, meta=n._cols;
+  const idF=p(n,"idField"), titleF=p(n,"titleField"), subF=p(n,"subtitleField"), badgeF=p(n,"badgeField");
+  const cols = meta && meta.length ? meta : Object.keys(groups).sort().map(k=>({id:k,name:k}));
+  let wrap=n.el.querySelector(".kboard");
+  if(!wrap){ wrap=document.createElement("div"); wrap.className="kboard"; n.el.appendChild(wrap); }
+  let status=n.el.querySelector(".kboard-status");
+  if(!status){ status=document.createElement("div"); status.className="kboard-status"; n.el.appendChild(status); }
+  wrap.textContent="";
+  const total=Object.values(groups).reduce((a,g)=>a+g.length,0);
+  status.textContent=total+" items across "+cols.length+" groups";
+  for(const col of cols){
+    const items=groups[col.id]||[];
+    const over=col.wipLimit&&items.length>col.wipLimit;
+    const c=document.createElement("div"); c.className="kcol"+(over?" over":"");
+    c.dataset.group=col.id;
+    const h=document.createElement("h6");
+    h.innerHTML=`<span>${col.name||col.id}</span><b>${items.length}${col.wipLimit?"/"+col.wipLimit:""}</b>`;
+    c.appendChild(h);
+    for(const it of items){
+      const card=document.createElement("div");
+      card.className="kcard"+(it.contested?" contested":"");
+      card.draggable=true;
+      const title=it[titleF]??it[idF]??"?", sub=it[subF], badge=it[badgeF];
+      card.innerHTML=`<div>${title}</div><div class="kid">${sub!=null&&sub!==title?sub:""}${badge!=null?" · "+badge:""}</div>`;
+      card.addEventListener("dragstart",e=>{
+        e.dataTransfer.setData("text/plain",JSON.stringify({itemId:it[idF],item:it,from:col.id}));
+        e.dataTransfer.effectAllowed="move";
+      });
+      card.addEventListener("pointerdown",e=>e.stopPropagation()); // don't pan the canvas while grabbing a card
+      c.appendChild(card);
+    }
+    c.addEventListener("dragover",e=>{ e.preventDefault(); c.classList.add("dragover"); });
+    c.addEventListener("dragleave",()=>c.classList.remove("dragover"));
+    c.addEventListener("drop",e=>{
+      e.preventDefault(); c.classList.remove("dragover");
+      let data; try{ data=JSON.parse(e.dataTransfer.getData("text/plain")); }catch(_){ return; }
+      if(!data||data.from===col.id) return;
+      status.textContent=data.itemId+": "+data.from+" → "+col.id+" (wired downstream decides what that means)";
+      n._lastMove={...data,to:col.id};
+      runAll(n.id); // this node's own downstream chain sees the gesture
+    });
+    wrap.appendChild(c);
+  }
+}
+function renderPanelsList(n,panels){
+  let wrap=n.el.querySelector(".kboard");
+  if(!wrap){ wrap=document.createElement("div"); wrap.className="kboard"; wrap.style.flexWrap="wrap"; n.el.appendChild(wrap); }
+  wrap.textContent="";
+  if(!panels.length){ const e=document.createElement("div"); e.className="kboard-status"; e.textContent="store has no programs yet — ⇪ store to save this one"; wrap.appendChild(e); return; }
+  for(const pnl of panels){
+    const chip=document.createElement("div"); chip.className="ref-dive"; chip.style.margin="4px";
+    chip.textContent="＋ "+pnl.name;
+    chip.title="click to add a program.ref("+pnl.name+") node to this canvas";
+    chip.addEventListener("click",()=>{
+      addNode("program.ref",n.x+n.el.offsetWidth+40,n.y);
+      $("#status").textContent="added program.ref("+pnl.name+") — double-click its dive-in strip to descend into it";
+      const added=G.nodes[G.nodes.length-1];
+      added.params.name=pnl.name;
+      const inp=added.el.querySelector(".params input"); if(inp) inp.value=pnl.name;
+      save();
+    });
+    wrap.appendChild(chip);
+  }
+}
+function renderProgramRef(n){
+  let dive=n.el.querySelector(".ref-dive");
+  if(!dive){ dive=document.createElement("div"); dive.className="ref-dive"; n.el.appendChild(dive); }
+  const name=p(n,"name");
+  dive.textContent=name?"⤵ dive into "+name:"⤵ dive in (set a name first)";
+  dive.onclick=()=>{ if(name) diveInto(name); };
+}
+function copyText(s){
+  if(navigator.clipboard&&navigator.clipboard.writeText){ navigator.clipboard.writeText(s).catch(()=>fallbackCopy(s)); }
+  else fallbackCopy(s);
+}
+function fallbackCopy(s){
+  const ta=document.createElement("textarea"); ta.value=s; ta.style.position="fixed"; ta.style.opacity="0";
+  document.body.appendChild(ta); ta.select();
+  try{ document.execCommand("copy"); }catch(e){}
+  ta.remove();
+}
+/* ── fractal dive: a program.ref node is not a function call, it is a
+   window onto another graph living at the SAME zoom/pan surface this one
+   does. Diving in swaps G for the referenced program and remembers how to
+   get back — the RTS camera descending a level, not a black-box invocation.
+   Because a dived-in graph can itself hold a program.ref, this recurses to
+   whatever depth the stored programs actually nest. */
+let diveStack=[]; // [{name, data}] — data is this level's serialize() before diving deeper
+function crumbSync(){
+  const el=$("#crumb");
+  if(!diveStack.length){ el.style.display="none"; el.textContent=""; return; }
+  el.style.display="flex";
+  el.textContent="";
+  const root=document.createElement("span"); root.className="seg"; root.textContent="⌂ root";
+  root.addEventListener("click",()=>popTo(0));
+  el.appendChild(root);
+  diveStack.forEach((entry,i)=>{
+    const sep=document.createElement("span"); sep.className="sep"; sep.textContent=" ▸ "; el.appendChild(sep);
+    const seg=document.createElement("span"); seg.className="seg"; seg.textContent=entry.name;
+    if(i<diveStack.length-1) seg.addEventListener("click",()=>popTo(i+1));
+    else seg.style.color="var(--ink)";
+    el.appendChild(seg);
+  });
+}
+async function diveInto(name){
+  const resp=await fetch("/api/panels/"+encodeURIComponent(name));
+  if(!resp.ok){ $("#status").textContent="dive failed: no such program '"+name+"'"; return; }
+  const data=await resp.json();
+  diveStack.push({name,data:serialize()});
+  crumbSync();
+  $("#panelName").value=name;
+  load(data);
+  $("#status").textContent="diving into "+name+" — ⌂ root or a breadcrumb segment to climb back out";
+}
+function popTo(depth){
+  if(depth>=diveStack.length) return;
+  const target=diveStack[depth];
+  diveStack=diveStack.slice(0,depth);
+  crumbSync();
+  $("#panelName").value=depth===0?"":diveStack[depth-1].name;
+  load(target.data);
 }
 /* ── node DOM ──────────────────────────────────────────────────────────── */
 function addNode(type,x,y,params){
@@ -386,6 +599,8 @@ function buildNode(n){
     const gl=document.createElement("div"); gl.className="gaugelabel"; gl.style.cssText="text-align:center;color:var(--dim);font-size:10px;padding-bottom:8px"; el.appendChild(gl);
   }
   if(n.type==="note") el.classList.add("note");
+  if(n.type==="program.ref") el.classList.add("ref");
+  if(t.wide) el.classList.add("wide");
   if(n.collapsed) el.classList.add("collapsed");
   el.style.left=n.x+"px"; el.style.top=n.y+"px";
   world.appendChild(el);
@@ -645,7 +860,8 @@ async function runNode(n,cache){
   try{
     const out=await t.run(n,inputs);
     n.el.classList.remove("running"); n.el.classList.add("ok");
-    if(!t.sink && n.type!=="display" && out!==undefined && Object.keys(out).length) setResult(n,out);
+    if(t.render) t.render(n,out);
+    else if(!t.sink && n.type!=="display" && out!==undefined && Object.keys(out).length) setResult(n,out);
     return out;
   }catch(e){
     n.el.classList.remove("running"); n.el.classList.add("err");
@@ -730,7 +946,7 @@ setInterval(drawMinimap, 1500);
 function serialize(){ return {view,nodes:G.nodes.map(n=>({id:n.id,type:n.type,x:n.x,y:n.y,params:n.params,collapsed:!!n.collapsed})),wires:G.wires,seq:G.seq}; }
 function save(){ try{ localStorage.setItem("trikeshed.panels.v3", JSON.stringify(serialize())); }catch(e){} }
 function load(data){
-  for(const n of G.nodes){ if(n._timer)clearInterval(n._timer); n.el.remove(); }
+  for(const n of G.nodes){ if(n._timer)clearInterval(n._timer); if(n._es){n._es.close();n._es=null;} n.el.remove(); }
   G={nodes:[],wires:[],seq:data.seq||1};
   if(data.view) view=data.view;
   for(const sn of data.nodes||[]){ if(!TYPES[sn.type])continue; const n={...sn,params:{...sn.params}}; G.nodes.push(n); buildNode(n); }
@@ -789,7 +1005,20 @@ else {
   const vsd=addNode("display",470,700);
   const ks=addNode("keys.status",250,880);
   const ksd=addNode("display",470,880);
-  const nt=addNode("note",650,340,{text:"production ops board — live planes, no fiction.\nright-click/double-click: add nodes.\ndrop a folder anywhere: mount it as a scope."});
+  // ── kanban: not a node, a COMPOSITION. Every step below is a generic,
+  // reusable primitive; the kanban-specific knowledge (endpoint, field
+  // names, the move command's shape) lives entirely in wiring + params —
+  // this exact graph is also saved as the "kanban" program in store (load
+  // via panel name "kanban") so it's a standalone, shareable LCNC program,
+  // not something only reachable by knowing it's baked into the boot state.
+  const bhg=addNode("http.get",30,1060,{path:"/api/board"});
+  const bpi=addNode("pick",250,1030,{path:"items"});
+  const bpc=addNode("pick",250,1150,{path:"columns"});
+  const bgb=addNode("list.groupBy",470,1030,{key:"status"});
+  const bdb=addNode("dom.board",690,1030,{idField:"id",titleField:"title",subtitleField:"id",badgeField:"priority"});
+  const bmv=addNode("js",1400,1030,{expr:"{commands:[{type:'move',jobId:x.itemId,idempotencyKey:'panel-'+x.itemId+'-'+Date.now().toString(36),expectedRevision:x.item.revision,toColumn:x.to}]}"});
+  const bhp=addNode("http.post",1620,1030,{path:"/api/invoke"});
+  const nt=addNode("note",650,340,{text:"production ops board — live planes, no fiction.\nright-click/double-click: add nodes.\ndrop a folder anywhere: mount it as a scope.\nkanban: drag a card in the board below — the drop only DESCRIBES the gesture; the js+http.post nodes decide what it means and fire the real move."});
   for(const [a,b,ap,bp] of [
     [t,v,"tick","trigger?"],[v,pk,"json","x"],[pk,g,"y","x"],
     [v,pk2,"json","x"],[pk2,g2,"y","x"],
@@ -797,10 +1026,24 @@ else {
     [t,bi,"tick","trigger?"],[bi,bid,"field","x"],
     [t,vs,"tick","trigger?"],[vs,vsd,"rows","x"],
     [t,ks,"tick","trigger?"],[ks,ksd,"roster","x"],
+    [t,bhg,"tick","trigger?"],
+    [bhg,bpi,"json","x"],[bhg,bpc,"json","x"],
+    [bpi,bgb,"y","x"],
+    [bgb,bdb,"groups","groups"],[bpc,bdb,"y","columns?"],
+    [bdb,bmv,"move","x"],[bmv,bhp,"y","body"],
   ]) G.wires.push({from:[a.id,ap],to:[b.id,bp]});
   save();
 }
 applyView(); requestAnimationFrame(redraw);
+// arm timer sources and run once immediately — a freshly loaded panel shows
+// LIVE state on first paint, not an inert diagram waiting for a click.
+for(const n of G.nodes){
+  if(TYPES[n.type]&&TYPES[n.type].source&&n.type==="timer"&&!n._timer){
+    const s=Math.max(1,+p(n,"seconds")||5);
+    n._timer=setInterval(()=>runAll(n.id), s*1000);
+  }
+}
+runAll();
 </script>
 </body>
 </html>

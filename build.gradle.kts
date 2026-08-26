@@ -1,3 +1,5 @@
+import java.net.URI
+import java.security.MessageDigest
 import org.jetbrains.kotlin.gradle.ExperimentalKotlinGradlePluginApi
 import org.jetbrains.kotlin.gradle.ExperimentalWasmDsl
 import org.jetbrains.kotlin.gradle.plugin.KotlinPlatformType
@@ -203,6 +205,9 @@ kotlin {
 
         val jvmMain = getByName("jvmMain") {
             resources.srcDir("src/jvmMain/resources")
+            // SUMO SUO-KIF corpus, fetched + checksum-verified by `fetchSumoCorpus`.
+            // Classpath layout: sumo/Merge.kif, sumo/Mid-level-ontology.kif
+            resources.srcDir(layout.buildDirectory.dir("generated/sumo/resources"))
             dependencies {
                 implementation("org.openjdk.jmh:jmh-core:1.37")
                 implementation("org.openjdk.jmh:jmh-generator-annprocess:1.37")
@@ -1135,3 +1140,121 @@ tasks.register<Exec>("hotswapFeed") {
     }
 }
 
+
+// ── SUMO corpus: inert data dependency ────────────────────────────────────
+// SUMO is data, not code: ~1.7MB of SUO-KIF that must never be vendored into
+// the tree and never re-downloaded on `clean`. Checksums are pinned in
+// gradle/sumo-corpus.pins; the payload caches in the Gradle user home keyed by
+// content hash and lands in generated jvmMain resources under `sumo/`.
+//
+// Offline-graceful by design: a missing network with a cold cache logs a
+// warning and produces an empty corpus dir so `jvmMainClasses` stays green.
+// SumoOntology's hardcoded upper spine is the fallback. Pass -PsumoStrict to
+// turn that warning into a build failure (use in release/bake pipelines).
+val sumoPinFile = file("gradle/sumo-corpus.pins")
+val sumoResourcesRoot = layout.buildDirectory.dir("generated/sumo/resources")
+
+val fetchSumoCorpus = tasks.register("fetchSumoCorpus") {
+    group = "data"
+    description = "Fetch + checksum-verify the pinned SUMO SUO-KIF corpus (ontologyportal/sumo)."
+
+    val pinFile = sumoPinFile
+    val outDir = sumoResourcesRoot.map { it.dir("sumo") }
+    val cacheRoot = File(gradle.gradleUserHomeDir, "trikeshed/sumo")
+    val strict = providers.gradleProperty("sumoStrict").isPresent
+
+    inputs.file(pinFile)
+    // Strictness participates in up-to-date checking: flipping it must re-run the
+    // verification, otherwise a cached success masks a strict-mode failure.
+    inputs.property("sumoStrict", strict)
+    outputs.dir(outDir)
+
+    doLast {
+        fun sha256(bytes: ByteArray): String =
+            MessageDigest.getInstance("SHA-256")
+                .digest(bytes)
+                .joinToString("") { "%02x".format(it) }
+
+        val lines = pinFile.readLines()
+        val ref = lines.firstNotNullOfOrNull { line ->
+            Regex("""^#\s*ref\s*=\s*([0-9a-f]{40})\s*$""").find(line.trim())?.groupValues?.get(1)
+        } ?: error("gradle/sumo-corpus.pins: no `# ref = <40-hex commit sha>` line")
+
+        val pins = lines
+            .map { it.substringBefore('#').trim() }
+            .filter { it.isNotEmpty() }
+            .map { row ->
+                val parts = row.split(Regex("""\s+"""), limit = 2)
+                require(parts.size == 2) { "gradle/sumo-corpus.pins: malformed row `$row`" }
+                parts[0] to parts[1]
+            }
+
+        val dest = outDir.get().asFile
+        dest.mkdirs()
+
+        var fetched = 0
+        var cached = 0
+        val missing = mutableListOf<String>()
+
+        for ((expected, repoPath) in pins) {
+            val name = repoPath.substringAfterLast('/')
+            val cacheFile = File(cacheRoot, "$expected/$name")
+            val target = File(dest, name)
+
+            if (!cacheFile.isFile) {
+                val url = "https://raw.githubusercontent.com/ontologyportal/sumo/$ref/$repoPath"
+                val body = runCatching { URI(url).toURL().readBytes() }.getOrNull()
+                if (body == null) {
+                    missing += "$repoPath (download failed, cold cache)"
+                    continue
+                }
+                val actual = sha256(body)
+                if (actual != expected) {
+                    error(
+                        "SUMO pin mismatch for $repoPath at ref $ref\n" +
+                            "  expected $expected\n" +
+                            "  actual   $actual\n" +
+                            "Upstream moved or the pin is stale. Update gradle/sumo-corpus.pins deliberately."
+                    )
+                }
+                cacheFile.parentFile.mkdirs()
+                cacheFile.writeBytes(body)
+                fetched++
+            } else {
+                cached++
+            }
+
+            if (target.exists() && sha256(target.readBytes()) == expected) continue
+            cacheFile.copyTo(target, overwrite = true)
+        }
+
+        if (missing.isNotEmpty()) {
+            val what = "SUMO corpus unavailable: ${missing.joinToString("; ")}."
+            if (strict) {
+                error("$what -PsumoStrict is set, so this is fatal rather than a fallback.")
+            }
+            logger.warn("w: $what Falling back to SumoOntology's hardcoded upper spine.")
+        }
+        logger.lifecycle(
+            "SUMO corpus @ $ref -> ${dest.relativeTo(rootDir)} " +
+                "(${pins.size - missing.size}/${pins.size} files; $fetched fetched, $cached cached)"
+        )
+    }
+}
+
+tasks.matching { it.name == "jvmProcessResources" }.configureEach {
+    dependsOn(fetchSumoCorpus)
+}
+
+// Curator state model — read Hermes' .usage.json and report where the
+// AttentionEconomy floor crossings disagree with the 30/90 wall clock.
+// Read-only: proposes nothing, writes nothing, touches no live skill.
+tasks.register<JavaExec>("curatorStateModel") {
+    group = "oroboros"
+    description = "Model Hermes curation state as AttentionEconomy floor crossings; report divergences."
+    dependsOn("compileKotlinJvm")
+    mainClass.set("borg.trikeshed.narsese.CuratorStateModelCli")
+    classpath(tasks.named("jvmJar"), configurations.getByName("jvmRuntimeClasspath"))
+    providers.gradleProperty("profileDir").orNull?.let { args(it) }
+    providers.gradleProperty("daysAhead").orNull?.let { args(it) }
+}

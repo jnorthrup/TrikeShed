@@ -45,6 +45,25 @@ val AcpModelCard.id:   String               get() = a
 val AcpModelCard.caps: Series<AcpCapability> get() = b.a
 val AcpModelCard.meta: AcpMeta              get() = b.b
 
+/**
+ * The provider id a catalog ingester tagged this card with, if any.
+ *
+ * ModelMux resolves keys by MODEL id (`llm.<modelId>.key`); a real credential
+ * pool (Hermes', for one) is keyed by PROVIDER. `providerTag` is the seam:
+ * when present, [modelmux.ModelMux.session] tries `llm.<providerTag>.key`
+ * before the per-model lookup, so one provider credential serves every model
+ * routed through it instead of needing one key entry per model id.
+ */
+val AcpModelCard.providerTag: String?
+    get() {
+        val headers = meta.headers
+        for (i in 0 until headers.size) {
+            val pair = headers[i]
+            if (pair.a == "provider") return pair.b
+        }
+        return null
+    }
+
 // ── ACP codec: AcpRequest → HTTP request bytes ──
 
 object AcpCodec {
