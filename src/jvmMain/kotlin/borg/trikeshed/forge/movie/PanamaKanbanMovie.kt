@@ -237,8 +237,13 @@ object PanamaKanbanMovie {
             "-crf", "23", outputFile.absolutePath
         ).directory(File(".")).redirectErrorStream(true).start()
         
-        val output = process.inputStream.bufferedReader().readText()
-        process.waitFor()
+        val future = java.util.concurrent.CompletableFuture.supplyAsync { process.inputStream.bufferedReader().readText() }
+        val finished = process.waitFor(10, java.util.concurrent.TimeUnit.MINUTES)
+        if (!finished) {
+            process.destroyForcibly()
+            throw RuntimeException("ffmpeg encoding timed out")
+        }
+        val output = runCatching { future.get(1, java.util.concurrent.TimeUnit.MINUTES) }.getOrDefault("")
         
         // Cleanup temp frames
         Thread { tempDir.deleteRecursively() }.start()
