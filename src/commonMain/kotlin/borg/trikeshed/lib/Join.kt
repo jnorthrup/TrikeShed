@@ -1,4 +1,4 @@
-@file:Suppress("NOTHING_TO_INLINE", "NonAsciiCharacters", "INLINE_CLASS_DEPRECATED", "FunctionName")
+@file:Suppress("NOTHING_TO_INLINE", "NonAsciiCharacters", "INLINE_CLASS_DEPRECATED", "FunctionName", "UNCHECKED_CAST")
 
 package borg.trikeshed.lib
 
@@ -34,8 +34,7 @@ fun <T> Twin(a: T, b: T): Twin<T> = a j b
 fun <T> emptySeriesOf(): Series<T> = 0 j { _: Int -> throw IllegalStateException("empty series") }
 
 /** Zip two same-sized Series into a Series2 (Series<Join<A,B>>). */
-infix fun <A, B> Series<A>.joins(other: Series<B>): Series2<A, B> =
-    size j { i -> this[i] j other[i] }
+infix fun <A, B> Series<A>.joins(other: Series<B>): Series2<A, B> = size j { i -> this[i] j other[i] }
 
 // ── MetaSeries / Series ─────────────────────────────────────────
 
@@ -79,12 +78,16 @@ val <T : Comparable<T>> Series<T>.cpb: CSeries<T>
 // ── Projection (α) ─────────────────────────────────────────────
 
 /** Lazy map / projection over a Series. */
-/*inline*/  infix fun <X, C, Domain >    MetaSeries<Domain,X>.α(/*crossinline*/ xform: (X) -> C): MetaSeries<Domain,C> = a j { i -> xform(this[i]) }
+inline infix fun <X, C, Domain> MetaSeries<Domain, X>.α(/*crossinline*/ xform: (X) -> C): MetaSeries<Domain, C> =
+    a j { i -> xform(this[i]) }
 
 /** Iterable projection. */
-inline infix fun <X, C> Iterable<X>.α(crossinline xform: (X) -> C): List<C> =
-    map { xform(it) }
-
+inline infix fun <X, C, Subject : Iterable<X>> Subject.α(crossinline xform: (X) -> C) = let { it: Subject ->
+    val xes: Subject = this@α
+    val join: Series<X> =
+        ((xes as? Series<X>) ?: ((xes as? List<X>)?.size j xes::get) ?: xes.toList().toSeries()) as Series<X>
+    join α xform //{ x:X->xform(x) }
+}
 // ── Left identity / constant anchor ────────────────────────────
 
 /** Returns a constant supplier of this value. */
@@ -118,7 +121,6 @@ object s_ {
 // ── Range view ──────────────────────────────────────────────────
 
 /** Range selection as composition, not control flow. */
-operator fun <T> Series<T>.get(range: IntRange): Series<T> =
-    range.count() j { i -> this[range.first + i] }
+operator fun <T> Series<T>.get(range: IntRange): Series<T> = range.count() j { i -> this[range.first + i] }
 
 
