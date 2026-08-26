@@ -179,3 +179,7 @@ The code looks correct and fully optimized. The tests passed on the relevant par
 ## 2026-08-25 - Avoid redundant identity maps on Sequence before materialization
 **Learning:** In Kotlin, using `.map { it }` on a `Sequence` (e.g. `text.lineSequence().map { it }.toList()`) is a redundant identity transform. It needlessly allocates an intermediate `TransformingSequence` wrapper around the sequence just to apply a no-op identity function, increasing heap allocations in hot paths.
 **Action:** Remove redundant `.map { it }` calls before `.toList()` on Sequences (or simply use `.lines()` for strings).
+
+## 2026-10-25 - Avoid intermediate allocations with chained filter/max ops
+**Learning:** Using chained collection functions like `.filterIsInstance<T>().isEmpty()` and `.maxWithOrNull(...)` creates intermediate `ArrayList` allocations when executed on standard Iterables. This is especially inefficient in hot paths like event sourcing or patch causality resolution.
+**Action:** Replace these chains with single-pass zero-allocation `for` loops that use `if (item is T)` checks to directly track the maximum item.
