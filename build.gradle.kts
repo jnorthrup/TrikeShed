@@ -28,8 +28,8 @@ val focusedTransportSlice = providers.gradleProperty("focusedTransportSlice").or
 val viewServerNodeSlice = false
 
 // ── Locked versions ───────────────────────────────────────────────────────
-// GraalVM CE 25.0.2 is the locked runtime; JDK 25 toolchain.
-val graalVersion = "25.0.2"
+// GraalVM CE 25.3.4.1 is the locked runtime (matches the JDK toolchain's bundled Truffle/JVMCI); JDK 25 toolchain.
+val graalVersion = "25.3.4.1"
 
 extra["versions.kotlinx-coroutines-core"] = "1.11.0"
 extra["versions.kotlinx-coroutines-test"] = "1.11.0"
@@ -217,7 +217,7 @@ kotlin {
                 implementation("org.graalvm.polyglot:polyglot:$graalVersion")
                 implementation("org.graalvm.polyglot:js-community:$graalVersion")
                 implementation("org.graalvm.polyglot:python-community:$graalVersion")
-                implementation("org.graalvm.polyglot:llvm-community:25.0.2")
+                implementation("org.graalvm.polyglot:llvm-community:$graalVersion")
                 implementation("org.graalvm.truffle:truffle-api:$graalVersion")
 
                 // Apache Tika — document text extraction (PDF/DOCX/images via Tesseract OCR).

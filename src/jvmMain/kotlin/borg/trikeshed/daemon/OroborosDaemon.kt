@@ -576,6 +576,33 @@ object OroborosDaemon {
             borg.trikeshed.forge.server.BeliefWire(beliefBag, turnReview, hermesMemoryFiles)
         } else null
 
+        // ── CausalityReteElement + CuratorImpulseElement: the LIVE rete over the
+        // bag (eternal truths at discounted support, minimum-understanding floor)
+        // and the curator-impulse training recipient (hindsight replay → SUMO/KIF
+        // banked knowledge → bag signals). Both ride the belief-bag flag; rules
+        // and impulses are fed by callers (forge routes / curation pulses).
+        val causalityRete: borg.trikeshed.narsese.CausalityReteElement? = beliefBag?.let { bag ->
+            val r = borg.trikeshed.narsese.CausalityReteElement(
+                bag,
+                rules = borg.trikeshed.lib.emptySeriesOf(),
+                parentJob = coroutineContext[kotlinx.coroutines.Job],
+            )
+            r.open()
+            r
+        }
+        val curatorImpulse: borg.trikeshed.narsese.CuratorImpulseElement? = beliefBag?.let { bag ->
+            val c = borg.trikeshed.narsese.CuratorImpulseElement(
+                bag,
+                rete = causalityRete,
+                parentJob = coroutineContext[kotlinx.coroutines.Job],
+            )
+            c.open()
+            c
+        }
+        if (causalityRete != null) {
+            System.err.println("[OROBOROS] CausalityRete live: ${causalityRete.rules.size} eternal rules; CuratorImpulse bank: ${curatorImpulse?.knowledgeBank?.asserts()?.size ?: 0} axioms")
+        }
+
         // ── PatchWire: the ComfyUI patch-panel backend — full KeyMux/ModelMux access
         // (provider-neutral, key-leased, values never cross the wire) + multiproject
         // scope mounting (drag a directory: git repo → projects/<name>/, else

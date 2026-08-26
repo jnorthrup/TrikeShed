@@ -321,7 +321,10 @@ class InProcessIsolate(
                 // would otherwise exhaust itself after budget.statements cumulative statements
                 if (bounds.statementLimitSafe && budget.statements > 0) context.resetLimits()
             }
-            val watchdog = if (depth == 0 && bounds.stop != StopStrategy.STATEMENT_LIMIT && budget.wallMillis > 0) armWatchdog() else null
+            // a watchdog backstops wall-clock enforcement whenever this crossing isn't actually relying on
+            // an installed statement limit — either the facet doesn't use one, or this budget disabled it
+            // (statements <= 0), which a caller can do deliberately to test the interrupt path on any language
+            val watchdog = if (depth == 0 && budget.wallMillis > 0 && (bounds.stop != StopStrategy.STATEMENT_LIMIT || budget.statements <= 0)) armWatchdog() else null
             try {
                 block()
             } catch (e: PolyglotException) {

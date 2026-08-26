@@ -1,6 +1,8 @@
 package borg.trikeshed.forge.blackboard
 
 import borg.trikeshed.lib.α
+import borg.trikeshed.lib.plus
+import borg.trikeshed.lib.toList
 import kotlinx.datetime.Clock
 import modelmux.ModelSelectionEvent
 import modelmux.QuotaSnapshot
@@ -76,7 +78,7 @@ fun projectModelMuxTelemetry(
     now: Long = Clock.System.now().toEpochMilliseconds(),
 ): Triple<ForgeBlackboardView, ForgeSectionSurface<ModelMuxTelemetry>, Map<String, ForgeSurfaceEnvelope<ModelMuxTelemetry>>> =
     ModelMuxSurfaceProjection.project(
-        domain = (quotas α { it.asTelemetry() }) + (selections α { it.asTelemetry() }),
+        domain = ((quotas α { it.asTelemetry() }) + (selections α { it.asTelemetry() })).toList(),
         base = base,
         now = now,
     )

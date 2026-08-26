@@ -44,15 +44,25 @@ val List<*>.toJsonPath: JsonPath
  *  "[ 0 , " in "[0,1,2,3]" would be "0"
  *
  *  " 3 ]" in "[0,1,2,3]" would be "3"
+ *
+ *  Kernel: Series-native, no Iterable hot copy. Combined delimiters
+ *  are zipped as consecutive Twin pairs via index arithmetic,
+ *  then projected to JsIndex (twin j src).
  */
-val JsContext.segments: Iterable<JsIndex>
+val JsContext.segments: Series<JsIndex>
     get() {
         val element = a
         val src = b
         val openIdx = element.a.a
         val closeIdx = element.a.b
-        val commaIdxs: Series<Int> = combine(s_[openIdx], element.b, s_[closeIdx])
-        return (commaIdxs.`▶` as Iterable<Int>).zipWithNext().map { (before, after) -> before.inc() j after } α { it j src }
+        val combined: Series<Int> = combine(s_[openIdx], element.b, s_[closeIdx])
+        val n = combined.size - 1
+        if (n <= 0) return emptySeriesOf()
+        return n j { i ->
+            val before = combined[i]
+            val after = combined[i + 1]
+            (before.inc() j after) j src
+        }
     }
 
 /** a json scanner that indexes and optionally reifies the json chars
@@ -66,7 +76,7 @@ object JsonParser {
          * format is _a[1,1,2,] where any valid segment is at least 1.
          * */
         depths: MutableList<Int>? = null,
-        /*  * an optional int that gives you n commas max, presuming undefined null bias in the last comma */
+        /** an optional int that gives you n commas max, presuming undefined null bias in the last comma */
         takeFirst: Int? = null,
     ): JsElement {
         var depth = 0
@@ -138,16 +148,18 @@ object JsonParser {
                 //if obj we create k-v pairs otherwise we create values
 
                 //iterate  segments exclusive of src first and last and commas in the middle
-                val combine: Series<Int> = combine(s_[openIdx], commaIdxs, s_[closeIdx])
+                val delims: Series<Int> = combine(s_[openIdx], commaIdxs, s_[closeIdx])
                 if (commaIdxs.isEmpty()) {
-                    val (before, after) = combine.toArray()
+                    val (before, after) = delims.toArray()
                     val possiblyEmpty = src.clone().lim(after).pos(before + 1).trim
                     if (!possiblyEmpty.hasRemaining)
                         return if (isObj) emptyMap<String, Any?>()
                         else emptyArray<Any?>()
                 }
 
-                (combine.`▶` as Iterable<Int>).zipWithNext().map { (before, after) ->
+                // Series-native zip: consecutive delimiter pairs -> Twin<Int>, no Iterable hot copy
+                val n = delims.size - 1
+                val mapped: Series<Any?> = if (n <= 0) emptySeriesOf() else (n j { i: Int -> delims[i] j delims[i + 1] }) α { twin: Twin<Int> -> val (before, after) = twin
                     if (isObj) {
                         val tmp = CharSeries(src[before.inc() until after]).trim
                         require(tmp.seekTo('"')) {
@@ -164,19 +176,22 @@ object JsonParser {
                         val valueContext = tmp.slice
                         unescapeJson(tmp.lim(closeQuote).pos(openQuote).asString()) j reify(valueContext)
                     } else reify(CharSeries(src[before.inc() until after]).trim)
-                }.let { mapped ->
-                    if (isObj) mapped.associate { item ->
-                        val join = item as Join<*, *>
-                        val key = join.a
+                }
+                if (isObj) {
+                    val out = LinkedHashMap<String, Any?>(mapped.size)
+                    for (i in 0 until mapped.size) {
+                        val join = mapped[i] as Join<*, *>
+                        val rawKey = join.a
                         val value = join.b
-                        key.let { k ->
-                            k as? String ?: (k as? Series<*>)?.let { s ->
-                                (s as? Series<Char>)?.asString()
-                            } ?: (k as? CharSeries)?.asString() ?: k
-                        } to value
-                    } else mapped as? String ?: (mapped as? Series<*>)?.let { s ->
-                        (s as? Series<Char>)?.asString()
-                    } ?: (mapped as? CharSeries)?.asString() ?: mapped
+                        val key = rawKey as? String
+                            ?: (rawKey as? Series<*>)?.let { s -> (s as? Series<Char>)?.asString() }
+                            ?: (rawKey as? CharSeries)?.asString()
+                            ?: rawKey.toString()
+                        out[key] = value
+                    }
+                    out
+                } else {
+                    mapped.toList()
                 }
             }
 
@@ -277,7 +292,7 @@ object JsonParser {
                 val (bounds: Twin<Int>, src: Series<Char>) = t
                 val (pos, lim) = bounds
                 CharSeries(src, pos, lim).trim
-            })) {
+            }).`▶`) {
                 /*
                         we have arrived at a place where string has been trimmed and braces have been confirmed and descoped.
                         we are now in the payload of the obj  and we are testing keys to see if they match the desired key
@@ -346,7 +361,8 @@ object JsonParser {
         val cs = CharSeries(src, pos, lim).trim
         val inObj = cs[0] == '{'
         do {
-            val tmp = CharSeries(context.segments.elementAtOrNull(idx)?.toSeries() ?: break)
+            if (idx !in 0 until context.segments.size) break
+            val tmp = CharSeries(context.segments[idx].toSeries())
             val value: CharSeries = if (inObj) {
                 if (!tmp.seekTo(':')) break
                 tmp.slice

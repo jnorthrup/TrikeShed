@@ -405,3 +405,79 @@ They are TODOs for the code, not corrections to PRELOAD.
 - ~~Series.filter laziness~~ CLOSED Aug 24 2026: Series.kt filter now memoizes the
   match scan behind `lazy {}` — no work at call time, one scan on first size/element
   access (the K `where` vector, deferred). Predicate.kt `%` (rem) still scans eagerly.
+
+# Antipattern fix: `listOf()` → literals / Join (Aug 26 2026)
+
+`listOf(a, b)` is the debt shape: it allocates a List for data that is either a
+STRUCTURAL PAIR or a lazy sequence, unifies element types to their common
+supertype (killing typed destructuring), and offers no compile-time arity.
+Fix by intent:
+
+| Intent | Use | Why |
+|---|---|---|
+| 2 immutably linked items, later destructured | `a j b` | `Join<A,B>` keeps BOTH types; `component1()`/`component2()` give `val (x, y) = a j b` with arity checked at compile time |
+| homogeneous sequence, structural/lazy | `s_[a, b, c]` | Series literal (`t.size j { t[i] }`) — the kernel sequence type; composes with `α`, `j`, fancy indexing |
+| a real `List` is required (stdlib interop) | `_l[a, b, c]` | List literal — same shape as `listOf`, but the notation marks the debt: a List here is a CHOICE, not a default |
+| set semantics | `_s[a, b, c]` | Set literal (dedupes — not a list substitute) |
+| array (reified, hot loop) | `_a[a, b, c]` | Array literal |
+
+Literals live in Join.kt (collection-literals block: `_l`, `_a`, `_s`, `s_`).
+Spelling note: the List literal is `_l` (underscore FIRST), not `l_`; the Series
+literal is `s_` (underscore LAST). `_s` is a SET — do not interchange `_s`/`s_`:
+set semantics dedupe, Series keeps order and arity.
+
+## Destructuring covenant
+
+- Two items that BELONG TOGETHER are a `Join`, never a 2-element List:
+  `val (key, source) = path j src` — not `pair[0]` / `pair[1]` index pokes.
+- Destructure at the binding site. A `Join` passed onward stays a `Join`;
+  re-packing it into `listOf(x, y)` for transport is the antipattern reborn.
+- `Join` is heterogeneous: `Join<String, Int>` keeps both types. `listOf(x, y)`
+  widens both to their common supertype and every destructure site casts —
+  that cast is the smell this notation exists to eliminate.
+- Arity ≥ 3, homogeneous → `s_[…]`. Arity ≥ 3, heterogeneous fields → a data
+  class (named destructuring beats positional past 2).
+- Empty Series → `emptySeriesOf()` — never `emptyList().toSeries()` on a hot path.
+
+## Rewrite examples
+
+```kotlin
+// WRONG — pair-as-list: types widened, destructuring by index, cast at use
+val pair = listOf(key, source)
+val k = pair[0] as String
+
+// RIGHT — immutably linked, destructured where bound
+val (k, src) = key j source
+
+// WRONG — eager List for a projection
+val names = (0 until models.size).map { models[it].name }
+
+// RIGHT — lazy Series projection
+val names = models α { it.name }
+
+// WRONG — List literal where Series is the domain shape
+val caps = listOf("chat", "stream").toSeries()
+
+// RIGHT — Series literal
+val caps = s_["chat", "stream"]
+```
+
+# Assoc & Twin contract: funnel hash, linear maps, immutable assoc, Confix (Aug 26 2026)
+
+When map creation and loop accumulation is done, the lack of Series gives an attack vector with no challenge to production expectations, plus escape-accounting failure. An immutable krapavin abstraction is a performance improvement in any size of Map that matters.
+
+## Rule
+- **No mutable assoc escapes.** After construction, an assoc is immutable Series. A retained `HashMap`/`mutableMapOf`/`LinkedHashMap` is an unguarded mutation surface — anyone downstream can rewrite production expectations with no challenge, and escape accounting cannot prove the store does not leak. Construction uses a mutable builder, but the builder does NOT escape: freeze to `Series2`/`FunnelHashIndex`/`FunnelHashMap` before return, and never store the mutable builder as a field.
+- **Funnel hash / linear maps are the contract.** Use `borg.trikeshed.collections.FunnelHashMap` / `FunnelHashIndex` (krapavin) or `ElasticHashIndex` linear probing for assoc. At every N that matters for blackboard/Confix/rete, the immutable krapavin shape beats hashing with mutable buckets on both probe cost and escape.
+- **Twins, not Pairs.** Paired outputs are `Twin<T>` / `Series2<A,B>` (`Join<A,B>`), never `Pair`. `ReifiedSplitSeries2` for zero-Join-allocation hot paths; `Twin<T>` dense pack where appropriate. A `Pair` widens types and pins a hot copy; a `Twin`/`Series2` keeps types and retains no mutable buffer (`size j {}` lambda, not `ArrayList.toSeries()` pinning).
+- **No pointless hot copies.** Accumulation is `size j { i: Int -> ... }` lambda Series, not `ArrayList` + `toSeries()` pinning the mutable buffer as the Series backing store. A lambda Series retains nothing; an `ArrayList.toSeries()` retains the live mutable list (the hot copy) — that retention is the "pinning pointless hot copies everywhere" defect.
+- **Confix is hanging offence.** Tossing a hot copy (mutable `List`/`ArrayList`/`Iterable` backing) into `ConfixBlackboard`/`ConfixDoc` is a hanging offence. Confix is content-addressed and versioned; a retained mutable buffer breaks content addressing, breaks `btrfs check` mountability discipline, and breaks `Series` indexing/twin access downstream. Confix payloads are `Series<Char>`/`Series<JsIndex>`/`Series2` views, never `Iterable` cemented as `List`. If a value must be a `Map<String,Any?>` for JSON interop, build it from the Series at emission time, not by cementing the mutable builder.
+
+## Confix cement check
+- `Json.kt: JsContext.segments` is `Series<JsIndex>`, not `Iterable<JsIndex>`. Confix's serial path leans on the JSON parser; an `Iterable` there kills indexing/twin access.
+- `JsContext.segments` + `combine` zip is `Series`-native `n j { i: Int -> delims[i] j delims[i+1] } α { twin -> ... }`, not `Iterable.zipWithNext()` hot copy.
+- Any `ConfixBlackboard.put` / `doc.set` that takes `List`/`Iterable` must take `Series` instead or be wrapped as `Series` view via `toSeries()` that does NOT pin a mutable buffer.
+
+## Skills bypass
+`@file:PRELOAD.md` is binding. Any skill that describes TrikeShed algebra, collections, or blackboard must cite PRELOAD and must NOT reintroduce `Iterable`/`Pair`/`HashMap`/`ArrayList`/`listOf` as the default. If a skill bypasses PRELOAD, it is stale — patch the skill, do not follow it.
+

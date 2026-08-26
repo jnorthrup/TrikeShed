@@ -107,6 +107,13 @@ class ModelMux internal constructor(
     private val core: ModelMuxCore,
     private val keyMux: KeyMux,
     private val configuredBaseUrls: Map<String, String>,
+    /**
+     * Optional quota legion metering every chat receipt. Null = standalone
+     * mode (no metering). When present, each chat's receipt is applied to the
+     * legion under the resolved key id, and a 429 exhausts the key — the
+     * provider's word outranks the ledger.
+     */
+    private val quotaLegion: QuotaLegion? = null,
 ) {
     private val models: Series<ModelEntry> get() = core.a
     private val router: ModelRouter get() = core.b
@@ -304,6 +311,16 @@ class ModelMux internal constructor(
             return Result.failure(t)
         } finally {
             session.drain(); session.close()
+            // Quota legion metering: only real (non-cached) calls consume provider
+            // quota. A 429 receipt exhausts the key inside applyReceipt.
+            session.lastReceipt?.let { receipt ->
+                if (keyId != null && !receipt.cachedHit) {
+                    quotaLegion?.applyReceipt(
+                        keyId, receipt.providerId, receipt,
+                        kotlinx.datetime.Clock.System.now().toEpochMilliseconds(),
+                    )
+                }
+            }
             if (reactor != null && keyId != null) {
                 val leasedTo = reactor.flowState.value.leases.firstOrNull { it.keyId == keyId }?.leasedTo
                 if (leasedTo != null) {
@@ -464,6 +481,10 @@ class ModelMux internal constructor(
 
 class ModelMuxBuilder(private val keyMux: KeyMux) {
     private val models = mutableListOf<ModelEntry>()
+    private var quotaLegion: QuotaLegion? = null
+
+    /** Attach a quota legion to meter every non-cached chat receipt. */
+    fun quota(legion: QuotaLegion): ModelMuxBuilder = apply { quotaLegion = legion }
 
     fun model(
         id: String,
@@ -485,6 +506,6 @@ class ModelMuxBuilder(private val keyMux: KeyMux) {
 
     internal fun build(): ModelMux {
         val core: ModelMuxCore = models.toSeries() j CapabilityRouter
-        return ModelMux(core, keyMux, pendingUrls.toMap())
+        return ModelMux(core, keyMux, pendingUrls.toMap(), quotaLegion)
     }
 }

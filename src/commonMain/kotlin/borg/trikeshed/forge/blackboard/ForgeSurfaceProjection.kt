@@ -1,6 +1,8 @@
 package borg.trikeshed.forge.blackboard
 
 import borg.trikeshed.lib.α
+import borg.trikeshed.lib.`▶`
+import borg.trikeshed.lib.toList
 import kotlinx.datetime.Clock
 
 /**
@@ -114,8 +116,8 @@ fun ForgeBlackboardView.withSurface(items: List<ForgeSurfaceGeometry>): ForgeBla
     val fresh = items.filter { seen.add(it.sectionId) }
     return if (fresh.isEmpty()) this
     else copy(
-        sections = sections + (fresh α { it.sectionId }),
-        layout3D = layout3D + (fresh α { it.asSection3D() }),
+        sections = sections + (fresh α { it.sectionId }).`▶`,
+        layout3D = layout3D + (fresh α { it.asSection3D() }).`▶`,
     )
 }
 
@@ -256,7 +258,7 @@ fun <D, P> ForgeSurfaceProjection<D, P>.project(
         if (held == null) slot++
     }
 
-    val envelopes: List<ForgeSurfaceEnvelope<P>> = byId.values α { it }
+    val envelopes: List<ForgeSurfaceEnvelope<P>> = byId.values.toList()
 
     val surface = ForgeSectionSurface(
         anchorSectionId = anchorSectionId,
