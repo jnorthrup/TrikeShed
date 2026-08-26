@@ -10,4 +10,4 @@ actual fun readLinesSeq(path: String): Sequence<String> {
     }
 }
 
-actual fun readLines(path: String): List<String> =borg.trikeshed.userspace.nio.file.Files.readAllLines( Paths.get(path)).map { it }
+actual fun readLines(path: String): List<String> =borg.trikeshed.userspace.nio.file.Files.readAllLines( Paths.get(path)) // ⚡ Bolt: removed redundant .map { it } which allocates an intermediate ArrayList O(N)
