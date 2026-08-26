@@ -145,7 +145,14 @@ class TrikeShedGraalVfs(
                 } else {
                     children
                 }
-                val accepted = maskedChildren.asSequence().map(parent::resolve).filter { child -> filter.accept(child) }.iterator()
+                val acceptedList = ArrayList<Path>()
+                for (childName in maskedChildren) {
+                    val childPath = parent.resolve(childName)
+                    if (filter.accept(childPath)) {
+                        acceptedList.add(childPath)
+                    }
+                }
+                val accepted = acceptedList.iterator()
                 return object : MutableIterator<Path> {
                     override fun hasNext(): Boolean = accepted.hasNext()
                     override fun next(): Path = accepted.next()

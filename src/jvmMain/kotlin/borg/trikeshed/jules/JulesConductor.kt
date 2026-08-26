@@ -52,10 +52,12 @@ class JulesConductor(
             cards.putAll(durable.first)
         }
         val sessions = client.listSessions(source)
-        val settledQueueSessions = durable?.second.orEmpty().asSequence()
-            .filter { it.receipt?.isImmutableSettlement() == true }
-            .mapNotNull { it.sessionId }
-            .toSet()
+        val settledQueueSessions = mutableSetOf<String>()
+        for (record in durable?.second.orEmpty()) {
+            if (record.receipt?.isImmutableSettlement() == true) {
+                record.sessionId?.let { settledQueueSessions.add(it) }
+            }
+        }
         fun hasImmutableSettlement(sessionId: String, card: JulesSessionCard?): Boolean =
             card?.causes?.any { it is JulesCause.WorkDrained && it.receipt?.isImmutableSettlement() == true } == true ||
                 sessionId in settledQueueSessions

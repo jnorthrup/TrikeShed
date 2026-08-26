@@ -77,13 +77,15 @@ class RowVecProxy(private val row: RowVec) : ProxyObject, ProxyHashMap {
         throw UnsupportedOperationException("Cursor proxy is read-only")
     }
 
-    override fun getHashEntriesIterator(): Any =
-        ProxyIterator.from(
-            metaList.indices.asSequence()
-                .map { i -> metaNames[i] to row.a.let { s -> (s as Series<Any?>).getOrNull(i) } }
-                .map { (n, v) -> ProxyArray.fromArray(n, v) }
-                .iterator()
-        )
+    override fun getHashEntriesIterator(): Any {
+        val entries = ArrayList<Any>(metaList.size)
+        for (i in metaList.indices) {
+            val n = metaNames[i]
+            val v = row.a.let { s -> (s as Series<Any?>).getOrNull(i) }
+            entries.add(ProxyArray.fromArray(n, v))
+        }
+        return ProxyIterator.from(entries.iterator())
+    }
 }
 
 class CursorProxy(private val cursor: Cursor) : ProxyArray {
