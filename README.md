@@ -830,9 +830,9 @@ fi
 set +u
 source "$SDKMAN_DIR/bin/sdkman-init.sh"
 
-sdk install java 25.0.2-graalce
+sdk install java 25.0.2-graalce || echo 'manual DL/setup https://github.com/graalvm/graalvm-ce-dev-builds/releases'
 sdk install kotlin 2.4.10
-sdk install gradle 9.6.1
+sdk install gradle 9.7.0
 hash -r
 set -u
 

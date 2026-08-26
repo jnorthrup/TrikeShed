@@ -49,7 +49,11 @@ val AcpModelCard.meta: AcpMeta              get() = b.b
 
 object AcpCodec {
 
-    fun encodeRequest(req: AcpRequest): String = buildString {
+    fun encodeRequest(
+        req: AcpRequest,
+        maxTokens: Int? = null,
+        temperature: Double? = null,
+    ): String = buildString {
         val (meta, body) = req
         val (msgs, tools) = body
         append("{")
@@ -68,6 +72,8 @@ object AcpCodec {
             }
             append("]")
         }
+        if (maxTokens != null) append(",\"max_tokens\":$maxTokens")
+        if (temperature != null) append(",\"temperature\":$temperature")
         // stream flag
         if (meta.b.a == "stream") append(",\"stream\":true")
         append("}")

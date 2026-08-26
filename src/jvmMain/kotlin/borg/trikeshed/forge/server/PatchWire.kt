@@ -387,6 +387,8 @@ class PatchWire(
      * Null = legacy inline mount (tests).
      */
     private val mountScope: kotlinx.coroutines.CoroutineScope? = null,
+    /** Tika/OCR mining over project dbs; extracts land as `.extract.md` citizens + belief mints. */
+    private val miner: ProjectMiner? = null,
 ) {
     suspend fun route(
         method: String,
@@ -472,6 +474,29 @@ class PatchWire(
                     },
                 ),
             )
+
+            method == "POST" && p.startsWith("/api/projects/") && p.endsWith("/mine") -> {
+                val name = p.removePrefix("/api/projects/").removeSuffix("/mine")
+                val m = miner ?: return json(mapOf("error" to "miner not wired"), 503)
+                val bg = mountScope
+                if (bg == null) {
+                    runCatching { m.mine(name) }.fold(
+                        onSuccess = { json(mapOf("verdict" to "mined", "extracted" to it.extracted, "minted" to it.minted, "skipped" to it.skipped, "failed" to it.failed)) },
+                        onFailure = { json(mapOf("verdict" to "refused", "detail" to (it.message ?: "")), 400) },
+                    )
+                } else {
+                    System.err.println("[OROBOROS] mining begun (detached): $name")
+                    bg.launch { runCatching { m.mine(name) }.onFailure { System.err.println("[OROBOROS] mine FAILED for $name: ${it.message}") } }
+                    json(mapOf("verdict" to "mining", "name" to name), 202)
+                }
+            }
+
+            method == "GET" && p.startsWith("/api/projects/") && p.endsWith("/mine") -> {
+                val name = p.removePrefix("/api/projects/").removeSuffix("/mine")
+                val prog = miner?.progress(name) ?: return json(mapOf("error" to "no mining run for '$name'"), 404)
+                json(mapOf("total" to prog.total, "extracted" to prog.extracted, "minted" to prog.minted,
+                    "skipped" to prog.skipped, "failed" to prog.failed, "done" to prog.done, "note" to prog.note))
+            }
 
             method == "DELETE" && p.startsWith("/api/projects/") -> {
                 val name = p.removePrefix("/api/projects/")

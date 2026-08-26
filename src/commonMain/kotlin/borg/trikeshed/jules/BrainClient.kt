@@ -1,21 +1,19 @@
 package borg.trikeshed.jules
 
-import borg.trikeshed.htx.htxHeaders
 import borg.trikeshed.lib.Series
 import borg.trikeshed.lib.get
 import borg.trikeshed.lib.size
-import borg.trikeshed.lib.toArray
 import borg.trikeshed.lib.α
 import borg.trikeshed.lib.view
 import borg.trikeshed.lib.j
+import borg.trikeshed.lib.toSeries
 import keymux.EnvVarSource
 import keymux.FixedKeySource
 import keymux.KeyMux
 import modelmux.ModelEntry
 import modelmux.ModelMux
+import modelmux.acp.AcpMessage
 import kotlinx.coroutines.withTimeout
-import kotlinx.coroutines.withContext
-import kotlinx.coroutines.Dispatchers
 import kotlinx.datetime.Clock
 import borg.trikeshed.userspace.nio.platform.spi.SystemOperations
 
@@ -32,12 +30,17 @@ object DiscardingBrainErrorSink : BrainErrorSink {
  * BrainClient — the answer brain.
  *
  * OpenAI-compatible chat completions over common reactor HTX with multi-provider
- * failover. Callers use this to answer
- * Jules sessions with project conventions as the system prompt.
+ * failover. Callers use this to answer Jules sessions with project conventions as
+ * the system prompt.
  *
  * The routing/key design is authoritative here: provider selection goes through
  * ModelMux and credential resolution goes through KeyMux. Environment variables
  * are used only to discover which bootstrap bindings exist.
+ *
+ * When an external [keyMux] and/or [modelMux] are provided, BrainClient uses
+ * those shared instances — the MuxReactor tracks quota, leases, and provider
+ * health across the entire daemon. When null, BrainClient creates its own
+ * (standalone mode for tests and embedded use).
  */
 class BrainClient(
     /** If non-null, overrides auto-discovery and uses a single endpoint. */
@@ -45,13 +48,23 @@ class BrainClient(
     base: String = "https://integrate.api.nvidia.com/v1",
     model: String = "poolside/laguna-xs-2.1",
     private val errorSink: BrainErrorSink = DiscardingBrainErrorSink,
+    /**
+     * External KeyMux — shared with the daemon. When provided, provider discovery
+     * uses this key pool and the MuxReactor tracks all key accesses. Null = create
+     * internal KeyMux from env (standalone mode).
+     */
+    private val keyMux: KeyMux? = null,
+    /**
+     * External ModelMux — shared with the daemon. When provided, chat calls route
+     * through ModelMux.chat() which uses HtxKey from coroutine context and records
+     * receipts via MuxReactor. Null = create internal ModelMux (standalone mode).
+     */
+    private val modelMux: ModelMux? = null,
 ) {
     /** Outer timeout for the entire multi-provider failover loop. */
     companion object {
         /** Outer timeout: if every provider fails to respond within this window, abort the whole call. */
         const val OUTER_TIMEOUT_MS = 60_000L
-        /** Per-provider HTTP timeout. */
-        const val HTTP_TIMEOUT_MS = 15_000L
     }
 
     /** One OpenAI-compatible endpoint + the env var that KeyMux resolves. */
@@ -68,8 +81,12 @@ class BrainClient(
         discoverEndpoints()
     }
     private val endpointByModel: Map<String, EndpointSpec> = endpoints.associateBy { it.model }
-    private val keyMux: KeyMux = buildKeyMux(apiKey, model)
-    private val modelMux: ModelMux = ModelMux(keyMux) {
+
+    /** Internal KeyMux — created when no external one is provided. */
+    private val internalKeyMux: KeyMux = this.keyMux ?: buildKeyMux(apiKey, model)
+
+    /** Internal ModelMux — created when no external one is provided. */
+    private val internalModelMux: ModelMux = this.modelMux ?: ModelMux(internalKeyMux) {
         endpoints.forEach { endpoint ->
             model(id = endpoint.model, caps = setOf("chat", "conflict-resolve"), baseUrl = endpoint.base)
         }
@@ -86,6 +103,17 @@ class BrainClient(
 
     /** The model id that most recently answered a chat, or null before the first success. */
     fun lastModel(): String? = lastGoodModelId
+
+    /** The static provider table (ungated) — discoverEndpoints() is this, filtered by key presence. */
+    private fun fullRoster(): List<EndpointSpec> {
+        val out = mutableListOf<EndpointSpec>()
+        val seen = mutableSetOf<String>()
+        fun add(name: String, envVar: String, base: String, model: String) {
+            if (seen.add("$name:$base:$model")) out.add(EndpointSpec(name, envVar, base.trim(), model.trim()))
+        }
+        rosterInto(::add)
+        return out
+    }
 
     /**
      * Full provider-roster status regardless of discovery: every table entry with a
@@ -106,33 +134,23 @@ class BrainClient(
         }
     }
 
-    /** The static provider table (ungated) — discoverEndpoints() is this, filtered by key presence. */
-    private fun fullRoster(): List<EndpointSpec> {
-        val out = mutableListOf<EndpointSpec>()
-        val seen = mutableSetOf<String>()
-        fun add(name: String, envVar: String, base: String, model: String) {
-            if (seen.add("$name:$base:$model")) out.add(EndpointSpec(name, envVar, base.trim(), model.trim()))
-        }
-        rosterInto(::add)
-        return out
-    }
-
     /**
      * Non-streaming chat completion with multi-provider failover.
      *
      * Outer timeout ([OUTER_TIMEOUT_MS]) bounds the entire failover loop —
-     * every `modelMux.route()`, `modelMux.session()`, and HTTP call across
-     * all providers must complete within 60 seconds or the call aborts.
-     * Per-provider HTTP timeout is [HTTP_TIMEOUT_MS].
+     * every modelMux.chat() call across all providers must complete within
+     * this window or the call aborts.
+     *
+     * When an external modelMux was provided, each provider attempt routes
+     * through ModelMux.chat() which uses HtxKey from coroutine context and
+     * records receipts via MuxReactor — quota, lease, and health tracking
+     * are airtight.
      *
      * If every provider fails, throws with the last error message.
      */
     suspend fun chat(messages: List<Pair<String, String>>, maxTokens: Int = 256, temperature: Double = 0.2): String {
         if (endpoints.isEmpty()) error("Brain: no provider endpoints discovered")
 
-        // Outer timeout: bounds the entire multi-provider failover sequence.
-        // modelMux.route() and modelMux.session() are blocking get() calls —
-        // without this, they can hang indefinitely on a quota-starved provider.
         return withTimeout(OUTER_TIMEOUT_MS) {
             chatInner(messages, maxTokens, temperature)
         }
@@ -141,93 +159,43 @@ class BrainClient(
     /** Inner loop: called inside the outer timeout. */
     private suspend fun chatInner(messages: List<Pair<String, String>>, maxTokens: Int, temperature: Double): String {
         var lastError = "all providers exhausted"
-        // IO is JVM/Native-only; revisit via PlatformHost
-        val routed = withContext(Dispatchers.Default) { modelMux.route("conflict-resolve").a }
+        val routed = internalModelMux.route("conflict-resolve").a
         for (modelId in orderedModelIds(routed)) {
             val endpoint = endpointByModel[modelId] ?: continue
-            val session = try {
-                // IO is JVM/Native-only; revisit via PlatformHost
-                withContext(Dispatchers.Default) { modelMux.session(modelId).getOrThrow() }
-            } catch (t: Throwable) {
-                lastError = "Brain ${endpoint.name} session failed: ${t.message}"
-                logError(endpoint.name, -1, t.message.orEmpty().take(500))
-                continue
+
+            // Route through ModelMux.chat() — uses HtxKey from coroutine context,
+            // records receipts via MuxReactor, respects quota/lease tracking.
+            val acpMessages = messages.size j { i: Int -> messages[i].first j messages[i].second }
+            val result = runCatching {
+                internalModelMux.chat(
+                    modelId = modelId,
+                    messages = acpMessages,
+                    maxTokens = maxTokens,
+                    temperature = temperature,
+                ).getOrThrow() // chat() is already Result-shaped; unwrap so fold sees AcpResponse, not Result<Result<…>>
             }
-            session.activate()
-            try {
-                val body = buildChatBody(modelId, messages, maxTokens, temperature)
-                val response = try {
-                    withTimeout(HTTP_TIMEOUT_MS) {
-                        TrikeHtxHttpClient(
-                            base = session.baseUrl,
-                            defaultHeaders = htxHeaders(*session.authHeaders().toArray()),
-                        ).post("/chat/completions", body)
-                    }
-                } catch (t: HtxHttpException) {
-                    lastError = "Brain ${endpoint.name} ${t.status}: ${t.message}"
-                    logError(endpoint.name, t.status, t.message.orEmpty().take(500))
-                    continue
-                } catch (t: Throwable) {
-                    // A hung or refused cluster must not abort failover — quotas
-                    // are disjoint, so the next model family may answer immediately.
-                    lastError = "Brain ${endpoint.name} threw: ${t.message}"
+            result.fold(
+                onSuccess = { response ->
+                    lastGoodModelId = modelId
+                    return response.a  // AcpResponse.a = full_text content
+                },
+                onFailure = { t ->
+                    lastError = "Brain ${endpoint.name} chat failed: ${t.message}"
                     logError(endpoint.name, -1, t.message.orEmpty().take(500))
-                    continue
-                }
-                lastGoodModelId = modelId
-                return try {
-                    extractContent(response)
-                } catch (t: Throwable) {
-                    // Malformed response body (missing field, truncated gzip, etc.)
-                    // — try the next provider instead of failing the whole call.
-                    val snippet = response.take(200)
-                    logError(endpoint.name, -1, "extractContent failed: ${t.message} body=${snippet}")
-                    lastError = "Brain ${endpoint.name} extractContent failed: ${t.message}"
-                    continue
-                }
-            } finally {
-                session.drain()
-                session.close()
-            }
+                },
+            )
         }
         error(lastError)
     }
 
-    /**
-     * Build the OpenAI-compatible chat completions JSON body with proper string escaping.
-     */
-    private fun buildChatBody(
-        modelId: String,
-        messages: List<Pair<String, String>>,
-        maxTokens: Int,
-        temperature: Double,
-    ): String = buildString {
-        append("{\"model\":")
-        append(jsonStr(modelId))
-        append(",\"messages\":[")
-        messages.forEachIndexed { index, (role, content) ->
-            if (index > 0) append(',')
-            append("{\"role\":")
-            append(jsonStr(role))
-            append(",\"content\":")
-            append(jsonStr(content))
-            append('}')
-        }
-        append("],\"max_tokens\":")
-        append(maxTokens.toString())
-        append(",\"temperature\":")
-        append(temperature.toString())
-        append(",\"top_p\":0.9}")
-    }
-
     private fun orderedModelIds(routed: Series<ModelEntry>): List<String> {
         val modelIds = routed α { it.a }
-        val preferred = lastGoodModelId ?: return modelIds.view.toList() // stdlib-boundary: List return
+        val preferred = lastGoodModelId ?: return modelIds.view.toList()
         val start = modelIds.view.indexOf(preferred)
-        if (start < 0) return modelIds.view.toList() // stdlib-boundary: List return
+        if (start < 0) return modelIds.view.toList()
 
         val series = modelIds.size j { offset: Int -> modelIds[(start + offset) % modelIds.size] }
-        return series.view.toList() // stdlib-boundary: List return
+        return series.view.toList()
     }
 
     private fun buildKeyMux(overrideKey: String?, overrideModel: String): KeyMux = KeyMux {
@@ -253,42 +221,6 @@ class BrainClient(
             append('}')
         }
         errorSink.append(entry)
-    }
-
-    /**
-     * Pull choices[0].message.content out of the OpenAI-compatible JSON.
-     * Throws on malformed input — callers must wrap in try/catch for graceful failover.
-     */
-    private fun extractContent(json: String): String {
-        val key = """"content""""
-        val i = json.indexOf(key)
-        if (i < 0) error("Brain: no content field in response: ${json.take(200)}")
-        var j = json.indexOf('"', i + key.length).also { if (it < 0) error("Brain: malformed content") }
-        j = json.indexOf('"', j).let { if (it < 0) error("Brain: missing content open quote"); it }
-        val out = StringBuilder()
-        var k = j + 1
-        while (k < json.length) {
-            val c = json[k]
-            when {
-                c == '\\' && k + 1 < json.length -> {
-                    when (val escaped = json[k + 1]) {
-                        'n' -> out.append('\n')
-                        't' -> out.append('\t')
-                        '"' -> out.append('"')
-                        '\\' -> out.append('\\')
-                        'r' -> out.append('\r')
-                        else -> out.append(escaped)
-                    }
-                    k += 2
-                }
-                c == '"' -> return out.toString()
-                else -> {
-                    out.append(c)
-                    k++
-                }
-            }
-        }
-        error("Brain: unterminated content")
     }
 
     /** Discover all configured OpenAI-compatible endpoints. */
@@ -340,9 +272,17 @@ class BrainClient(
         add("moonshot", "MOONSHOT_API_KEY", "https://api.moonshot.cn/v1", "moonshot-v1-32k")
         add("minimax-m3", "MINIMAX_API_KEY", "https://api.minimax.chat/v1", "MiniMax-M3")
         add("minimax-m25", "MINIMAX_API_KEY", "https://api.minimax.chat/v1", "MiniMax-Text-01")
+        // ── Hermes: Nous Portal / local proxy ──
+        add("hermes-go", "HERMES_CUSTOM_API_TOKENROUTER_COM_API_KEY", "https://api.tokentrouter.com/v1", "nousresearch/hermes-3-llama-3.1-405b")
+        add("hermes-nvidia", "HERMES_CUSTOM_INTEGRATE_API_NVIDIA_COM_API_KEY", nvidia, "nousresearch/hermes-3-llama-3.1-405b")
+        add("hermes-synth", "HERMES_CUSTOM_API_SYNTHETIC_NEW_API_KEY", "https://api.synthetic.new/v1", "nousresearch/hermes-3-llama-3.1-405b")
+        // ── OpenCode: coding-optimized providers ──
+        add("opencode-go", "OPENCODE_GO_API_KEY", "https://api.opencode.ai/v1", "opencode/go-1")
+        add("opencode-zen", "OPENCODE_ZEN_API_KEY", "https://api.opencode.ai/v1", "opencode/zen-1")
+        add("opencode", "OPENCODE_API_KEY", "https://api.opencode.ai/v1", "opencode/default")
     }
 
-    /** JSON string escaping — handles ", \, \n, \r, \t. Used for both log entries and chat body. */
+    /** JSON string escaping — handles ", \, \n, \r, \t. Used for log entries. */
     private fun jsonStr(s: String): String = buildString {
         append('"')
         for (c in s) when (c) {

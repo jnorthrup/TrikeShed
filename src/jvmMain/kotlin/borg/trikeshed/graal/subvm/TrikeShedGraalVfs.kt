@@ -71,6 +71,10 @@ class TrikeShedGraalVfs(
 
     fun generation(): Long = generation.get()
 
+    /** POSIX toolbox seam: the backing volume and the live subvolume it serves. */
+    fun btrfsForTools(): UserspaceBtrfs = btrfs
+    fun liveSubvolumeForTools(): String = liveSubvolume
+
     override fun parsePath(uri: URI): Path {
         require(uri.scheme == null || uri.scheme == "file") { "unsupported VFS URI scheme: ${uri.scheme}" }
         return Path.of(uri.path ?: "/")

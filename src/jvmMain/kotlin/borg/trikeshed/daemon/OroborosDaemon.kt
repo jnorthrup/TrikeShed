@@ -23,6 +23,7 @@ import borg.trikeshed.util.oroboros.WorktreeCouchGateway
 import borg.trikeshed.userspace.reactor.MuxReactorElement
 import borg.trikeshed.userspace.reactor.MuxReactorConfig
 import keymux.KeyMux
+import keymux.EnvSource
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.NonCancellable
@@ -246,7 +247,9 @@ object OroborosDaemon {
     }
 
     private suspend fun kotlinx.coroutines.CoroutineScope.mainImpl(args: Array<String>) {
-        val keyMux = KeyMux { env() }
+        // KeyMux with 24-hour cached env source — provider keys change infrequently,
+        // so caching avoids re-resolving on every chat call.
+        val keyMux = KeyMux { cached("*", EnvSource()) }
         // Probe early so a missing key aborts before opening the HTX reactor.
         val apiKeyPresent = kotlinx.coroutines.withContext(Dispatchers.IO) { keyMux.get("JULES_API_KEY") }
         if (apiKeyPresent.isNullOrBlank()) {
@@ -584,8 +587,12 @@ object OroborosDaemon {
             filesRoot = File(forgeHome, "files"),
         )
         val projectDbWire = borg.trikeshed.forge.server.ProjectDbWire(projectDbRegistry, uploads = projectScopes)
+        val projectMiner = borg.trikeshed.forge.server.ProjectMiner(
+            projectDbRegistry, projectScopes, casStore, beliefBag, File(forgeHome, "files"),
+        )
         val brainClient = borg.trikeshed.jules.BrainClient(
             errorSink = borg.trikeshed.jules.JvmBrainErrorSink(forgeHome),
+            keyMux = keyMux,
         )
         val patchWire = borg.trikeshed.forge.server.PatchWire(
             brain = brainClient,
@@ -593,6 +600,7 @@ object OroborosDaemon {
             attachments = attachmentGateway,
             muxContext = htxElement + muxReactor,
             mountScope = wireScope,
+            miner = projectMiner,
         )
         // (boot mounts + ledger remount happen below, once the Rete tendon hook is armed)
         // ── Dynamic modules: Rete (hoisted — the tendon below feeds it) + production

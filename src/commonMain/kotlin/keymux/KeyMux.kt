@@ -222,6 +222,55 @@ class FixedKeySource(
     }
 }
 
+// ── CACHED source — TTL-based cache wrapping any other source ──
+
+/**
+ * Wraps any [KeySource] with TTL-based in-memory caching.
+ * Model listings and provider keys change infrequently — caching for [ttlMs]
+ * (default 24 hours) avoids re-resolving env/persist/API on every chat call.
+ *
+ * Thread-safe: reads are lock-free (atomic snapshot), writes use synchronized.
+ */
+class CachedKeySource(
+    private val delegate: KeySource,
+    override val name: String = "cached:${delegate.name}",
+    private val ttlMs: Long = 24 * 60 * 60 * 1000L, // 24 hours
+) : KeySource() {
+    private data class Entry(val value: String?, val resolvedAt: Long)
+
+    private val cache = java.util.concurrent.ConcurrentHashMap<String, Entry>()
+
+    override suspend fun read(path: KeyPath): String? {
+        val key = path.asString()
+        val entry = cache[key]
+        if (entry != null && System.currentTimeMillis() - entry.resolvedAt < ttlMs) {
+            return entry.value
+        }
+        val value = delegate.read(path)
+        cache[key] = Entry(value, System.currentTimeMillis())
+        return value
+    }
+
+    override suspend fun write(path: KeyPath, value: String) {
+        delegate.write(path, value)
+        cache.remove(path.asString())
+    }
+
+    override suspend fun invalidate() {
+        cache.clear()
+        delegate.invalidate()
+    }
+
+    /** Evict entries older than [ageMs]. Useful for selective refresh. */
+    fun evictStale(ageMs: Long = ttlMs) {
+        val now = System.currentTimeMillis()
+        val iter = cache.entries.iterator()
+        while (iter.hasNext()) {
+            if (now - iter.next().value.resolvedAt >= ageMs) iter.remove()
+        }
+    }
+}
+
 // ── TEST source ──
 
 class TestKeySource(
@@ -517,6 +566,11 @@ class KeyMuxBuilder {
 
     fun bind(prefix: String, source: KeySource): KeyMuxBuilder = apply {
         sources.add(prefix.toKeyPath() j source)
+    }
+
+    /** Wrap the next-added source with [CachedKeySource] for24-hour TTL caching. */
+    fun cached(prefix: String, source: KeySource, ttlMs: Long = 24 * 60 * 60 * 1000L): KeyMuxBuilder = apply {
+        sources.add(prefix.toKeyPath() j CachedKeySource(source, ttlMs = ttlMs))
     }
 
     fun build(): KeyMux {

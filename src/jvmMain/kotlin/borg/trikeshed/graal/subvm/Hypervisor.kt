@@ -138,6 +138,8 @@ class Hypervisor(
         }
         isolates[id] = iso
         leases[id] = Lease(id, budget, seq.incrementAndGet())
+        // btrfs-world guests boot with the minimalist POSIX toolbox (cat/ls/grep/…) as host delegates
+        if (iso is GraalBtrfsSupervisor) runCatching { iso.installPosixTools() }
         land(id, facet, "<isolate>", "spawn", "$trust ${facet.id} $budget", -1, -1, null)
         return iso
     }

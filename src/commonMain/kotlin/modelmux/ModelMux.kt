@@ -206,6 +206,8 @@ class ModelMux internal constructor(
         messages: Series<AcpMessage>,
         tools: Series<AcpTool> = 0 j { error("no tools") },
         assessmentId: String? = null,
+        maxTokens: Int? = null,
+        temperature: Double? = null,
     ): Result<AcpResponse> {
         if (modelId.isEmpty()) return Result.failure(IllegalArgumentException("modelId must be non-empty"))
         val sessionResult = session(modelId)
@@ -225,7 +227,7 @@ class ModelMux internal constructor(
             val body: AcpRequestBody = messages j tools
             val req: AcpRequest = meta j body
 
-            val json = AcpCodec.encodeRequest(req)
+            val json = AcpCodec.encodeRequest(req, maxTokens = maxTokens, temperature = temperature)
             val requestHash = json.hashCode().toString()
 
             if (reactor != null) {
