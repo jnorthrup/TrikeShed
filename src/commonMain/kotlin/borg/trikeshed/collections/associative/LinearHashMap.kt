@@ -2,6 +2,7 @@ package borg.trikeshed.collections.associative
 
 import borg.trikeshed.lib.Join
 import borg.trikeshed.lib.Series
+import borg.trikeshed.lib.Series2
 import borg.trikeshed.lib.j
 
 /**
@@ -139,16 +140,19 @@ abstract class OpenAddressingMap<K : Any, V, IK : Any>(
         return null
     }
 
-    fun entries(): List<Pair<K, V>> {
-        val result = ArrayList<Pair<K, V>>(size)
+    /** Live entries as a frozen Series2 projection — `size j ::get` over the
+     *  build buffer; no mutable surface leaves the map. Destructure with
+     *  `val (k, v) = entry` or `.a`/`.b`. */
+    fun entries(): Series2<K, V> {
+        val result = ArrayList<Join<K, V>>(size)
         for (s in 0 until capacity) {
             val k = keys[s]
             if (!isAbsent(k) && !isDeleted(k)) {
                 // subclasses must provide reverse mapping
-                result += (extractUserKey(k as IK)) to (values[s] as V)
+                result += (extractUserKey(k as IK)) j (values[s] as V)
             }
         }
-        return result
+        return result.size j result::get
     }
 
     protected abstract fun extractUserKey(internalKey: IK): K
@@ -201,19 +205,19 @@ class LinkedLinearHashMap<K : Any, V>(initialCapacity: Int = 16)
     override fun extractUserKey(internalKey: Join<Int, ULong>): K =
         throw UnsupportedOperationException("LinkedLinearHashMap: reverse lookup not stored; use entriesInOrder()")
 
-    /** Iterate entries in insertion order (ascending counter). */
-    fun entriesInOrder(): List<Pair<K, V>> {
+    /** Iterate entries in insertion order (ascending counter) — frozen Series2. */
+    fun entriesInOrder(): Series2<K, V> {
         // Collect live entries with their sequence counter, sort by counter
-        val live = mutableListOf<Pair<ULong, Pair<K, V>>>()
+        val live = ArrayList<Join<ULong, Join<K, V>>>()
         for (s in 0 until capacity) {
             val k = keys[s]
             if (!isAbsent(k) && !isDeleted(k)) {
                 val ik = k as Join<Int, ULong>
-                live += (ik.b) to (extractUserKeyByValue(values[s] as V) to values[s] as V)
+                live += (ik.b) j ((extractUserKeyByValue(values[s] as V)) j (values[s] as V))
             }
         }
-        live.sortBy { it.first }
-        return live.map { it.second } // stdlib-boundary:
+        live.sortBy { it.a }
+        return live.size j { i: Int -> live[i].b }
     }
 
     /** Reverse lookup by value (for entriesInOrder) — override in subclass if needed. */

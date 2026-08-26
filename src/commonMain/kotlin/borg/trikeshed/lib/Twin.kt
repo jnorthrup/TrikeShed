@@ -20,7 +20,8 @@ inline  class TwinPacked(val packed: Long) {
     val start: Int get() = (packed ushr 32).toInt()
     val len: Int get() = (packed and 0xffffffffL).toInt()
 
-    fun toPair(): Pair<Int, Int> = start to len
+    /** Same-typed pair stays a Twin — `val (s, l) = twinPacked.twin`. */
+    fun twin(): Twin<Int> = start j len
     override fun toString(): String = "TwinPacked(start=$start,len=$len)"
 }
 

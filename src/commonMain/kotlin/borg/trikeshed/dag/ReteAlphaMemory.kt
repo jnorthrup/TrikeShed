@@ -1,6 +1,7 @@
 package borg.trikeshed.dag
 
 import borg.trikeshed.collections.associative.LinearHashMap
+import borg.trikeshed.lib.view
 
 data class AlphaPredicate(
     val facetId: String,
@@ -32,7 +33,7 @@ class ReteAlphaNode internal constructor(
     }
 
     fun facts(): List<ReteStoredFact> = matchingFacts.entries()
-        .map { it.second }
+        .view.map { it.b }
         .sortedWith(compareBy({ it.factId.partitionId }, { it.factId.localId }))
 }
 
@@ -53,10 +54,10 @@ class ReteAlphaMemory {
     }
 
     fun accept(fact: ReteStoredFact) {
-        nodes.entries().forEach { (_, node) -> node.accept(fact) }
+        nodes.entries().view.forEach { (_, node) -> node.accept(fact) }
     }
 
     fun retract(factId: FactId) {
-        nodes.entries().forEach { (_, node) -> node.retract(factId) }
+        nodes.entries().view.forEach { (_, node) -> node.retract(factId) }
     }
 }

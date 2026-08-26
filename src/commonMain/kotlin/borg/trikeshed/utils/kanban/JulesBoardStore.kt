@@ -134,9 +134,10 @@ class JulesBoardStore(
 
     /**
      * Fold the WAL into cards. Card state is a projection; the WAL is truth.
-     * Returns the full board keyed by sessionId.
+     * Returns the frozen board keyed by sessionId — a projection, not a
+     * second mutable copy of the truth.
      */
-    fun load(): MutableMap<String, JulesSessionCard> {
+    fun load(): Map<String, JulesSessionCard> {
         val snapshots = mutableMapOf<String, KanbanEventCodec.SnapEvent>()
         val causes = mutableMapOf<String, MutableList<JulesCause>>()
         for ((sid, payload) in records()) {

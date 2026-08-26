@@ -45,7 +45,8 @@ open class JobLog protected constructor(
         frames.add(Frame(sequence, ByteArray(0)))
     }
 
-    fun toMap(): MutableMap<String, ByteArray> {
+    /** Frozen projection of valid frames; mutation of the result writes nothing back. */
+    fun toMap(): Map<String, ByteArray> {
         val map = mutableMapOf<String, ByteArray>()
         for (frame in frames) {
             if (frame.payload.isNotEmpty()) {
@@ -58,7 +59,7 @@ open class JobLog protected constructor(
     companion object {
         fun inMemory(): JobLog = JobLog()
 
-        fun fromMap(data: MutableMap<String, ByteArray>): JobLog {
+        fun fromMap(data: Map<String, ByteArray>): JobLog {
             val log = JobLog()
             data.entries.sortedBy { it.key.toLongOrNull() ?: 0L }.forEach { (k, v) ->
                 val seq = k.toLongOrNull() ?: 0L

@@ -53,11 +53,11 @@ class CausalityReteElementTest {
         val landed = rete.fireLive()
         bag.settle()
         assertEquals(1, landed.size, "the live rete must fire against the bag as it exists")
-        assertTrue(landed[0].second.contains("fire ==> smoke"))
+        assertTrue(landed[0].b.contains("fire ==> smoke"))
 
         // the consequent landed in the bag at discounted evidence
         val snapshot = bag.snapshot()
-        val consequent = snapshot.values.firstOrNull { it.angular == landed[0].first }
+        val consequent = snapshot.values.firstOrNull { it.angular == landed[0].a }
         assertTrue(consequent != null, "firing must mint the consequent into the bag")
         assertEquals(5 * Nal.UNIT, consequent!!.evidence.positive, "support must carry the weak-rule discount")
         bag.drain()

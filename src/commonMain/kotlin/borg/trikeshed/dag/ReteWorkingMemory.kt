@@ -1,6 +1,7 @@
 package borg.trikeshed.dag
 
 import borg.trikeshed.collections.associative.LinearHashMap
+import borg.trikeshed.lib.view
 import borg.trikeshed.cursor.BlackboardContext
 import borg.trikeshed.job.ContentId
 
@@ -72,8 +73,8 @@ class ReteWorkingMemory {
         facet: Pair<String, Any?>,
     ): List<ReteStoredFact> {
         val results = ArrayList<ReteStoredFact>()
-        for (entry in current.entries()) {
-            val fact = entry.second
+        for (entry in current.entries().view) {
+            val fact = entry.b
             if (fact.factId.partitionId == board.id && fact.fields[facet.first] == facet.second) {
                 results.add(fact)
             }

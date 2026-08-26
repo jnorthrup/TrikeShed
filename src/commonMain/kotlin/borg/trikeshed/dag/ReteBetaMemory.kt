@@ -1,6 +1,7 @@
 package borg.trikeshed.dag
 
 import borg.trikeshed.collections.associative.LinearHashMap
+import borg.trikeshed.lib.view
 
 data class BetaJoin(
     val leftFacetId: String,
@@ -47,7 +48,7 @@ class ReteBetaMemory(
         val key = BetaJoinKey(fact.factId.partitionId, fact.fields[join.leftFacetId])
         bucket(leftIndex, key).facts.set(fact.factId, fact)
         leftKeys.set(fact.factId, key)
-        rightIndex.get(key)?.facts?.entries()?.forEach { (_, right) ->
+        rightIndex.get(key)?.facts?.entries()?.view?.forEach { (_, right) ->
             tokenMemory.set(
                 BetaTokenId(fact.factId, right.factId),
                 BetaToken(fact, right, key.value),
@@ -62,7 +63,7 @@ class ReteBetaMemory(
         val key = BetaJoinKey(fact.factId.partitionId, fact.fields[join.rightFacetId])
         bucket(rightIndex, key).facts.set(fact.factId, fact)
         rightKeys.set(fact.factId, key)
-        leftIndex.get(key)?.facts?.entries()?.forEach { (_, left) ->
+        leftIndex.get(key)?.facts?.entries()?.view?.forEach { (_, left) ->
             tokenMemory.set(
                 BetaTokenId(left.factId, fact.factId),
                 BetaToken(left, fact, key.value),
@@ -89,7 +90,7 @@ class ReteBetaMemory(
     }
 
     fun tokens(): List<BetaToken> = tokenMemory.entries()
-        .map { it.second }
+        .view.map { it.b }
         .sortedWith(compareBy(
             { it.left.factId.partitionId },
             { it.left.factId.localId },
@@ -109,9 +110,9 @@ class ReteBetaMemory(
 
     private fun removeTokens(predicate: (BetaTokenId) -> Boolean) {
         val toRemove = mutableListOf<BetaTokenId>()
-        tokenMemory.entries().forEach {
-            if (predicate(it.first)) {
-                toRemove.add(it.first)
+        tokenMemory.entries().view.forEach {
+            if (predicate(it.a)) {
+                toRemove.add(it.a)
             }
         }
         toRemove.forEach { tokenMemory.remove(it) }

@@ -1,6 +1,7 @@
 package borg.trikeshed.dag
 
 import borg.trikeshed.collections.associative.LinearHashMap
+import borg.trikeshed.lib.view
 import borg.trikeshed.job.ContentId
 
 private data class RefractionKey(
@@ -21,8 +22,8 @@ class ReteRefraction {
     }
 
     fun invalidateBySupport(supportCid: ContentId): Int {
-        val invalidated = fired.entries().filter { supportCid in it.first.supportCids }
-        invalidated.forEach { fired.remove(it.first) }
+        val invalidated = fired.entries().view.filter { supportCid in it.a.supportCids }
+        invalidated.forEach { fired.remove(it.a) }
         return invalidated.size
     }
 

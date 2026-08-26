@@ -1,6 +1,7 @@
 package borg.trikeshed.dag
 
 import borg.trikeshed.collections.associative.LinearHashMap
+import borg.trikeshed.lib.view
 import borg.trikeshed.graph.CausalGraphNode
 import borg.trikeshed.graph.CausalGraphNodeIndex
 import borg.trikeshed.job.ContentId
@@ -47,7 +48,7 @@ class ReteAgenda {
 
     fun popNext(): Activation? {
         var selected: Activation? = null
-        pending.entries().forEach { (_, candidate) ->
+        pending.entries().view.forEach { (_, candidate) ->
             val current = selected
             if (current == null || candidate.precedes(current)) selected = candidate
         }
@@ -55,9 +56,9 @@ class ReteAgenda {
     }
 
     fun removeBySupport(supportCid: ContentId): Int {
-        val invalidated = pending.entries()
+        val invalidated = pending.entries().view
             .filter { (_, activation) -> supportCid in activation.supportCids }
-            .map { it.first }
+            .map { it.a }
         invalidated.forEach(pending::remove)
         return invalidated.size
     }

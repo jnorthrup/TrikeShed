@@ -1,5 +1,8 @@
 package borg.trikeshed.narsese
 
+import borg.trikeshed.lib.Join
+import borg.trikeshed.lib.j
+
 /**
  * KgNalBridge — minimize the gap between interchange KR (Turtle/RDF, KIF, …)
  * and NAL causality. A triple is not "a MATCH": its predicate names a COPULA,
@@ -67,21 +70,22 @@ object KgNalBridge {
 
     // ── the mapping (the gap itself) ──────────────────────────────────
 
-    fun mapPredicate(rawPredicate: String): Pair<NalCopula, RelationKind> {
+    /** Predicate → (copula, relation) as a Join — heterogeneous pair, destructured at binding site. */
+    fun mapPredicate(rawPredicate: String): Join<NalCopula, RelationKind> {
         val p = rawPredicate.substringAfterLast('/').substringAfterLast('#').substringAfterLast(':')
             .trim().lowercase().replace('_', '-')
         return when (p) {
-            "type", "a", "instance", "instance-of", "isa", "is-a" -> NalCopula.INHERITANCE to RelationKind.MATCH
-            "subclassof", "subclass", "subclass-of", "subpropertyof" -> NalCopula.INHERITANCE to RelationKind.MATCH
-            "sameas", "same-as", "equivalent", "equivalentclass", "equal", "<=>" -> NalCopula.SIMILARITY to RelationKind.MATCH
+            "type", "a", "instance", "instance-of", "isa", "is-a" -> NalCopula.INHERITANCE j RelationKind.MATCH
+            "subclassof", "subclass", "subclass-of", "subpropertyof" -> NalCopula.INHERITANCE j RelationKind.MATCH
+            "sameas", "same-as", "equivalent", "equivalentclass", "equal", "<=>" -> NalCopula.SIMILARITY j RelationKind.MATCH
             "causes", "cause", "caused", "leadsto", "leads-to", "results-in", "implies", "entails", "=>" ->
-                NalCopula.IMPLICATION to RelationKind.CAUSALITY
+                NalCopula.IMPLICATION j RelationKind.CAUSALITY
             "precedes", "before", "then", "next", "predicts" ->
-                NalCopula.PREDICTIVE_IMPLICATION to RelationKind.CAUSALITY
+                NalCopula.PREDICTIVE_IMPLICATION j RelationKind.CAUSALITY
             "during", "while", "concurrent", "concurrent-with", "simultaneous" ->
-                NalCopula.CONCURRENT_IMPLICATION to RelationKind.CAUSALITY
-            "contradicts", "disjointwith", "disjoint-with", "not" -> NalCopula.SIMILARITY to RelationKind.CONTRADICTION
-            else -> NalCopula.PRODUCT to RelationKind.MATCH
+                NalCopula.CONCURRENT_IMPLICATION j RelationKind.CAUSALITY
+            "contradicts", "disjointwith", "disjoint-with", "not" -> NalCopula.SIMILARITY j RelationKind.CONTRADICTION
+            else -> NalCopula.PRODUCT j RelationKind.MATCH
         }
     }
 

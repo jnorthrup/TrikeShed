@@ -52,8 +52,8 @@ fun groupByContent(spine: Series<ContentId>): Series<Join<ContentId, Series<Int>
     val entriesList = map.entries()
     return entriesList.size j { i: Int ->
         val entry = entriesList[i]
-        val list = entry.second
-        entry.first j (list.size j { idx -> list[idx] })
+        val list = entry.b
+        entry.a j (list.size j { idx -> list[idx] })
     }
 }
 
