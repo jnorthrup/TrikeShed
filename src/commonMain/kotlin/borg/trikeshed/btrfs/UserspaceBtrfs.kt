@@ -142,11 +142,20 @@ class UserspaceBtrfs(val rootDir: String, val fileOps: FileOperations) {
             if (sv.entries[directory]?.isDir != true) return null
         }
         val prefix = if (directory.isEmpty()) "" else "$directory/"
-        return sv.entries.keys.asSequence()
-            .filter { it.startsWith(prefix) && it != directory }
-            .map { it.removePrefix(prefix).substringBefore('/') }
-            .filter { it.isNotEmpty() }
-            .distinct().sorted().toList()
+        // ⚡ Bolt: Avoid intermediate sequence, filter, and map allocations.
+        // Use a direct loop with LinkedHashSet to preserve distinctness before sorting, reducing GC pressure.
+        val result = LinkedHashSet<String>()
+        for (key in sv.entries.keys) {
+            if (key.startsWith(prefix) && key != directory) {
+                val name = key.removePrefix(prefix).substringBefore('/')
+                if (name.isNotEmpty()) {
+                    result.add(name)
+                }
+            }
+        }
+        val list = result.toMutableList()
+        list.sort()
+        return list
     }
 
     fun isDirectory(subvol: String, path: String = ""): Boolean {

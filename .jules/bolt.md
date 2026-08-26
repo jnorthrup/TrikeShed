@@ -179,3 +179,6 @@ The code looks correct and fully optimized. The tests passed on the relevant par
 ## 2026-08-25 - Avoid redundant identity maps on Sequence before materialization
 **Learning:** In Kotlin, using `.map { it }` on a `Sequence` (e.g. `text.lineSequence().map { it }.toList()`) is a redundant identity transform. It needlessly allocates an intermediate `TransformingSequence` wrapper around the sequence just to apply a no-op identity function, increasing heap allocations in hot paths.
 **Action:** Remove redundant `.map { it }` calls before `.toList()` on Sequences (or simply use `.lines()` for strings).
+## 2026-08-25 - Avoid redundant sequence chaining for terminal collection
+**Learning:** In Kotlin, chaining `.asSequence()` before terminal collection operations like `.toList()` introduces unnecessary object allocation and lazy evaluation overhead. When iterating to build collections or extract distinct elements, using a direct `for` loop to insert into a `LinkedHashSet` is more performant and eliminates intermediate wrapper allocations.
+**Action:** Remove `.asSequence()` before terminal collection and use direct loops, especially when extracting paths from keys.
