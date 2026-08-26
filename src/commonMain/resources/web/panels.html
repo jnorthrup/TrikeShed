@@ -86,8 +86,8 @@ button.stop{border-color:var(--err);color:var(--err)}
   <button id="exportBtn">export</button>
   <button id="importBtn">import</button>
   <button id="clearBtn">clear</button>
-  <button id="qsBtn" title="run the quickstart in anger" style="border-color:#3ddc84;color:#3ddc84">⚡</button>
-  <button id="fbBtn" title="open a GitHub issue prefilled with this construction's coordinates" style="border-color:var(--warn);color:var(--warn)">⚑</button>
+  <button id="qsBtn" aria-label="Run quickstart" title="run the quickstart in anger" style="border-color:#3ddc84;color:#3ddc84">⚡</button>
+  <button id="fbBtn" aria-label="Provide feedback" title="open a GitHub issue prefilled with this construction's coordinates" style="border-color:var(--warn);color:var(--warn)">⚑</button>
   <span id="status">idle</span>
 </div>
 <div id="viewport"><div id="world"><svg id="wires"></svg></div></div>
@@ -355,7 +355,7 @@ function buildNode(n){
   const t=TYPES[n.type];
   const el=document.createElement("div"); el.className="node"; el.dataset.id=n.id; n.el=el;
   const hd=document.createElement("div"); hd.className="hd";
-  hd.innerHTML=`<i></i><b>${t.title}</b><s title="delete">✕</s>`;
+  hd.innerHTML=`<i></i><b>${t.title}</b><s role="button" tabindex="0" aria-label="Delete node" title="delete">✕</s>`;
   el.appendChild(hd);
   const body=document.createElement("div"); body.className="body";
   for(const name of t.ins){
@@ -390,7 +390,9 @@ function buildNode(n){
   el.style.left=n.x+"px"; el.style.top=n.y+"px";
   world.appendChild(el);
   hd.addEventListener("dblclick",e=>{ e.stopPropagation(); n.collapsed=!n.collapsed; el.classList.toggle("collapsed",n.collapsed); save(); });
-  hd.querySelector("s").addEventListener("click",()=>{ removeNode(n.id); });
+  const sBtn = hd.querySelector("s");
+  sBtn.addEventListener("click",()=>{ removeNode(n.id); });
+  sBtn.addEventListener("keydown",e=>{ if(e.key==="Enter"||e.key===" ") { e.preventDefault(); removeNode(n.id); } });
   hd.addEventListener("pointerdown",e=>{
     if(e.target.tagName==="S")return;
     e.stopPropagation();
