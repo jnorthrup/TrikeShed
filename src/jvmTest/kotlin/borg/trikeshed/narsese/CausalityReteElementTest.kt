@@ -55,6 +55,9 @@ class CausalityReteElementTest {
         assertEquals(1, landed.size, "the live rete must fire against the bag as it exists")
         assertTrue(landed[0].b.contains("fire ==> smoke"))
 
+        val duplicate = rete.fireLive()
+        assertEquals(0, duplicate.size, "the same rule and premise must not inflate evidence twice")
+
         // the consequent landed in the bag at discounted evidence
         val snapshot = bag.snapshot()
         val consequent = snapshot.values.firstOrNull { it.angular == landed[0].a }
@@ -97,7 +100,7 @@ class CausalityReteElementTest {
             ReplayScenario("s2", "skill-b", listOf(ReplayTurn("user", "replay"), ReplayTurn("agent", "outcome [FAIL]")).toSeries()),
         ).toSeries()
 
-        val landed = curator.train(impulses, scenarios)
+        val landed = curator.teach(impulses, scenarios)
         bag.settle()
         assertEquals(2, landed.size, "SUPPORTED + REFUTED both mint; NEUTRAL would not")
 
@@ -125,7 +128,7 @@ class CausalityReteElementTest {
         val scenarios = listOf(
             ReplayScenario("s1", "skill-z", listOf(ReplayTurn("user", "replay"), ReplayTurn("agent", "no marker")).toSeries()),
         ).toSeries()
-        val landed = curator.train(impulses, scenarios)
+        val landed = curator.teach(impulses, scenarios)
         bag.settle()
         assertEquals(0, landed.size, "NEUTRAL mints nothing — honesty over volume")
         assertEquals(0, bag.size)

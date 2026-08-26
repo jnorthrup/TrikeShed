@@ -15,6 +15,8 @@ import borg.trikeshed.lib.j
 import borg.trikeshed.lib.size
 import borg.trikeshed.lib.toSeries
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.SharedFlow
 import kotlin.coroutines.CoroutineContext
 
 /**
@@ -57,6 +59,10 @@ class CausalityReteElement(
 
     private val rete: CausalityRete = CausalityRete(rules, discount, minSupport)
     private val evaluator = ContentId.of("causality-rete".encodeToByteArray())
+    private val _firings = MutableSharedFlow<ReteFiring>(replay = 0, extraBufferCapacity = 1024)
+    /** Every non-duplicate firing, for Curator/Forge explanation. */
+    val firings: SharedFlow<ReteFiring> get() = _firings
+    private val seenFirings = HashSet<ContentId>()
 
     // angular → (subject, obj) term registry; the caller owns registration.
 
@@ -113,6 +119,8 @@ class CausalityReteElement(
         val landed = ArrayList<Join<Long, String>>()
         for (i in 0 until firings.size) {
             val firing = firings[i]
+            if (!seenFirings.add(firing.firingCid)) continue
+            _firings.tryEmit(firing)
             val consequentAngular = firing.consequentAngular
             val receipt = DerivationReceipt.observation(
                 subject = TermIdentity(firing.matched.angular),
@@ -136,8 +144,9 @@ class CausalityReteElement(
                     receiptCid = receipt.canonicalCid,
                 ),
             )
-            // register the consequent's term identity so later fires can chain
-            register(consequentAngular, firing.rule.antecedent, firing.rule.consequent)
+            // register the consequent under its own subject term so a later
+            // rule may chain from it without this rule matching its own output
+            register(consequentAngular, firing.rule.consequent, firing.rule.antecedent)
             landed.add(
                 consequentAngular j
                     "${firing.rule.antecedent} ${firing.rule.copula.symbol} ${firing.rule.consequent}" +

@@ -15,14 +15,14 @@ import kotlinx.coroutines.Job
 import kotlin.coroutines.CoroutineContext
 
 /**
- * CuratorImpulseElement — the LIVE training recipient for hermes curator
+ * CuratorImpulseElement — the LIVE teaching recipient for hermes curator
  * impulses, over the daemon's BeliefBag.
  *
  * The pure [CuratorImpulseRecipient] does assess/bank/signals as folds; this
  * element is the CCEK owner that runs the pipeline against replayed scenario
  * transcripts and lands the results:
  *
- *  1. [train] — replay scenarios with hindsight, assess matching impulses,
+ *  1. [teach] — replay scenarios with hindsight, assess matching impulses,
  *     bank the verdicts as SUMO-grounded KIF (the banked knowledge survives
  *     across calls in [knowledgeBank]), and mint the projected signals into
  *     the bag at a discounted budget. NEUTRAL verdicts mint nothing.
@@ -65,11 +65,11 @@ class CuratorImpulseElement(
     }
 
     /**
-     * Run one training pass: assess impulses against replayed scenarios, bank
+     * Process one teaching pass: assess impulses against supplied scenarios, bank
      * the verdicts, mint the projected signals. Returns the landed
      * (angular → gloss) pairs for render captioning.
      */
-    suspend fun train(
+    suspend fun teach(
         impulses: Series<CuratorImpulse>,
         scenarios: Series<ReplayScenario>,
     ): List<Join<Long, String>> {

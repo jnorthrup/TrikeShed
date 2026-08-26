@@ -10,7 +10,9 @@ import borg.trikeshed.job.ContentId
 import borg.trikeshed.lib.Join
 import borg.trikeshed.lib.Series
 import borg.trikeshed.lib.Twin
+import borg.trikeshed.lib.get
 import borg.trikeshed.lib.j
+import borg.trikeshed.lib.size
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -26,7 +28,12 @@ import kotlin.coroutines.CoroutineContext
 /** One unit of work for the bag. Guest-facing paths clamp evidence before minting. */
 sealed class BeliefIntake {
     /** New signal at a budget; same angular revises (evidence union), never duplicates. */
-    data class Mint(val signal: SemanticSignal, val budget: BudgetCoord, val receiptCid: ContentId? = null) : BeliefIntake()
+    data class Mint(
+        val signal: SemanticSignal,
+        val budget: BudgetCoord,
+        val receiptCid: ContentId? = null,
+        val evidenceBasis: EvidenceBasis? = null,
+    ) : BeliefIntake()
 
     /** Evidence delta onto an existing angular; budget untouched. */
     data class Reinforce(val angular: Long, val delta: EvidenceCoord, val receiptCid: ContentId? = null) : BeliefIntake()
@@ -99,6 +106,9 @@ class BeliefBagElement(
     // (narchy HijackBag × Krapivin funnel — see HijackBeliefBag). The intake
     // channel is its single writer; readers cross its volatile stamp.
     private val hijack = HijackBeliefBag(capacity)
+    /** Exact ancestry is retained when supplied; Bloom remains the fast hint. */
+    private val basisByAngular = HashMap<Long, EvidenceBasis>()
+    private val receiptByAngular = HashMap<Long, ContentId>()
 
     // ── NAL-9: the moment field — the bag's self-model, rebuilt lazily on a
     // dirty flag (derived state: never WAL'd, milliseconds at d=64, n≤capacity).
@@ -200,7 +210,7 @@ class BeliefBagElement(
 
     private suspend fun handle(cmd: BeliefIntake) {
         when (cmd) {
-            is BeliefIntake.Mint -> mint(cmd.signal, cmd.budget, cmd.receiptCid)
+            is BeliefIntake.Mint -> mint(cmd.signal, cmd.budget, cmd.receiptCid, cmd.evidenceBasis)
             is BeliefIntake.Reinforce -> reinforce(cmd.angular, cmd.delta)
             is BeliefIntake.Attend -> attend(cmd.angular, cmd.budget)
             BeliefIntake.DecayTick -> decayAll()
@@ -209,22 +219,43 @@ class BeliefBagElement(
         maybeFlush()
     }
 
-    private fun mint(incoming: SemanticSignal, budget: BudgetCoord, receiptCid: ContentId?) {
+    private fun mint(
+        incoming: SemanticSignal,
+        budget: BudgetCoord,
+        receiptCid: ContentId?,
+        evidenceBasis: EvidenceBasis?,
+    ) {
         val angular = incoming.angular
         val revived = if (hijack.get(angular) == null && cas != null) reviveFromCas(incoming) else incoming
-        val outcome = hijack.put(HijackBeliefBag.Slot(angular, budget, revived)) { existing, inc ->
+        val existing = hijack.get(angular)
+        val incomingReceipt = receiptCid ?: ContentId.of(SignalCodec.encode(revived))
+        val explicitRevision = existing != null && evidenceBasis != null
+        val prepared = if (explicitRevision) {
+            val decision = OverlapSafeRevision.revise(
+                receiptByAngular[angular],
+                incomingReceipt,
+                existing!!.signal.evidence,
+                revived.evidence,
+                basisByAngular[angular],
+                evidenceBasis,
+            )
+            if (!decision.accepted) return
+            revived.copy(evidence = decision.evidence)
+        } else revived
+        val outcome = hijack.put(HijackBeliefBag.Slot(angular, budget, prepared)) { existing, inc ->
             // NARS revision at the cell: evidence union + basis Bloom union, incoming metadata wins
             HijackBeliefBag.Slot(
                 angular,
                 inc.budget,
                 inc.signal.copy(
-                    evidence = revise(existing.signal.evidence, inc.signal.evidence),
+                    evidence = if (explicitRevision) inc.signal.evidence else revise(existing.signal.evidence, inc.signal.evidence),
                     basisBloom = existing.signal.basisBloom or inc.signal.basisBloom,
                 ),
             )
         }
         when (outcome) {
             is HijackBeliefBag.Put.Placed -> {
+                recordBasis(angular, incomingReceipt, evidenceBasis)
                 walAppend("B:${outcome.slot.budget.packed}:" + SignalCodec.encode(outcome.slot.signal).decodeToString())
                 _events.tryEmit(
                     if (outcome.merged) BeliefEvent.Revised(angular, outcome.slot.signal.evidence)
@@ -232,6 +263,7 @@ class BeliefBagElement(
                 )
             }
             is HijackBeliefBag.Put.Hijacked -> {
+                recordBasis(angular, incomingReceipt, evidenceBasis)
                 walAppend("B:${outcome.slot.budget.packed}:" + SignalCodec.encode(outcome.slot.signal).decodeToString())
                 _events.tryEmit(BeliefEvent.Minted(angular, receiptCid))
                 spill(outcome.victim)
@@ -244,6 +276,24 @@ class BeliefBagElement(
         if (incoming.relation == RelationKind.CONTRADICTION && outcome !is HijackBeliefBag.Put.Rejected) {
             _events.tryEmit(BeliefEvent.Contradicted(angular, incoming.subjectCid))
         }
+    }
+
+    private fun recordBasis(angular: Long, receiptCid: ContentId, basis: EvidenceBasis?) {
+        receiptByAngular[angular] = receiptCid
+        if (basis != null) {
+            val prior = basisByAngular[angular]
+            basisByAngular[angular] = if (prior == null) basis else unionBasis(prior, basis)
+        }
+    }
+
+    private fun unionBasis(a: EvidenceBasis, b: EvidenceBasis): EvidenceBasis {
+        val seen = HashSet<ContentId>()
+        val leaves = mutableListOf<ContentId>()
+        for (source in listOf(a, b)) for (i in 0 until source.leaves.size) {
+            val leaf = source.leaves[i]
+            if (seen.add(leaf)) leaves.add(leaf)
+        }
+        return EvidenceBasis.of(*leaves.toTypedArray())
     }
 
     private fun reinforce(angular: Long, delta: EvidenceCoord) {

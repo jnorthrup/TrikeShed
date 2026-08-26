@@ -68,7 +68,7 @@ data class ImpulseAssessment(
 )
 
 /**
- * CuratorImpulseRecipient — the training recipient that matches hermes
+ * CuratorImpulseRecipient — the teaching recipient that matches hermes
  * curator impulses against hindsight-replayed scenario transcripts, banks
  * the results as SUMO-grounded predicate-logic (KIF) knowledge, and projects
  * them into Narsese bag signals.

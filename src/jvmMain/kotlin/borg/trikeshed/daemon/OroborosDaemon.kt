@@ -578,7 +578,7 @@ object OroborosDaemon {
 
         // ── CausalityReteElement + CuratorImpulseElement: the LIVE rete over the
         // bag (eternal truths at discounted support, minimum-understanding floor)
-        // and the curator-impulse training recipient (hindsight replay → SUMO/KIF
+        // and the curator-impulse teaching recipient (hindsight replay → SUMO/KIF
         // banked knowledge → bag signals). Both ride the belief-bag flag; rules
         // and impulses are fed by callers (forge routes / curation pulses).
         val causalityRete: borg.trikeshed.narsese.CausalityReteElement? = beliefBag?.let { bag ->
@@ -601,12 +601,34 @@ object OroborosDaemon {
         }
         if (causalityRete != null) {
             System.err.println("[OROBOROS] CausalityRete live: ${causalityRete.rules.size} eternal rules; CuratorImpulse bank: ${curatorImpulse?.knowledgeBank?.asserts()?.size ?: 0} axioms")
+            launch {
+                causalityRete.firings.collect { firing ->
+                    daemonBlackboard.put(
+                        "narsese/rete/firing/${firing.firingCid.hex}",
+                        mapOf(
+                            "event" to "dependent-rete-firing",
+                            "firingCid" to firing.firingCid.value,
+                            "ruleCid" to firing.rule.ruleCid.value,
+                            "antecedent" to firing.rule.antecedent,
+                            "consequent" to firing.rule.consequent,
+                            "dependence" to firing.dependence.name,
+                        ),
+                        "oroboros",
+                    )
+                }
+            }
+            launch {
+                while (isActive) {
+                    causalityRete.fireLive()
+                    delay(250L)
+                }
+            }
         }
 
         // ── Curator impulse feeding: hindsight replay over REAL ground truth —
         //    the hermes curator ledger (<home>/skills/.curator_ledger.jsonl) is
         //    the impulse source; the per-profile state.db messages table is the
-        //    replay transcript source. One pass at boot: assess → bank SUMO/KIF
+        //    historical backfill source. One pass at boot: assess → bank SUMO/KIF
         //    → mint bag signals. NEUTRAL transcripts mint nothing. HERMES_PROFILE
         //    selects a profile dir (e.g. profiles/src-trikeshed); default is the
         //    bare hermes home. All blocking IO lives behind Dispatchers.IO in
@@ -617,9 +639,9 @@ object OroborosDaemon {
             launch(Dispatchers.Default) {
                 runCatching {
                     val feeder = borg.trikeshed.narsese.CuratorImpulseFeeder(profileDir)
-                    val landed = feeder.train(curatorImpulse)
+                    val landed = feeder.backfill(curatorImpulse)
                     System.err.println(
-                        "[OROBOROS] CuratorImpulse trained from ${profileDir}: ${landed.size} signals minted; bank now ${curatorImpulse.knowledgeBank.asserts().size} axioms",
+                        "[OROBOROS] Curator backfilled from ${profileDir}: ${landed.size} signals minted; bank now ${curatorImpulse.knowledgeBank.asserts().size} axioms",
                     )
                 }.onFailure {
                     System.err.println("[OROBOROS] CuratorImpulse feed failed (non-fatal): ${it.message}")

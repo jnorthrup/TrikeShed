@@ -1,5 +1,7 @@
 package borg.trikeshed.narsese
 
+import borg.trikeshed.kif.KifExpr
+import borg.trikeshed.job.ContentId
 import borg.trikeshed.lib.Join
 import borg.trikeshed.lib.Series
 import borg.trikeshed.lib.emptySeriesOf
@@ -26,8 +28,56 @@ data class EternalRule(
     val evidence: EvidenceCoord,
     val provenanceCid: String? = null,
 ) {
+    /** Stable identity of the admitted rule's immutable canonical content. */
+    val ruleCid: ContentId
+        get() = ContentId.of(
+            "$antecedent|$consequent|${copula.name}|${evidence.packed}|${provenanceCid ?: ""}".encodeToByteArray(),
+        )
+
     val isEternal: Boolean
         get() = copula == NalCopula.IMPLICATION || copula == NalCopula.EQUIVALENCE
+
+    companion object {
+        /**
+         * Create from a KIF s-expression: (predicate subject object).
+         * The decedent's will, inscribed in predicate logic.
+         */
+        fun fromKif(kifExpr: KifExpr): EternalRule? {
+            val list = kifExpr as? KifExpr.ListExpr ?: return null
+            if (list.elements.size < 3) return null
+            val pred = (list.elements[0] as? KifExpr.Atom)?.token ?: return null
+            val subj = (list.elements[1] as? KifExpr.Atom)?.token ?: return null
+            val obj = (list.elements[2] as? KifExpr.Atom)?.token ?: return null
+            val (copula, relation) = KgNalBridge.mapPredicate(pred)
+            val evidence = EvidenceCoord(Nal.UNIT, 0L)
+            return EternalRule(subj, obj, copula, evidence)
+        }
+
+        /**
+         * Create from a CycL expression — first transcribe to KIF, then parse.
+         * The will translated from one dead language to another.
+         */
+        fun fromCycl(cyclExpr: KifExpr): EternalRule? {
+            val kif = borg.trikeshed.kif.CycLToKif.transcribe(cyclExpr.toKifString())
+            return fromKif(kif)
+        }
+
+        /**
+         * Create from an RDF triple via predicate→copula mapping.
+         * The will as the decedent wrote it — triple by triple.
+         */
+        fun fromTriplet(
+            triplet: KgTriplet,
+            copula: NalCopula,
+            relation: RelationKind,
+            evidenceWeight: Long = Nal.UNIT,
+        ): EternalRule = EternalRule(
+            antecedent = triplet.subject,
+            consequent = triplet.obj,
+            copula = copula,
+            evidence = EvidenceCoord(evidenceWeight, 0L),
+        )
+    }
 }
 
 /**
@@ -64,6 +114,15 @@ data class ReteFiring(
     /** Angular identity of the proposed consequent assertion (FNV of subject+predicate). */
     val consequentAngular: Long
         get() = KgTriplet(rule.antecedent, "entails", rule.consequent).angularIdentity()
+
+    /** Stable identity of this rule application against this live assertion. */
+    val firingCid: ContentId
+        get() = ContentId.of(
+            "${rule.ruleCid.value}|${matched.angular}|$consequentAngular".encodeToByteArray(),
+        )
+
+    /** Rule output is dependent derived support, never an independent observation. */
+    val dependence: EvidenceDependence get() = EvidenceDependence.DEPENDENT
 }
 
 /**
@@ -99,24 +158,28 @@ class CausalityRete(
     // Alpha network: rules indexed by antecedent term. Equivalence rules
     // index BOTH directions — a `<=>` fires from either end. Temporal rules
     // are refused at admission, never silently reinterpreted.
-    // TODO AND IF THEY WILL NOT BE MUTATING THE AI WILL PROMOTE THIS SLOP VALUE TYPE BACK TO SERIES
-    private val alpha: Map<String, List<EternalRule>>
+    private val alpha: Map<String, Series<EternalRule>>
     private val admitted: Series<EternalRule>
 
     init {
-        val kept = ArrayList<EternalRule>()
-        val index = HashMap<String, MutableList<EternalRule>>()
+        val kept = mutableListOf<EternalRule>()
+        val index = LinkedHashMap<String, MutableList<EternalRule>>()
         for (i in 0 until rules.size) {
             val rule = rules[i]
             if (!rule.isEternal) continue
             kept.add(rule)
-            index.getOrPut(rule.antecedent) { mutableListOf() }.add(rule)
+            val existing = index.get(rule.antecedent)
+            if (existing != null) existing.add(rule) else index[rule.antecedent] = mutableListOf(rule)
             if (rule.copula == NalCopula.EQUIVALENCE) {
-                index.getOrPut(rule.consequent) { mutableListOf() }.add(rule)
+                val existingEq = index.get(rule.consequent)
+                if (existingEq != null) existingEq.add(rule) else index[rule.consequent] = mutableListOf(rule)
             }
         }
-        admitted = kept.toSeries()
-        alpha = index
+        admitted = kept.size j { kept[it] }
+        alpha = index.mapValues { (_, rulesForTerm) ->
+            val frozen = rulesForTerm.toList()
+            frozen.size j { i: Int -> frozen[i] }
+        }
     }
 
     /** The admitted eternal rules (temporal input was dropped at admission). */
@@ -132,16 +195,17 @@ class CausalityRete(
      */
     fun fire(assertions: Series<ReteAssertion>): Series<ReteFiring> {
         if (assertions.size == 0) return emptySeriesOf()
-        val out = ArrayList<ReteFiring>()
+        val out = mutableListOf<ReteFiring>()
         for (i in 0 until assertions.size) {
             val assertion = assertions[i]
             val candidates = alpha[assertion.subject] ?: continue
-            for (rule in candidates) {
+            for (j in 0 until candidates.size) {
+                val rule = candidates[j]
                 val consequent = if (rule.antecedent == assertion.subject) rule.consequent else rule.antecedent
                 out.add(firing(rule, assertion, consequent))
             }
         }
-        return out.toSeries()
+        return out.size j { out[it] }
     }
 
     private fun firing(rule: EternalRule, matched: ReteAssertion, consequent: String): ReteFiring {
@@ -153,18 +217,30 @@ class CausalityRete(
     }
 
     companion object {
+        /** Build live law only from a version carrying admission receipts. */
+        fun fromRuleSet(
+            version: RuleSetVersion,
+            discount: Float = 0.5f,
+            minSupport: Long = Nal.UNIT / 4,
+        ): CausalityRete {
+            require(version.rules.size == 0 || version.admissionReceipts.size > 0) {
+                "a non-empty rule set requires admission receipts"
+            }
+            return CausalityRete(version.rules, discount, minSupport)
+        }
+
         /**
          * Admit only eternal rules; temporal copulas are dropped with a count
          * so the caller can report the refusal honestly.
          */
         fun admit(rules: Series<EternalRule>, discount: Float = 0.5f, minSupport: Long = Nal.UNIT / 4): Join<CausalityRete, Int> {
             var rejected = 0
-            val kept = ArrayList<EternalRule>()
+            val kept = mutableListOf<EternalRule>()
             for (i in 0 until rules.size) {
                 val r = rules[i]
                 if (r.isEternal) kept.add(r) else rejected++
             }
-            return CausalityRete(kept.toSeries(), discount, minSupport) j rejected
+            return CausalityRete(kept.size j { kept[it] }, discount, minSupport) j rejected
         }
     }
 }

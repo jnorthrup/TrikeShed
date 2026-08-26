@@ -1,7 +1,14 @@
 package borg.trikeshed.narsese
 
+import borg.trikeshed.kif.CycLToKif
+import borg.trikeshed.kif.KifExpr
 import borg.trikeshed.lib.Join
+import borg.trikeshed.lib.Series
+import borg.trikeshed.lib.emptySeriesOf
+import borg.trikeshed.lib.get
 import borg.trikeshed.lib.j
+import borg.trikeshed.lib.size
+import borg.trikeshed.ontology.SumoOntology
 
 /**
  * KgNalBridge — minimize the gap between interchange KR (Turtle/RDF, KIF, …)
@@ -66,6 +73,69 @@ object KgNalBridge {
                 ?: if (copula.isTemporal) TemporalSignal(TemporalGrade.RELATIVE, sourceCid = sourceCid) else null,
             provenanceCid = provenanceCid,
         )
+    }
+
+    // ── the mapping (the gap itself) ──────────────────────────────────
+
+    // ── pre-LLM corpus → EternalRule pipeline ──────────────────────────
+
+    /**
+     * Emit the SUMO upper spine as EternalRules. The decedent's will,
+     * inscribed in the Suggested Upper Merged Ontology — each subclass
+     * axiom becomes an INHERITANCE eternal truth.
+     */
+    fun emitSumoSpine(): Series<EternalRule> {
+        val kifText = SumoOntology.emitUpperKif()
+        val exprs = KifExpr.parseAll(kifText)
+        val out = mutableListOf<EternalRule>()
+        for (expr in exprs) {
+            EternalRule.fromKif(expr)?.let { out.add(it) }
+        }
+        return out.size j { out[it] }
+    }
+
+    /**
+     * Transcribe CycL text to EternalRules. The will translated from
+     * one dead language to another — CycL → KIF → NAL.
+     */
+    fun cyclToEternalRules(cyclText: String): Series<EternalRule> {
+        val cyclExprs = KifExpr.parseAll(cyclText)
+        val out = mutableListOf<EternalRule>()
+        for (expr in cyclExprs) {
+            EternalRule.fromCycl(expr)?.let { out.add(it) }
+        }
+        return out.size j { out[it] }
+    }
+
+    /**
+     * Bridge pre-LLM RDF triples to EternalRules. Each triple's predicate
+     * is mapped to a NalCopula via [mapPredicate], and the triple becomes
+     * an eternal truth admitted into the rete.
+     */
+    fun tripletsToEternalRules(
+        triplets: List<KgTriplet>,
+        evidenceWeight: Long = Nal.UNIT,
+    ): Series<EternalRule> {
+        val out = mutableListOf<EternalRule>()
+        for (t in triplets) {
+            val (copula, relation) = mapPredicate(t.predicate)
+            out.add(EternalRule.fromTriplet(t, copula, relation, evidenceWeight))
+        }
+        return out.size j { out[it] }
+    }
+
+    /**
+     * Parse + bridge the whole crossing: pre-LLM text → NalMapped signals.
+     * The will of the decedent, crossed into NAL — one statement at a time.
+     * Unparseable statements are skipped, never guessed.
+     */
+    fun bridgeToRules(text: String, confidence: Float = 0.9f): Series<EternalRule> {
+        val triplets = when (sniff(text)) {
+            KgFormat.KIF -> parseKif(text, confidence)
+            KgFormat.TURTLE, KgFormat.N_TRIPLES -> parseTurtle(text, confidence)
+            else -> return emptySeriesOf()
+        }
+        return tripletsToEternalRules(triplets)
     }
 
     // ── the mapping (the gap itself) ──────────────────────────────────

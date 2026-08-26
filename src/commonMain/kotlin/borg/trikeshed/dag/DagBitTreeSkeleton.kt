@@ -9,6 +9,12 @@ import borg.trikeshed.rdf.RdfTriple
 import borg.trikeshed.rdf.RdfVocab
 import borg.trikeshed.rdf.TurtleRdf
 
+/** Explicit storage layout; Fibonacci/Huffman is reserved for a later codec. */
+enum class DagLayout {
+    BINARY_POWER_OF_TWO,
+    FIBONACCI_HUFFMAN,
+}
+
 /**
  * Bit-Tree Skeleton — versioned fixed queryable/fillable abstraction for known DAGs.
  *
@@ -32,10 +38,14 @@ class DagBitTreeSkeleton private constructor(
     val dagId: String,
     val depth: Int,
     val version: String,
+    val layout: DagLayout,
     internal val filled: BooleanArray,
     internal val payloads: Array<Any?>,
 ) {
-    val capacity: Int get() = 1 shl depth
+    val capacity: Int get() = when (layout) {
+        DagLayout.BINARY_POWER_OF_TWO -> 1 shl depth
+        DagLayout.FIBONACCI_HUFFMAN -> error("FIBONACCI_HUFFMAN layout is not implemented")
+    }
     val size: Int get() = filled.count { it }
 
     fun isFilled(pos: Int): Boolean = pos in 0 until capacity && filled[pos]
@@ -76,7 +86,7 @@ class DagBitTreeSkeleton private constructor(
         val np = payloads.copyOf()
         nf[pos] = true
         np[pos] = payload
-        return DagBitTreeSkeleton(dagId, depth, newVersion, nf, np)
+        return DagBitTreeSkeleton(dagId, depth, newVersion, layout, nf, np)
     }
 
     fun fillAll(entries: Map<Int, Any?>, newVersion: String): DagBitTreeSkeleton {
@@ -87,11 +97,11 @@ class DagBitTreeSkeleton private constructor(
             nf[pos] = true
             np[pos] = payload
         }
-        return DagBitTreeSkeleton(dagId, depth, newVersion, nf, np)
+        return DagBitTreeSkeleton(dagId, depth, newVersion, layout, nf, np)
     }
 
     fun withVersion(newVersion: String): DagBitTreeSkeleton =
-        DagBitTreeSkeleton(dagId, depth, newVersion, filled, payloads)
+        DagBitTreeSkeleton(dagId, depth, newVersion, layout, filled, payloads)
 
     fun toRdfGraph(): RdfGraph {
         val gIri = "${RdfVocab.FORGE}dagSkeleton/$dagId/$version"
@@ -102,6 +112,7 @@ class DagBitTreeSkeleton private constructor(
         quads.add(RdfQuad(skeletonIri, RdfTerm.Iri(RdfVocab.RDF + "type"), RdfTerm.Iri(RdfVocab.SUMO + "Collection"), g))
         quads.add(RdfQuad(skeletonIri, RdfTerm.Iri("${RdfVocab.FORGE}depth"), RdfTerm.Literal(depth.toString(), datatype = RdfVocab.XSD + "integer"), g))
         quads.add(RdfQuad(skeletonIri, RdfTerm.Iri("${RdfVocab.FORGE}capacity"), RdfTerm.Literal(capacity.toString(), datatype = RdfVocab.XSD + "integer"), g))
+        quads.add(RdfQuad(skeletonIri, RdfTerm.Iri("${RdfVocab.FORGE}layout"), RdfTerm.Literal(layout.name), g))
         quads.add(RdfQuad(skeletonIri, RdfTerm.Iri("${RdfVocab.FORGE}version"), RdfTerm.Literal(version), g))
         for (i in 0 until capacity) {
             val nodeIri = RdfTerm.Iri("${RdfVocab.FORGE}dagNode/$dagId/$i")
@@ -126,10 +137,18 @@ class DagBitTreeSkeleton private constructor(
     }
 
     companion object {
-        fun empty(dagId: String, depth: Int, version: String = "v0"): DagBitTreeSkeleton {
+        fun empty(
+            dagId: String,
+            depth: Int,
+            version: String = "v0",
+            layout: DagLayout = DagLayout.BINARY_POWER_OF_TWO,
+        ): DagBitTreeSkeleton {
             require(depth in 1..20) { "depth 1..20" }
+            require(layout == DagLayout.BINARY_POWER_OF_TWO) {
+                "FIBONACCI_HUFFMAN layout is reserved for a future codec"
+            }
             val cap = 1 shl depth
-            return DagBitTreeSkeleton(dagId, depth, version, BooleanArray(cap), arrayOfNulls(cap))
+            return DagBitTreeSkeleton(dagId, depth, version, layout, BooleanArray(cap), arrayOfNulls(cap))
         }
         fun fromRdfGraph(graph: RdfGraph): DagBitTreeSkeleton? {
             val quads = graph.quads
@@ -140,7 +159,10 @@ class DagBitTreeSkeleton private constructor(
             val depthQuad = quads.firstOrNull { it.p.iri.endsWith("depth") } ?: return null
             val depth = (depthQuad.o as? RdfTerm.Literal)?.lexical?.toIntOrNull() ?: return null
             val version = (quads.firstOrNull { it.p.iri.endsWith("version") }?.o as? RdfTerm.Literal)?.lexical ?: "v0"
-            val skel = empty(dagId, depth, version)
+            val layoutName = (quads.firstOrNull { it.p.iri.endsWith("layout") }?.o as? RdfTerm.Literal)?.lexical
+            val layout = runCatching { layoutName?.let(DagLayout::valueOf) ?: DagLayout.BINARY_POWER_OF_TWO }.getOrNull()
+                ?: return null
+            val skel = runCatching { empty(dagId, depth, version, layout) }.getOrNull() ?: return null
             for (q in quads) {
                 if (!q.p.iri.endsWith("payload")) continue
                 val sIri = (q.s as? RdfTerm.Iri)?.iri ?: continue

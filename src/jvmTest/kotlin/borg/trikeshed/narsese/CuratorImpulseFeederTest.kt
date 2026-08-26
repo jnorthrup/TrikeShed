@@ -86,7 +86,7 @@ class CuratorImpulseFeederTest {
         val scenarios = feeder.loadScenarios(impulses)
         assertEquals(1, scenarios.size, "only feed01 has a transcript; feed02/feed03 sessions are absent and skipped")
 
-        val landed = feeder.train(curator)
+        val landed = feeder.backfill(curator)
         bag.settle()
 
         assertTrue(landed.size > 0, "a SUPPORTED verdict must mint at least one signal")
@@ -115,7 +115,7 @@ class CuratorImpulseFeederTest {
         rete.open()
         val curator = CuratorImpulseElement(bag, rete = rete).also { it.open() }
 
-        val landed = CuratorImpulseFeeder(dir).train(curator)
+        val landed = CuratorImpulseFeeder(dir).backfill(curator)
         assertEquals(0, landed.size, "NEUTRAL transcripts mint nothing — no fabricated evidence")
         bag.drain()
     }
@@ -131,7 +131,7 @@ class CuratorImpulseFeederTest {
 
         val feeder = CuratorImpulseFeeder(dir)
         assertEquals(0, feeder.loadImpulses().size, "absent ledger is empty, not an error")
-        assertEquals(0, feeder.train(curator).size, "nothing to train on lands nothing")
+        assertEquals(0, feeder.backfill(curator).size, "nothing to backfill lands nothing")
         bag.drain()
     }
 

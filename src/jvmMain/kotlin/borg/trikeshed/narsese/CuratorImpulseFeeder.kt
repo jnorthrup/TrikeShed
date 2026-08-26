@@ -13,7 +13,7 @@ import java.io.File
 import java.sql.DriverManager
 
 /**
- * CuratorImpulseFeeder — jvmMain adapter that feeds [CuratorImpulseElement]
+ * CuratorImpulseFeeder — jvmMain backfill adapter [CuratorImpulseElement]
  * from the real hermes ground truth:
  *
  *  - impulses: `<profile>/skills/.curator_ledger.jsonl` (one JSON record per
@@ -86,13 +86,13 @@ class CuratorImpulseFeeder(
         }.getOrNull()
 
     /**
-     * One full training pass: ledger → impulses, state.db → scenarios,
-     * [CuratorImpulseElement.train] banks SUMO/KIF and mints bag signals.
+     * One historical backfill pass: ledger → impulses, state.db → scenarios,
+     * [CuratorImpulseElement.teach] banks SUMO/KIF and mints bag signals.
      */
-    suspend fun train(element: CuratorImpulseElement): List<Join<Long, String>> {
+    suspend fun backfill(element: CuratorImpulseElement): List<Join<Long, String>> {
         val impulses = loadImpulses()
         if (impulses.size == 0) return emptyList()
         val scenarios = loadScenarios(impulses)
-        return element.train(impulses, scenarios)
+        return element.teach(impulses, scenarios)
     }
 }
