@@ -603,6 +603,30 @@ object OroborosDaemon {
             System.err.println("[OROBOROS] CausalityRete live: ${causalityRete.rules.size} eternal rules; CuratorImpulse bank: ${curatorImpulse?.knowledgeBank?.asserts()?.size ?: 0} axioms")
         }
 
+        // ── Curator impulse feeding: hindsight replay over REAL ground truth —
+        //    the hermes curator ledger (<home>/skills/.curator_ledger.jsonl) is
+        //    the impulse source; the per-profile state.db messages table is the
+        //    replay transcript source. One pass at boot: assess → bank SUMO/KIF
+        //    → mint bag signals. NEUTRAL transcripts mint nothing. HERMES_PROFILE
+        //    selects a profile dir (e.g. profiles/src-trikeshed); default is the
+        //    bare hermes home. All blocking IO lives behind Dispatchers.IO in
+        //    the feeder — never on this reactor thread.
+        if (curatorImpulse != null) {
+            val profileDir = System.getenv("HERMES_PROFILE")?.let { File(it) }
+                ?: File(hermesHomeDir.absolutePath)
+            launch(Dispatchers.Default) {
+                runCatching {
+                    val feeder = borg.trikeshed.narsese.CuratorImpulseFeeder(profileDir)
+                    val landed = feeder.train(curatorImpulse)
+                    System.err.println(
+                        "[OROBOROS] CuratorImpulse trained from ${profileDir}: ${landed.size} signals minted; bank now ${curatorImpulse.knowledgeBank.asserts().size} axioms",
+                    )
+                }.onFailure {
+                    System.err.println("[OROBOROS] CuratorImpulse feed failed (non-fatal): ${it.message}")
+                }
+            }
+        }
+
         // ── PatchWire: the ComfyUI patch-panel backend — full KeyMux/ModelMux access
         // (provider-neutral, key-leased, values never cross the wire) + multiproject
         // scope mounting (drag a directory: git repo → projects/<name>/, else

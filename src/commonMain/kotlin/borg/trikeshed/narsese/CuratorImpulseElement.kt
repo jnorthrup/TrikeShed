@@ -6,8 +6,10 @@ import borg.trikeshed.context.ElementState
 import borg.trikeshed.cursor.BudgetCoord
 import borg.trikeshed.job.ContentId
 import borg.trikeshed.kif.KifKnowledgeBase
+import borg.trikeshed.lib.Join
 import borg.trikeshed.lib.Series
 import borg.trikeshed.lib.get
+import borg.trikeshed.lib.j
 import borg.trikeshed.lib.size
 import kotlinx.coroutines.Job
 import kotlin.coroutines.CoroutineContext
@@ -70,7 +72,7 @@ class CuratorImpulseElement(
     suspend fun train(
         impulses: Series<CuratorImpulse>,
         scenarios: Series<ReplayScenario>,
-    ): List<Pair<Long, String>> {
+    ): List<Join<Long, String>> {
         if (state != ElementState.ACTIVE) return emptyList()
         val assessments = CuratorImpulseRecipient.assess(impulses, scenarios)
         if (assessments.size == 0) return emptyList()
@@ -83,7 +85,7 @@ class CuratorImpulseElement(
         // term registration stays aligned — NEUTRAL is skipped exactly once)
         val sourceCid = evaluator.value
         val paired = CuratorImpulseRecipient.signalsWith(assessments, sourceCid)
-        val landed = ArrayList<Pair<Long, String>>()
+        val landed = ArrayList<Join<Long, String>>()
         for (i in 0 until paired.size) {
             val assessment = paired[i].a
             val signal = paired[i].b
@@ -104,7 +106,7 @@ class CuratorImpulseElement(
             )
             // register term identity with the rete so later fires can chain
             rete?.register(signal.angular, assessment.impulse.term(), "scenario_${assessment.scenarioId}")
-            landed.add(signal.angular to "${signal.relation} ${assessment.impulse.term()}")
+            landed.add(signal.angular j "${signal.relation} ${assessment.impulse.term()}")
         }
         return landed
     }

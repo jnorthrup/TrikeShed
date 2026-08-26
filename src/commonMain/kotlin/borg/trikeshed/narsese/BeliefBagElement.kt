@@ -9,6 +9,7 @@ import borg.trikeshed.job.CasStore
 import borg.trikeshed.job.ContentId
 import borg.trikeshed.lib.Join
 import borg.trikeshed.lib.Series
+import borg.trikeshed.lib.Twin
 import borg.trikeshed.lib.j
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -135,8 +136,8 @@ class BeliefBagElement(
 
     // ── reads (COW: the map reference is immutable, superseded on write) ──
 
-    fun snapshot(): Map<Join<Long, Long>, SemanticSignal> {
-        val out = HashMap<Join<Long, Long>, SemanticSignal>(hijack.size)
+    fun snapshot(): Map<Twin<Long>, SemanticSignal> {
+        val out = HashMap<Twin<Long>, SemanticSignal>(hijack.size)
         hijack.forEach { s -> out[s.angular j s.budget.packed] = s.signal }
         return out
     }

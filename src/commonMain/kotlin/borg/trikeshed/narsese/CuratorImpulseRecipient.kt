@@ -90,9 +90,7 @@ data class ImpulseAssessment(
  */
 object CuratorImpulseRecipient {
 
-    /** Outcome markers the hindsight reader honours (case-insensitive). */
-    private val SUPPORT_MARKERS = listOf("[pass]", "[supported]", "[keep]")
-    private val REFUTE_MARKERS = listOf("[fail]", "[refuted]", "[drop]")
+    /** Outcome markers live in the marker oracles below — one source, no list slop. */
 
     /**
      * Replay scenarios with hindsight and assess each matching impulse.
@@ -133,12 +131,19 @@ object CuratorImpulseRecipient {
         for (t in 0 until scenario.turns.size) {
             val text = scenario.turns[t].text.lowercase()
             when {
-                SUPPORT_MARKERS.any { it in text } -> verdict = HindsightVerdict.SUPPORTED
-                REFUTE_MARKERS.any { it in text } -> verdict = HindsightVerdict.REFUTED
+                hasSupportMarker(text) -> verdict = HindsightVerdict.SUPPORTED
+                hasRefuteMarker(text) -> verdict = HindsightVerdict.REFUTED
             }
         }
         return verdict
     }
+
+    /** Marker oracles exposed for [ScenarioTranscripts] — same discipline, one source. */
+    internal fun hasSupportMarker(text: String): Boolean =
+        text.indexOf("[pass]") >= 0 || text.indexOf("[supported]") >= 0 || text.indexOf("[keep]") >= 0
+
+    internal fun hasRefuteMarker(text: String): Boolean =
+        text.indexOf("[fail]") >= 0 || text.indexOf("[refuted]") >= 0 || text.indexOf("[drop]") >= 0
 
     /**
      * Bank assessments as SUMO-grounded KIF. The KB carries the SUMO upper

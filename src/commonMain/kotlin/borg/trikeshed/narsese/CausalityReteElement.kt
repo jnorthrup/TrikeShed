@@ -7,6 +7,7 @@ import borg.trikeshed.cursor.BudgetCoord
 import borg.trikeshed.job.ContentId
 import borg.trikeshed.lib.Join
 import borg.trikeshed.lib.Series
+import borg.trikeshed.lib.Series2
 import borg.trikeshed.lib.Twin
 import borg.trikeshed.lib.emptySeriesOf
 import borg.trikeshed.lib.get
@@ -104,7 +105,7 @@ class CausalityReteElement(
      * a render layer can caption the minted consequents. Quota-free: no model
      * call anywhere on this path.
      */
-    suspend fun fireLive(): Series<Join<Long, String>> {
+    suspend fun fireLive(): Series2<Long, String> {
         if (state != ElementState.ACTIVE) return emptySeriesOf()
         val assertions = projectLive()
         if (assertions.size == 0) return emptySeriesOf()
