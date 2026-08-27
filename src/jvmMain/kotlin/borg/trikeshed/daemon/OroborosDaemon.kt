@@ -21,6 +21,7 @@ import borg.trikeshed.util.oroboros.GitCouchGateway
 import borg.trikeshed.util.oroboros.JvmFileWatchReactorElement
 import borg.trikeshed.util.oroboros.WorktreeCouchGateway
 import borg.trikeshed.userspace.reactor.MuxReactorElement
+import borg.trikeshed.ccek.CCEK
 import borg.trikeshed.userspace.reactor.MuxReactorConfig
 import keymux.KeyMux
 import keymux.EnvSource
@@ -339,6 +340,13 @@ object OroborosDaemon {
             parentJob = coroutineContext[kotlinx.coroutines.Job],
         )
         muxReactor.open()
+        // ── CCEK binding: the single control plane for assemblies ────
+        // Provides choreograph(), createUserContext(), and the bounded
+        // agent fan-out that LCNC nodes, model panels, and the curator
+        // all run through. Modules access it via the binding's
+        // reactorScope for coroutine dispatch.
+        val ccekBinding = CCEK.initialize(muxReactor)
+        System.err.println("[OROBOROS] CCEK binding open: reactor=${ccekBinding.reactorScope}")
         // Seed from already-resolved KeyMux env keys so the ReactorSource
         // (read path `llm.*.key`) returns real keyIds the very first cycle.
         // Each resolved key becomes one MuxCredentialRecord; later calls to
@@ -573,7 +581,18 @@ object OroborosDaemon {
         }
 
         val beliefWire = if (beliefBag != null && turnReview != null) {
-            borg.trikeshed.forge.server.BeliefWire(beliefBag, turnReview, hermesMemoryFiles)
+            // W5.3: wire the live curator element into the beliefs HTTP surface
+            // (teach/query routes). The curator itself is constructed below; its
+            // construction only needs beliefBag, which is already non-null here.
+            val curatorForWire: borg.trikeshed.narsese.CuratorImpulseElement? = beliefBag?.let { bag ->
+                val c = borg.trikeshed.narsese.CuratorImpulseElement(
+                    bag,
+                    parentJob = coroutineContext[kotlinx.coroutines.Job],
+                )
+                c.open()
+                c
+            }
+            borg.trikeshed.forge.server.BeliefWire(beliefBag, turnReview, hermesMemoryFiles, curatorForWire)
         } else null
 
         // ── CausalityReteElement + CuratorImpulseElement: the LIVE rete over the

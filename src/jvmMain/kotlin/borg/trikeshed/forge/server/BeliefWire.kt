@@ -5,9 +5,14 @@ import borg.trikeshed.memory.HermesMemoryFiles
 import borg.trikeshed.narsese.AttentionEconomy
 import borg.trikeshed.narsese.BeliefBagElement
 import borg.trikeshed.narsese.BeliefIntake
+import borg.trikeshed.narsese.CuratorImpulseElement
+import borg.trikeshed.narsese.CuratorImpulseKind
 import borg.trikeshed.narsese.Nal
 import borg.trikeshed.lib.get
 import borg.trikeshed.lib.size
+import borg.trikeshed.lib.toSeries
+import borg.trikeshed.narsese.ReplayScenario
+import borg.trikeshed.narsese.ReplayTurn
 import borg.trikeshed.narsese.TurnReviewElement
 import borg.trikeshed.parse.json.JsonSupport
 
@@ -19,6 +24,8 @@ import borg.trikeshed.parse.json.JsonSupport
  *   GET  /api/beliefs/render        the bounded MEMORY render (frozen-snapshot form)
  *   POST /api/beliefs/review        {facts:[{verb,ok,context,object?}], turnSucceeded} → pure induction pass
  *   POST /api/beliefs/tick          one DecayTick (curation pulse, on demand — demos/tests)
+ *   POST /api/beliefs/teach         {impulses:[{kind,subject,rationale}], scenarios:[...]} → curator hindsight pass (W5.3)
+ *   POST /api/beliefs/query         {pattern:"kif"} → bank solver query (W5.3)
  *
  * The loop, drivable end-to-end: mint (seed/pen/user) → review (induction) →
  * tick (attention decay → floor crossings → eviction/spill) → render (bounded
@@ -29,6 +36,8 @@ class BeliefWire(
     private val bag: BeliefBagElement,
     private val review: TurnReviewElement,
     private val memoryFiles: HermesMemoryFiles?,
+    /** W5.3: the live curator element; null = teach/query degrade to 503. */
+    private val curator: CuratorImpulseElement? = null,
 ) {
     suspend fun route(
         method: String,
@@ -84,6 +93,58 @@ class BeliefWire(
             method == "POST" && p == "/api/beliefs/tick" -> {
                 bag.intake.send(BeliefIntake.DecayTick)
                 json(mapOf("ok" to true, "bagSize" to bag.size))
+            }
+
+            // W5.3: curator hindsight teaching — impulses + replay scenarios in,
+            // landed (angular → gloss) pairs out. Quota-free by construction.
+            method == "POST" && p == "/api/beliefs/teach" -> {
+                val c = curator ?: return json(mapOf("error" to "curator not wired"), 503)
+                val req = runCatching { JsonSupport.parse(rawBody(text)) as? Map<*, *> }.getOrNull()
+                    ?: return json(mapOf("error" to "bad_json"), 400)
+                val impulses = ((req["impulses"] as? List<*>).orEmpty()).mapNotNull { raw ->
+                    val m = raw as? Map<*, *> ?: return@mapNotNull null
+                    val subject = m["subject"]?.toString() ?: return@mapNotNull null
+                    val kind = runCatching { CuratorImpulseKind.valueOf(m["kind"]?.toString()?.uppercase() ?: "") }
+                        .getOrNull() ?: CuratorImpulseKind.ADOPT
+                    borg.trikeshed.narsese.CuratorImpulse(
+                        kind = kind,
+                        subject = subject,
+                        rationale = m["rationale"]?.toString() ?: "",
+                        proposalCid = m["proposalCid"]?.toString(),
+                    )
+                }.toSeries()
+                val scenarios = ((req["scenarios"] as? List<*>).orEmpty()).mapNotNull { raw ->
+                    val m = raw as? Map<*, *> ?: return@mapNotNull null
+                    val sid = m["scenarioId"]?.toString() ?: return@mapNotNull null
+                    val subject = m["impulseSubject"]?.toString() ?: return@mapNotNull null
+                    val turns = ((m["turns"] as? List<*>).orEmpty()).mapNotNull { t ->
+                        (t as? Map<*, *>)?.let {
+                            ReplayTurn(
+                                role = it["role"]?.toString() ?: "user",
+                                text = it["text"]?.toString() ?: "",
+                            )
+                        }
+                    }.toSeries()
+                    ReplayScenario(sid, subject, turns)
+                }.toSeries()
+                val landed = c.teach(impulses, scenarios)
+                json(mapOf(
+                    "verdict" to "ok",
+                    "landed" to landed.size,
+                    "glosses" to landed.map { (_, gloss) -> gloss },
+                    "knowledgeSize" to c.knowledgeBank.asserts().size,
+                ))
+            }
+
+            // W5.3: query the banked knowledge through the KIF solver.
+            method == "POST" && p == "/api/beliefs/query" -> {
+                val c = curator ?: return json(mapOf("error" to "curator not wired"), 503)
+                val req = parse(text)
+                val pattern = req["pattern"]?.toString()
+                    ?: return json(mapOf("error" to "pattern required"), 400)
+                val results = runCatching { c.queryBank(pattern) }
+                    .getOrElse { return json(mapOf("error" to (it.message ?: "query failed")), 400) }
+                json(mapOf("verdict" to "ok", "pattern" to pattern, "results" to results))
             }
 
             // The resonance of a solver proposal: support + refutation fronts, one sweep

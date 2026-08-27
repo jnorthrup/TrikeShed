@@ -88,6 +88,8 @@ data class CardRow(
     val order: Int,
     val dependencies: List<String>,
     val tags: List<String>,
+    /** Explicit Hermes owner, persisted as part of the command payload. */
+    val owner: String = "",
 )
 
 /**
@@ -307,9 +309,15 @@ class BoardStoreElement(
             lastSequence = seq,
             lastMoveMs = if (moved) now else prev?.lastMoveMs ?: now,
             priority = priority,
-            order = prev?.order ?: rows.size,
+            // A move is appended to the target column's ordered sequence. The
+            // browser supplies only the gesture; ordering is derived here from
+            // the single-writer store so reload/replay produces the same board.
+            order = if (cmd is JobCommand.Move) {
+                rows.values.count { it.col == col && it.jobId != jobId }
+            } else prev?.order ?: rows.size,
             dependencies = snapshot.dependencies.map { it.value },
             tags = tags,
+            owner = (raw["owner"] as? String)?.trim()?.takeIf { it.isNotEmpty() } ?: prev?.owner ?: "",
         )
     }
 

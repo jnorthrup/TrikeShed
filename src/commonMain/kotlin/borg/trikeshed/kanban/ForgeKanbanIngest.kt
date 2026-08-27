@@ -51,15 +51,8 @@ object ForgeKanbanIngest {
     )
     private val dependencyId = Regex("\\b[A-Z][0-9]+\\b")
 
-    private val columns = listOf(
-        KanbanColumn(KanbanColumnId("triage"), "Triage", 0),
-        KanbanColumn(KanbanColumnId("todo"), "Todo", 1),
-        KanbanColumn(KanbanColumnId("ready"), "Ready", 2),
-        KanbanColumn(KanbanColumnId("running"), "Running", 3, wipLimit = 3),
-        KanbanColumn(KanbanColumnId("blocked"), "Blocked", 4),
-        KanbanColumn(KanbanColumnId("done"), "Done", 5),
-        KanbanColumn(KanbanColumnId("archived"), "Archived", 6),
-    )
+    // W6.6: the seven columns come from BoardCol.entries — one vocabulary, no drift.
+    private val columns = BoardCol.columns()
 
     /**
      * Persist the markdown envelope, then reduce it and assert the derived facts into

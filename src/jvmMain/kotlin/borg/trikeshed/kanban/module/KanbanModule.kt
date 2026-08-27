@@ -7,6 +7,9 @@ import borg.trikeshed.kanban.BoardIntake
 import borg.trikeshed.kanban.BoardStoreElement
 import borg.trikeshed.kanban.JvmBoardWal
 import borg.trikeshed.kanban.toBoardMap
+import borg.trikeshed.lcnc.LcncKanbanExperience
+import borg.trikeshed.lcnc.LcncNode
+import borg.trikeshed.lcnc.LcncContracts
 import borg.trikeshed.litebike.JvmKanbanServer
 import borg.trikeshed.module.ForgeModule
 import borg.trikeshed.module.ModuleContext
@@ -42,6 +45,8 @@ class KanbanModule : ForgeModule {
             parentJob = ctx.scope.coroutineContext[Job],
         )
         store.open()
+        val lcnc = LcncKanbanExperience(store)
+        val lcncRegistry = lcnc.registry()
 
         // ── NARS garnish (Phase 5): review bridge + attention order, iff the bag is live.
         //    Bag OFF ⇒ board JSON byte-identical minus the attention/contested fields.
@@ -62,12 +67,17 @@ class KanbanModule : ForgeModule {
             if (bag == null) cached?.let { if (it.first == seq) return it.second }
             val cursor = BoardCursor.of(store.cards())
             val base = cursor.toBoardMap(seq, title = "Oroboros board")
-            val map = if (bag == null) base else {
+            val withOwners = base + ("items" to ((base["items"] as List<*>).map { item ->
+                val m = item as Map<*, *>
+                m + mapOf("owner" to store.card(m["id"].toString())?.owner.orEmpty())
+            }))
+            val map = if (bag == null) withOwners else {
                 val garnish = borg.trikeshed.kanban.BoardAttentionOrder.garnish(bag, store.cards())
-                val items = (base["items"] as List<*>).map { item ->
+                val items = (withOwners["items"] as List<*>).map { item ->
                     val m = item as Map<*, *>
                     val g = garnish[m["id"]]
-                    if (g == null) m else m + mapOf("attention" to g.score, "contested" to g.contested)
+                    val owner = store.card(m["id"].toString())?.owner.orEmpty()
+                    (if (g == null) m else m + mapOf("attention" to g.score, "contested" to g.contested)) + mapOf("owner" to owner)
                 }
                 base + ("items" to items)
             }
@@ -194,13 +204,73 @@ class KanbanModule : ForgeModule {
             else import(store, text)
         }
 
+        ctx.routes.claim(id, "/api/lcnc/kanban") { method, _, _, _ ->
+            if (method != "GET") JvmKanbanServer.HttpResponse(405, """{"error":"method_not_allowed"}""")
+            else JvmKanbanServer.HttpResponse(200, JsonSupport.stringify(lcnc.activeSheets()))
+        }
+
+        ctx.routes.claim(id, "/api/lcnc/contracts") { method, _, _, _ ->
+            if (method != "GET") JvmKanbanServer.HttpResponse(405, """{"error":"method_not_allowed"}""")
+            else JvmKanbanServer.HttpResponse(200, JsonSupport.stringify(mapOf(
+                // The FULL contract: title, ports, kinds, cardinality, functions,
+                // param defaults, source/sink/wide — every field the retired JS
+                // TYPES table used to carry. Kotlin is the ONE vocabulary author;
+                // the browser renders (and fetches) but never invents.
+                "contracts" to LcncContracts.all().map { c -> mapOf(
+                    "type" to c.type, "title" to c.title,
+                    "inputs" to c.inputs, "outputs" to c.outputs,
+                    "inputKinds" to c.inputKinds, "outputKinds" to c.outputKinds,
+                    "cardinality" to c.cardinality.mapValues { it.value.name }, "functions" to c.functions,
+                    "params" to c.params.mapValues { p ->
+                        mapOf(
+                            "v" to p.value.v, "opts" to p.value.opts,
+                            "ta" to p.value.ta, "ph" to p.value.ph,
+                        )
+                    },
+                    "source" to c.isSource, "sink" to c.isSink, "wide" to c.wide,
+                ) },
+            )))
+        }
+
+        ctx.routes.claim(id, "/api/lcnc/kanban/move") { method, _, text, _ ->
+            if (method != "POST") return@claim JvmKanbanServer.HttpResponse(405, """{"error":"method_not_allowed"}""")
+            val req = runCatching { JsonSupport.parse(rawBody(text)) as? Map<*, *> }.getOrNull()
+                ?: return@claim JvmKanbanServer.HttpResponse(400, """{"error":"bad_json"}""")
+            val jobId = req["itemId"]?.toString() ?: req["jobId"]?.toString()
+                ?: return@claim JvmKanbanServer.HttpResponse(400, """{"error":"jobId_required"}""")
+            val toColumn = req["to"]?.toString() ?: req["toColumn"]?.toString()
+                ?: return@claim JvmKanbanServer.HttpResponse(400, """{"error":"toColumn_required"}""")
+            val item = req["item"] as? Map<*, *>
+            val revision = req["expectedRevision"] ?: item?.get("revision")
+                ?: return@claim JvmKanbanServer.HttpResponse(400, """{"error":"expectedRevision_required"}""")
+            // JsonSupport decodes JSON numbers as a numeric value whose
+            // toString may be `3.0`; the LCNC reducer consumes a long.
+            val normalizedRevision = revision.toString().toDoubleOrNull()?.toLong()?.toString()
+                ?: return@claim JvmKanbanServer.HttpResponse(400, """{"error":"expectedRevision_invalid"}""")
+            val node = LcncNode(
+                id = "move-$jobId",
+                type = "kanban.move",
+                params = mapOf(
+                    "jobId" to jobId,
+                    "toColumn" to toColumn,
+                    "expectedRevision" to normalizedRevision,
+                    "idempotencyKey" to (req["idempotencyKey"]?.toString() ?: "lcnc#$jobId#$revision#$toColumn"),
+                ),
+            )
+            val result = lcncRegistry.getValue("kanban.move").run(node, emptyMap())
+            JvmKanbanServer.HttpResponse(if (result["accepted"] == true) 202 else 409, JsonSupport.stringify(result))
+        }
+
         return object : ModuleHandle {
             override val id: String = "kanban"
 
             override fun describe(): Map<String, Any?> = mapOf(
                 "cards" to store.cards().size,
                 "sequence" to store.lastSequence,
-                "routes" to listOf("/api/board", "/api/invoke", "/api/board/import"),
+                "routes" to listOf(
+                    "/api/board", "/api/invoke", "/api/board/import",
+                    "/api/lcnc/kanban", "/api/lcnc/kanban/move",
+                ),
             )
 
             override suspend fun drain() {

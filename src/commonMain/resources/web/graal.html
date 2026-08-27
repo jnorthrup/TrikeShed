@@ -150,7 +150,7 @@ html[data-skin="marker"] #crumb{text-shadow:none}
   <div class="chip" id="cHermes" onclick="hermesRunner()" style="cursor:pointer"><b>VT220</b><span>hermes vm</span></div>
 </div>
 <div id="river"></div>
-<div class="panel" id="doc"><header><b id="docTitle">document</b><span class="x" onclick="hide('doc')">✕</span></header><div class="body"><div id="docBody"></div></div></div>
+<div class="panel" id="doc"><header><b id="docTitle">document</b><span><span class="x" id="docSheetsBtn" onclick="toggleSheetView()" title="grid-in-cell sheet family (CursorSheet)" style="margin-right:10px">▤ sheets</span><span class="x" onclick="hide('doc')">✕</span></span></header><div class="body"><div id="docBody"></div><div id="docSheetBody" style="display:none"></div></div></div>
 <div class="panel" id="points"><header><b>pointcut routes</b><span class="x" onclick="hide('points')">✕</span></header><div class="body" id="pointsBody"></div></div>
 <div class="panel" id="vms"><header><b>graal sub-vms</b><span class="x" onclick="hide('vms')">✕</span></header><div class="body" id="vmsBody"></div></div>
 <div class="panel" id="sheet"><header><b id="sheetTitle">tree sheet</b><span class="x" onclick="hide('sheet')">✕</span></header><div class="body" id="sheetBody"></div></div>
@@ -890,7 +890,9 @@ function shapeStripHtml(text){
 function jumpLine(n){const cv=document.querySelector('#proj .codeview');if(!cv)return;
   const row=cv.children[n-1];if(row){row.scrollIntoView({block:'center'});row.style.outline='1px solid var(--commit)';setTimeout(()=>row.style.outline='',1200);}}
 async function openDoc(id){
-  $('docTitle').textContent=id.split('/').pop();$('docBody').innerHTML='…';show('doc');
+  $('docTitle').textContent=id.split('/').pop();$('docBody').innerHTML='…';$('docBody').style.display='';
+  $('docSheetBody').style.display='none';$('docSheetBody').innerHTML='';sheetFamily=null;sheetCurrentId=null;
+  show('doc');
   sel=nodeFor(id);selEdges=[];
   // the forge PRODUCT projects from its own payload, not the couch harness
   const pd=productDocs.get(id);
@@ -939,6 +941,47 @@ async function openDoc(id){
         selEdges.slice(0,20).map((e,i)=>'<span class="dagchip" onclick="openDoc(selEdges['+i+'].id)">'+e.kind+' → …'+esc(e.id.slice(-38))+'</span>').join('');
       $('docBody').appendChild(div);
     }}catch(e){}
+}
+/* ── concentric treesheet: /api/graal/sheet's family, grid-in-cell, live ──
+   This is CursorSheet (borg/trikeshed/forge/sheet/CursorSheet.kt) — a sheet
+   is a grid whose cells are scalars or refs to another sheet. The whole
+   family for one document comes back in ONE fetch; navigating a ref cell is
+   local array lookup + re-render, no round trip per level. */
+let sheetFamily=null,sheetCurrentId=null;
+async function toggleSheetView(){
+  const db=$('docBody'),sb=$('docSheetBody');
+  if(sb.style.display!=='none'){sb.style.display='none';db.style.display='';return;}
+  const id=sel&&sel.id;
+  if(!id){sb.style.display='block';db.style.display='none';sb.innerHTML='<div style="color:var(--dim)">no document selected</div>';return;}
+  db.style.display='none';sb.style.display='block';sb.innerHTML='…loading sheet family…';
+  try{
+    const resp=await fetch('/api/graal/sheet?id='+encodeURIComponent(id));
+    if(!resp.ok){sb.innerHTML='<div style="color:var(--deopt)">sheet fetch failed: '+resp.status+'</div>';return;}
+    sheetFamily=await resp.json();
+    sheetCurrentId=sheetFamily[0]&&sheetFamily[0].id;
+    renderSheetFamily();
+  }catch(e){sb.innerHTML='<div style="color:var(--deopt)">'+esc(String(e))+'</div>';}
+}
+function sheetById(id){return (sheetFamily||[]).find(s=>s.id===id);}
+function renderSheetFamily(){
+  const sb=$('docSheetBody');const seed=sheetById(sheetCurrentId);
+  if(!seed){sb.textContent='no sheet';return;}
+  const crumb=[];let cur=seed;
+  while(cur){crumb.unshift(cur);cur=cur.parent?sheetById(cur.parent):null;}
+  let html='<div style="margin-bottom:6px;font-size:10px;color:var(--dim)">'+
+    crumb.map((s,i)=>'<span style="cursor:pointer;color:'+(i===crumb.length-1?'var(--ink)':'var(--commit)')+'" onclick="sheetCurrentId='+JSON.stringify(s.id)+';renderSheetFamily()">'+esc(s.title)+'</span>').join(' <span style="color:var(--dim)">▸</span> ')+
+    '</div>';
+  if(!seed.rows.length){html+='<div style="color:var(--dim)">empty sheet</div>';}
+  else html+='<table><tr>'+seed.columns.map(c=>'<th>'+esc(c.name)+'</th>').join('')+'</tr>'+
+    seed.rows.map(row=>'<tr>'+row.map(cell=>{
+      if(cell&&typeof cell==='object'&&cell.sheet){
+        const child=sheetById(cell.sheet);
+        return '<td><span class="dagchip" onclick="sheetCurrentId='+JSON.stringify(cell.sheet)+';renderSheetFamily()">▤ '+esc(child?child.title:cell.sheet)+'</span></td>';
+      }
+      return '<td>'+esc(cell===null||cell===undefined?'':String(cell))+'</td>';
+    }).join('')+'</tr>').join('')+
+    '</table>';
+  sb.innerHTML=html;
 }
 async function projectBytes(id,ct,ext){
   const proj=document.getElementById('proj');if(!proj)return;

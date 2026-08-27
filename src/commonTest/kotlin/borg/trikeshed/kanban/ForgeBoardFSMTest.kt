@@ -26,7 +26,10 @@ class ForgeBoardFSMTest {
         val state = ForgeBoardFSM.current()
         assertNotNull(state.activeBoard, "active board must be set after loadDefault")
         assertEquals("Forge Board", state.activeBoard!!.name)
-        assertEquals(4, state.activeBoard!!.columns.size)
+        // W6.6: the default board carries the full closed vocabulary
+        // (BoardCol.entries), not a locally curated subset — see
+        // BoardVocabularyConsistencyTest.loadDefaultBoardUsesOnlyCanonicalColumnIds.
+        assertEquals(BoardCol.entries.size, state.activeBoard!!.columns.size)
         assertTrue(state.activeBoard!!.cards.isNotEmpty())
     }
 

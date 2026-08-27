@@ -24,7 +24,7 @@ data class ModelResponseReceipt(
     val receiptId: String,                 // mrec-<uuid> (Monotonic filename-safe id)
     val modelId: String,                   // routed model
     val providerId: String,                // provider card id
-    val requestHash: String,               // hashCode of encoded request body
+    val requestHash: String,               // ContentId over the canonical encoded request body
     val assessmentId: String? = null,      // ModelCallDescriptor.id when dispatched from kanban
     val sessionId: String? = null,         // LlmSession.sessionId when LlmSession is id'd
     val action: String,                    // "chat" | "stream" | "embed"
@@ -33,6 +33,8 @@ data class ModelResponseReceipt(
     val inputTokens: Int,                  // from AcpUsage.usage.prompt_tokens
     val outputTokens: Int,                 // from AcpUsage.usage.completion_tokens
     val cachedHit: Boolean,                 // true if served from MuxReactorElement cache
+    val cacheReadTokens: Int = 0,           // tokens billed at cache-read rate (0 = unknown/not reported)
+    val cacheWriteTokens: Int = 0,          // tokens written to the provider's prompt cache (0 = unknown/not reported)
     val errorClass: String? = null,         // exception class name on failure
     val errorMessage: String? = null,       // exception message (truncated 500)
     val capturedAt: Long,                  // epoch ms when the receipt was minted
@@ -54,6 +56,8 @@ data class ModelResponseReceipt(
             append(",\"inputTokens\":").append(inputTokens)
             append(",\"outputTokens\":").append(outputTokens)
             append(",\"cachedHit\":").append(cachedHit)
+            if (cacheReadTokens != 0) { append(",\"cacheReadTokens\":").append(cacheReadTokens) }
+            if (cacheWriteTokens != 0) { append(",\"cacheWriteTokens\":").append(cacheWriteTokens) }
             if (errorClass != null) { append(",\"errorClass\":\"").append(esc(errorClass)).append('"') }
             if (errorMessage != null) { append(",\"errorMessage\":\"").append(esc(errorMessage)).append('"') }
             append(",\"capturedAt\":").append(capturedAt)
@@ -74,6 +78,8 @@ data class ModelResponseReceipt(
             cachedHit: Boolean = false,
             assessmentId: String? = null,
             sessionId: String? = null,
+            cacheReadTokens: Int = 0,
+            cacheWriteTokens: Int = 0,
             error: Throwable? = null,
         ): ModelResponseReceipt = ModelResponseReceipt(
             receiptId = defaultSecureIdGenerator.generateHexId("mrec", 8),
@@ -88,6 +94,8 @@ data class ModelResponseReceipt(
             inputTokens = inputTokens,
             outputTokens = outputTokens,
             cachedHit = cachedHit,
+            cacheReadTokens = cacheReadTokens,
+            cacheWriteTokens = cacheWriteTokens,
             errorClass = error?.let { it::class.simpleName },
             errorMessage = error?.message?.take(500),
             capturedAt = kotlinx.datetime.Clock.System.now().toEpochMilliseconds(),

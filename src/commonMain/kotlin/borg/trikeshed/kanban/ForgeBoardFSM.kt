@@ -198,24 +198,24 @@ object ForgeBoardFSM {
 
     /** Load a default board. Convenience for bootstrap. */
     fun loadDefault() {
-        val backlog = KanbanColumnId("col-backlog")
-        val inprog  = KanbanColumnId("col-inprogress")
-        val review  = KanbanColumnId("col-review")
-        val done    = KanbanColumnId("col-done")
+        // W6.6: the board carries the FULL closed vocabulary — BoardCol.entries,
+        // all seven lanes — never a locally hardcoded subset that can drift.
+        // (See BoardVocabularyConsistencyTest.loadDefaultBoardUsesOnlyCanonicalColumnIds:
+        // the default board's columns ARE BoardCol.entries, set-equal, not a curated four.)
+        val cols = BoardCol.columns()
+        val backlog = cols.first { it.id.value == BoardCol.TRIAGE.wire }.id
+        val inprog  = cols.first { it.id.value == BoardCol.RUNNING.wire }.id
+        val blocked = cols.first { it.id.value == BoardCol.BLOCKED.wire }.id
+        val done    = cols.first { it.id.value == BoardCol.DONE.wire }.id
         val board = KanbanBoard(
             id = KanbanBoardId("board-default"),
             name = "Forge Board",
-            columns = listOf(
-                KanbanColumn(backlog, "Backlog",     0),
-                KanbanColumn(inprog,  "In Progress", 1, wipLimit = 3),
-                KanbanColumn(review,  "Review",      2),
-                KanbanColumn(done,    "Done",        3),
-            ),
+            columns = cols,
             cards = listOf(
                 KanbanCard(KanbanCardId("c1"), "Setup CI pipeline",         columnId = backlog, priority = CardPriority.HIGH),
                 KanbanCard(KanbanCardId("c2"), "Add user authentication",   columnId = backlog),
                 KanbanCard(KanbanCardId("c3"), "Implement API gateway",     columnId = inprog,  priority = CardPriority.CRITICAL),
-                KanbanCard(KanbanCardId("c4"), "Code review: HTX client",   columnId = review,  priority = CardPriority.HIGH),
+                KanbanCard(KanbanCardId("c4"), "Code review: HTX client",   columnId = blocked, priority = CardPriority.HIGH),
                 KanbanCard(KanbanCardId("c5"), "Initial commit",            columnId = done,    priority = CardPriority.LOW),
                 KanbanCard(KanbanCardId("c6"), "Fix login bug",             columnId = backlog, priority = CardPriority.HIGH),
             ),

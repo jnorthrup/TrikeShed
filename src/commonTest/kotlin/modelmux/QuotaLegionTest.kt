@@ -16,6 +16,7 @@ import borg.trikeshed.lib.j
 import borg.trikeshed.lib.size
 import borg.trikeshed.lib.toList
 import borg.trikeshed.lib.toSeries
+import borg.trikeshed.job.ContentId
 import borg.trikeshed.modelmux.ModelResponseReceipt
 import borg.trikeshed.userspace.reactor.MuxReactorElement
 import borg.trikeshed.userspace.reactor.MuxKeyStatus
@@ -165,11 +166,64 @@ class QuotaLegionTest {
             models.chat("gpt-4", _s["user" j "hi"].toSeries())
         }
         assertTrue(result.isSuccess)
-        // the resolved key value ("sk-test") is the legion's ledger key in standalone mode
+        // metering keys on the resolved key ID (the binding path), never the
+        // secret value the source returns
         val reactor = MuxReactorElement()
-        reactor.recordAccess("sk-test", "gpt-4")
+        reactor.recordAccess("llm.gpt-4.key", "gpt-4")
         val standing = legion.standings(reactor.flowState.value, kotlinx.datetime.Clock.System.now().toEpochMilliseconds())[0]
         assertEquals(10L, standing.spent, "chat receipt tokens must be metered into the legion")
         htx.close()
+    }
+
+    @Test
+    fun modelMuxChatMetersTaggedProviderUnderProviderTagKey() = runTest {
+        // Before the keyId fix, chat() resolved the key VALUE and used it as the
+        // ledger key; a provider-tagged card resolves no `llm.<modelId>.key`
+        // binding, so tagged providers metered under null — receipts fell on
+        // the floor. The fix routes metering through the same providerTag
+        // fallback chain session() uses.
+        val fakeService = object : HtxRouteService {
+            override suspend fun exchange(state: HtxExchangeState, request: HtxRequest): HtxExchangeResult {
+                val response = HtxResponse(
+                    status = 200,
+                    body = ByteSeries(
+                        """{"choices":[{"message":{"content":"ok"}}],"usage":{"prompt_tokens":6,"completion_tokens":4}}""".encodeToByteArray(),
+                    ),
+                )
+                return HtxExchangeResult(state.copy(lifecycle = HtxExchangeLifecycle.RESPONDED, request = request, response = response))
+            }
+        }
+        val htx = openHtxElement(routeService = fakeService)
+        val legion = QuotaLegion(windowMs = 60_000, defaultLimit = 1000)
+        val keyMux = KeyMux { bind("llm.nvidia.key", TestKeySource()) }
+        val models = ModelMux(keyMux) {
+            model("deepseek-ai/deepseek-v4-pro", caps = setOf("chat"), provider = "nvidia")
+            quota(legion)
+        }
+        val result = withContext(coroutineContext + htx) {
+            models.chat("deepseek-ai/deepseek-v4-pro", _s["user" j "hi"].toSeries())
+        }
+        assertTrue(result.isSuccess, "tagged provider must open a session via its pooled credential")
+        val reactor = MuxReactorElement()
+        reactor.recordAccess("llm.nvidia.key", "nvidia")
+        val standing = legion.standings(reactor.flowState.value, kotlinx.datetime.Clock.System.now().toEpochMilliseconds())[0]
+        assertEquals(10L, standing.spent, "tagged provider receipts must meter under llm.<providerTag>.key")
+        htx.close()
+    }
+
+    @Test
+    fun requestHashIsContentAddressedNotHashCode() = runTest {
+        // Two distinct request bodies must never share a cache slot: the old
+        // 32-bit hashCode invited collisions that returned the WRONG cached
+        // payload verbatim. ContentId over canonical bytes is sha256.
+        val h1 = ContentId.of("""{"model":"a","messages":[]}""".encodeToByteArray()).value
+        val h2 = ContentId.of("""{"model":"b","messages":[]}""".encodeToByteArray()).value
+        assertTrue(h1.startsWith("sha256:") && h2.startsWith("sha256:"))
+        assertTrue(h1 != h2, "distinct requests must hash distinctly")
+        assertEquals(
+            ContentId.of("""{"model":"a","messages":[]}""".encodeToByteArray()).value,
+            h1,
+            "identical requests must hash identically (cache affinity depends on it)",
+        )
     }
 }

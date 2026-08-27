@@ -12,7 +12,9 @@ data class ModelCatalogEntry(
     val model: String,
     val freeTier: Boolean,
     val quotaRemaining: Int,
-    val latencyEstimateMs: Int
+    val latencyEstimateMs: Int,
+    /** Prompt-token price the provider quoted; null = unknown (discovery refuses to invent). */
+    val pricePerMillionPromptTokens: Double? = null,
 )
 
 class ModelCatalog(val entries: Series<ModelCatalogEntry>) : Cursor {
@@ -24,22 +26,24 @@ class ModelCatalog(val entries: Series<ModelCatalogEntry>) : Cursor {
     private val freeTierMeta = ColumnMeta("freeTier", IOMemento.IoBoolean, null)
     private val quotaMeta = ColumnMeta("quotaRemaining", IOMemento.IoInt, null)
     private val latencyMeta = ColumnMeta("latencyEstimateMs", IOMemento.IoInt, null)
+    private val priceMeta = ColumnMeta("pricePerMillionPromptTokens", IOMemento.IoDouble, null)
 
     override val b: (Int) -> RowVec
         get() = { rowIdx ->
             val entry = entries.b(rowIdx)
-            5 j { colIdx ->
+            6 j { colIdx ->
                 when (colIdx) {
                     0 -> entry.provider j { providerMeta }
                     1 -> entry.model j { modelMeta }
                     2 -> entry.freeTier j { freeTierMeta }
                     3 -> entry.quotaRemaining j { quotaMeta }
                     4 -> entry.latencyEstimateMs j { latencyMeta }
+                    5 -> (entry.pricePerMillionPromptTokens ?: 0.0) j { priceMeta }
                     else -> error("Invalid column index: $colIdx")
                 }
             }
         }
-        
+
     fun cacheHits(predicate: (ModelCatalogEntry) -> Boolean): Cursor {
         val hits = (0 until entries.a).filter { predicate(entries.b(it)) }
         return ModelCatalog(hits.size j { i -> entries.b(hits[i]) })

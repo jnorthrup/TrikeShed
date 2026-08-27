@@ -10,6 +10,7 @@ import borg.trikeshed.userspace.reactor.MuxReactorElement
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.emptyFlow
+import kotlinx.coroutines.sync.withLock
 
 /** Lazy iterable — delegates to Series.view, no eager size-N List. */
 fun <T> Series<T>.iterable(): Iterable<T> = view
@@ -229,7 +230,9 @@ class FixedKeySource(
  * Model listings and provider keys change infrequently — caching for [ttlMs]
  * (default 24 hours) avoids re-resolving env/persist/API on every chat call.
  *
- * Thread-safe: reads are lock-free (atomic snapshot), writes use synchronized.
+ * Thread-safe via [Mutex] (every method here is already `suspend`), not JVM
+ * `synchronized`/`ConcurrentHashMap` — this stays a legal commonMain
+ * `KeySource`, compiling for JVM, JS, and Wasm from one source.
  */
 class CachedKeySource(
     private val delegate: KeySource,
@@ -238,36 +241,36 @@ class CachedKeySource(
 ) : KeySource() {
     private data class Entry(val value: String?, val resolvedAt: Long)
 
-    private val cache = java.util.concurrent.ConcurrentHashMap<String, Entry>()
+    private val lock = kotlinx.coroutines.sync.Mutex()
+    private val cache = mutableMapOf<String, Entry>()
+
+    private fun nowMs(): Long = kotlinx.datetime.Clock.System.now().toEpochMilliseconds()
 
     override suspend fun read(path: KeyPath): String? {
         val key = path.asString()
-        val entry = cache[key]
-        if (entry != null && System.currentTimeMillis() - entry.resolvedAt < ttlMs) {
-            return entry.value
+        val now = nowMs()
+        lock.withLock { cache[key] }?.let { entry ->
+            if (now - entry.resolvedAt < ttlMs) return entry.value
         }
         val value = delegate.read(path)
-        cache[key] = Entry(value, System.currentTimeMillis())
+        lock.withLock { cache[key] = Entry(value, now) }
         return value
     }
 
     override suspend fun write(path: KeyPath, value: String) {
         delegate.write(path, value)
-        cache.remove(path.asString())
+        lock.withLock { cache.remove(path.asString()) }
     }
 
     override suspend fun invalidate() {
-        cache.clear()
+        lock.withLock { cache.clear() }
         delegate.invalidate()
     }
 
     /** Evict entries older than [ageMs]. Useful for selective refresh. */
-    fun evictStale(ageMs: Long = ttlMs) {
-        val now = System.currentTimeMillis()
-        val iter = cache.entries.iterator()
-        while (iter.hasNext()) {
-            if (now - iter.next().value.resolvedAt >= ageMs) iter.remove()
-        }
+    suspend fun evictStale(ageMs: Long = ttlMs) {
+        val now = nowMs()
+        lock.withLock { cache.entries.retainAll { now - it.value.resolvedAt < ageMs } }
     }
 }
 

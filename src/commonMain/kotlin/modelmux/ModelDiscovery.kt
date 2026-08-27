@@ -26,6 +26,8 @@ data class DiscoveredModel(
     val contextWindow: Int = 0,
     val freeTier: Boolean = false,
     val latencyEstimateMs: Int = 0,
+    /** Provider-quoted prompt price per token, or null when unquoted. */
+    val pricePerPromptToken: Double? = null,
 )
 
 /**
@@ -54,7 +56,14 @@ object ModelDiscovery {
             val contextWindow = (m["context_length"] as? Number)?.toInt()
                 ?: (m["context_window"] as? Number)?.toInt()
                 ?: 0
-            out.add(DiscoveredModel(provider, id, contextWindow, isFree(id, m["pricing"])))
+            val pricing = m["pricing"] as? Map<*, *>
+            val promptPrice = pricing?.get("prompt")?.toString()?.toDoubleOrNull()
+            out.add(
+                DiscoveredModel(
+                    provider, id, contextWindow, isFree(id, pricing),
+                    pricePerPromptToken = promptPrice,
+                )
+            )
         }
         return out.toSeries()
     }
@@ -109,6 +118,7 @@ object ModelDiscovery {
             freeTier = d.freeTier,
             quotaRemaining = quotaOf(d),
             latencyEstimateMs = d.latencyEstimateMs,
+            pricePerMillionPromptTokens = d.pricePerPromptToken?.let { it * 1_000_000.0 },
         )
     }
 }

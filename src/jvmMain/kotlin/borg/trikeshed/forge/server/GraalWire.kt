@@ -83,6 +83,7 @@ class GraalWire(
             method == "GET" && p == "/api/graal/vitals" -> JvmKanbanServer.HttpResponse(200, JsonSupport.stringify(vitals.snapshot() + ("pointcuts" to pointcutSummary())))
             method == "GET" && p == "/api/graal/pointcuts" -> JvmKanbanServer.HttpResponse(200, JsonSupport.stringify(mapOf("routes" to pointcutRoutes())))
             method == "GET" && p == "/api/graal/map" -> JvmKanbanServer.HttpResponse(200, JsonSupport.stringify(mapMap()))
+            method == "GET" && p == "/api/graal/sheet" -> withContext(Dispatchers.IO) { sheetRoute(path) }
             method == "GET" && p == "/api/graal/dag" -> {
                 val q = borg.trikeshed.utils.rfxhttp.CouchHttpSurface.parseQuery(path.substringAfter('?', ""))
                 JvmKanbanServer.HttpResponse(200, JsonSupport.stringify(q["id"]?.let { dagFor(it) } ?: dagHubs()))
@@ -168,6 +169,39 @@ class GraalWire(
             "dbs" to projectDbs?.all().orEmpty().map { it.name },
             "at" to System.currentTimeMillis(),
         )
+    }
+
+    /**
+     * `/api/graal/sheet?id=<docId>` — the live wiring [borg.trikeshed.forge.sheet.CursorSheet]
+     * never had. `id=vms` returns the sub-VM sheet (already served flat at `/api/vm`, offered
+     * here too so one client can navigate both families the same way); any other id is treated
+     * as a couch document, parsed as Confix, and returned as its FULL nested sheet family — every
+     * object/array field is a [borg.trikeshed.forge.sheet.SheetRef] cell the client can drill
+     * into, grid-in-cell, to whatever depth the document actually nests. This is the concentric
+     * treesheet PRELOAD/CursorSheet already specify; nothing before this route ever served it.
+     */
+    private fun sheetRoute(path: String): JvmKanbanServer.HttpResponse {
+        val q = borg.trikeshed.utils.rfxhttp.CouchHttpSurface.parseQuery(path.substringAfter('?', ""))
+        val id = q["id"] ?: return JvmKanbanServer.HttpResponse(400, """{"error":"id required"}""")
+
+        if (id == "vms") {
+            val host = vmHost ?: return JvmKanbanServer.HttpResponse(503, """{"error":"no sub-VM host mounted"}""")
+            val columns = borg.trikeshed.vm.VM_COLUMNS.map { borg.trikeshed.forge.sheet.SheetColumn(it.first, it.second.name) }
+            val sheet = borg.trikeshed.forge.sheet.sheetSeed("vms", "Sub-VMs", host.rows(), columns = columns)
+            return JvmKanbanServer.HttpResponse(200, JsonSupport.stringify(listOf(sheet.toMap())))
+        }
+
+        val store = couchStore ?: return JvmKanbanServer.HttpResponse(503, """{"error":"store not wired"}""")
+        val doc = store.get(id) ?: return JvmKanbanServer.HttpResponse(404, """{"error":"no such document","id":"$id"}""")
+        val fields = linkedMapOf<String, Any?>()
+        for (f in doc.fields) if (!f.name.startsWith("_")) fields[f.name] = f.value
+        val confix = runCatching {
+            borg.trikeshed.parse.confix.confixDoc(JsonSupport.stringify(fields))
+        }.getOrElse {
+            return JvmKanbanServer.HttpResponse(502, """{"error":"document did not parse as confix","detail":"${it.message}"}""")
+        }
+        val family = borg.trikeshed.forge.sheet.confixSheets(id, id, confix)
+        return JvmKanbanServer.HttpResponse(200, JsonSupport.stringify(family.map { it.toMap() }))
     }
 
     /**

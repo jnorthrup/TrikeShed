@@ -4,6 +4,7 @@ import keymux.*
 import modelmux.acp.*
 import borg.trikeshed.lib.*
 import borg.trikeshed.htx.*
+import borg.trikeshed.job.ContentId
 import borg.trikeshed.userspace.reactor.MuxReactorElement
 import borg.trikeshed.userspace.reactor.CacheLookup
 import borg.trikeshed.modelmux.ModelResponseReceipt
@@ -176,6 +177,22 @@ class ModelMux internal constructor(
     }
 
     /**
+     * Resolve the key ID (binding path) a call for [card] meters under, through
+     * the SAME fallback chain [session] uses to resolve the key VALUE:
+     * provider tag → model id → default. Never returns the secret itself —
+     * the returned string is the binding path (`llm.<provider>.key`), which is
+     * the ledger identity quota metering keys on. Null = no binding resolves,
+     * i.e. the same condition under which [session] refuses to open.
+     */
+    private suspend fun resolveKeyId(card: AcpModelCard): String? {
+        val providerTag = card.providerTag
+        if (providerTag != null && keyMux.get("llm.$providerTag.key") != null) return "llm.$providerTag.key"
+        if (keyMux.get("llm.${card.id}.key") != null) return "llm.${card.id}.key"
+        if (keyMux.get("llm.default.key") != null) return "llm.default.key"
+        return null
+    }
+
+    /**
      * Route to the best model for a given action + capabilities.
      *
      * This is the selection point. The result is a ranked candidate list, and its head is the
@@ -228,7 +245,10 @@ class ModelMux internal constructor(
         val session = sessionResult.getOrThrow()
         session.activate()
         val reactor = currentCoroutineContext()[MuxReactorElement.Key]
-        val keyId = keyMux.get("llm.$modelId.key")
+        // Meter under the resolved key ID (the binding path), not the key VALUE
+        // — the value is the secret, and it bypassed the providerTag chain
+        // session() honours, so tagged providers metered under null.
+        val keyId = resolveKeyId(session.model.b)
         val t0 = kotlinx.datetime.Clock.System.now().toEpochMilliseconds()
         var httpStatus = 0
         var cachedHit = false
@@ -241,7 +261,10 @@ class ModelMux internal constructor(
             val req: AcpRequest = meta j body
 
             val json = AcpCodec.encodeRequest(req, maxTokens = maxTokens, temperature = temperature)
-            val requestHash = json.hashCode().toString()
+            // Content-address the canonical request bytes. String.hashCode() is a
+            // 32-bit truncation: two distinct requests colliding on it returned each
+            // other's cached payload verbatim.
+            val requestHash = ContentId.of(json.encodeToByteArray()).value
 
             if (reactor != null) {
                 val lookup = reactor.lookupApiCall(provider = card.id, modelId = modelId, requestHash = requestHash, ttlMs = 3600_000)
@@ -257,6 +280,7 @@ class ModelMux internal constructor(
                             action = "chat", httpStatus = 200, latencyMs = kotlinx.datetime.Clock.System.now().toEpochMilliseconds() - t0,
                             inputTokens = inputTokens, outputTokens = outputTokens, cachedHit = true,
                             assessmentId = assessmentId, sessionId = session.sessionId,
+                            cacheReadTokens = inputTokens, cacheWriteTokens = 0,
                         )
                     )
                     return Result.success(cached)
@@ -301,6 +325,7 @@ class ModelMux internal constructor(
                     action = "chat", httpStatus = httpStatus, latencyMs = kotlinx.datetime.Clock.System.now().toEpochMilliseconds() - t0,
                     inputTokens = inputTokens, outputTokens = outputTokens, cachedHit = false,
                     assessmentId = assessmentId, sessionId = session.sessionId,
+                    cacheWriteTokens = inputTokens,
                 )
             )
             return Result.success(parsed)
@@ -401,7 +426,7 @@ class ModelMux internal constructor(
             val textsJson = (0 until texts.size).joinToString(",") { jsonStr(texts[it]) }
             val json = "{\"model\":\"${card.id}\",\"input\":[$textsJson]}"
 
-            val requestHash = json.hashCode().toString()
+            val requestHash = ContentId.of(json.encodeToByteArray()).value
             if (reactor != null) {
                 val lookup = reactor.lookupApiCall(provider = card.id, modelId = modelId, requestHash = requestHash, ttlMs = 3600_000)
                 if (lookup is CacheLookup.Hit) {
@@ -489,8 +514,20 @@ class ModelMuxBuilder(private val keyMux: KeyMux) {
     private val models = mutableListOf<ModelEntry>()
     private var quotaLegion: QuotaLegion? = null
 
+    init {
+        // The legion is constructed by default: receipts metered into it on every
+        // chat. An explicit `.quota(...)` replaces it; `.noQuota()` restores the
+        // standalone behaviour of dropping receipts. Before this default, the
+        // legion was built in tests only — every production receipt fell on the
+        // floor and quota metering never ran.
+        quotaLegion = QuotaLegion()
+    }
+
     /** Attach a quota legion to meter every non-cached chat receipt. */
     fun quota(legion: QuotaLegion): ModelMuxBuilder = apply { quotaLegion = legion }
+
+    /** Detach metering — receipts are produced but never applied to a ledger. */
+    fun noQuota(): ModelMuxBuilder = apply { quotaLegion = null }
 
     fun model(
         id: String,
