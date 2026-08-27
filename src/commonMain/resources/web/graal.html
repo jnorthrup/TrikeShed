@@ -108,6 +108,17 @@ canvas.spark{display:block;margin-top:3px}
 #vtInput{flex:1;background:transparent;border:0;outline:0;color:#eafcea;font:12px "SF Mono","JetBrains Mono",ui-monospace,monospace}
 #vt.dead #vtScroll{color:#f7c5c5}
 #aot{right:320px;top:78px;width:560px;max-height:74%}
+#gc{right:320px;top:78px;width:560px;max-height:74%}
+#zoom{left:10px;top:78px;width:480px;max-height:74%}
+.lanepool{display:flex;align-items:center;gap:8px;padding:3px 0;border-bottom:1px solid var(--line)}
+.lanepool .nm{width:120px;color:var(--dim);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.lanepool .track{flex:1;height:9px;background:var(--line);border-radius:2px;overflow:hidden;position:relative}
+.lanepool .track i{position:absolute;top:0;bottom:0;border-radius:2px}
+.lanepool .track .used{background:var(--gc)}
+.lanepool .track .recl{background:var(--compile)}
+.lanepool .num{width:150px;text-align:right;color:var(--ink);font-variant-numeric:tabular-nums}
+.gcphase{display:flex;justify-content:space-between;padding:3px 0;color:var(--dim)}
+.gcphase b{color:var(--ink);font-variant-numeric:tabular-nums}
 #sheet td:first-child{white-space:pre}
 .dagchip{display:inline-block;border:1px solid var(--line);border-radius:3px;padding:0 6px;margin:2px 3px 0 0;cursor:pointer;font-size:10px}
 .dagchip:hover{border-color:var(--commit);color:var(--commit)}
@@ -156,6 +167,8 @@ html[data-skin="marker"] #crumb{text-shadow:none}
 <div class="panel" id="sheet"><header><b id="sheetTitle">tree sheet</b><span class="x" onclick="hide('sheet')">✕</span></header><div class="body" id="sheetBody"></div></div>
 <div class="panel" id="ledger"><header><b id="ledgerTitle">ledger</b><span class="x" onclick="hide('ledger')">✕</span></header><div class="body" id="ledgerBody"></div></div>
 <div class="panel" id="aot"><header><b>HotSpot AOT cache</b><span class="x" onclick="hide('aot')">✕</span></header><div class="body" id="aotBody"></div></div>
+<div class="panel" id="gc"><header><b>gc lane — live occupancy</b><span class="x" onclick="hide('gc')">✕</span></header><div class="body" id="gcBody"></div></div>
+<div class="panel" id="zoom"><header><b>zoom / strength — bytes prove the grouping</b><span class="x" onclick="hide('zoom')">✕</span></header><div class="body" id="zoomBody"></div></div>
 <div id="notion"><div class="nhead"><input id="nfilter" placeholder="filter entries…"><span id="nscope"></span></div><div class="nbody" id="nbody"></div></div>
 <canvas id="mini" width="200" height="124"></canvas>
 <div id="crumb">loading terrain…</div>
@@ -197,11 +210,26 @@ function massOf(bytes,topName){const m=Math.log2(2+bytes);return VAULTS.has(topN
    (sortable, the hash can't do this); in POSITIONAL arrangement it splits by id path as before.
    The toggle itself is served state (T), never JS invention. */
 let maxSeq=1;
-let lastRows=null;
+let lastRows=null;         // the store terrain rows (from /api/graal/map)
+let heapRows=null;         // the heap continent rows (from /api/graal/heap)
 let ARRANGE=localStorage.getItem('arrange')||'positional';
-function toggleArrange(){ARRANGE=ARRANGE==='positional'?'similarity':'positional';localStorage.setItem('arrange',ARRANGE);if(lastRows)buildTree(lastRows);}
+/* R1: the heap continent — the JVM heap as a SECOND terrain source beside the store,
+   rendered through the SAME squarified treemap component (same row shape, different source).
+   `x` flips the terrain; /api/graal/heap supplies both continents in one fetch. */
+let HEAP_TERRAIN=(localStorage.getItem('heapTerrain')==='1');
+function activeRows(){return (HEAP_TERRAIN&&heapRows)?heapRows:(lastRows||[]);}
+function buildAll(){
+  const rows=activeRows();
+  if(!rows.length)return;
+  buildTree(rows);
+  $('crumb').textContent='terrain: '+(HEAP_TERRAIN?'JVM heap continent':'store')+
+    ' — '+rows.length.toLocaleString()+' rows · '+(HEAP_TERRAIN?'live-set + allocation, per class':'documents')+
+    ' · arrangement: '+ARRANGE+(HEAP_TERRAIN?' — x back to store':' — x for the heap continent');
+}
+function toggleArrange(){ARRANGE=ARRANGE==='positional'?'similarity':'positional';localStorage.setItem('arrange',ARRANGE);buildAll();}
+function toggleHeapTerrain(){HEAP_TERRAIN=!HEAP_TERRAIN;localStorage.setItem('heapTerrain',HEAP_TERRAIN?'1':'0');
+  if(HEAP_TERRAIN&&!heapRows)loadMap();else buildAll();}
 function buildTree(rows){
-  lastRows=rows;
   root=node('trikeshed',null);root.rect={x:0,y:0,w:W,h:H};byId=new Map();maxSeq=1;
   for(const row of rows){
     const [id,bytes,seq,gen,code]=row;
@@ -786,6 +814,9 @@ addEventListener('keydown',e=>{
   if(e.key==='b'||e.key==='B')cycleSkin();
   if(e.key==='m'||e.key==='M')cycleMode();
   if(e.key==='y'||e.key==='Y'){toggleArrange();$('crumb').textContent='arrangement: '+ARRANGE+(ARRANGE==='similarity'?' — split by AngularCodec rings (satellite)':' — split by id path (positional)');}
+  if(e.key==='x'||e.key==='X'){toggleHeapTerrain();}
+  if(e.key==='g'||e.key==='G'){toggleGc();}
+  if(e.key==='z'||e.key==='Z'){toggleZoom();}
   if(e.key==='f'||e.key==='F'){fog=!fog;$('crumb').textContent='fog of war: '+(fog?'ON — only active territories lit':'off');}
   if(e.key==='1'){layer=1;$('crumb').textContent='layer: plain terrain';}
   if(e.key==='2'){layer=2;$('crumb').textContent='layer: kolmogorov — green structured, red incompressible (measured lazily per tile)';}
@@ -1071,7 +1102,7 @@ function ledger(){
    there, just buried under an identically-positioned twin. show()/hide() are
    the only entry points now — every panel, and notion mode, route through
    them, so at most one of this concentric set is ever visible at once. */
-const EXCLUSIVE_PANELS=['doc','points','vms','sheet','ledger','aot'];
+const EXCLUSIVE_PANELS=['doc','points','vms','sheet','ledger','aot','gc','zoom'];
 function closeExclusivePanels(){
   for(const id of EXCLUSIVE_PANELS)$(id).style.display='none';
   if(mode==='notion'){mode='map';$('notion').style.display='none';}
@@ -1104,8 +1135,139 @@ async function pollVitals(){
     const mx=Math.max(1,...compHist);
     compHist.forEach((r,i)=>{const x=i*2,y=13-11*r/mx;i?sparkCtx.lineTo(x,y):sparkCtx.moveTo(x,y);});
     sparkCtx.stroke();
+    if($('gc').style.display==='flex')renderGcLane(gc);
   }catch(e){}
   setTimeout(pollVitals,2000);
+}
+/* ── R4 client: the GC lane — real occupancy deltas, not a single river line ──
+   Fed by the standing vitals poll (gc.lane = {heapOccupancy, pools, phases, allocation}).
+   Per-pool used bytes + cumulative reclaimed/grown as bars; the pause decomposed into
+   phases; the per-collection freed-bytes ring as a sparkline. Replaces the single
+   `gc · pause ms` river text line with the live lane widget the plan calls for. */
+function toggleGc(){const g=$('gc');if(g.style.display==='flex'){hide('gc');return;}
+  show('gc');renderGcLane(lastGcLane);}
+let lastGcLane=null;
+function renderGcLane(gc){
+  if(!gc){$('gcBody').innerHTML='<div style="color:var(--dim)">waiting for a GC…</div>';return;}
+  lastGcLane=gc.lane||{};
+  const lane=lastGcLane,occ=lane.heapOccupancy||{},pools=lane.pools||[],phases=lane.phases||[],alloc=lane.allocation||[];
+  const recent=occ.recentFreed||[],mx=Math.max(1,...recent.map(x=>Math.abs(x)));
+  let h='';
+  h+='<div style="color:var(--dim);margin-bottom:4px">whole heap · committed '+fmtBytes(occ.committedBytes||0)
+    +' · matched collections '+(occ.collectionsMatched||0)+' · avg freed/collection '+fmtBytes(occ.avgFreedBytes||0)+'</div>';
+  if(recent.length){
+    h+='<div style="color:var(--dim);margin:2px 0">freed per collection (last '+recent.length+')</div>'+
+      '<svg width="100%" height="34" style="display:block;background:var(--panel2);border-radius:3px">'+
+      recent.map((f,i)=>{const w=100/recent.length;
+        const x=i*w, top=32-Math.abs(f)/mx*30, hh=Math.max(1,Math.abs(f)/mx*30);
+        return '<rect x="'+x.toFixed(2)+'" y="'+top.toFixed(2)+'" width="'+(w*0.8).toFixed(2)+'" height="'+hh.toFixed(2)+'" fill="'+(f>=0?'var(--gc)':'var(--deopt)')+'" rx="1"/>';}).join('')+'</svg>';
+  }
+  h+='<div style="margin:8px 0 2px;color:var(--gc);font-size:10px;letter-spacing:.08em">POOLS · used / reclaimed / grown</div>';
+  if(!pools.length)h+='<div style="color:var(--dim)">no collection boundary yet</div>';
+  const pmx=Math.max(1,...pools.map(p=>p.lastUsedBytes||0));
+  for(const p of pools){
+    const usedFrac=Math.min(100,(p.lastUsedBytes||0)/pmx*100);
+    const recl=Math.min(100,(p.reclaimedBytes||0)/(pmx*2)*100);
+    h+='<div class="lanepool"><span class="nm">'+esc(p.pool)+'</span>'+
+       '<span class="track"><i class="recl" style="left:0;width:'+recl.toFixed(1)+'%;opacity:.5"></i>'+
+       '<i class="used" style="left:'+recl.toFixed(1)+'%;width:'+usedFrac.toFixed(1)+'%"></i></span>'+
+       '<span class="num">'+fmtBytes(p.lastUsedBytes||0)+' used · <span style="color:var(--compile)">−'+fmtBytes(p.reclaimedBytes||0)+'</span> · <span style="color:var(--deopt)">+'+fmtBytes(p.grownBytes||0)+'</span></span></div>';
+  }
+  h+='<div style="margin:10px 0 2px;color:var(--gc);font-size:10px;letter-spacing:.08em">PAUSE BY PHASE</div>';
+  if(!phases.length)h+='<div style="color:var(--dim)">no phase yet</div>';
+  const phmx=Math.max(1,...phases.map(p=>p.pauseMsTotal||0));
+  for(const p of phases.slice(0,14)){
+    const f=Math.min(100,(p.pauseMsTotal||0)/phmx*100);
+    h+='<div class="gcphase"><span>'+esc(p.phase)+' <span style="opacity:.6">×'+(p.count||0)+'</span></span>'+
+       '<span style="flex:1;margin:0 8px;background:var(--line);height:8px;border-radius:2px"><span style="display:block;height:100%;width:'+f.toFixed(1)+'%;background:var(--gc);border-radius:2px"></span></span>'+
+       '<b>'+(p.pauseMsTotal||0)+' ms</b></div>';
+  }
+  if(alloc.length){
+    h+='<div style="margin:10px 0 2px;color:var(--gc);font-size:10px;letter-spacing:.08em">ALLOCATION ATTRIBUTION (JFR sample) · top '+(alloc.length)+'</div>';
+    const amx=Math.max(1,...alloc.map(a=>a.bytes||0));
+    for(const a of alloc.slice(0,12)){
+      const f=Math.min(100,(a.bytes||0)/amx*100);
+      h+='<div class="gcphase"><span title="'+esc(a.class)+'">'+esc(a.class.length>40?a.class.slice(0,40)+'…':a.class)+'</span>'+
+         '<span style="flex:1;margin:0 8px;background:var(--line);height:8px;border-radius:2px"><span style="display:block;height:100%;width:'+f.toFixed(1)+'%;background:var(--cpu);border-radius:2px"></span></span>'+
+         '<b>'+fmtBytes(a.bytes||0)+'</b></div>';
+    }
+  }
+  $('gcBody').innerHTML=h;
+}
+/* ── R1 client: the zoom / strength pane — the bytes-prove-the-grouping pane ──
+   Two inputs: a code ring8 (→ /api/graal/zoom, representative cids + _cas byte links)
+   and a pair of cids (→ /api/graal/strength, linkMatch grades side by side).
+   Claim Check: the pane fetches real bytes from _cas to prove the grouping. */
+function toggleZoom(){$('zoom').style.display==='flex'?hide('zoom'):show('zoom');if($('zoomBody').innerHTML==='')zoomInit();}
+function zoomInit(){$('zoomBody').innerHTML=
+  '<div style="margin-bottom:6px"><b style="color:var(--dim);font-size:10px">ZOOM · code ring8 (hex or dec)</b><br>'+
+  '<input id="zoomCode" placeholder="e.g. 3f" style="width:90px;background:var(--panel2);border:1px solid var(--line);border-radius:4px;color:var(--ink);padding:3px 8px">'+
+  ' <span class="x" style="cursor:pointer" onclick="zoomGo()">→ ring</span></div>'+
+  '<div id="zoomOut" style="color:var(--dim)">enter a ring8 to see its representative fragments</div>'+
+  '<hr style="border:0;border-top:1px solid var(--line);margin:10px 0">'+
+  '<div style="margin-bottom:6px"><b style="color:var(--dim);font-size:10px">STRENGTH · two cids side by side</b><br>'+
+  '<input id="strA" placeholder="a cid" style="width:46%;background:var(--panel2);border:1px solid var(--line);border-radius:4px;color:var(--ink);padding:3px 8px">'+
+  '<input id="strB" placeholder="b cid" style="width:46%;background:var(--panel2);border:1px solid var(--line);border-radius:4px;color:var(--ink);padding:3px 8px">'+
+  ' <span class="x" style="cursor:pointer" onclick="strengthGo()">→ grade</span></div>'+
+  '<div id="strOut" style="color:var(--dim)">enter two cids to grade the match</div>'+
+  '<hr style="border:0;border-top:1px solid var(--line);margin:10px 0">'+
+  '<div style="margin-bottom:6px"><b style="color:var(--dim);font-size:10px">DENSITY · residual per aperture band (LineAperture → zoom bands)</b><br>'+
+  '<input id="dPath" placeholder="a doc id" style="width:46%;background:var(--panel2);border:1px solid var(--line);border-radius:4px;color:var(--ink);padding:3px 8px">'+
+  '<select id="dAperture" style="background:var(--panel2);border:1px solid var(--line);border-radius:4px;color:var(--ink);padding:3px 6px">'+
+  '<option value="L0">L0 macro</option><option value="L1">L1 region</option>'+
+  '<option value="L2" selected>L2 focus</option><option value="L3">L3 micro</option></select>'+
+  ' <span class="x" style="cursor:pointer" onclick="densityGo()">→ density</span></div>'+
+  '<div id="dOut" style="color:var(--dim)">enter a doc id to shade its residual density</div>';}
+  /* R1: per-ring density shading — residualDensity(probe, aperture) behind a route. */
+  async function densityGo(){
+  const p=($('dPath').value||'').trim();if(!p){$('dOut').textContent='enter a doc id';return;}
+  $('dOut').textContent='…';
+  try{const r=await (await fetch('/api/graal/density?path='+encodeURIComponent(p)+'&aperture='+$('dAperture').value)).json();
+   if(r.error){$('dOut').textContent='error: '+r.error;return;}
+   const tot=r.totals||{};
+   let h='<div style="margin-bottom:4px"><b>'+(r.regions||[]).length+'</b> regions · '+
+     'linked <b style="color:var(--commit)">'+tot.linked+'</b> · '+
+     'partial <b style="color:var(--warn)">'+tot.partial+'</b> · '+
+     'content-only <b style="color:var(--dim)">'+tot.contentOnly+'</b></div>';
+   (r.regions||[]).slice(0,32).forEach((rg,i)=>{
+     h+='<div style="display:flex;align-items:center;gap:6px;margin:2px 0">'+
+       '<span style="color:var(--dim);font-size:10px;min-width:44px">r'+rg.region+'</span>'+
+       '<div style="flex:1;height:8px;background:var(--panel2);border-radius:3px;position:relative;overflow:hidden">'+
+       '<div style="position:absolute;inset:0;width:'+Math.min(100,((rg.linked||0)*100)/Math.max(1,tot.linked+tot.partial+tot.contentOnly||1))+'%;background:var(--commit)"></div>'+
+       '</div>'+
+       '<span style="color:var(--dim);font-size:10px">'+rg.linked+'/'+rg.partial+'/'+rg.contentOnly+'</span></div>';
+   });
+   $('dOut').innerHTML=h;
+  }catch(e){$('dOut').textContent='density fetch failed: '+e;}
+  }
+async function zoomGo(){
+  const c=($('zoomCode').value||'').trim();if(!c){$('zoomOut').textContent='enter a ring8';return;}
+  $('zoomOut').textContent='…';
+  try{const r=await (await fetch('/api/graal/zoom?code='+encodeURIComponent(c))).json();
+    if(r.error){$('zoomOut').textContent='error: '+r.error;return;}
+    let h='<div style="color:var(--dim);margin-bottom:4px">ring8 '+r.ring8+' · '+r.docs+' docs · top '+(r.representatives||[]).length+' reps</div>';
+    for(const x of (r.representatives||[]).slice(0,24)){
+      h+='<div style="padding:2px 0;border-bottom:1px solid var(--line)"><span class="hashchip" title="'+esc(x.id)+'" onclick="navigator.clipboard&&navigator.clipboard.writeText(this.title)">'+esc(x.id.slice(0,44))+'…</span> '
+        +(x.structuralKey?'<span style="color:var(--dim)">'+esc(x.structuralKey.slice(0,28))+'</span>':'')
+        +'<a style="color:var(--commit);margin-left:6px" href="'+x.cas+'" target="_blank" rel="noopener">bytes</a></div>';
+    }
+    $('zoomOut').innerHTML=h;
+  }catch(e){$('zoomOut').textContent='zoom fetch failed: '+e;}
+}
+async function strengthGo(){
+  const a=($('strA').value||'').trim(),b=($('strB').value||'').trim();
+  if(!a||!b){$('strOut').textContent='enter two cids';return;}
+  $('strOut').textContent='…';
+  try{const r=await (await fetch('/api/graal/strength?a='+encodeURIComponent(a)+'&b='+encodeURIComponent(b))).json();
+    if(r.error){$('strOut').textContent='error: '+r.error;return;}
+    const color=r.confidence==='CONFIRMED'?'var(--compile)':r.confidence==='PROVISIONAL'?'var(--gc)':r.confidence==='CANDIDATE'?'var(--cpu)':'var(--deopt)';
+    $('strOut').innerHTML='<div style="font-size:15px;color:'+color+'">'+esc(r.confidence)+' <span style="color:var(--dim)">ramp '+(r.ramp||0)+'</span></div>'
+      +'<table class="kv">'
+      +'<tr><td>linked / partial / contentOnly</td><td>'+(r.linked||0)+' / '+(r.partial||0)+' / '+(r.contentOnly||0)+'</td></tr>'
+      +'<tr><td>proximity</td><td>'+esc(r.proximity||'')+'</td></tr>'
+      +'<tr><td>a bytes</td><td>'+fmtBytes(r.aBytes||0)+'</td></tr>'
+      +'<tr><td>b bytes</td><td>'+fmtBytes(r.bBytes||0)+'</td></tr></table>';
+  }catch(e){$('strOut').textContent='strength fetch failed: '+e;}
 }
 let vmSheet={columns:[],rows:[]};
 async function pollVms(){
@@ -1361,10 +1523,36 @@ async function loadMap(){
   try{const m=await (await fetch('/api/graal/map')).json();
     PROJECT_DBS=new Set(m.dbs||[]);
     const prod=await productRows();
-    buildTree((m.rows||[]).concat(prod));$('crumb').textContent='terrain: '+((m.rows||[]).length.toLocaleString())+' documents — wheel to dive';}
-  catch(e){$('crumb').textContent='map fetch failed: '+e;}
+    lastRows=(m.rows||[]).concat(prod);}
+  catch(e){}
+  try{const h=await (await fetch('/api/graal/heap')).json();heapRows=heapContinentRows(h);}catch(e){heapRows=heapRows||[];}
+  if(!lastRows.length)$('crumb').textContent='map fetch failed: '+(e||'empty');
+  buildAll();
   setTimeout(loadMap,30000);
 }
+/* R1: the JVM heap continent as treemap rows. Both continents from /api/graal/heap:
+   `rows` (per-class live-set, the GC class histogram) and `allocation` (JFR
+   ObjectAllocationSample, allocation-attributed). Mass = log2(bytes) like the store, so
+   a big class isn't drowned by 100k tiny ones; hue by class name (positional mode). */
+function heapContinentRows(h){
+  const rows=[];
+  const live=(h.rows||[]);
+  for(const r of live){
+    const b=r.bytes||0;if(!b)continue;
+    const id='heap-live/'+r.class;
+    rows.push([id,b,0,1,0]);
+    heapLeaves.set(id,{kind:'live',cls:r.class,count:r.count||0,bytes:b});
+  }
+  const alloc=(h.allocation||[]);
+  for(const a of alloc){
+    const b=a.bytes||0;if(!b)continue;
+    const id='heap-alloc/'+a.class;
+    rows.push([id,b,0,1,0]);
+    heapLeaves.set(id,{kind:'alloc',cls:a.class,bytes:b});
+  }
+  return rows;
+}
+const heapLeaves=new Map();
 resize();$('crumb').textContent='drop lane v2 armed — drag a folder anywhere';loadMap();pollVitals();pollVms();loadAot();connectSse();requestAnimationFrame(draw);
 </script>
 </body>

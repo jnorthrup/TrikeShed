@@ -1083,6 +1083,7 @@
       cell.addEventListener('click', () => { shapePick = { doc: di, run: ri }; renderShape(); });
       strip.appendChild(cell);
     });
+    if (!doc.runs.length) { const c = shapeEl('button', 'shape-cell'); c.style.flex = '1 0 4px'; c.title = doc.via === 'store' ? 'store row — click for bytes' : 'empty'; c.addEventListener('click', () => { shapePick = { doc: di, run: 0 }; renderShape(); }); strip.appendChild(c); }
     return strip;
   }
 
@@ -1091,16 +1092,52 @@
     const di = ids[0], doc = shapeDocs[di], group = ids.length > 1;
     const box = shapeEl('div', 'shape-doc');
     const head = shapeEl('div', 'shape-doc-head');
+    const isStore = doc.via === 'store';
     head.append(shapeEl('span', 'shape-name', group ? '×' + ids.length + '  ' + prefix : doc.name),
-      shapeEl('span', 'shape-chip ' + doc.kind.split(' ')[0], doc.kind === 'plan' ? 'kanban plan · persist' : doc.kind + (doc.kind === 'box media' ? '' : ' · rejected')),
-      shapeEl('span', 'shape-meta', doc.lines.length + ' ' + (doc.unit === 'bytes' ? 'boxes' : 'lines') + ' · ' + doc.runs.length + ' runs' + (doc.via ? ' · ' + doc.via : '')));
+      shapeEl('span', 'shape-chip ' + doc.kind.split(' ')[0], isStore ? 'store row · ' + doc.key.join('') : doc.kind === 'plan' ? 'kanban plan · persist' : doc.kind + (doc.kind === 'box media' ? '' : ' · rejected')),
+      shapeEl('span', 'shape-meta', isStore
+        ? (doc.bytes || 0).toLocaleString() + ' bytes · code ' + doc.key.join('')
+        : doc.lines.length + ' ' + (doc.unit === 'bytes' ? 'boxes' : 'lines') + ' · ' + doc.runs.length + ' runs' + (doc.via ? ' · ' + doc.via : '')));
     box.append(head, shapeStrip(doc, di), shapeEl('code', 'shape-key', doc.key.join(doc.sep)));
     if (group) box.appendChild(shapeEl('div', 'shape-members', ids.map((i) => shapeDocs[i].name).join(', ')));
     if (shapePick && shapePick.doc === di) {
-      const r = doc.runs[shapePick.run];
-      box.appendChild(shapeEl('pre', 'block-code shape-src', doc.lines.slice(r.start, r.end + 1).map((l, k) => String(r.start + k + 1).padStart(4) + '  ' + l).join('\n')));
+      if (isStore) {
+        const pre = shapeEl('pre', 'block-code shape-src');
+        pre.textContent = 'loading bytes…';
+        fetch('/' + DBNAME + '/' + doc.name.split('/').map(encodeURIComponent).join('/') + '/content')
+          .then((r) => (r.ok ? r.text() : Promise.reject(r.status)))
+          .then((t) => { pre.textContent = t.slice(0, 20000) + (t.length > 20000 ? '\n…' : ''); })
+          .catch(() => { pre.textContent = 'content unavailable'; });
+        box.appendChild(pre);
+      } else {
+        const r = doc.runs[shapePick.run];
+        if (r) box.appendChild(shapeEl('pre', 'block-code shape-src', doc.lines.slice(r.start, r.end + 1).map((l, k) => String(r.start + k + 1).padStart(4) + '  ' + l).join('\n')));
+      }
     }
     return box;
+  }
+
+  // ── R1: the group_level=<k> ladder, repointed from dropped files to store rows ──
+  // The ladder was built over browser-dropped files (planRules run symbols). The Step C
+  // residual: the same ladder groups the DAEMON'S STORE ROWS by the hex nibbles of each doc's
+  // AngularCodec code (16-bit = 4 nibbles; depth k = the first k nibbles — the zoom ring).
+  // fibTicks (kotlin().fib) are unchanged: they pick the ladder rungs.
+  const DBNAME = 'trikeshed';
+  let shapeStoreLoaded = false;
+  const storeKey = (code) => (((code >>> 0) & 0xFFFF)).toString(16).padStart(4, '0').split('');
+  async function loadStoreRows() {
+    shapePending++; setView('shape');
+    try {
+      const m = await (await fetch('/api/graal/map')).json();
+      (m.rows || []).forEach((r) => {
+        const [id, bytes, seq, gen, code] = r;
+        if (shapeDocs.some((d) => d.name === id && d.via === 'store')) return;
+        shapeDocs.push({ name: id, lines: [], runs: [], key: storeKey(code), sep: '', kind: 'store', unit: 'rows', via: 'store', bytes });
+      });
+      shapeStoreLoaded = true; shapePick = null; setView('shape');
+    } catch (e) {
+      shapeScrollEl && shapeScrollEl.appendChild(shapeEl('span', 'shape-count', 'store rows unavailable: ' + e + ' — drop files instead'));
+    } finally { shapePending = Math.max(0, shapePending - 1); }
   }
 
   function renderShape() {
@@ -1116,6 +1153,13 @@
       b.addEventListener('click', () => { shapeDepth = f; renderShape(); });
       hud.appendChild(b);
     });
+    if (!shapeStoreLoaded) {
+      const s = shapeEl('button', 'topbar-btn', '⬇ store rows');
+      s.title = 'repoint the ladder: load the daemon store rows (grouped by code nibbles)';
+      s.setAttribute('aria-label', 'Load store rows');
+      s.addEventListener('click', loadStoreRows);
+      hud.appendChild(s);
+    }
     hud.appendChild(shapeEl('span', 'shape-count', shapeDocs.length + ' files' + (shapePending ? ' · ' + shapePending + ' processing' : '') + ' · drop files anywhere'));
     shapeScrollEl.appendChild(hud);
     const groups = new Map();

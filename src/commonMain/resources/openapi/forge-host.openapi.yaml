@@ -184,3 +184,70 @@ paths:
       responses:
         "200":
           description: ok
+  /blackboard/board:
+    get:
+      operationId: blackboardBoard
+      summary: full blackboard snapshot (the one-key-per-event delta feed's complement)
+      responses:
+        "200":
+          description: ok
+  /blackboard:
+    get:
+      operationId: blackboardPage
+      summary: consolidated CAS, score, VM/receipt, heap/GC, and pointcut surface
+      responses:
+        "200":
+          description: html page
+  /api/graal/heap:
+    get:
+      operationId: graalHeap
+      summary: heap continent — per-class live-set rows + allocation-attributed continent
+      responses:
+        "200":
+          description: ok
+  /api/graal/zoom:
+    get:
+      operationId: graalZoom
+      summary: mid-zoom ring for a code — representative cids + _cas byte links
+      responses:
+        "200":
+          description: ok
+        "400":
+          description: code_required
+  /api/graal/strength:
+    get:
+      operationId: graalStrength
+      summary: CAS-granting-strength proof — linkMatch grades + the actual lines side by side
+      responses:
+        "200":
+          description: ok
+        "400":
+          description: a_and_b_required
+  /api/graal/density:
+    get:
+      operationId: graalDensity
+      summary: per-region residual density for a doc at a zoom aperture (L0..L3)
+      responses:
+        "200":
+          description: ok
+        "400":
+          description: path_or_aperture_required
+        "404":
+          description: no_spine
+        "503":
+          description: store_not_mounted
+  /hook/{program}/{node}/{port}:
+    post:
+      operationId: hookIntake
+      summary: signed idempotent envelope intake for an LCNC node port
+      parameters:
+        - { name: program, in: path, required: true, schema: { type: string } }
+        - { name: node, in: path, required: true, schema: { type: string } }
+        - { name: port, in: path, required: true, schema: { type: string } }
+      responses:
+        "202":
+          description: accepted
+        "401":
+          description: bad_signature
+        "404":
+          description: hook_not_found

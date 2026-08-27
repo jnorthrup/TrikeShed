@@ -11,5 +11,14 @@ object ForgeHostRoutes {
         "GET" to "/api/jules/surface", "GET" to "/api/jules/events",
         "POST" to "/api/submit", "POST" to "/api/donor", "POST" to "/api/invoke",
     )
-    val ALL: List<Pair<String, String>> get() = BUILT_IN + VmWire.ROUTES + BlackboardWire.ROUTES
+    /**
+     * R3: the new continent/zoom routes served by GraalWire, registered in the spec so the
+     * spec-parity ratchet (ForgeHostSpecParityTest) holds. These are NOT in BUILT_IN — they
+     * need GraalWire as an extraRoute, so they must not be exercised by the bare-server test.
+     */
+    val GRAAL: List<Pair<String, String>> = listOf(
+        "GET" to "/api/graal/heap", "GET" to "/api/graal/zoom", "GET" to "/api/graal/strength",
+        "GET" to "/api/graal/density",
+    )
+    val ALL: List<Pair<String, String>> get() = BUILT_IN + VmWire.ROUTES + BlackboardWire.ROUTES + WebhookWire.ROUTES + GRAAL
 }

@@ -499,6 +499,12 @@ object OroborosDaemon {
         launch { reportReactorForWires.open() }
         // ── Project DBs: dropped hierarchies as their own couch databases (shared CAS) ──
         val projectDbRegistry = borg.trikeshed.forge.server.ProjectDbRegistry(COUCH_DB_NAME)
+        // ── Memory store + ISAM index layer (fs-memory Prongs 1+2) ──
+        // MemoryStore composes the existing CAS+Couch into the paper's
+        // memory store M. MemoryIndexLayer subscribes to mutations and
+        // maintains taxonomy/temporal/provenance ISAM routes.
+        // Declared BEFORE graalWire: the density route reads its live lineIndex.
+        val memoryStore = borg.trikeshed.memory.MemoryStore(casStore, couchStore)
         val graalWire = borg.trikeshed.forge.server.GraalWire(
             jvmVitals,
             couchStore,
@@ -508,13 +514,20 @@ object OroborosDaemon {
             vmHost,
             attachmentGateway,
             projectDbs = projectDbRegistry,
+            memoryStore = memoryStore,
         )
 
-        // ── Memory store + ISAM index layer (fs-memory Prongs 1+2) ──
-        // MemoryStore composes the existing CAS+Couch into the paper's
-        // memory store M. MemoryIndexLayer subscribes to mutations and
-        // maintains taxonomy/temporal/provenance ISAM routes.
-        val memoryStore = borg.trikeshed.memory.MemoryStore(casStore, couchStore)
+        // R2: persist the inverted index. At boot, restore the continent from the store
+        // (no cold re-derive); after every ingest the live index snapshots to CAS+Couch,
+        // trailing the writer by at most one put.
+        borg.trikeshed.cas.LineCasIndexPersistence.restore(couchStore, casStore)?.let { restored ->
+            memoryStore.restoreIndex(restored)
+            System.err.println("[OROBOROS] LineCasIndex restored from store: ${restored.documentCount} docs, ${restored.contentKeyCount} content keys")
+        }
+        memoryStore.onIndexIngest = { idx ->
+            runCatching { borg.trikeshed.cas.LineCasIndexPersistence.write(couchStore, casStore, idx) }
+                .onFailure { t -> System.err.println("[OROBOROS] LineCasIndex persist failed: ${t.message}") }
+        }
         val memoryIndex = borg.trikeshed.memory.MemoryIndexLayer(memoryStore)
         val couchIndexBridge = borg.trikeshed.memory.CouchIndexBridge(attachmentGateway, memoryIndex)
         System.err.println("[OROBOROS] MemoryStore + MemoryIndexLayer: ${memoryIndex.route(borg.trikeshed.memory.IndexKind.Taxonomy).entryCount} taxonomy entries")
@@ -649,26 +662,39 @@ object OroborosDaemon {
             }
         }
 
-        // ── Curator impulse feeding: hindsight replay over REAL ground truth —
-        //    the hermes curator ledger (<home>/skills/.curator_ledger.jsonl) is
-        //    the impulse source; the per-profile state.db messages table is the
-        //    historical backfill source. One pass at boot: assess → bank SUMO/KIF
-        //    → mint bag signals. NEUTRAL transcripts mint nothing. HERMES_PROFILE
-        //    selects a profile dir (e.g. profiles/src-trikeshed); default is the
-        //    bare hermes home. All blocking IO lives behind Dispatchers.IO in
-        //    the feeder — never on this reactor thread.
+        // ── Hermes design distillation + incremental curator feeding (I1/I2) ──
+        // The trusted ledger/state.db reader remains CuratorImpulseFeeder. At boot its snapshot
+        // is distilled into CAS/Line-CAS design docs; then one structured coroutine follows
+        // MAX(messages.id) checkpoints. Checkpoint state is local/frozen Series data — no daemon
+        // registry. All file/sqlite/store blocking work is dispatched to IO inside the helpers.
         if (curatorImpulse != null) {
             val profileDir = System.getenv("HERMES_PROFILE")?.let { File(it) }
                 ?: File(hermesHomeDir.absolutePath)
+            val archiveProfile = System.getenv("HERMES_ARCHIVE_PROFILE")?.let { File(it) }
+                ?: File(System.getProperty("user.home"), ".hermes.prev").takeIf { it.isDirectory }
             launch(Dispatchers.Default) {
                 runCatching {
-                    val feeder = borg.trikeshed.narsese.CuratorImpulseFeeder(profileDir)
-                    val landed = feeder.backfill(curatorImpulse)
-                    System.err.println(
-                        "[OROBOROS] Curator backfilled from ${profileDir}: ${landed.size} signals minted; bank now ${curatorImpulse.knowledgeBank.asserts().size} axioms",
-                    )
+                    val distilled = borg.trikeshed.narsese.HermesDesignDistiller.distillTo(profileDir, archiveProfile, memoryStore)
+                    System.err.println("[OROBOROS] Hermes design distilled: ${distilled.size} CAS documents")
                 }.onFailure {
-                    System.err.println("[OROBOROS] CuratorImpulse feed failed (non-fatal): ${it.message}")
+                    System.err.println("[OROBOROS] Hermes design distillation failed (non-fatal): ${it.message}")
+                }
+
+                val feeder = borg.trikeshed.narsese.CuratorImpulseFeeder(profileDir)
+                var checkpoint = borg.trikeshed.narsese.CuratorImpulseFeeder.FollowCheckpoint.empty()
+                while (isActive) {
+                    runCatching {
+                        val followed = feeder.followOnce(curatorImpulse, memoryStore, checkpoint)
+                        checkpoint = followed.checkpoint
+                        if (followed.landed.isNotEmpty() || followed.transcriptCids.size > 0) {
+                            System.err.println(
+                                "[OROBOROS] Curator followed ${followed.transcriptCids.size} changed transcripts: ${followed.landed.size} signals; bank ${curatorImpulse.knowledgeBank.asserts().size} axioms",
+                            )
+                        }
+                    }.onFailure {
+                        System.err.println("[OROBOROS] CuratorImpulse follow failed (non-fatal): ${it.message}")
+                    }
+                    delay(5_000L)
                 }
             }
         }
@@ -731,9 +757,13 @@ object OroborosDaemon {
             },
         )
         val moduleWire = borg.trikeshed.forge.server.ModuleWire(moduleSupervisor, moduleRoutes)
+        val webhookRuntime = borg.trikeshed.forge.server.couchWebhookRuntime(couchStore, daemonBlackboard, forgeHome)
+        val webhookWire = webhookRuntime.wire
+        val webhookScope = CoroutineScope(SupervisorJob(coroutineContext[kotlinx.coroutines.Job]) + Dispatchers.Default + htxElement)
+        borg.trikeshed.hook.installOutboundWebhookBridge(couchStore, daemonBlackboard, webhookScope, webhookRuntime.ledger)
 
         val kanbanServer = JvmKanbanServer(
-            extraRoutes = listOfNotNull(graalWire::route, vmWire::route, hermesWire::route, beliefWire?.let { it::route }, patchWire::route, moduleWire::route, blackboardWire::route),
+            extraRoutes = listOfNotNull(graalWire::route, vmWire::route, hermesWire::route, beliefWire?.let { it::route }, patchWire::route, moduleWire::route, webhookWire::route, blackboardWire::route),
             rawRoutes = listOf(graalWire::ingestRoute, couchWire::route, projectDbWire::route),
             streamingPaths = borg.trikeshed.forge.server.CouchWire.streamingPaths(COUCH_DB_NAME) +
                 borg.trikeshed.forge.server.GraalWire.STREAMING +

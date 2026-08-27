@@ -1,6 +1,8 @@
 package borg.trikeshed.graal.vitals
 
+import jdk.jfr.consumer.RecordedClass
 import jdk.jfr.consumer.RecordedEvent
+import jdk.jfr.consumer.RecordedObject
 import jdk.jfr.consumer.RecordingStream
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.SharedFlow
@@ -48,6 +50,23 @@ class JvmVitals {
     private val recentGcs = ConcurrentLinkedDeque<Map<String, Any?>>()
     private var stream: RecordingStream? = null
 
+    // ── R4: real GC occupancy deltas + allocation-attributed continents ──
+    // JDK 25 (verified against `jfr metadata` on a live recording):
+    //  · jdk.GCHeapSummary      — gcId(int), when("Before GC"/"After GC"), heapSpace(VirtualSpace), heapUsed(long)
+    //  · jdk.GCHeapMemoryUsage  — used, committed, max   (whole heap, at each collection)
+    //  · jdk.GCHeapMemoryPoolUsage — name, used, committed, max (per pool, at each collection)
+    //  · jdk.GCPhasePause       — name, duration(Timespan)
+    //  · jdk.ObjectAllocationSample — objectClass, weight(long)
+    // The JMX NotificationEmitter does not exist in JDK 25, so JFR is the sole source.
+    private val heapBefore = java.util.concurrent.ConcurrentHashMap<Int, Long>()          // gcId → used before
+    private val heapAfter = java.util.concurrent.ConcurrentHashMap<Int, Long>()           // gcId → used after
+    private val heapCommitted = AtomicLong()                                              // last committed size
+    private val heapCommittedSamples = AtomicLong()
+    private val freedByGc = ConcurrentLinkedDeque<Long>()                                 // per-collection freed bytes (ring)
+    private val poolUsage = java.util.concurrent.ConcurrentHashMap<String, LongArray>()   // pool → [lastUsed, reclaimed, grown]
+    private val gcPhases = java.util.concurrent.ConcurrentHashMap<String, LongArray>()    // phase → [count, pauseNanos]
+    private val allocByClass = java.util.concurrent.ConcurrentHashMap<String, AtomicLong>() // class → sampled bytes
+
     fun start() {
         if (stream != null) return
         try {
@@ -56,6 +75,14 @@ class JvmVitals {
             rs.enable("jdk.Deoptimization").withoutThreshold()
             rs.enable("jdk.GarbageCollection")
             rs.enable("jdk.CPULoad").withPeriod(Duration.ofSeconds(1))
+            // R4: real occupancy deltas (GCHeapSummary before/after matched by gcId,
+            // GCHeapMemoryUsage whole-heap + GCHeapMemoryPoolUsage per-pool at each collection,
+            // GCPhasePause phase breakdown) and allocation attribution (ObjectAllocationSample).
+            rs.enable("jdk.GCHeapSummary").withoutThreshold()
+            rs.enable("jdk.GCHeapMemoryUsage").withoutThreshold()
+            rs.enable("jdk.GCHeapMemoryPoolUsage").withoutThreshold()
+            rs.enable("jdk.GCPhasePause").withoutThreshold()
+            rs.enable("jdk.ObjectAllocationSample").withPeriod(Duration.ofMillis(250))
             rs.onEvent("jdk.Compilation") { e -> onCompilation(e) }
             rs.onEvent("jdk.Deoptimization") { e -> onDeopt(e) }
             rs.onEvent("jdk.GarbageCollection") { e -> onGc(e) }
@@ -64,6 +91,11 @@ class JvmVitals {
                 machineCpuLoad = e.getDoubleOr("machineTotal")
                 _events.tryEmit(VitalEvent("cpu", mapOf("jvm" to jvmCpuLoad, "machine" to machineCpuLoad)))
             }
+            rs.onEvent("jdk.GCHeapSummary") { e -> onGcHeapSummary(e) }
+            rs.onEvent("jdk.GCHeapMemoryUsage") { e -> onGcHeapMemoryUsage(e) }
+            rs.onEvent("jdk.GCHeapMemoryPoolUsage") { e -> onGcHeapMemoryPoolUsage(e) }
+            rs.onEvent("jdk.GCPhasePause") { e -> onGcPhasePause(e) }
+            rs.onEvent("jdk.ObjectAllocationSample") { e -> onAllocSample(e) }
             rs.setMaxAge(Duration.ofMinutes(5))
             rs.startAsync()
             stream = rs
@@ -72,6 +104,37 @@ class JvmVitals {
             jfrLive = false
             jfrError = t.message ?: t.toString()
         }
+    }
+
+    private fun onGcHeapSummary(e: RecordedEvent) {
+        val gcId = e.getIntOr("gcId", -1)
+        if (gcId < 0) return
+        val used = e.getLongOr("heapUsed")
+        val when_ = e.getStringOr("when")
+        val committed = runCatching { (e.getValue<Any?>("heapSpace") as? RecordedObject)?.getLong("committedSize") }.getOrNull()
+        recordGcHeapSummary(gcId, when_ ?: "", used, committed)
+    }
+
+    private fun onGcHeapMemoryUsage(e: RecordedEvent) {
+        recordGcHeapMemoryUsage(e.getLongOr("committed"))
+    }
+
+    private fun onGcHeapMemoryPoolUsage(e: RecordedEvent) {
+        val pool = e.getStringOr("name") ?: return
+        recordGcHeapMemoryPoolUsage(pool, e.getLongOr("used"), e.getLongOr("committed"))
+    }
+
+    private fun onGcPhasePause(e: RecordedEvent) {
+        val phase = e.getStringOr("name") ?: return
+        val pauseNanos = runCatching { e.getDuration("duration").toNanos() }.getOrDefault(0L)
+        recordGcPhasePause(phase, pauseNanos)
+    }
+
+    private fun onAllocSample(e: RecordedEvent) {
+        val className = (e.getValue<Any?>("objectClass") as? RecordedClass)?.name
+            ?: e.getStringOr("objectClass") ?: "unknown"
+        val weight = e.getLongOr("weight")
+        if (weight > 0) recordAllocationSample(className, weight)
     }
 
     fun stop() {
@@ -113,6 +176,7 @@ class JvmVitals {
         _events.tryEmit(VitalEvent("deopt", d))
     }
 
+    /** jdk.GarbageCollection: collector-level counters + pause decomposition (JDK 25 Timespan fields). */
     private fun onGc(e: RecordedEvent) {
         gcCollections.incrementAndGet()
         val pauseMs = runCatching { e.getDuration("sumOfPauses").toMillis() }.getOrDefault(0L)
@@ -155,25 +219,60 @@ class JvmVitals {
             "instances" to totalInstances,
             "bytes" to totalBytes,
             "rows" to rows.take(256).map { mapOf("class" to it.className, "count" to it.count, "bytes" to it.bytes) },
+            // R4: the allocation-attributed continent (JFR ObjectAllocationSample) — the
+            // second terrain source beside the live-set rows, same treemap component.
+            "allocation" to allocationByClass(),
         )
     }
 
-    /** jcmd GC.class_histogram parsed into rows; empty when jcmd is unavailable. */
-    private fun classHistogram(): List<HeapRow> = runCatching {
-        val pid = ProcessHandle.current().pid()
-        val jcmd = ProcessHandle.current().info().command().orElse("java").let { cmd ->
-            // find jcmd beside the java executable; fall back to PATH
-            val dir = cmd.substringBeforeLast('/', "")
-            if (dir.isNotEmpty()) "$dir/jcmd" else "jcmd"
+    /**
+     * jcmd GC.class_histogram parsed into rows; empty when jcmd is unavailable.
+     *
+     * The main (calling) thread does EXACTLY ONE bounded join and never touches the process.
+     * A daemon worker spawns jcmd, a second daemon drains its stdout, and the worker — not
+     * the caller — kills the child on the timeout. This matters because jcmd can wedge in
+     * attach (uninterruptible kernel state) and a `readText()`/`waitFor()` on the main thread
+     * would hang /api/graal/heap — and the whole Gradle test worker — for minutes. The join
+     * always returns after [JCMD_TIMEOUT_MS]; the live-set continent degrades to the
+     * allocation-attributed one and the daemon thread leaks at worst (a JVM-exit cleanup, not
+     * a request-thread stall).
+     */
+    private fun classHistogram(): List<HeapRow> {
+        val result = java.util.concurrent.atomic.AtomicReference<List<HeapRow>>(emptyList())
+        val worker = Thread {
+            try {
+                val pid = ProcessHandle.current().pid()
+                val javaExe = ProcessHandle.current().info().command().orElse("java")
+                val dir = javaExe.substringBeforeLast('/', "")
+                val jcmd = if (dir.isNotEmpty()) "$dir/jcmd" else "jcmd"
+                val p = ProcessBuilder(jcmd, pid.toString(), "GC.class_histogram")
+                    .redirectErrorStream(true).start()
+                val out = java.util.concurrent.atomic.AtomicReference("")
+                val reader = Thread { runCatching { out.set(p.inputStream.bufferedReader().readText()) } }
+                reader.isDaemon = true
+                reader.name = "jvmvitals-class-histogram-reader"
+                reader.start()
+                reader.join(JCMD_TIMEOUT_MS)
+                // The worker kills the child on timeout — the main thread never calls waitFor/destroy.
+                if (reader.isAlive) {
+                    p.destroy()
+                    runCatching { p.waitFor(2, java.util.concurrent.TimeUnit.SECONDS) }
+                    if (runCatching { p.isAlive }.getOrDefault(false)) p.destroyForcibly()
+                    runCatching { p.waitFor(2, java.util.concurrent.TimeUnit.SECONDS) }
+                } else {
+                    runCatching { p.waitFor(2, java.util.concurrent.TimeUnit.SECONDS) }
+                }
+                result.set(parseClassHistogram(out.get()))
+            } catch (_: Throwable) { /* degraded: empty live-set */ }
         }
-        val p = ProcessBuilder(jcmd, pid.toString(), "GC.class_histogram")
-            .redirectErrorStream(true).start()
-        val out = p.inputStream.bufferedReader().readText()
-        p.waitFor()
-        parseClassHistogram(out)
-    }.getOrDefault(emptyList())
+        worker.isDaemon = true
+        worker.name = "jvmvitals-class-histogram"
+        worker.start()
+        worker.join(JCMD_TIMEOUT_MS + 5_000)
+        return runCatching { result.get() }.getOrDefault(emptyList())
+    }
 
-    /** The histogram text's `num: #instances #bytes class name` table → rows. */
+    /** The histogram text's `num: #instances #bytes class` table → rows. */
     internal fun parseClassHistogram(text: String): List<HeapRow> {
         val rows = ArrayList<HeapRow>()
         for (line in text.lineSequence()) {
@@ -187,6 +286,106 @@ class JvmVitals {
         }
         return rows.sortedByDescending { it.bytes }
     }
+
+    // ── R4 recorders — the accumulators the GC lane + allocation continent read ──
+
+    /** R4: record a GCHeapSummary boundary. `when_` is "Before GC" or "After GC". */
+    internal fun recordGcHeapSummary(gcId: Int, when_: String, heapUsed: Long, committed: Long?) {
+        if (committed != null) {
+            heapCommitted.set(committed)
+            heapCommittedSamples.incrementAndGet()
+        }
+        if (when_ == "Before GC") {
+            heapBefore[gcId] = heapUsed
+        } else if (when_ == "After GC") {
+            val before = heapBefore.remove(gcId) ?: return // unmatched After (evicted) → no delta
+            heapAfter[gcId] = heapUsed
+            val freed = before - heapUsed
+            freedByGc.addFirst(freed)
+            while (freedByGc.size > RING) freedByGc.pollLast()
+        }
+    }
+
+    /** R4: record a GCHeapMemoryUsage whole-heap boundary. */
+    internal fun recordGcHeapMemoryUsage(committed: Long) {
+        heapCommitted.set(committed)
+        heapCommittedSamples.incrementAndGet()
+    }
+
+    /** R4: record a GCHeapMemoryPoolUsage per-pool boundary. */
+    internal fun recordGcHeapMemoryPoolUsage(pool: String, used: Long, committed: Long) {
+        val acc = poolUsage[pool] ?: run { poolUsage.putIfAbsent(pool, longArrayOf(0L, 0L, 0L, 0L, 0L)); poolUsage[pool]!! }
+        // [lastUsed, reclaimed, grown, lastCommitted, samples]
+        if (acc[4] > 0) {
+            val d = used - acc[0]
+            if (d < 0) acc[1] -= d else if (d > 0) acc[2] += d
+        }
+        acc[0] = used
+        acc[3] = committed
+        acc[4] += 1
+    }
+
+    internal fun recordGcPhasePause(phase: String, pauseNanos: Long) {
+        val acc = gcPhases[phase] ?: run { gcPhases.putIfAbsent(phase, longArrayOf(0L, 0L)); gcPhases[phase]!! }
+        acc[0] += 1
+        acc[1] += pauseNanos
+    }
+
+    internal fun recordAllocationSample(className: String, weight: Long) {
+        allocByClass.getOrPut(className) { AtomicLong() }.addAndGet(weight)
+    }
+
+    /** R4: whole-heap occupancy — committed size + the per-collection freed-bytes ring. */
+    internal fun gcHeapOccupancy(): Map<String, Any?> {
+        val freed = freedByGc.toList()
+        val totalFreed = freed.sum()
+        return mapOf(
+            "committedBytes" to heapCommitted.get(),
+            "committedSamples" to heapCommittedSamples.get(),
+            "collectionsMatched" to heapAfter.size,
+            "totalFreedBytes" to totalFreed,
+            "avgFreedBytes" to (if (freedByGc.isNotEmpty()) totalFreed / freed.size else 0L),
+            "recentFreed" to freed.takeLast(RING),
+        )
+    }
+
+    /** R4: per-pool occupancy deltas from JFR GCHeapMemoryPoolUsage. */
+    internal fun gcPoolUsage(): List<Map<String, Any?>> =
+        poolUsage.entries.map { (pool, acc) ->
+            mapOf(
+                "pool" to pool,
+                "lastUsedBytes" to acc[0],
+                "lastCommittedBytes" to acc[3],
+                "reclaimedBytes" to acc[1],
+                "grownBytes" to acc[2],
+                "samples" to acc[4].toInt(),
+            )
+        }.sortedByDescending { (it["lastUsedBytes"] as? Long) ?: 0L }
+
+    /** R4: the pause decomposed into phases (JFR GCPhasePause). */
+    internal fun gcPhases(): List<Map<String, Any?>> =
+        gcPhases.entries.map { (phase, acc) ->
+            mapOf(
+                "phase" to phase,
+                "count" to acc[0].toInt(),
+                "pauseMsTotal" to (acc[1] / 1_000_000L),
+            )
+        }.sortedByDescending { (it["pauseMsTotal"] as? Long) ?: 0L }
+
+    /** R4: allocation-attributed continent (JFR ObjectAllocationSample), top classes by sampled bytes. */
+    internal fun allocationByClass(): List<Map<String, Any?>> =
+        allocByClass.entries.map { (name, acc) -> mapOf("class" to name, "bytes" to acc.get()) }
+            .sortedByDescending { (it["bytes"] as? Long) ?: 0L }
+            .take(256)
+
+    /** R4: the whole GC-lane snapshot — the fields the GC lane widget + spec-parity route expose. */
+    internal fun gcLane(): Map<String, Any?> = mapOf(
+        "heapOccupancy" to gcHeapOccupancy(),
+        "pools" to gcPoolUsage(),
+        "phases" to gcPhases(),
+        "allocation" to allocationByClass(),
+        "atMs" to System.currentTimeMillis(),
+    )
 
     /** The whole instrument cluster as one JSON-shaped map. */
     fun snapshot(): Map<String, Any?> {
@@ -228,6 +427,7 @@ class JvmVitals {
                 "pauseMsTotal" to gcPauseMsTotal.get(),
                 "beans" to gcBeans,
                 "recent" to recentGcs.toList(),
+                "lane" to gcLane(),
             ),
             "memory" to mapOf(
                 "heapUsed" to heap.used, "heapCommitted" to heap.committed, "heapMax" to heap.max,
@@ -243,8 +443,13 @@ class JvmVitals {
     // ── defensive JFR field access (event shapes drift across JDKs) ──
     private fun RecordedEvent.getStringOr(name: String): String? = runCatching { getString(name) }.getOrNull()
     private fun RecordedEvent.getLongOr(name: String): Long = runCatching { getLong(name) }.getOrElse { runCatching { getInt(name).toLong() }.getOrDefault(0L) }
+    private fun RecordedEvent.getIntOr(name: String, default: Int = 0): Int = runCatching { getInt(name) }.getOrElse { runCatching { getLong(name).toInt() }.getOrDefault(default) }
     private fun RecordedEvent.getBooleanOr(name: String, default: Boolean = false): Boolean = runCatching { getBoolean(name) }.getOrDefault(default)
     private fun RecordedEvent.getDoubleOr(name: String): Double = runCatching { getDouble(name) }.getOrElse { runCatching { getFloat(name).toDouble() }.getOrDefault(0.0) }
 
-    companion object { private const val RING = 40 }
+    companion object {
+        private const val RING = 40
+        /** Max wait for a jcmd class-histogram read; a wedged jcmd degrades the live-set, never the caller. */
+        private const val JCMD_TIMEOUT_MS = 8_000L
+    }
 }

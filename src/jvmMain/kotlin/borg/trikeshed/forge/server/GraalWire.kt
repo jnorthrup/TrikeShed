@@ -70,6 +70,12 @@ class GraalWire(
     private val attachmentGateway: CouchAttachmentGateway? = null,
     /** Mounted project dbs: their docs join the terrain as top-level `<name>/…` territories. */
     private val projectDbs: ProjectDbRegistry? = null,
+    /**
+     * R1: per-ring density shading + the heap/zoom panes. Read live (the index is restored /
+     * re-ingested over the daemon's life) by [densityFor] → `/api/graal/density`. Absent (CLI /
+     * bare-wire hosts) means the route 503s.
+     */
+    private val memoryStore: borg.trikeshed.memory.MemoryStore? = null,
 ) {
     private val occupancies = ConcurrentHashMap<String, RepoOccupancy>()
     companion object {
@@ -92,6 +98,7 @@ class GraalWire(
             method == "GET" && p == "/api/graal/map" -> JvmKanbanServer.HttpResponse(200, JsonSupport.stringify(mapMap()))
             method == "GET" && p == "/api/graal/zoom" -> zoomRoute(path)
             method == "GET" && p == "/api/graal/strength" -> strengthRoute(path)
+            method == "GET" && p == "/api/graal/density" -> densityRoute(path)
             method == "GET" && p == "/api/graal/sheet" -> withContext(Dispatchers.IO) { sheetRoute(path) }
             method == "GET" && p == "/api/graal/dag" -> {
                 val q = borg.trikeshed.utils.rfxhttp.CouchHttpSurface.parseQuery(path.substringAfter('?', ""))
@@ -538,6 +545,73 @@ class GraalWire(
 
     private fun cidOf(d: borg.trikeshed.couch.Document): String? =
         d.fields.firstOrNull { it.name == "contentId" }?.value as? String
+
+    /**
+     * `/api/graal/density?path=<doc>&aperture=L0..L3` — per-region residual density at a zoom
+     * band (Step C's `residualDensity(probe, aperture)` behind a route). Resolves the path to
+     * its [borg.trikeshed.cas.LineSpine] through [memoryStore].spineOf (reads the live index,
+     * restored at boot and re-ingested over the daemon's life) and serializes the regional
+     * top-k with [densityMap].
+     */
+    private suspend fun densityRoute(path: String): JvmKanbanServer.HttpResponse {
+        val store = memoryStore
+            ?: return JvmKanbanServer.HttpResponse(503, """{"error":"memory store not mounted"}""")
+        val q = borg.trikeshed.utils.rfxhttp.CouchHttpSurface.parseQuery(path.substringAfter('?', ""))
+        val id = q["path"] ?: q["id"] ?: return JvmKanbanServer.HttpResponse(400, """{"error":"path or id required"}""")
+        val aperture = borg.trikeshed.collections.LineAperture.entries.firstOrNull { it.name == (q["aperture"] ?: "L2") }
+            ?: return JvmKanbanServer.HttpResponse(400, """{"error":"aperture must be L0|L1|L2|L3"}""")
+        val spine = withContext(Dispatchers.IO) { store.spineOf(id) }
+            ?: return JvmKanbanServer.HttpResponse(404, """{"error":"no spine for $id"}""")
+        val result = withContext(Dispatchers.IO) { store.lineIndex.residualDensity(spine, aperture) }
+        return JvmKanbanServer.HttpResponse(
+            200,
+            JsonSupport.stringify(densityMap(result) + ("path" to id) + ("aperture" to aperture.name)),
+        )
+    }
+
+    /**
+     * Serialize [borg.trikeshed.cas.LineCasIndex.residualDensity]'s
+     * `Series<Join<Int, Series<Join<ContentId, OverlapCounts>>>>` to plain JSON:
+     * `regions[i]` carries the top-k overlap rows plus region-level sums.
+     */
+    internal fun densityMap(
+        result: Any?,
+    ): Map<String, Any?> {
+        val size = (result as? borg.trikeshed.lib.Series<*>)?.a ?: 0
+        val regions = ArrayList<Map<String, Any?>>(size)
+        var linkedTotal = 0
+        var partialTotal = 0
+        var contentTotal = 0
+        for (i in 0 until size) {
+            @Suppress("UNCHECKED_CAST")
+            val row = (result as borg.trikeshed.lib.Series<Any?>)[i] as? borg.trikeshed.lib.Join<Int, *>
+                ?: continue
+            val inner = row.b as? borg.trikeshed.lib.Series<*>
+                ?: continue
+            val n = inner.size
+            val rows = ArrayList<Map<String, Any?>>(n)
+            for (j in 0 until n) {
+                val pair = inner[j] as? borg.trikeshed.lib.Join<borg.trikeshed.job.ContentId, borg.trikeshed.cas.OverlapCounts>
+                    ?: continue
+                val c = pair.b
+                rows += mapOf("cid" to pair.a.hex, "linked" to c.linked, "partial" to c.partial, "contentOnly" to c.contentOnly)
+                linkedTotal += c.linked
+                partialTotal += c.partial
+                contentTotal += c.contentOnly
+            }
+            regions += mapOf(
+                "region" to row.a,
+                "rows" to rows,
+                "linked" to rows.sumOf { (it["linked"] as? Int) ?: 0 },
+                "partial" to rows.sumOf { (it["partial"] as? Int) ?: 0 },
+                "contentOnly" to rows.sumOf { (it["contentOnly"] as? Int) ?: 0 },
+            )
+        }
+        return mapOf(
+            "regions" to regions,
+            "totals" to mapOf("linked" to linkedTotal, "partial" to partialTotal, "contentOnly" to contentTotal),
+        )
+    }
 
     /** Edges for one node: every other doc sharing its blob, plus pointcut→class targets. */
     private fun dagFor(id: String): Map<String, Any?> {

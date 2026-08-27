@@ -446,6 +446,75 @@ class LineCasIndex {
         val finalIndices = if (missCount == missIndices.size) missIndices else missIndices.copyOf(missCount)
         return missCount j { i: Int -> probe[finalIndices[i]] }
     }
+
+    // ── R2: persistence — the inverted index is process-local; this makes it
+    //    re-derivable across boots. A stable text snapshot of every spine
+    //    round-trips EXACTLY because a linkedKey encodes BOTH the stamp and the
+    //    contentCid, and the per-line code is the coordinate: no clock, no
+    //    second derivation pass, no map→Series slop (the snapshot is a plain
+    //    projection; restore is a re-ingest through the existing seam).
+    //    Format (one spine per block, insertion-ordered):
+    //      #<spineCid.hex>
+    //      <stampHex>:<contentHex> <code>
+    //      <stampHex>:<contentHex> <code>
+    //      …
+    /** Stable snapshot of every indexed spine, in insertion order. */
+    fun snapshot(): String {
+        val sb = StringBuilder()
+        for ((hex, spine) in docs) {
+            sb.append('#').append(hex).append('\n')
+            for (i in 0 until spine.size) {
+                val n = spine[i]
+                sb.append(n.linkedKey).append(' ').append(n.code).append('\n')
+            }
+        }
+        return sb.toString()
+    }
+
+    companion object {
+        /**
+         * The exact inverse of [snapshot]: parse the text back into spines.
+         * Each `#<spineCid>` header opens a spine; each `<linkedKey> <code>` line
+         * is one [LineNode] whose ordinal is its position within the spine.
+         */
+        fun parseSnapshot(text: String): Series<LineSpine> {
+            val spines = ArrayList<LineSpine>()
+            var nodes: ArrayList<LineNode>? = null
+            for (raw in text.lineSequence()) {
+                val line = raw.trim()
+                if (line.isEmpty()) continue
+                if (line.startsWith("#")) {
+                    val open = nodes
+                    if (open != null) spines.add(open.size j { open[it] })
+                    nodes = ArrayList<LineNode>()
+                    continue
+                }
+                val parts = line.split(' ')
+                if (parts.size != 2) continue
+                val ci = parts[0].indexOf(':')
+                if (ci <= 0) continue
+                val open = nodes ?: continue
+                val node = LineNode(
+                    contentCid = ContentId("sha256:${parts[0].substring(ci + 1)}"),
+                    stamp = NeighborStamp(parts[0].substring(0, ci)),
+                    ordinal = open.size,
+                    code = parts[1].toIntOrNull() ?: 0,
+                )
+                open.add(node)
+            }
+            val last = nodes
+            if (last != null) spines.add(last.size j { last[it] })
+            return spines.size j { spines[it] }
+        }
+
+        /** Restore a [LineCasIndex] from a [snapshot] by re-ingesting every spine. */
+        fun restore(text: String): LineCasIndex {
+            val idx = LineCasIndex()
+            val spines = parseSnapshot(text)
+            for (i in 0 until spines.size) idx.ingestSpine(spines[i])
+            return idx
+        }
+    }
 }
 
 enum class LineCasNeighbor {

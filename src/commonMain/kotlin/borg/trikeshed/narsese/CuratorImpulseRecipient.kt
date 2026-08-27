@@ -49,7 +49,20 @@ data class ReplayScenario(
     val turns: Series<ReplayTurn>,
 )
 
-/** Hindsight verdict, derived only from explicit outcome markers. */
+/**
+ * R6's second hindsight source: a GroupingPost document together with the resolution document
+ * that was actually enacted. Relabel/split/merge support the curator's grouping impulse;
+ * Reject refutes it. The resolution cid is the immutable observation/provenance anchor.
+ */
+data class GroupCoherenceEnactment(
+    val post: borg.trikeshed.cas.GroupingReorientation.GroupingPost,
+    val resolution: borg.trikeshed.cas.GroupingReorientation.GroupingResolution,
+    val resolutionCid: String,
+)
+
+enum class AssessmentSource { TRANSCRIPT, GROUP_COHERENCE }
+
+/** Hindsight verdict, derived only from explicit outcome markers or an enacted resolution. */
 enum class HindsightVerdict {
     SUPPORTED,
     REFUTED,
@@ -65,6 +78,11 @@ data class ImpulseAssessment(
     val verdict: HindsightVerdict,
     val evidence: EvidenceCoord,
     val scenarioId: String,
+    val source: AssessmentSource = AssessmentSource.TRANSCRIPT,
+    /** Present only for the group-coherence source; bank() uses these for explicit KIF. */
+    val groupRing8: Int? = null,
+    val resolutionAction: String? = null,
+    val resolutionCid: String? = null,
 )
 
 /**
@@ -100,9 +118,12 @@ object CuratorImpulseRecipient {
     fun assess(
         impulses: Series<CuratorImpulse>,
         scenarios: Series<ReplayScenario>,
+        groupings: Series<GroupCoherenceEnactment> = emptySeriesOf(),
     ): Series<ImpulseAssessment> {
-        if (impulses.size == 0 || scenarios.size == 0) return emptySeriesOf()
+        if ((impulses.size == 0 || scenarios.size == 0) && groupings.size == 0) return emptySeriesOf()
         val out = ArrayList<ImpulseAssessment>()
+
+        // Source 1: transcript outcome markers, unchanged.
         for (i in 0 until impulses.size) {
             val impulse = impulses[i]
             for (s in 0 until scenarios.size) {
@@ -123,8 +144,44 @@ object CuratorImpulseRecipient {
                 )
             }
         }
+
+        // R6 source 2: the GroupingPost + the resolution document actually enacted. This is
+        // observation-grade evidence — no transcript marker and no guessed verdict. Reject is
+        // explicit negative evidence; deterministic relabel/split/merge are positive evidence.
+        for (g in 0 until groupings.size) {
+            val enacted = groupings[g]
+            val action = groupingAction(enacted.resolution)
+            val supported = action != "reject"
+            val ring8 = enacted.post.group.ring8
+            val subject = "group-ring8-$ring8"
+            out.add(
+                ImpulseAssessment(
+                    impulse = CuratorImpulse(
+                        kind = CuratorImpulseKind.PATCH,
+                        subject = subject,
+                        rationale = "group coherence: ${enacted.post.currentLabel} → $action",
+                        proposalCid = enacted.post.evidence.sampleMembers.firstOrNull()?.value,
+                    ),
+                    verdict = if (supported) HindsightVerdict.SUPPORTED else HindsightVerdict.REFUTED,
+                    evidence = if (supported) EvidenceCoord(Nal.UNIT, 0L) else EvidenceCoord(0L, Nal.UNIT),
+                    scenarioId = "grouping-${enacted.resolutionCid.substringAfter(':')}",
+                    source = AssessmentSource.GROUP_COHERENCE,
+                    groupRing8 = ring8,
+                    resolutionAction = action,
+                    resolutionCid = enacted.resolutionCid,
+                ),
+            )
+        }
         return out.toSeries()
     }
+
+    private fun groupingAction(resolution: borg.trikeshed.cas.GroupingReorientation.GroupingResolution): String =
+        when (resolution) {
+            is borg.trikeshed.cas.GroupingReorientation.GroupingResolution.Relabel -> "relabel"
+            is borg.trikeshed.cas.GroupingReorientation.GroupingResolution.Split -> "split"
+            is borg.trikeshed.cas.GroupingReorientation.GroupingResolution.Merge -> "merge"
+            borg.trikeshed.cas.GroupingReorientation.GroupingResolution.Reject -> "reject"
+        }
 
     private fun readVerdict(scenario: ReplayScenario): HindsightVerdict {
         var verdict = HindsightVerdict.NEUTRAL
@@ -165,6 +222,18 @@ object CuratorImpulseRecipient {
             val a = assessments[i]
             val term = a.impulse.term()
             kb.assert(kif("instance", KifExpr.Atom(term), KifExpr.Atom(SumoOntology.SumoCategory.Agent.kifName)))
+            // R6: grouping posts/resolutions are documents already; bank the enacted stitch as
+            // SUMO-grounded KIF beside transcript verdicts. The group is a SUMO Collection,
+            // the curator impulse is its member/agent, and the resolution cid is immutable
+            // provenance for the coherence observation.
+            if (a.source == AssessmentSource.GROUP_COHERENCE && a.groupRing8 != null && a.resolutionAction != null) {
+                val group = "group_ring8_${a.groupRing8}"
+                val resolution = "resolution_${a.resolutionCid.orEmpty().substringAfter(':').replace('-', '_')}"
+                kb.assert(kif("instance", KifExpr.Atom(group), KifExpr.Atom(SumoOntology.SumoCategory.Collection.kifName)))
+                kb.assert(kif("member", KifExpr.Atom(term), KifExpr.Atom(group)))
+                kb.assert(kif("groupCoherence", KifExpr.Atom(group), KifExpr.Atom(a.resolutionAction)))
+                kb.assert(kif("enactedResolution", KifExpr.Atom(group), KifExpr.Atom(resolution)))
+            }
             when (a.verdict) {
                 HindsightVerdict.SUPPORTED -> kb.assert(
                     kif(

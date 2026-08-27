@@ -48,7 +48,15 @@ class MemoryStore(
     val couch: CouchStore,
 ) {
     /** Ring 1 inverted index — per-line content-addressed with neighbor stamps. */
-    val lineIndex: LineCasIndex = LineCasIndex()
+    var lineIndex: LineCasIndex = LineCasIndex()
+
+    /**
+     * R2: incremental persistence hook. The daemon installs a persister that snapshots
+     * [lineIndex] to CAS+Couch after every ingest, so a boot can restore the continent
+     * from the store instead of re-deriving it cold. Invoked on the writer's thread,
+     * after [lineIndex] has absorbed the new spine.
+     */
+    var onIndexIngest: ((LineCasIndex) -> Unit)? = null
 
     /**
      * Put a memory file: decomposes into all rings.
@@ -71,6 +79,9 @@ class MemoryStore(
         val text = file.content.decodeToString()
         val spine = LineCas.spineInto(cas, text)
         val spineCid = lineIndex.ingestSpine(spine)
+        // R2: trail the live index by at most one put — the snapshot lands as the new
+        // spine is absorbed, so boot never pays a cold re-derive.
+        onIndexIngest?.invoke(lineIndex)
 
         // Ring 2 — metadata document.
         val doc = Document(
@@ -115,6 +126,16 @@ class MemoryStore(
     fun spineOf(path: String): LineSpine? {
         val scid = spineCidOf(path) ?: return null
         return lineIndex.spineOf(scid)
+    }
+
+    /**
+     * R2: adopt a persisted index snapshot as the live [lineIndex]. Called at boot
+     * when a snapshot document exists — the store's spine set is restored from the
+     * store, not re-derived. The [lineIndex] reference is the single seam; `spineOf`
+     * and `linkSearch` read it dynamically, so they follow the restored continent.
+     */
+    fun restoreIndex(restored: LineCasIndex) {
+        this.lineIndex = restored
     }
 
     /**

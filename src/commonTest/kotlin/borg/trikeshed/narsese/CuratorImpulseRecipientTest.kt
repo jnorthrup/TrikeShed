@@ -4,7 +4,13 @@ import borg.trikeshed.lib.get
 import borg.trikeshed.lib.size
 import borg.trikeshed.lib.toList
 import borg.trikeshed.lib.toSeries
+import borg.trikeshed.lib.emptySeriesOf
+import borg.trikeshed.lib.s_
+import borg.trikeshed.lib._l
 import borg.trikeshed.kif.KifExpr
+import borg.trikeshed.cas.GroupingReorientation
+import borg.trikeshed.job.CasStore
+import borg.trikeshed.job.ContentId
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -115,5 +121,46 @@ class CuratorImpulseRecipientTest {
         val impulses = listOf(impulse(CuratorImpulseKind.ADOPT, "skill-q")).toSeries()
         val scenarios = listOf(scenario("s1", "other-subject", "x", "[PASS]")).toSeries()
         assertEquals(0, CuratorImpulseRecipient.assess(impulses, scenarios).size)
+    }
+
+    @Test
+    fun enactedGroupingResolutionsFeedAssessAndBankSumoGroundedCoherence() {
+        val cas = CasStore.inMemory()
+        val member = ContentId.of("group-member".encodeToByteArray())
+        val post = GroupingReorientation.GroupingPost(
+            group = GroupingReorientation.Group(42, _l[member]),
+            currentLabel = "code-42",
+            proposedLabel = "retrieval-cluster",
+            proposedSplit = null,
+            proposedMergeWith = null,
+            evidence = GroupingReorientation.ProposalEvidence(_l[member], emptyList()),
+            origin = "curator",
+        )
+        val relabel = GroupingReorientation.GroupingResolution.Relabel("retrieval-cluster")
+        val reject = GroupingReorientation.GroupingResolution.Reject
+        val acceptedCid = GroupingReorientation.enact(cas, post, relabel)
+        val rejectedCid = GroupingReorientation.enact(cas, post, reject)
+        val groupings = s_[
+            GroupCoherenceEnactment(post, relabel, acceptedCid.value),
+            GroupCoherenceEnactment(post, reject, rejectedCid.value),
+        ]
+
+        val assessments = CuratorImpulseRecipient.assess(
+            emptySeriesOf<CuratorImpulse>(),
+            emptySeriesOf<ReplayScenario>(),
+            groupings,
+        )
+        assertEquals(2, assessments.size, "grouping enactments feed assess beside transcript markers")
+        assertEquals(HindsightVerdict.SUPPORTED, assessments[0].verdict, "enacted relabel supports coherence")
+        assertEquals(HindsightVerdict.REFUTED, assessments[1].verdict, "enacted reject refutes the proposal")
+        assertTrue(assessments.toList().all { it.source == AssessmentSource.GROUP_COHERENCE })
+
+        val kif = CuratorImpulseRecipient.bank(assessments).toKifFile()
+        assertTrue("(instance group_ring8_42 Collection)" in kif, "group is SUMO-grounded as Collection")
+        assertTrue("(groupCoherence group_ring8_42 relabel)" in kif, "accepted resolution banks coherence")
+        assertTrue("(groupCoherence group_ring8_42 reject)" in kif, "rejected resolution banks negative observation")
+        assertTrue("(enactedResolution group_ring8_42 resolution_${acceptedCid.hex})" in kif, "resolution cid anchors provenance")
+        assertTrue("(=> (verdict impulse_patch_group-ring8-42 SUPPORTED)" in kif)
+        assertTrue("(=> (verdict impulse_patch_group-ring8-42 REFUTED)" in kif)
     }
 }

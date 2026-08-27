@@ -65,16 +65,17 @@ class CuratorImpulseElement(
     }
 
     /**
-     * Process one teaching pass: assess impulses against supplied scenarios, bank
-     * the verdicts, mint the projected signals. Returns the landed
-     * (angular → gloss) pairs for render captioning.
+     * Process one teaching pass: assess curator impulses against transcript scenarios AND
+     * enacted grouping resolutions, bank the verdicts, mint the projected signals. Returns
+     * the landed (angular → gloss) pairs for render captioning.
      */
     suspend fun teach(
         impulses: Series<CuratorImpulse>,
         scenarios: Series<ReplayScenario>,
+        groupings: Series<GroupCoherenceEnactment> = borg.trikeshed.lib.emptySeriesOf(),
     ): List<Join<Long, String>> {
         if (state != ElementState.ACTIVE) return emptyList()
-        val assessments = CuratorImpulseRecipient.assess(impulses, scenarios)
+        val assessments = CuratorImpulseRecipient.assess(impulses, scenarios, groupings)
         if (assessments.size == 0) return emptyList()
 
         // bank the verdicts as predicate logic (accumulates across passes)

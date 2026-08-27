@@ -177,6 +177,39 @@ object TypedefProductionSystem {
         }
         @Synchronized get() = field
 
+    // ── H5: definition-driven suppression ────────────────────────────
+    // A pointcut definition document with enabled=false is an ACTUAL suppression, not a
+    // landed document: the site stops producing events. The hot path pays a single volatile
+    // read; the key build happens only when at least one suppression is live.
+    //
+    // The rewriter's publish() carries (methodName, siteIdx) — no owner — so the gate is
+    // (method, site)-keyed: a pointcut on a method's site. A suppressed site's events are
+    // dropped at the source, so no slab ever carries them (not just an un-applied doc).
+
+    private val suppressedSites = HashSet<String>()
+    @Volatile private var hasSuppression = false
+    private fun siteKey(method: String, site: Int) = method + '\u0000' + site
+
+    /** enabled=false: drop this method+site's events at the source. */
+    @Synchronized
+    fun suppressSite(method: String, site: Int) {
+        if (suppressedSites.add(siteKey(method, site))) hasSuppression = true
+    }
+
+    /** enabled=true: lift a prior suppression. */
+    @Synchronized
+    fun enableSite(method: String, site: Int) {
+        if (suppressedSites.remove(siteKey(method, site)) && suppressedSites.isEmpty()) hasSuppression = false
+    }
+
+    @Synchronized
+    fun isSuppressedSite(method: String, site: Int): Boolean =
+        suppressedSites.contains(siteKey(method, site))
+
+    /** Hot-path check: volatile flag first, allocation only when a suppression is live. */
+    private inline fun hasSuppressedSite0(method: String, site: Int): Boolean =
+        hasSuppression && isSuppressedSite(method, site)
+
     // ── Slab subscriber ─────────────────────────────────────────────
 
     interface SlabSubscriber {
@@ -270,6 +303,9 @@ object TypedefProductionSystem {
         isAfter: Boolean
     ) {
         if (!active) return
+        // H5: a definition with enabled=false suppresses the site at the source — a single
+        // volatile read, the key build only when a suppression is live.
+        if (hasSuppressedSite0(methodName, siteIdx)) return
 
         val tdIdx   = TypedefTable.register(typedefName)
         val mIdx    = InternPool.intern(methodName)
@@ -400,5 +436,7 @@ object TypedefProductionSystem {
         seq = 0
         slabEpoch = 0
         subscriber = null
+        suppressedSites.clear()
+        hasSuppression = false
     }
 }

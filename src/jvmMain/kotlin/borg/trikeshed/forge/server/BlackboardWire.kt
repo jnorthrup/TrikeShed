@@ -6,18 +6,22 @@ import borg.trikeshed.parse.json.JsonSupport
 import borg.trikeshed.parse.confix.value
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.nio.charset.StandardCharsets
 
 class BlackboardWire(val blackboard: ConfixBlackboard, scope: CoroutineScope) {
     companion object {
-        val ROUTES: List<Pair<String, String>> = listOf("GET" to "/blackboard/facts", "POST" to "/blackboard/assert", "GET" to "/blackboard/sites", "GET" to "/blackboard/board")
+        val ROUTES: List<Pair<String, String>> = listOf("GET" to "/blackboard", "GET" to "/blackboard/facts", "POST" to "/blackboard/assert", "GET" to "/blackboard/sites", "GET" to "/blackboard/board")
         /** Paths the HTTP server must hand to [route] raw (SSE lives on them). */
         val STREAMING: Set<String> = setOf("/blackboard/facts")
     }
 
     private val assertChannel = Channel<String>(Channel.UNLIMITED)
+    /** H5: pointcut definition docs posted through the assert funnel apply to the live runtime. */
+    internal val pointcutDefinitions = borg.trikeshed.cursor.PointcutDefinitionWriter(blackboard, scope)
     private var sequence = 0L
 
     // Bounded ring of 256
@@ -30,7 +34,11 @@ class BlackboardWire(val blackboard: ConfixBlackboard, scope: CoroutineScope) {
                     @Suppress("UNCHECKED_CAST")
                     val map = JsonSupport.parse(payload) as? Map<String, Any?>
                     map?.forEach { (k, v) ->
-                        blackboard.put(k, v, "ide")
+                        // H5: definitions are not theater — route the assert-funnel key through
+                        // the production writer so enabled=false suppresses the runtime site.
+                        if (pointcutDefinitions.applyFunnelDoc(k, v) == null) {
+                            blackboard.put(k, v, "ide")
+                        }
                     }
                 }
             }
@@ -45,6 +53,16 @@ class BlackboardWire(val blackboard: ConfixBlackboard, scope: CoroutineScope) {
     }
 
     suspend fun route(method: String, path: String, text: String, respond: (suspend (ByteArray) -> Unit)? = null): JvmKanbanServer.HttpResponse? {
+        // R7: one consolidated blackboard page. Resource I/O stays off the reactor thread.
+        if (method == "GET" && (path == "/blackboard" || path == "/blackboard/")) {
+            return withContext(Dispatchers.IO) {
+                val html = BlackboardWire::class.java.classLoader
+                    .getResourceAsStream("web/blackboard.html")
+                    ?.bufferedReader(StandardCharsets.UTF_8)?.use { it.readText() }
+                    ?: return@withContext JvmKanbanServer.HttpResponse(404, "blackboard page not found", "text/plain; charset=utf-8")
+                JvmKanbanServer.HttpResponse(200, html, "text/html; charset=utf-8")
+            }
+        }
         if (method == "GET" && path.startsWith("/blackboard/facts")) {
             // H1 repair: `since` is a QUERY PARAMETER, not a path suffix.
             val query = path.substringAfter("?", "")
