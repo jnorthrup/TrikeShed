@@ -171,18 +171,17 @@ class PointcutBlackboardAdapter(
         val live = minOf(count, slab.size)
         if (live <= 0) return
         val threadId = Thread.currentThread().threadId()
-        // Lazy projection over the live prefix — no (0 until size).map materialization.
-        val prefix: Series<TypedefProductionSystem.TraceEvent> = live j { slab[it] }
-        val landed: Series<PointcutLanding?> = prefix α { evt ->
+        // Indexed projection, not α-inlining: the JVM verifier rejects an inlined
+        // lambda capturing private members of this class (bad invokespecial under
+        // Kotlin 2.x inline machinery — same root cause fixed in
+        // ContentEpistemicIngest.semanticSignals).
+        for (i in 0 until live) {
             try {
-                land(evt, threadId, nanoStart)
+                land(slab[i], threadId, nanoStart)
             } catch (t: Throwable) {
                 rejected++
-                null
             }
         }
-        // Series is lazy: force exactly once, in order, to perform the puts.
-        for (i in 0 until landed.a) landed.b(i)
     }
 
     /** Land a single ring [TypedefProductionSystem.TraceEvent]. */

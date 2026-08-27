@@ -121,6 +121,9 @@ class JvmVitals {
             "name" to (e.getStringOr("name") ?: "?"),
             "cause" to (e.getStringOr("cause") ?: "?"),
             "pauseMs" to pauseMs,
+            // H4: the GC lane's occupancy deltas — previously discarded with the event timestamp
+            "atMs" to runCatching { e.startTime.toEpochMilli() }.getOrDefault(System.currentTimeMillis()),
+            "longestPauseMs" to runCatching { e.getDuration("longestPause").toMillis() }.getOrDefault(-1L),
         )
         ring(recentGcs, d)
         _events.tryEmit(VitalEvent("gc", d))
@@ -129,6 +132,60 @@ class JvmVitals {
     private fun ring(dq: ConcurrentLinkedDeque<Map<String, Any?>>, v: Map<String, Any?>) {
         dq.addFirst(v)
         while (dq.size > RING) dq.pollLast()
+    }
+
+    // ── H3: the heap continent ───────────────────────────────────
+
+    /** One row of the heap histogram: per-class live set. */
+    data class HeapRow(val className: String, val count: Long, val bytes: Long)
+
+    /**
+     * Live-set continent: per-class `(class, count, bytes)` from
+     * `jcmd <pid> GC.class_histogram` (parsed — HeatSoak's shell-out returned
+     * unparsed text and stayed demo-gated). JMX `MemoryMXBean` scalar heap usage
+     * remains in [snapshot]; this adds the per-class shape the treemap renders.
+     */
+    fun heapHistogram(): Map<String, Any?> {
+        val rows = classHistogram()
+        val totalInstances = rows.sumOf { it.count }
+        val totalBytes = rows.sumOf { it.bytes }
+        return mapOf(
+            "atMs" to System.currentTimeMillis(),
+            "classes" to rows.size,
+            "instances" to totalInstances,
+            "bytes" to totalBytes,
+            "rows" to rows.take(256).map { mapOf("class" to it.className, "count" to it.count, "bytes" to it.bytes) },
+        )
+    }
+
+    /** jcmd GC.class_histogram parsed into rows; empty when jcmd is unavailable. */
+    private fun classHistogram(): List<HeapRow> = runCatching {
+        val pid = ProcessHandle.current().pid()
+        val jcmd = ProcessHandle.current().info().command().orElse("java").let { cmd ->
+            // find jcmd beside the java executable; fall back to PATH
+            val dir = cmd.substringBeforeLast('/', "")
+            if (dir.isNotEmpty()) "$dir/jcmd" else "jcmd"
+        }
+        val p = ProcessBuilder(jcmd, pid.toString(), "GC.class_histogram")
+            .redirectErrorStream(true).start()
+        val out = p.inputStream.bufferedReader().readText()
+        p.waitFor()
+        parseClassHistogram(out)
+    }.getOrDefault(emptyList())
+
+    /** The histogram text's `num: #instances #bytes class name` table → rows. */
+    internal fun parseClassHistogram(text: String): List<HeapRow> {
+        val rows = ArrayList<HeapRow>()
+        for (line in text.lineSequence()) {
+            val t = line.trim()
+            if (t.isEmpty() || !t[0].isDigit()) continue
+            // "num:" (jcmd prints the index with a colon), then instances, bytes, class name
+            val m = Regex("^(\\d+):\\s+(\\d+)\\s+(\\d+)\\s+(.+)$").find(t) ?: continue
+            val className = m.groupValues[4].trim()
+            if (className == "Total") continue
+            rows += HeapRow(className, m.groupValues[2].toLongOrNull() ?: 0L, m.groupValues[3].toLongOrNull() ?: 0L)
+        }
+        return rows.sortedByDescending { it.bytes }
     }
 
     /** The whole instrument cluster as one JSON-shaped map. */

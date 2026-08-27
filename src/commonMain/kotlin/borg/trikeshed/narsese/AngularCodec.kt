@@ -86,6 +86,18 @@ object AngularCodec {
     /** Public taxonomy signature of a key — cohort selection (Hotelling, pen verbs). */
     fun taxonomySigOfKey(key: String?): Int = taxonomySig(key)
 
+    /**
+     * The COORDINATE for a CAS fragment: 16-bit simhash of its text surface.
+     * High byte = the 8-bit top zoom ring; full 16 bits = the next ring; the
+     * 64-bit [encode] word = the deepest ring. Locality-preserving — near
+     * duplicates land within small hamming distance — unlike the FNV identity
+     * hash, which keeps its own dedup job.
+     */
+    fun fragmentCode(text: String): Int = simhash16(text)
+
+    /** The 8-bit top ring of a fragment code: the sortable high byte of [fragmentCode]. */
+    fun ring8(code: Int): Int = (code ushr 8) and 0xFF
+
     /** substrate(3b) | mechanism(3b) | subject(2b) — compressed facet locality. */
     private fun facetBits(facet: FacetClassification?): Int {
         if (facet == null) return 0
@@ -110,7 +122,7 @@ object AngularCodec {
      * 16-bit simhash over character trigrams: per-trigram FNV votes each bit
      * up/down; the sign field is the hash. Similar surfaces → small hamming.
      */
-    internal fun simhash16(term: String): Int {
+    fun simhash16(term: String): Int {
         if (term.isEmpty()) return 0
         val votes = IntArray(16)
         val s = term.lowercase()

@@ -38,6 +38,42 @@ typealias AcpResponse = Join<String, AcpUsage>
 
 /** ACP model card — capability advertisement */
 typealias AcpCapability = String           // "chat", "stream", "tools", "vision", "embed"
+
+/**
+ * Rich-media capability dimensions (plan step 6): DECLARED now so routes,
+ * presets, and contracts can name them; model bindings stay deferred —
+ * env-gated exactly like [borg.trikeshed.jules.BrainClient] endpoint
+ * discovery. A card not bound to a rich-media lane simply never advertises
+ * these; nothing else in the mux changes shape.
+ *
+ *  - video.gen  : text→video generation
+ *  - audio.gen  : text→speech / text→audio generation
+ *  - image.gen  : text→image generation
+ *  - doc.ingest : document → structured text (Tika/OCR lane)
+ */
+object AcpRichMedia {
+    const val VIDEO_GEN = "video.gen"
+    const val AUDIO_GEN = "audio.gen"
+    const val IMAGE_GEN = "image.gen"
+    const val DOC_INGEST = "doc.ingest"
+
+    /** The closed set, for contract routes and validation. */
+    val all: Set<String> = setOf(VIDEO_GEN, AUDIO_GEN, IMAGE_GEN, DOC_INGEST)
+
+    /**
+     * Binding gate: a rich-media capability is routable only when its
+     * enabling environment is present (same discipline as provider keys —
+     * declare the dimension, defer the lane). envPresent is injected, not
+     * read here, keeping commonMain free of platform env access.
+     */
+    fun isBound(cap: String, envPresent: (String) -> Boolean): Boolean = when (cap) {
+        VIDEO_GEN -> envPresent("VIDEO_GEN_ENDPOINT")
+        AUDIO_GEN -> envPresent("AUDIO_GEN_ENDPOINT")
+        IMAGE_GEN -> envPresent("IMAGE_GEN_ENDPOINT")
+        DOC_INGEST -> true // the Tika lane ships in-process
+        else -> false
+    }
+}
 typealias AcpModelCard = Join<String, Join<Series<AcpCapability>, AcpMeta>>
 // model_id j (capabilities j default_meta)
 

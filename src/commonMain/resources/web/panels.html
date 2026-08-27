@@ -129,37 +129,37 @@ button.stop{border-color:var(--err);color:var(--err)}
 <script>
 "use strict";
 /* ── registry of node types: each speaks a REAL daemon surface ─────────── */
-const TYPES = {
+/* ── RUNNERS: execution bodies ONLY. The node VOCABULARY — titles, ports,
+   kinds, cardinality, param defaults, source/sink/wide flags — is authored
+   ONCE in Kotlin (LcncContracts) and hydrated at boot from
+   /api/lcnc/contracts. This file carries NO type table; RouteParityGate
+   fails the build if one reappears. A runner without a server contract is
+   dead code and surfaces in the console at boot. */
+const RUNNERS = {
   "vm.spawn": {
-    title:"vm spawn", ins:[], outs:["vmId"],
-    params:{ id:{v:"vm-panel"}, facet:{v:"python",opts:["python","js"]}, wallMillis:{v:"1800000"}, world:{v:"",ph:"host dirs, comma-sep"} },
     async run(n){
       const b={id:p(n,"id"),facet:p(n,"facet"),wallMillis:+p(n,"wallMillis")};
       const w=p(n,"world").split(",").map(s=>s.trim()).filter(Boolean); if(w.length)b.world=w;
       const r=await api("POST","/api/vm/spawn",b);
       if(r.error && !String(r.error).includes("exists")) throw r.error;
       return {vmId:r.id||b.id};
-    }},
+    },
+  },
   "vm.eval": {
-    title:"vm eval", ins:["vmId","source?"], outs:["value","cid"],
-    params:{ source:{v:"1+1",ta:1} },
     async run(n,i){
       const src = i["source?"]!==undefined ? String(i["source?"]) : p(n,"source");
       const r=await api("POST","/api/vm/"+enc(i.vmId)+"/eval",{source:src,name:"panel"});
       if(r.error) throw r.error;
       return {value:r.value,cid:r.cid};
-    }},
+    },
+  },
   "vm.revoke": {
-    title:"vm revoke", ins:["vmId"], outs:["ok"],
-    params:{},
-    async run(n,i){ const r=await api("POST","/api/vm/"+enc(i.vmId)+"/revoke",{}); return {ok:!r.error}; }},
+    async run(n,i){ const r=await api("POST","/api/vm/"+enc(i.vmId)+"/revoke",{}); return {ok:!r.error}; },
+  },
   "vms.list": {
-    title:"sub-vms", ins:["trigger?"], outs:["rows"],
-    params:{},
-    async run(){ const r=await api("GET","/api/vm"); return {rows:r.rows||r}; }},
+    async run(){ const r=await api("GET","/api/vm"); return {rows:r.rows||r}; },
+  },
   "pytest.pure": {
-    title:"pytest (pure, in-vm)", ins:["vmId"], outs:["exit","tail"],
-    params:{ path:{v:"/workspace/computronium/tests"}, flags:{v:"-q -s -o addopts= -p no:cacheprovider -p no:cov --continue-on-collection-errors"} },
     async run(n,i){
       const flags=p(n,"flags").split(/\s+/).filter(Boolean).map(f=>JSON.stringify(f)).join(",");
       const src=`import sys, io, __future__, importlib.machinery
@@ -185,107 +185,88 @@ finally:
       const r=await api("POST","/api/vm/"+enc(i.vmId)+"/eval",{source:src,name:"panel-pytest"});
       if(r.error) throw r.error;
       return {exit:r.value&&r.value[0],tail:r.value&&r.value[1]};
-    }},
+    },
+  },
   "graal.vitals": {
-    title:"jvm vitals", ins:["trigger?"], outs:["json"],
-    params:{},
-    async run(){ return {json:await api("GET","/api/graal/vitals")}; }},
+    async run(){ return {json:await api("GET","/api/graal/vitals")}; },
+  },
   "http.get": {
-    title:"http get", ins:["trigger?"], outs:["json"],
-    params:{ path:{v:"/api/health"} },
-    async run(n){ return {json:await api("GET",p(n,"path"))}; }},
+    async run(n){ return {json:await api("GET",p(n,"path"))}; },
+  },
   "http.post": {
-    title:"http post", ins:["body"], outs:["json"],
-    params:{ path:{v:"/api/submit"} },
-    async run(n,i){ return {json:await api("POST",p(n,"path"),i.body)}; }},
+    async run(n,i){ return {json:await api("POST",p(n,"path"),i.body)}; },
+  },
   "board.get": {
-    title:"kanban board", ins:["trigger?"], outs:["json"],
-    params:{},
-    async run(){ return {json:await api("GET","/api/board")}; }},
+    async run(){ return {json:await api("GET","/api/board")}; },
+  },
   "timer": {
-    title:"timer", ins:[], outs:["tick"], source:true,
-    params:{ seconds:{v:"5"} },
-    async run(n){ return {tick:Date.now()}; }},
+    async run(n){ return {tick:Date.now()}; },
+  },
   "js": {
-    title:"js transform", ins:["x"], outs:["y"],
-    params:{ expr:{v:"x",ta:1,ph:"expression over x"} },
-    async run(n,i){ const f=new Function("x","return ("+p(n,"expr")+")"); return {y:f(i.x)}; }},
+    async run(n,i){ const f=new Function("x","return ("+p(n,"expr")+")"); return {y:f(i.x)}; },
+  },
   "pick": {
-    title:"pick path", ins:["x"], outs:["y"],
-    params:{ path:{v:"memory.heapUsed",ph:"dot.path"} },
-    async run(n,i){ let v=i.x; for(const k of p(n,"path").split(".").filter(Boolean)) v=v?.[k]; return {y:v}; }},
+    async run(n,i){ let v=i.x; for(const k of p(n,"path").split(".").filter(Boolean)) v=v?.[k]; return {y:v}; },
+  },
   "display": {
-    title:"display", ins:["x"], outs:[], sink:true,
-    params:{},
-    async run(n,i){ setResult(n, i.x); return {}; }},
+    async run(n,i){ setResult(n, i.x); return {}; },
+  },
   "gauge": {
-    title:"gauge", ins:["x"], outs:[], sink:true,
-    params:{ label:{v:"value"} },
     async run(n,i){
       let v=i.x; if(typeof v==="number"&&v>9999) v=(v/1e6).toFixed(1)+"M";
       n.el.querySelector(".gaugeval").textContent=String(v);
       n.el.querySelector(".gaugelabel").textContent=p(n,"label"); return {};
-    }},
-  /* ── production patch-panel: mux, keys, scopes, causality, coherence ── */
+    },
+  },
   "mux.chat": {
-    title:"mux chat (provider-neutral)", ins:["prompt?"], outs:["content","model"],
-    params:{ prompt:{v:"",ta:1,ph:"prompt (or wire one in)"}, system:{v:"",ph:"system (optional)"}, maxTokens:{v:"512"}, temperature:{v:"0.2"} },
     async run(n,i){
       const body={prompt: i["prompt?"]!==undefined?String(i["prompt?"]):p(n,"prompt"), maxTokens:+p(n,"maxTokens"), temperature:+p(n,"temperature")};
       if(p(n,"system")) body.system=p(n,"system");
       const r=await api("POST","/api/mux/chat",body);
       if(r.verdict!=="ok") throw (r.detail||r.verdict||"mux error");
       return {content:r.content, model:r.model};
-    }},
+    },
+  },
   "mux.models": {
-    title:"mux models", ins:["trigger?"], outs:["models"],
-    params:{},
-    async run(){ const r=await api("GET","/api/mux/models"); return {models:r.models||r}; }},
+    async run(){ const r=await api("GET","/api/mux/models"); return {models:r.models||r}; },
+  },
   "keys.status": {
-    title:"keymux roster (presence only)", ins:["trigger?"], outs:["roster"],
-    params:{},
-    async run(){ const r=await api("GET","/api/mux/keys"); return {roster:r.roster||r}; }},
+    async run(){ const r=await api("GET","/api/mux/keys"); return {roster:r.roster||r}; },
+  },
   "project.kill": {
-    title:"project db kill", ins:["trigger?"], outs:["verdict"],
-    params:{ name:{v:"",ph:"project db name (hierarchy kill)"} },
     async run(n){
       const name=p(n,"name"); if(!name) throw "name required";
       const r=await api("DELETE","/api/projects/"+encodeURIComponent(name));
       return {verdict:r};
-    }},
+    },
+  },
   "project.mount": {
-    title:"mount scope (git|assets)", ins:["path?"], outs:["scope"],
-    params:{ path:{v:"",ph:"/absolute/dir — or drop a folder on the canvas"} },
     async run(n,i){
       const r=await api("POST","/api/projects",{path: i["path?"]!==undefined?String(i["path?"]):p(n,"path")});
       if(r.verdict!=="ok") throw (r.detail||"mount refused");
       return {scope:r};
-    }},
+    },
+  },
   "project.list": {
-    title:"mounted scopes", ins:["trigger?"], outs:["scopes"],
-    params:{},
-    async run(){ const r=await api("GET","/api/projects"); return {scopes:r.scopes||r}; }},
+    async run(){ const r=await api("GET","/api/projects"); return {scopes:r.scopes||r}; },
+  },
   "kg.ingest": {
-    title:"kg → nal (turtle/kif)", ins:["text?"], outs:["report"],
-    params:{ kg:{v:"",ta:1,ph:"@prefix ex: <...> .\nex:a ex:causes ex:b ."} },
     async run(n,i){
       const body = i["text?"]!==undefined?String(i["text?"]):p(n,"kg");
       const resp = await fetch("/api/beliefs/kg",{method:"POST",headers:{"Content-Type":"text/turtle"},body});
       const r = JSON.parse(await resp.text());
       if(r.error) throw r.error;
       return {report:r};
-    }},
+    },
+  },
   "beliefs.review": {
-    title:"turn review (induction)", ins:["facts"], outs:["landed"],
-    params:{ turnSucceeded:{v:"true",opts:["true","false"]} },
     async run(n,i){
       const r=await api("POST","/api/beliefs/review",{facts:i.facts, turnSucceeded:p(n,"turnSucceeded")==="true"});
       if(r.error) throw r.error;
       return {landed:r};
-    }},
+    },
+  },
   "beliefs.resonate": {
-    title:"resonance (support/refutation)", ins:["goal?"], outs:["synonyms","antonyms"],
-    params:{ goal:{v:"",ph:"solver proposal"}, taxonomy:{v:""}, mode:{v:"whitened",opts:["whitened","hamming"]}, k:{v:"4"} },
     async run(n,i){
       const body={goal: i["goal?"]!==undefined?String(i["goal?"]):p(n,"goal"), k:+p(n,"k")};
       if(p(n,"taxonomy")) body.taxonomy=p(n,"taxonomy");
@@ -293,18 +274,15 @@ finally:
       const r=await api("POST","/api/beliefs/resonate",body);
       if(r.error) throw r.error;
       return {synonyms:r.synonymPeaks, antonyms:r.antonymPeaks};
-    }},
+    },
+  },
   "beliefs.introspect": {
-    title:"NAL-9 introspection", ins:["trigger?"], outs:["field"],
-    params:{},
-    async run(){ const r=await api("GET","/api/beliefs/introspect"); return {field:r}; }},
+    async run(){ const r=await api("GET","/api/beliefs/introspect"); return {field:r}; },
+  },
   "pointcut.routes": {
-    title:"pointcut routes", ins:["trigger?"], outs:["routes"],
-    params:{},
-    async run(){ const r=await api("GET","/api/graal/pointcuts"); return {routes:r.routes||r}; }},
+    async run(){ const r=await api("GET","/api/graal/pointcuts"); return {routes:r.routes||r}; },
+  },
   "board.view": {
-    title:"kanban board (summary)", ins:["trigger?"], outs:["board","alerts"],
-    params:{},
     async run(){
       const r=await api("GET","/api/board");
       const cols=(r.columns||[]).map(c=>c.id+":"+(c.count!=null?c.count:"?")+(c.wipLimit?"/"+c.wipLimit:"")).join("  ");
@@ -313,14 +291,9 @@ finally:
       const wipAlerts=(r.columns||[]).filter(c=>c.wipLimit&&c.count>c.wipLimit).map(c=>"WIP "+c.id+" "+c.count+"/"+c.wipLimit);
       return {board:{seq:r.sequence,cols:cols,cards:items.length},
               alerts:{contested:contested,wip:wipAlerts}};
-    }},
-  /* ── generic composition primitives: reusable for ANY grouped/draggable
-     list, not specific to kanban or to Hermes' board shape. Kanban is not
-     implemented here — it is COMPOSED from these plus http.get/pick/js/
-     http.post (already generic) in the saved "kanban" program. ── */
+    },
+  },
   "list.groupBy": {
-    title:"group by key (generic)", ins:["x"], outs:["groups"],
-    params:{ key:{v:"status",ph:"field name (dot.path ok)"} },
     async run(n,i){
       const key=p(n,"key"); const out={};
       for(const item of (i.x||[])){
@@ -328,49 +301,31 @@ finally:
         const g=String(v); (out[g]=out[g]||[]).push(item);
       }
       return {groups:out};
-    }},
-  "dom.board": {
-    title:"draggable grouped board (generic)", ins:["groups","columns?"], outs:["move"],
-    wide:true,
-    params:{
-      idField:{v:"id"}, titleField:{v:"title"}, subtitleField:{v:"id"}, badgeField:{v:"priority"},
     },
+  },
+  "dom.board": {
     async run(n,i){ n._groups=i.groups||{}; n._cols=i["columns?"]||null; return {move:n._lastMove||null}; },
     render(n){ renderGroupedBoard(n); },
   },
-  /* ── the store as a browsable, ACTIONABLE surface — not a JSON dump you can
-     only look at. Click a program name, get a program.ref node wired to it. ── */
   "panels.list": {
-    title:"stored programs (click → embed)", ins:["trigger?"], outs:["panels"],
-    wide:true,
-    params:{},
     async run(){ const r=await api("GET","/api/panels"); return {panels:r.panels||[]}; },
     render(n,out){ renderPanelsList(n,out&&out.panels||[]); },
   },
-  /* ── a window onto another graph, not a function call. Double-click / the
-     dive-in strip to descend the SAME zoomable canvas into the referenced
-     program; ⌂ root or a breadcrumb segment climbs back out. Recursive by
-     construction: if that program also holds a program.ref, diving in again
-     just repeats this. ── */
   "program.ref": {
-    title:"program (dive in)", ins:[], outs:[], sink:true,
-    params:{ name:{v:"",ph:"stored program name"} },
     async run(){ return {}; },
     render(n){ renderProgramRef(n); },
   },
   "note": {
-    title:"note", ins:[], outs:[], sink:true,
-    params:{ text:{v:"",ta:1,ph:"sticky note"} },
-    async run(){ return {}; }},
+    async run(){ return {}; },
+  },
   "graal.events": {
-    title:"graal event source (SSE)", ins:[], outs:["event"], source:true,
-    params:{ filter:{v:"",ph:"substring filter (gc, compile, deopt, commit…)"} },
-    async run(n){ return {event:n._lastEvent||null}; }},
+    async run(n){ return {event:n._lastEvent||null}; },
+  },
   "vm.events": {
-    title:"vm event source (SSE)", ins:[], outs:["event"], source:true,
-    params:{ vmId:{v:"",ph:"empty = all vms"}, kind:{v:"",ph:"spawned|evaluated|revoked"} },
-    async run(n){ return {event:n._lastEvent||null}; }},
+    async run(n){ return {event:n._lastEvent||null}; },
+  },
 };
+
 /* ── graph state ───────────────────────────────────────────────────────── */
 let G={nodes:[],wires:[],seq:1};              // wires: {from:[nodeId,port], to:[nodeId,port]}
 let view={x:60,y:60,z:1};
@@ -551,9 +506,9 @@ function popTo(depth){
 }
 /* ── node DOM ──────────────────────────────────────────────────────────── */
 function addNode(type,x,y,params){
-  const t=TYPES[type]; if(!t) return null;
+  const t=CONTRACTS[type]; if(!t) return null;
   const n={id:"n"+(G.seq++),type,x,y,params:{}};
-  for(const k in t.params) n.params[k]=params?.[k]??t.params[k].v;
+  for(const k in (t.params||{})) n.params[k]=params?.[k]??t.params[k].v;
   G.nodes.push(n); buildNode(n); redraw(); save(); return n;
 }
 function portType(name){
@@ -565,7 +520,7 @@ function portType(name){
   return "t-json";
 }
 function buildNode(n){
-  const t=TYPES[n.type];
+  const t=CONTRACTS[n.type]; if(!t) return; // vocabulary is server-owned
   const el=document.createElement("div"); el.className="node"; el.dataset.id=n.id; n.el=el;
   const hd=document.createElement("div"); hd.className="hd";
   hd.innerHTML=`<i></i><b>${t.title}</b><s title="delete">✕</s>`;
@@ -708,9 +663,10 @@ function showMenu(cx,cy){
     addNode(k,(cx-view.x-world.getBoundingClientRect().left+viewport.getBoundingClientRect().left)/view.z,(cy-40-view.y)/view.z); };
   const render=(filter)=>{
     box.innerHTML="";
-    for(const k in TYPES){
-      if(filter && !k.includes(filter) && !TYPES[k].title.includes(filter)) continue;
-      const d=document.createElement("div"); d.className="item"; d.textContent=k+"  ·  "+TYPES[k].title;
+    for(const k of Object.keys(CONTRACTS).sort()){
+      const c=CONTRACTS[k];
+      if(filter && !k.includes(filter) && !c.title.toLowerCase().includes(filter)) continue;
+      const d=document.createElement("div"); d.className="item"; d.textContent=k+"  ·  "+c.title;
       d.addEventListener("click",()=>place(k));
       box.appendChild(d);
     }
@@ -848,7 +804,8 @@ function topo(){
   return order.map(id=>G.nodes.find(n=>n.id===id));
 }
 async function runNode(n,cache){
-  const t=TYPES[n.type];
+  const t=CONTRACTS[n.type]; const R=RUNNERS[n.type];
+  if(!t||!R) return undefined;
   const inputs={};
   for(const w of inputsOf(n.id)){
     const src=cache[w.from[0]];
@@ -858,9 +815,9 @@ async function runNode(n,cache){
   for(const name of t.ins){ if(!name.endsWith("?") && inputs[name]===undefined) return undefined; }
   n.el.classList.remove("ok","err"); n.el.classList.add("running");
   try{
-    const out=await t.run(n,inputs);
+    const out=await R.run(n,inputs);
     n.el.classList.remove("running"); n.el.classList.add("ok");
-    if(t.render) t.render(n,out);
+    if(R.render) R.render(n,out);
     else if(!t.sink && n.type!=="display" && out!==undefined && Object.keys(out).length) setResult(n,out);
     return out;
   }catch(e){
@@ -886,7 +843,7 @@ async function runAll(fromId){
 $("#runBtn").addEventListener("click",()=>{
   // arm sources (timers + SSE), run everything once
   for(const n of G.nodes){
-    if(TYPES[n.type].source&&n.type==="timer"&&!n._timer){
+    if(CONTRACTS[n.type]&&CONTRACTS[n.type].source&&n.type==="timer"&&!n._timer){
       const s=Math.max(1,+p(n,"seconds")||5);
       n._timer=setInterval(()=>runAll(n.id), s*1000);
     }
@@ -949,7 +906,7 @@ function load(data){
   for(const n of G.nodes){ if(n._timer)clearInterval(n._timer); if(n._es){n._es.close();n._es=null;} n.el.remove(); }
   G={nodes:[],wires:[],seq:data.seq||1};
   if(data.view) view=data.view;
-  for(const sn of data.nodes||[]){ if(!TYPES[sn.type])continue; const n={...sn,params:{...sn.params}}; G.nodes.push(n); buildNode(n); }
+  for(const sn of data.nodes||[]){ if(!CONTRACTS[sn.type])continue; const n={...sn,params:{...sn.params}}; G.nodes.push(n); buildNode(n); }
   G.wires=(data.wires||[]).filter(w=>G.nodes.find(n=>n.id===w.from[0])&&G.nodes.find(n=>n.id===w.to[0]));
   applyView(); redraw(); save();
 }
@@ -986,6 +943,9 @@ $("#importBtn").addEventListener("click",()=>$("#fileIn").click());
 $("#fileIn").addEventListener("change",async e=>{ const f=e.target.files[0]; if(f) load(JSON.parse(await f.text())); });
 $("#clearBtn").addEventListener("click",()=>{ if(confirm("clear the panel?")) load({nodes:[],wires:[]}); });
 /* ── boot: restore, or seed the starter panel ──────────────────────────── */
+// Boot waits for contract hydration: the vocabulary is server-owned, and the
+// starter board's addNode calls must see it or the first paint is empty.
+(async()=>{ await syncContracts();
 let stored=null; try{ stored=JSON.parse(localStorage.getItem("trikeshed.panels.v3")); }catch(e){}
 if(stored&&stored.nodes&&stored.nodes.length){ load(stored); }
 else {
@@ -1038,12 +998,13 @@ applyView(); requestAnimationFrame(redraw);
 // arm timer sources and run once immediately — a freshly loaded panel shows
 // LIVE state on first paint, not an inert diagram waiting for a click.
 for(const n of G.nodes){
-  if(TYPES[n.type]&&TYPES[n.type].source&&n.type==="timer"&&!n._timer){
+  if(CONTRACTS[n.type]&&CONTRACTS[n.type].source&&n.type==="timer"&&!n._timer){
     const s=Math.max(1,+p(n,"seconds")||5);
     n._timer=setInterval(()=>runAll(n.id), s*1000);
   }
 }
 runAll();
+})();
 </script>
 </body>
 </html>

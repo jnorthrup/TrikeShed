@@ -238,7 +238,16 @@ class ModelMux internal constructor(
         assessmentId: String? = null,
         maxTokens: Int? = null,
         temperature: Double? = null,
+        /**
+         * Conversation identity (plan step 5): the frame-chain cid this call
+         * belongs to. Stamped verbatim on the receipt's `assessmentId` slot —
+         * one provenance field, two names: callers from the kanban dispatcher
+         * pass a descriptor id, callers from the wire pass the contextId.
+         * Receipt → frame reconciliation needs no second field.
+         */
+        contextId: String? = null,
     ): Result<AcpResponse> {
+        val receiptAssessment = assessmentId ?: contextId
         if (modelId.isEmpty()) return Result.failure(IllegalArgumentException("modelId must be non-empty"))
         val sessionResult = session(modelId)
         if (sessionResult.isFailure) return Result.failure(sessionResult.exceptionOrNull()!!)
@@ -279,7 +288,7 @@ class ModelMux internal constructor(
                             modelId = modelId, providerId = card.id, requestHash = requestHash,
                             action = "chat", httpStatus = 200, latencyMs = kotlinx.datetime.Clock.System.now().toEpochMilliseconds() - t0,
                             inputTokens = inputTokens, outputTokens = outputTokens, cachedHit = true,
-                            assessmentId = assessmentId, sessionId = session.sessionId,
+                            assessmentId = receiptAssessment, sessionId = session.sessionId,
                             cacheReadTokens = inputTokens, cacheWriteTokens = 0,
                         )
                     )
@@ -324,7 +333,7 @@ class ModelMux internal constructor(
                     modelId = modelId, providerId = card.id, requestHash = requestHash,
                     action = "chat", httpStatus = httpStatus, latencyMs = kotlinx.datetime.Clock.System.now().toEpochMilliseconds() - t0,
                     inputTokens = inputTokens, outputTokens = outputTokens, cachedHit = false,
-                    assessmentId = assessmentId, sessionId = session.sessionId,
+                    assessmentId = receiptAssessment, sessionId = session.sessionId,
                     cacheWriteTokens = inputTokens,
                 )
             )
@@ -335,7 +344,7 @@ class ModelMux internal constructor(
                     modelId = modelId, providerId = modelId, requestHash = "0",
                     action = "chat", httpStatus = httpStatus,
                     latencyMs = kotlinx.datetime.Clock.System.now().toEpochMilliseconds() - t0,
-                    assessmentId = assessmentId, sessionId = session.sessionId,
+                    assessmentId = receiptAssessment, sessionId = session.sessionId,
                     error = t,
                 )
             )

@@ -499,7 +499,20 @@ class MuxReactorElement(
         status = status,
         leasedTo = leasedTo,
         leaseExpiresAt = leaseExpiresAt,
+        lastContextId = lastContextId,
     )
+
+    /**
+     * Affinity's write side (plan step 6): record that [keyId] last served
+     * [contextId]. `QuotaLegion.nextKey(preferKey = ...)` reads this to keep
+     * a conversation on its warm lane.
+     */
+    fun recordContext(keyId: String, contextId: String): MuxKeyEntry? {
+        val key = keysById[keyId] ?: return null
+        key.lastContextId = contextId
+        publishState()
+        return key.toImmutable()
+    }
 }
 
 suspend fun openMuxReactorElement(
@@ -549,6 +562,12 @@ data class MuxKeyEntry(
     val status: MuxKeyStatus = MuxKeyStatus.ACTIVE,
     val leasedTo: String? = null,
     val leaseExpiresAt: Long = 0,
+    /**
+     * The last conversation identity served by this key (plan step 6).
+     * Affinity's write side: `preferKey` reads it to route a follow-up call
+     * for the same context to the SAME key — the warm lane.
+     */
+    val lastContextId: String? = null,
 )
 
 @Serializable
@@ -625,6 +644,7 @@ private data class MutableMuxKey(
     var leasedTo: String? = null,
     var leaseStartedAt: Long = 0,
     var leaseExpiresAt: Long = 0,
+    var lastContextId: String? = null,
 )
 
 private fun emptyState(config: MuxReactorConfig): MuxReactorState = MuxReactorState(

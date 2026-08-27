@@ -165,7 +165,27 @@ class CouchWireRouter(
             if (m != "GET") return WireReply.methodNotAllowed(m)
             return vhost("/" + tail.drop(1).joinToString("/")) ?: WireReply.notFound("no rewrite matched")
         }
+        if (tail[0] == "_view") {
+            if (m != "GET") return WireReply.methodNotAllowed(m)
+            if (tail.size != 2) return WireReply.notFound("missing_named_view")
+            val r = viewRoute.handle(id, tail[1], query)
+            return WireReply.json(r.status, r.json)
+        }
         return WireReply.notFound("unsupported design handler ${tail[0]} on $id")
+    }
+
+    /** The `_view` route core mounted over this database — the same engine `CouchHttpSurface` serves. */
+    private val viewRoute: borg.trikeshed.utils.rfxhttp.ViewRoute by lazy {
+        val docs = object : borg.trikeshed.utils.rfxhttp.ViewDocs {
+            override fun all(): List<Pair<String, Map<String, Any?>>> =
+                db.store.all().filter { !db.isTombstone(it) && !it.id.startsWith("_design/") }
+                    .map { it.id to db.render(it, db.store.head.getRev(it.id)).filterKeys { k -> k != "_id" && k != "_rev" } }
+
+            override fun body(id: String): Map<String, Any?>? = db.docJson(id)?.filterKeys { k -> k != "_id" && k != "_rev" }
+
+            override fun couchDoc(id: String): Map<String, Any?>? = db.docJson(id)
+        }
+        borg.trikeshed.utils.rfxhttp.ViewRoute(docs)
     }
 
     private fun document(m: String, rest: List<String>, query: Map<String, String>, body: ByteArray): WireReply {

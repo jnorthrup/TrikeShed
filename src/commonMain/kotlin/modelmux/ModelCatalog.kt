@@ -15,6 +15,15 @@ data class ModelCatalogEntry(
     val latencyEstimateMs: Int,
     /** Prompt-token price the provider quoted; null = unknown (discovery refuses to invent). */
     val pricePerMillionPromptTokens: Double? = null,
+    /**
+     * Cache-affinity fact for THIS request: how much of the candidate's
+     * context is already warm for the conversation (plan step 6). Computed
+     * OUTSIDE the strategies — the provider-blind invariant forbids a
+     * strategy from reading provider identity, but affinity is not identity,
+     * it is a neutral fact about prefix reuse, so the catalog carries it the
+     * same way it carries quotaRemaining. 0 = cold lane.
+     */
+    val affinityScore: Double = 0.0,
 )
 
 class ModelCatalog(val entries: Series<ModelCatalogEntry>) : Cursor {
@@ -27,11 +36,12 @@ class ModelCatalog(val entries: Series<ModelCatalogEntry>) : Cursor {
     private val quotaMeta = ColumnMeta("quotaRemaining", IOMemento.IoInt, null)
     private val latencyMeta = ColumnMeta("latencyEstimateMs", IOMemento.IoInt, null)
     private val priceMeta = ColumnMeta("pricePerMillionPromptTokens", IOMemento.IoDouble, null)
+    private val affinityMeta = ColumnMeta("affinityScore", IOMemento.IoDouble, null)
 
     override val b: (Int) -> RowVec
         get() = { rowIdx ->
             val entry = entries.b(rowIdx)
-            6 j { colIdx ->
+            7 j { colIdx ->
                 when (colIdx) {
                     0 -> entry.provider j { providerMeta }
                     1 -> entry.model j { modelMeta }
@@ -39,6 +49,7 @@ class ModelCatalog(val entries: Series<ModelCatalogEntry>) : Cursor {
                     3 -> entry.quotaRemaining j { quotaMeta }
                     4 -> entry.latencyEstimateMs j { latencyMeta }
                     5 -> (entry.pricePerMillionPromptTokens ?: 0.0) j { priceMeta }
+                    6 -> entry.affinityScore j { affinityMeta }
                     else -> error("Invalid column index: $colIdx")
                 }
             }

@@ -191,17 +191,28 @@ function node(name,parent){return{name,parent,children:new Map(),bytes:0,mass:0,
 /* Nonce vaults: content-addressed storage planes. Real, divable, but they must not own the map. */
 const VAULTS=new Set(['.git','lost-found','subtree-cache','objects','worktrees']);
 function massOf(bytes,topName){const m=Math.log2(2+bytes);return VAULTS.has(topName)?m*0.18:m;}
-/* The one cursor: rows = [id, bytes, lastSeq, revGen]. Terrain, sheets, ledger and layers are
-   all projections over it — 'everything is a cursor' holds on the client too. */
+/* The one cursor: rows = [id, bytes, lastSeq, revGen, code]. Terrain, sheets, ledger and layers are
+   all projections over it — 'everything is a cursor' holds on the client too. The 5th element is
+   the AngularCodec coordinate: in SIMILARITY arrangement the tree splits by code nibbles
+   (sortable, the hash can't do this); in POSITIONAL arrangement it splits by id path as before.
+   The toggle itself is served state (T), never JS invention. */
 let maxSeq=1;
+let lastRows=null;
+let ARRANGE=localStorage.getItem('arrange')||'positional';
+function toggleArrange(){ARRANGE=ARRANGE==='positional'?'similarity':'positional';localStorage.setItem('arrange',ARRANGE);if(lastRows)buildTree(lastRows);}
 function buildTree(rows){
+  lastRows=rows;
   root=node('trikeshed',null);root.rect={x:0,y:0,w:W,h:H};byId=new Map();maxSeq=1;
-  for(const [id,bytes,seq,gen] of rows){
-    const parts=id.split('/').filter(p=>p.length);let n=root;
+  for(const row of rows){
+    const [id,bytes,seq,gen,code]=row;
+    const parts=ARRANGE==='similarity'
+      ? ['code-'+(((code|0)>>8)&0xFF).toString(16).padStart(2,'0'),'code-'+((code|0)&0xFFFF).toString(4).padStart(1,'0'),id]
+      : id.split('/').filter(p=>p.length);
+    let n=root;
     const mass=massOf(bytes,parts[0]);
     for(let i=0;i<parts.length;i++){
       let c=n.children.get(parts[i]);
-      if(!c){c=node(parts[i],n===root?null:n);if(n===root)c.hue=hueOf(parts[i]);else c.hue=n.hue;c.parent=n;n.children.set(parts[i],c);}
+      if(!c){c=node(parts[i],n===root?null:n);if(n===root)c.hue=ARRANGE==='similarity'?(code|0)%360:hueOf(parts[i]);else c.hue=ARRANGE==='similarity'?hueOf(parts[i]+'#'+(code|0)):n.hue;c.parent=n;n.children.set(parts[i],c);}
       n=c;n.bytes+=bytes;n.mass+=mass;n.docs++;
     }
     n.leaf=true;n.id=id;n.seq=seq||0;n.gen=gen||1;n.mass=mass;byId.set(id,n);
@@ -774,6 +785,7 @@ addEventListener('keydown',e=>{
   if(e.key==='l'||e.key==='L')ledger();
   if(e.key==='b'||e.key==='B')cycleSkin();
   if(e.key==='m'||e.key==='M')cycleMode();
+  if(e.key==='y'||e.key==='Y'){toggleArrange();$('crumb').textContent='arrangement: '+ARRANGE+(ARRANGE==='similarity'?' — split by AngularCodec rings (satellite)':' — split by id path (positional)');}
   if(e.key==='f'||e.key==='F'){fog=!fog;$('crumb').textContent='fog of war: '+(fog?'ON — only active territories lit':'off');}
   if(e.key==='1'){layer=1;$('crumb').textContent='layer: plain terrain';}
   if(e.key==='2'){layer=2;$('crumb').textContent='layer: kolmogorov — green structured, red incompressible (measured lazily per tile)';}
@@ -1312,6 +1324,7 @@ function connectSse(){
       case 'deopt':river('deopt',(e.reason||'?')+' → '+(e.action||'?')+' #'+(e.compileId??''));flash($('cDeopt'),'flash-deopt');shake=Math.min(shake+5,9);pingAt(nodeFor('pointcut'),PING.deopt,e.reason);break;
       case 'gc':river('gc',(e.name||'?')+' '+(e.cause||'')+' '+(e.pauseMs||0)+'ms');flash($('cGc'),'flash-gc');break;
       case 'commit':{const n=nodeFor(e.id);heatUp(n);quake(e,n);}break;
+      case 'score':river('compile','scoring session '+(e.session||'').slice(0,12)+'… seq='+(e.corpusSeq??'?')+' '+(e.scores??0)+' scores — '+(e.confidence||'?'));break;
       case 'cpu':break;
       default:river(e.kind||'?',JSON.stringify(e).slice(0,90));
     }

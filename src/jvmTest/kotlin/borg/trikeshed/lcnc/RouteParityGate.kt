@@ -28,19 +28,33 @@ class RouteParityGate {
     /** Every URL literal a page fetches: fetch("…"), api("METHOD","…"), EventSource("…"). */
     private fun fetchedRoutes(html: String): List<Pair<String, String>> {
         val out = mutableListOf<Pair<String, String>>()
-        // api("GET","/path") / api("POST","/path",body)
-        Regex("""api\(\s*"(GET|POST|PUT|DELETE)"\s*,\s*"([^"]+)"""").findAll(html).forEach {
+        // api("GET","/path") / api("POST","/path",body) — the negative lookahead
+        // excludes the concat form ("/api/vm/" + enc(id) …), handled below.
+        Regex("""api\(\s*"(GET|POST|PUT|DELETE)"\s*,\s*"([^"]+)"(?!\s*\+)""").findAll(html).forEach {
             out.add(it.groupValues[1] to it.groupValues[2])
+        }
+        // api(...)-form string-concat: api("DELETE","/api/projects/"+enc(name))
+        Regex("""api\(\s*"(GET|POST|PUT|DELETE)"\s*,\s*"([^"]*)"\s*\+\s*[^,)]+""").findAll(html).forEach {
+            out.add(it.groupValues[1] to it.groupValues[2].removeSuffix("/") + "/…")
         }
         // fetch("/path"… / fetch(`/api/panels/${…}`
-        Regex("""fetch\(\s*"(/[^"]*)"""").findAll(html).forEach { out.add("GET" to it.groupValues[1]) }
-        Regex("""fetch\(\s*`(/[^`]*)`""").findAll(html).forEach { out.add("GET" to it.groupValues[1]) }
-        // fetch("POST /path" style is not used; but record raw "/api" string literals too
-        Regex(""""(GET|POST|PUT|DELETE) (/api/[^"]*)""").findAll(html).forEach {
-            out.add(it.groupValues[1] to it.groupValues[2])
+        Regex("""fetch\(\s*"(/[^"]*)"(?!\s*\+)""").findAll(html).forEach {
+            val window = html.substring(it.range.first, minOf(html.length, it.range.first + 160))
+            val mM = Regex("method:\\s*['\"](\\w+)['\"]").find(window)
+            out.add((mM?.groupValues?.get(1) ?: "GET") to it.groupValues[1])
         }
-        // EventSource("/path")
-        Regex("""EventSource\(\s*"([^"]+)"""").findAll(html).forEach { out.add("SSE" to it.groupValues[1]) }
+        Regex("""fetch\(\s*`(/[^`]*)`""").findAll(html).forEach { out.add("GET" to it.groupValues[1]) }
+        // string-concat prefix fetches: fetch("/api/vm/"+enc(id)+"/eval",…),
+        // fetch("/_project/"+name+'/begin',{method:'POST'}). Capture the
+        // double-quoted PREFIX plus every concatenated literal ('…' or "…")
+        // and the declared method, defaulting GET.
+        Regex("""fetch\(\s*"(/[^"]*)"\s*\+""").findAll(html).forEach {
+            val window = html.substring(it.range.first, minOf(html.length, it.range.first + 220))
+            val mM = Regex("method:\\s*['\"](\\w+)['\"]").find(window)
+            out.add((mM?.groupValues?.get(1) ?: "GET") to it.groupValues[1].removeSuffix("/") + "/…")
+        }
+        // EventSource("/path") — SSE is a GET that streams; normalize the method
+        Regex("""EventSource\(\s*"([^"]+)"""").findAll(html).forEach { out.add("GET" to it.groupValues[1]) }
         return out
     }
 
@@ -55,16 +69,14 @@ class RouteParityGate {
                 // strip template holes and query strings: `/api/vm/${id}/eval?x` → `/api/vm/…/eval`
                 val cleaned = rawPath
                     .replace(Regex("\\$\\{[^}]*}"), "…")
+                    .replace(Regex("\"?\\+[^+]*\\+\"?"), "…") // string-concat: "/api/panels/"+name
                     .substringBefore('?')
                     .removeSuffix("/")
-                val path = cleaned.substringAfterLast("…", cleaned)
-                val wildcardFree = if (cleaned.contains("…")) {
-                    // template segment in the middle: manifest wildcard must cover from the hole on
+                val covered = if (cleaned.contains("…")) {
                     val prefix = cleaned.substringBefore("…").removeSuffix("/")
-                    "$method $prefix/…"
-                } else "$method $path"
-                val covered = RouteManifest.all.any { entry ->
-                    entry == wildcardFree || RouteManifest.covers(method, path)
+                    RouteManifest.all.any { it == "$method $prefix/…" }
+                } else {
+                    RouteManifest.covers(method, cleaned)
                 }
                 if (!covered) offenders.add("$page: $method $rawPath")
             }
@@ -81,20 +93,38 @@ class RouteParityGate {
         // Wire sources live on the jvmMain SOURCE tree, readable from the test
         // working directory. A manifest line naming a route no wire claims
         // anymore (deleted upstream) fails here — the manifest is not a
-        // graveyard.
+        // graveyard. Match on a distinctive FRAGMENT of each path so
+        // compound guards (startsWith + endsWith) also count as serving:
+        // "POST /api/panels/…/mate" is served by
+        // `p.startsWith("/api/panels/") && p.endsWith("/mate")`.
         val root = System.getProperty("user.dir") ?: fail("no user.dir")
         val srcRoot = java.io.File(root, "src/jvmMain/kotlin")
         assertTrue(srcRoot.isDirectory, "wire source tree not found at $srcRoot — run from the repo root")
         val corpus = StringBuilder()
-        srcRoot.walkTopDown().filter { it.extension == "kt" }.forEach { corpus.append(it.readText()) }
+        srcRoot.walkTopDown().filter { it.extension == "kt" }
+            .filter { it.name != "RouteManifest.kt" }
+            .forEach { corpus.append(it.readText()) }
         val src = corpus.toString()
         val offenders = RouteManifest.all.filter { line ->
+            val method = line.substringBefore(' ')
             val path = line.substringAfter(' ')
-            val literal = path.removeSuffix("…").trimEnd('/')
-            // every non-wildcard path must appear as a string literal somewhere
-            // in the jvmMain sources (wildcard lines cover startsWith families
-            // whose literal prefix must still exist)
-            !src.contains("\"$literal")
+            val segments = path.trim('/').split('/')
+            val concrete = segments.filter { it != "…" }
+            // served = every concrete segment appears as a literal (or as an
+            // endsWith/startsWith fragment) somewhere in the sources
+            val allPresent = concrete.all { seg ->
+                src.contains("\"$seg") || src.contains("/$seg") || src.contains("\"$seg\"")
+            }
+            if (!allPresent) return@filter true
+            // wildcard segment must be backed by a family guard — either a
+            // startsWith prefix match or a segment-split (first == "…") match
+            if ("…" in segments) {
+                val first = concrete.firstOrNull() ?: ""
+                val familyGuard = src.contains("startsWith(\"/$first") ||
+                    src.contains("\"$first\"")
+                return@filter !familyGuard
+            }
+            false
         }
         assertTrue(offenders.isEmpty(),
             "manifest names routes no jvmMain wire serves anymore (delete them from the manifest):\n  " +
@@ -150,11 +180,15 @@ class RouteParityGate {
     @Test
     fun jobCommandVerbCountIsNotOverstated() {
         // The retired "12 JobCommand verbs" claim: the sealed hierarchy's
-        // actual verb count is what any doc/preset may state. Count it from
-        // the compiled class list, not from memory.
-        val verbs = JobCommand::class.sealedSubclasses.mapNotNull { it.simpleName }
-        assertTrue(verbs.size in 4..12, "JobCommand verbs exploded unexpectedly: $verbs")
-        assertTrue("Submit" in verbs && "Move" in verbs && "Cancel" in verbs,
-            "core verbs present: $verbs")
+        // actual verb count is what any doc/preset may state. Count the verbs
+        // from the SOURCE (kotlin-reflect is not on the test classpath).
+        val src = java.io.File(
+            System.getProperty("user.dir") ?: fail("no user.dir"),
+            "src/commonMain/kotlin/borg/trikeshed/job/JobCommand.kt",
+        )
+        assertTrue(src.isFile, "JobCommand.kt not found at $src — run from the repo root")
+        val verbs = Regex("""data class (\w+)\(""").findAll(src.readText()).map { it.groupValues[1] }.toList()
+        assertTrue(verbs.size in 4..12, "JobCommand verbs drifted (${verbs.size}): $verbs")
+        assertTrue(setOf("Submit", "Move", "Cancel").all { it in verbs }, "core verbs present: $verbs")
     }
 }

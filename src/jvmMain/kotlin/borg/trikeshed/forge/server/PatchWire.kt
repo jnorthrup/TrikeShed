@@ -2,6 +2,8 @@ package borg.trikeshed.forge.server
 
 import borg.trikeshed.cursor.BudgetCoord
 import borg.trikeshed.jules.BrainClient
+import borg.trikeshed.job.ContentId
+import borg.trikeshed.modelmux.Frame
 import borg.trikeshed.litebike.JvmKanbanServer
 import borg.trikeshed.memory.CouchIndexBridge
 import borg.trikeshed.narsese.AngularCodec
@@ -418,13 +420,44 @@ class PatchWire(
                 val system = req["system"]?.toString()
                 val maxTokens = (req["maxTokens"] as? Number)?.toInt() ?: 512
                 val temperature = (req["temperature"] as? Number)?.toDouble() ?: 0.2
-                val messages = buildList {
-                    if (system != null) add("system" to system)
-                    add("user" to prompt)
+                // Plan step 5: the caller may carry a conversation identity.
+                // With one, the wire sends cid + delta — the prompt rides the
+                // rolling frame chain instead of a stateless rebuilt
+                // [system, user] pair; receipts stamp the cid so affinity and
+                // the commander view can reconcile them.
+                val contextId = req["contextId"]?.toString()?.takeIf { it.isNotBlank() }
+                val messages = if (contextId != null) {
+                    val parent = runCatching { ContentId(contextId) }.getOrNull()
+                        ?: return json(mapOf("error" to "bad_contextId", "detail" to "contextId must be a sha256:<hex> ContentId"), 400)
+                    val delta = system?.let { "$it\n\n" }.orEmpty() + prompt
+                    listOf("system" to parent.value, "user" to delta)
+                } else {
+                    buildList {
+                        if (system != null) add("system" to system)
+                        add("user" to prompt)
+                    }
                 }
-                val result = runCatching { withContext(muxContext) { brain.chat(messages, maxTokens, temperature) } }
+                val result = runCatching {
+                    withContext(muxContext) { brain.chat(messages, maxTokens, temperature, contextId) }
+                }
                 result.fold(
-                    onSuccess = { json(mapOf("verdict" to "ok", "model" to brain.lastModel(), "content" to it)) },
+                    onSuccess = {
+                        val resp = mutableMapOf<String, Any?>(
+                            "verdict" to "ok",
+                            "model" to brain.lastModel(),
+                            "content" to it,
+                        )
+                        if (contextId != null) {
+                            // the child cid the NEXT call appends to:
+                            // cid_child = H(cid_parent ++ answer)
+                            val child = Frame.append(
+                                Frame(cid = ContentId(contextId), parent = null, turn = ByteArray(0)),
+                                it.encodeToByteArray(),
+                            )
+                            resp["contextId"] = child.cid.value
+                        }
+                        json(resp)
+                    },
                     onFailure = { json(mapOf("verdict" to "mux-error", "detail" to (it.message ?: it.toString())), 502) },
                 )
             }

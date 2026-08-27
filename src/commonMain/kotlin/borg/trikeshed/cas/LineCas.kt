@@ -6,6 +6,7 @@ import borg.trikeshed.job.CasStore
 import borg.trikeshed.job.ContentId
 import borg.trikeshed.lib.*
 import borg.trikeshed.collections.associative.FunnelHashIndex
+import borg.trikeshed.narsese.AngularCodec
 
 /**
  * Line CAS taxonomy.
@@ -106,10 +107,13 @@ object LineCas {
         for (line in lines.view) line.trim().takeIf(String::isNotEmpty)?.let(trimmed::add)
         if (trimmed.isEmpty()) return emptySpine()
         val cids = Array(trimmed.size) { i -> cas.put(trimmed[i].encodeToByteArray()) }
+        // Mint the coordinate in the same pass — the loop already holds the trimmed text,
+        // so every text fragment leaves this seam carrying its zoom code. No second traversal.
+        val codes = IntArray(trimmed.size) { i -> AngularCodec.fragmentCode(trimmed[i]) }
         return trimmed.size j { i: Int ->
             val prev = if (i > 0) cids[i - 1] else null
             val next = if (i < cids.lastIndex) cids[i + 1] else null
-            LineNode(cids[i], stamp(prev, next), i)
+            LineNode(cids[i], stamp(prev, next), i, codes[i])
         }
     }
 
@@ -216,15 +220,21 @@ value class NeighborStamp(val hex: String) {
  * [contentCid] — pure trim→CAS identity (dedup / stringpool).
  * [stamp] — neighbor context that binds the line into local structure.
  * [linkedKey] — stamp:contentHex compact identity for indexes and spineCid.
+ * [code] — the AngularCodec coordinate (16-bit simhash of the line text):
+ *          locality-preserving, the sortable/groupable zoom key the cid can
+ *          never be. 0 when the node was built without minting (legacy paths).
  */
 data class LineNode(
     val contentCid: ContentId,
     val stamp: NeighborStamp,
     val ordinal: Int,
+    val code: Int = 0,
 ) {
     val linkedKey: String get() = "${stamp.hex}:${contentCid.hex}"
     val prevHex: String get() = stamp.prevHex
     val nextHex: String get() = stamp.nextHex
+    /** The 8-bit top zoom ring of [code]: the code's HIGH byte (bits 15..8, the coarse prefix). */
+    val codeRing8: Int get() = (code ushr 8) and 0xFF
 }
 
 /** Linear sequence of line nodes — a document under the Line CAS taxonomy. */

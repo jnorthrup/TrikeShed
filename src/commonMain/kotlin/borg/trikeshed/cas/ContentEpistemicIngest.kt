@@ -180,12 +180,15 @@ object ContentEpistemicIngest {
     ): Series<SemanticSignal> {
         val byCoordinate = linkedMapOf<EpistemicRegionCoordinate, EpistemicRegion>()
         for (region in regions.view) byCoordinate[region.coordinate] = region
-        return links α { link ->
+        // indexed projection, not α-inlining: the JVM verified an inlined lambda
+        // calling a private member of this object as bad invokespecial (Kotlin 2.x)
+        return links.size j { i: Int ->
+            val link = links[i]
             val from = byCoordinate.getValue(link.from)
             val to = byCoordinate.getValue(link.to)
             val positive = (link.weight.coerceIn(0.0, 1.0) * 1000.0).toLong().coerceAtLeast(1L)
             SemanticSignal(
-                angular = angular(from.regionCid, to.regionCid, link.kind),
+                angular = angular(from, to, link.kind),
                 evidence = EvidenceCoord(positive, 1000L - positive),
                 relation = when (link.kind) {
                     RelationKind.ATTRACTION -> SemanticRelationKind.ATTRACTION
@@ -198,6 +201,21 @@ object ContentEpistemicIngest {
             )
         }
     }
+
+    /**
+     * The angular COORDINATE for a region-to-region link: [AngularCodec.encode] over
+     * the regions' structural keys (schema shape + LZ76 + bits — the codeable surface
+     * a region carries). Raw FNV over cids lived here and was the documented
+     * anti-pattern: avalanche destroys locality, so `recallNear` over those keys was
+     * exact-match-or-noise. FNV keeps its IDENTITY job; this is the COORDINATE.
+     */
+    private fun angular(from: EpistemicRegion, to: EpistemicRegion, kind: RelationKind): Long =
+        borg.trikeshed.narsese.AngularCodec.encode(
+            relation = SemanticRelationKind.entries[kind.ordinal.coerceIn(0, SemanticRelationKind.entries.size - 1)],
+            taxonomyKey = null,
+            subjectTerm = from.schema.structuralKey,
+            objectTerm = to.schema.structuralKey,
+        )
 
     private fun attraction(left: EpistemicRegion, right: EpistemicRegion): Double {
         if (left.regionCid == right.regionCid) return 1.0
@@ -311,13 +329,6 @@ private fun contentJaccard(left: Series<ContentId>, right: Series<ContentId>): D
     for (cid in leftSet) if (cid in rightSet) intersection++
     val union = leftSet.size + rightSet.size - intersection
     return intersection.toDouble() / union.coerceAtLeast(1)
-}
-
-private fun angular(left: ContentId, right: ContentId, kind: RelationKind): Long {
-    var hash = 0xcbf29ce484222325UL.toLong()
-    val text = "${left.hex}|${right.hex}|${kind.name}"
-    for (char in text) hash = (hash xor char.code.toLong()) * 0x100000001b3L
-    return hash
 }
 
 private val TOKEN = Regex("[A-Za-z0-9_]+")

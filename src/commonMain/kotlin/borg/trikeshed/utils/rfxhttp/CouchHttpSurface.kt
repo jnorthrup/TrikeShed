@@ -2,13 +2,6 @@ package borg.trikeshed.utils.rfxhttp
 
 import borg.trikeshed.couch.ConfixDocStore
 import borg.trikeshed.couch.ConfixDocStoreEntry
-import borg.trikeshed.couch.Document
-import borg.trikeshed.couch.Field
-import borg.trikeshed.couch.KeyExpr
-import borg.trikeshed.couch.MapFunction
-import borg.trikeshed.couch.ReduceFunction
-import borg.trikeshed.couch.ValueExpr
-import borg.trikeshed.couch.ViewDefinition
 import borg.trikeshed.couch.ViewServer
 import borg.trikeshed.job.ContentId
 import borg.trikeshed.lib.get
@@ -60,6 +53,8 @@ class CouchHttpSurface(
     val viewServer: ViewServer = ViewServer(),
     val requestFactory: CouchRequestFactory = CouchRequestFactory(store, viewServer),
 ) {
+    /** The `_view` route core, shared with the daemon router's mount. */
+    private val viewRoute = ViewRoute(ViewDocs.of(store), viewServer)
 
     suspend fun handle(method: String, rawPath: String, body: String): CouchHttpReply {
         val path = rawPath.substringBefore('?')
@@ -160,64 +155,8 @@ class CouchHttpSurface(
     // ── views ─────────────────────────────────────────────────────
 
     private fun view(ddoc: String, viewName: String, query: Map<String, String>): CouchHttpReply {
-        val design = store[ddoc]?.jsonBody() ?: return error(404, "not_found", "missing")
-        val spec = (design["views"] as? Map<*, *>)?.get(viewName) as? Map<*, *>
-            ?: return error(404, "not_found", "missing_named_view")
-        val map = spec["map"] as? Map<*, *> ?: emptyMap<Any?, Any?>()
-        val reduceFn = reduceFn(spec["reduce"])
-        val q = ViewQuery.fromQueryString(query)
-        val wantReduce = q.wantReduce(reduceFn != null)
-        if (wantReduce && reduceFn == null) return error(400, "query_parse_error", "Reduce is invalid for map-only views.")
-
-        val def = ViewDefinition(
-            ddoc = ddoc,
-            viewName = viewName,
-            mapFn = MapFunction.Emit(keyExpr(map["key"]), valueExpr(map["value"])),
-            reduceFn = if (wantReduce) reduceFn else null,
-        )
-        val mapped = viewServer.execute(def.copy(reduceFn = null), documents())
-        val selected = q.select(mapped)
-
-        if (!wantReduce) {
-            return CouchHttpReply(
-                200,
-                mapOf(
-                    "total_rows" to mapped.size,
-                    "offset" to q.offset(selected),
-                    "rows" to q.page(selected).map { row ->
-                        // emit(key, doc) in CouchDB yields the object; ViewServer's DocValue is a string.
-                        val value = if (map["value"] == "doc") store[row.docId]?.asCouchDoc() else row.value
-                        val base = mapOf("id" to row.docId, "key" to row.key, "value" to value)
-                        if (q.include_docs) base + ("doc" to store[row.docId]?.asCouchDoc()) else base
-                    },
-                ),
-            )
-        }
-
-        val reduced = viewServer.execute(def, selected.map { row -> store[row.docId]!!.toDocument() }.distinctBy { it.id })
-        val rows: List<Map<String, Any?>> = if (q.grouped) {
-            reduced.rows.toKList().map { mapOf("key" to it.key, "value" to it.value) }
-        } else {
-            listOf(mapOf("key" to null, "value" to ViewQuery.rereduce(reduceFn!!, reduced)))
-        }
-        return CouchHttpReply(200, mapOf("rows" to rows))
-    }
-
-    private fun documents(): List<Document> {
-        val entries = store.byIdPrefix("")
-        return List(entries.size) { i -> entries[i] }
-            .filterNot { it.id.startsWith("_design/") }
-            .map { it.toDocument() }
-    }
-
-    private fun ConfixDocStoreEntry.toDocument(): Document {
-        val body = jsonBody()
-        return Document(
-            id,
-            body.entries
-                .filter { it.key != "_id" && it.key != "_rev" }
-                .map { Field(it.key.toString(), it.value ?: "null") },
-        )
+        val r = viewRoute.handle(ddoc, viewName, query)
+        return CouchHttpReply(r.status, r.json)
     }
 
     private fun ConfixDocStoreEntry.asCouchDoc(): Map<String, Any?> {
@@ -238,40 +177,6 @@ class CouchHttpSurface(
 
     private fun error(status: Int, error: String, reason: String): CouchHttpReply =
         CouchHttpReply(status, mapOf("error" to error, "reason" to reason))
-
-    private fun keyExpr(spec: Any?): KeyExpr = when (spec) {
-        null -> KeyExpr.DocId
-        is String -> KeyExpr.DocField(spec)
-        is Map<*, *> -> when {
-            spec["path"] is String -> KeyExpr.JsPathExpr(spec["path"] as String)
-            spec["field"] is String -> KeyExpr.DocField(spec["field"] as String)
-            spec.containsKey("const") -> KeyExpr.Const(spec["const"])
-            else -> KeyExpr.DocId
-        }
-        else -> KeyExpr.Const(spec)
-    }
-
-    private fun valueExpr(spec: Any?): ValueExpr = when (spec) {
-        null -> ValueExpr.Const(1)
-        "doc" -> ValueExpr.DocValue
-        is String -> ValueExpr.DocField(spec)
-        is Map<*, *> -> when {
-            spec["path"] is String -> ValueExpr.JsPathExpr(spec["path"] as String)
-            spec["field"] is String -> ValueExpr.DocField(spec["field"] as String)
-            spec.containsKey("const") -> ValueExpr.Const(spec["const"])
-            else -> ValueExpr.DocValue
-        }
-        else -> ValueExpr.Const(spec)
-    }
-
-    private fun reduceFn(spec: Any?): ReduceFunction? = when (spec) {
-        null -> null
-        is String -> ReduceFunction.Builtin(spec)
-        is Map<*, *> -> (spec["dsl"] as? String)?.let(ReduceFunction::Custom)
-        else -> null
-    }
-
-    private fun <T> borg.trikeshed.lib.Series<T>.toKList(): List<T> = List(size) { i -> this[i] }
 
     companion object {
         const val COUCH_VERSION = "1.6.2"

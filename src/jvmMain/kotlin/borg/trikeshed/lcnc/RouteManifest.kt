@@ -27,6 +27,8 @@ object RouteManifest {
             "GET /api/projects",
             "POST /api/projects",
             "DELETE /api/projects/…",
+            // GraalWire raw ingest rides the rawRoutes chain (documented on GraalWire)
+            "POST /api/graal/ingest",
         ),
         "ModuleWire" to listOf(
             "GET /api/modules",
@@ -96,6 +98,7 @@ object RouteManifest {
             "POST /api/donor",
             "GET /api/metrics",
             "POST /_project/…",
+            "GET /_project/…",
         ),
     )
 

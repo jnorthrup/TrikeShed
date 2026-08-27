@@ -146,18 +146,35 @@ class BrainClient(
      * records receipts via MuxReactor — quota, lease, and health tracking
      * are airtight.
      *
+     * [contextId] threads the conversation identity end to end: it is stamped
+     * on every [borg.trikeshed.modelmux.ModelResponseReceipt] as the
+     * `assessmentId` seam's sibling (plan step 5) so a receipt points back to
+     * the rolling frame chain the call belongs to — cache affinity, restage
+     * deltas, and the commander view all key on it. Null = stateless call
+     * (the historic behaviour).
+     *
      * If every provider fails, throws with the last error message.
      */
-    suspend fun chat(messages: List<Pair<String, String>>, maxTokens: Int = 256, temperature: Double = 0.2): String {
+    suspend fun chat(
+        messages: List<Pair<String, String>>,
+        maxTokens: Int = 256,
+        temperature: Double = 0.2,
+        contextId: String? = null,
+    ): String {
         if (endpoints.isEmpty()) error("Brain: no provider endpoints discovered")
 
         return withTimeout(OUTER_TIMEOUT_MS) {
-            chatInner(messages, maxTokens, temperature)
+            chatInner(messages, maxTokens, temperature, contextId)
         }
     }
 
     /** Inner loop: called inside the outer timeout. */
-    private suspend fun chatInner(messages: List<Pair<String, String>>, maxTokens: Int, temperature: Double): String {
+    private suspend fun chatInner(
+        messages: List<Pair<String, String>>,
+        maxTokens: Int,
+        temperature: Double,
+        contextId: String?,
+    ): String {
         var lastError = "all providers exhausted"
         val routed = internalModelMux.route("conflict-resolve").a
         for (modelId in orderedModelIds(routed)) {
@@ -170,6 +187,7 @@ class BrainClient(
                 internalModelMux.chat(
                     modelId = modelId,
                     messages = acpMessages,
+                    assessmentId = contextId,
                     maxTokens = maxTokens,
                     temperature = temperature,
                 ).getOrThrow() // chat() is already Result-shaped; unwrap so fold sees AcpResponse, not Result<Result<…>>

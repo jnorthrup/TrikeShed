@@ -6,65 +6,47 @@ import kotlin.test.assertTrue
 import kotlin.test.fail
 
 /**
- * W2.1/W2.2 gates: the contract table IS the vocabulary.
+ * Step 4 gates: the contract table IS the vocabulary — the ONLY author.
  *
- * The canonical JS type list lives in panels.html's TYPES map; this test
- * parses the resource file itself so drift between the two tables fails
- * loudly here instead of silently hiding types from drag-to-empty-space.
+ * panels.html no longer declares a TYPES table (RouteParityGate enforces
+ * that); the page hydrates its palette/ports/params from
+ * /api/lcnc/contracts. This test therefore asserts the properties the one
+ * vocabulary must hold on its own: completeness of kinds, unique types, and
+ * the run-surface parity between RUNNERS (JS execution bodies) and
+ * contracts (Kotlin vocabulary).
  */
 class LcncContractParityTest {
 
-    /** Parse the JS TYPES keys straight out of panels.html — no copy-paste drift. */
-    private fun jsTypeNames(): List<String> {
+    /** JS execution-body keys straight out of panels.html's RUNNERS table. */
+    private fun jsRunnerNames(): List<String> {
         val url = javaClass.getResource("/web/panels.html")
-            ?: return emptyList() // resource not on the test classpath for this target
+            ?: fail("panels.html missing from the test classpath — the gate must not silently pass on a missing resource")
         val text = url.readText()
-        val keys = Regex("^\\s*\"([a-zA-Z0-9._]+)\":\\s*\\{", RegexOption.MULTILINE)
-            .findAll(text.substringAfter("const TYPES = {").substringBefore("/* ── graph state"))
+        val start = text.indexOf("const RUNNERS = {")
+        assertTrue(start >= 0, "panels.html must carry a RUNNERS table (execution bodies)")
+        val end = text.indexOf("/* ── CONTRACTS", start).let { if (it < 0) text.indexOf("syncContracts", start) else it }
+        val block = text.substring(start, if (end > start) end else text.length)
+        return Regex(""""([a-zA-Z0-9._]+)":\s*\{""").findAll(block)
             .map { it.groupValues[1] }
-            .filter { it != "run" && it != "render" } // function keys, not type keys
             .toList()
-        return keys.distinct()
+            .distinct()
     }
 
-    /**
-     * The hard invariant: NO JS type is mating-blind. Every type the browser
-     * can declare must have a Kotlin contract, or drag-to-empty-space can't
-     * see it. commonMain (LcncContracts) is the authoritative SUPERSET — it
-     * may legitimately declare more types than the JS palette renders
-     * (W4–W5 job-control / VM / curator server-side nodes), so the reverse
-     * direction is NOT a failure.
-     */
     @Test
-    fun everyJsTypeHasAKotlinContract() {
-        val js = jsTypeNames()
+    fun everyJsRunnerHasAKotlinContract() {
+        val js = jsRunnerNames()
+        assertTrue(js.isNotEmpty(), "RUNNERS parsed empty — the extraction or the page is broken")
         val kotlin = LcncContracts.all().map { it.type }.toSet()
-        // The frozen expectation (kept in sync with panels.html by review):
-        // if a type is missing here, drag-to-empty-space can't see it.
-        val expected = setOf(
-            "vm.spawn", "vm.eval", "vm.revoke", "vms.list", "pytest.pure",
-            "graal.vitals", "http.get", "http.post", "board.get", "timer",
-            "js", "pick", "display", "gauge", "mux.chat", "mux.models",
-            "keys.status", "project.kill", "project.mount", "project.list",
-            "kg.ingest", "beliefs.review", "beliefs.resonate", "beliefs.introspect",
-            "pointcut.routes", "board.view", "list.groupBy", "dom.board",
-            "panels.list", "program.ref", "note", "graal.events", "vm.events",
-        )
-        for (t in expected) {
-            assertTrue(t in kotlin, "LcncContracts is missing type '$t' — invisible to mating")
-        }
-        if (js.isNotEmpty()) {
-            // HARD GATE: JS ⊆ Kotlin. A JS type with no Kotlin contract is
-            // invisible to drag-to-empty-space — the headline mating bug.
-            val missing = js.filter { it !in kotlin }
-            assertTrue(missing.isEmpty(),
-                "JS TYPES not covered by LcncContracts (mating-blind): $missing")
-            // SUPERSET is expected, not a failure: commonMain carries the
-            // W4–W5 additions (job.command, job.batch, vm.call/stats/tiers,
-            // curator/rete nodes) that the browser palette does not render.
-            val extra = kotlin.filter { it !in js.toSet() }
-            println("Kotlin superset (server-side / W4-W5, not in JS palette): $extra")
-        }
+        val missing = js.filter { it !in kotlin }
+        assertTrue(missing.isEmpty(),
+            "JS RUNNERS not covered by LcncContracts (dead code — nothing can offer or wire them): $missing")
+    }
+
+    @Test
+    fun contractTypesAreUnique() {
+        val all = LcncContracts.all()
+        val dupes = all.groupBy { it.type }.filterValues { it.size > 1 }.keys
+        assertTrue(dupes.isEmpty(), "duplicate contract types: $dupes")
     }
 
     @Test
@@ -84,8 +66,22 @@ class LcncContractParityTest {
     }
 
     @Test
+    fun sourcesAndSinksAreHonest() {
+        // source = auto-firing (re-fires on its own clock); sink = chain
+        // terminator; anything else is a manual/action node (vm.spawn fires
+        // when the sweep reaches it) — both flags may legitimately be false.
+        val declaredSources = LcncContracts.all().filter { it.isSource }.map { it.type }.toSet()
+        assertEquals(setOf("timer", "graal.events", "vm.events"), declaredSources,
+            "the auto-firing set must stay explicit, not accrete")
+        for (c in LcncContracts.all()) {
+            if (c.outputs.isEmpty()) {
+                assertTrue(c.isSink, "${c.type}: no outputs must be declared a sink")
+            }
+        }
+    }
+
+    @Test
     fun programRefDivesIntoStoredPanelsAndFindsThemFromGraph() {
-        // W2.5 groundwork sanity: contracts answer find() for the dive-capable type.
         assertEquals("program.ref", LcncContracts.find("program.ref")?.type)
     }
 }

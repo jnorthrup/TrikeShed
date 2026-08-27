@@ -136,14 +136,31 @@ class QuotaLegion(
     /**
      * Dispatch face: the best usable key for [provider] (null = any provider),
      * excluding keys already tried on this request chain.
+     *
+     * [preferKey] is the affinity hint (plan step 6): when that key is usable
+     * and not excluded, it wins REGARDLESS of remaining-quota ranking — a
+     * follow-up call for the same context belongs on the lane that already
+     * holds its warm KV cache. The hint never resurrects an exhausted or
+     * benched key: usability still gates everything. When the hint is absent
+     * or unusable, ranking proceeds exactly as before.
      */
     fun nextKey(
         state: MuxReactorState,
         nowMs: Long,
         provider: String? = null,
         excluding: Set<String> = emptySet(),
+        preferKey: String? = null,
     ): QuotaStanding? {
         val ranked = standings(state, nowMs)
+        if (preferKey != null && preferKey !in excluding) {
+            var warm: QuotaStanding? = null
+            for (i in 0 until ranked.size) {
+                if (ranked[i].keyId == preferKey) { warm = ranked[i]; break }
+            }
+            if (warm != null && warm.isUsable && (provider == null || warm.provider == provider)) {
+                return warm
+            }
+        }
         for (i in 0 until ranked.size) {
             val s = ranked[i]
             if (!s.isUsable) continue

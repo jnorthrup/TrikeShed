@@ -29,6 +29,17 @@ class CouchAttachmentGateway(
         val cid = casStore.put(bytes)
         require(cid == ref.contentId) { "Provided bytes do not match expected ContentId" }
 
+        // The derived-code-as-metadata precedent (MemoryStore.spineCid): the locality-preserving
+        // AngularCodec coordinate rides every attachment doc — taxonomy signature of the path
+        // (doc ids ARE paths) + simhash of the decodable text surface, so similarity grouping
+        // never needs the bytes. Code is deterministic in (path, bytes).
+        val textSurface = runCatching {
+            val s = bytes.decodeToString()
+            if (s.none { it == '\uFFFD' || (it.code < 32 && it !in " \t\r\n") }) s.take(4096) else ""
+        }.getOrDefault("")
+        val code = borg.trikeshed.narsese.AngularCodec.fragmentCode(
+            (borg.trikeshed.narsese.AngularCodec.taxonomySigOfKey(ref.path).toString()) + "/" + textSurface,
+        )
         val doc = Document(
             id = ref.path,
             fields = listOf(
@@ -37,7 +48,9 @@ class CouchAttachmentGateway(
                 Field("contentId", ref.contentId.value),
                 Field("agentId", ref.agentId),
                 Field("revision", ref.revision),
-                Field("sequence", ref.sequence.toString())
+                Field("sequence", ref.sequence.toString()),
+                Field("code", code.toString()),
+                Field("codeRing8", (code and 0xFF).toString())
             )
         )
         // The head rev is required once the path exists (ProductionCouchIngress semantics);

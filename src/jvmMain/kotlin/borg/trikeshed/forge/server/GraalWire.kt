@@ -4,6 +4,7 @@ import borg.trikeshed.couch.CouchReportEvent
 import borg.trikeshed.couch.CouchReportReactorElement
 import borg.trikeshed.couch.CouchStore
 import borg.trikeshed.couch.CouchDatabase
+import borg.trikeshed.cas.LineCas
 import borg.trikeshed.graal.subvm.HermesCapsule
 import borg.trikeshed.graal.vitals.JvmVitals
 import borg.trikeshed.litebike.JvmKanbanServer
@@ -16,6 +17,9 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.SharedFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.launch
@@ -81,8 +85,13 @@ class GraalWire(
             method == "GET" && (p == "/panels" || p == "/panels/") -> asset("web/panels.html", "text/html; charset=utf-8")
             method == "GET" && p == "/graal.webmanifest" -> JvmKanbanServer.HttpResponse(200, MANIFEST, "application/manifest+json; charset=utf-8")
             method == "GET" && p == "/api/graal/vitals" -> JvmKanbanServer.HttpResponse(200, JsonSupport.stringify(vitals.snapshot() + ("pointcuts" to pointcutSummary())))
+            method == "GET" && p == "/api/graal/heap" -> withContext(Dispatchers.IO) {
+                JvmKanbanServer.HttpResponse(200, JsonSupport.stringify(vitals.heapHistogram()))
+            }
             method == "GET" && p == "/api/graal/pointcuts" -> JvmKanbanServer.HttpResponse(200, JsonSupport.stringify(mapOf("routes" to pointcutRoutes())))
             method == "GET" && p == "/api/graal/map" -> JvmKanbanServer.HttpResponse(200, JsonSupport.stringify(mapMap()))
+            method == "GET" && p == "/api/graal/zoom" -> zoomRoute(path)
+            method == "GET" && p == "/api/graal/strength" -> strengthRoute(path)
             method == "GET" && p == "/api/graal/sheet" -> withContext(Dispatchers.IO) { sheetRoute(path) }
             method == "GET" && p == "/api/graal/dag" -> {
                 val q = borg.trikeshed.utils.rfxhttp.CouchHttpSurface.parseQuery(path.substringAfter('?', ""))
@@ -146,12 +155,21 @@ class GraalWire(
                 lastSeq[f.docId] = f.sequence + 1
             }
         }
+        // 5th row element: the doc code — taxonomy signature of the id path (ids ARE paths)
+        // plus the stored code field when one was minted at ingest (dropzone/attachments).
+        fun codeOf(id: String, stored: Int?): Int {
+            val s = stored ?: return borg.trikeshed.narsese.AngularCodec.fragmentCode(
+                borg.trikeshed.narsese.AngularCodec.taxonomySigOfKey(id).toString() + "/" + id.substringAfterLast('/'),
+            )
+            return s
+        }
         val rows = store?.all().orEmpty()
             .filter { d -> d.fields.none { it.name == "_deleted" && it.value == true } }
             .map { d ->
                 val len = (d.fields.firstOrNull { it.name == "length" }?.value as? String)?.toLongOrNull()
                 val gen = store?.head?.getRev(d.id)?.substringBefore('-')?.toIntOrNull() ?: 1
-                listOf(d.id, len ?: (d.fields.size.toLong() * 64), lastSeq[d.id] ?: 0L, gen)
+                val stored = (d.fields.firstOrNull { it.name == "code" }?.value as? String)?.toIntOrNull()
+                listOf(d.id, len ?: (d.fields.size.toLong() * 64), lastSeq[d.id] ?: 0L, gen, codeOf(d.id, stored))
             }
         // Project dbs join the terrain as top-level territories named after the db;
         // the client resolves `<db>/<docid>` rows back to `/<db>/<docid>` fetches.
@@ -161,7 +179,9 @@ class GraalWire(
                 .map { d ->
                     val len = (d.fields.firstOrNull { it.name == "length" }?.value as? String)?.toLongOrNull()
                     val gen = pdb.store.head.getRev(d.id)?.substringBefore('-')?.toIntOrNull() ?: 1
-                    listOf("${pdb.name}/${d.id}", len ?: (d.fields.size.toLong() * 64), 0L, gen)
+                    val stored = (d.fields.firstOrNull { it.name == "code" }?.value as? String)?.toIntOrNull()
+                    val id = "${pdb.name}/${d.id}"
+                    listOf(id, len ?: (d.fields.size.toLong() * 64), 0L, gen, codeOf(id, stored))
                 }
         }
         return mapOf(
@@ -229,21 +249,35 @@ class GraalWire(
             // 1) the original bytes become a store citizen
             val cid = database.blockPut(bytes)
             val docId = "dropzone/$name"
-            putAttachmentDoc(database, docId, borg.trikeshed.util.io.ContentTypes.forPath(name), cid, bytes.size.toLong())
-            // 2) binary → markdown through Tika/Tesseract; text is its own markdown
-            val markdown = if (texty) bytes.decodeToString() else {
-                val tmp = java.nio.file.Files.createTempFile("graal-ingest-", "-$name")
-                try {
-                    java.nio.file.Files.write(tmp, bytes)
-                    borg.trikeshed.kanban.JvmTikaIngestAdapter.extractToMarkdown(tmp)
-                } finally { runCatching { java.nio.file.Files.deleteIfExists(tmp) } }
+            // the locality-preserving coordinate: doc id path + text surface (or RLE shape for binary)
+            val docCode = borg.trikeshed.narsese.AngularCodec.fragmentCode(
+                borg.trikeshed.narsese.AngularCodec.taxonomySigOfKey(docId).toString() + "/" + name,
+            )
+            putAttachmentDoc(database, docId, borg.trikeshed.util.io.ContentTypes.forPath(name), cid, bytes.size.toLong(), docCode)
+            // 2) binary → markdown: in-tree COS disassembler first (its output flows through the
+            //    same text lanes as any drop), Tika/Tesseract as the fallback; text is its own markdown
+            val pdfText: String? = if (!texty && name.lowercase().endsWith(".pdf")) runCatching {
+                val doc = borg.trikeshed.pdf.JvmPdfDisassembler.parse(bytes)
+                borg.trikeshed.pdf.PdfText.extract(doc).text.takeIf { it.isNotBlank() }
+            }.getOrNull() else null
+            val markdown = when {
+                texty -> bytes.decodeToString()
+                pdfText != null -> pdfText
+                else -> {
+                    val tmp = java.nio.file.Files.createTempFile("graal-ingest-", "-$name")
+                    try {
+                        java.nio.file.Files.write(tmp, bytes)
+                        borg.trikeshed.kanban.JvmTikaIngestAdapter.extractToMarkdown(tmp)
+                    } finally { runCatching { java.nio.file.Files.deleteIfExists(tmp) } }
+                }
             }
             var extractId: String? = null
             if (!texty && markdown.isNotBlank()) {
                 val mdBytes = markdown.encodeToByteArray()
                 val mdCid = database.blockPut(mdBytes)
                 extractId = "$docId.extract.md"
-                putAttachmentDoc(database, extractId, "text/markdown", mdCid, mdBytes.size.toLong())
+                putAttachmentDoc(database, extractId, "text/markdown", mdCid, mdBytes.size.toLong(),
+                    borg.trikeshed.narsese.AngularCodec.fragmentCode(markdown.take(4096)))
             }
             // 3) the plan gate: shape grammar decides whether this drop is board material
             val plan = runCatching { borg.trikeshed.kanban.ForgeKanbanIngest.isPlan(markdown) }.getOrDefault(false)
@@ -257,14 +291,57 @@ class GraalWire(
                 } finally { runCatching { java.nio.file.Files.deleteIfExists(tmpMd) } }
             }
             val shapeKey = runCatching { borg.trikeshed.kanban.ForgeKanbanIngest.planShape(markdown) }.getOrDefault("")
-            // 4) byte epistemic surface: organic Kolmogorov comprehension of raw bytes
+            // 4) byte epistemic surface: organic Kolmogorov comprehension of raw bytes.
+            //    Persisted — chunks/links/signals become documents (cids, not scalars), so the
+            //    byte continent is zoomable and the signals feed the belief bag. Code fields
+            //    carry the 8/16-bit zoom rings minted by ByteEpistemicIngest.
             val byteSurface = if (!texty) runCatching {
                 borg.trikeshed.cas.ByteEpistemicIngest.ingest(database.cas, bytes)
             }.getOrNull() else null
+            if (byteSurface != null) {
+                val rev = database.store.head.getRev(docId)
+                for (ci in 0 until byteSurface.chunks.size) {
+                    val c = byteSurface.chunks[ci]
+                    database.store.put(borg.trikeshed.couch.Document(
+                        "$docId.chunks/${c.index}",
+                        listOf(
+                            borg.trikeshed.couch.Field("kind", "byte-chunk"),
+                            borg.trikeshed.couch.Field("sourceCid", byteSurface.sourceCid.value),
+                            borg.trikeshed.couch.Field("chunkCid", c.cid.value),
+                            borg.trikeshed.couch.Field("startOffset", c.startOffset.toString()),
+                            borg.trikeshed.couch.Field("endOffset", c.endOffset.toString()),
+                            borg.trikeshed.couch.Field("structuralKey", c.structuralKey.take(256)),
+                            borg.trikeshed.couch.Field("entropy", c.metrics.shannonBitsPerByte.toString()),
+                            borg.trikeshed.couch.Field("code", c.code.toString()),
+                            borg.trikeshed.couch.Field("codeRing8", c.codeRing8.toString()),
+                        ),
+                    ), rev)
+                }
+                val signalDocs = mutableListOf<Map<String, Any?>>()
+                for (si in 0 until byteSurface.signals.size) {
+                    val s = byteSurface.signals[si]
+                    val sid = "$docId.links/$si"
+                    database.store.put(borg.trikeshed.couch.Document(
+                        sid,
+                        listOf(
+                            borg.trikeshed.couch.Field("kind", "byte-link"),
+                            borg.trikeshed.couch.Field("sourceCid", byteSurface.sourceCid.value),
+                            borg.trikeshed.couch.Field("subjectCid", s.subjectCid ?: ""),
+                            borg.trikeshed.couch.Field("objectCid", s.objectCid ?: ""),
+                            borg.trikeshed.couch.Field("relation", s.relation.name),
+                            borg.trikeshed.couch.Field("angular", s.angular.toString()),
+                            borg.trikeshed.couch.Field("evidencePos", s.evidence.positive.toString()),
+                            borg.trikeshed.couch.Field("evidenceNeg", s.evidence.negative.toString()),
+                        ),
+                    ), rev)
+                    signalDocs += mapOf("id" to sid, "angular" to s.angular.toString(), "relation" to s.relation.name)
+                }
+            }
             JvmKanbanServer.HttpResponse(200, JsonSupport.stringify(mapOf(
                 "ok" to true, "id" to docId, "cid" to cid.value, "bytes" to bytes.size,
                 "extracted" to extractId, "chars" to markdown.length, "shape" to shapeKey.take(80),
                 "plan" to plan, "persisted" to persisted,
+                "code" to docCode, "codeRing8" to (docCode and 0xFF),
                 // byte schema: organic comprehension without parser
                 "byteSchema" to byteSurface?.documentSchema?.structuralKey?.take(120),
                 "byteChunks" to byteSurface?.chunks?.size,
@@ -272,6 +349,8 @@ class GraalWire(
                 "byteComplexity" to byteSurface?.documentSchema?.let {
                     String.format("%.4f", it.normalizedComplexity)
                 },
+                "byteLinks" to byteSurface?.links?.size,
+                "pdfLane" to (pdfText != null),
             )))
         } catch (t: Throwable) {
             JvmKanbanServer.HttpResponse(500, JsonSupport.stringify(mapOf("error" to (t.message ?: t.toString()))))
@@ -363,21 +442,99 @@ class GraalWire(
         }
     }
 
-    private fun putAttachmentDoc(database: borg.trikeshed.couch.CouchDatabase, id: String, contentType: String, cid: borg.trikeshed.job.ContentId, length: Long) {
-        val doc = borg.trikeshed.couch.Document(id, listOf(
+    private fun putAttachmentDoc(
+        database: borg.trikeshed.couch.CouchDatabase,
+        id: String,
+        contentType: String,
+        cid: borg.trikeshed.job.ContentId,
+        length: Long,
+        code: Int? = null,
+    ) {
+        // The derived-code-as-metadata precedent (MemoryStore.spineCid): the locality-preserving
+        // coordinate rides the doc so similarity grouping never needs the bytes.
+        val fields = mutableListOf(
             borg.trikeshed.couch.Field("contentType", contentType),
             borg.trikeshed.couch.Field("length", length.toString()),
             borg.trikeshed.couch.Field("contentId", cid.value),
             borg.trikeshed.couch.Field("agentId", "dropzone"),
             borg.trikeshed.couch.Field("revision", "drop"),
             borg.trikeshed.couch.Field("sequence", System.currentTimeMillis().toString()),
-        ))
-        database.store.put(doc, database.store.head.getRev(id))
+        )
+        if (code != null) {
+            fields += borg.trikeshed.couch.Field("code", code.toString())
+            fields += borg.trikeshed.couch.Field("codeRing8", (code and 0xFF).toString())
+        }
+        database.store.put(borg.trikeshed.couch.Document(id, fields), database.store.head.getRev(id))
     }
 
     // ── DAG arcs: what the prefix tree cannot show ───────────────
     // The terrain is a tree of ids, but the blackboard is a DAG: many documents name the same CAS
     // blob (dedup), and pointcut routes point INTO class attachments. These are the cross-links.
+
+    /**
+     * `/api/graal/zoom?code=<ring8 in hex or dec>` — the mid-zoom ring for Step E: representative
+     * fragments per group. Served as cids (Claim Check — never inlined): the client fetches real
+     * bytes via `_cas` when it wants the content side by side.
+     */
+    private fun zoomRoute(path: String): JvmKanbanServer.HttpResponse {
+        val db = couchDatabase ?: return JvmKanbanServer.HttpResponse(503, """{"error":"no store mounted"}""")
+        val q = borg.trikeshed.utils.rfxhttp.CouchHttpSurface.parseQuery(path.substringAfter('?', ""))
+        val raw = q["code"] ?: return JvmKanbanServer.HttpResponse(400, """{"error":"code required"}""")
+        val ring8 = (raw.toIntOrNull(16) ?: raw.toIntOrNull())?.and(0xFF)
+            ?: return JvmKanbanServer.HttpResponse(400, """{"error":"code must be a byte (hex or dec)"}""")
+        val chunkDocs = db.store.all().filter { d ->
+            d.fields.any { it.name == "kind" && it.value == "byte-chunk" } &&
+                d.fields.any { it.name == "codeRing8" && (it.value as? String)?.toIntOrNull() == ring8 }
+        }
+        val reps = chunkDocs.take(64).map { d ->
+            mapOf(
+                "id" to d.id,
+                "chunkCid" to cidOf(d),
+                "code" to (d.fields.firstOrNull { it.name == "code" }?.value as? String)?.toIntOrNull(),
+                "structuralKey" to (d.fields.firstOrNull { it.name == "structuralKey" }?.value as? String)?.take(96),
+                "cas" to "/api/graal/cas/${cidOf(d)}",
+            )
+        }
+        return JvmKanbanServer.HttpResponse(200, JsonSupport.stringify(mapOf(
+            "ring8" to ring8, "docs" to chunkDocs.size, "representatives" to reps,
+        )))
+    }
+
+    /**
+     * `/api/graal/strength?a=<cid>&b=<cid>` — the CAS-granting-strength proof by bytes (Step E).
+     * Both fragments are re-ingested through [LineCas] and graded with [MatchGrade] /
+     * [LinkConfidence] / rampScore; the answer carries both cids so the client can lay the
+     * actual stored bytes side by side — the bytes prove the grouping, not the chrome.
+     */
+    private fun strengthRoute(path: String): JvmKanbanServer.HttpResponse {
+        val db = couchDatabase ?: return JvmKanbanServer.HttpResponse(503, """{"error":"no store mounted"}""")
+        val q = borg.trikeshed.utils.rfxhttp.CouchHttpSurface.parseQuery(path.substringAfter('?', ""))
+        val a = q["a"] ?: return JvmKanbanServer.HttpResponse(400, """{"error":"a cid required"}""")
+        val b = q["b"] ?: return JvmKanbanServer.HttpResponse(400, """{"error":"b cid required"}""")
+        val bytesA = db.blockGet(a) ?: return JvmKanbanServer.HttpResponse(404, """{"error":"a not in cas"}""")
+        val bytesB = db.blockGet(b) ?: return JvmKanbanServer.HttpResponse(404, """{"error":"b not in cas"}""")
+        val spineA = LineCas.spineInto(db.cas, bytesA.decodeToString())
+        val spineB = LineCas.spineInto(db.cas, bytesB.decodeToString())
+        val overlap = LineCas.overlapCounts(spineA, spineB)
+        val proximity = LineCas.proximity(spineA, spineB)
+        val grades = overlap.linked to (overlap.partial)
+        val confidence = when {
+            overlap.linked > 0 -> "CONFIRMED"
+            overlap.partial > 0 -> "PROVISIONAL"
+            overlap.contentOnly > 0 -> "CANDIDATE"
+            else -> "NONE"
+        }
+        return JvmKanbanServer.HttpResponse(200, JsonSupport.stringify(mapOf(
+            "a" to a, "b" to b,
+            "linked" to grades.first, "partial" to grades.second, "contentOnly" to overlap.contentOnly,
+            "proximity" to String.format("%.4f", proximity),
+            "confidence" to confidence,
+            "ramp" to when (confidence) {
+                "CONFIRMED" -> 1.0; "PROVISIONAL" -> 0.45; "CANDIDATE" -> 0.12; else -> 0.0
+            },
+            "aBytes" to bytesA.size, "bBytes" to bytesB.size,
+        )))
+    }
 
     private fun cidOf(d: borg.trikeshed.couch.Document): String? =
         d.fields.firstOrNull { it.name == "contentId" }?.value as? String
@@ -454,6 +611,22 @@ class GraalWire(
 
     // ── the flourish feed ────────────────────────────────────────
 
+    /**
+     * H2 scoring tape: completed scoring sessions join the SSE fanout as `score` events
+     * beside compile|deopt|gc|cpu|commit|vm. Publishers emit [scoreEvents]; Step F's
+     * session service (mechanical scorers only) is the intended source.
+     */
+    private val _scoreEvents = MutableSharedFlow<Map<String, Any?>>(replay = 32, extraBufferCapacity = 256)
+    val scoreEvents: SharedFlow<Map<String, Any?>> = _scoreEvents.asSharedFlow()
+
+    /** Publish one scoring-session completion onto the tape. */
+    fun publishScore(sessionCid: String, corpusSeq: Long, scores: Int, topConfidence: String) {
+        _scoreEvents.tryEmit(mapOf(
+            "session" to sessionCid, "corpusSeq" to corpusSeq,
+            "scores" to scores, "confidence" to topConfidence,
+        ))
+    }
+
     private suspend fun stream(respond: suspend (ByteArray) -> Unit) {
         val head = "HTTP/1.1 200 OK\r\nContent-Type: text/event-stream\r\nCache-Control: no-cache\r\nConnection: keep-alive\r\nAccess-Control-Allow-Origin: *\r\n\r\n"
         respond(head.toByteArray(StandardCharsets.UTF_8))
@@ -461,6 +634,9 @@ class GraalWire(
         val jobs = mutableListOf(
             vitals.events.onEach { e ->
                 out.trySend(JsonSupport.stringify(mapOf("kind" to e.kind, "at" to e.atMs) + e.detail.mapKeys { (k, _) -> k }))
+            }.launchIn(scope),
+            scoreEvents.onEach { m ->
+                out.trySend(JsonSupport.stringify(mapOf("kind" to "score", "at" to System.currentTimeMillis()) + m))
             }.launchIn(scope),
         )
         report?.let { r ->

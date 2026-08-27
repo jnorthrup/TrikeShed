@@ -115,6 +115,31 @@ class PatchWireTest {
         assertEquals("prompt required", body["error"])
     }
 
+    @Test
+    fun muxChatRejectsAMalformedContextIdWith400(): Unit = runBlocking {
+        // legacy "ctx-$name" ids and other non-ContentId strings are refused
+        // before Brain is touched — the frame chain only accepts sha256 cids
+        val (wire, _) = harness(tmpLedger())
+        val r = post(wire, "/api/mux/chat", """{"prompt":"hi","contextId":"ctx-opposing"}""")!!
+        assertEquals(400, r.status)
+        val body = JsonSupport.parse(r.body) as Map<*, *>
+        assertEquals("bad_contextId", body["error"])
+    }
+
+    @Test
+    fun muxChatWithWellFormedContextIdFailsCleanlyWhenProvidersExhaust(): Unit = runBlocking {
+        // hermetic: the deterministic brain has no live providers, so the
+        // contextId path exercises the SAME mux-error surface as the stateless
+        // path — threading the identity must not change failure behaviour.
+        val parent = borg.trikeshed.job.ContentId.of("chain-root".encodeToByteArray()).value
+        val (wire, _) = harness(tmpLedger())
+        val r = post(wire, "/api/mux/chat", """{"prompt":"hi","contextId":"$parent"}""")!!
+        assertEquals(502, r.status)
+        val body = JsonSupport.parse(r.body) as Map<*, *>
+        assertEquals("mux-error", body["verdict"])
+        assertTrue((body["detail"] as String).contains("exhausted"))
+    }
+
     // ── panel constructions as Oroboros store documents ─────────────────
 
     @Test

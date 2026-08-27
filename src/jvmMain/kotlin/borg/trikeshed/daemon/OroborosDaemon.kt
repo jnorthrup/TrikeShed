@@ -477,6 +477,11 @@ object OroborosDaemon {
         val vmHost = borg.trikeshed.vm.HypervisorVmHost(borg.trikeshed.graal.subvm.Hypervisor(blackboard = daemonBlackboard))
         borg.trikeshed.vm.VmSupervisor.install(vmHost)
         val wireScope = CoroutineScope(SupervisorJob(coroutineContext[kotlinx.coroutines.Job]) + Dispatchers.Default)
+        // H1: the daemon's own blackboard is finally SERVED. The Hypervisor and the
+        // pointcut adapter already write receipts into it; the wire streams them out
+        // on the same litebike listener. Repair contract: seq-ordered replay, `id:`
+        // on every SSE event, `since` as a query param, snapshot at /blackboard/board.
+        val blackboardWire = borg.trikeshed.forge.server.BlackboardWire(daemonBlackboard, wireScope)
         val vmWire = borg.trikeshed.forge.server.VmWire(vmHost, wireScope)
         val hermesConsole = borg.trikeshed.hermes.HermesVmConsole(
             root = File(
@@ -728,12 +733,13 @@ object OroborosDaemon {
         val moduleWire = borg.trikeshed.forge.server.ModuleWire(moduleSupervisor, moduleRoutes)
 
         val kanbanServer = JvmKanbanServer(
-            extraRoutes = listOfNotNull(graalWire::route, vmWire::route, hermesWire::route, beliefWire?.let { it::route }, patchWire::route, moduleWire::route),
+            extraRoutes = listOfNotNull(graalWire::route, vmWire::route, hermesWire::route, beliefWire?.let { it::route }, patchWire::route, moduleWire::route, blackboardWire::route),
             rawRoutes = listOf(graalWire::ingestRoute, couchWire::route, projectDbWire::route),
             streamingPaths = borg.trikeshed.forge.server.CouchWire.streamingPaths(COUCH_DB_NAME) +
                 borg.trikeshed.forge.server.GraalWire.STREAMING +
                 borg.trikeshed.forge.server.VmWire.STREAMING +
-                borg.trikeshed.forge.server.HermesConsoleWire.STREAMING,
+                borg.trikeshed.forge.server.HermesConsoleWire.STREAMING +
+                borg.trikeshed.forge.server.BlackboardWire.STREAMING,
             maxRequestBatch = 4096,
             stateDir = forgeHome,
             moduleRoutes = moduleRoutes,
