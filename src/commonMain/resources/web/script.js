@@ -1317,16 +1317,21 @@
       .catch((err) => hostLogLine('! ' + err.message));
   });
 
+  const SIDEBAR_BTNS = { doc: document.getElementById('btn-home'), board: document.getElementById('btn-board'), graph: document.getElementById('btn-graph'), sheet: document.getElementById('btn-sheet'), host: document.getElementById('btn-host') };
   const VIEWS = { doc: [docScrollEl, viewDocBtn], board: [boardScrollEl, viewBoardBtn], graph: [graphScrollEl, viewGraphBtn], sheet: [sheetScrollEl, viewSheetBtn], shape: [shapeScrollEl, viewShapeBtn], host: [hostScrollEl, viewHostBtn] };
   function setView(view) {
     mutate((s) => { s.view = view; }, 'view');
     for (const [k, [el, btn]] of Object.entries(VIEWS)) {
       el.hidden = k !== view;
+      const sbtn = SIDEBAR_BTNS[k];
       btn.classList.toggle('active', k === view);
+      if (sbtn) sbtn.classList.toggle('active', k === view);
       if (k === view) {
         btn.setAttribute('aria-current', 'page');
+        if (sbtn) sbtn.setAttribute('aria-current', 'page');
       } else {
         btn.removeAttribute('aria-current');
+        if (sbtn) sbtn.removeAttribute('aria-current');
       }
     }
     if (view === 'board') { renderBoard(); hydrateBoard(); }
