@@ -89,8 +89,14 @@ class PdfDocument(
             if (o is PdfObject.PStream) {
                 when (val f = d?.get("Filter")) {
                     is PdfObject.PName -> filters[f.value] = (filters[f.value] ?: 0) + 1
-                    is PdfObject.PArr -> f.items.filterIsInstance<PdfObject.PName>()
-                        .forEach { filters[it.value] = (filters[it.value] ?: 0) + 1 }
+                    is PdfObject.PArr -> {
+                        // Bolt: avoid intermediate List allocations from filterIsInstance and forEach by using for loop with type check
+                        for (item in f.items) {
+                            if (item is PdfObject.PName) {
+                                filters[item.value] = (filters[item.value] ?: 0) + 1
+                            }
+                        }
+                    }
                     else -> {}
                 }
             }

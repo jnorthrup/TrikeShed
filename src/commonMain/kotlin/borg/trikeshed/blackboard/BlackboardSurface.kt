@@ -109,8 +109,14 @@ class BlackboardSurface private constructor(
             val blockedLane = KanbanColumnId("col-causal-blocked")
             val agenticLane = KanbanColumnId("col-agentic")
 
-            val validEntities = entities.filterIsInstance<LcncBlock>()
-            val orderedEntities = validEntities.sortedWith(
+            // Bolt: Avoid intermediate Sequence/List allocations before filterIsInstance and sortedWith
+            val orderedEntities = ArrayList<LcncBlock>()
+            for (entity in entities) {
+                if (entity is LcncBlock) {
+                    orderedEntities.add(entity)
+                }
+            }
+            orderedEntities.sortWith(
                 compareBy({ it.lane ?: "" }, { it.facet ?: "" }, { it.id })
             )
 

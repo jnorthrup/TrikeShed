@@ -146,15 +146,17 @@ class SignalJobBridgeElement(
      */
     suspend fun run() {
         activate()
-        events.filterIsInstance<KanbanEvent.SignalFacetReduced>().collect { event ->
-            try {
-                bridge(event)
-            } catch (e: CancellationException) {
-                throw e
-            } catch (_: Throwable) {
-                // The nexus stopped accepting. Stay attached — the flow is
-                // process-wide and a later supervisor may take over — but do
-                // not cancel the scope that launched this collector.
+        events.collect { event ->
+            if (event is KanbanEvent.SignalFacetReduced) {
+                try {
+                    bridge(event)
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (_: Throwable) {
+                    // The nexus stopped accepting. Stay attached — the flow is
+                    // process-wide and a later supervisor may take over — but do
+                    // not cancel the scope that launched this collector.
+                }
             }
         }
     }
