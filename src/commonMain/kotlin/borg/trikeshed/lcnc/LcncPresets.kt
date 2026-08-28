@@ -24,7 +24,72 @@ object LcncPresets {
         "preset-hermes" to hermes(),
         "preset-tribunal" to tribunal(),
         "preset-curator" to curator(),
+        "preset-context" to context(),
+        "preset-kanban" to kanban(),
     )
+
+    // ── Step 5: the kanban board AS an LCNC composition — dogfood proof ──
+    // Every node is a generic primitive; the kanban-specific knowledge
+    // (endpoints, field names, the move command's shape) lives entirely in
+    // wiring + params. Drag a card on the dom.board: the drop only DESCRIBES
+    // the gesture — the js + http.post nodes decide what it means and fire
+    // the real /api/invoke move. The second lane is the step-5 data spine:
+    // /api/lcnc/kanban — the concentric activeSheets projection, visible raw.
+
+    private fun kanban(): String {
+        val program = LcncProgram(
+            name = "preset-kanban",
+            nodes = listOf(
+                LcncNode("n1", "timer", params = mapOf("seconds" to "5"), x = 30.0, y = 60.0),
+                // ONE server projection feeds everything: the concentric sheet family
+                // (kanban.activeSheets executes in the daemon via /api/lcnc/run).
+                LcncNode("n2", "kanban.activeSheets", x = 230.0, y = 60.0),
+                // The concentric treesheet view — board sheet at the center, byStatus/
+                // byPriority partitions one ring out, orchestration lanes outermost;
+                // SheetRef cells drill in, the crumb climbs back.
+                LcncNode("n3", "sheet.concentric", x = 500.0, y = 30.0),
+                // The gesture surface stays generic: boardView → items/columns →
+                // grouped draggable board.
+                LcncNode("n4", "pick", params = mapOf("path" to "items"), x = 500.0, y = 420.0),
+                LcncNode("n5", "pick", params = mapOf("path" to "columns"), x = 500.0, y = 560.0),
+                LcncNode("n6", "list.groupBy", params = mapOf("key" to "status"), x = 720.0, y = 420.0),
+                LcncNode("n7", "dom.board",
+                    params = mapOf("idField" to "id", "titleField" to "title", "subtitleField" to "id", "badgeField" to "priority"),
+                    x = 940.0, y = 450.0),
+                // The drop DESCRIBES the gesture; js shapes it into a command map and
+                // kanban.move (the daemon's own runner — the same one webhook dispatch
+                // and /api/lcnc/kanban/move resolve) lands it on the WAL.
+                LcncNode("n8", "js",
+                    params = mapOf("expr" to "{jobId:x.itemId,toColumn:x.to,expectedRevision:x.item.revision,idempotencyKey:'panel-'+x.itemId+'-'+x.item.revision+'-'+x.to}"),
+                    x = 1660.0, y = 420.0),
+                LcncNode("n9", "kanban.move", x = 1880.0, y = 420.0),
+                // The no-wire submit lane: type a title, click run — a real card lands.
+                LcncNode("n10", "kanban.submit",
+                    params = mapOf("jobId" to "", "title" to "", "priority" to "2", "idempotencyKey" to ""),
+                    x = 230.0, y = 640.0),
+                LcncNode("n11", "note",
+                    params = mapOf("text" to "kanban as LCNC — the board is a COMPOSITION.\ncenter: kanban.activeSheets → sheet.concentric,\nthe concentric treesheets (board · byStatus ·\nbyPriority · orchestration) with SheetRef drill-in.\nbelow: the draggable gesture surface — a drop only\nDESCRIBES the gesture; js + kanban.move decide what\nit means and land it on the WAL.\nkanban.submit: fill params, run — a real card."),
+                    x = 30.0, y = 300.0),
+            ).toSeries(),
+            wires = listOf(
+                LcncWire("n1", "tick", "n2", "trigger?"),
+                LcncWire("n2", "board", "n3", "board"),
+                LcncWire("n2", "byStatus", "n3", "byStatus?"),
+                LcncWire("n2", "byPriority", "n3", "byPriority?"),
+                LcncWire("n2", "orchestration", "n3", "orchestration?"),
+                LcncWire("n2", "boardView", "n4", "x"),
+                LcncWire("n2", "boardView", "n5", "x"),
+                LcncWire("n4", "y", "n6", "x"),
+                LcncWire("n6", "groups", "n7", "groups"),
+                LcncWire("n5", "y", "n7", "columns?"),
+                LcncWire("n7", "move", "n8", "x"),
+                LcncWire("n8", "y", "n9", "command?"),
+            ).toSeries(),
+            view = LcncView(x = 20.0, y = 20.0, zoom = 0.75),
+            seq = 12,
+        )
+        return LcncProgramConfix.toJson(program)
+    }
 
     // ── W6.4 hermes: bone stock, pure lanes ──────────────────────────────
 
@@ -102,6 +167,32 @@ object LcncPresets {
             kanban = kanban,
             view = LcncView(x = 20.0, y = 10.0, zoom = 0.8),
             seq = 8,
+        )
+        return LcncProgramConfix.toJson(program)
+    }
+
+    // ── Step K: the context policy as an auditable program ───────────────
+    // Frames in change-frequency order; the fold is deterministic code (LLM
+    // proposes bullets, never rewrites the base); running assemble mints
+    // context-receipt/<chainHead> — the blackboard chunk pane's data.
+
+    private fun context(): String {
+        val program = LcncProgram(
+            name = "preset-context",
+            nodes = listOf(
+                LcncNode("n1", "context.fold", x = 30.0, y = 60.0),
+                LcncNode("n2", "context.assemble",
+                    params = mapOf("model" to "", "effort" to "medium", "tools" to ""),
+                    x = 300.0, y = 60.0),
+                LcncNode("n3", "display", x = 570.0, y = 60.0),
+                LcncNode("n4", "note", params = mapOf("text" to "adaptive context preset\nbullets → fold (deterministic merge)\n→ assemble (rolling cache-identity chain)\nchainHead = provable cache prefix.\ncounters live in the belief bag, never in frame bytes."), x = 300.0, y = 280.0),
+            ).toSeries(),
+            wires = listOf(
+                LcncWire("n1", "playbook", "n2", "playbook?"),
+                LcncWire("n2", "chain", "n3", "x"),
+            ).toSeries(),
+            view = LcncView(x = 30.0, y = 20.0, zoom = 0.9),
+            seq = 5,
         )
         return LcncProgramConfix.toJson(program)
     }

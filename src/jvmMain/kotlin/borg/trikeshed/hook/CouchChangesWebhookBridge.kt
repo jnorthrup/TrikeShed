@@ -33,7 +33,10 @@ fun installOutboundWebhookBridge(
         is CouchStore.MutationEvent.Deleted -> "deleted"
     }
     val eventKind = doc?.fields?.firstOrNull { it.name == "eventKind" || it.name == "kind" }?.value?.toString() ?: mutation
-    val body = JsonSupport.stringify(mapOf("kind" to eventKind, "mutation" to mutation, "id" to docId))
+    // The rev is part of the delivery identity: without it, two successive updates of the same
+    // doc to the same kind hash to the same NUID and the ledger suppresses the second forever.
+    val rev = runCatching { couch.head.getRev(docId) }.getOrNull() ?: ""
+    val body = JsonSupport.stringify(mapOf("kind" to eventKind, "mutation" to mutation, "id" to docId, "rev" to rev))
     val eventCid = ContentId.of(body.encodeToByteArray()).hex
 
     // Read subscription docs on every change: edits become effective without a mutable cache.

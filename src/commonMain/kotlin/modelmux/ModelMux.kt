@@ -289,7 +289,9 @@ class ModelMux internal constructor(
                             action = "chat", httpStatus = 200, latencyMs = kotlinx.datetime.Clock.System.now().toEpochMilliseconds() - t0,
                             inputTokens = inputTokens, outputTokens = outputTokens, cachedHit = true,
                             assessmentId = receiptAssessment, sessionId = session.sessionId,
-                            cacheReadTokens = inputTokens, cacheWriteTokens = 0,
+                            // cachedHit=true records OUR reactor-cache hit; cacheRead/Write stay
+                            // provider-measured only — this request never reached a provider.
+                            cacheReadTokens = 0, cacheWriteTokens = 0,
                         )
                     )
                     return Result.success(cached)
@@ -324,6 +326,8 @@ class ModelMux internal constructor(
             val parsed = AcpCodec.parseResponse(respBody)
             inputTokens = parsed.b.a
             outputTokens = parsed.b.b
+            // Provider-measured cache economics only — never synthesized from inputTokens.
+            val cacheUse = providerCacheUsage(respBody)
 
             if (reactor != null) {
                 reactor.cacheApiCall(provider = card.id, modelId = modelId, requestHash = requestHash, ttlMs = 3600_000, payload = respBody)
@@ -334,7 +338,7 @@ class ModelMux internal constructor(
                     action = "chat", httpStatus = httpStatus, latencyMs = kotlinx.datetime.Clock.System.now().toEpochMilliseconds() - t0,
                     inputTokens = inputTokens, outputTokens = outputTokens, cachedHit = false,
                     assessmentId = receiptAssessment, sessionId = session.sessionId,
-                    cacheWriteTokens = inputTokens,
+                    cacheReadTokens = cacheUse.a, cacheWriteTokens = cacheUse.b,
                 )
             )
             return Result.success(parsed)
@@ -517,6 +521,18 @@ class ModelMux internal constructor(
         }
         return results.toSeries()
     }
+
+    /**
+     * The legion's standings projected against the live reactor key roster —
+     * usable-first, most-remaining next. Empty when no legion is attached or
+     * no [MuxReactorElement] rides the calling context (the roster is the
+     * reactor's; the ledger alone names no keys).
+     */
+    suspend fun quotaStandings(nowMs: Long): List<QuotaStanding> {
+        val legion = quotaLegion ?: return emptyList()
+        val reactor = currentCoroutineContext()[MuxReactorElement.Key] ?: return emptyList()
+        return legion.standings(reactor.flowState.value, nowMs).toList()
+    }
 }
 
 class ModelMuxBuilder(private val keyMux: KeyMux) {
@@ -567,4 +583,23 @@ class ModelMuxBuilder(private val keyMux: KeyMux) {
         val core: ModelMuxCore = models.toSeries() j CapabilityRouter
         return ModelMux(core, keyMux, pendingUrls.toMap(), quotaLegion)
     }
+}
+
+/**
+ * Provider-reported prompt-cache token counts, (readTokens j writeTokens); zero when
+ * unreported. Receipts carry measured values only — never synthesized. The keys are
+ * the wire fields providers emit (`cached_tokens`, `cache_read_input_tokens`,
+ * `cache_creation_input_tokens`) — whoever sends them. Private to the mux receipt
+ * path on purpose: receipt repair, not protocol surface.
+ */
+private fun providerCacheUsage(json: String): Join<Int, Int> {
+    fun intAfter(key: String): Int {
+        val i = json.indexOf(key)
+        if (i < 0) return 0
+        return json.substring(i).substringAfter(':').substringBefore(',').substringBefore('}')
+            .trim().toIntOrNull() ?: 0
+    }
+    val read = maxOf(intAfter("\"cached_tokens\""), intAfter("\"cache_read_input_tokens\""))
+    val write = intAfter("\"cache_creation_input_tokens\"")
+    return read j write
 }

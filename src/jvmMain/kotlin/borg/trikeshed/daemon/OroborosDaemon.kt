@@ -523,6 +523,12 @@ object OroborosDaemon {
         borg.trikeshed.cas.LineCasIndexPersistence.restore(couchStore, casStore)?.let { restored ->
             memoryStore.restoreIndex(restored)
             System.err.println("[OROBOROS] LineCasIndex restored from store: ${restored.documentCount} docs, ${restored.contentKeyCount} content keys")
+            // Durable fact, not a log line: the board carries what the boot actually did.
+            daemonBlackboard.put(
+                "daemon/linecas-index",
+                mapOf("docs" to restored.documentCount.toString(), "contentKeys" to restored.contentKeyCount.toString()),
+                "oroboros",
+            )
         }
         memoryStore.onIndexIngest = { idx ->
             runCatching { borg.trikeshed.cas.LineCasIndexPersistence.write(couchStore, casStore, idx) }
@@ -682,6 +688,9 @@ object OroborosDaemon {
 
                 val feeder = borg.trikeshed.narsese.CuratorImpulseFeeder(profileDir)
                 var checkpoint = borg.trikeshed.narsese.CuratorImpulseFeeder.FollowCheckpoint.empty()
+                // I5: baselines are computed once per daemon run, after the first follow has
+                // had a chance to land transcripts — session cids to the blackboard.
+                var baselinesLanded = false
                 while (isActive) {
                     runCatching {
                         val followed = feeder.followOnce(curatorImpulse, memoryStore, checkpoint)
@@ -693,6 +702,25 @@ object OroborosDaemon {
                         }
                     }.onFailure {
                         System.err.println("[OROBOROS] CuratorImpulse follow failed (non-fatal): ${it.message}")
+                    }
+                    if (!baselinesLanded) {
+                        runCatching {
+                            val impulses = feeder.loadImpulses()
+                            if (impulses.size > 0) {
+                                val scenarios = feeder.loadScenarios(impulses)
+                                val baselines = borg.trikeshed.narsese.HermesBaselines.computeAndLand(
+                                    couchStore, casStore, daemonBlackboard, impulses, scenarios,
+                                )
+                                if (baselines != null) {
+                                    baselinesLanded = true
+                                    System.err.println(
+                                        "[OROBOROS] Hermes baselines landed: watermark=${baselines.watermark.size} training=${baselines.training?.sessionCid?.value?.take(18) ?: "-"} corpus=${baselines.corpus.cid.value.take(18)}@${baselines.corpus.seq}",
+                                    )
+                                }
+                            }
+                        }.onFailure {
+                            System.err.println("[OROBOROS] Hermes baseline computation failed (non-fatal): ${it.message}")
+                        }
                     }
                     delay(5_000L)
                 }
@@ -749,6 +777,9 @@ object OroborosDaemon {
             stateDir = forgeHome,
             muxContext = htxElement + muxReactor,
         )
+        // Step K: the context-assembly node family is host-composed like any module's
+        // runners — webhook dispatch and program runs can mint real context receipts.
+        moduleContext.lcncRunners.putAll(borg.trikeshed.memory.ace.AceContextNodes.registry(daemonBlackboard))
         val moduleSupervisor = borg.trikeshed.module.ModuleSupervisor(
             ctx = moduleContext,
             liveClassesDir = File(repoDir, "build/live/classes"),
@@ -757,11 +788,28 @@ object OroborosDaemon {
             },
         )
         val moduleWire = borg.trikeshed.forge.server.ModuleWire(moduleSupervisor, moduleRoutes)
-        val webhookRuntime = borg.trikeshed.forge.server.couchWebhookRuntime(couchStore, daemonBlackboard, forgeHome)
+        val webhookRuntime = borg.trikeshed.forge.server.couchWebhookRuntime(
+            couchStore, daemonBlackboard, forgeHome,
+            runners = moduleContext.lcncRunners,
+            loadProgram = { name -> attachmentGateway.getAttachment("panels/$name")?.second },
+        )
         val webhookWire = webhookRuntime.wire
         val webhookScope = CoroutineScope(SupervisorJob(coroutineContext[kotlinx.coroutines.Job]) + Dispatchers.Default + htxElement)
-        borg.trikeshed.hook.installOutboundWebhookBridge(couchStore, daemonBlackboard, webhookScope, webhookRuntime.ledger)
+        // Outbound deliveries own their lane: separate WAL + prefix, so inbound and
+        // outbound NUID acceptance spaces never collide.
+        val outboundHookLedger = withContext(Dispatchers.IO) {
+            borg.trikeshed.hook.CausalHookDeliveryLedger.open(
+                File(forgeHome, ".hook-deliveries-out.wal"), "hook-delivery-out/",
+            )
+        }
+        borg.trikeshed.hook.installOutboundWebhookBridge(couchStore, daemonBlackboard, webhookScope, outboundHookLedger)
 
+        // Boot facts land on the board — the durable answer to "what is this daemon".
+        daemonBlackboard.put(
+            "daemon/boot/kanban",
+            mapOf("port" to "8888", "atMs" to System.currentTimeMillis().toString()),
+            "oroboros",
+        )
         val kanbanServer = JvmKanbanServer(
             extraRoutes = listOfNotNull(graalWire::route, vmWire::route, hermesWire::route, beliefWire?.let { it::route }, patchWire::route, moduleWire::route, webhookWire::route, blackboardWire::route),
             rawRoutes = listOf(graalWire::ingestRoute, couchWire::route, projectDbWire::route),

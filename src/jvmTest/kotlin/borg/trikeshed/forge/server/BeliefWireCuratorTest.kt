@@ -81,6 +81,38 @@ class BeliefWireCuratorTest {
     }
 
     @Test
+    fun teachAcceptsGroupingsAndBanksGroupCoherence() = runBlocking {
+        // R6 gate: an enacted group-coherence resolution rides the teach wire beside
+        // the transcript lane and lands SUMO-grounded coherence facts in the bank.
+        val (wire, curator) = wireWithCurator()
+        val member = "sha256:" + "ab".repeat(32)
+        val body = """
+            {"impulses":[],"scenarios":[],
+             "groupings":[{
+               "ring8": 42,
+               "members": ["$member"],
+               "currentLabel": "misc",
+               "action": "relabel",
+               "label": "invoices",
+               "sampleMembers": ["$member"],
+               "origin": "pen"
+             }]}
+        """.trimIndent()
+        val r = post(wire, "/api/beliefs/teach", body)!!
+        assertEquals(200, r.status)
+        val resp = JsonSupport.parse(r.body) as Map<*, *>
+        assertEquals("ok", resp["verdict"])
+        assertEquals(1, (resp["groupings"] as Number).toInt())
+        val q = post(wire, "/api/beliefs/query", """{"pattern":"(groupCoherence ?g ?action)"}""")!!
+        assertEquals(200, q.status)
+        @Suppress("UNCHECKED_CAST")
+        val results = (JsonSupport.parse(q.body) as Map<*, *>)["results"] as List<Map<String, String>>
+        assertTrue(results.isNotEmpty(), "banked coherence fact answers the solver")
+        assertTrue(curator.knowledgeBank.asserts().any { it.toString().contains("group_ring8_42") },
+            "the group's KIF term is in the bank")
+    }
+
+    @Test
     fun teachRoundTripsThroughTheActualElementInternals() = runBlocking {
         // Prove the wire passes shapes the REAL recipient assesses: drive teach()
         // directly and confirm the bank grows by the assessed impulse.

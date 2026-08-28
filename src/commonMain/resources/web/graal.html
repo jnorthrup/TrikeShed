@@ -159,6 +159,7 @@ html[data-skin="marker"] #crumb{text-shadow:none}
   <div class="chip" id="cDocs"><b>–</b><span>documents</span></div>
   <div class="chip" id="cAot" onclick="toggleAot()" style="cursor:pointer"><b>–</b><span>aot cache</span></div>
   <div class="chip" id="cHermes" onclick="hermesRunner()" style="cursor:pointer"><b>VT220</b><span>hermes vm</span></div>
+  <div class="chip" id="cBoard" onclick="toggleBoard()" style="cursor:pointer"><b>0</b><span>blackboard</span></div>
 </div>
 <div id="river"></div>
 <div class="panel" id="doc"><header><b id="docTitle">document</b><span><span class="x" id="docSheetsBtn" onclick="toggleSheetView()" title="grid-in-cell sheet family (CursorSheet)" style="margin-right:10px">▤ sheets</span><span class="x" onclick="hide('doc')">✕</span></span></header><div class="body"><div id="docBody"></div><div id="docSheetBody" style="display:none"></div></div></div>
@@ -169,10 +170,11 @@ html[data-skin="marker"] #crumb{text-shadow:none}
 <div class="panel" id="aot"><header><b>HotSpot AOT cache</b><span class="x" onclick="hide('aot')">✕</span></header><div class="body" id="aotBody"></div></div>
 <div class="panel" id="gc"><header><b>gc lane — live occupancy</b><span class="x" onclick="hide('gc')">✕</span></header><div class="body" id="gcBody"></div></div>
 <div class="panel" id="zoom"><header><b>zoom / strength — bytes prove the grouping</b><span class="x" onclick="hide('zoom')">✕</span></header><div class="body" id="zoomBody"></div></div>
+<div class="panel" id="board"><header><b>blackboard — durable facts</b><span class="x" onclick="hide('board')">✕</span></header><div class="body" id="boardBody"></div></div>
 <div id="notion"><div class="nhead"><input id="nfilter" placeholder="filter entries…"><span id="nscope"></span></div><div class="nbody" id="nbody"></div></div>
 <canvas id="mini" width="200" height="124"></canvas>
 <div id="crumb">loading terrain…</div>
-<div id="help"><b>wheel</b> zoom · <b>drag</b> pan · <b>drop folder</b> → project db · <b>right-click territory</b> kill db · <b>dblclick</b> dive · <b>click</b> inspect+edges · <b>0</b> fit · <b>T</b> tree sheet · <b>L</b> ledger · <b>P</b> pointcuts · <b>V</b> vms · <b>H</b> Hermes VT220 · <b>A</b> AOT · <b>M</b> mode · <b>1/2/3</b> layer · <b>F</b> fog · <b>B</b> skin · <a href="/futon" style="color:var(--dim)">futon ↗</a> · <a id="qsLink" style="color:var(--commit);cursor:pointer">⚡ install now</a> · <a id="fbLink" style="color:var(--warn);cursor:pointer">⚑ feedback</a></div>
+<div id="help"><b>wheel</b> zoom · <b>drag</b> pan · <b>drop folder</b> → project db · <b>right-click territory</b> kill db · <b>dblclick</b> dive · <b>click</b> inspect+edges · <b>0</b> fit · <b>T</b> tree sheet · <b>L</b> ledger · <b>P</b> pointcuts · <b>V</b> vms · <b>H</b> Hermes VT220 · <b>A</b> AOT · <b>O</b> blackboard · <b>M</b> mode · <b>1/2/3</b> layer · <b>F</b> fog · <b>B</b> skin · <a href="/futon" style="color:var(--dim)">futon ↗</a> · <a id="qsLink" style="color:var(--commit);cursor:pointer">⚡ install now</a> · <a id="fbLink" style="color:var(--warn);cursor:pointer">⚑ feedback</a></div>
 <div class="panel" id="vt"><header><b id="vtTitle">hermes vt</b><span><span class="x" onclick="vtKill()" title="interrupt + close the guest" style="margin-right:10px">⏻ kill</span><span class="x" onclick="hide('vt')">✕</span></span></header><div class="body" id="vtBody" style="padding:0"><pre id="vtScroll"></pre><div id="vtLine"><span id="vtPrompt">#</span><input id="vtInput" autocomplete="off" spellcheck="false"></div></div></div>
 <script>
 'use strict';
@@ -808,6 +810,7 @@ addEventListener('keydown',e=>{
   if(e.key==='p'||e.key==='P')togglePoints();
   if(e.key==='v'||e.key==='V')toggleVms();
   if(e.key==='h'||e.key==='H')hermesRunner();
+  if(e.key==='o'||e.key==='O')toggleBoard();
   if(e.key==='a'||e.key==='A')toggleAot();
   if(e.key==='t'||e.key==='T')treeSheet();
   if(e.key==='l'||e.key==='L')ledger();
@@ -1198,6 +1201,45 @@ function renderGcLane(gc){
    Two inputs: a code ring8 (→ /api/graal/zoom, representative cids + _cas byte links)
    and a pair of cids (→ /api/graal/strength, linkMatch grades side by side).
    Claim Check: the pane fetches real bytes from _cas to prove the grouping. */
+/* ── the blackboard panel: durable facts, humanly ────────────────────────
+   scoring tape · VM + commit receipts → they stream in the river below
+   (score/vm/commit kinds); GC lane → the G panel. This panel is the DURABLE
+   side: the fact store — pointcut sites / writes, ACE chunk cache receipts
+   (cache-receipt/ · context-receipt/ keys), and the raw blackboard snapshot.
+   One page, one landscape: /graal and /blackboard serve this same document. */
+function toggleBoard(){$('board').style.display==='flex'?hide('board'):show('board');if($('boardBody').innerHTML==='')boardInit();boardRefresh();}
+function boardInit(){$('boardBody').innerHTML=
+  '<div style="color:var(--dim);font-size:10px;margin-bottom:8px">CAS / heap terrain = the canvas (X toggles the heap continent) · scoring tape · VM + commit receipts stream in the river (score / vm / commit kinds) · GC lane = G panel — this panel is the durable fact store</div>'+
+  '<div style="margin-bottom:6px"><b style="color:var(--dim);font-size:10px">pointcut sites / writes — through /blackboard/assert, the one funnel</b><br>'+
+  '<input id="pcO" placeholder="owner" style="width:22%;background:var(--panel2);border:1px solid var(--line);border-radius:4px;color:var(--ink);padding:3px 8px">'+
+  '<input id="pcM" placeholder="method" style="width:22%;background:var(--panel2);border:1px solid var(--line);border-radius:4px;color:var(--ink);padding:3px 8px">'+
+  '<input id="pcS" placeholder="site" style="width:14%;background:var(--panel2);border:1px solid var(--line);border-radius:4px;color:var(--ink);padding:3px 8px">'+
+  '<select id="pcE" style="background:var(--panel2);border:1px solid var(--line);border-radius:4px;color:var(--ink);padding:3px 6px"><option>true</option><option>false</option></select>'+
+  ' <span class="x" style="cursor:pointer" onclick="pcAssert()">→ assert</span></div>'+
+  '<div id="pcSites" style="color:var(--dim);font-size:10px;margin-bottom:8px">no pointcut sites on the board yet</div>'+
+  '<hr style="border:0;border-top:1px solid var(--line);margin:10px 0">'+
+  '<b style="color:var(--dim);font-size:10px">ACE chunk cache receipts (cache-receipt/ · context-receipt/)</b>'+
+  '<div id="aceRcpts" style="color:var(--dim);font-size:10px;margin:4px 0 8px">no cache receipts yet — they land when a context chain assembles</div>'+
+  '<hr style="border:0;border-top:1px solid var(--line);margin:10px 0">'+
+  '<b style="color:var(--dim);font-size:10px">blackboard snapshot</b> <span class="x" style="cursor:pointer" onclick="boardRefresh()">↻</span>'+
+  '<pre id="boardSnap" style="white-space:pre-wrap;word-break:break-word;color:var(--dim);font-size:10px;margin:4px 0"></pre>';}
+async function boardRefresh(){try{
+  const b=await(await fetch('/blackboard/board')).json(); const board=b.board||{}; const keys=Object.keys(board);
+  $('cBoard').querySelector('b').textContent=keys.length;
+  if($('boardBody').innerHTML==='')return;
+  const sites=keys.filter(k=>k.startsWith('pointcut/')||k.startsWith('pointcut-def/'));
+  $('pcSites').innerHTML=sites.length?sites.slice(0,60).map(k=>esc9(k)+' = '+esc9(JSON.stringify(board[k]))).join('<br>'):'no pointcut sites on the board yet';
+  const ace=keys.filter(k=>k.startsWith('cache-receipt/')||k.startsWith('context-receipt/'));
+  $('aceRcpts').innerHTML=ace.length?ace.slice(-40).reverse().map(k=>esc9(k)+' = '+esc9(JSON.stringify(board[k]))).join('<br>'):'no cache receipts yet — they land when a context chain assembles';
+  $('boardSnap').textContent=JSON.stringify(board,null,1).slice(0,16000);
+}catch(e){}}
+function esc9(s){return String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
+async function pcAssert(){
+  const o=$('pcO').value.trim(),m=$('pcM').value.trim(),s=$('pcS').value.trim(),en=$('pcE').value;
+  if(!o||!m||!s)return;
+  const key='pointcut-def/'+o+'/'+m+'/'+s;
+  await fetch('/blackboard/assert',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({[key]:{method:m,site:s,enabled:en}})});
+  setTimeout(boardRefresh,150);}
 function toggleZoom(){$('zoom').style.display==='flex'?hide('zoom'):show('zoom');if($('zoomBody').innerHTML==='')zoomInit();}
 function zoomInit(){$('zoomBody').innerHTML=
   '<div style="margin-bottom:6px"><b style="color:var(--dim);font-size:10px">ZOOM · code ring8 (hex or dec)</b><br>'+
@@ -1520,13 +1562,15 @@ async function productRows(){
   return rows;
 }
 async function loadMap(){
+  let mapErr='';
   try{const m=await (await fetch('/api/graal/map')).json();
     PROJECT_DBS=new Set(m.dbs||[]);
     const prod=await productRows();
     lastRows=(m.rows||[]).concat(prod);}
-  catch(e){}
+  catch(e){mapErr=String(e);}
   try{const h=await (await fetch('/api/graal/heap')).json();heapRows=heapContinentRows(h);}catch(e){heapRows=heapRows||[];}
-  if(!lastRows.length)$('crumb').textContent='map fetch failed: '+(e||'empty');
+  lastRows=lastRows||[];
+  if(!lastRows.length)$('crumb').textContent='map fetch failed: '+(mapErr||'empty');
   buildAll();
   setTimeout(loadMap,30000);
 }
@@ -1553,7 +1597,7 @@ function heapContinentRows(h){
   return rows;
 }
 const heapLeaves=new Map();
-resize();$('crumb').textContent='drop lane v2 armed — drag a folder anywhere';loadMap();pollVitals();pollVms();loadAot();connectSse();requestAnimationFrame(draw);
+resize();$('crumb').textContent='drop lane v2 armed — drag a folder anywhere';loadMap();pollVitals();pollVms();loadAot();connectSse();boardRefresh();requestAnimationFrame(draw);
 </script>
 </body>
 </html>

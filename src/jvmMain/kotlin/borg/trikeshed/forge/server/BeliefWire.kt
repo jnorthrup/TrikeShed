@@ -1,8 +1,10 @@
 package borg.trikeshed.forge.server
 
+import borg.trikeshed.cas.GroupingReorientation
 import borg.trikeshed.litebike.JvmKanbanServer
 import borg.trikeshed.memory.HermesMemoryFiles
 import borg.trikeshed.narsese.AttentionEconomy
+import borg.trikeshed.narsese.GroupCoherenceEnactment
 import borg.trikeshed.narsese.BeliefBagElement
 import borg.trikeshed.narsese.BeliefIntake
 import borg.trikeshed.narsese.CuratorImpulseElement
@@ -127,10 +129,54 @@ class BeliefWire(
                     }.toSeries()
                     ReplayScenario(sid, subject, turns)
                 }.toSeries()
-                val landed = c.teach(impulses, scenarios)
+                // R6: enacted group-coherence resolutions ride the same teach call. The wire is a
+                // reporter — enactment (human-approved) happened upstream; resolutionCid is trusted
+                // when supplied, else recomputed purely from the same canonical body enact() writes.
+                val asInt: (Any?) -> Int? = { v ->
+                    (v as? Number)?.toInt() ?: v?.toString()?.toDoubleOrNull()?.toInt()
+                }
+                val groupings = ((req["groupings"] as? List<*>).orEmpty()).mapNotNull { raw ->
+                    val m = raw as? Map<*, *> ?: return@mapNotNull null
+                    val ring8 = asInt(m["ring8"]) ?: return@mapNotNull null
+                    val members = ((m["members"] as? List<*>).orEmpty()).mapNotNull { v ->
+                        runCatching { borg.trikeshed.job.ContentId(v.toString()) }.getOrNull()
+                    }
+                    val samples = ((m["sampleMembers"] as? List<*>).orEmpty()).mapNotNull { v ->
+                        runCatching { borg.trikeshed.job.ContentId(v.toString()) }.getOrNull()
+                    }
+                    val resolution = when (m["action"]?.toString()) {
+                        "relabel" -> GroupingReorientation.GroupingResolution.Relabel(
+                            m["label"]?.toString() ?: return@mapNotNull null,
+                        )
+                        "split" -> GroupingReorientation.GroupingResolution.Split(
+                            asInt(m["low"]) ?: return@mapNotNull null,
+                            asInt(m["high"]) ?: return@mapNotNull null,
+                        )
+                        "merge" -> GroupingReorientation.GroupingResolution.Merge(
+                            asInt(m["other"]) ?: return@mapNotNull null,
+                            asInt(m["into"]) ?: return@mapNotNull null,
+                        )
+                        "reject" -> GroupingReorientation.GroupingResolution.Reject
+                        else -> return@mapNotNull null
+                    }
+                    val post = GroupingReorientation.GroupingPost(
+                        group = GroupingReorientation.Group(ring8, members),
+                        currentLabel = m["currentLabel"]?.toString() ?: "",
+                        proposedLabel = null,
+                        proposedSplit = null,
+                        proposedMergeWith = null,
+                        evidence = GroupingReorientation.ProposalEvidence(samples, emptyList()),
+                        origin = m["origin"]?.toString() ?: "wire",
+                    )
+                    val cid = m["resolutionCid"]?.toString()
+                        ?: GroupingReorientation.resolutionCid(post, resolution).value
+                    GroupCoherenceEnactment(post, resolution, cid)
+                }.toSeries()
+                val landed = c.teach(impulses, scenarios, groupings)
                 json(mapOf(
                     "verdict" to "ok",
                     "landed" to landed.size,
+                    "groupings" to groupings.size,
                     "glosses" to landed.map { (_, gloss) -> gloss },
                     "knowledgeSize" to c.knowledgeBank.asserts().size,
                 ))

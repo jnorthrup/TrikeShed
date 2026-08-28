@@ -299,7 +299,19 @@ data class LinkHit(
 class LineCasIndex {
     private val byContent = linkedMapOf<String, MutableList<Join<ContentId, LineNode>>>()
     private val docs = linkedMapOf<String, LineSpine>()
+
+    // The funnel is a negative-query gate over content keys. Rebuilding it inside every
+    // ingestSpine made bulk ingest (and boot-time restore, which re-ingests every spine)
+    // O(n²); ingest now just marks it dirty and the next query rebuilds once.
+    private var funnelDirty = false
     internal var funnel: FunnelHashIndex<String>? = null
+        get() {
+            if (funnelDirty) {
+                field = FunnelHashIndex.build(byContent.keys.toList().filterNotNull().toSeries(), 0L)
+                funnelDirty = false
+            }
+            return field
+        }
 
     val documentCount: Int get() = docs.size
     val contentKeyCount: Int get() = byContent.size
@@ -323,7 +335,7 @@ class LineCasIndex {
             if (n == null || n.contentCid == null) continue
             byContent.getOrPut(n.contentCid.hex) { mutableListOf() }.add(doc j n)
         }
-        funnel = FunnelHashIndex.build(byContent.keys.toList().filterNotNull().toSeries(), 0L)
+        funnelDirty = true
         return doc
     }
 

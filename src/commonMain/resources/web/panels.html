@@ -102,6 +102,26 @@ button.stop{border-color:var(--err);color:var(--err)}
 .ctree span.leaf.copied{color:var(--ok)!important}
 #menu input{width:calc(100% - 16px);margin:6px 8px 4px;background:var(--bg);border:1px solid var(--line);color:var(--ink);border-radius:3px;font:inherit;padding:3px 6px}
 #menu .items{max-height:300px;overflow-y:auto}
+/* ── concentric treesheets + standings tables ── */
+.csheet{margin:0 8px 8px;font-size:10.5px;user-select:text}
+.csheet .crumbrow{margin:2px 0 4px;color:var(--dim)}
+.csheet .seg{cursor:pointer;color:var(--wire)}
+.csheet .seg:hover{color:var(--graal);text-decoration:underline}
+.csheet .seg.here{color:var(--ink);cursor:default;text-decoration:none}
+.csheet .ringrow{margin:2px 0 4px}
+.csheet .ringrow.orch{color:var(--dim);font-size:9.5px}
+.csheet .tablewrap{max-height:260px;overflow:auto;border:1px solid var(--line);border-radius:3px}
+.csheet table{border-collapse:collapse;width:100%}
+.csheet th{position:sticky;top:0;background:var(--panel2);color:var(--dim);font-weight:400;text-transform:uppercase;font-size:8.5px;letter-spacing:.05em;text-align:left;padding:3px 6px;border-bottom:1px solid var(--line)}
+.csheet td{padding:2px 6px;border-bottom:1px solid rgba(35,42,56,.5);white-space:nowrap;max-width:220px;overflow:hidden;text-overflow:ellipsis}
+.csheet td.leafcell{cursor:pointer}
+.csheet td.leafcell:hover{color:var(--graal)}
+.csheet td.leafcell.copied{color:var(--ok)}
+.dagchip{display:inline-block;background:var(--panel2);border:1px solid var(--vm);color:var(--vm);border-radius:3px;padding:0 5px;margin:1px 2px;cursor:pointer;font-size:9.5px}
+.dagchip:hover{background:rgba(176,122,255,.15)}
+.dagchip i{color:var(--dim);font-style:normal}
+.utilbar{display:inline-block;width:64px;height:7px;background:var(--bg);border:1px solid var(--line);border-radius:2px;vertical-align:middle}
+.utilbar i{display:block;height:100%;background:var(--warn)}
 </style>
 </head>
 <body>
@@ -113,6 +133,7 @@ button.stop{border-color:var(--err);color:var(--err)}
   <input id="panelName" placeholder="panel-name" style="background:var(--bg);border:1px solid var(--line);color:var(--ink);border-radius:4px;padding:4px 8px;font:inherit;width:120px">
   <button id="storeSaveBtn" title="save construction as a replicated store document">⇪ store</button>
   <button id="storeLoadBtn" title="load a construction from the store">⇩ store</button>
+  <button id="presetsBtn" title="server-authored programs — offered, never installed">▤ presets</button>
   <button id="exportBtn">export</button>
   <button id="importBtn">import</button>
   <button id="clearBtn">clear</button>
@@ -304,7 +325,14 @@ finally:
     },
   },
   "dom.board": {
-    async run(n,i){ n._groups=i.groups||{}; n._cols=i["columns?"]||null; return {move:n._lastMove||null}; },
+    async run(n,i){
+      n._groups=i.groups||{}; n._cols=i["columns?"]||null;
+      // Event semantics: a drag gesture fires downstream exactly once; no gesture
+      // emits NOTHING (undefined skips required inputs — `move: null` crashed the
+      // js node's expr on every timer tick before any drag happened).
+      const mv=n._lastMove; n._lastMove=null;
+      return mv?{move:mv}:{};
+    },
     render(n){ renderGroupedBoard(n); },
   },
   "panels.list": {
@@ -324,7 +352,43 @@ finally:
   "vm.events": {
     async run(n){ return {event:n._lastEvent||null}; },
   },
+  "sheet.concentric": {
+    // The concentric treesheet view: board sheet at the center, partitions one
+    // ring out, orchestration outermost. State is an id→sheet index; SheetRef
+    // cells ({sheet:"id"}) and child rings drill in, the crumb climbs out.
+    async run(n,i){
+      const idx={}, add=s=>{ if(s&&s.id) idx[s.id]=s; };
+      add(i.board);
+      for(const s of (i["byStatus?"]||[])) add(s);
+      for(const s of (i["byPriority?"]||[])) add(s);
+      n._sheets=idx; n._orch=i["orchestration?"]||null;
+      if(!n._cur||!idx[n._cur]) n._cur=i.board&&i.board.id;
+      return {};
+    },
+    render(n){ renderConcentric(n); },
+  },
+  "graal.heap": {
+    async run(n){ const r=await api("GET","/api/graal/heap"); n._heap=r; return {heap:r}; },
+    render(n){ renderHeap(n); },
+  },
+  "mux.standings": {
+    async run(n){ const r=await api("GET","/api/mux/standings"); n._standings=(r&&r.standings)||[]; return {standings:n._standings}; },
+    render(n){ renderStandings(n); },
+  },
 };
+/* ── server-family runners: ONE author of execution semantics. The daemon runs
+   the node (LcncKanbanExperience / LcncSheetNodes via POST /api/lcnc/run against
+   the composed lcncRunners registry — the same map webhook dispatch resolves);
+   the browser posts params+inputs and renders the outputs. */
+function serverRun(type){
+  return { async run(n,i){
+    const r=await api("POST","/api/lcnc/run",{type:type,params:n.params||{},inputs:i});
+    if(r.ok!==true) throw (r.error||("lcnc run failed: "+type));
+    return r.outputs||{};
+  }};
+}
+for(const t of ["kanban.activeSheets","kanban.submit","kanban.move","confix.sheets","confix.pickPath",
+                "sheet.flatten","sheet.filter","sheet.count","sheet.columns","sheet.cell"]) RUNNERS[t]=serverRun(t);
 
 /* ── graph state ───────────────────────────────────────────────────────── */
 let G={nodes:[],wires:[],seq:1};              // wires: {from:[nodeId,port], to:[nodeId,port]}
@@ -354,7 +418,7 @@ function renderTree(v,key,depth){
     d.appendChild(s); return d;
   }
   const arr=Array.isArray(v), entries=arr?v.map((x,i)=>[i,x]):Object.entries(v);
-  const open=depth<2;
+  let open=depth<2; // let, not const: the toggle below reassigns it
   const tw=document.createElement("span"); tw.className="ctree-tw"; tw.textContent=open?"▾":"▸";
   const lb=document.createElement("span"); lb.textContent=key?(key+": "+(arr?`[${entries.length}]`:`{${entries.length}}`)):(arr?`Array[${entries.length}]`:`Object{${entries.length}}`);
   const hd=document.createElement("span"); hd.append(tw,lb);
@@ -425,6 +489,101 @@ function renderGroupedBoard(n){
     });
     wrap.appendChild(c);
   }
+}
+/* ── concentric treesheets: the graal.html sheet-family renderer, made a node.
+   Zero vocabulary: it renders exactly the {id,title,parent,columns,rows} sheets
+   the server projected; a {sheet:"id"} cell is a drill-in; children rings are
+   the sheets whose parent is the current one; the crumb is the way back out. */
+function renderConcentric(n){
+  let wrap=n.el.querySelector(".csheet");
+  if(!wrap){ wrap=document.createElement("div"); wrap.className="csheet"; n.el.appendChild(wrap); }
+  const idx=n._sheets||{}, cur=idx[n._cur];
+  if(!cur){ wrap.innerHTML='<div class="kboard-status">no sheets yet — wire kanban.activeSheets in and run</div>'; return; }
+  const esc=s=>String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
+  const crumb=[]; let c=cur, guard=0;
+  while(c&&guard++<12){ crumb.unshift(c); c=c.parent?idx[c.parent]:null; }
+  let html='<div class="crumbrow">'+crumb.map((s,i)=>
+    '<span class="seg'+(i===crumb.length-1?' here':'')+'" data-sheet="'+esc(s.id)+'">'+esc(s.title||s.id)+'</span>'
+  ).join(' ▸ ')+'</div>';
+  const kids=Object.values(idx).filter(s=>s.parent===cur.id);
+  if(kids.length) html+='<div class="ringrow">'+kids.map(s=>
+    '<span class="dagchip" data-sheet="'+esc(s.id)+'">▤ '+esc(s.title||s.id)+' <i>'+(s.rows||[]).length+'</i></span>'
+  ).join('')+'</div>';
+  if(!(cur.rows||[]).length) html+='<div class="kboard-status">empty sheet — '+(cur.columns||[]).map(c=>esc(c.name)).join(' · ')+'</div>';
+  else html+='<div class="tablewrap"><table><tr>'+(cur.columns||[]).map(c=>'<th title="'+esc(c.type||'')+'">'+esc(c.name)+'</th>').join('')+'</tr>'+
+    cur.rows.map(row=>'<tr>'+row.map(cell=>{
+      if(cell&&typeof cell==="object"&&cell.sheet){
+        const child=idx[cell.sheet];
+        return '<td><span class="dagchip" data-sheet="'+esc(cell.sheet)+'">▤ '+esc(child?(child.title||child.id):cell.sheet)+'</span></td>';
+      }
+      return '<td class="leafcell" title="click to copy">'+esc(cell==null?'':String(cell))+'</td>';
+    }).join('')+'</tr>').join('')+'</table></div>';
+  if(n._orch&&n._orch.lanes) html+='<div class="ringrow orch">'+
+    (n._orch.lanes||[]).map(l=>'<span class="dagchip" title="'+esc(l.role||'')+'">'+esc(l.id)+'</span>').join('→')+
+    ((n._orch.edges||[]).some(e=>e.mode&&e.mode!=="NORMAL")?' <i>'+(n._orch.edges||[]).filter(e=>e.mode&&e.mode!=="NORMAL").map(e=>esc(e.mode.toLowerCase())).join('·')+'</i>':'')+'</div>';
+  wrap.innerHTML=html;
+  wrap.querySelectorAll("[data-sheet]").forEach(el=>el.addEventListener("click",e=>{
+    e.stopPropagation(); n._cur=el.dataset.sheet; renderConcentric(n);
+  }));
+  wrap.querySelectorAll(".leafcell").forEach(el=>el.addEventListener("click",e=>{
+    e.stopPropagation(); copyText(el.textContent);
+    el.classList.add("copied"); setTimeout(()=>el.classList.remove("copied"),500);
+  }));
+  wrap.querySelectorAll("*").forEach(el=>el.addEventListener("pointerdown",e=>e.stopPropagation()));
+}
+/* ── heap continent: bytes-by-class as a slice-and-dice treemap off
+   /api/graal/heap — lane param picks JFR allocation attribution or the
+   jmap-style histogram when it has rows. */
+function renderHeap(n){
+  let cv=n.el.querySelector("canvas.heapmap");
+  if(!cv){ cv=document.createElement("canvas"); cv.className="heapmap"; cv.width=664; cv.height=150;
+    cv.style.cssText="display:block;margin:0 8px 4px;border:1px solid var(--line);border-radius:3px"; n.el.appendChild(cv);
+    const st=document.createElement("div"); st.className="kboard-status heapstat"; n.el.appendChild(st); }
+  const h=n._heap||{}, lane=p(n,"lane")||"allocation";
+  const rows=(lane==="histogram"&&(h.rows||[]).length?h.rows:h.allocation)||[];
+  const top=rows.slice().sort((a,b)=>(b.bytes||0)-(a.bytes||0)).slice(0,24);
+  const total=top.reduce((a,r)=>a+(r.bytes||0),0);
+  const x2=cv.getContext("2d"); x2.clearRect(0,0,cv.width,cv.height);
+  const stat=n.el.querySelector(".heapstat");
+  if(!total){ if(stat) stat.textContent="heap: no "+lane+" data yet"; return; }
+  const hue=s=>{ let v=0; for(let i=0;i<s.length;i++) v=(v*31+s.charCodeAt(i))>>>0; return v%360; };
+  // slice-and-dice: alternate axis each split, area ∝ bytes
+  function tile(items,x,y,w,hgt,horiz){
+    if(!items.length||w<1||hgt<1) return;
+    if(items.length===1){
+      const r=items[0];
+      x2.fillStyle="hsl("+hue(r.class)+" 45% 32%)"; x2.fillRect(x+0.5,y+0.5,w-1,hgt-1);
+      if(w>60&&hgt>12){ x2.fillStyle="#d8dce6"; x2.font="9px monospace";
+        const short=r.class.replace(/^.*\./,"").slice(0,Math.floor(w/6));
+        x2.fillText(short,x+3,y+10);
+        if(hgt>24) x2.fillText((r.bytes/1048576).toFixed(1)+"M",x+3,y+21); }
+      return;
+    }
+    const sum=items.reduce((a,r)=>a+r.bytes,0); let acc=0, cut=0;
+    for(let i=0;i<items.length;i++){ acc+=items[i].bytes; if(acc>=sum/2){ cut=i+1; break; } }
+    if(cut===0||cut===items.length) cut=Math.max(1,items.length>>1);
+    const a=items.slice(0,cut), b=items.slice(cut), fa=a.reduce((s,r)=>s+r.bytes,0)/sum;
+    if(horiz){ tile(a,x,y,Math.round(w*fa),hgt,!horiz); tile(b,x+Math.round(w*fa),y,w-Math.round(w*fa),hgt,!horiz); }
+    else { tile(a,x,y,w,Math.round(hgt*fa),!horiz); tile(b,x,y+Math.round(hgt*fa),w,hgt-Math.round(hgt*fa),!horiz); }
+  }
+  tile(top,0,0,cv.width,cv.height,true);
+  if(stat) stat.textContent=lane+": "+(total/1048576).toFixed(1)+"MB across top "+top.length+" classes"+
+    (lane==="histogram"?" · "+(h.classes||0)+" classes "+((h.bytes||0)/1048576).toFixed(1)+"MB live":"");
+}
+/* ── quota legion standings: reactor roster × ledger, usable-first ── */
+function renderStandings(n){
+  let wrap=n.el.querySelector(".csheet");
+  if(!wrap){ wrap=document.createElement("div"); wrap.className="csheet"; n.el.appendChild(wrap); }
+  const rows=n._standings||[];
+  const esc=s=>String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+  if(!rows.length){ wrap.innerHTML='<div class="kboard-status">no standings — legion empty or reactor context absent</div>'; return; }
+  wrap.innerHTML='<div class="tablewrap"><table><tr><th>key</th><th>provider</th><th>spent</th><th>limit</th><th>util</th><th></th></tr>'+
+    rows.map(s=>'<tr><td>'+esc(s.keyId)+'</td><td>'+esc(s.provider||"")+'</td><td>'+esc(s.spent)+'</td>'+
+      '<td>'+(s.limit>0?esc(s.limit):"∞")+'</td>'+
+      '<td><span class="utilbar"><i style="width:'+Math.round((s.utilization||0)*100)+'%"></i></span></td>'+
+      '<td style="color:'+(s.usable?"var(--ok)":"var(--err)")+'">'+(s.usable?"usable":(s.exhausted?"exhausted":"benched"))+'</td></tr>').join('')+
+    '</table></div>';
+  wrap.querySelectorAll("*").forEach(el=>el.addEventListener("pointerdown",e=>e.stopPropagation()));
 }
 function renderPanelsList(n,panels){
   let wrap=n.el.querySelector(".kboard");
@@ -660,7 +819,11 @@ function showMenu(cx,cy){
   const q=document.createElement("input"); q.placeholder="search nodes…";
   const box=document.createElement("div"); box.className="items";
   const place=(k)=>{ menu.style.display="none";
-    addNode(k,(cx-view.x-world.getBoundingClientRect().left+viewport.getBoundingClientRect().left)/view.z,(cy-40-view.y)/view.z); };
+    // client → world: subtract the viewport origin and the pan, divide by zoom.
+    // (The old worldRect arithmetic double-counted view.x — nodes landed offset
+    // by the pan distance whenever the canvas wasn't at origin.)
+    const vr=viewport.getBoundingClientRect();
+    addNode(k,(cx-vr.left-view.x)/view.z,(cy-vr.top-view.y)/view.z); };
   const render=(filter)=>{
     box.innerHTML="";
     for(const k of Object.keys(CONTRACTS).sort()){
@@ -817,6 +980,7 @@ async function runNode(n,cache){
   try{
     const out=await R.run(n,inputs);
     n.el.classList.remove("running"); n.el.classList.add("ok");
+    n._lastOut=out; // memo for partial runs: closure runs seed upstream values from here
     if(R.render) R.render(n,out);
     else if(!t.sink && n.type!=="display" && out!==undefined && Object.keys(out).length) setResult(n,out);
     return out;
@@ -837,11 +1001,19 @@ async function runAll(fromId){
     order=order.filter(n=>keep.has(n.id));
   }
   const cache={};
+  if(fromId){
+    // Partial runs start from an interior node (a board drop, an SSE event) whose
+    // own required inputs live OUTSIDE the closure — seed them from the last full
+    // run's memo or the closure's first node silently refuses to run.
+    for(const n of G.nodes) if(!order.includes(n) && n._lastOut!==undefined) cache[n.id]=n._lastOut;
+  }
   for(const n of order){ const out=await runNode(n,cache); if(out!==undefined) cache[n.id]=out; }
+  wiresSvg.querySelectorAll("path.flow").forEach(w=>w.classList.remove("flow"));
   $("#status").textContent="done "+new Date().toLocaleTimeString();
 }
-$("#runBtn").addEventListener("click",()=>{
-  // arm sources (timers + SSE), run everything once
+/* arm sources (timers + SSE). Called by ▶ run AND after every load path —
+   a preset loaded from the gallery must tick, not sit inert until ▶. */
+function armSources(){
   for(const n of G.nodes){
     if(CONTRACTS[n.type]&&CONTRACTS[n.type].source&&n.type==="timer"&&!n._timer){
       const s=Math.max(1,+p(n,"seconds")||5);
@@ -869,8 +1041,8 @@ $("#runBtn").addEventListener("click",()=>{
       };
     }
   }
-  runAll();
-});
+}
+$("#runBtn").addEventListener("click",()=>{ armSources(); runAll(); });
 $("#stopBtn").addEventListener("click",()=>{ for(const n of G.nodes){ if(n._timer){clearInterval(n._timer);n._timer=null;} if(n._es){n._es.close();n._es=null;} } $("#status").textContent="sources stopped"; });
 /* ── minimap: world overview + click-to-jump ───────────────────────────── */
 const mm=$("#minimap"), mmx=mm.getContext("2d");
@@ -900,7 +1072,7 @@ mm.addEventListener("click",e=>{
 setInterval(drawMinimap, 1500);
 
 /* ── persistence ───────────────────────────────────────────────────────── */
-function serialize(){ return {view,nodes:G.nodes.map(n=>({id:n.id,type:n.type,x:n.x,y:n.y,params:n.params,collapsed:!!n.collapsed})),wires:G.wires,seq:G.seq}; }
+function serialize(){ return {view,nodes:G.nodes.map(n=>({id:n.id,type:n.type,x:n.x,y:n.y,params:n.params,collapsed:!!n.collapsed,subprogram:n.subprogram||undefined})),wires:G.wires,seq:G.seq}; }
 function save(){ try{ localStorage.setItem("trikeshed.panels.v3", JSON.stringify(serialize())); }catch(e){} }
 function load(data){
   for(const n of G.nodes){ if(n._timer)clearInterval(n._timer); if(n._es){n._es.close();n._es=null;} n.el.remove(); }
@@ -933,6 +1105,7 @@ $("#storeLoadBtn").addEventListener("click",async()=>{
   const resp=await fetch("/api/panels/"+name);
   if(!resp.ok){ $("#status").textContent="load failed: "+resp.status; return; }
   load(await resp.json());
+  armSources(); runAll();
   $("#status").textContent="loaded panels/"+name;
 });
 $("#exportBtn").addEventListener("click",()=>{
@@ -940,8 +1113,89 @@ $("#exportBtn").addEventListener("click",()=>{
   const a=document.createElement("a"); a.href=URL.createObjectURL(blob); a.download="panel-graph.json"; a.click();
 });
 $("#importBtn").addEventListener("click",()=>$("#fileIn").click());
-$("#fileIn").addEventListener("change",async e=>{ const f=e.target.files[0]; if(f) load(JSON.parse(await f.text())); });
+$("#fileIn").addEventListener("change",async e=>{ const f=e.target.files[0]; if(f){ load(JSON.parse(await f.text())); armSources(); runAll(); } });
 $("#clearBtn").addEventListener("click",()=>{ if(confirm("clear the panel?")) load({nodes:[],wires:[]}); });
+/* ── preset gallery: /api/panels/presets finally has its consumer ────────
+   Server-shape (LcncProgramConfix) → client-shape converter + a picklist of
+   presets and stored programs. Presets are OFFERED — loading one puts it on
+   the canvas; installing stays the explicit ⇪ store act. */
+function fromConfix(doc){
+  // Server wires are {from:[node,port],to:[node,port]} (LcncProgramConfix.toJson);
+  // accept the flat fromNode/fromPort spelling too so older documents still load.
+  return {view:doc.view?{x:doc.view.x||0,y:doc.view.y||0,z:doc.view.z||doc.view.zoom||1}:undefined, seq:doc.seq||1,
+    nodes:(doc.nodes||[]).map(n=>({id:n.id,type:n.type,x:n.x||0,y:n.y||0,params:n.params||{},collapsed:!!n.collapsed,subprogram:n.subprogram||undefined})),
+    wires:(doc.wires||[]).map(w=>({from:w.from||[w.fromNode,w.fromPort],to:w.to||[w.toNode,w.toPort]}))};
+}
+async function openGallery(){
+  let g=$("#gallery");
+  if(g){ g.remove(); return; }
+  g=document.createElement("div"); g.id="gallery";
+  g.style.cssText="position:fixed;top:52px;right:12px;width:340px;max-height:70vh;overflow:auto;background:var(--panel,#101620);border:1px solid var(--line,#263348);border-radius:8px;padding:10px;z-index:50;font-size:12px";
+  g.innerHTML='<div style="display:flex;justify-content:space-between;margin-bottom:8px"><b style="color:var(--cyan,#57d3ff)">GALLERY</b><span style="cursor:pointer" onclick="this.closest(\'#gallery\').remove()">✕</span></div><div id="galBody">loading…</div>';
+  document.body.appendChild(g);
+  const body=g.querySelector("#galBody");
+  try{
+    const [pr,st]=await Promise.all([
+      fetch("/api/panels/presets").then(r=>r.json()).catch(()=>({presets:[]})),
+      fetch("/api/panels").then(r=>r.json()).catch(()=>({panels:[]})),
+    ]);
+    const rows=[];
+    rows.push('<div style="color:var(--dim,#7f91a9);margin:4px 0">presets — server-authored, offered</div>');
+    for(const p of (pr.presets||[])){
+      const doc=p.document||{}; const nn=(doc.nodes||[]).length;
+      rows.push('<div class="galRow" data-kind="preset" data-name="'+p.name+'" style="padding:5px 6px;border:1px solid var(--line,#263348);border-radius:5px;margin:3px 0;cursor:pointer">'+p.name+' <span style="color:var(--dim,#7f91a9)">· '+nn+' nodes</span></div>');
+    }
+    rows.push('<div style="color:var(--dim,#7f91a9);margin:8px 0 4px">store — your saved programs</div>');
+    const panels=st.panels||[];
+    if(!panels.length) rows.push('<div style="color:var(--dim,#7f91a9)">store has no programs yet — ⇪ store saves the canvas</div>');
+    for(const s of panels){
+      rows.push('<div class="galRow" data-kind="store" data-name="'+s.name+'" style="padding:5px 6px;border:1px solid var(--line,#263348);border-radius:5px;margin:3px 0;cursor:pointer">'+s.name+' <span style="color:var(--dim,#7f91a9)">· '+(s.bytes||0)+' B</span></div>');
+    }
+    body.innerHTML=rows.join("");
+    body.querySelectorAll(".galRow").forEach(el=>el.addEventListener("click",async()=>{
+      const name=el.dataset.name;
+      if(el.dataset.kind==="preset"){
+        const doc=(pr.presets||[]).find(x=>x.name===name)?.document;
+        if(doc){ load(fromConfix(doc)); $("#panelName").value=name.replace(/^preset-/,""); $("#status").textContent="loaded "+name+" (offered — ⇪ store to keep it)"; }
+      } else {
+        const resp=await fetch("/api/panels/"+name);
+        if(resp.ok){ load(await resp.json()); $("#panelName").value=name; $("#status").textContent="loaded panels/"+name; }
+      }
+      g.remove(); armSources(); runAll();
+    }));
+  }catch(e){ body.textContent="gallery failed: "+e; }
+}
+$("#presetsBtn").addEventListener("click",openGallery);
+/* ── contract hydration: the vocabulary is server-owned ─────────────────── */
+// The ONE author is /api/lcnc/contracts; this page carries no type table.
+// (This function was promised by the step-4 rework and never written — the
+// boot awaited an undefined name, the IIFE died on the ReferenceError, and
+// /panels rendered 100% empty. The vocabulary map is rebuilt here, verbatim
+// from the served contracts: title/inputs/outputs/params/source/sink/wide.)
+let CONTRACTS={};
+async function syncContracts(){
+  try{
+    const list=(await (await fetch('/api/lcnc/contracts')).json()).contracts||[];
+    const m={};
+    for(const c of list){
+      // Normalize wire shape → renderer shape: the page reads ins/outs, and an
+      // EMPTY opts array must not become a select (|| [] is truthy).
+      c.ins=c.inputs||[]; c.outs=c.outputs||[];
+      const p={};
+      for(const k in (c.params||{})){
+        const d=c.params[k]||{};
+        p[k]={v:d.v??"", opts:(d.opts&&d.opts.length)?d.opts:undefined,
+              ta:d.ta||undefined, ph:d.ph||undefined};
+      }
+      c.params=p;
+      m[c.type]=c;
+    }
+    CONTRACTS=m;
+    $("#status").textContent=Object.keys(m).length+" contracts hydrated";
+  }catch(e){
+    $("#status").textContent="contracts fetch failed: "+e;
+  }
+}
 /* ── boot: restore, or seed the starter panel ──────────────────────────── */
 // Boot waits for contract hydration: the vocabulary is server-owned, and the
 // starter board's addNode calls must see it or the first paint is empty.
@@ -965,20 +1219,25 @@ else {
   const vsd=addNode("display",470,700);
   const ks=addNode("keys.status",250,880);
   const ksd=addNode("display",470,880);
-  // ── kanban: not a node, a COMPOSITION. Every step below is a generic,
-  // reusable primitive; the kanban-specific knowledge (endpoint, field
-  // names, the move command's shape) lives entirely in wiring + params —
-  // this exact graph is also saved as the "kanban" program in store (load
-  // via panel name "kanban") so it's a standalone, shareable LCNC program,
-  // not something only reachable by knowing it's baked into the boot state.
-  const bhg=addNode("http.get",30,1060,{path:"/api/board"});
-  const bpi=addNode("pick",250,1030,{path:"items"});
-  const bpc=addNode("pick",250,1150,{path:"columns"});
-  const bgb=addNode("list.groupBy",470,1030,{key:"status"});
-  const bdb=addNode("dom.board",690,1030,{idField:"id",titleField:"title",subtitleField:"id",badgeField:"priority"});
-  const bmv=addNode("js",1400,1030,{expr:"{commands:[{type:'move',jobId:x.itemId,idempotencyKey:'panel-'+x.itemId+'-'+Date.now().toString(36),expectedRevision:x.item.revision,toColumn:x.to}]}"});
-  const bhp=addNode("http.post",1620,1030,{path:"/api/invoke"});
-  const nt=addNode("note",650,340,{text:"production ops board — live planes, no fiction.\nright-click/double-click: add nodes.\ndrop a folder anywhere: mount it as a scope.\nkanban: drag a card in the board below — the drop only DESCRIBES the gesture; the js+http.post nodes decide what it means and fire the real move."});
+  // ── kanban: not a node, a COMPOSITION — now on the atomic vocabulary.
+  // kanban.activeSheets (ONE server projection) feeds the concentric
+  // treesheets AND the draggable gesture surface; a drop only DESCRIBES the
+  // gesture, js shapes it, kanban.move (the daemon's own runner) lands it on
+  // the WAL. Same composition offered as "preset-kanban" (▤ presets).
+  const kas=addNode("kanban.activeSheets",30,1060);
+  const ksc=addNode("sheet.concentric",300,1030);
+  const bpi=addNode("pick",300,1430,{path:"items"});
+  const bpc=addNode("pick",300,1570,{path:"columns"});
+  const bgb=addNode("list.groupBy",520,1430,{key:"status"});
+  const bdb=addNode("dom.board",740,1430,{idField:"id",titleField:"title",subtitleField:"id",badgeField:"priority"});
+  const bmv=addNode("js",1460,1430,{expr:"{jobId:x.itemId,toColumn:x.to,expectedRevision:x.item.revision,idempotencyKey:'panel-'+x.itemId+'-'+x.item.revision+'-'+x.to}"});
+  const bkm=addNode("kanban.move",1680,1430);
+  const bks=addNode("kanban.submit",30,1430,{jobId:"",title:"",priority:"2",idempotencyKey:""});
+  // ── continents: the heap treemap and the quota-legion standings live on
+  // the same canvas as everything else — one zoom grammar, no side pages.
+  const hp=addNode("graal.heap",250,1760,{lane:"allocation"});
+  const ms=addNode("mux.standings",250,2000);
+  const nt=addNode("note",650,340,{text:"production ops board — live planes, no fiction.\nright-click/double-click: add nodes.\ndrop a folder anywhere: mount it as a scope.\nkanban below: concentric treesheets (click ▤ refs to\ndive, crumb climbs out) + draggable board — a drop\nonly DESCRIBES the gesture; js + kanban.move decide.\nkanban.submit: fill params, ▶ — a real card lands.\nfurther down: heap continent + quota legion."});
   for(const [a,b,ap,bp] of [
     [t,v,"tick","trigger?"],[v,pk,"json","x"],[pk,g,"y","x"],
     [v,pk2,"json","x"],[pk2,g2,"y","x"],
@@ -986,23 +1245,22 @@ else {
     [t,bi,"tick","trigger?"],[bi,bid,"field","x"],
     [t,vs,"tick","trigger?"],[vs,vsd,"rows","x"],
     [t,ks,"tick","trigger?"],[ks,ksd,"roster","x"],
-    [t,bhg,"tick","trigger?"],
-    [bhg,bpi,"json","x"],[bhg,bpc,"json","x"],
+    [t,kas,"tick","trigger?"],
+    [kas,ksc,"board","board"],[kas,ksc,"byStatus","byStatus?"],
+    [kas,ksc,"byPriority","byPriority?"],[kas,ksc,"orchestration","orchestration?"],
+    [kas,bpi,"boardView","x"],[kas,bpc,"boardView","x"],
     [bpi,bgb,"y","x"],
     [bgb,bdb,"groups","groups"],[bpc,bdb,"y","columns?"],
-    [bdb,bmv,"move","x"],[bmv,bhp,"y","body"],
+    [bdb,bmv,"move","x"],[bmv,bkm,"y","command?"],
+    [t,hp,"tick","trigger?"],
+    [t,ms,"tick","trigger?"],
   ]) G.wires.push({from:[a.id,ap],to:[b.id,bp]});
   save();
 }
 applyView(); requestAnimationFrame(redraw);
-// arm timer sources and run once immediately — a freshly loaded panel shows
-// LIVE state on first paint, not an inert diagram waiting for a click.
-for(const n of G.nodes){
-  if(CONTRACTS[n.type]&&CONTRACTS[n.type].source&&n.type==="timer"&&!n._timer){
-    const s=Math.max(1,+p(n,"seconds")||5);
-    n._timer=setInterval(()=>runAll(n.id), s*1000);
-  }
-}
+// arm sources and run once immediately — a freshly loaded panel shows LIVE
+// state on first paint, not an inert diagram waiting for a click.
+armSources();
 runAll();
 })();
 </script>

@@ -35,6 +35,13 @@ class CuratorImpulseFeeder(
     private val maxTurnsPerScenario: Int = 400,
 ) {
 
+    /**
+     * R6: enacted group-coherence resolutions ride the same teach calls, beside the
+     * transcript lane. Injected by the host (the daemon wires the curation surface's
+     * enactments in); empty by default — the feeder itself never invents groupings.
+     */
+    var groupingSource: () -> Series<GroupCoherenceEnactment> = { emptySeriesOf() }
+
     /** Frozen follow cursor: `(sessionId\u0000subject) → last message row id`, as Series algebra. */
     data class FollowCheckpoint(val sessions: Series<Join<String, Long>>) {
         fun last(key: String): Long {
@@ -138,7 +145,7 @@ class CuratorImpulseFeeder(
 
         val changedImpulses = changed.size j { i: Int -> changed[i].impulse }
         val changedScenarios = changed.size j { i: Int -> changed[i].scenario }
-        val landed = element.teach(changedImpulses, changedScenarios)
+        val landed = element.teach(changedImpulses, changedScenarios, groupingSource())
         val transcriptCids = withContext(Dispatchers.IO) {
             val written = ArrayList<Join<String, borg.trikeshed.job.ContentId>>(changed.size)
             for (i in changed.indices) {
@@ -189,6 +196,6 @@ class CuratorImpulseFeeder(
         val impulses = loadImpulses()
         if (impulses.size == 0) return emptyList()
         val scenarios = loadScenarios(impulses)
-        return element.teach(impulses, scenarios)
+        return element.teach(impulses, scenarios, groupingSource())
     }
 }

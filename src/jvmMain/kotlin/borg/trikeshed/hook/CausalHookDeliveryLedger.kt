@@ -11,6 +11,7 @@ import java.io.File
  */
 class CausalHookDeliveryLedger private constructor(
     private val wal: CausalWal,
+    private val prefix: String,
     replayed: Set<String>,
 ) : HookDeliveryLedger {
     private val mutex = Mutex()
@@ -18,18 +19,22 @@ class CausalHookDeliveryLedger private constructor(
 
     override suspend fun acceptOnce(nuid: String): Boolean = mutex.withLock {
         if (nuid in accepted) return@withLock false
-        wal.append("hook-delivery/$nuid", nuid.encodeToByteArray())
+        wal.append("$prefix$nuid", nuid.encodeToByteArray())
         accepted.add(nuid)
         true
     }
 
     companion object {
-        /** Call from Dispatchers.IO: replay reads the WAL file synchronously. */
-        fun open(path: File): CausalHookDeliveryLedger {
+        /**
+         * Call from Dispatchers.IO: replay reads the WAL file synchronously. The [prefix]
+         * separates NUID lanes — inbound and outbound each open their own ledger so the
+         * two acceptance spaces never collide.
+         */
+        fun open(path: File, prefix: String = "hook-delivery/"): CausalHookDeliveryLedger {
             val wal = CausalWal(path)
             val seen = HashSet<String>()
-            for ((key, _) in wal.replay()) if (key.startsWith("hook-delivery/")) seen.add(key.removePrefix("hook-delivery/"))
-            return CausalHookDeliveryLedger(wal, seen)
+            for ((key, _) in wal.replay()) if (key.startsWith(prefix)) seen.add(key.removePrefix(prefix))
+            return CausalHookDeliveryLedger(wal, prefix, seen)
         }
     }
 }

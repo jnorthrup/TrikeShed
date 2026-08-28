@@ -71,7 +71,18 @@ object GroupingReorientation {
      * relabel/split/merge (label docs are value projections of these documents).
      * Returns the resolution document's cid — content-addressed, reproducible.
      */
-    fun enact(cas: CasStore, post: GroupingPost, resolution: GroupingResolution): ContentId {
+    fun enact(cas: CasStore, post: GroupingPost, resolution: GroupingResolution): ContentId =
+        cas.put(resolutionBody(post, resolution).encodeToByteArray())
+
+    /**
+     * The cid [enact] would return, computed purely — for reporters (e.g. the teach
+     * wire) that carry an enactment without holding the CAS it was enacted into.
+     */
+    fun resolutionCid(post: GroupingPost, resolution: GroupingResolution): ContentId =
+        ContentId.of(resolutionBody(post, resolution).encodeToByteArray())
+
+    /** The canonical resolution document body — one source for [enact] and [resolutionCid]. */
+    fun resolutionBody(post: GroupingPost, resolution: GroupingResolution): String {
         val body = buildString {
             append("grouping-resolution-v1\n")
             append("group.ring8=").append(post.group.ring8).append('\n')
@@ -92,7 +103,7 @@ object GroupingReorientation {
             }
             append("origin=").append(post.origin).append('\n')
         }
-        return cas.put(body.encodeToByteArray())
+        return body
     }
 
     /**

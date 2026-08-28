@@ -56,8 +56,10 @@ class BlackboardWire(val blackboard: ConfixBlackboard, scope: CoroutineScope) {
         // R7: one consolidated blackboard page. Resource I/O stays off the reactor thread.
         if (method == "GET" && (path == "/blackboard" || path == "/blackboard/")) {
             return withContext(Dispatchers.IO) {
+                // One page, one landscape: /blackboard and /graal serve the SAME console
+                // document — the blackboard is the console's O panel, not a sibling page.
                 val html = BlackboardWire::class.java.classLoader
-                    .getResourceAsStream("web/blackboard.html")
+                    .getResourceAsStream("web/graal.html")
                     ?.bufferedReader(StandardCharsets.UTF_8)?.use { it.readText() }
                     ?: return@withContext JvmKanbanServer.HttpResponse(404, "blackboard page not found", "text/plain; charset=utf-8")
                 JvmKanbanServer.HttpResponse(200, html, "text/html; charset=utf-8")

@@ -104,6 +104,13 @@ class BrainClient(
     /** The model id that most recently answered a chat, or null before the first success. */
     fun lastModel(): String? = lastGoodModelId
 
+    /**
+     * Quota-legion standings from the mux (usable-first). Call under the mux
+     * reactor context — without it the roster is unknowable and this is empty.
+     */
+    suspend fun quotaStandings(nowMs: Long): List<modelmux.QuotaStanding> =
+        internalModelMux.quotaStandings(nowMs)
+
     /** The static provider table (ungated) — discoverEndpoints() is this, filtered by key presence. */
     private fun fullRoster(): List<EndpointSpec> {
         val out = mutableListOf<EndpointSpec>()

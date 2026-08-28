@@ -348,7 +348,7 @@ class GraalWire(
                 "ok" to true, "id" to docId, "cid" to cid.value, "bytes" to bytes.size,
                 "extracted" to extractId, "chars" to markdown.length, "shape" to shapeKey.take(80),
                 "plan" to plan, "persisted" to persisted,
-                "code" to docCode, "codeRing8" to (docCode and 0xFF),
+                "code" to docCode, "codeRing8" to ((docCode ushr 8) and 0xFF),
                 // byte schema: organic comprehension without parser
                 "byteSchema" to byteSurface?.documentSchema?.structuralKey?.take(120),
                 "byteChunks" to byteSurface?.chunks?.size,
@@ -469,7 +469,9 @@ class GraalWire(
         )
         if (code != null) {
             fields += borg.trikeshed.couch.Field("code", code.toString())
-            fields += borg.trikeshed.couch.Field("codeRing8", (code and 0xFF).toString())
+            // ring8 = the HIGH byte (bits 15..8) — the coarse ring, matching LineNode.codeRing8,
+            // ByteChunk.codeRing8, and the client's similarity split. Low byte is the fine ring.
+            fields += borg.trikeshed.couch.Field("codeRing8", ((code ushr 8) and 0xFF).toString())
         }
         database.store.put(borg.trikeshed.couch.Document(id, fields), database.store.head.getRev(id))
     }

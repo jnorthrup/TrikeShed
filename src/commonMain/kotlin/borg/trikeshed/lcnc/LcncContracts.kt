@@ -277,6 +277,124 @@ object LcncContracts {
         LcncPortContract("vm.tiers", "vm provider tiers",
             emptyList(), listOf("tiers"),
             outputKinds = mapOf("tiers" to "json")),
+
+        // ── Step 5: kanban/sheet/confix — the server runner family surfaced.
+        // These execute IN THE DAEMON (LcncKanbanExperience/LcncSheetNodes via
+        // POST /api/lcnc/run against the composed lcncRunners registry); the
+        // browser posts params+inputs and renders outputs. One author of
+        // execution semantics — the same runners webhook dispatch resolves.
+        LcncPortContract("kanban.activeSheets", "kanban concentric sheets",
+            listOf("trigger?"),
+            listOf("board", "byStatus", "byPriority", "boardView", "orchestration", "laneOrder", "conditions"),
+            inputKinds = mapOf("trigger" to "trigger"),
+            outputKinds = mapOf(
+                "board" to "json", "byStatus" to "json", "byPriority" to "json",
+                "boardView" to "json", "orchestration" to "json",
+                "laneOrder" to "json", "conditions" to "json",
+            )),
+        LcncPortContract("kanban.submit", "kanban submit (new card)",
+            listOf("command?"), listOf("accepted", "jobId", "revision", "sheets"),
+            inputKinds = mapOf("command" to "json"),
+            outputKinds = mapOf("accepted" to "json", "jobId" to "id", "revision" to "json", "sheets" to "json"),
+            params = mapOf(
+                "jobId" to LcncPortContract.LcncParamSpec(ph = "card-…"),
+                "title" to LcncPortContract.LcncParamSpec(ph = "card title"),
+                "priority" to LcncPortContract.LcncParamSpec(v = "2"),
+                "idempotencyKey" to LcncPortContract.LcncParamSpec(ph = "unique per submit"),
+            )),
+        LcncPortContract("kanban.move", "kanban move (WAL command)",
+            listOf("command?"), listOf("accepted", "jobId", "revision", "sheets"),
+            inputKinds = mapOf("command" to "json"),
+            outputKinds = mapOf("accepted" to "json", "jobId" to "id", "revision" to "json", "sheets" to "json"),
+            params = mapOf(
+                "jobId" to LcncPortContract.LcncParamSpec(ph = "wire a command in, or type one"),
+                "toColumn" to LcncPortContract.LcncParamSpec(ph = "target column id"),
+                "expectedRevision" to LcncPortContract.LcncParamSpec(ph = "card revision"),
+                "idempotencyKey" to LcncPortContract.LcncParamSpec(ph = "unique per gesture"),
+            )),
+        LcncPortContract("confix.sheets", "json → confix sheet family",
+            listOf("json?"), listOf("sheets", "sheet"),
+            inputKinds = mapOf("json" to "json"),
+            outputKinds = mapOf("sheets" to "json", "sheet" to "json"),
+            params = mapOf(
+                "json" to LcncPortContract.LcncParamSpec(ta = true, ph = "JSON (or wire it in)"),
+                "id" to LcncPortContract.LcncParamSpec(v = "confix"),
+                "title" to LcncPortContract.LcncParamSpec(ph = "sheet title"),
+            )),
+        LcncPortContract("confix.pickPath", "json path → sheet",
+            listOf("json"), listOf("found", "path", "sheets", "sheet"),
+            inputKinds = mapOf("json" to "json"),
+            outputKinds = mapOf("found" to "json", "path" to "json", "sheets" to "json", "sheet" to "json"),
+            params = mapOf("path" to LcncPortContract.LcncParamSpec(ph = "dot.or/slash path"))),
+        LcncPortContract("sheet.flatten", "sheet flatten (refs → ids)",
+            listOf("sheet"), listOf("sheet"),
+            inputKinds = mapOf("sheet" to "json"),
+            outputKinds = mapOf("sheet" to "json")),
+        LcncPortContract("sheet.filter", "sheet filter (column = value)",
+            listOf("sheet"), listOf("sheet"),
+            inputKinds = mapOf("sheet" to "json"),
+            outputKinds = mapOf("sheet" to "json"),
+            params = mapOf(
+                "columnName" to LcncPortContract.LcncParamSpec(ph = "column"),
+                "columnValue" to LcncPortContract.LcncParamSpec(ph = "value"),
+            )),
+        LcncPortContract("sheet.count", "sheet row count",
+            listOf("sheet"), listOf("count"),
+            inputKinds = mapOf("sheet" to "json"),
+            outputKinds = mapOf("count" to "json")),
+        LcncPortContract("sheet.columns", "sheet schema",
+            listOf("sheet"), listOf("columns"),
+            inputKinds = mapOf("sheet" to "json"),
+            outputKinds = mapOf("columns" to "json")),
+        LcncPortContract("sheet.cell", "sheet cell (row, column)",
+            listOf("sheet"), listOf("value"),
+            inputKinds = mapOf("sheet" to "json"),
+            outputKinds = mapOf("value" to "json"),
+            params = mapOf(
+                "row" to LcncPortContract.LcncParamSpec(v = "0"),
+                "column" to LcncPortContract.LcncParamSpec(v = "0"),
+            )),
+        // The concentric treesheet VIEW — the one sheet primitive that touches the
+        // DOM (like dom.board): crumb from `parent` chains, SheetRef cells drill in.
+        LcncPortContract("sheet.concentric", "concentric treesheets (drill-in)",
+            listOf("board", "byStatus?", "byPriority?", "orchestration?"), emptyList(),
+            inputKinds = mapOf(
+                "board" to "json", "byStatus" to "json",
+                "byPriority" to "json", "orchestration" to "json",
+            ),
+            isSink = true, wide = true),
+
+        // ── continents: heap + legion standings on the same canvas ───
+        LcncPortContract("graal.heap", "heap continent (bytes by class)",
+            listOf("trigger?"), listOf("heap"),
+            inputKinds = mapOf("trigger" to "trigger"),
+            outputKinds = mapOf("heap" to "json"),
+            params = mapOf("lane" to LcncPortContract.LcncParamSpec(
+                v = "allocation", opts = listOf("allocation", "histogram"))),
+            wide = true),
+        LcncPortContract("mux.standings", "quota legion standings",
+            listOf("trigger?"), listOf("standings"),
+            inputKinds = mapOf("trigger" to "trigger"),
+            outputKinds = mapOf("standings" to "json"),
+            wide = true),
+
+        // ── Step K: adaptive context engineering as LCNC ─────────────────
+        LcncPortContract("context.fold", "playbook fold (deterministic)",
+            listOf("bullets"), listOf("playbook"),
+            inputKinds = mapOf("bullets" to "json"),
+            outputKinds = mapOf("playbook" to "text")),
+        LcncPortContract("context.assemble", "context chain (cache identity)",
+            listOf("toolsSystem?", "playbook?", "envelope?", "tail?"), listOf("chain", "chainHead"),
+            inputKinds = mapOf(
+                "toolsSystem" to "text", "playbook" to "text",
+                "envelope" to "text", "tail" to "text",
+            ),
+            outputKinds = mapOf("chain" to "json", "chainHead" to "id"),
+            params = mapOf(
+                "model" to LcncPortContract.LcncParamSpec(v = ""),
+                "effort" to LcncPortContract.LcncParamSpec(v = "medium", opts = listOf("low", "medium", "high")),
+                "tools" to LcncPortContract.LcncParamSpec(v = "", ph = "comma-separated tool names"),
+            )),
     )
 
     fun compatible(sourceType: String, sourcePort: String): List<LcncPortContract> =

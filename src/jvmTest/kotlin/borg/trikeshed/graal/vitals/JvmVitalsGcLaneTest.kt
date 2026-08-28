@@ -118,6 +118,14 @@ class JvmVitalsGcLaneTest {
     @Test
     fun snapshotCarriesTheGcLaneAndHeapCarriesAllocation() {
         val v = JvmVitals()
+        // Gates must never self-attach jcmd: GC.class_histogram stops the whole target JVM
+        // at a safepoint and a wedged attach freezes the watchdog thread too. Swap the seam.
+        v.liveSetSource = {
+            listOf(
+                JvmVitals.HeapRow("java.lang.String", 10, 240),
+                JvmVitals.HeapRow("byte[]", 5, 1000),
+            )
+        }
         v.recordGcHeapSummary(1, "Before GC", 100, 64)
         v.recordGcHeapSummary(1, "After GC", 20, 64)
         val snap = v.snapshot()
@@ -126,5 +134,25 @@ class JvmVitalsGcLaneTest {
         assertTrue(gc.containsKey("lane"), "snapshot.gc.lane is present")
         val heap = v.heapHistogram()
         assertTrue(heap.containsKey("allocation"), "heapHistogram carries the allocation continent")
+        assertEquals(2, heap["classes"], "live-set rows come from the seam")
+        assertEquals(1240L, heap["bytes"], "240 + 1000")
+    }
+
+    @Test
+    fun parseClassHistogramParsesJcmdTable() {
+        val v = JvmVitals()
+        val text = """
+             num     #instances         #bytes  class name (module)
+            -------------------------------------------------------
+               1:          1200          48000  java.lang.String (java.base@25.0.4)
+               2:           300          24000  byte[] (java.base@25.0.4)
+               3:            50           1600  java.lang.Object (java.base@25.0.4)
+            Total          1550          73600
+        """.trimIndent()
+        val rows = v.parseClassHistogram(text)
+        assertEquals(3, rows.size, "Total line is not a row")
+        assertEquals("java.lang.String", rows[0].className, "sorted by bytes desc")
+        assertEquals(48000L, rows[0].bytes)
+        assertEquals(1200L, rows[0].count)
     }
 }

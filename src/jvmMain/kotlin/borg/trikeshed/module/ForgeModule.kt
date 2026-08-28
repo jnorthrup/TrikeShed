@@ -55,6 +55,11 @@ class ModuleContext(
     val stateDir: File,
     /** HtxKey + mux reactor for provider calls (ModelMuxKanbanAgent and kin). */
     val muxContext: CoroutineContext = EmptyCoroutineContext,
+    /**
+     * Modules publish their LCNC runner registries here (additive); the host composes
+     * them — webhook node dispatch resolves `program/node/port` against this map.
+     */
+    val lcncRunners: MutableMap<String, borg.trikeshed.lcnc.LcncNodeRunner> = linkedMapOf(),
 )
 
 /** The grip the supervisor holds: describe for /api/modules, drain-then-close on detach. */

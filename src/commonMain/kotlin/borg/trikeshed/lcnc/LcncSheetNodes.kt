@@ -32,11 +32,14 @@ object LcncSheetNodes {
                 } else cell
             }
         }
+        // Output rides the `sheet` port so the family composes: flatten → filter → count.
         mapOf(
-            "id" to (sheet["id"] ?: "flattened"),
-            "title" to (sheet["title"] ?: ""),
-            "columns" to columns,
-            "rows" to flatRows,
+            "sheet" to mapOf(
+                "id" to (sheet["id"] ?: "flattened"),
+                "title" to (sheet["title"] ?: ""),
+                "columns" to columns,
+                "rows" to flatRows,
+            ),
         )
     }
 
@@ -60,10 +63,12 @@ object LcncSheetNodes {
             if (colIdx < row.size) row[colIdx].toString() == columnValue else false
         }
         mapOf(
-            "id" to (sheet["id"] ?: "filtered"),
-            "title" to (sheet["title"] ?: ""),
-            "columns" to columns,
-            "rows" to filtered,
+            "sheet" to mapOf(
+                "id" to (sheet["id"] ?: "filtered"),
+                "title" to (sheet["title"] ?: ""),
+                "columns" to columns,
+                "rows" to filtered,
+            ),
         )
     }
 

@@ -75,9 +75,11 @@ class PointcutDefinitionWriter(
         val method = parts[1]
         val site = parts[2].toIntOrNull() ?: return null
         val map = value as? Map<*, *>
-        val enabled = (map?.get("enabled") as? String)?.toBoolean()
-            ?: parts.getOrNull(3)?.toBoolean()
-            ?: true
+        val enabled = when (val raw = map?.get("enabled")) {
+            is Boolean -> raw
+            is String -> raw.toBoolean()
+            else -> parts.getOrNull(3)?.toBoolean() ?: true
+        }
         return writeDefinition(owner, method, site, enabled)
     }
 }

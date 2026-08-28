@@ -47,6 +47,7 @@ class KanbanModule : ForgeModule {
         store.open()
         val lcnc = LcncKanbanExperience(store)
         val lcncRegistry = lcnc.registry()
+        ctx.lcncRunners.putAll(lcncRegistry)
 
         // ── NARS garnish (Phase 5): review bridge + attention order, iff the bag is live.
         //    Bag OFF ⇒ board JSON byte-identical minus the attention/contested fields.
@@ -232,6 +233,40 @@ class KanbanModule : ForgeModule {
             )))
         }
 
+        // The generic runner dispatch: ONE execution author. The browser (and any
+        // client) posts {type, params?, inputs?}; the node executes IN the daemon
+        // against the composed ctx.lcncRunners registry — the very map webhook
+        // node dispatch resolves. Looked up at request time so late-attached
+        // module registries (ace nodes, future modules) are reachable too.
+        ctx.routes.claim(id, "/api/lcnc/run") { method, _, text, _ ->
+            if (method != "POST") return@claim JvmKanbanServer.HttpResponse(405, """{"error":"method_not_allowed"}""")
+            val req = runCatching { JsonSupport.parse(rawBody(text)) as? Map<*, *> }.getOrNull()
+                ?: return@claim JvmKanbanServer.HttpResponse(400, """{"error":"bad_json"}""")
+            val type = req["type"]?.toString()
+                ?: return@claim JvmKanbanServer.HttpResponse(400, """{"error":"type_required"}""")
+            val runner = ctx.lcncRunners[type]
+                ?: return@claim JvmKanbanServer.HttpResponse(
+                    404, JsonSupport.stringify(mapOf("error" to "no_runner", "type" to type)),
+                )
+            val params = (req["params"] as? Map<*, *>)?.entries
+                ?.associate { (k, v) -> k.toString() to (v?.toString() ?: "") } ?: emptyMap()
+            @Suppress("UNCHECKED_CAST")
+            val inputs = (req["inputs"] as? Map<*, *>)?.entries
+                ?.associate { (k, v) -> k.toString() to v } ?: emptyMap<String, Any?>()
+            val node = LcncNode(id = "http-run", type = type, params = params)
+            runCatching { runner.run(node, inputs) }.fold(
+                onSuccess = { out ->
+                    JvmKanbanServer.HttpResponse(200, JsonSupport.stringify(mapOf("ok" to true, "type" to type, "outputs" to out)))
+                },
+                onFailure = { e ->
+                    JvmKanbanServer.HttpResponse(
+                        400,
+                        JsonSupport.stringify(mapOf("ok" to false, "type" to type, "error" to (e.message ?: e.toString()))),
+                    )
+                },
+            )
+        }
+
         ctx.routes.claim(id, "/api/lcnc/kanban/move") { method, _, text, _ ->
             if (method != "POST") return@claim JvmKanbanServer.HttpResponse(405, """{"error":"method_not_allowed"}""")
             val req = runCatching { JsonSupport.parse(rawBody(text)) as? Map<*, *> }.getOrNull()
@@ -269,7 +304,7 @@ class KanbanModule : ForgeModule {
                 "sequence" to store.lastSequence,
                 "routes" to listOf(
                     "/api/board", "/api/invoke", "/api/board/import",
-                    "/api/lcnc/kanban", "/api/lcnc/kanban/move",
+                    "/api/lcnc/kanban", "/api/lcnc/kanban/move", "/api/lcnc/run",
                 ),
             )
 

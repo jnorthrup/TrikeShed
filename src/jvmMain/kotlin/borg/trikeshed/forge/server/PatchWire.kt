@@ -373,6 +373,7 @@ class ProjectScopes(
  *
  *   GET  /api/mux/models     the discovered provider roster (name/base/model)
  *   GET  /api/mux/keys      FULL roster with key-PRESENCE flags — values never cross
+ *   GET  /api/mux/standings  quota-legion standings (reactor roster × ledger, usable-first)
  *   POST /api/mux/chat      {prompt, system?, maxTokens?, temperature?} → provider-neutral
  *                           failover chat THROUGH BrainClient→ModelMux (never around it)
  *   GET  /api/projects      mounted scopes
@@ -412,6 +413,26 @@ class PatchWire(
             )
 
             method == "GET" && p == "/api/mux/keys" -> json(mapOf("roster" to brain.rosterStatus()))
+
+            // The legion made visible: reactor roster × quota ledger, usable-first.
+            // Rides muxContext because the roster is the REACTOR's — no context, no keys.
+            method == "GET" && p == "/api/mux/standings" -> {
+                val now = kotlinx.datetime.Clock.System.now().toEpochMilliseconds()
+                val standings = runCatching { withContext(muxContext) { brain.quotaStandings(now) } }
+                    .getOrDefault(emptyList())
+                json(mapOf(
+                    "atMs" to now,
+                    "standings" to standings.map { s ->
+                        mapOf(
+                            "keyId" to s.keyId, "provider" to s.provider,
+                            "limit" to s.limit, "spent" to s.spent, "remaining" to s.remaining,
+                            "exhausted" to s.exhausted, "usable" to s.isUsable,
+                            "utilization" to s.utilization, "accessCount" to s.accessCount,
+                            "windowStartMs" to s.windowStartMs, "windowMs" to s.windowMs,
+                        )
+                    },
+                ))
+            }
 
             method == "POST" && p == "/api/mux/chat" -> {
                 if (!brain.hasEndpoints()) return json(mapOf("verdict" to "no-providers", "detail" to "no provider keys in env"), 503)

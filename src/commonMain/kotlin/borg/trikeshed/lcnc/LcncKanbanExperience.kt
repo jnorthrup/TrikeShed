@@ -50,25 +50,32 @@ class LcncKanbanExperience(
     fun registry(): Map<String, LcncNodeRunner> =
         sheetLcncRegistry() + kanbanLcncRegistry() + mapOf(
             "kanban.activeSheets" to LcncNodeRunner { _, _ -> activeSheets() },
-            "kanban.submit" to LcncNodeRunner { node, _ ->
+            // A wired `command` map (the gesture, shaped upstream) overrides params —
+            // same inputs-over-params precedence confix.sheets already honours. Params
+            // remain the no-wire path: type a jobId, click run.
+            "kanban.submit" to LcncNodeRunner { node, inputs ->
+                val c = wiredCommand(inputs)
                 command(
                     mapOf(
                         "type" to "submit",
-                        "jobId" to required(node, "jobId"),
-                        "title" to (node.params["title"] ?: required(node, "jobId")),
-                        "priority" to (node.params["priority"]?.toIntOrNull() ?: 2),
-                        "idempotencyKey" to required(node, "idempotencyKey"),
+                        "jobId" to required(node, c, "jobId"),
+                        "title" to (c["title"]?.toString() ?: node.params["title"] ?: required(node, c, "jobId")),
+                        "priority" to (c["priority"]?.toString()?.toDoubleOrNull()?.toInt()
+                            ?: node.params["priority"]?.toIntOrNull() ?: 2),
+                        "idempotencyKey" to required(node, c, "idempotencyKey"),
                     ),
                 )
             },
-            "kanban.move" to LcncNodeRunner { node, _ ->
+            "kanban.move" to LcncNodeRunner { node, inputs ->
+                val c = wiredCommand(inputs)
                 command(
                     mapOf(
                         "type" to "move",
-                        "jobId" to required(node, "jobId"),
-                        "toColumn" to required(node, "toColumn"),
-                        "expectedRevision" to required(node, "expectedRevision").toLong(),
-                        "idempotencyKey" to required(node, "idempotencyKey"),
+                        "jobId" to required(node, c, "jobId"),
+                        "toColumn" to required(node, c, "toColumn"),
+                        // JSON numbers may arrive as 3.0; the reducer consumes a long.
+                        "expectedRevision" to required(node, c, "expectedRevision").toDouble().toLong(),
+                        "idempotencyKey" to required(node, c, "idempotencyKey"),
                     ),
                 )
             },
@@ -132,6 +139,12 @@ class LcncKanbanExperience(
 
     private fun required(node: LcncNode, name: String): String =
         node.params[name] ?: error("${node.type}: $name param required")
+
+    private fun required(node: LcncNode, wired: Map<*, *>, name: String): String =
+        wired[name]?.toString() ?: node.params[name] ?: error("${node.type}: $name required (command input or param)")
+
+    private fun wiredCommand(inputs: Map<String, Any?>): Map<*, *> =
+        (inputs["command"] ?: inputs["command?"]) as? Map<*, *> ?: emptyMap<String, Any?>()
 
     /** No stale parent-port preview: only the requested JSON path is projectable. */
     private fun resolveJsonPath(root: Any?, rawPath: String): Any? {

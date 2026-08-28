@@ -88,7 +88,11 @@ object HermesDesignDistiller {
                 val text = scenario.turns[t].text.lowercase()
                 scenarioCount += when (feature) {
                     Feature.TOOL_CALL_FRAMING -> tokenCount(text, "tool_call", "tool call", "function_call")
-                    Feature.TOOL_DESCRIPTION_INVOCATION -> tokenCount(text, "tool", "function", "invoke", "schema")
+                    // Orthogonal to framing: subtract the counts embedded inside tool_call/
+                    // "tool call"/function_call so the two features never double-count.
+                    Feature.TOOL_DESCRIPTION_INVOCATION ->
+                        (tokenCount(text, "tool", "function", "invoke", "schema") -
+                            tokenCount(text, "tool_call", "tool call", "function_call")).coerceAtLeast(0)
                     Feature.RETRY_CONTINUATION -> tokenCount(text, "retry", "continue", "continuation", "resume", "timeout")
                     Feature.SESSION_STRUCTURE, Feature.CURATION_RECORDING -> 0
                 }

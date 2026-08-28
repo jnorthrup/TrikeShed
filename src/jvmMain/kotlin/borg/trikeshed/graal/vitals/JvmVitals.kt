@@ -208,9 +208,24 @@ class JvmVitals {
      * `jcmd <pid> GC.class_histogram` (parsed — HeatSoak's shell-out returned
      * unparsed text and stayed demo-gated). JMX `MemoryMXBean` scalar heap usage
      * remains in [snapshot]; this adds the per-class shape the treemap renders.
+     *
+     * The live-set source is a seam (production-test-seams pattern); the gate swaps in a
+     * fixture. jcmd GC.class_histogram self-attach stops the ENTIRE target JVM at a
+     * safepoint, and if any target thread cannot reach the safepoint the attach never
+     * completes: the whole JVM freezes, INCLUDING the daemon watchdog thread that would
+     * kill jcmd — unrecoverable from inside. PROVEN LIVE 2026-08-27: one GET
+     * /api/graal/heap wedged the daemon at 0% CPU (graal.html fetches it on every boot).
+     * Therefore NOBODY self-attaches by default — not gates, not production. The jcmd
+     * live-set is explicit opt-in (`-Dtrikeshed.vitals.jcmd=true`, for operators who
+     * accept the freeze risk); the default heap answer carries the JFR
+     * allocation-attributed continent, which needs no attach.
      */
+    internal var liveSetSource: () -> List<HeapRow> = {
+        if (System.getProperty("trikeshed.vitals.jcmd") == "true") classHistogram() else emptyList()
+    }
+
     fun heapHistogram(): Map<String, Any?> {
-        val rows = classHistogram()
+        val rows = runCatching { liveSetSource() }.getOrDefault(emptyList())
         val totalInstances = rows.sumOf { it.count }
         val totalBytes = rows.sumOf { it.bytes }
         return mapOf(
@@ -280,7 +295,9 @@ class JvmVitals {
             if (t.isEmpty() || !t[0].isDigit()) continue
             // "num:" (jcmd prints the index with a colon), then instances, bytes, class name
             val m = Regex("^(\\d+):\\s+(\\d+)\\s+(\\d+)\\s+(.+)$").find(t) ?: continue
-            val className = m.groupValues[4].trim()
+            // jcmd annotates module-owned classes: `java.lang.String (java.base@25.0.4)` —
+            // the treemap wants the bare class name.
+            val className = m.groupValues[4].trim().substringBeforeLast(" (")
             if (className == "Total") continue
             rows += HeapRow(className, m.groupValues[2].toLongOrNull() ?: 0L, m.groupValues[3].toLongOrNull() ?: 0L)
         }
