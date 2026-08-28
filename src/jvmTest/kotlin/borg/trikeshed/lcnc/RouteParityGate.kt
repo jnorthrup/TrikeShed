@@ -13,9 +13,10 @@ import kotlin.test.fail
  * and every manifest line must still be matched by the serving wire's source.
  * A route consumed by nothing, or served by nothing, fails here.
  *
- * Gate 2 (vocabulary single-author): panels.html must not carry a TYPES
- * vocabulary block. Contracts come from /api/lcnc/contracts — Kotlin is the
- * ONE author. A reintroduced `const TYPES = {` type table fails the build.
+ * Gate 2 (the browser editor stays deleted): the kmart LCNC panel editor
+ * (web/panels.html) was rooted out 2026-08-27 for the real concentric-scope
+ * spec (docs/concentric-lcnc-ccek-spec.md). The daemon is the one executor
+ * (/api/lcnc/run); a reintroduced panels.html fails the build.
  */
 class RouteParityGate {
 
@@ -37,7 +38,7 @@ class RouteParityGate {
         Regex("""api\(\s*"(GET|POST|PUT|DELETE)"\s*,\s*"([^"]*)"\s*\+\s*[^,)]+""").findAll(html).forEach {
             out.add(it.groupValues[1] to it.groupValues[2].removeSuffix("/") + "/…")
         }
-        // fetch("/path"… / fetch(`/api/panels/${…}`
+        // fetch("/path"… / fetch(`/api/vm/${…}`
         Regex("""fetch\(\s*"(/[^"]*)"(?!\s*\+)""").findAll(html).forEach {
             val window = html.substring(it.range.first, minOf(html.length, it.range.first + 160))
             val mM = Regex("method:\\s*['\"](\\w+)['\"]").find(window)
@@ -63,13 +64,13 @@ class RouteParityGate {
     @Test
     fun everyHtmlFetchIsARegisteredRoute() {
         val offenders = mutableListOf<String>()
-        for (page in listOf("panels.html", "graal.html", "index.html", "script.js")) {
+        for (page in listOf("graal.html", "index.html", "script.js")) {
             val html = resourceText(page)
             for ((method, rawPath) in fetchedRoutes(html)) {
                 // strip template holes and query strings: `/api/vm/${id}/eval?x` → `/api/vm/…/eval`
                 val cleaned = rawPath
                     .replace(Regex("\\$\\{[^}]*}"), "…")
-                    .replace(Regex("\"?\\+[^+]*\\+\"?"), "…") // string-concat: "/api/panels/"+name
+                    .replace(Regex("\"?\\+[^+]*\\+\"?"), "…") // string-concat: "/api/vm/"+id
                     .substringBefore('?')
                     .removeSuffix("/")
                 val covered = if (cleaned.contains("…")) {
@@ -95,8 +96,8 @@ class RouteParityGate {
         // anymore (deleted upstream) fails here — the manifest is not a
         // graveyard. Match on a distinctive FRAGMENT of each path so
         // compound guards (startsWith + endsWith) also count as serving:
-        // "POST /api/panels/…/mate" is served by
-        // `p.startsWith("/api/panels/") && p.endsWith("/mate")`.
+        // "POST /api/graal/capsule/…" is served by
+        // `p.startsWith("/api/graal/capsule/")`.
         val root = System.getProperty("user.dir") ?: fail("no user.dir")
         val srcRoot = java.io.File(root, "src/jvmMain/kotlin")
         assertTrue(srcRoot.isDirectory, "wire source tree not found at $srcRoot — run from the repo root")
@@ -154,17 +155,15 @@ class RouteParityGate {
         }
     }
 
-    // ── gate 2: the browser no longer carries a vocabulary table ───────────
+    // ── gate 2: the browser editor stays deleted ───────────────────────────
 
     @Test
-    fun panelsHtmlHasNoTypesVocabulary() {
-        val html = resourceText("panels.html")
-        // The retired vocabulary block: `const TYPES = { … }` declaring type
-        // keys with ins/outs. Run bodies were retired with it — the palette,
-        // ports, and titles all arrive from /api/lcnc/contracts.
-        val typesDecl = Regex("""const\s+TYPES\s*=\s*\{""")
-        assertTrue(!typesDecl.containsMatchIn(html),
-            "panels.html reintroduces a TYPES vocabulary table — contracts have ONE author (LcncContracts via /api/lcnc/contracts)")
+    fun panelsHtmlStaysDeleted() {
+        // The kmart LCNC browser editor is gone (2026-08-27). The palette,
+        // ports, and titles have ONE author (LcncContracts via
+        // /api/lcnc/contracts); execution is the daemon's /api/lcnc/run.
+        assertTrue(javaClass.getResource("/web/panels.html") == null,
+            "web/panels.html reappeared — the browser editor is deleted; the daemon is the one executor")
     }
 
     // ── gate 3: the served contract route carries the FULL contract ────────

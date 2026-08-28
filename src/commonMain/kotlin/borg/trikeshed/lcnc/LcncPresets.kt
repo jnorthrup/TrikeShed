@@ -9,13 +9,14 @@ import borg.trikeshed.lib.size
 import borg.trikeshed.lib.toSeries
 
 /**
- * W6.2: a composition IS a stored program. These are the three pre-assembled
- * orchestrations, authored once in Kotlin and served as offered documents —
+ * W6.2: a composition IS a stored program. These are the pre-assembled
+ * orchestrations, authored once in Kotlin and OFFERED as Confix documents —
  * PRESETS ARE NEVER INSTALLED. The live forge home (`~/.local/forge`) is
- * production; installing is always an explicit client act (POST to /api/panels/<name>).
+ * production; a preset reaches execution only through the stored-program
+ * resolver (ModuleContext.programLoader → /api/lcnc/run).
  *
- * Every node type here exists in [LcncContracts.all()] — the parity test
- * guards this file's vocabulary exactly like the browser's.
+ * Every node type here exists in [LcncContracts.all()] — the presets gate
+ * guards this file's vocabulary against the one author.
  */
 object LcncPresets {
 
@@ -26,7 +27,66 @@ object LcncPresets {
         "preset-curator" to curator(),
         "preset-context" to context(),
         "preset-kanban" to kanban(),
+        "preset-scope" to scopeDemo(),
+        "preset-scope-inner" to scopeInner(),
     )
+
+    // ── The concentric machine demo: three rings, ONE document. The root
+    // scope.in's default binds; its value is consumed TWO rings deep with
+    // zero re-plumbing (the wire crosses inward — the warm base); yields
+    // climb out explicitly ring by ring through scope.out — the asymmetry
+    // made visible. Runs through /api/lcnc/run with zero registered runners.
+
+    private fun scopeDemo(): String {
+        val program = LcncProgram(
+            name = "preset-scope",
+            nodes = listOf(
+                LcncNode("n0", LcncContracts.SCOPE_IN,
+                    params = mapOf("name" to "text", "default" to "hello"), x = 40.0, y = 60.0),
+                LcncNode("r1", LcncContracts.SCOPE, x = 260.0, y = 40.0,
+                    children = listOf(
+                        LcncNode("r2", LcncContracts.SCOPE, x = 40.0, y = 40.0,
+                            children = listOf(
+                                LcncNode("p", LcncContracts.SCOPE_OUT,
+                                    params = mapOf("name" to "result"), x = 40.0, y = 40.0),
+                            ).toSeries()),
+                        LcncNode("q", LcncContracts.SCOPE_OUT,
+                            params = mapOf("name" to "result"), x = 260.0, y = 40.0),
+                    ).toSeries()),
+                LcncNode("out", LcncContracts.SCOPE_OUT,
+                    params = mapOf("name" to "result"), x = 540.0, y = 60.0),
+                LcncNode("n3", "note",
+                    params = mapOf("text" to "the concentric machine, three rings, one document.\nn0 (scope.in, default=hello) is consumed TWO rings deep\nby a single wire — inner sees outer, zero re-plumbing.\nyields climb out ring by ring through scope.out —\nonly the yield crosses; locals die at their ring."),
+                    x = 40.0, y = 260.0),
+            ).toSeries(),
+            wires = listOf(
+                LcncWire("n0", "value", "p", "value"),
+                LcncWire("r2", "result", "q", "value"),
+                LcncWire("r1", "result", "out", "value"),
+            ).toSeries(),
+            view = LcncView(x = 20.0, y = 20.0, zoom = 1.0),
+            seq = 7,
+        )
+        return LcncProgramConfix.toJson(program)
+    }
+
+    private fun scopeInner(): String {
+        val program = LcncProgram(
+            name = "preset-scope-inner",
+            nodes = listOf(
+                LcncNode("p1", LcncContracts.SCOPE_IN,
+                    params = mapOf("name" to "text", "default" to "hello"), x = 40.0, y = 60.0),
+                LcncNode("p2", LcncContracts.SCOPE_OUT,
+                    params = mapOf("name" to "result"), x = 320.0, y = 60.0),
+            ).toSeries(),
+            wires = listOf(
+                LcncWire("p1", "value", "p2", "value"),
+            ).toSeries(),
+            view = LcncView(x = 20.0, y = 20.0, zoom = 1.0),
+            seq = 3,
+        )
+        return LcncProgramConfix.toJson(program)
+    }
 
     // ── Step 5: the kanban board AS an LCNC composition — dogfood proof ──
     // Every node is a generic primitive; the kanban-specific knowledge

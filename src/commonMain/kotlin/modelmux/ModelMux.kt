@@ -320,6 +320,18 @@ class ModelMux internal constructor(
             }
 
             if (resp.status !in 200..299) {
+                // Record the failure receipt BEFORE returning: the finally-block legion
+                // metering reads session.lastReceipt, and a 429 that left no receipt
+                // never exhausted its key — the provider's "no" fell on the floor.
+                session.recordReceipt(
+                    ModelResponseReceipt.mint(
+                        modelId = modelId, providerId = card.id, requestHash = requestHash,
+                        action = "chat", httpStatus = httpStatus,
+                        latencyMs = kotlinx.datetime.Clock.System.now().toEpochMilliseconds() - t0,
+                        assessmentId = receiptAssessment, sessionId = session.sessionId,
+                        error = IllegalStateException("HTTP ${resp.status}"),
+                    )
+                )
                 return Result.failure(IllegalStateException("ModelMux chat failed with HTTP ${resp.status}: ${respBody.take(500)}"))
             }
 
@@ -385,7 +397,10 @@ class ModelMux internal constructor(
         val session = sessionResult.getOrThrow()
         session.activate()
         val reactor = currentCoroutineContext()[MuxReactorElement.Key]
-        val keyId = keyMux.get("llm.$modelId.key")
+        // Lease identity is the binding PATH (llm.<provider>.key), never the secret
+        // value — keyMux.get(...) returns the credential, which matched no lease and
+        // leaked it. Same providerTag fallback chain session()/chat() honour.
+        val keyId = resolveKeyId(session.model.b)
         try {
             val card = models.let { ms -> (0 until ms.size).first { ms[it].a == modelId }.let { ms[it] } }.b
             val meta: AcpMeta = card.id j ("stream" j session.authHeaders())
@@ -432,7 +447,10 @@ class ModelMux internal constructor(
         val session = sessionResult.getOrThrow()
         session.activate()
         val reactor = currentCoroutineContext()[MuxReactorElement.Key]
-        val keyId = keyMux.get("llm.$modelId.key")
+        // Lease identity is the binding PATH, never the secret value (stream() fix,
+        // same defect class): keyMux.get returns the credential, which matched no
+        // lease. providerTag fallback chain via resolveKeyId.
+        val keyId = resolveKeyId(session.model.b)
         try {
             val card = models.let { ms -> (0 until ms.size).first { ms[it].a == modelId }.let { ms[it] } }.b
             val meta: AcpMeta = card.id j ("embed" j session.authHeaders())

@@ -24,46 +24,59 @@ class LcncSubprogramRecursionTest {
         LcncProgram("prog", nodes.toList().toSeries(), wires.toSeries())
 
     @Test
-    fun subprogramNodeRunsItsInnerProgram() = runBlocking {
-        val inner = program(LcncNode("inner-1", "source"))
+    fun subprogramNodeRunsItsInnerProgramAndKeepsLocalsInvisible() = runBlocking {
+        // Spec §3.5: only scope.out names cross the boundary — the inner
+        // node's own outputs are locals (the kmart-era "whole inner map"
+        // exposure is gone).
+        val inner = program(
+            LcncNode("inner-1", "source"),
+            LcncNode("out", "scope.out", params = mapOf("name" to "result")),
+            wires = listOf(LcncWire("inner-1", "out", "out", "value")),
+        )
         val runner = LcncRunner(registry).apply {
-            subprogramLoader = { name -> if (name == "panels/inner") inner else null }
+            subprogramLoader = { name -> if (name == "inner") inner else null }
         }
-        val outer = program(LcncNode("scope", "scope-box", subprogram = "panels/inner"))
+        val outer = program(LcncNode("scope", "scope-box", subprogram = "inner"))
 
         val out = runner.runAll(outer)
         val scopeOut = out["scope"] ?: throw AssertionError("subprogram node never ran")
-        assertEquals("src-inner-1", scopeOut["inner-1"]?.let { (it as Map<*, *>)["out"] },
-            "node output IS the inner program's outputs map")
+        assertEquals("src-inner-1", scopeOut["result"], "the scope.out value crossed as a per-name port")
+        assertEquals(mapOf("result" to "src-inner-1"), scopeOut["returns"], "…and as the composed returns map")
+        assertTrue("inner-1" !in scopeOut, "inner node outputs are locals — invisible to the caller (spec §3.5)")
     }
 
     @Test
     fun subprogramRecursesThroughNesting() = runBlocking {
-        val innermost = program(LcncNode("leaf", "source"))
-        val middle = program(LcncNode("mid-scope", "scope-box", subprogram = "panels/innermost"))
+        val innermost = program(
+            LcncNode("leaf", "source"),
+            LcncNode("o1", "scope.out", params = mapOf("name" to "deep")),
+            wires = listOf(LcncWire("leaf", "out", "o1", "value")),
+        )
+        val middle = program(
+            LcncNode("mid-scope", "scope-box", subprogram = "innermost"),
+            LcncNode("o2", "scope.out", params = mapOf("name" to "deep")),
+            wires = listOf(LcncWire("mid-scope", "deep", "o2", "value")),
+        )
         val runner = LcncRunner(registry).apply {
             subprogramLoader = { name ->
                 when (name) {
-                    "panels/innermost" -> innermost
-                    "panels/middle" -> middle
+                    "innermost" -> innermost
+                    "middle" -> middle
                     else -> null
                 }
             }
         }
-        val outer = program(LcncNode("top", "scope-box", subprogram = "panels/middle"))
+        val outer = program(LcncNode("top", "scope-box", subprogram = "middle"))
 
         val out = runner.runAll(outer)
         val top = out["top"] ?: throw AssertionError("outer scope never ran")
-        // top → middle-scope outputs → innermost leaf's map
-        val midOut = top["mid-scope"] as? Map<*, *> ?: throw AssertionError("middle scope absent: $top")
-        val leafOut = midOut["leaf"] as? Map<*, *> ?: throw AssertionError("innermost leaf absent: $midOut")
-        assertEquals("src-leaf", leafOut["out"], "three-deep nesting resolves")
+        assertEquals("src-leaf", top["deep"], "three-deep nesting resolves through scope.out at every ring")
     }
 
     @Test
     fun noLoaderKeepsFlatSweepBehaviour() = runBlocking {
         val runner = LcncRunner(registry) // subprogramLoader unset
-        val outer = program(LcncNode("scope", "scope-box", subprogram = "panels/unloaded"))
+        val outer = program(LcncNode("scope", "scope-box", subprogram = "unloaded"))
         // Without a loader the subprogram is invisible: the node is judged by
         // its type alone — here an unregistered type, which the flat sweep
         // rejects loudly, exactly as before step 3.
@@ -82,7 +95,7 @@ class LcncSubprogramRecursionTest {
             registry as Map<String, LcncNodeRunner>
         }
         val leafRunner = LcncRunner(registry + ("scope-box" to LcncNodeRunner { _, inputs -> inputs }))
-        val outer = program(LcncNode("scope", "scope-box", subprogram = "panels/unloaded"))
+        val outer = program(LcncNode("scope", "scope-box", subprogram = "unloaded"))
         val out = leafRunner.runAll(outer)
         assertTrue("scope" in out, "registered type + no loader → plain leaf run, subprogram ignored")
     }
@@ -90,12 +103,12 @@ class LcncSubprogramRecursionTest {
     @Test
     fun missingSubprogramIsALoudError() = runBlocking {
         val runner = LcncRunner(registry).apply { subprogramLoader = { null } }
-        val outer = program(LcncNode("scope", "scope-box", subprogram = "panels/vanished"))
+        val outer = program(LcncNode("scope", "scope-box", subprogram = "vanished"))
         try {
             runner.runAll(outer)
             throw AssertionError("a subprogram that fails to load must not pass silently")
         } catch (e: LcncUnknownNodeType) {
-            assertTrue("panels/vanished" in e.message!!, "error names the missing subprogram: ${e.message}")
+            assertTrue("vanished" in e.message!!, "error names the missing subprogram: ${e.message}")
         }
     }
 }

@@ -45,7 +45,7 @@ data class Frame(
 
 /**
  * Persisted shape of a frame chain under `contexts/<cid>` — the same CAS
- * document plane `panels/<name>` uses via [CouchAttachmentGateway]. Content
+ * document plane `lcnc/<name>` uses via [CouchAttachmentGateway]. Content
  * is the frame JSON: identity fields (cid/parent) plus caller-supplied
  * metadata. Deterministic; no wall clock.
  */

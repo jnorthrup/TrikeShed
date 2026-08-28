@@ -127,6 +127,13 @@ class PersistSource(
     override suspend fun invalidate() {
         cache = null
     }
+
+    /**
+     * Read the whole persisted map WITH THIS SOURCE'S CODEC. KeyMux.rotate() must not
+     * use the legacy k=v line reader — write() persists JSON, so a line-codec read
+     * sees zero candidates and rotation silently no-ops (found by the K7 gate).
+     */
+    internal suspend fun readAll(ops: FileOperations): Map<String, String> = load(ops)
 }
 
 private fun defaultCodecRead(bytes: ByteArray): Map<String, String> {
@@ -397,6 +404,11 @@ object FirstWinsResolver : KeyResolver {
      * - `pathMatch("users.*.profile".toKeyPath(), "users.123.profile".toKeyPath())` returns `true`
      */
     private fun pathMatch(binding: KeyPath, query: KeyPath): Boolean {
+        // A bare "*" binding is the global fallback — env()/persist()/api()/reactor()/
+        // harness() all bind it. Before this arm, ["*"] only matched single-segment
+        // queries, so `KeyMux { env() }` never answered "llm.<provider>.key" and the
+        // daemon's env lane was dead for every modelmux path.
+        if (binding.size == 1 && binding[0] == "*") return true
         if (binding.size != query.size) return false
         return (0 until binding.size).all { i ->
             binding[i] == "*" || binding[i] == query[i]
@@ -425,11 +437,11 @@ class KeyMux constructor(
         leaseBacking[keyId] = metadata
     }
 
-    /** Lease-view API returning Series<Pair<KeyId, LeaseMetadata>> — lazy, no copying */
-    val activeLeases: Series<Pair<KeyId, LeaseMetadata>> get() = leaseBacking.size j { i ->
+    /** Lease-view API returning Series2<KeyId, LeaseMetadata> — lazy, no copying, Join not Pair. */
+    val activeLeases: Series2<KeyId, LeaseMetadata> get() = leaseBacking.size j { i ->
         leaseVisits++
         val entry = leaseBacking.entries.elementAt(i)
-        Pair(entry.key, entry.value)
+        entry.key j entry.value
     }
 
     companion object {
@@ -473,7 +485,7 @@ class KeyMux constructor(
                     ?: continue
                 val file = ops.resolvePath(src.root, "keymux.conf")
                 if (!ops.exists(file)) continue
-                val map = defaultCodecRead(ops.readAllBytes(file))
+                val map = src.readAll(ops) // the source's own codec — not the legacy line reader
                 map[keyStr]?.let { candidates.add(src to it) }
             }
         }
@@ -536,7 +548,7 @@ class KeyMux constructor(
                     ?: continue
                 val file = fileOps.resolvePath(src.root, "keymux.conf")
                 if (!fileOps.exists(file)) continue
-                val map = defaultCodecRead(fileOps.readAllBytes(file))
+                val map = src.readAll(fileOps) // source's own codec (JSON), matching write()
                 map.filter { it.key.startsWith(prefix) }.forEach { (k, v) ->
                     results.add(k j v)
                 }

@@ -18,12 +18,9 @@ object RouteManifest {
             "GET /api/mux/models",
             "GET /api/mux/keys",
             "POST /api/mux/chat",
-            "GET /api/panels",
-            "GET /api/panels/…",
-            "POST /api/panels/…",
-            "GET /api/panels/presets",
-            "POST /api/panels/…/mate",
             "GET /api/lcnc/mating-options",
+            "GET /api/lcnc/fills",
+            "GET /api/lcnc/autowire",
             "GET /api/projects",
             "POST /api/projects",
             "DELETE /api/projects/…",
@@ -106,7 +103,7 @@ object RouteManifest {
 
     private const val WILDCARD = "…"
 
-    /** Longest-prefix manifest match: `GET /api/panels/foo/mate` matches `POST /api/panels/…` only if method agrees. */
+    /** Longest-prefix manifest match: `GET /api/vm/x/eval` matches `GET /api/vm/…` only if method agrees. */
     fun covers(method: String, path: String): Boolean {
         val exact = "$method $path"
         if (exact in all) return true

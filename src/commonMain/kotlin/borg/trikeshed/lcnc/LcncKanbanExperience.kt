@@ -48,7 +48,7 @@ class LcncKanbanExperience(
 
     /** Registry for a complete in-process Kanban panel program. */
     fun registry(): Map<String, LcncNodeRunner> =
-        sheetLcncRegistry() + kanbanLcncRegistry() + mapOf(
+        sheetLcncRegistry() + kanbanLcncRegistry() + PanelVoteNode.registry() + mapOf(
             "kanban.activeSheets" to LcncNodeRunner { _, _ -> activeSheets() },
             // A wired `command` map (the gesture, shaped upstream) overrides params —
             // same inputs-over-params precedence confix.sheets already honours. Params

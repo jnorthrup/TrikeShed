@@ -40,7 +40,7 @@ class ProjectDbRegistry(private val primaryDbName: String) {
     var onMount: ((ProjectDb) -> Unit)? = null
 
     private val reserved = setOf(
-        "api", "graal", "panels", "futon", "blackboard", "icons", "index.html",
+        "api", "graal", "futon", "blackboard", "icons", "index.html",
         "styles.css", "script.js", "sw.js", "manifest.webmanifest", "_replicate", "_project",
     )
 

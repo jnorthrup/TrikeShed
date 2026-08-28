@@ -61,6 +61,7 @@ data class ViewResult(
         "_count" -> reduceCount()
         "_sum"   -> reduceSum()
         "_stats" -> reduceStats()
+        "rollup-count" -> reduceRollupCount()
         else     -> error("Unknown built-in reducer: $reducer")
     }
 
@@ -92,6 +93,24 @@ data class ViewResult(
         val reduced = mutableSeriesOf<ViewRow>()
         for ((key, sum) in sums) {
             reduced.append(ViewRow(key = key, value = sum, docId = "_sum", jsPath = "_sum"))
+        }
+        return ViewResult(reduced)
+    }
+
+    /**
+     * CouchDbCascadeTool bounded shape: per key `[rollup,count]`, where rollup is
+     * the numeric sum of emitted values. The shape is fixed-size and rereduce-safe.
+     */
+    fun reduceRollupCount(): ViewResult {
+        val acc = mutableMapOf<Any?, DoubleArray>()
+        for (row in rows) {
+            val a = acc.getOrPut(row.key) { doubleArrayOf(0.0, 0.0) }
+            a[0] += row.value.toDoubleValue()
+            a[1] += 1.0
+        }
+        val reduced = mutableSeriesOf<ViewRow>()
+        for ((key, a) in acc) {
+            reduced.append(ViewRow(key, listOf(a[0], a[1].toLong()), "rollup-count", "rollup-count"))
         }
         return ViewResult(reduced)
     }

@@ -3,44 +3,15 @@ package borg.trikeshed.lcnc
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
-import kotlin.test.fail
 
 /**
- * Step 4 gates: the contract table IS the vocabulary — the ONLY author.
- *
- * panels.html no longer declares a TYPES table (RouteParityGate enforces
- * that); the page hydrates its palette/ports/params from
- * /api/lcnc/contracts. This test therefore asserts the properties the one
- * vocabulary must hold on its own: completeness of kinds, unique types, and
- * the run-surface parity between RUNNERS (JS execution bodies) and
- * contracts (Kotlin vocabulary).
+ * The contract table IS the vocabulary — the ONLY author. (The browser
+ * editor and its JS RUNNERS table were rooted out 2026-08-27; the parity
+ * that table needed is now structural — there is no second author left to
+ * drift.) This test asserts the properties the one vocabulary must hold on
+ * its own: completeness of kinds, unique types, honest source/sink flags.
  */
 class LcncContractParityTest {
-
-    /** JS execution-body keys straight out of panels.html's RUNNERS table. */
-    private fun jsRunnerNames(): List<String> {
-        val url = javaClass.getResource("/web/panels.html")
-            ?: fail("panels.html missing from the test classpath — the gate must not silently pass on a missing resource")
-        val text = url.readText()
-        val start = text.indexOf("const RUNNERS = {")
-        assertTrue(start >= 0, "panels.html must carry a RUNNERS table (execution bodies)")
-        val end = text.indexOf("/* ── CONTRACTS", start).let { if (it < 0) text.indexOf("syncContracts", start) else it }
-        val block = text.substring(start, if (end > start) end else text.length)
-        return Regex(""""([a-zA-Z0-9._]+)":\s*\{""").findAll(block)
-            .map { it.groupValues[1] }
-            .toList()
-            .distinct()
-    }
-
-    @Test
-    fun everyJsRunnerHasAKotlinContract() {
-        val js = jsRunnerNames()
-        assertTrue(js.isNotEmpty(), "RUNNERS parsed empty — the extraction or the page is broken")
-        val kotlin = LcncContracts.all().map { it.type }.toSet()
-        val missing = js.filter { it !in kotlin }
-        assertTrue(missing.isEmpty(),
-            "JS RUNNERS not covered by LcncContracts (dead code — nothing can offer or wire them): $missing")
-    }
 
     @Test
     fun contractTypesAreUnique() {
@@ -81,7 +52,15 @@ class LcncContractParityTest {
     }
 
     @Test
-    fun programRefDivesIntoStoredPanelsAndFindsThemFromGraph() {
+    fun programRefContractStaysInTheVocabulary() {
         assertEquals("program.ref", LcncContracts.find("program.ref")?.type)
+    }
+
+    @Test
+    fun concentricScopeVocabularyIsDeclared() {
+        // Spec §4: the call, the binding, the return — one author.
+        assertEquals(LcncContracts.SCOPE, LcncContracts.find(LcncContracts.SCOPE)?.type)
+        assertEquals(LcncContracts.SCOPE_IN, LcncContracts.find(LcncContracts.SCOPE_IN)?.type)
+        assertEquals(LcncContracts.SCOPE_OUT, LcncContracts.find(LcncContracts.SCOPE_OUT)?.type)
     }
 }

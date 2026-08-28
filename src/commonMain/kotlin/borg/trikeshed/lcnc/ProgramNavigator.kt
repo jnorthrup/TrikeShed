@@ -39,10 +39,10 @@ data class FrameIdChain(val cid: ContentId, val parent: ContentId? = null) {
  * actually nest — the stack is the only thing that makes that recursion safe
  * (a naive "load and forget" would strand the climb-back-out path).
  *
- * Direct port of `panels.html`'s `diveStack`/`diveInto`/`popTo` — commonMain
- * so the semantics are proven by a real test suite instead of a browser
- * screenshot. [loader] is the one platform seam: JS wires it to `fetch`
- * against `/api/panels/<name>`, tests wire it to an in-memory map.
+ * commonMain, proven by a real test suite — no browser anywhere in the
+ * semantics. [loader] is the one platform seam: production wires it to the
+ * stored-program resolver (ModuleContext.programLoader), tests wire it to an
+ * in-memory map.
  */
 class ProgramNavigator(
     root: LcncProgram,

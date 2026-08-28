@@ -54,7 +54,7 @@ Then open **http://localhost:8888** and poke it where it counts:
 | Surface | What to try in anger |
 |---|---|
 | `/graal` | **Drag a real folder onto the terrain.** It becomes its own project database — cloned into the forge home (APFS/btrfs reflink, so it costs nothing), every file a CAS-backed attachment, a new territory on the map. Wheel-dive to any single byte of it. |
-| `/panels` | Wire the ComfyUI-style patch panel to live daemon surfaces — VMs, beliefs, the board — and leave a timer running overnight. |
+| `POST /api/lcnc/run` | Run a stored LCNC program in the daemon — `{"program":"preset-scope"}` executes a concentric scope call (bind → run → gather) and returns its `scope.out` values. `GET /api/lcnc/contracts` is the palette. |
 | `/` | The board. Make cards, move them, kill the daemon mid-flight, restart it, and check that nothing you did was lost. (That's a promise we test; hold us to it.) |
 
 **When it breaks — and somewhere it will — that's the good part:**

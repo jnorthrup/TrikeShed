@@ -12,14 +12,14 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 /**
- * No JavaScript in this loop: a program stored as Confix JSON, read straight
- * out of the real Oroboros attachment store (the same `panels/<name>` path
- * `PatchWire` already writes), parsed into an [LcncProgram], and dived into
- * by [ProgramNavigator] — the whole chain in Kotlin.
+ * No JavaScript in this loop: a program stored as Confix (all data is
+ * Confix), read straight out of the real Oroboros attachment store
+ * (`lcnc/<name>`), parsed into an [LcncProgram], and dived into by
+ * [ProgramNavigator] — the whole chain in Kotlin.
  */
 class LcncProgramConfixTest {
 
-    /** The exact document shape `panels.html` wrote to `/api/panels/kanban` earlier this session. */
+    /** A representative stored-program document (Confix shape). */
     private val realKanbanJson = """
         {"nodes":[
           {"id":"n1","type":"timer","x":30,"y":60,"params":{"seconds":"5"},"collapsed":false},
@@ -86,7 +86,7 @@ class LcncProgramConfixTest {
 
         // Proof the bytes are real store content, not an in-memory echo —
         // the same assertion PatchWireTest makes for the browser path.
-        val (_, bytes) = gw.getAttachment("panels/kanban")!!
+        val (_, bytes) = gw.getAttachment("lcnc/kanban")!!
         assertTrue(bytes.decodeToString().contains("dom.board"))
 
         val nav = ProgramNavigator(LcncProgram.EMPTY, oroborosProgramLoader(gw))

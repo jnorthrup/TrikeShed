@@ -10,6 +10,7 @@ import borg.trikeshed.lib.toSeries
 import keymux.EnvVarSource
 import keymux.FixedKeySource
 import keymux.KeyMux
+import keymux.harness
 import modelmux.ModelEntry
 import modelmux.ModelMux
 import modelmux.acp.AcpMessage
@@ -230,6 +231,9 @@ class BrainClient(
             endpoints.forEach { endpoint ->
                 bind("llm.${endpoint.model}.key", EnvVarSource(endpoint.envVar))
             }
+            // Harness fallback: when an endpoint's own env var is absent, the key can
+            // still resolve from hermes .env / codex / opencode credential stores.
+            harness()
         }
     }
 

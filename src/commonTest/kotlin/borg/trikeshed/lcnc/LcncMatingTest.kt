@@ -12,10 +12,43 @@ import kotlin.test.assertTrue
 /**
  * Tests for the LCNC mating flow: from compatibility filtering through node/
  * wire creation and Confix round-trip persistence. Covers the same code path
- * that panels.html's `showMateMenu()` → `POST /api/panels/<name>/mate` and
- * PatchWire's `GET /api/lcnc/mating-options` execute.
+ * PatchWire's `GET /api/lcnc/mating-options` executes — including the
+ * mate-menu ordering (drag-cable-to-empty-space): evidence-ranked over a
+ * stored-program corpus, with the popup's text-entry filter lane.
  */
 class LcncMatingTest {
+
+    // ── the mate menu: evidence-ordered, text-filterable ─────────────────
+
+    private fun presetCorpus(): List<LcncProgram> =
+        LcncPresets.all().map { (n, doc) -> LcncProgramConfix.fromJson(n, doc) }
+
+    @Test
+    fun mateMenuRanksEvidencedTypesAboveNeverWiredCompatibles() {
+        // In the offered corpus, timer.tick actually wires into
+        // kanban.activeSheets (preset-kanban), board.get (preset-hermes) and
+        // beliefs.introspect (preset-curator). Compatible-but-never-wired
+        // types (http.get, graal.vitals, …) must rank below all three.
+        val timer = LcncNode("n1", "timer")
+        val program = LcncProgram("t", listOf(timer).toSeries(), emptySeriesOf())
+        val ranked = LcncMating.rankedCandidates(program, "n1", "tick", presetCorpus())
+        val head = ranked.take(3).map { it.type }.toSet()
+        assertEquals(setOf("kanban.activeSheets", "board.get", "beliefs.introspect"), head,
+            "the corpus-evidenced targets lead the menu: ${ranked.map { it.type }}")
+        assertTrue(ranked.drop(3).any { it.type == "http.get" },
+            "never-wired compatibles remain offered, below the evidence")
+    }
+
+    @Test
+    fun mateMenuTextEntryFiltersByNameAndTitle() {
+        val timer = LcncNode("n1", "timer")
+        val program = LcncProgram("t", listOf(timer).toSeries(), emptySeriesOf())
+        val hits = LcncMating.rankedCandidates(program, "n1", "tick", presetCorpus(), q = "board")
+        assertTrue(hits.isNotEmpty() && hits.all { "board" in it.type || "board" in it.title.lowercase() },
+            "the popup's text lane narrows to matching candidates: ${hits.map { it.type }}")
+        assertTrue(hits.first().type == "board.get",
+            "evidence ordering survives the filter (board.get is wired in the corpus): ${hits.map { it.type }}")
+    }
 
     // ── compatibility filtering ──────────────────────────────────────────
 

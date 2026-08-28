@@ -10,6 +10,8 @@ import borg.trikeshed.kanban.toBoardMap
 import borg.trikeshed.lcnc.LcncKanbanExperience
 import borg.trikeshed.lcnc.LcncNode
 import borg.trikeshed.lcnc.LcncContracts
+import borg.trikeshed.lcnc.LcncRunner
+import borg.trikeshed.lcnc.ccek.LcncCcekAssembly
 import borg.trikeshed.litebike.JvmKanbanServer
 import borg.trikeshed.module.ForgeModule
 import borg.trikeshed.module.ModuleContext
@@ -234,14 +236,54 @@ class KanbanModule : ForgeModule {
         }
 
         // The generic runner dispatch: ONE execution author. The browser (and any
-        // client) posts {type, params?, inputs?}; the node executes IN the daemon
-        // against the composed ctx.lcncRunners registry — the very map webhook
-        // node dispatch resolves. Looked up at request time so late-attached
-        // module registries (ace nodes, future modules) are reachable too.
+        // client) posts {type, params?, inputs?} to run ONE node (a job), or
+        // {program, inputs?} to run a WHOLE stored program (a procedure — spec
+        // §6) with subprogram recursion via ctx.programLoader. Either way the
+        // execution happens IN the daemon against the composed ctx.lcncRunners
+        // registry — the very map webhook node dispatch resolves. Looked up at
+        // request time so late-attached module registries (ace nodes, future
+        // modules) are reachable too.
         ctx.routes.claim(id, "/api/lcnc/run") { method, _, text, _ ->
             if (method != "POST") return@claim JvmKanbanServer.HttpResponse(405, """{"error":"method_not_allowed"}""")
             val req = runCatching { JsonSupport.parse(rawBody(text)) as? Map<*, *> }.getOrNull()
                 ?: return@claim JvmKanbanServer.HttpResponse(400, """{"error":"bad_json"}""")
+            @Suppress("UNCHECKED_CAST")
+            val inputs = (req["inputs"] as? Map<*, *>)?.entries
+                ?.associate { (k, v) -> k.toString() to v } ?: emptyMap<String, Any?>()
+            val programName = req["program"]?.toString()
+            if (programName != null) {
+                val load = ctx.programLoader
+                val program = load(programName)
+                    ?: return@claim JvmKanbanServer.HttpResponse(
+                        404, JsonSupport.stringify(mapOf("error" to "no_such_program", "program" to programName)),
+                    )
+                val walker = LcncRunner(ctx.lcncRunners).apply { subprogramLoader = load }
+                return@claim runCatching {
+                    val binding = ctx.ccekBinding
+                    if (binding != null) {
+                        // P1: the daemon path is a real CCEK assembly — structured child
+                        // scope, reactor + LcncScopeFrame in one context, projected receipts.
+                        LcncCcekAssembly(binding, walker)
+                            .launch(programName, program, inputs)
+                            .result.await()
+                    } else {
+                        // Reduced/test contexts preserve the direct path.
+                        walker.runProcedure(program, inputs)
+                    }
+                }.fold(
+                    onSuccess = { res ->
+                        JvmKanbanServer.HttpResponse(200, JsonSupport.stringify(mapOf(
+                            "ok" to true, "program" to programName,
+                            "returns" to res.returns, "outputs" to res.nodeOutputs,
+                        )))
+                    },
+                    onFailure = { e ->
+                        JvmKanbanServer.HttpResponse(400, JsonSupport.stringify(mapOf(
+                            "ok" to false, "program" to programName, "error" to (e.message ?: e.toString()),
+                        )))
+                    },
+                )
+            }
             val type = req["type"]?.toString()
                 ?: return@claim JvmKanbanServer.HttpResponse(400, """{"error":"type_required"}""")
             val runner = ctx.lcncRunners[type]
@@ -250,9 +292,6 @@ class KanbanModule : ForgeModule {
                 )
             val params = (req["params"] as? Map<*, *>)?.entries
                 ?.associate { (k, v) -> k.toString() to (v?.toString() ?: "") } ?: emptyMap()
-            @Suppress("UNCHECKED_CAST")
-            val inputs = (req["inputs"] as? Map<*, *>)?.entries
-                ?.associate { (k, v) -> k.toString() to v } ?: emptyMap<String, Any?>()
             val node = LcncNode(id = "http-run", type = type, params = params)
             runCatching { runner.run(node, inputs) }.fold(
                 onSuccess = { out ->

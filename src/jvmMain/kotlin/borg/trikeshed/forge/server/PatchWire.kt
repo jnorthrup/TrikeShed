@@ -368,7 +368,7 @@ class ProjectScopes(
 }
 
 /**
- * PatchWire — the patch-panel backend: full KeyMux/ModelMux access plus project
+ * PatchWire — the mux/projects wire: full KeyMux/ModelMux access plus project
  * scope mounting, mounted on the kanban listener like the other wires.
  *
  *   GET  /api/mux/models     the discovered provider roster (name/base/model)
@@ -382,8 +382,6 @@ class ProjectScopes(
 class PatchWire(
     private val brain: BrainClient,
     private val scopes: ProjectScopes,
-    /** Panel constructions are STORE DOCUMENTS (panels/<name>, CAS-addressed, replicated) — not browser state. */
-    private val attachments: CouchAttachmentGateway? = null,
     /** Carries HtxKey (+ mux reactor) so provider calls ride the daemon's reactor. */
     private val muxContext: CoroutineContext = EmptyCoroutineContext,
     /**
@@ -483,104 +481,63 @@ class PatchWire(
                 )
             }
 
-            // ── panel constructions: LCNC graphs as replicated store documents ──
-            method == "POST" && p.startsWith("/api/panels/") && p.endsWith("/mate") -> {
-                val att = attachments ?: return json(mapOf("error" to "store not wired"), 503)
-                val name = p.removePrefix("/api/panels/").removeSuffix("/mate").removeSuffix("/")
-                if (!name.matches(Regex("^[a-z0-9][a-z0-9._-]*$"))) return json(mapOf("error" to "bad name"), 400)
-                val req = runCatching { JsonSupport.parse(rawBody(text)) as? Map<*, *> }.getOrNull()
-                    ?: return json(mapOf("error" to "bad_json"), 400)
-                val programJson = req["program"]?.let { JsonSupport.stringify(it) }
-                    ?: return json(mapOf("error" to "program_required"), 400)
-                val sourceNode = req["sourceNode"]?.toString() ?: return json(mapOf("error" to "sourceNode_required"), 400)
-                val sourcePort = req["sourcePort"]?.toString() ?: return json(mapOf("error" to "sourcePort_required"), 400)
-                val targetType = req["targetType"]?.toString() ?: return json(mapOf("error" to "targetType_required"), 400)
-                val x = (req["x"] as? Number)?.toDouble() ?: return json(mapOf("error" to "x_required"), 400)
-                val y = (req["y"] as? Number)?.toDouble() ?: return json(mapOf("error" to "y_required"), 400)
-                val mated = runCatching {
-                    var program = borg.trikeshed.lcnc.LcncProgramConfix.fromJson(name, programJson)
-                    // W2.4: the request carries the live camera + seq; the persisted
-                    // document must hold the SAME view/seq the browser is looking at.
-                    val reqView = req["view"] as? Map<*, *>
-                    if (reqView != null) {
-                        fun d(v: Any?): Double = (v as? Number)?.toDouble() ?: 0.0
-                        program = program.copy(
-                            view = borg.trikeshed.lcnc.LcncView(d(reqView["x"]), d(reqView["y"]), d(reqView["z"])),
-                        )
-                    }
-                    val reqSeq = (req["seq"] as? Number)?.toInt()
-                    if (reqSeq != null) program = program.copy(seq = reqSeq)
-                    borg.trikeshed.lcnc.LcncMating.mate(program, sourceNode, sourcePort, targetType, x, y)
-                }.getOrElse { return json(mapOf("error" to (it.message ?: "mating rejected")), 409) }
-                val bytes = borg.trikeshed.lcnc.LcncProgramConfix.toJson(mated.program).encodeToByteArray()
-                val cid = borg.trikeshed.job.ContentId.of(bytes)
-                att.putAttachment(
-                    borg.trikeshed.util.oroboros.OroborosAttachmentRef(
-                        path = "panels/$name", contentType = "application/json", length = bytes.size.toLong(),
-                        contentId = cid, agentId = "lcnc-mating", revision = cid.hex.take(12), sequence = System.currentTimeMillis(),
-                    ), bytes,
-                )
-                json(mapOf("verdict" to "ok", "cid" to cid.value, "program" to JsonSupport.parse(bytes.decodeToString()),
-                    "wire" to mapOf("fromNode" to mated.wire.fromNode, "fromPort" to mated.wire.fromPort, "toNode" to mated.wire.toNode, "toPort" to mated.wire.toPort),
-                    "matingPoint" to mapOf("id" to mated.matingPoint.id, "function" to mated.matingPoint.function, "cardinality" to mated.matingPoint.cardinality.name)))
-            }
+            // (The /api/panels family — the browser panel editor's save/load/
+            // list/presets/mate API — was ROOTED OUT 2026-08-27 with the page
+            // itself. Stored programs are offered presets + ModuleContext.
+            // programLoader; execution is /api/lcnc/run. Mating stays as pure
+            // vocabulary logic below — it never needed the page.)
             method == "GET" && p == "/api/lcnc/mating-options" -> {
-                val sourceType = borg.trikeshed.utils.rfxhttp.CouchHttpSurface.parseQuery(path.substringAfter('?', ""))["sourceType"]
+                val query = borg.trikeshed.utils.rfxhttp.CouchHttpSurface.parseQuery(path.substringAfter('?', ""))
+                val sourceType = query["sourceType"]
                     ?: return json(mapOf("error" to "sourceType_required"), 400)
-                val sourcePort = borg.trikeshed.utils.rfxhttp.CouchHttpSurface.parseQuery(path.substringAfter('?', ""))["sourcePort"]
+                val sourcePort = query["sourcePort"]
                     ?: return json(mapOf("error" to "sourcePort_required"), 400)
                 val source = borg.trikeshed.lcnc.LcncNode("source", sourceType)
                 val program = borg.trikeshed.lcnc.LcncProgram("options", listOf(source).toSeries(), emptySeriesOf())
-                json(mapOf("options" to borg.trikeshed.lcnc.LcncMating.compatibleTypes(program, "source", sourcePort).map {
-                    mapOf("type" to it.type, "inputPort" to it.inputPort, "title" to it.title)
+                // The mate-menu list: kind-compatible, EVIDENCE-ordered (wire
+                // bigrams counted over the offered corpus), q = the popup's
+                // text-entry filter lane.
+                val corpus = borg.trikeshed.lcnc.LcncPresets.all().map { (n, doc) ->
+                    borg.trikeshed.lcnc.LcncProgramConfix.fromJson(n, doc)
+                }
+                json(mapOf("options" to borg.trikeshed.lcnc.LcncMating
+                    .rankedCandidates(program, "source", sourcePort, corpus, query["q"] ?: "").map {
+                        mapOf("type" to it.type, "inputPort" to it.inputPort, "title" to it.title)
+                    }))
+            }
+            method == "GET" && p == "/api/lcnc/fills" -> {
+                val query = borg.trikeshed.utils.rfxhttp.CouchHttpSurface.parseQuery(path.substringAfter('?', ""))
+                val type = query["type"] ?: return json(mapOf("error" to "type_required"), 400)
+                val corpus = borg.trikeshed.lcnc.LcncPresets.all().map { (n, doc) ->
+                    borg.trikeshed.lcnc.LcncProgramConfix.fromJson(n, doc)
+                }
+                val fills = borg.trikeshed.lcnc.LcncMating.paramFills(type, corpus)
+                json(mapOf("type" to type, "fills" to fills.map {
+                    mapOf("param" to it.param, "value" to it.value, "count" to it.count)
                 }))
             }
-            method == "GET" && p == "/api/panels" -> {
-                val att = attachments ?: return json(mapOf("error" to "store not wired"), 503)
-                json(mapOf("panels" to att.listAttachments("panels/").map {
-                    mapOf("name" to it.path.removePrefix("panels/"), "cid" to it.contentId.value, "bytes" to it.length)
-                }))
+            method == "GET" && p == "/api/lcnc/autowire" -> {
+                val query = borg.trikeshed.utils.rfxhttp.CouchHttpSurface.parseQuery(path.substringAfter('?', ""))
+                val fromType = query["from"] ?: return json(mapOf("error" to "from_required"), 400)
+                val toType = query["to"] ?: return json(mapOf("error" to "to_required"), 400)
+                val nodes = listOf(
+                    borg.trikeshed.lcnc.LcncNode("from", fromType),
+                    borg.trikeshed.lcnc.LcncNode("to", toType),
+                ).toSeries()
+                val program = borg.trikeshed.lcnc.LcncProgram("autowire", nodes, emptySeriesOf())
+                val result = borg.trikeshed.lcnc.LcncMating.autoWire(program, "from", "to")
+                json(mapOf(
+                    "from" to fromType, "to" to toType,
+                    "proposed" to result.wire?.let { mapOf(
+                        "fromNode" to it.fromNode, "fromPort" to it.fromPort,
+                        "toNode" to it.toNode, "toPort" to it.toPort,
+                    ) },
+                    "candidates" to result.candidates.map { mapOf(
+                        "fromPort" to it.fromPort, "toPort" to it.toPort, "kind" to it.kind,
+                    ) },
+                    "ambiguous" to (result.candidates.size > 1),
+                ))
             }
-
-            // W6.2: presets are OFFERED, never installed — the live forge home is
-            // production. Installing is always an explicit client POST.
-            method == "GET" && p == "/api/panels/presets" -> {
-                json(mapOf("presets" to borg.trikeshed.lcnc.LcncPresets.all().map { (name, doc) ->
-                    mapOf("name" to name, "document" to JsonSupport.parse(doc))
-                }))
-            }
-
-            method == "GET" && p.startsWith("/api/panels/") -> {
-                val att = attachments ?: return json(mapOf("error" to "store not wired"), 503)
-                val name = p.removePrefix("/api/panels/")
-                if (!name.matches(Regex("^[a-z0-9][a-z0-9._-]*$"))) return json(mapOf("error" to "bad name"), 400)
-                val doc = att.getAttachment("panels/" + name) ?: return json(mapOf("error" to "no such panel"), 404)
-                JvmKanbanServer.HttpResponse(200, doc.second.decodeToString())
-            }
-
-            method == "POST" && p.startsWith("/api/panels/") -> {
-                val att = attachments ?: return json(mapOf("error" to "store not wired"), 503)
-                val name = p.removePrefix("/api/panels/")
-                if (!name.matches(Regex("^[a-z0-9][a-z0-9._-]*$"))) return json(mapOf("error" to "bad name"), 400)
-                val body = rawBody(text)
-                if (body.isBlank()) return json(mapOf("error" to "empty body"), 400)
-                val bytes = body.encodeToByteArray()
-                val cid = borg.trikeshed.job.ContentId.of(bytes)
-                att.putAttachment(
-                    borg.trikeshed.util.oroboros.OroborosAttachmentRef(
-                        path = "panels/" + name,
-                        contentType = "application/json",
-                        length = bytes.size.toLong(),
-                        contentId = cid,
-                        agentId = "panels-ui",
-                        revision = cid.hex.take(12),
-                        sequence = System.currentTimeMillis(),
-                    ),
-                    bytes,
-                )
-                json(mapOf("verdict" to "ok", "name" to name, "cid" to cid.value))
-            }
-
             method == "GET" && p == "/api/projects" -> json(
                 mapOf(
                     "scopes" to scopes.list().map {

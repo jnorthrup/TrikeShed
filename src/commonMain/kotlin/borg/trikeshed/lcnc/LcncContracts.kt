@@ -33,10 +33,41 @@ data class LcncPortContract(
 }
 
 object LcncContracts {
+    /** Concentric-scope vocabulary (spec §4): the call, the binding, the return. */
+    const val SCOPE = "scope"
+    const val SCOPE_IN = "scope.in"
+    const val SCOPE_OUT = "scope.out"
+    /** P2 map-reduce vocabulary: declarative Confix/LCNC only, never JS eval. */
+    const val VIEW_EMIT = "view.emit"
+    const val VIEW_REDUCE = "view.reduce"
+
     /** Full vocabulary — ONE author for node types, ports, titles, param defaults.
      *  inputKinds/outputKinds drive the mating filter; omit a kind and the type
      *  is invisible to drag-to-empty-space. */
     fun all(): List<LcncPortContract> = listOf(
+        // ── §4: concentric scope — the call, the binding, the return ──
+        // A scope's REAL ports are declared by its child (`scope.in`/`scope.out`
+        // names); the generic args?/returns pair is the declared wire spelling —
+        // args? merges UNDER per-name wires (per-name wins), returns carries the
+        // composed map beside the per-name pass-through (spec §4).
+        LcncPortContract(SCOPE, "scope (a ring — holds its children)",
+            listOf("args?", "when?"), listOf("returns"),
+            inputKinds = mapOf("args" to "json", "when" to "json"),
+            outputKinds = mapOf("returns" to "json"),
+            params = mapOf("program" to LcncPortContract.LcncParamSpec(ph = "named ring (stored program / preset) — empty for inline children"))),
+        LcncPortContract(SCOPE_IN, "scope.in (formal parameter)",
+            emptyList(), listOf("value"),
+            outputKinds = mapOf("value" to "json"),
+            params = mapOf(
+                "name" to LcncPortContract.LcncParamSpec(ph = "parameter name (trailing ? = optional)"),
+                "default" to LcncPortContract.LcncParamSpec(ph = "value when the caller omits it"),
+            )),
+        LcncPortContract(SCOPE_OUT, "scope.out (return value)",
+            listOf("value"), emptyList(),
+            inputKinds = mapOf("value" to "json"),
+            params = mapOf("name" to LcncPortContract.LcncParamSpec(ph = "return name")),
+            isSink = true),
+
         // ── sources (no inputs) ──────────────────────────────────────
         LcncPortContract("timer", "timer",
             emptyList(), listOf("tick"),
@@ -321,8 +352,10 @@ object LcncContracts {
                 "id" to LcncPortContract.LcncParamSpec(v = "confix"),
                 "title" to LcncPortContract.LcncParamSpec(ph = "sheet title"),
             )),
+        // json is OPTIONAL: the runner falls back to the `json` param when the
+        // port is unwired (the LcncOperationalSheets use case runs on params).
         LcncPortContract("confix.pickPath", "json path → sheet",
-            listOf("json"), listOf("found", "path", "sheets", "sheet"),
+            listOf("json?"), listOf("found", "path", "sheets", "sheet"),
             inputKinds = mapOf("json" to "json"),
             outputKinds = mapOf("found" to "json", "path" to "json", "sheets" to "json", "sheet" to "json"),
             params = mapOf("path" to LcncPortContract.LcncParamSpec(ph = "dot.or/slash path"))),
@@ -378,6 +411,16 @@ object LcncContracts {
             outputKinds = mapOf("standings" to "json"),
             wide = true),
 
+        // ── wise-micali step 11: the workgroup vote (Seats + quorum; ties signal) ──
+        LcncPortContract("panel.vote", "panel vote (odd decides · even tie = research)",
+            listOf("ballots"), listOf("verdict", "accepted", "tie", "triage", "tally", "dissent"),
+            inputKinds = mapOf("ballots" to "json"),
+            outputKinds = mapOf(
+                "verdict" to "text", "accepted" to "json", "tie" to "json",
+                "triage" to "text", "tally" to "json", "dissent" to "json",
+            ),
+            params = mapOf("quorum" to LcncPortContract.LcncParamSpec(ph = "weighted quorum — blank = strict majority of OK ballots"))),
+
         // ── Step K: adaptive context engineering as LCNC ─────────────────
         LcncPortContract("context.fold", "playbook fold (deterministic)",
             listOf("bullets"), listOf("playbook"),
@@ -394,6 +437,35 @@ object LcncContracts {
                 "model" to LcncPortContract.LcncParamSpec(v = ""),
                 "effort" to LcncPortContract.LcncParamSpec(v = "medium", opts = listOf("low", "medium", "high")),
                 "tools" to LcncPortContract.LcncParamSpec(v = "", ph = "comma-separated tool names"),
+            )),
+
+        // ── P2: map-reduce as LCNC (Confix DSL lowering; never JS) ───────
+        LcncPortContract(VIEW_EMIT, "view emit (declarative map)",
+            listOf("documents?"), listOf("rows"),
+            inputKinds = mapOf("documents" to "json"),
+            outputKinds = mapOf("rows" to "json"),
+            params = mapOf(
+                "ddoc" to LcncPortContract.LcncParamSpec(v = "_design/lcnc"),
+                "view" to LcncPortContract.LcncParamSpec(ph = "view name; program name when blank"),
+                "key" to LcncPortContract.LcncParamSpec(v = "_id", ph = "_id | doc.field | const:value"),
+                "value" to LcncPortContract.LcncParamSpec(v = "const:1", ph = "_doc | doc.field | const:value"),
+                "arrayField" to LcncPortContract.LcncParamSpec(ph = "non-empty → emit each array element"),
+            )),
+        LcncPortContract(VIEW_REDUCE, "view reduce (bounded monoid)",
+            listOf("rows"), listOf("reduced"),
+            inputKinds = mapOf("rows" to "json"),
+            outputKinds = mapOf("reduced" to "json"),
+            params = mapOf("reducer" to LcncPortContract.LcncParamSpec(
+                v = "_count", opts = listOf("_count", "_sum", "_stats", "rollup-count")))),
+
+        // ── P4: bot seat — only this node may spend tokens ─────────────
+        LcncPortContract("read.construct", "read causal constructions (bot proposes; gate disposes)",
+            listOf("lines"), listOf("constructions"),
+            inputKinds = mapOf("lines" to "json"),
+            outputKinds = mapOf("constructions" to "json"),
+            params = mapOf(
+                "model" to LcncPortContract.LcncParamSpec(ph = "ModelMux route/model id"),
+                "window" to LcncPortContract.LcncParamSpec(v = "16"),
             )),
     )
 

@@ -16,11 +16,11 @@ import java.io.File
 data class CouchWebhookRuntime(val wire: WebhookWire, val ledger: CausalHookDeliveryLedger)
 
 /**
- * The LCNC dispatch half of the inbound intake: resolve `program` to its panels
- * document, find `node`, and run it with the delivery body as the named port's
- * input. Every delivery lands an auditable `hook-intake/` key first; the run (or
- * the reason there was none) lands as `hook-run/`. The loader is a seam so gates
- * inject fixture programs without a store.
+ * The LCNC dispatch half of the inbound intake: resolve `program` to its stored
+ * program document, find `node`, and run it with the delivery body as the named
+ * port's input. Every delivery lands an auditable `hook-intake/` key first; the
+ * run (or the reason there was none) lands as `hook-run/`. The loader is a seam
+ * so gates inject fixture programs without a store.
  */
 fun lcncHookIntake(
     blackboard: ConfixBlackboard,
@@ -55,7 +55,9 @@ fun lcncHookIntake(
         mapOf(
             "status" to "ran",
             "type" to node.type,
-            "outputs" to JsonSupport.stringify(outputs.mapValues { it.value?.toString() }),
+            // ONE honest serialization — real Confix JSON, never toString-mangled
+            // maps double-encoded inside a string.
+            "outputs" to JsonSupport.stringify(outputs),
         )
     }.getOrElse { t -> mapOf("status" to "error", "error" to (t.message ?: t.toString())) }
     blackboard.put(runKey, outcome, "webhook")
@@ -68,7 +70,7 @@ suspend fun couchWebhookRuntime(
     stateDir: File,
     /** The host-composed LCNC runner map (ModuleContext.lcncRunners) — a LIVE reference; modules attach later. */
     runners: Map<String, LcncNodeRunner> = emptyMap(),
-    /** Loads a program document's bytes by name; null = unresolvable. Production binds panels/<name>. */
+    /** Loads a program document's bytes by name; null = unresolvable. Production binds the offered presets. */
     loadProgram: suspend (String) -> ByteArray? = { null },
 ): CouchWebhookRuntime {
     val ledger = withContext(Dispatchers.IO) {

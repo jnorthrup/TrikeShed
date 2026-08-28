@@ -27,18 +27,36 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withPermit
 
+/**
+ * CCEK — **CoroutineContext.Element.Key**: named for the exact Kotlin type
+ * path (`kotlin.coroutines.CoroutineContext` / `.Element` / `.Key`). The
+ * substrate IS that mechanism — services, reactors, and channels are context
+ * Elements addressed by typed Keys, composed with `+`, resolved with
+ * `[Key]`, removed with `minusKey` — which is what gives every CCEK citizen
+ * block compatibility with none of lexical scoping's inclusion/exclusion
+ * quirks. Began as a WAM adaptation; it outgrew that origin.
+ */
 object CCEK {
     fun initialize(reactor: MuxReactorElement): CcekReactorBinding = CcekReactorBinding(reactor)
 
     fun <T> inputChannel(capacity: Int = Channel.BUFFERED): Channel<T> = Channel(capacity)
     fun <T> fanOutChannel(capacity: Int = 64): Channel<T> = Channel(capacity)
 
-    fun childScope(name: String, parentScope: CoroutineScope): CoroutineScope =
-        CoroutineScope(parentScope.coroutineContext + SupervisorJob() + CoroutineName("CCEK-$name"))
+    fun childScope(name: String, parentScope: CoroutineScope): CoroutineScope {
+        val parent = parentScope.coroutineContext[Job]
+        return CoroutineScope(
+            parentScope.coroutineContext + SupervisorJob(parent) + CoroutineName("CCEK-$name")
+        )
+    }
 
     class CcekReactorBinding(val reactor: MuxReactorElement) {
+        /**
+         * The reactor Element itself MUST ride the scope context. Before P1 this scope
+         * carried only reactor.supervisor + dispatcher + name, so code launched as a
+         * "CCEK assembly" could not resolve currentCoroutineContext()[MuxReactorElement.Key].
+         */
         val reactorScope: CoroutineScope = CoroutineScope(
-            reactor.supervisor + Dispatchers.Default + CoroutineName("CCEK-reactor")
+            reactor.supervisor + Dispatchers.Default + reactor + CoroutineName("CCEK-reactor")
         )
 
         fun choreograph(
@@ -363,7 +381,7 @@ class UserContext(
 
     /**
      * CAS persistence under `contexts/<id>` — the SAME document plane as
-     * `panels/<name>` (see LcncProgramConfix.saveProgramToOroboros).
+     * `lcnc/<name>` (see LcncProgramConfix.saveProgramToOroboros).
      */
     fun toDocument(): Map<String, Any?> = linkedMapOf(
         "id" to id,

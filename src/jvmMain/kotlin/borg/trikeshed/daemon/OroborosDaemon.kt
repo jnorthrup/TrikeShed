@@ -248,9 +248,16 @@ object OroborosDaemon {
     }
 
     private suspend fun kotlinx.coroutines.CoroutineScope.mainImpl(args: Array<String>) {
-        // KeyMux with 24-hour cached env source — provider keys change infrequently,
-        // so caching avoids re-resolving on every chat call.
-        val keyMux = KeyMux { cached("*", EnvSource()) }
+        // KeyMux: harness lane first (conventional env names + hermes .env +
+        // codex/opencode credential files, 5-minute discovery cache), then the
+        // legacy derived-name env lane (LLM_<X>_KEY, 24-hour cache) as fallback.
+        // fileOps is explicit: coroutine contexts don't reliably carry FileOperations,
+        // and without it the dotenv/auth.json lanes silently degrade to env-only.
+        val fileOps = JvmFileOperations()
+        val keyMux = KeyMux {
+            cached("*", keymux.HarnessSource(explicitFileOps = fileOps), ttlMs = 5 * 60_000L)
+            cached("*", EnvSource())
+        }
         // Probe early so a missing key aborts before opening the HTX reactor.
         val apiKeyPresent = kotlinx.coroutines.withContext(Dispatchers.IO) { keyMux.get("JULES_API_KEY") }
         if (apiKeyPresent.isNullOrBlank()) {
@@ -391,7 +398,7 @@ object OroborosDaemon {
 
         // ── The store: CAS-collapsed Couch (rev hash = body blob CID) over the forge-home CAS ──
         // Built before the HTTP tier so the server can host the PWA and the build out of it.
-        val fileOps = JvmFileOperations()
+        // fileOps was created above (the KeyMux harness lane shares it).
         val casStore = FileCasStore(fileOps, fileOps.resolvePath(forgeHome.absolutePath, "cas"))
         val couchStore = borg.trikeshed.couch.CouchStoreFactory.casBacked(casStore)
         val attachmentGateway = CouchAttachmentGateway(couchStore, casStore)
@@ -748,7 +755,6 @@ object OroborosDaemon {
         val patchWire = borg.trikeshed.forge.server.PatchWire(
             brain = brainClient,
             scopes = projectScopes,
-            attachments = attachmentGateway,
             muxContext = htxElement + muxReactor,
             mountScope = wireScope,
             miner = projectMiner,
@@ -762,6 +768,14 @@ object OroborosDaemon {
         val rete = borg.trikeshed.dag.ReteNetwork(reteProductions)
         val moduleRoutes = borg.trikeshed.module.ModuleRouteRegistry()
         val moduleScope = CoroutineScope(SupervisorJob(coroutineContext[kotlinx.coroutines.Job]) + Dispatchers.Default)
+        // Spec §3.1 production wiring: ONE stored-program resolver — the offered
+        // presets (the panels/ attachment namespace was rooted out 2026-08-27
+        // with the browser editor) — shared by module program runs
+        // (/api/lcnc/run {program}) and webhook node dispatch.
+        val storedProgramLoader: suspend (String) -> borg.trikeshed.lcnc.LcncProgram? = { name ->
+            borg.trikeshed.lcnc.LcncPresets.all()[name]
+                ?.let { borg.trikeshed.lcnc.LcncProgramConfix.fromJson(name, it) }
+        }
         val moduleContext = borg.trikeshed.module.ModuleContext(
             couchDb = couchDb,
             rete = rete,
@@ -776,10 +790,27 @@ object OroborosDaemon {
             clock = { System.currentTimeMillis() },
             stateDir = forgeHome,
             muxContext = htxElement + muxReactor,
+            ccekBinding = ccekBinding,
+            programLoader = storedProgramLoader,
         )
         // Step K: the context-assembly node family is host-composed like any module's
         // runners — webhook dispatch and program runs can mint real context receipts.
         moduleContext.lcncRunners.putAll(borg.trikeshed.memory.ace.AceContextNodes.registry(daemonBlackboard))
+        // P4: lawyer-bot reading seat. ONLY this runner calls BrainClient/ModelMux;
+        // ConstructionReadingLoop owns deterministic CAS claim-check/fold/bag/Rete landing.
+        beliefBag?.let { readingBag ->
+            moduleContext.lcncRunners["read.construct"] = borg.trikeshed.narsese.ConstructionBotNode.runner(
+                brain = brainClient,
+                muxContext = htxElement + muxReactor,
+                cas = casStore,
+                bag = readingBag,
+                rete = rete,
+                kifSink = { kif ->
+                    val cid = borg.trikeshed.job.ContentId.of(kif.encodeToByteArray())
+                    daemonBlackboard.put("construction-kif/${cid.hex}", kif, "reader")
+                },
+            )
+        }
         val moduleSupervisor = borg.trikeshed.module.ModuleSupervisor(
             ctx = moduleContext,
             liveClassesDir = File(repoDir, "build/live/classes"),
@@ -791,7 +822,7 @@ object OroborosDaemon {
         val webhookRuntime = borg.trikeshed.forge.server.couchWebhookRuntime(
             couchStore, daemonBlackboard, forgeHome,
             runners = moduleContext.lcncRunners,
-            loadProgram = { name -> attachmentGateway.getAttachment("panels/$name")?.second },
+            loadProgram = { name -> borg.trikeshed.lcnc.LcncPresets.all()[name]?.encodeToByteArray() },
         )
         val webhookWire = webhookRuntime.wire
         val webhookScope = CoroutineScope(SupervisorJob(coroutineContext[kotlinx.coroutines.Job]) + Dispatchers.Default + htxElement)

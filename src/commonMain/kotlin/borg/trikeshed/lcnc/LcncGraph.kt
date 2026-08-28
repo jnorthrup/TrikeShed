@@ -8,11 +8,11 @@ import borg.trikeshed.lib.size
 import borg.trikeshed.lib.toSeries
 
 /**
- * LcncGraph — the LCNC node/wire model as commonMain Kotlin, not the hand-rolled
- * JS object literals in `panels.html`. Loaded once from a stored program and never
- * mutated thereafter, so per PRELOAD's categorical-idempotency rule this stays a
- * `Series`, not a `List`: `LcncNode`/`LcncWire` are the frozen shape of a program,
- * read many times, written never after load.
+ * LcncGraph — the LCNC node/wire model as commonMain Kotlin (one author; no
+ * browser-side object literals anywhere). Loaded once from a stored program
+ * and never mutated thereafter, so per PRELOAD's categorical-idempotency rule
+ * this stays a `Series`, not a `List`: `LcncNode`/`LcncWire` are the frozen
+ * shape of a program, read many times, written never after load.
  */
 data class LcncNode(
     val id: String,
@@ -25,10 +25,20 @@ data class LcncNode(
     val height: Double? = null,
     /** Collapsed state — header shown, body hidden. */
     val collapsed: Boolean = false,
-    /** W2.5: name of a panels/<name> subprogram defining this node's internals.
-     *  Double-click a node carrying one to dive; ProgramNavigator already has
-     *  the frames, breadcrumb, and popTo-rejects-not-clamps semantics. */
+    /** Name of a stored subprogram defining this node's internals — a NAMED
+     *  ring: the body lives in another stored document, loaded at entry and
+     *  run under the same concentric rules as inline [children] (it still
+     *  sees the enclosing environment — a named ring is lazy containment,
+     *  not a call into a vacuum). ProgramNavigator dives the same chain the
+     *  executor walks; popTo rejects, never clamps. */
     val subprogram: String? = null,
+    /** CONCENTRIC CONTAINMENT — the ring's own statements. A node holding
+     *  children IS a scope ring: one document, rings inside rings. Inner
+     *  nodes may consume enclosing-ring outputs directly (wires cross ring
+     *  boundaries INWARD; see LcncScopeViolation for the outward rule) and
+     *  resolve `scope.in` names outward through the frame chain — nearest
+     *  ring shadows. Only `scope.out` values leave the ring. */
+    val children: Series<LcncNode> = emptySeriesOf(),
 )
 
 /** Viewport (pan/zoom) persisted with the program so a reload restores the exact camera. */
@@ -119,10 +129,10 @@ fun LcncProgram.inputsOf(nodeId: String): Series<LcncWire> {
 class LcncCycleException(val nodeId: String) : Exception("cycle at $nodeId")
 
 /**
- * Topological order over the wire DAG — direct Kotlin port of `panels.html`'s
- * `topo()`. A node with no matching entry in [nodes] for a wire endpoint is
- * skipped rather than crashing: a stale wire from a since-deleted node must not
- * break the whole program's execution order.
+ * Topological order over the wire DAG. A node with no matching entry in
+ * [nodes] for a wire endpoint is skipped rather than crashing: a stale wire
+ * from a since-deleted node must not break the whole program's execution
+ * order.
  */
 fun LcncProgram.topo(): Series<LcncNode> {
     val byId = LinkedHashMap<String, LcncNode>()

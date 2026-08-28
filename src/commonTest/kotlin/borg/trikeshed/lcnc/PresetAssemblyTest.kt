@@ -21,9 +21,15 @@ class PresetAssemblyTest {
         LcncProgramConfix.fromJson(name, LcncPresets.all().getValue(name))
 
     @Test
-    fun allThreePresetsExistAndRoundTrip() {
+    fun allOfferedPresetsExistAndRoundTrip() {
         val all = LcncPresets.all()
-        assertEquals(setOf("preset-hermes", "preset-tribunal", "preset-curator"), all.keys)
+        assertEquals(
+            setOf(
+                "preset-hermes", "preset-tribunal", "preset-curator",
+                "preset-context", "preset-kanban", "preset-scope", "preset-scope-inner",
+            ),
+            all.keys,
+        )
         for ((name, doc) in all) {
             val p = LcncProgramConfix.fromJson(name, doc)
             assertEquals(doc, LcncProgramConfix.toJson(p), "$name must round-trip byte-stable")
@@ -48,29 +54,48 @@ class PresetAssemblyTest {
         for ((name, doc) in LcncPresets.all()) {
             val p = LcncProgramConfix.fromJson(name, doc)
 
-            fun typeOf(id: String): String? {
-                val n = p.nodes.size
-                for (i in 0 until n) if (p.nodes[i].id == id) return p.nodes[i].type
-                return null
+            // Concentric documents: the node universe includes ring children.
+            val byId = HashMap<String, LcncNode>()
+            fun walk(nodes: borg.trikeshed.lib.Series<LcncNode>) {
+                for (i in 0 until nodes.size) {
+                    val n = nodes[i]
+                    byId[n.id] = n
+                    if (n.children.size > 0) walk(n.children)
+                }
             }
+            walk(p.nodes)
+
+            // A ring's ports are declared by its body (contract line 1); its
+            // body-derived ports carry no contract kind — the kind check
+            // applies only where both sides declare one.
+            fun outPorts(n: LcncNode): List<String> =
+                if (n.children.size > 0) {
+                    (0 until n.children.size).mapNotNull { i ->
+                        n.children[i].takeIf { it.type == LcncContracts.SCOPE_OUT }?.params?.get("name")
+                    } + "returns"
+                } else LcncContracts.find(n.type)!!.outputs
+            fun inPorts(n: LcncNode): List<String> =
+                if (n.children.size > 0) {
+                    listOf("args?", "when?") + (0 until n.children.size).mapNotNull { i ->
+                        n.children[i].takeIf { it.type == LcncContracts.SCOPE_IN }?.params?.get("name")
+                    }
+                } else LcncContracts.find(n.type)!!.inputs
 
             val w = p.wires.size
             for (i in 0 until w) {
                 val wire = p.wires[i]
-                val srcType = typeOf(wire.fromNode)
-                val tgtType = typeOf(wire.toNode)
-                assertTrue(srcType != null && tgtType != null,
+                val src = byId[wire.fromNode]
+                val tgt = byId[wire.toNode]
+                assertTrue(src != null && tgt != null,
                     "$name wire ${wire.fromNode}→${wire.toNode} references missing node")
-                val src = LcncContracts.find(srcType!!)!!
-                val tgt = LcncContracts.find(tgtType!!)!!
-                assertTrue(src.outputs.contains(wire.fromPort),
-                    "$name: $srcType has no output '${wire.fromPort}'")
-                assertTrue(tgt.inputs.contains(wire.toPort),
-                    "$name: $tgtType has no input '${wire.toPort}'")
+                assertTrue(outPorts(src!!).any { it.removeSuffix("?") == wire.fromPort.removeSuffix("?") },
+                    "$name: ${src.type} has no output '${wire.fromPort}'")
+                assertTrue(inPorts(tgt!!).any { it.removeSuffix("?") == wire.toPort.removeSuffix("?") },
+                    "$name: ${tgt.type} has no input '${wire.toPort}'")
                 // Kind compatibility across every preset edge — the same rule
                 // LcncMating.compatibleTypes applies to interactive drags.
-                val outKind = src.outputKinds[wire.fromPort.removeSuffix("?")]
-                val inKind = tgt.inputKinds[wire.toPort.removeSuffix("?")]
+                val outKind = LcncContracts.find(src.type)?.outputKinds?.get(wire.fromPort.removeSuffix("?"))
+                val inKind = LcncContracts.find(tgt.type)?.inputKinds?.get(wire.toPort.removeSuffix("?"))
                 if (outKind != null && inKind != null) {
                     assertEquals(outKind, inKind,
                         "$name wire ${wire.fromNode}.${wire.fromPort} → ${wire.toNode}.${wire.toPort} kind mismatch")
@@ -106,8 +131,8 @@ class PresetAssemblyTest {
     @Test
     fun presetsAreOfferedNotInstalled() {
         // LcncPresets' whole surface is name → document text. No store, no
-        // gateway, no filesystem anywhere in it: installation can only happen
-        // through an explicit client POST to /api/panels/<name>.
+        // gateway, no filesystem anywhere in it: a preset reaches execution
+        // only through the stored-program resolver (ModuleContext.programLoader).
         for ((_, doc) in LcncPresets.all()) {
             assertTrue(doc.startsWith("{"), "preset document is Confix JSON, offerable verbatim")
         }

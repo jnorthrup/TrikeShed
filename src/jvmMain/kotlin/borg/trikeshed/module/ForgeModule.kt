@@ -56,10 +56,25 @@ class ModuleContext(
     /** HtxKey + mux reactor for provider calls (ModelMuxKanbanAgent and kin). */
     val muxContext: CoroutineContext = EmptyCoroutineContext,
     /**
+     * P1: live CCEK control-plane binding. When present, whole LCNC program runs
+     * launch as structured CCEK assemblies; null preserves reduced/test contexts.
+     */
+    val ccekBinding: borg.trikeshed.ccek.CCEK.CcekReactorBinding? = null,
+    /**
      * Modules publish their LCNC runner registries here (additive); the host composes
      * them — webhook node dispatch resolves `program/node/port` against this map.
      */
     val lcncRunners: MutableMap<String, borg.trikeshed.lcnc.LcncNodeRunner> = linkedMapOf(),
+    /**
+     * Stored-program resolver for whole-program runs and scope recursion (spec
+     * §3.1): production wiring is `panels/<name>` attachments ∪ the offered
+     * [borg.trikeshed.lcnc.LcncPresets]; the default resolves presets only, so
+     * a bare context still runs them.
+     */
+    val programLoader: suspend (String) -> borg.trikeshed.lcnc.LcncProgram? = { name ->
+        borg.trikeshed.lcnc.LcncPresets.all()[name]
+            ?.let { borg.trikeshed.lcnc.LcncProgramConfix.fromJson(name, it) }
+    },
 )
 
 /** The grip the supervisor holds: describe for /api/modules, drain-then-close on detach. */

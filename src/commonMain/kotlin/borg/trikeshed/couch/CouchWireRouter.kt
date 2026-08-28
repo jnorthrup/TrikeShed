@@ -42,6 +42,8 @@ data class WireReply(val status: Int, val contentType: String, val bytes: ByteAr
 class CouchWireRouter(
     val db: CouchDatabase,
     val attachmentPrefix: String,
+    /** P2 registry seam: null means eager route, preserving every existing caller. */
+    val incrementalView: (ddoc: String, view: String) -> IncrementalViewElement? = { _, _ -> null },
 ) {
     suspend fun handle(method: String, rawPath: String, body: ByteArray): WireReply? {
         val m = method.uppercase()
@@ -168,10 +170,38 @@ class CouchWireRouter(
         if (tail[0] == "_view") {
             if (m != "GET") return WireReply.methodNotAllowed(m)
             if (tail.size != 2) return WireReply.notFound("missing_named_view")
-            val r = viewRoute.handle(id, tail[1], query)
+            val viewName = tail[1]
+            val incremental = incrementalView(id, viewName)
+            if (incremental != null && designMarksIncremental(id, viewName)) {
+                // Registry element owns map/reduce/checkpoint state. Delivery-time windowing
+                // remains route work; no eager docs.all() scan occurs here.
+                val result = incremental.answer()
+                val skip = query["skip"]?.toIntOrNull()?.coerceAtLeast(0) ?: 0
+                val limit = query["limit"]?.toIntOrNull()?.coerceAtLeast(0) ?: Int.MAX_VALUE
+                val rows = ArrayList<Map<String, Any?>>()
+                var seen = 0
+                for (row in result.rows) {
+                    if (seen++ < skip) continue
+                    if (rows.size >= limit) break
+                    rows.add(mapOf("id" to row.docId, "key" to row.key, "value" to row.value))
+                }
+                return WireReply.json(200, mapOf(
+                    "total_rows" to result.size, "offset" to skip.coerceAtMost(result.size), "rows" to rows,
+                    "update_seq" to db.updateSeq, "incremental" to true,
+                ))
+            }
+            val r = viewRoute.handle(id, viewName, query)
             return WireReply.json(r.status, r.json)
         }
         return WireReply.notFound("unsupported design handler ${tail[0]} on $id")
+    }
+
+    /** A design doc opts in explicitly: views.<name>.incremental == true. */
+    private fun designMarksIncremental(ddoc: String, view: String): Boolean {
+        val doc = db.docJson(ddoc) ?: return false
+        val views = doc["views"] as? Map<*, *> ?: return false
+        val spec = views[view] as? Map<*, *> ?: return false
+        return spec["incremental"] == true || spec["incremental"]?.toString() == "true"
     }
 
     /** The `_view` route core mounted over this database — the same engine `CouchHttpSurface` serves. */

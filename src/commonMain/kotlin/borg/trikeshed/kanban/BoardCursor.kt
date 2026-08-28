@@ -99,7 +99,7 @@ class BoardCursor private constructor(
 }
 
 /**
- * Boundary projection: the rich board shape the PWA/panels render (columns with
+ * Boundary projection: the rich board shape the PWA renders (columns with
  * wip data + cards + watermark). Pure structures — JSON stringify at the wire.
  */
 fun BoardCursor.toBoardMap(sequence: Long, title: String = "Board"): Map<String, Any?> {

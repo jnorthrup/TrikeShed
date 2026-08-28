@@ -10,31 +10,32 @@ import borg.trikeshed.util.oroboros.OroborosAttachmentRef
 import borg.trikeshed.job.ContentId
 
 /**
- * LcncProgram <-> Confix, no JavaScript anywhere in the loop. A stored
- * program is a plain JSON document — `{nodes:[{id,type,params,x,y}],
- * wires:[{from:[id,port],to:[id,port]}]}` — the exact shape `panels.html`
- * already wrote to `panels/<name>` via `PatchWire`/`CouchAttachmentGateway`.
- * This reads and writes the SAME documents from pure Kotlin: [ProgramNavigator]
- * can dive into a program stored by the old JS canvas, or one that never
- * touched a browser at all.
+ * LcncProgram <-> Confix, no JavaScript anywhere in the loop. ALL DATA IS
+ * CONFIX: a stored program is a plain Confix document —
+ * `{nodes:[{id,type,params,x,y}], wires:[{from:[id,port],to:[id,port]}]}` —
+ * read and written from pure Kotlin. [ProgramNavigator] dives into stored
+ * programs; [LcncRunner] executes them; no browser anywhere in the loop
+ * (the panel editor and its `panels/` occupancy were rooted out 2026-08-27).
  */
 object LcncProgramConfix {
 
+    private fun nodeMap(n: LcncNode): LinkedHashMap<String, Any?> = linkedMapOf(
+        "id" to n.id,
+        "type" to n.type,
+        "params" to n.params,
+        "x" to n.x,
+        "y" to n.y,
+        "width" to n.width,
+        "height" to n.height,
+        "collapsed" to n.collapsed,
+        "subprogram" to n.subprogram,
+        // Concentric containment: a ring's statements nest INSIDE it — one
+        // document, rings inside rings, recursively.
+        "children" to (0 until n.children.size).map { nodeMap(n.children[it]) },
+    )
+
     fun toJson(program: LcncProgram): String {
-        val nodes = (0 until program.nodes.size).map { i ->
-            val n = program.nodes[i]
-            linkedMapOf(
-                "id" to n.id,
-                "type" to n.type,
-                "params" to n.params,
-                "x" to n.x,
-                "y" to n.y,
-                "width" to n.width,
-                "height" to n.height,
-                "collapsed" to n.collapsed,
-                "subprogram" to n.subprogram,
-            )
-        }
+        val nodes = (0 until program.nodes.size).map { i -> nodeMap(program.nodes[i]) }
         val wires = (0 until program.wires.size).map { i ->
             val w = program.wires[i]
             linkedMapOf(
@@ -56,19 +57,30 @@ object LcncProgramConfix {
         ))
     }
 
+    private fun nodeFrom(raw: Any?): LcncNode? {
+        val m = raw as? Map<*, *> ?: return null
+        val id = m["id"]?.toString() ?: return null
+        val type = m["type"]?.toString() ?: return null
+        @Suppress("UNCHECKED_CAST")
+        val params = (m["params"] as? Map<String, Any?>)?.mapValues { it.value?.toString() ?: "" } ?: emptyMap()
+        val children = childList(m["children"]).mapNotNull { nodeFrom(it) }
+        return LcncNode(id, type, params, num(m["x"]), num(m["y"]), optionalNum(m["width"]), optionalNum(m["height"]),
+            collapsed = m["collapsed"] as? Boolean ?: false,
+            subprogram = m["subprogram"]?.toString(),
+            children = children.toSeries())
+    }
+
+    /** JsonSupport backends reify arrays as List or Array — accept both. */
+    private fun childList(v: Any?): List<*> = when (v) {
+        is List<*> -> v
+        is Array<*> -> v.toList()
+        else -> emptyList<Any?>()
+    }
+
     /** Tolerant of the shapes JSON parsing actually produces (Double vs Int, missing optional fields). */
     fun fromJson(name: String, json: String): LcncProgram {
         val parsed = JsonSupport.parse(json) as? Map<*, *> ?: error("not a program document: $name")
-        val nodes = ((parsed["nodes"] as? List<*>).orEmpty()).mapNotNull { raw ->
-            val m = raw as? Map<*, *> ?: return@mapNotNull null
-            val id = m["id"]?.toString() ?: return@mapNotNull null
-            val type = m["type"]?.toString() ?: return@mapNotNull null
-            @Suppress("UNCHECKED_CAST")
-            val params = (m["params"] as? Map<String, Any?>)?.mapValues { it.value?.toString() ?: "" } ?: emptyMap()
-            LcncNode(id, type, params, num(m["x"]), num(m["y"]), optionalNum(m["width"]), optionalNum(m["height"]),
-                collapsed = m["collapsed"] as? Boolean ?: false,
-                subprogram = m["subprogram"]?.toString())
-        }
+        val nodes = ((parsed["nodes"] as? List<*>).orEmpty()).mapNotNull { raw -> nodeFrom(raw) }
         val wires = ((parsed["wires"] as? List<*>).orEmpty()).mapNotNull { raw ->
             val m = raw as? Map<*, *> ?: return@mapNotNull null
             val from = m["from"] as? List<*> ?: return@mapNotNull null
@@ -112,13 +124,13 @@ object LcncProgramConfix {
 
 /**
  * The real, live loader: `ProgramNavigator.diveInto("kanban")` reads
- * `panels/kanban` straight out of Oroboros' CAS-backed attachment store —
- * the SAME document this session's `/api/panels/kanban` already serves —
- * with no HTTP, no serialization boundary crossed twice, no JS runtime
- * anywhere in the call path.
+ * `lcnc/kanban` straight out of Oroboros' CAS-backed attachment store —
+ * no HTTP, no serialization boundary crossed twice, no JS runtime anywhere
+ * in the call path. (The prefix moved `panels/` → `lcnc/` when the panel
+ * editor's occupancy was rooted out.)
  */
 fun oroborosProgramLoader(gateway: CouchAttachmentGateway): suspend (String) -> LcncProgram? = { name ->
-    gateway.getAttachment("panels/$name")?.let { (_, bytes) ->
+    gateway.getAttachment("lcnc/$name")?.let { (_, bytes) ->
         LcncProgramConfix.fromJson(name, bytes.decodeToString())
     }
 }
@@ -129,7 +141,7 @@ fun saveProgramToOroboros(gateway: CouchAttachmentGateway, program: LcncProgram,
     val cid = ContentId.of(bytes)
     gateway.putAttachment(
         OroborosAttachmentRef(
-            path = "panels/${program.name}",
+            path = "lcnc/${program.name}",
             contentType = "application/json",
             length = bytes.size.toLong(),
             contentId = cid,

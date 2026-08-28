@@ -13,7 +13,7 @@ import kotlin.test.assertTrue
 /**
  * W2.4 gate: geometry round-trips completely. `collapsed`, `view`, and `seq`
  * round-trip through LcncProgramConfix so Kotlin owns the whole document —
- * panels.html no longer re-attaches view/seq after every mate.
+ * no surface re-attaches view/seq after a mate — Kotlin owns the document.
  */
 class LcncGeometryRoundTripTest {
 
@@ -68,7 +68,7 @@ class LcncGeometryRoundTripTest {
 
     @Test
     fun fullDocumentShapeMatchesBrowserSerialize() {
-        // The exact shape panels.html's serialize() produces today.
+        // A legacy browser-era serialize() shape — must still parse.
         val browserDoc = """
             {"version":5,
              "view":{"x":60,"y":60,"z":1},
