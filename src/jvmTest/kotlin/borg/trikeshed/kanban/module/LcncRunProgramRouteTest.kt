@@ -129,6 +129,55 @@ class LcncRunProgramRouteTest {
     }
 
     @Test
+    fun runsAnInlineDocumentWithANestedRingAndSurfacesUnknownTypes(): Unit = runBlocking {
+        // The panels canvas posts a scope's children as an inline document —
+        // {name, document, inputs} — and the ring runs under the same
+        // LcncScopeFrame nesting as a stored program: scope.in binds from
+        // inputs through the frame chain (two rings deep), work runs, the
+        // warm base comes back per direct-child id.
+        val routes = ModuleRouteRegistry()
+        val server = JvmKanbanServer(moduleRoutes = routes)
+        val ctx = newContext(routes, tempDir("inline"), CasStore.inMemory())
+        ctx.lcncRunners["test.upper"] = LcncNodeRunner { _, inputs -> mapOf("y" to inputs["x"]?.toString()?.uppercase()) }
+        val supervisor = ModuleSupervisor(ctx)
+        supervisor.attach(KanbanModule())
+
+        val doc = """{"nodes":[
+            {"id":"a","type":"scope.in","params":{"name":"text"}},
+            {"id":"b","type":"test.upper"},
+            {"id":"r","type":"scope","children":[
+                {"id":"ri","type":"scope.in","params":{"name":"text"}},
+                {"id":"ro","type":"scope.out","params":{"name":"result"}}]},
+            {"id":"c","type":"scope.out","params":{"name":"result"}}],
+          "wires":[{"from":["a","value"],"to":["b","x"]},
+                   {"from":["ri","value"],"to":["ro","value"]},
+                   {"from":["b","y"],"to":["c","value"]}]}"""
+        val resp = post(server, "/api/lcnc/run", """{"name":"ring:n7","document":$doc,"inputs":{"text":"hi"}}""")
+        assertEquals(200, resp.status, resp.body)
+        val body = json(resp)
+        assertEquals(true, body["ok"])
+        assertEquals("ring:n7", body["program"], "the inline label rides back for the canvas to reconcile")
+        assertEquals("HI", (body["returns"] as Map<*, *>)["result"], "the yield climbed out: $body")
+        val outputs = body["outputs"] as Map<*, *>
+        assertTrue("b" in outputs, "warm base: direct children paint by id: $outputs")
+        assertTrue("r" in outputs, "the nested ring's gathered yield lands on its own id: $outputs")
+
+        // Rings hold daemon-runnable types only: a client-only type FED inside
+        // the ring is a loud error on the ring, never a silent flat sweep.
+        val bad = post(server, "/api/lcnc/run",
+            """{"document":{"nodes":[
+                {"id":"a","type":"scope.in","params":{"name":"text","default":"x"}},
+                {"id":"d","type":"display"}],
+              "wires":[{"from":["a","value"],"to":["d","x"]}]},"inputs":{}}""")
+        assertEquals(400, bad.status, bad.body)
+        assertTrue("display" in bad.body, "LcncUnknownNodeType surfaces the offending type: ${bad.body}")
+
+        val garbage = post(server, "/api/lcnc/run", """{"document":"not a program"}""")
+        assertEquals(400, garbage.status, "a malformed document is a loud 400: ${garbage.body}")
+        supervisor.detach("kanban")
+    }
+
+    @Test
     fun offeredScopePresetRunsThroughTheDefaultPresetLoader(): Unit = runBlocking {
         // The default ModuleContext.programLoader resolves presets only —
         // preset-scope is the three-ring concentric document: the root

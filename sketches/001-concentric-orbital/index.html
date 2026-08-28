@@ -1,0 +1,189 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Variant 1 — Concentric Orbital: the context IS the layout</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: "SF Mono", ui-monospace, Menlo, monospace;
+    background: #0a0e12; color: #c8d4dc; font-size: 12px; overflow: hidden;
+  }
+  header { padding: 14px 20px; border-bottom: 1px solid #1c2630; display:flex; gap:16px; align-items:baseline;}
+  header h1 { font-size: 13px; color: #e8eef2; font-weight: 600; letter-spacing: .04em; }
+  header span { color: #4d6070; }
+  #stage { position: relative; width: 100vw; height: calc(100vh - 46px); display: flex; }
+  #orbit { position: relative; flex: 1; }
+  svg.wires { position:absolute; inset:0; width:100%; height:100%; pointer-events:none; }
+  .core {
+    position:absolute; left:50%; top:50%; transform:translate(-50%,-50%);
+    width:120px; height:120px; border-radius:50%;
+    background: radial-gradient(circle, #16222c 0%, #0a0e12 70%);
+    border:1px solid #2e4456; display:flex; flex-direction:column; align-items:center; justify-content:center;
+    cursor:pointer; z-index:5;
+  }
+  .core b { color:#7fd4a8; font-size:11px; }
+  .core i { color:#4d6070; font-style:normal; font-size:10px; margin-top:3px; }
+  .ring {
+    position:absolute; left:50%; top:50%; transform:translate(-50%,-50%);
+    border:1px dashed #24384a; border-radius:50%; transition: box-shadow .15s;
+  }
+  .ring:hover, .ring.lit { box-shadow: 0 0 0 1px #3f6f8f inset; border-color:#3f6f8f; }
+  .ring .label {
+    position:absolute; top:-9px; left:50%; transform:translateX(-50%);
+    background:#0a0e12; padding:0 8px; color:#5d7librar486; font-size:10px; white-space:nowrap; color:#6b8aa0;
+  }
+  .w {
+    position:absolute; padding:5px 9px; border-radius:4px; font-size:11px;
+    background:#101820; border:1px solid #2a3c4c; cursor:pointer; z-index:6;
+    transition: border-color .12s, color .12s; white-space:nowrap;
+  }
+  .w:hover { border-color:#7fd4a8; color:#e8eef2; }
+  .w.sel { border-color:#7fd4a8; color:#7fd4a8; box-shadow:0 0 8px #7fd4a833; }
+  .w.vm { border-color:#8a6fd4; } .w.vm:hover { border-color:#b49df0; color:#d9cdf7;}
+  .w.bot { border-color:#d4a05f; } .w.bot:hover { border-color:#f0c184; color:#f4dfc2;}
+  #inspector {
+    width: 340px; border-left:1px solid #1c2630; padding:16px; overflow:auto;
+  }
+  #inspector h2 { font-size:11px; color:#5d7486; text-transform:uppercase; letter-spacing:.08em; margin-bottom:10px;}
+  .kv { margin: 3px 0; }
+  .kv b { color:#7a95a8; font-weight:500; display:inline-block; width:110px; }
+  .chain { margin-top:12px; border-left:2px solid #24384a; padding-left:12px; }
+  .chain div { padding:4px 0; color:#9fb4c2; }
+  .chain div b { color:#7fd4a8; font-weight:500; }
+  .chain div small { display:block; color:#4d6070; margin-left:14px;}
+  .state { display:inline-block; padding:1px 7px; border-radius:8px; font-size:10px; background:#152028; color:#7fd4a8; }
+  .drawer { position:absolute; bottom:0; left:0; right:0; border-top:1px solid #1c2630;
+    background:#0c1116; padding:10px 20px; display:flex; gap:10px; flex-wrap:wrap; z-index:9;}
+  .drawer .w { position:static; }
+  .drawer .ttl { color:#4d6070; font-size:10px; width:100%; text-transform:uppercase; letter-spacing:.08em;}
+</style>
+</head>
+<body>
+<header>
+  <h1>CONCENTRIC ORBITAL</h1>
+  <span>variant 1 — the context chain is the layout; widgets orbit the reactor core</span>
+</header>
+<div id="stage">
+  <div id="orbit">
+    <div class="core" onclick="select('core')"><b>MuxReactorElement</b><i>supervisor · flowState · lease quota</i></div>
+    <svg class="wires"><path id="wire1" stroke="#2a3c4c" fill="none"/><path id="wire2" stroke="#2a3c4c" fill="none" stroke-dasharray="3 3"/></svg>
+    <!-- rings are drawn by JS: radius = context depth -->
+    <div class="w"    data-ring="1" style="left:18%; top:30%" onclick="select('view.emit')">view.emit <small style="color:#4d6070">MapFunction.Emit</small></div>
+    <div class="w"    data-ring="1" style="left:24%; top:64%" onclick="select('view.reduce')">view.reduce <small style="color:#4d6070">_sum</small></div>
+    <div class="w vm" data-ring="2" style="left:70%; top:26%" onclick="select('vm.tika')">vm.tika <small style="color:#4d6070">GRAAL_JVM</small></div>
+    <div class="w vm" data-ring="2" style="left:76%; top:58%" onclick="select('vm.corenlp')">vm.corenlp</div>
+    <div class="w vm" data-ring="3" style="left:58%; top:76%" onclick="select('vm.camel')">vm.camel</div>
+    <div class="w bot" data-ring="3" style="left:38%; top:18%" onclick="select('read.construct')">read.construct <small style="color:#4d6070">bot seat</small></div>
+    <div class="w"    data-ring="2" style="left:52%; top:44%" onclick="select('panel.vote')">panel.vote</div>
+    <div class="drawer">
+      <div class="ttl">module drawer — sub-vm legos (drag-feint: click to place on a ring)</div>
+      <div class="w vm" onclick="select('vm.graalce')">vm.graalce</div>
+      <div class="w vm" onclick="select('vm.tika')">vm.tika</div>
+      <div class="w vm" onclick="select('vm.corenlp')">vm.corenlp</div>
+      <div class="w vm" onclick="select('vm.camel')">vm.camel</div>
+      <div class="w" onclick="select('kanban.move')">kanban.move</div>
+      <div class="w" onclick="select('mux.standings')">mux.standings</div>
+    </div>
+  </div>
+  <div id="inspector"><h2>CCEK projection</h2><div id="insp">click a widget…</div></div>
+</div>
+<script>
+// Ring radii = context nesting depth. Inner ring = deeper in the context chain.
+const rings = [
+  { r: 150, label: "HtxKey → HtxElement (transport)" },
+  { r: 240, label: "LcncScopeFrame — ring 1 (bindings · outputs)" },
+  { r: 330, label: "LcncScopeFrame — ring 2 (parent chain)" },
+];
+const orbit = document.getElementById("orbit");
+rings.forEach((rg, i) => {
+  const d = document.createElement("div");
+  d.className = "ring"; d.dataset.ring = i + 1;
+  d.style.width = d.style.height = rg.r * 2 + "px";
+  d.innerHTML = `<span class="label">${rg.label}</span>`;
+  d.onclick = () => select("ring" + (i + 1));
+  orbit.prepend(d);
+});
+function place() {
+  const R = Math.min(orbit.clientWidth, orbit.clientHeight) / 2;
+  document.querySelectorAll(".ring").forEach(el => {
+    const i = +el.dataset.ring, k = rings[i-1].r / 330;
+    el.style.width = el.style.height = (2 * R * k * 0.92) + "px";
+  });
+  // wires: core → selected context owner
+  const c = orbit.querySelector(".core");
+  const cx = c.offsetLeft + 60, cy = c.offsetTop + 60;
+  const sel = orbit.querySelector(".w.sel");
+  ["wire1","wire2"].forEach(id => document.getElementById(id).setAttribute("d",""));
+  if (sel) {
+    const x = sel.offsetLeft + sel.offsetWidth/2, y = sel.offsetTop + 12;
+    document.getElementById("wire1").setAttribute("d", `M${cx},${cy} Q${(cx+x)/2},${y-80} ${x},${y}`);
+  }
+}
+window.onresize = place; setTimeout(place, 50);
+
+const CCEK = {
+  "core": { el:"MuxReactorElement", key:"MuxReactorElement.Key", state:"ACTIVE",
+    chain:[["SupervisorJob","daemon root"],["flowState","leases · provider health"],["acquireLease","QuotaLegion admission"]],
+    note:"the reactor core every lego composes onto" },
+  "view.emit": { el:"LcncScopeFrame (ring 1)", key:"LcncScopeFrame.Key", state:"ACTIVE",
+    chain:[["MapFunction.Emit","KeyExpr.DocField · ValueExpr.DocField"],["lowered by","ViewProgramLowering → ViewServer"],["incremental via","IncrementalViewElement (Trie + _local cp)"]],
+    note:"declarative map; the doc it lowers to is the evaluator" },
+  "view.reduce": { el:"LcncScopeFrame (ring 1)", key:"LcncScopeFrame.Key", state:"ACTIVE",
+    chain:[["ReduceFunction.Builtin","_count | _sum | _stats | rollup-count"],["rereduce","cascade Trie cached prefixes"]],
+    note:"bounded monoid; never JS" },
+  "vm.tika": { el:"VmSupervisor.current → VmHandle", key:"HtxKey (egress) + VmSpec", state:"OWN trust",
+    chain:[["facet","JVM (java.typebridge)"],["world","/workspace seeded VFS"],["receipts","Evaluated → blackboard"]],
+    note:"guest eval; Teleported projection crossing only" },
+  "vm.corenlp": { el:"VmSupervisor.current → VmHandle", key:"VmSpec(lcnc:corenlp)", state:"OWN trust",
+    chain:[["annotators","tokenize,ssplit,pos,lemma,depparse"],["lane in","text (wired) or params"],["lane out","tokens"]],
+    note:"Stanford pipeline schema only — no CoreNLP dep in commonMain" },
+  "vm.camel": { el:"VmSupervisor.current → VmHandle", key:"VmSpec(lcnc:camel)", state:"OWN trust",
+    chain:[["route","direct:lcnc → log:lcnc"],["RouteBuilder","guest-side DSL"]],
+    note:"integration route as a lego" },
+  "vm.graalce": { el:"VmSupervisor.current → VmHandle", key:"VmSpec(lcnc:*)", state:"OWN | UNTRUSTED",
+    chain:[["facet","GRAAL_JS | PYTHON | RUBY | CLOJURE | LLVM"],["source","inline, print() → text lane"]],
+    note:"the escape hatch — still receipted" },
+  "read.construct": { el:"ConstructionBotNode.runner", key:"Seat (lane·role·policy)", state:"DRAINING",
+    chain:[["bot proposes","ModelMux.chat — the ONLY token spend"],["gate disposes","ConstructionPatternGate vs CAS cid"],["lands","reviseInto → BeliefBag · rete.register"]],
+    note:"LLM proposes, deterministic code disposes" },
+  "panel.vote": { el:"PanelVoteNode", key:"ccek.PanelVote", state:"ACTIVE",
+    chain:[["agents","subscribeAgent ×N, Semaphore(8)"],["quorum","weighted vote → signal"]],
+    note:"bounded fan-out opinion" },
+  "kanban.move": { el:"BoardStoreElement (wrapped: BoardCcekBridge)", key:"BoardStoreElement.Key", state:"ACTIVE",
+    chain:[["single-writer intake","BoardIntake"],["projection","board / byStatus / byPriority sheets"]],
+    note:"gesture enters the store, never shadow state" },
+  "mux.standings": { el:"QuotaLegion.standings", key:"MuxReactorElement.Key", state:"ACTIVE",
+    chain:[["roster","reactor keys × ledger"],["order","usable-first, most-remaining"]],
+    note:"spend visibility per key-ID, never the secret" },
+  "ring1": { el:"HtxKey → HtxElement", key:"—", state:"—", chain:[["serial engine chain","HtxKey → HtxElement → HtxReactorElement → JvmTlsCodecBackend → SSLEngine"]], note:"transport orbit" },
+  "ring2": { el:"LcncScopeFrame", key:"LcncScopeFrame.Key", state:"OPEN",
+    chain:[["bindings","named envelope at ring entry"],["outputs","warm base, nearest-ring-wins"],["composition","withContext(frame) over the reactor ctx"]],
+    note:"a ring IS a coroutine context element" },
+  "ring3": { el:"LcncScopeFrame.parent", key:"LcncScopeFrame.Key", state:"OPEN",
+    chain:[["shadowing","nearest ring wins"],["violation","only scope.out crosses outward"]],
+    note:"nested rings = parent-chained elements" },
+};
+let cur = null;
+function select(id) {
+  document.querySelectorAll(".w.sel").forEach(e => e.classList.remove("sel"));
+  document.querySelectorAll(".ring.lit").forEach(e => e.classList.remove("lit"));
+  cur = id;
+  const el = [...orbit.querySelectorAll(".w")].find(w => w.textContent.trim().startsWith(id));
+  if (el) el.classList.add("sel");
+  const ringEl = orbit.querySelector(`.ring[data-ring='${id.replace("ring","")}']`);
+  if (ringEl) ringEl.classList.add("lit");
+  const c = CCEK[id]; if (!c) return;
+  document.getElementById("insp").innerHTML = `
+    <div class="kv"><b>widget</b> ${id}</div>
+    <div class="kv"><b>element</b> ${c.el}</div>
+    <div class="kv"><b>key</b> ${c.key}</div>
+    <div class="kv"><b>state</b> <span class="state">${c.state}</span></div>
+    <div class="chain">${c.chain.map((x,i)=>`<div>${i==0?"└ ":"&nbsp;"}<b>${x[0]}</b><small>${x[1]}</small></div>`).join("")}</div>
+    <div class="kv" style="margin-top:12px;color:#5d7486">${c.note}</div>`;
+  place();
+}
+select("view.emit");
+</script>
+</body>
+</html>

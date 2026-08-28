@@ -1,0 +1,157 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Variant 2 — Lane Meter: widgets as lego studs, ports as sockets</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    background: #12161a; color: #d8dee3; font-size: 13px;
+  }
+  header { padding: 14px 22px; border-bottom: 1px solid #222a31; display:flex; gap:14px; align-items:baseline;}
+  header h1 { font-size: 14px; font-weight: 650; }
+  header span { color: #5a6a76; font-size: 12px; }
+  #wrap { display:flex; height: calc(100vh - 47px); }
+  #lanes { flex:1; overflow:auto; padding: 18px 22px 60px; }
+  .lane { margin-bottom: 14px; border:1px solid #232c34; border-radius:10px; background:#171d23; overflow:hidden;}
+  .lane > .hd {
+    display:flex; align-items:center; gap:10px; padding:8px 14px; background:#1b232b; cursor:pointer; user-select:none;
+  }
+  .lane > .hd .chev { color:#5a6a76; transition: transform .15s; }
+  .lane.closed .chev { transform: rotate(-90deg); }
+  .lane.closed .bd { display:none; }
+  .lane > .hd b { font-size: 12px; color:#e6ecf1; font-weight:600;}
+  .lane > .hd .depth { margin-left:auto; font-size:11px; color:#5a6a76; font-family:ui-monospace,Menlo,monospace;}
+  .bd { padding: 12px 14px; display:flex; gap:12px; flex-wrap:wrap; align-items:flex-start; }
+  /* the widget: a lego brick — top studs = inputs, bottom tubes = outputs */
+  .brick {
+    min-width: 132px; max-width: 210px; border-radius: 8px; cursor: grab;
+    background: #1f2933; border: 1px solid #2e3c49; position:relative;
+    transition: transform .1s, box-shadow .1s, border-color .1s;
+  }
+  .brick:hover { transform: translateY(-2px); box-shadow: 0 6px 14px #0007; }
+  .brick.sel { border-color:#5cc8ff; box-shadow: 0 0 0 1px #5cc8ff66, 0 6px 16px #5cc8ff22; }
+  .studs, .tubes { display:flex; gap:6px; justify-content:center; padding: 5px 0 2px; }
+  .tubes { padding: 2px 0 6px; }
+  .stud { width:14px; height:6px; border-radius:3px 3px 0 0; background:#3b4c5c; }
+  .tube { width:12px; height:7px; border-radius:0 0 4px 4px; background:#3b4c5c; }
+  .brick.vm  { background:#241f31; border-color:#4a3f68; }
+  .brick.vm .stud, .brick.vm .tube { background:#7a68b8; }
+  .brick.bot { background:#2b241a; border-color:#5c4b2e; }
+  .brick.bot .stud, .brick.bot .tube { background:#c89650; }
+  .brick .nm { text-align:center; font-size:12px; font-weight:600; color:#e6ecf1; padding:1px 8px; }
+  .brick .el { text-align:center; font-size:10px; color:#6d7f8d; font-family:ui-monospace,Menlo,monospace; padding-bottom:3px;}
+  .brick .kindrow { display:flex; justify-content:center; gap:4px; padding: 0 6px 4px; }
+  .ktag { font-size: 9px; padding: 0 5px; border-radius: 3px; background:#101820; color:#6d8296; font-family:ui-monospace,monospace;}
+  .ct { display:flex; align-items:center; gap:6px; margin-left:4px; color:#5cc8ff; }
+  .ct .stud { background:#5cc8ff; opacity:.7; }
+  /* inspector */
+  #insp { width: 330px; border-left:1px solid #222a31; padding:16px; background:#141a20;}
+  #insp h2 { font-size:11px; color:#5a6a76; text-transform:uppercase; letter-spacing:.08em; margin-bottom:10px;}
+  .row { display:flex; justify-content:space-between; padding:5px 0; border-bottom:1px dashed #222a31; gap: 8px;}
+  .row b { color:#8fa5b5; font-weight:500; }
+  .row span { color:#d8dee3; text-align:right; font-family:ui-monospace,Menlo,monospace; font-size:11px;}
+  .flow { margin-top:14px; font-family:ui-monospace,Menlo,monospace; font-size:11px; color:#9fb4c2;}
+  .flow div { padding:3px 0 3px 14px; border-left:2px solid #2e3c49; margin-left:2px;}
+  .flow div.hot { border-color:#5cc8ff; color:#e6ecf1;}
+  .wizard { margin-top:14px; }
+  .wizard .step { display:flex; gap:8px; align-items:center; padding:5px 0; color:#8fa5b5;}
+  .wizard .step i { width:18px; height:18px; border-radius:50%; background:#1f2933; border:1px solid #2e3c49;
+    display:flex; align-items:center; justify-content:center; font-size:10px; font-style:normal; color:#5cc8ff;}
+  .wizard .step.done i { background:#12351f; border-color:#2e7d4f; color:#7fd4a8;}
+  button.run { margin-top:14px; width:100%; padding:8px; border-radius:7px; border:1px solid #2e7d4f;
+    background:#12351f; color:#7fd4a8; font-weight:600; cursor:pointer; font-size:12px;}
+  button.run:hover { background:#174427; }
+</style>
+</head>
+<body>
+<header>
+  <h1>LANE METER</h1>
+  <span>variant 2 — bricks snap down lanes by context depth; studs/ports are the kinds</span>
+</header>
+<div id="wrap">
+  <div id="lanes"></div>
+  <div id="insp"><h2>Widget projection</h2><div id="body">click a brick…</div></div>
+</div>
+<script>
+// data straight from the shape the daemon already serves:
+// /api/lcnc/contracts → {type, inputs, outputs, inputKinds, outputKinds, params}
+// /api/lcnc/concentric → rings grouped by context depth
+const CONTRACTS = [
+  { type:"view.emit", el:"MapFunction.Emit", depth:1, in:[["documents","json","?"]], out:[["rows","json"]],
+    chain:["LcncProgram → ViewProgramLowering","ViewDefinition{KeyExpr,ValueExpr}","IncrementalViewElement (Trie·_local)"],
+    steps:[["ddoc","_design/lcnc"],["view","by_type"],["key","doc.type"],["value","doc.qty"]] },
+  { type:"view.reduce", el:"ReduceFunction.Builtin", depth:1, in:[["rows","json"]], out:[["reduced","json"]],
+    chain:["bounded monoid: _count|_sum|_stats|rollup-count","rereduce over cascade Trie"],
+    steps:[["reducer","_sum"]] },
+  { type:"kanban.move", el:"BoardStoreElement intake", depth:1, in:[], out:[["receipt","json"]],
+    chain:["BoardIntake single-writer","LcncConfix → receipt"],
+    steps:[["jobId","…"],["toColumn","DOING"],["expectedRevision","n"]] },
+  { type:"panel.vote", el:"ArticulatedNode agents", depth:2, in:[["question","json"]], out:[["verdict","json"]],
+    chain:["subscribeAgent ×N","Semaphore(8) bounded fan-out","weighted quorum → signal"],
+    steps:[["quorum","2/3"],["timeoutMs","4000"]] },
+  { type:"vm.tika", el:"VmHandle.eval", depth:3, in:[["files","json","?"]], out:[["text","text"]], vm:1,
+    chain:["VmSpec{facet JVM, world → /workspace}","Teleported.Str crossing","receipt Evaluated → blackboard"],
+    steps:[["facet","JVM"],["in:files","docs/lease.pdf"],["world","forgeHome/attachments"],["trust","OWN"]] },
+  { type:"vm.corenlp", el:"VmHandle.eval", depth:3, in:[["text","text","?"]], out:[["tokens","text"]], vm:1,
+    chain:["StanfordCoreNLP(props)","annotators: tokenize…depparse","schema only — no CoreNLP dep"],
+    steps:[["facet","JVM"],["annotators","tokenize,ssplit,pos,lemma,depparse"],["text","(wired)"]] },
+  { type:"vm.camel", el:"VmHandle.eval", depth:3, in:[["messages","json","?"]], out:[["routed","text"]], vm:1,
+    chain:["DefaultCamelContext","RouteBuilder: from → to"],
+    steps:[["from","direct:lcnc"],["to","log:lcnc"]] },
+  { type:"vm.graalce", el:"VmHandle.eval", depth:3, in:[["context","json","?"]], out:[["result","text"]], vm:1,
+    chain:["facet GRAAL_JS|PY|RB|CLJ|LLVM","inline source; print() → text"],
+    steps:[["facet","GRAAL_JS"],["source","print(JSON.stringify(ctx))"],["trust","UNTRUSTED"]] },
+  { type:"read.construct", el:"ConstructionBotNode", depth:4, in:[["lines","json"]], out:[["constructions","json"]], bot:1,
+    chain:["bot proposes (ModelMux.chat — only token spend)","ConstructionPatternGate vs CAS cid","reviseInto → BeliefBag · rete.register"],
+    steps:[["model","local/claude"],["window","16"]] },
+];
+const DEPTHS = [
+  [1, "LcncScopeFrame — ring 1", "bindings · outputs · HtxKey beneath"],
+  [2, "ring 2 — panel fan-out", "parent-chained frame · Semaphore(8)"],
+  [3, "ring 3 — sub-vm band", "VmSupervisor.current · Teleported crossings"],
+  [4, "bot seat — outermost", "Seat(lane,role,policy) · quota legion"],
+];
+const lanesEl = document.getElementById("lanes");
+let selBrick = null;
+DEPTHS.forEach(([d, title, sub]) => {
+  const lane = document.createElement("div"); lane.className = "lane";
+  lane.innerHTML = `<div class="hd" onclick="this.parentNode.classList.toggle('closed')">
+      <span class="chev">▾</span><b>${title}</b><span class="depth">depth ${d} — ${sub}</span></div>
+    <div class="bd"></div>`;
+  const bd = lane.querySelector(".bd");
+  CONTRACTS.filter(c => c.depth === d).forEach(c => bd.appendChild(brick(c)));
+  lanesEl.appendChild(lane);
+});
+function brick(c) {
+  const el = document.createElement("div");
+  el.className = "brick" + (c.vm ? " vm" : "") + (c.bot ? " bot" : "");
+  el.innerHTML = `
+    <div class="studs">${c.in.map(() => "<div class='stud'></div>").join("") || "<div class='stud' style='opacity:.15'></div>"}</div>
+    <div class="nm">${c.type}</div>
+    <div class="el">${c.el}</div>
+    <div class="kindrow">${c.in.map(p=>`<span class="ktag">▸${p[0]}:${p[1]}</span>`).join(" ")}</div>
+    <div class="kindrow">${c.out.map(p=>`<span class="ktag" style="color:#7fd4a8">◂${p[0]}:${p[1]}</span>`).join(" ")}</div>
+    <div class="tubes">${c.out.map(() => "<div class='tube'></div>").join("") || "<div class='tube' style='opacity:.15'></div>"}</div>`;
+  el.onclick = () => select(c, el);
+  return el;
+}
+function select(c, el) {
+  if (selBrick) selBrick.classList.remove("sel");
+  selBrick = el; el.classList.add("sel");
+  const kind = c.vm ? "sub-vm lego" : c.bot ? "bot seat" : "core lego";
+  document.getElementById("body").innerHTML = `
+    <div class="row"><b>type</b><span>${c.type}</span></div>
+    <div class="row"><b>element</b><span>${c.el}</span></div>
+    <div class="row"><b>family</b><span>${kind}</span></div>
+    <div class="flow">${c.chain.map((x,i)=>`<div class="${i===0?"hot":""}">${x}</div>`).join("")}</div>
+    <div class="wizard">${c.steps.map((s,i)=>`
+      <div class="step ${i===0?"done":""}"><i>${i===0?"✓":i+1}</i>${s[0]} <span style="margin-left:auto;font-family:monospace;font-size:11px;color:#d8dee3">${s[1]}</span></div>`).join("")}
+    </div>
+    <button class="run" onclick="this.textContent='receipt: Evaluated → blackboard ▸cid'">run widget ▸</button>`;
+}
+select(CONTRACTS[0], document.querySelector(".brick"));
+</script>
+</body>
+</html>

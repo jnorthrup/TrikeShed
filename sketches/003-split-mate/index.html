@@ -1,0 +1,201 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Variant 3 — Split Mate: wizard feed left, live CCEK trace right</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    background: #f4f2ee; color: #23282d; font-size: 13px; }
+  header { padding: 12px 20px; border-bottom: 1px solid #ddd8d0; display:flex; gap:14px; align-items:baseline; background:#fbfaf8;}
+  header h1 { font-size: 14px; font-weight: 700; }
+  header span { color: #8a8f94; font-size: 12px; }
+  #wrap { display:grid; grid-template-columns: 300px 1fr 46%; height: calc(100vh - 45px); }
+  /* left: the mate menu / module drawer */
+  #menu { border-right:1px solid #ddd8d0; background:#fbfaf8; overflow:auto; padding:12px;}
+  #menu h3, #tracepad h3 { font-size:10px; text-transform:uppercase; letter-spacing:.09em; color:#8a8f94; margin: 6px 0 8px;}
+  .mi { padding: 7px 10px; border-radius: 7px; cursor:pointer; margin-bottom:2px; border:1px solid transparent;}
+  .mi:hover { background:#efece6; }
+  .mi.sel { background:#fff; border-color:#d8d2c8; box-shadow: 0 1px 3px #00000012; }
+  .mi b { font-weight:600; font-size:12.5px; display:block;}
+  .mi small { color:#8a8f94; font-size: 11px;}
+  .mi .dot { display:inline-block; width:7px; height:7px; border-radius:50%; margin-right:6px;}
+  .mi.vm .dot { background:#8a6fd4; } .mi.bot .dot { background:#d4a05f; } .mi.core .dot { background:#4a9d6e; }
+  .q { width:100%; padding:7px 10px; border-radius:7px; border:1px solid #d8d2c8; margin-bottom:10px;
+    font-size:12px; background:#fff;}
+  /* middle: the assembled program as concentric cards */
+  #board { overflow:auto; padding: 20px; background:
+    radial-gradient(circle at 1px 1px, #d9d4cb 1px, transparent 0) 0 0/ 22px 22px #f4f2ee; }
+  .ringcard { border:1.5px solid #b9b2a6; border-radius:14px; background:#fffdfacc; padding:12px; margin-bottom:14px; position:relative;}
+  .ringcard .rh { display:flex; align-items:center; gap:8px; margin-bottom:8px;}
+  .ringcard .rh b { font-size:12px; }
+  .ringcard .rh .cx { font-family:ui-monospace,Menlo,monospace; font-size:10px; color:#8a8f94; margin-left:auto;}
+  .wcard { border:1px solid #d8d2c8; border-radius:10px; background:#fff; padding:8px 10px; margin:6px 0; cursor:pointer;
+    transition: box-shadow .12s, border-color .12s;}
+  .wcard:hover { box-shadow: 0 2px 8px #00000014; }
+  .wcard.sel { border-color:#4a9d6e; box-shadow: 0 0 0 1.5px #4a9d6e33; }
+  .wcard b { font-size:12.5px; font-weight:600; }
+  .wcard .ports { display:flex; gap:5px; margin-top:5px; flex-wrap:wrap;}
+  .port { font-size:9.5px; font-family:ui-monospace,monospace; padding:1px 6px; border-radius:4px; background:#f0ede7; color:#6b7076;}
+  .port.out { background:#e7f2ec; color:#2e7d4f; }
+  .wcard .cx { font-family:ui-monospace,monospace; font-size:9.5px; color:#a0a5aa; margin-top:4px;}
+  .nest { margin-left: 18px; padding-left: 12px; border-left: 2px dashed #d8d2c8; }
+  /* right: the live trace */
+  #tracepad { border-left:1px solid #ddd8d0; background:#fbfaf8; padding:12px; overflow:auto;}
+  .tr { font-family:ui-monospace,Menlo,monospace; font-size:11px; padding:6px 8px; border-left:2px solid #d8d2c8;
+    margin: 4px 0 4px 6px; color:#5a5f66; background:#fff; border-radius:0 6px 6px 0;}
+  .tr.hot { border-color:#4a9d6e; color:#23282d; }
+  .tr .k { color:#8a6fd4; } .tr .s { color:#4a9d6e; }
+  .wizard { margin-top: 10px; border-top: 1px dashed #ddd8d0; padding-top: 10px;}
+  .wstep { display:flex; align-items:center; gap:9px; padding:6px 4px; color:#5a5f66; cursor:pointer; border-radius:6px;}
+  .wstep:hover { background:#efece6; }
+  .wstep i { width: 20px; height:20px; border-radius:50%; border:1.5px solid #b9b2a6; font-style:normal;
+    display:flex; align-items:center; justify-content:center; font-size:10px; flex:none;}
+  .wstep.on { color:#23282d; font-weight:550;}
+  .wstep.on i { border-color:#4a9d6e; color:#2e7d4f; background:#e7f2ec;}
+  .infer { margin-top:10px; font-size:11.5px; color:#8a6fd4; background:#f6f3fc; border:1px dashed #cdbdf0;
+    padding:8px 10px; border-radius:8px; cursor:pointer;}
+</style>
+</head>
+<body>
+<header>
+  <h1>SPLIT MATE</h1>
+  <span>variant 3 — evidence-ordered mate menu feeds the wizard; the ring assembles while the CCEK trace narrates</span>
+</header>
+<div id="wrap">
+  <div id="menu">
+    <input class="q" placeholder="q = filter (bigram-ranked)…" oninput="filterMenu(this.value)">
+    <h3>mate menu — kind-compatible</h3>
+    <div id="items"></div>
+    <h3 style="margin-top:14px">module drawer — sub-vm</h3>
+    <div id="vitems"></div>
+  </div>
+  <div id="board"></div>
+  <div id="tracepad">
+    <h3>ccek trace — context chain</h3>
+    <div id="trace"></div>
+    <div class="wizard" id="wizard"></div>
+    <div class="infer" id="infer" onclick="autoWire()">⚡ inference fill: 1 kind-compatible pair found — autowire? (click)</div>
+  </div>
+</div>
+<script>
+const WIDGETS = {
+  "view.emit":     { fam:"core", el:"MapFunction.Emit → ViewServer", ctx:"LcncScopeFrame r1",
+    in:[["documents","json","?"]], out:[["rows","json"]],
+    steps:[["ddoc","_design/lcnc"],["view","by_type"],["key","doc.type ← corpus majority"],["value","doc.qty"]] },
+  "view.reduce":   { fam:"core", el:"ReduceFunction.Builtin", ctx:"LcncScopeFrame r1",
+    in:[["rows","json"]], out:[["reduced","json"]], steps:[["reducer","_sum"]] },
+  "panel.vote":    { fam:"core", el:"ArticulatedNode · Semaphore(8)", ctx:"LcncScopeFrame r2",
+    in:[["question","json"]], out:[["verdict","json"]], steps:[["quorum","2/3"],["agents","3"]] },
+  "vm.tika":       { fam:"vm", el:"VmHandle.eval · OWN", ctx:"VmSupervisor r3",
+    in:[["files","json","?"]], out:[["text","text"]],
+    steps:[["facet","JVM"],["in:files","lease.pdf"],["world","attachments/"]] },
+  "vm.corenlp":    { fam:"vm", el:"VmHandle.eval · OWN", ctx:"VmSupervisor r3",
+    in:[["text","text","?"]], out:[["tokens","text"]], steps:[["annotators","tokenize…depparse"]] },
+  "vm.camel":      { fam:"vm", el:"VmHandle.eval · OWN", ctx:"VmSupervisor r3",
+    in:[["messages","json","?"]], out:[["routed","text"]], steps:[["from","direct:lcnc"],["to","log:lcnc"]] },
+  "read.construct":{ fam:"bot", el:"ConstructionBotNode · Seat", ctx:"bot seat (outer)",
+    in:[["lines","json"]], out:[["constructions","json"]], steps:[["model","local/claude"],["window","16"]] },
+  "kanban.move":   { fam:"core", el:"BoardIntake single-writer", ctx:"LcncScopeFrame r1",
+    in:[], out:[["receipt","json"]], steps:[["jobId","42"],["toColumn","REVIEW"]] },
+};
+const PROGRAM = [
+  { id:"ingest", w:"vm.tika", kids:[] },
+  { id:"parse",  w:"vm.corenlp", kids:[] },
+  { id:"scope1", w:null, ring:"ring 1 — lease ingest", cx:"frame(cid:lease·task:r1)", kids:[
+      { id:"emit", w:"view.emit", kids:[] },
+      { id:"reduce", w:"view.reduce", kids:[] },
+  ]},
+  { id:"vote", w:"panel.vote", kids:[] },
+  { id:"read", w:"read.construct", kids:[] },
+];
+// left: mate menu — evidence-ordered (wire bigrams), the q filter narrows
+const MENU_ORDER = ["view.emit","kanban.move","vm.tika","vm.corenlp","panel.vote","view.reduce","read.construct"];
+function menuEntry(w) {
+  const c = WIDGETS[w];
+  const div = document.createElement("div");
+  div.className = "mi " + (c.fam === "vm" ? "vm" : c.fam === "bot" ? "bot" : "core");
+  div.innerHTML = `<span class="dot"></span><b>${w}</b><small>${c.el}</small>`;
+  div.onclick = () => { place(w); };
+  return div;
+}
+MENU_ORDER.forEach(w => document.getElementById("items").appendChild(menuEntry(w)));
+["vm.camel","vm.graalce"].forEach(w => document.getElementById("vitems").appendChild(menuEntry(w)));
+function filterMenu(q) {
+  document.querySelectorAll(".mi").forEach(m => {
+    m.style.display = !q || m.textContent.toLowerCase().includes(q.toLowerCase()) ? "" : "none";
+  });
+}
+// middle: render program, concentric
+function renderBoard(sel) {
+  const b = document.getElementById("board"); b.innerHTML = "";
+  PROGRAM.forEach(n => b.appendChild(nodeCard(n, sel)));
+}
+function nodeCard(n, sel) {
+  if (n.ring) {
+    const rc = document.createElement("div"); rc.className = "ringcard";
+    rc.innerHTML = `<div class="rh"><b>◍ ${n.ring}</b><span class="cx">${n.cx} · LcncScopeFrame(parent)</span></div>`;
+    const nest = document.createElement("div"); nest.className = "nest";
+    n.kids.forEach(k => nest.appendChild(nodeCard(k, sel)));
+    rc.appendChild(nest);
+    const hint = document.createElement("div");
+    hint.style.cssText = "font-size:10px;color:#a0a5aa;font-family:ui-monospace,monospace;padding:2px 0";
+    hint.textContent = "↳ bindings: envelope at entry · outputs: warm base, nearest-ring-wins · scope.out crosses outward";
+    rc.appendChild(hint);
+    return rc;
+  }
+  const c = WIDGETS[n.w];
+  const d = document.createElement("div");
+  d.className = "wcard" + (n.id === sel ? " sel" : "");
+  d.innerHTML = `<b>${n.id}</b> <span style="color:#8a8f94;font-size:11px">· ${n.w}</span>
+    <div class="ports">${(c.in||[]).map(p=>`<span class="port">▸${p[0]}:${p[1]}${p[2]||""}</span>`).join("")}
+    ${(c.out||[]).map(p=>`<span class="port out">◂${p[0]}:${p[1]}</span>`).join("")}</div>
+    <div class="cx">${c.ctx} — ${c.el}</div>`;
+  d.onclick = () => selectNode(n.id);
+  return d;
+}
+// right: trace narrates the context chain of the selected node
+function traceFor(id) {
+  const n = findNode(id); const w = n && n.w;
+  const base = [
+    ["SupervisorJob", "daemon root — one runBlocking at main"],
+    ["MuxReactorElement", "flowState · leases · QuotaLegion admission"],
+    ["HtxKey → HtxElement", "serial engine chain (transport beneath everything)"],
+  ];
+  let nodeRows = [];
+  if (w && WIDGETS[w].ctx.startsWith("LcncScopeFrame r2")) nodeRows.push(["withContext(LcncScopeFrame r2)", "parent-chained · composes OVER the reactor ctx"]);
+  if (w && WIDGETS[w].ctx.startsWith("LcncScopeFrame")) nodeRows.push(["withContext(LcncScopeFrame r1)", "bindings installed at entry · outputs warm base"]);
+  if (w && WIDGETS[w].fam === "vm") nodeRows.push(["VmSupervisor.current.spawn(VmSpec)", "facet JVM · world → /workspace · Teleported crossing"]);
+  if (w === "read.construct") nodeRows.push(["Seat(lane·role·policy)", "quota-checked — the ONLY token spend"], ["ConstructionPatternGate", "deterministic claim-check vs CAS cid"], ["reviseInto / rete.register", "belief lands; rule registers"]);
+  return [...base, ...nodeRows].map((r, i, a) =>
+    `<div class="tr ${i === a.length-1 ? "hot" : ""}">${"·".repeat(i)} <span class="${r[0].includes("Frame")||r[0].includes("Vm")||r[0].includes("Seat")?"k":"s"}">${r[0]}</span> — ${r[1]}</div>`).join("");
+}
+function findNode(id) {
+  for (const n of PROGRAM) { if (n.id === id) return n;
+    for (const k of n.kids) { if (k.id === id) return k; } }
+  return null;
+}
+let selected = "emit";
+function selectNode(id) { selected = id; renderBoard(id); document.getElementById("trace").innerHTML = traceFor(id); wizardFor(id); }
+function wizardFor(id) {
+  const n = findNode(id); const c = n && n.w && WIDGETS[n.w];
+  const el = document.getElementById("wizard");
+  if (!c) { el.innerHTML = "<h3>wizard</h3><div class='tr'>select a widget</div>"; return; }
+  el.innerHTML = `<h3>wizard — ${n.w}</h3>` + c.steps.map((s, i) =>
+    `<div class="wstep ${i === 0 ? "on" : ""}" onclick="steps(this)"><i>${i + 1}</i>${s[0]}
+      <span style="margin-left:auto;font-family:ui-monospace,monospace;font-size:11px">${s[1]}</span></div>`).join("");
+}
+function steps(el) {
+  el.parentNode.querySelectorAll(".wstep").forEach(s => s.classList.remove("on"));
+  el.classList.add("on");
+}
+function place(w) { selectNode(w === "view.reduce" ? "reduce" : "emit"); }
+function autoWire() {
+  const el = document.getElementById("infer");
+  el.textContent = "✓ wired emit.rows → reduce.rows (unique kind pair) — ambiguity would refuse to guess";
+  el.style.color = "#2e7d4f"; el.style.borderColor = "#a8d4bb"; el.style.background = "#e7f2ec";
+}
+selectNode("emit");
+</script>
+</body>
+</html>

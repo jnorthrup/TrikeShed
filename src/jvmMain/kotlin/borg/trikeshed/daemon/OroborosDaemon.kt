@@ -464,8 +464,24 @@ object OroborosDaemon {
             val resp = htxElement.request(req)
             borg.trikeshed.couch.replicate.HttpReply(resp.status, resp.body.toArray())
         }
+        // ── Incremental view registry (P2): every design-doc view marked
+        //    `"incremental": true` gets one _changes-driven tendon (mapped-once,
+        //    Trie-cached, `_local` checkpointed); `_view` reads marked views off the
+        //    router's registry hook and never rescan the corpus. Unmarked views keep
+        //    today's eager route, untouched.
+        val incrementalViews = borg.trikeshed.couch.IncrementalViewRegistry(
+            db = couchDb,
+            parentJob = coroutineContext[kotlinx.coroutines.Job],
+            log = { msg -> System.err.println("[OROBOROS] $msg") },
+        )
+        launch {
+            incrementalViews.open()
+            System.err.println("[OROBOROS] incremental-view registry: ${incrementalViews.state}")
+        }
         val couchWire = borg.trikeshed.forge.server.CouchWire(
-            router = borg.trikeshed.couch.CouchWireRouter(couchDb, WorktreeCouchGateway.WORKTREE_PREFIX),
+            router = borg.trikeshed.couch.CouchWireRouter(couchDb, WorktreeCouchGateway.WORKTREE_PREFIX) { ddoc, view ->
+                incrementalViews.lookup(ddoc, view)
+            },
             replicator = borg.trikeshed.couch.replicate.CouchReplicator(couchDb, peerHttp),
             // NOT the runBlocking scope: async/continuous replication must run on real workers,
             // not queued behind the daemon's single-threaded root event loop.
@@ -755,6 +771,7 @@ object OroborosDaemon {
         val patchWire = borg.trikeshed.forge.server.PatchWire(
             brain = brainClient,
             scopes = projectScopes,
+            attachments = attachmentGateway,
             muxContext = htxElement + muxReactor,
             mountScope = wireScope,
             miner = projectMiner,
@@ -811,6 +828,9 @@ object OroborosDaemon {
                 },
             )
         }
+        // Sub-VM module legos: tika/corenlp/camel/graalce as supervised guest evals
+        // over the daemon's own hypervisor (VmSupervisor.current — VmWire's same host).
+        borg.trikeshed.lcnc.SubVmLegos.register(moduleContext)
         val moduleSupervisor = borg.trikeshed.module.ModuleSupervisor(
             ctx = moduleContext,
             liveClassesDir = File(repoDir, "build/live/classes"),
@@ -1312,6 +1332,7 @@ object OroborosDaemon {
                 if (healthSock.exists()) healthSock.delete()
                 try { traceWriter?.flush(); traceWriter?.close() } catch (_: Exception) {}
                 runCatching { kanbanJob.cancel() }
+                runCatching { incrementalViews.closeAll() }
                 runCatching { hermesConsole.close() }
                 runCatching { reportReactor.close() }
                 runCatching { memoryIndex.close() }

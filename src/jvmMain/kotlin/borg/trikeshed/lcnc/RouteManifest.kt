@@ -17,6 +17,7 @@ object RouteManifest {
         "PatchWire" to listOf(
             "GET /api/mux/models",
             "GET /api/mux/keys",
+            "GET /api/mux/standings",
             "POST /api/mux/chat",
             "GET /api/lcnc/mating-options",
             "GET /api/lcnc/fills",
@@ -24,6 +25,11 @@ object RouteManifest {
             "GET /api/projects",
             "POST /api/projects",
             "DELETE /api/projects/…",
+            // panel constructions: replicated store documents + the offered presets
+            "GET /api/panels",
+            "GET /api/panels/presets",
+            "GET /api/panels/…",
+            "POST /api/panels/…",
             // GraalWire raw ingest rides the rawRoutes chain (documented on GraalWire)
             "POST /api/graal/ingest",
         ),
@@ -37,12 +43,15 @@ object RouteManifest {
             "POST /api/invoke",
             "POST /api/board/import",
             "GET /api/lcnc/kanban",
+            "GET /api/lcnc/concentric",
             "POST /api/lcnc/kanban/move",
             "GET /api/lcnc/contracts",
+            "POST /api/lcnc/run",
             "POST /api/submit",
         ),
         "GraalWire" to listOf(
             "GET /api/graal/vitals",
+            "GET /api/graal/heap",
             "GET /api/graal/map",
             "GET /api/graal/dag",
             "GET /api/graal/decompile",
@@ -89,6 +98,11 @@ object RouteManifest {
         "JulesWire" to listOf(
             "GET /api/jules/surface",
             "GET /api/jules/events",
+        ),
+        "BlackboardWire" to listOf(
+            "GET /blackboard/facts",
+            "GET /blackboard/board",
+            "GET /blackboard/sites",
         ),
         "CouchWire" to listOf(
             "POST /api/cap",

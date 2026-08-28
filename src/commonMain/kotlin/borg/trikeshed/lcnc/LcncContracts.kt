@@ -68,6 +68,18 @@ object LcncContracts {
             params = mapOf("name" to LcncPortContract.LcncParamSpec(ph = "return name")),
             isSink = true),
 
+        // ── blackboard: the shared Confix surface as first-class nodes ──
+        // (BlackboardWire's own GET routes; the canvas reads, never invents)
+        LcncPortContract("blackboard.facts", "blackboard facts",
+            listOf("trigger?"), listOf("facts"),
+            inputKinds = mapOf("trigger" to "trigger"), outputKinds = mapOf("facts" to "json")),
+        LcncPortContract("blackboard.board", "blackboard board view",
+            listOf("trigger?"), listOf("board"),
+            inputKinds = mapOf("trigger" to "trigger"), outputKinds = mapOf("board" to "json")),
+        LcncPortContract("blackboard.sites", "blackboard sites",
+            listOf("trigger?"), listOf("sites"),
+            inputKinds = mapOf("trigger" to "trigger"), outputKinds = mapOf("sites" to "json")),
+
         // ── sources (no inputs) ──────────────────────────────────────
         LcncPortContract("timer", "timer",
             emptyList(), listOf("tick"),
@@ -466,6 +478,55 @@ object LcncContracts {
             params = mapOf(
                 "model" to LcncPortContract.LcncParamSpec(ph = "ModelMux route/model id"),
                 "window" to LcncPortContract.LcncParamSpec(v = "16"),
+            )),
+
+        // ── Sub-VM module legos: tika / corenlp / camel / graalce ──────
+        LcncPortContract(SubVm.LEGO_PREFIX + "tika", "tika: extract text+metadata in a sub-VM",
+            listOf("files?"), listOf("text"),
+            inputKinds = mapOf("files" to "json"),
+            outputKinds = mapOf("text" to "text"),
+            params = mapOf(
+                "facet" to LcncPortContract.LcncParamSpec(v = "JVM", opts = listOf("JVM", "GRAAL_JS", "GRAAL_PYTHON", "GRAAL_RUBY", "GRAAL_CLOJURE", "GRAAL_LLVM")),
+                "in:files" to LcncPortContract.LcncParamSpec(ph = "comma-separated workspace paths (world-seeded)"),
+                "in:text" to LcncPortContract.LcncParamSpec(ph = "fallback when no files wired"),
+                "world" to LcncPortContract.LcncParamSpec(ph = "comma-separated host dirs seeded to /workspace"),
+                "trust" to LcncPortContract.LcncParamSpec(v = "OWN", opts = listOf("OWN", "UNTRUSTED")),
+                "keep" to LcncPortContract.LcncParamSpec(v = "false", opts = listOf("false", "true")),
+            )),
+        LcncPortContract(SubVm.LEGO_PREFIX + "corenlp", "corenlp: Stanford pipeline in a sub-VM",
+            listOf("text?"), listOf("tokens"),
+            inputKinds = mapOf("text" to "text"),
+            outputKinds = mapOf("tokens" to "text"),
+            params = mapOf(
+                "facet" to LcncPortContract.LcncParamSpec(v = "JVM"),
+                "annotators" to LcncPortContract.LcncParamSpec(v = "tokenize,ssplit,pos,lemma,depparse"),
+                "text" to LcncPortContract.LcncParamSpec(ta = true, ph = "inline text when nothing wired"),
+                "world" to LcncPortContract.LcncParamSpec(ph = "comma-separated host dirs seeded to /workspace"),
+                "trust" to LcncPortContract.LcncParamSpec(v = "OWN", opts = listOf("OWN", "UNTRUSTED")),
+                "keep" to LcncPortContract.LcncParamSpec(v = "false", opts = listOf("false", "true")),
+            )),
+        LcncPortContract(SubVm.LEGO_PREFIX + "camel", "camel: route DSL in a sub-VM",
+            listOf("messages?"), listOf("routed"),
+            inputKinds = mapOf("messages" to "json"),
+            outputKinds = mapOf("routed" to "text"),
+            params = mapOf(
+                "facet" to LcncPortContract.LcncParamSpec(v = "JVM"),
+                "from" to LcncPortContract.LcncParamSpec(v = "direct:lcnc"),
+                "to" to LcncPortContract.LcncParamSpec(v = "log:lcnc"),
+                "world" to LcncPortContract.LcncParamSpec(ph = "comma-separated host dirs seeded to /workspace"),
+                "trust" to LcncPortContract.LcncParamSpec(v = "OWN", opts = listOf("OWN", "UNTRUSTED")),
+                "keep" to LcncPortContract.LcncParamSpec(v = "false", opts = listOf("false", "true")),
+            )),
+        LcncPortContract(SubVm.LEGO_PREFIX + "graalce", "graalce: any Graal language, inline source",
+            listOf("context?"), listOf("result"),
+            inputKinds = mapOf("context" to "json"),
+            outputKinds = mapOf("result" to "text"),
+            params = mapOf(
+                "facet" to LcncPortContract.LcncParamSpec(v = "GRAAL_JS", opts = listOf("GRAAL_JS", "GRAAL_PYTHON", "GRAAL_RUBY", "GRAAL_CLOJURE", "GRAAL_LLVM")),
+                "source" to LcncPortContract.LcncParamSpec(ta = true, ph = "guest source; print() lands in text"),
+                "world" to LcncPortContract.LcncParamSpec(ph = "comma-separated host dirs seeded to /workspace"),
+                "trust" to LcncPortContract.LcncParamSpec(v = "OWN", opts = listOf("OWN", "UNTRUSTED")),
+                "keep" to LcncPortContract.LcncParamSpec(v = "false", opts = listOf("false", "true")),
             )),
     )
 

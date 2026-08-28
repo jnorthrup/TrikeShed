@@ -1,0 +1,163 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>CCEK ⇄ Confix — the same machine, two grammars</title>
+<style>
+  * { box-sizing:border-box; margin:0; padding:0 }
+  body { font-family:"SF Mono",ui-monospace,Menlo,monospace; background:#0a0e12; color:#c8d4dc; font-size:12px }
+  header { padding:12px 18px; border-bottom:1px solid #1c2630; display:flex; gap:14px; align-items:baseline }
+  header b { color:#e8eef2; font-size:13px; letter-spacing:.04em }
+  header span { color:#4d6070 }
+  .thesis { padding:10px 18px; color:#7a95a8; border-bottom:1px solid #131c24; font-size:11px; line-height:1.6 }
+  .thesis i { color:#7fd4a8; font-style:normal }
+  #stage { display:flex; min-height:calc(100vh - 92px) }
+  .half { flex:1; padding:14px 18px }
+  .half h2 { font-size:11px; text-transform:uppercase; letter-spacing:.09em; margin-bottom:10px }
+  .half.l h2 { color:#7fd4a8 } .half.r h2 { color:#cbbdf0 }
+  .half.l { border-right:1px solid #1c2630 }
+
+  /* ── left: CCEK runtime — wide E,K sets on the coroutine stack ── */
+  .stack { border:1px solid #3f5468; background:#0d1319; padding:10px; position:relative }
+  .stack .tab { position:absolute; top:-9px; left:8px; background:#0d1319; border:1px solid #3f5468;
+    font-size:9px; color:#7fd4a8; padding:0 6px; line-height:16px }
+  .ctxel { display:flex; align-items:center; gap:6px; padding:4px 6px; margin:3px 0;
+    border:1px solid #223442; background:#101820; cursor:pointer }
+  .ctxel:hover { border-color:#3f6f8f }
+  .ctxel .k { color:#7fd4a8; min-width:150px }
+  .ctxel .e { color:#6b8aa0; font-size:10px }
+  .ctxel .wid { margin-left:auto; color:#33475a; font-size:9px }
+  .ctxel.sel { border-color:#7fd4a8 }
+  .ctxel.dim { opacity:.45 }
+  .gate { margin:4px 0 4px 22px; font-size:10px; color:#d4a05f; }
+  .gate::before { content:"氓 "; }
+  .io { margin:3px 0 3px 22px; font-size:9.5px; color:#6b8aa0 }
+  .io b { color:#9fb4c2; font-weight:500 }
+
+  /* ── right: Confix static — same row, OpK faceted ── */
+  .confix { border:1px solid #4a3f68; background:#120f1c; padding:10px; position:relative }
+  .confix .tab { position:absolute; top:-9px; left:8px; background:#120f1c; border:1px solid #4a3f68;
+    font-size:9px; color:#cbbdf0; padding:0 6px; line-height:16px }
+  .facet { display:flex; align-items:center; gap:6px; padding:4px 6px; margin:3px 0;
+    border:1px solid #2e2840; background:#171323; cursor:pointer }
+  .facet:hover { border-color:#6a5aa0 }
+  .facet .k { color:#cbbdf0; min-width:150px }
+  .facet .e { color:#8a7fb0; font-size:10px }
+  .facet .r { margin-left:auto; color:#4a4160; font-size:9px }
+  .facet.sel { border-color:#8a6fd4 }
+
+  /* the mapping register — center overlay row */
+  #map { padding:8px 18px; border-top:1px solid #1c2630; color:#7a95a8; font-size:11px; min-height:44px }
+  #map i { color:#7fd4a8; font-style:normal } #map em { color:#cbbdf0; font-style:normal }
+  #map .none { color:#33475a }
+
+  .rare { display:inline-block; margin-left:6px; font-size:8.5px; padding:0 4px; border:1px solid #5c4b2e; color:#d4a05f }
+</style>
+</head>
+<body>
+<header>
+  <b>CCEK ⇄ CONFIX</b>
+  <span>Coroutine.Context.Element.Key (live, wide E·K sets) ⇄ ConfixIndexK (static, GADT facets) — the same faceted row, two grammars</span>
+</header>
+<div class="thesis">
+  thesis: a CCEK stack IS a <i>FacetedRow</i> — Key = OpK&lt;R&gt; (the GADT key fixing the result type), Element = the facet value.
+  The coroutine resolves <i>get(Key): Element</i> exactly as ConfixIndex resolves <i>facet(OpK): R</i> — one unchecked cast at the dispatch boundary.
+  Wide sets: N keys ride one context; they <i>rarely</i> modulate each other (a gate reads another element) and <i>rarely</i> externalize gates —
+  but both happen, so the row carries them as ordinary facets.
+</div>
+<div id="stage">
+  <div class="half l">
+    <h2>CCEK — runtime row (CoroutineContext)</h2>
+    <div class="stack">
+      <span class="tab">withContext( … ) — the frame</span>
+      <!-- wide set: many keys, independent by default -->
+      <div class="ctxel" onclick="sel('job', this)"><span class="k">Job</span><span class="e">SupervisorJob(parent)</span><span class="wid">structural</span></div>
+      <div class="ctxel" onclick="sel('htx', this)"><span class="k">HtxKey</span><span class="e">HtxElement · serial engine chain</span><span class="wid">io</span></div>
+      <div class="ctxel" onclick="sel('mux', this)"><span class="k">MuxReactorElement.Key</span><span class="e">flowState · leases · provider health</span><span class="wid">io</span></div>
+      <div class="ctxel" onclick="sel('frame', this)"><span class="k">LcncScopeFrame.Key</span><span class="e">bindings · warm outputs · parent chain</span><span class="wid">lcnc</span></div>
+      <div class="ctxel" onclick="sel('seat', this)"><span class="k">Seat.Key</span><span class="e">lane · role · policy (QuotaLegion)</span><span class="wid">lcnc</span></div>
+      <div class="ctxel" onclick="sel('ing', this)"><span class="k">IngestStateElement.Key</span><span class="e">ingestId · fanout channel</span><span class="wid">lcnc</span></div>
+
+      <!-- the RARE modulation: one element reads another -->
+      <div class="gate" id="g-mod" style="display:none">rare · modulation: Seat.Key's policy READS MuxReactorElement's flowState (leases) before admitting — one facet conditioning another</div>
+      <div class="gate" id="g-ext" style="display:none">rare · externalized gate: the element exposes its gate OUTSIDE the coroutine (QuotaLegion refuses admission at /api/mux/standings; IncrementalViewRegistry opens tendons off-request)</div>
+
+      <div class="io" id="io-lines"></div>
+    </div>
+    <div class="io" style="margin-top:10px">
+      dispatch: <b>currentCoroutineContext()[Key]</b> → Element — GADT get, zero casts for the caller
+    </div>
+  </div>
+
+  <div class="half r">
+    <h2>Confix — static row (ConfixIndex / FacetedRow&lt;ConfixIndexK&gt;)</h2>
+    <div class="confix">
+      <span class="tab">FacetedRow&lt;ConfixIndexK&gt;</span>
+      <div class="facet" onclick="sel('job', this)"><span class="k">StructuralNodes</span><span class="e">Series&lt;String?&gt; — cid per node</span><span class="r">Series&lt;String?&gt;</span></div>
+      <div class="facet" onclick="sel('htx', this)"><span class="k">Spans</span><span class="e">Series&lt;Twin&lt;Int&gt;&gt; — byte offsets</span><span class="r">Series&lt;Twin&lt;Int&gt;&gt;</span></div>
+      <div class="facet" onclick="sel('mux', this)"><span class="k">Depths</span><span class="e">Series&lt;Int&gt; — nesting depth</span><span class="r">Series&lt;Int&gt;</span></div>
+      <div class="facet" onclick="sel('frame', this)"><span class="k">DirectChildren</span><span class="e">(Int) → Series&lt;Int&gt; — parent→kids</span><span class="r">(Int) → Series&lt;Int&gt;</span></div>
+      <div class="facet" onclick="sel('seat', this)"><span class="k">TreeCursor</span><span class="e">Cursor — recursive RowVec tree</span><span class="r">Cursor</span></div>
+      <div class="facet" onclick="sel('ing', this)"><span class="k">KeyToChild</span><span class="e">(CharSequence) → Int? — name lookup</span><span class="r">(CharSequence) → Int?</span></div>
+      <div class="io" style="margin-top:8px">
+        dispatch: <b>index.facet(OpK): R</b> — b(key as Any) as R, one unchecked cast at the boundary
+      </div>
+      <div class="io">
+        row identity: <b>MetaSeries&lt;K, Any?&gt;</b> — the row is the map from keys to facets; ConfixElement (Null/Primitive/Array/Object) is the leaf CONTENT, the row is the SHAPE
+      </div>
+    </div>
+  </div>
+</div>
+<div id="map"><span class="none">click any row member — left or right — to see the mapping register</span></div>
+<script>
+const MAP = {
+  job:  ["Job ⇄ StructuralNodes", "lifecycle ⇄ content-addressed identity",
+         "both answer: who am I attached to / what am I, by cid",
+         "the coroutine row's structural facet; the parse row's cid facet"],
+  htx:  ["HtxKey ⇄ Spans", "wire geometry ⇄ byte offsets",
+         "serial transport ⇄ token spans — both are INDEX ranges over an ordered medium",
+         "engine state is contiguous like a scan's spans"],
+  mux:  ["MuxReactorElement.Key ⇄ Depths", "flowState nesting ⇄ parse depth",
+         "lease metering rides the reactor's nested state ⇄ the tree's nested depth",
+         "the admission gate reads this facet (rare modulation, left side)"],
+  frame:["LcncScopeFrame.Key ⇄ DirectChildren", "ring chain ⇄ parent→child",
+         "nearest-ring-wins lookup IS parent→child resolution with shadowing",
+         "bindings seed from the enclosing frame exactly as a child indexes its parent"],
+  seat: ["Seat.Key ⇄ TreeCursor", "lane·role·policy ⇄ recursive cursor",
+         "the seat is a VIEW into the wide row (role = which facets matter)",
+         "its gate externalizes through QuotaLegion — a row facet surfaced as a service"],
+  ing:  ["IngestStateElement.Key ⇄ KeyToChild", "ingestId fanout ⇄ name→token",
+         "id-keyed fanout channel ⇄ name-keyed child lookup — same keyed indirection",
+         "async context key carrying a channel ⇄ static key carrying an index"],
+};
+let pair = null;
+function sel(id, el) {
+  const side = el.closest(".half").classList.contains("l") ? "l" : "r";
+  if (!pair) pair = {l: null, r: null};
+  pair[side] = id;
+  // highlight BOTH ends of the mapping
+  const m = MAP[id];
+  document.querySelectorAll(".ctxel,.facet").forEach(e => {
+    const mine = e.closest(".half").classList.contains("l") ? pair.l : pair.r;
+    e.classList.toggle("sel", !!mine && e.textContent.trim().startsWith(m[0].split(" ⇄ ")[side === "l" ? 0 : 1]));
+    e.classList.toggle("dim", !!pair.l && !!pair.r && !e.classList.contains("sel"));
+  });
+  const gates = document.getElementById(side === "l" ? "g-mod" : "g-ext");
+  // show rare-phenomena annotations whenever the relevant key is selected
+  document.getElementById("g-mod").style.display = ["seat","mux"].includes(pair.l) ? "block" : "none";
+  document.getElementById("g-ext").style.display = ["seat","frame"].includes(pair.l) ? "block" : "none";
+  const iol = document.getElementById("io-lines");
+  iol.innerHTML = side === "l" && m ? `seed ◀ ${m[2]}<br>emit ▶ ${m[3]}` : iol.innerHTML;
+  if (pair.l && pair.r) {
+    document.getElementById("map").innerHTML =
+      `<i>${MAP[pair.l][0]}</i> — <em>${MAP[pair.l][1]}</em><br>${MAP[pair.l][2]}; ${MAP[pair.l][3]}`;
+  } else {
+    document.getElementById("map").innerHTML =
+      `picked <em>${side}</em> side — click the matching row member on the other side to close the register`;
+  }
+}
+sel('frame', document.querySelectorAll('.ctxel')[3]);
+sel('frame', document.querySelectorAll('.facet')[3]);
+</script>
+</body>
+</html>

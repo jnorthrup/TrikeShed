@@ -13,10 +13,11 @@ import kotlin.test.fail
  * and every manifest line must still be matched by the serving wire's source.
  * A route consumed by nothing, or served by nothing, fails here.
  *
- * Gate 2 (the browser editor stays deleted): the kmart LCNC panel editor
- * (web/panels.html) was rooted out 2026-08-27 for the real concentric-scope
- * spec (docs/concentric-lcnc-ccek-spec.md). The daemon is the one executor
- * (/api/lcnc/run); a reintroduced panels.html fails the build.
+ * Gate 2 (the revived editor stays honest): the concentric canvas
+ * (web/panels.html) hydrates its vocabulary from /api/lcnc/contracts and its
+ * lane assemblage from /api/lcnc/concentric (ConcentricSurface.LANE_ASSEMBLAGE)
+ * — the page authors nothing. A hand-authored lane/type table, elliptical
+ * child placement, or a children-dropping serialize fails the build.
  */
 class RouteParityGate {
 
@@ -64,7 +65,7 @@ class RouteParityGate {
     @Test
     fun everyHtmlFetchIsARegisteredRoute() {
         val offenders = mutableListOf<String>()
-        for (page in listOf("graal.html", "index.html", "script.js")) {
+        for (page in listOf("graal.html", "index.html", "script.js", "panels.html")) {
             val html = resourceText(page)
             for ((method, rawPath) in fetchedRoutes(html)) {
                 // strip template holes and query strings: `/api/vm/${id}/eval?x` → `/api/vm/…/eval`
@@ -155,15 +156,27 @@ class RouteParityGate {
         }
     }
 
-    // ── gate 2: the browser editor stays deleted ───────────────────────────
+    // ── gate 2: the revived concentric canvas stays honest ─────────────────
 
     @Test
-    fun panelsHtmlStaysDeleted() {
-        // The kmart LCNC browser editor is gone (2026-08-27). The palette,
-        // ports, and titles have ONE author (LcncContracts via
-        // /api/lcnc/contracts); execution is the daemon's /api/lcnc/run.
-        assertTrue(javaClass.getResource("/web/panels.html") == null,
-            "web/panels.html reappeared — the browser editor is deleted; the daemon is the one executor")
+    fun panelsCanvasHydratesAndStaysConcentric() {
+        // The canvas is REVIVED (2026-08-28, the concentric landing) but its
+        // vocabulary and lane assemblage stay daemon-authored: the page
+        // hydrates from /api/lcnc/contracts + /api/lcnc/concentric and
+        // invents nothing. CCEK lands as concentric squares — an elliptical
+        // (cos/sin) child placement or a hand-authored lane schema is the
+        // exact regression this gate exists to stop.
+        val html = resourceText("panels.html")
+        assertTrue(html.contains("/api/lcnc/contracts"),
+            "panels.html must hydrate its vocabulary from /api/lcnc/contracts")
+        assertTrue(html.contains("/api/lcnc/concentric"),
+            "panels.html must hydrate its lane assemblage from /api/lcnc/concentric")
+        assertTrue(!Regex("""element\s*:\s*"[^"]+"""").containsMatchIn(html),
+            "hand-authored lane schema reappeared — ConcentricSurface.LANE_ASSEMBLAGE is the one author")
+        assertTrue(!html.contains("Math.cos") && !html.contains("Math.sin"),
+            "elliptical child placement reappeared — concentric contexts are SQUARES, one shared center per ring")
+        assertTrue(html.contains("_parentScope"),
+            "the children tree (rings) must survive serialize/load — the concentric pass is gone")
     }
 
     // ── gate 3: the served contract route carries the FULL contract ────────

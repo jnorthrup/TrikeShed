@@ -382,6 +382,8 @@ class ProjectScopes(
 class PatchWire(
     private val brain: BrainClient,
     private val scopes: ProjectScopes,
+    /** Panel constructions are STORE DOCUMENTS (panels/<name>, CAS-addressed, replicated) — not browser state. */
+    private val attachments: CouchAttachmentGateway? = null,
     /** Carries HtxKey (+ mux reactor) so provider calls ride the daemon's reactor. */
     private val muxContext: CoroutineContext = EmptyCoroutineContext,
     /**
@@ -546,6 +548,48 @@ class PatchWire(
                     },
                 ),
             )
+
+            // ── panel constructions: LCNC graphs as replicated store documents ──
+            // (revived: the concentric editor at /panels saves/loads HERE, not
+            // localStorage — panels/<name> attachments, CAS-addressed.)
+            method == "GET" && p == "/api/panels" -> {
+                val att = attachments ?: return json(mapOf("error" to "store not wired"), 503)
+                json(mapOf("panels" to att.listAttachments("panels/").map {
+                    mapOf("name" to it.path.removePrefix("panels/"), "cid" to it.contentId.value, "bytes" to it.length)
+                }))
+            }
+            // Offered, never installed: the gallery's preset lane. Before the
+            // generic name branch — "presets" is a reserved word, not a panel.
+            method == "GET" && p == "/api/panels/presets" -> json(mapOf(
+                "presets" to borg.trikeshed.lcnc.LcncPresets.all().map { (name, doc) ->
+                    mapOf("name" to name, "document" to JsonSupport.parse(doc))
+                },
+            ))
+            method == "GET" && p.startsWith("/api/panels/") -> {
+                val att = attachments ?: return json(mapOf("error" to "store not wired"), 503)
+                val name = p.removePrefix("/api/panels/").trimEnd('/')
+                if (!name.matches(Regex("^[a-z0-9][a-z0-9._-]*$"))) return json(mapOf("error" to "bad name"), 400)
+                val doc = att.getAttachment("panels/" + name) ?: return json(mapOf("error" to "no such panel"), 404)
+                JvmKanbanServer.HttpResponse(200, doc.second.decodeToString())
+            }
+            method == "POST" && p.startsWith("/api/panels/") -> {
+                val att = attachments ?: return json(mapOf("error" to "store not wired"), 503)
+                val name = p.removePrefix("/api/panels/").trimEnd('/')
+                if (!name.matches(Regex("^[a-z0-9][a-z0-9._-]*$"))) return json(mapOf("error" to "bad name"), 400)
+                val programJson = rawBody(text)
+                val program = runCatching { borg.trikeshed.lcnc.LcncProgramConfix.fromJson(name, programJson) }
+                    .getOrElse { return json(mapOf("error" to (it.message ?: "bad program")), 400) }
+                val bytes = borg.trikeshed.lcnc.LcncProgramConfix.toJson(program).encodeToByteArray()
+                val cid = borg.trikeshed.job.ContentId.of(bytes)
+                att.putAttachment(
+                    borg.trikeshed.util.oroboros.OroborosAttachmentRef(
+                        path = "panels/$name", contentType = "application/json", length = bytes.size.toLong(),
+                        contentId = cid, agentId = "panels-editor", revision = cid.hex.take(12),
+                        sequence = System.currentTimeMillis(),
+                    ), bytes,
+                )
+                json(mapOf("verdict" to "ok", "cid" to cid.value))
+            }
 
             method == "POST" && p.startsWith("/api/projects/") && p.endsWith("/mine") -> {
                 val name = p.removePrefix("/api/projects/").removeSuffix("/mine")

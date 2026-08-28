@@ -1,0 +1,1942 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Construction Panels</title>
+<style>
+/* Committed single-theme: the same dark ops console as /graal. */
+:root{
+  --bg:#0c0f15; --panel:#131824; --panel2:#1a2130; --line:#262e3e; --ink:#e3e7ef; --dim:#8b94a7;
+  --graal:#f29111; --ok:#3ddc84; --err:#ff5560; --warn:#ffb02e; --wire:#3fd0ff; --vm:#b07aff; --cpu:#6ea8fe;
+  /* UI speaks a humanist sans; DATA (ports, params, values, frames) stays mono */
+  --sans:"Inter var",Inter,"SF Pro Text",-apple-system,BlinkMacSystemFont,"Segoe UI",system-ui,sans-serif;
+  --mono:"Berkeley Mono","IBM Plex Mono","Cascadia Code","SF Mono",ui-monospace,Menlo,monospace;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%}
+body{background:var(--bg);color:var(--ink);font:13px/1.5 var(--sans);-webkit-font-smoothing:antialiased;overflow:hidden;user-select:none}
+#bar{position:fixed;top:0;left:0;right:0;height:40px;display:flex;align-items:center;gap:8px;padding:0 10px;background:linear-gradient(180deg,rgba(11,14,20,.97),rgba(11,14,20,.88));border-bottom:1px solid var(--line);z-index:20}
+#bar b{color:var(--graal);letter-spacing:.03em;margin-right:6px}
+#bar .sub{color:var(--dim);font-size:10px;text-transform:uppercase;letter-spacing:.08em}
+button{background:var(--panel);border:1px solid var(--line);color:var(--ink);border-radius:4px;padding:4px 10px;font:inherit;cursor:pointer}
+button:hover{border-color:var(--graal)}
+button.run{border-color:var(--ok);color:var(--ok)}
+button.stop{border-color:var(--err);color:var(--err)}
+#status{margin-left:auto;color:var(--dim);font-size:11px}
+#viewport{position:absolute;inset:40px 0 0 0;overflow:hidden;cursor:grab}
+#viewport.panning{cursor:grabbing}
+#world{position:absolute;transform-origin:0 0}
+#wires{position:absolute;overflow:visible;pointer-events:none}
+#wires path{fill:none;stroke-width:2.2;pointer-events:stroke;cursor:pointer}
+#wires path.live{stroke:var(--wire)}
+#wires path.drag{stroke:var(--graal);stroke-dasharray:6 4}
+#wires path:hover{stroke:var(--err)}
+.node{position:absolute;min-width:190px;background:var(--panel);border:1px solid var(--line);border-radius:6px;box-shadow:0 4px 18px rgba(0,0,0,.45)}
+.node .hd{display:flex;align-items:center;gap:6px;padding:5px 8px;border-bottom:1px solid var(--line);border-radius:6px 6px 0 0;background:var(--panel2);cursor:move}
+.node .hd i{width:8px;height:8px;border-radius:50%;background:var(--dim)}
+.node.running .hd i{background:var(--warn);box-shadow:0 0 8px var(--warn)}
+.node.ok .hd i{background:var(--ok);box-shadow:0 0 8px rgba(61,220,132,.6)}
+.node.err .hd i{background:var(--err);box-shadow:0 0 8px rgba(255,79,88,.6)}
+.node .hd b{font-size:12px;flex:1;white-space:nowrap}
+.node .hd s{color:var(--dim);cursor:pointer;text-decoration:none;padding:0 3px}
+.node .hd s:hover{color:var(--err)}
+.node .body{padding:6px 0}
+.row{position:relative;display:flex;align-items:center;min-height:20px;padding:1px 12px;font-size:11px}
+.row.in{justify-content:flex-start;color:var(--ink)}
+.row.out{justify-content:flex-end;color:var(--ink)}
+.port{position:absolute;top:50%;width:10px;height:10px;border-radius:50%;border:2px solid var(--wire);background:var(--bg);transform:translateY(-50%);cursor:crosshair;z-index:2}
+.row.in .port{left:-6px}
+.row.out .port{right:-6px}
+.port:hover{background:var(--wire)}
+.params{padding:2px 8px 6px;display:flex;flex-direction:column;gap:4px}
+.params label{font-size:9px;color:var(--dim);text-transform:uppercase;letter-spacing:.06em}
+.params input,.params textarea,.params select{background:var(--bg);border:1px solid var(--line);color:var(--ink);border-radius:3px;font:11px/1.4 inherit;padding:3px 5px;width:100%;user-select:text}
+.params textarea{resize:both;min-height:44px;white-space:pre}
+.result{margin:0 8px 6px;padding:5px 6px;background:var(--bg);border:1px solid var(--line);border-radius:3px;font-size:10px;color:var(--dim);max-height:150px;max-width:340px;overflow:auto;white-space:pre;user-select:text;resize:both}
+.node.wide{min-width:680px}
+.kboard{display:flex;gap:6px;padding:6px 8px 8px;overflow-x:auto}
+.kcol{flex:0 0 132px;background:var(--bg);border:1px solid var(--line);border-radius:4px;min-height:60px;padding:5px;transition:outline .1s}
+.kcol.over{border-color:var(--err)}
+.kcol.dragover{outline:2px dashed var(--graal);outline-offset:-2px}
+.kcol h6{font-size:9px;text-transform:uppercase;letter-spacing:.05em;color:var(--dim);display:flex;justify-content:space-between;margin:0 0 5px;font-weight:400}
+.kcol h6 b{color:var(--ink);font-weight:600}
+.kcol.over h6 b{color:var(--err)}
+.kcard{background:var(--panel2);border:1px solid var(--line);border-radius:3px;padding:4px 6px;margin-bottom:5px;font-size:10.5px;line-height:1.35;cursor:grab;user-select:none}
+.kcard:active{cursor:grabbing;opacity:.6}
+.kcard.contested{border-color:var(--err);box-shadow:0 0 0 1px rgba(255,79,88,.3)}
+.kcard .kid{color:var(--dim);font-size:9px}
+.kboard-status{padding:2px 10px 8px;font-size:9px;color:var(--dim)}
+.ctree{white-space:pre;font-size:10px;line-height:1.5;user-select:text}
+.ctree-tw{display:inline-block;width:10px;color:#7b8496}
+.gaugeval{margin:2px 8px 8px;font-size:26px;font-variant-numeric:tabular-nums;color:var(--graal);text-align:center}
+#menu{position:fixed;display:none;background:var(--panel);border:1px solid var(--line);border-radius:6px;z-index:30;min-width:190px;box-shadow:0 8px 30px rgba(0,0,0,.6)}
+#menu h5{padding:5px 10px 3px;font-size:9px;color:var(--dim);text-transform:uppercase;letter-spacing:.08em}
+#menu div.item{padding:4px 12px;cursor:pointer;font-size:12px}
+#menu div.item:hover{background:var(--panel2);color:var(--graal)}
+#hint{position:fixed;bottom:8px;left:10px;color:var(--dim);font-size:10px;z-index:20}
+/* ── ComfyUI-grade affordances ── */
+#wires path.live.flow{stroke-dasharray:8 6;animation:wireflow .5s linear infinite}
+@keyframes wireflow{to{stroke-dashoffset:-14}}
+.port.t-text{border-color:#6ea8fe}.port.t-json{border-color:#3fd0ff}.port.t-id{border-color:#b07aff}
+.port.t-num{border-color:#ffb02e}.port.t-trig{border-color:#3ddc84}
+.port.t-text:hover{background:#6ea8fe}.port.t-json:hover{background:#3fd0ff}.port.t-id:hover{background:#b07aff}
+.port.t-num:hover{background:#ffb02e}.port.t-trig:hover{background:#3ddc84}
+.node.collapsed .params,.node.collapsed .result,.node.collapsed .gaugeval,.node.collapsed .gaugelabel,.node.collapsed .kboard,.node.collapsed .kboard-status{display:none}
+.node.note{background:#2a2410;border-color:#5c4d1a;min-width:150px}
+.node.note .hd{background:#33290f}
+#minimap{position:fixed;right:10px;bottom:26px;width:168px;height:112px;background:rgba(17,21,30,.92);border:1px solid var(--line);border-radius:5px;z-index:20;cursor:pointer}
+/* ── fractal zoom: diving into a program.ref swaps the SAME viewport to its
+   real sub-graph — the RTS camera going from strategic to tactical, not a
+   flat function call. #crumb is the way back up, one level per dive. ── */
+#crumb{position:fixed;top:40px;left:0;right:0;height:26px;display:flex;align-items:center;gap:4px;padding:0 10px;background:rgba(11,14,20,.94);border-bottom:1px solid var(--line);z-index:19;font-size:11px;color:var(--dim)}
+#crumb span.seg{cursor:pointer;color:var(--wire)}
+#crumb span.seg:hover{color:var(--graal);text-decoration:underline}
+#crumb span.sep{color:var(--dim)}
+.node.ref{border-color:var(--vm)}
+.node.ref .hd{background:linear-gradient(90deg,var(--panel2),rgba(176,122,255,.12))}
+.ref-dive{margin:0 8px 8px;padding:5px 8px;background:var(--bg);border:1px dashed var(--vm);border-radius:3px;font-size:10px;color:var(--vm);cursor:pointer;text-align:center}
+.ref-dive:hover{background:rgba(176,122,255,.1)}
+/* clickable treesheet leaves — this was the whole complaint: a JSON tree you
+   can only expand/collapse is a viewer, not a tool. Click a leaf, get its
+   value; click a panel-name leaf inside a panels.list result, get a node. */
+.ctree span.leaf{cursor:pointer;border-bottom:1px dotted transparent}
+.ctree span.leaf:hover{border-bottom-color:currentColor}
+.ctree span.leaf.copied{color:var(--ok)!important}
+#menu input{width:calc(100% - 16px);margin:6px 8px 4px;background:var(--bg);border:1px solid var(--line);color:var(--ink);border-radius:3px;font:inherit;padding:3px 6px}
+#menu .items{max-height:300px;overflow-y:auto}
+/* ── concentric treesheets + standings tables ── */
+.csheet{margin:0 8px 8px;font-size:10.5px;user-select:text}
+.csheet .crumbrow{margin:2px 0 4px;color:var(--dim)}
+.csheet .seg{cursor:pointer;color:var(--wire)}
+.csheet .seg:hover{color:var(--graal);text-decoration:underline}
+.csheet .seg.here{color:var(--ink);cursor:default;text-decoration:none}
+.csheet .ringrow{margin:2px 0 4px}
+.csheet .ringrow.orch{color:var(--dim);font-size:9.5px}
+.csheet .tablewrap{max-height:260px;overflow:auto;border:1px solid var(--line);border-radius:3px}
+.csheet table{border-collapse:collapse;width:100%}
+.csheet th{position:sticky;top:0;background:var(--panel2);color:var(--dim);font-weight:400;text-transform:uppercase;font-size:8.5px;letter-spacing:.05em;text-align:left;padding:3px 6px;border-bottom:1px solid var(--line)}
+.csheet td{padding:2px 6px;border-bottom:1px solid rgba(35,42,56,.5);white-space:nowrap;max-width:220px;overflow:hidden;text-overflow:ellipsis}
+.csheet td.leafcell{cursor:pointer}
+.csheet td.leafcell:hover{color:var(--graal)}
+.csheet td.leafcell.copied{color:var(--ok)}
+.dagchip{display:inline-block;background:var(--panel2);border:1px solid var(--vm);color:var(--vm);border-radius:3px;padding:0 5px;margin:1px 2px;cursor:pointer;font-size:9.5px}
+.dagchip:hover{background:rgba(176,122,255,.15)}
+.dagchip i{color:var(--dim);font-style:normal}
+.utilbar{display:inline-block;width:64px;height:7px;background:var(--bg);border:1px solid var(--line);border-radius:2px;vertical-align:middle}
+.utilbar i{display:block;height:100%;background:var(--warn)}
+/* ── fractal concentric: rings, CCEK swimlane spine, seed/emit IO ── */
+/* CONCENTRIC CONTEXT: a scope node IS its ring — a hard-cornered square whose
+   child nodes live INSIDE it at inset margins. Nesting of scope squares is the
+   withContext(LcncScopeFrame) chain itself: outer square = enclosing ring,
+   inner squares = child rings, nearest-ring-wins on shadowing. Children are
+   placed at polar angles inside the parent square — inner margin grows with
+   depth, so rings never crowd; margins absorb growth by construction.
+   This is the machine's own geometry (LcncRunner.runRing / LcncScopeFrame),
+   not a wrapper decoration. */
+.node.scope{background:transparent;border:1.5px solid var(--vm);min-width:0;box-shadow:none}
+.node.scope>.hd{background:transparent;border-bottom:1px dashed rgba(176,122,255,.35);cursor:move}
+.node.scope>.hd b{color:var(--vm)}
+.node.scope>.ringlbl{position:absolute;top:-9px;left:10px;background:var(--bg);border:1px solid var(--vm);
+  color:var(--vm);font-size:8.5px;padding:0 6px;line-height:15px;white-space:nowrap}
+.node.scope>.ringlbl i{font-style:normal;color:var(--dim)}
+.node.scope.collapsed{min-width:140px;min-height:34px}
+.node.scope.collapsed .body,.node.scope.collapsed .params,.node.scope.collapsed .result{display:none}
+.node.scope .childgrid{position:relative;min-height:60px;resize:both;overflow:auto}
+/* a child inside a ring squares off against its siblings at inset margins */
+.node.inring{border-color:rgba(176,122,255,.4)}
+.node[data-lane]{border-top:2px solid var(--line)}
+/* fractal IO: ◀ seed enters the left edge, emit ▶ leaves the right — the same
+   grammar at node scale and ring scale (ConcentricSurface.RingBand). */
+.node .seed,.node .emit{font-size:9px;color:var(--dim);padding:1px 8px;line-height:1.6;max-width:340px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.node .seed:empty,.node .emit:empty{display:none}
+.node .seed::before{content:"◀ ";color:#3f5468}
+.node .emit{text-align:right}
+.node .emit::after{content:" ▶";color:#3f5468}
+.node.scope>.seed{color:#6b8aa0}
+.node.scope>.emit{color:#7a95a8}
+/* the lane ruler: CCEK element families as a spine across the world's top */
+#spine{position:absolute;left:0;top:-30px;height:22px;pointer-events:none}
+#spine .lane{position:absolute;top:0;height:20px;border:1px dashed var(--line);border-bottom:none;color:var(--dim);font-size:9px;padding:0 6px;line-height:20px;white-space:nowrap;overflow:hidden}
+/* untyped port: contract declared no kind — it mates with nothing */
+.port.t-any{border-color:var(--dim)}
+/* wiring affordance: while a wire is in hand, only kind-equal ports stay lit;
+   everything incompatible dims — the canvas itself states the options */
+body.wiring .port{opacity:.18}
+body.wiring .port.mateable{opacity:1;box-shadow:0 0 7px currentColor}
+body.wiring .node.nomate{opacity:.35}
+/* the palette: docked drag-source for the served vocabulary + the gallery */
+#palette{position:fixed;top:40px;left:0;bottom:0;width:216px;background:rgba(11,14,20,.96);border-right:1px solid var(--line);z-index:18;overflow-y:auto;padding:8px;display:none}
+#palette.open{display:block}
+#palette h5{font-size:9px;color:var(--dim);text-transform:uppercase;letter-spacing:.08em;margin:8px 0 4px}
+#palette .pitem{padding:3px 8px;border:1px solid var(--line);border-radius:4px;margin:3px 0;font-size:11px;cursor:grab;background:var(--panel)}
+#palette .pitem:hover{border-color:var(--graal)}
+#palette .pitem i{color:var(--dim);font-style:normal;font-size:9px;display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#palette input{width:100%;margin-bottom:6px;background:var(--bg);border:1px solid var(--line);color:var(--ink);border-radius:3px;font:inherit;padding:3px 6px}
+/* ── taste: rounded chips, HARD-CORNERED rings (squares are the grammar),
+   quieter chrome, UI sans / data mono split. ── */
+.params input,.params textarea,.params select,.result,.ctree,.gaugeval,.row,.ringlbl,#panelName,.kid,.rev,.chain,.csheet,#menu div.item{font-family:var(--mono)}
+#palette .pitem{font-family:var(--mono)}
+#palette .pitem i{font-family:var(--sans)}
+.node{border-radius:10px;box-shadow:0 10px 28px rgba(0,0,0,.38)}
+.node .hd{border-radius:10px 10px 0 0}
+.node .hd b{font-weight:600;letter-spacing:.01em}
+.node.scope{border-radius:2px}
+.node.scope>.hd{border-radius:2px 2px 0 0}
+.kcard{border-radius:5px;font-family:var(--sans)}
+button{border-radius:6px;padding:4px 12px;transition:border-color .12s,color .12s}
+#menu{border-radius:10px}
+#bar b{font-weight:700;letter-spacing:.14em;font-size:13px}
+#bar .sub{letter-spacing:.14em}
+.seed,.emit{font-family:var(--sans)}
+#palette h5,#menu h5{letter-spacing:.1em}
+#hint{font-family:var(--sans)}
+::-webkit-scrollbar{width:8px;height:8px}
+::-webkit-scrollbar-thumb{background:var(--line);border-radius:4px}
+::-webkit-scrollbar-thumb:hover{background:var(--dim)}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-corner{background:transparent}
+</style>
+</head>
+<body>
+<div id="bar">
+  <b>PANELS</b><span class="sub">lowcode · nocode · construction</span>
+  <button class="run" id="runBtn">▶ run</button>
+  <button class="stop" id="stopBtn">■ stop timers</button>
+  <button id="addBtn">+ node</button>
+  <input id="panelName" placeholder="panel-name" style="background:var(--bg);border:1px solid var(--line);color:var(--ink);border-radius:4px;padding:4px 8px;font:inherit;width:120px">
+  <button id="storeSaveBtn" title="save construction as a replicated store document">⇪ store</button>
+  <button id="storeLoadBtn" title="load a construction from the store">⇩ store</button>
+  <button id="presetsBtn" title="server-authored programs — offered, never installed">▤ presets</button>
+  <button id="paletteBtn" title="drag node types and programs onto the canvas">⧉ palette</button>
+  <button id="exportBtn">export</button>
+  <button id="importBtn">import</button>
+  <button id="clearBtn">clear</button>
+  <button id="qsBtn" title="run the quickstart in anger" style="border-color:#3ddc84;color:#3ddc84">⚡</button>
+  <button id="fbBtn" title="open a GitHub issue prefilled with this construction's coordinates" style="border-color:var(--warn);color:var(--warn)">⚑</button>
+  <span id="status">idle</span>
+</div>
+<div id="crumb" style="display:none"></div>
+<div id="palette"></div>
+<div id="viewport"><div id="world"><svg id="wires"></svg></div></div>
+<div id="menu"></div>
+<canvas id="minimap" width="168" height="112"></canvas>
+<div id="hint">right-click / double-click: search nodes · drag port→port: wire · click wire: cut · drop a folder: mount scope · SSE node re-fires downstream on pointcut events · graphs autosave</div>
+<input type="file" id="fileIn" accept="application/json" style="display:none">
+<script>
+"use strict";
+/* ── registry of node types: each speaks a REAL daemon surface ─────────── */
+/* ── RUNNERS: execution bodies ONLY. The node VOCABULARY — titles, ports,
+   kinds, cardinality, param defaults, source/sink/wide flags — is authored
+   ONCE in Kotlin (LcncContracts) and hydrated at boot from
+   /api/lcnc/contracts. This file carries NO type table; RouteParityGate
+   fails the build if one reappears. A runner without a server contract is
+   dead code and surfaces in the console at boot. */
+const RUNNERS = {
+  "vm.spawn": {
+    async run(n){
+      const b={id:p(n,"id"),facet:p(n,"facet"),wallMillis:+p(n,"wallMillis")};
+      const w=p(n,"world").split(",").map(s=>s.trim()).filter(Boolean); if(w.length)b.world=w;
+      const r=await api("POST","/api/vm/spawn",b);
+      if(r.error && !String(r.error).includes("exists")) throw r.error;
+      return {vmId:r.id||b.id};
+    },
+  },
+  "vm.eval": {
+    async run(n,i){
+      const src = i["source?"]!==undefined ? String(i["source?"]) : p(n,"source");
+      const r=await api("POST","/api/vm/"+enc(i.vmId)+"/eval",{source:src,name:"panel"});
+      if(r.error) throw r.error;
+      return {value:r.value,cid:r.cid};
+    },
+  },
+  "vm.revoke": {
+    async run(n,i){ const r=await api("POST","/api/vm/"+enc(i.vmId)+"/revoke",{}); return {ok:!r.error}; },
+  },
+  "vms.list": {
+    async run(){ const r=await api("GET","/api/vm"); return {rows:r.rows||r}; },
+  },
+  "pytest.pure": {
+    async run(n,i){
+      const flags=p(n,"flags").split(/\s+/).filter(Boolean).map(f=>JSON.stringify(f)).join(",");
+      const src=`import sys, io, __future__, importlib.machinery
+sys.path[:0]=['/workspace/puresite','/workspace/computronium']
+class FutureLoader(importlib.machinery.SourceFileLoader):
+    def source_to_code(self, data, path, *, _optimize=-1):
+        flags = __future__.annotations.compiler_flag if str(path).startswith('/workspace/computronium') else 0
+        return compile(data, path, 'exec', flags=flags, dont_inherit=True, optimize=_optimize)
+sys.path_hooks.insert(0, importlib.machinery.FileFinder.path_hook((FutureLoader, importlib.machinery.SOURCE_SUFFIXES)))
+sys.path_importer_cache.clear()
+import typing, typing_extensions as te
+for _n in dir(te):
+    if not _n.startswith('_') and not hasattr(typing, _n):
+        try: setattr(typing, _n, getattr(te, _n))
+        except Exception: pass
+import pytest
+buf = io.StringIO(); old=(sys.stdout,sys.stderr); sys.stdout=sys.stderr=buf
+try:
+    rc = pytest.main([${flags}, ${JSON.stringify(p(n,"path"))}])
+finally:
+    sys.stdout,sys.stderr = old
+(rc, buf.getvalue()[-2000:])`;
+      const r=await api("POST","/api/vm/"+enc(i.vmId)+"/eval",{source:src,name:"panel-pytest"});
+      if(r.error) throw r.error;
+      return {exit:r.value&&r.value[0],tail:r.value&&r.value[1]};
+    },
+  },
+  "graal.vitals": {
+    async run(){ return {json:await api("GET","/api/graal/vitals")}; },
+  },
+  "blackboard.facts": {
+    async run(){ return {facts:await api("GET","/blackboard/facts")}; },
+  },
+  "blackboard.board": {
+    async run(){ return {board:await api("GET","/blackboard/board")}; },
+  },
+  "blackboard.sites": {
+    async run(){ return {sites:await api("GET","/blackboard/sites")}; },
+  },
+  "http.get": {
+    async run(n){ return {json:await api("GET",p(n,"path"))}; },
+  },
+  "http.post": {
+    async run(n,i){ return {json:await api("POST",p(n,"path"),i.body)}; },
+  },
+  "board.get": {
+    async run(){ return {json:await api("GET","/api/board")}; },
+  },
+  "timer": {
+    async run(n){ return {tick:Date.now()}; },
+  },
+  "js": {
+    async run(n,i){ const f=new Function("x","return ("+p(n,"expr")+")"); return {y:f(i.x)}; },
+  },
+  "pick": {
+    async run(n,i){ let v=i.x; for(const k of p(n,"path").split(".").filter(Boolean)) v=v?.[k]; return {y:v}; },
+  },
+  "display": {
+    async run(n,i){ setResult(n, i.x); return {}; },
+  },
+  "gauge": {
+    async run(n,i){
+      let v=i.x; if(typeof v==="number"&&v>9999) v=(v/1e6).toFixed(1)+"M";
+      n.el.querySelector(".gaugeval").textContent=String(v);
+      n.el.querySelector(".gaugelabel").textContent=p(n,"label"); return {};
+    },
+  },
+  "mux.chat": {
+    async run(n,i){
+      const body={prompt: i["prompt?"]!==undefined?String(i["prompt?"]):p(n,"prompt"), maxTokens:+p(n,"maxTokens"), temperature:+p(n,"temperature")};
+      if(p(n,"system")) body.system=p(n,"system");
+      const r=await api("POST","/api/mux/chat",body);
+      if(r.verdict!=="ok") throw (r.detail||r.verdict||"mux error");
+      return {content:r.content, model:r.model};
+    },
+  },
+  "mux.models": {
+    async run(){ const r=await api("GET","/api/mux/models"); return {models:r.models||r}; },
+  },
+  "keys.status": {
+    async run(){ const r=await api("GET","/api/mux/keys"); return {roster:r.roster||r}; },
+  },
+  "project.kill": {
+    async run(n){
+      const name=p(n,"name"); if(!name) throw "name required";
+      const r=await api("DELETE","/api/projects/"+encodeURIComponent(name));
+      return {verdict:r};
+    },
+  },
+  "project.mount": {
+    async run(n,i){
+      const r=await api("POST","/api/projects",{path: i["path?"]!==undefined?String(i["path?"]):p(n,"path")});
+      if(r.verdict!=="ok") throw (r.detail||"mount refused");
+      return {scope:r};
+    },
+  },
+  "project.list": {
+    async run(){ const r=await api("GET","/api/projects"); return {scopes:r.scopes||r}; },
+  },
+  "kg.ingest": {
+    async run(n,i){
+      const body = i["text?"]!==undefined?String(i["text?"]):p(n,"kg");
+      const resp = await fetch("/api/beliefs/kg",{method:"POST",headers:{"Content-Type":"text/turtle"},body});
+      const r = JSON.parse(await resp.text());
+      if(r.error) throw r.error;
+      return {report:r};
+    },
+  },
+  "beliefs.review": {
+    async run(n,i){
+      const r=await api("POST","/api/beliefs/review",{facts:i.facts, turnSucceeded:p(n,"turnSucceeded")==="true"});
+      if(r.error) throw r.error;
+      return {landed:r};
+    },
+  },
+  "beliefs.resonate": {
+    async run(n,i){
+      const body={goal: i["goal?"]!==undefined?String(i["goal?"]):p(n,"goal"), k:+p(n,"k")};
+      if(p(n,"taxonomy")) body.taxonomy=p(n,"taxonomy");
+      if(p(n,"mode")==="whitened") body.mode="whitened";
+      const r=await api("POST","/api/beliefs/resonate",body);
+      if(r.error) throw r.error;
+      return {synonyms:r.synonymPeaks, antonyms:r.antonymPeaks};
+    },
+  },
+  "beliefs.introspect": {
+    async run(){ const r=await api("GET","/api/beliefs/introspect"); return {field:r}; },
+  },
+  "pointcut.routes": {
+    async run(){ const r=await api("GET","/api/graal/pointcuts"); return {routes:r.routes||r}; },
+  },
+  "board.view": {
+    async run(){
+      const r=await api("GET","/api/board");
+      const cols=(r.columns||[]).map(c=>c.id+":"+(c.count!=null?c.count:"?")+(c.wipLimit?"/"+c.wipLimit:"")).join("  ");
+      const items=r.items||[];
+      const contested=items.filter(x=>x.contested).map(x=>x.id);
+      const wipAlerts=(r.columns||[]).filter(c=>c.wipLimit&&c.count>c.wipLimit).map(c=>"WIP "+c.id+" "+c.count+"/"+c.wipLimit);
+      return {board:{seq:r.sequence,cols:cols,cards:items.length},
+              alerts:{contested:contested,wip:wipAlerts}};
+    },
+  },
+  "list.groupBy": {
+    async run(n,i){
+      const key=p(n,"key"); const out={};
+      for(const item of (i.x||[])){
+        let v=item; for(const k of key.split(".").filter(Boolean)) v=v?.[k];
+        const g=String(v); (out[g]=out[g]||[]).push(item);
+      }
+      return {groups:out};
+    },
+  },
+  "dom.board": {
+    async run(n,i){
+      n._groups=i.groups||{}; n._cols=i["columns?"]||null;
+      // Event semantics: a drag gesture fires downstream exactly once; no gesture
+      // emits NOTHING (undefined skips required inputs — `move: null` crashed the
+      // js node's expr on every timer tick before any drag happened).
+      const mv=n._lastMove; n._lastMove=null;
+      return mv?{move:mv}:{};
+    },
+    render(n){ renderGroupedBoard(n); },
+  },
+  "panels.list": {
+    async run(){ const r=await api("GET","/api/panels"); return {panels:r.panels||[]}; },
+    render(n,out){ renderPanelsList(n,out&&out.panels||[]); },
+  },
+  "program.ref": {
+    async run(){ return {}; },
+    render(n){ renderProgramRef(n); },
+  },
+  "scope.in": {
+    // at canvas top level a formal parameter has no caller: its declared
+    // default IS the value (rings consume it through the frame chain)
+    async run(n){ return {value:p(n,"default")}; },
+  },
+  "scope.out": {
+    async run(n,i){ setResult(n, i.value); return {}; },
+  },
+  "scope": {
+    // The ring executes IN the daemon — withContext(LcncScopeFrame) nesting,
+    // the CCEK landing. The browser posts the ring (a named stored program,
+    // or its children as an inline document), paints the returned warm base
+    // onto the bands, and emits the gathered returns. Rings hold
+    // daemon-runnable types only: a client-only type inside throws
+    // LcncUnknownNodeType daemon-side and lands here as the ring's error.
+    async run(n,i){
+      const guard=i["when?"];
+      if(guard===false||guard==="false") return {};
+      const args=(i["args?"]&&typeof i["args?"]==="object")?i["args?"]:{};
+      const named=p(n,"program");
+      const descIds=new Set(); (function walk(m){ for(const c of (m.children||[])){ descIds.add(c.id); walk(c); } })(n);
+      // inward wires are the warm base (data flows lateral or inward — the
+      // daemon's own rule): a source OUTSIDE the ring is replicated into the
+      // posted document as a scope.in carrying its already-computed value
+      const intra=G.wires.filter(w=>descIds.has(w.from[0])&&descIds.has(w.to[0]));
+      const inbound=G.wires.filter(w=>!descIds.has(w.from[0])&&descIds.has(w.to[0])&&w.from[0]!==n.id);
+      const synth=[], synthWires=[], seen=new Set();
+      for(const w of inbound){
+        const key=w.from[0]+"·"+w.from[1];
+        if(!seen.has(key)){
+          seen.add(key);
+          const src=G.nodes.find(x=>x.id===w.from[0]);
+          let v=src&&src._lastOut?src._lastOut[w.from[1]]:undefined;
+          if(v===undefined)continue;
+          if(typeof v==="object")v=JSON.stringify(v);
+          synth.push({id:key,type:"scope.in",params:{name:"__in_"+key,default:String(v)}});
+        }
+        synthWires.push({from:[key,"value"],to:w.to});
+      }
+      const body=named?{program:named,inputs:args}
+        :{name:(($("#panelName").value||"ring")+":"+n.id),
+          document:{nodes:synth.concat((n.children||[]).map(nodeDoc)),
+                    wires:intra.concat(synthWires)},
+          inputs:args};
+      const r=await api("POST","/api/lcnc/run",body);
+      if(r.ok!==true) throw (r.error||"ring run failed");
+      for(const c of (n.children||[])){          // the warm base lands on the bands
+        const out=r.outputs&&r.outputs[c.id];
+        if(out!==undefined&&c.el){
+          c.el.classList.remove("err","running"); c.el.classList.add("ok");
+          if(out&&Object.keys(out).length) setResult(c,out);
+        }
+      }
+      // daemon shape: a ring's outputs are its yields PLUS the composed map
+      return {...(r.returns||{}), returns:r.returns||{}};
+    },
+  },
+  "note": {
+    async run(){ return {}; },
+  },
+  "graal.events": {
+    async run(n){ return {event:n._lastEvent||null}; },
+  },
+  "vm.events": {
+    async run(n){ return {event:n._lastEvent||null}; },
+  },
+  "sheet.concentric": {
+    // The concentric treesheet view: board sheet at the center, partitions one
+    // ring out, orchestration outermost. State is an id→sheet index; SheetRef
+    // cells ({sheet:"id"}) and child rings drill in, the crumb climbs out.
+    async run(n,i){
+      const idx={}, add=s=>{ if(s&&s.id) idx[s.id]=s; };
+      add(i.board);
+      for(const s of (i["byStatus?"]||[])) add(s);
+      for(const s of (i["byPriority?"]||[])) add(s);
+      n._sheets=idx; n._orch=i["orchestration?"]||null;
+      if(!n._cur||!idx[n._cur]) n._cur=i.board&&i.board.id;
+      return {};
+    },
+    render(n){ renderConcentric(n); },
+  },
+  "graal.heap": {
+    async run(n){ const r=await api("GET","/api/graal/heap"); n._heap=r; return {heap:r}; },
+    render(n){ renderHeap(n); },
+  },
+  "mux.standings": {
+    async run(n){ const r=await api("GET","/api/mux/standings"); n._standings=(r&&r.standings)||[]; return {standings:n._standings}; },
+    render(n){ renderStandings(n); },
+  },
+};
+/* ── server-family runners: ONE author of execution semantics. The daemon runs
+   the node (LcncKanbanExperience / LcncSheetNodes via POST /api/lcnc/run against
+   the composed lcncRunners registry — the same map webhook dispatch resolves);
+   the browser posts params+inputs and renders the outputs. */
+function serverRun(type){
+  return { async run(n,i){
+    const r=await api("POST","/api/lcnc/run",{type:type,params:n.params||{},inputs:i});
+    if(r.ok!==true) throw (r.error||("lcnc run failed: "+type));
+    return r.outputs||{};
+  }};
+}
+for(const t of ["kanban.activeSheets","kanban.submit","kanban.move","confix.sheets","confix.pickPath",
+                "sheet.flatten","sheet.filter","sheet.count","sheet.columns","sheet.cell"]) RUNNERS[t]=serverRun(t);
+
+/* ── graph state ───────────────────────────────────────────────────────── */
+let G={nodes:[],wires:[],seq:1};              // wires: {from:[nodeId,port], to:[nodeId,port]}
+let view={x:60,y:60,z:1};
+const $=s=>document.querySelector(s), world=$("#world"), wiresSvg=$("#wires"), viewport=$("#viewport");
+const enc=encodeURIComponent;
+function p(n,k){ return n.params[k]; }
+async function api(method,path,body){
+  const r=await fetch(path,{method,headers:{"Content-Type":"application/json"},body:body!==undefined&&method!=="GET"?JSON.stringify(body):undefined});
+  const t=await r.text(); try{ return JSON.parse(t); }catch(e){ return {raw:t,status:r.status}; }
+}
+/* cursor-tree widget: collapsible tree rendering of any JSON doc */
+function renderTree(v,key,depth){
+  const d=document.createElement("div"); d.className="ctree";
+  if(depth>0) d.style.marginLeft="10px";
+  const isObj=v!==null&&typeof v==="object";
+  if(!isObj){
+    const s=document.createElement("span"); s.className="leaf";
+    s.textContent=(key?key+": ":"")+(typeof v==="string"?'"'+v+'"':String(v));
+    if(v===null) s.style.color="#b07aff"; else if(typeof v==="number") s.style.color="#ffb02e"; else if(typeof v==="string") s.style.color="#3ddc84";
+    s.title="click to copy this value";
+    s.addEventListener("click",e=>{
+      e.stopPropagation();
+      copyText(String(v));
+      s.classList.add("copied"); setTimeout(()=>s.classList.remove("copied"),500);
+    });
+    d.appendChild(s); return d;
+  }
+  const arr=Array.isArray(v), entries=arr?v.map((x,i)=>[i,x]):Object.entries(v);
+  let open=depth<2; // let, not const: the toggle below reassigns it
+  const tw=document.createElement("span"); tw.className="ctree-tw"; tw.textContent=open?"▾":"▸";
+  const lb=document.createElement("span"); lb.textContent=key?(key+": "+(arr?`[${entries.length}]`:`{${entries.length}}`)):(arr?`Array[${entries.length}]`:`Object{${entries.length}}`);
+  const hd=document.createElement("span"); hd.append(tw,lb);
+  const kids=document.createElement("div");
+  for(const [k,val] of entries) kids.appendChild(renderTree(val,String(k),depth+1));
+  const sync=()=>{ kids.style.display=open?"":"none"; tw.textContent=open?"▾":"▸"; };
+  sync();
+  hd.style.cursor="pointer"; hd.onclick=()=>{ open=!open; sync(); };
+  d.append(hd,kids); return d;
+}
+function setResult(n,v){
+  let el=n.el.querySelector(".result");
+  if(!el){ el=document.createElement("div"); el.className="result"; n.el.appendChild(el); }
+  // JSON docs render as a cursor-tree; strings stay verbatim
+  if(v!==null&&typeof v==="object"){ el.textContent=""; el.appendChild(renderTree(v,"",0)); }
+  else el.textContent = typeof v==="string" ? v : String(v);
+}
+/* ── generic grouped/draggable board renderer — the ONE piece of this
+   composition that is unavoidably code, because SOME primitive has to touch
+   the DOM. It carries zero domain vocabulary: no kanban, no /api/invoke, no
+   "revision" or "committed". A drop only DESCRIBES the gesture — {itemId,
+   item, from, to} — on the node's `move` output; what that gesture MEANS is
+   entirely the wired graph's business (a `js` node shapes the command, an
+   `http.post` node fires it — see the "kanban" saved program). This same
+   node composes a CRM pipeline, a triage queue, a sprint board: whatever the
+   graph downstream of `move` decides to do with the gesture. */
+function renderGroupedBoard(n){
+  const groups=n._groups||{}, meta=n._cols;
+  const idF=p(n,"idField"), titleF=p(n,"titleField"), subF=p(n,"subtitleField"), badgeF=p(n,"badgeField");
+  const cols = meta && meta.length ? meta : Object.keys(groups).sort().map(k=>({id:k,name:k}));
+  let wrap=n.el.querySelector(".kboard");
+  if(!wrap){ wrap=document.createElement("div"); wrap.className="kboard"; n.el.appendChild(wrap); }
+  let status=n.el.querySelector(".kboard-status");
+  if(!status){ status=document.createElement("div"); status.className="kboard-status"; n.el.appendChild(status); }
+  wrap.textContent="";
+  const total=Object.values(groups).reduce((a,g)=>a+g.length,0);
+  status.textContent=total+" items across "+cols.length+" groups";
+  for(const col of cols){
+    const items=groups[col.id]||[];
+    const over=col.wipLimit&&items.length>col.wipLimit;
+    const c=document.createElement("div"); c.className="kcol"+(over?" over":"");
+    c.dataset.group=col.id;
+    const h=document.createElement("h6");
+    h.innerHTML=`<span>${col.name||col.id}</span><b>${items.length}${col.wipLimit?"/"+col.wipLimit:""}</b>`;
+    const plus=document.createElement("s"); plus.textContent="＋"; plus.title="new card (modal — kanban.submit)";
+    plus.style.cssText="cursor:pointer;color:var(--ok);text-decoration:none;margin-left:6px";
+    plus.addEventListener("pointerdown",e=>e.stopPropagation());
+    plus.addEventListener("click",e=>{ e.stopPropagation(); openCardModal(n,col.id,null); });
+    h.appendChild(plus);
+    c.appendChild(h);
+    for(const it of items){
+      const card=document.createElement("div");
+      card.className="kcard"+(it.contested?" contested":"");
+      card.draggable=true;
+      const title=it[titleF]??it[idF]??"?", sub=it[subF], badge=it[badgeF];
+      card.innerHTML=`<div>${title}</div><div class="kid">${sub!=null&&sub!==title?sub:""}${badge!=null?" · "+badge:""}</div>`;
+      card.addEventListener("dragstart",e=>{
+        e.dataTransfer.setData("text/plain",JSON.stringify({itemId:it[idF],item:it,from:col.id}));
+        e.dataTransfer.effectAllowed="move";
+      });
+      card.addEventListener("pointerdown",e=>e.stopPropagation()); // don't pan the canvas while grabbing a card
+      card.addEventListener("dblclick",e=>{ e.stopPropagation(); openCardModal(n,col.id,it); }); // modal CRUD
+      c.appendChild(card);
+    }
+    c.addEventListener("dragover",e=>{ e.preventDefault(); c.classList.add("dragover"); });
+    c.addEventListener("dragleave",()=>c.classList.remove("dragover"));
+    c.addEventListener("drop",e=>{
+      e.preventDefault(); c.classList.remove("dragover");
+      let data; try{ data=JSON.parse(e.dataTransfer.getData("text/plain")); }catch(_){ return; }
+      if(!data||data.from===col.id) return;
+      status.textContent=data.itemId+": "+data.from+" → "+col.id+" (wired downstream decides what that means)";
+      n._lastMove={...data,to:col.id};
+      runAll(n.id); // this node's own downstream chain sees the gesture
+    });
+    wrap.appendChild(c);
+  }
+}
+/* ── concentric treesheets: the graal.html sheet-family renderer, made a node.
+   Zero vocabulary: it renders exactly the {id,title,parent,columns,rows} sheets
+   the server projected; a {sheet:"id"} cell is a drill-in; children rings are
+   the sheets whose parent is the current one; the crumb is the way back out. */
+function renderConcentric(n){
+  let wrap=n.el.querySelector(".csheet");
+  if(!wrap){ wrap=document.createElement("div"); wrap.className="csheet"; n.el.appendChild(wrap); }
+  const idx=n._sheets||{}, cur=idx[n._cur];
+  if(!cur){ wrap.innerHTML='<div class="kboard-status">no sheets yet — wire kanban.activeSheets in and run</div>'; return; }
+  const esc=s=>String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
+  const crumb=[]; let c=cur, guard=0;
+  while(c&&guard++<12){ crumb.unshift(c); c=c.parent?idx[c.parent]:null; }
+  let html='<div class="crumbrow">'+crumb.map((s,i)=>
+    '<span class="seg'+(i===crumb.length-1?' here':'')+'" data-sheet="'+esc(s.id)+'">'+esc(s.title||s.id)+'</span>'
+  ).join(' ▸ ')+'</div>';
+  const kids=Object.values(idx).filter(s=>s.parent===cur.id);
+  if(kids.length) html+='<div class="ringrow">'+kids.map(s=>
+    '<span class="dagchip" data-sheet="'+esc(s.id)+'">▤ '+esc(s.title||s.id)+' <i>'+(s.rows||[]).length+'</i></span>'
+  ).join('')+'</div>';
+  if(!(cur.rows||[]).length) html+='<div class="kboard-status">empty sheet — '+(cur.columns||[]).map(c=>esc(c.name)).join(' · ')+'</div>';
+  else html+='<div class="tablewrap"><table><tr>'+(cur.columns||[]).map(c=>'<th title="'+esc(c.type||'')+'">'+esc(c.name)+'</th>').join('')+'</tr>'+
+    cur.rows.map(row=>'<tr>'+row.map(cell=>{
+      if(cell&&typeof cell==="object"&&cell.sheet){
+        const child=idx[cell.sheet];
+        return '<td><span class="dagchip" data-sheet="'+esc(cell.sheet)+'">▤ '+esc(child?(child.title||child.id):cell.sheet)+'</span></td>';
+      }
+      return '<td class="leafcell" title="click to copy">'+esc(cell==null?'':String(cell))+'</td>';
+    }).join('')+'</tr>').join('')+'</table></div>';
+  if(n._orch&&n._orch.lanes) html+='<div class="ringrow orch">'+
+    (n._orch.lanes||[]).map(l=>'<span class="dagchip" title="'+esc(l.role||'')+'">'+esc(l.id)+'</span>').join('→')+
+    ((n._orch.edges||[]).some(e=>e.mode&&e.mode!=="NORMAL")?' <i>'+(n._orch.edges||[]).filter(e=>e.mode&&e.mode!=="NORMAL").map(e=>esc(e.mode.toLowerCase())).join('·')+'</i>':'')+'</div>';
+  wrap.innerHTML=html;
+  wrap.querySelectorAll("[data-sheet]").forEach(el=>el.addEventListener("click",e=>{
+    e.stopPropagation(); n._cur=el.dataset.sheet; renderConcentric(n);
+  }));
+  wrap.querySelectorAll(".leafcell").forEach(el=>el.addEventListener("click",e=>{
+    e.stopPropagation(); copyText(el.textContent);
+    el.classList.add("copied"); setTimeout(()=>el.classList.remove("copied"),500);
+  }));
+  wrap.querySelectorAll("*").forEach(el=>el.addEventListener("pointerdown",e=>e.stopPropagation()));
+}
+/* ── heap continent: bytes-by-class as a slice-and-dice treemap off
+   /api/graal/heap — lane param picks JFR allocation attribution or the
+   jmap-style histogram when it has rows. */
+function renderHeap(n){
+  let cv=n.el.querySelector("canvas.heapmap");
+  if(!cv){ cv=document.createElement("canvas"); cv.className="heapmap"; cv.width=664; cv.height=150;
+    cv.style.cssText="display:block;margin:0 8px 4px;border:1px solid var(--line);border-radius:3px"; n.el.appendChild(cv);
+    const st=document.createElement("div"); st.className="kboard-status heapstat"; n.el.appendChild(st); }
+  const h=n._heap||{}, lane=p(n,"lane")||"allocation";
+  const rows=(lane==="histogram"&&(h.rows||[]).length?h.rows:h.allocation)||[];
+  const top=rows.slice().sort((a,b)=>(b.bytes||0)-(a.bytes||0)).slice(0,24);
+  const total=top.reduce((a,r)=>a+(r.bytes||0),0);
+  const x2=cv.getContext("2d"); x2.clearRect(0,0,cv.width,cv.height);
+  const stat=n.el.querySelector(".heapstat");
+  if(!total){ if(stat) stat.textContent="heap: no "+lane+" data yet"; return; }
+  const hue=s=>{ let v=0; for(let i=0;i<s.length;i++) v=(v*31+s.charCodeAt(i))>>>0; return v%360; };
+  // slice-and-dice: alternate axis each split, area ∝ bytes
+  function tile(items,x,y,w,hgt,horiz){
+    if(!items.length||w<1||hgt<1) return;
+    if(items.length===1){
+      const r=items[0];
+      x2.fillStyle="hsl("+hue(r.class)+" 45% 32%)"; x2.fillRect(x+0.5,y+0.5,w-1,hgt-1);
+      if(w>60&&hgt>12){ x2.fillStyle="#d8dce6"; x2.font="9px monospace";
+        const short=r.class.replace(/^.*\./,"").slice(0,Math.floor(w/6));
+        x2.fillText(short,x+3,y+10);
+        if(hgt>24) x2.fillText((r.bytes/1048576).toFixed(1)+"M",x+3,y+21); }
+      return;
+    }
+    const sum=items.reduce((a,r)=>a+r.bytes,0); let acc=0, cut=0;
+    for(let i=0;i<items.length;i++){ acc+=items[i].bytes; if(acc>=sum/2){ cut=i+1; break; } }
+    if(cut===0||cut===items.length) cut=Math.max(1,items.length>>1);
+    const a=items.slice(0,cut), b=items.slice(cut), fa=a.reduce((s,r)=>s+r.bytes,0)/sum;
+    if(horiz){ tile(a,x,y,Math.round(w*fa),hgt,!horiz); tile(b,x+Math.round(w*fa),y,w-Math.round(w*fa),hgt,!horiz); }
+    else { tile(a,x,y,w,Math.round(hgt*fa),!horiz); tile(b,x,y+Math.round(hgt*fa),w,hgt-Math.round(hgt*fa),!horiz); }
+  }
+  tile(top,0,0,cv.width,cv.height,true);
+  if(stat) stat.textContent=lane+": "+(total/1048576).toFixed(1)+"MB across top "+top.length+" classes"+
+    (lane==="histogram"?" · "+(h.classes||0)+" classes "+((h.bytes||0)/1048576).toFixed(1)+"MB live":"");
+}
+/* ── quota legion standings: reactor roster × ledger, usable-first ── */
+function renderStandings(n){
+  let wrap=n.el.querySelector(".csheet");
+  if(!wrap){ wrap=document.createElement("div"); wrap.className="csheet"; n.el.appendChild(wrap); }
+  const rows=n._standings||[];
+  const esc=s=>String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+  if(!rows.length){ wrap.innerHTML='<div class="kboard-status">no standings — legion empty or reactor context absent</div>'; return; }
+  wrap.innerHTML='<div class="tablewrap"><table><tr><th>key</th><th>provider</th><th>spent</th><th>limit</th><th>util</th><th></th></tr>'+
+    rows.map(s=>'<tr><td>'+esc(s.keyId)+'</td><td>'+esc(s.provider||"")+'</td><td>'+esc(s.spent)+'</td>'+
+      '<td>'+(s.limit>0?esc(s.limit):"∞")+'</td>'+
+      '<td><span class="utilbar"><i style="width:'+Math.round((s.utilization||0)*100)+'%"></i></span></td>'+
+      '<td style="color:'+(s.usable?"var(--ok)":"var(--err)")+'">'+(s.usable?"usable":(s.exhausted?"exhausted":"benched"))+'</td></tr>').join('')+
+    '</table></div>';
+  wrap.querySelectorAll("*").forEach(el=>el.addEventListener("pointerdown",e=>e.stopPropagation()));
+}
+function renderPanelsList(n,panels){
+  let wrap=n.el.querySelector(".kboard");
+  if(!wrap){ wrap=document.createElement("div"); wrap.className="kboard"; wrap.style.flexWrap="wrap"; n.el.appendChild(wrap); }
+  wrap.textContent="";
+  if(!panels.length){ const e=document.createElement("div"); e.className="kboard-status"; e.textContent="store has no programs yet — ⇪ store to save this one"; wrap.appendChild(e); return; }
+  for(const pnl of panels){
+    const chip=document.createElement("div"); chip.className="ref-dive"; chip.style.margin="4px";
+    chip.textContent="＋ "+pnl.name;
+    chip.title="click to add a program.ref("+pnl.name+") node to this canvas";
+    chip.addEventListener("click",()=>{
+      addNode("program.ref",n.x+n.el.offsetWidth+40,n.y);
+      $("#status").textContent="added program.ref("+pnl.name+") — double-click its dive-in strip to descend into it";
+      const added=G.nodes[G.nodes.length-1];
+      added.params.name=pnl.name;
+      const inp=added.el.querySelector(".params input"); if(inp) inp.value=pnl.name;
+      save();
+    });
+    wrap.appendChild(chip);
+  }
+}
+function renderProgramRef(n){
+  let dive=n.el.querySelector(".ref-dive");
+  if(!dive){ dive=document.createElement("div"); dive.className="ref-dive"; n.el.appendChild(dive); }
+  const name=p(n,"name");
+  dive.textContent=name?"⤵ dive into "+name:"⤵ dive in (set a name first)";
+  dive.onclick=()=>{ if(name) diveInto(name); };
+}
+function copyText(s){
+  if(navigator.clipboard&&navigator.clipboard.writeText){ navigator.clipboard.writeText(s).catch(()=>fallbackCopy(s)); }
+  else fallbackCopy(s);
+}
+function fallbackCopy(s){
+  const ta=document.createElement("textarea"); ta.value=s; ta.style.position="fixed"; ta.style.opacity="0";
+  document.body.appendChild(ta); ta.select();
+  try{ document.execCommand("copy"); }catch(e){}
+  ta.remove();
+}
+/* ── fractal dive: a program.ref node is not a function call, it is a
+   window onto another graph living at the SAME zoom/pan surface this one
+   does. Diving in swaps G for the referenced program and remembers how to
+   get back — the RTS camera descending a level, not a black-box invocation.
+   Because a dived-in graph can itself hold a program.ref, this recurses to
+   whatever depth the stored programs actually nest. */
+let diveStack=[]; // [{name, data}] — data is this level's serialize() before diving deeper
+function crumbSync(){
+  const el=$("#crumb");
+  if(!diveStack.length){ el.style.display="none"; el.textContent=""; return; }
+  el.style.display="flex";
+  el.textContent="";
+  const root=document.createElement("span"); root.className="seg"; root.textContent="⌂ root";
+  root.addEventListener("click",()=>popTo(0));
+  el.appendChild(root);
+  diveStack.forEach((entry,i)=>{
+    const sep=document.createElement("span"); sep.className="sep"; sep.textContent=" ▸ "; el.appendChild(sep);
+    const seg=document.createElement("span"); seg.className="seg"; seg.textContent=entry.name;
+    if(i<diveStack.length-1) seg.addEventListener("click",()=>popTo(i+1));
+    else seg.style.color="var(--ink)";
+    el.appendChild(seg);
+  });
+}
+async function diveInto(name){
+  const resp=await fetch("/api/panels/"+encodeURIComponent(name));
+  if(!resp.ok){ $("#status").textContent="dive failed: no such program '"+name+"'"; return; }
+  const data=await resp.json();
+  diveStack.push({name,data:serialize()});
+  crumbSync();
+  $("#panelName").value=name;
+  load(data);
+  $("#status").textContent="diving into "+name+" — ⌂ root or a breadcrumb segment to climb back out";
+}
+function popTo(depth){
+  if(depth>=diveStack.length) return;
+  const target=diveStack[depth];
+  diveStack=diveStack.slice(0,depth);
+  crumbSync();
+  $("#panelName").value=depth===0?"":diveStack[depth-1].name;
+  load(target.data);
+}
+/* ── node DOM ──────────────────────────────────────────────────────────── */
+/* ── fractal concentric: CCEK swimlane lanes + ring nesting + minimap ──── */
+// The machine's lanes: each node runs in one CCEK ring; the lane names the
+// Key factory whose upstream coroutine state seeds the node and what it emits.
+// HYDRATED from /api/lcnc/concentric (ConcentricSurface.LANE_ASSEMBLAGE, each
+// lane derived from its RING_BANDS entry) — this page authors NO lane schema.
+let LANES=[];
+async function syncLanes(){
+  try{
+    const r=await (await fetch("/api/lcnc/concentric")).json();
+    LANES=(r.lanes||[]).map(l=>({id:l.id,match:l.match||[],element:l.element,seed:l.seed,emit:l.emit}));
+    if(!LANES.length) $("#status").textContent="lane assemblage empty — /api/lcnc/concentric served no lanes";
+  }catch(e){ $("#status").textContent="lanes fetch failed: "+e; }
+}
+function laneOf(n){
+  for(const L of LANES) if(L.match.some(pfx=>n.type.startsWith(pfx))) return L;
+  return LANES.find(L=>L.id==="fanout")||LANES[LANES.length-1]; // default: the fan-out ring
+}
+/* ring depth: how many scope ancestors enclose this node (D0 = root canvas) */
+function ringDepth(n){
+  let d=0, p=n._parentScope;
+  while(p){ d++; p=p._parentScope; }
+  return d;
+}
+/* mountChildren: the concentric pass. Every ring lays its children on SQUARE
+   shells around ONE shared center: scope.in enters on the LEFT edge (the seed
+   side), scope.out leaves on the RIGHT edge (the emit side), plain statements
+   sit on the top/bottom edges, and nested rings stack inward at the center —
+   the same grammar at every depth, sized post-order so margins grow without
+   crowding. This is withContext(LcncScopeFrame) drawn: the outer square is
+   the enclosing element, the innermost shell is the executing statements.
+   Child x/y are RING-LOCAL and derived — this pass owns them; world-space
+   math (spine, minimap, topo) iterates top-level nodes only. */
+const RING_EDGE=26, RING_GAP=18;
+function layoutRing(n){
+  const kids=(n.children||[]).filter(c=>c.el);
+  const rings=kids.filter(c=>c.children&&c.children.length);
+  for(const r of rings) layoutRing(r);              // inward first — post-order
+  const ins=kids.filter(c=>c.type==="scope.in");
+  const outs=kids.filter(c=>c.type==="scope.out");
+  const mids=kids.filter(c=>!ins.includes(c)&&!outs.includes(c)&&!rings.includes(c));
+  const sz=c=>({w:c.el.offsetWidth||210,h:c.el.offsetHeight||96});
+  const stackH=a=>a.length?a.reduce((s,c)=>s+sz(c).h,0)+(a.length-1)*RING_GAP:0;
+  const rowW=a=>a.length?a.reduce((s,c)=>s+sz(c).w,0)+(a.length-1)*RING_GAP:0;
+  const rowH=a=>a.length?Math.max(...a.map(c=>sz(c).h)):0;
+  const colW=a=>a.length?Math.max(...a.map(c=>sz(c).w)):0;
+  const top=mids.filter((_,i)=>i%2===0), bot=mids.filter((_,i)=>i%2===1);
+  const centerW=Math.max(rowW(rings),rowW(top),rowW(bot),140);
+  const centerH=Math.max(rowH(rings),stackH(ins),stackH(outs),60);
+  const W=colW(ins)+centerW+colW(outs)+4*RING_EDGE;
+  const H=(top.length?rowH(top)+RING_EDGE:0)+centerH+(bot.length?rowH(bot)+RING_EDGE:0)+2*RING_EDGE;
+  const host=n._childHost;
+  host.style.minWidth=W+"px"; host.style.minHeight=H+"px";
+  // the shared center sits mid-CENTER-BAND (between the in and out edges),
+  // so asymmetric edge columns never squeeze the inner shells into them
+  const cx=colW(ins)+2*RING_EDGE+centerW/2, cy=(top.length?rowH(top)+RING_EDGE:0)+RING_EDGE+centerH/2;
+  const place=(c,x,y)=>{ c.x=x; c.y=y; c.el.classList.add("inring"); c.el.style.position="absolute";
+    c.el.style.left=x+"px"; c.el.style.top=y+"px"; host.appendChild(c.el); };
+  let y=cy-stackH(ins)/2;
+  for(const c of ins){ place(c,RING_EDGE,y); y+=sz(c).h+RING_GAP; }
+  y=cy-stackH(outs)/2;
+  for(const c of outs){ place(c,W-RING_EDGE-sz(c).w,y); y+=sz(c).h+RING_GAP; }
+  let x=cx-rowW(top)/2;
+  for(const c of top){ place(c,x,RING_EDGE); x+=sz(c).w+RING_GAP; }
+  x=cx-rowW(bot)/2;
+  for(const c of bot){ place(c,x,H-RING_EDGE-sz(c).h); x+=sz(c).w+RING_GAP; }
+  x=cx-rowW(rings)/2;                               // the innermost shell
+  for(const c of rings){ place(c,x,cy-sz(c).h/2); x+=sz(c).w+RING_GAP; }
+  return {w:W,h:H};
+}
+/* ring chrome rides the tree: depth tab + edge captions recompute once
+   parents are linked (buildNode runs before the links exist). */
+function refreshRingChrome(n){
+  const d=ringDepth(n);
+  const lbl=n.el&&n.el.querySelector(":scope > .ringlbl");
+  if(lbl) lbl.innerHTML=`◍ D${d} <i>LcncScopeFrame${d>0?" r"+d:" root"} · bindings·outputs</i>`;
+  const t=CONTRACTS[n.type]||{ins:[],outs:[]};
+  const inNames=(n.children||[]).filter(c=>c.type==="scope.in").map(c=>(c.params&&c.params.name)||"?");
+  const outNames=(n.children||[]).filter(c=>c.type==="scope.out").map(c=>(c.params&&c.params.name)||"?");
+  const seedEl=n.el&&n.el.querySelector(":scope > .seed");
+  if(seedEl) seedEl.textContent=(t.ins||[]).concat(inNames.map(x=>"in:"+x)).join(" · ");
+  const emitEl=n.el&&n.el.querySelector(":scope > .emit");
+  if(emitEl) emitEl.textContent=(t.outs||[]).concat(outNames.map(x=>"out:"+x)).join(" · ");
+}
+function mountChildren(){
+  // parent links first (children arrays ship inside the program doc)
+  for(const n of G.nodes){
+    for(const c of (n.children||[])){ c._parentScope=n; }
+  }
+  for(const n of G.nodes){ if(n._childHost) refreshRingChrome(n); }
+  for(const n of G.nodes){ if(n._childHost&&!n._parentScope) layoutRing(n); }
+  resolveTopLevelOverlaps();
+}
+/* rings grow; authored top-level coordinates don't know that. Push a
+   colliding top-level sibling right of the grown square — authored x-order
+   kept, layouts with no collision untouched. */
+function resolveTopLevelOverlaps(){
+  const tops=G.nodes.filter(n=>!n._parentScope&&n.el);
+  const rect=n=>({x:n.x,y:n.y,w:n.el.offsetWidth||200,h:n.el.offsetHeight||100});
+  for(let pass=0;pass<3;pass++){
+    let moved=false;
+    const sorted=tops.slice().sort((a,b)=>a.x-b.x);
+    for(let i=0;i<sorted.length;i++)for(let j=i+1;j<sorted.length;j++){
+      const a=rect(sorted[i]), b=rect(sorted[j]);
+      if(a.x<b.x+b.w&&b.x<a.x+a.w&&a.y<b.y+b.h&&b.y<a.y+a.h){
+        sorted[j].x=a.x+a.w+40; sorted[j].el.style.left=sorted[j].x+"px"; moved=true;
+      }
+    }
+    if(!moved)break;
+  }
+}
+/* the spine: lane ruler rendered across the world's top, nodes tinted by lane.
+   Ring children live in ring-local coordinates — top-level nodes only. */
+function drawSpine(){
+  let sp=document.getElementById("spine");
+  if(!sp){ sp=document.createElement("div"); sp.id="spine"; world.appendChild(sp); }
+  sp.innerHTML="";
+  // lanes bucket by x: sort live nodes, give each lane the span its members cover
+  const byLane={};
+  for(const n of G.nodes){
+    if(n._parentScope) continue;
+    const L=laneOf(n); if(!L) continue;
+    (byLane[L.id]=byLane[L.id]||[]).push(n);
+  }
+  for(const L of LANES){
+    const ns=(byLane[L.id]||[]).sort((a,b)=>a.x-b.x);
+    if(!ns.length) continue;
+    const x0=Math.min(...ns.map(n=>n.x))-30, x1=Math.max(...ns.map(n=>n.x))+220;
+    const d=document.createElement("div"); d.className="lane";
+    d.style.left=Math.max(0,x0)+"px"; d.style.width=(x1-x0)+"px";
+    d.textContent=L.id+" · "+L.element.split(" ·")[0];
+    sp.appendChild(d);
+  }
+}
+function redrawConcentric(){ drawSpine(); drawMinimap(); }
+
+function addNode(type,x,y,params){
+  const t=CONTRACTS[type]; if(!t) return null;
+  const n={id:"n"+(G.seq++),type,x,y,params:{}};
+  for(const k in (t.params||{})) n.params[k]=params?.[k]??t.params[k].v;
+  G.nodes.push(n); buildNode(n); redraw(); save(); return n;
+}
+function topRingOf(s){ let q=s; while(q._parentScope) q=q._parentScope; return q; }
+/* the authoring gesture for ring statements: double-click inside a ring's
+   square adds a node INTO that ring — it joins n.children, the whole nest
+   re-lays from its root, and the daemon runs it inside the ring's frame. */
+function addChildNode(scope,type){
+  const t=CONTRACTS[type]; if(!t) return null;
+  const n={id:"n"+(G.seq++),type,x:0,y:0,params:{},_parentScope:scope};
+  for(const k in (t.params||{})) n.params[k]=t.params[k].v;
+  scope.children=scope.children||[]; scope.children.push(n);
+  G.nodes.push(n); buildNode(n);
+  refreshRingChrome(scope);
+  layoutRing(topRingOf(scope));
+  resolveTopLevelOverlaps();
+  redraw(); save(); return n;
+}
+/* port kinds are the SERVED contract (inputKinds/outputKinds) — symbolic,
+   documented on hover, ENFORCED. The daemon's mating rule is exact kind
+   equality (LcncMating); an undeclared kind mates with nothing. No name
+   guessing anywhere. */
+function kindOf(type,dir,port){
+  const c=CONTRACTS[type]; if(!c) return null;
+  const m=(dir==="out"?c.outputKinds:c.inputKinds)||{};
+  return m[port.replace("?","")]||null;
+}
+const KIND_CLASS={trigger:"t-trig",json:"t-json",text:"t-text",id:"t-id",num:"t-num"};
+function portClass(type,dir,port){ return KIND_CLASS[kindOf(type,dir,port)]||"t-any"; }
+function kindsCompatible(a,b){ return !!a&&!!b&&a===b; }
+function buildNode(n){
+  const t=CONTRACTS[n.type]; if(!t) return; // vocabulary is server-owned
+  const el=document.createElement("div"); el.className="node"; el.dataset.id=n.id; n.el=el;
+  // ── CONCENTRIC CONTEXT: a scope node IS a ring square. Its children are
+  // real nodes rendered INSIDE it at inset margins — the geometry of
+  // withContext(LcncScopeFrame): child ring nested in parent ring, the
+  // parent's bindings/warm-outputs visible to every descendant.
+  const isScope = n.type==="scope" || (n.children&&n.children.length);
+  if(isScope){
+    el.classList.add("scope");
+    // lane tint travels with the ring (which CCEK element family hosts it)
+    const lane=laneOf(n);
+    if(lane) el.dataset.lane=lane.id;
+  }
+  const hd=document.createElement("div"); hd.className="hd";
+  hd.innerHTML=`<i></i><b>${t.title}</b><s title="collapse">▤</s><s title="delete">✕</s>`;
+  el.appendChild(hd);
+  const collapse=hd.querySelectorAll("s")[0];
+  collapse.addEventListener("pointerdown",e=>e.stopPropagation());
+  collapse.addEventListener("click",e=>{ e.stopPropagation(); el.classList.toggle("collapsed"); save(); });
+  if(isScope){
+    // the ring label: the frame identity — name + depth + the Key it runs under
+    const depth=ringDepth(n);
+    const lbl=document.createElement("div"); lbl.className="ringlbl";
+    lbl.innerHTML=`◍ D${depth} <i>LcncScopeFrame${depth>0?" r"+depth:" root"} · bindings·outputs</i>`;
+    el.appendChild(lbl);
+    // ◀ seed / emit ▶ on the ring's own edges — from the hydrated contract
+    // (args?/when? → returns) plus this ring's declared formals/yields; the
+    // page authors no vocabulary (refreshRingChrome recomputes on mount).
+    const seed=document.createElement("div"); seed.className="seed"; seed.textContent=(t.ins||[]).join(" · ");
+    const emit=document.createElement("div"); emit.className="emit"; emit.textContent=(t.outs||[]).join(" · ");
+    el.appendChild(seed); el.appendChild(emit);
+    // children INSIDE: concentric square shells around one shared center —
+    // layoutRing owns the geometry (scope.in left edge, scope.out right,
+    // statements top/bottom, nested rings inward).
+    const grid=document.createElement("div"); grid.className="childgrid";
+    el.appendChild(grid);
+    n._childHost=grid;
+  } else {
+    // leaf nodes name their Key factory's upstream state and hand-off
+    const lane=laneOf(n);
+    if(lane) el.dataset.lane=lane.id;
+    const seed=document.createElement("div"); seed.className="seed"; seed.textContent=lane?lane.seed:t.title;
+    const emit=document.createElement("div"); emit.className="emit"; emit.textContent=lane?lane.emit:(t.outs||[]).join(", ");
+    el.appendChild(seed); el.appendChild(emit);
+  }
+  const body=document.createElement("div"); body.className="body";
+  for(const name of t.ins){
+    const kd=kindOf(n.type,"in",name);
+    const r=document.createElement("div"); r.className="row in"; r.innerHTML=`<span class="port ${portClass(n.type,"in",name)}" data-dir="in" data-port="${name}" data-kind="${kd||""}" title="${name}: ${kd||"untyped — mates with nothing"}"></span>${name}`;
+    body.appendChild(r);
+  }
+  for(const name of t.outs){
+    const kd=kindOf(n.type,"out",name);
+    const r=document.createElement("div"); r.className="row out"; r.innerHTML=`${name}<span class="port ${portClass(n.type,"out",name)}" data-dir="out" data-port="${name}" data-kind="${kd||""}" title="${name}: ${kd||"untyped — mates with nothing"}"></span>`;
+    body.appendChild(r);
+  }
+  el.appendChild(body);
+  const ps=document.createElement("div"); ps.className="params";
+  for(const k in t.params){
+    const def=t.params[k];
+    if(n.params[k]===undefined) n.params[k]=def.v??""; // loaded docs may omit params — never literal "undefined"
+    const lab=document.createElement("label"); lab.textContent=k; ps.appendChild(lab);
+    let inp;
+    if(def.opts){ inp=document.createElement("select"); for(const o of def.opts){const op=document.createElement("option");op.value=op.textContent=o;inp.appendChild(op);} inp.value=n.params[k]; }
+    else if(def.ta){ inp=document.createElement("textarea"); inp.value=n.params[k]; }
+    else { inp=document.createElement("input"); inp.value=n.params[k]; }
+    if(def.ph) inp.placeholder=def.ph;
+    inp.addEventListener("input",()=>{ n.params[k]=inp.value; save(); });
+    inp.addEventListener("pointerdown",e=>e.stopPropagation());
+    ps.appendChild(inp);
+  }
+  el.appendChild(ps);
+  if(n.type==="gauge"){
+    const g=document.createElement("div"); g.className="gaugeval"; g.textContent="—"; el.appendChild(g);
+    const gl=document.createElement("div"); gl.className="gaugelabel"; gl.style.cssText="text-align:center;color:var(--dim);font-size:10px;padding-bottom:8px"; el.appendChild(gl);
+  }
+  if(n.type==="note") el.classList.add("note");
+  if(n.type==="program.ref") el.classList.add("ref");
+  if(t.wide) el.classList.add("wide");
+  if(n.collapsed) el.classList.add("collapsed");
+  el.style.left=n.x+"px"; el.style.top=n.y+"px";
+  world.appendChild(el);
+  hd.addEventListener("dblclick",e=>{ e.stopPropagation(); n.collapsed=!n.collapsed; el.classList.toggle("collapsed",n.collapsed); save(); });
+  hd.querySelector("s").addEventListener("click",()=>{ removeNode(n.id); });
+  hd.addEventListener("pointerdown",e=>{
+    if(e.target.tagName==="S")return;
+    e.stopPropagation();
+    const sx=e.clientX,sy=e.clientY,ox=n.x,oy=n.y;
+    const mv=ev=>{ n.x=ox+(ev.clientX-sx)/view.z; n.y=oy+(ev.clientY-sy)/view.z; el.style.left=n.x+"px"; el.style.top=n.y+"px"; redraw(); };
+    const up=()=>{ removeEventListener("pointermove",mv); removeEventListener("pointerup",up); save(); };
+    addEventListener("pointermove",mv); addEventListener("pointerup",up);
+  });
+  el.querySelectorAll(".port").forEach(port=>{
+    port.addEventListener("pointerdown",e=>{
+      e.stopPropagation(); e.preventDefault();
+      startWireDrag(n, port.dataset.dir, port.dataset.port, e);
+    });
+  });
+}
+function removeNode(id){
+  const n=G.nodes.find(n=>n.id===id); if(!n)return;
+  // a ring takes its whole subtree with it — timers/SSE cleared per node,
+  // and a removed child leaves its parent's children array (or serialize
+  // would resurrect it on the next round trip)
+  const drop=new Set(); (function collect(m){ drop.add(m.id); for(const c of (m.children||[])) collect(c); })(n);
+  for(const m of G.nodes){
+    if(!drop.has(m.id)) continue;
+    if(m._timer){clearInterval(m._timer);m._timer=null;}
+    if(m._es){m._es.close();m._es=null;}
+  }
+  const ps=n._parentScope;
+  if(ps&&ps.children){ ps.children=ps.children.filter(c=>c.id!==n.id); refreshRingChrome(ps); layoutRing(topRingOf(ps)); resolveTopLevelOverlaps(); }
+  n.el.remove();
+  G.nodes=G.nodes.filter(x=>!drop.has(x.id));
+  G.wires=G.wires.filter(w=>!drop.has(w.from[0])&&!drop.has(w.to[0]));
+  redraw(); save();
+}
+/* ── wires ─────────────────────────────────────────────────────────────── */
+function portCenter(nodeId,dir,name){
+  const n=G.nodes.find(n=>n.id===nodeId); if(!n)return null;
+  // a ring's DOM contains its children's ports — resolve the node's OWN port,
+  // never a child's shadowing one (nested scopes share port names)
+  let el=null;
+  for(const cand of n.el.querySelectorAll(`.port[data-dir="${dir}"][data-port="${name}"]`)){
+    if(cand.closest(".node")===n.el){ el=cand; break; }
+  }
+  if(!el)return null;
+  const r=el.getBoundingClientRect(), w=world.getBoundingClientRect();
+  return {x:(r.left+r.width/2-w.left)/view.z, y:(r.top+r.height/2-w.top)/view.z};
+}
+function bez(a,b){ const dx=Math.max(40,Math.abs(b.x-a.x)/2); return `M ${a.x} ${a.y} C ${a.x+dx} ${a.y}, ${b.x-dx} ${b.y}, ${b.x} ${b.y}`; }
+function redraw(){
+  const w=6000,h=6000; wiresSvg.setAttribute("width",w); wiresSvg.setAttribute("height",h);
+  wiresSvg.style.left="0px"; wiresSvg.style.top="0px";
+  wiresSvg.innerHTML="";
+  redrawConcentric(); // fractal spine + minimap ride every redraw
+  G.wires.forEach((wr,idx)=>{
+    const a=portCenter(wr.from[0],"out",wr.from[1]), b=portCenter(wr.to[0],"in",wr.to[1]);
+    if(!a||!b)return;
+    const path=document.createElementNS("http://www.w3.org/2000/svg","path");
+    path.setAttribute("d",bez(a,b)); path.classList.add("live");
+    const srcN=G.nodes.find(x=>x.id===wr.from[0]);
+    const tc={"t-text":"#6ea8fe","t-json":"#3fd0ff","t-id":"#b07aff","t-num":"#ffb02e","t-trig":"#3ddc84"}[srcN?portClass(srcN.type,"out",wr.from[1]):""];
+    if(tc) path.style.stroke=tc;
+    path.addEventListener("pointerdown",e=>{ e.stopPropagation(); G.wires.splice(idx,1); redraw(); save(); });
+    wiresSvg.appendChild(path);
+  });
+}
+let dragWire=null;
+function startWireDrag(n,dir,name,e){
+  const path=document.createElementNS("http://www.w3.org/2000/svg","path");
+  path.classList.add("drag"); wiresSvg.appendChild(path);
+  dragWire={n,dir,name,path};
+  // the canvas states the options: while this wire is in hand, kind-equal
+  // ports stay lit, everything else dims, mateless nodes fade
+  document.body.classList.add("wiring");
+  const srcKind=kindOf(n.type,dir,name);
+  for(const nd of G.nodes){
+    if(!nd.el) continue;
+    let any=false;
+    for(const pe of nd.el.querySelectorAll(".port")){
+      if(pe.closest(".node")!==nd.el) continue;
+      const ok=nd.id!==n.id&&pe.dataset.dir!==dir&&kindsCompatible(srcKind,kindOf(nd.type,pe.dataset.dir,pe.dataset.port));
+      pe.classList.toggle("mateable",ok); if(ok)any=true;
+    }
+    nd.el.classList.toggle("nomate",!any&&nd.id!==n.id);
+  }
+  const mv=ev=>{
+    const w=world.getBoundingClientRect();
+    const m={x:(ev.clientX-w.left)/view.z,y:(ev.clientY-w.top)/view.z};
+    const a=portCenter(n.id,dir,name)||m;
+    path.setAttribute("d", dir==="out"?bez(a,m):bez(m,a));
+  };
+  const up=ev=>{
+    removeEventListener("pointermove",mv); removeEventListener("pointerup",up);
+    path.remove();
+    document.body.classList.remove("wiring");
+    document.querySelectorAll(".port.mateable").forEach(x=>x.classList.remove("mateable"));
+    document.querySelectorAll(".node.nomate").forEach(x=>x.classList.remove("nomate"));
+    const tgt=document.elementFromPoint(ev.clientX,ev.clientY);
+    if(tgt&&tgt.classList.contains("port")&&tgt.dataset.dir!==dir){
+      // the port's OWNING node is its nearest .node ancestor — a ring's DOM
+      // contains its children, so .contains() would hand every child wire
+      // to the enclosing scope
+      const owner=tgt.closest(".node");
+      const tn=owner&&G.nodes.find(x=>x.el===owner);
+      if(tn&&tn.id!==n.id){
+        const pathOf=m=>{const q=[];let s=m._parentScope;while(s){q.unshift(s.id);s=s._parentScope;}return q;};
+        const src=dir==="out"?n:tn, dst=dir==="out"?tn:n;
+        const from = dir==="out" ? [n.id,name] : [tn.id,tgt.dataset.port];
+        const to   = dir==="out" ? [tn.id,tgt.dataset.port] : [n.id,name];
+        // ENFORCED kinds: the daemon's mating rule is exact equality — a
+        // mismatched wire is refused here, not discovered at run time.
+        const sk=kindOf(src.type,"out",from[1]), dk=kindOf(dst.type,"in",to[1]);
+        const sp=pathOf(src), dp=pathOf(dst);
+        // the daemon's own rule: data flows lateral or inward, never outward
+        const lateralOrInward=sp.length<=dp.length&&sp.every((v,ix)=>dp[ix]===v);
+        if(!kindsCompatible(sk,dk)){
+          $("#status").textContent="kind mismatch: "+src.type+"."+from[1]+" emits "+(sk||"untyped")+", "+dst.type+"."+to[1]+" wants "+(dk||"untyped");
+        } else if(!lateralOrInward){
+          $("#status").textContent="ring boundary: data flows lateral or inward — yields leave through scope.out";
+        } else {
+          G.wires=G.wires.filter(w=>!(w.to[0]===to[0]&&w.to[1]===to[1])); // one wire per input
+          G.wires.push({from,to}); save();
+        }
+      }
+    } else {
+      // released on EMPTY context: the MATE POPUP, both directions.
+      // Forward (from an output): daemon-offered, evidence-ordered
+      // continuations. BACKCHAIN (from an input): every type whose output
+      // kind equals this input's kind. Picking one lands the node AT the
+      // drop point — inside a ring if that's where you dropped — wired.
+      const w=world.getBoundingClientRect();
+      const wx=(ev.clientX-w.left)/view.z, wy=(ev.clientY-w.top)/view.z;
+      const grid=tgt&&tgt.classList&&tgt.classList.contains("childgrid")?tgt:null;
+      const scope=grid?G.nodes.find(x=>x._childHost===grid):null;
+      showMateMenu(ev.clientX,ev.clientY,n,name,wx,wy,scope,dir);
+    }
+    dragWire=null; redraw();
+  };
+  addEventListener("pointermove",mv); addEventListener("pointerup",up);
+}
+/* the mate popup: release a wire on empty canvas and the daemon offers the
+   kind-compatible continuations (evidence-ordered; the input filters).
+   Picking one lands the node at the drop point — inside a ring if you
+   dropped in one — already wired, params prefilled from corpus evidence. */
+async function showMateMenu(cx,cy,srcNode,srcPort,wx,wy,scope,dir){
+  let all=[];
+  if(dir!=="in"){
+    // forward: the daemon's evidence-ordered continuations
+    const mq="/api/lcnc/mating-options?sourceType="+enc(srcNode.type)+"&sourcePort="+enc(srcPort.replace("?",""))+"&q=";
+    try{ all=(await api("GET",mq)).options||[]; }
+    catch(e){ $("#status").textContent="mate options failed: "+e; return; }
+  } else {
+    // BACKCHAIN: from an input, offer every type whose output kind equals it
+    const want=kindOf(srcNode.type,"in",srcPort);
+    if(!want){ $("#status").textContent=srcNode.type+"."+srcPort+" is untyped — it mates with nothing"; return; }
+    for(const t of Object.keys(CONTRACTS).sort()){
+      const c=CONTRACTS[t];
+      for(const op of (c.outs||[])) if(kindsCompatible(kindOf(t,"out",op),want)) all.push({type:t,outputPort:op,title:c.title});
+    }
+  }
+  if(!all.length){ $("#status").textContent="no kind-compatible mate for "+srcNode.type+"."+srcPort; return; }
+  menu.innerHTML="<h5>"+(dir==="in"?"backchain ":"mate ")+srcNode.type+"."+srcPort+(scope?" → into ring "+scope.id:"")+"</h5>";
+  const q=document.createElement("input"); q.placeholder="filter mates…";
+  const box=document.createElement("div"); box.className="items";
+  const pick=async opt=>{
+    menu.style.display="none";
+    const nn=scope?addChildNode(scope,opt.type):addNode(opt.type,wx-8,wy-8);
+    if(!nn)return;
+    if(dir==="in"){
+      G.wires=G.wires.filter(x=>!(x.to[0]===srcNode.id&&x.to[1]===srcPort));
+      G.wires.push({from:[nn.id,opt.outputPort],to:[srcNode.id,srcPort]});
+    } else {
+      G.wires=G.wires.filter(x=>!(x.to[0]===nn.id&&x.to[1]===opt.inputPort));
+      G.wires.push({from:[srcNode.id,srcPort],to:[nn.id,opt.inputPort]});
+    }
+    try{
+      const fq="/api/lcnc/fills?type="+enc(opt.type);
+      const f=await api("GET",fq);
+      const best={};
+      for(const fl of (f.fills||[])) if(!(fl.param in best)) best[fl.param]=fl.value;
+      const labels=nn.el.querySelectorAll(".params label");
+      for(const lab of labels){
+        const k=lab.textContent;
+        if(best[k]!==undefined){ nn.params[k]=best[k];
+          const inp=lab.nextElementSibling; if(inp&&"value" in inp) inp.value=best[k]; }
+      }
+    }catch(_){}
+    redraw(); save();
+    $("#status").textContent="mated "+srcNode.type+"."+srcPort+" ↔ "+opt.type+"."+(opt.inputPort||opt.outputPort);
+  };
+  const render=f=>{
+    box.innerHTML="";
+    for(const o of all){
+      if(f&&!o.type.includes(f)&&!(o.title||"").toLowerCase().includes(f))continue;
+      const d=document.createElement("div"); d.className="item";
+      d.textContent=o.type+" · "+(o.inputPort||o.outputPort)+"  ·  "+(o.title||"");
+      d.addEventListener("click",()=>pick(o));
+      box.appendChild(d);
+    }
+  };
+  q.addEventListener("input",()=>render(q.value.trim().toLowerCase()));
+  q.addEventListener("keydown",e=>{ if(e.key==="Enter"){ const first=box.querySelector(".item"); if(first) first.click(); } });
+  menu.appendChild(q); menu.appendChild(box); render("");
+  menu.style.left=cx+"px"; menu.style.top=cy+"px"; menu.style.display="block";
+  setTimeout(()=>q.focus(),0);
+}
+/* ── pan / zoom ────────────────────────────────────────────────────────── */
+function applyView(){ world.style.transform=`translate(${view.x}px,${view.y}px) scale(${view.z})`; }
+viewport.addEventListener("pointerdown",e=>{
+  if(e.button!==0)return;
+  viewport.classList.add("panning");
+  const sx=e.clientX,sy=e.clientY,ox=view.x,oy=view.y;
+  const mv=ev=>{ view.x=ox+ev.clientX-sx; view.y=oy+ev.clientY-sy; applyView(); };
+  const up=()=>{ viewport.classList.remove("panning"); removeEventListener("pointermove",mv); removeEventListener("pointerup",up); save(); };
+  addEventListener("pointermove",mv); addEventListener("pointerup",up);
+});
+viewport.addEventListener("wheel",e=>{
+  e.preventDefault();
+  const f=e.deltaY<0?1.1:1/1.1, nz=Math.min(2.5,Math.max(.25,view.z*f));
+  view.x=e.clientX-(e.clientX-view.x)*(nz/view.z);
+  view.y=(e.clientY-40)-((e.clientY-40)-view.y)*(nz/view.z);
+  view.z=nz; applyView(); save();
+},{passive:false});
+/* ── add-node menu ─────────────────────────────────────────────────────── */
+const menu=$("#menu");
+function showMenu(cx,cy,intoScope){
+  menu.innerHTML=intoScope?"<h5>add into ring "+intoScope.id+"</h5>":"<h5>add node</h5>";
+  const q=document.createElement("input"); q.placeholder="search nodes…";
+  const box=document.createElement("div"); box.className="items";
+  const place=(k)=>{ menu.style.display="none";
+    // a ring target adds INTO the ring — the concentric authoring gesture
+    if(intoScope){ addChildNode(intoScope,k); return; }
+    // client → world: subtract the viewport origin and the pan, divide by zoom.
+    // (The old worldRect arithmetic double-counted view.x — nodes landed offset
+    // by the pan distance whenever the canvas wasn't at origin.)
+    const vr=viewport.getBoundingClientRect();
+    addNode(k,(cx-vr.left-view.x)/view.z,(cy-vr.top-view.y)/view.z); };
+  const render=(filter)=>{
+    box.innerHTML="";
+    for(const k of Object.keys(CONTRACTS).sort()){
+      const c=CONTRACTS[k];
+      if(filter && !k.includes(filter) && !c.title.toLowerCase().includes(filter)) continue;
+      const d=document.createElement("div"); d.className="item"; d.textContent=k+"  ·  "+c.title;
+      d.addEventListener("click",()=>place(k));
+      box.appendChild(d);
+    }
+  };
+  q.addEventListener("input",()=>render(q.value.trim().toLowerCase()));
+  q.addEventListener("keydown",e=>{ if(e.key==="Enter"){ const first=box.querySelector(".item"); if(first) first.click(); } });
+  menu.appendChild(q); menu.appendChild(box); render("");
+  menu.style.left=cx+"px"; menu.style.top=cy+"px"; menu.style.display="block";
+  setTimeout(()=>q.focus(),0);
+}
+/* dblclick/right-click on a ring's EMPTY interior adds into that ring */
+function menuTargetScope(e){
+  if(!e.target.classList||!e.target.classList.contains("childgrid")) return null;
+  return G.nodes.find(n=>n._childHost===e.target)||null;
+}
+viewport.addEventListener("dblclick",e=>{
+  const sc=menuTargetScope(e);
+  if(sc){ showMenu(e.clientX,e.clientY,sc); return; }
+  if(e.target===viewport||e.target.id==="world"||e.target.id==="wires") showMenu(e.clientX,e.clientY);
+});
+viewport.addEventListener("contextmenu",e=>{ e.preventDefault(); showMenu(e.clientX,e.clientY,menuTargetScope(e)); });
+document.getElementById("qsBtn").addEventListener("click",()=>{
+ var d=document.createElement("div");d.dataset.qs="1";
+ d.style.cssText="position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:99;display:flex;align-items:center;justify-content:center";
+ d.innerHTML='<div style="background:#11151e;border:1px solid #f29111;border-radius:8px;padding:18px 22px;max-width:580px;color:#d8dce6;font:13px monospace">'
+  +'<b style="color:#f29111">Run TrikeShed in anger — five minutes, one port</b>'
+  +'<pre id="qsCmds" style="background:#0b0e14;padding:10px;border-radius:4px;margin:10px 0;user-select:text;white-space:pre-wrap">git clone git@github.com:jnorthrup/TrikeShed.git && cd TrikeShed\n./gradlew hotswapFeed\nbin/oroboros-daemon --watch</pre>'
+  +'<button onclick="navigator.clipboard.writeText(document.getElementById(\'qsCmds\').textContent)" style="background:#161b26;border:1px solid #3ddc84;color:#3ddc84;border-radius:4px;padding:4px 12px;cursor:pointer;font:inherit">copy commands</button>'
+  +'<a href="https://github.com/jnorthrup/TrikeShed#run-it-in-anger--please" target="_blank" style="color:#3fd0ff;margin-left:10px">README ↗</a>'
+  +'<a onclick="document.querySelector(\'div[data-qs]\').remove()" style="color:#7b8496;margin-left:14px;cursor:pointer">close</a></div>';
+ d.onclick=function(e){if(e.target===d)d.remove()};
+ document.body.appendChild(d);
+});
+document.getElementById("fbBtn").addEventListener("click",()=>{
+  const coords={
+    panel:(document.getElementById("panelName").value||"(unsaved)"),
+    nodes:G.nodes.length,types:[...new Set(G.nodes.map(n=>n.type))],
+    wires:G.wires.length,status:(document.getElementById("status").textContent||"").slice(0,120),
+    view:{x:Math.round(view.x),y:Math.round(view.y),z:+view.z.toFixed(2)},
+  };
+  const body="**Surface:** panels\n**URL:** "+location.href+"\n**Coordinates:**\n```json\n"+
+    JSON.stringify(coords,null,1)+"\n```\n\n**What I did:**\n\n**What happened:**\n\n**What I expected:**\n";
+  window.open("https://github.com/jnorthrup/TrikeShed/issues/new?labels=quickstart-feedback"+
+    "&title="+encodeURIComponent("[panels] ")+"&body="+encodeURIComponent(body),"_blank");
+});
+const PROJECT_MARKERS=/^(settings\.gradle(\.kts)?|build\.gradle(\.kts)?|package\.json|Cargo\.toml|CMakeLists\.txt|Makefile|pom\.xml|go\.mod|pyproject\.toml|setup\.py|mix\.exs|Package\.swift|.*\.xcodeproj\/.*)$/;
+const SKIP_DIRS=new Set(['node_modules','build','target','dist','out','__pycache__','venv','.venv','.git','.gradle','.idea','DerivedData']);
+async function panelsWalkEntries(dirEntry,prefix){
+  const out=[]; const reader=dirEntry.createReader();
+  while(true){
+    const batch=await new Promise((res,rej)=>reader.readEntries(res,rej));
+    if(!batch.length)break;
+    for(const en of batch){
+      if(en.isFile){ out.push({rel:prefix+en.name,file:await new Promise((res,rej)=>en.file(res,rej))}); }
+      else if(en.isDirectory){ if(SKIP_DIRS.has(en.name))continue; out.push(...await panelsWalkEntries(en,prefix+en.name+"/")); }
+    }
+  }
+  return out;
+}
+/* drag a directory from Finder: mount as side-by-side project scope */
+let dragHint=null;
+viewport.addEventListener("dragover",e=>{
+  e.preventDefault(); e.dataTransfer.dropEffect="copy";
+  const types=e.dataTransfer.types||[];
+  const isPalette=[...types].includes("text/x-lcnc-type")||[...types].includes("text/x-lcnc-program");
+  if(!dragHint){ dragHint=document.createElement("div");
+    dragHint.style.cssText="position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:var(--panel);border:1px dashed var(--graal);color:var(--graal);padding:10px 18px;border-radius:8px;pointer-events:none;z-index:50;font-size:12px"; viewport.appendChild(dragHint); }
+  dragHint.textContent=isPalette?"⊕ drop to place (a ring's square places INSIDE it)":"⊕ drop to mount project";
+});
+viewport.addEventListener("dragleave",e=>{ if(!viewport.contains(e.relatedTarget)){ if(dragHint) dragHint.remove(); dragHint=null; }});
+viewport.addEventListener("drop",async e=>{
+  e.preventDefault(); if(dragHint) dragHint.remove(); dragHint=null;
+  // palette drops first: a type lands as a node (into a ring if dropped on
+  // its square), a program lands as a program.ref with the dive strip
+  const ptype=e.dataTransfer.getData("text/x-lcnc-type"), pprog=e.dataTransfer.getData("text/x-lcnc-program");
+  if(ptype||pprog){
+    const w=world.getBoundingClientRect();
+    const wx=(e.clientX-w.left)/view.z, wy=(e.clientY-w.top)/view.z;
+    const grid=e.target.classList&&e.target.classList.contains("childgrid")?e.target:null;
+    const scope=grid?G.nodes.find(x=>x._childHost===grid):null;
+    if(ptype){
+      const nn=scope?addChildNode(scope,ptype):addNode(ptype,wx-8,wy-8);
+      if(nn)$("#status").textContent="placed "+ptype+(scope?" into ring "+scope.id:"");
+    } else {
+      const nn=addNode("program.ref",wx-8,wy-8);
+      if(nn){ nn.params.name=pprog; const inp=nn.el.querySelector(".params input"); if(inp)inp.value=pprog;
+        renderProgramRef(nn); save(); $("#status").textContent="program.ref("+pprog+") placed — the dive strip descends"; }
+    }
+    return;
+  }
+  const dt=e.dataTransfer, paths=[];
+  const say=t=>{const s=document.getElementById("status"); if(s)s.textContent=t;};
+  // PRIORITY 1: file:// URIs — sources that expose absolute host paths
+  const raw=(dt.getData("text/uri-list")||dt.getData("text/plain")||"").split("\n").map(u=>u.trim()).filter(Boolean);
+  for(const u of raw){
+    if(u.startsWith("file://")){ try{ paths.push(decodeURIComponent(new URL(u).pathname)); }catch(_){ paths.push(decodeURIComponent(u.replace(/^file:\/\//,""))); } }
+    else if(u.startsWith("/")) paths.push(u);
+  }
+  // PRIORITY 2: Chrome hides host paths — WALK the dropped hierarchy and UPLOAD the bytes
+  if(!paths.length && dt.items){
+    const entries=[...dt.items].map(it=>it.webkitGetAsEntry&&it.webkitGetAsEntry()).filter(Boolean);
+    for(const entry of entries){
+      if(!entry.isDirectory){ say("drop a FOLDER to mount a project db"); continue; }
+      say("uploading "+entry.name+"/ …");
+      try{
+        const files=await panelsWalkEntries(entry,"");
+        const kind=files.some(f=>PROJECT_MARKERS.test(f.rel))?"project":"assets";
+        const b=await(await fetch("/_project/"+encodeURIComponent(entry.name.toLowerCase())+"/begin?kind="+kind,{method:"POST"})).json();
+        if(b.verdict!=="ok"){ say("upload refused: "+(b.detail||"?")); continue; }
+        let sent=0,skipped=0,failed=0;
+        let frames=[],packed=0;
+        async function flushBatch(){
+          if(!frames.length)return;
+          const blob=new Blob(frames);frames=[];packed=0;
+          const r=await fetch("/_project/"+encodeURIComponent(b.name)+"/putBatch",
+            {method:"POST",headers:{"Content-Type":"application/octet-stream"},body:blob});
+          if(r.ok){const j=await r.json();sent+=j.stored||0;failed+=j.failed||0;say(b.name+": "+sent+"/"+files.length);}
+          else failed++;
+        }
+        function frame(rel,buf){
+          const pb=new TextEncoder().encode(rel);
+          const h=new DataView(new ArrayBuffer(4));h.setInt32(0,pb.length);
+          const l=new DataView(new ArrayBuffer(8));l.setBigInt64(0,BigInt(buf.byteLength));
+          frames.push(h.buffer,pb,l.buffer,buf);packed+=12+pb.length+buf.byteLength;
+        }
+        for(const f of files){
+          if(f.file.size>3500000){skipped++;continue;}
+          frame(f.rel,await f.file.arrayBuffer());
+          if(packed>3000000||frames.length>=256)await flushBatch();
+        }
+        await flushBatch();
+        say("project db /"+b.name+" — "+sent+" docs"+(skipped?" ("+skipped+" >3.5MB skipped)":"")+(failed?" · "+failed+" FAILED":""));
+        addNode("project.list",(e.clientX-view.x-viewport.getBoundingClientRect().left)/view.z,(e.clientY-40-view.y)/view.z);
+      }catch(err){ say("upload failed: "+err); }
+    }
+    return;
+  }
+  if(!paths.length){ say("nothing mountable in that drop"); return; }
+  // place side-by-side: column to the right of existing project.mount nodes
+  let baseX=(e.clientX-view.x-viewport.getBoundingClientRect().left)/view.z;
+  let baseY=(e.clientY-40-view.y)/view.z;
+  const mounts=G.nodes.filter(n=>n.type==="project.mount");
+  if(mounts.length){ baseX=Math.max(...mounts.map(n=>n.x))+260; baseY=Math.min(...mounts.map(n=>n.y)); }
+  let wx=baseX, wy=baseY;
+  for(const p of paths){
+    // normalize: ensure no trailing file:// prefix shown in node
+    const path=p.startsWith("file://") ? decodeURIComponent(p.replace(/^file:\/\//,"")) : p;
+    const n=addNode("project.mount",wx,wy,{path});
+    if(n){ runAll(n.id); wx+=24; wy+=24; }
+  }
+});
+addEventListener("pointerdown",e=>{ if(!menu.contains(e.target)) menu.style.display="none"; });
+$("#addBtn").addEventListener("click",e=>showMenu(60,60));
+/* ── execution ─────────────────────────────────────────────────────────── */
+function inputsOf(id){ return G.wires.filter(w=>w.to[0]===id); }
+function topo(){
+  // ring children run in the daemon's frame (the scope runner posts the
+  // ring); the client walk sequences top-level nodes only
+  const order=[],mark={};
+  const visit=id=>{
+    if(mark[id]==="t")return; if(mark[id]==="p")throw "cycle at "+id;
+    const nd=G.nodes.find(n=>n.id===id);
+    if(!nd||nd._parentScope){ mark[id]="t"; return; }
+    mark[id]="p";
+    for(const w of inputsOf(id)) visit(w.from[0]);
+    // a ring depends on every outside source feeding its interior (the
+    // inward warm-base wires) — those must run before the ring posts
+    if(nd.children&&nd.children.length){
+      const dIds=new Set(); (function wk(m){ for(const c of (m.children||[])){ dIds.add(c.id); wk(c); } })(nd);
+      for(const w of G.wires) if(dIds.has(w.to[0])&&!dIds.has(w.from[0])) visit(w.from[0]);
+    }
+    mark[id]="t"; order.push(id);
+  };
+  G.nodes.forEach(n=>{ if(!n._parentScope) visit(n.id); });
+  return order.map(id=>G.nodes.find(n=>n.id===id));
+}
+async function runNode(n,cache){
+  const t=CONTRACTS[n.type]; const R=RUNNERS[n.type];
+  if(!t||!R) return undefined;
+  const inputs={};
+  for(const w of inputsOf(n.id)){
+    const src=cache[w.from[0]];
+    if(src===undefined) return undefined;             // upstream not run
+    inputs[w.to[1]]=src[w.from[1]];
+  }
+  for(const name of t.ins){ if(!name.endsWith("?") && inputs[name]===undefined) return undefined; }
+  n.el.classList.remove("ok","err"); n.el.classList.add("running");
+  try{
+    const out=await R.run(n,inputs);
+    n.el.classList.remove("running"); n.el.classList.add("ok");
+    n._lastOut=out; // memo for partial runs: closure runs seed upstream values from here
+    if(R.render) R.render(n,out);
+    else if(!t.sink && n.type!=="display" && out!==undefined && Object.keys(out).length) setResult(n,out);
+    return out;
+  }catch(e){
+    n.el.classList.remove("running"); n.el.classList.add("err");
+    setResult(n,"ERROR: "+(e&&e.message||e));
+    return undefined;
+  }
+}
+async function runAll(fromId){
+  $("#status").textContent="running…";
+  wiresSvg.querySelectorAll("path.live").forEach(w=>w.classList.add("flow"));
+  let order;
+  try{ order=topo(); }catch(e){ $("#status").textContent=String(e); return; }
+  if(fromId){                                          // restrict to downstream closure of fromId
+    const keep=new Set([fromId]); let grew=true;
+    while(grew){ grew=false; for(const w of G.wires) if(keep.has(w.from[0])&&!keep.has(w.to[0])){keep.add(w.to[0]);grew=true;} }
+    order=order.filter(n=>keep.has(n.id));
+  }
+  const cache={};
+  if(fromId){
+    // Partial runs start from an interior node (a board drop, an SSE event) whose
+    // own required inputs live OUTSIDE the closure — seed them from the last full
+    // run's memo or the closure's first node silently refuses to run.
+    for(const n of G.nodes) if(!order.includes(n) && n._lastOut!==undefined) cache[n.id]=n._lastOut;
+  }
+  for(const n of order){ const out=await runNode(n,cache); if(out!==undefined) cache[n.id]=out; }
+  wiresSvg.querySelectorAll("path.flow").forEach(w=>w.classList.remove("flow"));
+  resolveTopLevelOverlaps(); // result trees grow nodes — keep them clear of each other
+  redraw();
+  $("#status").textContent="done "+new Date().toLocaleTimeString();
+}
+/* arm sources (timers + SSE). Called by ▶ run AND after every load path —
+   a preset loaded from the gallery must tick, not sit inert until ▶. */
+function armSources(){
+  for(const n of G.nodes){
+    if(n._parentScope) continue; // no client timers/SSE inside a ring — the daemon owns the frame
+    if(CONTRACTS[n.type]&&CONTRACTS[n.type].source&&n.type==="timer"&&!n._timer){
+      const s=Math.max(1,+p(n,"seconds")||5);
+      n._timer=setInterval(()=>runAll(n.id), s*1000);
+    }
+    if(n.type==="graal.events"&&!n._es){
+      // pointcut-driven dataflow: every matching graal event re-fires this node's downstream
+      n._es=new EventSource("/api/graal/events");
+      n._es.onmessage=(ev)=>{
+        const f=p(n,"filter");
+        if(f && !(ev.data||"").includes(f)) return;
+        try{ n._lastEvent=JSON.parse(ev.data); }catch(_){ n._lastEvent=ev.data; }
+        runAll(n.id);
+      };
+    }
+    if(n.type==="vm.events"&&!n._es){
+      // sub-VM lifecycle dataflow: spawn/eval/revoke events re-fire this node's downstream
+      n._es=new EventSource("/api/vm/events");
+      n._es.onmessage=(ev)=>{
+        try{ var d=JSON.parse(ev.data); }catch(_){ return; }
+        if(p(n,"vmId") && d.vmId!==p(n,"vmId")) return;
+        if(p(n,"kind") && d.kind!==p(n,"kind")) return;
+        n._lastEvent=d;
+        runAll(n.id);
+      };
+    }
+  }
+}
+$("#runBtn").addEventListener("click",()=>{ armSources(); runAll(); });
+$("#stopBtn").addEventListener("click",()=>{ for(const n of G.nodes){ if(n._timer){clearInterval(n._timer);n._timer=null;} if(n._es){n._es.close();n._es=null;} } $("#status").textContent="sources stopped"; });
+/* ── minimap: world overview + click-to-jump ───────────────────────────── */
+const mm=$("#minimap"), mmx=mm.getContext("2d");
+function drawMinimap(){
+  mmx.clearRect(0,0,168,112);
+  // fractal containment: one inset frame per dive level — the crumb, drawn.
+  // The innermost frame holds the current level's world overview.
+  const depth=diveStack.length;
+  for(let i=0;i<=depth;i++){
+    const ins=2+i*5;
+    mmx.strokeStyle=i===depth?"#b07aff":"#232a38";
+    mmx.strokeRect(ins+.5,ins+.5,168-2*ins-1,112-2*ins-1);
+  }
+  // ring children live in ring-local coordinates — bounds over top level only
+  const tops=G.nodes.filter(n=>!n._parentScope&&n.el);
+  if(!tops.length) return;
+  const pad0=2+depth*5+3;
+  let minX=1e9,minY=1e9,maxX=-1e9,maxY=-1e9;
+  for(const n of tops){ minX=Math.min(minX,n.x); minY=Math.min(minY,n.y); maxX=Math.max(maxX,n.x+200); maxY=Math.max(maxY,n.y+120); }
+  const pad=40, s=Math.min((168-2*pad0)/(maxX-minX+2*pad), (112-2*pad0)/(maxY-minY+2*pad));
+  const ox=pad0-(minX-pad)*s, oy=pad0-(minY-pad)*s;
+  for(const n of tops){
+    mmx.fillStyle = n.el.classList.contains("err") ? "#ff4f58" : n.el.classList.contains("ok") ? "#3ddc84" : "#7b8496";
+    mmx.fillRect(n.x*s+ox, n.y*s+oy, Math.max(3,180*s), Math.max(2,80*s));
+  }
+  const vw=viewport.clientWidth/view.z, vh=viewport.clientHeight/view.z;
+  mmx.strokeStyle="#f29111"; mmx.lineWidth=1;
+  mmx.strokeRect((-view.x/view.z)*s+ox, (-view.y/view.z)*s+oy, vw*s, vh*s);
+  mm._s=s; mm._ox=ox; mm._oy=oy;
+}
+mm.addEventListener("click",e=>{
+  if(!mm._s) return;
+  const r=mm.getBoundingClientRect();
+  const wx=((e.clientX-r.left)-mm._ox)/mm._s, wy=((e.clientY-r.top)-mm._oy)/mm._s;
+  view.x=-(wx*view.z)+viewport.clientWidth/2; view.y=-(wy*view.z)+viewport.clientHeight/2;
+  applyView(); save(); drawMinimap();
+});
+setInterval(drawMinimap, 1500);
+
+/* ── persistence ───────────────────────────────────────────────────────── */
+/* the tree survives the round trip: top level = nodes outside any ring;
+   a ring emits its children recursively (the same objects that live
+   flattened in G.nodes — one identity, no shadow copy) */
+function nodeDoc(n){ return {id:n.id,type:n.type,x:n.x,y:n.y,params:n.params,collapsed:!!n.collapsed,subprogram:n.subprogram||undefined,
+  children:(n.children&&n.children.length)?n.children.map(nodeDoc):undefined}; }
+function serialize(){ return {view,nodes:G.nodes.filter(n=>!n._parentScope).map(nodeDoc),wires:G.wires,seq:G.seq}; }
+let AUTOSAVE=true; // ?load= link views are ephemeral — never clobber the scratch
+function save(){ if(!AUTOSAVE) return; try{ localStorage.setItem("trikeshed.panels.v3", JSON.stringify(serialize())); }catch(e){} }
+function load(data){
+  for(const n of G.nodes){ if(n._timer)clearInterval(n._timer); if(n._es){n._es.close();n._es=null;} n.el.remove(); }
+  G={nodes:[],wires:[],seq:data.seq||1};
+  if(data.view) view=data.view;
+  // three passes: CLONE the tree (children stay the SAME objects that get
+  // flattened into G.nodes — serialize and the dive stack rely on that
+  // identity), BUILD every node, then MOUNT children inside their ring
+  // squares — the concentric pass.
+  const cloneNode=sn=>({...sn,params:{...sn.params},children:(sn.children||[]).map(cloneNode)});
+  const built=[];
+  for(const sn of data.nodes||[]){
+    if(!CONTRACTS[sn.type])continue;
+    const n=cloneNode(sn);
+    buildNode(n); built.push(n);
+    // nested children become real graph citizens (wires, warm base, save)
+    // but live inside the scope's childgrid — the ring owns their geometry
+    const flatten=(node)=>{
+      for(const c of (node.children||[])){
+        if(!CONTRACTS[c.type])continue;
+        buildNode(c); built.push(c);
+        flatten(c);
+      }
+    };
+    flatten(n);
+  }
+  G.nodes=built;
+  mountChildren();
+  G.wires=(data.wires||[]).filter(w=>G.nodes.find(n=>n.id===w.from[0])&&G.nodes.find(n=>n.id===w.to[0]));
+  applyView(); redraw(); save();
+}
+/* constructions are STORE DOCUMENTS: panels/<name> in the attachment plane —
+   CAS-addressed, replicated with the forge home. localStorage remains only the
+   unsaved-scratch autosave. */
+$("#storeSaveBtn").addEventListener("click",async()=>{
+  const name=($("#panelName").value||"").trim();
+  if(!/^[a-z0-9][a-z0-9._-]*$/.test(name)){ $("#status").textContent="name: lowercase kebab"; return; }
+  const resp=await fetch("/api/panels/"+name,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(serialize())});
+  const r=await resp.json();
+  $("#status").textContent=r.verdict==="ok"?("saved panels/"+name+" @ "+String(r.cid).slice(7,19)):("save failed: "+(r.error||r.detail||resp.status));
+});
+$("#storeLoadBtn").addEventListener("click",async()=>{
+  let name=($("#panelName").value||"").trim();
+  if(!name){
+    const r=await(await fetch("/api/panels")).json();
+    const names=(r.panels||[]).map(x=>x.name);
+    if(!names.length){ $("#status").textContent="store has no panels yet"; return; }
+    name=prompt("load which panel?\n"+names.join("\n"),names[0])||"";
+    if(!name)return;
+    $("#panelName").value=name;
+  }
+  const resp=await fetch("/api/panels/"+name);
+  if(!resp.ok){ $("#status").textContent="load failed: "+resp.status; return; }
+  load(await resp.json());
+  armSources(); runAll();
+  $("#status").textContent="loaded panels/"+name;
+});
+$("#exportBtn").addEventListener("click",()=>{
+  const blob=new Blob([JSON.stringify(serialize(),null,1)],{type:"application/json"});
+  const a=document.createElement("a"); a.href=URL.createObjectURL(blob); a.download="panel-graph.json"; a.click();
+});
+$("#importBtn").addEventListener("click",()=>$("#fileIn").click());
+$("#fileIn").addEventListener("change",async e=>{ const f=e.target.files[0]; if(f){ load(JSON.parse(await f.text())); armSources(); runAll(); } });
+$("#clearBtn").addEventListener("click",()=>{ if(confirm("clear the panel?")) load({nodes:[],wires:[]}); });
+/* ── the PALETTE: docked drag-source. Types are the served vocabulary
+   (grouped by family — scope's coroutine rings, vm sub-VMs, kanban,
+   blackboard, beliefs… — hover shows every port with its KIND); programs
+   are the gallery (presets + store). Drag onto the canvas — or into a
+   ring — to place; click a type to add at view center; click a program
+   to open it as a link view. ── */
+async function buildPalette(){
+  const pal=$("#palette"); pal.innerHTML="";
+  const q=document.createElement("input"); q.placeholder="filter palette…"; pal.appendChild(q);
+  const body=document.createElement("div"); pal.appendChild(body);
+  let progs=[];
+  try{
+    const [pr,st]=await Promise.all([
+      fetch("/api/panels/presets").then(r=>r.json()).catch(()=>({presets:[]})),
+      fetch("/api/panels").then(r=>r.json()).catch(()=>({panels:[]})),
+    ]);
+    progs=(pr.presets||[]).map(x=>x.name).concat((st.panels||[]).map(x=>x.name));
+  }catch(_){}
+  const render=f=>{
+    body.innerHTML="";
+    const groups={};
+    for(const t of Object.keys(CONTRACTS).sort()){
+      if(f&&!t.includes(f)&&!CONTRACTS[t].title.toLowerCase().includes(f))continue;
+      const g=t.includes(".")?t.split(".")[0]:"core";
+      (groups[g]=groups[g]||[]).push(t);
+    }
+    for(const g of Object.keys(groups).sort()){
+      const h=document.createElement("h5"); h.textContent=g; body.appendChild(h);
+      for(const t of groups[g]){
+        const c=CONTRACTS[t];
+        const d=document.createElement("div"); d.className="pitem"; d.draggable=true;
+        const kin=(c.ins||[]).map(p2=>p2+":"+(kindOf(t,"in",p2)||"?")).join("  ");
+        const kout=(c.outs||[]).map(p2=>p2+":"+(kindOf(t,"out",p2)||"?")).join("  ");
+        d.title=c.title+"\nin   "+(kin||"—")+"\nout  "+(kout||"—");
+        d.innerHTML=t+"<i>"+c.title+"</i>";
+        d.addEventListener("dragstart",e=>{ e.dataTransfer.setData("text/x-lcnc-type",t); e.dataTransfer.effectAllowed="copy"; });
+        d.addEventListener("click",()=>{ addNode(t,(viewport.clientWidth/2-view.x)/view.z,(viewport.clientHeight/2-view.y)/view.z); });
+        body.appendChild(d);
+      }
+    }
+    if(progs.length){
+      const h=document.createElement("h5"); h.textContent="gallery — programs"; body.appendChild(h);
+      for(const nm of progs){
+        if(f&&!nm.toLowerCase().includes(f))continue;
+        const d=document.createElement("div"); d.className="pitem"; d.draggable=true;
+        d.innerHTML="▤ "+nm+"<i>drag → program.ref · click → open</i>";
+        d.addEventListener("dragstart",e=>{ e.dataTransfer.setData("text/x-lcnc-program",nm); e.dataTransfer.effectAllowed="copy"; });
+        d.addEventListener("click",()=>{ location.href="/panels?load="+enc(nm); });
+        body.appendChild(d);
+      }
+    }
+  };
+  q.addEventListener("input",()=>render(q.value.trim().toLowerCase()));
+  render("");
+}
+$("#paletteBtn").addEventListener("click",()=>$("#palette").classList.toggle("open"));
+/* modal CRUD for board cards — create via kanban.submit, move via
+   kanban.move: the daemon's own verbs, nothing invented. */
+function openCardModal(n,colId,item){
+  const isNew=!item;
+  const cols=(n._cols&&n._cols.length?n._cols.map(c=>c.id):Object.keys(n._groups||{})).sort();
+  const d=document.createElement("div");
+  d.style.cssText="position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:99;display:flex;align-items:center;justify-content:center";
+  d.innerHTML='<div style="background:var(--panel);border:1px solid var(--graal);border-radius:8px;padding:16px 18px;width:380px;color:var(--ink)">'
+    +'<b style="color:var(--graal)">'+(isNew?"new card":"card "+item.id+" · rev "+(item.revision??"—"))+'</b>'
+    +'<div style="margin:10px 0 3px;color:var(--dim);font-size:10px">TITLE</div><input data-cm="title" style="width:100%">'
+    +'<div style="margin:8px 0 3px;color:var(--dim);font-size:10px">PRIORITY</div><select data-cm="pri"><option>0</option><option>1</option><option>2</option></select>'
+    +(isNew?"":'<div style="margin:8px 0 3px;color:var(--dim);font-size:10px">COLUMN</div><select data-cm="col">'+cols.map(c=>'<option'+(c===colId?" selected":"")+'>'+c+'</option>').join("")+'</select>')
+    +'<div style="margin-top:14px;display:flex;gap:8px;justify-content:flex-end"><button data-cm="cancel">cancel</button><button data-cm="ok" style="border-color:var(--ok);color:var(--ok)">'+(isNew?"create":"apply")+'</button></div></div>';
+  document.body.appendChild(d);
+  const el=s=>d.querySelector('[data-cm="'+s+'"]');
+  el("title").value=item?item.title||"":"";
+  el("pri").value=String(item?(item.priority??2):2);
+  const close=()=>d.remove();
+  el("cancel").onclick=close; d.onclick=e=>{ if(e.target===d)close(); };
+  d.querySelectorAll("input,select,button").forEach(x=>x.addEventListener("pointerdown",e=>e.stopPropagation()));
+  el("ok").onclick=async()=>{
+    if(isNew){
+      const title=el("title").value.trim(); if(!title){ el("title").focus(); return; }
+      const r=await api("POST","/api/lcnc/run",{type:"kanban.submit",inputs:{},
+        params:{jobId:"",title,priority:el("pri").value,idempotencyKey:"panel-modal-"+Date.now()}});
+      $("#status").textContent=r.ok?("card landed: "+title):("submit failed: "+(r.error||JSON.stringify(r)));
+    } else {
+      const to=el("col").value;
+      if(to&&to!==(item.status||colId)){
+        const cmd={jobId:item.id,toColumn:to,expectedRevision:item.revision,idempotencyKey:"panel-modal-"+item.id+"-"+(item.revision??0)+"-"+to};
+        const r=await api("POST","/api/lcnc/run",{type:"kanban.move",params:{},inputs:{command:cmd,"command?":cmd}});
+        $("#status").textContent=r.ok?("moved "+item.id+" → "+to):("move failed: "+(r.error||JSON.stringify(r)));
+      }
+    }
+    close(); runAll();
+  };
+  setTimeout(()=>el("title").focus(),0);
+}
+/* ── preset gallery: /api/panels/presets finally has its consumer ────────
+   Server-shape (LcncProgramConfix) → client-shape converter + a picklist of
+   presets and stored programs. Presets are OFFERED — loading one puts it on
+   the canvas; installing stays the explicit ⇪ store act. */
+function fromConfix(doc){
+  // Server wires are {from:[node,port],to:[node,port]} (LcncProgramConfix.toJson);
+  // accept the flat fromNode/fromPort spelling too so older documents still load.
+  // children map RECURSIVELY — a preset's rings land concentric, never flattened.
+  const nodeOf=n=>({id:n.id,type:n.type,x:n.x||0,y:n.y||0,params:n.params||{},collapsed:!!n.collapsed,subprogram:n.subprogram||undefined,
+    children:(n.children&&n.children.length)?n.children.map(nodeOf):undefined});
+  return {view:doc.view?{x:doc.view.x||0,y:doc.view.y||0,z:doc.view.z||doc.view.zoom||1}:undefined, seq:doc.seq||1,
+    nodes:(doc.nodes||[]).map(nodeOf),
+    wires:(doc.wires||[]).map(w=>({from:w.from||[w.fromNode,w.fromPort],to:w.to||[w.toNode,w.toPort]}))};
+}
+async function openGallery(){
+  let g=$("#gallery");
+  if(g){ g.remove(); return; }
+  g=document.createElement("div"); g.id="gallery";
+  g.style.cssText="position:fixed;top:52px;right:12px;width:340px;max-height:70vh;overflow:auto;background:var(--panel,#101620);border:1px solid var(--line,#263348);border-radius:8px;padding:10px;z-index:50;font-size:12px";
+  g.innerHTML='<div style="display:flex;justify-content:space-between;margin-bottom:8px"><b style="color:var(--cyan,#57d3ff)">GALLERY</b><span style="cursor:pointer" onclick="this.closest(\'#gallery\').remove()">✕</span></div><div id="galBody">loading…</div>';
+  document.body.appendChild(g);
+  const body=g.querySelector("#galBody");
+  try{
+    const [pr,st]=await Promise.all([
+      fetch("/api/panels/presets").then(r=>r.json()).catch(()=>({presets:[]})),
+      fetch("/api/panels").then(r=>r.json()).catch(()=>({panels:[]})),
+    ]);
+    const rows=[];
+    rows.push('<div style="color:var(--dim,#7f91a9);margin:4px 0">presets — server-authored, offered</div>');
+    for(const p of (pr.presets||[])){
+      const doc=p.document||{}; const nn=(doc.nodes||[]).length;
+      rows.push('<div class="galRow" data-kind="preset" data-name="'+p.name+'" style="padding:5px 6px;border:1px solid var(--line,#263348);border-radius:5px;margin:3px 0;cursor:pointer">'+p.name+' <span style="color:var(--dim,#7f91a9)">· '+nn+' nodes</span></div>');
+    }
+    rows.push('<div style="color:var(--dim,#7f91a9);margin:8px 0 4px">store — your saved programs</div>');
+    const panels=st.panels||[];
+    if(!panels.length) rows.push('<div style="color:var(--dim,#7f91a9)">store has no programs yet — ⇪ store saves the canvas</div>');
+    for(const s of panels){
+      rows.push('<div class="galRow" data-kind="store" data-name="'+s.name+'" style="padding:5px 6px;border:1px solid var(--line,#263348);border-radius:5px;margin:3px 0;cursor:pointer">'+s.name+' <span style="color:var(--dim,#7f91a9)">· '+(s.bytes||0)+' B</span></div>');
+    }
+    body.innerHTML=rows.join("");
+    body.querySelectorAll(".galRow").forEach(el=>el.addEventListener("click",async()=>{
+      const name=el.dataset.name;
+      if(el.dataset.kind==="preset"){
+        const doc=(pr.presets||[]).find(x=>x.name===name)?.document;
+        if(doc){ load(fromConfix(doc)); $("#panelName").value=name.replace(/^preset-/,""); $("#status").textContent="loaded "+name+" (offered — ⇪ store to keep it)"; }
+      } else {
+        const resp=await fetch("/api/panels/"+name);
+        if(resp.ok){ load(await resp.json()); $("#panelName").value=name; $("#status").textContent="loaded panels/"+name; }
+      }
+      g.remove(); armSources(); runAll();
+    }));
+  }catch(e){ body.textContent="gallery failed: "+e; }
+}
+$("#presetsBtn").addEventListener("click",openGallery);
+/* ── contract hydration: the vocabulary is server-owned ─────────────────── */
+// The ONE author is /api/lcnc/contracts; this page carries no type table.
+// (This function was promised by the step-4 rework and never written — the
+// boot awaited an undefined name, the IIFE died on the ReferenceError, and
+// /panels rendered 100% empty. The vocabulary map is rebuilt here, verbatim
+// from the served contracts: title/inputs/outputs/params/source/sink/wide.)
+let CONTRACTS={};
+async function syncContracts(){
+  try{
+    const list=(await (await fetch('/api/lcnc/contracts')).json()).contracts||[];
+    const m={};
+    for(const c of list){
+      // Normalize wire shape → renderer shape: the page reads ins/outs, and an
+      // EMPTY opts array must not become a select (|| [] is truthy).
+      c.ins=c.inputs||[]; c.outs=c.outputs||[];
+      const p={};
+      for(const k in (c.params||{})){
+        const d=c.params[k]||{};
+        p[k]={v:d.v??"", opts:(d.opts&&d.opts.length)?d.opts:undefined,
+              ta:d.ta||undefined, ph:d.ph||undefined};
+      }
+      c.params=p;
+      m[c.type]=c;
+    }
+    CONTRACTS=m;
+    $("#status").textContent=Object.keys(m).length+" contracts hydrated";
+  }catch(e){
+    $("#status").textContent="contracts fetch failed: "+e;
+  }
+}
+/* ── boot: restore, or seed the starter panel ──────────────────────────── */
+// Boot waits for contract hydration: the vocabulary is server-owned, and the
+// starter board's addNode calls must see it or the first paint is empty.
+(async()=>{ await Promise.all([syncContracts(),syncLanes()]);
+buildPalette(); $("#palette").classList.add("open");
+// /panels?load=<name> IS a link to a document: presets first, then the
+// store. Link views are ephemeral — the localStorage scratch stays put.
+const qload=new URLSearchParams(location.search).get("load");
+if(qload){
+  AUTOSAVE=false;
+  try{
+    const pr=await(await fetch("/api/panels/presets")).json();
+    const hit=(pr.presets||[]).find(x=>x.name===qload||x.name==="preset-"+qload);
+    if(hit&&hit.document){ load(fromConfix(hit.document)); $("#panelName").value=hit.name.replace(/^preset-/,""); $("#status").textContent="viewing "+hit.name+" — link view, ⇪ store to keep changes"; }
+    else{
+      const resp=await fetch("/api/panels/"+enc(qload));
+      if(resp.ok){ load(await resp.json()); $("#panelName").value=qload; }
+      else $("#status").textContent="no such program: "+qload;
+    }
+  }catch(e){ $("#status").textContent="link load failed: "+e; }
+}
+else{
+let stored=null; try{ stored=JSON.parse(localStorage.getItem("trikeshed.panels.v3")); }catch(e){}
+if(stored&&stored.nodes&&stored.nodes.length){ load(stored); }
+else {
+  /* the default construction is the PRODUCTION OPS BOARD: live system state,
+     not an aspirational plan. timer drives; every column is a real surface. */
+  const t=addNode("timer",30,60,{seconds:"10"});
+  const v=addNode("graal.vitals",250,30);
+  const pk=addNode("pick",470,30,{path:"memory.heapUsed"});
+  const g=addNode("gauge",650,20,{label:"heap used"});
+  const pk2=addNode("pick",470,180,{path:"gc.collections"});
+  const g2=addNode("gauge",650,170,{label:"gc collections"});
+  const sc=addNode("project.list",250,330);
+  const scd=addNode("display",470,330);
+  const bi=addNode("beliefs.introspect",250,520);
+  const bid=addNode("display",470,520);
+  const vs=addNode("vms.list",250,700);
+  const vsd=addNode("display",470,700);
+  const ks=addNode("keys.status",250,880);
+  const ksd=addNode("display",470,880);
+  // ── kanban: not a node, a COMPOSITION — now on the atomic vocabulary.
+  // kanban.activeSheets (ONE server projection) feeds the concentric
+  // treesheets AND the draggable gesture surface; a drop only DESCRIBES the
+  // gesture, js shapes it, kanban.move (the daemon's own runner) lands it on
+  // the WAL. Same composition offered as "preset-kanban" (▤ presets).
+  const kas=addNode("kanban.activeSheets",30,1060);
+  const ksc=addNode("sheet.concentric",300,1030);
+  const bpi=addNode("pick",300,1430,{path:"items"});
+  const bpc=addNode("pick",300,1570,{path:"columns"});
+  const bgb=addNode("list.groupBy",520,1430,{key:"status"});
+  const bdb=addNode("dom.board",740,1430,{idField:"id",titleField:"title",subtitleField:"id",badgeField:"priority"});
+  const bmv=addNode("js",1460,1430,{expr:"{jobId:x.itemId,toColumn:x.to,expectedRevision:x.item.revision,idempotencyKey:'panel-'+x.itemId+'-'+x.item.revision+'-'+x.to}"});
+  const bkm=addNode("kanban.move",1680,1430);
+  const bks=addNode("kanban.submit",30,1430,{jobId:"",title:"",priority:"2",idempotencyKey:""});
+  // ── continents: the heap treemap and the quota-legion standings live on
+  // the same canvas as everything else — one zoom grammar, no side pages.
+  const hp=addNode("graal.heap",250,1760,{lane:"allocation"});
+  const ms=addNode("mux.standings",250,2000);
+  const nt=addNode("note",650,340,{text:"production ops board — live planes, no fiction.\nright-click/double-click: add nodes.\ndrop a folder anywhere: mount it as a scope.\nkanban below: concentric treesheets (click ▤ refs to\ndive, crumb climbs out) + draggable board — a drop\nonly DESCRIBES the gesture; js + kanban.move decide.\nkanban.submit: fill params, ▶ — a real card lands.\nfurther down: heap continent + quota legion."});
+  for(const [a,b,ap,bp] of [
+    [t,v,"tick","trigger?"],[v,pk,"json","x"],[pk,g,"y","x"],
+    [v,pk2,"json","x"],[pk2,g2,"y","x"],
+    [t,sc,"tick","trigger?"],[sc,scd,"scopes","x"],
+    [t,bi,"tick","trigger?"],[bi,bid,"field","x"],
+    [t,vs,"tick","trigger?"],[vs,vsd,"rows","x"],
+    [t,ks,"tick","trigger?"],[ks,ksd,"roster","x"],
+    [t,kas,"tick","trigger?"],
+    [kas,ksc,"board","board"],[kas,ksc,"byStatus","byStatus?"],
+    [kas,ksc,"byPriority","byPriority?"],[kas,ksc,"orchestration","orchestration?"],
+    [kas,bpi,"boardView","x"],[kas,bpc,"boardView","x"],
+    [bpi,bgb,"y","x"],
+    [bgb,bdb,"groups","groups"],[bpc,bdb,"y","columns?"],
+    [bdb,bmv,"move","x"],[bmv,bkm,"y","command?"],
+    [t,hp,"tick","trigger?"],
+    [t,ms,"tick","trigger?"],
+  ]) G.wires.push({from:[a.id,ap],to:[b.id,bp]});
+  save();
+}
+}
+applyView(); requestAnimationFrame(redraw);
+// arm sources and run once immediately — a freshly loaded panel shows LIVE
+// state on first paint, not an inert diagram waiting for a click.
+armSources();
+runAll();
+})();
+</script>
+</body>
+</html>

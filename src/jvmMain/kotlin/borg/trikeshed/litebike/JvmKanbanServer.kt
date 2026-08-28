@@ -456,6 +456,10 @@ class JvmKanbanServer(
     /** Static PWA assets straight from `src/commonMain/resources/web/` on the classpath. Paths are fixed — no traversal. */
     private val staticAssets: Map<String, Pair<String, String>> = mapOf(
         "/styles.css" to ("web/styles.css" to "text/css; charset=utf-8"),
+        "/panels.html" to ("web/panels.html" to "text/html; charset=utf-8"),
+        // the concentric construction canvas rides the page plane, not a module
+        // claim — ModuleRouteRegistry is exact /api/* by discipline
+        "/panels" to ("web/panels.html" to "text/html; charset=utf-8"),
         "/script.js" to ("web/script.js" to "application/javascript; charset=utf-8"),
         "/sw.js" to ("web/sw.js" to "application/javascript; charset=utf-8"),
         "/manifest.webmanifest" to ("web/manifest.webmanifest" to "application/manifest+json; charset=utf-8"),

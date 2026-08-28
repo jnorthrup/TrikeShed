@@ -212,6 +212,23 @@ class KanbanModule : ForgeModule {
             else JvmKanbanServer.HttpResponse(200, JsonSupport.stringify(lcnc.activeSheets()))
         }
 
+        // The concentric composition surface: modules + rings + wizard roster,
+        // projected purely from contracts, stored programs, and the sub-VM substrate.
+        ctx.routes.claim(id, "/api/lcnc/concentric") { method, _, _, _ ->
+            if (method != "GET") return@claim JvmKanbanServer.HttpResponse(405, """{"error":"method_not_allowed"}""")
+            val programs = runCatching {
+                borg.trikeshed.lcnc.LcncPresets.all().map { (name, doc) -> name to doc }
+            }.getOrNull().orEmpty()
+            val surface = borg.trikeshed.lcnc.ConcentricSurface.render(programs = programs)
+            JvmKanbanServer.HttpResponse(200, JsonSupport.stringify(surface))
+        }
+
+        // /panels — the concentric construction canvas (revived editor) — is a
+        // PAGE: JvmKanbanServer serves it from staticAssets (ModuleRouteRegistry
+        // is exact /api/* by discipline). The server-rendered swimlane projection
+        // moved to /api/lcnc/concentric; vocabulary hydrates from
+        // /api/lcnc/contracts; constructions are stored via /api/panels.
+
         ctx.routes.claim(id, "/api/lcnc/contracts") { method, _, _, _ ->
             if (method != "GET") JvmKanbanServer.HttpResponse(405, """{"error":"method_not_allowed"}""")
             else JvmKanbanServer.HttpResponse(200, JsonSupport.stringify(mapOf(
@@ -250,39 +267,59 @@ class KanbanModule : ForgeModule {
             @Suppress("UNCHECKED_CAST")
             val inputs = (req["inputs"] as? Map<*, *>)?.entries
                 ?.associate { (k, v) -> k.toString() to v } ?: emptyMap<String, Any?>()
+            // ONE execution path for named and inline rings: CCEK assembly when
+            // bound (structured child scope, reactor + LcncScopeFrame in one
+            // context, projected receipts), direct walk in reduced/test contexts.
+            val execute: suspend (String, borg.trikeshed.lcnc.LcncProgram) -> JvmKanbanServer.HttpResponse =
+                { label, program ->
+                    val walker = LcncRunner(ctx.lcncRunners).apply { subprogramLoader = ctx.programLoader }
+                    runCatching {
+                        val binding = ctx.ccekBinding
+                        if (binding != null) {
+                            LcncCcekAssembly(binding, walker)
+                                .launch(label, program, inputs)
+                                .result.await()
+                        } else {
+                            walker.runProcedure(program, inputs)
+                        }
+                    }.fold(
+                        onSuccess = { res ->
+                            JvmKanbanServer.HttpResponse(200, JsonSupport.stringify(mapOf(
+                                "ok" to true, "program" to label,
+                                "returns" to res.returns, "outputs" to res.nodeOutputs,
+                            )))
+                        },
+                        onFailure = { e ->
+                            JvmKanbanServer.HttpResponse(400, JsonSupport.stringify(mapOf(
+                                "ok" to false, "program" to label, "error" to (e.message ?: e.toString()),
+                            )))
+                        },
+                    )
+                }
             val programName = req["program"]?.toString()
             if (programName != null) {
-                val load = ctx.programLoader
-                val program = load(programName)
+                val program = ctx.programLoader(programName)
                     ?: return@claim JvmKanbanServer.HttpResponse(
                         404, JsonSupport.stringify(mapOf("error" to "no_such_program", "program" to programName)),
                     )
-                val walker = LcncRunner(ctx.lcncRunners).apply { subprogramLoader = load }
-                return@claim runCatching {
-                    val binding = ctx.ccekBinding
-                    if (binding != null) {
-                        // P1: the daemon path is a real CCEK assembly — structured child
-                        // scope, reactor + LcncScopeFrame in one context, projected receipts.
-                        LcncCcekAssembly(binding, walker)
-                            .launch(programName, program, inputs)
-                            .result.await()
-                    } else {
-                        // Reduced/test contexts preserve the direct path.
-                        walker.runProcedure(program, inputs)
-                    }
-                }.fold(
-                    onSuccess = { res ->
-                        JvmKanbanServer.HttpResponse(200, JsonSupport.stringify(mapOf(
-                            "ok" to true, "program" to programName,
-                            "returns" to res.returns, "outputs" to res.nodeOutputs,
-                        )))
-                    },
-                    onFailure = { e ->
-                        JvmKanbanServer.HttpResponse(400, JsonSupport.stringify(mapOf(
-                            "ok" to false, "program" to programName, "error" to (e.message ?: e.toString()),
-                        )))
-                    },
-                )
+                return@claim execute(programName, program)
+            }
+            // Inline ring: the panels canvas posts a scope's children as a
+            // whole document — {name?, document, inputs} — and the ring runs
+            // under the same frame nesting as a stored program. The document
+            // parses through LcncProgramConfix (ALL DATA IS CONFIX); a bad
+            // shape is a loud 400, never a silent flat sweep.
+            val document = req["document"]
+            if (document != null) {
+                val label = req["name"]?.toString()?.takeIf { it.isNotBlank() } ?: "inline"
+                val program = runCatching {
+                    borg.trikeshed.lcnc.LcncProgramConfix.fromJson(label, JsonSupport.stringify(document))
+                }.getOrElse { e ->
+                    return@claim JvmKanbanServer.HttpResponse(400, JsonSupport.stringify(mapOf(
+                        "error" to "bad_document", "detail" to (e.message ?: e.toString()),
+                    )))
+                }
+                return@claim execute(label, program)
             }
             val type = req["type"]?.toString()
                 ?: return@claim JvmKanbanServer.HttpResponse(400, """{"error":"type_required"}""")
