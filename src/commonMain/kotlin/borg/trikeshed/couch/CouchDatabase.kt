@@ -83,8 +83,16 @@ class CouchDatabase(
         includeDocs: Boolean = false,
         keys: List<String>? = null,
     ): Map<String, Any?> {
-        val live = store.all().filter { !isTombstone(it) }
-        var ids = live.map { it.id }.sorted()
+        val storeIds = store.ids()
+        val rawIds = ArrayList<String>()
+        for (i in 0 until storeIds.a) {
+            val id = storeIds.b(i)
+            if (!store.head.isDeleted(id)) {
+                rawIds.add(id)
+            }
+        }
+
+        var ids = rawIds.sorted()
         if (keys != null) {
             val set = keys.toSet(); ids = keys.filter { it in set }
         } else {
@@ -92,7 +100,7 @@ class CouchDatabase(
             if (endkey != null) ids = ids.filter { if (descending) it >= endkey else it <= endkey }
             if (descending) ids = ids.reversed()
         }
-        val total = live.size
+        val total = rawIds.size
         val page = ids.drop(skip).take(limit)
         return mapOf(
             "total_rows" to total,

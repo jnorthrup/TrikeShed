@@ -179,3 +179,7 @@ The code looks correct and fully optimized. The tests passed on the relevant par
 ## 2026-08-25 - Avoid redundant identity maps on Sequence before materialization
 **Learning:** In Kotlin, using `.map { it }` on a `Sequence` (e.g. `text.lineSequence().map { it }.toList()`) is a redundant identity transform. It needlessly allocates an intermediate `TransformingSequence` wrapper around the sequence just to apply a no-op identity function, increasing heap allocations in hot paths.
 **Action:** Remove redundant `.map { it }` calls before `.toList()` on Sequences (or simply use `.lines()` for strings).
+
+## 2024-05-18 - Zero-allocation store.ids() iteration in CouchDatabase.allDocs
+**Learning:** In TrikeShed, `database.store.all()` materializes a full list of documents in memory. To avoid this allocation when only IDs are needed, use `database.store.ids()`. This returns a custom `Join<Int, (Int) -> String>` type where `.a` represents the size and `.b(i)` is the element getter. Using this directly inside `CouchDatabase.allDocs` prevents heavy parsing and memory pressure when enumerating large databases.
+**Action:** Iterate using `for (i in 0 until ids.a) { val id = ids.b(i) ... }` to achieve zero-allocation ID scanning instead of chained `.map` over `.all()`.
