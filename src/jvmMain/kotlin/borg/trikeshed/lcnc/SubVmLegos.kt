@@ -61,14 +61,28 @@ object SubVmLegos {
             .ifEmpty { node.params["text"] ?: "" }
         val annotators = node.params["annotators"] ?: "tokenize,ssplit,pos,lemma,depparse"
         val script = buildString {
-            appendLine("props = new java.util.Properties()")
-            appendLine("props.setProperty('annotators', '$annotators')")
-            appendLine("pipeline = new edu.stanford.nlp.pipeline.StanfordCoreNLP(props)")
-            appendLine("doc = new edu.stanford.nlp.pipeline.CoreDocument('$text')")
+            // GraalJS (not Groovy): Java.type for class literals, JSON.stringify for output.
+            // Text rides as a global to avoid any quoting/escaping hazards.
+            appendLine("var Properties = Java.type('java.util.Properties')")
+            appendLine("var CoreNLP = Java.type('edu.stanford.nlp.pipeline.StanfordCoreNLP')")
+            appendLine("var CoreDocument = Java.type('edu.stanford.nlp.pipeline.CoreDocument')")
+            appendLine("var props = new Properties()")
+            appendLine("props.setProperty('annotators', '${annotators.replace("'", "\\'")}')")
+            appendLine("var pipeline = new CoreNLP(props)")
+            appendLine("var doc = new CoreDocument(GUEST_TEXT)")
             appendLine("pipeline.annotate(doc)")
-            appendLine("for (t in doc.tokens()) print(t.word() + '\\t' + t.tag() + '\\t' + t.lemma())")
+            appendLine("var out = []")
+            appendLine("for (var i = 0; i < doc.tokens().size(); i++) {")
+            appendLine("  var t = doc.tokens().get(i)")
+            appendLine("  out.push(t.word() + '\\t' + t.tag() + '\\t' + t.lemma())")
+            appendLine("}")
+            // The joined payload is the eval VALUE (Teleported.Str) — print()
+            // stays only as a human-readable terminal trace.
+            appendLine("var RESULT = out.join('\\n')")
+            appendLine("print(RESULT)")
+            appendLine("RESULT")
         }
-        evalInVm(host, node, facet, script, inputs)
+        evalInVmText(host, node, facet, script, text, inputs)
     }
 
     // ── corenlp.extract: NER + dependency + sentiment per sentence ───
@@ -86,68 +100,69 @@ object SubVmLegos {
             "$annotators,sentiment"
         } else annotators
         val script = buildString {
-            appendLine("props = new java.util.Properties()")
-            appendLine("props.setProperty('annotators', '$effectiveAnnotators')")
-            appendLine("pipeline = new edu.stanford.nlp.pipeline.StanfordCoreNLP(props)")
-            appendLine("doc = new edu.stanford.nlp.pipeline.CoreDocument('$text')")
+            // GraalJS: bare Java.type + plain object literals + JSON.stringify.
+            // NER span begin/end annotations are CHAR offsets in CoreNLP; token
+            // indexing is 1-based, so spans are recovered from the token list
+            // rather than the (absent on CoreToken) begin/end annotations.
+            appendLine("var Properties = Java.type('java.util.Properties')")
+            appendLine("var CoreNLP = Java.type('edu.stanford.nlp.pipeline.StanfordCoreNLP')")
+            appendLine("var CoreDocument = Java.type('edu.stanford.nlp.pipeline.CoreDocument')")
+            appendLine("var CoreAnnotations = Java.type('edu.stanford.nlp.ling.CoreAnnotations')")
+            appendLine("var props = new Properties()")
+            appendLine("props.setProperty('annotators', '${effectiveAnnotators.replace("'", "\\'")}')")
+            appendLine("var pipeline = new CoreNLP(props)")
+            appendLine("var doc = new CoreDocument(GUEST_TEXT)")
             appendLine("pipeline.annotate(doc)")
-            appendLine("import edu.stanford.nlp.ling.CoreAnnotations")
-            appendLine("import edu.stanford.nlp.semgraph.SemanticGraphCoreAnnotations")
-            appendLine("import edu.stanford.nlp.sentiment.SentimentCoreAnnotations")
-            appendLine("import edu.stanford.nlp.ie.machinereading.structure.Span")
-            appendLine("import com.google.gson.Gson")
-            appendLine("import com.google.gson.reflect.TypeToken")
-            appendLine("results = []")
-            appendLine("for (sent in doc.sentences()) {")
-            appendLine("  tokens = []")
-            appendLine("  for (t in sent.tokens()) {")
-            appendLine("    tok = [word: t.word(), tag: t.tag(), lemma: t.lemma(), index: t.index()]")
-            appendLine("    ner = t.get(CoreAnnotations.NamedEntityTagAnnotation.class)")
-            appendLine("    if (ner != null && ner != 'O') tok.ner = ner")
-            appendLine("    nerBegin = t.get(CoreAnnotations.NamedEntityTagStartAnnotation.class)")
-            appendLine("    nerEnd = t.get(CoreAnnotations.NamedEntityTagEndAnnotation.class)")
-            appendLine("    if (nerBegin != null) tok.nerBegin = nerBegin")
-            appendLine("    if (nerEnd != null) tok.nerEnd = nerEnd")
-            appendLine("    tokens.add(tok)")
+            appendLine("var results = []")
+            appendLine("for (var si = 0; si < doc.sentences().size(); si++) {")
+            appendLine("  var sent = doc.sentences().get(si)")
+            appendLine("  // CoreSentence typed accessors (not .get(annotation)): tokens(),")
+            appendLine("  // dependencyParse(), sentiment() — direct, no annotation classes.")
+            appendLine("  var tokens = []")
+            appendLine("  var n = sent.tokens().size()")
+            appendLine("  for (var i = 0; i < n; i++) {")
+            appendLine("    var t = sent.tokens().get(i)")
+            appendLine("    var tok = { word: t.word(), tag: t.tag(), lemma: t.lemma(), index: t.index() }")
+            appendLine("    var ner = t.ner()")
+            appendLine("    if (ner !== null && ner !== 'O') tok.ner = ner")
+            appendLine("    tokens.push(tok)")
             appendLine("  }")
-            appendLine("  deps = []")
-            appendLine("  graph = sent.get(SemanticGraphCoreAnnotations.BasicDependenciesAnnotation.class)")
-            appendLine("  if (graph != null) {")
-            appendLine("    for (edge in graph.edgeListSorted()) {")
-            appendLine("      deps.add([gov: edge.getGovernor().word(), dep: edge.getDependent().word(), rel: edge.getRelation().toString()])")
+            appendLine("  var deps = []")
+            appendLine("  try {")
+            appendLine("    var graph = sent.dependencyParse()")
+            appendLine("    var edges = graph.edgeListSorted()")
+            appendLine("    for (var e = 0; e < edges.size(); e++) {")
+            appendLine("      var edge = edges.get(e)")
+            appendLine("      deps.push({ gov: edge.getGovernor().word(), dep: edge.getDependent().word(), rel: String(edge.getRelation()) })")
             appendLine("    }")
+            appendLine("  } catch (depEx) { /* depparse not in the annotator set */ }")
+            appendLine("  var sentObj = { text: String(sent.text()), tokens: tokens, deps: deps }")
+            appendLine("  if ('$withSentiment' === 'true') {")
+            appendLine("    try { sentObj.sentiment = String(sent.sentiment()) } catch (sEx) { }")
             appendLine("  }")
-            appendLine("  sentObj = [text: sent.text(), tokens: tokens, deps: deps]")
-            appendLine("  if ('$withSentiment' == 'true') {")
-            appendLine("    tree = sent.get(SentimentCoreAnnotations.SentimentAnnotatedTree.class)")
-            appendLine("    if (tree != null) {")
-            appendLine("      sentObj.sentiment = tree.label().get(SentimentCoreAnnotations.SentimentClass.class)")
-            appendLine("      sentObj.sentimentValue = tree.label().get(org.ejml.simple.SimpleMatrix)")
-            appendLine("    }")
+            appendLine("  // NER spans: contiguous runs of the same non-O tag over the 1-based tokens")
+            appendLine("  var entities = []")
+            appendLine("  var run = null")
+            appendLine("  for (var i = 0; i < n; i++) {")
+            appendLine("    var ner = tokens[i].ner || null")
+            appendLine("    if (ner !== null && run !== null && run.ner === ner) { run.end = i + 1; }")
+            appendLine("    else if (ner !== null) { if (run !== null) entities.push(run); run = { text: tokens[i].word, ner: ner, begin: i + 1, end: i + 1 }; }")
+            appendLine("    else if (run !== null) { entities.push(run); run = null; }")
             appendLine("  }")
-            appendLine("  nerSpans = []")
-            appendLine("  seen = new HashSet()")
-            appendLine("  for (t in sent.tokens()) {")
-            appendLine("    ner = t.get(CoreAnnotations.NamedEntityTagAnnotation.class)")
-            appendLine("    if (ner != null && ner != 'O') {")
-            appendLine("      beginIdx = t.get(CoreAnnotations.NamedEntityTagStartAnnotation.class)")
-            appendLine("      endIdx = t.get(CoreAnnotations.NamedEntityTagEndAnnotation.class)")
-            appendLine("      if (beginIdx != null && endIdx != null) {")
-            appendLine("        key = ner + ':' + beginIdx + '-' + endIdx")
-            appendLine("        if (!seen.contains(key)) {")
-            appendLine("          nerSpans.add([text: sent.tokens().subList(beginIdx - 1, endIdx).collect{it.word()}.join(' '), ner: ner, begin: beginIdx, end: endIdx])")
-            appendLine("          seen.add(key)")
-            appendLine("        }")
-            appendLine("      }")
-            appendLine("    }")
+            appendLine("  if (run !== null) entities.push(run)")
+            appendLine("  for (var r = 0; r < entities.length; r++) {")
+            appendLine("    var words = []")
+            appendLine("    for (var w = entities[r].begin - 1; w < entities[r].end; w++) words.push(tokens[w].word)")
+            appendLine("    entities[r].text = words.join(' ')")
             appendLine("  }")
-            appendLine("  if (nerSpans.size() > 0) sentObj.entities = nerSpans")
-            appendLine("  results.add(sentObj)")
+            appendLine("  if (entities.length > 0) sentObj.entities = entities")
+            appendLine("  results.push(sentObj)")
             appendLine("}")
-            appendLine("gson = new Gson()")
-            appendLine("print(gson.toJson(results))")
+            appendLine("var RESULT = JSON.stringify(results)")
+            appendLine("print(RESULT)")
+            appendLine("RESULT")
         }
-        evalInVm(host, node, facet, script, inputs)
+        evalInVmText(host, node, facet, script, text, inputs)
     }
 
     // ── camel: route DSL over the lego's params ─────────────────────────
@@ -179,6 +194,28 @@ object SubVmLegos {
 
     // ── shared eval path ────────────────────────────────────────────────
 
+    /**
+     * Eval with an untrusted-length TEXT payload bound as the guest global
+     * `GUEST_TEXT` (a `var` statement prepended to the source) instead of
+     * string-literal-splicing it into the script. Documents contain quotes,
+     * newlines, backslashes — splicing them into generated source is how the
+     * old corenlp scripts broke; binding as a global leaves the script static
+     * and the data as data.
+     */
+    private suspend fun evalInVmText(
+        host: borg.trikeshed.vm.VmHost,
+        node: LcncNode,
+        facetName: String,
+        script: String,
+        text: String,
+        inputs: Map<String, Any?>,
+    ): Map<String, Any?> {
+        // JSON.stringify of the text is the one safe JS string literal form;
+        // GraalJS parses it with no further interpretation.
+        val literal = borg.trikeshed.parse.json.JsonSupport.stringify(text)
+        return evalInVm(host, node, facetName, "var GUEST_TEXT = $literal;\n$script", inputs)
+    }
+
     private suspend fun evalInVm(
         host: borg.trikeshed.vm.VmHost,
         node: LcncNode,
@@ -198,20 +235,63 @@ object SubVmLegos {
         val handle = host.get(spec.id) ?: host.spawn(spec)
         return try {
             val tele = handle.eval(source, node.id)
+            // The eval VALUE is the lego's structured result — the scripts end
+            // with the payload expression (print() is only a human trace on the
+            // VM's xterm, lossy past 28 rows). Terminal text is the FALLBACK for
+            // legacy scripts whose last expression is null.
+            val terminalText = runCatching {
+                val session = hostTerminalSession(host, spec.id) ?: return@runCatching null
+                // Screen (28 rows) + scrollback (up to 200): a token dump longer
+                // than the screen scrolls, so the head of the output lives in
+                // scrollback. Reconstruct print order scrollback→screen.
+                val term = session.panel.terminal
+                val snap = term.snapshot(500)
+                val sb = (0 until snap.scrollback.size).joinToString("\n") { r ->
+                    val line = snap.scrollback[r]
+                    (0 until line.size).joinToString("") { cIdx -> line[cIdx].text }
+                }
+                sb + "\n" + term.plainText()
+            }.getOrNull()
             mapOf(
                 "facet" to facet.id,
                 "vmId" to spec.id,
                 "cid" to tele.cid.value,
-                "text" to when (tele) {
-                    is Teleported.Str -> tele.v
-                    is Teleported.Bytes -> tele.v.decodeToString()
-                    else -> tele.toString()
+                "text" to when {
+                    tele is Teleported.Str -> tele.v
+                    tele is Teleported.Bytes -> tele.v.decodeToString()
+                    else -> extractPrintedOutput(terminalText, spec.id) ?: tele.toString()
                 },
                 "inputs" to inputs.keys.toList(),
             )
         } finally {
             if (node.params["keep"] != "true") runCatching { handle.close() }
         }
+    }
+
+    /** The terminal session a spawn opened for this vm id — where guest print() lands. */
+    private fun hostTerminalSession(host: borg.trikeshed.vm.VmHost, vmId: String): borg.trikeshed.vm.VmTerminalSession? {
+        val terminals = (host as? borg.trikeshed.vm.HypervisorVmHost)?.terminals ?: return null
+        return terminals[vmId]
+    }
+
+    /**
+     * Peel the printed output off the terminal screen: everything after the
+     * last line that looks like the session's echo of our eval (the prompt /
+     * banner prefaces it). When nothing printed, null → fall back to the
+     * eval's Teleported value.
+     */
+    private fun extractPrintedOutput(terminalText: String?, vmId: String): String? {
+        if (terminalText.isNullOrBlank()) return null
+        val lines = terminalText.lines().filter { it.isNotBlank() }
+        if (lines.isEmpty()) return null
+        // The banner line contains the vm id ("lcnc:n1 · js · in-process").
+        val bannerIdx = lines.indexOfFirst { it.contains(vmId) }
+        val body = if (bannerIdx >= 0) lines.drop(bannerIdx + 1) else lines
+        val cleaned = body
+            .filterNot { it.startsWith("lcnc:") }
+            .joinToString("\n")
+            .trim()
+        return cleaned.ifEmpty { null }
     }
 
     // ── param/input spelling helpers ────────────────────────────────────

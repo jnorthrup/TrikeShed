@@ -390,6 +390,7 @@ tasks.withType<Test>().configureEach {
         showStandardStreams = true
     }
     jvmArgs(
+        "-Xmx3g",
         "--add-exports", "java.base/jdk.internal.classfile=ALL-UNNAMED",
         "--add-exports", "java.base/jdk.internal.classfile.constantpool=ALL-UNNAMED",
         "--add-exports", "java.base/jdk.internal.classfile.instruction=ALL-UNNAMED",
