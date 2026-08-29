@@ -55,11 +55,15 @@ class LcncKanbanExperience(
             // remain the no-wire path: type a jobId, click run.
             "kanban.submit" to LcncNodeRunner { node, inputs ->
                 val c = wiredCommand(inputs)
-                command(
+                // Gesture nodes without a gesture NO-OP (headless program run, or the
+                // no-wire lane before anyone typed a jobId) — silent degrade, not error.
+                val jobId = c["jobId"]?.toString() ?: node.params["jobId"]
+                if (jobId.isNullOrBlank()) mapOf("accepted" to false, "reason" to "no gesture: jobId absent")
+                else command(
                     mapOf(
                         "type" to "submit",
-                        "jobId" to required(node, c, "jobId"),
-                        "title" to (c["title"]?.toString() ?: node.params["title"] ?: required(node, c, "jobId")),
+                        "jobId" to jobId,
+                        "title" to (c["title"]?.toString() ?: node.params["title"] ?: jobId),
                         "priority" to (c["priority"]?.toString()?.toDoubleOrNull()?.toInt()
                             ?: node.params["priority"]?.toIntOrNull() ?: 2),
                         "idempotencyKey" to required(node, c, "idempotencyKey"),
@@ -68,10 +72,12 @@ class LcncKanbanExperience(
             },
             "kanban.move" to LcncNodeRunner { node, inputs ->
                 val c = wiredCommand(inputs)
-                command(
+                val jobId = c["jobId"]?.toString() ?: c["itemId"]?.toString() ?: node.params["jobId"]
+                if (jobId.isNullOrBlank()) mapOf("accepted" to false, "reason" to "no gesture: command input or jobId param absent")
+                else command(
                     mapOf(
                         "type" to "move",
-                        "jobId" to required(node, c, "jobId"),
+                        "jobId" to jobId,
                         "toColumn" to required(node, c, "toColumn"),
                         // JSON numbers may arrive as 3.0; the reducer consumes a long.
                         "expectedRevision" to required(node, c, "expectedRevision").toDouble().toLong(),

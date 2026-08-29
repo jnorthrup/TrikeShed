@@ -842,6 +842,9 @@ object OroborosDaemon {
         // Sub-VM module legos: tika/corenlp/camel/graalce as supervised guest evals
         // over the daemon's own hypervisor (VmSupervisor.current — VmWire's same host).
         borg.trikeshed.lcnc.SubVmLegos.register(moduleContext)
+        // Pure/presentation node runners: canvas-authored programs (preset-kanban)
+        // complete HEADLESS via /api/lcnc/run — the curl-able smoke-test lane.
+        moduleContext.lcncRunners.putAll(borg.trikeshed.lcnc.PureNodes.registry { System.currentTimeMillis() })
         // ── NAL belief-bag nodes: nal.mint, nal.decay, nal.recall ────
         // nal.mint wraps ConstructionBotNode (the only model-spend seam).
         // nal.decay is a thin timer trigger over AttentionEconomy.decay.
