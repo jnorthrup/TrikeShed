@@ -84,6 +84,8 @@ What is landed vs pending, read from the tree — not from session memory:
 
 The absence of a landed D-letters decision artifact is stated plainly: the design decisions are encoded in source, not in a separate letters document. If such a document existed, it would be referenced here. It does not.
 
+**The actionable-layer deficit** (user's verdict, 2026-08-29: "the actionable layer is lacking the CCEK contours while making an honest attempt"): `LcncRunner` lands the honest attempt — scope frames as context Elements, authored-order ring execution, env-chain shadowing, `LcncScopeViolation` on outward wires, scope.out-only yield. Absent per the tree, checkable by inspection of `ccek/` and `lcnc/`: no unbound-Key socket semantics (a bare `Key` as typed demand that waits for Element installation), no `K.factory()` fallback in the resolution path (installed Element → factory → socket-wait discipline), no retry-with-alternative-Elements supervision choice point. Those are the missing contours; naming them here is the gate against declaring the layer done.
+
 > **Status:** verified-live — tree state derived from current source; D-letters absence confirmed.
 
 ## 6. Unblock Relationship
