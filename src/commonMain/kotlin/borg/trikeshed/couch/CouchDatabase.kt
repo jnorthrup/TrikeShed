@@ -83,8 +83,18 @@ class CouchDatabase(
         includeDocs: Boolean = false,
         keys: List<String>? = null,
     ): Map<String, Any?> {
-        val live = store.all().filter { !isTombstone(it) }
-        var ids = live.map { it.id }.sorted()
+        // ⚡ Bolt: Fetching document IDs directly without materializing full Document objects.
+        // This avoids O(N) memory allocations for large databases by using the zero-allocation store.ids() view.
+        val rawIds = store.ids()
+        val liveIds = ArrayList<String>()
+        for (i in 0 until rawIds.a) {
+            val id = rawIds.b(i)
+            // ⚡ Bolt: Use store.head.isDeleted instead of materializing the doc to call isTombstone.
+            if (!store.head.isDeleted(id)) {
+                liveIds.add(id)
+            }
+        }
+        var ids: List<String> = liveIds.sorted()
         if (keys != null) {
             val set = keys.toSet(); ids = keys.filter { it in set }
         } else {
@@ -92,7 +102,7 @@ class CouchDatabase(
             if (endkey != null) ids = ids.filter { if (descending) it >= endkey else it <= endkey }
             if (descending) ids = ids.reversed()
         }
-        val total = live.size
+        val total = liveIds.size
         val page = ids.drop(skip).take(limit)
         return mapOf(
             "total_rows" to total,
