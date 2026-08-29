@@ -338,11 +338,23 @@ class InProcessIsolate(
                 !bounds.statementLimitSafe && budget.statements > 0 -> bounds.defaultWallMillis
                 else -> 0L
             }
+            val interruptedBefore = interrupted.get()
             val watchdog = if (depth == 0 && wall > 0 && (bounds.stop != StopStrategy.STATEMENT_LIMIT || budget.statements <= 0)) armWatchdog(wall) else null
             try {
                 block()
             } catch (e: PolyglotException) {
                 throw classify(e)
+            } catch (e: GuestException) {
+                throw e
+            } catch (t: Throwable) {
+                // GraalPy can detonate an internal assert while BUILDING the PolyglotException for a
+                // watchdog interrupt (TruffleStackTrace.fillIn over BytecodeRootNode roots), so a raw
+                // AssertionError escapes instead of the typed path. The breach is ours and the guest
+                // was interrupted; the assert is exception cosmetics. Attribute to the interrupt ONLY
+                // when this crossing's watchdog actually fired — anything else stays a host bug.
+                if (watchdog != null && interrupted.get() > interruptedBefore)
+                    throw GuestException(GuestFailure.INTERRUPTED, "wall budget interrupt (engine assert during exception construction: ${t.message})", t)
+                throw t
             } finally {
                 watchdog?.cancel(false)
             }
