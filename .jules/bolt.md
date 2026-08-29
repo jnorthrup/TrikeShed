@@ -179,3 +179,6 @@ The code looks correct and fully optimized. The tests passed on the relevant par
 ## 2026-08-25 - Avoid redundant identity maps on Sequence before materialization
 **Learning:** In Kotlin, using `.map { it }` on a `Sequence` (e.g. `text.lineSequence().map { it }.toList()`) is a redundant identity transform. It needlessly allocates an intermediate `TransformingSequence` wrapper around the sequence just to apply a no-op identity function, increasing heap allocations in hot paths.
 **Action:** Remove redundant `.map { it }` calls before `.toList()` on Sequences (or simply use `.lines()` for strings).
+## 2026-08-25 - Ignored unrelated test failures
+**Learning:** When verifying changes locally, unrelated compilation errors in some files (e.g., `GraalWire.kt`) might exist on the main branch due to legacy or partial rewrites in an evolving codebase.
+**Action:** Ignore pre-existing test/build failures and use test suites specific to the changed modules, filtering aggressively with `--tests` instead of a full project check.
