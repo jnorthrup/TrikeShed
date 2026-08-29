@@ -135,8 +135,11 @@ Corollaries:
 - **`POST /api/lcnc/run`** (KanbanModule): `{type, params?, inputs?}` runs ONE
   node (job) against the composed registry; `{program, inputs?}` runs a WHOLE
   stored program (procedure) via `LcncRunner` with subprogram recursion —
-  imperative program execution as a service. Outputs: per-node map (program
-  run) or the node's output map (job run).
+  imperative program execution as a service; `{name?, document, inputs?}` runs
+  an inline ring from a posted document (not a stored program name) through
+  the same `LcncProgramConfix` parse and `execute` path, a bad shape failing
+  as a 400 rather than a silent flat sweep. Outputs: per-node map (program/
+  document run) or the node's output map (job run).
 - The browser editor is DELETED (2026-08-27) — no page executes or edits the
   graph. Any future surface renders fetched contracts and POSTs to the routes
   above; sheet projections render through the PWA's TreeSheets-idiom sheets
