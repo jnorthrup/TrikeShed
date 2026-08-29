@@ -99,24 +99,34 @@ Response:
 {"results": [{"seq": 1, "id": "doc1", "changes": [{"rev": "1-abc123"}]}]}
 ```
 
-### Replicate to a Second DB
+### Replicate to a Peer
 
-1. Create a target database:
-   ```bash
-   curl -X PUT http://localhost:5984/targetdb
-   ```
+Replication requires one side to be the local database name and the other to
+be an HTTP peer URL. Both db-name-only sources/targets return 400.
 
-2. Start replication:
-   ```bash
-   curl -X POST http://localhost:5984/testdb/_replicate \
-     -H "Content-Type: application/json" \
-     -d '{"source": "testdb", "target": "targetdb", "continuous": false, "interval_ms": 1000}'
-   ```
+```bash
+# Push local trikeshed DB to a remote CouchDB-compatible peer:
+curl -X POST http://localhost:5984/trikeshed/_replicate \
+  -H "Content-Type: application/json" \
+  -d '{"source": "trikeshed", "target": "http://remote-host:5984/trikeshed", "continuous": false, "interval_ms": 1000}'
+```
 
-3. Verify the document exists in target:
-   ```bash
-   curl http://localhost:5984/targetdb/doc1
-   ```
+Or pull from a peer:
+
+```bash
+curl -X POST http://localhost:5984/trikeshed/_replicate \
+  -H "Content-Type: application/json" \
+  -d '{"source": "http://remote-host:5984/trikeshed", "target": "trikeshed", "continuous": false, "interval_ms": 1000}'
+```
+
+Response:
+```json
+{ "ok": true, "history": [...] }
+```
+
+> **Note:** One side must be the local database name (`trikeshed`), the other
+> must be an HTTP URL. Passing two local db names returns
+> `{ "error": "bad_request", "reason": "one side must be 'trikeshed', the other a peer URL" }`.
 
 ## Caveats
 
