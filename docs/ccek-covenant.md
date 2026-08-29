@@ -96,3 +96,22 @@ The inert escape-velocity elements (`IpfsAdapter`, `CasReplicationElement`, reco
 CCEK completion — giving these elements proper CCEK owners with lifecycle management — is the unblock for wave 2's escape-velocity deliverable. See [escape-velocity.md](escape-velocity.md).
 
 > **Status:** verified-live — source comments quoted verbatim; cross-link to escape-velocity page.
+
+## 7. Reactor Core, Adapter Macros
+
+The covenant (user, 2026-08-29): the internal **async reactor design is the architecture**; MCP and ACP are adapter macros over it — retained for working functionality and low-bandwidth links, never allowed to become the design center. The dependency direction is the falsifiable part: adapters import and compose reactor/core primitives; the core never imports adapter shapes.
+
+The reactor core in-tree:
+
+- `MuxReactorElement` — `src/commonMain/kotlin/userspace/reactor/MuxReactorElement.kt` (a context Element, per §4).
+- `CcekReactorBinding` — `CCEK.kt:52–76` (reactor scope, choreograph, user context).
+- Two-plane discipline — `src/jvmMain/kotlin/borg/trikeshed/daemon/OroborosDaemon.kt:1298`: "Initial two-plane reconcile. File reads and CAS writes stay off the reactor thread."
+
+Direction audit (current tree):
+
+- `borg/trikeshed/mcp/McpServerHandler.kt` imports core (`cas`, `job`, `lib`, `memory`) — **correct direction**: the MCP surface is an adapter wrapping the core.
+- **Known inversion:** `borg/trikeshed/ccek/Seat.kt:11–12` imports `modelmux.acp.AcpAction` — the core referencing an ACP-namespace type. Pinned as a contour deficit for wave-2 flattening; wave 1 documents it, does not fix it.
+
+**Falsifiable gate:** grep the core packages (`ccek/`, `userspace/reactor/`) for `mcp`/`acp` imports; the only permitted hit is the pinned `Seat.kt` inversion above (or fewer, once flattened). Any new hit is a covenant violation.
+
+> **Status:** verified-live for the direction audit (one known inversion, pinned); design-covenant for the adapter-macro boundary itself.
