@@ -17,8 +17,7 @@ self.addEventListener('install', (event) => {
         './script.js',
         './manifest.webmanifest',
         './icons/forge-icon.svg',
-        './icons/forge-icon-maskable.svg',
-        './js/TrikeShed.js'
+        './icons/forge-icon-maskable.svg'
       ]);
     }).then(() => self.skipWaiting())
   );

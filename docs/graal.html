@@ -108,6 +108,17 @@ canvas.spark{display:block;margin-top:3px}
 #vtInput{flex:1;background:transparent;border:0;outline:0;color:#eafcea;font:12px "SF Mono","JetBrains Mono",ui-monospace,monospace}
 #vt.dead #vtScroll{color:#f7c5c5}
 #aot{right:320px;top:78px;width:560px;max-height:74%}
+#gc{right:320px;top:78px;width:560px;max-height:74%}
+#zoom{left:10px;top:78px;width:480px;max-height:74%}
+.lanepool{display:flex;align-items:center;gap:8px;padding:3px 0;border-bottom:1px solid var(--line)}
+.lanepool .nm{width:120px;color:var(--dim);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.lanepool .track{flex:1;height:9px;background:var(--line);border-radius:2px;overflow:hidden;position:relative}
+.lanepool .track i{position:absolute;top:0;bottom:0;border-radius:2px}
+.lanepool .track .used{background:var(--gc)}
+.lanepool .track .recl{background:var(--compile)}
+.lanepool .num{width:150px;text-align:right;color:var(--ink);font-variant-numeric:tabular-nums}
+.gcphase{display:flex;justify-content:space-between;padding:3px 0;color:var(--dim)}
+.gcphase b{color:var(--ink);font-variant-numeric:tabular-nums}
 #sheet td:first-child{white-space:pre}
 .dagchip{display:inline-block;border:1px solid var(--line);border-radius:3px;padding:0 6px;margin:2px 3px 0 0;cursor:pointer;font-size:10px}
 .dagchip:hover{border-color:var(--commit);color:var(--commit)}
@@ -148,18 +159,22 @@ html[data-skin="marker"] #crumb{text-shadow:none}
   <div class="chip" id="cDocs"><b>–</b><span>documents</span></div>
   <div class="chip" id="cAot" onclick="toggleAot()" style="cursor:pointer"><b>–</b><span>aot cache</span></div>
   <div class="chip" id="cHermes" onclick="hermesRunner()" style="cursor:pointer"><b>VT220</b><span>hermes vm</span></div>
+  <div class="chip" id="cBoard" onclick="toggleBoard()" style="cursor:pointer"><b>0</b><span>blackboard</span></div>
 </div>
 <div id="river"></div>
-<div class="panel" id="doc"><header><b id="docTitle">document</b><span class="x" onclick="hide('doc')">✕</span></header><div class="body"><div id="docBody"></div></div></div>
+<div class="panel" id="doc"><header><b id="docTitle">document</b><span><span class="x" id="docSheetsBtn" onclick="toggleSheetView()" title="grid-in-cell sheet family (CursorSheet)" style="margin-right:10px">▤ sheets</span><span class="x" onclick="hide('doc')">✕</span></span></header><div class="body"><div id="docBody"></div><div id="docSheetBody" style="display:none"></div></div></div>
 <div class="panel" id="points"><header><b>pointcut routes</b><span class="x" onclick="hide('points')">✕</span></header><div class="body" id="pointsBody"></div></div>
 <div class="panel" id="vms"><header><b>graal sub-vms</b><span class="x" onclick="hide('vms')">✕</span></header><div class="body" id="vmsBody"></div></div>
 <div class="panel" id="sheet"><header><b id="sheetTitle">tree sheet</b><span class="x" onclick="hide('sheet')">✕</span></header><div class="body" id="sheetBody"></div></div>
 <div class="panel" id="ledger"><header><b id="ledgerTitle">ledger</b><span class="x" onclick="hide('ledger')">✕</span></header><div class="body" id="ledgerBody"></div></div>
 <div class="panel" id="aot"><header><b>HotSpot AOT cache</b><span class="x" onclick="hide('aot')">✕</span></header><div class="body" id="aotBody"></div></div>
+<div class="panel" id="gc"><header><b>gc lane — live occupancy</b><span class="x" onclick="hide('gc')">✕</span></header><div class="body" id="gcBody"></div></div>
+<div class="panel" id="zoom"><header><b>zoom / strength — bytes prove the grouping</b><span class="x" onclick="hide('zoom')">✕</span></header><div class="body" id="zoomBody"></div></div>
+<div class="panel" id="board"><header><b>blackboard — durable facts</b><span class="x" onclick="hide('board')">✕</span></header><div class="body" id="boardBody"></div></div>
 <div id="notion"><div class="nhead"><input id="nfilter" placeholder="filter entries…"><span id="nscope"></span></div><div class="nbody" id="nbody"></div></div>
 <canvas id="mini" width="200" height="124"></canvas>
 <div id="crumb">loading terrain…</div>
-<div id="help"><b>wheel</b> zoom · <b>drag</b> pan · <b>drop folder</b> → project db · <b>right-click territory</b> kill db · <b>dblclick</b> dive · <b>click</b> inspect+edges · <b>0</b> fit · <b>T</b> tree sheet · <b>L</b> ledger · <b>P</b> pointcuts · <b>V</b> vms · <b>H</b> Hermes VT220 · <b>A</b> AOT · <b>M</b> mode · <b>1/2/3</b> layer · <b>F</b> fog · <b>B</b> skin · <a href="/futon" style="color:var(--dim)">futon ↗</a> · <a id="qsLink" style="color:var(--commit);cursor:pointer">⚡ install now</a> · <a id="fbLink" style="color:var(--warn);cursor:pointer">⚑ feedback</a></div>
+<div id="help"><b>wheel</b> zoom · <b>drag</b> pan · <b>drop folder</b> → project db · <b>right-click territory</b> kill db · <b>dblclick</b> dive · <b>click</b> inspect+edges · <b>0</b> fit · <b>T</b> tree sheet · <b>L</b> ledger · <b>P</b> pointcuts · <b>V</b> vms · <b>H</b> Hermes VT220 · <b>A</b> AOT · <b>O</b> blackboard · <b>M</b> mode · <b>1/2/3</b> layer · <b>F</b> fog · <b>B</b> skin · <a href="/futon" style="color:var(--dim)">futon ↗</a> · <a id="qsLink" style="color:var(--commit);cursor:pointer">⚡ install now</a> · <a id="fbLink" style="color:var(--warn);cursor:pointer">⚑ feedback</a></div>
 <div class="panel" id="vt"><header><b id="vtTitle">hermes vt</b><span><span class="x" onclick="vtKill()" title="interrupt + close the guest" style="margin-right:10px">⏻ kill</span><span class="x" onclick="hide('vt')">✕</span></span></header><div class="body" id="vtBody" style="padding:0"><pre id="vtScroll"></pre><div id="vtLine"><span id="vtPrompt">#</span><input id="vtInput" autocomplete="off" spellcheck="false"></div></div></div>
 <script>
 'use strict';
@@ -191,17 +206,43 @@ function node(name,parent){return{name,parent,children:new Map(),bytes:0,mass:0,
 /* Nonce vaults: content-addressed storage planes. Real, divable, but they must not own the map. */
 const VAULTS=new Set(['.git','lost-found','subtree-cache','objects','worktrees']);
 function massOf(bytes,topName){const m=Math.log2(2+bytes);return VAULTS.has(topName)?m*0.18:m;}
-/* The one cursor: rows = [id, bytes, lastSeq, revGen]. Terrain, sheets, ledger and layers are
-   all projections over it — 'everything is a cursor' holds on the client too. */
+/* The one cursor: rows = [id, bytes, lastSeq, revGen, code]. Terrain, sheets, ledger and layers are
+   all projections over it — 'everything is a cursor' holds on the client too. The 5th element is
+   the AngularCodec coordinate: in SIMILARITY arrangement the tree splits by code nibbles
+   (sortable, the hash can't do this); in POSITIONAL arrangement it splits by id path as before.
+   The toggle itself is served state (T), never JS invention. */
 let maxSeq=1;
+let lastRows=null;         // the store terrain rows (from /api/graal/map)
+let heapRows=null;         // the heap continent rows (from /api/graal/heap)
+let ARRANGE=localStorage.getItem('arrange')||'positional';
+/* R1: the heap continent — the JVM heap as a SECOND terrain source beside the store,
+   rendered through the SAME squarified treemap component (same row shape, different source).
+   `x` flips the terrain; /api/graal/heap supplies both continents in one fetch. */
+let HEAP_TERRAIN=(localStorage.getItem('heapTerrain')==='1');
+function activeRows(){return (HEAP_TERRAIN&&heapRows)?heapRows:(lastRows||[]);}
+function buildAll(){
+  const rows=activeRows();
+  if(!rows.length)return;
+  buildTree(rows);
+  $('crumb').textContent='terrain: '+(HEAP_TERRAIN?'JVM heap continent':'store')+
+    ' — '+rows.length.toLocaleString()+' rows · '+(HEAP_TERRAIN?'live-set + allocation, per class':'documents')+
+    ' · arrangement: '+ARRANGE+(HEAP_TERRAIN?' — x back to store':' — x for the heap continent');
+}
+function toggleArrange(){ARRANGE=ARRANGE==='positional'?'similarity':'positional';localStorage.setItem('arrange',ARRANGE);buildAll();}
+function toggleHeapTerrain(){HEAP_TERRAIN=!HEAP_TERRAIN;localStorage.setItem('heapTerrain',HEAP_TERRAIN?'1':'0');
+  if(HEAP_TERRAIN&&!heapRows)loadMap();else buildAll();}
 function buildTree(rows){
   root=node('trikeshed',null);root.rect={x:0,y:0,w:W,h:H};byId=new Map();maxSeq=1;
-  for(const [id,bytes,seq,gen] of rows){
-    const parts=id.split('/').filter(p=>p.length);let n=root;
+  for(const row of rows){
+    const [id,bytes,seq,gen,code]=row;
+    const parts=ARRANGE==='similarity'
+      ? ['code-'+(((code|0)>>8)&0xFF).toString(16).padStart(2,'0'),'code-'+((code|0)&0xFFFF).toString(4).padStart(1,'0'),id]
+      : id.split('/').filter(p=>p.length);
+    let n=root;
     const mass=massOf(bytes,parts[0]);
     for(let i=0;i<parts.length;i++){
       let c=n.children.get(parts[i]);
-      if(!c){c=node(parts[i],n===root?null:n);if(n===root)c.hue=hueOf(parts[i]);else c.hue=n.hue;c.parent=n;n.children.set(parts[i],c);}
+      if(!c){c=node(parts[i],n===root?null:n);if(n===root)c.hue=ARRANGE==='similarity'?(code|0)%360:hueOf(parts[i]);else c.hue=ARRANGE==='similarity'?hueOf(parts[i]+'#'+(code|0)):n.hue;c.parent=n;n.children.set(parts[i],c);}
       n=c;n.bytes+=bytes;n.mass+=mass;n.docs++;
     }
     n.leaf=true;n.id=id;n.seq=seq||0;n.gen=gen||1;n.mass=mass;byId.set(id,n);
@@ -278,6 +319,7 @@ function heatUp(n){const now=performance.now();while(n&&n!==root){heat.set(pathO
 function heatOf(n){const t=heat.get(pathOf(n));return t?Math.max(0,1-(performance.now()-t)/120000):0;}
 function cycleMode(){mode=mode==='map'?'graph':mode==='graph'?'tree':mode==='tree'?'notion':'map';
   if(mode==='graph')buildGraph();
+  if(mode==='notion'){for(const id of EXCLUSIVE_PANELS)$(id).style.display='none';}
   $('notion').style.display=mode==='notion'?'flex':'none';
   if(mode==='notion')buildNotion();
   $('crumb').textContent='mode: '+mode+(mode==='graph'?' — force DAG (hubs + edges), drag nodes':mode==='tree'?' — radial drilldown of '+(targetNode()===root?'/':pathOf(targetNode())):mode==='notion'?' — database flavor: sort by header, filter, click to inspect':' — territory map');}
@@ -737,7 +779,7 @@ function qsInstall(){
  d.innerHTML='<div style="background:#11151e;border:1px solid #f29111;border-radius:8px;padding:18px 22px;max-width:580px;color:#d8dce6;font:13px monospace">'
   +'<b style="color:#f29111">Run TrikeShed in anger — five minutes, one port</b>'
   +'<pre id="qsCmds" style="background:#0b0e14;padding:10px;border-radius:4px;margin:10px 0;user-select:text;white-space:pre-wrap">git clone git@github.com:jnorthrup/TrikeShed.git && cd TrikeShed\n./gradlew hotswapFeed\nbin/oroboros-daemon --watch</pre>'
-  +'<div style="color:#7b8496;margin-bottom:10px">then open http://localhost:8888 — drop a REAL folder on this terrain, wire /panels, abuse the board.</div>'
+  +'<div style="color:#7b8496;margin-bottom:10px">then open http://localhost:8888 — drop a REAL folder on this terrain, run a stored program via POST /api/lcnc/run, abuse the board.</div>'
   +'<button onclick="navigator.clipboard.writeText(document.getElementById(\'qsCmds\').textContent)" style="background:#161b26;border:1px solid #3ddc84;color:#3ddc84;border-radius:4px;padding:4px 12px;cursor:pointer;font:inherit">copy commands</button>'
   +'<a href="https://github.com/jnorthrup/TrikeShed#run-it-in-anger--please" target="_blank" style="color:#3fd0ff;margin-left:10px">README ↗</a>'
   +'<a onclick="document.querySelector(\'div[data-qs]\').remove()" style="color:#7b8496;margin-left:14px;cursor:pointer">close</a></div>';
@@ -768,11 +810,16 @@ addEventListener('keydown',e=>{
   if(e.key==='p'||e.key==='P')togglePoints();
   if(e.key==='v'||e.key==='V')toggleVms();
   if(e.key==='h'||e.key==='H')hermesRunner();
+  if(e.key==='o'||e.key==='O')toggleBoard();
   if(e.key==='a'||e.key==='A')toggleAot();
   if(e.key==='t'||e.key==='T')treeSheet();
   if(e.key==='l'||e.key==='L')ledger();
   if(e.key==='b'||e.key==='B')cycleSkin();
   if(e.key==='m'||e.key==='M')cycleMode();
+  if(e.key==='y'||e.key==='Y'){toggleArrange();$('crumb').textContent='arrangement: '+ARRANGE+(ARRANGE==='similarity'?' — split by AngularCodec rings (satellite)':' — split by id path (positional)');}
+  if(e.key==='x'||e.key==='X'){toggleHeapTerrain();}
+  if(e.key==='g'||e.key==='G'){toggleGc();}
+  if(e.key==='z'||e.key==='Z'){toggleZoom();}
   if(e.key==='f'||e.key==='F'){fog=!fog;$('crumb').textContent='fog of war: '+(fog?'ON — only active territories lit':'off');}
   if(e.key==='1'){layer=1;$('crumb').textContent='layer: plain terrain';}
   if(e.key==='2'){layer=2;$('crumb').textContent='layer: kolmogorov — green structured, red incompressible (measured lazily per tile)';}
@@ -889,7 +936,9 @@ function shapeStripHtml(text){
 function jumpLine(n){const cv=document.querySelector('#proj .codeview');if(!cv)return;
   const row=cv.children[n-1];if(row){row.scrollIntoView({block:'center'});row.style.outline='1px solid var(--commit)';setTimeout(()=>row.style.outline='',1200);}}
 async function openDoc(id){
-  $('docTitle').textContent=id.split('/').pop();$('docBody').innerHTML='…';show('doc');
+  $('docTitle').textContent=id.split('/').pop();$('docBody').innerHTML='…';$('docBody').style.display='';
+  $('docSheetBody').style.display='none';$('docSheetBody').innerHTML='';sheetFamily=null;sheetCurrentId=null;
+  show('doc');
   sel=nodeFor(id);selEdges=[];
   // the forge PRODUCT projects from its own payload, not the couch harness
   const pd=productDocs.get(id);
@@ -938,6 +987,47 @@ async function openDoc(id){
         selEdges.slice(0,20).map((e,i)=>'<span class="dagchip" onclick="openDoc(selEdges['+i+'].id)">'+e.kind+' → …'+esc(e.id.slice(-38))+'</span>').join('');
       $('docBody').appendChild(div);
     }}catch(e){}
+}
+/* ── concentric treesheet: /api/graal/sheet's family, grid-in-cell, live ──
+   This is CursorSheet (borg/trikeshed/forge/sheet/CursorSheet.kt) — a sheet
+   is a grid whose cells are scalars or refs to another sheet. The whole
+   family for one document comes back in ONE fetch; navigating a ref cell is
+   local array lookup + re-render, no round trip per level. */
+let sheetFamily=null,sheetCurrentId=null;
+async function toggleSheetView(){
+  const db=$('docBody'),sb=$('docSheetBody');
+  if(sb.style.display!=='none'){sb.style.display='none';db.style.display='';return;}
+  const id=sel&&sel.id;
+  if(!id){sb.style.display='block';db.style.display='none';sb.innerHTML='<div style="color:var(--dim)">no document selected</div>';return;}
+  db.style.display='none';sb.style.display='block';sb.innerHTML='…loading sheet family…';
+  try{
+    const resp=await fetch('/api/graal/sheet?id='+encodeURIComponent(id));
+    if(!resp.ok){sb.innerHTML='<div style="color:var(--deopt)">sheet fetch failed: '+resp.status+'</div>';return;}
+    sheetFamily=await resp.json();
+    sheetCurrentId=sheetFamily[0]&&sheetFamily[0].id;
+    renderSheetFamily();
+  }catch(e){sb.innerHTML='<div style="color:var(--deopt)">'+esc(String(e))+'</div>';}
+}
+function sheetById(id){return (sheetFamily||[]).find(s=>s.id===id);}
+function renderSheetFamily(){
+  const sb=$('docSheetBody');const seed=sheetById(sheetCurrentId);
+  if(!seed){sb.textContent='no sheet';return;}
+  const crumb=[];let cur=seed;
+  while(cur){crumb.unshift(cur);cur=cur.parent?sheetById(cur.parent):null;}
+  let html='<div style="margin-bottom:6px;font-size:10px;color:var(--dim)">'+
+    crumb.map((s,i)=>'<span style="cursor:pointer;color:'+(i===crumb.length-1?'var(--ink)':'var(--commit)')+'" onclick="sheetCurrentId='+JSON.stringify(s.id)+';renderSheetFamily()">'+esc(s.title)+'</span>').join(' <span style="color:var(--dim)">▸</span> ')+
+    '</div>';
+  if(!seed.rows.length){html+='<div style="color:var(--dim)">empty sheet</div>';}
+  else html+='<table><tr>'+seed.columns.map(c=>'<th>'+esc(c.name)+'</th>').join('')+'</tr>'+
+    seed.rows.map(row=>'<tr>'+row.map(cell=>{
+      if(cell&&typeof cell==='object'&&cell.sheet){
+        const child=sheetById(cell.sheet);
+        return '<td><span class="dagchip" onclick="sheetCurrentId='+JSON.stringify(cell.sheet)+';renderSheetFamily()">▤ '+esc(child?child.title:cell.sheet)+'</span></td>';
+      }
+      return '<td>'+esc(cell===null||cell===undefined?'':String(cell))+'</td>';
+    }).join('')+'</tr>').join('')+
+    '</table>';
+  sb.innerHTML=html;
 }
 async function projectBytes(id,ct,ext){
   const proj=document.getElementById('proj');if(!proj)return;
@@ -1006,7 +1096,21 @@ function ledger(){
     '</table>'+(leaves.length>cap.length?'<div style="color:var(--dim);margin-top:4px">…'+(leaves.length-cap.length).toLocaleString()+' more entries (zoom to a smaller territory)</div>':'');
   show('ledger');
 }
-function show(id){$(id).style.display='flex';}
+/* ── floating panels: doc/sheet/notion share ONE screen rectangle
+   (left:10,top:78), vms/ledger/aot share ANOTHER (right:320,top:78). Nothing
+   used to close a sibling before opening another, so two panels at the same
+   z-index would sit exactly on top of each other — both "open", both
+   pointer-interactive, the top one silently eating every click meant for the
+   one underneath. That is the "non-interactive, useless" bug: the panel was
+   there, just buried under an identically-positioned twin. show()/hide() are
+   the only entry points now — every panel, and notion mode, route through
+   them, so at most one of this concentric set is ever visible at once. */
+const EXCLUSIVE_PANELS=['doc','points','vms','sheet','ledger','aot','gc','zoom'];
+function closeExclusivePanels(){
+  for(const id of EXCLUSIVE_PANELS)$(id).style.display='none';
+  if(mode==='notion'){mode='map';$('notion').style.display='none';}
+}
+function show(id){closeExclusivePanels();$(id).style.display='flex';}
 function hide(id){$(id).style.display='none';}
 /* ── HUD vitals ─────────────────────────────────────────── */
 let lastComp=0,compHist=[];
@@ -1034,8 +1138,178 @@ async function pollVitals(){
     const mx=Math.max(1,...compHist);
     compHist.forEach((r,i)=>{const x=i*2,y=13-11*r/mx;i?sparkCtx.lineTo(x,y):sparkCtx.moveTo(x,y);});
     sparkCtx.stroke();
+    if($('gc').style.display==='flex')renderGcLane(gc);
   }catch(e){}
   setTimeout(pollVitals,2000);
+}
+/* ── R4 client: the GC lane — real occupancy deltas, not a single river line ──
+   Fed by the standing vitals poll (gc.lane = {heapOccupancy, pools, phases, allocation}).
+   Per-pool used bytes + cumulative reclaimed/grown as bars; the pause decomposed into
+   phases; the per-collection freed-bytes ring as a sparkline. Replaces the single
+   `gc · pause ms` river text line with the live lane widget the plan calls for. */
+function toggleGc(){const g=$('gc');if(g.style.display==='flex'){hide('gc');return;}
+  show('gc');renderGcLane(lastGcLane);}
+let lastGcLane=null;
+function renderGcLane(gc){
+  if(!gc){$('gcBody').innerHTML='<div style="color:var(--dim)">waiting for a GC…</div>';return;}
+  lastGcLane=gc.lane||{};
+  const lane=lastGcLane,occ=lane.heapOccupancy||{},pools=lane.pools||[],phases=lane.phases||[],alloc=lane.allocation||[];
+  const recent=occ.recentFreed||[],mx=Math.max(1,...recent.map(x=>Math.abs(x)));
+  let h='';
+  h+='<div style="color:var(--dim);margin-bottom:4px">whole heap · committed '+fmtBytes(occ.committedBytes||0)
+    +' · matched collections '+(occ.collectionsMatched||0)+' · avg freed/collection '+fmtBytes(occ.avgFreedBytes||0)+'</div>';
+  if(recent.length){
+    h+='<div style="color:var(--dim);margin:2px 0">freed per collection (last '+recent.length+')</div>'+
+      '<svg width="100%" height="34" style="display:block;background:var(--panel2);border-radius:3px">'+
+      recent.map((f,i)=>{const w=100/recent.length;
+        const x=i*w, top=32-Math.abs(f)/mx*30, hh=Math.max(1,Math.abs(f)/mx*30);
+        return '<rect x="'+x.toFixed(2)+'" y="'+top.toFixed(2)+'" width="'+(w*0.8).toFixed(2)+'" height="'+hh.toFixed(2)+'" fill="'+(f>=0?'var(--gc)':'var(--deopt)')+'" rx="1"/>';}).join('')+'</svg>';
+  }
+  h+='<div style="margin:8px 0 2px;color:var(--gc);font-size:10px;letter-spacing:.08em">POOLS · used / reclaimed / grown</div>';
+  if(!pools.length)h+='<div style="color:var(--dim)">no collection boundary yet</div>';
+  const pmx=Math.max(1,...pools.map(p=>p.lastUsedBytes||0));
+  for(const p of pools){
+    const usedFrac=Math.min(100,(p.lastUsedBytes||0)/pmx*100);
+    const recl=Math.min(100,(p.reclaimedBytes||0)/(pmx*2)*100);
+    h+='<div class="lanepool"><span class="nm">'+esc(p.pool)+'</span>'+
+       '<span class="track"><i class="recl" style="left:0;width:'+recl.toFixed(1)+'%;opacity:.5"></i>'+
+       '<i class="used" style="left:'+recl.toFixed(1)+'%;width:'+usedFrac.toFixed(1)+'%"></i></span>'+
+       '<span class="num">'+fmtBytes(p.lastUsedBytes||0)+' used · <span style="color:var(--compile)">−'+fmtBytes(p.reclaimedBytes||0)+'</span> · <span style="color:var(--deopt)">+'+fmtBytes(p.grownBytes||0)+'</span></span></div>';
+  }
+  h+='<div style="margin:10px 0 2px;color:var(--gc);font-size:10px;letter-spacing:.08em">PAUSE BY PHASE</div>';
+  if(!phases.length)h+='<div style="color:var(--dim)">no phase yet</div>';
+  const phmx=Math.max(1,...phases.map(p=>p.pauseMsTotal||0));
+  for(const p of phases.slice(0,14)){
+    const f=Math.min(100,(p.pauseMsTotal||0)/phmx*100);
+    h+='<div class="gcphase"><span>'+esc(p.phase)+' <span style="opacity:.6">×'+(p.count||0)+'</span></span>'+
+       '<span style="flex:1;margin:0 8px;background:var(--line);height:8px;border-radius:2px"><span style="display:block;height:100%;width:'+f.toFixed(1)+'%;background:var(--gc);border-radius:2px"></span></span>'+
+       '<b>'+(p.pauseMsTotal||0)+' ms</b></div>';
+  }
+  if(alloc.length){
+    h+='<div style="margin:10px 0 2px;color:var(--gc);font-size:10px;letter-spacing:.08em">ALLOCATION ATTRIBUTION (JFR sample) · top '+(alloc.length)+'</div>';
+    const amx=Math.max(1,...alloc.map(a=>a.bytes||0));
+    for(const a of alloc.slice(0,12)){
+      const f=Math.min(100,(a.bytes||0)/amx*100);
+      h+='<div class="gcphase"><span title="'+esc(a.class)+'">'+esc(a.class.length>40?a.class.slice(0,40)+'…':a.class)+'</span>'+
+         '<span style="flex:1;margin:0 8px;background:var(--line);height:8px;border-radius:2px"><span style="display:block;height:100%;width:'+f.toFixed(1)+'%;background:var(--cpu);border-radius:2px"></span></span>'+
+         '<b>'+fmtBytes(a.bytes||0)+'</b></div>';
+    }
+  }
+  $('gcBody').innerHTML=h;
+}
+/* ── R1 client: the zoom / strength pane — the bytes-prove-the-grouping pane ──
+   Two inputs: a code ring8 (→ /api/graal/zoom, representative cids + _cas byte links)
+   and a pair of cids (→ /api/graal/strength, linkMatch grades side by side).
+   Claim Check: the pane fetches real bytes from _cas to prove the grouping. */
+/* ── the blackboard panel: durable facts, humanly ────────────────────────
+   scoring tape · VM + commit receipts → they stream in the river below
+   (score/vm/commit kinds); GC lane → the G panel. This panel is the DURABLE
+   side: the fact store — pointcut sites / writes, ACE chunk cache receipts
+   (cache-receipt/ · context-receipt/ keys), and the raw blackboard snapshot.
+   One page, one landscape: /graal and /blackboard serve this same document. */
+function toggleBoard(){$('board').style.display==='flex'?hide('board'):show('board');if($('boardBody').innerHTML==='')boardInit();boardRefresh();}
+function boardInit(){$('boardBody').innerHTML=
+  '<div style="color:var(--dim);font-size:10px;margin-bottom:8px">CAS / heap terrain = the canvas (X toggles the heap continent) · scoring tape · VM + commit receipts stream in the river (score / vm / commit kinds) · GC lane = G panel — this panel is the durable fact store</div>'+
+  '<div style="margin-bottom:6px"><b style="color:var(--dim);font-size:10px">pointcut sites / writes — through /blackboard/assert, the one funnel</b><br>'+
+  '<input id="pcO" placeholder="owner" style="width:22%;background:var(--panel2);border:1px solid var(--line);border-radius:4px;color:var(--ink);padding:3px 8px">'+
+  '<input id="pcM" placeholder="method" style="width:22%;background:var(--panel2);border:1px solid var(--line);border-radius:4px;color:var(--ink);padding:3px 8px">'+
+  '<input id="pcS" placeholder="site" style="width:14%;background:var(--panel2);border:1px solid var(--line);border-radius:4px;color:var(--ink);padding:3px 8px">'+
+  '<select id="pcE" style="background:var(--panel2);border:1px solid var(--line);border-radius:4px;color:var(--ink);padding:3px 6px"><option>true</option><option>false</option></select>'+
+  ' <span class="x" style="cursor:pointer" onclick="pcAssert()">→ assert</span></div>'+
+  '<div id="pcSites" style="color:var(--dim);font-size:10px;margin-bottom:8px">no pointcut sites on the board yet</div>'+
+  '<hr style="border:0;border-top:1px solid var(--line);margin:10px 0">'+
+  '<b style="color:var(--dim);font-size:10px">ACE chunk cache receipts (cache-receipt/ · context-receipt/)</b>'+
+  '<div id="aceRcpts" style="color:var(--dim);font-size:10px;margin:4px 0 8px">no cache receipts yet — they land when a context chain assembles</div>'+
+  '<hr style="border:0;border-top:1px solid var(--line);margin:10px 0">'+
+  '<b style="color:var(--dim);font-size:10px">blackboard snapshot</b> <span class="x" style="cursor:pointer" onclick="boardRefresh()">↻</span>'+
+  '<pre id="boardSnap" style="white-space:pre-wrap;word-break:break-word;color:var(--dim);font-size:10px;margin:4px 0"></pre>';}
+async function boardRefresh(){try{
+  const b=await(await fetch('/blackboard/board')).json(); const board=b.board||{}; const keys=Object.keys(board);
+  $('cBoard').querySelector('b').textContent=keys.length;
+  if($('boardBody').innerHTML==='')return;
+  const sites=keys.filter(k=>k.startsWith('pointcut/')||k.startsWith('pointcut-def/'));
+  $('pcSites').innerHTML=sites.length?sites.slice(0,60).map(k=>esc9(k)+' = '+esc9(JSON.stringify(board[k]))).join('<br>'):'no pointcut sites on the board yet';
+  const ace=keys.filter(k=>k.startsWith('cache-receipt/')||k.startsWith('context-receipt/'));
+  $('aceRcpts').innerHTML=ace.length?ace.slice(-40).reverse().map(k=>esc9(k)+' = '+esc9(JSON.stringify(board[k]))).join('<br>'):'no cache receipts yet — they land when a context chain assembles';
+  $('boardSnap').textContent=JSON.stringify(board,null,1).slice(0,16000);
+}catch(e){}}
+function esc9(s){return String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
+async function pcAssert(){
+  const o=$('pcO').value.trim(),m=$('pcM').value.trim(),s=$('pcS').value.trim(),en=$('pcE').value;
+  if(!o||!m||!s)return;
+  const key='pointcut-def/'+o+'/'+m+'/'+s;
+  await fetch('/blackboard/assert',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({[key]:{method:m,site:s,enabled:en}})});
+  setTimeout(boardRefresh,150);}
+function toggleZoom(){$('zoom').style.display==='flex'?hide('zoom'):show('zoom');if($('zoomBody').innerHTML==='')zoomInit();}
+function zoomInit(){$('zoomBody').innerHTML=
+  '<div style="margin-bottom:6px"><b style="color:var(--dim);font-size:10px">ZOOM · code ring8 (hex or dec)</b><br>'+
+  '<input id="zoomCode" placeholder="e.g. 3f" style="width:90px;background:var(--panel2);border:1px solid var(--line);border-radius:4px;color:var(--ink);padding:3px 8px">'+
+  ' <span class="x" style="cursor:pointer" onclick="zoomGo()">→ ring</span></div>'+
+  '<div id="zoomOut" style="color:var(--dim)">enter a ring8 to see its representative fragments</div>'+
+  '<hr style="border:0;border-top:1px solid var(--line);margin:10px 0">'+
+  '<div style="margin-bottom:6px"><b style="color:var(--dim);font-size:10px">STRENGTH · two cids side by side</b><br>'+
+  '<input id="strA" placeholder="a cid" style="width:46%;background:var(--panel2);border:1px solid var(--line);border-radius:4px;color:var(--ink);padding:3px 8px">'+
+  '<input id="strB" placeholder="b cid" style="width:46%;background:var(--panel2);border:1px solid var(--line);border-radius:4px;color:var(--ink);padding:3px 8px">'+
+  ' <span class="x" style="cursor:pointer" onclick="strengthGo()">→ grade</span></div>'+
+  '<div id="strOut" style="color:var(--dim)">enter two cids to grade the match</div>'+
+  '<hr style="border:0;border-top:1px solid var(--line);margin:10px 0">'+
+  '<div style="margin-bottom:6px"><b style="color:var(--dim);font-size:10px">DENSITY · residual per aperture band (LineAperture → zoom bands)</b><br>'+
+  '<input id="dPath" placeholder="a doc id" style="width:46%;background:var(--panel2);border:1px solid var(--line);border-radius:4px;color:var(--ink);padding:3px 8px">'+
+  '<select id="dAperture" style="background:var(--panel2);border:1px solid var(--line);border-radius:4px;color:var(--ink);padding:3px 6px">'+
+  '<option value="L0">L0 macro</option><option value="L1">L1 region</option>'+
+  '<option value="L2" selected>L2 focus</option><option value="L3">L3 micro</option></select>'+
+  ' <span class="x" style="cursor:pointer" onclick="densityGo()">→ density</span></div>'+
+  '<div id="dOut" style="color:var(--dim)">enter a doc id to shade its residual density</div>';}
+  /* R1: per-ring density shading — residualDensity(probe, aperture) behind a route. */
+  async function densityGo(){
+  const p=($('dPath').value||'').trim();if(!p){$('dOut').textContent='enter a doc id';return;}
+  $('dOut').textContent='…';
+  try{const r=await (await fetch('/api/graal/density?path='+encodeURIComponent(p)+'&aperture='+$('dAperture').value)).json();
+   if(r.error){$('dOut').textContent='error: '+r.error;return;}
+   const tot=r.totals||{};
+   let h='<div style="margin-bottom:4px"><b>'+(r.regions||[]).length+'</b> regions · '+
+     'linked <b style="color:var(--commit)">'+tot.linked+'</b> · '+
+     'partial <b style="color:var(--warn)">'+tot.partial+'</b> · '+
+     'content-only <b style="color:var(--dim)">'+tot.contentOnly+'</b></div>';
+   (r.regions||[]).slice(0,32).forEach((rg,i)=>{
+     h+='<div style="display:flex;align-items:center;gap:6px;margin:2px 0">'+
+       '<span style="color:var(--dim);font-size:10px;min-width:44px">r'+rg.region+'</span>'+
+       '<div style="flex:1;height:8px;background:var(--panel2);border-radius:3px;position:relative;overflow:hidden">'+
+       '<div style="position:absolute;inset:0;width:'+Math.min(100,((rg.linked||0)*100)/Math.max(1,tot.linked+tot.partial+tot.contentOnly||1))+'%;background:var(--commit)"></div>'+
+       '</div>'+
+       '<span style="color:var(--dim);font-size:10px">'+rg.linked+'/'+rg.partial+'/'+rg.contentOnly+'</span></div>';
+   });
+   $('dOut').innerHTML=h;
+  }catch(e){$('dOut').textContent='density fetch failed: '+e;}
+  }
+async function zoomGo(){
+  const c=($('zoomCode').value||'').trim();if(!c){$('zoomOut').textContent='enter a ring8';return;}
+  $('zoomOut').textContent='…';
+  try{const r=await (await fetch('/api/graal/zoom?code='+encodeURIComponent(c))).json();
+    if(r.error){$('zoomOut').textContent='error: '+r.error;return;}
+    let h='<div style="color:var(--dim);margin-bottom:4px">ring8 '+r.ring8+' · '+r.docs+' docs · top '+(r.representatives||[]).length+' reps</div>';
+    for(const x of (r.representatives||[]).slice(0,24)){
+      h+='<div style="padding:2px 0;border-bottom:1px solid var(--line)"><span class="hashchip" title="'+esc(x.id)+'" onclick="navigator.clipboard&&navigator.clipboard.writeText(this.title)">'+esc(x.id.slice(0,44))+'…</span> '
+        +(x.structuralKey?'<span style="color:var(--dim)">'+esc(x.structuralKey.slice(0,28))+'</span>':'')
+        +'<a style="color:var(--commit);margin-left:6px" href="'+x.cas+'" target="_blank" rel="noopener">bytes</a></div>';
+    }
+    $('zoomOut').innerHTML=h;
+  }catch(e){$('zoomOut').textContent='zoom fetch failed: '+e;}
+}
+async function strengthGo(){
+  const a=($('strA').value||'').trim(),b=($('strB').value||'').trim();
+  if(!a||!b){$('strOut').textContent='enter two cids';return;}
+  $('strOut').textContent='…';
+  try{const r=await (await fetch('/api/graal/strength?a='+encodeURIComponent(a)+'&b='+encodeURIComponent(b))).json();
+    if(r.error){$('strOut').textContent='error: '+r.error;return;}
+    const color=r.confidence==='CONFIRMED'?'var(--compile)':r.confidence==='PROVISIONAL'?'var(--gc)':r.confidence==='CANDIDATE'?'var(--cpu)':'var(--deopt)';
+    $('strOut').innerHTML='<div style="font-size:15px;color:'+color+'">'+esc(r.confidence)+' <span style="color:var(--dim)">ramp '+(r.ramp||0)+'</span></div>'
+      +'<table class="kv">'
+      +'<tr><td>linked / partial / contentOnly</td><td>'+(r.linked||0)+' / '+(r.partial||0)+' / '+(r.contentOnly||0)+'</td></tr>'
+      +'<tr><td>proximity</td><td>'+esc(r.proximity||'')+'</td></tr>'
+      +'<tr><td>a bytes</td><td>'+fmtBytes(r.aBytes||0)+'</td></tr>'
+      +'<tr><td>b bytes</td><td>'+fmtBytes(r.bBytes||0)+'</td></tr></table>';
+  }catch(e){$('strOut').textContent='strength fetch failed: '+e;}
 }
 let vmSheet={columns:[],rows:[]};
 async function pollVms(){
@@ -1254,6 +1528,7 @@ function connectSse(){
       case 'deopt':river('deopt',(e.reason||'?')+' → '+(e.action||'?')+' #'+(e.compileId??''));flash($('cDeopt'),'flash-deopt');shake=Math.min(shake+5,9);pingAt(nodeFor('pointcut'),PING.deopt,e.reason);break;
       case 'gc':river('gc',(e.name||'?')+' '+(e.cause||'')+' '+(e.pauseMs||0)+'ms');flash($('cGc'),'flash-gc');break;
       case 'commit':{const n=nodeFor(e.id);heatUp(n);quake(e,n);}break;
+      case 'score':river('compile','scoring session '+(e.session||'').slice(0,12)+'… seq='+(e.corpusSeq??'?')+' '+(e.scores??0)+' scores — '+(e.confidence||'?'));break;
       case 'cpu':break;
       default:river(e.kind||'?',JSON.stringify(e).slice(0,90));
     }
@@ -1287,14 +1562,42 @@ async function productRows(){
   return rows;
 }
 async function loadMap(){
+  let mapErr='';
   try{const m=await (await fetch('/api/graal/map')).json();
     PROJECT_DBS=new Set(m.dbs||[]);
     const prod=await productRows();
-    buildTree((m.rows||[]).concat(prod));$('crumb').textContent='terrain: '+((m.rows||[]).length.toLocaleString())+' documents — wheel to dive';}
-  catch(e){$('crumb').textContent='map fetch failed: '+e;}
+    lastRows=(m.rows||[]).concat(prod);}
+  catch(e){mapErr=String(e);}
+  try{const h=await (await fetch('/api/graal/heap')).json();heapRows=heapContinentRows(h);}catch(e){heapRows=heapRows||[];}
+  lastRows=lastRows||[];
+  if(!lastRows.length)$('crumb').textContent='map fetch failed: '+(mapErr||'empty');
+  buildAll();
   setTimeout(loadMap,30000);
 }
-resize();$('crumb').textContent='drop lane v2 armed — drag a folder anywhere';loadMap();pollVitals();pollVms();loadAot();connectSse();requestAnimationFrame(draw);
+/* R1: the JVM heap continent as treemap rows. Both continents from /api/graal/heap:
+   `rows` (per-class live-set, the GC class histogram) and `allocation` (JFR
+   ObjectAllocationSample, allocation-attributed). Mass = log2(bytes) like the store, so
+   a big class isn't drowned by 100k tiny ones; hue by class name (positional mode). */
+function heapContinentRows(h){
+  const rows=[];
+  const live=(h.rows||[]);
+  for(const r of live){
+    const b=r.bytes||0;if(!b)continue;
+    const id='heap-live/'+r.class;
+    rows.push([id,b,0,1,0]);
+    heapLeaves.set(id,{kind:'live',cls:r.class,count:r.count||0,bytes:b});
+  }
+  const alloc=(h.allocation||[]);
+  for(const a of alloc){
+    const b=a.bytes||0;if(!b)continue;
+    const id='heap-alloc/'+a.class;
+    rows.push([id,b,0,1,0]);
+    heapLeaves.set(id,{kind:'alloc',cls:a.class,bytes:b});
+  }
+  return rows;
+}
+const heapLeaves=new Map();
+resize();$('crumb').textContent='drop lane v2 armed — drag a folder anywhere';loadMap();pollVitals();pollVms();loadAot();connectSse();boardRefresh();requestAnimationFrame(draw);
 </script>
 </body>
 </html>

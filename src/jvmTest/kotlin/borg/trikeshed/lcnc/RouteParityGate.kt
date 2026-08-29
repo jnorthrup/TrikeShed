@@ -70,16 +70,11 @@ class RouteParityGate {
             for ((method, rawPath) in fetchedRoutes(html)) {
                 // strip template holes and query strings: `/api/vm/${id}/eval?x` → `/api/vm/…/eval`
                 val cleaned = rawPath
-                    .replace(Regex("\\$\\{[^}]*}"), "…")
-                    .replace(Regex("\"?\\+[^+]*\\+\"?"), "…") // string-concat: "/api/vm/"+id
+                    .replace(Regex("\\$\\{[^}]*}"), "{id}")
+                    .replace(Regex("\"?\\+[^+]*\\+\"?"), "{id}") // string-concat: "/api/vm/"+id
                     .substringBefore('?')
                     .removeSuffix("/")
-                val covered = if (cleaned.contains("…")) {
-                    val prefix = cleaned.substringBefore("…").removeSuffix("/")
-                    RouteManifest.all.any { it == "$method $prefix/…" }
-                } else {
-                    RouteManifest.covers(method, cleaned)
-                }
+                val covered = RouteManifest.covers(method, cleaned)
                 if (!covered) offenders.add("$page: $method $rawPath")
             }
         }
@@ -111,7 +106,7 @@ class RouteParityGate {
             val method = line.substringBefore(' ')
             val path = line.substringAfter(' ')
             val segments = path.trim('/').split('/')
-            val concrete = segments.filter { it != "…" }
+            val concrete = segments.filter { it != "…" && !(it.startsWith("{") && it.endsWith("}")) }
             // served = every concrete segment appears as a literal (or as an
             // endsWith/startsWith fragment) somewhere in the sources
             val allPresent = concrete.all { seg ->

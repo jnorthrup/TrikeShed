@@ -136,3 +136,4 @@ logs/
 nal_projection.txt
 /.tasks.txt
 /cas/
+.zenith-runtime/
