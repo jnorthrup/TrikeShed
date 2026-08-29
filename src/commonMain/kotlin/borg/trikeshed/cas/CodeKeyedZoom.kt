@@ -131,7 +131,7 @@ object CodeKeyedZoom {
 
         /** Docs under one ring8 value (the satellite neighborhood), by doc cid hex. */
         fun docsInRing(ring8: Int): List<String> {
-            val want = String.format("%02x", ring8 and 0xFF)
+            val want = buildString { appendHex(this, ring8 and 0xFF, 2) }
             return byDoc.entries.mapNotNull { (hex, code) ->
                 val sb = StringBuilder(2)
                 appendHex(sb, (code ushr 8) and 0xFF, 2)

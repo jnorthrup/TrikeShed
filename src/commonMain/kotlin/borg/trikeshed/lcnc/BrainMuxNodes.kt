@@ -43,12 +43,12 @@ object BrainMuxNodes {
             for (i in 0 until keymux.HarnessRegistry.providers.size) {
                 val p = keymux.HarnessRegistry.providers[i]
                 val keyPresent = runCatching {
-                    kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                    kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
                         keyMux.get("llm.${p.id}.key")
                     }
                 }.getOrNull()?.isNotBlank() == true
                 val baseUrl = runCatching {
-                    kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                    kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
                         keyMux.get("llm.${p.id}.base_url")
                     }
                 }.getOrNull() ?: p.defaultBaseUrl ?: ""

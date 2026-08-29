@@ -1,5 +1,6 @@
 package borg.trikeshed.narsese
 
+import borg.trikeshed.cursor.currentTimeMillis
 import borg.trikeshed.job.CasStore
 import borg.trikeshed.job.ContentId
 import borg.trikeshed.kif.KifKnowledgeBase
@@ -65,7 +66,7 @@ object StateNodes {
             append("\"bagSize\":${bagSnap.size},")
             append("\"kifLength\":${kifText.length},")
             append("\"rdfLength\":${rdfTurtle.length},")
-            append("\"timestamp\":${System.currentTimeMillis()}}")
+            append("\"timestamp\":${currentTimeMillis()}}")
         }
         val receiptCid = cas.put(receipt.encodeToByteArray())
 

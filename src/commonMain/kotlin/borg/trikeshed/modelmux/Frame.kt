@@ -12,8 +12,9 @@ import borg.trikeshed.util.toLowerHex
  *
  * The chain IS the scope: concentric LCNC scopes are prefixes of this chain,
  * cache affinity is longest-prefix match against a warm lane, and the address
- * grammar (scope prefix + [Nuid] suffix) is the same structure routed three
- * ways. No wall clock is consulted inside the algebra — timestamps are
+ * grammar (scope prefix + host-id suffix, minted by `modelmux.defaultSecureIdGenerator`)
+ * is the same structure routed three ways. No wall clock is consulted inside
+ * the algebra — timestamps are
  * supplied by the caller and live only in the persisted document, never in
  * identity.
  */
@@ -109,8 +110,8 @@ object FrameChainStore {
         if (hex.length % 2 != 0) return null
         val out = ByteArray(hex.length / 2)
         for (i in out.indices) {
-            val hi = Character.digit(hex[i * 2], 16)
-            val lo = Character.digit(hex[i * 2 + 1], 16)
+            val hi = hex[i * 2].digitToIntOrNull(16) ?: -1
+            val lo = hex[i * 2 + 1].digitToIntOrNull(16) ?: -1
             if (hi < 0 || lo < 0) return null
             out[i] = ((hi shl 4) or lo).toByte()
         }

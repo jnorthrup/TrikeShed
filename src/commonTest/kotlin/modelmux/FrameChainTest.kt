@@ -68,35 +68,6 @@ class FrameChainTest {
     }
 
     @Test
-    fun nuidIsMonotonicAndPrefixStable() {
-        val nuid = Nuid.seeded("forge9")
-        val a = nuid.next()
-        val b = nuid.next()
-        val c = nuid.next()
-        assertTrue(a < b && b < c, "lexicographic order == allocation order: $a $b $c")
-        assertTrue(a.startsWith("forge9") && b.startsWith("forge9"), "seeded prefix is stable")
-    }
-
-    @Test
-    fun nuidBase62RoundTrips() {
-        assertEquals("0", Nuid.encode(0L))
-        assertEquals("10", Nuid.encode(62L))
-        assertEquals(62L, Nuid.decode("10"))
-        for (v in listOf(1L, 61L, 62L, 3843L, 238327L, Long.MAX_VALUE / 3)) {
-            assertEquals(v, Nuid.decode(Nuid.encode(v)), "base62 round trip at $v")
-        }
-    }
-
-    @Test
-    fun taskAddressIsScopePrefixPlusNuidSuffix() {
-        val scope = Frame.root("advisory-board".encodeToByteArray()).cid.hex
-        val nuid = Nuid.seeded("matter42")
-        val addr = "$scope/${nuid.next()}"
-        assertTrue(addr.startsWith(scope), "network part (scope) is the cid-chain prefix")
-        assertTrue(addr.substringAfter('/').startsWith("matter42"), "host part is the nuid")
-    }
-
-    @Test
     fun persistedFramePathLandsUnderContextsPlane() {
         val root = Frame.root("contexts-check".encodeToByteArray())
         // direct codec-level check of the plane prefix the store uses

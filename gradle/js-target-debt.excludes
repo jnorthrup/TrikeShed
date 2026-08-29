@@ -10,6 +10,10 @@
 **/userspace/nio/process/ProcessWorkerFactory.kt
 **/org/trikeshed/oroboros/OroborosDaemon.kt
 **/pointcut/polyglot/PointcutPolyglotBlackboardTaxonomy.kt
+# java.util.concurrent.ConcurrentHashMap; needs a real Mutex/atomic-map rewrite
+# (lookup() must stay a synchronous "pure map read" per its own doc comment,
+# so this isn't a mechanical swap) -- see GH #768
+**/couch/IncrementalViewRegistry.kt
 # JS *test* compile debt (commonTest/jsTest): runBlocking is JVM-only; the rest mirror excluded main clusters
 **/cas/VolumeCasStoreTest.kt
 **/userspace/nio/process/ProcessWorkerContractTest.kt
