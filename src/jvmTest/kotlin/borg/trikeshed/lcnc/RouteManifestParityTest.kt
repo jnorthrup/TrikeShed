@@ -23,9 +23,9 @@ class RouteManifestParityTest {
         // GET /panels — served as a static asset by JvmKanbanServer.staticAssets,
         // not an API endpoint; the manifest covers /api/panels/* API routes.
         "GET /panels",
-        // POST /_project/<name>/begin|put -- error message string in ProjectDbWire, not a route
+        // POST /_project/<name>/begin|put — error message string in ProjectDbWire, not a route
         "POST /_project/<name>/begin|put",
-        // GET / or GET /index.html -- served by ForgeRoutes.PORTABLE / JvmKanbanServer
+        // GET / or GET /index.html — served by ForgeRoutes.PORTABLE / JvmKanbanServer
         // as the shell HTML, not owned by any of the eight surface wires.
         "GET /",
         "GET /index.html",
@@ -58,11 +58,11 @@ class RouteManifestParityTest {
     private fun extractRoutePatterns(sourceText: String): Set<Pair<String, String>> {
         val routes = mutableSetOf<Pair<String, String>>()
         // "METHOD" to "/path" — ROUTES constant and similar
-        Regex(""""(GET|POST|PUT|DELETE)"\s+to\s+"(/[^"]+)"""").findAll(sourceText).forEach {
+        Regex(""""(GET|POST|PUT|DELETE)"\s+to\s+"(/[^"]+)""""").findAll(sourceText).forEach {
             routes.add(it.groupValues[1] to it.groupValues[2])
         }
         // "METHOD /path" — RouteManifest-style strings in source
-        Regex(""""((?:GET|POST|PUT|DELETE)\s+/[^"]+)"""").findAll(sourceText).forEach {
+        Regex(""""((?:GET|POST|PUT|DELETE)\s+/[^"]+)""""").findAll(sourceText).forEach {
             val parts = it.groupValues[1].split(' ', limit = 2)
             if (parts.size == 2) routes.add(parts[0] to parts[1])
         }
@@ -71,8 +71,23 @@ class RouteManifestParityTest {
             routes.add("*" to it.groupValues[1])
         }
         // p.startsWith("/path") — prefix match → treat as wildcard
-        Regex("""(?:p|path)\.startsWith\("(/[^"]+)"""").findAll(sourceText).forEach {
+        Regex("""(?:p|path)\.startsWith\("(/[^"]+)""""").findAll(sourceText).forEach {
             routes.add("*" to it.groupValues[1] + "\u2026")
+        }
+        return routes
+    }
+
+    /**
+     * Extract paths registered via `ctx.routes.claim(moduleId, "/path")`.
+     * This is the pattern KanbanModule (and any ForgeModule) uses — the method
+     * is determined inside the handler lambda, so we extract path-only pairs
+     * with method = "*CLAIM" to distinguish them from generic "*".
+     */
+    private fun extractClaimPaths(sourceText: String): Set<Pair<String, String>> {
+        val routes = mutableSetOf<Pair<String, String>>()
+        // ctx.routes.claim(id, "/api/...") { method, ... ->
+        Regex("""claim\(\w+, "(/[^"]+)"\) """).findAll(sourceText).forEach {
+            routes.add("*CLAIM" to it.groupValues[1])
         }
         return routes
     }
@@ -126,6 +141,18 @@ class RouteManifestParityTest {
                 offenders.add(key)
             }
         }
+
+        // claim()-registered routes: the handler determines the method at runtime,
+        // so we verify each claim path has at least one manifest entry (any method).
+        val claimPaths = extractClaimPaths(src)
+        val allManifestPaths = RouteManifest.entries.values.flatten()
+        for ((_, claimPath) in claimPaths) {
+            val covered = allManifestPaths.any { it.path == claimPath }
+            if (!covered) {
+                offenders.add("claim() path $claimPath — no manifest entry covers it")
+            }
+        }
+
         assertTrue(offenders.isEmpty(),
             "Routes registered in code but absent from manifest (code → manifest gap):\n  ${offenders.joinToString("\n  ")}")
     }
@@ -151,5 +178,22 @@ class RouteManifestParityTest {
         assertTrue(total >= 80,
             "Manifest has only $total routes — expected 80+ for eight surfaces; " +
                 "the test may be passing vacuously")
+    }
+
+    @Test
+    fun kanbanModuleContributesKnownRoutes() {
+        // Canary: KanbanModule MUST contribute its known route families.
+        // This guards against the extraction being blinded by syntax variants —
+        // if the claim() regex fails, this test catches it.
+        val kanbanEntries = RouteManifest.entries["KanbanModule"]
+            ?: fail("KanbanModule has no manifest entries at all")
+        assertTrue(kanbanEntries.size >= 5,
+            "KanbanModule has only ${kanbanEntries.size} manifest entries — expected >= 5; " +
+                "the claim() extraction may be broken")
+        // Verify specific route families are present
+        val paths = kanbanEntries.map { it.path }.toSet()
+        assertTrue("/api/board" in paths, "KanbanModule must declare GET /api/board")
+        assertTrue("/api/invoke" in paths, "KanbanModule must declare POST /api/invoke")
+        assertTrue("/api/lcnc/run" in paths, "KanbanModule must declare POST /api/lcnc/run")
     }
 }
