@@ -1,0 +1,126 @@
+# Couch Surface Guide
+
+> **Status:** verified-live
+
+## Overview
+
+The Couch surface provides a CouchDB 1.6-compatible document store with CRUD operations, change tracking, and replication. Built on CouchWire (Kotlin Multiplatform), it exposes routes through CouchWireRouter (commonMain) and CouchWire (jvmMain).
+
+## Routes
+
+### Document CRUD
+
+| Method | Path | Request | Response |
+|--------|------|---------|----------|
+| `GET` | `/{db}/{id}` | — | `{ "_id": "...", "_rev": "...", ... }` |
+| `PUT` | `/{db}/{id}` | `{ "_id": "...", "_rev": "...", ... }` (JSON body) | `{ "ok": true, "id": "...", "rev": "..." }` |
+| `DELETE` | `/{db}/{id}` | — | `{ "ok": true, "id": "...", "rev": "..." }` |
+
+### All Documents
+
+| Method | Path | Request | Response |
+|--------|------|---------|----------|
+| `GET` | `/{db}/_all_docs` | — | `{ "rows": [...] }` |
+
+### Views
+
+| Method | Path | Request | Response |
+|--------|------|---------|----------|
+| `GET` | `/{db}/_design/{ddoc}/_view/{v}` | Query params for view options | `{ "rows": [...] }` |
+
+### Changes Feed
+
+| Method | Path | Request | Response |
+|--------|------|---------|----------|
+| `GET` | `/{db}/_changes` | Query params: `?since=...&limit=...` | `{ "results": [...] }` |
+| `GET` | `/{db}/_changes?feed=continuous` | Query params | Stream of JSON objects |
+| `GET` | `/{db}/_changes?feed=longpoll` | Query params | Blocks until changes arrive |
+
+**Note:** Continuous mode is a polling loop with `interval_ms`, not true push. Longpoll mode waits for changes and returns when new data arrives or a heartbeat fires.
+
+### Replication
+
+| Method | Path | Request | Response |
+|--------|------|---------|----------|
+| `POST` | `/{db}/_replicate` | `{ "source": "...", "target": "...", "continuous": false, "interval_ms": 1000, "cancel": false }` | `{ "ok": true, "history": [...] }` |
+| `GET` | `/{db}/_replicate` | — | `{ "jobs": [...] }` |
+
+**Note:** Replication is a 1.x replicator. Interrupted replication has no automatic recovery procedure—you must restart manually.
+
+### CAS Block Access
+
+| Method | Path | Request | Response |
+|--------|------|---------|----------|
+| `GET` | `/_cas/{cid}` | — | Binary content |
+| `GET` | `/api/v0/block/*` | — | Binary content (IPFS-compatible alias) |
+
+### Known Gaps
+
+| Issue | Status | Details |
+|-------|--------|---------|
+| Attachment GET + rewrite wiring | **known-bug** | Attachment handling is incomplete. Requests may succeed but attachments aren't correctly served. |
+| Interrupted replication recovery | **known-bug** | No automatic recovery. If replication stops, you must restart manually. |
+| Continuous replication polling | **degraded** | Uses `interval_ms` polling, not true CouchDB-style push replication. |
+
+## Worked Walkthrough
+
+### PUT a Document
+
+```bash
+curl -X PUT http://localhost:5984/testdb/doc1 \
+  -H "Content-Type: application/json" \
+  -d '{"_id": "doc1", "name": "Hello", "value": 42}'
+```
+
+Response:
+```json
+{"ok": true, "id": "doc1", "rev": "1-abc123"}
+```
+
+### GET It Back
+
+```bash
+curl http://localhost:5984/testdb/doc1
+```
+
+Response:
+```json
+{"_id": "doc1", "_rev": "1-abc123", "name": "Hello", "value": 42}
+```
+
+### See It in _changes
+
+```bash
+curl http://localhost:5984/testdb/_changes
+```
+
+Response:
+```json
+{"results": [{"seq": 1, "id": "doc1", "changes": [{"rev": "1-abc123"}]}]}
+```
+
+### Replicate to a Second DB
+
+1. Create a target database:
+   ```bash
+   curl -X PUT http://localhost:5984/targetdb
+   ```
+
+2. Start replication:
+   ```bash
+   curl -X POST http://localhost:5984/testdb/_replicate \
+     -H "Content-Type: application/json" \
+     -d '{"source": "testdb", "target": "targetdb", "continuous": false, "interval_ms": 1000}'
+   ```
+
+3. Verify the document exists in target:
+   ```bash
+   curl http://localhost:5984/targetdb/doc1
+   ```
+
+## Caveats
+
+- **Attachment handling** is incomplete. Use document metadata for now.
+- **Replication** is stateless—if interrupted, you must restart from scratch.
+- **Longpoll mode** is blocking. Use with timeout handling.
+- **No attachment rewrite** wiring. Attachments are not reliably served.
