@@ -698,7 +698,13 @@ function renderGroupedBoard(n){
       e.preventDefault(); c.classList.remove("dragover");
       let data; try{ data=JSON.parse(e.dataTransfer.getData("text/plain")); }catch(_){ return; }
       if(!data||data.from===col.id) return;
-      status.textContent=data.itemId+": "+data.from+" → "+col.id+" (wired downstream decides what that means)";
+      // Optimistic local move: the card lands NOW. Without this the board sits
+      // frozen until the next activeSheets tick (5s) — a drag that shows
+      // nothing for 5 seconds reads as broken. The next tick reconciles truth
+      // (a 409'd move snaps the card back).
+      const fromArr=n._groups[data.from]||[], idx=fromArr.findIndex(x=>x[idF]===data.itemId);
+      if(idx>=0){ (n._groups[col.id]=n._groups[col.id]||[]).push(fromArr.splice(idx,1)[0]); renderGroupedBoard(n); }
+      status.textContent=data.itemId+": "+data.from+" → "+col.id+" (downstream deciding…)";
       n._lastMove={...data,to:col.id};
       runAll(n.id); // this node's own downstream chain sees the gesture
     });

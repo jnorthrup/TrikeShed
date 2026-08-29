@@ -318,6 +318,11 @@ class JvmKanbanServer(
                         append("HTTP/1.1 ${resp.status} ${statusReason(resp.status)}\r\n")
                         append("Content-Length: ${payloadOut.size}\r\n")
                         append("Content-Type: ${resp.contentType}\r\n")
+                        // Operator surface: NEVER heuristically cached. With no header the
+                        // browser is free to serve day-old pages — every "stale slop" report
+                        // this daemon has eaten traces to that. no-cache still allows
+                        // conditional revalidation; it forbids silent staleness.
+                        append("Cache-Control: no-cache\r\n")
                         append("Access-Control-Allow-Origin: *\r\n\r\n")
                     }.toByteArray(StandardCharsets.UTF_8)
                     val outBytes = head + payloadOut
