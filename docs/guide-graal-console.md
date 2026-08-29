@@ -103,18 +103,18 @@ All routes are served on the same port as the rest of the daemon (default 8888).
 
 | Method | Path | Status | Description |
 |--------|------|--------|-------------|
-| POST | `/api/graal/capsule/spawn` | undocumented-experimental | Spawn a Hermes sleeve: GraalPy guest VM with its own btrfs subvolume. Body: `{"id": "optional-name"}`. Returns `{ok, id, terminal}`. |
-| POST | `/api/graal/capsule/{id}/stdin` | undocumented-experimental | Type a line at the captured shell. Body: `{"text": "..."}`. |
-| GET | `/api/graal/capsule/{id}/output` | undocumented-experimental | VT scrollback so far (poll, not stream). Returns `{id, alive, text}`. |
-| POST | `/api/graal/capsule/{id}/kill` | undocumented-experimental | Interrupt + close the guest. |
+| POST | `/api/graal/capsule/spawn` | stub | Spawn a Hermes sleeve: GraalPy guest VM with its own btrfs subvolume. Body: `{"id": "optional-name"}`. Returns `{ok, id, terminal}`. |
+| POST | `/api/graal/capsule/{id}/stdin` | stub | Type a line at the captured shell. Body: `{"text": "..."}`. |
+| GET | `/api/graal/capsule/{id}/output` | stub | VT scrollback so far (poll, not stream). Returns `{id, alive, text}`. |
+| POST | `/api/graal/capsule/{id}/kill` | stub | Interrupt + close the guest. |
 
 ### Occupy Routes (experimental)
 
 | Method | Path | Status | Description |
 |--------|------|--------|-------------|
-| GET | `/api/graal/occupy` | undocumented-experimental | List occupied repos: `{"repos": [{id, path, live path count, ...}]}`. |
-| POST | `/api/graal/occupy` | undocumented-experimental | Absorb a git repo's worktree under `repos/<id>/` and watch it live. Body: `{"path": "/path/to/repo"}`. Returns `{ok, id, prefix}`. |
-| POST | `/api/graal/occupy/{id}/release` | undocumented-experimental | Stop watching. Already-absorbed content stays. |
+| GET | `/api/graal/occupy` | stub | List occupied repos: `{"repos": [{id, path, live path count, ...}]}`. |
+| POST | `/api/graal/occupy` | stub | Absorb a git repo's worktree under `repos/<id>/` and watch it live. Body: `{"path": "/path/to/repo"}`. Returns `{ok, id, prefix}`. |
+| POST | `/api/graal/occupy/{id}/release` | stub | Stop watching. Already-absorbed content stays. |
 
 ## Worked Walkthrough
 

@@ -10,49 +10,49 @@ The Couch surface provides a CouchDB 1.6-compatible document store with CRUD ope
 
 ### Document CRUD
 
-| Method | Path | Request | Response |
-|--------|------|---------|----------|
-| `GET` | `/{db}/{id}` | — | `{ "_id": "...", "_rev": "...", ... }` |
-| `PUT` | `/{db}/{id}` | `{ "_id": "...", "_rev": "...", ... }` (JSON body) | `{ "ok": true, "id": "...", "rev": "..." }` |
-| `DELETE` | `/{db}/{id}` | — | `{ "ok": true, "id": "...", "rev": "..." }` |
+| Method | Path | Status | Request | Response |
+|--------|------|--------|---------|----------|
+| `GET` | `/{db}/{id}` | verified-live | — | `{ "_id": "...", "_rev": "...", ... }` |
+| `PUT` | `/{db}/{id}` | verified-live | `{ "_id": "...", "_rev": "...", ... }` (JSON body) | `{ "ok": true, "id": "...", "rev": "..." }` |
+| `DELETE` | `/{db}/{id}` | verified-live | — | `{ "ok": true, "id": "...", "rev": "..." }` |
 
 ### All Documents
 
-| Method | Path | Request | Response |
-|--------|------|---------|----------|
-| `GET` | `/{db}/_all_docs` | — | `{ "rows": [...] }` |
+| Method | Path | Status | Request | Response |
+|--------|------|--------|---------|----------|
+| `GET` | `/{db}/_all_docs` | verified-live | — | `{ "rows": [...] }` |
 
 ### Views
 
-| Method | Path | Request | Response |
-|--------|------|---------|----------|
-| `GET` | `/{db}/_design/{ddoc}/_view/{v}` | Query params for view options | `{ "rows": [...] }` |
+| Method | Path | Status | Request | Response |
+|--------|------|--------|---------|----------|
+| `GET` | `/{db}/_design/{ddoc}/_view/{v}` | verified-live | Query params for view options | `{ "rows": [...] }` |
 
 ### Changes Feed
 
-| Method | Path | Request | Response |
-|--------|------|---------|----------|
-| `GET` | `/{db}/_changes` | Query params: `?since=...&limit=...` | `{ "results": [...] }` |
-| `GET` | `/{db}/_changes?feed=continuous` | Query params | Stream of JSON objects |
-| `GET` | `/{db}/_changes?feed=longpoll` | Query params | Blocks until changes arrive |
+| Method | Path | Status | Request | Response |
+|--------|------|--------|---------|----------|
+| `GET` | `/{db}/_changes` | verified-live | Query params: `?since=...&limit=...` | `{ "results": [...] }` |
+| `GET` | `/{db}/_changes?feed=continuous` | degraded | Query params | Stream of JSON objects |
+| `GET` | `/{db}/_changes?feed=longpoll` | verified-live | Query params | Blocks until changes arrive |
 
 **Note:** Continuous mode is a polling loop with `interval_ms`, not true push. Longpoll mode waits for changes and returns when new data arrives or a heartbeat fires.
 
 ### Replication
 
-| Method | Path | Request | Response |
-|--------|------|---------|----------|
-| `POST` | `/{db}/_replicate` | `{ "source": "...", "target": "...", "continuous": false, "interval_ms": 1000, "cancel": false }` | `{ "ok": true, "history": [...] }` |
-| `GET` | `/{db}/_replicate` | — | `{ "jobs": [...] }` |
+| Method | Path | Status | Request | Response |
+|--------|------|--------|---------|----------|
+| `POST` | `/{db}/_replicate` | verified-live | `{ "source": "...", "target": "...", "continuous": false, "interval_ms": 1000, "cancel": false }` | `{ "ok": true, "history": [...] }` |
+| `GET` | `/{db}/_replicate` | verified-live | — | `{ "jobs": [...] }` |
 
 **Note:** Replication is a 1.x replicator. Interrupted replication has no automatic recovery procedure—you must restart manually.
 
 ### CAS Block Access
 
-| Method | Path | Request | Response |
-|--------|------|---------|----------|
-| `GET` | `/_cas/{cid}` | — | Binary content |
-| `GET` | `/api/v0/block/*` | — | Binary content (IPFS-compatible alias) |
+| Method | Path | Status | Request | Response |
+|--------|------|--------|---------|----------|
+| `GET` | `/_cas/{cid}` | verified-live | — | Binary content |
+| `GET` | `/api/v0/block/*` | verified-live | — | Binary content (IPFS-compatible alias) |
 
 ### Known Gaps
 
