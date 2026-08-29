@@ -2,6 +2,12 @@
 
 Open the concentric canvas and run an LCNC program. This guide is **deliberately thin** — no widget-library investment.
 
+> **Status: PROBATIONARY.** The panels editor was rooted out on 2026-08-27 and
+> revived on 2026-08-28 as the concentric canvas. The user's standing verdict
+> (2026-08-29) is that the concentric-UI promise re-entered past the no-widget
+> ruling — this surface's commerce status is probationary. This guide documents
+> what is; it does not pitch this surface as part of the commerce story.
+
 > **Launch prerequisite:** the daemon must be running. See [guide-daemon-launch.md](guide-daemon-launch.md).
 
 ## Opening the Canvas
@@ -88,9 +94,9 @@ The following routes exist but are stubs — they return empty or placeholder da
 
 | Route | Status |
 |-------|--------|
-| `POST /api/lcnc/mating-options` | **stub** |
-| `POST /api/lcnc/fills` | **stub** |
-| `POST /api/lcnc/autowire` | **stub** |
+| `GET /api/lcnc/mating-options` | **stub** |
+| `GET /api/lcnc/fills` | **stub** |
+| `GET /api/lcnc/autowire` | **stub** |
 
 > **Status:** stub — these routes are explicitly not implemented.
 
