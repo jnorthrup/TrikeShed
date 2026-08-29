@@ -77,3 +77,6 @@
 ## 2024-08-24 - Dynamic ARIA Label Injection
 **Learning:** When dynamically rendering interactive lists in vanilla JS (like page trees, sheet references, or slash menus), screen reader context is lost if we only use CSS classes like `.active` to indicate state.
 **Action:** When creating elements with `document.createElement`, proactively attach explicit, descriptive `aria-label`s that encapsulate both the item's identity and its current state (e.g., `"Active page: Untitled"` or `"Navigate to parent sheet: ..."`).
+## 2024-05-27 - Context-Specific ARIA Labels for generic buttons
+**Learning:** Adding ARIA labels to generic icon-only or poorly labeled buttons (like 'Fit') provides essential context for screen reader users, but adding ARIA labels that duplicate visible text (like 'Add a page') is redundant and violates WCAG 2.5.3 (Label in Name) best practices unless it provides significant extra context.
+**Action:** Before adding an ARIA label, verify the element's existing text content. Only add `aria-label` if the visible text is insufficient or absent (e.g., icon-only buttons), or if it adds crucial missing context.
