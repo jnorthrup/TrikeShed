@@ -163,13 +163,15 @@ if [[ ${#AOT_OPTS[@]} -eq 0 ]]; then
     AOT_OPTS=("-XX:AOTCacheOutput=$TRIKESHED_AOT_CACHE_OUTPUT")
   fi
 fi
-# ── AOT by default (JDK 25 JEP 514 one-step). No flags needed: when the cache
-# matches the live classpath fingerprint it loads; otherwise this run TRAINS and
-# the archive lands on exit, ready for the next boot. Operator --aot-cache /
-# --aot-record / TRIKESHED_AOT_CACHE* always override; TRIKESHED_AOT_DEFAULT=0
-# disables. Fingerprint = live-classes generation + lib listing + JVM version,
+# ── AOT is OPT-IN (TRIKESHED_AOT_DEFAULT=1, or the explicit --aot-cache /
+# --aot-record / TRIKESHED_AOT_CACHE* lanes). It defaulted ON until 2026-08-29:
+# every classpath this script builds carries directory entries (live classes,
+# processed resources), and the JEP 514/CDS dump refuses non-empty directories —
+# so default training failed on EVERY exit and no cache could ever land. The
+# server launches with no AOT flags at all unless an operator asks for them.
+# Fingerprint = live-classes generation + lib listing + JVM version,
 # so a hotswapFeed or toolchain bump retrains instead of loading a stale archive.
-if [[ ${#AOT_OPTS[@]} -eq 0 && "${TRIKESHED_AOT_DEFAULT:-1}" != "0" && -n "${AOT_HOME:-}" ]]; then
+if [[ ${#AOT_OPTS[@]} -eq 0 && "${TRIKESHED_AOT_DEFAULT:-0}" == "1" && -n "${AOT_HOME:-}" ]]; then
   # Per-instance archive: two daemons off one classpath (trikeshed + computronium)
   # must not train into the same file — concurrent exits would tear it.
   _AOT_INSTANCE=$(printf '%s' "${DAEMON_ARGS[*]:-} $WATCH ${HOME_POS:-} ${REPO_POS:-}" | shasum -a 256 | cut -c1-8)
