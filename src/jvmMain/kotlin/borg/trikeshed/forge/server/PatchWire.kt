@@ -518,11 +518,12 @@ class PatchWire(
                 )
             }
 
-            // (The /api/panels family — the browser panel editor's save/load/
-            // list/presets/mate API — was ROOTED OUT 2026-08-27 with the page
-            // itself. Stored programs are offered presets + ModuleContext.
-            // programLoader; execution is /api/lcnc/run. Mating stays as pure
-            // vocabulary logic below — it never needed the page.)
+            // (The /api/panels family — save/load/list/presets for the
+            // revived concentric editor at /panels — is defined below. Stored
+            // programs are also offered via presets + ModuleContext.
+            // programLoader; execution is /api/lcnc/run either way. Mating
+            // stays as pure vocabulary logic below — it never needed the
+            // page, revived or not.)
             method == "GET" && p == "/api/lcnc/mating-options" -> {
                 val query = borg.trikeshed.utils.rfxhttp.CouchHttpSurface.parseQuery(path.substringAfter('?', ""))
                 val sourceType = query["sourceType"]

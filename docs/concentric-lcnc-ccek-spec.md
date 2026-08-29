@@ -140,10 +140,16 @@ Corollaries:
   the same `LcncProgramConfix` parse and `execute` path, a bad shape failing
   as a 400 rather than a silent flat sweep. Outputs: per-node map (program/
   document run) or the node's output map (job run).
-- The browser editor is DELETED (2026-08-27) — no page executes or edits the
-  graph. Any future surface renders fetched contracts and POSTs to the routes
-  above; sheet projections render through the PWA's TreeSheets-idiom sheets
-  renderer (`script.js`), the one treesheet.
+- The browser editor was deleted 2026-08-27, then revived 2026-08-28
+  (`46b073bda`) as the concentric canvas at `/panels`. It renders nothing it
+  authors itself: vocabulary comes from `GET /api/lcnc/contracts`, lane
+  assemblage from `GET /api/lcnc/concentric` (`ConcentricSurface.LANE_ASSEMBLAGE`),
+  and save/load goes through `/api/panels/*` (CAS-addressed `panels/<name>`
+  attachments, not localStorage) — never a hand-authored lane/type table.
+  `RouteParityGate`'s "the revived editor stays honest" gate fails the build
+  on any hand-authored table, elliptical child placement, or children-dropping
+  serialize. Sheet projections outside the canvas still render through the
+  PWA's TreeSheets-idiom sheets renderer (`script.js`), the one treesheet.
 - **`GET /api/lcnc/contracts`** serves the scope vocabulary like every other
   contract; parity gates fail the build if the vocabulary forks. The palette
   is inspectable there — one author, no browser TYPES table, ever again.
