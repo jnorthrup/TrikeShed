@@ -40,15 +40,25 @@ public class CouchWal {
 
         Process process = builder.start();
 
-        // Log output
-        try (BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()))) {
-            String line;
-            while ((line = reader.readLine()) != null) {
-                System.out.println(line);
+        // Log output asynchronously
+        java.util.concurrent.CompletableFuture<Void> outputReader = java.util.concurrent.CompletableFuture.runAsync(() -> {
+            try (BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()))) {
+                String line;
+                while ((line = reader.readLine()) != null) {
+                    System.out.println(line);
+                }
+            } catch (IOException e) {
+                // Ignore stream closed errors if killed
             }
-        }
+        });
 
-        int exitCode = process.waitFor();
+        boolean finished = process.waitFor(1, java.util.concurrent.TimeUnit.HOURS);
+        if (!finished) {
+            process.destroyForcibly();
+            throw new RuntimeException("Gradle build process timed out");
+        }
+        outputReader.join();
+        int exitCode = process.exitValue();
         if (exitCode != 0) {
             throw new RuntimeException("Gradle build failed with exit code: " + exitCode);
         }
