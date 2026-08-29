@@ -15,7 +15,7 @@ Navigate the daemon surfaces. Each guide covers one surface: purpose, routes, wa
 | [Guest Worlds](guide-guest-worlds.md) | `/api/vm` + capsule | Spawn GraalPy sub-VMs, seed VFS directories, run pytest in the sandbox |
 | [Drop a Corpus](guide-drop-a-corpus.md) | `/api/graal/ingest` | Bulk ingest any file — Tika/OCR extraction, CAS storage, plan-shape gate |
 | [Metered VMs](guide-metered-vms.md) | `/api/vm` | Spawn/drive/revoke metered VMs, SSE events, terminal page |
-| [Panels / LCNC](guide-panels-lcnc.md) | `/panels` | Open the concentric canvas, run LCNC programs, server-persisted constructions |
+| [Panels / LCNC](guide-panels-lcnc.md) *(probationary)* | `/panels` | Open the concentric canvas, run LCNC programs, server-persisted constructions |
 
 ## Architecture Pages
 
