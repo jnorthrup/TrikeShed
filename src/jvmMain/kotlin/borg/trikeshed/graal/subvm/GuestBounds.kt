@@ -15,7 +15,16 @@ import borg.trikeshed.pointcut.VmFacet
  *    ("trying to release the GIL with invalid hold count 0"). Python is stopped from OUTSIDE —
  *    `Context.interrupt(timeout)` from a watchdog — or run in a [ProcessIsolate].
  *  - HOST ACCESS: `HostAccess.NONE` blocks Java objects but not polyglot proxies, so the only
- *    door into the host is the `host` proxy the isolate installs ([InProcessIsolate.HOST_BINDING]).
+ *    door into the host is the `host` proxy the isolate installs ([InProcessIsolate.HOST_BINDING]) —
+ *    for every facet EXCEPT [VmFacet.JVM] ([FacetBounds.hostTrusted]), which is the one deliberate
+ *    exception: `vm.tika`/`vm.corenlp` legos are OWN-trust JVM-facet scripts authored by the host
+ *    operator through the LCNC editor (not derived from untrusted input — document text crosses as a
+ *    string parameter, never as source), and they exist specifically to call real host libraries
+ *    (`Java.type('org.apache.tika.Tika')`, `edu.stanford.nlp...`) already bundled in this same JVM.
+ *    `hostTrusted` is read only by [InProcessIsolate] (the OWN-trust tier) — [ProcessIsolate]'s
+ *    subprocess re-resolves bounds by language id via [GuestBounds.ofLanguage], which has no JVM
+ *    entry, so a JVM-facet lego requested at UNTRUSTED trust safely degrades to a sandboxed `js`
+ *    guest in the child process rather than leaking host access to untrusted-declared code.
  *  - Values never cross contexts: state is [Teleport]ed to host primitives/proxies and back.
  *  - Node.js APIs (`require`, `process`, event loop) are NOT in the in-process JS engine; they
  *    need the GraalJS `node` launcher, i.e. a [ProcessIsolate] with `nodeLauncher` set.
@@ -37,6 +46,8 @@ data class FacetBounds(
      * wrapped after eval and observed at the binding instead of by instrumentation.
      */
     val rootEventsObservable: Boolean,
+    /** [VmFacet.JVM] only — see the class doc's HOST ACCESS note. Every other facet stays HostAccess.NONE. */
+    val hostTrusted: Boolean = false,
 )
 
 object GuestBounds {
@@ -65,11 +76,21 @@ object GuestBounds {
         defaultWallMillis = DEFAULT_WALL_MILLIS,
         rootEventsObservable = false,
     )
+    /** JVM facet: GraalJS with real host access — see the class doc's HOST ACCESS note. */
+    val JVM = FacetBounds(
+        facet = VmFacet.JVM, languageId = "js",
+        statementLimitSafe = true, stop = StopStrategy.STATEMENT_LIMIT,
+        rootNameNoise = { it.isBlank() || it.startsWith(":") || it.startsWith("<") },
+        defaultWallMillis = DEFAULT_WALL_MILLIS,
+        rootEventsObservable = true,
+        hostTrusted = true,
+    )
 
     fun of(facet: VmFacet): FacetBounds = when (facet) {
         VmFacet.GRAAL_JS -> JS
         VmFacet.GRAAL_PYTHON -> PYTHON
         VmFacet.GRAAL_LLVM -> LLVM
+        VmFacet.JVM -> JVM
         else -> throw IllegalArgumentException("no in-process guest for facet $facet")
     }
 

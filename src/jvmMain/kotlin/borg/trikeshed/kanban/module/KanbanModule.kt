@@ -245,6 +245,7 @@ class KanbanModule : ForgeModule {
                         mapOf(
                             "v" to p.value.v, "opts" to p.value.opts,
                             "ta" to p.value.ta, "ph" to p.value.ph,
+                            "cols" to p.value.cols,
                         )
                     },
                     "source" to c.isSource, "sink" to c.isSink, "wide" to c.wide,

@@ -9,6 +9,7 @@ import borg.trikeshed.lib.j
 import borg.trikeshed.lib.toSeries
 import keymux.EnvVarSource
 import keymux.FixedKeySource
+import keymux.HarnessRegistry
 import keymux.KeyMux
 import keymux.harness
 import modelmux.ModelEntry
@@ -66,6 +67,15 @@ class BrainClient(
     companion object {
         /** Outer timeout: if every provider fails to respond within this window, abort the whole call. */
         const val OUTER_TIMEOUT_MS = 60_000L
+
+        /** The [keymux.HarnessRegistry] provider id whose [keymux.HarnessProvider.envVars] contains [envVar], if any. */
+        private fun providerTagFor(envVar: String): String? {
+            for (i in 0 until HarnessRegistry.providers.size) {
+                val p = HarnessRegistry.providers[i]
+                for (j in 0 until p.envVars.size) if (p.envVars[j] == envVar) return p.id
+            }
+            return null
+        }
     }
 
     /** One OpenAI-compatible endpoint + the env var that KeyMux resolves. */
@@ -74,6 +84,16 @@ class BrainClient(
         val envVar: String,
         val base: String,
         val model: String,
+        /**
+         * [HarnessRegistry] provider id sharing [envVar], when one exists — auto-derived,
+         * never hand-mapped, so a wrong tag can't silently route a call to the wrong
+         * provider's key. Passed to [modelmux.ModelMuxBuilder.model] as `provider` so
+         * [modelmux.ModelMux.session] resolves via the pooled `llm.<provider>.key` path —
+         * the one [keymux.HarnessSource] actually answers from the operator's real
+         * credential stores (hermes profile .env/auth.json, codex, opencode), not just
+         * this class's own literal per-model-id bindings ([buildKeyMux], standalone-only).
+         */
+        val provider: String? = providerTagFor(envVar),
     )
 
     private val endpoints: List<EndpointSpec> = if (apiKey != null) {
@@ -89,7 +109,10 @@ class BrainClient(
     /** Internal ModelMux — created when no external one is provided. */
     private val internalModelMux: ModelMux = this.modelMux ?: ModelMux(internalKeyMux) {
         endpoints.forEach { endpoint ->
-            model(id = endpoint.model, caps = setOf("chat", "conflict-resolve"), baseUrl = endpoint.base)
+            model(
+                id = endpoint.model, caps = setOf("chat", "conflict-resolve"), baseUrl = endpoint.base,
+                provider = endpoint.provider,
+            )
         }
     }
 

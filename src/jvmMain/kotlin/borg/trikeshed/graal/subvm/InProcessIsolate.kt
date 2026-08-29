@@ -106,9 +106,13 @@ class InProcessIsolate(
                 .fileSystem(guestFs)
                 .build()
         } ?: IOAccess.NONE
+        // hostTrusted (VmFacet.JVM only — see GuestBounds' HOST ACCESS note) is the one
+        // deliberate exception to HostAccess.NONE: OWN-trust JVM-facet legos are authored
+        // by the host operator specifically to call real host libraries already on this
+        // JVM's classpath. Every other facet keeps the fully sandboxed policy unchanged.
         val b = Context.newBuilder(bounds.languageId).engine(engine)
-            .allowHostAccess(HostAccess.NONE)
-            .allowHostClassLookup { false }
+            .allowHostAccess(if (bounds.hostTrusted) HostAccess.ALL else HostAccess.NONE)
+            .allowHostClassLookup { bounds.hostTrusted }
             .allowIO(ioAccess)
             .allowCreateThread(false)
             .allowNativeAccess(false)

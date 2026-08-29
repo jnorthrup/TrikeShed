@@ -27,6 +27,8 @@ class PresetAssemblyTest {
             setOf(
                 "preset-hermes", "preset-tribunal", "preset-curator",
                 "preset-context", "preset-kanban", "preset-scope", "preset-scope-inner",
+                "preset-pairs", "preset-brain-mux", "preset-media",
+                "preset-hermes-train", "preset-legal-tribunal", "preset-state-freeze",
             ),
             all.keys,
         )
@@ -113,8 +115,11 @@ class PresetAssemblyTest {
             "argue⇄rebut LOOP bounded at 3")
         assertTrue(edges.any { it.mode == KanbanEdgeMode.ABORT },
             "mistrial ABORT edge present")
-        // The graph must validate under Phase 4's rules.
-        val v = g.validate()
+        // The graph must validate under Phase 4's rules. The judge's
+        // clarification loop-back is a guarded edge — its predicate must be
+        // registered for validation to resolve it (an empty registry would
+        // report it as unresolved, not illegal).
+        val v = g.validate(TribunalPredicates.registry())
         assertTrue(v.valid, "tribunal kanban validates: ${v.errors}")
     }
 

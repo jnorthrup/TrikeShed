@@ -159,6 +159,20 @@ open class HtxElement(
             ),
         )
 
+    /**
+     * Request that returns [Result] shaped by 200/non-200 status.
+     * [Result.success] for 2xx, [Result.failure] with status + body for non-2xx.
+     */
+    open suspend fun requestResult(request: HtxRequest): Result<HtxResponse> {
+        val resp = request(request)
+        return if (resp.status in 200..299) {
+            Result.success(resp)
+        } else {
+            val body = resp.body.toArray().decodeToString().take(500)
+            Result.failure(borg.trikeshed.htx.HtxHttpError(resp.status, body))
+        }
+    }
+
     internal suspend fun channelize(frames: HtxFrames) {
         fanoutSubscribers.forEach {
             if (it is HtxFrameSubscriber) {

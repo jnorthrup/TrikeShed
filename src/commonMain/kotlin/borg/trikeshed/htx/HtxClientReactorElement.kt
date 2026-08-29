@@ -23,6 +23,10 @@ import kotlin.coroutines.CoroutineContext
 
 object HtxClientKey : AsyncContextKey<HtxClientReactorElement>()
 
+/** Non-2xx HTTP error — carries status + body snippet for Result.failure. */
+class HtxHttpError(val status: Int, val body: String) :
+    Exception("HTTP $status: ${body.take(200)}")
+
 data class HtxClientOptions(
     val channelParallelism: Int = 4,
     val blobChunkBytes: Long = 4L * 1024L * 1024L,
@@ -42,6 +46,10 @@ enum class HtxClientStage {
     REQUEST_DISPATCHED,
     REDIRECTED,
     RESPONSE_RECEIVED,
+    /** 2xx patchpoint — subscribers branch here for successful responses. */
+    RESPONSE_OK,
+    /** non-2xx patchpoint — subscribers branch here for error responses. */
+    RESPONSE_ERROR,
     TRANSFER_CLOSED,
     TRANSFER_FAILED,
 }
@@ -122,6 +130,22 @@ open class HtxClientReactorElement(
         )
         return withContext(workerContext) {
             transfer.execute().response
+        }
+    }
+
+    /**
+     * Request that returns [Result] shaped by the 200/non-200 patchpoints.
+     * [Result.success] for 2xx, [Result.failure] with HTTP status + body
+     * snippet for non-2xx. Subscribers still see the RESPONSE_OK /
+     * RESPONSE_ERROR fanout frames — this is the convenience wrapper.
+     */
+    suspend fun requestResult(request: HtxRequest): Result<HtxResponse> {
+        val resp = request(request)
+        return if (resp.status in 200..299) {
+            Result.success(resp)
+        } else {
+            val body = resp.body.toArray().decodeToString().take(500)
+            Result.failure(HtxHttpError(resp.status, body))
         }
     }
 
@@ -269,6 +293,21 @@ open class HtxClientReactorElement(
                 transferOrdinal = transferOrdinal,
                 channelOrdinal = channelOrdinal,
                 stage = HtxClientStage.RESPONSE_RECEIVED,
+                range = request.range,
+                request = request,
+                response = response,
+            ),
+        )
+
+        // 200/non-200 patchpoints — subscribers branch here for OK vs error.
+        val patchStage = if (response.status in 200..299)
+            HtxClientStage.RESPONSE_OK else HtxClientStage.RESPONSE_ERROR
+        channelize(
+            HtxClientFrame(
+                clientOrdinal = clientOrdinal,
+                transferOrdinal = transferOrdinal,
+                channelOrdinal = channelOrdinal,
+                stage = patchStage,
                 range = request.range,
                 request = request,
                 response = response,

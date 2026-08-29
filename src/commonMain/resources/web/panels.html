@@ -9,8 +9,9 @@
 :root{
   --bg:#0c0f15; --panel:#131824; --panel2:#1a2130; --line:#262e3e; --ink:#e3e7ef; --dim:#8b94a7;
   --graal:#f29111; --ok:#3ddc84; --err:#ff5560; --warn:#ffb02e; --wire:#3fd0ff; --vm:#b07aff; --cpu:#6ea8fe;
-  /* UI speaks a humanist sans; DATA (ports, params, values, frames) stays mono */
-  --sans:"Inter var",Inter,"SF Pro Text",-apple-system,BlinkMacSystemFont,"Segoe UI",system-ui,sans-serif;
+  /* UI speaks the SYSTEM sans (no named families — a local novelty font
+     aliasing "Inter" etc. must never leak in); DATA stays mono */
+  --sans:-apple-system,BlinkMacSystemFont,"Segoe UI",system-ui,sans-serif;
   --mono:"Berkeley Mono","IBM Plex Mono","Cascadia Code","SF Mono",ui-monospace,Menlo,monospace;
 }
 *{box-sizing:border-box;margin:0;padding:0}
@@ -31,6 +32,7 @@ button.stop{border-color:var(--err);color:var(--err)}
 #wires path{fill:none;stroke-width:2.2;pointer-events:stroke;cursor:pointer}
 #wires path.live{stroke:var(--wire)}
 #wires path.drag{stroke:var(--graal);stroke-dasharray:6 4}
+#wires path.mismatch{stroke:var(--err)!important;stroke-dasharray:4 5;opacity:.85}
 #wires path:hover{stroke:var(--err)}
 .node{position:absolute;min-width:190px;background:var(--panel);border:1px solid var(--line);border-radius:6px;box-shadow:0 4px 18px rgba(0,0,0,.45)}
 .node .hd{display:flex;align-items:center;gap:6px;padding:5px 8px;border-bottom:1px solid var(--line);border-radius:6px 6px 0 0;background:var(--panel2);cursor:move}
@@ -142,7 +144,13 @@ button.stop{border-color:var(--err);color:var(--err)}
 .node.scope>.ringlbl i{font-style:normal;color:var(--dim)}
 .node.scope.collapsed{min-width:140px;min-height:34px}
 .node.scope.collapsed .body,.node.scope.collapsed .params,.node.scope.collapsed .result{display:none}
-.node.scope .childgrid{position:relative;min-height:60px;resize:both;overflow:auto}
+/* the ring's window: a clipping viewport onto its own microscopic canvas.
+   Drag the header to move it, grab the corner to resize it, WHEEL inside to
+   zoom it, drag its empty interior to pan it — the same physics as the main
+   screen, at every depth. */
+.node.scope .childgrid{position:relative;min-height:60px;resize:both;overflow:hidden;cursor:grab}
+.node.scope .childgrid:active{cursor:grabbing}
+.ringworld{position:absolute;left:0;top:0;transform-origin:0 0}
 /* a child inside a ring squares off against its siblings at inset margins */
 .node.inring{border-color:rgba(176,122,255,.4)}
 .node[data-lane]{border-top:2px solid var(--line)}
@@ -173,6 +181,20 @@ body.wiring .node.nomate{opacity:.35}
 #palette .pitem:hover{border-color:var(--graal)}
 #palette .pitem i{color:var(--dim);font-style:normal;font-size:9px;display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 #palette input{width:100%;margin-bottom:6px;background:var(--bg);border:1px solid var(--line);color:var(--ink);border-radius:3px;font:inherit;padding:3px 6px}
+/* generic controls */
+.bigbtn{display:block;margin:4px 8px 8px;width:calc(100% - 16px);padding:10px 0;font-size:13px;border-color:var(--ok);color:var(--ok);cursor:pointer}
+.bigbtn:active{background:rgba(61,220,132,.15)}
+.sliderwrap{display:flex;align-items:center;gap:8px;margin:2px 8px 8px}
+.sliderwrap input[type=range]{flex:1;accent-color:var(--graal)}
+.slval{font-family:var(--mono);font-size:10px;color:var(--dim);min-width:34px;text-align:right}
+/* the LIST widget: rows of typed columns; a drop target for dragged values */
+.plist{border:1px solid var(--line);border-radius:4px;padding:4px;background:var(--bg)}
+.plist .plr{display:flex;gap:4px;margin:2px 0;align-items:center}
+.plist .plr input{flex:1;min-width:0}
+.plist .plh span{flex:1;font-size:9px;color:var(--dim);text-transform:uppercase;letter-spacing:.06em}
+.plist .plr s{cursor:pointer;color:var(--err);text-decoration:none;padding:0 3px}
+.plist .pladd{cursor:pointer;color:var(--ok);font-size:10px;padding:2px 4px}
+.plist.dropready{outline:2px dashed var(--graal);outline-offset:-2px}
 /* ── taste: rounded chips, HARD-CORNERED rings (squares are the grammar),
    quieter chrome, UI sans / data mono split. ── */
 .params input,.params textarea,.params select,.result,.ctree,.gaugeval,.row,.ringlbl,#panelName,.kid,.rev,.chain,.csheet,#menu div.item{font-family:var(--mono)}
@@ -183,6 +205,9 @@ body.wiring .node.nomate{opacity:.35}
 .node .hd b{font-weight:600;letter-spacing:.01em}
 .node.scope{border-radius:2px}
 .node.scope>.hd{border-radius:2px 2px 0 0}
+/* ring chrome is MACHINE identity — mono, never the UI face */
+.node.scope>.hd b{font-family:var(--mono);font-weight:600;letter-spacing:0}
+.node.scope>.seed,.node.scope>.emit{font-family:var(--mono)}
 .kcard{border-radius:5px;font-family:var(--sans)}
 button{border-radius:6px;padding:4px 12px;transition:border-color .12s,color .12s}
 #menu{border-radius:10px}
@@ -209,6 +234,7 @@ button{border-radius:6px;padding:4px 12px;transition:border-color .12s,color .12
   <button id="storeLoadBtn" title="load a construction from the store">⇩ store</button>
   <button id="presetsBtn" title="server-authored programs — offered, never installed">▤ presets</button>
   <button id="paletteBtn" title="drag node types and programs onto the canvas">⧉ palette</button>
+  <button id="keysBtn" title="keymux endpoints — names & addresses; key values never cross">⚿ keys</button>
   <button id="exportBtn">export</button>
   <button id="importBtn">import</button>
   <button id="clearBtn">clear</button>
@@ -328,6 +354,9 @@ finally:
     async run(n,i){
       const body={prompt: i["prompt?"]!==undefined?String(i["prompt?"]):p(n,"prompt"), maxTokens:+p(n,"maxTokens"), temperature:+p(n,"temperature")};
       if(p(n,"system")) body.system=p(n,"system");
+      // the seat's admissible key×model pairs ride the call
+      let mlist; try{ mlist=JSON.parse(p(n,"models")||"[]"); }catch(_){ mlist=[]; }
+      if(Array.isArray(mlist)&&mlist.length) body.models=mlist;
       const r=await api("POST","/api/mux/chat",body);
       if(r.verdict!=="ok") throw (r.detail||r.verdict||"mux error");
       return {content:r.content, model:r.model};
@@ -399,6 +428,9 @@ finally:
               alerts:{contested:contested,wip:wipAlerts}};
     },
   },
+  "list.pairs": {
+    async run(n){ let a; try{ a=JSON.parse(p(n,"pairs")||"[]"); }catch(_){ a=[]; } return {pairs:Array.isArray(a)?a:[]}; },
+  },
   "list.groupBy": {
     async run(n,i){
       const key=p(n,"key"); const out={};
@@ -452,8 +484,8 @@ finally:
       // inward wires are the warm base (data flows lateral or inward — the
       // daemon's own rule): a source OUTSIDE the ring is replicated into the
       // posted document as a scope.in carrying its already-computed value
-      const intra=G.wires.filter(w=>descIds.has(w.from[0])&&descIds.has(w.to[0]));
-      const inbound=G.wires.filter(w=>!descIds.has(w.from[0])&&descIds.has(w.to[0])&&w.from[0]!==n.id);
+      const intra=G.wires.filter(w=>descIds.has(w.from[0])&&descIds.has(w.to[0])&&wireKindOk(w));
+      const inbound=G.wires.filter(w=>!descIds.has(w.from[0])&&descIds.has(w.to[0])&&w.from[0]!==n.id&&wireKindOk(w));
       const synth=[], synthWires=[], seen=new Set();
       for(const w of inbound){
         const key=w.from[0]+"·"+w.from[1];
@@ -487,6 +519,35 @@ finally:
   },
   "note": {
     async run(){ return {}; },
+  },
+  "text.value": {
+    async run(n){ return {value:p(n,"value")}; },
+  },
+  "button": {
+    // press is an EDGE: it exists on the run its click fired, then it's gone
+    async run(n){ const t=n._pressedAt; n._pressedAt=null; return t?{press:t}:{}; },
+    render(n){ renderButtonNode(n); },
+  },
+  "slider": {
+    async run(n){ return {value:+(n._sval??p(n,"value")??0)}; },
+    render(n){ renderSliderNode(n); },
+  },
+  "media.player": {
+    // every control is a PATCH POINT: url on a text wire, play/stop/rewind
+    // as trigger signals, `ended` firing downstream when playback finishes
+    async run(n,i){
+      const url=String(i.url);
+      const m=ensureMedia(n,url);
+      if(m.getAttribute("data-src")!==url){ m.setAttribute("data-src",url); m.src=url; }
+      if(i["volume?"]!==undefined) m.volume=Math.max(0,Math.min(1,+i["volume?"]||0));
+      if(i["rewind?"]!==undefined) m.currentTime=0;
+      if(i["stop?"]!==undefined) m.pause();
+      if(i["play?"]!==undefined){ try{ await m.play(); }catch(e){ setResult(n,"autoplay blocked — press the element's ▶ once"); } }
+      const fired=n._endedAt; n._endedAt=null;
+      const out={state:{url,playing:!m.paused,t:Math.round(m.currentTime*10)/10,duration:isFinite(m.duration)?Math.round(m.duration*10)/10:0}};
+      if(fired) out.ended=fired;
+      return out;
+    },
   },
   "graal.events": {
     async run(n){ return {event:n._lastEvent||null}; },
@@ -547,8 +608,12 @@ function renderTree(v,key,depth){
   const d=document.createElement("div"); d.className="ctree";
   if(depth>0) d.style.marginLeft="10px";
   const isObj=v!==null&&typeof v==="object";
+  // every value drags OUT of a result tree — drop it into a list widget,
+  // a param field, or anything else that accepts object values
+  const asDrag=(el2,val)=>{ el2.draggable=true; el2.addEventListener("dragstart",e=>{
+    e.stopPropagation(); e.dataTransfer.setData("text/x-lcnc-value",JSON.stringify(val)); e.dataTransfer.effectAllowed="copy"; }); };
   if(!isObj){
-    const s=document.createElement("span"); s.className="leaf";
+    const s=document.createElement("span"); s.className="leaf"; asDrag(s,v);
     s.textContent=(key?key+": ":"")+(typeof v==="string"?'"'+v+'"':String(v));
     if(v===null) s.style.color="#b07aff"; else if(typeof v==="number") s.style.color="#ffb02e"; else if(typeof v==="string") s.style.color="#3ddc84";
     s.title="click to copy this value";
@@ -563,7 +628,7 @@ function renderTree(v,key,depth){
   let open=depth<2; // let, not const: the toggle below reassigns it
   const tw=document.createElement("span"); tw.className="ctree-tw"; tw.textContent=open?"▾":"▸";
   const lb=document.createElement("span"); lb.textContent=key?(key+": "+(arr?`[${entries.length}]`:`{${entries.length}}`)):(arr?`Array[${entries.length}]`:`Object{${entries.length}}`);
-  const hd=document.createElement("span"); hd.append(tw,lb);
+  const hd=document.createElement("span"); hd.append(tw,lb); asDrag(hd,v);
   const kids=document.createElement("div");
   for(const [k,val] of entries) kids.appendChild(renderTree(val,String(k),depth+1));
   const sync=()=>{ kids.style.display=open?"":"none"; tw.textContent=open?"▾":"▸"; };
@@ -573,7 +638,9 @@ function renderTree(v,key,depth){
 }
 function setResult(n,v){
   let el=n.el.querySelector(".result");
-  if(!el){ el=document.createElement("div"); el.className="result"; n.el.appendChild(el); }
+  if(!el){ el=document.createElement("div"); el.className="result"; n.el.appendChild(el);
+    // resizing/selecting a result pane must not bleed into a canvas pan
+    el.addEventListener("pointerdown",e=>e.stopPropagation()); }
   // JSON docs render as a cursor-tree; strings stay verbatim
   if(v!==null&&typeof v==="object"){ el.textContent=""; el.appendChild(renderTree(v,"",0)); }
   else el.textContent = typeof v==="string" ? v : String(v);
@@ -760,6 +827,46 @@ function renderProgramRef(n){
   dive.textContent=name?"⤵ dive into "+name:"⤵ dive in (set a name first)";
   dive.onclick=()=>{ if(name) diveInto(name); };
 }
+/* generic controls: press fires the button's downstream chain; a slider
+   drag streams its value down its wire live */
+function renderButtonNode(n){
+  let b=n.el.querySelector(".bigbtn");
+  if(!b){ b=document.createElement("button"); b.className="bigbtn";
+    b.addEventListener("pointerdown",e=>e.stopPropagation());
+    b.addEventListener("click",()=>{ n._pressedAt=Date.now(); runAll(n.id); });
+    n.el.appendChild(b); }
+  b.textContent="▸ "+(p(n,"label")||"press");
+}
+function renderSliderNode(n){
+  let w=n.el.querySelector(".sliderwrap");
+  if(!w){ w=document.createElement("div"); w.className="sliderwrap";
+    const r=document.createElement("input"); r.type="range";
+    const lab=document.createElement("span"); lab.className="slval";
+    r.addEventListener("pointerdown",e=>e.stopPropagation());
+    r.addEventListener("input",()=>{ n._sval=r.value; lab.textContent=r.value; runAll(n.id); });
+    w.appendChild(r); w.appendChild(lab); n.el.appendChild(w); n._srange=r; n._slab=lab; }
+  const r=n._srange;
+  r.min=p(n,"min")||0; r.max=p(n,"max")||1; r.step=p(n,"step")||0.01;
+  if(n._sval===undefined) r.value=p(n,"value")||0;
+  n._slab.textContent=r.value;
+}
+/* the media element rides the node; audio vs video follows the url. The
+   `ended` event is a live patch point — it re-fires the downstream chain. */
+function ensureMedia(n,url){
+  const isVideo=/\.(mp4|webm|mov|m4v|mkv)(\?|#|$)/i.test(url||"");
+  const want=isVideo?"VIDEO":"AUDIO";
+  if(n._media&&n._media.tagName!==want){ n._media.remove(); n._media=null; }
+  if(!n._media){
+    const m=document.createElement(isVideo?"video":"audio");
+    m.controls=true; m.preload="metadata";
+    m.style.cssText=isVideo?"display:block;width:100%;max-width:640px;margin:0 8px 8px;border-radius:6px;background:#000"
+                           :"display:block;width:calc(100% - 16px);margin:0 8px 8px";
+    m.addEventListener("pointerdown",e=>e.stopPropagation());
+    m.addEventListener("ended",()=>{ n._endedAt=Date.now(); runAll(n.id); });
+    n.el.appendChild(m); n._media=m;
+  }
+  return n._media;
+}
 function copyText(s){
   if(navigator.clipboard&&navigator.clipboard.writeText){ navigator.clipboard.writeText(s).catch(()=>fallbackCopy(s)); }
   else fallbackCopy(s);
@@ -864,11 +971,13 @@ function layoutRing(n){
   const H=(top.length?rowH(top)+RING_EDGE:0)+centerH+(bot.length?rowH(bot)+RING_EDGE:0)+2*RING_EDGE;
   const host=n._childHost;
   host.style.minWidth=W+"px"; host.style.minHeight=H+"px";
+  const rw=n._ringWorld||host;
+  if(n._ringWorld){ rw.style.width=W+"px"; rw.style.height=H+"px"; applyRingView(n); }
   // the shared center sits mid-CENTER-BAND (between the in and out edges),
   // so asymmetric edge columns never squeeze the inner shells into them
   const cx=colW(ins)+2*RING_EDGE+centerW/2, cy=(top.length?rowH(top)+RING_EDGE:0)+RING_EDGE+centerH/2;
   const place=(c,x,y)=>{ c.x=x; c.y=y; c.el.classList.add("inring"); c.el.style.position="absolute";
-    c.el.style.left=x+"px"; c.el.style.top=y+"px"; host.appendChild(c.el); };
+    c.el.style.left=x+"px"; c.el.style.top=y+"px"; rw.appendChild(c.el); };
   let y=cy-stackH(ins)/2;
   for(const c of ins){ place(c,RING_EDGE,y); y+=sz(c).h+RING_GAP; }
   y=cy-stackH(outs)/2;
@@ -880,6 +989,13 @@ function layoutRing(n){
   x=cx-rowW(rings)/2;                               // the innermost shell
   for(const c of rings){ place(c,x,cy-sz(c).h/2); x+=sz(c).w+RING_GAP; }
   return {w:W,h:H};
+}
+/* per-ring camera: each ring window carries its own {x,y,z} — the fractal
+   physics. Outer scales compound, so pointer math divides by the product. */
+function ringScaleOf(m){ let s=1,q=m._parentScope; while(q){ s*=((q._view&&q._view.z)||1); q=q._parentScope; } return s; }
+function applyRingView(n){
+  const v=n._view||{x:0,y:0,z:1};
+  if(n._ringWorld) n._ringWorld.style.transform=`translate(${v.x}px,${v.y}px) scale(${v.z})`;
 }
 /* ring chrome rides the tree: depth tab + edge captions recompute once
    parents are linked (buildNode runs before the links exist). */
@@ -980,6 +1096,29 @@ function kindOf(type,dir,port){
 const KIND_CLASS={trigger:"t-trig",json:"t-json",text:"t-text",id:"t-id",num:"t-num"};
 function portClass(type,dir,port){ return KIND_CLASS[kindOf(type,dir,port)]||"t-any"; }
 function kindsCompatible(a,b){ return !!a&&!!b&&a===b; }
+/* node-aware kind: rings declare PER-NAME ports through their scope.in /
+   scope.out children (spec §4) — those carry the composed json plane. A
+   named ring (program param, no inline children) defers to the daemon. */
+function nodeKindOf(nd,dir,port){
+  const k=kindOf(nd.type,dir,port); if(k) return k;
+  if(nd.type==="scope"){
+    const p2=port.replace("?","");
+    if(!(nd.children&&nd.children.length)&&(nd.params&&nd.params.program)) return "json";
+    const want=dir==="out"?"scope.out":"scope.in";
+    let hit=false;
+    (function wk(m){ for(const c of (m.children||[])){ if(c.type===want&&((c.params&&c.params.name)||"").replace("?","")===p2) hit=true; wk(c); } })(nd);
+    if(hit) return "json";
+  }
+  return null;
+}
+/* a cable is type-safe when its two pins agree exactly. Loaded documents can
+   carry stale cables — those render red-dashed, feed NOTHING at run time,
+   and never enter a ring's posted document. */
+function wireKindOk(w){
+  const s=G.nodes.find(x=>x.id===w.from[0]), d=G.nodes.find(x=>x.id===w.to[0]);
+  if(!s||!d) return false;
+  return kindsCompatible(nodeKindOf(s,"out",w.from[1]),nodeKindOf(d,"in",w.to[1]));
+}
 function buildNode(n){
   const t=CONTRACTS[n.type]; if(!t) return; // vocabulary is server-owned
   const el=document.createElement("div"); el.className="node"; el.dataset.id=n.id; n.el=el;
@@ -1014,10 +1153,42 @@ function buildNode(n){
     el.appendChild(seed); el.appendChild(emit);
     // children INSIDE: concentric square shells around one shared center —
     // layoutRing owns the geometry (scope.in left edge, scope.out right,
-    // statements top/bottom, nested rings inward).
+    // statements top/bottom, nested rings inward). The grid is the WINDOW;
+    // the ringworld inside it is this ring's own microscopic canvas with
+    // its own camera — wheel zooms it, dragging its emptiness pans it,
+    // double-click the D-tab fits it. Same physics at every depth.
     const grid=document.createElement("div"); grid.className="childgrid";
+    const rw=document.createElement("div"); rw.className="ringworld"; grid.appendChild(rw);
     el.appendChild(grid);
-    n._childHost=grid;
+    n._childHost=grid; n._ringWorld=rw; n._view={x:0,y:0,z:1};
+    grid.addEventListener("wheel",ev=>{
+      ev.preventDefault(); ev.stopPropagation();
+      const v=n._view, outer=view.z*ringScaleOf(n);
+      const f=ev.deltaY<0?1.1:1/1.1, nz=Math.min(4,Math.max(.15,v.z*f));
+      const r=grid.getBoundingClientRect();
+      const gx=(ev.clientX-r.left)/outer, gy=(ev.clientY-r.top)/outer;
+      v.x=gx-(gx-v.x)*(nz/v.z); v.y=gy-(gy-v.y)*(nz/v.z); v.z=nz;
+      applyRingView(n); redraw();
+    },{passive:false});
+    grid.addEventListener("pointerdown",ev=>{
+      if(ev.target!==grid&&ev.target!==rw)return; // nodes keep their own drags
+      const gr=grid.getBoundingClientRect();
+      // the native resize grip owns the bottom-right corner — resizing must
+      // never bleed into a pan (of the ring OR the canvas)
+      if(ev.clientX>gr.right-20&&ev.clientY>gr.bottom-20){ ev.stopPropagation(); return; }
+      ev.stopPropagation();
+      const v=n._view, outer=view.z*ringScaleOf(n);
+      const sx=ev.clientX,sy=ev.clientY,ox=v.x,oy=v.y;
+      const mv2=e2=>{ v.x=ox+(e2.clientX-sx)/outer; v.y=oy+(e2.clientY-sy)/outer; applyRingView(n); redraw(); };
+      const up2=()=>{ removeEventListener("pointermove",mv2); removeEventListener("pointerup",up2); save(); };
+      addEventListener("pointermove",mv2); addEventListener("pointerup",up2);
+    });
+    lbl.addEventListener("dblclick",ev=>{
+      ev.stopPropagation();
+      const W=parseFloat(rw.style.width)||grid.clientWidth||1, H=parseFloat(rw.style.height)||grid.clientHeight||1;
+      const z=Math.min(grid.clientWidth/W,grid.clientHeight/H)||1;
+      n._view={x:0,y:0,z}; applyRingView(n); redraw();
+    });
   } else {
     // leaf nodes name their Key factory's upstream state and hand-off
     const lane=laneOf(n);
@@ -1043,13 +1214,73 @@ function buildNode(n){
     const def=t.params[k];
     if(n.params[k]===undefined) n.params[k]=def.v??""; // loaded docs may omit params — never literal "undefined"
     const lab=document.createElement("label"); lab.textContent=k; ps.appendChild(lab);
+    if(def.cols&&def.cols.length){
+      // LIST widget: rows of {col:value}. The param VALUE is the JSON array
+      // text — add rows, edit inline, ✕ them, or DROP any dragged value
+      // (result trees drag out) straight in. Objects map by column name.
+      const wrap=document.createElement("div"); wrap.className="plist";
+      const rowsOf=()=>{ try{ const a=JSON.parse(n.params[k]||"[]"); return Array.isArray(a)?a:[]; }catch(_){ return []; } };
+      const commit=rows=>{ n.params[k]=JSON.stringify(rows); save(); };
+      const paint=()=>{
+        const rows=rowsOf(); wrap.innerHTML="";
+        const head=document.createElement("div"); head.className="plr plh";
+        def.cols.forEach(c2=>{ const s=document.createElement("span"); s.textContent=c2; head.appendChild(s); });
+        head.appendChild(document.createElement("span"));
+        wrap.appendChild(head);
+        rows.forEach((row,ri)=>{
+          const r=document.createElement("div"); r.className="plr";
+          def.cols.forEach(c2=>{
+            const inp2=document.createElement("input"); inp2.value=row[c2]??"";
+            inp2.addEventListener("input",()=>{ const rs=rowsOf(); (rs[ri]=rs[ri]||{})[c2]=inp2.value; commit(rs); });
+            inp2.addEventListener("pointerdown",e=>e.stopPropagation());
+            r.appendChild(inp2);
+          });
+          const del=document.createElement("s"); del.textContent="✕";
+          del.addEventListener("pointerdown",e=>e.stopPropagation());
+          del.addEventListener("click",()=>{ const rs=rowsOf(); rs.splice(ri,1); commit(rs); paint(); });
+          r.appendChild(del);
+          wrap.appendChild(r);
+        });
+        const add=document.createElement("div"); add.className="pladd"; add.textContent="＋ row";
+        add.addEventListener("pointerdown",e=>e.stopPropagation());
+        add.addEventListener("click",()=>{ const rs=rowsOf(); rs.push({}); commit(rs); paint(); });
+        wrap.appendChild(add);
+      };
+      wrap.addEventListener("dragover",e=>{ if([...e.dataTransfer.types].includes("text/x-lcnc-value")){ e.preventDefault(); e.stopPropagation(); wrap.classList.add("dropready"); } });
+      wrap.addEventListener("dragleave",()=>wrap.classList.remove("dropready"));
+      wrap.addEventListener("drop",e=>{
+        const txt=e.dataTransfer.getData("text/x-lcnc-value"); if(!txt)return;
+        e.preventDefault(); e.stopPropagation(); wrap.classList.remove("dropready");
+        let v; try{ v=JSON.parse(txt); }catch(_){ v=txt; }
+        const rs=rowsOf();
+        const toRow=o=>{ const row={};
+          if(o&&typeof o==="object"&&!Array.isArray(o)){
+            for(const c2 of def.cols) if(o[c2]!==undefined) row[c2]=String(o[c2]);
+            if(!Object.keys(row).length){ const vals=Object.entries(o); def.cols.forEach((c2,i)=>{ if(vals[i]) row[c2]=String(vals[i][1]); }); }
+          } else def.cols.forEach((c2,i)=>{ if(i===0) row[c2]=String(o); });
+          return row; };
+        if(Array.isArray(v)) v.forEach(o=>rs.push(toRow(o))); else rs.push(toRow(v));
+        commit(rs); paint();
+        $("#status").textContent="dropped "+(Array.isArray(v)?v.length+" rows":"a row")+" into "+n.type+"."+k;
+      });
+      paint(); ps.appendChild(wrap);
+      continue;
+    }
     let inp;
     if(def.opts){ inp=document.createElement("select"); for(const o of def.opts){const op=document.createElement("option");op.value=op.textContent=o;inp.appendChild(op);} inp.value=n.params[k]; }
     else if(def.ta){ inp=document.createElement("textarea"); inp.value=n.params[k]; }
-    else { inp=document.createElement("input"); inp.value=n.params[k]; }
-    if(def.ph) inp.placeholder=def.ph;
+    else { inp=document.createElement("input"); if(def.ph&&def.ph.startsWith("secret:")) inp.type="password"; inp.value=n.params[k]; }
+    if(def.ph) inp.placeholder=def.ph.startsWith("secret:")?def.ph.slice(7):def.ph;
     inp.addEventListener("input",()=>{ n.params[k]=inp.value; save(); });
     inp.addEventListener("pointerdown",e=>e.stopPropagation());
+    // any dragged value drops into a plain param too
+    inp.addEventListener("dragover",e=>{ if([...e.dataTransfer.types].includes("text/x-lcnc-value")){ e.preventDefault(); e.stopPropagation(); } });
+    inp.addEventListener("drop",e=>{
+      const txt=e.dataTransfer.getData("text/x-lcnc-value"); if(!txt)return;
+      e.preventDefault(); e.stopPropagation();
+      let v; try{ v=JSON.parse(txt); }catch(_){ v=txt; }
+      inp.value=typeof v==="string"?v:JSON.stringify(v); n.params[k]=inp.value; save();
+    });
     ps.appendChild(inp);
   }
   el.appendChild(ps);
@@ -1069,7 +1300,8 @@ function buildNode(n){
     if(e.target.tagName==="S")return;
     e.stopPropagation();
     const sx=e.clientX,sy=e.clientY,ox=n.x,oy=n.y;
-    const mv=ev=>{ n.x=ox+(ev.clientX-sx)/view.z; n.y=oy+(ev.clientY-sy)/view.z; el.style.left=n.x+"px"; el.style.top=n.y+"px"; redraw(); };
+    const sc=view.z*ringScaleOf(n); // a child in a zoomed ring drags in RING units
+    const mv=ev=>{ n.x=ox+(ev.clientX-sx)/sc; n.y=oy+(ev.clientY-sy)/sc; el.style.left=n.x+"px"; el.style.top=n.y+"px"; redraw(); };
     const up=()=>{ removeEventListener("pointermove",mv); removeEventListener("pointerup",up); save(); };
     addEventListener("pointermove",mv); addEventListener("pointerup",up);
   });
@@ -1125,6 +1357,12 @@ function redraw(){
     const srcN=G.nodes.find(x=>x.id===wr.from[0]);
     const tc={"t-text":"#6ea8fe","t-json":"#3fd0ff","t-id":"#b07aff","t-num":"#ffb02e","t-trig":"#3ddc84"}[srcN?portClass(srcN.type,"out",wr.from[1]):""];
     if(tc) path.style.stroke=tc;
+    if(!wireKindOk(wr)){
+      path.classList.add("mismatch");
+      const t=document.createElementNS("http://www.w3.org/2000/svg","title");
+      t.textContent="kind mismatch — this cable feeds nothing: "+wr.from.join(".")+" → "+wr.to.join(".");
+      path.appendChild(t);
+    }
     path.addEventListener("pointerdown",e=>{ e.stopPropagation(); G.wires.splice(idx,1); redraw(); save(); });
     wiresSvg.appendChild(path);
   });
@@ -1137,13 +1375,13 @@ function startWireDrag(n,dir,name,e){
   // the canvas states the options: while this wire is in hand, kind-equal
   // ports stay lit, everything else dims, mateless nodes fade
   document.body.classList.add("wiring");
-  const srcKind=kindOf(n.type,dir,name);
+  const srcKind=nodeKindOf(n,dir,name);
   for(const nd of G.nodes){
     if(!nd.el) continue;
     let any=false;
     for(const pe of nd.el.querySelectorAll(".port")){
       if(pe.closest(".node")!==nd.el) continue;
-      const ok=nd.id!==n.id&&pe.dataset.dir!==dir&&kindsCompatible(srcKind,kindOf(nd.type,pe.dataset.dir,pe.dataset.port));
+      const ok=nd.id!==n.id&&pe.dataset.dir!==dir&&kindsCompatible(srcKind,nodeKindOf(nd,pe.dataset.dir,pe.dataset.port));
       pe.classList.toggle("mateable",ok); if(ok)any=true;
     }
     nd.el.classList.toggle("nomate",!any&&nd.id!==n.id);
@@ -1174,7 +1412,7 @@ function startWireDrag(n,dir,name,e){
         const to   = dir==="out" ? [tn.id,tgt.dataset.port] : [n.id,name];
         // ENFORCED kinds: the daemon's mating rule is exact equality — a
         // mismatched wire is refused here, not discovered at run time.
-        const sk=kindOf(src.type,"out",from[1]), dk=kindOf(dst.type,"in",to[1]);
+        const sk=nodeKindOf(src,"out",from[1]), dk=nodeKindOf(dst,"in",to[1]);
         const sp=pathOf(src), dp=pathOf(dst);
         // the daemon's own rule: data flows lateral or inward, never outward
         const lateralOrInward=sp.length<=dp.length&&sp.every((v,ix)=>dp[ix]===v);
@@ -1195,8 +1433,7 @@ function startWireDrag(n,dir,name,e){
       // drop point — inside a ring if that's where you dropped — wired.
       const w=world.getBoundingClientRect();
       const wx=(ev.clientX-w.left)/view.z, wy=(ev.clientY-w.top)/view.z;
-      const grid=tgt&&tgt.classList&&tgt.classList.contains("childgrid")?tgt:null;
-      const scope=grid?G.nodes.find(x=>x._childHost===grid):null;
+      const scope=scopeAtTarget(tgt);
       showMateMenu(ev.clientX,ev.clientY,n,name,wx,wy,scope,dir);
     }
     dragWire=null; redraw();
@@ -1216,7 +1453,7 @@ async function showMateMenu(cx,cy,srcNode,srcPort,wx,wy,scope,dir){
     catch(e){ $("#status").textContent="mate options failed: "+e; return; }
   } else {
     // BACKCHAIN: from an input, offer every type whose output kind equals it
-    const want=kindOf(srcNode.type,"in",srcPort);
+    const want=nodeKindOf(srcNode,"in",srcPort);
     if(!want){ $("#status").textContent=srcNode.type+"."+srcPort+" is untyped — it mates with nothing"; return; }
     for(const t of Object.keys(CONTRACTS).sort()){
       const c=CONTRACTS[t];
@@ -1317,10 +1554,13 @@ function showMenu(cx,cy,intoScope){
   setTimeout(()=>q.focus(),0);
 }
 /* dblclick/right-click on a ring's EMPTY interior adds into that ring */
-function menuTargetScope(e){
-  if(!e.target.classList||!e.target.classList.contains("childgrid")) return null;
-  return G.nodes.find(n=>n._childHost===e.target)||null;
+function scopeAtTarget(t){
+  if(!t||!t.classList) return null;
+  if(t.classList.contains("childgrid")) return G.nodes.find(x=>x._childHost===t)||null;
+  if(t.classList.contains("ringworld")) return G.nodes.find(x=>x._ringWorld===t)||null;
+  return null;
 }
+function menuTargetScope(e){ return scopeAtTarget(e.target); }
 viewport.addEventListener("dblclick",e=>{
   const sc=menuTargetScope(e);
   if(sc){ showMenu(e.clientX,e.clientY,sc); return; }
@@ -1384,8 +1624,7 @@ viewport.addEventListener("drop",async e=>{
   if(ptype||pprog){
     const w=world.getBoundingClientRect();
     const wx=(e.clientX-w.left)/view.z, wy=(e.clientY-w.top)/view.z;
-    const grid=e.target.classList&&e.target.classList.contains("childgrid")?e.target:null;
-    const scope=grid?G.nodes.find(x=>x._childHost===grid):null;
+    const scope=scopeAtTarget(e.target);
     if(ptype){
       const nn=scope?addChildNode(scope,ptype):addNode(ptype,wx-8,wy-8);
       if(nn)$("#status").textContent="placed "+ptype+(scope?" into ring "+scope.id:"");
@@ -1487,6 +1726,7 @@ async function runNode(n,cache){
   if(!t||!R) return undefined;
   const inputs={};
   for(const w of inputsOf(n.id)){
+    if(!wireKindOk(w)) continue;                      // a mismatched cable feeds nothing
     const src=cache[w.from[0]];
     if(src===undefined) return undefined;             // upstream not run
     inputs[w.to[1]]=src[w.from[1]];
@@ -1638,6 +1878,8 @@ function load(data){
   G.nodes=built;
   mountChildren();
   G.wires=(data.wires||[]).filter(w=>G.nodes.find(n=>n.id===w.from[0])&&G.nodes.find(n=>n.id===w.to[0]));
+  const bad=G.wires.filter(w=>!wireKindOk(w)).length;
+  if(bad) $("#status").textContent=bad+" kind-unsafe cable"+(bad>1?"s":"")+" (red, dashed) — they feed nothing until reconnected";
   applyView(); redraw(); save();
 }
 /* constructions are STORE DOCUMENTS: panels/<name> in the attachment plane —
@@ -1729,6 +1971,71 @@ async function buildPalette(){
   render("");
 }
 $("#paletteBtn").addEventListener("click",()=>$("#palette").classList.toggle("open"));
+/* the KEYMUX dialog: name · api address · api link · flags. Built-in roster
+   rows are the brain's truth (key-presence/discovery as read-only checks);
+   user rows persist in the forge home via /api/mux/endpoints. KEY VALUES
+   NEVER CROSS — env var NAMES point at them. Deep link: /panels?dlg=keys */
+async function openKeyMuxDlg(){
+  let data={builtin:[],user:[]};
+  try{ data=await api("GET","/api/mux/endpoints"); }catch(e){}
+  const d=document.createElement("div");
+  d.style.cssText="position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:99;display:flex;align-items:center;justify-content:center";
+  const flagBox=(label,on,disabled,attr)=>'<label style="display:inline-flex;align-items:center;gap:4px;margin-right:10px;font-size:10px;color:var(--dim)"><input type="checkbox" '+(on?"checked ":"")+(disabled?"disabled ":"")+(attr||"")+'>'+label+'</label>';
+  const rows=[];
+  for(const b of (data.builtin||[])){
+    rows.push('<div style="display:flex;gap:8px;align-items:baseline;padding:5px 0;border-bottom:1px solid var(--line)">'
+      +'<b style="font-family:var(--mono);font-size:11px;flex:0 0 175px">'+b.name+'</b>'
+      +'<a href="'+(b.base||"")+'" target="_blank" style="color:var(--wire);font-size:10px;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+(b.base||"")+'/'+(b.model||"")+'</a>'
+      +flagBox("key",!!b.keyPresent,true)+flagBox("discovered",!!b.discovered,true)
+      +'<span style="color:var(--dim);font-size:9px">'+(b.envVar||"")+'</span></div>');
+  }
+  for(const u of (data.user||[])){
+    const f=u.flags||{};
+    rows.push('<div data-uname="'+u.name+'" style="display:flex;gap:8px;align-items:baseline;padding:5px 0;border-bottom:1px solid var(--line)">'
+      +'<b style="font-family:var(--mono);font-size:11px;flex:0 0 175px;color:var(--graal)">'+u.name+'</b>'
+      +'<a href="'+(u.base||"")+'" target="_blank" style="color:var(--wire);font-size:10px;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+(u.base||"")+'/'+(u.model||"")+'</a>'
+      +flagBox("enabled",f.enabled!==false,false,'data-flag="enabled"')+flagBox("preferred",!!f.preferred,false,'data-flag="preferred"')
+      +'<span style="color:var(--dim);font-size:9px">'+(u.envVar||"")+'</span>'
+      +'<s data-del="'+u.name+'" style="cursor:pointer;color:var(--err);text-decoration:none">✕</s></div>');
+  }
+  d.innerHTML='<div style="background:var(--panel);border:1px solid var(--graal);border-radius:10px;padding:16px 18px;width:660px;max-height:76vh;overflow:auto;color:var(--ink)">'
+    +'<b style="color:var(--graal);letter-spacing:.08em">KEYMUX ENDPOINTS</b> <span style="color:var(--dim);font-size:10px">— key VALUES never cross; env var names point at them</span>'
+    +'<div style="margin:10px 0">'+rows.join("")+'</div>'
+    +'<div style="border-top:1px solid var(--line);padding-top:10px;color:var(--dim);font-size:10px;letter-spacing:.06em">NEW ENDPOINT</div>'
+    +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:6px">'
+    +'<span><div style="color:var(--dim);font-size:10px">NAME</div><input data-k="name" placeholder="my-provider" style="width:100%"></span>'
+    +'<span><div style="color:var(--dim);font-size:10px">ENV VAR (the key\'s NAME, never its value)</div><input data-k="envVar" placeholder="MY_PROVIDER_API_KEY" style="width:100%"></span>'
+    +'<span><div style="color:var(--dim);font-size:10px">API ADDRESS</div><input data-k="base" placeholder="https://api.provider.com/v1" style="width:100%"></span>'
+    +'<span><div style="color:var(--dim);font-size:10px">API LINK · MODEL PATH</div><input data-k="model" placeholder="vendor/model-id" style="width:100%"></span>'
+    +'</div><div style="margin-top:10px">'+flagBox("enabled",true,false,'data-k="fEnabled"')+flagBox("preferred",false,false,'data-k="fPreferred"')
+    +'<span style="float:right"><button data-k="close">close</button> <button data-k="add" style="border-color:var(--ok);color:var(--ok)">add</button></span></div></div>';
+  document.body.appendChild(d);
+  d.querySelectorAll("input,select,button,a,s").forEach(x=>x.addEventListener("pointerdown",e=>e.stopPropagation()));
+  const close=()=>d.remove();
+  d.onclick=e=>{ if(e.target===d)close(); };
+  d.querySelector('[data-k="close"]').onclick=close;
+  d.querySelectorAll("[data-del]").forEach(el=>el.addEventListener("click",async()=>{
+    const dq="/api/mux/endpoints/"+enc(el.dataset.del);
+    await api("DELETE",dq); close(); openKeyMuxDlg();
+  }));
+  d.querySelectorAll("[data-uname]").forEach(row=>{
+    row.querySelectorAll("[data-flag]").forEach(cb=>cb.addEventListener("change",async()=>{
+      const u=(data.user||[]).find(x=>x.name===row.dataset.uname); if(!u)return;
+      const flags={...(u.flags||{})}; flags[cb.dataset.flag]=cb.checked;
+      await api("POST","/api/mux/endpoints",{...u,flags});
+      $("#status").textContent="keymux: "+u.name+" flags saved";
+    }));
+  });
+  d.querySelector('[data-k="add"]').onclick=async()=>{
+    const g=k=>d.querySelector('[data-k="'+k+'"]');
+    const body={name:g("name").value.trim(),base:g("base").value.trim(),model:g("model").value.trim(),envVar:g("envVar").value.trim(),
+      flags:{enabled:g("fEnabled").checked,preferred:g("fPreferred").checked}};
+    if(!body.name){ g("name").focus(); return; }
+    const r=await api("POST","/api/mux/endpoints",body);
+    if(r.verdict==="ok"){ close(); openKeyMuxDlg(); } else $("#status").textContent="keymux: "+(r.error||"refused");
+  };
+}
+$("#keysBtn").addEventListener("click",openKeyMuxDlg);
 /* modal CRUD for board cards — create via kanban.submit, move via
    kanban.move: the daemon's own verbs, nothing invented. */
 function openCardModal(n,colId,item){
@@ -1840,7 +2147,8 @@ async function syncContracts(){
       for(const k in (c.params||{})){
         const d=c.params[k]||{};
         p[k]={v:d.v??"", opts:(d.opts&&d.opts.length)?d.opts:undefined,
-              ta:d.ta||undefined, ph:d.ph||undefined};
+              ta:d.ta||undefined, ph:d.ph||undefined,
+              cols:(d.cols&&d.cols.length)?d.cols:undefined};
       }
       c.params=p;
       m[c.type]=c;
@@ -1856,6 +2164,7 @@ async function syncContracts(){
 // starter board's addNode calls must see it or the first paint is empty.
 (async()=>{ await Promise.all([syncContracts(),syncLanes()]);
 buildPalette(); $("#palette").classList.add("open");
+if(new URLSearchParams(location.search).get("dlg")==="keys") openKeyMuxDlg();
 // /panels?load=<name> IS a link to a document: presets first, then the
 // store. Link views are ephemeral — the localStorage scratch stays put.
 const qload=new URLSearchParams(location.search).get("load");

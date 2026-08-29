@@ -231,6 +231,12 @@ kotlin {
                 implementation("org.apache.tika:tika-parsers-standard-package:3.2.3")
                 implementation("org.xerial:sqlite-jdbc:3.42.0.0")
 
+                // Stanford CoreNLP — the vm.corenlp/vm.corenlp.extract legos' real
+                // pipeline (tokenize/pos/lemma/depparse/ner). Models classifier is
+                // ~450MB (English models); needed for annotators beyond tokenize/ssplit.
+                implementation("edu.stanford.nlp:stanford-corenlp:4.5.10")
+                implementation("edu.stanford.nlp:stanford-corenlp:4.5.10:models")
+
                 // Compose Desktop UI — JVM + Skiko only
                 implementation(compose.desktop.currentOs)
                 implementation(compose.foundation)

@@ -26,7 +26,7 @@ import kotlin.test.assertTrue
  */
 class TribunalFsmTest {
 
-    private val predicates = KanbanPredicateRegistry()
+    private val predicates = TribunalPredicates.registry()
 
     private fun presetKanban(): KanbanGraph {
         val json = LcncPresets.all()["preset-tribunal"] ?: error("preset-tribunal missing")
@@ -93,5 +93,48 @@ class TribunalFsmTest {
             .first { it.id == "rebut-argue" }
         assertEquals(KanbanEdgeMode.LOOP, loop.mode)
         assertEquals(3, loop.maxIterations)
+    }
+
+    @Test
+    fun clarificationLoopIsDeclaredGuardedAndBounded() {
+        val g = presetKanban()
+        val loop = (0 until g.edges.size).map { g.edges[it] }
+            .first { it.id == "deliberate-clarify" }
+        assertEquals("deliberate", loop.from)
+        assertEquals("argue", loop.to)
+        assertEquals(KanbanEdgeMode.LOOP, loop.mode)
+        assertEquals(1, loop.maxIterations)
+        assertEquals(TribunalPredicates.NEEDS_CLARIFICATION, loop.condition?.predicate)
+    }
+
+    @Test
+    fun judgeClarificationLoopIsGuardedAndBounded() {
+        // Without the judge's flag, the guard refuses — deliberate stays terminal
+        // exactly as it did before this edge existed.
+        val silent = seed(presetKanban(), "deliberate")
+        val refused = KanbanGraphEngine.transition(silent, KanbanTransitionRequest("case", 0L, "argue"), predicates)
+        assertIs<KanbanTransitionResult.Rejected>(refused, "no clarification flag: guard must refuse")
+
+        // With the flag, the judge's loop-back is legal and lands the record
+        // back at argue for a fresh round.
+        val flagged = presetKanban().copy(
+            cards = listOf(KanbanCardState("case", "test", "deliberate", "deliberate", io = mapOf("clarification" to true))).toSeries(),
+        )
+        val committed = KanbanGraphEngine.transition(flagged, KanbanTransitionRequest("case", 0L, "argue"), predicates)
+        assertIs<KanbanTransitionResult.Committed>(committed, "clarification flag set: loop-back must commit")
+        val moved = (0 until committed.graph.cards.size).map { committed.graph.cards[it] }.first { it.id == "case" }
+        assertEquals("argue", moved.lane)
+
+        // A second attempt (as if the judge asked twice) is bounded at 1 —
+        // same iteration-exhaustion mechanism as the counsel-level loop.
+        val usedOnce = presetKanban().copy(
+            cards = listOf(KanbanCardState(
+                "case", "test", "deliberate", "deliberate",
+                io = mapOf("clarification" to true, "loop.iterations.deliberate-clarify" to 1),
+            )).toSeries(),
+        )
+        val exhausted = KanbanGraphEngine.transition(usedOnce, KanbanTransitionRequest("case", 0L, "argue"), predicates)
+        assertIs<KanbanTransitionResult.Rejected>(exhausted, "second clarification round must be refused")
+        assertTrue(exhausted.reason.contains("exhausted"), exhausted.reason)
     }
 }

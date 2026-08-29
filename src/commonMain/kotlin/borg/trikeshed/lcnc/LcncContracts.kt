@@ -23,12 +23,15 @@ data class LcncPortContract(
     val isSink: Boolean = false,
     val wide: Boolean = false,
 ) {
-    /** One editable parameter: default value, optional dropdown options, multi-line flag, placeholder. */
+    /** One editable parameter: default value, optional dropdown options, multi-line flag, placeholder.
+     *  [cols] non-empty makes it a LIST widget: rows of {col: value}, the param
+     *  VALUE is the JSON array text — daemon shape (Map<String,String>) unchanged. */
     data class LcncParamSpec(
         val v: String = "",
         val opts: List<String> = emptyList(),
         val ta: Boolean = false,
         val ph: String = "",
+        val cols: List<String> = emptyList(),
     )
 }
 
@@ -199,6 +202,12 @@ object LcncContracts {
             inputKinds = mapOf("x" to "json"),
             outputKinds = mapOf("y" to "json"),
             params = mapOf("expr" to LcncPortContract.LcncParamSpec(v = "x", ta = true, ph = "expression over x"))),
+        // A LIST as a first-class value: rows of key/model pairs authored in
+        // the widget (or dropped from any result tree), emitted as json.
+        LcncPortContract("list.pairs", "key/model pairs",
+            emptyList(), listOf("pairs"),
+            outputKinds = mapOf("pairs" to "json"),
+            params = mapOf("pairs" to LcncPortContract.LcncParamSpec(cols = listOf("key", "model")))),
         LcncPortContract("list.groupBy", "group by key (generic)",
             listOf("x"), listOf("groups"),
             mapOf("x" to LcncCardinality.ONE),
@@ -211,6 +220,37 @@ object LcncContracts {
             inputKinds = mapOf("body" to "json"),
             outputKinds = mapOf("json" to "json"),
             params = mapOf("path" to LcncPortContract.LcncParamSpec(v = "/api/submit"))),
+
+        // ── media: an audio/video player as a PATCH PANEL citizen — every
+        // control is a patch point: url arrives on a text wire, the
+        // transports are trigger signals, `ended` fires downstream.
+        // Nothing internal.
+        LcncPortContract("media.player", "audio/video player",
+            listOf("url", "play?", "stop?", "rewind?", "volume?"), listOf("state", "ended"),
+            inputKinds = mapOf("url" to "text", "play" to "trigger", "stop" to "trigger", "rewind" to "trigger", "volume" to "num"),
+            outputKinds = mapOf("state" to "json", "ended" to "trigger"),
+            wide = true),
+        // generic controls: a nameable button (its press is a trigger patch
+        // point) and a slider (its value is a num patch point — volume, gain…)
+        LcncPortContract("button", "button (nameable trigger)",
+            emptyList(), listOf("press"),
+            outputKinds = mapOf("press" to "trigger"),
+            params = mapOf("label" to LcncPortContract.LcncParamSpec(v = "press", ph = "what this button says"))),
+        LcncPortContract("slider", "slider (num patch point)",
+            emptyList(), listOf("value"),
+            outputKinds = mapOf("value" to "num"),
+            params = mapOf(
+                "label" to LcncPortContract.LcncParamSpec(ph = "what this slider sets"),
+                "min" to LcncPortContract.LcncParamSpec(v = "0"),
+                "max" to LcncPortContract.LcncParamSpec(v = "1"),
+                "step" to LcncPortContract.LcncParamSpec(v = "0.01"),
+                "value" to LcncPortContract.LcncParamSpec(v = "0.8"),
+            )),
+        // the text literal that feeds text patch points (a url, a prompt…)
+        LcncPortContract("text.value", "text literal",
+            emptyList(), listOf("value"),
+            outputKinds = mapOf("value" to "text"),
+            params = mapOf("value" to LcncPortContract.LcncParamSpec(ph = "the text this node emits"))),
 
         // ── LCNC composition ─────────────────────────────────────────
         LcncPortContract("dom.board", "draggable grouped board (generic)",
@@ -251,6 +291,12 @@ object LcncContracts {
                 "system" to LcncPortContract.LcncParamSpec(ph = "system (optional)"),
                 "maxTokens" to LcncPortContract.LcncParamSpec(v = "512"),
                 "temperature" to LcncPortContract.LcncParamSpec(v = "0.2"),
+                "brief" to LcncPortContract.LcncParamSpec(ph = "root frame binding to read when no prompt is wired (first-seat brief)"),
+                // the seat's admissible endpoints: keymux key × model, a LIST —
+                // lawyer/agent/worker/scribe/curator seats all author it here.
+                // Sent as `models` on /api/mux/chat; routing consumption is the
+                // model code's own seam.
+                "models" to LcncPortContract.LcncParamSpec(cols = listOf("key", "model")),
             )),
 
         // ── project / scope ──────────────────────────────────────────
@@ -471,14 +517,136 @@ object LcncContracts {
                 v = "_count", opts = listOf("_count", "_sum", "_stats", "rollup-count")))),
 
         // ── P4: bot seat — only this node may spend tokens ─────────────
+        // ConstructionBotNode.runner is the one implementation behind both
+        // `read.construct` and `nal.mint` below (nal.mint is the NAL-domain
+        // alias); both contracts must describe its REAL shape: in `lines`,
+        // out `{accepted, refused, aggregates}` (ConstructionReadingReceipt).
         LcncPortContract("read.construct", "read causal constructions (bot proposes; gate disposes)",
-            listOf("lines"), listOf("constructions"),
+            listOf("lines"), listOf("accepted", "refused", "aggregates"),
             inputKinds = mapOf("lines" to "json"),
-            outputKinds = mapOf("constructions" to "json"),
+            outputKinds = mapOf("accepted" to "json", "refused" to "json", "aggregates" to "json"),
             params = mapOf(
                 "model" to LcncPortContract.LcncParamSpec(ph = "ModelMux route/model id"),
                 "window" to LcncPortContract.LcncParamSpec(v = "16"),
             )),
+
+        // ── NAL belief-bag as LCNC nodes ─────────────────────────────
+        LcncPortContract("nal.mint", "mint beliefs from construction receipts",
+            listOf("lines"), listOf("accepted", "refused", "aggregates"),
+            inputKinds = mapOf("lines" to "json"),
+            outputKinds = mapOf("accepted" to "json", "refused" to "json", "aggregates" to "json"),
+            params = mapOf(
+                "maxTokens" to LcncPortContract.LcncParamSpec(v = "1024"),
+            )),
+        LcncPortContract("nal.decay", "attention decay pulse (thin wrapper)",
+            listOf("trigger?", "after?"), listOf("decayed"),
+            // `after?` is the same pulse-only port under a second declared
+            // kind: it sequences the decay pulse behind a data-bearing
+            // upstream (e.g. read.construct's aggregates) without the
+            // runner reading the payload — decayRunner ignores all inputs.
+            inputKinds = mapOf("trigger" to "trigger", "after" to "json"),
+            outputKinds = mapOf("decayed" to "trigger")),
+        LcncPortContract("nal.recall", "belief recall (top/sample/near)",
+            listOf("trigger?"), listOf("beliefs"),
+            inputKinds = mapOf("trigger" to "trigger"),
+            outputKinds = mapOf("beliefs" to "json"),
+            params = mapOf(
+                "mode" to LcncPortContract.LcncParamSpec(v = "top", opts = listOf("top", "sample", "near")),
+                "k" to LcncPortContract.LcncParamSpec(v = "16"),
+            )),
+        LcncPortContract("skill.decay", "skill budget decay (per-skill AttentionEconomy)",
+            listOf("trigger?"), listOf("budgets"),
+            inputKinds = mapOf("trigger" to "trigger"),
+            outputKinds = mapOf("budgets" to "json")),
+
+        // ── CoreNLP extract (NER + deps) ──────────────────────────
+        LcncPortContract(SubVm.LEGO_PREFIX + "corenlp.extract", "corenlp extract (NER, deps)",
+            listOf("text?"), listOf("sentences"),
+            inputKinds = mapOf("text" to "text"),
+            outputKinds = mapOf("sentences" to "json"),
+            params = mapOf(
+                "facet" to LcncPortContract.LcncParamSpec(v = "JVM"),
+                "text" to LcncPortContract.LcncParamSpec(ta = true, ph = "inline text when nothing wired"),
+                "annotators" to LcncPortContract.LcncParamSpec(v = "tokenize,ssplit,pos,lemma,depparse,ner"),
+                "world" to LcncPortContract.LcncParamSpec(ph = "comma-separated host dirs seeded to /workspace"),
+                "trust" to LcncPortContract.LcncParamSpec(v = "OWN", opts = listOf("OWN", "UNTRUSTED")),
+                "keep" to LcncPortContract.LcncParamSpec(v = "false", opts = listOf("false", "true")),
+            )),
+
+        // ── State freeze / thaw (persistence seam) ────────────────
+        LcncPortContract("state.freeze", "freeze bag+KB to CAS (snapshot)",
+            listOf("trigger?"), listOf("snapshot"),
+            inputKinds = mapOf("trigger" to "trigger"),
+            outputKinds = mapOf("snapshot" to "json")),
+        LcncPortContract("state.thaw", "thaw bag+KB from CAS (restore)",
+            listOf("trigger?"), listOf("restored"),
+            inputKinds = mapOf("trigger" to "trigger"),
+            outputKinds = mapOf("restored" to "json")),
+
+        // ── Legal domain nodes ────────────────────────────────────
+        LcncPortContract("legal.ingest", "legal document ingest (eyecite + LLM propose/gate)",
+            listOf("text?"), listOf("documentCid", "citations", "elements", "brief"),
+            inputKinds = mapOf("text" to "text"),
+            outputKinds = mapOf("documentCid" to "id", "citations" to "json", "elements" to "json", "brief" to "text"),
+            params = mapOf(
+                "text" to LcncPortContract.LcncParamSpec(ta = true, ph = "legal document text (or wire one in)"),
+                "maxTokens" to LcncPortContract.LcncParamSpec(v = "2048"),
+                "brief" to LcncPortContract.LcncParamSpec(ph = "root frame binding to read when no text is wired (human-oversight brief)"),
+            )),
+        LcncPortContract("legal.evidence", "evidence-bank query (shared KIF bank) → brief folded with prior facts",
+            listOf("documentCid?", "brief?"), listOf("brief"),
+            inputKinds = mapOf("documentCid" to "id", "brief" to "text"),
+            outputKinds = mapOf("brief" to "text"),
+            params = mapOf(
+                "documentCid" to LcncPortContract.LcncParamSpec(ph = "doc CID to query when none is wired"),
+                "brief" to LcncPortContract.LcncParamSpec(ta = true, ph = "brief text to query when none is wired"),
+            )),
+        LcncPortContract("legal.review", "legal tribunal review (preset-tribunal extended)",
+            listOf("brief?"), listOf("verdict"),
+            inputKinds = mapOf("brief" to "text"),
+            outputKinds = mapOf("verdict" to "json"),
+            params = mapOf(
+                "maxIterations" to LcncPortContract.LcncParamSpec(v = "3"),
+            )),
+
+        // ── BrainClient decomposition as LCNC ──────────────────────
+        // credential.enter: manual key-type/url/api-type/key entry →
+        //   stored in CouchDB via CouchKeyStore, resolvable by KeyMux.
+        LcncPortContract("credential.enter", "credential enter (manual → CouchDB)",
+            emptyList(), listOf("credential"),
+            outputKinds = mapOf("credential" to "json"),
+            params = mapOf(
+                "key_type" to LcncPortContract.LcncParamSpec(ph = "provider id (nvidia, openai, groq…)", v = "nvidia"),
+                "url" to LcncPortContract.LcncParamSpec(ph = "base URL", v = "https://integrate.api.nvidia.com/v1"),
+                "api_type" to LcncPortContract.LcncParamSpec(v = "openai", opts = listOf("openai", "anthropic", "google")),
+                "key" to LcncPortContract.LcncParamSpec(ph = "API key"),
+            )),
+        // prompt.chat: a dirt-simple prompt → model → content. Uses manual
+        //   credentials from params or CouchKeyStore, calls via [chatFn] (HTX client).
+        //   Outputs content + model + ok/error status for downstream display.
+        LcncPortContract("prompt.chat", "prompt chat (manual credentials)",
+            listOf("prompt?"), listOf("content", "model", "ok", "error"),
+            inputKinds = mapOf("prompt" to "text"),
+            outputKinds = mapOf("content" to "text", "model" to "id", "ok" to "json", "error" to "text"),
+            params = mapOf(
+                "prompt" to LcncPortContract.LcncParamSpec(ta = true, ph = "prompt text"),
+                "prefill" to LcncPortContract.LcncParamSpec(
+                    ph = "prefill from daemon keys",
+                    opts = listOf("(manual)", "nvidia", "openai", "groq", "deepseek", "openrouter", "xai")),
+                "url" to LcncPortContract.LcncParamSpec(ph = "base URL", v = "https://integrate.api.nvidia.com/v1"),
+                "key" to LcncPortContract.LcncParamSpec(ph = "secret:API key"),
+                "headers" to LcncPortContract.LcncParamSpec(
+                    cols = listOf("name", "value"),
+                    ph = "extra headers (k-v pairs)"),
+                "model" to LcncPortContract.LcncParamSpec(ph = "model id", v = "deepseek-ai/deepseek-v4-flash"),
+                "maxTokens" to LcncPortContract.LcncParamSpec(v = "256"),
+                "temperature" to LcncPortContract.LcncParamSpec(v = "0.2"),
+            )),
+        // result.confirm: OK/ERROR HTML confirmation dialog
+        LcncPortContract("result.confirm", "result confirmation (OK/ERROR HTML)",
+            listOf("content", "ok", "error"), emptyList(),
+            inputKinds = mapOf("content" to "text", "ok" to "json", "error" to "text"),
+            isSink = true),
 
         // ── Sub-VM module legos: tika / corenlp / camel / graalce ──────
         LcncPortContract(SubVm.LEGO_PREFIX + "tika", "tika: extract text+metadata in a sub-VM",

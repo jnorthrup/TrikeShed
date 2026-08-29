@@ -813,6 +813,16 @@ object OroborosDaemon {
         // Step K: the context-assembly node family is host-composed like any module's
         // runners — webhook dispatch and program runs can mint real context receipts.
         moduleContext.lcncRunners.putAll(borg.trikeshed.memory.ace.AceContextNodes.registry(daemonBlackboard))
+        // Shared, live, queryable KIF bank — nal-kif/construction-kif/legal-kif
+        // all assert here (in addition to their write-only, provenance-only
+        // blackboard landing), so SparqlKifMcpServer-style pattern queries
+        // (kif.query semantics) over `sparql.query`/`kif.sparqlSelect` can
+        // actually find them. Also backs state.freeze/thaw's persistence.
+        // One bank rather than three: the predicate vocabularies (causal
+        // relation/subject/object for NAL, cites/holding/party for legal)
+        // don't collide, and a single bank is what lets the legal tribunal's
+        // evidence-bank query (below) see everything ingested so far.
+        val kifBank = borg.trikeshed.kif.KifKnowledgeBase()
         // P4: lawyer-bot reading seat. ONLY this runner calls BrainClient/ModelMux;
         // ConstructionReadingLoop owns deterministic CAS claim-check/fold/bag/Rete landing.
         beliefBag?.let { readingBag ->
@@ -825,12 +835,198 @@ object OroborosDaemon {
                 kifSink = { kif ->
                     val cid = borg.trikeshed.job.ContentId.of(kif.encodeToByteArray())
                     daemonBlackboard.put("construction-kif/${cid.hex}", kif, "reader")
+                    runCatching { kifBank.assertKif(kif) }
                 },
             )
         }
         // Sub-VM module legos: tika/corenlp/camel/graalce as supervised guest evals
         // over the daemon's own hypervisor (VmSupervisor.current — VmWire's same host).
         borg.trikeshed.lcnc.SubVmLegos.register(moduleContext)
+        // ── NAL belief-bag nodes: nal.mint, nal.decay, nal.recall ────
+        // nal.mint wraps ConstructionBotNode (the only model-spend seam).
+        // nal.decay is a thin timer trigger over AttentionEconomy.decay.
+        // nal.recall exposes BeliefBagElement's read methods as LCNC nodes.
+        beliefBag?.let { bag ->
+            moduleContext.lcncRunners["nal.mint"] = borg.trikeshed.narsese.NalNodes.mintRunner(
+                brain = brainClient,
+                muxContext = htxElement + muxReactor,
+                cas = casStore,
+                bag = bag,
+                rete = rete,
+                kifSink = { kif ->
+                    val cid = borg.trikeshed.job.ContentId.of(kif.encodeToByteArray())
+                    daemonBlackboard.put("nal-kif/${cid.hex}", kif, "nal.mint")
+                    runCatching { kifBank.assertKif(kif) }
+                },
+            )
+            moduleContext.lcncRunners["nal.decay"] = borg.trikeshed.narsese.NalNodes.decayRunner(bag)
+            moduleContext.lcncRunners["nal.recall"] = borg.trikeshed.narsese.NalNodes.recallRunner(bag)
+            moduleContext.lcncRunners["skill.decay"] = borg.trikeshed.narsese.NalNodes.skillDecayRunner(bag)
+        }
+        // ── State freeze / thaw: persist bag+KB to CAS ─────────────
+        beliefBag?.let { bag ->
+            moduleContext.lcncRunners["state.freeze"] = borg.trikeshed.narsese.StateNodes.freezeRunner(
+                bag = bag,
+                kif = kifBank,
+                graph = { borg.trikeshed.rdf.RdfGraph(emptyList()) },
+                cas = casStore,
+            )
+            moduleContext.lcncRunners["state.thaw"] = borg.trikeshed.narsese.StateNodes.thawRunner(
+                cas = casStore,
+                kif = kifBank,
+            )
+        }
+        // ── Legal domain nodes: legal.ingest, legal.evidence, legal.review ─
+        moduleContext.lcncRunners["legal.ingest"] = borg.trikeshed.narsese.LegalNodes.ingestRunner(
+            brain = brainClient,
+            muxContext = htxElement + muxReactor,
+            cas = casStore,
+            kifSink = { kif ->
+                val cid = borg.trikeshed.job.ContentId.of(kif.encodeToByteArray())
+                daemonBlackboard.put("legal-kif/${cid.hex}", kif, "legal.ingest")
+                runCatching { kifBank.assertKif(kif) }
+            },
+        )
+        // Evidence-bank injection (§3/§5 gap): queries the shared kifBank for
+        // every fact legal.ingest asserted against this document's atom and
+        // folds it into the brief argue actually reads — closing the loop
+        // the report flagged as "nothing reads these entries back out".
+        moduleContext.lcncRunners["legal.evidence"] = borg.trikeshed.narsese.LegalNodes.evidenceRunner(kifBank)
+        moduleContext.lcncRunners["legal.review"] = borg.trikeshed.narsese.LegalNodes.reviewRunner()
+        // ── Tribunal: the LCNC preset that argues, rebuts, and rules through
+        //    REAL hermes-env model dialogs. The node family (mux.chat /
+        //    kg.ingest / display) is registered in-process, and each seat's
+        //    model call routes through BrainClient — KeyMux harness lane
+        //    ($HERMES_HOME/.env, auth.json credential pool) → ModelMux →
+        //    HtxReactor, so the tribunal's token spend lands on the daemon's
+        //    quota/lease receipts exactly like every other model traffic.
+        //    The instance (schema → mutable, versionable state) opens from
+        //    the preset's pre-canned lanes; kg.ingest advances the judge's
+        //    job (active → closed) when the verdict lands on the record.
+        val tribunalHolder = borg.trikeshed.lcnc.TribunalInstanceHolder()
+        moduleContext.lcncRunners.putAll(
+            borg.trikeshed.lcnc.TribunalNodes.registry(
+                dialog = borg.trikeshed.lcnc.hermesEnvDialog(
+                    chat = { system, prompt ->
+                        {
+                            val content = brainClient.chat(
+                                listOf("system" to system, "user" to prompt),
+                                maxTokens = 600,
+                                contextId = "tribunal-seat",
+                            )
+                            content to (brainClient.lastModel() ?: "")
+                        }
+                    },
+                    muxContext = htxElement + muxReactor,
+                ),
+                ingest = { verdict ->
+                    val t = tribunalHolder.instance
+                    val life = t?.lifecycle("deliberate")
+                    if (t == null || (life != "active" && life != "submitted")) verdict
+                    else {
+                        t.advance("deliberate", "complete", "tribunal-verdict-${verdict.hashCode()}", t.revision("deliberate") ?: 1L)
+                        t.snapshotCid("deliberate") ?: verdict
+                    }
+                },
+            ),
+        )
+        // ── BrainClient decomposition as LCNC: credential.enter → prompt.chat →
+        //    result.confirm. CouchKeyStore backs the credential persistence;
+        //    the chatFn uses the daemon's HTX client (200/non-200 patchpoints).
+        val couchKeyStore = keymux.CouchKeyStore(couchDb)
+        // Seed CouchKeyStore from the daemon's KeyMux so the prefill
+        // dropdown resolves real keys from env/hermes/harness stores.
+        runCatching {
+            for (i in 0 until keymux.HarnessRegistry.providers.size) {
+                val p = keymux.HarnessRegistry.providers[i]
+                val k = kotlinx.coroutines.withContext(Dispatchers.IO) {
+                    keyMux.get("llm.${p.id}.key")
+                }
+                val u = kotlinx.coroutines.withContext(Dispatchers.IO) {
+                    keyMux.get("llm.${p.id}.base_url")
+                }
+                if (!k.isNullOrBlank()) {
+                    couchKeyStore.storeCredential(
+                        p.id, k,
+                        u ?: p.defaultBaseUrl ?: "",
+                        "openai",
+                    )
+                }
+            }
+        }
+        // ModelMux for the mux.models LCNC node — enumerates routable models.
+        val lcncModelMux = modelmux.ModelMux(keyMux) {
+            val nvidia = "https://integrate.api.nvidia.com/v1"
+            model(id = "deepseek-ai/deepseek-v4-pro", caps = setOf("chat"), baseUrl = nvidia)
+            model(id = "nvidia/nemotron-3-super-120b-a12b", caps = setOf("chat"), baseUrl = nvidia)
+            model(id = "mistralai/mistral-large-2-instruct", caps = setOf("chat"), baseUrl = nvidia)
+            model(id = "z-ai/glm-5.2", caps = setOf("chat"), baseUrl = nvidia)
+            model(id = "moonshotai/kimi-k2.6", caps = setOf("chat"), baseUrl = nvidia)
+            model(id = "openai/gpt-oss-120b", caps = setOf("chat"), baseUrl = nvidia)
+            model(id = "minimaxai/minimax-m3", caps = setOf("chat"), baseUrl = nvidia)
+            model(id = "poolside/laguna-xs-2.1", caps = setOf("chat"), baseUrl = nvidia)
+            model(id = "gpt-4o-mini", caps = setOf("chat"), baseUrl = "https://api.openai.com/v1")
+            model(id = "llama-3.3-70b-versatile", caps = setOf("chat"), baseUrl = "https://api.groq.com/openai/v1")
+            model(id = "deepseek-chat", caps = setOf("chat"), baseUrl = "https://api.deepseek.com/v1")
+        }
+        moduleContext.lcncRunners.putAll(
+            borg.trikeshed.lcnc.BrainMuxNodes.registry(
+                keyMux = keyMux,
+                modelMux = lcncModelMux,
+                credStore = couchKeyStore,
+                chatFn = { url, apiKey, model, messages, maxTokens, temperature, headers ->
+                    runCatching {
+                        val bodyMap = linkedMapOf<String, Any?>(
+                            "model" to model,
+                            "max_tokens" to maxTokens,
+                            "temperature" to temperature,
+                            "messages" to (0 until messages.size).map { i ->
+                                linkedMapOf("role" to messages[i].first, "content" to messages[i].second)
+                            },
+                        )
+                        val json = JsonSupport.stringify(bodyMap)
+                        fun hdr(k: String, v: String): borg.trikeshed.htx.HtxHeader =
+                            object : borg.trikeshed.htx.HtxHeader {
+                                override val a = k; override val b = v
+                            }
+                        val allHdrs = arrayOf(
+                            hdr("Authorization", "Bearer $apiKey"),
+                            hdr("Content-Type", "application/json"),
+                        ) + headers.filter { it.first.isNotBlank() }.map { (k, v) -> hdr(k, v) }.toTypedArray()
+                        val htxReq = borg.trikeshed.htx.parseHtxRequest(
+                            url = "$url/chat/completions",
+                            method = borg.trikeshed.htx.HtxMethod.POST,
+                            body = borg.trikeshed.lib.ByteSeries(json.encodeToByteArray()),
+                        ).copy(headers = borg.trikeshed.htx.htxHeaders(*allHdrs))
+                        val resp = htxElement.requestResult(htxReq).getOrThrow()
+                        val respBody = resp.body.toArray().decodeToString()
+                        val parsed = JsonSupport.parse(respBody) as? Map<*, *>
+                            ?: error("non-JSON response: ${respBody.take(200)}")
+                        val choices = parsed["choices"] as? List<*>
+                            ?: error("no choices in response")
+                        val first = choices.firstOrNull() as? Map<*, *>
+                            ?: error("empty choices")
+                        val message = first["message"] as? Map<*, *>
+                            ?: error("no message in choice")
+                        message["content"] as? String ?: error("no content in message")
+                    }
+                },
+            ),
+        )
+        launch(Dispatchers.Default) {
+            runCatching {
+                val tribunal = borg.trikeshed.lcnc.TribunalInstance.open(
+                    scope = moduleScope,
+                    plan = borg.trikeshed.lcnc.TribunalInstance.schemaPlan(),
+                    presetDocument = borg.trikeshed.lcnc.LcncPresets.all().getValue("preset-tribunal"),
+                )
+                tribunalHolder.instance = tribunal
+                tribunal.awaitRootSeeds()
+                System.err.println("[OROBOROS] tribunal instance live: ${tribunal.laneIds.size} lanes seeded at root (schema job-nexus)")
+            }.onFailure {
+                System.err.println("[OROBOROS] tribunal instance failed to open (non-fatal): ${it.message}")
+            }
+        }
         val moduleSupervisor = borg.trikeshed.module.ModuleSupervisor(
             ctx = moduleContext,
             liveClassesDir = File(repoDir, "build/live/classes"),

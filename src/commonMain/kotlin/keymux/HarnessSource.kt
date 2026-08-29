@@ -51,6 +51,7 @@ object HarnessRegistry {
         HarnessProvider("jules", s_["JULES_API_KEY"]),
         HarnessProvider("brain", s_["BRAIN_API_KEY"]),
         HarnessProvider("synthetic", s_["SYNTHETIC_API_KEY"], "https://api.synthetic.new/v1"),
+        HarnessProvider("opencode", s_["OPENCODE_API_KEY"], "https://api.opencode.ai/v1"),
     ]
 
     fun byId(id: String): HarnessProvider? {

@@ -434,6 +434,41 @@ class PatchWire(
                 ))
             }
 
+            // ── keymux endpoint registry: user-declared provider endpoints
+            // beside the built-in roster. NAMES AND ADDRESSES ONLY — key
+            // values never cross the wire (env var NAMES point at them).
+            // Stored in the forge home (keymux/endpoints attachment);
+            // consumption by routing stays the model code's own decision.
+            method == "GET" && p == "/api/mux/endpoints" -> {
+                val att = attachments ?: return json(mapOf("error" to "store not wired"), 503)
+                json(mapOf("builtin" to brain.rosterStatus(), "user" to loadEndpointRegistry(att)))
+            }
+            method == "POST" && p == "/api/mux/endpoints" -> {
+                val att = attachments ?: return json(mapOf("error" to "store not wired"), 503)
+                val req = parse(text)
+                val name = req["name"]?.toString()?.lowercase()?.trim().orEmpty()
+                if (!name.matches(Regex("^[a-z0-9][a-z0-9._-]*$"))) return json(mapOf("error" to "bad name"), 400)
+                val entry = mapOf(
+                    "name" to name,
+                    "base" to (req["base"]?.toString() ?: ""),
+                    "model" to (req["model"]?.toString() ?: ""),
+                    "envVar" to (req["envVar"]?.toString() ?: ""),
+                    "flags" to ((req["flags"] as? Map<*, *>)?.entries?.associate { it.key.toString() to (it.value == true) } ?: emptyMap()),
+                )
+                val next = loadEndpointRegistry(att).filter { it["name"] != name } + listOf(entry)
+                saveEndpointRegistry(att, next)
+                json(mapOf("verdict" to "ok", "count" to next.size))
+            }
+            method == "DELETE" && p.startsWith("/api/mux/endpoints/") -> {
+                val att = attachments ?: return json(mapOf("error" to "store not wired"), 503)
+                val name = p.removePrefix("/api/mux/endpoints/").trimEnd('/')
+                val cur = loadEndpointRegistry(att)
+                val next = cur.filter { it["name"] != name }
+                if (next.size == cur.size) return json(mapOf("error" to "no such endpoint", "name" to name), 404)
+                saveEndpointRegistry(att, next)
+                json(mapOf("verdict" to "removed", "name" to name))
+            }
+
             method == "POST" && p == "/api/mux/chat" -> {
                 if (!brain.hasEndpoints()) return json(mapOf("verdict" to "no-providers", "detail" to "no provider keys in env"), 503)
                 val req = parse(text)
@@ -650,6 +685,27 @@ class PatchWire(
 
             else -> null
         }
+    }
+
+    @Suppress("UNCHECKED_CAST")
+    private fun loadEndpointRegistry(att: CouchAttachmentGateway): List<Map<String, Any?>> =
+        att.getAttachment("keymux/endpoints")?.let { (_, bytes) ->
+            runCatching {
+                (JsonSupport.parse(bytes.decodeToString()) as? List<*>)?.filterIsInstance<Map<String, Any?>>()
+            }.getOrNull()
+        } ?: emptyList()
+
+    private fun saveEndpointRegistry(att: CouchAttachmentGateway, entries: List<Map<String, Any?>>) {
+        val bytes = JsonSupport.stringify(entries).encodeToByteArray()
+        val cid = ContentId.of(bytes)
+        att.putAttachment(
+            borg.trikeshed.util.oroboros.OroborosAttachmentRef(
+                path = "keymux/endpoints", contentType = "application/json", length = bytes.size.toLong(),
+                contentId = cid, agentId = "keymux-dlg", revision = cid.hex.take(12),
+                sequence = System.currentTimeMillis(),
+            ),
+            bytes,
+        )
     }
 
     private fun json(value: Any?, status: Int = 200): JvmKanbanServer.HttpResponse =

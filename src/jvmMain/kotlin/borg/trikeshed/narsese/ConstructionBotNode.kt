@@ -36,7 +36,11 @@ object ConstructionBotNode {
                         "system" to "Extract only explicit causal constructions. Return JSON: {\"constructions\":[{\"subject\":string,\"relation\":\"causes|results_in|leads_to|because|therefore|if_then\",\"object\":string,\"polarity\":boolean,\"evidenceCid\":\"sha256:...\",\"dependency\":\"nsubj|dobj|nmod|acl|advcl:because|mark:if|advcl:if|cc:therefore|neg\"}]}. Never invent a CID or a relation absent from the cited line.",
                         "user" to prompt,
                     ),
-                    maxTokens = node.params["maxTokens"]?.toIntOrNull() ?: 1024,
+                    // 1024 starved reasoning-style roster entries (e.g. gpt-oss-120b) before
+                    // they ever emitted the requested JSON — confirmed live: the whole budget
+                    // went to visible chain-of-thought ("We need to extract...") and the call
+                    // never reached the answer. 4096 gives room for reasoning + the JSON.
+                    maxTokens = node.params["maxTokens"]?.toIntOrNull() ?: 4096,
                     temperature = 0.0,
                     contextId = "read.construct:${node.id}",
                 )
@@ -91,8 +95,14 @@ object ConstructionBotNode {
 
     @Suppress("UNCHECKED_CAST")
     private fun parseProposals(raw: String): borg.trikeshed.lib.Series<CausalConstruction> {
-        val json = raw.substringAfter("```json", raw).substringAfter("```", raw).substringBeforeLast("```", raw).trim()
-        val root = JsonSupport.parse(json) as? Map<*, *> ?: error("read.construct bot returned non-object JSON")
+        val json = stripTrailingCommas(
+            raw.substringAfter("```json", raw).substringAfter("```", raw).substringBeforeLast("```", raw).trim(),
+        )
+        val parsed = runCatching { JsonSupport.parse(json) }.getOrElse {
+            error("read.construct bot JSON parse failed: ${it.message} — raw response: ${raw.take(2000)}")
+        }
+        val root = parsed as? Map<*, *>
+            ?: error("read.construct bot returned non-object JSON (got ${parsed?.let { it::class.simpleName } ?: "null"}) — raw response: ${raw.take(2000)}")
         val rows = root["constructions"] as? List<*> ?: emptyList<Any?>()
         val out = ArrayList<CausalConstruction>()
         for (row in rows) {
@@ -109,6 +119,46 @@ object ConstructionBotNode {
             )
         }
         return out.size j { i: Int -> out[i] }
+    }
+
+    /**
+     * Small models frequently emit a trailing comma before `}`/`]` in
+     * structured JSON output (no strict-JSON-mode enforcement upstream).
+     * [borg.trikeshed.parse.json.Json]'s object parser requires every
+     * comma-delimited segment to open on a quoted key, so an unguarded
+     * trailing comma throws "malformed open quote" on the resulting empty
+     * segment. Quote-aware: never touches a comma inside a string value.
+     */
+    internal fun stripTrailingCommas(json: String): String {
+        val sb = StringBuilder(json.length)
+        var inString = false
+        var escaped = false
+        var i = 0
+        while (i < json.length) {
+            val c = json[i]
+            if (inString) {
+                sb.append(c)
+                when {
+                    escaped -> escaped = false
+                    c == '\\' -> escaped = true
+                    c == '"' -> inString = false
+                }
+                i++
+                continue
+            }
+            when (c) {
+                '"' -> { inString = true; sb.append(c); i++ }
+                ',' -> {
+                    var k = i + 1
+                    while (k < json.length && json[k].isWhitespace()) k++
+                    // Drop the comma only when it is truly trailing (next token closes
+                    // the enclosing object/array); otherwise keep it.
+                    if (k < json.length && (json[k] == '}' || json[k] == ']')) i++ else { sb.append(c); i++ }
+                }
+                else -> { sb.append(c); i++ }
+            }
+        }
+        return sb.toString()
     }
 
     private fun constructionMap(c: CausalConstruction): Map<String, Any?> = mapOf(
