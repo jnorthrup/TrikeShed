@@ -1296,9 +1296,13 @@ object OroborosDaemon {
         }
 
         // Initial two-plane reconcile. File reads and CAS writes stay off the
-        // reactor thread.
+        // reactor thread. Three independent runCatching blocks ensure a failure
+        // in one plane (e.g. memory bridge) does not prevent another (build
+        // plane) from completing — specifically, classpath.tsv must always be
+        // written so --boot-forge hydration works.
         withContext(Dispatchers.IO) {
-            runCatching {
+            // ── Foundation: git + worktree reconcile ──
+            val reconcileResult = runCatching {
                 val headSha = gitState.headSha()
                 val snap = gitCouchGateway.reconcile(
                     forgeHome = repoDir.absolutePath,
@@ -1322,11 +1326,23 @@ object OroborosDaemon {
                     WorktreeCouchGateway.WORKTREE_PREFIX,
                     worktreeSnap.paths.size j { i: Int -> worktreeSnap.paths[i] },
                 )
-                val bridged = memoryBridge.bridge(worktreeSnap, agentId = "oroboros")
                 projectScopes.registerPrimary(repoDir, worktreeSnap.paths.size)
                 System.err.println(
-                    "[OROBOROS] Worktree→Couch initial reconcile: ${worktreeSnap.paths.size} paths, " +
-                        "$bridged memory files bridged (spines + IPFS)"
+                    "[OROBOROS] Worktree→Couch initial reconcile: ${worktreeSnap.paths.size} paths"
+                )
+                headSha to worktreeSnap
+            }.onFailure {
+                System.err.println("[OROBOROS] git/worktree reconcile failed: ${it.message}")
+                it.printStackTrace()
+            }.getOrNull() ?: return@withContext
+
+            val (headSha, worktreeSnap) = reconcileResult
+
+            // ── Memory bridge + belief seeding (degrades independently) ──
+            runCatching {
+                val bridged = memoryBridge.bridge(worktreeSnap, agentId = "oroboros")
+                System.err.println(
+                    "[OROBOROS] Memory bridge: $bridged memory files bridged (spines + IPFS)"
                 )
                 // ── Belief minting feed: epistemic signals from the memory plane land in the bag.
                 // FNV identity stays on the signal's CIDs; the BAG key gets the feature-coded
@@ -1363,6 +1379,13 @@ object OroborosDaemon {
                     }
                     System.err.println("[OROBOROS] BeliefBag seeded: $mintedSignals epistemic signals → ${beliefBag.size} beliefs")
                 }
+            }.onFailure {
+                System.err.println("[OROBOROS] memory bridge/belief failed: ${it.message}")
+                it.printStackTrace()
+            }
+
+            // ── Build plane reconcile + hermes home (must always run — writes classpath.tsv) ──
+            runCatching {
                 val buildPaths = reconcileBuildPlane(buildPlanes, headSha)
                 System.err.println("[OROBOROS] Build→Couch initial reconcile: $buildPaths classpath attachments → manifest ${buildPlanes.manifestFile}")
                 if (hermesHomeDir.isDirectory) {
@@ -1372,7 +1395,7 @@ object OroborosDaemon {
                     System.err.println("[OROBOROS] Hermes home skipped: $hermesHomeDir not found")
                 }
             }.onFailure {
-                System.err.println("[OROBOROS] initial reconcile failed: ${it.message}")
+                System.err.println("[OROBOROS] build plane reconcile failed: ${it.message}")
                 it.printStackTrace()
             }
         }

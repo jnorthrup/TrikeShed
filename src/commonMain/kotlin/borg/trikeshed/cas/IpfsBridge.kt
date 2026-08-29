@@ -9,7 +9,7 @@ import borg.trikeshed.collections.associative.LinearHashMap
  * - CAS blocks as IPFS blocks.
  * - IPNS names resolve to CasManifest CIDs.
  */
-class IpfsBridge(private val cas: CasStore) {
+open class IpfsBridge(private val cas: CasStore) {
     // Map of IPNS name to Manifest CID
     private val ipnsRegistry = LinearHashMap<String, ContentId>()
 
@@ -21,11 +21,11 @@ class IpfsBridge(private val cas: CasStore) {
         return cas.get(cid)
     }
 
-    fun publishIpns(name: String, manifestCid: ContentId) {
+    open fun publishIpns(name: String, manifestCid: ContentId) {
         ipnsRegistry[name] = manifestCid
     }
 
-    fun unpublishIpns(name: String): Boolean = ipnsRegistry.remove(name) != null
+    open fun unpublishIpns(name: String): Boolean = ipnsRegistry.remove(name) != null
 
     fun resolveIpns(name: String): ContentId? {
         return ipnsRegistry[name]

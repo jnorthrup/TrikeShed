@@ -26,32 +26,36 @@ class MemoryBridge(
         var bridged = 0
         for (attachmentPath in snapshot.deletedPaths) {
             if (!isMemoryEligible(attachmentPath)) continue
-            val relative = attachmentPath.removePrefix(WorktreeCouchGateway.WORKTREE_PREFIX)
-            val memoryPath = "/memories/${WorktreeCouchGateway.WORKTREE_PREFIX}$relative"
-            if (memoryStore.delete(memoryPath)) bridged++
-            ipfsBridge.unpublishIpns("memory:$memoryPath")
+            runCatching {
+                val relative = attachmentPath.removePrefix(WorktreeCouchGateway.WORKTREE_PREFIX)
+                val memoryPath = "/memories/${WorktreeCouchGateway.WORKTREE_PREFIX}$relative"
+                if (memoryStore.delete(memoryPath)) bridged++
+                ipfsBridge.unpublishIpns("memory:$memoryPath")
+            }
         }
         for (attachmentPath in snapshot.paths) {
             if (!isMemoryEligible(attachmentPath)) continue
-            val stored = attachments.getAttachment(attachmentPath) ?: continue
-            val relative = attachmentPath.removePrefix(WorktreeCouchGateway.WORKTREE_PREFIX)
-            val memoryPath = "/memories/${WorktreeCouchGateway.WORKTREE_PREFIX}$relative"
-            val bytes = stored.second
-            val currentCid = memoryStore.couch.get(memoryPath)
-                ?.fields
-                ?.find { it.name == "contentId" }
-                ?.value as? String
-            if (currentCid == stored.first.contentId.value) continue
-            val description = extractDescription(bytes.decodeToString(), relative)
+            runCatching {
+                val stored = attachments.getAttachment(attachmentPath) ?: return@runCatching
+                val relative = attachmentPath.removePrefix(WorktreeCouchGateway.WORKTREE_PREFIX)
+                val memoryPath = "/memories/${WorktreeCouchGateway.WORKTREE_PREFIX}$relative"
+                val bytes = stored.second
+                val currentCid = memoryStore.couch.get(memoryPath)
+                    ?.fields
+                    ?.find { it.name == "contentId" }
+                    ?.value as? String
+                if (currentCid == stored.first.contentId.value) return@runCatching
+                val description = extractDescription(bytes.decodeToString(), relative)
 
-            memoryStore.put(
-                memoryFile(memoryPath, description, bytes),
-                agentId = agentId,
-                kind = "repository-document",
-            )
-            val spineCid = memoryStore.spineCidOf(memoryPath) ?: continue
-            ipfsBridge.publishIpns("memory:$memoryPath", spineCid)
-            bridged++
+                memoryStore.put(
+                    memoryFile(memoryPath, description, bytes),
+                    agentId = agentId,
+                    kind = "repository-document",
+                )
+                val spineCid = memoryStore.spineCidOf(memoryPath) ?: return@runCatching
+                ipfsBridge.publishIpns("memory:$memoryPath", spineCid)
+                bridged++
+            }
         }
         return bridged
     }
