@@ -132,7 +132,7 @@ Response:
 
 ```bash
 # Send input
-curl -s -X POST http://localhost:8888/api/graal/capsule/my-sleeve/stdin   -H "Content-Type: application/json"   -d '{"text": "print("hello from graalpy")"}'
+curl -s -X POST http://localhost:8888/api/graal/capsule/my-sleeve/stdin   -H "Content-Type: application/json"   -d '{"text": "print(\"hello from graalpy\")"}'
 
 # Read output
 curl -s http://localhost:8888/api/graal/capsule/my-sleeve/output

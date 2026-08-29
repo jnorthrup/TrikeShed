@@ -2,7 +2,7 @@
 
 > **Status:** verified-live
 
-A user guide for the NALS curation loop — the belief bag, its routes, and how to teach and query beliefs through the HTTP API.
+A user guide for the NARS curation loop — the belief bag, its routes, and how to teach and query beliefs through the HTTP API.
 
 ---
 
@@ -269,7 +269,7 @@ bin/oroboros-daemon
 | `POST /api/beliefs/query` | **dual-state** | 200 with `--belief-bag`, 503 without |
 | All belief routes | **dual-state** | 200 with `--belief-bag`, 503 without `--belief-bag` |
 
-> This is a NALS curation loop, not a database query interface. Beliefs are living hypotheses — they decay, get evicted, and are revised by incoming evidence. Do not treat them as persistent storage.
+> This is a NARS curation loop, not a database query interface. Beliefs are living hypotheses — they decay, get evicted, and are revised by incoming evidence. Do not treat them as persistent storage.
 
 ---
 
@@ -376,5 +376,6 @@ This guide uses the marker convention:
 | `stub` | Route defined but not yet implemented |
 | `known-bug` | Route implemented but has a known defect |
 | `unverified` | Route defined but not yet tested |
+| `dual-state` | Route behavior depends on a boot prerequisite (e.g. 200 with `--belief-bag`, 503 without) |
 
 Use `> **Status:** <class>` at the top of each section or route to indicate its current state.
