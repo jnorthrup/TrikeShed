@@ -23,7 +23,9 @@ class RouteManifestParityTest {
         // GET /panels — served as a static asset by JvmKanbanServer.staticAssets,
         // not an API endpoint; the manifest covers /api/panels/* API routes.
         "GET /panels",
-        // GET / or GET /index.html — served by ForgeRoutes.PORTABLE / JvmKanbanServer
+        // POST /_project/<name>/begin|put -- error message string in ProjectDbWire, not a route
+        "POST /_project/<name>/begin|put",
+        // GET / or GET /index.html -- served by ForgeRoutes.PORTABLE / JvmKanbanServer
         // as the shell HTML, not owned by any of the eight surface wires.
         "GET /",
         "GET /index.html",

@@ -74,7 +74,15 @@ class RouteParityGate {
                     .replace(Regex("\"?\\+[^+]*\\+\"?"), "{id}") // string-concat: "/api/vm/"+id
                     .substringBefore('?')
                     .removeSuffix("/")
-                val covered = RouteManifest.covers(method, cleaned)
+                val covered = if (cleaned.contains("\u2026")) {
+                    val prefix = cleaned.substringBefore("\u2026").removeSuffix("/")
+                    // Any manifest entry with same method starts with this prefix
+                    RouteManifest.entries.values.flatten().any { entry ->
+                        entry.method == method && entry.path.startsWith(prefix)
+                    }
+                } else {
+                    RouteManifest.covers(method, cleaned)
+                }
                 if (!covered) offenders.add("$page: $method $rawPath")
             }
         }
@@ -95,12 +103,16 @@ class RouteParityGate {
         // "POST /api/graal/capsule/…" is served by
         // `p.startsWith("/api/graal/capsule/")`.
         val root = System.getProperty("user.dir") ?: fail("no user.dir")
-        val srcRoot = java.io.File(root, "src/jvmMain/kotlin")
-        assertTrue(srcRoot.isDirectory, "wire source tree not found at $srcRoot — run from the repo root")
+        val jvmRoot = java.io.File(root, "src/jvmMain/kotlin")
+        assertTrue(jvmRoot.isDirectory, "wire source tree not found at $jvmRoot — run from the repo root")
+        val commonRoot = java.io.File(root, "src/commonMain/kotlin")
         val corpus = StringBuilder()
-        srcRoot.walkTopDown().filter { it.extension == "kt" }
-            .filter { it.name != "RouteManifest.kt" }
-            .forEach { corpus.append(it.readText()) }
+        for (srcDir in listOf(jvmRoot, commonRoot)) {
+            if (!srcDir.isDirectory) continue
+            srcDir.walkTopDown().filter { it.extension == "kt" }
+                .filter { it.name != "RouteManifest.kt" }
+                .forEach { corpus.append(it.readText()) }
+        }
         val src = corpus.toString()
         val offenders = RouteManifest.all.filter { line ->
             val method = line.substringBefore(' ')

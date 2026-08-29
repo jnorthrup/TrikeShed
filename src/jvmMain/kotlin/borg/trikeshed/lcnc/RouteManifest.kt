@@ -14,7 +14,7 @@ package borg.trikeshed.lcnc
  * Streaming/SSE routes are annotated by the wires themselves; the gate only
  * checks existence, not transport.
  *
- * The couch surface (/{db}/*) is reconciled with
+ * The couch surface (/{db}/ pattern) is reconciled with
  * `src/commonMain/resources/openapi/couch-oroboros.openapi.yaml` — that spec
  * stays authoritative for request/response schemas on the couch/_cas surface.
  *
