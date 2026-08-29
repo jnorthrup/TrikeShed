@@ -64,10 +64,22 @@ The Couch surface provides a CouchDB 1.6-compatible document store with CRUD ope
 
 ## Worked Walkthrough
 
+There is **no second server and no port 5984**: CouchWire mounts ONE
+`CouchDatabase` on the daemon's own HTTP tier, so the Couch surface answers on
+the same port as `/api/…` (default `8888`; use your scratch port from the
+launch guide). The mounted database's name is the daemon's configured db —
+`trikeshed` in a default boot — and `_changes`/`_replicate` are wired for
+THAT name only.
+
+> **Status:** known-bug — doc routes accept arbitrary `/{db}/` prefixes (a
+> `PUT /testdb/doc1` succeeds), but `_changes` exists only for the mounted
+> db's name; `GET /testdb/_changes` returns `{"error":"not_found"}`. Use the
+> mounted name throughout.
+
 ### PUT a Document
 
 ```bash
-curl -X PUT http://localhost:5984/testdb/doc1 \
+curl -X PUT http://localhost:8888/trikeshed/doc1 \
   -H "Content-Type: application/json" \
   -d '{"_id": "doc1", "name": "Hello", "value": 42}'
 ```
@@ -80,7 +92,7 @@ Response:
 ### GET It Back
 
 ```bash
-curl http://localhost:5984/testdb/doc1
+curl http://localhost:8888/trikeshed/doc1
 ```
 
 Response:
@@ -91,7 +103,7 @@ Response:
 ### See It in _changes
 
 ```bash
-curl http://localhost:5984/testdb/_changes
+curl http://localhost:8888/trikeshed/_changes
 ```
 
 Response:
@@ -101,22 +113,24 @@ Response:
 
 ### Replicate to a Peer
 
-Replication requires one side to be the local database name and the other to
-be an HTTP peer URL. Both db-name-only sources/targets return 400.
+Replication requires one side to be the mounted database's name and the other
+to be an HTTP peer URL (`http://host:port/db`). Both db-name-only
+sources/targets return 400 with `one side must be 'trikeshed', the other a
+peer URL`. Pull is the preferred m2m direction (the laptop pulls the install).
 
 ```bash
-# Push local trikeshed DB to a remote CouchDB-compatible peer:
-curl -X POST http://localhost:5984/trikeshed/_replicate \
+# Push the local mounted DB to a remote TrikeShed/Couch-compatible peer:
+curl -X POST http://localhost:8888/trikeshed/_replicate \
   -H "Content-Type: application/json" \
-  -d '{"source": "trikeshed", "target": "http://remote-host:5984/trikeshed", "continuous": false, "interval_ms": 1000}'
+  -d '{"source": "trikeshed", "target": "http://remote-host:8888/trikeshed", "continuous": false, "interval_ms": 1000}'
 ```
 
 Or pull from a peer:
 
 ```bash
-curl -X POST http://localhost:5984/trikeshed/_replicate \
+curl -X POST http://localhost:8888/trikeshed/_replicate \
   -H "Content-Type: application/json" \
-  -d '{"source": "http://remote-host:5984/trikeshed", "target": "trikeshed", "continuous": false, "interval_ms": 1000}'
+  -d '{"source": "http://remote-host:8888/trikeshed", "target": "trikeshed", "continuous": false, "interval_ms": 1000}'
 ```
 
 Response:
