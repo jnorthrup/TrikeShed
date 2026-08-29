@@ -5,8 +5,8 @@ It combines a PWA dashboard (`/graal`), a Couch-CRUD companion (`/futon`), and
 a set of JSON/streaming API routes for JVM vitals, terrain mapping, CAS linking,
 AOT metadata, and the flourish event feed.
 
-> **Status:** verified-live — the console page, vitals, map, pointcuts, SSE feed,
-> and AOT routes are exercised on standard daemon boots.
+> **Status:** verified-live — the console page, vitals, map, pointcuts, density,
+> capsule, occupy, SSE feed, and AOT routes are exercised on standard daemon boots.
 
 ## Launch Prerequisite
 
@@ -49,7 +49,7 @@ All routes are served on the same port as the rest of the daemon (default 8888).
 |--------|------|--------|-------------|
 | GET | `/api/graal/zoom?code=<hex\|dec>` | verified-live | Representative byte-chunk fragments per code-ring8 group. Returns `{"ring8": N, "docs": N, "representatives": [...]}`. Each representative carries a `chunkCid` (Claim Check — fetch bytes via `_cas` route). |
 | GET | `/api/graal/strength?a=<cid>&b=<cid>` | verified-live | Match strength between two CIDs. Both fragments are re-ingested through `LineCas` and graded with `MatchGrade`/`LinkConfidence`/`rampScore`. Returns `{a, b, linked, partial, contentOnly, proximity, confidence, ramp, aBytes, bBytes}`. |
-| GET | `/api/graal/density?path=<id>&aperture=L0..L3` | degraded | Per-region residual density at a zoom band. Reads the live `MemoryStore` index. **Returns 503 when `memoryStore` is absent** (not mounted on scratch daemon or CLI/wire-only hosts). Accepts `path` or `id` query param; `aperture` defaults to `L2`. Returns `{"regions": [...], "totals": {...}, "path": "...", "aperture": "L2"}`. |
+| GET | `/api/graal/density?path=<id>&aperture=L0..L3` | verified-live | Per-region residual density at a zoom band. Reads the live `MemoryStore` index. Note: `memoryStore` is always mounted in current daemon builds (OroborosDaemon.kt:530). The 503 branch (GraalWire.kt:559) is dead code. Accepts `path` or `id` query param; `aperture` defaults to `L2`. Returns `{"regions": [...], "totals": {...}, "path": "...", "aperture": "L2"}`. |
 
 ### DAG Cross-Links
 
@@ -99,22 +99,49 @@ All routes are served on the same port as the rest of the daemon (default 8888).
 > **Note:** SSE is long-lived. The stream opens immediately and delivers the first
 > event on connection. Consumers should handle reconnection with backoff.
 
-### Capsule Routes (experimental)
+### Capsule Routes
 
 | Method | Path | Status | Description |
 |--------|------|--------|-------------|
-| POST | `/api/graal/capsule/spawn` | stub | Spawn a Hermes sleeve: GraalPy guest VM with its own btrfs subvolume. Body: `{"id": "optional-name"}`. Returns `{ok, id, terminal}`. |
-| POST | `/api/graal/capsule/{id}/stdin` | stub | Type a line at the captured shell. Body: `{"text": "..."}`. |
-| GET | `/api/graal/capsule/{id}/output` | stub | VT scrollback so far (poll, not stream). Returns `{id, alive, text}`. |
-| POST | `/api/graal/capsule/{id}/kill` | stub | Interrupt + close the guest. |
+| POST | `/api/graal/capsule/spawn` | verified-live | Spawn a Hermes sleeve: GraalPy guest VM with its own btrfs subvolume. Body: `{"id": "optional-name"}`. Returns `{ok, id, terminal}`. |
+| POST | `/api/graal/capsule/{id}/stdin` | verified-live | Type a line at the captured shell. Body: `{"text": "..."}`. |
+| GET | `/api/graal/capsule/{id}/output` | verified-live | VT scrollback so far (poll, not stream). Returns `{id, alive, text}`. |
+| POST | `/api/graal/capsule/{id}/kill` | verified-live | Interrupt + close the guest. |
 
-### Occupy Routes (experimental)
+### Occupy Routes
 
 | Method | Path | Status | Description |
 |--------|------|--------|-------------|
-| GET | `/api/graal/occupy` | stub | List occupied repos: `{"repos": [{id, path, live path count, ...}]}`. |
-| POST | `/api/graal/occupy` | stub | Absorb a git repo's worktree under `repos/<id>/` and watch it live. Body: `{"path": "/path/to/repo"}`. Returns `{ok, id, prefix}`. |
-| POST | `/api/graal/occupy/{id}/release` | stub | Stop watching. Already-absorbed content stays. |
+| GET | `/api/graal/occupy` | verified-live | List occupied repos: `{"repos": [{id, path, live path count, ...}]}`. |
+| POST | `/api/graal/occupy` | verified-live | Absorb a git repo's worktree under `repos/<id>/` and watch it live. Body: `{"path": "/path/to/repo"}`. Returns `{ok, id, prefix}`. |
+| POST | `/api/graal/occupy/{id}/release` | verified-live | Stop watching. Already-absorbed content stays. |
+
+### Capsule Walkthrough
+
+Spawn a Hermes sleeve (GraalPy guest VM) and interact with it:
+
+```bash
+# Spawn a capsule
+curl -s -X POST http://localhost:8888/api/graal/capsule/spawn   -H "Content-Type: application/json"   -d '{"id": "my-sleeve"}'
+```
+
+Response:
+```json
+{ "ok": true, "id": "my-sleeve", "terminal": "/dev/pts/3" }
+```
+
+```bash
+# Send input
+curl -s -X POST http://localhost:8888/api/graal/capsule/my-sleeve/stdin   -H "Content-Type: application/json"   -d '{"text": "print("hello from graalpy")"}'
+
+# Read output
+curl -s http://localhost:8888/api/graal/capsule/my-sleeve/output
+
+# Kill the capsule when done
+curl -s -X POST http://localhost:8888/api/graal/capsule/my-sleeve/kill
+```
+
+> **Status:** verified-live — capsule routes return 202/200 on standard daemon boots.
 
 ## Worked Walkthrough
 
