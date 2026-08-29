@@ -43,7 +43,7 @@ Positive evidence raises expectation; negative evidence lowers it. The revision 
 
 Teaching takes **impulses** and **replay scenarios** in, runs curator hindsight, and emits landed glosses. This is the mechanism by which new domain knowledge is absorbed into the belief bag.
 
-> **Status:** degraded — `POST /api/beliefs/teach` returns **503** without the curator element wired. This is a known limitation.
+> **Status:** dual-state — `POST /api/beliefs/teach` returns **200** when the daemon boots with `--belief-bag` (the curator element is wired), and **503** without it. See the walkthrough for the working path.
 
 ---
 
@@ -154,7 +154,7 @@ Curator hindsight (W5.3). Accepts impulses and replay scenarios.
 }
 ```
 
-> **Status:** degraded — returns **503** without curator element wired. This is a known limitation of the current deployment.
+> **Status:** dual-state — returns **200** with `--belief-bag` (curator element wired), **503** without it.
 
 ---
 
@@ -170,7 +170,7 @@ Bank solver query (W5.3).
 }
 ```
 
-> **Status:** degraded — returns **503** without curator element wired. Known limitation.
+> **Status:** dual-state — returns **200** with `--belief-bag`, **503** without it.
 
 ---
 
@@ -253,10 +253,10 @@ All belief routes require the `--belief-bag` flag at daemon startup. Without it,
 
 ```bash
 # Correct — belief routes available
-triangulate daemon --belief-bag
+bin/oroboros-daemon --belief-bag
 
 # Incorrect — belief routes return 503
-triangulate daemon
+bin/oroboros-daemon
 ```
 
 ---
@@ -265,9 +265,9 @@ triangulate daemon
 
 | Route | Status | Detail |
 |-------|--------|--------|
-| `POST /api/beliefs/teach` | **degraded** | 503 without curator element wired |
-| `POST /api/beliefs/query` | **degraded** | 503 without curator element wired |
-| All belief routes | **stub** (without flag) | 503 without `--belief-bag` |
+| `POST /api/beliefs/teach` | **dual-state** | 200 with `--belief-bag`, 503 without |
+| `POST /api/beliefs/query` | **dual-state** | 200 with `--belief-bag`, 503 without |
+| All belief routes | **dual-state** | 200 with `--belief-bag`, 503 without `--belief-bag` |
 
 > This is a NALS curation loop, not a database query interface. Beliefs are living hypotheses — they decay, get evicted, and are revised by incoming evidence. Do not treat them as persistent storage.
 
@@ -278,13 +278,13 @@ triangulate daemon
 ### 1. Boot with belief bag
 
 ```bash
-triangulate daemon --belief-bag
+bin/oroboros-daemon --belief-bag
 ```
 
 ### 2. Send a decay tick
 
 ```bash
-curl -X POST http://localhost:8080/api/beliefs/tick
+curl -X POST http://localhost:8888/api/beliefs/tick
 ```
 
 Response:
@@ -298,7 +298,7 @@ The bag is empty — no beliefs have been taught yet.
 ### 3. Read top-k beliefs
 
 ```bash
-curl http://localhost:8080/api/beliefs
+curl http://localhost:8888/api/beliefs
 ```
 
 Response:
@@ -311,10 +311,10 @@ Response:
 }
 ```
 
-### 4. Teach a belief (observe the degraded path)
+### 4. Teach a belief (working path with --belief-bag)
 
 ```bash
-curl -X POST http://localhost:8080/api/beliefs/teach \
+curl -X POST http://localhost:8888/api/beliefs/teach \
   -H "Content-Type: application/json" \
   -d '{
     "impulses": [
@@ -324,18 +324,20 @@ curl -X POST http://localhost:8080/api/beliefs/teach \
   }'
 ```
 
-Response:
+Response (200 when daemon booted with `--belief-bag`):
 
-```
-HTTP/1.1 503 Service Unavailable
+```json
+{ "landed": 1, "bagSize": 1, "factsParsed": 1 }
 ```
 
-This is expected — the curator element is not wired. The `teach` and `query` routes are explicitly degraded in the current build.
+> If the daemon was booted without `--belief-bag`, this returns **503** — the
+> curator element is not wired in that mode. The `teach` and `query` routes
+> are dual-state: they work when the belief bag flag is set.
 
 ### 5. Ingest via KG
 
 ```bash
-curl -X POST http://localhost:8080/api/beliefs/kg \
+curl -X POST http://localhost:8888/api/beliefs/kg \
   -H "Content-Type: text/turtle" \
   -d '@prefix ex: <http://example.org/> . ex:sparrow ex:has_feathers true .'
 ```
@@ -356,7 +358,7 @@ The KG route ingests domain statements and mints NAL beliefs directly — this i
 ### 6. Read beliefs after ingestion
 
 ```bash
-curl http://localhost:8080/api/beliefs
+curl http://localhost:8888/api/beliefs
 ```
 
 The bag now contains the minted belief with updated budgets.
