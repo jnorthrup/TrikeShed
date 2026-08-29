@@ -77,3 +77,33 @@ renders whatever geometry was convened.
 
 - No new model providers, no browser-side seat execution, no persistence
   scheme beyond the existing CAS/couch/blackboard planes.
+
+## Implementation plan (synthesized 2026-08-29, design panel wf_174b9fae)
+
+Recon verdict on the napkin: 3 seats × 5 lanes in one authored-order pass —
+judge ruled on the rebuttal alone, verdict bytes hashed then dropped, record
+hook one-shot on a singleton in-memory instance, trial FSM dead data, dialog
+seam dropping per-seat params, evidence a same-doc echo, BrainClient roster
+gated on getenv so harness-file credentials yielded empty rosters.
+
+Winning design: **lcnc-purist base + judged grafts.** One pure geometry author
+`CouncilProgram.build(config): LcncProgram` consumed three identical ways:
+`preset-council` (default 3×5 fully drawn, byte-identical to
+`council.convene(DEFAULT)` — pinned by a regression test), the pure
+`council.convene` node (re-geometry, bounds 1..8 panels × 1..9 experts × 1..4
+rounds), and headless `POST /api/lcnc/run`. Rounds unroll; clarify/mistrial are
+guarded rings (`when?` skip) with a `coalesce` over absent yields; record
+assembly is MANY-cardinality `text.fold` nodes; per-seat diversity via
+personas + roster model assignment. New `council.seat`/`CouncilDialog` seam
+(legacy tribunal untouched) with loud per-seat failure banners ON the record.
+Persistence: `council.record` CAS-puts transcript+verdict, lands
+`council-verdict/<caseId>` blackboard facts, per-case jobs in
+`CouncilCaseRegistry` (no more one-verdict-per-boot). BrainClient roster
+un-gated through KeyMux harness lane. `legal.evidence` gains corpus scope.
+
+Tasks: council-01 builder, council-02 dialog+nodes, council-03 brainclient,
+council-04 registry, council-05 evidence (parallel, disjoint files), then
+council-06 integration (contracts/preset/daemon/module/manifest + scripted-
+dialog e2e) sequenced last and additive. Full specs:
+`council-plan.json` in the session scratchpad; judge + designs in workflow
+`wf_174b9fae-5c3` transcripts.

@@ -135,6 +135,14 @@
 //   POST /api/board/import              markdown bullets
 const LANES = ["triage", "todo", "ready", "running", "blocked", "done"]; // archived stays hidden
 let lastSeq = -1, lastPayload = "";
+// A re-render mid-drag destroys the dragged element and kills the gesture.
+// While a drag is live, renders are deferred; the last board lands at dragend.
+let dragLive = false, deferredBoard = null;
+function dragBegan() { dragLive = true; }
+function dragEnded() {
+  dragLive = false;
+  if (deferredBoard) { const b = deferredBoard; deferredBoard = null; render(b); }
+}
 
 const $ = (s) => document.querySelector(s);
 const boardEl = $("#board");
@@ -164,10 +172,13 @@ async function refresh(force = false) {
   try {
     const { status, body } = await api("/api/board");
     if (status !== 200 || !body) return;
-    const payload = JSON.stringify(body);
+    // NARS attention scores drift every poll; rounding them in the compare key
+    // stops the board re-rendering (and eating drags) when nothing moved.
+    const payload = JSON.stringify(body, (k, v) => (k === "attention" && typeof v === "number") ? Math.round(v * 20) / 20 : v);
     if (!force && payload === lastPayload) return;
     lastPayload = payload;
     lastSeq = body.sequence;
+    if (dragLive) { deferredBoard = body; return; }
     render(body);
   } catch (_) {
     // daemon momentarily away (restart / hotswap) — keep the last render
@@ -247,10 +258,11 @@ function cardEl(it) {
     <button class="archive" title="Archive this card">×</button>`;
   el.querySelector(".archive").addEventListener("click", () => archiveCard(it));
   el.addEventListener("dragstart", (e) => {
+    dragBegan();
     el.classList.add("dragging");
     e.dataTransfer.setData("text/plain", JSON.stringify({ id: it.id, revision: it.revision, from: it.status }));
   });
-  el.addEventListener("dragend", () => el.classList.remove("dragging"));
+  el.addEventListener("dragend", () => { el.classList.remove("dragging"); dragEnded(); });
   return el;
 }
 

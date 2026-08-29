@@ -44,7 +44,8 @@ object KanbanCausalNodes {
         val rete = CausalityRete(1 j { rule }, discount = discount)
 
         @Suppress("UNCHECKED_CAST")
-        val rawAssertions = inputs["assertions"] as? List<Map<String, Any?>> ?: emptyList()
+        // Wires deliver values under the ?-suffixed port name as authored — dual-read.
+        val rawAssertions = (inputs["assertions"] ?: inputs["assertions?"]) as? List<Map<String, Any?>> ?: emptyList()
         val assertions: Series<ReteAssertion> = rawAssertions.size j { i ->
             val a = rawAssertions[i]
             val subject = a["subject"]?.toString() ?: ""

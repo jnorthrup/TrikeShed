@@ -1,6 +1,7 @@
 package borg.trikeshed.kanban
 
 import borg.trikeshed.dag.Activation
+import borg.trikeshed.isam.synchronizedLock
 import borg.trikeshed.job.JobCommand
 import borg.trikeshed.kanban.rules.BoardRules
 import borg.trikeshed.narsese.TurnReviewElement
@@ -26,6 +27,11 @@ class BoardReviewBridge(
     private val counterMoveWindowMs: Long = 10 * 60 * 1000L,
     private val clock: () -> Long = { 0L },
 ) {
+    // Four concurrent callers reach this state (receipts collector, rete
+    // productionSink, the 60s ticker's flush, the kanban.review runner) — every
+    // pending/ruleMoves/failSinceFlush touch rides one gate. reviewTurn itself
+    // runs OUTSIDE the gate (it suspends).
+    private val gate = Any()
     private val pending = ArrayList<TurnReviewElement.TurnFact>()
 
     private class RuleMove(val ruleId: String, val col: String, val atMs: Long)
@@ -34,9 +40,9 @@ class BoardReviewBridge(
 
     private var failSinceFlush = false
 
-    val pendingCount: Int get() = pending.size
+    val pendingCount: Int get() = synchronizedLock(gate) { pending.size }
 
-    fun onCommitted(ev: BoardCommitted) {
+    fun onCommitted(ev: BoardCommitted): Unit = synchronizedLock(gate) {
         if (ev.command is JobCommand.Move) {
             val ruleTag = "#${BoardRules.DEPENDENCY_READY}#"
             if (ruleTag in ev.command.idempotencyKey) {
@@ -65,7 +71,7 @@ class BoardReviewBridge(
     }
 
     /** A board rule fired (post-refraction): the rule itself becomes evidence. */
-    fun onRuleFired(a: Activation) {
+    fun onRuleFired(a: Activation): Unit = synchronizedLock(gate) {
         pending.add(
             TurnReviewElement.TurnFact(
                 verb = a.ruleId,
@@ -88,12 +94,17 @@ class BoardReviewBridge(
      *  intake cap. [turnSucceeded] defaults to "no Fail commits since the last
      *  flush" so Nal.observe's failure dampening is reachable on the periodic
      *  flush path, not only when a caller passes false explicitly. */
-    suspend fun flush(turnSucceeded: Boolean = !failSinceFlush): List<Pair<Long, String>> {
-        failSinceFlush = false
-        if (pending.isEmpty()) return emptyList()
-        val facts = pending.toList()
-        pending.clear()
-        return review.reviewTurn(facts, turnSucceeded)
+    suspend fun flush(turnSucceeded: Boolean? = null): List<Pair<Long, String>> {
+        // Drain atomically; two concurrent flushes must never review the same facts.
+        val (facts, succeeded) = synchronizedLock(gate) {
+            val s = turnSucceeded ?: !failSinceFlush
+            failSinceFlush = false
+            if (pending.isEmpty()) return@synchronizedLock null
+            val f = pending.toList()
+            pending.clear()
+            f to s
+        } ?: return emptyList()
+        return review.reviewTurn(facts, succeeded)
     }
 }
 

@@ -870,6 +870,7 @@ object OroborosDaemon {
                 cas = casStore,
             )
             moduleContext.lcncRunners["state.thaw"] = borg.trikeshed.narsese.StateNodes.thawRunner(
+                bag = bag,
                 cas = casStore,
                 kif = kifBank,
             )
@@ -905,7 +906,7 @@ object OroborosDaemon {
                 "read.construct", "nal.mint", "nal.decay", "nal.recall", "skill.decay",
                 "nal.attend", "nal.reinforce", "nal.rule.admit", "nal.rules.fromKg",
                 "beliefs.introspect", "beliefs.resonate", "beliefs.review",
-                "state.freeze", "state.thaw", "kanban.attention", "kanban.drift",
+                "state.freeze", "state.thaw", "kanban.attention", "kanban.drift", "kanban.review",
             )
             val bagOff = borg.trikeshed.lcnc.LcncNodeRunner { _, _ ->
                 mapOf("error" to "belief bag disabled (--belief-bag)")

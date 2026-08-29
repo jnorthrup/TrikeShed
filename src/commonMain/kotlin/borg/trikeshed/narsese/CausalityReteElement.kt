@@ -83,9 +83,11 @@ class CausalityReteElement(
         if (state == ElementState.OPEN) state = ElementState.ACTIVE
     }
 
-    /** Record the term identity of a signal the caller minted with known terms. */
+    /** Record the term identity of a signal the caller minted with known terms.
+     *  Guarded: the curator feeder and HTTP teach write while the 250ms
+     *  fireLive loop reads — a bare LinkedHashMap corrupts under that. */
     fun register(angular: Long, subject: String, obj: String) {
-        this.terms[angular] = subject j obj
+        synchronizedLock(admitGate) { this.terms[angular] = subject j obj }
     }
 
     /**
@@ -118,9 +120,10 @@ class CausalityReteElement(
     fun projectLive(): Series<ReteAssertion> {
         val snapshot = bag.snapshot()
         if (snapshot.isEmpty()) return emptySeriesOf()
+        val termsSnap = synchronizedLock(admitGate) { HashMap(terms) }
         val out = ArrayList<ReteAssertion>()
         for ((_, signal) in snapshot) {
-            val term: Twin<String> = terms[signal.angular] ?: continue
+            val term: Twin<String> = termsSnap[signal.angular] ?: continue
             val (subject, obj) = term
             out.add(
                 ReteAssertion(

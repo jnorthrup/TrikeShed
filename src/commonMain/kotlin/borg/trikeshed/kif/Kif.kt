@@ -108,22 +108,32 @@ sealed class KifExpr {
 fun kif(pred: String, vararg args: KifExpr): KifExpr.ListExpr =
     KifExpr.ListExpr(listOf(KifExpr.Atom(pred)) + args)
 
-/** Light KIF knowledge base — asserts + simple forward chain for subclass/instance. */
+/** Light KIF knowledge base — asserts + simple forward chain for subclass/instance.
+ *  Thread-safe: ONE bank is shared by the curator feeder (5s loop), HTTP teach,
+ *  every kifSink lego (nal.mint/legal.ingest/read.construct), state.freeze's
+ *  toKifFile, and the evidence/SPARQL readers. Exact-duplicate assertions are
+ *  dropped (the SUMO spine re-asserts on every thaw otherwise). */
 class KifKnowledgeBase {
+    private val gate = Any()
     private val asserts: MutableList<KifExpr> = mutableListOf()
+    private val seen = HashSet<String>()
 
-    fun assert(expr: KifExpr) { asserts.add(expr) }
+    fun assert(expr: KifExpr) {
+        borg.trikeshed.isam.synchronizedLock(gate) {
+            if (seen.add(expr.toKifString())) asserts.add(expr)
+        }
+    }
     fun assertKif(kif: String) { assert(KifExpr.parse(kif)) }
-    fun asserts(): List<KifExpr> = asserts.toList()
+    fun asserts(): List<KifExpr> = borg.trikeshed.isam.synchronizedLock(gate) { asserts.toList() }
 
-    fun toKifFile(): String = asserts.joinToString("\n") { it.toKifString() }
+    fun toKifFile(): String = asserts().joinToString("\n") { it.toKifString() }
 
     /** Minimal solver: subclass/instance closure + (and ...) grounding. Light effort — not a full FOL prover. */
     fun query(pattern: KifExpr): List<Map<String, String>> {
         // pattern is a KIF list with Vars, e.g. (subclass ?X Physical)
         // brute-force unify against asserts
         val bindings = mutableListOf<Map<String, String>>()
-        for (a in asserts) {
+        for (a in asserts()) {
             unify(pattern, a)?.let { bindings.add(it) }
         }
         // also transitively chase subclass
@@ -141,7 +151,7 @@ class KifKnowledgeBase {
     }
 
     private fun subclassClosure(): Set<Pair<String, String>> {
-        val edges = asserts.mapNotNull { e ->
+        val edges = asserts().mapNotNull { e ->
             (e as? KifExpr.ListExpr)?.let {
                 if (it.elements.size == 3 && (it.elements[0] as? KifExpr.Atom)?.token == "subclass") {
                     val a = (it.elements[1] as? KifExpr.Atom)?.token ?: return@mapNotNull null
