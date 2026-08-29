@@ -1317,16 +1317,19 @@
       .catch((err) => hostLogLine('! ' + err.message));
   });
 
-  const VIEWS = { doc: [docScrollEl, viewDocBtn], board: [boardScrollEl, viewBoardBtn], graph: [graphScrollEl, viewGraphBtn], sheet: [sheetScrollEl, viewSheetBtn], shape: [shapeScrollEl, viewShapeBtn], host: [hostScrollEl, viewHostBtn] };
+  const VIEWS = { doc: [docScrollEl, viewDocBtn, document.getElementById('btn-home')], board: [boardScrollEl, viewBoardBtn, document.getElementById('btn-board')], graph: [graphScrollEl, viewGraphBtn, document.getElementById('btn-graph')], sheet: [sheetScrollEl, viewSheetBtn, document.getElementById('btn-sheet')], shape: [shapeScrollEl, viewShapeBtn], host: [hostScrollEl, viewHostBtn, document.getElementById('btn-host')] };
   function setView(view) {
     mutate((s) => { s.view = view; }, 'view');
-    for (const [k, [el, btn]] of Object.entries(VIEWS)) {
+    for (const [k, [el, btn, sidebarBtn]] of Object.entries(VIEWS)) {
       el.hidden = k !== view;
       btn.classList.toggle('active', k === view);
+      if (sidebarBtn) sidebarBtn.classList.toggle('active', k === view);
       if (k === view) {
         btn.setAttribute('aria-current', 'page');
+        if (sidebarBtn) sidebarBtn.setAttribute('aria-current', 'page');
       } else {
         btn.removeAttribute('aria-current');
+        if (sidebarBtn) sidebarBtn.removeAttribute('aria-current');
       }
     }
     if (view === 'board') { renderBoard(); hydrateBoard(); }
