@@ -9,7 +9,8 @@ import borg.trikeshed.narsese.RelationKind
  * an attention score from one resonance sweep over the bag's vector plane
  * (support front minus refutation front); a card whose refutation front is a
  * substantial fraction of its support front is CONTESTED. Board-cohort drift
- * is the Hotelling T² of the "kanban"-taxonomy beliefs against the whole bag.
+ * is the Hotelling T² of the review-taxonomy beliefs (what [BoardReviewBridge]
+ * actually mints through TurnReviewElement) against the whole bag.
  *
  * Strictly garnish: with the bag OFF the board JSON is byte-identical minus
  * the attention/contested fields (the Phase-5 gate).
@@ -18,9 +19,12 @@ object BoardAttentionOrder {
 
     data class Garnish(val score: Float, val contested: Boolean)
 
+    // taxonomyKey "review" — NOT "kanban": the board path mints through
+    // TurnReviewElement.reviewTurn, whose observations land under "review"
+    // with (contextTerm → col.wire); this centroid must be that exact word.
     fun angularOf(row: CardRow): Long = AngularCodec.encode(
         relation = RelationKind.CAUSALITY,
-        taxonomyKey = "kanban",
+        taxonomyKey = "review",
         subjectTerm = termOf(row),
         objectTerm = row.col.wire,
     )
@@ -60,11 +64,15 @@ object BoardAttentionOrder {
         return out
     }
 
-    /** Board-cohort drift: T² of kanban-taxonomy beliefs vs the bag's whole field. */
+    /** Board-cohort drift: T² of the review-taxonomy beliefs vs the bag's whole
+     *  field — cohort = what the bridge mints: observations under "review",
+     *  pairwise inductions under "review/induced". */
     suspend fun driftT2(bag: BeliefBagElement): Float {
-        val sig = AngularCodec.taxonomySigOfKey("kanban")
+        val observed = AngularCodec.taxonomySigOfKey("review")
+        val induced = AngularCodec.taxonomySigOfKey("review/induced")
         return bag.field().hotelling { a ->
-            AngularCodec.Fields.extract(a, AngularCodec.Fields.TAXONOMY_MASK, AngularCodec.Fields.TAXONOMY_SHIFT) == sig
+            val sig = AngularCodec.Fields.taxonomySigOf(a)
+            sig == observed || sig == induced
         }
     }
 }

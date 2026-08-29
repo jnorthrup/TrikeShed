@@ -5,6 +5,13 @@ It combines a PWA dashboard (`/graal`), a Couch-CRUD companion (`/futon`), and
 a set of JSON/streaming API routes for JVM vitals, terrain mapping, CAS linking,
 AOT metadata, and the flourish event feed.
 
+Architecturally, this is the current Graal RTS facet of the unified grand
+blackboard—not a separate intended product or coordinate system. The target is
+for its terrain, density, pointcuts, heap, CAS zoom, and camera behavior to be
+dimensionally coherent with the actual CCEK process city, LCNC facets, Kanban,
+channels, agents, guests, and receipts. See the
+[grand-blackboard north star](../doc/rewire.md#north-star--the-ccek-city-and-the-unified-grand-blackboard).
+
 > **Status:** verified-live — the console page, vitals, map, pointcuts, density,
 > capsule, occupy, SSE feed, and AOT routes are exercised on standard daemon boots.
 

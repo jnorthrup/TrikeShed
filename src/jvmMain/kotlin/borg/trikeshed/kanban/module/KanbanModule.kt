@@ -78,6 +78,27 @@ class KanbanModule : ForgeModule {
                 clock = ctx.clock,
             )
         } else null
+        // ONE flush seam: every drain of the review window (threshold, periodic
+        // tick, kanban.review node) lands its minted (angular, gloss) pairs as
+        // blackboard receipts instead of dropping them. turnSucceeded defaults
+        // inside the bridge to "no Fail commits since the last flush".
+        suspend fun flushReview(): List<Pair<Long, String>> {
+            val minted = bridge?.flush() ?: return emptyList()
+            for ((angular, gloss) in minted) {
+                ctx.blackboard.put("kanban/review/$angular", mapOf("gloss" to gloss), "kanban-nars")
+            }
+            return minted
+        }
+        // kanban.review = the TurnReview glosses, bag-gated beside kanban.attention.
+        if (bridge != null) {
+            ctx.lcncRunners["kanban.review"] = LcncNodeRunner { _, _ ->
+                val minted = flushReview()
+                mapOf(
+                    "minted" to minted.map { (angular, gloss) -> mapOf("angular" to angular, "gloss" to gloss) },
+                    "count" to minted.size,
+                )
+            }
+        }
 
         // Board JSON memo keyed by the commit watermark: rebuild only after a commit.
         // (Bag-on skips the memo: attention scores evolve independently of the board.)

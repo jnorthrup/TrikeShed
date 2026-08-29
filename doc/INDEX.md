@@ -2,6 +2,13 @@
 
 Source: `doc/archives/archive-2026-07-22.md` (13,066 lines, 762KB) — consolidated below.
 
+> **Current-status note (2026-08-29):** this is a July historical index, not a
+> live task snapshot. `doc/todo.md` now contains five unchecked tasks, while
+> `kanban-evolution.yaml` still names older task ids and flat-file sources.
+> Current board ownership, MCP status, and the proposed marketability backlog
+> are reconciled in
+> [`docs/marketability-kanban-mcp-audit.md`](../docs/marketability-kanban-mcp-audit.md).
+
 ---
 
 ## 1. Core Architecture Docs (LIVING)
@@ -52,11 +59,11 @@ Source: `doc/archives/archive-2026-07-22.md` (13,066 lines, 762KB) — consolida
 
 | List | Location | Status |
 |------|----------|--------|
-| **Active todo** | `doc/todo.md` | 39 landable TDD tasks (80% project / 20% kanban-evolution) |
+| **Active todo** | `doc/todo.md` | Live intake; 5 unchecked tasks on 2026-08-29 |
 | **Accomplishment pins** | `doc/dont-redo` | 39 checked items — verified closures, merged branches, decisions |
-| **Kanban evolution config** | `kanban-evolution.yaml` | 80/20 split, MAX_LIVE=15 → 12 project : 3 pin slots |
+| **Kanban evolution config** | `kanban-evolution.yaml` | Historical 80/20 intent; task ids and flat-file sources are stale against current intake |
 
-### Task Categories (from `doc/todo.md`)
+### Historical July task categories (no longer the contents of `doc/todo.md`)
 
 **GATE-CONFIX-CBOR** (6) — CBOR encoder/decoder test vectors, round-trip, classpath boundary
 **GATE-NGSCTP** (5) — TLV parser, bounded channel, association scope, partial reliability, liburing facade
@@ -68,7 +75,7 @@ Source: `doc/archives/archive-2026-07-22.md` (13,066 lines, 762KB) — consolida
 
 ---
 
-## 6. Flywheel Operational State
+## 6. Historical Flywheel Operational State (2026-07-22 snapshot)
 
 | Metric | Value |
 |--------|-------|
@@ -86,7 +93,7 @@ Source: `doc/archives/archive-2026-07-22.md` (13,066 lines, 762KB) — consolida
 - **Start here (new maintainer):** `../README.md` §0 Quick Orientation → §1 Kernel Algebra → `PRELOAD.md`
 - **Architecture decisions:** `rewire.md` §0 Storage Unification → §9 Immediate Cuts
 - **Performance gaps:** `taste.md` Cut list (T1–T3 core promise, T4–T6 storage/cursor, T7–T10 refinement)
-- **Current work pool:** `doc/todo.md` (39 unchecked items)
+- **Current work pool:** `doc/todo.md` (5 unchecked items on 2026-08-29)
 - **What's done (don't redo):** `doc/dont-redo` (39 checked items)
 - **Flywheel ratios:** `kanban-evolution.yaml`
 - **Full history:** `doc/archives/archive-2026-07-22.md`

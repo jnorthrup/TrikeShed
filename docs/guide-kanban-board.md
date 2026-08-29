@@ -4,7 +4,15 @@
 
 ## Overview
 
-The kanban board is a WAL-backed card store exposed as a set of HTTP routes by the Kanban module. It is the primary surface for tracking jobs through column transitions, running LCNC programs, and importing plan documents.
+Kanban is an LCNC asset. `LcncKanbanExperience` supplies the live operational
+sheets and `kanban.submit`/`kanban.move` runners used by LCNC programs and
+panels. `KanbanModule` mounts that experience in Oroboros, while the WAL-backed
+`BoardStoreElement` supplies one durable state and command-ordering boundary.
+The HTTP routes below are projections and ingress for that same LCNC asset.
+Within the ultimate design, Kanban is the realtime work facet of the unified
+grand blackboard: cards and moves remain causally connected to the CCEK
+elements, channels, programs, agents, and receipts that produce them, and share
+the same semantic-zoom dimensions as the Graal RTS terrain.
 
 The WAL lives at `.kanban` in the forge home directory. Board JSON is memoized by commit watermark — repeated reads return the same payload until a write advances the sequence.
 
@@ -20,9 +28,13 @@ Returns the live board as JSON. Response fields:
 
 - `title` — board title (default: `"Oroboros board"`).
 - `items` — array of card objects, each containing:
-  - `id`, `title`, `column`, `owner`
+  - `id`, `title`, `status`, `priority`, `order`, `revision`, `lastMoveMs`, `owner`
   - `attention` (optional — only when belief bag is wired)
   - `contested` (optional — only when belief bag is wired)
+
+The store also persists dependencies and tags, but the current `/api/board`
+projection does not return them. See the marketability/MCP audit below for why
+that prevents lossless audit-task exchange.
 
 Board JSON is memoized keyed by the current commit watermark (`lastSequence`). The memo is invalidated on every write that advances the sequence. When a belief bag is present, `BoardAttentionOrder.garnish()` computes attention scores and contested flags from the bag's resonance sweep; these fields are absent when `bag == null`.
 
@@ -187,6 +199,23 @@ Before the reducer runs, the board enforces:
 
 ---
 
+## MCP Status
+
+> **Status:** absent for Kanban
+
+There is no mounted MCP projection of the LCNC Kanban asset. The existing
+`McpServerHandler` is a read-only citation-search handler over `MemoryStore` and
+has no production caller or `/mcp` route. MCP should expose the existing LCNC
+active sheets and delegate tool calls to its `kanban.submit` and `kanban.move`
+runners. It must not bypass LCNC with a second board API, create another FSM,
+or mutate the deprecated `ForgeBoardFSM`.
+
+See [Oroboros marketability and MCP Kanban audit](marketability-kanban-mcp-audit.md)
+for the reconciled ownership model, proposed task envelope, and minimum MCP
+resource/tool contract.
+
+---
+
 ## Belief Bag Fields (Optional)
 
 > **Status:** stub
@@ -280,3 +309,4 @@ Returns HTTP 202 with `{"accepted": true}` on success, or HTTP 409 if the revisi
 ## See Also
 
 - The `/api/submit` endpoint is documented canonically in the corpus guide — see that file for the full submit surface. This guide links to it; it does not duplicate it.
+- [Oroboros marketability and MCP Kanban audit](marketability-kanban-mcp-audit.md) — current LCNC Kanban packaging gaps and inert proposed backlog.

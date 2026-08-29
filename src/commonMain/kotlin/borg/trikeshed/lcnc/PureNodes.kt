@@ -8,7 +8,11 @@ package borg.trikeshed.lcnc
  *
  * Semantics under a headless run:
  *  - `timer` emits ONE tick per run — a server run is one pulse, no interval.
- *  - data nodes (`pick`, `list.groupBy`) compute exactly as the canvas does.
+ *  - data nodes (`pick`, `list.groupBy`, `list.format`) compute exactly as
+ *    the canvas does. `list.format` is the declarative reshaper — the
+ *    eval-free lane from map-shaped outputs (kanban.attention `cards`/
+ *    `ordered`) to the `lines` port `read.construct`/`nal.mint` take, where
+ *    the only alternative is the canvas-only `js` node.
  *  - display nodes (`dom.board`, `sheet.concentric`) echo their projection on
  *    a `rendered` port and emit NO gesture outputs, so gesture-shaping
  *    downstream (`js` → `kanban.move`) skips silently per walker readiness.
@@ -16,6 +20,8 @@ package borg.trikeshed.lcnc
  *    nothing to shape must stay loud if ever fed, not eval strings in-daemon.
  */
 object PureNodes {
+    private val FIELD = Regex("""\{([^{}]+)\}""")
+
     fun registry(clock: () -> Long): Map<String, LcncNodeRunner> = mapOf(
         "timer" to LcncNodeRunner { _, _ -> mapOf("tick" to clock()) },
         "pick" to LcncNodeRunner { node, inputs ->
@@ -38,6 +44,20 @@ object PureNodes {
                 groups.getOrPut(k) { mutableListOf() }.add(item)
             }
             mapOf("groups" to groups)
+        },
+        "list.format" to LcncNodeRunner { node, inputs ->
+            val template = node.params["template"] ?: ""
+            val limit = node.params["limit"]?.toIntOrNull()
+            val xs = inputs["x"] as? List<*> ?: listOfNotNull(inputs["x"])
+            val bounded = if (limit != null) xs.take(limit.coerceAtLeast(0)) else xs
+            val lines = bounded.map { item ->
+                when {
+                    item !is Map<*, *> -> item?.toString() ?: ""
+                    template.isEmpty() -> item.toString()
+                    else -> FIELD.replace(template) { m -> item[m.groupValues[1]]?.toString() ?: "" }
+                }
+            }
+            mapOf("lines" to lines)
         },
         "dom.board" to LcncNodeRunner { _, inputs -> mapOf("rendered" to inputs["groups"]) },
         "sheet.concentric" to LcncNodeRunner { _, inputs -> mapOf("rendered" to inputs["board"]) },

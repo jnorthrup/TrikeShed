@@ -32,6 +32,8 @@ class BoardReviewBridge(
 
     private val ruleMoves = HashMap<String, RuleMove>()
 
+    private var failSinceFlush = false
+
     val pendingCount: Int get() = pending.size
 
     fun onCommitted(ev: BoardCommitted) {
@@ -51,6 +53,7 @@ class BoardReviewBridge(
             is JobCommand.Fail, is JobCommand.Cancel, is JobCommand.Retract -> false
             else -> true
         }
+        if (ev.command is JobCommand.Fail) failSinceFlush = true
         pending.add(
             TurnReviewElement.TurnFact(
                 verb = ev.command.operationName,
@@ -81,8 +84,12 @@ class BoardReviewBridge(
         return ev.jobId
     }
 
-    /** Drain the window through the pure induction pass. Bounded by the review's intake cap. */
-    suspend fun flush(turnSucceeded: Boolean = true): List<Pair<Long, String>> {
+    /** Drain the window through the pure induction pass. Bounded by the review's
+     *  intake cap. [turnSucceeded] defaults to "no Fail commits since the last
+     *  flush" so Nal.observe's failure dampening is reachable on the periodic
+     *  flush path, not only when a caller passes false explicitly. */
+    suspend fun flush(turnSucceeded: Boolean = !failSinceFlush): List<Pair<Long, String>> {
+        failSinceFlush = false
         if (pending.isEmpty()) return emptyList()
         val facts = pending.toList()
         pending.clear()

@@ -11,6 +11,157 @@
 
 ---
 
+## North star — the CCEK city and the unified grand blackboard
+
+This section is newly explicit, not a new intention. The unified grand
+blackboard has been the project's direction since its 1990s lineage; the
+current CCEK, LCNC, Confix, Graal, and camera vocabulary finally makes the
+runtime contract precise enough to state directly.
+
+The ultimate design is not a collection of dashboards. The **actual CCEK
+reactor is the city**: contexts, elements, keys, channels, fanout, lifecycle,
+backpressure, capabilities, jobs, guests, storage, pointcuts, and causal
+traffic are the real process topology. LCNC is the compositional grammar and
+view layer over that city. The grand blackboard is the inclusive fact and
+projection plane through which the whole runtime becomes inspectable.
+
+Oroboros is the city's **absorber, delta ledger, and replicator**. It is not a
+web shell that happens to watch a directory. Its comprehensive role is to
+observe file and runtime change planes, content-address the changed material,
+land ordered Couch/CAS citizens and receipts, drive downstream facts/views,
+and make the resulting state replicable to another Oroboros.
+
+```text
+actual runtime truth
+  CCEK Context -> Element -> Key
+       + channels / fanout / queues / lifecycle / pressure
+       + jobs / agents / LCNC programs / VMs / storage / pointcuts
+                         |
+                         v
+  typed realtime facts + causal coordinates + stable identities
+                         |
+                         v
+              UNIFIED GRAND BLACKBOARD
+                         |
+                         v
+       LCNC facets, sheets, reducers, and compositions
+                         |
+                         v
+  one zoomable fractal camera and dimension system
+       |- city / whole-runtime flow
+       |- districts / rings / workgroups / subsystems
+       |- elements / programs / boards / guests / stores
+       |- channels / causal edges / queue pressure
+       `- messages / receipts / pointcuts / bytes
+```
+
+### Oroboros absorption and replication invariant
+
+```text
+worktree/source/doc delta --+
+.git identity/history delta -+
+class/resource/jar delta -----+--> CAS content identity
+agent/environment delta ------+         + Couch revision/sequence
+CCEK/runtime event -----------+         + causal/blackboard fact
+                                         + _changes frame
+                                         `--> peer replica
+```
+
+**Every material delta becomes a named, content-addressed, causally located,
+replicable citizen.** Reinstallable bulk or sensitive payloads may have an
+explicit retention/redaction policy, but a filter is policy—not permission to
+create an invisible second runtime. At minimum, the citizen and the fact that
+its delta occurred remain representable in the grand-blackboard ontology.
+
+Current code already establishes the major planes:
+
+- a worktree watcher and reconcile path absorb source and document changes;
+- a separate `.git/**` watcher/gateway preserves repository identity and
+  history without confusing it with worktree content;
+- narrow build-plane watchers re-absorb `build/live/classes` and
+  `build/staging/lib`, while processed resources and the hotswap agent ride the
+  bootable classpath manifest;
+- initial agent-home reconciliation carries selected colocated history;
+- Couch `_changes`, `_bulk_docs`, `_revs_diff`, `_local`, CAS bulk transfer,
+  and `_replicate` make absorbed citizens portable between nodes;
+- committed Couch frames already feed report events and Rete facts.
+
+Comprehensive is the architectural invariant, not a claim that every plane is
+finished today. External homes that are only reconciled once, ephemeral VM and
+in-memory CCEK events, filtered runtime churn, and interrupted replication are
+the remaining edges to make continuously observable and recoverable. A file
+watcher alone cannot see an in-memory channel; CCEK fortification supplies
+those runtime deltas to the same absorption/replication contract.
+
+### Non-negotiable invariants
+
+1. **Reactor truth precedes visualization.** The UI never invents a process
+   topology. It projects the running CCEK elements and their real channels.
+2. **LCNC remains the view/composition language.** Kanban, operational sheets,
+   procedures, panels, and future facets are LCNC assets over reactor truth,
+   not detached applications.
+3. **One grand blackboard, no architectural exclusions.** If the runtime can
+   name an element, channel, capability, job, guest, document, pointcut, or
+   receipt, the blackboard can represent it. An unknown type degrades to a
+   generic typed node; it never disappears because a bespoke renderer is
+   absent.
+4. **One dimension system.** Identity, containment, causality, time, flow,
+   pressure, and scale have stable coordinates shared by every view.
+5. **Graal RTS is a coherent facet, not another world.** Its terrain, density,
+   zoom, pointcuts, heap, and CAS topology occupy the same coordinate and
+   camera grammar as CCEK process flow, LCNC, Kanban, agents, and storage.
+6. **Semantic zoom is fractal.** Zoom changes the projection aperture, not the
+   truth: city -> district -> element -> channel -> event -> byte. Each level
+   retains causal and containment links to the levels above and below.
+7. **Realtime means committed deltas.** Views advance from ordered reactor,
+   blackboard, WAL, and `_changes` facts. Polling snapshots may recover or
+   hydrate, but they are not a parallel source of truth.
+8. **Access control is a lens, not a fork.** Capabilities may redact payloads or
+   actions for a viewer; they do not create a second ontology or state model.
+
+### Dimensional coherence
+
+Every projected citizen needs the same minimum coordinates:
+
+| Dimension | Meaning |
+|---|---|
+| identity | Stable CCEK key, NUID, CID, job id, route id, or derived causal key |
+| containment | Coroutine context, ring, workgroup, LCNC scope, VM, store, or project parent |
+| causality | Producer/consumer, dependency, dispatch, commit, pointcut, and receipt edges |
+| time | Monotonic sequence plus event/lifecycle time |
+| flow | Channel direction, protocol, message class, and throughput |
+| pressure | Capacity, depth, suspension, WIP, lease, stall, and failure state |
+| scale | Fractal aperture at which the citizen aggregates or becomes individually visible |
+| facet | LCNC/Confix projection vocabulary available for inspecting or operating it |
+
+This is how the Graal RTS terrain and the process-flow city remain
+dimensionally coherent: they share coordinates and camera behavior even when
+their visual glyphs differ.
+
+### CCEK fortification sequence
+
+This is an architectural backlog, not live `doc/todo.md` intake:
+
+| Id | Design cut | Proof obligation |
+|---|---|---|
+| GBB-000 | Make the Oroboros absorber census explicit across worktree, git, build/runtime, agent-home, and in-memory CCEK planes | Every configured plane reports coverage, exclusions/retention policy, last absorbed sequence, and replica watermark; an unclassified delta is a visible error |
+| GBB-001 | Census every live CCEK element, key, lifecycle, and parent context with stable identity | Runtime census and blackboard census have matching identities |
+| GBB-002 | Project channel/fanout topology and pressure as typed facts | Every bounded channel exposes producer, consumer, capacity, depth/suspension state, and causal sequence without changing channel ownership |
+| GBB-003 | Unify lifecycle, dispatch, commit, failure, and drain events behind one causal coordinate contract | One event can be followed from ingress through elements/channels to receipt and durable frame |
+| GBB-004 | Land the reactor census and deltas on the common blackboard contract | No subsystem-specific blackboard is required to see a live CCEK citizen |
+| GBB-005 | Define LCNC facets over the common reactor/blackboard rows | LCNC can group, filter, compose, and operate the city without reconstructing state in a UI |
+| GBB-006 | Provide realtime ordered delta and recovery projections | A late viewer hydrates once, follows committed deltas, and reaches the same watermark as the daemon |
+| GBB-007 | Share semantic-zoom coordinates and camera contracts with Graal RTS | The same identity selected in terrain, process, Kanban, sheet, or pointcut view resolves to one citizen and causal neighborhood |
+| GBB-008 | Make every specialized surface a facet of the grand blackboard | Kanban, Graal, agents, VMs, storage, documents, Rete, and routes pass a no-orphan projection census |
+| GBB-009 | Prove no parallel mutable visual truth | UI state contains camera/selection only; operational state rehydrates entirely from reactor/blackboard facts |
+
+The order matters: fortify and observe the real CCEK reactor first, project it
+into the grand blackboard second, compose LCNC facets third, and render the
+realtime fractal city last. The camera is allowed to be ambitious because it
+never carries operational truth.
+
+---
+
 ## 0. Storage Unification — One CID, Five Lenses
 
 The foundational rule: **the bytes are the thing; the views are lenses,
@@ -431,9 +582,10 @@ The CAS is the common ground.
   Confix document. The "queries" are cursor projections. The "indexes"
   are MultiIndexK facets. There is no SQL, no ORM, no migration.
 
-- **Not a chat UI with a kanban skin.** The kanban is a projection over
-  committed job state. The agents are job executors. The board is the
-  ledger, not the interface.
+- **Not a chat UI with a kanban skin.** Kanban is the LCNC work asset and
+  realtime facet over committed job state. Agents are job executors; cards,
+  sheets, gestures, and receipts remain ledger-grounded without reducing the
+  board to storage or creating parallel visual truth.
 
 - **Not a cloud service with a local cache.** The workspace is local-first.
   The mesh is additive. The cloud is a deployment target for the static
@@ -493,4 +645,3 @@ database. The Rete engine is the inference layer. The force-directed
 graph is the UI. The VFS is btrfs-on-JBOD with COW snapshots. The VCS
 gateway is pijul<->git over CAS/IPFS/IPNS. Every claim maps to code
 that exists or is one focused cut away.*
-

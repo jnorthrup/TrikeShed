@@ -95,7 +95,7 @@ TrikeShed/
 **No libs/ subprojects** — everything lives in `src/`.
 **Confix** — the only portable serializer; `kotlinx-serialization-json` is not a `commonMain` dependency (jvmMain pulls it for the one target that needs the kotlinx JSON frontend). `commonMain` source allows only `kotlinx-serialization-core` annotations (`@Serializable`/`@Contextual`) via the `kotlin("plugin.serialization")` plugin; the json runtime never crosses into portable code.
 **License** — AGPLv3 (effective 2017). Do not change.
-**Task ledger** — `doc/todo.md` (LCNC T22–T29, Kanban-live T-KANBAN-*, Storage-unification T-CAS-PROJ-* queues).
+**Task ledger** — `doc/todo.md` is live flywheel intake; dated task lists elsewhere are historical unless explicitly refreshed. The current marketability/MCP board audit is `docs/marketability-kanban-mcp-audit.md` and is inert until explicitly dispatched.
 **Architecture docs** — `doc/rewire.md` (user-centric Forge workspace architecture, storage unification, K8s emulation via GraalVM pointcut server), `doc/taste.md` (high-performance hierarchical-UI engine principles, 10-point gap review).
 **Compiled-out layers** — `classfile/slab/**` is excluded from `commonMain` compile in `build.gradle.kts` (~20 `TODO()` stubs: GraalJS eval, DuckDB c-interop, `FacetedCursorContract`, `MiniDuckContract`; files preserved on disk). `CircularQueue.poll/peek/iterator.remove` converted from `TODO()` to `error(...)` — loud hollow, not silent stub.
 **Static assets** — `src/commonMain/resources/web/` (index.html, styles.css, script.js, manifest.webmanifest, icons/) is the single source of truth for the Forge HTML shell; the `generateForgeAssets` Gradle task bakes these into the Kotlin-internal `ForgeAssets` object so no runtime resource lookup is needed.
@@ -140,12 +140,25 @@ Key operators (in `lib/Join.kt`, `lib/Series.kt`):
 
 ## 2. Architecture Spine (runtime layers)
 
+**Ultimate design:** the running CCEK reactor is the process city; LCNC is its
+composition and facet grammar; one inclusive grand blackboard projects every
+element, channel, flow, job, guest, store, pointcut, and receipt into a shared
+causal dimension system. Kanban and the Graal RTS terrain are coherent views
+through one zoomable fractal camera, never separate operational truths.
+Oroboros is the absorber and replicator underneath it: worktree, git,
+class/resource, agent/environment, and runtime deltas become CAS/Couch citizens,
+ordered change facts, and peer-replicable state. See
+`doc/rewire.md` § “North star — the CCEK city and the unified grand blackboard.”
+
 ```
 ┌──────────────────────────────────────────────────────────────────────┐
 │  FORGE / KANBAN / BLACKBOARD   (user-facing surfaces)               │
 │  - Forge Workspace: light-theme block editor (sidebar + doc + board)│
 │  - ForgeDoc block tree (H1/H2/H3, P, TODO, BULLET, QUOTE, CODE)     │
-│  - ForgeBoardFSM, KanbanFSM, slash-command menu, localStorage PWA   │
+│  - LCNC Kanban experience = user asset, runners, operational sheets│
+│  - BoardStoreElement = its one durable card-state owner            │
+│  - KanbanModule = Oroboros composition and route mount             │
+│  - ForgeBoardFSM legacy UI; KanbanFSM reactor telemetry only       │
 │  - CCEK choreography (channels, projections, agents)                │
 │  - Gallery / blackboard 2.5D/3D spatial layout                      │
 │  - BlackboardSurface projection: `confixDoc(persistedJson)` → `BlackboardSurface.project(...)` → seed rows; the `ForgeAppState` DTO family was removed (commit `1e8fd692`) │

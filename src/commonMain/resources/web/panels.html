@@ -580,9 +580,11 @@ finally:
   },
 };
 /* ── server-family runners: ONE author of execution semantics. The daemon runs
-   the node (LcncKanbanExperience / LcncSheetNodes via POST /api/lcnc/run against
-   the composed lcncRunners registry — the same map webhook dispatch resolves);
-   the browser posts params+inputs and renders the outputs. */
+   the node (POST /api/lcnc/run against the composed lcncRunners registry — the
+   same map webhook dispatch resolves); the browser posts params+inputs and
+   renders the outputs. Installed by syncContracts() for EVERY hydrated
+   contract type without an explicit browser runner above, so a registered
+   daemon lego is never inert on the canvas. */
 function serverRun(type){
   return { async run(n,i){
     const r=await api("POST","/api/lcnc/run",{type:type,params:n.params||{},inputs:i});
@@ -590,8 +592,6 @@ function serverRun(type){
     return r.outputs||{};
   }};
 }
-for(const t of ["kanban.activeSheets","kanban.submit","kanban.move","confix.sheets","confix.pickPath",
-                "sheet.flatten","sheet.filter","sheet.count","sheet.columns","sheet.cell"]) RUNNERS[t]=serverRun(t);
 
 /* ── graph state ───────────────────────────────────────────────────────── */
 let G={nodes:[],wires:[],seq:1};              // wires: {from:[nodeId,port], to:[nodeId,port]}
@@ -2154,6 +2154,9 @@ async function syncContracts(){
       m[c.type]=c;
     }
     CONTRACTS=m;
+    // Fallback parity: every hydrated type with no explicit browser runner
+    // dispatches to the daemon — explicit RUNNERS entries keep winning.
+    for(const t in m) if(!RUNNERS[t]) RUNNERS[t]=serverRun(t);
     $("#status").textContent=Object.keys(m).length+" contracts hydrated";
   }catch(e){
     $("#status").textContent="contracts fetch failed: "+e;

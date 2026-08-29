@@ -4,6 +4,7 @@ import borg.trikeshed.context.AsyncContextElement
 import borg.trikeshed.context.AsyncContextKey
 import borg.trikeshed.context.ElementState
 import borg.trikeshed.cursor.BudgetCoord
+import borg.trikeshed.isam.synchronizedLock
 import borg.trikeshed.job.ContentId
 import borg.trikeshed.lib.Join
 import borg.trikeshed.lib.Series
@@ -14,6 +15,7 @@ import borg.trikeshed.lib.get
 import borg.trikeshed.lib.j
 import borg.trikeshed.lib.size
 import borg.trikeshed.lib.toSeries
+import kotlin.concurrent.Volatile
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.SharedFlow
@@ -57,7 +59,12 @@ class CausalityReteElement(
 
     override val key: CoroutineContext.Key<*> get() = Key
 
-    private val rete: CausalityRete = CausalityRete(rules, discount, minSupport)
+    // The inner CausalityRete freezes its alpha network at construction, so
+    // ADMISSION is a whole-rete swap: one volatile write of an immutable,
+    // fully-built rete. fireLive stays lock-free — it works against whichever
+    // rete its single read observed.
+    @Volatile private var rete: CausalityRete = CausalityRete(rules, discount, minSupport)
+    private val admitGate = Any()
     private val evaluator = ContentId.of("causality-rete".encodeToByteArray())
     private val _firings = MutableSharedFlow<ReteFiring>(replay = 0, extraBufferCapacity = 1024)
     /** Every non-duplicate firing, for Curator/Forge explanation. */
@@ -79,6 +86,29 @@ class CausalityReteElement(
     /** Record the term identity of a signal the caller minted with known terms. */
     fun register(angular: Long, subject: String, obj: String) {
         this.terms[angular] = subject j obj
+    }
+
+    /**
+     * Admit [newRules] into the LIVE rete. Rebuilds the inner [CausalityRete]
+     * over the union of the already-admitted rules and [newRules] (deduplicated
+     * by ruleCid; temporal copulas refused by [CausalityRete.admit], never
+     * silently reinterpreted) and swaps it in with one volatile write — a
+     * concurrent [fireLive] finishes against the immutable rete it already
+     * read; the next tick fires the new law. Returns how many rules the swap
+     * actually added (an exact duplicate of an admitted rule counts zero).
+     */
+    fun admit(newRules: Series<EternalRule>): Int = synchronizedLock(admitGate) {
+        val current = rete
+        val union = LinkedHashMap<ContentId, EternalRule>()
+        val existing = current.rules
+        for (i in 0 until existing.size) existing[i].let { union[it.ruleCid] = it }
+        val before = union.size
+        for (i in 0 until newRules.size) newRules[i].let { if (it.isEternal) union[it.ruleCid] = it }
+        if (union.size == before) return@synchronizedLock 0
+        val merged = union.values.toList()
+        val (rebuilt, _) = CausalityRete.admit(merged.size j { merged[it] }, current.discount, current.minSupport)
+        rete = rebuilt
+        union.size - before
     }
 
     /**

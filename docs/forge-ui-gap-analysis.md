@@ -1,3 +1,12 @@
+# Forge UI gap analysis
+
+> **Historical survey:** ownership and route findings on this page predate the
+> WAL-backed `BoardStoreElement` and default `KanbanModule`. Use the
+> [Kanban Board Guide](guide-kanban-board.md) for the live HTTP surface and the
+> [Marketability + MCP Kanban Audit](marketability-kanban-mcp-audit.md) for
+> reconciled board/MCP status. The ranked items below remain provenance, not a
+> current execution queue.
+
 Goal: Realize a unified, integrated Forge UI with live data binding, widget rendering, and coherent cross-platform organization.
 
 Root gap: Forge has rich data models (30+ gallery widgets, blackboard camera, kanban signals, view proofs) and platform window managers (8 targets), but no unified rendering pipeline connecting them. Two duplicate ForgeWindowManager interfaces exist. The widget catalog defines previewTokens that nothing renders. The blackboard has 3D camera/force layout data but no canvas drawing. The shell generates HTML but has no live data binding to kanban state.
