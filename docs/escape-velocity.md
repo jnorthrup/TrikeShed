@@ -25,7 +25,7 @@ The content-addressed store is the pivot — every identity column indexes the s
 |------|------|
 | `job/CasStore.kt` | CAS store interface |
 | `cas/VolumeCasStore.kt` | LBA volume CAS |
-| `cas/MmapCasStoreJvm.kt` | Memory-mapped CAS (JVM) |
+| `jvmMain cas/MmapCasStoreJvm.kt` | Memory-mapped CAS (JVM) |
 | `cas/LineCas.kt` | Line-level CAS: `contentCid`, `linkedKey`, `spineCid` |
 | `cas/TreeCas.kt` | Fanout-k Merkle tree over line CAS |
 | `cas/CasManifest.kt` | CAS manifest (IPNS → manifest CID) |
@@ -52,9 +52,9 @@ The `PijulCrdt` is live — it applies patches and produces spine CIDs. However,
 | Path | Role |
 |------|------|
 | `util/oroboros/GitCouchGateway.kt` | Mirrors `.git/**` as opaque bytes into Couch |
-| `util/oroboros/GitReconcileElement.kt` | Reconcile step — **inert** |
+| `util/oroboros/element/GitReconcileElement.kt` | Reconcile step — **inert** |
 | `util/oroboros/VersionGateway.kt` | Pijul-flavored init/record |
-| `util/oroboros/WorktreeReconcileElement.kt` | Worktree reconcile — **inert** |
+| `util/oroboros/element/WorktreeReconcileElement.kt` | Worktree reconcile — **inert** |
 
 The absorber exists (`GitCouchGateway`, `WorktreeCouchGateway`) but `GitReconcileElement` and `WorktreeReconcileElement` carry the header:
 
@@ -72,7 +72,7 @@ Rejected malformed Pijul materialization; intentionally inert pending a complete
 | `cas/IpfsAdapter.kt` | Live IPFS via Kubo HTTP API — **inert** |
 | `htx/client/ipfs/CidAndStore.kt` | CID + BlockStore |
 | `couch/CouchWireRouter.kt` | `/api/v0/block/*` → `_cas/*` aliases (commonMain) |
-| `openapi/couch-oroboros.openapi.yaml` | OpenAPI spec |
+| `src/commonMain resources/openapi/couch-oroboros.openapi.yaml` | OpenAPI spec |
 
 `IpfsAdapter.kt` line 1:
 ```
