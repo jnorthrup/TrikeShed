@@ -121,15 +121,19 @@ class TrikeShedGraalVfs(
         if (!exists && !create) throw NoSuchFileException(path.toString())
         val truncate = write && StandardOpenOption.TRUNCATE_EXISTING in options
         val initial = if (exists && !truncate) btrfs.fetchFile(liveSubvolume, relative) ?: ByteArray(0) else ByteArray(0)
+        val commit: (ByteArray) -> Unit = { bytes ->
+            if (!btrfs.writeFile(liveSubvolume, relative, bytes)) throw IOException("VFS commit rejected: $path")
+            generation.incrementAndGet()
+        }
+        // open(2) visibility: O_CREAT materializes the entry and O_TRUNC empties it NOW, not at close.
+        if (write && (!exists || truncate)) commit(ByteArray(0))
         return VfsByteChannel(
             initial = initial,
             readable = read,
             writable = write,
             append = StandardOpenOption.APPEND in options,
-        ) { bytes ->
-            if (!btrfs.writeFile(liveSubvolume, relative, bytes)) throw IOException("VFS commit rejected: $path")
-            generation.incrementAndGet()
-        }
+            commit = commit,
+        )
     }
 
     override fun newDirectoryStream(path: Path, filter: DirectoryStream.Filter<in Path>): DirectoryStream<Path> {
@@ -262,6 +266,12 @@ private object DevNullByteChannel : SeekableByteChannel {
     override fun truncate(size: Long): SeekableByteChannel = this
 }
 
+/**
+ * Whole-file channel over one CoW store entry. Every mutation commits (write(2)/ftruncate(2)
+ * visibility): GraalPy has no refcounted close, so a guest writer that is never close()d flushes at
+ * no deterministic point — commit-on-close alone silently lost such writes (the guest-write bug).
+ * CoW dedup keeps re-commits of unchanged content cheap in extents; correctness over amplification.
+ */
 private class VfsByteChannel(
     initial: ByteArray,
     private val readable: Boolean,
@@ -277,9 +287,7 @@ private class VfsByteChannel(
     override fun isOpen(): Boolean = open
 
     override fun close() {
-        if (!open) return
-        if (writable) commit(data.copyOf(length))
-        open = false
+        open = false // every mutation already committed; open(2) materialized O_CREAT/O_TRUNC
     }
 
     override fun read(dst: ByteBuffer): Int {
@@ -301,6 +309,7 @@ private class VfsByteChannel(
         src.get(data, cursor, count)
         cursor += count
         if (cursor > length) length = cursor
+        commit(data.copyOf(length))
         return count
     }
 
@@ -319,7 +328,7 @@ private class VfsByteChannel(
         ensureOpen()
         if (!writable) throw NonWritableChannelException()
         require(size in 0..Int.MAX_VALUE.toLong()) { "invalid size: $size" }
-        if (size < length) length = size.toInt()
+        if (size < length) { length = size.toInt(); commit(data.copyOf(length)) }
         if (cursor > length) cursor = length
         return this
     }

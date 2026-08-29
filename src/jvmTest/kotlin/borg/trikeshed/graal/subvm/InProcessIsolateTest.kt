@@ -128,6 +128,40 @@ class InProcessIsolateTest {
         }
     }
 
+    /**
+     * GraalPy's statement limit is UNSAFE (GIL assert — [GuestBounds.PYTHON], GraalBoundsSmokeTest):
+     * a statements-only budget (wall disabled) must still stop a runaway loop, as a clean outside
+     * interrupt after [GuestBounds.DEFAULT_WALL_MILLIS] with the isolate surviving — before this
+     * hardening such a budget was silently unenforced and the loop ran forever.
+     */
+    @Test fun pythonStatementsBudgetDegradesToTheWallProxyInterrupt() {
+        py(Budget(statements = 10_000, wallMillis = 0)).use { iso ->
+            assertEquals(Num(2), iso.eval("1+1"))
+            val t0 = System.nanoTime()
+            expectFailure(GuestFailure.INTERRUPTED) { iso.eval("i=0\nwhile True:\n    i+=1") }
+            val ms = (System.nanoTime() - t0) / 1_000_000
+            assertTrue(
+                ms < GuestBounds.DEFAULT_WALL_MILLIS + InProcessIsolate.INTERRUPT_GRACE_MS + 5_000,
+                "proxy watchdog took ${ms}ms (default wall ${GuestBounds.DEFAULT_WALL_MILLIS}ms + grace)",
+            )
+            assertTrue(iso.isAlive)
+            assertEquals(1L, iso.stats().interrupted)
+            assertEquals(Num(4), iso.eval("2+2"))
+        }
+    }
+
+    /**
+     * The crossing failure taxonomy as a table. The GIL-assert shape — engine-internal, usually also
+     * cancelled — must come out DEAD and fail closed, never INTERRUPTED over a poisoned context.
+     */
+    @Test fun failureTaxonomyFailsClosedOnEngineInternalErrors() {
+        assertEquals(GuestFailure.EXHAUSTED to true, InProcessIsolate.classify(resourceExhausted = true, internalError = false, interrupted = true))
+        assertEquals(GuestFailure.DEAD to true, InProcessIsolate.classify(resourceExhausted = false, internalError = true, interrupted = true))
+        assertEquals(GuestFailure.DEAD to true, InProcessIsolate.classify(resourceExhausted = false, internalError = true, interrupted = false))
+        assertEquals(GuestFailure.INTERRUPTED to false, InProcessIsolate.classify(resourceExhausted = false, internalError = false, interrupted = true))
+        assertEquals(GuestFailure.GUEST_ERROR to false, InProcessIsolate.classify(resourceExhausted = false, internalError = false, interrupted = false))
+    }
+
     @Test fun pythonLoopIsInterruptedByTheWallWatchdogAndTheIsolateSurvives() {
         py(Budget(wallMillis = 500)).use { iso ->
             assertEquals(Num(2), iso.eval("1+1"))

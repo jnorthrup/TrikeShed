@@ -117,15 +117,15 @@ curl -s -X POST http://localhost:8888/api/vm/pytest-world/eval \
 
 ## Known Limits
 
-### Guest-Write Bug
-Guest VFS writes (files written by guest code) are subject to an open bug where writes may not persist as expected. Guest code should treat its VFS as read-only for reliable behavior.
+### Guest-Write Durability
+Root cause found and patched 2026-08-29: the VFS committed a file's bytes to the store only when the guest's channel was closed, and GraalPy has no refcounted close — a writer the guest never explicitly closed silently lost everything that reached the channel (re-reads showed the old content). Every write/truncate now commits immediately (write(2) visibility), and `O_CREAT`/`O_TRUNC` take effect at open, not at close. One residue stands: bytes still sitting in Python's own io buffer that never reach the VFS cannot be persisted by any host-side fix — guest code should still `flush()` or close its writers (after the patch, a flush alone is durable).
 
-> **Status:** known-bug — VFS guest-write bug is open.
+> **Status:** unverified — patched with regression tests (`TrikeShedGraalVfsTest.channelWritesAreDurableWithoutClose`, `graalPythonFlushWithoutCloseReachesTheStore`); not yet re-traced by a validator.
 
 ### GraalPy StatementLimit
-When `statements` budget is set and the guest hits the limit, GraalPy terminates the process. This is not a graceful degradation — the process is killed, and any in-flight state is lost. The `statements` and `wallMillis` budgets are declared and carried but **not yet enforced** by the VM host (budget enforcement is wave-2).
+`ResourceLimits.statementLimit` is unsafe on GraalPy (the trip dies inside the GIL bookkeeping — `GraalBoundsSmokeTest`), so the VM host never installs it for Python. Since 2026-08-29 a `statements` budget on a Python world degrades to the wall watchdog (the facet's default 5000ms when `wallMillis` is unset): a runaway eval ends as a clean typed `INTERRUPTED` failure and the world survives. An engine-internal crash (the GIL-assert shape) now fails closed as a typed `DEAD` failure with the isolate downed, instead of leaving a poisoned context serving later evals. Statement-precise counting on GraalPy remains unimplemented; `wallMillis` is enforced by the watchdog at the isolate tier.
 
-> **Status:** degraded — budget fields not enforced; statementLimit crash is abrupt.
+> **Status:** unverified — patched with regression tests (`InProcessIsolateTest.pythonStatementsBudgetDegradesToTheWallProxyInterrupt`, `failureTaxonomyFailsClosedOnEngineInternalErrors`); not yet re-traced by a validator.
 
 ### No Network Access
 Guest worlds have no network access. The GraalPy sandbox does not expose outbound sockets.

@@ -33,7 +33,7 @@ data class WireReply(val status: Int, val contentType: String, val bytes: ByteAr
  *   POST   /{db}/_cas/_bulk {cids:[…]}             many blocks in one exchange (see [CasBulkCodec])
  *   GET    /{db}/_design/{d}/_rewrite/{path}      CouchApp: attachment bytes via the ddoc's rewrites
  *   GET|PUT|DELETE /{db}/{id…}                    document JSON (`_attachments` stubs rendered)
- *   GET    /{db}/{id…}/content                    attachment bytes of a path document
+ *   GET    /{db}/{id…}/content[?rev]              attachment bytes of a path document (rev = a CAS-held revision)
  *   GET    /api/v0/block/get?arg={cid}  POST /api/v0/block/put     IPFS-shaped aliases of _cas
  *   GET    /{anything}                            vhost: rewrite of the root ddoc → attachment bytes
  *
@@ -222,7 +222,7 @@ class CouchWireRouter(
         val id = rest.joinToString("/")
         return when (m) {
             "GET" -> db.docJson(id)?.let { WireReply.json(200, it) }
-                ?: attachmentReply(id.removeSuffix("/content").takeIf { rest.size >= 2 && rest.last() == "content" })
+                ?: attachmentReply(id.removeSuffix("/content").takeIf { rest.size >= 2 && rest.last() == "content" }, query["rev"])
                 ?: WireReply.notFound()
             "PUT" -> {
                 val doc = parseMap(body) ?: return WireReply.badRequest("Document must be a JSON object")
@@ -234,8 +234,8 @@ class CouchWireRouter(
         }
     }
 
-    private fun attachmentReply(id: String?): WireReply? {
-        val (ct, bytes) = db.attachment(id ?: return null) ?: return null
+    private fun attachmentReply(id: String?, rev: String? = null): WireReply? {
+        val (ct, bytes) = db.attachment(id ?: return null, rev) ?: return null
         return WireReply(200, ct.ifEmpty { ContentTypes.forPath(id) }, bytes)
     }
 

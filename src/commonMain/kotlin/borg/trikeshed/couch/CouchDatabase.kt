@@ -185,10 +185,17 @@ class CouchDatabase(
 
     // ── blobs: attachments, bodies, raw blocks ────────────────────
 
-    /** Attachment bytes for a path document: `(content_type, bytes)`; null if absent, deleted or blob missing. */
-    fun attachment(id: String): Pair<String, ByteArray>? {
-        val doc = store.get(id) ?: return null
-        if (isTombstone(doc)) return null
+    /**
+     * Attachment bytes for a path document: `(content_type, bytes)`; null if absent, deleted or blob
+     * missing. [rev] reads a specific revision through the CAS — `gen-sha256:<hex>` names the canonical
+     * body blob ([bodyBlob]), whose `contentId` names the attachment blob; null or the head rev reads
+     * the live document.
+     */
+    fun attachment(id: String, rev: String? = null): Pair<String, ByteArray>? {
+        val doc = when {
+            rev == null || rev == store.head.getRev(id) -> store.get(id)?.takeUnless { isTombstone(it) }
+            else -> bodyBlob(rev)?.let { CouchStoreFactory.documentFromBody(it) }?.takeIf { it.id == id }
+        } ?: return null
         val cid = field(doc, "contentId") as? String ?: return null
         val bytes = cas.get(ContentId(cid)) ?: return null
         return (field(doc, "contentType") as? String ?: "application/octet-stream") to bytes
@@ -260,7 +267,9 @@ class CouchDatabase(
             m["_attachments"] = mapOf(
                 "content" to mapOf(
                     "content_type" to (field(doc, "contentType") ?: "application/octet-stream"),
-                    "length" to ((field(doc, "length") as? String)?.toLongOrNull() ?: 0L),
+                    // JSON PUTs land length as a Double (JsonSupport reifies numbers so), the
+                    // attachment gateway as a String — the stub must be right either way.
+                    "length" to (field(doc, "length").let { l -> (l as? Number)?.toLong() ?: (l as? String)?.toLongOrNull() } ?: 0L),
                     "digest" to "sha256-${cid.removePrefix("sha256:")}",
                     "cid" to cid,
                     "stub" to true,

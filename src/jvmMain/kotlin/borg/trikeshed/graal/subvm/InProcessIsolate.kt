@@ -59,7 +59,9 @@ class RootObservation(
  *  - its own [Engine] so the [ExecutionListener] sees only this guest, never a leaf isolate,
  *  - `HostAccess.NONE`; the single door is the `host` proxy ([HOST_BINDING]) whose `call(name, ...)`
  *    routes to functions registered with [delegate],
- *  - stop: statement limit where it is safe (JS), otherwise a watchdog `interrupt()` after the wall budget.
+ *  - stop: statement limit where it is safe (JS), otherwise a watchdog `interrupt()` after the wall
+ *    budget; a statements budget on a statement-unsafe facet (GraalPy) degrades to the default wall,
+ *    and an engine-internal failure (the GIL-assert shape) fails closed as [GuestFailure.DEAD].
  *
  * Root enter/return are observed (roots only, not statements — cheap enough to leave on) and reported
  * through [onRootReturn]; that is the raw material the [LeafTrainer] learns from.
@@ -327,8 +329,16 @@ class InProcessIsolate(
             }
             // a watchdog backstops wall-clock enforcement whenever this crossing isn't actually relying on
             // an installed statement limit — either the facet doesn't use one, or this budget disabled it
-            // (statements <= 0), which a caller can do deliberately to test the interrupt path on any language
-            val watchdog = if (depth == 0 && budget.wallMillis > 0 && (bounds.stop != StopStrategy.STATEMENT_LIMIT || budget.statements <= 0)) armWatchdog() else null
+            // (statements <= 0), which a caller can do deliberately to test the interrupt path on any language.
+            // A statements budget on a facet whose statement limit is UNSAFE (GraalPy: the GIL assert,
+            // GuestBounds.PYTHON) degrades to the default wall: the breach is a clean interrupt() from
+            // outside, never a ResourceLimits trip inside the GIL bookkeeping.
+            val wall = when {
+                budget.wallMillis > 0 -> budget.wallMillis
+                !bounds.statementLimitSafe && budget.statements > 0 -> bounds.defaultWallMillis
+                else -> 0L
+            }
+            val watchdog = if (depth == 0 && wall > 0 && (bounds.stop != StopStrategy.STATEMENT_LIMIT || budget.statements <= 0)) armWatchdog(wall) else null
             try {
                 block()
             } catch (e: PolyglotException) {
@@ -346,21 +356,36 @@ class InProcessIsolate(
     /** Run queued guest-thread actions now, without evaluating anything (a safe point on demand). */
     fun settle() { if (!alive) return; lock.withLock { drainGuestActions() } }
 
-    private fun armWatchdog(): ScheduledFuture<*> = WATCHDOG.schedule({
+    private fun armWatchdog(wallMillis: Long): ScheduledFuture<*> = WATCHDOG.schedule({
         interrupted.incrementAndGet()
         runCatching { context.interrupt(Duration.ofMillis(INTERRUPT_GRACE_MS)) }
-    }, budget.wallMillis, TimeUnit.MILLISECONDS)
+    }, wallMillis, TimeUnit.MILLISECONDS)
 
-    private fun classify(e: PolyglotException): GuestException = when {
-        e.isResourceExhausted -> { alive = false; GuestException(GuestFailure.EXHAUSTED, e.message ?: "resource exhausted", e) }
-        e.isInterrupted || e.isCancelled -> GuestException(GuestFailure.INTERRUPTED, e.message ?: "interrupted", e)
-        e.isGuestException -> GuestException(GuestFailure.GUEST_ERROR, e.message ?: "guest error", e)
-        else -> GuestException(GuestFailure.GUEST_ERROR, e.message ?: e.toString(), e)
+    private fun classify(e: PolyglotException): GuestException {
+        val (kind, failClosed) = classify(e.isResourceExhausted, e.isInternalError, e.isInterrupted || e.isCancelled)
+        if (failClosed) runCatching { close() } // the context can no longer be trusted; free it now, not at .use{} exit
+        return GuestException(kind, e.message ?: e.toString(), e)
     }
 
     companion object {
         const val HOST_BINDING = "host"
         const val INTERRUPT_GRACE_MS = 2_000L
+
+        /**
+         * Failure taxonomy for one crossing, precedence-ordered; the Boolean says the context can no
+         * longer be trusted and the isolate fails closed. An engine INTERNAL error (GraalPy's GIL
+         * assert when a statement limit trips mid-loop — see GuestBounds and GraalBoundsSmokeTest) is
+         * DEAD, matching the process tier's "child died": a typed failure and a downed isolate, never
+         * a poisoned context served again — internal errors often also carry isCancelled, so this
+         * check must precede the INTERRUPTED mapping.
+         */
+        fun classify(resourceExhausted: Boolean, internalError: Boolean, interrupted: Boolean): Pair<GuestFailure, Boolean> = when {
+            resourceExhausted -> GuestFailure.EXHAUSTED to true
+            internalError -> GuestFailure.DEAD to true
+            interrupted -> GuestFailure.INTERRUPTED to false
+            else -> GuestFailure.GUEST_ERROR to false
+        }
+
         /** Meta-object names of executables that are runtime furniture, not program roots. */
         val BINDING_NOISE_META = setOf("builtin_function_or_method", "builtin_method", "method-wrapper", "wrapper_descriptor", "method_descriptor", "type", "module", "classmethod_descriptor")
         private val WATCHDOG = Executors.newSingleThreadScheduledExecutor { r -> Thread(r, "subvm-watchdog").apply { isDaemon = true } }
