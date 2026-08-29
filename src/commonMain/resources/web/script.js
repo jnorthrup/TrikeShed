@@ -1320,13 +1320,19 @@
   const VIEWS = { doc: [docScrollEl, viewDocBtn], board: [boardScrollEl, viewBoardBtn], graph: [graphScrollEl, viewGraphBtn], sheet: [sheetScrollEl, viewSheetBtn], shape: [shapeScrollEl, viewShapeBtn], host: [hostScrollEl, viewHostBtn] };
   function setView(view) {
     mutate((s) => { s.view = view; }, 'view');
+    const SIDEBAR_BTNS = { doc: 'btn-home', board: 'btn-board', graph: 'btn-graph', sheet: 'btn-sheet', host: 'btn-host' };
     for (const [k, [el, btn]] of Object.entries(VIEWS)) {
+      const sidebarBtnId = SIDEBAR_BTNS[k];
+      const sidebarBtn = sidebarBtnId ? document.getElementById(sidebarBtnId) : null;
       el.hidden = k !== view;
       btn.classList.toggle('active', k === view);
+      if (sidebarBtn) sidebarBtn.classList.toggle('active', k === view);
       if (k === view) {
         btn.setAttribute('aria-current', 'page');
+        if (sidebarBtn) sidebarBtn.setAttribute('aria-current', 'page');
       } else {
         btn.removeAttribute('aria-current');
+        if (sidebarBtn) sidebarBtn.removeAttribute('aria-current');
       }
     }
     if (view === 'board') { renderBoard(); hydrateBoard(); }
