@@ -234,6 +234,21 @@ class KeyMuxContractTest {
         }
     }
 
+    // K2: list() prefix-matching is segment-aware, not a raw substring —
+    // "llm" must not match "llmx.key" the way String.startsWith would.
+    @Test
+    fun k2_listPrefixIsSegmentAwareNotSubstring() = runTest {
+        val files = FakeFiles()
+        val mux = KeyMux { persist("/cfg") }
+        withContext(coroutineContext + files) {
+            mux.set("llm.key", "v1")
+            mux.set("llmx.key", "v2")
+            val listed = mux.list("llm")
+            val keys = (0 until listed.size).map { listed[it].a }.toSet()
+            assertEquals(setOf("llm.key"), keys, "\"llm\" must not prefix-match \"llmx.key\" as a substring")
+        }
+    }
+
     // ApiSource: GET reads, PUT writes, through the scripted transport.
     @Test
     fun apiSourceReadsAndWritesThroughHtx() = runTest {

@@ -549,7 +549,11 @@ class KeyMux constructor(
                 val file = fileOps.resolvePath(src.root, "keymux.conf")
                 if (!fileOps.exists(file)) continue
                 val map = src.readAll(fileOps) // source's own codec (JSON), matching write()
-                map.filter { it.key.startsWith(prefix) }.forEach { (k, v) ->
+                // Segments, not a raw substring: a bare trailing "." (e.g. "llm.") or an
+                // empty prefix must not become a literal "" segment requiring an empty
+                // key segment to match — drop empty segments so "llm." == "llm" and "" == match-all.
+                val prefixPath = prefix.split(".").filter { it.isNotEmpty() }.toSeries()
+                map.filter { pathMatch(prefixPath, it.key.toKeyPath()) }.forEach { (k, v) ->
                     results.add(k j v)
                 }
             }
