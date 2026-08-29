@@ -100,16 +100,3 @@ value class ColId(val value: Byte) {
     val col: BoardCol get() = BoardCol.fromId(this)
     override fun toString(): String = col.wire
 }
-
-/**
- * Coarse column from the causal log alone (CausalKernel: "This IS the kanban
- * column"). READY/BLOCKED are finer than the phase machine sees — they come
- * only from committed Move frames, never inferred here.
- */
-fun CausalPhase.toCol(): BoardCol = when (this) {
-    CausalPhase.CREATED -> BoardCol.TRIAGE
-    CausalPhase.OPEN -> BoardCol.TODO
-    CausalPhase.ACTIVE -> BoardCol.RUNNING
-    CausalPhase.DRAINING -> BoardCol.DONE
-    CausalPhase.CLOSED -> BoardCol.ARCHIVED
-}
