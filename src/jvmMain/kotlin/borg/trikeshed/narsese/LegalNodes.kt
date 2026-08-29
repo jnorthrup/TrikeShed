@@ -19,8 +19,6 @@ import java.util.concurrent.TimeUnit
  *   BSD) run as a plain OS subprocess, plus LLM-propose/gate for
  *   HOLDING/ELEMENT/PARTY spans, grounded by the same deterministic
  *   substring-against-source check [ConstructionPatternGate] uses.
- * - `legal.review`: preset-tribunal with legal system prompts,
- *   evidence-bank injection via SparqlKifMcpServer tools.
  *
  * eyecite's real dependency closure (`regex`, `lxml`, `pyahocorasick`,
  * `fast-diff-match-patch`) is native-extension code, which rules out
@@ -274,24 +272,6 @@ object LegalNodes {
         kif.query(KifExpr.parse("(standardOfProof $docAtom ?text)")).forEach { lines += "- standard of proof: ${text(it["?text"])}" }
         kif.query(KifExpr.parse("(party $docAtom ?name ?role)")).forEach { lines += "- party: ${text(it["?name"])} (${text(it["?role"])})" }
         return lines.joinToString("\n")
-    }
-
-    /**
-     * `legal.review` — wraps preset-tribunal with legal system prompts.
-     * The node itself doesn't run the tribunal (that's a composition);
-     * it provides the system prompts for the arguer/rebuttal/judge seats.
-     */
-    fun reviewRunner(): LcncNodeRunner = LcncNodeRunner { node, _ ->
-        val maxIterations = node.params["maxIterations"]?.toIntOrNull() ?: 3
-        mapOf(
-            "verdict" to linkedMapOf(
-                "argueSystem" to "You are counsel for the motion in a legal proceeding. Argue based on the evidence and legal standards provided. Cite specific statutes and cases.",
-                "rebutSystem" to "You are opposing counsel. Rebut the argument point by point, citing contradictory evidence, distinguishable precedent, or statutory defenses.",
-                "judgeSystem" to "You are the presiding judge. Weigh the record, apply the relevant legal standards (preponderance of evidence, beyond reasonable doubt, or clear and convincing as appropriate), and rule. If the record is insufficient, state what clarification is needed.",
-                "maxIterations" to maxIterations,
-                "evidenceBank" to "wire sparql.query or kif.sparqlSelect results into the brief port",
-            ),
-        )
     }
 
     // ── eyecite: a real subprocess call, not a vm.* guest — see class doc ──

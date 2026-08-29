@@ -3,6 +3,7 @@ package borg.trikeshed.narsese
 import borg.trikeshed.kif.KifKnowledgeBase
 import borg.trikeshed.lcnc.LcncNode
 import kotlinx.coroutines.runBlocking
+import org.junit.jupiter.api.Assumptions.assumeTrue
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -187,10 +188,7 @@ class LegalNodesTest {
         val citations = LegalNodes.runEyecite(
             "The Court in Miranda v. Arizona, 384 U.S. 436 (1966), held that suspects must be informed of their rights, citing 42 U.S.C. sec 1983.",
         )
-        if (citations.isEmpty()) {
-            println("SKIP eyeciteSubprocessExtractsRealCitations: .venv not provisioned (python3 -m venv .venv && .venv/bin/pip install eyecite)")
-            return
-        }
+        assumeTrue(citations.isNotEmpty(), "eyecite .venv not provisioned (python3 -m venv .venv && .venv/bin/pip install eyecite)")
         val reporterCite = citations.first { (it["reporter"] as? String) == "U.S." }
         assertEquals("384 U.S. 436", reporterCite["text"])
         assertEquals("436", reporterCite["page"])

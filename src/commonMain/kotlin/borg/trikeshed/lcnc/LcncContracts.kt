@@ -601,14 +601,6 @@ object LcncContracts {
                 "documentCid" to LcncPortContract.LcncParamSpec(ph = "doc CID to query when none is wired"),
                 "brief" to LcncPortContract.LcncParamSpec(ta = true, ph = "brief text to query when none is wired"),
             )),
-        LcncPortContract("legal.review", "legal tribunal review (preset-tribunal extended)",
-            listOf("brief?"), listOf("verdict"),
-            inputKinds = mapOf("brief" to "text"),
-            outputKinds = mapOf("verdict" to "json"),
-            params = mapOf(
-                "maxIterations" to LcncPortContract.LcncParamSpec(v = "3"),
-            )),
-
         // ── BrainClient decomposition as LCNC ──────────────────────
         // credential.enter: manual key-type/url/api-type/key entry →
         //   stored in CouchDB via CouchKeyStore, resolvable by KeyMux.

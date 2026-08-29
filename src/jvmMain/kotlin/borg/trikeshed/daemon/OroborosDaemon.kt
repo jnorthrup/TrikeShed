@@ -876,7 +876,7 @@ object OroborosDaemon {
                 kif = kifBank,
             )
         }
-        // ── Legal domain nodes: legal.ingest, legal.evidence, legal.review ─
+        // ── Legal domain nodes: legal.ingest, legal.evidence ────────────
         moduleContext.lcncRunners["legal.ingest"] = borg.trikeshed.narsese.LegalNodes.ingestRunner(
             brain = brainClient,
             muxContext = htxElement + muxReactor,
@@ -892,7 +892,6 @@ object OroborosDaemon {
         // folds it into the brief argue actually reads — closing the loop
         // the report flagged as "nothing reads these entries back out".
         moduleContext.lcncRunners["legal.evidence"] = borg.trikeshed.narsese.LegalNodes.evidenceRunner(kifBank)
-        moduleContext.lcncRunners["legal.review"] = borg.trikeshed.narsese.LegalNodes.reviewRunner()
         // ── Tribunal: the LCNC preset that argues, rebuts, and rules through
         //    REAL hermes-env model dialogs. The node family (mux.chat /
         //    kg.ingest / display) is registered in-process, and each seat's
