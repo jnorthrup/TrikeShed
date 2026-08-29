@@ -72,11 +72,19 @@ class ProjectMiner(
         runs[name] = prog
         val kind = scopes.list().firstOrNull { it.name == name }?.kind ?: pdb.kind
 
-        val ids = pdb.store.all()
-            .map { it.id }
-            .filter { id -> id.substringAfterLast('.', "").lowercase() in MINEABLE }
-            .filter { id -> !id.endsWith(".extract.md") }
-        val already = pdb.store.all().map { it.id }.filter { it.endsWith(".extract.md") }.toSet()
+        // ⚡ Bolt: Use store.ids() instead of store.all() to avoid materializing full Document instances in memory.
+        val storeIds = pdb.store.ids()
+        val ids = mutableListOf<String>()
+        val already = mutableSetOf<String>()
+        for (i in 0 until storeIds.a) {
+            val id = storeIds.b(i)
+            if (id.endsWith(".extract.md")) {
+                already.add(id)
+            } else if (id.substringAfterLast('.', "").lowercase() in MINEABLE) {
+                ids.add(id)
+            }
+        }
+
         val work = ids.filter { "$it.extract.md" !in already }.take(cap)
         prog.total = work.size
         var mintedRun = 0
