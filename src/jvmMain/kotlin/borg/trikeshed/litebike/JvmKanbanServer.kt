@@ -382,7 +382,8 @@ class JvmKanbanServer(
                     "/api/board" -> ForgeRoutes.boardJson()
                     "/api/metrics" -> ForgeRoutes.metricsResponse(text.contains("format=json", ignoreCase = true))
                     "/api/invoke" -> if (method == "POST") ForgeRoutes.invokeJson(text) else null
-                    "/", "/index.html" -> ForgeRoutes.shellHtml()
+                    // "/" deliberately absent: the PWA shell is the gh-pages public
+                    // offering — the app port's root falls through to the board page.
                     else -> null
                 }
                 if (fr != null) return HttpResponse(fr.status, fr.body.decodeToString(), fr.headers["Content-Type"] ?: "application/json; charset=utf-8", fr.body)
@@ -437,7 +438,11 @@ class JvmKanbanServer(
             "/api/submit" -> if (method == "POST") submit(text) else HttpResponse(405, """{"error":"method_not_allowed"}""")
             "/api/donor"  -> if (method == "POST") submit(text) else HttpResponse(405, """{"error":"method_not_allowed"}""")
             "/api/invoke" -> if (method == "POST") invoke(text) else HttpResponse(405, """{"error":"method_not_allowed"}""")
-            "/", "/index.html" -> HttpResponse(200, forgeShellHtml(), "text/html; charset=utf-8")
+            // The PWA shell is the gh-pages PUBLIC offering (docs/) — it does not ride
+            // the app port. Root lands on the operator board; forgeShellHtml stays
+            // for the public build lineage only.
+            "/", "/index.html" -> staticAsset("/kanban.html")
+                ?: HttpResponse(404, """{"error":"asset_missing","resource":"web/kanban.html"}""")
             else -> staticAsset(path)
                 ?: extraRoutes.firstNotNullOfOrNull { it(method, path, text, null) }
                 ?: HttpResponse(404, """{"error":"not_found","path":"$path"}""")
@@ -460,8 +465,14 @@ class JvmKanbanServer(
         // the concentric construction canvas rides the page plane, not a module
         // claim — ModuleRouteRegistry is exact /api/* by discipline
         "/panels" to ("web/panels.html" to "text/html; charset=utf-8"),
+        // the operator-facing board page — /api/board rendered for humans
+        "/kanban.html" to ("web/kanban.html" to "text/html; charset=utf-8"),
+        "/kanban" to ("web/kanban.html" to "text/html; charset=utf-8"),
         "/script.js" to ("web/script.js" to "application/javascript; charset=utf-8"),
-        "/sw.js" to ("web/sw.js" to "application/javascript; charset=utf-8"),
+        // On the APP port the service worker is a self-destructor: any browser that
+        // ever registered the PWA's cache-first SW here gets unregistered and its
+        // caches wiped on next visit. The real sw.js ships with the gh-pages build.
+        "/sw.js" to ("web/sw-kill.js" to "application/javascript; charset=utf-8"),
         "/manifest.webmanifest" to ("web/manifest.webmanifest" to "application/manifest+json; charset=utf-8"),
         "/icons/forge-icon.svg" to ("web/icons/forge-icon.svg" to "image/svg+xml"),
         "/icons/forge-icon-maskable.svg" to ("web/icons/forge-icon-maskable.svg" to "image/svg+xml"),

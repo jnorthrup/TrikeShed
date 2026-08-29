@@ -63,6 +63,12 @@ class CouchWire(
 
         if (p == "/${db.name}/_replicate" || p == "/_replicate") return replicate(method, bodyOf(payload))
 
+        // The ddoc vhost (gh-pages PWA hoisted out of store attachments) does NOT
+        // ride the app port: it shadowed `/`, `/sw.js`, and any page docs/ carries
+        // with the stale PUBLIC build. Only the db surface is couch's here —
+        // everything else falls through to the operator pages on the same listener.
+        if (p != "/${db.name}" && !p.startsWith("/${db.name}/")) return null
+
         if (respond != null) {
             if (p == "/${db.name}/_changes" && method == "GET") { streamChanges(query, respond); return JvmKanbanServer.HttpResponse(200, "") }
             // A streaming slot we do not own: answer as a normal reply through `respond`.

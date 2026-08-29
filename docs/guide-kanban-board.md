@@ -154,19 +154,25 @@ Move a card between columns.
 
 Fields: `jobId`, `toColumn`, `expectedRevision`, `idempotencyKey`. The board guard checks WIP limits on the target column before the reducer runs.
 
-### archive
+### archive (= move to `archived`)
 
-Archive a card.
+There is no `archive` command type — `InvokeLowering` rejects it with
+`unknown command type 'archive'`. Archiving is a `move` to the `archived`
+column:
 
 ```json
 {
-  "type": "archive",
+  "type": "move",
   "jobId": "card-abc123",
+  "toColumn": "archived",
+  "expectedRevision": 1,
   "idempotencyKey": "k3"
 }
 ```
 
-Fields: `jobId`, `idempotencyKey`.
+The full verb set the lowering accepts: `submit`/`create`/`new`, `move`,
+`start`, `complete`/`done`, `fail`, `retry`, `progress`, `block`, `cancel`,
+`acknowledge`/`ack`, `retract`/`delete`.
 
 ---
 
