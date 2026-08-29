@@ -71,10 +71,11 @@ launch guide). The mounted database's name is the daemon's configured db —
 `trikeshed` in a default boot — and `_changes`/`_replicate` are wired for
 THAT name only.
 
-> **Status:** known-bug — doc routes accept arbitrary `/{db}/` prefixes (a
-> `PUT /testdb/doc1` succeeds), but `_changes` exists only for the mounted
-> db's name; `GET /testdb/_changes` returns `{"error":"not_found"}`. Use the
-> mounted name throughout.
+> **Status:** fixed 2026-08-29 — the wire now refuses any `/{db}/` prefix that
+> is not the mounted db: `PUT /testdb/doc1` and `GET /testdb/_changes` both
+> return 404, while the mounted name serves docs and `_changes` symmetrically.
+> (Fell out of evicting the ddoc vhost from the app port: CouchWire answers
+> only `/{db}` paths.)
 
 ### PUT a Document
 
