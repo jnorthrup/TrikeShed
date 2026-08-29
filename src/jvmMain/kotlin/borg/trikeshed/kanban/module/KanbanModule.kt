@@ -10,6 +10,7 @@ import borg.trikeshed.kanban.toBoardMap
 import borg.trikeshed.lcnc.LcncKanbanExperience
 import borg.trikeshed.lcnc.LcncNode
 import borg.trikeshed.lcnc.LcncContracts
+import borg.trikeshed.lcnc.LcncNodeRunner
 import borg.trikeshed.lcnc.LcncRunner
 import borg.trikeshed.lcnc.ccek.LcncCcekAssembly
 import borg.trikeshed.litebike.JvmKanbanServer
@@ -54,6 +55,22 @@ class KanbanModule : ForgeModule {
         // ── NARS garnish (Phase 5): review bridge + attention order, iff the bag is live.
         //    Bag OFF ⇒ board JSON byte-identical minus the attention/contested fields.
         val bag = ctx.beliefBag
+        // NARS × kanban legos — the bag's board view as composable nodes:
+        // kanban.attention = BoardAttentionOrder.garnish (per-card score/contested +
+        // attention-descending order), kanban.drift = the Hotelling T² cohort alarm.
+        if (bag != null) {
+            ctx.lcncRunners["kanban.attention"] = LcncNodeRunner { _, _ ->
+                val g = borg.trikeshed.kanban.BoardAttentionOrder.garnish(bag, store.cards())
+                mapOf(
+                    "cards" to g.mapValues { (_, v) -> mapOf("attention" to v.score, "contested" to v.contested) },
+                    "ordered" to g.entries.sortedByDescending { it.value.score }.map { it.key },
+                )
+            }
+            ctx.lcncRunners["kanban.drift"] = LcncNodeRunner { _, _ ->
+                val t2 = borg.trikeshed.kanban.BoardAttentionOrder.driftT2(bag)
+                mapOf("t2" to t2, "alarm" to (t2 > 9f))
+            }
+        }
         val bridge = if (bag != null && ctx.turnReview != null) {
             borg.trikeshed.kanban.BoardReviewBridge(
                 review = ctx.turnReview!!,
@@ -70,17 +87,23 @@ class KanbanModule : ForgeModule {
             if (bag == null) cached?.let { if (it.first == seq) return it.second }
             val cursor = BoardCursor.of(store.cards())
             val base = cursor.toBoardMap(seq, title = "Oroboros board")
-            val withOwners = base + ("items" to ((base["items"] as List<*>).map { item ->
-                val m = item as Map<*, *>
-                m + mapOf("owner" to store.card(m["id"].toString())?.owner.orEmpty())
-            }))
+            // Marketability audit: the store persists dependencies/tags/owner but the
+            // public projection dropped them — lossless task exchange needs all three.
+            fun enrich(m: Map<*, *>): Map<Any?, Any?> {
+                val row = store.card(m["id"].toString())
+                return m + mapOf(
+                    "owner" to row?.owner.orEmpty(),
+                    "dependencies" to (row?.dependencies ?: emptyList<String>()),
+                    "tags" to (row?.tags ?: emptyList<String>()),
+                )
+            }
+            val withOwners = base + ("items" to ((base["items"] as List<*>).map { enrich(it as Map<*, *>) }))
             val map = if (bag == null) withOwners else {
                 val garnish = borg.trikeshed.kanban.BoardAttentionOrder.garnish(bag, store.cards())
                 val items = (withOwners["items"] as List<*>).map { item ->
                     val m = item as Map<*, *>
                     val g = garnish[m["id"]]
-                    val owner = store.card(m["id"].toString())?.owner.orEmpty()
-                    (if (g == null) m else m + mapOf("attention" to g.score, "contested" to g.contested)) + mapOf("owner" to owner)
+                    if (g == null) m else m + mapOf("attention" to g.score, "contested" to g.contested)
                 }
                 base + ("items" to items)
             }

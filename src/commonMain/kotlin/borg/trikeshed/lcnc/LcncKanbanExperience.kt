@@ -85,6 +85,34 @@ class LcncKanbanExperience(
                     ),
                 )
             },
+            // Plan-doc import as a lego: bullets in, cards out — the node form of
+            // POST /api/board/import (same parse rules, same content-hash dedupe).
+            "kanban.import" to LcncNodeRunner { node, inputs ->
+                val text = (inputs["text"] ?: node.params["text"])?.toString().orEmpty()
+                val bullets = text.lineSequence()
+                    .map { it.trim() }
+                    .filter { it.startsWith("- ") || it.startsWith("* ") || Regex("^\\d+\\.\\s").containsMatchIn(it) }
+                    .map { it.removePrefix("- ").removePrefix("* ").replace(Regex("^\\d+\\.\\s+"), "").trim() }
+                    .map { it.removePrefix("[ ]").removePrefix("[x]").trim() }
+                    .filter { it.length in 3..200 }
+                    .take(100)
+                    .toList()
+                var imported = 0
+                var duplicates = 0
+                val jobIds = ArrayList<String>()
+                for (title in bullets) {
+                    val hex = borg.trikeshed.job.ContentId.of(title.encodeToByteArray()).hex
+                    val jobId = "card-" + hex.take(12)
+                    val r = command(
+                        mapOf(
+                            "type" to "submit", "jobId" to jobId,
+                            "title" to title, "idempotencyKey" to "import#" + hex.take(16),
+                        ),
+                    )
+                    if (r["accepted"] == true) { imported++; jobIds.add(jobId) } else duplicates++
+                }
+                mapOf("parsed" to bullets.size, "imported" to imported, "duplicates" to duplicates, "jobIds" to jobIds)
+            },
             "confix.sheets" to LcncNodeRunner { node, inputs ->
                 val json = (inputs["json"] ?: node.params["json"])
                     ?.toString()

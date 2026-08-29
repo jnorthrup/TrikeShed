@@ -41,8 +41,12 @@ class BlackboardWire(val blackboard: ConfixBlackboard, scope: CoroutineScope) {
      * raw objects handed to blackboard.put (maps/strings), which stringify cleanly;
      * anything exotic degrades to its toString, never to a broken stream.
      */
-    private fun emitDeltas() {
-        for (k in blackboard.keys()) {
+    private fun emitDeltas() = synchronized(this) {
+        // The blackboard's maps are single-writer/unguarded-read: a keys() snapshot
+        // can throw mid-grow under a concurrent writer. Dropping one diff pass is
+        // safe — the next change event (or the next client) re-diffs by stamp.
+        val keys = runCatching { blackboard.keys() }.getOrElse { return@synchronized }
+        for (k in keys) {
             val prov = blackboard.getProvenance(k) ?: continue
             if (lastStamps[k] == prov.timestamp) continue
             lastStamps[k] = prov.timestamp
@@ -79,7 +83,7 @@ class BlackboardWire(val blackboard: ConfixBlackboard, scope: CoroutineScope) {
         scope.launch {
             // The one owner of sequence/ring. replay=1 on changes seeds the ring with
             // the current board on attach, so a fresh SSE client replays real facts.
-            blackboard.changes.collect { emitDeltas() }
+            blackboard.changes.collect { runCatching { emitDeltas() } }
         }
     }
 
@@ -109,39 +113,55 @@ class BlackboardWire(val blackboard: ConfixBlackboard, scope: CoroutineScope) {
                     "Access-Control-Allow-Origin: *\r\n\r\n"
             respond?.invoke(headers.toByteArray(StandardCharsets.UTF_8))
 
-            // H1 repair: replay in SEQUENCE order, not array-slot order (out of order
-            // after the first wrap). The ring holds seq → serialized event; a
-            // seq-sorted sweep of the occupied slots is the causal order.
-            var replayedTo = -1L
-            val occupied = ring.mapIndexed { i, e -> if (e != null) i else -1 }.filter { it >= 0 }
-                .sortedBy { i -> ring[i]!!.first }
-            for (i in occupied) {
-                val (seq, json) = ring[i]!!
-                if (seq >= since) {
-                    val data = "id: $seq\r\ndata: $json\r\n\r\n"
-                    try {
-                        respond?.invoke(data.toByteArray(StandardCharsets.UTF_8))
-                        replayedTo = seq
-                    } catch (_: Throwable) {
-                        return null
-                    }
-                }
-            }
+            // Catch-up diff on the client's own thread: the collector may lag the
+            // blackboard (bounded changes buffer + real-thread scheduling); a fresh
+            // client must replay the CURRENT board, not the collector's progress.
+            // emitDeltas is synchronized and idempotent per provenance stamp.
+            emitDeltas()
 
-            try {
-                // Subscribe-only: the init collector owns sequence/ring. Skip anything
-                // the replay already delivered (the flow buffer may overlap the ring).
-                factEvents.collect { (seq, json) ->
-                    if (seq <= replayedTo) return@collect
-                    val data = "id: $seq\r\ndata: $json\r\n\r\n"
-                    try {
-                        respond?.invoke(data.toByteArray(StandardCharsets.UTF_8))
-                    } catch (_: Throwable) {
-                        throw kotlinx.coroutines.CancellationException("SSE client disconnected")
+            // Subscribe FIRST, replay SECOND: events the collector emits while we
+            // sweep the ring land in the live buffer instead of the gap between
+            // ring-read and subscription (the old order silently dropped them).
+            kotlinx.coroutines.coroutineScope {
+                val live = Channel<Pair<Long, String>>(4096)
+                val sub = launch {
+                    factEvents.collect { e -> live.trySend(e) }
+                }
+                // H1 repair: replay in SEQUENCE order, not array-slot order (out of
+                // order after the first wrap). The ring holds seq → serialized event;
+                // a seq-sorted sweep of the occupied slots is the causal order.
+                var replayedTo = -1L
+                val occupied = ring.mapIndexed { i, e -> if (e != null) i else -1 }.filter { it >= 0 }
+                    .sortedBy { i -> ring[i]!!.first }
+                var clientGone = false
+                for (i in occupied) {
+                    val (seq, json) = ring[i]!!
+                    if (seq >= since) {
+                        val data = "id: $seq\r\ndata: $json\r\n\r\n"
+                        try {
+                            respond?.invoke(data.toByteArray(StandardCharsets.UTF_8))
+                            replayedTo = seq
+                        } catch (_: Throwable) {
+                            clientGone = true; break
+                        }
                     }
                 }
-            } catch (_: kotlinx.coroutines.CancellationException) {
-            } catch (t: Throwable) {
+                if (!clientGone) try {
+                    // The init collector owns sequence/ring; this lane only forwards.
+                    // Skip anything the replay already delivered.
+                    for ((seq, json) in live) {
+                        if (seq <= replayedTo || seq < since) continue
+                        val data = "id: $seq\r\ndata: $json\r\n\r\n"
+                        try {
+                            respond?.invoke(data.toByteArray(StandardCharsets.UTF_8))
+                        } catch (_: Throwable) {
+                            break
+                        }
+                    }
+                } catch (_: kotlinx.coroutines.CancellationException) {
+                } catch (t: Throwable) {
+                }
+                sub.cancel()
             }
 
             return null
