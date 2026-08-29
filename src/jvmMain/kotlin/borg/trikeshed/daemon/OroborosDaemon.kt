@@ -627,21 +627,18 @@ object OroborosDaemon {
             }
         }
 
-        val beliefWire = if (beliefBag != null && turnReview != null) {
-            // W5.3: wire the live curator element into the beliefs HTTP surface
-            // (teach/query routes). The curator itself is constructed below; its
-            // construction only needs beliefBag, which is already non-null here.
-            val curatorForWire: borg.trikeshed.narsese.CuratorImpulseElement? = beliefBag?.let { bag ->
-                val c = borg.trikeshed.narsese.CuratorImpulseElement(
-                    bag,
-                    parentJob = coroutineContext[kotlinx.coroutines.Job],
-                )
-                c.open()
-                c
-            }
-            borg.trikeshed.forge.server.BeliefWire(beliefBag, turnReview, hermesMemoryFiles, curatorForWire)
-        } else null
-
+        // Shared, live, queryable KIF bank — nal-kif/construction-kif/legal-kif
+        // all assert here (in addition to their write-only, provenance-only
+        // blackboard landing), so SparqlKifMcpServer-style pattern queries
+        // (kif.query semantics) over `sparql.query`/`kif.sparqlSelect` can
+        // actually find them. Also backs state.freeze/thaw's persistence.
+        // One bank rather than three: the predicate vocabularies (causal
+        // relation/subject/object for NAL, cites/holding/party for legal)
+        // don't collide, and a single bank is what lets the legal tribunal's
+        // evidence-bank query (below) see everything ingested so far. The
+        // curator banks its SUMO spine + assessed impulses HERE too — one
+        // bank, not a wire twin and an impulse twin each hoarding their own.
+        val kifBank = borg.trikeshed.kif.KifKnowledgeBase()
         // ── CausalityReteElement + CuratorImpulseElement: the LIVE rete over the
         // bag (eternal truths at discounted support, minimum-understanding floor)
         // and the curator-impulse teaching recipient (hindsight replay → SUMO/KIF
@@ -656,15 +653,23 @@ object OroborosDaemon {
             r.open()
             r
         }
+        // ONE curator: the same element serves the BeliefWire teach/query routes
+        // AND the hermes feeder below — rete-registered, kifBank-banked.
         val curatorImpulse: borg.trikeshed.narsese.CuratorImpulseElement? = beliefBag?.let { bag ->
             val c = borg.trikeshed.narsese.CuratorImpulseElement(
                 bag,
                 rete = causalityRete,
+                knowledgeBank = kifBank,
                 parentJob = coroutineContext[kotlinx.coroutines.Job],
             )
             c.open()
             c
         }
+        val beliefWire = if (beliefBag != null && turnReview != null) {
+            // W5.3: wire the live curator element into the beliefs HTTP surface
+            // (teach/query routes) — the SAME element the feeder teaches.
+            borg.trikeshed.forge.server.BeliefWire(beliefBag, turnReview, hermesMemoryFiles, curatorImpulse)
+        } else null
         if (causalityRete != null) {
             System.err.println("[OROBOROS] CausalityRete live: ${causalityRete.rules.size} eternal rules; CuratorImpulse bank: ${curatorImpulse?.knowledgeBank?.asserts()?.size ?: 0} axioms")
             launch {
@@ -813,16 +818,6 @@ object OroborosDaemon {
         // Step K: the context-assembly node family is host-composed like any module's
         // runners — webhook dispatch and program runs can mint real context receipts.
         moduleContext.lcncRunners.putAll(borg.trikeshed.memory.ace.AceContextNodes.registry(daemonBlackboard))
-        // Shared, live, queryable KIF bank — nal-kif/construction-kif/legal-kif
-        // all assert here (in addition to their write-only, provenance-only
-        // blackboard landing), so SparqlKifMcpServer-style pattern queries
-        // (kif.query semantics) over `sparql.query`/`kif.sparqlSelect` can
-        // actually find them. Also backs state.freeze/thaw's persistence.
-        // One bank rather than three: the predicate vocabularies (causal
-        // relation/subject/object for NAL, cites/holding/party for legal)
-        // don't collide, and a single bank is what lets the legal tribunal's
-        // evidence-bank query (below) see everything ingested so far.
-        val kifBank = borg.trikeshed.kif.KifKnowledgeBase()
         // P4: lawyer-bot reading seat. ONLY this runner calls BrainClient/ModelMux;
         // ConstructionReadingLoop owns deterministic CAS claim-check/fold/bag/Rete landing.
         beliefBag?.let { readingBag ->
@@ -878,6 +873,44 @@ object OroborosDaemon {
                 cas = casStore,
                 kif = kifBank,
             )
+        }
+        // ── Belief-field nodes: the BeliefWire behaviors as runners plus the
+        // attend/reinforce/encode legos. Gloss identity rides HermesMemoryFiles.
+        beliefBag?.let { bag ->
+            moduleContext.lcncRunners["beliefs.introspect"] = borg.trikeshed.narsese.BeliefsNodes.introspectRunner(bag)
+            moduleContext.lcncRunners["beliefs.resonate"] = borg.trikeshed.narsese.BeliefsNodes.resonateRunner(bag) { angular ->
+                hermesMemoryFiles?.glossOf(angular)
+            }
+            moduleContext.lcncRunners["nal.attend"] = borg.trikeshed.narsese.BeliefsNodes.attendRunner(bag)
+            moduleContext.lcncRunners["nal.reinforce"] = borg.trikeshed.narsese.BeliefsNodes.reinforceRunner(bag)
+        }
+        turnReview?.let { review ->
+            moduleContext.lcncRunners["beliefs.review"] = borg.trikeshed.narsese.BeliefsNodes.reviewRunner(review) { angular, gloss ->
+                hermesMemoryFiles?.gloss(angular, gloss)
+            }
+        }
+        moduleContext.lcncRunners["nal.encode"] = borg.trikeshed.narsese.BeliefsNodes.encodeRunner()
+        // ── Rule admission: the seam that ends the live rete's dead spin —
+        // the daemon boots causalityRete over ZERO rules; these admit law.
+        causalityRete?.let { liveRete ->
+            moduleContext.lcncRunners["nal.rule.admit"] = borg.trikeshed.narsese.RuleNodes.ruleAdmitRunner(liveRete)
+            moduleContext.lcncRunners["nal.rules.fromKg"] = borg.trikeshed.narsese.RuleNodes.rulesFromKgRunner(liveRete)
+        }
+        // Bag-off honesty: these contracts ship unconditionally, so with the
+        // bag flagged off the canvas still gets a value naming the flag — not
+        // a 404. KanbanModule's own bag-gated pair is stubbed here too (its
+        // attach only registers them when ctx.beliefBag is live).
+        if (beliefBag == null) {
+            val bagGated = listOf(
+                "read.construct", "nal.mint", "nal.decay", "nal.recall", "skill.decay",
+                "nal.attend", "nal.reinforce", "nal.rule.admit", "nal.rules.fromKg",
+                "beliefs.introspect", "beliefs.resonate", "beliefs.review",
+                "state.freeze", "state.thaw", "kanban.attention", "kanban.drift",
+            )
+            val bagOff = borg.trikeshed.lcnc.LcncNodeRunner { _, _ ->
+                mapOf("error" to "belief bag disabled (--belief-bag)")
+            }
+            for (type in bagGated) moduleContext.lcncRunners[type] = bagOff
         }
         // ── Legal domain nodes: legal.ingest, legal.evidence ────────────
         moduleContext.lcncRunners["legal.ingest"] = borg.trikeshed.narsese.LegalNodes.ingestRunner(

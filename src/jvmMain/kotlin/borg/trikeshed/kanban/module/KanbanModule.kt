@@ -141,6 +141,22 @@ class KanbanModule : ForgeModule {
             ctx.rete.register(borg.trikeshed.kanban.rules.StallProduction()),
             ctx.rete.register(borg.trikeshed.kanban.rules.CycleGuardProduction()),
         )
+        // kanban.alerts substrate: the sink retains each rule's last few
+        // activations in a ring so the node answers from memory, bag OFF
+        // included (rules fire without NARS). synchronized: the sink runs on
+        // the commit path, the node on HTTP dispatch.
+        val alerts = borg.trikeshed.kanban.BoardRuleAlertRing()
+        ctx.lcncRunners["kanban.alerts"] = LcncNodeRunner { _, _ ->
+            fun tail(ruleId: String): List<Map<String, String>> = synchronized(alerts) {
+                alerts.tail(ruleId).map { it.bindings + ("activationId" to it.activationId) }
+            }
+            mapOf(
+                "breaches" to tail(borg.trikeshed.kanban.rules.BoardRules.WIP_BREACH),
+                "stalls" to tail(borg.trikeshed.kanban.rules.BoardRules.STALL),
+                "cycles" to tail(borg.trikeshed.kanban.rules.BoardRules.CYCLE_GUARD),
+                "ready" to tail(borg.trikeshed.kanban.rules.BoardRules.DEPENDENCY_READY),
+            )
+        }
         // Non-job activations: receipt on the blackboard ALWAYS; dependency-ready also
         // lowers to a store Move with a derived idempotency key (dedupe compensates
         // any popped-but-unprocessed activation).
@@ -150,6 +166,7 @@ class KanbanModule : ForgeModule {
                 a.bindings + ("salience" to "${a.salience}"),
                 "kanban-rete",
             )
+            synchronized(alerts) { alerts.retain(a) }
             bridge?.onRuleFired(a)
             if (a.ruleId == borg.trikeshed.kanban.rules.BoardRules.DEPENDENCY_READY) {
                 val jobId = a.bindings["jobId"]
@@ -189,7 +206,7 @@ class KanbanModule : ForgeModule {
                 facts.onCommitted(ev)
                 bridge?.let { b ->
                     b.onCommitted(ev)
-                    if (b.pendingCount >= 12) b.flush()
+                    if (b.pendingCount >= 12) flushReview()
                 }
             }
         }
@@ -221,7 +238,7 @@ class KanbanModule : ForgeModule {
             }
             while (true) {
                 facts.tick(ctx.clock())
-                bridge?.flush()
+                flushReview()
                 if (bag != null) {
                     val t2 = borg.trikeshed.kanban.BoardAttentionOrder.driftT2(bag)
                     if (t2 > 9f) { // χ²-ish alarm line: the board cohort has drifted from the field

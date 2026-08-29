@@ -96,3 +96,22 @@ class BoardReviewBridge(
         return review.reviewTurn(facts, turnSucceeded)
     }
 }
+
+/**
+ * BoardRuleAlertRing — the productions' live tail: the last [cap] activations
+ * per ruleId, so kanban.alerts answers from memory instead of replaying the
+ * kanban/rule blackboard receipts. Bag-independent (rules fire with NARS
+ * off). No internal locking — the holder serializes writer (productionSink)
+ * against readers.
+ */
+class BoardRuleAlertRing(private val cap: Int = 8) {
+    private val rings = HashMap<String, ArrayDeque<Activation>>()
+
+    fun retain(a: Activation) {
+        val ring = rings.getOrPut(a.ruleId) { ArrayDeque(cap) }
+        ring.addLast(a)
+        while (ring.size > cap) ring.removeFirst()
+    }
+
+    fun tail(ruleId: String): List<Activation> = rings[ruleId]?.toList() ?: emptyList()
+}

@@ -40,6 +40,8 @@ class CuratorImpulseElement(
     private val rete: CausalityReteElement? = null,
     /** Attention budget for minted impulse signals. */
     private val mintBudget: BudgetCoord = BudgetCoord(0.6f, 0.5f, 0.5f),
+    /** The accumulated banked knowledge — SUMO spine + assessed impulses (share ONE bank daemon-wide). */
+    val knowledgeBank: KifKnowledgeBase = KifKnowledgeBase(),
     parentJob: Job? = null,
 ) : AsyncContextElement(ElementState.CREATED, parentJob) {
 
@@ -48,9 +50,6 @@ class CuratorImpulseElement(
     override val key: CoroutineContext.Key<*> get() = Key
 
     private val evaluator = ContentId.of("curator-impulse".encodeToByteArray())
-
-    /** The accumulated banked knowledge — SUMO spine + assessed impulses. */
-    val knowledgeBank: KifKnowledgeBase = KifKnowledgeBase()
 
     init {
         // bootstrap the bank with the SUMO upper spine once
