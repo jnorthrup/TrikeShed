@@ -44,3 +44,8 @@
 **Vulnerability:** The `generateKey()` method in `Rfc6455Handshake.kt` used a highly predictable linear shift-XOR algorithm seeded by the system clock (`Clock.System.now().toEpochMilliseconds()`) to generate the `Sec-WebSocket-Key`.
 **Learning:** Using predictable, time-based PRNGs for cryptographic nonces like `Sec-WebSocket-Key` makes the handshake susceptible to prediction or replay attacks. While the RFC 6455 states this key is not meant for authentication, it is meant to prove the request is actually a WebSocket request and to prevent caching proxy issues, so it should still be robustly random.
 **Prevention:** Always use standard, secure-by-default libraries for random number generation (e.g., `kotlin.random.Random.Default.nextBytes` or `SecureRandom`) instead of rolling custom cryptographic algorithms or using simple PRNGs.
+
+## 2024-05-24 - ProcessBuilder Environment Leak Mitigation
+**Vulnerability:** `JvmProcessPipe` created a `ProcessBuilder` which inherits the host process environment variables by default, potentially leaking secrets to untrusted guest code.
+**Learning:** `ProcessBuilder` copies the parent environment. When spawning processes for untrusted code execution, the environment must be explicitly cleared and populated with only a curated whitelist of safe variables.
+**Prevention:** Always clear `ProcessBuilder.environment()` and populate it explicitly from a whitelist (like `GuestEnvironment.curated()`) when launching untrusted guests.

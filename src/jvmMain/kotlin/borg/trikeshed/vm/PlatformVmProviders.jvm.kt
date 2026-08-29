@@ -9,7 +9,11 @@ import java.io.File
 
 /** A child process over stdin/stdout lines — the JVM's contribution to the process tier. */
 class JvmProcessPipe(command: List<String>) : ProcessPipe {
-    private val process: Process = ProcessBuilder(command).redirectError(ProcessBuilder.Redirect.INHERIT).start()
+    private val process: Process = ProcessBuilder(command).apply {
+        environment().clear()
+        environment().putAll(borg.trikeshed.graal.subvm.GuestEnvironment.curated())
+        redirectError(ProcessBuilder.Redirect.INHERIT)
+    }.start()
     private val out: BufferedWriter = process.outputStream.bufferedWriter()
     private val input: BufferedReader = process.inputStream.bufferedReader()
     override val isAlive: Boolean get() = process.isAlive
