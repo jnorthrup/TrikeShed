@@ -3,7 +3,6 @@ package borg.trikeshed.forge.server
 import borg.trikeshed.graal.ConfixBlackboard
 import borg.trikeshed.litebike.JvmKanbanServer
 import borg.trikeshed.parse.json.JsonSupport
-import borg.trikeshed.parse.confix.value
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -24,8 +23,41 @@ class BlackboardWire(val blackboard: ConfixBlackboard, scope: CoroutineScope) {
     internal val pointcutDefinitions = borg.trikeshed.cursor.PointcutDefinitionWriter(blackboard, scope)
     private var sequence = 0L
 
-    // Bounded ring of 256
-    private val ring = Array<Pair<Long, borg.trikeshed.parse.confix.ConfixDoc>?>(256) { null }
+    // Bounded ring of 256 serialized fact events (seq → SSE-ready JSON line).
+    private val ring = Array<Pair<Long, String>?>(256) { null }
+    /** Live fan-out to SSE clients: (seq, json). ONE collector below owns sequence + ring. */
+    private val factEvents = MutableSharedFlow<Pair<Long, String>>(
+        extraBufferCapacity = 1024,
+        onBufferOverflow = kotlinx.coroutines.channels.BufferOverflow.DROP_OLDEST,
+    )
+    /** key → provenance timestamp at last emission; the diff basis for per-key events. */
+    private val lastStamps = mutableMapOf<String, Long>()
+
+    /**
+     * ConfixBlackboard.changes emits the WHOLE post-mutation doc, not a keyed delta —
+     * and its Confix internals defeat JsonSupport (the old wire streamed
+     * `JoinKt$j$1@…` toString hashes). Diff by provenance timestamp instead and emit
+     * one honest `{seq,key,value,actor,atMs}` event per changed key. Values are the
+     * raw objects handed to blackboard.put (maps/strings), which stringify cleanly;
+     * anything exotic degrades to its toString, never to a broken stream.
+     */
+    private fun emitDeltas() {
+        for (k in blackboard.keys()) {
+            val prov = blackboard.getProvenance(k) ?: continue
+            if (lastStamps[k] == prov.timestamp) continue
+            lastStamps[k] = prov.timestamp
+            val event = linkedMapOf<String, Any?>(
+                "seq" to sequence, "key" to k, "value" to blackboard.get(k),
+                "actor" to prov.language, "atMs" to prov.timestamp,
+            )
+            val json = runCatching { JsonSupport.stringify(event) }.getOrElse {
+                JsonSupport.stringify(event + ("value" to blackboard.get(k).toString()))
+            }
+            val seq = sequence++
+            ring[(seq % 256).toInt()] = seq to json
+            factEvents.tryEmit(seq to json)
+        }
+    }
 
     init {
         scope.launch {
@@ -45,10 +77,9 @@ class BlackboardWire(val blackboard: ConfixBlackboard, scope: CoroutineScope) {
         }
 
         scope.launch {
-            blackboard.changes.collect { doc ->
-                val seq = sequence++
-                ring[(seq % 256).toInt()] = seq to doc
-            }
+            // The one owner of sequence/ring. replay=1 on changes seeds the ring with
+            // the current board on attach, so a fresh SSE client replays real facts.
+            blackboard.changes.collect { emitDeltas() }
         }
     }
 
@@ -79,16 +110,18 @@ class BlackboardWire(val blackboard: ConfixBlackboard, scope: CoroutineScope) {
             respond?.invoke(headers.toByteArray(StandardCharsets.UTF_8))
 
             // H1 repair: replay in SEQUENCE order, not array-slot order (out of order
-            // after the first wrap). The ring holds seq → doc; a seq-sorted sweep of
-            // the occupied slots is the causal order.
+            // after the first wrap). The ring holds seq → serialized event; a
+            // seq-sorted sweep of the occupied slots is the causal order.
+            var replayedTo = -1L
             val occupied = ring.mapIndexed { i, e -> if (e != null) i else -1 }.filter { it >= 0 }
                 .sortedBy { i -> ring[i]!!.first }
             for (i in occupied) {
-                val (seq, doc) = ring[i]!!
+                val (seq, json) = ring[i]!!
                 if (seq >= since) {
-                    val data = "id: $seq\r\ndata: ${JsonSupport.stringify(doc.value())}\r\n\r\n"
+                    val data = "id: $seq\r\ndata: $json\r\n\r\n"
                     try {
                         respond?.invoke(data.toByteArray(StandardCharsets.UTF_8))
+                        replayedTo = seq
                     } catch (_: Throwable) {
                         return null
                     }
@@ -96,10 +129,11 @@ class BlackboardWire(val blackboard: ConfixBlackboard, scope: CoroutineScope) {
             }
 
             try {
-                blackboard.changes.collect { doc ->
-                    val seq = sequence++
-                    ring[(seq % 256).toInt()] = seq to doc
-                    val data = "id: $seq\r\ndata: ${JsonSupport.stringify(doc.value())}\r\n\r\n"
+                // Subscribe-only: the init collector owns sequence/ring. Skip anything
+                // the replay already delivered (the flow buffer may overlap the ring).
+                factEvents.collect { (seq, json) ->
+                    if (seq <= replayedTo) return@collect
+                    val data = "id: $seq\r\ndata: $json\r\n\r\n"
                     try {
                         respond?.invoke(data.toByteArray(StandardCharsets.UTF_8))
                     } catch (_: Throwable) {
