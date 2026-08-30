@@ -236,16 +236,28 @@ class BrainClient(
      * Full provider-roster status regardless of discovery: every table entry with a
      * key-PRESENCE flag only — key VALUES never leave this class. The patch-panel
      * keymux surface reads this (quota VOLUME visibility without secret exposure).
+     *
+     * When an external [keyMux] is provided, key presence is resolved through the
+     * full KeyMux chain (env → dotenv → harness credential files) instead of raw
+     * getenv() — harness-stored keys (hermes .env, codex, opencode) are visible.
      */
-    fun rosterStatus(): List<Map<String, Any>> {
+    suspend fun rosterStatus(): List<Map<String, Any>> {
         val discovered = endpoints.mapTo(mutableSetOf()) { it.name }
         return fullRoster().map { spec ->
+            val keyPresent = if (this@BrainClient.keyMux != null) {
+                // Resolve through the shared KeyMux — covers env + dotenv + harness stores.
+                runCatching { this@BrainClient.keyMux!!.get("llm.${spec.provider ?: spec.name}.key") }
+                    .getOrNull()?.isNotBlank() == true
+            } else {
+                // Standalone mode: raw env check only.
+                !SystemOperations.default.getenv(spec.envVar).isNullOrBlank()
+            }
             mapOf(
                 "name" to spec.name,
                 "envVar" to spec.envVar,
                 "base" to spec.base,
                 "model" to spec.model,
-                "keyPresent" to !SystemOperations.default.getenv(spec.envVar).isNullOrBlank(),
+                "keyPresent" to keyPresent,
                 "discovered" to (spec.name in discovered),
             )
         }

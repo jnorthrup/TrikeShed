@@ -6,6 +6,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
+import kotlinx.coroutines.runBlocking
 
 /**
  * Council graft #1: BrainClient discovery with an external KeyMux is UN-GATED —
@@ -20,7 +21,7 @@ class BrainClientRosterTest {
         BrainClient.EndpointSpec(name, envVar, "https://example.invalid/v1", "$name-model")
 
     @Test
-    fun externalKeyMuxAdmitsTheFullRoster() {
+    fun externalKeyMuxAdmitsTheFullRoster() = runBlocking {
         // Harness-file-only setup: no relevant env vars needed — the roster must
         // still be full, because per-call resolution (not discovery) owns keys.
         val client = BrainClient(keyMux = KeyMux { harness() })
@@ -33,7 +34,7 @@ class BrainClientRosterTest {
     }
 
     @Test
-    fun standaloneDiscoveryStaysEnvGated() {
+    fun standaloneDiscoveryStaysEnvGated() = runBlocking {
         // Standalone (keyMux == null): discovery is unchanged — an endpoint is
         // discovered iff its env var is present, pinned via rosterStatus flags.
         val client = BrainClient()

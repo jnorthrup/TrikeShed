@@ -1252,43 +1252,6 @@ object OroborosDaemon {
                 keyMux = keyMux,
                 modelMux = lcncModelMux,
                 credStore = couchKeyStore,
-                chatFn = { url, apiKey, model, messages, maxTokens, temperature, headers ->
-                    runCatching {
-                        val bodyMap = linkedMapOf<String, Any?>(
-                            "model" to model,
-                            "max_tokens" to maxTokens,
-                            "temperature" to temperature,
-                            "messages" to (0 until messages.size).map { i ->
-                                linkedMapOf("role" to messages[i].first, "content" to messages[i].second)
-                            },
-                        )
-                        val json = JsonSupport.stringify(bodyMap)
-                        fun hdr(k: String, v: String): borg.trikeshed.htx.HtxHeader =
-                            object : borg.trikeshed.htx.HtxHeader {
-                                override val a = k; override val b = v
-                            }
-                        val allHdrs = arrayOf(
-                            hdr("Authorization", "Bearer $apiKey"),
-                            hdr("Content-Type", "application/json"),
-                        ) + headers.filter { it.first.isNotBlank() }.map { (k, v) -> hdr(k, v) }.toTypedArray()
-                        val htxReq = borg.trikeshed.htx.parseHtxRequest(
-                            url = "$url/chat/completions",
-                            method = borg.trikeshed.htx.HtxMethod.POST,
-                            body = borg.trikeshed.lib.ByteSeries(json.encodeToByteArray()),
-                        ).copy(headers = borg.trikeshed.htx.htxHeaders(*allHdrs))
-                        val resp = htxElement.requestResult(htxReq).getOrThrow()
-                        val respBody = resp.body.toArray().decodeToString()
-                        val parsed = JsonSupport.parse(respBody) as? Map<*, *>
-                            ?: error("non-JSON response: ${respBody.take(200)}")
-                        val choices = parsed["choices"] as? List<*>
-                            ?: error("no choices in response")
-                        val first = choices.firstOrNull() as? Map<*, *>
-                            ?: error("empty choices")
-                        val message = first["message"] as? Map<*, *>
-                            ?: error("no message in choice")
-                        message["content"] as? String ?: error("no content in message")
-                    }
-                },
             ),
         )
         launch(Dispatchers.Default) {

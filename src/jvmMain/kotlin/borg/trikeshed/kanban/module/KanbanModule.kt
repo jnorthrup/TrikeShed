@@ -189,9 +189,20 @@ class KanbanModule : ForgeModule {
             }
         }
 
+        // The MCP lens onto this same asset (docs/marketability-kanban-mcp-audit.md,
+        // KMFSM-004/005/006). It is handed the LCNC registry and a read port — never
+        // the store — so an MCP write cannot become a second path to the intake.
+        val receiptLog = borg.trikeshed.mcp.KanbanReceiptLog()
+        receiptLog.seedFrom(store.cards())
+        val mcp = borg.trikeshed.mcp.LcncKanbanMcp(
+            tools = lcncRegistry,
+            reads = borg.trikeshed.mcp.BoardKanbanReadPort(store, lcnc, receiptLog),
+        )
+
         // Receipts: every committed transition is blackboard-visible AND a Rete card fact.
         val receipts = ctx.scope.launch {
             store.committed.collect { ev ->
+                receiptLog.record(ev)
                 ctx.blackboard.put(
                     "kanban/committed/${ev.jobId}/${ev.sequence}",
                     mapOf(
@@ -266,6 +277,43 @@ class KanbanModule : ForgeModule {
         ctx.routes.claim(id, "/api/board/import") { method, _, text, _ ->
             if (method != "POST") JvmKanbanServer.HttpResponse(405, """{"error":"method_not_allowed"}""")
             else import(store, text)
+        }
+
+        // KMFSM-006: MCP mounted in the daemon's own lifecycle — one server, one
+        // board, no second process. Streamable HTTP's POST half: one JSON-RPC
+        // document in, one out; a notification (no id) gets 202 and no body.
+        // GET is answered with the handshake a client would otherwise have to
+        // POST for, so `curl /api/mcp` is a useful thing to type.
+        ctx.routes.claim(id, "/api/mcp") { method, _, text, _ ->
+            when (method) {
+                "GET" -> JvmKanbanServer.HttpResponse(
+                    200,
+                    JsonSupport.stringify(
+                        mapOf(
+                            "server" to borg.trikeshed.mcp.LcncKanbanMcp.SERVER_NAME,
+                            "protocolVersions" to borg.trikeshed.mcp.LcncKanbanMcp.SUPPORTED_PROTOCOLS,
+                            "transport" to "POST this path with a JSON-RPC 2.0 document",
+                            "tools" to listOf(
+                                borg.trikeshed.mcp.LcncKanbanMcp.TOOL_SUBMIT,
+                                borg.trikeshed.mcp.LcncKanbanMcp.TOOL_MOVE,
+                            ),
+                            "resources" to listOf(
+                                borg.trikeshed.mcp.LcncKanbanMcp.URI_SCHEMA,
+                                borg.trikeshed.mcp.LcncKanbanMcp.URI_SHEETS,
+                                "${borg.trikeshed.mcp.LcncKanbanMcp.URI_CARD_PREFIX}{jobId}",
+                                "${borg.trikeshed.mcp.LcncKanbanMcp.URI_RECEIPT_PREFIX}{sequence}",
+                            ),
+                        ),
+                    ),
+                )
+
+                "POST" -> when (val reply = mcp.handle(rawBody(text))) {
+                    "" -> JvmKanbanServer.HttpResponse(202, "")
+                    else -> JvmKanbanServer.HttpResponse(200, reply)
+                }
+
+                else -> JvmKanbanServer.HttpResponse(405, """{"error":"method_not_allowed"}""")
+            }
         }
 
         ctx.routes.claim(id, "/api/lcnc/kanban") { method, _, _, _ ->
@@ -483,7 +531,11 @@ class KanbanModule : ForgeModule {
                 "routes" to listOf(
                     "/api/board", "/api/invoke", "/api/board/import",
                     "/api/lcnc/kanban", "/api/lcnc/kanban/move", "/api/lcnc/run",
-                    "/api/lcnc/council",
+                    "/api/lcnc/council", "/api/mcp",
+                ),
+                "mcp" to mapOf(
+                    "protocolVersions" to borg.trikeshed.mcp.LcncKanbanMcp.SUPPORTED_PROTOCOLS,
+                    "retainedReceipts" to receiptLog.size,
                 ),
             )
 

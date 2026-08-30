@@ -69,16 +69,32 @@ class LcncKanbanExperience(
                 // program run): NO-OP with a reason — silent degrade, not error.
                 if (jobId.isNullOrBlank()) mapOf("accepted" to false, "reason" to "no gesture: jobId/title absent")
                 else command(
-                    mapOf(
-                        "type" to "submit",
-                        "jobId" to jobId,
-                        "title" to (title ?: jobId),
-                        "priority" to (c["priority"]?.toString()?.toDoubleOrNull()?.toInt()
-                            ?: node.params["priority"]?.toIntOrNull() ?: 2),
-                        "idempotencyKey" to (c["idempotencyKey"]?.toString()?.takeIf { it.isNotBlank() }
-                            ?: node.params["idempotencyKey"]?.takeIf { it.isNotBlank() }
-                            ?: "submit#$jobId"),
-                    ),
+                    buildMap {
+                        put("type", "submit")
+                        put("jobId", jobId)
+                        put("title", title ?: jobId)
+                        put(
+                            "priority",
+                            c["priority"]?.toString()?.toDoubleOrNull()?.toInt()
+                                ?: node.params["priority"]?.toIntOrNull() ?: 2,
+                        )
+                        put(
+                            "idempotencyKey",
+                            c["idempotencyKey"]?.toString()?.takeIf { it.isNotBlank() }
+                                ?: node.params["idempotencyKey"]?.takeIf { it.isNotBlank() }
+                                ?: "submit#$jobId",
+                        )
+                        // The store already persists tags/dependencies/owner off the
+                        // raw command (BoardStoreElement.advanceRow reads all three),
+                        // but this runner dropped them on the floor — so a card
+                        // submitted through LCNC could never carry a dependency, and
+                        // the cycle guard had nothing to guard. Forward when the
+                        // gesture supplies them; absent stays absent, so an existing
+                        // card keeps the values it has.
+                        listish(c["tags"])?.let { put("tags", it) }
+                        listish(c["dependencies"])?.let { put("dependencies", it) }
+                        c["owner"]?.toString()?.trim()?.takeIf { it.isNotEmpty() }?.let { put("owner", it) }
+                    },
                 )
             },
             "kanban.move" to LcncNodeRunner { node, inputs ->
@@ -192,6 +208,14 @@ class LcncKanbanExperience(
 
     private fun wiredCommand(inputs: Map<String, Any?>): Map<*, *> =
         (inputs["command"] ?: inputs["command?"]) as? Map<*, *> ?: emptyMap<String, Any?>()
+
+    /** Non-empty string list, or null so the caller can leave the field unset.
+     *  Backends disagree on List vs Array; [BoardIntake]'s lowering already
+     *  normalizes both, so reuse its rule rather than inventing a second one. */
+    private fun listish(value: Any?): List<String>? =
+        borg.trikeshed.kanban.InvokeLowering.listishOf(value)
+            ?.mapNotNull { it?.toString()?.trim()?.takeIf(String::isNotEmpty) }
+            ?.takeIf { it.isNotEmpty() }
 
     /** No stale parent-port preview: only the requested JSON path is projectable. */
     private fun resolveJsonPath(root: Any?, rawPath: String): Any? {
