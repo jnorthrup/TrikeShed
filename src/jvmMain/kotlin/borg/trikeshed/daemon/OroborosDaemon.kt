@@ -720,6 +720,11 @@ object OroborosDaemon {
                             null,
                         )
                     }.onFailure { System.err.println("[OROBOROS] curator kif-ledger write failed (non-fatal): ${it.message}") }
+                    // The couch write above does not survive a restart — casBacked rebuilds its
+                    // head projection empty at every boot, so the bodies persist in CAS but
+                    // nothing can find them again. The file is the durable plane.
+                    runCatching { borg.trikeshed.narsese.NarsDurableLedger.appendAxiom(forgeHome, kif) }
+                        .onFailure { System.err.println("[OROBOROS] curator axiom ledger write failed (non-fatal): ${it.message}") }
                 },
                 parentJob = coroutineContext[kotlinx.coroutines.Job],
             )
@@ -1053,6 +1058,10 @@ object OroborosDaemon {
                             null,
                         )
                     }.onFailure { System.err.println("[OROBOROS] rete-rule ledger write failed (non-fatal): ${it.message}") }
+                    // Same reason as the axiom ledger: couch cannot find its own documents after
+                    // a restart, so the durable record of admitted law is the file.
+                    runCatching { borg.trikeshed.narsese.NarsDurableLedger.appendRule(forgeHome, r) }
+                        .onFailure { System.err.println("[OROBOROS] rete-rule file ledger write failed (non-fatal): ${it.message}") }
                 },
             )
             moduleContext.lcncRunners["nal.rules.fromKg"] = borg.trikeshed.narsese.RuleNodes.rulesFromKgRunner(liveRete)
@@ -1363,6 +1372,13 @@ object OroborosDaemon {
                     val kif = (rowMap["doc"] as? Map<*, *>)?.get("kif") as? String ?: continue
                     runCatching { kifBank.assertKif(kif) }.onSuccess { kifCount++ }
                 }
+                // The couch loop above can only see documents THIS boot wrote — casBacked's head
+                // projection starts empty every time. The file ledger is what actually carries
+                // taught axioms across a restart.
+                var kifFileCount = 0
+                for (kif in borg.trikeshed.narsese.NarsDurableLedger.readAxioms(forgeHome)) {
+                    runCatching { kifBank.assertKif(kif) }.onSuccess { kifFileCount++ }
+                }
                 val caseRows = couchDb.allDocs(startkey = "council-case/", endkey = "council-case/\uFFF0", includeDocs = true)["rows"] as? List<*> ?: emptyList<Any?>()
                 for (row in caseRows) {
                     val rowMap = row as? Map<*, *> ?: continue
@@ -1407,9 +1423,13 @@ object OroborosDaemon {
                             ),
                         )
                     }
+                    restored.addAll(borg.trikeshed.narsese.NarsDurableLedger.readRules(forgeHome))
                     if (restored.isNotEmpty()) ruleCount = liveRete.admit(borg.trikeshed.lib.seriesOf(restored))
                 }
-                System.err.println("[OROBOROS] council thaw: $kifCount kif facts, $caseCount cases re-indexed, $ruleCount eternal rules re-admitted")
+                System.err.println(
+                    "[OROBOROS] council thaw: $kifCount kif facts (couch) + $kifFileCount (durable ledger), " +
+                        "$caseCount cases re-indexed, $ruleCount eternal rules re-admitted"
+                )
             }.onFailure {
                 System.err.println("[OROBOROS] council thaw failed (non-fatal): ${it.message}")
             }
