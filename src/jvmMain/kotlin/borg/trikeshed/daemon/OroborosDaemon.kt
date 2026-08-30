@@ -1552,6 +1552,12 @@ object OroborosDaemon {
             parentJob = coroutineContext[kotlinx.coroutines.Job],
             includeGlobs = listOf(".git/**"),
             excludeGlobs = emptyList(),
+            // This watcher wants the git DB and nothing else, but the walk is rooted at the repo:
+            // 15,232 of this checkout's 16,537 directories live under .claude/worktrees, so
+            // without pruning it registered an OS watch on 92% of the tree to observe none of it.
+            // `.git` stays walkable — everything this watcher exists for is under it.
+            walkerBlockedSegments = WorktreeCouchGateway.EXCLUDED_SEGMENTS - ".git",
+            walkerBlockedRelativePrefixes = WorktreeCouchGateway.EXCLUDED_RELATIVE_PREFIXES,
         )
         launch(Dispatchers.IO) { gitWatcher.open() }
         System.err.println("[OROBOROS] Git watcher: ${gitWatcher.state} — reactive .git/** events")
@@ -1564,6 +1570,10 @@ object OroborosDaemon {
             parentJob = coroutineContext[kotlinx.coroutines.Job],
             includeGlobs = listOf("jules-board.wal"),
             excludeGlobs = emptyList(),
+            // One file at the forge root, but the walk is rooted at the forge home — which is
+            // where the CAS store lives. Pruning the store's shard tree keeps this watcher the
+            // size of the thing it actually watches.
+            walkerBlockedSegments = WorktreeCouchGateway.EXCLUDED_SEGMENTS,
         )
         launch(Dispatchers.IO) { julesWalWatcher.open() }
         launch {
