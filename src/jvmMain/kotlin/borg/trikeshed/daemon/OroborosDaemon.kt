@@ -33,6 +33,7 @@ import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.cancelChildren
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.channels.Channel
@@ -240,6 +241,18 @@ object OroborosDaemon {
         try {
             runBlocking {
                 mainImpl(args)
+                // mainImpl is an extension on THIS scope, so everything it launched without an
+                // explicit parent is a child of this runBlocking. Its own finally cancels the jobs
+                // it holds by name, but runBlocking still waits on every remaining child — so
+                // `--once` did all its work, ran its cleanup, returned, and then hung forever with
+                // nothing left to do. Measured: a test worker parked on
+                // BlockingCoroutine.joinBlocking with 17s of CPU across 32 minutes of wall clock,
+                // which is why no full-suite result has ever been obtainable for this repo.
+                //
+                // Cancelling here rather than adding one more name to that finally: the failure is
+                // that the list has to be exhaustive, and any future launch that forgets to
+                // register re-introduces the hang silently. This makes exit independent of the list.
+                coroutineContext.cancelChildren()
             }
         } catch (e: kotlinx.coroutines.CancellationException) {
             // JVM shutdown triggered by signal handler
