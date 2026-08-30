@@ -1,4 +1,7 @@
 package borg.trikeshed.jules
+import borg.trikeshed.agent.SessionInfo
+
+import borg.trikeshed.agent.ActivityInfo
 
 import borg.trikeshed.jules.ui.JulesBlackboardAdapter
 import kotlinx.coroutines.test.runTest
@@ -23,7 +26,7 @@ class JulesBlackboardAdapterTest {
         patchBytes: Long = 1024L,
         source: String = "sources/test",
         updateTime: String = "2024-01-01T00:00:00Z",
-    ) = JulesRestClient.SessionInfo(
+    ) = SessionInfo(
         id = id, state = state, title = title, patchBytes = patchBytes,
         source = source, updateTime = updateTime,
     )
@@ -36,7 +39,7 @@ class JulesBlackboardAdapterTest {
         kind: String = "agentMessaged",
         patchBytes: Long = 512L,
         excerpt: String = "Test excerpt text",
-    ) = JulesRestClient.ActivityInfo(
+    ) = ActivityInfo(
         id = id, seq = seq, createTime = createTime, originator = originator,
         kind = kind, patchBytes = patchBytes, excerpt = excerpt, message = excerpt,
     )

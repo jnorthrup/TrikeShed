@@ -1,5 +1,7 @@
 package borg.trikeshed.jules
 
+import borg.trikeshed.agent.SessionInfo
+
 import borg.trikeshed.userspace.containment.CrossInstanceCollusionDetector
 import kotlinx.datetime.Clock
 import kotlin.test.Test
@@ -15,7 +17,7 @@ class CrossInstanceCollusionDetectorTest {
         
         val arms = listOf(
             Triple(
-                JulesRestClient.SessionInfo(
+                SessionInfo(
                     id = "s1", 
                     state = "COMPLETED", 
                     title = "Task 1", 
@@ -27,7 +29,7 @@ class CrossInstanceCollusionDetectorTest {
                 "+++ b/src/commonMain/kotlin/App.kt\n"
             ),
             Triple(
-                JulesRestClient.SessionInfo(
+                SessionInfo(
                     id = "s2", 
                     state = "COMPLETED", 
                     title = "Task 2", 
@@ -39,7 +41,7 @@ class CrossInstanceCollusionDetectorTest {
                 "+++ b/src/commonMain/kotlin/App.kt\n"
             ),
             Triple(
-                JulesRestClient.SessionInfo(
+                SessionInfo(
                     id = "s3", 
                     state = "COMPLETED", 
                     title = "Task 3", 
@@ -66,7 +68,7 @@ class CrossInstanceCollusionDetectorTest {
         
         val arms = listOf(
             Triple(
-                JulesRestClient.SessionInfo(
+                SessionInfo(
                     id = "s1", 
                     state = "COMPLETED", 
                     title = "Task 1", 
@@ -78,7 +80,7 @@ class CrossInstanceCollusionDetectorTest {
                 "+++ b/src/commonMain/kotlin/App1.kt\n"
             ),
             Triple(
-                JulesRestClient.SessionInfo(
+                SessionInfo(
                     id = "s2", 
                     state = "COMPLETED", 
                     title = "Task 2", 
@@ -90,7 +92,7 @@ class CrossInstanceCollusionDetectorTest {
                 "+++ b/src/commonMain/kotlin/App2.kt\n"
             ),
             Triple(
-                JulesRestClient.SessionInfo(
+                SessionInfo(
                     id = "s3", 
                     state = "COMPLETED", 
                     title = "Task 3", 
@@ -117,7 +119,7 @@ class CrossInstanceCollusionDetectorTest {
         
         val arms = listOf(
             Triple(
-                JulesRestClient.SessionInfo(
+                SessionInfo(
                     id = "s1", 
                     state = "COMPLETED", 
                     title = "Fix typo in App", 
@@ -129,7 +131,7 @@ class CrossInstanceCollusionDetectorTest {
                 "+++ b/src/commonMain/kotlin/App1.kt\n"
             ),
             Triple(
-                JulesRestClient.SessionInfo(
+                SessionInfo(
                     id = "s2", 
                     state = "COMPLETED", 
                     title = "fix typo in app", 
@@ -141,7 +143,7 @@ class CrossInstanceCollusionDetectorTest {
                 "+++ b/src/commonMain/kotlin/App2.kt\n"
             ),
             Triple(
-                JulesRestClient.SessionInfo(
+                SessionInfo(
                     id = "s3", 
                     state = "COMPLETED", 
                     title = "FIX TYPO IN APP!!!", 
