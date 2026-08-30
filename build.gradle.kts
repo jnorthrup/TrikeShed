@@ -664,7 +664,7 @@ tasks.register<Exec>("stageDaemonAot") {
         // (we want to link the class graph fast, not replicate 600MB of agent home).
         commandLine("bash", "-c", """
             set -u
-            HOME='${trainHome.path}' JULES_API_KEY="${'$'}{JULES_API_KEY:-aot-training-dummy}" \
+            HOME='${trainHome.path}' \
               '$javaBin' -XX:AOTCacheOutput='${aot.path}' -Xlog:aot=info \
               -cp '$cp' borg.trikeshed.daemon.OroborosDaemon \
               --watch --kanban-port $port --interval-ms 86400000 '${trainHome.path}/forge' '$repo' &
@@ -908,7 +908,6 @@ val generateForgeAssets = tasks.register("generateForgeAssets") {
     val bundleAllowlist = listOf(
         "confix/job-nexus.schema.json",
         "openapi/htx-general.openapi.yaml",
-        "openapi/jules.openapi.yaml",
         "openapi/forge-host.openapi.yaml",
         // Immutable WikiSkill trainer 1A. Keep every asset in the common bundle so
         // JVM, browser, Worker, and native evaluate the same bytes.
@@ -1113,7 +1112,7 @@ tasks.register("metrics") {
 
 tasks.register<JavaExec>("queueGraphWork") {
     group = "trikeshed"
-    description = "Queue Graphify + pgGraph merged work to Jules board"
+    description = "Queue Graphify + pgGraph merged work to the kanban board"
     classpath = files(
         layout.buildDirectory.dir("classes/kotlin/jvm/main"),
         configurations.named("jvmRuntimeClasspath")

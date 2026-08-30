@@ -41,7 +41,13 @@ object GuestModules {
      * the working directory that contains `utils/subvm`. Null when nothing is installed — an absent
      * module is a lego that cannot run, never a daemon that cannot boot.
      */
+    /** System-property form of [HOME_ENV]; wins over it, since a JVM can set it and env it cannot. */
+    const val HOME_PROPERTY = "trikeshed.subvm.home"
+
     fun root(): File? {
+        System.getProperty(HOME_PROPERTY)?.takeIf { it.isNotBlank() }?.let { prop ->
+            return File(prop).takeIf { it.isDirectory }
+        }
         System.getenv(HOME_ENV)?.takeIf { it.isNotBlank() }?.let { env ->
             return File(env).takeIf { it.isDirectory }
         }
@@ -86,6 +92,27 @@ object GuestModules {
     fun loaderFor(module: String): URLClassLoader? {
         if (!isInstalled(module)) return null
         return loaders.computeIfAbsent(module) {
+            // Verify BEFORE handing back a loader. A mounted classpath is code the daemon
+            // executes, so "a drifted jar should be visible, not silent" has to be enforced at the
+            // one place that makes it executable — otherwise verify() is a function nobody calls.
+            // computeIfAbsent means this hashes the module's bytes once per process, not per eval.
+            // The branch is on whether a manifest EXISTS, not on whether it has rows. A manifest
+            // present but empty is not a debug drop — it is a manifest that accounts for nothing,
+            // and every jar beside it is unaccounted for. Keying on `entries.isEmpty()` let exactly
+            // that case mount unverified, which is what GuestModuleMountVerificationTest caught.
+            if (manifestFile(module) == null) {
+                // A hand-assembled module — `classes/` dropped in for debugging, per the deploy
+                // convention — legitimately has no manifest. Allowed, but never silently: an
+                // unpinned classpath the operator forgot about should still announce itself.
+                println("[SUBVM] guest module '$module' has no ${GuestModuleLayout.MANIFEST} — mounting UNVERIFIED (${classpath(module).size} roots)")
+            } else {
+                val v = verify(module)
+                check(v.ok) {
+                    "guest module '$module' failed verification against ${GuestModuleLayout.MANIFEST} " +
+                        "and was NOT mounted:\n  " + v.problems.joinToString("\n  ") +
+                        "\nRe-resolve it: ./gradlew -p utils/subvm install${module.replaceFirstChar { it.uppercase() }}"
+                }
+            }
             URLClassLoader(
                 // File.toURI() appends the trailing slash for an existing directory, which is what
                 // URLClassLoader needs to treat `classes/` as a directory rather than a jar.

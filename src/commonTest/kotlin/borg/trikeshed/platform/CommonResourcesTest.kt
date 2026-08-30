@@ -16,7 +16,7 @@ class CommonResourcesTest {
         val schema = assertNotNull(CommonResources.text("classpath:/confix/job-nexus.schema.json"))
         assertTrue(schema.contains("Job Nexus Confix Schema"))
         assertEquals(schema, CommonResources.text("confix/job-nexus.schema.json"), "classpath:/ and bare keys are the same resource")
-        assertTrue(assertNotNull(CommonResources.text("openapi/jules.openapi.yaml")).contains("openapi"))
+        assertTrue(assertNotNull(CommonResources.text("openapi/htx-general.openapi.yaml")).contains("openapi"))
         assertEquals(schema.encodeToByteArray().size, loadConfixSchemaBytes("classpath:/confix/job-nexus.schema.json").size)
     }
 
