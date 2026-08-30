@@ -666,7 +666,7 @@ function renderGroupedBoard(n){
   const total=Object.values(groups).reduce((a,g)=>a+g.length,0);
   status.textContent=total+" items across "+cols.length+" groups";
   for(const col of cols){
-    const items=groups[col.id]||[];
+    const items=(groups[col.id]||[]).slice().sort((a,b)=>((a&&a.order)??0)-((b&&b.order)??0));
     const over=col.wipLimit&&items.length>col.wipLimit;
     const c=document.createElement("div"); c.className="kcol"+(over?" over":"");
     c.dataset.group=col.id;
@@ -681,6 +681,7 @@ function renderGroupedBoard(n){
     for(const it of items){
       const card=document.createElement("div");
       card.className="kcard"+(it.contested?" contested":"");
+      card.dataset.jobid=it[idF];
       card.style.touchAction="none"; // pointer drag streams moves on touch too
       const title=it[titleF]??it[idF]??"?", sub=it[subF], badge=it[badgeF];
       card.innerHTML=`<div>${title}</div><div class="kid">${sub!=null&&sub!==title?sub:""}${badge!=null?" · "+badge:""}</div>`;
@@ -714,14 +715,30 @@ function renderGroupedBoard(n){
           if(!ghost) return; // never crossed the threshold: plain click
           ghost.remove();
           const kc=colUnder(ev), to=kc&&kc.dataset.group;
-          if(!to||to===col.id) return;
-          // Optimistic local move: the card lands NOW; the next activeSheets
+          if(!to) return;
+          // X and Y both mean something: the card whose top half the pointer is
+          // above becomes the insert-before target; below every card = append.
+          let beforeJobId=null;
+          for(const el2 of kc.querySelectorAll(".kcard")){
+            if(el2===card) continue;
+            const r2=el2.getBoundingClientRect();
+            if(ev.clientY<r2.top+r2.height/2){ beforeJobId=el2.dataset.jobid||null; break; }
+          }
+          if(to===col.id&&beforeJobId===null) return; // dropped back where it was
+          // Optimistic local move AT the pointed position; the next activeSheets
           // tick reconciles truth (a refused move snaps it back).
           const fromArr=n._groups[col.id]||[], idx=fromArr.findIndex(x=>x[idF]===it[idF]);
-          if(idx>=0){ (n._groups[to]=n._groups[to]||[]).push(fromArr.splice(idx,1)[0]); renderGroupedBoard(n); }
+          if(idx>=0){
+            const moved=fromArr.splice(idx,1)[0];
+            const dst=(n._groups[to]=n._groups[to]||[]);
+            const at=beforeJobId?dst.findIndex(x=>x[idF]===beforeJobId):-1;
+            if(at>=0) dst.splice(at,0,moved); else dst.push(moved);
+            dst.forEach((x,i)=>{ if(x&&typeof x==="object") x.order=i; });
+            renderGroupedBoard(n);
+          }
           const st=n.el.querySelector(".kboard-status");
-          if(st) st.textContent=it[idF]+": "+col.id+" → "+to+" (downstream deciding…)";
-          n._lastMove={itemId:it[idF],item:it,from:col.id,to};
+          if(st) st.textContent=it[idF]+": "+col.id+" → "+to+(beforeJobId?" (before "+beforeJobId+")":"")+" (downstream deciding…)";
+          n._lastMove={itemId:it[idF],item:it,from:col.id,to,beforeJobId};
           runAll(n.id); // this node's own downstream chain sees the gesture
         };
         window.addEventListener("pointermove",onMove);

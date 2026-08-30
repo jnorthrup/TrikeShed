@@ -36,7 +36,16 @@ object LcncPresets {
         "preset-hermes-train" to hermesTrain(),
         "preset-legal-tribunal" to legalTribunal(),
         "preset-state-freeze" to stateFreeze(),
+        "preset-council" to council(),
     )
+
+    // ── legal council: the default 3x5 convening, fully drawn ────────────
+    // The can and the atoms are the same substance: this preset IS
+    // CouncilProgram.build(DEFAULT_3x5) verbatim — byte-identical to what
+    // the pure council.convene node emits for an empty config
+    // (CouncilPresetIdentityTest pins the identity in both directions).
+    private fun council(): String =
+        LcncProgramConfix.toJson(CouncilProgram.build(CouncilConfig.DEFAULT_3x5))
 
     // ── The concentric machine demo: three rings, ONE document. The root
     // scope.in's default binds; its value is consumed TWO rings deep with
@@ -156,7 +165,7 @@ object LcncPresets {
                 // kanban.move (the daemon's own runner — the same one webhook dispatch
                 // and /api/lcnc/kanban/move resolve) lands it on the WAL.
                 LcncNode("n8", "js",
-                    params = mapOf("expr" to "{jobId:x.itemId,toColumn:x.to,expectedRevision:x.item.revision,idempotencyKey:'panel-'+x.itemId+'-'+x.item.revision+'-'+x.to}"),
+                    params = mapOf("expr" to "{jobId:x.itemId,toColumn:x.to,expectedRevision:x.item.revision,beforeJobId:x.beforeJobId,idempotencyKey:'panel-'+x.itemId+'-'+x.item.revision+'-'+x.to+'-'+(x.beforeJobId||'end')}"),
                     x = 1660.0, y = 420.0),
                 LcncNode("n9", "kanban.move", x = 1880.0, y = 420.0),
                 // The no-wire submit lane: type a title, click run — a real card lands.

@@ -86,14 +86,16 @@ class LcncKanbanExperience(
                 val jobId = c["jobId"]?.toString() ?: c["itemId"]?.toString() ?: node.params["jobId"]
                 if (jobId.isNullOrBlank()) mapOf("accepted" to false, "reason" to "no gesture: command input or jobId param absent")
                 else command(
-                    mapOf(
-                        "type" to "move",
-                        "jobId" to jobId,
-                        "toColumn" to required(node, c, "toColumn"),
+                    buildMap {
+                        put("type", "move")
+                        put("jobId", jobId)
+                        put("toColumn", required(node, c, "toColumn"))
                         // JSON numbers may arrive as 3.0; the reducer consumes a long.
-                        "expectedRevision" to required(node, c, "expectedRevision").toDouble().toLong(),
-                        "idempotencyKey" to required(node, c, "idempotencyKey"),
-                    ),
+                        put("expectedRevision", required(node, c, "expectedRevision").toDouble().toLong())
+                        put("idempotencyKey", required(node, c, "idempotencyKey"))
+                        // Positional insert: land BEFORE this card in the target column.
+                        c["beforeJobId"]?.toString()?.takeIf { it.isNotBlank() }?.let { put("beforeJobId", it) }
+                    },
                 )
             },
             // Plan-doc import as a lego: bullets in, cards out — the node form of

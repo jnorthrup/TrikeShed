@@ -173,4 +173,43 @@ class BoardStoreElementTest {
         assertEquals(1, flushes, "group commit must flush once for the drained batch")
         el.drain()
     }
+
+    @Test
+    fun beforeJobIdInsertsBetweenCardsAndSurvivesReplay() = runBlocking {
+        val dir = tempDir("ordering")
+        val cas = CasStore.inMemory()
+        val el = BoardStoreElement(JvmBoardWal(dir), cas, clock = { 1L })
+        el.open()
+        for (j in listOf("a", "b", "c")) submit(el, j, "k-$j")
+        // all three sit in todo at submit order a,b,c — move c BEFORE a
+        send(el, "type" to "move", "jobId" to "c", "idempotencyKey" to "m1",
+            "expectedRevision" to 1, "toColumn" to "todo", "beforeJobId" to "a")
+        fun ordered(e: BoardStoreElement) =
+            e.cards().filter { it.col == BoardCol.TODO }.sortedBy { it.order }.map { it.jobId }
+        assertEquals(listOf("c", "a", "b"), ordered(el), "same-lane reorder inserts BETWEEN cards")
+
+        // cross-lane positional insert: b → ready (alone), then a → ready BEFORE b
+        send(el, "type" to "move", "jobId" to "b", "idempotencyKey" to "m2",
+            "expectedRevision" to 1, "toColumn" to "ready")
+        send(el, "type" to "move", "jobId" to "a", "idempotencyKey" to "m3",
+            "expectedRevision" to 1, "toColumn" to "ready", "beforeJobId" to "b")
+        val ready = el.cards().filter { it.col == BoardCol.READY }.sortedBy { it.order }.map { it.jobId }
+        assertEquals(listOf("a", "b"), ready, "cross-lane insert-before lands at the pointed position")
+
+        // an unknown beforeJobId degrades to append, never an error
+        val ok = send(el, "type" to "move", "jobId" to "c", "idempotencyKey" to "m4",
+            "expectedRevision" to 2, "toColumn" to "ready", "beforeJobId" to "card-gone")
+        assertIs<BoardApply.Committed>(ok)
+        assertEquals(listOf("a", "b", "c"),
+            el.cards().filter { it.col == BoardCol.READY }.sortedBy { it.order }.map { it.jobId })
+        el.drain()
+
+        // replay: a fresh element over the same WAL derives the SAME packing
+        val el2 = BoardStoreElement(JvmBoardWal(dir), cas, clock = { 1L })
+        el2.open()
+        assertEquals(listOf("a", "b", "c"),
+            el2.cards().filter { it.col == BoardCol.READY }.sortedBy { it.order }.map { it.jobId },
+            "beforeJobId ordering is replay-stable — the raw map is the WAL truth")
+        el2.drain()
+    }
 }

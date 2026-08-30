@@ -249,6 +249,7 @@ function render(board) {
 function cardEl(it) {
   const el = document.createElement("div");
   el.className = "card";
+  el.dataset.id = it.id;
   el.style.touchAction = "none"; // pointer drag streams moves on touch too
   const heat = typeof it.attention === "number" && it.attention > 0
     ? `<span class="heat" title="attention">${it.contested ? "⚡" : "●"} ${(it.attention * 100).toFixed(0)}%</span>` : "";
@@ -292,8 +293,11 @@ function cardEl(it) {
       ghost.remove();
       const lane = laneUnder(ev);
       dragEnded();
-      if (lane && lane.dataset.lane && lane.dataset.lane !== it.status) {
-        moveCard({ id: it.id, revision: it.revision, from: it.status }, lane.dataset.lane);
+      if (lane && lane.dataset.lane) {
+        const before = beforeTargetIn(lane, ev.clientY, it.id);
+        // A completed drag always commits: cross-lane moves, same-lane reorders
+        // (append when dropped below every card, insert-before otherwise).
+        moveCard({ id: it.id, revision: it.revision, from: it.status }, lane.dataset.lane, before);
       }
     };
     window.addEventListener("pointermove", onMove);
@@ -326,19 +330,34 @@ async function addCard(title, lane, input) {
   }
 }
 
-async function moveCard(drag, toLane) {
-  if (drag.from === toLane) return;
-  const { status, body } = await api("/api/lcnc/kanban/move", {
+async function moveCard(drag, toLane, beforeJobId) {
+  if (drag.from === toLane && !beforeJobId) return;
+  const command = {
+    jobId: drag.id, toColumn: toLane, expectedRevision: drag.revision,
+    idempotencyKey: "ui#" + drag.id + "#" + drag.revision + "#" + toLane + "#" + (beforeJobId || "end"),
+  };
+  if (beforeJobId) command.beforeJobId = beforeJobId;
+  // kanban.move via the runner dispatch — the one lane that carries beforeJobId.
+  const { status, body } = await api("/api/lcnc/run", {
     method: "POST", headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ itemId: drag.id, to: toLane, expectedRevision: drag.revision }),
+    body: JSON.stringify({ type: "kanban.move", inputs: { command, "command?": command } }),
   });
-  if (status === 202) { await refresh(true); return; }
-  if (status === 409) {
-    toast(body?.reason ? "Move refused: " + body.reason : "That card changed under you — board refreshed.");
-  } else {
-    toast("Move failed (" + status + ")");
-  }
+  const out = body && body.outputs;
+  if (status === 200 && out && out.accepted !== false) { await refresh(true); return; }
+  toast("Move refused: " + ((out && out.reason) || body?.error || status));
   await refresh(true);
+}
+
+// The card whose TOP HALF the pointer is above becomes the insert-before
+// target; below every card = append. This is what makes X-and-Y drops land
+// BETWEEN cards instead of at the bottom.
+function beforeTargetIn(lane, clientY, draggedId) {
+  for (const card of lane.querySelectorAll(".card")) {
+    if (card.dataset.id === draggedId) continue;
+    const r = card.getBoundingClientRect();
+    if (clientY < r.top + r.height / 2) return card.dataset.id;
+  }
+  return null;
 }
 
 async function archiveCard(it) {

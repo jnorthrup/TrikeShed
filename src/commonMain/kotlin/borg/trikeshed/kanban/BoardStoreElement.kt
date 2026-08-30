@@ -213,11 +213,38 @@ class BoardStoreElement(
         val row = advanceRow(prev, jobId, raw, lowered, snapshot, seq)
         rows = if (row == null) rows - jobId else rows + (jobId to row)
 
+        // Positional insert: a move carrying beforeJobId lands BETWEEN cards, not
+        // at the bottom. The raw map is the WAL truth, so replay re-derives the
+        // same packing; ordering never depends on client state.
+        val beforeId = (raw["beforeJobId"] as? String)?.takeIf { it.isNotBlank() && it != jobId }
+        if (lowered is JobCommand.Move && row != null && beforeId != null) {
+            rows = repackColumn(rows, row.col, jobId, beforeId)
+        }
+
         appendCausal(jobId, lowered, snapshot, cid, raw)
 
         val event = BoardCommitted(seq, jobId, snapshot, cid, lowered, row?.col ?: BoardCol.ARCHIVED, prev?.col, row?.lastMoveMs ?: 0L)
         _committed.tryEmit(event)
         return BoardApply.Committed(jobId, seq, snapshot.revision, lowered.idempotencyKey, cid)
+    }
+
+    /** Re-pack one column 0..n with [movedId] positioned before [beforeId].
+     *  A beforeId outside the column degrades to append — never an error. */
+    private fun repackColumn(
+        current: Map<String, CardRow>,
+        col: BoardCol,
+        movedId: String,
+        beforeId: String,
+    ): Map<String, CardRow> {
+        val moved = current[movedId] ?: return current
+        val rest = current.values.filter { it.col == col && it.jobId != movedId }.sortedBy { it.order }
+        val at = rest.indexOfFirst { it.jobId == beforeId }
+        val packed = ArrayList<CardRow>(rest.size + 1)
+        if (at < 0) { packed.addAll(rest); packed.add(moved) }
+        else { packed.addAll(rest.subList(0, at)); packed.add(moved); packed.addAll(rest.subList(at, rest.size)) }
+        var out = current
+        packed.forEachIndexed { i, r -> if (r.order != i) out = out + (r.jobId to r.copy(order = i)) }
+        return out
     }
 
     private fun boardGuard(cmd: JobCommand): String? = when (cmd) {
