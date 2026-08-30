@@ -166,7 +166,19 @@ attach_loop() {
   echo "$dev"
 }
 
-fs_type_of() { blkid -o value -s TYPE "$1" 2>/dev/null || true; }
+# blkid exit codes: 0 = signature found, 2 = none found, anything else = ERROR.
+# The old `|| true` collapsed error into "no filesystem", which would let the
+# mkfs fence pass on a probe failure. Errors now abort instead of silently
+# clearing EXISTING.
+fs_type_of() {
+  local out rc
+  out="$(blkid -o value -s TYPE "$1" 2>/dev/null)"; rc=$?
+  case "$rc" in
+    0) printf '%s' "$out" ;;
+    2) printf '' ;;
+    *) echo "blkid failed (exit $rc) probing $1 — refusing to treat this as 'no filesystem'" >&2; exit 3 ;;
+  esac
+}
 
 mount_if_needed() {
   local dev="$1"
@@ -253,7 +265,8 @@ EOF
   if [ -n "$EXISTING" ]; then
     ctx "--format PASSED — destroying existing $EXISTING on $DEV"
   fi
-  ctx "mkfs.btrfs -L $LABEL $DEV"
+  ctx "mkfs.btrfs -L $LABEL -f $DEV"   # -f is stated because it is what runs: an echo
+                                      # that hides the destructive flag makes the evidence lie
   mkfs.btrfs -L "$LABEL" -f "$DEV"
 
   ctx "mount $DEV $MNT"
