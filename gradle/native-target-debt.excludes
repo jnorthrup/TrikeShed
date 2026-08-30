@@ -7,6 +7,11 @@
 # expect declarations with jvm-only actuals (mirrors the js ratchet's reasoning)
 **/userspace/nio/ebpf/**
 **/org/trikeshed/oroboros/OroborosDaemon.kt
+# java.util.concurrent.ConcurrentHashMap; needs a real Mutex/atomic-map rewrite
+# (lookup() must stay a synchronous "pure map read" per its own doc comment,
+# so this isn't a mechanical swap) -- see GH #768. Already on the JS list for the
+# same reason; native inherited the break when the file landed and never got the line.
+**/couch/IncrementalViewRegistry.kt
 # jvm-only test debt for native test compiles
 **/userspace/nio/process/ProcessWorkerContractTest.kt
 **/forge/window/NativeForgeWindowManagerTest.kt

@@ -1,5 +1,6 @@
-package borg.trikeshed.utils.rfxhttp
+package borg.trikeshed.relaxfactory
 
+import borg.trikeshed.couch.CouchCascade
 import borg.trikeshed.couch.ReduceFunction
 import borg.trikeshed.couch.ViewResult
 import borg.trikeshed.couch.ViewRow
@@ -106,9 +107,18 @@ data class ViewQuery(
             )
         }
 
-        /** group=false: fold the per-key reduction into one value, the way CouchDB rereduces. */
+        /**
+         * group=false: fold the per-key reduction into one value, the way CouchDB rereduces.
+         *
+         * A reducer with no case here falls through to the raw partial list, which is not a
+         * rereduction — it is the ungrouped rows wearing a reduced view's clothes. That was the
+         * behaviour for the two cascade-shaped reducers, so `group=false` on them reported a list
+         * of partials instead of a total; both now fold properly through [CouchCascade.combine]
+         * and the `rollup-count` case below.
+         */
         fun rereduce(fn: ReduceFunction, grouped: ViewResult): Any? {
             val values = grouped.rows.toKList().map { it.value }
+            if (fn is ReduceFunction.Cascade) return CouchCascade.combine(values, fn.metrics)
             return when ((fn as? ReduceFunction.Builtin)?.name) {
                 "_count", "_sum" -> values.sumOf { (it as? Number)?.toDouble() ?: 0.0 }.let { if (it == it.toLong().toDouble()) it.toLong() else it }
                 "_stats" -> {
@@ -119,6 +129,14 @@ data class ViewQuery(
                         "min" to stats.mapNotNull { (it["min"] as? Number)?.toDouble() }.minOrNull(),
                         "max" to stats.mapNotNull { (it["max"] as? Number)?.toDouble() }.maxOrNull(),
                         "sumsqr" to stats.sumOf { (it["sumsqr"] as? Number ?: it["sumSqr"] as? Number)?.toDouble() ?: 0.0 },
+                    )
+                }
+                // The bounded `[sum, count]` cascade shape: fold both columns, keep the shape.
+                "rollup-count" -> {
+                    val parts = values.mapNotNull { it as? List<*> }
+                    listOf(
+                        parts.sumOf { (it.getOrNull(0) as? Number)?.toDouble() ?: 0.0 },
+                        parts.sumOf { (it.getOrNull(1) as? Number)?.toLong() ?: 0L },
                     )
                 }
                 else -> values

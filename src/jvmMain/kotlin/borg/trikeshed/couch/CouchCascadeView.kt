@@ -29,18 +29,8 @@ enum class CouchCascadeView(
         }
 
     companion object {
-        internal val metricFields: List<String> = listOf(
-            "interval",
-            "reading_date",
-            "cpu_mhz",
-            "memory_mib",
-            "storage_gib",
-            "disk_io_kilobytes_per_sec",
-            "lan_io_kilobits_per_sec",
-            "wan_io_kilobits_per_sec",
-            "consumption_wac",
-            "created_at",
-        )
+        /** The canonical list — see [CouchCascade.METRICS]; the JS below spells it out again for the host. */
+        internal val metricFields: List<String> get() = CouchCascade.METRICS
 
         internal val reduceSource: String = """
             function (keys, values, rereduce) {

@@ -115,6 +115,34 @@ data class ViewResult(
         return ViewResult(reduced)
     }
 
+    /**
+     * Cascade reducer: group by key, roll every [metrics] field of the emitted document bodies up
+     * to `{sum,avg,min,max}`, paired with the contributing count — `[rollup, count]`.
+     *
+     * Emissions whose value is not a document body contribute nothing rather than throwing: a
+     * cascade view is normally `emit(dimensions, doc)`, but a reduce must not be the thing that
+     * fails when one document in a corpus is shaped differently.
+     */
+    fun reduceCascade(metrics: List<String> = CouchCascade.METRICS): ViewResult {
+        val byKey = LinkedHashMap<Any?, MutableList<Map<*, *>>>()
+        for (row in rows) {
+            // A cascade view emits the document, and `ValueExpr.DocValue` hands over the
+            // [Document] itself rather than a body map — so accept both spellings of "the
+            // document" instead of silently rolling up nothing.
+            val body: Map<*, *> = when (val v = row.value) {
+                is Map<*, *> -> v
+                is Document -> v.fields.associate { it.name to it.value }
+                else -> continue
+            }
+            byKey.getOrPut(row.key) { mutableListOf() }.add(body)
+        }
+        val reduced = mutableSeriesOf<ViewRow>()
+        for ((key, docs) in byKey) {
+            reduced.append(ViewRow(key, CouchCascade.rollup(docs, metrics), "_cascade", "_cascade"))
+        }
+        return ViewResult(reduced)
+    }
+
     /** _stats reducer: group by key, compute count/sum/min/max/sumSqr per key. */
     private class StatsAcc(
         var count: Long = 0L,
@@ -234,12 +262,99 @@ sealed interface ValueExpr {
     data class JsPathExpr(val path: String) : ValueExpr
 }
 
-/** Reduce function — either builtin name or custom Confix DSL. */
+/** Reduce function — a builtin name, a custom Confix DSL, or the configured cascade rollup. */
 sealed interface ReduceFunction {
     @Serializable
     data class Builtin(val name: String) : ReduceFunction  // "_count", "_sum", "_stats"
     @Serializable
     data class Custom(val dsl: String) : ReduceFunction    // Confix DSL string
+
+    /**
+     * The confix cascade rollup: per key, per metric field, `{sum,avg,min,max}` over the emitted
+     * document bodies, paired with the contributing document count.
+     *
+     * It is a variant rather than another [Builtin] string on purpose. `CommonViewServerTest`
+     * settled that cascade is not a parameterless builtin — it is *configured* — and the reason
+     * bites hardest here: [metrics] decides what the reducer computed, so it has to reach
+     * [ReducerIdentity] and land in the proof receipt. A bare `"_cascade"` string in the builtin
+     * table would produce identical receipts for two runs that rolled up different fields.
+     *
+     * `"reduce": "_cascade"` in a design doc or envelope still selects this with
+     * [CouchCascade.METRICS]; `{"cascade": {"metrics": [...]}}` narrows it.
+     */
+    @Serializable
+    data class Cascade(val metrics: List<String> = CouchCascade.METRICS) : ReduceFunction
+}
+
+/**
+ * CouchCascade — the cascade vocabulary and its fold, in one place.
+ *
+ * The metric list and the dimension views were written out three times (the `CouchDbCascadeTool`
+ * ViewServerTool, the jvm `CouchCascadeView` JS generator, and nothing at all on the couch view
+ * path). Two copies that must agree and cannot be checked is the shape this repo calls a second
+ * truth, so the list lives here and the others read it.
+ *
+ * [rollup] and [combine] are reduce and rereduce of the same shape — `[{metric: {sum,avg,min,max}},
+ * count]` — kept adjacent because a rereduce that disagrees with its reduce is silent corruption:
+ * it only shows up as a wrong total when `group=false`.
+ */
+object CouchCascade {
+    /** The metric fields a cascade rolls up. Non-numeric entries contribute nothing, by design. */
+    val METRICS: List<String> = listOf(
+        "interval",
+        "reading_date",
+        "cpu_mhz",
+        "memory_mib",
+        "storage_gib",
+        "disk_io_kilobytes_per_sec",
+        "lan_io_kilobits_per_sec",
+        "wan_io_kilobits_per_sec",
+        "consumption_wac",
+        "created_at",
+    )
+
+    /** Dimension views: view name → the key fields that precede the time dimensions. */
+    val VIEWS: Map<String, List<String>> = mapOf(
+        "byOrganization" to listOf("organization_id", "machine_id"),
+        "byMachine" to listOf("machine_id"),
+        "byInfrastructure" to listOf("infrastructure_id", "machine_id"),
+        "byContract" to listOf("contract_id", "machine_id"),
+        "byBillingGroup" to listOf("billing_group_id", "machine_id"),
+    )
+
+    /** reduce: document bodies for one key → `[rollup, count]`. */
+    fun rollup(documents: List<Map<*, *>>, metrics: List<String> = METRICS): List<Any?> {
+        val count = documents.size
+        val rollup = metrics.associateWith { field ->
+            val numbers = documents.mapNotNull { (it[field] as? Number)?.toDouble() }
+            val sum = numbers.sum()
+            mapOf<String, Any?>(
+                "sum" to sum,
+                "avg" to if (count == 0) 0.0 else sum / count,
+                "min" to (numbers.minOrNull() ?: 0.0),
+                "max" to (numbers.maxOrNull() ?: 0.0),
+            )
+        }
+        return listOf(rollup, count.toLong())
+    }
+
+    /** rereduce: `[rollup, count]` partials → one `[rollup, count]`. */
+    fun combine(partials: List<Any?>, metrics: List<String> = METRICS): List<Any?> {
+        val parts = partials.mapNotNull { it as? List<*> }
+        val totalCount = parts.sumOf { (it.getOrNull(1) as? Number)?.toLong() ?: 0L }
+        val rollup = metrics.associateWith { field ->
+            val fieldParts = parts.mapNotNull { (it.getOrNull(0) as? Map<*, *>)?.get(field) as? Map<*, *> }
+            val sum = fieldParts.sumOf { (it["sum"] as? Number)?.toDouble() ?: 0.0 }
+            mapOf<String, Any?>(
+                "sum" to sum,
+                // avg is recomputed from the totals, never averaged from the partial averages.
+                "avg" to if (totalCount == 0L) 0.0 else sum / totalCount,
+                "min" to (fieldParts.mapNotNull { (it["min"] as? Number)?.toDouble() }.minOrNull() ?: 0.0),
+                "max" to (fieldParts.mapNotNull { (it["max"] as? Number)?.toDouble() }.maxOrNull() ?: 0.0),
+            )
+        }
+        return listOf(rollup, totalCount)
+    }
 }
 
 /**
@@ -248,8 +363,15 @@ sealed interface ReduceFunction {
  * Executes map functions expressed as Confix DSL against documents stored
  * as ConfixDoc (Confix-backed JSON/CBOR/YAML). Zero JVM dependencies,
  * compiles to JS target.
+ *
+ * [report] is the ReportServer seam. Spec C3 asks that a request resolve to a report that is
+ * CCEK-owned and pointcut-observable; [CouchReportEvent.MapEmitted] and [CouchReportEvent.Reduced]
+ * were declared for exactly that and had no producer, so the report bus carried only committed
+ * frames and no view execution was observable at all. Attaching an element makes every map
+ * emission and every reduction a fact on that bus. Null (the default) costs nothing — the emission
+ * is guarded, so an unobserved server does no extra work.
  */
-class ViewServer {
+class ViewServer(private val report: CouchReportReactorElement? = null) {
 
     /**
      * Executes this server's native map/reduce path and binds its canonical output to the
@@ -320,13 +442,24 @@ class ViewServer {
             executeMap(viewDef.mapFn, doc, rows)
         }
         var result = ViewResult(rows)
+        observeMap(viewDef, rows)
         viewDef.reduceFn?.let { reduceFn ->
             result = when (reduceFn) {
                 is ReduceFunction.Builtin -> result.reduce(reduceFn.name)
                 is ReduceFunction.Custom -> executeCustomReduce(reduceFn.dsl, result)
+                is ReduceFunction.Cascade -> result.reduceCascade(reduceFn.metrics)
             }
+            report?.ingest(CouchReportEvent.Reduced(viewDef.fullName, result.size.toLong()))
         }
         return result
+    }
+
+    /** One [CouchReportEvent.MapEmitted] per emitted row — the report bus's own granularity. */
+    private fun observeMap(viewDef: ViewDefinition, rows: MutableSeries<ViewRow>) {
+        val bus = report ?: return
+        for (row in rows) {
+            bus.ingest(CouchReportEvent.MapEmitted(viewDef.fullName, row.docId, row.key.toString()))
+        }
     }
 
     private fun receiptFor(
@@ -504,6 +637,9 @@ private fun reducerIdentity(viewDef: ViewDefinition): ReducerIdentity = when (va
     null -> ReducerIdentity("_map", "builtin-v1")
     is ReduceFunction.Builtin -> ReducerIdentity(reduce.name, "builtin-v1")
     is ReduceFunction.Custom -> ReducerIdentity("confix:${reduce.dsl}", "confix-v1")
+    // The metric list is what the cascade computed, so it belongs in the identity: two rollups
+    // over different fields must not be able to mint the same receipt.
+    is ReduceFunction.Cascade -> ReducerIdentity("cascade:${reduce.metrics.joinToString(",")}", "cascade-v1")
 }
 
 private fun definitionBytes(viewDef: ViewDefinition): ByteArray = canonicalFields(
@@ -537,6 +673,7 @@ private fun reduceFunctionValue(reduce: ReduceFunction?): String = when (reduce)
     null -> "none"
     is ReduceFunction.Builtin -> canonicalFields("builtin", reduce.name)
     is ReduceFunction.Custom -> canonicalFields("custom", reduce.dsl)
+    is ReduceFunction.Cascade -> canonicalFields("cascade", *reduce.metrics.toTypedArray())
 }
 
 private fun keyExprValue(expression: KeyExpr): String = when (expression) {

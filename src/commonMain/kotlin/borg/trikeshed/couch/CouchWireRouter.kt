@@ -2,7 +2,7 @@ package borg.trikeshed.couch
 
 import borg.trikeshed.parse.json.JsonSupport
 import borg.trikeshed.util.io.ContentTypes
-import borg.trikeshed.utils.rfxhttp.CouchHttpSurface
+import borg.trikeshed.relaxfactory.CouchHttpSurface
 
 /** A rendered reply: status, content type, raw bytes. Binary-safe so attachments and blocks can flow. */
 data class WireReply(val status: Int, val contentType: String, val bytes: ByteArray) {
@@ -23,11 +23,13 @@ data class WireReply(val status: Int, val contentType: String, val bytes: ByteAr
  *
  *   GET    /                                      welcome {couchdb, version:"1.6.2"}
  *   GET    /{db}                                  info
- *   POST   /{db}                                  bare document put
+ *   POST   /{db}                                  bare document put, or a RequestFactory envelope
+ *   POST   /{db}/_relax                           RequestFactory envelope ({operations:[…]} → {ok,receipts})
  *   GET    /{db}/_all_docs[?startkey&endkey&limit&skip&descending&include_docs]   POST with {keys}
  *   GET    /{db}/_changes[?since&limit&include_docs]
  *   POST   /{db}/_revs_diff                       {id:[rev…]} → {id:{missing:[…]}}
  *   POST   /{db}/_bulk_docs                       {docs:[…], new_edits?}
+ *   GET    /{db}/_projects[/{id}][?under=]        project headings ([ProjectPath], [Projects])
  *   GET|PUT|DELETE /{db}/_local/{id}              checkpoints (never replicated)
  *   GET    /{db}/_cas/{cid}   POST /{db}/_cas     raw blocks; POST body is the block → {cid}
  *   POST   /{db}/_cas/_bulk {cids:[…]}             many blocks in one exchange (see [CasBulkCodec])
@@ -42,9 +44,30 @@ data class WireReply(val status: Int, val contentType: String, val bytes: ByteAr
 class CouchWireRouter(
     val db: CouchDatabase,
     val attachmentPrefix: String,
+    /** Bound so the envelope's `replicate` operation can drive m2m sync; null leaves it unimplemented. */
+    val replicator: borg.trikeshed.couch.replicate.CouchReplicator? = null,
+    /**
+     * The ReportServer. Attached, every view this router runs — over `_view` or inside a
+     * RequestFactory `query` — emits its map and reduce facts onto the CCEK report bus, which is
+     * what spec C3 means by a report being pointcut-observable. Null keeps views silent.
+     */
+    val report: CouchReportReactorElement? = null,
     /** P2 registry seam: null means eager route, preserving every existing caller. */
     val incrementalView: (ddoc: String, view: String) -> IncrementalViewElement? = { _, _ -> null },
 ) {
+    /** One observed engine behind both askers, so a view reports the same way whoever ran it. */
+    private val viewServer: ViewServer by lazy { ViewServer(report) }
+
+    /**
+     * The batched RequestFactory face of this same database. Not a second store and not a second
+     * engine: `put` here mints the revision `PUT /{db}/{id}` would, `query` maps the projection
+     * `_view` maps, and `changes`/`revs_diff`/`bulk_docs`/`block_*` are the envelope spelling of
+     * the routes below. That is what lets one commonMain proxy address local and remote state.
+     */
+    val requestFactory: borg.trikeshed.relaxfactory.CouchRequestFactory by lazy {
+        borg.trikeshed.relaxfactory.CouchRequestFactory.forDatabase(db, replicator, viewServer)
+    }
+
     suspend fun handle(method: String, rawPath: String, body: ByteArray): WireReply? {
         val m = method.uppercase()
         val path = rawPath.substringBefore('?')
@@ -60,14 +83,22 @@ class CouchWireRouter(
             "GET" -> WireReply.json(200, db.info())
             "POST" -> {
                 val doc = parseMap(body) ?: return WireReply.badRequest("invalid JSON body")
-                val id = doc["_id"] as? String ?: borg.trikeshed.job.ContentId.of(body).hex
-                val r = db.put(id, doc, doc["_rev"] as? String)
-                WireReply.json(if (r["ok"] == true) 201 else 409, r)
+                // An envelope and a bare document share this route, as they do on CouchHttpSurface,
+                // so a client written against either mounting works against both. The sniff is
+                // narrower than "has the key": `operations` must be a list, which a document
+                // carrying a scalar or object under that name is not.
+                if (CouchDatabase.asList(doc["operations"]) != null) envelope(body)
+                else {
+                    val id = doc["_id"] as? String ?: borg.trikeshed.job.ContentId.of(body).hex
+                    val r = db.put(id, doc, doc["_rev"] as? String)
+                    WireReply.json(if (r["ok"] == true) 201 else 409, r)
+                }
             }
             else -> WireReply.methodNotAllowed(m)
         }
 
         return when (rest[0]) {
+            "_relax" -> if (m != "POST") WireReply.methodNotAllowed(m) else envelope(body)
             "_all_docs" -> allDocs(m, query, body)
             "_changes" -> if (m != "GET") WireReply.methodNotAllowed(m) else WireReply.json(
                 200,
@@ -89,6 +120,13 @@ class CouchWireRouter(
                 val docs = CouchDatabase.asList(req["docs"])?.mapNotNull { it as? Map<String, Any?> } ?: return WireReply.badRequest("docs required")
                 WireReply.json(201, db.bulkDocs(docs, newEdits = req["new_edits"] != false))
             }
+            // The project headings: what namespaces this database holds, declared or merely in use.
+            "_projects" -> if (m != "GET") WireReply.methodNotAllowed(m) else {
+                val p = Projects(db)
+                val one = rest.getOrNull(1)
+                if (one == null) WireReply.json(200, mapOf("rows" to p.summaries()))
+                else WireReply.json(200, p.summary(one) + ("documents" to p.documents(one, query["under"] ?: "")))
+            }
             "_local" -> local(m, rest.drop(1).joinToString("/"), body)
             "_cas" -> cas(m, rest.getOrNull(1), body)
             "_design" -> design(m, rest, query, body)
@@ -97,6 +135,13 @@ class CouchWireRouter(
     }
 
     // ── pieces ────────────────────────────────────────────────────
+
+    /**
+     * Always 200: a RequestFactory batch reports per-operation, so a failed operation is a receipt
+     * with `ok:false`, never a status that would discard the receipts beside it.
+     */
+    private suspend fun envelope(body: ByteArray): WireReply =
+        WireReply.json(200, requestFactory.process(body.decodeToString()))
 
     private fun welcome() = WireReply.json(200, mapOf("couchdb" to "Welcome", "version" to CouchHttpSurface.COUCH_VERSION, "vendor" to mapOf("name" to "TrikeShed", "version" to "oroboros")))
 
@@ -205,17 +250,8 @@ class CouchWireRouter(
     }
 
     /** The `_view` route core mounted over this database — the same engine `CouchHttpSurface` serves. */
-    private val viewRoute: borg.trikeshed.utils.rfxhttp.ViewRoute by lazy {
-        val docs = object : borg.trikeshed.utils.rfxhttp.ViewDocs {
-            override fun all(): List<Pair<String, Map<String, Any?>>> =
-                db.store.all().filter { !db.isTombstone(it) && !it.id.startsWith("_design/") }
-                    .map { it.id to db.render(it, db.store.head.getRev(it.id)).filterKeys { k -> k != "_id" && k != "_rev" } }
-
-            override fun body(id: String): Map<String, Any?>? = db.docJson(id)?.filterKeys { k -> k != "_id" && k != "_rev" }
-
-            override fun couchDoc(id: String): Map<String, Any?>? = db.docJson(id)
-        }
-        borg.trikeshed.utils.rfxhttp.ViewRoute(docs)
+    private val viewRoute: borg.trikeshed.relaxfactory.ViewRoute by lazy {
+        borg.trikeshed.relaxfactory.ViewRoute(borg.trikeshed.relaxfactory.ViewDocs.of(db), viewServer)
     }
 
     private fun document(m: String, rest: List<String>, query: Map<String, String>, body: ByteArray): WireReply {

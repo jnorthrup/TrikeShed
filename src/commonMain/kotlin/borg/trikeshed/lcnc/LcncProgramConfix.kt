@@ -81,11 +81,21 @@ object LcncProgramConfix {
     fun fromJson(name: String, json: String): LcncProgram {
         val parsed = JsonSupport.parse(json) as? Map<*, *> ?: error("not a program document: $name")
         val nodes = ((parsed["nodes"] as? List<*>).orEmpty()).mapNotNull { raw -> nodeFrom(raw) }
-        val wires = ((parsed["wires"] as? List<*>).orEmpty()).mapNotNull { raw ->
-            val m = raw as? Map<*, *> ?: return@mapNotNull null
-            val from = m["from"] as? List<*> ?: return@mapNotNull null
-            val to = m["to"] as? List<*> ?: return@mapNotNull null
-            if (from.size != 2 || to.size != 2) return@mapNotNull null
+        // A malformed cable is CORRUPT DATA, not an absent one. Dropping it silently
+        // meant a document could execute with wires the author wrote and the engine
+        // never saw — the same class of lie the type checker exists to end. (Stale
+        // cables that name a missing node or port are a different thing: those parse,
+        // and LcncTypeCheck names them before the run.)
+        val wires = ((parsed["wires"] as? List<*>).orEmpty()).mapIndexed { i, raw ->
+            val m = raw as? Map<*, *>
+                ?: throw IllegalArgumentException("$name: wire[$i] is not an object")
+            val from = m["from"] as? List<*>
+                ?: throw IllegalArgumentException("$name: wire[$i] has no from:[node,port]")
+            val to = m["to"] as? List<*>
+                ?: throw IllegalArgumentException("$name: wire[$i] has no to:[node,port]")
+            if (from.size != 2 || to.size != 2) {
+                throw IllegalArgumentException("$name: wire[$i] endpoints must be [node,port]")
+            }
             LcncWire(from[0].toString(), from[1].toString(), to[0].toString(), to[1].toString())
         }
         val controls = (parsed["controls"] as? Map<*, *>)?.let { c ->

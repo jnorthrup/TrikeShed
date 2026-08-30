@@ -1,4 +1,4 @@
-package borg.trikeshed.utils.rfxhttp
+package borg.trikeshed.relaxfactory
 
 import borg.trikeshed.couch.ConfixDocStore
 import borg.trikeshed.couch.ViewServer
@@ -6,7 +6,7 @@ import borg.trikeshed.htx.HtxRequest
 import borg.trikeshed.htx.HtxResponse
 import borg.trikeshed.htx.HtxMethod
 
-interface RfxHttpServer {
+interface RelaxHttpServer {
     val store: ConfixDocStore
     val viewServer: ViewServer
 

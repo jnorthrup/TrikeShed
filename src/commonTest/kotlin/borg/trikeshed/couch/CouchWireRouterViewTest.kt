@@ -10,7 +10,7 @@ import kotlin.test.assertTrue
 
 /**
  * Step A gate — the view engine is mounted on the daemon router, not only on the test-only
- * [borg.trikeshed.utils.rfxhttp.CouchHttpSurface]. Everything `HtxLitebikeCouchE2eTest` proves
+ * [borg.trikeshed.relaxfactory.CouchHttpSurface]. Everything `HtxLitebikeCouchE2eTest` proves
  * about `_view` (1.6.2 params: reduce/group/group_level/key/startkey/endkey/inclusive_end/
  * descending/skip/limit/include_docs, collation, rereduce, builtin reducers) must be answered
  * by [CouchWireRouter] over a CAS-backed [CouchDatabase] — the wiring the live daemon mounts

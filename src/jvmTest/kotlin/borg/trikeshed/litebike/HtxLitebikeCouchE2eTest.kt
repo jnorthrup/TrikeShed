@@ -11,7 +11,7 @@ import borg.trikeshed.lib.ByteSeries
 import borg.trikeshed.litebike.taxonomy.Protocol
 import borg.trikeshed.parse.json.JsonSupport
 import borg.trikeshed.userspace.nio.channels.spi.JvmChannelOperations
-import borg.trikeshed.utils.rfxhttp.CouchHttpSurface
+import borg.trikeshed.relaxfactory.CouchHttpSurface
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob

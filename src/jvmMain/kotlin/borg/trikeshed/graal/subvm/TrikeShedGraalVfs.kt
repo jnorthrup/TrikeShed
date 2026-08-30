@@ -1,5 +1,6 @@
 package borg.trikeshed.graal.subvm
 
+import borg.trikeshed.btrfs.BtrfsWorldStore
 import borg.trikeshed.btrfs.UserspaceBtrfs
 import borg.trikeshed.pointcut.VmFacet
 import borg.trikeshed.userspace.nio.file.spi.FileOperations
@@ -343,7 +344,15 @@ private class VfsByteChannel(
     }
 }
 
-/** Supervisor-owned Graal guest with an isolated, snapshot-capable UserspaceBtrfs VFS. */
+/**
+ * Supervisor-owned Graal guest with an isolated, snapshot-capable UserspaceBtrfs VFS.
+ *
+ * [world] decides whether that VFS is file-based. The default is [BtrfsWorldStore.ofMemory], which
+ * is what this class always did implicitly by taking `TrikeShedGraalVfs`'s in-memory default
+ * argument — worth naming rather than inheriting, because a world that cannot outlive its process
+ * is a different product from one that can. Hand it [BtrfsWorldStore.ofFiles] and the guest's
+ * subvolume, its extents and its snapshots are on disk and readable by the next boot.
+ */
 class GraalBtrfsSupervisor(
     override val id: String,
     override val facet: VmFacet,
@@ -351,9 +360,17 @@ class GraalBtrfsSupervisor(
     input: InputStream? = null,
     output: OutputStream? = null,
     error: OutputStream? = output,
+    world: BtrfsWorldStore = BtrfsWorldStore.ofMemory(),
     onRootReturn: (RootObservation) -> Unit = {},
 ) : GuestIsolate {
-    val vfs = TrikeShedGraalVfs(instanceId = id)
+    val vfs = TrikeShedGraalVfs(
+        fileOps = world.fileOpsFor(id),
+        btrfsRoot = world.root,
+        // One subvolume per guest: on a shared file root the guests would otherwise all be "live"
+        // and see each other's files. The isolation this class advertises is the subvolume.
+        liveSubvolume = world.subvolumeFor(id),
+        instanceId = id,
+    )
     /** Exposed so the Hypervisor's LeafTrainer can observe the same in-process guest it trains. */
     val guest = InProcessIsolate(
         id,

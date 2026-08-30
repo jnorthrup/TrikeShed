@@ -38,11 +38,16 @@ import java.util.concurrent.ConcurrentHashMap
  *   GET  /api/vm/{id}/terminal   one terminal snapshot
  *   POST /api/vm/{id}/terminal/input  {text, mode: eval|stdin}
  *   GET  /api/vm/terminal/events global terminal patch SSE, keyed by vmId
+ *   GET  /api/vm/worlds          published guest worlds, and whether this node holds the bytes
+ *   POST /api/vm/{id}/world/publish   → {ok, id, rev, cid, length}; the world becomes a couch attachment
+ *   POST /api/vm/{id}/world/restore   {into?} → receive a replicated world into a subvolume
  */
 class VmWire(
     private val host: VmHost,
     private val scope: CoroutineScope,
     private val terminals: VmTerminalRegistry? = (host as? HypervisorVmHost)?.terminals,
+    /** Bound to put a guest's file-based btrfs world on the couch transport; null leaves those routes 501. */
+    private val worlds: borg.trikeshed.btrfs.VmWorldTeleport? = null,
 ) {
 
     private data class TerminalCommand(val id: String, val input: ManualMediaInput, val source: String)
@@ -140,6 +145,36 @@ class VmWire(
                         if (manual != null) terminal.fail(failure, manual)
                         json(422, mapOf("error" to (failure.message ?: failure.toString())))
                     })
+            }
+
+            // A guest's btrfs world onto the couch transport and back. Publishing writes an
+            // ordinary attachment document, so from there `_replicate` moves the world with no
+            // VM-specific lane; restoring receives it into a subvolume on whichever node has it.
+            method == "GET" && p == "/api/vm/worlds" -> {
+                val t = worlds ?: return json(501, mapOf("error" to "no world store bound"))
+                json(200, mapOf("worlds" to t.published().map { mapOf("guest" to it, "local" to t.isLocal(it)) }))
+            }
+
+            method == "POST" && p.startsWith("/api/vm/") && p.endsWith("/world/publish") -> {
+                val t = worlds ?: return json(501, mapOf("error" to "no world store bound"))
+                val id = p.removePrefix("/api/vm/").removeSuffix("/world/publish")
+                val r = t.publish(id)
+                json(if (r["ok"] == true) 200 else 404, r)
+            }
+
+            method == "POST" && p.startsWith("/api/vm/") && p.endsWith("/world/restore") -> {
+                val t = worlds ?: return json(501, mapOf("error" to "no world store bound"))
+                val id = p.removePrefix("/api/vm/").removeSuffix("/world/restore")
+                val into = parse(text)["into"] as? String
+                val ok = if (into != null) t.restore(id, into) else t.restore(id)
+                json(
+                    if (ok) 200 else 409,
+                    mapOf(
+                        "ok" to ok, "guest" to id, "into" to (into ?: id),
+                        // The two ways this legitimately refuses, told apart for the caller.
+                        "reason" to if (ok) null else if (!t.isLocal(id)) "world not replicated to this node" else "target subvolume exists",
+                    ),
+                )
             }
 
             method == "POST" && p.startsWith("/api/vm/") && p.endsWith("/revoke") -> {

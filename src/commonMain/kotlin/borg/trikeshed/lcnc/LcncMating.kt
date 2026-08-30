@@ -91,19 +91,47 @@ object LcncMating {
         return LcncAutoWireResult(wire, candidates)
     }
 
-    fun compatibleTypes(program: LcncProgram, sourceNode: String, sourcePort: String): List<LcncMatingCandidate> {
+    /**
+     * Drag-to-blank narrowing, resolved through the ONE type authority
+     * ([LcncTypeCheck.portKind]) so the menu and the drop agree.
+     *
+     * Reading the kind straight out of `outputKinds` made this node-blind: a
+     * ring's per-name port is declared by its `scope.out` child, never by the
+     * `scope` contract, so the daemon answered "nothing is compatible" for a
+     * port the canvas would wire without complaint — the menu and the manual
+     * drag disagreed about the same cable. A generic ring port genuinely
+     * accepts every kind; [genericSource] lets the surface say so instead of
+     * pretending the wide list is a narrow one.
+     */
+    fun compatibleTypes(
+        program: LcncProgram,
+        sourceNode: String,
+        sourcePort: String,
+        /** The surface's already-resolved kind — a ring port's kind lives in the
+         *  node, and `/api/lcnc/mating-options` only receives (type, port). */
+        kindOverride: LcncTypeCheck.PortKind? = null,
+    ): List<LcncMatingCandidate> {
         val source = node(program, sourceNode)
-        val sourceContract = LcncContracts.find(source.type) ?: return emptyList()
-        val sourceKind = sourceContract.outputKinds[sourcePort.removeSuffix("?")] ?: return emptyList()
+        val contracts = LcncContracts.all().associateBy { it.type }
+        val sourceKind = kindOverride
+            ?: LcncTypeCheck.portKind(source, "out", sourcePort.removeSuffix("?"), contracts)
+        if (sourceKind.kind == null && !sourceKind.generic) return emptyList()
         return LcncContracts.all().flatMap { target ->
             target.inputs.mapNotNull { input ->
                 val clean = input.removeSuffix("?")
                 val inputKind = target.inputKinds[clean] ?: return@mapNotNull null
-                if (inputKind != sourceKind) return@mapNotNull null
+                if (!sourceKind.acceptedBy(LcncTypeCheck.PortKind(inputKind, generic = false))) return@mapNotNull null
                 LcncMatingCandidate(target.type, input, target.title)
             }
         }.distinctBy { it.type to it.inputPort }
     }
+
+    /** True when the source port is a ring parameter that declared no kind. */
+    fun genericSource(program: LcncProgram, sourceNode: String, sourcePort: String): Boolean =
+        LcncTypeCheck.portKind(
+            node(program, sourceNode), "out", sourcePort.removeSuffix("?"),
+            LcncContracts.all().associateBy { it.type },
+        ).generic
 
     /**
      * The mate-menu ordering — the drag-cable-to-empty-space popup's list:
@@ -121,8 +149,9 @@ object LcncMating {
         sourcePort: String,
         corpus: Collection<LcncProgram> = emptyList(),
         q: String = "",
+        kindOverride: LcncTypeCheck.PortKind? = null,
     ): List<LcncMatingCandidate> {
-        val compatible = compatibleTypes(program, sourceNode, sourcePort)
+        val compatible = compatibleTypes(program, sourceNode, sourcePort, kindOverride)
         val sourceType = node(program, sourceNode).type
         val counts = HashMap<String, Int>()
         for (doc in corpus) {

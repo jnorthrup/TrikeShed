@@ -97,8 +97,8 @@ class ProjectDbWire(
             if (method != "POST" || segments.size < 3) return json(400, """{"error":"POST /_project/<name>/begin|put"}""")
             // Finder names carry spaces; the client sends them percent-encoded ("My%20PDF%20Stash").
             // Decode BEFORE sanitize, or '%20' mangles into literal '-20' in the db name.
-            val name = borg.trikeshed.utils.rfxhttp.CouchHttpSurface.percentDecode(segments[1])
-            val kind = borg.trikeshed.utils.rfxhttp.CouchHttpSurface
+            val name = borg.trikeshed.relaxfactory.CouchHttpSurface.percentDecode(segments[1])
+            val kind = borg.trikeshed.relaxfactory.CouchHttpSurface
                 .parseQuery(path.substringAfter('?', ""))["kind"] ?: "assets"
             return when (segments[2]) {
                 "begin" -> runCatching { scopes.beginUpload(name, kind) }.fold(
@@ -143,7 +143,7 @@ class ProjectDbWire(
                 }
 
                 "put" -> {
-                    val rel = borg.trikeshed.utils.rfxhttp.CouchHttpSurface
+                    val rel = borg.trikeshed.relaxfactory.CouchHttpSurface
                         .parseQuery(path.substringAfter('?', ""))["path"]
                         ?: return json(400, """{"error":"path query required"}""")
                     val bytes = CouchWire.bodyOf(payload)

@@ -334,6 +334,20 @@ class KanbanModule : ForgeModule {
             // context, projected receipts), direct walk in reduced/test contexts.
             val execute: suspend (String, borg.trikeshed.lcnc.LcncProgram) -> JvmKanbanServer.HttpResponse =
                 { label, program ->
+                    // Patch type-system compliance, enforced where it counts. The canvas
+                    // refuses a kind-mismatched drag, but the canvas is not the authority:
+                    // a stored panel, an import, a Kotlin preset or a raw POST never passed
+                    // that check and used to execute anyway. One rule, one author
+                    // (LcncContracts), stated on the deciding side — loudly, before the run.
+                    // strict=false: the registry may carry types the contract table does
+                    // not describe, and LcncRunner throws for one that is truly absent.
+                    val violations = borg.trikeshed.lcnc.LcncTypeCheck.check(program, strict = false)
+                    if (violations.isNotEmpty()) {
+                        JvmKanbanServer.HttpResponse(400, JsonSupport.stringify(mapOf(
+                            "ok" to false, "program" to label, "error" to "type_check_failed",
+                            "violations" to violations.map { it.toMap() },
+                        )))
+                    } else {
                     val walker = LcncRunner(ctx.lcncRunners).apply { subprogramLoader = ctx.programLoader }
                     runCatching {
                         val binding = ctx.ccekBinding
@@ -357,6 +371,7 @@ class KanbanModule : ForgeModule {
                             )))
                         },
                     )
+                    }
                 }
             val programName = req["program"]?.toString()
             if (programName != null) {

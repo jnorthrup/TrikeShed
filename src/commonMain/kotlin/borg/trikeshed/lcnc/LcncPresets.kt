@@ -19,7 +19,152 @@ import borg.trikeshed.lib.toSeries
  * Every node type here exists in [LcncContracts.all()] — the presets gate
  * guards this file's vocabulary against the one author.
  */
+/**
+ * What a person needs before a prefab is adoptable — authored in plain words,
+ * beside the document it describes.
+ *
+ * The note nodes inside the presets are written for whoever wrote them
+ * (`brief → argue ⇄ rebut (LOOP ≤3)`, `teach via POST /api/beliefs/teach`), and
+ * two presets carried no note at all. A person opening the gallery needs four
+ * things instead: what this does, what it needs before it will work, what
+ * they will see, and the one knob to turn first. No arrows, no route paths,
+ * no phase numbers — [LcncPresetCatalogTest] holds that line.
+ */
+data class LcncPresetInfo(
+    val name: String,
+    /** Plain-language name — what a person would call it. */
+    val title: String,
+    /** One sentence: what it does. */
+    val does: String,
+    /** What must already be true, or "nothing — it runs as it is". */
+    val needs: String,
+    /** What appears when it runs. */
+    val see: String,
+    /** The first thing worth changing, named as it appears on the canvas. */
+    val tweakFirst: String,
+)
+
 object LcncPresets {
+
+    /** The offered prefabs, described for the person adopting them. */
+    fun catalog(): List<LcncPresetInfo> = listOf(
+        LcncPresetInfo(
+            "preset-hermes", "Board at a glance",
+            does = "Reads the kanban board every 15 seconds and lays its cards out in columns by status.",
+            needs = "Nothing — it runs as it is.",
+            see = "Your board's cards, grouped into draggable columns.",
+            tweakFirst = "The timer's seconds, to poll faster or slower.",
+        ),
+        LcncPresetInfo(
+            "preset-tribunal", "Three-model debate",
+            does = "One model argues a motion, a second rebuts it, a third weighs the record and rules.",
+            needs = "A model provider key.",
+            see = "Each model's turn in order, then the ruling as structured facts.",
+            tweakFirst = "The system prompt on the first chat node — that sets what is being argued.",
+        ),
+        LcncPresetInfo(
+            "preset-curator", "Belief review loop",
+            does = "Every minute it reads what the belief store currently holds and runs a review pass over it.",
+            needs = "Nothing — it runs as it is.",
+            see = "The belief store's current field, and what the review pass landed.",
+            tweakFirst = "The timer's seconds.",
+        ),
+        LcncPresetInfo(
+            "preset-context", "Context assembly",
+            does = "Folds a list of notes into one stable playbook, then builds the reusable context chain from it.",
+            needs = "Nothing — it runs as it is.",
+            see = "The folded playbook text and the chain identity it produced.",
+            tweakFirst = "The bullets input on the fold node.",
+        ),
+        LcncPresetInfo(
+            "preset-kanban", "The board, built from parts",
+            does = "Rebuilds the whole board experience out of generic parts, so every step is visible and changeable.",
+            needs = "Nothing — it runs as it is.",
+            see = "The same board as the built-in one, with every step of its assembly on the canvas.",
+            tweakFirst = "The group-by key, to column the cards by something other than status.",
+        ),
+        LcncPresetInfo(
+            "preset-ccek", "The engine, driven",
+            does = "Starts a live engine node, sends it a message, listens to it as an agent, and replays what it recorded.",
+            needs = "Nothing — it runs as it is.",
+            see = "The message reaching the engine, the agent receiving it, and the running record.",
+            tweakFirst = "The signal node's verb and text.",
+        ),
+        LcncPresetInfo(
+            "preset-scope", "Rings inside rings",
+            does = "Shows how a value handed to an outer ring is used by a part nested two rings deep.",
+            needs = "Nothing — it runs as it is.",
+            see = "The value passing inward through each ring and the result coming back out.",
+            tweakFirst = "The default value on the outer ring's parameter.",
+        ),
+        LcncPresetInfo(
+            "preset-scope-inner", "A ring body to reuse",
+            does = "A small named body other programs can call as a ring, taking one value and returning one.",
+            needs = "Nothing — it runs as it is.",
+            see = "Little on its own; it is meant to be called from another program.",
+            tweakFirst = "The parameter name, which is how callers address it.",
+        ),
+        LcncPresetInfo(
+            "preset-pairs", "Editable list of pairs",
+            does = "Keeps rows of name-and-model pairs you can add to, remove and edit in place, and sends one to a model.",
+            needs = "A model provider key for the chat node.",
+            see = "An editable table of rows and the model's answer.",
+            tweakFirst = "The rows themselves — add one with the plus button.",
+        ),
+        LcncPresetInfo(
+            "preset-brain-mux", "Bring your own key",
+            does = "Finds which provider keys are already available to this machine and sends one prompt with the one you pick.",
+            needs = "At least one provider key present in the environment or saved credentials.",
+            see = "Which providers are reachable, and the answer to your prompt.",
+            tweakFirst = "The prompt text.",
+        ),
+        LcncPresetInfo(
+            "preset-media", "Media player from parts",
+            does = "Drives a player from separate buttons and a slider, so the controls are ordinary parts on wires.",
+            needs = "A media address to play.",
+            see = "A player responding to the buttons and slider beside it.",
+            tweakFirst = "The address in the text node feeding the player.",
+        ),
+        LcncPresetInfo(
+            "preset-hermes-train", "Learning from past sessions",
+            does = "On a timer, feeds recorded sessions through review and lets a proposer suggest what to keep.",
+            needs = "A recorded session profile on this machine.",
+            see = "What each pass reviewed and which proposals passed the gate.",
+            tweakFirst = "The timer's seconds.",
+        ),
+        LcncPresetInfo(
+            "preset-legal-tribunal", "Grounded legal review",
+            does = "Takes in a document, checks its claims against stored evidence, then argues and rules on it.",
+            needs = "A model provider key and a document to review.",
+            see = "The evidence gathered for the document, the argument, and the ruling.",
+            tweakFirst = "The document text on the intake node.",
+        ),
+        LcncPresetInfo(
+            "preset-state-freeze", "Snapshot everything",
+            does = "Every five minutes it writes the current beliefs and knowledge to permanent storage and reports the receipt.",
+            needs = "Nothing — it runs as it is.",
+            see = "A receipt naming exactly what was stored.",
+            tweakFirst = "The timer's seconds, to snapshot more or less often.",
+        ),
+        LcncPresetInfo(
+            "preset-council", "Full council",
+            does = "Runs three panels of five experts over two rounds, then records one ruling with the whole transcript.",
+            needs = "A model provider key — this one makes many calls.",
+            see = "Each panel's round, the final ruling, and a stored record of both.",
+            tweakFirst = "The convene settings, to change how many panels, experts and rounds.",
+        ),
+        LcncPresetInfo(
+            "preset-subvm-audit", "Supply-chain audit",
+            does = "Re-checks every library on the mounted sandboxes against what was recorded, and reports anything that differs.",
+            needs = "At least one mounted sandbox module.",
+            see = "A per-module verdict, and the mismatches if there are any.",
+            tweakFirst = "Nothing — read it first; it only reports.",
+        ),
+    )
+
+    /** The description for [name], or null when the prefab carries none. */
+    fun info(name: String): LcncPresetInfo? = catalog().firstOrNull { it.name == name }
+
 
     /** name → Confix JSON document, the exact shape LcncProgramConfix parses. */
     fun all(): Map<String, String> = linkedMapOf(
@@ -28,6 +173,7 @@ object LcncPresets {
         "preset-curator" to curator(),
         "preset-context" to context(),
         "preset-kanban" to kanban(),
+        "preset-ccek" to ccek(),
         "preset-scope" to scopeDemo(),
         "preset-scope-inner" to scopeInner(),
         "preset-pairs" to pairsDemo(),
@@ -364,6 +510,56 @@ object LcncPresets {
             ).toSeries(),
             view = LcncView(x = 30.0, y = 20.0, zoom = 0.9),
             seq = 5,
+        )
+        return LcncProgramConfix.toJson(program)
+    }
+
+    // ── CCEK itself, programmed: the substrate as a first-class program ──
+    // Every other preset drives a PROJECTION of CCEK (a board, a council, a
+    // case). This one drives the engine: incarnate a node, signal it, host an
+    // agent on its bounded fan-out, read its live projection, replay its
+    // recording, watch its status, and fork the context lineage beside it.
+
+    private fun ccek(): String {
+        val program = LcncProgram(
+            name = "preset-ccek",
+            nodes = listOf(
+                LcncNode("n1", "timer", params = mapOf("seconds" to "5"), x = 30.0, y = 200.0),
+                LcncNode("n2", "ccek.incarnate",
+                    params = mapOf("title" to "showcase", "record" to "true", "maxConcurrency" to "4"),
+                    x = 250.0, y = 200.0),
+                LcncNode("n3", "ccek.signal",
+                    params = mapOf("verb" to "append", "blockKind" to "TEXT", "text" to "a tick reached the engine"),
+                    x = 520.0, y = 30.0),
+                LcncNode("n4", "ccek.agent", params = mapOf("name" to "watcher"), x = 520.0, y = 200.0),
+                LcncNode("n5", "ccek.projection", params = mapOf("kind" to "markdown"), x = 520.0, y = 370.0),
+                LcncNode("n6", "ccek.recording", x = 520.0, y = 540.0),
+                LcncNode("n7", "ccek.status", x = 520.0, y = 700.0),
+                LcncNode("n8", "display", x = 800.0, y = 200.0),
+                LcncNode("n9", "display", x = 800.0, y = 370.0),
+                LcncNode("n10", "display", x = 800.0, y = 540.0),
+                LcncNode("n11", "display", x = 800.0, y = 700.0),
+                LcncNode("n12", "ccek.context", params = mapOf("role" to "operator"), x = 250.0, y = 880.0),
+                LcncNode("n13", "ccek.fact", params = mapOf("kind" to "observation"), x = 520.0, y = 880.0),
+                LcncNode("n14", "display", x = 800.0, y = 880.0),
+                LcncNode("n15", "note", params = mapOf("text" to "CCEK, programmed.\nincarnate (idempotent by title) → signal\n(all ten ForgeSignal verbs) → this program\nsubscribes as an AGENT on the bounded\nfan-out, reads the live projection, replays\nthe recording, and watches Started/Completed.\nBelow: the context lineage the facts land in."), x = 250.0, y = 480.0),
+            ).toSeries(),
+            wires = listOf(
+                LcncWire("n1", "tick", "n2", "trigger?"),
+                LcncWire("n2", "handle", "n3", "handle"),
+                LcncWire("n2", "handle", "n4", "handle"),
+                LcncWire("n2", "handle", "n5", "handle"),
+                LcncWire("n2", "handle", "n6", "handle"),
+                LcncWire("n2", "handle", "n7", "handle"),
+                LcncWire("n4", "signals", "n8", "x"),
+                LcncWire("n5", "projection", "n9", "x"),
+                LcncWire("n6", "signals", "n10", "x"),
+                LcncWire("n7", "events", "n11", "x"),
+                LcncWire("n12", "contextId", "n13", "contextId"),
+                LcncWire("n13", "factCount", "n14", "x"),
+            ).toSeries(),
+            view = LcncView(x = 20.0, y = 20.0, zoom = 0.75),
+            seq = 16,
         )
         return LcncProgramConfix.toJson(program)
     }

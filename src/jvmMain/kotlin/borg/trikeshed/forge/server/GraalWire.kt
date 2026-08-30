@@ -100,11 +100,11 @@ class GraalWire(
             method == "GET" && p == "/api/graal/density" -> densityRoute(path)
             method == "GET" && p == "/api/graal/sheet" -> withContext(Dispatchers.IO) { sheetRoute(path) }
             method == "GET" && p == "/api/graal/dag" -> {
-                val q = borg.trikeshed.utils.rfxhttp.CouchHttpSurface.parseQuery(path.substringAfter('?', ""))
+                val q = borg.trikeshed.relaxfactory.CouchHttpSurface.parseQuery(path.substringAfter('?', ""))
                 JvmKanbanServer.HttpResponse(200, JsonSupport.stringify(q["id"]?.let { dagFor(it) } ?: dagHubs()))
             }
             method == "GET" && p == "/api/graal/decompile" -> withContext(Dispatchers.IO) {
-                val source = borg.trikeshed.utils.rfxhttp.CouchHttpSurface
+                val source = borg.trikeshed.relaxfactory.CouchHttpSurface
                     .parseQuery(path.substringAfter('?', ""))["source"]
                     ?: return@withContext JvmKanbanServer.HttpResponse(400, """{"error":"source_required"}""")
                 val db = couchDatabase
@@ -207,7 +207,7 @@ class GraalWire(
      * treesheet PRELOAD/CursorSheet already specify; nothing before this route ever served it.
      */
     private fun sheetRoute(path: String): JvmKanbanServer.HttpResponse {
-        val q = borg.trikeshed.utils.rfxhttp.CouchHttpSurface.parseQuery(path.substringAfter('?', ""))
+        val q = borg.trikeshed.relaxfactory.CouchHttpSurface.parseQuery(path.substringAfter('?', ""))
         val id = q["id"] ?: return JvmKanbanServer.HttpResponse(400, """{"error":"id required"}""")
 
         if (id == "vms") {
@@ -245,7 +245,7 @@ class GraalWire(
         if (p != "/api/graal/ingest") return null
         if (method != "POST") return JvmKanbanServer.HttpResponse(405, """{"error":"method_not_allowed"}""")
         val database = couchDatabase ?: return JvmKanbanServer.HttpResponse(501, """{"error":"no store mounted"}""")
-        val q = borg.trikeshed.utils.rfxhttp.CouchHttpSurface.parseQuery(path.substringAfter('?', ""))
+        val q = borg.trikeshed.relaxfactory.CouchHttpSurface.parseQuery(path.substringAfter('?', ""))
         val rawName = (q["name"] ?: "drop-${System.currentTimeMillis()}").substringAfterLast('/').substringAfterLast('\\')
         val name = rawName.replace(Regex("[^\\w .()-]+"), "_").ifBlank { "drop" }
         val bytes = CouchWire.bodyOf(payload)
@@ -486,7 +486,7 @@ class GraalWire(
      */
     private fun zoomRoute(path: String): JvmKanbanServer.HttpResponse {
         val db = couchDatabase ?: return JvmKanbanServer.HttpResponse(503, """{"error":"no store mounted"}""")
-        val q = borg.trikeshed.utils.rfxhttp.CouchHttpSurface.parseQuery(path.substringAfter('?', ""))
+        val q = borg.trikeshed.relaxfactory.CouchHttpSurface.parseQuery(path.substringAfter('?', ""))
         val raw = q["code"] ?: return JvmKanbanServer.HttpResponse(400, """{"error":"code required"}""")
         val ring8 = (raw.toIntOrNull(16) ?: raw.toIntOrNull())?.and(0xFF)
             ?: return JvmKanbanServer.HttpResponse(400, """{"error":"code must be a byte (hex or dec)"}""")
@@ -516,7 +516,7 @@ class GraalWire(
      */
     private fun strengthRoute(path: String): JvmKanbanServer.HttpResponse {
         val db = couchDatabase ?: return JvmKanbanServer.HttpResponse(503, """{"error":"no store mounted"}""")
-        val q = borg.trikeshed.utils.rfxhttp.CouchHttpSurface.parseQuery(path.substringAfter('?', ""))
+        val q = borg.trikeshed.relaxfactory.CouchHttpSurface.parseQuery(path.substringAfter('?', ""))
         val a = q["a"] ?: return JvmKanbanServer.HttpResponse(400, """{"error":"a cid required"}""")
         val b = q["b"] ?: return JvmKanbanServer.HttpResponse(400, """{"error":"b cid required"}""")
         val bytesA = db.blockGet(a) ?: return JvmKanbanServer.HttpResponse(404, """{"error":"a not in cas"}""")
@@ -557,7 +557,7 @@ class GraalWire(
     private suspend fun densityRoute(path: String): JvmKanbanServer.HttpResponse {
         val store = memoryStore
             ?: return JvmKanbanServer.HttpResponse(503, """{"error":"memory store not mounted"}""")
-        val q = borg.trikeshed.utils.rfxhttp.CouchHttpSurface.parseQuery(path.substringAfter('?', ""))
+        val q = borg.trikeshed.relaxfactory.CouchHttpSurface.parseQuery(path.substringAfter('?', ""))
         val id = q["path"] ?: q["id"] ?: return JvmKanbanServer.HttpResponse(400, """{"error":"path or id required"}""")
         val aperture = borg.trikeshed.collections.LineAperture.entries.firstOrNull { it.name == (q["aperture"] ?: "L2") }
             ?: return JvmKanbanServer.HttpResponse(400, """{"error":"aperture must be L0|L1|L2|L3"}""")

@@ -525,7 +525,7 @@ class PatchWire(
             // stays as pure vocabulary logic below — it never needed the
             // page, revived or not.)
             method == "GET" && p == "/api/lcnc/mating-options" -> {
-                val query = borg.trikeshed.utils.rfxhttp.CouchHttpSurface.parseQuery(path.substringAfter('?', ""))
+                val query = borg.trikeshed.relaxfactory.CouchHttpSurface.parseQuery(path.substringAfter('?', ""))
                 val sourceType = query["sourceType"]
                     ?: return json(mapOf("error" to "sourceType_required"), 400)
                 val sourcePort = query["sourcePort"]
@@ -538,13 +538,27 @@ class PatchWire(
                 val corpus = borg.trikeshed.lcnc.LcncPresets.all().map { (n, doc) ->
                     borg.trikeshed.lcnc.LcncProgramConfix.fromJson(n, doc)
                 }
-                json(mapOf("options" to borg.trikeshed.lcnc.LcncMating
-                    .rankedCandidates(program, "source", sourcePort, corpus, query["q"] ?: "").map {
-                        mapOf("type" to it.type, "inputPort" to it.inputPort, "title" to it.title)
-                    }))
+                // The surface resolves a RING port's kind (it lives in the node's
+                // scope.out child, not in the `scope` contract) and passes it here as
+                // `kind`; "*" means the ring declared none and accepts everything.
+                // Without it this route was node-blind and answered "no compatible
+                // mate" for cables the canvas would happily let you drop.
+                val kindParam = query["kind"]?.takeIf { it.isNotBlank() }
+                val override = when (kindParam) {
+                    null -> null
+                    "*" -> borg.trikeshed.lcnc.LcncTypeCheck.PortKind(null, generic = true)
+                    else -> borg.trikeshed.lcnc.LcncTypeCheck.PortKind(kindParam, generic = false)
+                }
+                json(mapOf(
+                    "generic" to (override?.generic ?: false),
+                    "options" to borg.trikeshed.lcnc.LcncMating
+                        .rankedCandidates(program, "source", sourcePort, corpus, query["q"] ?: "", override).map {
+                            mapOf("type" to it.type, "inputPort" to it.inputPort, "title" to it.title)
+                        },
+                ))
             }
             method == "GET" && p == "/api/lcnc/fills" -> {
-                val query = borg.trikeshed.utils.rfxhttp.CouchHttpSurface.parseQuery(path.substringAfter('?', ""))
+                val query = borg.trikeshed.relaxfactory.CouchHttpSurface.parseQuery(path.substringAfter('?', ""))
                 val type = query["type"] ?: return json(mapOf("error" to "type_required"), 400)
                 val corpus = borg.trikeshed.lcnc.LcncPresets.all().map { (n, doc) ->
                     borg.trikeshed.lcnc.LcncProgramConfix.fromJson(n, doc)
@@ -555,7 +569,7 @@ class PatchWire(
                 }))
             }
             method == "GET" && p == "/api/lcnc/autowire" -> {
-                val query = borg.trikeshed.utils.rfxhttp.CouchHttpSurface.parseQuery(path.substringAfter('?', ""))
+                val query = borg.trikeshed.relaxfactory.CouchHttpSurface.parseQuery(path.substringAfter('?', ""))
                 val fromType = query["from"] ?: return json(mapOf("error" to "from_required"), 400)
                 val toType = query["to"] ?: return json(mapOf("error" to "to_required"), 400)
                 val nodes = listOf(
@@ -596,9 +610,21 @@ class PatchWire(
             }
             // Offered, never installed: the gallery's preset lane. Before the
             // generic name branch — "presets" is a reserved word, not a panel.
+            // The document is what runs; the description is what makes it adoptable.
+            // Both are server-authored, so the gallery renders plain language rather
+            // than inventing its own (or showing a file name and a node count).
             method == "GET" && p == "/api/panels/presets" -> json(mapOf(
                 "presets" to borg.trikeshed.lcnc.LcncPresets.all().map { (name, doc) ->
-                    mapOf("name" to name, "document" to JsonSupport.parse(doc))
+                    val info = borg.trikeshed.lcnc.LcncPresets.info(name)
+                    linkedMapOf(
+                        "name" to name,
+                        "title" to (info?.title ?: name),
+                        "does" to info?.does.orEmpty(),
+                        "needs" to info?.needs.orEmpty(),
+                        "see" to info?.see.orEmpty(),
+                        "tweakFirst" to info?.tweakFirst.orEmpty(),
+                        "document" to JsonSupport.parse(doc),
+                    )
                 },
             ))
             method == "GET" && p.startsWith("/api/panels/") -> {

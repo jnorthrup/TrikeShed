@@ -1,4 +1,4 @@
-package borg.trikeshed.utils.rfxhttp
+package borg.trikeshed.relaxfactory
 
 import borg.trikeshed.couch.ConfixDocStore
 import borg.trikeshed.couch.ConfixDocStoreEntry
@@ -51,7 +51,7 @@ class CouchHttpSurface(
     val dbName: String,
     val store: ConfixDocStore,
     val viewServer: ViewServer = ViewServer(),
-    val requestFactory: CouchRequestFactory = CouchRequestFactory(store, viewServer),
+    val requestFactory: CouchRequestFactory = CouchRequestFactory.forConfixStore(store, viewServer),
 ) {
     /** The `_view` route core, shared with the daemon router's mount. */
     private val viewRoute = ViewRoute(ViewDocs.of(store), viewServer)

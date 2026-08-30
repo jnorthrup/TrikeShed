@@ -523,6 +523,13 @@ object OroborosDaemon {
         )
         val couchDb = borg.trikeshed.couch.CouchDatabase(COUCH_DB_NAME, couchStore, casStore)
         couchDb.ensureDesignDoc(vhostRoot = "docs/")
+        // Declare the heading the worktree gateway has always been minting documents under. Until
+        // now `projects/<repo>/…` was an id prefix nobody had declared, so the store could not say
+        // what projects it held; the manifest is an ordinary document, so it replicates with them.
+        borg.trikeshed.couch.Projects(couchDb).put(
+            repoDir.name.lowercase(),
+            mapOf("root" to repoDir.absolutePath, "prefix" to WorktreeCouchGateway.WORKTREE_PREFIX),
+        )
         // Peer exchange for _replicate rides the same HTX reactor as Jules/ModelMux — no JDK client.
         val peerHttp = borg.trikeshed.couch.replicate.HttpExchange { method, url, body, contentType ->
             val req = borg.trikeshed.htx.parseHtxRequest(
@@ -547,11 +554,24 @@ object OroborosDaemon {
             incrementalViews.open()
             System.err.println("[OROBOROS] incremental-view registry: ${incrementalViews.state}")
         }
+        // One replicator, held by both mountings: `POST _replicate` drives it as a route, and the
+        // RequestFactory's `replicate` operation drives the same object inside a batch.
+        val couchReplicator = borg.trikeshed.couch.replicate.CouchReplicator(couchDb, peerHttp)
+        // The ReportServer, declared here rather than beside the other wires because the router
+        // needs it: with it attached, every `_view` and every envelope `query` puts its map and
+        // reduce facts on the CCEK report bus. Without it those events had no producer at all.
+        val reportReactorForWires = CouchReportReactorElement(parentJob = coroutineContext[kotlinx.coroutines.Job])
+        launch { reportReactorForWires.open() }
         val couchWire = borg.trikeshed.forge.server.CouchWire(
-            router = borg.trikeshed.couch.CouchWireRouter(couchDb, WorktreeCouchGateway.WORKTREE_PREFIX) { ddoc, view ->
+            router = borg.trikeshed.couch.CouchWireRouter(
+                couchDb,
+                WorktreeCouchGateway.WORKTREE_PREFIX,
+                replicator = couchReplicator,
+                report = reportReactorForWires,
+            ) { ddoc, view ->
                 incrementalViews.lookup(ddoc, view)
             },
-            replicator = borg.trikeshed.couch.replicate.CouchReplicator(couchDb, peerHttp),
+            replicator = couchReplicator,
             // NOT the runBlocking scope: async/continuous replication must run on real workers,
             // not queued behind the daemon's single-threaded root event loop.
             scope = CoroutineScope(SupervisorJob(coroutineContext[kotlinx.coroutines.Job]) + Dispatchers.Default),
@@ -566,7 +586,16 @@ object OroborosDaemon {
         //    userspace uring stack stays the only channelization substrate; JFR/JMX are in-process.
         val daemonBlackboard = borg.trikeshed.graal.ConfixBlackboard.empty()
         val jvmVitals = borg.trikeshed.graal.vitals.JvmVitals().also { it.start() }
-        val vmHost = borg.trikeshed.vm.HypervisorVmHost(borg.trikeshed.graal.subvm.Hypervisor(blackboard = daemonBlackboard))
+        // Guest worlds are file-based under forgeHome: a `world = true` guest gets its own btrfs
+        // subvolume on disk, so what it wrote and what it snapshotted are still there next boot.
+        // They shared one in-memory filesystem before, which meant every world died with the daemon.
+        val vmWorldStore = borg.trikeshed.btrfs.BtrfsWorldStore.ofFiles(
+            fileOps,
+            borg.trikeshed.btrfs.BtrfsWorldStore.homeUnder(forgeHome.absolutePath),
+        )
+        val vmHost = borg.trikeshed.vm.HypervisorVmHost(
+            borg.trikeshed.graal.subvm.Hypervisor(blackboard = daemonBlackboard, worldStore = vmWorldStore),
+        )
         borg.trikeshed.vm.VmSupervisor.install(vmHost)
         val wireScope = CoroutineScope(SupervisorJob(coroutineContext[kotlinx.coroutines.Job]) + Dispatchers.Default)
         // H1: the daemon's own blackboard is finally SERVED. The Hypervisor and the
@@ -574,7 +603,12 @@ object OroborosDaemon {
         // on the same litebike listener. Repair contract: seq-ordered replay, `id:`
         // on every SSE event, `since` as a query param, snapshot at /blackboard/board.
         val blackboardWire = borg.trikeshed.forge.server.BlackboardWire(daemonBlackboard, wireScope)
-        val vmWire = borg.trikeshed.forge.server.VmWire(vmHost, wireScope)
+        // A guest's file-based world publishes onto the same database `_replicate` already moves,
+        // so a VM world teleports on the couch transport rather than needing a lane of its own.
+        val vmWire = borg.trikeshed.forge.server.VmWire(
+            vmHost, wireScope,
+            worlds = borg.trikeshed.btrfs.VmWorldTeleport(couchDb, vmWorldStore),
+        )
         val hermesConsole = borg.trikeshed.hermes.HermesVmConsole(
             root = File(
                 config.hermesRoot ?: System.getenv("HERMES_SOURCE_ROOT")
@@ -587,8 +621,6 @@ object OroborosDaemon {
         )
         val hermesWire = borg.trikeshed.forge.server.HermesConsoleWire(hermesConsole, wireScope)
         if (config.hermesConsole) wireScope.launch(Dispatchers.IO) { hermesConsole.open() }
-        val reportReactorForWires = CouchReportReactorElement(parentJob = coroutineContext[kotlinx.coroutines.Job])
-        launch { reportReactorForWires.open() }
         // ── Project DBs: dropped hierarchies as their own couch databases (shared CAS) ──
         val projectDbRegistry = borg.trikeshed.forge.server.ProjectDbRegistry(COUCH_DB_NAME)
         // ── Memory store + ISAM index layer (fs-memory Prongs 1+2) ──
@@ -1006,6 +1038,15 @@ object OroborosDaemon {
         // Pure/presentation node runners: canvas-authored programs (preset-kanban)
         // complete HEADLESS via /api/lcnc/run — the curl-able smoke-test lane.
         moduleContext.lcncRunners.putAll(borg.trikeshed.lcnc.PureNodes.registry { System.currentTimeMillis() })
+        // ── CCEK itself, programmable ────────────────────────────────
+        // Every family above drives a PROJECTION of CCEK (board, council, legal).
+        // This one drives the engine: incarnate/signal/agent/projection/recording/
+        // status/drain plus context lineage, choreographed by the SAME
+        // reactor-bound binding the rest of the process rides (ccekBinding above),
+        // so a program addresses the live CCEK rather than a private instance.
+        moduleContext.lcncRunners.putAll(
+            borg.trikeshed.lcnc.CcekNodes.registry(borg.trikeshed.lcnc.CcekSeams.live(ccekBinding)),
+        )
         // ── NAL belief-bag nodes: nal.mint, nal.decay, nal.recall ────
         // nal.mint wraps ConstructionBotNode (the only model-spend seam).
         // nal.decay is a thin timer trigger over AttentionEconomy.decay.
@@ -1486,8 +1527,31 @@ object OroborosDaemon {
             mapOf("port" to "8888", "atMs" to System.currentTimeMillis().toString()),
             "oroboros",
         )
+        val extraRouteList: List<borg.trikeshed.litebike.ExtraRoute> = listOfNotNull(
+            graalWire::route, vmWire::route, hermesWire::route, beliefWire?.let { it::route },
+            patchWire::route, moduleWire::route, webhookWire::route, blackboardWire::route,
+        )
+        // ── the surface family: node types the canvas could only reach by fetch ──
+        // board.get, blackboard.*, graal.vitals/heap, vms.list, panels.list … existed
+        // as contracts plus small JS wrappers, so a headless run (webhook delivery,
+        // /api/lcnc/run, a scheduled program) threw LcncUnknownNodeType — preset-hermes
+        // could not run outside a browser tab. These dispatch to the daemon's OWN
+        // handlers in process: one author, no second implementation to drift.
+        moduleContext.lcncRunners.putAll(
+            borg.trikeshed.lcnc.SurfaceNodes.registry { method, path, body ->
+                val text = buildString {
+                    append(method).append(' ').append(path).append(" HTTP/1.1\r\n")
+                    append("Content-Type: application/json\r\n\r\n")
+                    if (body != null) append(JsonSupport.stringify(body))
+                }
+                val claimed = moduleRoutes.match(path)?.route
+                val response = claimed?.invoke(method, path, text, null)
+                    ?: extraRouteList.firstNotNullOfOrNull { it(method, path, text, null) }
+                response?.body?.let { runCatching { JsonSupport.parse(it) }.getOrDefault(it) }
+            },
+        )
         val kanbanServer = JvmKanbanServer(
-            extraRoutes = listOfNotNull(graalWire::route, vmWire::route, hermesWire::route, beliefWire?.let { it::route }, patchWire::route, moduleWire::route, webhookWire::route, blackboardWire::route),
+            extraRoutes = extraRouteList,
             rawRoutes = listOfNotNull(graalWire::ingestRoute, couchWire::route, projectDbWire::route, casReflinkWire?.let { it::route }, wikiReadWire::route),
             streamingPaths = borg.trikeshed.forge.server.CouchWire.streamingPaths(COUCH_DB_NAME) +
                 borg.trikeshed.forge.server.GraalWire.STREAMING +

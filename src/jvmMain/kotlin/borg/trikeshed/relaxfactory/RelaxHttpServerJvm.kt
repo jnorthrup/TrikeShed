@@ -1,4 +1,4 @@
-package borg.trikeshed.utils.rfxhttp
+package borg.trikeshed.relaxfactory
 
 import borg.trikeshed.couch.ConfixDocStore
 import borg.trikeshed.couch.ConfixDocStoreFactory
@@ -23,12 +23,12 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 
-class RfxHttpServerJvm(
+class RelaxHttpServerJvm(
     override val store: ConfixDocStore = ConfixDocStoreFactory.create(),
     override val viewServer: ViewServer = ViewServer(),
-    private val requestFactory: RequestFactoryHandler = CouchRequestFactory(store, viewServer),
+    private val requestFactory: RequestFactoryHandler = CouchRequestFactory.forConfixStore(store, viewServer),
     private val nioSupervisor: NioSupervisor? = null
-) : RfxHttpServer {
+) : RelaxHttpServer {
 
     private var reactor: HtxReactorElement? = null
     private var job: Job? = null
@@ -53,7 +53,7 @@ class RfxHttpServerJvm(
     }
 
     private fun handleGet(request: HtxRequest): HtxResponse {
-        return createResponse(200, "RFX HTTP Server running. Connect via RequestFactory GWT clients.")
+        return createResponse(200, "RelaxFactory HTTP server running. Connect via RequestFactory clients.")
     }
 
     private fun createResponse(statusCode: Int, body: String, contentType: String = "text/plain"): HtxResponse {

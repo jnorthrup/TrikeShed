@@ -237,6 +237,8 @@ button{border-radius:6px;padding:4px 12px;transition:border-color .12s,color .12
   <button id="keysBtn" title="keymux endpoints — names & addresses; key values never cross">⚿ keys</button>
   <button id="exportBtn">export</button>
   <button id="importBtn">import</button>
+  <button id="undoBtn" title="undo ⌘Z" disabled>↶</button>
+  <button id="redoBtn" title="redo ⇧⌘Z" disabled>↷</button>
   <button id="clearBtn">clear</button>
   <button id="qsBtn" title="run the quickstart in anger" style="border-color:#3ddc84;color:#3ddc84">⚡</button>
   <button id="fbBtn" title="open a GitHub issue prefilled with this construction's coordinates" style="border-color:var(--warn);color:var(--warn)">⚑</button>
@@ -1141,7 +1143,9 @@ function kindOf(type,dir,port){
 }
 const KIND_CLASS={trigger:"t-trig",json:"t-json",text:"t-text",id:"t-id",num:"t-num"};
 function portClass(type,dir,port){ return KIND_CLASS[kindOf(type,dir,port)]||"t-any"; }
-function kindsCompatible(a,b){ return !!a&&!!b&&a===b; }
+/* exact equality, the daemon's mating rule — with "*" (a ring parameter that
+   has declared no kind) as the one generic, matching LcncTypeCheck.PortKind. */
+function kindsCompatible(a,b){ return !!a&&!!b&&(a===b||a==="*"||b==="*"); }
 /* node-aware kind: rings declare PER-NAME ports through their scope.in /
    scope.out children (spec §4) — those carry the composed json plane. A
    named ring (program param, no inline children) defers to the daemon. */
@@ -1149,11 +1153,18 @@ function nodeKindOf(nd,dir,port){
   const k=kindOf(nd.type,dir,port); if(k) return k;
   if(nd.type==="scope"){
     const p2=port.replace("?","");
-    if(!(nd.children&&nd.children.length)&&(nd.params&&nd.params.program)) return "json";
+    // PROGRESSIVE TYPING (LcncTypeCheck.portKind is the same rule, server-side):
+    // a ring parameter is GENERIC until its scope.in/scope.out declares a `kind`.
+    // Forcing "json" here was a lie — a frame binding is Any?, and the lie made
+    // the shipped council preset (text → ring param) undrawable in this editor.
+    if(!(nd.children&&nd.children.length)&&(nd.params&&nd.params.program)) return "*";
     const want=dir==="out"?"scope.out":"scope.in";
-    let hit=false;
-    (function wk(m){ for(const c of (m.children||[])){ if(c.type===want&&((c.params&&c.params.name)||"").replace("?","")===p2) hit=true; wk(c); } })(nd);
-    if(hit) return "json";
+    let declared=null,hit=false;
+    (function wk(m){ for(const c of (m.children||[])){
+      if(c.type===want&&((c.params&&c.params.name)||"").replace("?","")===p2){
+        hit=true; const dk=(c.params&&c.params.kind)||""; if(dk) declared=dk;
+      } wk(c); } })(nd);
+    if(hit) return declared||"*";
   }
   return null;
 }
@@ -1494,13 +1505,21 @@ async function showMateMenu(cx,cy,srcNode,srcPort,wx,wy,scope,dir){
   let all=[];
   if(dir!=="in"){
     // forward: the daemon's evidence-ordered continuations
-    const mq="/api/lcnc/mating-options?sourceType="+enc(srcNode.type)+"&sourcePort="+enc(srcPort.replace("?",""))+"&q=";
-    try{ all=(await api("GET",mq)).options||[]; }
+    // A ring port's kind lives in the NODE (its scope.out child), not in the
+    // `scope` contract — the route only gets (type, port), so the surface that
+    // knows resolves it and says so. Without this the daemon answered "no
+    // compatible mate" for cables this same canvas would let you drop.
+    const srcKind=nodeKindOf(srcNode,"out",srcPort)||"";
+    const mq="/api/lcnc/mating-options?sourceType="+enc(srcNode.type)+"&sourcePort="+enc(srcPort.replace("?",""))+"&kind="+enc(srcKind)+"&q=";
+    let generic=false;
+    try{ const r=await api("GET",mq); all=r.options||[]; generic=!!r.generic; }
     catch(e){ $("#status").textContent="mate options failed: "+e; return; }
+    if(generic) $("#status").textContent=srcNode.type+"."+srcPort+" is a generic ring parameter — every kind mates; declare a kind on its scope.out to narrow";
   } else {
     // BACKCHAIN: from an input, offer every type whose output kind equals it
     const want=nodeKindOf(srcNode,"in",srcPort);
     if(!want){ $("#status").textContent=srcNode.type+"."+srcPort+" is untyped — it mates with nothing"; return; }
+    if(want==="*") $("#status").textContent=srcNode.type+"."+srcPort+" is a generic ring parameter — every kind mates; declare a kind on its scope.in to narrow";
     for(const t of Object.keys(CONTRACTS).sort()){
       const c=CONTRACTS[t];
       for(const op of (c.outs||[])) if(kindsCompatible(kindOf(t,"out",op),want)) all.push({type:t,outputPort:op,title:c.title});
@@ -1895,7 +1914,66 @@ function nodeDoc(n){ return {id:n.id,type:n.type,x:n.x,y:n.y,params:n.params,col
   children:(n.children&&n.children.length)?n.children.map(nodeDoc):undefined}; }
 function serialize(){ return {view,nodes:G.nodes.filter(n=>!n._parentScope).map(nodeDoc),wires:G.wires,seq:G.seq}; }
 let AUTOSAVE=true; // ?load= link views are ephemeral — never clobber the scratch
-function save(){ if(!AUTOSAVE) return; try{ localStorage.setItem("trikeshed.panels.v3", JSON.stringify(serialize())); }catch(e){} }
+function save(){
+  // History first: a ?load= view is ephemeral for the SCRATCH, but a person
+  // poking at it still gets to back out. Undo is not autosave.
+  recordHistory(JSON.stringify(serialize()));
+  if(!AUTOSAVE) return;
+  try{ localStorage.setItem("trikeshed.panels.v3", JSON.stringify(serialize())); }catch(e){}
+}
+/* ── undo / redo ────────────────────────────────────────────────────────
+   Taking over a canned demo means being able to back out of every change:
+   load a preset, cut a cable, retype a param, dive into a ring — and step
+   back. Every mutation already funnels through save(), so history records
+   the TRANSITION there; no call site has to remember to snapshot. A burst of
+   keystrokes in one field collapses into a single step (same node/wire shape
+   inside 600ms), so undo walks edits, not characters. */
+const UNDO=[],REDO=[],UNDO_MAX=200;
+let restoring=false,lastDoc=null,lastPushMs=0;
+function shapeKey(o){
+  return (o.nodes||[]).map(n=>n.id+":"+n.type).join(",")+"|"+
+         (o.wires||[]).map(w=>w.from+">"+w.to).join(",");
+}
+function recordHistory(cur){
+  if(restoring||lastDoc===null||lastDoc===cur){ lastDoc=cur; histButtons(); return; }
+  const now=Date.now();
+  let sameShape=false;
+  try{ sameShape=UNDO.length>0&&shapeKey(JSON.parse(lastDoc))===shapeKey(JSON.parse(cur)); }catch(e){}
+  if(!(sameShape&&now-lastPushMs<600)){
+    UNDO.push(lastDoc); if(UNDO.length>UNDO_MAX) UNDO.shift();
+    lastPushMs=now;
+  }
+  REDO.length=0; lastDoc=cur; histButtons();
+}
+function histButtons(){
+  const u=$("#undoBtn"),r=$("#redoBtn");
+  if(u){ u.disabled=!UNDO.length; u.title="undo ("+UNDO.length+") ⌘Z"; }
+  if(r){ r.disabled=!REDO.length; r.title="redo ("+REDO.length+") ⇧⌘Z"; }
+}
+function applyDoc(json){
+  restoring=true;
+  try{ load(JSON.parse(json)); lastDoc=JSON.stringify(serialize()); }
+  finally{ restoring=false; }
+  if(AUTOSAVE){ try{ localStorage.setItem("trikeshed.panels.v3", lastDoc); }catch(e){} }
+  histButtons(); runAll();
+}
+function undo(){
+  if(!UNDO.length){ $("#status").textContent="nothing to undo"; return; }
+  REDO.push(lastDoc); applyDoc(UNDO.pop());
+  $("#status").textContent="undo · "+UNDO.length+" step"+(UNDO.length===1?"":"s")+" back";
+}
+function redo(){
+  if(!REDO.length){ $("#status").textContent="nothing to redo"; return; }
+  UNDO.push(lastDoc); applyDoc(REDO.pop());
+  $("#status").textContent="redo · "+REDO.length+" ahead";
+}
+addEventListener("keydown",e=>{
+  const t=e.target,tag=((t&&t.tagName)||"").toLowerCase();
+  if(tag==="input"||tag==="textarea"||tag==="select"||(t&&t.isContentEditable)) return;
+  if(!(e.metaKey||e.ctrlKey)) return;
+  if(e.key==="z"||e.key==="Z"){ e.preventDefault(); if(e.shiftKey) redo(); else undo(); }
+  else if(e.key==="y"||e.key==="Y"){ e.preventDefault(); redo(); }
+});
 function load(data){
   for(const n of G.nodes){ if(n._timer)clearInterval(n._timer); if(n._es){n._es.close();n._es=null;} n.el.remove(); }
   G={nodes:[],wires:[],seq:data.seq||1};
@@ -2151,10 +2229,20 @@ async function openGallery(){
       fetch("/api/panels").then(r=>r.json()).catch(()=>({panels:[]})),
     ]);
     const rows=[];
-    rows.push('<div style="color:var(--dim,#7f91a9);margin:4px 0">presets — server-authored, offered</div>');
+    rows.push('<div style="color:var(--dim,#7f91a9);margin:4px 0">examples — pick one, then change it</div>');
+    const esc=s=>String(s??"").replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
     for(const p of (pr.presets||[])){
-      const doc=p.document||{}; const nn=(doc.nodes||[]).length;
-      rows.push('<div class="galRow" data-kind="preset" data-name="'+p.name+'" style="padding:5px 6px;border:1px solid var(--line,#263348);border-radius:5px;margin:3px 0;cursor:pointer">'+p.name+' <span style="color:var(--dim,#7f91a9)">· '+nn+' nodes</span></div>');
+      const doc=p.document||{}, nn=(doc.nodes||[]).length;
+      // What a person needs before adopting it: what it does, what it needs
+      // first, what they will see, and the one knob to turn. Server-authored.
+      rows.push(
+        '<div class="galRow" data-kind="preset" data-name="'+p.name+'" style="padding:7px 8px;border:1px solid var(--line,#263348);border-radius:6px;margin:5px 0;cursor:pointer">'+
+        '<div style="font-weight:600">'+esc(p.title||p.name)+' <span style="color:var(--dim,#7f91a9);font-weight:400">· '+nn+' parts</span></div>'+
+        (p.does?'<div style="margin-top:3px">'+esc(p.does)+'</div>':'')+
+        (p.needs?'<div style="margin-top:3px;color:var(--dim,#7f91a9)"><b>needs</b> '+esc(p.needs)+'</div>':'')+
+        (p.see?'<div style="color:var(--dim,#7f91a9)"><b>you see</b> '+esc(p.see)+'</div>':'')+
+        (p.tweakFirst?'<div style="color:var(--dim,#7f91a9)"><b>change first</b> '+esc(p.tweakFirst)+'</div>':'')+
+        '</div>');
     }
     rows.push('<div style="color:var(--dim,#7f91a9);margin:8px 0 4px">store — your saved programs</div>');
     const panels=st.panels||[];
@@ -2166,8 +2254,14 @@ async function openGallery(){
     body.querySelectorAll(".galRow").forEach(el=>el.addEventListener("click",async()=>{
       const name=el.dataset.name;
       if(el.dataset.kind==="preset"){
-        const doc=(pr.presets||[]).find(x=>x.name===name)?.document;
-        if(doc){ load(fromConfix(doc)); $("#panelName").value=name.replace(/^preset-/,""); $("#status").textContent="loaded "+name+" (offered — ⇪ store to keep it)"; }
+        const hit=(pr.presets||[]).find(x=>x.name===name), doc=hit&&hit.document;
+        if(doc){
+          load(fromConfix(doc)); $("#panelName").value=name.replace(/^preset-/,"");
+          // Land on the on-ramp, not on jargon: say what to change, and that
+          // backing out is safe. ⇪ store keeps it; it is offered, not installed.
+          $("#status").textContent=(hit.title||name)+" loaded — change first: "+
+            (hit.tweakFirst||"anything")+" · ⌘Z undoes · ⇪ store keeps it";
+        }
       } else {
         const resp=await fetch("/api/panels/"+name);
         if(resp.ok){ load(await resp.json()); $("#panelName").value=name; $("#status").textContent="loaded panels/"+name; }
@@ -2177,6 +2271,8 @@ async function openGallery(){
   }catch(e){ body.textContent="gallery failed: "+e; }
 }
 $("#presetsBtn").addEventListener("click",openGallery);
+$("#undoBtn").addEventListener("click",undo);
+$("#redoBtn").addEventListener("click",redo);
 /* ── contract hydration: the vocabulary is server-owned ─────────────────── */
 // The ONE author is /api/lcnc/contracts; this page carries no type table.
 // (This function was promised by the step-4 rework and never written — the

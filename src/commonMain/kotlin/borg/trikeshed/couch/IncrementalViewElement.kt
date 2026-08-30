@@ -120,6 +120,9 @@ class IncrementalViewElement(
         _answer = when (val r = definition.reduceFn) {
             is ReduceFunction.Builtin -> raw.reduce(r.name)
             null -> raw
+            // Admitted for the same reason Custom is refused: the cascade's per-key output is a
+            // fixed-size `[rollup, count]`, so re-reducing the retained mapped rows stays bounded.
+            is ReduceFunction.Cascade -> raw.reduceCascade(r.metrics)
             is ReduceFunction.Custom -> error("incremental views accept bounded LCNC built-ins only")
         }
 

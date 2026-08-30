@@ -32,10 +32,13 @@ class LcncMatingTest {
         val timer = LcncNode("n1", "timer")
         val program = LcncProgram("t", listOf(timer).toSeries(), emptySeriesOf())
         val ranked = LcncMating.rankedCandidates(program, "n1", "tick", presetCorpus())
-        val head = ranked.take(3).map { it.type }.toSet()
-        assertEquals(setOf("kanban.activeSheets", "board.get", "beliefs.introspect"), head,
+        // ccek.incarnate joined the evidenced set with preset-ccek (timer.tick →
+        // ccek.incarnate.trigger?) — the menu leads with whatever the corpus wires.
+        val evidenced = setOf("kanban.activeSheets", "board.get", "beliefs.introspect", "ccek.incarnate")
+        val head = ranked.take(evidenced.size).map { it.type }.toSet()
+        assertEquals(evidenced, head,
             "the corpus-evidenced targets lead the menu: ${ranked.map { it.type }}")
-        assertTrue(ranked.drop(3).any { it.type == "http.get" },
+        assertTrue(ranked.drop(evidenced.size).any { it.type == "http.get" },
             "never-wired compatibles remain offered, below the evidence")
     }
 
@@ -261,5 +264,40 @@ class LcncMatingTest {
             .first { it.type == "http.get" }
         assertEquals(1234.5, newNode.x)
         assertEquals(678.9, newNode.y)
+    }
+
+    @Test
+    fun dragToBlankNarrowsFromARingPortInsteadOfAnsweringNothing() {
+        // QA: auto-narrowing on drag-to-blank did not match. The menu resolved
+        // the source kind from the CONTRACT only, and a ring's per-name port is
+        // declared by its scope.out child — so the daemon answered "nothing is
+        // compatible" for a cable the canvas would let you drop.
+        val ring = LcncNode(
+            "r", LcncContracts.SCOPE,
+            children = listOf(
+                LcncNode("o", LcncContracts.SCOPE_OUT, params = mapOf("name" to "verdict", "kind" to "text")),
+            ).toSeries(),
+        )
+        val program = LcncProgram("t", listOf(ring).toSeries(), emptySeriesOf())
+        val typed = LcncMating.compatibleTypes(program, "r", "verdict")
+        assertTrue(typed.isNotEmpty(), "a DECLARED ring port narrows to its kind's mates")
+        assertTrue(typed.all { c ->
+            LcncContracts.find(c.type)!!.inputKinds[c.inputPort.removeSuffix("?")] == "text"
+        }, "every offered mate accepts text: ${typed.map { it.type + "." + it.inputPort }}")
+        assertTrue(!LcncMating.genericSource(program, "r", "verdict"), "a declared ring port is not generic")
+
+        // An UNDECLARED ring port is genuinely generic — it mates with everything,
+        // and the surface is told so rather than shown a fake narrowing.
+        val open = LcncProgram(
+            "t2",
+            listOf(LcncNode(
+                "r", LcncContracts.SCOPE,
+                children = listOf(LcncNode("o", LcncContracts.SCOPE_OUT, params = mapOf("name" to "any"))).toSeries(),
+            )).toSeries(),
+            emptySeriesOf(),
+        )
+        assertTrue(LcncMating.genericSource(open, "r", "any"), "an undeclared ring port is generic")
+        assertTrue(LcncMating.compatibleTypes(open, "r", "any").size > typed.size,
+            "generic offers a superset — the caller labels it, never pretends it narrowed")
     }
 }

@@ -67,11 +67,23 @@ object LcncContracts {
             params = mapOf(
                 "name" to LcncPortContract.LcncParamSpec(ph = "parameter name (trailing ? = optional)"),
                 "default" to LcncPortContract.LcncParamSpec(ph = "value when the caller omits it"),
+                // Progressive typing: a ring parameter is GENERIC until it declares a
+                // kind. Declared ⇒ LcncTypeCheck enforces it like any leaf port; absent
+                // ⇒ the ring accepts any kind (a frame binding is Any?, and pretending
+                // otherwise is what made the shipped council preset undrawable).
+                "kind" to LcncPortContract.LcncParamSpec(
+                    opts = listOf("", "json", "text", "id", "trigger"),
+                    ph = "declared parameter kind — empty = generic"),
             )),
         LcncPortContract(SCOPE_OUT, "scope.out (return value)",
             listOf("value"), emptyList(),
             inputKinds = mapOf("value" to "json"),
-            params = mapOf("name" to LcncPortContract.LcncParamSpec(ph = "return name")),
+            params = mapOf(
+                "name" to LcncPortContract.LcncParamSpec(ph = "return name"),
+                "kind" to LcncPortContract.LcncParamSpec(
+                    opts = listOf("", "json", "text", "id", "trigger"),
+                    ph = "declared yield kind — empty = generic"),
+            ),
             isSink = true),
 
         // ── blackboard: the shared Confix surface as first-class nodes ──
@@ -85,6 +97,75 @@ object LcncContracts {
         LcncPortContract("blackboard.sites", "blackboard sites",
             listOf("trigger?"), listOf("sites"),
             inputKinds = mapOf("trigger" to "trigger"), outputKinds = mapOf("sites" to "json")),
+
+        // ── CCEK: the substrate every other plane rides, made programmable ──
+        // Bounded fan-out agents over a ForgeDocument, ten control verbs, live
+        // projections, the recorded signal log, and context lineage. Everything
+        // above (kanban, council, legal, belief) is a projection OF this; these
+        // nodes let a program drive the engine itself.
+        LcncPortContract("ccek.incarnate", "ccek node (incarnate / attach)",
+            listOf("trigger?"), listOf("handle", "node"),
+            inputKinds = mapOf("trigger" to "trigger"),
+            outputKinds = mapOf("handle" to "id", "node" to "json"),
+            params = mapOf(
+                "title" to LcncPortContract.LcncParamSpec(v = "lcnc-node", ph = "same title = same node (idempotent)"),
+                "record" to LcncPortContract.LcncParamSpec(v = "true", opts = listOf("true", "false")),
+                "maxConcurrency" to LcncPortContract.LcncParamSpec(v = "8", ph = "bounded fan-out width"),
+                "projections" to LcncPortContract.LcncParamSpec(ph = "DOCUMENT,BOARD,MARKDOWN — empty = all"),
+            )),
+        LcncPortContract("ccek.signal", "ccek signal (every ForgeSignal verb)",
+            listOf("handle", "fields?"), listOf("sent", "signal"),
+            inputKinds = mapOf("handle" to "id", "fields" to "json"),
+            outputKinds = mapOf("sent" to "json", "signal" to "json"),
+            params = mapOf(
+                "verb" to LcncPortContract.LcncParamSpec(v = "append", opts = CcekNodes.VERBS),
+                "text" to LcncPortContract.LcncParamSpec(ta = true, ph = "append / update"),
+                "blockKind" to LcncPortContract.LcncParamSpec(v = "TEXT", ph = "append: TEXT, HEADING_1, TODO…"),
+                "blockId" to LcncPortContract.LcncParamSpec(ph = "update / delete"),
+                "cardId" to LcncPortContract.LcncParamSpec(ph = "move / continue / repeat / abort / fork / join / vote"),
+                "toColumnId" to LcncPortContract.LcncParamSpec(ph = "move"),
+                "edgeId" to LcncPortContract.LcncParamSpec(ph = "repeat"),
+                "reason" to LcncPortContract.LcncParamSpec(ph = "abort"),
+                "targetLane" to LcncPortContract.LcncParamSpec(ph = "fork"),
+                "group" to LcncPortContract.LcncParamSpec(ph = "join"),
+                "requiredBranches" to LcncPortContract.LcncParamSpec(v = "2", ph = "join"),
+                "verdict" to LcncPortContract.LcncParamSpec(ph = "vote"),
+            )),
+        LcncPortContract("ccek.projection", "ccek projection (live view)",
+            listOf("handle"), listOf("projection", "kind"),
+            inputKinds = mapOf("handle" to "id"),
+            outputKinds = mapOf("projection" to "json", "kind" to "text"),
+            params = mapOf("kind" to LcncPortContract.LcncParamSpec(
+                v = "markdown", opts = listOf("markdown", "board", "document")))),
+        LcncPortContract("ccek.recording", "ccek recording (replay log)",
+            listOf("handle"), listOf("signals", "count"),
+            inputKinds = mapOf("handle" to "id"),
+            outputKinds = mapOf("signals" to "json", "count" to "json")),
+        LcncPortContract("ccek.agent", "ccek agent (this program subscribes)",
+            listOf("handle"), listOf("agent", "signals", "count"),
+            inputKinds = mapOf("handle" to "id"),
+            outputKinds = mapOf("agent" to "text", "signals" to "json", "count" to "json"),
+            params = mapOf("name" to LcncPortContract.LcncParamSpec(ph = "agent name — empty uses the node id"))),
+        LcncPortContract("ccek.status", "ccek fan-out status",
+            listOf("handle"), listOf("events", "started", "completed", "failed"),
+            inputKinds = mapOf("handle" to "id"),
+            outputKinds = mapOf("events" to "json", "started" to "json", "completed" to "json", "failed" to "json")),
+        LcncPortContract("ccek.drain", "ccek drain (graceful cancel)",
+            listOf("handle"), listOf("drained"),
+            inputKinds = mapOf("handle" to "id"), outputKinds = mapOf("drained" to "json")),
+        LcncPortContract("ccek.context", "ccek user context (fork lineage)",
+            listOf("parent?"), listOf("context", "contextId"),
+            inputKinds = mapOf("parent" to "id"),
+            outputKinds = mapOf("context" to "json", "contextId" to "id"),
+            params = mapOf(
+                "role" to LcncPortContract.LcncParamSpec(v = "root", ph = "context role"),
+                "parent" to LcncPortContract.LcncParamSpec(ph = "parent contextId — empty = root"),
+            )),
+        LcncPortContract("ccek.fact", "ccek causal fact",
+            listOf("contextId", "fields?"), listOf("factCount", "asserted"),
+            inputKinds = mapOf("contextId" to "id", "fields" to "json"),
+            outputKinds = mapOf("factCount" to "json", "asserted" to "json"),
+            params = mapOf("kind" to LcncPortContract.LcncParamSpec(v = "observation", ph = "assertion kind"))),
 
         // ── sources (no inputs) ──────────────────────────────────────
         LcncPortContract("timer", "timer",

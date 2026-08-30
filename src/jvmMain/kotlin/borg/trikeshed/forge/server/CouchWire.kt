@@ -6,7 +6,7 @@ import borg.trikeshed.couch.replicate.CouchReplicator
 import borg.trikeshed.couch.replicate.ReplicationReport
 import borg.trikeshed.litebike.JvmKanbanServer
 import borg.trikeshed.parse.json.JsonSupport
-import borg.trikeshed.utils.rfxhttp.CouchHttpSurface
+import borg.trikeshed.relaxfactory.CouchHttpSurface
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay

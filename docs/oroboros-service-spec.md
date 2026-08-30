@@ -47,14 +47,23 @@ Pijul materialization; intentionally inert pending a complete CCEK implementatio
 | ❌ | — | `_rev` is not `N-hash` shaped; no `_bulk_docs`, `_all_docs`, `_local`, `_replicate` |
 
 ### C3 — ReportServer / RequestFactory
+*Delta 2026-08-30: the package `utils/rfxhttp` is now `relaxfactory`, and the ❌ below is closed —
+the factory is mounted on the router the daemon actually serves, over the same `CouchDatabase` as
+every other route. What is written here is the state after that.*
+
 | | Path | Role |
 |-|------|------|
-| ✅ | `utils/rfxhttp/RfxHttpServer.kt` | `interface RfxHttpServer { store: ConfixDocStore; viewServer: ViewServer; handleRequest(HtxRequest) }`, `RequestFactoryHandler.processRequest(payload)` |
-| ✅ | `utils/rfxhttp/CouchRequestFactory.kt` (182 L), `RfxHttpServerJvm.kt` | RequestFactory batched-operation envelope over `ConfixDocStore`/`ViewServer` — **the RxF lineage is already here** |
-| ✅ | `couch/CouchReportReactorElement.kt` | CCEK owner for report execution; emits `MapEmitted` etc. as pointcut facts |
-| ✅ | `litebike/JvmKanbanServer.kt` (563 L) | the one bind; routes `/api/{health,cap,board,metrics,jules/surface,jules/events(SSE),submit,donor,invoke}`, `/` → `forgeShellHtml()`, static assets |
+| ✅ | `relaxfactory/RelaxHttpServer.kt` | `interface RelaxHttpServer { store; viewServer; handleRequest(HtxRequest) }`, `RequestFactoryHandler.processRequest(payload)` |
+| ✅ | `relaxfactory/CouchRequestFactory.kt`, `RelaxHttpServerJvm.kt` | RequestFactory batched-operation envelope — **the RxF lineage** |
+| ✅ | `relaxfactory/RelaxStore.kt` | the port the factory resolves against: `RelaxStore.of(CouchDatabase)` is canonical (CAS revisions, `_changes`, CAS lanes), `RelaxStore.of(ConfixDocStore)` is `CouchHttpSurface`'s document-only binding |
+| ✅ | `relaxfactory/RequestFactoryProxy.kt` | commonMain client proxy: `RelaxTransport.local(db)` for server-side state, `RelaxTransport.http(exchange, base)` for client-side state; typed `RelaxOp`/`RelaxReceipt`; compiles jvm/js/wasm/native |
+| ✅ | `couch/CouchWireRouter.kt` | mounts the envelope at `POST /{db}/_relax` (and the sniffed `POST /{db}`) beside `_changes`/`_replicate`/`_cas` |
+| ✅ | `couch/CouchReportReactorElement.kt` | CCEK owner for report execution. Corrected 2026-08-30: `MapEmitted`/`Reduced` were **declared with no producer anywhere** — only `Committed` ever reached the bus, so no view execution was observable. `ViewServer(report)` now emits both, and the daemon mounts the element on the router, so the `_view` route and the envelope `query` report through one observed engine |
+| ✅ | `couch/ViewServer.kt` `ReduceFunction.Cascade`, `CouchCascade` | the confix cascade **among the reducer options**: `"reduce": "_cascade"` or `{"cascade":{"metrics":[…]}}` from a design doc or the envelope. Its metric list reaches `ReducerIdentity`, so two rollups over different fields cannot mint one receipt. Rereduce added for it and for `rollup-count`, which had been returning raw partials at `group=false`. `CouchCascade.METRICS`/`VIEWS` is now the one definition the `CouchDbCascadeTool` and the jvm JS generator both read |
+| ✅ | `litebike/JvmKanbanServer.kt` | the one bind; `/api/*` built-ins, `/` → forge shell, static assets; `CouchWire` routes the db surface onto it |
 | ✅ | `reactor/*` (`ReactorEndpoint`, `ReactorAlgebra`, `ReactorCodec`, SCTP/TLS/SSH-mesh, `openapi/`) | transport algebra |
-| ❌ | — | `CouchRequestFactory` is not mounted on `JvmKanbanServer`; nothing parses `project/<id>/…`; reports are not addressable as `_design/<ddoc>/_view/<name>` |
+| ✅ | `relaxfactory/ViewRoute.kt` `handle(ddoc, name, ViewQuery)` | a report **is** addressable as `_design/<ddoc>/_view/<name>` through the envelope: the `view` operation runs the `_view` route's own body, so both askers give one answer and only the parameter dialect differs |
+| ✅ | `couch/ProjectPath.kt`, `couch/Projects.kt` | **the grammar is parsed, in one place**, and a project is an entity: a manifest document at the namespace root plus `_design`/`_local` reserved inside it. Envelope ops `project_put`/`project_get`/`project_list`/`project_docs`; route `GET /{db}/_projects[/{id}][?under=]`; the daemon declares its own heading at boot. **Kept plural and flat** (`projects/<id>/<path…>`) — see §3 note |
 
 ### C4 — file-watching git absorber
 | | Path | Role |
@@ -96,7 +105,24 @@ Pijul materialization; intentionally inert pending a complete CCEK implementatio
 | ✅ | `kanban/ForgeBoardPersistence.kt` | one canonical markdown source with `contentId`; derived state rebuilt by `ForgeKanbanIngest` — already the couch discipline (no second truth) |
 | ✅ | `forge/ForgeApp.kt`, `jvmMain forge/ForgeBakePages.kt`, Gradle `generateForgePages`/`serveForgePages` | `docs/` as a baked projection |
 | ✅ | `utils/kanban/JulesBoardStore*.kt` (`~/.local/forge/jules-board.wal`), `docs/JULES_DRAIN_CONTRACT.md`, `docs/gates.md` | public, replayable process state |
-| ❌ | — | no `Project` entity; `docs/` is written by a JVM `main`, not served by the store; Forge/kanban do not read from couch |
+| ✅ | `couch/Projects.kt` | the `Project` entity: a manifest document at `projects/<id>`, `list`/`undeclared`/`documents`/`summary`. `undeclared()` names namespaces in use that nobody declared — the normal state for a gateway-minted prefix, surfaced rather than hidden |
+| ❌ | — | `docs/` is written by a JVM `main`, not served by the store; Forge/kanban do not read from couch |
+
+**End-to-end proof:** `jvmTest litebike/RelaxServiceE2eTest.kt` drives all of the above through one
+real loopback socket — HTX client → litebike → `CouchWireRouter` — asserting the envelope at
+`_relax`, a stored view addressed through it, the cascade as a design-doc reducer, the report bus
+observing both askers, and a VM world's bytes agreeing across `_cas`, the IPFS alias and the
+attachment route. A 200 is not the assertion; the bytes and the rollup numbers are.
+
+### Guest VM worlds — file-based btrfs hosting (added 2026-08-30)
+| | Path | Role |
+|-|------|------|
+| ✅ | `btrfs/UserspaceBtrfs.kt` | CoW extents in a `ContentId` CAS, snapshots sized by file count, send/receive that fails closed — the same hash convention as the couch CAS above |
+| ✅ | `btrfs/BtrfsWorldStore.kt` | where a `world = true` guest's subvolume lives. **`ofFiles` is the file-based host**: one btrfs root on a real filesystem, one subvolume per guest, one shared extent store — so two guests holding the same bytes hold one copy. `ofMemory` names the old behaviour and keeps its per-guest isolation |
+| ✅ | `graal/subvm/TrikeShedGraalVfs.kt` (`GraalBtrfsSupervisor`), `Hypervisor.worldStore` | the store threaded to the guest; `liveSubvolume = <guest id>`, which is what keeps guests on one root from being one world |
+| ✅ | `daemon/OroborosDaemon.kt` | guest worlds under `$forgeHome/vm-worlds` |
+| ⚠ | — | Corrected 2026-08-30: `GraalBtrfsSupervisor` took `TrikeShedGraalVfs`'s **in-memory default**, so every "btrfs-hosted" VM was RAM-hosted — the world died with the process and `snapshot()` wrote something nothing could read back. `BtrfsVolumeTest`/`BtrfsUserspaceVolume` remain a separate directory-shaped emulation, not this path |
+| ✅ | `btrfs/VmWorldTeleport.kt`, `forge/server/VmWire.kt` | **a guest world replicates.** `publish` sends the subvolume, lands the stream as a CAS block, and writes an ordinary attachment document `vm-worlds/<guest>` naming it — so `referencedCids` makes `_replicate` carry it, `_cas/{cid}` and the IPFS alias serve it, `GET …/vm-worlds/<guest>/content` streams it, and a RequestFactory client pulls it with `block_get`. No VM-specific lane. `restore` receives it on the far node; `GET /api/vm/worlds`, `POST /api/vm/{id}/world/{publish,restore}` |
 
 ### Structural debt touching this spec
 - `org/trikeshed/oroboros/OroborosDaemon.kt` — `expect` with an empty `actual` ("TOP PRIORITY, DRAIN ALL JVM CODE"); on `gradle/js-target-debt.excludes`.
@@ -116,6 +142,23 @@ project/<_id>/_local/<name>            per-replica state (view checkpoints, peer
 ```
 `MemoryBridge` already mints `projects/trikeshed/<relative>`; this grammar is that, singularised and
 with the couch reserved segments added. `_id` of the TrikeShed project = `TrikeShed`.
+
+**Implemented 2026-08-30 as plural and flat, deliberately.** `ProjectPath` parses what the store
+actually holds:
+
+```
+projects/<id>                  the project document (manifest)
+projects/<id>/_design/<ddoc>   design docs scoped to the project
+projects/<id>/_local/<name>    per-replica state, never replicated
+projects/<id>/<path…>          content, one document per work-tree path
+```
+
+The reserved segments above are new and real; the singularisation and the `attachments/` segment are
+not, because `WorktreeCouchGateway.WORKTREE_PREFIX`, `MemoryBridge` and the vhost rewrites all mint
+and resolve the plural flat form, so changing it renames every document id already committed to a
+running daemon's couch. That is a migration to run deliberately, not a grammar to redefine under a
+live store — `ProjectPath.CONTENT_SEGMENT` names the segment so the change stays one line in one
+file when someone chooses to run it.
 
 Identity columns (C5) on every attachment:
 
@@ -195,7 +238,8 @@ The daemon keeps its single-bind, no-JDK-networking, no-`git`-process discipline
 | WP | Deliverable | Builds on | Gate (observable) |
 |----|-------------|-----------|-------------------|
 | WP1 | Un-inert `GitReconcileElement`/`WorktreeReconcileElement` → `OroborosCoordinator` → `ProductionCouchIngress`; attachment doc model with `_attachments` stub/inline; `_rev` = `seq-cid` | gateways, coordinator, ingress | touching a file under the repo yields a new `_rev` on its attachment doc within one watch tick |
-| WP2 | Mount `CouchRequestFactory` on `JvmKanbanServer` under `project/<id>/…`; `_changes` (normal + SSE continuous); `_all_docs`; `_bulk_docs`; move `/api/*` to `_design/kanban` shows; `FlywheelDriver` subscribes to `_changes` | rfxhttp, litebike, `CouchChangesProjection`, `CouchReportReactorElement` | PouchDB `replicate.from(url)` of project `TrikeShed` completes; `curl …/_changes?feed=continuous` streams frames |
+| WP2 | Mount `CouchRequestFactory` on `JvmKanbanServer` under `project/<id>/…`; `_changes` (normal + SSE continuous); `_all_docs`; `_bulk_docs`; move `/api/*` to `_design/kanban` shows; `FlywheelDriver` subscribes to `_changes` | relaxfactory, litebike, `CouchChangesProjection`, `CouchReportReactorElement` | PouchDB `replicate.from(url)` of project `TrikeShed` completes; `curl …/_changes?feed=continuous` streams frames |
+| | *2026-08-30: the mount is done — `POST /{db}/_relax` on `CouchWireRouter`, over the same `CouchDatabase` as `_changes`/`_replicate`/`_cas`, so an envelope put mints a CAS revision and replicates. `_changes`/`_all_docs`/`_bulk_docs`/`_revs_diff`/`_local`/`_cas`/`_replicate` also answer as envelope operations, and `RequestFactoryProxy` drives them from any Kotlin target. Still open in WP2: the `project/<id>/…` grammar and moving `/api/*` to `_design/kanban` shows.* | | |
 | WP3 | `GitObjectReader`: loose (zlib) + pack/idx decoding, oid for blob/tree/commit; `git` column; HEAD walk on ref change | `GitStateCache`, `.git/**` watcher | attachment `git.blob` == `git rev-parse HEAD:<path>` for every tracked file; zero `ProcessOperations` use in the daemon path |
 | WP4 | Lazy views: `_local` checkpoints, incremental fold from `_changes`, spine-CID receipts, `?stale=ok`; un-exclude `ViewServerTest` | `ViewServer`, `MapReduceProofReceipt`, `LineCas` | after 1 doc change the next `GET _view` maps exactly 1 doc, and the receipt proves it |
 | WP5 | multihash + CIDv1 + DAG-PB encoders in commonMain (no `MessageDigest`); un-inert `HtxIpfsAdapter`/`CasReplicationElement`; `ipfs` column; IPNS name = project manifest CID | `CidAndStore`, `IpfsBridge`, `CasManifest` | `ipfs block stat <cid>` agrees with the stored CID for a raw leaf; `CidAndStore` leaves the JS-debt list |

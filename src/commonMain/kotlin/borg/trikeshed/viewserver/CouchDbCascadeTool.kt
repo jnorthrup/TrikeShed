@@ -20,26 +20,10 @@ interface ViewServerTool {
 object CouchDbCascadeTool : ViewServerTool {
     override val id: String = "couchdbcascade"
 
-    private val views = mapOf(
-        "byOrganization" to listOf("organization_id", "machine_id"),
-        "byMachine" to listOf("machine_id"),
-        "byInfrastructure" to listOf("infrastructure_id", "machine_id"),
-        "byContract" to listOf("contract_id", "machine_id"),
-        "byBillingGroup" to listOf("billing_group_id", "machine_id"),
-    )
-
-    private val metrics = listOf(
-        "interval",
-        "reading_date",
-        "cpu_mhz",
-        "memory_mib",
-        "storage_gib",
-        "disk_io_kilobytes_per_sec",
-        "lan_io_kilobits_per_sec",
-        "wan_io_kilobits_per_sec",
-        "consumption_wac",
-        "created_at",
-    )
+    // The vocabulary is shared with the couch view path's `ReduceFunction.Cascade` and the jvm
+    // JS generator; it lives in one place so the three cannot disagree about what a cascade is.
+    private val views get() = borg.trikeshed.couch.CouchCascade.VIEWS
+    private val metrics get() = borg.trikeshed.couch.CouchCascade.METRICS
 
     override fun mapper(name: String): ViewServerMapper {
         val keyFields = views[name]

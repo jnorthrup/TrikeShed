@@ -39,6 +39,12 @@ class Hypervisor(
     val promoteAfter: Long = 8,
     val trainCalls: Int = 8,
     val shadowCalls: Int = 4,
+    /**
+     * Where `world = true` guests keep their btrfs subvolume. In-memory by default — the behaviour
+     * every btrfs-world guest had before this was a choice anyone could see — and
+     * [borg.trikeshed.btrfs.BtrfsWorldStore.ofFiles] to make those worlds outlive the process.
+     */
+    val worldStore: borg.trikeshed.btrfs.BtrfsWorldStore = borg.trikeshed.btrfs.BtrfsWorldStore.ofMemory(),
     private val scope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.Default),
 ) : AutoCloseable {
 
@@ -128,6 +134,7 @@ class Hypervisor(
                 val guest: GuestIsolate = if (world) GraalBtrfsSupervisor(
                     id, facet, budget,
                     input = input, output = output, error = error,
+                    world = worldStore,
                 ) { obs -> trainer.observe(obs); observed(id, facet, obs) }
                 else InProcessIsolate(
                     id, facet, budget,
