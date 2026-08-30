@@ -769,10 +769,34 @@ object OroborosDaemon {
         val projectMiner = borg.trikeshed.forge.server.ProjectMiner(
             projectDbRegistry, projectScopes, casStore, beliefBag, File(forgeHome, "files"),
         )
-        val brainClient = borg.trikeshed.jules.BrainClient(
-            errorSink = borg.trikeshed.jules.JvmBrainErrorSink(forgeHome),
-            keyMux = keyMux,
-        )
+        // ── Single-file model pin (hermes convention): GLM_MODEL beside the existing
+        // GLM_BASE_URL in ~/.hermes/.env (or plain env) pins EVERY brain call to
+        // exactly that endpoint through the override lane — no roster, no failover
+        // maze, no env-var archaeology. Key: GLM_API_KEY, else ZAI_API_KEY.
+        // A half-configured pin WARNS LOUDLY and falls back to the roster — the
+        // daemon never dies over model config.
+        suspend fun pinVar(name: String): String? = kotlinx.coroutines.withContext(Dispatchers.IO) {
+            (keyMux.get(name) ?: System.getenv(name))?.trim()?.takeIf { it.isNotEmpty() }
+        }
+        val glmModel = pinVar("GLM_MODEL")
+        val glmBase = pinVar("GLM_BASE_URL")
+        val glmKey = pinVar("GLM_API_KEY") ?: pinVar("ZAI_API_KEY")
+        val brainErrorSink = borg.trikeshed.jules.JvmBrainErrorSink(forgeHome)
+        val brainClient = when {
+            glmModel != null && glmBase != null && glmKey != null -> {
+                System.err.println("[OROBOROS] Brain PINNED: $glmModel @ $glmBase (single-file GLM pin, ~/.hermes/.env)")
+                borg.trikeshed.jules.BrainClient(apiKey = glmKey, base = glmBase, model = glmModel, errorSink = brainErrorSink)
+            }
+            glmModel != null -> {
+                System.err.println(
+                    "[OROBOROS] GLM pin INCOMPLETE: GLM_MODEL=$glmModel but " +
+                        (if (glmBase == null) "GLM_BASE_URL missing" else "no GLM_API_KEY/ZAI_API_KEY") +
+                        " — falling back to the provider roster. Fix ~/.hermes/.env.",
+                )
+                borg.trikeshed.jules.BrainClient(errorSink = brainErrorSink, keyMux = keyMux)
+            }
+            else -> borg.trikeshed.jules.BrainClient(errorSink = brainErrorSink, keyMux = keyMux)
+        }
         val patchWire = borg.trikeshed.forge.server.PatchWire(
             brain = brainClient,
             scopes = projectScopes,
