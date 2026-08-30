@@ -37,6 +37,7 @@ object LcncPresets {
         "preset-legal-tribunal" to legalTribunal(),
         "preset-state-freeze" to stateFreeze(),
         "preset-council" to council(),
+        "preset-subvm-audit" to subvmAudit(),
     )
 
     // ── legal council: the default 3x5 convening, fully drawn ────────────
@@ -46,6 +47,61 @@ object LcncPresets {
     // (CouncilPresetIdentityTest pins the identity in both directions).
     private fun council(): String =
         LcncProgramConfix.toJson(CouncilProgram.build(CouncilConfig.DEFAULT_3x5))
+
+    // ── The sub-VM supply chain, made answerable on the surface.
+    //
+    // A daemon that mounts guest classpaths executes code from them. Until this preset the only
+    // account of WHICH classpaths, and whether their bytes still matched what was resolved, lived
+    // in a KDoc — an operator could read the comment, not the machine. Here the audit and the work
+    // sit on one canvas: vm.modules reports the mounted classpaths and re-hashes them against
+    // MANIFEST.tsv, and vm.corenlp.extract does real extraction out of the very module that was
+    // just verified.
+    //
+    // The security property is the composition, not a check inside either node. vm.modules
+    // declares NO inputs and cannot mount, unmount or install — there is no port through which
+    // that could be expressed — so an audit cannot be steered into becoming an action. The
+    // extractor reaches CoreNLP only through a mounted module whose loader is parented to the
+    // platform loader, so it cannot name borg.trikeshed.* even at OWN trust. Neither property is a
+    // promise in a comment; both are consequences of what LcncContracts declares.
+    private fun subvmAudit(): String {
+        val program = LcncProgram(
+            name = "preset-subvm-audit",
+            nodes = listOf(
+                LcncNode("audit", SubVm.LEGO_PREFIX + "modules",
+                    params = mapOf("verify" to "true"), x = 40.0, y = 60.0),
+                LcncNode("report", LcncContracts.SCOPE_OUT,
+                    params = mapOf("name" to "supply-chain"), x = 320.0, y = 60.0),
+                LcncNode("extract", SubVm.LEGO_PREFIX + "corenlp.extract",
+                    params = mapOf(
+                        "text" to "Stanford CoreNLP runs in a mounted guest module. TrikeShed never links it.",
+                    ), x = 40.0, y = 220.0),
+                LcncNode("facts", LcncContracts.SCOPE_OUT,
+                    params = mapOf("name" to "extracted"), x = 320.0, y = 220.0),
+                LcncNode("note", "note",
+                    params = mapOf("text" to
+                        "the sub-VM supply chain, answerable.\n\n" +
+                        "vm.modules (verify=true) re-hashes every jar on every mounted\n" +
+                        "classpath against the MANIFEST.tsv it was resolved from, and\n" +
+                        "reports root, mount lifecycle, drift. it declares NO inputs and\n" +
+                        "no mutating output: an audit that cannot be steered into an action.\n\n" +
+                        "vm.corenlp.extract then works out of that same verified module.\n" +
+                        "CoreNLP is NOT on this daemon's classpath — 472MB of GPL v3 that\n" +
+                        "src/ never calls. it is mounted per-guest, parented to the platform\n" +
+                        "loader, so the guest can name edu.stanford.nlp.* and java.* and\n" +
+                        "cannot name borg.trikeshed.* even at OWN trust.\n\n" +
+                        "crack the can: both nodes are legos in the drawer, and the whole\n" +
+                        "capability of each is its row in LcncContracts."),
+                    x = 40.0, y = 400.0),
+            ).toSeries(),
+            wires = listOf(
+                LcncWire("audit", "modules", "report", "value"),
+                LcncWire("extract", "sentences", "facts", "value"),
+            ).toSeries(),
+            view = LcncView(x = 20.0, y = 20.0, zoom = 1.0),
+            seq = 11,
+        )
+        return LcncProgramConfix.toJson(program)
+    }
 
     // ── The concentric machine demo: three rings, ONE document. The root
     // scope.in's default binds; its value is consumed TWO rings deep with

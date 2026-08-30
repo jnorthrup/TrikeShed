@@ -22,6 +22,15 @@ import kotlin.test.assertTrue
  */
 class VmModulesLegoTest {
 
+    /** JsonSupport reifies arrays as Array<Any?>, not List — and numbers as Double ("28.0"). */
+    private fun rows(obj: Map<*, *>): List<Map<*, *>> = when (val m = obj["modules"]) {
+        is List<*> -> m
+        is Array<*> -> m.toList()
+        else -> error("modules was neither list nor array: ${m?.let { it::class }} = $m")
+    }.map { it as Map<*, *> }
+
+    private fun num(v: Any?): Long = v.toString().toDouble().toLong()
+
     private fun run(params: Map<String, String>): Map<*, *> = kotlinx.coroutines.runBlocking {
         val out = SubVmLegos.modules().run(LcncNode("m1", SubVmLegos.MODULES, params = params), emptyMap())
         JsonSupport.parse(out["modules"].toString()) as? Map<*, *>
@@ -43,24 +52,24 @@ class VmModulesLegoTest {
     fun itEnumeratesTheInstalledModulesWithoutMountingThem() {
         val before = GuestModules.mounted().toSet()
         val obj = run(emptyMap())
-        val rows = obj["modules"] as? List<*> ?: error("no modules array: $obj")
+        val rows = rows(obj)
         assertTrue(rows.isNotEmpty(), "expected at least the corenlp module: $obj")
         // Listing must not be a side effect: an audit that mounts what it reports is not an audit.
         assertEquals(before, GuestModules.mounted().toSet(), "vm.modules mounted something by listing")
-        val names = rows.map { (it as Map<*, *>)["module"].toString() }
+        val names = rows.map { it["module"].toString() }
         assertTrue("corenlp" in names, "corenlp absent from $names")
     }
 
     @Test
     fun itReportsJarCountAndManifestPresencePerModule() {
         val obj = run(mapOf("module" to "corenlp"))
-        val rows = obj["modules"] as List<*>
+        val rows = rows(obj)
         assertEquals(1, rows.size, "the module param must narrow to one row")
-        val row = rows.single() as Map<*, *>
+        val row = rows.single()
         assertEquals("corenlp", row["module"])
         assertEquals(true, row["manifest"], "corenlp was resolved by utils/subvm and has a manifest")
-        assertTrue((row["jars"].toString().toInt()) > 0, "jar count should be non-zero: $row")
-        assertTrue((row["bytes"].toString().toLong()) > 0L)
+        assertTrue(num(row["jars"]) > 0, "jar count should be non-zero: $row")
+        assertTrue(num(row["bytes"]) > 0L)
         // Not verified unless asked: hashing 472MB is an audit, not a listing.
         assertTrue(!row.containsKey("verified"), "verify must be opt-in: $row")
     }
@@ -68,16 +77,16 @@ class VmModulesLegoTest {
     @Test
     fun verificationIsOptInAndReportsTheRealResult() {
         val obj = run(mapOf("module" to "corenlp", "verify" to "true"))
-        val row = (obj["modules"] as List<*>).single() as Map<*, *>
+        val row = rows(obj).single()
         assertEquals(true, row["verified"], "installed corenlp reported as drifted: ${row["problems"]}")
-        assertTrue((row["checked"].toString().toInt()) > 0, "verify checked nothing: $row")
+        assertTrue(num(row["checked"]) > 0, "verify checked nothing: $row")
     }
 
     @Test
     fun anUnknownModuleIsAnEmptyResultNotAnError() {
         // The worst a wrong param can do. No throw, no partial state, nothing mutated.
         val obj = run(mapOf("module" to "no-such-module"))
-        assertEquals(0, (obj["modules"] as List<*>).size)
+        assertEquals(0, rows(obj).size)
     }
 
     @Test

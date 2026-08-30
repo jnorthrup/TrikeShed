@@ -661,6 +661,9 @@ object LcncContracts {
             outputKinds = mapOf("sentences" to "json"),
             params = mapOf(
                 "facet" to LcncPortContract.LcncParamSpec(v = "JVM"),
+                // Guest module supplying this lego's classes (utils/subvm/<module>). Declared so the
+                // surface can express the override; blank means the lego's own default.
+                "module" to LcncPortContract.LcncParamSpec(v = ""),
                 "text" to LcncPortContract.LcncParamSpec(ta = true, ph = "inline text when nothing wired"),
                 "annotators" to LcncPortContract.LcncParamSpec(v = "tokenize,ssplit,pos,lemma,depparse,ner"),
                 "world" to LcncPortContract.LcncParamSpec(ph = "comma-separated host dirs seeded to /workspace"),
@@ -742,6 +745,9 @@ object LcncContracts {
             outputKinds = mapOf("text" to "text"),
             params = mapOf(
                 "facet" to LcncPortContract.LcncParamSpec(v = "JVM", opts = listOf("JVM", "GRAAL_JS", "GRAAL_PYTHON", "GRAAL_RUBY", "GRAAL_CLOJURE", "GRAAL_LLVM")),
+                // Guest module supplying this lego's classes (utils/subvm/<module>). Declared so the
+                // surface can express the override; blank means the lego's own default.
+                "module" to LcncPortContract.LcncParamSpec(v = ""),
                 "in:files" to LcncPortContract.LcncParamSpec(ph = "comma-separated workspace paths (world-seeded)"),
                 "in:text" to LcncPortContract.LcncParamSpec(ph = "fallback when no files wired"),
                 "world" to LcncPortContract.LcncParamSpec(ph = "comma-separated host dirs seeded to /workspace"),
@@ -754,6 +760,9 @@ object LcncContracts {
             outputKinds = mapOf("tokens" to "text"),
             params = mapOf(
                 "facet" to LcncPortContract.LcncParamSpec(v = "JVM"),
+                // Guest module supplying this lego's classes (utils/subvm/<module>). Declared so the
+                // surface can express the override; blank means the lego's own default.
+                "module" to LcncPortContract.LcncParamSpec(v = ""),
                 "annotators" to LcncPortContract.LcncParamSpec(v = "tokenize,ssplit,pos,lemma,depparse"),
                 "text" to LcncPortContract.LcncParamSpec(ta = true, ph = "inline text when nothing wired"),
                 "world" to LcncPortContract.LcncParamSpec(ph = "comma-separated host dirs seeded to /workspace"),
@@ -778,6 +787,9 @@ object LcncContracts {
             outputKinds = mapOf("routed" to "text"),
             params = mapOf(
                 "facet" to LcncPortContract.LcncParamSpec(v = "JVM"),
+                // Guest module supplying this lego's classes (utils/subvm/<module>). Declared so the
+                // surface can express the override; blank means the lego's own default.
+                "module" to LcncPortContract.LcncParamSpec(v = ""),
                 "from" to LcncPortContract.LcncParamSpec(v = "direct:lcnc"),
                 "to" to LcncPortContract.LcncParamSpec(v = "log:lcnc"),
                 "world" to LcncPortContract.LcncParamSpec(ph = "comma-separated host dirs seeded to /workspace"),
