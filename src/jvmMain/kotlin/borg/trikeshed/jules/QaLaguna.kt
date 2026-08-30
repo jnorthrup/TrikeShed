@@ -1,5 +1,6 @@
 package borg.trikeshed.jules
 
+import kotlinx.coroutines.async
 import kotlinx.coroutines.withTimeoutOrNull
 import java.io.File
 
@@ -121,15 +122,17 @@ object QaLaguna {
     /** Files with unresolved conflict markers. */
     private suspend fun conflictFiles(repoDir: File): List<String> {
         suspend fun git(vararg args: String): List<String> = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
-            val p = ProcessBuilder("git", *args)
-                .directory(repoDir)
-                .redirectErrorStream(true)
-                .start()
-            if (!p.waitFor(10_000, java.util.concurrent.TimeUnit.MILLISECONDS)) {
-                p.destroy()
+            kotlinx.coroutines.coroutineScope {
+                val p = ProcessBuilder("git", *args)
+                    .directory(repoDir)
+                    .redirectErrorStream(true)
+                    .start()
+                val outDeferred = this.async { p.inputStream.bufferedReader().readText() }
+                if (!p.waitFor(10_000, java.util.concurrent.TimeUnit.MILLISECONDS)) {
+                    p.destroyForcibly()
+                }
+                outDeferred.await().trim().lines().filter { it.isNotBlank() }
             }
-            p.inputStream.bufferedReader().readText().trim().lines()
-                .filter { it.isNotBlank() }
         }
         val unmerged = git("diff", "--name-only", "--diff-filter=U")
         val marked = git("grep", "-l", "^<<<<<<< ", "--").filter { path ->
