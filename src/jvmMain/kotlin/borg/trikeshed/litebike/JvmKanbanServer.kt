@@ -578,15 +578,39 @@ class JvmKanbanServer(
         }
     }
 
+    /**
+     * Reason phrase for the status line. The former `else -> "OK"` put the word OK on the wire
+     * beside every code not listed here — a curation lane caught `HTTP/1.1 403 OK`. Clients key
+     * on the code, so nothing broke, but a log or a human reading the status line was told the
+     * opposite of what happened. The fallback is now the code's CLASS, so an unlisted status is
+     * merely unnamed rather than misdescribed.
+     */
     private fun statusReason(code: Int): String = when (code) {
         200 -> "OK"
         201 -> "Created"
         202 -> "Accepted"
+        204 -> "No Content"
+        304 -> "Not Modified"
         400 -> "Bad Request"
+        401 -> "Unauthorized"
+        403 -> "Forbidden"
         404 -> "Not Found"
         405 -> "Method Not Allowed"
+        409 -> "Conflict"
+        410 -> "Gone"
+        413 -> "Payload Too Large"
         500 -> "Internal Server Error"
-        else -> "OK"
+        501 -> "Not Implemented"
+        503 -> "Service Unavailable"
+        504 -> "Gateway Timeout"
+        else -> when (code / 100) {
+            1 -> "Informational"
+            2 -> "Success"
+            3 -> "Redirection"
+            4 -> "Client Error"
+            5 -> "Server Error"
+            else -> "Unknown"
+        }
     }
 
     private fun replayCausalWal() {

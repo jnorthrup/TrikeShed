@@ -1033,7 +1033,28 @@ object OroborosDaemon {
         // ── Rule admission: the seam that ends the live rete's dead spin —
         // the daemon boots causalityRete over ZERO rules; these admit law.
         causalityRete?.let { liveRete ->
-            moduleContext.lcncRunners["nal.rule.admit"] = borg.trikeshed.narsese.RuleNodes.ruleAdmitRunner(liveRete)
+            // …and law that is only in memory is not law after a restart. Each admitted rule is
+            // filed under its own ruleCid in the `rete-rule/` couch plane, which the boot thaw
+            // below re-admits — the rules counterpart of the `kif-ledger/` axiom plane.
+            moduleContext.lcncRunners["nal.rule.admit"] = borg.trikeshed.narsese.RuleNodes.ruleAdmitRunner(
+                liveRete,
+                ledger = { r ->
+                    runCatching {
+                        couchDb.put(
+                            "rete-rule/${r.ruleCid.hex}",
+                            mapOf(
+                                "antecedent" to r.antecedent,
+                                "consequent" to r.consequent,
+                                "copula" to r.copula.name,
+                                "evidence" to r.evidence.packed.toString(),
+                                "provenanceCid" to (r.provenanceCid ?: ""),
+                                "atMs" to System.currentTimeMillis(),
+                            ),
+                            null,
+                        )
+                    }.onFailure { System.err.println("[OROBOROS] rete-rule ledger write failed (non-fatal): ${it.message}") }
+                },
+            )
             moduleContext.lcncRunners["nal.rules.fromKg"] = borg.trikeshed.narsese.RuleNodes.rulesFromKgRunner(liveRete)
         }
         // Bag-off honesty: these contracts ship unconditionally, so with the
@@ -1359,7 +1380,36 @@ object OroborosDaemon {
                     ), "council-thaw")
                     caseCount++
                 }
-                System.err.println("[OROBOROS] council thaw: $kifCount kif facts, $caseCount cases re-indexed")
+                // Rules half of the thaw: the rete boots over zero rules, so every rule ever
+                // admitted is re-offered from the `rete-rule/` plane. admit() is a set union on
+                // ruleCid, so replaying the whole plane is idempotent.
+                var ruleCount = 0
+                causalityRete?.let { liveRete ->
+                    val ruleRows = couchDb.allDocs(startkey = "rete-rule/", endkey = "rete-rule/￰", includeDocs = true)["rows"] as? List<*> ?: emptyList<Any?>()
+                    val restored = ArrayList<borg.trikeshed.narsese.EternalRule>()
+                    for (row in ruleRows) {
+                        val rowMap = row as? Map<*, *> ?: continue
+                        if (rowMap["id"]?.toString()?.startsWith("rete-rule/") != true) continue
+                        val doc = rowMap["doc"] as? Map<*, *> ?: continue
+                        val antecedent = doc["antecedent"]?.toString() ?: continue
+                        val consequent = doc["consequent"]?.toString() ?: continue
+                        val packed = doc["evidence"]?.toString()?.toLongOrNull() ?: continue
+                        val copula = runCatching {
+                            borg.trikeshed.narsese.NalCopula.valueOf(doc["copula"]?.toString() ?: "")
+                        }.getOrNull() ?: continue
+                        restored.add(
+                            borg.trikeshed.narsese.EternalRule(
+                                antecedent = antecedent,
+                                consequent = consequent,
+                                copula = copula,
+                                evidence = borg.trikeshed.narsese.EvidenceCoord(packed),
+                                provenanceCid = doc["provenanceCid"]?.toString()?.takeIf { it.isNotBlank() },
+                            ),
+                        )
+                    }
+                    if (restored.isNotEmpty()) ruleCount = liveRete.admit(borg.trikeshed.lib.seriesOf(restored))
+                }
+                System.err.println("[OROBOROS] council thaw: $kifCount kif facts, $caseCount cases re-indexed, $ruleCount eternal rules re-admitted")
             }.onFailure {
                 System.err.println("[OROBOROS] council thaw failed (non-fatal): ${it.message}")
             }

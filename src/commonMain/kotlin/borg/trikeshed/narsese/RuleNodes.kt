@@ -42,7 +42,17 @@ object RuleNodes {
      * input the node's own params declare ONE rule. Outputs the count the
      * swap actually added plus every offered rule's ruleCid.
      */
-    fun ruleAdmitRunner(element: CausalityReteElement): LcncNodeRunner = LcncNodeRunner { node, inputs ->
+    fun ruleAdmitRunner(
+        element: CausalityReteElement,
+        /**
+         * Durability tee for admitted rules. The rete is in-memory and the daemon boots it over
+         * zero rules, so without this every rule admitted through this node is gone at the next
+         * restart. Called with each OFFERED rule — keying on `ruleCid` makes a re-admission of
+         * an unchanged rule idempotent, so teeing the offered set rather than only the newly
+         * added one costs nothing and avoids losing a rule that a concurrent admit raced us to.
+         */
+        ledger: ((EternalRule) -> Unit)? = null,
+    ): LcncNodeRunner = LcncNodeRunner { node, inputs ->
         val specs: List<Map<*, *>> = when (val raw = inputs["rules"] ?: inputs["rules?"]) {
             is List<*> -> raw.mapNotNull { it as? Map<*, *> }
             is String -> (JsonSupport.parse(raw) as? List<*>)?.mapNotNull { it as? Map<*, *> } ?: emptyList()
@@ -59,6 +69,9 @@ object RuleNodes {
             else listOf(rule(antecedent, consequent, node.params["copula"], node.params["discount"]?.toFloatOrNull()))
         }
         val admitted = if (offered.isEmpty()) 0 else element.admit(offered.toSeries())
+        // After the live admit, and never able to break it: a durability sink that is down
+        // costs durability, not the rule that is already in the rete.
+        if (ledger != null) for (r in offered) runCatching { ledger(r) }
         mapOf(
             "admitted" to admitted,
             "ruleCids" to offered.map { it.ruleCid.value },
