@@ -114,6 +114,12 @@ class Hypervisor(
         error: OutputStream? = output,
         /** OWN only: give the guest a private btrfs world (TrikeShedGraalVfs) instead of IOAccess.NONE. */
         world: Boolean = false,
+        /**
+         * OWN only: mount a [GuestModules] module as the guest's classpath. UNTRUSTED guests keep
+         * going to [ProcessIsolate], which resolves its own bounds in the child process and has no
+         * host classpath to narrow.
+         */
+        guestModule: String? = null,
     ): GuestIsolate {
         require(!isolates.containsKey(id)) { "isolate '$id' exists" }
         val iso: GuestIsolate = when (trust) {
@@ -126,6 +132,7 @@ class Hypervisor(
                 else InProcessIsolate(
                     id, facet, budget,
                     input = input, output = output, error = error,
+                    guestModule = guestModule,
                 ) { obs -> trainer.observe(obs); observed(id, facet, obs) }
                 val inproc = if (guest is GraalBtrfsSupervisor) guest.guest else guest as InProcessIsolate
                 trainer = LeafTrainer(inproc, trainCalls, shadowCalls,

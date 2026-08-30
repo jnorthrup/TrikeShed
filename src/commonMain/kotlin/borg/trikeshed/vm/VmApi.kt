@@ -32,6 +32,14 @@ data class VmSpec(
      * snapshot-capable VFS instead of IOAccess.NONE. OWN trust only.
      */
     val world: List<String> = emptyList(),
+    /**
+     * Guest module whose classpath this VM mounts — a directory under `utils/subvm` in the same
+     * shape as a TrikeShed deploy (`classes/` then the jars in `lib/`). When set, the guest
+     * resolves host classes from THAT classpath instead of the daemon's own, which is how
+     * `vm.corenlp` and `vm.camel` call real libraries that are deliberately NOT dependencies of
+     * TrikeShed. Null keeps the previous behaviour (resolve from the host classpath, JVM facet only).
+     */
+    val module: String? = null,
 )
 
 data class VmStats(

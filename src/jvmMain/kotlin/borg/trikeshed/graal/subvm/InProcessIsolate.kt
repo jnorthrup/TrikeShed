@@ -74,6 +74,16 @@ class InProcessIsolate(
     private val input: InputStream? = null,
     private val output: OutputStream? = null,
     private val error: OutputStream? = output,
+    /**
+     * Name of a [GuestModules] module to mount as this guest's classpath (`utils/subvm/<module>`,
+     * `classes/` then `lib/`). When set, the guest resolves classes from THAT loader instead of
+     * from this JVM's classpath — which is how a lego can call CoreNLP or Camel without those
+     * coordinates being `implementation` dependencies of `jvmMain`.
+     *
+     * Declared BEFORE [onRootReturn] on purpose: callers pass the observation callback as a
+     * trailing lambda, so it has to stay the last parameter.
+     */
+    private val guestModule: String? = null,
     private val onRootReturn: (RootObservation) -> Unit = {},
 ) : GuestIsolate {
     override val trust = Trust.OWN
@@ -112,9 +122,22 @@ class InProcessIsolate(
         // deliberate exception to HostAccess.NONE: OWN-trust JVM-facet legos are authored
         // by the host operator specifically to call real host libraries already on this
         // JVM's classpath. Every other facet keeps the fully sandboxed policy unchanged.
+        //
+        // A MOUNTED GUEST MODULE IS THE NARROWER PATH, and the preferred one. `hostTrusted`
+        // alone means "resolve anything on the host classpath", which is why CoreNLP had to BE
+        // on the host classpath for `vm.corenlp` to work at all. With a module mounted, lookup
+        // is restricted to what that module's loader can resolve — the guest can name
+        // `edu.stanford.nlp.*` and `java.*`, and cannot name `borg.trikeshed.*` even though the
+        // facet is trusted. That is a tighter boundary than the one it replaces, not a looser one.
+        val guestLoader = guestModule?.let { GuestModules.loaderFor(it) }
         val b = Context.newBuilder(bounds.languageId).engine(engine)
-            .allowHostAccess(if (bounds.hostTrusted) HostAccess.ALL else HostAccess.NONE)
-            .allowHostClassLookup { bounds.hostTrusted }
+            .allowHostAccess(if (bounds.hostTrusted || guestLoader != null) HostAccess.ALL else HostAccess.NONE)
+            .allowHostClassLookup(
+                if (guestLoader != null) java.util.function.Predicate { name: String ->
+                    GuestModules.canResolve(guestLoader, name)
+                } else java.util.function.Predicate { _: String -> bounds.hostTrusted },
+            )
+            .also { builder -> guestLoader?.let { builder.hostClassLoader(it) } }
             .allowIO(ioAccess)
             .allowCreateThread(false)
             .allowNativeAccess(false)

@@ -1,0 +1,10 @@
+# Resolved guest module classpaths are build output, not source. `*.jar` is already
+# ignored repo-wide (.gitignore:35); these are explicit so an empty-handed clone is
+# obviously incomplete rather than subtly wrong.
+build/
+*/lib/
+*/classes/
+
+# MANIFEST.tsv is NOT ignored on purpose: it is the reproducibility record (coordinates,
+# sizes, sha256) that makes a mounted classpath checkable with GuestModules.verify().
+!*/MANIFEST.tsv

@@ -9,8 +9,15 @@ import kotlin.test.assertTrue
 
 /**
  * The vm.corenlp / vm.corenlp.extract legos executed for real: the JVM-facet
- * GraalJS guest calls the bundled Stanford CoreNLP classes through the
- * hostTrusted door (GuestBounds.JVM — the deliberate OWN-trust exception).
+ * GraalJS guest calls Stanford CoreNLP out of a MOUNTED GUEST MODULE
+ * (`utils/subvm/corenlp`, via VmSpec.module), not off the host classpath.
+ *
+ * CoreNLP used to be an `implementation` dependency of jvmMain purely so these
+ * legos could resolve it, despite having no compile-time reference anywhere in
+ * src/ — 472MB of GPL v3 staged into build/staging/lib on every daemon launch.
+ * These tests now pass with it absent from this JVM's classpath entirely, and
+ * fail at the lego boundary (IllegalStateException naming the install command)
+ * when the module directory is not there.
  *
  * These are not parse-only checks: each test asserts on the JSON the guest
  * actually printed, so a broken script (the old Groovy-flavored ones never

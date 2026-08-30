@@ -231,11 +231,19 @@ kotlin {
                 implementation("org.apache.tika:tika-parsers-standard-package:3.2.3")
                 implementation("org.xerial:sqlite-jdbc:3.42.0.0")
 
-                // Stanford CoreNLP — the vm.corenlp/vm.corenlp.extract legos' real
-                // pipeline (tokenize/pos/lemma/depparse/ner). Models classifier is
-                // ~450MB (English models); needed for annotators beyond tokenize/ssplit.
-                implementation("edu.stanford.nlp:stanford-corenlp:4.5.10")
-                implementation("edu.stanford.nlp:stanford-corenlp:4.5.10:models")
+                // Stanford CoreNLP is deliberately NOT here any more. It has no compile-time
+                // reference anywhere in src/ — the vm.corenlp/vm.corenlp.extract legos reach it
+                // only through Java.type('edu.stanford.nlp…') inside a guest script — so the only
+                // reason it sat on this classpath was that InProcessIsolate could resolve guest
+                // classes from the host classpath and nowhere else. It is GPL v3 and stages ~472MB
+                // into build/staging/lib on every daemon launch, for a library the deploy's own
+                // classes never call.
+                //
+                // It is now a GUEST MODULE: utils/subvm/corenlp (classes/ + lib/, the same shape as
+                // a TrikeShed deploy), resolved by the standalone utils/subvm build and mounted
+                // into a per-guest URLClassLoader via VmSpec.module. Install with:
+                //     ./gradlew -p utils/subvm installCorenlp
+                // Same for Camel (utils/subvm/camel), which was never a dependency here at all.
 
                 // Compose Desktop UI — JVM + Skiko only
                 implementation(compose.desktop.currentOs)

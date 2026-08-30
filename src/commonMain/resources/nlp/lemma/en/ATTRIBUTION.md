@@ -15,10 +15,22 @@ frozen funnel generations; no reference lemmatizer runs at TrikeShed runtime, on
   English.* Natural Language Engineering 7(3), 2001. There is therefore no Stanford dictionary file to
   copy; this TSV is the *output* of that analyser over the corpus named in `MANIFEST.txt`.
 
-CoreNLP is used only as a build-time tool in the separate `bench/lemma` Gradle build
-(`extractDictionary` task). It is not a dependency of TrikeShed's main build. The generated TSV is the
-output of a GPL program, which the GPL does not itself cover; the corpus it was run over is listed in
-`MANIFEST.txt` with each source's own terms.
+CoreNLP is not a dependency of TrikeShed's main build. It is used in exactly two places, neither of
+which puts it on the library's classpath:
+
+1. **Build-time tool** in the separate `bench/lemma` Gradle build (`extractDictionary` task), which
+   produced `observations.tsv`. The generated TSV is the output of a GPL program, which the GPL does
+   not itself cover; the corpus it was run over is listed in `MANIFEST.txt` with each source's terms.
+2. **Runtime guest module** at `utils/subvm/corenlp`, resolved by the standalone `utils/subvm` build
+   and mounted into a per-guest `URLClassLoader` by the Oroboros daemon for the `vm.corenlp` legos
+   (`VmSpec.module` → `InProcessIsolate` → `Context.Builder.hostClassLoader`). The daemon loads it;
+   TrikeShed never links it.
+
+Note that (2) was for a time NOT true: `edu.stanford.nlp:stanford-corenlp` and its `:models`
+classifier were `implementation` dependencies of `jvmMain`, because the guest could originally
+resolve classes only from the host classpath. That put ~472MB of GPL v3 into `build/staging/lib` on
+every daemon launch, for a library with no compile-time reference anywhere in `src/`. The guest
+module mount removed it; this document's claim and the build now agree again.
 
 ## Corpus
 

@@ -44,6 +44,7 @@ class HypervisorVmHost(
             output = terminal.output,
             error = terminal.error,
             world = spec.world.isNotEmpty() && trust == Trust.OWN,
+            guestModule = spec.module?.takeIf { trust == Trust.OWN },
         )
         if (iso is borg.trikeshed.graal.subvm.GraalBtrfsSupervisor) seedWorld(iso, spec.world)
         if (iso is ProcessIsolate) terminal.bindInput(iso::pushInput)

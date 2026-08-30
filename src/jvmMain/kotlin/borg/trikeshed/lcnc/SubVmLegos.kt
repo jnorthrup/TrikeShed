@@ -82,7 +82,7 @@ object SubVmLegos {
             appendLine("print(RESULT)")
             appendLine("RESULT")
         }
-        evalInVmText(host, node, facet, script, text, inputs)
+        evalInVmText(host, node, facet, script, text, inputs, defaultModule = "corenlp")
     }
 
     // ── corenlp.extract: NER + dependency + sentiment per sentence ───
@@ -162,7 +162,7 @@ object SubVmLegos {
             appendLine("print(RESULT)")
             appendLine("RESULT")
         }
-        evalInVmText(host, node, facet, script, text, inputs)
+        evalInVmText(host, node, facet, script, text, inputs, defaultModule = "corenlp")
     }
 
     // ── camel: route DSL over the lego's params ─────────────────────────
@@ -171,17 +171,37 @@ object SubVmLegos {
         val facet = facetOf(node, default = "JVM")
         val from = node.params["from"] ?: "direct:lcnc"
         val to = node.params["to"] ?: "log:lcnc"
+        // Body to dispatch through the route. Without one the lego only proves the context
+        // starts; with one it proves the route actually carries a message end to end.
+        val body = inputStrings(node, inputs, key = "body").joinToString("\n")
+            .ifEmpty { node.params["body"] ?: "" }
+        fun q(s: String) = s.replace("\\", "\\\\").replace("'", "\\'")
         val script = buildString {
-            appendLine("ctx = new org.apache.camel.impl.DefaultCamelContext()")
-            appendLine("ctx.addRoutes(new org.apache.camel.builder.RouteBuilder() {")
-            appendLine("  void configure() {")
-            appendLine("    from('$from').to('$to')")
-            appendLine("  }")
-            appendLine("})")
+            // GraalJS, not Groovy. The previous body was Java/Groovy source — bare `new
+            // org.apache.camel...` and an anonymous `RouteBuilder(){ void configure() }` subclass —
+            // which GraalJS cannot parse, so this lego could never have run even with Camel present.
+            // RouteBuilder is abstract and JS cannot subclass it, but Camel 4 exposes the static
+            // RouteBuilder.addRoutes(CamelContext, LambdaRouteBuilder); LambdaRouteBuilder is a
+            // functional interface, and GraalJS coerces a plain JS function to one.
+            appendLine("var DefaultCamelContext = Java.type('org.apache.camel.impl.DefaultCamelContext')")
+            appendLine("var RouteBuilder = Java.type('org.apache.camel.builder.RouteBuilder')")
+            appendLine("var ctx = new DefaultCamelContext()")
+            appendLine("RouteBuilder.addRoutes(ctx, function (rb) { rb.from('${q(from)}').to('${q(to)}') })")
             appendLine("ctx.start()")
-            appendLine("print('camel route up: $from → $to')")
+            appendLine("var reply = null")
+            if (body.isNotEmpty()) {
+                // GUEST_TEXT carries the body as a JSON-quoted literal (see evalInVmText).
+                appendLine("var tpl = ctx.createProducerTemplate()")
+                appendLine("reply = String(tpl.requestBody('${q(from)}', GUEST_TEXT, Java.type('java.lang.String').class))")
+            }
+            appendLine("var names = []")
+            appendLine("for (var i = 0; i < ctx.getRoutes().size(); i++) names.push(ctx.getRoutes().get(i).getId())")
+            appendLine("var RESULT = JSON.stringify({ status: String(ctx.getStatus()), routes: names, from: '${q(from)}', to: '${q(to)}', reply: reply })")
+            appendLine("ctx.stop()")
+            appendLine("print(RESULT)")
+            appendLine("RESULT")
         }
-        evalInVm(host, node, facet, script, inputs)
+        evalInVmText(host, node, facet, script, body, inputs, defaultModule = "camel")
     }
 
     // ── graalce: any Graal language, source spelled inline ──────────────
@@ -209,11 +229,12 @@ object SubVmLegos {
         script: String,
         text: String,
         inputs: Map<String, Any?>,
+        defaultModule: String? = null,
     ): Map<String, Any?> {
         // JSON.stringify of the text is the one safe JS string literal form;
         // GraalJS parses it with no further interpretation.
         val literal = borg.trikeshed.parse.json.JsonSupport.stringify(text)
-        return evalInVm(host, node, facetName, "var GUEST_TEXT = $literal;\n$script", inputs)
+        return evalInVm(host, node, facetName, "var GUEST_TEXT = $literal;\n$script", inputs, defaultModule)
     }
 
     private suspend fun evalInVm(
@@ -222,15 +243,30 @@ object SubVmLegos {
         facetName: String,
         source: String,
         inputs: Map<String, Any?>,
+        defaultModule: String? = null,
     ): Map<String, Any?> {
         val facet = borg.trikeshed.vm.vmFacetOf(facetName)
             ?: throw IllegalArgumentException("vm lego '${node.id}': unknown facet '$facetName' (use JVM, GRAAL_JS, …)")
         val world = inputStrings(node, inputs, key = "world")
+        // `module` names the guest classpath this lego needs (utils/subvm/<module>). An explicit
+        // param wins so a canvas can point a lego at a different build of the same library.
+        val module = node.params["module"] ?: defaultModule
+        if (module != null && !borg.trikeshed.graal.subvm.GuestModules.isInstalled(module)) {
+            // Fail HERE, with the command that fixes it, rather than as a ClassNotFoundException
+            // thrown from inside a guest script where the cause is invisible.
+            throw IllegalStateException(
+                "vm lego '${node.id}': guest module '$module' is not installed. " +
+                    "Run: ./gradlew -p utils/subvm install${module.replaceFirstChar { it.uppercase() }}" +
+                    (borg.trikeshed.graal.subvm.GuestModules.root()?.let { " (modules root: $it)" }
+                        ?: " (no utils/subvm directory found from ${System.getProperty("user.dir")})"),
+            )
+        }
         val spec = borg.trikeshed.vm.VmSpec(
             id = "lcnc:${node.id}",
             facet = facet,
             trust = if (node.params["trust"] == "UNTRUSTED") borg.trikeshed.vm.VmTrust.UNTRUSTED else borg.trikeshed.vm.VmTrust.OWN,
             world = world,
+            module = module,
         )
         val handle = host.get(spec.id) ?: host.spawn(spec)
         return try {
