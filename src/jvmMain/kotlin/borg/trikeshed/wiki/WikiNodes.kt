@@ -216,7 +216,16 @@ object WikiNodes {
             val edit = (raw as? Map<*, *>)?.entries?.associate { (k, v) -> k.toString() to v } ?: continue
             val op = (edit["op"] as? String)?.trim()?.lowercase() ?: "append"
             val relRaw = (edit["file"] as? String)?.trim().orEmpty()
-            val rel = relRaw.removePrefix("./").removePrefix("wiki/")
+            // logs.md is the RUNNER's machine ledger (precise-ms timestamps, real
+            // response cids). A model asked for "a narrative line" writes lines that
+            // IMITATE that format — mission-002 caught three with round 00.000Z
+            // stamps reusing an earlier iteration's cid, and one citing a
+            // raw-responses file that never existed. Nothing about the model is at
+            // fault; a shared file simply cannot be a trustworthy machine ledger.
+            // Model narrative is therefore redirected to its own file, so a reader
+            // can tell provenance by which file a line lives in.
+            val relRedirected = relRaw.removePrefix("./").removePrefix("wiki/")
+            val rel = if (relRedirected == "logs.md") "logs-narrative.md" else relRedirected
             val text = (edit["text"] as? String).orEmpty()
             val target = home.resolve(rel)
             if (rel.isEmpty() || target == null || !rel.endsWith(".md")) {
@@ -629,7 +638,9 @@ object WikiNodes {
         appendLine("2. Create or PATCH pattern pages under patterns/ — one page per failure mode or")
         appendLine("   successful strategy, each with an actionable workaround.")
         appendLine("3. Revise index.md so it catalogues every pattern page.")
-        appendLine("4. Append one narrative line to logs.md describing what changed and why.")
+        appendLine("4. Append one narrative line to logs-narrative.md describing what changed and why.")
+        appendLine("   (logs.md is the runner's machine ledger and is NOT yours to write —")
+        appendLine("    an edit naming it is redirected to logs-narrative.md.)")
         appendLine("Prefer INCREMENTAL edits (replace/insert/append) on existing pages over creating")
         appendLine("near-duplicates. Never rewrite a page wholesale when a span edit will do.")
         appendLine()
@@ -639,7 +650,7 @@ object WikiNodes {
         appendLine("""  {"op":"replace","file":"patterns/<slug>.md","find":"<exact span already in the page>","text":"<replacement>"},""")
         appendLine("""  {"op":"insert","file":"patterns/<slug>.md","after":"<exact anchor span>","text":"<inserted markdown>"},""")
         appendLine("""  {"op":"append","file":"index.md","text":"<catalog line>"},""")
-        appendLine("""  {"op":"append","file":"logs.md","text":"<narrative log line>"}""")
+        appendLine("""  {"op":"append","file":"logs-narrative.md","text":"<narrative log line>"}""")
         appendLine("""]}""")
         appendLine("`find`/`after` spans must occur VERBATIM in the current file content shown above,")
         appendLine("or the edit is refused. A NEW pattern page that names no sampled cid is refused,")
