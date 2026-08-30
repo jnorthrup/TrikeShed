@@ -142,6 +142,15 @@ class BrainClient(
             return "429" in m || "rate limit" in m || "\"1302\"" in m || "\"1305\"" in m || "temporarily overloaded" in m
         }
 
+        /** Transient-provider signature the single-endpoint ladder also retries:
+         *  rate limits plus upstream 5xx ("Operation failed" is z.ai's 500 body).
+         *  4xx (except 429) stays fatal — retrying a bad request is noise. */
+        internal fun isRetryableFailure(message: String): Boolean {
+            if (isRateLimitFailure(message)) return true
+            val m = message.lowercase()
+            return "http 500" in m || "http 502" in m || "http 503" in m || "http 504" in m || "operation failed" in m
+        }
+
         /** Backoff ladder for retrying a rate-limited SINGLE-endpoint lane (the pin has no failover by design). */
         internal val RATE_LIMIT_BACKOFF_MS = longArrayOf(15_000L, 30_000L, 60_000L)
 
@@ -288,7 +297,7 @@ class BrainClient(
         if (endpoints.size != 1) return result
         for (backoffMs in RATE_LIMIT_BACKOFF_MS) {
             val msg = result.exceptionOrNull()?.message ?: return result
-            if (!isRateLimitFailure(msg)) return result
+            if (!isRetryableFailure(msg)) return result
             kotlinx.coroutines.delay(backoffMs)
             result = attempt()
         }
