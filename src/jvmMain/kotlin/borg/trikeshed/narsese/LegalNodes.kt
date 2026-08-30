@@ -244,20 +244,44 @@ object LegalNodes {
      * document's atom, and folds it into the brief `argue` actually reads.
      * Never fails the run: an unrecognized/missing documentCid just yields
      * an unmodified brief (evidence bank empty, not an error).
+     *
+     * `scope` param (also honored from a wired `scope`/`scope?` input,
+     * inputs-over-params like every other port here):
+     * - `"doc"` (default) — the original single-document rendering,
+     *   byte-stable for the legacy predicates, plus any `(ruling ?case
+     *   doc_<hex> ?verdict)` read-back lines when such facts exist (the
+     *   reader for the ruling facts `council.record` asserts).
+     * - `"corpus"` — the doc-scoped section first (when a documentCid is
+     *   present), then an all-documents section from doc-variable queries,
+     *   each line attributed to its document atom, capped at `maxFacts`
+     *   (param, default 64) with a loud truncation marker.
      */
     fun evidenceRunner(kif: KifKnowledgeBase): LcncNodeRunner = LcncNodeRunner { node, inputs ->
         val documentCid = ((inputs["documentCid"] ?: inputs["documentCid?"]) as? String)
             ?: node.params["documentCid"].orEmpty()
         val brief = ((inputs["brief"] ?: inputs["brief?"]) as? String)
             ?: node.params["brief"].orEmpty()
+        val scope = ((inputs["scope"] ?: inputs["scope?"]) as? String)?.takeIf { it.isNotBlank() }
+            ?: node.params["scope"]?.takeIf { it.isNotBlank() }
+            ?: "doc"
+        val maxFacts = node.params["maxFacts"]?.toIntOrNull() ?: 64
         val docHex = documentCid.removePrefix("sha256:").trim()
         val evidence = if (docHex.isEmpty()) "" else queryEvidence(kif, "doc_$docHex")
-        val combined = if (evidence.isBlank()) brief else buildString {
+        val corpus = if (scope == "corpus") queryCorpus(kif, maxFacts) else ""
+        val combined = buildString {
             append(brief)
-            appendLine()
-            appendLine()
-            appendLine("Evidence bank (prior KIF facts for doc_$docHex):")
-            append(evidence)
+            if (evidence.isNotBlank()) {
+                appendLine()
+                appendLine()
+                appendLine("Evidence bank (prior KIF facts for doc_$docHex):")
+                append(evidence)
+            }
+            if (corpus.isNotBlank()) {
+                appendLine()
+                appendLine()
+                appendLine("Corpus evidence (all documents):")
+                append(corpus)
+            }
         }
         mapOf("brief" to combined)
     }
@@ -271,7 +295,31 @@ object LegalNodes {
         kif.query(KifExpr.parse("(legalElement $docAtom ?text)")).forEach { lines += "- element: ${text(it["?text"])}" }
         kif.query(KifExpr.parse("(standardOfProof $docAtom ?text)")).forEach { lines += "- standard of proof: ${text(it["?text"])}" }
         kif.query(KifExpr.parse("(party $docAtom ?name ?role)")).forEach { lines += "- party: ${text(it["?name"])} (${text(it["?role"])})" }
+        // Ruling read-back — the (ruling <case> <doc> <verdictCid>) facts
+        // council.record asserts. Appended AFTER the legacy predicates so
+        // the rendering stays byte-stable when no ruling facts exist.
+        kif.query(KifExpr.parse("(ruling ?case $docAtom ?verdict)")).forEach { lines += "- prior ruling: ${text(it["?case"])} -> ${text(it["?verdict"])}" }
         return lines.joinToString("\n")
+    }
+
+    /**
+     * Corpus-wide evidence: the same predicate shapes as [queryEvidence]
+     * but with the document position a variable, each line attributed to
+     * its document atom. Rendered fact lines are capped at [maxFacts] with
+     * a loud truncation marker naming the remainder — never a silent cut.
+     */
+    internal fun queryCorpus(kif: KifKnowledgeBase, maxFacts: Int): String {
+        fun text(v: String?): String = v?.trim('"').orEmpty()
+        val lines = mutableListOf<String>()
+        kif.query(KifExpr.parse("(cites ?doc ?case)")).forEach { lines += "- [${text(it["?doc"])}] cites: ${text(it["?case"])}" }
+        kif.query(KifExpr.parse("(holding ?doc ?text)")).forEach { lines += "- [${text(it["?doc"])}] holding: ${text(it["?text"])}" }
+        kif.query(KifExpr.parse("(legalElement ?doc ?text)")).forEach { lines += "- [${text(it["?doc"])}] element: ${text(it["?text"])}" }
+        kif.query(KifExpr.parse("(standardOfProof ?doc ?text)")).forEach { lines += "- [${text(it["?doc"])}] standard of proof: ${text(it["?text"])}" }
+        kif.query(KifExpr.parse("(party ?doc ?name ?role)")).forEach { lines += "- [${text(it["?doc"])}] party: ${text(it["?name"])} (${text(it["?role"])})" }
+        kif.query(KifExpr.parse("(ruling ?case ?doc ?verdict)")).forEach { lines += "- [${text(it["?doc"])}] ruling: ${text(it["?case"])} -> ${text(it["?verdict"])}" }
+        if (lines.size <= maxFacts) return lines.joinToString("\n")
+        val truncated = lines.size - maxFacts
+        return (lines.take(maxFacts) + "... $truncated more facts truncated (maxFacts=$maxFacts)").joinToString("\n")
     }
 
     // ── eyecite: a real subprocess call, not a vm.* guest — see class doc ──

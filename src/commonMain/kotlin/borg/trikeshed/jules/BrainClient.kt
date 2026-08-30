@@ -29,6 +29,16 @@ object DiscardingBrainErrorSink : BrainErrorSink {
 }
 
 /**
+ * Thrown by [BrainClient.chatSeat] when every candidate provider was tried (or
+ * skipped on a cached no-key verdict) and none answered. [attempts] is the
+ * per-provider failover trail in attempt order — `"<endpoint>/<model>: <error>"`
+ * lines — so a refused council seat can put the whole route on the record
+ * instead of a silent empty ruling.
+ */
+class BrainNoRoute(val attempts: List<String>) :
+    Exception("no provider answered: " + attempts.joinToString(" -> "))
+
+/**
  * BrainClient — the answer brain.
  *
  * OpenAI-compatible chat completions over common reactor HTX with multi-provider
@@ -43,6 +53,15 @@ object DiscardingBrainErrorSink : BrainErrorSink {
  * those shared instances — the MuxReactor tracks quota, leases, and provider
  * health across the entire daemon. When null, BrainClient creates its own
  * (standalone mode for tests and embedded use).
+ *
+ * DISCOVERY (external keyMux): when an external [keyMux] is provided, the
+ * endpoint roster is NOT env-gated — the full [rosterInto] table is admitted,
+ * stably ordered so env-present providers come first ([orderEnvFirst]), and
+ * per-call resolution through the shared KeyMux/harness lane decides key
+ * presence at chat time. Harness-file-only setups (~/.hermes/.env, auth.json
+ * via keymux `harness()`) therefore yield a full roster with per-call key
+ * resolution instead of an empty roster. Standalone mode (keyMux == null)
+ * keeps the historic env-gated [discoverEndpoints] behaviour unchanged.
  */
 class BrainClient(
     /** If non-null, overrides auto-discovery and uses a single endpoint. */
@@ -52,8 +71,11 @@ class BrainClient(
     private val errorSink: BrainErrorSink = DiscardingBrainErrorSink,
     /**
      * External KeyMux — shared with the daemon. When provided, provider discovery
-     * uses this key pool and the MuxReactor tracks all key accesses. Null = create
-     * internal KeyMux from env (standalone mode).
+     * is UN-GATED: the full roster is admitted (env-present providers ordered
+     * first) and this key pool resolves credentials per call — harness-file-only
+     * setups get a full roster instead of an empty one — while the MuxReactor
+     * tracks all key accesses. Null = create internal KeyMux from env
+     * (standalone mode, env-gated discovery unchanged).
      */
     private val keyMux: KeyMux? = null,
     /**
@@ -76,6 +98,50 @@ class BrainClient(
             }
             return null
         }
+
+        /**
+         * Stable partition of [specs]: entries whose env var answers [probe]
+         * non-blank come first, relative order preserved on both sides. Used by
+         * the external-keyMux discovery path — env-present providers lead the
+         * roster, but nothing is dropped (per-call key resolution decides).
+         */
+        internal fun orderEnvFirst(
+            specs: List<EndpointSpec>,
+            probe: (String) -> String? = { SystemOperations.default.getenv(it) },
+        ): List<EndpointSpec> {
+            val (present, absent) = specs.partition { !probe(it.envVar).isNullOrBlank() }
+            return present + absent
+        }
+
+        /**
+         * Candidate order for a council seat: rotate [modelIds] to START at
+         * [preferred] when it is in the roster; otherwise the incoming order
+         * (the caller's lastGood rotation) stands.
+         */
+        internal fun seatOrder(modelIds: List<String>, preferred: String?): List<String> {
+            if (preferred == null) return modelIds
+            val start = modelIds.indexOf(preferred)
+            if (start < 0) return modelIds
+            return List(modelIds.size) { offset -> modelIds[(start + offset) % modelIds.size] }
+        }
+
+        /**
+         * Classifies a chat failure as a MISSING-KEY verdict — "no key" /
+         * "key not found" / 401-unauthorized text. Such a provider is skipped
+         * for the rest of the process ([noKeyVerdicts]): a key absent from the
+         * env AND every harness store does not appear mid-process.
+         */
+        internal fun isMissingKeyFailure(message: String): Boolean {
+            val m = message.lowercase()
+            return "no key" in m || "key not found" in m || "401" in m || "unauthorized" in m
+        }
+
+        /**
+         * Process-lifetime no-key verdict cache: endpoint NAMES whose chatSeat
+         * attempt failed with the missing-key signature. Never cleared — a
+         * process gains no credentials it did not start with.
+         */
+        private val noKeyVerdicts: MutableSet<String> = mutableSetOf()
     }
 
     /** One OpenAI-compatible endpoint + the env var that KeyMux resolves. */
@@ -96,10 +162,12 @@ class BrainClient(
         val provider: String? = providerTagFor(envVar),
     )
 
-    private val endpoints: List<EndpointSpec> = if (apiKey != null) {
-        listOf(EndpointSpec("override", "BRAIN_OVERRIDE", base, model))
-    } else {
-        discoverEndpoints()
+    private val endpoints: List<EndpointSpec> = when {
+        apiKey != null -> listOf(EndpointSpec("override", "BRAIN_OVERRIDE", base, model))
+        // External keyMux: the full roster is admitted (env-present providers
+        // first) — per-call KeyMux/harness resolution decides key presence.
+        this.keyMux != null -> orderEnvFirst(fullRoster())
+        else -> discoverEndpoints()
     }
     private val endpointByModel: Map<String, EndpointSpec> = endpoints.associateBy { it.model }
 
@@ -235,6 +303,73 @@ class BrainClient(
             )
         }
         error(lastError)
+    }
+
+    /**
+     * Council-seat chat: like [chat] but returns `(content to answeredByModelId)`
+     * and carries the full failover trail on failure.
+     *
+     * Candidate order is [orderedModelIds] (the lastGood rotation) rotated by
+     * [seatOrder] to START at [preferredModel] when it is in the roster — a
+     * seat's assigned model leads, the rest of the roster backs it up.
+     * Providers with a cached no-key verdict ([noKeyVerdicts], populated when a
+     * failure matches [isMissingKeyFailure]) are skipped for the rest of the
+     * process. Every failed or skipped attempt appends a
+     * `"<endpoint>/<model>: <message>"` line to the trail; exhaustion throws
+     * [BrainNoRoute] carrying that trail so the refusal lands on the record.
+     */
+    suspend fun chatSeat(
+        messages: List<Pair<String, String>>,
+        maxTokens: Int = 512,
+        temperature: Double = 0.2,
+        contextId: String? = null,
+        preferredModel: String? = null,
+    ): Pair<String, String> = withTimeout(OUTER_TIMEOUT_MS) {
+        chatSeatInner(messages, maxTokens, temperature, contextId, preferredModel)
+    }
+
+    /** Inner seat loop: called inside the outer timeout. */
+    private suspend fun chatSeatInner(
+        messages: List<Pair<String, String>>,
+        maxTokens: Int,
+        temperature: Double,
+        contextId: String?,
+        preferredModel: String?,
+    ): Pair<String, String> {
+        val trail = mutableListOf<String>()
+        if (endpoints.isEmpty()) throw BrainNoRoute(trail + "no provider endpoints discovered")
+        val routed = internalModelMux.route("conflict-resolve").a
+        for (modelId in seatOrder(orderedModelIds(routed), preferredModel)) {
+            val endpoint = endpointByModel[modelId] ?: continue
+            if (endpoint.name in noKeyVerdicts) {
+                trail.add("${endpoint.name}/$modelId: skipped (no-key verdict cached)")
+                continue
+            }
+
+            val acpMessages = messages.size j { i: Int -> messages[i].first j messages[i].second }
+            val result = runCatching {
+                internalModelMux.chat(
+                    modelId = modelId,
+                    messages = acpMessages,
+                    assessmentId = contextId,
+                    maxTokens = maxTokens,
+                    temperature = temperature,
+                ).getOrThrow() // chat() is already Result-shaped; unwrap so fold sees AcpResponse
+            }
+            result.fold(
+                onSuccess = { response ->
+                    lastGoodModelId = modelId
+                    return response.a to modelId // AcpResponse.a = full_text content
+                },
+                onFailure = { t ->
+                    val message = t.message ?: t.toString()
+                    trail.add("${endpoint.name}/$modelId: ${message.take(200)}")
+                    if (isMissingKeyFailure(message)) noKeyVerdicts.add(endpoint.name)
+                    logError(endpoint.name, -1, message.take(500))
+                },
+            )
+        }
+        throw BrainNoRoute(trail)
     }
 
     private fun orderedModelIds(routed: Series<ModelEntry>): List<String> {
