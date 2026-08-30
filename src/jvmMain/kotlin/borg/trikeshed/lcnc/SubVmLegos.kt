@@ -26,6 +26,7 @@ object SubVmLegos {
     const val CORENLP_EXTRACT = "vm.corenlp.extract"
     const val CAMEL = "vm.camel"
     const val GRAALCE = "vm.graalce"
+    const val MODULES = "vm.modules"
 
     /**
      * Register every lego into the daemon's [ModuleContext.lcncRunners]. Called from
@@ -38,6 +39,60 @@ object SubVmLegos {
         ctx.lcncRunners[CAMEL] = camel(host)
         ctx.lcncRunners[GRAALCE] = graalce(host)
         ctx.lcncRunners[CORENLP_EXTRACT] = corenlpExtract(host)
+        ctx.lcncRunners[MODULES] = modules()
+    }
+
+    // ── modules: what classpaths can this daemon execute from? ────────
+
+    /**
+     * `vm.modules` — enumerate every installed guest module, its mount state, and whether what is
+     * on disk still matches the MANIFEST.tsv it was resolved from.
+     *
+     * This is the auditable half of the sub-VM. A mounted module is a classpath the daemon executes
+     * code from, and until now the only account of which ones existed and whether they had drifted
+     * lived in a KDoc. An operator could read the comment; they could not read the machine.
+     *
+     * It is deliberately READ-ONLY and takes no VM: it lists, hashes and reports. It cannot mount,
+     * unmount, install or delete, and that is not enforced by a check inside the body — it is a
+     * property of the lego having no such input and no such output in [LcncContracts]. A surface
+     * whose capability is its declaration cannot be talked into doing something else; the worst a
+     * wrong `module` param can produce is a row saying that module is not installed.
+     */
+    fun modules() = LcncNodeRunner { node, _ ->
+        val only = node.params["module"]?.takeIf { it.isNotBlank() }
+        val names = borg.trikeshed.graal.subvm.GuestModules.installed()
+            .let { all -> if (only == null) all else all.filter { it == only } }
+        val mounted = borg.trikeshed.graal.subvm.GuestModules.mounted().toSet()
+        val rows = names.map { m ->
+            val manifest = borg.trikeshed.graal.subvm.GuestModules.manifest(m)
+            val jars = borg.trikeshed.graal.subvm.GuestModules.jars(m)
+            val hasClasses = borg.trikeshed.graal.subvm.GuestModules.classesDir(m) != null
+            // Verification hashes real bytes, so it is opt-in per call rather than on by default:
+            // an audit of a 472MB module should be asked for, not incurred by listing.
+            val verify = if (node.params["verify"] == "true") borg.trikeshed.graal.subvm.GuestModules.verify(m) else null
+            buildString {
+                append("{\"module\":\"").append(m).append("\"")
+                append(",\"mounted\":").append(m in mounted)
+                append(",\"classes\":").append(hasClasses)
+                append(",\"jars\":").append(jars.size)
+                append(",\"bytes\":").append(jars.sumOf { it.length() })
+                append(",\"declared\":").append(manifest.declared.size)
+                append(",\"manifest\":").append(manifest.entries.isNotEmpty())
+                if (verify != null) {
+                    append(",\"verified\":").append(verify.ok)
+                    append(",\"checked\":").append(verify.checked)
+                    append(",\"problems\":[")
+                    append(verify.problems.joinToString(",") { p -> "\"" + p.replace("\\", "\\\\").replace("\"", "\\\"") + "\"" })
+                    append("]")
+                }
+                append("}")
+            }
+        }
+        val root = borg.trikeshed.graal.subvm.GuestModules.root()?.absolutePath ?: ""
+        val payload = "{\"root\":\"${root.replace("\\", "\\\\").replace("\"", "\\\"")}\"," +
+            "\"lifecycle\":\"${borg.trikeshed.graal.subvm.GuestModules.lifecycle()}\"," +
+            "\"modules\":[${rows.joinToString(",")}]}"
+        mapOf("modules" to payload, "count" to names.size)
     }
 
     // ── tika: extract text + metadata from world-seeded files ─────────

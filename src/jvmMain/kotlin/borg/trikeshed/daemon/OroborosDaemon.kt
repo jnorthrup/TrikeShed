@@ -33,7 +33,8 @@ import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.cancelChildren
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.job
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.channels.Channel
@@ -240,19 +241,27 @@ object OroborosDaemon {
     fun main(args: Array<String>) {
         try {
             runBlocking {
-                mainImpl(args)
-                // mainImpl is an extension on THIS scope, so everything it launched without an
-                // explicit parent is a child of this runBlocking. Its own finally cancels the jobs
-                // it holds by name, but runBlocking still waits on every remaining child — so
-                // `--once` did all its work, ran its cleanup, returned, and then hung forever with
-                // nothing left to do. Measured: a test worker parked on
-                // BlockingCoroutine.joinBlocking with 17s of CPU across 32 minutes of wall clock,
-                // which is why no full-suite result has ever been obtainable for this repo.
+                // The daemon gets its OWN supervised scope rather than launching straight into this
+                // runBlocking. mainImpl is an extension on its receiver, so everything it launches
+                // without an explicit parent becomes a child of that receiver — and runBlocking
+                // waits on every child. `--once` therefore did all its work, ran its cleanup,
+                // returned, and hung with nothing left to do: a test worker parked on
+                // BlockingCoroutine.joinBlocking, 17s of CPU across 32 minutes of wall clock.
                 //
-                // Cancelling here rather than adding one more name to that finally: the failure is
-                // that the list has to be exhaustive, and any future launch that forgets to
-                // register re-introduces the hang silently. This makes exit independent of the list.
-                coroutineContext.cancelChildren()
+                // The fix is structural, not a sweep. Cancelling leftover children by hand works
+                // only while the cancel list stays exhaustive, and the next launch that forgets to
+                // register reintroduces the hang silently. Scoping to a SupervisorJob makes
+                // termination a property of the hierarchy instead: whatever mainImpl launched is a
+                // child of daemonScope by construction, and one cancel of the parent ends all of
+                // it, in a `finally`, on every path including throw. Supervisor rather than plain
+                // Job so a child failing during shutdown cannot cancel its siblings mid-close —
+                // the same idiom AsyncContextElement already uses for its own elements.
+                val daemonScope = CoroutineScope(coroutineContext + SupervisorJob(coroutineContext.job))
+                try {
+                    with(daemonScope) { mainImpl(args) }
+                } finally {
+                    daemonScope.cancel()
+                }
             }
         } catch (e: kotlinx.coroutines.CancellationException) {
             // JVM shutdown triggered by signal handler

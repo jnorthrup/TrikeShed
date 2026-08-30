@@ -760,6 +760,18 @@ object LcncContracts {
                 "trust" to LcncPortContract.LcncParamSpec(v = "OWN", opts = listOf("OWN", "UNTRUSTED")),
                 "keep" to LcncPortContract.LcncParamSpec(v = "false", opts = listOf("false", "true")),
             )),
+        // Read-only audit of the classpaths this daemon can execute guest code from. No inputs, so
+        // nothing upstream can steer it; two params and two outputs, so its whole capability is
+        // visible here. It cannot mount, unmount or install — not because the body refuses, but
+        // because no such port is declared.
+        LcncPortContract(SubVm.LEGO_PREFIX + "modules", "modules: audit mounted guest classpaths",
+            emptyList(), listOf("modules", "count"),
+            outputKinds = mapOf("modules" to "json", "count" to "number"),
+            params = mapOf(
+                "module" to LcncPortContract.LcncParamSpec(v = ""),
+                "verify" to LcncPortContract.LcncParamSpec(v = "false", opts = listOf("false", "true")),
+            ),
+        ),
         LcncPortContract(SubVm.LEGO_PREFIX + "camel", "camel: route DSL in a sub-VM",
             listOf("messages?"), listOf("routed"),
             inputKinds = mapOf("messages" to "json"),

@@ -38,6 +38,25 @@ interface SupervisorJob {
     val lifecycle: FanoutLifecycle
     val fanoutSubscribers: Int
     fun <T> slot(source: Observable<T>): Observable<T>
+    /**
+     * Put an arbitrary resource under this supervisor's lifecycle, so [close] releases it along
+     * with everything else the supervisor holds.
+     *
+     * The supervisor already owned exactly this discipline — it kept the [CancelToken]s that
+     * [slot] minted and cancelled them all on close — but only fanout subscriptions could reach
+     * it. Anything else with a lifecycle had to keep its own cancel list, and a hand-maintained
+     * cancel list is the failure mode: it works only while it stays exhaustive, and whatever is
+     * added next and forgets to register leaks silently.
+     *
+     * That is not hypothetical here. `OroborosDaemon`'s `--once` hung forever because its shutdown
+     * cancelled jobs by name and one launch was not on the list; and `GuestModules` mounted
+     * `URLClassLoader`s into a static map that nothing ever closed. Registering with a supervisor
+     * makes release a property of the hierarchy instead of a property of remembering.
+     *
+     * Registering on a CLOSED supervisor cancels the token immediately rather than retaining it:
+     * a resource acquired after shutdown is a leak, not a member.
+     */
+    fun hold(token: CancelToken)
     fun open()
     fun drain()
     fun close()
@@ -64,11 +83,21 @@ class RealSupervisorJob(override val key: Any) : SupervisorJob {
         }
     }
 
+    override fun hold(token: CancelToken) {
+        // A resource handed to a supervisor that is already CLOSED is not a member of anything;
+        // retaining it would mean it is never released, which is the leak this method exists to
+        // prevent. Cancel it now and say nothing was held.
+        if (_lifecycle == FanoutLifecycle.CLOSED) token.cancel() else cancelTokens.add(token)
+    }
+
     override fun close() {
         _lifecycle = FanoutLifecycle.CLOSED
         _fanoutSubscribers = 0
-        cancelTokens.toList().forEach { it.cancel() }
+        // One cancel per token, and the list is emptied even if a token throws — a resource that
+        // fails to release must not strand the ones behind it in the list.
+        val held = cancelTokens.toList()
         cancelTokens.clear()
+        held.forEach { runCatching { it.cancel() } }
     }
 
     override fun <T> slot(source: Observable<T>): Observable<T> {

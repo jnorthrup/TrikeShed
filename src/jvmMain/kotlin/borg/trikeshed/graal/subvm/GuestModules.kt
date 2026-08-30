@@ -37,6 +37,37 @@ object GuestModules {
     private val loaders = java.util.concurrent.ConcurrentHashMap<String, URLClassLoader>()
 
     /**
+     * Mounted classpaths under a CCEK lifecycle.
+     *
+     * A mount is a resource: a [URLClassLoader] holding open jar handles, from which the daemon
+     * executes code. The first version of this object kept them in a static map and closed none of
+     * them, so a module remounted after a re-resolve leaked its predecessor and the daemon kept
+     * executing from file handles nobody could name any more.
+     *
+     * Registering each mount with [borg.trikeshed.ccek.SupervisorJob] makes release structural:
+     * [closeAll] closes every loader the supervisor holds, with no list here to keep exhaustive.
+     * That is the same discount the daemon's own shutdown needed and did not have.
+     */
+    private val supervisor: borg.trikeshed.ccek.SupervisorJob =
+        borg.trikeshed.ccek.RealSupervisorJob("guest-modules").also { it.open() }
+
+    /** Module names currently mounted in this process. */
+    fun mounted(): List<String> = loaders.keys.sorted()
+
+    /** Lifecycle of the mount supervisor — OPEN until [closeAll]. */
+    fun lifecycle(): borg.trikeshed.ccek.FanoutLifecycle = supervisor.lifecycle
+
+    /**
+     * Release every mounted classpath. After this the supervisor is CLOSED, so a later mount is
+     * cancelled on arrival rather than silently retained — mounting during shutdown is a leak.
+     */
+    fun closeAll() {
+        supervisor.drain()
+        supervisor.close()
+        loaders.clear()
+    }
+
+    /**
      * The `utils/subvm` directory: `$TRIKESHED_SUBVM_HOME` when set, else the nearest ancestor of
      * the working directory that contains `utils/subvm`. Null when nothing is installed — an absent
      * module is a lego that cannot run, never a daemon that cannot boot.
@@ -118,7 +149,17 @@ object GuestModules {
                 // URLClassLoader needs to treat `classes/` as a directory rather than a jar.
                 classpath(module).map { f -> f.toURI().toURL() }.toTypedArray(),
                 ClassLoader.getPlatformClassLoader(),
-            )
+            ).also { loader ->
+                // Under the supervisor from birth. A URLClassLoader holds open jar handles and is
+                // the thing the daemon executes code from; releasing it must not depend on some
+                // future shutdown path remembering this map exists.
+                supervisor.hold(object : borg.trikeshed.ccek.CancelToken {
+                    override fun cancel() {
+                        runCatching { loader.close() }
+                        loaders.remove(module, loader)
+                    }
+                })
+            }
         }
     }
 
