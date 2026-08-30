@@ -1156,6 +1156,42 @@ object OroborosDaemon {
                 ),
             ),
         )
+        // ── WikiSkill (arXiv 2608.27454) as two legos: wiki.consolidate (the
+        //    Wiki Maintainer, one iteration per invocation) and wiki.propose
+        //    (the Skill Proposer, one atomic proposal per pass). Their ONE
+        //    spend seam is BrainClient.chatSeat under the same htx+mux context
+        //    the council uses, so every Maintainer/Proposer token lands on the
+        //    daemon's quota/lease receipts. Wiki state lives under the FORGE
+        //    home (<forgeHome>/wiki) — never the repo worktree. The raw/ layer
+        //    is the CAS, with a cid-VERIFIED rebuild from the hermes profile
+        //    for snapshots this process never wrote (WikiTraceSources).
+        val wikiDialog = borg.trikeshed.wiki.WikiNodes.WikiDialog { call ->
+            val (content, answeredBy) = kotlinx.coroutines.withContext(htxElement + muxReactor) {
+                brainClient.chatSeat(
+                    messages = listOf("system" to call.system, "user" to call.prompt),
+                    maxTokens = call.maxTokens,
+                    temperature = call.temperature,
+                    contextId = call.contextId.takeIf { it.isNotBlank() },
+                    preferredModel = call.preferredModel,
+                )
+            }
+            borg.trikeshed.wiki.WikiNodes.WikiReply(content, answeredBy)
+        }
+        val wikiRoot = { File(forgeHome, "wiki") }
+        val wikiTraces = borg.trikeshed.wiki.WikiTraceSources.loader(
+            cas = casStore,
+            profileDir = System.getenv("HERMES_PROFILE")?.let { File(it) } ?: File(hermesHomeDir.absolutePath),
+        )
+        moduleContext.lcncRunners[borg.trikeshed.lcnc.LcncContracts.WIKI_CONSOLIDATE] =
+            borg.trikeshed.wiki.WikiNodes.consolidateRunner(
+                dialog = wikiDialog, wikiRoot = wikiRoot, traces = wikiTraces,
+                casPut = { bytes -> casStore.put(bytes).value },
+            )
+        moduleContext.lcncRunners[borg.trikeshed.lcnc.LcncContracts.WIKI_PROPOSE] =
+            borg.trikeshed.wiki.WikiNodes.proposeRunner(
+                dialog = wikiDialog, wikiRoot = wikiRoot, traces = wikiTraces,
+                casPut = { bytes -> casStore.put(bytes).value },
+            )
         // Boot thaw (non-fatal, like the tribunal open): the kifBank and the
         // blackboard are in-memory — couch + FileCasStore are the durable
         // planes. Re-assert the kif-ledger/ facts and re-land the

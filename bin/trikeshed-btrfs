@@ -1,0 +1,399 @@
+#!/usr/bin/env bash
+# bin/trikeshed-btrfs — the operator recipe for TrikeShed's file-backed btrfs store volume.
+#
+# darwin has no btrfs. The Linux kernel comes from the existing colima VM, reached
+# through ONE container image (mission-002 decision D10):
+#
+#   docker run --rm -i --privileged -v ~/.local/trikeshed-btrfs:/img \
+#       eclipse-temurin:25-jdk bash -s -- <args>          (this file piped on stdin)
+#
+# and inside it:
+#
+#   apt-get update -qq && apt-get install -y -qq btrfs-progs btrfs-compsize \
+#       e2fsprogs util-linux
+#
+# The image FILE lives on the Mac at ~/.local/trikeshed-btrfs/ — never inside the
+# repo worktree — so the operator can see it, back it up and delete it. It is 8 GiB
+# SPARSE (decision D5: the host has ~31 GiB free).
+#
+# USAGE (from macOS; the script re-enters itself inside the container):
+#
+#   bin/trikeshed-btrfs host-facts          macOS-only: df -h /, BSD stat, sparseness
+#   bin/trikeshed-btrfs create [--format]   create image + mkfs + mount + BOTH planes
+#   bin/trikeshed-btrfs mount               idempotent attach + mount, no mkfs ever
+#   bin/trikeshed-btrfs status              findmnt / fi show / df / subvolume list
+#   bin/trikeshed-btrfs plane-verify        three-way subvolume proof for both planes
+#   bin/trikeshed-btrfs scrub-floor         btrfs scrub start -B over the whole mount
+#   bin/trikeshed-btrfs teardown            umount + detach BY BACKING FILE
+#   bin/trikeshed-btrfs discard --img X     detach and DELETE a throwaway image
+#
+# Flags:
+#   --img NAME          image file name inside ~/.local/trikeshed-btrfs (default
+#                       trikeshed-store.img); use a different name for throwaway probes
+#   --mnt PATH          in-container mount point (default /mnt/trikeshed)
+#   --forge-home PATH   forge home ON the volume (default <mnt>/forge). The CAS plane
+#                       is created at exactly <forge-home>/cas — the path
+#                       OroborosDaemon.kt:402 resolves — and the curation plane at
+#                       exactly <forge-home>/wiki (decision D14).
+#   --label NAME        btrfs label (default trikeshed-store)
+#   --size N            image size (default 8G, sparse)
+#   --format            THE ONLY way to run mkfs.btrfs against an image that already
+#                       carries a filesystem. Without it the recipe REFUSES.
+#
+# DESTRUCTIVE FENCES, implemented here rather than left to operator discipline:
+#   * mkfs.btrfs is gated by a blkid probe of the backing file's loop device; an
+#     existing filesystem is a hard refusal unless --format is passed.
+#   * teardown locates the loop device BY BACKING FILE (`losetup -j <img>`). The
+#     detach-all `losetup -D` and any hardcoded /dev/loop0 are forbidden and absent.
+#   * the only bind mount is ~/.local/trikeshed-btrfs. $HOME, ~/.local, ~/.local/forge
+#     and ~/.hermes are NEVER mounted into the privileged container.
+#   * every space figure for the mount is taken after `sync; btrfs filesystem sync`.
+#
+# Plane layout on the volume (decisions D8/D11/D14):
+#   <forge-home>/cas    btrfs SUBVOLUME  — the daemon's CAS plane
+#   <forge-home>/wiki   btrfs SUBVOLUME  — the curation / WikiSkill plane
+#   <forge-home>/.oroboros, /files, /memories  PLAIN DIRECTORIES (not subvolumes)
+# Both subvolumes are created in the SAME run as mkfs and BEFORE anything populates
+# the volume: `btrfs subvolume create` fails outright on a populated directory
+# ("ERROR: Could not create subvolume: File exists"), so no later step could do it.
+
+set -euo pipefail
+
+IMG_DIR_HOST="$HOME/.local/trikeshed-btrfs"
+IMG_NAME="trikeshed-store.img"
+MNT="/mnt/trikeshed"
+FORGE_HOME=""
+LABEL="trikeshed-store"
+SIZE="8G"
+FORMAT=0
+DOCKER_IMAGE="eclipse-temurin:25-jdk"
+
+CMD="${1:-}"; shift || true
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --img)        IMG_NAME="$2"; shift 2 ;;
+    --mnt)        MNT="$2"; shift 2 ;;
+    --forge-home) FORGE_HOME="$2"; shift 2 ;;
+    --label)      LABEL="$2"; shift 2 ;;
+    --size)       SIZE="$2"; shift 2 ;;
+    --format)     FORMAT=1; shift ;;
+    *) echo "trikeshed-btrfs: unknown flag: $1" >&2; exit 2 ;;
+  esac
+done
+[ -n "$FORGE_HOME" ] || FORGE_HOME="$MNT/forge"
+CAS_PLANE="$FORGE_HOME/cas"
+WIKI_PLANE="$FORGE_HOME/wiki"
+IMG="/img/$IMG_NAME"                     # in-container path (bind mount target)
+IMG_HOST="$IMG_DIR_HOST/$IMG_NAME"       # macOS path
+MARKER="$MNT/.trikeshed-volume-id"
+
+case "$CMD" in
+  create|mount|status|plane-verify|scrub-floor|teardown|discard|host-facts) ;;
+  ""|-h|--help) sed -n '2,60p' "${BASH_SOURCE[0]:-/dev/null}"; exit 0 ;;
+  *) echo "trikeshed-btrfs: unknown command: $CMD" >&2; exit 2 ;;
+esac
+
+# ─────────────────────────────────────────────────────────────────────────────
+# macOS side: capture host-only facts, then re-enter this same script inside the
+# ONE container image, printing the docker run command line VERBATIM first.
+# ─────────────────────────────────────────────────────────────────────────────
+if [ "$(uname -s)" = "Darwin" ]; then
+  mkdir -p "$IMG_DIR_HOST"
+
+  if [ "$CMD" = "host-facts" ]; then
+    echo "### macOS shell: df -h /"
+    df -h /
+    echo "### macOS shell: image directory (fence: this is the ONLY rw bind mount)"
+    ls -la "$IMG_DIR_HOST"
+    if [ -e "$IMG_HOST" ]; then
+      echo "### macOS shell: ls -lh $IMG_HOST"
+      ls -lh "$IMG_HOST"
+      echo "### macOS shell: BSD stat -f '%N %z %i %Sm' (GNU stat has no -f format string)"
+      stat -f '%N %z %i %Sm' "$IMG_HOST"
+      echo "### macOS shell: sparseness — stat -f '%z %b' = logical bytes vs allocated 512B blocks"
+      stat -f '%z %b' "$IMG_HOST"
+      echo "### macOS shell: du -h $IMG_HOST (allocated)"
+      du -h "$IMG_HOST"
+    else
+      echo "(no image at $IMG_HOST yet)"
+    fi
+    exit 0
+  fi
+
+  SELF="${BASH_SOURCE[0]}"
+  DOCKER_ARGS=(docker run --rm -i --privileged
+               -v "$IMG_DIR_HOST:/img"
+               "$DOCKER_IMAGE" bash -s --
+               "$CMD" --img "$IMG_NAME" --mnt "$MNT" --forge-home "$FORGE_HOME"
+               --label "$LABEL" --size "$SIZE")
+  if [ "$FORMAT" = "1" ]; then DOCKER_ARGS+=(--format); fi
+  echo "### macOS shell: docker run command line, VERBATIM (bind mounts: ONLY $IMG_DIR_HOST)"
+  printf '%q ' "${DOCKER_ARGS[@]}"; printf '< %q\n' "$SELF"
+  exec "${DOCKER_ARGS[@]}" < "$SELF"
+fi
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Linux side (axis-2 container): the real work.
+# ─────────────────────────────────────────────────────────────────────────────
+ctx() { echo; echo "### axis-2 container: $*"; }
+
+ensure_tools() {
+  if ! command -v mkfs.btrfs >/dev/null 2>&1; then
+    ctx "apt-get install btrfs-progs btrfs-compsize e2fsprogs util-linux (decision D10 image)"
+    apt-get update -qq
+    DEBIAN_FRONTEND=noninteractive apt-get install -y -qq \
+      btrfs-progs btrfs-compsize e2fsprogs util-linux >/dev/null
+  fi
+  ctx "tool versions"
+  mkfs.btrfs --version | head -1
+  losetup --version | head -1
+  blkid -v 2>&1 | head -1 || true
+  java -version 2>&1 | head -1
+  uname -m
+}
+
+# Loop device for $IMG, located BY BACKING FILE. Never /dev/loop0 by name.
+loopdev_for_img() { losetup -j "$IMG" 2>/dev/null | cut -d: -f1 | head -1; }
+
+attach_loop() {
+  local dev; dev="$(loopdev_for_img)"
+  if [ -z "$dev" ]; then
+    dev="$(losetup -f --show "$IMG")"
+    echo "attached $dev -> $IMG (losetup -f --show)" >&2
+  else
+    echo "reusing $dev -> $IMG (found by losetup -j)" >&2
+  fi
+  echo "$dev"
+}
+
+fs_type_of() { blkid -o value -s TYPE "$1" 2>/dev/null || true; }
+
+mount_if_needed() {
+  local dev="$1"
+  mkdir -p "$MNT"
+  if findmnt -no TARGET "$MNT" >/dev/null 2>&1; then
+    echo "already mounted at $MNT" >&2
+  else
+    mount "$dev" "$MNT"
+  fi
+}
+
+report_volume() {
+  ctx "sync; btrfs filesystem sync $MNT (mandatory before any space figure)"
+  sync; btrfs filesystem sync "$MNT"
+  ctx "btrfs filesystem show"
+  btrfs filesystem show
+  ctx "findmnt $MNT"
+  findmnt "$MNT"
+  ctx "findmnt -no FSTYPE,SOURCE -T $MNT"
+  findmnt -no FSTYPE,SOURCE -T "$MNT"
+  ctx "df -h $MNT"
+  df -h "$MNT"
+  ctx "btrfs subvolume list $MNT"
+  btrfs subvolume list "$MNT"
+  ctx "stat -c '%n inode=%i size=%s blocks=%b' $IMG (image file inode, container view)"
+  stat -c '%n inode=%i size=%s blocks=%b' "$IMG"
+  ctx "losetup -j $IMG (loop located BY BACKING FILE)"
+  losetup -j "$IMG"
+}
+
+three_way() {         # the discriminating subvolume proof
+  local p="$1"
+  ctx "btrfs subvolume show $p"
+  if btrfs subvolume show "$p"; then echo "SHOW: OK (a plain directory fails this)"; else echo "SHOW: FAILED"; return 1; fi
+  ctx "stat -c %i $p  (a btrfs subvolume root is always inode 256)"
+  stat -c %i "$p"
+}
+
+case "$CMD" in
+
+create)
+  ensure_tools
+  ctx "image file (created sparse with truncate if absent): $IMG size=$SIZE"
+  if [ ! -e "$IMG" ]; then
+    truncate -s "$SIZE" "$IMG"
+    echo "created sparse image $IMG ($SIZE)"
+  else
+    echo "image already present: $IMG"
+  fi
+  ls -lh "$IMG"; du -h --apparent-size "$IMG"; du -h "$IMG"
+
+  DEV="$(attach_loop)"
+  ctx "blkid guard — probing $DEV (backing file $IMG) for an existing filesystem"
+  EXISTING="$(fs_type_of "$DEV")"
+  blkid "$DEV" || echo "(blkid: no filesystem signature)"
+
+  if [ -n "$EXISTING" ] && [ "$FORMAT" != "1" ]; then
+    ctx "REFUSAL"
+    cat <<EOF
+trikeshed-btrfs: REFUSING to run mkfs.btrfs.
+  image      : $IMG
+  loop device: $DEV  (located by backing file, not hardcoded)
+  blkid TYPE : $EXISTING
+  This image ALREADY CARRIES A FILESYSTEM. mkfs.btrfs is not reachable here.
+  Pass --format explicitly to destroy it. Continuing in IDEMPOTENT MOUNT mode:
+  no mkfs, no reformat, no plane re-creation, no data loss.
+EOF
+    mount_if_needed "$DEV"
+    ctx "idempotent re-run: existing planes are left UNTOUCHED"
+    for p in "$CAS_PLANE" "$WIKI_PLANE"; do
+      if [ -d "$p" ]; then
+        echo "-- $p"
+        btrfs subvolume show "$p" | sed -n '1,8p'
+      else
+        echo "-- $p MISSING (unexpected)"; exit 4
+      fi
+    done
+    ctx "data intact: volume marker + sha256"
+    if [ -f "$MARKER" ]; then cat "$MARKER"; sha256sum "$MARKER"; else echo "marker missing"; exit 4; fi
+    report_volume
+    exit 0
+  fi
+
+  if [ -n "$EXISTING" ]; then
+    ctx "--format PASSED — destroying existing $EXISTING on $DEV"
+  fi
+  ctx "mkfs.btrfs -L $LABEL $DEV"
+  mkfs.btrfs -L "$LABEL" -f "$DEV"
+
+  ctx "mount $DEV $MNT"
+  mkdir -p "$MNT"
+  mount "$DEV" "$MNT"
+
+  # ── the axis's EMPTY-VOLUME FLOOR: scrub the freshly created, still-empty fs ──
+  ctx "sync; btrfs filesystem sync $MNT"
+  sync; btrfs filesystem sync "$MNT"
+  ctx "EMPTY-VOLUME SCRUB FLOOR — btrfs scrub start -B $MNT (nothing has been written yet)"
+  btrfs scrub start -B "$MNT"
+  ctx "btrfs filesystem df $MNT at the empty floor"
+  btrfs filesystem df "$MNT"
+
+  # ── the planes. D11: this is the ONLY moment they can be created. ──
+  ctx "forge home on the volume: $FORGE_HOME (plain directory; the PLANES under it are subvolumes)"
+  mkdir -p "$FORGE_HOME"
+  ctx "btrfs subvolume create $CAS_PLANE   (CAS plane — the path OroborosDaemon.kt:402 resolves)"
+  btrfs subvolume create "$CAS_PLANE"
+  ctx "btrfs subvolume create $WIKI_PLANE  (curation plane — decision D14)"
+  btrfs subvolume create "$WIKI_PLANE"
+
+  # ── plain directories (decision D8): NOT subvolumes, and named as such ──
+  ctx "plain directories (decision D8 — NOT subvolumes): .oroboros/ (WAL, couch dbs, manifests), files/, memories/"
+  mkdir -p "$FORGE_HOME/.oroboros/manifests" "$FORGE_HOME/files" "$FORGE_HOME/memories"
+  for d in "$FORGE_HOME/.oroboros" "$FORGE_HOME/files" "$FORGE_HOME/memories"; do
+    printf '%s inode=%s ' "$d" "$(stat -c %i "$d")"
+    btrfs subvolume show "$d" >/dev/null 2>&1 && echo "SUBVOLUME(!)" || echo "plain directory (subvolume show fails)"
+  done
+
+  ctx "volume marker (idempotence/data-intact witness; lives at the mount root, outside every plane)"
+  UUID="$(blkid -o value -s UUID "$DEV")"
+  { echo "label=$LABEL"; echo "uuid=$UUID"; echo "forge-home=$FORGE_HOME";
+    echo "cas-plane=$CAS_PLANE"; echo "wiki-plane=$WIKI_PLANE";
+    echo "created-utc=$(date -u +%Y-%m-%dT%H:%M:%SZ)"; } > "$MARKER"
+  cat "$MARKER"; sha256sum "$MARKER"
+
+  report_volume
+  ;;
+
+mount)
+  ensure_tools
+  DEV="$(attach_loop)"
+  T="$(fs_type_of "$DEV")"
+  ctx "blkid TYPE of $DEV = ${T:-<none>} — mount NEVER runs mkfs under any flag"
+  [ "$T" = "btrfs" ] || { echo "not a btrfs filesystem; refusing to mount" >&2; exit 4; }
+  mount_if_needed "$DEV"
+  ctx "data intact: volume marker + sha256"
+  cat "$MARKER"; sha256sum "$MARKER"
+  report_volume
+  ;;
+
+status)
+  ensure_tools
+  DEV="$(loopdev_for_img)"
+  ctx "losetup -j $IMG"
+  losetup -j "$IMG" || true
+  if [ -z "$DEV" ]; then echo "no loop device backed by $IMG"; exit 0; fi
+  if findmnt -no TARGET "$MNT" >/dev/null 2>&1; then report_volume; else echo "$DEV attached, not mounted at $MNT"; fi
+  ;;
+
+plane-verify)
+  ensure_tools
+  DEV="$(attach_loop)"
+  mount_if_needed "$DEV"
+  ctx "btrfs subvolume list $MNT  (every claimed plane must appear here)"
+  btrfs subvolume list "$MNT"
+  echo
+  echo "=== CAS PLANE (verbatim path): $CAS_PLANE"
+  three_way "$CAS_PLANE"
+  echo
+  echo "=== CURATION PLANE (verbatim path): $WIKI_PLANE"
+  three_way "$WIKI_PLANE"
+  ctx "PLAIN DIRECTORIES under $FORGE_HOME (decision D8 — explicitly NOT subvolumes)"
+  for d in "$FORGE_HOME" "$FORGE_HOME/.oroboros" "$FORGE_HOME/.oroboros/manifests" "$FORGE_HOME/files" "$FORGE_HOME/memories"; do
+    [ -e "$d" ] || continue
+    printf '%-46s inode=%-8s ' "$d" "$(stat -c %i "$d")"
+    if btrfs subvolume show "$d" >/dev/null 2>&1; then echo "SUBVOLUME"; else echo "plain directory (btrfs subvolume show FAILS)"; fi
+  done
+  ;;
+
+scrub-floor)
+  ensure_tools
+  DEV="$(attach_loop)"
+  mount_if_needed "$DEV"
+  ctx "sync; btrfs filesystem sync $MNT"
+  sync; btrfs filesystem sync "$MNT"
+  ctx "btrfs scrub start -B $MNT"
+  btrfs scrub start -B "$MNT"
+  ctx "btrfs scrub status -d $MNT"
+  btrfs scrub status -d "$MNT"
+  ctx "btrfs filesystem df $MNT"
+  btrfs filesystem df "$MNT"
+  ;;
+
+teardown)
+  ensure_tools
+  ctx "losetup -a BEFORE teardown"
+  losetup -a || true
+  # A container's mount namespace dies with the container, so a teardown invoked
+  # from a fresh container would have nothing to unmount and the clean-unmount
+  # path would never be exercised. Re-establish the mount first, then unmount it
+  # for real, then detach. Nothing is written; this is mount -> sync -> umount.
+  if ! findmnt -no TARGET "$MNT" >/dev/null 2>&1; then
+    if [ -n "$(loopdev_for_img)" ] || [ -e "$IMG" ]; then
+      ctx "$MNT not mounted in this namespace — re-attaching and mounting so the clean-unmount path is actually exercised"
+      DEV="$(attach_loop)"
+      mount_if_needed "$DEV"
+      findmnt "$MNT"
+    fi
+  fi
+  if findmnt -no TARGET "$MNT" >/dev/null 2>&1; then
+    ctx "sync; btrfs filesystem sync $MNT; umount $MNT"
+    sync; btrfs filesystem sync "$MNT"; umount "$MNT"
+    echo "unmounted $MNT"
+    ctx "findmnt $MNT AFTER umount (must be empty)"
+    findmnt "$MNT" || echo "(no mount at $MNT — clean)"
+  else
+    echo "$MNT not mounted and no image to mount"
+  fi
+  ctx "detach BY BACKING FILE: losetup -j $IMG  (never losetup -D, never a hardcoded /dev/loopN)"
+  losetup -j "$IMG" || true
+  for d in $(losetup -j "$IMG" 2>/dev/null | cut -d: -f1); do
+    losetup -d "$d" && echo "detached $d (backing file $IMG)"
+  done
+  ctx "losetup -j $IMG AFTER teardown (must be empty)"
+  losetup -j "$IMG" || true
+  ctx "losetup -a AFTER teardown (no orphan loop for this image)"
+  losetup -a || true
+  ctx "image file intact"
+  ls -lh "$IMG"; stat -c '%n inode=%i size=%s blocks=%b' "$IMG"
+  ;;
+
+discard)
+  # Throwaway probe images only — never the default store image.
+  ensure_tools
+  [ "$IMG_NAME" != "trikeshed-store.img" ] || { echo "refusing to discard the live store image" >&2; exit 5; }
+  findmnt -no TARGET "$MNT" >/dev/null 2>&1 && umount "$MNT" || true
+  for d in $(losetup -j "$IMG" 2>/dev/null | cut -d: -f1); do losetup -d "$d"; echo "detached $d"; done
+  rm -f "$IMG"; echo "removed $IMG"
+  losetup -a || true
+  ;;
+esac

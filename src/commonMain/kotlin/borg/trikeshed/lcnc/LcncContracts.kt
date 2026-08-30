@@ -43,6 +43,9 @@ object LcncContracts {
     /** P2 map-reduce vocabulary: declarative Confix/LCNC only, never JS eval. */
     const val VIEW_EMIT = "view.emit"
     const val VIEW_REDUCE = "view.reduce"
+    /** WikiSkill consolidation vocabulary: one pass per invocation, loop outside. */
+    const val WIKI_CONSOLIDATE = "wiki.consolidate"
+    const val WIKI_PROPOSE = "wiki.propose"
 
     /** Full vocabulary — ONE author for node types, ports, titles, param defaults.
      *  inputKinds/outputKinds drive the mating filter; omit a kind and the type
@@ -857,6 +860,41 @@ object LcncContracts {
             inputKinds = mapOf("caseId" to "id"),
             outputKinds = mapOf("case" to "json"),
             params = mapOf("caseId" to LcncPortContract.LcncParamSpec(ph = "convened case id"))),
+
+        // ── WikiSkill (arXiv 2608.27454) — the two consolidation legos.
+        // ONE invocation is ONE pass: wiki.consolidate is a single Maintainer
+        // iteration k, wiki.propose is a single Proposer pass. The iteration
+        // LOOP is the caller's (a program document / successive runs), never
+        // hidden inside a runner — cans and atoms. Wiki state lives under the
+        // FORGE home the daemon wires, never the repo worktree.
+        LcncPortContract(WIKI_CONSOLIDATE, "wiki consolidate (Wiki Maintainer: traces + prior wiki → PATCH edits)",
+            listOf("cids?"), listOf("report"),
+            inputKinds = mapOf("cids" to "json"),
+            outputKinds = mapOf("report" to "json"),
+            params = mapOf(
+                "cids" to LcncPortContract.LcncParamSpec(
+                    ta = true, ph = "sampled transcript cids (comma/newline separated) — success AND failure mix"),
+                "iteration" to LcncPortContract.LcncParamSpec(v = "1"),
+                "maxTokens" to LcncPortContract.LcncParamSpec(v = "4096"),
+                "temperature" to LcncPortContract.LcncParamSpec(v = "0.2"),
+                "traceChars" to LcncPortContract.LcncParamSpec(v = "9000", ph = "per-trace context budget"),
+                "model" to LcncPortContract.LcncParamSpec(ph = "preferred model id (roster failover behind it)"),
+                "contextId" to LcncPortContract.LcncParamSpec(ph = "spend receipt id; also names the captured response file"),
+            )),
+        LcncPortContract(WIKI_PROPOSE, "wiki propose (Skill Proposer: multi-turn ReAct → ONE atomic proposal)",
+            listOf("summary?"), listOf("report"),
+            inputKinds = mapOf("summary" to "text"),
+            outputKinds = mapOf("report" to "json"),
+            params = mapOf(
+                "summary" to LcncPortContract.LcncParamSpec(
+                    ta = true, ph = "concise summary of training outcomes (the paper's third initial input)"),
+                "maxTurns" to LcncPortContract.LcncParamSpec(v = "6"),
+                "maxTokens" to LcncPortContract.LcncParamSpec(v = "4096"),
+                "temperature" to LcncPortContract.LcncParamSpec(v = "0.2"),
+                "readChars" to LcncPortContract.LcncParamSpec(v = "9000", ph = "per-read context budget"),
+                "model" to LcncPortContract.LcncParamSpec(ph = "preferred model id"),
+                "contextId" to LcncPortContract.LcncParamSpec(ph = "spend receipt id; also names the read log"),
+            )),
     )
 
     fun compatible(sourceType: String, sourcePort: String): List<LcncPortContract> =

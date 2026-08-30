@@ -4,7 +4,6 @@ import borg.trikeshed.job.ContentId
 import borg.trikeshed.userspace.nio.file.spi.InMemoryFileOperations
 import borg.trikeshed.userspace.nio.channels.spi.ProcessOperations
 import borg.trikeshed.userspace.nio.channels.spi.ProcessResult
-import borg.trikeshed.reflink.FixedBlockReflinkScanner
 import borg.trikeshed.reflink.InMemoryReferenceCounter
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
@@ -13,6 +12,12 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 class BtrfsReflinkStoreTest {
+
+    // The unit tests run against InMemoryFileOperations, which is not a real
+    // filesystem at all; the btrfs guard is satisfied with an explicit stub so the
+    // guard itself stays a REQUIRED constructor argument (no permissive default).
+    private val BTRFS_PROBE = FilesystemTypeProbe { BtrfsReflinkStore.BTRFS }
+
     
     // Mock ProcessOperations
     class MockProcessOperations : ProcessOperations {
@@ -34,15 +39,14 @@ class BtrfsReflinkStoreTest {
     fun testStoreAndRetrieve() = runTest {
         val fileOps = InMemoryFileOperations()
         val processOps = MockProcessOperations()
-        val scanner = FixedBlockReflinkScanner()
         val refCounter = InMemoryReferenceCounter()
         
         val store = BtrfsReflinkStore(
             rootDir = "/btrfs/cas",
             fileOps = fileOps,
             processOps = processOps,
-            scanner = scanner,
-            refCounter = refCounter
+            refCounter = refCounter,
+            fsProbe = BTRFS_PROBE
         )
         
         val data = "Hello, Btrfs!".encodeToByteArray()
@@ -59,15 +63,14 @@ class BtrfsReflinkStoreTest {
     fun testDedupIncrement() = runTest {
         val fileOps = InMemoryFileOperations()
         val processOps = MockProcessOperations()
-        val scanner = FixedBlockReflinkScanner()
         val refCounter = InMemoryReferenceCounter()
         
         val store = BtrfsReflinkStore(
             rootDir = "/btrfs/cas",
             fileOps = fileOps,
             processOps = processOps,
-            scanner = scanner,
-            refCounter = refCounter
+            refCounter = refCounter,
+            fsProbe = BTRFS_PROBE
         )
         
         val data = "Duplicate Me".encodeToByteArray()
@@ -83,15 +86,14 @@ class BtrfsReflinkStoreTest {
     fun testReflinkCopy() = runTest {
         val fileOps = InMemoryFileOperations()
         val processOps = MockProcessOperations()
-        val scanner = FixedBlockReflinkScanner()
         val refCounter = InMemoryReferenceCounter()
         
         val store = BtrfsReflinkStore(
             rootDir = "/btrfs/cas",
             fileOps = fileOps,
             processOps = processOps,
-            scanner = scanner,
-            refCounter = refCounter
+            refCounter = refCounter,
+            fsProbe = BTRFS_PROBE
         )
         
         val data = "Reflink This".encodeToByteArray()

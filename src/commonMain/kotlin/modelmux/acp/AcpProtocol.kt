@@ -149,8 +149,29 @@ object AcpCodec {
         return content j usage
     }
 
-    private fun jsonStr(s: String): String = "\"" +
-        s.replace("\\", "\\\\").replace("\"", "\\\"").replace("\n", "\\n") + "\""
+    /**
+     * A JSON string literal. Backslash, quote and newline are not the only
+     * characters that must not ride raw inside one: a tab or a carriage
+     * return (both ordinary in a pasted transcript) makes the request body
+     * malformed JSON, which providers answer with a 400 that reads like a
+     * model failure. Everything below U+0020 is escaped.
+     */
+    private fun jsonStr(s: String): String = buildString {
+        append('"')
+        for (c in s) when (c) {
+            '\\' -> append("\\\\")
+            '"' -> append("\\\"")
+            '\n' -> append("\\n")
+            '\r' -> append("\\r")
+            '\t' -> append("\\t")
+            '\b' -> append("\\b")
+            '\u000C' -> append("\\f")
+            else -> if (c.code < 0x20) {
+                append("\\u").append(c.code.toString(16).padStart(4, '0'))
+            } else append(c)
+        }
+        append('"')
+    }
 
     private fun extractDelta(json: String): String {
         val i = json.indexOf("\"delta\"")
@@ -174,6 +195,19 @@ object AcpCodec {
         return p j c
     }
 
+    /**
+     * The quoted string starting at the first `"` at or after [from], with its
+     * JSON escapes DECODED.
+     *
+     * The escape table is not decoration: a completion's content arrives as a
+     * JSON string, so every newline in it is on the wire as `\n`. Skipping the
+     * backslash and taking the next character literally (the shape this used
+     * to have) silently rewrote `\n` to the letter `n`, `\t` to `t`, and
+     * `é` to `u00e9` — every multi-line answer this daemon has ever read
+     * came back as one unbroken line. `\"` and `\\` happened to survive that
+     * shape, which is why it looked correct. Terminating on an unescaped `"`
+     * still works because an escaped quote is consumed inside the loop.
+     */
     private fun extractQuoted(s: String, from: Int): String {
         var i = from
         while (i < s.length && s[i] != '"') i++
@@ -181,8 +215,26 @@ object AcpCodec {
         i++ // skip opening quote
         val sb = StringBuilder()
         while (i < s.length && s[i] != '"') {
-            if (s[i] == '\\' && i + 1 < s.length) { i++; sb.append(s[i]) } else sb.append(s[i])
-            i++
+            val c = s[i]
+            if (c != '\\') { sb.append(c); i++; continue }
+            if (i + 1 >= s.length) { i++; continue }
+            when (val e = s[i + 1]) {
+                '"' -> { sb.append('"'); i += 2 }
+                '\\' -> { sb.append('\\'); i += 2 }
+                '/' -> { sb.append('/'); i += 2 }
+                'b' -> { sb.append('\b'); i += 2 }
+                'f' -> { sb.append('\u000C'); i += 2 }
+                'n' -> { sb.append('\n'); i += 2 }
+                'r' -> { sb.append('\r'); i += 2 }
+                't' -> { sb.append('\t'); i += 2 }
+                'u' -> {
+                    val hex = if (i + 6 <= s.length) s.substring(i + 2, i + 6).toIntOrNull(16) else null
+                    if (hex != null) { sb.append(hex.toChar()); i += 6 } else { sb.append(e); i += 2 }
+                }
+                // An unknown escape is not ours to reinterpret: keep the
+                // character, drop the backslash, exactly as before.
+                else -> { sb.append(e); i += 2 }
+            }
         }
         return sb.toString()
     }
