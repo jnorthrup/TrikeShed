@@ -1,7 +1,16 @@
 {
   "schema": "trikeshed.hermes-wikiskill-trainer/v1",
   "setId": "1A",
+  "artifactOrdinal": 1,
   "resourceRoot": "hermes/wiki-trainer/1A",
+  "roles": [
+    "training-corpus",
+    "benchmark",
+    "performance-watermark",
+    "test-analysis-fixture",
+    "sample-oroboros-deliverable"
+  ],
+  "productionKnowledgeSeed": false,
   "designAuthority": {
     "title": "WikiSkill: Compiling Agent Experience into Persistent Knowledge for Skill Evolution",
     "arxiv": "2608.27454v1",
@@ -70,6 +79,8 @@
     "nlp/dependencies.jsonl",
     "translation/round-trips.jsonl",
     "nars/causal-decisions.jsonl",
+    "analysis/performance-watermark.json",
+    "deliverable/oroboros-actual-to-greenfield.json",
     "wiki/index.md",
     "wiki/patterns/grounded-causal-link.md",
     "wiki/logs.md",

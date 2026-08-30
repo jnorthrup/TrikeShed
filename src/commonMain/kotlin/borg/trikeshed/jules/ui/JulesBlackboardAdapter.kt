@@ -4,7 +4,8 @@ import borg.trikeshed.forge.blackboard.ForgeBlackboardSection3D
 import borg.trikeshed.forge.blackboard.ForgeBlackboardView
 import borg.trikeshed.forge.blackboard.ForgeDomainSurface
 import borg.trikeshed.forge.blackboard.ForgeSurfaceGeometry
-import borg.trikeshed.jules.JulesRestClient
+import borg.trikeshed.agent.ActivityInfo
+import borg.trikeshed.agent.SessionInfo
 import borg.trikeshed.userspace.nio.platform.spi.SystemOperations
 import kotlinx.datetime.Clock
 
@@ -87,7 +88,7 @@ val TTL_MS: Long = run {
  * Session entry held in the adapter cache with TTL metadata.
  */
 data class SessionEntry(
-    val session: JulesRestClient.SessionInfo,
+    val session: SessionInfo,
     val expiresAt: Long,
 ) {
     val isExpired: Boolean
@@ -124,7 +125,7 @@ object JulesBlackboardAdapter {
      * @return a Pair of the updated ForgeBlackboardView and the list of ForgeSurfaceSession
      */
     fun projectSessionsToBlackboard(
-        sessions: List<JulesRestClient.SessionInfo>,
+        sessions: List<SessionInfo>,
     ): Pair<ForgeBlackboardView, List<ForgeSurfaceSession>> {
         val baseView = ForgeBlackboardView.DEFAULT
         val baseLayout = baseView.layout3D
@@ -199,7 +200,7 @@ object JulesBlackboardAdapter {
      */
     fun projectActivitiesToBlackboard(
         sessionId: String,
-        activities: List<JulesRestClient.ActivityInfo>,
+        activities: List<ActivityInfo>,
     ): Pair<ForgeBlackboardView, List<ForgeSurfaceActivity>> {
         val baseView = ForgeBlackboardView.DEFAULT
         val baseLayout = baseView.layout3D
@@ -262,8 +263,8 @@ object JulesBlackboardAdapter {
      *   [JulesRestClient.activityTimeline] or assembled from per-session API calls
      */
     fun projectFullSurface(
-        sessions: List<JulesRestClient.SessionInfo>,
-        activitiesBySession: Map<String, List<JulesRestClient.ActivityInfo>>,
+        sessions: List<SessionInfo>,
+        activitiesBySession: Map<String, List<ActivityInfo>>,
     ): Triple<ForgeBlackboardView, JulesBlackboardSurface, Map<String, List<ForgeSurfaceActivity>>> {
         val (view, surfaceSessions) = projectSessionsToBlackboard(sessions)
 

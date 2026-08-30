@@ -17,7 +17,6 @@ import borg.trikeshed.context.nuid.TraitSpace
 import borg.trikeshed.context.nuid.Workgroup
 import borg.trikeshed.context.nuid.nuid
 import borg.trikeshed.lib.j
-import borg.trikeshed.jules.JulesRestClient
 import borg.trikeshed.litebike.taxonomy.Protocol
 import borg.trikeshed.forge.server.ForgeRoutes
 import borg.trikeshed.parse.json.JsonSupport

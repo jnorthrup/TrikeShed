@@ -602,21 +602,7 @@ fun org.gradle.api.tasks.JavaExec.useStagedJvmClasspath() {
     }
 }
 
-// Jules CAS bridges (formerly bin/oroboros-artifact, -settle, -review-patch, -review-report).
-// Pass CLI args with --args, e.g. ./gradlew julesReviewPatch --args="<activity-id>".
-fun registerJulesCli(taskName: String, cliMain: String, desc: String, vararg fixedArgs: String) =
-    tasks.register<JavaExec>(taskName) {
-        group = "jules"
-        description = desc
-        mainClass.set(cliMain)
-        useStagedJvmClasspath()
-        if (fixedArgs.isNotEmpty()) args(*fixedArgs)
-        standardInput = System.`in`
-    }
-registerJulesCli("julesArtifact", "borg.trikeshed.jules.JulesArtifactCli", "Emit exact, already-observed Jules CAS bytes; no API or repository mutations.")
-registerJulesCli("julesSettle", "borg.trikeshed.jules.JulesSettlementCli", "Durable settlement bridge for Jules patches delivered without a PR or branch.")
-registerJulesCli("julesReviewPatch", "borg.trikeshed.jules.JulesPatchReviewCli", "Select one already-CASed Jules activity patch for drain after explicit review.")
-registerJulesCli("julesReviewReport", "borg.trikeshed.jules.JulesPatchReviewCli", "Bond one already-CASed full Jules agent report to an explicit disposition.", "report")
+// Jules CAS bridge tasks removed: Jules is externalized, its in-repo CLI layer deleted.
 
 tasks.register<JavaExec>("portHermesPython") {
     group = "subvm"
@@ -934,6 +920,8 @@ val generateForgeAssets = tasks.register("generateForgeAssets") {
         "hermes/wiki-trainer/1A/nlp/dependencies.jsonl",
         "hermes/wiki-trainer/1A/translation/round-trips.jsonl",
         "hermes/wiki-trainer/1A/nars/causal-decisions.jsonl",
+        "hermes/wiki-trainer/1A/analysis/performance-watermark.json",
+        "hermes/wiki-trainer/1A/deliverable/oroboros-actual-to-greenfield.json",
         "hermes/wiki-trainer/1A/wiki/index.md",
         "hermes/wiki-trainer/1A/wiki/patterns/grounded-causal-link.md",
         "hermes/wiki-trainer/1A/wiki/logs.md",

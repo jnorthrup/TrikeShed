@@ -1,0 +1,67 @@
+{
+  "schema": "trikeshed.oroboros-deliverable/v1",
+  "artifactId": "oroboros-actual-to-greenfield-1A",
+  "artifactOrdinal": 1,
+  "kind": "sample-deliverable-mockup",
+  "trainingSet": "1A",
+  "source": {
+    "name": "TrikeShed actuals",
+    "evidence": [
+      "doc/open-state-2026-08-30.md@ad79f8d6f",
+      "WorktreeCouchGateway.kt@c451a96a4",
+      "WorktreeCouchGateway.kt@2fad82b31",
+      "WatcherExcludeParityTest.kt"
+    ],
+    "observedFailureShape": [
+      "retained task checkout trees dominated the watcher walk",
+      "generated logs and compiler session files could wake full reconciliation",
+      "abandoned does not mean disposable",
+      "an operator needed a bounded, attributable reconciliation receipt"
+    ]
+  },
+  "target": {
+    "name": "grass-roots green-field Oroboros",
+    "properties": [
+      "inventory every task tree with age, owner, head, lease, and last useful delta",
+      "quarantine stale trees from active watching without deleting them",
+      "derive watcher and reconciler exclusions from one policy",
+      "coalesce event bursts before reconciliation",
+      "emit content-addressed receipts for scope, duration, counts, and outcome",
+      "feed receipts back through the 1A benchmark without making the fixture production memory"
+    ]
+  },
+  "mockupSurface": {
+    "summaryCard": [
+      "active task trees",
+      "stale retained task trees",
+      "watched directories",
+      "excluded directories",
+      "events coalesced",
+      "reconciles executed",
+      "last receipt CID"
+    ],
+    "treeActions": [
+      "inspect",
+      "retain",
+      "quarantine-from-watch",
+      "re-admit"
+    ],
+    "automaticDestructiveAction": null
+  },
+  "benchmark": "analysis/performance-watermark.json",
+  "acceptance": [
+    "all 1A resource bytes are present through CommonResources",
+    "transcript CIDs remain exact",
+    "semantic incumbent and target scores remain reproducible",
+    "excluded task trees generate no worktree watcher registrations",
+    "self-generated logs and compiler state generate no reconcile events",
+    "real source edits remain visible",
+    "no retained task tree is deleted by reconciliation"
+  ],
+  "nonGoals": [
+    "seed the production wiki from synthetic trainer text",
+    "delete abandoned task trees",
+    "present the operator-reported 48-hour duration as an independently measured value",
+    "replace actual receipts with model narrative"
+  ]
+}

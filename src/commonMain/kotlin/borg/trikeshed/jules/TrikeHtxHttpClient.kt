@@ -32,12 +32,15 @@ typealias JulesHttpException = HtxHttpException
 class TrikeHtxHttpClient(
     private val base: String,
     private val defaultHeaders: HtxHeaders = emptyHtxHeaders(),
-) : JulesHttpClient {
-    override suspend fun get(path: String): String = exchange(HtxMethod.GET, path, null)
+) {
+    // Was `: JulesHttpClient`. That interface existed only to let JulesRestClient swap transports;
+    // both are gone with the Jules externalization, and this class is a plain HTX client with one
+    // consumer (JvmWebhookTransport). Keeping the supertype would mean keeping the integration.
+    suspend fun get(path: String): String = exchange(HtxMethod.GET, path, null)
 
-    override suspend fun post(path: String, json: String): String = exchange(HtxMethod.POST, path, json)
+    suspend fun post(path: String, json: String): String = exchange(HtxMethod.POST, path, json)
 
-    override suspend fun delete(path: String): String = exchange(HtxMethod.DELETE, path, null)
+    suspend fun delete(path: String): String = exchange(HtxMethod.DELETE, path, null)
 
     private suspend fun exchange(method: HtxMethod, path: String, json: String?): String = withTimeout(45_000) {
         val htx = currentCoroutineContext()[HtxKey]

@@ -1,6 +1,6 @@
 # WikiSkill Hermes trainer
 
-TrikeShed carries a fixed `1A` acceptance corpus in `src/commonMain/resources/hermes/wiki-trainer/1A`. It exists to force one auditable lane:
+TrikeShed carries a fixed `1A` training, benchmarking, and performance-watermark corpus in `src/commonMain/resources/hermes/wiki-trainer/1A`. It is a test/analysis fixture, not a production knowledge seed. It exists to force one auditable lane:
 
 `immutable Hermes transcript → NLPCore facts ↔ BrainClient/ModelMux translation ↔ NARS proposal → deterministic causal admission → NARS evidence → persistent wiki pattern → atomic skill candidate → disjoint validation`
 
@@ -14,6 +14,8 @@ The architecture authority is Tang et al., *WikiSkill: Compiling Agent Experienc
 | CoreNLP | `nlp/dependencies.jsonl` | Exact source spans, token indices, predicates, and supporting dependencies |
 | Translator | `translation/round-trips.jsonl` | BrainClient/ModelMux NLPCore→NARS proposal and NARS→NLPCore evidence-projection contracts |
 | NARS | `nars/causal-decisions.jsonl` | Proposed edges, admit/refuse answers, and budgets only for admitted evidence |
+| Analysis | `analysis/performance-watermark.json` | Reproducible semantic baseline plus Oroboros incident actuals and unmeasured green-field targets |
+| Deliverable | `deliverable/oroboros-actual-to-greenfield.json` | First sample Oroboros artifact: TrikeShed actuals transformed into an idealized, measurable mockup |
 | Wiki | `wiki/` | Persistent pattern, index, evolution log, and skill-impact statement |
 | Candidate | `candidate/grounded-causal-link/` | One atomic `SKILL.md` plus its pattern-mapped `PURPOSE.md` |
 | Gate | `validation/expected-results.json` | Incumbent score, held-out miss, target score, and promotion rule |
@@ -21,6 +23,12 @@ The architecture authority is Tang et al., *WikiSkill: Compiling Agent Experienc
 Every path is in the generated `CommonResources` allowlist. The same bytes are therefore available to JVM, browser, Worker, and native targets without relying on a source-tree filesystem.
 
 NLPCore is the structured-language side of the boundary; the supervised `vm.corenlp.extract` lego supplies Stanford tokens and dependencies. BrainClient is the translation client, and ModelMux routes its model seat. Their output is a proposal or evidence projection—not evidence authority. CID, source-span, and dependency-direction checks remain deterministic.
+
+## First Oroboros deliverable
+
+The corpus doubles as the first sample deliverable trained from TrikeShed actuals toward an idealized grass-roots green-field. The actuals are preserved, not cleaned out of the story: twelve retained `.claude/worktrees` account for 15,232 directories and 92 percent of the recorded checkout walk; daemon logs and Kotlin compiler-session files previously triggered full-tree reconciliation. The operator separately reports a 48-hour accumulation of abandoned task trees. That duration remains labeled as operator-reported context until a receipt measures it.
+
+The mockup target inventories age, owner, head, lease, and last useful delta; removes stale trees from the active watch set without deleting them; coalesces bursts; and emits content-addressed reconciliation receipts. Its watermark demands zero self-generated reconciles, full source-edit visibility, one reconcile per coalesced burst, and zero destructive cleanup.
 
 ## The 1A discriminator
 

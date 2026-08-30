@@ -1,6 +1,6 @@
 package borg.trikeshed.userspace.containment
 
-import borg.trikeshed.jules.JulesRestClient
+import borg.trikeshed.agent.SessionInfo
 import kotlinx.datetime.Instant
 
 /**
@@ -22,14 +22,14 @@ class CrossInstanceCollusionDetector {
      * Internal representation of session data for analysis.
      */
     data class SessionContext(
-        val session: JulesRestClient.SessionInfo,
+        val session: SessionInfo,
         val filesTouched: Set<String>,
         val author: String,
         val timestampMs: Long,
         val messageSimilarityToken: String
     )
 
-    fun detect(arms: List<Triple<JulesRestClient.SessionInfo, String?, String>>): CollusionReport {
+    fun detect(arms: List<Triple<SessionInfo, String?, String>>): CollusionReport {
         if (arms.isEmpty()) return CollusionReport(1.0, emptySet(), emptyList())
 
         val contexts = arms.mapNotNull { (session, branch, patch) ->

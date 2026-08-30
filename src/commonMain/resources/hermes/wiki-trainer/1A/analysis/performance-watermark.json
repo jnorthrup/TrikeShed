@@ -1,0 +1,41 @@
+{
+  "schema": "trikeshed.hermes-wikiskill-watermark/v1",
+  "setId": "1A",
+  "scope": "test-and-analysis-only",
+  "semanticDecisionBenchmark": {
+    "metric": "exact decision agreement",
+    "incumbent": { "correct": 3, "total": 4, "ratio": 0.75 },
+    "target": { "correct": 4, "total": 4, "ratio": 1.0 },
+    "knownMiss": "validation-reversed-cause-fail"
+  },
+  "incidentContext": {
+    "operatorReport": "Oroboros reconciled a 48-hour accumulation of abandoned task trees.",
+    "evidenceClass": "operator-reported context; duration is not promoted to a machine measurement",
+    "repositoryActuals": [
+      {
+        "claim": "Twelve retained .claude worktrees contained 15,232 directories and represented 92 percent of the checkout walk.",
+        "source": "doc/open-state-2026-08-30.md",
+        "commit": "ad79f8d6f"
+      },
+      {
+        "claim": "The daemon log woke its own watcher and caused a persistent full-reconcile feedback loop.",
+        "source": "src/commonMain/kotlin/borg/trikeshed/util/oroboros/WorktreeCouchGateway.kt",
+        "commit": "c451a96a4"
+      },
+      {
+        "claim": "Kotlin compiler session churn fired a full reconcile per transition until .kotlin became an excluded segment.",
+        "source": "src/commonMain/kotlin/borg/trikeshed/util/oroboros/WorktreeCouchGateway.kt",
+        "commit": "2fad82b31"
+      }
+    ]
+  },
+  "oroborosTargets": {
+    "excludedAgentWorktreeWalks": 0,
+    "selfGeneratedEventReconciles": 0,
+    "staleTaskTreesDeleted": 0,
+    "staleTaskTreesInventoriedRatio": 1.0,
+    "sourceEditDetectionRatio": 1.0,
+    "maximumReconcilesPerCoalescedBurst": 1,
+    "measurementStatus": "requires deliverable runner"
+  }
+}

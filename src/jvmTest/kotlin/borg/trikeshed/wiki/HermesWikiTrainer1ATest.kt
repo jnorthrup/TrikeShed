@@ -103,6 +103,39 @@ class HermesWikiTrainer1ATest {
     }
 
     @Test
+    fun corpusIsAnAnalysisWatermarkAndFirstNonDestructiveOroborosDeliverable() {
+        val manifest = objectAt("manifest.json")
+        val roles = manifest["roles"] as List<*>
+        assertTrue("training-corpus" in roles)
+        assertTrue("benchmark" in roles)
+        assertTrue("performance-watermark" in roles)
+        assertTrue("test-analysis-fixture" in roles)
+        assertTrue("sample-oroboros-deliverable" in roles)
+        assertEquals(false, manifest["productionKnowledgeSeed"])
+        assertEquals(1, (manifest["artifactOrdinal"] as Number).toInt())
+
+        val watermark = objectAt("analysis/performance-watermark.json")
+        assertEquals("test-and-analysis-only", watermark["scope"])
+        val context = watermark["incidentContext"] as Map<*, *>
+        assertTrue((context["operatorReport"] as String).contains("48-hour"))
+        assertTrue((context["evidenceClass"] as String).contains("not promoted to a machine measurement"))
+        val targets = watermark["oroborosTargets"] as Map<*, *>
+        assertEquals(0, (targets["staleTaskTreesDeleted"] as Number).toInt())
+        assertEquals("requires deliverable runner", targets["measurementStatus"])
+
+        val deliverable = objectAt("deliverable/oroboros-actual-to-greenfield.json")
+        assertEquals("sample-deliverable-mockup", deliverable["kind"])
+        assertEquals(1, (deliverable["artifactOrdinal"] as Number).toInt())
+        val target = deliverable["target"] as Map<*, *>
+        assertEquals("grass-roots green-field Oroboros", target["name"])
+        val surface = deliverable["mockupSurface"] as Map<*, *>
+        assertNull(surface["automaticDestructiveAction"])
+        val nonGoals = deliverable["nonGoals"] as List<*>
+        assertTrue("delete abandoned task trees" in nonGoals)
+        assertTrue("seed the production wiki from synthetic trainer text" in nonGoals)
+    }
+
+    @Test
     fun incumbentScoresThreeOfFourAndExposesTheDirectionalHallucination() {
         val decisions = jsonLines("nars/causal-decisions.jsonl")
         val actualByCase = linkedMapOf<String, String>()

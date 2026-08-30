@@ -23,6 +23,8 @@ object HermesWikiTrainerCorpus {
         "$ROOT_1A/nlp/dependencies.jsonl",
         "$ROOT_1A/translation/round-trips.jsonl",
         "$ROOT_1A/nars/causal-decisions.jsonl",
+        "$ROOT_1A/analysis/performance-watermark.json",
+        "$ROOT_1A/deliverable/oroboros-actual-to-greenfield.json",
         "$ROOT_1A/wiki/index.md",
         "$ROOT_1A/wiki/patterns/grounded-causal-link.md",
         "$ROOT_1A/wiki/logs.md",
