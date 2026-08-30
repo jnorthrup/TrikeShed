@@ -707,6 +707,20 @@ object OroborosDaemon {
                 bag,
                 rete = causalityRete,
                 knowledgeBank = kifBank,
+                // Same tee shape as councilKifSink below: taught axioms land in the `kif-ledger/`
+                // couch plane the boot thaw re-asserts from. Without this the curator's whole
+                // knowledge — everything /api/beliefs/teach banks — died at every restart while
+                // council's and legal.ingest's survived, because only they wrote the ledger.
+                ledger = { kif ->
+                    val cid = borg.trikeshed.job.ContentId.of(kif.encodeToByteArray())
+                    runCatching {
+                        couchDb.put(
+                            "kif-ledger/${cid.hex}",
+                            mapOf("kif" to kif, "source" to "curator.teach", "atMs" to System.currentTimeMillis()),
+                            null,
+                        )
+                    }.onFailure { System.err.println("[OROBOROS] curator kif-ledger write failed (non-fatal): ${it.message}") }
+                },
                 parentJob = coroutineContext[kotlinx.coroutines.Job],
             )
             c.open()

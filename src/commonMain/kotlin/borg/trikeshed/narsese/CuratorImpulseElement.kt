@@ -42,6 +42,16 @@ class CuratorImpulseElement(
     private val mintBudget: BudgetCoord = BudgetCoord(0.6f, 0.5f, 0.5f),
     /** The accumulated banked knowledge — SUMO spine + assessed impulses (share ONE bank daemon-wide). */
     val knowledgeBank: KifKnowledgeBase = KifKnowledgeBase(),
+    /**
+     * Durability tee for taught verdicts, called with each newly banked axiom in canonical KIF
+     * text. [knowledgeBank] is in-memory and dies with the process; without this hook everything
+     * taught through [teach] is gone at the next boot, which is not "taught" in any useful sense.
+     * The daemon points it at the same `kif-ledger/` couch plane the boot thaw re-asserts from,
+     * so the curator's knowledge restores by the identical path council and legal.ingest use.
+     * The SUMO spine is deliberately NOT tee'd — `init` re-bootstraps it on every boot, so
+     * persisting it would only accumulate duplicates.
+     */
+    private val ledger: ((String) -> Unit)? = null,
     parentJob: Job? = null,
 ) : AsyncContextElement(ElementState.CREATED, parentJob) {
 
@@ -79,7 +89,20 @@ class CuratorImpulseElement(
 
         // bank the verdicts as predicate logic (accumulates across passes)
         val fresh = CuratorImpulseRecipient.bank(assessments)
-        for (expr in fresh.asserts()) knowledgeBank.assert(expr)
+        // `fresh` is a whole bank, so its asserts() carry the SUMO spine as well as this pass's
+        // verdicts. Teeing all of them would persist the ontology that `init` already
+        // re-bootstraps on every boot. The delta against what the live bank ALREADY holds is
+        // exactly the set that would otherwise be lost at restart — spine excluded for free,
+        // and a re-teach of an unchanged axiom writes no ledger line either.
+        val alreadyBanked = if (ledger == null) emptySet() else knowledgeBank.asserts().toSet()
+        for (expr in fresh.asserts()) {
+            knowledgeBank.assert(expr)
+            // Tee AFTER the in-memory assert, and never let it throw: a durability sink that is
+            // down degrades durability, it does not cost the live bank this axiom or the ones
+            // after it. Guarded here rather than only at the daemon's sink so the invariant
+            // holds for every caller that supplies a ledger.
+            if (expr !in alreadyBanked) ledger?.let { sink -> runCatching { sink(expr.toKifString()) } }
+        }
 
         // mint the projected signals into the bag (paired with assessments so
         // term registration stays aligned — NEUTRAL is skipped exactly once)
