@@ -6,6 +6,7 @@ import borg.trikeshed.lib.get
 import borg.trikeshed.lib.size
 import borg.trikeshed.lib.toSeries
 import borg.trikeshed.lib.toList
+import borg.trikeshed.lib.forEach
 
 /** Hermes-compatible production role carried by a lane, without fixing its order. */
 data class KanbanLane(
@@ -127,10 +128,10 @@ fun KanbanGraph.validate(predicates: KanbanPredicateRegistry = KanbanPredicateRe
     val errors = mutableListOf<KanbanGraphError>()
     val laneIds = lanes.toList().map { it.id }
     val seenOrders = mutableSetOf<Int>()
-    lanes.toList().forEach { if (!seenOrders.add(it.order)) errors += KanbanGraphError.IncompatibleIo("lane:${it.id}", "duplicate lane order ${it.order}") }
+    lanes.forEach { if (!seenOrders.add(it.order)) errors += KanbanGraphError.IncompatibleIo("lane:${it.id}", "duplicate lane order ${it.order}") }
     val seenIds = mutableSetOf<String>()
     val seenShapes = mutableSetOf<String>()
-    edges.toList().forEach { edge ->
+    edges.forEach { edge ->
         if (!seenIds.add(edge.id)) errors += KanbanGraphError.DuplicateEdge(edge.id)
         if (!laneIds.contains(edge.from)) errors += KanbanGraphError.MissingEndpoint(edge.id, edge.from)
         if (!laneIds.contains(edge.to)) errors += KanbanGraphError.MissingEndpoint(edge.id, edge.to)
@@ -157,7 +158,7 @@ fun KanbanGraph.validate(predicates: KanbanPredicateRegistry = KanbanPredicateRe
         if (first.mode == KanbanEdgeMode.FANOUT && grouped.size < 2) errors += KanbanGraphError.IncompatibleIo(first.id, "fanout requires at least two branches")
         if (first.mode == KanbanEdgeMode.JOIN && grouped.size < first.requiredBranches) errors += KanbanGraphError.IncompatibleIo(first.id, "join requires ${first.requiredBranches} branches")
     }
-    cards.toList().forEach { card -> if (lane(card.lane) == null) errors += KanbanGraphError.InvalidCard(card.id, "missing lane ${card.lane}") }
+    cards.forEach { card -> if (lane(card.lane) == null) errors += KanbanGraphError.InvalidCard(card.id, "missing lane ${card.lane}") }
     // W4.3: cycles become opt-in. A back-edge is forbidden only when it is NOT
     // declared as a LOOP edge. LOOP edges were already required to carry a
     // positive maxIterations above, so the iteration guard bounds any loop.
