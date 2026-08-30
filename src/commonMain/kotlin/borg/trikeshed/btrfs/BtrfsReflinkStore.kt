@@ -51,6 +51,13 @@ class BtrfsReflinkStore(
     private val processOps: ProcessOperations,
     private val refCounter: ReferenceCounter,
     private val fsProbe: FilesystemTypeProbe,
+    /**
+     * Base directory the MATERIALIZE primitive resolves topics against
+     * (`<topicRoot>/<dstTopic>/<newPath>`). Defaults to [rootDir]'s parent, so for a CAS root
+     * of `<forgeHome>/cas` topic `wiki` lands in the curation plane `<forgeHome>/wiki`
+     * (decision D14) — same filesystem, so `cp --reflink=always` is legal across the planes.
+     */
+    private val topicRoot: String = rootDir.trimEnd('/').substringBeforeLast('/', rootDir),
 ) : CasStore() {
 
     init {
@@ -103,6 +110,7 @@ class BtrfsReflinkStore(
             if (ContentId.of(existing) == cid) {
                 // Dedup: the blob is already published at its cid path. No second file.
                 refCounter.increment(cid)
+                emit("put DEDUP cid=${cid.value} path=$target bytes=${bytes.size}")
                 return cid
             }
             throw IllegalStateException("CAS collision: $cid already exists with different content")
@@ -123,8 +131,58 @@ class BtrfsReflinkStore(
         }
 
         refCounter.increment(cid)
+        // STORE-ATTRIBUTABLE OBSERVABLE (mission-002 VAL-BTRFS-008): emitted from INSIDE
+        // this class, on the write path, after publication. It names the store, the cid and
+        // the exact path THIS code wrote — it cannot be produced by FileCasStore, and it is
+        // not gated on any daemon-side selection switch. `FRESH` distinguishes a real write
+        // from the dedup return above, which emits `DEDUP` instead.
+        emit("put FRESH cid=${cid.value} path=$target bytes=${bytes.size}")
         return cid
     }
+
+    /**
+     * The store's own log sink. Every line is prefixed [OBSERVABLE_TAG] so a run's output can
+     * be grepped for writes this class performed. Deliberately unparameterised: nothing outside
+     * the store can install, silence or fake it.
+     */
+    private fun emit(line: String) {
+        println("$OBSERVABLE_TAG $line")
+    }
+
+    /**
+     * D13 / prong-1 step 5 MATERIALIZE primitive:
+     * reflink the blob at [srcCid] into [dstTopic] at [newPath], i.e. to
+     * `<topicRoot>/<dstTopic>/<newPath>`, sharing extents with the CAS blob rather than
+     * copying its bytes. Implemented via [reflinkCopy] (`cp --reflink=always`).
+     *
+     * Returns true only when `cp` exited 0. Extent SHARING remains a physical fact to be
+     * measured (`filefrag -v`, `btrfs filesystem du -s`) — never inferred from this boolean.
+     */
+    suspend fun reflinkReorganize(srcCid: ContentId, dstTopic: String, newPath: String): Boolean {
+        requireBtrfsRoot("reflink-reorganize")
+        val srcPath = cidPath(srcCid)
+        val dstDirPath = if (dstTopic.isEmpty()) topicRoot else fileOps.resolvePath(topicRoot, dstTopic)
+        val target = fileOps.resolvePath(dstDirPath, newPath)
+        val targetParent = target.substringBeforeLast('/', dstDirPath)
+        if (!fileOps.exists(targetParent)) fileOps.mkdirs(targetParent)
+
+        val ok = reflinkCopy(srcCid, target)
+        emit(
+            "reflink-reorganize ok=$ok cid=${srcCid.value} topic=$dstTopic src=$srcPath dst=$target" +
+                (if (ok) "" else " error=${lastReflinkError ?: "<none>"}")
+        )
+        lastMaterializedPath = if (ok) target else null
+        return ok
+    }
+
+    /** Absolute path written by the most recent successful [reflinkReorganize]. */
+    var lastMaterializedPath: String? = null
+        private set
+
+    /** The path [reflinkReorganize] would write for ([dstTopic], [newPath]) — for evidence. */
+    fun materializePathFor(dstTopic: String, newPath: String): String =
+        if (dstTopic.isEmpty()) fileOps.resolvePath(topicRoot, newPath)
+        else fileOps.resolvePath(fileOps.resolvePath(topicRoot, dstTopic), newPath)
 
     /**
      * The btrfs primitive: clone [srcCid]'s extents to [dstPath] with `cp --reflink=always`.
@@ -171,5 +229,8 @@ class BtrfsReflinkStore(
     companion object {
         const val BTRFS: String = "btrfs"
         private const val SHA256_DIR: String = "sha256"
+
+        /** Prefix of every line [emit] writes. Grep this to see what THIS store did. */
+        const val OBSERVABLE_TAG: String = "[BTRFS-CAS]"
     }
 }

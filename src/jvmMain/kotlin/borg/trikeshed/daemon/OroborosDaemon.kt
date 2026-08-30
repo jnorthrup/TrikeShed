@@ -399,7 +399,54 @@ object OroborosDaemon {
         // ── The store: CAS-collapsed Couch (rev hash = body blob CID) over the forge-home CAS ──
         // Built before the HTTP tier so the server can host the PWA and the build out of it.
         // fileOps was created above (the KeyMux harness lane shares it).
-        val casStore = FileCasStore(fileOps, fileOps.resolvePath(forgeHome.absolutePath, "cas"))
+        // Store selection is EXPLICIT (mission-002 decision D6): `TRIKESHED_CAS=btrfs` selects
+        // the reflink store, anything else (default `file`) keeps FileCasStore. There is NO
+        // autodetect and NO silent fallback — if btrfs is asked for and the CAS root does not
+        // resolve onto a btrfs filesystem, the store's own guard throws and the daemon REFUSES
+        // TO BOOT here, loudly. A quiet degrade to FileCasStore is exactly the failure that
+        // would let "the daemon is on btrfs" pass while nothing had changed.
+        val casRootPath = fileOps.resolvePath(forgeHome.absolutePath, "cas")
+        val casSelection = (System.getenv("TRIKESHED_CAS") ?: "file").trim().lowercase()
+        var btrfsCasStore: borg.trikeshed.btrfs.BtrfsReflinkStore? = null
+        val casStore: borg.trikeshed.job.CasStore = when (casSelection) {
+            "btrfs" -> {
+                val store = try {
+                    borg.trikeshed.btrfs.BtrfsReflinkStore(
+                        rootDir = casRootPath,
+                        fileOps = fileOps,
+                        processOps = borg.trikeshed.userspace.nio.channels.spi.JvmProcessOperations(),
+                        refCounter = borg.trikeshed.reflink.InMemoryReferenceCounter(),
+                        fsProbe = borg.trikeshed.btrfs.JvmFilesystemTypeProbe,
+                    )
+                } catch (t: Throwable) {
+                    System.err.println("[OROBOROS] CAS STORE REFUSED: TRIKESHED_CAS=btrfs but $casRootPath is not on btrfs — ${t.message}")
+                    System.err.println("[OROBOROS] BOOT ABORTED: no silent fallback to FileCasStore (mission-002 decision D6).")
+                    exitProcess(1)
+                }
+                btrfsCasStore = store
+                store
+            }
+            "file" -> FileCasStore(fileOps, casRootPath)
+            else -> {
+                System.err.println("[OROBOROS] BOOT ABORTED: TRIKESHED_CAS='$casSelection' is not a known store (expected 'btrfs' or 'file').")
+                exitProcess(1)
+            }
+        }
+        System.err.println(
+            "[OROBOROS] CAS STORE SELECTED: ${casStore::class.java.name} casRoot=$casRootPath " +
+                "TRIKESHED_CAS=$casSelection fstype=${borg.trikeshed.btrfs.JvmFilesystemTypeProbe.typeOf(casRootPath) ?: "<undeterminable>"} " +
+                "source=${borg.trikeshed.btrfs.JvmFilesystemTypeProbe.sourceOf(casRootPath) ?: "<undeterminable>"}"
+        )
+        // The D13 MATERIALIZE surface exists only when the btrfs store is live: reflinkReorganize
+        // is a BtrfsReflinkStore member, absent from the CasStore base class.
+        val casReflinkWire = btrfsCasStore?.let {
+            borg.trikeshed.forge.server.CasReflinkWire(it, casRootPath).also { _ ->
+                System.err.println(
+                    "[OROBOROS] CAS reflink routes armed: " +
+                        borg.trikeshed.forge.server.CasReflinkWire.ROUTES.joinToString(" ") { r -> "${r.first} ${r.second}" }
+                )
+            }
+        }
         val couchStore = borg.trikeshed.couch.CouchStoreFactory.casBacked(casStore)
         val attachmentGateway = CouchAttachmentGateway(couchStore, casStore)
         val gitCouchGateway = GitCouchGateway(fileOps, attachmentGateway)
@@ -701,11 +748,24 @@ object OroborosDaemon {
         // is distilled into CAS/Line-CAS design docs; then one structured coroutine follows
         // MAX(messages.id) checkpoints. Checkpoint state is local/frozen Series data — no daemon
         // registry. All file/sqlite/store blocking work is dispatched to IO inside the helpers.
+        // The wikiLane holder is the seam between this loop and the WIKI_CONSOLIDATE
+        // registration below (which runs after brainClient/moduleContext exist): the
+        // registration arms slot 0, the loop polls it — null just means "not wired yet".
+        val wikiLane = arrayOf<borg.trikeshed.lcnc.LcncNodeRunner?>(null)
         if (curatorImpulse != null) {
             val profileDir = System.getenv("HERMES_PROFILE")?.let { File(it) }
                 ?: File(hermesHomeDir.absolutePath)
             val archiveProfile = System.getenv("HERMES_ARCHIVE_PROFILE")?.let { File(it) }
                 ?: File(System.getProperty("user.home"), ".hermes.prev").takeIf { it.isDirectory }
+            // Wiki Maintainer lane cadence: one pass per N transcript-cid
+            // batches (the arXiv outer loop k); WIKI_CONSOLIDATE_EVERY=0
+            // disables the lane entirely.
+            val wikiEvery = System.getenv("WIKI_CONSOLIDATE_EVERY")?.toIntOrNull() ?: 1
+            var wikiBatchesSeen = 0
+            var wikiIterationsDone = 0
+            // Transcript cids that landed before the runner was armed; drained
+            // into the first Maintainer pass once it is.
+            var wikiPending = emptyList<String>()
             launch(Dispatchers.Default) {
                 runCatching {
                     val distilled = borg.trikeshed.narsese.HermesDesignDistiller.distillTo(profileDir, archiveProfile, memoryStore)
@@ -720,16 +780,57 @@ object OroborosDaemon {
                 // had a chance to land transcripts — session cids to the blackboard.
                 var baselinesLanded = false
                 while (isActive) {
+                    var followed: borg.trikeshed.narsese.CuratorImpulseFeeder.FollowResult? = null
                     runCatching {
-                        val followed = feeder.followOnce(curatorImpulse, memoryStore, checkpoint)
-                        checkpoint = followed.checkpoint
-                        if (followed.landed.isNotEmpty() || followed.transcriptCids.size > 0) {
+                        val f = feeder.followOnce(curatorImpulse, memoryStore, checkpoint)
+                        checkpoint = f.checkpoint
+                        followed = f
+                        if (f.landed.isNotEmpty() || f.transcriptCids.size > 0) {
                             System.err.println(
-                                "[OROBOROS] Curator followed ${followed.transcriptCids.size} changed transcripts: ${followed.landed.size} signals; bank ${curatorImpulse.knowledgeBank.asserts().size} axioms",
+                                "[OROBOROS] Curator followed ${f.transcriptCids.size} changed transcripts: ${f.landed.size} signals; bank ${curatorImpulse.knowledgeBank.asserts().size} axioms",
                             )
                         }
                     }.onFailure {
                         System.err.println("[OROBOROS] CuratorImpulse follow failed (non-fatal): ${it.message}")
+                    }
+                    // ── the arXiv outer loop (WikiSkill 2608.27454): every time
+                    //    the feeder lands NEW transcript cids, the Wiki
+                    //    Maintainer runs one consolidation pass over them —
+                    //    traces → PATCH edits to wiki/patterns/. Guarded by
+                    //    cadence + presence so an idle corpus spends nothing.
+                    //    Batches that land BEFORE the runner is armed are
+                    //    stashed and processed once it is (a boot's first
+                    //    follow races the module registration that wires
+                    //    WIKI_CONSOLIDATE); the drain check runs on every
+                    //    tick so an armed-then-idle corpus still drains.
+                    val freshCids = followed?.transcriptCids
+                    if (wikiEvery > 0 && freshCids != null && freshCids.size > 0) {
+                        wikiPending = (wikiPending + (0 until freshCids.size).map { i -> freshCids[i].b.value }).take(32)
+                    }
+                    val wikiRunner = wikiLane[0]
+                    if (wikiEvery > 0 && wikiRunner != null && wikiPending.isNotEmpty()) {
+                        wikiBatchesSeen++
+                        if (wikiBatchesSeen >= wikiEvery) {
+                            wikiBatchesSeen = 0
+                            val cids = wikiPending
+                            wikiPending = emptyList()
+                            wikiIterationsDone++
+                            runCatching {
+                                val wikiNode = borg.trikeshed.lcnc.LcncNode(
+                                    id = "wiki-consolidate-lane",
+                                    type = borg.trikeshed.lcnc.LcncContracts.WIKI_CONSOLIDATE,
+                                    params = mapOf("iteration" to wikiIterationsDone.toString()),
+                                )
+                                val report = wikiRunner.run(wikiNode, mapOf("cids" to cids))["report"] as? Map<*, *>
+                                System.err.println(
+                                    "[OROBOROS] Wiki Maintainer iteration $wikiIterationsDone: ok=${report?.get("ok")} " +
+                                        "applied=${(report?.get("applied") as? List<*>)?.size ?: "-"} " +
+                                        "refused=${(report?.get("refused") as? List<*>)?.size ?: "-"}",
+                                )
+                            }.onFailure {
+                                System.err.println("[OROBOROS] Wiki Maintainer failed (non-fatal): ${it.message}")
+                            }
+                        }
                     }
                     if (!baselinesLanded) {
                         runCatching {
@@ -1165,6 +1266,9 @@ object OroborosDaemon {
         //    home (<forgeHome>/wiki) — never the repo worktree. The raw/ layer
         //    is the CAS, with a cid-VERIFIED rebuild from the hermes profile
         //    for snapshots this process never wrote (WikiTraceSources).
+        //    The same consolidate runner instance is armed into the curation
+        //    loop's lane seam — manual /api/lcnc/run invocations and the
+        //    automatic feeder-driven lane hit ONE wiki, ONE spend seam.
         val wikiDialog = borg.trikeshed.wiki.WikiNodes.WikiDialog { call ->
             val (content, answeredBy) = kotlinx.coroutines.withContext(htxElement + muxReactor) {
                 brainClient.chatSeat(
@@ -1186,7 +1290,7 @@ object OroborosDaemon {
             borg.trikeshed.wiki.WikiNodes.consolidateRunner(
                 dialog = wikiDialog, wikiRoot = wikiRoot, traces = wikiTraces,
                 casPut = { bytes -> casStore.put(bytes).value },
-            )
+            ).also { wikiLane[0] = it }
         moduleContext.lcncRunners[borg.trikeshed.lcnc.LcncContracts.WIKI_PROPOSE] =
             borg.trikeshed.wiki.WikiNodes.proposeRunner(
                 dialog = wikiDialog, wikiRoot = wikiRoot, traces = wikiTraces,
@@ -1262,7 +1366,7 @@ object OroborosDaemon {
         )
         val kanbanServer = JvmKanbanServer(
             extraRoutes = listOfNotNull(graalWire::route, vmWire::route, hermesWire::route, beliefWire?.let { it::route }, patchWire::route, moduleWire::route, webhookWire::route, blackboardWire::route),
-            rawRoutes = listOf(graalWire::ingestRoute, couchWire::route, projectDbWire::route),
+            rawRoutes = listOfNotNull(graalWire::ingestRoute, couchWire::route, projectDbWire::route, casReflinkWire?.let { it::route }),
             streamingPaths = borg.trikeshed.forge.server.CouchWire.streamingPaths(COUCH_DB_NAME) +
                 borg.trikeshed.forge.server.GraalWire.STREAMING +
                 borg.trikeshed.forge.server.VmWire.STREAMING +

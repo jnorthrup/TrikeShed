@@ -399,7 +399,11 @@ class JvmKanbanServer(
         // EXCEPT the whole `/api/graal/…` namespace and `/api/v0/…` (IPFS block aliases), which
         // GraalWire's binary-safe raw routes own outright — widened once, generally, rather than
         // adding one more literal prefix here every time a new POST endpoint lands under /api/graal/.
-        if (!path.startsWith("/api/") || path.startsWith("/api/v0/") || path.startsWith("/api/graal/")) {
+        // `/api/cas/…` joins the binary-safe raw namespace for the same reason `/api/graal/…`
+        // did: its bodies are blobs (≥1 MiB), which the text-decoded extraRoute surface mangles.
+        if (!path.startsWith("/api/") || path.startsWith("/api/v0/") || path.startsWith("/api/graal/") ||
+            path.startsWith(borg.trikeshed.forge.server.CasReflinkWire.PREFIX)
+        ) {
             rawRoutes.firstNotNullOfOrNull { it(method, path, payload, null) }?.let { return it }
         }
         return when (path.substringBefore('?')) {

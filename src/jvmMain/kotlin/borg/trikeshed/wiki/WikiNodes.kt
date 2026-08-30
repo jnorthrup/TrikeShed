@@ -674,6 +674,9 @@ object WikiNodes {
         appendLine("""or {"action":"propose","skill":"<existing slug>","kind":"patch","diff":"<unified diff against that ONE skill>","purposeMd":"<PURPOSE.md naming the motivating pattern pages>"}""")
         appendLine("Read at least one pattern page AND at least one raw trace before proposing.")
         appendLine("Reply with EXACTLY ONE JSON object per turn.")
+        appendLine("Budget: keep SKILL.md under 80 lines and PURPOSE.md under 20 lines, and do")
+        appendLine("not restate the pattern pages — cite them. A proposal that runs past the")
+        appendLine("token budget is truncated and lost, so be terse and finish the object.")
     }
 
     // ── small helpers ──────────────────────────────────────────────────
