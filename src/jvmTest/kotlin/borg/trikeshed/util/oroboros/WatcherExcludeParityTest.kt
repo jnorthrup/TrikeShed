@@ -45,6 +45,10 @@ class WatcherExcludeParityTest {
         assertFalse(glob.accepts(".causal.wal"))
         assertFalse(glob.accepts("cas/sha256/ab/cdef"))
         assertFalse(glob.accepts(".oroboros/manifests/classpath.tsv"))
+        // The spill that followed the first fix: a build run beside the daemon creates and
+        // deletes this file around every compile, and each transition fired a full reconcile.
+        assertFalse(glob.accepts(".kotlin/sessions/kotlin-compiler-4398423614898389958.salive"))
+        assertFalse(glob.accepts(".kotlin/errors/errors-123.log"))
     }
 
     @Test

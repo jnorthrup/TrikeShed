@@ -145,6 +145,12 @@ class WorktreeCouchGateway(
             // The daemon's own rolling logs: absorbing them re-quakes the watcher on
             // every log line — a permanent self-reconcile loop churning store sequence.
             "logs",
+            // Kotlin's build-session directory. `.kotlin/sessions/kotlin-compiler-<n>.salive`
+            // is created and deleted around every compile, so a build the operator runs beside
+            // the daemon toggles one tracked path and fires a FULL reconcile per transition —
+            // measured live at 4168 ↔ 4169 paths on a loop, holding the daemon at 53.6% CPU.
+            // Same shape as `logs` and `build`: a tool's own churn directory, never content.
+            ".kotlin",
         )
 
         /** Agent worktree clones are other checkouts, not this project's history. */
