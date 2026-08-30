@@ -919,7 +919,29 @@ val generateForgeAssets = tasks.register("generateForgeAssets") {
 
     // Common resources baked for every target (CommonResources layer 1). Keys are bundle paths under
     // src/commonMain/resources; missing files are skipped so the allowlist can name future assets.
-    val bundleAllowlist = listOf("confix/job-nexus.schema.json", "openapi/htx-general.openapi.yaml", "openapi/jules.openapi.yaml", "openapi/forge-host.openapi.yaml")
+    val bundleAllowlist = listOf(
+        "confix/job-nexus.schema.json",
+        "openapi/htx-general.openapi.yaml",
+        "openapi/jules.openapi.yaml",
+        "openapi/forge-host.openapi.yaml",
+        // Immutable WikiSkill trainer 1A. Keep every asset in the common bundle so
+        // JVM, browser, Worker, and native evaluate the same bytes.
+        "hermes/wiki-trainer/1A/manifest.json",
+        "hermes/wiki-trainer/1A/raw/train-explicit-cause-pass.md",
+        "hermes/wiki-trainer/1A/raw/train-cooccurrence-fail.md",
+        "hermes/wiki-trainer/1A/raw/validation-if-then-pass.md",
+        "hermes/wiki-trainer/1A/raw/validation-reversed-cause-fail.md",
+        "hermes/wiki-trainer/1A/nlp/dependencies.jsonl",
+        "hermes/wiki-trainer/1A/translation/round-trips.jsonl",
+        "hermes/wiki-trainer/1A/nars/causal-decisions.jsonl",
+        "hermes/wiki-trainer/1A/wiki/index.md",
+        "hermes/wiki-trainer/1A/wiki/patterns/grounded-causal-link.md",
+        "hermes/wiki-trainer/1A/wiki/logs.md",
+        "hermes/wiki-trainer/1A/wiki/skill-impact.md",
+        "hermes/wiki-trainer/1A/candidate/grounded-causal-link/SKILL.md",
+        "hermes/wiki-trainer/1A/candidate/grounded-causal-link/PURPOSE.md",
+        "hermes/wiki-trainer/1A/validation/expected-results.json",
+    )
     val resourcesDir = file("src/commonMain/resources")
     inputs.file(htmlFile)
     inputs.file(cssFile)

@@ -1,0 +1,81 @@
+{
+  "schema": "trikeshed.hermes-wikiskill-trainer/v1",
+  "setId": "1A",
+  "resourceRoot": "hermes/wiki-trainer/1A",
+  "designAuthority": {
+    "title": "WikiSkill: Compiling Agent Experience into Persistent Knowledge for Skill Evolution",
+    "arxiv": "2608.27454v1",
+    "url": "https://arxiv.org/abs/2608.27454",
+    "role": "architecture authority; paper benchmark scores are not local 1A results"
+  },
+  "pipeline": [
+    "immutable-hermes-transcript",
+    "corenlp-indexed-dependencies",
+    "brainclient-modelmux-bidirectional-nlpcore-nars-translation",
+    "deterministic-causal-projection",
+    "nars-evidence-budget",
+    "persistent-wiki-pattern",
+    "one-atomic-skill-candidate",
+    "disjoint-validation-gate"
+  ],
+  "invariants": [
+    "raw transcript bytes are immutable and addressed by sha256",
+    "a causal edge must cite an exact transcript cid and source span",
+    "subject and object direction must match indexed CoreNLP dependencies",
+    "BrainClient through ModelMux translates NLPCore to and from NARS proposals",
+    "BrainClient and ModelMux translate but do not create evidence authority",
+    "co-occurrence is not causation",
+    "an LLM may propose but cannot admit a causal edge",
+    "the wiki persists when a candidate skill is rejected",
+    "a candidate skill is not active until validation improves the incumbent score"
+  ],
+  "sampling": {
+    "maximumTraces": 8,
+    "train": { "pass": 1, "fail": 1 },
+    "validation": { "pass": 1, "fail": 1 },
+    "disjointSplits": true,
+    "maximumCharactersPerTrace": 15000
+  },
+  "traces": [
+    {
+      "case": "train-explicit-cause-pass",
+      "path": "raw/train-explicit-cause-pass.md",
+      "cid": "sha256:7a72b0428e73ba3ce0e2b26fba3eb53f13aafc89edf39462203feb5878eea03b",
+      "split": "train",
+      "outcome": "pass"
+    },
+    {
+      "case": "train-cooccurrence-fail",
+      "path": "raw/train-cooccurrence-fail.md",
+      "cid": "sha256:3b33d24932fe2c531171abfb1713cda0bd28ccf849e19c275e3cb29f83a9cc8d",
+      "split": "train",
+      "outcome": "fail"
+    },
+    {
+      "case": "validation-if-then-pass",
+      "path": "raw/validation-if-then-pass.md",
+      "cid": "sha256:867c7137aa47e2aaeb42006015bd55df06e3671a04406eb8dde1ae75168923a9",
+      "split": "validation",
+      "outcome": "pass"
+    },
+    {
+      "case": "validation-reversed-cause-fail",
+      "path": "raw/validation-reversed-cause-fail.md",
+      "cid": "sha256:e8eff09b94145caa24f50c56410202b3ad38ed041ed385a7106d5e87e7818e5f",
+      "split": "validation",
+      "outcome": "fail"
+    }
+  ],
+  "artifacts": [
+    "nlp/dependencies.jsonl",
+    "translation/round-trips.jsonl",
+    "nars/causal-decisions.jsonl",
+    "wiki/index.md",
+    "wiki/patterns/grounded-causal-link.md",
+    "wiki/logs.md",
+    "wiki/skill-impact.md",
+    "candidate/grounded-causal-link/SKILL.md",
+    "candidate/grounded-causal-link/PURPOSE.md",
+    "validation/expected-results.json"
+  ]
+}

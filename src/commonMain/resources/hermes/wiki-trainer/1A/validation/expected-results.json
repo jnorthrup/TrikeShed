@@ -1,0 +1,20 @@
+{
+  "setId": "1A",
+  "metric": "exact decision agreement",
+  "cases": 4,
+  "incumbent": {
+    "implementation": "ConstructionPatternGate.validateLine",
+    "correct": 3,
+    "total": 4,
+    "knownMiss": "validation-reversed-cause-fail",
+    "reason": "the lexical gate checks phrase presence but not indexed dependency direction"
+  },
+  "candidateTarget": {
+    "implementation": "grounded-causal-link",
+    "correct": 4,
+    "total": 4,
+    "promotionRule": "candidate score must be greater than incumbent score",
+    "status": "not-yet-validated-or-promoted"
+  },
+  "wikiRollback": false
+}
