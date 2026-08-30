@@ -168,9 +168,13 @@ object CouncilProgram {
 
         nodes.add(LcncNode("in.doc", "scope.in", params = mapOf("name" to "document"), x = laneX(), y = 40.0))
         nodes.add(LcncNode("in.case", "scope.in", params = mapOf("name" to "caseId?", "default" to config.caseId), x = laneX(), y = 40.0))
+        // No value→text? wire from in.doc: scope.in's value is json-kinded and
+        // legal.ingest's text? is text-kinded (the preset kind gate refuses the
+        // crossing). Instead `brief="document"` reads the ROOT FRAME BINDING —
+        // the exact mechanism preset-legal-tribunal rides (mux.chat's dance):
+        // POST /api/lcnc/run inputs.document binds the frame, ingest reads it.
         nodes.add(LcncNode("ingest", "legal.ingest", params = mapOf("brief" to "document", "maxTokens" to "2048"), x = laneX(), y = 40.0))
         nodes.add(LcncNode("evidence", "legal.evidence", params = mapOf("scope" to "corpus", "maxFacts" to "64"), x = laneX(), y = 40.0))
-        wires.add(LcncWire("in.doc", "value", "ingest", "text?"))
         wires.add(LcncWire("ingest", "documentCid", "evidence", "documentCid?"))
         wires.add(LcncWire("ingest", "brief", "evidence", "brief?"))
 
@@ -284,8 +288,10 @@ object CouncilProgram {
         }
 
         // The judge's diet is evidence AND positions — exactly two parts.
+        // The evidence brief rides text.fold's text-kinded `brief?` port
+        // (folded first); the positions ride `parts` — kind-clean on both.
         nodes.add(fold("fold.ruling", "Record before the council", laneX(), 40.0))
-        wires.add(LcncWire("evidence", "brief", "fold.ruling", "parts"))
+        wires.add(LcncWire("evidence", "brief", "fold.ruling", "brief?"))
         wires.add(LcncWire("fold.positions", "text", "fold.ruling", "parts"))
 
         nodes.add(seat(

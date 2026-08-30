@@ -922,6 +922,9 @@ object OroborosDaemon {
                 val cid = borg.trikeshed.job.ContentId.of(kif.encodeToByteArray())
                 daemonBlackboard.put("legal-kif/${cid.hex}", kif, "legal.ingest")
                 runCatching { kifBank.assertKif(kif) }
+                // Durable tee: the in-memory bank dies with the process; the
+                // couch ledger is what the council boot thaw re-asserts from.
+                runCatching { couchDb.put("kif-ledger/${cid.hex}", mapOf("kif" to kif, "source" to "legal.ingest", "atMs" to System.currentTimeMillis()), null) }
             },
         )
         // Evidence-bank injection (§3/§5 gap): queries the shared kifBank for
@@ -1061,6 +1064,110 @@ object OroborosDaemon {
                 System.err.println("[OROBOROS] tribunal instance live: ${tribunal.laneIds.size} lanes seeded at root (schema job-nexus)")
             }.onFailure {
                 System.err.println("[OROBOROS] tribunal instance failed to open (non-fatal): ${it.message}")
+            }
+        }
+        // ── Legal council (design/legal-council-3x5.md): the 3x5 preset's node
+        //    family. Its OWN seam — CouncilDialog → BrainClient.chatSeat — so
+        //    every seat carries its authored maxTokens/temperature/preferred
+        //    model and a council/<caseId>/<panel>/<seat> spend contextId (the
+        //    legacy tribunal closure above, with its hardcoded maxTokens=600 /
+        //    contextId="tribunal-seat", is intentionally untouched: the council
+        //    supersedes it; preset-tribunal keeps byte-identical semantics).
+        val councilDialog = borg.trikeshed.lcnc.CouncilDialog { call ->
+            runCatching {
+                kotlinx.coroutines.withContext(htxElement + muxReactor) {
+                    brainClient.chatSeat(
+                        messages = listOf("system" to call.system, "user" to call.prompt),
+                        maxTokens = call.maxTokens,
+                        temperature = call.temperature,
+                        contextId = call.contextId.takeIf { it.isNotBlank() },
+                        preferredModel = call.preferredModel,
+                    )
+                }
+            }.fold(
+                onSuccess = { (content, answeredBy) -> borg.trikeshed.lcnc.SeatOutcome.Ok(content, answeredBy) },
+                onFailure = { t ->
+                    if (t is kotlinx.coroutines.CancellationException) throw t
+                    borg.trikeshed.lcnc.SeatOutcome.Refused(
+                        t.message ?: t.toString(),
+                        (t as? borg.trikeshed.jules.BrainNoRoute)?.attempts ?: emptyList(),
+                    )
+                },
+            )
+        }
+        // Per-case job nexus: every convened case gets its own lifecycle (the
+        // boot TribunalInstance singleton above stays legacy-preset-only).
+        val councilCases = borg.trikeshed.lcnc.CouncilCaseRegistry(
+            moduleScope, borg.trikeshed.lcnc.TribunalInstance.schemaPlan(),
+        )
+        // The council's KIF sink: blackboard provenance + live bank + durable
+        // couch ledger (same tee shape as legal.ingest's sink above).
+        val councilKifSink: (String) -> Unit = { kif ->
+            val cid = borg.trikeshed.job.ContentId.of(kif.encodeToByteArray())
+            daemonBlackboard.put("legal-kif/${cid.hex}", kif, "council.record")
+            runCatching { kifBank.assertKif(kif) }
+            runCatching { couchDb.put("kif-ledger/${cid.hex}", mapOf("kif" to kif, "source" to "council", "atMs" to System.currentTimeMillis()), null) }
+        }
+        moduleContext.lcncRunners.putAll(
+            borg.trikeshed.lcnc.CouncilNodes.registry(
+                dialog = councilDialog,
+                seams = borg.trikeshed.lcnc.RecordSeams(
+                    casPut = { bytes -> casStore.put(bytes).value },
+                    blackboardPut = { key, fact, source -> daemonBlackboard.put(key, fact, source) },
+                    kifSink = councilKifSink,
+                    couchPut = { docId, body ->
+                        runCatching {
+                            val rev = couchDb.docJson(docId)?.get("_rev") as? String
+                            couchDb.put(docId, body, rev)
+                        }
+                    },
+                    recordRuling = councilCases::recordRuling,
+                    recordMistrial = councilCases::recordMistrial,
+                    blackboardGet = { key ->
+                        (daemonBlackboard.get(key) as? Map<*, *>)
+                            ?.entries?.associate { (k, v) -> k.toString() to (v?.toString() ?: "") }
+                    },
+                    couchGet = { docId -> couchDb.docJson(docId) },
+                    casGet = { cid -> runCatching { casStore.get(borg.trikeshed.job.ContentId(cid)) }.getOrNull() },
+                ),
+            ),
+        )
+        // Boot thaw (non-fatal, like the tribunal open): the kifBank and the
+        // blackboard are in-memory — couch + FileCasStore are the durable
+        // planes. Re-assert the kif-ledger/ facts and re-land the
+        // council-case/ index facts so the bank and the GET read-back
+        // survive a restart.
+        launch(Dispatchers.Default) {
+            runCatching {
+                var kifCount = 0
+                var caseCount = 0
+                val kifRows = couchDb.allDocs(startkey = "kif-ledger/", endkey = "kif-ledger/\uFFF0", includeDocs = true)["rows"] as? List<*> ?: emptyList<Any?>()
+                for (row in kifRows) {
+                    val rowMap = row as? Map<*, *> ?: continue
+                    if (rowMap["id"]?.toString()?.startsWith("kif-ledger/") != true) continue
+                    val kif = (rowMap["doc"] as? Map<*, *>)?.get("kif") as? String ?: continue
+                    runCatching { kifBank.assertKif(kif) }.onSuccess { kifCount++ }
+                }
+                val caseRows = couchDb.allDocs(startkey = "council-case/", endkey = "council-case/\uFFF0", includeDocs = true)["rows"] as? List<*> ?: emptyList<Any?>()
+                for (row in caseRows) {
+                    val rowMap = row as? Map<*, *> ?: continue
+                    val docId = rowMap["id"]?.toString() ?: continue
+                    if (!docId.startsWith("council-case/")) continue
+                    val doc = rowMap["doc"] as? Map<*, *> ?: continue
+                    // The couch case doc carries no caseCid (a doc cannot embed
+                    // its own hash); the read-back resolves transcript/verdict
+                    // from these cids directly.
+                    daemonBlackboard.put(docId, mapOf(
+                        "verdictCid" to (doc["verdictCid"]?.toString() ?: ""),
+                        "transcriptCid" to (doc["transcriptCid"]?.toString() ?: ""),
+                        "documentCid" to (doc["documentCid"]?.toString() ?: ""),
+                        "status" to (doc["status"]?.toString() ?: ""),
+                    ), "council-thaw")
+                    caseCount++
+                }
+                System.err.println("[OROBOROS] council thaw: $kifCount kif facts, $caseCount cases re-indexed")
+            }.onFailure {
+                System.err.println("[OROBOROS] council thaw failed (non-fatal): ${it.message}")
             }
         }
         val moduleSupervisor = borg.trikeshed.module.ModuleSupervisor(

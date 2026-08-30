@@ -780,6 +780,83 @@ object LcncContracts {
                 "trust" to LcncPortContract.LcncParamSpec(v = "OWN", opts = listOf("OWN", "UNTRUSTED")),
                 "keep" to LcncPortContract.LcncParamSpec(v = "false", opts = listOf("false", "true")),
             )),
+
+        // ── Legal council (design/legal-council-3x5.md) — the node family
+        // behind CouncilProgram.build / preset-council. MANY cardinality on
+        // the fold/record parts is LOAD-BEARING: LcncRunner.isManyInput
+        // consults these declarations to collect multi-wire ports as lists.
+        // Kinds: the council's assembly lane is json end to end (scope.in
+        // values and scope.out yields are json-kinded, and every fold/prompt
+        // /content port sits between them); the ONE text-kinded legacy feed
+        // — legal.evidence's brief into the ruling fold — rides text.fold's
+        // dedicated `brief?` port so every declared kind pair on every
+        // preset wire agrees (the kind-parity gate checks each one).
+        LcncPortContract("council.seat", "council seat (one model call, degrade-loudly)",
+            listOf("prompt"), listOf("content", "labeled", "model", "record"),
+            inputKinds = mapOf("prompt" to "json"),
+            outputKinds = mapOf("content" to "json", "labeled" to "json", "model" to "id", "record" to "json"),
+            params = mapOf(
+                "system" to LcncPortContract.LcncParamSpec(ta = true, ph = "seat system charge"),
+                "persona" to LcncPortContract.LcncParamSpec(ph = "seat persona (experts)"),
+                "panel" to LcncPortContract.LcncParamSpec(ph = "panel token (p1…)"),
+                "seat" to LcncPortContract.LcncParamSpec(ph = "seat name (e1, synth, ruling…)"),
+                "role" to LcncPortContract.LcncParamSpec(ph = "expert|rebuttal|synthesis|ruling|clarify"),
+                "round" to LcncPortContract.LcncParamSpec(v = "1"),
+                "charge" to LcncPortContract.LcncParamSpec(ph = "panel charge"),
+                "model" to LcncPortContract.LcncParamSpec(ph = "preferred model id (roster failover behind it)"),
+                "maxTokens" to LcncPortContract.LcncParamSpec(v = "512"),
+                "temperature" to LcncPortContract.LcncParamSpec(v = "0.2"),
+                "contextId" to LcncPortContract.LcncParamSpec(ph = "council/<caseId>/<panel>/<seat> spend receipt"),
+                "caseId" to LcncPortContract.LcncParamSpec(ph = "convened case id"),
+            )),
+        LcncPortContract("text.fold", "text fold (dumb MANY-part concatenator)",
+            listOf("parts", "brief?"), listOf("text"),
+            mapOf("parts" to LcncCardinality.MANY),
+            inputKinds = mapOf("parts" to "json", "brief" to "text"),
+            outputKinds = mapOf("text" to "json"),
+            params = mapOf(
+                "label" to LcncPortContract.LcncParamSpec(ph = "fold header (== label ==)"),
+                "separator" to LcncPortContract.LcncParamSpec(v = "\n\n---\n\n"),
+                "numbered" to LcncPortContract.LcncParamSpec(v = "true", opts = listOf("true", "false")),
+            )),
+        LcncPortContract("record.fold", "record fold (turn provenance gatherer)",
+            listOf("parts"), listOf("turns"),
+            mapOf("parts" to LcncCardinality.MANY),
+            inputKinds = mapOf("parts" to "json"),
+            outputKinds = mapOf("turns" to "json")),
+        LcncPortContract("ruling.parse", "ruling parse (trailing JSON, strict-false booleans)",
+            listOf("text"), listOf("verdict", "needsClarification", "clarificationQuestion", "mistrial", "text"),
+            inputKinds = mapOf("text" to "json"),
+            outputKinds = mapOf(
+                "verdict" to "json", "needsClarification" to "json",
+                "clarificationQuestion" to "text", "mistrial" to "json", "text" to "json",
+            )),
+        LcncPortContract("coalesce", "coalesce (a? over b — clarified wins, absent yields lose)",
+            listOf("a?", "b"), listOf("value"),
+            inputKinds = mapOf("a" to "json", "b" to "json"),
+            outputKinds = mapOf("value" to "json")),
+        LcncPortContract("council.convene", "council convene (config → drawn program)",
+            listOf("config?"), listOf("program", "summary"),
+            inputKinds = mapOf("config" to "json"),
+            outputKinds = mapOf("program" to "json", "summary" to "json"),
+            params = mapOf(
+                "config" to LcncPortContract.LcncParamSpec(
+                    ta = true, ph = "{\"panels\":[{name,charge,experts}],\"rounds\":2,…} — empty = DEFAULT_3x5"),
+            )),
+        LcncPortContract("council.record", "council record (CAS + blackboard + couch + KIF + case lifecycle)",
+            listOf("verdict", "transcript", "turns?", "caseId?", "documentCid?"), listOf("report"),
+            mapOf("transcript" to LcncCardinality.MANY, "turns" to LcncCardinality.MANY),
+            inputKinds = mapOf(
+                "verdict" to "json", "transcript" to "json", "turns" to "json",
+                "caseId" to "json", "documentCid" to "id",
+            ),
+            outputKinds = mapOf("report" to "json"),
+            params = mapOf("caseId" to LcncPortContract.LcncParamSpec(v = "default"))),
+        LcncPortContract("council.case", "council case read-back (index + transcript/verdict from CAS)",
+            listOf("caseId?"), listOf("case"),
+            inputKinds = mapOf("caseId" to "id"),
+            outputKinds = mapOf("case" to "json"),
+            params = mapOf("caseId" to LcncPortContract.LcncParamSpec(ph = "convened case id"))),
     )
 
     fun compatible(sourceType: String, sourcePort: String): List<LcncPortContract> =

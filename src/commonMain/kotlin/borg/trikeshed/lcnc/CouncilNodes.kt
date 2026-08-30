@@ -162,14 +162,17 @@ object CouncilNodes {
 
         // Dumb concatenator over MANY `parts` wires. Tolerates the runner's
         // single-wire scalar unwrap (LcncRunner gather: one wire arrives as
-        // the value itself, not a list). A part that already carries a
-        // bracket header (a seat's `labeled`) keeps it; otherwise `numbered`
+        // the value itself, not a list). `brief?` is the text-kinded lead
+        // part (legal.evidence's brief into the ruling fold — the judge-diet
+        // graft's wire), folded FIRST. A part that already carries a bracket
+        // header (a seat's `labeled`) keeps it; otherwise `numbered`
         // prefixes its ordinal.
         "text.fold" to LcncNodeRunner { node, inputs ->
             val label = node.params["label"].orEmpty()
             val separator = node.params["separator"] ?: "\n\n---\n\n"
             val numbered = node.params["numbered"] != "false"
             val parts = ArrayList<String>()
+            flattenText(inputs["brief"] ?: inputs["brief?"], parts)
             flattenText(inputs["parts"] ?: inputs["parts?"], parts)
             val body = parts.filter { it.isNotBlank() }.mapIndexed { i, p ->
                 if (!numbered || p.startsWith("[")) p else "(${i + 1}) $p"

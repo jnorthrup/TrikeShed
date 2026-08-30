@@ -405,6 +405,31 @@ class KanbanModule : ForgeModule {
             )
         }
 
+        // Council case read-back: a thin veneer over the council.case runner
+        // (blackboard/couch index → CAS transcript+verdict bytes), so this
+        // module stays dependency-free. ModuleRouteRegistry claims are EXACT
+        // paths — no /{caseId} segment is claimable — so the case id rides
+        // the query string: GET /api/lcnc/council?caseId=<id>.
+        ctx.routes.claim(id, "/api/lcnc/council") { method, path, _, _ ->
+            if (method != "GET") return@claim JvmKanbanServer.HttpResponse(405, """{"error":"method_not_allowed"}""")
+            val caseId = path.substringAfter('?', "")
+                .split('&')
+                .firstOrNull { it.startsWith("caseId=") }
+                ?.substringAfter('=')
+                ?.let { java.net.URLDecoder.decode(it, "UTF-8") }
+                ?.takeIf { it.isNotBlank() }
+                ?: return@claim JvmKanbanServer.HttpResponse(400, """{"error":"caseId_required"}""")
+            val runner = ctx.lcncRunners["council.case"]
+                ?: return@claim JvmKanbanServer.HttpResponse(
+                    404, JsonSupport.stringify(mapOf("error" to "no_runner", "type" to "council.case")),
+                )
+            val out = runner.run(
+                LcncNode(id = "council-case-get", type = "council.case", params = mapOf("caseId" to caseId)),
+                emptyMap(),
+            )
+            JvmKanbanServer.HttpResponse(200, JsonSupport.stringify(out))
+        }
+
         ctx.routes.claim(id, "/api/lcnc/kanban/move") { method, _, text, _ ->
             if (method != "POST") return@claim JvmKanbanServer.HttpResponse(405, """{"error":"method_not_allowed"}""")
             val req = runCatching { JsonSupport.parse(rawBody(text)) as? Map<*, *> }.getOrNull()
@@ -443,6 +468,7 @@ class KanbanModule : ForgeModule {
                 "routes" to listOf(
                     "/api/board", "/api/invoke", "/api/board/import",
                     "/api/lcnc/kanban", "/api/lcnc/kanban/move", "/api/lcnc/run",
+                    "/api/lcnc/council",
                 ),
             )
 

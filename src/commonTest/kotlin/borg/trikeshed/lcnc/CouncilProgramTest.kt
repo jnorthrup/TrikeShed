@@ -169,14 +169,22 @@ class CouncilProgramTest {
 
     @Test
     fun rulingFoldEatsExactlyEvidenceAndPositions() {
+        // The evidence brief rides text.fold's text-kinded `brief?` port
+        // (folded first); the positions ride `parts` — two wires, one diet.
         val program = CouncilProgram.build(CouncilConfig.DEFAULT_3x5)
-        val parts = ArrayList<Pair<String, String>>()
+        val parts = ArrayList<Triple<String, String, String>>()
         for (i in 0 until program.wires.size) {
             val w = program.wires[i]
-            if (w.toNode == "fold.ruling" && w.toPort == "parts") parts.add(w.fromNode to w.fromPort)
+            if (w.toNode == "fold.ruling") parts.add(Triple(w.fromNode, w.fromPort, w.toPort))
         }
         assertEquals(2, parts.size, "fold.ruling has exactly two part-wires")
-        assertEquals(setOf("evidence" to "brief", "fold.positions" to "text"), parts.toSet(),
-            "the ruling's diet is the evidence brief plus the panel positions")
+        assertEquals(
+            setOf(
+                Triple("evidence", "brief", "brief?"),
+                Triple("fold.positions", "text", "parts"),
+            ),
+            parts.toSet(),
+            "the ruling's diet is the evidence brief plus the panel positions",
+        )
     }
 }

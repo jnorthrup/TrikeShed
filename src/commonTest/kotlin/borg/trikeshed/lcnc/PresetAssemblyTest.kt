@@ -29,6 +29,7 @@ class PresetAssemblyTest {
                 "preset-context", "preset-kanban", "preset-scope", "preset-scope-inner",
                 "preset-pairs", "preset-brain-mux", "preset-media",
                 "preset-hermes-train", "preset-legal-tribunal", "preset-state-freeze",
+                "preset-council",
             ),
             all.keys,
         )
