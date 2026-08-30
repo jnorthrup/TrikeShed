@@ -149,5 +149,32 @@ class WorktreeCouchGateway(
 
         /** Agent worktree clones are other checkouts, not this project's history. */
         val EXCLUDED_RELATIVE_PREFIXES = setOf(".claude/worktrees")
+
+        /**
+         * Exclude globs for a file watcher driving this gateway, derived from the SAME sets the
+         * walk ignores so the two cannot drift.
+         *
+         * They had drifted, and it cost the operator's daemon: the watcher excluded only
+         * `.git`, `.gradle`, `.idea`, `build` and `node_modules`, so every write to
+         * `logs/oroboros-daemon.log` woke it, and the reconcile it triggered printed to that
+         * same log. The daemon fed its own watcher — `worktree-quake: N events in 5s (last:
+         * MODIFY logs/oroboros-daemon.log)` forever, at 95% CPU, until it stopped answering
+         * HTTP altogether. The seismic-damping `println` was part of the cycle, so the thing
+         * meant to quiet the log was keeping the loop alive.
+         *
+         * Watching a path whose events can never change what gets absorbed is waste at best;
+         * when the daemon itself writes that path it is a feedback loop. Both cases are ruled
+         * out by construction here. `EXCLUDED_SEGMENTS` matches at ANY depth in [collectFiles],
+         * so each entry becomes four globs — the bare name and the subtree, at the root and
+         * nested — because the matcher full-matches each pattern against the relative path.
+         */
+        fun watcherExcludeGlobs(): List<String> = buildList {
+            for (segment in EXCLUDED_SEGMENTS) {
+                add(segment); add("$segment/**"); add("**/$segment"); add("**/$segment/**")
+            }
+            for (prefix in EXCLUDED_RELATIVE_PREFIXES) {
+                add(prefix); add("$prefix/**")
+            }
+        }
     }
 }

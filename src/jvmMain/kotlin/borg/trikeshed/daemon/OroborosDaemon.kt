@@ -1601,9 +1601,10 @@ object OroborosDaemon {
             root = repoDir.absolutePath,
             parentJob = coroutineContext[kotlinx.coroutines.Job],
             includeGlobs = emptyList(),
-            excludeGlobs = listOf(
-                ".git/**", ".gradle/**", ".idea/**", "build/**", "node_modules/**",
-            ),
+            // Derived from the gateway's own ignore sets, never hand-listed here again: the
+            // hand-listed version omitted `logs/`, so the daemon's log writes woke the watcher
+            // whose reconcile wrote that log — a permanent self-feeding quake at 95% CPU.
+            excludeGlobs = WorktreeCouchGateway.watcherExcludeGlobs(),
         )
         launch(Dispatchers.IO) { worktreeWatcher.open() }
         System.err.println("[OROBOROS] Worktree watcher: ${worktreeWatcher.state} — reactive source/document events")
