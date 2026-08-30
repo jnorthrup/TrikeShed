@@ -1303,6 +1303,15 @@ object OroborosDaemon {
                 dialog = wikiDialog, wikiRoot = wikiRoot, traces = wikiTraces,
                 casPut = { bytes -> casStore.put(bytes).value },
             )
+        // Both wiki legos above call a model to do their work, so until now READING a curated
+        // artifact needed an API key. VAL-CROSS-002 found the curation plane hosted, durable and
+        // unreachable as itself. These two routes are the read side, and they touch nothing.
+        val wikiReadWire = borg.trikeshed.forge.server.WikiReadWire(wikiRoot)
+        System.err.println(
+            "[OROBOROS] Wiki read routes armed: " +
+                borg.trikeshed.forge.server.WikiReadWire.ROUTES.joinToString(" ") { r -> "${r.first} ${r.second}" } +
+                " root=${wikiRoot().absolutePath}"
+        )
         // Boot thaw (non-fatal, like the tribunal open): the kifBank and the
         // blackboard are in-memory — couch + FileCasStore are the durable
         // planes. Re-assert the kif-ledger/ facts and re-land the
@@ -1373,7 +1382,7 @@ object OroborosDaemon {
         )
         val kanbanServer = JvmKanbanServer(
             extraRoutes = listOfNotNull(graalWire::route, vmWire::route, hermesWire::route, beliefWire?.let { it::route }, patchWire::route, moduleWire::route, webhookWire::route, blackboardWire::route),
-            rawRoutes = listOfNotNull(graalWire::ingestRoute, couchWire::route, projectDbWire::route, casReflinkWire?.let { it::route }),
+            rawRoutes = listOfNotNull(graalWire::ingestRoute, couchWire::route, projectDbWire::route, casReflinkWire?.let { it::route }, wikiReadWire::route),
             streamingPaths = borg.trikeshed.forge.server.CouchWire.streamingPaths(COUCH_DB_NAME) +
                 borg.trikeshed.forge.server.GraalWire.STREAMING +
                 borg.trikeshed.forge.server.VmWire.STREAMING +
@@ -1643,7 +1652,10 @@ object OroborosDaemon {
                 )
                 projectScopes.registerPrimary(repoDir, worktreeSnap.paths.size)
                 System.err.println(
-                    "[OROBOROS] Worktree→Couch initial reconcile: ${worktreeSnap.paths.size} paths"
+                    "[OROBOROS] Worktree→Couch initial reconcile: ${worktreeSnap.paths.size} paths" +
+                        if (worktreeSnap.skippedDirs.isEmpty()) ""
+                        else " — INCOMPLETE: ${worktreeSnap.skippedDirs.size} unreadable dir(s), " +
+                            "nothing under them tombstoned: ${worktreeSnap.skippedDirs.take(5)}"
                 )
                 headSha to worktreeSnap
             }.onFailure {

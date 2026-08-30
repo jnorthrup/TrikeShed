@@ -125,6 +125,12 @@ class JvmKanbanServer(
         val contentType: String = "application/json; charset=utf-8",
         /** Binary payload; when set it is written instead of [body]. */
         val bytes: ByteArray? = null,
+        /**
+         * Extra response headers. Used by routes that must return a verifiable property of the
+         * payload alongside it — `X-Content-Id` on a curation read, so the caller can check the
+         * served bytes against a freeze record without a second request.
+         */
+        val headers: Map<String, String> = emptyMap(),
     ) {
         val payloadBytes: ByteArray get() = bytes ?: body.toByteArray(StandardCharsets.UTF_8)
     }
@@ -323,6 +329,11 @@ class JvmKanbanServer(
                         // this daemon has eaten traces to that. no-cache still allows
                         // conditional revalidation; it forbids silent staleness.
                         append("Cache-Control: no-cache\r\n")
+                        // CR/LF stripped: a header value carrying them would let a route's
+                        // payload-derived string inject frame structure of its own.
+                        for ((k, v) in resp.headers) {
+                            append("$k: ${v.replace("\r", "").replace("\n", "")}\r\n")
+                        }
                         append("Access-Control-Allow-Origin: *\r\n\r\n")
                     }.toByteArray(StandardCharsets.UTF_8)
                     val outBytes = head + payloadOut
@@ -401,8 +412,13 @@ class JvmKanbanServer(
         // adding one more literal prefix here every time a new POST endpoint lands under /api/graal/.
         // `/api/cas/…` joins the binary-safe raw namespace for the same reason `/api/graal/…`
         // did: its bodies are blobs (≥1 MiB), which the text-decoded extraRoute surface mangles.
+        // `/api/wiki/…` joins for a third reason: its GET returns a curated artifact's bytes
+        // VERBATIM with the cid in a header, and the text-decoded surface can neither preserve
+        // arbitrary bytes nor set a header. A raw route not listed here is silently unreachable —
+        // the built-in table below answers 404 first — so every new prefix needs a socket test.
         if (!path.startsWith("/api/") || path.startsWith("/api/v0/") || path.startsWith("/api/graal/") ||
-            path.startsWith(borg.trikeshed.forge.server.CasReflinkWire.PREFIX)
+            path.startsWith(borg.trikeshed.forge.server.CasReflinkWire.PREFIX) ||
+            path.startsWith(borg.trikeshed.forge.server.WikiReadWire.PREFIX)
         ) {
             rawRoutes.firstNotNullOfOrNull { it(method, path, payload, null) }?.let { return it }
         }

@@ -25,6 +25,12 @@ class WorktreeCouchGateway(
         val revision: String,
         val paths: List<String>,
         val deletedPaths: List<String> = emptyList(),
+        /**
+         * Directories the walk could not enumerate. A non-empty list means this snapshot is
+         * INCOMPLETE — callers log it rather than reading `paths` as the whole tree, because a
+         * partial plane that reports success is the failure mode this field exists to expose.
+         */
+        val skippedDirs: List<String> = emptyList(),
     )
 
     fun reconcile(
@@ -35,7 +41,8 @@ class WorktreeCouchGateway(
     ): Snapshot {
         if (!fileOps.isDir(repoRoot)) return Snapshot(revision, emptyList())
 
-        val current = collectFiles(repoRoot)
+        val skippedDirs = mutableListOf<String>()
+        val current = collectFiles(repoRoot, skippedDirs)
         val existing = attachments.listAttachments(prefix).associateBy { it.path }
 
         for ((relativePath, physicalPath) in current) {
@@ -68,30 +75,48 @@ class WorktreeCouchGateway(
 
         val currentLogicalPaths = current.keys.mapTo(mutableSetOf()) { prefix + it }
         val deletedPaths = mutableListOf<String>()
+        // A path missing from `current` because its directory could not be ENUMERATED is not a
+        // deleted file — tombstoning it would convert a transient read failure into real data
+        // loss, and the next pass would re-absorb it, churning the store forever. Absence is
+        // only evidence of deletion under a subtree the walk actually reached.
+        val unreadable = skippedDirs.map { if (it.isEmpty()) prefix else "$prefix$it/" }
         for ((path, ref) in existing) {
-            if (path !in currentLogicalPaths) {
-                attachments.deleteAttachment(path, ref.revision)
-                deletedPaths.add(path)
-            }
+            if (path in currentLogicalPaths) continue
+            if (unreadable.any { path.startsWith(it) }) continue
+            attachments.deleteAttachment(path, ref.revision)
+            deletedPaths.add(path)
         }
 
-        return Snapshot(revision, currentLogicalPaths.sorted(), deletedPaths.sorted())
+        return Snapshot(revision, currentLogicalPaths.sorted(), deletedPaths.sorted(), skippedDirs.sorted())
     }
 
-    private fun collectFiles(repoRoot: String): Map<String, String> {
+    private fun collectFiles(repoRoot: String, skippedDirs: MutableList<String>): Map<String, String> {
         val files = mutableMapOf<String, String>()
         val queue = mutableListOf(repoRoot to "")
         while (queue.isNotEmpty()) {
             val (directory, relativeDirectory) = queue.removeAt(0)
-            for (name in fileOps.listDir(directory).sorted()) {
+            // One unreadable directory is one subtree lost, not the whole worktree. Before this
+            // guard a single throw from the walk (an undecodable filename, a permission change
+            // mid-pass) propagated out of reconcile() and left the doc plane holding git refs
+            // alone — the failure looked like "no worktree documents exist" rather than an error.
+            val names = try {
+                fileOps.listDir(directory).sorted()
+            } catch (_: Exception) {
+                skippedDirs.add(relativeDirectory); continue
+            }
+            for (name in names) {
                 if (name in excludedSegments) continue
-                val fullPath = fileOps.resolvePath(directory, name)
                 val relative = if (relativeDirectory.isEmpty()) name else "$relativeDirectory/$name"
                 if (excludedRelativePrefixes.any { relative == it || relative.startsWith("$it/") }) continue
-                if (fileOps.isDir(fullPath)) {
-                    queue.add(fullPath to relative)
-                } else if (fileOps.isFile(fullPath)) {
-                    files[relative] = fullPath
+                try {
+                    val fullPath = fileOps.resolvePath(directory, name)
+                    if (fileOps.isDir(fullPath)) {
+                        queue.add(fullPath to relative)
+                    } else if (fileOps.isFile(fullPath)) {
+                        files[relative] = fullPath
+                    }
+                } catch (_: Exception) {
+                    skippedDirs.add(relative)
                 }
             }
         }

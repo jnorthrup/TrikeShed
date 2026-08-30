@@ -161,9 +161,41 @@ class JvmFileOperations : FileOperations {
     override fun listDir(path: String): List<String> {
         val p = pathOf(path)
         if (!NioFiles.isDirectory(p)) return emptyList()
+        // One entry whose NAME the platform charset cannot decode used to abort the whole
+        // listing, and with it every caller's walk. `sun.jnu.encoding` follows the process
+        // locale, which is ASCII in a bare container (no LANG), so a single non-ASCII
+        // filename anywhere under the repo — `.venv/bin/…` is how we found it — threw
+        // "Malformed input or input contains unmappable characters" and reduced the whole
+        // Couch worktree plane to nothing. A name we cannot read is one entry lost, never
+        // the directory. UnixPath holds raw bytes and decodes lazily, so the throw usually
+        // lands on toString(); the iterator guard covers the case where it lands earlier.
+        val names = ArrayList<String>()
+        var undecodable = 0
+        var lastError: String? = null
         NioFiles.newDirectoryStream(p).use { stream ->
-            return stream.map { it.fileName.toString() }
+            val entries = stream.iterator()
+            while (undecodable <= MAX_UNDECODABLE_ENTRIES) {
+                val entry = try {
+                    if (!entries.hasNext()) break
+                    entries.next()
+                } catch (t: Throwable) {
+                    undecodable++; lastError = t.message ?: t.toString(); continue
+                }
+                try {
+                    names.add(entry.fileName.toString())
+                } catch (t: Throwable) {
+                    undecodable++; lastError = t.message ?: t.toString()
+                }
+            }
         }
+        if (undecodable > 0) {
+            System.err.println(
+                "[FS] listDir($path): $undecodable entr${if (undecodable == 1) "y" else "ies"} skipped, " +
+                    "name undecodable under sun.jnu.encoding=${System.getProperty("sun.jnu.encoding")} " +
+                    "(${names.size} returned; last: $lastError)"
+            )
+        }
+        return names
     }
 
     override fun isDir(path: String): Boolean =
@@ -216,4 +248,13 @@ class JvmFileOperations : FileOperations {
 
     override fun createTempDir(prefix: String): String =
         NioFiles.createTempDirectory(prefix).toAbsolutePath().toString()
+
+    companion object {
+        /**
+         * Cap on entries [listDir] will skip in one directory before it stops advancing the
+         * iterator. Skipping is only safe while the iterator stays usable; the cap is what
+         * keeps an iterator that throws unconditionally from spinning forever.
+         */
+        private const val MAX_UNDECODABLE_ENTRIES = 64
+    }
 }
