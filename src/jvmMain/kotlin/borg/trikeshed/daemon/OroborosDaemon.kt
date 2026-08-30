@@ -1073,9 +1073,16 @@ object OroborosDaemon {
                 dialog = borg.trikeshed.lcnc.hermesEnvDialog(
                     chat = { system, prompt ->
                         {
+                            // 600 starved every seat on a REASONING model: GLM 4.x flash
+                            // spends this same budget thinking, so mux.chat returned
+                            // content:"" on every non-trivial prompt while succeeding on
+                            // "say OK" (mission-002 M2 measured it four times). The floor
+                            // is the seat's authored budget; TRIKESHED_SEAT_MAXTOKENS
+                            // overrides for a model that needs more headroom.
+                            val seatBudget = (System.getenv("TRIKESHED_SEAT_MAXTOKENS")?.toIntOrNull() ?: 3000)
                             val content = brainClient.chat(
                                 listOf("system" to system, "user" to prompt),
-                                maxTokens = 600,
+                                maxTokens = seatBudget,
                                 contextId = "tribunal-seat",
                             )
                             content to (brainClient.lastModel() ?: "")
