@@ -9,15 +9,22 @@ import kotlin.test.assertTrue
 
 /**
  * The vm.corenlp / vm.corenlp.extract legos executed for real: the JVM-facet
- * GraalJS guest calls Stanford CoreNLP out of a MOUNTED GUEST MODULE
- * (`utils/subvm/corenlp`, via VmSpec.module), not off the host classpath.
+ * GraalJS guest calls the bundled Stanford CoreNLP classes through the
+ * hostTrusted door (GuestBounds.JVM — the deliberate OWN-trust exception).
  *
- * CoreNLP used to be an `implementation` dependency of jvmMain purely so these
- * legos could resolve it, despite having no compile-time reference anywhere in
- * src/ — 472MB of GPL v3 staged into build/staging/lib on every daemon launch.
- * These tests now pass with it absent from this JVM's classpath entirely, and
- * fail at the lego boundary (IllegalStateException naming the install command)
- * when the module directory is not there.
+ * (The paragraph above is the original, by jnorthrup in `wip` 49c94c868 — the
+ * commit that converted these legos from Groovy to GraalJS and added this test.
+ * It is kept because it states the design as it stood, and because the delta
+ * below only makes sense against it.)
+ *
+ * SINCE 053e79ff1 the "bundled" half of that is no longer true. CoreNLP is not on
+ * this JVM's classpath at all; it is mounted from the guest module
+ * `utils/subvm/corenlp` (VmSpec.module → Context.Builder.hostClassLoader), and
+ * allowHostClassLookup narrows from hostTrusted to "resolvable in that module".
+ * The hostTrusted door itself is unchanged and still governs any facet with no
+ * module mounted. `-Xmx3g` in build.gradle.kts, added by the same wip commit,
+ * stays load-bearing: the guest classloader lives in THIS JVM, so moving CoreNLP
+ * off the classpath did not move its models off this heap.
  *
  * These are not parse-only checks: each test asserts on the JSON the guest
  * actually printed, so a broken script (the old Groovy-flavored ones never

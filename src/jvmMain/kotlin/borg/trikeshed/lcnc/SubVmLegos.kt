@@ -180,6 +180,11 @@ object SubVmLegos {
             // GraalJS, not Groovy. The previous body was Java/Groovy source — bare `new
             // org.apache.camel...` and an anonymous `RouteBuilder(){ void configure() }` subclass —
             // which GraalJS cannot parse, so this lego could never have run even with Camel present.
+            //
+            // The corenlp legos above were converted out of that same Groovy shape by jnorthrup in
+            // `wip` 49c94c868 (144+/64- here), which is where the "GraalJS (not Groovy)" note on
+            // vm.corenlp comes from and why that lego runs. Camel was the one left behind — it had
+            // no dependency to run against, so nothing forced the issue.
             // RouteBuilder is abstract and JS cannot subclass it, but Camel 4 exposes the static
             // RouteBuilder.addRoutes(CamelContext, LambdaRouteBuilder); LambdaRouteBuilder is a
             // functional interface, and GraalJS coerces a plain JS function to one.
