@@ -1605,6 +1605,11 @@ object OroborosDaemon {
             // hand-listed version omitted `logs/`, so the daemon's log writes woke the watcher
             // whose reconcile wrote that log — a permanent self-feeding quake at 95% CPU.
             excludeGlobs = WorktreeCouchGateway.watcherExcludeGlobs(),
+            // …and prune the same paths from the WALK, not just from event delivery. Registering
+            // an OS watch on every directory of .git and of every .claude/worktrees checkout cost
+            // minutes of boot and a permanent watch set, for events this daemon then discards.
+            walkerBlockedSegments = WorktreeCouchGateway.EXCLUDED_SEGMENTS,
+            walkerBlockedRelativePrefixes = WorktreeCouchGateway.EXCLUDED_RELATIVE_PREFIXES,
         )
         launch(Dispatchers.IO) { worktreeWatcher.open() }
         System.err.println("[OROBOROS] Worktree watcher: ${worktreeWatcher.state} — reactive source/document events")

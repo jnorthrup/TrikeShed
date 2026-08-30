@@ -38,6 +38,20 @@ class JvmFileWatchReactorElement(
      * Default: every `.kt` path — drops Kotlin source ("the code checked in").
      */
     excludeGlobs: List<String> = listOf("**" + "/" + "*.kt"),
+    /**
+     * Directory names pruned during the initial walk, at any depth — the OS watch is never
+     * registered for them, so they cost nothing to walk and deliver no events.
+     *
+     * Per-instance rather than global, because instances disagree on what is noise: the git
+     * watcher exists to see everything under `.git`, which the worktree watcher must never
+     * descend into. A global constant cannot express that, and the global it replaced omitted
+     * `.git` AND `.claude/worktrees` — so the worktree watcher registered a watch on every
+     * directory of the git object store and of every agent worktree checkout, minutes of
+     * walking and a large permanent watch set, on a daemon that only cares about tracked source.
+     */
+    private val walkerBlockedSegments: Set<String> = DEFAULT_WALKER_BLOCKED_SEGMENTS,
+    /** Root-relative subtrees pruned during the walk (e.g. `.claude/worktrees`). */
+    private val walkerBlockedRelativePrefixes: Set<String> = emptySet(),
 ) : AsyncContextElement(ElementState.CREATED, parentJob) {
     companion object Key : AsyncContextKey<JvmFileWatchReactorElement>()
     override val key: CoroutineContext.Key<*> = Key
@@ -132,9 +146,12 @@ class JvmFileWatchReactorElement(
         if (runCatching { Files.isDirectory(start) }.getOrDefault(false)) walk(start)
     }
 
-    private fun isIgnored(path: java.nio.file.Path): Boolean {
+    internal fun isIgnored(path: java.nio.file.Path): Boolean {
         val relative = if (path.startsWith(rootPath)) rootPath.relativize(path) else path
-        return relative.any { it.toString() in WALKER_BLOCKED_SEGMENTS }
+        if (relative.any { it.toString() in walkerBlockedSegments }) return true
+        if (walkerBlockedRelativePrefixes.isEmpty()) return false
+        val relStr = relative.joinToString("/")
+        return walkerBlockedRelativePrefixes.any { relStr == it || relStr.startsWith("$it/") }
     }
 }
 
@@ -145,7 +162,7 @@ class JvmFileWatchReactorElement(
  * Note: the watcher still registers these at a directory level so OS-level
  * FS events are delivered.  Filters enforced in [PathGlob] apply at event time.
  */
-private val WALKER_BLOCKED_SEGMENTS: Set<String> =
+internal val DEFAULT_WALKER_BLOCKED_SEGMENTS: Set<String> =
     setOf(".gradle", ".idea", "build", "node_modules")
 
 /**

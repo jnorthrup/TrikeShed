@@ -64,3 +64,64 @@ class WatcherExcludeParityTest {
         }
     }
 }
+
+/**
+ * The walk had its OWN third exclude list — `.gradle`, `.idea`, `build`, `node_modules` — which
+ * omitted `.git` and `.claude/worktrees`. So the worktree watcher registered an OS watch on every
+ * directory of the git object store and of every agent worktree checkout: minutes of walking at
+ * boot and a permanent watch set, for events the glob filter then threw away.
+ *
+ * It is per-instance now, because instances genuinely disagree: the git watcher exists to see
+ * everything under `.git`, which the worktree watcher must never descend into.
+ */
+class WalkerPruningTest {
+
+    private fun watcher(root: java.io.File) = borg.trikeshed.util.oroboros.JvmFileWatchReactorElement(
+        root = root.absolutePath,
+        includeGlobs = emptyList(),
+        excludeGlobs = WorktreeCouchGateway.watcherExcludeGlobs(),
+        walkerBlockedSegments = WorktreeCouchGateway.EXCLUDED_SEGMENTS,
+        walkerBlockedRelativePrefixes = WorktreeCouchGateway.EXCLUDED_RELATIVE_PREFIXES,
+    )
+
+    @kotlin.test.Test
+    fun theWorktreeWatcherPrunesGitAndAgentWorktreesFromTheWalk() {
+        val root = java.nio.file.Files.createTempDirectory("walk-prune-").toFile()
+        try {
+            val w = watcher(root)
+            fun p(rel: String) = java.nio.file.Path.of(root.absolutePath, *rel.split("/").toTypedArray())
+            // The two the old global list missed, and which dominated the cost.
+            assertTrue(w.isIgnored(p(".git")), ".git must not be walked by the worktree watcher")
+            assertTrue(w.isIgnored(p(".git/objects/ab")))
+            assertTrue(w.isIgnored(p(".claude/worktrees")))
+            assertTrue(w.isIgnored(p(".claude/worktrees/agent-a1/src/commonMain")))
+            // And the daemon-state paths, so the walk matches the event filter.
+            assertTrue(w.isIgnored(p("logs")))
+            assertTrue(w.isIgnored(p("cas/sha256/ab")))
+            assertTrue(w.isIgnored(p(".oroboros/manifests")))
+            assertTrue(w.isIgnored(p("build/live/classes")))
+            // Real trees must still be walked, including `.claude` itself — only its
+            // `worktrees` subtree is other people's checkouts.
+            assertFalse(w.isIgnored(p("src/commonMain/kotlin")))
+            assertFalse(w.isIgnored(p("doc")))
+            assertFalse(w.isIgnored(p(".claude")))
+            assertFalse(w.isIgnored(p(".claude/skills")))
+        } finally {
+            root.deleteRecursively()
+        }
+    }
+
+    @kotlin.test.Test
+    fun theGitWatcherStillDescendsIntoGitOnTheDefaults() {
+        val root = java.nio.file.Files.createTempDirectory("walk-git-").toFile()
+        try {
+            // Defaults: what the git-side watcher uses. Blocking .git globally would have made
+            // this watcher useless, which is why the pruning list is per-instance.
+            val w = borg.trikeshed.util.oroboros.JvmFileWatchReactorElement(root = root.absolutePath)
+            assertFalse(w.isIgnored(java.nio.file.Path.of(root.absolutePath, ".git", "objects")))
+            assertTrue(w.isIgnored(java.nio.file.Path.of(root.absolutePath, "build")))
+        } finally {
+            root.deleteRecursively()
+        }
+    }
+}
