@@ -55,18 +55,29 @@ class LcncKanbanExperience(
             // remain the no-wire path: type a jobId, click run.
             "kanban.submit" to LcncNodeRunner { node, inputs ->
                 val c = wiredCommand(inputs)
-                // Gesture nodes without a gesture NO-OP (headless program run, or the
-                // no-wire lane before anyone typed a jobId) — silent degrade, not error.
-                val jobId = c["jobId"]?.toString() ?: node.params["jobId"]
-                if (jobId.isNullOrBlank()) mapOf("accepted" to false, "reason" to "no gesture: jobId absent")
+                val title = c["title"]?.toString()?.takeIf { it.isNotBlank() }
+                    ?: node.params["title"]?.takeIf { it.isNotBlank() }
+                // A title without a jobId is a CREATE, not a malformed gesture: mint a
+                // deterministic id (the panels modal and no-wire lane submit exactly
+                // this shape — blank jobId + typed title — and used to silently lose
+                // the card while reporting success).
+                val jobId = (c["jobId"]?.toString() ?: node.params["jobId"])?.takeIf { it.isNotBlank() }
+                    ?: title?.let { t ->
+                        "card-" + borg.trikeshed.job.ContentId.of(t.encodeToByteArray()).hex.take(12)
+                    }
+                // No jobId AND no title = a gesture node without a gesture (headless
+                // program run): NO-OP with a reason — silent degrade, not error.
+                if (jobId.isNullOrBlank()) mapOf("accepted" to false, "reason" to "no gesture: jobId/title absent")
                 else command(
                     mapOf(
                         "type" to "submit",
                         "jobId" to jobId,
-                        "title" to (c["title"]?.toString() ?: node.params["title"] ?: jobId),
+                        "title" to (title ?: jobId),
                         "priority" to (c["priority"]?.toString()?.toDoubleOrNull()?.toInt()
                             ?: node.params["priority"]?.toIntOrNull() ?: 2),
-                        "idempotencyKey" to required(node, c, "idempotencyKey"),
+                        "idempotencyKey" to (c["idempotencyKey"]?.toString()?.takeIf { it.isNotBlank() }
+                            ?: node.params["idempotencyKey"]?.takeIf { it.isNotBlank() }
+                            ?: "submit#$jobId"),
                     ),
                 )
             },

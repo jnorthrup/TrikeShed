@@ -681,33 +681,56 @@ function renderGroupedBoard(n){
     for(const it of items){
       const card=document.createElement("div");
       card.className="kcard"+(it.contested?" contested":"");
-      card.draggable=true;
+      card.style.touchAction="none"; // pointer drag streams moves on touch too
       const title=it[titleF]??it[idF]??"?", sub=it[subF], badge=it[badgeF];
       card.innerHTML=`<div>${title}</div><div class="kid">${sub!=null&&sub!==title?sub:""}${badge!=null?" · "+badge:""}</div>`;
-      card.addEventListener("dragstart",e=>{
-        e.dataTransfer.setData("text/plain",JSON.stringify({itemId:it[idF],item:it,from:col.id}));
-        e.dataTransfer.effectAllowed="move";
+      // Pointer-event drag, NOT HTML5 DnD: works for mouse/trackpad/touch/pen
+      // alike, survives the canvas transform, and needs no dataTransfer.
+      card.addEventListener("pointerdown",e=>{
+        e.stopPropagation(); // don't pan the canvas while grabbing a card
+        if(e.button!==0) return;
+        const sx=e.clientX, sy=e.clientY; let ghost=null;
+        const colUnder=ev=>{ const t=document.elementFromPoint(ev.clientX,ev.clientY); return t?t.closest(".kcol"):null; };
+        const onMove=ev=>{
+          if(!ghost){
+            if(Math.hypot(ev.clientX-sx,ev.clientY-sy)<6) return; // click/dblclick stays intact
+            const r=card.getBoundingClientRect();
+            ghost=card.cloneNode(true);
+            ghost.style.cssText=`position:fixed;pointer-events:none;z-index:999;opacity:.88;width:${r.width}px;margin:0`;
+            document.body.appendChild(ghost);
+            card.style.opacity=".35";
+          }
+          ghost.style.left=(ev.clientX+8)+"px"; ghost.style.top=(ev.clientY+8)+"px";
+          wrap.querySelectorAll(".kcol").forEach(k=>k.classList.remove("dragover"));
+          const kc=colUnder(ev); if(kc) kc.classList.add("dragover");
+          ev.preventDefault();
+        };
+        const onUp=ev=>{
+          window.removeEventListener("pointermove",onMove);
+          window.removeEventListener("pointerup",onUp);
+          window.removeEventListener("pointercancel",onUp);
+          wrap.querySelectorAll(".kcol").forEach(k=>k.classList.remove("dragover"));
+          card.style.opacity="";
+          if(!ghost) return; // never crossed the threshold: plain click
+          ghost.remove();
+          const kc=colUnder(ev), to=kc&&kc.dataset.group;
+          if(!to||to===col.id) return;
+          // Optimistic local move: the card lands NOW; the next activeSheets
+          // tick reconciles truth (a refused move snaps it back).
+          const fromArr=n._groups[col.id]||[], idx=fromArr.findIndex(x=>x[idF]===it[idF]);
+          if(idx>=0){ (n._groups[to]=n._groups[to]||[]).push(fromArr.splice(idx,1)[0]); renderGroupedBoard(n); }
+          const st=n.el.querySelector(".kboard-status");
+          if(st) st.textContent=it[idF]+": "+col.id+" → "+to+" (downstream deciding…)";
+          n._lastMove={itemId:it[idF],item:it,from:col.id,to};
+          runAll(n.id); // this node's own downstream chain sees the gesture
+        };
+        window.addEventListener("pointermove",onMove);
+        window.addEventListener("pointerup",onUp);
+        window.addEventListener("pointercancel",onUp);
       });
-      card.addEventListener("pointerdown",e=>e.stopPropagation()); // don't pan the canvas while grabbing a card
       card.addEventListener("dblclick",e=>{ e.stopPropagation(); openCardModal(n,col.id,it); }); // modal CRUD
       c.appendChild(card);
     }
-    c.addEventListener("dragover",e=>{ e.preventDefault(); c.classList.add("dragover"); });
-    c.addEventListener("dragleave",()=>c.classList.remove("dragover"));
-    c.addEventListener("drop",e=>{
-      e.preventDefault(); c.classList.remove("dragover");
-      let data; try{ data=JSON.parse(e.dataTransfer.getData("text/plain")); }catch(_){ return; }
-      if(!data||data.from===col.id) return;
-      // Optimistic local move: the card lands NOW. Without this the board sits
-      // frozen until the next activeSheets tick (5s) — a drag that shows
-      // nothing for 5 seconds reads as broken. The next tick reconciles truth
-      // (a 409'd move snaps the card back).
-      const fromArr=n._groups[data.from]||[], idx=fromArr.findIndex(x=>x[idF]===data.itemId);
-      if(idx>=0){ (n._groups[col.id]=n._groups[col.id]||[]).push(fromArr.splice(idx,1)[0]); renderGroupedBoard(n); }
-      status.textContent=data.itemId+": "+data.from+" → "+col.id+" (downstream deciding…)";
-      n._lastMove={...data,to:col.id};
-      runAll(n.id); // this node's own downstream chain sees the gesture
-    });
     wrap.appendChild(c);
   }
 }
@@ -2067,7 +2090,10 @@ function openCardModal(n,colId,item){
       const title=el("title").value.trim(); if(!title){ el("title").focus(); return; }
       const r=await api("POST","/api/lcnc/run",{type:"kanban.submit",inputs:{},
         params:{jobId:"",title,priority:el("pri").value,idempotencyKey:"panel-modal-"+Date.now()}});
-      $("#status").textContent=r.ok?("card landed: "+title):("submit failed: "+(r.error||JSON.stringify(r)));
+      // ok:true only means the RUNNER ran — the store's verdict is outputs.accepted.
+      const acc=r.ok&&r.outputs&&r.outputs.accepted!==false;
+      $("#status").textContent=acc?("card landed: "+title+" ("+(r.outputs.jobId||"")+")")
+        :("submit REFUSED: "+((r.outputs&&r.outputs.reason)||r.error||JSON.stringify(r).slice(0,120)));
     } else {
       const to=el("col").value;
       if(to&&to!==(item.status||colId)){

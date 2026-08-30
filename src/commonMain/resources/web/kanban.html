@@ -249,7 +249,7 @@ function render(board) {
 function cardEl(it) {
   const el = document.createElement("div");
   el.className = "card";
-  el.draggable = true;
+  el.style.touchAction = "none"; // pointer drag streams moves on touch too
   const heat = typeof it.attention === "number" && it.attention > 0
     ? `<span class="heat" title="attention">${it.contested ? "⚡" : "●"} ${(it.attention * 100).toFixed(0)}%</span>` : "";
   const owner = it.owner ? `<span class="owner">${escapeHtml(it.owner)}</span>` : "";
@@ -257,12 +257,49 @@ function cardEl(it) {
     <div class="meta">${owner}${heat}<span>r${it.revision}</span></div>
     <button class="archive" title="Archive this card">×</button>`;
   el.querySelector(".archive").addEventListener("click", () => archiveCard(it));
-  el.addEventListener("dragstart", (e) => {
-    dragBegan();
-    el.classList.add("dragging");
-    e.dataTransfer.setData("text/plain", JSON.stringify({ id: it.id, revision: it.revision, from: it.status }));
+  // Pointer-event drag, NOT HTML5 DnD: works identically for mouse, trackpad,
+  // touch, and pen; no dataTransfer, no browser drag-image quirks, and it
+  // responds to plain pointer input so it is machine-verifiable too.
+  el.addEventListener("pointerdown", (e) => {
+    if (e.button !== 0 || e.target.closest(".archive")) return;
+    const sx = e.clientX, sy = e.clientY;
+    let ghost = null;
+    const laneUnder = (ev) => document.elementFromPoint(ev.clientX, ev.clientY)?.closest(".lane") || null;
+    const onMove = (ev) => {
+      if (!ghost) {
+        if (Math.hypot(ev.clientX - sx, ev.clientY - sy) < 6) return; // click stays a click
+        dragBegan();
+        el.classList.add("dragging");
+        ghost = el.cloneNode(true);
+        const r = el.getBoundingClientRect();
+        ghost.style.cssText = `position:fixed;pointer-events:none;z-index:999;opacity:.88;width:${r.width}px;margin:0;`;
+        ghost.className = "card";
+        document.body.appendChild(ghost);
+      }
+      ghost.style.left = (ev.clientX + 8) + "px";
+      ghost.style.top = (ev.clientY + 8) + "px";
+      document.querySelectorAll(".lane").forEach(l => l.classList.remove("drop-ok"));
+      laneUnder(ev)?.classList.add("drop-ok");
+      ev.preventDefault();
+    };
+    const onUp = (ev) => {
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("pointerup", onUp);
+      window.removeEventListener("pointercancel", onUp);
+      document.querySelectorAll(".lane").forEach(l => l.classList.remove("drop-ok"));
+      el.classList.remove("dragging");
+      if (!ghost) return; // never crossed the threshold: plain click
+      ghost.remove();
+      const lane = laneUnder(ev);
+      dragEnded();
+      if (lane && lane.dataset.lane && lane.dataset.lane !== it.status) {
+        moveCard({ id: it.id, revision: it.revision, from: it.status }, lane.dataset.lane);
+      }
+    };
+    window.addEventListener("pointermove", onMove);
+    window.addEventListener("pointerup", onUp);
+    window.addEventListener("pointercancel", onUp);
   });
-  el.addEventListener("dragend", () => { el.classList.remove("dragging"); dragEnded(); });
   return el;
 }
 
