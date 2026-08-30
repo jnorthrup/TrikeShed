@@ -221,7 +221,7 @@ object CouncilProgram {
                         id = "$pTok.$seatName", panel = pTok, seatName = seatName,
                         role = if (r == 1) "expert" else "rebuttal", round = r,
                         charge = spec.charge, persona = persona, system = system,
-                        model = expertModels[e], maxTokens = 500,
+                        model = expertModels[e], maxTokens = 2500,
                         temperature = if (r == 1) "0.8" else "0.6",
                         x = colX(seatCol), y = rowY(e),
                     ))
@@ -246,7 +246,7 @@ object CouncilProgram {
                     "\nPanel charge (${spec.name}): ${spec.charge}." +
                     "\nReduce the expert record to the panel position: majority themes; " +
                     "preserve numbered dissents with seat attribution.",
-                model = synthModel, maxTokens = 700, temperature = "0.2",
+                model = synthModel, maxTokens = 3000, temperature = "0.2",
                 x = colX(synthCol), y = rowY(0),
             ))
             wires.add(LcncWire("$pTok.fold.r$rounds", "text", "$pTok.synth", "prompt"))
@@ -297,7 +297,7 @@ object CouncilProgram {
         nodes.add(seat(
             id = "ruling", panel = "council", seatName = "ruling", role = "ruling", round = 1,
             charge = RULING_CHARGE, persona = null, system = rulingSystem,
-            model = rulingModel, maxTokens = 900, temperature = "0.1",
+            model = rulingModel, maxTokens = 3500, temperature = "0.1",
             x = laneX(), y = 40.0,
         ))
         wires.add(LcncWire("fold.ruling", "text", "ruling", "prompt"))
@@ -326,7 +326,7 @@ object CouncilProgram {
                     system = "A clarification was requested on the record. You answer for panel " +
                         "${spec.name} (${spec.charge}). Answer the presiding question directly " +
                         "from the evidence and positions provided.",
-                    model = roster[0], maxTokens = 500, temperature = "0.3",
+                    model = roster[0], maxTokens = 2500, temperature = "0.3",
                     x = colX(2), y = rowY(p),
                 ))
                 wires.add(LcncWire("cl.fold.q", "text", id, "prompt"))
@@ -338,7 +338,7 @@ object CouncilProgram {
                 id = "cl.ruling", panel = "council", seatName = "ruling-final", role = "ruling", round = 2,
                 charge = RULING_CHARGE, persona = null,
                 system = rulingSystem + " This is the final round — you MUST rule: set needsClarification to false.",
-                model = rulingModel, maxTokens = 900, temperature = "0.1",
+                model = rulingModel, maxTokens = 3500, temperature = "0.1",
                 x = colX(4), y = rowY(0),
             ))
             wires.add(LcncWire("cl.fold.rec", "text", "cl.ruling", "prompt"))
