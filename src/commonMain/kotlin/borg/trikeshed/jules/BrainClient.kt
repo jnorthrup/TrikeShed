@@ -136,6 +136,15 @@ class BrainClient(
             return "no key" in m || "key not found" in m || "401" in m || "unauthorized" in m
         }
 
+        /** Rate-limit signature: HTTP 429 or the z.ai/Zhipu limit codes (1302 rpm, 1305 overload). */
+        internal fun isRateLimitFailure(message: String): Boolean {
+            val m = message.lowercase()
+            return "429" in m || "rate limit" in m || "\"1302\"" in m || "\"1305\"" in m || "temporarily overloaded" in m
+        }
+
+        /** Backoff ladder for retrying a rate-limited SINGLE-endpoint lane (the pin has no failover by design). */
+        internal val RATE_LIMIT_BACKOFF_MS = longArrayOf(15_000L, 30_000L, 60_000L)
+
         /**
          * Process-lifetime no-key verdict cache: endpoint NAMES whose chatSeat
          * attempt failed with the missing-key signature. Never cleared — a
@@ -262,9 +271,28 @@ class BrainClient(
     ): String {
         if (endpoints.isEmpty()) error("Brain: no provider endpoints discovered")
 
-        return withTimeout(OUTER_TIMEOUT_MS) {
+        return withTimeout(outerBudgetMs()) {
             chatInner(messages, maxTokens, temperature, contextId)
         }
+    }
+
+    /** A single-endpoint lane (the pin / override) retries rate limits with backoff —
+     *  its outer budget must cover the ladder; multi-endpoint lanes fail over instead. */
+    private fun outerBudgetMs(): Long =
+        if (endpoints.size == 1) OUTER_TIMEOUT_MS + RATE_LIMIT_BACKOFF_MS.sum() + RATE_LIMIT_BACKOFF_MS.size * OUTER_TIMEOUT_MS
+        else OUTER_TIMEOUT_MS
+
+    /** Retry [attempt] through the backoff ladder while it fails rate-limited — single-endpoint lanes only. */
+    private suspend fun <T> withRateLimitRetry(attempt: suspend () -> Result<T>): Result<T> {
+        var result = attempt()
+        if (endpoints.size != 1) return result
+        for (backoffMs in RATE_LIMIT_BACKOFF_MS) {
+            val msg = result.exceptionOrNull()?.message ?: return result
+            if (!isRateLimitFailure(msg)) return result
+            kotlinx.coroutines.delay(backoffMs)
+            result = attempt()
+        }
+        return result
     }
 
     /** Inner loop: called inside the outer timeout. */
@@ -282,14 +310,16 @@ class BrainClient(
             // Route through ModelMux.chat() — uses HtxKey from coroutine context,
             // records receipts via MuxReactor, respects quota/lease tracking.
             val acpMessages = messages.size j { i: Int -> messages[i].first j messages[i].second }
-            val result = runCatching {
-                internalModelMux.chat(
-                    modelId = modelId,
-                    messages = acpMessages,
-                    assessmentId = contextId,
-                    maxTokens = maxTokens,
-                    temperature = temperature,
-                ).getOrThrow() // chat() is already Result-shaped; unwrap so fold sees AcpResponse, not Result<Result<…>>
+            val result = withRateLimitRetry {
+                runCatching {
+                    internalModelMux.chat(
+                        modelId = modelId,
+                        messages = acpMessages,
+                        assessmentId = contextId,
+                        maxTokens = maxTokens,
+                        temperature = temperature,
+                    ).getOrThrow() // chat() is already Result-shaped; unwrap so fold sees AcpResponse, not Result<Result<…>>
+                }
             }
             result.fold(
                 onSuccess = { response ->
@@ -324,7 +354,7 @@ class BrainClient(
         temperature: Double = 0.2,
         contextId: String? = null,
         preferredModel: String? = null,
-    ): Pair<String, String> = withTimeout(OUTER_TIMEOUT_MS) {
+    ): Pair<String, String> = withTimeout(outerBudgetMs()) {
         chatSeatInner(messages, maxTokens, temperature, contextId, preferredModel)
     }
 
@@ -347,14 +377,16 @@ class BrainClient(
             }
 
             val acpMessages = messages.size j { i: Int -> messages[i].first j messages[i].second }
-            val result = runCatching {
-                internalModelMux.chat(
-                    modelId = modelId,
-                    messages = acpMessages,
-                    assessmentId = contextId,
-                    maxTokens = maxTokens,
-                    temperature = temperature,
-                ).getOrThrow() // chat() is already Result-shaped; unwrap so fold sees AcpResponse
+            val result = withRateLimitRetry {
+                runCatching {
+                    internalModelMux.chat(
+                        modelId = modelId,
+                        messages = acpMessages,
+                        assessmentId = contextId,
+                        maxTokens = maxTokens,
+                        temperature = temperature,
+                    ).getOrThrow() // chat() is already Result-shaped; unwrap so fold sees AcpResponse
+                }
             }
             result.fold(
                 onSuccess = { response ->

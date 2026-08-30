@@ -93,4 +93,17 @@ class BrainClientRosterTest {
         assertEquals(attempts, e.attempts)
         assertEquals("no provider answered: " + attempts.joinToString(" -> "), e.message)
     }
+
+    @Test
+    fun rateLimitClassifierMatchesZaiShapesOnly() {
+        // z.ai/Zhipu shapes seen live: HTTP 429 + code 1302 (rpm) / 1305 (overload)
+        kotlin.test.assertTrue(BrainClient.isRateLimitFailure("""ModelMux chat failed with HTTP 429: {"error":{"code":"1302","message":"Rate limit reached for requests"}}"""))
+        kotlin.test.assertTrue(BrainClient.isRateLimitFailure("""HTTP 429: {"error":{"code":"1305","message":"The service may be temporarily overloaded, please try again later"}}"""))
+        kotlin.test.assertTrue(BrainClient.isRateLimitFailure("Rate limit exceeded"))
+        kotlin.test.assertFalse(BrainClient.isRateLimitFailure("401 unauthorized"))
+        kotlin.test.assertFalse(BrainClient.isRateLimitFailure("connection refused"))
+        // ladder is bounded and ascending — the single-endpoint outer budget depends on it
+        kotlin.test.assertEquals(3, BrainClient.RATE_LIMIT_BACKOFF_MS.size)
+        kotlin.test.assertTrue(BrainClient.RATE_LIMIT_BACKOFF_MS.toList() == BrainClient.RATE_LIMIT_BACKOFF_MS.sorted())
+    }
 }
