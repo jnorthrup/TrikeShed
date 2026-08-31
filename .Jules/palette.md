@@ -77,3 +77,7 @@
 ## 2024-08-24 - Dynamic ARIA Label Injection
 **Learning:** When dynamically rendering interactive lists in vanilla JS (like page trees, sheet references, or slash menus), screen reader context is lost if we only use CSS classes like `.active` to indicate state.
 **Action:** When creating elements with `document.createElement`, proactively attach explicit, descriptive `aria-label`s that encapsulate both the item's identity and its current state (e.g., `"Active page: Untitled"` or `"Navigate to parent sheet: ..."`).
+
+## 2024-11-20 - Alt text for dynamically created images
+**Learning:** Dynamically created image elements (e.g., via `document.createElement("img")`) often miss the `alt` attribute, breaking accessibility for screen reader users.
+**Action:** Always add an `alt` attribute using `setAttribute("alt", ...)` when dynamically creating image elements, using a meaningful title or a fallback.
