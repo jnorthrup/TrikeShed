@@ -188,12 +188,21 @@ class McpSurfaceParityTest {
         for (version in LcncKanbanMcp.SUPPORTED_PROTOCOLS) {
             assertTrue(version in text, "the guide omits supported protocol version $version")
         }
-        // The handshake answers with the default when it does not recognize a version.
-        val negotiated = result(mcp, "initialize", mapOf("protocolVersion" to "1999-01-01"))["protocolVersion"]
-        assertEquals(LcncKanbanMcp.DEFAULT_PROTOCOL, negotiated)
+        // A revision we do not speak negotiates DOWN to the newest we do that is
+        // no newer than the ask. This is the case that took the server off the
+        // air for every Claude Code client: it asks 2025-11-25, and answering
+        // with our own newest (2026-07-28) is a version from beyond its horizon.
+        val fromTheFuture = result(mcp, "initialize", mapOf("protocolVersion" to "2025-11-25"))["protocolVersion"]
+        assertEquals("2025-06-18", fromTheFuture, "an unknown NEWER ask must negotiate down, not up")
+
+        // Older than anything we speak: nothing to negotiate down to, so the
+        // widely-implemented baseline is the best answer available.
+        val ancient = result(mcp, "initialize", mapOf("protocolVersion" to "1999-01-01"))["protocolVersion"]
+        assertEquals(LcncKanbanMcp.BASELINE_PROTOCOL, ancient)
+
         assertTrue(
-            LcncKanbanMcp.DEFAULT_PROTOCOL in text,
-            "the guide does not name the version the server actually answers with",
+            LcncKanbanMcp.BASELINE_PROTOCOL in text,
+            "the guide does not name the version the server falls back to",
         )
         store.drain()
     }

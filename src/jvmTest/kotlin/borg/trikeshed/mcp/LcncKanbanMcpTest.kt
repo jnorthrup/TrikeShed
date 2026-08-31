@@ -397,8 +397,13 @@ class LcncKanbanMcpTest {
         val known = ok(rig, "initialize", mapOf("protocolVersion" to "2025-06-18"))
         assertEquals("2025-06-18", known["protocolVersion"], "a recognized client version is echoed")
 
+        // The live failure this guards: Claude Code asks for a revision we do not
+        // list, and answering with our newest made it hang up. Negotiate down.
+        val newer = ok(rig, "initialize", mapOf("protocolVersion" to "2025-11-25"))
+        assertEquals("2025-06-18", newer["protocolVersion"], "an unknown newer ask negotiates down")
+
         val unknown = ok(rig, "initialize", mapOf("protocolVersion" to "1999-01-01"))
-        assertEquals(LcncKanbanMcp.DEFAULT_PROTOCOL, unknown["protocolVersion"])
+        assertEquals(LcncKanbanMcp.BASELINE_PROTOCOL, unknown["protocolVersion"])
 
         val caps = unknown["capabilities"] as Map<*, *>
         assertEquals(false, (caps["resources"] as Map<*, *>)["subscribe"], "do not advertise a push we do not do")

@@ -113,7 +113,12 @@ fi
 
 step "starting the daemon"
 LOG="$HOME_DIR/daemon.log"
-( cd "$REPO" && nohup bin/oroboros-daemon --home "$HOME_DIR" --repo "$REPO" --kanban-port "$PORT" >>"$LOG" 2>&1 & )
+# --belief-bag: without it nal.*/beliefs.*/state.freeze answer "belief bag
+# disabled", and two gallery presets that advertise "Nothing — it runs as it
+# is" (preset-curator, preset-state-freeze) fail on the one path we tell a
+# newcomer to use. The onboarding launcher opts in; the daemon default is
+# untouched.
+( cd "$REPO" && nohup bin/oroboros-daemon --home "$HOME_DIR" --repo "$REPO" --kanban-port "$PORT" --belief-bag >>"$LOG" 2>&1 & )
 BASE="http://127.0.0.1:$PORT"
 for i in $(seq 1 60); do
   curl -sf -m 2 "$BASE/api/board" >/dev/null 2>&1 && break

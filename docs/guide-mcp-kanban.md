@@ -102,6 +102,27 @@ curl -s http://localhost:8888/api/mcp
 }
 ```
 
+### Which version you get back
+
+A revision in that list is echoed back unchanged. Anything else **negotiates
+down** — you get the newest revision in the list that is no newer than what you
+asked for, and `2025-06-18` when there is nothing older to offer.
+
+| You ask for | You get | Why |
+|---|---|---|
+| `2025-06-18` | `2025-06-18` | recognized, echoed |
+| `2025-11-25` | `2025-06-18` | not spoken here; the newest we speak that is not newer than your ask |
+| `1999-01-01` | `2025-06-18` | nothing older to fall back to, so the widely-implemented baseline |
+
+This is not a detail. The handler used to answer *any* unrecognized ask with
+its own newest revision, `2026-07-28` — so a client asking for `2025-11-25`
+was handed a revision from beyond its horizon and hung up with
+`Server's protocol version is not supported: 2026-07-28`. The `claude mcp add`
+line above produced a dead server for exactly as long as that held.
+`McpSurfaceParityTest` and `LcncKanbanMcpTest` now both pin the
+newer-but-unknown case; the old tests only ever probed a version older than
+everything, which is why nothing went red.
+
 ---
 
 ## Before you expose it

@@ -50,11 +50,36 @@ class LcncKanbanMcp(
 
         /**
          * Revisions whose JSON-RPC core this handler speaks. Negotiation echoes a
-         * recognized client version and otherwise answers with [DEFAULT_PROTOCOL],
-         * which is the revision the marketability audit targets.
+         * recognized client version; see [negotiateProtocol] for what an
+         * unrecognized one gets.
          */
         val SUPPORTED_PROTOCOLS: List<String> = listOf("2026-07-28", "2025-06-18", "2025-03-26")
         val DEFAULT_PROTOCOL: String = SUPPORTED_PROTOCOLS.first()
+
+        /**
+         * The revision to answer with when the client's ask is not one we speak
+         * and nothing older is available. It is the widely-implemented baseline,
+         * not our newest: a client that asked for something we do not know is far
+         * likelier to accept this than a revision from the future.
+         */
+        val BASELINE_PROTOCOL: String = "2025-06-18"
+
+        /**
+         * Answer a client's `protocolVersion`.
+         *
+         * Replying with our NEWEST whenever we did not recognize the ask is what
+         * made `claude mcp add` fail: Claude Code asks for 2025-11-25, which is
+         * not in [SUPPORTED_PROTOCOLS], and a reply of 2026-07-28 is a revision
+         * from beyond its own horizon, so it disconnects with "Server's protocol
+         * version is not supported". Negotiate DOWN instead — the newest revision
+         * we speak that is no newer than the ask. ISO dates order lexicographically,
+         * so a plain string compare is the whole rule.
+         */
+        fun negotiateProtocol(asked: String?): String {
+            if (asked == null) return BASELINE_PROTOCOL
+            if (asked in SUPPORTED_PROTOCOLS) return asked
+            return SUPPORTED_PROTOCOLS.filter { it <= asked }.maxOrNull() ?: BASELINE_PROTOCOL
+        }
 
         // JSON-RPC 2.0 reserved codes, plus MCP's resource-not-found.
         const val PARSE_ERROR: Int = -32700
@@ -120,7 +145,7 @@ class LcncKanbanMcp(
     private fun initialize(params: Map<*, *>): Map<String, Any?> {
         val asked = params["protocolVersion"] as? String
         return mapOf(
-            "protocolVersion" to (asked?.takeIf { it in SUPPORTED_PROTOCOLS } ?: DEFAULT_PROTOCOL),
+            "protocolVersion" to negotiateProtocol(asked),
             "capabilities" to mapOf(
                 "tools" to mapOf("listChanged" to false),
                 // No subscriptions yet: a client re-reads the sheets resource after

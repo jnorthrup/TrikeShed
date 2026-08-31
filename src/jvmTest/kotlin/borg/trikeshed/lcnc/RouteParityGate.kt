@@ -65,7 +65,7 @@ class RouteParityGate {
     @Test
     fun everyHtmlFetchIsARegisteredRoute() {
         val offenders = mutableListOf<String>()
-        for (page in listOf("graal.html", "index.html", "script.js", "panels.html")) {
+        for (page in listOf("graal.html", "index.html", "script.js", "panels.html", "kanban.html")) {
             val html = resourceText(page)
             for ((method, rawPath) in fetchedRoutes(html)) {
                 // strip template holes and query strings: `/api/vm/${id}/eval?x` → `/api/vm/…/eval`
@@ -184,6 +184,53 @@ class RouteParityGate {
             "elliptical child placement reappeared — concentric contexts are SQUARES, one shared center per ring")
         assertTrue(html.contains("_parentScope"),
             "the children tree (rings) must survive serialize/load — the concentric pass is gone")
+    }
+
+    // ── gate 2b: the board's primary verb is reachable by pointer ─────────
+
+    @Test
+    fun theBoardsAddVerbIsClickableAndNotKeyboardOnly() {
+        // A board whose only way to add a card was the Enter key read, to the
+        // person holding the mouse, as a board that does not work: the lane
+        // offered a bare input and no control. Both ways in must call the SAME
+        // addCard(), so neither can drift into being the "real" one.
+        val html = resourceText("kanban.html")
+
+        assertTrue(
+            Regex("""addrow\.appendChild\(\s*addBtn\s*\)""").containsMatchIn(html),
+            "the add row must carry a button, not only an input — Enter alone is not an affordance",
+        )
+        assertTrue(
+            Regex("""addBtn\.addEventListener\(\s*"click"""").containsMatchIn(html),
+            "the add button must be wired; a control that looks clickable and is not is worse than none",
+        )
+        // One verb, two entry points. If the click path and the Enter path stop
+        // sharing a body, one of them will rot unnoticed.
+        val submitBody = Regex("""const submit = \(\) => \{(.*?)\n    \};""", RegexOption.DOT_MATCHES_ALL)
+            .find(html)?.groupValues?.get(1)
+            ?: fail("the shared submit() the button and Enter both call is gone")
+        assertTrue(
+            "addCard(" in submitBody,
+            "submit() must reach addCard() — the one path that lowers through /api/invoke",
+        )
+        assertTrue(
+            Regex("""if \(e\.key === "Enter"\) submit\(\)""").containsMatchIn(html),
+            "Enter must go through the same submit() as the button",
+        )
+    }
+
+    // ── gate 2c: what the board persists, the board shows ──────────────────
+
+    @Test
+    fun theCardRendersTheTagsAndDependenciesTheBoardReturns() {
+        // /api/board has carried owner, tags and dependencies since the LCNC
+        // runner stopped dropping them. The card face rendered none of it, so a
+        // board could not answer "which change closed this?" or "what is this
+        // waiting on?" without a second tool. Persisted-and-invisible is the
+        // regression this stops.
+        val html = resourceText("kanban.html")
+        assertTrue(html.contains("it.tags"), "the card must render the tags the board returns")
+        assertTrue(html.contains("it.dependencies"), "the card must render the dependencies the board returns")
     }
 
     // ── gate 3: the served contract route carries the FULL contract ────────

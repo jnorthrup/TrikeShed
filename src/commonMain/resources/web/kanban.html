@@ -69,12 +69,28 @@
     font-size: 15px; padding: 2px 4px; line-height: 1; cursor: pointer;
   }
   .card .archive:hover { color: var(--danger); }
-  .addrow { padding: 0 10px 12px; }
+  .card .tags { display: flex; flex-wrap: wrap; gap: 4px; margin: 5px 0 0; }
+  .card .tag {
+    font-size: 10px; line-height: 1.5; padding: 1px 6px; border-radius: 999px;
+    background: var(--bg); color: var(--muted); border: 1px solid var(--line);
+  }
+  .card .tag.patch { color: var(--ok); border-color: var(--ok); }
+  .card .deps { font-size: 10px; color: var(--muted); margin-top: 4px; }
+  .addrow { padding: 0 10px 12px; display: flex; gap: 6px; align-items: stretch; }
   .addrow input {
-    width: 100%; font: inherit; padding: 7px 10px; border-radius: 8px;
+    flex: 1 1 auto; min-width: 0; font: inherit; padding: 7px 10px; border-radius: 8px;
     border: 1px dashed var(--line); background: transparent; color: var(--ink);
   }
   .addrow input:focus { outline: none; border-color: var(--accent); border-style: solid; }
+  /* Enter alone used to be the ONLY way to add a card. A board whose primary
+     verb is invisible reads as a board that does not work. */
+  .addrow button {
+    flex: 0 0 auto; font: inherit; line-height: 1; padding: 7px 12px; border-radius: 8px;
+    border: 1px solid var(--line); background: var(--panel); color: var(--muted);
+    cursor: pointer;
+  }
+  .addrow button:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); }
+  .addrow button:disabled { opacity: .45; cursor: default; }
   #toast {
     position: fixed; bottom: 22px; left: 50%; transform: translateX(-50%);
     background: var(--ink); color: var(--bg); border-radius: 10px; padding: 10px 18px;
@@ -226,11 +242,22 @@ function render(board) {
     const addrow = document.createElement("div");
     addrow.className = "addrow";
     const input = document.createElement("input");
-    input.placeholder = "+ Add a card, press Enter";
-    input.addEventListener("keydown", (e) => {
-      if (e.key === "Enter" && input.value.trim().length >= 3) addCard(input.value.trim(), lane, input);
-    });
+    input.placeholder = "Add a card…";
+    const addBtn = document.createElement("button");
+    addBtn.textContent = "Add";
+    addBtn.title = `Add a card to ${meta.name}`;
+    addBtn.disabled = true;
+    // One verb, two ways in: the button and Enter call the same addCard().
+    const submit = () => {
+      const title = input.value.trim();
+      if (title.length >= 3) addCard(title, lane, input);
+    };
+    const sync = () => { addBtn.disabled = input.value.trim().length < 3; };
+    input.addEventListener("input", sync);
+    input.addEventListener("keydown", (e) => { if (e.key === "Enter") submit(); });
+    addBtn.addEventListener("click", submit);
     addrow.appendChild(input);
+    addrow.appendChild(addBtn);
     laneEl.appendChild(addrow);
 
     laneEl.addEventListener("dragover", (e) => { e.preventDefault(); laneEl.classList.add("drop-ok"); });
@@ -254,7 +281,21 @@ function cardEl(it) {
   const heat = typeof it.attention === "number" && it.attention > 0
     ? `<span class="heat" title="attention">${it.contested ? "⚡" : "●"} ${(it.attention * 100).toFixed(0)}%</span>` : "";
   const owner = it.owner ? `<span class="owner">${escapeHtml(it.owner)}</span>` : "";
+  // /api/board has always returned tags and dependencies; the card used to drop
+  // both on the floor, so a board could not answer "which patch closed this?"
+  // or "what is this waiting on?" without a second tool.
+  const tags = (it.tags || []).length
+    ? `<div class="tags">${it.tags.map(t => {
+        const patch = String(t).startsWith("patch:");
+        const label = patch ? String(t).slice(6) : t;
+        return `<span class="tag${patch ? " patch" : ""}"${patch ? ' title="the change that closed this card"' : ""}>${escapeHtml(label)}</span>`;
+      }).join("")}</div>`
+    : "";
+  const deps = (it.dependencies || []).length
+    ? `<div class="deps" title="waits on">↳ ${it.dependencies.map(escapeHtml).join(", ")}</div>`
+    : "";
   el.innerHTML = `<div class="t">${escapeHtml(it.title || it.id)}</div>
+    ${tags}${deps}
     <div class="meta">${owner}${heat}<span>r${it.revision}</span></div>
     <button class="archive" title="Archive this card">×</button>`;
   el.querySelector(".archive").addEventListener("click", () => archiveCard(it));
