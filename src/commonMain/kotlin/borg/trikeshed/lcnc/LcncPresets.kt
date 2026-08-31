@@ -113,9 +113,9 @@ object LcncPresets {
         ),
         LcncPresetInfo(
             "preset-brain-mux", "Bring your own key",
-            does = "Finds which provider keys are already available to this machine and sends one prompt with the one you pick.",
-            needs = "At least one provider key present in the environment or saved credentials.",
-            see = "Which providers are reachable, and the answer to your prompt.",
+            does = "Finds which provider keys are already available to this machine, sends a prompt with the one that resolves, and shows the modelmux's strategy, last selection and quota standings.",
+            needs = "At least one provider key present in the environment, hermes .env, or saved credentials — nothing needs to be entered when one resolves.",
+            see = "Which providers are reachable, the answer to your prompt, and the mux's live meta (strategy, last selection, quota).",
             tweakFirst = "The prompt text.",
         ),
         LcncPresetInfo(
@@ -639,8 +639,8 @@ object LcncPresets {
                     params = mapOf("text" to "keymux recall —\nprefill dropdown resolves keys from\nenv, hermes .env, auth.json, harness.\nno key = no route for that provider."),
                     x = 30.0, y = 60.0),
                 LcncNode("m3", "note",
-                    params = mapOf("text" to "modelmux recall —\nfill model in prompt.chat.\neach model has caps (chat, conflict-resolve).\nrouting goes through KeyMux → provider."),
-                    x = 30.0, y = 280.0),
+                    params = mapOf("text" to "modelmux recall —\nfill model in prompt.chat.\neach model has caps (chat, conflict-resolve).\nrouting goes through KeyMux → provider.\nmux.meta shows strategy, last\nselection, and quota standings."),
+                    x = 30.0, y = 260.0),
                 LcncNode("c1", "credential.enter",
                     params = mapOf(
                         "key_type" to "nvidia",
@@ -650,7 +650,7 @@ object LcncPresets {
                     ), x = 400.0, y = 60.0),
                 LcncNode("p1", "prompt.chat",
                     params = mapOf(
-                        "prefill" to "nvidia",
+                        "prefill" to "(none — use env/harness keys)",
                         "url" to "https://integrate.api.nvidia.com/v1",
                         "key" to "",
                         "headers" to "[]",
@@ -658,11 +658,13 @@ object LcncPresets {
                         "maxTokens" to "128",
                         "temperature" to "0.3",
                         "prompt" to "Say hello in one sentence.",
-                    ), x = 400.0, y = 340.0),
-                LcncNode("d1", "result.confirm", x = 400.0, y = 600.0),
+                    ), x = 400.0, y = 260.0),
+                LcncNode("d1", "result.confirm", x = 400.0, y = 470.0),
                 LcncNode("n1", "note",
-                    params = mapOf("text" to "model action —\nprefill: select daemon-known provider\nor fill URL + key (password) manually.\nheaders: k-v pairs (name, value).\nOK patchcable = green card.\nERROR patchcable = red card.\nHTX: 200 → RESPONSE_OK,\nnon-200 → RESPONSE_ERROR."),
-                    x = 700.0, y = 340.0),
+                    params = mapOf("text" to "model action —\nenv-first: a model whose provider\nkey resolves runs with NOTHING entered.\nmanual: select a prefill provider or\nfill URL + key (password) as fallback.\nheaders: k-v pairs (name, value).\nOK patchcable = green card.\nERROR patchcable = red card.\nHTX: 200 → RESPONSE_OK,\nnon-200 → RESPONSE_ERROR."),
+                    x = 700.0, y = 260.0),
+                LcncNode("me1", "mux.meta", x = 400.0, y = 680.0),
+                LcncNode("dm1", "display", x = 700.0, y = 680.0),
             ).toSeries(),
             wires = listOf(
                 // c1/p1 are independent showcases (credential entry vs. model
@@ -672,8 +674,10 @@ object LcncPresets {
                 LcncWire("p1", "content", "d1", "content"),
                 LcncWire("p1", "ok", "d1", "ok"),
                 LcncWire("p1", "error", "d1", "error"),
+                // mux.meta → display: modelmux presence on the canvas.
+                LcncWire("me1", "meta", "dm1", "x"),
             ).toSeries(),
-            view = LcncView(x = 20.0, y = 20.0, zoom = 0.75),
+            view = LcncView(x = 20.0, y = 20.0, zoom = 0.5),
             seq = 10,
         )
         return LcncProgramConfix.toJson(program)

@@ -8,6 +8,13 @@ Boot the Oroboros daemon from a clean checkout or an existing forge home. This i
 # 1. Build the gate (once per checkout, or after source changes)
 ./gradlew jvmMainClasses --console=plain
 
+# 1b. Publish those classes to what the daemon actually runs from.
+#     The daemon's classpath is build/live/classes (+ build/staging/lib);
+#     jvmMainClasses does NOT refresh it, and the self-heal below only fires
+#     when build/live is ABSENT — a stale build/live boots silently stale, and
+#     your change simply will not be there.
+./gradlew hotswapFeed --console=plain
+
 # 2. Launch into a SCRATCH home (default for newcomers)
 #    ⚠ --home must be a FRESH directory. Pointing it at an existing forge
 #    home operates on production state — deleting WAL files, modifying
@@ -45,6 +52,7 @@ The classpath resolution order:
 | `--watch` | Loop forever (default) |
 | `--interval-ms N` | Poll cadence in ms |
 | `--home <path>` | Forge home directory |
+| `--kanban-port N` | HTTP port (default 8888). Use this for a second daemon — 8888 is the operator surface, and a scratch-home daemon squatting it makes a live board look empty |
 | `--repo <path>` | Repo work tree (default: cwd) |
 | `--debug` | Attach JDWP on :5005, suspend=n |
 | `--suspend` | JDWP suspend=y (block until debugger attaches) |
@@ -110,5 +118,6 @@ rm ~/Library/LaunchAgents/com.trikeshed.oroboros.plist
 |---------|-------|-----|
 | `CAS blob missing for ...` | `classpath.tsv` references a blob not in `cas/sha256/` | Re-run Path A from a checkout to re-absorb, or `./gradlew hotswapFeed` |
 | `AOT cache missing or empty` | Stale AOT file | Delete `~/.local/state/trikeshed/aot/oroboros-*.aot*` and reboot |
-| `Address already in use` | Port 8888 occupied | Use a different `--home` or kill the other process |
+| `Address already in use` | Port 8888 occupied | Use a different `--home` or kill the other process. Note `bin/oroboros-daemon` is a wrapper: killing its PID leaves the `java` child holding the port. Kill by classpath instead — `ps aux \| grep '[b]uild/live/classes' \| awk '{print $2}' \| xargs kill` |
+| Daemon serves an old version of your change | `build/live/classes` is stale | Run `./gradlew hotswapFeed` and restart; see step 1b |
 | `no build dirs, no forge manifest` | Neither checkout build nor forge home available | Run `./gradlew jvmMainClasses` first |

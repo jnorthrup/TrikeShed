@@ -272,6 +272,35 @@ class RequestFactoryProxyTest {
         assertTrue(!missing.ok && missing.error == "not_found", "expected a refusal, got $missing")
     }
 
+    // ── Kotlin target RPC through the same proxy ──────────────────
+
+    @Test
+    fun proxyCallsServerOwnedKotlinTargetsLocallyAndThroughTheRouter() = runTest {
+        val targets = mapOf(
+            "session.echo" to RequestFactoryRpcTarget { args ->
+                mapOf("echo" to args["text"], "count" to args.size)
+            },
+        )
+        val a = Node()
+        val server = RequestFactoryServerProxy(targets)
+        val local = RequestFactoryProxy(RelaxTransport.local(server.bind(a.db)))
+
+        val echoed = local.rpc("session.echo", mapOf("text" to "hello"))
+        assertTrue(echoed.ok, "rpc failed: $echoed")
+        @Suppress("UNCHECKED_CAST")
+        val result = echoed.result as Map<String, Any?>
+        assertEquals("hello", result["echo"])
+        assertEquals(1L, (result["count"] as Number).toLong())
+
+        val missing = local.rpc("session.nope")
+        assertTrue(!missing.ok, "missing target should fail as a receipt: $missing")
+        assertEquals("no_such_target", missing.error)
+
+        val routed = CouchWireRouter(a.db, PREFIX, rpcTargets = targets)
+        val remote = RequestFactoryProxy(RelaxTransport.http(exchangeFor(routed), "http://a/trikeshed"))
+        assertEquals("over-wire", ((remote.rpc("session.echo", mapOf("text" to "over-wire")).result as Map<*, *>)["echo"]))
+    }
+
     // ── honesty about what a document-only store cannot do ────────
 
     @Test

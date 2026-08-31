@@ -1,11 +1,14 @@
 package keymux
 
 import borg.trikeshed.lib.Series
+import borg.trikeshed.lib.emptySeriesOf
 import borg.trikeshed.lib.get
 import borg.trikeshed.lib.j
 import borg.trikeshed.lib.size
+import borg.trikeshed.lib.toSeries
 import borg.trikeshed.parse.json.JsonSupport
 import borg.trikeshed.userspace.nio.file.spi.FileOperations
+import borg.trikeshed.userspace.nio.platform.spi.SystemOperations
 import borg.trikeshed.userspace.reactor.MuxKeyEntry
 import borg.trikeshed.userspace.reactor.MuxKeyStatus
 import kotlinx.coroutines.currentCoroutineContext
@@ -21,6 +24,23 @@ import kotlinx.coroutines.currentCoroutineContext
  * is the bridge: a model card tagged with its provider makes `ModelMux.session()`
  * try `llm.<provider>.key` first, landing here.
  *
+ * **Env indirection** — Hermes externalizes most pool secrets: an entry's
+ * `source` field is either `"env:<VAR>"` (the credential lives in the process
+ * env or a hermes `.env` file) or an inline mechanism (`device_code`,
+ * `manual`, …) with the token in `access_token`. This source follows the same
+ * indirection: `env:<VAR>` answers from the process env first, then the hermes
+ * dotenv chain ($HERMES_HOME/.env, ~/.hermes/.env, ~/.hermes/profiles/<name>/.env) —
+ * so a key the operator already gave Hermes answers here with no second copy,
+ * which is the whole point of borrowing hermes' key access for proto testing.
+ * A pool entry whose key cannot be resolved does not win — selection falls
+ * through to the next-priority entry that can.
+ *
+ * **Both pools** — the active profile's pool (`<hermesHome>/auth.json`) and the
+ * default pool (`~/.hermes/auth.json`) are merged, profile first (its entries
+ * win per provider; a provider present in both carries rotation depth). Each
+ * carries a different provider set; merging is what makes "everything hermes
+ * can reach" one source.
+ *
  * Follows [PersistSource]'s pattern — file IO through the [FileOperations] SPI
  * from the coroutine context, so this stays a legal commonMain [KeySource]
  * subclass (a jvmMain subclass of a commonMain `sealed class` does not compile:
@@ -32,26 +52,48 @@ import kotlinx.coroutines.currentCoroutineContext
 class HermesCredentialSource(
     private val hermesHome: String = "~/.hermes",
     private val explicitFileOps: FileOperations? = null,
+    /** Test seam: pin env lookup instead of the real process env. */
+    private val getenv: (String) -> String? = { SystemOperations.default.getenv(it) },
 ) : KeySource() {
     override val name = "hermes-credential-pool"
 
     private var cachedPool: Map<String, List<Map<String, Any?>>>? = null
+    private val dotenvMemo = mutableMapOf<String, Map<String, String>>()
 
     private suspend fun fileOps(): FileOperations =
         explicitFileOps
             ?: currentCoroutineContext()[FileOperations.Key]
             ?: error("No FileOperations found in coroutine context for HermesCredentialSource")
 
+    private suspend fun fileOpsOrNull(): FileOperations? =
+        explicitFileOps ?: currentCoroutineContext()[FileOperations.Key]
+
     override suspend fun read(path: KeyPath): String? {
         if (path.size != 3 || path[0] != "llm") return null
         val provider = path[1]
         val field = path[2]
+        // base_url and key resolve INDEPENDENTLY: an entry that cannot answer
+        // a key (env:VAR nobody set) still carries the provider's base_url —
+        // the key just falls through the KeyMux chain, the endpoint does not.
         val entry = bestEntry(provider) ?: return null
         return when (field) {
-            "key" -> str(entry["access_token"])
+            "key" -> keyFor(entry)
             "base_url" -> str(entry["base_url"]) ?: str(entry["inference_base_url"])
             else -> null
         }
+    }
+
+    /**
+     * The key an entry actually answers with: `env:<VAR>` follows the hermes
+     * indirection (process env, then the dotenv chain); anything else is the
+     * inline `access_token`. Null when neither yields a value.
+     */
+    private suspend fun keyFor(entry: Map<String, Any?>): String? {
+        val source = str(entry["source"])
+        if (source != null && source.startsWith("env:")) {
+            return envOrDotenv(source.substring("env:".length))
+        }
+        return str(entry["access_token"])?.takeIf { it.isNotBlank() }
     }
 
     override suspend fun write(path: KeyPath, value: String) {
@@ -60,6 +102,7 @@ class HermesCredentialSource(
 
     override suspend fun invalidate() {
         cachedPool = null
+        dotenvMemo.clear()
     }
 
     /**
@@ -77,13 +120,19 @@ class HermesCredentialSource(
         return out.size j { out[it] }
     }
 
-    /** The entry a call would actually use for [provider] right now, or null if none is usable. */
+    /**
+     * The entry a call would actually use for [provider] right now, or null if
+     * none is usable. "Usable" = not dead, not still cooling down, AND able to
+     * answer a key (its `env:<VAR>` indirection resolves, or it carries an
+     * inline token) — an unresolvable pool row must not win.
+     */
     suspend fun bestEntry(provider: String): Map<String, Any?>? {
         val entries = loadPool()[provider] ?: return null
         val alive = entries.filterNot { str(it["last_status"]) == "dead" }
         if (alive.isEmpty()) return null
         val now = kotlinx.datetime.Clock.System.now().toEpochMilliseconds()
-        return alive.filter { isUsableNow(it, now) }.minByOrNull { int(it["priority"]) }
+        val usable = alive.filter { isUsableNow(it, now) && keyFor(it) != null }
+        return usable.minByOrNull { int(it["priority"]) }
             ?: alive.minByOrNull { int(it["priority"]) }
     }
 
@@ -119,10 +168,36 @@ class HermesCredentialSource(
     private suspend fun loadPool(): Map<String, List<Map<String, Any?>>> {
         cachedPool?.let { return it }
         val ops = fileOps()
-        val file = ops.resolvePath(hermesHome, "auth.json")
-        if (!ops.exists(file)) return emptyMap<String, List<Map<String, Any?>>>().also { cachedPool = it }
+        // The ACTIVE profile's pool first (profile entries win per provider),
+        // then the default ~/.hermes pool as a union — each carries a different
+        // provider set (copilot/custom:* live only in the default pool today).
+        val files = mutableListOf<String>()
+        val active = ops.resolvePath(hermesHome, "auth.json")
+        files += active
+        val default = ops.resolvePath("~", ".hermes", "auth.json")
+        if (default != active) files += default
+        val out = LinkedHashMap<String, List<Map<String, Any?>>>()
+        for (file in files) {
+            val pool = loadPoolFile(ops, file) ?: continue
+            for ((provider, entries) in pool) {
+                val existing = out[provider]
+                if (existing != null) {
+                    // Provider in both pools: profile rows first, default rows
+                    // appended (a second pool entry = rotation depth, not a
+                    // conflict).
+                    out[provider] = existing + entries
+                } else {
+                    out[provider] = entries
+                }
+            }
+        }
+        return out.also { cachedPool = it }
+    }
+
+    private suspend fun loadPoolFile(ops: FileOperations, file: String): Map<String, List<Map<String, Any?>>>? {
+        if (!ops.exists(file)) return null
         val parsed = runCatching { JsonSupport.parse(ops.readString(file)) }.getOrNull() as? Map<*, *>
-            ?: return emptyMap<String, List<Map<String, Any?>>>().also { cachedPool = it }
+            ?: return null
         val pool = (parsed["credential_pool"] as? Map<*, *>) ?: emptyMap<Any?, Any?>()
         val out = LinkedHashMap<String, List<Map<String, Any?>>>()
         for ((k, v) in pool) {
@@ -133,7 +208,44 @@ class HermesCredentialSource(
             } ?: continue
             out[provider] = entries
         }
-        return out.also { cachedPool = it }
+        return out
+    }
+
+    // ── env:<VAR> indirection (mirrors HarnessSource's dotenv chain) ──────────
+
+    private suspend fun envOrDotenv(name: String): String? {
+        getenv(name)?.takeIf { it.isNotBlank() }?.let { return it }
+        val ops = fileOpsOrNull() ?: return null
+        val files = dotenvFiles(ops)
+        for (i in 0 until files.size) {
+            dotenv(ops, files[i])?.get(name)?.takeIf { it.isNotBlank() }?.let { return it }
+        }
+        return null
+    }
+
+    private fun dotenvFiles(ops: FileOperations): Series<String> {
+        val home = getenv("HOME") ?: return emptySeriesOf()
+        val defaultHermes = "$home/.hermes"
+        val hh = getenv("HERMES_HOME")
+        val out = mutableListOf<String>()
+        if (hh != null) out += "$hh/.env"
+        if (hh != defaultHermes) out += "$defaultHermes/.env"
+        val profilesDir = "$defaultHermes/profiles"
+        if (runCatching { ops.isDir(profilesDir) }.getOrDefault(false)) {
+            for (p in runCatching { ops.listDir(profilesDir) }.getOrDefault(emptyList()).sorted()) {
+                val f = "$profilesDir/$p/.env"
+                if (f !in out) out += f
+            }
+        }
+        return out.toSeries()
+    }
+
+    private suspend fun dotenv(ops: FileOperations, file: String): Map<String, String>? {
+        dotenvMemo[file]?.let { return it }
+        if (!runCatching { ops.isFile(file) }.getOrDefault(false)) return null
+        val parsed = parseDotenv(runCatching { ops.readString(file) }.getOrNull() ?: return null)
+        dotenvMemo[file] = parsed
+        return parsed
     }
 
     // ── boundary coercions — JSON minting is never trusted to be one type ──
@@ -163,6 +275,13 @@ class HermesCredentialSource(
     }
 }
 
-/** `KeyMux { hermes() }` — bind Hermes' credential pool under `llm.*.*`. */
-fun KeyMuxBuilder.hermes(hermesHome: String = "~/.hermes"): KeyMuxBuilder =
-    bind("llm.*.*", HermesCredentialSource(hermesHome))
+/** `KeyMux { hermes() }` — bind Hermes' credential pool under `llm.*.*`.
+ *  [fileOps] explicit: coroutine contexts don't reliably carry FileOperations
+ *  (the daemon's KeyMux reads from non-coroutine boot paths), so the daemon
+ *  passes its JvmFileOperations — without it the pool silently degrades to
+ *  nothing. */
+fun KeyMuxBuilder.hermes(
+    hermesHome: String = "~/.hermes",
+    fileOps: FileOperations? = null,
+): KeyMuxBuilder =
+    bind("llm.*.*", HermesCredentialSource(hermesHome, fileOps))

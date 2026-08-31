@@ -6,8 +6,37 @@ tasks anywhere; mark done with `- [x]`. Non-checkbox lines are ignored.
 
 ## Product
 
-- [ ] Collapse the three AppendWal implementations onto one SPI: delete the expect/actual pairs borg.trikeshed.kanban.AppendWal (jvmMain kanban/AppendWalJvm.kt) and borg.trikeshed.couch.wal.AppendWal (jvmMain couch/wal/AppendWalJvm.kt), route every call site through borg.trikeshed.lib.AppendWal implemented by userspace/nio/file/spi/JvmAppendWal.kt
-- [ ] KanbanEventCodec decode parity: unescape JSON string content (\n \t \" \\ \uXXXX) when decoding WAL records — card titles and cause excerpts currently carry literal backslash-n because JsonParser.reify slices raw escaped token chars
+(no open tasks)
+
+<!--
+Struck 2026-08-30, same reason as the block below: both lines were standing orders
+against a world that had already changed, and one of them was a standing order to
+REINTRODUCE a bug.
+
+  - Collapse the three AppendWal implementations onto one SPI …
+    Already done. There is exactly one declaration — `borg.trikeshed.lib.AppendWal`
+    (commonMain/lib/appendWal.kt) — implemented by `JvmAppendWal`. Both files the
+    task named for deletion are absent (`jvmMain/kanban/AppendWalJvm.kt`,
+    `jvmMain/couch/wal/AppendWalJvm.kt`), no `couch/wal` package exists, and every
+    call site already imports `borg.trikeshed.lib.AppendWal` (JulesBoardStore,
+    JiraQueueAdapter, ModelCallLeaf, QueueGraphWork) or constructs `JvmAppendWal`
+    directly (JulesBoardStoreJvm, ReapAppend, and the tests). Nothing left to collapse.
+
+  - KanbanEventCodec decode parity: unescape JSON string content …
+    DANGEROUS AS WRITTEN — following it would put the bug back. The premise held once:
+    JsonParser used to hand back raw escaped chars, and an `unescape()` pass was added
+    to compensate. JsonParser was then fixed (`Json.kt` unescapeJson, lines 177/203),
+    which turned that compensating pass into a DOUBLE decode: a title containing `\"`
+    came back as `"`, and `\\` collapsed to `\`. Only the escapes people check (\n, \t)
+    looked right, which is why it survived. Fixed by DELETING the second pass in
+    KanbanEventCodec, and in ForgeBoardPersistence.decode where the same double-decode
+    also broke the contentId re-hash — a markdown description with a code fence or a
+    Windows path failed `require` and the envelope would not load at all.
+    Guarded now by KanbanEventCodecEscapeTest and ForgeBoardPersistenceEscapeTest.
+
+Kept as a comment, not deleted outright: non-checkbox lines are ignored by the inducter,
+so this records what was removed and why without re-arming any of it.
+-->
 
 <!--
 Struck 2026-08-30. Three lines here described work over classes that no longer exist, and

@@ -3,10 +3,23 @@
 package borg.trikeshed.relaxfactory
 
 import borg.trikeshed.couch.CouchDatabase
+import borg.trikeshed.couch.ViewServer
+import borg.trikeshed.couch.replicate.CouchReplicator
 import borg.trikeshed.couch.replicate.HttpExchange
 import borg.trikeshed.parse.json.JsonSupport
 import kotlin.io.encoding.Base64
 import kotlin.io.encoding.ExperimentalEncodingApi
+
+/**
+ * One server-owned Kotlin target callable through the RequestFactory envelope.
+ *
+ * The target owns its own authority: the envelope only carries a target name and a JSON object of
+ * arguments, then reports the target's JSON-shaped result. That keeps client and server proxying
+ * transport-agnostic without letting a document update pretend to be a host capability.
+ */
+fun interface RequestFactoryRpcTarget {
+    suspend fun call(args: Map<String, Any?>): Any?
+}
 
 /**
  * How an envelope reaches a [CouchRequestFactory]: JSON in, JSON out, one exchange.
@@ -139,6 +152,16 @@ sealed class RelaxOp {
         override fun toMap() = mapOf("op" to "replicate", "direction" to direction, "peer" to peer, "since" to since)
     }
 
+    /** Host capability call: a named Kotlin target plus JSON-shaped arguments. */
+    data class Rpc(val target: String, val args: Map<String, Any?> = emptyMap()) : RelaxOp() {
+        override fun toMap() = mapOf("op" to "rpc", "target" to target, "args" to args)
+    }
+
+    /** A validated escape hatch for already-shaped envelope operations. */
+    data class Raw(val fields: Map<String, Any?>) : RelaxOp() {
+        override fun toMap(): Map<String, Any?> = fields
+    }
+
     // ── projects: the heading a document hangs under ──────────────
 
     /** Declare a project heading, or update its manifest. */
@@ -191,6 +214,9 @@ class RelaxReceipt(val fields: Map<String, Any?>) {
 
     @Suppress("UNCHECKED_CAST")
     val diff: Map<String, Any?> get() = fields["diff"] as? Map<String, Any?> ?: emptyMap()
+
+    /** Result of a `rpc` operation. */
+    val result: Any? get() = fields["result"]
 
     override fun toString(): String = JsonSupport.stringify(fields)
 }
@@ -284,6 +310,10 @@ class RequestFactoryProxy(private val transport: RelaxTransport) {
     suspend fun replicate(direction: String, peer: String, since: Long? = null): RelaxReceipt =
         submit(RelaxOp.Replicate(direction, peer, since)).first
 
+    /** Call one server-owned Kotlin target through the same RequestFactory transport. */
+    suspend fun rpc(target: String, args: Map<String, Any?> = emptyMap()): RelaxReceipt =
+        submit(RelaxOp.Rpc(target, args)).first
+
     /** Declare a project heading, or update its manifest. */
     suspend fun projectPut(id: String, doc: Map<String, Any?> = emptyMap()): RelaxReceipt =
         submit(RelaxOp.ProjectPut(id, doc)).first
@@ -296,3 +326,26 @@ class RequestFactoryProxy(private val transport: RelaxTransport) {
     suspend fun projectDocs(id: String, under: String = "", includeDocs: Boolean = false): RelaxReceipt =
         submit(RelaxOp.ProjectDocs(id, under, includeDocs)).first
 }
+
+/**
+ * Server proxy for Kotlin RPC targets. It binds a target registry to the same
+ * [CouchRequestFactory] used by the Couch/Relax lanes; the client side remains
+ * [RequestFactoryProxy], regardless of whether the transport is local or HTTP.
+ */
+class RequestFactoryServerProxy(
+    val targets: Map<String, RequestFactoryRpcTarget> = emptyMap(),
+) {
+    fun bind(
+        store: RelaxStore,
+        viewServer: ViewServer = ViewServer(),
+    ): CouchRequestFactory = CouchRequestFactory(store, viewServer, targets)
+
+    fun bind(
+        db: CouchDatabase,
+        replicator: CouchReplicator? = null,
+        viewServer: ViewServer = ViewServer(),
+    ): CouchRequestFactory = CouchRequestFactory(RelaxStore.of(db, replicator), viewServer, targets)
+}
+
+/** The session-client role is the RequestFactory proxy with a transport selected by the host. */
+typealias RequestFactorySessionClient = RequestFactoryProxy

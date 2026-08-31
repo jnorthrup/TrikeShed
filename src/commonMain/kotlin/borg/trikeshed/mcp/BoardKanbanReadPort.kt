@@ -125,11 +125,11 @@ class BoardKanbanReadPort(
 
     companion object {
         /**
-         * The FULL card. `/api/board`'s summary projection drops tags,
-         * dependencies, and owner even though the store persists all three
-         * (audit finding: "read projection is thinner still"); an agent deciding
-         * what to work on needs exactly those, so the single-card resource
-         * carries them.
+         * The full card, addressed by id. `/api/board` carries the same fields
+         * (its `enrich` closed the audit's "read projection is thinner still"),
+         * but it is a whole-board read with no per-card route and no link to the
+         * change that produced the row — so this adds `lastSequence` and the
+         * receipt reference an agent needs to trace what it just did.
          */
         fun cardMap(row: CardRow): Map<String, Any?> = linkedMapOf(
             "id" to row.jobId,

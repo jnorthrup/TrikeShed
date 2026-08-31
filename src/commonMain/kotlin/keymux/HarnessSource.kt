@@ -48,6 +48,9 @@ object HarnessRegistry {
         HarnessProvider("kimi", s_["KIMI_API_KEY", "MOONSHOT_API_KEY"], "https://api.moonshot.ai/v1"),
         HarnessProvider("glm", s_["GLM_API_KEY", "ZHIPU_API_KEY"]),
         HarnessProvider("zhipu", s_["ZHIPU_API_KEY", "GLM_API_KEY"]),
+        HarnessProvider("zai", s_["ZAI_API_KEY", "GLM_API_KEY"], "https://api.z.ai/api/paas/v4"),
+        HarnessProvider("perplexity", s_["PERPLEXITY_API_KEY"], "https://api.perplexity.ai"),
+        HarnessProvider("minimax", s_["MINIMAX_API_KEY"], "https://api.minimax.chat/v1"),
         HarnessProvider("jules", s_["JULES_API_KEY"]),
         HarnessProvider("brain", s_["BRAIN_API_KEY"]),
         HarnessProvider("synthetic", s_["SYNTHETIC_API_KEY"], "https://api.synthetic.new/v1"),
@@ -198,23 +201,6 @@ class HarnessSource(
         return parsed
     }
 
-    internal fun parseDotenv(text: String): Map<String, String> {
-        val out = LinkedHashMap<String, String>()
-        for (line in text.lineSequence()) {
-            val t = line.trim()
-            if (t.isEmpty() || t.startsWith("#")) continue
-            val eq = t.indexOf('=')
-            if (eq <= 0) continue
-            val k = t.substring(0, eq).trim().removePrefix("export ").trim()
-            var v = t.substring(eq + 1).trim()
-            if (v.length >= 2 && ((v.startsWith('"') && v.endsWith('"')) || (v.startsWith('\'') && v.endsWith('\'')))) {
-                v = v.substring(1, v.length - 1)
-            }
-            if (k.isNotEmpty()) out[k] = v
-        }
-        return out
-    }
-
     // ── harness credential files ─────────────────────────────────────
 
     private suspend fun harnessFileKey(provider: String, entry: HarnessProvider): String? {
@@ -264,6 +250,25 @@ class HarnessSource(
 
     private suspend fun fileOpsOrNull(): FileOperations? =
         explicitFileOps ?: currentCoroutineContext()[FileOperations.Key]
+}
+
+/** Hermes dotenv parser — shared by [HarnessSource] and [HermesCredentialSource]
+ *  (both walk the same $HERMES_HOME/.env → ~/.hermes/.env → profiles chain). */
+internal fun parseDotenv(text: String): Map<String, String> {
+    val out = LinkedHashMap<String, String>()
+    for (line in text.lineSequence()) {
+        val t = line.trim()
+        if (t.isEmpty() || t.startsWith("#")) continue
+        val eq = t.indexOf('=')
+        if (eq <= 0) continue
+        val k = t.substring(0, eq).trim().removePrefix("export ").trim()
+        var v = t.substring(eq + 1).trim()
+        if (v.length >= 2 && ((v.startsWith('"') && v.endsWith('"')) || (v.startsWith('\'') && v.endsWith('\'')))) {
+            v = v.substring(1, v.length - 1)
+        }
+        if (k.isNotEmpty()) out[k] = v
+    }
+    return out
 }
 
 /** Builder arm: keys from environment AND the popular harnesses' credential stores. */

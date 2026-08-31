@@ -286,7 +286,18 @@ class KanbanModule : ForgeModule {
         // POST for, so `curl /api/mcp` is a useful thing to type.
         ctx.routes.claim(id, "/api/mcp") { method, _, text, _ ->
             when (method) {
-                "GET" -> JvmKanbanServer.HttpResponse(
+                // Streamable HTTP lets a client GET this path to open a
+                // server-initiated SSE stream. We do not offer one — which is
+                // exactly what `resources.subscribe: false` advertises — and the
+                // transport says a server without that stream MUST answer 405.
+                // Returning the human-readable card to a client that asked for
+                // `text/event-stream` hands it JSON where it expects a stream,
+                // which is a hang or a parse error rather than a clean refusal.
+                // So: negotiate. curl gets the card, a client gets the 405.
+                "GET" -> if (wantsEventStream(text)) JvmKanbanServer.HttpResponse(
+                    405,
+                    """{"error":"method_not_allowed","reason":"this server offers no GET event stream; POST JSON-RPC to this path"}""",
+                ) else JvmKanbanServer.HttpResponse(
                     200,
                     JsonSupport.stringify(
                         mapOf(
@@ -640,6 +651,12 @@ class KanbanModule : ForgeModule {
             ),
         )
     }
+
+    /** True when the caller asked for an SSE stream rather than a document. */
+    private fun wantsEventStream(text: String): Boolean =
+        text.lineSequence()
+            .takeWhile { it.isNotBlank() }
+            .any { it.startsWith("accept:", ignoreCase = true) && "text/event-stream" in it.lowercase() }
 
     private fun rawBody(text: String): String = when {
         "\r\n\r\n" in text -> text.substringAfter("\r\n\r\n")

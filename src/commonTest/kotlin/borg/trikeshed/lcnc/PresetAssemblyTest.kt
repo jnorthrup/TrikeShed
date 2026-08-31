@@ -26,7 +26,7 @@ class PresetAssemblyTest {
         assertEquals(
             setOf(
                 "preset-hermes", "preset-tribunal", "preset-curator",
-                "preset-context", "preset-kanban", "preset-scope", "preset-scope-inner",
+                "preset-context", "preset-kanban", "preset-ccek", "preset-scope", "preset-scope-inner",
                 "preset-pairs", "preset-brain-mux", "preset-media",
                 "preset-hermes-train", "preset-legal-tribunal", "preset-state-freeze",
                 "preset-council",

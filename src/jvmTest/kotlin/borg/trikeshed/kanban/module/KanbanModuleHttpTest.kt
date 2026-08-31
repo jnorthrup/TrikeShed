@@ -131,6 +131,144 @@ class KanbanModuleHttpTest {
         supervisor2.detach("kanban")
     }
 
+    /**
+     * KMFSM-006: MCP is mounted in the daemon's own lifecycle, reached over the
+     * real HTTP route rather than by calling the handler directly — and the
+     * board an MCP client writes is still there, through the same lens, after a
+     * restart. That last clause is the whole durability claim: an agent's card
+     * is not a session artifact.
+     */
+    @Test
+    fun mcpIsMountedOnTheDaemonAndItsBoardSurvivesRestart(): Unit = runBlocking {
+        val stateDir = tempDir("mcp")
+        val cas = CasStore.inMemory()
+        var rpcId = 0
+        fun rpc(server: JvmKanbanServer, method: String, params: Map<String, Any?>? = null): Map<String, Any?> {
+            val doc = buildMap<String, Any?> {
+                put("jsonrpc", "2.0"); put("id", ++rpcId); put("method", method)
+                params?.let { put("params", it) }
+            }
+            val resp = post(server, "/api/mcp", JsonSupport.stringify(doc))
+            assertEquals(200, resp.status, resp.body.take(200))
+            val parsed = json(resp)
+            assertTrue(parsed["error"] == null, "$method failed: ${parsed["error"]}")
+            @Suppress("UNCHECKED_CAST")
+            return parsed["result"] as Map<String, Any?>
+        }
+
+        fun readResource(server: JvmKanbanServer, uri: String): Map<*, *> {
+            val contents = arr(rpc(server, "resources/read", mapOf("uri" to uri))["contents"])
+            return JsonSupport.parse((contents.first() as Map<*, *>)["text"] as String) as Map<*, *>
+        }
+
+        // ── boot 1: an MCP client discovers the board and puts a card on it ──
+        val routes1 = ModuleRouteRegistry()
+        val server1 = JvmKanbanServer(moduleRoutes = routes1)
+        val supervisor1 = ModuleSupervisor(newContext(routes1, stateDir, cas))
+        supervisor1.attach(KanbanModule())
+
+        // The unauthenticated server card: what a human gets for typing the URL.
+        val card = json(get(server1, "/api/mcp"))
+        assertEquals("oroboros-lcnc-kanban", card["server"])
+        assertTrue(arr(card["tools"]).contains("kanban.submit"))
+
+        val handshake = rpc(server1, "initialize", mapOf("protocolVersion" to "2025-06-18"))
+        assertEquals("2025-06-18", handshake["protocolVersion"])
+        assertEquals(202, post(server1, "/api/mcp", """{"jsonrpc":"2.0","method":"notifications/initialized"}""").status)
+
+        val tools = arr(rpc(server1, "tools/list")["tools"]).map { (it as Map<*, *>)["name"] }
+        assertEquals(listOf("kanban.submit", "kanban.move"), tools)
+
+        val submitted = rpc(
+            server1, "tools/call",
+            mapOf(
+                "name" to "kanban.submit",
+                "arguments" to mapOf("title" to "Written by an agent", "tags" to listOf("mcp"), "owner" to "agent"),
+            ),
+        )
+        assertEquals(false, submitted["isError"])
+        @Suppress("UNCHECKED_CAST")
+        val verdict = submitted["structuredContent"] as Map<String, Any?>
+        val jobId = verdict["jobId"] as String
+        assertTrue((verdict["cid"] as String).isNotBlank(), "a committed write must carry its CAS receipt")
+
+        // The very same card is visible on the ordinary board route — one board,
+        // two lenses, not an MCP-private sidecar.
+        val onBoard = arr(json(get(server1, "/api/board"))["items"]).map { it as Map<*, *> }
+        assertEquals(listOf(jobId), onBoard.map { it["id"] })
+        assertEquals("Written by an agent", onBoard.single()["title"])
+
+        val moved = rpc(
+            server1, "tools/call",
+            mapOf(
+                "name" to "kanban.move",
+                "arguments" to mapOf(
+                    "jobId" to jobId, "toColumn" to "running",
+                    "expectedRevision" to (verdict["revision"] as Number).toLong(),
+                ),
+            ),
+        )
+        assertEquals(false, moved["isError"])
+        supervisor1.detach("kanban")
+
+        // ── boot 2, same state dir: the WAL is the state ──
+        val routes2 = ModuleRouteRegistry()
+        val server2 = JvmKanbanServer(moduleRoutes = routes2)
+        val supervisor2 = ModuleSupervisor(newContext(routes2, stateDir, cas))
+        supervisor2.attach(KanbanModule())
+
+        val afterRestart = readResource(server2, "oroboros://lcnc/kanban/cards/$jobId")
+        assertEquals("running", afterRestart["status"], "the agent's card must survive the restart")
+        assertEquals(listOf("mcp"), arr(afterRestart["tags"]))
+        assertEquals("agent", afterRestart["owner"])
+
+        // And its receipt reference resolves after replay — rebuilt from the
+        // board, and honest that the committing command's cid is not indexed.
+        val receipt = readResource(server2, afterRestart["receiptResource"] as String)
+        assertEquals(jobId, receipt["jobId"])
+        assertEquals("replay", receipt["source"])
+        supervisor2.detach("kanban")
+    }
+
+    /**
+     * The streamable-HTTP transport detail that decides whether `claude mcp add
+     * --transport http …` actually works, rather than merely looking like it does.
+     *
+     * A client may GET the endpoint to open a server-initiated SSE stream. This
+     * server offers none — which is what `resources.subscribe: false` advertises
+     * — and the transport requires a server without that stream to answer 405.
+     * Handing back the human-readable server card instead gives a client
+     * `application/json` where it expects `text/event-stream`: a hang or a parse
+     * error rather than a clean refusal. So the route negotiates on Accept, and
+     * both halves of that are pinned here.
+     */
+    @Test
+    fun theMcpGetRefusesAnEventStreamButStillGreetsCurl(): Unit = runBlocking {
+        val routes = ModuleRouteRegistry()
+        val server = JvmKanbanServer(moduleRoutes = routes)
+        val supervisor = ModuleSupervisor(newContext(routes, tempDir("sse"), CasStore.inMemory()))
+        supervisor.attach(KanbanModule())
+
+        suspend fun getWith(accept: String?): JvmKanbanServer.HttpResponse {
+            val head = if (accept == null) "" else "Accept: $accept\r\n"
+            return server.routeHttp(
+                "GET /api/mcp HTTP/1.1\r\nHost: t\r\n$head\r\n".toByteArray(StandardCharsets.UTF_8),
+            )
+        }
+
+        assertEquals(405, getWith("text/event-stream").status, "a client opening an SSE stream must get a clean 405")
+        assertEquals(
+            405,
+            getWith("application/json, text/event-stream").status,
+            "a compound Accept that includes text/event-stream is still a stream request",
+        )
+        // A human with curl, and a client that only wants a document, still get the card.
+        assertEquals(200, getWith(null).status)
+        assertEquals(200, getWith("application/json").status)
+        assertEquals("oroboros-lcnc-kanban", json(getWith(null))["server"])
+        supervisor.detach("kanban")
+    }
+
     /** Phase 6: the EXACT shapes the updated script.js emits (+New prompt → submit; card click → move). */
     @Test
     fun updatedPwaPayloadsRoundTrip(): Unit = runBlocking {

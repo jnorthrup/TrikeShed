@@ -73,6 +73,7 @@ import kotlin.io.encoding.ExperimentalEncodingApi
 class CouchRequestFactory(
     val store: RelaxStore,
     val viewServer: ViewServer = ViewServer(),
+    val rpcTargets: Map<String, RequestFactoryRpcTarget> = emptyMap(),
 ) : RequestFactoryHandler {
 
     /** The store's replication/CAS lanes, when it has them. */
@@ -122,6 +123,7 @@ class CouchRequestFactory(
                 "block_get" -> blockGet(op["cid"] as? String ?: return failure(null, verb, "cid required"))
                 "block_put" -> blockPut(op["data"] as? String ?: return failure(null, verb, "data required (base64)"))
                 "replicate" -> replicate(op)
+                "rpc" -> rpc(op)
                 "project_put" -> projectPut(op)
                 "project_get" -> projectGet(id ?: return failure(null, verb, "id required"))
                 "project_list" -> projectList()
@@ -314,6 +316,18 @@ class CouchRequestFactory(
         return mapOf("ok" to true) + report
     }
 
+    // ── Kotlin targets: host-owned RPC through the same proxy lane ───────
+
+    private suspend fun rpc(op: Map<*, *>): Map<String, Any?> {
+        val target = op["target"] as? String ?: return failure(null, "rpc", "target required")
+        val args = op["args"]?.let { raw ->
+            raw as? Map<*, *> ?: return failure(null, "rpc", "args must be an object") + ("target" to target)
+        }?.entries?.associate { (k, v) -> k.toString() to v }.orEmpty()
+        val fn = rpcTargets[target]
+            ?: return failure(null, "no_such_target", "no Kotlin RPC target '$target'") + ("target" to target)
+        return mapOf("ok" to true, "target" to target, "result" to fn.call(args))
+    }
+
     // ── projects: the heading a document hangs under ──────────────
 
     private fun projectPut(op: Map<*, *>): Map<String, Any?> {
@@ -387,10 +401,15 @@ class CouchRequestFactory(
             db: CouchDatabase,
             replicator: CouchReplicator? = null,
             viewServer: ViewServer = ViewServer(),
-        ): CouchRequestFactory = CouchRequestFactory(RelaxStore.of(db, replicator), viewServer)
+            rpcTargets: Map<String, RequestFactoryRpcTarget> = emptyMap(),
+        ): CouchRequestFactory = CouchRequestFactory(RelaxStore.of(db, replicator), viewServer, rpcTargets)
 
         /** [CouchHttpSurface]'s document-only store: no changes log, so no lanes. */
-        fun forConfixStore(store: ConfixDocStore, viewServer: ViewServer = ViewServer()): CouchRequestFactory =
-            CouchRequestFactory(RelaxStore.of(store), viewServer)
+        fun forConfixStore(
+            store: ConfixDocStore,
+            viewServer: ViewServer = ViewServer(),
+            rpcTargets: Map<String, RequestFactoryRpcTarget> = emptyMap(),
+        ): CouchRequestFactory =
+            CouchRequestFactory(RelaxStore.of(store), viewServer, rpcTargets)
     }
 }

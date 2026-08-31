@@ -18,15 +18,19 @@ import borg.trikeshed.htx.HtxHeader
 import borg.trikeshed.htx.parseHtxRequest
 import borg.trikeshed.htx.htxHeaders
 import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.withContext
+import kotlin.coroutines.CoroutineContext
 
 /**
  * BrainMuxNodes — BrainClient decomposed as LCNC graph nodes.
  *
  *   - keys.status → KeyMux roster (which providers have keys)
  *   - mux.models → ModelMux model list (routable models + caps + provider)
+ *   - mux.meta → modelmux presence: strategy, last selection, quota standings
  *   - credential.enter → CouchKeyStore (CouchDB persistence)
  *   - prompt.chat → ModelMux.chat() (receipt-tracked, quota-metered)
  *   - result.confirm → HTML confirmation dialog (OK/ERROR)
+ *   - display → passthrough sink (shared vocabulary)
  *   - note → passthrough no-op
  */
 object BrainMuxNodes {
@@ -35,6 +39,15 @@ object BrainMuxNodes {
         keyMux: KeyMux? = null,
         modelMux: ModelMux? = null,
         credStore: CouchKeyStore? = null,
+        /**
+         * Coroutine context the chat rides under. MUST carry [HtxElement] under
+         * [HtxKey] and the MuxReactorElement — [ModelMux.chat] resolves the HTX
+         * client and the reactor (receipt/cache/lease metering) from the caller's
+         * context. The CCEK assembly scope rides the reactor but NOT the HTX
+         * element, so without this the ModelMux path threw
+         * "No HtxKey found in coroutine context" on every call.
+         */
+        chatContext: CoroutineContext? = null,
     ): Map<String, LcncNodeRunner> = mapOf(
 
         // ── keys.status ─────────────────────────────────────────────
@@ -98,7 +111,45 @@ object BrainMuxNodes {
             mapOf("models" to models)
         },
 
+        // ── mux.meta ────────────────────────────────────────────────
+        // Modelmux presence: the ranking discipline in force, the most recent
+        // selection this mux made, and the quota legion's standings (usable-
+        // first). Empty lists/absent fields when the reactor ledger is not yet
+        // warm — meta is a live projection, never a guess.
+        "mux.meta" to LcncNodeRunner { _, _ ->
+            if (modelMux == null) return@LcncNodeRunner mapOf("meta" to emptyList<Any>())
+            val meta = linkedMapOf<String, Any?>(
+                "strategy" to modelMux.strategyName,
+                "selection" to modelMux.lastSelection?.let { sel ->
+                    linkedMapOf<String, Any?>(
+                        "provider" to sel.provider,
+                        "model" to sel.model,
+                        "strategy" to sel.strategy,
+                        "requestId" to sel.requestId,
+                        "at" to sel.at,
+                    )
+                },
+            )
+            val standings = runCatching {
+                modelMux.quotaStandings(kotlinx.datetime.Clock.System.now().toEpochMilliseconds())
+            }.getOrDefault(emptyList())
+            meta["quota"] = standings.map { s ->
+                linkedMapOf<String, Any?>(
+                    "keyId" to s.keyId,
+                    "provider" to s.provider,
+                    "limit" to s.limit,
+                    "spent" to s.spent,
+                    "remaining" to s.remaining,
+                    "exhausted" to s.exhausted,
+                    "utilization" to s.utilization,
+                )
+            }
+            mapOf("meta" to meta)
+        },
+
         // ── credential.enter ────────────────────────────────────────
+        // Output carries manualKey/manualUrl so the panel's prefill lane
+        // can read the manual entry back without re-typing.
         "credential.enter" to LcncNodeRunner { node, _ ->
             val keyType = node.params["key_type"] ?: ""
             val url = node.params["url"] ?: ""
@@ -113,7 +164,8 @@ object BrainMuxNodes {
                 "key_type" to keyType,
                 "url" to url,
                 "api_type" to apiType,
-                "key" to key,
+                "manualKey" to key,
+                "manualUrl" to url,
             ))
         },
 
@@ -129,11 +181,14 @@ object BrainMuxNodes {
 
             val model = node.params["model"] ?: ""
 
-            val prefill = node.params["prefill"] ?: "(manual)"
+            // Prefill sentinel: the env-first default — resolve through the
+            // ModelMux/KeyMux chain (env → dotenv → harness stores) and only
+            // fall to manual fields when no provider key resolves.
+            val prefill = node.params["prefill"] ?: "(none — use env/harness keys)"
             var apiKey = node.params["key"] ?: ""
             var baseUrl = node.params["url"] ?: ""
 
-            if (prefill != "(manual)" && credStore != null) {
+            if (prefill.isNotBlank() && !prefill.startsWith("(none") && credStore != null) {
                 val stored = credStore.readCredential(prefill)
                 if (stored != null) {
                     if (apiKey.isBlank()) apiKey = stored["key"].orEmpty()
@@ -162,16 +217,25 @@ object BrainMuxNodes {
             val temperature = (node.params["temperature"] ?: "0.2").toDoubleOrNull() ?: 0.2
 
             // Primary path: route through ModelMux when available —
-            // receipt-tracked, quota-metered, cache-backed.
+            // receipt-tracked, quota-metered, cache-backed. Rides [chatContext]
+            // because ModelMux.chat resolves HtxKey + MuxReactorElement from the
+            // caller's context, and the CCEK assembly scope lacks HtxKey.
             if (modelMux != null) {
                 val acpMessages: Series<AcpMessage> = 1 j { _: Int -> "user" j prompt }
-                val result = runCatching {
-                    modelMux.chat(
-                        modelId = model,
-                        messages = acpMessages,
-                        maxTokens = maxTokens,
-                        temperature = temperature,
-                    ).getOrThrow()
+                val result = try {
+                    val chatCt = chatContext ?: currentCoroutineContext()
+                    withContext(chatCt) {
+                        modelMux.chat(
+                            modelId = model,
+                            messages = acpMessages,
+                            maxTokens = maxTokens,
+                            temperature = temperature,
+                        ).getOrThrow()
+                    }.let { Result.success(it) }
+                } catch (t: kotlinx.coroutines.CancellationException) {
+                    throw t
+                } catch (t: Throwable) {
+                    Result.failure(t)
                 }
                 return@LcncNodeRunner result.fold(
                     onSuccess = { response ->
@@ -193,7 +257,13 @@ object BrainMuxNodes {
                 )
             }
             val extraHeaders = parseHeaders(node.params["headers"] ?: "")
-            val chatResult = directHtxChat(baseUrl, apiKey, model, prompt, maxTokens, temperature, extraHeaders)
+            val chatResult = if (chatContext != null) {
+                withContext(chatContext) {
+                    directHtxChat(baseUrl, apiKey, model, prompt, maxTokens, temperature, extraHeaders)
+                }
+            } else {
+                directHtxChat(baseUrl, apiKey, model, prompt, maxTokens, temperature, extraHeaders)
+            }
             chatResult.fold(
                 onSuccess = { content ->
                     mapOf("content" to content, "model" to model, "ok" to true, "error" to "")
@@ -230,7 +300,7 @@ object BrainMuxNodes {
     )
 
     fun servedTypes(): Set<String> = setOf(
-        "keys.status", "mux.models",
+        "keys.status", "mux.models", "mux.meta",
         "credential.enter", "prompt.chat", "result.confirm", "note",
     )
 
@@ -245,7 +315,7 @@ object BrainMuxNodes {
         maxTokens: Int,
         temperature: Double,
         headers: List<Pair<String, String>>,
-    ): Result<String> = runCatching {
+    ): Result<String> = try {
         val bodyMap = linkedMapOf<String, Any?>(
             "model" to model,
             "max_tokens" to maxTokens,
@@ -276,7 +346,12 @@ object BrainMuxNodes {
             ?: error("empty choices")
         val message = first["message"] as? Map<*, *>
             ?: error("no message in choice")
-        message["content"] as? String ?: error("no content in message")
+        (message["content"] as? String)?.let { Result.success(it) }
+            ?: Result.failure(IllegalStateException("no content in message"))
+    } catch (t: kotlinx.coroutines.CancellationException) {
+        throw t
+    } catch (t: Throwable) {
+        Result.failure(t)
     }
 
     private fun parseHeaders(json: String): List<Pair<String, String>> {

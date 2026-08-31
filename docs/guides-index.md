@@ -10,6 +10,7 @@ Navigate the daemon surfaces. Each guide covers one surface: purpose, routes, wa
 |-------|---------|-----------------|
 | [Graal Console](guide-graal-console.md) | `/graal` | RTS commander view — vitals, terrain map, DAG cross-links, decompile, AOT cache, SSE events |
 | [Kanban Board](guide-kanban-board.md) | `/api/board` | Read the WAL-backed board, issue invoke commands, import plan docs |
+| [MCP Kanban](guide-mcp-kanban.md) | `/api/mcp` | Point Claude Code or any MCP client at the board — two tools, four resources, one durable store |
 | [NARS Beliefs](guide-nars-beliefs.md) | `/api/beliefs` | Drive the NARS curation loop — belief bag, review induction, decay tick, teach/query |
 | [Couch Surface](guide-couch-surface.md) | `/{db}/*` | Couch 1.6-style document CRUD, `_changes` feed, `_replicate` pull/push |
 | [Guest Worlds](guide-guest-worlds.md) | `/api/vm` + capsule | Spawn GraalPy sub-VMs, seed VFS directories, run pytest in the sandbox |

@@ -332,6 +332,14 @@ class ModelMux internal constructor(
                         error = IllegalStateException("HTTP ${resp.status}"),
                     )
                 )
+                // 429 → rotate: the current credential is rate-limited; the next
+                // session() call must resolve a different key from the persist pool.
+                // rotate() cycles through PersistSource entries and invalidates
+                // the CachedKeySource so the fresh value is read, not the stale one.
+                if (resp.status == 429 && keyId != null) {
+                    runCatching { keyMux.rotate(keyId) }
+                        .onFailure { println("[MODELMUX] rotate($keyId) failed: ${it.message}") }
+                }
                 return Result.failure(IllegalStateException("ModelMux chat failed with HTTP ${resp.status}: ${respBody.take(500)}"))
             }
 

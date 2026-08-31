@@ -67,6 +67,8 @@ object RouteManifest {
             RouteEntry("GET", "/api/lcnc/contracts", "full LCNC contract vocabulary"),
             RouteEntry("POST", "/api/lcnc/run", "generic runner dispatch"),
             RouteEntry("GET", "/api/lcnc/council", "council case read-back: index fact + transcript/verdict from CAS (?caseId=<id>)"),
+            RouteEntry("GET", "/api/mcp", "MCP server card: protocol versions, tools, resource URIs"),
+            RouteEntry("POST", "/api/mcp", "MCP JSON-RPC: the LCNC Kanban board as tools and resources"),
         ),
         // -- GraalWire: console + terrain + ingest + capsule + occupy --
         "GraalWire" to listOf(

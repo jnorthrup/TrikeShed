@@ -62,13 +62,19 @@ private fun OpenApiRawDocument.resolveOperation(raw: OpenApiRawOperation): Resol
         },
         responses = operation["responses"].resolverMap().orEmpty().mapNotNull { (status, response) ->
             val node = response.resolverMap() ?: return@mapNotNull null
+            // OpenAPI response keys are quoted in YAML ("200":) because a bare 200
+            // would be an integer key, and the YAML reader hands the key back with
+            // its quotes still attached. Parsing it raw made EVERY status code 0 —
+            // silently, because nothing read this field until a parity test did.
+            // Unquote before converting, or the model cannot describe a response.
+            val code = status.trim().removeSurrounding("\"").removeSurrounding("'")
             ResolvedResponse(
-                statusCode = status.toIntOrNull() ?: 0,
+                statusCode = code.toIntOrNull() ?: 0,
                 description = node["description"].resolverString(),
                 contentTypes = node["content"].resolverMap().orEmpty().map { (mediaType, content) ->
                     ContentType(mediaType, resolveSchema(content.resolverMap()?.get("schema")), content.resolverMap()?.get("example"))
                 },
-                isDefault = status == "default",
+                isDefault = code == "default",
             )
         },
         security = emptyList(),

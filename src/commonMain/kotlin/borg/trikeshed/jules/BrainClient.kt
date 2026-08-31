@@ -221,6 +221,23 @@ class BrainClient(
     suspend fun quotaStandings(nowMs: Long): List<modelmux.QuotaStanding> =
         internalModelMux.quotaStandings(nowMs)
 
+    /**
+     * The ModelMux this client chats through — provider-tagged cards over the
+     * full roster (external-keyMux mode) or the discovered subset (standalone).
+     */
+    fun modelMux(): modelmux.ModelMux = internalModelMux
+
+    /**
+     * The machine's full provider capability set — the static [rosterInto]
+     * table (name/envVar/base/model + auto-derived provider tag), un-gated by
+     * key presence. Exposed so the LCNC surface can build a mux over the
+     * daemon's shared KeyMux that reflects every provider this machine COULD
+     * talk to, independent of the Brain's runtime pin (which narrows the
+     * Brain's own dispatch to a single endpoint but must not narrow the
+     * panel's view of the machine).
+     */
+    fun providerRoster(): List<EndpointSpec> = fullRoster()
+
     /** The static provider table (ungated) — discoverEndpoints() is this, filtered by key presence. */
     private fun fullRoster(): List<EndpointSpec> {
         val out = mutableListOf<EndpointSpec>()

@@ -36,6 +36,8 @@ data class LcncPortContract(
 }
 
 object LcncContracts {
+    private val PORT_KIND_OPTIONS = listOf("", "json", "text", "id", "trigger", "num")
+
     /** Concentric-scope vocabulary (spec §4): the call, the binding, the return. */
     const val SCOPE = "scope"
     const val SCOPE_IN = "scope.in"
@@ -72,7 +74,7 @@ object LcncContracts {
                 // ⇒ the ring accepts any kind (a frame binding is Any?, and pretending
                 // otherwise is what made the shipped council preset undrawable).
                 "kind" to LcncPortContract.LcncParamSpec(
-                    opts = listOf("", "json", "text", "id", "trigger"),
+                    opts = PORT_KIND_OPTIONS,
                     ph = "declared parameter kind — empty = generic"),
             )),
         LcncPortContract(SCOPE_OUT, "scope.out (return value)",
@@ -81,7 +83,7 @@ object LcncContracts {
             params = mapOf(
                 "name" to LcncPortContract.LcncParamSpec(ph = "return name"),
                 "kind" to LcncPortContract.LcncParamSpec(
-                    opts = listOf("", "json", "text", "id", "trigger"),
+                    opts = PORT_KIND_OPTIONS,
                     ph = "declared yield kind — empty = generic"),
             ),
             isSink = true),
@@ -217,6 +219,11 @@ object LcncContracts {
             listOf("trigger?"), listOf("models"),
             inputKinds = mapOf("trigger" to "trigger"),
             outputKinds = mapOf("models" to "json")),
+        // mux.meta: modelmux presence — strategy, last selection, quota standings.
+        LcncPortContract("mux.meta", "mux meta (modelmux presence)",
+            listOf("trigger?"), listOf("meta"),
+            inputKinds = mapOf("trigger" to "trigger"),
+            outputKinds = mapOf("meta" to "json")),
         LcncPortContract("project.kill", "project db kill",
             listOf("trigger?"), listOf("verdict"),
             inputKinds = mapOf("trigger" to "trigger"),
@@ -304,6 +311,25 @@ object LcncContracts {
             inputKinds = mapOf("body" to "json"),
             outputKinds = mapOf("json" to "json"),
             params = mapOf("path" to LcncPortContract.LcncParamSpec(v = "/api/submit"))),
+        LcncPortContract("rf.rpc", "requestfactory rpc",
+            listOf("target?", "args?"), listOf("result", "receipt"),
+            inputKinds = mapOf("target" to "text", "args" to "json"),
+            outputKinds = mapOf("result" to "json", "receipt" to "json"),
+            params = mapOf(
+                "target" to LcncPortContract.LcncParamSpec(v = "session.info", ph = "Kotlin target name"),
+                "args" to LcncPortContract.LcncParamSpec(v = "{}", ta = true, ph = "JSON object args"),
+            )),
+        LcncPortContract("rf.batch", "requestfactory batch",
+            listOf("operations"), listOf("ok", "receipts"),
+            inputKinds = mapOf("operations" to "json"),
+            outputKinds = mapOf("ok" to "json", "receipts" to "json"),
+            params = mapOf(
+                "operations" to LcncPortContract.LcncParamSpec(
+                    v = """[{"op":"rpc","target":"session.info","args":{}}]""",
+                    ta = true,
+                    ph = "RequestFactory operation objects",
+                ),
+            )),
 
         // ── media: an audio/video player as a PATCH PANEL citizen — every
         // control is a patch point: url arrives on a text wire, the
@@ -783,19 +809,27 @@ object LcncContracts {
         // ── BrainClient decomposition as LCNC ──────────────────────
         // credential.enter: manual key-type/url/api-type/key entry →
         //   stored in CouchDB via CouchKeyStore, resolvable by KeyMux.
+        //   The key field is a secret (password input) — the panel renders
+        //   type=password when the placeholder carries the `secret:` prefix.
         LcncPortContract("credential.enter", "credential enter (manual → CouchDB)",
             emptyList(), listOf("credential"),
             outputKinds = mapOf("credential" to "json"),
             params = mapOf(
-                "key_type" to LcncPortContract.LcncParamSpec(ph = "provider id (nvidia, openai, groq…)", v = "nvidia"),
+                "key_type" to LcncPortContract.LcncParamSpec(
+                    ph = "provider id", v = "nvidia",
+                    opts = listOf("nvidia", "openai", "deepseek", "groq", "zai",
+                        "cerebras", "xai", "moonshot", "minimax", "openrouter", "perplexity")),
                 "url" to LcncPortContract.LcncParamSpec(ph = "base URL", v = "https://integrate.api.nvidia.com/v1"),
                 "api_type" to LcncPortContract.LcncParamSpec(v = "openai", opts = listOf("openai", "anthropic", "google")),
-                "key" to LcncPortContract.LcncParamSpec(ph = "API key"),
+                "key" to LcncPortContract.LcncParamSpec(ph = "secret:API key"),
             )),
-        // prompt.chat: a dirt-simple prompt → model → content. Uses manual
-        //   credentials from params or CouchKeyStore, calls via [chatFn] (HTX client).
-        //   Outputs content + model + ok/error status for downstream display.
-        LcncPortContract("prompt.chat", "prompt chat (manual credentials)",
+        // prompt.chat: prompt → model → content. Credential precedence,
+        //   highest first: (1) the ModelMux key chain — KeyMux resolves
+        //   llm.<provider>.key from env → dotenv → harness stores, so a model
+        //   with a resolvable key runs with NOTHING entered; (2) the prefill
+        //   CouchKeyStore entry; (3) the manual url+key fields. The key field
+        //   is a password input (secret: prefix).
+        LcncPortContract("prompt.chat", "prompt chat (modelmux, env-first)",
             listOf("prompt?"), listOf("content", "model", "ok", "error"),
             inputKinds = mapOf("prompt" to "text"),
             outputKinds = mapOf("content" to "text", "model" to "id", "ok" to "json", "error" to "text"),
@@ -803,13 +837,14 @@ object LcncContracts {
                 "prompt" to LcncPortContract.LcncParamSpec(ta = true, ph = "prompt text"),
                 "prefill" to LcncPortContract.LcncParamSpec(
                     ph = "prefill from daemon keys",
-                    opts = listOf("(manual)", "nvidia", "openai", "groq", "deepseek", "openrouter", "xai")),
-                "url" to LcncPortContract.LcncParamSpec(ph = "base URL", v = "https://integrate.api.nvidia.com/v1"),
-                "key" to LcncPortContract.LcncParamSpec(ph = "secret:API key"),
+                    opts = listOf("(none — use env/harness keys)", "nvidia", "openai", "deepseek",
+                        "groq", "zai", "cerebras", "xai", "moonshot", "minimax", "openrouter", "perplexity")),
+                "url" to LcncPortContract.LcncParamSpec(ph = "base URL (manual fallback)", v = "https://integrate.api.nvidia.com/v1"),
+                "key" to LcncPortContract.LcncParamSpec(ph = "secret:API key (manual fallback)"),
                 "headers" to LcncPortContract.LcncParamSpec(
                     cols = listOf("name", "value"),
                     ph = "extra headers (k-v pairs)"),
-                "model" to LcncPortContract.LcncParamSpec(ph = "model id", v = "deepseek-ai/deepseek-v4-flash"),
+                "model" to LcncPortContract.LcncParamSpec(ph = "model id (mux.models lists what resolves)", v = "deepseek-ai/deepseek-v4-flash"),
                 "maxTokens" to LcncPortContract.LcncParamSpec(v = "256"),
                 "temperature" to LcncPortContract.LcncParamSpec(v = "0.2"),
             )),
@@ -856,7 +891,7 @@ object LcncContracts {
         // because no such port is declared.
         LcncPortContract(SubVm.LEGO_PREFIX + "modules", "modules: audit mounted guest classpaths",
             emptyList(), listOf("modules", "count"),
-            outputKinds = mapOf("modules" to "json", "count" to "number"),
+            outputKinds = mapOf("modules" to "json", "count" to "json"),
             params = mapOf(
                 "module" to LcncPortContract.LcncParamSpec(v = ""),
                 "verify" to LcncPortContract.LcncParamSpec(v = "false", opts = listOf("false", "true")),

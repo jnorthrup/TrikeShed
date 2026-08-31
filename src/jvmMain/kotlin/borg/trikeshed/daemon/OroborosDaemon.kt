@@ -270,15 +270,32 @@ object OroborosDaemon {
     }
 
     private suspend fun kotlinx.coroutines.CoroutineScope.mainImpl(args: Array<String>) {
-        // KeyMux: harness lane first (conventional env names + hermes .env +
-        // codex/opencode credential files, 5-minute discovery cache), then the
-        // legacy derived-name env lane (LLM_<X>_KEY, 24-hour cache) as fallback.
+        // KeyMux, env-FIRST: harness lane (conventional env names + hermes .env
+        // + codex/opencode credential files), then the legacy derived-name env
+        // lane (LLM_<X>_KEY), then the hermes CREDENTIAL POOL as the borrowing
+        // lane — providers the operator configured in hermes but not in this
+        // process env (credential_pool, priority-ordered with cooldowns,
+        // following hermes' own env:<VAR> indirection). 5-minute caches.
         // fileOps is explicit: coroutine contexts don't reliably carry FileOperations,
-        // and without it the dotenv/auth.json lanes silently degrade to env-only.
+        // and without it the dotenv/auth.json/pool lanes silently degrade to env-only.
         val fileOps = JvmFileOperations()
+        // The ACTIVE hermes profile's pool is the operator's live credential
+        // store; HERMES_HOME names it (falls back to the default ~/.hermes
+        // when the env var is unset). resolvePath expands ~ to $HOME, so the
+        // explicit $HERMES_HOME value is what actually gets read.
+        val hermesHome = System.getenv("HERMES_HOME") ?: "~/.hermes"
         val keyMux = KeyMux {
+            // env-FIRST: the harness lane (conventional env names + hermes .env
+            // + codex/opencode credential files) and the legacy env lane answer
+            // before the pool, so an env key always outranks a pool row. The
+            // pool (credential_pool — hermes' OWN keys, priority-ordered with
+            // cooldowns, following its env:<VAR> indirection) is the borrowing
+            // lane: providers the operator configured in hermes but not in this
+            // process env. 5-minute caches so pool rotation and exhaustion
+            // cooldowns are picked up.
             cached("*", keymux.HarnessSource(explicitFileOps = fileOps), ttlMs = 5 * 60_000L)
             cached("*", EnvSource())
+            cached("llm.*.*", keymux.HermesCredentialSource(hermesHome, fileOps), ttlMs = 5 * 60_000L)
         }
         // Probe early so a missing key aborts before opening the HTX reactor.
         val apiKeyPresent = kotlinx.coroutines.withContext(Dispatchers.IO) { keyMux.get("JULES_API_KEY") }
@@ -557,6 +574,8 @@ object OroborosDaemon {
         // One replicator, held by both mountings: `POST _replicate` drives it as a route, and the
         // RequestFactory's `replicate` operation drives the same object inside a batch.
         val couchReplicator = borg.trikeshed.couch.replicate.CouchReplicator(couchDb, peerHttp)
+        val requestFactoryRpcTargets =
+            java.util.concurrent.ConcurrentHashMap<String, borg.trikeshed.relaxfactory.RequestFactoryRpcTarget>()
         // The ReportServer, declared here rather than beside the other wires because the router
         // needs it: with it attached, every `_view` and every envelope `query` puts its map and
         // reduce facts on the CCEK report bus. Without it those events had no producer at all.
@@ -568,6 +587,7 @@ object OroborosDaemon {
                 WorktreeCouchGateway.WORKTREE_PREFIX,
                 replicator = couchReplicator,
                 report = reportReactorForWires,
+                rpcTargets = requestFactoryRpcTargets,
             ) { ddoc, view ->
                 incrementalViews.lookup(ddoc, view)
             },
@@ -1013,6 +1033,24 @@ object OroborosDaemon {
             ccekBinding = ccekBinding,
             programLoader = storedProgramLoader,
         )
+        requestFactoryRpcTargets["session.info"] = borg.trikeshed.relaxfactory.RequestFactoryRpcTarget { args ->
+            linkedMapOf<String, Any?>(
+                "db" to couchDb.info(),
+                "args" to args,
+                "lcnc" to linkedMapOf<String, Any?>(
+                    "contracts" to borg.trikeshed.lcnc.LcncContracts.all().size,
+                    "runners" to moduleContext.lcncRunners.size,
+                ),
+                "rpcTargets" to requestFactoryRpcTargets.keys.sorted(),
+            )
+        }
+        moduleContext.lcncRunners.putAll(
+            borg.trikeshed.lcnc.RequestFactoryNodes.registry(
+                borg.trikeshed.relaxfactory.RequestFactoryProxy(
+                    borg.trikeshed.relaxfactory.RelaxTransport.local(couchWire.router.requestFactory),
+                ),
+            ),
+        )
         // Step K: the context-assembly node family is host-composed like any module's
         // runners — webhook dispatch and program runs can mint real context receipts.
         moduleContext.lcncRunners.putAll(borg.trikeshed.memory.ace.AceContextNodes.registry(daemonBlackboard))
@@ -1232,26 +1270,26 @@ object OroborosDaemon {
                 }
             }
         }
-        // ModelMux for the mux.models LCNC node — enumerates routable models.
+        // ModelMux for the mux.* LCNC nodes: built from the brain's full
+        // provider ROSTER (the static table, un-gated) over the daemon's
+        // shared KeyMux — so the panel reflects every provider this machine
+        // could talk to, not the brain's runtime pin (GLM single-endpoint).
+        // One key pool: every card's provider tag resolves llm.<provider>.key
+        // through the same env → dotenv → harness chain keys.status reports.
+        // chatContext rides HtxKey + the MuxReactor: ModelMux.chat resolves
+        // the HTX client and reactor metering from the caller's context, and
+        // the CCEK assembly scope carries the reactor but NOT the HTX element.
         val lcncModelMux = modelmux.ModelMux(keyMux) {
-            val nvidia = "https://integrate.api.nvidia.com/v1"
-            model(id = "deepseek-ai/deepseek-v4-pro", caps = setOf("chat"), baseUrl = nvidia)
-            model(id = "nvidia/nemotron-3-super-120b-a12b", caps = setOf("chat"), baseUrl = nvidia)
-            model(id = "mistralai/mistral-large-2-instruct", caps = setOf("chat"), baseUrl = nvidia)
-            model(id = "z-ai/glm-5.2", caps = setOf("chat"), baseUrl = nvidia)
-            model(id = "moonshotai/kimi-k2.6", caps = setOf("chat"), baseUrl = nvidia)
-            model(id = "openai/gpt-oss-120b", caps = setOf("chat"), baseUrl = nvidia)
-            model(id = "minimaxai/minimax-m3", caps = setOf("chat"), baseUrl = nvidia)
-            model(id = "poolside/laguna-xs-2.1", caps = setOf("chat"), baseUrl = nvidia)
-            model(id = "gpt-4o-mini", caps = setOf("chat"), baseUrl = "https://api.openai.com/v1")
-            model(id = "llama-3.3-70b-versatile", caps = setOf("chat"), baseUrl = "https://api.groq.com/openai/v1")
-            model(id = "deepseek-chat", caps = setOf("chat"), baseUrl = "https://api.deepseek.com/v1")
+            brainClient.providerRoster().forEach { ep ->
+                model(id = ep.model, caps = setOf("chat", "conflict-resolve"), baseUrl = ep.base, provider = ep.provider)
+            }
         }
         moduleContext.lcncRunners.putAll(
             borg.trikeshed.lcnc.BrainMuxNodes.registry(
                 keyMux = keyMux,
                 modelMux = lcncModelMux,
                 credStore = couchKeyStore,
+                chatContext = htxElement + muxReactor,
             ),
         )
         launch(Dispatchers.Default) {

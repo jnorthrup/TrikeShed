@@ -309,14 +309,19 @@ object KanbanEventCodec {
         is JulesCause.WorkIdentitySynthesized -> "WorkIdentitySynthesized"
     }
 
-    private fun Map<*, *>.str(k: String): String = this[k]?.toString()?.let { unescape(it) } ?: ""
-    private fun Map<*, *>.optStr(k: String): String? = this[k]?.toString()?.let { unescape(it) }
+    // NO second unescape pass here. `JsonSupport.parse` (Json.kt `unescapeJson`)
+    // already decodes string content, so re-decoding it ate one layer of
+    // backslashes: a title containing `\"` came back as `"`, and `\\` collapsed
+    // to `\`. The escapes people notice — \n and \t — looked fine either way,
+    // which is why it survived. `doc/todo.md` asked for the unescape because
+    // JsonParser used to hand back raw escaped chars; once the parser was fixed
+    // this became the compensating bug, not the fix.
+    // KanbanEventCodecEscapeTest round-trips every escape the task named.
+    private fun Map<*, *>.str(k: String): String = this[k]?.toString() ?: ""
+    private fun Map<*, *>.optStr(k: String): String? = this[k]?.toString()
     private fun Map<*, *>.num(k: String): Long = (this[k] as? Number)?.toLong() ?: 0L
     private fun Map<*, *>.strings(k: String): List<String> =
-        (this[k] as? List<*>)?.mapNotNull { it?.toString()?.let(::unescape) } ?: emptyList()
-
-    private fun unescape(v: String): String =
-        if (!v.contains('\\')) v else borg.trikeshed.util.jsonUnescape(v)
+        (this[k] as? List<*>)?.mapNotNull { it?.toString() } ?: emptyList()
 
     private fun StringBuilder.field(k: String, v: String) {
         append(",\"").append(k).append("\":")

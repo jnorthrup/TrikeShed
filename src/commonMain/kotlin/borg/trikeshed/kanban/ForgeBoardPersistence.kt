@@ -66,8 +66,14 @@ object ForgeBoardPersistence {
 
     fun decode(encoded: String): ForgeKanbanSource {
         val fields = JsonSupport.parse(encoded) as? Map<*, *> ?: error("source envelope is not an object")
+        // NO second unescape pass: `JsonSupport.parse` already decoded these
+        // strings, and decoding them again ate a layer of backslashes. Here that
+        // was not cosmetic — `description` is markdown (code fences, regexes,
+        // Windows paths all carry backslashes), and the contentId check below
+        // re-hashes it, so a corrupted description failed the `require` and the
+        // envelope would not load at all. Same defect as KanbanEventCodec.
         fun string(key: String): String =
-            jsonUnescape(fields[key] as? String ?: error("missing $key"))
+            fields[key] as? String ?: error("missing $key")
 
         val version = (fields["version"] as? Number)?.toInt()
             ?: error("missing version")
@@ -88,5 +94,6 @@ object ForgeBoardPersistence {
         return source
     }
 
-    private fun jsonUnescape(value: String): String = borg.trikeshed.util.jsonUnescape(value)
+    // (the private jsonUnescape wrapper went with the double-decode above —
+    //  `JsonSupport.parse` is the only unescape this envelope needs)
 }

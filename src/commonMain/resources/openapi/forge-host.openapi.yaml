@@ -69,8 +69,10 @@ paths:
       operationId: invoke
       summary: reactor invoke
       responses:
-        "200":
-          description: ok
+        "202":
+          description: accepted - per-command results {accepted,rejected,results}
+        "400":
+          description: empty body or malformed JSON
   /api/vm:
     get:
       operationId: vmList

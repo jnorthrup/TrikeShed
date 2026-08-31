@@ -2,6 +2,7 @@ package keymux
 
 import borg.trikeshed.lib.get
 import borg.trikeshed.lib.size
+import borg.trikeshed.userspace.nio.platform.spi.SystemOperations
 import borg.trikeshed.userspace.reactor.MuxKeyStatus
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
@@ -149,4 +150,104 @@ class HermesCredentialSourceTest {
         }
         assertEquals("sk-gem", mux.get("llm.gemini.key"))
     }
+
+    // ── env:<VAR> indirection — hermes externalizes pool secrets ─────────
+
+    /** Source whose env lookup rides the test [envScope] (JVM getenv is read-only). */
+    private fun srcWithEnv(hermesHome: String, fs: KeyMuxTest.FakeFileOperations) =
+        HermesCredentialSource(hermesHome, fs) { envScope.lookup(it) }
+
+    @Test
+    fun envIndirectionAnswersFromProcessEnv() = runTest {
+        val json = """{"credential_pool": {"opencode-go": [
+            {"provider":"opencode-go","id":"a","label":"go","priority":0,
+             "auth_type":"api_key","source":"env:HERMES_POOL_TEST_VAR",
+             "base_url":"https://opencode.ai/zen/go/v1","last_status":"ok"}
+        ]}}"""
+        assertEquals("sk-pooltest", envScope.with(mapOf("HERMES_POOL_TEST_VAR" to "sk-pooltest")) {
+            srcWithEnv("/hermes", fakeFs(json)).read("llm.opencode-go.key".toKeyPath())
+        }, "env:VAR must follow the operator's process env")
+    }
+
+    @Test
+    fun envIndirectionFallsBackToHermesDotenv() = runTest {
+        // VAR absent from process env — only the hermes .env chain carries it.
+        val json = """{"credential_pool": {"opencode-zen": [
+            {"provider":"opencode-zen","id":"a","label":"zen","priority":0,
+             "auth_type":"api_key","source":"env:HERMES_POOL_TEST_ZEN",
+             "base_url":"https://opencode.ai/zen/v1","last_status":"ok"}
+        ]}}"""
+        val fs = KeyMuxTest.FakeFileOperations(mutableMapOf(
+            "/hermes/auth.json" to json.encodeToByteArray(),
+            "/home/.hermes/.env" to "HERMES_POOL_TEST_ZEN=sk-dotenv\n".encodeToByteArray(),
+        ))
+        val getenv = { name: String ->
+            when (name) {
+                "HOME" -> "/home"          // pins the dotenv chain to the fake fs
+                "HERMES_POOL_TEST_ZEN" -> null  // not in process env
+                else -> null
+            }
+        }
+        val src = HermesCredentialSource("/hermes", fs, getenv)
+        assertEquals("sk-dotenv", src.read("llm.opencode-zen.key".toKeyPath()),
+            "env:VAR with no process value must fall through to the hermes .env files")
+    }
+
+    @Test
+    fun unresolvableEnvEntryDoesNotWin() = runTest {
+        // Priority-0 row references a VAR nobody set; priority-9 row is inline.
+        // The unresolvable row must NOT win — the answerable one does.
+        val json = """{"credential_pool": {"nvidia": [
+            {"provider":"nvidia","id":"a","label":"env-missing","priority":0,
+             "auth_type":"api_key","source":"env:HERMES_POOL_TEST_MISSING","last_status":"ok"},
+            {"provider":"nvidia","id":"b","label":"inline","priority":9,
+             "auth_type":"api_key","source":"manual","access_token":"sk-inline","last_status":"ok"}
+        ]}}"""
+        val src = HermesCredentialSource("/hermes", fakeFs(json), { null })
+        assertEquals("sk-inline", src.read("llm.nvidia.key".toKeyPath()),
+            "a pool row whose env:VAR cannot be resolved must fall through to the next answerable entry")
+    }
+
+    @Test
+    fun defaultPoolIsMergedInWhenProfilePoolIsSparse() = runTest {
+        // Provider only in the profile pool; another provider only in default.
+        val profile = """{"credential_pool": {"zai": [
+            {"provider":"zai","id":"a","label":"z","priority":0,
+             "auth_type":"api_key","source":"manual","access_token":"sk-zai","last_status":"ok"}
+        ]}}"""
+        val default = """{"credential_pool": {"copilot": [
+            {"provider":"copilot","id":"gh","label":"gh","priority":0,
+             "auth_type":"api_key","source":"manual","access_token":"sk-gh","last_status":"ok"}
+        ]}}"""
+        val fs = KeyMuxTest.FakeFileOperations(mutableMapOf(
+            "/hermes/auth.json" to profile.encodeToByteArray(),
+            "~/.hermes/auth.json" to default.encodeToByteArray(),
+        ))
+        val src = HermesCredentialSource("/hermes", fs)
+        assertEquals("sk-zai", src.read("llm.zai.key".toKeyPath()), "profile pool provider")
+        assertEquals("sk-gh", src.read("llm.copilot.key".toKeyPath()), "default-only provider must be reachable")
+    }
 }
+
+/**
+ * The JVM's `System.getenv` is read-only, so the source's env lookup is a
+ * constructor seam. This object re-routes lookups for the duration of a test
+ * (single-threaded runTest): a pinned var wins, everything else falls through
+ * to the real process env.
+ */
+private class EnvScope {
+    private val pinned = mutableMapOf<String, String>()
+
+    fun lookup(name: String): String? = pinned[name] ?: SystemOperations.default.getenv(name)
+
+    suspend fun <T> with(pinnedVars: Map<String, String>, block: suspend () -> T): T {
+        pinned.putAll(pinnedVars)
+        try {
+            return block()
+        } finally {
+            pinned.keys.removeAll { pinnedVars.containsKey(it) }
+        }
+    }
+}
+
+private val envScope = EnvScope()

@@ -5,6 +5,12 @@
 > **Scope:** documentation and live-source inspection only; no external market survey, code change, live-board mutation, or flywheel dispatch
 >
 > **Decision:** the proposed marketability backlog below is inert until a human explicitly imports or submits it
+>
+> **Update 2026-08-30:** the MCP half of the implementation backlog
+> (KMFSM-004/005/006) is built, tested, and documented — see
+> [Delivery record](#delivery-record--2026-08-30) and
+> [`guide-mcp-kanban.md`](guide-mcp-kanban.md). The MKT-001…015 market backlog
+> is unchanged and still inert.
 
 ## Executive finding
 
@@ -87,14 +93,14 @@ research are tasks, not invented findings.
 | Dimension | State | Repository evidence | Deficiency to close |
 |---|---|---|---|
 | Product spine | Amber | Oroboros absorbs worktree/git/build deltas into CAS/Couch, exposes LCNC Kanban and VM surfaces, and has a live replication wire | The first screen says JSON scanner/database, real-mess corpus engine, Forge workspace, embodiment platform, and escape-velocity host without choosing one buyer outcome |
-| LCNC Kanban asset | Green architecture; Red packaging | `LcncKanbanExperience` composes operational sheets and existing submit/move runners over the durable store | No concise LCNC-user outcome, asset-specific quickstart, proof demo, MCP discovery surface, or reason to adopt it over an ordinary board |
+| LCNC Kanban asset | Green architecture; Amber packaging *(was Red — updated 2026-08-30)* | `LcncKanbanExperience` composes operational sheets and existing submit/move runners over the durable store; `/api/mcp` projects both to any MCP client, and `guide-mcp-kanban.md` carries the quickstart and a restart-proof walkthrough | Still no named LCNC-user outcome or evidenced reason to adopt it over an ordinary board — the remaining gap is a claim, not a surface |
 | Beachhead user | Red | README asks people with large messy corpora to try it | No named ideal user, urgent job, disqualifier, or buying trigger |
-| Demonstrable outcome | Amber | One process exposes `/`, `/graal`, board, Couch, corpus, LCNC, and VM routes | No frozen ten-minute proof with expected outputs on a clean machine |
-| Claim evidence | Amber | Guides use live/stub/unverified markers and the Couch gap addendum records a two-node pull | No single claim-to-command-to-artifact evidence matrix; several high-level claims require reading multiple dated documents |
-| Onboarding | Amber/Red | Quickstart and daemon launch guide exist | JDK/GraalVM 25, Gradle staging, state-home choices, and clean-machine timing are not reduced to a verified buyer trial |
+| Demonstrable outcome | Amber/Green *(updated 2026-08-30)* | One process exposes `/`, `/graal`, board, Couch, corpus, LCNC, and VM routes; `scripts/demo-mcp-kanban.sh` is a frozen 15-check proof — scratch home, port 8899, MCP write → board parity → CAS receipt → stale-revision refusal → WIP limit → restart replay — exiting non-zero when a claim stops holding | The frozen proof covers the LCNC Kanban/MCP workflow, not the corpus or VM surfaces; clean-machine timing (MKT-005) is still unmeasured |
+| Claim evidence | Amber *(narrowed 2026-08-30)* | Guides use live/stub/unverified markers; the Couch gap addendum records a two-node pull; `scripts/demo-mcp-kanban.sh --evidence proof.json` emits a claim-to-command-to-artifact bundle (15 claims with expected/observed/verdict, git rev, dirty flag, JDK, platform, timings) | The bundle covers the LCNC Kanban/MCP claims only. Corpus, VM, Couch and replication claims still have no captured artifact, and the README's high-level claims are unreconciled |
+| Onboarding | Amber *(was Amber/Red — updated 2026-08-30)* | Quickstart and daemon launch guide exist; `scripts/demo-mcp-kanban.sh` self-times a trial — **22s to first value** (boot → card on the board), **43s** total including restart-and-replay, 428M of build artifacts, 3.9M of forge state for the run, on JDK 25.0.4.1 | Measured on ONE machine with warm Gradle/build caches. A true clean-machine number (cold clone, cold Gradle, first compile) and a second machine are still unmeasured — MKT-005 asks for both |
 | Reliability | Amber | Board WAL replay, CAS payloads, single writer, idempotency, revisions, and guards are strong | Store/replication durability is uneven; live demo recovery and two-node acceptance evidence are not a release gate |
 | Trust boundary | Red for remote use; Amber for local demo | Gap analysis explicitly says Couch 1.6 shape is an embodiment platform, not a secure database; NUID capability substrate exists | No concise deployment boundary, threat model, authenticated remote-board policy, or MCP write authorization contract |
-| API/product integration | Amber/Red | HTTP board routes are live and LCNC routes are mounted | Forge OpenAPI omits module/import/LCNC routes, documents `/api/invoke` as 200 while the module returns 202, and exposes no MCP contract |
+| API/product integration | Amber *(was Amber/Red — updated 2026-08-30)* | HTTP board routes are live, LCNC routes are mounted, and an MCP contract exists at `/api/mcp` with a route-manifest parity gate covering its paths | Forge OpenAPI still omits module/import/LCNC routes and documents `/api/invoke` as 200 while the module returns 202; MCP tool/resource schemas have no parity gate |
 | Work representation | Red for audit work | Cards have title, column, revision, sequence, priority, order, dependencies, tags, owner | Public reads omit dependencies/tags; no description, evidence, acceptance criteria, customer, deliverable, scoring, dates, or artifact links |
 | Packaging | Red | AGPLv3 is stated; wrapper and launchers exist | No release artifact, supported platform matrix, version promise, upgrade/backup contract, or support boundary |
 | Positioning and alternatives | Red | Architecture differentiators are documented | No evidence-based comparison against the buyer's current alternative, including “keep using files/scripts/hosted tools” |
@@ -315,16 +321,75 @@ These are design tasks only and are not dispatched by this document.
 
 | Id | Proposed task | Acceptance gate |
 |---|---|---|
-| KMFSM-001 | Declare `LcncKanbanExperience` as the user-facing asset and `BoardStoreElement`/`BoardCol` as its durable state contract; classify legacy FSMs as adapters or telemetry | Architecture test or static gate proves MCP reaches Kanban through LCNC and no write reaches legacy `ForgeBoardFSM` or telemetry `KanbanFSM` |
+| KMFSM-001 | ✅ **Static gate done 2026-08-30.** Declare `LcncKanbanExperience` as the user-facing asset and `BoardStoreElement`/`BoardCol` as its durable state contract; classify legacy FSMs as adapters or telemetry | Architecture test or static gate proves MCP reaches Kanban through LCNC and no write reaches legacy `ForgeBoardFSM` or telemetry `KanbanFSM` |
 | KMFSM-002 | Decide and publish the legal transition table as part of the LCNC Kanban contract | Every state/verb pair has an allow/reject fixture shared by LCNC, HTTP, UI, and MCP |
 | KMFSM-003 | Define an optional marketability Confix facet and LCNC sheet projection without changing the base Kanban contract | Round-trip preserves the marketability manifest, including acceptance and evidence fields, across restart and active-sheet reprojection; ordinary LCNC cards remain valid unchanged |
-| KMFSM-004 | Expose LCNC Kanban sheets, cards, and receipts as MCP resources | Resource reads return the active-sheet family, watermark, revision, dependencies, metadata, and provenance without scanning raw WAL files |
-| KMFSM-005 | Expose existing `kanban.submit` and `kanban.move` LCNC runners as MCP tools | Tool calls delegate to the LCNC registry; duplicate keys and stale revisions preserve the existing rejection and sheet-result semantics |
-| KMFSM-006 | Mount MCP in the Oroboros lifecycle | One daemon serves the current stateless MCP version, supports capability discovery and required request metadata/header routing, and drains transport without a second server or nested blocking; any older handshake compatibility is explicit |
+| KMFSM-004 | ✅ **Done 2026-08-30.** Expose LCNC Kanban sheets, cards, and receipts as MCP resources | Resource reads return the active-sheet family, watermark, revision, dependencies, metadata, and provenance without scanning raw WAL files |
+| KMFSM-005 | ✅ **Done 2026-08-30.** Expose existing `kanban.submit` and `kanban.move` LCNC runners as MCP tools | Tool calls delegate to the LCNC registry; duplicate keys and stale revisions preserve the existing rejection and sheet-result semantics |
+| KMFSM-006 | ✅ **Done 2026-08-30.** Mount MCP in the Oroboros lifecycle | One daemon serves the current stateless MCP version, supports capability discovery and required request metadata/header routing, and drains transport without a second server or nested blocking; any older handshake compatibility is explicit |
 | KMFSM-007 | Define the write security boundary | Local-only default is enforced or a NUID board-write capability is required and tested; read/write capabilities are separate |
 | KMFSM-008 | Add LCNC query and manifest semantics | Filtered sheet resources and a documented partial/atomic batch policy can import all MKT records without field loss |
-| KMFSM-009 | Establish route/protocol parity | OpenAPI/MCP schemas and live route/tool registries fail tests when status codes, paths, fields, or capabilities drift |
-| KMFSM-010 | Prove restart and concurrent-client behavior | Integration test covers submit, stale transition, duplicate retry, restart replay, and two MCP clients racing one revision |
+| KMFSM-009 | ✅ **Done 2026-08-30.** Establish route/protocol parity | OpenAPI/MCP schemas and live route/tool registries fail tests when status codes, paths, fields, or capabilities drift |
+| KMFSM-010 | ✅ **Done 2026-08-30.** Prove restart and concurrent-client behavior | Integration test covers submit, stale transition, duplicate retry, restart replay, and two MCP clients racing one revision |
+
+## Delivery record — 2026-08-30
+
+KMFSM-004, KMFSM-005, and KMFSM-006 shipped. The audit's ownership rule is now
+executable rather than aspirational, and the user-facing surface it enables is
+documented in [`guide-mcp-kanban.md`](guide-mcp-kanban.md).
+
+| What | Where |
+|---|---|
+| The projection (JSON-RPC, tools, resources, schema) | `src/commonMain/kotlin/borg/trikeshed/mcp/LcncKanbanMcp.kt` |
+| Read port + receipt index | `src/commonMain/kotlin/borg/trikeshed/mcp/BoardKanbanReadPort.kt` |
+| Daemon mount at `GET`/`POST /api/mcp` | `src/jvmMain/kotlin/borg/trikeshed/kanban/module/KanbanModule.kt` |
+| Manifest entries (drift gate) | `src/jvmMain/kotlin/borg/trikeshed/lcnc/RouteManifest.kt` |
+| 19 behavioural cases against a live WAL board | `src/jvmTest/kotlin/borg/trikeshed/mcp/LcncKanbanMcpTest.kt` |
+| Static ownership gate (KMFSM-001) | `src/jvmTest/kotlin/borg/trikeshed/mcp/McpKanbanOwnershipTest.kt` |
+| Concurrent-client races (KMFSM-010) | `src/jvmTest/kotlin/borg/trikeshed/mcp/McpKanbanRaceTest.kt` |
+| MCP surface + guide parity (KMFSM-009) | `src/jvmTest/kotlin/borg/trikeshed/mcp/McpSurfaceParityTest.kt` |
+| OpenAPI status-code parity (KMFSM-009) | `src/jvmTest/kotlin/borg/trikeshed/reactor/openapi/ForgeHostSpecStatusParityTest.kt` |
+| Frozen runnable proof (MKT-003, partial) | `scripts/demo-mcp-kanban.sh` |
+| Captured evidence bundle (MKT-004, partial) | `scripts/demo-mcp-kanban.sh --evidence <path>` |
+| Mount + write + restart + read-back over real HTTP | `KanbanModuleHttpTest.mcpIsMountedOnTheDaemonAndItsBoardSurvivesRestart` |
+
+Two findings from the body of this audit were closed as a side effect:
+
+- **The write side of "read projection is thinner still."** `/api/board` had
+  already been enriched with owner/dependencies/tags (`KanbanModule.boardJson`'s
+  `enrich`), so the *read* gap named in the table above is closed. The **write**
+  was still losing them: the LCNC `kanban.submit` runner dropped tags,
+  dependencies, and owner even though `BoardStoreElement.advanceRow` has always
+  persisted all three — so an LCNC-submitted card could never carry a
+  dependency, and the cycle guard had nothing to guard. The runner now forwards
+  them, which fixes the panels canvas and `/api/lcnc/run` at the same time.
+  Repaired inside LCNC rather than routed around, per the ownership rule.
+  (The MCP card resource adds single-card addressing and a receipt link, which
+  `/api/board` does not offer — not a different field set.)
+- **KMFSM-002's policy decision** is answered by publishing the policy the store
+  *enforces* (`open`, plus four named guards) in the schema resource, rather
+  than a happy-path diagram nothing checks.
+
+### Deliberate deviations from the sketch above
+
+- **Submit does not require a client-minted `jobId`/`idempotencyKey`.** Both
+  have deterministic defaults — the id is the title's content hash, the key is
+  `submit#<jobId>` — so stable ids and retry-safety are preserved without
+  making a client invent them. Every accepted write still *returns* both.
+- **Tool results do not echo the full sheet family.** They carry the verdict,
+  the compact `boardView`, and a `sheetsResource` pointer; the whole family is a
+  resource. A client pays for the board once rather than on every mutation.
+
+### Still open
+
+KMFSM-002 as a *narrower* policy if one is ever wanted, KMFSM-003
+(marketability facet), KMFSM-007 (**write authorization — the daemon binds
+`0.0.0.0` with no auth on `/api/*`; MCP adds no new exposure class, since
+`/api/invoke` was already an unauthenticated write, but it does add an eager
+caller**), and KMFSM-008 (filtered queries, atomic import).
+
+MKT-001 through MKT-015 remain untouched and inert: they need a human's market
+decisions and interviews, not code.
 
 ## Gate for importing the proposed marketability backlog
 

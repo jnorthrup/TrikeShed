@@ -37,6 +37,16 @@ class LcncContractParityTest {
     }
 
     @Test
+    fun portKindsUseCanonicalVocabulary() {
+        val allowed = setOf("json", "text", "id", "trigger", "num")
+        for (c in LcncContracts.all()) {
+            for ((port, kind) in c.inputKinds + c.outputKinds) {
+                assertTrue(kind in allowed, "${c.type}.$port uses non-canonical kind '$kind'")
+            }
+        }
+    }
+
+    @Test
     fun sourcesAndSinksAreHonest() {
         // source = auto-firing (re-fires on its own clock); sink = chain
         // terminator; anything else is a manual/action node (vm.spawn fires

@@ -52,6 +52,8 @@ class CouchWireRouter(
      * what spec C3 means by a report being pointcut-observable. Null keeps views silent.
      */
     val report: CouchReportReactorElement? = null,
+    /** Host-owned Kotlin targets callable through the RequestFactory `rpc` operation. */
+    val rpcTargets: Map<String, borg.trikeshed.relaxfactory.RequestFactoryRpcTarget> = emptyMap(),
     /** P2 registry seam: null means eager route, preserving every existing caller. */
     val incrementalView: (ddoc: String, view: String) -> IncrementalViewElement? = { _, _ -> null },
 ) {
@@ -65,7 +67,7 @@ class CouchWireRouter(
      * the routes below. That is what lets one commonMain proxy address local and remote state.
      */
     val requestFactory: borg.trikeshed.relaxfactory.CouchRequestFactory by lazy {
-        borg.trikeshed.relaxfactory.CouchRequestFactory.forDatabase(db, replicator, viewServer)
+        borg.trikeshed.relaxfactory.CouchRequestFactory.forDatabase(db, replicator, viewServer, rpcTargets)
     }
 
     suspend fun handle(method: String, rawPath: String, body: ByteArray): WireReply? {
