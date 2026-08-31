@@ -1,0 +1,30 @@
+[project]
+name = "lcnc-depth"
+version = "0.1.0"
+description = "Model LCNC patch-cable connections below the five-string kind layer"
+requires-python = ">=3.11"
+dependencies = [
+    "predict-rlm>=0.3.0,<0.4",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8.0"]
+
+[tool.predict-rlm.generated]
+predict_rlm_version = "0.3.0"
+skill_version = "2.0"
+layout = "agent-tools-bench-gepa"
+features = ["agent"]
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+include = ["lcnc_depth*"]
+
+[tool.setuptools.package-data]
+lcnc_depth = ["modules/*.py"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

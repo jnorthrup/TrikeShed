@@ -2,6 +2,8 @@
 
 Navigate the daemon surfaces. Each guide covers one surface: purpose, routes, walkthrough, and honest status markers.
 
+> **One command:** `bin/oroboros-up` boots a daemon and prints its board, panels and MCP URLs. `scripts/oroboros-doctor.sh` diagnoses it when it misbehaves.
+>
 > **Start here:** [Daemon Launch Guide](guide-daemon-launch.md) — boot the daemon from a clean checkout or forge home. Every other guide requires a running daemon.
 
 ## Surface Guides

@@ -239,7 +239,33 @@ object BrainMuxNodes {
                 }
                 return@LcncNodeRunner result.fold(
                     onSuccess = { response ->
-                        mapOf("content" to response.a, "model" to model, "ok" to true, "error" to "")
+                        val content = response.a
+                        val inTok = response.b.a
+                        val outTok = response.b.b
+                        // An empty answer is NOT a success. A 2xx that carries no
+                        // content rendered as a green OK with a blank body, which is
+                        // the single worst state this panel can be in: the operator
+                        // cannot tell a mute model from a broken parser from a wrong
+                        // key, because all three look like "it worked". The token
+                        // counts separate them — they come from the provider's own
+                        // usage block, so they are evidence, not inference.
+                        if (content.isBlank()) {
+                            mapOf(
+                                "content" to "",
+                                "model" to model,
+                                "ok" to false,
+                                "error" to if (outTok > 0) {
+                                    "provider billed $outTok completion tokens but returned no content " +
+                                        "(in=$inTok) — the text is somewhere this parser did not look: " +
+                                        "a reasoning-only reply, a refusal field, or a non-OpenAI response shape"
+                                } else {
+                                    "provider returned no content and billed 0 completion tokens (in=$inTok) — " +
+                                        "the model emitted nothing: raise maxTokens, or the request was refused upstream"
+                                },
+                            )
+                        } else {
+                            mapOf("content" to content, "model" to model, "ok" to true, "error" to "")
+                        }
                     },
                     onFailure = { t ->
                         mapOf("content" to "", "model" to model, "ok" to false, "error" to (t.message ?: "unknown error"))

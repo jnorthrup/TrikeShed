@@ -2,6 +2,21 @@
 
 Boot the Oroboros daemon from a clean checkout or an existing forge home. This is the prerequisite for every surface guide.
 
+## Boot Path 0 — one command (recommended)
+
+```bash
+bin/oroboros-up
+```
+
+Does the whole sequence below and refuses to lie about it: JDK check, the
+`hotswapFeed` build the daemon's classpath actually needs, a port that is really
+free, a scratch forge home, readiness wait, and a printed set of URLs. Use
+`--home <path>` for a real forge home, `--port N` to pin one, `--open` to launch
+the board. When something misbehaves, `scripts/oroboros-doctor.sh` names the
+cause and the fix.
+
+The manual path below still works and explains what that script does.
+
 ## Boot Path A — Clean Checkout
 
 ```bash

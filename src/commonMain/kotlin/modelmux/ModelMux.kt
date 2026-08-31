@@ -115,6 +115,16 @@ class ModelMux internal constructor(
      * provider's word outranks the ledger.
      */
     private val quotaLegion: QuotaLegion? = null,
+    /**
+     * Which cache identities this mux will answer from, in order.
+     *
+     * Defaults to [CacheCascade.EXACT_ONLY] — byte-exact sha256, the M3
+     * invariant and the only identity that can never return a wrong reply. An
+     * owner opts into relaxation explicitly via [ModelMuxBuilder.cacheStrategy],
+     * because every relaxed strategy trades a correctness guarantee for a hit
+     * rate and that trade belongs to whoever owns the traffic.
+     */
+    private val cacheCascade: CacheCascade = CacheCascade.EXACT_ONLY,
 ) {
     private val models: Series<ModelEntry> get() = core.a
     private val router: ModelRouter get() = core.b
@@ -265,7 +275,7 @@ class ModelMux internal constructor(
         var outputTokens = 0
         try {
             val card = session.model.b
-            val meta: AcpMeta = card.id j ("chat" j session.authHeaders())
+            val meta: AcpMeta = card.wireName j ("chat" j session.authHeaders())
             val body: AcpRequestBody = messages j tools
             val req: AcpRequest = meta j body
 
@@ -273,14 +283,28 @@ class ModelMux internal constructor(
             // Content-address the canonical request bytes. String.hashCode() is a
             // 32-bit truncation: two distinct requests colliding on it returned each
             // other's cached payload verbatim.
-            val requestHash = ContentId.of(json.encodeToByteArray()).value
+            //
+            // The receipt is ALWAYS attributed to the exact identity, whichever
+            // strategy produced the hit: a ledger keyed by a relaxed bucket could
+            // not be reconciled against the bytes actually sent.
+            val requestHash = cacheCascade.primary(json)
+            // Every identity this mux is willing to answer from, exact first.
+            // EXACT_ONLY (the default) makes this a one-element list and the
+            // behaviour byte-identical to before strategies existed.
+            val cacheIds = cacheCascade.identities(json)
 
             if (reactor != null) {
-                val lookup = reactor.lookupApiCall(provider = card.id, modelId = modelId, requestHash = requestHash, ttlMs = 3600_000)
-                if (lookup is CacheLookup.Hit) {
+                // First hit wins, and exact is always tried first — the cheapest
+                // correct answer outranks the most permissive one.
+                var hit: CacheLookup.Hit? = null
+                for ((_, id) in cacheIds) {
+                    val lookup = reactor.lookupApiCall(provider = card.id, modelId = modelId, requestHash = id, ttlMs = 3600_000)
+                    if (lookup is CacheLookup.Hit) { hit = lookup; break }
+                }
+                if (hit != null) {
                     cachedHit = true
                     httpStatus = 200
-                    val cached = AcpCodec.parseResponse(lookup.entry.payload)
+                    val cached = AcpCodec.parseResponse(hit.entry.payload)
                     inputTokens = cached.b.a
                     outputTokens = cached.b.b
                     session.recordReceipt(
@@ -350,7 +374,13 @@ class ModelMux internal constructor(
             val cacheUse = providerCacheUsage(respBody)
 
             if (reactor != null) {
-                reactor.cacheApiCall(provider = card.id, modelId = modelId, requestHash = requestHash, ttlMs = 3600_000, payload = respBody)
+                // Warm EVERY identity from this one paid call: the exact entry, plus
+                // each relaxed bucket. A later request differing only in formatting
+                // then hits without a second purchase — which is the whole return on
+                // running a cascade at all.
+                for ((_, id) in cacheIds) {
+                    reactor.cacheApiCall(provider = card.id, modelId = modelId, requestHash = id, ttlMs = 3600_000, payload = respBody)
+                }
             }
             session.recordReceipt(
                 ModelResponseReceipt.mint(
@@ -411,7 +441,7 @@ class ModelMux internal constructor(
         val keyId = resolveKeyId(session.model.b)
         try {
             val card = models.let { ms -> (0 until ms.size).first { ms[it].a == modelId }.let { ms[it] } }.b
-            val meta: AcpMeta = card.id j ("stream" j session.authHeaders())
+            val meta: AcpMeta = card.wireName j ("stream" j session.authHeaders())
             val body: AcpRequestBody = messages j tools
             val req: AcpRequest = meta j body
 
@@ -461,15 +491,20 @@ class ModelMux internal constructor(
         val keyId = resolveKeyId(session.model.b)
         try {
             val card = models.let { ms -> (0 until ms.size).first { ms[it].a == modelId }.let { ms[it] } }.b
-            val meta: AcpMeta = card.id j ("embed" j session.authHeaders())
+            val meta: AcpMeta = card.wireName j ("embed" j session.authHeaders())
             val textsJson = (0 until texts.size).joinToString(",") { jsonStr(texts[it]) }
-            val json = "{\"model\":\"${card.id}\",\"input\":[$textsJson]}"
+            val json = "{\"model\":\"${card.wireName}\",\"input\":[$textsJson]}"
 
-            val requestHash = ContentId.of(json.encodeToByteArray()).value
+            // Same cascade as chat(): embeddings of a re-wrapped paragraph are the
+            // same embeddings, and paying twice for that was the same defect.
+            val requestHash = cacheCascade.primary(json)
+            val cacheIds = cacheCascade.identities(json)
             if (reactor != null) {
-                val lookup = reactor.lookupApiCall(provider = card.id, modelId = modelId, requestHash = requestHash, ttlMs = 3600_000)
-                if (lookup is CacheLookup.Hit) {
-                    return parseEmbeddings(lookup.entry.payload, texts)
+                for ((_, id) in cacheIds) {
+                    val lookup = reactor.lookupApiCall(provider = card.id, modelId = modelId, requestHash = id, ttlMs = 3600_000)
+                    if (lookup is CacheLookup.Hit) {
+                        return parseEmbeddings(lookup.entry.payload, texts)
+                    }
                 }
             }
 
@@ -493,7 +528,9 @@ class ModelMux internal constructor(
                     latencyMs = kotlinx.datetime.Clock.System.now().toEpochMilliseconds() - t0
                 )
                 if (resp.status in 200..299) {
-                    reactor.cacheApiCall(provider = card.id, modelId = modelId, requestHash = requestHash, ttlMs = 3600_000, payload = respBody)
+                    for ((_, id) in cacheIds) {
+                        reactor.cacheApiCall(provider = card.id, modelId = modelId, requestHash = id, ttlMs = 3600_000, payload = respBody)
+                    }
                 }
             }
             if (resp.status !in 200..299) {
@@ -564,6 +601,7 @@ class ModelMux internal constructor(
 class ModelMuxBuilder(private val keyMux: KeyMux) {
     private val models = mutableListOf<ModelEntry>()
     private var quotaLegion: QuotaLegion? = null
+    private var cascade: CacheCascade = CacheCascade.EXACT_ONLY
 
     init {
         // The legion is constructed by default: receipts metered into it on every
@@ -580,6 +618,25 @@ class ModelMuxBuilder(private val keyMux: KeyMux) {
     /** Detach metering — receipts are produced but never applied to a ledger. */
     fun noQuota(): ModelMuxBuilder = apply { quotaLegion = null }
 
+    /**
+     * Opt into additional cache identities beyond the byte-exact default.
+     *
+     *     ModelMux(keyMux) {
+     *         model(id = "gpt-4o-mini", caps = setOf("chat"), provider = "openai")
+     *         cacheStrategy(CacheCascade.RELAXED)          // prose-shaped traffic
+     *         // or: cacheStrategy(CacheCascade.RELAXED_INDENT_SAFE)
+     *         // or: cacheStrategy(listOf(WhitespaceRelaxed(myPolicy)))
+     *     }
+     *
+     * Exact is always consulted first regardless of what is passed, so this can
+     * only ADD hits, never redirect one that would have been exact.
+     */
+    fun cacheStrategy(cascade: CacheCascade): ModelMuxBuilder = apply { this.cascade = cascade }
+
+    /** Convenience: build a cascade from strategies, exact implicitly first. */
+    fun cacheStrategy(strategies: List<CacheKeyStrategy>): ModelMuxBuilder =
+        apply { this.cascade = CacheCascade(strategies) }
+
     fun model(
         id: String,
         caps: Set<String>,
@@ -587,11 +644,22 @@ class ModelMuxBuilder(private val keyMux: KeyMux) {
         version: String = "1.0",
         /** Tags this card so [ModelMux.session] resolves keys by provider, not model id. */
         provider: String? = null,
+        /**
+         * What the PROVIDER calls this model, when [id] had to be qualified to stay
+         * unique in the catalog. Null means [id] is already the provider's name.
+         * See [modelmux.acp.wireModel] — without this, a disambiguated id like
+         * `openrouter/z-ai/glm-5.2` goes out on the wire and earns a 400.
+         */
+        wireModel: String? = null,
     ): ModelMuxBuilder = apply {
         val capSeries = caps.toList().toSeries()
         val action = if ("chat" in caps) "chat" else if ("embed" in caps) "embed" else "complete"
-        val headers: Series<Join<String, String>> = if (provider != null) {
-            1 j { _: Int -> "provider" j provider }
+        val tags = buildList {
+            if (provider != null) add("provider" j provider)
+            if (wireModel != null && wireModel != id) add("wire_model" j wireModel)
+        }
+        val headers: Series<Join<String, String>> = if (tags.isNotEmpty()) {
+            tags.toSeries()
         } else {
             0 j { _: Int -> error("no headers") }
         }
@@ -607,7 +675,7 @@ class ModelMuxBuilder(private val keyMux: KeyMux) {
 
     internal fun build(): ModelMux {
         val core: ModelMuxCore = models.toSeries() j CapabilityRouter
-        return ModelMux(core, keyMux, pendingUrls.toMap(), quotaLegion)
+        return ModelMux(core, keyMux, pendingUrls.toMap(), quotaLegion, cascade)
     }
 }
 

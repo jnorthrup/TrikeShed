@@ -25,6 +25,18 @@ data class HarnessProvider(
     val id: String,
     val envVars: Series<String>,
     val defaultBaseUrl: String? = null,
+    /**
+     * The cheapest model this provider will answer a live `/chat/completions`
+     * probe on, or null when there is no OpenAI-compatible probe for it.
+     *
+     * This is what makes `bin/mux doctor` a real end-to-end check instead of a
+     * key-presence check: a resolved key proves only that a STRING was found,
+     * and a string that 401s is indistinguishable from no key at all until
+     * something actually spends it. Null is an honest answer, not a gap —
+     * anthropic speaks `/v1/messages`, not `/chat/completions`, so probing it
+     * through this lane would report a protocol mismatch as a bad credential.
+     */
+    val probeModel: String? = null,
 )
 
 /**
@@ -33,24 +45,27 @@ data class HarnessProvider(
  */
 object HarnessRegistry {
     val providers: Series<HarnessProvider> = s_[
-        HarnessProvider("openai", s_["OPENAI_API_KEY"], "https://api.openai.com/v1"),
+        HarnessProvider("openai", s_["OPENAI_API_KEY"], "https://api.openai.com/v1", "gpt-4o-mini"),
+        // No defaultBaseUrl and no probeModel: anthropic's wire protocol is
+        // /v1/messages, which the ModelMux /chat/completions lane does not speak.
         HarnessProvider("anthropic", s_["ANTHROPIC_API_KEY"]),
-        HarnessProvider("xai", s_["XAI_API_KEY"], "https://api.x.ai/v1"),
+        HarnessProvider("xai", s_["XAI_API_KEY"], "https://api.x.ai/v1", "grok-3-mini"),
         HarnessProvider("google", s_["GOOGLE_API_KEY", "GEMINI_API_KEY"], "https://generativelanguage.googleapis.com/v1beta"),
         HarnessProvider("gemini", s_["GEMINI_API_KEY", "GOOGLE_API_KEY"], "https://generativelanguage.googleapis.com/v1beta"),
-        HarnessProvider("deepseek", s_["DEEPSEEK_API_KEY"], "https://api.deepseek.com/v1"),
-        HarnessProvider("nvidia", s_["NVIDIA_API_KEY", "NGC_API_KEY"], "https://integrate.api.nvidia.com/v1"),
-        HarnessProvider("openrouter", s_["OPENROUTER_API_KEY"], "https://openrouter.ai/api/v1"),
-        HarnessProvider("groq", s_["GROQ_API_KEY"], "https://api.groq.com/openai/v1"),
-        HarnessProvider("mistral", s_["MISTRAL_API_KEY"], "https://api.mistral.ai/v1"),
-        HarnessProvider("cerebras", s_["CEREBRAS_API_KEY"], "https://api.cerebras.ai/v1"),
-        HarnessProvider("moonshot", s_["MOONSHOT_API_KEY", "KIMI_API_KEY"], "https://api.moonshot.ai/v1"),
-        HarnessProvider("kimi", s_["KIMI_API_KEY", "MOONSHOT_API_KEY"], "https://api.moonshot.ai/v1"),
+        HarnessProvider("deepseek", s_["DEEPSEEK_API_KEY"], "https://api.deepseek.com/v1", "deepseek-chat"),
+        HarnessProvider("nvidia", s_["NVIDIA_API_KEY", "NGC_API_KEY"], "https://integrate.api.nvidia.com/v1", "nvidia/nemotron-3-super-120b-a12b"),
+        HarnessProvider("openrouter", s_["OPENROUTER_API_KEY"], "https://openrouter.ai/api/v1", "openai/gpt-4o-mini"),
+        HarnessProvider("groq", s_["GROQ_API_KEY"], "https://api.groq.com/openai/v1", "llama-3.1-8b-instant"),
+        HarnessProvider("mistral", s_["MISTRAL_API_KEY"], "https://api.mistral.ai/v1", "mistral-small-latest"),
+        HarnessProvider("cerebras", s_["CEREBRAS_API_KEY"], "https://api.cerebras.ai/v1", "gpt-oss-120b"),
+        HarnessProvider("moonshot", s_["MOONSHOT_API_KEY", "KIMI_API_KEY"], "https://api.moonshot.ai/v1", "moonshot-v1-8k"),
+        HarnessProvider("kimi", s_["KIMI_API_KEY", "MOONSHOT_API_KEY"], "https://api.moonshot.ai/v1", "moonshot-v1-8k"),
         HarnessProvider("glm", s_["GLM_API_KEY", "ZHIPU_API_KEY"]),
         HarnessProvider("zhipu", s_["ZHIPU_API_KEY", "GLM_API_KEY"]),
-        HarnessProvider("zai", s_["ZAI_API_KEY", "GLM_API_KEY"], "https://api.z.ai/api/paas/v4"),
-        HarnessProvider("perplexity", s_["PERPLEXITY_API_KEY"], "https://api.perplexity.ai"),
+        HarnessProvider("zai", s_["ZAI_API_KEY", "GLM_API_KEY"], "https://api.z.ai/api/paas/v4", "glm-4.5-air"),
+        HarnessProvider("perplexity", s_["PERPLEXITY_API_KEY"], "https://api.perplexity.ai", "sonar"),
         HarnessProvider("minimax", s_["MINIMAX_API_KEY"], "https://api.minimax.chat/v1"),
+        // jules/brain are dispatch identities, not chat endpoints.
         HarnessProvider("jules", s_["JULES_API_KEY"]),
         HarnessProvider("brain", s_["BRAIN_API_KEY"]),
         HarnessProvider("synthetic", s_["SYNTHETIC_API_KEY"], "https://api.synthetic.new/v1"),

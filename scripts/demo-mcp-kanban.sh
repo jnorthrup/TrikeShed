@@ -82,8 +82,12 @@ stop_daemon() {
   return 0
 }
 
+# Only ever stop a daemon THIS script started. The EXIT trap is installed before
+# the port guard runs, so without this a refusal would still fire stop_daemon and
+# kill the very daemon the guard exists to protect.
+WE_STARTED=0
 cleanup() {
-  stop_daemon
+  [ "$WE_STARTED" = "1" ] && stop_daemon
   rm -f "$EV_FILE" 2>/dev/null
   if [ "$KEEP" = "1" ]; then
     printf '\nscratch home kept: %s\n' "$HOME_DIR"
@@ -120,7 +124,26 @@ rpc() { # rpc <id> <method> <params-json|-->
 # is a demo that does not run on a clean machine.
 pyq() { python3 -c "$1" 2>/dev/null; }
 
-say "0. build feed (so the daemon runs the code in this checkout, not a stale build/live)"
+say "0. the port must be OURS"
+# Without this the proof is worthless and dangerous. If something already holds
+# the port, `start_daemon`'s readiness curl is answered by THAT daemon: the demo
+# then submits a card to a stranger's forge home, and its restart step kills a
+# process it did not start. That is exactly what happened when this ran on a port
+# `oroboros-up` had already taken — the card was written to one home, looked for
+# in another, and reported a false durability failure while killing the other
+# daemon on the way out.
+if lsof -ti:"$PORT" >/dev/null 2>&1; then
+  bad "port $PORT is already in use — refusing to run"
+  printf '       Something is already serving %s. This demo must own its port: it\n' "$PORT"
+  printf '       starts a daemon on a scratch home and stops it again, and adopting\n'
+  printf '       a daemon it did not start would test the wrong state and kill the\n'
+  printf '       wrong process.\n'
+  printf '       Try:  PORT=%s scripts/demo-mcp-kanban.sh\n' "$((PORT+10))"
+  exit 1
+fi
+ok "port $PORT is free — the daemon this starts is the one it tests"
+
+say "1. build feed (so the daemon runs the code in this checkout, not a stale build/live)"
 if ( cd "$REPO_ROOT" && ./gradlew hotswapFeed --console=plain -q >/dev/null 2>&1 ); then
   ok "hotswapFeed published build/live/classes"
 else
@@ -128,16 +151,16 @@ else
   exit 1
 fi
 
-say "1. boot a daemon on a scratch home (port $PORT, never 8888)"
-if start_daemon; then ok "daemon up at $BASE"; else bad "daemon failed to boot"; exit 1; fi
+say "2. boot a daemon on a scratch home (port $PORT, never 8888)"
+if start_daemon; then WE_STARTED=1; ok "daemon up at $BASE"; else bad "daemon failed to boot"; exit 1; fi
 
-say "2. MCP is mounted and discoverable"
+say "3. MCP is mounted and discoverable"
 CARD="$(curl -sf -m 10 "$MCP")"
 check "oroboros-lcnc-kanban" "$(printf '%s' "$CARD" | pyq 'import sys,json;print(json.load(sys.stdin)["server"])')" "GET /api/mcp names the server"
 TOOLS="$(rpc 1 tools/list | pyq 'import sys,json;print(",".join(t["name"] for t in json.load(sys.stdin)["result"]["tools"]))')"
 check "kanban.submit,kanban.move" "$TOOLS" "tools/list offers exactly the two LCNC runners"
 
-say "3. an agent writes a card over MCP"
+say "4. an agent writes a card over MCP"
 SUB="$(rpc 2 tools/call '{"name":"kanban.submit","arguments":{"title":"Written by the demo","tags":["demo"],"owner":"agent"}}')"
 JOB="$(printf '%s' "$SUB" | pyq 'import sys,json;print(json.load(sys.stdin)["result"]["structuredContent"]["jobId"])')"
 REV="$(printf '%s' "$SUB" | pyq 'import sys,json;print(json.load(sys.stdin)["result"]["structuredContent"]["revision"])')"
@@ -145,23 +168,23 @@ CID="$(printf '%s' "$SUB" | pyq 'import sys,json;print(json.load(sys.stdin)["res
 if [ -n "$JOB" ]; then T_FIRST_VALUE="$(elapsed)"; ok "submit accepted: $JOB at revision $REV"; else bad "submit produced no jobId"; fi
 if [ -n "$CID" ]; then ok "committed with a CAS receipt: ${CID:0:24}…"; else bad "no CAS receipt on the write"; fi
 
-say "4. the same card is on the ordinary board route (one board, two lenses)"
+say "5. the same card is on the ordinary board route (one board, two lenses)"
 BOARD_TITLE="$(curl -sf -m 10 "$BASE/api/board" | pyq "import sys,json;print(next((i['title'] for i in json.load(sys.stdin)['items'] if i['id']=='$JOB'),''))")"
 check "Written by the demo" "$BOARD_TITLE" "/api/board shows the MCP-written card"
 
-say "5. tags and owner survived the LCNC runner"
+say "6. tags and owner survived the LCNC runner"
 CARDJSON="$(rpc 3 resources/read "{\"uri\":\"oroboros://lcnc/kanban/cards/$JOB\"}" | pyq 'import sys,json;print(json.load(sys.stdin)["result"]["contents"][0]["text"])')"
 check "demo" "$(printf '%s' "$CARDJSON" | pyq 'import sys,json;print(",".join(json.load(sys.stdin)["tags"]))')" "tags round-tripped"
 check "agent" "$(printf '%s' "$CARDJSON" | pyq 'import sys,json;print(json.load(sys.stdin)["owner"])')" "owner round-tripped"
 
-say "6. move is compare-and-set"
+say "7. move is compare-and-set"
 MV="$(rpc 4 tools/call "{\"name\":\"kanban.move\",\"arguments\":{\"jobId\":\"$JOB\",\"toColumn\":\"running\",\"expectedRevision\":$REV}}")"
 check "False" "$(printf '%s' "$MV" | pyq 'import sys,json;print(json.load(sys.stdin)["result"]["isError"])')" "move accepted"
 STALE="$(rpc 5 tools/call "{\"name\":\"kanban.move\",\"arguments\":{\"jobId\":\"$JOB\",\"toColumn\":\"done\",\"expectedRevision\":$REV}}")"
 check "True" "$(printf '%s' "$STALE" | pyq 'import sys,json;print(json.load(sys.stdin)["result"]["isError"])')" "replaying the stale revision is REFUSED"
 printf '       reason: %s\n' "$(printf '%s' "$STALE" | pyq 'import sys,json;print(json.load(sys.stdin)["result"]["content"][0]["text"])')"
 
-say "7. the WIP limit is enforced (running holds 3)"
+say "8. the WIP limit is enforced (running holds 3)"
 for i in 1 2 3 4; do
   S="$(rpc "$((10+i))" tools/call "{\"name\":\"kanban.submit\",\"arguments\":{\"title\":\"Rusher $i\"}}")"
   J="$(printf '%s' "$S" | pyq 'import sys,json;print(json.load(sys.stdin)["result"]["structuredContent"]["jobId"])')"
@@ -171,7 +194,7 @@ done
 RUNNING="$(curl -sf -m 10 "$BASE/api/board" | pyq 'import sys,json;print(sum(1 for i in json.load(sys.stdin)["items"] if i["status"]=="running"))')"
 check "3" "$RUNNING" "exactly 3 cards in running despite 5 attempts"
 
-say "8. restart the daemon on the SAME home — the WAL is the state"
+say "9. restart the daemon on the SAME home — the WAL is the state"
 stop_daemon
 if start_daemon; then ok "daemon restarted"; else bad "daemon failed to restart"; exit 1; fi
 AFTER="$(rpc 30 resources/read "{\"uri\":\"oroboros://lcnc/kanban/cards/$JOB\"}" | pyq 'import sys,json;print(json.load(sys.stdin)["result"]["contents"][0]["text"])')"

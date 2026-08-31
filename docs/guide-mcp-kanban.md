@@ -39,10 +39,39 @@ says no before anyone has to notice at runtime.
 
 ---
 
+## From nothing, in one command
+
+```bash
+bin/oroboros-up            # scratch home, first free port from 8888
+bin/oroboros-up --open     # …and open the board
+```
+
+It checks the JDK, **builds the classpath the daemon actually runs from**
+(`hotswapFeed` — `jvmMainClasses` does *not* refresh it, which is the single
+most common way to end up staring at code that isn't running), picks a port that
+is genuinely free rather than fighting whatever holds 8888, boots on a scratch
+forge home, waits for the surfaces to answer, and prints the URLs and the
+`claude mcp add` line. `--home <path>` uses a real forge home instead, and says
+plainly that it is production state.
+
+When something is wrong:
+
+```bash
+scripts/oroboros-doctor.sh          # what is broken, and the command that fixes it
+scripts/oroboros-doctor.sh --fix    # apply the safe repairs
+```
+
+Every check in it is a failure mode that actually cost someone time: a stale
+`build/live/classes` serving old code silently, a wrapper PID that isn't the
+java process holding the port, orphaned test workers pinning cores, and a CAS
+that grows about a gigabyte an hour with nothing reclaiming it. Run it before
+asking for help, and paste its identity block when you do.
+
 ## Connect an MCP client
 
-With the daemon running (see the [Daemon Launch Guide](guide-daemon-launch.md)),
-point a client at the endpoint. For Claude Code:
+With the daemon running (`bin/oroboros-up`, or see the
+[Daemon Launch Guide](guide-daemon-launch.md)), point a client at the endpoint.
+For Claude Code:
 
 ```bash
 claude mcp add --transport http oroboros-kanban http://localhost:8888/api/mcp

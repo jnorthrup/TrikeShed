@@ -102,10 +102,15 @@ class JvmChannelOperations(
     }
 
     override fun connect(fd: Int, host: String, port: Int): Int {
-        val allowlist = setOf("127.0.0.1", "localhost", "github.com", "jules.googleapis.com") +
-            (System.getenv("TRIKESHED_EGRESS_ALLOWLIST")?.split(',')?.map { it.trim() }?.filter { it.isNotEmpty() } ?: emptyList())
-        if (host !in allowlist) {
-            recordFailure(fd, "connect to $host:$port", SecurityException("egress channel closed by substrate: host not in allowlist"))
+        // Deny by default, permit deliberately — the policy now lives in
+        // [EgressAllowlist], which DERIVES the provider hosts from
+        // keymux.HarnessRegistry instead of requiring a second copy of that list
+        // to be maintained by hand in bash. See that file for what this broke.
+        if (!EgressAllowlist.permits(host)) {
+            recordFailure(
+                fd, "connect to $host:$port",
+                SecurityException(EgressAllowlist.refusalMessage(host, port)),
+            )
             return -1
         }
         val ch = socketChannels[fd] as? SocketChannel ?: return -1

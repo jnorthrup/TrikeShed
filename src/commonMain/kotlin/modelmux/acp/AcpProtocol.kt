@@ -100,6 +100,36 @@ val AcpModelCard.providerTag: String?
         return null
     }
 
+/**
+ * What the PROVIDER calls this model, when that differs from the card's id.
+ *
+ * A card id has two jobs that only coincide by luck: it is the local routing key
+ * (`ModelMux.session` scans for it, so it must be unique across the catalog) and
+ * it is the string sent as `"model"` on the wire (so it must be exactly what the
+ * provider recognises). They collide the moment two providers serve the same
+ * model: one of the two cards has to take a qualified id like
+ * `openrouter/z-ai/glm-5.2` to stay reachable, and sending THAT to the provider
+ * earns `400 … is not a valid model ID`.
+ *
+ * So the qualified name stays local and the wire name rides here. Null means the
+ * two coincide, which is the common case. Stamped into the card's metadata header
+ * bag exactly as [providerTag] is — that bag is catalog metadata and is never
+ * transmitted (the HTTP headers come from `LlmSession.authHeaders()`), so nothing
+ * leaks onto the request.
+ */
+val AcpModelCard.wireModel: String?
+    get() {
+        val headers = meta.headers
+        for (i in 0 until headers.size) {
+            val pair = headers[i]
+            if (pair.a == "wire_model") return pair.b
+        }
+        return null
+    }
+
+/** The string to send as `"model"`: the provider's name for it, else the card id. */
+val AcpModelCard.wireName: String get() = wireModel ?: id
+
 // ── ACP codec: AcpRequest → HTTP request bytes ──
 
 object AcpCodec {
@@ -181,10 +211,76 @@ object AcpCodec {
         return extractQuoted(json, ci + "\"content\"".length)
     }
 
+    /**
+     * The assistant's text, or "" when the reply carries none.
+     *
+     * This used to be `indexOf("\"content\"")` followed by "take the next quoted
+     * string", which is only correct when the value IS a quoted string. When a
+     * provider sends `"content":null` — routine for a reasoning model, a refusal,
+     * or a length-truncated reply — the scan sailed past the null and returned the
+     * next quoted token in the document, which is the following KEY. A live
+     * openrouter reply produced the answer `refusal` that way: not empty, not an
+     * error, just a plausible-looking word the model never said. A parser that
+     * FABRICATES content is worse than one that returns nothing, because nothing
+     * downstream can tell the difference.
+     *
+     * So the value is now inspected before it is trusted:
+     *  - a quoted string is the answer (empty string → keep looking, a later
+     *    `content` may hold the real text);
+     *  - `[` is an Anthropic-style block array — the first `"text"` inside it is
+     *    the answer;
+     *  - `null`, a number, or an object is NOT text: skip to the next candidate.
+     *
+     * Several keys named `content` legitimately appear in one document (the echoed
+     * request, per-choice messages), hence the loop rather than a single hit.
+     */
+    /**
+     * Index of [key] where it is used as a KEY — followed by `:` — at or after
+     * [from], else -1. A plain `indexOf` also matches the same token used as a
+     * VALUE, which is how `"type":"text"` was mistaken for the `"text"` field and
+     * returned the answer `text`.
+     */
+    private fun indexOfKey(json: String, key: String, from: Int): Int {
+        var f = from
+        while (true) {
+            val k = json.indexOf(key, f)
+            if (k < 0) return -1
+            var i = k + key.length
+            while (i < json.length && json[i].isWhitespace()) i++
+            if (i < json.length && json[i] == ':') return k
+            f = k + 1
+        }
+    }
+
     private fun extractContent(json: String): String {
-        val ci = json.indexOf("\"content\"")
-        if (ci < 0) return ""
-        return extractQuoted(json, ci + "\"content\"".length)
+        var from = 0
+        val key = "\"content\""
+        while (true) {
+            val ci = indexOfKey(json, key, from)
+            if (ci < 0) return ""
+            from = ci + key.length
+            var i = from
+            while (i < json.length && json[i].isWhitespace()) i++
+            i++ // the ':' — indexOfKey guaranteed it
+            while (i < json.length && json[i].isWhitespace()) i++
+            if (i >= json.length) return ""
+            when (json[i]) {
+                '"' -> {
+                    val s = extractQuoted(json, i)
+                    if (s.isNotEmpty()) return s
+                }
+                '[' -> {
+                    // Content blocks: [{"type":"text","text":"…"}]
+                    val t = indexOfKey(json, "\"text\"", i)
+                    if (t >= 0) {
+                        val s = extractQuoted(json, t + "\"text\"".length)
+                        if (s.isNotEmpty()) return s
+                    }
+                }
+                // null / number / object — not the assistant's text.
+                else -> {}
+            }
+        }
     }
 
     private fun extractUsage(json: String): AcpUsage {

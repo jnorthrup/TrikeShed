@@ -524,9 +524,9 @@ class BrainClient(
         if ((SystemOperations.default.getenv("OPENAI_API_KEY") ?: "").startsWith("sk-")) {
             add("openai", "OPENAI_API_KEY", openAiBase, "gpt-4o-mini")
         }
-        add("perplexity", "PERPLEXITY_API_KEY", "https://api.perplexity.ai", "llama-3.1-sonar-small-128k-online")
+        add("perplexity", "PERPLEXITY_API_KEY", "https://api.perplexity.ai", "sonar")
         add("xai", "XAI_API_KEY", "https://api.x.ai/v1", "grok-2-latest")
-        add("moonshot", "MOONSHOT_API_KEY", "https://api.moonshot.cn/v1", "moonshot-v1-32k")
+        add("moonshot", "MOONSHOT_API_KEY", "https://api.moonshot.ai/v1", "moonshot-v1-32k")
         add("minimax-m3", "MINIMAX_API_KEY", "https://api.minimax.chat/v1", "MiniMax-M3")
         add("minimax-m25", "MINIMAX_API_KEY", "https://api.minimax.chat/v1", "MiniMax-Text-01")
         // ── Hermes: Nous Portal / local proxy ──

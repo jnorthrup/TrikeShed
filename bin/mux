@@ -1,0 +1,51 @@
+#!/usr/bin/env bash
+# mux — keymux/modelmux operator surface.
+#
+#   bin/mux keys              which providers resolve a key, and from where
+#   bin/mux keys --all        including the ones that don't
+#   bin/mux models            what the mux would actually route
+#   bin/mux doctor            resolve → make a REAL call → verdict
+#   bin/mux chat --model llama-3.1-8b-instant "say hello"
+#
+# Why this exists: the mux contract tests pass against fakes on a machine with
+# no keys and no network, and the daemon only resolves credentials in the middle
+# of a boot that also wants a port, a couch and a board. Neither one could tell
+# an operator whether a key resolved and a call landed, so every failure looked
+# the same from outside — a blank panel. `doctor` exits non-zero when nothing
+# answers, which makes it a gate and not just something to read.
+#
+# Secrets are never printed: keys report as a length and a sha256 prefix.
+#
+# The build is checked, not assumed. A stale classpath is the failure mode that
+# makes a working fix look broken, so the wrapper rebuilds when jvmMain has
+# moved and says so rather than silently running last week's code.
+
+set -uo pipefail
+REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+CP_FILE="$REPO/build/mux/classpath.txt"
+
+note() { printf '\033[2m%s\033[0m\n' "$*" >&2; }
+die()  { printf '\033[31m✗\033[0m %s\n' "$*" >&2; exit 1; }
+
+JV="$(java -version 2>&1 | head -1 | sed -E 's/.*"([0-9]+)\..*/\1/')"
+[ "${JV:-0}" -ge 25 ] 2>/dev/null || die "JDK ${JV:-unknown}; this needs 25+ (try: sdk use java 25.0.4.1-graal)"
+
+# Rebuild when the classpath file is missing, or when any jvmMain/commonMain
+# source is newer than it. `find -newer` on the first hit only: we need the
+# yes/no, not the list.
+need_build=0
+if [ ! -s "$CP_FILE" ]; then
+  need_build=1
+else
+  newer=$(find "$REPO/src/jvmMain" "$REPO/src/commonMain" -name '*.kt' -newer "$CP_FILE" 2>/dev/null | head -1)
+  [ -n "$newer" ] && need_build=1
+  [ "$REPO/build.gradle.kts" -nt "$CP_FILE" ] && need_build=1
+fi
+
+if [ "$need_build" = 1 ]; then
+  note "▸ building (sources newer than the staged classpath)…"
+  "$REPO/gradlew" -q muxClasspath --console=plain >&2 || die "build failed — run: ./gradlew muxClasspath"
+fi
+[ -s "$CP_FILE" ] || die "no classpath at $CP_FILE — run: ./gradlew muxClasspath"
+
+exec java -cp "$(cat "$CP_FILE")" borg.trikeshed.mux.MuxCli "$@"

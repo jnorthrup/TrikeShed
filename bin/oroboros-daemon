@@ -39,7 +39,24 @@ set -- ${_PASS[@]+"${_PASS[@]}"}
 
 LOG_DIR="$ROOT/logs"
 mkdir -p "$LOG_DIR"
-LOG_FILE="$LOG_DIR/oroboros-daemon.log"
+
+# One log per INSTANCE, keyed by port.
+#
+# This was a single shared file that every launch ROTATED. Starting any second
+# daemon — a scratch instance, a test boot, `oroboros-up` — pushed a RUNNING
+# daemon's history to .1, and after five launches off the end entirely. Worse,
+# concurrent daemons appended to the same file, so "send me your log" produced
+# one narrative stitched from several processes with no way to tell them apart.
+# Both of those happened here today.
+#
+# The port is the natural instance key: exactly one daemon can hold it.
+_PORT="default"
+for ((_i=1; _i<=$#; _i++)); do
+    if [[ "${!_i}" == "--kanban-port" ]]; then
+        _j=$((_i+1)); _PORT="${!_j:-default}"
+    fi
+done
+LOG_FILE="$LOG_DIR/oroboros-daemon-$_PORT.log"
 
 if [[ -f "$LOG_FILE" ]]; then
     for i in {4..1}; do
@@ -126,13 +143,18 @@ else
     echo "[oroboros-daemon] hotswap-agent.jar not found ($AGENT_JAR); running without hot-swap" >&2
 fi
 
-# HTX egress allowlist (see JvmChannelOperations.connect): BrainClient fails
-# over across these provider hosts; without them the GUIDE brain cannot
-# connect and every council/tribunal turn stalls unanswered each cycle.
-# Operator-set values win; this default covers all BrainClient providers.
-if [[ -z "${TRIKESHED_EGRESS_ALLOWLIST:-}" ]]; then
-    export TRIKESHED_EGRESS_ALLOWLIST="integrate.api.nvidia.com,openrouter.ai,api.z.ai,api.groq.com,api.deepseek.com,api.cerebras.ai,api.openai.com,api.perplexity.ai,api.x.ai,api.moonshot.cn,api.minimax.chat"
-fi
+# HTX egress allowlist (see EgressAllowlist.kt): the provider hosts are now
+# DERIVED from keymux.HarnessRegistry, so this script no longer maintains a
+# second copy of that list. It used to, and the copies drifted: this file said
+# api.moonshot.cn while the registry said api.moonshot.ai (moonshot and kimi
+# could never connect), and mistral, google/gemini, synthetic and opencode were
+# never listed at all. Worse, anything NOT launched through this script got the
+# four-host default and could reach no provider — which is why keymux/modelmux
+# had no working wire-up outside the daemon.
+#
+# TRIKESHED_EGRESS_ALLOWLIST still works and is still additive: set it for a
+# host the registry does not know (a gateway, a proxy, a private endpoint).
+# Deny-by-default is unchanged.
 
 WATCH="--watch"
 DAEMON_ARGS=()

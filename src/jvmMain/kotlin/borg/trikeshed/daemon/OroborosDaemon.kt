@@ -283,20 +283,13 @@ object OroborosDaemon {
         // store; HERMES_HOME names it (falls back to the default ~/.hermes
         // when the env var is unset). resolvePath expands ~ to $HOME, so the
         // explicit $HERMES_HOME value is what actually gets read.
-        val hermesHome = System.getenv("HERMES_HOME") ?: "~/.hermes"
-        val keyMux = KeyMux {
-            // env-FIRST: the harness lane (conventional env names + hermes .env
-            // + codex/opencode credential files) and the legacy env lane answer
-            // before the pool, so an env key always outranks a pool row. The
-            // pool (credential_pool — hermes' OWN keys, priority-ordered with
-            // cooldowns, following its env:<VAR> indirection) is the borrowing
-            // lane: providers the operator configured in hermes but not in this
-            // process env. 5-minute caches so pool rotation and exhaustion
-            // cooldowns are picked up.
-            cached("*", keymux.HarnessSource(explicitFileOps = fileOps), ttlMs = 5 * 60_000L)
-            cached("*", EnvSource())
-            cached("llm.*.*", keymux.HermesCredentialSource(hermesHome, fileOps), ttlMs = 5 * 60_000L)
-        }
+        val hermesHome = keymux.defaultHermesHome()
+        // The recipe itself lives in keymux.operatorKeyMux — ONE lane order,
+        // shared with `bin/mux` (borg.trikeshed.mux.MuxCli). When the daemon
+        // built this inline, the diagnostic that told the operator whether a key
+        // was visible resolved through a different chain than the daemon did,
+        // so it could only ever confirm its own wiring.
+        val keyMux = keymux.operatorKeyMux(fileOps = fileOps, hermesHome = hermesHome)
         // Probe early so a missing key aborts before opening the HTX reactor.
         val apiKeyPresent = kotlinx.coroutines.withContext(Dispatchers.IO) { keyMux.get("JULES_API_KEY") }
         if (apiKeyPresent.isNullOrBlank()) {
@@ -345,6 +338,79 @@ object OroborosDaemon {
             fHome.mkdirs()
             Pair(fHome, rDir)
         }
+        // ── health FIRST ───────────────────────────────────────────────────
+        // This used to bind 1,600 lines further down, after CAS, wiki, git
+        // reconcile and the rest — so during a boot that takes minutes there was
+        // no way to ask the daemon anything at all, and OroborosDaemonHealthTest
+        // timed out waiting for a socket that only appears once the work is
+        // already done. Health is the one surface that must exist BEFORE the slow
+        // parts, not after them: it answers 'am I alive' while the answer is still
+        // in doubt. It needs only forgeHome and daemonStartTime, both known here.
+        daemonStartTime = System.currentTimeMillis()
+
+        val oroborosDir = File(forgeHome, ".oroboros")
+        oroborosDir.mkdirs()
+        val healthSock = File(oroborosDir, "health.sock")
+        if (healthSock.exists()) healthSock.delete()
+
+        // Bind with retry: a prior daemon may have left a stale socket file
+        // even after the JVM exited; the bind() then creates a regular file
+        // instead of a UNIX socket. Retry up to 3× with the file removed
+        // between attempts so we always end up with a real socket.
+        var serverSocket: ServerSocketChannel? = null
+        var bindAttempt = 0
+        while (serverSocket == null && bindAttempt < 3) {
+            try {
+                serverSocket = ServerSocketChannel.open(StandardProtocolFamily.UNIX)
+                serverSocket.bind(UnixDomainSocketAddress.of(healthSock.toPath()))
+                serverSocket.configureBlocking(false)
+            } catch (e: Throwable) {
+                System.err.println("[OROBOROS] health.sock bind attempt ${bindAttempt + 1} failed: ${e.message}")
+                try { serverSocket?.close() } catch (_: Exception) {}
+                serverSocket = null
+                if (healthSock.exists()) healthSock.delete()
+                bindAttempt++
+            }
+        }
+        if (serverSocket == null) {
+            System.err.println("[OROBOROS] health.sock bind FAILED after 3 attempts; aborting")
+            return
+        }
+
+        val healthJob = launch(Dispatchers.IO) {
+            while (isActive) {
+                var client: SocketChannel? = null
+                try {
+                    client = serverSocket!!.accept()
+                    if (client == null) {
+                        delay(100)
+                        continue
+                    }
+                    val uptimeMs = System.currentTimeMillis() - daemonStartTime
+
+                    // Backward-compatible ALIVE line (cycle fields retired with the flywheel)
+                    val aliveLine = "ALIVE $uptimeMs -1 -1 -1 -1 -1\n"
+
+                    val metricsJson = try {
+                        "METRICS " + JsonSupport.stringify(mapOf("uptimeMs" to uptimeMs)) + "\n"
+                    } catch (e: Exception) {
+                        "METRICS {}\n"
+                    }
+
+                    val metricsBytes = (aliveLine + metricsJson).toByteArray()
+                    val buf = ByteBuffer.allocate(metricsBytes.size)
+                    buf.put(metricsBytes)
+                    buf.flip()
+                    while (buf.hasRemaining()) {
+                        client.write(buf)
+                    }
+                } catch (e: Exception) { /* ignore */ }
+                finally {
+                    try { client?.close() } catch (_: Exception) {}
+                }
+            }
+        }
+
         // A daemon process rooted at a repo other than TrikeShed itself (its own port +
         // forgeHome, run standalone) must not file its worktree under "projects/trikeshed/" —
         // that mislabels every absorbed path with this project's name instead of its own.
@@ -1279,9 +1345,35 @@ object OroborosDaemon {
         // chatContext rides HtxKey + the MuxReactor: ModelMux.chat resolves
         // the HTX client and reactor metering from the caller's context, and
         // the CCEK assembly scope carries the reactor but NOT the HTX element.
+        // Card ids must be UNIQUE. ModelMux.session takes the first entry whose id
+        // matches, so a model id served by two providers is not ambiguous — the
+        // second one is silently unreachable while still being listed in the panel.
+        // The roster collides exactly so (z-ai/glm-5.2 under both nvidia and
+        // openrouter; one hermes model under three endpoints), which is why the
+        // panel offered a menu whose entries mostly failed. disambiguateModelIds
+        // keeps the bare id for the first claimant and qualifies the rest.
+        val lcncRoster = brainClient.providerRoster()
+        val lcncRosterEntries = lcncRoster.map {
+            modelmux.RosterEntry(provider = it.provider ?: it.name, model = it.model)
+        }
+        val lcncCardIds = modelmux.disambiguateModelIds(lcncRosterEntries)
+        modelmux.shadowedEntries(lcncRosterEntries).forEach { (entry, id) ->
+            System.err.println(
+                "[OROBOROS] roster collision: ${entry.provider} serves '${entry.model}', " +
+                    "already claimed — routable as '$id' (previously unreachable)",
+            )
+        }
         val lcncModelMux = modelmux.ModelMux(keyMux) {
-            brainClient.providerRoster().forEach { ep ->
-                model(id = ep.model, caps = setOf("chat", "conflict-resolve"), baseUrl = ep.base, provider = ep.provider)
+            lcncRoster.forEachIndexed { i, ep ->
+                model(
+                    id = lcncCardIds[i],
+                    caps = setOf("chat", "conflict-resolve"),
+                    baseUrl = ep.base,
+                    provider = ep.provider ?: ep.name,
+                    // The qualified id is a LOCAL routing key; the provider still
+                    // only answers to its own name for the model.
+                    wireModel = ep.model,
+                )
             }
         }
         moduleContext.lcncRunners.putAll(
@@ -1962,70 +2054,6 @@ object OroborosDaemon {
                 "intervalMs=$intervalMs maxSlots=$maxSlots mode=${if (watch) "watch" else "once"}"
         )
 
-        daemonStartTime = System.currentTimeMillis()
-
-        val oroborosDir = File(forgeHome, ".oroboros")
-        oroborosDir.mkdirs()
-        val healthSock = File(oroborosDir, "health.sock")
-        if (healthSock.exists()) healthSock.delete()
-
-        // Bind with retry: a prior daemon may have left a stale socket file
-        // even after the JVM exited; the bind() then creates a regular file
-        // instead of a UNIX socket. Retry up to 3× with the file removed
-        // between attempts so we always end up with a real socket.
-        var serverSocket: ServerSocketChannel? = null
-        var bindAttempt = 0
-        while (serverSocket == null && bindAttempt < 3) {
-            try {
-                serverSocket = ServerSocketChannel.open(StandardProtocolFamily.UNIX)
-                serverSocket.bind(UnixDomainSocketAddress.of(healthSock.toPath()))
-                serverSocket.configureBlocking(false)
-            } catch (e: Throwable) {
-                System.err.println("[OROBOROS] health.sock bind attempt ${bindAttempt + 1} failed: ${e.message}")
-                try { serverSocket?.close() } catch (_: Exception) {}
-                serverSocket = null
-                if (healthSock.exists()) healthSock.delete()
-                bindAttempt++
-            }
-        }
-        if (serverSocket == null) {
-            System.err.println("[OROBOROS] health.sock bind FAILED after 3 attempts; aborting")
-            return
-        }
-
-        val healthJob = launch(Dispatchers.IO) {
-            while (isActive) {
-                var client: SocketChannel? = null
-                try {
-                    client = serverSocket!!.accept()
-                    if (client == null) {
-                        delay(100)
-                        continue
-                    }
-                    val uptimeMs = System.currentTimeMillis() - daemonStartTime
-
-                    // Backward-compatible ALIVE line (cycle fields retired with the flywheel)
-                    val aliveLine = "ALIVE $uptimeMs -1 -1 -1 -1 -1\n"
-
-                    val metricsJson = try {
-                        "METRICS " + JsonSupport.stringify(mapOf("uptimeMs" to uptimeMs)) + "\n"
-                    } catch (e: Exception) {
-                        "METRICS {}\n"
-                    }
-
-                    val metricsBytes = (aliveLine + metricsJson).toByteArray()
-                    val buf = ByteBuffer.allocate(metricsBytes.size)
-                    buf.put(metricsBytes)
-                    buf.flip()
-                    while (buf.hasRemaining()) {
-                        client.write(buf)
-                    }
-                } catch (e: Exception) { /* ignore */ }
-                finally {
-                    try { client?.close() } catch (_: Exception) {}
-                }
-            }
-        }
         if (!preflight(repoDir)) {
             System.err.println("[OROBOROS] preflight failed; aborting")
             return

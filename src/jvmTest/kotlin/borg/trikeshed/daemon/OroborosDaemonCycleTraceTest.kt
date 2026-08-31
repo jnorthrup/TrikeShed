@@ -49,38 +49,46 @@ class OroborosDaemonCycleTraceTest {
         )
     }
 
+    /**
+     * Cycle tracing was RETIRED with the flywheel; this test outlived it.
+     *
+     * It booted the daemon five times and expected five JSONL records carrying
+     * `t/c/d/p/a/v/e` — flywheel cycle fields. Nothing writes them any more:
+     * `traceWriter` in OroborosDaemon is opened, flushed and closed, and never
+     * written to (the daemon's own ALIVE line says "cycle fields retired with the
+     * flywheel" and reports -1 for each). So it could not pass, and it paid five
+     * full daemon boots — about five minutes — to fail.
+     *
+     * Rewritten to the invariant that survived: a `--once` boot completes and
+     * shuts down cleanly. That is a real smoke test and costs ONE boot. The
+     * emptiness of the trace file is asserted deliberately, so that whoever
+     * reinstates cycle tracing is told by a failure here to update this test
+     * rather than discovering an always-empty file in every forge home.
+     */
     @Test
-    fun `daemon cycle trace writes jsonl rings`() {
+    fun `a --once daemon boots and shuts down cleanly`() {
         val traceFile = File(forgeHome, "oroboros-cycles.jsonl")
-
-        // Mock api key
         setEnv("JULES_API_KEY", "test-key-mock")
 
-        for (i in 1..5) {
-            try {
-                OroborosDaemon.main(arrayOf("--once", forgeHome.absolutePath, repoDir.absolutePath))
-            } catch (e: SecurityException) {
-                // Ignore if exitProcess was called and trapped
-            }
+        try {
+            OroborosDaemon.main(
+                arrayOf(
+                    "--once",
+                    "--kanban-port", java.net.ServerSocket(0).use { it.localPort }.toString(),
+                    forgeHome.absolutePath,
+                    repoDir.absolutePath,
+                ),
+            )
+        } catch (e: SecurityException) {
+            // exitProcess trapped by the test security manager — a clean exit.
         }
 
-        // The JSONL file is not flushed until JVM exit. In the test, we must call flush manually if possible, or wait, we can't because it's a private variable. But wait, we can close the daemon or use reflection. Actually, FileOutputStream has a FileDescriptor that we can't flush easily. Let's fix OroborosDaemon to close on --once.
-
-        assertTrue(traceFile.exists(), "traceFile should exist")
-        val lines = traceFile.readLines()
-        assertEquals(5, lines.size, "Should have 5 lines")
-
-        lines.forEach { line ->
-            assertTrue(line.startsWith("{"), "Should be JSON")
-
-            // Use simple regex parsing since we can't use complex JSON libraries
-            val timeRegex = "\"t\":\\d+".toRegex()
-            val cycleRegex = "\"c\":\\d+".toRegex()
-            val keys = listOf("\"t\":", "\"c\":", "\"d\":", "\"p\":", "\"a\":", "\"v\":", "\"e\":")
-
-            keys.forEach { key ->
-                assertTrue(line.contains(key), "Should contain $key")
-            }
-        }
+        assertTrue(traceFile.exists(), "the daemon should still open its trace file")
+        assertEquals(
+            0,
+            traceFile.readLines().size,
+            "cycle tracing is retired: nothing writes traceWriter. If you have reinstated it, " +
+                "assert the real record shape here instead of this emptiness check.",
+        )
     }
 }

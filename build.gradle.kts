@@ -518,6 +518,38 @@ tasks.register<JavaExec>("trajectoryReduction") {
     classpath(tasks.named("jvmJar"), configurations.getByName("jvmRuntimeClasspath"))
 }
 
+// Writes the mux CLI runtime classpath to a file so `bin/mux` can exec java
+// directly. A diagnostic you run twenty times while chasing a credential must
+// not cost a Gradle daemon round-trip each time — that is the difference
+// between a tool an operator reaches for and one they work around.
+tasks.register("muxClasspath") {
+    group = "oroboros"
+    description = "Write the mux CLI runtime classpath to build/mux/classpath.txt for bin/mux."
+    dependsOn("jvmJar")
+    val outFile = layout.buildDirectory.file("mux/classpath.txt")
+    val cp = files(tasks.named("jvmJar"), configurations.getByName("jvmRuntimeClasspath"))
+    outputs.file(outFile)
+    doLast {
+        val f = outFile.get().asFile
+        f.parentFile.mkdirs()
+        f.writeText(cp.joinToString(":") { it.absolutePath })
+    }
+}
+
+// mux — the keymux/modelmux operator surface. `bin/mux` wraps this; the task is
+// here so `./gradlew mux --args="doctor"` works without the wrapper.
+tasks.register<JavaExec>("mux") {
+    group = "oroboros"
+    description = "keymux/modelmux operator surface: keys | models | chat | doctor."
+    dependsOn("jvmJar")
+    mainClass.set("borg.trikeshed.mux.MuxCli")
+    classpath(tasks.named("jvmJar"), configurations.getByName("jvmRuntimeClasspath"))
+    // The whole point is the process environment the operator is standing in —
+    // a sanitized env would resolve a different key set than their shell does.
+    environment(System.getenv())
+    standardInput = System.`in`
+}
+
 // Forge JVM shell — interactive Compose Desktop window that hosts the same
 // workspace model the browser bundle renders (board, page, gallery, blackboard).
 tasks.register<JavaExec>("runForgeJvm") {

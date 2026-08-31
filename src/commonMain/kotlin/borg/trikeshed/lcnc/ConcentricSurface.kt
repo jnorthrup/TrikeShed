@@ -206,6 +206,14 @@ object ConcentricSurface {
 
     val LANE_ASSEMBLAGE: List<LaneBand> = listOf(
         LaneBand("accept", listOf("timer", "sse", "graal.events", "vm.events"), band("daemon-root")),
+        // Monitoring had no lane at all: `graal.vitals`, `graal.heap`, `vms.list`
+        // and the blackboard reads matched nothing and fell through laneOf's
+        // default into `fanout`, so heap and vitals panels drew inside the
+        // fan-out band beside unrelated work. They are readings of the runtime
+        // terrain, so they belong to the sub-VM band. Placed AFTER `accept` on
+        // purpose — `graal.events` is an acceptor signal and must keep matching
+        // there, and laneOf takes the FIRST match.
+        LaneBand("monitor", listOf("graal.", "vms.", "sub-vm", "blackboard."), band("sub-vm")),
         LaneBand("store", listOf("kanban.", "confix.", "sheet.", "panels.list"), band("frame-r1-store")),
         LaneBand("lease", listOf("mux.", "brain.", "llm"), band("frame-r1-lease")),
         LaneBand("fanout", listOf("vm.", "display", "gauge", "pick", "group", "board.", "js"), band("frame-r2-fanout")),

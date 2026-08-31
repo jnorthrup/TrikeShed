@@ -164,8 +164,14 @@ button.stop{border-color:var(--err);color:var(--err)}
 .node.scope>.seed{color:#6b8aa0}
 .node.scope>.emit{color:#7a95a8}
 /* the lane ruler: CCEK element families as a spine across the world's top */
-#spine{position:absolute;left:0;top:-30px;height:22px;pointer-events:none}
-#spine .lane{position:absolute;top:0;height:20px;border:1px dashed var(--line);border-bottom:none;color:var(--dim);font-size:9px;padding:0 6px;line-height:20px;white-space:nowrap;overflow:hidden}
+/* ELASTIC concentric border: a lane is the BOX its members occupy, not a
+   caption rail above them. It was `top:-30px;height:20px` with drawSpine only
+   ever setting left/width, so the frame never enclosed anything and appeared
+   to sit still while its interior moved. Now it stretches in both axes. */
+#spine{position:absolute;left:0;top:0;width:0;height:0;pointer-events:none;z-index:0}
+#spine .lane{position:absolute;border:1px dashed var(--line);border-radius:10px;color:var(--dim);font-size:9px;white-space:nowrap;background:rgba(255,255,255,.012)}
+#spine .lane>b{position:absolute;top:-8px;left:10px;font-weight:400;background:var(--bg);padding:0 6px;line-height:16px;border-radius:4px}
+.node{z-index:1}
 /* untyped port: contract declared no kind — it mates with nothing */
 .port.t-any{border-color:var(--dim)}
 /* wiring affordance: while a wire is in hand, only kind-equal ports stay lit;
@@ -229,6 +235,7 @@ button{border-radius:6px;padding:4px 12px;transition:border-color .12s,color .12
   <button class="run" id="runBtn">▶ run</button>
   <button class="stop" id="stopBtn">■ stop timers</button>
   <button id="addBtn">+ node</button>
+  <button id="fitBtn" title="frame every node (F) — the top-level answer to the D-tab's ring fit">⤢ fit</button>
   <input id="panelName" placeholder="panel-name" style="background:var(--bg);border:1px solid var(--line);color:var(--ink);border-radius:4px;padding:4px 8px;font:inherit;width:120px">
   <button id="storeSaveBtn" title="save construction as a replicated store document">⇪ store</button>
   <button id="storeLoadBtn" title="load a construction from the store">⇩ store</button>
@@ -1018,9 +1025,15 @@ function layoutRing(n){
   const W=colW(ins)+centerW+colW(outs)+4*RING_EDGE;
   const H=(top.length?rowH(top)+RING_EDGE:0)+centerH+(bot.length?rowH(bot)+RING_EDGE:0)+2*RING_EDGE;
   const host=n._childHost;
-  host.style.minWidth=W+"px"; host.style.minHeight=H+"px";
   const rw=n._ringWorld||host;
-  if(n._ringWorld){ rw.style.width=W+"px"; rw.style.height=H+"px"; applyRingView(n); }
+  if(n._ringWorld){
+    rw.style.width=W+"px"; rw.style.height=H+"px";
+    // applyRingView sizes the frame from the world × this ring's zoom, so the
+    // floor is never re-set to the unscaled W/H behind a zoomed interior.
+    applyRingView(n);
+  } else {
+    host.style.minWidth=W+"px"; host.style.minHeight=H+"px";
+  }
   // the shared center sits mid-CENTER-BAND (between the in and out edges),
   // so asymmetric edge columns never squeeze the inner shells into them
   const cx=colW(ins)+2*RING_EDGE+centerW/2, cy=(top.length?rowH(top)+RING_EDGE:0)+RING_EDGE+centerH/2;
@@ -1043,7 +1056,32 @@ function layoutRing(n){
 function ringScaleOf(m){ let s=1,q=m._parentScope; while(q){ s*=((q._view&&q._view.z)||1); q=q._parentScope; } return s; }
 function applyRingView(n){
   const v=n._view||{x:0,y:0,z:1};
-  if(n._ringWorld) n._ringWorld.style.transform=`translate(${v.x}px,${v.y}px) scale(${v.z})`;
+  if(!n._ringWorld) return;
+  n._ringWorld.style.transform=`translate(${v.x}px,${v.y}px) scale(${v.z})`;
+  /* The FRAME has to track the zoom, or the interior grows against a fixed
+     clipping box: `.childgrid` is overflow:hidden, so anything zoomed past its
+     edge became unreachable — and a parent ring laying out its children read
+     the UNSCALED frame via offsetWidth while the child rendered scaled, which
+     is the "not evenly" part. min-* is a floor, so a hand-resized ring keeps
+     whatever the person dragged it to. */
+  syncRingFrame(n);
+}
+/* ELASTIC border: the ring's frame IS its contents at the current zoom, not a
+   fixed window onto them. The world is stored at intrinsic size and drawn at
+   size×z, so the border is set to exactly size×z — it stretches and contracts
+   with what it holds. Nothing can be zoomed past an edge that no longer moves,
+   which is what made the interior inaccessible, and a parent measuring this
+   ring with offsetWidth now reads the size actually drawn, which is what made
+   sibling layout uneven. Width/height, not min-*: a floor still lets a frame
+   sit larger than its contents and reintroduces the dead space. */
+function syncRingFrame(n){
+  const host=n._childHost, rw=n._ringWorld;
+  if(!host||!rw) return;
+  const z=((n._view&&n._view.z)||1);
+  const w=parseFloat(rw.style.width)||0, h=parseFloat(rw.style.height)||0;
+  if(!w||!h) return;
+  host.style.width=Math.round(w*z)+"px";
+  host.style.height=Math.round(h*z)+"px";
 }
 /* ring chrome rides the tree: depth tab + edge captions recompute once
    parents are linked (buildNode runs before the links exist). */
@@ -1099,13 +1137,20 @@ function drawSpine(){
     const L=laneOf(n); if(!L) continue;
     (byLane[L.id]=byLane[L.id]||[]).push(n);
   }
+  const PAD=20;
   for(const L of LANES){
     const ns=(byLane[L.id]||[]).sort((a,b)=>a.x-b.x);
     if(!ns.length) continue;
-    const x0=Math.min(...ns.map(n=>n.x))-30, x1=Math.max(...ns.map(n=>n.x))+220;
+    // The border is the members' bounding box in BOTH axes — measured from what
+    // is actually drawn, so it stretches as they move, resize or are added.
+    const w=n=>(n.el&&n.el.offsetWidth)||190, h=n=>(n.el&&n.el.offsetHeight)||96;
+    const x0=Math.min(...ns.map(n=>n.x))-PAD, x1=Math.max(...ns.map(n=>n.x+w(n)))+PAD;
+    const y0=Math.min(...ns.map(n=>n.y))-PAD, y1=Math.max(...ns.map(n=>n.y+h(n)))+PAD;
     const d=document.createElement("div"); d.className="lane";
-    d.style.left=Math.max(0,x0)+"px"; d.style.width=(x1-x0)+"px";
-    d.textContent=L.id+" · "+L.element.split(" ·")[0];
+    d.style.left=x0+"px"; d.style.top=y0+"px";
+    d.style.width=(x1-x0)+"px"; d.style.height=(y1-y0)+"px";
+    const b=document.createElement("b"); b.textContent=L.id+" · "+L.element.split(" ·")[0];
+    d.appendChild(b);
     sp.appendChild(d);
   }
 }
@@ -1221,11 +1266,18 @@ function buildNode(n){
     grid.addEventListener("wheel",ev=>{
       ev.preventDefault(); ev.stopPropagation();
       const v=n._view, outer=view.z*ringScaleOf(n);
-      const f=ev.deltaY<0?1.1:1/1.1, nz=Math.min(4,Math.max(.15,v.z*f));
+      // Proportional to the gesture, like the main canvas: a fixed step per
+      // event makes a trackpad rocket and a mouse crawl.
+      const k=ev.deltaMode===1?16:ev.deltaMode===2?grid.clientHeight:1;
+      const f=Math.exp(-ev.deltaY*k*0.0025), nz=Math.min(4,Math.max(.15,v.z*f));
       const r=grid.getBoundingClientRect();
       const gx=(ev.clientX-r.left)/outer, gy=(ev.clientY-r.top)/outer;
       v.x=gx-(gx-v.x)*(nz/v.z); v.y=gy-(gy-v.y)*(nz/v.z); v.z=nz;
-      applyRingView(n); redraw();
+      applyRingView(n);
+      // The frame just changed size, so the enclosing nest has to reflow around
+      // it — redraw() only repaints wires, it never re-runs layoutRing.
+      const topRing=topRingOf(n); if(topRing&&topRing._childHost) layoutRing(topRing);
+      redraw(); saveCameraSoon();
     },{passive:false});
     grid.addEventListener("pointerdown",ev=>{
       if(ev.target!==grid&&ev.target!==rw)return; // nodes keep their own drags
@@ -1581,13 +1633,55 @@ viewport.addEventListener("pointerdown",e=>{
   const up=()=>{ viewport.classList.remove("panning"); removeEventListener("pointermove",mv); removeEventListener("pointerup",up); save(); };
   addEventListener("pointermove",mv); addEventListener("pointerup",up);
 });
+/* A camera move is not a document mutation.
+   save() serializes the WHOLE document twice (once for history, once for
+   localStorage), JSON.parses it twice more for the shape check, and writes
+   localStorage synchronously. Calling that per wheel event — a trackpad emits
+   50-100 a second — is what made zooming stutter, and it buried every real edit
+   under a hundred camera frames in the undo stack. Pan already saves only on
+   pointerup; the wheel was the outlier. */
+let camSaveT=0;
+function saveCameraSoon(){ clearTimeout(camSaveT); camSaveT=setTimeout(save,250); }
+
+/* deltaMode: 0=pixel, 1=line, 2=page. Firefox sends lines. */
+function wheelPixels(e,rect){ const k=e.deltaMode===1?16:e.deltaMode===2?rect.height:1; return {dx:e.deltaX*k,dy:e.deltaY*k}; }
+
 viewport.addEventListener("wheel",e=>{
   e.preventDefault();
-  const f=e.deltaY<0?1.1:1/1.1, nz=Math.min(2.5,Math.max(.25,view.z*f));
-  view.x=e.clientX-(e.clientX-view.x)*(nz/view.z);
-  view.y=(e.clientY-40)-((e.clientY-40)-view.y)*(nz/view.z);
-  view.z=nz; applyView(); save();
+  const r=viewport.getBoundingClientRect();
+  // Anchor on the viewport's own box rather than a hardcoded 40px bar height,
+  // so the point under the cursor stays under the cursor.
+  const px=e.clientX-r.left, py=e.clientY-r.top;
+  const {dy}=wheelPixels(e,r);
+  // Wheel zooms, as it always has. Only the STEP changed: proportional to the
+  // gesture instead of a fixed 1.1 per event, because a trackpad sends many
+  // small deltas where a mouse sends few large ones — a constant step made the
+  // trackpad rocket and the wheel crawl.
+  const f=Math.exp(-dy*0.0025);
+  const nz=Math.min(2.5,Math.max(.08,view.z*f));   // .08 so a spread-out board fits
+  view.x=px-(px-view.x)*(nz/view.z);
+  view.y=py-(py-view.y)*(nz/view.z);
+  view.z=nz; applyView(); saveCameraSoon();
 },{passive:false});
+
+/* Frame every top-level node. The rings have had a fit gesture all along
+   (double-click the D-tab); the top-level canvas had none, so a board wider
+   than the window could only be found by dragging blind. */
+function fitToContent(){
+  const tops=G.nodes.filter(n=>!n._parentScope&&n.el);
+  if(!tops.length) return;
+  let x0=Infinity,y0=Infinity,x1=-Infinity,y1=-Infinity;
+  for(const n of tops){
+    x0=Math.min(x0,n.x); y0=Math.min(y0,n.y);
+    x1=Math.max(x1,n.x+(n.el.offsetWidth||190)); y1=Math.max(y1,n.y+(n.el.offsetHeight||90));
+  }
+  const r=viewport.getBoundingClientRect(), pad=48;
+  const z=Math.min(2.5,Math.max(.08,Math.min((r.width-pad*2)/Math.max(1,x1-x0),(r.height-pad*2)/Math.max(1,y1-y0))));
+  view.z=z;
+  view.x=(r.width-(x1-x0)*z)/2-x0*z;
+  view.y=(r.height-(y1-y0)*z)/2-y0*z;
+  applyView(); saveCameraSoon();
+}
 /* ── add-node menu ─────────────────────────────────────────────────────── */
 const menu=$("#menu");
 function showMenu(cx,cy,intoScope){
@@ -1763,6 +1857,7 @@ viewport.addEventListener("drop",async e=>{
 });
 addEventListener("pointerdown",e=>{ if(!menu.contains(e.target)) menu.style.display="none"; });
 $("#addBtn").addEventListener("click",e=>showMenu(60,60));
+$("#fitBtn").addEventListener("click",()=>fitToContent());
 /* ── execution ─────────────────────────────────────────────────────────── */
 function inputsOf(id){ return G.wires.filter(w=>w.to[0]===id); }
 function topo(){
@@ -1970,6 +2065,9 @@ function redo(){
 addEventListener("keydown",e=>{
   const t=e.target,tag=((t&&t.tagName)||"").toLowerCase();
   if(tag==="input"||tag==="textarea"||tag==="select"||(t&&t.isContentEditable)) return;
+  // Bare F frames the board — checked before the modifier gate below, which
+  // exists for the undo/redo pair.
+  if((e.key==="f"||e.key==="F")&&!e.metaKey&&!e.ctrlKey&&!e.altKey){ e.preventDefault(); fitToContent(); return; }
   if(!(e.metaKey||e.ctrlKey)) return;
   if(e.key==="z"||e.key==="Z"){ e.preventDefault(); if(e.shiftKey) redo(); else undo(); }
   else if(e.key==="y"||e.key==="Y"){ e.preventDefault(); redo(); }

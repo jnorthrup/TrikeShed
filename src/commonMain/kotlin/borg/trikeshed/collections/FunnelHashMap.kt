@@ -45,6 +45,8 @@ class FunnelHashMap<K : Any, V>(
         private const val DECAY_NUM = 3
         private const val DECAY_DEN = 4 // A_{i+1} = 3/4 A_i
         private const val MIN_BETA = 8
+        /** Grow-and-retry bound when funnel placement finds every bucket full. */
+        private const val MAX_PLACEMENT_GROWTHS = 8
         private const val BETA_LN_SCALE = 4.0
 
         fun betaFor(slack: Double): Int {
@@ -119,7 +121,13 @@ class FunnelHashMap<K : Any, V>(
         return h xor (h ushr 16)
     }
 
-    fun put(key: K, value: V): V? {
+    fun put(key: K, value: V): V? = put(key, value, 0)
+
+    /**
+     * [growth] bounds the grow-and-retry below. `resize` rehashes through the
+     * public entry point, so those re-insertions each start fresh at 0.
+     */
+    private fun put(key: K, value: V, growth: Int): V? {
         if (size >= liveCap()) {
             resize(capacity * 2)
         }
@@ -159,7 +167,17 @@ class FunnelHashMap<K : Any, V>(
             return null
         }
 
-        return null
+        // Every candidate bucket on every level was occupied. Funnel hashing can
+        // fail to place a key even below the load factor — that is inherent, and
+        // the answer is to grow and retry. Returning null here instead DISCARDED
+        // the entry in silence: put() reported success, `size` never advanced,
+        // and get() answered null for that key forever. FunnelHashMapTest.resize
+        // caught it losing key 46 while inserting 2000.
+        if (growth >= MAX_PLACEMENT_GROWTHS) {
+            error("FunnelHashMap: no slot for key after $growth growths (capacity=$capacity, size=$size)")
+        }
+        resize(capacity * 2)
+        return put(key, value, growth + 1)
     }
 
     fun get(key: K): V? {
