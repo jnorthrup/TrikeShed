@@ -72,12 +72,22 @@ class LcncKanbanExperience(
                     buildMap {
                         put("type", "submit")
                         put("jobId", jobId)
-                        put("title", title ?: jobId)
-                        put(
-                            "priority",
-                            c["priority"]?.toString()?.toDoubleOrNull()?.toInt()
-                                ?: node.params["priority"]?.toIntOrNull() ?: 2,
-                        )
+                        // Absent stays absent, same as priority/tags/owner below.
+                        // `title ?: jobId` meant an edit that only touched tags
+                        // OVERWROTE the card's title with its own id — advanceRow's
+                        // `?: prev?.title` was unreachable for the same reason the
+                        // priority fallback was. A create still gets a title: the
+                        // store falls back to the jobId when there is no prev.
+                        title?.let { put("title", it) }
+                        // Absent stays absent — the same rule the tags/owner lines
+                        // below keep. This used to default to 2 on EVERY submit, so
+                        // re-submitting a card to add a tag silently reset a p0 to p2:
+                        // advanceRow's `?: prev?.priority` could never be reached
+                        // because the key was always present. A new card still lands
+                        // at 2; the store owns that default, not this runner.
+                        (c["priority"]?.toString()?.toDoubleOrNull()?.toInt()
+                            ?: node.params["priority"]?.toIntOrNull())
+                            ?.let { put("priority", it) }
                         put(
                             "idempotencyKey",
                             c["idempotencyKey"]?.toString()?.takeIf { it.isNotBlank() }

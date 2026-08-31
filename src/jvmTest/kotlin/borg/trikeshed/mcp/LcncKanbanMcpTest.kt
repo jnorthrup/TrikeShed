@@ -317,6 +317,38 @@ class LcncKanbanMcpTest {
     }
 
     @Test
+    fun reSubmittingACardToEditItDoesNotResetThePriorityItAlreadyHas() = withRig("priority-keep") { rig ->
+        // Found by using the board: re-submitting four p0 cards purely to add a
+        // `patch:` tag silently reset every one of them to p2. The runner always
+        // wrote a priority — defaulting to 2 when the caller omitted it — so
+        // advanceRow's `?: prev?.priority` was unreachable. Absent must stay
+        // absent, exactly as it already does for tags, dependencies and owner.
+        val jobId = submit(rig, "An urgent card", mapOf("priority" to 0))
+        assertEquals(0L, num(readResource(rig, "${LcncKanbanMcp.URI_CARD_PREFIX}$jobId")["priority"]))
+
+        // An edit that says nothing about priority
+        submit(rig, "An urgent card", mapOf("tags" to listOf("patch:somewhere.kt"), "idempotencyKey" to "edit#1"))
+
+        val after = readResource(rig, "${LcncKanbanMcp.URI_CARD_PREFIX}$jobId")
+        assertEquals(0L, num(after["priority"]), "an edit that never mentions priority must not demote the card")
+        assertEquals(listOf("patch:somewhere.kt"), after["tags"], "the edit itself still lands")
+
+        // The same defect one field over, and it wrecked the board the same day:
+        // an edit that states no title used to overwrite the title with the jobId,
+        // so cards read "KB-06" instead of what they said.
+        toolCall(
+            rig, LcncKanbanMcp.TOOL_SUBMIT,
+            mapOf("jobId" to jobId, "tags" to listOf("second-edit"), "idempotencyKey" to "edit#2"),
+        )
+        val retitled = readResource(rig, "${LcncKanbanMcp.URI_CARD_PREFIX}$jobId")
+        assertEquals("An urgent card", retitled["title"], "an edit that never mentions the title must not rename the card to its id")
+
+        // A brand-new card with no stated priority still gets the store's default.
+        val fresh = submit(rig, "A card with no stated priority")
+        assertEquals(2L, num(readResource(rig, "${LcncKanbanMcp.URI_CARD_PREFIX}$fresh")["priority"]))
+    }
+
+    @Test
     fun aCommittedChangeHasAReadableReceiptAnchoredInCas() = withRig("receipts") { rig ->
 
         val jobId = submit(rig, "Leaves a receipt")
