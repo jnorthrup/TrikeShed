@@ -164,8 +164,14 @@ button.stop{border-color:var(--err);color:var(--err)}
 .node.scope>.seed{color:#6b8aa0}
 .node.scope>.emit{color:#7a95a8}
 /* the lane ruler: CCEK element families as a spine across the world's top */
-#spine{position:absolute;left:0;top:-30px;height:22px;pointer-events:none}
-#spine .lane{position:absolute;top:0;height:20px;border:1px dashed var(--line);border-bottom:none;color:var(--dim);font-size:9px;padding:0 6px;line-height:20px;white-space:nowrap;overflow:hidden}
+/* ELASTIC concentric border: a lane is the BOX its members occupy, not a
+   caption rail above them. It was `top:-30px;height:20px` with drawSpine only
+   ever setting left/width, so the frame never enclosed anything and appeared
+   to sit still while its interior moved. Now it stretches in both axes. */
+#spine{position:absolute;left:0;top:0;width:0;height:0;pointer-events:none;z-index:0}
+#spine .lane{position:absolute;border:1px dashed var(--line);border-radius:10px;color:var(--dim);font-size:9px;white-space:nowrap;background:rgba(255,255,255,.012)}
+#spine .lane>b{position:absolute;top:-8px;left:10px;font-weight:400;background:var(--bg);padding:0 6px;line-height:16px;border-radius:4px}
+.node{z-index:1}
 /* untyped port: contract declared no kind — it mates with nothing */
 .port.t-any{border-color:var(--dim)}
 /* wiring affordance: while a wire is in hand, only kind-equal ports stay lit;
@@ -229,6 +235,7 @@ button{border-radius:6px;padding:4px 12px;transition:border-color .12s,color .12
   <button class="run" id="runBtn">▶ run</button>
   <button class="stop" id="stopBtn">■ stop timers</button>
   <button id="addBtn">+ node</button>
+  <button id="fitBtn" title="frame every node (F) — the top-level answer to the D-tab's ring fit">⤢ fit</button>
   <input id="panelName" placeholder="panel-name" style="background:var(--bg);border:1px solid var(--line);color:var(--ink);border-radius:4px;padding:4px 8px;font:inherit;width:120px">
   <button id="storeSaveBtn" title="save construction as a replicated store document">⇪ store</button>
   <button id="storeLoadBtn" title="load a construction from the store">⇩ store</button>
@@ -237,6 +244,8 @@ button{border-radius:6px;padding:4px 12px;transition:border-color .12s,color .12
   <button id="keysBtn" title="keymux endpoints — names & addresses; key values never cross">⚿ keys</button>
   <button id="exportBtn">export</button>
   <button id="importBtn">import</button>
+  <button id="undoBtn" title="undo ⌘Z" disabled>↶</button>
+  <button id="redoBtn" title="redo ⇧⌘Z" disabled>↷</button>
   <button id="clearBtn">clear</button>
   <button id="qsBtn" title="run the quickstart in anger" style="border-color:#3ddc84;color:#3ddc84">⚡</button>
   <button id="fbBtn" title="open a GitHub issue prefilled with this construction's coordinates" style="border-color:var(--warn);color:var(--warn)">⚑</button>
@@ -580,9 +589,11 @@ finally:
   },
 };
 /* ── server-family runners: ONE author of execution semantics. The daemon runs
-   the node (LcncKanbanExperience / LcncSheetNodes via POST /api/lcnc/run against
-   the composed lcncRunners registry — the same map webhook dispatch resolves);
-   the browser posts params+inputs and renders the outputs. */
+   the node (POST /api/lcnc/run against the composed lcncRunners registry — the
+   same map webhook dispatch resolves); the browser posts params+inputs and
+   renders the outputs. Installed by syncContracts() for EVERY hydrated
+   contract type without an explicit browser runner above, so a registered
+   daemon lego is never inert on the canvas. */
 function serverRun(type){
   return { async run(n,i){
     const r=await api("POST","/api/lcnc/run",{type:type,params:n.params||{},inputs:i});
@@ -590,8 +601,6 @@ function serverRun(type){
     return r.outputs||{};
   }};
 }
-for(const t of ["kanban.activeSheets","kanban.submit","kanban.move","confix.sheets","confix.pickPath",
-                "sheet.flatten","sheet.filter","sheet.count","sheet.columns","sheet.cell"]) RUNNERS[t]=serverRun(t);
 
 /* ── graph state ───────────────────────────────────────────────────────── */
 let G={nodes:[],wires:[],seq:1};              // wires: {from:[nodeId,port], to:[nodeId,port]}
@@ -666,7 +675,7 @@ function renderGroupedBoard(n){
   const total=Object.values(groups).reduce((a,g)=>a+g.length,0);
   status.textContent=total+" items across "+cols.length+" groups";
   for(const col of cols){
-    const items=groups[col.id]||[];
+    const items=(groups[col.id]||[]).slice().sort((a,b)=>((a&&a.order)??0)-((b&&b.order)??0));
     const over=col.wipLimit&&items.length>col.wipLimit;
     const c=document.createElement("div"); c.className="kcol"+(over?" over":"");
     c.dataset.group=col.id;
@@ -681,27 +690,73 @@ function renderGroupedBoard(n){
     for(const it of items){
       const card=document.createElement("div");
       card.className="kcard"+(it.contested?" contested":"");
-      card.draggable=true;
+      card.dataset.jobid=it[idF];
+      card.style.touchAction="none"; // pointer drag streams moves on touch too
       const title=it[titleF]??it[idF]??"?", sub=it[subF], badge=it[badgeF];
       card.innerHTML=`<div>${title}</div><div class="kid">${sub!=null&&sub!==title?sub:""}${badge!=null?" · "+badge:""}</div>`;
-      card.addEventListener("dragstart",e=>{
-        e.dataTransfer.setData("text/plain",JSON.stringify({itemId:it[idF],item:it,from:col.id}));
-        e.dataTransfer.effectAllowed="move";
+      // Pointer-event drag, NOT HTML5 DnD: works for mouse/trackpad/touch/pen
+      // alike, survives the canvas transform, and needs no dataTransfer.
+      card.addEventListener("pointerdown",e=>{
+        e.stopPropagation(); // don't pan the canvas while grabbing a card
+        if(e.button!==0) return;
+        const sx=e.clientX, sy=e.clientY; let ghost=null;
+        const colUnder=ev=>{ const t=document.elementFromPoint(ev.clientX,ev.clientY); return t?t.closest(".kcol"):null; };
+        const onMove=ev=>{
+          if(!ghost){
+            if(Math.hypot(ev.clientX-sx,ev.clientY-sy)<6) return; // click/dblclick stays intact
+            const r=card.getBoundingClientRect();
+            ghost=card.cloneNode(true);
+            ghost.style.cssText=`position:fixed;pointer-events:none;z-index:999;opacity:.88;width:${r.width}px;margin:0`;
+            document.body.appendChild(ghost);
+            card.style.opacity=".35";
+          }
+          ghost.style.left=(ev.clientX+8)+"px"; ghost.style.top=(ev.clientY+8)+"px";
+          wrap.querySelectorAll(".kcol").forEach(k=>k.classList.remove("dragover"));
+          const kc=colUnder(ev); if(kc) kc.classList.add("dragover");
+          ev.preventDefault();
+        };
+        const onUp=ev=>{
+          window.removeEventListener("pointermove",onMove);
+          window.removeEventListener("pointerup",onUp);
+          window.removeEventListener("pointercancel",onUp);
+          wrap.querySelectorAll(".kcol").forEach(k=>k.classList.remove("dragover"));
+          card.style.opacity="";
+          if(!ghost) return; // never crossed the threshold: plain click
+          ghost.remove();
+          const kc=colUnder(ev), to=kc&&kc.dataset.group;
+          if(!to) return;
+          // X and Y both mean something: the card whose top half the pointer is
+          // above becomes the insert-before target; below every card = append.
+          let beforeJobId=null;
+          for(const el2 of kc.querySelectorAll(".kcard")){
+            if(el2===card) continue;
+            const r2=el2.getBoundingClientRect();
+            if(ev.clientY<r2.top+r2.height/2){ beforeJobId=el2.dataset.jobid||null; break; }
+          }
+          if(to===col.id&&beforeJobId===null) return; // dropped back where it was
+          // Optimistic local move AT the pointed position; the next activeSheets
+          // tick reconciles truth (a refused move snaps it back).
+          const fromArr=n._groups[col.id]||[], idx=fromArr.findIndex(x=>x[idF]===it[idF]);
+          if(idx>=0){
+            const moved=fromArr.splice(idx,1)[0];
+            const dst=(n._groups[to]=n._groups[to]||[]);
+            const at=beforeJobId?dst.findIndex(x=>x[idF]===beforeJobId):-1;
+            if(at>=0) dst.splice(at,0,moved); else dst.push(moved);
+            dst.forEach((x,i)=>{ if(x&&typeof x==="object") x.order=i; });
+            renderGroupedBoard(n);
+          }
+          const st=n.el.querySelector(".kboard-status");
+          if(st) st.textContent=it[idF]+": "+col.id+" → "+to+(beforeJobId?" (before "+beforeJobId+")":"")+" (downstream deciding…)";
+          n._lastMove={itemId:it[idF],item:it,from:col.id,to,beforeJobId};
+          runAll(n.id); // this node's own downstream chain sees the gesture
+        };
+        window.addEventListener("pointermove",onMove);
+        window.addEventListener("pointerup",onUp);
+        window.addEventListener("pointercancel",onUp);
       });
-      card.addEventListener("pointerdown",e=>e.stopPropagation()); // don't pan the canvas while grabbing a card
       card.addEventListener("dblclick",e=>{ e.stopPropagation(); openCardModal(n,col.id,it); }); // modal CRUD
       c.appendChild(card);
     }
-    c.addEventListener("dragover",e=>{ e.preventDefault(); c.classList.add("dragover"); });
-    c.addEventListener("dragleave",()=>c.classList.remove("dragover"));
-    c.addEventListener("drop",e=>{
-      e.preventDefault(); c.classList.remove("dragover");
-      let data; try{ data=JSON.parse(e.dataTransfer.getData("text/plain")); }catch(_){ return; }
-      if(!data||data.from===col.id) return;
-      status.textContent=data.itemId+": "+data.from+" → "+col.id+" (wired downstream decides what that means)";
-      n._lastMove={...data,to:col.id};
-      runAll(n.id); // this node's own downstream chain sees the gesture
-    });
     wrap.appendChild(c);
   }
 }
@@ -970,9 +1025,15 @@ function layoutRing(n){
   const W=colW(ins)+centerW+colW(outs)+4*RING_EDGE;
   const H=(top.length?rowH(top)+RING_EDGE:0)+centerH+(bot.length?rowH(bot)+RING_EDGE:0)+2*RING_EDGE;
   const host=n._childHost;
-  host.style.minWidth=W+"px"; host.style.minHeight=H+"px";
   const rw=n._ringWorld||host;
-  if(n._ringWorld){ rw.style.width=W+"px"; rw.style.height=H+"px"; applyRingView(n); }
+  if(n._ringWorld){
+    rw.style.width=W+"px"; rw.style.height=H+"px";
+    // applyRingView sizes the frame from the world × this ring's zoom, so the
+    // floor is never re-set to the unscaled W/H behind a zoomed interior.
+    applyRingView(n);
+  } else {
+    host.style.minWidth=W+"px"; host.style.minHeight=H+"px";
+  }
   // the shared center sits mid-CENTER-BAND (between the in and out edges),
   // so asymmetric edge columns never squeeze the inner shells into them
   const cx=colW(ins)+2*RING_EDGE+centerW/2, cy=(top.length?rowH(top)+RING_EDGE:0)+RING_EDGE+centerH/2;
@@ -995,7 +1056,32 @@ function layoutRing(n){
 function ringScaleOf(m){ let s=1,q=m._parentScope; while(q){ s*=((q._view&&q._view.z)||1); q=q._parentScope; } return s; }
 function applyRingView(n){
   const v=n._view||{x:0,y:0,z:1};
-  if(n._ringWorld) n._ringWorld.style.transform=`translate(${v.x}px,${v.y}px) scale(${v.z})`;
+  if(!n._ringWorld) return;
+  n._ringWorld.style.transform=`translate(${v.x}px,${v.y}px) scale(${v.z})`;
+  /* The FRAME has to track the zoom, or the interior grows against a fixed
+     clipping box: `.childgrid` is overflow:hidden, so anything zoomed past its
+     edge became unreachable — and a parent ring laying out its children read
+     the UNSCALED frame via offsetWidth while the child rendered scaled, which
+     is the "not evenly" part. min-* is a floor, so a hand-resized ring keeps
+     whatever the person dragged it to. */
+  syncRingFrame(n);
+}
+/* ELASTIC border: the ring's frame IS its contents at the current zoom, not a
+   fixed window onto them. The world is stored at intrinsic size and drawn at
+   size×z, so the border is set to exactly size×z — it stretches and contracts
+   with what it holds. Nothing can be zoomed past an edge that no longer moves,
+   which is what made the interior inaccessible, and a parent measuring this
+   ring with offsetWidth now reads the size actually drawn, which is what made
+   sibling layout uneven. Width/height, not min-*: a floor still lets a frame
+   sit larger than its contents and reintroduces the dead space. */
+function syncRingFrame(n){
+  const host=n._childHost, rw=n._ringWorld;
+  if(!host||!rw) return;
+  const z=((n._view&&n._view.z)||1);
+  const w=parseFloat(rw.style.width)||0, h=parseFloat(rw.style.height)||0;
+  if(!w||!h) return;
+  host.style.width=Math.round(w*z)+"px";
+  host.style.height=Math.round(h*z)+"px";
 }
 /* ring chrome rides the tree: depth tab + edge captions recompute once
    parents are linked (buildNode runs before the links exist). */
@@ -1051,13 +1137,20 @@ function drawSpine(){
     const L=laneOf(n); if(!L) continue;
     (byLane[L.id]=byLane[L.id]||[]).push(n);
   }
+  const PAD=20;
   for(const L of LANES){
     const ns=(byLane[L.id]||[]).sort((a,b)=>a.x-b.x);
     if(!ns.length) continue;
-    const x0=Math.min(...ns.map(n=>n.x))-30, x1=Math.max(...ns.map(n=>n.x))+220;
+    // The border is the members' bounding box in BOTH axes — measured from what
+    // is actually drawn, so it stretches as they move, resize or are added.
+    const w=n=>(n.el&&n.el.offsetWidth)||190, h=n=>(n.el&&n.el.offsetHeight)||96;
+    const x0=Math.min(...ns.map(n=>n.x))-PAD, x1=Math.max(...ns.map(n=>n.x+w(n)))+PAD;
+    const y0=Math.min(...ns.map(n=>n.y))-PAD, y1=Math.max(...ns.map(n=>n.y+h(n)))+PAD;
     const d=document.createElement("div"); d.className="lane";
-    d.style.left=Math.max(0,x0)+"px"; d.style.width=(x1-x0)+"px";
-    d.textContent=L.id+" · "+L.element.split(" ·")[0];
+    d.style.left=x0+"px"; d.style.top=y0+"px";
+    d.style.width=(x1-x0)+"px"; d.style.height=(y1-y0)+"px";
+    const b=document.createElement("b"); b.textContent=L.id+" · "+L.element.split(" ·")[0];
+    d.appendChild(b);
     sp.appendChild(d);
   }
 }
@@ -1095,7 +1188,9 @@ function kindOf(type,dir,port){
 }
 const KIND_CLASS={trigger:"t-trig",json:"t-json",text:"t-text",id:"t-id",num:"t-num"};
 function portClass(type,dir,port){ return KIND_CLASS[kindOf(type,dir,port)]||"t-any"; }
-function kindsCompatible(a,b){ return !!a&&!!b&&a===b; }
+/* exact equality, the daemon's mating rule — with "*" (a ring parameter that
+   has declared no kind) as the one generic, matching LcncTypeCheck.PortKind. */
+function kindsCompatible(a,b){ return !!a&&!!b&&(a===b||a==="*"||b==="*"); }
 /* node-aware kind: rings declare PER-NAME ports through their scope.in /
    scope.out children (spec §4) — those carry the composed json plane. A
    named ring (program param, no inline children) defers to the daemon. */
@@ -1103,11 +1198,18 @@ function nodeKindOf(nd,dir,port){
   const k=kindOf(nd.type,dir,port); if(k) return k;
   if(nd.type==="scope"){
     const p2=port.replace("?","");
-    if(!(nd.children&&nd.children.length)&&(nd.params&&nd.params.program)) return "json";
+    // PROGRESSIVE TYPING (LcncTypeCheck.portKind is the same rule, server-side):
+    // a ring parameter is GENERIC until its scope.in/scope.out declares a `kind`.
+    // Forcing "json" here was a lie — a frame binding is Any?, and the lie made
+    // the shipped council preset (text → ring param) undrawable in this editor.
+    if(!(nd.children&&nd.children.length)&&(nd.params&&nd.params.program)) return "*";
     const want=dir==="out"?"scope.out":"scope.in";
-    let hit=false;
-    (function wk(m){ for(const c of (m.children||[])){ if(c.type===want&&((c.params&&c.params.name)||"").replace("?","")===p2) hit=true; wk(c); } })(nd);
-    if(hit) return "json";
+    let declared=null,hit=false;
+    (function wk(m){ for(const c of (m.children||[])){
+      if(c.type===want&&((c.params&&c.params.name)||"").replace("?","")===p2){
+        hit=true; const dk=(c.params&&c.params.kind)||""; if(dk) declared=dk;
+      } wk(c); } })(nd);
+    if(hit) return declared||"*";
   }
   return null;
 }
@@ -1164,11 +1266,18 @@ function buildNode(n){
     grid.addEventListener("wheel",ev=>{
       ev.preventDefault(); ev.stopPropagation();
       const v=n._view, outer=view.z*ringScaleOf(n);
-      const f=ev.deltaY<0?1.1:1/1.1, nz=Math.min(4,Math.max(.15,v.z*f));
+      // Proportional to the gesture, like the main canvas: a fixed step per
+      // event makes a trackpad rocket and a mouse crawl.
+      const k=ev.deltaMode===1?16:ev.deltaMode===2?grid.clientHeight:1;
+      const f=Math.exp(-ev.deltaY*k*0.0025), nz=Math.min(4,Math.max(.15,v.z*f));
       const r=grid.getBoundingClientRect();
       const gx=(ev.clientX-r.left)/outer, gy=(ev.clientY-r.top)/outer;
       v.x=gx-(gx-v.x)*(nz/v.z); v.y=gy-(gy-v.y)*(nz/v.z); v.z=nz;
-      applyRingView(n); redraw();
+      applyRingView(n);
+      // The frame just changed size, so the enclosing nest has to reflow around
+      // it — redraw() only repaints wires, it never re-runs layoutRing.
+      const topRing=topRingOf(n); if(topRing&&topRing._childHost) layoutRing(topRing);
+      redraw(); saveCameraSoon();
     },{passive:false});
     grid.addEventListener("pointerdown",ev=>{
       if(ev.target!==grid&&ev.target!==rw)return; // nodes keep their own drags
@@ -1448,13 +1557,21 @@ async function showMateMenu(cx,cy,srcNode,srcPort,wx,wy,scope,dir){
   let all=[];
   if(dir!=="in"){
     // forward: the daemon's evidence-ordered continuations
-    const mq="/api/lcnc/mating-options?sourceType="+enc(srcNode.type)+"&sourcePort="+enc(srcPort.replace("?",""))+"&q=";
-    try{ all=(await api("GET",mq)).options||[]; }
+    // A ring port's kind lives in the NODE (its scope.out child), not in the
+    // `scope` contract — the route only gets (type, port), so the surface that
+    // knows resolves it and says so. Without this the daemon answered "no
+    // compatible mate" for cables this same canvas would let you drop.
+    const srcKind=nodeKindOf(srcNode,"out",srcPort)||"";
+    const mq="/api/lcnc/mating-options?sourceType="+enc(srcNode.type)+"&sourcePort="+enc(srcPort.replace("?",""))+"&kind="+enc(srcKind)+"&q=";
+    let generic=false;
+    try{ const r=await api("GET",mq); all=r.options||[]; generic=!!r.generic; }
     catch(e){ $("#status").textContent="mate options failed: "+e; return; }
+    if(generic) $("#status").textContent=srcNode.type+"."+srcPort+" is a generic ring parameter — every kind mates; declare a kind on its scope.out to narrow";
   } else {
     // BACKCHAIN: from an input, offer every type whose output kind equals it
     const want=nodeKindOf(srcNode,"in",srcPort);
     if(!want){ $("#status").textContent=srcNode.type+"."+srcPort+" is untyped — it mates with nothing"; return; }
+    if(want==="*") $("#status").textContent=srcNode.type+"."+srcPort+" is a generic ring parameter — every kind mates; declare a kind on its scope.in to narrow";
     for(const t of Object.keys(CONTRACTS).sort()){
       const c=CONTRACTS[t];
       for(const op of (c.outs||[])) if(kindsCompatible(kindOf(t,"out",op),want)) all.push({type:t,outputPort:op,title:c.title});
@@ -1516,13 +1633,55 @@ viewport.addEventListener("pointerdown",e=>{
   const up=()=>{ viewport.classList.remove("panning"); removeEventListener("pointermove",mv); removeEventListener("pointerup",up); save(); };
   addEventListener("pointermove",mv); addEventListener("pointerup",up);
 });
+/* A camera move is not a document mutation.
+   save() serializes the WHOLE document twice (once for history, once for
+   localStorage), JSON.parses it twice more for the shape check, and writes
+   localStorage synchronously. Calling that per wheel event — a trackpad emits
+   50-100 a second — is what made zooming stutter, and it buried every real edit
+   under a hundred camera frames in the undo stack. Pan already saves only on
+   pointerup; the wheel was the outlier. */
+let camSaveT=0;
+function saveCameraSoon(){ clearTimeout(camSaveT); camSaveT=setTimeout(save,250); }
+
+/* deltaMode: 0=pixel, 1=line, 2=page. Firefox sends lines. */
+function wheelPixels(e,rect){ const k=e.deltaMode===1?16:e.deltaMode===2?rect.height:1; return {dx:e.deltaX*k,dy:e.deltaY*k}; }
+
 viewport.addEventListener("wheel",e=>{
   e.preventDefault();
-  const f=e.deltaY<0?1.1:1/1.1, nz=Math.min(2.5,Math.max(.25,view.z*f));
-  view.x=e.clientX-(e.clientX-view.x)*(nz/view.z);
-  view.y=(e.clientY-40)-((e.clientY-40)-view.y)*(nz/view.z);
-  view.z=nz; applyView(); save();
+  const r=viewport.getBoundingClientRect();
+  // Anchor on the viewport's own box rather than a hardcoded 40px bar height,
+  // so the point under the cursor stays under the cursor.
+  const px=e.clientX-r.left, py=e.clientY-r.top;
+  const {dy}=wheelPixels(e,r);
+  // Wheel zooms, as it always has. Only the STEP changed: proportional to the
+  // gesture instead of a fixed 1.1 per event, because a trackpad sends many
+  // small deltas where a mouse sends few large ones — a constant step made the
+  // trackpad rocket and the wheel crawl.
+  const f=Math.exp(-dy*0.0025);
+  const nz=Math.min(2.5,Math.max(.08,view.z*f));   // .08 so a spread-out board fits
+  view.x=px-(px-view.x)*(nz/view.z);
+  view.y=py-(py-view.y)*(nz/view.z);
+  view.z=nz; applyView(); saveCameraSoon();
 },{passive:false});
+
+/* Frame every top-level node. The rings have had a fit gesture all along
+   (double-click the D-tab); the top-level canvas had none, so a board wider
+   than the window could only be found by dragging blind. */
+function fitToContent(){
+  const tops=G.nodes.filter(n=>!n._parentScope&&n.el);
+  if(!tops.length) return;
+  let x0=Infinity,y0=Infinity,x1=-Infinity,y1=-Infinity;
+  for(const n of tops){
+    x0=Math.min(x0,n.x); y0=Math.min(y0,n.y);
+    x1=Math.max(x1,n.x+(n.el.offsetWidth||190)); y1=Math.max(y1,n.y+(n.el.offsetHeight||90));
+  }
+  const r=viewport.getBoundingClientRect(), pad=48;
+  const z=Math.min(2.5,Math.max(.08,Math.min((r.width-pad*2)/Math.max(1,x1-x0),(r.height-pad*2)/Math.max(1,y1-y0))));
+  view.z=z;
+  view.x=(r.width-(x1-x0)*z)/2-x0*z;
+  view.y=(r.height-(y1-y0)*z)/2-y0*z;
+  applyView(); saveCameraSoon();
+}
 /* ── add-node menu ─────────────────────────────────────────────────────── */
 const menu=$("#menu");
 function showMenu(cx,cy,intoScope){
@@ -1698,6 +1857,7 @@ viewport.addEventListener("drop",async e=>{
 });
 addEventListener("pointerdown",e=>{ if(!menu.contains(e.target)) menu.style.display="none"; });
 $("#addBtn").addEventListener("click",e=>showMenu(60,60));
+$("#fitBtn").addEventListener("click",()=>fitToContent());
 /* ── execution ─────────────────────────────────────────────────────────── */
 function inputsOf(id){ return G.wires.filter(w=>w.to[0]===id); }
 function topo(){
@@ -1849,7 +2009,69 @@ function nodeDoc(n){ return {id:n.id,type:n.type,x:n.x,y:n.y,params:n.params,col
   children:(n.children&&n.children.length)?n.children.map(nodeDoc):undefined}; }
 function serialize(){ return {view,nodes:G.nodes.filter(n=>!n._parentScope).map(nodeDoc),wires:G.wires,seq:G.seq}; }
 let AUTOSAVE=true; // ?load= link views are ephemeral — never clobber the scratch
-function save(){ if(!AUTOSAVE) return; try{ localStorage.setItem("trikeshed.panels.v3", JSON.stringify(serialize())); }catch(e){} }
+function save(){
+  // History first: a ?load= view is ephemeral for the SCRATCH, but a person
+  // poking at it still gets to back out. Undo is not autosave.
+  recordHistory(JSON.stringify(serialize()));
+  if(!AUTOSAVE) return;
+  try{ localStorage.setItem("trikeshed.panels.v3", JSON.stringify(serialize())); }catch(e){}
+}
+/* ── undo / redo ────────────────────────────────────────────────────────
+   Taking over a canned demo means being able to back out of every change:
+   load a preset, cut a cable, retype a param, dive into a ring — and step
+   back. Every mutation already funnels through save(), so history records
+   the TRANSITION there; no call site has to remember to snapshot. A burst of
+   keystrokes in one field collapses into a single step (same node/wire shape
+   inside 600ms), so undo walks edits, not characters. */
+const UNDO=[],REDO=[],UNDO_MAX=200;
+let restoring=false,lastDoc=null,lastPushMs=0;
+function shapeKey(o){
+  return (o.nodes||[]).map(n=>n.id+":"+n.type).join(",")+"|"+
+         (o.wires||[]).map(w=>w.from+">"+w.to).join(",");
+}
+function recordHistory(cur){
+  if(restoring||lastDoc===null||lastDoc===cur){ lastDoc=cur; histButtons(); return; }
+  const now=Date.now();
+  let sameShape=false;
+  try{ sameShape=UNDO.length>0&&shapeKey(JSON.parse(lastDoc))===shapeKey(JSON.parse(cur)); }catch(e){}
+  if(!(sameShape&&now-lastPushMs<600)){
+    UNDO.push(lastDoc); if(UNDO.length>UNDO_MAX) UNDO.shift();
+    lastPushMs=now;
+  }
+  REDO.length=0; lastDoc=cur; histButtons();
+}
+function histButtons(){
+  const u=$("#undoBtn"),r=$("#redoBtn");
+  if(u){ u.disabled=!UNDO.length; u.title="undo ("+UNDO.length+") ⌘Z"; }
+  if(r){ r.disabled=!REDO.length; r.title="redo ("+REDO.length+") ⇧⌘Z"; }
+}
+function applyDoc(json){
+  restoring=true;
+  try{ load(JSON.parse(json)); lastDoc=JSON.stringify(serialize()); }
+  finally{ restoring=false; }
+  if(AUTOSAVE){ try{ localStorage.setItem("trikeshed.panels.v3", lastDoc); }catch(e){} }
+  histButtons(); runAll();
+}
+function undo(){
+  if(!UNDO.length){ $("#status").textContent="nothing to undo"; return; }
+  REDO.push(lastDoc); applyDoc(UNDO.pop());
+  $("#status").textContent="undo · "+UNDO.length+" step"+(UNDO.length===1?"":"s")+" back";
+}
+function redo(){
+  if(!REDO.length){ $("#status").textContent="nothing to redo"; return; }
+  UNDO.push(lastDoc); applyDoc(REDO.pop());
+  $("#status").textContent="redo · "+REDO.length+" ahead";
+}
+addEventListener("keydown",e=>{
+  const t=e.target,tag=((t&&t.tagName)||"").toLowerCase();
+  if(tag==="input"||tag==="textarea"||tag==="select"||(t&&t.isContentEditable)) return;
+  // Bare F frames the board — checked before the modifier gate below, which
+  // exists for the undo/redo pair.
+  if((e.key==="f"||e.key==="F")&&!e.metaKey&&!e.ctrlKey&&!e.altKey){ e.preventDefault(); fitToContent(); return; }
+  if(!(e.metaKey||e.ctrlKey)) return;
+  if(e.key==="z"||e.key==="Z"){ e.preventDefault(); if(e.shiftKey) redo(); else undo(); }
+  else if(e.key==="y"||e.key==="Y"){ e.preventDefault(); redo(); }
+});
 function load(data){
   for(const n of G.nodes){ if(n._timer)clearInterval(n._timer); if(n._es){n._es.close();n._es=null;} n.el.remove(); }
   G={nodes:[],wires:[],seq:data.seq||1};
@@ -2061,7 +2283,10 @@ function openCardModal(n,colId,item){
       const title=el("title").value.trim(); if(!title){ el("title").focus(); return; }
       const r=await api("POST","/api/lcnc/run",{type:"kanban.submit",inputs:{},
         params:{jobId:"",title,priority:el("pri").value,idempotencyKey:"panel-modal-"+Date.now()}});
-      $("#status").textContent=r.ok?("card landed: "+title):("submit failed: "+(r.error||JSON.stringify(r)));
+      // ok:true only means the RUNNER ran — the store's verdict is outputs.accepted.
+      const acc=r.ok&&r.outputs&&r.outputs.accepted!==false;
+      $("#status").textContent=acc?("card landed: "+title+" ("+(r.outputs.jobId||"")+")")
+        :("submit REFUSED: "+((r.outputs&&r.outputs.reason)||r.error||JSON.stringify(r).slice(0,120)));
     } else {
       const to=el("col").value;
       if(to&&to!==(item.status||colId)){
@@ -2102,10 +2327,20 @@ async function openGallery(){
       fetch("/api/panels").then(r=>r.json()).catch(()=>({panels:[]})),
     ]);
     const rows=[];
-    rows.push('<div style="color:var(--dim,#7f91a9);margin:4px 0">presets — server-authored, offered</div>');
+    rows.push('<div style="color:var(--dim,#7f91a9);margin:4px 0">examples — pick one, then change it</div>');
+    const esc=s=>String(s??"").replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
     for(const p of (pr.presets||[])){
-      const doc=p.document||{}; const nn=(doc.nodes||[]).length;
-      rows.push('<div class="galRow" data-kind="preset" data-name="'+p.name+'" style="padding:5px 6px;border:1px solid var(--line,#263348);border-radius:5px;margin:3px 0;cursor:pointer">'+p.name+' <span style="color:var(--dim,#7f91a9)">· '+nn+' nodes</span></div>');
+      const doc=p.document||{}, nn=(doc.nodes||[]).length;
+      // What a person needs before adopting it: what it does, what it needs
+      // first, what they will see, and the one knob to turn. Server-authored.
+      rows.push(
+        '<div class="galRow" data-kind="preset" data-name="'+p.name+'" style="padding:7px 8px;border:1px solid var(--line,#263348);border-radius:6px;margin:5px 0;cursor:pointer">'+
+        '<div style="font-weight:600">'+esc(p.title||p.name)+' <span style="color:var(--dim,#7f91a9);font-weight:400">· '+nn+' parts</span></div>'+
+        (p.does?'<div style="margin-top:3px">'+esc(p.does)+'</div>':'')+
+        (p.needs?'<div style="margin-top:3px;color:var(--dim,#7f91a9)"><b>needs</b> '+esc(p.needs)+'</div>':'')+
+        (p.see?'<div style="color:var(--dim,#7f91a9)"><b>you see</b> '+esc(p.see)+'</div>':'')+
+        (p.tweakFirst?'<div style="color:var(--dim,#7f91a9)"><b>change first</b> '+esc(p.tweakFirst)+'</div>':'')+
+        '</div>');
     }
     rows.push('<div style="color:var(--dim,#7f91a9);margin:8px 0 4px">store — your saved programs</div>');
     const panels=st.panels||[];
@@ -2117,8 +2352,14 @@ async function openGallery(){
     body.querySelectorAll(".galRow").forEach(el=>el.addEventListener("click",async()=>{
       const name=el.dataset.name;
       if(el.dataset.kind==="preset"){
-        const doc=(pr.presets||[]).find(x=>x.name===name)?.document;
-        if(doc){ load(fromConfix(doc)); $("#panelName").value=name.replace(/^preset-/,""); $("#status").textContent="loaded "+name+" (offered — ⇪ store to keep it)"; }
+        const hit=(pr.presets||[]).find(x=>x.name===name), doc=hit&&hit.document;
+        if(doc){
+          load(fromConfix(doc)); $("#panelName").value=name.replace(/^preset-/,"");
+          // Land on the on-ramp, not on jargon: say what to change, and that
+          // backing out is safe. ⇪ store keeps it; it is offered, not installed.
+          $("#status").textContent=(hit.title||name)+" loaded — change first: "+
+            (hit.tweakFirst||"anything")+" · ⌘Z undoes · ⇪ store keeps it";
+        }
       } else {
         const resp=await fetch("/api/panels/"+name);
         if(resp.ok){ load(await resp.json()); $("#panelName").value=name; $("#status").textContent="loaded panels/"+name; }
@@ -2128,6 +2369,8 @@ async function openGallery(){
   }catch(e){ body.textContent="gallery failed: "+e; }
 }
 $("#presetsBtn").addEventListener("click",openGallery);
+$("#undoBtn").addEventListener("click",undo);
+$("#redoBtn").addEventListener("click",redo);
 /* ── contract hydration: the vocabulary is server-owned ─────────────────── */
 // The ONE author is /api/lcnc/contracts; this page carries no type table.
 // (This function was promised by the step-4 rework and never written — the
@@ -2154,6 +2397,9 @@ async function syncContracts(){
       m[c.type]=c;
     }
     CONTRACTS=m;
+    // Fallback parity: every hydrated type with no explicit browser runner
+    // dispatches to the daemon — explicit RUNNERS entries keep winning.
+    for(const t in m) if(!RUNNERS[t]) RUNNERS[t]=serverRun(t);
     $("#status").textContent=Object.keys(m).length+" contracts hydrated";
   }catch(e){
     $("#status").textContent="contracts fetch failed: "+e;
