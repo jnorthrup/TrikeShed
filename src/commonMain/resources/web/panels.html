@@ -74,14 +74,26 @@ button.stop{border-color:var(--err);color:var(--err)}
 .gaugeval{margin:2px 8px 8px;font-size:26px;font-variant-numeric:tabular-nums;color:var(--graal);text-align:center}
 #menu{position:fixed;display:none;background:var(--panel);border:1px solid var(--line);border-radius:6px;z-index:30;min-width:190px;box-shadow:0 8px 30px rgba(0,0,0,.6)}
 #menu h5{padding:5px 10px 3px;font-size:9px;color:var(--dim);text-transform:uppercase;letter-spacing:.08em}
-#menu div.item{padding:4px 12px;cursor:pointer;font-size:12px}
-#menu div.item:hover{background:var(--panel2);color:var(--graal)}
+#menu div.item{padding:6px 12px 6px 10px;cursor:pointer;font-size:12px;
+  border-left:3px solid transparent;line-height:1.35}
+#menu div.item:hover,#menu div.item.sel{background:var(--panel2);border-left-color:var(--graal)}
+/* one flat concatenated string was unscannable: the type, the port it lands
+   on, and the prose all read at the same weight. */
+#menu div.item .ty{color:var(--ink);font-weight:600}
+#menu div.item .pt{color:var(--wire)}
+#menu div.item .ti{display:block;color:var(--dim);font-family:var(--sans);font-size:11px}
+#menu div.item:hover .ty{color:var(--graal)}
 #hint{position:fixed;bottom:8px;left:10px;color:var(--dim);font-size:10px;z-index:20}
 /* ── ComfyUI-grade affordances ── */
 #wires path.live.flow{stroke-dasharray:8 6;animation:wireflow .5s linear infinite}
 @keyframes wireflow{to{stroke-dashoffset:-14}}
-.port.t-text{border-color:#6ea8fe}.port.t-json{border-color:#3fd0ff}.port.t-id{border-color:#b07aff}
-.port.t-num{border-color:#ffb02e}.port.t-trig{border-color:#3ddc84}
+/* `color` as well as border-color: the wiring glow below is drawn in
+   currentColor, which inherited the node's TEXT colour and rendered a grey
+   halo on every port regardless of kind. Setting color here is what makes a
+   mateable json port glow json-cyan instead of dishwater. */
+.port.t-text{border-color:#6ea8fe;color:#6ea8fe}.port.t-json{border-color:#3fd0ff;color:#3fd0ff}
+.port.t-id{border-color:#b07aff;color:#b07aff}
+.port.t-num{border-color:#ffb02e;color:#ffb02e}.port.t-trig{border-color:#3ddc84;color:#3ddc84}
 .port.t-text:hover{background:#6ea8fe}.port.t-json:hover{background:#3fd0ff}.port.t-id:hover{background:#b07aff}
 .port.t-num:hover{background:#ffb02e}.port.t-trig:hover{background:#3ddc84}
 .node.collapsed .params,.node.collapsed .result,.node.collapsed .gaugeval,.node.collapsed .gaugelabel,.node.collapsed .kboard,.node.collapsed .kboard-status{display:none}
@@ -176,9 +188,33 @@ button.stop{border-color:var(--err);color:var(--err)}
 .port.t-any{border-color:var(--dim)}
 /* wiring affordance: while a wire is in hand, only kind-equal ports stay lit;
    everything incompatible dims — the canvas itself states the options */
-body.wiring .port{opacity:.18}
-body.wiring .port.mateable{opacity:1;box-shadow:0 0 7px currentColor}
-body.wiring .node.nomate{opacity:.35}
+/* Wiring mode. Dimming the rest was never the problem — the highlight was.
+   A 10px hollow dot with a 7px halo in the wrong colour is not a target, so
+   a mateable port now FILLS with its kind colour, grows, and pulses. */
+body.wiring .port{opacity:.22}
+body.wiring .port.mateable{
+  opacity:1;
+  background:currentColor;
+  border-color:currentColor;
+  transform:translateY(-50%) scale(1.55);
+  /* plain first, color-mix second: an engine without color-mix drops the
+     second declaration and still gets a solid glow rather than none */
+  box-shadow:0 0 12px 2px currentColor;
+  box-shadow:0 0 0 3px color-mix(in srgb, currentColor 28%, transparent),
+             0 0 14px 2px currentColor;
+  animation:matepulse 1.15s ease-in-out infinite;
+}
+@keyframes matepulse{
+  0%,100%{box-shadow:0 0 0 3px color-mix(in srgb, currentColor 28%, transparent),
+                     0 0 10px 1px currentColor}
+  50%    {box-shadow:0 0 0 6px color-mix(in srgb, currentColor 14%, transparent),
+                     0 0 18px 3px currentColor}
+}
+@media (prefers-reduced-motion:reduce){ body.wiring .port.mateable{animation:none} }
+/* the node that owns a live target earns a rim, so you can find it before you
+   go hunting for the dot */
+body.wiring .node:has(.port.mateable){box-shadow:0 0 0 1px color-mix(in srgb, var(--wire) 55%, transparent)}
+body.wiring .node.nomate{opacity:.3;filter:saturate(.25)}
 /* the palette: docked drag-source for the served vocabulary + the gallery */
 #palette{position:fixed;top:40px;left:0;bottom:0;width:216px;background:rgba(11,14,20,.96);border-right:1px solid var(--line);z-index:18;overflow-y:auto;padding:8px;display:none}
 #palette.open{display:block}
@@ -1612,7 +1648,10 @@ async function showMateMenu(cx,cy,srcNode,srcPort,wx,wy,scope,dir){
     for(const o of all){
       if(f&&!o.type.includes(f)&&!(o.title||"").toLowerCase().includes(f))continue;
       const d=document.createElement("div"); d.className="item";
-      d.textContent=o.type+" · "+(o.inputPort||o.outputPort)+"  ·  "+(o.title||"");
+      const esc=x=>String(x??"").replace(/[&<>"]/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[ch]));
+      d.innerHTML='<span class="ty">'+esc(o.type)+'</span> <span class="pt">·&nbsp;'
+        +esc(o.inputPort||o.outputPort)+'</span>'
+        +(o.title?'<span class="ti">'+esc(o.title)+'</span>':'');
       d.addEventListener("click",()=>pick(o));
       box.appendChild(d);
     }
