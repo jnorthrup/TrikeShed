@@ -10,4 +10,5 @@ actual fun readLinesSeq(path: String): Sequence<String> {
     }
 }
 
-actual fun readLines(path: String): List<String> =borg.trikeshed.userspace.nio.file.Files.readAllLines( Paths.get(path)).map { it }
+// ⚡ Bolt: Removed redundant `.map { it }` to avoid an unnecessary O(N) allocation.
+actual fun readLines(path: String): List<String> =borg.trikeshed.userspace.nio.file.Files.readAllLines( Paths.get(path))
