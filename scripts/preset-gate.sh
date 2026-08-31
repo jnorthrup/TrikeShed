@@ -72,6 +72,61 @@ if ! ( cd "$REPO_ROOT" && bin/oroboros-up --port "$PORT" --home "$HOME_DIR" --no
 fi
 printf '  daemon answering on %s\n' "$BASE"
 
+say "static pass: every required input on every prefab is fed"
+BASE="$BASE" python3 - <<'STATIC'
+import json, os, sys, urllib.request
+
+BASE = os.environ["BASE"]
+
+def get(path):
+    with urllib.request.urlopen(BASE + path, timeout=30) as r:
+        return json.load(r)
+
+# The treeshake: a prefab is a claim that these parts, wired this way, do the
+# thing the card says. A REQUIRED input with no wire and no param is a claim
+# with a hole in it — and the runtime pass below cannot see it, because a node
+# starved of input does not error, it just yields nothing and the graph carries
+# on. preset-context shipped exactly like this: context.fold's only input,
+# `bullets`, was fed by nothing, so the "folded playbook" its own copy promises
+# you would see was never produced.
+contracts = {c["type"]: c for c in get("/api/lcnc/contracts").get("contracts", [])}
+presets = get("/api/panels/presets").get("presets", [])
+
+def walk(nodes):
+    for n in nodes:
+        yield n
+        yield from walk(n.get("children") or [])
+
+holes = []
+for p in presets:
+    doc = p.get("document") or {}
+    nodes = list(walk(doc.get("nodes") or []))
+    fed = {(w["to"][0], w["to"][1].rstrip("?")) for w in (doc.get("wires") or [])}
+    for n in nodes:
+        c = contracts.get(n.get("type"))
+        if not c:
+            continue
+        for port in (c.get("inputs") or []):
+            if port.endswith("?"):
+                continue                       # optional by contract
+            if port in (n.get("params") or {}):
+                continue                       # supplied as a param instead
+            if (n["id"], port) not in fed:
+                holes.append((p["name"], n["id"], n["type"], port))
+
+if holes:
+    for name, nid, ntype, port in holes:
+        print(f"  \033[31mFAIL\033[0m {name:<24} {ntype}.{port} ({nid}) is required and fed by nothing")
+    print(f"\n\033[31m{len(holes)} required input(s) on shipped prefabs are fed by nothing\033[0m")
+    sys.exit(1)
+print(f"  \033[32mPASS\033[0m every required input across {len(presets)} prefabs is wired or parameterised")
+STATIC
+STATIC_RC=$?
+if [ "$STATIC_RC" != "0" ]; then
+  printf '\n  \033[31mFAIL\033[0m a prefab ships with a hole in it\n'
+  exit 1
+fi
+
 say "running every preset that promises it needs nothing"
 BASE="$BASE" ALL="$ALL" python3 - <<'PY'
 import json, os, sys, urllib.request
