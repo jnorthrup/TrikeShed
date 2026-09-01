@@ -171,7 +171,12 @@ class PijulCrdtPropertyTest {
             apply(patchOf("ins", Change.Insert(2, "X\n"))) // addressed at B's old start
             render()
         }
-        assertEquals("A\nC\nX\n", r)
+        // A tombstone KEEPS its authored span, so an insert addressed at B's old
+        // start lands where it was aimed instead of skipping past the next live
+        // vertex. The old expectation ("A\nC\nX\n") came from a coordinate space
+        // that collapsed as vertices died — which is what let a second concurrent
+        // delete of one line resolve onto its neighbour and eat it.
+        assertEquals("A\nX\nC\n", r)
     }
 
     /**

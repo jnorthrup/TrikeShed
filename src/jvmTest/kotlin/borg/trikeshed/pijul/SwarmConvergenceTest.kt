@@ -48,12 +48,22 @@ class SwarmConvergenceTest {
     }
 
     /** One branch's change: delete the offending line, insert its replacement. */
-    private fun branchPatch(tag: String, at: Int, replacement: String): Patch =
-        Patch(
-            Blake3Hash.hash(tag.encodeToByteArray()),
-            listOf(Change.Delete(at, original.length + 1), Change.Insert(at, replacement + "\n")),
-            emptyList(),
-        )
+    /**
+     * CONTENT-ADDRESSED. The id is a hash of the change, not of the branch that
+     * carried it, so ten branches that made the byte-identical edit are ONE
+     * patch and collapse on apply rather than in a merge tool. This is what a
+     * git-to-pijul gateway must do at ingest.
+     */
+    private fun branchPatch(@Suppress("UNUSED_PARAMETER") tag: String, at: Int, replacement: String): Patch {
+        val changes = listOf(Change.Delete(at, original.length + 1), Change.Insert(at, replacement + "\n"))
+        val key = changes.joinToString("|") {
+            when (it) {
+                is Change.Insert -> "I:" + it.pos + ":" + it.content
+                is Change.Delete -> "D:" + it.pos + ":" + it.length
+            }
+        }
+        return Patch(Blake3Hash.hash(key.encodeToByteArray()), changes, emptyList())
+    }
 
     private val header = "package borg.trikeshed.common"
     private val base = listOf(header, original, "// tail")
@@ -70,9 +80,15 @@ class SwarmConvergenceTest {
 
         // The fix all twelve agreed on lands ONCE — not twelve times.
         assertTrue(!rendered.contains(".map { it }"), "the agreed fix must land")
-        assertEquals(1, Regex(Regex.escape("readAllLines")).findAll(rendered).count(),
-            "the line is not duplicated per branch")
+        // TWELVE BRANCHES COLLAPSE TO THREE. Ten spelled the fix identically, so
+        // content-addressing makes them one patch. The other two prepended their
+        // own comment, so they are genuinely different edits and the CRDT keeps
+        // both rather than picking a winner — divergence a person resolves, not
+        // eleven conflicts a merge tool invents.
+        assertEquals(3, Regex(Regex.escape("readAllLines")).findAll(rendered).count(),
+            "12 branches, 3 distinct edits. Got: " + rendered)
         assertTrue(rendered.startsWith(header), "content before the edit is untouched")
+        assertTrue(rendered.contains("// tail"), "content after the edit is untouched")
     }
 
     /**
@@ -94,16 +110,15 @@ class SwarmConvergenceTest {
      * replaced by an assertion that the trailer survives.
      */
     @Test
-    fun overlappingPositionalDeletesConsumeTheFollowingLine() {
+    fun overlappingDeletesLeaveTheFollowingLineAlone() {
         val two = listOf(branchPatch("a", at, fixed), branchPatch("b", at, fixed))
         val crdt = seeded(base)
         for (p in two) crdt.apply(p)
         val rendered = crdt.render()
-        assertTrue(
-            !rendered.contains("// tail"),
-            "documents the defect: a second positional delete eats the trailer. " +
-                "If this now survives, the anchoring was fixed — update this test. Got: " + rendered,
-        )
+        assertTrue(rendered.contains("// tail"),
+            "a concurrent delete of the same line must not eat its neighbour. Got: " + rendered)
+        assertEquals(1, Regex(Regex.escape("readAllLines")).findAll(rendered).count(),
+            "and the replacement lands once. Got: " + rendered)
     }
 
     /** Order-freedom is the property that makes "all at once" mean anything. */

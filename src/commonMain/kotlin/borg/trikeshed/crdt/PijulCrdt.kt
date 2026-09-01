@@ -33,6 +33,16 @@ class PijulCrdt {
     private val vertexContent = mutableMapOf<VertexId, String>()
 
     /**
+     * The span a vertex occupied when it was authored, never reduced by
+     * tombstoning. Patch coordinates are relative to the document its AUTHOR
+     * saw, so the coordinate space a delete resolves against must not shrink
+     * underneath later patches — otherwise the second of two concurrent deletes
+     * for the same line resolves onto whatever moved into its offsets and eats
+     * the following line.
+     */
+    private val vertexSpan = mutableMapOf<VertexId, Int>()
+
+    /**
      * Linearized order of alive vertices by position. Each entry carries
      * its cumulative content length so attach-point lookup is binary search.
      */
@@ -46,6 +56,7 @@ class PijulCrdt {
 
     init {
         vertexContent[root] = ""
+        vertexSpan[root] = 0
         aliveOrder.add(root)
         cumulativeLen.add(0)
         indexOf[root] = 0
@@ -58,7 +69,13 @@ class PijulCrdt {
             when (change) {
                 is Change.Insert -> {
                     val newVertex = VertexId(patch.id, change.pos)
+                    // Applying the same patch twice must be a no-op. With
+                    // content-addressed patch ids, two branches that made the
+                    // byte-identical edit ARE one patch, and the swarm collapses
+                    // here rather than in a merge tool.
+                    if (vertexContent.containsKey(newVertex)) continue
                     vertexContent[newVertex] = change.content
+                    vertexSpan[newVertex] = change.content.length
 
                     val attachIdx = findAttachIndex(change.pos)
                     val attachVertex = aliveOrder[attachIdx]
@@ -82,6 +99,9 @@ class PijulCrdt {
                     val (startIdx, endIdx) = findRangeIndices(change.pos, change.length)
                     for (i in startIdx..endIdx) {
                         val v = aliveOrder[i]
+                        // idempotent: a tombstone stays a tombstone, and keeps
+                        // its authored span so the coordinates stay stable
+                        if (vertexContent[v].isNullOrEmpty()) continue
                         vertexContent[v] = ""
                     }
                     // Rebuild cumulative lengths (deleted vertices now have len 0).
@@ -132,7 +152,16 @@ class PijulCrdt {
         return startIdx to lo
     }
 
-    private fun contentLen(idx: Int): Int = vertexContent[aliveOrder[idx]]?.length ?: 0
+    /**
+     * The COORDINATE length of a vertex — its authored span, not what survives.
+     * Using live content here is what made deletes positional: tombstoning a
+     * vertex collapsed the space its neighbours were addressed by, so a
+     * concurrent patch aimed at the same line landed somewhere else.
+     */
+    private fun contentLen(idx: Int): Int {
+        val v = aliveOrder[idx]
+        return vertexSpan[v] ?: vertexContent[v]?.length ?: 0
+    }
 
     /**
      * Lazily rebuild cumulative lengths if dirty. O(V) but only when
