@@ -181,9 +181,13 @@ class ByteSeries(
 
     fun asString(upto: Int = Int.MAX_VALUE): String = toArray().decodeToChars().asString().take(upto)
 
+    /** Diagnostics, not content — see CharSeries.toString. The peek reads the
+     *  accessor directly; `asString().take(4)` decoded the whole buffer to show
+     *  four bytes. */
     override fun toString(): String {
-        val take = asString().take(4)
-        return "ByteSeries(position=$pos, limit=$limit, mark=$mark, cacheCode=$cacheCode,take-4=${take})"
+        val n = minOf(4, size)
+        val peek = CharArray(n) { b(it).toInt().toChar() }.concatToString()
+        return "ByteSeries(position=$pos, limit=$limit, mark=$mark, size=$size, take-4=$peek)"
     }
 
     /** skipws and rtrim */

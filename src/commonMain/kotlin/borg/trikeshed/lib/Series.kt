@@ -546,7 +546,16 @@ fun Series<Char>.parseDouble(): Double {
         }
     }
     val signMultiplier = if (isNegative && result != 0.0) -1.0 else 1.0
-    return signMultiplier * result * 10.0.pow((exponentSign * exponentValue - digitsAfterDecimal).toDouble())
+    // DIVIDE for a negative scale; do not multiply by a negative power of ten.
+    // 10.0.pow(-1.0) is the double just above 0.1, so "0.7" came back as
+    // 7.0 * 0.1 = 0.7000000000000001 while 7.0 / 10.0 is exact. The error is
+    // small and everywhere: every decimal in every document this parses —
+    // coordinates, zoom, priorities, temperatures — drifted by one ulp and any
+    // byte-stable round-trip gate caught it as a mismatch it could not explain.
+    val scale = exponentSign * exponentValue - digitsAfterDecimal
+    val magnitude = if (scale < 0) result / 10.0.pow(-scale.toDouble())
+                    else result * 10.0.pow(scale.toDouble())
+    return signMultiplier * magnitude
 }
 
 /** parse a double or return null if not a valid double.

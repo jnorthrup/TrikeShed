@@ -18,7 +18,23 @@ class CharSeries(
 
     /** the mark accessor */
     var mark: Int = -1,
-) : Series<Char> by buf { //delegate to the underlying series
+) : Series<Char> by buf, CharSequence { //delegate to the underlying series
+
+    // ── CharSequence, the conversion currency ────────────────────────────
+    // The point of this type was to hand text onward as a CharSequence and
+    // never take a String dependency. The exit existed only as `Series<Char>.cs`,
+    // an adapter that allocated a fresh wrapper per call and had zero callers in
+    // the tree; every real exit went through asString(). Conforming directly
+    // removes the wrapper and makes the currency the default rather than a
+    // deliberate act.
+    //
+    // Semantics are EXACTLY the adapter's, which are exactly the indexing this
+    // class already had: `Join.get(key) = b(key)`, so a member `get` shadowing
+    // that extension is the same call. Nothing indexes differently than before.
+    override val length: Int get() = size
+    override fun get(index: Int): Char = b(index)
+    override fun subSequence(startIndex: Int, endIndex: Int): CharSequence =
+        CharSeries(this[startIndex until endIndex])
 
 
     /** get, the verb - the char at the current position and increment position */
@@ -140,9 +156,28 @@ class CharSeries(
     fun asString(upto: Int = Int.MAX_VALUE): String =
         ((limit - pos) j { x: Int -> this[x + pos] }).toArray().concatToString()
 
+    /**
+     * DELIBERATELY NOT THE CHARACTERS. A friendly toString() is not a
+     * convenience on this type, it is a reification contract: grant it here and
+     * every Series and Join is expected to carry one, which is the java baggage
+     * this family exists without. Materialising text is an EFFECT and belongs at
+     * a call site that asked for it — [asString], or handing this to something
+     * that takes a CharSequence.
+     *
+     * Note what most CharSequence consumers actually do: StringBuilder.append,
+     * Regex and Pattern.matcher read length/get and never call toString. Only
+     * String.valueOf and a "$x" template do, and those are exactly the two
+     * places where reification should be visible in the source.
+     *
+     * The peek is taken directly off the accessor. The previous rendering read
+     * `asString().take(4)`, which materialised the whole buffer to show four
+     * characters — the effect this comment is about, inside the diagnostic that
+     * was supposed to be free.
+     */
     override fun toString(): String {
-        val take = asString().take(4)
-        return "CharSeries(position=$pos, limit=$limit, mark=$mark, cacheCode=$cacheCode,take-4=${take})"
+        val n = minOf(4, size)
+        val peek = CharArray(n) { b(it) }.concatToString()
+        return "CharSeries(position=$pos, limit=$limit, mark=$mark, size=$size, take-4=$peek)"
     }
 
     /** skipws and rtrim */
@@ -160,8 +195,15 @@ class CharSeries(
     }
 
 
-    //isEmpty override
-    val isEmpty: Boolean get() = pos == limit
+    /**
+     * The CURSOR is spent — pos has reached limit. This is not CharSequence's
+     * isEmpty(), which asks whether there are no characters at all; a fully
+     * parsed buffer is exhausted but not empty. It was named `isEmpty` and
+     * commented "isEmpty override" while overriding nothing, and had no callers
+     * in the tree; conforming to CharSequence turned that into a JVM signature
+     * clash, which is the first time the ambiguity cost anything.
+     */
+    val isExhausted: Boolean get() = pos == limit
 
     /** success move position to the char after found and returns true.
      *  fail returns false and leaves position unchanged */
@@ -289,8 +331,13 @@ operator fun Series<Byte>.div(delim: Byte): Series<Series<Byte>> { //lazy split
     }
 }
 
+/**
+ * CharSequence over a bare [Series]<Char>. [CharSeries] IS a CharSequence and
+ * needs no adapter — prefer it, or this, over asString() at any boundary that
+ * accepts a CharSequence.
+ */
 val Series<Char>.cs: CharSequence
-    get() = object : CharSequence {
+    get() = if (this is CharSeries) this else object : CharSequence {
         override val length: Int by ::a
         override fun get(index: Int) = b(index)
         override fun toString(): String = asString()
