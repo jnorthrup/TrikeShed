@@ -1318,10 +1318,21 @@
   });
 
   const VIEWS = { doc: [docScrollEl, viewDocBtn], board: [boardScrollEl, viewBoardBtn], graph: [graphScrollEl, viewGraphBtn], sheet: [sheetScrollEl, viewSheetBtn], shape: [shapeScrollEl, viewShapeBtn], host: [hostScrollEl, viewHostBtn] };
+  const SIDEBAR_VIEWS = { doc: 'btn-home', board: 'btn-board', graph: 'btn-graph', sheet: 'btn-sheet', host: 'btn-host' };
   function setView(view) {
     mutate((s) => { s.view = view; }, 'view');
     for (const [k, [el, btn]] of Object.entries(VIEWS)) {
       el.hidden = k !== view;
+      btn.classList.toggle('active', k === view);
+      if (k === view) {
+        btn.setAttribute('aria-current', 'page');
+      } else {
+        btn.removeAttribute('aria-current');
+      }
+    }
+    for (const [k, id] of Object.entries(SIDEBAR_VIEWS)) {
+      const btn = document.getElementById(id);
+      if (!btn) continue;
       btn.classList.toggle('active', k === view);
       if (k === view) {
         btn.setAttribute('aria-current', 'page');
