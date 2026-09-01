@@ -225,6 +225,28 @@ body.wiring .port.mateable{
 @media (prefers-reduced-motion:reduce){ body.wiring .port.mateable{animation:none} }
 /* the sole survivor of the shake: brighter than a candidate, because it is
    what will happen if you simply let go */
+/* THE SHAKE'S VERDICT, left on the board.
+   Green/red alone would lie in both directions: a port with no mate on the
+   whole board (add a node — nothing here can ever feed it) is a different
+   problem from one that simply lost this pass or sat out of reach (move it
+   closer, or shift-shake). Three states, because there are three answers. */
+.port.v-ok,.port.v-dead,.port.v-open{transform:translateY(-50%) scale(1.75);z-index:4}
+.port.v-ok::after,.port.v-dead::after,.port.v-open::after{
+  position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
+  font-size:7px;line-height:1;font-weight:700;pointer-events:none;font-family:var(--sans)}
+.port.v-ok{background:var(--ok)!important;border-color:var(--ok)!important}
+.port.v-ok::after{content:"✓";color:#06301a}
+.port.v-dead{background:var(--err)!important;border-color:var(--err)!important}
+.port.v-dead::after{content:"✕";color:#2a0507}
+.port.v-open{background:var(--warn)!important;border-color:var(--warn)!important}
+.port.v-open::after{content:"?";color:#2e1c00}
+/* STARVED REACH: a required input nobody feeds does not fail alone. Everything
+   downstream of it runs on nothing and reports success — which is exactly how
+   preset-context shipped a fold with no bullets and a green test suite. Show
+   the dead reach, not just the origin. */
+.node.starved{outline:1px dashed var(--err);outline-offset:2px}
+.node.starved>.hd b{color:var(--err)}
+#wires path.starved{stroke:var(--err)!important;opacity:.42;stroke-dasharray:2 7}
 /* what the shake just closed, for a moment, so a whole-graph change is not a
    silent diff you have to hunt for */
 @keyframes shookflash{0%{box-shadow:0 0 0 0 var(--ok)}100%{box-shadow:0 0 0 14px transparent}}
@@ -1116,6 +1138,13 @@ function ringScaleOf(m){ let s=1,q=m._parentScope; while(q){ s*=((q._view&&q._vi
 function applyRingView(n){
   const v=n._view||{x:0,y:0,z:1};
   if(!n._ringWorld) return;
+  /* An elastic frame cannot hold anything ABOVE or LEFT of itself: there is no
+     box in that direction to grow into, only the clip. Zoom-to-cursor drives
+     v.x/v.y negative by construction — that is how it keeps a point under the
+     pointer — so a ring zoomed anywhere but its top-left corner pushed its own
+     interior out through the border. Hold the edge; the frame grows instead. */
+  if(v.x<0) v.x=0;
+  if(v.y<0) v.y=0;
   n._ringWorld.style.transform=`translate(${v.x}px,${v.y}px) scale(${v.z})`;
   /* The FRAME has to track the zoom, or the interior grows against a fixed
      clipping box: `.childgrid` is overflow:hidden, so anything zoomed past its
@@ -1159,11 +1188,18 @@ function growRingWorldFor(child){
 function syncRingFrame(n){
   const host=n._childHost, rw=n._ringWorld;
   if(!host||!rw) return;
-  const z=((n._view&&n._view.z)||1);
+  const v=n._view||{x:0,y:0,z:1};
+  const z=v.z||1;
   const w=parseFloat(rw.style.width)||0, h=parseFloat(rw.style.height)||0;
   if(!w||!h) return;
-  host.style.width=Math.round(w*z)+"px";
-  host.style.height=Math.round(h*z)+"px";
+  /* The pan counts. Sizing to w*z alone described a world pinned at the frame's
+     origin, and the moment a ring was panned or zoomed at a point its contents
+     reached past an edge that had not moved.
+     min-* and not width/height, so this is a FLOOR: the frame can never be
+     smaller than what it holds — which is the whole clipping bug — while a ring
+     someone dragged bigger by its resize corner keeps the size they chose. */
+  host.style.minWidth=Math.round(v.x+w*z)+"px";
+  host.style.minHeight=Math.round(v.y+h*z)+"px";
 }
 /* ring chrome rides the tree: depth tab + edge captions recompute once
    parents are linked (buildNode runs before the links exist). */
@@ -1596,6 +1632,7 @@ function redraw(){
     const srcN=G.nodes.find(x=>x.id===wr.from[0]);
     const tc=KINDCOLOR[srcN?portClass(srcN.type,"out",wr.from[1]):""];
     if(tc) path.style.stroke=tc;
+    if(STARVED.has(wr.from[0])) path.classList.add("starved");
     if(!wireKindOk(wr)){
       path.classList.add("mismatch");
       const t=document.createElementNS("http://www.w3.org/2000/svg","title");
@@ -1621,6 +1658,36 @@ let dragWire=null;
    spent once per shake so it stops being open. Everything it does is one
    save() and therefore one undo. */
 const SHAKE_REACH=340;   // world units; past this it is a guess, not a mate
+let STARVED=new Set();   // node ids whose reach runs on nothing (redraw paints their cables)
+function clearVerdicts(){
+  document.querySelectorAll(".port.v-ok,.port.v-dead,.port.v-open")
+    .forEach(e=>e.classList.remove("v-ok","v-dead","v-open"));
+  document.querySelectorAll(".node.starved").forEach(e=>e.classList.remove("starved"));
+  STARVED=new Set();
+}
+/* mark one of a node's OWN ports (a ring's DOM holds its children's ports too) */
+function markPort(nd,dir,port,cls){
+  if(!nd.el) return;
+  for(const pe of nd.el.querySelectorAll('.port[data-dir="'+dir+'"]')){
+    if(pe.closest(".node")!==nd.el) continue;
+    if(pe.dataset.port!==port) continue;
+    pe.classList.add(cls); return;
+  }
+}
+/* Everything a starved node reaches is starved too. This is the propagation the
+   runtime cannot do for you: a node with no input still returns, its consumers
+   still run, and the whole chain reports ok. */
+function starvedReach(seedIds){
+  const out=new Set(seedIds);
+  let grew=true;
+  while(grew){
+    grew=false;
+    for(const w of G.wires){
+      if(out.has(w.from[0])&&!out.has(w.to[0])){ out.add(w.to[0]); grew=true; }
+    }
+  }
+  return out;
+}
 function treeshake(opts){
   const inclOptional=!!(opts&&opts.optional);
   const KEY=(id,port)=>id+"\u0000"+port;
@@ -1671,14 +1738,31 @@ function treeshake(opts){
     made.push(pr);
   }
   const stillOpen=openIns.filter(i=>i.req&&!tookIn.has(KEY(i.nd.id,bare(i.port))));
+  // Does a mate exist ANYWHERE on the board, ignoring reach and the greedy
+  // contest? That is the line between "move it closer" and "nothing here can
+  // ever feed this".
+  const hasAnyMate=i=>openOuts.some(o=>o.nd.id!==i.nd.id&&kindsCompatible(o.kind,i.kind)
+      &&o.sp.length<=i.sp.length&&o.sp.every((v,ix)=>i.sp[ix]===v));
+  const dead=stillOpen.filter(i=>!hasAnyMate(i));
+  const reachable=stillOpen.filter(hasAnyMate);
   if(made.length){ redraw(); save(); }
+  clearVerdicts();
+  for(const pr of made) markPort(pr.i.nd,"in",pr.i.port,"v-ok");
+  for(const i of dead) markPort(i.nd,"in",i.port,"v-dead");
+  for(const i of reachable) markPort(i.nd,"in",i.port,"v-open");
+  // the dead reach: every node downstream of a required input nobody feeds
+  STARVED=starvedReach(stillOpen.map(i=>i.nd.id));
+  for(const id of STARVED){ const nd=G.nodes.find(x=>x.id===id); if(nd&&nd.el) nd.el.classList.add("starved"); }
+  if(STARVED.size) redraw();   // repaint so the starved cables pick up their class
+  // The numbers name the three verdicts now on the board, so the status line
+  // stops being a truncated list nobody can find on a 98-node graph.
   const parts=[];
-  parts.push(made.length
-    ? ("shook "+made.length+" open port"+(made.length===1?"":"s")+" closed")
-    : ("nothing to shake — no open "+(inclOptional?"":"required ")+"port has a legal mate within "+SHAKE_REACH+"px"
-       +(inclOptional?"":"; shift-click to include optional ports)")));
-  if(stillOpen.length) parts.push(stillOpen.length+" required input"+(stillOpen.length===1?"":"s")+" still unfed: "
-      +stillOpen.slice(0,3).map(i=>i.nd.type+"."+i.port).join(", ")+(stillOpen.length>3?"…":""));
+  parts.push("✓ "+made.length+" closed");
+  if(reachable.length) parts.push("? "+reachable.length+" fillable — out of "+SHAKE_REACH+"px reach or lost the pass");
+  if(dead.length) parts.push("✕ "+dead.length+" with no mate on the board: "
+      +dead.slice(0,2).map(i=>i.nd.type+"."+i.port).join(", ")+(dead.length>2?"…":""));
+  if(STARVED.size) parts.push(STARVED.size+" node"+(STARVED.size===1?"":"s")+" downstream run on nothing");
+  if(!made.length&&!stillOpen.length) parts.push("nothing open"+(inclOptional?"":" — shift-click to include optional ports"));
   $("#status").textContent=parts.join(" · ");
   // flash what it just made, so a shake is legible instead of a silent diff
   for(const pr of made){
