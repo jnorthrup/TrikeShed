@@ -10,8 +10,10 @@ import borg.trikeshed.parse.json.JsonSupport
  *
  * Semantics under a headless run:
  *  - `timer` emits ONE tick per run — a server run is one pulse, no interval.
- *  - data nodes (`pick`, `list.groupBy`, `list.format`) compute exactly as
- *    the canvas does. `list.format` is the declarative reshaper — the
+ *  - data nodes (`list.groupBy`, `list.format`) compute exactly as the canvas
+ *    does. JVM `pick` deliberately lives in CanvasJsPureNodes: the daemon
+ *    executes the canvas's own JavaScript method through sandboxed GraalJS.
+ *    `list.format` is the declarative reshaper — the
  *    eval-free lane from map-shaped outputs (kanban.attention `cards`/
  *    `ordered`) to the `lines` port `read.construct`/`nal.mint` take, where
  *    the only alternative is the canvas-only `js` node.
@@ -26,17 +28,6 @@ object PureNodes {
 
     fun registry(clock: () -> Long): Map<String, LcncNodeRunner> = mapOf(
         "timer" to LcncNodeRunner { _, _ -> mapOf("tick" to clock()) },
-        "pick" to LcncNodeRunner { node, inputs ->
-            var v: Any? = inputs["x"]
-            for (k in (node.params["path"] ?: "").split('.').filter { it.isNotBlank() }) {
-                v = when (v) {
-                    is Map<*, *> -> v[k]
-                    is List<*> -> k.toIntOrNull()?.let { idx -> v.getOrNull(idx) }
-                    else -> null
-                }
-            }
-            mapOf("y" to v)
-        },
         "list.groupBy" to LcncNodeRunner { node, inputs ->
             val key = node.params["key"]
             val xs = inputs["x"] as? List<*> ?: emptyList<Any?>()

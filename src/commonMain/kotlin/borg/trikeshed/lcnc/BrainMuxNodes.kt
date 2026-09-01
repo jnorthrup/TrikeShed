@@ -306,8 +306,16 @@ object BrainMuxNodes {
         // ── result.confirm ──────────────────────────────────────────
         "result.confirm" to LcncNodeRunner { _, inputs ->
             val content = (inputs["content"] as? String).orEmpty()
-            val ok = inputs["ok"] == true
-            val error = (inputs["error"] as? String).orEmpty()
+            val error = ((inputs["error"] ?: inputs["error?"]) as? String).orEmpty()
+            // A plain text producer has completed successfully. Producers that
+            // expose an explicit verdict may override that default; an error
+            // payload is also a failure even when no boolean is supplied.
+            val explicitOk = inputs["ok"] ?: inputs["ok?"]
+            val ok = when (explicitOk) {
+                null -> error.isEmpty()
+                true, "true" -> true
+                else -> false
+            }
 
             val html = if (ok) {
                 """<div style="border:2px solid #22c55e;border-radius:8px;padding:16px;margin:8px;background:#f0fdf4">

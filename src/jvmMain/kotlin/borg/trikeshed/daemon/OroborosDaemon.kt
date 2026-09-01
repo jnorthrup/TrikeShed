@@ -1142,6 +1142,10 @@ object OroborosDaemon {
         // Pure/presentation node runners: canvas-authored programs (preset-kanban)
         // complete HEADLESS via /api/lcnc/run — the curl-able smoke-test lane.
         moduleContext.lcncRunners.putAll(borg.trikeshed.lcnc.PureNodes.registry { System.currentTimeMillis() })
+        // Phase-1 twin removal: `pick` is not a Kotlin lambda. Its existing
+        // panels.html RUNNERS method executes in one HostAccess.NONE GraalJS
+        // context per invocation; registry() loads that resource on IO.
+        moduleContext.lcncRunners.putAll(borg.trikeshed.lcnc.CanvasJsPureNodes.registry())
         // ── hermes.lastUsed: the outcome, next to the intent ──────────
         // mux.meta answers "what is modelmux configured to select" and reports
         // selection:null. Hermes' own state.db answers "what actually replied",

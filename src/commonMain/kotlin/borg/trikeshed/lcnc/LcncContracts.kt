@@ -899,9 +899,12 @@ object LcncContracts {
                 "maxTokens" to LcncPortContract.LcncParamSpec(v = "256"),
                 "temperature" to LcncPortContract.LcncParamSpec(v = "0.2"),
             ), isEffect = true),
-        // result.confirm: OK/ERROR HTML confirmation dialog
+        // result.confirm: content is the completion signal. `ok` and `error`
+        // refine that completion when the producer has an explicit verdict;
+        // content-only producers are successful confirmations, not starved
+        // nodes (and not blank ERROR cards).
         LcncPortContract("result.confirm", "result confirmation (OK/ERROR HTML)",
-            listOf("content", "ok", "error"), emptyList(),
+            listOf("content", "ok?", "error?"), emptyList(),
             inputKinds = mapOf("content" to "text", "ok" to "json", "error" to "text"),
             isSink = true),
 
