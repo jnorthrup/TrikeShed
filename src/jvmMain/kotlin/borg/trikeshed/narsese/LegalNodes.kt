@@ -61,15 +61,19 @@ object LegalNodes {
         // does not strip the `?`), and — same as mux.chat's prompt — a
         // human-oversight brief can arrive as a root frame binding instead
         // of a wire when this node is the trial's entry point. Precedence:
-        // wired input > param > brief binding, matching mux.chat exactly.
-        val text = ((inputs["text"] as? String)
-            ?: (inputs["text?"] as? String)
-            ?: node.params["text"]?.takeIf { it.isNotBlank() }
-            ?: node.params["brief"]?.takeIf { it.isNotBlank() }?.let { briefName ->
+        // brief binding > wired input > param. A bound brief is an explicit
+        // runtime act by the operator — it must beat the canned document a
+        // text.value socket ships, or the sample filing permanently shadows
+        // the real one (the socket exists so the preset demos unbound, not
+        // so it owns the trial when a human speaks).
+        val text = (node.params["brief"]?.takeIf { it.isNotBlank() }?.let { briefName ->
                 currentCoroutineContext()[LcncScopeFrame]?.binding(briefName)?.toString()
             }
+            ?: (inputs["text"] as? String)
+            ?: (inputs["text?"] as? String)
+            ?: node.params["text"]?.takeIf { it.isNotBlank() }
         )?.takeIf { it.isNotBlank() }
-        require(text != null) { "legal.ingest: no text wired, in params, or bound as '${node.params["brief"] ?: "<brief>"}'" }
+        require(text != null) { "legal.ingest: no text bound as '${node.params["brief"] ?: "<brief>"}', wired, or in params" }
 
         // Step 1: real citation extraction — eyecite, run as a subprocess
         // (see class doc for why it's a subprocess and not a vm.* guest).

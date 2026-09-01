@@ -56,8 +56,8 @@ object BughunterSquad {
                 personas = listOf(RESEARCH[5], COUNCIL[3], COUNCIL[1], COUNCIL[0], COUNCIL[6])),
             PanelSpec("surface", "what touches: control flow, state, external boundaries, config, duplication",
                 personas = listOf(RESEARCH[0], RESEARCH[1], RESEARCH[2], RESEARCH[6], RESEARCH[7])),
-            PanelSpec("record", "what it means: history, conventions, architecture, cost, operability",
-                personas = listOf(RESEARCH[3], RESEARCH[4], COUNCIL[2], COUNCIL[5], COUNCIL[7])),
+            PanelSpec("record", "what it means: history, conventions, architecture, purpose, cost, operability",
+                personas = listOf(RESEARCH[3], RESEARCH[4], COUNCIL[2], COUNCIL[4], COUNCIL[5], COUNCIL[7])),
         ),
         rounds = 2,
     )

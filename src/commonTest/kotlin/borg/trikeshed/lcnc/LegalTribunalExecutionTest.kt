@@ -3,6 +3,7 @@ package borg.trikeshed.lcnc
 import borg.trikeshed.kanban.validate
 import borg.trikeshed.lib.get
 import borg.trikeshed.lib.size
+import borg.trikeshed.lib.toSeries
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
@@ -22,11 +23,17 @@ import kotlin.test.assertTrue
  * (`legal.ingest`) originally had no way to receive the document text at
  * all (no wire targets it, no `text` param, no `brief` binding) — running
  * it for real would have thrown `legal.ingest requires text` on the first
- * sweep. `legal.ingest`'s real runner also needs a live [borg.trikeshed.jules.BrainClient],
+ * sweep.
+ *
+ * The t0 text.value socket (the canned sample filing) changed the shape of
+ * this gate: a BOUND operator brief must beat the canned text (that is the
+ * human-oversight contract, pinned in the end-to-end test), and the refusal
+ * test now runs a variant with the socket removed — the one shape that is
+ * genuinely blind. `legal.ingest`'s real runner also needs a live [borg.trikeshed.jules.BrainClient],
  * so — same as [TribunalExecutionTest] fakes the model dialog — this test
  * fakes `legal.ingest` with the identical brief-resolution precedence the
- * real [borg.trikeshed.narsese.LegalNodes.ingestRunner] uses (wired input >
- * param > root frame binding), so the wiring itself is what's under test.
+ * real [borg.trikeshed.narsese.LegalNodes.ingestRunner] uses (brief binding
+ * > wired input > param), so the wiring itself is what's under test.
  */
 class LegalTribunalExecutionTest {
 
@@ -34,14 +41,17 @@ class LegalTribunalExecutionTest {
         LcncProgramConfix.fromJson("preset-legal-tribunal", LcncPresets.all().getValue("preset-legal-tribunal"))
 
     private fun legalIngestFake(): LcncNodeRunner = LcncNodeRunner { node, inputs ->
-        val text = ((inputs["text"] as? String)
-            ?: (inputs["text?"] as? String)
-            ?: node.params["text"]?.takeIf { it.isNotBlank() }
-            ?: node.params["brief"]?.takeIf { it.isNotBlank() }?.let { briefName ->
+        // Same precedence as the production runner: a human-oversight brief
+        // bound at the root frame OVERRIDES the canned document the preset
+        // ships in the t0 socket — the operator's filing beats the sample.
+        val text = (node.params["brief"]?.takeIf { it.isNotBlank() }?.let { briefName ->
                 currentCoroutineContext()[LcncScopeFrame]?.binding(briefName)?.toString()
             }
+            ?: (inputs["text"] as? String)
+            ?: (inputs["text?"] as? String)
+            ?: node.params["text"]?.takeIf { it.isNotBlank() }
         )?.takeIf { it.isNotBlank() }
-        require(text != null) { "legal.ingest: no text wired, in params, or bound as '${node.params["brief"] ?: "<brief>"}'" }
+        require(text != null) { "legal.ingest: no text bound as '${node.params["brief"] ?: "<brief>"}', wired, or in params" }
         mapOf(
             "citations" to listOf(mapOf("case" to "Miranda v. Arizona", "reporter" to "U.S.", "page" to "436")),
             "elements" to mapOf("holdings" to emptyList<Any?>(), "parties" to emptyList<Any?>(), "refused" to emptyList<Any?>()),
@@ -64,6 +74,9 @@ class LegalTribunalExecutionTest {
         registry.putAll(TribunalNodes.registry(dialog) { verdict -> verdict })
         registry["legal.ingest"] = legalIngestFake()
         registry["legal.evidence"] = legalEvidenceFake()
+        // The canned matter text the preset ships (the t0 literal socket):
+        // one shared source, PureNodes' text.value runner.
+        registry["text.value"] = PureNodes.registry { 0L }["text.value"]!!
         return LcncRunner(registry)
     }
 
@@ -132,8 +145,17 @@ class LegalTribunalExecutionTest {
 
     @Test
     fun withoutABriefLegalIngestRefusesRatherThanRunningBlind() = runTest {
-        val program = preset()
-        val thrown = runCatching { runner(program).runProcedure(program, args = emptyMap()) }
+        // The t0 socket is the canned sample filing — a genuinely blind trial
+        // has neither it nor a bound brief, so strip the socket and run the
+        // shipped preset with no root bindings.
+        val base = preset()
+        val blind = base.copy(
+            nodes = (0 until base.nodes.size).map { base.nodes[it] }
+                .filter { it.id != "t0" }.toSeries(),
+            wires = (0 until base.wires.size).map { base.wires[it] }
+                .filter { it.fromNode != "t0" }.toSeries(),
+        )
+        val thrown = runCatching { runner(blind).runProcedure(blind, args = emptyMap()) }
         assertTrue(thrown.isFailure, "legal.ingest must refuse to run with no text at all")
         assertIs<IllegalArgumentException>(thrown.exceptionOrNull())
     }

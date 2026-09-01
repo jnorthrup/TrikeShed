@@ -89,8 +89,10 @@ object TribunalNodes {
         // prompt; a wired `prompt` input (the prior seat's content) wins —
         // inputs-over-params, the same precedence kanban.submit honours.
         // A `brief` param names the ROOT frame binding (the human oversight
-        // brief) the first seat reads when neither is fed — resolved outward
-        // through the frame chain, so the brief is warm base, not re-plumbing.
+        // brief) the first seat reads when no input is fed — and it OUTRANKS
+        // the canned `prompt` param, because human oversight beating the
+        // default motion is the preset's whole point (the end-to-end gate
+        // pins it). Resolution: input → brief binding → prompt param.
         "mux.chat" to LcncNodeRunner { node, inputs ->
             val system = node.params["system"] ?: ""
             // The prior seat's content arrives on the wire as `prompt?`
@@ -98,12 +100,12 @@ object TribunalNodes {
             // `prompt` is honoured identically. Inputs-over-params.
             val prompt = ((inputs["prompt"] as? String)
                 ?: (inputs["prompt?"] as? String)
-                ?: node.params["prompt"]?.takeIf { it.isNotBlank() }
                 ?: node.params["brief"]?.takeIf { it.isNotBlank() }?.let { briefName ->
                     currentCoroutineContext()[LcncScopeFrame]?.binding(briefName)?.toString()
                 }
+                ?: node.params["prompt"]?.takeIf { it.isNotBlank() }
             )?.takeIf { it.isNotBlank() }
-            require(prompt != null) { "mux.chat: no prompt wired, in params, or bound as '${node.params["brief"] ?: "<brief>"}'" }
+            require(prompt != null) { "mux.chat: no prompt wired, bound as '${node.params["brief"] ?: "<brief>"}', or in params" }
             val (content, model) = dialog.seat(node, system, prompt!!)
             mapOf("content" to content, "model" to model)
         },

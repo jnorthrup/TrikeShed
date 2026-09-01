@@ -45,6 +45,9 @@ class TribunalExecutionTest {
             ingested.add(verdict)
             verdict
         })
+        // The canned motion literal the preset ships (t0/n12 sockets): one
+        // shared source, PureNodes' text.value runner.
+        registry["text.value"] = PureNodes.registry { 0L }["text.value"]!!
         return LcncRunner(registry)
     }
 
