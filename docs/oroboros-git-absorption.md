@@ -1,48 +1,75 @@
-# Absorbing git: Oroboros as the repository, GitHub as an export
+# Absorbing git: git IS a CAS, and Oroboros mounts it
 
-> **Status:** design proposal. Every component named below exists in the tree; the
-> proposal is about which one holds authority, not about new machinery.
+> **Status:** design proposal. Every component named below exists in the tree.
+> The proposal is a recognition, not a migration.
 
-## The inversion
+## IS, not WAS
 
-Today git holds authority and Oroboros watches it. `GitStateCache` shells out to
-`git rev-parse`/`git diff`, and `WorktreeCouchGateway.reconcile(repoRoot, prefix)`
-walks the worktree and files what changed into attachments. Oroboros is a
-downstream observer of a store it does not own.
+The wrong framing — the one this page carried in its first draft — is that
+Oroboros *replaces* git, that authority *moves*, that objects get *imported*.
+All future tense, all migration, all work.
 
-The proposal inverts exactly that and nothing else:
+Git **is** a content-addressed store. Not "is like one":
+
+| git | what it already is |
+|---|---|
+| `.git/objects/xx/…` | a sha-sharded CAS. `FileCasStore` shards `sha256/xx/…`. Same layout. |
+| a blob | a CAS block |
+| a commit | a patch: a tree delta, plus parents — which are `Patch.dependencies` |
+| a ref | a mutable name over immutable content — which is what IPNS is |
+| a packfile | block storage with delta compression |
+
+So there is nothing to convert. `.git/objects` is **mounted**, not imported, and
+`escape-velocity.md:108` already names this as the wave-2 deliverable: "git
+objects decoded from the absorbed `.git/**` bytes and served as CAS citizens —
+no external git process."
+
+This is the same move as `CharSeries : CharSequence` earlier on this branch.
+That conformance cost nothing — `length = size`, `get(i) = b(i)` — because
+`CharSequence` **is** `Series<Char>`, a bound joined to an accessor, wearing a
+JDK name. Nothing was adapted; the shape was recognised. Git is the same
+situation one layer down: a CAS wearing a porcelain.
+
+What Oroboros adds is not storage. Git has storage. It is that git's *merge* is a
+three-way text algorithm over that storage, and the channel's is set union.
+
+## The one thing that actually changes
+
+Authority over the **worktree**.
 
 ```
-NOW      git (authority) ──watch──▶ Oroboros (observer) ──▶ CAS
-PROPOSED Oroboros (authority) ──render──▶ worktree ──▶ git ──push──▶ GitHub
+git:       objects (CAS) ──checkout──▶ worktree ──▶ you edit ──▶ objects
+oroboros:  objects (CAS) ──patches──▶ channel ──render──▶ worktree
 ```
 
-Git stops being the repository and becomes a **publication format** — the thing
-you emit at the boundary, the way you emit a tarball. GitHub stays exactly where
-it is, because that is where other people are.
+The CAS is the same CAS in both lines. The difference is that the worktree stops
+being an editable original and becomes a projection — `PijulCrdt.render()` per
+path, reconstructible, disposable.
 
-## Why this is possible now
+## Why this is available now, not later
 
-`PijulCrdt` was positional until this branch: `contentLen()` read live content, so
-tombstoning a vertex collapsed the span its neighbours were addressed by, and two
-concurrent deletes of one line ate the following line. Vertices now keep their
-authored span and both operations are idempotent. That was the load-bearing
-repair — without it, "merge by applying patches" silently corrupts, and no amount
-of gateway wrapping fixes it.
+`PijulCrdt`'s delete **is** vertex-anchored as of this branch — it reads authored
+spans, and both insert and delete are idempotent. Before that, applying two
+concurrent patches to one line silently ate the following line, so "merge by
+applying patches" was not a thing that worked and no gateway could have made it
+one.
 
 Measured on forty real abandoned branches: `git merge` gives up on the third
 ("Should not be doing an octopus"), then degrades to thirty-nine two-way merges
 each re-conflicting on a line eleven other branches already touched. Through the
-channel, twelve branches editing one line collapse to **three** distinct edits —
-ten identical spellings become one patch by content address, two that added their
-own comment stay separate because they genuinely differ.
+channel, the twelve branches editing one line collapse to **three** distinct
+edits — ten identical spellings are one patch by content address, and the two
+that added a comment stay separate because they genuinely differ.
 
-That ratio is the whole argument. Git's merge cost grows with the number of
-*branches*; the channel's grows with the number of *distinct edits*.
+Git's merge cost grows with the number of *branches*. The channel's grows with
+the number of *distinct edits*.
 
-## Four planes
+## Four costumes over one store
 
-### 1. Patch plane — authority
+Not four systems. One content-addressed store, addressed four ways — the same
+pattern as `.view`, `.toList()` and `CharSequence` over a single `Join`.
+
+### Patches — how change is named
 
 `PijulChannel` + `PijulCrdt` + `PatchStorage`.
 
@@ -53,7 +80,7 @@ byte-identical edit produce the same patch, and it applies once. Merge is
 
 `PatchStorage.store/get/getAll` is the patch log. It is a DAG, not a line.
 
-### 2. CAS plane — storage
+### CAS — the store git already keeps
 
 `FileCasStore` (`Sha2CasBus.kt`), sharded `sha256/xx/…`.
 
@@ -61,7 +88,7 @@ Blobs are content-addressed; patches reference blob CIDs. **The worktree is a
 render, never authority** — `PijulCrdt.render()` per path materialises it, and
 deleting it loses nothing.
 
-### 3. M2M plane — replication
+### M2M — how two instances agree
 
 `CasReplicationElement.replicate(cid, payload)` with `registerHook`, over the
 relaxfactory transport (`RelaxTransport.http`, `RequestFactoryProxy`).
@@ -75,12 +102,13 @@ Identically` and `applyOrderDoesNotChangeTheResult` are the existing gates.
 This is the part git cannot do. `git pull` is a negotiation; patch exchange is a
 set union.
 
-### 4. IPFS plane — the closed loop
+### IPFS — the same blocks, off the machine
 
 `IpfsBridge.putBlock/getBlock/resolveIpns`.
 
-CAS blocks and IPFS blocks are the same idea, so the bridge is an identity map,
-not a translation. IPNS names the channel head. The loop closes with no server
+CAS blocks, git objects and IPFS blocks are all sha-addressed immutable bytes.
+The bridge is an identity map, not a translation — which is why this plane is a
+costume and not a port. IPNS names the channel head. The loop closes with no server
 in it:
 
 ```
@@ -162,8 +190,10 @@ bootstraps from IPNS alone.
 *Gate:* a daemon with an empty CAS reconstructs the tree from the IPNS name and
 nothing else.
 
-**P6 — authority flips.** The worktree is generated; `git` becomes an export
-command. Only here does the repo stop being a git repo.
+**P6 — the worktree becomes a render.** `git` becomes an export command. Note
+what does NOT happen here: the object store is not migrated, because it was
+never anything but a CAS. The repo does not stop being a git repo; git stops
+being the thing that decides what the worktree says.
 
 ## What this does not claim
 
