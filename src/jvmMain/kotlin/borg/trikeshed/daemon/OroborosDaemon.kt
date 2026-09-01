@@ -1142,6 +1142,30 @@ object OroborosDaemon {
         // Pure/presentation node runners: canvas-authored programs (preset-kanban)
         // complete HEADLESS via /api/lcnc/run — the curl-able smoke-test lane.
         moduleContext.lcncRunners.putAll(borg.trikeshed.lcnc.PureNodes.registry { System.currentTimeMillis() })
+        // ── hermes.lastUsed: the outcome, next to the intent ──────────
+        // mux.meta answers "what is modelmux configured to select" and reports
+        // selection:null. Hermes' own state.db answers "what actually replied",
+        // and it is not empty. Where those two disagree, the ledger is the one
+        // with completions behind it. JVM-side because the ledger is SQLite.
+        moduleContext.lcncRunners["hermes.lastUsed"] = borg.trikeshed.lcnc.LcncNodeRunner { _, _ ->
+            val recent = borg.trikeshed.jules.HermesModelUsage.recent()
+            fun row(u: borg.trikeshed.jules.HermesModelUsage.Usage) = mapOf(
+                "model" to u.model,
+                "provider" to u.provider,
+                "baseUrl" to u.baseUrl,
+                "task" to u.task,
+                "calls" to u.calls,
+                "inputTokens" to u.inputTokens,
+                "outputTokens" to u.outputTokens,
+                "lastSeenMs" to (u.lastSeenEpochSeconds * 1000).toLong(),
+            )
+            mapOf(
+                "lastUsed" to (recent.firstOrNull()?.let(::row)),
+                "recent" to recent.map(::row),
+                "provenEndpoints" to borg.trikeshed.jules.HermesModelUsage.provenEndpoints()
+                    .map { mapOf("provider" to it.first, "baseUrl" to it.second) },
+            )
+        }
         // ── CCEK itself, programmable ────────────────────────────────
         // Every family above drives a PROJECTION of CCEK (board, council, legal).
         // This one drives the engine: incarnate/signal/agent/projection/recording/

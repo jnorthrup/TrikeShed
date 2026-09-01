@@ -22,6 +22,17 @@ data class LcncPortContract(
     val isSource: Boolean = false,
     val isSink: Boolean = false,
     val wide: Boolean = false,
+    /**
+     * This node CHANGES SOMETHING outside the graph — writes a card, freezes
+     * state, mints a belief, spawns a VM, posts a request, stores a credential.
+     *
+     * [isSink] does not mean this: the seven sinks are all DISPLAYS. Every
+     * genuine effect in the vocabulary — kanban.submit, state.freeze, nal.mint,
+     * http.post, vm.spawn, credential.enter — is sink=false, so nothing could
+     * tell an effect from a transaction. A treeshake that auto-wires a write is
+     * not tidying a graph, it is performing one.
+     */
+    val isEffect: Boolean = false,
 ) {
     /** One editable parameter: default value, optional dropdown options, multi-line flag, placeholder.
      *  [cols] non-empty makes it a LIST widget: rows of {col: value}, the param
@@ -32,6 +43,19 @@ data class LcncPortContract(
         val ta: Boolean = false,
         val ph: String = "",
         val cols: List<String> = emptyList(),
+        /**
+         * LIVE options. [opts] is a dead list an author typed once; this names a
+         * running source and the picklist is filled from it at open time.
+         *
+         * `"<runner>#<path>"` — the runner is executed through the ordinary
+         * /api/lcnc/run lane and the path picks the field out of its result, so
+         * a picklist is a one-node program and nothing new had to be invented to
+         * evaluate it. `mux.models#models[].id` lists the models modelmux can
+         * actually route to right now; `board.get#items[].id` lists the cards
+         * that actually exist. A stale option is then impossible by
+         * construction, because there is no list to go stale.
+         */
+        val optsFrom: String = "",
     )
 }
 
@@ -114,7 +138,7 @@ object LcncContracts {
                 "record" to LcncPortContract.LcncParamSpec(v = "true", opts = listOf("true", "false")),
                 "maxConcurrency" to LcncPortContract.LcncParamSpec(v = "8", ph = "bounded fan-out width"),
                 "projections" to LcncPortContract.LcncParamSpec(ph = "DOCUMENT,BOARD,MARKDOWN — empty = all"),
-            )),
+            ), isEffect = true),
         LcncPortContract("ccek.signal", "ccek signal (every ForgeSignal verb)",
             listOf("handle", "fields?"), listOf("sent", "signal"),
             inputKinds = mapOf("handle" to "id", "fields" to "json"),
@@ -132,7 +156,7 @@ object LcncContracts {
                 "group" to LcncPortContract.LcncParamSpec(ph = "join"),
                 "requiredBranches" to LcncPortContract.LcncParamSpec(v = "2", ph = "join"),
                 "verdict" to LcncPortContract.LcncParamSpec(ph = "vote"),
-            )),
+            ), isEffect = true),
         LcncPortContract("ccek.projection", "ccek projection (live view)",
             listOf("handle"), listOf("projection", "kind"),
             inputKinds = mapOf("handle" to "id"),
@@ -154,7 +178,7 @@ object LcncContracts {
             outputKinds = mapOf("events" to "json", "started" to "json", "completed" to "json", "failed" to "json")),
         LcncPortContract("ccek.drain", "ccek drain (graceful cancel)",
             listOf("handle"), listOf("drained"),
-            inputKinds = mapOf("handle" to "id"), outputKinds = mapOf("drained" to "json")),
+            inputKinds = mapOf("handle" to "id"), outputKinds = mapOf("drained" to "json"), isEffect = true),
         LcncPortContract("ccek.context", "ccek user context (fork lineage)",
             listOf("parent?"), listOf("context", "contextId"),
             inputKinds = mapOf("parent" to "id"),
@@ -167,7 +191,7 @@ object LcncContracts {
             listOf("contextId", "fields?"), listOf("factCount", "asserted"),
             inputKinds = mapOf("contextId" to "id", "fields" to "json"),
             outputKinds = mapOf("factCount" to "json", "asserted" to "json"),
-            params = mapOf("kind" to LcncPortContract.LcncParamSpec(v = "observation", ph = "assertion kind"))),
+            params = mapOf("kind" to LcncPortContract.LcncParamSpec(v = "observation", ph = "assertion kind")), isEffect = true),
 
         // ── sources (no inputs) ──────────────────────────────────────
         LcncPortContract("timer", "timer",
@@ -228,7 +252,7 @@ object LcncContracts {
             listOf("trigger?"), listOf("verdict"),
             inputKinds = mapOf("trigger" to "trigger"),
             outputKinds = mapOf("verdict" to "json"),
-            params = mapOf("name" to LcncPortContract.LcncParamSpec(ph = "project db name (hierarchy kill)"))),
+            params = mapOf("name" to LcncPortContract.LcncParamSpec(ph = "project db name (hierarchy kill)")), isEffect = true),
         LcncPortContract("project.list", "mounted scopes",
             listOf("trigger?"), listOf("scopes"),
             inputKinds = mapOf("trigger" to "trigger"),
@@ -260,16 +284,16 @@ object LcncContracts {
                 "facet" to LcncPortContract.LcncParamSpec(v = "python", opts = listOf("python", "js")),
                 "wallMillis" to LcncPortContract.LcncParamSpec(v = "1800000"),
                 "world" to LcncPortContract.LcncParamSpec(ph = "host dirs, comma-sep"),
-            )),
+            ), isEffect = true),
         LcncPortContract("vm.eval", "vm eval",
             listOf("vmId", "source?"), listOf("value", "cid"),
             inputKinds = mapOf("vmId" to "id", "source" to "text"),
             outputKinds = mapOf("value" to "json", "cid" to "id"),
-            params = mapOf("source" to LcncPortContract.LcncParamSpec(v = "1+1", ta = true))),
+            params = mapOf("source" to LcncPortContract.LcncParamSpec(v = "1+1", ta = true)), isEffect = true),
         LcncPortContract("vm.revoke", "vm revoke",
             listOf("vmId"), listOf("ok"),
             inputKinds = mapOf("vmId" to "id"),
-            outputKinds = mapOf("ok" to "json")),
+            outputKinds = mapOf("ok" to "json"), isEffect = true),
         LcncPortContract("pytest.pure", "pytest (pure, in-vm)",
             listOf("vmId"), listOf("exit", "tail"),
             inputKinds = mapOf("vmId" to "id"),
@@ -310,7 +334,7 @@ object LcncContracts {
             listOf("body"), listOf("json"),
             inputKinds = mapOf("body" to "json"),
             outputKinds = mapOf("json" to "json"),
-            params = mapOf("path" to LcncPortContract.LcncParamSpec(v = "/api/submit"))),
+            params = mapOf("path" to LcncPortContract.LcncParamSpec(v = "/api/submit")), isEffect = true),
         LcncPortContract("rf.rpc", "requestfactory rpc",
             listOf("target?", "args?"), listOf("result", "receipt"),
             inputKinds = mapOf("target" to "text", "args" to "json"),
@@ -318,7 +342,7 @@ object LcncContracts {
             params = mapOf(
                 "target" to LcncPortContract.LcncParamSpec(v = "session.info", ph = "Kotlin target name"),
                 "args" to LcncPortContract.LcncParamSpec(v = "{}", ta = true, ph = "JSON object args"),
-            )),
+            ), isEffect = true),
         LcncPortContract("rf.batch", "requestfactory batch",
             listOf("operations"), listOf("ok", "receipts"),
             inputKinds = mapOf("operations" to "json"),
@@ -329,7 +353,7 @@ object LcncContracts {
                     ta = true,
                     ph = "RequestFactory operation objects",
                 ),
-            )),
+            ), isEffect = true),
 
         // ── media: an audio/video player as a PATCH PANEL citizen — every
         // control is a patch point: url arrives on a text wire, the
@@ -416,26 +440,26 @@ object LcncContracts {
                 // Sent as `models` on /api/mux/chat; routing consumption is the
                 // model code's own seam.
                 "models" to LcncPortContract.LcncParamSpec(cols = listOf("key", "model")),
-            )),
+            ), isEffect = true),
 
         // ── project / scope ──────────────────────────────────────────
         LcncPortContract("project.mount", "mount scope (git|assets)",
             listOf("path?"), listOf("scope"),
             inputKinds = mapOf("path" to "text"),
             outputKinds = mapOf("scope" to "id"),
-            params = mapOf("path" to LcncPortContract.LcncParamSpec(ph = "/absolute/dir — or drop a folder on the canvas"))),
+            params = mapOf("path" to LcncPortContract.LcncParamSpec(ph = "/absolute/dir — or drop a folder on the canvas")), isEffect = true),
 
         // ── knowledge / beliefs ──────────────────────────────────────
         LcncPortContract("kg.ingest", "kg → nal (turtle/kif)",
             listOf("text?"), listOf("report"),
             inputKinds = mapOf("text" to "text"),
             outputKinds = mapOf("report" to "json"),
-            params = mapOf("kg" to LcncPortContract.LcncParamSpec(ta = true, ph = "@prefix ex: <...> .\nex:a ex:causes ex:b ."))),
+            params = mapOf("kg" to LcncPortContract.LcncParamSpec(ta = true, ph = "@prefix ex: <...> .\nex:a ex:causes ex:b .")), isEffect = true),
         LcncPortContract("beliefs.review", "turn review (induction)",
             listOf("facts"), listOf("landed"),
             inputKinds = mapOf("facts" to "json"),
             outputKinds = mapOf("landed" to "json"),
-            params = mapOf("turnSucceeded" to LcncPortContract.LcncParamSpec(v = "true", opts = listOf("true", "false")))),
+            params = mapOf("turnSucceeded" to LcncPortContract.LcncParamSpec(v = "true", opts = listOf("true", "false"))), isEffect = true),
         LcncPortContract("beliefs.resonate", "resonance (support/refutation)",
             listOf("goal?"), listOf("synonyms", "antonyms"),
             inputKinds = mapOf("goal" to "text"),
@@ -477,7 +501,7 @@ object LcncContracts {
         LcncPortContract("vm.call", "vm call (VmHandle.call)",
             listOf("vmId", "root", "args?"), listOf("value"),
             inputKinds = mapOf("vmId" to "id", "root" to "text", "args" to "json"),
-            outputKinds = mapOf("value" to "json")),
+            outputKinds = mapOf("value" to "json"), isEffect = true),
         LcncPortContract("vm.stats", "vm stats",
             listOf("vmId"), listOf("stats"),
             inputKinds = mapOf("vmId" to "id"),
@@ -505,28 +529,28 @@ object LcncContracts {
             inputKinds = mapOf("command" to "json"),
             outputKinds = mapOf("accepted" to "json", "jobId" to "id", "revision" to "json", "sheets" to "json"),
             params = mapOf(
-                "jobId" to LcncPortContract.LcncParamSpec(ph = "card-…"),
+                "jobId" to LcncPortContract.LcncParamSpec(ph = "card-…", optsFrom = "board.get#json.items[].id"),
                 "title" to LcncPortContract.LcncParamSpec(ph = "card title"),
                 "priority" to LcncPortContract.LcncParamSpec(v = "2"),
                 "idempotencyKey" to LcncPortContract.LcncParamSpec(ph = "unique per submit"),
-            )),
+            ), isEffect = true),
         LcncPortContract("kanban.move", "kanban move (WAL command)",
             listOf("command?"), listOf("accepted", "jobId", "revision", "sheets"),
             inputKinds = mapOf("command" to "json"),
             outputKinds = mapOf("accepted" to "json", "jobId" to "id", "revision" to "json", "sheets" to "json"),
             params = mapOf(
-                "jobId" to LcncPortContract.LcncParamSpec(ph = "wire a command in, or type one"),
-                "toColumn" to LcncPortContract.LcncParamSpec(ph = "target column id"),
+                "jobId" to LcncPortContract.LcncParamSpec(ph = "wire a command in, or type one", optsFrom = "board.get#json.items[].id"),
+                "toColumn" to LcncPortContract.LcncParamSpec(ph = "target column id", optsFrom = "board.get#json.columns[].id"),
                 "expectedRevision" to LcncPortContract.LcncParamSpec(ph = "card revision"),
                 "idempotencyKey" to LcncPortContract.LcncParamSpec(ph = "unique per gesture"),
-            )),
+            ), isEffect = true),
         LcncPortContract("kanban.import", "kanban import (plan doc → cards)",
             listOf("text?"), listOf("parsed", "imported", "duplicates", "jobIds"),
             inputKinds = mapOf("text" to "text"),
             outputKinds = mapOf("parsed" to "json", "imported" to "json", "duplicates" to "json", "jobIds" to "json"),
             params = mapOf(
                 "text" to LcncPortContract.LcncParamSpec(ta = true, ph = "- one bullet per card (dedupe by content hash)"),
-            )),
+            ), isEffect = true),
         LcncPortContract("kanban.attention", "NARS attention garnish (belief bag)",
             listOf("trigger?"), listOf("cards", "ordered"),
             inputKinds = mapOf("trigger" to "trigger"),
@@ -687,7 +711,7 @@ object LcncContracts {
             outputKinds = mapOf("accepted" to "json", "refused" to "json", "aggregates" to "json"),
             params = mapOf(
                 "maxTokens" to LcncPortContract.LcncParamSpec(v = "1024"),
-            )),
+            ), isEffect = true),
         LcncPortContract("nal.decay", "attention decay pulse (thin wrapper)",
             listOf("trigger?", "after?"), listOf("decayed"),
             // `after?` is the same pulse-only port under a second declared
@@ -695,7 +719,7 @@ object LcncContracts {
             // upstream (e.g. read.construct's aggregates) without the
             // runner reading the payload — decayRunner ignores all inputs.
             inputKinds = mapOf("trigger" to "trigger", "after" to "json"),
-            outputKinds = mapOf("decayed" to "trigger")),
+            outputKinds = mapOf("decayed" to "trigger"), isEffect = true),
         LcncPortContract("nal.recall", "belief recall (top/sample/near)",
             listOf("trigger?"), listOf("beliefs"),
             inputKinds = mapOf("trigger" to "trigger"),
@@ -717,7 +741,7 @@ object LcncContracts {
                 "p" to LcncPortContract.LcncParamSpec(ph = "priority 0..1 (resident value kept when blank)"),
                 "d" to LcncPortContract.LcncParamSpec(ph = "durability 0..1"),
                 "q" to LcncPortContract.LcncParamSpec(ph = "quality 0..1"),
-            )),
+            ), isEffect = true),
         LcncPortContract("nal.reinforce", "reinforce (evidence delta, budget untouched)",
             listOf("angular?"), listOf("revised"),
             inputKinds = mapOf("angular" to "id"),
@@ -726,7 +750,7 @@ object LcncContracts {
                 "angular" to LcncPortContract.LcncParamSpec(ph = "angular (decimal string) when none is wired"),
                 "wPlus" to LcncPortContract.LcncParamSpec(v = "1"),
                 "wMinus" to LcncPortContract.LcncParamSpec(v = "0"),
-            )),
+            ), isEffect = true),
         LcncPortContract("nal.encode", "encode 64-bit centroid (AngularCodec)",
             listOf("subject?"), listOf("centroid"),
             inputKinds = mapOf("subject" to "text"),
@@ -749,7 +773,7 @@ object LcncContracts {
                 "consequent" to LcncPortContract.LcncParamSpec(ph = "one rule's consequent"),
                 "copula" to LcncPortContract.LcncParamSpec(v = "==>", opts = listOf("==>", "<=>")),
                 "discount" to LcncPortContract.LcncParamSpec(v = "1.0"),
-            )),
+            ), isEffect = true),
         LcncPortContract("nal.rules.fromKg", "kg → eternal rules (bridge + admit)",
             listOf("kgText?"), listOf("rules", "admitted", "rejectedTemporal"),
             inputKinds = mapOf("kgText" to "text"),
@@ -758,7 +782,7 @@ object LcncContracts {
                 "kgText" to LcncPortContract.LcncParamSpec(ta = true, ph = "(=> fire smoke)\nex:a ex:causes ex:b ."),
                 "confidence" to LcncPortContract.LcncParamSpec(v = "0.9"),
                 "copula" to LcncPortContract.LcncParamSpec(ph = "force every bridged copula", opts = listOf("==>", "<=>")),
-            )),
+            ), isEffect = true),
         LcncPortContract("nars.reteFire", "nars rete fire (one rule, in-process)",
             listOf("assertions?"), listOf("firings", "ruleCid"),
             inputKinds = mapOf("assertions" to "json"),
@@ -791,11 +815,11 @@ object LcncContracts {
         LcncPortContract("state.freeze", "freeze bag+KB to CAS (snapshot)",
             listOf("trigger?"), listOf("snapshot"),
             inputKinds = mapOf("trigger" to "trigger"),
-            outputKinds = mapOf("snapshot" to "json")),
+            outputKinds = mapOf("snapshot" to "json"), isEffect = true),
         LcncPortContract("state.thaw", "thaw bag+KB from CAS (restore)",
             listOf("trigger?"), listOf("restored"),
             inputKinds = mapOf("trigger" to "trigger"),
-            outputKinds = mapOf("restored" to "json")),
+            outputKinds = mapOf("restored" to "json"), isEffect = true),
 
         // ── Legal domain nodes ────────────────────────────────────
         LcncPortContract("legal.ingest", "legal document ingest (eyecite + LLM propose/gate)",
@@ -806,7 +830,7 @@ object LcncContracts {
                 "text" to LcncPortContract.LcncParamSpec(ta = true, ph = "legal document text (or wire one in)"),
                 "maxTokens" to LcncPortContract.LcncParamSpec(v = "2048"),
                 "brief" to LcncPortContract.LcncParamSpec(ph = "root frame binding to read when no text is wired (human-oversight brief)"),
-            )),
+            ), isEffect = true),
         LcncPortContract("legal.evidence", "evidence-bank query (shared KIF bank) → brief folded with prior facts",
             listOf("documentCid?", "brief?"), listOf("brief"),
             inputKinds = mapOf("documentCid" to "id", "brief" to "text"),
@@ -831,7 +855,7 @@ object LcncContracts {
                 "url" to LcncPortContract.LcncParamSpec(ph = "base URL", v = "https://integrate.api.nvidia.com/v1"),
                 "api_type" to LcncPortContract.LcncParamSpec(v = "openai", opts = listOf("openai", "anthropic", "google")),
                 "key" to LcncPortContract.LcncParamSpec(ph = "secret:API key"),
-            )),
+            ), isEffect = true),
         // prompt.chat: prompt → model → content. Credential precedence,
         //   highest first: (1) the ModelMux key chain — KeyMux resolves
         //   llm.<provider>.key from env → dotenv → harness stores, so a model
@@ -853,10 +877,10 @@ object LcncContracts {
                 "headers" to LcncPortContract.LcncParamSpec(
                     cols = listOf("name", "value"),
                     ph = "extra headers (k-v pairs)"),
-                "model" to LcncPortContract.LcncParamSpec(ph = "model id (mux.models lists what resolves)", v = "deepseek-ai/deepseek-v4-flash"),
+                "model" to LcncPortContract.LcncParamSpec(ph = "model id (mux.models lists what resolves)", v = "deepseek-ai/deepseek-v4-flash", optsFrom = "mux.models#models[].id"),
                 "maxTokens" to LcncPortContract.LcncParamSpec(v = "256"),
                 "temperature" to LcncPortContract.LcncParamSpec(v = "0.2"),
-            )),
+            ), isEffect = true),
         // result.confirm: OK/ERROR HTML confirmation dialog
         LcncPortContract("result.confirm", "result confirmation (OK/ERROR HTML)",
             listOf("content", "ok", "error"), emptyList(),
@@ -994,7 +1018,7 @@ object LcncContracts {
             params = mapOf(
                 "config" to LcncPortContract.LcncParamSpec(
                     ta = true, ph = "{\"panels\":[{name,charge,experts}],\"rounds\":2,…} — empty = DEFAULT_3x5"),
-            )),
+            ), isEffect = true),
         LcncPortContract("council.record", "council record (CAS + blackboard + couch + KIF + case lifecycle)",
             listOf("verdict", "transcript", "turns?", "caseId?", "documentCid?"), listOf("report"),
             mapOf("transcript" to LcncCardinality.MANY, "turns" to LcncCardinality.MANY),
@@ -1003,7 +1027,7 @@ object LcncContracts {
                 "caseId" to "json", "documentCid" to "id",
             ),
             outputKinds = mapOf("report" to "json"),
-            params = mapOf("caseId" to LcncPortContract.LcncParamSpec(v = "default"))),
+            params = mapOf("caseId" to LcncPortContract.LcncParamSpec(v = "default")), isEffect = true),
         LcncPortContract("council.case", "council case read-back (index + transcript/verdict from CAS)",
             listOf("caseId?"), listOf("case"),
             inputKinds = mapOf("caseId" to "id"),

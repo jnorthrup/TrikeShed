@@ -39,6 +39,9 @@ button.stop{border-color:var(--err);color:var(--err)}
    drop. */
 #wires path.cand{stroke-width:1.4;opacity:.30;stroke-dasharray:3 6;pointer-events:none}
 #wires path.cand.near{stroke-width:2.4;opacity:.85;stroke-dasharray:5 4}
+/* refused by containment, not by kind — visible so the impedance is legible,
+   dimmer and violet so it never reads as an offer */
+#wires path.cand.blocked{stroke:var(--vm)!important;opacity:.20;stroke-dasharray:1 6}
 /* the shake resolved to one: this is not a candidate any more, it is the
    answer, so it stops looking provisional */
 #wires path.cand.only{stroke-width:2.8;opacity:1;stroke-dasharray:none;
@@ -198,6 +201,18 @@ button.stop{border-color:var(--err);color:var(--err)}
 .node{z-index:1}
 /* untyped port: contract declared no kind — it mates with nothing */
 .port.t-any{border-color:var(--dim)}
+/* a picklist filled from a running source, not from a list someone typed */
+.params select.live{border-color:var(--wire)}
+.params select.live option[data-stale]{color:var(--warn)}
+/* SHAPE is the second axis. Colour is already spoken for by KIND, so effect-ness
+   gets shape: a circle is a transaction, a square CHANGES SOMETHING outside the
+   graph. You can see, without reading a label, which cables end in a write. */
+.port.fx{border-radius:2px}
+.port.fx::before{content:"";position:absolute;inset:-3px;border-radius:3px;
+  border:1px dashed currentColor;opacity:.45;pointer-events:none}
+/* an outlet with nowhere to go — the yield cannot leave its ring */
+.port.outletblocked{border-radius:2px;transform:translateY(-50%) rotate(45deg);
+  border-color:var(--warn);box-shadow:0 0 0 2px color-mix(in srgb, var(--warn) 30%, transparent)}
 /* wiring affordance: while a wire is in hand, only kind-equal ports stay lit;
    everything incompatible dims — the canvas itself states the options */
 /* Wiring mode. Dimming the rest was never the problem — the highlight was.
@@ -281,6 +296,12 @@ body.wiring .port.mate-only{
    go hunting for the dot */
 body.wiring .node:has(.port.mateable){box-shadow:0 0 0 1px color-mix(in srgb, var(--wire) 55%, transparent)}
 body.wiring .node.nomate{opacity:.3;filter:saturate(.25)}
+/* the kind matches, the ring refuses — the failure that had no appearance */
+body.wiring .port.scopeblock{opacity:.75;border-color:var(--vm);background:transparent;
+  box-shadow:0 0 0 2px color-mix(in srgb, var(--vm) 30%, transparent)}
+.port.v-scope{background:var(--vm)!important;border-color:var(--vm)!important}
+.vmark.scope{background:var(--vm);color:#1a0b2e;
+  box-shadow:0 0 0 3px color-mix(in srgb, var(--vm) 22%, transparent),0 0 16px 2px color-mix(in srgb, var(--vm) 50%, transparent)}
 /* the palette: docked drag-source for the served vocabulary + the gallery */
 #palette{position:fixed;top:40px;left:0;bottom:0;width:216px;background:rgba(11,14,20,.96);border-right:1px solid var(--line);z-index:18;overflow-y:auto;padding:8px;display:none}
 #palette.open{display:block}
@@ -1526,7 +1547,25 @@ function buildNode(n){
       continue;
     }
     let inp;
-    if(def.opts){ inp=document.createElement("select"); for(const o of def.opts){const op=document.createElement("option");op.value=op.textContent=o;inp.appendChild(op);} inp.value=n.params[k]; }
+    if(def.opts||def.optsFrom){
+      inp=document.createElement("select");
+      const fill=list=>{ const keep=n.params[k]; inp.textContent="";
+        for(const o of list){const op=document.createElement("option");op.value=op.textContent=o;inp.appendChild(op);}
+        if(keep&&!list.includes(keep)){ const op=document.createElement("option");
+          op.value=op.textContent=keep; op.dataset.stale="1"; inp.appendChild(op); }
+        inp.value=keep??list[0]??""; };
+      fill(def.opts||[]);
+      // LIVE PICKLIST. A dead opts array is a list someone typed once and the
+      // world moved on; optsFrom names a running source and the list is filled
+      // from it when the node renders. The current value survives even if it is
+      // no longer offered — marked stale rather than silently replaced.
+      if(def.optsFrom){
+        inp.classList.add("live");
+        livePicklist(def.optsFrom).then(list=>{ if(list&&list.length) fill(list); })
+          .catch(()=>{});
+      }
+      inp.value=n.params[k];
+    }
     else if(def.ta){ inp=document.createElement("textarea"); inp.value=n.params[k]; }
     else { inp=document.createElement("input"); if(def.ph&&def.ph.startsWith("secret:")) inp.type="password"; inp.value=n.params[k]; }
     if(def.ph) inp.placeholder=def.ph.startsWith("secret:")?def.ph.slice(7):def.ph;
@@ -1570,6 +1609,9 @@ function buildNode(n){
     const up=()=>{ removeEventListener("pointermove",mv); removeEventListener("pointerup",up); save(); };
     addEventListener("pointermove",mv); addEventListener("pointerup",up);
   });
+  // effect nodes carry the shape on every one of their ports
+  if(CONTRACTS[n.type] && CONTRACTS[n.type].effect)
+    el.querySelectorAll(".port").forEach(p=>p.classList.add("fx"));
   el.querySelectorAll(".port").forEach(port=>{
     port.addEventListener("pointerdown",e=>{
       e.stopPropagation(); e.preventDefault();
@@ -1782,8 +1824,8 @@ function verdictLayer(){
   return L;
 }
 function clearVerdicts(){
-  document.querySelectorAll(".port.v-ok,.port.v-dead,.port.v-open")
-    .forEach(e=>e.classList.remove("v-ok","v-dead","v-open"));
+  document.querySelectorAll(".port.v-ok,.port.v-dead,.port.v-open,.port.v-scope")
+    .forEach(e=>e.classList.remove("v-ok","v-dead","v-open","v-scope"));
   document.querySelectorAll(".node.starved").forEach(e=>e.classList.remove("starved"));
   verdictLayer().textContent="";
   VERDICTS=[]; STARVED=new Set();
@@ -1795,7 +1837,7 @@ function buildVerdicts(){
     const c=portCenter(v.nodeId,v.dir,v.port); if(!c) return;
     const d=document.createElement("div");
     d.className="vmark "+v.cls;
-    d.textContent=v.cls==="ok"?"✓":v.cls==="dead"?"✕":"?";
+    d.textContent=v.cls==="ok"?"✓":v.cls==="dead"?"✕":v.cls==="scope"?"⇱":"?";
     d.style.left=c.x+"px"; d.style.top=c.y+"px";
     d.style.animationDelay=(i*55)+"ms";
     d.title=v.label||"";
@@ -1837,6 +1879,39 @@ function starvedReach(seedIds){
   }
   return out;
 }
+/**
+ * Resolve a live picklist: "<runner>#<path>" — run the node through the ordinary
+ * /api/lcnc/run lane, then walk the path out of its outputs. `models[].id`
+ * means "the id of every element of models". A picklist is a one-node program,
+ * so nothing new evaluates it and anything the daemon can run can fill a list.
+ * Cached per source for the session; a reload is a refresh.
+ */
+const PICKLIST_CACHE=new Map();
+async function livePicklist(spec){
+  if(PICKLIST_CACHE.has(spec)) return PICKLIST_CACHE.get(spec);
+  const [type,path]=String(spec).split("#");
+  if(!type||!path) return [];
+  const p=(async()=>{
+    const res=await api("POST","/api/lcnc/run",{type,inputs:{}});
+    if(!res||!res.outputs) return [];
+    let cur=res.outputs;
+    for(const seg of path.split(".")){
+      if(cur==null) return [];
+      if(seg.endsWith("[]")){
+        const key=seg.slice(0,-2);
+        cur=(key?cur[key]:cur);
+        if(!Array.isArray(cur)) return [];
+        cur={__list:cur};
+      } else if(cur&&cur.__list){
+        cur={__list:cur.__list.map(x=>x&&x[seg]).filter(v=>v!=null)};
+      } else cur=cur[seg];
+    }
+    const out=cur&&cur.__list?cur.__list:(Array.isArray(cur)?cur:[]);
+    return out.map(String).filter(Boolean);
+  })();
+  PICKLIST_CACHE.set(spec,p);
+  return p;
+}
 function treeshake(opts){
   const inclOptional=!!(opts&&opts.optional);
   const KEY=(id,port)=>id+"\u0000"+port;
@@ -1847,6 +1922,11 @@ function treeshake(opts){
   const openIns=[],openOuts=[];
   for(const nd of G.nodes){
     const c=CONTRACTS[nd.type]; if(!c||!nd.el) continue;
+    // A shake tidies a graph; it does not perform one. An input on an effect
+    // node is a write waiting to happen, and auto-wiring it is the shake
+    // deciding to submit a card, freeze state or spend a token on your behalf.
+    // They are reported, never merged.
+    const isEffect = !!(c.effect);
     for(const ip of (c.ins||[])){
       if(fedIn.has(KEY(nd.id,bare(ip)))) continue;
       // An OPTIONAL port left open is not a gap — it is a choice. Filling those
@@ -1856,7 +1936,7 @@ function treeshake(opts){
       const req=!String(ip).endsWith("?");
       if(!req&&!inclOptional) continue;
       const ctr=portCenter(nd.id,"in",ip); if(!ctr) continue;
-      openIns.push({nd,port:ip,req,c:ctr,
+      openIns.push({nd,port:ip,req,c:ctr,effect:isEffect,
                     kind:nodeKindOf(nd,"in",ip),sp:scopePathOf(nd)});
     }
     for(const op of (c.outs||[])){
@@ -1880,6 +1960,7 @@ function treeshake(opts){
   pairs.sort((a,b)=> (a.i.req!==b.i.req) ? (a.i.req?-1:1) : a.d-b.d );
   const tookIn=new Set(),tookOut=new Set(),made=[];
   for(const pr of pairs){
+    if(pr.i.effect) continue;              // never auto-wire into an effect
     const ik=KEY(pr.i.nd.id,bare(pr.i.port)), ok=KEY(pr.o.nd.id,bare(pr.o.port));
     if(tookIn.has(ik)||tookOut.has(ok)) continue;
     tookIn.add(ik); tookOut.add(ok);
@@ -1893,12 +1974,19 @@ function treeshake(opts){
   // Does a mate exist ANYWHERE on the board, ignoring reach and the greedy
   // contest? That is the line between "move it closer" and "nothing here can
   // ever feed this".
-  const hasAnyMate=i=>openOuts.some(o=>o.nd.id!==i.nd.id&&kindsCompatible(o.kind,i.kind)
-      &&o.sp.length<=i.sp.length&&o.sp.every((v,ix)=>i.sp[ix]===v));
-  const dead=stillOpen.filter(i=>!hasAnyMate(i));
-  const reachable=stillOpen.filter(hasAnyMate);
+  // KIND and CONTAINMENT are different questions and were being asked as one,
+  // so a socket whose only producers sat outside its ring reported "no mate on
+  // the board" — which is false, and sends you hunting for a node that is
+  // already on the canvas. Scope impedance is the invisible failure here: the
+  // types line up, the frames do not.
+  const kindMates=i=>openOuts.filter(o=>o.nd.id!==i.nd.id&&kindsCompatible(o.kind,i.kind));
+  const inScope=(o,i)=>o.sp.length<=i.sp.length&&o.sp.every((v,ix)=>i.sp[ix]===v);
+  const dead=stillOpen.filter(i=>kindMates(i).length===0);
+  const scoped=stillOpen.filter(i=>{ const k=kindMates(i); return k.length>0&&!k.some(o=>inScope(o,i)); });
+  const reachable=stillOpen.filter(i=>{ const k=kindMates(i); return k.some(o=>inScope(o,i)); });
   if(made.length){ redraw(); save(); }
   clearVerdicts();
+  const parts0=[];
   // Ordered so the pass tells a story as it lands: what closed, then what is
   // merely out of reach, then what nothing here can ever close.
   for(const pr of made){ markPort(pr.i.nd,"in",pr.i.port,"v-ok");
@@ -1907,6 +1995,10 @@ function treeshake(opts){
   for(const i of reachable){ markPort(i.nd,"in",i.port,"v-open");
     VERDICTS.push({nodeId:i.nd.id,dir:"in",port:i.port,cls:"open",
       label:"a legal mate exists, but not within "+SHAKE_REACH+"px"}); }
+  for(const i of scoped){ markPort(i.nd,"in",i.port,"v-scope");
+    VERDICTS.push({nodeId:i.nd.id,dir:"in",port:i.port,cls:"scope",
+      label:"kind-compatible producers exist, but every one is outside this ring — "+
+            "data flows lateral or inward, so thread it through scope.in/scope.out or move it"}); }
   for(const i of dead){ markPort(i.nd,"in",i.port,"v-dead");
     VERDICTS.push({nodeId:i.nd.id,dir:"in",port:i.port,cls:"dead",
       label:"no kind-compatible mate anywhere on this board"}); }
@@ -1914,14 +2006,40 @@ function treeshake(opts){
   // the dead reach: every node downstream of a required input nobody feeds
   // Starvation still seeds from REQUIRED holes only: an optional port left open
   // is a choice, and a node is not running on nothing because you declined one.
+  // OUTLET BLOCKED — the mirror of scope impedance, on the producing side.
+  // A yield deep in a ring whose only kind-compatible consumers sit OUTWARD has
+  // nowhere to go: data flows lateral or inward, so the value dies at the ring
+  // unless it is threaded out through scope.out. Nothing said so; the port just
+  // sat there looking ordinary while its result went nowhere.
+  const allIns=[];
+  for(const nd of G.nodes){
+    const c=CONTRACTS[nd.type]; if(!c||!nd.el) continue;
+    for(const ip of (c.ins||[])) allIns.push({nd,port:ip,kind:nodeKindOf(nd,"in",ip),sp:scopePathOf(nd)});
+  }
+  let outletBlocked=0;
+  for(const o of openOuts){
+    if(!o.sp.length) continue;                       // top level: nothing encloses it
+    const consumers=allIns.filter(i=>i.nd.id!==o.nd.id&&kindsCompatible(o.kind,i.kind));
+    if(!consumers.length) continue;                  // nobody wants it at all — a different problem
+    if(consumers.some(i=>o.sp.length<=i.sp.length&&o.sp.every((v,ix)=>i.sp[ix]===v))) continue;
+    markPort(o.nd,"out",o.port,"outletblocked");
+    VERDICTS.push({nodeId:o.nd.id,dir:"out",port:o.port,cls:"scope",
+      label:"outlet blocked — every consumer of this yield is outside the ring. "+
+            "Thread it out through scope.out, or the value dies here."});
+    outletBlocked++;
+  }
+  if(outletBlocked) parts0.push("⇱ "+outletBlocked+" outlet"+(outletBlocked===1?"":"s")+" blocked by ring depth");
+
   STARVED=starvedReach(stillOpen.filter(i=>i.req).map(i=>i.nd.id));
   for(const id of STARVED){ const nd=G.nodes.find(x=>x.id===id); if(nd&&nd.el) nd.el.classList.add("starved"); }
   if(STARVED.size) redraw();   // repaint so the starved cables pick up their class
   // The numbers name the three verdicts now on the board, so the status line
   // stops being a truncated list nobody can find on a 98-node graph.
-  const parts=[];
-  parts.push("✓ "+made.length+" closed");
+  const parts=parts0.slice();
+  parts.unshift("✓ "+made.length+" closed");
   if(reachable.length) parts.push("? "+reachable.length+" fillable — out of "+SHAKE_REACH+"px reach or lost the pass");
+  if(scoped.length) parts.push("⇱ "+scoped.length+" scope-blocked — mate exists, wrong ring: "
+      +scoped.slice(0,2).map(i=>i.nd.type+"."+i.port).join(", ")+(scoped.length>2?"…":""));
   if(dead.length) parts.push("✕ "+dead.length+" with no mate on the board: "
       +dead.slice(0,2).map(i=>i.nd.type+"."+i.port).join(", ")+(dead.length>2?"…":""));
   if(STARVED.size) parts.push(STARVED.size+" node"+(STARVED.size===1?"":"s")+" downstream run on nothing");
@@ -1962,20 +2080,29 @@ function startWireDrag(n,dir,name,e){
   const scopePathOf=m=>{const q=[];let sc=m._parentScope;while(sc){q.unshift(sc.id);sc=sc._parentScope;}return q;};
   const srcScope=scopePathOf(n);
   const cands=[];
+  const blocked=[];   // kind-compatible, ring-refused — shown, not hidden
   for(const nd of G.nodes){
     if(!nd.el) continue;
     let any=false;
     for(const pe of nd.el.querySelectorAll(".port")){
       if(pe.closest(".node")!==nd.el) continue;
-      let ok=nd.id!==n.id&&pe.dataset.dir!==dir&&kindsCompatible(srcKind,nodeKindOf(nd,pe.dataset.dir,pe.dataset.port));
-      if(ok){
-        // data flows lateral or inward, never outward — same rule as the drop
+      const kindOk=nd.id!==n.id&&pe.dataset.dir!==dir&&kindsCompatible(srcKind,nodeKindOf(nd,pe.dataset.dir,pe.dataset.port));
+      // Containment is a SEPARATE question from kind. A port that matches on
+      // kind but sits in a ring this cable cannot reach used to be pruned
+      // silently — indistinguishable from a port that does not match at all.
+      // That is the scope impedance: the types line up and the frames do not,
+      // and nothing on screen said so. It is shown REFUSED now, not hidden.
+      let scopeOk=true;
+      if(kindOk){
         const dp=scopePathOf(nd), sp=srcScope;
         const a=dir==="out"?sp:dp, b=dir==="out"?dp:sp;
-        if(!(a.length<=b.length&&a.every((v,ix)=>b[ix]===v))) ok=false;
+        scopeOk=a.length<=b.length&&a.every((v,ix)=>b[ix]===v);
       }
+      const ok=kindOk&&scopeOk;
       pe.classList.toggle("mateable",ok);
+      pe.classList.toggle("scopeblock",kindOk&&!scopeOk);
       if(ok){ any=true; cands.push({nd,pe,port:pe.dataset.port,pdir:pe.dataset.dir}); }
+      else if(kindOk){ any=true; blocked.push({nd,pe,port:pe.dataset.port,pdir:pe.dataset.dir}); }
     }
     nd.el.classList.toggle("nomate",!any&&nd.id!==n.id);
   }
@@ -1994,9 +2121,23 @@ function startWireDrag(n,dir,name,e){
     wiresSvg.insertBefore(g,wiresSvg.firstChild); // behind the live cable
     ghosts.push({...c,g,b});
   }
+  // …and the refused ones, so the impedance is visible rather than absent.
+  if(anchor) for(const c of blocked){
+    const b=portCenter(c.nd.id,c.pdir,c.port); if(!b) continue;
+    const g=document.createElementNS("http://www.w3.org/2000/svg","path");
+    g.classList.add("cand","blocked");
+    g.setAttribute("d", dir==="out"?bez(anchor,b):bez(b,anchor));
+    wiresSvg.insertBefore(g,wiresSvg.firstChild);
+    ghosts.push({...c,g,b,blocked:true});
+  }
+  if(blocked.length) $("#status").textContent =
+    blocked.length+" kind-compatible port"+(blocked.length===1?" is":"s are")+
+    " out of ring — data flows lateral or inward; thread through scope.in/scope.out";
+
   // THE SHAKE: when exactly one legal mate survives, the drag has only one
   // meaning left. Say so now, and land it on release without a menu.
-  const only=ghosts.length===1?ghosts[0]:null;
+  const live=ghosts.filter(g=>!g.blocked);
+  const only=live.length===1?live[0]:null;
   if(only){
     only.g.classList.add("only");
     only.pe.classList.add("mate-only");
@@ -2011,6 +2152,7 @@ function startWireDrag(n,dir,name,e){
     // dense fan still reads as one intention rather than a hairball
     let best=null,bd=Infinity;
     for(const gh of ghosts){
+      if(gh.blocked) continue;                 // never lead the eye to a refusal
       const d=(gh.b.x-m.x)**2+(gh.b.y-m.y)**2;
       if(d<bd){bd=d;best=gh;}
     }
@@ -2021,6 +2163,7 @@ function startWireDrag(n,dir,name,e){
     path.remove();
     document.body.classList.remove("wiring");
     document.querySelectorAll(".port.mateable").forEach(x=>x.classList.remove("mateable"));
+    document.querySelectorAll(".port.scopeblock").forEach(x=>x.classList.remove("scopeblock"));
     document.querySelectorAll(".port.mate-only").forEach(x=>x.classList.remove("mate-only"));
     document.querySelectorAll(".node.nomate").forEach(x=>x.classList.remove("nomate"));
     for(const gh of ghosts) gh.g.remove();
@@ -2928,6 +3071,7 @@ async function syncContracts(){
       for(const k in (c.params||{})){
         const d=c.params[k]||{};
         p[k]={v:d.v??"", opts:(d.opts&&d.opts.length)?d.opts:undefined,
+              optsFrom:d.optsFrom||undefined,
               ta:d.ta||undefined, ph:d.ph||undefined,
               cols:(d.cols&&d.cols.length)?d.cols:undefined};
       }

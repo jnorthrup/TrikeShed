@@ -363,12 +363,12 @@ class KanbanModule : ForgeModule {
                     "cardinality" to c.cardinality.mapValues { it.value.name }, "functions" to c.functions,
                     "params" to c.params.mapValues { p ->
                         mapOf(
-                            "v" to p.value.v, "opts" to p.value.opts,
+                            "v" to p.value.v, "opts" to p.value.opts, "optsFrom" to p.value.optsFrom,
                             "ta" to p.value.ta, "ph" to p.value.ph,
                             "cols" to p.value.cols,
                         )
                     },
-                    "source" to c.isSource, "sink" to c.isSink, "wide" to c.wide,
+                    "source" to c.isSource, "sink" to c.isSink, "wide" to c.wide, "effect" to c.isEffect,
                 ) },
             )))
         }
