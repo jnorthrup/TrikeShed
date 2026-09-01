@@ -2853,20 +2853,32 @@ async function openGallery(){
       fetch("/api/panels").then(r=>r.json()).catch(()=>({panels:[]})),
     ]);
     const rows=[];
-    rows.push('<div style="color:var(--dim,#7f91a9);margin:4px 0">examples — pick one, then change it</div>');
     const esc=s=>String(s??"").replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
-    for(const p of (pr.presets||[])){
-      const doc=p.document||{}, nn=(doc.nodes||[]).length;
-      // What a person needs before adopting it: what it does, what it needs
-      // first, what they will see, and the one knob to turn. Server-authored.
-      rows.push(
-        '<div class="galRow" data-kind="preset" data-name="'+p.name+'" style="padding:7px 8px;border:1px solid var(--line,#263348);border-radius:6px;margin:5px 0;cursor:pointer">'+
+    /* Two groups, and the order is the whole point. A preset that needs a
+       provider key is not a worse example — it is a DIFFERENT PROMISE, and
+       putting it first means a person's first click can fail for reasons that
+       have nothing to do with this canvas. The ones that run on nothing go
+       first, and the rest are honestly labelled rather than hidden. */
+    const needsKey=p=>/provider key|model provider/i.test(p.needs||"");
+    const all=pr.presets||[];
+    const card=p=>{
+      const nn=((p.document||{}).nodes||[]).length;
+      return '<div class="galRow" data-kind="preset" data-name="'+p.name+'" style="padding:7px 8px;border:1px solid var(--line,#263348);border-radius:6px;margin:5px 0;cursor:pointer">'+
         '<div style="font-weight:600">'+esc(p.title||p.name)+' <span style="color:var(--dim,#7f91a9);font-weight:400">· '+nn+' parts</span></div>'+
         (p.does?'<div style="margin-top:3px">'+esc(p.does)+'</div>':'')+
         (p.needs?'<div style="margin-top:3px;color:var(--dim,#7f91a9)"><b>needs</b> '+esc(p.needs)+'</div>':'')+
         (p.see?'<div style="color:var(--dim,#7f91a9)"><b>you see</b> '+esc(p.see)+'</div>':'')+
         (p.tweakFirst?'<div style="color:var(--dim,#7f91a9)"><b>change first</b> '+esc(p.tweakFirst)+'</div>':'')+
-        '</div>');
+        '</div>';
+    };
+    const free=all.filter(p=>!needsKey(p)), keyed=all.filter(needsKey);
+    rows.push('<div style="color:var(--ok,#3ddc84);margin:4px 0;font-weight:600">runs now · nothing to set up</div>');
+    for(const p of free) rows.push(card(p));
+    if(keyed.length){
+      rows.push('<div style="color:var(--warn,#ffb02e);margin:12px 0 2px;font-weight:600">needs a provider key</div>');
+      rows.push('<div style="color:var(--dim,#7f91a9);margin:0 0 4px">These call a model. If none of your keys answer, that is the provider, '+
+        'not the canvas — the daemon records every attempt in <code>brain-errors.jsonl</code>.</div>');
+      for(const p of keyed) rows.push(card(p));
     }
     rows.push('<div style="color:var(--dim,#7f91a9);margin:8px 0 4px">store — your saved programs</div>');
     const panels=st.panels||[];

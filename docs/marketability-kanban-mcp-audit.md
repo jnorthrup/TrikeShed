@@ -424,3 +424,51 @@ Until then, this page is the consolidated audit and proposed task manifest;
 - [MCP 2026-07-28 specification](https://modelcontextprotocol.io/specification/2026-07-28)
   and official release notes, used for the stateless request, discovery,
   resource, tool, cache, and authorization contract
+
+## Addendum 2026-08-31 — the model half has never worked, and that decides the packaging
+
+Not an opinion. The daemon keeps a timestamped record of every model attempt at
+`<forge-home>/brain-errors.jsonl`, and on this machine it reads:
+
+| attempts | successes | providers tried |
+|---:|---:|---|
+| 14 | **0** | `override` — every single one |
+
+Two distinct failures, not one quota story:
+
+- `HTTP 400 code 1213` — *"The prompt parameter was not received normally"* (×4).
+  A request-shaping bug on our side, not the provider's.
+- `HTTP 429 code 1305` — service overloaded (×10). One provider, repeatedly.
+
+Meanwhile `keys.status` resolves **seven** providers with keys present (openai,
+xai, google, gemini, deepseek, nvidia, openrouter), and `mux.meta` reports
+`selection: null` — capability routing has never selected anything.
+
+The cause is one line. `BrainClient.kt:184`:
+
+```kotlin
+apiKey != null -> listOf(EndpointSpec("override", "BRAIN_OVERRIDE", base, model))
+```
+
+When an override key resolves, the endpoint list collapses to a **singleton**.
+The roster is discarded by construction, so there is no failover: one overloaded
+provider means no model call in the product can succeed, and requesting a
+different `model` does not escape it — asking for deepseek, nvidia or gpt-5
+still times out against the same pinned endpoint, retrying with backoff.
+
+### What that settles
+
+The marketable path is the model-free set, and this is now evidence rather than
+preference. Eight presets promise "Nothing — it runs as it is" and all eight
+keep that promise; the operator who reported this uses `preset-hermes` daily and
+has never once seen a model complete. A gallery that leads with model-dependent
+examples spends a newcomer's first click on a failure that has nothing to do
+with LCNC, the board, or the daemon.
+
+So the gallery groups: **runs now · nothing to set up** first, **needs a
+provider key** second and honestly labelled, pointing at `brain-errors.jsonl` so
+the failure is attributable instead of mysterious.
+
+The override pin itself is deliberate (the single-file GLM convention) and is
+NOT changed here — that is a design decision, carded as MUX-01, not a patch to
+make unilaterally. What is changed is that it no longer gates first value.
