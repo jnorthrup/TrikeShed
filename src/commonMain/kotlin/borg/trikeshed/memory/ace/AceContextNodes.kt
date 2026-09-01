@@ -26,8 +26,18 @@ object AceContextNodes {
      */
     fun registry(blackboard: ConfixBlackboard? = null): Map<String, LcncNodeRunner> = mapOf(
         "context.fold" to LcncNodeRunner { _, inputs ->
-            val bulletsJson = inputs["bullets"]?.toString() ?: "[]"
-            val parsed = (runCatching { JsonSupport.parse(bulletsJson) }.getOrNull() as? List<*>).orEmpty()
+            // A wired json port arrives ALREADY PARSED. toString()-ing it gave
+            // Kotlin's own map form — `[{id=1.0, content=…}]` — which is not
+            // JSON, so re-parsing threw "malformed open quote in id=1.0" and the
+            // fold silently folded nothing. Take the structure when it is handed
+            // one; parse only when handed text.
+            val raw = inputs["bullets"]
+            val parsed = when (raw) {
+                is List<*> -> raw
+                is String -> (runCatching { JsonSupport.parse(raw) }.getOrNull() as? List<*>).orEmpty()
+                null -> emptyList<Any?>()
+                else -> (runCatching { JsonSupport.parse(raw.toString()) }.getOrNull() as? List<*>).orEmpty()
+            }
             val deltas = parsed.mapNotNull { raw ->
                 val m = raw as? Map<*, *> ?: return@mapNotNull null
                 val id = (m["id"] as? Number)?.toInt()

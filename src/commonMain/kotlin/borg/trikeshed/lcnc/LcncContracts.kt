@@ -361,6 +361,15 @@ object LcncContracts {
             emptyList(), listOf("value"),
             outputKinds = mapOf("value" to "text"),
             params = mapOf("value" to LcncPortContract.LcncParamSpec(ph = "the text this node emits"))),
+        // …and its json twin. Mating is exact kind equality, so `text` could
+        // never reach a json socket: bullets, fields, args, command, facts had
+        // NO hand-authorable source at all, and every preset that needed one
+        // shipped with the socket empty. This is that source.
+        LcncPortContract("json.value", "json literal",
+            emptyList(), listOf("value"),
+            outputKinds = mapOf("value" to "json"),
+            params = mapOf("value" to LcncPortContract.LcncParamSpec(
+                v = "[]", ta = true, ph = "the json this node emits — edit me"))),
 
         // ── LCNC composition ─────────────────────────────────────────
         LcncPortContract("dom.board", "draggable grouped board (generic)",

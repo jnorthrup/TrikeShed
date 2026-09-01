@@ -634,6 +634,14 @@ finally:
   "text.value": {
     async run(n){ return {value:p(n,"value")}; },
   },
+  "json.value": {
+    async run(n){
+      const raw=(p(n,"value")||"").trim();
+      if(!raw) return {value:[]};
+      try{ return {value:JSON.parse(raw)}; }
+      catch(e){ return {error:"json.value: not valid json"}; }
+    },
+  },
   "button": {
     // press is an EDGE: it exists on the run its click fired, then it's gone
     async run(n){ const t=n._pressedAt; n._pressedAt=null; return t?{press:t}:{}; },

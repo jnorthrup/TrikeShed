@@ -114,6 +114,14 @@ object CouncilProgram {
      * config, same bytes — and carries no kanban graph: the concentric walk
      * IS the orchestration.
      */
+    /** What the council argues about when a caller binds no `document`. */
+    const val DEFAULT_MATTER: String =
+        "In re Wilkins v. Datacorp, 412 F.3d 118 (9th Cir. 2021). Movant seeks " +
+        "summary judgment on the breach claim, arguing the limitation of liability " +
+        "clause in section 7.2 bars consequential damages. Respondent contends " +
+        "section 7.2 is unconscionable under Cal. Civ. Code 1670.5 and that the " +
+        "damages sought are direct, not consequential."
+
     fun build(config: CouncilConfig): LcncProgram {
         require(config.panels.size in 1..8) {
             "council panels out of bounds: ${config.panels.size} (allowed 1..8)"
@@ -166,7 +174,14 @@ object CouncilProgram {
         var lane = 0
         fun laneX(): Double = colX(0) + (lane++) * 260.0
 
-        nodes.add(LcncNode("in.doc", "scope.in", params = mapOf("name" to "document"), x = laneX(), y = 40.0))
+        // A DEFAULT, so the council convenes on something when you just press
+        // run. `document` is still the frame binding a caller overrides through
+        // POST /api/lcnc/run {"inputs":{"document":"…"}} — the default only
+        // decides what it argues about when nobody said.
+        nodes.add(LcncNode("in.doc", "scope.in", params = mapOf(
+            "name" to "document",
+            "default" to DEFAULT_MATTER,
+        ), x = laneX(), y = 40.0))
         nodes.add(LcncNode("in.case", "scope.in", params = mapOf("name" to "caseId?", "default" to config.caseId), x = laneX(), y = 40.0))
         // No value→text? wire from in.doc: scope.in's value is json-kinded and
         // legal.ingest's text? is text-kinded (the preset kind gate refuses the

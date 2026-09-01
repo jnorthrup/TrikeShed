@@ -1,5 +1,7 @@
 package borg.trikeshed.lcnc
 
+import borg.trikeshed.parse.json.JsonSupport
+
 /**
  * Server-side runners for the pure/presentation node types the panels canvas
  * executes in-browser. Registered in the daemon so a stored program authored
@@ -58,6 +60,37 @@ object PureNodes {
                 }
             }
             mapOf("lines" to lines)
+        },
+        // The two literals. text.value had a contract and no server runner at
+        // all, so a stored program that fed a url or a prompt through one went
+        // silent the moment it ran headless — the canvas was the only place it
+        // worked. Both run everywhere now.
+        "text.value" to LcncNodeRunner { node, _ -> mapOf("value" to (node.params["value"] ?: "")) },
+        "json.value" to LcncNodeRunner { node, _ ->
+            val raw = (node.params["value"] ?: "").trim()
+            // A literal that will not parse must say so rather than quietly
+            // emitting nothing: an empty socket downstream is the exact failure
+            // this node exists to end.
+            if (raw.isEmpty()) mapOf("value" to emptyList<Any?>())
+            else runCatching { mapOf("value" to JsonSupport.parse(raw)) }
+                .getOrElse { mapOf("error" to "json.value: not valid json") }
+        },
+        // The list widget's value. It had a contract and a canvas runner and no
+        // server runner, so preset-pairs answered "no runner registered for node
+        // type 'list.pairs'" the moment it ran anywhere but a browser.
+        "list.pairs" to LcncNodeRunner { node, _ ->
+            val raw = (node.params["pairs"] ?: "").trim()
+            if (raw.isEmpty()) mapOf("pairs" to emptyList<Any?>())
+            else runCatching { mapOf("pairs" to JsonSupport.parse(raw)) }
+                .getOrElse { mapOf("error" to "list.pairs: not valid json") }
+        },
+        // Gesture sources. A press is an EDGE that only exists when a person
+        // makes it, so headless they emit NOTHING — but they must still RUN, or
+        // a graph containing a button dies at load instead of simply sitting
+        // idle. `js` stays unregistered on purpose; these do not shape anything.
+        "button" to LcncNodeRunner { _, _ -> emptyMap() },
+        "slider" to LcncNodeRunner { node, _ ->
+            mapOf("value" to ((node.params["value"] ?: "0").toDoubleOrNull() ?: 0.0))
         },
         "dom.board" to LcncNodeRunner { _, inputs -> mapOf("rendered" to inputs["groups"]) },
         "sheet.concentric" to LcncNodeRunner { _, inputs -> mapOf("rendered" to inputs["board"]) },
