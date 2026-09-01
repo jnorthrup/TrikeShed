@@ -30,6 +30,7 @@ class PresetAssemblyTest {
                 "preset-pairs", "preset-brain-mux", "preset-media",
                 "preset-hermes-train", "preset-legal-tribunal", "preset-state-freeze",
                 "preset-council", "preset-bughunter", "preset-subvm-audit",
+                "preset-turbohaul",
             ),
             all.keys,
         )

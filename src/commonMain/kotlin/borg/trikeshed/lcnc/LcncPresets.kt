@@ -164,8 +164,9 @@ object LcncPresets {
         ),
         LcncPresetInfo(
             "preset-turbohaul", "Turbohaul, as an org chart (STRAWMAN)",
-            does = "Draws turbohaul-manager's admission → staging → resident → engine pipeline as rings, " +
-                "with modelmux standing in for the llama.cpp sidecars and keymux for the admission gate.",
+            does = "Draws the turbohaul manager's pipeline as rings — requests are admitted, staged by " +
+                "role, then handed to a resident — with modelmux standing in for the engine processes " +
+                "and keymux as the gate that admits them.",
             needs = "Nothing to look at it. A provider key only if you run the resident seat at the end.",
             see = "A wave of requests admitted, grouped by role into staging lanes, and the resident set " +
                 "modelmux will actually route to — the org chart and the real roster side by side.",
@@ -402,12 +403,6 @@ object LcncPresets {
             nodes = listOf(
                 LcncNode("n0", LcncContracts.SCOPE_IN,
                     params = mapOf("name" to "text", "default" to "hello"), x = 40.0, y = 60.0),
-                // args? is how a ring is CALLED — the bindings the frame opens
-                // with. Empty, the demo proved only that a default survives two
-                // rings; with args it proves a caller's value does.
-                LcncNode("a1", "json.value",
-                    params = mapOf("value" to """{"text":"hello from the caller"}"""),
-                    x = 40.0, y = 160.0),
                 LcncNode("r1", LcncContracts.SCOPE, x = 260.0, y = 40.0,
                     children = listOf(
                         LcncNode("r2", LcncContracts.SCOPE, x = 40.0, y = 40.0,
@@ -420,12 +415,18 @@ object LcncPresets {
                     ).toSeries()),
                 LcncNode("out", LcncContracts.SCOPE_OUT,
                     params = mapOf("name" to "result"), x = 540.0, y = 60.0),
+                // scope.args? and scope.when? stay EMPTY here on purpose. This preset
+                // is the one that runs through the default loader with ZERO
+                // registered runners — pure ring machinery, nothing to execute.
+                // Wiring a literal into args? adds a node type that needs a
+                // runner and destroys exactly the property the preset exists to
+                // prove. The caller's binding is demonstrated in preset-turbohaul
+                // instead, which has runners anyway.
                 LcncNode("n3", "note",
                     params = mapOf("text" to "the concentric machine, three rings, one document.\nn0 (scope.in, default=hello) is consumed TWO rings deep\nby a single wire — inner sees outer, zero re-plumbing.\nyields climb out ring by ring through scope.out —\nonly the yield crosses; locals die at their ring."),
                     x = 40.0, y = 260.0),
             ).toSeries(),
             wires = listOf(
-                LcncWire("a1", "value", "r1", "args?"),
                 LcncWire("n0", "value", "p", "value"),
                 LcncWire("r2", "result", "q", "value"),
                 LcncWire("r1", "result", "out", "value"),

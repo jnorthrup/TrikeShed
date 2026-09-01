@@ -32,9 +32,15 @@ class LcncMatingTest {
         val timer = LcncNode("n1", "timer")
         val program = LcncProgram("t", listOf(timer).toSeries(), emptySeriesOf())
         val ranked = LcncMating.rankedCandidates(program, "n1", "tick", presetCorpus())
-        // ccek.incarnate joined the evidenced set with preset-ccek (timer.tick →
-        // ccek.incarnate.trigger?) — the menu leads with whatever the corpus wires.
-        val evidenced = setOf("kanban.activeSheets", "board.get", "beliefs.introspect", "ccek.incarnate")
+        // The menu leads with whatever the corpus actually wires, so this set is
+        // a FACT ABOUT THE PREFABS and moves when they do. It grew when the
+        // prefabs' empty sockets were filled: turbohaul ticks keymux and
+        // modelmux, hermes-train ticks the decay pulse, brain-mux ticks the
+        // model-presence panel it was previously never refreshing.
+        val evidenced = setOf(
+            "kanban.activeSheets", "board.get", "beliefs.introspect", "ccek.incarnate",
+            "state.freeze", "keys.status", "mux.meta", "mux.models", "nal.decay",
+        )
         val head = ranked.take(evidenced.size).map { it.type }.toSet()
         assertEquals(evidenced, head,
             "the corpus-evidenced targets lead the menu: ${ranked.map { it.type }}")
