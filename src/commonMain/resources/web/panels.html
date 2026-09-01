@@ -230,16 +230,37 @@ body.wiring .port.mateable{
    whole board (add a node — nothing here can ever feed it) is a different
    problem from one that simply lost this pass or sat out of reach (move it
    closer, or shift-shake). Three states, because there are three answers. */
-.port.v-ok,.port.v-dead,.port.v-open{transform:translateY(-50%) scale(1.75);z-index:4}
-.port.v-ok::after,.port.v-dead::after,.port.v-open::after{
-  position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
-  font-size:7px;line-height:1;font-weight:700;pointer-events:none;font-family:var(--sans)}
 .port.v-ok{background:var(--ok)!important;border-color:var(--ok)!important}
-.port.v-ok::after{content:"✓";color:#06301a}
 .port.v-dead{background:var(--err)!important;border-color:var(--err)!important}
-.port.v-dead::after{content:"✕";color:#2a0507}
 .port.v-open{background:var(--warn)!important;border-color:var(--warn)!important}
-.port.v-open::after{content:"?";color:#2e1c00}
+/* THE VERDICT LAYER. A 7px glyph inside a 10px socket is a footnote; a shake
+   across a 98-node graph needs to be readable at the zoom you actually inspect
+   a graph from. These are real verdicts — every mark is computed, none is
+   decoration — but they are allowed to be loud about it, and they land one
+   after another so a shake reads as a pass over the graph rather than a
+   silent repaint. */
+#verdicts{position:absolute;left:0;top:0;pointer-events:none;z-index:6}
+.vmark{position:absolute;width:28px;height:28px;margin:-14px 0 0 -14px;border-radius:50%;
+  display:flex;align-items:center;justify-content:center;
+  font:800 16px/1 var(--sans);transform:scale(0);
+  animation:vpop .32s cubic-bezier(.2,1.7,.35,1) both}
+@keyframes vpop{
+  0%{transform:scale(0) rotate(-30deg);opacity:0}
+  65%{transform:scale(1.3) rotate(5deg);opacity:1}
+  100%{transform:scale(1) rotate(0);opacity:1}}
+.vmark.ok{background:var(--ok);color:#03210d;
+  box-shadow:0 0 0 3px rgba(61,220,132,.22),0 0 18px 2px rgba(61,220,132,.5)}
+.vmark.dead{background:var(--err);color:#2b0406;
+  box-shadow:0 0 0 3px rgba(255,85,96,.22),0 0 18px 2px rgba(255,85,96,.55)}
+.vmark.open{background:var(--warn);color:#2b1a00;
+  box-shadow:0 0 0 3px rgba(255,176,46,.22),0 0 16px 2px rgba(255,176,46,.45)}
+/* the unsolvable ones keep asking: nothing on the board can close them */
+.vmark.dead::after{content:"";position:absolute;inset:-3px;border-radius:50%;
+  border:2px solid var(--err);animation:vthrob 1.5s ease-out infinite}
+@keyframes vthrob{0%{transform:scale(1);opacity:.85}100%{transform:scale(1.9);opacity:0}}
+@media (prefers-reduced-motion:reduce){
+  .vmark{animation-duration:.01s}
+  .vmark.dead::after{animation:none;opacity:.5}}
 /* STARVED REACH: a required input nobody feeds does not fail alone. Everything
    downstream of it runs on nothing and reports success — which is exactly how
    preset-context shipped a fold with no bullets and a green test suite. Show
@@ -1645,6 +1666,7 @@ function redraw(){
   // endpoints are the truth: a cable into a deeply nested, zoomed ring can sit
   // outside anything the node coordinates above predicted.
   if(ends.length&&growWireBox(ends)) applyWireBox();
+  positionVerdicts();
 }
 let dragWire=null;
 /* TREESHAKE — the whole graph, not one cable.
@@ -1659,11 +1681,44 @@ let dragWire=null;
    save() and therefore one undo. */
 const SHAKE_REACH=340;   // world units; past this it is a guess, not a mate
 let STARVED=new Set();   // node ids whose reach runs on nothing (redraw paints their cables)
+let VERDICTS=[];       // [{nodeId,dir,port,cls}] — the shaken sockets and their outcome
+function verdictLayer(){
+  let L=document.getElementById("verdicts");
+  if(!L){ L=document.createElement("div"); L.id="verdicts"; world.appendChild(L); }
+  return L;
+}
 function clearVerdicts(){
   document.querySelectorAll(".port.v-ok,.port.v-dead,.port.v-open")
     .forEach(e=>e.classList.remove("v-ok","v-dead","v-open"));
   document.querySelectorAll(".node.starved").forEach(e=>e.classList.remove("starved"));
-  STARVED=new Set();
+  verdictLayer().textContent="";
+  VERDICTS=[]; STARVED=new Set();
+}
+/* Build the badges once, staggered, so the pass reads as a pass. */
+function buildVerdicts(){
+  const L=verdictLayer(); L.textContent="";
+  VERDICTS.forEach((v,i)=>{
+    const c=portCenter(v.nodeId,v.dir,v.port); if(!c) return;
+    const d=document.createElement("div");
+    d.className="vmark "+v.cls;
+    d.textContent=v.cls==="ok"?"✓":v.cls==="dead"?"✕":"?";
+    d.style.left=c.x+"px"; d.style.top=c.y+"px";
+    d.style.animationDelay=(i*55)+"ms";
+    d.title=v.label||"";
+    L.appendChild(d); v.el=d;
+  });
+}
+/* Re-anchor on redraw — cheap, and it keeps a badge on its socket when the
+   node it belongs to is dragged. Rebuilding here would restart every animation
+   on every pointermove. */
+function positionVerdicts(){
+  if(!VERDICTS.length) return;
+  for(const v of VERDICTS){
+    if(!v.el) continue;
+    const c=portCenter(v.nodeId,v.dir,v.port);
+    if(c){ v.el.style.left=c.x+"px"; v.el.style.top=c.y+"px"; v.el.style.display=""; }
+    else v.el.style.display="none";
+  }
 }
 /* mark one of a node's OWN ports (a ring's DOM holds its children's ports too) */
 function markPort(nd,dir,port,cls){
@@ -1737,7 +1792,10 @@ function treeshake(opts){
     G.wires.push({from:[pr.o.nd.id,pr.o.port],to:[pr.i.nd.id,pr.i.port]});
     made.push(pr);
   }
-  const stillOpen=openIns.filter(i=>i.req&&!tookIn.has(KEY(i.nd.id,bare(i.port))));
+  // EVERY socket the shake looked at gets a verdict, not just the required ones.
+  // Filtering to req here meant an optional port that nothing could close sat
+  // unmarked — indistinguishable, on the board, from one that was closed.
+  const stillOpen=openIns.filter(i=>!tookIn.has(KEY(i.nd.id,bare(i.port))));
   // Does a mate exist ANYWHERE on the board, ignoring reach and the greedy
   // contest? That is the line between "move it closer" and "nothing here can
   // ever feed this".
@@ -1747,11 +1805,22 @@ function treeshake(opts){
   const reachable=stillOpen.filter(hasAnyMate);
   if(made.length){ redraw(); save(); }
   clearVerdicts();
-  for(const pr of made) markPort(pr.i.nd,"in",pr.i.port,"v-ok");
-  for(const i of dead) markPort(i.nd,"in",i.port,"v-dead");
-  for(const i of reachable) markPort(i.nd,"in",i.port,"v-open");
+  // Ordered so the pass tells a story as it lands: what closed, then what is
+  // merely out of reach, then what nothing here can ever close.
+  for(const pr of made){ markPort(pr.i.nd,"in",pr.i.port,"v-ok");
+    VERDICTS.push({nodeId:pr.i.nd.id,dir:"in",port:pr.i.port,cls:"ok",
+      label:"closed by "+pr.o.nd.type+"."+pr.o.port}); }
+  for(const i of reachable){ markPort(i.nd,"in",i.port,"v-open");
+    VERDICTS.push({nodeId:i.nd.id,dir:"in",port:i.port,cls:"open",
+      label:"a legal mate exists, but not within "+SHAKE_REACH+"px"}); }
+  for(const i of dead){ markPort(i.nd,"in",i.port,"v-dead");
+    VERDICTS.push({nodeId:i.nd.id,dir:"in",port:i.port,cls:"dead",
+      label:"no kind-compatible mate anywhere on this board"}); }
+  buildVerdicts();
   // the dead reach: every node downstream of a required input nobody feeds
-  STARVED=starvedReach(stillOpen.map(i=>i.nd.id));
+  // Starvation still seeds from REQUIRED holes only: an optional port left open
+  // is a choice, and a node is not running on nothing because you declined one.
+  STARVED=starvedReach(stillOpen.filter(i=>i.req).map(i=>i.nd.id));
   for(const id of STARVED){ const nd=G.nodes.find(x=>x.id===id); if(nd&&nd.el) nd.el.classList.add("starved"); }
   if(STARVED.size) redraw();   // repaint so the starved cables pick up their class
   // The numbers name the three verdicts now on the board, so the status line
