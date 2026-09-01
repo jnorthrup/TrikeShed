@@ -105,7 +105,7 @@ fun Cursor.zoom(vararg path: CharSequence): Cursor {
  * Zooms into a nested cursor at the specified column name.
  * Flattening all nested cursors into a single continuous Cursor lazily.
  */
-fun Cursor.zoom(path: String): Cursor {
+fun Cursor.zoom(path: CharSequence): Cursor {
     if (this.size == 0) return emptySeries()
     
     val firstRow = this.b(0)

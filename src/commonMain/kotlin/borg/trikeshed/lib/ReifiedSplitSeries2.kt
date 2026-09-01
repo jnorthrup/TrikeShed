@@ -68,7 +68,12 @@ class ReifiedSplitSeries2<A, B>(val leftSeries: Series<A>, val rightSeries: Seri
         fun <A> invoke(twin: Series<Twin<A>>): ReifiedSplitSeries2<A, A> =
             ReifiedSplitSeries2(twin.right, twin.left)
 
-        fun <A, B> Series2<A, B>.reify(): ReifiedSplitSeries2<A, B> = ReifiedSplitSeries2<A, B>(this).reify()
+        // Join is covariant now, so Twin<Series<A>> and Series<Twin<A>> are no
+        // longer distinguishable here by overload resolution. Name the
+        // constructor directly instead of recursing through an extension that
+        // three signatures can claim.
+        fun <A, B> Series2<A, B>.reify(): ReifiedSplitSeries2<A, B> =
+            ReifiedSplitSeries2<A, B>(this α { it.a }, this α { it.b })
         @JvmName("reifyTwinSeries")
         fun <A> Twin<Series<A>>.reify(): ReifiedSplitSeries2<A, A> = ReifiedSplitSeries2(this.a, this.b)
         @JvmName("reifySeriesTwin")

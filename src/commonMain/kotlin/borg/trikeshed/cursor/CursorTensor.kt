@@ -226,7 +226,7 @@ object CursorTensorReifier {
         else -> false
     }
 
-   fun Any?.toTensorDouble(columnName: String, row: Int, column: Int): Double = when (this) {
+   fun Any?.toTensorDouble(columnName: CharSequence, row: Int, column: Int): Double = when (this) {
         null -> Double.NaN
         is Double -> this
         is Float -> toDouble()

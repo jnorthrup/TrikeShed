@@ -38,7 +38,7 @@ inline fun <V> Cursor.toTrie(key: ColK<*>, m: Monoid<V>, crossinline value: (Row
     Trie<Char, V>(m).also { t -> for (i in 0 until size) { val row = this[i]; t.add(row.charKey(key), value(row)) } }
 
 /** A Level rendered as a two-column Cursor: [prefix: String, name: V]. */
-fun <V> Level<Char, V>.toCursor(name: String = "value"): Cursor = size j { i ->
+fun <V> Level<Char, V>.toCursor(name: CharSequence = "value"): Cursor = size j { i ->
     val node = this[i]
     cellsToRowVec(
         cells = seriesOfAny(listOf(node.a.toList().joinToString(""), node.b)),

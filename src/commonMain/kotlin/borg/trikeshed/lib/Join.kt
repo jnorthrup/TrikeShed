@@ -6,7 +6,7 @@ package borg.trikeshed.lib
  * The base binary composition — a product type with two properties and nothing else.
  * Lower memory footprint and better cache working set than any JVM data class.
  */
-interface Join<A, B> {
+interface Join<out A, out B> {
     val a: A
     val b: B
     operator fun component1(): A = a
