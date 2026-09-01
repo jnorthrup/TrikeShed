@@ -152,31 +152,30 @@ class ByteSeries(
             return h
         }
 
+    /**
+     * CONTENT, over the window. Identity used to fold in pos, limit and mark —
+     * so advancing a cursor silently made a value a different value, which is an
+     * undeclared effect on a type whose whole point is that effects are
+     * declared. It also compared the entire backing buffer while [cacheCode]
+     * hashed only pos..limit, so equal-hashing values could compare unequal.
+     * Both halves now ask the same question: are these the same characters.
+     */
     override fun equals(other: Any?): Boolean {
-        when {
-            this === other -> return true
-            other !is ByteSeries -> return false
-            pos != other.pos -> return false
-            limit != other.limit -> return false
-            mark != other.mark -> return false
-            size != other.size -> return false
-            else -> {
-                for ((x, y) in this.`▶`.zip(other.`▶`)) if (x != y) return false
-                return true
-            }
-        }
+        if (this === other) return true
+        if (other !is ByteSeries) return false
+        if (rem != other.rem) return false
+        for (i in 0 until rem) if (b(pos + i) != other.b(other.pos + i)) return false
+        return true
     }
 
-    /** idempotent, a cache can contain this hash and safely deduce the result from previous inserts */
-    override fun hashCode(): Int {
-        var result = pos
-        result = 31 * result + limit
-        result = 31 * result + mark
-        result = 31 * result + size
-//include cachecode
-        result = 31 * result + cacheCode
-        return result
-    }
+    /**
+     * The content hash, and only that — so the value is a usable key. It folded
+     * pos/limit/mark, all `var`, which made every instance an unstable key: put
+     * one in a map, advance it, and the entry is unreachable. That is why the
+     * soft-referenced token memo this hash was written for could never hit on a
+     * repeated token — the cursor had moved by the time it came round again.
+     */
+    override fun hashCode(): Int = cacheCode
 
 
     fun asString(upto: Int = Int.MAX_VALUE): String = toArray().decodeToChars().asString().take(upto)
