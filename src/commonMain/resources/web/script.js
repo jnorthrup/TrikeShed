@@ -1317,16 +1317,34 @@
       .catch((err) => hostLogLine('! ' + err.message));
   });
 
-  const VIEWS = { doc: [docScrollEl, viewDocBtn], board: [boardScrollEl, viewBoardBtn], graph: [graphScrollEl, viewGraphBtn], sheet: [sheetScrollEl, viewSheetBtn], shape: [shapeScrollEl, viewShapeBtn], host: [hostScrollEl, viewHostBtn] };
+  const viewDocSidebarBtn = document.getElementById('btn-home');
+  const viewBoardSidebarBtn = document.getElementById('btn-board');
+  const viewGraphSidebarBtn = document.getElementById('btn-graph');
+  const viewSheetSidebarBtn = document.getElementById('btn-sheet');
+  const viewHostSidebarBtn = document.getElementById('btn-host');
+
+  const VIEWS = {
+    doc: [docScrollEl, viewDocBtn, viewDocSidebarBtn],
+    board: [boardScrollEl, viewBoardBtn, viewBoardSidebarBtn],
+    graph: [graphScrollEl, viewGraphBtn, viewGraphSidebarBtn],
+    sheet: [sheetScrollEl, viewSheetBtn, viewSheetSidebarBtn],
+    shape: [shapeScrollEl, viewShapeBtn, null],
+    host: [hostScrollEl, viewHostBtn, viewHostSidebarBtn]
+  };
+
   function setView(view) {
     mutate((s) => { s.view = view; }, 'view');
-    for (const [k, [el, btn]] of Object.entries(VIEWS)) {
+    for (const [k, [el, btn, sidebarBtn]] of Object.entries(VIEWS)) {
       el.hidden = k !== view;
       btn.classList.toggle('active', k === view);
+      if (sidebarBtn) sidebarBtn.classList.toggle('active', k === view);
+
       if (k === view) {
         btn.setAttribute('aria-current', 'page');
+        if (sidebarBtn) sidebarBtn.setAttribute('aria-current', 'page');
       } else {
         btn.removeAttribute('aria-current');
+        if (sidebarBtn) sidebarBtn.removeAttribute('aria-current');
       }
     }
     if (view === 'board') { renderBoard(); hydrateBoard(); }
