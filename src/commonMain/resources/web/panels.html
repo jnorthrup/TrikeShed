@@ -33,6 +33,18 @@ button.stop{border-color:var(--err);color:var(--err)}
 #wires path.live{stroke:var(--wire)}
 #wires path.drag{stroke:var(--graal);stroke-dasharray:6 4}
 #wires path.mismatch{stroke:var(--err)!important;stroke-dasharray:4 5;opacity:.85}
+/* candidate splines: the cable you WOULD get, drawn to every legal spot while
+   one is in hand. pointer-events:none is not optional — #wires path is
+   clickable (that is how a cable is cut), and a fan of ghosts would eat the
+   drop. */
+#wires path.cand{stroke-width:1.4;opacity:.30;stroke-dasharray:3 6;pointer-events:none}
+#wires path.cand.near{stroke-width:2.4;opacity:.85;stroke-dasharray:5 4}
+/* the shake resolved to one: this is not a candidate any more, it is the
+   answer, so it stops looking provisional */
+#wires path.cand.only{stroke-width:2.8;opacity:1;stroke-dasharray:none;
+  filter:drop-shadow(0 0 5px currentColor);animation:wireflow .5s linear infinite}
+#wires path.cand.only{stroke-dasharray:8 6}
+@media (prefers-reduced-motion:reduce){ #wires path.cand.only{animation:none;stroke-dasharray:none} }
 #wires path:hover{stroke:var(--err)}
 .node{position:absolute;min-width:190px;background:var(--panel);border:1px solid var(--line);border-radius:6px;box-shadow:0 4px 18px rgba(0,0,0,.45)}
 .node .hd{display:flex;align-items:center;gap:6px;padding:5px 8px;border-bottom:1px solid var(--line);border-radius:6px 6px 0 0;background:var(--panel2);cursor:move}
@@ -211,6 +223,17 @@ body.wiring .port.mateable{
                      0 0 18px 3px currentColor}
 }
 @media (prefers-reduced-motion:reduce){ body.wiring .port.mateable{animation:none} }
+/* the sole survivor of the shake: brighter than a candidate, because it is
+   what will happen if you simply let go */
+/* what the shake just closed, for a moment, so a whole-graph change is not a
+   silent diff you have to hunt for */
+@keyframes shookflash{0%{box-shadow:0 0 0 0 var(--ok)}100%{box-shadow:0 0 0 14px transparent}}
+.port.just-shook{border-color:var(--ok)!important;background:var(--ok)!important;animation:shookflash 1.4s ease-out}
+body.wiring .port.mate-only{
+  transform:translateY(-50%) scale(1.9);
+  box-shadow:0 0 0 4px color-mix(in srgb, currentColor 40%, transparent),0 0 22px 4px currentColor;
+  animation-duration:.7s;
+}
 /* the node that owns a live target earns a rim, so you can find it before you
    go hunting for the dot */
 body.wiring .node:has(.port.mateable){box-shadow:0 0 0 1px color-mix(in srgb, var(--wire) 55%, transparent)}
@@ -271,7 +294,7 @@ button{border-radius:6px;padding:4px 12px;transition:border-color .12s,color .12
   <button class="run" id="runBtn">▶ run</button>
   <button class="stop" id="stopBtn">■ stop timers</button>
   <button id="addBtn">+ node</button>
-  <button id="fitBtn" title="frame every node (F) — the top-level answer to the D-tab's ring fit">⤢ fit</button>
+  <button id="shakeBtn" title="treeshake: pair every OPEN port in the graph with its closest legal open mate">shake</button><button id="fitBtn" title="frame every node (F) — the top-level answer to the D-tab's ring fit">⤢ fit</button>
   <input id="panelName" placeholder="panel-name" style="background:var(--bg);border:1px solid var(--line);color:var(--ink);border-radius:4px;padding:4px 8px;font:inherit;width:120px">
   <button id="storeSaveBtn" title="save construction as a replicated store document">⇪ store</button>
   <button id="storeLoadBtn" title="load a construction from the store">⇩ store</button>
@@ -1224,6 +1247,9 @@ function kindOf(type,dir,port){
 }
 const KIND_CLASS={trigger:"t-trig",json:"t-json",text:"t-text",id:"t-id",num:"t-num"};
 function portClass(type,dir,port){ return KIND_CLASS[kindOf(type,dir,port)]||"t-any"; }
+/* one kind→colour map. It was inline in redraw(); the candidate splines need
+   the same colours, and two copies of a palette drift. */
+const KINDCOLOR={"t-text":"#6ea8fe","t-json":"#3fd0ff","t-id":"#b07aff","t-num":"#ffb02e","t-trig":"#3ddc84"};
 /* exact equality, the daemon's mating rule — with "*" (a ring parameter that
    has declared no kind) as the one generic, matching LcncTypeCheck.PortKind. */
 function kindsCompatible(a,b){ return !!a&&!!b&&(a===b||a==="*"||b==="*"); }
@@ -1500,7 +1526,7 @@ function redraw(){
     const path=document.createElementNS("http://www.w3.org/2000/svg","path");
     path.setAttribute("d",bez(a,b)); path.classList.add("live");
     const srcN=G.nodes.find(x=>x.id===wr.from[0]);
-    const tc={"t-text":"#6ea8fe","t-json":"#3fd0ff","t-id":"#b07aff","t-num":"#ffb02e","t-trig":"#3ddc84"}[srcN?portClass(srcN.type,"out",wr.from[1]):""];
+    const tc=KINDCOLOR[srcN?portClass(srcN.type,"out",wr.from[1]):""];
     if(tc) path.style.stroke=tc;
     if(!wireKindOk(wr)){
       path.classList.add("mismatch");
@@ -1513,6 +1539,84 @@ function redraw(){
   });
 }
 let dragWire=null;
+/* TREESHAKE — the whole graph, not one cable.
+   Every port that is still OPEN (an input nothing feeds, an output feeding
+   nothing) is a loose end. The shake pairs them by the two laws a drop already
+   obeys — kinds mate on exact equality, data flows lateral or inward — and then
+   takes the CLOSEST surviving pair first, because proximity on this canvas is
+   how intent is expressed: you put the parts near what they belong to.
+   Required inputs go before optional ones; a hole that stops the graph meaning
+   anything outranks a convenience port. Greedy, one wire per input, an output
+   spent once per shake so it stops being open. Everything it does is one
+   save() and therefore one undo. */
+const SHAKE_REACH=340;   // world units; past this it is a guess, not a mate
+function treeshake(opts){
+  const inclOptional=!!(opts&&opts.optional);
+  const KEY=(id,port)=>id+"\u0000"+port;
+  const bare=p=>String(p).replace("?","");
+  const fedIn=new Set(G.wires.map(w=>KEY(w.to[0],bare(w.to[1]))));
+  const usedOut=new Set(G.wires.map(w=>KEY(w.from[0],bare(w.from[1]))));
+  const scopePathOf=m=>{const q=[];let sc=m._parentScope;while(sc){q.unshift(sc.id);sc=sc._parentScope;}return q;};
+  const openIns=[],openOuts=[];
+  for(const nd of G.nodes){
+    const c=CONTRACTS[nd.type]; if(!c||!nd.el) continue;
+    for(const ip of (c.ins||[])){
+      if(fedIn.has(KEY(nd.id,bare(ip)))) continue;
+      // An OPTIONAL port left open is not a gap — it is a choice. Filling those
+      // by default is how a shake turns into vandalism: the pass would happily
+      // reach 580 units across the canvas to feed kanban.submit.command? from
+      // activeSheets.laneOrder, which is kind-legal and means nothing.
+      const req=!String(ip).endsWith("?");
+      if(!req&&!inclOptional) continue;
+      const ctr=portCenter(nd.id,"in",ip); if(!ctr) continue;
+      openIns.push({nd,port:ip,req,c:ctr,
+                    kind:nodeKindOf(nd,"in",ip),sp:scopePathOf(nd)});
+    }
+    for(const op of (c.outs||[])){
+      if(usedOut.has(KEY(nd.id,bare(op)))) continue;
+      const ctr=portCenter(nd.id,"out",op); if(!ctr) continue;
+      openOuts.push({nd,port:op,c:ctr,kind:nodeKindOf(nd,"out",op),sp:scopePathOf(nd)});
+    }
+  }
+  const pairs=[];
+  for(const i of openIns) for(const o of openOuts){
+    if(o.nd.id===i.nd.id) continue;
+    if(!kindsCompatible(o.kind,i.kind)) continue;
+    if(!(o.sp.length<=i.sp.length&&o.sp.every((v,ix)=>i.sp[ix]===v))) continue;
+    const d=Math.hypot(o.c.x-i.c.x,o.c.y-i.c.y);
+    // "closest" has to mean close. Proximity is the intent signal; a cable
+    // dragged across the whole canvas by a machine is not reading intent.
+    if(d>SHAKE_REACH) continue;
+    pairs.push({i,o,d});
+  }
+  // required first, then nearest
+  pairs.sort((a,b)=> (a.i.req!==b.i.req) ? (a.i.req?-1:1) : a.d-b.d );
+  const tookIn=new Set(),tookOut=new Set(),made=[];
+  for(const pr of pairs){
+    const ik=KEY(pr.i.nd.id,bare(pr.i.port)), ok=KEY(pr.o.nd.id,bare(pr.o.port));
+    if(tookIn.has(ik)||tookOut.has(ok)) continue;
+    tookIn.add(ik); tookOut.add(ok);
+    G.wires.push({from:[pr.o.nd.id,pr.o.port],to:[pr.i.nd.id,pr.i.port]});
+    made.push(pr);
+  }
+  const stillOpen=openIns.filter(i=>i.req&&!tookIn.has(KEY(i.nd.id,bare(i.port))));
+  if(made.length){ redraw(); save(); }
+  const parts=[];
+  parts.push(made.length
+    ? ("shook "+made.length+" open port"+(made.length===1?"":"s")+" closed")
+    : ("nothing to shake — no open "+(inclOptional?"":"required ")+"port has a legal mate within "+SHAKE_REACH+"px"
+       +(inclOptional?"":"; shift-click to include optional ports)")));
+  if(stillOpen.length) parts.push(stillOpen.length+" required input"+(stillOpen.length===1?"":"s")+" still unfed: "
+      +stillOpen.slice(0,3).map(i=>i.nd.type+"."+i.port).join(", ")+(stillOpen.length>3?"…":""));
+  $("#status").textContent=parts.join(" · ");
+  // flash what it just made, so a shake is legible instead of a silent diff
+  for(const pr of made){
+    for(const el of document.querySelectorAll('.port[data-port="'+CSS.escape(pr.i.port)+'"]')){
+      if(el.closest(".node")===pr.i.nd.el){ el.classList.add("just-shook"); setTimeout(()=>el.classList.remove("just-shook"),1400); }
+    }
+  }
+  return made.length;
+}
 function startWireDrag(n,dir,name,e){
   const path=document.createElementNS("http://www.w3.org/2000/svg","path");
   path.classList.add("drag"); wiresSvg.appendChild(path);
@@ -1521,29 +1625,82 @@ function startWireDrag(n,dir,name,e){
   // ports stay lit, everything else dims, mateless nodes fade
   document.body.classList.add("wiring");
   const srcKind=nodeKindOf(n,dir,name);
+  // scope path — the ring-containment rule the drop check uses. Hoisted so the
+  // SHAKE below prunes by the same law the landing does, instead of lighting a
+  // spot that would be refused the moment you let go.
+  const scopePathOf=m=>{const q=[];let sc=m._parentScope;while(sc){q.unshift(sc.id);sc=sc._parentScope;}return q;};
+  const srcScope=scopePathOf(n);
+  const cands=[];
   for(const nd of G.nodes){
     if(!nd.el) continue;
     let any=false;
     for(const pe of nd.el.querySelectorAll(".port")){
       if(pe.closest(".node")!==nd.el) continue;
-      const ok=nd.id!==n.id&&pe.dataset.dir!==dir&&kindsCompatible(srcKind,nodeKindOf(nd,pe.dataset.dir,pe.dataset.port));
-      pe.classList.toggle("mateable",ok); if(ok)any=true;
+      let ok=nd.id!==n.id&&pe.dataset.dir!==dir&&kindsCompatible(srcKind,nodeKindOf(nd,pe.dataset.dir,pe.dataset.port));
+      if(ok){
+        // data flows lateral or inward, never outward — same rule as the drop
+        const dp=scopePathOf(nd), sp=srcScope;
+        const a=dir==="out"?sp:dp, b=dir==="out"?dp:sp;
+        if(!(a.length<=b.length&&a.every((v,ix)=>b[ix]===v))) ok=false;
+      }
+      pe.classList.toggle("mateable",ok);
+      if(ok){ any=true; cands.push({nd,pe,port:pe.dataset.port,pdir:pe.dataset.dir}); }
     }
     nd.el.classList.toggle("nomate",!any&&nd.id!==n.id);
+  }
+  // THE SPLINES. Lighting the spot says "legal"; drawing the cable says what
+  // you would GET — which node, around which ring, crossing what. Ports do not
+  // move during a drag, so this geometry is computed once.
+  const anchor=portCenter(n.id,dir,name);
+  const ghosts=[];
+  if(anchor) for(const c of cands){
+    const b=portCenter(c.nd.id,c.pdir,c.port); if(!b) continue;
+    const g=document.createElementNS("http://www.w3.org/2000/svg","path");
+    g.classList.add("cand");
+    g.setAttribute("d", dir==="out"?bez(anchor,b):bez(b,anchor));
+    const kc=KINDCOLOR[portClass(c.nd.type,c.pdir,c.port)]||KINDCOLOR[portClass(n.type,dir,name)];
+    if(kc) g.style.stroke=kc;
+    wiresSvg.insertBefore(g,wiresSvg.firstChild); // behind the live cable
+    ghosts.push({...c,g,b});
+  }
+  // THE SHAKE: when exactly one legal mate survives, the drag has only one
+  // meaning left. Say so now, and land it on release without a menu.
+  const only=ghosts.length===1?ghosts[0]:null;
+  if(only){
+    only.g.classList.add("only");
+    only.pe.classList.add("mate-only");
+    $("#status").textContent="one legal mate: "+n.type+"."+name+" → "+only.nd.type+"."+only.port+" — release to plug it";
   }
   const mv=ev=>{
     const w=world.getBoundingClientRect();
     const m={x:(ev.clientX-w.left)/view.z,y:(ev.clientY-w.top)/view.z};
     const a=portCenter(n.id,dir,name)||m;
     path.setAttribute("d", dir==="out"?bez(a,m):bez(m,a));
+    // the nearest candidate leads: its spline brightens as you approach, so a
+    // dense fan still reads as one intention rather than a hairball
+    let best=null,bd=Infinity;
+    for(const gh of ghosts){
+      const d=(gh.b.x-m.x)**2+(gh.b.y-m.y)**2;
+      if(d<bd){bd=d;best=gh;}
+    }
+    for(const gh of ghosts) gh.g.classList.toggle("near",gh===best&&bd<220*220);
   };
   const up=ev=>{
     removeEventListener("pointermove",mv); removeEventListener("pointerup",up);
     path.remove();
     document.body.classList.remove("wiring");
     document.querySelectorAll(".port.mateable").forEach(x=>x.classList.remove("mateable"));
+    document.querySelectorAll(".port.mate-only").forEach(x=>x.classList.remove("mate-only"));
     document.querySelectorAll(".node.nomate").forEach(x=>x.classList.remove("nomate"));
-    const tgt=document.elementFromPoint(ev.clientX,ev.clientY);
+    for(const gh of ghosts) gh.g.remove();
+    let tgt=document.elementFromPoint(ev.clientX,ev.clientY);
+    // THE SHAKE, landed: one legal mate means the gesture had one meaning. Let
+    // go anywhere that is not another port and it plugs, instead of offering a
+    // menu whose only entry is a node you would then have to duplicate.
+    if(only && !(tgt&&tgt.classList.contains("port")&&tgt.dataset.dir!==dir)){
+      tgt=only.pe;
+      $("#status").textContent="plugged the only legal mate: "+n.type+"."+name+" → "+only.nd.type+"."+only.port;
+    }
     if(tgt&&tgt.classList.contains("port")&&tgt.dataset.dir!==dir){
       // the port's OWNING node is its nearest .node ancestor — a ring's DOM
       // contains its children, so .contains() would hand every child wire
@@ -1897,6 +2054,7 @@ viewport.addEventListener("drop",async e=>{
 addEventListener("pointerdown",e=>{ if(!menu.contains(e.target)) menu.style.display="none"; });
 $("#addBtn").addEventListener("click",e=>showMenu(60,60));
 $("#fitBtn").addEventListener("click",()=>fitToContent());
+$("#shakeBtn").addEventListener("click",e=>treeshake({optional:e.shiftKey}));
 /* ── execution ─────────────────────────────────────────────────────────── */
 function inputsOf(id){ return G.wires.filter(w=>w.to[0]===id); }
 function topo(){
