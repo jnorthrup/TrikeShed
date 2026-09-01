@@ -1320,13 +1320,17 @@
   const VIEWS = { doc: [docScrollEl, viewDocBtn], board: [boardScrollEl, viewBoardBtn], graph: [graphScrollEl, viewGraphBtn], sheet: [sheetScrollEl, viewSheetBtn], shape: [shapeScrollEl, viewShapeBtn], host: [hostScrollEl, viewHostBtn] };
   function setView(view) {
     mutate((s) => { s.view = view; }, 'view');
-    for (const [k, [el, btn]] of Object.entries(VIEWS)) {
+    for (const [k, [el, topBtn]] of Object.entries(VIEWS)) {
       el.hidden = k !== view;
-      btn.classList.toggle('active', k === view);
-      if (k === view) {
-        btn.setAttribute('aria-current', 'page');
-      } else {
-        btn.removeAttribute('aria-current');
+      const sideBtnId = 'btn-' + (k === 'doc' ? 'home' : k);
+      const sideBtn = document.getElementById(sideBtnId);
+      for (const btn of (sideBtn ? [topBtn, sideBtn] : [topBtn])) {
+        btn.classList.toggle('active', k === view);
+        if (k === view) {
+          btn.setAttribute('aria-current', 'page');
+        } else {
+          btn.removeAttribute('aria-current');
+        }
       }
     }
     if (view === 'board') { renderBoard(); hydrateBoard(); }
