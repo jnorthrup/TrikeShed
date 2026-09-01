@@ -26,10 +26,10 @@ fun Series<Char>.trimEnd(): Series<Char> = CharSeries(this).rtrim.slice
 
 fun Series<Char>.drop(count: Int): Series<Char> = slice(count.coerceAtMost(size), size)
 
-fun Series<Char>.startsWith(prefix: String): Boolean =
+fun Series<Char>.startsWith(prefix: CharSequence): Boolean =
     size >= prefix.length && prefix.indices.all { index -> this[index] == prefix[index] }
 
-fun Series<Char>.endsWith(suffix: String): Boolean =
+fun Series<Char>.endsWith(suffix: CharSequence): Boolean =
     size >= suffix.length && suffix.indices.all { index -> this[size - suffix.length + index] == suffix[index] }
 
 fun Series<Char>.leadingWhitespace(): Int {
@@ -37,7 +37,7 @@ fun Series<Char>.leadingWhitespace(): Int {
     return size
 }
 
-fun Series<Char>.matches(literal: String): Boolean =
+fun Series<Char>.matches(literal: CharSequence): Boolean =
     size == literal.length && literal.indices.all { index -> this[index] == literal[index] }
 
 fun Series<Char>.isQuoted(quote: Char): Boolean =

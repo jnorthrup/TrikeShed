@@ -129,7 +129,11 @@ object std {
     }
 
     fun trimmed(name: String, delegate: KursiveParser<CharSeries>): KursiveParser<CharSeries> = parser(name) { input ->
-        delegate(input)?.let { raw: CharSeries -> CharSeries(raw).trim }
+        // CharSeries is both a Series<Char> and a CharSequence, so handing one
+        // to the constructor is ambiguous. The intent here is a FRESH CURSOR
+        // over the same buffer — the Series overload — not a re-view of the
+        // remaining window.
+        delegate(input)?.let { raw: CharSeries -> CharSeries(raw as Series<Char>).trim }
     }
 
     fun restOfLine(name: String): KursiveParser<CharSeries> =

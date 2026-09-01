@@ -26,7 +26,7 @@ class FibonacciReporter(
     /** if we know the size beforehand we provide estimation */
     val size: Int? = null,
     /** what do we report? */
-    val noun: String = "rows",
+    val noun: CharSequence = "rows",
 ) : Usable {
 
     var trigger: Int = 0

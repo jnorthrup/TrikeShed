@@ -45,7 +45,13 @@ class CharSeries(
         }
 
     //string ctor
-    constructor(s: String) : this(s.toCharArray().toSeries())
+    /**
+     * Any CharSequence, VIEWED rather than copied. `String` forced
+     * `toCharArray()` — a full copy on the way in, on a type whose reason to
+     * exist is not copying. A CharSequence is a bound joined to an accessor,
+     * which is what Series<Char> already is, so the view is the conversion.
+     */
+    constructor(s: CharSequence) : this(s.length j { i: Int -> s[i] })
 
     /**remaining chars*/
     val rem: Int get() = limit - pos
@@ -310,7 +316,7 @@ class CharSeries(
 
         }
 
-        private fun confixFeature(client: CharSeries, chlit: String): Boolean {
+        private fun confixFeature(client: CharSeries, chlit: CharSequence): Boolean {
             logNone { "confix $chlit before: ${client.asString()}" }
             var x = 0
             client.confixScope { test: Char ->

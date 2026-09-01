@@ -298,7 +298,7 @@ class ByteSeries(
         fun unbracket(it: ByteSeries): Boolean = confixFeature(it, "[] ")
         fun unquote(it: ByteSeries): Boolean = confixFeature(it, "\"\" ")
 
-        private fun confixFeature(client: ByteSeries, chlit: String): Boolean {
+        private fun confixFeature(client: ByteSeries, chlit: CharSequence): Boolean {
             var x = 0
             client.confixScope { test: Byte ->
                 val target = chlit[x].code.toByte()

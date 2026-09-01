@@ -81,7 +81,7 @@ TypeEvidence(
             }
         }
 
-        fun detectStructuralMemento(confix: String): TypeMemento? =
+        fun detectStructuralMemento(confix: CharSequence): TypeMemento? =
             when (confix) {
                 "{}" -> MapTypeMemento
                 "[]" -> SeqTypeMemento
