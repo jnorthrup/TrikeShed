@@ -1762,7 +1762,12 @@ function treeshake(opts){
   if(dead.length) parts.push("✕ "+dead.length+" with no mate on the board: "
       +dead.slice(0,2).map(i=>i.nd.type+"."+i.port).join(", ")+(dead.length>2?"…":""));
   if(STARVED.size) parts.push(STARVED.size+" node"+(STARVED.size===1?"":"s")+" downstream run on nothing");
-  if(!made.length&&!stillOpen.length) parts.push("nothing open"+(inclOptional?"":" — shift-click to include optional ports"));
+  // "nothing open" used to fire whenever no REQUIRED hole was left, and said it
+  // over a graph full of open optional ports that simply had no mate in reach.
+  if(!openIns.length) parts.push("nothing open"+(inclOptional?"":" — shift-click to include optional ports"));
+  else if(!made.length&&!reachable.length&&!dead.length)
+    parts.push(openIns.length+" open port"+(openIns.length===1?"":"s")+", none with a legal mate within "+SHAKE_REACH+"px"
+      +(inclOptional?"":" — shift-click to include optional ports"));
   $("#status").textContent=parts.join(" · ");
   // flash what it just made, so a shake is legible instead of a silent diff
   for(const pr of made){
