@@ -121,14 +121,16 @@ object LcncPresets {
         LcncPresetInfo(
             "preset-media", "Media player from parts",
             does = "Drives a player from separate buttons and a slider, so the controls are ordinary parts on wires.",
-            needs = "A media address to play.",
+            needs = "A browser — media.player is a real <video> element, so this one " +
+                "cannot run headless. A media address to play.",
             see = "A player responding to the buttons and slider beside it.",
             tweakFirst = "The address in the text node feeding the player.",
         ),
         LcncPresetInfo(
             "preset-hermes-train", "Learning from past sessions",
             does = "On a timer, feeds recorded sessions through review and lets a proposer suggest what to keep.",
-            needs = "A recorded session profile on this machine.",
+            needs = "A model provider key — read.construct asks a model to propose — " +
+                "and a recorded session profile on this machine.",
             see = "What each pass reviewed and which proposals passed the gate.",
             tweakFirst = "The timer's seconds.",
         ),

@@ -188,7 +188,14 @@ object CouncilProgram {
         // crossing). Instead `brief="document"` reads the ROOT FRAME BINDING —
         // the exact mechanism preset-legal-tribunal rides (mux.chat's dance):
         // POST /api/lcnc/run inputs.document binds the frame, ingest reads it.
-        nodes.add(LcncNode("ingest", "legal.ingest", params = mapOf("brief" to "document", "maxTokens" to "2048"), x = laneX(), y = 40.0))
+        // `brief="document"` reads the ROOT FRAME BINDING, which a bare run does
+        // not have — the scope.in default binds that scope's value port, not the
+        // frame — so convening with no caller refused outright. The `text` param
+        // is the fallback the ingest already looks for: bind `document` and it
+        // wins, bind nothing and the council still has a matter to argue.
+        nodes.add(LcncNode("ingest", "legal.ingest", params = mapOf(
+            "brief" to "document", "text" to DEFAULT_MATTER, "maxTokens" to "2048",
+        ), x = laneX(), y = 40.0))
         nodes.add(LcncNode("evidence", "legal.evidence", params = mapOf("scope" to "corpus", "maxFacts" to "64"), x = laneX(), y = 40.0))
         wires.add(LcncWire("ingest", "documentCid", "evidence", "documentCid?"))
         wires.add(LcncWire("ingest", "brief", "evidence", "brief?"))

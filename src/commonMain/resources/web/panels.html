@@ -337,7 +337,7 @@ button{border-radius:6px;padding:4px 12px;transition:border-color .12s,color .12
   <button class="run" id="runBtn">▶ run</button>
   <button class="stop" id="stopBtn">■ stop timers</button>
   <button id="addBtn">+ node</button>
-  <button id="shakeBtn" title="treeshake: pair every OPEN port in the graph with its closest legal open mate">shake</button><button id="fitBtn" title="frame every node (F) — the top-level answer to the D-tab's ring fit">⤢ fit</button>
+  <button id="fdBtn" title="one-shot layout: layer by cable polarity, relax the rest, then STOP">↦ fd</button><button id="shakeBtn" title="treeshake: pair every OPEN port in the graph with its closest legal open mate">shake</button><button id="fitBtn" title="frame every node (F) — the top-level answer to the D-tab's ring fit">⤢ fit</button>
   <input id="panelName" placeholder="panel-name" style="background:var(--bg);border:1px solid var(--line);color:var(--ink);border-radius:4px;padding:4px 8px;font:inherit;width:120px">
   <button id="storeSaveBtn" title="save construction as a replicated store document">⇪ store</button>
   <button id="storeLoadBtn" title="load a construction from the store">⇩ store</button>
@@ -1677,6 +1677,92 @@ function redraw(){
   positionVerdicts();
 }
 let dragWire=null;
+/* FD PLACEMENT, ONCE.
+   Not a simulation. No rAF loop, no jitter, no ongoing chatter — press it, it
+   settles, it stops, and the result is a document you can still drag.
+
+   Pure force-direction is wrong for a patch panel: it has no idea a cable has a
+   POLARITY, so it happily parks a producer to the right of its consumer and
+   every wire runs backwards. So x is LAYERED — longest path along the wires, a
+   node sits one column right of everything feeding it — and only y is relaxed.
+   Cables then flow left to right by construction; nothing spawns backwards.
+
+   Rings take part as single boxes at their own measured size. That is the
+   outer-scope-as-passive-projection reading: a ring does not get placed by its
+   contents, it gets SIZED by them, and the size is what pushes its neighbours
+   away. Ring children are left alone — layoutRing owns them. */
+function fdLayout(){
+  const nodes=G.nodes.filter(n=>!n._parentScope&&n.el);
+  if(nodes.length<2){ $("#status").textContent="fd: nothing to place"; return; }
+  const idx=new Map(nodes.map((n,i)=>[n.id,i]));
+  const topOf=id=>{ let m=G.nodes.find(x=>x.id===id); while(m&&m._parentScope) m=m._parentScope; return m; };
+  const edges=[];
+  for(const w of G.wires){
+    const a=topOf(w.from[0]), b=topOf(w.to[0]);
+    if(a&&b&&a!==b&&idx.has(a.id)&&idx.has(b.id)) edges.push([idx.get(a.id),idx.get(b.id)]);
+  }
+  // ── x: longest-path layering, so every cable points forward ──
+  const layer=new Array(nodes.length).fill(0);
+  for(let pass=0;pass<nodes.length;pass++){
+    let moved=false;
+    for(const [a,b] of edges) if(layer[b]<layer[a]+1){ layer[b]=layer[a]+1; moved=true; }
+    if(!moved) break;                       // a cycle just stops improving
+  }
+  const size=n=>({w:(n.el.offsetWidth||220),h:(n.el.offsetHeight||120)});
+  const COLGAP=90, ROWGAP=42;
+  const byLayer=new Map();
+  nodes.forEach((n,i)=>{ if(!byLayer.has(layer[i])) byLayer.set(layer[i],[]); byLayer.get(layer[i]).push(i); });
+  // A layer of eight tall displays is one 5600px column and a legible graph
+  // becomes an unreadable strip. Wrap a layer into as many sub-columns as its
+  // own height demands: still the same layer, still left of everything it
+  // feeds, just not a single tower.
+  const MAXCOL=1800;
+  const cols=[...byLayer.keys()].sort((a,b)=>a-b);
+  const colX=new Map();          // layer -> [x per sub-column]
+  const sub=new Array(nodes.length).fill(0);
+  let x=40;
+  for(const c of cols){
+    const members=byLayer.get(c);
+    const total=members.reduce((t,i)=>t+size(nodes[i]).h+ROWGAP,0);
+    const parts=Math.max(1,Math.ceil(total/MAXCOL));
+    const per=total/parts;
+    const xs=[]; let run=0, k=0;
+    for(const i of members){ sub[i]=Math.min(parts-1,k); run+=size(nodes[i]).h+ROWGAP;
+      if(run>=per*(k+1)) k++; }
+    const wide=Math.max(...members.map(i=>size(nodes[i]).w));
+    for(let q=0;q<parts;q++){ xs.push(x); x+=wide+COLGAP; }
+    colX.set(c,xs);
+  }
+  const bucket=i=>colX.get(layer[i])[sub[i]];
+  // ── y: barycentre relaxation, a few sweeps, then stop ──
+  const preds=nodes.map(()=>[]), succs=nodes.map(()=>[]);
+  for(const [a,b] of edges){ succs[a].push(b); preds[b].push(a); }
+  // stacks are per SUB-column now, not per layer
+  const stacks=new Map();
+  nodes.forEach((n,i)=>{ const k=layer[i]+":"+sub[i]; if(!stacks.has(k)) stacks.set(k,[]); stacks.get(k).push(i); });
+  const y=new Array(nodes.length).fill(0);
+  for(const [,st] of stacks){ let cy=40; for(const i of st){ y[i]=cy; cy+=size(nodes[i]).h+ROWGAP; } }
+  for(let sweep=0;sweep<24;sweep++){
+    for(const [,st] of stacks){
+      for(const i of st){
+        const nb=[...preds[i],...succs[i]];
+        if(nb.length) y[i]=nb.reduce((s,j)=>s+y[j]+size(nodes[j]).h/2,0)/nb.length-size(nodes[i]).h/2;
+      }
+      st.sort((p,q)=>y[p]-y[q]);
+      let floor=40;
+      for(const i of st){ if(y[i]<floor) y[i]=floor; floor=y[i]+size(nodes[i]).h+ROWGAP; }
+    }
+  }
+  nodes.forEach((n,i)=>{ n.x=Math.round(bucket(i)); n.y=Math.round(y[i]);
+    n.el.style.left=n.x+"px"; n.el.style.top=n.y+"px"; });
+  redraw(); save();
+  // The frame has to come AFTER the browser has reflowed the boxes we just
+  // moved; fitting in the same tick measures the layout we replaced.
+  requestAnimationFrame(()=>{ redraw(); fitToContent(); });
+  const back=edges.filter(([a,b])=>layer[b]<=layer[a]).length;
+  $("#status").textContent="fd: "+nodes.length+" boxes in "+cols.length+" columns"
+    +(back?" · "+back+" cable(s) still fold back — a cycle, not a placement bug":" · every cable points forward");
+}
 /* TREESHAKE — the whole graph, not one cable.
    Every port that is still OPEN (an input nothing feeds, an output feeding
    nothing) is a loose end. The shake pairs them by the two laws a drop already
@@ -2297,6 +2383,7 @@ addEventListener("pointerdown",e=>{ if(!menu.contains(e.target)) menu.style.disp
 $("#addBtn").addEventListener("click",e=>showMenu(60,60));
 $("#fitBtn").addEventListener("click",()=>fitToContent());
 $("#shakeBtn").addEventListener("click",e=>treeshake({optional:e.shiftKey}));
+$("#fdBtn").addEventListener("click",()=>fdLayout());
 /* ── execution ─────────────────────────────────────────────────────────── */
 function inputsOf(id){ return G.wires.filter(w=>w.to[0]===id); }
 function topo(){
