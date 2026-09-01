@@ -149,7 +149,27 @@ class CharSeries(
      * soft-referenced token memo this hash was written for could never hit on a
      * repeated token — the cursor had moved by the time it came round again.
      */
-    override fun hashCode(): Int = cacheCode
+    /**
+     * THROWS. Keying is a reification: a map wants a canonical, stable value and
+     * this is a CURSOR — pos moves, and the JDK's own CharSequence javadoc says
+     * arbitrary CharSequences are inappropriate as keys precisely because the
+     * contract is unspecified. A String key and a content-equal non-String key
+     * do not match, and a HashMap reports that by returning null and telling
+     * nobody.
+     *
+     * There is no effect system here to forbid it, so the contract is enforced
+     * the only way left: loudly, at the point of misuse. Reify at the gate —
+     * `asString()` — and key on that.
+     *
+     * [cacheCode] remains available for anyone building a cache that knows what
+     * it is doing.
+     */
+    override fun hashCode(): Int =
+        throw UnsupportedOperationException(
+            "CharSeries is a cursor, not a key — pos/limit move. " +
+                "Reify at the gate with asString() and key on that; " +
+                "cacheCode is the content hash if you are building the cache yourself."
+        )
 
 
     fun asString(upto: Int = Int.MAX_VALUE): String =
