@@ -62,6 +62,24 @@ data class LcncPortContract(
 object LcncContracts {
     private val PORT_KIND_OPTIONS = listOf("", "json", "text", "id", "trigger", "num")
 
+    // ── picklists DERIVED from the enum that owns them ────────────────────
+    // These were transcribed by hand at three sites and drifted in both
+    // directions: VmFacet declares JVM("java") first and no picklist offered it,
+    // while three facets that ARE offered (ruby, clojure, llvm) have no language
+    // jar staged. A copied list is a list that goes stale silently; the enum is
+    // the authority, so read it.
+    /** Facet ENUM NAMES — the spelling vm.graalce takes. */
+    val VM_FACET_NAMES: List<String> =
+        borg.trikeshed.pointcut.VmFacet.entries.map { it.name }
+    /** Facet WIRE IDS — the spelling vm.eval takes. */
+    val VM_FACET_IDS: List<String> =
+        borg.trikeshed.pointcut.VmFacet.entries.map { it.id }
+    /** Guest trust levels, from [borg.trikeshed.vm.VmTrust]. */
+    val VM_TRUST_OPTIONS: List<String> =
+        borg.trikeshed.vm.VmTrust.entries.map { it.name }
+    /** One spelling of a boolean picklist; it was written both ways, nine times. */
+    val BOOLEAN_OPTIONS: List<String> = listOf("false", "true")
+
     /** Concentric-scope vocabulary (spec §4): the call, the binding, the return. */
     const val SCOPE = "scope"
     const val SCOPE_IN = "scope.in"
@@ -135,7 +153,7 @@ object LcncContracts {
             outputKinds = mapOf("handle" to "id", "node" to "json"),
             params = mapOf(
                 "title" to LcncPortContract.LcncParamSpec(v = "lcnc-node", ph = "same title = same node (idempotent)"),
-                "record" to LcncPortContract.LcncParamSpec(v = "true", opts = listOf("true", "false")),
+                "record" to LcncPortContract.LcncParamSpec(v = "true", opts = BOOLEAN_OPTIONS),
                 "maxConcurrency" to LcncPortContract.LcncParamSpec(v = "8", ph = "bounded fan-out width"),
                 "projections" to LcncPortContract.LcncParamSpec(ph = "DOCUMENT,BOARD,MARKDOWN — empty = all"),
             ), isEffect = true),
@@ -281,7 +299,7 @@ object LcncContracts {
             outputKinds = mapOf("vmId" to "id"),
             params = mapOf(
                 "id" to LcncPortContract.LcncParamSpec(v = "vm-panel"),
-                "facet" to LcncPortContract.LcncParamSpec(v = "python", opts = listOf("python", "js")),
+                "facet" to LcncPortContract.LcncParamSpec(v = "python", opts = VM_FACET_IDS),
                 "wallMillis" to LcncPortContract.LcncParamSpec(v = "1800000"),
                 "world" to LcncPortContract.LcncParamSpec(ph = "host dirs, comma-sep"),
             ), isEffect = true),
@@ -459,7 +477,7 @@ object LcncContracts {
             listOf("facts"), listOf("landed"),
             inputKinds = mapOf("facts" to "json"),
             outputKinds = mapOf("landed" to "json"),
-            params = mapOf("turnSucceeded" to LcncPortContract.LcncParamSpec(v = "true", opts = listOf("true", "false"))), isEffect = true),
+            params = mapOf("turnSucceeded" to LcncPortContract.LcncParamSpec(v = "true", opts = BOOLEAN_OPTIONS)), isEffect = true),
         LcncPortContract("beliefs.resonate", "resonance (support/refutation)",
             listOf("goal?"), listOf("synonyms", "antonyms"),
             inputKinds = mapOf("goal" to "text"),
@@ -807,8 +825,8 @@ object LcncContracts {
                 "text" to LcncPortContract.LcncParamSpec(ta = true, ph = "inline text when nothing wired"),
                 "annotators" to LcncPortContract.LcncParamSpec(v = "tokenize,ssplit,pos,lemma,depparse,ner"),
                 "world" to LcncPortContract.LcncParamSpec(ph = "comma-separated host dirs seeded to /workspace"),
-                "trust" to LcncPortContract.LcncParamSpec(v = "OWN", opts = listOf("OWN", "UNTRUSTED")),
-                "keep" to LcncPortContract.LcncParamSpec(v = "false", opts = listOf("false", "true")),
+                "trust" to LcncPortContract.LcncParamSpec(v = "OWN", opts = VM_TRUST_OPTIONS),
+                "keep" to LcncPortContract.LcncParamSpec(v = "false", opts = BOOLEAN_OPTIONS),
             )),
 
         // ── State freeze / thaw (persistence seam) ────────────────
@@ -900,8 +918,8 @@ object LcncContracts {
                 "in:files" to LcncPortContract.LcncParamSpec(ph = "comma-separated workspace paths (world-seeded)"),
                 "in:text" to LcncPortContract.LcncParamSpec(ph = "fallback when no files wired"),
                 "world" to LcncPortContract.LcncParamSpec(ph = "comma-separated host dirs seeded to /workspace"),
-                "trust" to LcncPortContract.LcncParamSpec(v = "OWN", opts = listOf("OWN", "UNTRUSTED")),
-                "keep" to LcncPortContract.LcncParamSpec(v = "false", opts = listOf("false", "true")),
+                "trust" to LcncPortContract.LcncParamSpec(v = "OWN", opts = VM_TRUST_OPTIONS),
+                "keep" to LcncPortContract.LcncParamSpec(v = "false", opts = BOOLEAN_OPTIONS),
             )),
         LcncPortContract(SubVm.LEGO_PREFIX + "corenlp", "corenlp: Stanford pipeline in a sub-VM",
             listOf("text?"), listOf("tokens"),
@@ -915,8 +933,8 @@ object LcncContracts {
                 "annotators" to LcncPortContract.LcncParamSpec(v = "tokenize,ssplit,pos,lemma,depparse"),
                 "text" to LcncPortContract.LcncParamSpec(ta = true, ph = "inline text when nothing wired"),
                 "world" to LcncPortContract.LcncParamSpec(ph = "comma-separated host dirs seeded to /workspace"),
-                "trust" to LcncPortContract.LcncParamSpec(v = "OWN", opts = listOf("OWN", "UNTRUSTED")),
-                "keep" to LcncPortContract.LcncParamSpec(v = "false", opts = listOf("false", "true")),
+                "trust" to LcncPortContract.LcncParamSpec(v = "OWN", opts = VM_TRUST_OPTIONS),
+                "keep" to LcncPortContract.LcncParamSpec(v = "false", opts = BOOLEAN_OPTIONS),
             )),
         // Read-only audit of the classpaths this daemon can execute guest code from. No inputs, so
         // nothing upstream can steer it; two params and two outputs, so its whole capability is
@@ -927,7 +945,7 @@ object LcncContracts {
             outputKinds = mapOf("modules" to "json", "count" to "json"),
             params = mapOf(
                 "module" to LcncPortContract.LcncParamSpec(v = ""),
-                "verify" to LcncPortContract.LcncParamSpec(v = "false", opts = listOf("false", "true")),
+                "verify" to LcncPortContract.LcncParamSpec(v = "false", opts = BOOLEAN_OPTIONS),
             ),
         ),
         LcncPortContract(SubVm.LEGO_PREFIX + "camel", "camel: route DSL in a sub-VM",
@@ -942,19 +960,19 @@ object LcncContracts {
                 "from" to LcncPortContract.LcncParamSpec(v = "direct:lcnc"),
                 "to" to LcncPortContract.LcncParamSpec(v = "log:lcnc"),
                 "world" to LcncPortContract.LcncParamSpec(ph = "comma-separated host dirs seeded to /workspace"),
-                "trust" to LcncPortContract.LcncParamSpec(v = "OWN", opts = listOf("OWN", "UNTRUSTED")),
-                "keep" to LcncPortContract.LcncParamSpec(v = "false", opts = listOf("false", "true")),
+                "trust" to LcncPortContract.LcncParamSpec(v = "OWN", opts = VM_TRUST_OPTIONS),
+                "keep" to LcncPortContract.LcncParamSpec(v = "false", opts = BOOLEAN_OPTIONS),
             )),
         LcncPortContract(SubVm.LEGO_PREFIX + "graalce", "graalce: any Graal language, inline source",
             listOf("context?"), listOf("result"),
             inputKinds = mapOf("context" to "json"),
             outputKinds = mapOf("result" to "text"),
             params = mapOf(
-                "facet" to LcncPortContract.LcncParamSpec(v = "GRAAL_JS", opts = listOf("GRAAL_JS", "GRAAL_PYTHON", "GRAAL_RUBY", "GRAAL_CLOJURE", "GRAAL_LLVM")),
+                "facet" to LcncPortContract.LcncParamSpec(v = "GRAAL_JS", opts = VM_FACET_NAMES),
                 "source" to LcncPortContract.LcncParamSpec(ta = true, ph = "guest source; print() lands in text"),
                 "world" to LcncPortContract.LcncParamSpec(ph = "comma-separated host dirs seeded to /workspace"),
-                "trust" to LcncPortContract.LcncParamSpec(v = "OWN", opts = listOf("OWN", "UNTRUSTED")),
-                "keep" to LcncPortContract.LcncParamSpec(v = "false", opts = listOf("false", "true")),
+                "trust" to LcncPortContract.LcncParamSpec(v = "OWN", opts = VM_TRUST_OPTIONS),
+                "keep" to LcncPortContract.LcncParamSpec(v = "false", opts = BOOLEAN_OPTIONS),
             )),
 
         // ── Legal council (design/legal-council-3x5.md) — the node family
@@ -993,7 +1011,7 @@ object LcncContracts {
             params = mapOf(
                 "label" to LcncPortContract.LcncParamSpec(ph = "fold header (== label ==)"),
                 "separator" to LcncPortContract.LcncParamSpec(v = "\n\n---\n\n"),
-                "numbered" to LcncPortContract.LcncParamSpec(v = "true", opts = listOf("true", "false")),
+                "numbered" to LcncPortContract.LcncParamSpec(v = "true", opts = BOOLEAN_OPTIONS),
             )),
         LcncPortContract("record.fold", "record fold (turn provenance gatherer)",
             listOf("parts"), listOf("turns"),

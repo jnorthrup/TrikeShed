@@ -24,7 +24,13 @@ object JvmProcessIsolateProvider : VmProvider {
     private val java: String get() = File(System.getProperty("java.home"), "bin/java").path
     override fun isAvailable(): Boolean = File(java).canExecute()
     override fun report(): VmCapabilityReport = VmCapabilityReport(
-        id, isAvailable(), listOf("js", "python"), "process", wallBudgetSupported = true, callSupported = true,
+        // The THIRD hand-transcription of the facet list. It claimed js+python
+        // while VmFacet declares six — a provider advertising a capability list
+        // it copied rather than derived. Report what the enum says this provider
+        // can be asked for; whether a language jar is staged is a runtime fact,
+        // not a spelling choice.
+        id, isAvailable(), borg.trikeshed.pointcut.VmFacet.entries.map { it.id },
+        "process", wallBudgetSupported = true, callSupported = true,
         note = "child JVM running SubVmMain over SubVmProtocol; separate address space",
     )
 
