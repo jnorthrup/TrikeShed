@@ -228,6 +228,18 @@ object LcncPresets {
                     params = mapOf("idField" to "id", "titleField" to "role", "subtitleField" to "model", "badgeField" to "status"),
                     x = 700.0, y = 60.0),
                 LcncNode("n5", "display", x = 980.0, y = 60.0),
+                // THE SIGNAL SPLITTER. turbohaul's dispatcher takes one admitted
+                // wave and fans it to per-model residents; here one grouped wave
+                // splits into one tap per role. It is not a node — it is three
+                // picks off the same output, which is what a splitter IS in a
+                // patch panel. Add a role to the request list, add a tap here,
+                // and the lane exists; nothing else changes.
+                LcncNode("s1", "pick", params = mapOf("path" to "planner"), x = 980.0, y = 200.0),
+                LcncNode("s2", "pick", params = mapOf("path" to "worker"), x = 980.0, y = 300.0),
+                LcncNode("s3", "pick", params = mapOf("path" to "scribe"), x = 980.0, y = 400.0),
+                LcncNode("d1", "display", x = 1220.0, y = 200.0),
+                LcncNode("d2", "display", x = 1220.0, y = 300.0),
+                LcncNode("d3", "display", x = 1220.0, y = 400.0),
                 // THE ROSTER, beside the drawing: who may be admitted (keymux)
                 // and who can actually be routed to (modelmux). Where turbohaul
                 // would probe VRAM and spawn a sidecar, this asks the mux.
@@ -259,8 +271,15 @@ object LcncPresets {
                 LcncWire("r1", "staged", "n3", "groups"),
                 LcncWire("n4", "value", "n3", "columns?"),
                 LcncWire("n3", "move", "n5", "x"),
+                LcncWire("r1", "staged", "s1", "x"),
+                LcncWire("r1", "staged", "s2", "x"),
+                LcncWire("r1", "staged", "s3", "x"),
+                LcncWire("s1", "y", "d1", "x"),
+                LcncWire("s2", "y", "d2", "x"),
+                LcncWire("s3", "y", "d3", "x"),
                 LcncWire("n1", "tick", "n6", "trigger?"),
                 LcncWire("n6", "roster", "n7", "x"),
+                LcncWire("n1", "tick", "n8", "trigger?"),
                 LcncWire("n8", "models", "n9", "x"),
                 LcncWire("n1", "tick", "n10", "trigger?"),
                 LcncWire("n10", "meta", "n11", "x"),
