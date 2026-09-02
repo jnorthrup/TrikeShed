@@ -384,6 +384,8 @@ class PatchWire(
     private val scopes: ProjectScopes,
     /** Panel constructions are STORE DOCUMENTS (panels/<name>, CAS-addressed, replicated) — not browser state. */
     private val attachments: CouchAttachmentGateway? = null,
+    /** The one writer of LCNC onto the blackboard: a saved panel is published as `lcnc/program/<name>`, cables typed. */
+    private val publisher: borg.trikeshed.lcnc.LcncPublisher? = null,
     /** Carries HtxKey (+ mux reactor) so provider calls ride the daemon's reactor. */
     private val muxContext: CoroutineContext = EmptyCoroutineContext,
     /**
@@ -631,13 +633,27 @@ class PatchWire(
                 val att = attachments ?: return json(mapOf("error" to "store not wired"), 503)
                 val name = p.removePrefix("/api/panels/").trimEnd('/')
                 if (!name.matches(Regex("^[a-z0-9][a-z0-9._-]*$"))) return json(mapOf("error" to "bad name"), 400)
-                val doc = att.getAttachment("panels/" + name) ?: return json(mapOf("error" to "no such panel"), 404)
-                JvmKanbanServer.HttpResponse(200, doc.second.decodeToString())
+                // `?entry=1`: the BOARD ENTRY itself — document, every cable with the
+                // exact type it carries, violations — so the canvas can SHOW what the
+                // daemon obeys. Seen is believed.
+                if (path.substringAfter('?', "").split('&').contains("entry=1")) {
+                    val entry = publisher?.boardEntry(name) ?: return json(mapOf("error" to "not on the board", "name" to name), 404)
+                    return JvmKanbanServer.HttpResponse(200, JsonSupport.stringify(entry))
+                }
+                // The attachment, else the BOARD's document — a program that exists
+                // only as a blackboard entry opens in the canvas like any other.
+                val doc = att.getAttachment("panels/" + name)?.second?.decodeToString()
+                    ?: publisher?.boardDocumentJson(name)
+                    ?: return json(mapOf("error" to "no such panel"), 404)
+                JvmKanbanServer.HttpResponse(200, doc)
             }
             method == "POST" && p.startsWith("/api/panels/") -> {
                 val att = attachments ?: return json(mapOf("error" to "store not wired"), 503)
                 val name = p.removePrefix("/api/panels/").trimEnd('/')
                 if (!name.matches(Regex("^[a-z0-9][a-z0-9._-]*$"))) return json(mapOf("error" to "bad name"), 400)
+                // A preset owns its name (LcncPublisher's precedence); saving under it
+                // would be shadowed after the next boot and obeyed until then.
+                if (publisher?.isPreset(name) == true) return json(mapOf("error" to "name_is_a_preset", "name" to name), 409)
                 val programJson = rawBody(text)
                 val program = runCatching { borg.trikeshed.lcnc.LcncProgramConfix.fromJson(name, programJson) }
                     .getOrElse { return json(mapOf("error" to (it.message ?: "bad program")), 400) }
@@ -650,7 +666,18 @@ class PatchWire(
                         sequence = System.currentTimeMillis(),
                     ), bytes,
                 )
-                json(mapOf("verdict" to "ok", "cid" to cid.value))
+                // ON THE BLACKBOARD, by the one writer: the program with every cable
+                // typed against the late-bound vocabulary and its violations beside
+                // it, then the vocabulary itself (a panel with formal ports is a new
+                // composite) — both as deltas on /blackboard/facts.
+                val entry = publisher?.let { pub ->
+                    val e = pub.publishProgram(name, program)
+                    // A panel with formal ports is a new composite: the vocabulary and
+                    // every other program's validity may have moved — refresh the board.
+                    pub.publishAll()
+                    e
+                }
+                json(mapOf("verdict" to "ok", "cid" to cid.value, "violations" to (entry?.get("violations") ?: emptyList<Any?>())))
             }
 
             method == "POST" && p.startsWith("/api/projects/") && p.endsWith("/mine") -> {

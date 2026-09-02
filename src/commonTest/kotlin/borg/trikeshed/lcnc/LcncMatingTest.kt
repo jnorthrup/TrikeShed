@@ -105,12 +105,14 @@ class LcncMatingTest {
 
     @Test
     fun compatibleTypesReturnsEmptyWhenKindMismatch() {
-        // timer.tick is trigger, display.x expects json → no match
+        // timer.tick is trigger; list.format.x expects json → no match. display.x is
+        // Any (its runner echoes whatever it is given), so a tick cable into it is exact.
         val timer = LcncNode("n1", "timer")
         val program = LcncProgram("t", listOf(timer).toSeries(), emptySeriesOf())
         val candidates = LcncMating.compatibleTypes(program, "n1", "tick")
-        assertTrue(candidates.none { it.type == "display" },
-            "trigger-kind tick must not mate with display (json-kind): $candidates")
+        assertTrue(candidates.none { it.type == "list.format" },
+            "trigger-kind tick must not mate with list.format.x (json): $candidates")
+        assertTrue(candidates.any { it.type == "display" }, "display declares Any: $candidates")
     }
 
     // ── mate operation ───────────────────────────────────────────────────
@@ -163,11 +165,11 @@ class LcncMatingTest {
 
     @Test
     fun mateRejectsIncompatibleTargetType() {
-        // timer.tick (trigger) cannot mate with display (expects json, not trigger)
+        // timer.tick (trigger) cannot mate with list.format (x expects json, not trigger)
         val timer = LcncNode("n1", "timer")
         val program = LcncProgram("test", listOf(timer).toSeries(), emptySeriesOf())
         assertFailsWith<IllegalStateException> {
-            LcncMating.mate(program, "n1", "tick", "display", 300.0, 60.0)
+            LcncMating.mate(program, "n1", "tick", "list.format", 300.0, 60.0)
         }
     }
 
@@ -288,8 +290,9 @@ class LcncMatingTest {
         val typed = LcncMating.compatibleTypes(program, "r", "verdict")
         assertTrue(typed.isNotEmpty(), "a DECLARED ring port narrows to its kind's mates")
         assertTrue(typed.all { c ->
-            LcncContracts.find(c.type)!!.inputKinds[c.inputPort.removeSuffix("?")] == "text"
-        }, "every offered mate accepts text: ${typed.map { it.type + "." + it.inputPort }}")
+            val k = LcncContracts.find(c.type)!!.inputKinds[c.inputPort.removeSuffix("?")]!!
+            k == "text" || k == LcncKinds.CCEK_ANY || LcncKinds.isTypeVariable(k)
+        }, "every offered mate is text, a runner that declares Any, or a pass-through T: ${typed.map { it.type + "." + it.inputPort }}")
         assertTrue(!LcncMating.genericSource(program, "r", "verdict"), "a declared ring port is not generic")
 
         // An UNDECLARED ring port is genuinely generic — it mates with everything,

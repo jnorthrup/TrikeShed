@@ -241,6 +241,13 @@ class LcncRunner(private val registry: Map<String, LcncNodeRunner>) {
             val loader = subprogramLoader
             val subName = node.subprogram
                 ?: node.params["program"]?.takeIf { node.type == LcncContracts.SCOPE && it.isNotBlank() }
+                // LATE BINDING: a type that is neither a registered runner nor a
+                // compiled contract names a stored program — a COMPOSITE wrapper
+                // (LcncComposites). The name resolves through the loader when
+                // the walk reaches it, never at boot; the body runs as a named
+                // ring under the same rules. A name the loader cannot find
+                // still throws LcncUnknownNodeType below.
+                ?: node.type.takeIf { loader != null && it !in registry && LcncContracts.find(it) == null }
             val inline = node.children.size > 0
             if (inline || (subName != null && loader != null)) {
                 // if (cond) { ring }: a falsy guard skips — yields stay absent.

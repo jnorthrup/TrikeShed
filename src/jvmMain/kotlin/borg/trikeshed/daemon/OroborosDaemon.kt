@@ -1057,10 +1057,14 @@ object OroborosDaemon {
             }
             else -> borg.trikeshed.jules.BrainClient(errorSink = brainErrorSink, keyMux = keyMux)
         }
+        // The runner registry is assembled below; the publisher reads it late.
+        val lcncRunnersRef = java.util.concurrent.atomic.AtomicReference<Map<String, borg.trikeshed.lcnc.LcncNodeRunner>>(emptyMap())
+        val lcncPublisher = borg.trikeshed.lcnc.LcncPublisher(daemonBlackboard, { lcncRunnersRef.get() }, attachmentGateway)
         val patchWire = borg.trikeshed.forge.server.PatchWire(
             brain = brainClient,
             scopes = projectScopes,
             attachments = attachmentGateway,
+            publisher = lcncPublisher,
             muxContext = htxElement + muxReactor,
             mountScope = wireScope,
             miner = projectMiner,
@@ -1078,10 +1082,10 @@ object OroborosDaemon {
         // presets (the panels/ attachment namespace was rooted out 2026-08-27
         // with the browser editor) — shared by module program runs
         // (/api/lcnc/run {program}) and webhook node dispatch.
-        val storedProgramLoader: suspend (String) -> borg.trikeshed.lcnc.LcncProgram? = { name ->
-            borg.trikeshed.lcnc.LcncPresets.all()[name]
-                ?.let { borg.trikeshed.lcnc.LcncProgramConfix.fromJson(name, it) }
-        }
+        // THE LOADER IS THE BLACKBOARD (LcncPublisher.load): the source — a preset,
+        // then the user's `panels/<name>` attachment — keeps `lcnc/program/<name>`
+        // fresh, and the entry is what the run seam obeys.
+        val storedProgramLoader: suspend (String) -> borg.trikeshed.lcnc.LcncProgram? = { name -> lcncPublisher.load(name) }
         val moduleContext = borg.trikeshed.module.ModuleContext(
             couchDb = couchDb,
             rete = rete,
@@ -1099,6 +1103,7 @@ object OroborosDaemon {
             ccekBinding = ccekBinding,
             programLoader = storedProgramLoader,
         )
+        lcncRunnersRef.set(moduleContext.lcncRunners)
         requestFactoryRpcTargets["session.info"] = borg.trikeshed.relaxfactory.RequestFactoryRpcTarget { args ->
             linkedMapOf<String, Any?>(
                 "db" to couchDb.info(),
@@ -1960,9 +1965,13 @@ object OroborosDaemon {
                 projectScopes.registerPrimary(repoDir, worktreeSnap.paths.size)
                 System.err.println(
                     "[OROBOROS] Worktree→Couch initial reconcile: ${worktreeSnap.paths.size} paths" +
-                        if (worktreeSnap.skippedDirs.isEmpty()) ""
+                        (if (worktreeSnap.skippedDirs.isEmpty()) ""
                         else " — INCOMPLETE: ${worktreeSnap.skippedDirs.size} unreadable dir(s), " +
-                            "nothing under them tombstoned: ${worktreeSnap.skippedDirs.take(5)}"
+                            "nothing under them tombstoned: ${worktreeSnap.skippedDirs.take(5)}") +
+                        (if (worktreeSnap.skippedFiles.isEmpty()) ""
+                        else " — ${worktreeSnap.skippedFiles.size} file(s) over " +
+                            "${borg.trikeshed.util.oroboros.WorktreeCouchGateway.MAX_FILE_BYTES shr 20} MiB skipped: " +
+                            "${worktreeSnap.skippedFiles.take(3)}")
                 )
                 headSha to worktreeSnap
             }.onFailure {

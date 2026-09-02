@@ -11,6 +11,9 @@ import borg.trikeshed.lib.toList
  * the selected type are merely ingress; all compatibility, cardinality,
  * function, add, and replace validation happens here before a new immutable
  * program value is returned for Confix persistence.
+ *
+ * Every compatibility question is a pattern over the vocabulary's tuples
+ * ([LcncFacts]); this file shapes the answers, it does not loop the table.
  */
 data class LcncMatingCandidate(
     val type: String,
@@ -72,21 +75,13 @@ object LcncMating {
     /**
      * Infer a wire only when exactly one kind-compatible port pair exists.
      * Multiple pairs are returned as evidence; no arbitrary first-pair guess.
+     * The pairs are `(outKind from ?p ?K)` × `(inKind to ?q ?L)` where the
+     * tuple rule accepts K into L.
      */
     fun autoWire(program: LcncProgram, fromId: String, toId: String): LcncAutoWireResult {
         val from = node(program, fromId)
         val to = node(program, toId)
-        val fc = LcncContracts.find(from.type) ?: return LcncAutoWireResult(null, emptyList())
-        val tc = LcncContracts.find(to.type) ?: return LcncAutoWireResult(null, emptyList())
-        val candidates = mutableListOf<LcncAutoWireCandidate>()
-        for (outRaw in fc.outputs) {
-            val out = outRaw.removeSuffix("?")
-            val kind = fc.outputKinds[out] ?: continue
-            for (inRaw in tc.inputs) {
-                val input = inRaw.removeSuffix("?")
-                if (tc.inputKinds[input] == kind) candidates += LcncAutoWireCandidate(outRaw, inRaw, kind)
-            }
-        }
+        val candidates = LcncFacts.of(LcncContracts.all()).autoWire(from.type, to.type)
         val wire = candidates.singleOrNull()?.let { LcncWire(fromId, it.fromPort, toId, it.toPort) }
         return LcncAutoWireResult(wire, candidates)
     }
@@ -110,20 +105,22 @@ object LcncMating {
         /** The surface's already-resolved kind — a ring port's kind lives in the
          *  node, and `/api/lcnc/mating-options` only receives (type, port). */
         kindOverride: LcncTypeCheck.PortKind? = null,
+        facts: LcncFacts = LcncFacts.of(LcncContracts.all()),
     ): List<LcncMatingCandidate> {
         val source = node(program, sourceNode)
         val contracts = LcncContracts.all().associateBy { it.type }
+        // A source the vocabulary cannot see offers nothing: the menu refuses to
+        // guess (the checker, by contrast, leaves such a port unresolved).
+        val ring = source.children.size > 0 || !source.subprogram.isNullOrBlank() || !source.params["program"].isNullOrBlank()
+        if (kindOverride == null && source.type !in contracts && !ring) return emptyList()
         val sourceKind = kindOverride
-            ?: LcncTypeCheck.portKind(source, "out", sourcePort.removeSuffix("?"), contracts)
+            ?: LcncTypeCheck.portKind(source, "out", sourcePort.removeSuffix("?"), contracts, facts)
         if (sourceKind.kind == null && !sourceKind.generic) return emptyList()
-        return LcncContracts.all().flatMap { target ->
-            target.inputs.mapNotNull { input ->
-                val clean = input.removeSuffix("?")
-                val inputKind = target.inputKinds[clean] ?: return@mapNotNull null
-                if (!sourceKind.acceptedBy(LcncTypeCheck.PortKind(inputKind, generic = false))) return@mapNotNull null
-                LcncMatingCandidate(target.type, input, target.title)
-            }
-        }.distinctBy { it.type to it.inputPort }
+        val kind = if (sourceKind.generic) LcncKinds.UNRESOLVED else sourceKind.kind!!
+        // `(inKind ?T ?p ?K)` where K accepts an output of `kind` — vocabulary order.
+        return facts.compatibleInputs(kind)
+            .map { (type, input) -> LcncMatingCandidate(type, input, facts.label(type) ?: type) }
+            .distinctBy { it.type to it.inputPort }
     }
 
     /** True when the source port is a ring parameter that declared no kind. */
@@ -138,10 +135,12 @@ object LcncMating {
      * kind-compatible candidates ranked by EVIDENCE. The prior is quota-free
      * Bayes counted from a corpus of stored programs (rings included): how
      * often `sourceType.sourcePort` actually wires into each target type in
-     * practice. Deterministic: count descending, then the contract-declared
-     * order. [q] is the popup's text-entry lane — a name filter over type and
-     * title (blank = unfiltered). Live-usage revision on top of this prior is
-     * the belief bag's job, later — this function stays pure.
+     * practice — `(feeds ?g ?n port ?m ?q)` joined to `(node ?g ?n sourceType)`
+     * and `(node ?g ?m ?T)`, counted by T. Deterministic: count descending,
+     * then the contract-declared order. [q] is the popup's text-entry lane — a
+     * name filter over type and title (blank = unfiltered). Live-usage
+     * revision on top of this prior is the belief bag's job, later — this
+     * function stays pure.
      */
     fun rankedCandidates(
         program: LcncProgram,
@@ -151,28 +150,9 @@ object LcncMating {
         q: String = "",
         kindOverride: LcncTypeCheck.PortKind? = null,
     ): List<LcncMatingCandidate> {
-        val compatible = compatibleTypes(program, sourceNode, sourcePort, kindOverride)
-        val sourceType = node(program, sourceNode).type
-        val counts = HashMap<String, Int>()
-        for (doc in corpus) {
-            val types = HashMap<String, String>()
-            fun walk(nodes: Series<LcncNode>) {
-                for (i in 0 until nodes.size) {
-                    val n = nodes[i]
-                    types[n.id] = n.type
-                    if (n.children.size > 0) walk(n.children)
-                }
-            }
-            walk(doc.nodes)
-            for (i in 0 until doc.wires.size) {
-                val w = doc.wires[i]
-                if (types[w.fromNode] == sourceType &&
-                    w.fromPort.removeSuffix("?") == sourcePort.removeSuffix("?")
-                ) {
-                    types[w.toNode]?.let { counts[it] = (counts[it] ?: 0) + 1 }
-                }
-            }
-        }
+        val facts = LcncFacts.of(LcncContracts.all(), corpus.withIndex().associate { (i, p) -> "g$i" to p })
+        val compatible = compatibleTypes(program, sourceNode, sourcePort, kindOverride, facts)
+        val counts = facts.feedsInto(node(program, sourceNode).type, sourcePort)
         val needle = q.trim().lowercase()
         val filtered = if (needle.isEmpty()) compatible else compatible.filter {
             needle in it.type.lowercase() || needle in it.title.lowercase()

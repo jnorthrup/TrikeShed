@@ -2,6 +2,8 @@ package borg.trikeshed.kanban.module
 
 import borg.trikeshed.job.ContentId
 import borg.trikeshed.kanban.BoardApply
+import borg.trikeshed.lib.get
+import borg.trikeshed.lib.size
 import borg.trikeshed.kanban.BoardCursor
 import borg.trikeshed.kanban.BoardIntake
 import borg.trikeshed.kanban.BoardStoreElement
@@ -349,28 +351,35 @@ class KanbanModule : ForgeModule {
         // moved to /api/lcnc/concentric; vocabulary hydrates from
         // /api/lcnc/contracts; constructions are stored via /api/panels.
 
+        // Everything LCNC ON THE BLACKBOARD, by the one writer (LcncPublisher):
+        // `lcnc/vocabulary` and `lcnc/program/<name>` with every cable typed and
+        // every violation beside it. The routes below serve what is on the board.
+        val publisher = borg.trikeshed.lcnc.LcncPublisher(ctx.blackboard, { ctx.lcncRunners }, ctx.attachments)
+        runCatching { publisher.publishAll() }
+            .onFailure { System.err.println("[KanbanModule] lcnc → blackboard publish failed: ${it.message}") }
+
         ctx.routes.claim(id, "/api/lcnc/contracts") { method, _, _, _ ->
             if (method != "GET") JvmKanbanServer.HttpResponse(405, """{"error":"method_not_allowed"}""")
-            else JvmKanbanServer.HttpResponse(200, JsonSupport.stringify(mapOf(
-                // The FULL contract: title, ports, kinds, cardinality, functions,
-                // param defaults, source/sink/wide — every field the retired JS
-                // TYPES table used to carry. Kotlin is the ONE vocabulary author;
-                // the browser renders (and fetches) but never invents.
-                "contracts" to LcncContracts.all().map { c -> mapOf(
-                    "type" to c.type, "title" to c.title,
-                    "inputs" to c.inputs, "outputs" to c.outputs,
-                    "inputKinds" to c.inputKinds, "outputKinds" to c.outputKinds,
-                    "cardinality" to c.cardinality.mapValues { it.value.name }, "functions" to c.functions,
-                    "params" to c.params.mapValues { p ->
-                        mapOf(
-                            "v" to p.value.v, "opts" to p.value.opts, "optsFrom" to p.value.optsFrom,
-                            "ta" to p.value.ta, "ph" to p.value.ph,
-                            "cols" to p.value.cols,
-                        )
-                    },
-                    "source" to c.isSource, "sink" to c.isSink, "wide" to c.wide, "effect" to c.isEffect,
-                ) },
-            )))
+            else JvmKanbanServer.HttpResponse(200, JsonSupport.stringify(publisher.publishVocabulary()))
+        }
+
+        // The same vocabulary as a GRAPH: kinds, ports, and the binding edges,
+        // as Turtle — queryable, countable, and the form LcncRdf's doc comment
+        // promised for SHACL-minded readers.
+        ctx.routes.claim(id, "/api/lcnc/ontology") { method, _, _, _ ->
+            if (method != "GET") JvmKanbanServer.HttpResponse(405, """{"error":"method_not_allowed"}""")
+            else {
+                val lb = publisher.lateBound()
+                val triples = borg.trikeshed.lcnc.LcncRdf.ontology(lb.vocabulary.values.toList()) + borg.trikeshed.lcnc.LcncRdf.bindings(lb.bindings)
+                JvmKanbanServer.HttpResponse(200, borg.trikeshed.lcnc.LcncRdf.turtle(triples) + "\n", contentType = "text/turtle; charset=utf-8")
+            }
+        }
+
+        // The TUPLES themselves, verbatim: the vocabulary, the corpus's wires and
+        // the bindings as a .kif file — what LcncFacts.parse reads back.
+        ctx.routes.claim(id, "/api/lcnc/facts") { method, _, _, _ ->
+            if (method != "GET") JvmKanbanServer.HttpResponse(405, """{"error":"method_not_allowed"}""")
+            else JvmKanbanServer.HttpResponse(200, publisher.lateBound().facts.toKifFile() + "\n", contentType = "text/plain; charset=utf-8")
         }
 
         // The generic runner dispatch: ONE execution author. The browser (and any
@@ -400,11 +409,16 @@ class KanbanModule : ForgeModule {
                     // (LcncContracts), stated on the deciding side — loudly, before the run.
                     // strict=false: the registry may carry types the contract table does
                     // not describe, and LcncRunner throws for one that is truly absent.
-                    val violations = borg.trikeshed.lcnc.LcncTypeCheck.check(program, strict = false)
+                    // THE BOARD IS OBEYED: a named program's entry (refreshed by the
+                    // loader a moment ago) carries the violations the publisher
+                    // recorded; an inline document, which has no entry, is checked now.
+                    val entry = ctx.blackboard.get(borg.trikeshed.lcnc.LcncBlackboard.programKey(label))
+                    val violations = borg.trikeshed.lcnc.LcncBlackboard.violationsOf(entry)
+                        ?: borg.trikeshed.lcnc.LcncTypeCheck.check(program, publisher.vocabulary(), strict = false).map { it.toMap() }
                     if (violations.isNotEmpty()) {
                         JvmKanbanServer.HttpResponse(400, JsonSupport.stringify(mapOf(
                             "ok" to false, "program" to label, "error" to "type_check_failed",
-                            "violations" to violations.map { it.toMap() },
+                            "violations" to violations,
                         )))
                     } else {
                     val walker = LcncRunner(ctx.lcncRunners).apply { subprogramLoader = ctx.programLoader }

@@ -62,7 +62,8 @@ object LcncRdf {
 
     fun nodeIri(nodeId: String): RdfTerm.Iri = iri(NS + nodeId)
     fun typeIri(type: String): RdfTerm.Iri = iri(TYPE_NS + type)
-    fun kindIri(kind: String): RdfTerm.Iri = iri(KIND_NS + kind)
+    /** A CCEK type name like `List<TurnFact>` is a kind; `<`/`>` would end the IRI, so they are percent-encoded. */
+    fun kindIri(kind: String): RdfTerm.Iri = iri(KIND_NS + kind.replace("<", "%3C").replace(">", "%3E").replace(" ", "%20"))
 
     /**
      * The VOCABULARY, from the contracts. Kinds become classes so that
@@ -72,6 +73,14 @@ object LcncRdf {
      */
     fun ontology(contracts: List<LcncPortContract> = LcncContracts.all()): List<RdfTriple> {
         val out = ArrayList<RdfTriple>()
+        // The kind hierarchy, from the names in use: `json.turn-facts` is a
+        // class, and its dotted name IS the subClassOf edge (LcncKinds). A
+        // shape's required keys ride the class, so a SHACL-minded reader can
+        // reconstruct the literal refinement rule from the graph alone.
+        val facts = LcncFacts.of(contracts)
+        for (k in facts.kinds()) out.add(RdfTriple(kindIri(k), RDF_TYPE, pr("Kind")))
+        for ((child, parent) in facts.hierarchy()) out.add(RdfTriple(kindIri(child), RDFS_SUBCLASS, kindIri(parent)))
+        for ((k, keys) in facts.shapes()) for (key in keys) out.add(RdfTriple(kindIri(k), pr("requiresKey"), lit(key)))
         for (c in contracts) {
             val t = typeIri(c.type)
             out.add(RdfTriple(t, RDF_TYPE, pr("NodeType")))
@@ -138,6 +147,22 @@ object LcncRdf {
             val w = program.wires[j]
             // THE POINT: one triple per cable, no reification.
             out.add(RdfTriple(portIri(w.fromNode, w.fromPort), pr("feeds"), portIri(w.toNode, w.toPort)))
+        }
+        return out
+    }
+
+    /**
+     * The BINDING edges — the late-bound join between a wrapper and what runs
+     * it, one triple pair per type. `:type/pick lcnc:boundBy "…CanvasJsPureNodes…"`
+     * is provenance a query can ask for ("which file binds this?") and blame
+     * can walk, without reflecting on anything twice.
+     */
+    fun bindings(bindings: List<LcncBinding>): List<RdfTriple> {
+        val out = ArrayList<RdfTriple>()
+        for (b in bindings) {
+            val t = typeIri(b.type)
+            out.add(RdfTriple(t, pr("bindingKind"), lit(b.kind.name.lowercase())))
+            if (b.provenance.isNotEmpty()) out.add(RdfTriple(t, pr("boundBy"), lit(b.provenance)))
         }
         return out
     }

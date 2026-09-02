@@ -38,10 +38,16 @@ class LcncContractParityTest {
 
     @Test
     fun portKindsUseCanonicalVocabulary() {
-        val allowed = setOf("json", "text", "id", "trigger", "num")
+        // A kind is a Confix slot, `Any` where the runner declares it, or the exact
+        // CCEK type name (`List<TurnFact>`) — capitalised, as Kotlin spells it.
+        // Nothing else mates with anything (LcncKinds): cables are never untyped.
+        val slots = LcncKinds.CONFIX_SLOTS.toSet() + LcncKinds.CCEK_ANY
         for (c in LcncContracts.all()) {
             for ((port, kind) in c.inputKinds + c.outputKinds) {
-                assertTrue(kind in allowed, "${c.type}.$port uses non-canonical kind '$kind'")
+                assertTrue(kind in slots || LcncKinds.isCcekType(kind), "${c.type}.$port uses non-canonical kind '$kind'")
+            }
+            for (kind in c.kindShapes.keys) {
+                assertTrue(LcncKinds.isCcekType(kind), "${c.type} declares a shape for '$kind' — a shape says what a CCEK type parses from")
             }
         }
     }

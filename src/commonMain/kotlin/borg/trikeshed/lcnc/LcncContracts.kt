@@ -33,6 +33,16 @@ data class LcncPortContract(
      * not tidying a graph, it is performing one.
      */
     val isEffect: Boolean = false,
+    /**
+     * Refined kinds this type INTRODUCES, each with the keys every element of
+     * a json array must carry to be that kind. `beliefs.review` wants
+     * `json.turn-facts`, and says what one is: `{verb, ok, context, object}`.
+     * A `json.value` literal whose authored rows all carry those keys IS a
+     * turn-fact list ([LcncKinds.refineLiteral]); a belief field never is.
+     * The hierarchy itself needs no declaration — the dotted name is the
+     * `rdfs:subClassOf` edge ([LcncKinds]).
+     */
+    val kindShapes: Map<String, List<String>> = emptyMap(),
 ) {
     /** One editable parameter: default value, optional dropdown options, multi-line flag, placeholder.
      *  [cols] non-empty makes it a LIST widget: rows of {col: value}, the param
@@ -275,6 +285,9 @@ object LcncContracts {
             listOf("trigger?"), listOf("scopes"),
             inputKinds = mapOf("trigger" to "trigger"),
             outputKinds = mapOf("scopes" to "json")),
+        // The field is a SUMMARY of the bag — size, crux bits, concepts: a
+        // Confix object, so `json` is honest here. It is `beliefs.review` that
+        // names the exact type it consumes; a cable between them is not a cable.
         LcncPortContract("beliefs.introspect", "NAL-9 introspection",
             listOf("trigger?"), listOf("field"),
             inputKinds = mapOf("trigger" to "trigger"),
@@ -433,7 +446,7 @@ object LcncContracts {
             listOf("x"), emptyList(),
             mapOf("x" to LcncCardinality.MANY),
             mapOf("x" to listOf("identity")),
-            inputKinds = mapOf("x" to "json"),
+            inputKinds = mapOf("x" to "Any") /* the runner echoes whatever it is given: exact type Any */,
             isSink = true),
         LcncPortContract("gauge", "gauge",
             listOf("x"), emptyList(),
@@ -473,11 +486,16 @@ object LcncContracts {
             inputKinds = mapOf("text" to "text"),
             outputKinds = mapOf("report" to "json"),
             params = mapOf("kg" to LcncPortContract.LcncParamSpec(ta = true, ph = "@prefix ex: <...> .\nex:a ex:causes ex:b .")), isEffect = true),
+        // `facts` is `List<TurnFact>` — the exact type the runner parses — not
+        // json: the curator wired the introspect field here for as long as both
+        // were `json`, and reviewed nothing. The shape says what a turn fact is,
+        // so an authored literal that matches it IS one (LcncFacts.refineLiteral).
         LcncPortContract("beliefs.review", "turn review (induction)",
             listOf("facts"), listOf("landed"),
-            inputKinds = mapOf("facts" to "json"),
+            inputKinds = mapOf("facts" to "List<TurnFact>"),
             outputKinds = mapOf("landed" to "json"),
-            params = mapOf("turnSucceeded" to LcncPortContract.LcncParamSpec(v = "true", opts = BOOLEAN_OPTIONS)), isEffect = true),
+            params = mapOf("turnSucceeded" to LcncPortContract.LcncParamSpec(v = "true", opts = BOOLEAN_OPTIONS)), isEffect = true,
+            kindShapes = mapOf("List<TurnFact>" to listOf("verb", "ok", "context", "object"))),
         LcncPortContract("beliefs.resonate", "resonance (support/refutation)",
             listOf("goal?"), listOf("synonyms", "antonyms"),
             inputKinds = mapOf("goal" to "text"),
@@ -988,10 +1006,15 @@ object LcncContracts {
         // — legal.evidence's brief into the ruling fold — rides text.fold's
         // dedicated `brief?` port so every declared kind pair on every
         // preset wire agrees (the kind-parity gate checks each one).
+        // `prompt` is read as a String by the seat runner: its exact type is
+        // text. It said `json`, and the council preset's text cable into it was
+        // the first thing exact cable typing refused.
         LcncPortContract("council.seat", "council seat (one model call, degrade-loudly)",
             listOf("prompt"), listOf("content", "labeled", "model", "record"),
-            inputKinds = mapOf("prompt" to "json"),
-            outputKinds = mapOf("content" to "json", "labeled" to "json", "model" to "id", "record" to "json"),
+            inputKinds = mapOf("prompt" to "text"),
+            // content and labeled are Strings in the runner (the model's answer, and
+            // the same under a bracket header); record is a turn-record map.
+            outputKinds = mapOf("content" to "text", "labeled" to "text", "model" to "id", "record" to "json"),
             params = mapOf(
                 "system" to LcncPortContract.LcncParamSpec(ta = true, ph = "seat system charge"),
                 "persona" to LcncPortContract.LcncParamSpec(ph = "seat persona (experts)"),
@@ -1009,8 +1032,9 @@ object LcncContracts {
         LcncPortContract("text.fold", "text fold (dumb MANY-part concatenator)",
             listOf("parts", "brief?"), listOf("text"),
             mapOf("parts" to LcncCardinality.MANY),
-            inputKinds = mapOf("parts" to "json", "brief" to "text"),
-            outputKinds = mapOf("text" to "json"),
+            // flattenText folds strings (or lists of them) and joins them: text in, text out.
+            inputKinds = mapOf("parts" to "text", "brief" to "text"),
+            outputKinds = mapOf("text" to "text"),
             params = mapOf(
                 "label" to LcncPortContract.LcncParamSpec(ph = "fold header (== label ==)"),
                 "separator" to LcncPortContract.LcncParamSpec(v = "\n\n---\n\n"),
@@ -1023,15 +1047,18 @@ object LcncContracts {
             outputKinds = mapOf("turns" to "json")),
         LcncPortContract("ruling.parse", "ruling parse (trailing JSON, strict-false booleans)",
             listOf("text"), listOf("verdict", "needsClarification", "clarificationQuestion", "mistrial", "text"),
-            inputKinds = mapOf("text" to "json"),
+            // the runner reads `text` as a String and passes it through: text in, text out.
+            inputKinds = mapOf("text" to "text"),
             outputKinds = mapOf(
                 "verdict" to "json", "needsClarification" to "json",
-                "clarificationQuestion" to "text", "mistrial" to "json", "text" to "json",
+                "clarificationQuestion" to "text", "mistrial" to "json", "text" to "text",
             )),
         LcncPortContract("coalesce", "coalesce (a? over b — clarified wins, absent yields lose)",
             listOf("a?", "b"), listOf("value"),
-            inputKinds = mapOf("a" to "json", "b" to "json"),
-            outputKinds = mapOf("value" to "json")),
+            // A pass-through: coalesce<T>(a?: T, b: T): T. The first cable fixes T, the
+            // second must be T, and the value cable carries T (LcncTypeCheck.Resolver).
+            inputKinds = mapOf("a" to "T", "b" to "T"),
+            outputKinds = mapOf("value" to "T")),
         LcncPortContract("council.convene", "council convene (config → drawn program)",
             listOf("config?"), listOf("program", "summary"),
             inputKinds = mapOf("config" to "json"),
@@ -1043,9 +1070,10 @@ object LcncContracts {
         LcncPortContract("council.record", "council record (CAS + blackboard + couch + KIF + case lifecycle)",
             listOf("verdict", "transcript", "turns?", "caseId?", "documentCid?"), listOf("report"),
             mapOf("transcript" to LcncCardinality.MANY, "turns" to LcncCardinality.MANY),
+            // transcript is MANY text parts the runner flattens; caseId is read as a String.
             inputKinds = mapOf(
-                "verdict" to "json", "transcript" to "json", "turns" to "json",
-                "caseId" to "json", "documentCid" to "id",
+                "verdict" to "json", "transcript" to "text", "turns" to "json",
+                "caseId" to "id", "documentCid" to "id",
             ),
             outputKinds = mapOf("report" to "json"),
             params = mapOf("caseId" to LcncPortContract.LcncParamSpec(v = "default")), isEffect = true),

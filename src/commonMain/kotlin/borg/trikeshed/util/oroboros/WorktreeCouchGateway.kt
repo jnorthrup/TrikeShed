@@ -20,6 +20,15 @@ class WorktreeCouchGateway(
     private val excludedSegments: Set<String> = EXCLUDED_SEGMENTS,
     /** Relative paths (from the root) skipped as subtrees, e.g. `.claude/worktrees`. */
     private val excludedRelativePrefixes: Set<String> = EXCLUDED_RELATIVE_PREFIXES,
+    /**
+     * Files larger than this are not documents and are never read. An 8 GB Blu-ray remux that
+     * a download dropped into the repo root (untracked, gitignored, 2026-09-01) made
+     * `readAllBytes` throw `OutOfMemoryError: Required array size too large` at every boot and
+     * the whole reconcile died with it — the plane held git refs alone. A JVM array tops out
+     * at 2 GB; a source tree's largest legitimate document is orders of magnitude smaller.
+     * The size is a stat, taken before the read, so the file is never opened for content.
+     */
+    private val maxFileBytes: Long = MAX_FILE_BYTES,
 ) {
     data class Snapshot(
         val revision: String,
@@ -31,6 +40,8 @@ class WorktreeCouchGateway(
          * partial plane that reports success is the failure mode this field exists to expose.
          */
         val skippedDirs: List<String> = emptyList(),
+        /** Files over [maxFileBytes], by relative path: present in the tree, absent from the plane, said so. */
+        val skippedFiles: List<String> = emptyList(),
     )
 
     fun reconcile(
@@ -42,11 +53,14 @@ class WorktreeCouchGateway(
         if (!fileOps.isDir(repoRoot)) return Snapshot(revision, emptyList())
 
         val skippedDirs = mutableListOf<String>()
+        val skippedFiles = mutableListOf<String>()
         val current = collectFiles(repoRoot, skippedDirs)
         val existing = attachments.listAttachments(prefix).associateBy { it.path }
 
         for ((relativePath, physicalPath) in current) {
             val logicalPath = prefix + relativePath
+            // Stat before read: an oversized file is skipped and NAMED, never loaded.
+            if (sizeOf(physicalPath) > maxFileBytes) { skippedFiles.add(relativePath); continue }
             // TOCTOU guard: the walk and the read are separate syscalls; a file
             // deleted between them (reactive editor, daemon self-write, git
             // checkout) used to abort the whole reconcile with FileNotFound —
@@ -73,7 +87,9 @@ class WorktreeCouchGateway(
             )
         }
 
-        val currentLogicalPaths = current.keys.mapTo(mutableSetOf()) { prefix + it }
+        // An oversized file is in the tree but not in the plane: it is neither claimed as a path
+        // nor protected from tombstoning — a file that GREW past the cap leaves the plane.
+        val currentLogicalPaths = current.keys.filterNot { it in skippedFiles }.mapTo(mutableSetOf()) { prefix + it }
         val deletedPaths = mutableListOf<String>()
         // A path missing from `current` because its directory could not be ENUMERATED is not a
         // deleted file — tombstoning it would convert a transient read failure into real data
@@ -87,7 +103,13 @@ class WorktreeCouchGateway(
             deletedPaths.add(path)
         }
 
-        return Snapshot(revision, currentLogicalPaths.sorted(), deletedPaths.sorted(), skippedDirs.sorted())
+        return Snapshot(revision, currentLogicalPaths.sorted(), deletedPaths.sorted(), skippedDirs.sorted(), skippedFiles.sorted())
+    }
+
+    /** A stat, not a read: open, size, close. -1 when it cannot be told, and then the read decides. */
+    private fun sizeOf(path: String): Long {
+        val fd = try { fileOps.open(path) } catch (_: Exception) { return -1L }
+        return try { fileOps.size(fd) } finally { fileOps.close(fd) }
     }
 
     private fun collectFiles(repoRoot: String, skippedDirs: MutableList<String>): Map<String, String> {
@@ -134,6 +156,9 @@ class WorktreeCouchGateway(
          * project name instead of a name borrowed from this one.
          */
         var WORKTREE_PREFIX = "projects/trikeshed/"
+
+        /** 64 MiB. Above this a worktree file is a payload, not a document, and is skipped by name. */
+        const val MAX_FILE_BYTES: Long = 64L shl 20
 
         val EXCLUDED_SEGMENTS = setOf(
             ".git", ".gradle", ".idea", "build", "node_modules",
