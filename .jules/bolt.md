@@ -179,3 +179,12 @@ The code looks correct and fully optimized. The tests passed on the relevant par
 ## 2026-08-25 - Avoid redundant identity maps on Sequence before materialization
 **Learning:** In Kotlin, using `.map { it }` on a `Sequence` (e.g. `text.lineSequence().map { it }.toList()`) is a redundant identity transform. It needlessly allocates an intermediate `TransformingSequence` wrapper around the sequence just to apply a no-op identity function, increasing heap allocations in hot paths.
 **Action:** Remove redundant `.map { it }` calls before `.toList()` on Sequences (or simply use `.lines()` for strings).
+
+## 2026-11-01 - Prevent `ConcurrentModificationException` during Iterable mutation iteration
+**Learning:** Calling `.toList().forEach()` on a mutable list of callbacks/listeners creates a defensive copy of the list. Removing `.toList()` when the underlying collection is modified during iteration (e.g. by a subscriber unsubscribing itself during the `observe` or `update` callback) will result in a `ConcurrentModificationException`.
+**Action:** Retain `.toList()` defensive copying for lists of subscribers, callbacks, and dynamically modified endpoint collections when they are iterated.
+
+
+## 2026-11-02 - Remove redundant `.map { it }` on materialized collections
+**Learning:** Using `.map { it }` on an already materialized list, such as the output of `Files.readAllLines`, is an unnecessary identity transform that needlessly copies the entire list. This increases memory allocation and wastes CPU cycles.
+**Action:** Remove redundant `.map { it }` transformations on materialized collections when returning the original collection is semantically identical.
