@@ -1329,6 +1329,18 @@
         btn.removeAttribute('aria-current');
       }
     }
+    const sidebarBtns = { doc: 'btn-home', board: 'btn-board', graph: 'btn-graph', sheet: 'btn-sheet', host: 'btn-host' };
+    for (const [k, id] of Object.entries(sidebarBtns)) {
+      const sbBtn = document.getElementById(id);
+      if (sbBtn) {
+        sbBtn.classList.toggle('active', k === view);
+        if (k === view) {
+          sbBtn.setAttribute('aria-current', 'page');
+        } else {
+          sbBtn.removeAttribute('aria-current');
+        }
+      }
+    }
     if (view === 'board') { renderBoard(); hydrateBoard(); }
     if (view === 'graph') { setGraphMode(graphMode); }
     if (view === 'sheet') renderSheet();

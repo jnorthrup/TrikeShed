@@ -82,6 +82,8 @@ button { font: inherit; color: inherit; background: none; border: none; cursor: 
   user-select: none;
 }
 .sidebar-item:hover { background: var(--hover); }
+.sidebar-item.active { background: var(--accent-soft); color: var(--accent); }
+.sidebar-item.active .sidebar-item-icon { color: var(--accent); }
 .sidebar-item-icon {
   width: 20px;
   text-align: center;
