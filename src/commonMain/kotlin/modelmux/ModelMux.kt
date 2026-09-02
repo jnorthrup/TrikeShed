@@ -146,6 +146,16 @@ class ModelMux internal constructor(
         private set
 
     /**
+     * The most recent [ModelResponseReceipt] any call through this mux produced —
+     * success or failure — or null before the first call. [lastSelection] is
+     * only written by [route]; a caller that names its model outright
+     * (`chat(modelId = …)`, which is what every LCNC prompt does) never routes,
+     * so this is the record of what actually answered.
+     */
+    var lastReceipt: ModelResponseReceipt? = null
+        private set
+
+    /**
      * Label naming the ranking discipline behind a selection; stamped onto
      * [ModelSelectionEvent.ModelSelected.strategy].
      *
@@ -408,6 +418,7 @@ class ModelMux internal constructor(
             // Quota legion metering: only real (non-cached) calls consume provider
             // quota. A 429 receipt exhausts the key inside applyReceipt.
             session.lastReceipt?.let { receipt ->
+                lastReceipt = receipt
                 if (keyId != null && !receipt.cachedHit) {
                     quotaLegion?.applyReceipt(
                         keyId, receipt.providerId, receipt,

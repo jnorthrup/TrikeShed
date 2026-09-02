@@ -259,23 +259,26 @@ object LcncContracts {
             listOf("trigger?"), listOf("rows"),
             inputKinds = mapOf("trigger" to "trigger"),
             outputKinds = mapOf("rows" to "json")),
-        LcncPortContract("keys.status", "keymux roster",
-            listOf("trigger?"), listOf("roster"),
+        // have/missing: the provider lists a person reads; roster: the full rows.
+        LcncPortContract("keys.status", "keys this machine already has",
+            listOf("trigger?"), listOf("have", "missing", "roster"),
             inputKinds = mapOf("trigger" to "trigger"),
-            outputKinds = mapOf("roster" to "json")),
+            outputKinds = mapOf("have" to "json", "missing" to "json", "roster" to "json")),
         LcncPortContract("board.get", "kanban board",
             listOf("trigger?"), listOf("json"),
             inputKinds = mapOf("trigger" to "trigger"),
             outputKinds = mapOf("json" to "json")),
-        LcncPortContract("mux.models", "mux models",
+        LcncPortContract("mux.models", "models that can answer here",
             listOf("trigger?"), listOf("models"),
             inputKinds = mapOf("trigger" to "trigger"),
             outputKinds = mapOf("models" to "json")),
         // mux.meta: modelmux presence — strategy, last selection, quota standings.
-        LcncPortContract("mux.meta", "mux meta (modelmux presence)",
-            listOf("trigger?"), listOf("meta"),
+        // lastAnswer: the one record a person reads (model, provider, ok, tokens);
+        // meta: the full account (strategy, route selection, quota standings).
+        LcncPortContract("mux.meta", "what the model router did",
+            listOf("trigger?"), listOf("lastAnswer", "meta"),
             inputKinds = mapOf("trigger" to "trigger"),
-            outputKinds = mapOf("meta" to "json")),
+            outputKinds = mapOf("lastAnswer" to "json", "meta" to "json")),
         LcncPortContract("project.kill", "project db kill",
             listOf("trigger?"), listOf("verdict"),
             inputKinds = mapOf("trigger" to "trigger"),
@@ -880,17 +883,24 @@ object LcncContracts {
         //   stored in CouchDB via CouchKeyStore, resolvable by KeyMux.
         //   The key field is a secret (password input) — the panel renders
         //   type=password when the placeholder carries the `secret:` prefix.
-        LcncPortContract("credential.enter", "credential enter (manual → CouchDB)",
+        // credential.list: the stored credentials, "(none …)" first — what the
+        //   prompt.chat prefill picklist is filled from (a stored name, or none).
+        LcncPortContract("credential.list", "saved keys",
+            listOf("trigger?"), listOf("names", "stored"),
+            inputKinds = mapOf("trigger" to "trigger"),
+            outputKinds = mapOf("names" to "json", "stored" to "json")),
+        LcncPortContract("credential.enter", "save a key",
             emptyList(), listOf("credential"),
             outputKinds = mapOf("credential" to "json"),
             params = mapOf(
+                // Provider ids are the keymux roster's — filled live from keys.status,
+                // not a second hand-typed list that drifts from HarnessRegistry.
                 "key_type" to LcncPortContract.LcncParamSpec(
-                    ph = "provider id", v = "nvidia",
-                    opts = listOf("nvidia", "openai", "deepseek", "groq", "zai",
-                        "cerebras", "xai", "moonshot", "minimax", "openrouter", "perplexity")),
-                "url" to LcncPortContract.LcncParamSpec(ph = "base URL", v = "https://integrate.api.nvidia.com/v1"),
+                    ph = "the provider this key is for", v = "nvidia",
+                    optsFrom = "keys.status#roster[].provider"),
+                "url" to LcncPortContract.LcncParamSpec(ph = "the provider's API address", v = "https://integrate.api.nvidia.com/v1"),
                 "api_type" to LcncPortContract.LcncParamSpec(v = "openai", opts = listOf("openai", "anthropic", "google")),
-                "key" to LcncPortContract.LcncParamSpec(ph = "secret:API key"),
+                "key" to LcncPortContract.LcncParamSpec(ph = "secret:the key itself — stored, never shown again"),
             ), isEffect = true),
         // prompt.chat: prompt → model → content. Credential precedence,
         //   highest first: (1) the ModelMux key chain — KeyMux resolves
@@ -898,30 +908,33 @@ object LcncContracts {
         //   with a resolvable key runs with NOTHING entered; (2) the prefill
         //   CouchKeyStore entry; (3) the manual url+key fields. The key field
         //   is a password input (secret: prefix).
-        LcncPortContract("prompt.chat", "prompt chat (modelmux, env-first)",
+        LcncPortContract("prompt.chat", "ask a model",
             listOf("prompt?"), listOf("content", "model", "ok", "error"),
             inputKinds = mapOf("prompt" to "text"),
             outputKinds = mapOf("content" to "text", "model" to "id", "ok" to "json", "error" to "text"),
             params = mapOf(
-                "prompt" to LcncPortContract.LcncParamSpec(ta = true, ph = "prompt text"),
+                "prompt" to LcncPortContract.LcncParamSpec(ta = true, ph = "what do you want to ask?"),
+                // Blank default: the live list leads, and its first entry is the newest
+                // model Hermes ran here (mux cards come from Hermes first).
+                "model" to LcncPortContract.LcncParamSpec(ph = "which model answers — the list is what runs here", optsFrom = "mux.models#models[].id"),
+                "maxTokens" to LcncPortContract.LcncParamSpec(v = "256", ph = "how long the answer may be"),
+                "temperature" to LcncPortContract.LcncParamSpec(v = "0.2", ph = "0 = precise, 1 = creative"),
+                // The stored credentials, "(none …)" first — filled live from
+                // credential.list, so the list is what credential.enter actually saved.
                 "prefill" to LcncPortContract.LcncParamSpec(
-                    ph = "prefill from daemon keys",
-                    opts = listOf("(none — use env/harness keys)", "nvidia", "openai", "deepseek",
-                        "groq", "zai", "cerebras", "xai", "moonshot", "minimax", "openrouter", "perplexity")),
-                "url" to LcncPortContract.LcncParamSpec(ph = "base URL (manual fallback)", v = "https://integrate.api.nvidia.com/v1"),
-                "key" to LcncPortContract.LcncParamSpec(ph = "secret:API key (manual fallback)"),
+                    ph = "a saved key to use, or none (the router finds one)",
+                    optsFrom = "credential.list#names[]"),
+                "url" to LcncPortContract.LcncParamSpec(ph = "advanced: API address, only if the model is not in the list"),
+                "key" to LcncPortContract.LcncParamSpec(ph = "secret:advanced: key, only if the model is not in the list"),
                 "headers" to LcncPortContract.LcncParamSpec(
                     cols = listOf("name", "value"),
-                    ph = "extra headers (k-v pairs)"),
-                "model" to LcncPortContract.LcncParamSpec(ph = "model id (mux.models lists what resolves)", v = "deepseek-ai/deepseek-v4-flash", optsFrom = "mux.models#models[].id"),
-                "maxTokens" to LcncPortContract.LcncParamSpec(v = "256"),
-                "temperature" to LcncPortContract.LcncParamSpec(v = "0.2"),
+                    ph = "advanced: extra request headers"),
             ), isEffect = true),
         // result.confirm: content is the completion signal. `ok` and `error`
         // refine that completion when the producer has an explicit verdict;
         // content-only producers are successful confirmations, not starved
         // nodes (and not blank ERROR cards).
-        LcncPortContract("result.confirm", "result confirmation (OK/ERROR HTML)",
+        LcncPortContract("result.confirm", "the answer",
             listOf("content", "ok?", "error?"), emptyList(),
             inputKinds = mapOf("content" to "text", "ok" to "json", "error" to "text"),
             isSink = true),

@@ -37,6 +37,17 @@ data class HarnessProvider(
      * through this lane would report a protocol mismatch as a bad credential.
      */
     val probeModel: String? = null,
+    /**
+     * The env/dotenv variable that overrides this provider's base url — Hermes'
+     * own `base_url_env_var` overlay (hermes_cli/providers.py), mirrored so the
+     * two resolve the same endpoint: zai reads GLM_BASE_URL, kimi KIMI_BASE_URL,
+     * … Consulted before the generic `<ID>_BASE_URL`. Without it, zai answered
+     * `api/paas/v4` (the registry default) while Hermes, honouring
+     * `GLM_BASE_URL=…/api/coding/paas/v4` in `~/.hermes/.env`, ran the coding
+     * plan — and every mux-routed zai call hit "insufficient balance" on a
+     * plan the operator does not use.
+     */
+    val baseUrlEnvVar: String? = null,
 )
 
 /**
@@ -45,26 +56,26 @@ data class HarnessProvider(
  */
 object HarnessRegistry {
     val providers: Series<HarnessProvider> = s_[
-        HarnessProvider("openai", s_["OPENAI_API_KEY"], "https://api.openai.com/v1", "gpt-4o-mini"),
+        HarnessProvider("openai", s_["OPENAI_API_KEY"], "https://api.openai.com/v1", "gpt-4o-mini", baseUrlEnvVar = "OPENAI_BASE_URL"),
         // No defaultBaseUrl and no probeModel: anthropic's wire protocol is
         // /v1/messages, which the ModelMux /chat/completions lane does not speak.
         HarnessProvider("anthropic", s_["ANTHROPIC_API_KEY"]),
-        HarnessProvider("xai", s_["XAI_API_KEY"], "https://api.x.ai/v1", "grok-3-mini"),
+        HarnessProvider("xai", s_["XAI_API_KEY"], "https://api.x.ai/v1", "grok-3-mini", baseUrlEnvVar = "XAI_BASE_URL"),
         HarnessProvider("google", s_["GOOGLE_API_KEY", "GEMINI_API_KEY"], "https://generativelanguage.googleapis.com/v1beta"),
         HarnessProvider("gemini", s_["GEMINI_API_KEY", "GOOGLE_API_KEY"], "https://generativelanguage.googleapis.com/v1beta"),
-        HarnessProvider("deepseek", s_["DEEPSEEK_API_KEY"], "https://api.deepseek.com/v1", "deepseek-chat"),
+        HarnessProvider("deepseek", s_["DEEPSEEK_API_KEY"], "https://api.deepseek.com/v1", "deepseek-chat", baseUrlEnvVar = "DEEPSEEK_BASE_URL"),
         HarnessProvider("nvidia", s_["NVIDIA_API_KEY", "NGC_API_KEY"], "https://integrate.api.nvidia.com/v1", "nvidia/nemotron-3-super-120b-a12b"),
-        HarnessProvider("openrouter", s_["OPENROUTER_API_KEY"], "https://openrouter.ai/api/v1", "openai/gpt-4o-mini"),
+        HarnessProvider("openrouter", s_["OPENROUTER_API_KEY"], "https://openrouter.ai/api/v1", "openai/gpt-4o-mini", baseUrlEnvVar = "OPENROUTER_BASE_URL"),
         HarnessProvider("groq", s_["GROQ_API_KEY"], "https://api.groq.com/openai/v1", "llama-3.1-8b-instant"),
         HarnessProvider("mistral", s_["MISTRAL_API_KEY"], "https://api.mistral.ai/v1", "mistral-small-latest"),
         HarnessProvider("cerebras", s_["CEREBRAS_API_KEY"], "https://api.cerebras.ai/v1", "gpt-oss-120b"),
-        HarnessProvider("moonshot", s_["MOONSHOT_API_KEY", "KIMI_API_KEY"], "https://api.moonshot.ai/v1", "moonshot-v1-8k"),
-        HarnessProvider("kimi", s_["KIMI_API_KEY", "MOONSHOT_API_KEY"], "https://api.moonshot.ai/v1", "moonshot-v1-8k"),
+        HarnessProvider("moonshot", s_["MOONSHOT_API_KEY", "KIMI_API_KEY"], "https://api.moonshot.ai/v1", "moonshot-v1-8k", baseUrlEnvVar = "KIMI_BASE_URL"),
+        HarnessProvider("kimi", s_["KIMI_API_KEY", "MOONSHOT_API_KEY"], "https://api.moonshot.ai/v1", "moonshot-v1-8k", baseUrlEnvVar = "KIMI_BASE_URL"),
         HarnessProvider("glm", s_["GLM_API_KEY", "ZHIPU_API_KEY"]),
         HarnessProvider("zhipu", s_["ZHIPU_API_KEY", "GLM_API_KEY"]),
-        HarnessProvider("zai", s_["ZAI_API_KEY", "GLM_API_KEY"], "https://api.z.ai/api/paas/v4", "glm-4.5-air"),
+        HarnessProvider("zai", s_["ZAI_API_KEY", "GLM_API_KEY"], "https://api.z.ai/api/paas/v4", "glm-4.5-air", baseUrlEnvVar = "GLM_BASE_URL"),
         HarnessProvider("perplexity", s_["PERPLEXITY_API_KEY"], "https://api.perplexity.ai", "sonar"),
-        HarnessProvider("minimax", s_["MINIMAX_API_KEY"], "https://api.minimax.chat/v1"),
+        HarnessProvider("minimax", s_["MINIMAX_API_KEY"], "https://api.minimax.chat/v1", baseUrlEnvVar = "MINIMAX_BASE_URL"),
         // jules/brain are dispatch identities, not chat endpoints.
         HarnessProvider("jules", s_["JULES_API_KEY"]),
         HarnessProvider("brain", s_["BRAIN_API_KEY"]),
@@ -162,6 +173,13 @@ class HarnessSource(
     }
 
     private suspend fun providerBaseUrl(provider: String): String? {
+        // Hermes' own override variable for this provider wins outright — the
+        // same rule its _resolve_*_base_url helpers apply ("if the user has
+        // explicitly set GLM_BASE_URL, that always wins").
+        HarnessRegistry.byId(provider)?.baseUrlEnvVar?.let { hermesVar ->
+            getenv(hermesVar)?.takeIf { it.isNotBlank() }?.let { return it }
+            dotenvValue(hermesVar)?.let { return it }
+        }
         val varName = provider.uppercase().replace('.', '_').replace('-', '_') + "_BASE_URL"
         getenv(varName)?.takeIf { it.isNotBlank() }?.let { return it }
         dotenvValue(varName)?.let { return it }

@@ -116,6 +116,10 @@ button.stop{border-color:var(--err);color:var(--err)}
 .port.t-num:hover{background:#ffb02e}.port.t-trig:hover{background:#3ddc84}
 .node.collapsed .params,.node.collapsed .result,.node.collapsed .gaugeval,.node.collapsed .gaugelabel,.node.collapsed .kboard,.node.collapsed .kboard-status{display:none}
 .node.note{background:#2a2410;border-color:#5c4d1a;min-width:150px}
+/* Reading-width for what a person reads: notes and the answer card. */
+.node[data-type="note"]{min-width:330px}
+.node[data-type="result.confirm"]{min-width:360px}
+.node[data-type="result.confirm"] .result pre{font-size:13px}
 .node.note .hd{background:#33290f}
 #minimap{position:fixed;right:10px;bottom:26px;width:168px;height:112px;background:rgba(17,21,30,.92);border:1px solid var(--line);border-radius:5px;z-index:20;cursor:pointer}
 /* ── fractal zoom: diving into a program.ref swaps the SAME viewport to its
@@ -497,12 +501,11 @@ finally:
       return {content:r.content, model:r.model};
     },
   },
-  "mux.models": {
-    async run(){ const r=await api("GET","/api/mux/models"); return {models:r.models||r}; },
-  },
-  "keys.status": {
-    async run(){ const r=await api("GET","/api/mux/keys"); return {roster:r.roster||r}; },
-  },
+  // mux.models / keys.status have NO client twin: the server runners
+  // (BrainMuxNodes, reached through serverRun) are the contract. The twins
+  // that lived here read /api/mux/models (the brain's single pinned endpoint)
+  // and /api/mux/keys (the static roster), so the canvas showed one model
+  // where the picklist showed thirty-seven, and the `have` port never existed.
   "project.kill": {
     async run(n){
       const name=p(n,"name"); if(!name) throw "name required";
@@ -1419,7 +1422,7 @@ function wireKindOk(w){
 }
 function buildNode(n){
   const t=CONTRACTS[n.type]; if(!t) return; // vocabulary is server-owned
-  const el=document.createElement("div"); el.className="node"; el.dataset.id=n.id; n.el=el;
+  const el=document.createElement("div"); el.className="node"; el.dataset.id=n.id; el.dataset.type=n.type; n.el=el;
   // ── CONCENTRIC CONTEXT: a scope node IS a ring square. Its children are
   // real nodes rendered INSIDE it at inset margins — the geometry of
   // withContext(LcncScopeFrame): child ring nested in parent ring, the
@@ -1578,6 +1581,12 @@ function buildNode(n){
         for(const o of list){const op=document.createElement("option");op.value=op.textContent=o;inp.appendChild(op);}
         if(keep&&!list.includes(keep)){ const op=document.createElement("option");
           op.value=op.textContent=keep; op.dataset.stale="1"; inp.appendChild(op); }
+        // A LIVE list with no value yet takes its first entry — and records it,
+        // so what the select shows is what the daemon runs. (`??` left "" alone:
+        // the select displayed the first model while the param stayed blank and
+        // the run answered "no model specified".) Dead lists keep their blanks:
+        // there "" can be a real option.
+        if(def.optsFrom&&!keep&&list.length){ n.params[k]=list[0]; inp.value=list[0]; save(); return; }
         inp.value=keep??list[0]??""; };
       fill(def.opts||[]);
       // LIVE PICKLIST. A dead opts array is a list someone typed once and the
@@ -1591,7 +1600,10 @@ function buildNode(n){
       }
       inp.value=n.params[k];
     }
-    else if(def.ta){ inp=document.createElement("textarea"); inp.value=n.params[k]; }
+    else if(def.ta){ inp=document.createElement("textarea"); inp.value=n.params[k];
+      // Size to the text: a five-line note in a three-line box is a note cut off
+      // at the exact point it was about to say something.
+      inp.rows=Math.max(3, Math.min(16, String(n.params[k]??"").split("\n").length)); }
     else { inp=document.createElement("input"); if(def.ph&&def.ph.startsWith("secret:")) inp.type="password"; inp.value=n.params[k]; }
     if(def.ph) inp.placeholder=def.ph.startsWith("secret:")?def.ph.slice(7):def.ph;
     inp.addEventListener("input",()=>{ n.params[k]=inp.value; save(); });
@@ -3165,6 +3177,19 @@ async function syncContracts(){
     // Fallback parity: every hydrated type with no explicit browser runner
     // dispatches to the daemon — explicit RUNNERS entries keep winning.
     for(const t in m) if(!RUNNERS[t]) RUNNERS[t]=serverRun(t);
+    // result.confirm is a SINK whose server runner answers with a ready HTML
+    // card (x). Sinks skip setResult by design (they own their own body), so
+    // without a render hook the card the preset promises never appeared and the
+    // answer stayed buried in prompt.chat's output tree.
+    if(RUNNERS["result.confirm"]&&!RUNNERS["result.confirm"].render){
+      RUNNERS["result.confirm"].render=(n,out)=>{
+        const html=out&&typeof out.x==="string"?out.x:"";
+        let el=n.el.querySelector(".result");
+        if(!el){ el=document.createElement("div"); el.className="result"; n.el.appendChild(el);
+          el.addEventListener("pointerdown",e=>e.stopPropagation()); }
+        el.innerHTML=html;   // server-authored; content/error are escaped there
+      };
+    }
     $("#status").textContent=Object.keys(m).length+" contracts · "+Object.keys(KIND_ACCEPTANCE).length+" semantic kinds · "+KIND_HIERARCHY.length+" rdfs:subClassOf edges";
   }catch(e){
     $("#status").textContent="contracts fetch failed: "+e;

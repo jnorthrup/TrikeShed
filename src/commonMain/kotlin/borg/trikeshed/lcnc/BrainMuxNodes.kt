@@ -4,6 +4,7 @@ import keymux.CouchKeyStore
 import keymux.KeyMux
 import modelmux.ModelMux
 import modelmux.acp.AcpMessage
+import modelmux.acp.providerTag
 import borg.trikeshed.lib.ByteSeries
 import borg.trikeshed.lib.Series
 import borg.trikeshed.lib.get
@@ -73,7 +74,13 @@ object BrainMuxNodes {
                     "baseUrl" to baseUrl,
                 ))
             }
-            mapOf("roster" to roster)
+            // The two lists a person actually asks for: which providers can
+            // answer with nothing typed, and which cannot.
+            mapOf(
+                "roster" to roster,
+                "have" to roster.filter { it["keyPresent"] == true }.map { it["provider"] },
+                "missing" to roster.filter { it["keyPresent"] != true }.map { it["provider"] },
+            )
         },
 
         // ── mux.models ──────────────────────────────────────────────
@@ -118,20 +125,50 @@ object BrainMuxNodes {
         // warm — meta is a live projection, never a guess.
         "mux.meta" to LcncNodeRunner { _, _ ->
             if (modelMux == null) return@LcncNodeRunner mapOf("meta" to emptyList<Any>())
+            // lastSelection is written by route() — capability ranking. A
+            // prompt.chat names its model outright and never routes, so after
+            // the one call a person just made this read `selection: null`,
+            // which looks broken. The receipt is the record of that call.
+            val answered = modelMux.lastReceipt?.let { r ->
+                // The receipt's providerId is the CARD id; the provider a person
+                // means is the card's provider tag (zai, nvidia, …).
+                val providerTag = runCatching {
+                    val cards = modelMux.listModels()
+                    var tag: String? = null
+                    for (i in 0 until cards.size) if (cards[i].a == r.providerId) { tag = cards[i].providerTag; break }
+                    tag
+                }.getOrNull()
+                linkedMapOf<String, Any?>(
+                    "model" to r.modelId,
+                    "provider" to (providerTag ?: r.providerId),
+                    "ok" to (r.httpStatus in 200..299),
+                    "httpStatus" to r.httpStatus,
+                    "latencyMs" to r.latencyMs,
+                    "inputTokens" to r.inputTokens,
+                    "outputTokens" to r.outputTokens,
+                    "fromCache" to r.cachedHit,
+                )
+            }
             val meta = linkedMapOf<String, Any?>(
+                "lastAnswer" to answered,
                 "strategy" to modelMux.strategyName,
-                "selection" to modelMux.lastSelection?.let { sel ->
-                    linkedMapOf<String, Any?>(
-                        "provider" to sel.provider,
-                        "model" to sel.model,
-                        "strategy" to sel.strategy,
-                        "requestId" to sel.requestId,
-                        "at" to sel.at,
-                    )
-                },
             )
+            // Only when a route() ranking happened: a null here read as "broken".
+            modelMux.lastSelection?.let { sel ->
+                meta["selection"] = linkedMapOf<String, Any?>(
+                    "provider" to sel.provider,
+                    "model" to sel.model,
+                    "strategy" to sel.strategy,
+                    "requestId" to sel.requestId,
+                    "at" to sel.at,
+                )
+            }
+            // Standings live in the MuxReactor; without its context the roster
+            // is unknowable and the list is empty. Ride chatContext like chat does.
             val standings = runCatching {
-                modelMux.quotaStandings(kotlinx.datetime.Clock.System.now().toEpochMilliseconds())
+                val now = kotlinx.datetime.Clock.System.now().toEpochMilliseconds()
+                if (chatContext != null) withContext(chatContext) { modelMux.quotaStandings(now) }
+                else modelMux.quotaStandings(now)
             }.getOrDefault(emptyList())
             meta["quota"] = standings.map { s ->
                 linkedMapOf<String, Any?>(
@@ -144,7 +181,7 @@ object BrainMuxNodes {
                     "utilization" to s.utilization,
                 )
             }
-            mapOf("meta" to meta)
+            mapOf("meta" to meta, "lastAnswer" to answered)
         },
 
         // ── credential.enter ────────────────────────────────────────
@@ -304,6 +341,16 @@ object BrainMuxNodes {
         "note" to LcncNodeRunner { _, _ -> emptyMap() },
 
         // ── result.confirm ──────────────────────────────────────────
+        // ── credential.list ─────────────────────────────────────────
+        // The prefill picklist's HONEST source: the credentials credential.enter
+        // actually stored (CouchKeyStore), led by the "none" entry — blank is
+        // not offerable through a live list, and prompt.chat already reads a
+        // leading "(none" as "let the mux key chain answer".
+        "credential.list" to LcncNodeRunner { _, _ ->
+            val stored = credStore?.let { runCatching { it.listProviders() }.getOrDefault(emptyList()) }.orEmpty()
+            mapOf("names" to listOf(PREFILL_NONE) + stored, "stored" to stored)
+        },
+
         "result.confirm" to LcncNodeRunner { _, inputs ->
             val content = (inputs["content"] as? String).orEmpty()
             val error = ((inputs["error"] ?: inputs["error?"]) as? String).orEmpty()
@@ -335,8 +382,11 @@ object BrainMuxNodes {
 
     fun servedTypes(): Set<String> = setOf(
         "keys.status", "mux.models", "mux.meta",
-        "credential.enter", "prompt.chat", "result.confirm", "note",
+        "credential.enter", "credential.list", "prompt.chat", "result.confirm", "note",
     )
+
+    /** The prefill option meaning "no stored credential — the mux key chain answers". */
+    const val PREFILL_NONE = "(none — env/harness keys)"
 
     // ── Direct HTX fallback for unregistered models ─────────────────
     // Used when no ModelMux is wired (standalone mode) or the model ID

@@ -6,16 +6,22 @@ import java.sql.DriverManager
 /**
  * What Hermes ACTUALLY ran, from Hermes' own ledger.
  *
- * `~/.hermes/state.db` carries a `session_model_usage` table — model, billing
- * provider, base url, task, call count, tokens, cost, first_seen/last_seen —
- * written by Hermes every time a model answers. It is the only record on this
- * machine of a model call that SUCCEEDED.
+ * `$HERMES_HOME/state.db` carries a `session_model_usage` table — model,
+ * billing provider, base url, task, call count, tokens, cost,
+ * first_seen/last_seen — written by Hermes every time a model answers. It is
+ * the only record on this machine of a model call that SUCCEEDED, and the
+ * panel reads it next to `mux.meta` for exactly that reason: the pin is
+ * intent, this is outcome.
  *
- * That matters more than telemetry. `mux.meta` reports `selection: null` and
- * `brain-errors.jsonl` is 14 attempts with zero successes, all against the
- * pinned `GLM_BASE_URL`. Meanwhile this table shows models answering through
- * entirely different endpoints. The pin and the evidence disagree, and only one
- * of them has ever produced a completion.
+ * WHICH ledger: Hermes keeps one `state.db` per profile, and the profile is
+ * `$HERMES_HOME` — the same rule [keymux.defaultHermesHome] gives the KeyMux,
+ * so the daemon (which runs under the operator's `src-trikeshed` profile)
+ * reads the ledger of the Hermes it shares credentials with. Reading a fixed
+ * `~/.hermes` read a different profile's history.
+ *
+ * This is reporting only. The model instance the daemon borrows comes from
+ * [HermesActiveSession] — the session row Hermes itself would resume — not
+ * from ranking this table.
  *
  * Read-only, and defensive: an absent db, a locked db, or a schema that has
  * moved on all answer empty rather than throwing into a panel refresh.
@@ -26,23 +32,34 @@ object HermesModelUsage {
         val model: String,
         val provider: String,
         val baseUrl: String,
+        /** Empty for a main conversational turn; a name (`title_generation`, `approval`, …) for a side task. */
         val task: String,
         val calls: Int,
         val inputTokens: Long,
         val outputTokens: Long,
         val lastSeenEpochSeconds: Double,
+        /** The `state.db` this row was read from. */
+        val ledger: String = "",
     )
 
-    fun stateDb(hermesHome: String = System.getProperty("user.home") + "/.hermes"): File =
-        File(hermesHome, "state.db")
-
     /**
-     * Most recently used first. [limit] rows, newest `last_seen` wins — which is
-     * the "last used model" a panel wants at the top.
+     * The hermes home this process shares with Hermes: `$HERMES_HOME` (the
+     * active profile — `~/.hermes/profiles/src-trikeshed` for the daemon) else
+     * `~/.hermes`, with `~` expanded.
      */
+    fun hermesHome(getenv: (String) -> String? = { System.getenv(it) }): String =
+        expandHome(keymux.defaultHermesHome(getenv))
+
+    fun stateDb(hermesHome: String = hermesHome()): File = File(hermesHome, "state.db")
+
+    /** Most recently used first — [limit] rows, newest `last_seen` wins. */
     fun recent(db: File = stateDb(), limit: Int = 16): List<Usage> = runCatching {
         if (!db.isFile) return emptyList()
-        DriverManager.getConnection("jdbc:sqlite:${db.absolutePath}").use { conn ->
+        val props = org.sqlite.SQLiteConfig().apply {
+            setReadOnly(true)
+            setBusyTimeout(2_000)
+        }.toProperties()
+        DriverManager.getConnection("jdbc:sqlite:${db.absolutePath}", props).use { conn ->
             conn.prepareStatement(
                 """
                 SELECT model, billing_provider, billing_base_url, task,
@@ -66,6 +83,7 @@ object HermesModelUsage {
                                 inputTokens = rs.getLong(6),
                                 outputTokens = rs.getLong(7),
                                 lastSeenEpochSeconds = rs.getDouble(8),
+                                ledger = db.absolutePath,
                             ),
                         )
                     }
@@ -75,19 +93,27 @@ object HermesModelUsage {
         }
     }.getOrElse { emptyList() }
 
-    /** The single most recent model that answered, or null if the ledger is empty. */
+    /** The single most recent row that answered, or null if the ledger is empty. */
     fun lastUsed(db: File = stateDb()): Usage? = recent(db, limit = 1).firstOrNull()
 
     /**
      * Distinct endpoints that have ever produced a completion, newest first.
      *
-     * This is the list worth reading next to the pin: a base url in here has
-     * demonstrably answered on this machine, and one that is not in here has
-     * not, however confidently it is configured.
+     * A base url in here has demonstrably answered on this machine, and one
+     * that is not in here has not, however confidently it is configured.
      */
     fun provenEndpoints(db: File = stateDb()): List<Pair<String, String>> =
         recent(db, limit = 256)
             .filter { it.baseUrl.isNotEmpty() }
             .map { it.provider to it.baseUrl }
             .distinct()
+
+    internal fun expandHome(path: String): String {
+        val home = System.getProperty("user.home")
+        return when {
+            path == "~" -> home
+            path.startsWith("~/") -> home + path.substring(1)
+            else -> path
+        }
+    }
 }

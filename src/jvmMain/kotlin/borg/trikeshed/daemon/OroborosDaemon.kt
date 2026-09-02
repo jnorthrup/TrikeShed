@@ -1029,33 +1029,53 @@ object OroborosDaemon {
         val projectMiner = borg.trikeshed.forge.server.ProjectMiner(
             projectDbRegistry, projectScopes, casStore, beliefBag, File(forgeHome, "files"),
         )
-        // ── Single-file model pin (hermes convention): GLM_MODEL beside the existing
-        // GLM_BASE_URL in ~/.hermes/.env (or plain env) pins EVERY brain call to
-        // exactly that endpoint through the override lane — no roster, no failover
-        // maze, no env-var archaeology. Key: GLM_API_KEY, else ZAI_API_KEY.
-        // A half-configured pin WARNS LOUDLY and falls back to the roster — the
-        // daemon never dies over model config.
-        suspend fun pinVar(name: String): String? = kotlinx.coroutines.withContext(Dispatchers.IO) {
-            (keyMux.get(name) ?: System.getenv(name))?.trim()?.takeIf { it.isNotEmpty() }
-        }
-        val glmModel = pinVar("GLM_MODEL")
-        val glmBase = pinVar("GLM_BASE_URL")
-        val glmKey = pinVar("GLM_API_KEY") ?: pinVar("ZAI_API_KEY")
+        // ── Brain pin = Hermes' live session. Hermes records, per session, the
+        // model and the resolved runtime it actually runs on
+        // (sessions.model_config.gateway_runtime: provider, base_url, api_mode)
+        // and ranks sessions by real recency (hermes_state.py; mirrored in
+        // HermesActiveSession). The daemon runs under the same $HERMES_HOME as
+        // the operator's CLI, so the row Hermes would resume IS the model
+        // instance to borrow — it follows every `/model` switch with no second
+        // config. The key resolves the way Hermes resolves it — the provider's
+        // env vars, then its credential pool — which here is the KeyMux
+        // `llm.<provider>.key` lane; a runtime that names only a provider gets
+        // its base url from `llm.<provider>.base_url` the same way. No session,
+        // an api_mode BrainClient cannot speak (it posts /chat/completions), or
+        // a key that does not resolve → the roster, with the reason logged.
+        // (GLM_MODEL was never a Hermes variable; only GLM_BASE_URL is — the
+        // zai base-url override — and the session row already reflects it.)
         val brainErrorSink = borg.trikeshed.jules.JvmBrainErrorSink(forgeHome)
-        val brainClient = when {
-            glmModel != null && glmBase != null && glmKey != null -> {
-                System.err.println("[OROBOROS] Brain PINNED: $glmModel @ $glmBase (single-file GLM pin, ~/.hermes/.env)")
-                borg.trikeshed.jules.BrainClient(apiKey = glmKey, base = glmBase, model = glmModel, errorSink = brainErrorSink)
+        val hermesSession = borg.trikeshed.jules.HermesActiveSession.current()
+        val hermesProvider = hermesSession?.runtime?.provider
+        suspend fun hermesLane(field: String): String? = hermesProvider?.let { provider ->
+            kotlinx.coroutines.withContext(Dispatchers.IO) {
+                runCatching { keyMux.get("llm.$provider.$field") }.getOrNull()?.trim()?.takeIf { it.isNotEmpty() }
             }
-            glmModel != null -> {
-                System.err.println(
-                    "[OROBOROS] GLM pin INCOMPLETE: GLM_MODEL=$glmModel but " +
-                        (if (glmBase == null) "GLM_BASE_URL missing" else "no GLM_API_KEY/ZAI_API_KEY") +
-                        " — falling back to the provider roster. Fix ~/.hermes/.env.",
-                )
-                borg.trikeshed.jules.BrainClient(errorSink = brainErrorSink, keyMux = keyMux)
-            }
-            else -> borg.trikeshed.jules.BrainClient(errorSink = brainErrorSink, keyMux = keyMux)
+        }
+        val hermesKey = hermesLane("key")
+        val hermesBaseUrl = hermesSession?.runtime?.baseUrl ?: hermesLane("base_url")
+        val hermesModel = hermesSession?.model?.takeIf { it.isNotBlank() }
+        val hermesPinReason: String = when {
+            hermesSession == null -> "no session row in ${borg.trikeshed.jules.HermesActiveSession.stateDb()}"
+            hermesModel == null -> "session ${hermesSession.id} carries no model"
+            hermesProvider == null -> "session ${hermesSession.id} has no resolved runtime provider"
+            !hermesSession.runtime.speaksChatCompletions ->
+                "session ${hermesSession.id} runs api_mode=${hermesSession.runtime.apiMode}, not chat_completions"
+            hermesBaseUrl == null -> "no base url for provider $hermesProvider (session row nor llm.$hermesProvider.base_url)"
+            hermesKey == null -> "no key resolves for llm.$hermesProvider.key"
+            else -> ""
+        }
+        val brainClient = if (hermesPinReason.isEmpty() && hermesSession != null && hermesModel != null && hermesBaseUrl != null && hermesKey != null) {
+            val seen = java.time.Instant.ofEpochMilli((hermesSession.recencyEpochSeconds * 1000).toLong())
+            System.err.println(
+                "[OROBOROS] Brain PINNED to hermes session ${hermesSession.id} (${hermesSession.source}, " +
+                    (if (hermesSession.isOpen) "open" else "ended") + ", last activity $seen, ${hermesSession.apiCallCount} api calls): " +
+                    "$hermesModel @ $hermesBaseUrl (provider=$hermesProvider, api_mode=${hermesSession.runtime.apiMode ?: "chat_completions"}, ${hermesSession.ledger})",
+            )
+            borg.trikeshed.jules.BrainClient(apiKey = hermesKey, base = hermesBaseUrl.trimEnd('/'), model = hermesModel, errorSink = brainErrorSink)
+        } else {
+            System.err.println("[OROBOROS] Brain on the provider roster — hermes session pin unavailable: $hermesPinReason")
+            borg.trikeshed.jules.BrainClient(errorSink = brainErrorSink, keyMux = keyMux)
         }
         // The runner registry is assembled below; the publisher reads it late.
         val lcncRunnersRef = java.util.concurrent.atomic.AtomicReference<Map<String, borg.trikeshed.lcnc.LcncNodeRunner>>(emptyMap())
@@ -1156,8 +1176,11 @@ object OroborosDaemon {
         // selection:null. Hermes' own state.db answers "what actually replied",
         // and it is not empty. Where those two disagree, the ledger is the one
         // with completions behind it. JVM-side because the ledger is SQLite.
+        // Ledger = $HERMES_HOME/state.db; `session` = the row Hermes would resume
+        // (HermesActiveSession) and `brainPin` = what the daemon borrowed from it.
         moduleContext.lcncRunners["hermes.lastUsed"] = borg.trikeshed.lcnc.LcncNodeRunner { _, _ ->
-            val recent = borg.trikeshed.jules.HermesModelUsage.recent()
+            val db = borg.trikeshed.jules.HermesModelUsage.stateDb()
+            val recent = borg.trikeshed.jules.HermesModelUsage.recent(db)
             fun row(u: borg.trikeshed.jules.HermesModelUsage.Usage) = mapOf(
                 "model" to u.model,
                 "provider" to u.provider,
@@ -1168,10 +1191,31 @@ object OroborosDaemon {
                 "outputTokens" to u.outputTokens,
                 "lastSeenMs" to (u.lastSeenEpochSeconds * 1000).toLong(),
             )
+            val session = borg.trikeshed.jules.HermesActiveSession.current(db)
             mapOf(
+                "ledger" to db.absolutePath,
+                "session" to session?.let { s ->
+                    mapOf(
+                        "id" to s.id,
+                        "source" to s.source,
+                        "open" to s.isOpen,
+                        "model" to s.model,
+                        "provider" to s.runtime.provider,
+                        "baseUrl" to s.runtime.baseUrl,
+                        "apiMode" to s.runtime.apiMode,
+                        "lastActivityMs" to (s.recencyEpochSeconds * 1000).toLong(),
+                        "messages" to s.messageCount,
+                        "apiCalls" to s.apiCallCount,
+                        "cwd" to s.cwd,
+                    )
+                },
+                "brainPin" to if (hermesPinReason.isEmpty()) {
+                    mapOf("model" to hermesModel, "baseUrl" to hermesBaseUrl, "provider" to hermesProvider, "sessionId" to hermesSession?.id)
+                } else null,
+                "brainPinReason" to hermesPinReason.ifEmpty { null },
                 "lastUsed" to (recent.firstOrNull()?.let(::row)),
                 "recent" to recent.map(::row),
-                "provenEndpoints" to borg.trikeshed.jules.HermesModelUsage.provenEndpoints()
+                "provenEndpoints" to borg.trikeshed.jules.HermesModelUsage.provenEndpoints(db)
                     .map { mapOf("provider" to it.first, "baseUrl" to it.second) },
             )
         }
@@ -1385,7 +1429,31 @@ object OroborosDaemon {
         // openrouter; one hermes model under three endpoints), which is why the
         // panel offered a menu whose entries mostly failed. disambiguateModelIds
         // keeps the bare id for the first claimant and qualifies the rest.
-        val lcncRoster = brainClient.providerRoster()
+        // Cards come from Hermes FIRST — the model instances it has run on and
+        // been answered by ($HERMES_HOME/state.db: sessions + session_model_usage,
+        // HermesInstances) — then the static roster for whatever Hermes has not
+        // touched. The live picklist prompt.chat declares (mux.models#models[].id)
+        // therefore offers what actually runs here, not a hand-typed table.
+        // …and only the rows THIS daemon can authenticate: a provider whose
+        // `llm.<provider>.key` does not resolve here would be a dead entry in the
+        // listbox, so it is reported, not offered.
+        val hermesKnown = borg.trikeshed.jules.HermesInstances.known()
+        val hermesKeyed = kotlinx.coroutines.withContext(Dispatchers.IO) {
+            hermesKnown.map { it.provider }.distinct().associateWith { provider ->
+                runCatching { keyMux.get("llm.$provider.key") }.getOrNull()?.isNotBlank() == true
+            }
+        }
+        val hermesInstances = hermesKnown.filter { hermesKeyed[it.provider] == true }
+        val hermesSpecs = borg.trikeshed.jules.HermesInstances.specs(hermesInstances)
+        val hermesClaimed = hermesSpecs.mapTo(HashSet()) { it.provider to it.model }
+        val lcncRoster = hermesSpecs + brainClient.providerRoster().filterNot { (it.provider ?: it.name) to it.model in hermesClaimed }
+        System.err.println(
+            "[OROBOROS] mux cards: ${hermesSpecs.size} from hermes (${borg.trikeshed.jules.HermesModelUsage.stateDb()}), " +
+                "${lcncRoster.size - hermesSpecs.size} from the static roster" +
+                hermesInstances.take(3).joinToString(prefix = " — newest: ", separator = ", ") { "${it.model}@${it.provider}" } +
+                hermesKeyed.filterValues { !it }.keys.takeIf { it.isNotEmpty() }
+                    ?.joinToString(prefix = "; hermes providers with no key here (not offered): ", separator = ", ").orEmpty(),
+        )
         val lcncRosterEntries = lcncRoster.map {
             modelmux.RosterEntry(provider = it.provider ?: it.name, model = it.model)
         }

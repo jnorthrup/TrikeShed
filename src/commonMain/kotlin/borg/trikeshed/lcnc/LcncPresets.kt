@@ -862,57 +862,66 @@ object LcncPresets {
     }
 
     private fun brainMux(): String {
+        // The BrainMux family for a person who has never seen a patch panel:
+        // three numbered steps top to bottom, the answer to the right of the
+        // question, the router's account at the bottom. x starts at 320 because
+        // the palette (216px, fixed) covers the canvas's left edge — a note at
+        // x=30 is a note nobody sees. Rows are spaced by the tallest node above
+        // them (ask a model runs ~700 canvas px): the loader pushes an
+        // overlapping node sideways, which scattered a tighter grid.
         val program = LcncProgram(
             name = "preset-brain-mux",
             nodes = listOf(
-                LcncNode("k3", "note",
-                    params = mapOf("text" to "keymux recall —\nprefill dropdown resolves keys from\nenv, hermes .env, auth.json, harness.\nno key = no route for that provider."),
-                    x = 30.0, y = 60.0),
-                LcncNode("m3", "note",
-                    params = mapOf("text" to "modelmux recall —\nfill model in prompt.chat.\neach model has caps (chat, conflict-resolve).\nrouting goes through KeyMux → provider.\nmux.meta shows strategy, last\nselection, and quota standings."),
-                    x = 30.0, y = 260.0),
+                LcncNode("n1", "note",
+                    params = mapOf("text" to "1 · keys this machine already has —\nany model from one of these providers\nanswers with nothing typed."),
+                    x = 320.0, y = 60.0),
+                LcncNode("k1", "keys.status", x = 620.0, y = 60.0),
+                LcncNode("kd", "display", x = 1000.0, y = 60.0),
+                LcncNode("n2", "note",
+                    params = mapOf("text" to "2 · ask —\npick a model (the list is what runs here,\nnewest first), type a question, press ▶ run.\nThe answer lands in the green card;\na red card says what went wrong."),
+                    x = 320.0, y = 440.0),
+                LcncNode("p1", "prompt.chat",
+                    params = mapOf(
+                        "prompt" to "Say hello in one sentence.",
+                        // Blank model/prefill/url/key: the live list leads with the newest
+                        // model Hermes ran here and the router finds the key.
+                        "model" to "",
+                        // 256, not 128: a thinking model spends its budget on reasoning
+                        // first, and a small cap returned an empty answer.
+                        "maxTokens" to "256",
+                        "temperature" to "0.3",
+                        "prefill" to "",
+                        "url" to "",
+                        "key" to "",
+                        "headers" to "[]",
+                    ), x = 620.0, y = 440.0),
+                LcncNode("d1", "result.confirm", x = 1000.0, y = 440.0),
+                LcncNode("n3", "note",
+                    params = mapOf("text" to "3 · optional: save your own key —\nfor a provider step 1 does not list.\nIt then shows up under \"prefill\" in step 2."),
+                    x = 320.0, y = 1180.0),
                 LcncNode("c1", "credential.enter",
                     params = mapOf(
                         "key_type" to "nvidia",
                         "url" to "https://integrate.api.nvidia.com/v1",
                         "api_type" to "openai",
                         "key" to "",
-                    ), x = 400.0, y = 60.0),
-                LcncNode("p1", "prompt.chat",
-                    params = mapOf(
-                        "prefill" to "(none — use env/harness keys)",
-                        "url" to "https://integrate.api.nvidia.com/v1",
-                        "key" to "",
-                        "headers" to "[]",
-                        "model" to "nvidia/nemotron-3-super-120b-a12b",
-                        "maxTokens" to "128",
-                        "temperature" to "0.3",
-                        "prompt" to "Say hello in one sentence.",
-                    ), x = 400.0, y = 260.0),
-                LcncNode("d1", "result.confirm", x = 400.0, y = 470.0),
-                LcncNode("n1", "note",
-                    params = mapOf("text" to "model action —\nenv-first: a model whose provider\nkey resolves runs with NOTHING entered.\nmanual: select a prefill provider or\nfill URL + key (password) as fallback.\nheaders: k-v pairs (name, value).\nOK patchcable = green card.\nERROR patchcable = red card.\nHTX: 200 → RESPONSE_OK,\nnon-200 → RESPONSE_ERROR."),
-                    x = 700.0, y = 260.0),
-                // mux.meta sat untriggered, so the strategy/quota panel this
-                // preset exists to show never refreshed.
-                LcncNode("t1", "timer", params = mapOf("seconds" to "30"), x = 180.0, y = 680.0),
-                LcncNode("me1", "mux.meta", x = 400.0, y = 680.0),
-                LcncNode("dm1", "display", x = 700.0, y = 680.0),
+                    ), x = 620.0, y = 1180.0),
+                LcncNode("n4", "note",
+                    params = mapOf("text" to "what the router did —\nthe last answer: which model and provider,\nwhether it succeeded, how long it took,\nand the tokens spent. Refreshes every 30 s."),
+                    x = 320.0, y = 1640.0),
+                LcncNode("t1", "timer", params = mapOf("seconds" to "30"), x = 620.0, y = 1640.0),
+                LcncNode("me1", "mux.meta", x = 850.0, y = 1640.0),
+                LcncNode("dm1", "display", x = 1130.0, y = 1640.0),
             ).toSeries(),
             wires = listOf(
-                // c1/p1 are independent showcases (credential entry vs. model
-                // action) — no wire between them: credential.enter's output is
-                // structured json, prompt.chat's prompt? port is text, and
-                // prompt.chat already draws credentials from its own params.
-                LcncWire("t1", "tick", "me1", "trigger?"),
+                LcncWire("k1", "have", "kd", "x"),
                 LcncWire("p1", "content", "d1", "content"),
                 LcncWire("p1", "ok", "d1", "ok"),
                 LcncWire("p1", "error", "d1", "error"),
-                // mux.meta → display: modelmux presence on the canvas.
-                LcncWire("me1", "meta", "dm1", "x"),
+                LcncWire("t1", "tick", "me1", "trigger?"),
+                LcncWire("me1", "lastAnswer", "dm1", "x"),
             ).toSeries(),
-            view = LcncView(x = 20.0, y = 20.0, zoom = 0.5),
-            seq = 10,
+            view = LcncView(x = 20.0, y = 20.0, zoom = 0.65),
         )
         return LcncProgramConfix.toJson(program)
     }
