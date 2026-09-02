@@ -1317,16 +1317,26 @@
       .catch((err) => hostLogLine('! ' + err.message));
   });
 
-  const VIEWS = { doc: [docScrollEl, viewDocBtn], board: [boardScrollEl, viewBoardBtn], graph: [graphScrollEl, viewGraphBtn], sheet: [sheetScrollEl, viewSheetBtn], shape: [shapeScrollEl, viewShapeBtn], host: [hostScrollEl, viewHostBtn] };
+  const VIEWS = {
+    doc: [docScrollEl, [viewDocBtn, document.getElementById('btn-home')]],
+    board: [boardScrollEl, [viewBoardBtn, document.getElementById('btn-board')]],
+    graph: [graphScrollEl, [viewGraphBtn, document.getElementById('btn-graph')]],
+    sheet: [sheetScrollEl, [viewSheetBtn, document.getElementById('btn-sheet')]],
+    shape: [shapeScrollEl, [viewShapeBtn]],
+    host: [hostScrollEl, [viewHostBtn, document.getElementById('btn-host')]]
+  };
   function setView(view) {
     mutate((s) => { s.view = view; }, 'view');
-    for (const [k, [el, btn]] of Object.entries(VIEWS)) {
+    for (const [k, [el, btns]] of Object.entries(VIEWS)) {
       el.hidden = k !== view;
-      btn.classList.toggle('active', k === view);
-      if (k === view) {
-        btn.setAttribute('aria-current', 'page');
-      } else {
-        btn.removeAttribute('aria-current');
+      for (const btn of btns) {
+        if (!btn) continue;
+        btn.classList.toggle('active', k === view);
+        if (k === view) {
+          btn.setAttribute('aria-current', 'page');
+        } else {
+          btn.removeAttribute('aria-current');
+        }
       }
     }
     if (view === 'board') { renderBoard(); hydrateBoard(); }
@@ -1336,12 +1346,11 @@
     if (view === 'host') renderHost();
   }
 
-  for (const [k, [, btn]] of Object.entries(VIEWS)) btn.addEventListener('click', () => setView(k));
-  document.getElementById('btn-board').addEventListener('click', () => setView('board'));
-  document.getElementById('btn-graph').addEventListener('click', () => setView('graph'));
-  document.getElementById('btn-sheet').addEventListener('click', () => setView('sheet'));
-  document.getElementById('btn-host').addEventListener('click', () => setView('host'));
-  document.getElementById('btn-home').addEventListener('click', () => setView('doc'));
+  for (const [k, [, btns]] of Object.entries(VIEWS)) {
+    for (const btn of btns) {
+      if (btn) btn.addEventListener('click', () => setView(k));
+    }
+  }
   document.getElementById('btn-new-page').addEventListener('click', () => {
     newPage();
     renderAll();
