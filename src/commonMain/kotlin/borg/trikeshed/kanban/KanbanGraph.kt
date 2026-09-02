@@ -6,6 +6,13 @@ import borg.trikeshed.lib.get
 import borg.trikeshed.lib.size
 import borg.trikeshed.lib.toSeries
 import borg.trikeshed.lib.toList
+import borg.trikeshed.lib.forEach
+import borg.trikeshed.lib.map
+import borg.trikeshed.lib.view
+import borg.trikeshed.lib.filter
+import borg.trikeshed.lib.j
+import borg.trikeshed.lib.mapIndexed
+import borg.trikeshed.lib.isEmpty
 
 /** Hermes-compatible production role carried by a lane, without fixing its order. */
 data class KanbanLane(
@@ -94,13 +101,13 @@ data class KanbanGraph(
         )
     }
 
-    fun lane(id: String): KanbanLane? = (0 until lanes.size).map { lanes[it] }.firstOrNull { it.id == id }
-    fun outgoing(id: String): Series<KanbanEdge> = (0 until edges.size).map { edges[it] }.filter { it.from == id }.toSeries()
+    fun lane(id: String): KanbanLane? = lanes.view.firstOrNull { it.id == id }
+    fun outgoing(id: String): Series<KanbanEdge> = edges.filter { it.from == id }
 
     /** W4.4: all edges in a FANOUT/JOIN group — the branches that must lower together. */
     fun edgesInGroup(group: String?): List<KanbanEdge> =
         if (group == null) emptyList()
-        else (0 until edges.size).map { edges[it] }.filter { it.group == group }
+        else edges.filter { it.group == group }.map { it }
 }
 
 fun interface KanbanPredicate { fun test(card: KanbanCardState, edge: KanbanEdge): Boolean }
@@ -125,12 +132,12 @@ data class KanbanGraphValidation(val errors: List<KanbanGraphError>) { val valid
 
 fun KanbanGraph.validate(predicates: KanbanPredicateRegistry = KanbanPredicateRegistry()): KanbanGraphValidation {
     val errors = mutableListOf<KanbanGraphError>()
-    val laneIds = lanes.toList().map { it.id }
+    val laneIds = lanes.map { it.id }
     val seenOrders = mutableSetOf<Int>()
-    lanes.toList().forEach { if (!seenOrders.add(it.order)) errors += KanbanGraphError.IncompatibleIo("lane:${it.id}", "duplicate lane order ${it.order}") }
+    lanes.forEach { if (!seenOrders.add(it.order)) errors += KanbanGraphError.IncompatibleIo("lane:${it.id}", "duplicate lane order ${it.order}") }
     val seenIds = mutableSetOf<String>()
     val seenShapes = mutableSetOf<String>()
-    edges.toList().forEach { edge ->
+    edges.forEach { edge ->
         if (!seenIds.add(edge.id)) errors += KanbanGraphError.DuplicateEdge(edge.id)
         if (!laneIds.contains(edge.from)) errors += KanbanGraphError.MissingEndpoint(edge.id, edge.from)
         if (!laneIds.contains(edge.to)) errors += KanbanGraphError.MissingEndpoint(edge.id, edge.to)
@@ -152,12 +159,12 @@ fun KanbanGraph.validate(predicates: KanbanPredicateRegistry = KanbanPredicateRe
             errors += KanbanGraphError.IncompatibleIo(edge.id, "${source.id} outputs ${source.outputs.values} do not mate ${target.id} inputs ${target.inputs.values}")
         }
     }
-    edges.toList().groupBy { it.group }.values.forEach { grouped ->
+    edges.view.groupBy { it.group }.values.forEach { grouped ->
         val first = grouped.firstOrNull() ?: return@forEach
         if (first.mode == KanbanEdgeMode.FANOUT && grouped.size < 2) errors += KanbanGraphError.IncompatibleIo(first.id, "fanout requires at least two branches")
         if (first.mode == KanbanEdgeMode.JOIN && grouped.size < first.requiredBranches) errors += KanbanGraphError.IncompatibleIo(first.id, "join requires ${first.requiredBranches} branches")
     }
-    cards.toList().forEach { card -> if (lane(card.lane) == null) errors += KanbanGraphError.InvalidCard(card.id, "missing lane ${card.lane}") }
+    cards.forEach { card -> if (lane(card.lane) == null) errors += KanbanGraphError.InvalidCard(card.id, "missing lane ${card.lane}") }
     // W4.3: cycles become opt-in. A back-edge is forbidden only when it is NOT
     // declared as a LOOP edge. LOOP edges were already required to carry a
     // positive maxIterations above, so the iteration guard bounds any loop.
@@ -168,14 +175,14 @@ fun KanbanGraph.validate(predicates: KanbanPredicateRegistry = KanbanPredicateRe
             // Cycle detected along `path`. Legal iff every edge closing it is a LOOP.
             // The offending back-edge is path.first() -> ... the lane being re-entered.
             val cycle = path.subList(path.indexOf(id), path.size) + id
-            val closes = edges.toList().any { edge ->
+            val closes = edges.view.any { edge ->
                 edge.mode == KanbanEdgeMode.LOOP && edge.from == path.last() && edge.to == id
             }
             if (!closes) errors += KanbanGraphError.ForbiddenCycle(cycle)
             return
         }
         marks[id] = 1
-        (0 until edges.size).map { edges[it] }.filter { it.from == id }.forEach { visit(it.to, path + id) }
+        edges.forEach { if (it.from == id) visit(it.to, path + id) }
         marks[id] = 2
     }
     laneIds.forEach { visit(it, emptyList()) }
@@ -215,9 +222,9 @@ object KanbanGraphEngine {
     fun transition(graph: KanbanGraph, request: KanbanTransitionRequest, predicates: KanbanPredicateRegistry): KanbanTransitionResult {
         val validation = graph.validate(predicates)
         if (!validation.valid) return KanbanTransitionResult.Rejected(validation.errors.joinToString { it.toString() })
-        val card = graph.cards.toList().firstOrNull { it.id == request.cardId } ?: return KanbanTransitionResult.Rejected("missing card ${request.cardId}")
+        val card = graph.cards.view.firstOrNull { it.id == request.cardId } ?: return KanbanTransitionResult.Rejected("missing card ${request.cardId}")
         if (card.revision != request.expectedRevision) return KanbanTransitionResult.Rejected("revision mismatch")
-        val candidates = graph.outgoing(card.lane).toList().filter { edge ->
+        val candidates = graph.outgoing(card.lane).filter { edge ->
             (request.requestedTarget == null || edge.to == request.requestedTarget) &&
                 // ABORT is an unguarded escape — it bypasses predicates by design.
                 (edge.mode == KanbanEdgeMode.ABORT ||
@@ -228,9 +235,9 @@ object KanbanGraphEngine {
             // An available ABORT edge breaks the ambiguity: abort wins over branching.
             val aborts = candidates.filter { it.mode == KanbanEdgeMode.ABORT }
             if (aborts.size != 1) return KanbanTransitionResult.Rejected("branch target required")
-            return commit(graph, card, aborts.first())
+            return commit(graph, card, aborts[0])
         }
-        val chosen = candidates.first()
+        val chosen = candidates[0]
         // W4.2 iteration guard: a LOOP edge refuses transitions past its bound.
         // The count is per-card, per-edge, living in the card's own io map.
         if (chosen.mode == KanbanEdgeMode.LOOP) {
@@ -260,9 +267,9 @@ object KanbanGraphEngine {
         val moved = card.copy(
             lane = chosen.to, state = chosen.to, revision = card.revision + 1,
             io = nextIo,
-            effects = (0 until card.effects.size).map { card.effects[it] }.plus(effect).toSeries(),
+            effects = card.effects.view.plus(effect).toSeries(),
         )
-        val cards = graph.cards.toList().map { if (it.id == card.id) moved else it }.toSeries()
+        val cards = graph.cards.map { if (it.id == card.id) moved else it }.toSeries()
 
         // W4.4: FANOUT lowers to N Submits (one per FANOUT branch in the group);
         // JOIN lowers to one Submit whose dependencies are the FANOUT branch jobIds.

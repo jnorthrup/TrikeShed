@@ -179,3 +179,6 @@ The code looks correct and fully optimized. The tests passed on the relevant par
 ## 2026-08-25 - Avoid redundant identity maps on Sequence before materialization
 **Learning:** In Kotlin, using `.map { it }` on a `Sequence` (e.g. `text.lineSequence().map { it }.toList()`) is a redundant identity transform. It needlessly allocates an intermediate `TransformingSequence` wrapper around the sequence just to apply a no-op identity function, increasing heap allocations in hot paths.
 **Action:** Remove redundant `.map { it }` calls before `.toList()` on Sequences (or simply use `.lines()` for strings).
+## 2026-11-20 - Use Series.filter instead of mapped arrays
+**Learning:** When filtering custom Series collections, using `(0 until size).map { this[it] }.filter { ... }.toSeries()` creates unnecessary intermediate ArrayList allocations.
+**Action:** Use `Series.filter { ... }` directly to return a filtered Series natively and avoid all intermediate list allocations.
