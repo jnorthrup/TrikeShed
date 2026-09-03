@@ -18,6 +18,7 @@ Source: `doc/archives/archive-2026-07-22.md` (13,066 lines, 762KB) — consolida
 | **Concept Map** (`../README.md`) | One-place Kotlin maintainer guide (merged from `concepts.md`) | Kernel algebra, Architecture spine (12 layers), Job Nexus, Confix, Couch, Collections, Choreography, Build/Deploy, Reading paths, Pitfalls |
 | **Rewrite** (`rewire.md`) | User-centric Forge workspace architecture | Storage unification (1 CID, 5 lenses), Unified surface, Storage layer (btrfs), VCS gateway (pijul/git/IPFS), Agent layer (Modelmux/Kanban/Jules), Ingest pipeline, Mesh layer (Litebike/SSH/UPnP) |
 | **Taste** (`taste.md`) | High-performance hierarchical UI engine principles | 10 principles, Meta-finding, Cut list (T1–T10 ranked by unblocking power) |
+| **Kernel shapes** (`kernel/`) | The algebraic kernel's documents carried from CCEKCMMKPlatform @ f3f276eeb (2026-09-03), plus `parity.tsv` and `scripts/kernel-parity.sh`; `KernelParityTest` holds the shared kernel files to the manifest | Whitepaper, Curiously Recursive MetaSeries shapes, algebra deep dive, CharStr DAG, Confix architecture, parity gate |
 
 ---
 
