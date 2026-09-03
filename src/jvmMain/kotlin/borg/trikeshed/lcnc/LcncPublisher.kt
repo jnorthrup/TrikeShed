@@ -1,8 +1,10 @@
 package borg.trikeshed.lcnc
 
+import borg.trikeshed.dag.ReteNetwork
 import borg.trikeshed.graal.ConfixBlackboard
 import borg.trikeshed.parse.json.JsonSupport
 import borg.trikeshed.util.oroboros.CouchAttachmentGateway
+import kotlinx.coroutines.runBlocking
 
 /**
  * ONE writer for everything LCNC on the blackboard ([LcncBlackboard]).
@@ -22,13 +24,26 @@ import borg.trikeshed.util.oroboros.CouchAttachmentGateway
  * carry their types. Every put is guarded by a canonical (stringified)
  * comparison, so `/blackboard/facts` subscribers see a delta only when
  * something moved.
+ *
+ * THE PANELS PLANE rides the same call. When a [ReteNetwork] is given, every
+ * program that passes [publishProgram] is also exploded ([PanelFacts]) into
+ * the `panels` partition — one fact per program, node, cable (with its exact
+ * type) and violation — by a [PanelFactBridge] that retracts what a republish
+ * dropped and stays silent when nothing moved. The hook sits after the
+ * blackboard put, so the board stays the authority and the facts are its
+ * projection; a publisher without a network publishes exactly as before.
  */
 class LcncPublisher(
     private val blackboard: ConfixBlackboard,
     /** Read late: the registry keeps growing after boot as modules attach. */
     private val runners: () -> Map<String, LcncNodeRunner>,
     private val attachments: CouchAttachmentGateway?,
+    /** The daemon's one production network; null publishes to the blackboard only. */
+    rete: ReteNetwork? = null,
 ) {
+    /** The panels-plane bridge over [rete], or null when no network was given. */
+    val panelFacts: PanelFactBridge? = rete?.let(::PanelFactBridge)
+
     fun isPreset(name: String): Boolean = name in LcncPresets.all()
 
     /** The stored-program corpus: the offered presets, then the user's own `panels/<name>` constructions. */
@@ -134,6 +149,13 @@ class LcncPublisher(
     ): Map<String, Any?> {
         val entry = LcncBlackboard.programEntry(name, program, vocabulary, sourceCid)
         putIfChanged(LcncBlackboard.programKey(name), entry, "lcnc")
+        // The panels plane: the entry, exploded, on the production network. The
+        // bridge is idempotent (same entry => no ops) and retracts what vanished,
+        // so it runs on every publish, not only on a board delta — a network handed
+        // over after the board was seeded still ends up holding every program.
+        // runBlocking: the network's ops are suspend behind its own mutex; the
+        // hold is short and no observer may write back into it (ReteObserver doc).
+        panelFacts?.let { bridge -> runBlocking { bridge.publish(name, program, entry, actor = "lcnc") } }
         return entry
     }
 
