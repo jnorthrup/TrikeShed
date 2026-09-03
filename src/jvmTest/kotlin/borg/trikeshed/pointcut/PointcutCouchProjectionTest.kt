@@ -37,16 +37,17 @@ class PointcutCouchProjectionTest {
         
         adapter.accept(event, true)
         
-        // Wait a short time for the flow to process
-        delay(100)
-        
-        // Assert the document exists
+        // The collector is attached before the constructor returned (UNDISPATCHED subscribe),
+        // so the landing is in flight; wait for the projection to land it rather than a fixed
+        // sleep, bounded so a lost landing still fails instead of hanging.
         val docId = PointcutBlackboardAdapter.keyOf(
             event.coordinate.substringBeforeLast('.', "?"),
             event.coordinate.substringAfterLast('.'),
             PointcutBlackboardAdapter.guestSiteIdx("prop")
         )
         var doc = store.get(docId)
+        var waitedMs = 0
+        while (doc == null && waitedMs < 2_000) { delay(10); waitedMs += 10; doc = store.get(docId) }
         assertNotNull(doc, "Document should be present in store")
         
         val initialRev = store.head.getRev(docId)
@@ -62,9 +63,9 @@ class PointcutCouchProjectionTest {
         )
         adapter.accept(event2, true)
         
-        delay(100)
-        
-        val secondRev = store.head.getRev(docId)
+        var secondRev = store.head.getRev(docId)
+        waitedMs = 0
+        while (secondRev == initialRev && waitedMs < 2_000) { delay(10); waitedMs += 10; secondRev = store.head.getRev(docId) }
         assertNotEquals(initialRev, secondRev, "Revision should be bumped")
         
         // by_typedef: the projection stores `coordinate` as a nested map; ViewServer's JsPath is flat, so key on the

@@ -4,8 +4,8 @@ import borg.trikeshed.couch.CouchStore
 import borg.trikeshed.couch.Document
 import borg.trikeshed.couch.Field
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.flow.launchIn
-import kotlinx.coroutines.flow.onEach
+import kotlinx.coroutines.CoroutineStart
+import kotlinx.coroutines.launch
 import borg.trikeshed.dag.DagCoordinate
 import borg.trikeshed.pointcut.PointcutBlackboardAdapter.PointcutLanding
 
@@ -18,10 +18,16 @@ class PointcutCouchProjection(
         // Seed the design document for pointcut views
         seedDesignDocument()
 
-        // Subscribe to the shared flow
-        adapter.flow.onEach { landing ->
-            processLanding(landing)
-        }.launchIn(scope)
+        // Subscribe to the shared flow.
+        // UNDISPATCHED: the adapter's flow has replay = 0, so a landing emitted between this
+        // constructor returning and a dispatched collector attaching would be dropped on the
+        // floor (the daemon constructs the projection and the first landings can follow at
+        // once). Starting undispatched runs collect() on the caller's thread up to its first
+        // suspension, which is after the subscriber slot is registered — the collector is
+        // attached by the time `PointcutCouchProjection(...)` returns.
+        scope.launch(start = CoroutineStart.UNDISPATCHED) {
+            adapter.flow.collect { landing -> processLanding(landing) }
+        }
     }
 
     private fun seedDesignDocument() {
