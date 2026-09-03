@@ -103,6 +103,38 @@ class PointcutBlackboardAdapter(
         /** Provenance language landed with this record. */
         val language: String get() = facet.id
 
+        /**
+         * The [coordinate] as the nested map the couch `_design/pointcut` views read
+         * (`doc.coordinate.className`, `doc.coordinate.timestamp`). One author for the
+         * five coordinate columns; [toFields] flattens the same map.
+         */
+        fun coordinateFields(): Map<String, Any?> = mapOf(
+            "className" to coordinate.className,
+            "methodName" to coordinate.methodName,
+            "bytecodeOffset" to coordinate.bytecodeOffset,
+            "timestamp" to coordinate.timestamp,
+            "threadId" to coordinate.threadId,
+        )
+
+        /**
+         * The landing as FLAT fields — the one flattening every projection shares:
+         * the couch document ([borg.trikeshed.pointcut.PointcutCouchProjection]) and
+         * the `graal` plane fact (`GraalFactElement`) are both built from this map,
+         * so a field renamed here renames everywhere. Field order is the order
+         * the couch projection wrote them in: `facet`, `mark` (the phase byte as
+         * an Int), `property`, `value` (`toString`, `"null"` when absent), then
+         * the five coordinate columns from [coordinateFields] flattened in place.
+         */
+        fun toFields(): Map<String, Any?> {
+            val fields = LinkedHashMap<String, Any?>(9)
+            fields["facet"] = facet.id
+            fields["mark"] = markRaw.toInt()
+            fields["property"] = propertyName
+            fields["value"] = value?.toString() ?: "null"
+            fields.putAll(coordinateFields())
+            return fields
+        }
+
         override fun toString(): String =
             "$key#${mark.raw}@${coordinate.timestamp}:${facet.id}"
     }

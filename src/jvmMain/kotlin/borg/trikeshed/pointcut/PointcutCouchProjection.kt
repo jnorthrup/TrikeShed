@@ -68,22 +68,19 @@ class PointcutCouchProjection(
         while (true) {
             val rev = store.head.getRev(docId)
             
+            // One author for the flattening: PointcutLanding.toFields() (the same map the
+            // graal plane fact carries). The four scalar columns come from it verbatim ...
+            // (toFields never lands a null: `value` is stringified, `"null"` when absent.)
+            val flat = landing.toFields()
             val fields = mutableListOf<Field>()
-            fields.add(Field("facet", landing.facet.id))
-            fields.add(Field("mark", landing.markRaw.toInt()))
-            fields.add(Field("property", landing.propertyName))
-            fields.add(Field("value", landing.value?.toString() ?: "null"))
-            
-            // Nested coordinate representation required
-            val coordMap = mapOf(
-                "className" to landing.coordinate.className,
-                "methodName" to landing.coordinate.methodName,
-                "bytecodeOffset" to landing.coordinate.bytecodeOffset,
-                "timestamp" to landing.coordinate.timestamp,
-                "threadId" to landing.coordinate.threadId
-            )
-            
-            fields.add(Field("coordinate", coordMap))
+            for (column in listOf("facet", "mark", "property", "value")) {
+                fields.add(Field(column, flat.getValue(column)!!))
+            }
+
+            // ... and the coordinate stays NESTED here because `_design/pointcut` reads
+            // `doc.coordinate.className` / `doc.coordinate.timestamp` — same five columns,
+            // same author (coordinateFields), different shape.
+            fields.add(Field("coordinate", landing.coordinateFields()))
             
             val doc = Document(docId, fields)
             if (store.put(doc, rev)) {

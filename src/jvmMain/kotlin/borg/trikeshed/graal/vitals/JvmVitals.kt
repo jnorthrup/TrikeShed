@@ -143,12 +143,15 @@ class JvmVitals {
         jfrLive = false
     }
 
+    /** `Type.method` for a JFR `method` field (jdk.Compilation and jdk.Deoptimization both carry one); `?` when absent. */
+    private fun RecordedEvent.methodLabel(): String = runCatching {
+        val m = getValue<Any?>("method")
+        if (m is jdk.jfr.consumer.RecordedMethod) "${m.type?.name?.substringAfterLast('.')}.${m.name}" else m?.toString()
+    }.getOrNull() ?: "?"
+
     private fun onCompilation(e: RecordedEvent) {
         compilations.incrementAndGet()
-        val method = runCatching {
-            val m = e.getValue<Any?>("method")
-            if (m is jdk.jfr.consumer.RecordedMethod) "${m.type?.name?.substringAfterLast('.')}.${m.name}" else m?.toString()
-        }.getOrNull() ?: "?"
+        val method = e.methodLabel()
         if (e.getBooleanOr("isOsr")) osrCompilations.incrementAndGet()
         e.getLongOr("codeSize").let { if (it > 0) compiledBytes.addAndGet(it) }
         val d = mapOf(
@@ -166,6 +169,8 @@ class JvmVitals {
     private fun onDeopt(e: RecordedEvent) {
         deoptimizations.incrementAndGet()
         val d = mapOf(
+            // the deopt's site, same label as a compile's — GraalFactElement keys `deopt/<method>` on it
+            "method" to e.methodLabel(),
             "reason" to (e.getStringOr("reason") ?: "?"),
             "action" to (e.getStringOr("action") ?: "?"),
             "compileId" to e.getLongOr("compileId"),
