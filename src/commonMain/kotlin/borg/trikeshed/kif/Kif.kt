@@ -124,7 +124,25 @@ class KifKnowledgeBase {
         }
     }
     fun assertKif(kif: String) { assert(KifExpr.parse(kif)) }
+
+    /**
+     * Forget one assertion — the exact string [assert] deduped on — so a
+     * projection that is retracted upstream (a Rete fact retracted or modified,
+     * see [borg.trikeshed.dag.KifTee]) leaves the bank instead of accumulating
+     * forever. Returns true when the expression was present. [query] semantics
+     * are untouched: the subclass closure is recomputed from what remains.
+     */
+    fun retract(expr: KifExpr): Boolean = borg.trikeshed.isam.synchronizedLock(gate) {
+        val key = expr.toKifString()
+        if (!seen.remove(key)) return@synchronizedLock false
+        val at = asserts.indexOfFirst { it.toKifString() == key }
+        if (at >= 0) asserts.removeAt(at)
+        true
+    }
+    fun retractKif(kif: String): Boolean = retract(KifExpr.parse(kif))
     fun asserts(): List<KifExpr> = borg.trikeshed.isam.synchronizedLock(gate) { asserts.toList() }
+    /** Distinct assertions currently held. */
+    fun size(): Int = borg.trikeshed.isam.synchronizedLock(gate) { asserts.size }
 
     fun toKifFile(): String = asserts().joinToString("\n") { it.toKifString() }
 

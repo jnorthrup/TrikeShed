@@ -36,9 +36,24 @@ import borg.trikeshed.lib.size
 class LcncFacts private constructor(private val kb: KifKnowledgeBase) {
 
     companion object {
-        /** The compiled table, and any programs, as tuples. */
-        fun of(contracts: Collection<LcncPortContract>, programs: Map<String, LcncProgram> = emptyMap()): LcncFacts {
-            val f = LcncFacts(KifKnowledgeBase())
+        /**
+         * The compiled table, and any programs, as tuples.
+         *
+         * [into] is the bank the tuples are told to. The default is a private
+         * bank per call (every type-check and mating question builds its own
+         * throwaway view); the daemon hands its ONE shared bank in — the same
+         * `kifBank` the SUMO spine, `nal.mint`, `state.freeze` and the plane
+         * tee ([borg.trikeshed.dag.KifTee]) write — so `/api/beliefs/query
+         * (nodeType ?t)` answers on the live bank. Telling the same vocabulary
+         * into the same bank twice is a no-op: [KifKnowledgeBase.assert]
+         * dedupes on the exact tuple string.
+         */
+        fun of(
+            contracts: Collection<LcncPortContract>,
+            programs: Map<String, LcncProgram> = emptyMap(),
+            into: KifKnowledgeBase = KifKnowledgeBase(),
+        ): LcncFacts {
+            val f = LcncFacts(into)
             for (k in LcncKinds.CONFIX_SLOTS) f.kind(k)
             f.kind(LcncKinds.CCEK_ANY)
             for (c in contracts) f.learn(c)
@@ -46,9 +61,9 @@ class LcncFacts private constructor(private val kb: KifKnowledgeBase) {
             return f
         }
 
-        /** A vocabulary authored as a `.kif` file. */
-        fun parse(kif: String): LcncFacts {
-            val f = LcncFacts(KifKnowledgeBase())
+        /** A vocabulary authored as a `.kif` file; [into] as for [of]. */
+        fun parse(kif: String, into: KifKnowledgeBase = KifKnowledgeBase()): LcncFacts {
+            val f = LcncFacts(into)
             for (e in KifExpr.parseAll(kif)) f.kb.assert(e)
             return f
         }
