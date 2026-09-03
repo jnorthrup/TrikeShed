@@ -67,8 +67,8 @@ object HermesDonorTrace {
                 while (rs.next()) {
                     hasWorkPackages = true
                     val id = rs.getString("id")
-                    val title = rs.getString("title")
-                    val body = rs.getString("body")
+                    val title = escapeMarkdown(rs.getString("title"))
+                    val body = escapeMarkdown(rs.getString("body"))
                     val parentIds = rs.getString("parent_ids")
 
                     // id needs to match "^([A-Z][0-9]+)$"
