@@ -58,6 +58,12 @@ object RouteManifest {
             RouteEntry("POST", "/api/lcnc/rdf/program", "Turtle in the LCNC vocabulary back to a program document"),
             RouteEntry("POST", "/api/lcnc/rdf/align", "a program joined with the Rete productions, causal rules and KIF facts that mention its terms; plus its causal projection for /api/beliefs/kg"),
         ),
+        // -- ReteWire: the fact plane read back — JSON, Turtle, and who watches it --
+        "ReteWire" to listOf(
+            RouteEntry("GET", "/api/rete/facts", "current Rete facts as JSON {count, facts:[{partition,id,versionCid,fields}]}: ?partition= alone lists a partition, &field=&value= filters on one field, ?key= filters on the reserved key field"),
+            RouteEntry("GET", "/api/facts/rdf", "the same selection projected through PlaneFacts.toTriples as Turtle (fact:/plane# prefixes); every partition when ?partition= is omitted"),
+            RouteEntry("GET", "/api/rete/productions", "registered productions {count, productions:[{ruleId, salience, interests:[field=value]}]} — the row shape /api/lcnc/rdf/align prints"),
+        ),
         "ModuleWire" to listOf(
             RouteEntry("GET", "/api/modules", "attached modules and claimed routes"),
             RouteEntry("POST", "/api/modules", "attach a module by FQCN"),
