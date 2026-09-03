@@ -77,3 +77,6 @@
 ## 2024-08-24 - Dynamic ARIA Label Injection
 **Learning:** When dynamically rendering interactive lists in vanilla JS (like page trees, sheet references, or slash menus), screen reader context is lost if we only use CSS classes like `.active` to indicate state.
 **Action:** When creating elements with `document.createElement`, proactively attach explicit, descriptive `aria-label`s that encapsulate both the item's identity and its current state (e.g., `"Active page: Untitled"` or `"Navigate to parent sheet: ..."`).
+## 2025-02-23 - Active states for duplicate navigation items
+**Learning:** When managing view state in a single-page application (like TrikeShed's frontend), ensure that all duplicate instances of navigation buttons for the active view (e.g., both topbar and sidebar buttons) consistently receive the `aria-current="page"` attribute and visual active state updates to prevent ambiguous states for screen reader users.
+**Action:** Synchronize the `active` class and `aria-current="page"` state for all duplicate navigation buttons across the interface when the active view changes.
