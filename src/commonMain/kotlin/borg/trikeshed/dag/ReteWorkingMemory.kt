@@ -68,6 +68,19 @@ class ReteWorkingMemory {
     fun facts(factId: FactId): List<ReteStoredFact> =
         current.get(factId)?.let(::listOf) ?: emptyList()
 
+    /**
+     * Every current fact across every partition, ordered by (partition, localId).
+     * The projection surfaces (RDF/KIF over the plane, `/api/rete/facts`) read
+     * this; call it through [ReteNetwork.snapshot] so the read is serialized
+     * with the writers.
+     */
+    fun all(): List<ReteStoredFact> {
+        val results = ArrayList<ReteStoredFact>()
+        for (entry in current.entries().view) results.add(entry.b)
+        results.sortWith(compareBy({ it.factId.partitionId }, { it.factId.localId }))
+        return results
+    }
+
     fun query(
         board: BlackboardContext,
         facet: Pair<String, Any?>,
