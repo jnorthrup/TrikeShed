@@ -50,13 +50,37 @@ class KanbanModule : ForgeModule {
             parentJob = ctx.scope.coroutineContext[Job],
         )
         store.open()
-        val lcnc = LcncKanbanExperience(store)
+        val bag = ctx.beliefBag
+        // kanban.alerts substrate: the sink retains each rule's last few
+        // activations in a ring so the node answers from memory, bag OFF
+        // included (rules fire without NARS). synchronized: the sink runs on
+        // the commit path, the node on HTTP dispatch.
+        val alerts = borg.trikeshed.kanban.BoardRuleAlertRing()
+        fun alertTail(ruleId: String): List<Map<String, String>> = synchronized(alerts) {
+            alerts.tail(ruleId).map { it.bindings + ("activationId" to it.activationId) }
+        }
+        fun alertMap(): Map<String, Any?> = mapOf(
+            "breaches" to alertTail(borg.trikeshed.kanban.rules.BoardRules.WIP_BREACH),
+            "stalls" to alertTail(borg.trikeshed.kanban.rules.BoardRules.STALL),
+            "cycles" to alertTail(borg.trikeshed.kanban.rules.BoardRules.CYCLE_GUARD),
+            "ready" to alertTail(borg.trikeshed.kanban.rules.BoardRules.DEPENDENCY_READY),
+        )
+        // board.get / board.view / /api/board all read ONE projection: LcncKanbanExperience.boardView.
+        val lcnc = LcncKanbanExperience(
+            store,
+            attention = if (bag == null) null else {
+                {
+                    borg.trikeshed.kanban.BoardAttentionOrder.garnish(bag, store.cards())
+                        .mapValues { (_, g) -> mapOf("attention" to g.score, "contested" to g.contested) }
+                }
+            },
+            alerts = ::alertMap,
+        )
         val lcncRegistry = lcnc.registry()
         ctx.lcncRunners.putAll(lcncRegistry)
 
         // ── NARS garnish (Phase 5): review bridge + attention order, iff the bag is live.
         //    Bag OFF ⇒ board JSON byte-identical minus the attention/contested fields.
-        val bag = ctx.beliefBag
         // NARS × kanban legos — the bag's board view as composable nodes:
         // kanban.attention = BoardAttentionOrder.garnish (per-card score/contested +
         // attention-descending order), kanban.drift = the Hotelling T² cohort alarm.
@@ -108,29 +132,7 @@ class KanbanModule : ForgeModule {
         fun boardJson(): String {
             val seq = store.lastSequence
             if (bag == null) cached?.let { if (it.first == seq) return it.second }
-            val cursor = BoardCursor.of(store.cards())
-            val base = cursor.toBoardMap(seq, title = "Oroboros board")
-            // Marketability audit: the store persists dependencies/tags/owner but the
-            // public projection dropped them — lossless task exchange needs all three.
-            fun enrich(m: Map<*, *>): Map<Any?, Any?> {
-                val row = store.card(m["id"].toString())
-                return m + mapOf(
-                    "owner" to row?.owner.orEmpty(),
-                    "dependencies" to (row?.dependencies ?: emptyList<String>()),
-                    "tags" to (row?.tags ?: emptyList<String>()),
-                )
-            }
-            val withOwners = base + ("items" to ((base["items"] as List<*>).map { enrich(it as Map<*, *>) }))
-            val map = if (bag == null) withOwners else {
-                val garnish = borg.trikeshed.kanban.BoardAttentionOrder.garnish(bag, store.cards())
-                val items = (withOwners["items"] as List<*>).map { item ->
-                    val m = item as Map<*, *>
-                    val g = garnish[m["id"]]
-                    if (g == null) m else m + mapOf("attention" to g.score, "contested" to g.contested)
-                }
-                base + ("items" to items)
-            }
-            val json = JsonSupport.stringify(map)
+            val json = JsonSupport.stringify(lcnc.boardView())
             if (bag == null) cached = seq to json
             return json
         }
@@ -143,22 +145,8 @@ class KanbanModule : ForgeModule {
             ctx.rete.register(borg.trikeshed.kanban.rules.StallProduction()),
             ctx.rete.register(borg.trikeshed.kanban.rules.CycleGuardProduction()),
         )
-        // kanban.alerts substrate: the sink retains each rule's last few
-        // activations in a ring so the node answers from memory, bag OFF
-        // included (rules fire without NARS). synchronized: the sink runs on
-        // the commit path, the node on HTTP dispatch.
-        val alerts = borg.trikeshed.kanban.BoardRuleAlertRing()
-        ctx.lcncRunners["kanban.alerts"] = LcncNodeRunner { _, _ ->
-            fun tail(ruleId: String): List<Map<String, String>> = synchronized(alerts) {
-                alerts.tail(ruleId).map { it.bindings + ("activationId" to it.activationId) }
-            }
-            mapOf(
-                "breaches" to tail(borg.trikeshed.kanban.rules.BoardRules.WIP_BREACH),
-                "stalls" to tail(borg.trikeshed.kanban.rules.BoardRules.STALL),
-                "cycles" to tail(borg.trikeshed.kanban.rules.BoardRules.CYCLE_GUARD),
-                "ready" to tail(borg.trikeshed.kanban.rules.BoardRules.DEPENDENCY_READY),
-            )
-        }
+        // kanban.alerts = the same tail board.view#alerts carries.
+        ctx.lcncRunners["kanban.alerts"] = LcncNodeRunner { _, _ -> alertMap() }
         // Non-job activations: receipt on the blackboard ALWAYS; dependency-ready also
         // lowers to a store Move with a derived idempotency key (dedupe compensates
         // any popped-but-unprocessed activation).

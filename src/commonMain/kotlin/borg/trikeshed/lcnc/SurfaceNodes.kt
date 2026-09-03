@@ -27,13 +27,10 @@ object SurfaceNodes {
 
     fun registry(call: Call): Map<String, LcncNodeRunner> = mapOf(
 
-        "board.get" to LcncNodeRunner { _, _ ->
-            mapOf("json" to call("GET", "/api/board", null))
-        },
-        "board.view" to LcncNodeRunner { _, _ ->
-            val r = call("GET", "/api/board", null)
-            mapOf("board" to r, "alerts" to (field(r, "alerts") ?: emptyList<Any?>()))
-        },
+        // board.get / board.view are NOT here: they are units over
+        // BoardStoreElement (LcncKanbanExperience.registry). A self-fetch of
+        // /api/board was a no-code node playing no-function, and its `alerts`
+        // output was a constant [] because the route never carried one.
         "http.get" to LcncNodeRunner { node, _ ->
             mapOf("json" to call("GET", node.params["path"]?.takeIf { it.isNotBlank() } ?: "/api/health", null))
         },
@@ -81,7 +78,7 @@ object SurfaceNodes {
 
     /** The types this family serves — the gate compares this against the contracts. */
     fun servedTypes(): Set<String> = setOf(
-        "board.get", "board.view", "http.get", "http.post",
+        "http.get", "http.post",
         "blackboard.facts", "blackboard.board", "blackboard.sites",
         "graal.vitals", "graal.heap", "vms.list", "pointcut.routes",
         "panels.list", "project.list", "mux.standings",

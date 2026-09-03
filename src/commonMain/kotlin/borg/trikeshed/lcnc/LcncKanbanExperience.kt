@@ -25,7 +25,39 @@ import borg.trikeshed.lib.toList
 class LcncKanbanExperience(
     private val store: BoardStoreElement,
     private val graph: () -> KanbanGraph = { KanbanGraph.hermesDefault() },
+    /** NARS garnish per card id (`attention`, `contested`), when a belief bag is live; null = bag off. */
+    private val attention: (() -> Map<String, Map<String, Any?>>)? = null,
+    /** The board productions' live tail (`breaches`, `stalls`, `cycles`, `ready`) — what `board.view#alerts` carries. */
+    private val alerts: () -> Map<String, Any?> = { emptyMap() },
 ) {
+
+    /**
+     * THE board projection — the one map `/api/board` serializes and
+     * `board.get`/`board.view` hand the canvas. It reads [store] directly:
+     * cards, then the fields the store persists but the bare cursor drops
+     * (owner, dependencies, tags), then the attention garnish when a bag is
+     * live. One author; the route and the node cannot answer differently.
+     *
+     * `board.get` used to be a self-fetch of `/api/board` through the route
+     * table — a no-code node playing no-function. It is a unit over
+     * [BoardStoreElement] now, like every other kanban lego here.
+     */
+    fun boardView(title: String = "Oroboros board"): Map<String, Any?> {
+        val seq = store.lastSequence
+        val base = borg.trikeshed.kanban.BoardCursor.of(store.cards()).toBoardMap(seq, title)
+        val garnish = attention?.invoke().orEmpty()
+        val items = (base["items"] as List<*>).map { item ->
+            val m = item as Map<*, *>
+            val id = m["id"].toString()
+            val row = store.card(id)
+            m + mapOf(
+                "owner" to row?.owner.orEmpty(),
+                "dependencies" to (row?.dependencies ?: emptyList<String>()),
+                "tags" to (row?.tags ?: emptyList<String>()),
+            ) + garnish[id].orEmpty()
+        }
+        return base + ("items" to items)
+    }
 
     /** Current board plus the two useful concentric partitions. */
     fun activeSheets(): Map<String, Any?> {
@@ -49,6 +81,8 @@ class LcncKanbanExperience(
     /** Registry for a complete in-process Kanban panel program. */
     fun registry(): Map<String, LcncNodeRunner> =
         sheetLcncRegistry() + kanbanLcncRegistry() + PanelVoteNode.registry() + mapOf(
+            "board.get" to LcncNodeRunner { _, _ -> mapOf("json" to boardView()) },
+            "board.view" to LcncNodeRunner { _, _ -> mapOf("board" to boardView(), "alerts" to alerts()) },
             "kanban.activeSheets" to LcncNodeRunner { _, _ -> activeSheets() },
             // A wired `command` map (the gesture, shaped upstream) overrides params —
             // same inputs-over-params precedence confix.sheets already honours. Params

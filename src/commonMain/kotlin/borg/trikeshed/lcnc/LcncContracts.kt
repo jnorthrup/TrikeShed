@@ -601,7 +601,9 @@ object LcncContracts {
         LcncPortContract("kanban.review", "TurnReview glosses (board window drain)",
             listOf("trigger?"), listOf("minted", "count"),
             inputKinds = mapOf("trigger" to "trigger"),
-            outputKinds = mapOf("minted" to "json", "count" to "json")),
+            outputKinds = mapOf("minted" to "json", "count" to "json"),
+            // It mints glosses and writes blackboard receipts: an effect, and said so.
+            isEffect = true),
         LcncPortContract("list.format", "declarative list → lines projector",
             listOf("x"), listOf("lines"),
             inputKinds = mapOf("x" to "json"),

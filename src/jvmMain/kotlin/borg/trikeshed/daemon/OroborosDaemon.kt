@@ -1752,7 +1752,8 @@ object OroborosDaemon {
             patchWire::route, moduleWire::route, webhookWire::route, blackboardWire::route, rdfWire::route,
         )
         // ── the surface family: node types the canvas could only reach by fetch ──
-        // board.get, blackboard.*, graal.vitals/heap, vms.list, panels.list … existed
+        // blackboard.*, graal.vitals/heap, vms.list, panels.list … existed (board.get /
+        // board.view moved to KanbanModule: units over BoardStoreElement, not a self-fetch)
         // as contracts plus small JS wrappers, so a headless run (webhook delivery,
         // /api/lcnc/run, a scheduled program) threw LcncUnknownNodeType — preset-hermes
         // could not run outside a browser tab. These dispatch to the daemon's OWN

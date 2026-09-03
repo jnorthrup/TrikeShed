@@ -468,9 +468,9 @@ finally:
   "http.post": {
     async run(n,i){ return {json:await api("POST",p(n,"path"),i.body)}; },
   },
-  "board.get": {
-    async run(){ return {json:await api("GET","/api/board")}; },
-  },
+  // board.get / board.view: no browser runner — serverRun() sends them to the
+  // daemon's unit over BoardStoreElement, so the canvas and a headless run
+  // answer identically (the JS twin used to compute its own alerts).
   "timer": {
     async run(n){ return {tick:Date.now()}; },
   },
@@ -555,17 +555,6 @@ finally:
   },
   "pointcut.routes": {
     async run(){ const r=await api("GET","/api/graal/pointcuts"); return {routes:r.routes||r}; },
-  },
-  "board.view": {
-    async run(){
-      const r=await api("GET","/api/board");
-      const cols=(r.columns||[]).map(c=>c.id+":"+(c.count!=null?c.count:"?")+(c.wipLimit?"/"+c.wipLimit:"")).join("  ");
-      const items=r.items||[];
-      const contested=items.filter(x=>x.contested).map(x=>x.id);
-      const wipAlerts=(r.columns||[]).filter(c=>c.wipLimit&&c.count>c.wipLimit).map(c=>"WIP "+c.id+" "+c.count+"/"+c.wipLimit);
-      return {board:{seq:r.sequence,cols:cols,cards:items.length},
-              alerts:{contested:contested,wip:wipAlerts}};
-    },
   },
   "list.pairs": {
     async run(n){ let a; try{ a=JSON.parse(p(n,"pairs")||"[]"); }catch(_){ a=[]; } return {pairs:Array.isArray(a)?a:[]}; },
