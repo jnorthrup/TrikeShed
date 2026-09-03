@@ -43,7 +43,7 @@ object ChokepointTodoScanner {
     /** Split a raw TODO with multi-targets into per-target items. */
     fun expandTargets(raw: RawTodo): List<TodoQueueItem> {
         val desc = raw.rawDescription
-        val targets = targetRegex.findAll(desc).map { it.groupValues[1] }.distinct().toList()
+        val targets = targetRegex.findAll(desc).mapTo(LinkedHashSet()) { it.groupValues[1] }.toList()
         if (targets.isEmpty()) {
             // no explicit target → common
             return listOf(TodoQueueItem(id = todoId(raw, "common"), target = "common", description = desc, source = raw.source, status = "pending"))
