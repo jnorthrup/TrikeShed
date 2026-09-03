@@ -39,6 +39,12 @@ object BrainMuxNodes {
     fun registry(
         keyMux: KeyMux? = null,
         modelMux: ModelMux? = null,
+        /**
+         * LIVE mux: consulted on every call instead of [modelMux]. The daemon
+         * hands one that rebuilds its cards when Hermes' state.db changes, so a
+         * `/model` switch in the Hermes CLI is in the picklist on its next open.
+         */
+        modelMuxProvider: (suspend () -> ModelMux?)? = null,
         credStore: CouchKeyStore? = null,
         /**
          * Coroutine context the chat rides under. MUST carry [HtxElement] under
@@ -49,6 +55,13 @@ object BrainMuxNodes {
          * "No HtxKey found in coroutine context" on every call.
          */
         chatContext: CoroutineContext? = null,
+    ): Map<String, LcncNodeRunner> = registryWith({ modelMuxProvider?.invoke() ?: modelMux }, keyMux, credStore, chatContext)
+
+    private fun registryWith(
+        mux: suspend () -> ModelMux?,
+        keyMux: KeyMux?,
+        credStore: CouchKeyStore?,
+        chatContext: CoroutineContext?,
     ): Map<String, LcncNodeRunner> = mapOf(
 
         // ── keys.status ─────────────────────────────────────────────
@@ -88,6 +101,7 @@ object BrainMuxNodes {
         // Returns: [{id, caps, provider}] — provider lets the browser
         // map a model to its KeyMux binding for credential selection.
         "mux.models" to LcncNodeRunner { _, _ ->
+            val modelMux = mux()
             if (modelMux == null) return@LcncNodeRunner mapOf("models" to emptyList<Any>())
             val cards = modelMux.listModels()
             val models = ArrayList<Map<String, Any?>>()
@@ -124,6 +138,7 @@ object BrainMuxNodes {
         // first). Empty lists/absent fields when the reactor ledger is not yet
         // warm — meta is a live projection, never a guess.
         "mux.meta" to LcncNodeRunner { _, _ ->
+            val modelMux = mux()
             if (modelMux == null) return@LcncNodeRunner mapOf("meta" to emptyList<Any>())
             // lastSelection is written by route() — capability ranking. A
             // prompt.chat names its model outright and never routes, so after
@@ -212,6 +227,7 @@ object BrainMuxNodes {
         // provider health recording. Falls back to direct HTX for manual
         // key+url entries that don't match any registered model.
         "prompt.chat" to LcncNodeRunner { node, inputs ->
+            val modelMux = mux()
             val prompt = (inputs["prompt"] as? String)
                 ?: node.params["prompt"]?.takeIf { it.isNotBlank() }
                 ?: ""
@@ -301,7 +317,8 @@ object BrainMuxNodes {
                                 },
                             )
                         } else {
-                            mapOf("content" to content, "model" to model, "ok" to true, "error" to "")
+                            mapOf("content" to content, "model" to model, "ok" to true, "error" to "",
+                                "cached" to (modelMux.lastReceipt?.cachedHit == true))
                         }
                     },
                     onFailure = { t ->
@@ -353,6 +370,7 @@ object BrainMuxNodes {
 
         "result.confirm" to LcncNodeRunner { _, inputs ->
             val content = (inputs["content"] as? String).orEmpty()
+            val cached = (inputs["cached"] ?: inputs["cached?"]).let { it == true || it == "true" }
             val error = ((inputs["error"] ?: inputs["error?"]) as? String).orEmpty()
             // A plain text producer has completed successfully. Producers that
             // expose an explicit verdict may override that default; an error
@@ -368,6 +386,7 @@ object BrainMuxNodes {
                 """<div style="border:2px solid #22c55e;border-radius:8px;padding:16px;margin:8px;background:#f0fdf4">
 <h3 style="color:#16a34a;margin:0 0 8px">✓ OK</h3>
 <pre style="white-space:pre-wrap;font-family:monospace;font-size:13px">${escHtml(content)}</pre>
+${if (cached) """<div style="color:#6b7280;font-size:12px;margin-top:6px">served from cache — the same question was asked before; change the prompt for a fresh answer</div>""" else ""}
 </div>"""
             } else {
                 """<div style="border:2px solid #ef4444;border-radius:8px;padding:16px;margin:8px;background:#fef2f2">

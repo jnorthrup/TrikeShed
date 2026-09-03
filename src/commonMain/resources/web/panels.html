@@ -370,6 +370,7 @@ button{border-radius:6px;padding:4px 12px;transition:border-color .12s,color .12
   <button id="storeSaveBtn" title="save construction as a replicated store document">⇪ store</button>
   <button id="storeLoadBtn" title="load a construction from the store">⇩ store</button>
   <button id="presetsBtn" title="server-authored programs — offered, never installed">▤ presets</button>
+  <button id="rdfBtn" title="the canvas as RDF — graph, ontology, and its alignment with productions and causal rules">⟁ rdf</button>
   <button id="paletteBtn" title="drag node types and programs onto the canvas">⧉ palette</button>
   <button id="keysBtn" title="keymux endpoints — names & addresses; key values never cross">⚿ keys</button>
   <button id="exportBtn">export</button>
@@ -1331,9 +1332,17 @@ function drawSpine(){
 }
 function redrawConcentric(){ drawSpine(); drawMinimap(); }
 
+// A fresh id is one the board does not already hold. Presets name their own
+// nodes (n1..n4 for notes was common), and "n"+G.seq++ handed the first node
+// added after a load the id n1 — shadowing the preset's note, so its cables
+// resolved to the wrong node and a text literal "would not mate".
+function mintId(){
+  const taken=new Set(); (function walk(ns){ for(const n of (ns||[])){ taken.add(n.id); walk(n.children); } })(G.nodes);
+  let id; do{ id="n"+(G.seq++); }while(taken.has(id)); return id;
+}
 function addNode(type,x,y,params){
   const t=CONTRACTS[type]; if(!t) return null;
-  const n={id:"n"+(G.seq++),type,x,y,params:{}};
+  const n={id:mintId(),type,x,y,params:{}};
   for(const k in (t.params||{})) n.params[k]=params?.[k]??t.params[k].v;
   G.nodes.push(n); buildNode(n); redraw(); save(); return n;
 }
@@ -1343,7 +1352,7 @@ function topRingOf(s){ let q=s; while(q._parentScope) q=q._parentScope; return q
    re-lays from its root, and the daemon runs it inside the ring's frame. */
 function addChildNode(scope,type){
   const t=CONTRACTS[type]; if(!t) return null;
-  const n={id:"n"+(G.seq++),type,x:0,y:0,params:{},_parentScope:scope};
+  const n={id:mintId(),type,x:0,y:0,params:{},_parentScope:scope};
   for(const k in (t.params||{})) n.params[k]=t.params[k].v;
   scope.children=scope.children||[]; scope.children.push(n);
   G.nodes.push(n); buildNode(n);
@@ -2758,6 +2767,7 @@ function save(){
   // History first: a ?load= view is ephemeral for the SCRATCH, but a person
   // poking at it still gets to back out. Undo is not autosave.
   recordHistory(JSON.stringify(serialize()));
+  refreshRdf();
   if(!AUTOSAVE) return;
   try{ localStorage.setItem("trikeshed.panels.v3", JSON.stringify(serialize())); }catch(e){}
 }
@@ -3131,6 +3141,80 @@ async function openGallery(){
   }catch(e){ body.textContent="gallery failed: "+e; }
 }
 $("#presetsBtn").addEventListener("click",openGallery);
+/* ── RDF mapping interface ──────────────────────────────────────────────
+   The canvas as triples (LcncRdf.graph, server-side, never authored here), the
+   vocabulary as triples (LcncRdf.ontology), and the ALIGNMENT: the same IRIs
+   joined against the Rete productions watching them, the causal rules that
+   mention them, and the KIF facts about them. Turtle in the box is editable and
+   "apply" maps it back onto the canvas; "→ NAL" ingests the causal projection
+   (each cable as `causes`) so the program becomes implication beliefs. */
+function toConfix(){ const d=serialize(); return {name:($("#panelName").value||"canvas"),nodes:d.nodes,wires:d.wires,view:{x:view.x,y:view.y,z:view.z}}; }
+let RDF_TIMER=null, RDF_NOTE="";
+function refreshRdf(){ if(!$("#rdfPanel")) return; clearTimeout(RDF_TIMER); RDF_TIMER=setTimeout(()=>{ const t=$("#rdfPanel").dataset.tab||"graph"; rdfTab(t); },400); }
+async function rdfTab(tab){
+  const g=$("#rdfPanel"); if(!g) return; g.dataset.tab=tab;
+  g.querySelectorAll("[data-rt]").forEach(b=>b.style.borderColor=b.dataset.rt===tab?"var(--cyan,#57d3ff)":"var(--line,#263348)");
+  const body=g.querySelector("#rdfBody"); const esc=x=>String(x??"").replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+  try{
+    if(tab==="graph"||tab==="ontology"){
+      const r= tab==="graph"
+        ? await fetch("/api/lcnc/rdf",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(toConfix())})
+        : await fetch("/api/lcnc/rdf");
+      const ttl=await r.text();
+      const n=(ttl.match(/ \.\s*$/gm)||[]).length;
+      body.innerHTML='<div style="color:var(--dim,#7f91a9);margin:0 0 6px">'+n+' triples · '+(tab==="graph"?'this canvas, ports as resources, one <code>lcnc:feeds</code> per cable':'the vocabulary: node types, kinds, rdfs:subClassOf, in/out ports')+'</div>'
+        +'<textarea id="rdfText" spellcheck="false" style="width:100%;height:46vh;font:11px/1.35 var(--mono);background:var(--bg);color:var(--ink);border:1px solid var(--line);border-radius:4px;padding:6px;white-space:pre">'+esc(ttl)+'</textarea>'
+        +'<div style="display:flex;gap:6px;margin-top:6px;flex-wrap:wrap">'
+        +(tab==="graph"?'<button data-ra="apply" title="map the Turtle in the box back onto the canvas">⇲ apply to canvas</button><button data-ra="nal" title="ingest the causal projection: every cable becomes an implication belief">→ NAL beliefs</button>':'')
+        +'<button data-ra="copy">copy</button></div><div id="rdfMsg" style="color:var(--dim,#7f91a9);margin-top:6px">'+esc(RDF_NOTE)+'</div>';
+      RDF_NOTE="";
+      body.querySelectorAll("[data-ra]").forEach(b=>b.addEventListener("click",async()=>{
+        const msg=body.querySelector("#rdfMsg"); const ttl2=body.querySelector("#rdfText").value;
+        if(b.dataset.ra==="copy"){ try{ await navigator.clipboard.writeText(ttl2); msg.textContent="copied"; }catch(e){ msg.textContent="copy failed: "+e; } }
+        else if(b.dataset.ra==="apply"){
+          const rr=await fetch("/api/lcnc/rdf/program",{method:"POST",headers:{"Content-Type":"text/turtle"},body:ttl2});
+          const doc=await rr.json();
+          if(!rr.ok||doc.error){ msg.textContent="apply refused: "+(doc.error||rr.status); return; }
+          // load() re-renders this tab (debounced), which would erase the message; park it for that render.
+          RDF_NOTE="canvas rebuilt from "+((doc.nodes||[]).length)+" nodes, "+((doc.wires||[]).length)+" cables";
+          load(fromConfix(doc)); save(); armSources(); msg.textContent=RDF_NOTE; }
+        else if(b.dataset.ra==="nal"){
+          const al=await fetch("/api/lcnc/rdf/align",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(toConfix())}).then(r=>r.json());
+          const rr=await fetch("/api/beliefs/kg",{method:"POST",headers:{"Content-Type":"text/turtle"},body:al.nal||""});
+          const res=await rr.json();
+          msg.textContent=rr.ok?("minted "+res.minted+" beliefs from "+res.statements+" statements · copulas "+JSON.stringify(res.copulas||{})):("NAL refused: "+(res.error||rr.status)); }
+      }));
+    } else {
+      const al=await fetch("/api/lcnc/rdf/align",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(toConfix())}).then(r=>r.json());
+      if(al.error){ body.textContent="align failed: "+al.error; return; }
+      const rows=['<div style="color:var(--dim,#7f91a9);margin:0 0 6px">'+al.summary+'</div>'];
+      for(const n of (al.nodes||[])){
+        rows.push('<div class="rdfNode" data-id="'+esc(n.id)+'" style="padding:6px 8px;border:1px solid var(--line,#263348);border-radius:6px;margin:5px 0;cursor:pointer">'
+          +'<div><b>'+esc(n.id)+'</b> <span style="color:var(--dim)">a</span> '+esc(n.type)+'</div>'
+          +(n.watchedBy.length?'<div style="margin-top:3px"><span style="color:var(--warn,#ffb02e)">productions</span> '+n.watchedBy.map(esc).join(", ")+'</div>':'<div style="margin-top:3px;color:var(--dim)">no production watches it</div>')
+          +(n.causalRules.length?'<div style="margin-top:3px"><span style="color:var(--ok,#3ddc84)">causal rules</span><br>'+n.causalRules.map(esc).join("<br>")+'</div>':'')
+          +(n.facts.length?'<div style="margin-top:3px"><span style="color:var(--cyan,#57d3ff)">facts</span><br>'+n.facts.map(esc).join("<br>")+'</div>':'')
+          +(n.feeds.length?'<div style="margin-top:3px;color:var(--dim)">causes → '+n.feeds.map(esc).join(", ")+'</div>':'')
+          +'</div>');
+      }
+      if(al.firings&&al.firings.length){ rows.push('<div style="color:var(--dim,#7f91a9);margin:8px 0 2px">recent causal firings</div>'); for(const f of al.firings) rows.push('<div style="font-size:11px">'+esc(f)+'</div>'); }
+      body.innerHTML=rows.join("");
+      body.querySelectorAll(".rdfNode").forEach(el=>el.addEventListener("click",()=>{ const n=G.nodes.find(x=>x.id===el.dataset.id); if(!n) return; n.el.style.outline="2px solid var(--cyan,#57d3ff)"; setTimeout(()=>n.el.style.outline="",1200); }));
+    }
+  }catch(e){ body.textContent="rdf failed: "+e; }
+}
+function openRdf(){
+  let g=$("#rdfPanel"); if(g){ g.remove(); return; }
+  g=document.createElement("div"); g.id="rdfPanel";
+  g.style.cssText="position:fixed;top:52px;right:12px;width:520px;max-height:80vh;overflow:auto;background:var(--panel,#101620);border:1px solid var(--line,#263348);border-radius:8px;padding:10px;z-index:30;font-size:12px";
+  g.innerHTML='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px"><b style="color:var(--cyan,#57d3ff)">RDF</b>'
+    +'<span><button data-rt="graph">graph</button> <button data-rt="ontology">ontology</button> <button data-rt="align">align</button></span>'
+    +'<span style="cursor:pointer" onclick="this.closest(\'#rdfPanel\').remove()">✕</span></div><div id="rdfBody">loading…</div>';
+  document.body.appendChild(g);
+  g.querySelectorAll("[data-rt]").forEach(b=>b.addEventListener("click",()=>rdfTab(b.dataset.rt)));
+  rdfTab("graph");
+}
+$("#rdfBtn").addEventListener("click",openRdf);
 $("#undoBtn").addEventListener("click",undo);
 $("#redoBtn").addEventListener("click",redo);
 /* ── contract hydration: the vocabulary is server-owned ─────────────────── */

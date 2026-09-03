@@ -166,7 +166,9 @@ class HermesCredentialSource(
     }
 
     private suspend fun loadPool(): Map<String, List<Map<String, Any?>>> {
-        cachedPool?.let { return it }
+        // No memo: the pool is Hermes' live store (rotation, cooldowns, new
+        // logins). auth.json is small; reading it per call is the price of
+        // answering with the key Hermes would use right now.
         val ops = fileOps()
         // The ACTIVE profile's pool first (profile entries win per provider),
         // then the default ~/.hermes pool as a union — each carries a different
@@ -191,7 +193,7 @@ class HermesCredentialSource(
                 }
             }
         }
-        return out.also { cachedPool = it }
+        return out
     }
 
     private suspend fun loadPoolFile(ops: FileOperations, file: String): Map<String, List<Map<String, Any?>>>? {
@@ -241,11 +243,8 @@ class HermesCredentialSource(
     }
 
     private suspend fun dotenv(ops: FileOperations, file: String): Map<String, String>? {
-        dotenvMemo[file]?.let { return it }
         if (!runCatching { ops.isFile(file) }.getOrDefault(false)) return null
-        val parsed = parseDotenv(runCatching { ops.readString(file) }.getOrNull() ?: return null)
-        dotenvMemo[file] = parsed
-        return parsed
+        return parseDotenv(runCatching { ops.readString(file) }.getOrNull() ?: return null)
     }
 
     // ── boundary coercions — JSON minting is never trusted to be one type ──

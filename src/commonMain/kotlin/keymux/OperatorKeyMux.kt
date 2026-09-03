@@ -40,7 +40,9 @@ fun operatorKeyMux(
 ): KeyMux = KeyMux {
     cached("*", HarnessSource(explicitFileOps = fileOps), ttlMs = ttlMs)
     cached("*", EnvSource())
-    cached("llm.*.*", HermesCredentialSource(hermesHome, fileOps), ttlMs = ttlMs)
+    // Uncached on purpose: a key rotated in auth.json or .env is used on the
+    // very next call. The source itself re-reads its files per call.
+    bind("llm.*.*", HermesCredentialSource(hermesHome, fileOps))
 }
 
 /**

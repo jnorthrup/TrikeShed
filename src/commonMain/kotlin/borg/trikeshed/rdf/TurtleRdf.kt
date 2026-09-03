@@ -48,7 +48,13 @@ object TurtleRdf {
         // strip prefix lines for triple parse
         val body = turtle.lines().filter { !it.trim().startsWith("@prefix") }.joinToString("\n")
         // very light triple regex: <s> <p> <o> . or _:b <p> "..." .
-        val tripleRe = Regex("""([<][^>]+>|[_\w:][^\s]*)\s+([<][^>]+>|[_\w:][^\s]*)\s+([<][^>]+>|"[^"]*"(@\w+|\^\^<[^>]+>)?|_:\w+)\s*\.""")
+        // A literal may contain ESCAPED quotes and backslashes — the emitter
+        // writes `\"` and `\\` (RdfTerm.toTurtle) — so the literal token is
+        // "any run of non-quote non-backslash chars or backslash-anything".
+        // `"[^"]*"` stopped at the first escaped quote and silently lost the
+        // triple, which is how a prompt containing a quote vanished on the
+        // canvas's "apply" round trip.
+        val tripleRe = Regex("""([<][^>]+>|[_\w:][^\s]*)\s+([<][^>]+>|[_\w:][^\s]*)\s+([<][^>]+>|"(?:[^"\\]|\\.)*"(@\w+|\^\^<[^>]+>)?|_:\w+)\s*\.""")
         // also handle quads: GRAPH { s p o . }
         val quadRe = Regex("""([<][^>]+>)\s*\{\s*([^}]+)\}""")
         for (qm in quadRe.findAll(body)) {
@@ -78,11 +84,32 @@ object TurtleRdf {
             t.startsWith("<") && t.endsWith(">") -> RdfTerm.Iri(t.removePrefix("<").removeSuffix(">"))
             t.startsWith("_:") -> RdfTerm.BlankNode(t.removePrefix("_:"))
             t.startsWith("\"") -> {
-                // literal with optional lang/datatype
-                val litEnd = t.indexOf('"', 1)
-                if (litEnd < 0) return null
-                val lex = t.substring(1, litEnd).replace("\\\"", "\"").replace("\\n", "\n").replace("\\\\", "\\")
-                val rest = t.substring(litEnd + 1).trim()
+                // literal with optional lang/datatype: find the closing quote
+                // past any escapes, then unescape in ONE pass — sequential
+                // replaces turned `\\n` (an escaped backslash then an n) into a
+                // newline.
+                val sb = StringBuilder()
+                var i = 1
+                var closed = false
+                while (i < t.length) {
+                    val ch = t[i]
+                    when {
+                        ch == '"' -> { closed = true; break }
+                        ch == '\\' && i + 1 < t.length -> {
+                            when (val e = t[i + 1]) {
+                                'n' -> sb.append('\n'); 't' -> sb.append('\t'); 'r' -> sb.append('\r')
+                                'u' -> if (i + 5 < t.length) { sb.append(t.substring(i + 2, i + 6).toInt(16).toChar()); i += 4 } else sb.append(e)
+                                else -> sb.append(e)
+                            }
+                            i += 2; continue
+                        }
+                        else -> sb.append(ch)
+                    }
+                    i++
+                }
+                if (!closed) return null
+                val lex = sb.toString()
+                val rest = t.substring(i + 1).trim()
                 when {
                     rest.startsWith("@") -> RdfTerm.Literal(lex, lang = rest.removePrefix("@"))
                     rest.startsWith("^^") -> RdfTerm.Literal(lex, datatype = rest.removePrefix("^^").removeSurrounding("<", ">"))

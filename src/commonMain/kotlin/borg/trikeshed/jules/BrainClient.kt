@@ -63,7 +63,7 @@ class BrainNoRoute(val attempts: List<String>) :
  * resolution instead of an empty roster. Standalone mode (keyMux == null)
  * keeps the historic env-gated [discoverEndpoints] behaviour unchanged.
  */
-class BrainClient(
+open class BrainClient(
     /** If non-null, overrides auto-discovery and uses a single endpoint. */
     apiKey: String? = null,
     base: String = "https://integrate.api.nvidia.com/v1",
@@ -206,26 +206,26 @@ class BrainClient(
     private var lastGoodModelId: String? = endpoints.firstOrNull()?.model
 
     /** True if at least one provider endpoint was discovered. */
-    fun hasEndpoints(): Boolean = endpoints.isNotEmpty()
+    open fun hasEndpoints(): Boolean = endpoints.isNotEmpty()
 
     /** Read-only view of the discovered roster — name/base/model, no key material. */
-    fun endpointSummaries(): List<EndpointSpec> = endpoints
+    open fun endpointSummaries(): List<EndpointSpec> = endpoints
 
     /** The model id that most recently answered a chat, or null before the first success. */
-    fun lastModel(): String? = lastGoodModelId
+    open fun lastModel(): String? = lastGoodModelId
 
     /**
      * Quota-legion standings from the mux (usable-first). Call under the mux
      * reactor context — without it the roster is unknowable and this is empty.
      */
-    suspend fun quotaStandings(nowMs: Long): List<modelmux.QuotaStanding> =
+    open suspend fun quotaStandings(nowMs: Long): List<modelmux.QuotaStanding> =
         internalModelMux.quotaStandings(nowMs)
 
     /**
      * The ModelMux this client chats through — provider-tagged cards over the
      * full roster (external-keyMux mode) or the discovered subset (standalone).
      */
-    fun modelMux(): modelmux.ModelMux = internalModelMux
+    open fun modelMux(): modelmux.ModelMux = internalModelMux
 
     /**
      * The machine's full provider capability set — the static [rosterInto]
@@ -236,7 +236,7 @@ class BrainClient(
      * Brain's own dispatch to a single endpoint but must not narrow the
      * panel's view of the machine).
      */
-    fun providerRoster(): List<EndpointSpec> = fullRoster()
+    open fun providerRoster(): List<EndpointSpec> = fullRoster()
 
     /** The static provider table (ungated) — discoverEndpoints() is this, filtered by key presence. */
     private fun fullRoster(): List<EndpointSpec> {
@@ -258,7 +258,7 @@ class BrainClient(
      * full KeyMux chain (env → dotenv → harness credential files) instead of raw
      * getenv() — harness-stored keys (hermes .env, codex, opencode) are visible.
      */
-    suspend fun rosterStatus(): List<Map<String, Any>> {
+    open suspend fun rosterStatus(): List<Map<String, Any>> {
         val discovered = endpoints.mapTo(mutableSetOf()) { it.name }
         return fullRoster().map { spec ->
             val keyPresent = if (this@BrainClient.keyMux != null) {
@@ -301,7 +301,7 @@ class BrainClient(
      *
      * If every provider fails, throws with the last error message.
      */
-    suspend fun chat(
+    open suspend fun chat(
         messages: List<Pair<String, String>>,
         maxTokens: Int = 256,
         temperature: Double = 0.2,
@@ -386,7 +386,7 @@ class BrainClient(
      * `"<endpoint>/<model>: <message>"` line to the trail; exhaustion throws
      * [BrainNoRoute] carrying that trail so the refusal lands on the record.
      */
-    suspend fun chatSeat(
+    open suspend fun chatSeat(
         messages: List<Pair<String, String>>,
         maxTokens: Int = 512,
         temperature: Double = 0.2,

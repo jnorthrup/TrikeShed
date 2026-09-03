@@ -2,6 +2,7 @@ package borg.trikeshed.lcnc
 
 import borg.trikeshed.lib.get
 import borg.trikeshed.lib.size
+import borg.trikeshed.lib.toSeries
 import borg.trikeshed.rdf.RdfTerm
 import borg.trikeshed.rdf.RdfTriple
 
@@ -123,6 +124,9 @@ object LcncRdf {
                 // re-implements.
                 parent?.let { out.add(RdfTriple(ni, pr("inScope"), nodeIri(it))) }
                 for ((k, v) in n.params) if (v.isNotEmpty()) out.add(RdfTriple(ni, pr("param_$k"), lit(v)))
+                // Layout rides along so the mapping round-trips a canvas, not just a graph.
+                out.add(RdfTriple(ni, pr("x"), lit(n.x.toString())))
+                out.add(RdfTriple(ni, pr("y"), lit(n.y.toString())))
                 val c = LcncContracts.find(n.type)
                 for (i in c?.inputs.orEmpty()) {
                     val pi = portIri(n.id, i)
@@ -168,4 +172,94 @@ object LcncRdf {
     }
 
     fun turtle(triples: List<RdfTriple>): String = triples.joinToString("\n") { it.toTurtle() }
+
+    private val RDF_TYPE_IRI = RDF_TYPE.iri
+
+    /**
+     * The INVERSE mapping: a graph in this vocabulary back to a program. Nodes
+     * are the subjects typed in [TYPE_NS]; params are `lcnc:param_<k>`; layout
+     * is `lcnc:x`/`lcnc:y`; ring membership is `lcnc:inScope`; every
+     * `lcnc:feeds` between two port IRIs is one cable. Terms this vocabulary
+     * does not know are ignored — open world — so a graph annotated by another
+     * tool (alignment, provenance, SHACL reports) still maps back cleanly.
+     */
+    fun programOf(graph: borg.trikeshed.rdf.RdfGraph, name: String): LcncProgram {
+        data class Raw(val id: String, var type: String = "", val params: LinkedHashMap<String, String> = LinkedHashMap(), var x: Double = 0.0, var y: Double = 0.0, var parent: String? = null)
+        val raws = LinkedHashMap<String, Raw>()
+        fun nodeId(t: RdfTerm): String? {
+            val i = (t as? RdfTerm.Iri)?.iri ?: return null
+            if (!i.startsWith(NS)) return null
+            val local = i.removePrefix(NS)
+            if (local.isEmpty() || "%23" in local || "#" in local) return null
+            return local
+        }
+        fun port(t: RdfTerm): Pair<String, String>? {
+            val i = (t as? RdfTerm.Iri)?.iri ?: return null
+            if (!i.startsWith(NS)) return null
+            val local = i.removePrefix(NS)
+            val sep = local.indexOf("%23").takeIf { it >= 0 } ?: local.indexOf('#').takeIf { it >= 0 } ?: return null
+            val n = local.substring(0, sep); val p = local.substring(sep + if (local.startsWith("%23", sep)) 3 else 1)
+            if (n.isEmpty() || p.isEmpty()) return null
+            return n to p
+        }
+        val wires = ArrayList<LcncWire>()
+        for (t in graph.triples) {
+            val pred = t.p.iri
+            if (pred == RDF_TYPE_IRI) {
+                val id = nodeId(t.s) ?: continue
+                val type = (t.o as? RdfTerm.Iri)?.iri?.takeIf { it.startsWith(TYPE_NS) }?.removePrefix(TYPE_NS) ?: continue
+                raws.getOrPut(id) { Raw(id) }.type = type
+                continue
+            }
+            if (!pred.startsWith(NS)) continue
+            val local = pred.removePrefix(NS)
+            when {
+                local == "feeds" -> {
+                    val from = port(t.s) ?: continue; val to = port(t.o) ?: continue
+                    wires.add(LcncWire(from.first, from.second, to.first, to.second))
+                }
+                local.startsWith("param_") -> {
+                    val id = nodeId(t.s) ?: continue
+                    raws.getOrPut(id) { Raw(id) }.params[local.removePrefix("param_")] = (t.o as? RdfTerm.Literal)?.lexical ?: continue
+                }
+                local == "x" -> { val id = nodeId(t.s) ?: continue; raws.getOrPut(id) { Raw(id) }.x = (t.o as? RdfTerm.Literal)?.lexical?.toDoubleOrNull() ?: 0.0 }
+                local == "y" -> { val id = nodeId(t.s) ?: continue; raws.getOrPut(id) { Raw(id) }.y = (t.o as? RdfTerm.Literal)?.lexical?.toDoubleOrNull() ?: 0.0 }
+                local == "inScope" -> { val id = nodeId(t.s) ?: continue; raws.getOrPut(id) { Raw(id) }.parent = nodeId(t.o) }
+            }
+        }
+        val typed = raws.values.filter { it.type.isNotEmpty() }
+        val byParent = typed.groupBy { it.parent }
+        fun build(r: Raw): LcncNode {
+            val kids = byParent[r.id].orEmpty().map { build(it) }
+            return LcncNode(id = r.id, type = r.type, params = r.params, x = r.x, y = r.y, children = kids.toSeries())
+        }
+        val top = byParent[null].orEmpty().map { build(it) }
+        // A cable whose ends are not both typed nodes is dropped, not guessed.
+        val known = typed.mapTo(HashSet()) { it.id }
+        val keptWires = wires.filter { it.fromNode in known && it.toNode in known }
+        return LcncProgram(name = name, nodes = top.toSeries(), wires = keptWires.toSeries())
+    }
+
+    /**
+     * The CAUSAL projection for the NAL crossing: every cable as `lcnc:causes`
+     * (KgNalBridge maps `causes` to IMPLICATION), every node as an instance of
+     * its type (INHERITANCE). Ingested through /api/beliefs/kg this turns a
+     * program into causal beliefs the belief bag and the causality rete can
+     * reason over — the same IRIs the graph and the alignment use.
+     */
+    fun causalProjection(program: LcncProgram): List<RdfTriple> {
+        val out = ArrayList<RdfTriple>()
+        fun walk(nodes: List<LcncNode>) {
+            for (n in nodes) {
+                out.add(RdfTriple(nodeIri(n.id), RDF_TYPE, typeIri(n.type)))
+                val kids = ArrayList<LcncNode>(); for (j in 0 until n.children.size) kids.add(n.children[j]); if (kids.isNotEmpty()) walk(kids)
+            }
+        }
+        val top = ArrayList<LcncNode>(); for (j in 0 until program.nodes.size) top.add(program.nodes[j]); walk(top)
+        for (j in 0 until program.wires.size) {
+            val w = program.wires[j]
+            out.add(RdfTriple(portIri(w.fromNode, w.fromPort), pr("causes"), portIri(w.toNode, w.toPort)))
+        }
+        return out
+    }
 }

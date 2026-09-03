@@ -195,7 +195,7 @@ object KgNalBridge {
         // strip comments, gather prefixes
         val body = StringBuilder()
         for (line in text.lines()) {
-            val l = line.substringBefore('#').trim()
+            val l = stripComment(line).trim()
             if (l.isEmpty()) continue
             val prefixMatch = Regex("""@prefix\s+(\S*):\s*<([^>]*)>\s*\.""").find(l)
             if (prefixMatch != null) {
@@ -233,6 +233,29 @@ object KgNalBridge {
     }
 
     private fun expandA(p: String): String = if (p == "a") "rdf:type" else p
+
+    /**
+     * A `#` starts a comment only OUTSIDE an IRI or a literal. Hash IRIs are
+     * the common case (`<https://trikeshed.borg/lcnc#n1>`, `rdf:type` itself
+     * is `…22-rdf-syntax-ns#type`), and `substringBefore('#')` chopped every
+     * such line at its first fragment — the LCNC causal projection bridged to
+     * zero statements while the sniff said TURTLE.
+     */
+    private fun stripComment(line: String): String {
+        var inIri = false; var inLit = false; var i = 0
+        while (i < line.length) {
+            val c = line[i]
+            when {
+                inLit -> { if (c == '\\') i++ else if (c == '"') inLit = false }
+                inIri -> if (c == '>') inIri = false
+                c == '<' -> inIri = true
+                c == '"' -> inLit = true
+                c == '#' -> return line.substring(0, i)
+            }
+            i++
+        }
+        return line
+    }
 
     private fun emitObjects(
         out: MutableList<KgTriplet>,

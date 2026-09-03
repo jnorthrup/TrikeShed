@@ -106,4 +106,23 @@ class KgNalBridgeTest {
             "same terms, different copulas must land apart in angular space",
         )
     }
+
+    @Test
+    fun hashIrisAreNotComments() {
+        // Every LCNC IRI carries a fragment, and so does rdf:type itself. A `#`
+        // inside <…> or "…" must survive; one outside still starts a comment.
+        val turtle = """
+            <https://trikeshed.borg/lcnc#n1%23value> <https://trikeshed.borg/lcnc#causes> <https://trikeshed.borg/lcnc#p1%23prompt> .
+            <https://trikeshed.borg/lcnc#n1> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <https://trikeshed.borg/lcnc/type#text.value> . # a trailing comment
+            <https://trikeshed.borg/lcnc#n1> <https://trikeshed.borg/lcnc#param_text> "issue #12 is \"open\"" .
+        """.trimIndent()
+        val mapped = KgNalBridge.bridge(turtle)
+        assertEquals(3, mapped.size, mapped.toString())
+        assertEquals(NalCopula.IMPLICATION, mapped[0].copula)
+        assertEquals(RelationKind.CAUSALITY, mapped[0].relation)
+        assertEquals("https://trikeshed.borg/lcnc#p1%23prompt", mapped[0].triplet.obj)
+        assertEquals(NalCopula.INHERITANCE, mapped[1].copula)
+        assertEquals("https://trikeshed.borg/lcnc/type#text.value", mapped[1].triplet.obj)
+        assertTrue("#12" in mapped[2].triplet.obj, mapped[2].triplet.obj)
+    }
 }

@@ -909,9 +909,11 @@ object LcncContracts {
         //   CouchKeyStore entry; (3) the manual url+key fields. The key field
         //   is a password input (secret: prefix).
         LcncPortContract("prompt.chat", "ask a model",
-            listOf("prompt?"), listOf("content", "model", "ok", "error"),
+            listOf("prompt?"), listOf("content", "model", "ok", "error", "cached"),
             inputKinds = mapOf("prompt" to "text"),
-            outputKinds = mapOf("content" to "text", "model" to "id", "ok" to "json", "error" to "text"),
+            // cached: the reactor answered from its cache (same question as before) —
+            // the answer card says so, because a repeat that looks live is a lie.
+            outputKinds = mapOf("content" to "text", "model" to "id", "ok" to "json", "error" to "text", "cached" to "json"),
             params = mapOf(
                 "prompt" to LcncPortContract.LcncParamSpec(ta = true, ph = "what do you want to ask?"),
                 // Blank default: the live list leads, and its first entry is the newest
@@ -935,8 +937,8 @@ object LcncContracts {
         // content-only producers are successful confirmations, not starved
         // nodes (and not blank ERROR cards).
         LcncPortContract("result.confirm", "the answer",
-            listOf("content", "ok?", "error?"), emptyList(),
-            inputKinds = mapOf("content" to "text", "ok" to "json", "error" to "text"),
+            listOf("content", "ok?", "error?", "cached?"), emptyList(),
+            inputKinds = mapOf("content" to "text", "ok" to "json", "error" to "text", "cached" to "json"),
             isSink = true),
 
         // ── Sub-VM module legos: tika / corenlp / camel / graalce ──────

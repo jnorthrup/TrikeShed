@@ -46,7 +46,7 @@ class PresetRequiredInputsTest {
     @Test
     fun resultConfirmAcceptsContentAsSuccessAndStatusAsOptionalRefinement() = runBlocking {
         val contract = LcncContracts.find("result.confirm")!!
-        assertEquals(listOf("content", "ok?", "error?"), contract.inputs)
+        assertEquals(listOf("content", "ok?", "error?", "cached?"), contract.inputs)
 
         val runner = BrainMuxNodes.registry().getValue("result.confirm")
         val node = LcncNode("confirm", "result.confirm")

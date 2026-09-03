@@ -51,6 +51,13 @@ object RouteManifest {
             RouteEntry("GET", "/api/projects/{name}/mine", "mining progress"),
         ),
         // -- ModuleWire: module lifecycle --
+        // -- LcncRdfWire: the canvas as RDF, and its alignment --
+        "LcncRdfWire" to listOf(
+            RouteEntry("GET", "/api/lcnc/rdf", "LCNC vocabulary as Turtle (ontology + bindings)"),
+            RouteEntry("POST", "/api/lcnc/rdf", "a program document as Turtle (ports as resources, one lcnc:feeds per cable)"),
+            RouteEntry("POST", "/api/lcnc/rdf/program", "Turtle in the LCNC vocabulary back to a program document"),
+            RouteEntry("POST", "/api/lcnc/rdf/align", "a program joined with the Rete productions, causal rules and KIF facts that mention its terms; plus its causal projection for /api/beliefs/kg"),
+        ),
         "ModuleWire" to listOf(
             RouteEntry("GET", "/api/modules", "attached modules and claimed routes"),
             RouteEntry("POST", "/api/modules", "attach a module by FQCN"),
