@@ -40,6 +40,13 @@ class LcncPublisher(
     private val attachments: CouchAttachmentGateway?,
     /** The daemon's one production network; null publishes to the blackboard only. */
     rete: ReteNetwork? = null,
+    /**
+     * The daemon's one KIF bank: [lateBound] tells the vocabulary's tuples to it
+     * (a re-tell is a dedupe no-op), so `/api/beliefs/query (nodeType ?t)` answers
+     * from the same bank every Rete fact projects into. Null keeps a private bank
+     * per call, the pre-join behaviour.
+     */
+    private val kifBank: borg.trikeshed.kif.KifKnowledgeBase? = null,
 ) {
     /** The panels-plane bridge over [rete], or null when no network was given. */
     val panelFacts: PanelFactBridge? = rete?.let(::PanelFactBridge)
@@ -93,7 +100,7 @@ class LcncPublisher(
         val composites = vocabulary.filterKeys { it !in compiled }
         // ONE reflective act per runner: its class name is the provenance.
         val bindings = LcncWrappers.bindings(vocabulary.values, runners(), { it.javaClass.name }, composites)
-        val facts = LcncFacts.of(vocabulary.values, corpus).learn(bindings)
+        val facts = LcncFacts.of(vocabulary.values, corpus, into = kifBank ?: borg.trikeshed.kif.KifKnowledgeBase()).learn(bindings)
         return LateBound(corpus, vocabulary, bindings, facts)
     }
 

@@ -75,6 +75,13 @@ class ModuleContext(
         borg.trikeshed.lcnc.LcncPresets.all()[name]
             ?.let { borg.trikeshed.lcnc.LcncProgramConfix.fromJson(name, it) }
     },
+    /**
+     * The daemon's ONE KIF bank (the tuple plane every Rete fact projects into
+     * and the LCNC vocabulary is told to). A module's [borg.trikeshed.lcnc.LcncPublisher]
+     * must tell the same bank the daemon's publisher tells; null (tests, reduced
+     * contexts) means each publisher keeps a private bank, as before.
+     */
+    val kifBank: borg.trikeshed.kif.KifKnowledgeBase? = null,
 )
 
 /** The grip the supervisor holds: describe for /api/modules, drain-then-close on detach. */

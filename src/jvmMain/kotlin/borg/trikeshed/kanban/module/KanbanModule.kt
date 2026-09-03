@@ -342,7 +342,9 @@ class KanbanModule : ForgeModule {
         // Everything LCNC ON THE BLACKBOARD, by the one writer (LcncPublisher):
         // `lcnc/vocabulary` and `lcnc/program/<name>` with every cable typed and
         // every violation beside it. The routes below serve what is on the board.
-        val publisher = borg.trikeshed.lcnc.LcncPublisher(ctx.blackboard, { ctx.lcncRunners }, ctx.attachments)
+        // The same ReteNetwork and KIF bank the daemon's publisher holds: the panels plane and
+        // the vocabulary tuples come from one network and one bank however many publishers exist.
+        val publisher = borg.trikeshed.lcnc.LcncPublisher(ctx.blackboard, { ctx.lcncRunners }, ctx.attachments, ctx.rete, ctx.kifBank)
         runCatching { publisher.publishAll() }
             .onFailure { System.err.println("[KanbanModule] lcnc → blackboard publish failed: ${it.message}") }
 

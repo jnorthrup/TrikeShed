@@ -679,8 +679,13 @@ object OroborosDaemon {
             fileOps,
             borg.trikeshed.btrfs.BtrfsWorldStore.homeUnder(forgeHome.absolutePath),
         )
+        // ONE pointcut adapter over the daemon blackboard. Built here, before the Hypervisor, so
+        // the Hypervisor's landings, the couch projection (installed below, in the pointcut
+        // subsystem) and the graal fact tendon all read the same `flow` — the Hypervisor used to
+        // build a private adapter of its own, whose landings no projection ever saw.
+        val pointcutAdapter = borg.trikeshed.pointcut.PointcutBlackboardAdapter(daemonBlackboard)
         val vmHost = borg.trikeshed.vm.HypervisorVmHost(
-            borg.trikeshed.graal.subvm.Hypervisor(blackboard = daemonBlackboard, worldStore = vmWorldStore),
+            borg.trikeshed.graal.subvm.Hypervisor(blackboard = daemonBlackboard, adapter = pointcutAdapter, worldStore = vmWorldStore),
         )
         borg.trikeshed.vm.VmSupervisor.install(vmHost)
         val wireScope = CoroutineScope(SupervisorJob(coroutineContext[kotlinx.coroutines.Job]) + Dispatchers.Default)
@@ -1094,7 +1099,17 @@ object OroborosDaemon {
         val brainClient = borg.trikeshed.jules.LiveBrainClient(hermesWatch, { buildBrain() }, buildBrain())
         // The runner registry is assembled below; the publisher reads it late.
         val lcncRunnersRef = java.util.concurrent.atomic.AtomicReference<Map<String, borg.trikeshed.lcnc.LcncNodeRunner>>(emptyMap())
-        val lcncPublisher = borg.trikeshed.lcnc.LcncPublisher(daemonBlackboard, { lcncRunnersRef.get() }, attachmentGateway)
+        // ── The ONE production network and its registry, hoisted above the publisher: the
+        //    panels plane (LcncPublisher → PanelFactBridge) writes into it, the couch tendon
+        //    and the modules below write into it, and the KIF tee reads every op off it.
+        val reteProductions = borg.trikeshed.dag.ReteProductionRegistry()
+        val rete = borg.trikeshed.dag.ReteNetwork(reteProductions)
+        // KIF half of the join: every fact the network applies is projected into `kifBank`
+        // (and un-projected on retract) by one observer — attached before any bridge opens,
+        // so nothing needs priming; `prime` is still called once after the bridges open below,
+        // idempotently, as the belt to this brace.
+        val (kifTee, kifTeeDisposer) = borg.trikeshed.dag.KifTee.attach(rete, kifBank)
+        val lcncPublisher = borg.trikeshed.lcnc.LcncPublisher(daemonBlackboard, { lcncRunnersRef.get() }, attachmentGateway, rete, kifBank)
         val patchWire = borg.trikeshed.forge.server.PatchWire(
             brain = brainClient,
             scopes = projectScopes,
@@ -1109,8 +1124,7 @@ object OroborosDaemon {
         //    registry + CoW route registry + supervisor (proxy ctors: app CP first,
         //    then a fresh URLClassLoader over build/live/classes — hotswapFeed's tree,
         //    so a class compiled after boot attaches without a bounce).
-        val reteProductions = borg.trikeshed.dag.ReteProductionRegistry()
-        val rete = borg.trikeshed.dag.ReteNetwork(reteProductions)
+        // (reteProductions / rete are constructed above the LcncPublisher, which needs them)
         val moduleRoutes = borg.trikeshed.module.ModuleRouteRegistry()
         val moduleScope = CoroutineScope(SupervisorJob(coroutineContext[kotlinx.coroutines.Job]) + Dispatchers.Default)
         // Spec §3.1 production wiring: ONE stored-program resolver — the offered
@@ -1137,6 +1151,7 @@ object OroborosDaemon {
             muxContext = htxElement + muxReactor,
             ccekBinding = ccekBinding,
             programLoader = storedProgramLoader,
+            kifBank = kifBank,
         )
         lcncRunnersRef.set(moduleContext.lcncRunners)
         requestFactoryRpcTargets["session.info"] = borg.trikeshed.relaxfactory.RequestFactoryRpcTarget { args ->
@@ -1268,7 +1283,8 @@ object OroborosDaemon {
             moduleContext.lcncRunners["state.freeze"] = borg.trikeshed.narsese.StateNodes.freezeRunner(
                 bag = bag,
                 kif = kifBank,
-                graph = { borg.trikeshed.rdf.RdfGraph(emptyList()) },
+                // The RDF projection of the whole fact plane at freeze time (was an empty graph).
+                graph = { borg.trikeshed.rdf.RdfGraph(kotlinx.coroutines.runBlocking { rete.snapshot() }.flatMap(borg.trikeshed.dag.PlaneFacts::toTriples)) },
                 cas = casStore,
             )
             moduleContext.lcncRunners["state.thaw"] = borg.trikeshed.narsese.StateNodes.thawRunner(
@@ -1747,9 +1763,12 @@ object OroborosDaemon {
             causalRules = { causalityRete?.rules?.let { r -> (0 until r.size).map { r[it] } }.orEmpty() },
             facts = { pattern -> curatorImpulse?.let { c -> runCatching { c.queryBank(pattern) }.getOrDefault(emptyList()) }.orEmpty() },
         )
+        // The fact plane itself, read-only: /api/rete/facts, /api/facts/rdf, /api/rete/productions.
+        val reteWire = borg.trikeshed.forge.server.ReteWire(rete)
         val extraRouteList: List<borg.trikeshed.litebike.ExtraRoute> = listOfNotNull(
             graalWire::route, vmWire::route, hermesWire::route, beliefWire?.let { it::route },
             patchWire::route, moduleWire::route, webhookWire::route, blackboardWire::route, rdfWire::route,
+            reteWire::route,
         )
         // ── the surface family: node types the canvas could only reach by fetch ──
         // blackboard.*, graal.vitals/heap, vms.list, panels.list … existed (board.get /
@@ -1854,7 +1873,7 @@ object OroborosDaemon {
         // Connect the pointcut adapter to the actual process-wide ConfixBlackboard instance if it existed globally. 
         // Currently, we'll continue providing an empty blackboard here as there's no pre-existing global ConfixBlackboard exposed to OroborosDaemon.
         // And PointcutCouchProjection ensures it propagates pointcut landings to couch.
-        val pointcutAdapter = borg.trikeshed.pointcut.PointcutBlackboardAdapter(daemonBlackboard)
+        // (the adapter itself is constructed next to the Hypervisor, which shares it)
         pointcutAdapter.install()
         val pointcutProjection = borg.trikeshed.pointcut.PointcutCouchProjection(couchStore, pointcutAdapter, CoroutineScope(Dispatchers.Default))
 
@@ -2150,12 +2169,41 @@ object OroborosDaemon {
             db = couchDb,
             rete = rete,
             report = reportReactor,
-            admit = { !it.docId.startsWith("_design/") && !it.docId.startsWith(GitCouchGateway.GIT_PREFIX) },
+            // pointcut/ docs stay out: the graal tendon below asserts each landing once, on the graal partition.
+            admit = { !it.docId.startsWith("_design/") && !it.docId.startsWith(GitCouchGateway.GIT_PREFIX) && !it.docId.startsWith("pointcut/") },
             parentJob = kanbanJob,
         )
         launch {
             changesFacts.open()
             System.err.println("[OROBOROS] Changes→Rete tendon: ${changesFacts.state} — ${changesFacts.factsApplied} facts from the initial reconcile, commits=${reportReactor.reportState.value.commits}")
+        }
+
+        // ── Tendon: daemonBlackboard keys → Rete facts (partition "blackboard"). Admit table is
+        //    BlackboardNamespaces: rule-firing outputs (kanban/rule/, narsese/curation/,
+        //    narsese/rete/firing/) stay receipt-only so the sink cannot re-enter the network.
+        val blackboardFacts = borg.trikeshed.graal.BlackboardChangesFactElement(
+            blackboard = daemonBlackboard,
+            rete = rete,
+            parentJob = kanbanJob,
+        )
+        // ── Tendon: the runtime → Rete facts (partition "graal"): bounded STATE facts per tick
+        //    (memory, gc/<collector>, jit, deopt/<method> capped, alloc/<class> top-N) plus one
+        //    fact per pointcut landing key off the one shared adapter (daemon + Hypervisor lanes).
+        val graalFacts = borg.trikeshed.graal.vitals.GraalFactElement(
+            vitals = jvmVitals,
+            rete = rete,
+            pointcutFlows = listOf(pointcutAdapter.flow),
+            tickMs = borg.trikeshed.graal.vitals.GraalFactElement.DEFAULT_TICK_MS,
+            parentJob = kanbanJob,
+        )
+        launch {
+            blackboardFacts.open()
+            System.err.println("[OROBOROS] Blackboard→Rete tendon: ${blackboardFacts.state} — ${blackboardFacts.factsApplied} facts from the initial drain of ${daemonBlackboard.keys().size} keys")
+            graalFacts.open()
+            System.err.println("[OROBOROS] Graal→Rete tendon: ${graalFacts.state}")
+            // Belt to the tee's brace: anything the network held before the observer attached is projected once.
+            kifTee.prime(rete)
+            System.err.println("[OROBOROS] Rete→KIF tee: ${kifTee.trackedCount()} facts projected into the one bank")
         }
 
         val mainJob = coroutineContext[kotlinx.coroutines.Job]
@@ -2223,6 +2271,10 @@ object OroborosDaemon {
                 healthJob.cancelAndJoin()
                 if (healthSock.exists()) healthSock.delete()
                 try { traceWriter?.flush(); traceWriter?.close() } catch (_: Exception) {}
+                // Plane tendons close before their supervisor is cancelled, so close() joins the drains cleanly.
+                runCatching { blackboardFacts.close() }
+                runCatching { graalFacts.close() }
+                runCatching { kifTeeDisposer.close() }
                 runCatching { kanbanJob.cancel() }
                 runCatching { incrementalViews.closeAll() }
                 runCatching { hermesConsole.close() }
