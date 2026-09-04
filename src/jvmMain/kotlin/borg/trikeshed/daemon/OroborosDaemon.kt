@@ -1057,7 +1057,25 @@ object OroborosDaemon {
         // Hermes' state.db / auth.json / .env change (HermesWatch), so the brain
         // follows a `/model` switch or a key rotation without a restart.
         val hermesWatch = borg.trikeshed.jules.HermesWatch.default()
+        // ONE quota legion for every mux in the process, walked back from Hermes' success
+        // ledger: a provider's proven limit is the most it ever bore in one day, and what
+        // Hermes burned today is already charged — the key is shared, so the pool is.
+        // Refreshed (limits + pre-charge, meters kept) whenever the ledger changes.
+        val quotaLegion = modelmux.QuotaLegion(windowMs = modelmux.QuotaLegion.DAY_MS)
+        fun refreshQuotaLegion() {
+            val now = System.currentTimeMillis()
+            val db = borg.trikeshed.jules.HermesModelUsage.stateDb()
+            quotaLegion.refresh(borg.trikeshed.jules.HermesModelUsage.ledgerRows(db), now)
+            System.err.println(
+                "[OROBOROS] quota legion from hermes ledger ($db): " +
+                    quotaLegion.limitsByProvider.entries.joinToString("; ") { (p, lim) ->
+                        "$p proven $lim/day, spent today ${quotaLegion.ledgerSpentFor(p, now)}"
+                    }.ifEmpty { "no provider rows — every key unmetered" },
+            )
+        }
+        refreshQuotaLegion()
         suspend fun buildBrain(): Pair<borg.trikeshed.jules.BrainClient, Map<String, Any?>> {
+            refreshQuotaLegion()
             val hermesSession = borg.trikeshed.jules.HermesActiveSession.current()
             val hermesProvider = hermesSession?.runtime?.provider
             suspend fun hermesLane(field: String): String? = hermesProvider?.let { provider ->
@@ -1085,10 +1103,10 @@ object OroborosDaemon {
                         (if (hermesSession.isOpen) "open" else "ended") + ", last activity $seen, ${hermesSession.apiCallCount} api calls): " +
                         "$hermesModel @ $hermesBaseUrl (provider=$hermesProvider, api_mode=${hermesSession.runtime.apiMode ?: "chat_completions"}, ${hermesSession.ledger})",
                 )
-                borg.trikeshed.jules.BrainClient(apiKey = hermesKey, base = hermesBaseUrl.trimEnd('/'), model = hermesModel, errorSink = brainErrorSink)
+                borg.trikeshed.jules.BrainClient(apiKey = hermesKey, base = hermesBaseUrl.trimEnd('/'), model = hermesModel, errorSink = brainErrorSink, quotaLegion = quotaLegion)
             } else {
                 System.err.println("[OROBOROS] Brain on the provider roster — hermes session pin unavailable: $hermesPinReason")
-                borg.trikeshed.jules.BrainClient(errorSink = brainErrorSink, keyMux = keyMux)
+                borg.trikeshed.jules.BrainClient(errorSink = brainErrorSink, keyMux = keyMux, quotaLegion = quotaLegion)
             }
             val account: Map<String, Any?> = mapOf(
                 "pin" to if (hermesPinReason.isEmpty()) {
@@ -1500,7 +1518,12 @@ object OroborosDaemon {
                         "already claimed — routable as '$id' (previously unreachable)",
                 )
             }
+            // Quota walked back from Hermes' success ledger: a provider's proven limit is the
+            // most it ever bore in one day, and what Hermes burned today is already charged —
+            // the key is shared, so the pool is. Rebuilt with the mux on every ledger change.
+            refreshQuotaLegion()
             return modelmux.ModelMux(keyMux) {
+                quota(quotaLegion)
                 lcncRoster.forEachIndexed { i, ep ->
                     model(
                         id = lcncCardIds[i],

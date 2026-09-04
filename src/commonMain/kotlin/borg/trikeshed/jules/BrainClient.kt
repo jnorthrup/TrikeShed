@@ -84,6 +84,8 @@ open class BrainClient(
      * receipts via MuxReactor. Null = create internal ModelMux (standalone mode).
      */
     private val modelMux: ModelMux? = null,
+    /** Quota legion for the internal mux — the daemon passes its ledger-fed legion so every mux meters one pool. */
+    private val quotaLegion: modelmux.QuotaLegion? = null,
 ) {
     /** Outer timeout for the entire multi-provider failover loop. */
     companion object {
@@ -194,6 +196,7 @@ open class BrainClient(
 
     /** Internal ModelMux — created when no external one is provided. */
     private val internalModelMux: ModelMux = this.modelMux ?: ModelMux(internalKeyMux) {
+        this@BrainClient.quotaLegion?.let { quota(it) }
         endpoints.forEach { endpoint ->
             model(
                 id = endpoint.model, caps = setOf("chat", "conflict-resolve"), baseUrl = endpoint.base,

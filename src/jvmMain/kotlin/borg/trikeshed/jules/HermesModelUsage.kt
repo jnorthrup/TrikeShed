@@ -96,6 +96,16 @@ object HermesModelUsage {
     /** The single most recent row that answered, or null if the ledger is empty. */
     fun lastUsed(db: File = stateDb()): Usage? = recent(db, limit = 1).firstOrNull()
 
+    /** The ledger as [modelmux.LedgerRow]s for [modelmux.QuotaLegion.fromLedger] — every row Hermes wrote, newest first. */
+    fun ledgerRows(db: File = stateDb(), limit: Int = 4096): List<modelmux.LedgerRow> =
+        recent(db, limit).map { u ->
+            modelmux.LedgerRow(
+                provider = u.provider, model = u.model,
+                inputTokens = u.inputTokens, outputTokens = u.outputTokens,
+                lastSeenMs = (u.lastSeenEpochSeconds * 1000.0).toLong(), calls = u.calls,
+            )
+        }
+
     /**
      * Distinct endpoints that have ever produced a completion, newest first.
      *

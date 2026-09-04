@@ -278,6 +278,14 @@ class ModelMux internal constructor(
         // — the value is the secret, and it bypassed the providerTag chain
         // session() honours, so tagged providers metered under null.
         val keyId = resolveKeyId(session.model.b)
+        // The reactor's roster is the keys this process actually used: record the
+        // resolved key on dispatch so the quota legion's standings can project it
+        // (delta 2026-09-04 — before this only the daemon's boot-time
+        // `<provider>-default` rows were ever on the roster, and every metered
+        // receipt landed on a key the standings could not show).
+        if (reactor != null && keyId != null) {
+            reactor.recordAccess(keyId = keyId, provider = session.model.b.providerTag ?: session.model.b.id, label = keyId)
+        }
         val t0 = kotlinx.datetime.Clock.System.now().toEpochMilliseconds()
         var httpStatus = 0
         var cachedHit = false
@@ -450,6 +458,14 @@ class ModelMux internal constructor(
         // value — keyMux.get(...) returns the credential, which matched no lease and
         // leaked it. Same providerTag fallback chain session()/chat() honour.
         val keyId = resolveKeyId(session.model.b)
+        // The reactor's roster is the keys this process actually used: record the
+        // resolved key on dispatch so the quota legion's standings can project it
+        // (delta 2026-09-04 — before this only the daemon's boot-time
+        // `<provider>-default` rows were ever on the roster, and every metered
+        // receipt landed on a key the standings could not show).
+        if (reactor != null && keyId != null) {
+            reactor.recordAccess(keyId = keyId, provider = session.model.b.providerTag ?: session.model.b.id, label = keyId)
+        }
         try {
             val card = models.let { ms -> (0 until ms.size).first { ms[it].a == modelId }.let { ms[it] } }.b
             val meta: AcpMeta = card.wireName j ("stream" j session.authHeaders())
@@ -500,6 +516,14 @@ class ModelMux internal constructor(
         // same defect class): keyMux.get returns the credential, which matched no
         // lease. providerTag fallback chain via resolveKeyId.
         val keyId = resolveKeyId(session.model.b)
+        // The reactor's roster is the keys this process actually used: record the
+        // resolved key on dispatch so the quota legion's standings can project it
+        // (delta 2026-09-04 — before this only the daemon's boot-time
+        // `<provider>-default` rows were ever on the roster, and every metered
+        // receipt landed on a key the standings could not show).
+        if (reactor != null && keyId != null) {
+            reactor.recordAccess(keyId = keyId, provider = session.model.b.providerTag ?: session.model.b.id, label = keyId)
+        }
         try {
             val card = models.let { ms -> (0 until ms.size).first { ms[it].a == modelId }.let { ms[it] } }.b
             val meta: AcpMeta = card.wireName j ("embed" j session.authHeaders())

@@ -59,8 +59,94 @@ class QuotaLegion(
     /** Per-key window budget in tokens; 0 = unmetered (ACTIVE on reputation). */
     val defaultLimit: Long = 0L,
     /** Per-provider budget overrides, keyed by provider id. */
-    val limitsByProvider: Map<String, Long> = emptyMap(),
+    limitsByProvider: Map<String, Long> = emptyMap(),
+    /**
+     * Tokens a SHARED key already burned this window outside this process — Hermes'
+     * own sessions on the same provider key ([fromLedger]). Charged against every key
+     * of that provider in [standings] until the window that started at
+     * [ledgerWindowStartMs] rolls; after that the ledger's word has expired and only
+     * this process's receipts count. The ledger is per provider, so the pre-charge is
+     * too — a provider's quota is one pool no matter which process spends it.
+     */
+    ledgerSpentByProvider: Map<String, Long> = emptyMap(),
+    ledgerWindowStartMs: Long = 0L,
 ) {
+    var limitsByProvider: Map<String, Long> = limitsByProvider
+        private set
+    var ledgerSpentByProvider: Map<String, Long> = ledgerSpentByProvider
+        private set
+    var ledgerWindowStartMs: Long = ledgerWindowStartMs
+        private set
+
+    /**
+     * Re-walk the ledger into this legion without losing this process's own meters —
+     * the daemon calls it when Hermes' state.db changes, so ONE legion (one pool) serves
+     * the brain's mux and the LCNC mux across rebuilds.
+     */
+    fun refresh(rows: List<LedgerRow>, nowMs: Long) {
+        val walked = walkBack(rows, nowMs, windowMs)
+        limitsByProvider = walked.mapValues { it.value.provenLimit }
+        ledgerSpentByProvider = walked.mapValues { it.value.spentThisWindow }
+        ledgerWindowStartMs = nowMs - (nowMs % windowMs)
+    }
+
+    /** The ledger pre-charge still in force for [provider] at [nowMs] (0 once its window rolled). */
+    fun ledgerSpentFor(provider: String, nowMs: Long): Long =
+        if (nowMs < ledgerWindowStartMs + windowMs) ledgerSpentByProvider[provider] ?: 0L else 0L
+
+    companion object {
+        const val DAY_MS: Long = 86_400_000L
+
+        /**
+         * Walk a success ledger back into quotas. For each provider, the PROVEN limit
+         * is the most tokens the ledger shows burned in any one window-sized bucket —
+         * the provider demonstrably bore that much, so it is a floor, not a guess —
+         * and the SPENT is the tokens whose rows fall inside the window ending at
+         * [nowMs]. Rows without a provider are skipped. Nothing here invents a tier:
+         * a provider the ledger never reached keeps [defaultLimit] (unmetered).
+         */
+        fun walkBack(rows: List<LedgerRow>, nowMs: Long, windowMs: Long = DAY_MS): Map<String, LedgerQuota> {
+            val buckets = HashMap<String, HashMap<Long, Long>>()
+            val spent = HashMap<String, Long>()
+            val rowsBy = HashMap<String, Int>()
+            val lastSeen = HashMap<String, Long>()
+            for (r in rows) {
+                if (r.provider.isEmpty()) continue
+                val tokens = r.inputTokens + r.outputTokens
+                if (tokens <= 0L) continue
+                val bucket = r.lastSeenMs / windowMs
+                val per = buckets.getOrPut(r.provider) { HashMap() }
+                per[bucket] = (per[bucket] ?: 0L) + tokens
+                if (r.lastSeenMs > nowMs - windowMs && r.lastSeenMs <= nowMs) spent[r.provider] = (spent[r.provider] ?: 0L) + tokens
+                rowsBy[r.provider] = (rowsBy[r.provider] ?: 0) + 1
+                lastSeen[r.provider] = maxOf(lastSeen[r.provider] ?: 0L, r.lastSeenMs)
+            }
+            val out = LinkedHashMap<String, LedgerQuota>()
+            for ((provider, per) in buckets.entries.sortedBy { it.key }) {
+                out[provider] = LedgerQuota(
+                    provider = provider,
+                    provenLimit = per.values.max(),
+                    spentThisWindow = spent[provider] ?: 0L,
+                    rows = rowsBy[provider] ?: 0,
+                    lastSeenMs = lastSeen[provider] ?: 0L,
+                )
+            }
+            return out
+        }
+
+        /** A legion whose limits and pre-charged spend come from [walkBack] over [rows]. */
+        fun fromLedger(rows: List<LedgerRow>, nowMs: Long, windowMs: Long = DAY_MS): QuotaLegion {
+            val walked = walkBack(rows, nowMs, windowMs)
+            return QuotaLegion(
+                windowMs = windowMs,
+                defaultLimit = 0L,
+                limitsByProvider = walked.mapValues { it.value.provenLimit },
+                ledgerSpentByProvider = walked.mapValues { it.value.spentThisWindow },
+                ledgerWindowStartMs = nowMs - (nowMs % windowMs),
+            )
+        }
+    }
+
     private data class Meter(var windowStartMs: Long, var spent: Long, var exhausted: Boolean)
 
     private val meters = mutableMapOf<String, Meter>()
@@ -106,8 +192,23 @@ class QuotaLegion(
      */
     fun standings(state: MuxReactorState, nowMs: Long): Series<QuotaStanding> {
         val keys = state.keys
-        if (keys.isEmpty()) return emptySeriesOf()
-        val out = ArrayList<QuotaStanding>(keys.size)
+        val out = ArrayList<QuotaStanding>(keys.size + limitsByProvider.size)
+        // Providers the ledger proved but no key has touched yet: shown as
+        // `ledger:<provider>` rows (accessCount 0) so the walk-back is visible before
+        // the first dispatch. They are not dispatchable keys — the reactor's are.
+        val seenProviders = HashSet<String>()
+        for (key in keys) seenProviders.add(key.provider)
+        for ((provider, limit) in limitsByProvider) if (provider !in seenProviders) {
+            val spent = ledgerSpentFor(provider, nowMs)
+            out.add(
+                QuotaStanding(
+                    keyId = "ledger:$provider", provider = provider,
+                    windowStartMs = if (nowMs < ledgerWindowStartMs + windowMs) ledgerWindowStartMs else nowMs,
+                    windowMs = windowMs, limit = limit, spent = spent, exhausted = false, accessCount = 0L,
+                ),
+            )
+        }
+        if (keys.isEmpty() && out.isEmpty()) return emptySeriesOf()
         for (key in keys) {
             val meter = meters[key.keyId]
             val windowStart = meter?.windowStartMs ?: nowMs
@@ -119,7 +220,7 @@ class QuotaLegion(
                     windowStartMs = if (inWindow) windowStart else nowMs,
                     windowMs = windowMs,
                     limit = limitFor(key.provider),
-                    spent = if (inWindow) meter.spent else 0L,
+                    spent = (if (inWindow) meter.spent else 0L) + ledgerSpentFor(key.provider, nowMs),
                     exhausted = (inWindow && meter.exhausted) || key.status != MuxKeyStatus.ACTIVE,
                     accessCount = key.accessCount,
                 ),
@@ -191,4 +292,25 @@ data class LegionCensus(
     val usable: Int,
     val exhausted: Int,
     val unmetered: Int,
+)
+
+/** One success-ledger row: what a provider was seen to bear, when. (`HermesModelUsage.ledgerRows` on the JVM.) */
+data class LedgerRow(
+    val provider: String,
+    val model: String,
+    val inputTokens: Long,
+    val outputTokens: Long,
+    val lastSeenMs: Long,
+    val calls: Int = 0,
+)
+
+/** A provider's quota as walked back from the ledger by [QuotaLegion.walkBack]. */
+data class LedgerQuota(
+    val provider: String,
+    /** Most tokens the ledger shows burned in one window — the proven floor. */
+    val provenLimit: Long,
+    /** Tokens the ledger shows burned inside the window ending now — already gone from the shared pool. */
+    val spentThisWindow: Long,
+    val rows: Int,
+    val lastSeenMs: Long,
 )
