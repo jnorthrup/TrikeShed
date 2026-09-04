@@ -54,3 +54,29 @@ class KifKnowledgeBaseRetractTest {
         assertEquals(setOf("Mammal"), after, "the inferred edge goes with its support")
     }
 }
+
+class KifKnowledgeBaseReplaceTest {
+    @Test
+    fun replaceIsOneStepAndCountsOnlyRealChanges() {
+        val kb = KifKnowledgeBase()
+        kb.assertKif("(a 1)"); kb.assertKif("(b 2)"); kb.assertKif("(c 3)")
+        val changed = kb.replace(
+            gone = listOf(KifExpr.parse("(b 2)"), KifExpr.parse("(never 0)")),
+            told = listOf(KifExpr.parse("(c 3)"), KifExpr.parse("(d 4)")),
+        )
+        assertEquals(2, changed, "one real retract + one real assert")
+        assertEquals("(a 1)\n(c 3)\n(d 4)", kb.toKifFile(), "telling order kept; the new tuple goes last")
+    }
+
+    @Test
+    fun retractStaysFlatAtSize() {
+        val kb = KifKnowledgeBase()
+        val n = 20_000
+        for (i in 0 until n) kb.assertKif("(fact f$i v$i)")
+        assertEquals(n, kb.size())
+        for (i in 0 until n step 2) assertTrue(kb.retractKif("(fact f$i v$i)"))
+        assertEquals(n / 2, kb.size())
+        assertEquals("(fact f1 v1)", kb.asserts().first().toKifString())
+        assertEquals("(fact f${n - 1} v${n - 1})", kb.asserts().last().toKifString())
+    }
+}

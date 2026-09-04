@@ -1,5 +1,8 @@
 package borg.trikeshed.kif
 
+import borg.trikeshed.collections.associative.LinkedLinearHashMap
+import borg.trikeshed.lib.view
+
 /**
  * SUO-KIF — Standard Upper Ontology Knowledge Interchange Format (LISP-like S-expressions)
  *
@@ -115,13 +118,17 @@ fun kif(pred: String, vararg args: KifExpr): KifExpr.ListExpr =
  *  dropped (the SUMO spine re-asserts on every thaw otherwise). */
 class KifKnowledgeBase {
     private val gate = Any()
-    private val asserts: MutableList<KifExpr> = mutableListOf()
-    private val seen = HashSet<String>()
+    /** The keyed store: exact KIF string → expression, in telling order. Assert
+     *  is idempotent on the key and retract is one probe, so a projection that
+     *  churns (see [borg.trikeshed.dag.KifTee]) costs the same at 200k tuples as
+     *  at 2. Delta (2026-09-04): replaces a list + seen-set pair whose retract
+     *  re-serialized every entry to find its index. */
+    private val held = LinkedLinearHashMap<String, KifExpr>(1024)
+    /** [asserts] in telling order, rebuilt lazily after a write. */
+    private var snapshot: List<KifExpr>? = null
 
     fun assert(expr: KifExpr) {
-        borg.trikeshed.isam.synchronizedLock(gate) {
-            if (seen.add(expr.toKifString())) asserts.add(expr)
-        }
+        borg.trikeshed.isam.synchronizedLock(gate) { tell(expr) }
     }
     fun assertKif(kif: String) { assert(KifExpr.parse(kif)) }
 
@@ -132,17 +139,44 @@ class KifKnowledgeBase {
      * forever. Returns true when the expression was present. [query] semantics
      * are untouched: the subclass closure is recomputed from what remains.
      */
-    fun retract(expr: KifExpr): Boolean = borg.trikeshed.isam.synchronizedLock(gate) {
-        val key = expr.toKifString()
-        if (!seen.remove(key)) return@synchronizedLock false
-        val at = asserts.indexOfFirst { it.toKifString() == key }
-        if (at >= 0) asserts.removeAt(at)
-        true
-    }
+    fun retract(expr: KifExpr): Boolean = borg.trikeshed.isam.synchronizedLock(gate) { forget(expr) }
     fun retractKif(kif: String): Boolean = retract(KifExpr.parse(kif))
-    fun asserts(): List<KifExpr> = borg.trikeshed.isam.synchronizedLock(gate) { asserts.toList() }
+
+    /**
+     * Retract [gone] then assert [told] as ONE step under the bank's lock, so a
+     * reader never sees a fact's projection half-replaced. Returns how many
+     * tuples actually changed (absent retracts and duplicate asserts count 0).
+     */
+    fun replace(gone: Iterable<KifExpr>, told: Iterable<KifExpr>): Int =
+        borg.trikeshed.isam.synchronizedLock(gate) {
+            var changed = 0
+            for (e in gone) if (forget(e)) changed++
+            for (e in told) if (tell(e)) changed++
+            changed
+        }
+
+    private fun tell(expr: KifExpr): Boolean {
+        val key = expr.toKifString()
+        if (key in held) return false
+        held[key] = expr
+        snapshot = null
+        return true
+    }
+
+    private fun forget(expr: KifExpr): Boolean {
+        if (held.remove(expr.toKifString()) == null) return false
+        snapshot = null
+        return true
+    }
+
+    fun asserts(): List<KifExpr> = borg.trikeshed.isam.synchronizedLock(gate) {
+        snapshot ?: ArrayList<KifExpr>(held.count).also { out ->
+            for (entry in held.entriesInOrder().view) out.add(entry.b)
+            snapshot = out
+        }
+    }
     /** Distinct assertions currently held. */
-    fun size(): Int = borg.trikeshed.isam.synchronizedLock(gate) { asserts.size }
+    fun size(): Int = borg.trikeshed.isam.synchronizedLock(gate) { held.count }
 
     fun toKifFile(): String = asserts().joinToString("\n") { it.toKifString() }
 

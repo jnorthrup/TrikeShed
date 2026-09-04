@@ -28,6 +28,14 @@ import borg.trikeshed.kif.KifKnowledgeBase
  * into the network. A reader querying the bank between the retract and the
  * re-assert of a MODIFY can see the fact's tuples momentarily absent; the
  * bank is the light solver, not the source of record, and the Rete fact is.
+
+ *
+ * Delta (2026-09-04): each fact's change is ONE [KifKnowledgeBase.replace]
+ * (retract the tuples that left, assert the new set) under one take of the
+ * bank's lock, so the momentary absence above no longer happens, and the bank
+ * retracts by key, so the time spent inside the network's write lock is per
+ * tuple, not per tuple times bank size (the graal tick was holding the lock
+ * for seconds at ~200k tuples).
  */
 class KifTee(val bank: KifKnowledgeBase) {
     private val gate = Any()
@@ -60,14 +68,14 @@ class KifTee(val bank: KifKnowledgeBase) {
         val next = PlaneFacts.toKif(fact)
         val previous = synchronizedLock(gate) { told[fact.factId] }
         if (previous == next) return
-        if (previous != null) for (e in previous) if (e !in next) bank.retract(e)
-        for (e in next) bank.assert(e)
+        val gone = if (previous == null) emptyList() else previous.filter { it !in next }
+        bank.replace(gone, next)
         synchronizedLock(gate) { told[fact.factId] = next }
     }
 
     private fun unproject(id: FactId) {
         val previous = synchronizedLock(gate) { told.remove(id) } ?: return
-        for (e in previous) bank.retract(e)
+        bank.replace(previous, emptyList())
     }
 
     companion object {

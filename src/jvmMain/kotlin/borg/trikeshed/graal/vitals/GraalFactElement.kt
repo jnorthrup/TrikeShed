@@ -165,7 +165,10 @@ class GraalFactElement(
         for (flow in pointcutFlows) scope.launch { flow.collect { onLanding(it) } }
         if (tickMs > 0) scope.launch {
             while (isActive) {
-                runCatching { tick() }
+                runCatching { tick() }.onFailure { e ->
+                    if (e is kotlinx.coroutines.CancellationException) throw e
+                    System.err.println("[GraalFactElement] tick failed: $e")
+                }
                 delay(tickMs)
             }
         }

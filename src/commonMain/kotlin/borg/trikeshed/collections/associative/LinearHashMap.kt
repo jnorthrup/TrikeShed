@@ -170,11 +170,29 @@ abstract class OpenAddressingMap<K : Any, V, IK : Any>(
         for (s in 0 until oldCap) {
             val k = oldKeys[s]
             if (!isAbsent(k) && !isDeleted(k)) {
-                val userKey = extractUserKey(k as IK)
-                val oldVal = oldValues[s] as V
-                set(userKey, oldVal)
+                @Suppress("UNCHECKED_CAST")
+                reinsert(k as IK, oldValues[s] as V)
             }
         }
+    }
+
+    /** Place an existing internal key into the grown table unchanged — a
+     *  subclass that carries order in its internal key (LinkedLinearHashMap)
+     *  keeps that order across a resize; `set` would mint a new one. */
+    private fun reinsert(ik: IK, value: V) {
+        val hash = mix(internalKeyHash(ik))
+        var i = 0
+        while (i < MAX_PROBES) {
+            val slot = triangularProbe(hash, i, capacity)
+            if (isAbsent(keys[slot])) {
+                keys[slot] = ik
+                values[slot] = value as Any?
+                size++
+                return
+            }
+            i++
+        }
+        throw IllegalStateException("LinearHashMap resize() exhausted: probes=$MAX_PROBES size=$size")
     }
 }
 
@@ -188,39 +206,46 @@ class LinearHashMap<K : Any, V>(initialCapacity: Int = 16)
     override fun extractUserKey(internalKey: K): K = internalKey
 }
 
-/** LinkedLinearHashMap — LinearHashMap preserving insertion order via Join<hash, counter>. */
+/** LinkedLinearHashMap — LinearHashMap preserving insertion order via Join<hash, counter>.
+ *
+ *  Delta (2026-09-04): the internal key is now `Join<userKey, counter>` and two
+ *  internal keys are equal when their USER keys are equal — the counter only
+ *  orders. Before this the counter took part in equality, so `get`/`remove`
+ *  minted a fresh counter and never matched a stored key: the map was
+ *  write-only and had no callers. It is now the ordered keyed store behind
+ *  [borg.trikeshed.kif.KifKnowledgeBase] (assert/retract by exact string,
+ *  `toKifFile` in telling order), the same open-addressing shape
+ *  [borg.trikeshed.dag.ReteWorkingMemory] keeps its facts in. Re-setting a
+ *  present key keeps its position; a key removed and set again goes last. */
 class LinkedLinearHashMap<K : Any, V>(initialCapacity: Int = 16)
-    : OpenAddressingMap<K, V, Join<Int, ULong>>(initialCapacity) {
+    : OpenAddressingMap<K, V, Join<K, ULong>>(initialCapacity) {
 
     private var sequence: ULong = 0UL
 
-    override fun makeInternalKey(userKey: K): Join<Int, ULong> =
-        userKey.hashCode() j sequence++
+    override fun makeInternalKey(userKey: K): Join<K, ULong> =
+        userKey j sequence++
 
-    override fun internalKeyEquals(a: Join<Int, ULong>, b: Join<Int, ULong>): Boolean =
-        a.a == b.a && a.b == b.b
+    override fun internalKeyEquals(a: Join<K, ULong>, b: Join<K, ULong>): Boolean =
+        a.a == b.a
 
-    override fun internalKeyHash(internalKey: Join<Int, ULong>): Int = internalKey.a
+    override fun internalKeyHash(internalKey: Join<K, ULong>): Int = internalKey.a.hashCode()
 
-    override fun extractUserKey(internalKey: Join<Int, ULong>): K =
-        throw UnsupportedOperationException("LinkedLinearHashMap: reverse lookup not stored; use entriesInOrder()")
+    override fun extractUserKey(internalKey: Join<K, ULong>): K = internalKey.a
 
     /** Iterate entries in insertion order (ascending counter) — frozen Series2. */
     fun entriesInOrder(): Series2<K, V> {
         // Collect live entries with their sequence counter, sort by counter
-        val live = ArrayList<Join<ULong, Join<K, V>>>()
+        val live = ArrayList<Join<ULong, Join<K, V>>>(size)
         for (s in 0 until capacity) {
             val k = keys[s]
             if (!isAbsent(k) && !isDeleted(k)) {
-                val ik = k as Join<Int, ULong>
-                live += (ik.b) j ((extractUserKeyByValue(values[s] as V)) j (values[s] as V))
+                @Suppress("UNCHECKED_CAST")
+                val ik = k as Join<K, ULong>
+                @Suppress("UNCHECKED_CAST")
+                live += ik.b j (ik.a j (values[s] as V))
             }
         }
         live.sortBy { it.a }
         return live.size j { i: Int -> live[i].b }
     }
-
-    /** Reverse lookup by value (for entriesInOrder) — override in subclass if needed. */
-    protected open fun extractUserKeyByValue(value: V): K =
-        throw UnsupportedOperationException("Override extractUserKeyByValue or store user key alongside")
 }
