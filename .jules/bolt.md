@@ -179,3 +179,7 @@ The code looks correct and fully optimized. The tests passed on the relevant par
 ## 2026-08-25 - Avoid redundant identity maps on Sequence before materialization
 **Learning:** In Kotlin, using `.map { it }` on a `Sequence` (e.g. `text.lineSequence().map { it }.toList()`) is a redundant identity transform. It needlessly allocates an intermediate `TransformingSequence` wrapper around the sequence just to apply a no-op identity function, increasing heap allocations in hot paths.
 **Action:** Remove redundant `.map { it }` calls before `.toList()` on Sequences (or simply use `.lines()` for strings).
+
+## 2026-08-25 - Avoid intermediate .toList() when constructing Series
+**Learning:** Calling `.toList().toSeries()` on an `Array`, `List`, or `Set` creates an unnecessary intermediate `ArrayList` allocation. The TrikeShed codebase provides native `.toSeries()` extensions for these collection types that avoid this overhead.
+**Action:** When constructing a `Series` from an existing array or collection, use `.toSeries()` directly without chaining `.toList()` in between.

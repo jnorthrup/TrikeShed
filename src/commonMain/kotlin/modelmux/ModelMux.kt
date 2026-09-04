@@ -225,7 +225,7 @@ class ModelMux internal constructor(
      * ranking, which is the only selection this method makes.
      */
     fun route(action: AcpAction, vararg requiredCaps: String): RouteResult {
-        val result = router.route(models, action, requiredCaps.toList().toSeries())
+        val result = router.route(models, action, requiredCaps.toSeries())
         if (result.a.size > 0) {
             val chosen = result.a[0]
             val event = ModelSelectionEvent.ModelSelected(
@@ -563,7 +563,7 @@ class ModelMux internal constructor(
     fun listModels(vararg cap: String): Series<AcpModelCard> {
         val cards = models.α { it.b }
         if (cap.isEmpty()) return cards
-        val capSeries = cap.toList().toSeries()
+        val capSeries = cap.toSeries()
         return filtered(cards, capSeries)
     }
 
@@ -663,7 +663,7 @@ class ModelMuxBuilder(private val keyMux: KeyMux) {
          */
         wireModel: String? = null,
     ): ModelMuxBuilder = apply {
-        val capSeries = caps.toList().toSeries()
+        val capSeries = caps.toSeries()
         val action = if ("chat" in caps) "chat" else if ("embed" in caps) "embed" else "complete"
         val tags = buildList {
             if (provider != null) add("provider" j provider)

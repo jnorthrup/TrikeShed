@@ -81,7 +81,7 @@ class RelaxHttpServerJvm(
                 alpnProtocols = arrayOf(
                     TlsApplicationProtocol.HTTP_1_1,
                     TlsApplicationProtocol.H2
-                ).toList().toSeries()
+                ).toSeries()
             )
 
             // Open the HTX Reactor via the NioSupervisor.
