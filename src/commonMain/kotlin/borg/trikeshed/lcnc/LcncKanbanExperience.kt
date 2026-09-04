@@ -55,6 +55,7 @@ class LcncKanbanExperience(
                 "dependencies" to (row?.dependencies ?: emptyList<String>()),
                 "tags" to (row?.tags ?: emptyList<String>()),
                 "spec" to row?.spec.orEmpty(),
+                "strikes" to (row?.strikes ?: 0),
             ) + garnish[id].orEmpty()
         }
         return base + ("items" to items)
@@ -141,6 +142,8 @@ class LcncKanbanExperience(
                         listish(c["tags"])?.let { put("tags", it) }
                         listish(c["dependencies"])?.let { put("dependencies", it) }
                         c["owner"]?.toString()?.trim()?.takeIf { it.isNotEmpty() }?.let { put("owner", it) }
+                        // The orphan guard's input (verifier finding: MCP advertised `parent`, this runner dropped it).
+                        (c["parent"]?.toString() ?: node.params["parent"])?.trim()?.takeIf { it.isNotEmpty() }?.let { put("parent", it) }
                     },
                 )
             },
@@ -158,6 +161,8 @@ class LcncKanbanExperience(
                         put("idempotencyKey", required(node, c, "idempotencyKey"))
                         // Positional insert: land BEFORE this card in the target column.
                         c["beforeJobId"]?.toString()?.takeIf { it.isNotBlank() }?.let { put("beforeJobId", it) }
+                        // Who is moving (the claim/owner guards read it); absent stays absent.
+                        c["actor"]?.toString()?.trim()?.takeIf { it.isNotEmpty() }?.let { put("actor", it) }
                     },
                 )
             },

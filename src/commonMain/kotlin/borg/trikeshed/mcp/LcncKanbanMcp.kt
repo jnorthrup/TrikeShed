@@ -203,6 +203,7 @@ class LcncKanbanMcp(
                     "jobId" to mapOf("type" to "string"),
                     "toColumn" to mapOf("type" to "string", "enum" to columnWires()),
                     "expectedRevision" to mapOf("type" to "integer", "description" to "The revision you last read. The move is refused if the card has moved on."),
+                    "actor" to mapOf("type" to "string", "description" to "Who is moving — the claim gates read it: a card owned by claim:* leaves REVIEW for DONE only when the actor is not the claimant, and a claim is released (owner changed) only by 'reaper' or 'judge:plane'."),
                     "beforeJobId" to mapOf("type" to "string", "description" to "Land immediately before this card in the target column instead of at the bottom."),
                     "idempotencyKey" to mapOf("type" to "string", "description" to "Retry key. Defaults to a value derived from the move itself."),
                 ),
@@ -275,6 +276,7 @@ class LcncKanbanMcp(
             put("idempotencyKey", (args["idempotencyKey"] as? String)?.takeIf { it.isNotBlank() }
                 ?: "move#$jobId#$expected#$toColumn")
             (args["beforeJobId"] as? String)?.trim()?.takeIf { it.isNotEmpty() }?.let { put("beforeJobId", it) }
+            (args["actor"] as? String)?.trim()?.takeIf { it.isNotEmpty() }?.let { put("actor", it) }
         }
     }
 

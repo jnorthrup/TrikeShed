@@ -174,6 +174,7 @@ class KanbanClaimLoopTest {
             // strike 1 and 2 hand it back to READY (re-claimed each time); strike 3 parks it in BLOCKED
             val blocked = awaitStatus(rig, "blocked", "f1", timeoutMs = 20_000)
             assertEquals("", blocked.getValue("f1")["owner"], "BLOCKED clears the claimant so a person sees it")
+            assertEquals(3, (blocked.getValue("f1")["strikes"] as Number).toInt(), "strikes ride the row, so the breaker survives a restart")
             val r = rig.ctx.blackboard.get("kanban/claim/f1") as Map<*, *>
             assertEquals(false, r["ok"]); assertEquals("RETRY", r["decision"])
             assertEquals("quota exhausted for hermes-newest", r["error"])
@@ -182,6 +183,45 @@ class KanbanClaimLoopTest {
             val commits = rig.ctx.blackboard.keys().filter { it.startsWith("kanban/committed/f1/") }
                 .map { rig.ctx.blackboard.get(it) as Map<*, *> }.sortedBy { it["revision"].toString().toLong() }.map { it["col"] }
             assertEquals(listOf("todo", "ready", "running", "ready", "running", "ready", "running", "blocked"), commits)
+        } finally {
+            runBlocking { rig.supervisor.detach("kanban") }
+        }
+    }
+
+    @Test
+    fun claimGatesHoldWhileRunningAndInReview() {
+        // A slow brain that asks for a person: the card sits in RUNNING for a moment, then REVIEW.
+        val brain = LcncNodeRunner { node, _ ->
+            kotlinx.coroutines.delay(1_500)
+            mapOf("ok" to true, "content" to "VERDICT: NEEDS-HUMAN\nMUST-1: NOT-MET — evidence: none\nACTION: ask Jim", "model" to node.params["model"], "cached" to false)
+        }
+        val rig = rig("gates", brain)
+        try {
+            invoke(
+                rig,
+                mapOf("type" to "submit", "jobId" to "g1", "idempotencyKey" to "s1", "title" to "Guarded"),
+                mapOf("type" to "move", "jobId" to "g1", "idempotencyKey" to "m1", "expectedRevision" to 1, "toColumn" to "ready"),
+            )
+            val running = awaitStatus(rig, "running", "g1")
+            val r = (running.getValue("g1")["revision"] as Number).toLong()
+            // while RUNNING and claimed: no archive, no cancel, no re-owning to slip the gate
+            val archived = invoke(rig, mapOf("type" to "move", "jobId" to "g1", "idempotencyKey" to "a1", "expectedRevision" to r, "toColumn" to "archived"))
+            assertEquals("rejected", archived[0]["verdict"]); assertTrue((archived[0]["reason"] as String).contains("passes review first"), archived[0].toString())
+            val cancelled = invoke(rig, mapOf("type" to "cancel", "jobId" to "g1", "idempotencyKey" to "c1", "expectedRevision" to r))
+            assertEquals("rejected", cancelled[0]["verdict"]); assertTrue((cancelled[0]["reason"] as String).contains("passes review first"), cancelled[0].toString())
+            val reowned = invoke(rig, mapOf("type" to "move", "jobId" to "g1", "idempotencyKey" to "o1", "expectedRevision" to r, "toColumn" to "running", "owner" to ""))
+            assertEquals("rejected", reowned[0]["verdict"]); assertTrue((reowned[0]["reason"] as String).contains("released by the reaper or the judge"), reowned[0].toString())
+
+            val reviewed = awaitStatus(rig, "review", "g1")
+            val rr = (reviewed.getValue("g1")["revision"] as Number).toLong()
+            val rec = rig.ctx.blackboard.get("kanban/claim/g1") as Map<*, *>
+            assertEquals("REVIEW", rec["decision"]); assertEquals("NEEDS-HUMAN", rec["verdict"])
+            // in REVIEW: the claimant may not close it; a person may
+            val self = invoke(rig, mapOf("type" to "move", "jobId" to "g1", "idempotencyKey" to "d-self", "expectedRevision" to rr, "toColumn" to "done", "actor" to "claim:brain"))
+            assertEquals("rejected", self[0]["verdict"]); assertTrue((self[0]["reason"] as String).contains("second pair of eyes"))
+            val jim = invoke(rig, mapOf("type" to "move", "jobId" to "g1", "idempotencyKey" to "d-jim", "expectedRevision" to rr, "toColumn" to "done", "actor" to "jim"))
+            assertEquals("committed", jim[0]["verdict"], jim[0].toString())
+            assertEquals("done", items(rig).getValue("g1")["status"])
         } finally {
             runBlocking { rig.supervisor.detach("kanban") }
         }

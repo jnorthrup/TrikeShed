@@ -176,7 +176,9 @@ class BoardClaimWorker(
         for (r in planeRows) planeIds.add(PlaneBrief.evidenceId(r))
         val humanTag = card?.tags?.any { it.lowercase() in HUMAN_TAGS } == true
         val decision = PlaneJudge.decide(spec, humanTag, ok, answer["content"]?.toString().orEmpty(), planeIds)
-        val current = store.card(jobId)?.revision ?: landed.snapshot.revision
+        // The revision the card landed RUNNING on — NOT store.card().revision: a person who
+        // moved the card during the brain call must win, and the CAS refusal records it.
+        val current = landed.snapshot.revision
         val judged = linkedMapOf<String, Any?>(
             "decision" to decision.outcome.name,
             "why" to decision.reason,
@@ -197,21 +199,22 @@ class BoardClaimWorker(
             return r
         }
         when (decision.outcome) {
-            PlaneJudge.Outcome.REVIEW -> move(BoardCol.REVIEW, current, "$jobId#claim-review#$current")
+            PlaneJudge.Outcome.REVIEW -> move(BoardCol.REVIEW, current, "$jobId#claim-review#$current", mapOf("actor" to JUDGE_ACTOR))
             PlaneJudge.Outcome.DONE -> {
-                val r1 = move(BoardCol.REVIEW, current, "$jobId#claim-review#$current")
+                val r1 = move(BoardCol.REVIEW, current, "$jobId#claim-review#$current", mapOf("actor" to JUDGE_ACTOR))
                 if (r1 is BoardApply.Committed) move(BoardCol.DONE, r1.revision, "$jobId#judge-done#${r1.revision}", mapOf("actor" to JUDGE_ACTOR))
             }
             PlaneJudge.Outcome.RETRY -> {
-                val strike = borg.trikeshed.kanban.rules.ReaperProduction.countPriorStrikes(blackboard, jobId) + 1
+                // Durable: the row carries strikes across restarts; the blackboard receipts are the same count while the process lives.
+                val strike = maxOf(borg.trikeshed.kanban.rules.ReaperProduction.countPriorStrikes(blackboard, jobId), card?.strikes ?: 0) + 1
                 val block = strike >= BoardRules.REAPER_BLOCK_STRIKE
                 blackboard.put(
                     borg.trikeshed.kanban.rules.ReaperProduction.RECEIPT_PREFIX + "judge-$jobId-r$current",
                     mapOf("jobId" to jobId, "strike" to "$strike", "toColumn" to (if (block) BoardCol.BLOCKED.wire else BoardCol.READY.wire), "expectedRevision" to "$current", "why" to decision.reason, "by" to JUDGE_ACTOR),
                     LANGUAGE,
                 )
-                if (block) move(BoardCol.BLOCKED, current, "$jobId#judge-block#$current", mapOf("owner" to ""))
-                else move(BoardCol.READY, current, "$jobId#judge-retry#$current")
+                if (block) move(BoardCol.BLOCKED, current, "$jobId#judge-block#$current", mapOf("owner" to "", "strikes" to strike, "actor" to JUDGE_ACTOR))
+                else move(BoardCol.READY, current, "$jobId#judge-retry#$current", mapOf("strikes" to strike, "actor" to JUDGE_ACTOR))
             }
         }
         written + ("moves" to trail)

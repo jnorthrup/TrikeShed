@@ -98,6 +98,8 @@ data class CardRow(
      * Delta 2026-09-04: the plane judge reads MUSTs from here ([PlaneBrief.parseSpec]).
      */
     val spec: String = "",
+    /** Judge/reaper strikes so far — persisted from the move payload's `strikes`, so the breaker survives a restart. */
+    val strikes: Int = 0,
 )
 
 /**
@@ -280,13 +282,19 @@ class BoardStoreElement(
             val limit = target?.wipLimit
             if (limit != null && rows.values.count { it.col == target && it.jobId != cmd.jobId.value } >= limit)
                 "WIP limit ${limit} full for '${target.wire}'"
-            else if (target == BoardCol.DONE) claimGuard(cmd.jobId.value, raw)
-            else null
+            // Delta 2026-09-04 (verifier finding): ARCHIVED is a settling column too, and a
+            // re-owning Move was a two-step way around the gate — both go through the guards.
+            else if (target == BoardCol.DONE || target == BoardCol.ARCHIVED) claimGuard(cmd.jobId.value, raw) ?: ownerGuard(cmd.jobId.value, raw, target)
+            else ownerGuard(cmd.jobId.value, raw, target)
         }
 
         // `complete`/`done` lowers to Complete → lifecycle closed → DONE: the same gate, or a
         // claimant could close its own card by the lifecycle verb instead of the column.
         is JobCommand.Complete -> claimGuard(cmd.jobId.value, raw)
+
+        // `cancel` / `retract` settle a card to ARCHIVED: claimed work in RUNNING is released
+        // by its judge or reaper, never cancelled out from under them (verifier finding).
+        is JobCommand.Cancel, is JobCommand.Retract -> claimGuard(cmd.jobId.value, raw)
 
         is JobCommand.Start -> {
             val limit = BoardCol.RUNNING.wipLimit
@@ -316,13 +324,32 @@ class BoardStoreElement(
     private fun claimGuard(jobId: String, raw: Map<*, *>): String? {
         val prev = rows[jobId] ?: return null
         if (!prev.owner.startsWith(CLAIM_OWNER_PREFIX)) return null
-        if (prev.col != BoardCol.REVIEW) {
+        if (prev.col != BoardCol.REVIEW && prev.col != BoardCol.BLOCKED) {
             return "claimed work passes review first: '$jobId' is owned by ${prev.owner} and sits in '${prev.col.wire}', not 'review'"
         }
         val actor = (raw["actor"] as? String)?.trim().orEmpty()
         return if (actor.isNotEmpty() && actor == prev.owner) {
             "review needs a second pair of eyes: actor '$actor' is the claimant of '$jobId'"
         } else null
+    }
+
+    /** Actors allowed to release a claim (change or clear a `claim:*` owner). */
+    private val releasers = setOf("reaper", "judge:plane")
+
+    /**
+     * A claim is released by the reaper or the judge, not by re-owning. A Move whose
+     * map carries `owner` different from a `claim:*` owner is refused unless the
+     * actor is a releaser or the target is BLOCKED (the strike-out hands the card
+     * back to a person). Closes the two-step bypass: re-own to blank, then DONE.
+     */
+    private fun ownerGuard(jobId: String, raw: Map<*, *>, target: BoardCol?): String? {
+        val prev = rows[jobId] ?: return null
+        if (!prev.owner.startsWith(CLAIM_OWNER_PREFIX) || !raw.containsKey("owner")) return null
+        val next = (raw["owner"] as? String)?.trim().orEmpty()
+        if (next == prev.owner) return null
+        val actor = (raw["actor"] as? String)?.trim().orEmpty()
+        if (actor in releasers || target == BoardCol.BLOCKED) return null
+        return "a claim is released by the reaper or the judge, not by re-owning: '$jobId' is owned by ${prev.owner}"
     }
 
 
@@ -418,6 +445,7 @@ class BoardStoreElement(
             // reaper's third strike hands a card back to a human that way).
             owner = if (raw.containsKey("owner")) (raw["owner"] as? String)?.trim().orEmpty() else prev?.owner ?: "",
             spec = (raw["spec"] as? String)?.takeIf { it.isNotBlank() } ?: prev?.spec ?: "",
+            strikes = (raw["strikes"] as? Number)?.toInt() ?: raw["strikes"]?.toString()?.toIntOrNull() ?: prev?.strikes ?: 0,
         )
     }
 
