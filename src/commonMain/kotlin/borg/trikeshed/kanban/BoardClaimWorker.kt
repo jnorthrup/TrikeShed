@@ -22,6 +22,7 @@ import kotlinx.coroutines.withTimeoutOrNull
  *   2. The card's title is the brief. `prompt.chat` — the daemon's own brain
  *      (ModelMux over KeyMux; quota it already has) — answers in ≤ 3 sentences,
  *      maxTokens 256. The model is the first entry of `mux.models`, which is
+ *      (Delta 2026-09-04: MAX_TOKENS is 1024 — see the constant; 256 starved a thinking model.)
  *      the newest model Hermes ran here (LcncContracts: "the live list leads,
  *      and its first entry is the newest") — `prompt.chat` itself refuses a
  *      blank model, so the worker resolves it the way the picklist would.
