@@ -181,6 +181,7 @@ class LcncKanbanMcp(
                     "tags" to mapOf("type" to "array", "items" to mapOf("type" to "string")),
                     "dependencies" to mapOf("type" to "array", "items" to mapOf("type" to "string"), "description" to "jobIds this card waits on. A cycle is refused."),
                     "owner" to mapOf("type" to "string"),
+                    "parent" to mapOf("type" to "string", "description" to "jobId this card is split from. Must be live (exists, not done/archived) or the submit is refused as an orphan. Omit for intake."),
                     "idempotencyKey" to mapOf("type" to "string", "description" to "Retry key. Defaults to 'submit#<jobId>', so an accidental repeat is refused as a duplicate rather than doubling the card."),
                 ),
                 "anyOf" to listOf(
@@ -244,6 +245,7 @@ class LcncKanbanMcp(
             stringsOf(args["tags"])?.let { put("tags", it) }
             stringsOf(args["dependencies"])?.let { put("dependencies", it) }
             (args["owner"] as? String)?.trim()?.takeIf { it.isNotEmpty() }?.let { put("owner", it) }
+            (args["parent"] as? String)?.trim()?.takeIf { it.isNotEmpty() }?.let { put("parent", it) }
             (args["idempotencyKey"] as? String)?.takeIf { it.isNotBlank() }?.let { put("idempotencyKey", it) }
         }
     }
@@ -421,6 +423,18 @@ class LcncKanbanMcp(
                 "name" to "dependencyCycle",
                 "applies" to TOOL_SUBMIT,
                 "effect" to "A submit whose dependencies would close a cycle is refused at the door.",
+            ),
+            mapOf(
+                "name" to "claimReview",
+                "applies" to TOOL_MOVE,
+                "effect" to "A card owned by 'claim:*' (the daemon's brain worked it) reaches 'done' only from 'review', " +
+                    "and never under an 'actor' equal to its owner: claimed work passes review first.",
+            ),
+            mapOf(
+                "name" to "orphanParent",
+                "applies" to TOOL_SUBMIT,
+                "effect" to "A submit carrying 'parent' must name a card that exists and is not done/archived; " +
+                    "otherwise it is refused as an orphan. A submit without 'parent' is intake.",
             ),
         ),
         "tools" to listOf(TOOL_SUBMIT, TOOL_MOVE),

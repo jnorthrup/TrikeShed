@@ -138,13 +138,19 @@ class KanbanModule : ForgeModule {
         }
 
         // ── Rete: fact bridge + the board productions + activation sink ──
-        //    (the four audit/flow rules, plus claim: the board proposes its own READY work)
+        //    (the four audit/flow rules, plus claim: the board proposes its own READY work,
+        //     and reaper: a claim whose worker died goes back to READY — thrice, then BLOCKED)
         val facts = borg.trikeshed.kanban.BoardFactElement(ctx.rete)
         val ruleDisposers = listOf(
             ctx.rete.register(borg.trikeshed.kanban.rules.DependencyReadyProduction()),
             ctx.rete.register(borg.trikeshed.kanban.rules.ClaimProduction()),
             ctx.rete.register(borg.trikeshed.kanban.rules.WipBreachProduction()),
             ctx.rete.register(borg.trikeshed.kanban.rules.StallProduction()),
+            ctx.rete.register(
+                borg.trikeshed.kanban.rules.ReaperProduction(
+                    priorStrikes = { jobId -> borg.trikeshed.kanban.rules.ReaperProduction.countPriorStrikes(ctx.blackboard, jobId) },
+                ),
+            ),
             ctx.rete.register(borg.trikeshed.kanban.rules.CycleGuardProduction()),
         )
         // kanban.alerts = the same tail board.view#alerts carries.
@@ -209,6 +215,33 @@ class KanbanModule : ForgeModule {
                     }
                 }
             }
+            // Reaper: strikes 1..2 hand the card back to READY (the claim production
+            // takes the new revision afresh); the block strike parks it in BLOCKED with
+            // the owner CLEARED — "owner" present and blank clears — so a human sees it.
+            // The receipt above is the strike's durable record: the production counts
+            // kanban/rule/reaper/* by jobId, so n is never carried in anybody's head.
+            if (a.ruleId == borg.trikeshed.kanban.rules.BoardRules.REAPER) {
+                val jobId = a.bindings["jobId"]
+                val rev = a.bindings["expectedRevision"]?.toLongOrNull()
+                val strike = a.bindings["strike"]?.toIntOrNull() ?: 1
+                if (jobId != null && rev != null) {
+                    val block = strike >= borg.trikeshed.kanban.rules.BoardRules.REAPER_BLOCK_STRIKE
+                    val move = linkedMapOf<String, Any?>(
+                        "type" to "move",
+                        "jobId" to jobId,
+                        "idempotencyKey" to "$jobId#${a.ruleId}#$rev",
+                        "expectedRevision" to rev,
+                        "toColumn" to if (block) borg.trikeshed.kanban.BoardCol.BLOCKED.wire else a.bindings["toColumn"],
+                    )
+                    if (block) move["owner"] = ""
+                    ctx.scope.launch {
+                        val reply = CompletableDeferred<BoardApply>()
+                        store.intake.send(BoardIntake(move, reply))
+                        val verdict = reply.await()
+                        System.err.println("[KanbanModule] reaper $jobId r$rev strike $strike → ${move["toColumn"]}: $verdict")
+                    }
+                }
+            }
         }
 
         // The MCP lens onto this same asset (docs/marketability-kanban-mcp-audit.md,
@@ -266,6 +299,7 @@ class KanbanModule : ForgeModule {
                         col = row.col,
                         previousCol = null,
                         lastMoveMs = row.lastMoveMs,
+                        owner = row.owner,
                     ),
                 )
             }

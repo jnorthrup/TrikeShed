@@ -16,6 +16,9 @@ import borg.trikeshed.job.JobCommand
  * modified on a coarse tick — temporal expiry via ordinary modify/refraction,
  * ZERO temporal machinery inside Rete (production lesson: the tick-fact IS the
  * mechanism).
+ *
+ * Card fact shape: {kind=card, jobId, lifecycle, column, dependencies, revision,
+ * lastSequence, lastMoveMs, owner} — `owner` added with the reaper.
  */
 class BoardFactElement(
     private val rete: ReteNetwork,
@@ -40,6 +43,10 @@ class BoardFactElement(
             "revision" to ev.snapshot.revision,
             "lastSequence" to ev.sequence,
             "lastMoveMs" to ev.lastMoveMs,
+            // Delta (reaper): the owner rides the fact so a production can tell the
+            // brain's claimed work (`claim:*`) from a human's. This element is the
+            // one author of the card fact; nothing else adds a field to it.
+            "owner" to ev.owner,
         )
         if (known.add(jobId)) rete.assert(factId, fields, ev.cid, board)
         else rete.modify(factId, fields, ev.cid)

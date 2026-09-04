@@ -406,7 +406,7 @@ class LcncKanbanMcpTest {
         assertNull(columns.map { it as Map<*, *> }.first { it["id"] == "todo" }["wipLimit"])
 
         val guards = (schema["guards"] as List<*>).map { (it as Map<*, *>)["name"] }
-        assertEquals(listOf("idempotency", "expectedRevision", "wipLimit", "dependencyCycle"), guards)
+        assertEquals(listOf("idempotency", "expectedRevision", "wipLimit", "dependencyCycle", "claimReview", "orphanParent"), guards)
         assertEquals("open", (schema["transitionPolicy"] as Map<*, *>)["kind"])
     }
 
