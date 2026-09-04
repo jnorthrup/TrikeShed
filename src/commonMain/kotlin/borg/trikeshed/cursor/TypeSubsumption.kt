@@ -110,21 +110,38 @@ class IsALattice(val edges: Series<IsAEdge>) {
      */
     fun isA(sub: TypeToken, sup: TypeToken): Boolean {
         if (sub == sup) return true
-        // BFS from sub; seed guarded so a cycle through sub can't re-enqueue it.
-        val visited = HashSet<TypeToken>()
-        visited.add(sub)
-        val queue = ArrayDeque<TypeToken>()
-        queue.add(sub)
-        while (queue.isNotEmpty()) {
-            val cur = queue.removeFirst()
-            for (i in 0 until edges.size) {
-                val e = edges[i]
-                if (e.sub == cur) {
-                    if (e.sup == sup) return true
-                    if (visited.add(e.sup)) queue.add(e.sup)
-                }
-            }
+        val idx = closure()
+        val a = idx.dense[sub.poolIdx] ?: return false
+        val b = idx.dense[sup.poolIdx] ?: return false
+        return idx.index.isA(a, b)
+    }
+
+    /**
+     * Delta (2026-09-04): [isA] is a bit test on a
+     * [borg.trikeshed.collections.bits.ClosureIndex] built from the edge Series
+     * (DFS-numbered Roaring ancestor sets) instead of a per-query BFS that
+     * scanned every edge per hop. The index is rebuilt when the edge count
+     * changes — the COW/mutable-backend case — and is otherwise a pure function
+     * of the edge set, so [isA] stays idempotent. [supertypes] keeps its BFS
+     * order (shallowest first), which the closure does not carry.
+     */
+    private class Closure(val edgeCount: Int, val dense: Map<Int, Int>, val index: borg.trikeshed.collections.bits.ClosureIndex)
+
+    private var closureCache: Closure? = null
+
+    private fun closure(): Closure {
+        val n = edges.size
+        closureCache?.let { if (it.edgeCount == n) return it }
+        val dense = LinkedHashMap<Int, Int>()
+        fun id(p: Int) = dense.getOrPut(p) { dense.size }
+        val parents = ArrayList<ArrayList<Int>>()
+        for (i in 0 until n) {
+            val e = edges[i]
+            val a = id(e.sub.poolIdx); val b = id(e.sup.poolIdx)
+            while (parents.size < dense.size) parents.add(ArrayList())
+            parents[a].add(b)
         }
-        return false
+        val index = borg.trikeshed.collections.bits.ClosureIndex.build(dense.size) { v -> parents[v].toIntArray() }
+        return Closure(n, dense, index).also { closureCache = it }
     }
 }

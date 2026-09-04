@@ -48,6 +48,8 @@ sealed class KifExpr {
             return out
         }
 
+        private fun isDelimiter(c: Char): Boolean = when (c) { ' ', '\n', '\r', '\t', '(', ')', '"', ';' -> true; else -> false }
+
         private fun tokenize(s: String): List<String> {
             val out = mutableListOf<String>()
             var i = 0
@@ -70,7 +72,7 @@ sealed class KifExpr {
                     ';' -> { while (i < s.length && s[i] != '\n') i++ } // comment to EOL
                     else -> {
                         val sb = StringBuilder()
-                        while (i < s.length && s[i] !in setOf(' ', '\n', '\r', '\t', '(', ')', '"', ';')) { sb.append(s[i]); i++ }
+                        while (i < s.length && !isDelimiter(s[i])) { sb.append(s[i]); i++ }
                         if (sb.isNotEmpty()) out.add(sb.toString())
                     }
                 }
@@ -160,12 +162,14 @@ class KifKnowledgeBase {
         if (key in held) return false
         held[key] = expr
         snapshot = null
+        if (subclassEdge(expr) != null) closureCache = null
         return true
     }
 
     private fun forget(expr: KifExpr): Boolean {
         if (held.remove(expr.toKifString()) == null) return false
         snapshot = null
+        if (subclassEdge(expr) != null) closureCache = null
         return true
     }
 
@@ -202,23 +206,35 @@ class KifKnowledgeBase {
         return bindings
     }
 
+    /**
+     * Transitive `subclass` pairs over what is held. Delta (2026-09-04): built by
+     * [borg.trikeshed.collections.bits.ClosureIndex] (DFS-numbered Roaring sets)
+     * instead of a pairwise fixpoint loop, and cached until a `subclass` tuple is
+     * told or forgotten — the loop was O(E²) per pass and could not hold the
+     * SUMO corpus.
+     */
     private fun subclassClosure(): Set<Pair<String, String>> {
-        val edges = asserts().mapNotNull { e ->
-            (e as? KifExpr.ListExpr)?.let {
-                if (it.elements.size == 3 && (it.elements[0] as? KifExpr.Atom)?.token == "subclass") {
-                    val a = (it.elements[1] as? KifExpr.Atom)?.token ?: return@mapNotNull null
-                    val b = (it.elements[2] as? KifExpr.Atom)?.token ?: return@mapNotNull null
-                    a to b
-                } else null
-            }
-        }
-        val closure = edges.toMutableSet()
-        var changed = true
-        while (changed) {
-            changed = false
-            for ((a, b) in closure.toList()) for ((c, d) in closure.toList()) if (b == c && a to d !in closure) { closure.add(a to d); changed = true }
-        }
-        return closure
+        borg.trikeshed.isam.synchronizedLock(gate) { closureCache }?.let { return it }
+        val edges = asserts().mapNotNull { e -> subclassEdge(e) }
+        val names = ArrayList<String>(); val index = HashMap<String, Int>()
+        fun id(n: String) = index.getOrPut(n) { names.size.also { names.add(n) } }
+        val parents = Array(edges.size * 2 + 1) { ArrayList<Int>() }
+        for ((a, b) in edges) { val ia = id(a); val ib = id(b); parents[ia].add(ib) }
+        val closure = borg.trikeshed.collections.bits.ClosureIndex.build(names.size) { n -> parents[n].toIntArray() }
+        val out = LinkedHashSet<Pair<String, String>>()
+        for (n in names.indices) for (anc in closure.ancestorNodes(n)) out.add(names[n] to names[anc])
+        borg.trikeshed.isam.synchronizedLock(gate) { closureCache = out }
+        return out
+    }
+
+    private var closureCache: Set<Pair<String, String>>? = null
+
+    private fun subclassEdge(e: KifExpr): Pair<String, String>? {
+        val l = e as? KifExpr.ListExpr ?: return null
+        if (l.elements.size != 3 || (l.elements[0] as? KifExpr.Atom)?.token != "subclass") return null
+        val a = (l.elements[1] as? KifExpr.Atom)?.token ?: return null
+        val b = (l.elements[2] as? KifExpr.Atom)?.token ?: return null
+        return a to b
     }
 
     private fun unify(pattern: KifExpr, fact: KifExpr): Map<String, String>? {
