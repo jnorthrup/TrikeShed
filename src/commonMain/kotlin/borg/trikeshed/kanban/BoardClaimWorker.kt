@@ -48,7 +48,13 @@ class BoardClaimWorker(
     companion object {
         const val RECEIPT_PREFIX: String = "kanban/claim/"
         const val LANGUAGE: String = "kanban-claim"
-        const val MAX_TOKENS: String = "256"
+        /**
+         * 1024, not 256: the newest Hermes card is a thinking model (glm-5.3-flash)
+         * that spends its budget on reasoning first; at 256 every claim on
+         * 2026-09-04 came back "provider billed 256 completion tokens but returned
+         * no content". One claim costs ~1k tokens of quota the ledger already proved.
+         */
+        const val MAX_TOKENS: String = "1024"
 
         fun brief(jobId: String, title: String): String =
             "Card $jobId: $title. Propose the concrete next action in ≤ 3 sentences."
