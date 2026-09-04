@@ -149,9 +149,20 @@ class KanbanModule : ForgeModule {
         )
         // kanban.alerts = the same tail board.view#alerts carries.
         ctx.lcncRunners["kanban.alerts"] = LcncNodeRunner { _, _ -> alertMap() }
+        // The claim worker: Move(RUNNING) → the daemon's brain → receipt → Move(REVIEW).
+        // Runners are looked up at claim time (the daemon fills prompt.chat/mux.models
+        // into ctx.lcncRunners after this module attaches). One worker per activation
+        // id: a re-proposed claim (support invalidation) never doubles a brain call.
+        val claimWorker = borg.trikeshed.kanban.BoardClaimWorker(
+            store = store,
+            blackboard = ctx.blackboard,
+            runner = { ctx.lcncRunners[it] },
+            clock = ctx.clock,
+        )
+        val claimsInFlight = java.util.concurrent.ConcurrentHashMap.newKeySet<String>()
         // Non-job activations: receipt on the blackboard ALWAYS; dependency-ready also
         // lowers to a store Move with a derived idempotency key (dedupe compensates
-        // any popped-but-unprocessed activation).
+        // any popped-but-unprocessed activation); claim hands the card to the worker.
         ctx.rete.productionSink = { a ->
             ctx.blackboard.put(
                 "kanban/rule/${a.ruleId}/${a.activationId}",
@@ -176,6 +187,25 @@ class KanbanModule : ForgeModule {
                                 ),
                             ),
                         )
+                    }
+                }
+            }
+            if (a.ruleId == borg.trikeshed.kanban.rules.BoardRules.CLAIM) {
+                val jobId = a.bindings["jobId"]
+                val rev = a.bindings["expectedRevision"]?.toLongOrNull()
+                val owner = a.bindings["owner"] ?: borg.trikeshed.kanban.rules.BoardRules.CLAIM_OWNER
+                if (jobId != null && rev != null && claimsInFlight.add(a.activationId)) {
+                    ctx.scope.launch {
+                        try {
+                            val outcome = claimWorker.claim(jobId, rev, owner)
+                            System.err.println("[KanbanModule] claim $jobId r$rev: ok=${outcome["ok"]} model=${outcome["model"]} ${outcome["review"]}")
+                        } catch (t: kotlinx.coroutines.CancellationException) {
+                            throw t
+                        } catch (t: Throwable) {
+                            System.err.println("[KanbanModule] claim $jobId r$rev failed: ${t.message}")
+                        } finally {
+                            claimsInFlight.remove(a.activationId)
+                        }
                     }
                 }
             }
