@@ -55,19 +55,25 @@ class BoardClaimWorker(
     companion object {
         const val RECEIPT_PREFIX: String = "kanban/claim/"
         const val LANGUAGE: String = "kanban-claim"
+        /** The actor the plane judge signs its REVIEW→DONE move with — never the claimant. */
+        const val JUDGE_ACTOR: String = "judge:plane"
         /**
          * 1024, not 256: the newest Hermes card is a thinking model (glm-5.3-flash)
          * that spends its budget on reasoning first; at 256 every claim on
          * 2026-09-04 came back "provider billed 256 completion tokens but returned
          * no content". One claim costs ~1k tokens of quota the ledger already proved.
          */
-        const val MAX_TOKENS: String = "1024"
+        const val MAX_TOKENS: String = "2048"
+        /** Tags that route a claimed card to a person no matter what the reply says. */
+        val HUMAN_TAGS: Set<String> = setOf("human-review", "experiment", "review:human")
 
-        fun brief(jobId: String, title: String): String = brief(jobId, title, emptyList())
+        fun brief(jobId: String, title: String): String = brief(jobId, title, "", emptyList(), emptyList())
 
-        /** The grounded brief: the card plus the plane facts that mention it ([PlaneBrief]). */
-        fun brief(jobId: String, title: String, plane: List<PlaneBrief.Row>): String =
-            PlaneBrief.render(jobId, title, PlaneBrief.select(plane, title), PlaneBrief.state(plane))
+        /** The RFC brief: goal, criteria, evidence from the plane, daemon state, lessons, reply shape ([PlaneBrief]). */
+        fun brief(jobId: String, title: String, spec: String, plane: List<PlaneBrief.Row>, receipts: List<PlaneBrief.Receipt>): String {
+            val parsed = PlaneBrief.parseSpec(title, spec)
+            return PlaneBrief.render(jobId, title, parsed, PlaneBrief.select(plane, title + " " + spec), PlaneBrief.state(plane), PlaneBrief.lessons(receipts))
+        }
     }
 
     /** One claim, start to finish. Returns the receipt as written (plus `review`: the REVIEW move's verdict). */
@@ -128,17 +134,26 @@ class BoardClaimWorker(
         }
 
         // ── 2. the brief is the card; the brain is the daemon's own ────────────
-        val title = store.card(jobId)?.title ?: jobId
-        val model = resolveModel()
+        val card = store.card(jobId)
+        val title = card?.title ?: jobId
+        val specText = card?.spec.orEmpty()
+        val spec = PlaneBrief.parseSpec(title, specText)
+        val model = spec.model.ifBlank { resolveModel() }
+        val tokens = (spec.tokens ?: MAX_TOKENS.toInt()).toString()
         val planeRows = runCatching { plane() }.getOrDefault(emptyList())
-        val briefText = brief(jobId, title, planeRows)
-        val mentioned = PlaneBrief.select(planeRows, title).size
+        val priorReceipts = blackboard.keys().filter { it.startsWith(RECEIPT_PREFIX) }.mapNotNull { k ->
+            (blackboard.get(k) as? Map<*, *>)?.let { m ->
+                PlaneBrief.Receipt(m["model"]?.toString().orEmpty(), m["ok"] == true, m["error"]?.toString().orEmpty())
+            }
+        }
+        val briefText = brief(jobId, title, specText, planeRows, priorReceipts)
+        val mentioned = PlaneBrief.select(planeRows, title + " " + specText).size
         val answer: Map<String, Any?> = try {
             chat.run(
                 LcncNode(
                     id = "claim-$jobId",
                     type = "prompt.chat",
-                    params = mapOf("prompt" to briefText, "model" to model, "maxTokens" to MAX_TOKENS),
+                    params = mapOf("prompt" to briefText, "model" to model, "maxTokens" to tokens),
                 ),
                 emptyMap(),
             )
@@ -152,28 +167,54 @@ class BoardClaimWorker(
             if (ok) "content" to (answer["content"]?.toString() ?: "")
             else "error" to (answer["error"]?.toString()?.takeIf { it.isNotBlank() } ?: "brain answered without content")
 
-        // ── 3. receipt, then REVIEW at the card's current revision — never DONE ──
+        // ── 3. the plane judges; the receipt says why; the card moves accordingly ──
+        // DONE  → RUNNING→REVIEW→DONE as actor "judge:plane" (the guard lets a non-claimant
+        //         close from REVIEW; the claimant never can);
+        // REVIEW→ a person decides;
+        // RETRY → READY with a reaper strike receipt (3rd strike: BLOCKED, owner cleared).
+        val planeIds = HashSet<String>(planeRows.size * 2)
+        for (r in planeRows) planeIds.add(PlaneBrief.evidenceId(r))
+        val humanTag = card?.tags?.any { it.lowercase() in HUMAN_TAGS } == true
+        val decision = PlaneJudge.decide(spec, humanTag, ok, answer["content"]?.toString().orEmpty(), planeIds)
         val current = store.card(jobId)?.revision ?: landed.snapshot.revision
-        val written = receipt(jobId, owner, model = answer["model"]?.toString() ?: model, ok = ok, body = body, revision = current, facts = mentioned)
-        val reviewReply = CompletableDeferred<BoardApply>()
-        store.intake.send(
-            BoardIntake(
-                mapOf(
-                    "type" to "move",
-                    "jobId" to jobId,
-                    "idempotencyKey" to "$jobId#claim-review#$current",
-                    "expectedRevision" to current,
-                    "toColumn" to BoardCol.REVIEW.wire,
-                ),
-                reviewReply,
-            ),
+        val judged = linkedMapOf<String, Any?>(
+            "decision" to decision.outcome.name,
+            "why" to decision.reason,
+            "verdict" to (decision.reply?.verdict ?: ""),
+            "criteria" to (decision.reply?.lines?.map { l -> mapOf("label" to l.label, "met" to l.met, "evidence" to l.evidence) } ?: emptyList<Any>()),
         )
-        val review = when (val r = withTimeoutOrNull(commitTimeoutMs) { reviewReply.await() }) {
-            is BoardApply.Committed -> "review r${r.revision}"
-            is BoardApply.Rejected -> "review refused: ${r.reason}"
-            null -> "review: no reply within ${commitTimeoutMs}ms"
+        val written = receipt(jobId, owner, model = answer["model"]?.toString() ?: model, ok = ok, body = body, revision = current, facts = mentioned, judged = judged)
+        val trail = ArrayList<String>()
+        suspend fun move(to: BoardCol, rev: Long, key: String, extra: Map<String, Any?> = emptyMap()): BoardApply? {
+            val reply = CompletableDeferred<BoardApply>()
+            store.intake.send(BoardIntake(mapOf("type" to "move", "jobId" to jobId, "idempotencyKey" to key, "expectedRevision" to rev, "toColumn" to to.wire) + extra, reply))
+            val r = withTimeoutOrNull(commitTimeoutMs) { reply.await() }
+            trail += when (r) {
+                is BoardApply.Committed -> "${to.wire} r${r.revision}"
+                is BoardApply.Rejected -> "${to.wire} refused: ${r.reason}"
+                null -> "${to.wire}: no reply within ${commitTimeoutMs}ms"
+            }
+            return r
         }
-        written + ("review" to review)
+        when (decision.outcome) {
+            PlaneJudge.Outcome.REVIEW -> move(BoardCol.REVIEW, current, "$jobId#claim-review#$current")
+            PlaneJudge.Outcome.DONE -> {
+                val r1 = move(BoardCol.REVIEW, current, "$jobId#claim-review#$current")
+                if (r1 is BoardApply.Committed) move(BoardCol.DONE, r1.revision, "$jobId#judge-done#${r1.revision}", mapOf("actor" to JUDGE_ACTOR))
+            }
+            PlaneJudge.Outcome.RETRY -> {
+                val strike = borg.trikeshed.kanban.rules.ReaperProduction.countPriorStrikes(blackboard, jobId) + 1
+                val block = strike >= BoardRules.REAPER_BLOCK_STRIKE
+                blackboard.put(
+                    borg.trikeshed.kanban.rules.ReaperProduction.RECEIPT_PREFIX + "judge-$jobId-r$current",
+                    mapOf("jobId" to jobId, "strike" to "$strike", "toColumn" to (if (block) BoardCol.BLOCKED.wire else BoardCol.READY.wire), "expectedRevision" to "$current", "why" to decision.reason, "by" to JUDGE_ACTOR),
+                    LANGUAGE,
+                )
+                if (block) move(BoardCol.BLOCKED, current, "$jobId#judge-block#$current", mapOf("owner" to ""))
+                else move(BoardCol.READY, current, "$jobId#judge-retry#$current")
+            }
+        }
+        written + ("moves" to trail)
     }
 
     /** `mux.models#models[0].id` — the newest model Hermes ran here, or "" when the daemon offers none. */
@@ -194,7 +235,7 @@ class BoardClaimWorker(
         return (list.firstOrNull() as? Map<*, *>)?.get("id")?.toString().orEmpty()
     }
 
-    private fun receipt(jobId: String, owner: String, model: String, ok: Boolean, body: Pair<String, Any?>, revision: Long, facts: Int = 0): Map<String, Any?> {
+    private fun receipt(jobId: String, owner: String, model: String, ok: Boolean, body: Pair<String, Any?>, revision: Long, facts: Int = 0, judged: Map<String, Any?> = emptyMap()): Map<String, Any?> {
         val value = linkedMapOf<String, Any?>(
             "owner" to owner,
             "model" to model,
@@ -205,6 +246,7 @@ class BoardClaimWorker(
             // how many plane facts the brief carried (0 = the title alone)
             "facts" to facts,
         )
+        value.putAll(judged)
         blackboard.put(RECEIPT_PREFIX + jobId, value, LANGUAGE)
         return value
     }

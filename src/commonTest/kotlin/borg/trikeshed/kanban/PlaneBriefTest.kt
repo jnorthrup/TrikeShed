@@ -4,7 +4,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
-/** The brief carries the plane facts that mention the card, source before build output, bounded, plus the daemon's tick. */
+/** The RFC brief: parsed spec, evidence from the plane (source first, bounded), daemon state, lessons, reply shape. */
 class PlaneBriefTest {
     private fun row(p: String, id: String, vararg f: Pair<String, Any?>) = PlaneBrief.Row(p, id, mapOf(*f))
 
@@ -12,14 +12,19 @@ class PlaneBriefTest {
         row("trikeshed", "projects/trikeshed/src/jvmMain/kotlin/borg/trikeshed/graal/vitals/GraalFactElement.kt", "kind" to "repository-document"),
         row("trikeshed", "projects/trikeshed/build/live/classes/borg/trikeshed/graal/vitals/GraalFactElement\$1.class"),
         row("trikeshed", "projects/trikeshed/src/commonMain/kotlin/borg/trikeshed/couch/CouchChangesFactElement.kt", "kind" to "repository-document"),
-        row("graal", "vitals/memory", "kind" to "memory", "heapUsed" to 775L, "heapMax" to 9216L),
+        row("graal", "vitals/memory", "kind" to "memory", "heapUsed" to 775L * 1_048_576, "heapMax" to 9216L * 1_048_576),
         row("graal", "gc/G1New", "kind" to "gc", "collector" to "G1New", "collections" to 7),
         row("panels", "preset-brain-mux/node/p1", "kind" to "node", "type" to "prompt.chat"),
     ) + (1..100).map { row("trikeshed", "projects/trikeshed/docs/unrelated-$it.md") }
 
     @Test
-    fun termsDropStopwordsAndShortWords() {
-        assertEquals(listOf("graalfactelement", "tick", "couch", "reconcile"), PlaneBrief.terms("name the one file to change so the GraalFactElement tick lands before the couch reconcile"))
+    fun specParsesRfcLinesAndDefaultsOneMust() {
+        val s = PlaneBrief.parseSpec("t", "GOAL: reaper wired\nMUST: name the file\nmust: cite a fact\nSHOULD: keep it short\nOUT-OF-SCOPE: the UI\nREVIEW: human\nMODEL: glm-5.3\nTOKENS: 512\nsome prose")
+        assertEquals("reaper wired", s.goal)
+        assertEquals(listOf("MUST-1", "MUST-2", "SHOULD-1"), s.criteria.map { it.label })
+        assertEquals(listOf("the UI"), s.outOfScope); assertTrue(s.humanReview); assertEquals("glm-5.3", s.model); assertEquals(512, s.tokens)
+        val d = PlaneBrief.parseSpec("title only", "")
+        assertEquals("title only", d.goal); assertEquals(1, d.musts.size); assertEquals(PlaneBrief.DEFAULT_MUST, d.musts[0].text); assertTrue(!d.humanReview)
     }
 
     @Test
@@ -29,22 +34,25 @@ class PlaneBriefTest {
         assertTrue(picked[0].id.endsWith("GraalFactElement.kt"), "source first: ${picked[0].id}")
         assertTrue(picked[1].id.endsWith("CouchChangesFactElement.kt"), "the other source next: ${picked[1].id}")
         assertTrue(picked[2].id.endsWith("GraalFactElement\$1.class"), "build output last")
+        assertEquals(PlaneBrief.MAX_EVIDENCE, PlaneBrief.select((1..200).map { row("trikeshed", "projects/trikeshed/src/graal-$it.kt") }, "graal").size)
     }
 
     @Test
-    fun renderIsBoundedAndCarriesTheTick() {
-        val many = (1..200).map { row("trikeshed", "projects/trikeshed/src/graal-$it.kt") }
-        val text = PlaneBrief.render("j1", "graal", PlaneBrief.select(many, "graal"), PlaneBrief.state(rows))
-        assertEquals(PlaneBrief.MAX_ROWS, text.lines().count { it.startsWith("- trikeshed/") })
-        assertTrue("graal/vitals/memory: kind=memory, heapUsed=775, heapMax=9216" in text, text)
-        assertTrue("graal/gc/G1New: kind=gc, collector=G1New, collections=7" in text)
-        assertTrue(text.lines().all { it.length <= PlaneBrief.MAX_LINE + 2 })
-        assertTrue(text.startsWith("Card j1: graal\n"))
-    }
-
-    @Test
-    fun noMentionsSaysSo() {
-        val text = PlaneBrief.render("j2", "zzzz", PlaneBrief.select(rows, "zzzz"), emptyList())
-        assertTrue("No fact on the daemon's plane mentions this card's terms." in text)
+    fun renderIsAnRfcWithEvidenceStateLessonsAndTheReplyShape() {
+        val spec = PlaneBrief.parseSpec("GraalFactElement tick", "MUST: name the file\nSHOULD: cite the tick")
+        val lessons = PlaneBrief.lessons(listOf(
+            PlaneBrief.Receipt("glm-5.3-flash", false, "provider billed 256 completion tokens but returned no content"),
+            PlaneBrief.Receipt("glm-5.3-flash", true, ""), PlaneBrief.Receipt("nemotron", true, ""),
+        ))
+        val text = PlaneBrief.render("j1", "GraalFactElement tick", spec, PlaneBrief.select(rows, "GraalFactElement"), PlaneBrief.state(rows), lessons)
+        assertTrue(text.startsWith("Card j1 — brief (RFC 2119: MUST, SHOULD, MAY)\nGOAL: GraalFactElement tick\nACCEPTANCE:\n  MUST-1: name the file\n  SHOULD-1: cite the tick\n"), text)
+        assertTrue("  trikeshed/projects/trikeshed/src/jvmMain/kotlin/borg/trikeshed/graal/vitals/GraalFactElement.kt  (repository-document)" in text, text)
+        assertTrue("DAEMON: heap 775/9216 MB · G1New 7 gcs" in text, text)
+        assertTrue("AVOID  glm-5.3-flash: 1 of 2 claims failed — last: provider billed 256" in text, text)
+        assertTrue("DO     nemotron: 1 of 1 claims answered" in text, text)
+        assertTrue("READY --claim--> RUNNING" in text)
+        assertTrue("  MUST-1: MET | NOT-MET — evidence: <one id from EVIDENCE, or none>" in text, text)
+        assertTrue(text.lines().all { it.length <= PlaneBrief.MAX_LINE + 4 }, "no line wider than the cap")
+        assertTrue(text.lines().none { it.contains("heapUsed=") }, "no field dumps")
     }
 }

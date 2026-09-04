@@ -182,6 +182,7 @@ class LcncKanbanMcp(
                     "dependencies" to mapOf("type" to "array", "items" to mapOf("type" to "string"), "description" to "jobIds this card waits on. A cycle is refused."),
                     "owner" to mapOf("type" to "string"),
                     "parent" to mapOf("type" to "string", "description" to "jobId this card is split from. Must be live (exists, not done/archived) or the submit is refused as an orphan. Omit for intake."),
+                    "spec" to mapOf("type" to "string", "description" to "The card's acceptance spec as RFC 2119 lines, one per line: GOAL: …, MUST: …, SHOULD: …, MAY: …, OUT-OF-SCOPE: …, REVIEW: human (a person must decide), MODEL: <id>, TOKENS: <n>. The plane judge closes a claimed card when every MUST is met with an evidence id that exists on the fact plane; without a MUST the default is 'name the next action citing evidence'."),
                     "idempotencyKey" to mapOf("type" to "string", "description" to "Retry key. Defaults to 'submit#<jobId>', so an accidental repeat is refused as a duplicate rather than doubling the card."),
                 ),
                 "anyOf" to listOf(
@@ -246,6 +247,7 @@ class LcncKanbanMcp(
             stringsOf(args["dependencies"])?.let { put("dependencies", it) }
             (args["owner"] as? String)?.trim()?.takeIf { it.isNotEmpty() }?.let { put("owner", it) }
             (args["parent"] as? String)?.trim()?.takeIf { it.isNotEmpty() }?.let { put("parent", it) }
+            (args["spec"] as? String)?.takeIf { it.isNotBlank() }?.let { put("spec", it) }
             (args["idempotencyKey"] as? String)?.takeIf { it.isNotBlank() }?.let { put("idempotencyKey", it) }
         }
     }

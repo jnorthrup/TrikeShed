@@ -92,6 +92,12 @@ data class CardRow(
     val tags: List<String>,
     /** Explicit Hermes owner, persisted as part of the command payload. */
     val owner: String = "",
+    /**
+     * The card's spec as RFC 2119 lines (GOAL / MUST / SHOULD / MAY / OUT-OF-SCOPE /
+     * REVIEW: human / MODEL / TOKENS), persisted from the submit payload's `spec`.
+     * Delta 2026-09-04: the plane judge reads MUSTs from here ([PlaneBrief.parseSpec]).
+     */
+    val spec: String = "",
 )
 
 /**
@@ -411,6 +417,7 @@ class BoardStoreElement(
             // An absent key keeps the owner; a key present and blank CLEARS it (the
             // reaper's third strike hands a card back to a human that way).
             owner = if (raw.containsKey("owner")) (raw["owner"] as? String)?.trim().orEmpty() else prev?.owner ?: "",
+            spec = (raw["spec"] as? String)?.takeIf { it.isNotBlank() } ?: prev?.spec ?: "",
         )
     }
 

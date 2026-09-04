@@ -54,6 +54,7 @@ class LcncKanbanExperience(
                 "owner" to row?.owner.orEmpty(),
                 "dependencies" to (row?.dependencies ?: emptyList<String>()),
                 "tags" to (row?.tags ?: emptyList<String>()),
+                "spec" to row?.spec.orEmpty(),
             ) + garnish[id].orEmpty()
         }
         return base + ("items" to items)
@@ -122,6 +123,8 @@ class LcncKanbanExperience(
                         (c["priority"]?.toString()?.toDoubleOrNull()?.toInt()
                             ?: node.params["priority"]?.toIntOrNull())
                             ?.let { put("priority", it) }
+                        // The RFC spec (MUST/SHOULD/MAY lines) — absent stays absent.
+                        (c["spec"]?.toString() ?: node.params["spec"])?.takeIf { it.isNotBlank() }?.let { put("spec", it) }
                         put(
                             "idempotencyKey",
                             c["idempotencyKey"]?.toString()?.takeIf { it.isNotBlank() }

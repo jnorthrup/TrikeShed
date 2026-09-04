@@ -105,61 +105,64 @@ class KanbanClaimLoopTest {
     }
 
     @Test
-    fun readyCardsAreClaimedWorkedAndParkedInReview() {
+    fun theJudgeClosesAMetCardAndParksAHumanReviewCard() {
         val prompts = CopyOnWriteArrayList<Map<String, String>>()
+        // The brain answers in the RFC reply shape, citing the card's own fact on the plane.
         val brain = LcncNodeRunner { node, _ ->
             prompts.add(node.params)
-            mapOf("ok" to true, "content" to "Next: split '${node.params["prompt"]}' into a test first.", "model" to node.params["model"], "cached" to false)
+            val id = node.id.removePrefix("claim-")
+            mapOf(
+                "ok" to true,
+                "content" to "VERDICT: MET\nMUST-1: MET — evidence: board/$id\nACTION: Next: split it into a test first.",
+                "model" to node.params["model"], "cached" to false,
+            )
         }
         val rig = rig("loop", brain)
         try {
             invoke(
                 rig,
-                mapOf("type" to "submit", "jobId" to "c1", "idempotencyKey" to "s1", "title" to "Wire the reaper"),
-                mapOf("type" to "submit", "jobId" to "c2", "idempotencyKey" to "s2", "title" to "Prove it live"),
+                mapOf("type" to "submit", "jobId" to "c1", "idempotencyKey" to "s1", "title" to "Wire the reaper",
+                    "spec" to "GOAL: the reaper is wired\nMUST: name the file that registers it"),
+                mapOf("type" to "submit", "jobId" to "c2", "idempotencyKey" to "s2", "title" to "Prove it live", "tags" to listOf("human-review")),
                 mapOf("type" to "move", "jobId" to "c1", "idempotencyKey" to "m1", "expectedRevision" to 1, "toColumn" to "ready"),
                 mapOf("type" to "move", "jobId" to "c2", "idempotencyKey" to "m2", "expectedRevision" to 1, "toColumn" to "ready"),
             )
-            val reviewed = awaitStatus(rig, "review", "c1", "c2")
-            assertEquals("claim:brain", reviewed.getValue("c1")["owner"], "the claim owns the card, and REVIEW keeps the owner")
+            // c1: every MUST met with evidence on the plane → the judge closes it (RUNNING → REVIEW → DONE)
+            val done = awaitStatus(rig, "done", "c1")
+            assertEquals("claim:brain", done.getValue("c1")["owner"], "DONE keeps the claimant as owner; the judge signed the move")
+            // c2: tagged for a person → REVIEW no matter what the reply said
+            val reviewed = awaitStatus(rig, "review", "c2")
             assertEquals("claim:brain", reviewed.getValue("c2")["owner"])
 
-            // the brain was asked ONCE per card, with the card as the brief, the newest model, MAX_TOKENS tokens
             assertEquals(2, prompts.size, "one brain call per claim: $prompts")
-            val byJob = prompts.associateBy { it["prompt"]!!.substringAfter("Card ").substringBefore(":") }
-            // Delta 2026-09-04: the brief is grounded in the plane (PlaneBrief), so it is
-            // compared by its fixed head and tail, not the title-only text.
+            val byJob = prompts.associateBy { it["prompt"]!!.substringAfter("Card ").substringBefore(" ") }
             val prompt = byJob.getValue("c1")["prompt"].toString()
-            assertTrue(prompt.startsWith("Card c1: Wire the reaper\n"), prompt)
-            assertTrue(prompt.endsWith("say so if none does."), prompt)
+            assertTrue(prompt.startsWith("Card c1 — brief (RFC 2119"), prompt)
+            assertTrue("MUST-1: name the file that registers it" in prompt, prompt)
+            assertTrue("VERDICT: MET | NOT-MET | NEEDS-HUMAN" in prompt, prompt)
             assertEquals("hermes-newest", byJob.getValue("c1")["model"], "blank model → the first mux.models card")
             assertEquals(BoardClaimWorker.MAX_TOKENS, byJob.getValue("c1")["maxTokens"])
 
-            // the receipt a human reads in REVIEW
             val r1 = rig.ctx.blackboard.get("kanban/claim/c1") as Map<*, *>
-            assertEquals(true, r1["ok"])
-            assertEquals("claim:brain", r1["owner"])
-            assertEquals("hermes-newest", r1["model"])
-            assertTrue((r1["content"] as String).startsWith("Next:"), "$r1")
+            assertEquals(true, r1["ok"]); assertEquals("DONE", r1["decision"]); assertEquals("MET", r1["verdict"])
+            val crit = (r1["criteria"] as List<*>).first() as Map<*, *>
+            assertEquals("MUST-1", crit["label"]); assertEquals(true, crit["met"]); assertEquals("board/c1", crit["evidence"])
+            val r2 = rig.ctx.blackboard.get("kanban/claim/c2") as Map<*, *>
+            assertEquals("REVIEW", r2["decision"]); assertTrue((r2["why"] as String).contains("person"), r2.toString())
             assertEquals("kanban-claim", rig.ctx.blackboard.getProvenance("kanban/claim/c1")?.language)
-            // the rule receipts are on the board too
             assertTrue(rig.ctx.blackboard.keys().any { it.startsWith("kanban/rule/claim/claim-c1-r") })
 
-            // nothing moved itself to DONE, and the claimant may not: the guard from the review column
-            val rev = (reviewed.getValue("c1")["revision"] as Number).toLong()
-            val self = invoke(rig, mapOf("type" to "move", "jobId" to "c1", "idempotencyKey" to "d-self", "expectedRevision" to rev, "toColumn" to "done", "actor" to "claim:brain"))
-            assertEquals("rejected", self[0]["verdict"])
-            assertTrue((self[0]["reason"] as String).contains("second pair of eyes"), self[0].toString())
-            val jim = invoke(rig, mapOf("type" to "move", "jobId" to "c1", "idempotencyKey" to "d-jim", "expectedRevision" to rev, "toColumn" to "done", "actor" to "jim"))
-            assertEquals("committed", jim[0]["verdict"], jim[0].toString())
-            assertEquals("done", items(rig).getValue("c1")["status"])
+            // the trail: the claimant never moved to DONE from RUNNING — REVIEW sat between
+            val commits = rig.ctx.blackboard.keys().filter { it.startsWith("kanban/committed/c1/") }
+                .map { rig.ctx.blackboard.get(it) as Map<*, *> }.sortedBy { it["revision"].toString().toLong() }.map { it["col"] }
+            assertEquals(listOf("todo", "ready", "running", "review", "done"), commits)
         } finally {
             runBlocking { rig.supervisor.detach("kanban") }
         }
     }
 
     @Test
-    fun aFailingBrainStillParksTheCardInReviewWithTheErrorOnTheReceipt() {
+    fun aFailingBrainStrikesOutToBlocked() {
         val brain = LcncNodeRunner { node, _ -> mapOf("ok" to false, "error" to "quota exhausted for ${node.params["model"]}", "model" to node.params["model"], "content" to "") }
         val rig = rig("failing", brain)
         try {
@@ -168,15 +171,17 @@ class KanbanClaimLoopTest {
                 mapOf("type" to "submit", "jobId" to "f1", "idempotencyKey" to "s1", "title" to "Doomed"),
                 mapOf("type" to "move", "jobId" to "f1", "idempotencyKey" to "m1", "expectedRevision" to 1, "toColumn" to "ready"),
             )
-            val reviewed = awaitStatus(rig, "review", "f1")
-            assertEquals("claim:brain", reviewed.getValue("f1")["owner"])
+            // strike 1 and 2 hand it back to READY (re-claimed each time); strike 3 parks it in BLOCKED
+            val blocked = awaitStatus(rig, "blocked", "f1", timeoutMs = 20_000)
+            assertEquals("", blocked.getValue("f1")["owner"], "BLOCKED clears the claimant so a person sees it")
             val r = rig.ctx.blackboard.get("kanban/claim/f1") as Map<*, *>
-            assertEquals(false, r["ok"])
+            assertEquals(false, r["ok"]); assertEquals("RETRY", r["decision"])
             assertEquals("quota exhausted for hermes-newest", r["error"])
-            // and RUNNING → DONE was never an option for it: the card went RUNNING then REVIEW
+            val strikes = rig.ctx.blackboard.keys().filter { it.startsWith("kanban/rule/reaper/judge-f1-") }
+            assertEquals(3, strikes.size, "three judge strikes: $strikes")
             val commits = rig.ctx.blackboard.keys().filter { it.startsWith("kanban/committed/f1/") }
                 .map { rig.ctx.blackboard.get(it) as Map<*, *> }.sortedBy { it["revision"].toString().toLong() }.map { it["col"] }
-            assertEquals(listOf("todo", "ready", "running", "review"), commits)
+            assertEquals(listOf("todo", "ready", "running", "ready", "running", "ready", "running", "blocked"), commits)
         } finally {
             runBlocking { rig.supervisor.detach("kanban") }
         }

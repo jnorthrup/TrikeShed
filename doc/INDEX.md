@@ -98,3 +98,4 @@ Source: `doc/archives/archive-2026-07-22.md` (13,066 lines, 762KB) — consolida
 - **What's done (don't redo):** `doc/dont-redo` (39 checked items)
 - **Flywheel ratios:** `kanban-evolution.yaml`
 - **Full history:** `doc/archives/archive-2026-07-22.md`
+- [RFC 0001 — The board claims its own work](rfc/0001-board-claim-loop.md) — claim → brief (RFC 2119, plane evidence, lessons) → plane judge → DONE / REVIEW / RETRY-strike
