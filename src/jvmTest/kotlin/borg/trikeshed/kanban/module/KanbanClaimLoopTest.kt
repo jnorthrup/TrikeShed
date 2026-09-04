@@ -124,12 +124,16 @@ class KanbanClaimLoopTest {
             assertEquals("claim:brain", reviewed.getValue("c1")["owner"], "the claim owns the card, and REVIEW keeps the owner")
             assertEquals("claim:brain", reviewed.getValue("c2")["owner"])
 
-            // the brain was asked ONCE per card, with the card as the brief, the newest model, 256 tokens
+            // the brain was asked ONCE per card, with the card as the brief, the newest model, MAX_TOKENS tokens
             assertEquals(2, prompts.size, "one brain call per claim: $prompts")
             val byJob = prompts.associateBy { it["prompt"]!!.substringAfter("Card ").substringBefore(":") }
-            assertEquals(BoardClaimWorker.brief("c1", "Wire the reaper"), byJob.getValue("c1")["prompt"])
+            // Delta 2026-09-04: the brief is grounded in the plane (PlaneBrief), so it is
+            // compared by its fixed head and tail, not the title-only text.
+            val prompt = byJob.getValue("c1")["prompt"].toString()
+            assertTrue(prompt.startsWith("Card c1: Wire the reaper\n"), prompt)
+            assertTrue(prompt.endsWith("say so if none does."), prompt)
             assertEquals("hermes-newest", byJob.getValue("c1")["model"], "blank model → the first mux.models card")
-            assertEquals("256", byJob.getValue("c1")["maxTokens"])
+            assertEquals(BoardClaimWorker.MAX_TOKENS, byJob.getValue("c1")["maxTokens"])
 
             // the receipt a human reads in REVIEW
             val r1 = rig.ctx.blackboard.get("kanban/claim/c1") as Map<*, *>

@@ -164,6 +164,8 @@ class KanbanModule : ForgeModule {
             blackboard = ctx.blackboard,
             runner = { ctx.lcncRunners[it] },
             clock = ctx.clock,
+            // The brief is grounded in the plane: one snapshot per claim, selected by the card's terms.
+            plane = { ctx.rete.snapshot().map { f -> borg.trikeshed.kanban.PlaneBrief.Row(f.factId.partitionId, f.factId.localId, f.fields) } },
         )
         val claimsInFlight = java.util.concurrent.ConcurrentHashMap.newKeySet<String>()
         // Non-job activations: receipt on the blackboard ALWAYS; dependency-ready also

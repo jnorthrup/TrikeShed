@@ -45,6 +45,12 @@ class BoardClaimWorker(
     private val runner: (String) -> LcncNodeRunner?,
     private val clock: () -> Long,
     private val commitTimeoutMs: Long = 10_000L,
+    /**
+     * The fact plane at claim time, for [PlaneBrief]. Delta (2026-09-04): the brief
+     * was the title alone; the module hands one `ReteNetwork.snapshot()` here so the
+     * brain sees the files, panels and daemon state that mention the card's terms.
+     */
+    private val plane: suspend () -> List<PlaneBrief.Row> = { emptyList() },
 ) {
     companion object {
         const val RECEIPT_PREFIX: String = "kanban/claim/"
@@ -57,8 +63,11 @@ class BoardClaimWorker(
          */
         const val MAX_TOKENS: String = "1024"
 
-        fun brief(jobId: String, title: String): String =
-            "Card $jobId: $title. Propose the concrete next action in ≤ 3 sentences."
+        fun brief(jobId: String, title: String): String = brief(jobId, title, emptyList())
+
+        /** The grounded brief: the card plus the plane facts that mention it ([PlaneBrief]). */
+        fun brief(jobId: String, title: String, plane: List<PlaneBrief.Row>): String =
+            PlaneBrief.render(jobId, title, PlaneBrief.select(plane, title), PlaneBrief.state(plane))
     }
 
     /** One claim, start to finish. Returns the receipt as written (plus `review`: the REVIEW move's verdict). */
@@ -121,12 +130,15 @@ class BoardClaimWorker(
         // ── 2. the brief is the card; the brain is the daemon's own ────────────
         val title = store.card(jobId)?.title ?: jobId
         val model = resolveModel()
+        val planeRows = runCatching { plane() }.getOrDefault(emptyList())
+        val briefText = brief(jobId, title, planeRows)
+        val mentioned = PlaneBrief.select(planeRows, title).size
         val answer: Map<String, Any?> = try {
             chat.run(
                 LcncNode(
                     id = "claim-$jobId",
                     type = "prompt.chat",
-                    params = mapOf("prompt" to brief(jobId, title), "model" to model, "maxTokens" to MAX_TOKENS),
+                    params = mapOf("prompt" to briefText, "model" to model, "maxTokens" to MAX_TOKENS),
                 ),
                 emptyMap(),
             )
@@ -142,7 +154,7 @@ class BoardClaimWorker(
 
         // ── 3. receipt, then REVIEW at the card's current revision — never DONE ──
         val current = store.card(jobId)?.revision ?: landed.snapshot.revision
-        val written = receipt(jobId, owner, model = answer["model"]?.toString() ?: model, ok = ok, body = body, revision = current)
+        val written = receipt(jobId, owner, model = answer["model"]?.toString() ?: model, ok = ok, body = body, revision = current, facts = mentioned)
         val reviewReply = CompletableDeferred<BoardApply>()
         store.intake.send(
             BoardIntake(
@@ -182,7 +194,7 @@ class BoardClaimWorker(
         return (list.firstOrNull() as? Map<*, *>)?.get("id")?.toString().orEmpty()
     }
 
-    private fun receipt(jobId: String, owner: String, model: String, ok: Boolean, body: Pair<String, Any?>, revision: Long): Map<String, Any?> {
+    private fun receipt(jobId: String, owner: String, model: String, ok: Boolean, body: Pair<String, Any?>, revision: Long, facts: Int = 0): Map<String, Any?> {
         val value = linkedMapOf<String, Any?>(
             "owner" to owner,
             "model" to model,
@@ -190,6 +202,8 @@ class BoardClaimWorker(
             body.first to body.second,
             "atMs" to clock(),
             "revision" to revision,
+            // how many plane facts the brief carried (0 = the title alone)
+            "facts" to facts,
         )
         blackboard.put(RECEIPT_PREFIX + jobId, value, LANGUAGE)
         return value
