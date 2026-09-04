@@ -1768,10 +1768,16 @@ object OroborosDaemon {
         )
         // The fact plane itself, read-only: /api/rete/facts, /api/facts/rdf, /api/rete/productions.
         val reteWire = borg.trikeshed.forge.server.ReteWire(rete)
+        // The hover blip: one LCNC node read across panels + KIF + productions + graal (/api/lcnc/blip).
+        val blipWire = borg.trikeshed.forge.server.LcncBlipWire(
+            network = rete,
+            kif = { pattern -> curatorImpulse?.let { c -> runCatching { c.queryBank(pattern) }.getOrDefault(emptyList()) }.orEmpty() },
+            productions = { reteProductions.all() },
+        )
         val extraRouteList: List<borg.trikeshed.litebike.ExtraRoute> = listOfNotNull(
             graalWire::route, vmWire::route, hermesWire::route, beliefWire?.let { it::route },
             patchWire::route, moduleWire::route, webhookWire::route, blackboardWire::route, rdfWire::route,
-            reteWire::route,
+            reteWire::route, blipWire::route,
         )
         // ── the surface family: node types the canvas could only reach by fetch ──
         // blackboard.*, graal.vitals/heap, vms.list, panels.list … existed (board.get /

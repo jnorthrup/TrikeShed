@@ -102,6 +102,17 @@ button.stop{border-color:var(--err);color:var(--err)}
 #menu div.item .ti{display:block;color:var(--dim);font-family:var(--sans);font-size:11px}
 #menu div.item:hover .ty{color:var(--graal)}
 #hint{position:fixed;bottom:8px;left:10px;color:var(--dim);font-size:10px;z-index:20}
+/* ── the hover blip: one node read across the planes — asserted / inferred / graal ── */
+#blip{position:fixed;display:none;z-index:31;pointer-events:none;background:var(--panel);border:1px solid var(--line);border-radius:8px;
+  padding:7px 10px 8px;max-width:400px;min-width:240px;font-size:11px;line-height:1.35;box-shadow:0 8px 30px rgba(0,0,0,.6)}
+#blip .bt{font-weight:600;color:var(--ink);margin-bottom:4px}
+#blip .bt i{color:var(--dim);font-style:normal;margin-left:6px}
+#blip h6{margin:6px 0 2px;font-size:9px;text-transform:uppercase;letter-spacing:.08em;color:var(--dim)}
+#blip h6.asserted{color:var(--wire)} #blip h6.inferred{color:var(--vm)} #blip h6.graal{color:var(--graal)}
+#blip div.row{padding-left:8px;border-left:2px solid var(--line);margin:1px 0;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#blip div.row.a{border-left-color:var(--wire)} #blip div.row.i{border-left-color:var(--vm)} #blip div.row.g{border-left-color:var(--graal)}
+#blip div.row.refused{color:var(--err)} #blip div.row.none{color:var(--dim);font-style:italic}
+#blip div.row b{color:var(--ink);font-weight:600;margin-right:5px} #blip div.row s{text-decoration:none;color:var(--dim);margin-left:4px}
 /* ── ComfyUI-grade affordances ── */
 #wires path.live.flow{stroke-dasharray:8 6;animation:wireflow .5s linear infinite}
 @keyframes wireflow{to{stroke-dashoffset:-14}}
@@ -385,6 +396,7 @@ button{border-radius:6px;padding:4px 12px;transition:border-color .12s,color .12
 <div id="crumb" style="display:none"></div>
 <div id="palette"></div>
 <div id="viewport"><div id="world"><svg id="wires"></svg></div></div>
+<div id="blip"></div>
 <div id="menu"></div>
 <canvas id="minimap" width="168" height="112"></canvas>
 <div id="hint">right-click / double-click: search nodes · drag port→port: wire · click wire: cut · drop a folder: mount scope · SSE node re-fires downstream on pointcut events · graphs autosave</div>
@@ -735,6 +747,69 @@ let view={x:60,y:60,z:1};
 const $=s=>document.querySelector(s), world=$("#world"), wiresSvg=$("#wires"), viewport=$("#viewport");
 const enc=encodeURIComponent;
 function p(n,k){ return n.params[k]; }
+/* ── the hover blip ──────────────────────────────────────────────────────
+   One node read across the planes it lands on, the daemon's own answer
+   (/api/lcnc/blip): what the publisher ASSERTED (panels facts), what was
+   INFERRED (the checker's violations, the KIF bank's vocabulary rows, the
+   productions whose interests hit this node), and the GRAAL plane beside them
+   (facts keyed to the node, then the JVM-wide tick). Nothing here is authored
+   by the page: every row is a fact id or a binding the daemon returned. */
+let BLIP={timer:null,node:null,seq:0,x:0,y:0};
+function blipEl(){ return document.getElementById("blip"); }
+function blipMove(e){ BLIP.x=e.clientX; BLIP.y=e.clientY; blipPlace(); }
+function blipPlace(){
+  const b=blipEl(); if(b.style.display!=="block") return;
+  const w=b.offsetWidth,h=b.offsetHeight;
+  let x=BLIP.x+16,y=BLIP.y+14;
+  if(x+w>innerWidth-8) x=BLIP.x-w-12; if(y+h>innerHeight-8) y=Math.max(8,innerHeight-h-8);
+  b.style.left=x+"px"; b.style.top=y+"px";
+}
+function blipLeave(){ clearTimeout(BLIP.timer); BLIP.timer=null; BLIP.node=null; BLIP.seq++; blipEl().style.display="none"; }
+function blipEnter(n,e){
+  BLIP.x=e.clientX; BLIP.y=e.clientY; BLIP.node=n; clearTimeout(BLIP.timer);
+  const seq=++BLIP.seq;
+  BLIP.timer=setTimeout(async()=>{
+    const q="program="+encodeURIComponent(BOARD.name||"")+"&node="+encodeURIComponent(n.id)+"&type="+encodeURIComponent(n.type);
+    let r; try{ r=await api("GET","/api/lcnc/blip?"+q); }catch(_){ r={error:"unreachable"}; }
+    if(seq!==BLIP.seq||BLIP.node!==n) return;
+    blipRender(n,r);
+  },320);
+}
+function blipRender(n,r){
+  const b=blipEl(); const esc=s=>String(s).replace(/[&<>]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;"}[c]));
+  const row=(cls,html)=>`<div class="row ${cls}">${html}</div>`;
+  const none=(cls,txt)=>row(cls+" none",esc(txt));
+  let h=`<div class="bt">${esc(n.type)}<i>${esc(n.id)}${BOARD.name?" · "+esc(BOARD.name):""}</i></div>`;
+  if(r.error){ b.innerHTML=h+row("i refused",esc(r.error)); b.style.display="block"; blipPlace(); return; }
+  // asserted
+  const A=r.asserted||{}, af=A.facts||[];
+  h+=`<h6 class="asserted">asserted · ${af.length} fact${af.length===1?"":"s"} · actor lcnc</h6>`;
+  if(!A.onPlane) h+=none("a",BOARD.name?"not on the plane: no panels fact for this node":"not on the plane yet — store the construction to publish it");
+  for(const f of af){ const x=f.fields||{};
+    if(x.kind==="node") h+=row("a",`<b>node</b> ${esc(x.node)} : ${esc(x.type)}${x.parent?` <s>in ${esc(x.parent)}</s>`:""}`);
+    else if(x.kind==="cable") h+=row("a",`<b>cable</b> ${esc(x.fromNode)}.${esc(x.fromPort)} → ${esc(x.toNode)}.${esc(x.toPort)} : ${esc(x.type||"untyped")}`);
+    else h+=row("a",esc(f.id)); }
+  // inferred
+  const I=r.inferred||{}, vio=I.violations||[], voc=I.vocabulary||[], prods=(I.productions||[]);
+  const hit=prods.filter(p=>p.matched);
+  h+=`<h6 class="inferred">inferred · ${vio.length} refusal${vio.length===1?"":"s"} · ${voc.length} vocabulary row${voc.length===1?"":"s"} · ${hit.length}/${prods.length} productions</h6>`;
+  for(const v of vio){ const x=v.fields||{}; h+=row("i refused",`<b>refused</b> ${esc(x.rule||"")} ${esc(x.fromNode||"")}.${esc(x.fromPort||"")} → ${esc(x.toNode||"")}.${esc(x.toPort||"")} <s>${esc(x.detail||"")}</s>`); }
+  for(const v of voc){ const bs=(v.bindings||[]).map(m=>Object.values(m).join(" ")).join(", "); h+=row("i",`<b>${esc(v.pattern.split(" ")[0].slice(1))}</b> ${esc(bs)}`); }
+  if(prods.length) h+=row("i",hit.length?`<b>watched by</b> ${hit.map(p=>esc(p.ruleId)).join(", ")}`:`<s>no production's interests hit this node (${prods.map(p=>esc(p.interests.join(" "))).filter((v,i,a)=>a.indexOf(v)===i).join(" · ")})</s>`);
+  if(!vio.length&&!voc.length&&!prods.length) h+=none("i","nothing inferred");
+  // graal
+  const G=r.graal||{}, gk=G.keyed||[], gj=G.jvm||[];
+  h+=`<h6 class="graal">graal · ${gk.length} keyed to this node · ${gj.length} jvm-wide</h6>`;
+  if(!gk.length) h+=none("g","no graal fact names this node (no pointcut has landed on it)");
+  for(const f of gk){ const x=f.fields||{}; h+=row("g",`<b>${esc(x.kind||"")}</b> ${esc(f.id)} <s>${esc(x.facet||x.method||x.class||"")}</s>`); }
+  for(const f of gj){ const x=f.fields||{};
+    if(x.kind==="memory") h+=row("g",`<b>memory</b> heap ${mb(x.heapUsed)} / ${mb(x.heapMax)} · metaspace ${mb(x.metaspaceUsed)}`);
+    else if(x.kind==="gc") h+=row("g",`<b>${esc(x.collector)}</b> ${esc(x.collections)} collections · ${esc(x.pauseMsTotal)} ms · last ${esc(x.lastCause||"")}`);
+    else if(x.kind==="jit") h+=row("g",`<b>jit</b> ${esc(x.compilations)} compilations · ${esc(x.osr)} osr · ${mb(x.compiledBytes)} code`); }
+  if(!gj.length) h+=none("g","jvm tick not on the plane yet (graal facts land after the couch reconcile)");
+  b.innerHTML=h; b.style.display="block"; blipPlace();
+}
+function mb(v){ v=Number(v); return isFinite(v)?(v>=1048576?(v/1048576).toFixed(1)+" MB":(v/1024).toFixed(0)+" KB"):"?"; }
 async function api(method,path,body){
   const r=await fetch(path,{method,headers:{"Content-Type":"application/json"},body:body!==undefined&&method!=="GET"?JSON.stringify(body):undefined});
   const t=await r.text(); try{ return JSON.parse(t); }catch(e){ return {raw:t,status:r.status}; }
@@ -1435,6 +1510,11 @@ function buildNode(n){
   const hd=document.createElement("div"); hd.className="hd";
   hd.innerHTML=`<i></i><b>${t.title}</b><s title="collapse">▤</s><s title="delete">✕</s>`;
   el.appendChild(hd);
+  // the hover blip: asserted / inferred / graal for THIS node, from the daemon
+  el.addEventListener("pointerenter",e=>blipEnter(n,e));
+  el.addEventListener("pointerleave",blipLeave);
+  el.addEventListener("pointermove",blipMove);
+  el.addEventListener("pointerdown",blipLeave);
   const collapse=hd.querySelectorAll("s")[0];
   collapse.addEventListener("pointerdown",e=>e.stopPropagation());
   collapse.addEventListener("click",e=>{ e.stopPropagation(); el.classList.toggle("collapsed"); save(); });
@@ -1986,7 +2066,77 @@ async function livePicklist(spec){
   PICKLIST_CACHE.set(spec,p);
   return p;
 }
-function treeshake(opts){
+async function treeshake(opts){
+  const inclOptional=!!(opts&&opts.optional);
+  try{
+    const res=await api("POST","/api/lcnc/treeshake",{program:G,options:{optional:inclOptional,reach:SHAKE_REACH}});
+    if(res&&res.ok){
+      return applyServerTreeShake(res, inclOptional);
+    }
+  }catch(e){
+    console.warn("server treeshake fallback:",e);
+  }
+  return localTreeshake(opts);
+}
+function applyServerTreeShake(res, inclOptional){
+  clearVerdicts();
+  const made = res.made || [];
+  for(const m of made){
+    const exists = G.wires.some(w => w.from[0]===m.fromNode && w.from[1]===m.fromPort && w.to[0]===m.toNode && w.to[1]===m.toPort);
+    if(!exists) G.wires.push({from:[m.fromNode,m.fromPort], to:[m.toNode,m.toPort]});
+  }
+  if(made.length){ redraw(); save(); }
+
+  const verdicts = res.verdicts || [];
+  for(const v of verdicts){
+    const nd = G.nodes.find(x => x.id === v.nodeId);
+    if(nd){
+      markPort(nd, v.dir, v.port, "v-" + v.status);
+      VERDICTS.push({nodeId: v.nodeId, dir: v.dir, port: v.port, cls: v.status, label: v.label});
+    }
+  }
+  buildVerdicts();
+
+  STARVED = new Set(res.starved || []);
+  for(const id of STARVED){
+    const nd = G.nodes.find(x => x.id === id);
+    if(nd && nd.el) nd.el.classList.add("starved");
+  }
+  if(STARVED.size) redraw();
+
+  const reachable = verdicts.filter(v => v.status === "open");
+  const scoped = verdicts.filter(v => v.status === "scope");
+  const dead = verdicts.filter(v => v.status === "dead");
+  const parts = [];
+  parts.push("✓ " + made.length + " closed");
+  if(reachable.length) parts.push("? " + reachable.length + " fillable — out of " + SHAKE_REACH + "px reach or lost the pass");
+  if(scoped.length) parts.push("⇱ " + scoped.length + " scope-blocked");
+  if(dead.length) parts.push("✕ " + dead.length + " with no mate on the board");
+  if(STARVED.size) parts.push(STARVED.size + " node" + (STARVED.size===1?"":"s") + " downstream run on nothing");
+  if(res.outletBlocked) parts.push("⇱ " + res.outletBlocked + " outlet" + (res.outletBlocked===1?"":"s") + " blocked by ring depth");
+  $("#status").textContent = parts.join(" · ");
+
+  for(const m of made){
+    for(const el of document.querySelectorAll('.port[data-port="'+CSS.escape(m.toPort)+'"]')){
+      const nd = G.nodes.find(x => x.id === m.toNode);
+      if(nd && el.closest(".node") === nd.el){
+        el.classList.add("just-shook");
+        setTimeout(() => el.classList.remove("just-shook"), 1400);
+      }
+    }
+    const a = portCenter(m.fromNode, "out", m.fromPort), b = portCenter(m.toNode, "in", m.toPort);
+    if(a && b){
+      const g = document.createElementNS("http://www.w3.org/2000/svg", "path");
+      g.classList.add("cand", "only", "just-merged");
+      g.setAttribute("d", bez(a, b));
+      g.style.stroke = "var(--ok)";
+      wiresSvg.appendChild(g);
+      setTimeout(() => g.remove(), 1400);
+    }
+  }
+  return made.length;
+}
+function localTreeshake(opts){
   const inclOptional=!!(opts&&opts.optional);
   const KEY=(id,port)=>id+"\u0000"+port;
   const bare=p=>String(p).replace("?","");

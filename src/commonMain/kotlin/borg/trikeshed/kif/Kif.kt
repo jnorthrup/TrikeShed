@@ -191,7 +191,9 @@ class KifKnowledgeBase {
     fun query(pattern: KifExpr): List<Map<String, String>> {
         // pattern is a KIF list with Vars, e.g. (subclass ?X Physical)
         // brute-force unify against asserts
-        val bindings = mutableListOf<Map<String, String>>()
+        // A LinkedHashSet: a direct `subclass` edge is also in the closure, and one binding
+        // should come back once (delta 2026-09-04).
+        val bindings = LinkedHashSet<Map<String, String>>()
         for (a in asserts()) {
             unify(pattern, a)?.let { bindings.add(it) }
         }
@@ -206,7 +208,7 @@ class KifKnowledgeBase {
                 }
             }
         }
-        return bindings
+        return bindings.toList()
     }
 
     /**
