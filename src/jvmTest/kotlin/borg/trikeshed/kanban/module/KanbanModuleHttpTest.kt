@@ -6,6 +6,7 @@ import borg.trikeshed.dag.ReteNetwork
 import borg.trikeshed.dag.ReteProductionRegistry
 import borg.trikeshed.graal.ConfixBlackboard
 import borg.trikeshed.job.CasStore
+import borg.trikeshed.kanban.BoardCol
 import borg.trikeshed.litebike.JvmKanbanServer
 import borg.trikeshed.module.ModuleContext
 import borg.trikeshed.module.ModuleRouteRegistry
@@ -79,7 +80,12 @@ class KanbanModuleHttpTest {
         supervisor1.attach(KanbanModule())
 
         val empty = json(get(server1, "/api/board"))
-        assertEquals(7, arr(empty["columns"]).size, "canonical seven columns on an empty store")
+        assertEquals(BoardCol.entries.size, arr(empty["columns"]).size, "the closed vocabulary, every column, on an empty store")
+        assertEquals(
+            BoardCol.rendered.map { it.wire },
+            arr(empty["columns"]).map { (it as Map<*, *>)["id"] },
+            "/api/board lists columns in render order (review before done)",
+        )
         assertEquals(0, arr(empty["items"]).size)
 
         val invoke = post(

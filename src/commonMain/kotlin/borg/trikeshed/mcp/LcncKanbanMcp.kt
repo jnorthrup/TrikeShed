@@ -90,7 +90,7 @@ class LcncKanbanMcp(
         const val RESOURCE_NOT_FOUND: Int = -32002
 
         /** Column wire vocabulary, in board order. */
-        fun columnWires(): List<String> = BoardCol.entries.sortedBy { it.order }.map { it.wire }
+        fun columnWires(): List<String> = BoardCol.rendered.map { it.wire }
     }
 
     /** A JSON-RPC fault carrying the code the client should see. */
@@ -392,14 +392,14 @@ class LcncKanbanMcp(
      * for HTTP, UI, and MCP callers at once.
      */
     fun schema(): Map<String, Any?> = mapOf(
-        "columns" to BoardCol.entries.sortedBy { it.order }.map {
+        "columns" to BoardCol.rendered.map {
             mapOf("id" to it.wire, "order" to it.order, "wipLimit" to it.wipLimit)
         },
         "transitionPolicy" to mapOf(
             "kind" to "open",
             "note" to "Any recognized column is a legal target; movement is constrained by the guards, " +
                 "not by a per-column allow table.",
-            "allowedTargets" to BoardCol.entries.sortedBy { it.order }.associate { it.wire to columnWires() },
+            "allowedTargets" to BoardCol.rendered.associate { it.wire to columnWires() },
         ),
         "guards" to listOf(
             mapOf(

@@ -112,7 +112,10 @@ class BoardStoreElement(
     parentJob: Job? = null,
 ) : AsyncContextElement(ElementState.CREATED, parentJob) {
 
-    companion object Key : AsyncContextKey<BoardStoreElement>()
+    companion object Key : AsyncContextKey<BoardStoreElement>() {
+        /** Owner prefix that marks a card as claimed by the daemon's brain (`claim:brain`). */
+        const val CLAIM_OWNER_PREFIX: String = "claim:"
+    }
 
     override val key: CoroutineContext.Key<*> get() = Key
 
@@ -190,7 +193,7 @@ class BoardStoreElement(
         val jobId = lowered.jobId.value
 
         // Board guards the reducer can't see — refuse BEFORE reducer state mutates.
-        boardGuard(lowered)?.let { return BoardApply.Rejected(lowered.idempotencyKey, it) }
+        boardGuard(lowered, raw)?.let { return BoardApply.Rejected(lowered.idempotencyKey, it) }
 
         val reduced = reducer.reduce(lowered)
         if (!reduced.accepted || reduced.snapshot == null) {
@@ -247,13 +250,24 @@ class BoardStoreElement(
         return out
     }
 
-    private fun boardGuard(cmd: JobCommand): String? = when (cmd) {
+    /**
+     * Board guards, in order: WIP, the claim/review gate, the dependency cycle.
+     * [raw] is the intake map (the WAL truth) — a Move may carry `"actor"` (who
+     * is moving); it is read here and nowhere else.
+     */
+    private fun boardGuard(cmd: JobCommand, raw: Map<*, *>): String? = when (cmd) {
         is JobCommand.Move -> {
             val target = BoardCol.fromWire(cmd.toColumn.value)
             val limit = target?.wipLimit
             if (limit != null && rows.values.count { it.col == target && it.jobId != cmd.jobId.value } >= limit)
-                "WIP limit ${limit} full for '${target.wire}'" else null
+                "WIP limit ${limit} full for '${target.wire}'"
+            else if (target == BoardCol.DONE) claimGuard(cmd.jobId.value, raw)
+            else null
         }
+
+        // `complete`/`done` lowers to Complete → lifecycle closed → DONE: the same gate, or a
+        // claimant could close its own card by the lifecycle verb instead of the column.
+        is JobCommand.Complete -> claimGuard(cmd.jobId.value, raw)
 
         is JobCommand.Start -> {
             val limit = BoardCol.RUNNING.wipLimit
@@ -272,6 +286,26 @@ class BoardStoreElement(
 
         else -> null
     }
+
+    /**
+     * Claimed work passes review first. A card whose owner is `claim:*` was
+     * worked by the daemon's brain; it reaches DONE only from REVIEW, and only
+     * when the mover is somebody else (a Move map carrying `"actor"` equal to
+     * the owner is the claimant closing its own ticket — refused). A move with
+     * no actor is an unlabeled human gesture and passes.
+     */
+    private fun claimGuard(jobId: String, raw: Map<*, *>): String? {
+        val prev = rows[jobId] ?: return null
+        if (!prev.owner.startsWith(CLAIM_OWNER_PREFIX)) return null
+        if (prev.col != BoardCol.REVIEW) {
+            return "claimed work passes review first: '$jobId' is owned by ${prev.owner} and sits in '${prev.col.wire}', not 'review'"
+        }
+        val actor = (raw["actor"] as? String)?.trim().orEmpty()
+        return if (actor.isNotEmpty() && actor == prev.owner) {
+            "review needs a second pair of eyes: actor '$actor' is the claimant of '$jobId'"
+        } else null
+    }
+
 
     /** Materialize the current rows (+ an incoming submit) as a KanbanBoard for the DAG verbs. */
     private fun boardOf(extra: JobCommand.Submit?): KanbanBoard {
@@ -304,7 +338,7 @@ class BoardStoreElement(
         return KanbanBoard(
             id = KanbanBoardId("board-store"),
             name = "board-store",
-            columns = BoardCol.entries.map { KanbanColumn(KanbanColumnId(it.wire), it.wire, it.order, wipLimit = it.wipLimit) },
+            columns = BoardCol.rendered.map { KanbanColumn(KanbanColumnId(it.wire), it.wire, it.order, wipLimit = it.wipLimit) },
             cards = cards,
         )
     }

@@ -149,7 +149,9 @@
 //   POST /api/invoke                    {type:submit|archive, ...}
 //   POST /api/lcnc/kanban/move          {itemId, to, expectedRevision} -> 202 | 409
 //   POST /api/board/import              markdown bullets
-const LANES = ["triage", "todo", "ready", "running", "blocked", "done"]; // archived stays hidden
+// BoardCol.rendered minus archived (hidden): review sits between blocked and done —
+// claimed work lands there for a human verdict before anyone drags it to done.
+const LANES = ["triage", "todo", "ready", "running", "blocked", "review", "done"];
 let lastSeq = -1, lastPayload = "";
 // A re-render mid-drag destroys the dragged element and kills the gesture.
 // While a drag is live, renders are deferred; the last board lands at dragend.

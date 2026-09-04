@@ -12,6 +12,13 @@ import kotlin.jvm.JvmInline
  *
  * The wire ids deliberately equal ForgeKanbanIngest's seven so every existing
  * PWA/panel surface renders unchanged.
+ *
+ * Delta (claim → work → review): [REVIEW] is the eighth column — where claimed
+ * work lands after the brain has worked it and BEFORE anyone calls it done. It
+ * is declared LAST because [id] is the ordinal and the ordinal is what the WAL
+ * persists: DONE stays ColId(5), ARCHIVED ColId(6), forever. Render position is
+ * [order] (review sits between blocked and done), so every surface that lists
+ * columns iterates [rendered], never `entries`.
  */
 enum class BoardCol(val wire: String, val order: Int, val wipLimit: Int? = null) {
     TRIAGE("triage", 0),
@@ -19,13 +26,19 @@ enum class BoardCol(val wire: String, val order: Int, val wipLimit: Int? = null)
     READY("ready", 2),
     RUNNING("running", 3, wipLimit = 3),
     BLOCKED("blocked", 4),
-    DONE("done", 5),
-    ARCHIVED("archived", 6);
+    DONE("done", 6),
+    ARCHIVED("archived", 7),
+
+    /** Claimed work, worked, awaiting a human verdict. Appended last: persisted ColIds stay valid. */
+    REVIEW("review", 5);
 
     val id: ColId get() = ColId(ordinal.toByte())
 
     companion object {
         private val byWire = entries.associateBy { it.wire }
+
+        /** The columns in RENDER order (by [order]) — what every listing surface iterates. */
+        val rendered: List<BoardCol> = entries.sortedBy { it.order }
 
         /** Wire string → column, or null (callers refuse-with-reason, never guess). */
         fun fromWire(wire: String): BoardCol? = byWire[wire.lowercase()]
@@ -71,7 +84,7 @@ enum class BoardCol(val wire: String, val order: Int, val wipLimit: Int? = null)
             "col-agentic" -> "in-progress" // legacy: an agent is on it → RUNNING
             "col-closed" -> "done"         // legacy: closed → DONE
             else -> when (fromWire(columnId)) {
-                RUNNING -> "in-progress"
+                RUNNING, REVIEW -> "in-progress" // review: the work is done, the card is not
                 DONE, ARCHIVED -> "done"
                 else -> "backlog"
             }
@@ -81,9 +94,10 @@ enum class BoardCol(val wire: String, val order: Int, val wipLimit: Int? = null)
          * W6.6: the single source for KanbanBoard column lists. Every producer
          * that used to hardcode its own vocabulary (ForgeKanbanIngest's seven
          * strings, ForgeBoardFSM.loadDefault's incompatible four) renders from
-         * HERE, so the closed vocabulary cannot drift again.
+         * HERE, so the closed vocabulary cannot drift again. Rendered in [order]
+         * (REVIEW is declared last for ColId stability but sits before DONE).
          */
-        fun columns(): List<KanbanColumn> = entries.map { col ->
+        fun columns(): List<KanbanColumn> = rendered.map { col ->
             KanbanColumn(
                 id = KanbanColumnId(col.wire),
                 name = col.wire.replaceFirstChar { it.uppercase() },
