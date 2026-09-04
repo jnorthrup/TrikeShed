@@ -84,8 +84,7 @@ object KgNalBridge {
      * inscribed in the Suggested Upper Merged Ontology — each subclass
      * axiom becomes an INHERITANCE eternal truth.
      */
-    fun emitSumoSpine(): Series<EternalRule> {
-        val kifText = SumoOntology.emitUpperKif()
+    fun emitSumoSpine(kifText: String = SumoOntology.emitUpperKif()): Series<EternalRule> {
         val exprs = KifExpr.parseAll(kifText)
         val out = mutableListOf<EternalRule>()
         for (expr in exprs) {

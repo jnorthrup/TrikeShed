@@ -214,14 +214,24 @@ object CuratorImpulseRecipient {
      * implication. The bank is the knowledge the rete and future replays
      * draw on; it is predicate logic, not prose.
      */
-    fun bank(assessments: Series<ImpulseAssessment>): KifKnowledgeBase {
+    fun bank(
+        assessments: Series<ImpulseAssessment>,
+        /**
+         * The ground theory to seed the fresh bank with. Default: the 13-category upper
+         * spine. Delta (2026-09-04): a caller whose live bank already holds its theory
+         * (CuratorImpulseElement, seeded once from the pinned SUMO corpus) passes an
+         * empty list so a teaching pass banks only this pass's verdicts.
+         */
+        groundTheory: List<KifExpr> = KifExpr.parseAll(SumoOntology.emitUpperKif()),
+        /** The class every assessed impulse is an instance of — `Agent` in the spine, `AutonomousAgent` in the corpus. */
+        agentClass: String = SumoOntology.SumoCategory.Agent.kifName,
+    ): KifKnowledgeBase {
         val kb = KifKnowledgeBase()
-        // SUMO upper spine as the ground theory
-        for (expr in KifExpr.parseAll(SumoOntology.emitUpperKif())) kb.assert(expr)
+        for (expr in groundTheory) kb.assert(expr)
         for (i in 0 until assessments.size) {
             val a = assessments[i]
             val term = a.impulse.term()
-            kb.assert(kif("instance", KifExpr.Atom(term), KifExpr.Atom(SumoOntology.SumoCategory.Agent.kifName)))
+            kb.assert(kif("instance", KifExpr.Atom(term), KifExpr.Atom(agentClass)))
             // R6: grouping posts/resolutions are documents already; bank the enacted stitch as
             // SUMO-grounded KIF beside transcript verdicts. The group is a SUMO Collection,
             // the curator impulse is its member/agent, and the resolution cid is immutable

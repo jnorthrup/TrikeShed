@@ -852,6 +852,9 @@ object OroborosDaemon {
                 bag,
                 rete = causalityRete,
                 knowledgeBank = kifBank,
+                // The pinned SUMO corpus (Merge + Mid-level) is the ground theory; the
+                // 13-category spine is only the offline-cold-cache fallback.
+                groundTheory = borg.trikeshed.ontology.SumoCorpus.text().ifBlank { borg.trikeshed.ontology.SumoOntology.emitUpperKif() },
                 // Same tee shape as councilKifSink below: taught axioms land in the `kif-ledger/`
                 // couch plane the boot thaw re-asserts from. Without this the curator's whole
                 // knowledge — everything /api/beliefs/teach banks — died at every restart while
@@ -882,7 +885,7 @@ object OroborosDaemon {
             borg.trikeshed.forge.server.BeliefWire(beliefBag, turnReview, hermesMemoryFiles, curatorImpulse)
         } else null
         if (causalityRete != null) {
-            System.err.println("[OROBOROS] CausalityRete live: ${causalityRete.rules.size} eternal rules; CuratorImpulse bank: ${curatorImpulse?.knowledgeBank?.asserts()?.size ?: 0} axioms")
+            System.err.println("[OROBOROS] CausalityRete live: ${causalityRete.rules.size} eternal rules; CuratorImpulse bank: ${curatorImpulse?.knowledgeBank?.size() ?: 0} axioms (ground theory ${curatorImpulse?.theorySize ?: 0} forms, impulses are ${curatorImpulse?.agentClass})")
             launch {
                 causalityRete.firings.collect { firing ->
                     daemonBlackboard.put(

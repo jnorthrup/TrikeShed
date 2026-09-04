@@ -134,6 +134,9 @@ class KifKnowledgeBase {
     }
     fun assertKif(kif: String) { assert(KifExpr.parse(kif)) }
 
+    /** [assert] that says whether the tuple was new — the dedupe answer, so a durability tee can skip re-tellings without diffing the bank. */
+    fun assertNew(expr: KifExpr): Boolean = borg.trikeshed.isam.synchronizedLock(gate) { tell(expr) }
+
     /**
      * Forget one assertion — the exact string [assert] deduped on — so a
      * projection that is retracted upstream (a Rete fact retracted or modified,

@@ -52,6 +52,14 @@ class CuratorImpulseElement(
      * persisting it would only accumulate duplicates.
      */
     private val ledger: ((String) -> Unit)? = null,
+    /**
+     * The ground theory banked once at construction, as SUO-KIF text. Default: the
+     * 13-category upper spine. Delta (2026-09-04): the daemon passes the pinned SUMO
+     * corpus (`SumoCorpus.text()`, Merge + Mid-level, ~2,500 classes) so impulses are
+     * classified against SUMO proper; every impulse is then an instance of
+     * `AutonomousAgent`, the corpus's name for what the spine calls `Agent`.
+     */
+    groundTheory: String = borg.trikeshed.ontology.SumoOntology.emitUpperKif(),
     parentJob: Job? = null,
 ) : AsyncContextElement(ElementState.CREATED, parentJob) {
 
@@ -61,11 +69,19 @@ class CuratorImpulseElement(
 
     private val evaluator = ContentId.of("curator-impulse".encodeToByteArray())
 
+    /** Forms the ground theory contributed at construction. */
+    val theorySize: Int
+
+    /** The SUMO class assessed impulses are banked as instances of. */
+    val agentClass: String
+
     init {
-        // bootstrap the bank with the SUMO upper spine once
-        for (expr in borg.trikeshed.kif.KifExpr.parseAll(
-            borg.trikeshed.ontology.SumoOntology.emitUpperKif(),
-        )) knowledgeBank.assert(expr)
+        // bootstrap the bank with the ground theory once (spine or corpus; never tee'd)
+        var told = 0
+        for (expr in borg.trikeshed.kif.KifExpr.parseAll(groundTheory)) if (knowledgeBank.assertNew(expr)) told++
+        theorySize = told
+        agentClass = if (knowledgeBank.query(borg.trikeshed.kif.KifExpr.parse("(subclass AutonomousAgent ?p)")).isNotEmpty()) "AutonomousAgent"
+        else borg.trikeshed.ontology.SumoOntology.SumoCategory.Agent.kifName
     }
 
     override suspend fun open() {
@@ -88,20 +104,18 @@ class CuratorImpulseElement(
         if (assessments.size == 0) return emptyList()
 
         // bank the verdicts as predicate logic (accumulates across passes)
-        val fresh = CuratorImpulseRecipient.bank(assessments)
-        // `fresh` is a whole bank, so its asserts() carry the SUMO spine as well as this pass's
-        // verdicts. Teeing all of them would persist the ontology that `init` already
-        // re-bootstraps on every boot. The delta against what the live bank ALREADY holds is
-        // exactly the set that would otherwise be lost at restart — spine excluded for free,
-        // and a re-teach of an unchanged axiom writes no ledger line either.
-        val alreadyBanked = if (ledger == null) emptySet() else knowledgeBank.asserts().toSet()
+        // `fresh` carries only this pass's verdicts: the ground theory is already in the live
+        // bank (init), so it is neither re-banked nor tee'd. Delta (2026-09-04): the ledger
+        // tee keys off the bank's own dedupe answer (assertNew) instead of a snapshot of
+        // every tuple the bank holds — that snapshot was the whole fact plane once the
+        // KifTee shared this bank (~280k tuples per teaching pass).
+        val fresh = CuratorImpulseRecipient.bank(assessments, groundTheory = emptyList(), agentClass = agentClass)
         for (expr in fresh.asserts()) {
-            knowledgeBank.assert(expr)
             // Tee AFTER the in-memory assert, and never let it throw: a durability sink that is
             // down degrades durability, it does not cost the live bank this axiom or the ones
             // after it. Guarded here rather than only at the daemon's sink so the invariant
             // holds for every caller that supplies a ledger.
-            if (expr !in alreadyBanked) ledger?.let { sink -> runCatching { sink(expr.toKifString()) } }
+            if (knowledgeBank.assertNew(expr)) ledger?.let { sink -> runCatching { sink(expr.toKifString()) } }
         }
 
         // mint the projected signals into the bag (paired with assessments so
