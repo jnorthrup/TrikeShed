@@ -25,6 +25,12 @@ object BoardRules {
     const val STALL = "stall"
     const val CYCLE_GUARD = "cycle-guard"
 
+    /** Delta (claim → work → review): the board claims its own READY work. */
+    const val CLAIM = "claim"
+
+    /** The owner a claim stamps on the card: the daemon's own brain, never a person, never Hermes. */
+    const val CLAIM_OWNER = "claim:brain"
+
     internal fun cardInterest(): Series<Join<String, Any?>> = 1 j { _: Int -> "kind" j ("card" as Any?) }
 
     internal fun cards(net: ReteNetwork, partitionId: String): List<ReteStoredFact> =
@@ -99,6 +105,62 @@ class DependencyReadyProduction : ReteProduction {
                     bindings = mapOf("jobId" to jobId, "toColumn" to BoardCol.READY.wire, "expectedRevision" to "$revision"),
                 ),
             )
+        }
+    }
+}
+
+/**
+ * The board claims its own work: for each READY card, oldest-first by
+ * lastMoveMs, while RUNNING (counted from the facts) + claims fired this pass
+ * stays under RUNNING's WIP limit, propose Move(RUNNING, owner=claim:brain).
+ * The sink lowers the activation to the store and runs the brain (the module's
+ * claim worker); the card comes back through REVIEW, never DONE, by itself.
+ *
+ * Dedupe is refraction: one firing per card REVISION — the activation id
+ * carries the revision and the card's own cid is support, so the same READY
+ * card cannot be claimed twice, and a card the reaper sends back to READY is a
+ * new revision and is claimed afresh. The RUNNING cards' cids ride as support
+ * too (the DependencyReady precedent: the facts that decided the firing ARE its
+ * support) so that when RUNNING drains a claim the store refused for WIP is
+ * un-refracted and proposed again instead of leaving a READY card stranded.
+ * The sink keys its worker by activationId, so a re-proposal of a claim already
+ * in flight is a no-op there and a duplicate idempotency key at the store.
+ */
+class ClaimProduction(private val owner: String = BoardRules.CLAIM_OWNER) : ReteProduction {
+    override val ruleId: String = BoardRules.CLAIM
+    override val salience: Int = 85
+    override val interests: Series<Join<String, Any?>> = BoardRules.cardInterest()
+
+    override fun evaluate(net: ReteNetwork, partitionId: String, fire: (Activation) -> Unit) {
+        val limit = BoardCol.RUNNING.wipLimit ?: return
+        val cards = BoardRules.cards(net, partitionId)
+        val running = cards.filter { it.fields["column"] == BoardCol.RUNNING.wire }
+        if (running.size >= limit) return
+        val ready = cards
+            .filter { it.fields["column"] == BoardCol.READY.wire }
+            .sortedWith(compareBy({ (it.fields["lastMoveMs"] as? Long) ?: 0L }, { it.fields["jobId"] as? String ?: "" }))
+        var fired = 0
+        for (card in ready) {
+            if (running.size + fired >= limit) break
+            val jobId = card.fields["jobId"] as? String ?: continue
+            val revision = (card.fields["revision"] as? Long) ?: 0L
+            fire(
+                Activation(
+                    activationId = "claim-$jobId-r$revision",
+                    ruleId = ruleId,
+                    ruleVersionCid = BoardRules.cid("rule-claim-v1"),
+                    salience = salience,
+                    sequence = revision,
+                    supportCids = listOf(card.versionCid) + running.map { it.versionCid },
+                    bindings = mapOf(
+                        "jobId" to jobId,
+                        "toColumn" to BoardCol.RUNNING.wire,
+                        "expectedRevision" to "$revision",
+                        "owner" to owner,
+                    ),
+                ),
+            )
+            fired++
         }
     }
 }

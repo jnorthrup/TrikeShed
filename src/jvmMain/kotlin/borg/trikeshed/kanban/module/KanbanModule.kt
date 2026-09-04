@@ -137,10 +137,12 @@ class KanbanModule : ForgeModule {
             return json
         }
 
-        // ── Rete: fact bridge + the four board productions + activation sink ──
+        // ── Rete: fact bridge + the board productions + activation sink ──
+        //    (the four audit/flow rules, plus claim: the board proposes its own READY work)
         val facts = borg.trikeshed.kanban.BoardFactElement(ctx.rete)
         val ruleDisposers = listOf(
             ctx.rete.register(borg.trikeshed.kanban.rules.DependencyReadyProduction()),
+            ctx.rete.register(borg.trikeshed.kanban.rules.ClaimProduction()),
             ctx.rete.register(borg.trikeshed.kanban.rules.WipBreachProduction()),
             ctx.rete.register(borg.trikeshed.kanban.rules.StallProduction()),
             ctx.rete.register(borg.trikeshed.kanban.rules.CycleGuardProduction()),
