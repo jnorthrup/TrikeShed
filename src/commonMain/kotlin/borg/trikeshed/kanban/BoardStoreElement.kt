@@ -74,6 +74,8 @@ data class BoardCommitted(
     val previousCol: BoardCol?,
     /** Card's transition clock (row state) — the stall production's input. */
     val lastMoveMs: Long = 0L,
+    /** Delta (reaper): the row's owner after the commit — `claim:*` marks the brain's work, which the reaper watches. */
+    val owner: String = "",
 )
 
 /** One card = one row (the SoA projection reads these; strings only at the wire). */
@@ -104,6 +106,11 @@ data class CardRow(
  * refusal and dependency-cycle refusal (first caller of KanbanTypes.hasCycle).
  * State is WAL-rebuildable by construction — the detach→attach upgrade
  * contract of the module system, and the restart gate's proof obligation.
+ *
+ * Delta (claim → work → review): two more guards at the same door — the claim
+ * gate ([claimGuard]: claimed work reaches DONE only from REVIEW, and never by
+ * its claimant) and the orphan gate ([orphanGuard]: a Submit carrying `parent`
+ * must branch off a live card). Both read the raw intake map, nothing else.
  */
 class BoardStoreElement(
     private val wal: BoardWalPort?,
@@ -112,7 +119,10 @@ class BoardStoreElement(
     parentJob: Job? = null,
 ) : AsyncContextElement(ElementState.CREATED, parentJob) {
 
-    companion object Key : AsyncContextKey<BoardStoreElement>()
+    companion object Key : AsyncContextKey<BoardStoreElement>() {
+        /** Owner prefix that marks a card as claimed by the daemon's brain (`claim:brain`). */
+        const val CLAIM_OWNER_PREFIX: String = "claim:"
+    }
 
     override val key: CoroutineContext.Key<*> get() = Key
 
@@ -182,7 +192,13 @@ class BoardStoreElement(
 
     // ── the spine (single consumer; also the replay path with durable=false) ──
 
-    private suspend fun applyOne(raw: Map<*, *>, durable: Boolean, replaySeq: Long? = null): BoardApply {
+    private suspend fun applyOne(incoming: Map<*, *>, durable: Boolean, replaySeq: Long? = null): BoardApply {
+        // Delta (reaper): the transition clock is part of the WAL truth. The live path
+        // stamps `atMs` into the raw map before it is serialized, and advanceRow reads
+        // it back — so a replay re-derives the SAME lastMoveMs. Before this, replay
+        // took clock() at boot and every restart zeroed every card's idle time: the
+        // stall and reaper thresholds started over, and a dead claim was never reaped.
+        val raw: Map<*, *> = if (durable && incoming["atMs"] == null) incoming + ("atMs" to clock()) else incoming
         val lowered = when (val o = InvokeLowering.lower(raw)) {
             is InvokeLowering.Outcome.Rejected -> return BoardApply.Rejected(o.idempotencyKey, o.reason)
             is InvokeLowering.Outcome.Lowered -> o.command
@@ -190,7 +206,7 @@ class BoardStoreElement(
         val jobId = lowered.jobId.value
 
         // Board guards the reducer can't see — refuse BEFORE reducer state mutates.
-        boardGuard(lowered)?.let { return BoardApply.Rejected(lowered.idempotencyKey, it) }
+        boardGuard(lowered, raw)?.let { return BoardApply.Rejected(lowered.idempotencyKey, it) }
 
         val reduced = reducer.reduce(lowered)
         if (!reduced.accepted || reduced.snapshot == null) {
@@ -223,7 +239,7 @@ class BoardStoreElement(
 
         appendCausal(jobId, lowered, snapshot, cid, raw)
 
-        val event = BoardCommitted(seq, jobId, snapshot, cid, lowered, row?.col ?: BoardCol.ARCHIVED, prev?.col, row?.lastMoveMs ?: 0L)
+        val event = BoardCommitted(seq, jobId, snapshot, cid, lowered, row?.col ?: BoardCol.ARCHIVED, prev?.col, row?.lastMoveMs ?: 0L, row?.owner ?: "")
         _committed.tryEmit(event)
         return BoardApply.Committed(jobId, seq, snapshot.revision, lowered.idempotencyKey, cid)
     }
@@ -247,13 +263,24 @@ class BoardStoreElement(
         return out
     }
 
-    private fun boardGuard(cmd: JobCommand): String? = when (cmd) {
+    /**
+     * Board guards, in order: WIP, the claim/review gate, the dependency cycle.
+     * [raw] is the intake map (the WAL truth) — a Move may carry `"actor"` (who
+     * is moving); it is read here and nowhere else.
+     */
+    private fun boardGuard(cmd: JobCommand, raw: Map<*, *>): String? = when (cmd) {
         is JobCommand.Move -> {
             val target = BoardCol.fromWire(cmd.toColumn.value)
             val limit = target?.wipLimit
             if (limit != null && rows.values.count { it.col == target && it.jobId != cmd.jobId.value } >= limit)
-                "WIP limit ${limit} full for '${target.wire}'" else null
+                "WIP limit ${limit} full for '${target.wire}'"
+            else if (target == BoardCol.DONE) claimGuard(cmd.jobId.value, raw)
+            else null
         }
+
+        // `complete`/`done` lowers to Complete → lifecycle closed → DONE: the same gate, or a
+        // claimant could close its own card by the lifecycle verb instead of the column.
+        is JobCommand.Complete -> claimGuard(cmd.jobId.value, raw)
 
         is JobCommand.Start -> {
             val limit = BoardCol.RUNNING.wipLimit
@@ -262,7 +289,7 @@ class BoardStoreElement(
         }
 
         is JobCommand.Submit -> {
-            if (cmd.dependencies.isEmpty()) null
+            orphanGuard(raw) ?: if (cmd.dependencies.isEmpty()) null
             else {
                 // First caller of the KanbanTypes verbs: refuse a dependency cycle at the door.
                 val board = boardOf(extra = cmd)
@@ -271,6 +298,42 @@ class BoardStoreElement(
         }
 
         else -> null
+    }
+
+    /**
+     * Claimed work passes review first. A card whose owner is `claim:*` was
+     * worked by the daemon's brain; it reaches DONE only from REVIEW, and only
+     * when the mover is somebody else (a Move map carrying `"actor"` equal to
+     * the owner is the claimant closing its own ticket — refused). A move with
+     * no actor is an unlabeled human gesture and passes.
+     */
+    private fun claimGuard(jobId: String, raw: Map<*, *>): String? {
+        val prev = rows[jobId] ?: return null
+        if (!prev.owner.startsWith(CLAIM_OWNER_PREFIX)) return null
+        if (prev.col != BoardCol.REVIEW) {
+            return "claimed work passes review first: '$jobId' is owned by ${prev.owner} and sits in '${prev.col.wire}', not 'review'"
+        }
+        val actor = (raw["actor"] as? String)?.trim().orEmpty()
+        return if (actor.isNotEmpty() && actor == prev.owner) {
+            "review needs a second pair of eyes: actor '$actor' is the claimant of '$jobId'"
+        } else null
+    }
+
+
+    /**
+     * Orphan guard. The tree of work lives ON THE BOARD: a Submit whose intake
+     * map carries `"parent"` is a split of that card and must name one that
+     * exists and is still live (not DONE/ARCHIVED) — else it is a branch off a
+     * dead tree and is refused at the door. A Submit without `parent` is intake
+     * (a root), and passes. The raw map is the WAL truth, so the parent edge
+     * replays with the card.
+     */
+    private fun orphanGuard(raw: Map<*, *>): String? {
+        val parent = (raw["parent"] as? String)?.trim()?.takeIf { it.isNotEmpty() } ?: return null
+        val row = rows[parent] ?: return "orphan: parent $parent is not live (no such card)"
+        return if (row.col == BoardCol.DONE || row.col == BoardCol.ARCHIVED) {
+            "orphan: parent $parent is not live (it is '${row.col.wire}')"
+        } else null
     }
 
     /** Materialize the current rows (+ an incoming submit) as a KanbanBoard for the DAG verbs. */
@@ -304,7 +367,7 @@ class BoardStoreElement(
         return KanbanBoard(
             id = KanbanBoardId("board-store"),
             name = "board-store",
-            columns = BoardCol.entries.map { KanbanColumn(KanbanColumnId(it.wire), it.wire, it.order, wipLimit = it.wipLimit) },
+            columns = BoardCol.rendered.map { KanbanColumn(KanbanColumnId(it.wire), it.wire, it.order, wipLimit = it.wipLimit) },
             cards = cards,
         )
     }
@@ -317,7 +380,8 @@ class BoardStoreElement(
         snapshot: JobSnapshot,
         seq: Long,
     ): CardRow? {
-        val now = clock()
+        // The stamped transition clock (live: stamped just now; replay: what the WAL says).
+        val now = (raw["atMs"] as? Number)?.toLong() ?: clock()
         val col = when (cmd) {
             is JobCommand.Move -> BoardCol.fromWire(cmd.toColumn.value) ?: prev?.col ?: BoardCol.TRIAGE
             is JobCommand.Acknowledge -> prev?.col ?: BoardCol.fromLifecycle(snapshot.lifecycle)
@@ -344,7 +408,9 @@ class BoardStoreElement(
             } else prev?.order ?: rows.size,
             dependencies = snapshot.dependencies.map { it.value },
             tags = tags,
-            owner = (raw["owner"] as? String)?.trim()?.takeIf { it.isNotEmpty() } ?: prev?.owner ?: "",
+            // An absent key keeps the owner; a key present and blank CLEARS it (the
+            // reaper's third strike hands a card back to a human that way).
+            owner = if (raw.containsKey("owner")) (raw["owner"] as? String)?.trim().orEmpty() else prev?.owner ?: "",
         )
     }
 

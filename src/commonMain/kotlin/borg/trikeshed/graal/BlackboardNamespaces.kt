@@ -41,6 +41,7 @@ data object BlackboardNamespaces {
         Namespace("narsese/curation/", "belief-bag curation receipts, one per (kind, angular) reviewed downstream of a rule firing", "BoardReviewBridge via the production sink", admitted = false),
         Namespace("narsese/rete/firing/", "NARS rete firing receipts keyed by firing cid", "OroborosDaemon narsese firing collector", admitted = false),
         Namespace("kanban/rule/", "production-sink activation receipts: bindings + salience per (ruleId, activationId)", "KanbanModule productionSink", admitted = false),
+        Namespace("kanban/claim/", "claim receipts per jobId: {owner, model, ok, content|error, atMs, revision} — the brain's answer a human reads in REVIEW", "BoardClaimWorker"),
         Namespace("kanban/committed/", "board store commit receipts per (jobId, sequence)", "KanbanModule committed collector"),
         Namespace("kanban/review/", "kanban-nars review gloss per angular", "KanbanModule review bridge"),
         Namespace("kanban/drift/", "board drift observations stamped by the module clock", "KanbanModule ticker"),

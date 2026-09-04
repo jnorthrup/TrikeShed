@@ -7,6 +7,7 @@ import borg.trikeshed.dag.ReteProduction
 import borg.trikeshed.dag.ReteStoredFact
 import borg.trikeshed.job.ContentId
 import borg.trikeshed.kanban.BoardCol
+import borg.trikeshed.kanban.BoardStoreElement
 import borg.trikeshed.lib.Join
 import borg.trikeshed.lib.Series
 import borg.trikeshed.lib.j
@@ -18,12 +19,28 @@ import borg.trikeshed.lib.j
  * (`jobId#ruleId#revision`) so a popped-but-unprocessed activation is
  * compensated by store-level dedupe, and refraction stops re-fires while the
  * supporting facts stand.
+ *
+ * Delta (claim → work → review): two more, same discipline — [ClaimProduction]
+ * (the board claims its own READY work) and [ReaperProduction] (a claim whose
+ * worker died goes back to READY, thrice, then BLOCKED).
  */
 object BoardRules {
     const val WIP_BREACH = "wip-breach"
     const val DEPENDENCY_READY = "dependency-ready"
     const val STALL = "stall"
     const val CYCLE_GUARD = "cycle-guard"
+
+    /** Delta (claim → work → review): the board claims its own READY work. */
+    const val CLAIM = "claim"
+
+    /** The owner a claim stamps on the card: the daemon's own brain, never a person, never Hermes. */
+    const val CLAIM_OWNER = "claim:brain"
+
+    /** Delta (reaper): a claimed RUNNING card the worker never brought back goes to READY — thrice, then BLOCKED. */
+    const val REAPER = "reaper"
+
+    /** The strike on which the reaper parks the card in BLOCKED (owner cleared) instead of READY. */
+    const val REAPER_BLOCK_STRIKE = 3
 
     internal fun cardInterest(): Series<Join<String, Any?>> = 1 j { _: Int -> "kind" j ("card" as Any?) }
 
@@ -104,6 +121,62 @@ class DependencyReadyProduction : ReteProduction {
 }
 
 /**
+ * The board claims its own work: for each READY card, oldest-first by
+ * lastMoveMs, while RUNNING (counted from the facts) + claims fired this pass
+ * stays under RUNNING's WIP limit, propose Move(RUNNING, owner=claim:brain).
+ * The sink lowers the activation to the store and runs the brain (the module's
+ * claim worker); the card comes back through REVIEW, never DONE, by itself.
+ *
+ * Dedupe is refraction: one firing per card REVISION — the activation id
+ * carries the revision and the card's own cid is support, so the same READY
+ * card cannot be claimed twice, and a card the reaper sends back to READY is a
+ * new revision and is claimed afresh. The RUNNING cards' cids ride as support
+ * too (the DependencyReady precedent: the facts that decided the firing ARE its
+ * support) so that when RUNNING drains a claim the store refused for WIP is
+ * un-refracted and proposed again instead of leaving a READY card stranded.
+ * The sink keys its worker by activationId, so a re-proposal of a claim already
+ * in flight is a no-op there and a duplicate idempotency key at the store.
+ */
+class ClaimProduction(private val owner: String = BoardRules.CLAIM_OWNER) : ReteProduction {
+    override val ruleId: String = BoardRules.CLAIM
+    override val salience: Int = 85
+    override val interests: Series<Join<String, Any?>> = BoardRules.cardInterest()
+
+    override fun evaluate(net: ReteNetwork, partitionId: String, fire: (Activation) -> Unit) {
+        val limit = BoardCol.RUNNING.wipLimit ?: return
+        val cards = BoardRules.cards(net, partitionId)
+        val running = cards.filter { it.fields["column"] == BoardCol.RUNNING.wire }
+        if (running.size >= limit) return
+        val ready = cards
+            .filter { it.fields["column"] == BoardCol.READY.wire }
+            .sortedWith(compareBy({ (it.fields["lastMoveMs"] as? Long) ?: 0L }, { it.fields["jobId"] as? String ?: "" }))
+        var fired = 0
+        for (card in ready) {
+            if (running.size + fired >= limit) break
+            val jobId = card.fields["jobId"] as? String ?: continue
+            val revision = (card.fields["revision"] as? Long) ?: 0L
+            fire(
+                Activation(
+                    activationId = "claim-$jobId-r$revision",
+                    ruleId = ruleId,
+                    ruleVersionCid = BoardRules.cid("rule-claim-v1"),
+                    salience = salience,
+                    sequence = revision,
+                    supportCids = listOf(card.versionCid) + running.map { it.versionCid },
+                    bindings = mapOf(
+                        "jobId" to jobId,
+                        "toColumn" to BoardCol.RUNNING.wire,
+                        "expectedRevision" to "$revision",
+                        "owner" to owner,
+                    ),
+                ),
+            )
+            fired++
+        }
+    }
+}
+
+/**
  * A RUNNING card with no transition for [thresholdMs] — surfaced when the
  * now-FACT ticks past it. Refraction holds one firing per (job, lastMove);
  * the next real move changes lastMoveMs and re-arms.
@@ -134,6 +207,80 @@ class StallProduction(private val thresholdMs: Long = 30 * 60 * 1000L) : RetePro
                     // Support = the card alone; a real move changes lastMoveMs → new id.
                     supportCids = listOf(card.versionCid),
                     bindings = mapOf("jobId" to jobId, "idleMs" to "$idle"),
+                ),
+            )
+        }
+    }
+}
+
+/**
+ * The reaper: a RUNNING card owned by `claim:*` with no transition for
+ * [thresholdMs] (lastMoveMs against the now-FACT) is a claim whose worker
+ * died — a daemon restart mid-brain-call, a hung provider — and would sit
+ * there forever (the dead tree unsupervised splitting leaves). Propose
+ * Move(READY, expectedRevision) with `strike` = prior reaper firings for the
+ * job + 1; the sink moves it to READY (the claim production then claims the
+ * new revision afresh) or, on [BoardRules.REAPER_BLOCK_STRIKE], to BLOCKED
+ * with the owner cleared so a human sees it.
+ *
+ * The production reads working memory only; the prior strikes live on the
+ * blackboard as `kanban/rule/reaper/<activationId>` receipts, so the count comes in
+ * through [priorStrikes] — the module hands in [countPriorStrikes] over its
+ * blackboard; a bare production counts nothing and every firing is strike 1.
+ * Refraction as StallProduction: one firing per (job, lastMoveMs), the card
+ * alone is support (the now-fact would re-arm every tick), a real move → new id.
+ */
+class ReaperProduction(
+    private val thresholdMs: Long = 15 * 60 * 1000L,
+    private val priorStrikes: (jobId: String) -> Int = { 0 },
+) : ReteProduction {
+    override val ruleId: String = BoardRules.REAPER
+    override val salience: Int = 45
+    override val interests: Series<Join<String, Any?>> = 1 j { _: Int -> "kind" j ("now" as Any?) }
+
+    companion object {
+        const val RECEIPT_PREFIX: String = "kanban/rule/${BoardRules.REAPER}/"
+
+        /**
+         * Prior reaper strikes for [jobId]: the `kanban/rule/reaper/<activationId>` receipts
+         * whose bindings name the job (the receipt VALUE is the activation's
+         * bindings, so a jobId that is a prefix of another never miscounts).
+         */
+        fun countPriorStrikes(blackboard: borg.trikeshed.graal.ConfixBlackboard, jobId: String): Int =
+            blackboard.keys().count { key ->
+                key.startsWith(RECEIPT_PREFIX) && (blackboard.get(key) as? Map<*, *>)?.get("jobId") == jobId
+            }
+    }
+
+    override fun evaluate(net: ReteNetwork, partitionId: String, fire: (Activation) -> Unit) {
+        val now = net.workingMemory.query(BlackboardContext(partitionId), "kind" to "now").firstOrNull() ?: return
+        val nowMs = (now.fields["ms"] as? Long) ?: return
+        for (card in BoardRules.cards(net, partitionId)) {
+            if (card.fields["column"] != BoardCol.RUNNING.wire) continue
+            val owner = card.fields["owner"] as? String ?: continue
+            if (!owner.startsWith(BoardStoreElement.CLAIM_OWNER_PREFIX)) continue
+            val lastMove = (card.fields["lastMoveMs"] as? Long) ?: continue
+            val idle = nowMs - lastMove
+            if (idle <= thresholdMs) continue
+            val jobId = card.fields["jobId"] as? String ?: continue
+            val revision = (card.fields["revision"] as? Long) ?: 0L
+            val strike = priorStrikes(jobId) + 1
+            fire(
+                Activation(
+                    activationId = "reaper-$jobId-$lastMove",
+                    ruleId = ruleId,
+                    ruleVersionCid = BoardRules.cid("rule-reaper-v1"),
+                    salience = salience,
+                    sequence = revision,
+                    supportCids = listOf(card.versionCid),
+                    bindings = mapOf(
+                        "jobId" to jobId,
+                        "toColumn" to BoardCol.READY.wire,
+                        "expectedRevision" to "$revision",
+                        "strike" to "$strike",
+                        "idleMs" to "$idle",
+                        "owner" to owner,
+                    ),
                 ),
             )
         }

@@ -396,8 +396,9 @@ class LcncKanbanMcpTest {
         val schema = readResource(rig, LcncKanbanMcp.URI_SCHEMA)
         val columns = schema["columns"] as List<*>
         assertEquals(
-            listOf("triage", "todo", "ready", "running", "blocked", "done", "archived"),
+            listOf("triage", "todo", "ready", "running", "blocked", "review", "done", "archived"),
             columns.map { (it as Map<*, *>)["id"] },
+            "render order: review (declared last for ColId stability) sits before done",
         )
         // The one WIP limit the store enforces, published as the number it enforces.
         val running = columns.map { it as Map<*, *> }.first { it["id"] == "running" }
@@ -405,7 +406,7 @@ class LcncKanbanMcpTest {
         assertNull(columns.map { it as Map<*, *> }.first { it["id"] == "todo" }["wipLimit"])
 
         val guards = (schema["guards"] as List<*>).map { (it as Map<*, *>)["name"] }
-        assertEquals(listOf("idempotency", "expectedRevision", "wipLimit", "dependencyCycle"), guards)
+        assertEquals(listOf("idempotency", "expectedRevision", "wipLimit", "dependencyCycle", "claimReview", "orphanParent"), guards)
         assertEquals("open", (schema["transitionPolicy"] as Map<*, *>)["kind"])
     }
 

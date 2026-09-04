@@ -58,7 +58,7 @@ object InvokeLowering {
                 val colStr = (raw["toColumn"] ?: raw["toColumnId"] ?: raw["column"])?.toString()
                     ?: return Outcome.Rejected(key, type, "move without toColumn")
                 val col = BoardCol.legacyCol(colStr)
-                    ?: return Outcome.Rejected(key, type, "unknown column '$colStr' (canonical: ${BoardCol.entries.joinToString { it.wire }})")
+                    ?: return Outcome.Rejected(key, type, "unknown column '$colStr' (canonical: ${BoardCol.rendered.joinToString { it.wire }})")
                 val rev = needRevision() ?: return Outcome.Rejected(key, type, "move without expectedRevision")
                 Outcome.Lowered(JobCommand.Move(jobId, key, rev, KanbanColumnId(col.wire)))
             }

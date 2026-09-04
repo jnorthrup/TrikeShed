@@ -16,10 +16,12 @@ class BoardVocabularyConsistencyTest {
     fun boardColColumnsMatchTheClosedVocabularyExactly() {
         val cols = BoardCol.columns()
         assertEquals(BoardCol.entries.size, cols.size, "every BoardCol renders exactly one KanbanColumn")
+        // columns() renders in BoardCol.order, not declaration order: REVIEW is
+        // declared last (its ColId must not shift DONE/ARCHIVED) but sits before DONE.
         for ((i, col) in cols.withIndex()) {
-            val entry = BoardCol.entries[i]
+            val entry = BoardCol.rendered[i]
             assertEquals(entry.wire, col.id.value, "wire id is the canonical string")
-            assertEquals(entry.order, col.order, "order matches enum position")
+            assertEquals(entry.order, col.order, "order matches render position")
             assertEquals(entry.wipLimit, col.wipLimit, "wip limits carry through (RUNNING=3)")
         }
     }

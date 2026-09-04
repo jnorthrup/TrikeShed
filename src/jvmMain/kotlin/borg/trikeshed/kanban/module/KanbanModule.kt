@@ -137,19 +137,38 @@ class KanbanModule : ForgeModule {
             return json
         }
 
-        // ── Rete: fact bridge + the four board productions + activation sink ──
+        // ── Rete: fact bridge + the board productions + activation sink ──
+        //    (the four audit/flow rules, plus claim: the board proposes its own READY work,
+        //     and reaper: a claim whose worker died goes back to READY — thrice, then BLOCKED)
         val facts = borg.trikeshed.kanban.BoardFactElement(ctx.rete)
         val ruleDisposers = listOf(
             ctx.rete.register(borg.trikeshed.kanban.rules.DependencyReadyProduction()),
+            ctx.rete.register(borg.trikeshed.kanban.rules.ClaimProduction()),
             ctx.rete.register(borg.trikeshed.kanban.rules.WipBreachProduction()),
             ctx.rete.register(borg.trikeshed.kanban.rules.StallProduction()),
+            ctx.rete.register(
+                borg.trikeshed.kanban.rules.ReaperProduction(
+                    priorStrikes = { jobId -> borg.trikeshed.kanban.rules.ReaperProduction.countPriorStrikes(ctx.blackboard, jobId) },
+                ),
+            ),
             ctx.rete.register(borg.trikeshed.kanban.rules.CycleGuardProduction()),
         )
         // kanban.alerts = the same tail board.view#alerts carries.
         ctx.lcncRunners["kanban.alerts"] = LcncNodeRunner { _, _ -> alertMap() }
+        // The claim worker: Move(RUNNING) → the daemon's brain → receipt → Move(REVIEW).
+        // Runners are looked up at claim time (the daemon fills prompt.chat/mux.models
+        // into ctx.lcncRunners after this module attaches). One worker per activation
+        // id: a re-proposed claim (support invalidation) never doubles a brain call.
+        val claimWorker = borg.trikeshed.kanban.BoardClaimWorker(
+            store = store,
+            blackboard = ctx.blackboard,
+            runner = { ctx.lcncRunners[it] },
+            clock = ctx.clock,
+        )
+        val claimsInFlight = java.util.concurrent.ConcurrentHashMap.newKeySet<String>()
         // Non-job activations: receipt on the blackboard ALWAYS; dependency-ready also
         // lowers to a store Move with a derived idempotency key (dedupe compensates
-        // any popped-but-unprocessed activation).
+        // any popped-but-unprocessed activation); claim hands the card to the worker.
         ctx.rete.productionSink = { a ->
             ctx.blackboard.put(
                 "kanban/rule/${a.ruleId}/${a.activationId}",
@@ -174,6 +193,52 @@ class KanbanModule : ForgeModule {
                                 ),
                             ),
                         )
+                    }
+                }
+            }
+            if (a.ruleId == borg.trikeshed.kanban.rules.BoardRules.CLAIM) {
+                val jobId = a.bindings["jobId"]
+                val rev = a.bindings["expectedRevision"]?.toLongOrNull()
+                val owner = a.bindings["owner"] ?: borg.trikeshed.kanban.rules.BoardRules.CLAIM_OWNER
+                if (jobId != null && rev != null && claimsInFlight.add(a.activationId)) {
+                    ctx.scope.launch {
+                        try {
+                            val outcome = claimWorker.claim(jobId, rev, owner)
+                            System.err.println("[KanbanModule] claim $jobId r$rev: ok=${outcome["ok"]} model=${outcome["model"]} ${outcome["review"]}")
+                        } catch (t: kotlinx.coroutines.CancellationException) {
+                            throw t
+                        } catch (t: Throwable) {
+                            System.err.println("[KanbanModule] claim $jobId r$rev failed: ${t.message}")
+                        } finally {
+                            claimsInFlight.remove(a.activationId)
+                        }
+                    }
+                }
+            }
+            // Reaper: strikes 1..2 hand the card back to READY (the claim production
+            // takes the new revision afresh); the block strike parks it in BLOCKED with
+            // the owner CLEARED — "owner" present and blank clears — so a human sees it.
+            // The receipt above is the strike's durable record: the production counts
+            // kanban/rule/reaper/* by jobId, so n is never carried in anybody's head.
+            if (a.ruleId == borg.trikeshed.kanban.rules.BoardRules.REAPER) {
+                val jobId = a.bindings["jobId"]
+                val rev = a.bindings["expectedRevision"]?.toLongOrNull()
+                val strike = a.bindings["strike"]?.toIntOrNull() ?: 1
+                if (jobId != null && rev != null) {
+                    val block = strike >= borg.trikeshed.kanban.rules.BoardRules.REAPER_BLOCK_STRIKE
+                    val move = linkedMapOf<String, Any?>(
+                        "type" to "move",
+                        "jobId" to jobId,
+                        "idempotencyKey" to "$jobId#${a.ruleId}#$rev",
+                        "expectedRevision" to rev,
+                        "toColumn" to if (block) borg.trikeshed.kanban.BoardCol.BLOCKED.wire else a.bindings["toColumn"],
+                    )
+                    if (block) move["owner"] = ""
+                    ctx.scope.launch {
+                        val reply = CompletableDeferred<BoardApply>()
+                        store.intake.send(BoardIntake(move, reply))
+                        val verdict = reply.await()
+                        System.err.println("[KanbanModule] reaper $jobId r$rev strike $strike → ${move["toColumn"]}: $verdict")
                     }
                 }
             }
@@ -234,6 +299,7 @@ class KanbanModule : ForgeModule {
                         col = row.col,
                         previousCol = null,
                         lastMoveMs = row.lastMoveMs,
+                        owner = row.owner,
                     ),
                 )
             }

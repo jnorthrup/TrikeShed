@@ -108,7 +108,8 @@ fun BoardCursor.toBoardMap(sequence: Long, title: String = "Board"): Map<String,
     return linkedMapOf(
         "title" to title,
         "sequence" to sequence,
-        "columns" to BoardCol.entries.map { c ->
+        // Render order is BoardCol.order, not declaration: REVIEW is declared last (ColId stability).
+        "columns" to BoardCol.rendered.map { c ->
             linkedMapOf(
                 "id" to c.wire,
                 "name" to c.wire.replaceFirstChar { it.uppercase() },
