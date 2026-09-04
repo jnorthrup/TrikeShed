@@ -119,6 +119,13 @@ object LcncPresets {
             tweakFirst = "The prompt text.",
         ),
         LcncPresetInfo(
+            "preset-ccek-mux", "Hermes CCEK Orchestration",
+            does = "Resolves available provider keys through KeyMux, prompts the Hermes model via ModelMux, choreographs the resulting action into a CCEK reactor hub with fact assertions, and displays both the live projection and router meta.",
+            needs = "A provider key (OpenAI/Anthropic/OpenRouter/NVIDIA/local) or saved credentials. Defaults to Hermes 3.",
+            see = "Key status, Hermes chat output, CCEK articulated node markdown projection, causal fact count, and router telemetry.",
+            tweakFirst = "The prompt in the chat node.",
+        ),
+        LcncPresetInfo(
             "preset-media", "Media player from parts",
             does = "Drives a player from separate buttons and a slider, so the controls are ordinary parts on wires.",
             needs = "A browser — media.player is a real <video> element, so this one " +
@@ -311,6 +318,7 @@ object LcncPresets {
         "preset-scope-inner" to scopeInner(),
         "preset-pairs" to pairsDemo(),
         "preset-brain-mux" to brainMux(),
+        "preset-ccek-mux" to ccekMux(),
         "preset-media" to mediaDemo(),
         "preset-hermes-train" to hermesTrain(),
         "preset-legal-tribunal" to legalTribunal(),
@@ -923,6 +931,83 @@ object LcncPresets {
                 LcncWire("me1", "lastAnswer", "dm1", "x"),
             ).toSeries(),
             view = LcncView(x = 20.0, y = 20.0, zoom = 0.65),
+        )
+        return LcncProgramConfix.toJson(program)
+    }
+
+    // ── ccek-mux: Hermes model + CCEK reactor choreography ────────────
+    // keys.status & ModelMux (Hermes 3 default) → prompt.chat →
+    // ccek.signal (append Hermes action to articulated node) →
+    // ccek.projection (markdown view) & ccek.fact (causal lineage) →
+    // mux.meta (telemetry)
+    private fun ccekMux(): String {
+        val program = LcncProgram(
+            name = "preset-ccek-mux",
+            nodes = listOf(
+                LcncNode("note-keys", "note",
+                    params = mapOf("text" to "1 · KeyMux & ModelMux —\nInspect keys and run the Hermes model.\nAuto-routes to the first available key."),
+                    x = 320.0, y = 60.0),
+                LcncNode("k1", "keys.status", x = 620.0, y = 60.0),
+                LcncNode("kd", "display", x = 920.0, y = 60.0),
+                LcncNode("note-ask", "note",
+                    params = mapOf("text" to "2 · Ask Hermes —\nPrompts the Hermes model (or resolved provider)\nto propose an action to orchestrate."),
+                    x = 320.0, y = 320.0),
+                LcncNode("p1", "prompt.chat",
+                    params = mapOf(
+                        "prompt" to "Propose a concise next action for the project workspace.",
+                        "model" to "", // blank adopts the newest model Hermes ran here
+                        "maxTokens" to "1024",
+                        "temperature" to "0.2",
+                        "prefill" to "",
+                        "url" to "",
+                        "key" to "",
+                        "headers" to "[]",
+                    ), x = 620.0, y = 320.0),
+                LcncNode("d-chat", "display", x = 920.0, y = 320.0),
+                LcncNode("note-ccek", "note",
+                    params = mapOf("text" to "3 · CCEK Hub & Context —\nIncarnates an articulated node,\nfans out Hermes's response as a signal,\nand asserts a causal fact in the context lineage."),
+                    x = 320.0, y = 620.0),
+                LcncNode("c1", "ccek.incarnate",
+                    params = mapOf(
+                        "title" to "hermes-ccek-orchestration",
+                        "record" to "true",
+                        "maxConcurrency" to "4",
+                    ), x = 620.0, y = 620.0),
+                LcncNode("ctx1", "ccek.context",
+                    params = mapOf("role" to "hermes-agent"),
+                    x = 620.0, y = 800.0),
+                LcncNode("s1", "ccek.signal",
+                    params = mapOf("verb" to "append", "blockKind" to "TEXT"),
+                    x = 920.0, y = 620.0),
+                LcncNode("cf1", "ccek.fact",
+                    params = mapOf("kind" to "observation"),
+                    x = 920.0, y = 800.0),
+                LcncNode("pr1", "ccek.projection",
+                    params = mapOf("kind" to "markdown"),
+                    x = 1180.0, y = 620.0),
+                LcncNode("d-proj", "display", x = 1420.0, y = 620.0),
+                LcncNode("d-fact", "display", x = 1180.0, y = 800.0),
+                LcncNode("note-mux", "note",
+                    params = mapOf("text" to "4 · Router telemetry —\nInspect the last route selection,\nlatency, and quota usage."),
+                    x = 320.0, y = 1020.0),
+                LcncNode("t1", "timer", params = mapOf("seconds" to "30"), x = 620.0, y = 1020.0),
+                LcncNode("me1", "mux.meta", x = 850.0, y = 1020.0),
+                LcncNode("dm1", "display", x = 1130.0, y = 1020.0),
+            ).toSeries(),
+            wires = listOf(
+                LcncWire("k1", "have", "kd", "x"),
+                LcncWire("p1", "content", "d-chat", "x"),
+                LcncWire("c1", "handle", "s1", "handle"),
+                LcncWire("p1", "content", "s1", "text"),
+                LcncWire("c1", "handle", "pr1", "handle"),
+                LcncWire("pr1", "projection", "d-proj", "x"),
+                LcncWire("ctx1", "contextId", "cf1", "contextId"),
+                LcncWire("cf1", "factCount", "d-fact", "x"),
+                LcncWire("t1", "tick", "me1", "trigger?"),
+                LcncWire("me1", "lastAnswer", "dm1", "x"),
+            ).toSeries(),
+            view = LcncView(x = 20.0, y = 20.0, zoom = 0.65),
+            seq = 17,
         )
         return LcncProgramConfix.toJson(program)
     }

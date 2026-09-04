@@ -237,4 +237,12 @@ object LcncMating {
         while (program.nodes.toList().any { it.id == "n$n" }) n++
         return "n$n"
     }
+
+    /** Whole-graph treeshake: pairs open ports with nearest legal mates under scope/type rules. */
+    fun treeshake(
+        program: LcncProgram,
+        options: LcncTreeShakeOptions = LcncTreeShakeOptions(),
+        contracts: Map<String, LcncPortContract> = LcncContracts.all().associateBy { it.type },
+        facts: LcncFacts = LcncFacts.of(contracts.values),
+    ): LcncTreeShakeResult = LcncTreeShake.shake(program, options, contracts, facts)
 }

@@ -28,6 +28,17 @@ object PureNodes {
 
     fun registry(clock: () -> Long): Map<String, LcncNodeRunner> = mapOf(
         "timer" to LcncNodeRunner { _, _ -> mapOf("tick" to clock()) },
+        "pick" to LcncNodeRunner { node, inputs ->
+            var v: Any? = inputs["x"]
+            for (k in (node.params["path"] ?: "").split('.').filter { it.isNotBlank() }) {
+                v = when (v) {
+                    is Map<*, *> -> v[k]
+                    is List<*> -> k.toIntOrNull()?.let { idx -> v.getOrNull(idx) }
+                    else -> null
+                }
+            }
+            mapOf("y" to v)
+        },
         "list.groupBy" to LcncNodeRunner { node, inputs ->
             val key = node.params["key"]
             val xs = inputs["x"] as? List<*> ?: emptyList<Any?>()

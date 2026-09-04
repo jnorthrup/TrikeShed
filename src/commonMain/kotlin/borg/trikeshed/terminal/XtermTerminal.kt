@@ -30,7 +30,9 @@ data class VtCell(
     val style: VtStyle = VtStyle(),
     /** True for the second cell occupied by a full-width glyph. */
     val continuation: Boolean = false,
-)
+) {
+    companion object
+}
 
 data class VtCursor(val row: Int, val column: Int, val visible: Boolean)
 

@@ -40,6 +40,7 @@ object RouteManifest {
             RouteEntry("GET", "/api/lcnc/mating-options", "kind-compatible mates for a source port"),
             RouteEntry("GET", "/api/lcnc/fills", "param fills for a node type"),
             RouteEntry("GET", "/api/lcnc/autowire", "auto-wire proposal between two types"),
+            RouteEntry("POST", "/api/lcnc/treeshake", "whole-graph tree-shake under type/scope rules"),
             RouteEntry("GET", "/api/projects", "mounted project scopes"),
             RouteEntry("POST", "/api/projects", "mount a directory as a project scope"),
             RouteEntry("DELETE", "/api/projects/{name}", "unmount a project scope"),

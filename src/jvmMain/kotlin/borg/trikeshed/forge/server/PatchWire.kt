@@ -592,6 +592,19 @@ class PatchWire(
                     "ambiguous" to (result.candidates.size > 1),
                 ))
             }
+            method == "POST" && p == "/api/lcnc/treeshake" -> {
+                val req = parse(text)
+                val programData = req["program"] ?: return json(mapOf("error" to "program_required"), 400)
+                val program = runCatching {
+                    borg.trikeshed.lcnc.LcncProgramConfix.fromJson("treeshake", JsonSupport.stringify(programData))
+                }.getOrElse { return json(mapOf("error" to "bad_program", "detail" to (it.message ?: "")), 400) }
+                val optMap = req["options"] as? Map<*, *>
+                val reach = (optMap?.get("reach") as? Number)?.toDouble() ?: 340.0
+                val inclOpt = optMap?.get("optional") == true
+                val options = borg.trikeshed.lcnc.LcncTreeShakeOptions(reach = reach, includeOptional = inclOpt)
+                val result = borg.trikeshed.lcnc.LcncMating.treeshake(program, options)
+                json(result.toMap())
+            }
             method == "GET" && p == "/api/projects" -> json(
                 mapOf(
                     "scopes" to scopes.list().map {

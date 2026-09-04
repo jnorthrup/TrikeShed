@@ -168,8 +168,8 @@ object LcncContracts {
                 "projections" to LcncPortContract.LcncParamSpec(ph = "DOCUMENT,BOARD,MARKDOWN — empty = all"),
             ), isEffect = true),
         LcncPortContract("ccek.signal", "ccek signal (every ForgeSignal verb)",
-            listOf("handle", "fields?"), listOf("sent", "signal"),
-            inputKinds = mapOf("handle" to "id", "fields" to "json"),
+            listOf("handle", "fields?", "text?"), listOf("sent", "signal"),
+            inputKinds = mapOf("handle" to "id", "fields" to "json", "text" to "text"),
             outputKinds = mapOf("sent" to "json", "signal" to "json"),
             params = mapOf(
                 "verb" to LcncPortContract.LcncParamSpec(v = "append", opts = CcekNodes.VERBS),

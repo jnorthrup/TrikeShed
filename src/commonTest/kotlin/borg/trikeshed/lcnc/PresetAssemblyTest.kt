@@ -27,7 +27,7 @@ class PresetAssemblyTest {
             setOf(
                 "preset-hermes", "preset-tribunal", "preset-curator",
                 "preset-context", "preset-kanban", "preset-ccek", "preset-scope", "preset-scope-inner",
-                "preset-pairs", "preset-brain-mux", "preset-media",
+                "preset-pairs", "preset-brain-mux", "preset-ccek-mux", "preset-media",
                 "preset-hermes-train", "preset-legal-tribunal", "preset-state-freeze",
                 "preset-council", "preset-bughunter", "preset-subvm-audit",
                 "preset-turbohaul",
@@ -55,6 +55,8 @@ class PresetAssemblyTest {
 
     @Test
     fun everyPresetWireConnectsPortsWithMatchingKinds() {
+        val facts = LcncFacts.of(LcncContracts.all())
+        val contracts = LcncContracts.all().associateBy { it.type }
         for ((name, doc) in LcncPresets.all()) {
             val p = LcncProgramConfix.fromJson(name, doc)
 
@@ -98,11 +100,13 @@ class PresetAssemblyTest {
                     "$name: ${tgt.type} has no input '${wire.toPort}'")
                 // Kind compatibility across every preset edge — the same rule
                 // LcncMating.compatibleTypes applies to interactive drags.
-                val outKind = LcncContracts.find(src.type)?.outputKinds?.get(wire.fromPort.removeSuffix("?"))
-                val inKind = LcncContracts.find(tgt.type)?.inputKinds?.get(wire.toPort.removeSuffix("?"))
-                if (outKind != null && inKind != null) {
-                    assertEquals(outKind, inKind,
-                        "$name wire ${wire.fromNode}.${wire.fromPort} → ${wire.toNode}.${wire.toPort} kind mismatch")
+                val outKind = LcncTypeCheck.portKind(src!!, "out", wire.fromPort.removeSuffix("?"), contracts, facts)
+                val inKind = LcncTypeCheck.portKind(tgt!!, "in", wire.toPort.removeSuffix("?"), contracts, facts)
+                if (outKind.kind != null && inKind.kind != null) {
+                    assertTrue(
+                        LcncFacts.accepts(outKind, inKind),
+                        "$name wire ${wire.fromNode}.${wire.fromPort} (${outKind.kind}) → ${wire.toNode}.${wire.toPort} (${inKind.kind}) kind mismatch"
+                    )
                 }
             }
         }

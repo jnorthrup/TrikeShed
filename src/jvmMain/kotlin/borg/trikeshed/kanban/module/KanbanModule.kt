@@ -438,6 +438,25 @@ class KanbanModule : ForgeModule {
             else JvmKanbanServer.HttpResponse(200, publisher.lateBound().facts.toKifFile() + "\n", contentType = "text/plain; charset=utf-8")
         }
 
+        ctx.routes.claim(id, "/api/lcnc/treeshake") { method, _, text, _ ->
+            if (method != "POST") return@claim JvmKanbanServer.HttpResponse(405, """{"error":"method_not_allowed"}""")
+            val req = runCatching { JsonSupport.parse(rawBody(text)) as? Map<*, *> }.getOrNull()
+                ?: return@claim JvmKanbanServer.HttpResponse(400, """{"error":"bad_json"}""")
+            val programData = req["program"]
+                ?: return@claim JvmKanbanServer.HttpResponse(400, """{"error":"program_required"}""")
+            val program = runCatching {
+                borg.trikeshed.lcnc.LcncProgramConfix.fromJson("treeshake", JsonSupport.stringify(programData))
+            }.getOrElse {
+                return@claim JvmKanbanServer.HttpResponse(400, JsonSupport.stringify(mapOf("error" to "bad_program", "detail" to (it.message ?: ""))))
+            }
+            val optMap = req["options"] as? Map<*, *>
+            val reach = (optMap?.get("reach") as? Number)?.toDouble() ?: 340.0
+            val inclOpt = optMap?.get("optional") == true
+            val options = borg.trikeshed.lcnc.LcncTreeShakeOptions(reach = reach, includeOptional = inclOpt)
+            val result = borg.trikeshed.lcnc.LcncMating.treeshake(program, options, publisher.vocabulary())
+            JvmKanbanServer.HttpResponse(200, JsonSupport.stringify(result.toMap()))
+        }
+
         // The generic runner dispatch: ONE execution author. The browser (and any
         // client) posts {type, params?, inputs?} to run ONE node (a job), or
         // {program, inputs?} to run a WHOLE stored program (a procedure — spec

@@ -81,6 +81,7 @@ object HarnessRegistry {
         HarnessProvider("brain", s_["BRAIN_API_KEY"]),
         HarnessProvider("synthetic", s_["SYNTHETIC_API_KEY"], "https://api.synthetic.new/v1"),
         HarnessProvider("opencode", s_["OPENCODE_API_KEY"], "https://api.opencode.ai/v1"),
+        HarnessProvider("hermes", s_["HERMES_API_KEY", "NOUS_API_KEY"], "https://inference-api.nousresearch.com/v1", "nousresearch/hermes-3-llama-3.1-405b", baseUrlEnvVar = "HERMES_BASE_URL"),
     ]
 
     fun byId(id: String): HarnessProvider? {

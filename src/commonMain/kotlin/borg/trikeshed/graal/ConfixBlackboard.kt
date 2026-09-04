@@ -124,6 +124,33 @@ class ConfixBlackboard {
         }
         return this
     }
+
+    /** Merge another ConfixBlackboard into this blackboard */
+    fun merge(other: ConfixBlackboard, language: String = "merge"): ConfixBlackboard {
+        for (key in other.keys()) {
+            put(key, other.get(key), language)
+        }
+        return this
+    }
+
+    /** Merge a BlackboardContext into this blackboard */
+    fun merge(context: BlackboardContext, language: String = "context"): ConfixBlackboard {
+        put("context.id", context.id, language)
+        context.tags.forEach { (k, v) ->
+            put("tag.$k", v, language)
+        }
+        context.columnOverlays.forEach { (colIdx, overlay) ->
+            put("column.$colIdx.name", overlay.name, language)
+            put("column.$colIdx.role", overlay.defaultRole.name, language)
+            overlay.description?.let { put("column.$colIdx.description", it, language) }
+        }
+        context.provenance?.let { prov ->
+            put("context.provenance.source", prov.source, language)
+            put("context.provenance.timestamp", prov.timestamp, language)
+            prov.creator?.let { put("context.provenance.creator", it, language) }
+        }
+        return this
+    }
     
     /**
      * Subscribe to changes (legacy synchronous shim).

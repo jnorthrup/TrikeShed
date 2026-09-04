@@ -232,7 +232,14 @@ object BrainMuxNodes {
                 ?: node.params["prompt"]?.takeIf { it.isNotBlank() }
                 ?: ""
 
-            val model = node.params["model"] ?: ""
+            var model = node.params["model"] ?: ""
+            if (model.isBlank()) {
+                // Ensure using last hermes model as a crutch example for keymux and modelmux to hit the ground running
+                val firstCardId = modelMux?.listModels()?.let { if (it.size > 0) it[0].a else null }
+                model = modelMux?.lastReceipt?.modelId?.takeIf { it.isNotBlank() }
+                    ?: firstCardId?.takeIf { it.isNotBlank() }
+                    ?: "nousresearch/hermes-3-llama-3.1-405b"
+            }
 
             // Prefill sentinel: the env-first default — resolve through the
             // ModelMux/KeyMux chain (env → dotenv → harness stores) and only
@@ -249,14 +256,6 @@ object BrainMuxNodes {
                 }
             }
 
-            if (model.isBlank()) {
-                return@LcncNodeRunner mapOf(
-                    "content" to "",
-                    "model" to model,
-                    "ok" to false,
-                    "error" to "no model specified",
-                )
-            }
             if (prompt.isBlank()) {
                 return@LcncNodeRunner mapOf(
                     "content" to "",
@@ -265,6 +264,7 @@ object BrainMuxNodes {
                     "error" to "no prompt wired or in params",
                 )
             }
+
 
             val maxTokens = (node.params["maxTokens"] ?: "256").toIntOrNull() ?: 256
             val temperature = (node.params["temperature"] ?: "0.2").toDoubleOrNull() ?: 0.2

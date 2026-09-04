@@ -38,7 +38,9 @@ data class MediaPatch(
     val height: Int,
     val payload: MediaPatchPayload,
     val causeSignalId: String?,
-)
+) {
+    companion object
+}
 
 /** One user-originated or consequence-originated LCNC signal with an explicit causal parent. */
 data class LcncUserSignal(
@@ -51,6 +53,8 @@ data class LcncUserSignal(
     val payload: String,
     val causeSignalId: String? = null,
 ) {
+    companion object
+
     /** LCNC's packed marker spine: manual ingress is Inducted; consequence is Answered. */
     fun marked(): MarkedResult<LcncUserSignal> = marked(
         this,
@@ -138,6 +142,38 @@ class XtermMediaPatchPanel(
 
     fun causalFailed(causeSignalId: String?, timestampMs: Long, detail: String): CausalMediaEmission =
         causal(CausalSignalKind.FAILED, detail, causeSignalId, timestampMs, emptySeriesOf())
+
+    fun causalText(text: String, causeSignalId: String?, timestampMs: Long): CausalMediaEmission {
+        val signal = signal(LcncSignalLane.CAUSAL, CausalSignalKind.OUTPUT.name.lowercase(), text, causeSignalId, timestampMs)
+        val patch = MediaPatch(
+            panelId = descriptor.id,
+            kind = MediaPatchKind.TEXT,
+            revision = signal.sequence,
+            x = 0,
+            y = 0,
+            width = text.length,
+            height = 1,
+            payload = MediaPatchPayload.Text(text),
+            causeSignalId = causeSignalId,
+        )
+        return CausalMediaEmission(signal, s_[patch])
+    }
+
+    fun causalBytes(contentType: String, bytes: ByteArray, causeSignalId: String?, timestampMs: Long): CausalMediaEmission {
+        val signal = signal(LcncSignalLane.CAUSAL, CausalSignalKind.PATCH.name.lowercase(), "$contentType (${bytes.size} bytes)", causeSignalId, timestampMs)
+        val patch = MediaPatch(
+            panelId = descriptor.id,
+            kind = MediaPatchKind.IMAGE_REGION,
+            revision = signal.sequence,
+            x = 0,
+            y = 0,
+            width = bytes.size,
+            height = 1,
+            payload = MediaPatchPayload.Bytes(contentType, bytes),
+            causeSignalId = causeSignalId,
+        )
+        return CausalMediaEmission(signal, s_[patch])
+    }
 
     fun snapshot(scrollbackRows: Int = 200): VtSnapshot = terminal.snapshot(scrollbackRows)
 

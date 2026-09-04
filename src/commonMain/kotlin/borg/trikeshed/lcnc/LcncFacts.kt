@@ -81,6 +81,16 @@ class LcncFacts private constructor(private val kb: KifKnowledgeBase) {
             }
             return sb.toString()
         }
+        fun accepts(source: String, target: String): Boolean =
+            source == LcncKinds.UNRESOLVED || target == LcncKinds.UNRESOLVED ||
+                LcncKinds.isTypeVariable(source) || LcncKinds.isTypeVariable(target) ||
+                target == LcncKinds.CCEK_ANY || source == target
+
+        fun accepts(a: LcncTypeCheck.PortKind, b: LcncTypeCheck.PortKind): Boolean = when {
+            a.generic || b.generic -> true
+            a.kind == null || b.kind == null -> false
+            else -> accepts(a.kind, b.kind)
+        }
     }
 
     // ── telling ──────────────────────────────────────────────────────────
