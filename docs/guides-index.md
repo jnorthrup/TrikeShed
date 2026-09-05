@@ -27,4 +27,5 @@ Navigate the daemon surfaces. Each guide covers one surface: purpose, routes, wa
 | [WikiSkill Hermes Trainer](wikiskill-hermes-trainer.md) | Fixed `1A` CommonResources corpus for grounded CoreNLP → NARS causal links, persistent wiki patterns, an atomic candidate, and a disjoint validation target |
 | [Marketability + MCP Kanban Audit](marketability-kanban-mcp-audit.md) | Current corpus reconciliation, proposed marketability backlog, and minimum MCP exposure of the LCNC Kanban asset over its one durable store |
 | [Escape Velocity](escape-velocity.md) | The independence story — git-CAS self-hosting, pijul gateway, substrate inventory, wave-2 targets |
+| [KIF Binary Container](kif-binary-container.md) | The Roaring-shaped bitset under the SUMO classifier — array/run/bitmap chunks as MetaSeries, DFS-numbered closure, measured shape over the pinned corpus |
 | [CCEK Covenant](ccek-covenant.md) | The anti-rolloff anchor — CCEK definition, negative space, rings-are-blocks, machine status |
