@@ -18,6 +18,7 @@ actual fun readLinesSeq(path: String): Sequence<String> {
 <<<<<<< HEAD
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
 actual fun readLines(path: String): List<String> =borg.trikeshed.userspace.nio.file.Files.readAllLines( Paths.get(path))
 =======
 actual fun readLines(path: String): List<String> = borg.trikeshed.userspace.nio.file.Files.readAllLines(Paths.get(path))
@@ -45,3 +46,6 @@ actual fun readLines(path: String): List<String> = borg.trikeshed.userspace.nio.
 =======
 actual fun readLines(path: String): List<String> =borg.trikeshed.userspace.nio.file.Files.readAllLines( Paths.get(path)) // ⚡ Bolt: removed redundant .map { it } which allocates an intermediate ArrayList O(N)
 >>>>>>> origin/bolt/avoid-redundant-identity-map-16165159785968055024
+=======
+actual fun readLines(path: String): List<String> =borg.trikeshed.userspace.nio.file.Files.readAllLines( Paths.get(path))
+>>>>>>> origin/bolt/avoid-redundant-map-allocation-5919844668792147379

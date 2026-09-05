@@ -187,6 +187,7 @@ The code looks correct and fully optimized. The tests passed on the relevant par
 <<<<<<< HEAD
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
 
 <<<<<<< HEAD
 <<<<<<< HEAD
@@ -253,3 +254,9 @@ The code looks correct and fully optimized. The tests passed on the relevant par
 **Learning:** In Kotlin, using `.map { it }` on an already materialized collection (such as a `List` returned by `Files.readAllLines`) is a redundant identity transform that needlessly copies the entire list, wasting O(N) time and memory.
 **Action:** Remove `.map { it }` to return the original list directly, saving memory allocations on hot paths.
 >>>>>>> origin/bolt/avoid-redundant-identity-map-16165159785968055024
+=======
+
+## 2026-10-26 - Avoid O(N) allocation on materialized collections
+**Learning:** In Kotlin, using `.map { it }` on an already materialized collection (such as a `List` returned by `Files.readAllLines`) is a redundant identity transform that needlessly copies the entire list, wasting O(N) time and memory.
+**Action:** Remove it to return the original list directly.
+>>>>>>> origin/bolt/avoid-redundant-map-allocation-5919844668792147379
