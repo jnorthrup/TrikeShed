@@ -52,12 +52,26 @@ class InMemoryFileOperations(
 
     override fun listDir(path: String): List<String> {
         val prefix = path.trimEnd('/') + "/"
-        return (files.keys.asSequence() + dirs.asSequence())
-            .filter { it.startsWith(prefix) }
-            .map { it.removePrefix(prefix).substringBefore('/') }
-            .filter { it.isNotEmpty() }
-            .distinct()
-            .toList()
+        // ⚡ Bolt: Avoid intermediate sequence, filter, and map allocations.
+        // Use a direct loop with LinkedHashSet to preserve order and distinctness with zero intermediate object overhead.
+        val result = LinkedHashSet<String>()
+        for (key in files.keys) {
+            if (key.startsWith(prefix)) {
+                val name = key.removePrefix(prefix).substringBefore('/')
+                if (name.isNotEmpty()) {
+                    result.add(name)
+                }
+            }
+        }
+        for (dir in dirs) {
+            if (dir.startsWith(prefix)) {
+                val name = dir.removePrefix(prefix).substringBefore('/')
+                if (name.isNotEmpty()) {
+                    result.add(name)
+                }
+            }
+        }
+        return result.toList()
     }
 
     override fun write(filename: String, bytes: ByteArray) {
