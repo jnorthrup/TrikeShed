@@ -45,6 +45,7 @@
 **Learning:** Using predictable, time-based PRNGs for cryptographic nonces like `Sec-WebSocket-Key` makes the handshake susceptible to prediction or replay attacks. While the RFC 6455 states this key is not meant for authentication, it is meant to prove the request is actually a WebSocket request and to prevent caching proxy issues, so it should still be robustly random.
 **Prevention:** Always use standard, secure-by-default libraries for random number generation (e.g., `kotlin.random.Random.Default.nextBytes` or `SecureRandom`) instead of rolling custom cryptographic algorithms or using simple PRNGs.
 <<<<<<< HEAD
+<<<<<<< HEAD
 
 <<<<<<< HEAD
 ## 2024-05-24 - [Denial of Service via Pipe Buffer Deadlock]
@@ -63,3 +64,10 @@
 **Learning:** This pipe buffer deadlock pattern occurs when stdout/stderr is read synchronously and blocks because the child process hangs, preventing the parent from reaching the bounded waitFor timeout logic.
 **Prevention:** When enforcing bounded timeouts on child processes, always read the input stream asynchronously (using async or CompletableFuture) so the main thread can proceed to execute waitFor(timeout).
 >>>>>>> origin/sentinel/fix-pipe-buffer-dos-9936734963835218111
+=======
+
+## 2024-05-24 - [Denial of Service via Unbounded waitFor and Thread Deadlocks]
+**Vulnerability:** Core logic across multiple JVM files (`CouchWal.java`, `PatchWire.kt`, `PanamaKanbanMovie.kt`, `HeatSoak.kt`) spawned child processes via `ProcessBuilder` and unconditionally called `process.waitFor()` with no timeout. Additionally, in some cases, the output streams were either read synchronously after waiting or not fully consumed before waiting, leading to potential thread starvation and OS pipe buffer deadlocks.
+**Learning:** `Process.waitFor()` without a timeout combined with synchronous or improper stream handling guarantees a thread deadlock if the OS pipe buffer fills up, preventing the process from exiting, or if the subprocess hangs indefinitely. This violates the "Fail securely" and resource bounding principles.
+**Prevention:** Always use bounded `waitFor(timeout, TimeUnit)` accompanied by `destroyForcibly()` if the timeout occurs. Crucially, always use asynchronous stream reading mechanisms (e.g., `CompletableFuture.runAsync` or `CompletableFuture.supplyAsync`) to consume `stdout` and `stderr` to prevent OS pipe deadlocks.
+>>>>>>> origin/sentinel/fix-unbounded-waitfor-dos-5652840941151199537

@@ -13,6 +13,10 @@ import java.nio.file.Paths;
 import java.util.stream.Stream;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.TimeoutException;
 
 public class CouchWal {
     private final ConfixBlackboard blackboard;
@@ -40,15 +44,32 @@ public class CouchWal {
 
         Process process = builder.start();
 
-        // Log output
-        try (BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()))) {
-            String line;
-            while ((line = reader.readLine()) != null) {
-                System.out.println(line);
+        // Log output asynchronously to avoid pipe buffer deadlocks
+        CompletableFuture<Void> readerFuture = CompletableFuture.runAsync(() -> {
+            try (BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()))) {
+                String line;
+                while ((line = reader.readLine()) != null) {
+                    System.out.println(line);
+                }
+            } catch (IOException e) {
+                System.err.println("Error reading process output: " + e.getMessage());
             }
+        });
+
+        boolean finished = process.waitFor(1, TimeUnit.HOURS);
+        if (!finished) {
+            process.destroyForcibly();
+            throw new RuntimeException("Gradle build timed out");
         }
 
-        int exitCode = process.waitFor();
+        try {
+            readerFuture.get(1, TimeUnit.MINUTES);
+        } catch (ExecutionException | TimeoutException e) {
+            // Log but don't fail, the process itself already finished
+            System.err.println("Error or timeout waiting for stream reader: " + e.getMessage());
+        }
+
+        int exitCode = process.exitValue();
         if (exitCode != 0) {
             throw new RuntimeException("Gradle build failed with exit code: " + exitCode);
         }

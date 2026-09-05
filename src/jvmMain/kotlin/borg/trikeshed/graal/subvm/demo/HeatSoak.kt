@@ -211,6 +211,7 @@ object HeatSoak {
         val jcmd = java.io.File(System.getProperty("java.home"), "bin/jcmd").path
         val p = ProcessBuilder(jcmd, ProcessHandle.current().pid().toString(), "GC.class_histogram").redirectErrorStream(true).start()
 <<<<<<< HEAD
+<<<<<<< HEAD
         val future = java.util.concurrent.CompletableFuture.supplyAsync {
             p.inputStream.bufferedReader().readLines()
         }
@@ -224,6 +225,15 @@ object HeatSoak {
         if (!finished) p.destroyForcibly()
         val lines = outAsync.get()
 >>>>>>> origin/sentinel/fix-pipe-buffer-dos-9936734963835218111
+=======
+        val future = java.util.concurrent.CompletableFuture.supplyAsync { p.inputStream.bufferedReader().readLines() }
+        val finished = p.waitFor(1, java.util.concurrent.TimeUnit.MINUTES)
+        if (!finished) {
+            p.destroyForcibly()
+            throw RuntimeException("jcmd timed out")
+        }
+        val lines = future.get(30, java.util.concurrent.TimeUnit.SECONDS)
+>>>>>>> origin/sentinel/fix-unbounded-waitfor-dos-5652840941151199537
         "\n── class histogram (live, top $n) ──\n" + lines.take(n + 3).joinToString("\n") { it.take(140) }
     }.getOrElse { "\n── class histogram unavailable: $it" }
 
