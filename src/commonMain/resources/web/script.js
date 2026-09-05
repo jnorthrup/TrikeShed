@@ -1330,9 +1330,14 @@
   function setView(view) {
     mutate((s) => { s.view = view; }, 'view');
 <<<<<<< HEAD
+<<<<<<< HEAD
     for (const [k, [el, btn, sidebarBtn]] of Object.entries(VIEWS)) {
 =======
     const SIDEBAR_BTNS = { doc: 'btn-home', board: 'btn-board', graph: 'btn-graph', sheet: 'btn-sheet', host: 'btn-host' };
+=======
+
+    // Update topbar buttons
+>>>>>>> origin/palette-sidebar-active-states-17480957366909985694
     for (const [k, [el, btn]] of Object.entries(VIEWS)) {
       const sidebarBtnId = SIDEBAR_BTNS[k];
       const sidebarBtn = sidebarBtnId ? document.getElementById(sidebarBtnId) : null;
@@ -1358,6 +1363,27 @@
         btn.removeAttribute('aria-current');
         if (sideBtn) sideBtn.removeAttribute('aria-current');
 >>>>>>> origin/palette-sidebar-active-states-15969824106785082289
+      }
+    }
+
+    // Update sidebar navigation buttons
+    const sidebarMapping = {
+      'doc': 'btn-home',
+      'board': 'btn-board',
+      'graph': 'btn-graph',
+      'sheet': 'btn-sheet',
+      'host': 'btn-host'
+    };
+
+    for (const [v, btnId] of Object.entries(sidebarMapping)) {
+      const sbtn = document.getElementById(btnId);
+      if (sbtn) {
+        sbtn.classList.toggle('active', v === view);
+        if (v === view) {
+          sbtn.setAttribute('aria-current', 'page');
+        } else {
+          sbtn.removeAttribute('aria-current');
+        }
       }
     }
     if (view === 'board') { renderBoard(); hydrateBoard(); }

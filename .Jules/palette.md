@@ -78,9 +78,15 @@
 **Learning:** When dynamically rendering interactive lists in vanilla JS (like page trees, sheet references, or slash menus), screen reader context is lost if we only use CSS classes like `.active` to indicate state.
 **Action:** When creating elements with `document.createElement`, proactively attach explicit, descriptive `aria-label`s that encapsulate both the item's identity and its current state (e.g., `"Active page: Untitled"` or `"Navigate to parent sheet: ..."`).
 <<<<<<< HEAD
+<<<<<<< HEAD
 ## 2025-05-24 - Synchronizing active states for duplicate navigation items
 **Learning:** When navigation buttons exist in multiple places (e.g., a topbar and a sidebar), visual styling and ARIA attributes (like `aria-current="page"`) must be updated on all instances when the view changes. Screen reader users navigating the sidebar would otherwise not know which view is currently active.
 **Action:** Expand view-switching logic to query and update all relevant navigation buttons, not just the primary ones, ensuring consistent state across the entire UI.
 =======
 ## 2026-08-27 - WCAG 2.5.3 Label in Name rule\n**Learning:** When using `aria-label` on elements that already contain visible text, screen readers override the visible text with the ARIA label. If they do not match exactly, it causes a WCAG 2.5.3 'Label in Name' violation, which confuses speech-input users who try to voice the visible text.\n**Action:** Use `title` attributes on buttons with visible text instead of `aria-label` to provide supplementary tooltips without overriding the accessible name.
 >>>>>>> origin/palette-fix-wcag-253-label-in-name-4042681561026698692
+=======
+## 2024-05-25 - Syncing active states for duplicate navigation items
+**Learning:** When a single-page application has duplicate navigation buttons (e.g., both topbar and sidebar buttons for the same views), updating the active state (`aria-current="page"` and visual classes) on only one set of buttons leaves the other set in an ambiguous or incorrect state, confusing screen reader users navigating the DOM.
+**Action:** Ensure that view-switching logic globally queries and updates all duplicate instances of navigation buttons for the active view to maintain consistent `aria-current="page"` attributes and visual active states.
+>>>>>>> origin/palette-sidebar-active-states-17480957366909985694
