@@ -85,6 +85,37 @@ this does not establish the complete cause. The isolated, dispatch-disabled
 preview was forcibly stopped and restarted. Clean full-daemon shutdown remains
 an acceptance obligation; receipt recovery must not be mistaken for that proof.
 
+## Sticky Editing and Recursive Scale
+
+The selected main remains the mutation owner during zoom-out, panning, board
+fit and terrain navigation. Layout and pairing commands use that owner, not
+whichever panel happens to occupy the most screen area. Explicit program or
+scope focus transfers ownership. Wheel zoom-in transfers it only when the
+pointer is inside another main covering at least 55 percent of the viewport.
+
+Readable nodes in the active main retain their interactive DOM representation
+when zoomed back out; another main taking ownership releases that detail latch.
+Other programs remain inspectable spatial context, with inert node controls.
+This changes editing focus only, never server execution authority.
+
+Every scope fits its intrinsic child layout into a maximum 560 by 360 local
+interior. These scales multiply down the actual scope tree. Descendants and
+internal links remain miniature spatial structure until the pixel cutoff;
+zoom reveals the same nodes, not a replacement overview document. The existing
+non-harness ring camera keeps its behavior. Program frames use content bounds
+without the former 1550 by 720 floor, and mount-origin normalization does not
+rewrite document-local coordinates. Object and blackboard regions start beyond
+the complete program region, not just the first program.
+
+Browser checks retained all 360 node identities, kept the active panel's seven
+nodes visible after zoom-out to roughly 20-pixel leaf widths, and released
+them on main handoff. Five scopes in the large preset were checked for child
+containment after stabilizing intrinsic widths during layout. These checks
+supplement the helper tests for sticky ownership, recursive scale and bounds.
+The follow-up verification passed 12 JavaScript helper tests, the JVM build
+gate and nine page/route tests. A 390 by 844 mobile check also exercised scope
+focus and miniature containment.
+
 ## Shared Completion Review
 
 Keep concurrent work moving through three shared checkpoints: integrity,

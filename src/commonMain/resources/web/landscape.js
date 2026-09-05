@@ -1,15 +1,30 @@
 "use strict";
 
 function visibleClosure(node) {
+  if(typeof Harness!=="undefined"&&node?._program===Harness.selected&&Landscape.details.has(node.id))return node;
   let result=node,parent=node?._parentScope;
   while(parent){const r=parent.el.getBoundingClientRect();if(r.width<420||r.height<240)result=parent;parent=parent._parentScope;}
   return result;
 }
 
 const Landscape = {
+  detailOwner:null, details:new Set(),
   canvas:document.getElementById("landscape"), pending:0, terrain:null, rows:[], dbs:[], edges:[], hits:[],
   objectBox:{x:3000,y:1000,w:2200,h:1600},
+  positionObjects() {
+    const x=Harness.programRight()+1760;
+    if(this.objectBox.x===x)return;
+    this.objectBox={x,y:0,w:3200,h:2400};
+    this.terrain?.setRows(this.rows,this.objectBox,this.dbs);
+  },
   schedule() {if(this.pending)return;this.pending=requestAnimationFrame(()=>{this.pending=0;this.draw();});},
+  detailFor(node, box, absorbed) {
+    if(this.detailOwner!==Harness.selected){this.detailOwner=Harness.selected;this.details.clear();}
+    const active=node._program===this.detailOwner;
+    const readable=!absorbed&&box.w>=115&&box.h>=38;
+    if(active&&readable)this.details.add(node.id);
+    return active&&this.details.has(node.id);
+  },
   draw() {
     if(typeof Harness==="undefined"||!Harness.ready)return;
     const width=viewport.clientWidth,height=viewport.clientHeight,dpr=devicePixelRatio||1;
@@ -30,6 +45,17 @@ const Landscape = {
       this.hits.push({box,key});
     }
     if(this.terrain)this.terrain.draw({s:view.z,ox:-view.x/view.z,oy:-view.y/view.z},width,height);
+    const byId=new Map(G.nodes.map(n=>[n.id,n])),vr=viewport.getBoundingClientRect();
+    ctx.strokeStyle="#81aaa8";ctx.lineWidth=.7;
+    for(const wire of G.wires){
+      const from=byId.get(wire.from[0]),to=byId.get(wire.to[0]);if(!from?.el||!to?.el)continue;
+      const closure=visibleClosure(from);
+      if(closure===from||closure!==visibleClosure(to)||!closure._childHost)continue;
+      const a=from.el.getBoundingClientRect(),b=to.el.getBoundingClientRect(),clip=closure._childHost.getBoundingClientRect();
+      if(clip.right<vr.left||clip.left>vr.right||clip.bottom<vr.top||clip.top>vr.bottom)continue;
+      ctx.save();ctx.beginPath();ctx.rect(clip.left-vr.left,clip.top-vr.top,clip.width,clip.height);ctx.clip();
+      ctx.beginPath();ctx.moveTo(a.right-vr.left,a.top+a.height/2-vr.top);ctx.lineTo(b.left-vr.left,b.top+b.height/2-vr.top);ctx.stroke();ctx.restore();
+    }
     for(const n of G.nodes){
       if(!n.el)continue;
       const rect=n.el.getBoundingClientRect(),vr=viewport.getBoundingClientRect();
@@ -37,15 +63,24 @@ const Landscape = {
       const b=screen(box),scope=!!n.children?.length;
       const absorbed=visibleClosure(n)!==n;
       const onScreen=b.x<=width&&b.y<=height&&b.x+b.w>=0&&b.y+b.h>=0;
-      const detail=onScreen&&!absorbed&&b.w>=115&&b.h>=38&&view.z>=.45;
+      const detail=onScreen&&this.detailFor(n,b,absorbed);
       n.el.style.visibility=detail?"visible":"hidden";
-      if(absorbed||detail||b.x>width||b.y>height||b.x+b.w<0||b.y+b.h<0)continue;
+      n.el.inert=n._program!==Harness.selected;
+      if(detail||!onScreen)continue;
       const size=Math.min(b.w,b.h);
+      // The same interior survives at every depth, down to a pixel. Collapsing
+      // interaction does not erase the nested spatial structure.
+      if(absorbed&&size<1.5)continue;
       const hue=this.terrain?.hueOf(n._program||n.type)||175;
+      ctx.save();
+      for(let parent=n._parentScope;parent;parent=parent._parentScope){
+        const clip=parent._childHost.getBoundingClientRect();ctx.beginPath();ctx.rect(clip.left-vr.left,clip.top-vr.top,clip.width,clip.height);ctx.clip();
+      }
       ctx.fillStyle=scope?`hsl(${hue} 23% 28%)`:n.el.classList.contains("ok")?"#7fbd93":n.type.startsWith("beliefs.")?"#b2a270":n.type.startsWith("vm.")?"#ad93c2":"#669b9c";
       if(size<4){ctx.fillRect(b.x+b.w/2-1,b.y+b.h/2-1,2,2);}
       else {ctx.fillRect(b.x,b.y,b.w,b.h);ctx.strokeStyle=scope?"#8ac5bb":"#28383b";ctx.strokeRect(b.x,b.y,b.w,b.h);}
       if(b.w>85&&b.h>20){ctx.fillStyle=scope?"#d7ebe5":"#101c1d";ctx.font="10px system-ui";ctx.fillText(n.type.slice(0,Math.floor(b.w/6)),b.x+4,b.y+13);}
+      ctx.restore();
       this.hits.push({box,node:n});
     }
     if(view.z<.45)for(const [key,box] of Harness.positions){
@@ -67,13 +102,14 @@ const Landscape = {
       const a=screen(from),b=screen(to);ctx.beginPath();ctx.moveTo(a.x+a.w/2,a.y+a.h/2);ctx.lineTo(b.x+b.w/2,b.y+b.h/2);ctx.stroke();
     }
     ctx.setLineDash([]);
+    const closureKey=Harness.selected+":"+G.nodes.map(n=>visibleClosure(n)?.id).join("|");
+    if(this.closureKey!==closureKey){this.closureKey=closureKey;redraw();}
   },
   async refresh() {
     try {
       const response=await fetch("/api/graal/map");if(!response.ok)throw Error(response.status);
       const map=await response.json();this.rows=map.rows||[];this.dbs=map.dbs||[];
-      const first=Harness.mounts.values().next().value||{w:1600};
-      this.objectBox={x:first.w+1760,y:0,w:5200,h:3400};
+      this.positionObjects();
       if(!this.terrain)this.terrain=createGraalTerrain({canvas:this.canvas,invalidate:()=>this.schedule()});
       this.terrain.setRows(this.rows,this.objectBox,this.dbs);
       Harness.schedule();this.schedule();

@@ -20,6 +20,7 @@
 .terrain-ref{color:var(--graal);display:block;text-align:left;margin-top:7px;overflow-wrap:anywhere;max-width:100%}
 body.zoomed-out .territory{background:none;border-color:transparent}
 body.zoomed-out .territory>header,body.zoomed-out .territory>div,body.zoomed-out .territory>button,body.zoomed-out .territory>p,body.zoomed-out .territory>pre{visibility:hidden}
+body.zoomed-out .territory.active-program.selected>header{visibility:visible}
 #palette{top:86px;width:216px;background:#181c1e}
 #minimap,#hint,#spine{display:none!important}
 #channels{position:absolute;top:0;left:0;overflow:visible;pointer-events:none;width:1px;height:1px}
@@ -37,6 +38,7 @@ body.zoomed-out .territory>header,body.zoomed-out .territory>div,body.zoomed-out
 .node .hd b{white-space:normal;overflow-wrap:anywhere}
 .node .result{max-width:350px;max-height:180px}
 .node.scope{border-radius:2px}
+.node.scope .childgrid{resize:none}
 #wires text.wiretype{font-size:12px;fill:var(--wire);stroke-width:5px}
 body.zoomed-out #wires text.wiretype{display:none}
 .fact-field{display:grid;grid-template-columns:repeat(auto-fill,minmax(9px,1fr));gap:3px;align-content:start}

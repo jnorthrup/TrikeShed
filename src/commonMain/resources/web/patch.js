@@ -812,10 +812,13 @@ function layoutRing(n){
   const kids=(n.children||[]).filter(c=>c.el);
   const rings=kids.filter(c=>c.children&&c.children.length);
   for(const r of rings) layoutRing(r);              // inward first — post-order
+  // Moving into a scaled host must not change shrink-to-fit widths mid-layout.
+  if(typeof Harness!=="undefined")for(const c of kids)c.el.style.width=(c.el.offsetWidth||210)+"px";
+  const sizes=new Map(kids.map(c=>[c,{w:c.el.offsetWidth||210,h:c.el.offsetHeight||96}]));
   const ins=kids.filter(c=>c.type==="scope.in");
   const outs=kids.filter(c=>c.type==="scope.out");
   const mids=kids.filter(c=>!ins.includes(c)&&!outs.includes(c)&&!rings.includes(c));
-  const sz=c=>({w:c.el.offsetWidth||210,h:c.el.offsetHeight||96});
+  const sz=c=>sizes.get(c);
   const stackH=a=>a.length?a.reduce((s,c)=>s+sz(c).h,0)+(a.length-1)*RING_GAP:0;
   const rowW=a=>a.length?a.reduce((s,c)=>s+sz(c).w,0)+(a.length-1)*RING_GAP:0;
   const rowH=a=>a.length?Math.max(...a.map(c=>sz(c).h)):0;
@@ -829,6 +832,7 @@ function layoutRing(n){
   const rw=n._ringWorld||host;
   if(n._ringWorld){
     rw.style.width=W+"px"; rw.style.height=H+"px";
+    if(typeof Harness!=="undefined")n._view={x:0,y:0,z:Math.min(1,560/W,360/H)};
     // applyRingView sizes the frame from the world × this ring's zoom, so the
     // floor is never re-set to the unscaled W/H behind a zoomed interior.
     applyRingView(n);
@@ -912,6 +916,11 @@ function syncRingFrame(n){
   const z=v.z||1;
   const w=parseFloat(rw.style.width)||0, h=parseFloat(rw.style.height)||0;
   if(!w||!h) return;
+  if(typeof Harness!=="undefined"){
+    host.style.minWidth="0";host.style.minHeight="0";
+    host.style.width=Math.ceil(w*z)+"px";host.style.height=Math.ceil(h*z)+"px";
+    return;
+  }
   /* The pan counts. Sizing to w*z alone described a world pinned at the frame's
      origin, and the moment a ring was panned or zoomed at a point its contents
      reached past an edge that had not moved.
@@ -1490,7 +1499,9 @@ function redraw(){
       const t=document.createElementNS("http://www.w3.org/2000/svg","title");
       t.textContent="refused by the daemon: "+refused; path.appendChild(t);
     }
-    path.addEventListener("pointerdown",e=>{ e.stopPropagation(); G.wires.splice(idx,1); redraw(); save(); });
+    const mutable=()=>typeof Harness==="undefined"||(source?._program===Harness.selected&&target?._program===Harness.selected);
+    if(!mutable())path.style.pointerEvents="none";
+    path.addEventListener("pointerdown",e=>{if(!mutable())return;e.stopPropagation();G.wires.splice(idx,1);redraw();save();});
     wiresSvg.appendChild(path);
     if(BOARD.cables.has(bk)&&Math.hypot(a.x-b.x,a.y-b.y)*view.z>140&&Math.abs(a.x-b.x)>80){
       const ty=BOARD.cables.get(bk);
@@ -2238,7 +2249,10 @@ viewport.addEventListener("wheel",e=>{
   const nz=Math.min(4000,Math.max(.01,view.z*f));
   view.x=px-(px-view.x)*(nz/view.z);
   view.y=py-(py-view.y)*(nz/view.z);
-  view.z=nz; applyView(); saveCameraSoon();
+  const zoomingIn=nz>view.z;
+  view.z=nz;
+  if(zoomingIn&&typeof Harness!=="undefined")Harness.observeZoom(px,py);
+  applyView(); saveCameraSoon();
   if(!reducedMotion){ // glide anchor = wheel point; the zoom keeps diving there after the gesture ends
     mom.ax=px; mom.ay=py; mom.vx=0; mom.vy=0;
     mom.zv=Math.max(-0.12,Math.min(0.12,mom.zv+Math.log(f)*0.28));
@@ -2442,8 +2456,7 @@ viewport.addEventListener("drop",async e=>{
 addEventListener("pointerdown",e=>{ if(!menu.contains(e.target)) menu.style.display="none"; });
 $("#addBtn").addEventListener("click",e=>showMenu(60,60));
 $("#fitBtn").addEventListener("click",()=>fitToContent());
-/* fd and shake retarget to the most prominent panel first — the one filling
-   the viewport — so the toolbar acts on what is in front of the operator. */
+/* The harness owns mutation targeting independently of camera prominence. */
 function retargetProminent(){
   if(typeof Harness==="undefined"||!Harness.ready) return;
   const p=Harness.prominent();

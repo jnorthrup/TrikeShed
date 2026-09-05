@@ -82,8 +82,13 @@ const Harness = {
       for(const v of entry.violations||[])BOARD.violations.set(cableKey(id(v.fromNode),v.fromPort,id(v.toNode),v.toPort),v.detail||v.rule);
       Object.assign(anchor,this.bounds(name));
       if(fresh){
-        if(this.mounts.size===1){this.nextY=Math.max(3900,anchor.y+anchor.h+250);this.nextX=0;}
-        else {this.nextX=anchor.x+anchor.w+220;this.rowHeight=Math.max(this.rowHeight,anchor.h);if(this.nextX>6500){this.nextY+=this.rowHeight+250;this.nextX=0;this.rowHeight=0;}}
+        // Normalize only the mount origin; document-local coordinates survive.
+        for(const n of G.nodes.filter(n=>n._program===name&&!n._parentScope)){
+          n.x-=anchor.left;n.y-=anchor.top;n.el.style.left=n.x+"px";n.el.style.top=n.y+"px";
+        }
+        anchor.x-=anchor.left;anchor.y-=anchor.top;
+        if(this.mounts.size===1){this.nextY=anchor.y+anchor.top+anchor.h+180;this.nextX=0;}
+        else {this.nextX=anchor.x+anchor.left+anchor.w+120;this.rowHeight=Math.max(this.rowHeight,anchor.h);if(this.nextX>6500){this.nextY+=this.rowHeight+180;this.nextX=0;this.rowHeight=0;}}
       }
       if(!document&&!this.drafts.has(name))this.baselines.set(name,JSON.stringify(this.document(name)));
     }finally{this.applying=previous;}
@@ -102,13 +107,14 @@ const Harness = {
   },
   bounds(name=this.selected) {
     const origin=this.mounts.get(name)||{x:0,y:0};
-    let w = 1550, h = 720;
-    for (const n of G.nodes.filter(n => !n._parentScope&&n._program===name)) {
-      w = Math.max(w, n.x-origin.x + (n.el?.offsetWidth || 190) + 50);
-      h = Math.max(h, n.y-origin.y + (n.el?.offsetHeight || 100) + 50);
-    }
-    return {w,h};
+    const nodes=G.nodes.filter(n=>!n._parentScope&&n._program===name);
+    if(!nodes.length)return {left:0,top:0,w:320,h:180};
+    const left=Math.min(...nodes.map(n=>n.x-origin.x)),top=Math.min(...nodes.map(n=>n.y-origin.y));
+    const right=Math.max(...nodes.map(n=>n.x-origin.x+(n.el?.offsetWidth||190)));
+    const bottom=Math.max(...nodes.map(n=>n.y-origin.y+(n.el?.offsetHeight||100)));
+    return {left,top,w:right-left,h:bottom-top};
   },
+  programRight() {return Math.max(0,...[...this.mounts.values()].map(a=>a.x+(a.left||0)+a.w));},
   territory(key, title, count, x, y, w, h, tone) {
     const el = this.el("section", "territory");
     el.dataset.territory = key;
@@ -129,7 +135,7 @@ const Harness = {
     const {w,h} = this.activeBounds = this.bounds();
     for(const [name,anchor] of this.mounts){
       const box=this.bounds(name);Object.assign(anchor,box);
-      const territory=this.territory("lcnc/program/"+name,name,this.drafts.has(name)?"Unpublished":"lcnc/program/"+name,anchor.x-30,anchor.y-80,box.w+60,box.h+110,"#64ceca");
+      const territory=this.territory("lcnc/program/"+name,name,this.drafts.has(name)?"Unpublished":"lcnc/program/"+name,anchor.x+box.left-24,anchor.y+box.top-64,box.w+48,box.h+88,"#64ceca");
       territory.classList.add("active-program");if(name===this.selected)territory.classList.add("selected");
       const head=territory.querySelector("header");head.addEventListener("click",()=>this.select(name));
       const cid=this.board["lcnc/program/"+name]?.programCid;
@@ -145,8 +151,8 @@ const Harness = {
         groups.get(prefix).push([key,value]);
       }
     }
-    const first=this.mounts.values().next().value||{w:1550};
-    const side = first.w+100;
+    const side=this.programRight()+100;
+    Landscape.positionObjects();
     const runs = Object.entries(this.board).filter(([k,v]) => k.startsWith("lcnc/run/") && v.program === this.selected)
       .sort((a,b) => (b[1].sequence || b[1].startedAtMs || 0) - (a[1].sequence || a[1].startedAtMs || 0));
     $("#cancelRun").disabled=!runs.some(([,v])=>["validating","running"].includes(v.status));
@@ -432,23 +438,24 @@ const Harness = {
     else if(this.viewNode)this.select(this.viewNode._program);
     else this.fit(true);
   },
-  focusNode(node) {this.focusElement(node.el,LandscapeNavigation.node(node._program,node._localId||node.id));this.viewNode=node;},
-  /* The panel that owns the most of the viewport right now. fd and shake act on
-     what the operator is looking at, not on a selection that may sit off-screen
-     from an earlier click. Screen = world * view.z + view (the wheel math's
-     frame). No territory on screen → the selection stands. */
-  prominent() {
-    const r=viewport.getBoundingClientRect();let best=this.selected,bestArea=0;
-    for(const [name,a] of this.mounts){
-      const x0=Math.max(0,a.x*view.z+view.x),y0=Math.max(0,a.y*view.z+view.y);
-      const x1=Math.min(r.width,(a.x+a.w)*view.z+view.x),y1=Math.min(r.height,(a.y+a.h)*view.z+view.y);
-      const area=Math.max(0,x1-x0)*Math.max(0,y1-y0);
-      if(area>bestArea){best=name;bestArea=area;}
+  focusNode(node) {if(node._program!==this.selected)this.select(node._program,false);this.focusElement(node.el,LandscapeNavigation.node(node._program,node._localId||node.id));this.viewNode=node;},
+  // Editing ownership is sticky. Panning, fitting the board and zooming out
+  // cannot retarget layout or mutation commands.
+  prominent() {return this.selected;},
+  observeZoom(px,py) {
+    const r=viewport.getBoundingClientRect();
+    for(const [key,a] of this.positions){
+      if(!key.startsWith("lcnc/program/"))continue;
+      const x=a.x*view.z+view.x,y=a.y*view.z+view.y,w=a.w*view.z,h=a.h*view.z;
+      const area=Math.max(0,Math.min(r.width,x+w)-Math.max(0,x))*Math.max(0,Math.min(r.height,y+h)-Math.max(0,y));
+      if(px<x||py<y||px>x+w||py>y+h||area<r.width*r.height*.55)continue;
+      const name=key.slice(13);
+      if(name!==this.selected)this.select(name,false);
+      return;
     }
-    return best;
   },
   fit(all) {
-    if (!all) { const anchor=this.mounts.get(this.selected)||{x:0,y:0};this.focus({x:anchor.x-40,y:anchor.y-90,w:this.activeBounds.w+120,h:this.activeBounds.h+130},LandscapeNavigation.program(this.selected)); return; }
+    if (!all) { const box=this.positions.get("lcnc/program/"+this.selected);if(box)this.focus(box,LandscapeNavigation.program(this.selected));return; }
     const boxes=[...this.positions.values()];
     const x=Math.min(...boxes.map(b=>b.x)),y=Math.min(...boxes.map(b=>b.y));
     this.focus({x,y,w:Math.max(...boxes.map(b=>b.x+b.w))-x,h:Math.max(...boxes.map(b=>b.y+b.h))-y});
@@ -607,7 +614,7 @@ $("#factInspector").addEventListener("close",()=>{
 $("#terrainLayer").addEventListener("change",e=>{Landscape.terrain?.setLayer(Number(e.target.value));Landscape.schedule();});
 viewport.addEventListener("pointerdown",e=>{
   const element=e.target.closest(".node"),n=element&&G.nodes.find(n=>n.el===element);
-  if(n?._program&&n._program!==Harness.selected)Harness.select(n._program,false);
+  if(n?._program&&n._program!==Harness.selected){e.preventDefault();e.stopImmediatePropagation();}
 },true);
 viewport.addEventListener("dblclick",e=>{
   if(e.target.closest(".node,button,input,textarea,select"))return;

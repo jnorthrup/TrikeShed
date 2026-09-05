@@ -56,6 +56,92 @@ test("collapsed closures retain the original node and re-expand reversibly",()=>
   assert.equal(child._parentScope,scope);
 });
 
+test("interactive detail sticks through zoom-out until another main owns edits",()=>{
+  const {landscape,harness}=fixture();
+  const node={id:"a::one",_program:"a"};
+  harness.selected="a";
+  assert.equal(landscape.detailFor(node,{w:200,h:100},false),true);
+  assert.equal(landscape.detailFor(node,{w:20,h:10},true),true);
+  harness.selected="b";
+  assert.equal(landscape.detailFor(node,{w:200,h:100},false),false);
+  assert.equal(landscape.details.size,0);
+  assert.equal(harness.prominent(),"b");
+});
+
+test("only a zoom into a dominant main transfers editing ownership",()=>{
+  const {context,harness}=fixture();
+  context.viewport={getBoundingClientRect:()=>({width:1000,height:800})};
+  context.view={x:0,y:0,z:1};
+  harness.selected="a";
+  harness.positions.set("lcnc/program/b",{x:100,y:100,w:300,h:200});
+  harness.select=name=>{harness.selected=name;};
+  harness.observeZoom(150,150);
+  assert.equal(harness.selected,"a");
+  harness.positions.set("lcnc/program/b",{x:0,y:0,w:950,h:750});
+  harness.observeZoom(990,790);
+  assert.equal(harness.selected,"a");
+  harness.observeZoom(400,300);
+  assert.equal(harness.selected,"b");
+});
+
+test("the wheel routes ownership checks only on zoom-in",()=>{
+  const {context,harness}=fixture();
+  const patch=fs.readFileSync(path.join(web,"patch.js"),"utf8");
+  let wheel,checks=0;
+  context.viewport={addEventListener:(name,handler)=>{wheel=handler;},getBoundingClientRect:()=>({left:0,top:0,width:1000,height:800})};
+  context.view={x:0,y:0,z:1};context.wheelPixels=e=>({dy:e.deltaY});
+  context.applyView=()=>{};context.saveCameraSoon=()=>{};context.reducedMotion=true;
+  harness.observeZoom=()=>{checks++;};
+  const start=patch.indexOf('viewport.addEventListener("wheel",e=>{');
+  vm.runInContext(patch.slice(start,patch.indexOf('},{passive:false});',start)+19),context);
+  wheel({preventDefault(){},clientX:400,clientY:300,deltaY:100});
+  assert.equal(checks,0);
+  wheel({preventDefault(){},clientX:400,clientY:300,deltaY:-100});
+  assert.equal(checks,1);
+});
+
+test("assembly bounds are content-tight without rewriting authored coordinates",()=>{
+  const {context,harness}=fixture();
+  const nodes=[{_program:"a",x:10000,y:-700,el:{offsetWidth:190,offsetHeight:100}},
+    {_program:"a",x:10300,y:-650,el:{offsetWidth:200,offsetHeight:80}}];
+  context.G={nodes};harness.selected="a";
+  const bounds=harness.bounds();
+  assert.equal(bounds.left,10000);assert.equal(bounds.top,-700);
+  assert.equal(bounds.w,500);assert.equal(bounds.h,130);
+  assert.equal(nodes[0].x,10000);
+});
+
+test("object terrain stays outside the complete program region",()=>{
+  const {landscape,harness}=fixture();
+  harness.mounts.set("small",{x:0,left:0,w:300});
+  harness.mounts.set("large",{x:1800,left:500,w:2400});
+  landscape.positionObjects();
+  assert.equal(harness.programRight(),4700);
+  assert.ok(landscape.objectBox.x>4700);
+});
+
+test("scope interiors compound their scales instead of expanding every ancestor",()=>{
+  const {context}=fixture();
+  const patch=fs.readFileSync(path.join(web,"patch.js"),"utf8");
+  vm.runInContext(patch.slice(patch.indexOf("const RING_EDGE="),patch.indexOf("/* ring chrome rides")),context);
+  const leaf={type:"note",children:[],el:{offsetWidth:1000,offsetHeight:500,style:{},classList:{add(){}}}};
+  const scope=child=>{
+    const host={style:{}},world={style:{},appendChild(){}};
+    const n={type:"scope",children:[child],_childHost:host,_ringWorld:world,_view:{x:0,y:0,z:1}};
+    n.el={style:{},classList:{add(){}},get offsetWidth(){return parseFloat(host.style.width)||0;},get offsetHeight(){return (parseFloat(host.style.height)||0)+100;}};
+    child._parentScope=n;return n;
+  };
+  const inner=scope(leaf),outer=scope(inner),root=scope(outer);
+  context.layoutRing(root);
+  for(const n of [root,outer,inner]){
+    assert.ok(parseFloat(n._childHost.style.width)<=560);
+    assert.ok(parseFloat(n._childHost.style.height)<=360);
+    assert.ok(n._view.z<1);
+  }
+  assert.equal(context.ringScaleOf(leaf),root._view.z*outer._view.z*inner._view.z);
+  assert.equal(leaf.el.offsetWidth,1000);
+});
+
 test("bounded readers cancel oversized chunked responses without content-length",async()=>{
   const {landscape}=fixture();
   let cancelled=false;
