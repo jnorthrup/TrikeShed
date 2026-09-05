@@ -1333,6 +1333,7 @@
 <<<<<<< HEAD
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
 =======
   const VIEWS = { doc: [docScrollEl, viewDocBtn, document.getElementById('btn-home')], board: [boardScrollEl, viewBoardBtn, document.getElementById('btn-board')], graph: [graphScrollEl, viewGraphBtn, document.getElementById('btn-graph')], sheet: [sheetScrollEl, viewSheetBtn, document.getElementById('btn-sheet')], shape: [shapeScrollEl, viewShapeBtn], host: [hostScrollEl, viewHostBtn, document.getElementById('btn-host')] };
 >>>>>>> origin/jules-17428175357654286191-b5258251
@@ -1351,6 +1352,10 @@
     host: document.getElementById('btn-host')
   };
 >>>>>>> origin/palette/consistent-sidebar-active-states-2051654551536943700
+=======
+  const SIDEBAR_BTNS = { doc: document.getElementById('btn-home'), board: document.getElementById('btn-board'), graph: document.getElementById('btn-graph'), sheet: document.getElementById('btn-sheet'), host: document.getElementById('btn-host') };
+
+>>>>>>> origin/palette/sidebar-active-state-16031907533662246712
   function setView(view) {
     mutate((s) => { s.view = view; }, 'view');
 <<<<<<< HEAD
@@ -1554,10 +1559,15 @@
       const btn = document.getElementById(id);
       if (!btn) continue;
       btn.classList.toggle('active', k === view);
+      const sideBtn = SIDEBAR_BTNS[k];
+      if (sideBtn) sideBtn.classList.toggle('active', k === view);
+
       if (k === view) {
         btn.setAttribute('aria-current', 'page');
+        if (sideBtn) sideBtn.setAttribute('aria-current', 'page');
       } else {
         btn.removeAttribute('aria-current');
+        if (sideBtn) sideBtn.removeAttribute('aria-current');
       }
     }
     for (const [k, btn] of Object.entries(SIDEBAR_BTNS)) {

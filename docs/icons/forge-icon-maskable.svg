@@ -1,7 +1,0 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64" role="img" aria-label="Forge">
-  <!-- maskable: full-bleed background, glyph inside the 80% safe zone -->
-  <rect width="64" height="64" fill="#090d13"/>
-  <path d="M18 44V20h28v24H18Zm3-3h22V23H21v18Z" fill="#e9e9e7"/>
-  <rect x="26" y="29" width="12" height="2.5" fill="#2383e2"/>
-  <rect x="26" y="34" width="8" height="2.5" fill="#2383e2"/>
-</svg>

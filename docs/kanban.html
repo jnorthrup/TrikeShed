@@ -1,0 +1,417 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Oroboros Board</title>
+<style>
+  :root {
+    --bg: #f4f2ec; --panel: #ffffff; --ink: #2b2a27; --muted: #8a867c;
+    --line: #e2ded4; --accent: #4a6fa5; --danger: #b3543f; --ok: #5a8a5e;
+    --card-shadow: 0 1px 3px rgba(40,36,28,.10), 0 1px 2px rgba(40,36,28,.06);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #201f1c; --panel: #2a2926; --ink: #e8e5dd; --muted: #98938a;
+      --line: #3a3833; --accent: #7d9fc9; --danger: #cf7a63; --ok: #7fae83;
+      --card-shadow: 0 1px 3px rgba(0,0,0,.4);
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--ink);
+    font: 15px/1.45 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  }
+  header {
+    display: flex; align-items: baseline; gap: 14px; padding: 14px 20px 10px;
+    flex-wrap: wrap;
+  }
+  header h1 { font-size: 20px; margin: 0; font-weight: 650; }
+  header .seq { color: var(--muted); font-size: 13px; }
+  header .spacer { flex: 1; }
+  button {
+    font: inherit; border: 1px solid var(--line); background: var(--panel);
+    color: var(--ink); border-radius: 8px; padding: 6px 14px; cursor: pointer;
+  }
+  button:hover { border-color: var(--accent); }
+  button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+  #board {
+    display: flex; gap: 12px; padding: 6px 20px 24px; align-items: flex-start;
+    overflow-x: auto; min-height: 70vh;
+  }
+  .lane {
+    background: color-mix(in srgb, var(--panel) 62%, var(--bg));
+    border: 1px solid var(--line); border-radius: 12px;
+    min-width: 250px; max-width: 300px; flex: 1 0 250px;
+    display: flex; flex-direction: column; max-height: calc(100vh - 120px);
+  }
+  .lane.drop-ok { outline: 2px dashed var(--accent); outline-offset: -4px; }
+  .lane h2 {
+    font-size: 13px; letter-spacing: .06em; text-transform: uppercase;
+    margin: 0; padding: 12px 14px 8px; color: var(--muted); font-weight: 650;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .lane h2 .count { font-weight: 400; }
+  .lane h2 .wip { margin-left: auto; font-weight: 400; font-size: 12px; }
+  .lane h2 .wip.full { color: var(--danger); font-weight: 650; }
+  .cards { padding: 4px 10px 10px; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; min-height: 40px; }
+  .card {
+    background: var(--panel); border: 1px solid var(--line); border-radius: 10px;
+    box-shadow: var(--card-shadow); padding: 10px 12px; cursor: grab; position: relative;
+  }
+  .card.dragging { opacity: .45; }
+  .card .t { font-weight: 550; word-wrap: break-word; padding-right: 18px; }
+  .card .meta { display: flex; gap: 8px; margin-top: 6px; font-size: 12px; color: var(--muted); flex-wrap: wrap; align-items: center; }
+  .card .owner { background: color-mix(in srgb, var(--accent) 14%, transparent); color: var(--accent); border-radius: 20px; padding: 1px 9px; }
+  .card .heat { color: var(--danger); }
+  .card .archive {
+    position: absolute; top: 6px; right: 8px; border: 0; background: none; color: var(--muted);
+    font-size: 15px; padding: 2px 4px; line-height: 1; cursor: pointer;
+  }
+  .card .archive:hover { color: var(--danger); }
+  .addrow { padding: 0 10px 12px; }
+  .addrow input {
+    width: 100%; font: inherit; padding: 7px 10px; border-radius: 8px;
+    border: 1px dashed var(--line); background: transparent; color: var(--ink);
+  }
+  .addrow input:focus { outline: none; border-color: var(--accent); border-style: solid; }
+  #toast {
+    position: fixed; bottom: 22px; left: 50%; transform: translateX(-50%);
+    background: var(--ink); color: var(--bg); border-radius: 10px; padding: 10px 18px;
+    font-size: 14px; opacity: 0; transition: opacity .25s; pointer-events: none; max-width: 80vw;
+  }
+  #toast.show { opacity: .96; }
+  dialog {
+    border: 1px solid var(--line); border-radius: 14px; background: var(--panel); color: var(--ink);
+    padding: 20px; width: min(560px, 92vw);
+  }
+  dialog::backdrop { background: rgba(0,0,0,.35); }
+  dialog h3 { margin: 0 0 6px; }
+  dialog p { margin: 4px 0 12px; color: var(--muted); font-size: 14px; }
+  dialog textarea {
+    width: 100%; height: 180px; font: 13px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace;
+    border: 1px solid var(--line); border-radius: 8px; background: var(--bg); color: var(--ink); padding: 10px;
+  }
+  dialog .row { display: flex; gap: 10px; justify-content: flex-end; margin-top: 12px; }
+  .empty-board {
+    padding: 40px 20px; text-align: center; color: var(--muted); width: 100%;
+  }
+  #ticker {
+    position: fixed; bottom: 0; left: 0; right: 0; background: var(--panel);
+    border-top: 1px solid var(--line); padding: 5px 20px; font: 12px/1.5 ui-monospace, Menlo, monospace;
+    color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  #ticker b { color: var(--ok); font-weight: 650; }
+  #ticker .k { color: var(--accent); }
+</style>
+</head>
+<body>
+<header>
+  <h1>Oroboros Board</h1>
+  <span class="seq" id="seq"></span>
+  <span class="spacer"></span>
+  <button id="importBtn">Import a plan…</button>
+</header>
+<div id="board"></div>
+<div id="ticker">daemon wire: connecting…</div>
+<div id="toast"></div>
+
+<dialog id="importDlg">
+  <h3>Import a plan</h3>
+  <p>Paste a plan or to-do list. Every bullet line (<code>-</code>, <code>*</code>, or <code>1.</code>) becomes a card. Re-importing the same list is safe — duplicates are skipped.</p>
+  <textarea id="importText" placeholder="- Ship the release notes&#10;- Review the tribunal preset&#10;- Archive stale cards"></textarea>
+  <div class="row">
+    <button id="importCancel">Cancel</button>
+    <button class="primary" id="importGo">Import</button>
+  </div>
+</dialog>
+
+<script>
+"use strict";
+// Talks only to the module's claimed routes:
+//   GET  /api/board                     board JSON (memoized by sequence)
+//   POST /api/invoke                    {type:submit|archive, ...}
+//   POST /api/lcnc/kanban/move          {itemId, to, expectedRevision} -> 202 | 409
+//   POST /api/board/import              markdown bullets
+const LANES = ["triage", "todo", "ready", "running", "blocked", "done"]; // archived stays hidden
+let lastSeq = -1, lastPayload = "";
+// A re-render mid-drag destroys the dragged element and kills the gesture.
+// While a drag is live, renders are deferred; the last board lands at dragend.
+let dragLive = false, deferredBoard = null;
+function dragBegan() { dragLive = true; }
+function dragEnded() {
+  dragLive = false;
+  if (deferredBoard) { const b = deferredBoard; deferredBoard = null; render(b); }
+}
+
+const $ = (s) => document.querySelector(s);
+const boardEl = $("#board");
+
+function toast(msg, ms = 2600) {
+  const t = $("#toast");
+  t.textContent = msg;
+  t.classList.add("show");
+  clearTimeout(t._h);
+  t._h = setTimeout(() => t.classList.remove("show"), ms);
+}
+
+function randomId() {
+  const b = new Uint8Array(6);
+  crypto.getRandomValues(b);
+  return Array.from(b, x => x.toString(16).padStart(2, "0")).join("");
+}
+
+async function api(path, opts) {
+  const r = await fetch(path, opts);
+  let body = null;
+  try { body = await r.json(); } catch (_) { /* non-JSON error page */ }
+  return { status: r.status, body };
+}
+
+async function refresh(force = false) {
+  try {
+    const { status, body } = await api("/api/board");
+    if (status !== 200 || !body) return;
+    // NARS attention scores drift every poll; rounding them in the compare key
+    // stops the board re-rendering (and eating drags) when nothing moved.
+    const payload = JSON.stringify(body, (k, v) => (k === "attention" && typeof v === "number") ? Math.round(v * 20) / 20 : v);
+    if (!force && payload === lastPayload) return;
+    lastPayload = payload;
+    lastSeq = body.sequence;
+    if (dragLive) { deferredBoard = body; return; }
+    render(body);
+  } catch (_) {
+    // daemon momentarily away (restart / hotswap) — keep the last render
+  }
+}
+
+function render(board) {
+  $("#seq").textContent = "seq " + board.sequence;
+  const byCol = {};
+  for (const lane of LANES) byCol[lane] = [];
+  let archived = 0;
+  for (const it of board.items || []) {
+    if (it.status === "archived") { archived++; continue; }
+    (byCol[it.status] || (byCol[it.status] = [])).push(it);
+  }
+  for (const lane of LANES) byCol[lane].sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+  const colMeta = Object.fromEntries((board.columns || []).map(c => [c.id, c]));
+
+  boardEl.textContent = "";
+  const total = (board.items || []).length - archived;
+  if (total === 0) {
+    const hint = document.createElement("div");
+    hint.className = "empty-board";
+    hint.innerHTML = "The board is empty. Type into a lane below to add the first card, or use <b>Import a plan…</b> to turn a bullet list into cards.";
+    boardEl.appendChild(hint);
+  }
+  for (const lane of LANES) {
+    const meta = colMeta[lane] || { name: lane, wipLimit: null };
+    const laneEl = document.createElement("div");
+    laneEl.className = "lane";
+    laneEl.dataset.lane = lane;
+
+    const h = document.createElement("h2");
+    const wip = meta.wipLimit != null
+      ? `<span class="wip ${byCol[lane].length >= meta.wipLimit ? "full" : ""}">${byCol[lane].length}/${meta.wipLimit}</span>`
+      : "";
+    h.innerHTML = `${meta.name} <span class="count">${byCol[lane].length}</span>${wip}`;
+    laneEl.appendChild(h);
+
+    const cards = document.createElement("div");
+    cards.className = "cards";
+    for (const it of byCol[lane]) cards.appendChild(cardEl(it));
+    laneEl.appendChild(cards);
+
+    const addrow = document.createElement("div");
+    addrow.className = "addrow";
+    const input = document.createElement("input");
+    input.placeholder = "+ Add a card, press Enter";
+    input.addEventListener("keydown", (e) => {
+      if (e.key === "Enter" && input.value.trim().length >= 3) addCard(input.value.trim(), lane, input);
+    });
+    addrow.appendChild(input);
+    laneEl.appendChild(addrow);
+
+    laneEl.addEventListener("dragover", (e) => { e.preventDefault(); laneEl.classList.add("drop-ok"); });
+    laneEl.addEventListener("dragleave", () => laneEl.classList.remove("drop-ok"));
+    laneEl.addEventListener("drop", (e) => {
+      e.preventDefault();
+      laneEl.classList.remove("drop-ok");
+      const data = e.dataTransfer.getData("text/plain");
+      if (data) moveCard(JSON.parse(data), lane);
+    });
+    boardEl.appendChild(laneEl);
+  }
+  if (archived > 0) $("#seq").textContent += ` · ${archived} archived`;
+}
+
+function cardEl(it) {
+  const el = document.createElement("div");
+  el.className = "card";
+  el.dataset.id = it.id;
+  el.style.touchAction = "none"; // pointer drag streams moves on touch too
+  const heat = typeof it.attention === "number" && it.attention > 0
+    ? `<span class="heat" title="attention">${it.contested ? "⚡" : "●"} ${(it.attention * 100).toFixed(0)}%</span>` : "";
+  const owner = it.owner ? `<span class="owner">${escapeHtml(it.owner)}</span>` : "";
+  el.innerHTML = `<div class="t">${escapeHtml(it.title || it.id)}</div>
+    <div class="meta">${owner}${heat}<span>r${it.revision}</span></div>
+    <button class="archive" title="Archive this card">×</button>`;
+  el.querySelector(".archive").addEventListener("click", () => archiveCard(it));
+  // Pointer-event drag, NOT HTML5 DnD: works identically for mouse, trackpad,
+  // touch, and pen; no dataTransfer, no browser drag-image quirks, and it
+  // responds to plain pointer input so it is machine-verifiable too.
+  el.addEventListener("pointerdown", (e) => {
+    if (e.button !== 0 || e.target.closest(".archive")) return;
+    const sx = e.clientX, sy = e.clientY;
+    let ghost = null;
+    const laneUnder = (ev) => document.elementFromPoint(ev.clientX, ev.clientY)?.closest(".lane") || null;
+    const onMove = (ev) => {
+      if (!ghost) {
+        if (Math.hypot(ev.clientX - sx, ev.clientY - sy) < 6) return; // click stays a click
+        dragBegan();
+        el.classList.add("dragging");
+        ghost = el.cloneNode(true);
+        const r = el.getBoundingClientRect();
+        ghost.style.cssText = `position:fixed;pointer-events:none;z-index:999;opacity:.88;width:${r.width}px;margin:0;`;
+        ghost.className = "card";
+        document.body.appendChild(ghost);
+      }
+      ghost.style.left = (ev.clientX + 8) + "px";
+      ghost.style.top = (ev.clientY + 8) + "px";
+      document.querySelectorAll(".lane").forEach(l => l.classList.remove("drop-ok"));
+      laneUnder(ev)?.classList.add("drop-ok");
+      ev.preventDefault();
+    };
+    const onUp = (ev) => {
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("pointerup", onUp);
+      window.removeEventListener("pointercancel", onUp);
+      document.querySelectorAll(".lane").forEach(l => l.classList.remove("drop-ok"));
+      el.classList.remove("dragging");
+      if (!ghost) return; // never crossed the threshold: plain click
+      ghost.remove();
+      const lane = laneUnder(ev);
+      dragEnded();
+      if (lane && lane.dataset.lane) {
+        const before = beforeTargetIn(lane, ev.clientY, it.id);
+        // A completed drag always commits: cross-lane moves, same-lane reorders
+        // (append when dropped below every card, insert-before otherwise).
+        moveCard({ id: it.id, revision: it.revision, from: it.status }, lane.dataset.lane, before);
+      }
+    };
+    window.addEventListener("pointermove", onMove);
+    window.addEventListener("pointerup", onUp);
+    window.addEventListener("pointercancel", onUp);
+  });
+  return el;
+}
+
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+}
+
+async function addCard(title, lane, input) {
+  const hex = randomId();
+  const { status, body } = await api("/api/invoke", {
+    method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ type: "submit", jobId: "card-" + hex, title, idempotencyKey: "ui#" + hex }),
+  });
+  if (status === 202 && body && body.accepted >= 1) {
+    input.value = "";
+    await refresh(true);
+    // new cards land in triage; if the user typed into another lane, walk it over
+    if (lane !== "triage") {
+      const fresh = JSON.parse(lastPayload).items.find(i => i.id === "card-" + hex);
+      if (fresh) await moveCard({ id: fresh.id, revision: fresh.revision, from: fresh.status }, lane);
+    }
+  } else {
+    toast("Couldn't add the card: " + (body?.results?.[0]?.reason || "server said no"));
+  }
+}
+
+async function moveCard(drag, toLane, beforeJobId) {
+  if (drag.from === toLane && !beforeJobId) return;
+  const command = {
+    jobId: drag.id, toColumn: toLane, expectedRevision: drag.revision,
+    idempotencyKey: "ui#" + drag.id + "#" + drag.revision + "#" + toLane + "#" + (beforeJobId || "end"),
+  };
+  if (beforeJobId) command.beforeJobId = beforeJobId;
+  // kanban.move via the runner dispatch — the one lane that carries beforeJobId.
+  const { status, body } = await api("/api/lcnc/run", {
+    method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ type: "kanban.move", inputs: { command, "command?": command } }),
+  });
+  const out = body && body.outputs;
+  if (status === 200 && out && out.accepted !== false) { await refresh(true); return; }
+  toast("Move refused: " + ((out && out.reason) || body?.error || status));
+  await refresh(true);
+}
+
+// The card whose TOP HALF the pointer is above becomes the insert-before
+// target; below every card = append. This is what makes X-and-Y drops land
+// BETWEEN cards instead of at the bottom.
+function beforeTargetIn(lane, clientY, draggedId) {
+  for (const card of lane.querySelectorAll(".card")) {
+    if (card.dataset.id === draggedId) continue;
+    const r = card.getBoundingClientRect();
+    if (clientY < r.top + r.height / 2) return card.dataset.id;
+  }
+  return null;
+}
+
+async function archiveCard(it) {
+  // there is no "archive" verb in the reducer — archiving IS a move to the archived column
+  await moveCard({ id: it.id, revision: it.revision, from: it.status }, "archived");
+}
+
+// ── Import dialog ──
+$("#importBtn").addEventListener("click", () => $("#importDlg").showModal());
+$("#importCancel").addEventListener("click", () => $("#importDlg").close());
+$("#importGo").addEventListener("click", async () => {
+  const text = $("#importText").value;
+  if (!text.trim()) { $("#importDlg").close(); return; }
+  const { status, body } = await api("/api/board/import", {
+    method: "POST", headers: { "Content-Type": "text/plain" }, body: text,
+  });
+  $("#importDlg").close();
+  if (status === 200 && body) {
+    toast(`Imported ${body.imported} card${body.imported === 1 ? "" : "s"}` +
+      (body.duplicates ? `, ${body.duplicates} already on the board` : ""));
+    $("#importText").value = "";
+  } else {
+    toast("Import failed (" + status + ")");
+  }
+  await refresh(true);
+});
+
+// ── The interchange rail, visible: every board action lands as a durable fact
+// on the daemon blackboard (kanban/committed/…, kanban/rule/… from the Rete
+// productions); the repaired /blackboard/facts SSE streams them back here live.
+(function ticker() {
+  const el = $("#ticker");
+  let es;
+  function connect() {
+    es = new EventSource("/blackboard/facts");
+    es.onmessage = (m) => {
+      let f; try { f = JSON.parse(m.data); } catch (_) { return; }
+      if (!f.key) return;
+      if (f.key.startsWith("kanban/")) {
+        const v = f.value || {};
+        el.innerHTML = `<b>●</b> <span class="k">${escapeHtml(f.key)}</span> ${escapeHtml(
+          v.op ? `${v.op} → ${v.col}${v.from ? " (from " + v.from + ")" : ""} r${v.revision}` : JSON.stringify(v).slice(0, 120))}`;
+        refresh(); // a fact means the board may have moved under us
+      } else if (el.textContent.startsWith("daemon wire")) {
+        el.innerHTML = `<b>●</b> daemon wire live — last fact: <span class="k">${escapeHtml(f.key)}</span>`;
+      }
+    };
+    es.onerror = () => { es.close(); el.textContent = "daemon wire: reconnecting…"; setTimeout(connect, 3000); };
+  }
+  connect();
+})();
+
+refresh(true);
+setInterval(refresh, 2500);
+</script>
+</body>
+</html>
