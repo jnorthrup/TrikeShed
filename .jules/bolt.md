@@ -192,6 +192,7 @@ The code looks correct and fully optimized. The tests passed on the relevant par
 <<<<<<< HEAD
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
 
 <<<<<<< HEAD
 <<<<<<< HEAD
@@ -287,3 +288,9 @@ The code looks correct and fully optimized. The tests passed on the relevant par
 **Learning:** In Kotlin, using `.map { it }` on an already materialized collection (such as a `List` returned by `Files.readAllLines`) is a redundant identity transform. It needlessly copies the entire list, allocating an intermediate `ArrayList` and wasting O(N) time and memory.
 **Action:** Remove redundant `.map { it }` calls after functions that already return materialized collections to return the original list directly without extra overhead.
 >>>>>>> origin/bolt/optimize-read-lines-2426821052458345611
+=======
+
+## 2026-08-30 - Avoid O(N) allocation when iterating Series with forEach
+**Learning:** Chaining `.toList().forEach { ... }` on custom immutable data structures like `Series` allocates an intermediate `ArrayList` (O(N) memory allocation and copy). TrikeShed's `Series` provides an inline `.forEach` extension, making this intermediate list redundant and harmful to performance on hot validation paths.
+**Action:** Call `.forEach` directly on `Series` objects instead of chaining `.toList().forEach()` to eliminate lambda and list heap allocations.
+>>>>>>> origin/bolt/remove-redundant-toList-in-KanbanGraph-3252174643772873366
