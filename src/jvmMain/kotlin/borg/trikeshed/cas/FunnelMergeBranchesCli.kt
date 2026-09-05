@@ -83,8 +83,16 @@ class FunnelMergeBranchesCli(private val repoDir: File, private val since: Strin
             val newPaths = hunks.map { it.path }.distinct().filter { !File(repoDir, it).exists() }
             val quarantined = EntropyPathScanner.scanTouchedPaths(newPaths).map { it.path }.toSet()
             if (quarantined.isNotEmpty()) println("[FUNNEL-MERGE] QUARANTINE $label: new paths with entropy > 3.5 dropped: $quarantined")
-            val kept = hunks.filter { it.path !in quarantined }
-            sources[label] = ArmSource(ref, date, dropped + quarantined)
+            // Resurrection guard (Jim's rule: kept merges must not bring owner-deleted files back).
+            // A path the branch presents as NEW relative to the base, absent from master today,
+            // that master's history has deleted, is a deletion being undone — refused.
+            val resurrected = newPaths.filter { it !in quarantined }.filter { path ->
+                git("cat-file", "-e", "$base:$path").first != 0 &&
+                    git("log", "--diff-filter=D", "-1", "--format=%h", "master", "--", path).second.isNotBlank()
+            }.toSet()
+            if (resurrected.isNotEmpty()) println("[FUNNEL-MERGE] RESURRECTION refused for $label: $resurrected")
+            val kept = hunks.filter { it.path !in quarantined && it.path !in resurrected }
+            sources[label] = ArmSource(ref, date, dropped + quarantined + resurrected)
             if (kept.isEmpty()) { println("[FUNNEL-MERGE] $label: only scratch/quarantined paths — nothing to merge"); continue }
             arms.add(GitPijulGateway.Arm(label, kept))
         }
