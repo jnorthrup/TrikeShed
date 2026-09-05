@@ -183,6 +183,7 @@ The code looks correct and fully optimized. The tests passed on the relevant par
 <<<<<<< HEAD
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
 
 <<<<<<< HEAD
 <<<<<<< HEAD
@@ -221,3 +222,8 @@ The code looks correct and fully optimized. The tests passed on the relevant par
 **Learning:** Using chained collection functions like `.filterIsInstance<T>().isEmpty()` and `.maxWithOrNull(...)` creates intermediate `ArrayList` allocations when executed on standard Iterables. This is especially inefficient in hot paths like event sourcing or patch causality resolution.
 **Action:** Replace these chains with single-pass zero-allocation `for` loops that use `if (item is T)` checks to directly track the maximum item.
 >>>>>>> origin/bolt-patch-continuity-opt-7763142742223188880
+=======
+## 2026-10-26 - Avoid redundant `.map { it }` on JVM ReadLines actuals
+**Learning:** In Kotlin, using `.map { it }` on a collection (e.g., `Files.readAllLines(path).map { it }`) is a redundant identity transform. It needlessly allocates a full copy of the list, increasing heap allocations and GC pressure in hot paths.
+**Action:** Remove redundant `.map { it }` calls to directly return the list and avoid the O(N) allocation overhead.
+>>>>>>> origin/bolt-readlines-optimization-1347311716355117455
