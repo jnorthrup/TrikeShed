@@ -69,6 +69,7 @@ sealed interface JulesReportSettlementSelection {
 fun selectJulesPatchForDrain(causes: Iterable<JulesCause>): JulesPatchDrainSelection {
     val causalList = causes as? List<JulesCause> ?: causes.toList()
 
+<<<<<<< HEAD
     // ⚡ Bolt: Replace intermediate List allocations (.filterIsInstance, .maxWith)
     // with a single manual iteration to find the latest snapshot and latest report.
     var latestSnapshot: JulesCause.PatchSnapshotObserved? = null
@@ -86,15 +87,33 @@ fun selectJulesPatchForDrain(causes: Iterable<JulesCause>): JulesPatchDrainSelec
     }
 
     if (latestSnapshot == null) return JulesPatchDrainSelection.Unobserved
+=======
+    // Bolt: Prevent intermediate List allocations with filterIsInstance<T>()
+    var maxObservation: JulesCause.PatchSnapshotObserved? = null
+    var latestObservationIndex = -1
+    var rejectIndex = -1
+
+    for ((index, item) in causalList.withIndex()) {
+        if (item is JulesCause.PatchSnapshotObserved) {
+            latestObservationIndex = index
+            if (maxObservation == null || snapshotCausalOrder.compare(item, maxObservation) > 0) {
+                maxObservation = item
+            }
+        } else if (item is JulesCause.PatchRejected) {
+            rejectIndex = index
+        }
+    }
+
+    if (maxObservation == null) return JulesPatchDrainSelection.Unobserved
+>>>>>>> origin/bolt-patch-continuity-opt-7763142742223188880
 
     // A typed reject, bonded to a receipt and posted after every producer
     // artifact, closes the chain: the session settles as rejected without
     // applying any observed patch.  Recency never launders a reject away and
     // a reject never discards the observed evidence it names.
-    val rejectIndex = causalList.indexOfLast { it is JulesCause.PatchRejected }
-    val latestObservationIndex = causalList.indexOfLast { it is JulesCause.PatchSnapshotObserved }
     val reject = causalList.getOrNull(rejectIndex) as? JulesCause.PatchRejected
     if (reject != null && rejectIndex > latestObservationIndex) {
+<<<<<<< HEAD
         val latestPatchCid = latestSnapshot.patchCid
         val latestReportCid = maxReport?.reportCid
 
@@ -108,6 +127,22 @@ fun selectJulesPatchForDrain(causes: Iterable<JulesCause>): JulesPatchDrainSelec
             }
         }
 
+=======
+        val latestPatchCid = maxObservation.patchCid
+        // Bolt: avoid intermediate List allocations from filterIsInstance by using sequence for terminal ops
+        var maxReport: JulesCause.AgentReportObserved? = null
+        for (item in causalList) {
+            if (item is JulesCause.AgentReportObserved) {
+                if (maxReport == null || reportCausalOrder.compare(item, maxReport) > 0) {
+                    maxReport = item
+                }
+            }
+        }
+        val latestReportCid = maxReport?.reportCid
+        val rejected = causalList.lastOrNull {
+            it is JulesCause.PatchSnapshotObserved && it.patchCid == reject.patchCid && it.causalOrdinal == reject.causalOrdinal
+        } as? JulesCause.PatchSnapshotObserved
+>>>>>>> origin/bolt-patch-continuity-opt-7763142742223188880
         if (rejected != null &&
             reject.latestPatchCid == latestPatchCid &&
             reject.latestReportCid == latestReportCid &&
@@ -127,6 +162,7 @@ fun selectJulesPatchForDrain(causes: Iterable<JulesCause>): JulesPatchDrainSelec
     val explicitIndex = causalList.indexOfLast { it is JulesCause.PatchReviewSelected }
     val explicit = causalList.getOrNull(explicitIndex) as? JulesCause.PatchReviewSelected
     if (explicit != null && explicitIndex > latestObservationIndex) {
+<<<<<<< HEAD
         val latestPatchCid = latestSnapshot.patchCid
         val latestReportCid = maxReport?.reportCid
 
@@ -140,6 +176,22 @@ fun selectJulesPatchForDrain(causes: Iterable<JulesCause>): JulesPatchDrainSelec
             }
         }
 
+=======
+        val latestPatchCid = maxObservation.patchCid
+        // Bolt: avoid intermediate List allocations from filterIsInstance by using sequence for terminal ops
+        var maxReport: JulesCause.AgentReportObserved? = null
+        for (item in causalList) {
+            if (item is JulesCause.AgentReportObserved) {
+                if (maxReport == null || reportCausalOrder.compare(item, maxReport) > 0) {
+                    maxReport = item
+                }
+            }
+        }
+        val latestReportCid = maxReport?.reportCid
+        val selected = causalList.lastOrNull {
+            it is JulesCause.PatchSnapshotObserved && it.patchCid == explicit.patchCid && it.causalOrdinal == explicit.causalOrdinal
+        } as? JulesCause.PatchSnapshotObserved
+>>>>>>> origin/bolt-patch-continuity-opt-7763142742223188880
         if (selected != null &&
             explicit.latestPatchCid == latestPatchCid &&
             explicit.latestReportCid == latestReportCid &&
@@ -154,7 +206,11 @@ fun selectJulesPatchForDrain(causes: Iterable<JulesCause>): JulesPatchDrainSelec
         }
     }
 
+<<<<<<< HEAD
     val latest = latestSnapshot
+=======
+    val latest = maxObservation
+>>>>>>> origin/bolt-patch-continuity-opt-7763142742223188880
     // The automatic gate is file-set monotonicity against the previous
     // CANDIDATE, exactly as documented: a snapshot is eligible when its file
     // set contains the retained candidate's file set (reviewCandidate).
@@ -195,19 +251,35 @@ fun selectJulesPatchForDrain(causes: Iterable<JulesCause>): JulesPatchDrainSelec
 fun selectJulesReportForSettlement(causes: Iterable<JulesCause>): JulesReportSettlementSelection {
     val causalList = causes as? List<JulesCause> ?: causes.toList()
 
+<<<<<<< HEAD
     // ⚡ Bolt: Replace intermediate List allocations (.filterIsInstance, .maxWith)
     // with a single manual iteration to find the final report.
     var finalReport: JulesCause.AgentReportObserved? = null
     for (item in causalList) {
+=======
+    // Bolt: Prevent intermediate List allocations with filterIsInstance<T>()
+    var finalReport: JulesCause.AgentReportObserved? = null
+    var reviewIndex = -1
+
+    for ((index, item) in causalList.withIndex()) {
+>>>>>>> origin/bolt-patch-continuity-opt-7763142742223188880
         if (item is JulesCause.AgentReportObserved) {
             if (finalReport == null || reportCausalOrder.compare(item, finalReport) > 0) {
                 finalReport = item
             }
+<<<<<<< HEAD
+=======
+        } else if (item is JulesCause.AgentReportReviewSelected) {
+            reviewIndex = index
+>>>>>>> origin/bolt-patch-continuity-opt-7763142742223188880
         }
     }
 
     if (finalReport == null) return JulesReportSettlementSelection.Unobserved
+<<<<<<< HEAD
     val reviewIndex = causalList.indexOfLast { it is JulesCause.AgentReportReviewSelected }
+=======
+>>>>>>> origin/bolt-patch-continuity-opt-7763142742223188880
     // A report-only disposition is authorized only after every producer
     // artifact currently observed. A later patch invalidates an older no-op
     // review just as a later report does.

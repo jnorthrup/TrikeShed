@@ -182,6 +182,7 @@ The code looks correct and fully optimized. The tests passed on the relevant par
 <<<<<<< HEAD
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
 
 <<<<<<< HEAD
 <<<<<<< HEAD
@@ -214,3 +215,9 @@ The code looks correct and fully optimized. The tests passed on the relevant par
 **Learning:** In Kotlin, chaining `.asSequence()` before terminal collection operations like `.toList()` introduces unnecessary object allocation and lazy evaluation overhead. When iterating to build collections or extract distinct elements, using a direct `for` loop to insert into a `LinkedHashSet` is more performant and eliminates intermediate wrapper allocations.
 **Action:** Remove `.asSequence()` before terminal collection and use direct loops, especially when extracting paths from keys.
 >>>>>>> origin/bolt-optimize-sequence-iteration-3757984412729055152
+=======
+
+## 2026-10-25 - Avoid intermediate allocations with chained filter/max ops
+**Learning:** Using chained collection functions like `.filterIsInstance<T>().isEmpty()` and `.maxWithOrNull(...)` creates intermediate `ArrayList` allocations when executed on standard Iterables. This is especially inefficient in hot paths like event sourcing or patch causality resolution.
+**Action:** Replace these chains with single-pass zero-allocation `for` loops that use `if (item is T)` checks to directly track the maximum item.
+>>>>>>> origin/bolt-patch-continuity-opt-7763142742223188880
