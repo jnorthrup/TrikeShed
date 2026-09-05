@@ -1,5 +1,6 @@
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
 1. Modify `src/commonMain/kotlin/borg/trikeshed/ccek/CCEK.kt` using `replace_with_git_merge_diff`
    - Between lines 301-309, remove the intermediate `.asSequence()` allocation before `.filter` and `.forEach`. Since `doc.blocks.values` is a collection, creating a Sequence wrapper and its lazy iterators introduces object allocation overhead. Add a comment explaining the zero-allocation iteration optimization.
 2. Modify `src/commonMain/kotlin/borg/trikeshed/kanban/KanbanGraph.kt` using `replace_with_git_merge_diff`
@@ -41,3 +42,8 @@
 5. **Submit PR:**
    - Create a PR using `submit` tool to address this DoS / Thread Starvation deadlock security issue.
 >>>>>>> origin/sentinel-fix-processbuilder-deadlock-18380543544369340595
+=======
+1. **Fix Command/Environment Leak in `JvmProcessPipe`**: Update `JvmProcessPipe` (in `src/jvmMain/kotlin/borg/trikeshed/vm/PlatformVmProviders.jvm.kt`) to ensure that `ProcessBuilder(command)` does not inherit the parent environment, which may contain sensitive secrets (like `JULES_API_KEY` or `OPENAI_API_KEY`). We should apply the `GuestEnvironment.curated()` allowlist in the same way `ProcessIsolate.kt` does. This is a critical security fix to prevent untrusted guest code from accessing host secrets.
+2. **Pre-commit step**: Complete pre commit steps to make sure proper testing, verifications, reviews and reflections are done.
+3. **Submit**: Create PR.
+>>>>>>> origin/sentinel-fix-processbuilder-env-leak-4933897859296758517
