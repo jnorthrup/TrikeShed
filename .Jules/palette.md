@@ -91,6 +91,7 @@
 <<<<<<< HEAD
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
 ## 2025-05-24 - Synchronizing active states for duplicate navigation items
 **Learning:** When navigation buttons exist in multiple places (e.g., a topbar and a sidebar), visual styling and ARIA attributes (like `aria-current="page"`) must be updated on all instances when the view changes. Screen reader users navigating the sidebar would otherwise not know which view is currently active.
 **Action:** Expand view-switching logic to query and update all relevant navigation buttons, not just the primary ones, ensuring consistent state across the entire UI.
@@ -166,3 +167,8 @@
 **Learning:** Dynamically created image elements (e.g., via `document.createElement("img")`) often miss the `alt` attribute, breaking accessibility for screen reader users.
 **Action:** Always add an `alt` attribute using `setAttribute("alt", ...)` when dynamically creating image elements, using a meaningful title or a fallback.
 >>>>>>> origin/palette/gallery-image-alt-text-15620175637245280240
+=======
+## 2024-05-25 - Synchronize aria-current on duplicated navigation buttons
+**Learning:** When a single-page application has duplicate navigation buttons representing the same view (e.g., a topbar menu and a sidebar menu), updating the active state (such as the `aria-current="page"` attribute and visual active CSS class) on only one set of buttons leaves the other set showing an incorrect, stale state to screen readers and visual users.
+**Action:** When managing view state changes dynamically, ensure the script iterates over *all* instances of the navigation buttons corresponding to that view (e.g., using an array `[topbarBtn, sidebarBtn]`) and updates `aria-current` and active classes synchronously.
+>>>>>>> origin/palette/sidebar-active-states-16899461393671200881

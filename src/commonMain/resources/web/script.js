@@ -1325,6 +1325,7 @@
 <<<<<<< HEAD
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
   const SIDEBAR_BTNS = { doc: 'btn-home', board: 'btn-board', graph: 'btn-graph', sheet: 'btn-sheet', host: 'btn-host' };
 =======
   const SIDEBAR_BTNS = { doc: document.getElementById('btn-home'), board: document.getElementById('btn-board'), graph: document.getElementById('btn-graph'), sheet: document.getElementById('btn-sheet'), host: document.getElementById('btn-host') };
@@ -1575,6 +1576,29 @@
         btn.classList.toggle('active', k === view);
         if (k === view) btn.setAttribute('aria-current', 'page');
         else btn.removeAttribute('aria-current');
+=======
+  const VIEWS = {
+    doc: [docScrollEl, viewDocBtn, document.getElementById('btn-home')],
+    board: [boardScrollEl, viewBoardBtn, document.getElementById('btn-board')],
+    graph: [graphScrollEl, viewGraphBtn, document.getElementById('btn-graph')],
+    sheet: [sheetScrollEl, viewSheetBtn, document.getElementById('btn-sheet')],
+    shape: [shapeScrollEl, viewShapeBtn, null],
+    host: [hostScrollEl, viewHostBtn, document.getElementById('btn-host')]
+  };
+  function setView(view) {
+    mutate((s) => { s.view = view; }, 'view');
+    for (const [k, [el, btn, sidebarBtn]] of Object.entries(VIEWS)) {
+      el.hidden = k !== view;
+
+      const buttons = [btn, sidebarBtn].filter(Boolean);
+      for (const b of buttons) {
+        b.classList.toggle('active', k === view);
+        if (k === view) {
+          b.setAttribute('aria-current', 'page');
+        } else {
+          b.removeAttribute('aria-current');
+        }
+>>>>>>> origin/palette/sidebar-active-states-16899461393671200881
       }
     }
     if (view === 'board') { renderBoard(); hydrateBoard(); }
