@@ -2156,12 +2156,57 @@ async function showMateMenu(cx,cy,srcNode,srcPort,wx,wy,scope,dir){
 }
 /* ── pan / zoom ────────────────────────────────────────────────────────── */
 function applyView(){ world.style.transform=`translate(${view.x}px,${view.y}px) scale(${view.z})`; document.body.classList.toggle("zoomed-out",view.z<.45); if(typeof Landscape!=="undefined")Landscape.schedule(); }
+/* momentum — ported from graal.html's kinetic camera. Pan velocity in SCREEN
+   px/ms (the harness camera IS a screen translate, so it applies directly);
+   zoom velocity in log-scale per 16.7ms, anchored at the last wheel point so
+   the glide keeps diving into the point the wheel math holds fixed. A drag
+   records a low-passed flick velocity; a release within 80ms turns it into a
+   glide. Frame-rate independent decay. Off under prefers-reduced-motion. */
+const reducedMotion=matchMedia("(prefers-reduced-motion: reduce)").matches;
+const mom={vx:0,vy:0,zv:0,ax:0,ay:0};
+let momT=0,momFrame=0,panning=false;
+function killMomentum(){ mom.vx=0; mom.vy=0; mom.zv=0; }
+function tickMomentum(){
+  momFrame=0;
+  const now=performance.now(),dt=Math.min(50,now-momT); momT=now;
+  if(reducedMotion){ killMomentum(); return; }
+  const k=dt/16.7;
+  let live=false;
+  if(!panning&&(Math.abs(mom.vx)>0.002||Math.abs(mom.vy)>0.002)){
+    view.x+=mom.vx*dt; view.y+=mom.vy*dt;
+    const fr=Math.pow(0.93,k); mom.vx*=fr; mom.vy*=fr;
+    if(Math.abs(mom.vx)<=0.002&&Math.abs(mom.vy)<=0.002){ mom.vx=0; mom.vy=0; } else live=true;
+  }
+  if(Math.abs(mom.zv)>0.0008){
+    const f=Math.exp(mom.zv*k);
+    const nz=Math.min(4000,Math.max(.01,view.z*f));
+    view.x=mom.ax-(mom.ax-view.x)*(nz/view.z);
+    view.y=mom.ay-(mom.ay-view.y)*(nz/view.z);
+    view.z=nz;
+    mom.zv*=Math.pow(0.88,k);
+    if(Math.abs(mom.zv)<=0.0008) mom.zv=0; else live=true;
+  }
+  applyView();
+  if(live) glide(); else saveCameraSoon();
+}
+function glide(){ if(!momFrame) momFrame=requestAnimationFrame(tickMomentum); }
+
 viewport.addEventListener("pointerdown",e=>{
   if(e.button!==0)return;
+  killMomentum(); panning=true;
   viewport.classList.add("panning");
   const sx=e.clientX,sy=e.clientY,ox=view.x,oy=view.y;
-  const mv=ev=>{ view.x=ox+ev.clientX-sx; view.y=oy+ev.clientY-sy; applyView(); };
-  const up=()=>{ viewport.classList.remove("panning"); removeEventListener("pointermove",mv); removeEventListener("pointerup",up); save(); };
+  let lx=sx,ly=sy,velX=0,velY=0,velT=performance.now();
+  const mv=ev=>{
+    view.x=ox+ev.clientX-sx; view.y=oy+ev.clientY-sy; applyView();
+    const now=performance.now(),dt=Math.max(1,now-velT);
+    velX=0.75*velX+0.25*((ev.clientX-lx)/dt); velY=0.75*velY+0.25*((ev.clientY-ly)/dt); // low-passed flick velocity
+    lx=ev.clientX; ly=ev.clientY; velT=now;
+  };
+  const up=()=>{
+    panning=false; viewport.classList.remove("panning"); removeEventListener("pointermove",mv); removeEventListener("pointerup",up); save();
+    if(!reducedMotion&&performance.now()-velT<80){ mom.vx=velX; mom.vy=velY; momT=performance.now(); glide(); } // recent flick → glide
+  };
   addEventListener("pointermove",mv); addEventListener("pointerup",up);
 });
 /* A camera move is not a document mutation.
@@ -2193,12 +2238,18 @@ viewport.addEventListener("wheel",e=>{
   view.x=px-(px-view.x)*(nz/view.z);
   view.y=py-(py-view.y)*(nz/view.z);
   view.z=nz; applyView(); saveCameraSoon();
+  if(!reducedMotion){ // glide anchor = wheel point; the zoom keeps diving there after the gesture ends
+    mom.ax=px; mom.ay=py; mom.vx=0; mom.vy=0;
+    mom.zv=Math.max(-0.12,Math.min(0.12,mom.zv+Math.log(f)*0.28));
+    momT=performance.now(); glide();
+  }
 },{passive:false});
 
 /* Frame every top-level node. The rings have had a fit gesture all along
    (double-click the D-tab); the top-level canvas had none, so a board wider
    than the window could only be found by dragging blind. */
 function fitToContent(){
+  killMomentum(); // a fit is a hard cut, never a glide target
   if(typeof Harness!=="undefined"&&Harness.ready) { Harness.fit(false); return; }
   const tops=G.nodes.filter(n=>!n._parentScope&&n.el);
   if(!tops.length) return;

@@ -239,6 +239,7 @@ const Harness = {
     }
   },
   focus(box) {
+    if(typeof killMomentum==="function")killMomentum(); // a focus is a hard cut, never a glide target
     const r=viewport.getBoundingClientRect(),pad=30;
     view.z=Math.min(4000,Math.max(.01,Math.min((r.width-pad*2)/box.w,(r.height-pad*2)/box.h)));
     view.x=(r.width-box.w*view.z)/2-box.x*view.z;view.y=(r.height-box.h*view.z)/2-box.y*view.z;applyView();redraw();
