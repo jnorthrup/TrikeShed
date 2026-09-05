@@ -2441,8 +2441,15 @@ viewport.addEventListener("drop",async e=>{
 addEventListener("pointerdown",e=>{ if(!menu.contains(e.target)) menu.style.display="none"; });
 $("#addBtn").addEventListener("click",e=>showMenu(60,60));
 $("#fitBtn").addEventListener("click",()=>fitToContent());
-$("#shakeBtn").addEventListener("click",e=>treeshake({optional:e.shiftKey}));
-$("#fdBtn").addEventListener("click",()=>fdLayout());
+/* fd and shake retarget to the most prominent panel first — the one filling
+   the viewport — so the toolbar acts on what is in front of the operator. */
+function retargetProminent(){
+  if(typeof Harness==="undefined"||!Harness.ready) return;
+  const p=Harness.prominent();
+  if(p&&p!==Harness.selected) Harness.select(p,false);
+}
+$("#shakeBtn").addEventListener("click",e=>{ retargetProminent(); treeshake({optional:e.shiftKey}); });
+$("#fdBtn").addEventListener("click",()=>{ retargetProminent(); fdLayout(); });
 /* ── execution ─────────────────────────────────────────────────────────── */
 function inputsOf(id){ return G.wires.filter(w=>w.to[0]===id); }
 function topo(){

@@ -244,6 +244,20 @@ const Harness = {
     view.z=Math.min(4000,Math.max(.01,Math.min((r.width-pad*2)/box.w,(r.height-pad*2)/box.h)));
     view.x=(r.width-box.w*view.z)/2-box.x*view.z;view.y=(r.height-box.h*view.z)/2-box.y*view.z;applyView();redraw();
   },
+  /* The panel that owns the most of the viewport right now. fd and shake act on
+     what the operator is looking at, not on a selection that may sit off-screen
+     from an earlier click. Screen = world * view.z + view (the wheel math's
+     frame). No territory on screen → the selection stands. */
+  prominent() {
+    const r=viewport.getBoundingClientRect();let best=this.selected,bestArea=0;
+    for(const [name,a] of this.mounts){
+      const x0=Math.max(0,a.x*view.z+view.x),y0=Math.max(0,a.y*view.z+view.y);
+      const x1=Math.min(r.width,(a.x+a.w)*view.z+view.x),y1=Math.min(r.height,(a.y+a.h)*view.z+view.y);
+      const area=Math.max(0,x1-x0)*Math.max(0,y1-y0);
+      if(area>bestArea){best=name;bestArea=area;}
+    }
+    return best;
+  },
   fit(all) {
     if (!all) { const anchor=this.mounts.get(this.selected)||{x:0,y:0};this.focus({x:anchor.x-40,y:anchor.y-90,w:this.activeBounds.w+120,h:this.activeBounds.h+130}); return; }
     const boxes=[...this.positions.values()];
