@@ -210,6 +210,7 @@ object HeatSoak {
     fun classHistogram(n: Int): String = runCatching {
         val jcmd = java.io.File(System.getProperty("java.home"), "bin/jcmd").path
         val p = ProcessBuilder(jcmd, ProcessHandle.current().pid().toString(), "GC.class_histogram").redirectErrorStream(true).start()
+<<<<<<< HEAD
         val future = java.util.concurrent.CompletableFuture.supplyAsync {
             p.inputStream.bufferedReader().readLines()
         }
@@ -217,6 +218,12 @@ object HeatSoak {
             p.destroyForcibly()
         }
         val lines = runCatching { future.get(1, java.util.concurrent.TimeUnit.SECONDS) }.getOrDefault(emptyList())
+=======
+        val outAsync = java.util.concurrent.CompletableFuture.supplyAsync { p.inputStream.bufferedReader().readLines() }
+        val finished = p.waitFor(5, java.util.concurrent.TimeUnit.SECONDS)
+        if (!finished) p.destroyForcibly()
+        val lines = outAsync.get()
+>>>>>>> origin/sentinel/fix-pipe-buffer-dos-9936734963835218111
         "\n── class histogram (live, top $n) ──\n" + lines.take(n + 3).joinToString("\n") { it.take(140) }
     }.getOrElse { "\n── class histogram unavailable: $it" }
 

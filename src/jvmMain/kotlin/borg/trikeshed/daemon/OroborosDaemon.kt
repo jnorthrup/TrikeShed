@@ -2380,9 +2380,13 @@ object OroborosDaemon {
 
         suspend fun command(vararg args: String): String = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
             val p = ProcessBuilder(*args).directory(repoDir).redirectErrorStream(true).start()
+            val outAsync = java.util.concurrent.CompletableFuture.supplyAsync { p.inputStream.bufferedReader().readText().trim() }
             val finished = p.waitFor(10, java.util.concurrent.TimeUnit.SECONDS)
-            if (!finished) p.destroyForcibly()
-            p.inputStream.bufferedReader().readText().trim()
+            if (!finished) {
+                p.destroyForcibly()
+                return@withContext ""
+            }
+            outAsync.get()
         }
 
         val local = command("git", "rev-parse", "HEAD")

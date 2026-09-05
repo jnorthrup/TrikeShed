@@ -44,6 +44,7 @@
 **Vulnerability:** The `generateKey()` method in `Rfc6455Handshake.kt` used a highly predictable linear shift-XOR algorithm seeded by the system clock (`Clock.System.now().toEpochMilliseconds()`) to generate the `Sec-WebSocket-Key`.
 **Learning:** Using predictable, time-based PRNGs for cryptographic nonces like `Sec-WebSocket-Key` makes the handshake susceptible to prediction or replay attacks. While the RFC 6455 states this key is not meant for authentication, it is meant to prove the request is actually a WebSocket request and to prevent caching proxy issues, so it should still be robustly random.
 **Prevention:** Always use standard, secure-by-default libraries for random number generation (e.g., `kotlin.random.Random.Default.nextBytes` or `SecureRandom`) instead of rolling custom cryptographic algorithms or using simple PRNGs.
+<<<<<<< HEAD
 
 <<<<<<< HEAD
 ## 2024-05-24 - [Denial of Service via Pipe Buffer Deadlock]
@@ -56,3 +57,9 @@
 **Learning:** `ProcessBuilder` copies the parent environment. When spawning processes for untrusted code execution, the environment must be explicitly cleared and populated with only a curated whitelist of safe variables.
 **Prevention:** Always clear `ProcessBuilder.environment()` and populate it explicitly from a whitelist (like `GuestEnvironment.curated()`) when launching untrusted guests.
 >>>>>>> origin/sentinel-fix-processbuilder-env-leak-4933897859296758517
+=======
+## 2026-08-28 - Pipe Buffer Deadlock DoS
+**Vulnerability:** Reading a process output stream synchronously before calling waitFor can cause the process to hang indefinitely if the output pipe buffer fills up, creating a DoS via pipe buffer deadlock.
+**Learning:** This pipe buffer deadlock pattern occurs when stdout/stderr is read synchronously and blocks because the child process hangs, preventing the parent from reaching the bounded waitFor timeout logic.
+**Prevention:** When enforcing bounded timeouts on child processes, always read the input stream asynchronously (using async or CompletableFuture) so the main thread can proceed to execute waitFor(timeout).
+>>>>>>> origin/sentinel/fix-pipe-buffer-dos-9936734963835218111

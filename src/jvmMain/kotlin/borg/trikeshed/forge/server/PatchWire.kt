@@ -254,8 +254,11 @@ class ProjectScopes(
         for (cmd in attempts) {
             val ok = runCatching {
                 val p = ProcessBuilder(cmd).redirectErrorStream(true).start()
-                p.inputStream.readBytes()
-                p.waitFor() == 0
+                val outAsync = java.util.concurrent.CompletableFuture.supplyAsync { p.inputStream.readBytes() }
+                val finished = p.waitFor(30, java.util.concurrent.TimeUnit.SECONDS)
+                if (!finished) p.destroyForcibly()
+                outAsync.get()
+                finished && p.exitValue() == 0
             }.getOrDefault(false)
             if (ok && dest.isDirectory) return dest
             dest.deleteRecursively()
