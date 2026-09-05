@@ -79,6 +79,7 @@
 **Action:** When creating elements with `document.createElement`, proactively attach explicit, descriptive `aria-label`s that encapsulate both the item's identity and its current state (e.g., `"Active page: Untitled"` or `"Navigate to parent sheet: ..."`).
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
 ## 2025-05-24 - Synchronizing active states for duplicate navigation items
 **Learning:** When navigation buttons exist in multiple places (e.g., a topbar and a sidebar), visual styling and ARIA attributes (like `aria-current="page"`) must be updated on all instances when the view changes. Screen reader users navigating the sidebar would otherwise not know which view is currently active.
 **Action:** Expand view-switching logic to query and update all relevant navigation buttons, not just the primary ones, ensuring consistent state across the entire UI.
@@ -90,3 +91,8 @@
 **Learning:** When a single-page application has duplicate navigation buttons (e.g., both topbar and sidebar buttons for the same views), updating the active state (`aria-current="page"` and visual classes) on only one set of buttons leaves the other set in an ambiguous or incorrect state, confusing screen reader users navigating the DOM.
 **Action:** Ensure that view-switching logic globally queries and updates all duplicate instances of navigation buttons for the active view to maintain consistent `aria-current="page"` attributes and visual active states.
 >>>>>>> origin/palette-sidebar-active-states-17480957366909985694
+=======
+## 2025-02-23 - Active states for duplicate navigation items
+**Learning:** When managing view state in a single-page application (like TrikeShed's frontend), ensure that all duplicate instances of navigation buttons for the active view (e.g., both topbar and sidebar buttons) consistently receive the `aria-current="page"` attribute and visual active state updates to prevent ambiguous states for screen reader users.
+**Action:** Synchronize the `active` class and `aria-current="page"` state for all duplicate navigation buttons across the interface when the active view changes.
+>>>>>>> origin/palette-sidebar-active-states-18252850510239450495
