@@ -54,8 +54,10 @@ class GalleryRenderer {
     private fun renderImageCard(item: dynamic): Element {
         val el = createBaseCard(item)
         val imgUrl = item.objectUrl as? String ?: ""
+        val altText = item.title as? String ?: "Image"
         val img = document.createElement("img")
         img.setAttribute("src", imgUrl)
+        img.setAttribute("alt", altText)
         img.setAttribute("style", "max-width: 100%; height: auto;")
         el.appendChild(img)
         return el
