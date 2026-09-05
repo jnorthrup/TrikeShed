@@ -87,6 +87,7 @@
 <<<<<<< HEAD
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
 ## 2025-05-24 - Synchronizing active states for duplicate navigation items
 **Learning:** When navigation buttons exist in multiple places (e.g., a topbar and a sidebar), visual styling and ARIA attributes (like `aria-current="page"`) must be updated on all instances when the view changes. Screen reader users navigating the sidebar would otherwise not know which view is currently active.
 **Action:** Expand view-switching logic to query and update all relevant navigation buttons, not just the primary ones, ensuring consistent state across the entire UI.
@@ -140,3 +141,8 @@
 **Learning:** Single-page applications often use custom buttons to switch views instead of actual `<a>` tags with `href`s. While visual users see an active state (like a background color change), screen reader users hear no change in state unless explicitly announced. Furthermore, it is critical to ensure that when duplicate navigation instances exist (like a topbar and a sidebar), all duplicates reflecting the active view receive the same active state attributes to maintain context for screen readers.
 **Action:** When building custom view switchers (like tabs or navigation sidebar items) that aren't native links, always apply `aria-current="page"` via JavaScript when the view changes. Ensure this is applied consistently across all instances of the navigation buttons that represent the current view.
 >>>>>>> origin/palette-ux-aria-current-navigation-3263123026885197086
+=======
+## 2024-05-27 - Synchronizing active states for duplicate navigation elements
+**Learning:** In single-page applications, it's common to have multiple sets of navigation elements (e.g., a topbar and a sidebar) that switch to the same views. Applying `aria-current="page"` and visual `.active` classes to only one set leaves users navigating via the other set without clear feedback on the current active view, creating ambiguous states for screen reader users and keyboard navigators.
+**Action:** When managing view state, ensure that *all* instances of navigation buttons for the active view consistently receive the `aria-current="page"` attribute and visual active state updates, rather than just the primary or most visible set.
+>>>>>>> origin/palette/a11y-sidebar-aria-current-8447647767196904215

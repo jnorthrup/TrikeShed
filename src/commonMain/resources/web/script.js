@@ -1331,12 +1331,16 @@
 >>>>>>> origin/palette-sync-sidebar-aria-11912243228218524737
   const VIEWS = { doc: [docScrollEl, viewDocBtn], board: [boardScrollEl, viewBoardBtn], graph: [graphScrollEl, viewGraphBtn], sheet: [sheetScrollEl, viewSheetBtn], shape: [shapeScrollEl, viewShapeBtn], host: [hostScrollEl, viewHostBtn] };
 <<<<<<< HEAD
+<<<<<<< HEAD
 =======
   const VIEWS = { doc: [docScrollEl, viewDocBtn, document.getElementById('btn-home')], board: [boardScrollEl, viewBoardBtn, document.getElementById('btn-board')], graph: [graphScrollEl, viewGraphBtn, document.getElementById('btn-graph')], sheet: [sheetScrollEl, viewSheetBtn, document.getElementById('btn-sheet')], shape: [shapeScrollEl, viewShapeBtn], host: [hostScrollEl, viewHostBtn, document.getElementById('btn-host')] };
 >>>>>>> origin/jules-17428175357654286191-b5258251
 =======
   const SIDEBAR_BTNS = { doc: document.getElementById('btn-home'), board: document.getElementById('btn-board'), graph: document.getElementById('btn-graph'), sheet: document.getElementById('btn-sheet'), host: document.getElementById('btn-host') };
 >>>>>>> origin/palette-sidebar-active-states-15969824106785082289
+=======
+  const SIDEBAR_VIEWS = { doc: 'btn-home', board: 'btn-board', graph: 'btn-graph', sheet: 'btn-sheet', host: 'btn-host' };
+>>>>>>> origin/palette/a11y-sidebar-aria-current-8447647767196904215
   function setView(view) {
     mutate((s) => { s.view = view; }, 'view');
 <<<<<<< HEAD
@@ -1534,6 +1538,16 @@
 >>>>>>> origin/palette-sync-sidebar-aria-11912243228218524737
 =======
 >>>>>>> origin/palette-ux-aria-current-navigation-3263123026885197086
+      }
+    }
+    for (const [k, id] of Object.entries(SIDEBAR_VIEWS)) {
+      const btn = document.getElementById(id);
+      if (!btn) continue;
+      btn.classList.toggle('active', k === view);
+      if (k === view) {
+        btn.setAttribute('aria-current', 'page');
+      } else {
+        btn.removeAttribute('aria-current');
       }
     }
     if (view === 'board') { renderBoard(); hydrateBoard(); }
