@@ -43,6 +43,10 @@ object GitPijulGateway {
         val insertAt: Int,
         /** Inserted lines without their newline. */
         val inserted: List<String>,
+        /** The deleted lines' text, without newline — what [rebase] matches against the target. */
+        val deleted: List<String> = emptyList(),
+        /** Up to three context lines immediately before the run, without newline — the anchor for an insert-only hunk. */
+        val context: List<String> = emptyList(),
     ) {
         /** The change, spelled once — what the id hashes. */
         val key: String
@@ -117,20 +121,23 @@ object GitPijulGateway {
         var runDeleteStart = 0
         var runDeleteCount = 0
         val runInserts = ArrayList<String>()
+        val runDeleted = ArrayList<String>()
+        val recentContext = ArrayDeque<String>()
+        var runContext: List<String> = emptyList()
         var inRun = false
 
         fun flush() {
             val p = path
             if (inRun && p != null && (runDeleteCount > 0 || runInserts.isNotEmpty())) {
                 val insertAt = if (runDeleteCount > 0) runDeleteStart + runDeleteCount else oldLine
-                out.add(Hunk(p, if (runDeleteCount > 0) runDeleteStart else 0, runDeleteCount, insertAt, runInserts.toList()))
+                out.add(Hunk(p, if (runDeleteCount > 0) runDeleteStart else 0, runDeleteCount, insertAt, runInserts.toList(), runDeleted.toList(), runContext))
             }
-            inRun = false; runDeleteStart = 0; runDeleteCount = 0; runInserts.clear()
+            inRun = false; runDeleteStart = 0; runDeleteCount = 0; runInserts.clear(); runDeleted.clear(); runContext = emptyList()
         }
 
         for (line in diffText.lineSequence()) {
             when {
-                line.startsWith("diff --git") -> { flush(); path = null }
+                line.startsWith("diff --git") -> { flush(); path = null; recentContext.clear() }
                 line.startsWith("--- ") -> {
                     flush()
                     val p = line.removePrefix("--- ").substringBefore('\t').trim()
@@ -145,23 +152,89 @@ object GitPijulGateway {
                     flush()
                     val m = Regex("""@@\s+-(\d+)(?:,\d+)?\s+\+(\d+)(?:,\d+)?\s+@@""").find(line)
                     oldLine = m?.groupValues?.get(1)?.toInt() ?: 1
+                    recentContext.clear()
                 }
                 line.startsWith("\\") -> Unit // "\ No newline at end of file"
                 line.startsWith("-") -> {
-                    if (!inRun) { inRun = true; runDeleteStart = oldLine }
+                    if (!inRun) { inRun = true; runDeleteStart = oldLine; runContext = recentContext.toList() }
                     else if (runDeleteCount == 0) runDeleteStart = oldLine
                     runDeleteCount++
+                    runDeleted.add(line.substring(1))
                     oldLine++
                 }
                 line.startsWith("+") -> {
-                    if (!inRun) inRun = true
+                    if (!inRun) { inRun = true; runContext = recentContext.toList() }
                     runInserts.add(line.substring(1))
                 }
-                else -> { flush(); oldLine++ } // context (" …") or blank
+                else -> { // context (" …") or blank
+                    flush()
+                    recentContext.addLast(if (line.startsWith(" ")) line.substring(1) else line)
+                    while (recentContext.size > 3) recentContext.removeFirst()
+                    oldLine++
+                }
             }
         }
         flush()
         return out
+    }
+
+    // ── rebase onto the target the hunk will actually be applied to ────────
+
+    sealed interface Rebased {
+        /** The hunk applies where it says. */
+        data class Exact(val hunk: Hunk) : Rebased
+        /** The lines moved; the hunk's coordinates were re-anchored by content. */
+        data class Relocated(val hunk: Hunk, val from: Int) : Rebased
+        /** The target already contains the inserted lines; the change has landed by other hands. */
+        data class Superseded(val hunk: Hunk) : Rebased
+        /** The lines the hunk edits are gone from the target and its result is not there either — master rewrote them. */
+        data class Stale(val hunk: Hunk) : Rebased
+    }
+
+    /**
+     * A hunk was authored against the branch's merge-base; the render applies it to the
+     * target's current text. Re-anchor by content — a replacement by its deleted lines, an
+     * insert by its preceding context — and classify what cannot be anchored, so a change
+     * master already has is dropped as [Rebased.Superseded] and one master overwrote is
+     * dropped as [Rebased.Stale] instead of landing on the wrong lines.
+     */
+    fun rebase(hunk: Hunk, target: String): Rebased {
+        val t = splitLines(target).map { it.removeSuffix("\n") }
+        fun matchesAt(pos1: Int, lines: List<String>): Boolean {
+            if (lines.isEmpty()) return true
+            val i = pos1 - 1
+            if (i < 0 || i + lines.size > t.size) return false
+            for (k in lines.indices) if (t[i + k] != lines[k]) return false
+            return true
+        }
+        fun findAll(lines: List<String>): List<Int> = if (lines.isEmpty()) emptyList() else (1..(t.size - lines.size + 1)).filter { matchesAt(it, lines) }
+        /** A block worth anchoring on: at least one line with some real content in it. */
+        fun specific(lines: List<String>): Boolean = lines.any { l -> l.count { !it.isWhitespace() } >= 4 }
+        val insertedPresent = hunk.inserted.isNotEmpty() && findAll(hunk.inserted).isNotEmpty()
+
+        if (hunk.deleteCount > 0) {
+            if (matchesAt(hunk.deleteStart, hunk.deleted)) return Rebased.Exact(hunk)
+            // Relocate only on a UNIQUE match of a specific block: a lone `}` matches everywhere,
+            // and the nearest of many would rewrite the wrong line (seen on CouchWal.java).
+            val cands = if (specific(hunk.deleted)) findAll(hunk.deleted) else emptyList()
+            if (cands.size == 1) {
+                val p = cands[0]
+                return Rebased.Relocated(hunk.copy(deleteStart = p, insertAt = p + hunk.deleteCount), hunk.deleteStart)
+            }
+            return if (insertedPresent) Rebased.Superseded(hunk) else Rebased.Stale(hunk)
+        }
+        // insert-only: anchor on the preceding context
+        val k = hunk.context.size
+        if (k == 0) return if (hunk.insertAt <= 1) Rebased.Exact(hunk) else if (insertedPresent) Rebased.Superseded(hunk) else Rebased.Stale(hunk)
+        if (matchesAt(hunk.insertAt - k, hunk.context)) {
+            return if (matchesAt(hunk.insertAt, hunk.inserted)) Rebased.Superseded(hunk) else Rebased.Exact(hunk)
+        }
+        val cands = if (specific(hunk.context)) findAll(hunk.context) else emptyList()
+        if (cands.size == 1) {
+            val q = cands[0] + k
+            return if (matchesAt(q, hunk.inserted)) Rebased.Superseded(hunk.copy(insertAt = q)) else Rebased.Relocated(hunk.copy(insertAt = q), hunk.insertAt)
+        }
+        return if (insertedPresent) Rebased.Superseded(hunk) else Rebased.Stale(hunk)
     }
 
     // ── grouping and resolution ────────────────────────────────────────────
@@ -202,6 +275,7 @@ object GitPijulGateway {
         val rejected = ArrayList<Group>()
         for (g in gs) {
             val keep: List<Hunk> = when {
+                g.converged && resolutions[g.locus] is Resolution.Reject -> { rejected.add(g); emptyList() }
                 g.converged -> listOf(g.variants[0].hunk)
                 else -> when (val r = resolutions[g.locus]) {
                     null -> { unresolved.add(g); emptyList() }

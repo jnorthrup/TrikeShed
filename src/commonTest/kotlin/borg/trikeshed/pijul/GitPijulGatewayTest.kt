@@ -125,3 +125,63 @@ class GitPijulGatewayTest {
         assertEquals("a\nB\nC\nd\nE\n", GitPijulGateway.render("A\nB\nC\nD\nE\n", hs))
     }
 }
+
+class GitPijulGatewayRebaseTest {
+    private val fix = "actual fun readLines(path: String): List<String> =X.readAllLines(Paths.get(path))"
+    private val old = "actual fun readLines(path: String): List<String> =X.readAllLines(Paths.get(path)).map { it }"
+    private fun replacement(): GitPijulGateway.Hunk = GitPijulGateway.hunksOf(
+        "diff --git a/f b/f\n--- a/f\n+++ b/f\n@@ -1,3 +1,3 @@\n package p\n-$old\n+$fix\n // tail\n",
+    ).single()
+
+    @Test
+    fun exactWhenTheTargetStillHasTheLines() {
+        val r = GitPijulGateway.rebase(replacement(), "package p\n$old\n// tail\n")
+        assertTrue(r is GitPijulGateway.Rebased.Exact, r.toString())
+    }
+
+    @Test
+    fun relocatedWhenLinesMovedAndSupersededWhenTheFixIsAlreadyThere() {
+        val moved = GitPijulGateway.rebase(replacement(), "// header\n// more\npackage p\n$old\n// tail\n")
+        val rel = moved as GitPijulGateway.Rebased.Relocated
+        assertEquals(4, rel.hunk.deleteStart); assertEquals(5, rel.hunk.insertAt)
+        assertEquals("// header\n// more\npackage p\n$fix\n// tail\n", GitPijulGateway.render("// header\n// more\npackage p\n$old\n// tail\n", listOf(rel.hunk)))
+        val done = GitPijulGateway.rebase(replacement(), "package p\n$fix\n// tail\n")
+        assertTrue(done is GitPijulGateway.Rebased.Superseded, done.toString())
+    }
+
+    @Test
+    fun staleWhenMasterRewroteTheLines() {
+        val r = GitPijulGateway.rebase(replacement(), "package p\nactual fun readLines(path: String): List<String> = Files.readLines(path)\n// tail\n")
+        assertTrue(r is GitPijulGateway.Rebased.Stale, r.toString())
+    }
+
+    @Test
+    fun insertOnlyAnchorsOnContext() {
+        val h = GitPijulGateway.hunksOf("diff --git a/f b/f\n--- a/f\n+++ b/f\n@@ -1,3 +1,4 @@\n import alpha\n import beta\n+import NEW\n fun c() = 1\n").single()
+        assertEquals(listOf("import alpha", "import beta"), h.context)
+        val t = "import alpha\nimport beta\nfun c() = 1\n"
+        assertTrue(GitPijulGateway.rebase(h, t) is GitPijulGateway.Rebased.Exact)
+        val rel = GitPijulGateway.rebase(h, "// zeta\n$t") as GitPijulGateway.Rebased.Relocated
+        assertEquals("// zeta\nimport alpha\nimport beta\nimport NEW\nfun c() = 1\n", GitPijulGateway.render("// zeta\n$t", listOf(rel.hunk)))
+        assertTrue(GitPijulGateway.rebase(h, "import alpha\nimport beta\nimport NEW\nfun c() = 1\n") is GitPijulGateway.Rebased.Superseded)
+        assertTrue(GitPijulGateway.rebase(h, "import x\nimport y\nfun c() = 1\n") is GitPijulGateway.Rebased.Stale)
+    }
+}
+
+class GitPijulGatewayAnchorTest {
+    @Test
+    fun aLoneBraceNeverRelocates() {
+        val h = GitPijulGateway.hunksOf("diff --git a/f b/f\n--- a/f\n+++ b/f\n@@ -5,3 +5,3 @@\n x\n-        }\n+        });\n y\n").single()
+        val target = "a {\n        }\nb {\n        }\nc\nz\n"
+        val r = GitPijulGateway.rebase(h, target)
+        assertTrue(r is GitPijulGateway.Rebased.Stale, "ambiguous, generic block must not relocate: $r")
+    }
+
+    @Test
+    fun twoMatchesOfASpecificBlockIsAmbiguousToo() {
+        val h = GitPijulGateway.hunksOf("diff --git a/f b/f\n--- a/f\n+++ b/f\n@@ -9,1 +9,1 @@\n-val total = live.size\n+val total = liveIds.size\n").single()
+        val target = "val total = live.size\nq\nval total = live.size\n"
+        assertTrue(GitPijulGateway.rebase(h, target) is GitPijulGateway.Rebased.Stale)
+        assertTrue(GitPijulGateway.rebase(h, "q\nval total = live.size\n") is GitPijulGateway.Rebased.Relocated)
+    }
+}

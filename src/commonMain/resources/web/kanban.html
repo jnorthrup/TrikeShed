@@ -867,7 +867,16 @@ function frameRow(n, atMs) {
     if (lastFactSeq >= 0) {
       let epochSeq = null;
       try { const r = await fetch("/blackboard/board"); const b = await r.json(); epochSeq = typeof b.seq === "number" ? b.seq : null; } catch (_) { /* no answer = assume restart */ }
-      if (epochSeq === null || epochSeq < lastFactSeq) { lastFactSeq = -1; seenSeq.clear(); }
+      if (epochSeq === null || epochSeq < lastFactSeq) {
+        lastFactSeq = -1; seenSeq.clear();
+        // The rows already on the strip belong to the old epoch: re-key them so a
+        // new-epoch fact with the same #seq is not deduped against them, and rank
+        // them below anything that arrives from now on.
+        for (const li of timelineEl.children) {
+          if (li.dataset.seq != null && !li.dataset.seq.startsWith("prev:")) li.dataset.seq = "prev:" + li.dataset.seq;
+          li.dataset.order = "-1";
+        }
+      }
     }
     es = new EventSource("/blackboard/facts" + (lastFactSeq >= 0 ? "?since=" + (lastFactSeq + 1) : ""));
     es.onmessage = (m) => {

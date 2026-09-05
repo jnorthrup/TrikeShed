@@ -118,6 +118,26 @@ class ConfixBlackboard {
         return this
     }
     
+    /**
+     * Put [value] at [key] only if [admit] accepts what is there now (null = absent) — decided
+     * and applied in ONE compare-and-set, so two writers that both read the key first cannot
+     * both pass the check and land in either order. Returns whether the put happened.
+     * (Delta 2026-09-05: the fan-out receipt's owner is the newest revision; the stale
+     * worker's write was admitted by a read that raced the newer one's put.)
+     */
+    fun putIf(key: String, value: Any?, language: String, admit: (current: Any?) -> Boolean): Boolean {
+        val entry = ProvenanceEntry(language, Clock.System.now().toEpochMilliseconds())
+        while (true) {
+            val cur = cell.load()
+            if (!admit(cur.store[key])) return false
+            val new = Cell(cur.store + (key to value), cur.provenance + (key to entry), cur.doc.set(key, value))
+            if (cell.compareAndSet(cur, new)) {
+                notifySubscribers(new.doc)
+                return true
+            }
+        }
+    }
+
     /** Get value at key */
     fun get(key: String): Any? = store[key]
     

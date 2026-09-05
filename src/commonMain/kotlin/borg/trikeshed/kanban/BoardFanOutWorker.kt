@@ -302,9 +302,12 @@ class BoardFanOutWorker(
         value.putAll(extra)
         // Two workers can be live at once (a drag mid-split fires the rule at the new
         // revision while the old one still runs); the newer revision owns the key. A
-        // stale worker never overwrites it — its own map is still returned to the sink.
-        val standing = (blackboard.get(RECEIPT_PREFIX + jobId) as? Map<*, *>)?.get("revision") as? Number
-        if (standing == null || standing.toLong() <= revision) blackboard.put(RECEIPT_PREFIX + jobId, value, LANGUAGE)
+        // stale worker never overwrites it — decided and written in one compare-and-set,
+        // so the check cannot race the other worker's put. Its own map still goes to the sink.
+        blackboard.putIf(RECEIPT_PREFIX + jobId, value, LANGUAGE) { standing ->
+            val rev = (standing as? Map<*, *>)?.get("revision") as? Number
+            rev == null || rev.toLong() <= revision
+        }
         return value
     }
 }

@@ -42,7 +42,6 @@ fun main(args: Array<String>) {
 
 class FunnelMergeBranchesCli(private val repoDir: File, private val since: String) {
 
-    companion object { const val MASTER = "master" }
 
     private data class ArmSource(val ref: String, val date: String, val dropped: List<String>)
 
@@ -54,64 +53,62 @@ class FunnelMergeBranchesCli(private val repoDir: File, private val since: Strin
         val dirty = git("status", "--porcelain").second.lineSequence().filter { it.length > 3 }.map { it.substring(3).trim().substringAfter(" -> ") }.toSet()
 
         // ── arms ──────────────────────────────────────────────────────────
-        val refs = git("for-each-ref", "--sort=committerdate", "--format=%(committerdate:short) %(refname:short)", "refs/remotes/origin").second
+        // Each branch's OWN change: its diff against its merge-base with master. Every hunk is
+        // then re-anchored on master's current text by content (GitPijulGateway.rebase): a hunk
+        // master already contains is SUPERSEDED, one master rewrote is STALE, both dropped and
+        // reported; EXACT and RELOCATED hunks are the arm. (An octopus common base with master
+        // as an arm was tried first: git cuts the same edit into different hunk shapes on the
+        // two sides, the ids differ, and the edit lands twice — the build gate caught it.)
+        val refs: List<Pair<String, String>> = git("for-each-ref", "--sort=committerdate", "--format=%(committerdate:short) %(refname:short)", "refs/remotes/origin").second
             .lineSequence().map { it.trim() }.filter { it.isNotEmpty() }
             .map { it.substringBefore(' ') to it.substringAfter(' ') }
             .filter { (d, r) -> d >= since && r != "origin/master" && r != "origin/HEAD" && r != "origin" }
             .toList()
         val arms = ArrayList<GitPijulGateway.Arm>()
         val sources = LinkedHashMap<String, ArmSource>()
-        var skippedMerged = 0
+        val outcomes = LinkedHashMap<String, MutableList<String>>()
         val live = refs.filter { (_, ref) -> git("rev-list", "--count", "master..$ref").second.trim() != "0" }
-        skippedMerged = refs.size - live.size
+        val skippedMerged = refs.size - live.size
         if (live.isEmpty()) { println("[FUNNEL-MERGE] since=$since refs=${refs.size} — every branch is already in master"); return 0 }
-        // The Pijul rule: every arm is a patch against ONE base. The base is the common
-        // ancestor of master and every live branch; master's own changes since then are
-        // an arm too, so a bot hunk that master has since rewritten collides with master's
-        // and is resolved (master wins by default) instead of landing on stale coordinates.
-        val base = git("merge-base", "--octopus", "master", *live.map { it.second }.toTypedArray()).second.trim()
-        require(base.length >= 40) { "no common base for master and ${live.size} branches" }
+        val masterText = HashMap<String, String>()
+        fun masterFile(path: String): String = masterText.getOrPut(path) { git("show", "master:$path").let { if (it.first == 0) it.second else "" } }
         for ((date, ref) in live) {
-            val diff = git("diff", "--no-color", base, ref)
+            val diff = git("diff", "--no-color", "master...$ref")
             if (diff.first != 0 || diff.second.isBlank()) continue
             val all = GitPijulGateway.hunksOf(diff.second)
             val dropped = all.map { it.path }.distinct().filterNot(GitPijulGateway::isProductionPath)
-            val hunks = all.filter { GitPijulGateway.isProductionPath(it.path) }
+            val production = all.filter { GitPijulGateway.isProductionPath(it.path) }
             val label = ref.removePrefix("origin/")
-            // Steganographic path entropy is a NEW-path threat; an edit to a file master
-            // already has (CouchDatabase.kt scores 3.6 bits on its own name) is not one.
-            val newPaths = hunks.map { it.path }.distinct().filter { !File(repoDir, it).exists() }
+            val newPaths = production.map { it.path }.distinct().filter { git("cat-file", "-e", "master:$it").first != 0 }
             val quarantined = EntropyPathScanner.scanTouchedPaths(newPaths).map { it.path }.toSet()
             if (quarantined.isNotEmpty()) println("[FUNNEL-MERGE] QUARANTINE $label: new paths with entropy > 3.5 dropped: $quarantined")
-            // Resurrection guard (Jim's rule: kept merges must not bring owner-deleted files back).
-            // A path the branch presents as NEW relative to the base, absent from master today,
-            // that master's history has deleted, is a deletion being undone — refused.
+            // Resurrection guard (Jim's rule: kept merges must not bring owner-deleted files back):
+            // a path the branch adds that master's history has deleted is a deletion being undone.
             val resurrected = newPaths.filter { it !in quarantined }.filter { path ->
-                git("cat-file", "-e", "$base:$path").first != 0 &&
-                    git("log", "--diff-filter=D", "-1", "--format=%h", "master", "--", path).second.isNotBlank()
+                git("log", "--diff-filter=D", "-1", "--format=%h", "master", "--", path).second.isNotBlank()
             }.toSet()
             if (resurrected.isNotEmpty()) println("[FUNNEL-MERGE] RESURRECTION refused for $label: $resurrected")
-            val kept = hunks.filter { it.path !in quarantined && it.path !in resurrected }
+            val log = outcomes.getOrPut(label) { ArrayList() }
+            val kept = ArrayList<GitPijulGateway.Hunk>()
+            for (h in production) {
+                if (h.path in quarantined || h.path in resurrected) continue
+                when (val r = GitPijulGateway.rebase(h, masterFile(h.path))) {
+                    is GitPijulGateway.Rebased.Exact -> kept.add(r.hunk)
+                    is GitPijulGateway.Rebased.Relocated -> { kept.add(r.hunk); log.add("relocated ${h.path}:L${r.from}→L${r.hunk.lo}") }
+                    is GitPijulGateway.Rebased.Superseded -> log.add("superseded ${h.path}:L${h.lo} (master already has it)")
+                    is GitPijulGateway.Rebased.Stale -> log.add("stale ${h.path}:L${h.lo} (master rewrote those lines)")
+                }
+            }
             sources[label] = ArmSource(ref, date, dropped + quarantined + resurrected)
-            if (kept.isEmpty()) { println("[FUNNEL-MERGE] $label: only scratch/quarantined paths — nothing to merge"); continue }
+            if (kept.isEmpty()) { println("[FUNNEL-MERGE] $label: nothing left to merge — ${log.joinToString("; ").ifEmpty { "scratch/quarantined paths only" }}"); continue }
             arms.add(GitPijulGateway.Arm(label, kept))
         }
-        val branchTouched = arms.flatMap { a -> a.hunks.map { it.path } }.distinct().sorted()
-        if (branchTouched.isNotEmpty()) {
-            val md = git("diff", "--no-color", base, "master", "--", *branchTouched.toTypedArray())
-            val masterHunks = GitPijulGateway.hunksOf(md.second)
-            if (masterHunks.isNotEmpty()) arms.add(0, GitPijulGateway.Arm(MASTER, masterHunks))
-        }
-        println("[FUNNEL-MERGE] since=$since refs=${refs.size} alreadyMerged=$skippedMerged arms=${arms.size} (incl. master) head=${baseSha.take(12)} base=${base.take(12)}")
+        println("[FUNNEL-MERGE] since=$since refs=${refs.size} alreadyMerged=$skippedMerged arms=${arms.size} head=${baseSha.take(12)}")
+        for ((label, log) in outcomes) if (log.isNotEmpty()) println("[FUNNEL-MERGE] $label: " + log.joinToString("; "))
 
         // ── plan ──────────────────────────────────────────────────────────
-        val explicit = table?.let { GitPijulGateway.parseResolutions(it.readText()) } ?: emptyMap()
-        val first = GitPijulGateway.plan(arms, explicit)
-        val defaults = first.unresolved.filter { g -> g.variants.any { MASTER in it.arms } }
-            .associate { it.locus to (GitPijulGateway.Resolution.Accept(MASTER) as GitPijulGateway.Resolution) }
-        val resolutions = defaults + explicit
+        val resolutions = table?.let { GitPijulGateway.parseResolutions(it.readText()) } ?: emptyMap()
         val plan = GitPijulGateway.plan(arms, resolutions)
-        if (defaults.isNotEmpty()) println("[FUNNEL-MERGE] ${defaults.size} loci where master already rewrote the lines → master wins (superseded): ${defaults.keys.joinToString(" ")}")
         printReport(plan, sources)
         if (report) return 0
         if (plan.unresolved.isNotEmpty()) {
@@ -129,9 +126,7 @@ class FunnelMergeBranchesCli(private val repoDir: File, private val since: Strin
             val touched = plan.survivors.keys.sorted()
             for (path in touched) {
                 val target = File(worktree, path)
-                val shown = git("show", "$base:$path")
-                val baseText = if (shown.first == 0) shown.second else ""
-                val rendered = GitPijulGateway.render(baseText, plan.survivors.getValue(path))
+                val rendered = GitPijulGateway.render(masterFile(path), plan.survivors.getValue(path))
                 if (rendered.isEmpty() && target.isFile) target.delete()
                 else { target.parentFile?.mkdirs(); target.writeText(rendered) }
             }
@@ -144,9 +139,8 @@ class FunnelMergeBranchesCli(private val repoDir: File, private val since: Strin
             if (names.isBlank()) { println("[FUNNEL-MERGE] no delta vs master — everything already present"); return 0 }
             val stagedPaths = names.lines().map { it.trim() }.filter { it.isNotEmpty() }
             // Render-drift gate: a path may differ from master ONLY if a branch hunk survived on it.
-            // Every other path is master reproduced through the CRDT from the base and must be byte-identical.
-            val branchPaths = plan.survivors.filter { (_, hs) -> hs.any { h -> plan.groups.any { g -> g.path == h.path && g.variants.any { v -> v.hunk.id == h.id && v.arms.any { it != MASTER } } } } }.keys
-            val drift = stagedPaths.filter { it !in branchPaths }
+            // Only paths with a surviving branch hunk may be written; anything else staged is a render fault.
+            val drift = stagedPaths.filter { it !in plan.survivors.keys }
             if (drift.isNotEmpty()) { System.err.println("[FUNNEL-MERGE] RENDER DRIFT — master-only files came out different, aborting: $drift"); return 3 }
             val overlap = stagedPaths.filter { it in dirty }
             if (overlap.isNotEmpty()) { System.err.println("[FUNNEL-MERGE] working tree has uncommitted edits in paths this merge changes: $overlap — commit or park them first"); return 3 }
@@ -160,13 +154,15 @@ class FunnelMergeBranchesCli(private val repoDir: File, private val since: Strin
             // ── commit, fast-forward, push ────────────────────────────────
             val msg = buildString {
                 append(subject ?: "funnel ${arms.size}-way merge — ${plan.groups.count { it.converged }} loci converged, ${plan.groups.size - plan.groups.count { it.converged }} resolved")
-                append("\n\nEvery unmerged origin branch since $since, absorbed through the Pijul gateway against\n")
-                append("common base ${base.take(12)} with master's own changes since then as one more arm.\n")
-                append("Through the\n")
+                append("\n\nEvery unmerged origin branch since $since, absorbed through the Pijul gateway: each\n")
+                append("branch's own hunks re-anchored on master by content; what master already had or\n")
+                append("rewrote is dropped and named below. Through the\n")
                 append("Pijul gateway (GitPijulGateway): hunks content-addressed, identical edits applied\n")
                 append("once, same-locus divergence resolved by the table below, scratch paths refused.\n")
                 append("\nArms (${arms.size}):\n")
-                for (a in arms) append("  ${a.label}  (${sources[a.label]?.date ?: "head"}, ${a.hunks.size} hunks)\n")
+                for (a in arms) append("  ${a.label}  (${sources[a.label]?.date}, ${a.hunks.size} hunks)\n")
+                val notes = outcomes.filter { it.value.isNotEmpty() }
+                if (notes.isNotEmpty()) { append("\nRe-anchoring:\n"); for ((l, log) in notes) append("  $l: ${log.joinToString("; ")}\n") }
                 val nonProd = sources.filter { it.value.dropped.isNotEmpty() }
                 if (nonProd.isNotEmpty()) {
                     append("\nRefused as scratch / gh-pages (never committed):\n")
@@ -207,7 +203,7 @@ class FunnelMergeBranchesCli(private val repoDir: File, private val since: Strin
             val posted = gs.filterNot { it.converged }
             if (posted.isEmpty()) {
                 val arms = conv.flatMap { g -> g.variants.flatMap { it.arms } }.distinct()
-                println("CONVERGED $path  hunks=${conv.size} arms=${arms.size} [${arms.joinToString(" ")}]")
+                println("CONVERGED $path  hunks=${conv.size} arms=${arms.size} [${arms.joinToString(" ")}] loci=${conv.joinToString(" ") { it.locus.substringAfterLast(':') }}")
             } else {
                 if (conv.isNotEmpty()) println("CONVERGED $path  hunks=${conv.size} (outside the posted loci)")
                 for (g in posted) {
