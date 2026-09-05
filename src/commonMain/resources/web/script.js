@@ -1321,6 +1321,7 @@
 <<<<<<< HEAD
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
   const SIDEBAR_BTNS = { doc: 'btn-home', board: 'btn-board', graph: 'btn-graph', sheet: 'btn-sheet', host: 'btn-host' };
   const VIEWS = { doc: [docScrollEl, viewDocBtn], board: [boardScrollEl, viewBoardBtn], graph: [graphScrollEl, viewGraphBtn], sheet: [sheetScrollEl, viewSheetBtn], shape: [shapeScrollEl, viewShapeBtn], host: [hostScrollEl, viewHostBtn] };
 <<<<<<< HEAD
@@ -1447,6 +1448,28 @@
       } else {
         btns.forEach(btn => { if (btn) btn.removeAttribute('aria-current'); });
 >>>>>>> origin/palette-sync-active-states-13061811296034537326
+=======
+  const VIEWS = {
+    doc: [docScrollEl, [viewDocBtn, document.getElementById('btn-home')]],
+    board: [boardScrollEl, [viewBoardBtn, document.getElementById('btn-board')]],
+    graph: [graphScrollEl, [viewGraphBtn, document.getElementById('btn-graph')]],
+    sheet: [sheetScrollEl, [viewSheetBtn, document.getElementById('btn-sheet')]],
+    shape: [shapeScrollEl, [viewShapeBtn]],
+    host: [hostScrollEl, [viewHostBtn, document.getElementById('btn-host')]]
+  };
+  function setView(view) {
+    mutate((s) => { s.view = view; }, 'view');
+    for (const [k, [el, btns]] of Object.entries(VIEWS)) {
+      el.hidden = k !== view;
+      for (const btn of btns) {
+        if (!btn) continue;
+        btn.classList.toggle('active', k === view);
+        if (k === view) {
+          btn.setAttribute('aria-current', 'page');
+        } else {
+          btn.removeAttribute('aria-current');
+        }
+>>>>>>> origin/palette-sync-aria-current-5674151201601486281
       }
     }
     if (view === 'board') { renderBoard(); hydrateBoard(); }
@@ -1456,6 +1479,7 @@
     if (view === 'host') renderHost();
   }
 
+<<<<<<< HEAD
 <<<<<<< HEAD
   for (const [k, [, btn]] of Object.entries(VIEWS)) {
     btn.addEventListener('click', () => setView(k));
@@ -1467,6 +1491,13 @@
 =======
   for (const [k, [, btns]] of Object.entries(VIEWS)) btns.forEach(btn => { if (btn) btn.addEventListener('click', () => setView(k)); });
 >>>>>>> origin/palette-sync-active-states-13061811296034537326
+=======
+  for (const [k, [, btns]] of Object.entries(VIEWS)) {
+    for (const btn of btns) {
+      if (btn) btn.addEventListener('click', () => setView(k));
+    }
+  }
+>>>>>>> origin/palette-sync-aria-current-5674151201601486281
   document.getElementById('btn-new-page').addEventListener('click', () => {
     newPage();
     renderAll();
