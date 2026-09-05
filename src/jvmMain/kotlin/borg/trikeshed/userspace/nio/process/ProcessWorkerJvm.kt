@@ -10,7 +10,7 @@ class ProcessWorkerJvm(private val capability: ProcessCapability) : ProcessWorke
         }
         val pb = ProcessBuilder(spec.command, *spec.args.toTypedArray())
         if (spec.cwd != null) pb.directory(java.io.File(spec.cwd))
-        pb.environment().putAll(spec.env)
+        pb.environment().apply { clear(); putAll(borg.trikeshed.graal.subvm.GuestEnvironment.curated()); putAll(spec.env) }
         return kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { kotlinx.coroutines.coroutineScope {
             val proc = pb.start()
             val stdoutDeferred = this.async {
