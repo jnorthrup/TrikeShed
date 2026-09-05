@@ -1324,6 +1324,7 @@
 <<<<<<< HEAD
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
   const SIDEBAR_BTNS = { doc: 'btn-home', board: 'btn-board', graph: 'btn-graph', sheet: 'btn-sheet', host: 'btn-host' };
 =======
   const SIDEBAR_BTNS = { doc: document.getElementById('btn-home'), board: document.getElementById('btn-board'), graph: document.getElementById('btn-graph'), sheet: document.getElementById('btn-sheet'), host: document.getElementById('btn-host') };
@@ -1357,6 +1358,26 @@
     mutate((s) => { s.view = view; }, 'view');
     for (const [k, [el, btn, sidebarBtn]] of Object.entries(VIEWS)) {
 >>>>>>> origin/palette-sidebar-active-sync-363112185002837110
+=======
+  const viewDocSidebarBtn = document.getElementById('btn-home');
+  const viewBoardSidebarBtn = document.getElementById('btn-board');
+  const viewGraphSidebarBtn = document.getElementById('btn-graph');
+  const viewSheetSidebarBtn = document.getElementById('btn-sheet');
+  const viewHostSidebarBtn = document.getElementById('btn-host');
+
+  const VIEWS = {
+    doc: [docScrollEl, viewDocBtn, viewDocSidebarBtn],
+    board: [boardScrollEl, viewBoardBtn, viewBoardSidebarBtn],
+    graph: [graphScrollEl, viewGraphBtn, viewGraphSidebarBtn],
+    sheet: [sheetScrollEl, viewSheetBtn, viewSheetSidebarBtn],
+    shape: [shapeScrollEl, viewShapeBtn, null],
+    host: [hostScrollEl, viewHostBtn, viewHostSidebarBtn]
+  };
+
+  function setView(view) {
+    mutate((s) => { s.view = view; }, 'view');
+    for (const [k, [el, btn, sidebarBtn]] of Object.entries(VIEWS)) {
+>>>>>>> origin/palette-ux-aria-current-navigation-3263123026885197086
       el.hidden = k !== view;
 <<<<<<< HEAD
       const sidebarBtn = SIDEBAR_BTNS[k] ? document.getElementById(SIDEBAR_BTNS[k]) : null;
@@ -1371,15 +1392,21 @@
       btn.classList.toggle('active', k === view);
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
 =======
 >>>>>>> origin/palette-sidebar-active-sync-363112185002837110
       if (sidebarBtn) sidebarBtn.classList.toggle('active', k === view);
+=======
+      if (sidebarBtn) sidebarBtn.classList.toggle('active', k === view);
+
+>>>>>>> origin/palette-ux-aria-current-navigation-3263123026885197086
       if (k === view) {
         btn.setAttribute('aria-current', 'page');
         if (sidebarBtn) sidebarBtn.setAttribute('aria-current', 'page');
       } else {
         btn.removeAttribute('aria-current');
         if (sidebarBtn) sidebarBtn.removeAttribute('aria-current');
+<<<<<<< HEAD
 <<<<<<< HEAD
 =======
       const sideBtn = SIDEBAR_BTNS[k];
@@ -1505,6 +1532,8 @@
         btn.removeAttribute('aria-current');
         if (sbtn) sbtn.removeAttribute('aria-current');
 >>>>>>> origin/palette-sync-sidebar-aria-11912243228218524737
+=======
+>>>>>>> origin/palette-ux-aria-current-navigation-3263123026885197086
       }
     }
     if (view === 'board') { renderBoard(); hydrateBoard(); }
