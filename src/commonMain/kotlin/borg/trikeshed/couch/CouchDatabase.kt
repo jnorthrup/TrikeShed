@@ -44,12 +44,25 @@ class CouchDatabase(
             return if (s.size == 0) 0L else s[s.size - 1].sequence + 1
         }
 
-    fun info(): Map<String, Any?> = mapOf(
-        "db_name" to name,
-        "doc_count" to store.all().count { !isTombstone(it) && !it.id.startsWith("_design/") },
-        "update_seq" to updateSeq,
-        "instance_start_time" to "0",
-    )
+    fun info(): Map<String, Any?> {
+        // ⚡ Bolt: Using store.ids() for zero-allocation ID scanning instead of store.all().
+        // Avoiding materializing full documents in memory just to count them reduces GC pressure.
+        var docCount = 0
+        val ids = store.ids()
+        for (i in 0 until ids.a) {
+            val id = ids.b(i)
+            // ⚡ Bolt: Using store.head.isDeleted(id) directly is faster than loading the doc and checking for a tombstone flag.
+            if (!store.head.isDeleted(id) && !id.startsWith("_design/")) {
+                docCount++
+            }
+        }
+        return mapOf(
+            "db_name" to name,
+            "doc_count" to docCount,
+            "update_seq" to updateSeq,
+            "instance_start_time" to "0",
+        )
+    }
 
     // ── documents ─────────────────────────────────────────────────
 

@@ -20,7 +20,7 @@ class JvmProcessOperations : ProcessOperations {
     ): ProcessResult {
         validateCommand(listOf(command) + args)
         val pb = ProcessBuilder(command, *args.toTypedArray())
-        env.forEach { (k, v) -> pb.environment()[k] = v }
+        pb.environment().apply { clear(); putAll(borg.trikeshed.graal.subvm.GuestEnvironment.curated()); putAll(env) }
 
         return kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { kotlinx.coroutines.coroutineScope {
             val proc = pb.start()
