@@ -84,6 +84,39 @@ class BrainClientRosterTest {
     }
 
     @Test
+    fun retiredModelMatcherClassifiesEndOfLifeOnly() {
+        // NVIDIA's live shape, 2026-09-04: HTTP 410 + "reached its end of life … no longer available".
+        assertTrue(BrainClient.isRetiredModelFailure("""ModelMux chat failed with HTTP 410: {"type":"about:blank","title":"Gone","status":410,"detail":"The model 'deepseek-ai/deepseek-v4-pro' has reached its end of life on 2026-08-07T09:00:00Z and is no longer available."}"""))
+        assertTrue(BrainClient.isRetiredModelFailure("HTTP 410 Gone"))
+        assertTrue(BrainClient.isRetiredModelFailure("model has reached its end of life"))
+        // NVIDIA's other dead shape: catalogued, but the function is not served to this account.
+        assertTrue(BrainClient.isRetiredModelFailure("""ModelMux chat failed with HTTP 404: {"detail":"Function '7fadd4de-e22a-48e4-90e9-f02ef14a74b9': Not found for account 'x'"}"""))
+        assertFalse(BrainClient.isRetiredModelFailure("HTTP 404: {\"error\":\"route missing\"}"), "a 404 without 'not found' is not a verdict")
+        assertFalse(BrainClient.isRetiredModelFailure("HTTP 401 Unauthorized"))
+        assertFalse(BrainClient.isRetiredModelFailure("HTTP 429 rate limit"))
+        assertFalse(BrainClient.isRetiredModelFailure("HTTP 500"))
+        assertFalse(BrainClient.isRetiredModelFailure("connection reset by peer"))
+        // A retired id is not a missing key and not retryable — the verdicts stay disjoint.
+        assertFalse(BrainClient.isMissingKeyFailure("HTTP 410 Gone: end of life"))
+        assertFalse(BrainClient.isRetryableFailure("HTTP 410 Gone: end of life"))
+    }
+
+    @Test
+    fun rosterCarriesNoRetiredNvidiaId() {
+        // The six ids NVIDIA answered 410 for on 2026-09-04 must not be on the roster:
+        // the first row is the roster's first pick until something answers.
+        val retired = setOf(
+            "deepseek-ai/deepseek-v4-pro", "deepseek-ai/deepseek-v4-flash",
+            "nvidia/llama-3.3-nemotron-super-49b-v1.5", "openai/gpt-oss-120b", "thinkingmachines/inkling",
+        )
+        val nvidiaModels = BrainClient(keyMux = KeyMux { harness() }).providerRoster()
+            .filter { it.base.contains("integrate.api.nvidia.com") }.map { it.model }
+        assertTrue(nvidiaModels.isNotEmpty())
+        assertEquals(emptyList(), nvidiaModels.filter { it in retired || it == "z-ai/glm-5.2" })
+        assertTrue("deepseek-ai/deepseek-v4-pro-0813" in nvidiaModels, "the dated successor replaces the retired id")
+    }
+
+    @Test
     fun brainNoRouteCarriesEveryAttemptInOrder() {
         val attempts = listOf(
             "groq/llama-3.3-70b-versatile: KeyMux: no key for llm.groq.key",

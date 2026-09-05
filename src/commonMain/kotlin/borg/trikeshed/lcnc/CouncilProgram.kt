@@ -77,14 +77,19 @@ object CouncilProgram {
      * (OroborosDaemon.kt, `val lcncModelMux = modelmux.ModelMux(keyMux) {…}`,
      * ~line 993) — mirrored BY CONVENTION, same ids, same order. A model
      * added to one list belongs in both.
+     *
+     * Delta 2026-09-04: the ids follow BrainClient.rosterInto (no `lcncModelMux`
+     * is inlined in the daemon any more). NVIDIA retired deepseek-v4-pro → the
+     * dated `-0813` successor, and gpt-oss-120b with no successor (HTTP 410,
+     * probed live) — same edit as the roster. `z-ai/glm-5.2` stays: openrouter
+     * still serves that id.
      */
     val DEFAULT_ROSTER: List<String> = listOf(
-        "deepseek-ai/deepseek-v4-pro",
+        "deepseek-ai/deepseek-v4-pro-0813",
         "nvidia/nemotron-3-super-120b-a12b",
         "mistralai/mistral-large-2-instruct",
         "z-ai/glm-5.2",
         "moonshotai/kimi-k2.6",
-        "openai/gpt-oss-120b",
         "minimaxai/minimax-m3",
         "poolside/laguna-xs-2.1",
         "gpt-4o-mini",

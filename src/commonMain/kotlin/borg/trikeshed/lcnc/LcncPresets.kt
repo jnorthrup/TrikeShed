@@ -454,7 +454,7 @@ object LcncPresets {
             nodes = listOf(
                 LcncNode("n1", "list.pairs",
                     params = mapOf("pairs" to
-                        """[{"key":"nv-deepseek-v4-pro","model":"deepseek-ai/deepseek-v4-pro"},{"key":"zai","model":"glm-5.2"}]"""),
+                        """[{"key":"nv-deepseek-v4-pro","model":"deepseek-ai/deepseek-v4-pro-0813"},{"key":"zai","model":"glm-5.2"}]"""),
                     x = 40.0, y = 60.0),
                 LcncNode("n2", "display", x = 340.0, y = 60.0),
                 // The seat had a system prompt and no user prompt: nothing to send.

@@ -1096,6 +1096,29 @@ object OroborosDaemon {
                 hermesKey == null -> "no key resolves for llm.$hermesProvider.key"
                 else -> ""
             }
+            // Rung 2 (2026-09-04): the launch Hermes makes when no session row
+            // pins a runtime — its resume path "falls back to ambient config
+            // resolution", i.e. the profile's config.yaml model block
+            // (HermesConfigDefault mirrors resolve_runtime_provider). Until this
+            // rung existed the daemon fell from a pin-less row straight to the
+            // static roster, and the model Hermes runs in this profile was never
+            // the model the daemon ran.
+            val hermesHome = borg.trikeshed.jules.HermesModelUsage.hermesHome()
+            val configOutcome: borg.trikeshed.jules.HermesConfigDefault.Outcome? =
+                if (hermesPinReason.isEmpty()) null
+                else borg.trikeshed.jules.HermesConfigDefault.resolve(hermesHome, keyLane = { provider, field ->
+                    kotlinx.coroutines.withContext(Dispatchers.IO) {
+                        runCatching { keyMux.get("llm.$provider.$field") }.getOrNull()?.trim()?.takeIf { it.isNotEmpty() }
+                    }
+                })
+            val configLaunch = (configOutcome as? borg.trikeshed.jules.HermesConfigDefault.Outcome.Pinned)?.launch
+                ?.takeIf { it.apiMode == "chat_completions" }
+            val configReason: String? = when (configOutcome) {
+                null -> null
+                is borg.trikeshed.jules.HermesConfigDefault.Outcome.Unavailable -> configOutcome.reason
+                is borg.trikeshed.jules.HermesConfigDefault.Outcome.Pinned ->
+                    if (configLaunch == null) "config default ${configOutcome.launch.model} runs api_mode=${configOutcome.launch.apiMode}, not chat_completions" else null
+            }
             val built: borg.trikeshed.jules.BrainClient = if (hermesPinReason.isEmpty() && hermesSession != null && hermesModel != null && hermesBaseUrl != null && hermesKey != null) {
                 val seen = java.time.Instant.ofEpochMilli((hermesSession.recencyEpochSeconds * 1000).toLong())
                 System.err.println(
@@ -1103,16 +1126,35 @@ object OroborosDaemon {
                         (if (hermesSession.isOpen) "open" else "ended") + ", last activity $seen, ${hermesSession.apiCallCount} api calls): " +
                         "$hermesModel @ $hermesBaseUrl (provider=$hermesProvider, api_mode=${hermesSession.runtime.apiMode ?: "chat_completions"}, ${hermesSession.ledger})",
                 )
+                // The host Hermes launches against IS an operator-configured provider
+                // host: admit it through the substrate's deny-by-default egress gate
+                // the same way a configured base_url is (EgressAllowlist.allowUrl).
+                // 2026-09-04: the first config-default pin, mimo-v2.5 @ opencode.ai,
+                // resolved a key and built a correct request, then died one layer
+                // down — "egress denied by substrate: opencode.ai:443" — because
+                // that host is Hermes' to know, not the HarnessRegistry's.
+                borg.trikeshed.userspace.nio.channels.spi.EgressAllowlist.allowUrl(hermesBaseUrl)
                 borg.trikeshed.jules.BrainClient(apiKey = hermesKey, base = hermesBaseUrl.trimEnd('/'), model = hermesModel, errorSink = brainErrorSink, quotaLegion = quotaLegion)
+            } else if (configLaunch != null) {
+                System.err.println(
+                    "[OROBOROS] Brain PINNED to hermes config default (${configLaunch.configFile}; session pin unavailable: $hermesPinReason): " +
+                        "${configLaunch.model} @ ${configLaunch.baseUrl} (provider=${configLaunch.provider}, api_mode=${configLaunch.apiMode}, key from ${configLaunch.keySource})",
+                )
+                borg.trikeshed.userspace.nio.channels.spi.EgressAllowlist.allowUrl(configLaunch.baseUrl)
+                borg.trikeshed.jules.BrainClient(apiKey = configLaunch.apiKey, base = configLaunch.baseUrl, model = configLaunch.model, errorSink = brainErrorSink, quotaLegion = quotaLegion)
             } else {
-                System.err.println("[OROBOROS] Brain on the provider roster — hermes session pin unavailable: $hermesPinReason")
+                System.err.println("[OROBOROS] Brain on the provider roster — hermes session pin unavailable: $hermesPinReason; config default unavailable: $configReason")
                 borg.trikeshed.jules.BrainClient(errorSink = brainErrorSink, keyMux = keyMux, quotaLegion = quotaLegion)
             }
             val account: Map<String, Any?> = mapOf(
-                "pin" to if (hermesPinReason.isEmpty()) {
-                    mapOf("model" to hermesModel, "baseUrl" to hermesBaseUrl, "provider" to hermesProvider, "sessionId" to hermesSession?.id)
-                } else null,
-                "reason" to hermesPinReason.ifEmpty { null },
+                "pin" to when {
+                    hermesPinReason.isEmpty() ->
+                        mapOf("source" to "session", "model" to hermesModel, "baseUrl" to hermesBaseUrl, "provider" to hermesProvider, "sessionId" to hermesSession?.id)
+                    configLaunch != null ->
+                        mapOf("source" to "config", "model" to configLaunch.model, "baseUrl" to configLaunch.baseUrl, "provider" to configLaunch.provider, "configFile" to configLaunch.configFile, "keySource" to configLaunch.keySource)
+                    else -> null
+                },
+                "reason" to listOfNotNull(hermesPinReason.ifEmpty { null }, configReason).joinToString("; ").ifEmpty { null },
                 "builtAtMs" to System.currentTimeMillis(),
             )
             return built to account

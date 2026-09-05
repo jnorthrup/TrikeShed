@@ -8,13 +8,16 @@ import kotlinx.coroutines.sync.withLock
  * The files whose change means "Hermes' world moved": its `state.db` (and the
  * WAL/SHM sidecars SQLite actually writes to), `auth.json`, and `.env`.
  * [stamp] is the newest mtime among them — cheap enough to ask on every call.
+ * Delta 2026-09-04: `config.yaml` too — its `model:` block is the ambient
+ * launch ([HermesConfigDefault]), the rung the brain takes when no session row
+ * pins a runtime, so a `hermes model` edit there must rebuild the brain as well.
  */
 class HermesWatch(val files: List<File>) {
     fun stamp(): Long = files.maxOfOrNull { runCatching { it.lastModified() }.getOrDefault(0L) } ?: 0L
 
     companion object {
         fun default(hermesHome: String = HermesModelUsage.hermesHome()): HermesWatch = HermesWatch(
-            listOf("state.db", "state.db-wal", "state.db-shm", "auth.json", ".env").map { File(hermesHome, it) },
+            listOf("state.db", "state.db-wal", "state.db-shm", "auth.json", ".env", "config.yaml").map { File(hermesHome, it) },
         )
     }
 }

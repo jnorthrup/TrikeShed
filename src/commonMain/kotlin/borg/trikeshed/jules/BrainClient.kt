@@ -138,6 +138,24 @@ open class BrainClient(
             return "no key" in m || "key not found" in m || "401" in m || "unauthorized" in m
         }
 
+        /**
+         * Classifies a chat failure as a RETIRED-MODEL verdict — HTTP 410 Gone, or
+         * the provider saying the model id reached end of life / is no longer
+         * available (NVIDIA's shape, seen live 2026-09-04 for six roster ids), or
+         * HTTP 404 "… Not found …" (NVIDIA's shape for a catalogued id whose
+         * function is not served to this account — four roster rows on
+         * 2026-09-04, each a 0.15 s dead round trip). Such an endpoint is skipped
+         * for the rest of the process ([retiredVerdicts]): a retired or
+         * unserved model id does not come back mid-process, and retrying it on
+         * every call is a dead round trip before the first live provider gets
+         * asked. 5xx and 429 stay with [isRetryableFailure] — transient.
+         */
+        internal fun isRetiredModelFailure(message: String): Boolean {
+            val m = message.lowercase()
+            return "http 410" in m || "end of life" in m || "no longer available" in m ||
+                ("http 404" in m && "not found" in m)
+        }
+
         /** Rate-limit signature: HTTP 429 or the z.ai/Zhipu limit codes (1302 rpm, 1305 overload). */
         internal fun isRateLimitFailure(message: String): Boolean {
             val m = message.lowercase()
@@ -162,6 +180,14 @@ open class BrainClient(
          * process gains no credentials it did not start with.
          */
         private val noKeyVerdicts: MutableSet<String> = mutableSetOf()
+
+        /**
+         * Process-lifetime retired-model verdict cache: endpoint NAMES whose chat
+         * or chatSeat attempt failed with the retired signature
+         * ([isRetiredModelFailure]). Never cleared — consulted by BOTH loops, so
+         * a dead roster row costs one round trip per process, not one per call.
+         */
+        private val retiredVerdicts: MutableSet<String> = mutableSetOf()
     }
 
     /** One OpenAI-compatible endpoint + the env var that KeyMux resolves. */
@@ -347,6 +373,7 @@ open class BrainClient(
         val routed = internalModelMux.route("conflict-resolve").a
         for (modelId in orderedModelIds(routed)) {
             val endpoint = endpointByModel[modelId] ?: continue
+            if (endpoint.name in retiredVerdicts) continue
 
             // Route through ModelMux.chat() — uses HtxKey from coroutine context,
             // records receipts via MuxReactor, respects quota/lease tracking.
@@ -368,8 +395,10 @@ open class BrainClient(
                     return response.a  // AcpResponse.a = full_text content
                 },
                 onFailure = { t ->
-                    lastError = "Brain ${endpoint.name} chat failed: ${t.message}"
-                    logError(endpoint.name, -1, t.message.orEmpty().take(500))
+                    val message = t.message.orEmpty()
+                    lastError = "Brain ${endpoint.name} chat failed: $message"
+                    if (isRetiredModelFailure(message)) retiredVerdicts.add(endpoint.name)
+                    logError(endpoint.name, -1, message.take(500))
                 },
             )
         }
@@ -416,6 +445,10 @@ open class BrainClient(
                 trail.add("${endpoint.name}/$modelId: skipped (no-key verdict cached)")
                 continue
             }
+            if (endpoint.name in retiredVerdicts) {
+                trail.add("${endpoint.name}/$modelId: skipped (retired-model verdict cached)")
+                continue
+            }
 
             val acpMessages = messages.size j { i: Int -> messages[i].first j messages[i].second }
             val result = withRateLimitRetry {
@@ -438,6 +471,7 @@ open class BrainClient(
                     val message = t.message ?: t.toString()
                     trail.add("${endpoint.name}/$modelId: ${message.take(200)}")
                     if (isMissingKeyFailure(message)) noKeyVerdicts.add(endpoint.name)
+                    if (isRetiredModelFailure(message)) retiredVerdicts.add(endpoint.name)
                     logError(endpoint.name, -1, message.take(500))
                 },
             )
@@ -503,15 +537,23 @@ open class BrainClient(
     private fun rosterInto(add: (String, String, String, String) -> Unit) {
 
         val nvidia = "https://integrate.api.nvidia.com/v1"
-        add("nv-deepseek-v4-pro", "NVIDIA_API_KEY", nvidia, "deepseek-ai/deepseek-v4-pro")
+        // NVIDIA retires model ids with HTTP 410 and a dated successor. Probed
+        // 2026-09-04 against /v1/models + a one-token chat: deepseek-v4-pro (EOL
+        // 08-07) → -0813, deepseek-v4-flash (EOL 08-07) → -0731; nemotron-super-49b
+        // (EOL 08-26), z-ai/glm-5.2 (08-21), gpt-oss-120b (09-03) and inkling
+        // (08-25) are gone with no successor on NVIDIA — dropped. The first row
+        // is the roster's first pick until something answers, so a dead row
+        // here was one 410 round trip ahead of EVERY brain call. Still listed
+        // in NVIDIA's catalog but answering 404 "Function … Not found for
+        // account" to this key the same day: mistral-large-2, codestral-22b,
+        // nemotron-ultra-253b, kimi-k2.6 — kept (an entitlement, not an EOL),
+        // and [retiredVerdicts] parks them after one 0.15 s miss per process.
+        // nemotron-ultra-550b answered, but took 22 s for one token.
+        add("nv-deepseek-v4-pro", "NVIDIA_API_KEY", nvidia, "deepseek-ai/deepseek-v4-pro-0813")
         add("nv-nemotron-super-120b", "NVIDIA_API_KEY", nvidia, "nvidia/nemotron-3-super-120b-a12b")
         add("nv-mistral-large-2", "NVIDIA_API_KEY", nvidia, "mistralai/mistral-large-2-instruct")
-        add("nv-deepseek-v4-flash", "NVIDIA_API_KEY", nvidia, "deepseek-ai/deepseek-v4-flash")
-        add("nv-nemotron-super-49b", "NVIDIA_API_KEY", nvidia, "nvidia/llama-3.3-nemotron-super-49b-v1.5")
-        add("nv-glm-52", "NVIDIA_API_KEY", nvidia, "z-ai/glm-5.2")
+        add("nv-deepseek-v4-flash", "NVIDIA_API_KEY", nvidia, "deepseek-ai/deepseek-v4-flash-0731")
         add("nv-kimi-k26", "NVIDIA_API_KEY", nvidia, "moonshotai/kimi-k2.6")
-        add("nv-gpt-oss-120b", "NVIDIA_API_KEY", nvidia, "openai/gpt-oss-120b")
-        add("nv-inkling", "NVIDIA_API_KEY", nvidia, "thinkingmachines/inkling")
         add("nv-minimax-m3", "NVIDIA_API_KEY", nvidia, "minimaxai/minimax-m3")
         add("nv-nemotron-ultra-253b", "NVIDIA_API_KEY", nvidia, "nvidia/llama-3.1-nemotron-ultra-253b-v1")
         add("nv-codestral-22b", "NVIDIA_API_KEY", nvidia, "mistralai/codestral-22b-instruct-v0.1")
