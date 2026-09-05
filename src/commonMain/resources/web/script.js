@@ -1325,7 +1325,14 @@
 >>>>>>> origin/jules-17428175357654286191-b5258251
   function setView(view) {
     mutate((s) => { s.view = view; }, 'view');
+<<<<<<< HEAD
     for (const [k, [el, btn, sidebarBtn]] of Object.entries(VIEWS)) {
+=======
+    const SIDEBAR_BTNS = { doc: 'btn-home', board: 'btn-board', graph: 'btn-graph', sheet: 'btn-sheet', host: 'btn-host' };
+    for (const [k, [el, btn]] of Object.entries(VIEWS)) {
+      const sidebarBtnId = SIDEBAR_BTNS[k];
+      const sidebarBtn = sidebarBtnId ? document.getElementById(sidebarBtnId) : null;
+>>>>>>> origin/palette-sidebar-active-state-9417121923487732280
       el.hidden = k !== view;
       const sidebarBtn = SIDEBAR_BTNS[k] ? document.getElementById(SIDEBAR_BTNS[k]) : null;
       btn.classList.toggle('active', k === view);
