@@ -88,6 +88,7 @@
 <<<<<<< HEAD
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
 ## 2025-05-24 - Synchronizing active states for duplicate navigation items
 **Learning:** When navigation buttons exist in multiple places (e.g., a topbar and a sidebar), visual styling and ARIA attributes (like `aria-current="page"`) must be updated on all instances when the view changes. Screen reader users navigating the sidebar would otherwise not know which view is currently active.
 **Action:** Expand view-switching logic to query and update all relevant navigation buttons, not just the primary ones, ensuring consistent state across the entire UI.
@@ -146,3 +147,8 @@
 **Learning:** In single-page applications, it's common to have multiple sets of navigation elements (e.g., a topbar and a sidebar) that switch to the same views. Applying `aria-current="page"` and visual `.active` classes to only one set leaves users navigating via the other set without clear feedback on the current active view, creating ambiguous states for screen reader users and keyboard navigators.
 **Action:** When managing view state, ensure that *all* instances of navigation buttons for the active view consistently receive the `aria-current="page"` attribute and visual active state updates, rather than just the primary or most visible set.
 >>>>>>> origin/palette/a11y-sidebar-aria-current-8447647767196904215
+=======
+## $(date +%Y-%m-%d) - Component specific keydown listeners for role="button" elements
+**Learning:** In vanilla JS apps, assigning `role="button"` and `tabindex="0"` to non-button semantic tags (like `<s>` or `<div>`) is necessary for accessibility, but these elements do not natively dispatch `click` events upon receiving document-level keyboard interactions (like Enter or Space). While some apps use a global keydown handler for `role="button"`, relying on local component-specific keydown handlers provides better encapsulation and prevents event-bubbling bugs when modifying specific UI components like the node delete button.
+**Action:** When adding `role="button"` and `tabindex="0"` to custom interactive elements, always explicitly bind a `keydown` listener for Enter and Space alongside the `click` handler on the component itself, rather than assuming a global handler exists or will reliably trigger it.
+>>>>>>> origin/palette/accessibility-aria-panels-5332397891945758788

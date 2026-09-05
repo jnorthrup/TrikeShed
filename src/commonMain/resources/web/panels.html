@@ -389,8 +389,8 @@ button{border-radius:6px;padding:4px 12px;transition:border-color .12s,color .12
   <button id="undoBtn" title="undo ⌘Z" disabled>↶</button>
   <button id="redoBtn" title="redo ⇧⌘Z" disabled>↷</button>
   <button id="clearBtn">clear</button>
-  <button id="qsBtn" title="run the quickstart in anger" style="border-color:#3ddc84;color:#3ddc84">⚡</button>
-  <button id="fbBtn" title="open a GitHub issue prefilled with this construction's coordinates" style="border-color:var(--warn);color:var(--warn)">⚑</button>
+  <button id="qsBtn" aria-label="Run quickstart" title="run the quickstart in anger" style="border-color:#3ddc84;color:#3ddc84">⚡</button>
+  <button id="fbBtn" aria-label="Provide feedback" title="open a GitHub issue prefilled with this construction's coordinates" style="border-color:var(--warn);color:var(--warn)">⚑</button>
   <span id="status">idle</span>
 </div>
 <div id="crumb" style="display:none"></div>
@@ -1508,7 +1508,11 @@ function buildNode(n){
     if(lane) el.dataset.lane=lane.id;
   }
   const hd=document.createElement("div"); hd.className="hd";
+<<<<<<< HEAD
   hd.innerHTML=`<i></i><b>${t.title}</b><s title="collapse">▤</s><s title="delete">✕</s>`;
+=======
+  hd.innerHTML=`<i></i><b>${t.title}</b><s role="button" tabindex="0" aria-label="Delete node" title="delete">✕</s>`;
+>>>>>>> origin/palette/accessibility-aria-panels-5332397891945758788
   el.appendChild(hd);
   // the hover blip: asserted / inferred / graal for THIS node, from the daemon
   el.addEventListener("pointerenter",e=>blipEnter(n,e));
@@ -1708,7 +1712,9 @@ function buildNode(n){
   el.style.left=n.x+"px"; el.style.top=n.y+"px";
   world.appendChild(el);
   hd.addEventListener("dblclick",e=>{ e.stopPropagation(); n.collapsed=!n.collapsed; el.classList.toggle("collapsed",n.collapsed); save(); });
-  hd.querySelector("s").addEventListener("click",()=>{ removeNode(n.id); });
+  const sBtn = hd.querySelector("s");
+  sBtn.addEventListener("click",()=>{ removeNode(n.id); });
+  sBtn.addEventListener("keydown",e=>{ if(e.key==="Enter"||e.key===" ") { e.preventDefault(); removeNode(n.id); } });
   hd.addEventListener("pointerdown",e=>{
     if(e.target.tagName==="S")return;
     e.stopPropagation();
