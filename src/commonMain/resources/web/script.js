@@ -1320,6 +1320,7 @@
 <<<<<<< HEAD
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
   const SIDEBAR_BTNS = { doc: 'btn-home', board: 'btn-board', graph: 'btn-graph', sheet: 'btn-sheet', host: 'btn-host' };
   const VIEWS = { doc: [docScrollEl, viewDocBtn], board: [boardScrollEl, viewBoardBtn], graph: [graphScrollEl, viewGraphBtn], sheet: [sheetScrollEl, viewSheetBtn], shape: [shapeScrollEl, viewShapeBtn], host: [hostScrollEl, viewHostBtn] };
 <<<<<<< HEAD
@@ -1427,6 +1428,25 @@
         } else {
           sbBtn.removeAttribute('aria-current');
         }
+=======
+  const VIEWS = {
+    doc: [docScrollEl, [viewDocBtn, document.getElementById('btn-home')]],
+    board: [boardScrollEl, [viewBoardBtn, document.getElementById('btn-board')]],
+    graph: [graphScrollEl, [viewGraphBtn, document.getElementById('btn-graph')]],
+    sheet: [sheetScrollEl, [viewSheetBtn, document.getElementById('btn-sheet')]],
+    shape: [shapeScrollEl, [viewShapeBtn]],
+    host: [hostScrollEl, [viewHostBtn, document.getElementById('btn-host')]]
+  };
+  function setView(view) {
+    mutate((s) => { s.view = view; }, 'view');
+    for (const [k, [el, btns]] of Object.entries(VIEWS)) {
+      el.hidden = k !== view;
+      btns.forEach(btn => { if (btn) btn.classList.toggle('active', k === view); });
+      if (k === view) {
+        btns.forEach(btn => { if (btn) btn.setAttribute('aria-current', 'page'); });
+      } else {
+        btns.forEach(btn => { if (btn) btn.removeAttribute('aria-current'); });
+>>>>>>> origin/palette-sync-active-states-13061811296034537326
       }
     }
     if (view === 'board') { renderBoard(); hydrateBoard(); }
@@ -1436,6 +1456,7 @@
     if (view === 'host') renderHost();
   }
 
+<<<<<<< HEAD
   for (const [k, [, btn]] of Object.entries(VIEWS)) {
     btn.addEventListener('click', () => setView(k));
     if (SIDEBAR_BTNS[k]) {
@@ -1443,6 +1464,9 @@
       if (sidebarBtn) sidebarBtn.addEventListener('click', () => setView(k));
     }
   }
+=======
+  for (const [k, [, btns]] of Object.entries(VIEWS)) btns.forEach(btn => { if (btn) btn.addEventListener('click', () => setView(k)); });
+>>>>>>> origin/palette-sync-active-states-13061811296034537326
   document.getElementById('btn-new-page').addEventListener('click', () => {
     newPage();
     renderAll();
