@@ -24,6 +24,10 @@ from .modules import kotlin_scan as ks
 # demand for anything outside this set is unsatisfiable under that scope.
 CCEK_ASSEMBLY_PROVIDES = {"MuxReactorElement.Key", "LcncScopeFrame", "Job"}
 
+# The plane's package. Files elsewhere that happen to sit in a `ccek/` directory
+# (lcnc/ccek/LcncCcekAssembly.kt) are the LCNC side of the assembly, not the plane.
+CCEK_PACKAGE = "borg.trikeshed.ccek"
+
 # ── CCEK decomposition rulings ───────────────────────────────────────────
 # The scanner reports a FACT per public member of the CCEK package: reached by an
 # LCNC runner file, unreached, or orphan (no file outside its own imports it).
@@ -105,13 +109,15 @@ def _iter_sources(root: Path, include_tests: bool):
 def ccek_decomposition(root: Path, texts: dict[str, str]) -> dict:
     """The CCEK package, member by member, against the LCNC runner files.
 
-    Surface = every public member under a `ccek/` package directory. Seams =
-    every file under an `lcnc/` directory (the runners are the only way a program
-    touches the plane). The whole tree decides orphan-hood.
+    Surface = every public member declared in the `borg.trikeshed.ccek` package
+    (by its `package` line, not its directory — `lcnc/ccek/` is the LCNC side of
+    the assembly, not the plane). Seams = every file under an `lcnc/` directory
+    (the runners are the only way a program touches the plane). The whole tree
+    decides orphan-hood.
     """
     surface: list[dict] = []
     for rel, text in sorted(texts.items()):
-        if "/ccek/" in "/" + rel.replace("\\", "/"):
+        if ks._package_of(text) == CCEK_PACKAGE:
             surface += ks.ccek_surface(text, rel)
     seams = {rel: t for rel, t in texts.items() if "/lcnc/" in "/" + rel.replace("\\", "/")}
     rows = ks.ccek_coverage(surface, seams, texts)

@@ -1,8 +1,13 @@
 package borg.trikeshed.lcnc
 
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.withContext
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertTrue
 
 /**
@@ -21,7 +26,7 @@ class CcekNodesTest {
     fun everyServedTypeHasAContractAndEveryContractHasARunner() {
         val contracts = LcncContracts.all().map { it.type }.toSet()
         val served = CcekNodes.servedTypes()
-        assertEquals(9, served.size, "the family is nine node types")
+        assertEquals(22, served.size, "the family is twenty-two node types: the nine verbs plus the thirteen the decomposition scan found unreached")
         for (t in served) assertTrue(t in contracts, "$t is served but has no contract")
         val ccekContracts = contracts.filter { it.startsWith("ccek.") }.toSet()
         assertEquals(served, ccekContracts, "no ccek.* contract without a runner (dead vocabulary)")
@@ -117,5 +122,117 @@ class CcekNodesTest {
             assertTrue(e.message!!.contains("teleport"), "the message names the bad verb")
         }
         assertTrue(threw, "an unknown verb must not be silently dropped")
+    }
+
+    @Test
+    fun theRestOfTheEngineIsProgrammableMemberByMember() = runTest {
+        val store = InMemoryCcekStore()
+        val reg = registry(store)
+        suspend fun run(type: String, params: Map<String, String> = emptyMap(), inputs: Map<String, Any?> = emptyMap()) =
+            reg.getValue(type).run(LcncNode("x-$type", type, params), inputs)
+
+        // a node's liveness, before and after the drain
+        run("ccek.incarnate", mapOf("title" to "t"))
+        run("ccek.signal", mapOf("verb" to "append", "text" to "one"), mapOf("handle" to "t"))
+        val alive = run("ccek.vitals", inputs = mapOf("handle" to "t"))
+        assertEquals(true, alive["active"])
+        assertEquals(1, alive["markdownProjections"])
+        run("ccek.drain", inputs = mapOf("handle" to "t"))
+        assertEquals(false, run("ccek.vitals", inputs = mapOf("handle" to "t"))["active"])
+        assertEquals(false, run("ccek.vitals", inputs = mapOf("handle" to "nobody"))["active"])
+
+        // a context: activation, its standing document, and the rete query
+        val ctx = run("ccek.context", mapOf("role" to "operator"))["contextId"].toString()
+        assertEquals(false, run("ccek.lineage", inputs = mapOf("contextId" to ctx))["active"])
+        val on = run("ccek.activate", mapOf("mode" to "activate"), mapOf("contextId" to ctx))
+        assertEquals(true, on["active"]); assertEquals(true, on["known"])
+        assertEquals(false, run("ccek.activate", mapOf("mode" to "deactivate"), mapOf("contextId" to ctx))["active"])
+        assertEquals(false, run("ccek.activate", mapOf("mode" to "activate"), mapOf("contextId" to "ghost"))["known"])
+        run("ccek.fact", mapOf("kind" to "block:appended"), mapOf("contextId" to ctx, "fields" to mapOf("text" to "one", "lane" to "a")))
+        run("ccek.fact", mapOf("kind" to "block:deleted"), mapOf("contextId" to ctx, "fields" to mapOf("lane" to "b")))
+        run("ccek.fact", mapOf("kind" to "card:moved"), mapOf("contextId" to ctx, "fields" to mapOf("lane" to "a")))
+        val lineage = run("ccek.lineage", inputs = mapOf("contextId" to ctx))
+        assertEquals(3, lineage["factCount"])
+        assertEquals("", lineage["parentId"], "a root context has no parent")
+        val blocks = run("ccek.query", mapOf("kind" to "block:"), mapOf("contextId" to ctx))
+        assertEquals(2, blocks["count"], "a prefix query, as CausalReteTable.query defines it")
+        assertEquals(true, blocks["contains"])
+        assertEquals(false, run("ccek.query", mapOf("kind" to "nothing"), mapOf("contextId" to ctx))["contains"])
+
+        // the spreadsheet veneer facets the same facts by field
+        val laneA = run("ccek.veneer", mapOf("column" to "lane", "value" to "a"), mapOf("contextId" to ctx))
+        assertEquals(2, laneA["count"])
+
+        // polyglot facts load and query
+        val loaded = run("ccek.polyglot.load", inputs = mapOf("contextId" to ctx, "facts" to listOf(
+            mapOf("language" to "kotlin", "opcode" to "call", "target" to "sendSignal", "kind" to "verb"),
+            mapOf("language" to "js", "opcode" to "call", "target" to "fetch", "kind" to "verb"),
+        )))
+        assertEquals(2, loaded["loaded"])
+        assertEquals(1, run("ccek.polyglot.query", mapOf("language" to "kotlin", "kind" to "verb"), mapOf("contextId" to ctx))["count"])
+
+        // prediction and its table test, as UserContext defines them
+        val prediction = run("ccek.predict", mapOf("model" to "m"), mapOf("contextId" to ctx, "inputs" to mapOf("method" to "appendBlock", "count" to 1)))
+        @Suppress("UNCHECKED_CAST")
+        val p = prediction["prediction"] as Map<String, Any?>
+        assertEquals(2, p["expectedBlocks"])
+        val test = run("ccek.table.test", inputs = mapOf("contextId" to ctx, "prediction" to p))
+        assertEquals(true, test["passed"], "two block facts satisfy expectedBlocks=2: ${test["evidence"]}")
+        val untestable = run("ccek.table.test", inputs = mapOf("contextId" to ctx, "prediction" to mapOf("model" to "m")))
+        assertEquals(false, untestable["passed"])
+        assertTrue(untestable["evidence"].toString().contains("expectedBlocks"))
+
+        // a graphical flow is a cursor over its blocks
+        val flow = run("ccek.flow", mapOf("name" to "f"), mapOf("contextId" to ctx,
+            "blocks" to listOf(mapOf("id" to "a", "label" to "A"), mapOf("id" to "b", "label" to "B", "properties" to mapOf("x" to "1"))),
+            "edges" to listOf(mapOf("from" to "a", "to" to "b"))))
+        assertEquals(2, flow["size"])
+        @Suppress("UNCHECKED_CAST")
+        assertEquals(1, ((flow["flow"] as Map<String, Any?>)["edges"] as List<*>).size)
+
+        // a paradigm's rules land as facts the context can be queried for
+        val paradigm = run("ccek.paradigm", mapOf("name" to "p"), mapOf("contextId" to ctx,
+            "rules" to listOf(mapOf("name" to "r1", "expression" to "a -> b"), mapOf("name" to "r2", "expression" to "b -> c"))))
+        assertEquals(5, paradigm["factCount"])
+        assertEquals(2, run("ccek.query", mapOf("kind" to "rule:p:"), mapOf("contextId" to ctx))["count"])
+
+        // choreograph: a node the context asserts against, idempotent by title
+        val bound = run("ccek.choreograph", mapOf("title" to "stage"), mapOf("contextId" to ctx))
+        assertEquals("stage", bound["handle"]); assertEquals(true, bound["bound"])
+        assertEquals("stage", run("ccek.choreograph", mapOf("title" to "stage"), mapOf("contextId" to ctx))["handle"])
+        assertEquals(2, store.nodes.size, "t and stage")
+        assertEquals(ctx, store.nodes.getValue("stage").choreographedBy)
+        assertEquals(false, run("ccek.choreograph", mapOf("title" to "orphan"), mapOf("contextId" to "ghost"))["bound"])
+        assertEquals(true, run("ccek.signal", mapOf("verb" to "append", "text" to "x"), mapOf("handle" to "stage"))["sent"])
+    }
+
+    @Test
+    fun scopeValidationNamesTheKeysThisContextLacksAndRefusesUnknownNames() = runTest {
+        val reg = registry(InMemoryCcekStore())
+        // runTest's own root is a TestScopeImpl, not a CompletableJob: the validator
+        // says so, and the node carries that verdict instead of throwing.
+        val unsupervised = reg.getValue("ccek.validate").run(LcncNode("v", "ccek.validate", mapOf("requiredKeys" to "")), emptyMap())
+        assertEquals(false, unsupervised["valid"])
+        assertTrue(unsupervised["error"].toString().contains("CompletableJob"), "the donor's own message: $unsupervised")
+        val supervisor = SupervisorJob(currentCoroutineContext()[Job])
+        try {
+            withContext(supervisor) {
+                val bare = reg.getValue("ccek.validate").run(LcncNode("v", "ccek.validate", mapOf("requiredKeys" to "")), emptyMap())
+                assertEquals(true, bare["valid"], "a supervised scope with nothing required: $bare")
+                assertEquals("", bare["error"])
+                val reactor = reg.getValue("ccek.validate").run(LcncNode("v", "ccek.validate", mapOf("requiredKeys" to "MuxReactorElement, HtxElement")), emptyMap())
+                assertEquals(false, reactor["valid"])
+                assertEquals(listOf("MuxReactorElement", "HtxElement"), reactor["missingKeys"], "a test scope carries neither")
+                val spi = reg.getValue("ccek.validate").run(LcncNode("v", "ccek.validate", mapOf("requiredKeys" to "", "minimumSpis" to "FileOperations")), emptyMap())
+                assertEquals(false, spi["valid"])
+                assertEquals(listOf("FileOperations"), spi["missingSpis"])
+            }
+        } finally {
+            supervisor.complete() // a SupervisorJob never finishes on its own; runTest would wait on it
+        }
+        val e = assertFailsWith<IllegalArgumentException> {
+            reg.getValue("ccek.validate").run(LcncNode("v", "ccek.validate", mapOf("requiredKeys" to "Teleporter")), emptyMap())
+        }
+        assertTrue(e.message!!.contains("Teleporter"), "the message names the bad key")
     }
 }

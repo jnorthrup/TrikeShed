@@ -80,6 +80,47 @@ scope `/api/lcnc/run` gives them, and nothing checks before the walk starts.
 Parentless sites are classified by position, so a `default-parameter` or the
 `else` of `if (parent == null)` is not reported as a defect.
 
+## CCEK decomposition — which of the engine a program can reach
+
+The plane is a small set of classes (`CCEK`, `ArticulatedNode`, `UserContext`,
+`CausalReteTable`, …). Two scanners answer, member by member, whether a program
+can reach each one:
+
+- `ccek_surface(text, path)` — every PUBLIC declaration in a file with its
+  owner and root type. Declarations count only at the owner's body depth (a
+  `val` inside a function is a local), constructor properties count, anything
+  `private`/`protected`/`internal` does not, `*ForTest` is a test seam.
+- `ccek_coverage(surface, seams, everywhere)` — per member: **reached** when an
+  LCNC runner file brings the root type into scope (an import from the plane's
+  package, a star import, a qualified use, or the same package) AND reads or
+  calls the member; **unreached**; **orphan** when no file outside its own
+  imports the root at all; **plumbing** for test seams, nested `Key` objects and
+  stdlib overrides. Import discipline is what keeps kotlinx's `SupervisorJob(`
+  from being credited to the CCEK interface of the same name.
+
+Reachability is the fact. Whether an unreached member SHOULD be a lego is a
+ruling, and rulings live in `scan_repo.CCEK_RULINGS` with their reason —
+substrate (channel factories, the boot binding), alias (`stop()` is `cancel()`),
+carried (a sealed case the verb node constructs), orphan vocabulary
+(`Seat.kt`, `SupervisorJob.kt`, doc/ccek-consistency-pass.md §4) — and one
+that came from reading the donor: `ArticulatedNode.start()` cannot revive a
+drained node because `signalIn` is closed for good, so exposing it would promise
+a restart the engine does not perform. Unreached + unruled = **GAP**.
+
+```bash
+python -m lcnc_depth.scan_repo /path/to/TrikeShed/src --fail-on-ccek-gap   # gate (exit 1 on a gap)
+```
+
+The first run on 2026-09-05 found 12 gaps: `UserContext.{activate, deactivate,
+loadPolyglotFacts, queryPolyglot, predictModel, tableTest, createGraphicalFlow,
+spreadsheetVeneer, adaptParadigm}` and `ArticulatedNode.{isActive,
+childScopeCount, markdownProjectionCount}`, plus `requireCcekScope` ruled a
+lego. Thirteen `ccek.*` node types followed (`CcekNodes.kt`: vitals, choreograph,
+activate, lineage, query, polyglot.load, polyglot.query, predict, table.test,
+flow, veneer, paradigm, validate); the scan then read 228 members, 91 reached
+(from 51), 0 gaps, and `preset-shake` grew from 121 palette types / 754
+sockets to 134 / 858, every socket still closed by Shake.
+
 ## The scanners stand alone
 
 `lcnc_depth/modules/kotlin_scan.py` is stdlib-only and is mounted into the RLM
@@ -105,5 +146,5 @@ is a *default parameter*, so it is a root only when the caller supplies no scope
 PYTHONPATH=. python3 -m pytest tests/test_smoke.py -q
 ```
 
-No network, no API key, no Pyodide. 14 pass; the three that exercise the DSPy
+No network, no API key, no Pyodide. 17 pass; the three that exercise the DSPy
 surface skip cleanly when `predict_rlm` is absent.

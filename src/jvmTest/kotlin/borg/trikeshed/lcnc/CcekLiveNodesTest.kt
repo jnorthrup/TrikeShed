@@ -108,4 +108,55 @@ class CcekLiveNodesTest {
             scope.cancel()
         }
     }
+
+    @Test
+    fun choreographBindsARealNodeToAContextAndVitalsFollowTheDrain() = runBlocking {
+        val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+        try {
+            val reg = CcekNodes.registry(CcekSeams.live(scope))
+            val ctx = reg.getValue("ccek.context").run(
+                LcncNode("c", "ccek.context", mapOf("role" to "author")), emptyMap(),
+            )["contextId"].toString()
+            val bound = reg.getValue("ccek.choreograph").run(
+                LcncNode("ch", "ccek.choreograph", mapOf("title" to "live-stage")), mapOf("contextId" to ctx),
+            )
+            assertEquals("live-stage", bound["handle"]); assertEquals(true, bound["bound"])
+            assertEquals(true, reg.getValue("ccek.vitals").run(LcncNode("v", "ccek.vitals"), mapOf("handle" to "live-stage"))["active"])
+
+            // The context's own causal-assertion agent rides the node's fan-out:
+            // an append becomes a block:appended fact the rete query can see.
+            assertEquals(true, reg.getValue("ccek.signal").run(
+                LcncNode("s", "ccek.signal", mapOf("verb" to "append", "text" to "asserted")), mapOf("handle" to "live-stage"),
+            )["sent"])
+            var count = 0
+            repeat(60) {
+                delay(50)
+                count = reg.getValue("ccek.query").run(
+                    LcncNode("q", "ccek.query", mapOf("kind" to "block:appended")), mapOf("contextId" to ctx),
+                )["count"] as Int
+                if (count > 0) return@repeat
+            }
+            assertTrue(count >= 1, "the choreographed node asserted into its context")
+            assertEquals(1, reg.getValue("ccek.veneer").run(
+                LcncNode("ve", "ccek.veneer", mapOf("column" to "text", "value" to "asserted")), mapOf("contextId" to ctx),
+            )["count"])
+
+            assertEquals(true, reg.getValue("ccek.drain").run(LcncNode("d", "ccek.drain"), mapOf("handle" to "live-stage"))["drained"])
+            var active = true
+            repeat(60) {
+                delay(50)
+                active = reg.getValue("ccek.vitals").run(LcncNode("v", "ccek.vitals"), mapOf("handle" to "live-stage"))["active"] as Boolean
+                if (!active) return@repeat
+            }
+            assertEquals(false, active, "a drained node reports inactive")
+
+            val validation = reg.getValue("ccek.validate").run(
+                LcncNode("va", "ccek.validate", mapOf("requiredKeys" to "MuxReactorElement")), emptyMap(),
+            )
+            assertEquals(false, validation["valid"], "a bare SupervisorJob scope carries no reactor: $validation")
+            assertEquals(listOf("MuxReactorElement"), validation["missingKeys"])
+        } finally {
+            scope.cancel()
+        }
+    }
 }

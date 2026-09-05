@@ -111,3 +111,46 @@ launcher. The harness and board API returned HTTP 200; the preset catalog served
 `preset-shake` with 501 nodes, zero wires, and `inspectionOnly` enabled. Nothing
 was stashed or manually removed. Live visual acceptance and 100-percent automatic
 closure remain separate from these passing build, test, and HTTP checks.
+
+## Follow-Up: The Palette Grew to the Whole Engine (2026-09-05)
+
+The lcnc-depth RLM's static half (`utils/lcnc-depth`, `scan_repo
+--fail-on-ccek-gap`) enumerated the CCEK package member by member and reported
+twelve public capabilities no LCNC runner reached. Thirteen `ccek.*` node types
+now front them (vitals, choreograph, activate, lineage, query, polyglot.load,
+polyglot.query, predict, table.test, flow, veneer, paradigm, validate), each
+with exact kinds on every port, an in-memory fake and a live seam, and unit plus
+live-engine tests. What the scan ruled out stays out: `start()` cannot revive a
+drained node, `stop()` is `cancel()`, `ForgeDocNode` is a wrapper, the channel
+factories are substrate, `Seat.kt` and `SupervisorJob.kt` are orphan vocabulary.
+
+Because `preset-shake` is generated from `LcncContracts.all()`, the item grew
+without a second author:
+
+| | before | after |
+|---|---|---|
+| palette types | 121 | 134 |
+| nodes | 507 | 572 |
+| covered sockets | 754 | 858 |
+| installed wires on open | 0 | 0 |
+
+All ten `LcncShakeDemoTest` cases pass on the grown palette, including full
+closure (`socketCount == connectedSocketCount`) after scattering, collocating,
+doubling, and at scope depth 16; the CCEK scan reads 0 gaps.
+
+### Live Acceptance (2026-09-05, 16:27 CDT)
+
+Port 8888 was restarted through `runOroborosDaemon` on the new classes (the
+previous JVM was TERMed, then KILLed when it lingered headless without its
+port). `/api/lcnc/contracts` served 140 types with all 22 `ccek.*` legos. In
+Chrome, `/harness?load=shake` mounted `preset-shake` with 572 nodes and no
+wires; pressing Shake rendered the status line
+
+```text
+429 cables connected · 858/858 sockets connected (100%)
+```
+
+with Run disabled and the Connections panel listing each closed socket (for
+example `palette.ccek.activate.in.0 / value` — Caller input). This is the
+rendered check, not a curl.
+
