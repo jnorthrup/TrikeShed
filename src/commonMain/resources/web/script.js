@@ -1322,6 +1322,7 @@
 <<<<<<< HEAD
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
   const SIDEBAR_BTNS = { doc: 'btn-home', board: 'btn-board', graph: 'btn-graph', sheet: 'btn-sheet', host: 'btn-host' };
   const VIEWS = { doc: [docScrollEl, viewDocBtn], board: [boardScrollEl, viewBoardBtn], graph: [graphScrollEl, viewGraphBtn], sheet: [sheetScrollEl, viewSheetBtn], shape: [shapeScrollEl, viewShapeBtn], host: [hostScrollEl, viewHostBtn] };
 <<<<<<< HEAD
@@ -1462,6 +1463,21 @@
     for (const [k, [el, btns]] of Object.entries(VIEWS)) {
       el.hidden = k !== view;
       for (const btn of btns) {
+=======
+  const VIEWS = {
+    doc: { el: docScrollEl, btns: [viewDocBtn, document.getElementById('btn-home')] },
+    board: { el: boardScrollEl, btns: [viewBoardBtn, document.getElementById('btn-board')] },
+    graph: { el: graphScrollEl, btns: [viewGraphBtn, document.getElementById('btn-graph')] },
+    sheet: { el: sheetScrollEl, btns: [viewSheetBtn, document.getElementById('btn-sheet')] },
+    shape: { el: shapeScrollEl, btns: [viewShapeBtn] },
+    host: { el: hostScrollEl, btns: [viewHostBtn, document.getElementById('btn-host')] }
+  };
+  function setView(view) {
+    mutate((s) => { s.view = view; }, 'view');
+    for (const [k, config] of Object.entries(VIEWS)) {
+      config.el.hidden = k !== view;
+      for (const btn of config.btns) {
+>>>>>>> origin/palette-sync-aria-current-6449805464969164506
         if (!btn) continue;
         btn.classList.toggle('active', k === view);
         if (k === view) {
@@ -1469,7 +1485,10 @@
         } else {
           btn.removeAttribute('aria-current');
         }
+<<<<<<< HEAD
 >>>>>>> origin/palette-sync-aria-current-5674151201601486281
+=======
+>>>>>>> origin/palette-sync-aria-current-6449805464969164506
       }
     }
     if (view === 'board') { renderBoard(); hydrateBoard(); }
@@ -1479,6 +1498,7 @@
     if (view === 'host') renderHost();
   }
 
+<<<<<<< HEAD
 <<<<<<< HEAD
 <<<<<<< HEAD
   for (const [k, [, btn]] of Object.entries(VIEWS)) {
@@ -1498,6 +1518,13 @@
     }
   }
 >>>>>>> origin/palette-sync-aria-current-5674151201601486281
+=======
+  for (const [k, config] of Object.entries(VIEWS)) {
+    for (const btn of config.btns) {
+      if (btn) btn.addEventListener('click', () => setView(k));
+    }
+  }
+>>>>>>> origin/palette-sync-aria-current-6449805464969164506
   document.getElementById('btn-new-page').addEventListener('click', () => {
     newPage();
     renderAll();

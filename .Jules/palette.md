@@ -84,6 +84,7 @@
 <<<<<<< HEAD
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
 ## 2025-05-24 - Synchronizing active states for duplicate navigation items
 **Learning:** When navigation buttons exist in multiple places (e.g., a topbar and a sidebar), visual styling and ARIA attributes (like `aria-current="page"`) must be updated on all instances when the view changes. Screen reader users navigating the sidebar would otherwise not know which view is currently active.
 **Action:** Expand view-switching logic to query and update all relevant navigation buttons, not just the primary ones, ensuring consistent state across the entire UI.
@@ -120,3 +121,9 @@
 **Learning:** When managing view state in a single-page application, duplicate instances of navigation buttons for the active view (e.g., both topbar and sidebar buttons) must consistently receive the `aria-current="page"` attribute. Otherwise, screen reader users might encounter ambiguous states where one button indicates it's the current page while its duplicate does not.
 **Action:** Always refactor view-switching logic to apply state changes to all instances of navigation buttons for a given view, rather than just the primary ones.
 >>>>>>> origin/palette-sync-aria-current-5674151201601486281
+=======
+
+## 2025-02-23 - Synchronizing active states across duplicated navigation buttons
+**Learning:** When managing view state in a single-page application, ensure that all duplicate instances of navigation buttons for the active view (e.g., both topbar and sidebar buttons) consistently receive the `aria-current="page"` attribute and visual active state updates to prevent ambiguous states for screen reader users.
+**Action:** Always apply state changes to all instances of a duplicated control simultaneously, rather than just the primary one.
+>>>>>>> origin/palette-sync-aria-current-6449805464969164506
