@@ -88,13 +88,11 @@ enum class Syntax {
             val char = chars[index]
             when {
                 inQuote -> when {
-                    escaped -> {
-                        escaped = false
-                        if (char == '"') {
-                            inQuote = false
-                            pop(index)
-                        }
-                    }
+                    // Delta 2026-09-05: an escaped character never closes the string — `\"` is a
+                    // quote INSIDE the text. This branch used to close on it, so every JSON string
+                    // carrying a quoted phrase (narsese receipts: «"…"») ended early and the rest
+                    // of the document indexed as garbage keys and Infinity-valued numbers.
+                    escaped -> escaped = false
                     char == '\\' -> escaped = true
                     char == '"' -> {
                         inQuote = false
@@ -419,7 +417,7 @@ enum class Syntax {
                 val open = span.a + 1
                 val close = span.b - 1
                 if (close < open) continue
-                CharArray(close - open + 1) { offset -> src[open + offset].toInt().toChar() }.concatToString()
+                decodeTextSpan(src, open, close) // the same decode reify() gives the value, so lookups by key match
             }
             if (key !in keys) keys[key] = index
         }

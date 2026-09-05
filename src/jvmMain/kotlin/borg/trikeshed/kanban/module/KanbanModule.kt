@@ -495,12 +495,21 @@ class KanbanModule : ForgeModule {
         // The same ReteNetwork and KIF bank the daemon's publisher holds: the panels plane and
         // the vocabulary tuples come from one network and one bank however many publishers exist.
         val publisher = borg.trikeshed.lcnc.LcncPublisher(ctx.blackboard, { ctx.lcncRunners }, ctx.attachments, ctx.rete, ctx.kifBank)
+        val runs = LcncRunService(ctx, store, publisher::vocabulary)
+        runs.recover()
         runCatching { publisher.publishAll() }
             .onFailure { System.err.println("[KanbanModule] lcnc → blackboard publish failed: ${it.message}") }
 
         ctx.routes.claim(id, "/api/lcnc/contracts") { method, _, _, _ ->
             if (method != "GET") JvmKanbanServer.HttpResponse(405, """{"error":"method_not_allowed"}""")
             else JvmKanbanServer.HttpResponse(200, JsonSupport.stringify(publisher.publishVocabulary()))
+        }
+
+        ctx.routes.claim(id, "/api/lcnc/run/cancel") { method, _, text, _ ->
+            if (method != "POST") return@claim JvmKanbanServer.HttpResponse(405, """{"error":"method_not_allowed"}""")
+            val req = runCatching { JsonSupport.parse(rawBody(text)) as? Map<*, *> }.getOrNull()
+            val cancelled = req?.get("runId")?.toString()?.let(runs::cancel) ?: false
+            JvmKanbanServer.HttpResponse(if (cancelled) 202 else 404, JsonSupport.stringify(mapOf("ok" to cancelled)))
         }
 
         // The same vocabulary as a GRAPH: kinds, ports, and the binding edges,
@@ -551,84 +560,22 @@ class KanbanModule : ForgeModule {
         // modules) are reachable too.
         ctx.routes.claim(id, "/api/lcnc/run") { method, _, text, _ ->
             if (method != "POST") return@claim JvmKanbanServer.HttpResponse(405, """{"error":"method_not_allowed"}""")
+            if (text.length > 1_048_576) return@claim JvmKanbanServer.HttpResponse(413, """{"error":"payload_limit"}""")
             val req = runCatching { JsonSupport.parse(rawBody(text)) as? Map<*, *> }.getOrNull()
                 ?: return@claim JvmKanbanServer.HttpResponse(400, """{"error":"bad_json"}""")
+            borg.trikeshed.parse.json.ValueBudget().violation(req)?.let { limit ->
+                return@claim JvmKanbanServer.HttpResponse(413, JsonSupport.stringify(mapOf("error" to limit)))
+            }
             @Suppress("UNCHECKED_CAST")
             val inputs = (req["inputs"] as? Map<*, *>)?.entries
                 ?.associate { (k, v) -> k.toString() to v } ?: emptyMap<String, Any?>()
-            // ONE execution path for named and inline rings: CCEK assembly when
-            // bound (structured child scope, reactor + LcncScopeFrame in one
-            // context, projected receipts), direct walk in reduced/test contexts.
-            val execute: suspend (String, borg.trikeshed.lcnc.LcncProgram) -> JvmKanbanServer.HttpResponse =
-                { label, program ->
-                    val runId = java.util.UUID.randomUUID().toString()
-                    val runKey = "lcnc/run/$runId"
-                    val startedAtMs = System.currentTimeMillis()
-                    val identity = mapOf(
-                        "runId" to runId, "program" to label,
-                        "programKey" to borg.trikeshed.lcnc.LcncBlackboard.programKey(label),
-                        "inputs" to inputs, "startedAtMs" to startedAtMs,
-                    )
-                    ctx.blackboard.put(runKey, identity + ("status" to "running"), "lcnc-runner")
-                    fun finish(status: Int, result: Map<String, Any?>): JvmKanbanServer.HttpResponse {
-                        val receipt = identity + result + mapOf(
-                            "status" to if (result["ok"] == true) "completed" else "refused",
-                            "finishedAtMs" to System.currentTimeMillis(),
-                        )
-                        ctx.blackboard.put(runKey, receipt, "lcnc-runner")
-                        return JvmKanbanServer.HttpResponse(status, JsonSupport.stringify(result + ("runId" to runId)))
-                    }
-                    // Patch type-system compliance, enforced where it counts. The canvas
-                    // refuses a kind-mismatched drag, but the canvas is not the authority:
-                    // a stored panel, an import, a Kotlin preset or a raw POST never passed
-                    // that check and used to execute anyway. One rule, one author
-                    // (LcncContracts), stated on the deciding side — loudly, before the run.
-                    // strict=false: the registry may carry types the contract table does
-                    // not describe, and LcncRunner throws for one that is truly absent.
-                    // THE BOARD IS OBEYED: a named program's entry (refreshed by the
-                    // loader a moment ago) carries the violations the publisher
-                    // recorded; an inline document, which has no entry, is checked now.
-                    val entry = ctx.blackboard.get(borg.trikeshed.lcnc.LcncBlackboard.programKey(label))
-                    val violations = borg.trikeshed.lcnc.LcncBlackboard.violationsOf(entry)
-                        ?: borg.trikeshed.lcnc.LcncTypeCheck.check(program, publisher.vocabulary(), strict = false).map { it.toMap() }
-                    if (violations.isNotEmpty()) {
-                        finish(400, mapOf(
-                            "ok" to false, "program" to label, "error" to "type_check_failed",
-                            "violations" to violations,
-                        ))
-                    } else {
-                    val walker = LcncRunner(ctx.lcncRunners).apply { subprogramLoader = ctx.programLoader }
-                    runCatching {
-                        val binding = ctx.ccekBinding
-                        if (binding != null) {
-                            LcncCcekAssembly(binding, walker)
-                                .launch(label, program, inputs)
-                                .result.await()
-                        } else {
-                            walker.runProcedure(program, inputs)
-                        }
-                    }.fold(
-                        onSuccess = { res ->
-                            finish(200, mapOf(
-                                "ok" to true, "program" to label,
-                                "returns" to res.returns, "outputs" to res.nodeOutputs,
-                            ))
-                        },
-                        onFailure = { e ->
-                            finish(400, mapOf(
-                                "ok" to false, "program" to label, "error" to (e.message ?: e.toString()),
-                            ))
-                        },
-                    )
-                    }
-                }
             val programName = req["program"]?.toString()
             if (programName != null) {
                 val program = ctx.programLoader(programName)
                     ?: return@claim JvmKanbanServer.HttpResponse(
                         404, JsonSupport.stringify(mapOf("error" to "no_such_program", "program" to programName)),
                     )
-                return@claim execute(programName, program)
+                return@claim runs.execute(programName, program, true, inputs, req)
             }
             // Inline ring: the panels canvas posts a scope's children as a
             // whole document — {name?, document, inputs} — and the ring runs
@@ -645,7 +592,7 @@ class KanbanModule : ForgeModule {
                         "error" to "bad_document", "detail" to (e.message ?: e.toString()),
                     )))
                 }
-                return@claim execute(label, program)
+                return@claim runs.execute(label, program, false, inputs, req)
             }
             val type = req["type"]?.toString()
                 ?: return@claim JvmKanbanServer.HttpResponse(400, """{"error":"type_required"}""")
@@ -741,6 +688,7 @@ class KanbanModule : ForgeModule {
             )
 
             override suspend fun drain() {
+                runs.drain()
                 store.drain()
             }
 

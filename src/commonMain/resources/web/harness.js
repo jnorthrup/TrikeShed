@@ -2,6 +2,7 @@
 
 // View state only. Documents, vocabulary, run receipts and provenance come from the board.
 const Harness = {
+  epoch: null, connectionGeneration: 0, viewHistory: [], focusKey: "", viewNode: null,
   board: Object.create(null), seq: 0, selected: null, applying: false, dirty: false,
   events: [], drafts: new Map(), actors: new Map(), positions: new Map(), flashes: new Map(), // Delta 2026-09-05 (fan-out): Map<key, expiresAt ms>; one Set with one timer collapsed a burst into one border
   mounts: new Map(), baselines: new Map(), nextY: 0, nextX:0, rowHeight:0,
@@ -14,7 +15,7 @@ const Harness = {
   },
   message(value) { $("#status").textContent = value; },
   programs() {
-    return Object.keys(this.board).filter(k => k.startsWith("lcnc/program/") && this.board[k]?.document).sort();
+    return [...new Set([...Object.keys(this.board).filter(k => k.startsWith("lcnc/program/") && this.board[k]?.document), ...[...this.drafts.keys()].map(n=>"lcnc/program/"+n)])].sort();
   },
   changed() {
     if (this.applying || !this.ready) return;
@@ -25,7 +26,7 @@ const Harness = {
     this.schedule();
   },
   document(name=this.selected) {
-    const entry = this.board["lcnc/program/" + name];
+    const entry = this.board["lcnc/program/" + name] || {document:this.drafts.get(name)};
     const origin=this.mounts.get(name)||{x:0,y:0};
     const owned=G.nodes.filter(n=>n._program===name), ids=new Map(owned.map(n=>[n.id,n._localId||n.id]));
     const original=new Map();
@@ -35,7 +36,7 @@ const Harness = {
       wires:G.wires.filter(w=>ids.has(w.from[0])&&ids.has(w.to[0])).map(w=>({from:[ids.get(w.from[0]),w.from[1]],to:[ids.get(w.to[0]),w.to[1]]})),seq:Math.max(entry?.document?.seq||1,...[...ids.values()].map(id=>/^n\d+$/.test(id)?Number(id.slice(1))+1:1))};
   },
   select(name, focus = true) {
-    const entry = this.board["lcnc/program/" + name];
+    const entry = this.board["lcnc/program/" + name] || {document:this.drafts.get(name)};
     if (!entry?.document) { this.message("Program is not on the board: " + name); return false; }
     if (this.selected && this.dirty) this.drafts.set(this.selected, this.document());
     this.selected = name;
@@ -48,7 +49,7 @@ const Harness = {
     this.render();
     if (focus) this.fit(false);
     this.message(name + (this.dirty ? " has unpublished changes" : " on the blackboard"));
-    history.replaceState(null, "", "/harness?load=" + encodeURIComponent(name));
+    const url=new URL(location.href);url.pathname="/harness";url.searchParams.set("load",name);history.replaceState(null,"",url);
     return true;
   },
   mount(name,document) {
@@ -88,6 +89,13 @@ const Harness = {
     }finally{this.applying=previous;}
   },
   replaceSelected(doc) { this.mount(this.selected,doc);this.changed();this.render(); },
+  unmount(name) {
+    const ids=new Set(G.nodes.filter(n=>n._program===name).map(n=>n.id));
+    for(const n of G.nodes)if(ids.has(n.id)){if(n._timer)clearInterval(n._timer);n._es?.close();n.el?.remove();}
+    G.nodes=G.nodes.filter(n=>!ids.has(n.id));G.wires=G.wires.filter(w=>!ids.has(w.from[0])&&!ids.has(w.to[0]));
+    this.mounts.delete(name);this.baselines.delete(name);
+    for(const table of [BOARD.cables,BOARD.violations])for(const key of table.keys())if(key.startsWith(name+"::"))table.delete(key);
+  },
   schedule() {
     if (this.frame) return;
     this.frame = requestAnimationFrame(() => { this.frame = 0; this.render(); });
@@ -124,6 +132,8 @@ const Harness = {
       const territory=this.territory("lcnc/program/"+name,name,this.drafts.has(name)?"Unpublished":"lcnc/program/"+name,anchor.x-30,anchor.y-80,box.w+60,box.h+110,"#64ceca");
       territory.classList.add("active-program");if(name===this.selected)territory.classList.add("selected");
       const head=territory.querySelector("header");head.addEventListener("click",()=>this.select(name));
+      const cid=this.board["lcnc/program/"+name]?.programCid;
+      if(cid){const source=this.el("button","source-ref","◇");source.title="Program version "+cid;source.setAttribute("aria-label","Inspect version of "+name);source.dataset.relation="reference";source.addEventListener("click",e=>{e.stopPropagation();Landscape.inspectCid(cid);});head.append(source);}
       const run=this.el("button","run","▶ Run");run.disabled=this.running||this.drafts.has(name);run.setAttribute("aria-label","Run "+name);
       run.addEventListener("click",e=>{e.stopPropagation();this.select(name,false);this.run();});head.append(run);
     }
@@ -138,7 +148,8 @@ const Harness = {
     const first=this.mounts.values().next().value||{w:1550};
     const side = first.w+100;
     const runs = Object.entries(this.board).filter(([k,v]) => k.startsWith("lcnc/run/") && v.program === this.selected)
-      .sort((a,b) => (b[1].startedAtMs || 0) - (a[1].startedAtMs || 0));
+      .sort((a,b) => (b[1].sequence || b[1].startedAtMs || 0) - (a[1].sequence || a[1].startedAtMs || 0));
+    $("#cancelRun").disabled=!runs.some(([,v])=>["validating","running"].includes(v.status));
     const receipt = this.territory("receipts", "Run receipt", runs.length + " runs", side, -80, 600, 350, "#91c49d");
     if (runs.length) {
       const [key,value] = runs[0];
@@ -152,6 +163,7 @@ const Harness = {
       const tone = prefix === "narsese" ? "#c4b07c" : prefix === "kanban" ? "#80b4d2" : "#a7a1c9";
       if (prefix === "narsese") { y += this.narseseTerritory(items, side, y, tone) + 24; continue; }
       const territory = this.territory(prefix, prefix, items.length + " entries", side, y, 600, height, tone);
+      this.sheetButton(territory, prefix);
       if (items.length > 24) {
         const field = this.el("div", "fact-field");
         for (const [key,value] of items) {
@@ -248,6 +260,7 @@ const Harness = {
     const LIMIT = 36, visible = rows.slice(0, LIMIT), rest = rows.slice(LIMIT);
     const height = 96 + visible.length*34 + (rest.length ? 60 + Math.ceil(rest.length/50)*12 : 0);
     const territory = this.territory("narsese", "narsese", shown + " expressions" + (blind ? " · " + blind + " uncaptioned" : ""), x, y, 600, height, tone);
+    this.sheetButton(territory, "narsese");
     const byHead = new Map();
     this.narseseChains = [];
     for (const r of visible) {
@@ -282,17 +295,18 @@ const Harness = {
   },
   channels(receipt) {
     const svg=$("#channels");svg.replaceChildren();
-    // derivation chains inside the narsese territory: object → subject of the next expression
+    // Term correspondence is an association, not evidence of a derivation.
     const w=world.getBoundingClientRect();
     for (const [from,to] of this.narseseChains || []) {
       const a=from.getBoundingClientRect(), b=to.getBoundingClientRect();
       const ax=(a.right-w.left)/view.z, ay=(a.top+a.height/2-w.top)/view.z, bx=(b.right-w.left)/view.z, by=(b.top+b.height/2-w.top)/view.z;
       const path=document.createElementNS(svg.namespaceURI,"path");path.setAttribute("class","chain");
+      path.dataset.relation="association";const title=document.createElementNS(svg.namespaceURI,"title");title.textContent="Term association, not causal support";path.append(title);
       path.setAttribute("d",`M ${ax} ${ay} C ${ax+70} ${ay}, ${bx+70} ${by}, ${bx} ${by}`);svg.append(path);
     }
     if(!receipt)return;
     const a=this.positions.get(receipt.programKey),b=this.positions.get("receipts");if(!a||!b)return;
-    const path=document.createElementNS(svg.namespaceURI,"path");path.setAttribute("d",bez({x:a.x+a.w,y:a.y+160},{x:b.x,y:b.y+160}));svg.append(path);
+    const path=document.createElementNS(svg.namespaceURI,"path");path.dataset.relation="execution";path.setAttribute("d",bez({x:a.x+a.w,y:a.y+160},{x:b.x,y:b.y+160}));svg.append(path);
     const label=document.createElementNS(svg.namespaceURI,"text");label.setAttribute("x",String(a.x+a.w+8));label.setAttribute("y",String(a.y+147));label.textContent=receipt.status;svg.append(label);
   },
   summary(value) {
@@ -301,8 +315,81 @@ const Harness = {
     return Object.entries(value).slice(0,4).map(([k,v])=>k+": "+(typeof v === "object" ? JSON.stringify(v) : v)).join(" / ").slice(0,250);
   },
   inspect(key) {
+    $("#factInspector").querySelectorAll(".terrain-ref").forEach(e=>e.remove());
     $("#factKey").textContent=key;$("#factActor").textContent=this.actors.get(key)||this.board[key]?.actor||"";
     $("#factValue").textContent=JSON.stringify(this.board[key],null,2);$("#factInspector").showModal();
+    this.loadSheets([{url:"/blackboard/sheet?key="+encodeURIComponent(key)}], key);
+    const receipt=this.board[key];
+    if(receipt?.programCid){const button=this.el("button","terrain-ref","Program version "+receipt.programCid.slice(0,16));button.addEventListener("click",()=>Landscape.inspectCid(receipt.programCid));$("#factInspector").append(button);}
+  },
+  /* Sheets. A fact, a territory, or the whole board opens as the grid-in-cell family
+     /blackboard/sheet projects (CursorSheet/confixSheets — the same projection /api/graal/sheet
+     serves for a couch document): rows are (key, value), a container value is a ▤ ref cell that
+     drills in, the crumb climbs out. The kanban territory also carries kanban.activeSheets
+     (board · byStatus · byPriority · the lane ring) from /api/lcnc/kanban — the board's own
+     sheets, the ones the MCP resource serves. The renderer is patch.js's renderConcentric on
+     a synthetic node whose el is the dialog host; nothing here reshapes a sheet. */
+  sheetButton(territory, prefix) {
+    const button = this.el("button", "sheets", "▤");
+    button.title = prefix + " as sheets"; button.setAttribute("aria-label", prefix + " as sheets");
+    button.addEventListener("click", e => { e.stopPropagation(); this.openSheets([prefix]); });
+    territory.querySelector("header").append(button);
+  },
+  openSheets(prefixes) {
+    const list = prefixes.length ? prefixes : [...new Set(Object.keys(this.board).map(k => k.split("/")[0]))].sort();
+    const sources = list.map(p => ({url:"/blackboard/sheet?prefix=" + encodeURIComponent(p) + "&max=1024"}));
+    if (list.includes("kanban")) sources.push({url:"/api/lcnc/kanban", kanban:true});
+    $("#factKey").textContent = (prefixes.length ? list.join(" · ") : "blackboard") + " as sheets";
+    $("#factActor").textContent = ""; $("#factValue").textContent = "";
+    $("#factInspector").showModal();
+    this.loadSheets(sources, list.includes("kanban") ? "board" : list[0]);
+  },
+  async loadSheets(sources, cur) {
+    const host = $("#factSheet"), dialog = $("#factInspector");
+    const ticket = this.sheetTicket = (this.sheetTicket || 0) + 1;
+    host.replaceChildren(this.el("p", "sheet-note", "Projecting sheets"));
+    $("#sheetRoots").replaceChildren(); this.rawSheets(false);
+    const idx = {}, notes = [], continuations=[]; let orch = null;
+    await Promise.all(sources.map(async src => {
+      try {
+        const r = await fetch(src.url); if (!r.ok) throw Error(r.status + " on " + src.url);
+        const j = await r.json();
+        const sheets = src.kanban ? [j.board, ...(j.byStatus || []), ...(j.byPriority || [])] : j;
+        if(!src.kanban&&j[0]?.nextKey){const url=new URL(src.url,location.href);url.searchParams.set("after",j[0].nextKey);url.searchParams.set("revision",j[0].boardRevision);continuations.push(url.pathname+url.search);}
+        if (src.kanban) orch = j.orchestration || null;
+        for (const s of sheets || []) if (s && s.id) idx[s.id] = s;
+      } catch (e) { notes.push(String(e.message || e)); }
+    }));
+    if (ticket !== this.sheetTicket) return;
+    if (!Object.keys(idx).length) {
+      host.replaceChildren(this.el("p", "sheet-note error", "No sheets: " + (notes.join("; ") || "empty projection")));
+      if ($("#factValue").textContent) this.rawSheets(true);
+      return;
+    }
+    host.replaceChildren();
+    this.sheetNode = {el:host, _sheets:idx, _cur:idx[cur] ? cur : Object.keys(idx)[0], _orch:orch, _notes:notes};
+    this.renderSheets();
+    if (notes.length) host.append(this.el("p", "sheet-note error", notes.join("; ")));
+    for(const url of continuations){const button=this.el("button","sheet-more","Next page");button.addEventListener("click",()=>this.loadSheets([{url}],cur));host.append(button);}
+  },
+  renderSheets() {
+    const n = this.sheetNode; if (!n) return;
+    const roots = Object.values(n._sheets).filter(s => !s.parent || !n._sheets[s.parent]);
+    let top = n._sheets[n._cur], guard = 0;
+    while (top && top.parent && n._sheets[top.parent] && guard++ < 24) top = n._sheets[top.parent];
+    const strip = $("#sheetRoots"); strip.replaceChildren();
+    if (roots.length > 1) for (const r of roots) {
+      const b = this.el("button", top && top.id === r.id ? "here" : "", "▤ " + (r.title || r.id));
+      b.addEventListener("click", () => { n._cur = r.id; this.renderSheets(); });
+      strip.append(b);
+    }
+    renderConcentric(n);
+    // a drill-in or crumb click re-renders inside patch.js; keep the roots strip honest
+    n.el.querySelectorAll("[data-sheet]").forEach(el => el.addEventListener("click", () => this.renderSheets()));
+  },
+  rawSheets(on) {
+    $("#factInspector").classList.toggle("raw", on);
+    $("#sheetRawBtn").setAttribute("aria-pressed", String(on));
   },
   renderEvents() {
     const host=$("#events");host.replaceChildren();
@@ -312,12 +399,32 @@ const Harness = {
       button.addEventListener("click",()=>this.inspect(event.key));host.append(button);
     }
   },
-  focus(box) {
+  focus(box, identity="", remember=true) {
+    if(remember){this.viewHistory.push({camera:{...view},focus:this.focusKey,node:this.viewNode});if(this.viewHistory.length>64)this.viewHistory.shift();}
+    this.focusKey=identity;this.viewNode=null;$("#viewBack").disabled=!this.viewHistory.length;
     if(typeof killMomentum==="function")killMomentum(); // a focus is a hard cut, never a glide target
     const r=viewport.getBoundingClientRect(),pad=30;
     view.z=Math.min(4000,Math.max(.01,Math.min((r.width-pad*2)/box.w,(r.height-pad*2)/box.h)));
     view.x=(r.width-box.w*view.z)/2-box.x*view.z;view.y=(r.height-box.h*view.z)/2-box.y*view.z;applyView();redraw();
+    this.rememberView();
   },
+  rememberView() {
+    if(!this.ready)return;
+    clearTimeout(this.viewSave);this.viewSave=setTimeout(()=>{
+      const url=new URL(location.href);url.hash=LandscapeNavigation.encode(view,this.focusKey);history.replaceState(null,"",url);
+    },200);
+  },
+  previousView() {
+    const previous=this.viewHistory.pop();if(!previous)return;
+    Object.assign(view,previous.camera);this.focusKey=previous.focus;this.viewNode=previous.node;
+    $("#viewBack").disabled=!this.viewHistory.length;applyView();redraw();this.rememberView();
+  },
+  enclosingView() {
+    if(this.viewNode?._parentScope)this.focusNode(this.viewNode._parentScope);
+    else if(this.viewNode)this.select(this.viewNode._program);
+    else this.fit(true);
+  },
+  focusNode(node) {this.focusElement(node.el,LandscapeNavigation.node(node._program,node._localId||node.id));this.viewNode=node;},
   /* The panel that owns the most of the viewport right now. fd and shake act on
      what the operator is looking at, not on a selection that may sit off-screen
      from an earlier click. Screen = world * view.z + view (the wheel math's
@@ -333,13 +440,16 @@ const Harness = {
     return best;
   },
   fit(all) {
-    if (!all) { const anchor=this.mounts.get(this.selected)||{x:0,y:0};this.focus({x:anchor.x-40,y:anchor.y-90,w:this.activeBounds.w+120,h:this.activeBounds.h+130}); return; }
+    if (!all) { const anchor=this.mounts.get(this.selected)||{x:0,y:0};this.focus({x:anchor.x-40,y:anchor.y-90,w:this.activeBounds.w+120,h:this.activeBounds.h+130},LandscapeNavigation.program(this.selected)); return; }
     const boxes=[...this.positions.values()];
     const x=Math.min(...boxes.map(b=>b.x)),y=Math.min(...boxes.map(b=>b.y));
     this.focus({x,y,w:Math.max(...boxes.map(b=>b.x+b.w))-x,h:Math.max(...boxes.map(b=>b.y+b.h))-y});
   },
-  focusElement(el) {const a=el.getBoundingClientRect(),b=world.getBoundingClientRect();this.focus({x:(a.left-b.left)/view.z,y:(a.top-b.top)/view.z,w:a.width/view.z,h:a.height/view.z});},
+  focusElement(el,identity="") {const a=el.getBoundingClientRect(),b=world.getBoundingClientRect();this.focus({x:(a.left-b.left)/view.z,y:(a.top-b.top)/view.z,w:a.width/view.z,h:a.height/view.z},identity);},
   output(receipt) {
+    if(!receipt?.programKey)return;
+    const entry=this.board[receipt.programKey];
+    if(receipt.programCid&&entry?.programCid&&receipt.programCid!==entry.programCid)return;
     if (this.drafts.has(receipt.program)) return;
     for (const n of G.nodes.filter(n=>n._program===receipt.program)) {
       const out=receipt.outputs?.[n._localId||n.id];
@@ -362,6 +472,12 @@ const Harness = {
       this.message(name+": "+(result.ok?"completed":result.error||"failed"));
     } catch(e) { this.message("Run failed: "+e.message); }
     finally { this.running=false;$("#runBtn").disabled=this.dirty; }
+  },
+  async cancelRun() {
+    const run=Object.values(this.board).find(v=>v?.programKey==="lcnc/program/"+this.selected&&["validating","running"].includes(v.status));
+    if(!run)return;
+    const response=await fetch("/api/lcnc/run/cancel",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({runId:run.runId})});
+    this.message(response.ok?"Cancellation requested":"Run is no longer active");
   },
   async publish() {
     const name=$("#panelName").value.trim();
@@ -386,7 +502,9 @@ const Harness = {
   },
   async accept(event) {
     if (!event.key || Number(event.seq)<=this.seq) return;
-    this.seq=Number(event.seq);this.board[event.key]=event.value;
+    if(event.epoch!==this.epoch||Number(event.seq)!==this.seq+1){this.reconnect("Revision gap");return;}
+    this.seq=Number(event.seq);
+    if(event.deleted)delete this.board[event.key];else this.board[event.key]=event.value;
     if(event.actor)this.actors.set(event.key,event.actor);
     this.events.unshift(event);this.events.length=Math.min(this.events.length,100);
     const prefix=event.key.split("/")[0];this.flash(prefix);this.flash(event.key);
@@ -394,10 +512,10 @@ const Harness = {
     if(event.key.startsWith("lcnc/program/")){
       const name=event.key.slice(13);
       if(this.drafts.has(name))this.message("Board updated while "+name+" has unpublished changes");
+      else if(event.deleted)this.unmount(name);
       else this.mount(name);
     }
-    if(event.key.startsWith("lcnc/run/"))this.output(event.value);
-    if(event.key.startsWith("lcnc/run/")){this.flash(event.value.programKey);this.flash("receipts");}
+    if(event.key.startsWith("lcnc/run/")&&!event.deleted){this.output(event.value);this.flash(event.value.programKey);this.flash("receipts");}
     this.schedule();
   },
   // Delta 2026-09-05 (fan-out): each key keeps its own expiry (now + 1000 ms) so a burst of N kanban
@@ -413,41 +531,68 @@ const Harness = {
       if (!this.flashes.size) { clearInterval(this.flashSweep); this.flashSweep = null; }
     }, 250);
   },
-  connect() {
+  reconnect(reason="Reconnecting") {
+    this.stream?.close();this.connectionGeneration++;
+    $("#connection").textContent=reason;$("#connection").classList.remove("live");
+    clearTimeout(this.reconnectTimer);this.reconnectTimer=setTimeout(()=>this.connect(),500);
+  },
+  async connect() {
+    this.stream?.close();clearTimeout(this.reconnectTimer);
+    const generation=++this.connectionGeneration,initial=!this.ready;
+    const bookmark=initial?LandscapeNavigation.decode(location.hash):null;
     let buffer=[],hydrating=true,chain=Promise.resolve();
-    const stream=new EventSource("/blackboard/facts?since="+this.seq);
-    stream.onmessage=e=>{try{const d=JSON.parse(e.data);if(hydrating)buffer.push(d);else chain=chain.then(()=>this.accept(d));}catch(_){} };
-    stream.onopen=async()=>{
-      hydrating=true;$("#connection").textContent="Syncing";
-      try {
-        const response=await fetch("/blackboard/board");if(!response.ok)throw Error("Snapshot "+response.status);
-        const snapshot=await response.json();this.board=snapshot.board||Object.create(null);this.seq=Number(snapshot.seq)||0;
-        await syncContracts(this.board["lcnc/vocabulary"]);await syncLanes();
-        this.ready=true;
-        const requested=new URLSearchParams(location.search).get("load");
-        const name=this.selected||[requested,requested?"preset-"+requested:null,"preset-curator",this.programs()[0]?.slice(13)].find(n=>this.board["lcnc/program/"+n]);
-        const first=this.board["lcnc/program/preset-curator"]?"preset-curator":this.programs()[0]?.slice(13);
-        if(first)this.mount(first);
-        for(const key of this.programs())if(key.slice(13)!==first)this.mount(key.slice(13));
-        this.select(name,!this.selected);
-        for(const d of buffer.sort((a,b)=>a.seq-b.seq)) {
-          if(d.actor)this.actors.set(d.key,d.actor);
-          await this.accept(d);
-        }
-        buffer=[];hydrating=false;this.render();buildPalette();
-        Landscape.refresh().then(()=>{if(!requested)this.fit(true);});
-        $("#connection").textContent="Live";$("#connection").classList.add("live");
-      }catch(e){this.message("Blackboard unavailable: "+e.message);stream.close();setTimeout(()=>this.connect(),2000);}
-    };
-    stream.onerror=()=>{stream.close();$("#connection").textContent="Reconnecting";$("#connection").classList.remove("live");setTimeout(()=>this.connect(),2000);};
-    addEventListener("pagehide",()=>stream.close(),{once:true});
+    $("#connection").textContent="Syncing";
+    try {
+      const response=await fetch("/blackboard/board");if(!response.ok)throw Error("Snapshot "+response.status);
+      const snapshot=await response.json();if(generation!==this.connectionGeneration)return;
+      this.board=snapshot.board||Object.create(null);this.seq=Number(snapshot.revision);this.epoch=snapshot.epoch;
+      if(!Number.isSafeInteger(this.seq)||!this.epoch)throw Error("Revision-linked snapshot required");
+      this.actors=new Map(Object.entries(snapshot.provenance||{}).map(([k,v])=>[k,v.actor]));
+      const stream=this.stream=new EventSource("/blackboard/facts?since="+this.seq+"&epoch="+encodeURIComponent(this.epoch));
+      stream.addEventListener("reset",()=>{if(generation===this.connectionGeneration)this.reconnect("Refreshing snapshot");});
+      stream.onmessage=e=>{
+        if(generation!==this.connectionGeneration)return;
+        try {
+          const event=JSON.parse(e.data);
+          if(hydrating){buffer.push(event);if(buffer.length>2048)this.reconnect("Snapshot backlog");}
+          else chain=chain.then(()=>generation===this.connectionGeneration?this.accept(event):null).catch(()=>this.reconnect());
+        }catch(_){this.reconnect("Invalid event");}
+      };
+      stream.onerror=()=>{if(generation===this.connectionGeneration)this.reconnect();};
+      await syncContracts(this.board["lcnc/vocabulary"]);await syncLanes();
+      if(generation!==this.connectionGeneration)return;
+      this.ready=true;
+      for(const name of this.mounts.keys())if(!this.board["lcnc/program/"+name]&&!this.drafts.has(name))this.unmount(name);
+      const requested=new URLSearchParams(location.search).get("load");
+      const names=this.programs().map(k=>k.slice(13));
+      const name=[this.selected,requested,requested?"preset-"+requested:null,"preset-curator",names[0]].find(n=>names.includes(n));
+      const first=this.board["lcnc/program/preset-curator"]?"preset-curator":names[0];
+      if(first)this.mount(first);
+      for(const n of names)if(n!==first)this.mount(n);
+      if(name)this.select(name,initial&&!bookmark);
+      for(const event of buffer) {
+        if(generation!==this.connectionGeneration)return;
+        await this.accept(event);
+      }
+      buffer=[];hydrating=false;this.render();buildPalette();
+      await Landscape.refresh();
+      if(generation!==this.connectionGeneration)return;
+      if(bookmark){Object.assign(view,bookmark.camera);this.focusKey=bookmark.focus;applyView();redraw();}
+      else if(initial&&!requested)this.fit(true);
+      $("#connection").textContent="Live";$("#connection").classList.add("live");
+    }catch(e){if(generation===this.connectionGeneration){this.message("Blackboard unavailable: "+e.message);this.reconnect();}}
   },
 };
 
 AUTOSAVE=false;
 $("#programSelect").addEventListener("change",e=>Harness.select(e.target.value));
 $("#boardHome").addEventListener("click",()=>Harness.fit(true));
-$("#objectsBtn").addEventListener("click",()=>Harness.focus(Landscape.objectBox));
+$("#objectsBtn").addEventListener("click",()=>Harness.focus(Landscape.objectBox,LandscapeNavigation.object("")));
+$("#viewBack").addEventListener("click",()=>Harness.previousView());
+$("#viewUp").addEventListener("click",()=>Harness.enclosingView());
+$("#cancelRun").addEventListener("click",()=>Harness.cancelRun().catch(e=>Harness.message(e.message)));
+$("#sheetsBtn").addEventListener("click",()=>Harness.openSheets([]));
+$("#sheetRawBtn").addEventListener("click",()=>Harness.rawSheets(!$("#factInspector").classList.contains("raw")));
 $("#terrainLayer").addEventListener("change",e=>{Landscape.terrain?.setLayer(Number(e.target.value));Landscape.schedule();});
 viewport.addEventListener("pointerdown",e=>{
   const element=e.target.closest(".node"),n=element&&G.nodes.find(n=>n.el===element);
@@ -457,8 +602,8 @@ viewport.addEventListener("dblclick",e=>{
   if(e.target.closest(".node,button,input,textarea,select"))return;
   const hit=Landscape.hit(e);if(!hit)return;
   e.preventDefault();e.stopImmediatePropagation();
-  if(hit.object)Harness.focus(hit.object.rect);
-  else if(hit.node)Harness.focusElement(hit.node.el);
+  if(hit.object)Harness.focus(hit.object.rect,LandscapeNavigation.object(hit.object.id||""));
+  else if(hit.node)Harness.focusNode(hit.node);
   else if(hit.key?.startsWith("lcnc/program/"))Harness.select(hit.key.slice(13));
   else Harness.focus(hit.box);
 },true);
@@ -468,5 +613,6 @@ viewport.addEventListener("click",e=>{
   if(e.target.closest(".node,button,input,textarea,select")||!landscapePress||Math.hypot(e.clientX-landscapePress.x,e.clientY-landscapePress.y)>4)return;
   const hit=Landscape.hit(e);if(hit?.object?.leaf)Landscape.inspect(hit.object.id);
 });
-addEventListener("resize",()=>Harness.fit(false));
+addEventListener("resize",()=>{applyView();redraw();Landscape.schedule();});
+addEventListener("pagehide",()=>{Harness.stream?.close();clearTimeout(Harness.reconnectTimer);});
 Harness.connect();

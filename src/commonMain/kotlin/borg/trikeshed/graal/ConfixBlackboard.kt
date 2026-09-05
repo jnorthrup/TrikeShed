@@ -55,7 +55,43 @@ import kotlin.concurrent.atomics.ExperimentalAtomicApi
 class ConfixBlackboard {
 
     /** One immutable snapshot of the board: the key/value map, its provenance, the last-written doc. */
-    private class Cell(val store: Map<String, Any?>, val provenance: Map<String, ProvenanceEntry>, val doc: ConfixDoc)
+    private class Cell(
+        val store: Map<String, Any?>,
+        val provenance: Map<String, ProvenanceEntry>,
+        val doc: ConfixDoc,
+        val revision: Long = 0,
+        val journal: List<Change> = emptyList(),
+    ) {
+        fun updated(key: String, value: Any?, entry: ProvenanceEntry, deleted: Boolean = false): Cell {
+            val next = revision + 1
+            val stamped = entry.copy(revision = next)
+            val change = Change(next, key, value, stamped, deleted)
+            return Cell(
+                if (deleted) store - key else store + (key to value),
+                if (deleted) provenance - key else provenance + (key to stamped),
+                if (deleted) doc.remove(key) else doc.set(key, value),
+                next, journal.takeLast(REPLAY_CAPACITY - 1) + change,
+            )
+        }
+    }
+
+    data class Change(val revision: Long, val key: String, val value: Any?, val provenance: ProvenanceEntry, val deleted: Boolean)
+    data class Snapshot(val revision: Long, val values: Map<String, Any?>, val provenance: Map<String, ProvenanceEntry>)
+    data class Replay(val snapshot: Snapshot, val changes: List<Change>, val reset: Boolean)
+
+    /** Values, provenance and revision are captured from the same atomic publication. */
+    fun snapshot(): Snapshot = cell.load().let { Snapshot(it.revision, it.store, it.provenance) }
+
+    /** An expired or future cursor must rehydrate; missing history is never silently skipped. */
+    fun replay(after: Long): Replay {
+        val current = cell.load()
+        val oldest = current.journal.firstOrNull()?.revision ?: current.revision + 1
+        val reset = after < oldest - 1 || after > current.revision
+        return Replay(
+            Snapshot(current.revision, current.store, current.provenance),
+            if (reset) emptyList() else current.journal.filter { it.revision > after }, reset,
+        )
+    }
 
     // Internal map for immediate access, synced to ConfixDoc on mutations —
     // published whole on every mutation (see the class note).
@@ -80,7 +116,8 @@ class ConfixBlackboard {
     data class ProvenanceEntry(
         val language: String,
         val timestamp: Long,
-        val sourceLocation: String? = null
+        val sourceLocation: String? = null,
+        val revision: Long = 0,
     )
     
     /**
@@ -113,7 +150,7 @@ class ConfixBlackboard {
     /** Put a value at key */
     fun put(key: String, value: Any?, language: String): ConfixBlackboard {
         val entry = ProvenanceEntry(language, Clock.System.now().toEpochMilliseconds())
-        val newDoc = mutate { cur -> Cell(cur.store + (key to value), cur.provenance + (key to entry), cur.doc.set(key, value)) }
+        val newDoc = mutate { cur -> cur.updated(key, value, entry) }
         notifySubscribers(newDoc)
         return this
     }
@@ -130,7 +167,7 @@ class ConfixBlackboard {
         while (true) {
             val cur = cell.load()
             if (!admit(cur.store[key])) return false
-            val new = Cell(cur.store + (key to value), cur.provenance + (key to entry), cur.doc.set(key, value))
+            val new = cur.updated(key, value, entry)
             if (cell.compareAndSet(cur, new)) {
                 notifySubscribers(new.doc)
                 return true
@@ -146,7 +183,8 @@ class ConfixBlackboard {
     
     /** Delete key */
     fun remove(key: String): ConfixBlackboard {
-        val newDoc = mutate { cur -> Cell(cur.store - key, cur.provenance - key, cur.doc.remove(key)) }
+        val entry = ProvenanceEntry("remove", Clock.System.now().toEpochMilliseconds())
+        val newDoc = mutate { cur -> cur.updated(key, null, entry, deleted = true) }
         notifySubscribers(newDoc)
         return this
     }
@@ -217,7 +255,7 @@ class ConfixBlackboard {
     
     /** Get snapshot as Series<Pair> for cursor operations */
     fun toSeries(): Series<Pair<String, Any?>> {
-        val pairs = keys().map { it to get(it) }
+        val pairs = snapshot().values.entries.map { it.key to it.value }
         return pairs.size j { pairs[it] }
     }
     
@@ -228,6 +266,7 @@ class ConfixBlackboard {
     companion object {
         /** Buffered snapshots per collector before the oldest is dropped. */
         const val CHANGE_BUFFER_CAPACITY: Int = 64
+        const val REPLAY_CAPACITY: Int = 256
 
         fun empty(): ConfixBlackboard = ConfixBlackboard()
         

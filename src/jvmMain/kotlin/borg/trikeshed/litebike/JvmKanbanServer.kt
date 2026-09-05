@@ -485,10 +485,10 @@ class JvmKanbanServer(
     /** Static PWA assets straight from `src/commonMain/resources/web/` on the classpath. Paths are fixed — no traversal. */
     private val staticAssets: Map<String, Pair<String, String>> = mapOf(
         "/styles.css" to ("web/styles.css" to "text/css; charset=utf-8"),
-        "/panels.html" to ("web/panels.html" to "text/html; charset=utf-8"),
+        "/panels.html" to ("web/harness.html" to "text/html; charset=utf-8"),
         // the concentric construction canvas rides the page plane, not a module
         // claim — ModuleRouteRegistry is exact /api/* by discipline
-        "/panels" to ("web/panels.html" to "text/html; charset=utf-8"),
+        "/panels" to ("web/harness.html" to "text/html; charset=utf-8"),
         // the blackboard harness draws board territories and LCNC typed cables
         "/harness.html" to ("web/harness.html" to "text/html; charset=utf-8"),
         "/harness" to ("web/harness.html" to "text/html; charset=utf-8"),
@@ -498,6 +498,7 @@ class JvmKanbanServer(
         "/harness.css" to ("web/harness.css" to "text/css; charset=utf-8"),
         "/graal-terrain.js" to ("web/graal-terrain.js" to "application/javascript; charset=utf-8"),
         "/landscape.js" to ("web/landscape.js" to "application/javascript; charset=utf-8"),
+        "/landscape-navigation.js" to ("web/landscape-navigation.js" to "application/javascript; charset=utf-8"),
         // the operator-facing board page — /api/board rendered for humans
         "/kanban.html" to ("web/kanban.html" to "text/html; charset=utf-8"),
         "/kanban" to ("web/kanban.html" to "text/html; charset=utf-8"),

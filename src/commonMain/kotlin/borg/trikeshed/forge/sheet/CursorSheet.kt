@@ -11,6 +11,7 @@ import borg.trikeshed.parse.confix.reify
 import borg.trikeshed.parse.confix.rootCell
 import borg.trikeshed.parse.confix.row
 import borg.trikeshed.parse.confix.tag
+import kotlin.time.TimeSource
 
 /**
  * Cursor → sheet: the first UI projection that reads the canonical algebra directly.
@@ -31,11 +32,15 @@ data class SheetSeed(
     val columns: List<SheetColumn>,
     val rows: List<List<Any?>>,
     val parent: String? = null,
+    val truncated: Boolean = false,
+    val limit: String? = null,
 ) {
     fun toMap(): Map<String, Any?> = mapOf(
         "id" to id,
         "title" to title,
         "parent" to parent,
+        "truncated" to truncated,
+        "limit" to limit,
         "columns" to columns.map { mapOf("name" to it.name, "type" to it.type) },
         "rows" to rows.map { row -> row.map { cell -> if (cell is SheetRef) mapOf("sheet" to cell.sheet) else cell } },
     )
@@ -61,48 +66,71 @@ fun sheetSeed(id: String, title: String, cursor: Cursor, parent: String? = null,
  * rows are `(key, value)` / `(index, value)`, and a nested container cell becomes a [SheetRef]
  * to its own sheet. Hierarchy-as-index (the Confix flat index) → grid-in-cell (TreeSheets).
  */
-fun confixSheets(id: String, title: String, doc: ConfixDoc, maxSheets: Int = 256): List<SheetSeed> {
+fun confixSheets(id: String, title: String, doc: ConfixDoc, maxSheets: Int = 256, maxRows: Int = 1024, maxChars: Int = 65536, maxDepth: Int = 16, maxMillis: Long = 50): List<SheetSeed> {
     val out = ArrayList<SheetSeed>()
     val root = doc.rootCell ?: return out
-    fun walk(cell: ConfixCell, sheetId: String, sheetTitle: String, parent: String?) {
-        if (out.size >= maxSheets) return
+    if (maxSheets <= 0) return out
+    val started = TimeSource.Monotonic.markNow()
+    var remainingRows = maxRows
+    var remainingChars = maxChars
+    var allocated = 1
+    fun walk(cell: ConfixCell, sheetId: String, sheetTitle: String, parent: String?, depth: Int) {
         val kids = cell.cellKids
         val isObject = cell.row.tag == IOMemento.IoObject
         val columns = if (isObject) listOf(SheetColumn("key", "IoString"), SheetColumn("value", "Any"))
         else listOf(SheetColumn("index", "IoInt"), SheetColumn("value", "Any"))
         val rows = ArrayList<List<Any?>>()
         val pending = ArrayList<Triple<ConfixCell, String, String>>()
+        var limit: String? = null
+        fun rowAllowed(): Boolean {
+            limit = when {
+                remainingRows <= 0 -> "row_limit"
+                remainingChars <= 0 -> "payload_limit"
+                started.elapsedNow().inWholeMilliseconds > maxMillis -> "time_limit"
+                else -> limit
+            }
+            if (limit != null) return false
+            remainingRows--
+            return true
+        }
+        fun text(value: String): String {
+            val shown = value.take(remainingChars.coerceAtLeast(0))
+            remainingChars -= shown.length
+            if (shown.length < value.length) limit = "payload_limit"
+            return shown
+        }
+        fun value(cell: ConfixCell, key: String, title: String): Any? = when (cell.row.tag) {
+            IOMemento.IoObject, IOMemento.IoArray -> {
+                if (allocated >= maxSheets || depth >= maxDepth) {
+                    limit = if (depth >= maxDepth) "depth_limit" else "sheet_limit"
+                    "[projection limit]"
+                } else {
+                    allocated++
+                    val childId = "$sheetId/${key.replace("~", "~0").replace("/", "~1")}"
+                    pending.add(Triple(cell, childId, title))
+                    SheetRef(childId)
+                }
+            }
+            else -> cell.reify().let { if (it is String) text(it) else it }
+        }
         if (isObject) {
             // Confix flat-kid order inside an object is (key, value) pairs (verified by CursorSheetTest on JSON;
             // the comment in ConfixKit.step() claiming (value, key) is stale).
             var i = 0
-            while (i + 1 < kids.size) {
+            while (i + 1 < kids.size && rowAllowed()) {
                 val key = kids[i].reify()?.toString() ?: "#$i"
-                val value = kids[i + 1]
-                rows.add(listOf(key, cellValue(value, "$sheetId/$key", key, pending)))
+                rows.add(listOf(text(key), value(kids[i + 1], key, key)))
                 i += 2
             }
         } else {
             for (i in 0 until kids.size) {
-                rows.add(listOf(i, cellValue(kids[i], "$sheetId/$i", "[$i]", pending)))
+                if (!rowAllowed()) break
+                rows.add(listOf(i, value(kids[i], "$i", "[$i]")))
             }
         }
-        out.add(SheetSeed(sheetId, sheetTitle, columns, rows, parent))
-        pending.forEach { (child, childId, childTitle) -> walk(child, childId, childTitle, sheetId) }
+        out.add(SheetSeed(sheetId, sheetTitle, columns, rows, parent, limit != null, limit))
+        pending.forEach { (child, childId, childTitle) -> walk(child, childId, childTitle, sheetId, depth + 1) }
     }
-    walk(root, id, title, null)
+    walk(root, id, title, null, 0)
     return out
-}
-
-private fun cellValue(
-    cell: ConfixCell,
-    childId: String,
-    childTitle: String,
-    pending: MutableList<Triple<ConfixCell, String, String>>,
-): Any? = when (cell.row.tag) {
-    IOMemento.IoObject, IOMemento.IoArray -> {
-        pending.add(Triple(cell, childId, childTitle))
-        SheetRef(childId)
-    }
-    else -> cell.reify()
 }

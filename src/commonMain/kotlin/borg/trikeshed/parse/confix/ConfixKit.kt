@@ -120,7 +120,7 @@ fun RowVec.reify(src: Series<Byte>): Any? = when (tag) {
     borg.trikeshed.cursor.IOMemento.IoLong -> decodeCborLong(src, open)
         ?: src.spanLong(open, close)
     borg.trikeshed.cursor.IOMemento.IoString -> decodeCborText(src, open)
-        ?: src.spanStr(open + 1, close - 1)
+        ?: decodeTextSpan(src, open + 1, close - 1)
     borg.trikeshed.cursor.IOMemento.IoBytes -> decodeCborBytes(src, open)
         ?: ByteArray(close - open + 1) { src[open + it] }
     borg.trikeshed.cursor.IOMemento.IoObject,
@@ -336,6 +336,38 @@ private fun Series<Byte>.spanStr(open: Int, close: Int): String {
     if (close < open) return ""
     val len = close - open + 1
     return CharArray(len) { this[open + it].toInt().toChar() }.concatToString()
+}
+
+/**
+ * The text between a JSON/YAML string's quotes, as the text it denotes: the bytes are UTF-8
+ * (one byte per char made « into "ￂﾫ"), and the escapes the scanner stepped over — `\"`,
+ * `\\`, `\/`, `\n`, `\t`, `\r`, `\b`, `\f`, `\uXXXX` — are resolved. CBOR text never comes
+ * here (decodeCborText answers first). Delta 2026-09-05, found by the harness's sheets.
+ */
+internal fun decodeTextSpan(src: Series<Byte>, open: Int, close: Int): String {
+    if (close < open) return ""
+    val raw = ByteArray(close - open + 1) { src[open + it] }.decodeToString()
+    if (raw.indexOf('\\') < 0) return raw
+    val out = StringBuilder(raw.length)
+    var i = 0
+    while (i < raw.length) {
+        val c = raw[i]
+        if (c != '\\' || i + 1 >= raw.length) { out.append(c); i++; continue }
+        when (val e = raw[i + 1]) {
+            '"', '\\', '/' -> { out.append(e); i += 2 }
+            'n' -> { out.append('\n'); i += 2 }
+            't' -> { out.append('\t'); i += 2 }
+            'r' -> { out.append('\r'); i += 2 }
+            'b' -> { out.append('\b'); i += 2 }
+            'f' -> { out.append('\u000C'); i += 2 }
+            'u' -> {
+                val hex = if (i + 5 < raw.length) raw.substring(i + 2, i + 6).toIntOrNull(16) else null
+                if (hex == null) { out.append(c); i++ } else { out.append(hex.toChar()); i += 6 }
+            }
+            else -> { out.append(c); i++ }
+        }
+    }
+    return out.toString()
 }
 
 private fun Series<Byte>.spanLong(open: Int, close: Int): Long {

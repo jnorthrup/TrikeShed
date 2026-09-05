@@ -43,7 +43,7 @@ class BlackboardWireRepairTest {
             bb.put("k$i", "v$i", "test")
         }
         val sink = Sink()
-        val job = launch { wire.route("GET", "/blackboard/facts?since=0", "", sink::send) }
+        val job = launch { wire.route("GET", "/blackboard/facts?since=4", "", sink::send) }
         withTimeout(5000) { delay(300) } // allow the collector + replay to flush
         job.cancel()
 
@@ -67,7 +67,7 @@ class BlackboardWireRepairTest {
         job.cancel()
 
         val ids = Regex("id: (\\d+)").findAll(sink.all).map { it.groupValues[1].toInt() }.toList()
-        assertEquals(listOf(7, 8, 9), ids.filter { it < 10 }, "since=7 → exactly seqs 7,8,9 replayed (0-based)")
+        assertEquals(listOf(8, 9, 10), ids, "since is the last applied board revision, exclusive")
     }
 
     @Test

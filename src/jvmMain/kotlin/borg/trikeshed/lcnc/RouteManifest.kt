@@ -82,6 +82,7 @@ object RouteManifest {
             RouteEntry("GET", "/api/lcnc/ontology", "the same vocabulary as Turtle triples (kinds, ports, bindings)"),
             RouteEntry("GET", "/api/lcnc/facts", "the vocabulary, corpus wires and bindings as KIF tuples — what LcncFacts.parse reads back"),
             RouteEntry("POST", "/api/lcnc/run", "generic runner dispatch"),
+            RouteEntry("POST", "/api/lcnc/run/cancel", "cancel an active scoped run; receipt lands on the durable work timeline"),
             RouteEntry("GET", "/api/lcnc/council", "council case read-back: index fact + transcript/verdict from CAS (?caseId=<id>)"),
             RouteEntry("GET", "/api/mcp", "MCP server card: protocol versions, tools, resource URIs"),
             RouteEntry("POST", "/api/mcp", "MCP JSON-RPC: the LCNC Kanban board as tools and resources"),
@@ -176,6 +177,7 @@ object RouteManifest {
             RouteEntry("POST", "/blackboard/assert", "assert key-value pairs"),
             RouteEntry("GET", "/blackboard/sites", "pointcut site listing"),
             RouteEntry("GET", "/blackboard/board", "full board snapshot"),
+            RouteEntry("GET", "/blackboard/sheet", "one fact (?key=) or one territory (?prefix=) as a grid-in-cell sheet family (CursorSheet); ?max= caps the family"),
         ),
         // -- HermesWire: supervised Hermes VM console --
         "HermesWire" to listOf(

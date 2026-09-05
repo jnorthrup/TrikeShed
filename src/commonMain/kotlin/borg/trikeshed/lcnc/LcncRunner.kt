@@ -97,6 +97,10 @@ class LcncRunner(private val registry: Map<String, LcncNodeRunner>) {
     /** Deepest scope nesting a single walk may enter — a cycle of subprogram
      *  references is a data error and must surface, not stack-overflow. */
     var maxScopeDepth: Int = 16
+    var maxNodeExecutions: Int = 10000
+    private var executedNodes: Int = 0
+
+    class LcncWorkLimitExceeded : Exception("node execution work_limit exceeded")
 
     class LcncScopeDepthExceeded(val path: List<String>) :
         Exception("scope nesting exceeded ${path.size}: ${path.joinToString(" ▸ ")}")
@@ -127,6 +131,7 @@ class LcncRunner(private val registry: Map<String, LcncNodeRunner>) {
      * `scope.out` yields come back as [ScopeResult.returns].
      */
     suspend fun runProcedure(program: LcncProgram, args: Map<String, Any?> = emptyMap()): ScopeResult {
+        executedNodes = 0
         val state = WalkState(program)
         val root = LcncScopeFrame(bindings = args, chain = FrameIdChain.root(ROOT_SCOPE))
         val returns = withContext(root) {
@@ -204,6 +209,7 @@ class LcncRunner(private val registry: Map<String, LcncNodeRunner>) {
             // Cooperative cancellation between statements: ABORT stops the walk
             // here; in-flight runners cancel at their next suspension point.
             currentCoroutineContext().job.ensureActive()
+            if (++executedNodes > maxNodeExecutions) throw LcncWorkLimitExceeded()
             val node = nodes[i]
             state.visited.add(node.id)
 

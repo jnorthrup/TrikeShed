@@ -22,6 +22,9 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.async
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.withTimeout
 import java.io.File
 import java.nio.charset.StandardCharsets
 import kotlin.test.Test
@@ -68,12 +71,11 @@ class LcncRunProgramRouteTest {
         )
     }
 
-    private fun post(server: JvmKanbanServer, path: String, body: String): JvmKanbanServer.HttpResponse = runBlocking {
+    private suspend fun post(server: JvmKanbanServer, path: String, body: String): JvmKanbanServer.HttpResponse =
         server.routeHttp(
             "POST $path HTTP/1.1\r\nHost: t\r\nContent-Type: application/json\r\n\r\n$body"
                 .toByteArray(StandardCharsets.UTF_8),
         )
-    }
 
     @Suppress("UNCHECKED_CAST")
     private fun json(resp: JvmKanbanServer.HttpResponse): Map<String, Any?> =
@@ -122,6 +124,13 @@ class LcncRunProgramRouteTest {
         assertEquals(true, body["ok"])
         val returns = body["returns"] as Map<*, *>
         assertEquals("HI", returns["result"], "the outer scope.out value came back through the route: $body")
+        val receipt = ctx.blackboard.get("lcnc/run/${body["runId"]}") as Map<*, *>
+        assertEquals("completed", receipt["status"])
+        assertEquals("lcnc/program/outer", receipt["programKey"])
+        assertTrue((receipt["sequence"] as Number).toLong() > 0)
+        assertTrue((receipt["programVersions"] as Map<*, *>).keys.containsAll(listOf("outer", "inner-shout")))
+        val bytes = ctx.casStore.get(borg.trikeshed.job.ContentId(receipt["programCid"].toString()))!!
+        assertEquals(borg.trikeshed.job.ContentId.of(bytes).value, receipt["programCid"])
 
         val missing = post(server, "/api/lcnc/run", """{"program":"ghost"}""")
         assertEquals(404, missing.status, "an unknown program is a loud 404, not an empty run")
@@ -196,5 +205,83 @@ class LcncRunProgramRouteTest {
             "the root default reached two rings deep and climbed all the way back out: $body")
         assertTrue((body["outputs"] as Map<*, *>).isNotEmpty(), "the per-node map is served beside the returns")
         supervisor.detach("kanban")
+    }
+
+    @Test fun inlineValidationCannotBorrowANamedProgramsCleanEntry() = runBlocking {
+        val routes = ModuleRouteRegistry()
+        val server = JvmKanbanServer(moduleRoutes = routes)
+        val ctx = newContext(routes, tempDir("inline-validation"), CasStore.inMemory())
+        val supervisor = ModuleSupervisor(ctx)
+        supervisor.attach(KanbanModule())
+        try {
+            val named = ctx.blackboard.get("lcnc/program/preset-scope")
+            val response = post(server, "/api/lcnc/run", """{"name":"preset-scope","document":{"nodes":[
+                {"id":"a","type":"scope.in","params":{"name":"x","default":"hello"}},
+                {"id":"b","type":"scope.out","params":{"name":"x"}}],
+                "wires":[{"from":["a","missing"],"to":["b","value"]}]}}""")
+            assertEquals(400, response.status, response.body)
+            val body = json(response)
+            assertEquals("refused", body["status"])
+            assertEquals("validation", body["phase"])
+            assertEquals(null, body["programKey"])
+            assertEquals(named, ctx.blackboard.get("lcnc/program/preset-scope"))
+        } finally { supervisor.detach("kanban") }
+    }
+
+    @Test fun timeoutWorkLimitAndCancellationHaveDistinctDurableOutcomes() = runBlocking {
+        val routes = ModuleRouteRegistry()
+        val server = JvmKanbanServer(moduleRoutes = routes)
+        val ctx = newContext(routes, tempDir("budgets"), CasStore.inMemory())
+        ctx.lcncRunners["test.slow"] = LcncNodeRunner { _, _ -> delay(10000); emptyMap() }
+        val supervisor = ModuleSupervisor(ctx)
+        supervisor.attach(KanbanModule())
+        try {
+            val timeout = post(server, "/api/lcnc/run", """{"document":{"nodes":[{"id":"n","type":"test.slow"}],"wires":[]},"timeoutMs":10}""")
+            assertEquals(504, timeout.status, timeout.body)
+            assertEquals("timed_out", json(timeout)["status"])
+            val work = post(server, "/api/lcnc/run", """{"program":"preset-scope","maxNodes":1}""")
+            assertEquals("failed", json(work)["status"])
+            assertTrue(work.body.contains("work_limit"))
+            val pending = async { post(server, "/api/lcnc/run", """{"name":"cancel-check","document":{"nodes":[{"id":"n","type":"test.slow"}],"wires":[]}}""") }
+            val runId = withTimeout(5000) {
+                var id: String? = null
+                while (id == null) {
+                    id = ctx.blackboard.snapshot().values.values.mapNotNull { it as? Map<*, *> }
+                        .firstOrNull { it["program"] == "cancel-check" && it["status"] == "running" }?.get("runId")?.toString()
+                    if (id == null) delay(10)
+                }
+                id
+            }
+            assertEquals(202, post(server, "/api/lcnc/run/cancel", """{"runId":"$runId"}""").status)
+            val cancelled = withTimeout(5000) { pending.await() }
+            assertEquals(499, cancelled.status, cancelled.body)
+            val body = json(cancelled)
+            assertEquals("cancelled", body["status"])
+            val raw = JsonSupport.parse(ctx.casStore.get(borg.trikeshed.job.ContentId(body["receiptCid"].toString()))!!.decodeToString()) as Map<*, *>
+            assertEquals("cancelled", (raw["lcncRun"] as Map<*, *>)["status"])
+        } finally { supervisor.detach("kanban") }
+    }
+
+    @Test fun receiptsRebuildFromTheExistingWalAfterModuleRestart() = runBlocking {
+        val dir = tempDir("restart")
+        val cas = CasStore.inMemory()
+        val routes = ModuleRouteRegistry()
+        val ctx = newContext(routes, dir, cas)
+        val supervisor = ModuleSupervisor(ctx)
+        supervisor.attach(KanbanModule())
+        val response = post(JvmKanbanServer(moduleRoutes = routes), "/api/lcnc/run", """{"program":"preset-scope"}""")
+        assertEquals(200, response.status, response.body)
+        val original = json(response)
+        supervisor.detach("kanban")
+        val restarted = newContext(ModuleRouteRegistry(), dir, cas)
+        val next = ModuleSupervisor(restarted)
+        next.attach(KanbanModule())
+        try {
+            val recovered = restarted.blackboard.get("lcnc/run/${original["runId"]}") as Map<*, *>
+            assertEquals(original["programCid"], recovered["programCid"])
+            assertEquals(original["receiptCid"], recovered["receiptCid"])
+            assertEquals("completed", recovered["status"])
+            assertEquals(original["returns"], recovered["returns"])
+        } finally { next.detach("kanban") }
     }
 }

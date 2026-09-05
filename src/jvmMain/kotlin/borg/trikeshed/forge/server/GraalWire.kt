@@ -137,7 +137,7 @@ class GraalWire(
         }
     }
 
-    private fun page(): JvmKanbanServer.HttpResponse = asset("web/graal.html", "text/html; charset=utf-8")
+    private fun page(): JvmKanbanServer.HttpResponse = asset("web/harness.html", "text/html; charset=utf-8")
 
     private fun asset(resource: String, contentType: String): JvmKanbanServer.HttpResponse {
         val bytes = GraalWire::class.java.classLoader.getResourceAsStream(resource)?.use { it.readBytes() }

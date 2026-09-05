@@ -11,10 +11,13 @@
 <div id="bar">
   <b>BLACKBOARD</b><span id="connection">Connecting</span>
   <button id="boardHome" title="Fit the blackboard" aria-label="Fit blackboard">⊞</button>
+  <button id="viewBack" title="Previous view" aria-label="Previous view" disabled>←</button>
+  <button id="viewUp" title="Enclosing scope" aria-label="Enclosing scope">↑</button>
   <button id="objectsBtn" title="Fit object terrain" aria-label="Object terrain">◇</button>
   <select id="terrainLayer" aria-label="Terrain layer"><option value="1">Objects</option><option value="2">Entropy</option><option value="3">Recency</option></select>
   <select id="programSelect" aria-label="Program"><option>Loading programs</option></select>
   <button class="run" id="runBtn">▶ Run</button>
+  <button class="stop" id="cancelRun" title="Cancel selected program run" aria-label="Cancel run" disabled>■</button>
   <button class="stop" id="stopBtn">■ stop timers</button>
   <button id="addBtn">+ node</button>
   <button id="fdBtn" title="one-shot layout: layer by cable polarity, relax the rest, then STOP">↦ fd</button><button id="shakeBtn" title="treeshake: pair every OPEN port in the graph with its closest legal open mate">shake</button><button id="fitBtn" title="frame every node (F) — the top-level answer to the D-tab's ring fit">⤢ fit</button>
@@ -25,6 +28,7 @@
   <button id="rdfBtn" title="the canvas as RDF — graph, ontology, and its alignment with productions and causal rules">⟁ rdf</button>
   <button id="paletteBtn" title="drag node types and programs onto the canvas">⧉ palette</button>
   <button id="keysBtn" title="keymux endpoints — names & addresses; key values never cross">⚿ keys</button>
+  <button id="sheetsBtn" title="every territory as grid-in-cell sheets (CursorSheet) — a container cell drills in, the crumb climbs out">▤ sheets</button>
   <button id="exportBtn">export</button>
   <button id="importBtn">import</button>
   <button id="undoBtn" title="undo ⌘Z" disabled>↶</button>
@@ -39,7 +43,7 @@
 <div id="palette"></div>
 <div id="viewport"><canvas id="landscape" aria-label="Graal and blackboard landscape"></canvas><div id="world"><div id="territories"></div><svg id="channels"></svg><svg id="wires"></svg></div></div>
 <aside id="activity"><header><b>Activity</b><span id="boardCount"></span></header><div id="events"></div></aside>
-<dialog id="factInspector"><form method="dialog"><button aria-label="Close fact inspector">×</button></form><h2 id="factKey"></h2><p id="factActor"></p><pre id="factValue"></pre></dialog>
+<dialog id="factInspector"><form method="dialog"><button aria-label="Close fact inspector">×</button></form><h2 id="factKey"></h2><p id="factActor"></p><div id="sheetBar"><div id="sheetRoots"></div><button id="sheetRawBtn" title="the fact as raw JSON instead of sheets" aria-pressed="false">{ } raw</button></div><div id="factSheet"></div><pre id="factValue"></pre></dialog>
 <div id="blip"></div>
 <div id="menu"></div>
 <canvas id="minimap" width="168" height="112"></canvas>
@@ -48,6 +52,7 @@
 <script src="/patch.js"></script>
 <script src="/graal-terrain.js"></script>
 <script src="/landscape.js"></script>
+<script src="/landscape-navigation.js"></script>
 <script src="/harness.js"></script>
 </body>
 </html>

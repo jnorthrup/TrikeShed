@@ -21,17 +21,18 @@ class BlackboardPageTest {
             assertEquals(200, response?.status)
             assertEquals("text/html; charset=utf-8", response?.contentType)
             val html = response!!.body
-            assertTrue("CAS / heap terrain" in html)
-            assertTrue("scoring tape" in html)
-            assertTrue("VM + commit receipts" in html)
-            assertTrue("GC lane" in html)
-            assertTrue("pointcut sites / writes" in html)
-            assertTrue("ACE chunk cache receipts" in html)
-            assertTrue("cache-receipt/" in html && "context-receipt/" in html)
-            assertTrue("blackboard snapshot" in html)
-            assertTrue("new EventSource('/api/graal/events')" in html)
-            assertEquals(1, Regex("new EventSource\\(").findAll(html).count(), "one event endpoint fans every event kind")
-            assertTrue("/blackboard/assert" in html, "pointcut writes route through the real assert funnel")
+            assertTrue("id=\"landscape\"" in html)
+            assertTrue("/graal-terrain.js" in html && "/patch.js" in html)
+            assertTrue("/landscape-navigation.js" in html)
+            assertTrue("id=\"cancelRun\"" in html)
+            val script = javaClass.classLoader.getResource("web/harness.js")!!.readText()
+            assertEquals(1, Regex("new EventSource\\(").findAll(script).count())
+            assertTrue("/blackboard/board" in script && "stream.addEventListener(\"reset\"" in script)
+            val server = borg.trikeshed.litebike.JvmKanbanServer()
+            for (path in listOf("/panels", "/panels.html", "/harness")) {
+                val other = server.routeHttp("GET $path HTTP/1.1\r\nHost: t\r\n\r\n".toByteArray())
+                assertEquals(html, other.body, "$path must share the same spatial surface")
+            }
         } finally {
             scope.cancel()
         }

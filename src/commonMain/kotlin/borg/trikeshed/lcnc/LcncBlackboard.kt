@@ -52,6 +52,7 @@ object LcncBlackboard {
             "cables" to cables,
             "violations" to LcncTypeCheck.check(program, contracts, strict = false).map { it.toMap() },
             "sourceCid" to sourceCid,
+            "programCid" to cidOf(program),
         )
     }
 

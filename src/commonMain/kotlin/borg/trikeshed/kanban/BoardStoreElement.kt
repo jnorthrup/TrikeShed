@@ -22,6 +22,7 @@ import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import kotlin.concurrent.Volatile
 import kotlin.coroutines.CoroutineContext
 
@@ -123,6 +124,8 @@ data class CardRow(
      * op, so a later command without the key keeps the value.
      */
     val parent: String = "",
+    /** Rebuildable pointer to this row's latest command in the existing CAS/WAL. */
+    val commandCid: ContentId? = null,
 )
 
 /**
@@ -179,6 +182,13 @@ class BoardStoreElement(
 
     fun card(jobId: String): CardRow? = rows[jobId]
 
+    suspend fun command(jobId: String): Map<*, *>? {
+        val cid = rows[jobId]?.commandCid ?: return null
+        return withContext(Dispatchers.IO) {
+            cas.get(cid)?.let { JsonSupport.parse(it.decodeToString()) as? Map<*, *> }
+        }
+    }
+
     fun projection(): JobKanbanProjection = projection
 
     fun graph(): CausalGraph = causal.toGraph()
@@ -206,27 +216,33 @@ class BoardStoreElement(
             for (first in intake) {
                 // Group commit: drain whatever queued behind the first, ONE flush for the batch.
                 val batch = ArrayList<BoardIntake>(4).apply { add(first) }
-                while (true) batch.add(intake.tryReceive().getOrNull() ?: break)
-                var dirty = false
-                for (cmd in batch) {
-                    val result = applyOne(cmd.raw, durable = true)
-                    if (result is BoardApply.Committed) dirty = true
-                    cmd.reply?.complete(result)
+                while (batch.size < 256) batch.add(intake.tryReceive().getOrNull() ?: break)
+                val events = ArrayList<BoardCommitted>()
+                try {
+                    val results = batch.map { applyOne(it.raw, durable = true, pending = events) }
+                    if (events.isNotEmpty()) withContext(Dispatchers.IO) { wal?.flush() }
+                    // Acknowledgments and causal fanout are released only after the durability barrier.
+                    events.forEach { _committed.emit(it) }
+                    batch.zip(results).forEach { (cmd, result) -> cmd.reply?.complete(result) }
+                } catch (failure: Throwable) {
+                    batch.forEach { it.reply?.completeExceptionally(failure) }
+                    intake.close(failure)
+                    while (true) (intake.tryReceive().getOrNull() ?: break).reply?.completeExceptionally(failure)
+                    throw failure
                 }
-                if (dirty) wal?.flush()
             }
         }
     }
 
     override suspend fun drain() {
         intake.close()
-        wal?.flush()
+        withContext(Dispatchers.IO) { wal?.flush() }
         super.drain()
     }
 
     // ── the spine (single consumer; also the replay path with durable=false) ──
 
-    private suspend fun applyOne(incoming: Map<*, *>, durable: Boolean, replaySeq: Long? = null): BoardApply {
+    private suspend fun applyOne(incoming: Map<*, *>, durable: Boolean, replaySeq: Long? = null, pending: MutableList<BoardCommitted>? = null): BoardApply {
         // Delta (reaper): the transition clock is part of the WAL truth. The live path
         // stamps `atMs` into the raw map before it is serialized, and advanceRow reads
         // it back — so a replay re-derives the SAME lastMoveMs. Before this, replay
@@ -251,16 +267,18 @@ class BoardStoreElement(
 
         // Durable truth: the raw command map, canonical-serialized once, CAS-addressed.
         val bytes = JsonSupport.stringify(raw).encodeToByteArray()
-        val cid = cas.put(bytes)
-        val seq = replaySeq
-            ?: if (durable && wal != null) wal.append("$jobId\t${cid.value}".encodeToByteArray())
-            else sequence + 1
+        val (cid, seq) = withContext(Dispatchers.IO) {
+            val cid = cas.put(bytes)
+            cid to (replaySeq
+                ?: if (durable && wal != null) wal.append("$jobId\t${cid.value}".encodeToByteArray())
+                else sequence + 1)
+        }
         if (seq > sequence) sequence = seq
 
         projection.applyCommit(jobId, snapshot, cid)
 
         val prev = rows[jobId]
-        val row = advanceRow(prev, jobId, raw, lowered, snapshot, seq)
+        val row = advanceRow(prev, jobId, raw, lowered, snapshot, seq)?.copy(commandCid = cid)
         rows = if (row == null) rows - jobId else rows + (jobId to row)
 
         // Positional insert: a move carrying beforeJobId lands BETWEEN cards, not
@@ -290,7 +308,7 @@ class BoardStoreElement(
             parent = row?.parent ?: "",
             atMs = (raw["atMs"] as? Number)?.toLong() ?: 0L,
         )
-        _committed.tryEmit(event)
+        if (pending != null) pending.add(event)
         return BoardApply.Committed(jobId, seq, snapshot.revision, lowered.idempotencyKey, cid)
     }
 

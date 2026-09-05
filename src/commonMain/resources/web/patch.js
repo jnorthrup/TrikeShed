@@ -574,12 +574,13 @@ function renderConcentric(n){
     '<span class="seg'+(i===crumb.length-1?' here':'')+'" data-sheet="'+esc(s.id)+'">'+esc(s.title||s.id)+'</span>'
   ).join(' ▸ ')+'</div>';
   const kids=Object.values(idx).filter(s=>s.parent===cur.id);
+  if(cur.truncated)html+='<div class="kboard-status" role="status">Partial projection: '+esc(cur.limit||'limit')+'</div>';
   if(kids.length) html+='<div class="ringrow">'+kids.map(s=>
     '<span class="dagchip" data-sheet="'+esc(s.id)+'">▤ '+esc(s.title||s.id)+' <i>'+(s.rows||[]).length+'</i></span>'
   ).join('')+'</div>';
   if(!(cur.rows||[]).length) html+='<div class="kboard-status">empty sheet — '+(cur.columns||[]).map(c=>esc(c.name)).join(' · ')+'</div>';
   else html+='<div class="tablewrap"><table><tr>'+(cur.columns||[]).map(c=>'<th title="'+esc(c.type||'')+'">'+esc(c.name)+'</th>').join('')+'</tr>'+
-    cur.rows.map(row=>'<tr>'+row.map(cell=>{
+    cur.rows.slice(0,1024).map(row=>'<tr>'+row.slice(0,64).map(cell=>{
       if(cell&&typeof cell==="object"&&cell.sheet){
         const child=idx[cell.sheet];
         return '<td><span class="dagchip" data-sheet="'+esc(cell.sheet)+'">▤ '+esc(child?(child.title||child.id):cell.sheet)+'</span></td>';
@@ -1173,7 +1174,7 @@ function buildNode(n){
     });
     lbl.addEventListener("dblclick",ev=>{
       ev.stopPropagation();
-      if(typeof Harness!=="undefined") { Harness.focusElement(n.el); return; }
+      if(typeof Harness!=="undefined") { Harness.focusNode(n); return; }
       const W=parseFloat(rw.style.width)||grid.clientWidth||1, H=parseFloat(rw.style.height)||grid.clientHeight||1;
       const z=Math.min(grid.clientWidth/W,grid.clientHeight/H)||1;
       n._view={x:0,y:0,z}; applyRingView(n); redraw();
@@ -2155,7 +2156,7 @@ async function showMateMenu(cx,cy,srcNode,srcPort,wx,wy,scope,dir){
   setTimeout(()=>q.focus(),0);
 }
 /* ── pan / zoom ────────────────────────────────────────────────────────── */
-function applyView(){ world.style.transform=`translate(${view.x}px,${view.y}px) scale(${view.z})`; document.body.classList.toggle("zoomed-out",view.z<.45); if(typeof Landscape!=="undefined")Landscape.schedule(); }
+function applyView(){ world.style.transform=`translate(${view.x}px,${view.y}px) scale(${view.z})`; document.body.classList.toggle("zoomed-out",view.z<.45); if(typeof Landscape!=="undefined")Landscape.schedule(); if(typeof Harness!=="undefined")Harness.rememberView(); }
 /* momentum — ported from graal.html's kinetic camera. Pan velocity in SCREEN
    px/ms (the harness camera IS a screen translate, so it applies directly);
    zoom velocity in log-scale per 16.7ms, anchored at the last wheel point so
