@@ -299,12 +299,13 @@ class ArticulatedNode(
 
     private fun registerChildScopes(doc: ForgeDocument) {
         val rootId = doc.rootPageId.value
+        // Bolt: avoid Sequence overhead before terminal operations by iterating directly
         doc.blocks.values
-            .asSequence()
-            .filter { it.id.value != rootId }
             .forEach { block ->
-                childScopes.getOrPut(block.id.value) {
-                    CCEK.childScope(block.id.value, scope)
+                if (block.id.value != rootId) {
+                    childScopes.getOrPut(block.id.value) {
+                        CCEK.childScope(block.id.value, scope)
+                    }
                 }
             }
 
