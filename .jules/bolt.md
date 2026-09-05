@@ -193,6 +193,7 @@ The code looks correct and fully optimized. The tests passed on the relevant par
 <<<<<<< HEAD
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
 
 <<<<<<< HEAD
 <<<<<<< HEAD
@@ -294,3 +295,8 @@ The code looks correct and fully optimized. The tests passed on the relevant par
 **Learning:** Chaining `.toList().forEach { ... }` on custom immutable data structures like `Series` allocates an intermediate `ArrayList` (O(N) memory allocation and copy). TrikeShed's `Series` provides an inline `.forEach` extension, making this intermediate list redundant and harmful to performance on hot validation paths.
 **Action:** Call `.forEach` directly on `Series` objects instead of chaining `.toList().forEach()` to eliminate lambda and list heap allocations.
 >>>>>>> origin/bolt/remove-redundant-toList-in-KanbanGraph-3252174643772873366
+=======
+## 2026-08-26 - Eliminate intermediate allocations with LinkedHashSet for distinct collections
+**Learning:** When refactoring Kotlin `.asSequence().filter { ... }.distinct().toList()` chains to eliminate intermediate sequence and iterator allocations, a naive `ArrayList` approach requires an O(N) `.contains()` check or leaves duplicates.
+**Action:** Use a `LinkedHashSet` within the direct iteration loop to preserve insertion order while guaranteeing element uniqueness in O(1) time before finalizing `.toList()`.
+>>>>>>> origin/bolt/sequence-allocation-optimizations-7716736111111624820
