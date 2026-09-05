@@ -1,10 +1,33 @@
 :root{--bg:#111315;--panel:#1c2022;--panel2:#24292c;--line:#3c4448;--ink:#e9eeee;--dim:#a0adb1;--graal:#64ceca}
+#argumentInspector{margin:auto;width:min(940px,calc(100vw - 24px));max-height:calc(100dvh - 24px);overflow:auto;padding:16px;background:var(--panel);color:var(--ink);border:1px solid var(--line);border-radius:4px}
+#argumentInspector::backdrop{background:#0008}
+#argumentInspector form{float:right}
+#argumentInspector h2{font-size:18px;margin:0 40px 14px 0;overflow-wrap:anywhere}
+#argumentInspector h3{font-size:13px;margin:14px 0 8px}
+.argument-table{overflow:auto}
+.argument-table table{width:100%;border-collapse:collapse;font-size:12px;table-layout:fixed}
+.argument-table th,.argument-table td{text-align:left;padding:7px;border-bottom:1px solid var(--line);overflow-wrap:anywhere;vertical-align:top}
+.argument-table input:not([type=checkbox]){width:100%;min-width:75px}
+#argumentInspector input{background:var(--bg);color:var(--ink);border:1px solid var(--line);padding:5px;border-radius:2px}
+.argument-actions{display:flex;gap:8px;margin-top:8px}
+.argument-actions input{min-width:0;flex:1}
+#argumentError{color:var(--err);margin-top:8px}
+#argumentReceipt{font-size:11px;overflow-wrap:anywhere;color:var(--dim)}
+@media(max-width:600px){.argument-table table{min-width:620px}}
 *{letter-spacing:0!important}
 #bar{height:52px;background:#181c1e;gap:7px;overflow-x:auto;white-space:nowrap}
 #bar b{color:var(--ink);font-size:14px;flex-shrink:0}
 #connection{font-size:11px;color:var(--dim)}
 #connection.live{color:var(--ok)}
 #bar button{padding:5px 8px;flex-shrink:0}
+#bar #parentHandle{max-width:220px;overflow:hidden;text-overflow:ellipsis;cursor:grab;border-color:#dfbc68;touch-action:none}
+#parentTools{display:flex;align-items:center;gap:7px;flex-shrink:0}
+@media(max-width:600px){#bar #parentHandle{max-width:150px}}
+#parentHandle:active,.selected-parent>.ringlbl:active{cursor:grabbing}
+.node.selected-parent{outline:2px solid #dfbc68;outline-offset:3px}
+.node.selected-parent>.ringlbl{color:#dfbc68;cursor:grab;touch-action:none}
+.territory.active-program.selected-parent{border-color:#dfbc68}
+.territory.active-program>header{cursor:grab;touch-action:none}
 #programSelect{background:var(--panel);color:var(--ink);border:1px solid var(--line);padding:6px;width:190px;min-width:130px;border-radius:4px}
 #status{position:fixed;bottom:0;left:0;right:0;background:#181c1e;border-top:1px solid var(--line);padding:4px 12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;z-index:25}
 #bar #stopBtn,#bar #storeLoadBtn,#bar #presetsBtn,#bar #rdfBtn,#bar #exportBtn,#bar #importBtn,#bar #clearBtn,#bar #qsBtn,#bar #fbBtn,#bar .sub{display:none}
@@ -14,6 +37,30 @@
 #world{isolation:isolate;left:0;top:0}
 #landscape{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}
 #terrainLayer{background:var(--panel);border:1px solid var(--line);color:var(--ink);border-radius:4px;padding:6px}
+#topologyLegend{position:absolute;top:96px;left:10px;z-index:24;width:228px;max-width:calc(100vw - 20px);max-height:calc(100dvh - 135px);overflow:auto;background:#181c1ef2;border:1px solid var(--line);border-radius:4px;color:var(--ink);font:12px var(--sans)}
+#topologyLegend summary{padding:8px;cursor:pointer;font-weight:600}
+#topologyCount{float:right;font-weight:400;font-variant-numeric:tabular-nums;color:var(--dim)}
+#topologyCategories,#activityCategories{padding:0 8px 6px}
+#topologyLegend label{display:grid;grid-template-columns:16px 9px minmax(0,1fr) 40px;gap:7px;align-items:center;min-height:28px;cursor:pointer}
+#topologyLegend input{margin:0;accent-color:#64ceca}
+#topologyLegend i{width:8px;height:8px}
+#topologyLegend output{text-align:right;font-variant-numeric:tabular-nums;color:var(--dim)}
+.legend-section{border-top:1px solid var(--line)}
+#activitySelection{display:block;width:calc(100% - 16px);margin:0 8px 6px;text-align:left;white-space:normal;overflow-wrap:anywhere;font:11px var(--sans);padding:6px}
+.activity-lamp{position:absolute;right:4px;bottom:4px;width:18px;height:18px;min-width:18px;padding:0!important;border:1px solid var(--activity-color)!important;border-radius:50%;background:#15191b!important;color:var(--activity-color)!important;font:12px/14px var(--mono);z-index:8;pointer-events:auto}
+.territory>.activity-lamp{top:3px;bottom:auto}
+.node>.activity-lamp{right:28px}
+body.zoomed-out .territory.active-program>.activity-lamp{visibility:visible}
+.node.activity-muted:not(.scope)>:not(.activity-lamp):not(.childgrid),.node.scope.activity-muted>.ringlbl,.node.scope.activity-muted>.hd,.territory.activity-muted>header,.fact-row.activity-muted,.fact-cell.activity-muted{opacity:.2}
+.activity-muted>.activity-lamp{opacity:.25}
+.fact-row[data-activity]{border-left:3px solid var(--activity-color);padding-left:6px}
+.fact-cell[data-activity]{box-shadow:inset 0 0 0 1px var(--activity-color)}
+.activity-ref{stroke:#7bb7c8;stroke-width:1.5;fill:none;stroke-dasharray:3 5}
+@media(prefers-reduced-motion:no-preference){[data-activity=operational]>.activity-lamp{animation:activity-pulse 1.8s ease-in-out infinite}@keyframes activity-pulse{50%{box-shadow:0 0 0 3px #69cd9233}}}
+#topologyLegend footer{display:flex;gap:8px;padding:8px;border-top:1px solid var(--line);align-items:flex-start}
+#topologyLegend footer button{flex:none;width:28px;height:28px;padding:0;font-size:18px}
+#topologyLegend footer div{min-width:0}
+#topologyLegend p{font-size:10px;line-height:1.4;margin:0;overflow-wrap:anywhere;color:var(--dim)}
 .territory.objects{background:none;pointer-events:none}
 .territory.active-program{border-color:#396361}
 .territory.active-program.selected{border-color:#64ceca}
@@ -66,6 +113,18 @@ body.zoomed-out #wires text.wiretype{display:none}
 #activity{position:absolute;top:86px;bottom:25px;right:0;width:290px;border-left:1px solid var(--line);background:#181c1e;overflow:auto;padding:12px;user-select:text}
 #activity>header{display:flex;justify-content:space-between;gap:8px;margin-bottom:12px;font-size:12px}
 #boardCount{color:var(--dim);font-size:11px}
+#connections{border-bottom:1px solid var(--line);padding-bottom:12px;margin-bottom:12px}
+#connections h3{font-size:13px;margin-bottom:6px}
+#connections p{font-size:12px;white-space:normal;overflow-wrap:anywhere;margin-bottom:8px}
+.connection-row{display:grid;grid-template-columns:minmax(0,1fr) 28px;gap:4px;padding:7px 0;border-top:1px solid var(--line)}
+.connection-row span{grid-column:1;font-size:11px;color:var(--dim);overflow-wrap:anywhere}
+.connection-focus{text-align:left;font:12px var(--mono);border:0;background:none;padding:0;white-space:normal;overflow-wrap:anywhere}
+.connection-mate{grid-column:2;grid-row:1 / span 2;width:28px;height:28px;padding:0;align-self:center}
+.connection-row.dead .connection-focus,.connection-row.scope .connection-focus{color:var(--err)}
+.connection-row.open .connection-focus{color:var(--warn)}
+.connection-row.ok .connection-focus{color:var(--ok)}
+.port.v-binding{outline:1px solid var(--graal)}
+.vmark.binding,.vmark.optional{display:none}
 .event-row{width:100%;text-align:left;border:0;border-bottom:1px solid var(--line);background:none;border-radius:0;padding:10px 0;overflow:hidden}
 .event-row b,.event-row small{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .event-row b{font:11px var(--mono)}.event-row small{color:var(--dim);font-size:10px;margin-top:3px}
@@ -73,7 +132,7 @@ body.zoomed-out #wires text.wiretype{display:none}
 .run-result.error{color:var(--err)}
 dialog{margin:auto;width:min(1100px,94vw);max-height:80vh;background:var(--panel);color:var(--ink);border:1px solid var(--line);border-radius:6px;padding:20px;user-select:text}
 dialog::backdrop{background:#0008}dialog form{float:right}dialog h2{font:14px var(--mono);overflow-wrap:anywhere;margin-bottom:12px}dialog p{color:var(--dim);font-size:12px;margin-bottom:10px}dialog pre{font:12px/1.5 var(--mono);white-space:pre-wrap;overflow-wrap:anywhere}
-@media(max-width:900px){#activity{width:220px}#viewport{right:220px}#panelName,#keysBtn,#shakeBtn,#connection{display:none!important}}
+@media(max-width:900px){#activity{width:220px}#viewport{right:220px}#panelName,#keysBtn,#connection{display:none!important}}
 @media(max-width:600px){#activity{top:auto;height:145px;width:100%;border-left:0;border-top:1px solid var(--line)}#viewport{right:0;bottom:170px}#events{display:flex;gap:16px;overflow-x:auto}#events .event-row{min-width:190px;max-width:210px}#bar b{font-size:12px}#programSelect{width:140px}#activity>header{margin-bottom:4px}}
 @media(prefers-reduced-motion:reduce){*{animation:none!important}}
 /* Sheets in the inspector: patch.js's concentric treesheet renderer (renderConcentric) on a

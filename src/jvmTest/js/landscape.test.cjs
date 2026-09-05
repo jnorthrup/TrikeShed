@@ -24,6 +24,7 @@ function fixture() {
   const context = vm.createContext({
     document:{getElementById:element}, $:selector=>element(selector.slice(1)),
     URL, URLSearchParams, AbortController, TextDecoder, Uint8Array,
+    G:{nodes:[],wires:[]},
     fetch:async()=>{throw Error("unexpected fetch");},
   });
   vm.runInContext(fs.readFileSync(path.join(web,"landscape.js"),"utf8")+"\nglobalThis.landscape=Landscape;",context);
@@ -31,6 +32,192 @@ function fixture() {
   vm.runInContext(harness+"\nglobalThis.harness=Harness;",context);
   return {context, landscape:context.landscape, harness:context.harness, element};
 }
+
+test("Shake reuses verdict rendering with program-local identities and no-op preserves nodes",async()=>{
+  const {context,harness,element}=fixture();
+  const node={id:"scope-demo::arg",_program:"scope-demo",el:{classList:{add(){}}}};
+  context.G={nodes:[node],wires:[]};context.VERDICTS=[];context.STARVED=new Set();context.SHAKE_REACH=340;
+  context.clearVerdicts=()=>{context.VERDICTS=[];};context.markPort=()=>{};context.buildVerdicts=()=>{};
+  let saves=0,report;
+  context.save=()=>{saves++;};context.redraw=()=>{};
+  harness.showConnections=(name,result)=>{report={name,result};};
+  const patch=fs.readFileSync(path.join(web,"patch.js"),"utf8");
+  vm.runInContext(patch.slice(patch.indexOf("function applyServerTreeShake("),patch.indexOf("function localTreeshake(")),context);
+  harness.selected="scope-demo";harness.document=()=>({nodes:[{id:"arg"}],wires:[]});
+  harness.replaceSelected=()=>assert.fail("no-op must not remount nodes");
+  context.fetch=async()=>({ok:true,json:async()=>({ok:true,made:[],verdicts:[{nodeId:"arg",dir:"out",port:"value",status:"binding",label:"Default binding: hello"}],starved:[]})});
+  await harness.shake();
+  assert.equal(saves,0);assert.equal(context.G.nodes[0],node);
+  assert.equal(report.name,"scope-demo");assert.equal(report.result.verdicts[0].nodeId,node.id);
+  assert.match(element("status").textContent,/No cables changed/);
+  assert.match(element("status").textContent,/No required cable gaps/);
+  assert.equal(element("shakeBtn").disabled,false);
+  context.document.querySelectorAll=()=>[];context.portCenter=()=>null;context.CSS={escape:value=>value};
+  context.applyServerTreeShake({made:[{fromNode:"source",fromPort:"value",toNode:"arg",toPort:"text"}],verdicts:[],starved:[]},false,"scope-demo");
+  assert.equal(saves,1);
+  assert.equal(context.G.wires[0].from[0],"scope-demo::source");
+  assert.equal(context.G.wires[0].to[0],"scope-demo::arg");
+});
+
+test("Shake refuses stale results after editing or changing the selected parent",async()=>{
+  for(const change of ["edit","select","parent"]){
+    const {context,harness,element}=fixture();
+    harness.selected="a";let revision=1,release;
+    harness.document=()=>({revision});
+    context.fetch=()=>new Promise(resolve=>{release=resolve;});
+    context.applyServerTreeShake=()=>assert.fail("stale result applied");
+    const pending=harness.shake();
+    if(change==="edit")revision++;else if(change==="parent")harness.parentRevision++;else harness.selected="b";
+    release({ok:true,json:async()=>({ok:true,made:[]})});
+    await pending;
+    assert.match(element("status").textContent,/changed during the check/);
+    assert.equal(harness.shaking,false);
+  }
+});
+
+function parentFixture(){
+  const f=fixture(),{context,harness,element}=f;
+  const node=(id,parent=null,ring=false)=>({id:"a::"+id,_localId:id,_program:"a",x:60,y:80,_parentScope:parent,
+    _childHost:ring?{}:null,_view:{z:.5},children:[],el:{style:{},offsetWidth:200,offsetHeight:100,classList:{toggle(){}},}});
+  const outer=node("outer",null,true),inner=node("inner",outer,true),leaf=node("leaf",inner),peer=node("peer",inner),other=node("other");
+  outer.children=[inner];inner.children=[leaf,peer];context.G={nodes:[outer,inner,leaf,peer,other],wires:[]};
+  harness.selected="a";harness.mounts.set("a",{x:10,y:20});harness.setParent(inner);
+  context.LandscapeNavigation=navigation;context.view={x:0,y:0,z:2};context.redraw=()=>{};harness.schedule=()=>{};
+  context.nodeDoc=n=>({id:n.id,type:n.type,x:n.x,y:n.y});
+  const patch=fs.readFileSync(path.join(web,"patch.js"),"utf8");
+  vm.runInContext(patch.slice(patch.indexOf("function ringScaleOf("),patch.indexOf("function resizeParentFrames(")),context);
+  return {...f,outer,inner,leaf,peer,other,patch};
+}
+
+test("Fit, FD, Shake and drag resolve one stable parent handle",async()=>{
+  const {context,harness,element,outer,inner,leaf,peer,other,patch}=parentFixture();
+  assert.equal(harness.parentTarget().node,inner);
+  for(const id of ["fitBtn","fdBtn","shakeBtn"])assert.match(element(id).title,/a \/ outer \/ inner/);
+  let focused,saves=0,resized,request;
+  harness.focusElement=el=>{focused=el;};harness.fit(false);assert.equal(focused,inner.el);
+  context.resizeParentFrames=node=>{resized=node;};context.save=()=>{saves++;};context.requestAnimationFrame=fn=>fn();context.fitToContent=()=>harness.fit(false);
+  vm.runInContext(patch.slice(patch.indexOf("function fdLayout("),patch.indexOf("/* TREESHAKE")),context);
+  const untouched=[outer,inner,other].map(n=>[n.x,n.y]);
+  context.fdLayout();assert.equal(resized,inner);assert.equal(focused,inner.el);assert.equal(saves,1);
+  assert.deepEqual([outer,inner,other].map(n=>[n.x,n.y]),untouched);
+  harness.document=()=>({nodes:[{id:"outer",children:[{id:"inner",children:[{id:"leaf"}]}]}],wires:[{from:["other","value"],to:["leaf","x"]}]});
+  context.fetch=async(url,options)=>{request=JSON.parse(options.body);return {ok:true,json:async()=>({ok:true,parentId:"inner"})};};
+  let applied=false;context.applyServerTreeShake=()=>{applied=true;};await harness.shake();
+  assert.equal(request.options.parentId,"inner");assert.equal(request.program.wires.length,1);assert.equal(applied,true);
+  const listeners=new Map();context.addEventListener=(k,v)=>listeners.set(k,v);context.removeEventListener=k=>listeners.delete(k);
+  const start={button:0,clientX:0,clientY:0,preventDefault(){},stopPropagation(){}};
+  const before={x:inner.x,y:inner.y,leaf:leaf.x};harness.dragParent(start);
+  listeners.get("pointermove")({clientX:20,clientY:10});listeners.get("pointerup")();
+  assert.equal(inner.x,before.x+20);assert.equal(inner.y,before.y+10);assert.equal(leaf.x,before.leaf);
+  assert.equal(saves,2);assert.equal(harness.parentTarget().node,inner);assert.equal(listeners.size,0);
+  harness.dragParent(start,leaf);listeners.get("pointermove")({clientX:20,clientY:10});listeners.get("pointercancel")();
+  assert.equal(leaf.x,before.leaf);assert.equal(saves,2);
+  // Remounts replace node objects but not the selected identity.
+  const replacement={...inner};context.G.nodes=context.G.nodes.map(n=>n===inner?replacement:n);
+  assert.equal(harness.parentTarget().node,replacement);
+  harness.selected="b";assert.equal(harness.parentTarget().handle.nodeId,null);
+});
+
+test("main-handle drag is assembly placement, not a document edit",()=>{
+  const {context,harness,outer,other}=parentFixture();harness.setParent(null);
+  const listeners=new Map();context.addEventListener=(k,v)=>listeners.set(k,v);context.removeEventListener=k=>listeners.delete(k);
+  context.save=()=>assert.fail("main placement must not create a draft");
+  const origin=harness.mounts.get("a"),local=[outer.x-origin.x,other.y-origin.y];
+  harness.dragParent({button:0,clientX:0,clientY:0,preventDefault(){},stopPropagation(){}});
+  listeners.get("pointermove")({clientX:20,clientY:40});listeners.get("pointerup")();
+  assert.deepEqual([outer.x-origin.x,other.y-origin.y],local);assert.equal(origin.x,20);assert.equal(origin.y,40);
+  const document=JSON.stringify(harness.document());
+  context.view.z=.203710215;
+  for(let i=0;i<3;i++){
+    harness.dragParent({button:0,clientX:0,clientY:0,preventDefault(){},stopPropagation(){}});
+    listeners.get("pointermove")({clientX:37,clientY:19});listeners.get("pointerup")();
+    assert.equal(JSON.stringify(harness.document()),document);
+  }
+  outer.x+=20;
+  assert.notEqual(JSON.stringify(harness.document()),document,"a genuine local move must still be an edit");
+});
+
+test("Meta-drag captures an occluded parent without retargeting or activating the covered control",()=>{
+  const {context,harness,inner,leaf,other}=parentFixture();
+  const viewportListeners=new Map(),windowListeners=new Map();
+  context.viewport={addEventListener:(name,fn,capture)=>{assert.equal(capture,true);viewportListeners.set(name,fn);}};
+  context.addEventListener=(name,fn)=>windowListeners.set(name,fn);context.removeEventListener=name=>windowListeners.delete(name);
+  let saves=0,stoppedMomentum=0;
+  context.save=()=>{saves++;};context.resizeParentFrames=()=>{};context.killMomentum=()=>{stoppedMomentum++;};
+  const source=fs.readFileSync(path.join(web,"harness.js"),"utf8");
+  vm.runInContext(source.slice(source.indexOf("let parentDragGesture="),source.indexOf("let landscapePress=")),context);
+  const event=extra=>({button:0,metaKey:true,clientX:0,clientY:0,detail:1,
+    target:{closest(){assert.fail("Meta-drag must not hit-test or retarget a covered node/control");}},
+    preventDefault(){this.prevented=true;},stopPropagation(){},stopImmediatePropagation(){this.stopped=true;},...extra});
+  const camera=JSON.stringify(context.view),positions=[inner.x,inner.y,leaf.x,other.x];
+  const down=event();viewportListeners.get("pointerdown")(down);
+  assert.equal(down.stopped,true);assert.equal(down.prevented,true);
+  windowListeners.get("pointermove")({clientX:20,clientY:10});windowListeners.get("pointerup")();
+  assert.equal(harness.parentTarget().node,inner);assert.equal(inner.x,positions[0]+20);assert.equal(inner.y,positions[1]+10);
+  assert.equal(leaf.x,positions[2]);assert.equal(other.x,positions[3]);assert.equal(JSON.stringify(context.view),camera);
+  assert.equal(saves,1);assert.equal(stoppedMomentum,1);
+  for(const name of ["click","dblclick"]){
+    const click=event({metaKey:false,detail:name==="click"?1:2});viewportListeners.get(name)(click);
+    assert.equal(click.prevented,true,"releasing Meta before pointerup must not activate a covered control");assert.equal(click.stopped,true);
+  }
+  const keyboard=event({detail:0});viewportListeners.get("click")(keyboard);assert.equal(keyboard.stopped,undefined);
+  const ordinary=event({metaKey:false,target:{closest:()=>null}});viewportListeners.get("pointerdown")(ordinary);
+  assert.equal(ordinary.stopped,undefined);
+  const click=event({metaKey:false});viewportListeners.get("click")(click);assert.equal(click.stopped,undefined);
+  viewportListeners.get("pointerdown")(event());windowListeners.get("pointermove")({clientX:30,clientY:10});windowListeners.get("pointercancel")();
+  assert.equal(inner.x,positions[0]+20);assert.equal(saves,1);assert.equal(windowListeners.size,0);
+  for(const extra of [{button:2},{button:1}]){
+    const down=event({...extra,target:{closest:()=>null}});viewportListeners.get("pointerdown")(down);assert.equal(down.stopped,undefined);
+  }
+  harness.selected=null;
+  const unselected=event({target:{closest:()=>null}});viewportListeners.get("pointerdown")(unselected);
+  assert.equal(unselected.stopped,undefined);
+});
+
+test("selected parent deletion is explicit and old servers cannot broaden a scoped Shake",async()=>{
+  const {context,harness,element,inner}=parentFixture();
+  harness.document=()=>({nodes:[]});context.fetch=async()=>({ok:true,json:async()=>({ok:true,made:[]})});
+  context.applyServerTreeShake=()=>assert.fail("unconfirmed scope cannot apply");await harness.shake();
+  assert.match(element("status").textContent,/Server did not confirm/);
+  context.G.nodes=context.G.nodes.filter(n=>n!==inner);harness.refreshParent();
+  assert.equal(harness.parentTarget().node,null);assert.match(element("status").textContent,/Selected scope removed/);
+});
+
+test("a failed Shake reports failure and releases its control",async()=>{
+  const {context,harness,element}=fixture();
+  harness.selected="a";harness.document=()=>({nodes:[]});
+  context.fetch=async()=>({ok:false,status:409,json:async()=>({error:"validation conflict"})});
+  await harness.shake();
+  assert.match(element("status").textContent,/Connections refused: validation conflict/);
+  assert.equal(element("shakeBtn").disabled,false);
+});
+
+test("scope sockets follow direct child declarations and retain working drag handlers",()=>{
+  const {context}=fixture();
+  const patch=fs.readFileSync(path.join(web,"patch.js"),"utf8");
+  vm.runInContext(patch.slice(patch.indexOf("function nodeParams("),patch.indexOf("function buildNode(")),context);
+  context.CONTRACTS={scope:{ins:["args?","when?"],outs:["returns"]},"scope.in":{params:{name:{v:""},default:{v:""},kind:{v:""}}}};
+  const authored={name:"text"};
+  assert.equal("default" in context.nodeParams("scope.in",authored),false);
+  assert.equal(context.nodeParams("scope.in",{name:"text",default:""}).default,"");
+  assert.equal("kind" in authored,false);
+  const dom=()=>({children:[],dataset:{},classList:{add(){}},listeners:{},
+    replaceChildren(){this.children=[];},append(...children){this.children.push(...children);},
+    addEventListener(event,fn){this.listeners[event]=fn;}});
+  context.document.createElement=dom;context.nodeKindOf=()=>"*";context.portClass=()=>"";
+  const body=dom(),node={type:"scope",children:[{type:"scope.in",params:{name:"text"}},
+    {type:"scope.out",params:{name:"result"}}, {type:"scope",children:[{type:"scope.in",params:{name:"private"}}]}],el:{querySelector:()=>body}};
+  context.renderNodePorts(node);
+  const ports=body.children.flatMap(row=>row.children.filter(child=>typeof child!=="string"));
+  assert.deepEqual(ports.map(p=>p.dataset.port),["args?","when?","text","returns","result"]);
+  let dragged;
+  context.startWireDrag=(...args)=>{dragged=args;};
+  ports[2].listeners.pointerdown({preventDefault(){},stopPropagation(){}});
+  assert.equal(dragged[0],node);assert.equal(dragged[1],"in");assert.equal(dragged[2],"text");
+  node.children[0].params.name="renamed";context.renderNodePorts(node);
+  assert.equal(body.children.length,5);
+  assert.equal(body.children[2].children[0].dataset.port,"renamed");
+});
 
 test("bookmarks round-trip distinct program, object and local scope identities",()=>{
   const camera={x:-440.5,y:900,z:.012};
@@ -140,6 +327,13 @@ test("scope interiors compound their scales instead of expanding every ancestor"
   }
   assert.equal(context.ringScaleOf(leaf),root._view.z*outer._view.z*inner._view.z);
   assert.equal(leaf.el.offsetWidth,1000);
+  leaf.x=450;leaf.y=180;inner.x=360;inner.y=240;
+  context.layoutRing(root,true);
+  assert.deepEqual([leaf.x,leaf.y,inner.x,inner.y],[450,180,360,240]);
+  for(const n of [root,outer,inner]){
+    assert.ok(parseFloat(n._childHost.style.width)<=560);
+    assert.ok(parseFloat(n._childHost.style.height)<=360);
+  }
 });
 
 test("bounded readers cancel oversized chunked responses without content-length",async()=>{

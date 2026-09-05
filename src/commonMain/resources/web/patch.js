@@ -808,12 +808,81 @@ function ringDepth(n){
    Child x/y are RING-LOCAL and derived — this pass owns them; world-space
    math (spine, minimap, topo) iterates top-level nodes only. */
 const RING_EDGE=26, RING_GAP=18;
-function layoutRing(n){
+// Presentation sizes survive board remounts, but never enter executable documents.
+const NODE_FRAMES=new Map();
+function applyNodeFrame(n){
+  if(!n._frame)return;
+  if(n._childHost){
+    const w=parseFloat(n._ringWorld.style.width)||1,h=parseFloat(n._ringWorld.style.height)||1;
+    n._view={x:0,y:0,z:Math.min(n._frame.w/w,n._frame.h/h)};
+    n.el.style.width="";
+    applyRingView(n);
+  }else{
+    n.el.style.width=n._frame.w+"px";
+    n.el.style.minHeight=n.collapsed?"":n._frame.h+"px";
+  }
+}
+function resizeNode(event,n){
+  if(event.button!==0||n.collapsed)return;
+  event.preventDefault();event.stopPropagation();
+  if(typeof Harness!=="undefined")Harness.selectParent(n);
+  if(typeof killMomentum==="function")killMomentum();
+  const revision=typeof Harness!=="undefined"?Harness.parentRevision:null;
+  const handle=event.currentTarget,scale=view.z*ringScaleOf(n);
+  if(!(scale>0))return;
+  const box=n._childHost||n.el,old=n._frame,oldView={...n._view};
+  const styles=[n.el,n._childHost,n._ringWorld].filter(Boolean).map(el=>[el,el.style.cssText]);
+  const start={w:box.offsetWidth,h:box.offsetHeight,x:event.clientX,y:event.clientY};
+  let moved=false,finished=false;
+  const stale=()=>!G.nodes.includes(n)||(typeof Harness!=="undefined"&&Harness.parentRevision!==revision);
+  const move=e=>{
+    if(e.pointerId!==event.pointerId)return;
+    if(stale())return finish(true);
+    if(!moved&&Math.hypot(e.clientX-start.x,e.clientY-start.y)<3)return;
+    moved=true;
+    n._frame={w:Math.max(160,Math.min(1600,start.w+(e.clientX-start.x)/scale)),h:Math.max(80,Math.min(1200,start.h+(e.clientY-start.y)/scale))};
+    applyNodeFrame(n);redraw();
+  };
+  const finish=cancelled=>{
+    if(finished)return;finished=true;
+    removeEventListener("pointermove",move);removeEventListener("pointerup",up);removeEventListener("pointercancel",cancel);removeEventListener("keydown",key);
+    handle.removeEventListener("lostpointercapture",cancel);
+    if(handle.hasPointerCapture(event.pointerId))handle.releasePointerCapture(event.pointerId);
+    if(cancelled||stale()){
+      n._frame=old;n._view=oldView;
+      for(const [el,css] of styles)el.style.cssText=css;
+    }else if(moved){
+      NODE_FRAMES.delete(n.id);NODE_FRAMES.set(n.id,{type:n.type,...n._frame});
+      if(NODE_FRAMES.size>1024)NODE_FRAMES.delete(NODE_FRAMES.keys().next().value);
+      resizeParentFrames(n._parentScope);
+    }
+    redraw();if(typeof Harness!=="undefined")Harness.schedule();
+  };
+  const up=e=>{if(e.pointerId===event.pointerId)finish(false);};
+  const cancel=()=>finish(true),key=e=>{if(e.key==="Escape"){e.preventDefault();finish(true);}};
+  handle.setPointerCapture(event.pointerId);handle.addEventListener("lostpointercapture",cancel);
+  addEventListener("pointermove",move);addEventListener("pointerup",up);addEventListener("pointercancel",cancel);addEventListener("keydown",key);
+}
+function toggleNodeCollapsed(n,button){
+  if(typeof Harness!=="undefined")Harness.selectParent(n);
+  n.collapsed=!n.collapsed;n.el.classList.toggle("collapsed",n.collapsed);
+  button.textContent=n.collapsed?"\u25b8":"\u25be";
+  button.setAttribute("aria-expanded",String(!n.collapsed));
+  button.setAttribute("aria-label",n.collapsed?"Expand node":"Collapse node");
+  button.title=n.collapsed?"Expand node":"Collapse node (keep contents)";
+  applyNodeFrame(n);resizeParentFrames(n._parentScope);redraw();save();
+}
+function layoutRing(n,preserve=false){
   const kids=(n.children||[]).filter(c=>c.el);
   const rings=kids.filter(c=>c.children&&c.children.length);
-  for(const r of rings) layoutRing(r);              // inward first — post-order
+  for(const r of rings) layoutRing(r,preserve);     // inward first — post-order
   // Moving into a scaled host must not change shrink-to-fit widths mid-layout.
   if(typeof Harness!=="undefined")for(const c of kids)c.el.style.width=(c.el.offsetWidth||210)+"px";
+  if(preserve&&n._ringWorld){
+    for(const c of kids){c.el.classList.add("inring");c.el.style.position="absolute";c.el.style.left=c.x+"px";c.el.style.top=c.y+"px";n._ringWorld.appendChild(c.el);}
+    resizeParentFrames(n,false);
+    return {w:parseFloat(n._ringWorld.style.width),h:parseFloat(n._ringWorld.style.height)};
+  }
   const sizes=new Map(kids.map(c=>[c,{w:c.el.offsetWidth||210,h:c.el.offsetHeight||96}]));
   const ins=kids.filter(c=>c.type==="scope.in");
   const outs=kids.filter(c=>c.type==="scope.out");
@@ -836,6 +905,7 @@ function layoutRing(n){
     // applyRingView sizes the frame from the world × this ring's zoom, so the
     // floor is never re-set to the unscaled W/H behind a zoomed interior.
     applyRingView(n);
+    applyNodeFrame(n);
   } else {
     host.style.minWidth=W+"px"; host.style.minHeight=H+"px";
   }
@@ -859,6 +929,18 @@ function layoutRing(n){
 /* per-ring camera: each ring window carries its own {x,y,z} — the fractal
    physics. Outer scales compound, so pointer math divides by the product. */
 function ringScaleOf(m){ let s=1,q=m._parentScope; while(q){ s*=((q._view&&q._view.z)||1); q=q._parentScope; } return s; }
+// Resize only the affected ancestry; never rearrange a sibling's interior.
+function resizeParentFrames(parent,ancestors=true){
+  for(let n=parent;n;n=ancestors?n._parentScope:null){
+    if(!n._ringWorld)continue;
+    const children=n.children||[];
+    const w=Math.max(1,...children.map(c=>c.x+(c.el?.offsetWidth||200)+RING_EDGE));
+    const h=Math.max(1,...children.map(c=>c.y+(c.el?.offsetHeight||100)+RING_EDGE));
+    n._ringWorld.style.width=w+"px";n._ringWorld.style.height=h+"px";
+    n._view={x:0,y:0,z:Math.min(1,560/w,360/h)};applyRingView(n);
+    applyNodeFrame(n);
+  }
+}
 function applyRingView(n){
   const v=n._view||{x:0,y:0,z:1};
   if(!n._ringWorld) return;
@@ -916,9 +998,9 @@ function syncRingFrame(n){
   const z=v.z||1;
   const w=parseFloat(rw.style.width)||0, h=parseFloat(rw.style.height)||0;
   if(!w||!h) return;
-  if(typeof Harness!=="undefined"){
+  if(typeof Harness!=="undefined"||n._frame){
     host.style.minWidth="0";host.style.minHeight="0";
-    host.style.width=Math.ceil(w*z)+"px";host.style.height=Math.ceil(h*z)+"px";
+    host.style.width=Math.ceil(n._frame?.w||w*z)+"px";host.style.height=Math.ceil(n._frame?.h||h*z)+"px";
     return;
   }
   /* The pan counts. Sizing to w*z alone described a world pinned at the frame's
@@ -935,7 +1017,7 @@ function syncRingFrame(n){
 function refreshRingChrome(n){
   const d=ringDepth(n);
   const lbl=n.el&&n.el.querySelector(":scope > .ringlbl");
-  if(lbl) lbl.innerHTML=`◍ D${d} <i>LcncScopeFrame${d>0?" r"+d:" root"} · bindings·outputs</i>`;
+  if(lbl){lbl.textContent=`D${d} ${n._localId||n.id}`;lbl.title="Scope depth "+d+"; arguments enter bindings, child yields form returns";}
   const t=CONTRACTS[n.type]||{ins:[],outs:[]};
   const inNames=(n.children||[]).filter(c=>c.type==="scope.in").map(c=>(c.params&&c.params.name)||"?");
   const outNames=(n.children||[]).filter(c=>c.type==="scope.out").map(c=>(c.params&&c.params.name)||"?");
@@ -943,6 +1025,7 @@ function refreshRingChrome(n){
   if(seedEl) seedEl.textContent=(t.ins||[]).concat(inNames.map(x=>"in:"+x)).join(" · ");
   const emitEl=n.el&&n.el.querySelector(":scope > .emit");
   if(emitEl) emitEl.textContent=(t.outs||[]).concat(outNames.map(x=>"out:"+x)).join(" · ");
+  renderNodePorts(n);
 }
 function mountChildren(){
   // parent links first (children arrays ship inside the program doc)
@@ -1013,9 +1096,8 @@ function mintId(){
 }
 function addNode(type,x,y,params){
   const t=CONTRACTS[type]; if(!t) return null;
-  const n={id:mintId(),type,x,y,params:{}};
+  const n={id:mintId(),type,x,y,params:nodeParams(type,params)};
   if(typeof Harness!=="undefined") n._program=Harness.selected;
-  for(const k in (t.params||{})) n.params[k]=params?.[k]??t.params[k].v;
   G.nodes.push(n); buildNode(n); redraw(); save(); return n;
 }
 function topRingOf(s){ let q=s; while(q._parentScope) q=q._parentScope; return q; }
@@ -1024,9 +1106,8 @@ function topRingOf(s){ let q=s; while(q._parentScope) q=q._parentScope; return q
    re-lays from its root, and the daemon runs it inside the ring's frame. */
 function addChildNode(scope,type){
   const t=CONTRACTS[type]; if(!t) return null;
-  const n={id:mintId(),type,x:0,y:0,params:{},_parentScope:scope};
+  const n={id:mintId(),type,x:0,y:0,params:nodeParams(type),_parentScope:scope};
   n._program=scope._program;
-  for(const k in (t.params||{})) n.params[k]=t.params[k].v;
   scope.children=scope.children||[]; scope.children.push(n);
   G.nodes.push(n); buildNode(n);
   refreshRingChrome(scope);
@@ -1103,8 +1184,79 @@ function wireKindOk(w){
   if(s._program!==d._program) return false;
   return kindsCompatible(nodeKindOf(s,"out",w.from[1]),nodeKindOf(d,"in",w.to[1]));
 }
+function nodeParams(type,authored={}){
+  const params={...authored};
+  for(const [key,spec] of Object.entries(CONTRACTS[type]?.params||{})){
+    // Absence of a scope default is meaningful: it is not an empty binding.
+    if(params[key]===undefined&&!(type==="scope.in"&&key==="default"))params[key]=spec.v??"";
+  }
+  return params;
+}
+function nodePorts(n,dir){
+  const declared=CONTRACTS[n.type]?.[dir==="in"?"ins":"outs"]||[];
+  if(n.type!=="scope"&&!n.children?.length)return declared;
+  const named=(n.children||[]).filter(c=>c.type===(dir==="in"?"scope.in":"scope.out"))
+    .map(c=>c.params?.name).filter(Boolean);
+  return [...new Set([...declared,...named])];
+}
+// Structural frame projections, not authored cables or evidence of execution.
+function scopeBindingLinks(nodes,wires,limit=512){
+  const links=[],incoming=new Map();
+  for(const w of wires){const key=w.to[0];if(!incoming.has(key))incoming.set(key,new Set());incoming.get(key).add(w.to[1].replace(/\?$/,""));}
+  const add=(scope,child,from,to,kind,label)=>{if(links.length<limit)links.push({scope,child,from,to,kind,label});};
+  for(const scope of nodes){
+    if(links.length>=limit)break;
+    if(scope.type!=="scope"||!scope.children?.length)continue;
+    for(const child of scope.children){
+      if(links.length>=limit)break;
+      const name=child.params?.name?.replace(/\?$/,"");if(!name)continue;
+      if(child.type==="scope.in"){
+        const port=nodePorts(scope,"in").find(p=>p.replace(/\?$/,"")===name);
+        if(port)add(scope,child,[scope.id,"in",port],[child.id,"out","value"],"binding",name+" binding declaration; resolved at runtime from named input, args map or enclosing frame, then default");
+        if(incoming.get(scope.id)?.has("args"))add(scope,child,[scope.id,"in","args?"],[child.id,"out","value"],"argument", "args."+name+" candidate; named input takes precedence; map contents are checked at runtime");
+      }else if(child.type==="scope.out"){
+        const port=nodePorts(scope,"out").find(p=>p.replace(/\?$/,"")===name);
+        if(port)add(scope,child,[child.id,"in","value"],[scope.id,"out",port],"yield", "yield "+name+" only when the child receives a value");
+        add(scope,child,[child.id,"in","value"],[scope.id,"out","returns"],"yield", "collect returns."+name+"; this is a field name, not a constant value");
+      }
+    }
+  }
+  return links;
+}
+function scopePortLabel(n,dir,name){
+  if(n.type!=="scope")return name;
+  if(dir==="in"&&name.replace(/\?$/,"")==="args")return "args? {bindings}";
+  if(dir==="out"&&name==="returns")return "returns {"+(n.children||[]).filter(c=>c.type==="scope.out").map(c=>c.params?.name).filter(Boolean).join(", ")+"}";
+  return name;
+}
+function refreshBindingCaption(n){
+  if(n.type!=="scope.in"&&n.type!=="scope.out")return;
+  const seed=n.el?.querySelector(":scope > .seed"),emit=n.el?.querySelector(":scope > .emit"),name=n.params?.name||"?";
+  if(seed)seed.textContent=n.type==="scope.in"?"binding "+name:"yield "+name;
+  if(emit)emit.textContent=n.type==="scope.in"
+    ?(Object.prototype.hasOwnProperty.call(n.params||{},"default")?"default: "+n.params.default:"from enclosing bindings")
+    :(n._parentScope? (n._parentScope._localId||n._parentScope.id)+".returns."+name:"program returns."+name);
+}
+function renderNodePorts(n){
+  const body=n.el?.querySelector(":scope > .body");if(!body)return;
+  body.replaceChildren();
+  for(const dir of ["in","out"])for(const name of nodePorts(n,dir)){
+    const kind=nodeKindOf(n,dir,name);
+    const row=document.createElement("div");row.className="row "+dir;
+    const port=document.createElement("span");port.className="port "+portClass(n.type,dir,name);
+    port.dataset.dir=dir;port.dataset.port=name;port.dataset.kind=kind||"";
+    port.title=name+": "+(kind==="*"?"generic binding":kind||"untyped");
+    if(CONTRACTS[n.type]?.effect)port.classList.add("fx");
+    port.addEventListener("pointerdown",e=>{e.stopPropagation();e.preventDefault();startWireDrag(n,dir,name,e);});
+    const label=scopePortLabel(n,dir,name);
+    if(dir==="in")row.append(port,label);else row.append(label,port);
+    body.append(row);
+  }
+  refreshBindingCaption(n);
+}
 function buildNode(n){
   const t=CONTRACTS[n.type]; if(!t) return; // vocabulary is server-owned
+  n.params=nodeParams(n.type,n.params);
   const el=document.createElement("div"); el.className="node"; el.dataset.id=n.id; el.dataset.type=n.type; n.el=el;
   // ── CONCENTRIC CONTEXT: a scope node IS a ring square. Its children are
   // real nodes rendered INSIDE it at inset margins — the geometry of
@@ -1118,16 +1270,17 @@ function buildNode(n){
     if(lane) el.dataset.lane=lane.id;
   }
   const hd=document.createElement("div"); hd.className="hd";
-  hd.innerHTML=`<i></i><b>${t.title}</b><s role="button" tabindex="0" aria-label="Collapse node" title="collapse">▤</s><s role="button" tabindex="0" aria-label="Delete node" title="delete">✕</s>`;
+  hd.innerHTML=`<i></i><b>${t.title}</b><button type="button" class="node-collapse" aria-expanded="${!n.collapsed}" aria-label="${n.collapsed?"Expand":"Collapse"} node" title="${n.collapsed?"Expand node":"Collapse node (keep contents)"}">${n.collapsed?"\u25b8":"\u25be"}</button><button type="button" class="node-delete" aria-label="Delete node" title="Delete node and its cables">✕</button>`;
   el.appendChild(hd);
   // the hover blip: asserted / inferred / graal for THIS node, from the daemon
   el.addEventListener("pointerenter",e=>blipEnter(n,e));
   el.addEventListener("pointerleave",blipLeave);
   el.addEventListener("pointermove",blipMove);
   el.addEventListener("pointerdown",blipLeave);
-  const collapse=hd.querySelectorAll("s")[0];
+  const collapse=hd.querySelector(".node-collapse");
   collapse.addEventListener("pointerdown",e=>e.stopPropagation());
-  collapse.addEventListener("click",e=>{ e.stopPropagation(); el.classList.toggle("collapsed"); save(); });
+  collapse.addEventListener("click",e=>{e.stopPropagation();toggleNodeCollapsed(n,collapse);});
+  collapse.addEventListener("dblclick",e=>e.stopPropagation());
   if(isScope){
     // the ring label: the frame identity — name + depth + the Key it runs under
     const depth=ringDepth(n);
@@ -1181,6 +1334,9 @@ function buildNode(n){
       const up2=()=>{ removeEventListener("pointermove",mv2); removeEventListener("pointerup",up2); save(); };
       addEventListener("pointermove",mv2); addEventListener("pointerup",up2);
     });
+    lbl.addEventListener("pointerdown",ev=>{
+      if(typeof Harness!=="undefined"&&ev.button===0){Harness.selectParent(n);Harness.dragParent(ev);}
+    });
     lbl.addEventListener("dblclick",ev=>{
       ev.stopPropagation();
       if(typeof Harness!=="undefined") { Harness.focusNode(n); return; }
@@ -1197,21 +1353,11 @@ function buildNode(n){
     el.appendChild(seed); el.appendChild(emit);
   }
   const body=document.createElement("div"); body.className="body";
-  for(const name of t.ins){
-    const kd=kindOf(n.type,"in",name);
-    const r=document.createElement("div"); r.className="row in"; r.innerHTML=`<span class="port ${portClass(n.type,"in",name)}" data-dir="in" data-port="${name}" data-kind="${kd||""}" title="${name}: ${kd||"untyped — mates with nothing"}"></span>${name}`;
-    body.appendChild(r);
-  }
-  for(const name of t.outs){
-    const kd=kindOf(n.type,"out",name);
-    const r=document.createElement("div"); r.className="row out"; r.innerHTML=`${name}<span class="port ${portClass(n.type,"out",name)}" data-dir="out" data-port="${name}" data-kind="${kd||""}" title="${name}: ${kd||"untyped — mates with nothing"}"></span>`;
-    body.appendChild(r);
-  }
   el.appendChild(body);
+  renderNodePorts(n);
   const ps=document.createElement("div"); ps.className="params";
   for(const k in t.params){
     const def=t.params[k];
-    if(n.params[k]===undefined) n.params[k]=def.v??""; // loaded docs may omit params — never literal "undefined"
     const lab=document.createElement("label"); lab.textContent=k; ps.appendChild(lab);
     if(def.cols&&def.cols.length){
       // LIST widget: rows of {col:value}. The param VALUE is the JSON array
@@ -1289,15 +1435,22 @@ function buildNode(n){
         livePicklist(def.optsFrom).then(list=>{ if(list&&list.length) fill(list); })
           .catch(()=>{});
       }
-      inp.value=n.params[k];
+      inp.value=n.params[k]??"";
     }
-    else if(def.ta){ inp=document.createElement("textarea"); inp.value=n.params[k];
+    else if(def.ta){ inp=document.createElement("textarea"); inp.value=n.params[k]??"";
       // Size to the text: a five-line note in a three-line box is a note cut off
       // at the exact point it was about to say something.
       inp.rows=Math.max(3, Math.min(16, String(n.params[k]??"").split("\n").length)); }
-    else { inp=document.createElement("input"); if(def.ph&&def.ph.startsWith("secret:")) inp.type="password"; inp.value=n.params[k]; }
+    else { inp=document.createElement("input"); if(def.ph&&def.ph.startsWith("secret:")) inp.type="password"; inp.value=n.params[k]??""; }
     if(def.ph) inp.placeholder=def.ph.startsWith("secret:")?def.ph.slice(7):def.ph;
-    inp.addEventListener("input",()=>{ n.params[k]=inp.value; save(); });
+    inp.addEventListener("input",()=>{
+      n.params[k]=inp.value;
+      refreshBindingCaption(n);
+      if(n._parentScope&&["scope.in","scope.out"].includes(n.type)&&["name","kind"].includes(k)){
+        refreshRingChrome(n._parentScope);layoutRing(topRingOf(n._parentScope));redraw();
+      }
+      save();
+    });
     inp.addEventListener("pointerdown",e=>e.stopPropagation());
     // any dragged value drops into a plain param too
     inp.addEventListener("dragover",e=>{ if([...e.dataTransfer.types].includes("text/x-lcnc-value")){ e.preventDefault(); e.stopPropagation(); } });
@@ -1318,14 +1471,26 @@ function buildNode(n){
   if(n.type==="program.ref") el.classList.add("ref");
   if(t.wide) el.classList.add("wide");
   if(n.collapsed) el.classList.add("collapsed");
+  const frame=NODE_FRAMES.get(n.id);
+  if(frame?.type===n.type){n._frame={w:frame.w,h:frame.h};applyNodeFrame(n);}
+  const grip=document.createElement("div");grip.className="node-resize";
+  grip.title="Resize node";grip.setAttribute("aria-label","Resize node");
+  grip.addEventListener("pointerdown",e=>resizeNode(e,n));
+  grip.addEventListener("click",e=>e.stopPropagation());
+  grip.addEventListener("dblclick",e=>e.stopPropagation());el.appendChild(grip);
   el.style.left=n.x+"px"; el.style.top=n.y+"px";
   world.appendChild(el);
-  hd.addEventListener("dblclick",e=>{ e.stopPropagation(); n.collapsed=!n.collapsed; el.classList.toggle("collapsed",n.collapsed); save(); });
-  const sBtn = hd.querySelectorAll("s")[1];
-  sBtn.addEventListener("click",()=>{ removeNode(n.id); });
-  sBtn.addEventListener("keydown",e=>{ if(e.key==="Enter"||e.key===" ") { e.preventDefault(); removeNode(n.id); } });
+  hd.addEventListener("dblclick",e=>{e.stopPropagation();toggleNodeCollapsed(n,collapse);});
+  const sBtn = hd.querySelector(".node-delete");
+  sBtn.addEventListener("pointerdown",e=>e.stopPropagation());
+  sBtn.addEventListener("dblclick",e=>e.stopPropagation());
+  sBtn.addEventListener("click",e=>{e.stopPropagation();if(typeof Harness!=="undefined")Harness.selectParent(n);removeNode(n.id);});
   hd.addEventListener("pointerdown",e=>{
-    if(e.target.tagName==="S")return;
+    if(e.target.closest("button"))return;
+    if(typeof Harness!=="undefined"){
+      if(e.button===0){Harness.selectParent(n);Harness.dragParent(e,n._childHost?null:n);}
+      return;
+    }
     e.stopPropagation();
     const sx=e.clientX,sy=e.clientY,ox=n.x,oy=n.y;
     const sc=view.z*ringScaleOf(n); // a child in a zoomed ring drags in RING units
@@ -1338,15 +1503,6 @@ function buildNode(n){
     };
     const up=()=>{ removeEventListener("pointermove",mv); removeEventListener("pointerup",up); save(); };
     addEventListener("pointermove",mv); addEventListener("pointerup",up);
-  });
-  // effect nodes carry the shape on every one of their ports
-  if(CONTRACTS[n.type] && CONTRACTS[n.type].effect)
-    el.querySelectorAll(".port").forEach(p=>p.classList.add("fx"));
-  el.querySelectorAll(".port").forEach(port=>{
-    port.addEventListener("pointerdown",e=>{
-      e.stopPropagation(); e.preventDefault();
-      startWireDrag(n, port.dataset.dir, port.dataset.port, e);
-    });
   });
 }
 function removeNode(id){
@@ -1515,10 +1671,22 @@ function redraw(){
       wiresSvg.appendChild(label);
     }
   });
+  const projected=typeof Harness==="undefined"?G.nodes:G.nodes.filter(n=>n._program===Harness.selected);
+  for(const link of scopeBindingLinks(projected,G.wires)){
+    if(link.scope.collapsed||!link.child.el?.offsetWidth||visibleClosure(link.child)!==link.child||visibleClosure(link.scope)!==link.scope)continue;
+    const a=portCenter(...link.from),b=portCenter(...link.to);if(!a||!b)continue;
+    ends.push(a,b);
+    const path=document.createElementNS("http://www.w3.org/2000/svg","path");
+    path.setAttribute("d",bez(a,b));path.classList.add("scope-binding",link.kind);
+    path.dataset.scope=link.scope.id;path.dataset.child=link.child.id;
+    const title=document.createElementNS("http://www.w3.org/2000/svg","title");
+    title.textContent=link.label;path.appendChild(title);wiresSvg.appendChild(path);
+  }
   // endpoints are the truth: a cable into a deeply nested, zoomed ring can sit
   // outside anything the node coordinates above predicted.
   if(ends.length&&growWireBox(ends)) applyWireBox();
   positionVerdicts();
+  if(dragWire?.repaint)dragWire.repaint();
 }
 let dragWire=null;
 /* FD PLACEMENT, ONCE.
@@ -1536,11 +1704,14 @@ let dragWire=null;
    contents, it gets SIZED by them, and the size is what pushes its neighbours
    away. Ring children are left alone — layoutRing owns them. */
 function fdLayout(){
-  const nodes=G.nodes.filter(n=>!n._parentScope&&n.el&&(typeof Harness==="undefined"||n._program===Harness.selected));
-  const origin=typeof Harness!=="undefined"?Harness.mounts.get(Harness.selected)||{x:0,y:0}:{x:0,y:0};
+  const target=typeof Harness!=="undefined"?Harness.parentTarget():null;
+  if(typeof Harness!=="undefined"&&!target)return;
+  const nodes=(target?target.nodes:G.nodes.filter(n=>!n._parentScope)).filter(n=>n.el);
+  const origin=target?.origin||{x:0,y:0},parent=target?.node||null;
+  const revision=typeof Harness!=="undefined"?Harness.parentRevision:0;
   if(nodes.length<2){ $("#status").textContent="fd: nothing to place"; return; }
   const idx=new Map(nodes.map((n,i)=>[n.id,i]));
-  const topOf=id=>{ let m=G.nodes.find(x=>x.id===id); while(m&&m._parentScope) m=m._parentScope; return m; };
+  const topOf=id=>{ let m=G.nodes.find(x=>x.id===id); while(m&&m._parentScope&&m._parentScope!==parent) m=m._parentScope; return m; };
   const edges=[];
   for(const w of G.wires){
     const a=topOf(w.from[0]), b=topOf(w.to[0]);
@@ -1600,10 +1771,11 @@ function fdLayout(){
   }
   nodes.forEach((n,i)=>{ n.x=origin.x+Math.round(bucket(i)); n.y=origin.y+Math.round(y[i]);
     n.el.style.left=n.x+"px"; n.el.style.top=n.y+"px"; });
+  if(parent)resizeParentFrames(parent);
   redraw(); save();
   // The frame has to come AFTER the browser has reflowed the boxes we just
   // moved; fitting in the same tick measures the layout we replaced.
-  requestAnimationFrame(()=>{ redraw(); fitToContent(); });
+  requestAnimationFrame(()=>{ redraw(); if(typeof Harness==="undefined"||Harness.parentRevision===revision)fitToContent(); });
   const back=edges.filter(([a,b])=>layer[b]<=layer[a]).length;
   $("#status").textContent="fd: "+nodes.length+" boxes in "+cols.length+" columns"
     +(back?" · "+back+" cable(s) still fold back — a cycle, not a placement bug":" · every cable points forward");
@@ -1627,8 +1799,8 @@ function verdictLayer(){
   return L;
 }
 function clearVerdicts(){
-  document.querySelectorAll(".port.v-ok,.port.v-dead,.port.v-open,.port.v-scope")
-    .forEach(e=>e.classList.remove("v-ok","v-dead","v-open","v-scope"));
+  document.querySelectorAll(".port.v-ok,.port.v-dead,.port.v-open,.port.v-scope,.port.v-optional,.port.v-binding")
+    .forEach(e=>e.classList.remove("v-ok","v-dead","v-open","v-scope","v-optional","v-binding"));
   document.querySelectorAll(".node.starved").forEach(e=>e.classList.remove("starved"));
   verdictLayer().textContent="";
   VERDICTS=[]; STARVED=new Set();
@@ -1728,7 +1900,12 @@ async function treeshake(opts){
   }
   return localTreeshake(opts);
 }
-function applyServerTreeShake(res, inclOptional){
+function applyServerTreeShake(res, inclOptional, programName){
+  if(programName){
+    const id=local=>programName+"::"+local;
+    res={...res,made:(res.made||[]).map(m=>({...m,fromNode:id(m.fromNode),toNode:id(m.toNode)})),
+      verdicts:(res.verdicts||[]).map(v=>({...v,nodeId:id(v.nodeId)})),starved:(res.starved||[]).map(id)};
+  }
   clearVerdicts();
   const made = res.made || [];
   for(const m of made){
@@ -1758,13 +1935,21 @@ function applyServerTreeShake(res, inclOptional){
   const scoped = verdicts.filter(v => v.status === "scope");
   const dead = verdicts.filter(v => v.status === "dead");
   const parts = [];
-  parts.push("✓ " + made.length + " closed");
-  if(reachable.length) parts.push("? " + reachable.length + " fillable — out of " + SHAKE_REACH + "px reach or lost the pass");
+  parts.push(made.length ? made.length + " cables connected" : "No cables changed");
+  const coverage=res.coverage;
+  if(coverage&&Number.isInteger(coverage.total)&&coverage.total>0&&Number.isInteger(coverage.connected)&&coverage.connected>=0&&coverage.connected<=coverage.total){
+    parts.push(coverage.connected+"/"+coverage.total+" sockets connected ("+Math.floor(100*coverage.connected/coverage.total)+"%)");
+  }
+  if(reachable.length) parts.push(reachable.length + " inputs need an explicit connection or closer source");
   if(scoped.length) parts.push("⇱ " + scoped.length + " scope-blocked");
   if(dead.length) parts.push("✕ " + dead.length + " with no mate on the board");
   if(STARVED.size) parts.push(STARVED.size + " node" + (STARVED.size===1?"":"s") + " downstream run on nothing");
   if(res.outletBlocked) parts.push("⇱ " + res.outletBlocked + " outlet" + (res.outletBlocked===1?"":"s") + " blocked by ring depth");
+  const optional=verdicts.filter(v=>v.status==="optional").length;
+  if(optional)parts.push(optional+" optional inputs unchanged");
+  if(!made.length&&!reachable.length&&!scoped.length&&!dead.length&&!STARVED.size)parts.push("No required cable gaps found");
   $("#status").textContent = parts.join(" · ");
+  if(programName)Harness.showConnections(programName,res,$("#status").textContent);
 
   for(const m of made){
     for(const el of document.querySelectorAll('.port[data-port="'+CSS.escape(m.toPort)+'"]')){
@@ -1940,7 +2125,22 @@ function localTreeshake(opts){
   }
   return made.length;
 }
+// Screen-space speed stays manageable at every fractal zoom level.
+function wireEdgeVelocity(point,rect){
+  if(!point||![point.x,point.y,rect.left,rect.right,rect.top,rect.bottom].every(Number.isFinite))return {x:0,y:0};
+  if(point.x<rect.left||point.x>rect.right||point.y<rect.top||point.y>rect.bottom)return {x:0,y:0};
+  const axis=(p,lo,hi)=>{
+    const margin=Math.min(56,(hi-lo)/4);if(margin<=0)return 0;
+    const near=(lo+margin-p)/margin,far=(p-hi+margin)/margin;
+    return near>0?near*near:far>0?-far*far:0;
+  };
+  const x=axis(point.x,rect.left,rect.right),y=axis(point.y,rect.top,rect.bottom),scale=320/Math.max(1,Math.hypot(x,y));
+  return {x:x*scale,y:y*scale};
+}
 function startWireDrag(n,dir,name,e){
+  if(e.button!==0||e.isPrimary===false)return;
+  dragWire?.cancel?.();killMomentum();
+  e.preventDefault();e.stopPropagation();
   const path=document.createElementNS("http://www.w3.org/2000/svg","path");
   path.classList.add("drag"); wiresSvg.appendChild(path);
   dragWire={n,dir,name,path};
@@ -2017,10 +2217,20 @@ function startWireDrag(n,dir,name,e){
     only.pe.classList.add("mate-only");
     $("#status").textContent="one legal mate: "+n.type+"."+name+" → "+only.nd.type+"."+only.port;
   }
-  const mv=ev=>{
+  let point={x:e.clientX,y:e.clientY},frame=0,last=performance.now(),finished=false,movedCamera=false;
+  const revision=typeof Harness!=="undefined"?Harness.parentRevision:null;
+  const stale=()=>!G.nodes.includes(n)||!n.el.isConnected||
+    (typeof Harness!=="undefined"&&Harness.parentRevision!==revision);
+  const bounds=()=>{
+    const r=viewport.getBoundingClientRect();
+    return {left:Math.max(0,r.left),top:Math.max(0,r.top),right:Math.min(innerWidth,r.right),bottom:Math.min(innerHeight,r.bottom)};
+  };
+  const inside=()=>{const r=bounds();return point.x>=r.left&&point.x<=r.right&&point.y>=r.top&&point.y<=r.bottom;};
+  const paint=()=>{
     const w=world.getBoundingClientRect();
-    const m={x:(ev.clientX-w.left)/view.z,y:(ev.clientY-w.top)/view.z};
+    const m={x:(point.x-w.left)/view.z,y:(point.y-w.top)/view.z};
     const a=portCenter(n.id,dir,name)||m;
+    if(growWireBox([a,m]))applyWireBox();
     path.setAttribute("d", dir==="out"?bez(a,m):bez(m,a));
     // the nearest candidate leads: its spline brightens as you approach, so a
     // dense fan still reads as one intention rather than a hairball
@@ -2032,8 +2242,11 @@ function startWireDrag(n,dir,name,e){
     }
     for(const gh of ghosts) gh.g.classList.toggle("near",gh===best&&bd<220*220);
   };
-  const up=ev=>{
+  const cleanup=()=>{
+    if(finished)return;finished=true;cancelAnimationFrame(frame);
     removeEventListener("pointermove",mv); removeEventListener("pointerup",up);
+    removeEventListener("pointercancel",cancelPointer);removeEventListener("keydown",key);removeEventListener("blur",cancel);
+    document.removeEventListener("visibilitychange",visibility);
     path.remove();
     document.body.classList.remove("wiring");
     document.querySelectorAll(".port.mateable").forEach(x=>x.classList.remove("mateable"));
@@ -2041,7 +2254,35 @@ function startWireDrag(n,dir,name,e){
     document.querySelectorAll(".port.mate-only").forEach(x=>x.classList.remove("mate-only"));
     document.querySelectorAll(".node.nomate").forEach(x=>x.classList.remove("nomate"));
     for(const gh of ghosts) gh.g.remove();
+    dragWire=null;killMomentum();if(movedCamera)saveCameraSoon();
+  };
+  const cancel=()=>{cleanup();redraw();};
+  const cancelPointer=ev=>{if(ev.pointerId===e.pointerId)cancel();};
+  const key=ev=>{if(ev.key==="Escape"){ev.preventDefault();cancel();}};
+  const visibility=()=>{if(document.hidden)cancel();};
+  const mv=ev=>{
+    if(ev.pointerId!==e.pointerId)return;
+    if(stale()||!(ev.buttons&1)){cancel();return;}
+    point={x:ev.clientX,y:ev.clientY};paint();
+  };
+  const tick=now=>{
+    if(finished)return;
+    if(stale()||document.hidden){cancel();return;}
+    const dt=Math.max(0,Math.min(50,now-last))/1000;last=now;
+    const velocity=wireEdgeVelocity(point,bounds());
+    if((velocity.x||velocity.y)&&viewport.contains(document.elementFromPoint(point.x,point.y))){
+      view.x+=velocity.x*dt;view.y+=velocity.y*dt;movedCamera=true;
+      killMomentum();applyView();paint();
+    }
+    frame=requestAnimationFrame(tick);
+  };
+  const up=ev=>{
+    if(ev.pointerId!==e.pointerId)return;
+    point={x:ev.clientX,y:ev.clientY};
+    if(stale()||!inside()){cancel();return;}
+    cleanup();
     const tgt=document.elementFromPoint(ev.clientX,ev.clientY);
+    if(!viewport.contains(tgt)){redraw();return;}
     // Highlighting HIGHLIGHTS. A lone legal mate is worth pointing at, and
     // nothing more — landing it because the drag happened to be unambiguous
     // merges on a gesture that never asked to merge. Auto-merge lives in the
@@ -2085,9 +2326,21 @@ function startWireDrag(n,dir,name,e){
       const scope=scopeAtTarget(tgt);
       showMateMenu(ev.clientX,ev.clientY,n,name,wx,wy,scope,dir);
     }
-    dragWire=null; redraw();
+    redraw();
+  };
+  dragWire.cancel=cancel;
+  dragWire.repaint=()=>{
+    for(const gh of ghosts){
+      gh.b=portCenter(gh.nd.id,gh.pdir,gh.port)||gh.b;
+      const a=portCenter(n.id,dir,name);if(a)gh.g.setAttribute("d",dir==="out"?bez(a,gh.b):bez(gh.b,a));
+      wiresSvg.appendChild(gh.g);
+    }
+    wiresSvg.appendChild(path);paint();
   };
   addEventListener("pointermove",mv); addEventListener("pointerup",up);
+  addEventListener("pointercancel",cancelPointer);addEventListener("keydown",key);addEventListener("blur",cancel);
+  document.addEventListener("visibilitychange",visibility);
+  paint();frame=requestAnimationFrame(tick);
 }
 /* the mate popup: release a wire on empty canvas and the daemon offers the
    kind-compatible continuations (evidence-ordered; the input filters).
@@ -2163,7 +2416,7 @@ async function showMateMenu(cx,cy,srcNode,srcPort,wx,wy,scope,dir){
   q.addEventListener("input",()=>render(q.value.trim().toLowerCase()));
   q.addEventListener("keydown",e=>{ if(e.key==="Enter"){ const first=box.querySelector(".item"); if(first) first.click(); } });
   menu.appendChild(q); menu.appendChild(box); render("");
-  menu.style.left=cx+"px"; menu.style.top=cy+"px"; menu.style.display="block";
+  positionCreationMenu(cx,cy);
   setTimeout(()=>q.focus(),0);
 }
 /* ── pan / zoom ────────────────────────────────────────────────────────── */
@@ -2282,6 +2535,11 @@ function fitToContent(){
 }
 /* ── add-node menu ─────────────────────────────────────────────────────── */
 const menu=$("#menu");
+function positionCreationMenu(cx,cy){
+  menu.style.display="block";
+  menu.style.left=Math.max(8,Math.min(cx,innerWidth-menu.offsetWidth-8))+"px";
+  menu.style.top=Math.max(8,Math.min(cy,innerHeight-menu.offsetHeight-8))+"px";
+}
 function showMenu(cx,cy,intoScope){
   menu.innerHTML=intoScope?"<h5>add into ring "+intoScope.id+"</h5>":"<h5>add node</h5>";
   const q=document.createElement("input"); q.placeholder="search nodes…";
@@ -2307,7 +2565,7 @@ function showMenu(cx,cy,intoScope){
   q.addEventListener("input",()=>render(q.value.trim().toLowerCase()));
   q.addEventListener("keydown",e=>{ if(e.key==="Enter"){ const first=box.querySelector(".item"); if(first) first.click(); } });
   menu.appendChild(q); menu.appendChild(box); render("");
-  menu.style.left=cx+"px"; menu.style.top=cy+"px"; menu.style.display="block";
+  positionCreationMenu(cx,cy);
   setTimeout(()=>q.focus(),0);
 }
 /* dblclick/right-click on a ring's EMPTY interior adds into that ring */
@@ -2456,14 +2714,8 @@ viewport.addEventListener("drop",async e=>{
 addEventListener("pointerdown",e=>{ if(!menu.contains(e.target)) menu.style.display="none"; });
 $("#addBtn").addEventListener("click",e=>showMenu(60,60));
 $("#fitBtn").addEventListener("click",()=>fitToContent());
-/* The harness owns mutation targeting independently of camera prominence. */
-function retargetProminent(){
-  if(typeof Harness==="undefined"||!Harness.ready) return;
-  const p=Harness.prominent();
-  if(p&&p!==Harness.selected) Harness.select(p,false);
-}
-$("#shakeBtn").addEventListener("click",e=>{ retargetProminent(); treeshake({optional:e.shiftKey}); });
-$("#fdBtn").addEventListener("click",()=>{ retargetProminent(); fdLayout(); });
+$("#shakeBtn").addEventListener("click",e=>treeshake({optional:e.shiftKey}));
+$("#fdBtn").addEventListener("click",()=>fdLayout());
 /* ── execution ─────────────────────────────────────────────────────────── */
 function inputsOf(id){ return G.wires.filter(w=>w.to[0]===id); }
 function topo(){

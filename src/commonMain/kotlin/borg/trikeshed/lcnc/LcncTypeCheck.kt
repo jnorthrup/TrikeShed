@@ -178,6 +178,15 @@ object LcncTypeCheck {
     fun portKind(n: LcncNode, dir: String, port: String, contracts: Map<String, LcncPortContract>, facts: LcncFacts): PortKind =
         Resolver(mapOf(n.id to n), emptyMap(), emptyList(), contracts, facts).kind(n, dir, port.removeSuffix("?"))
 
+    /** Shared, memoized resolution for candidate queries against one wired graph. */
+    internal fun portKindResolver(
+        program: LcncProgram, contracts: Map<String, LcncPortContract>, facts: LcncFacts,
+    ): (LcncNode, String, String) -> PortKind {
+        val ix = index(program)
+        val resolver = Resolver(ix.byId, ix.pathOf, ix.wires, contracts, facts)
+        return { node, dir, port -> resolver.kind(node, dir, port.removeSuffix("?")) }
+    }
+
     /** One program's nodes (walk order), ids, ring paths, wires, and duplicate ids. */
     private class Index(
         val nodes: List<LcncNode>,

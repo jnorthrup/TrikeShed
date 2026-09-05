@@ -178,7 +178,8 @@ internal class LcncRunService(
                             try { assembly.result.await() } finally { assembly.cancel("run scope closed") }
                         }
                     }
-                    val output = mapOf("returns" to result.returns, "outputs" to result.nodeOutputs)
+                    val output = mapOf("returns" to result.returns, "outputs" to result.nodeOutputs,
+                        "bindings" to result.bindings, "bindingsTruncated" to result.bindingsTruncated)
                     val limit = ValueBudget().violation(output)
                     if (limit != null) finish(413, "fail", "failed", mapOf("ok" to false, "phase" to "reporting", "error" to limit))
                     else finish(200, "complete", "completed", output + ("ok" to true))

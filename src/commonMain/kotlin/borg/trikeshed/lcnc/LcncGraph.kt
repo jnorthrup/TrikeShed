@@ -81,6 +81,8 @@ data class LcncPatchMatingPoint(
 data class LcncConfixControls(
     val humanOversight: Boolean = true,
     val matingPoints: Series<LcncPatchMatingPoint> = emptySeriesOf(),
+    /** Wiring specimens may be edited, but never dispatched as procedures. */
+    val inspectionOnly: Boolean = false,
 ) {
     fun toggleOversight(enabled: Boolean): LcncConfixControls = copy(humanOversight = enabled)
 

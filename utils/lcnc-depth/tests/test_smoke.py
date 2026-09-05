@@ -186,8 +186,117 @@ def test_runner_registry_finds_node_types():
 
 def test_scan_all_returns_every_section():
     out = kotlin_scan.scan_all(FIXTURE, "Demo.kt")
-    assert set(out) == {"path", "context_demands", "supervision", "casts", "contracts", "runners"}
+    assert set(out) == {"path", "context_demands", "supervision", "casts", "contracts", "runners", "surface"}
     assert out["path"] == "Demo.kt"
+
+
+CCEK_FIXTURE = '''
+package borg.trikeshed.ccek
+
+object CCEK {
+    fun initialize(reactor: MuxReactorElement): Binding = Binding(reactor)
+    fun childScope(name: String, parent: CoroutineScope): CoroutineScope {
+        val job = parent.coroutineContext[Job]   // a LOCAL, not a member
+        return CoroutineScope(job!!)
+    }
+}
+
+class UserContext(
+    val name: String,
+    private val scope: CoroutineScope,
+    val parentId: String? = null,
+) {
+    private val facts = mutableListOf<CausalAssertion>()
+    var active: Boolean = false
+        private set
+    val factCount: Int get() = facts.size
+    fun assertFact(assertion: CausalAssertion) { facts += assertion }
+    fun queryPolyglot(language: String, kind: String): List<PolyglotFact> = emptyList()
+    fun applySignalForTest(signal: ForgeSignal): Int = 0
+    override fun toString(): String = "UserContext($name)"
+}
+
+data class CausalAssertion(val kind: String, val fields: Map<String, Any>)
+data class PolyglotFact(val language: String, val opcode: String)
+'''
+
+SEAM_FIXTURE = '''
+package borg.trikeshed.lcnc
+
+import borg.trikeshed.ccek.CausalAssertion
+import borg.trikeshed.ccek.UserContext
+
+object CcekNodes {
+    fun registry(contexts: Map<String, UserContext>) = mapOf(
+        "ccek.fact" to LcncNodeRunner { node, inputs ->
+            val ctx = contexts.getValue(inputs["contextId"].toString())
+            ctx.assertFact(CausalAssertion("observation", emptyMap()))
+            mapOf("factCount" to ctx.factCount, "name" to node.params["name"])
+        },
+    )
+}
+'''
+
+UNRELATED_FIXTURE = '''
+package borg.trikeshed.other
+import kotlinx.coroutines.SupervisorJob
+val scope = CoroutineScope(SupervisorJob())
+fun childScope() = 1   // same name as CCEK.childScope; a different function
+'''
+
+
+def test_ccek_surface_lists_public_members_with_owners_and_skips_locals():
+    rows = kotlin_scan.ccek_surface(CCEK_FIXTURE, "ccek/CCEK.kt")
+    q = {r["qualified"]: r for r in rows}
+    assert "CCEK.initialize" in q and q["CCEK.initialize"]["kind"] == "fun"
+    assert "CCEK.childScope" in q
+    assert "CCEK.job" not in q, "a val inside a fun body is a local, not a member"
+    # constructor properties are surface; the private one is not
+    assert q["UserContext.name"]["kind"] == "property"
+    assert q["UserContext.parentId"]["kind"] == "property"
+    assert "UserContext.scope" not in q
+    assert "UserContext.facts" not in q, "private members are not surface"
+    assert q["UserContext.active"]["kind"] == "val"
+    assert q["UserContext.factCount"]["kind"] == "val"
+    assert q["UserContext.applySignalForTest"]["test_seam"] is True
+    assert q["UserContext.toString"]["override"] is True
+    assert q["CausalAssertion.kind"]["owner"] == "CausalAssertion"
+    assert all(r["package"] == "borg.trikeshed.ccek" for r in rows)
+    assert q["UserContext.assertFact"]["root"] == "UserContext"
+
+
+def test_ccek_coverage_credits_only_imported_owners_and_flags_orphans():
+    rows = kotlin_scan.ccek_surface(CCEK_FIXTURE, "ccek/CCEK.kt")
+    seams = {"lcnc/CcekNodes.kt": SEAM_FIXTURE}
+    everywhere = {"ccek/CCEK.kt": CCEK_FIXTURE, **seams, "other/Other.kt": UNRELATED_FIXTURE}
+    cov = {r["qualified"]: r for r in kotlin_scan.ccek_coverage(rows, seams, everywhere)}
+    assert cov["UserContext.assertFact"]["status"] == "reached"
+    assert cov["UserContext.assertFact"]["reached_at"] == ["lcnc/CcekNodes.kt:11"]
+    assert cov["UserContext.factCount"]["status"] == "reached"
+    assert cov["CausalAssertion"]["status"] == "reached"
+    # `.name` appears in the seam (node.params["name"]) but UserContext.name is
+    # only credited because UserContext IS imported there — and it is not read.
+    assert cov["UserContext.name"]["status"] == "unreached"
+    assert cov["UserContext.queryPolyglot"]["status"] == "unreached"
+    # CCEK is imported nowhere outside its file: orphan, even though an unrelated
+    # file has a function called childScope.
+    assert cov["CCEK.childScope"]["status"] == "orphan"
+    assert cov["PolyglotFact"]["status"] == "orphan"
+    assert cov["UserContext.applySignalForTest"]["status"] == "plumbing"
+    assert cov["UserContext.toString"]["status"] == "plumbing"
+
+
+def test_scan_repo_rulings_turn_unreached_into_gaps_only_when_unruled():
+    from lcnc_depth import scan_repo
+    row = {"qualified": "UserContext.queryPolyglot", "owner": "UserContext", "root": "UserContext",
+           "member": "queryPolyglot", "path": "ccek/CCEK.kt"}
+    assert scan_repo.ruling_for(row) is None
+    ruled = {"qualified": "ArticulatedNode.start", "owner": "ArticulatedNode", "root": "ArticulatedNode",
+             "member": "start", "path": "ccek/CCEK.kt"}
+    assert "cannot revive" in scan_repo.ruling_for(ruled)
+    by_file = {"qualified": "RealSupervisorJob.slot", "owner": "RealSupervisorJob", "root": "RealSupervisorJob",
+               "member": "slot", "path": "commonMain/kotlin/borg/trikeshed/ccek/SupervisorJob.kt"}
+    assert "orphan vocabulary" in scan_repo.ruling_for(by_file)
 
 
 def test_scanners_are_safe_on_empty_and_garbage_input():

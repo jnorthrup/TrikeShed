@@ -34,6 +34,15 @@ value. `kotlin_scan.scan_all(text, path)` runs every scanner over one file.
 - `contracts(text, path)` — `LcncPortContract(...)` literals, with kind-map keys
   already de-suffixed.
 - `runner_registry(text, path)` — `"node.type" to LcncNodeRunner { … }` entries.
+- `ccek_surface(text, path)` — every PUBLIC member of every type in a file, with
+  its owner and root type; locals inside function bodies are excluded.
+- `ccek_coverage(surface, seams, everywhere)` — per member: `reached` (an LCNC
+  runner file imports the root type AND reads/calls the member), `unreached`,
+  `orphan` (no file outside its own imports the root), `plumbing`. Run it with
+  seams = every `lcnc/*.kt` and everywhere = the whole tree. Reachability is the
+  FACT; whether an unreached member should be a lego is a RULING — propose one
+  in `CcekMember.lego` only when the member is a capability (a verb or a read a
+  program would want), never for a channel factory or an alias.
 
 ## Load-bearing facts about this codebase
 These are established; use them as ground truth and spend your effort elsewhere.

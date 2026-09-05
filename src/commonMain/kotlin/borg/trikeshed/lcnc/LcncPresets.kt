@@ -49,6 +49,13 @@ object LcncPresets {
     /** The offered prefabs, described for the person adopting them. */
     fun catalog(): List<LcncPresetInfo> = listOf(
         LcncPresetInfo(
+            LcncShakeDemo.NAME, "Shake Demo",
+            does = "Places every node type beside typed input and output counterparts, with no cables installed.",
+            needs = "Nothing for wiring and inspection. Execution is disabled for this specimen.",
+            see = "The complete node palette, empty sockets, and eight nested scopes carrying the same named value.",
+            tweakFirst = "A counterpart's position, then compare the connection results.",
+        ),
+        LcncPresetInfo(
             "preset-hermes", "Board at a glance",
             does = "Reads the kanban board every 15 seconds and lays its cards out in columns by status.",
             needs = "Nothing — it runs as it is.",
@@ -92,9 +99,9 @@ object LcncPresets {
         ),
         LcncPresetInfo(
             "preset-scope", "Rings inside rings",
-            does = "Shows how a value handed to an outer ring is used by a part nested two rings deep.",
+            does = "Builds an argument map, patches scope inputs, and passes a named value through nested rings.",
             needs = "Nothing — it runs as it is.",
-            see = "The value passing inward through each ring and the result coming back out.",
+            see = "Connected args and text inputs, their frame bindings, and the result coming back out.",
             tweakFirst = "The default value on the outer ring's parameter.",
         ),
         LcncPresetInfo(
@@ -308,6 +315,7 @@ object LcncPresets {
 
     /** name → Confix JSON document, the exact shape LcncProgramConfix parses. */
     fun all(): Map<String, String> = linkedMapOf(
+        LcncShakeDemo.NAME to LcncProgramConfix.toJson(LcncShakeDemo.build().program),
         "preset-hermes" to hermes(),
         "preset-tribunal" to tribunal(),
         "preset-curator" to curator(),
@@ -399,11 +407,8 @@ object LcncPresets {
         return LcncProgramConfix.toJson(program)
     }
 
-    // ── The concentric machine demo: three rings, ONE document. The root
-    // scope.in's default binds; its value is consumed TWO rings deep with
-    // zero re-plumbing (the wire crosses inward — the warm base); yields
-    // climb out explicitly ring by ring through scope.out — the asymmetry
-    // made visible. Runs through /api/lcnc/run with zero registered runners.
+    // Scope machinery supplies the argument map as a return value: no literal
+    // runner is needed. Both map binding and named binding are visible cables.
 
     private fun scopeDemo(): String {
         val program = LcncProgram(
@@ -411,10 +416,21 @@ object LcncPresets {
             nodes = listOf(
                 LcncNode("n0", LcncContracts.SCOPE_IN,
                     params = mapOf("name" to "text", "default" to "hello"), x = 40.0, y = 60.0),
-                LcncNode("r1", LcncContracts.SCOPE, x = 260.0, y = 40.0,
+                LcncNode("args", LcncContracts.SCOPE, x = 260.0, y = 40.0,
                     children = listOf(
+                        LcncNode("seed", LcncContracts.SCOPE_IN,
+                            params = mapOf("name" to "text"), x = 40.0, y = 40.0),
+                        LcncNode("argYield", LcncContracts.SCOPE_OUT,
+                            params = mapOf("name" to "text"), x = 260.0, y = 40.0),
+                    ).toSeries()),
+                LcncNode("r1", LcncContracts.SCOPE, x = 620.0, y = 40.0,
+                    children = listOf(
+                        LcncNode("a", LcncContracts.SCOPE_IN,
+                            params = mapOf("name" to "text"), x = 40.0, y = 40.0),
                         LcncNode("r2", LcncContracts.SCOPE, x = 40.0, y = 40.0,
                             children = listOf(
+                                LcncNode("b", LcncContracts.SCOPE_IN,
+                                    params = mapOf("name" to "text"), x = 40.0, y = 40.0),
                                 LcncNode("p", LcncContracts.SCOPE_OUT,
                                     params = mapOf("name" to "result"), x = 40.0, y = 40.0),
                             ).toSeries()),
@@ -422,20 +438,15 @@ object LcncPresets {
                             params = mapOf("name" to "result"), x = 260.0, y = 40.0),
                     ).toSeries()),
                 LcncNode("out", LcncContracts.SCOPE_OUT,
-                    params = mapOf("name" to "result"), x = 540.0, y = 60.0),
-                // scope.args? and scope.when? stay EMPTY here on purpose. This preset
-                // is the one that runs through the default loader with ZERO
-                // registered runners — pure ring machinery, nothing to execute.
-                // Wiring a literal into args? adds a node type that needs a
-                // runner and destroys exactly the property the preset exists to
-                // prove. The caller's binding is demonstrated in preset-turbohaul
-                // instead, which has runners anyway.
-                LcncNode("n3", "note",
-                    params = mapOf("text" to "the concentric machine, three rings, one document.\nn0 (scope.in, default=hello) is consumed TWO rings deep\nby a single wire — inner sees outer, zero re-plumbing.\nyields climb out ring by ring through scope.out —\nonly the yield crosses; locals die at their ring."),
-                    x = 40.0, y = 260.0),
+                    params = mapOf("name" to "result"), x = 980.0, y = 60.0),
             ).toSeries(),
             wires = listOf(
-                LcncWire("n0", "value", "p", "value"),
+                LcncWire("n0", "value", "args", "text"),
+                LcncWire("seed", "value", "argYield", "value"),
+                LcncWire("args", "returns", "r1", "args?"),
+                LcncWire("args", "returns", "r2", "args?"),
+                LcncWire("a", "value", "r2", "text"),
+                LcncWire("b", "value", "p", "value"),
                 LcncWire("r2", "result", "q", "value"),
                 LcncWire("r1", "result", "out", "value"),
             ).toSeries(),

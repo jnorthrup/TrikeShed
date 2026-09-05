@@ -50,7 +50,9 @@ object LcncProgramConfix {
         return JsonSupport.stringify(linkedMapOf(
             "nodes" to nodes,
             "wires" to wires,
-            "controls" to linkedMapOf("humanOversight" to program.controls.humanOversight, "matingPoints" to matingPoints),
+            "controls" to linkedMapOf("humanOversight" to program.controls.humanOversight, "matingPoints" to matingPoints).apply {
+                if (program.controls.inspectionOnly) put("inspectionOnly", true)
+            },
             "kanban" to program.kanban?.let { JsonSupport.parse(borg.trikeshed.kanban.KanbanGraphConfix.toJson(it)) },
             "view" to program.view?.let { linkedMapOf("x" to it.x, "y" to it.y, "z" to it.zoom) },
             "seq" to program.seq,
@@ -110,7 +112,7 @@ object LcncProgramConfix {
                     ).validate()
                 }.getOrNull()
             }.toSeries()
-            LcncConfixControls(c["humanOversight"] as? Boolean ?: true, points)
+            LcncConfixControls(c["humanOversight"] as? Boolean ?: true, points, c["inspectionOnly"] == true)
         } ?: LcncConfixControls()
         val kanban = (parsed["kanban"] as? Map<*, *>)?.let { borg.trikeshed.kanban.KanbanGraphConfix.fromJson(JsonSupport.stringify(it)) }
         val view = (parsed["view"] as? Map<*, *>)?.let { v ->

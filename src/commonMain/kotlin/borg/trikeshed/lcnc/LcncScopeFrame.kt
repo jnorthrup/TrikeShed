@@ -30,6 +30,7 @@ class LcncScopeFrame(
     val chain: FrameIdChain,
     /** The enclosing ring; null at the root. Nearest ring shadows on lookup. */
     val parent: LcncScopeFrame? = null,
+    val bindingSources: Map<String, String> = emptyMap(),
 ) : AbstractCoroutineContextElement(Key) {
     companion object Key : CoroutineContext.Key<LcncScopeFrame>
 
@@ -40,6 +41,9 @@ class LcncScopeFrame(
     /** Nearest-ring-wins binding lookup, walking outward. */
     fun binding(name: String): Any? =
         if (bindings.containsKey(name)) bindings[name] else parent?.binding(name)
+
+    fun bindingOwner(name: String): LcncScopeFrame? =
+        if (bindings.containsKey(name)) this else parent?.bindingOwner(name)
 
     /** Warm base: a node's outputs, resolved outward through the enclosing rings. */
     fun outputsOf(nodeId: String): Map<String, Any?>? =

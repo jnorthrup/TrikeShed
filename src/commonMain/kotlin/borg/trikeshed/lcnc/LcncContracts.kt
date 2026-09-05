@@ -158,9 +158,9 @@ object LcncContracts {
         // above (kanban, council, legal, belief) is a projection OF this; these
         // nodes let a program drive the engine itself.
         LcncPortContract("ccek.incarnate", "ccek node (incarnate / attach)",
-            listOf("trigger?"), listOf("handle", "node"),
-            inputKinds = mapOf("trigger" to "trigger"),
-            outputKinds = mapOf("handle" to "id", "node" to "json"),
+            listOf("trigger?", "args?", "title?", "record?", "maxConcurrency?", "projections?"), listOf("handle", "node", "arguments"),
+            inputKinds = mapOf("trigger" to "trigger", "args" to "json", "title" to "text", "record" to "json", "maxConcurrency" to "num", "projections" to "json"),
+            outputKinds = mapOf("handle" to "id", "node" to "json", "arguments" to "json"),
             params = mapOf(
                 "title" to LcncPortContract.LcncParamSpec(v = "lcnc-node", ph = "same title = same node (idempotent)"),
                 "record" to LcncPortContract.LcncParamSpec(v = "true", opts = BOOLEAN_OPTIONS),

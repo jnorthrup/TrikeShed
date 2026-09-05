@@ -21,6 +21,8 @@ __all__ = [
     "casts",
     "contracts",
     "runner_registry",
+    "ccek_surface",
+    "ccek_coverage",
     "scan_all",
 ]
 
@@ -562,6 +564,225 @@ def runner_registry(text: str, path: str = "") -> list[dict]:
     ]
 
 
+# ── 6. the CCEK surface ─────────────────────────────────────────────────
+
+_MODIFIERS = (
+    "public", "private", "internal", "protected", "open", "abstract", "sealed",
+    "data", "enum", "inline", "suspend", "override", "operator", "infix",
+    "lateinit", "const", "companion", "inner", "value", "annotation", "external",
+    "tailrec", "expect", "actual",
+)
+_DECL = re.compile(
+    r"^[ \t]*(?P<mods>(?:(?:" + "|".join(_MODIFIERS) + r")\s+)*)"
+    r"(?P<kw>class|object|interface|fun|val|var|typealias)\b\s*"
+    r"(?P<generics><[^>\n]*>\s*)?"
+    r"(?P<receiver>(?:[A-Za-z_][\w.]*(?:<[^>\n]*>)?\.)*)"
+    r"(?P<name>[A-Za-z_]\w*)?",
+)
+_HEADER_PROP = re.compile(
+    r"(?<![\w.])(?:(?P<vis>private|protected|internal)\s+)?(?:override\s+)?(?:open\s+)?"
+    r"(?:val|var)\s+(?P<name>[A-Za-z_]\w*)\s*:"
+)
+_HIDDEN = ("private", "protected", "internal")
+_TYPE_KW = ("class", "object", "interface")
+
+
+def ccek_surface(text: str, path: str = "") -> list[dict]:
+    """Every PUBLIC declaration in a Kotlin file, with the class it belongs to.
+
+    The CCEK plane is a small set of classes — ``CCEK``, ``ArticulatedNode``,
+    ``UserContext``, ``CausalReteTable`` … — and the question this agent has to
+    answer is "which of their members can a program reach?". That needs the
+    surface enumerated member by member, each with an owner, so a gap can be
+    named as ``UserContext.queryPolyglot`` rather than as a bare identifier.
+
+    Lexical, like every other scanner: comments and strings are blanked, brace
+    depth tracks nesting, and a declaration counts only when it sits DIRECTLY in
+    the enclosing type's body (or at top level) — a ``val`` inside a function is
+    a local, not a member. Constructor ``val``/``var`` parameters are public
+    properties too and are recorded as ``kind = "property"``. ``private``,
+    ``protected`` and ``internal`` declarations are not surface. ``override``
+    members are kept and flagged.
+
+    A member whose name ends in ``ForTest`` is flagged ``test_seam`` — the
+    codebase's own convention for a hole punched for tests, not a capability.
+    """
+    scan = _mask(text)
+    lines = scan.split("\n")
+    raw = text.split("\n")
+    pkg_m = re.search(r"^\s*package\s+([\w.]+)", scan, re.M)
+    package = pkg_m.group(1) if pkg_m else ""
+    out: list[dict] = []
+    stack: list[tuple[str, int]] = []  # (owner, depth of the owner's body)
+    depth = 0
+    i = 0
+    n = len(lines)
+
+    def emit(line_no: int, owner: str | None, name: str, kind: str, mods: list[str]) -> None:
+        root = stack[0][0] if stack else (name if kind in _TYPE_KW else None)
+        if owner and not stack:
+            root = owner
+        out.append(
+            {
+                "path": path,
+                "package": package,
+                "line": line_no,
+                "owner": owner,
+                "root": root,
+                "member": name,
+                "qualified": f"{owner}.{name}" if owner else name,
+                "kind": kind,
+                "override": "override" in mods,
+                "suspend": "suspend" in mods,
+                "test_seam": name.endswith("ForTest"),
+                "snippet": raw[line_no - 1].strip(),
+            }
+        )
+
+    while i < n:
+        line = lines[i]
+        owner_depth = stack[-1][1] if stack else 0
+        m = _DECL.match(line)
+        at_member_depth = depth == owner_depth
+        if m and m.group("name") and at_member_depth:
+            mods = m.group("mods").split()
+            kw = m.group("kw")
+            name = m.group("name")
+            hidden = any(v in mods for v in _HIDDEN)
+            owner = stack[-1][0] if stack else None
+            if kw in _TYPE_KW:
+                # Consume the header to its balancing paren (constructor
+                # properties live there), then decide whether a body opens.
+                j, paren, started = i, 0, False
+                header_lines: list[str] = []
+                while j < n:
+                    seg = lines[j]
+                    header_lines.append(seg)
+                    for ch in seg:
+                        if ch == "(":
+                            paren += 1
+                            started = True
+                        elif ch == ")":
+                            paren -= 1
+                    if started and paren <= 0:
+                        break
+                    if not started and ("{" in seg or seg.strip().endswith((")", ":")) is False and j > i):
+                        break
+                    if not started and "{" in seg:
+                        break
+                    j += 1
+                header = "\n".join(header_lines)
+                if not hidden:
+                    emit(i + 1, owner, name, kw, mods)
+                    if "(" in header:
+                        body = header[header.find("(") :]
+                        for pm in _HEADER_PROP.finditer(body):
+                            if pm.group("vis"):
+                                continue
+                            stack.append((name, depth + 1))  # so root resolves through this type
+                            emit(i + 1 + header[: header.find("(") + pm.start()].count("\n"), name, pm.group("name"), "property", [])
+                            stack.pop()
+                d0 = depth
+                for k in range(i, min(j, n - 1) + 1):
+                    depth += lines[k].count("{") - lines[k].count("}")
+                if depth > d0:
+                    stack.append((name if not hidden else f"({name})", depth))
+                while stack and depth < stack[-1][1]:
+                    stack.pop()
+                i = min(j, n - 1) + 1
+                continue
+            if not hidden:
+                emit(i + 1, owner, name, "val" if kw == "var" else kw, mods)
+        depth += line.count("{") - line.count("}")
+        while stack and depth < stack[-1][1]:
+            stack.pop()
+        i += 1
+    return out
+
+
+def _mentions(text: str, package: str, root: str, same_package: bool) -> bool:
+    """Does this file bring `package.root` into scope?
+
+    An explicit import, a star import of the package, a fully-qualified use, or
+    living in the same package. Nothing else counts: `SupervisorJob(` in a file
+    that imports kotlinx.coroutines is kotlinx's, not the CCEK interface of the
+    same name.
+    """
+    if same_package:
+        return re.search(r"(?<!\w)" + re.escape(root) + r"(?!\w)", text) is not None
+    pkg = re.escape(package)
+    return (
+        re.search(r"^\s*import\s+" + pkg + r"\." + re.escape(root) + r"(?:\.\w+)*\s*$", text, re.M) is not None
+        or re.search(r"^\s*import\s+" + pkg + r"\.\*\s*$", text, re.M) is not None
+        or re.search(r"(?<!\w)" + pkg + r"\." + re.escape(root) + r"(?!\w)", text) is not None
+    )
+
+
+def _package_of(text: str) -> str:
+    m = re.search(r"^\s*package\s+([\w.]+)", text, re.M)
+    return m.group(1) if m else ""
+
+
+def ccek_coverage(surface: list[dict], seams: dict[str, str], everywhere: dict[str, str] | None = None) -> list[dict]:
+    """For each surface member, where (if anywhere) the LCNC seams reach it.
+
+    ``seams`` maps a path to the text of a file whose runners are how a program
+    touches the plane (every ``lcnc/*.kt`` in this codebase). A member is
+    ``reached`` when a seam file brings its ROOT type into scope (an import from
+    the surface's package, a star import, a qualified use, or the same package)
+    AND calls or reads the member — ``.member(`` / ``.member``. A type is reached
+    when such a file names it. Reachability is the fact reported; whether an
+    unreached member is a missing lego or substrate is a RULING, and lives with
+    the caller.
+
+    ``everywhere`` (optional) is the same map for the whole source tree: a member
+    whose root type no file outside its own brings into scope is ``orphan`` —
+    vocabulary ahead of implementation, a different finding from a missing lego.
+
+    Plumbing is never a gap: a test seam, a nested ``Key`` object, or an
+    ``override`` of a stdlib contract (``toString``, ``key``, ``equals``).
+    """
+    masked = {p: _mask(t) for p, t in seams.items()}
+    tree = {p: _mask(t) for p, t in (everywhere or {}).items()}
+    pkgs = {p: _package_of(t) for p, t in {**tree, **masked}.items()}
+    out: list[dict] = []
+    for row in surface:
+        name = row["member"]
+        kind = row["kind"]
+        root = row.get("root") or name
+        package = row.get("package", "")
+        is_type = kind in ("class", "object", "interface", "typealias")
+        if is_type:
+            pattern = re.compile(r"(?<!\w)" + re.escape(name) + r"\s*(?:\(|\.|<|\b(?=\s*[,):]))")
+        elif kind == "fun":
+            pattern = re.compile(r"(?<![\w])" + re.escape(name) + r"\s*(?:\(|\{)")
+        else:
+            pattern = re.compile(r"\." + re.escape(name) + r"\b(?!\s*\()")
+        hits: list[str] = []
+        for p, t in masked.items():
+            if not _mentions(t, package, root, pkgs.get(p, "") == package):
+                continue
+            for m in pattern.finditer(t):
+                hits.append(f"{p}:{_lineno(t, m.start())}")
+                if len(hits) >= 6:
+                    break
+        orphan = False
+        if tree:
+            orphan = not any(
+                _mentions(t, package, root, pkgs.get(p, "") == package)
+                for p, t in tree.items()
+                if not p.endswith(row["path"])
+            )
+        plumbing = (
+            row["test_seam"]
+            or (row["override"] and name in ("toString", "key", "equals", "hashCode"))
+            or name == "Key"
+        )
+        status = "plumbing" if plumbing else "orphan" if orphan and not hits else "reached" if hits else "unreached"
+        out.append({**row, "reached": bool(hits), "reached_at": hits, "status": status})
+    return out
+
+
 def scan_all(text: str, path: str = "") -> dict:
     """Every scanner at once, for a single file."""
     return {
@@ -571,4 +792,5 @@ def scan_all(text: str, path: str = "") -> dict:
         "casts": casts(text, path),
         "contracts": contracts(text, path),
         "runners": runner_registry(text, path),
+        "surface": ccek_surface(text, path),
     }

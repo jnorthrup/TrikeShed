@@ -1,16 +1,54 @@
 "use strict";
+const GraalTopology = {
+  categories:[
+    {id:"git",label:"Git",color:"#c798df",hint:"Git paths and pack files (path-classified)"},
+    {id:"classes",label:"Classes",color:"#68c8c1",hint:"Compiled .class files (path-classified)"},
+    {id:"binaries",label:"Binaries",color:"#e7b66b",hint:"Known binary file extensions; unknown blobs remain Other"},
+    {id:"other",label:"Other blobs",color:"#9daeb8",hint:"Source, documents and unclassified content"},
+    {id:"blocks",label:"Heap blocks",color:"#79ba81",hint:"Measured GC pool occupancy blocks, not object addresses"},
+    {id:"live",label:"Actual heap",color:"#ed928e",hint:"Live class histogram, when supplied by the daemon; not allocation samples or an object-reference graph"},
+    {id:"allocation",label:"Allocations",color:"#8fb9ee",hint:"JFR sampled allocation attribution, not retained live bytes"},
+  ],
+  category(row) {
+    if(row[5]?.runtime)return row[5].category;
+    const id=String(row[0]);
+    if(/(^|\/)\.git(\/|$)|(^|\/)pack-[0-9a-f]+\.(pack|idx)$/i.test(id))return "git";
+    if(/\.class$/i.test(id))return "classes";
+    if(/\.(jar|war|zip|gz|bz2|xz|7z|so|dylib|dll|exe|bin|o|a|wasm|hprof|png|jpg|jpeg|gif|webp|ico|pdf|mp[34]|wav|woff2?|ttf)$/i.test(id))return "binaries";
+    return "other";
+  },
+  bit(id) {const i=this.categories.findIndex(c=>c.id===id);return i<0?0:1<<i;},
+  all:127,
+  heapRows(heap={},vitals={}) {
+    const rows=[],atMs=heap.atMs||null;
+    const add=(category,name,bytes,detail)=>{
+      if(typeof name!=="string"||!Number.isFinite(bytes)||bytes<=0)return;
+      rows.push(["runtime:"+category+"/"+encodeURIComponent(name),bytes,0,1,0,
+        {runtime:true,category,name,...detail}]);
+    };
+    for(const r of (Array.isArray(heap.rows)?heap.rows:[]).slice(0,256))
+      if(r)add("live",r.class,r.bytes,{source:"GC.class_histogram",atMs,count:r.count,bytes:r.bytes});
+    for(const r of (Array.isArray(heap.allocation)?heap.allocation:[]).slice(0,256))
+      if(r)add("allocation",r.class,r.bytes,{source:"JFR ObjectAllocationSample",atMs,sampledBytes:r.bytes});
+    const lane=vitals.gc?.lane||{};
+    for(const p of (Array.isArray(lane.pools)?lane.pools:[]).slice(0,64))
+      if(p)add("blocks",p.pool,p.lastUsedBytes,{source:"JFR GCHeapMemoryPoolUsage",atMs:lane.atMs||null,
+        usedBytes:p.lastUsedBytes,committedBytes:p.lastCommittedBytes,samples:p.samples});
+    return rows;
+  },
+};
 // Extracted from Graal's object viewer. Geometry is independent of the shared camera.
 function createGraalTerrain(options) {
 const ctx=options.canvas.getContext("2d");
 const W=1600,H=1000,DB="trikeshed";
 let cam={s:1,ox:0,oy:0},innerWidth=1,innerHeight=1,PROJECT_DBS=new Set(),layer=1;
-let hover=null,fog=false,skin="ops";
+let hover=null,fog=false,skin="ops",mask=GraalTopology.all;
 const heatOf=()=>0;
 function dbUrl(id){const parts=id.split("/");return PROJECT_DBS.has(parts[0])?"/"+parts.map(encodeURIComponent).join("/"):"/"+DB+"/"+parts.map(encodeURIComponent).join("/");}
 let root=null,byId=new Map();
 const HUES={'forge':300,'projects':172,'.git':262,'pointcut':8,'_design':318,'memories':210,'lost-found':48,'jules':132,'vms':282};
 function hueOf(name){if(name in HUES)return HUES[name];let h=0;for(const c of name)h=(h*31+c.charCodeAt(0))>>>0;return h%360;}
-function node(name,parent){return{name,parent,children:new Map(),bytes:0,mass:0,docs:0,leaf:false,rect:null,laid:false,hue:parent?parent.hue:hueOf(name)};}
+function node(name,parent){return{name,parent,children:new Map(),categories:0,bytes:0,mass:0,docs:0,leaf:false,rect:null,laid:false,hue:parent?parent.hue:hueOf(name)};}
 /* Nonce vaults: content-addressed storage planes. Real, divable, but they must not own the map. */
 const VAULTS=new Set(['.git','lost-found','subtree-cache','objects','worktrees']);
 function massOf(bytes,topName){const m=Math.log2(2+bytes);return VAULTS.has(topName)?m*0.18:m;}
@@ -20,25 +58,7 @@ function massOf(bytes,topName){const m=Math.log2(2+bytes);return VAULTS.has(topN
    (sortable, the hash can't do this); in POSITIONAL arrangement it splits by id path as before.
    The toggle itself is served state (T), never JS invention. */
 let maxSeq=1;
-let lastRows=null;         // the store terrain rows (from /api/graal/map)
-let heapRows=null;         // the heap continent rows (from /api/graal/heap)
 let ARRANGE='positional';
-/* R1: the heap continent — the JVM heap as a SECOND terrain source beside the store,
-   rendered through the SAME squarified treemap component (same row shape, different source).
-   `x` flips the terrain; /api/graal/heap supplies both continents in one fetch. */
-let HEAP_TERRAIN=false;
-function activeRows(){return (HEAP_TERRAIN&&heapRows)?heapRows:(lastRows||[]);}
-function buildAll(){
-  const rows=activeRows();
-  if(!rows.length)return;
-  buildTree(rows);
-  $('crumb').textContent='terrain: '+(HEAP_TERRAIN?'JVM heap continent':'store')+
-    ' — '+rows.length.toLocaleString()+' rows · '+(HEAP_TERRAIN?'live-set + allocation, per class':'documents')+
-    ' · arrangement: '+ARRANGE+(HEAP_TERRAIN?' — x back to store':' — x for the heap continent');
-}
-function toggleArrange(){ARRANGE=ARRANGE==='positional'?'similarity':'positional';localStorage.setItem('arrange',ARRANGE);buildAll();}
-function toggleHeapTerrain(){HEAP_TERRAIN=!HEAP_TERRAIN;localStorage.setItem('heapTerrain',HEAP_TERRAIN?'1':'0');
-  if(HEAP_TERRAIN&&!heapRows)loadMap();else buildAll();}
 function buildTree(rows){
   root=node('trikeshed',null);root.rect={x:0,y:0,w:W,h:H};byId=new Map();maxSeq=1;
   for(const row of rows){
@@ -53,7 +73,10 @@ function buildTree(rows){
       if(!c){c=node(parts[i],n===root?null:n);if(n===root)c.hue=ARRANGE==='similarity'?(code|0)%360:hueOf(parts[i]);else c.hue=ARRANGE==='similarity'?hueOf(parts[i]+'#'+(code|0)):n.hue;c.parent=n;n.children.set(parts[i],c);}
       n=c;n.bytes+=bytes;n.mass+=mass;n.docs++;
     }
-    n.leaf=true;n.id=id;n.seq=seq||0;n.gen=gen||1;n.mass=mass;byId.set(id,n);
+    n.leaf=true;n.id=id;n.seq=seq||0;n.gen=gen||1;n.mass=mass;n.detail=row[5];
+    const bit=GraalTopology.bit(GraalTopology.category(row));
+    for(let a=n;a;a=a.parent)a.categories|=bit;
+    byId.set(id,n);
     if(n.seq>maxSeq)maxSeq=n.seq;
     let a=n.parent;while(a){if((a.maxSeq||0)<n.seq)a.maxSeq=n.seq;a=a.parent;}
     if((root.maxSeq||0)<n.seq)root.maxSeq=n.seq;
@@ -113,6 +136,7 @@ const SKINS={
 const kCache=new Map();      // id → gzip ratio 0..1 (the practical K estimate)
 let kInFlight=0;
 function wantK(n){
+  if(n.detail?.runtime)return;
   if(kCache.has(n.id)||kInFlight>=3||n.bytes>1500000||typeof CompressionStream==='undefined')return;
   kCache.set(n.id,-1);kInFlight++;
   fetch(dbUrl(n.id)+'/content')
@@ -126,6 +150,7 @@ const previewCache=new Map(); // id → array of first lines (or null = not text
 let pInFlight=0;
 const TEXTY=/\.(kt|kts|java|py|js|ts|md|json|yaml|yml|css|sh|gradle|xml|txt|html|toml|properties|sql|rs|c|h|cpp|go|wal|jsonl)$/i;
 function wantPreview(n){
+  if(n.detail?.runtime)return;
   if(previewCache.has(n.id)||pInFlight>=3)return;
   if(!TEXTY.test(n.id)||n.bytes>400000){previewCache.set(n.id,null);return;}
   previewCache.set(n.id,[]);pInFlight++;
@@ -136,6 +161,7 @@ function wantPreview(n){
   if(previewCache.size>400){const k=previewCache.keys().next().value;previewCache.delete(k);}
 }
 function drawNode(n,depth){
+  if(!(n.categories&mask))return;
   const r=n.rect;if(!r)return;
   const x=(r.x-cam.ox)*cam.s,y=(r.y-cam.oy)*cam.s,w=r.w*cam.s,h=r.h*cam.s;
   if(x>innerWidth||y>innerHeight||x+w<0||y+h<0||w<1.2||h<1.2)return;
@@ -148,6 +174,10 @@ function drawNode(n,depth){
   ctx.strokeStyle=S.stroke(n.hue,light);
   ctx.lineWidth=n===hover?2:S.lw;
   ctx.beginPath();ctx.rect(x,y,w,h);ctx.fill();ctx.stroke();
+  if(n.leaf&&w>8&&h>8){
+    ctx.fillStyle=GraalTopology.categories.find(c=>GraalTopology.bit(c.id)&n.categories)?.color||S.sub;
+    ctx.fillRect(x+1,y+1,Math.min(3,w-2),h-2);
+  }
   if(n===hover){ctx.strokeStyle=S.hot(n.hue);ctx.stroke();}
   if(glow>0&&depth>0){ctx.globalAlpha=(fogged?0.22:1)*glow*0.8;ctx.strokeStyle=S.hot(n.hue);ctx.lineWidth=2;ctx.strokeRect(x+1,y+1,w-2,h-2);ctx.globalAlpha=fogged?0.22:1;}
   // ── layers: kolmogorov (2) and causal (3) tint the same cursor ──
@@ -181,7 +211,8 @@ function drawNode(n,depth){
     ctx.font=(depth<2?'bold ':'')+Math.min(13,Math.max(9,h*0.08))+'px monospace';
     ctx.fillStyle=depth<2?S.label(n.hue):S.text;
     const HEXY=/^[0-9a-f]{16,}(\.\w+)?$/;
-    const nm=HEXY.test(n.name)?'⬡'+n.name.slice(0,8):n.name;
+    const runtimeLabel=n.name.startsWith('runtime:')?GraalTopology.categories.find(c=>c.id===n.name.slice(8))?.label:null;
+    const nm=n.detail?.name||runtimeLabel||(HEXY.test(n.name)?'⬡'+n.name.slice(0,8):n.name);
     const label=nm+(showKids?'':n.leaf?'':' ·'+n.docs);
     ctx.fillText(label.slice(0,Math.floor(w/7)),x+5,y+12);
     if(!showKids&&h>34){ctx.font='9px monospace';ctx.fillStyle=S.sub;
@@ -209,12 +240,15 @@ function drawNode(n,depth){
 function fmtBytes(b){return b>1048576?(b/1048576).toFixed(1)+'M':b>1024?(b/1024).toFixed(1)+'K':b+'B';}
 
 return {
-setRows(rows,rect,dbs=[]) {PROJECT_DBS=new Set(dbs);lastRows=rows;buildTree(rows);root.rect={...rect};invalidate(root);},
+setRows(rows,rect,dbs=[]) {PROJECT_DBS=new Set(dbs);buildTree(rows);root.rect={...rect};invalidate(root);},
 draw(camera,width,height) {cam=camera;innerWidth=width;innerHeight=height;if(root)drawNode(root,0);},
 setLayer(value){layer=value;},
+setMask(value){mask=value&GraalTopology.all;options.invalidate();},
+visible(n){return !!(n?.categories&mask);},
 hit(x,y) {
  if(!root)return null;let found=null;
- function visit(n){const r=n.rect;if(!r||x<r.x||y<r.y||x>r.x+r.w||y>r.y+r.h)return;found=n;
+ function visit(n){const r=n.rect;if(!r||x<r.x||y<r.y||x>r.x+r.w||y>r.y+r.h)return;
+ if(!(n.categories&mask)){found=null;return;}found=n;
  if(n.children.size&&r.w*cam.s>26&&r.h*cam.s>18){layout(n);for(const c of n.children.values())visit(c);}}
  visit(root);return found===root?null:found;
 },

@@ -16,11 +16,15 @@
   <button id="objectsBtn" title="Fit object terrain" aria-label="Object terrain">◇</button>
   <select id="terrainLayer" aria-label="Terrain layer"><option value="1">Objects</option><option value="2">Entropy</option><option value="3">Recency</option></select>
   <select id="programSelect" aria-label="Program"><option>Loading programs</option></select>
+  <div id="parentTools" role="group" aria-label="Selected parent controls">
+    <button id="parentHandle" title="Selected parent" aria-label="Selected parent">⠿</button>
+    <button id="fdBtn" title="Layout selected parent">↦ fd</button><button id="shakeBtn" title="Shake selected parent">shake</button><button id="fitBtn" title="Fit selected parent">⤢ fit</button>
+  </div>
   <button class="run" id="runBtn">▶ Run</button>
+  <button id="argumentsBtn" title="Invocation arguments and resolved bindings" aria-label="Invocation arguments">{ }</button>
   <button class="stop" id="cancelRun" title="Cancel selected program run" aria-label="Cancel run" disabled>■</button>
   <button class="stop" id="stopBtn">■ stop timers</button>
   <button id="addBtn">+ node</button>
-  <button id="fdBtn" title="one-shot layout: layer by cable polarity, relax the rest, then STOP">↦ fd</button><button id="shakeBtn" title="treeshake: pair every OPEN port in the graph with its closest legal open mate">shake</button><button id="fitBtn" title="frame every node (F) — the top-level answer to the D-tab's ring fit">⤢ fit</button>
   <input id="panelName" placeholder="panel-name" style="background:var(--bg);border:1px solid var(--line);color:var(--ink);border-radius:4px;padding:4px 8px;font:inherit;width:120px">
   <button id="storeSaveBtn" title="Publish program changes" aria-label="Publish program">↑ Publish</button>
   <button id="storeLoadBtn" title="load a construction from the store">⇩ store</button>
@@ -39,12 +43,30 @@
   <span id="status" role="status">Loading board</span>
 </div>
 <nav id="boardnav" aria-label="Blackboard territories"></nav>
+<details id="topologyLegend" open>
+  <summary>Topology <span id="topologyCount"></span></summary>
+  <details class="legend-section" open><summary>Activity</summary><button id="activitySelection" title="Inspect selected program activity">No program</button><div id="activityCategories" role="group" aria-label="Activity highlighting"></div></details>
+  <details class="legend-section"><summary>Blobs and heap</summary>
+  <div id="topologyCategories" role="group" aria-label="Topology masks"></div>
+  <footer><button id="refreshHeap" title="Refresh measured heap data" aria-label="Refresh heap">↻</button><div><p id="heapAvailability" role="status"></p><p id="poolAvailability" role="status"></p></div></footer>
+  </details>
+</details>
 <div id="crumb" style="display:none"></div>
 <div id="palette"></div>
 <div id="viewport"><canvas id="landscape" aria-label="Graal and blackboard landscape"></canvas><div id="world"><div id="territories"></div><svg id="channels"></svg><svg id="wires"></svg></div></div>
-<aside id="activity"><header><b>Activity</b><span id="boardCount"></span></header><div id="events"></div></aside>
+<aside id="activity"><section id="connections" aria-label="Connection results" hidden></section><header><b>Activity</b><span id="boardCount"></span></header><div id="events"></div></aside>
 <dialog id="factInspector"><form method="dialog"><button aria-label="Close fact inspector">×</button></form><h2 id="factKey"></h2><p id="factActor"></p><div id="sheetBar"><div id="sheetRoots"></div><button id="sheetRawBtn" title="the fact as raw JSON instead of sheets" aria-pressed="false">{ } raw</button></div><div id="factSheet"></div><pre id="factValue"></pre></dialog>
 <div id="blip"></div>
+<dialog id="argumentInspector" aria-labelledby="argumentTitle">
+  <form method="dialog"><button aria-label="Close arguments">×</button></form>
+  <h2 id="argumentTitle">Arguments</h2>
+  <h3>Invocation</h3>
+  <div class="argument-table"><table><thead><tr><th>Supply</th><th>Name</th><th>Type</th><th>Value (JSON)</th><th>Default</th></tr></thead><tbody id="argumentInputs"></tbody></table></div>
+  <div class="argument-actions"><input id="argumentName" aria-label="New argument name" placeholder="Name"><button id="argumentAdd" aria-label="Add argument" title="Add argument">+</button><button id="argumentRun" class="run">▶ Run</button></div>
+  <p id="argumentError" role="alert"></p>
+  <h3>Resolved Bindings</h3><p id="argumentReceipt"></p>
+  <div class="argument-table"><table><thead><tr><th>Node</th><th>Name</th><th>Type</th><th>Source</th><th>Value</th><th>Status</th></tr></thead><tbody id="argumentResolved"></tbody></table></div>
+</dialog>
 <div id="menu"></div>
 <canvas id="minimap" width="168" height="112"></canvas>
 <div id="hint"></div>
@@ -53,6 +75,7 @@
 <script src="/graal-terrain.js"></script>
 <script src="/landscape.js"></script>
 <script src="/landscape-navigation.js"></script>
+<script src="/harness-arguments.js"></script>
 <script src="/harness.js"></script>
 </body>
 </html>

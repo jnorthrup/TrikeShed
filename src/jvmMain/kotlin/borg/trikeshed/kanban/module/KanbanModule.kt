@@ -542,11 +542,12 @@ class KanbanModule : ForgeModule {
             }.getOrElse {
                 return@claim JvmKanbanServer.HttpResponse(400, JsonSupport.stringify(mapOf("error" to "bad_program", "detail" to (it.message ?: ""))))
             }
-            val optMap = req["options"] as? Map<*, *>
-            val reach = (optMap?.get("reach") as? Number)?.toDouble() ?: 340.0
-            val inclOpt = optMap?.get("optional") == true
-            val options = borg.trikeshed.lcnc.LcncTreeShakeOptions(reach = reach, includeOptional = inclOpt)
-            val result = borg.trikeshed.lcnc.LcncMating.treeshake(program, options, publisher.vocabulary())
+            val result = try {
+                val options = borg.trikeshed.lcnc.LcncTreeShakeOptions.fromMap(req["options"] as? Map<*, *>)
+                borg.trikeshed.lcnc.LcncMating.treeshake(program, options, publisher.vocabulary())
+            } catch (e: IllegalArgumentException) {
+                return@claim JvmKanbanServer.HttpResponse(400, JsonSupport.stringify(mapOf("error" to "bad_selection", "detail" to e.message)))
+            }
             JvmKanbanServer.HttpResponse(200, JsonSupport.stringify(result.toMap()))
         }
 
@@ -573,6 +574,8 @@ class KanbanModule : ForgeModule {
                 return@claim JvmKanbanServer.HttpResponse(413, JsonSupport.stringify(mapOf("error" to limit)))
             }
             @Suppress("UNCHECKED_CAST")
+            if (req.containsKey("inputs") && req["inputs"] !is Map<*, *>)
+                return@claim JvmKanbanServer.HttpResponse(400, """{"error":"inputs_must_be_object"}""")
             val inputs = (req["inputs"] as? Map<*, *>)?.entries
                 ?.associate { (k, v) -> k.toString() to v } ?: emptyMap<String, Any?>()
             val programName = req["program"]?.toString()

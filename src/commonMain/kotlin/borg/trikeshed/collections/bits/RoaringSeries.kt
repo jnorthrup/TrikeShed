@@ -2,6 +2,7 @@ package borg.trikeshed.collections.bits
 
 import borg.trikeshed.lib.Series
 import borg.trikeshed.lib.Series2
+import borg.trikeshed.lib.binarySearch
 import borg.trikeshed.lib.get
 import borg.trikeshed.lib.j
 

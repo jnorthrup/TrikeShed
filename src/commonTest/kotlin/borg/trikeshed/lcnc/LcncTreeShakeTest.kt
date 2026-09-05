@@ -1,13 +1,81 @@
 package borg.trikeshed.lcnc
 
 import borg.trikeshed.lib.toSeries
+import borg.trikeshed.lib.toList
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
+import kotlin.test.assertFailsWith
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 class LcncTreeShakeTest {
+
+    @Test
+    fun selectedParentBoundsNewWiresButRetainsFullProgramContext() {
+        val inbound = LcncWire("external", "heap", "nested", "args?")
+        val program = LcncProgram("selection", listOf(
+            LcncNode("external", "graal.heap"),
+            LcncNode("outside-source", "prompt.chat", x = 100.0),
+            LcncNode("outside-sink", "display", x = 200.0),
+            LcncNode("selected", "scope", children = listOf(
+                LcncNode("source", "prompt.chat", x = 100.0),
+                LcncNode("sink", "display", x = 200.0),
+                LcncNode("nested", "scope", x = 800.0, children = listOf(
+                    LcncNode("binding", "scope.in", params = mapOf("name" to "text")),
+                ).toSeries()),
+            ).toSeries()),
+        ).toSeries(), listOf(inbound).toSeries())
+        val result = LcncTreeShake.shake(program, LcncTreeShakeOptions(parentId = "selected"))
+        assertEquals("selected", result.toMap()["parentId"])
+        assertEquals(listOf(LcncWire("source", "content", "sink", "x")), result.made)
+        assertEquals(program.nodes, result.program.nodes)
+        assertTrue(inbound in result.program.wires.toList())
+        assertTrue(result.verdicts.any { it.nodeId == "nested" && it.port == "text" && it.status == "binding" })
+        assertTrue(result.verdicts.any { it.nodeId == "binding" && it.label.startsWith("Enclosing frame") })
+        assertFalse(result.verdicts.any { it.nodeId.startsWith("outside") })
+    }
+
+    @Test
+    fun invalidParentCannotFallBackToWholeProgramShake() {
+        val program = LcncProgram("selection", listOf(LcncNode("leaf", "display"), LcncNode("empty", "scope")).toSeries(),
+            emptyList<LcncWire>().toSeries())
+        for (parent in listOf("missing", "leaf")) assertFailsWith<IllegalArgumentException> {
+            LcncTreeShake.shake(program, LcncTreeShakeOptions(parentId = parent))
+        }
+        assertTrue(LcncTreeShake.shake(program, LcncTreeShakeOptions(parentId = "empty")).verdicts.isEmpty())
+        for (parent in listOf("", 42)) assertFailsWith<IllegalArgumentException> {
+            LcncTreeShakeOptions.fromMap(mapOf("parentId" to parent))
+        }
+        assertEquals("empty", LcncTreeShakeOptions.fromMap(mapOf("parentId" to "empty")).parentId)
+    }
+
+    @Test
+    fun argumentMapIsNotOverriddenByAGuessedNamedWire() {
+        val program = LcncProgram("bound", listOf(
+            LcncNode("map", "graal.heap"),
+            LcncNode("other", "graal.heap"),
+            LcncNode("ring", "scope", children = listOf(
+                LcncNode("arg", "scope.in", params = mapOf("name" to "text")),
+            ).toSeries()),
+        ).toSeries(), listOf(LcncWire("map", "heap", "ring", "args?")).toSeries())
+        for (optional in listOf(false, true)) {
+            val result = LcncTreeShake.shake(program, LcncTreeShakeOptions(includeOptional = optional))
+            assertFalse(result.made.any { it.toNode == "ring" && it.toPort == "text" })
+            assertTrue(result.verdicts.any { it.nodeId == "ring" && it.port == "text" && it.status == "binding" })
+            assertFalse("ring" in result.starvedNodeIds)
+        }
+    }
+
+    @Test
+    fun optionalInputsAreReportedWithoutBeingConnected() {
+        val program = LcncProgram("optional", listOf(LcncNode("ring", "scope")).toSeries(),
+            emptyList<LcncWire>().toSeries())
+        val result = LcncTreeShake.shake(program)
+        assertTrue(result.made.isEmpty())
+        assertTrue(result.verdicts.any { it.port == "args?" && it.status == "optional" })
+        assertTrue(result.starvedNodeIds.isEmpty())
+    }
 
     @Test
     fun testTreeShakeMatesCompatiblePortsWithinReach() {
@@ -106,7 +174,7 @@ class LcncTreeShakeTest {
         val result = LcncTreeShake.shake(program)
         // Data flow cannot escape from inner scope to outer without scope.out
         assertTrue(result.made.isEmpty(), "inner scope cannot auto-mate outward to outer scope")
-        val v = result.verdicts.find { it.nodeId == "outer-confirm" }
+        val v = result.verdicts.find { it.nodeId == "outer-confirm" && it.port == "content" }
         assertNotNull(v)
         assertEquals("scope", v.status)
     }

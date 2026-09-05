@@ -40,6 +40,43 @@ import kotlin.test.assertTrue
  */
 class LcncRunProgramRouteTest {
 
+    @Test
+    fun invocationBindingsAndEffectiveConstructionReachDurableReceipt(): Unit = runBlocking {
+        val p = program("factory-args", listOf(
+            LcncNode("input", "scope.in", mapOf("name" to "construction")),
+            LcncNode("factory", "ccek.incarnate"),
+            LcncNode("out", "scope.out", mapOf("name" to "instance")),
+        ), listOf(LcncWire("input", "value", "factory", "args?"), LcncWire("factory", "node", "out", "value")))
+        val routes = ModuleRouteRegistry()
+        val server = JvmKanbanServer(moduleRoutes = routes)
+        val ctx = newContext(routes, tempDir("factory-args"), CasStore.inMemory(), mapOf(p.name to p))
+        ctx.lcncRunners.putAll(borg.trikeshed.lcnc.CcekNodes.registry(borg.trikeshed.lcnc.CcekSeams.live(ctx.scope)))
+        val supervisor = ModuleSupervisor(ctx)
+        supervisor.attach(KanbanModule())
+        try {
+            val request = """{"program":"factory-args","inputs":{"construction":{"title":"route-instance","maxConcurrency":3,"record":true}}}"""
+            val response = post(server, "/api/lcnc/run", request)
+            assertEquals(200, response.status, response.body)
+            val result = json(response)
+            val instance = (result["returns"] as Map<*, *>)["instance"] as Map<*, *>
+            assertEquals(3, (instance["maxConcurrency"] as Number).toInt())
+            val bindings = result["bindings"] as List<*>
+            assertEquals("invocation", (bindings.single() as Map<*, *>)["source"])
+            val receipt = ctx.blackboard.get("lcnc/run/${result["runId"]}") as Map<*, *>
+            assertEquals(result["bindings"], JsonSupport.parse(JsonSupport.stringify(receipt["bindings"])))
+            assertEquals(result["inputs"], receipt["inputs"])
+            val conflict = post(server, "/api/lcnc/run", request.replace("Concurrency\":3", "Concurrency\":4"))
+            assertEquals(400, conflict.status, conflict.body)
+            assertTrue(json(conflict)["error"].toString().contains("incarnation_conflict"))
+            val malformed = post(server, "/api/lcnc/run", """{"program":"factory-args","inputs":[]}""")
+            assertEquals(400, malformed.status)
+            assertEquals("inputs_must_be_object", json(malformed)["error"])
+        } finally {
+            supervisor.drainAll()
+            ctx.scope.coroutineContext[kotlinx.coroutines.Job]?.cancel()
+        }
+    }
+
     private fun tempDir(name: String): File =
         File(System.getProperty("java.io.tmpdir"), "lcnc-run-$name-${System.nanoTime()}").apply { mkdirs() }
 
@@ -83,6 +120,27 @@ class LcncRunProgramRouteTest {
 
     private fun program(name: String, nodes: List<LcncNode>, wires: List<LcncWire>) =
         LcncProgram(name, nodes.toSeries(), wires.toSeries())
+
+    @Test
+    fun shakeRouteConfirmsParentAndRefusesUnknownSelection(): Unit = runBlocking {
+        val routes = ModuleRouteRegistry()
+        val server = JvmKanbanServer(moduleRoutes = routes)
+        val ctx = newContext(routes, tempDir("selected-shake"), CasStore.inMemory())
+        val supervisor = ModuleSupervisor(ctx)
+        supervisor.attach(KanbanModule())
+        try {
+            val document = borg.trikeshed.lcnc.LcncPresets.all().getValue("preset-scope")
+            for (parent in listOf("r2", "missing", "n0")) {
+                val response = post(server, "/api/lcnc/treeshake", """{"program":$document,"options":{"parentId":"$parent"}}""")
+                assertEquals(if (parent == "r2") 200 else 400, response.status, response.body)
+                if (parent == "r2") {
+                    assertEquals("r2", json(response)["parentId"])
+                    assertTrue((json(response)["made"] as List<*>).isEmpty())
+                    assertTrue((json(response)["verdicts"] as List<*>).all { (it as Map<*, *>)["nodeId"] in setOf("b", "p") })
+                } else assertEquals("bad_selection", json(response)["error"])
+            }
+        } finally { supervisor.detach("kanban") }
+    }
 
     @Test
     fun runsAStoredTwoLevelProgramAndReturnsOuterScopeOuts(): Unit = runBlocking {
@@ -189,9 +247,7 @@ class LcncRunProgramRouteTest {
     @Test
     fun offeredScopePresetRunsThroughTheDefaultPresetLoader(): Unit = runBlocking {
         // The default ModuleContext.programLoader resolves presets only —
-        // preset-scope is the three-ring concentric document: the root
-        // scope.in default rides one wire two rings deep and the yield climbs
-        // out ring by ring; zero registered runners needed.
+        // Map and named scope bindings need no registered runners.
         val routes = ModuleRouteRegistry()
         val server = JvmKanbanServer(moduleRoutes = routes)
         val supervisor = ModuleSupervisor(newContext(routes, tempDir("preset"), CasStore.inMemory()))

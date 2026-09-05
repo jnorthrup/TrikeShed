@@ -99,6 +99,8 @@ class LcncRunner(private val registry: Map<String, LcncNodeRunner>) {
     var maxScopeDepth: Int = 16
     var maxNodeExecutions: Int = 10000
     private var executedNodes: Int = 0
+    private val argumentBindings = ArrayList<Map<String, Any?>>()
+    private var bindingsTruncated = false
 
     class LcncWorkLimitExceeded : Exception("node execution work_limit exceeded")
 
@@ -120,6 +122,8 @@ class LcncRunner(private val registry: Map<String, LcncNodeRunner>) {
     data class ScopeResult(
         val nodeOutputs: Map<String, Map<String, Any?>>,
         val returns: Map<String, Any?>,
+        val bindings: List<Map<String, Any?>> = emptyList(),
+        val bindingsTruncated: Boolean = false,
     )
 
     suspend fun runAll(program: LcncProgram): Map<String, Map<String, Any?>> =
@@ -131,13 +135,16 @@ class LcncRunner(private val registry: Map<String, LcncNodeRunner>) {
      * `scope.out` yields come back as [ScopeResult.returns].
      */
     suspend fun runProcedure(program: LcncProgram, args: Map<String, Any?> = emptyMap()): ScopeResult {
+        require(!program.controls.inspectionOnly) { "Inspection-only wiring specimen; execution is disabled" }
         executedNodes = 0
+        argumentBindings.clear()
+        bindingsTruncated = false
         val state = WalkState(program)
-        val root = LcncScopeFrame(bindings = args, chain = FrameIdChain.root(ROOT_SCOPE))
+        val root = LcncScopeFrame(bindings = args, chain = FrameIdChain.root(ROOT_SCOPE), bindingSources = args.keys.associateWith { "invocation" })
         val returns = withContext(root) {
             runRing(program.nodes, state, root, emptyList())
         }
-        return ScopeResult(root.outputs, returns)
+        return ScopeResult(root.outputs, returns, argumentBindings.toList(), bindingsTruncated)
     }
 
     /** Per-document walk state: the node universe, each node's ring path,
@@ -184,7 +191,8 @@ class LcncRunner(private val registry: Map<String, LcncNodeRunner>) {
                 if (wire.fromNode !in state.visited) throw LcncUseBeforeDef(wire.fromNode, wire.toNode)
                 continue // ran but produced nothing: the port stays absent, silently
             }
-            gathered.getOrPut(wire.toPort) { mutableListOf() }.add(fromOut[wire.fromPort])
+            if (fromOut.containsKey(wire.fromPort))
+                gathered.getOrPut(wire.toPort) { mutableListOf() }.add(fromOut[wire.fromPort])
         }
         val inputs = LinkedHashMap<String, Any?>()
         for ((port, values) in gathered) {
@@ -218,6 +226,9 @@ class LcncRunner(private val registry: Map<String, LcncNodeRunner>) {
             // then the declared default.
             if (node.type == LcncContracts.SCOPE_IN) {
                 val name = node.params["name"]?.removeSuffix("?")
+                val installed = checkNotNull(currentCoroutineContext()[LcncScopeFrame])
+                check(installed === frame) { "scope frame differs from installed CoroutineContext element" }
+                val owner = name?.let(installed::bindingOwner)
                 when {
                     name != null && frame.hasBinding(name) ->
                         frame.outputs[node.id] = _m["value" j frame.binding(name)]
@@ -225,6 +236,14 @@ class LcncRunner(private val registry: Map<String, LcncNodeRunner>) {
                         frame.outputs[node.id] = _m["value" j node.params["default"]]
                     // unbound and defaultless: the port stays absent downstream
                 }
+                if (argumentBindings.size < 1024) argumentBindings.add(linkedMapOf(
+                    "nodeId" to node.id, "path" to pathNames, "name" to name,
+                    "type" to (node.params["kind"] ?: "generic"),
+                    "source" to when { owner != null -> owner.bindingSources[name] ?: "binding"; node.params.containsKey("default") -> "default"; else -> "unbound" },
+                    "ownerDepth" to owner?.depth, "depth" to installed.depth,
+                    "value" to frame.outputs[node.id]?.get("value"),
+                    "status" to if (frame.outputs[node.id]?.containsKey("value") == true) "resolved" else "unbound",
+                )) else bindingsTruncated = true
                 continue
             }
 
@@ -272,6 +291,7 @@ class LcncRunner(private val registry: Map<String, LcncNodeRunner>) {
                 } else {
                     // A missing named body is a data error, never a silent leaf.
                     val doc = loader!!(subName!!) ?: throw LcncUnknownNodeType(subName)
+                    require(!doc.controls.inspectionOnly) { "Inspection-only wiring specimen: $subName" }
                     bodyNodes = doc.nodes
                     bodyState = WalkState(doc)
                 }
@@ -279,17 +299,25 @@ class LcncRunner(private val registry: Map<String, LcncNodeRunner>) {
                 // Install the envelope: the generic args? map merges UNDER the
                 // per-name wires (per-name wins); `when` guards, never binds.
                 val bound = LinkedHashMap<String, Any?>()
-                ((inputs["args"] ?: inputs["args?"]) as? Map<*, *>)?.forEach { (k, v) -> bound[k.toString()] = v }
+                val sources = LinkedHashMap<String, String>()
+                val envelope = if (inputs.containsKey("args")) inputs["args"] else inputs["args?"]
+                require(!inputs.containsKey("args") && !inputs.containsKey("args?") || envelope is Map<*, *>) {
+                    "scope ${node.id}: args must be an object"
+                }
+                (envelope as? Map<*, *>)?.forEach { (k, v) ->
+                    require(k is String) { "scope ${node.id}: argument names must be strings" }
+                    bound[k] = v; sources[k] = "args"
+                }
                 for ((port, v) in inputs) {
                     val p = port.removeSuffix("?")
-                    if (p != "args" && p != "when") bound[p] = v
+                    if (p != "args" && p != "when") { bound[p] = v; sources[p] = "input" }
                 }
                 // Required = the body's non-optional scope.in names, satisfiable
                 // by the envelope OR the enclosing chain — rings are blocks.
                 if (requiredScopeIns(bodyNodes).any { !bound.containsKey(it) && !frame.hasBinding(it) }) continue
 
                 val childChain = FrameIdChain.append(frame.chain, ringName)
-                val childFrame = LcncScopeFrame(bindings = bound, chain = childChain, parent = frame)
+                val childFrame = LcncScopeFrame(bindings = bound, chain = childChain, parent = frame, bindingSources = sources)
                 onScopeEnter?.invoke(pathNames + ringName, childChain)
                 // Ring entry IS withContext: any suspend runner in the subtree
                 // reads currentCoroutineContext()[LcncScopeFrame] — block

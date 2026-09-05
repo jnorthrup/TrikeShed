@@ -1,6 +1,7 @@
 package borg.trikeshed.lcnc
 
 import borg.trikeshed.lib.toSeries
+import borg.trikeshed.lib.toList
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.runBlocking
 import kotlin.test.Test
@@ -247,8 +248,17 @@ class LcncConcentricScopeTest {
     fun presetScopeRunsAsAThreeRingDocument() = runBlocking {
         val doc = LcncPresets.all().getValue("preset-scope")
         val p = LcncProgramConfix.fromJson("preset-scope", doc)
-        val res = LcncRunner(registry).runProcedure(p)
+        val res = LcncRunner(emptyMap()).runProcedure(p)
         assertEquals("hello", res.returns["result"],
-            "the root scope.in default rode a wire two rings deep and the yield climbed all the way out")
+            "map and named bindings carry the default inward and yields carry it out")
+        val wires = p.wires.toList()
+        assertTrue(wires.any { it.fromNode == "args" && it.toNode == "r1" && it.toPort == "args?" })
+        assertTrue(wires.any { it.fromNode == "args" && it.toNode == "r2" && it.toPort == "args?" })
+        assertTrue(wires.any { it.fromNode == "a" && it.toNode == "r2" && it.toPort == "text" })
+        val patched = LcncRunner(emptyMap()).runProcedure(p, mapOf("text" to "patched"))
+        assertEquals("patched", patched.returns["result"])
+        val shake = LcncTreeShake.shake(p)
+        assertTrue(shake.made.isEmpty(), "a complete demo needs no guessed cables")
+        assertTrue(shake.starvedNodeIds.isEmpty())
     }
 }

@@ -495,6 +495,7 @@ class JvmKanbanServer(
         "/patch.js" to ("web/patch.js" to "application/javascript; charset=utf-8"),
         "/patch.css" to ("web/patch.css" to "text/css; charset=utf-8"),
         "/harness.js" to ("web/harness.js" to "application/javascript; charset=utf-8"),
+        "/harness-arguments.js" to ("web/harness-arguments.js" to "application/javascript; charset=utf-8"),
         "/harness.css" to ("web/harness.css" to "text/css; charset=utf-8"),
         "/graal-terrain.js" to ("web/graal-terrain.js" to "application/javascript; charset=utf-8"),
         "/landscape.js" to ("web/landscape.js" to "application/javascript; charset=utf-8"),

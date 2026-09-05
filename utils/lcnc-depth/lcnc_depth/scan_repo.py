@@ -24,6 +24,76 @@ from .modules import kotlin_scan as ks
 # demand for anything outside this set is unsatisfiable under that scope.
 CCEK_ASSEMBLY_PROVIDES = {"MuxReactorElement.Key", "LcncScopeFrame", "Job"}
 
+# ── CCEK decomposition rulings ───────────────────────────────────────────
+# The scanner reports a FACT per public member of the CCEK package: reached by an
+# LCNC runner file, unreached, or orphan (no file outside its own imports it).
+# Whether an unreached member SHOULD be a lego is a ruling, and rulings are
+# declared here with their reason so they can be argued with. A member that is
+# unreached and unruled is a GAP — a capability a program cannot reach.
+#
+# Keyed by qualified name, then by owner type, then by file name.
+CCEK_RULINGS: dict[str, str] = {
+    # the daemon composes these once at boot; a program rides the bound reactor
+    "CCEK.initialize": "substrate — OroborosDaemon calls CCEK.initialize(muxReactor) once; programs ride the binding via CcekSeams.live(binding)",
+    "CCEK.inputChannel": "substrate — channel factory used inside ArticulatedNode",
+    "CCEK.fanOutChannel": "substrate — channel factory used inside ArticulatedNode",
+    "CCEK.childScope": "substrate — per-block child scope, owned by ArticulatedNode.registerChildScopes",
+    "CcekReactorBinding.reactor": "substrate — the reactor element the binding was made from",
+    # the same capability under another name
+    "ArticulatedNode.signalIn": "same capability — sendSignal writes this channel; ccek.signal is the lego",
+    "ArticulatedNode.start": "not a lego — init() and sendSignal() call it; a drained node's signalIn is closed for good, so start() cannot revive it (CCEK.kt cancel/start). Exposing it would promise a restart the engine does not perform",
+    "ArticulatedNode.stop": "alias — fun stop() = cancel(); ccek.drain is the lego",
+    "ForgeDocNode": "wrapper — every member delegates to ArticulatedNode; ccek.incarnate is the lego",
+    "coroutineService": "substrate — generic keyed lookup; ccek.validate reports which keys the runner's context carries",
+    "KeyedService": "substrate — marker interface for context elements",
+    "CcekKeyService": "carried — a context element ccek.validate can require by name",
+    "requireCcekScope": "lego — ccek.validate",
+    "CcekScopeValidation": "carried — ccek.validate's outputs",
+    "UserContext.parentId": "carried — ccek.lineage / ccek.context document field",
+    "UserContext.active": "carried — ccek.activate / ccek.lineage output",
+    "UserContext.reteTable": "lego — ccek.query (CausalReteTable.query / containsFact)",
+    "CausalReteTable": "lego — ccek.query",
+    "PolyglotFact": "lego — ccek.polyglot.load / ccek.polyglot.query",
+    "TableTestResult": "carried — ccek.table.test outputs",
+    "GraphicalFlow": "lego — ccek.flow",
+    "GraphicalBlock": "carried — ccek.flow input rows",
+    "GraphicalEdge": "carried — ccek.flow input rows",
+    "GraphicalCursor": "carried — ccek.flow output",
+    "SpreadsheetVeneer": "lego — ccek.veneer",
+    "MetaLcncParadigm": "lego — ccek.paradigm",
+    "LcncRule": "carried — ccek.paradigm input rows",
+    "AdaptedParadigm": "carried — ccek.paradigm output",
+    "ForgeProjection": "carried — ccek.projection reads the typed replay caches; ForgeProjection.Error surfaces as a Failed status event",
+    "AgentStatusEvent": "carried — ccek.status renders every case (statusMap)",
+    "CausalAssertion": "carried — ccek.fact / ccek.query rows",
+    "VoteBallot": "carried — panel.vote input rows (PanelVoteNode)",
+    "VoteTally": "carried — panel.vote output",
+    "VoteResult": "carried — panel.vote output",
+    # vocabulary ahead of implementation (doc/ccek-consistency-pass.md §4)
+    "Seat.kt": "orphan vocabulary — Seat/MuxVenn have no caller outside their file; council seats run through CouncilNodes, not this type",
+    "SupervisorJob.kt": "orphan vocabulary — an interface set that shadows kotlinx SupervisorJob; RealSupervisorJob's one caller is graal/subvm/GuestModules.kt",
+}
+# Sealed-case constructors and their fields are constructed/rendered by the verb
+# node; the class is what a program reaches, the fields ride inside it.
+CCEK_CARRIED_OWNERS = {
+    "AppendBlock", "UpdateText", "DeleteBlock", "MoveCard", "Continue", "Repeat",
+    "Abort", "Fork", "Join", "Vote", "Started", "Completed", "Failed",
+    "DocumentChanged", "BoardChanged", "MarkdownChanged", "Error",
+}
+
+
+def ruling_for(row: dict) -> str | None:
+    q = row["qualified"]
+    if q in CCEK_RULINGS:
+        return CCEK_RULINGS[q]
+    for key in (row.get("owner"), row.get("root"), row["member"]):
+        if key and key in CCEK_RULINGS:
+            return CCEK_RULINGS[key]
+    if row.get("owner") in CCEK_CARRIED_OWNERS or row.get("root") in CCEK_CARRIED_OWNERS:
+        return "carried — a sealed case the verb node constructs or renders"
+    name = Path(row["path"]).name
+    return CCEK_RULINGS.get(name)
+
 
 def _iter_sources(root: Path, include_tests: bool):
     for p in sorted(root.rglob("*.kt")):
@@ -32,11 +102,37 @@ def _iter_sources(root: Path, include_tests: bool):
         yield p
 
 
+def ccek_decomposition(root: Path, texts: dict[str, str]) -> dict:
+    """The CCEK package, member by member, against the LCNC runner files.
+
+    Surface = every public member under a `ccek/` package directory. Seams =
+    every file under an `lcnc/` directory (the runners are the only way a program
+    touches the plane). The whole tree decides orphan-hood.
+    """
+    surface: list[dict] = []
+    for rel, text in sorted(texts.items()):
+        if "/ccek/" in "/" + rel.replace("\\", "/"):
+            surface += ks.ccek_surface(text, rel)
+    seams = {rel: t for rel, t in texts.items() if "/lcnc/" in "/" + rel.replace("\\", "/")}
+    rows = ks.ccek_coverage(surface, seams, texts)
+    for r in rows:
+        r["ruling"] = ruling_for(r)
+        r["gap"] = r["status"] in ("unreached", "orphan") and r["ruling"] is None
+    return {
+        "surface": rows,
+        "reached": [r for r in rows if r["status"] == "reached"],
+        "unreached": [r for r in rows if r["status"] == "unreached"],
+        "orphan": [r for r in rows if r["status"] == "orphan"],
+        "gaps": [r for r in rows if r["gap"]],
+    }
+
+
 def analyse(root: Path, include_tests: bool = False) -> dict:
     demands: list[dict] = []
     supervision: list[dict] = []
     contracts: list[dict] = []
     cast_rows: list[dict] = []
+    texts: dict[str, str] = {}
 
     for p in _iter_sources(root, include_tests):
         try:
@@ -44,6 +140,7 @@ def analyse(root: Path, include_tests: bool = False) -> dict:
         except OSError:
             continue
         rel = str(p.relative_to(root))
+        texts[rel] = text
         demands += ks.context_demands(text, rel)
         supervision += ks.supervision(text, rel)
         cast_rows += ks.casts(text, rel)
@@ -72,6 +169,7 @@ def analyse(root: Path, include_tests: bool = False) -> dict:
         "suspicious_supervision": suspicious,
         "casts": cast_rows,
         "silent_cast_failures": silent,
+        "ccek": ccek_decomposition(root, texts),
     }
 
 
@@ -133,6 +231,35 @@ def _report(a: dict) -> None:
         f"      delivers the wrong Kotlin type takes one of these branches and\n"
         f"      produces a plausible-looking empty answer, with no error anywhere.\n"
     )
+
+    # ── CCEK decomposition ──
+    c = a["ccek"]
+    owners = sorted({r["root"] or r["member"] for r in c["surface"]})
+    w(
+        f"\nCCEK DECOMPOSITION  {len(c['surface'])} public members across {len(owners)} types; "
+        f"{len(c['reached'])} reached by an LCNC runner, {len(c['unreached'])} unreached, "
+        f"{len(c['orphan'])} orphan\n"
+    )
+    by_root: dict[str, list[dict]] = defaultdict(list)
+    for r in c["surface"]:
+        by_root[r["root"] or r["member"]].append(r)
+    for root_name in sorted(by_root, key=lambda k: (-sum(1 for r in by_root[k] if r["status"] != "reached"), k)):
+        rows = by_root[root_name]
+        reached = sum(1 for r in rows if r["status"] == "reached")
+        if reached == len(rows):
+            continue
+        w(f"    {root_name:26} {reached:2}/{len(rows):<2} reached\n")
+        for r in rows:
+            if r["status"] == "reached":
+                continue
+            tag = "GAP" if r["gap"] else r["status"]
+            w(f"        {tag:9} {r['kind']:9} {r['qualified']:40} {r['path']}:{r['line']}\n")
+            if r["ruling"]:
+                w(f"            {r['ruling']}\n")
+    w(
+        f"    → {len(c['gaps'])} GAP(s): public capability with no LCNC lego and no ruling.\n"
+        f"      A ruling lives in CCEK_RULINGS with its reason; a lego is a contract + runner.\n"
+    )
     w("\n")
 
 
@@ -147,6 +274,12 @@ def main(argv: list[str] | None = None) -> int:
         help="exit non-zero when a suspicious supervision site or an unsatisfiable "
         "context demand is found — for use as a CI gate",
     )
+    ap.add_argument(
+        "--fail-on-ccek-gap",
+        action="store_true",
+        help="exit non-zero when a public CCEK member is neither reached by an LCNC "
+        "runner nor covered by a ruling in CCEK_RULINGS",
+    )
     args = ap.parse_args(argv)
 
     if not args.root.is_dir():
@@ -160,10 +293,12 @@ def main(argv: list[str] | None = None) -> int:
     else:
         _report(a)
 
+    bad = 0
     if args.fail_on_suspicious:
-        bad = len(a["suspicious_supervision"]) + len(a["unsatisfiable_under_ccek_assembly"])
-        return 1 if bad else 0
-    return 0
+        bad += len(a["suspicious_supervision"]) + len(a["unsatisfiable_under_ccek_assembly"])
+    if args.fail_on_ccek_gap:
+        bad += len(a["ccek"]["gaps"])
+    return 1 if bad else 0
 
 
 if __name__ == "__main__":

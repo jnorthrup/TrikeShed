@@ -134,6 +134,25 @@ class SupervisionBoundary(BaseModel):
 # ── Stage 1 output ──────────────────────────────────────────────────────
 
 
+class CcekMember(BaseModel):
+    """One public member of the CCEK plane and whether a program can reach it.
+
+    The plane is ~230 public members across ~30 types; nine node types fronted
+    it before this model existed. `status` is the scanner's FACT (reached /
+    unreached / orphan / plumbing); `ruling` is the human-declared reason an
+    unreached member is not a gap; a member with neither is a capability no
+    program can use.
+    """
+
+    qualified: str = Field(description='Owner-qualified name, e.g. "UserContext.queryPolyglot"')
+    kind: str = Field(description="class | object | interface | fun | val | property | typealias")
+    status: str = Field(description="reached | unreached | orphan | plumbing")
+    reached_at: list[str] = Field(default_factory=list, description="file:line in an LCNC runner file that reads or calls it")
+    ruling: str | None = Field(default=None, description="Declared reason it is not a gap (substrate / alias / carried / orphan vocabulary), or null")
+    lego: str | None = Field(default=None, description="The ccek.* node type that should front it, when the RLM proposes one")
+    witness: str = Field(description="file:line of the declaration")
+
+
 class DepthModel(BaseModel):
     """The three-layer model derived from the Kotlin sources."""
 
@@ -150,7 +169,10 @@ class DepthModel(BaseModel):
 
 
 # ── Stage 2 output ──────────────────────────────────────────────────────
-
+    ccek_members: list[CcekMember] = Field(
+        default_factory=list,
+        description="The CCEK plane member by member: what a program reaches, what it cannot, and why",
+    )
 
 class Violation(BaseModel):
     """One connection defect, stated so an operator can act on it."""

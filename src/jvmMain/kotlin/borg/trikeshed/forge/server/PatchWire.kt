@@ -606,11 +606,12 @@ class PatchWire(
                 val program = runCatching {
                     borg.trikeshed.lcnc.LcncProgramConfix.fromJson("treeshake", JsonSupport.stringify(programData))
                 }.getOrElse { return json(mapOf("error" to "bad_program", "detail" to (it.message ?: "")), 400) }
-                val optMap = req["options"] as? Map<*, *>
-                val reach = (optMap?.get("reach") as? Number)?.toDouble() ?: 340.0
-                val inclOpt = optMap?.get("optional") == true
-                val options = borg.trikeshed.lcnc.LcncTreeShakeOptions(reach = reach, includeOptional = inclOpt)
-                val result = borg.trikeshed.lcnc.LcncMating.treeshake(program, options)
+                val result = try {
+                    val options = borg.trikeshed.lcnc.LcncTreeShakeOptions.fromMap(req["options"] as? Map<*, *>)
+                    borg.trikeshed.lcnc.LcncMating.treeshake(program, options)
+                } catch (e: IllegalArgumentException) {
+                    return json(mapOf("error" to "bad_selection", "detail" to e.message), 400)
+                }
                 json(result.toMap())
             }
             method == "GET" && p == "/api/projects" -> json(

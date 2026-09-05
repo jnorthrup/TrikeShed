@@ -6,7 +6,9 @@ const Harness = {
   board: Object.create(null), seq: 0, selected: null, applying: false, dirty: false,
   events: [], drafts: new Map(), actors: new Map(), positions: new Map(), flashes: new Map(), // Delta 2026-09-05 (fan-out): Map<key, expiresAt ms>; one Set with one timer collapsed a burst into one border
   mounts: new Map(), baselines: new Map(), nextY: 0, nextX:0, rowHeight:0,
-  ready: false, running: false, frame: 0, activeBounds: {w:1600,h:900},
+  ready: false, live: false, running: false, frame: 0, activeBounds: {w:1600,h:900},
+  connectionReport: null, shaking: false,
+  parentHandle: null, parentRevision: 0, dragMoved: false,
   el(tag, cls, value) {
     const el = document.createElement(tag);
     if (cls) el.className = cls;
@@ -14,14 +16,16 @@ const Harness = {
     return el;
   },
   message(value) { $("#status").textContent = value; },
+  inspectionOnly(name=this.selected) {return (this.drafts.get(name)||this.board["lcnc/program/"+name]?.document)?.controls?.inspectionOnly===true;},
   programs() {
     return [...new Set([...Object.keys(this.board).filter(k => k.startsWith("lcnc/program/") && this.board[k]?.document), ...[...this.drafts.keys()].map(n=>"lcnc/program/"+n)])].sort();
   },
   changed() {
     if (this.applying || !this.ready) return;
+    if(this.connectionReport){this.connectionReport=null;$("#connections").hidden=true;clearVerdicts();}
     this.dirty = JSON.stringify(this.document()) !== this.baselines.get(this.selected);
     if(this.dirty)this.drafts.set(this.selected,this.document());else this.drafts.delete(this.selected);
-    $("#runBtn").disabled = this.dirty || this.running;
+    $("#runBtn").disabled = this.dirty || this.running || this.inspectionOnly();
     if(this.dirty)this.message("Unpublished changes in " + this.selected);
     this.schedule();
   },
@@ -31,29 +35,97 @@ const Harness = {
     const owned=G.nodes.filter(n=>n._program===name), ids=new Map(owned.map(n=>[n.id,n._localId||n.id]));
     const original=new Map();
     const walk=nodes=>{for(const n of nodes||[]){original.set(n.id,n);walk(n.children);}};walk(entry?.document?.nodes);
-    const node=n=>({...original.get(ids.get(n.id)),...nodeDoc(n),id:ids.get(n.id),x:n.x-(n._parentScope?0:origin.x),y:n.y-(n._parentScope?0:origin.y),children:(n.children||[]).map(node)});
+    // A mount translation must not round-trip authored coordinates through
+    // floating-point subtraction. Reuse its exact local values until edited.
+    const coordinate=(n,axis)=>n._parentScope?n[axis]:n._placement?.[axis]===n[axis]?n._placement.local[axis]:n[axis]-origin[axis];
+    const node=n=>({...original.get(ids.get(n.id)),...nodeDoc(n),id:ids.get(n.id),x:coordinate(n,"x"),y:coordinate(n,"y"),children:(n.children||[]).map(node)});
     return {...entry?.document,nodes:owned.filter(n=>!n._parentScope).map(node),
       wires:G.wires.filter(w=>ids.has(w.from[0])&&ids.has(w.to[0])).map(w=>({from:[ids.get(w.from[0]),w.from[1]],to:[ids.get(w.to[0]),w.to[1]]})),seq:Math.max(entry?.document?.seq||1,...[...ids.values()].map(id=>/^n\d+$/.test(id)?Number(id.slice(1))+1:1))};
   },
-  select(name, focus = true) {
+  select(name, focus = true, preserveParent = false) {
     const entry = this.board["lcnc/program/" + name] || {document:this.drafts.get(name)};
     if (!entry?.document) { this.message("Program is not on the board: " + name); return false; }
     if (this.selected && this.dirty) this.drafts.set(this.selected, this.document());
+    const changedMain=this.selected!==name;
     this.selected = name;
+    if(changedMain||!preserveParent)this.setParent(null);
+    if(this.connectionReport?.program!==name){this.connectionReport=null;$("#connections").hidden=true;clearVerdicts();}
     if(!this.mounts.has(name))this.mount(name);
-    UNDO.length = 0; REDO.length = 0; lastDoc = JSON.stringify(this.document()); histButtons();
+    if(changedMain){UNDO.length = 0; REDO.length = 0; lastDoc = JSON.stringify(this.document()); histButtons();}
     $("#panelName").value = name.replace(/^preset-/, "");
     $("#programSelect").value = name;
     this.dirty = this.drafts.has(name);
-    $("#runBtn").disabled = this.dirty || this.running;
+    $("#runBtn").disabled = this.dirty || this.running || this.inspectionOnly();
+    $("#runBtn").title=this.inspectionOnly()?"Inspection-only wiring specimen":"Run selected program";
     this.render();
     if (focus) this.fit(false);
     this.message(name + (this.dirty ? " has unpublished changes" : " on the blackboard"));
     const url=new URL(location.href);url.pathname="/harness";url.searchParams.set("load",name);history.replaceState(null,"",url);
     return true;
   },
+  setParent(node) {
+    const next={program:this.selected,nodeId:node?._localId||node?.id||null};
+    if(this.parentHandle?.program!==next.program||this.parentHandle?.nodeId!==next.nodeId)this.parentRevision++;
+    this.parentHandle=next;
+    this.refreshParent();
+  },
+  selectParent(node) {
+    if(node&&node._program!==this.selected&&!this.select(node._program,false))return;
+    this.setParent(node?._childHost?node:node?._parentScope||null);
+  },
+  parentTarget() {
+    const handle=this.parentHandle?.program===this.selected?this.parentHandle:{program:this.selected,nodeId:null};
+    const node=handle.nodeId==null?null:G.nodes.find(n=>n._program===handle.program&&(n._localId||n.id)===handle.nodeId&&n._childHost);
+    if(!handle.program||(handle.nodeId!=null&&!node))return null;
+    const nodes=node?node.children||[]:G.nodes.filter(n=>n._program===handle.program&&!n._parentScope);
+    return {handle,node,nodes,origin:node?{x:0,y:0}:this.mounts.get(handle.program)||{x:0,y:0}};
+  },
+  refreshParent() {
+    const target=this.parentTarget();
+    if(!target){
+      if(this.selected&&this.parentHandle?.nodeId!=null){this.message("Selected scope removed; parent is now "+this.selected);this.setParent(null);}
+      return;
+    }
+    for(const n of G.nodes)n.el?.classList.toggle("selected-parent",n===target.node);
+    const labels=[];for(let n=target.node;n;n=n._parentScope)labels.unshift(n._localId||n.id);
+    const label=[target.handle.program,...labels].join(" / ");
+    const grip=$("#parentHandle");grip.textContent="⠿ "+label;grip.title="Drag selected parent: "+label+" (or Meta-drag anywhere in the landscape)";grip.setAttribute("aria-label","Selected parent: "+label);
+    for(const [id,verb] of [["fitBtn","Fit"],["fdBtn","Layout"],["shakeBtn","Shake"]])$("#"+id).title=verb+" selected parent: "+label;
+  },
+  dragParent(event, leaf=null) {
+    if(event.button!==0)return;
+    const target=this.parentTarget();if(!target)return;
+    event.preventDefault();event.stopPropagation();this.dragMoved=false;
+    if(typeof killMomentum==="function")killMomentum();
+    const node=leaf||target.node, nodes=node?[node]:target.nodes;
+    const scale=view.z*(node?ringScaleOf(node):1),sx=event.clientX,sy=event.clientY;
+    const anchor=node?null:target.origin,origin=anchor&&{x:anchor.x,y:anchor.y};
+    const locals=anchor?new Map(this.document(target.handle.program).nodes.map(n=>[n.id,{x:n.x,y:n.y}])):null;
+    const starts=nodes.map(n=>({n,x:n.x,y:n.y,placement:n._placement,local:locals?.get(n._localId||n.id)}));
+    const revision=this.parentRevision;
+    const stale=()=>this.parentRevision!==revision||starts.some(s=>!G.nodes.includes(s.n));
+    const move=e=>{
+      if(stale())return finish(true);
+      if(!this.dragMoved&&Math.hypot(e.clientX-sx,e.clientY-sy)<3)return;
+      this.dragMoved=true;
+      const dx=(e.clientX-sx)/scale,dy=(e.clientY-sy)/scale;
+      if(anchor){anchor.x=origin.x+dx;anchor.y=origin.y+dy;}
+      for(const s of starts){s.n.x=s.x+dx;s.n.y=s.y+dy;if(s.n._parentScope){s.n.x=Math.max(0,s.n.x);s.n.y=Math.max(0,s.n.y);}if(anchor)s.n._placement={x:s.n.x,y:s.n.y,local:s.local};s.n.el.style.left=s.n.x+"px";s.n.el.style.top=s.n.y+"px";}
+      redraw();this.schedule();
+    };
+    const finish=cancelled=>{
+      cancelled=cancelled||stale();
+      removeEventListener("pointermove",move);removeEventListener("pointerup",up);removeEventListener("pointercancel",cancel);
+      if(cancelled){if(anchor)Object.assign(anchor,origin);for(const s of starts){s.n.x=s.x;s.n.y=s.y;s.n._placement=s.placement;s.n.el.style.left=s.x+"px";s.n.el.style.top=s.y+"px";}}
+      else if(this.dragMoved&&node){resizeParentFrames(node._parentScope);save();}
+      redraw();this.schedule();
+    };
+    const up=()=>finish(false),cancel=()=>finish(true);
+    addEventListener("pointermove",move);addEventListener("pointerup",up);addEventListener("pointercancel",cancel);
+  },
   mount(name,document) {
     const entry=this.board["lcnc/program/"+name]||{document:this.drafts.get(name)};if(!entry?.document)return;
+    if(this.connectionReport?.program===name){this.connectionReport=null;$("#connections").hidden=true;clearVerdicts();}
     const previous=this.applying;this.applying=true;
     try {
       let anchor=this.mounts.get(name);
@@ -74,7 +146,7 @@ const Harness = {
       const doc=document||this.drafts.get(name)||entry.document;
       for(const n of doc.nodes||[])clone(n,null);
       for(const n of G.nodes.filter(n=>n._program===name&&n._childHost))refreshRingChrome(n);
-      for(const n of G.nodes.filter(n=>n._program===name&&n._childHost&&!n._parentScope))layoutRing(n);
+      for(const n of G.nodes.filter(n=>n._program===name&&n._childHost&&!n._parentScope))layoutRing(n,!!document||this.drafts.has(name));
       resolveTopLevelOverlaps();
       const allIds=new Set(G.nodes.filter(n=>n._program===name).map(n=>n.id));
       for(const wire of fromConfix(doc).wires)if(allIds.has(id(wire.from[0]))&&allIds.has(id(wire.to[0])))G.wires.push({from:[id(wire.from[0]),wire.from[1]],to:[id(wire.to[0]),wire.to[1]]});
@@ -130,6 +202,7 @@ const Harness = {
   },
   render() {
     if (!this.ready) return;
+    this.refreshParent();
     $("#territories").replaceChildren();
     this.positions.clear();
     const {w,h} = this.activeBounds = this.bounds();
@@ -137,10 +210,13 @@ const Harness = {
       const box=this.bounds(name);Object.assign(anchor,box);
       const territory=this.territory("lcnc/program/"+name,name,this.drafts.has(name)?"Unpublished":"lcnc/program/"+name,anchor.x+box.left-24,anchor.y+box.top-64,box.w+48,box.h+88,"#64ceca");
       territory.classList.add("active-program");if(name===this.selected)territory.classList.add("selected");
-      const head=territory.querySelector("header");head.addEventListener("click",()=>this.select(name));
+      territory.classList.toggle("selected-parent",name===this.selected&&!this.parentTarget()?.node);
+      const head=territory.querySelector("header");
+      head.addEventListener("pointerdown",e=>{if(e.target.closest("button")||e.button!==0)return;if(name!==this.selected)this.select(name,false);else this.setParent(null);this.dragParent(e);});
+      head.addEventListener("dblclick",()=>this.fit(false));
       const cid=this.board["lcnc/program/"+name]?.programCid;
       if(cid){const source=this.el("button","source-ref","◇");source.title="Program version "+cid;source.setAttribute("aria-label","Inspect version of "+name);source.dataset.relation="reference";source.addEventListener("click",e=>{e.stopPropagation();Landscape.inspectCid(cid,"lcnc/program/"+name);});head.append(source);}
-      const run=this.el("button","run","▶ Run");run.disabled=this.running||this.drafts.has(name);run.setAttribute("aria-label","Run "+name);
+      const run=this.el("button","run","▶ Run");run.disabled=this.running||this.drafts.has(name)||this.inspectionOnly(name);run.setAttribute("aria-label","Run "+name);
       run.addEventListener("click",e=>{e.stopPropagation();this.select(name,false);this.run();});head.append(run);
     }
     const groups = new Map();
@@ -174,6 +250,7 @@ const Harness = {
         const field = this.el("div", "fact-field");
         for (const [key,value] of items) {
           const cell = this.el("button", "fact-cell");
+          cell.dataset.key=key;
           cell.title = key + "\n" + this.summary(value);
           cell.setAttribute("aria-label", key);
           if (this.flashes.has(key)) cell.classList.add("flash");
@@ -183,6 +260,7 @@ const Harness = {
         territory.append(field);
       } else for (const [key,value] of items) {
         const row = this.el("button", "fact-row");
+        row.dataset.key=key;
         row.append(this.el("b", "", key.split("/").slice(1).join("/")), this.el("span", "", this.summary(value)));
         row.title = key;
         if (this.flashes.has(key)) row.classList.add("flash");
@@ -231,7 +309,7 @@ const Harness = {
       select.replaceChildren(...programKeys.map(key=> {const option=this.el("option","",key.slice(13));option.value=key.slice(13);return option;}));
     }
     select.value = this.selected;
-    this.renderEvents(); this.channels(runs[0]?.[1]);
+    Landscape.refreshActivity();this.renderEvents(); this.channels(runs[0]?.[1]);
     $("#boardCount").textContent = Object.keys(this.board).length + " entries";
     applyView(); redraw();Landscape.schedule();
   },
@@ -290,6 +368,7 @@ const Harness = {
       const field = this.el("div", "fact-field");
       for (const r of rest) {
         const cell = this.el("button", "fact-cell" + (r.expression ? "" : " blind"));
+        cell.dataset.key=r.key;
         cell.title = (r.expression || "no expression") + "\n" + r.key; cell.setAttribute("aria-label", r.expression || r.key);
         if (this.flashes.has(r.key)) cell.classList.add("flash");
         cell.addEventListener("click", () => this.inspect(r.key));
@@ -303,6 +382,13 @@ const Harness = {
     const svg=$("#channels");svg.replaceChildren();
     // Term correspondence is an association, not evidence of a derivation.
     const w=world.getBoundingClientRect();
+    for(const link of Landscape.activityLinks){
+      const from=this.positions.get(link.from.split("/")[0]),to=this.positions.get(link.to.split("/")[0]);
+      if(!from||!to||from===to)continue;
+      const path=document.createElementNS(svg.namespaceURI,"path");path.setAttribute("class","activity-ref");path.dataset.relation="reference";
+      const title=document.createElementNS(svg.namespaceURI,"title");title.textContent=link.kind+": "+link.from+" → "+link.to+" (not causal support)";path.append(title);
+      path.setAttribute("d",bez({x:from.x+from.w,y:from.y+70},{x:to.x+to.w,y:to.y+70}));svg.append(path);
+    }
     for (const [from,to] of this.narseseChains || []) {
       const a=from.getBoundingClientRect(), b=to.getBoundingClientRect();
       const ax=(a.right-w.left)/view.z, ay=(a.top+a.height/2-w.top)/view.z, bx=(b.right-w.left)/view.z, by=(b.top+b.height/2-w.top)/view.z;
@@ -336,6 +422,11 @@ const Harness = {
     this.beginInspection(key, this.actors.get(key)||this.board[key]?.actor||"", JSON.stringify(this.board[key],null,2));
     this.loadSheets([{url:"/blackboard/sheet?key="+encodeURIComponent(key)}], key);
     const receipt=this.board[key];
+    for(const link of Landscape.activityLinks.filter(l=>l.from===key||l.to===key)){
+      const target=link.from===key?link.to:link.from;
+      const button=this.el("button","terrain-ref",link.kind+" → "+target);button.dataset.relation="reference";
+      button.title="Recorded identifier reference, not causal support";button.addEventListener("click",()=>this.inspect(target));$("#factInspector").append(button);
+    }
     if(receipt?.programCid){const button=this.el("button","terrain-ref","Program version "+receipt.programCid.slice(0,16));button.addEventListener("click",()=>Landscape.inspectCid(receipt.programCid));$("#factInspector").append(button);}
   },
   /* Sheets. A fact, a territory, or the whole board opens as the grid-in-cell family
@@ -434,11 +525,12 @@ const Harness = {
     $("#viewBack").disabled=!this.viewHistory.length;applyView();redraw();this.rememberView();
   },
   enclosingView() {
-    if(this.viewNode?._parentScope)this.focusNode(this.viewNode._parentScope);
-    else if(this.viewNode)this.select(this.viewNode._program);
+    const node=this.parentTarget()?.node;
+    if(node?._parentScope)this.focusNode(node._parentScope);
+    else if(node)this.select(node._program);
     else this.fit(true);
   },
-  focusNode(node) {if(node._program!==this.selected)this.select(node._program,false);this.focusElement(node.el,LandscapeNavigation.node(node._program,node._localId||node.id));this.viewNode=node;},
+  focusNode(node) {this.selectParent(node);this.focusElement(node.el,LandscapeNavigation.node(node._program,node._localId||node.id));this.viewNode=node;},
   // Editing ownership is sticky. Panning, fitting the board and zooming out
   // cannot retarget layout or mutation commands.
   prominent() {return this.selected;},
@@ -455,13 +547,19 @@ const Harness = {
     }
   },
   fit(all) {
-    if (!all) { const box=this.positions.get("lcnc/program/"+this.selected);if(box)this.focus(box,LandscapeNavigation.program(this.selected));return; }
+    if (!all) {
+      const target=this.parentTarget();if(!target)return;
+      if(target.node){this.focusElement(target.node.el,LandscapeNavigation.node(this.selected,target.handle.nodeId));this.viewNode=target.node;}
+      else {const box=this.positions.get("lcnc/program/"+this.selected);if(box)this.focus(box,LandscapeNavigation.program(this.selected));}
+      return;
+    }
     const boxes=[...this.positions.values()];
     const x=Math.min(...boxes.map(b=>b.x)),y=Math.min(...boxes.map(b=>b.y));
     this.focus({x,y,w:Math.max(...boxes.map(b=>b.x+b.w))-x,h:Math.max(...boxes.map(b=>b.y+b.h))-y});
   },
   focusElement(el,identity="") {const a=el.getBoundingClientRect(),b=world.getBoundingClientRect();this.focus({x:(a.left-b.left)/view.z,y:(a.top-b.top)/view.z,w:a.width/view.z,h:a.height/view.z},identity);},
   output(receipt) {
+    if(typeof HarnessArguments!=="undefined")HarnessArguments.record(receipt);
     if(!receipt?.programKey)return;
     const entry=this.board[receipt.programKey];
     if(receipt.programCid&&entry?.programCid&&receipt.programCid!==entry.programCid)return;
@@ -478,15 +576,18 @@ const Harness = {
     this.schedule();
   },
   async run() {
+    if(this.inspectionOnly()){this.message("Inspection-only wiring specimen; execution is disabled");return;}
     if (this.running || this.dirty || !this.selected) return;
+    let inputs;
+    try{inputs=typeof HarnessArguments==="undefined"?{}:HarnessArguments.inputs(this.selected);}catch(e){this.message(e.message);return;}
     this.running=true;$("#runBtn").disabled=true;
     const name=this.selected;this.message("Running "+name);
     try {
-      const response=await fetch("/api/lcnc/run",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({program:name})});
+      const response=await fetch("/api/lcnc/run",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({program:name,inputs})});
       const result=await response.json();this.output(result);
       this.message(name+": "+(result.ok?"completed":result.error||"failed"));
     } catch(e) { this.message("Run failed: "+e.message); }
-    finally { this.running=false;$("#runBtn").disabled=this.dirty; }
+    finally { this.running=false;$("#runBtn").disabled=this.dirty||this.inspectionOnly();if(typeof HarnessArguments!=="undefined"&&$("#argumentInspector").open)HarnessArguments.validate(); }
   },
   async cancelRun() {
     const run=Object.values(this.board).find(v=>v?.programKey==="lcnc/program/"+this.selected&&["validating","running"].includes(v.status));
@@ -508,12 +609,43 @@ const Harness = {
     }catch(e){this.message("Publish failed: "+e.message);}
   },
   async shake(options) {
+    if(this.shaking||!this.selected)return;
+    const target=this.parentTarget();if(!target)return;
+    const name=this.selected,document=this.document(),snapshot=JSON.stringify(document),revision=this.parentRevision,parentId=target.handle.nodeId;
+    this.shaking=true;$("#shakeBtn").disabled=true;this.message("Checking connections in "+name);
     try {
-      const response=await fetch("/api/lcnc/treeshake",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({program:this.document(),options:options||{}})});
-      const result=await response.json();if(!response.ok||!result.ok)throw Error(result.error||response.status);
-      this.replaceSelected(typeof result.program==="string"?JSON.parse(result.program):result.program);
-      this.message((result.made||[]).length+" cables connected in "+this.selected);
+      const response=await fetch("/api/lcnc/treeshake",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({program:document,options:{...options,parentId}})});
+      const result=await response.json();if(!response.ok||!result.ok)throw Error(result.detail||result.error||response.status);
+      if(this.selected!==name||this.parentRevision!==revision||JSON.stringify(this.document())!==snapshot){this.message("Connections or selected parent changed during the check; run Shake again");return;}
+      if(parentId!=null&&result.parentId!==parentId)throw Error("Server did not confirm the selected parent; use an updated server");
+      applyServerTreeShake(result,!!options?.optional,name);
     }catch(e){this.message("Connections refused: "+e.message);}
+    finally{this.shaking=false;$("#shakeBtn").disabled=false;}
+  },
+  showConnections(program,result,summary) {
+    this.connectionReport={program,result};
+    const host=$("#connections");host.hidden=false;host.replaceChildren(this.el("h3","","Connections"),this.el("p","",summary));
+    const verdicts=[...(result.verdicts||[])].sort((a,b)=>Number(["optional","binding","ok"].includes(a.status))-Number(["optional","binding","ok"].includes(b.status)));
+    for(const verdict of verdicts.slice(0,100)){
+      const node=G.nodes.find(n=>n.id===verdict.nodeId);if(!node)continue;
+      const row=this.el("div","connection-row "+verdict.status);
+      const focus=this.el("button","connection-focus",(node._localId||node.id)+" / "+verdict.port);
+      focus.title="Focus "+node.type+" "+verdict.port;
+      focus.addEventListener("click",()=>this.focusNode(node));
+      row.append(focus,this.el("span","",verdict.label));
+      if(verdict.dir==="in"&&!["ok","binding"].includes(verdict.status)){
+        const mate=this.el("button","connection-mate","+");mate.title="Choose a source for "+verdict.port;
+        mate.setAttribute("aria-label","Choose source for "+(node._localId||node.id)+" "+verdict.port);
+        mate.addEventListener("click",()=>{
+          this.focusNode(node);
+          const box=viewport.getBoundingClientRect();
+          showMateMenu(box.left+20,box.top+20,node,verdict.port,node.x-240,node.y,node._parentScope,"in");
+        });
+        row.append(mate);
+      }
+      host.append(row);
+    }
+    if(verdicts.length>100)host.append(this.el("p","",(verdicts.length-100)+" additional port results"));
   },
   async accept(event) {
     if (!event.key || Number(event.seq)<=this.seq) return;
@@ -547,11 +679,13 @@ const Harness = {
     }, 250);
   },
   reconnect(reason="Reconnecting") {
+    this.live=false;Landscape.refreshActivity();
     this.stream?.close();this.connectionGeneration++;
     $("#connection").textContent=reason;$("#connection").classList.remove("live");
     clearTimeout(this.reconnectTimer);this.reconnectTimer=setTimeout(()=>this.connect(),500);
   },
   async connect() {
+    this.live=false;
     this.stream?.close();clearTimeout(this.reconnectTimer);
     const generation=++this.connectionGeneration,initial=!this.ready;
     const bookmark=initial?LandscapeNavigation.decode(location.hash):null;
@@ -584,7 +718,7 @@ const Harness = {
       const first=this.board["lcnc/program/preset-curator"]?"preset-curator":names[0];
       if(first)this.mount(first);
       for(const n of names)if(n!==first)this.mount(n);
-      if(name)this.select(name,initial&&!bookmark);
+      if(name)this.select(name,initial&&!bookmark,!initial);
       for(const event of buffer) {
         if(generation!==this.connectionGeneration)return;
         await this.accept(event);
@@ -595,28 +729,43 @@ const Harness = {
       if(bookmark){Object.assign(view,bookmark.camera);this.focusKey=bookmark.focus;applyView();redraw();}
       else if(initial&&!requested)this.fit(true);
       $("#connection").textContent="Live";$("#connection").classList.add("live");
+      this.live=true;Landscape.refreshActivity();
     }catch(e){if(generation===this.connectionGeneration){this.message("Blackboard unavailable: "+e.message);this.reconnect();}}
   },
 };
 
 AUTOSAVE=false;
+$("#argumentsBtn").addEventListener("click",()=>HarnessArguments.open());
+$("#argumentAdd").addEventListener("click",()=>HarnessArguments.add());
+$("#argumentRun").addEventListener("click",()=>{if(HarnessArguments.validate())Harness.run();});
 $("#programSelect").addEventListener("change",e=>Harness.select(e.target.value));
 $("#boardHome").addEventListener("click",()=>Harness.fit(true));
 $("#objectsBtn").addEventListener("click",()=>Harness.focus(Landscape.objectBox,LandscapeNavigation.object("")));
 $("#viewBack").addEventListener("click",()=>Harness.previousView());
 $("#viewUp").addEventListener("click",()=>Harness.enclosingView());
 $("#cancelRun").addEventListener("click",()=>Harness.cancelRun().catch(e=>Harness.message(e.message)));
+$("#parentHandle").addEventListener("pointerdown",e=>Harness.dragParent(e));
+$("#parentHandle").addEventListener("click",()=>{if(!Harness.dragMoved)Harness.fit(false);});
 $("#sheetsBtn").addEventListener("click",()=>Harness.openSheets([]));
 $("#sheetRawBtn").addEventListener("click",()=>Harness.rawSheets(!$("#factInspector").classList.contains("raw")));
 $("#factInspector").addEventListener("close",()=>{
   Harness.inspectionController?.abort(); Harness.sheetTicket = (Harness.sheetTicket || 0) + 1;
 });
 $("#terrainLayer").addEventListener("change",e=>{Landscape.terrain?.setLayer(Number(e.target.value));Landscape.schedule();});
+let parentDragGesture=false;
 viewport.addEventListener("pointerdown",e=>{
+  parentDragGesture=false;
+  if(e.metaKey&&e.button===0&&Harness.parentTarget()){
+    parentDragGesture=true;e.stopImmediatePropagation();Harness.dragParent(e);return;
+  }
   const element=e.target.closest(".node"),n=element&&G.nodes.find(n=>n.el===element);
   if(n?._program&&n._program!==Harness.selected){e.preventDefault();e.stopImmediatePropagation();}
 },true);
+viewport.addEventListener("click",e=>{
+  if(parentDragGesture&&e.detail>0){e.preventDefault();e.stopImmediatePropagation();}
+},true);
 viewport.addEventListener("dblclick",e=>{
+  if(parentDragGesture){e.preventDefault();e.stopImmediatePropagation();return;}
   if(e.target.closest(".node,button,input,textarea,select"))return;
   const hit=Landscape.hit(e);if(!hit)return;
   e.preventDefault();e.stopImmediatePropagation();
