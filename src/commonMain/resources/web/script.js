@@ -1323,7 +1323,11 @@
 <<<<<<< HEAD
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
   const SIDEBAR_BTNS = { doc: 'btn-home', board: 'btn-board', graph: 'btn-graph', sheet: 'btn-sheet', host: 'btn-host' };
+=======
+  const SIDEBAR_BTNS = { doc: document.getElementById('btn-home'), board: document.getElementById('btn-board'), graph: document.getElementById('btn-graph'), sheet: document.getElementById('btn-sheet'), host: document.getElementById('btn-host') };
+>>>>>>> origin/palette-sync-sidebar-aria-11912243228218524737
   const VIEWS = { doc: [docScrollEl, viewDocBtn], board: [boardScrollEl, viewBoardBtn], graph: [graphScrollEl, viewGraphBtn], sheet: [sheetScrollEl, viewSheetBtn], shape: [shapeScrollEl, viewShapeBtn], host: [hostScrollEl, viewHostBtn] };
 <<<<<<< HEAD
 =======
@@ -1354,6 +1358,7 @@
     for (const [k, [el, btn, sidebarBtn]] of Object.entries(VIEWS)) {
 >>>>>>> origin/palette-sidebar-active-sync-363112185002837110
       el.hidden = k !== view;
+<<<<<<< HEAD
       const sidebarBtn = SIDEBAR_BTNS[k] ? document.getElementById(SIDEBAR_BTNS[k]) : null;
 =======
   const VIEWS = { doc: [docScrollEl, viewDocBtn, document.getElementById('btn-home')], board: [boardScrollEl, viewBoardBtn, document.getElementById('btn-board')], graph: [graphScrollEl, viewGraphBtn, document.getElementById('btn-graph')], sheet: [sheetScrollEl, viewSheetBtn, document.getElementById('btn-sheet')], shape: [shapeScrollEl, viewShapeBtn], host: [hostScrollEl, viewHostBtn, document.getElementById('btn-host')] };
@@ -1489,6 +1494,17 @@
 >>>>>>> origin/palette-sync-aria-current-5674151201601486281
 =======
 >>>>>>> origin/palette-sync-aria-current-6449805464969164506
+=======
+      const sbtn = SIDEBAR_BTNS[k];
+      btn.classList.toggle('active', k === view);
+      if (sbtn) sbtn.classList.toggle('active', k === view);
+      if (k === view) {
+        btn.setAttribute('aria-current', 'page');
+        if (sbtn) sbtn.setAttribute('aria-current', 'page');
+      } else {
+        btn.removeAttribute('aria-current');
+        if (sbtn) sbtn.removeAttribute('aria-current');
+>>>>>>> origin/palette-sync-sidebar-aria-11912243228218524737
       }
     }
     if (view === 'board') { renderBoard(); hydrateBoard(); }
