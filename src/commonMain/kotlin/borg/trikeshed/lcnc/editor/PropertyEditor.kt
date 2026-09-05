@@ -49,8 +49,24 @@ class MultiSelectPropertyEditor(
     override val onChange: ((PropertyChangeEvent) -> Unit)? = null
 ) : PropertyEditor {
     override fun renderHtml(): String = html {
-        val options = (schema.configuration?.get("options") as? List<*>)?.filterIsInstance<String>() ?: emptyList()
-        val selectedValues = (value as? List<*>)?.filterIsInstance<String>() ?: emptyList()
+        // Bolt: avoid intermediate List allocations from filterIsInstance by using a loop
+        val optionsList = schema.configuration?.get("options") as? List<*>
+        val options = if (optionsList != null) {
+            val list = ArrayList<String>(optionsList.size)
+            for (item in optionsList) {
+                if (item is String) list.add(item)
+            }
+            list
+        } else emptyList()
+
+        val valueList = value as? List<*>
+        val selectedValues = if (valueList != null) {
+            val list = ArrayList<String>(valueList.size)
+            for (item in valueList) {
+                if (item is String) list.add(item)
+            }
+            list
+        } else emptyList()
         val builder = HtmlBuilder()
         builder.div(classes = "lcnc-prop-multi-select", id = "prop-${schema.id}") {
             // Need to emit something that triggers onchange with an array. In vanilla HTML/JS without framework,
@@ -68,10 +84,23 @@ class MultiSelectPropertyEditor(
     }
 
     override fun validate(input: Any?): Boolean {
-        val options = (schema.configuration?.get("options") as? List<*>)?.filterIsInstance<String>() ?: emptyList()
+        // Bolt: avoid intermediate List allocations from filterIsInstance by using a loop
+        val optionsList = schema.configuration?.get("options") as? List<*>
+        val options = if (optionsList != null) {
+            val list = ArrayList<String>(optionsList.size)
+            for (item in optionsList) {
+                if (item is String) list.add(item)
+            }
+            list
+        } else emptyList()
+
         if (input == null) return true
-        val inputList = (input as? List<*>)?.filterIsInstance<String>() ?: return false
-        return inputList.all { options.contains(it) }
+        val inList = input as? List<*> ?: return false
+
+        for (item in inList) {
+            if (item is String && !options.contains(item)) return false
+        }
+        return true
     }
 }
 
@@ -81,7 +110,15 @@ class SelectPropertyEditor(
     override val onChange: ((PropertyChangeEvent) -> Unit)? = null
 ) : PropertyEditor {
     override fun renderHtml(): String = html {
-        val options = (schema.configuration?.get("options") as? List<*>)?.filterIsInstance<String>() ?: emptyList()
+        // Bolt: avoid intermediate List allocations from filterIsInstance by using a loop
+        val optionsList = schema.configuration?.get("options") as? List<*>
+        val options = if (optionsList != null) {
+            val list = ArrayList<String>(optionsList.size)
+            for (item in optionsList) {
+                if (item is String) list.add(item)
+            }
+            list
+        } else emptyList()
         val builder = HtmlBuilder()
         builder.div(classes = "lcnc-prop-select", id = "prop-${schema.id}") {
             text("<select onchange=\"window.lcncPropChange('${schema.id}', this.value)\" aria-label=\"${schema.name}\">")
@@ -95,8 +132,12 @@ class SelectPropertyEditor(
     }
 
     override fun validate(input: Any?): Boolean {
-        val options = (schema.configuration?.get("options") as? List<*>)?.filterIsInstance<String>() ?: emptyList()
-        return options.contains(input?.toString())
+        val inputStr = input?.toString() ?: return false
+        val optionsList = schema.configuration?.get("options") as? List<*> ?: return false
+        for (item in optionsList) {
+            if (item is String && item == inputStr) return true
+        }
+        return false
     }
 }
 

@@ -188,6 +188,7 @@ The code looks correct and fully optimized. The tests passed on the relevant par
 <<<<<<< HEAD
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
 
 <<<<<<< HEAD
 <<<<<<< HEAD
@@ -260,3 +261,8 @@ The code looks correct and fully optimized. The tests passed on the relevant par
 **Learning:** In Kotlin, using `.map { it }` on an already materialized collection (such as a `List` returned by `Files.readAllLines`) is a redundant identity transform that needlessly copies the entire list, wasting O(N) time and memory.
 **Action:** Remove it to return the original list directly.
 >>>>>>> origin/bolt/avoid-redundant-map-allocation-5919844668792147379
+=======
+## 2026-10-25 - Avoid intermediate Sequence/List allocations before filterIsInstance
+**Learning:** Chaining collection operations like `.filterIsInstance<T>()` and `.sortedWith(...)` or `.forEach { ... }` generates intermediate `ArrayList`s (or `Sequence` wrappers if `.asSequence()` is used), leading to unnecessary memory allocation and GC pressure, especially when the collection is large or processed frequently in hot paths.
+**Action:** Replace these chains with direct `for` loops that conditionally append to an `ArrayList` and perform the final operation (like `.sortWith()`) in-place, avoiding the intermediate collections.
+>>>>>>> origin/bolt/eliminate-filterisinstance-allocations-7930739672532501127
