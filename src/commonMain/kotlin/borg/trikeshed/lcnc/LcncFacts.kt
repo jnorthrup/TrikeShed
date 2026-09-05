@@ -1,10 +1,11 @@
 package borg.trikeshed.lcnc
 
+import borg.trikeshed.collections.associative.toCommonSortedMap
 import borg.trikeshed.kif.KifExpr
 import borg.trikeshed.kif.KifKnowledgeBase
 import borg.trikeshed.lib.Series
-import borg.trikeshed.lib.get
 import borg.trikeshed.lib.size
+import borg.trikeshed.lib.view
 
 /**
  * The LCNC vocabulary AS TUPLES, and its questions as pattern queries.
@@ -140,16 +141,14 @@ class LcncFacts private constructor(private val kb: KifKnowledgeBase) {
 
     private fun learn(g: String, p: LcncProgram) {
         fun walk(nodes: Series<LcncNode>, parent: String?) {
-            for (i in 0 until nodes.size) {
-                val n = nodes[i]
+            for (n in nodes.view) {
                 tell("node", g, n.id, n.type)
                 parent?.let { tell("ring", g, n.id, it) }
                 if (n.children.size > 0) walk(n.children, n.id)
             }
         }
         walk(p.nodes, null)
-        for (i in 0 until p.wires.size) {
-            val w = p.wires[i]
+        for (w in p.wires.view) {
             tell("feeds", g, w.fromNode, w.fromPort.removeSuffix("?"), w.toNode, w.toPort.removeSuffix("?"))
         }
     }
@@ -213,7 +212,7 @@ class LcncFacts private constructor(private val kb: KifKnowledgeBase) {
     }
 
     fun shape(kind: String): List<String> = q("shape", kind, null).map { it[0] }
-    fun shapes(): Map<String, List<String>> = q("shape", null, null).groupBy({ it[0] }, { it[1] }).toSortedMap()
+    fun shapes(): Map<String, List<String>> = q("shape", null, null).groupBy({ it[0] }, { it[1] }).toCommonSortedMap()
 
     fun label(type: String): String? = q("label", type, null).firstOrNull()?.let { unstr(it[0]) }
 

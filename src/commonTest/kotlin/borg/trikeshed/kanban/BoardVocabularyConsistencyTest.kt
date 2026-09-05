@@ -30,7 +30,7 @@ class BoardVocabularyConsistencyTest {
     fun ingestColumnsAreFoldedOntoBoardCol() {
         // The seven-string list historically duplicated in ForgeKanbanIngest.
         val expectedWires = BoardCol.entries.map { it.wire }.toSet()
-        val inCols = invokeIngestColumns()
+        val inCols = ForgeKanbanIngest.fallbackReduction().board.columns.map { it.id.value }.toSet()
         assertEquals(expectedWires, inCols, "ForgeKanbanIngest renders BoardCol.entries")
     }
 
@@ -55,12 +55,4 @@ class BoardVocabularyConsistencyTest {
         }
     }
 
-    /** ForgeKanbanIngest.columns is private; read it reflectively to pin its content. */
-    private fun invokeIngestColumns(): Set<String> {
-        val field = ForgeKanbanIngest::class.java.getDeclaredField("columns")
-        field.isAccessible = true
-        @Suppress("UNCHECKED_CAST")
-        val cols = field.get(null) as List<KanbanColumn>
-        return cols.map { it.id.value }.toSet()
-    }
 }

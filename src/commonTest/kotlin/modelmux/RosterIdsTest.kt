@@ -24,7 +24,7 @@ class RosterIdsTest {
     }
 
     @Test
-    fun `a collision qualifies the later endpoint, not the first`() {
+    fun `a collision qualifies only the later endpoint`() {
         // The live defect: nvidia registers z-ai/glm-5.2 first, so openrouter's
         // copy — the one with working credit — was unreachable.
         val ids = disambiguateModelIds(listOf(

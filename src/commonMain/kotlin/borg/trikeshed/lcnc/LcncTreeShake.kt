@@ -331,19 +331,20 @@ object LcncTreeShake {
         val made = ArrayList<LcncWire>()
 
         val proposals = if (specimen) validatedMatching(program, pairs, openIns, contracts, facts) else pairs
-        for (pr in proposals) {
+        for (pr: CandidatePair in proposals) {
             if (pr.i.isEffect && !specimen) continue // executable graphs still require explicit effect wiring
-            val ik = pr.i.nd.id to bare(pr.i.port)
-            val ok = pr.o.nd.id to bare(pr.o.port)
+            val ik: Pair<String, String> = pr.i.nd.id to bare(pr.i.port)
+            val ok: Pair<String, String> = pr.o.nd.id to bare(pr.o.port)
             if (ik in tookIn || ok in tookOut) continue
             tookIn.add(ik)
             tookOut.add(ok)
             made.add(LcncWire(pr.o.nd.id, pr.o.port, pr.i.nd.id, pr.i.port))
         }
 
-        val stillOpen = openIns.filter { (it.nd.id to bare(it.port)) !in tookIn }
+        val stillOpen: List<OpenIn> = openIns.filter { (it.nd.id to bare(it.port)) !in tookIn }
 
-        for (pr in proposals.filter { (it.i.nd.id to bare(it.i.port)) in tookIn && (it.o.nd.id to bare(it.o.port)) in tookOut }) {
+        for (pr: CandidatePair in proposals.filter { (it.i.nd.id to bare(it.i.port)) in tookIn && (it.o.nd.id to bare(it.o.port)) in tookOut }) {
+
             if (made.any { it.fromNode == pr.o.nd.id && it.fromPort == pr.o.port && it.toNode == pr.i.nd.id && it.toPort == pr.i.port }) {
                 verdicts.add(
                     LcncTreeShakeVerdict(
@@ -358,20 +359,20 @@ object LcncTreeShake {
             }
         }
 
-        fun kindMates(i: OpenIn) = openOuts.filter { it.nd.id != i.nd.id && facts.accepts(it.kind, i.kind) }
-        fun inScope(o: OpenOut, i: OpenIn) = o.sp.size <= i.sp.size && o.sp.indices.all { idx -> i.sp[idx] == o.sp[idx] }
+        fun kindMates(i: OpenIn): List<OpenOut> = openOuts.filter { it.nd.id != i.nd.id && facts.accepts(it.kind, i.kind) }
+        fun inScope(o: OpenOut, i: OpenIn): Boolean = o.sp.size <= i.sp.size && o.sp.indices.all { idx -> i.sp[idx] == o.sp[idx] }
 
-        val dead = stillOpen.filter { kindMates(it).isEmpty() }
-        val scoped = stillOpen.filter {
-            val km = kindMates(it)
+        val dead: List<OpenIn> = stillOpen.filter { kindMates(it).isEmpty() }
+        val scoped: List<OpenIn> = stillOpen.filter {
+            val km: List<OpenOut> = kindMates(it)
             km.isNotEmpty() && km.none { o -> inScope(o, it) }
         }
-        val reachable = stillOpen.filter {
-            val km = kindMates(it)
+        val reachable: List<OpenIn> = stillOpen.filter {
+            val km: List<OpenOut> = kindMates(it)
             km.any { o -> inScope(o, it) }
         }
 
-        for (i in reachable) {
+        for (i in reachable)
             verdicts.add(
                 LcncTreeShakeVerdict(
                     nodeId = i.nd.id,
@@ -386,9 +387,8 @@ object LcncTreeShake {
                     },
                 ),
             )
-        }
 
-        for (i in scoped) {
+        for (i in scoped)
             verdicts.add(
                 LcncTreeShakeVerdict(
                     nodeId = i.nd.id,
@@ -399,9 +399,8 @@ object LcncTreeShake {
                     label = "kind-compatible producers exist, but outside ring boundary — data flows lateral or inward",
                 ),
             )
-        }
 
-        for (i in dead) {
+        for (i: OpenIn in dead)
             verdicts.add(
                 LcncTreeShakeVerdict(
                     nodeId = i.nd.id,
@@ -413,7 +412,6 @@ object LcncTreeShake {
                         else "no kind-compatible mate inside selected parent ${parent.id}; connect an external source explicitly",
                 ),
             )
-        }
 
         // Outlet blocked
         val allIns = ArrayList<OpenIn>()
@@ -449,7 +447,7 @@ object LcncTreeShake {
         val starvedSeed = stillOpen.filter { it.isRequired }.map { it.nd.id }.toSet()
         val allWires = existingWires.snapshot()
         for (w in made) allWires.add(w)
-        val starved = HashSet<String>(starvedSeed)
+        val starved: MutableSet<String> = HashSet(starvedSeed)
         var grew = true
         while (grew) {
             grew = false
@@ -461,24 +459,24 @@ object LcncTreeShake {
             }
         }
 
-        val updatedWires = allWires.freeze()
-        val updatedProgram = program.copy(wires = updatedWires)
+        val updatedWires: Series<LcncWire> = allWires.freeze()
+        val updatedProgram: LcncProgram = program.copy(wires = updatedWires)
         if (specimen) {
-            val violations = LcncTypeCheck.check(updatedProgram, contracts)
+            val violations: List<LcncTypeCheck.Violation> = LcncTypeCheck.check(updatedProgram, contracts)
             require(violations.isEmpty()) { "Wiring specimen failed type validation: $violations" }
         }
-        for (w in made) {
+        for (w: LcncWire in made) {
             fedIn.add(PortKey(w.toNode, bare(w.toPort)))
             usedOut.add(PortKey(w.fromNode, bare(w.fromPort)))
         }
         var socketCount = 0
         var connectedSocketCount = 0
-        for (nd in selectedNodes) {
-            for (port in LcncTypeCheck.inputsOf(nd, contracts)) {
+        for (nd: LcncNode in selectedNodes) {
+            for (port: String in LcncTypeCheck.inputsOf(nd, contracts)) {
                 socketCount++
                 if (PortKey(nd.id, bare(port)) in fedIn) connectedSocketCount++
             }
-            for (port in LcncTypeCheck.outputsOf(nd, contracts)) {
+            for (port: String in LcncTypeCheck.outputsOf(nd, contracts)) {
                 socketCount++
                 if (PortKey(nd.id, bare(port)) in usedOut) connectedSocketCount++
             }

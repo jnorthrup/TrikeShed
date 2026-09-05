@@ -50,7 +50,7 @@ class AcpContentParseTest {
     }
 
     @Test
-    fun `escapes are decoded, not mangled`() {
+    fun `escapes are decoded without mangling`() {
         assertEquals("line one\nline two\ttabbed",
             content("""{"choices":[{"message":{"content":"line one\nline two\ttabbed"}}]}"""))
     }

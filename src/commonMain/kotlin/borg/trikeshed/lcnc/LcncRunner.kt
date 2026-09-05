@@ -2,9 +2,11 @@ package borg.trikeshed.lcnc
 
 import borg.trikeshed.collections._m
 import borg.trikeshed.lib.Series
-import borg.trikeshed.lib.get
+import borg.trikeshed.lib.filter
 import borg.trikeshed.lib.j
 import borg.trikeshed.lib.size
+import borg.trikeshed.lib.view
+import borg.trikeshed.lib.α
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.async
 import kotlinx.coroutines.currentCoroutineContext
@@ -157,16 +159,14 @@ class LcncRunner(private val registry: Map<String, LcncNodeRunner>) {
 
         init {
             fun walk(nodes: Series<LcncNode>, path: List<String>) {
-                for (i in 0 until nodes.size) {
-                    val n = nodes[i]
+                for (n in nodes.view) {
                     require(index.put(n.id, n) == null) { "duplicate node id '${n.id}' — ids are document-wide identities" }
                     ringPath[n.id] = path
                     if (n.children.size > 0) walk(n.children, path + n.id)
                 }
             }
             walk(program.nodes, emptyList())
-            for (i in 0 until program.wires.size) {
-                val w = program.wires[i]
+            for (w in program.wires.view) {
                 wiresTo.getOrPut(w.toNode) { mutableListOf() }.add(w)
             }
         }
@@ -213,12 +213,11 @@ class LcncRunner(private val registry: Map<String, LcncNodeRunner>) {
     ): Map<String, Any?> {
         val returns = LinkedHashMap<String, Any?>()
 
-        for (i in 0 until nodes.size) {
+        for (node in nodes.view) {
             // Cooperative cancellation between statements: ABORT stops the walk
             // here; in-flight runners cancel at their next suspension point.
             currentCoroutineContext().job.ensureActive()
             if (++executedNodes > maxNodeExecutions) throw LcncWorkLimitExceeded()
-            val node = nodes[i]
             state.visited.add(node.id)
 
             // scope.in never runs a runner — it IS the binding: the name
@@ -314,7 +313,7 @@ class LcncRunner(private val registry: Map<String, LcncNodeRunner>) {
                 }
                 // Required = the body's non-optional scope.in names, satisfiable
                 // by the envelope OR the enclosing chain — rings are blocks.
-                if (requiredScopeIns(bodyNodes).any { !bound.containsKey(it) && !frame.hasBinding(it) }) continue
+                if (requiredScopeIns(bodyNodes).view.any { !bound.containsKey(it) && !frame.hasBinding(it) }) continue
 
                 val childChain = FrameIdChain.append(frame.chain, ringName)
                 val childFrame = LcncScopeFrame(bindings = bound, chain = childChain, parent = frame, bindingSources = sources)
@@ -346,18 +345,12 @@ class LcncRunner(private val registry: Map<String, LcncNodeRunner>) {
     }
 
     /** The body's non-optional `scope.in` names — a trailing `?` on the name or a declared default opts out. */
-    private fun requiredScopeIns(body: Series<LcncNode>): List<String> {
-        val req = ArrayList<String>()
-        for (i in 0 until body.size) {
-            val n = body[i]
-            if (n.type != LcncContracts.SCOPE_IN) continue
-            val name = n.params["name"] ?: continue
-            if (name.endsWith("?")) continue
-            if (n.params.containsKey("default")) continue
-            req.add(name)
-        }
-        return req
-    }
+    private fun requiredScopeIns(body: Series<LcncNode>): Series<String> =
+        body.filter { n ->
+            n.type == LcncContracts.SCOPE_IN &&
+                n.params["name"]?.endsWith("?") == false &&
+                !n.params.containsKey("default")
+        } α { it.params.getValue("name") }
 }
 
 /**

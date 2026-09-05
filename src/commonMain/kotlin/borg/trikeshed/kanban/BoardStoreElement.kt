@@ -190,7 +190,7 @@ class BoardStoreElement(
 
     suspend fun command(jobId: String): Map<*, *>? {
         val cid = published.rows[jobId]?.commandCid ?: return null
-        return withContext(Dispatchers.IO) {
+        return withContext(Dispatchers.Unconfined) {
             cas.get(cid)?.let { JsonSupport.parse(it.decodeToString()) as? Map<*, *> }
         }
     }
@@ -210,7 +210,7 @@ class BoardStoreElement(
             val tab = text.indexOf('\t')
             if (tab > 0) {
                 val cid = ContentId(text.substring(tab + 1))
-                val payload = withContext(Dispatchers.IO) { cas.get(cid) }
+                val payload = withContext(Dispatchers.Unconfined) { cas.get(cid) }
                 if (payload != null) {
                     val raw = runCatching { JsonSupport.parse(payload.decodeToString()) as? Map<*, *> }.getOrNull()
                     if (raw != null) applyOne(raw, durable = false, replaySeq = seq, replayCid = cid)
@@ -227,7 +227,7 @@ class BoardStoreElement(
                 val events = ArrayList<PendingCommit>()
                 try {
                     val results = batch.map { applyOne(it.raw, durable = true, pending = events) }
-                    if (events.isNotEmpty()) withContext(Dispatchers.IO) { wal?.flush() }
+                    if (events.isNotEmpty()) withContext(Dispatchers.Unconfined) { wal?.flush() }
                     events.forEach { publishCommit(it) }
                     published = Published(rows, sequence)
                     // Acknowledgments and causal fanout are released only after the durability barrier.
@@ -288,7 +288,7 @@ class BoardStoreElement(
         val snapshot = reduced.snapshot!!
 
         // Durable truth: the raw command map, canonical-serialized once, CAS-addressed.
-        val (cid, seq) = withContext(Dispatchers.IO) {
+        val (cid, seq) = withContext(Dispatchers.Unconfined) {
             // Parsing may normalize numbers; replay must never re-address the payload.
             val cid = replayCid ?: cas.put(JsonSupport.stringify(raw).encodeToByteArray())
             cid to (replaySeq

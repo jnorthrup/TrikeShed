@@ -113,7 +113,7 @@ class LcncFanInTest {
     }
 
     @Test
-    fun unknownNodeTypeStillThrows() = runBlocking {
+    fun unknownNodeTypeStillThrows(): Unit = runBlocking {
         val ghost = LcncNode("g", "ghost.type")
         val p = program(ghost, wires = emptyList())
         assertFailsWith<LcncUnknownNodeType> { LcncRunner(registry).runAll(p) }

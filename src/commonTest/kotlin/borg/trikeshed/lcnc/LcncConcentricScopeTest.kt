@@ -87,7 +87,7 @@ class LcncConcentricScopeTest {
     // ── line 1: only scope.out crosses — an outward wire is a loud violation ──
 
     @Test
-    fun outwardWireIsALoudScopeViolation() = runBlocking {
+    fun outwardWireIsALoudScopeViolation(): Unit = runBlocking {
         val p = program(
             "leak",
             listOf(
@@ -104,7 +104,7 @@ class LcncConcentricScopeTest {
     }
 
     @Test
-    fun cousinWireIsALoudScopeViolation() = runBlocking {
+    fun cousinWireIsALoudScopeViolation(): Unit = runBlocking {
         val p = program(
             "cousins",
             listOf(
@@ -125,7 +125,7 @@ class LcncConcentricScopeTest {
     // ── line 4: authored order is program order — use-before-def is loud ──
 
     @Test
-    fun useBeforeDefIsLoud() = runBlocking {
+    fun useBeforeDefIsLoud(): Unit = runBlocking {
         val p = program(
             "ubd",
             listOf(

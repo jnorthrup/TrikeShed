@@ -1,3 +1,5 @@
+@file:OptIn(ExperimentalStdlibApi::class)
+
 package borg.trikeshed.pijul
 
 import borg.trikeshed.crdt.PijulCrdt
@@ -313,8 +315,8 @@ object GitPijulGateway {
             val seed = lines.map { l -> Change.Insert(off, l).also { off += l.length } }
             crdt.apply(Patch(Blake3Hash.hash(("seed:" + base.length).encodeToByteArray()), seed, emptyList()))
         }
-        val distinct = LinkedHashMap<Blake3Hash, Hunk>()
-        for (h in hunks) distinct.putIfAbsent(h.id, h)
+        val distinct: MutableMap<Blake3Hash, Hunk> = LinkedHashMap()
+        for (h in hunks) distinct.getOrPutIfMissing(h.id) { h }
         val ordered = distinct.values.sortedWith(compareByDescending<Hunk> { it.lo }.thenByDescending { it.hi })
         for (h in ordered) {
             val changes = ArrayList<Change>(2)

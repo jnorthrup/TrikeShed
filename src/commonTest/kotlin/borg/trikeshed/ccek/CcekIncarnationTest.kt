@@ -9,7 +9,6 @@ import borg.trikeshed.kanban.KanbanCard
 import borg.trikeshed.kanban.KanbanCardId
 import borg.trikeshed.kanban.KanbanColumn
 import borg.trikeshed.kanban.KanbanColumnId
-import java.util.concurrent.atomic.AtomicInteger
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -21,6 +20,9 @@ import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withTimeout
 import kotlinx.coroutines.withTimeoutOrNull
 
 /**
@@ -103,8 +105,9 @@ class CcekIncarnationTest {
     @Test
     fun boundedConcurrencyRespectsSemaphore() = runBlocking {
         val (node, scope) = newNode(maxConcurrency = 2)
-        val running = AtomicInteger(0)
-        val peak = AtomicInteger(0)
+        val counters = Mutex()
+        var running = 0
+        var peak = 0
         val allDone = CompletableDeferred<Unit>()
 
         val agentCount = 6
@@ -112,26 +115,30 @@ class CcekIncarnationTest {
 
         repeat(agentCount) { i ->
             node.subscribeAgent("slow-$i") { _ ->
-                val cur = running.incrementAndGet()
-                while (true) {
-                    val p = peak.get()
-                    if (cur <= p || peak.compareAndSet(p, cur)) break
+                counters.withLock {
+                    running++
+                    peak = maxOf(peak, running)
                 }
                 delay(20)
-                running.decrementAndGet()
-                synchronized(this) {
+                counters.withLock {
+                    running--
                     completedCount++
                     if (completedCount >= agentCount) allDone.complete(Unit)
                 }
             }
         }
 
-        node.sendSignal(ForgeSignal.AppendBlock(ForgeBlockKind.TEXT, "go"))
-        withTimeoutOrNull(5000) { allDone.await() }
-
-        assertTrue(peak.get() <= 2, "peak concurrency ${peak.get()} exceeded max 2")
-
-        scope.cancel()
+        try {
+            node.sendSignal(ForgeSignal.AppendBlock(ForgeBlockKind.TEXT, "go"))
+            withTimeout(5000) { allDone.await() }
+            counters.withLock {
+                assertEquals(agentCount, completedCount)
+                assertEquals(0, running)
+                assertTrue(peak in 1..2, "peak concurrency $peak must be between 1 and 2")
+            }
+        } finally {
+            scope.cancel()
+        }
     }
 
     @Test
@@ -234,23 +241,27 @@ class CcekIncarnationTest {
     fun multipleAgentsAllReceiveSameSignal() = runBlocking {
         val (node, scope) = newNode()
         val received = mutableMapOf<String, ForgeSignal>()
+        val receivedMutex = Mutex()
         val allReceived = CompletableDeferred<Unit>()
 
         repeat(3) { i ->
             node.subscribeAgent("agent-$i") { signal ->
-                synchronized(received) {
+                receivedMutex.withLock {
                     received["agent-$i"] = signal
                     if (received.size >= 3) allReceived.complete(Unit)
                 }
             }
         }
 
-        node.sendSignal(ForgeSignal.AppendBlock(ForgeBlockKind.TEXT, "broadcast"))
-        withTimeoutOrNull(2000) { allReceived.await() }
-
-        assertEquals(3, received.size, "all 3 agents received the signal")
-        assertTrue(received.values.all { it is ForgeSignal.AppendBlock })
-
-        scope.cancel()
+        try {
+            node.sendSignal(ForgeSignal.AppendBlock(ForgeBlockKind.TEXT, "broadcast"))
+            withTimeout(2000) { allReceived.await() }
+            receivedMutex.withLock {
+                assertEquals(3, received.size, "all 3 agents received the signal")
+                assertTrue(received.values.all { it is ForgeSignal.AppendBlock })
+            }
+        } finally {
+            scope.cancel()
+        }
     }
 }
