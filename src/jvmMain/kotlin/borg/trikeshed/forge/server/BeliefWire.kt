@@ -275,6 +275,7 @@ class BeliefWire(
                         BeliefIntake.Mint(
                             signal,
                             borg.trikeshed.cursor.BudgetCoord(0.6f, 0.4f, 0.6f),
+                            gloss = m.gloss(),
                         ),
                     )
                     memoryFiles?.gloss(signal.angular, m.gloss())

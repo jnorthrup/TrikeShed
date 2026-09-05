@@ -92,6 +92,7 @@ class TurnReviewElement(
                     ),
                     BudgetCoord(0.7f, 0.4f, 0.6f),
                     receiptCid = receipt.canonicalCid,
+                    gloss = "$subject → $obj (${if (fact.ok && turnSucceeded) "worked" else "failed"})",
                 ),
             )
             landed.add(angular to "$subject → $obj (${if (fact.ok && turnSucceeded) "worked" else "failed"})")
@@ -138,6 +139,7 @@ class TurnReviewElement(
                         ),
                         BudgetCoord(0.4f, 0.3f, 0.5f),
                         receiptCid = receipt.canonicalCid,
+                        gloss = "$b tends to accompany $a (induced from $context)",
                     ),
                 )
                 landed.add(inducedAngular to "$b tends to accompany $a (induced from $context)")

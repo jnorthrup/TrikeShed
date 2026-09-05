@@ -800,21 +800,47 @@ object OroborosDaemon {
             }
             files
         }
+        // ── Curation receipts: one per (kind, angular), and each one SHOWS the
+        // belief. Subscribed HERE, before any suspension point, because the
+        // event flow has no replay and the boot seed mints ~1k beliefs early.
+        // The expression comes from whoever knows it — the mint's own gloss,
+        // the bag's remembered gloss, the rete's firing gloss, the hermes gloss
+        // table, or the rete's registered terms — plus the resident signal's
+        // relation/evidence/cids so a receipt can be linked by identity. The
+        // rete is built later and arrives through [receiptRete].
+        var receiptRete: borg.trikeshed.narsese.CausalityReteElement? = null
         if (beliefBag != null) {
             launch {
                 beliefBag.beliefEvents.collect { ev ->
-                    val (kind, angular) = when (ev) {
-                        is borg.trikeshed.narsese.BeliefEvent.Minted -> "minted" to ev.angular
-                        is borg.trikeshed.narsese.BeliefEvent.Revised -> "revised" to ev.angular
-                        is borg.trikeshed.narsese.BeliefEvent.Attended -> "attended" to ev.angular
-                        is borg.trikeshed.narsese.BeliefEvent.Evicted -> "evicted" to ev.angular
-                        is borg.trikeshed.narsese.BeliefEvent.Contradicted -> "contradicted" to ev.angular
+                    val (kind, angular, eventGloss) = when (ev) {
+                        is borg.trikeshed.narsese.BeliefEvent.Minted -> Triple("minted", ev.angular, ev.gloss)
+                        is borg.trikeshed.narsese.BeliefEvent.Revised -> Triple("revised", ev.angular, ev.gloss)
+                        is borg.trikeshed.narsese.BeliefEvent.Attended -> Triple("attended", ev.angular, null)
+                        is borg.trikeshed.narsese.BeliefEvent.Evicted -> Triple("evicted", ev.angular, null)
+                        is borg.trikeshed.narsese.BeliefEvent.Contradicted -> Triple("contradicted", ev.angular, null)
                     }
-                    daemonBlackboard.put(
-                        "narsese/curation/$kind/${angular.toString(16)}",
-                        mapOf("event" to kind, "angular" to angular.toString(), "actor" to "curator-pure"),
-                        "oroboros",
+                    val rete = receiptRete
+                    val signal = beliefBag.signalOf(angular)
+                    val terms = rete?.termsOf(angular)
+                    val expression = eventGloss
+                        ?: beliefBag.glossOf(angular)
+                        ?: rete?.glossOf(angular)
+                        ?: hermesMemoryFiles?.glossOf(angular)
+                        ?: terms?.let { "${it.a} --> ${it.b}" }
+                    val receipt = linkedMapOf<String, Any?>(
+                        "event" to kind, "angular" to angular.toString(), "actor" to "curator-pure",
                     )
+                    if (expression != null) receipt["expression"] = expression
+                    if (terms != null) { receipt["subject"] = terms.a; receipt["object"] = terms.b }
+                    if (signal != null) {
+                        receipt["relation"] = signal.relation.name
+                        receipt["expectation"] = borg.trikeshed.narsese.Nal.truthOf(signal.evidence).expectation()
+                        receipt["evidence"] = mapOf("positive" to signal.evidence.positive, "negative" to signal.evidence.negative)
+                        receipt["subjectCid"] = signal.subjectCid
+                        receipt["objectCid"] = signal.objectCid
+                        receipt["provenanceCid"] = signal.provenanceCid
+                    }
+                    daemonBlackboard.put("narsese/curation/$kind/${angular.toString(16)}", receipt, "oroboros")
                 }
             }
         }
@@ -879,6 +905,7 @@ object OroborosDaemon {
             c.open()
             c
         }
+        receiptRete = causalityRete
         val beliefWire = if (beliefBag != null && turnReview != null) {
             // W5.3: wire the live curator element into the beliefs HTTP surface
             // (teach/query routes) — the SAME element the feeder teaches.
@@ -2187,8 +2214,9 @@ object OroborosDaemon {
                         val path = worktreeSnap.paths[i]
                         if (!path.endsWith(".md") && !path.endsWith(".markdown")) continue
                         val att = attachmentGateway.getAttachment(path) ?: continue
+                        val docText = att.second.decodeToString()
                         val surface = runCatching {
-                            borg.trikeshed.cas.ContentEpistemicIngest.ingest(casStore, att.second.decodeToString())
+                            borg.trikeshed.cas.ContentEpistemicIngest.ingest(casStore, docText)
                         }.getOrNull() ?: continue
                         for (si in 0 until surface.signals.size) {
                             if (mintedSignals >= mintCap) break
@@ -2203,6 +2231,7 @@ object OroborosDaemon {
                                 borg.trikeshed.narsese.BeliefIntake.Mint(
                                     s.copy(angular = coord),
                                     borg.trikeshed.cursor.BudgetCoord(0.5f, 0.3f, 0.5f),
+                                    gloss = borg.trikeshed.cas.epistemicGloss(surface, s, path.substringAfterLast('/'), docText),
                                 ),
                             )
                             mintedSignals++

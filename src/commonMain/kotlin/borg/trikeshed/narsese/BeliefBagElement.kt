@@ -33,6 +33,9 @@ sealed class BeliefIntake {
         val budget: BudgetCoord,
         val receiptCid: ContentId? = null,
         val evidenceBasis: EvidenceBasis? = null,
+        /** The Narsese surface of the signal, when the minter knows it. A belief
+         *  shown as a bare angular is a mistake; carry the expression with it. */
+        val gloss: String? = null,
     ) : BeliefIntake()
 
     /** Evidence delta onto an existing angular; budget untouched. */
@@ -46,8 +49,8 @@ sealed class BeliefIntake {
 }
 
 sealed class BeliefEvent {
-    data class Minted(val angular: Long, val receiptCid: ContentId?) : BeliefEvent()
-    data class Revised(val angular: Long, val evidence: EvidenceCoord) : BeliefEvent()
+    data class Minted(val angular: Long, val receiptCid: ContentId?, val gloss: String? = null) : BeliefEvent()
+    data class Revised(val angular: Long, val evidence: EvidenceCoord, val gloss: String? = null) : BeliefEvent()
     data class Attended(val angular: Long, val budget: BudgetCoord) : BeliefEvent()
     data class Evicted(val angular: Long, val spillCid: ContentId?) : BeliefEvent()
     data class Contradicted(val angular: Long, val subjectCid: String) : BeliefEvent()
@@ -109,6 +112,12 @@ class BeliefBagElement(
     /** Exact ancestry is retained when supplied; Bloom remains the fast hint. */
     private val basisByAngular = HashMap<Long, EvidenceBasis>()
     private val receiptByAngular = HashMap<Long, ContentId>()
+    // angular → the Narsese surface the minter supplied; revisions keep the
+    // latest one so a receipt can always show the expression, not a coordinate.
+    private val glossByAngular = HashMap<Long, String>()
+
+    /** The expression minted under [angular], when any minter supplied one. */
+    fun glossOf(angular: Long): String? = glossByAngular[angular]
 
     // ── NAL-9: the moment field — the bag's self-model, rebuilt lazily on a
     // dirty flag (derived state: never WAL'd, milliseconds at d=64, n≤capacity).
@@ -206,11 +215,14 @@ class BeliefBagElement(
 
     fun budgetOf(angular: Long): BudgetCoord? = hijack.get(angular)?.budget
 
+    /** The resident signal under [angular], so a receipt can name what it is about. */
+    fun signalOf(angular: Long): SemanticSignal? = hijack.get(angular)?.signal
+
     // ── intake processing (single consumer: the bag's serial spine) ────
 
     private suspend fun handle(cmd: BeliefIntake) {
         when (cmd) {
-            is BeliefIntake.Mint -> mint(cmd.signal, cmd.budget, cmd.receiptCid, cmd.evidenceBasis)
+            is BeliefIntake.Mint -> mint(cmd.signal, cmd.budget, cmd.receiptCid, cmd.evidenceBasis, cmd.gloss)
             is BeliefIntake.Reinforce -> reinforce(cmd.angular, cmd.delta)
             is BeliefIntake.Attend -> attend(cmd.angular, cmd.budget)
             BeliefIntake.DecayTick -> decayAll()
@@ -224,8 +236,11 @@ class BeliefBagElement(
         budget: BudgetCoord,
         receiptCid: ContentId?,
         evidenceBasis: EvidenceBasis?,
+        gloss: String? = null,
     ) {
         val angular = incoming.angular
+        if (gloss != null) glossByAngular[angular] = gloss
+        val shown = glossByAngular[angular]
         val revived = if (hijack.get(angular) == null && cas != null) reviveFromCas(incoming) else incoming
         val existing = hijack.get(angular)
         val incomingReceipt = receiptCid ?: ContentId.of(SignalCodec.encode(revived))
@@ -258,14 +273,14 @@ class BeliefBagElement(
                 recordBasis(angular, incomingReceipt, evidenceBasis)
                 walAppend("B:${outcome.slot.budget.packed}:" + SignalCodec.encode(outcome.slot.signal).decodeToString())
                 _events.tryEmit(
-                    if (outcome.merged) BeliefEvent.Revised(angular, outcome.slot.signal.evidence)
-                    else BeliefEvent.Minted(angular, receiptCid),
+                    if (outcome.merged) BeliefEvent.Revised(angular, outcome.slot.signal.evidence, shown)
+                    else BeliefEvent.Minted(angular, receiptCid, shown),
                 )
             }
             is HijackBeliefBag.Put.Hijacked -> {
                 recordBasis(angular, incomingReceipt, evidenceBasis)
                 walAppend("B:${outcome.slot.budget.packed}:" + SignalCodec.encode(outcome.slot.signal).decodeToString())
-                _events.tryEmit(BeliefEvent.Minted(angular, receiptCid))
+                _events.tryEmit(BeliefEvent.Minted(angular, receiptCid, shown))
                 spill(outcome.victim)
             }
             is HijackBeliefBag.Put.Rejected -> {

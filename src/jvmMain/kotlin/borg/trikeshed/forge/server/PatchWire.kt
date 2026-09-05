@@ -137,8 +137,9 @@ class ProjectScopes(
                     if (minted >= mintCap) break
                     if (!path.endsWith(".md") && !path.endsWith(".markdown") && !path.endsWith(".txt")) continue
                     val att = scopeGateway.getAttachment(path) ?: continue
+                    val docText = att.second.decodeToString()
                     val surface = runCatching {
-                        borg.trikeshed.cas.ContentEpistemicIngest.ingest(casStore, att.second.decodeToString())
+                        borg.trikeshed.cas.ContentEpistemicIngest.ingest(casStore, docText)
                     }.getOrNull() ?: continue
                     for (si in 0 until surface.signals.size) {
                         if (minted >= mintCap) break@outer
@@ -154,6 +155,7 @@ class ProjectScopes(
                                     ),
                                 ),
                                 BudgetCoord(0.5f, 0.3f, 0.5f),
+                                gloss = borg.trikeshed.cas.epistemicGloss(surface, s, path.substringAfterLast('/'), docText),
                             ),
                         )
                         minted++

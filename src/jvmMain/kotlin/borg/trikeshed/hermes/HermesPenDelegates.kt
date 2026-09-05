@@ -105,6 +105,7 @@ class HermesPen(
                     provenanceCid = evaluator.value,
                 ),
                 BudgetCoord(0.6f, 0.4f, 0.5f),
+                gloss = "$agentId $verb ==> $verb (${if (outcome.isSuccess) "ok" else "failed"})",
                 receiptCid = DerivationReceipt.observation(
                     subject = TermIdentity(AngularCodec.encode(RelationKind.CAUSALITY, subjectTerm = agentId)),
                     predicate = TermIdentity(AngularCodec.encode(RelationKind.CAUSALITY, subjectTerm = verb)),
@@ -178,6 +179,7 @@ class HermesPen(
                     provenanceCid = evaluator.value,
                 ),
                 BudgetCoord(0.4f, 0.3f, 0.5f),
+                gloss = "$subjectTerm ==> ${objectTerm ?: "?"} (${if (success) "ok" else "failed"})",
             ),
         )
         return Teleported.Str(JsonSupport.stringify(mapOf("verdict" to "ok", "angular" to angular.toString())))

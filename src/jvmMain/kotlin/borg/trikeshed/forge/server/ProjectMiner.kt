@@ -148,6 +148,7 @@ class ProjectMiner(
                                             ),
                                         ),
                                         BudgetCoord(0.5f, 0.35f, 0.5f),
+                                        gloss = borg.trikeshed.cas.epistemicGloss(surface, s, id.substringAfterLast('/'), body),
                                     ),
                                 )
                                 perDoc++; mintedRun++; prog.minted++

@@ -90,6 +90,17 @@ class CausalityReteElement(
         synchronizedLock(admitGate) { this.terms[angular] = subject j obj }
     }
 
+    /** The registered (subject, obj) terms under [angular], if the caller ever named them. */
+    fun termsOf(angular: Long): Twin<String>? = synchronizedLock(admitGate) { terms[angular] }
+
+    // angular → Narsese surface gloss of the firing that minted it; the render
+    // layer captions receipts from here so an expression is never shown as a
+    // bare coordinate.
+    private val glosses: MutableMap<Long, String> = LinkedHashMap()
+
+    /** The Narsese expression [fireLive] minted under [angular], if any. */
+    fun glossOf(angular: Long): String? = synchronizedLock(admitGate) { glosses[angular] }
+
     /**
      * Admit [newRules] into the LIVE rete. Rebuilds the inner [CausalityRete]
      * over the union of the already-admitted rules and [newRules] (deduplicated
@@ -163,6 +174,8 @@ class CausalityReteElement(
                 evidence = firing.support,
                 evaluatorCid = evaluator,
             )
+            val gloss = "${firing.rule.antecedent} ${firing.rule.copula.symbol} ${firing.rule.consequent}" +
+                if (firing.floored) " (floored)" else ""
             bag.intake.send(
                 BeliefIntake.Mint(
                     SemanticSignal(
@@ -175,16 +188,14 @@ class CausalityReteElement(
                     ),
                     mintBudget,
                     receiptCid = receipt.canonicalCid,
+                    gloss = gloss,
                 ),
             )
             // register the consequent under its own subject term so a later
             // rule may chain from it without this rule matching its own output
             register(consequentAngular, firing.rule.consequent, firing.rule.antecedent)
-            landed.add(
-                consequentAngular j
-                    "${firing.rule.antecedent} ${firing.rule.copula.symbol} ${firing.rule.consequent}" +
-                    if (firing.floored) " (floored)" else "",
-            )
+            synchronizedLock(admitGate) { glosses[consequentAngular] = gloss }
+            landed.add(consequentAngular j gloss)
         }
         return landed.toSeries()
     }

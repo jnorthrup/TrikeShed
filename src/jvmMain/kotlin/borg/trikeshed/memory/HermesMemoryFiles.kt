@@ -58,6 +58,7 @@ class HermesMemoryFiles(
                         provenanceCid = evaluatorCid.value,
                     ),
                     BudgetCoord(1.0f, if (pinned) 1.0f else 0.6f, 0.9f),
+                    gloss = entry,
                 ),
             )
             gloss(angular, entry)

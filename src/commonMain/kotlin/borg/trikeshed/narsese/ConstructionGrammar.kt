@@ -163,6 +163,7 @@ class ConstructionReadingLoop(
             budget = BudgetCoord(1f, 1f, 1f),
             receiptCid = a.identity,
             evidenceBasis = EvidenceBasis.of(*leaves),
+            gloss = "${a.subject} ==> ${a.obj}",
         ))
         kifSink("(causes ${kifAtom(a.subject)} ${kifAtom(a.obj)})")
         if (a.relation == "if_then") registerRule(a)

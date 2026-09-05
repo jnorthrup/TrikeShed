@@ -82,6 +82,46 @@ data class ContentEpistemicSurface(
     val signals: Series<SemanticSignal>,
 )
 
+/**
+ * The Narsese surface of one of this surface's [signals]: the structural keys
+ * of the two regions the link joins, under the relation's copula, prefixed by
+ * [source] (the document the regions came from). A minted belief must SHOW as
+ * an expression on the blackboard, never as a bare angular — this is what the
+ * ingest sites hand to [borg.trikeshed.narsese.BeliefIntake.Mint.gloss].
+ */
+fun epistemicGloss(surface: ContentEpistemicSurface, signal: SemanticSignal, source: String, text: String? = null): String {
+    var from: EpistemicRegion? = null
+    var to: EpistemicRegion? = null
+    val regions = surface.regions
+    for (i in 0 until regions.size) {
+        val r = regions[i]
+        val hex = r.regionCid.hex
+        if (hex == signal.subjectCid) from = r
+        if (hex == signal.objectCid) to = r
+    }
+    val lines = text?.lines()
+    // caption a region by its first non-blank line when the document text is at
+    // hand; otherwise by its structural key (the codeable surface it carries)
+    fun caption(r: EpistemicRegion?, cid: String?): String {
+        if (r == null) return cid?.take(12) ?: "?"
+        if (lines != null) {
+            var i = r.coordinate.startInclusive
+            while (i < r.coordinate.endExclusive && i < lines.size) {
+                val l = lines[i].trim()
+                if (l.isNotEmpty()) return "«" + (if (l.length > 56) l.take(55) + "…" else l) + "»"
+                i++
+            }
+        }
+        return r.schema.structuralKey
+    }
+    val copula = when (signal.relation) {
+        SemanticRelationKind.CAUSALITY -> "==>"
+        SemanticRelationKind.ATTRACTION -> "<->"
+        else -> "-->"
+    }
+    return "$source: ${caption(from, signal.subjectCid)} $copula ${caption(to, signal.objectCid)}"
+}
+
 fun EpistemicRegion.linesOf(spine: LineSpine): LineSpine {
     require(LineCas.spineCid(spine) == coordinate.spineCid) { "region belongs to another spine" }
     require(coordinate.startInclusive >= 0 && coordinate.endExclusive <= spine.size)

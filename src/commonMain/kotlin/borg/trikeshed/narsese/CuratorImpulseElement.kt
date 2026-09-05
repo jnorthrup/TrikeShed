@@ -139,6 +139,9 @@ class CuratorImpulseElement(
                     signal.copy(provenanceCid = receipt.canonicalCid.value),
                     mintBudget,
                     receiptCid = receipt.canonicalCid,
+                    gloss = "${assessment.impulse.term()} " +
+                        (if (signal.relation == RelationKind.CONTRADICTION) "--/> " else "--> ") +
+                        "scenario_${assessment.scenarioId}",
                 ),
             )
             // register term identity with the rete so later fires can chain

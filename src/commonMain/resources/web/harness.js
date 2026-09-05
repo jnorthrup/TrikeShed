@@ -150,6 +150,7 @@ const Harness = {
     for (const [prefix, items] of [...groups].sort((a,b) => b[1].length-a[1].length)) {
       const height = Math.max(190, Math.min(560, 140 + Math.sqrt(items.length)*11));
       const tone = prefix === "narsese" ? "#c4b07c" : prefix === "kanban" ? "#80b4d2" : "#a7a1c9";
+      if (prefix === "narsese") { y += this.narseseTerritory(items, side, y, tone) + 24; continue; }
       const territory = this.territory(prefix, prefix, items.length + " entries", side, y, 600, height, tone);
       if (items.length > 24) {
         const field = this.el("div", "fact-field");
@@ -215,8 +216,80 @@ const Harness = {
     $("#boardCount").textContent = Object.keys(this.board).length + " entries";
     applyView(); redraw();Landscape.schedule();
   },
+  /* Narsese on the board is shown as EXPRESSIONS and linked by their terms.
+     A curation receipt carries the expression the minter knew (plus subject /
+     object / relation when the bag knows them); a rete firing carries its
+     antecedent and consequent. Rows are the expressions; a row whose object
+     (or consequent) is another row's subject (or antecedent) is a derivation
+     step, and channels() draws that chain. A receipt with no expression is
+     shown as exactly that — a coordinate the daemon could not caption — so
+     the gap is visible instead of silent. */
+  narseseExpression(key, value) {
+    if (!value || typeof value !== "object") return null;
+    if (value.expression) return value.expression;
+    if (value.antecedent && value.consequent) return value.antecedent + " ==> " + value.consequent;
+    if (value.subject && value.object) return value.subject + " --> " + value.object;
+    return null;
+  },
+  narseseTerms(value) {
+    if (!value || typeof value !== "object") return null;
+    const head = value.antecedent || value.subject, tail = value.consequent || value.object;
+    if (head && tail) return {head, tail};
+    // "source: head ==> tail (note)" — the source prefix is provenance, not a term
+    const m = /^(?:[^:«»]+:\s)?(.+?)\s(==>|-->|<->|=\/>|--\/>|→)\s(.+?)(\s\(.*\))?$/.exec(value.expression || "");
+    return m ? {head:m[1], tail:m[3]} : null;
+  },
+  narseseTerritory(items, x, y, tone) {
+    const rank = v => v?.event === "minted" ? 0 : v?.event === "dependent-rete-firing" ? 1 : v?.event === "revised" ? 2 : 3;
+    const rows = items.map(([key,value]) => ({key, value, expression:this.narseseExpression(key,value), terms:this.narseseTerms(value)}))
+      .sort((a,b) => (a.expression?0:1)-(b.expression?0:1) || rank(a.value)-rank(b.value) || a.key.localeCompare(b.key));
+    const shown = rows.filter(r => r.expression).length, blind = rows.length - shown;
+    const LIMIT = 36, visible = rows.slice(0, LIMIT), rest = rows.slice(LIMIT);
+    const height = 96 + visible.length*34 + (rest.length ? 60 + Math.ceil(rest.length/50)*12 : 0);
+    const territory = this.territory("narsese", "narsese", shown + " expressions" + (blind ? " · " + blind + " uncaptioned" : ""), x, y, 600, height, tone);
+    const byHead = new Map();
+    this.narseseChains = [];
+    for (const r of visible) {
+      const row = this.el("button", "fact-row nal-row" + (r.expression ? "" : " blind"));
+      row.dataset.key = r.key;
+      const tag = (r.value?.event || "") + (r.value?.relation ? " · " + r.value.relation.toLowerCase() : "") + (typeof r.value?.expectation === "number" ? " · e=" + r.value.expectation.toFixed(2) : "");
+      row.append(this.el("b", "", r.expression || ("∠ " + (r.value?.angular || r.key) + " — no expression on this daemon")), this.el("span", "", tag));
+      row.title = r.key;
+      if (this.flashes.has(r.key)) row.classList.add("flash");
+      row.addEventListener("click", () => this.inspect(r.key));
+      territory.append(row);
+      r.el = row;
+      if (r.terms) { if (!byHead.has(r.terms.head)) byHead.set(r.terms.head, []); byHead.get(r.terms.head).push(r); }
+    }
+    for (const r of visible) {
+      if (!r.terms) continue;
+      for (const next of byHead.get(r.terms.tail) || []) if (next !== r) this.narseseChains.push([r.el, next.el]);
+    }
+    if (rest.length) {
+      territory.append(this.el("p", "nal-more", rest.length + " more receipts"));
+      const field = this.el("div", "fact-field");
+      for (const r of rest) {
+        const cell = this.el("button", "fact-cell" + (r.expression ? "" : " blind"));
+        cell.title = (r.expression || "no expression") + "\n" + r.key; cell.setAttribute("aria-label", r.expression || r.key);
+        if (this.flashes.has(r.key)) cell.classList.add("flash");
+        cell.addEventListener("click", () => this.inspect(r.key));
+        field.append(cell);
+      }
+      territory.append(field);
+    }
+    return height;
+  },
   channels(receipt) {
-    const svg=$("#channels");svg.replaceChildren();if(!receipt)return;
+    const svg=$("#channels");svg.replaceChildren();
+    // derivation chains inside the narsese territory: object → subject of the next expression
+    const w=world.getBoundingClientRect();
+    for (const [from,to] of this.narseseChains || []) {
+      const a=from.getBoundingClientRect(), b=to.getBoundingClientRect();
+      const ax=(a.right-w.left)/view.z, ay=(a.top+a.height/2-w.top)/view.z, bx=(b.right-w.left)/view.z, by=(b.top+b.height/2-w.top)/view.z;
+      const path=document.createElementNS(svg.namespaceURI,"path");path.setAttribute("class","chain");
+      path.setAttribute("d",`M ${ax} ${ay} C ${ax+70} ${ay}, ${bx+70} ${by}, ${bx} ${by}`);svg.append(path);
+    }
+    if(!receipt)return;
     const a=this.positions.get(receipt.programKey),b=this.positions.get("receipts");if(!a||!b)return;
     const path=document.createElementNS(svg.namespaceURI,"path");path.setAttribute("d",bez({x:a.x+a.w,y:a.y+160},{x:b.x,y:b.y+160}));svg.append(path);
     const label=document.createElementNS(svg.namespaceURI,"text");label.setAttribute("x",String(a.x+a.w+8));label.setAttribute("y",String(a.y+147));label.textContent=receipt.status;svg.append(label);
