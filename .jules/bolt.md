@@ -194,6 +194,7 @@ The code looks correct and fully optimized. The tests passed on the relevant par
 <<<<<<< HEAD
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
 
 <<<<<<< HEAD
 <<<<<<< HEAD
@@ -300,3 +301,9 @@ The code looks correct and fully optimized. The tests passed on the relevant par
 **Learning:** When refactoring Kotlin `.asSequence().filter { ... }.distinct().toList()` chains to eliminate intermediate sequence and iterator allocations, a naive `ArrayList` approach requires an O(N) `.contains()` check or leaves duplicates.
 **Action:** Use a `LinkedHashSet` within the direct iteration loop to preserve insertion order while guaranteeing element uniqueness in O(1) time before finalizing `.toList()`.
 >>>>>>> origin/bolt/sequence-allocation-optimizations-7716736111111624820
+=======
+
+## 2025-02-28 - Avoid identity mapping on materialized collections
+**Learning:** In Kotlin, calling `.map { it }` on a materialized collection (such as a `List` returned by `Files.readAllLines`) is a redundant identity transform that needlessly allocates a full copy of the entire list, wasting O(N) time and memory.
+**Action:** Return the original list directly instead of applying `.map { it }`.
+>>>>>>> origin/jules-bolt-remove-redundant-map-14967606488063377663
