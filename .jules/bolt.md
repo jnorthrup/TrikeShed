@@ -235,3 +235,6 @@ The code looks correct and fully optimized. The tests passed on the relevant par
 ## 2024-05-18 - Optimize Series Operations in LcncMating
 **Learning:** Using chained `.toList()` operations (e.g. `.toList().none`, `.toList().size`, `.toList().plus()`) on `Series` collections forces intermediate O(N) `ArrayList` allocations. This is heavily detrimental on execution hot paths like treeshaking and wiring.
 **Action:** Replace `.toList()` accessors with zero-allocation alternatives. Use `.view` for lazy sequence-like iterations (`.view.none`, `.view.any`, `.view.firstOrNull`), direct `.size` property for bounds, and the custom `j` constructor (e.g., `(size + 1) j { i -> if (i < size) arr[i] else new_element }`) to append elements to a `Series` without intermediate lists.
+## 2024-08-25 - CouchDatabase Document ID Iteration Optimization
+**Learning:** `CouchDatabase`'s `allDocs` method previously materialized all documents using `store.all()` just to filter tombstones and extract IDs. This is highly inefficient in TrikeShed since `store.all()` forces deserialization of the entire database.
+**Action:** Use `store.ids()` to get a zero-allocation `Join` view of the document IDs. Iterate using `ids.a` (size) and `ids.b(i)` (getter). To check deletion status without loading the document, use `store.head.isDeleted(id)` instead of `isTombstone(doc)`.
