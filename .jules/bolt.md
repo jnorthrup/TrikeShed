@@ -181,6 +181,7 @@ The code looks correct and fully optimized. The tests passed on the relevant par
 **Action:** Remove redundant `.map { it }` calls before `.toList()` on Sequences (or simply use `.lines()` for strings).
 
 <<<<<<< HEAD
+<<<<<<< HEAD
 ## 2024-05-18 - Zero-allocation store.ids() iteration in CouchDatabase.allDocs
 **Learning:** In TrikeShed, `database.store.all()` materializes a full list of documents in memory. To avoid this allocation when only IDs are needed, use `database.store.ids()`. This returns a custom `Join<Int, (Int) -> String>` type where `.a` represents the size and `.b(i)` is the element getter. Using this directly inside `CouchDatabase.allDocs` prevents heavy parsing and memory pressure when enumerating large databases.
 **Action:** Iterate using `for (i in 0 until ids.a) { val id = ids.b(i) ... }` to achieve zero-allocation ID scanning instead of chained `.map` over `.all()`.
@@ -189,3 +190,8 @@ The code looks correct and fully optimized. The tests passed on the relevant par
 **Learning:** Calling `.toList().toSeries()` on an `Array`, `List`, or `Set` creates an unnecessary intermediate `ArrayList` allocation. The TrikeShed codebase provides native `.toSeries()` extensions for these collection types that avoid this overhead.
 **Action:** When constructing a `Series` from an existing array or collection, use `.toSeries()` directly without chaining `.toList()` in between.
 >>>>>>> origin/bolt-avoid-tolist-toseries-allocations-15664182334725267166
+=======
+## 2024-08-29 - Avoid intermediate List allocations in sequence processing
+**Learning:** `filterIsInstance<T>()` and `maxWith(..)` on Iterables allocate intermediate Lists which could be avoided in hot paths by iterating once.
+**Action:** Replace `observations = causalList.filterIsInstance<...>()` and `.maxWith(...)` with a single manual for-loop iteration on `causalList`.
+>>>>>>> origin/bolt-eliminate-intermediate-allocations-julespatchcontinuity-1013692572153607276
