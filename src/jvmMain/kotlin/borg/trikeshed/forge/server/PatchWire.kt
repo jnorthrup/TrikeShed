@@ -254,13 +254,6 @@ class ProjectScopes(
         for (cmd in attempts) {
             val ok = runCatching {
                 val p = ProcessBuilder(cmd).redirectErrorStream(true).start()
-<<<<<<< HEAD
-                val outAsync = java.util.concurrent.CompletableFuture.supplyAsync { p.inputStream.readBytes() }
-                val finished = p.waitFor(30, java.util.concurrent.TimeUnit.SECONDS)
-                if (!finished) p.destroyForcibly()
-                outAsync.get()
-                finished && p.exitValue() == 0
-=======
                 val future = java.util.concurrent.CompletableFuture.supplyAsync { p.inputStream.readBytes() }
                 val finished = p.waitFor(5, java.util.concurrent.TimeUnit.MINUTES)
                 if (!finished) {
@@ -269,7 +262,6 @@ class ProjectScopes(
                 }
                 future.get(1, java.util.concurrent.TimeUnit.MINUTES)
                 p.exitValue() == 0
->>>>>>> origin/sentinel/fix-unbounded-waitfor-dos-5652840941151199537
             }.getOrDefault(false)
             if (ok && dest.isDirectory) return dest
             dest.deleteRecursively()

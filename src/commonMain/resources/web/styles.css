@@ -82,34 +82,8 @@ button { font: inherit; color: inherit; background: none; border: none; cursor: 
   user-select: none;
 }
 .sidebar-item:hover { background: var(--hover); }
-<<<<<<< HEAD
-<<<<<<< HEAD
-<<<<<<< HEAD
-<<<<<<< HEAD
 .sidebar-item.active { background: var(--hover-strong); font-weight: 500; }
-<<<<<<< HEAD
-<<<<<<< HEAD
-<<<<<<< HEAD
 .sidebar-item.active .sidebar-item-icon { color: var(--accent); }
-=======
->>>>>>> origin/palette-sidebar-active-states-17480957366909985694
-=======
->>>>>>> origin/palette-sidebar-active-states-18252850510239450495
-=======
->>>>>>> origin/palette-sidebar-active-sync-363112185002837110
-=======
-.sidebar-item.active { background: var(--accent-soft); color: var(--accent); }
-.sidebar-item.active .sidebar-item-icon { color: var(--accent); }
->>>>>>> origin/palette-sidebar-navigation-active-state-4631464799665027047
-=======
-.sidebar-item.active { background: var(--hover-strong); font-weight: 500; }
->>>>>>> origin/palette-sync-active-states-13061811296034537326
-=======
-.sidebar-item.active { background: var(--hover-strong); font-weight: 500; }
->>>>>>> origin/palette/consistent-sidebar-active-states-2051654551536943700
-=======
-.sidebar-item.active { background: var(--hover-strong); font-weight: 500; }
->>>>>>> origin/palette/sidebar-active-state-16031907533662246712
 .sidebar-item-icon {
   width: 20px;
   text-align: center;

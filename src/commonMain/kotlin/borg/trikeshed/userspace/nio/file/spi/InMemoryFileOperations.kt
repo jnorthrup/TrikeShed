@@ -52,7 +52,6 @@ class InMemoryFileOperations(
 
     override fun listDir(path: String): List<String> {
         val prefix = path.trimEnd('/') + "/"
-<<<<<<< HEAD
         // ⚡ Bolt: Avoid intermediate sequence, filter, and map allocations.
         // Use a direct loop with LinkedHashSet to preserve order and distinctness with zero intermediate object overhead.
         val result = LinkedHashSet<String>()
@@ -70,19 +69,6 @@ class InMemoryFileOperations(
                 if (name.isNotEmpty()) {
                     result.add(name)
                 }
-=======
-        val result = LinkedHashSet<String>()
-        for (key in files.keys) {
-            if (key.startsWith(prefix)) {
-                val mapped = key.removePrefix(prefix).substringBefore('/')
-                if (mapped.isNotEmpty()) result.add(mapped)
-            }
-        }
-        for (key in dirs) {
-            if (key.startsWith(prefix)) {
-                val mapped = key.removePrefix(prefix).substringBefore('/')
-                if (mapped.isNotEmpty()) result.add(mapped)
->>>>>>> origin/bolt/sequence-allocation-optimizations-7716736111111624820
             }
         }
         return result.toList()

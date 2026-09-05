@@ -1508,11 +1508,7 @@ function buildNode(n){
     if(lane) el.dataset.lane=lane.id;
   }
   const hd=document.createElement("div"); hd.className="hd";
-<<<<<<< HEAD
-  hd.innerHTML=`<i></i><b>${t.title}</b><s title="collapse">▤</s><s title="delete">✕</s>`;
-=======
-  hd.innerHTML=`<i></i><b>${t.title}</b><s role="button" tabindex="0" aria-label="Delete node" title="delete">✕</s>`;
->>>>>>> origin/palette/accessibility-aria-panels-5332397891945758788
+  hd.innerHTML=`<i></i><b>${t.title}</b><s role="button" tabindex="0" aria-label="Collapse node" title="collapse">▤</s><s role="button" tabindex="0" aria-label="Delete node" title="delete">✕</s>`;
   el.appendChild(hd);
   // the hover blip: asserted / inferred / graal for THIS node, from the daemon
   el.addEventListener("pointerenter",e=>blipEnter(n,e));
