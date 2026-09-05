@@ -5,6 +5,8 @@ import borg.trikeshed.lib.get
 import borg.trikeshed.lib.size
 import borg.trikeshed.lib.toSeries
 import borg.trikeshed.lib.toList
+import borg.trikeshed.lib.j
+import borg.trikeshed.lib.view
 
 /**
  * Kotlin-owned mating operation over the contract vocabulary. Pointer geometry and
@@ -188,14 +190,16 @@ object LcncMating {
         // using the existing wire graph (not the fresh `id` which is always new).
         val srcCard = LcncContracts.find(source.type)?.cardinality?.get(sourcePort.removeSuffix("?")) ?: LcncCardinality.ONE
         if (srcCard == LcncCardinality.ONE) {
-            require(program.wires.toList().none { it.fromNode == sourceNode && it.fromPort == sourcePort }) {
+            // Bolt: use .view to iterate Series zero-allocation instead of creating an ArrayList.
+            require(program.wires.view.none { it.fromNode == sourceNode && it.fromPort == sourcePort }) {
                 "source output already wired: ${source.type}.$sourcePort (ONE cardinality)"
             }
         }
         val tgtCard = LcncContracts.find(targetType)?.cardinality?.get(candidate.inputPort.removeSuffix("?")) ?: LcncCardinality.ONE
         if (tgtCard == LcncCardinality.ONE) {
             val existingType = mutableMapOf<String, String>()
-            require(program.wires.toList().none {
+            // Bolt: zero allocation Series iteration.
+            require(program.wires.view.none {
                 it.toPort == candidate.inputPort && run {
                     val t = existingType.getOrPut(it.toNode) {
                         runCatching { node(program, it.toNode).type }.getOrDefault("")
@@ -216,8 +220,9 @@ object LcncMating {
             function = LcncContracts.find(candidate.type)?.functions?.get(candidate.inputPort.removeSuffix("?"))?.firstOrNull() ?: "identity",
         ).validate()
         val controls = program.controls.addMatingPoint(point)
-        val nodes = program.nodes.toList().plus(targetNode).toSeries()
-        val wires = program.wires.toList().plus(wire).toSeries()
+        // Bolt: zero allocation element append with the infix `j` operator instead of toList().plus()
+        val nodes = (program.nodes.size + 1) j { i: Int -> if (i < program.nodes.size) program.nodes[i] else targetNode }
+        val wires = (program.wires.size + 1) j { i: Int -> if (i < program.wires.size) program.wires[i] else wire }
         // W2.4: seq must clear the fresh id — "n3" ⇒ seq ≥ 4 — or the browser's
         // next addNode("n"+G.seq++) would collide with the mated node.
         val freshNum = id.removePrefix("n").toIntOrNull() ?: 0
@@ -229,12 +234,13 @@ object LcncMating {
     }
 
     private fun node(program: LcncProgram, id: String): LcncNode =
-        program.nodes.toList().firstOrNull { it.id == id }
+        program.nodes.view.firstOrNull { it.id == id } // Bolt: zero allocation Series iteration
             ?: error("unknown source node: $id")
 
     private fun freshNodeId(program: LcncProgram): String {
-        var n = program.nodes.toList().size + 1
-        while (program.nodes.toList().any { it.id == "n$n" }) n++
+        // Bolt: read size property directly, and use .view zero-allocation iterator.
+        var n = program.nodes.size + 1
+        while (program.nodes.view.any { it.id == "n$n" }) n++
         return "n$n"
     }
 

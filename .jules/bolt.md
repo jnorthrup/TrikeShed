@@ -231,3 +231,7 @@ The code looks correct and fully optimized. The tests passed on the relevant par
 ## 2025-02-28 - Avoid identity mapping on materialized collections
 **Learning:** In Kotlin, calling `.map { it }` on a materialized collection (such as a `List` returned by `Files.readAllLines`) is a redundant identity transform that needlessly allocates a full copy of the entire list, wasting O(N) time and memory.
 **Action:** Return the original list directly instead of applying `.map { it }`.
+
+## 2024-05-18 - Optimize Series Operations in LcncMating
+**Learning:** Using chained `.toList()` operations (e.g. `.toList().none`, `.toList().size`, `.toList().plus()`) on `Series` collections forces intermediate O(N) `ArrayList` allocations. This is heavily detrimental on execution hot paths like treeshaking and wiring.
+**Action:** Replace `.toList()` accessors with zero-allocation alternatives. Use `.view` for lazy sequence-like iterations (`.view.none`, `.view.any`, `.view.firstOrNull`), direct `.size` property for bounds, and the custom `j` constructor (e.g., `(size + 1) j { i -> if (i < size) arr[i] else new_element }`) to append elements to a `Series` without intermediate lists.
