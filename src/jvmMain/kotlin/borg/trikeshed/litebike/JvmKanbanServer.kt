@@ -489,6 +489,15 @@ class JvmKanbanServer(
         // the concentric construction canvas rides the page plane, not a module
         // claim — ModuleRouteRegistry is exact /api/* by discipline
         "/panels" to ("web/panels.html" to "text/html; charset=utf-8"),
+        // the blackboard harness draws board territories and LCNC typed cables
+        "/harness.html" to ("web/harness.html" to "text/html; charset=utf-8"),
+        "/harness" to ("web/harness.html" to "text/html; charset=utf-8"),
+        "/patch.js" to ("web/patch.js" to "application/javascript; charset=utf-8"),
+        "/patch.css" to ("web/patch.css" to "text/css; charset=utf-8"),
+        "/harness.js" to ("web/harness.js" to "application/javascript; charset=utf-8"),
+        "/harness.css" to ("web/harness.css" to "text/css; charset=utf-8"),
+        "/graal-terrain.js" to ("web/graal-terrain.js" to "application/javascript; charset=utf-8"),
+        "/landscape.js" to ("web/landscape.js" to "application/javascript; charset=utf-8"),
         // the operator-facing board page — /api/board rendered for humans
         "/kanban.html" to ("web/kanban.html" to "text/html; charset=utf-8"),
         "/kanban" to ("web/kanban.html" to "text/html; charset=utf-8"),

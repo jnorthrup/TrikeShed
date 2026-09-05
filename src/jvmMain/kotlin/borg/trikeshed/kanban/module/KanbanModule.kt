@@ -479,6 +479,23 @@ class KanbanModule : ForgeModule {
             // context, projected receipts), direct walk in reduced/test contexts.
             val execute: suspend (String, borg.trikeshed.lcnc.LcncProgram) -> JvmKanbanServer.HttpResponse =
                 { label, program ->
+                    val runId = java.util.UUID.randomUUID().toString()
+                    val runKey = "lcnc/run/$runId"
+                    val startedAtMs = System.currentTimeMillis()
+                    val identity = mapOf(
+                        "runId" to runId, "program" to label,
+                        "programKey" to borg.trikeshed.lcnc.LcncBlackboard.programKey(label),
+                        "inputs" to inputs, "startedAtMs" to startedAtMs,
+                    )
+                    ctx.blackboard.put(runKey, identity + ("status" to "running"), "lcnc-runner")
+                    fun finish(status: Int, result: Map<String, Any?>): JvmKanbanServer.HttpResponse {
+                        val receipt = identity + result + mapOf(
+                            "status" to if (result["ok"] == true) "completed" else "refused",
+                            "finishedAtMs" to System.currentTimeMillis(),
+                        )
+                        ctx.blackboard.put(runKey, receipt, "lcnc-runner")
+                        return JvmKanbanServer.HttpResponse(status, JsonSupport.stringify(result + ("runId" to runId)))
+                    }
                     // Patch type-system compliance, enforced where it counts. The canvas
                     // refuses a kind-mismatched drag, but the canvas is not the authority:
                     // a stored panel, an import, a Kotlin preset or a raw POST never passed
@@ -493,10 +510,10 @@ class KanbanModule : ForgeModule {
                     val violations = borg.trikeshed.lcnc.LcncBlackboard.violationsOf(entry)
                         ?: borg.trikeshed.lcnc.LcncTypeCheck.check(program, publisher.vocabulary(), strict = false).map { it.toMap() }
                     if (violations.isNotEmpty()) {
-                        JvmKanbanServer.HttpResponse(400, JsonSupport.stringify(mapOf(
+                        finish(400, mapOf(
                             "ok" to false, "program" to label, "error" to "type_check_failed",
                             "violations" to violations,
-                        )))
+                        ))
                     } else {
                     val walker = LcncRunner(ctx.lcncRunners).apply { subprogramLoader = ctx.programLoader }
                     runCatching {
@@ -510,15 +527,15 @@ class KanbanModule : ForgeModule {
                         }
                     }.fold(
                         onSuccess = { res ->
-                            JvmKanbanServer.HttpResponse(200, JsonSupport.stringify(mapOf(
+                            finish(200, mapOf(
                                 "ok" to true, "program" to label,
                                 "returns" to res.returns, "outputs" to res.nodeOutputs,
-                            )))
+                            ))
                         },
                         onFailure = { e ->
-                            JvmKanbanServer.HttpResponse(400, JsonSupport.stringify(mapOf(
+                            finish(400, mapOf(
                                 "ok" to false, "program" to label, "error" to (e.message ?: e.toString()),
-                            )))
+                            ))
                         },
                     )
                     }

@@ -211,6 +211,7 @@ object RouteManifest {
             RouteEntry("GET", "/api/health", "server health check"),
             RouteEntry("GET", "/api/cap", "server capabilities"),
             RouteEntry("GET", "/api/metrics", "flywheel metrics (retired)"),
+            RouteEntry("GET", "/harness", "blackboard harness surface"),
         ),
     )
 

@@ -171,11 +171,12 @@ class BlackboardWire(val blackboard: ConfixBlackboard, scope: CoroutineScope) {
         // stream carries one key per event and never reflects deletions; a client
         // that wants the whole board asks for it explicitly.
         if (method == "GET" && path.startsWith("/blackboard/board")) {
+            emitDeltas()
             val snapshot = linkedMapOf<String, Any?>()
             for (k in blackboard.keys().sorted()) {
                 blackboard.get(k)?.let { snapshot[k] = it }
             }
-            return JvmKanbanServer.HttpResponse(200, JsonSupport.stringify(mapOf("keys" to snapshot.size, "board" to snapshot)))
+            return JvmKanbanServer.HttpResponse(200, JsonSupport.stringify(mapOf("keys" to snapshot.size, "board" to snapshot, "seq" to sequence - 1)))
         }
 
         if (method == "POST" && path == "/blackboard/assert") {

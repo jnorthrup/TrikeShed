@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Blackboard</title>
+<link rel="stylesheet" href="/patch.css">
+<link rel="stylesheet" href="/harness.css">
+</head>
+<body>
+<div id="bar">
+  <b>BLACKBOARD</b><span id="connection">Connecting</span>
+  <button id="boardHome" title="Fit the blackboard" aria-label="Fit blackboard">⊞</button>
+  <button id="objectsBtn" title="Fit object terrain" aria-label="Object terrain">◇</button>
+  <select id="terrainLayer" aria-label="Terrain layer"><option value="1">Objects</option><option value="2">Entropy</option><option value="3">Recency</option></select>
+  <select id="programSelect" aria-label="Program"><option>Loading programs</option></select>
+  <button class="run" id="runBtn">▶ Run</button>
+  <button class="stop" id="stopBtn">■ stop timers</button>
+  <button id="addBtn">+ node</button>
+  <button id="fdBtn" title="one-shot layout: layer by cable polarity, relax the rest, then STOP">↦ fd</button><button id="shakeBtn" title="treeshake: pair every OPEN port in the graph with its closest legal open mate">shake</button><button id="fitBtn" title="frame every node (F) — the top-level answer to the D-tab's ring fit">⤢ fit</button>
+  <input id="panelName" placeholder="panel-name" style="background:var(--bg);border:1px solid var(--line);color:var(--ink);border-radius:4px;padding:4px 8px;font:inherit;width:120px">
+  <button id="storeSaveBtn" title="Publish program changes" aria-label="Publish program">↑ Publish</button>
+  <button id="storeLoadBtn" title="load a construction from the store">⇩ store</button>
+  <button id="presetsBtn" title="server-authored programs — offered, never installed">▤ presets</button>
+  <button id="rdfBtn" title="the canvas as RDF — graph, ontology, and its alignment with productions and causal rules">⟁ rdf</button>
+  <button id="paletteBtn" title="drag node types and programs onto the canvas">⧉ palette</button>
+  <button id="keysBtn" title="keymux endpoints — names & addresses; key values never cross">⚿ keys</button>
+  <button id="exportBtn">export</button>
+  <button id="importBtn">import</button>
+  <button id="undoBtn" title="undo ⌘Z" disabled>↶</button>
+  <button id="redoBtn" title="redo ⇧⌘Z" disabled>↷</button>
+  <button id="clearBtn">clear</button>
+  <button id="qsBtn" aria-label="Run quickstart" title="run the quickstart in anger" style="border-color:#3ddc84;color:#3ddc84">⚡</button>
+  <button id="fbBtn" aria-label="Provide feedback" title="open a GitHub issue prefilled with this construction's coordinates" style="border-color:var(--warn);color:var(--warn)">⚑</button>
+  <span id="status" role="status">Loading board</span>
+</div>
+<nav id="boardnav" aria-label="Blackboard territories"></nav>
+<div id="crumb" style="display:none"></div>
+<div id="palette"></div>
+<div id="viewport"><canvas id="landscape" aria-label="Graal and blackboard landscape"></canvas><div id="world"><div id="territories"></div><svg id="channels"></svg><svg id="wires"></svg></div></div>
+<aside id="activity"><header><b>Activity</b><span id="boardCount"></span></header><div id="events"></div></aside>
+<dialog id="factInspector"><form method="dialog"><button aria-label="Close fact inspector">×</button></form><h2 id="factKey"></h2><p id="factActor"></p><pre id="factValue"></pre></dialog>
+<div id="blip"></div>
+<div id="menu"></div>
+<canvas id="minimap" width="168" height="112"></canvas>
+<div id="hint"></div>
+<input type="file" id="fileIn" accept="application/json" style="display:none">
+<script src="/patch.js"></script>
+<script src="/graal-terrain.js"></script>
+<script src="/landscape.js"></script>
+<script src="/harness.js"></script>
+</body>
+</html>

@@ -11,13 +11,13 @@ import org.graalvm.polyglot.io.IOAccess
  * Phase-1 proof that a pure canvas runner can be the daemon implementation too.
  *
  * This does not carry a second spelling of `pick`: [loadPickMethod] extracts the
- * method authored in `web/panels.html`'s RUNNERS table. `pick` has no await, so
+ * method authored in `web/patch.js`'s RUNNERS table. `pick` has no await, so
  * [pickRunner] removes only its `async` declaration before evaluating that same
  * method body synchronously. Every invocation gets a fresh, closed GraalJS
  * context with no host, class, IO, native, or thread capability.
  */
 object CanvasJsPureNodes {
-    private const val PANELS_RESOURCE = "web/panels.html"
+    private const val PANELS_RESOURCE = "web/patch.js"
     private const val PICK_MARKER = "\"pick\": {"
 
     /** Public only at the JVM module boundary so the jvmTest sandbox gate can inspect it. */

@@ -65,7 +65,7 @@ class RouteParityGate {
     @Test
     fun everyHtmlFetchIsARegisteredRoute() {
         val offenders = mutableListOf<String>()
-        for (page in listOf("graal.html", "index.html", "script.js", "panels.html", "kanban.html")) {
+        for (page in listOf("graal.html", "index.html", "script.js", "patch.js", "kanban.html", "harness.js")) {
             val html = resourceText(page)
             for ((method, rawPath) in fetchedRoutes(html)) {
                 // strip template holes and query strings: `/api/vm/${id}/eval?x` → `/api/vm/…/eval`
@@ -169,13 +169,17 @@ class RouteParityGate {
     fun panelsCanvasHydratesAndStaysConcentric() {
         // The canvas is REVIVED (2026-08-28, the concentric landing) but its
         // vocabulary and lane assemblage stay daemon-authored: the page
-        // hydrates from /api/lcnc/contracts + /api/lcnc/concentric and
-        // invents nothing. CCEK lands as concentric squares — an elliptical
+        // hydrates vocabulary from lcnc/vocabulary on /blackboard/board,
+        // lanes from /api/lcnc/concentric, and invents nothing. CCEK lands as concentric squares — an elliptical
         // (cos/sin) child placement or a hand-authored lane schema is the
         // exact regression this gate exists to stop.
-        val html = resourceText("panels.html")
-        assertTrue(html.contains("/api/lcnc/contracts"),
-            "panels.html must hydrate its vocabulary from /api/lcnc/contracts")
+        val html = resourceText("patch.js") + resourceText("harness.js")
+        assertTrue(html.contains("/blackboard/board"),
+            "panels.html must hydrate its vocabulary from the blackboard snapshot")
+        assertTrue(html.contains("lcnc/vocabulary"),
+            "panels.html must read the board's lcnc/vocabulary entry")
+        assertTrue(!Regex("""fetch\(\s*["']/api/lcnc/contracts""").containsMatchIn(html),
+            "panels.html must not use /api/lcnc/contracts as a second vocabulary source")
         assertTrue(html.contains("/api/lcnc/concentric"),
             "panels.html must hydrate its lane assemblage from /api/lcnc/concentric")
         assertTrue(!Regex("""element\s*:\s*"[^"]+"""").containsMatchIn(html),
