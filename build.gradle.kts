@@ -154,15 +154,19 @@ kotlin {
                 }
             }
         }
-        macosX64("macosX64") {
-            compilations.getByName("main") {
-                cinterops {
-                    create("posixSpawn") {
-                        defFile = project.file("src/macosMain/resources/META-INF/cinterop/posix_spawn.def")
-                    }
-                }
-            }
-        }
+        // macIntel: nobody cares (Jim, 2026-09-05). The arm64 target above is named
+        // "macos", so `macosMain` is ITS default source set and macosX64Main cannot
+        // also depend on it ("can't depend on 'macosMain' which is a default source
+        // set for compilation"). Kept as a comment, not deleted.
+        // macosX64("macosX64") {
+        //     compilations.getByName("main") {
+        //         cinterops {
+        //             create("posixSpawn") {
+        //                 defFile = project.file("src/macosMain/resources/META-INF/cinterop/posix_spawn.def")
+        //             }
+        //         }
+        //     }
+        // }
     }
 
     if (isLinux || providers.gradleProperty("enableLinuxX64").orNull == "true") {
@@ -186,7 +190,7 @@ kotlin {
                 // that legitimately needs the kotlinx JSON frontend. See README.md §4.
                 // Compose runtime annotations must be visible to every target so the
                 // compose compiler plugin (applied globally) doesn't bail on JS/WASM/Native.
-                // Full UI deps stay in jvmMain — Compose doesn't publish for macosX64.
+                // Full UI deps stay in jvmMain — Compose doesn't publish for macosX64 (target now commented out).
                 // implementation(org.jetbrains.compose.ComposePlugin.Dependencies(project).runtime) // REMOVED: breaks macosX64
             }
             // Slab hollows: GraalJS-eval / DuckDB-c-interop / MiniDuck layers are
@@ -298,9 +302,9 @@ kotlin {
         // We explicitly connect macosMain and linuxMain to posixMain above.
         
         findByName("macosMain")?.dependsOn(posixMain)
-        findByName("macosX64Main")?.dependsOn(getByName("macosMain"))
+        // findByName("macosX64Main")?.dependsOn(getByName("macosMain"))   // macIntel target commented out above
         findByName("macosTest")?.dependsOn(posixTest)
-        findByName("macosX64Test")?.dependsOn(posixTest)
+        // findByName("macosX64Test")?.dependsOn(posixTest)
         findByName("linuxMain")?.dependsOn(posixMain)
         findByName("linuxTest")?.dependsOn(posixTest)
         // T7 browser storage: IndexedDB test doubles for JS/Wasm storage tests.
