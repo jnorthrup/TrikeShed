@@ -27,6 +27,22 @@ class PlaneBriefTest {
         assertEquals("title only", d.goal); assertEquals(1, d.musts.size); assertEquals(PlaneBrief.DEFAULT_MUST, d.musts[0].text); assertTrue(!d.humanReview)
     }
 
+    /** `MUST-1:` (the label form the REPLY block teaches) is a MUST; a prose line beginning "Models" is prose, never a split. */
+    @Test
+    fun numberedCriteriaAreReadAndProseNeverFansOut() {
+        val s = PlaneBrief.parseSpec("t", "GOAL: demo\nMUST-1: cite one blackboard/kanban/claim/ id\nMUST-2: keep it short\nSHOULD-7: be kind\nMODELS: a, b, c\nFANOUT: 2")
+        assertEquals(listOf("MUST-1", "MUST-2", "SHOULD-1"), s.criteria.map { it.label })
+        assertEquals("cite one blackboard/kanban/claim/ id", s.criteria[0].text)
+        assertEquals(listOf("a", "b", "c"), s.models); assertEquals(2, s.fanout); assertTrue(s.fansOut)
+        val prose = PlaneBrief.parseSpec("t", "GOAL: compare\nModels like GPT, Claude and Llama should be compared here\nFanout 3 ways is too many")
+        assertEquals(emptyList(), prose.models); assertEquals(null, prose.fanout); assertTrue(!prose.fansOut)
+        assertEquals(PlaneBrief.Head("MUST", true, "x"), PlaneBrief.specHead("- MUST-3: x"))
+        assertEquals(PlaneBrief.Head("OUT-OF-SCOPE", true, "the UI"), PlaneBrief.specHead("OUT-OF-SCOPE: the UI"))
+        // a child's evidence id is never clipped, however long
+        val longId = "blackboard/kanban/claim/" + "x".repeat(140)
+        assertTrue(PlaneBrief.childLine(PlaneBrief.ChildReceipt(longId, "j", "m", true, "DONE", "")).startsWith(longId + "  ("))
+    }
+
     @Test
     fun selectionScoresByTermsAndPrefersSourceOverBuild() {
         val picked = PlaneBrief.select(rows, "the GraalFactElement tick lands before the couch reconcile")

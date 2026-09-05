@@ -211,7 +211,7 @@ write: a client pays for the whole board once, not per mutation.
 |---|---|
 | `oroboros://lcnc/kanban/schema` | Columns with WIP limits, the transition policy, the guards a write must pass, and the card field schema |
 | `oroboros://lcnc/kanban/sheets` | The `kanban.activeSheets` family — board, byStatus, byPriority, orchestration — plus the commit watermark |
-| `oroboros://lcnc/kanban/cards/{jobId}` | One card by id — tags, dependencies, owner, the revision a move must quote, and its `receiptResource`. `/api/board` carries the same fields but has no single-card read, and no `lastSequence`/receipt link |
+| `oroboros://lcnc/kanban/cards/{jobId}` | One card by id — tags, dependencies, owner, `parent` (the jobId it split from; `""` = a root), the revision a move must quote, and its `receiptResource`. `/api/board` carries the same fields but has no single-card read, and no `lastSequence`/receipt link |
 | `oroboros://lcnc/kanban/receipts/{sequence}` | What the store committed at that sequence: card, columns left and entered, command, and the CAS id of the raw command |
 
 ### The guards, as published

@@ -196,6 +196,14 @@ data class KanbanTransitionRequest(val cardId: String, val expectedRevision: Lon
  * FANOUT → N Submits (one per branch edge); JOIN → one Submit with
  * dependencies on those branch jobIds. Idempotency keys follow the
  * existing "$jobId#$ruleId#$rev" convention.
+ *
+ * Delta 2026-09-05 (fan-out): this lowering has no consumer. The LIVE fan-out /
+ * fan-in on the board is `rules/BoardProductions.kt`'s [borg.trikeshed.kanban.rules.FanOutProduction]
+ * → [BoardFanOutWorker] (child Submits carrying `parent`, `spec` and a `MODEL:` each,
+ * then the join as a re-Submit of the parent with `dependencies`), with the fan-IN
+ * left to `DependencyReadyProduction`. Nothing here was reused: a [LoweredCommand]
+ * carries no spec or parent and is keyed by edge group, not by the card's models.
+ * Kept as the W4.4 graph-engine shape; not the board's.
  */
 data class LoweredCommand(
     val type: String,

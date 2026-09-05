@@ -56,6 +56,9 @@ class LcncKanbanExperience(
                 "tags" to (row?.tags ?: emptyList<String>()),
                 "spec" to row?.spec.orEmpty(),
                 "strikes" to (row?.strikes ?: 0),
+                // Delta 2026-09-05 (fan-out): the tree edge, so the board page can nest
+                // children under their parent and count "k/N children done" from one body.
+                "parent" to row?.parent.orEmpty(),
             ) + garnish[id].orEmpty()
         }
         return base + ("items" to items)

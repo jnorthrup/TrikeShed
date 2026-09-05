@@ -23,6 +23,13 @@ import borg.trikeshed.lib.j
  * Delta (claim → work → review): two more, same discipline — [ClaimProduction]
  * (the board claims its own READY work) and [ReaperProduction] (a claim whose
  * worker died goes back to READY, thrice, then BLOCKED).
+ *
+ * Delta 2026-09-05 (fan-out): two more still — [FanOutProduction] (a card whose
+ * spec names several models is split into child cards on the board, never
+ * claimed whole) and [DependencyBlockedProduction] (a parent whose child struck
+ * out follows it into BLOCKED, naming the child). The fan-IN needs no new rule:
+ * [DependencyReadyProduction] already moves the parent to READY once every
+ * child is Done, and the ordinary claim then merges the children's receipts.
  */
 object BoardRules {
     const val WIP_BREACH = "wip-breach"
@@ -42,6 +49,15 @@ object BoardRules {
     /** The strike on which the reaper parks the card in BLOCKED (owner cleared) instead of READY. */
     const val REAPER_BLOCK_STRIKE = 3
 
+    /** Delta 2026-09-05 (fan-out): a `MODELS:`/`FANOUT:` card in TODO or READY is split into child cards. */
+    const val FAN_OUT = "fan-out"
+
+    /** The actor the fan-out worker signs its child moves and its BLOCKED parking with — never a person. */
+    const val FAN_OUT_ACTOR = "fanout:plane"
+
+    /** Delta 2026-09-05 (fan-out): a TODO card whose dependency parked in BLOCKED parks beside it, naming the child. */
+    const val DEPENDENCY_BLOCKED = "dependency-blocked"
+
     internal fun cardInterest(): Series<Join<String, Any?>> = 1 j { _: Int -> "kind" j ("card" as Any?) }
 
     internal fun cards(net: ReteNetwork, partitionId: String): List<ReteStoredFact> =
@@ -52,6 +68,174 @@ object BoardRules {
         (fact.fields["dependencies"] as? List<String>) ?: emptyList()
 
     internal fun cid(tag: String): ContentId = ContentId.of(tag.encodeToByteArray())
+
+    /** The card fact's explicit fan-out targets (`MODELS:`), parsed by [borg.trikeshed.kanban.BoardFactElement]; empty = none. */
+    internal fun models(fact: ReteStoredFact): List<String> =
+        (fact.fields["models"] as? List<*>)?.mapNotNull { it?.toString()?.takeIf { s -> s.isNotBlank() } } ?: emptyList()
+
+    /** The card fact's `FANOUT: n` count; 0 = none asked. */
+    internal fun fanout(fact: ReteStoredFact): Int = (fact.fields["fanout"] as? Number)?.toInt() ?: 0
+
+    /**
+     * Is [jobId] a child the fan-out worker minted for [parent]? The worker's naming is
+     * `<parent>-m<i>` (`BoardFanOutWorker.childJobId`), and THAT — not the `parent`
+     * field alone — is what the split predicate counts: a sub-card a person submits
+     * with `parent` set is part of the tree on the board but not of the split, so it
+     * can never keep the split pending. A card is never its own minted child.
+     */
+    fun isMintedChild(parent: String, jobId: String): Boolean {
+        val prefix = "$parent-m"
+        if (jobId.length <= prefix.length || !jobId.startsWith(prefix)) return false
+        for (i in prefix.length until jobId.length) if (!jobId[i].isDigit()) return false
+        return true
+    }
+
+    /** The minted children of [jobId] on the fact plane: card facts whose `parent` names it and whose id the worker minted. */
+    internal fun children(jobId: String, cards: List<ReteStoredFact>): List<ReteStoredFact> =
+        cards.filter { it.fields["parent"] == jobId && isMintedChild(jobId, it.fields["jobId"] as? String ?: "") }
+
+    /** The join has landed: the card's own dependencies name at least one minted child. */
+    internal fun joined(jobId: String, dependencies: List<String>): Boolean =
+        dependencies.any { isMintedChild(jobId, it) }
+
+    /**
+     * Delta 2026-09-05 (fan-out): the ONE predicate both [FanOutProduction] and
+     * [ClaimProduction] read, so a card is never both split and claimed whole.
+     * True when [card] declares ≥ 2 targets (`MODELS:` ids, or `FANOUT: n` with
+     * n ≥ 2 — the same rule as `PlaneBrief.Spec.fansOut`, read off the fact) and
+     * the split is not finished. "Finished" is read off the card's OWN fact first:
+     * once its dependencies name a minted child (`<jobId>-m<i>`) the join has
+     * landed, and that stays true when the child facts are gone (archived,
+     * cancelled, not yet seeded on a cold start) — the parent is then claimed or
+     * parked, never re-split and never withheld. With no such dependency the split
+     * is pending; with minted children on the plane that the dependencies do not
+     * all name, it is pending too (the worker's join is what adds them, as the
+     * union of what was there and what it minted). Termination is this predicate,
+     * not refraction — a landing child un-refracts the rule and it simply finds
+     * nothing pending once the join has landed. The worker reads the same predicate
+     * over the store's rows ([borg.trikeshed.kanban.BoardFanOutWorker]).
+     */
+    fun fanOutPending(card: ReteStoredFact, cards: List<ReteStoredFact>): Boolean {
+        if (models(card).size < 2 && fanout(card) < 2) return false
+        val jobId = card.fields["jobId"] as? String ?: return false
+        return fanOutPending(jobId, deps(card), children(jobId, cards).mapNotNull { it.fields["jobId"] as? String })
+    }
+
+    /** The predicate itself, over ids: [dependencies] of the parent and the ids of its minted [children] as some reader sees them. */
+    fun fanOutPending(jobId: String, dependencies: List<String>, children: List<String>): Boolean {
+        if (children.isEmpty()) return !joined(jobId, dependencies)
+        val deps = dependencies.toHashSet()
+        return children.any { it !in deps }
+    }
+}
+
+/**
+ * Delta 2026-09-05 (fan-out): the Todo/Ready lane process for a `MODELS:` card.
+ * A card in TODO or READY with [BoardRules.fanOutPending] proposes its own
+ * split; the sink hands it to the module's [borg.trikeshed.kanban.BoardFanOutWorker],
+ * which submits one child per model, readies each, and re-submits the parent
+ * with the children as dependencies (the join). From there the fan-IN is the
+ * existing causal rule: [DependencyReadyProduction] moves the parent to READY
+ * when every child is Done, and [ClaimProduction] claims it with the children's
+ * receipts in its brief.
+ *
+ * Salience 95 sits above dependency-ready (90) and claim (85): a split is
+ * decided before anything else looks at the card. Support = the card's cid plus
+ * its children's cids, so a landing child un-refracts and re-proposes; the
+ * sink's in-flight set (keyed by activationId, which carries the revision)
+ * makes the re-proposal a no-op while the worker runs, and the predicate is
+ * false once the join has landed. A join the store refused (someone moved the
+ * parent meanwhile) leaves the predicate true at a NEW revision → a new
+ * activation id → the worker runs again; the child submits and readies carry
+ * parent-revision-independent keys, so that re-run is a duplicate, never a double.
+ */
+class FanOutProduction : ReteProduction {
+    override val ruleId: String = BoardRules.FAN_OUT
+    override val salience: Int = 95
+    override val interests: Series<Join<String, Any?>> = BoardRules.cardInterest()
+
+    override fun evaluate(net: ReteNetwork, partitionId: String, fire: (Activation) -> Unit) {
+        val cards = BoardRules.cards(net, partitionId)
+        for (card in cards) {
+            val column = card.fields["column"]
+            if (column != BoardCol.TODO.wire && column != BoardCol.READY.wire) continue
+            if (!BoardRules.fanOutPending(card, cards)) continue
+            val jobId = card.fields["jobId"] as? String ?: continue
+            val revision = (card.fields["revision"] as? Long) ?: 0L
+            val kids = BoardRules.children(jobId, cards)
+            fire(
+                Activation(
+                    activationId = "fan-out-$jobId-r$revision",
+                    ruleId = ruleId,
+                    ruleVersionCid = BoardRules.cid("rule-fan-out-v1"),
+                    salience = salience,
+                    sequence = revision,
+                    // The children ARE support: a child landing (or leaving) re-evaluates the split.
+                    supportCids = listOf(card.versionCid) + kids.map { it.versionCid },
+                    bindings = mapOf(
+                        "jobId" to jobId,
+                        "expectedRevision" to "$revision",
+                        "models" to BoardRules.models(card).joinToString(","),
+                        "fanout" to "${BoardRules.fanout(card)}",
+                    ),
+                ),
+            )
+        }
+    }
+}
+
+/**
+ * Delta 2026-09-05 (fan-out, "children that park"): a TODO card one of whose
+ * dependencies sits in BLOCKED — a fan-out child that struck out, or any
+ * dependency a reaper or judge parked — can never become READY by itself, and
+ * without this rule it would wait in TODO forever showing nothing. Propose
+ * Move(BLOCKED) naming the child (`blockedBy`), signed by the plane judge; the
+ * sink lowers it with the key `<jobId>#dependency-blocked#<rev>`. Recovery is
+ * human: whoever unblocks the child moves the parent back too.
+ *
+ * Salience 88: below dependency-ready (90), which cannot fire for the same card
+ * (a BLOCKED dependency is not settled), above claim (85). One activation per
+ * (parent, blocked child, revision); several blocked children lower to the same
+ * store key and dedupe. Support = the parent's cid and the child's, so the child
+ * leaving BLOCKED un-refracts the rule for a later recurrence.
+ */
+class DependencyBlockedProduction : ReteProduction {
+    override val ruleId: String = BoardRules.DEPENDENCY_BLOCKED
+    override val salience: Int = 88
+    override val interests: Series<Join<String, Any?>> = BoardRules.cardInterest()
+
+    override fun evaluate(net: ReteNetwork, partitionId: String, fire: (Activation) -> Unit) {
+        val cards = BoardRules.cards(net, partitionId)
+        val factByJob = HashMap<String, ReteStoredFact>(cards.size)
+        for (c in cards) factByJob[c.fields["jobId"] as? String ?: continue] = c
+        for (card in cards) {
+            if (card.fields["column"] != BoardCol.TODO.wire) continue
+            val deps = BoardRules.deps(card)
+            if (deps.isEmpty()) continue
+            val jobId = card.fields["jobId"] as? String ?: continue
+            val revision = (card.fields["revision"] as? Long) ?: 0L
+            for (childId in deps) {
+                val child = factByJob[childId] ?: continue
+                if (child.fields["column"] != BoardCol.BLOCKED.wire) continue
+                fire(
+                    Activation(
+                        activationId = "dependency-blocked-$jobId-$childId-r$revision",
+                        ruleId = ruleId,
+                        ruleVersionCid = BoardRules.cid("rule-dependency-blocked-v1"),
+                        salience = salience,
+                        sequence = revision,
+                        supportCids = listOf(card.versionCid, child.versionCid),
+                        bindings = mapOf(
+                            "jobId" to jobId,
+                            "expectedRevision" to "$revision",
+                            "toColumn" to BoardCol.BLOCKED.wire,
+                            "blockedBy" to childId,
+                        ),
+                    ),
+                )
+            }
+        }
+    }
 }
 
 /** A column over its WIP limit — attention receipt (the board already refuses NEW entries; this audits imports/replays/starts). */
@@ -136,6 +320,11 @@ class DependencyReadyProduction : ReteProduction {
  * un-refracted and proposed again instead of leaving a READY card stranded.
  * The sink keys its worker by activationId, so a re-proposal of a claim already
  * in flight is a no-op there and a duplicate idempotency key at the store.
+ *
+ * Delta 2026-09-05 (fan-out): a READY card with [BoardRules.fanOutPending] is
+ * skipped — a `MODELS:` card dragged straight to READY is split by
+ * [FanOutProduction] (salience 95, decided first), never claimed whole. Once its
+ * join has landed the predicate is false and the parent is claimed like any card.
  */
 class ClaimProduction(private val owner: String = BoardRules.CLAIM_OWNER) : ReteProduction {
     override val ruleId: String = BoardRules.CLAIM
@@ -153,6 +342,7 @@ class ClaimProduction(private val owner: String = BoardRules.CLAIM_OWNER) : Rete
         var fired = 0
         for (card in ready) {
             if (running.size + fired >= limit) break
+            if (BoardRules.fanOutPending(card, cards)) continue
             val jobId = card.fields["jobId"] as? String ?: continue
             val revision = (card.fields["revision"] as? Long) ?: 0L
             fire(

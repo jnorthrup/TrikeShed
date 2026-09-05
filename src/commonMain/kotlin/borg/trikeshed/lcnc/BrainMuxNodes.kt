@@ -275,6 +275,10 @@ object BrainMuxNodes {
             // caller's context, and the CCEK assembly scope lacks HtxKey.
             if (modelMux != null) {
                 val acpMessages: Series<AcpMessage> = 1 j { _: Int -> "user" j prompt }
+                // Delta 2026-09-05 (receipt timing): wall clock around the mux call, measured
+                // HERE — not read back from lastReceipt, which a cache hit or a failed call
+                // may leave stale or absent. The kanban claim receipt copies it as-is.
+                val startedAtMs = kotlinx.datetime.Clock.System.now().toEpochMilliseconds()
                 val result = try {
                     val chatCt = chatContext ?: currentCoroutineContext()
                     withContext(chatCt) {
@@ -283,6 +287,9 @@ object BrainMuxNodes {
                             messages = acpMessages,
                             maxTokens = maxTokens,
                             temperature = temperature,
+                            // Stamped on the mux receipt's assessmentId slot, so THIS call's
+                            // receipt can be told from a concurrent call's below.
+                            contextId = node.id,
                         ).getOrThrow()
                     }.let { Result.success(it) }
                 } catch (t: kotlinx.coroutines.CancellationException) {
@@ -290,6 +297,15 @@ object BrainMuxNodes {
                 } catch (t: Throwable) {
                     Result.failure(t)
                 }
+                val latencyMs = kotlinx.datetime.Clock.System.now().toEpochMilliseconds() - startedAtMs
+                // `lastReceipt` is ONE var on the mux, overwritten by every call's finally;
+                // under concurrent claims it can be another call's. Only a receipt stamped
+                // with this node's id is this call's: `cachedHit` is reported from it, and
+                // omitted (not guessed false) when the receipt cannot be attributed.
+                val attributed = modelMux.lastReceipt?.takeIf { it.assessmentId == node.id }
+                val cachedHitKnown: Boolean? = attributed?.cachedHit
+                val cachedHit = cachedHitKnown == true
+                val cachedHitEntry: Map<String, Any?> = if (cachedHitKnown != null) mapOf("cachedHit" to cachedHitKnown) else emptyMap()
                 return@LcncNodeRunner result.fold(
                     onSuccess = { response ->
                         val content = response.a
@@ -302,6 +318,9 @@ object BrainMuxNodes {
                         // key, because all three look like "it worked". The token
                         // counts separate them — they come from the provider's own
                         // usage block, so they are evidence, not inference.
+                        // Delta 2026-09-05: the counts are also OUTPUT now (inputTokens /
+                        // outputTokens), with latencyMs and cachedHit, on the ok and the
+                        // error map alike — the claim receipt and the board page show them.
                         if (content.isBlank()) {
                             mapOf(
                                 "content" to "",
@@ -315,14 +334,30 @@ object BrainMuxNodes {
                                     "provider returned no content and billed 0 completion tokens (in=$inTok) — " +
                                         "the model emitted nothing: raise maxTokens, or the request was refused upstream"
                                 },
-                            )
+                                "cached" to cachedHit,
+                                "latencyMs" to latencyMs,
+                                "inputTokens" to inTok,
+                                "outputTokens" to outTok,
+                            ) + cachedHitEntry
                         } else {
-                            mapOf("content" to content, "model" to model, "ok" to true, "error" to "",
-                                "cached" to (modelMux.lastReceipt?.cachedHit == true))
+                            mapOf(
+                                "content" to content, "model" to model, "ok" to true, "error" to "",
+                                "cached" to cachedHit,
+                                "latencyMs" to latencyMs,
+                                "inputTokens" to inTok,
+                                "outputTokens" to outTok,
+                            ) + cachedHitEntry
                         }
                     },
                     onFailure = { t ->
-                        mapOf("content" to "", "model" to model, "ok" to false, "error" to (t.message ?: "unknown error"))
+                        // No usage block reached us: the token counts are NOT reported, so the
+                        // keys are absent — never a 0 a receipt could mistake for a count. The
+                        // latency is still real — it is what the caller waited.
+                        mapOf(
+                            "content" to "", "model" to model, "ok" to false, "error" to (t.message ?: "unknown error"),
+                            "cached" to cachedHit,
+                            "latencyMs" to latencyMs,
+                        ) + cachedHitEntry
                     },
                 )
             }
@@ -337,6 +372,7 @@ object BrainMuxNodes {
                 )
             }
             val extraHeaders = parseHeaders(node.params["headers"] ?: "")
+            val directStartedAtMs = kotlinx.datetime.Clock.System.now().toEpochMilliseconds()
             val chatResult = if (chatContext != null) {
                 withContext(chatContext) {
                     directHtxChat(baseUrl, apiKey, model, prompt, maxTokens, temperature, extraHeaders)
@@ -344,12 +380,21 @@ object BrainMuxNodes {
             } else {
                 directHtxChat(baseUrl, apiKey, model, prompt, maxTokens, temperature, extraHeaders)
             }
+            val directLatencyMs = kotlinx.datetime.Clock.System.now().toEpochMilliseconds() - directStartedAtMs
+            // Same output shape as the mux path; this path has no cache (cachedHit is an honest
+            // false) and reads no usage block, so the token keys are absent = not reported.
             chatResult.fold(
                 onSuccess = { content ->
-                    mapOf("content" to content, "model" to model, "ok" to true, "error" to "")
+                    mapOf(
+                        "content" to content, "model" to model, "ok" to true, "error" to "",
+                        "cached" to false, "cachedHit" to false, "latencyMs" to directLatencyMs,
+                    )
                 },
                 onFailure = { t ->
-                    mapOf("content" to "", "model" to model, "ok" to false, "error" to (t.message ?: "unknown error"))
+                    mapOf(
+                        "content" to "", "model" to model, "ok" to false, "error" to (t.message ?: "unknown error"),
+                        "cached" to false, "cachedHit" to false, "latencyMs" to directLatencyMs,
+                    )
                 },
             )
         },

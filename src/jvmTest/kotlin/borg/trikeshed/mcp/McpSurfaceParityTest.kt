@@ -180,6 +180,20 @@ class McpSurfaceParityTest {
         store.drain()
     }
 
+    /** The schema's `cardFields` describe exactly what `cards/{jobId}` serves (minus the receipt link): a row field cannot drift in silently. */
+    @Test
+    fun theSchemaCardFieldsAreTheCardMapKeys() = runBlocking {
+        val (mcp, store) = rig()
+        store.open() // the intake has no consumer until the store is open
+        val d = kotlinx.coroutines.CompletableDeferred<borg.trikeshed.kanban.BoardApply>()
+        store.intake.send(borg.trikeshed.kanban.BoardIntake(mapOf("type" to "submit", "jobId" to "x", "idempotencyKey" to "kx", "title" to "x"), d))
+        d.await()
+        val described = ((readResource(mcp, LcncKanbanMcp.URI_SCHEMA)["cardFields"] as List<*>).map { (it as Map<*, *>)["name"].toString() })
+        val served = BoardKanbanReadPort.cardMap(store.card("x")!!).keys - "receiptResource"
+        assertEquals(served.toList(), described, "schema cardFields vs cards/{jobId} keys")
+        store.drain()
+    }
+
     @Test
     fun theGuidesProtocolVersionsAreTheOnesNegotiated() = runBlocking {
         val (mcp, store) = rig()

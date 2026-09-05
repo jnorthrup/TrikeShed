@@ -3,7 +3,7 @@
 // View state only. Documents, vocabulary, run receipts and provenance come from the board.
 const Harness = {
   board: Object.create(null), seq: 0, selected: null, applying: false, dirty: false,
-  events: [], drafts: new Map(), actors: new Map(), positions: new Map(), flashes: new Set(),
+  events: [], drafts: new Map(), actors: new Map(), positions: new Map(), flashes: new Map(), // Delta 2026-09-05 (fan-out): Map<key, expiresAt ms>; one Set with one timer collapsed a burst into one border
   mounts: new Map(), baselines: new Map(), nextY: 0, nextX:0, rowHeight:0,
   ready: false, running: false, frame: 0, activeBounds: {w:1600,h:900},
   el(tag, cls, value) {
@@ -167,6 +167,7 @@ const Harness = {
         const row = this.el("button", "fact-row");
         row.append(this.el("b", "", key.split("/").slice(1).join("/")), this.el("span", "", this.summary(value)));
         row.title = key;
+        if (this.flashes.has(key)) row.classList.add("flash");
         row.addEventListener("click", () => this.inspect(key));
         territory.append(row);
       }
@@ -388,7 +389,7 @@ const Harness = {
     this.seq=Number(event.seq);this.board[event.key]=event.value;
     if(event.actor)this.actors.set(event.key,event.actor);
     this.events.unshift(event);this.events.length=Math.min(this.events.length,100);
-    const prefix=event.key.split("/")[0];this.flashes.add(prefix);this.flashes.add(event.key);
+    const prefix=event.key.split("/")[0];this.flash(prefix);this.flash(event.key);
     if(event.key==="lcnc/vocabulary") { await syncContracts(event.value);buildPalette(); }
     if(event.key.startsWith("lcnc/program/")){
       const name=event.key.slice(13);
@@ -396,9 +397,21 @@ const Harness = {
       else this.mount(name);
     }
     if(event.key.startsWith("lcnc/run/"))this.output(event.value);
-    if(event.key.startsWith("lcnc/run/")){this.flashes.add(event.value.programKey);this.flashes.add("receipts");}
+    if(event.key.startsWith("lcnc/run/")){this.flash(event.value.programKey);this.flash("receipts");}
     this.schedule();
-    clearTimeout(this.flashTimer);this.flashTimer=setTimeout(()=>{this.flashes.clear();this.schedule();},1000);
+  },
+  // Delta 2026-09-05 (fan-out): each key keeps its own expiry (now + 1000 ms) so a burst of N kanban
+  // commits lights N rows that fade on their own clocks. The old single re-armed timer cleared every
+  // flash 1 s after the LAST event, so a burst was one amber border that went dark all at once.
+  flash(key) { if (key) this.flashes.set(key, Date.now() + 1000); this.armFlashSweep(); },
+  armFlashSweep() {
+    if (this.flashSweep) return;
+    this.flashSweep = setInterval(() => {
+      const now = Date.now(); let expired = false;
+      for (const [key, until] of this.flashes) if (until <= now) { this.flashes.delete(key); expired = true; }
+      if (expired) this.schedule();
+      if (!this.flashes.size) { clearInterval(this.flashSweep); this.flashSweep = null; }
+    }, 250);
   },
   connect() {
     let buffer=[],hydrating=true,chain=Promise.resolve();

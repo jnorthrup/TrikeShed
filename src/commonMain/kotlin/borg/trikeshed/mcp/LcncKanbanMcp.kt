@@ -438,7 +438,8 @@ class LcncKanbanMcp(
                 "name" to "orphanParent",
                 "applies" to TOOL_SUBMIT,
                 "effect" to "A submit carrying 'parent' must name a card that exists and is not done/archived; " +
-                    "otherwise it is refused as an orphan. A submit without 'parent' is intake.",
+                    "otherwise it is refused as an orphan. A card is never its own parent, and a parent whose own " +
+                    "parent chain leads back to the card is refused as a tree cycle. A submit without 'parent' is intake.",
             ),
         ),
         "tools" to listOf(TOOL_SUBMIT, TOOL_MOVE),
@@ -454,6 +455,7 @@ class LcncKanbanMcp(
             mapOf("name" to "dependencies", "type" to "string[]"),
             mapOf("name" to "tags", "type" to "string[]"),
             mapOf("name" to "owner", "type" to "string"),
+            mapOf("name" to "parent", "type" to "string", "note" to "jobId this card split from; \"\" = a root"),
         ),
         "watermark" to reads.watermark(),
     )

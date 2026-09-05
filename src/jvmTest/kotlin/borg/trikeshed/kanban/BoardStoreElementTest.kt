@@ -132,6 +132,43 @@ class BoardStoreElementTest {
         el2.drain()
     }
 
+    /**
+     * Delta 2026-09-05 (fan-out): the parent edge is stored, replays, and is guarded — a card
+     * is never its own parent, a parent whose chain leads back to the card is a cycle, and a
+     * dependency-only re-submit (the fan-out join) keeps the edge.
+     */
+    @Test
+    fun parentIsStoredGuardedAndReplayed() = runBlocking {
+        val dir = tempDir("parent")
+        val cas = CasStore.inMemory()
+        val el1 = BoardStoreElement(JvmBoardWal(dir), cas, clock = { 9L })
+        el1.open()
+        assertIs<BoardApply.Committed>(submit(el1, "p", "kp"))
+        assertIs<BoardApply.Committed>(send(el1, "type" to "submit", "jobId" to "p-m1", "idempotencyKey" to "kc", "title" to "child", "parent" to "p"))
+        assertEquals("p", el1.card("p-m1")!!.parent)
+        assertEquals("", el1.card("p")!!.parent)
+
+        // a card cannot be its own parent, even on a re-submit of a live card
+        val self = send(el1, "type" to "submit", "jobId" to "p", "idempotencyKey" to "kself", "parent" to "p")
+        assertTrue("cannot be its own parent" in (self as BoardApply.Rejected).reason, self.reason)
+        assertEquals("", el1.card("p")!!.parent)
+        // nor close a cycle through the chain: p-m1's parent is p, so p's parent cannot be p-m1
+        val cycle = send(el1, "type" to "submit", "jobId" to "p", "idempotencyKey" to "kcyc", "parent" to "p-m1")
+        assertTrue("tree cycle" in (cycle as BoardApply.Rejected).reason, cycle.reason)
+        assertEquals("", el1.card("p")!!.parent)
+        // the join (dependencies only) keeps the child's edge
+        assertIs<BoardApply.Committed>(send(el1, "type" to "submit", "jobId" to "p-m1", "idempotencyKey" to "kjoin", "dependencies" to emptyList<String>(), "expectedRevision" to 1))
+        assertEquals("p", el1.card("p-m1")!!.parent)
+        val liveRows = el1.cards().sortedBy { it.jobId }
+        el1.drain()
+
+        val el2 = BoardStoreElement(JvmBoardWal(dir), cas, clock = { 9L })
+        el2.open()
+        assertEquals(liveRows, el2.cards().sortedBy { it.jobId }, "the parent edge replays with the card")
+        assertEquals("p", el2.card("p-m1")!!.parent)
+        el2.drain()
+    }
+
     @Test
     fun tornTailTruncatesToCommittedPrefix() = runBlocking {
         val dir = tempDir("torn")

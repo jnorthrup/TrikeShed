@@ -36,6 +36,17 @@ import kotlinx.coroutines.withTimeoutOrNull
  * no claim: the receipt says "no brain", the card stays READY for whoever has
  * one. A brain that is present and fails is step 3's ok=false, not this.
  *
+ * Delta 2026-09-05 (fan-out): the token budget is `TOKENS:` on the spec, else
+ * [MAX_TOKENS] (2048 now; the 256/1024 figures above are history). A card whose
+ * dependencies carry `kanban/claim/<child>` receipts is a fan-IN: those receipts
+ * ride the brief as a CHILDREN block ([PlaneBrief.ChildReceipt]), their evidence
+ * ids (`blackboard/kanban/claim/<child>`) are accepted by the judge, and the
+ * default budget rises to 4096 because one merge reads N answers. The receipt
+ * also carries `startedAtMs`/`finishedAtMs` from this worker's clock around the
+ * brain call, and `latencyMs`/`inputTokens`/`outputTokens`/`cachedHit` copied from
+ * `prompt.chat`'s answer when it reports them (omitted when it does not, never
+ * computed here, never a zero) — the board page shows real progress from these, not a guess.
+ *
  * Pure over the store, the blackboard and a runner lookup (looked up at claim
  * time so a registry the daemon fills after the module attached still counts).
  */
@@ -64,15 +75,91 @@ class BoardClaimWorker(
          * no content". One claim costs ~1k tokens of quota the ledger already proved.
          */
         const val MAX_TOKENS: String = "2048"
+        /**
+         * Delta 2026-09-05 (fan-out): the default budget for a fan-IN merge when the
+         * spec names no `TOKENS:`. One merge reads N child answers and must reconcile
+         * them; the plan's floor for a thinking model on a tree is 4096.
+         */
+        const val MERGE_TOKENS: Int = 4096
         /** Tags that route a claimed card to a person no matter what the reply says. */
         val HUMAN_TAGS: Set<String> = setOf("human-review", "experiment", "review:human")
 
         fun brief(jobId: String, title: String): String = brief(jobId, title, "", emptyList(), emptyList())
 
-        /** The RFC brief: goal, criteria, evidence from the plane, daemon state, lessons, reply shape ([PlaneBrief]). */
-        fun brief(jobId: String, title: String, spec: String, plane: List<PlaneBrief.Row>, receipts: List<PlaneBrief.Receipt>): String {
+        /**
+         * The RFC brief: goal, criteria, evidence from the plane, daemon state, lessons, reply shape ([PlaneBrief]).
+         * Delta 2026-09-05 (fan-out): [children] — the receipts of the card's Done children — become the
+         * CHILDREN block and the MERGE line; empty for an ordinary card.
+         */
+        fun brief(
+            jobId: String,
+            title: String,
+            spec: String,
+            plane: List<PlaneBrief.Row>,
+            receipts: List<PlaneBrief.Receipt>,
+            children: List<PlaneBrief.ChildReceipt> = emptyList(),
+        ): String {
             val parsed = PlaneBrief.parseSpec(title, spec)
-            return PlaneBrief.render(jobId, title, parsed, PlaneBrief.select(plane, title + " " + spec), PlaneBrief.state(plane), PlaneBrief.lessons(receipts))
+            return PlaneBrief.render(
+                jobId, title, parsed,
+                PlaneBrief.select(plane, title + " " + spec), PlaneBrief.state(plane), PlaneBrief.lessons(receipts),
+                children,
+            )
+        }
+
+        /**
+         * The children's receipts for a fan-IN claim: one [PlaneBrief.ChildReceipt] per child in [children]
+         * that has a `kanban/claim/<child>` receipt on the blackboard, in the order given. [children] are the
+         * card's dependencies whose row says `parent == this card` (the durable edge from S1) — an ordinary
+         * dependency is never briefed as a child, however it was closed. A child WITHOUT a receipt is not
+         * skipped silently by [claim]: it refuses the merge with a receipt naming the missing keys (the
+         * blackboard is in-memory; a restart between the children's Done and the merge loses them).
+         * The evidence id is the blackboard key as the plane names it, so the reply can cite it and the judge accepts it.
+         */
+        fun childReceipts(blackboard: ConfixBlackboard, children: List<String>): List<PlaneBrief.ChildReceipt> =
+            children.mapNotNull { dep ->
+                (blackboard.get(RECEIPT_PREFIX + dep) as? Map<*, *>)?.let { m ->
+                    PlaneBrief.ChildReceipt(
+                        evidenceId = "blackboard/" + RECEIPT_PREFIX + dep,
+                        jobId = dep,
+                        model = m["model"]?.toString().orEmpty(),
+                        ok = m["ok"] == true,
+                        decision = m["decision"]?.toString().orEmpty(),
+                        content = (m["content"] ?: m["error"])?.toString().orEmpty(),
+                    )
+                }
+            }
+    }
+
+    /**
+     * What the brain call cost, as the receipt records it. [startedAtMs]/[finishedAtMs] are this
+     * worker's clock around `chat.run` (null when no brain was asked); the rest are copied from the
+     * answer map when `prompt.chat` reports them (Number-safe: a fake brain in a test rig may hand
+     * back none) and NULL otherwise — a field that was not measured is not written, never a zero
+     * a page could mistake for "instant". [NONE] is what an early-return receipt (no brain, claim
+     * refused) carries.
+     */
+    private data class Timing(
+        val startedAtMs: Long?,
+        val finishedAtMs: Long?,
+        val latencyMs: Long?,
+        val inputTokens: Int?,
+        val outputTokens: Int?,
+        val cachedHit: Boolean?,
+    ) {
+        companion object {
+            val NONE = Timing(null, null, null, null, null, null)
+
+            fun of(startedAtMs: Long, finishedAtMs: Long, answer: Map<String, Any?>): Timing = Timing(
+                startedAtMs = startedAtMs,
+                finishedAtMs = finishedAtMs,
+                latencyMs = (answer["latencyMs"] as? Number)?.toLong(),
+                inputTokens = (answer["inputTokens"] as? Number)?.toInt(),
+                outputTokens = (answer["outputTokens"] as? Number)?.toInt(),
+                // `cachedHit` is the attributed value (prompt.chat omits it when the mux receipt
+                // could not be matched to this call); the legacy `cached` key is only a fallback.
+                cachedHit = (answer["cachedHit"] as? Boolean) ?: (answer["cached"] as? Boolean),
+            )
         }
     }
 
@@ -138,16 +225,47 @@ class BoardClaimWorker(
         val title = card?.title ?: jobId
         val specText = card?.spec.orEmpty()
         val spec = PlaneBrief.parseSpec(title, specText)
+        // Delta 2026-09-05 (fan-out): a fan-IN card's children are the dependencies whose row
+        // says `parent == this card`; their claim receipts ride the brief. The merge model is the
+        // parent's own MODEL: (or the newest Hermes model) — the children's models are named in
+        // the CHILDREN block, not reused. A child whose receipt is not on this blackboard (a
+        // restart lost it; a person closed the child without a claim) makes the merge a lie, so
+        // it is refused with a receipt naming the keys and the card parks in REVIEW for a person.
+        val childIds = card?.dependencies.orEmpty().filter { store.card(it)?.parent == jobId }
+        val missingReceipts = childIds.filter { blackboard.get(RECEIPT_PREFIX + it) == null }
+        if (missingReceipts.isNotEmpty()) {
+            val current0 = landed.snapshot.revision
+            val written = receipt(
+                jobId, owner, model = "", ok = false, revision = current0,
+                body = "error" to "child receipts lost: ${missingReceipts.joinToString { RECEIPT_PREFIX + it }} — " +
+                    "no merge without every child's answer; a person decides",
+            )
+            val reply2 = CompletableDeferred<BoardApply>()
+            store.intake.send(BoardIntake(mapOf("type" to "move", "jobId" to jobId, "idempotencyKey" to "$jobId#claim-review#$current0", "expectedRevision" to current0, "toColumn" to BoardCol.REVIEW.wire, "actor" to JUDGE_ACTOR), reply2))
+            val r = withTimeoutOrNull(commitTimeoutMs) { reply2.await() }
+            return@coroutineScope written + ("review" to when (r) {
+                is BoardApply.Committed -> "review r${r.revision}"
+                is BoardApply.Rejected -> "review refused: ${r.reason}"
+                null -> "review: no reply within ${commitTimeoutMs}ms"
+            })
+        }
+        val children = childReceipts(blackboard, childIds)
         val model = spec.model.ifBlank { resolveModel() }
-        val tokens = (spec.tokens ?: MAX_TOKENS.toInt()).toString()
+        // A merge never gets less than a child did: the floor is MERGE_TOKENS, the same
+        // rule as the worker's child floor (max of the parent's TOKENS: and 4096).
+        val tokens = (if (children.isNotEmpty()) maxOf(spec.tokens ?: 0, MERGE_TOKENS) else (spec.tokens ?: MAX_TOKENS.toInt())).toString()
         val planeRows = runCatching { plane() }.getOrDefault(emptyList())
         val priorReceipts = blackboard.keys().filter { it.startsWith(RECEIPT_PREFIX) }.mapNotNull { k ->
             (blackboard.get(k) as? Map<*, *>)?.let { m ->
                 PlaneBrief.Receipt(m["model"]?.toString().orEmpty(), m["ok"] == true, m["error"]?.toString().orEmpty())
             }
         }
-        val briefText = brief(jobId, title, specText, planeRows, priorReceipts)
+        val briefText = brief(jobId, title, specText, planeRows, priorReceipts, children)
         val mentioned = PlaneBrief.select(planeRows, title + " " + specText).size
+        // Delta 2026-09-05 (receipt timing): this worker's clock brackets the brain call so the
+        // receipt shows when the model was asked and when it answered, independent of what
+        // prompt.chat reports (latencyMs there is the provider round trip, measured by the node).
+        val startedAtMs = clock()
         val answer: Map<String, Any?> = try {
             chat.run(
                 LcncNode(
@@ -162,6 +280,8 @@ class BoardClaimWorker(
         } catch (t: Throwable) {
             mapOf("ok" to false, "error" to (t.message ?: t.toString()), "model" to model, "content" to "")
         }
+        val finishedAtMs = clock()
+        val timing = Timing.of(startedAtMs, finishedAtMs, answer)
         val ok = answer["ok"] == true
         val body: Pair<String, Any?> =
             if (ok) "content" to (answer["content"]?.toString() ?: "")
@@ -172,8 +292,11 @@ class BoardClaimWorker(
         //         close from REVIEW; the claimant never can);
         // REVIEW→ a person decides;
         // RETRY → READY with a reaper strike receipt (3rd strike: BLOCKED, owner cleared).
-        val planeIds = HashSet<String>(planeRows.size * 2)
+        val planeIds = HashSet<String>(planeRows.size * 2 + children.size)
         for (r in planeRows) planeIds.add(PlaneBrief.evidenceId(r))
+        // A child receipt id is evidence the judge accepts even where the blackboard is not
+        // on the plane (the test rig has no BlackboardChangesFactElement; the daemon does).
+        for (c in children) planeIds.add(c.evidenceId)
         val humanTag = card?.tags?.any { it.lowercase() in HUMAN_TAGS } == true
         val decision = PlaneJudge.decide(spec, humanTag, ok, answer["content"]?.toString().orEmpty(), planeIds)
         // The revision the card landed RUNNING on — NOT store.card().revision: a person who
@@ -185,7 +308,7 @@ class BoardClaimWorker(
             "verdict" to (decision.reply?.verdict ?: ""),
             "criteria" to (decision.reply?.lines?.map { l -> mapOf("label" to l.label, "met" to l.met, "evidence" to l.evidence) } ?: emptyList<Any>()),
         )
-        val written = receipt(jobId, owner, model = answer["model"]?.toString() ?: model, ok = ok, body = body, revision = current, facts = mentioned, judged = judged)
+        val written = receipt(jobId, owner, model = answer["model"]?.toString() ?: model, ok = ok, body = body, revision = current, facts = mentioned, judged = judged, timing = timing)
         val trail = ArrayList<String>()
         suspend fun move(to: BoardCol, rev: Long, key: String, extra: Map<String, Any?> = emptyMap()): BoardApply? {
             val reply = CompletableDeferred<BoardApply>()
@@ -238,17 +361,41 @@ class BoardClaimWorker(
         return (list.firstOrNull() as? Map<*, *>)?.get("id")?.toString().orEmpty()
     }
 
-    private fun receipt(jobId: String, owner: String, model: String, ok: Boolean, body: Pair<String, Any?>, revision: Long, facts: Int = 0, judged: Map<String, Any?> = emptyMap()): Map<String, Any?> {
+    private fun receipt(
+        jobId: String,
+        owner: String,
+        model: String,
+        ok: Boolean,
+        body: Pair<String, Any?>,
+        revision: Long,
+        facts: Int = 0,
+        judged: Map<String, Any?> = emptyMap(),
+        timing: Timing = Timing.NONE,
+    ): Map<String, Any?> {
+        // atMs stays the moment the answer was in hand (what the page has always shown); an
+        // early-return receipt never asked a brain, so its atMs is simply now and it carries
+        // no timing fields at all.
+        val atMs = timing.finishedAtMs ?: clock()
         val value = linkedMapOf<String, Any?>(
             "owner" to owner,
             "model" to model,
             "ok" to ok,
             body.first to body.second,
-            "atMs" to clock(),
+            "atMs" to atMs,
             "revision" to revision,
             // how many plane facts the brief carried (0 = the title alone)
             "facts" to facts,
         )
+        // Delta 2026-09-05 (receipt timing): worker clock around the brain call, then what
+        // prompt.chat itself measured/was billed — each key only when it was measured. A
+        // receipt that never asked a brain has none of them; the page then shows nothing
+        // rather than an invented "0 ms".
+        timing.startedAtMs?.let { value["startedAtMs"] = it }
+        timing.finishedAtMs?.let { value["finishedAtMs"] = it }
+        timing.latencyMs?.let { value["latencyMs"] = it }
+        timing.inputTokens?.let { value["inputTokens"] = it }
+        timing.outputTokens?.let { value["outputTokens"] = it }
+        timing.cachedHit?.let { value["cachedHit"] = it }
         value.putAll(judged)
         blackboard.put(RECEIPT_PREFIX + jobId, value, LANGUAGE)
         return value

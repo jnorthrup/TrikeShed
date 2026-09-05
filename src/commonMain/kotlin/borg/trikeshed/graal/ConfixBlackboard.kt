@@ -8,6 +8,8 @@ import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.datetime.Clock
+import kotlin.concurrent.atomics.AtomicReference
+import kotlin.concurrent.atomics.ExperimentalAtomicApi
 
 /**
  * ConfixBlackboard — content-addressed blackboard backed by ConfixDoc.
@@ -35,25 +37,46 @@ import kotlinx.datetime.Clock
  *   intermediate snapshots under back-pressure, but the values it does receive
  *   are always the newest ones, and `replay = 1` hands a late subscriber the
  *   current snapshot instead of nothing.
- * - Mutation is not synchronized: confine writes to a single writer. The
- *   emitted ConfixDoc values are immutable, so collectors are safe anywhere.
+ * - Delta 2026-09-05 (fan-out): the store is copy-on-write behind one atomic
+ *   cell. It used to be a bare mutable map ("confine writes to a single
+ *   writer"), but the kanban module writes from its committed collector, its
+ *   claim workers and its fan-out worker at once, and a `keys()` snapshot taken
+ *   under a concurrent `put` tore (a null slot, a ConcurrentModificationException)
+ *   — a parent's merge claim died on it. Every read now sees one immutable
+ *   snapshot; every mutator publishes a new one with compare-and-set, so a
+ *   concurrent put is never lost. A put copies the map (≈1k keys on the live
+ *   daemon: tens of microseconds), the same order as the per-put doc rebuild.
+ *   The emitted ConfixDoc values are immutable, so collectors are safe anywhere.
  * - The blackboard owns no coroutine scope: collectors bring their own scope
  *   and simply stop collecting to detach — no close/shutdown is required.
  * - The legacy callback [subscribe] remains as a deprecated synchronous shim.
  */
+@OptIn(ExperimentalAtomicApi::class)
 class ConfixBlackboard {
-    
-    // Internal map for immediate access, synced to ConfixDoc on mutations
-    private val store = mutableMapOf<String, Any?>()
-    
-    private var doc: ConfixDoc = emptyConfix()
-    
+
+    /** One immutable snapshot of the board: the key/value map, its provenance, the last-written doc. */
+    private class Cell(val store: Map<String, Any?>, val provenance: Map<String, ProvenanceEntry>, val doc: ConfixDoc)
+
+    // Internal map for immediate access, synced to ConfixDoc on mutations —
+    // published whole on every mutation (see the class note).
+    private val cell = AtomicReference(Cell(emptyMap(), emptyMap(), emptyConfix()))
+
+    private val store: Map<String, Any?> get() = cell.load().store
+    private val provenance: Map<String, ProvenanceEntry> get() = cell.load().provenance
+    private val doc: ConfixDoc get() = cell.load().doc
+
     /** The current ConfixDoc — content-addressed state */
     val state: ConfixDoc get() = doc
-    
-    /** Provenance map: key -> source language + timestamp */
-    private val provenance = mutableMapOf<String, ProvenanceEntry>()
-    
+
+    /** Publish the snapshot [next] derives from the current one; retried until no writer raced us. */
+    private inline fun mutate(next: (Cell) -> Cell): ConfixDoc {
+        while (true) {
+            val cur = cell.load()
+            val new = next(cur)
+            if (cell.compareAndSet(cur, new)) return new.doc
+        }
+    }
+
     data class ProvenanceEntry(
         val language: String,
         val timestamp: Long,
@@ -89,10 +112,9 @@ class ConfixBlackboard {
     
     /** Put a value at key */
     fun put(key: String, value: Any?, language: String): ConfixBlackboard {
-        store[key] = value
-        provenance[key] = ProvenanceEntry(language, Clock.System.now().toEpochMilliseconds())
-        doc = doc.set(key, value)
-        notifySubscribers()
+        val entry = ProvenanceEntry(language, Clock.System.now().toEpochMilliseconds())
+        val newDoc = mutate { cur -> Cell(cur.store + (key to value), cur.provenance + (key to entry), cur.doc.set(key, value)) }
+        notifySubscribers(newDoc)
         return this
     }
     
@@ -104,17 +126,15 @@ class ConfixBlackboard {
     
     /** Delete key */
     fun remove(key: String): ConfixBlackboard {
-        store.remove(key)
-        provenance.remove(key)
-        doc = doc.remove(key)
-        notifySubscribers()
+        val newDoc = mutate { cur -> Cell(cur.store - key, cur.provenance - key, cur.doc.remove(key)) }
+        notifySubscribers(newDoc)
         return this
     }
     
     /** Check if key exists */
     fun has(key: String): Boolean = store.containsKey(key)
     
-    /** Get all keys */
+    /** Get all keys — a stable snapshot, never torn by a concurrent writer. */
     fun keys(): List<String> = store.keys.toList()
     
     /** Merge another ConfixDoc into blackboard */
@@ -168,7 +188,7 @@ class ConfixBlackboard {
         return { subscribers.remove(handler) }
     }
 
-    private fun notifySubscribers() {
+    private fun notifySubscribers(doc: ConfixDoc) {
         _changes.tryEmit(doc)
         // Copy before dispatch: a legacy handler is allowed to unsubscribe itself
         // from inside the callback, which would otherwise mutate the list mid-iteration.

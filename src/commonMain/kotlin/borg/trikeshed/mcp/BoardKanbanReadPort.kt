@@ -143,6 +143,9 @@ class BoardKanbanReadPort(
             "dependencies" to row.dependencies,
             "tags" to row.tags,
             "owner" to row.owner,
+            // Delta 2026-09-05 (fan-out): the parent edge, so an agent reading
+            // `cards/{jobId}` sees the tree a child belongs to ("" = a root).
+            "parent" to row.parent,
             "receiptResource" to "${LcncKanbanMcp.URI_RECEIPT_PREFIX}${row.lastSequence}",
         )
     }

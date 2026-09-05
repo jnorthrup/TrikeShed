@@ -64,6 +64,9 @@ class KanbanModule : ForgeModule {
             "stalls" to alertTail(borg.trikeshed.kanban.rules.BoardRules.STALL),
             "cycles" to alertTail(borg.trikeshed.kanban.rules.BoardRules.CYCLE_GUARD),
             "ready" to alertTail(borg.trikeshed.kanban.rules.BoardRules.DEPENDENCY_READY),
+            // Delta 2026-09-05 (fan-out): the splits proposed and the parents parked behind a blocked child.
+            "fanouts" to alertTail(borg.trikeshed.kanban.rules.BoardRules.FAN_OUT),
+            "blocked" to alertTail(borg.trikeshed.kanban.rules.BoardRules.DEPENDENCY_BLOCKED),
         )
         // board.get / board.view / /api/board all read ONE projection: LcncKanbanExperience.boardView.
         val lcnc = LcncKanbanExperience(
@@ -139,10 +142,14 @@ class KanbanModule : ForgeModule {
 
         // ── Rete: fact bridge + the board productions + activation sink ──
         //    (the four audit/flow rules, plus claim: the board proposes its own READY work,
-        //     and reaper: a claim whose worker died goes back to READY — thrice, then BLOCKED)
+        //     and reaper: a claim whose worker died goes back to READY — thrice, then BLOCKED;
+        //     Delta 2026-09-05 (fan-out): fan-out splits a MODELS: card into child cards, and
+        //     dependency-blocked parks a parent whose child struck out)
         val facts = borg.trikeshed.kanban.BoardFactElement(ctx.rete)
         val ruleDisposers = listOf(
+            ctx.rete.register(borg.trikeshed.kanban.rules.FanOutProduction()),
             ctx.rete.register(borg.trikeshed.kanban.rules.DependencyReadyProduction()),
+            ctx.rete.register(borg.trikeshed.kanban.rules.DependencyBlockedProduction()),
             ctx.rete.register(borg.trikeshed.kanban.rules.ClaimProduction()),
             ctx.rete.register(borg.trikeshed.kanban.rules.WipBreachProduction()),
             ctx.rete.register(borg.trikeshed.kanban.rules.StallProduction()),
@@ -168,6 +175,18 @@ class KanbanModule : ForgeModule {
             plane = { ctx.rete.snapshot().map { f -> borg.trikeshed.kanban.PlaneBrief.Row(f.factId.partitionId, f.factId.localId, f.fields) } },
         )
         val claimsInFlight = java.util.concurrent.ConcurrentHashMap.newKeySet<String>()
+        // Delta 2026-09-05 (fan-out): the fan-out worker — child submits, READY moves, the
+        // join, one receipt — next to the claim worker, same constructor, same runner lookup
+        // (mux.models is filled in by the daemon after this module attaches). One worker per
+        // activation id: a landing child un-refracts the rule and re-proposes the same split;
+        // the in-flight set makes that a no-op while the worker runs.
+        val fanOutWorker = borg.trikeshed.kanban.BoardFanOutWorker(
+            store = store,
+            blackboard = ctx.blackboard,
+            runner = { ctx.lcncRunners[it] },
+            clock = ctx.clock,
+        )
+        val fanOutsInFlight = java.util.concurrent.ConcurrentHashMap.newKeySet<String>()
         // Non-job activations: receipt on the blackboard ALWAYS; dependency-ready also
         // lowers to a store Move with a derived idempotency key (dedupe compensates
         // any popped-but-unprocessed activation); claim hands the card to the worker.
@@ -214,6 +233,55 @@ class KanbanModule : ForgeModule {
                         } finally {
                             claimsInFlight.remove(a.activationId)
                         }
+                    }
+                }
+            }
+            // Delta 2026-09-05 (fan-out): a MODELS:/FANOUT: card in TODO/READY is split by the
+            // worker — launched, never awaited: this sink runs under the Rete lock and the
+            // worker awaits store replies that produce card facts. The activation id carries
+            // the revision, so a re-proposal of a split already in flight is a no-op here.
+            if (a.ruleId == borg.trikeshed.kanban.rules.BoardRules.FAN_OUT) {
+                val jobId = a.bindings["jobId"]
+                val rev = a.bindings["expectedRevision"]?.toLongOrNull()
+                val models = a.bindings["models"].orEmpty().split(',').map { it.trim() }.filter { it.isNotEmpty() }
+                val fanout = a.bindings["fanout"]?.toIntOrNull() ?: 0
+                if (jobId != null && rev != null && fanOutsInFlight.add(a.activationId)) {
+                    ctx.scope.launch {
+                        try {
+                            val outcome = fanOutWorker.fanOut(jobId, rev, models, fanout)
+                            System.err.println("[KanbanModule] fan-out $jobId r$rev: ok=${outcome["ok"]} children=${outcome["children"]} ${outcome["error"] ?: ""}")
+                        } catch (t: kotlinx.coroutines.CancellationException) {
+                            throw t
+                        } catch (t: Throwable) {
+                            System.err.println("[KanbanModule] fan-out $jobId r$rev failed: ${t.message}")
+                        } finally {
+                            fanOutsInFlight.remove(a.activationId)
+                        }
+                    }
+                }
+            }
+            // Delta 2026-09-05 (fan-out, children that park): a TODO parent with a BLOCKED
+            // dependency follows it into BLOCKED, signed by the plane judge and naming the
+            // child — the same lowering shape as dependency-ready, derived key, dedupe
+            // compensates a re-fire. Recovery is human; the receipt above says which child.
+            if (a.ruleId == borg.trikeshed.kanban.rules.BoardRules.DEPENDENCY_BLOCKED) {
+                val jobId = a.bindings["jobId"]
+                val rev = a.bindings["expectedRevision"]?.toLongOrNull()
+                if (jobId != null && rev != null) {
+                    ctx.scope.launch {
+                        store.intake.send(
+                            BoardIntake(
+                                mapOf(
+                                    "type" to "move",
+                                    "jobId" to jobId,
+                                    "idempotencyKey" to "$jobId#${a.ruleId}#$rev",
+                                    "expectedRevision" to rev,
+                                    "toColumn" to (a.bindings["toColumn"] ?: borg.trikeshed.kanban.BoardCol.BLOCKED.wire),
+                                    "actor" to borg.trikeshed.kanban.BoardClaimWorker.JUDGE_ACTOR,
+                                    "blockedBy" to a.bindings["blockedBy"],
+                                ),
+                            ),
+                        )
                     }
                 }
             }
@@ -268,6 +336,12 @@ class KanbanModule : ForgeModule {
                         "from" to (ev.previousCol?.wire ?: ""),
                         "revision" to ev.snapshot.revision.toString(),
                         "cid" to ev.cid.value,
+                        // Delta 2026-09-05 (receipt timing): the store's stamp on the committing
+                        // command (0 = no stamp: a seed or a test — the page prints t=?, never
+                        // epoch 0) and the owner after the commit, so a witness surface shows
+                        // WHEN and WHOSE each hop was without a second read of the row table.
+                        "atMs" to ev.atMs,
+                        "owner" to ev.owner,
                     ),
                     "kanban-module",
                 )
@@ -302,6 +376,14 @@ class KanbanModule : ForgeModule {
                         previousCol = null,
                         lastMoveMs = row.lastMoveMs,
                         owner = row.owner,
+                        // Delta 2026-09-05 (fan-out): the seed fact carries the spec and the
+                        // tree edge, so a MODELS: card submitted before a restart (or before a
+                        // brain was attached) is split from cold; without them the seed would
+                        // read models=[] / parent="" and the rule would never fire. atMs stays
+                        // 0: there is no committing command to stamp, and lastMoveMs is a
+                        // different clock (the transition, not the commit).
+                        spec = row.spec,
+                        parent = row.parent,
                     ),
                 )
             }

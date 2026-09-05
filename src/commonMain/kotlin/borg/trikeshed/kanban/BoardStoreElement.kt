@@ -76,6 +76,21 @@ data class BoardCommitted(
     val lastMoveMs: Long = 0L,
     /** Delta (reaper): the row's owner after the commit — `claim:*` marks the brain's work, which the reaper watches. */
     val owner: String = "",
+    /**
+     * Delta 2026-09-05 (fan-out): the row's spec after the commit. [BoardFactElement]
+     * parses it (`MODELS:` / `FANOUT:`) so the fan-out production can see which cards
+     * split; the raw string itself never lands on the fact (PlaneBrief.select scans
+     * string fields and would self-match).
+     */
+    val spec: String = "",
+    /** Delta 2026-09-05 (fan-out): the parent card this row branched off (`""` = a root). */
+    val parent: String = "",
+    /**
+     * Delta 2026-09-05 (fan-out): the store's stamp on the committing command (`raw["atMs"]`,
+     * stamped in [BoardStoreElement.applyOne]) — the one server time a witness surface may
+     * print for this commit. 0 = the command carried no stamp (a seed or a test).
+     */
+    val atMs: Long = 0L,
 )
 
 /** One card = one row (the SoA projection reads these; strings only at the wire). */
@@ -100,6 +115,14 @@ data class CardRow(
     val spec: String = "",
     /** Judge/reaper strikes so far — persisted from the move payload's `strikes`, so the breaker survives a restart. */
     val strikes: Int = 0,
+    /**
+     * Delta 2026-09-05 (fan-out, Jim's ruling: store `parent` at submit): the card this
+     * one branched off, persisted from the submit payload's `parent` — the same key the
+     * orphan guard checks, which until now was verified at the door and then dropped.
+     * `""` is a root. WAL replay re-derives it from the raw map; there is no re-parenting
+     * op, so a later command without the key keeps the value.
+     */
+    val parent: String = "",
 )
 
 /**
@@ -130,6 +153,9 @@ class BoardStoreElement(
     companion object Key : AsyncContextKey<BoardStoreElement>() {
         /** Owner prefix that marks a card as claimed by the daemon's brain (`claim:brain`). */
         const val CLAIM_OWNER_PREFIX: String = "claim:"
+
+        /** The longest `parent` chain the orphan guard walks; a real tree of work is a handful deep. */
+        const val MAX_PARENT_HOPS: Int = 64
     }
 
     override val key: CoroutineContext.Key<*> get() = Key
@@ -247,7 +273,23 @@ class BoardStoreElement(
 
         appendCausal(jobId, lowered, snapshot, cid, raw)
 
-        val event = BoardCommitted(seq, jobId, snapshot, cid, lowered, row?.col ?: BoardCol.ARCHIVED, prev?.col, row?.lastMoveMs ?: 0L, row?.owner ?: "")
+        val event = BoardCommitted(
+            sequence = seq,
+            jobId = jobId,
+            snapshot = snapshot,
+            cid = cid,
+            command = lowered,
+            col = row?.col ?: BoardCol.ARCHIVED,
+            previousCol = prev?.col,
+            lastMoveMs = row?.lastMoveMs ?: 0L,
+            owner = row?.owner ?: "",
+            // Delta 2026-09-05 (fan-out): spec/parent ride the event so the fact bridge can
+            // parse MODELS:/FANOUT: and the tree without a second read of the row table;
+            // atMs is the stamp on THIS command (live: just now; replay: what the WAL says).
+            spec = row?.spec ?: "",
+            parent = row?.parent ?: "",
+            atMs = (raw["atMs"] as? Number)?.toLong() ?: 0L,
+        )
         _committed.tryEmit(event)
         return BoardApply.Committed(jobId, seq, snapshot.revision, lowered.idempotencyKey, cid)
     }
@@ -303,7 +345,7 @@ class BoardStoreElement(
         }
 
         is JobCommand.Submit -> {
-            orphanGuard(raw) ?: if (cmd.dependencies.isEmpty()) null
+            orphanGuard(cmd.jobId.value, raw) ?: if (cmd.dependencies.isEmpty()) null
             else {
                 // First caller of the KanbanTypes verbs: refuse a dependency cycle at the door.
                 val board = boardOf(extra = cmd)
@@ -360,13 +402,29 @@ class BoardStoreElement(
      * dead tree and is refused at the door. A Submit without `parent` is intake
      * (a root), and passes. The raw map is the WAL truth, so the parent edge
      * replays with the card.
+     *
+     * Delta 2026-09-05 (fan-out): the edge this guard verifies is also STORED now
+     * ([CardRow.parent], read in [advanceRow]); before, it was checked here and then
+     * forgotten, so no reader could reconstruct the tree the guard protected. Because
+     * it is stored — and a re-Submit of an existing card (the fan-out join) passes
+     * through here too — the guard also refuses a card as its own parent and a parent
+     * edge that would close a cycle through the existing `parent` chain (bounded to
+     * [MAX_PARENT_HOPS]); a tree reader walking `parent` must always reach a root.
      */
-    private fun orphanGuard(raw: Map<*, *>): String? {
+    private fun orphanGuard(jobId: String, raw: Map<*, *>): String? {
         val parent = (raw["parent"] as? String)?.trim()?.takeIf { it.isNotEmpty() } ?: return null
+        if (parent == jobId) return "orphan: $jobId cannot be its own parent"
         val row = rows[parent] ?: return "orphan: parent $parent is not live (no such card)"
-        return if (row.col == BoardCol.DONE || row.col == BoardCol.ARCHIVED) {
-            "orphan: parent $parent is not live (it is '${row.col.wire}')"
-        } else null
+        if (row.col == BoardCol.DONE || row.col == BoardCol.ARCHIVED) {
+            return "orphan: parent $parent is not live (it is '${row.col.wire}')"
+        }
+        var cur = row.parent
+        var hops = 0
+        while (cur.isNotEmpty() && hops++ < MAX_PARENT_HOPS) {
+            if (cur == jobId) return "orphan: parent $parent would close a tree cycle via $jobId"
+            cur = rows[cur]?.parent.orEmpty()
+        }
+        return null
     }
 
     /** Materialize the current rows (+ an incoming submit) as a KanbanBoard for the DAG verbs. */
@@ -446,6 +504,10 @@ class BoardStoreElement(
             owner = if (raw.containsKey("owner")) (raw["owner"] as? String)?.trim().orEmpty() else prev?.owner ?: "",
             spec = (raw["spec"] as? String)?.takeIf { it.isNotBlank() } ?: prev?.spec ?: "",
             strikes = (raw["strikes"] as? Number)?.toInt() ?: raw["strikes"]?.toString()?.toIntOrNull() ?: prev?.strikes ?: 0,
+            // Delta 2026-09-05 (fan-out): the parent edge the orphan guard verified is now kept.
+            // A blank or absent key keeps the previous value — a re-submit that only sets
+            // dependencies (the fan-out join) must not detach a child from its tree.
+            parent = (raw["parent"] as? String)?.trim()?.takeIf { it.isNotEmpty() } ?: prev?.parent ?: "",
         )
     }
 

@@ -7,13 +7,13 @@
 <style>
   :root {
     --bg: #f4f2ec; --panel: #ffffff; --ink: #2b2a27; --muted: #8a867c;
-    --line: #e2ded4; --accent: #4a6fa5; --danger: #b3543f; --ok: #5a8a5e;
+    --line: #e2ded4; --accent: #4a6fa5; --danger: #b3543f; --ok: #5a8a5e; --amber: #c98f2a;
     --card-shadow: 0 1px 3px rgba(40,36,28,.10), 0 1px 2px rgba(40,36,28,.06);
   }
   @media (prefers-color-scheme: dark) {
     :root {
       --bg: #201f1c; --panel: #2a2926; --ink: #e8e5dd; --muted: #98938a;
-      --line: #3a3833; --accent: #7d9fc9; --danger: #cf7a63; --ok: #7fae83;
+      --line: #3a3833; --accent: #7d9fc9; --danger: #cf7a63; --ok: #7fae83; --amber: #e0a94a;
       --card-shadow: 0 1px 3px rgba(0,0,0,.4);
     }
   }
@@ -35,15 +35,17 @@
   }
   button:hover { border-color: var(--accent); }
   button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+  /* The timeline strip below is ~8 rows tall; the board leaves it room so the
+     last lane row is never hidden behind it. */
   #board {
-    display: flex; gap: 12px; padding: 6px 20px 24px; align-items: flex-start;
+    display: flex; gap: 12px; padding: 6px 20px 170px; align-items: flex-start;
     overflow-x: auto; min-height: 70vh;
   }
   .lane {
     background: color-mix(in srgb, var(--panel) 62%, var(--bg));
     border: 1px solid var(--line); border-radius: 12px;
     min-width: 250px; max-width: 300px; flex: 1 0 250px;
-    display: flex; flex-direction: column; max-height: calc(100vh - 120px);
+    display: flex; flex-direction: column; max-height: calc(100vh - 260px);
   }
   .lane.drop-ok { outline: 2px dashed var(--accent); outline-offset: -4px; }
   .lane h2 {
@@ -54,6 +56,9 @@
   .lane h2 .count { font-weight: 400; }
   .lane h2 .wip { margin-left: auto; font-weight: 400; font-size: 12px; }
   .lane h2 .wip.full { color: var(--danger); font-weight: 650; }
+  /* "+N": more cards changed in one frame than the 120 ms stagger can show
+     distinctly (8 slots); the badge says how many share the last slot. */
+  .lane h2 .burst { font-weight: 650; font-size: 11px; color: var(--amber); letter-spacing: 0; text-transform: none; }
   .cards { padding: 4px 10px 10px; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; min-height: 40px; }
   .card {
     background: var(--panel); border: 1px solid var(--line); border-radius: 10px;
@@ -76,6 +81,36 @@
   }
   .card .tag.patch { color: var(--ok); border-color: var(--ok); }
   .card .deps { font-size: 10px; color: var(--muted); margin-top: 4px; }
+  /* Delta 2026-09-05 (fan-out): a family (parent + its child cards) shares one
+     hue on the left border; a child sitting in the same lane as its parent is
+     indented under it and wears an "↑ parent" chip; the parent wears the
+     children tally so a viewer can count the fan-in without opening anything. */
+  .card.family { border-left-width: 4px; border-left-style: solid; }
+  .card.child { margin-left: 14px; }
+  .card .parentchip {
+    display: inline-block; font-size: 10px; line-height: 1.5; padding: 1px 6px; border-radius: 999px;
+    color: var(--muted); border: 1px dashed var(--line); margin-top: 4px;
+  }
+  .card .kids { font-size: 11px; margin-top: 4px; color: var(--muted); }
+  .card .kids.ready { color: var(--ok); font-weight: 600; }
+  .card .kids.blocked { color: var(--danger); }
+  /* Delta 2026-09-05 (fan-out): per-card flash. The animation runs 700 ms from
+     the moment the change was seen; a DOM rebuild re-applies the class with a
+     negative animation-delay so the card resumes at phase instead of
+     restarting. fill-mode forwards: a staggered card (positive delay) looks
+     normal until its slot, and the 100% frame IS the resting look. */
+  @keyframes cardFlash {
+    0%   { box-shadow: 0 0 0 3px var(--flash), var(--card-shadow); background: color-mix(in srgb, var(--flash) 24%, var(--panel)); }
+    100% { box-shadow: 0 0 0 0 transparent, var(--card-shadow); background: var(--panel); }
+  }
+  .card.flash { --flash: var(--accent); animation: cardFlash 700ms ease-out forwards; }
+  .card.flash-new { --flash: var(--ok); }
+  .card.flash-moved { --flash: var(--accent); }
+  .card.flash-claimed { --flash: var(--amber); }
+  .card.flash-revised { --flash: var(--muted); }
+  @media (prefers-reduced-motion: reduce) {
+    .card.flash { animation: none; outline: 2px solid var(--flash); outline-offset: 1px; }
+  }
   .addrow { padding: 0 10px 12px; display: flex; gap: 6px; align-items: stretch; }
   .addrow input {
     flex: 1 1 auto; min-width: 0; font: inherit; padding: 7px 10px; border-radius: 8px;
@@ -95,6 +130,7 @@
     position: fixed; bottom: 22px; left: 50%; transform: translateX(-50%);
     background: var(--ink); color: var(--bg); border-radius: 10px; padding: 10px 18px;
     font-size: 14px; opacity: 0; transition: opacity .25s; pointer-events: none; max-width: 80vw;
+    z-index: 5;
   }
   #toast.show { opacity: .96; }
   dialog {
@@ -112,13 +148,32 @@
   .empty-board {
     padding: 40px 20px; text-align: center; color: var(--muted); width: 100%;
   }
+  /* Delta 2026-09-05 (fan-out): the ticker was one overwritten line, so a burst
+     of N commits read as one. It is a timeline strip now: one row per fact,
+     newest first, server timestamps only. */
   #ticker {
     position: fixed; bottom: 0; left: 0; right: 0; background: var(--panel);
-    border-top: 1px solid var(--line); padding: 5px 20px; font: 12px/1.5 ui-monospace, Menlo, monospace;
-    color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    border-top: 1px solid var(--line); padding: 4px 20px 6px; font: 12px/1.5 ui-monospace, Menlo, monospace;
+    color: var(--muted);
   }
   #ticker b { color: var(--ok); font-weight: 650; }
   #ticker .k { color: var(--accent); }
+  #wire { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  #timeline {
+    list-style: none; margin: 2px 0 0; padding: 0; max-height: 7.5em; overflow-y: auto;
+    border-top: 1px dashed var(--line);
+  }
+  #timeline li { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: flex; gap: 10px; align-items: baseline; }
+  #timeline li .ts { color: var(--ink); font-variant-numeric: tabular-nums; }
+  #timeline li .ts.unknown { color: var(--danger); }
+  #timeline li .id { color: var(--accent); }
+  #timeline li .rev { color: var(--muted); }
+  #timeline li small { color: var(--muted); margin-left: auto; padding-left: 10px; }
+  #timeline li.rule { opacity: .55; }
+  #timeline li.frame { opacity: .6; font-style: italic; }
+  #timeline li.burst .n { color: var(--amber); font-weight: 650; }
+  #timeline li.claim .good { color: var(--ok); font-weight: 650; }
+  #timeline li.claim .bad { color: var(--danger); font-weight: 650; }
 </style>
 </head>
 <body>
@@ -129,7 +184,10 @@
   <button id="importBtn">Import a plan…</button>
 </header>
 <div id="board"></div>
-<div id="ticker">daemon wire: connecting…</div>
+<div id="ticker">
+  <div id="wire">daemon wire: connecting…</div>
+  <ol id="timeline"></ol>
+</div>
 <div id="toast"></div>
 
 <dialog id="importDlg">
@@ -149,6 +207,7 @@
 //   POST /api/invoke                    {type:submit|archive, ...}
 //   POST /api/lcnc/kanban/move          {itemId, to, expectedRevision} -> 202 | 409
 //   POST /api/board/import              markdown bullets
+//   GET  /blackboard/facts?since=<seq>  SSE: {seq, key, value, actor, atMs}
 // BoardCol.rendered minus archived (hidden): review sits between blocked and done —
 // claimed work lands there for a human verdict before anyone drags it to done.
 const LANES = ["triage", "todo", "ready", "running", "blocked", "review", "done"];
@@ -190,12 +249,19 @@ async function refresh(force = false) {
   try {
     const { status, body } = await api("/api/board");
     if (status !== 200 || !body) return;
+    // An older board never replaces a newer one: two fetches can overlap (a
+    // drop's refresh(true) against the poll) and land out of order; adopting the
+    // stale one would flash a card backwards and bounce it.
+    if (typeof body.sequence === "number" && body.sequence < lastSeq) return;
     // NARS attention scores drift every poll; rounding them in the compare key
     // stops the board re-rendering (and eating drags) when nothing moved.
     const payload = JSON.stringify(body, (k, v) => (k === "attention" && typeof v === "number") ? Math.round(v * 20) / 20 : v);
     if (!force && payload === lastPayload) return;
     lastPayload = payload;
     lastSeq = body.sequence;
+    // The diff runs even mid-drag: a flash is a timer keyed by card id, not a
+    // DOM node, so the deferred render still picks it up at phase.
+    diffBoard(body);
     if (dragLive) { deferredBoard = body; return; }
     render(body);
   } catch (_) {
@@ -203,17 +269,129 @@ async function refresh(force = false) {
   }
 }
 
+// ── Delta 2026-09-05 (fan-out): scheduleRefresh replaces the raw refresh() the
+// SSE handler used to fire per fact. Leading + trailing edge at 150 ms with an
+// in-flight guard: a burst of 30 facts costs two /api/board fetches (the first
+// and the last), never 30, and a slow fetch never overlaps the next one.
+const REFRESH_DEBOUNCE_MS = 150;
+let refreshTimer = null, refreshInFlight = false, refreshPending = false;
+function scheduleRefresh() {
+  if (refreshTimer) { refreshPending = true; return; }
+  runRefresh();
+  refreshTimer = setTimeout(() => {
+    refreshTimer = null;
+    if (refreshPending) { refreshPending = false; scheduleRefresh(); }
+  }, REFRESH_DEBOUNCE_MS);
+}
+async function runRefresh() {
+  if (refreshInFlight) { refreshPending = true; return; }
+  refreshInFlight = true;
+  try { await refresh(); }
+  finally {
+    refreshInFlight = false;
+    if (refreshPending && !refreshTimer) { refreshPending = false; scheduleRefresh(); }
+  }
+}
+
+// ── Delta 2026-09-05 (fan-out): per-card flash with a per-card timer.
+// The old page rebuilt the DOM on every refresh, so nothing on a card could
+// outlive one render. `flashes` lives outside the DOM: cardEl re-applies the
+// class after a rebuild with a negative animation-delay so the 700 ms
+// animation resumes where it was. Never flash the first load: nothing changed.
+const FLASH_MS = 700, STAGGER_MS = 120, STAGGER_SLOTS = 8;
+const flashes = new Map();     // id -> {kind, startedAt, until, timer}
+const laneBurst = new Map();   // lane -> {n, until}: "+N" badge past the stagger slots
+let prevItems = null;          // Map<id, item> of the last board seen (null = first load)
+// jobId -> server atMs of the latest kanban/committed fact seen for that card;
+// the "N in one frame" row reports the span of exactly the changed cards'
+// commits, never of whatever else arrived meanwhile, never a client-side guess.
+const commitAt = new Map();
+
+function diffBoard(board) {
+  const items = (board.items || []).filter(i => i.status !== "archived");
+  const next = new Map(items.map(i => [i.id, i]));
+  if (prevItems === null) { prevItems = next; return; }
+  const changed = [];
+  for (const it of items) {
+    const p = prevItems.get(it.id);
+    let kind = null;
+    if (!p) kind = "new";
+    else if (p.status !== it.status) kind = "moved";
+    else if ((p.owner || "") !== (it.owner || "") && it.owner) kind = "claimed";
+    else if (p.revision !== it.revision) kind = "revised";
+    if (kind) changed.push({ id: it.id, kind, lane: it.status });
+  }
+  prevItems = next;
+  if (!changed.length) return;
+  // Stagger 120 ms apart so N flashes in one frame are N countable things;
+  // past 8 slots they share the last slot and the lane wears "+N".
+  const overflow = {};
+  changed.forEach((c, i) => {
+    const slot = Math.min(i, STAGGER_SLOTS);
+    if (i >= STAGGER_SLOTS) overflow[c.lane] = (overflow[c.lane] || 0) + 1;
+    flash(c.id, c.kind, slot * STAGGER_MS);
+  });
+  const now = performance.now();
+  for (const [lane, n] of Object.entries(overflow)) {
+    const until = now + STAGGER_SLOTS * STAGGER_MS + FLASH_MS;
+    const old = laneBurst.get(lane);
+    if (old && old.timer) clearTimeout(old.timer);
+    // The badge expires on its own clock, not on the next board change: a quiet
+    // board would otherwise wear a stale "+N" for as long as nothing moves.
+    const timer = setTimeout(() => {
+      laneBurst.delete(lane);
+      const span = boardEl.querySelector('.lane[data-lane="' + CSS.escape(lane) + '"] h2 .burst');
+      if (span) span.remove();
+    }, until - now + 20);
+    laneBurst.set(lane, { n, until, timer });
+  }
+  if (changed.length >= 2) frameRow(changed.length, changed.map(c => commitAt.get(c.id)));
+}
+
+function flash(id, kind, delayMs) {
+  const old = flashes.get(id);
+  if (old) clearTimeout(old.timer);
+  const startedAt = performance.now() + delayMs;
+  const entry = { kind, startedAt, until: startedAt + FLASH_MS, timer: null };
+  entry.timer = setTimeout(() => {
+    flashes.delete(id);
+    const el = cardById(id);
+    if (el) { el.classList.remove("flash", "flash-" + kind); el.style.animationDelay = ""; }
+  }, delayMs + FLASH_MS + 20);
+  flashes.set(id, entry);
+  const el = cardById(id);
+  if (el) {
+    if (old) { el.classList.remove("flash", "flash-" + old.kind); void el.offsetWidth; } // restart, not resume
+    applyFlash(el, entry);
+  }
+}
+
+function applyFlash(el, entry) {
+  const elapsed = performance.now() - entry.startedAt; // negative = still waiting for its slot
+  if (elapsed > FLASH_MS) return;
+  el.classList.add("flash", "flash-" + entry.kind);
+  // negative delay resumes at phase after a rebuild; positive delay is the stagger slot
+  el.style.animationDelay = (-elapsed).toFixed(0) + "ms";
+}
+
+function cardById(id) {
+  return boardEl.querySelector('.card[data-id="' + CSS.escape(id) + '"]');
+}
+
 function render(board) {
   $("#seq").textContent = "seq " + board.sequence;
   const byCol = {};
   for (const lane of LANES) byCol[lane] = [];
   let archived = 0;
+  const byId = new Map();
   for (const it of board.items || []) {
     if (it.status === "archived") { archived++; continue; }
+    byId.set(it.id, it);
     (byCol[it.status] || (byCol[it.status] = [])).push(it);
   }
   for (const lane of LANES) byCol[lane].sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
   const colMeta = Object.fromEntries((board.columns || []).map(c => [c.id, c]));
+  const tree = buildTree(byId);
 
   boardEl.textContent = "";
   const total = (board.items || []).length - archived;
@@ -223,6 +401,7 @@ function render(board) {
     hint.innerHTML = "The board is empty. Type into a lane below to add the first card, or use <b>Import a plan…</b> to turn a bullet list into cards.";
     boardEl.appendChild(hint);
   }
+  const now = performance.now();
   for (const lane of LANES) {
     const meta = colMeta[lane] || { name: lane, wipLimit: null };
     const laneEl = document.createElement("div");
@@ -233,12 +412,17 @@ function render(board) {
     const wip = meta.wipLimit != null
       ? `<span class="wip ${byCol[lane].length >= meta.wipLimit ? "full" : ""}">${byCol[lane].length}/${meta.wipLimit}</span>`
       : "";
-    h.innerHTML = `${meta.name} <span class="count">${byCol[lane].length}</span>${wip}`;
+    const burst = laneBurst.get(lane);
+    if (burst && burst.until < now) laneBurst.delete(lane);
+    const burstBadge = burst && burst.until >= now
+      ? `<span class="burst" title="${burst.n} more cards changed in this frame than the 120 ms stagger can show one by one">+${burst.n}</span>`
+      : "";
+    h.innerHTML = `${meta.name} <span class="count">${byCol[lane].length}</span>${burstBadge}${wip}`;
     laneEl.appendChild(h);
 
     const cards = document.createElement("div");
     cards.className = "cards";
-    for (const it of byCol[lane]) cards.appendChild(cardEl(it));
+    for (const it of laneOrder(byCol[lane], tree)) cards.appendChild(cardEl(it, tree, lane));
     laneEl.appendChild(cards);
 
     const addrow = document.createElement("div");
@@ -275,7 +459,61 @@ function render(board) {
   if (archived > 0) $("#seq").textContent += ` · ${archived} archived`;
 }
 
-function cardEl(it) {
+// ── Delta 2026-09-05 (fan-out): the tree of work, from the same /api/board body.
+// `parent` is the row field the store keeps at submit; a board that predates it
+// (or a join re-submitted without it) still shows the family because the fan-out
+// worker names children `<parent>-m<i>` and lists them as the parent's dependencies.
+function buildTree(byId) {
+  const parentOf = new Map();
+  for (const it of byId.values()) {
+    if (it.parent && byId.has(it.parent) && it.parent !== it.id) parentOf.set(it.id, it.parent);
+  }
+  for (const it of byId.values()) {
+    for (const d of it.dependencies || []) {
+      if (!parentOf.has(d) && byId.has(d) && d !== it.id && String(d).startsWith(it.id + "-m")) parentOf.set(d, it.id);
+    }
+  }
+  const childrenOf = new Map();
+  for (const [child, parent] of parentOf) {
+    if (!childrenOf.has(parent)) childrenOf.set(parent, []);
+    childrenOf.get(parent).push(byId.get(child));
+  }
+  for (const kids of childrenOf.values()) kids.sort((a, b) => (a.order ?? 0) - (b.order ?? 0) || String(a.id).localeCompare(String(b.id)));
+  const rootOf = (id) => {
+    let cur = id, hops = 0;
+    while (parentOf.has(cur) && hops++ < 32) cur = parentOf.get(cur);
+    return cur;
+  };
+  const hue = (id) => {
+    let h = 5381;
+    for (const ch of String(id)) h = ((h << 5) + h + ch.charCodeAt(0)) >>> 0;
+    return h % 360;
+  };
+  return { byId, parentOf, childrenOf, rootOf, hue };
+}
+
+// Children follow their parent inside a lane (indented); every other card keeps
+// its own order. A child whose parent sits in another lane stays where its
+// order puts it.
+function laneOrder(items, tree) {
+  const lane = new Set(items.map(i => i.id));
+  const out = [], seen = new Set();
+  const emit = (it) => {
+    if (seen.has(it.id)) return; // a parent cycle is rendered once, never twice and never lost
+    seen.add(it.id);
+    out.push(it);
+    for (const kid of tree.childrenOf.get(it.id) || []) if (lane.has(kid.id)) emit(kid);
+  };
+  for (const it of items) {
+    const parent = tree.parentOf.get(it.id);
+    if (parent && lane.has(parent)) continue; // emitted under its parent
+    emit(it);
+  }
+  for (const it of items) if (!seen.has(it.id)) emit(it); // whatever a cycle skipped
+  return out;
+}
+
+function cardEl(it, tree, lane) {
   const el = document.createElement("div");
   el.className = "card";
   el.dataset.id = it.id;
@@ -296,11 +534,37 @@ function cardEl(it) {
   const deps = (it.dependencies || []).length
     ? `<div class="deps" title="waits on">↳ ${it.dependencies.map(escapeHtml).join(", ")}</div>`
     : "";
+  // Family decoration (tree): hue on the left border, chip on a child, tally on a parent.
+  const parent = tree ? tree.parentOf.get(it.id) : undefined;
+  const kids = tree ? (tree.childrenOf.get(it.id) || []) : [];
+  let chip = "", tally = "";
+  if (parent || kids.length) {
+    el.classList.add("family");
+    el.style.borderLeftColor = `hsl(${tree.hue(tree.rootOf(it.id))} 55% 55%)`;
+  }
+  if (parent) {
+    const parentItem = tree.byId.get(parent);
+    const sameLane = parentItem && parentItem.status === lane;
+    if (sameLane) el.classList.add("child");
+    chip = `<span class="parentchip" title="${escapeHtml(parent)}">↑ parent ${escapeHtml(shortId(parent))}${sameLane ? "" : " · " + escapeHtml(parentItem ? parentItem.status : "?")}</span>`;
+  }
+  if (kids.length) {
+    const n = kids.length;
+    const done = kids.filter(k => k.status === "done").length;
+    const blocked = kids.filter(k => k.status === "blocked").length;
+    const blockedNote = blocked ? ` · ${blocked} blocked` : "";
+    if (done < n) tally = `<div class="kids${blocked ? " blocked" : ""}">waiting on ${done}/${n} children${blockedNote}</div>`;
+    else if (it.status === "todo") tally = `<div class="kids ready">all ${n} done → ready pending</div>`;
+    else tally = `<div class="kids">${n}/${n} children done</div>`;
+  }
   el.innerHTML = `<div class="t">${escapeHtml(it.title || it.id)}</div>
-    ${tags}${deps}
+    ${tags}${deps}${chip}${tally}
     <div class="meta">${owner}${heat}<span>r${it.revision}</span></div>
     <button class="archive" title="Archive this card">×</button>`;
   el.querySelector(".archive").addEventListener("click", () => archiveCard(it));
+  // A live flash survives the rebuild: resume the animation at phase.
+  const fl = flashes.get(it.id);
+  if (fl) applyFlash(el, fl);
   // Pointer-event drag, NOT HTML5 DnD: works identically for mouse, trackpad,
   // touch, and pen; no dataTransfer, no browser drag-image quirks, and it
   // responds to plain pointer input so it is machine-verifiable too.
@@ -352,6 +616,13 @@ function cardEl(it) {
 
 function escapeHtml(s) {
   return String(s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+}
+
+// Short job id for a one-line row: whole when it fits, else head…tail so a
+// fan-out child (`<parent>-m<i>`) keeps its suffix.
+function shortId(id) {
+  const s = String(id || "");
+  return s.length <= 14 ? s : s.slice(0, 8) + "…" + s.slice(-4);
 }
 
 async function addCard(title, lane, input) {
@@ -430,31 +701,199 @@ $("#importGo").addEventListener("click", async () => {
 
 // ── The interchange rail, visible: every board action lands as a durable fact
 // on the daemon blackboard (kanban/committed/…, kanban/rule/… from the Rete
-// productions); the repaired /blackboard/facts SSE streams them back here live.
+// productions, kanban/claim/… receipts); the /blackboard/facts SSE streams
+// them back here live.
+//
+// Delta 2026-09-05 (fan-out): timeline strip. One <li data-seq> per kanban
+// fact, newest first, cap 40. Every field on a row comes from the fact itself;
+// time is the server atMs (a fact without one prints "t=?"; nothing is stamped
+// here). Dedupe on f.seq; a reconnect resumes at ?since=<lastSeq+1> instead of
+// replaying the ring. Burst rule ported from graal.html's quake coalescer: up
+// to 12 kanban facts per second get their own rows; above that they bucket by
+// column / rule and flush once at 900 ms as one labelled row whose Δ is the
+// span of the facts' own atMs.
+const TIMELINE_CAP = 40, BURST_PER_SECOND = 12, BURST_FLUSH_MS = 900;
+const timelineEl = $("#timeline");
+const seenSeq = new Set();
+let lastFactSeq = -1;
+let recentFacts = 0;
+setInterval(() => { recentFacts = 0; }, 1000);
+const burstBuf = new Map(); // bucket -> {n, minAt, maxAt, missingAt, firstSeq, lastSeq}
+let burstTimer = null;
+
+function stampOf(ms) {
+  if (typeof ms !== "number" || !isFinite(ms)) return `<span class="ts unknown">t=?</span>`;
+  const d = new Date(ms), p = (n, w = 2) => String(n).padStart(w, "0");
+  return `<span class="ts">${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}.${p(d.getMilliseconds(), 3)}</span>`;
+}
+
+// orderSeq (a number) places the row among the others by #seq — a burst row
+// flushed 900 ms late still lands below the rows that arrived after its facts,
+// so #seq stays strictly increasing down the strip. No orderSeq = newest on top.
+function timelineRow(cls, seqKey, html, orderSeq) {
+  if (seqKey != null && timelineEl.querySelector(`li[data-seq="${CSS.escape(String(seqKey))}"]`)) return;
+  const li = document.createElement("li");
+  li.className = cls;
+  if (seqKey != null) li.dataset.seq = String(seqKey);
+  const order = typeof orderSeq === "number" ? orderSeq : (typeof seqKey === "number" ? seqKey : null);
+  if (order != null) li.dataset.order = String(order);
+  li.innerHTML = html;
+  let before = null;
+  if (order != null) {
+    for (const row of timelineEl.children) {
+      const o = Number(row.dataset.order);
+      if (Number.isFinite(o) && o < order) { before = row; break; }
+    }
+    if (before) timelineEl.insertBefore(li, before); else timelineEl.appendChild(li);
+  } else {
+    timelineEl.prepend(li);
+  }
+  while (timelineEl.children.length > TIMELINE_CAP) timelineEl.lastChild.remove();
+}
+
+// The server time of a fact: for a commit, the store's own stamp on the
+// committing command (value.atMs, 0 = unstamped seed) leads; else the
+// blackboard's provenance stamp on the event. Both are server clocks.
+function factAt(f) {
+  const v = (f.value && typeof f.value === "object") ? f.value : {};
+  if (f.key.startsWith("kanban/committed/") && typeof v.atMs === "number" && v.atMs > 0) return v.atMs;
+  if (typeof f.atMs === "number") return f.atMs;
+  return (typeof v.atMs === "number" && v.atMs > 0) ? v.atMs : undefined;
+}
+
+// Describe one kanban fact: {bucket, cls, html}. Nothing here invents a field.
+function describe(f) {
+  const parts = f.key.split("/");
+  const v = (f.value && typeof f.value === "object") ? f.value : {};
+  const at = factAt(f);
+  const actor = v.actor || f.actor || "";
+  const tail = `<small>${escapeHtml(actor)} · #${f.seq}</small>`;
+  if (parts[1] === "committed") {
+    const jobId = parts[2] || "";
+    const from = v.from ? escapeHtml(v.from) + " → " : "→ ";
+    return {
+      bucket: "commits → " + (v.col || "?"), cls: "committed",
+      html: `${stampOf(at)}<span class="id" title="${escapeHtml(jobId)}">${escapeHtml(shortId(jobId))}</span>` +
+        `<span>${from}${escapeHtml(v.col || "?")}</span><span class="rev">r${escapeHtml(v.revision ?? "?")}</span>` +
+        (v.op && v.op !== "move" ? `<span class="rev">${escapeHtml(v.op)}</span>` : "") + tail,
+    };
+  }
+  if (parts[1] === "rule") {
+    const ruleId = parts[2] || "?";
+    const to = v.toColumn ? ` → ${escapeHtml(v.toColumn)}` : "";
+    return {
+      bucket: "rule " + ruleId, cls: "rule",
+      html: `${stampOf(at)}<span>rule <b>${escapeHtml(ruleId)}</b>${to}</span>` +
+        `<span class="id" title="${escapeHtml(v.jobId || "")}">${escapeHtml(shortId(v.jobId || ""))}</span>` + tail,
+    };
+  }
+  if (parts[1] === "claim") {
+    const jobId = parts[2] || "";
+    const ok = v.ok === true ? `<span class="good">✓</span>` : v.ok === false ? `<span class="bad" title="${escapeHtml(v.error || "")}">✗</span>` : "";
+    // The receipt carries latencyMs only when the brain reported it; a 0 is not a measurement.
+    const latency = typeof v.latencyMs === "number" && v.latencyMs > 0 ? `<span>${v.latencyMs} ms</span>` : `<span class="rev" title="no latency reported">–</span>`;
+    const verdict = v.verdict ? `<span>${escapeHtml(v.verdict)}</span>` : "";
+    const decision = v.decision ? `<span class="rev">${escapeHtml(v.decision)}</span>` : "";
+    return {
+      bucket: "claim receipts", cls: "claim",
+      html: `${stampOf(at)}<span class="id" title="${escapeHtml(jobId)}">${escapeHtml(shortId(jobId))}</span><span>claim</span>` +
+        (v.owner ? `<span>${escapeHtml(v.owner)}</span>` : "") + (v.model ? `<span class="rev">${escapeHtml(v.model)}</span>` : "") +
+        ok + latency + verdict + decision + tail,
+    };
+  }
+  if (parts[1] === "fanout") {
+    const jobId = parts[2] || "";
+    const children = Array.isArray(v.children) ? v.children.length : null;
+    const models = Array.isArray(v.models) ? v.models.join(", ") : "";
+    const span = typeof v.startedAtMs === "number" && typeof v.finishedAtMs === "number" ? `<span class="rev">${v.finishedAtMs - v.startedAtMs} ms</span>` : "";
+    return {
+      bucket: "fan-out receipts", cls: "fanout",
+      html: `${stampOf(at)}<span class="id" title="${escapeHtml(jobId)}">${escapeHtml(shortId(jobId))}</span>` +
+        `<span>fan-out${children != null ? " → " + children + " children" : ""}</span>` +
+        (models ? `<span class="rev">${escapeHtml(models)}</span>` : "") + span + tail,
+    };
+  }
+  return {
+    bucket: parts.slice(0, 2).join("/"), cls: "other",
+    html: `${stampOf(at)}<span class="k">${escapeHtml(f.key)}</span><span>${escapeHtml(JSON.stringify(f.value).slice(0, 100))}</span>` + tail,
+  };
+}
+
+function flushBursts() {
+  for (const [bucket, b] of burstBuf) {
+    const delta = b.missingAt ? "Δ ?" : `Δ ${b.maxAt - b.minAt} ms server`;
+    timelineRow("burst", `burst-${b.firstSeq}-${b.lastSeq}`,
+      `${stampOf(b.missingAt ? undefined : b.maxAt)}<span>⚡ <span class="n">${b.n}</span> ${escapeHtml(bucket)} (${delta})</span><small>#${b.firstSeq}–#${b.lastSeq}</small>`,
+      b.lastSeq);
+  }
+  burstBuf.clear();
+  burstTimer = null;
+}
+
+function onKanbanFact(f) {
+  recentFacts++;
+  const d = describe(f);
+  const at = factAt(f);
+  const parts = f.key.split("/");
+  if (parts[1] === "committed" && parts[2] && typeof at === "number") commitAt.set(parts[2], at);
+  if (recentFacts <= BURST_PER_SECOND) { timelineRow(d.cls, f.seq, d.html); return; }
+  const b = burstBuf.get(d.bucket) || { n: 0, minAt: Infinity, maxAt: -Infinity, missingAt: false, firstSeq: f.seq, lastSeq: f.seq };
+  b.n++;
+  if (typeof at === "number") { b.minAt = Math.min(b.minAt, at); b.maxAt = Math.max(b.maxAt, at); } else b.missingAt = true;
+  b.lastSeq = f.seq;
+  burstBuf.set(d.bucket, b);
+  if (!burstTimer) burstTimer = setTimeout(flushBursts, BURST_FLUSH_MS);
+}
+
+// Display cadence declared as display: when one refresh changed N cards their
+// flashes are spread 120 ms apart on this screen; the server span is that of
+// the changed cards' own latest commits (Δ ? until at least two of them have one).
+function frameRow(n, atMs) {
+  const nums = atMs.filter(x => typeof x === "number");
+  const delta = nums.length >= 2 ? `Δ ${Math.max(...nums) - Math.min(...nums)} ms server` : "Δ ?";
+  timelineRow("frame", null,
+    `<span class="ts"> </span><span>${n} in one frame (${delta}) · flashes staggered ${STAGGER_MS} ms apart on this display</span>`);
+}
+
 (function ticker() {
-  const el = $("#ticker");
+  const wire = $("#wire");
   let es;
-  function connect() {
-    es = new EventSource("/blackboard/facts");
+  async function connect() {
+    // Resume where we left off; the first connect (no seq yet) takes the ring.
+    // The wire's seq is a per-process counter: after a daemon restart it starts
+    // at 0 again, and `?since=<old seq>` would silence this tab for good. Probe
+    // the wire's current seq first; a seq behind ours (or no answer) is a new
+    // epoch — forget what we saw and take the ring.
+    if (lastFactSeq >= 0) {
+      let epochSeq = null;
+      try { const r = await fetch("/blackboard/board"); const b = await r.json(); epochSeq = typeof b.seq === "number" ? b.seq : null; } catch (_) { /* no answer = assume restart */ }
+      if (epochSeq === null || epochSeq < lastFactSeq) { lastFactSeq = -1; seenSeq.clear(); }
+    }
+    es = new EventSource("/blackboard/facts" + (lastFactSeq >= 0 ? "?since=" + (lastFactSeq + 1) : ""));
     es.onmessage = (m) => {
       let f; try { f = JSON.parse(m.data); } catch (_) { return; }
       if (!f.key) return;
+      if (typeof f.seq === "number") {
+        if (seenSeq.has(f.seq)) return;
+        seenSeq.add(f.seq);
+        if (seenSeq.size > 1024) for (const s of seenSeq) { seenSeq.delete(s); if (seenSeq.size <= 512) break; }
+        lastFactSeq = Math.max(lastFactSeq, f.seq);
+      }
       if (f.key.startsWith("kanban/")) {
-        const v = f.value || {};
-        el.innerHTML = `<b>●</b> <span class="k">${escapeHtml(f.key)}</span> ${escapeHtml(
-          v.op ? `${v.op} → ${v.col}${v.from ? " (from " + v.from + ")" : ""} r${v.revision}` : JSON.stringify(v).slice(0, 120))}`;
-        refresh(); // a fact means the board may have moved under us
-      } else if (el.textContent.startsWith("daemon wire")) {
-        el.innerHTML = `<b>●</b> daemon wire live — last fact: <span class="k">${escapeHtml(f.key)}</span>`;
+        onKanbanFact(f);
+        wire.innerHTML = `<b>●</b> daemon wire live · last <span class="k">${escapeHtml(f.key)}</span> #${f.seq}`;
+        scheduleRefresh(); // a fact means the board may have moved under us
+      } else if (wire.textContent.startsWith("daemon wire")) {
+        wire.innerHTML = `<b>●</b> daemon wire live — last fact: <span class="k">${escapeHtml(f.key)}</span>`;
       }
     };
-    es.onerror = () => { es.close(); el.textContent = "daemon wire: reconnecting…"; setTimeout(connect, 3000); };
+    es.onerror = () => { es.close(); wire.textContent = "daemon wire: reconnecting…"; setTimeout(() => { connect(); }, 3000); };
   }
   connect();
 })();
 
 refresh(true);
-setInterval(refresh, 2500);
+setInterval(scheduleRefresh, 2500);
 </script>
 </body>
 </html>
