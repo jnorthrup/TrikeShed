@@ -241,3 +241,6 @@ The code looks correct and fully optimized. The tests passed on the relevant par
 ## 2026-08-25 - Ignored unrelated test failures
 **Learning:** When verifying changes locally, unrelated compilation errors in some files (e.g., `GraalWire.kt`) might exist on the main branch due to legacy or partial rewrites in an evolving codebase.
 **Action:** Ignore pre-existing test/build failures and use test suites specific to the changed modules, filtering aggressively with `--tests` instead of a full project check.
+## 2026-10-31 - Avoid Redundant Map Transforms on Materialized Collections
+**Learning:** In Kotlin, chaining `.map { it }` on an already materialized collection (such as the `List<String>` returned by `Files.readAllLines`) is a redundant identity transform. It needlessly iterates over the original collection to allocate and populate a brand new `ArrayList`, wasting O(N) time and memory on the heap.
+**Action:** Remove `.map { it }` calls on methods or objects that already return a fully materialized `List`.
