@@ -180,6 +180,7 @@ The code looks correct and fully optimized. The tests passed on the relevant par
 **Learning:** In Kotlin, using `.map { it }` on a `Sequence` (e.g. `text.lineSequence().map { it }.toList()`) is a redundant identity transform. It needlessly allocates an intermediate `TransformingSequence` wrapper around the sequence just to apply a no-op identity function, increasing heap allocations in hot paths.
 **Action:** Remove redundant `.map { it }` calls before `.toList()` on Sequences (or simply use `.lines()` for strings).
 <<<<<<< HEAD
+<<<<<<< HEAD
 
 <<<<<<< HEAD
 <<<<<<< HEAD
@@ -201,3 +202,9 @@ The code looks correct and fully optimized. The tests passed on the relevant par
 **Learning:** When filtering custom Series collections, using `(0 until size).map { this[it] }.filter { ... }.toSeries()` creates unnecessary intermediate ArrayList allocations.
 **Action:** Use `Series.filter { ... }` directly to return a filtered Series natively and avoid all intermediate list allocations.
 >>>>>>> origin/bolt-kanbangraph-series-opt-16370706827623048663
+=======
+
+## 2026-09-01 - Avoid redundant identity map on Java collections
+**Learning:** In Kotlin, using `.map { it }` on an already materialized collection (such as a `List` returned by `Files.readAllLines`) is a redundant identity transform that needlessly copies the entire list, wasting O(N) time and memory.
+**Action:** Remove redundant `.map { it }` calls when the function already returns a `List`.
+>>>>>>> origin/bolt-optimize-readlines-map-13293556096672935698

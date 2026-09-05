@@ -10,4 +10,8 @@ actual fun readLinesSeq(path: String): Sequence<String> {
     }
 }
 
+<<<<<<< HEAD
 actual fun readLines(path: String): List<String> =borg.trikeshed.userspace.nio.file.Files.readAllLines( Paths.get(path))
+=======
+actual fun readLines(path: String): List<String> = borg.trikeshed.userspace.nio.file.Files.readAllLines(Paths.get(path))
+>>>>>>> origin/bolt-optimize-readlines-map-13293556096672935698
