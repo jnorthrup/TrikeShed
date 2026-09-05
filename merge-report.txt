@@ -1,0 +1,2 @@
+Recursive 3-way merge since Aug 25 2026 — keeping conflicts
+Started: $(date)

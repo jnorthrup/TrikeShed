@@ -64,7 +64,7 @@ class FunnelHashIndex<K : Any> internal constructor(
         fun <K : Any> build(keys: Series<K>, seed: Long, slack: Double = 0.20): FunnelHashIndex<K> {
             val d = slack.coerceIn(0.05, 0.50)
             val b = betaFor(d)
-            if (keys.size == 0) return FunnelHashIndex(keys, seed, emptyArray<Level>().toList().toSeries(), d, b)
+            if (keys.size == 0) return FunnelHashIndex(keys, seed, emptyArray<Level>().toSeries(), d, b)
 
             val minCap = (keys.size / (1.0 - d)).toInt().coerceAtLeast(MIN_CAPACITY)
             var capacity = MIN_CAPACITY
@@ -168,7 +168,7 @@ class FunnelHashIndex<K : Any> internal constructor(
                 builtLevels.add(level)
             }
 
-            return FunnelHashIndex(keys, seed, builtLevels.toList().toSeries(), d, b)
+            return FunnelHashIndex(keys, seed, builtLevels.toSeries(), d, b)
         }
 
         private fun calculateBaseCapacity(n: Int): Int {
