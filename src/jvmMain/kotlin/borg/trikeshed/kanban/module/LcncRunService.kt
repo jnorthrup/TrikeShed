@@ -27,6 +27,38 @@ internal class LcncRunService(
 
     private fun response(status: Int, body: Map<String, Any?>) = HttpResponse(status, JsonSupport.stringify(body))
 
+    suspend fun content(cidText: String?, view: String?, programKey: String?): HttpResponse = withContext(Dispatchers.IO) {
+        val cid = runCatching { ContentId(cidText.orEmpty()) }.getOrNull()
+            ?: return@withContext response(400, mapOf("error" to "invalid_content_id"))
+        if (view != null && view !in listOf("raw", "sheet"))
+            return@withContext response(400, mapOf("error" to "invalid_content_view"))
+        val bytes = ctx.casStore.get(cid) ?: run {
+            // A published, unexecuted preset may not yet have durable bytes.
+            // The key only locates a candidate; the requested CID still decides identity.
+            val entry = programKey?.takeIf { it.startsWith(LcncBlackboard.PROGRAM_PREFIX) }
+                ?.let { ctx.blackboard.snapshot().values[it] }
+                ?: return@withContext response(404, mapOf("error" to "content_not_found"))
+            ValueBudget().violation(entry)?.let { return@withContext response(413, mapOf("error" to it)) }
+            val program = LcncBlackboard.programOf(entry)
+                ?: return@withContext response(422, mapOf("error" to "content_not_program"))
+            LcncProgramConfix.toJson(program).encodeToByteArray()
+        }
+        if (bytes.size > 1_048_576) return@withContext response(413, mapOf("error" to "payload_limit"))
+        if (ContentId.of(bytes) != cid) return@withContext response(409, mapOf("error" to "content_identity_mismatch"))
+        val text = bytes.decodeToString()
+        val value = runCatching { JsonSupport.parse(text) }.getOrElse {
+            return@withContext response(422, mapOf("error" to "content_not_json"))
+        }
+        ValueBudget().violation(value)?.let { return@withContext response(413, mapOf("error" to it)) }
+        if (view != "sheet") return@withContext HttpResponse(200, text)
+        val doc = borg.trikeshed.parse.confix.confixDoc(bytes, borg.trikeshed.parse.confix.Syntax.JSON)
+        val sheets = borg.trikeshed.forge.sheet.confixSheets(cid.value, cid.value, doc, maxRows = 512).map { it.toMap() }
+        ValueBudget(maxNodes = 32768, maxChars = 131072).violation(sheets)?.let {
+            return@withContext response(413, mapOf("error" to it))
+        }
+        HttpResponse(200, JsonSupport.stringify(sheets))
+    }
+
     private fun project(receipt: Map<String, Any?>, commit: BoardApply.Committed): Map<String, Any?> {
         val value = receipt + mapOf(
             "jobId" to commit.jobId, "sequence" to commit.sequence,
@@ -45,7 +77,8 @@ internal class LcncRunService(
             "type" to op, "jobId" to jobId, "expectedRevision" to revision,
             "idempotencyKey" to "$jobId:${receipt["status"]}:$revision",
             "title" to "LCNC ${receipt["program"]}", "owner" to "lcnc-runner",
-            "tags" to listOf("lcnc-run"), "lcncRun" to receipt,
+            "tags" to listOf("lcnc-run"),
+            "lcncRun" to (receipt - setOf("sequence", "timelineRevision", "receiptCid")),
             "reason" to (receipt["error"] ?: receipt["status"]),
         )
         store.intake.send(BoardIntake(raw, reply))
@@ -63,6 +96,7 @@ internal class LcncRunService(
             if (receipt["status"] in listOf("validating", "running")) {
                 commit(row.jobId, "cancel", receipt + mapOf(
                     "ok" to false, "status" to "interrupted", "error" to "runtime_restarted",
+                    "previousReceiptCid" to row.commandCid?.value,
                     "finishedAtMs" to ctx.clock(),
                 ), row.revision)
             } else {
@@ -101,11 +135,15 @@ internal class LcncRunService(
                 var receipt: Map<String, Any?> = mapOf(
                     "runId" to runId, "program" to name, "programKey" to if (named) LcncBlackboard.programKey(name) else null,
                     "programCid" to cid, "inputs" to inputs, "startedAtMs" to ctx.clock(),
+                    "versionPolicy" to "root-at-admission,subprogram-at-first-use",
                     "budgets" to mapOf("timeoutMs" to timeoutMs, "maxNodes" to maxNodes, "maxPayloadChars" to 131072),
                 )
                 var revision = 0L
                 suspend fun record(op: String, status: String, fields: Map<String, Any?> = emptyMap()): Map<String, Any?> {
-                    receipt = commit(jobId, op, receipt + fields + mapOf("status" to status, "programVersions" to versions.toMap()), revision)
+                    receipt = commit(jobId, op, receipt + fields + mapOf(
+                        "status" to status, "programVersions" to versions.toMap(),
+                        "previousReceiptCid" to receipt["receiptCid"],
+                    ), revision)
                     revision = (receipt["timelineRevision"] as Number).toLong()
                     return receipt
                 }

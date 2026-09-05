@@ -154,7 +154,7 @@ object JsonParser {
                     val possiblyEmpty = src.clone().lim(after).pos(before + 1).trim
                     if (!possiblyEmpty.hasRemaining)
                         return if (isObj) emptyMap<String, Any?>()
-                        else emptyArray<Any?>()
+                        else emptyList<Any?>()
                 }
 
                 // Series-native zip: consecutive delimiter pairs -> Twin<Int>, no Iterable hot copy
@@ -373,4 +373,3 @@ object JsonParser {
         r
     }
 }
-

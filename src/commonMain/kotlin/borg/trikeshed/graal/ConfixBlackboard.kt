@@ -7,6 +7,10 @@ import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.asSharedFlow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
 import kotlinx.datetime.Clock
 import kotlin.concurrent.atomics.AtomicReference
 import kotlin.concurrent.atomics.ExperimentalAtomicApi
@@ -20,23 +24,21 @@ import kotlin.concurrent.atomics.ExperimentalAtomicApi
  * - Provenance tracking for each entry
  *
  * Reactor/lifecycle notes (CCEK-style):
- * - Every mutator ([put], [remove], [merge]) emits the post-mutation [state]
- *   into [changes], so collectors observe exactly one snapshot per mutation.
- * - **Caveat: [state] is not a full view of the board.** The authoritative
- *   key/value store is the private map behind [get] / [keys] / [has]; `doc` is
+ * - [snapshot] is the authoritative full view, atomically joining values,
+ *   provenance and revision. [revisions] is a conflated monotonic wakeup;
+ *   [replay] supplies ordered changes or an explicit history-gap reset.
+ * - **[lastWrite] and legacy [changes] are not snapshots.** `doc` is
  *   rebuilt by a single-key `ConfixDoc.set` and `ConfixDoc.remove` is a no-op,
- *   so an emitted snapshot carries only the most recently written key and never
- *   reflects a deletion. This predates the reactor form — collectors that need
- *   the whole board must read [get] / [keys] rather than parse the emitted doc.
- *   Making `doc` a faithful multi-key projection is follow-up work.
+ *   so a legacy notification carries only the most recently written key and
+ *   never reflects a deletion. It remains for source compatibility only.
  * - Cost note: each [put] rebuilds and reparses a one-key JSON document inline on
- *   the caller's thread, so a bulk flush pays one parse per entry. Fixing that
- *   means making `doc` lazy or incremental, which is the same follow-up as above.
+ *   the caller's thread, so a bulk flush pays one parse per entry. That
+ *   remains a legacy compatibility cost, not a requirement of [snapshot].
  * - Emission uses `tryEmit` with `DROP_OLDEST`, so it always succeeds and the
  *   mutators stay synchronous and non-suspending. A slow collector loses
- *   intermediate snapshots under back-pressure, but the values it does receive
- *   are always the newest ones, and `replay = 1` hands a late subscriber the
- *   current snapshot instead of nothing.
+ *   intermediate legacy notifications under back-pressure. Concurrent writers
+ *   can emit those notifications out of order; only [revisions] and [replay]
+ *   establish the revision contract. Legacy `replay = 1` retains the last emission.
  * - Delta 2026-09-05 (fan-out): the store is copy-on-write behind one atomic
  *   cell. It used to be a bare mutable map ("confine writes to a single
  *   writer"), but the kanban module writes from its committed collector, its
@@ -101,8 +103,15 @@ class ConfixBlackboard {
     private val provenance: Map<String, ProvenanceEntry> get() = cell.load().provenance
     private val doc: ConfixDoc get() = cell.load().doc
 
-    /** The current ConfixDoc — content-addressed state */
+    /** Legacy last-write projection; not a full board or a deletion notification. */
+    val lastWrite: ConfixDoc get() = doc
+
+    @Deprecated("Not a snapshot. Use snapshot() for full revision-linked state, or lastWrite for the legacy partial view.")
     val state: ConfixDoc get() = doc
+
+    private val _revisions = MutableStateFlow(0L)
+    /** A wakeup only: use snapshot()/replay() for data, including after conflation. */
+    val revisions: StateFlow<Long> = _revisions.asStateFlow()
 
     /** Publish the snapshot [next] derives from the current one; retried until no writer raced us. */
     private inline fun mutate(next: (Cell) -> Cell): ConfixDoc {
@@ -121,7 +130,7 @@ class ConfixBlackboard {
     )
     
     /**
-     * Reactor-form change stream. Each mutation emits the post-mutation [state].
+     * Legacy last-write notifications, retained without changing their wire shape.
      *
      * `DROP_OLDEST` over a non-zero buffer makes `tryEmit` *always succeed*, which
      * is what lets the mutators stay plain non-suspending functions: under
@@ -137,7 +146,8 @@ class ConfixBlackboard {
         onBufferOverflow = BufferOverflow.DROP_OLDEST,
     )
 
-    /** Hot stream of ConfixDoc snapshots, one per mutation. Collect to observe the blackboard. */
+    /** Legacy partial notifications. Concurrent writers need not deliver these in revision order. */
+    @Deprecated("Partial last-write notifications only. Collect revisions and read snapshot()/replay().")
     val changes: SharedFlow<ConfixDoc> = _changes.asSharedFlow()
 
     /** Legacy synchronous shim — see [subscribe]. */
@@ -205,8 +215,8 @@ class ConfixBlackboard {
 
     /** Merge another ConfixBlackboard into this blackboard */
     fun merge(other: ConfixBlackboard, language: String = "merge"): ConfixBlackboard {
-        for (key in other.keys()) {
-            put(key, other.get(key), language)
+        for ((key, value) in other.snapshot().values) {
+            put(key, value, language)
         }
         return this
     }
@@ -239,7 +249,7 @@ class ConfixBlackboard {
     // No ReplaceWith: `changes` is a SharedFlow property, not a drop-in for a
     // (handler) -> unsubscribe call, so a mechanical quick-fix would not compile.
     @Deprecated(
-        message = "Collect the changes SharedFlow instead; this synchronous shim exists only for legacy callers.",
+        message = "Collect revisions and read snapshot()/replay(); this synchronous shim exists only for legacy callers.",
     )
     fun subscribe(handler: (ConfixDoc) -> Unit): () -> Unit {
         subscribers.add(handler)
@@ -247,6 +257,8 @@ class ConfixBlackboard {
     }
 
     private fun notifySubscribers(doc: ConfixDoc) {
+        val revision = cell.load().revision
+        _revisions.update { maxOf(it, revision) }
         _changes.tryEmit(doc)
         // Copy before dispatch: a legacy handler is allowed to unsubscribe itself
         // from inside the callback, which would otherwise mutate the list mid-iteration.

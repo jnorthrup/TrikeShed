@@ -8,6 +8,8 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
 import kotlin.test.assertTrue
+import kotlin.test.assertNull
+import kotlin.test.assertFailsWith
 
 class InvokeLoweringTest {
 
@@ -208,6 +210,38 @@ class BoardStoreElementTest {
         el.open()
         replies.forEach { assertIs<BoardApply.Committed>(it.await()) }
         assertEquals(1, flushes, "group commit must flush once for the drained batch")
+        el.drain()
+    }
+
+    @Test
+    fun noReaderSeesAnUnflushedBatchAndFailureClosesIntake() = runBlocking {
+        lateinit var el: BoardStoreElement
+        val replies = (1..2).map { CompletableDeferred<BoardApply>() }
+        val diskFailure = java.io.IOException("injected flush failure")
+        val wal = object : BoardWalPort {
+            var sequence = 0L
+            override fun append(record: ByteArray): Long = ++sequence
+            override suspend fun replay(onRecord: suspend (Long, ByteArray) -> Unit) = Unit
+            override fun flush() {
+                assertTrue(el.cards().isEmpty())
+                assertNull(el.card("j1"))
+                assertEquals(0, el.projection().cardCount)
+                assertEquals(0L, el.lastSequence)
+                assertTrue(replies.none { it.isCompleted })
+                throw diskFailure
+            }
+        }
+        el = BoardStoreElement(wal, CasStore.inMemory())
+        replies.forEachIndexed { i, reply ->
+            el.intake.send(BoardIntake(mapOf("type" to "submit", "jobId" to "j${i + 1}", "idempotencyKey" to "k$i"), reply))
+        }
+        el.open()
+        replies.forEach { assertEquals(diskFailure.message, assertFailsWith<java.io.IOException> { it.await() }.message) }
+        assertTrue(el.cards().isEmpty())
+        assertEquals(0, el.projection().cardCount)
+        assertEquals(0L, el.lastSequence)
+        assertEquals(diskFailure.message, el.failure?.message)
+        assertTrue(el.intake.trySend(BoardIntake(emptyMap<String, Any?>())).isFailure)
         el.drain()
     }
 

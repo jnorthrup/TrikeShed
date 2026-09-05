@@ -6,7 +6,6 @@ import borg.trikeshed.parse.json.JsonSupport
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.flow.takeWhile
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -61,7 +60,7 @@ class BlackboardWire(val blackboard: ConfixBlackboard, scope: CoroutineScope) {
             val clientEpoch = query["epoch"]
             respond?.invoke(("HTTP/1.1 200 OK\r\nContent-Type: text/event-stream\r\n" +
                 "Cache-Control: no-cache\r\nConnection: keep-alive\r\n\r\n").toByteArray(StandardCharsets.UTF_8))
-            blackboard.changes.onStart { emit(blackboard.state) }.takeWhile {
+            blackboard.revisions.takeWhile {
                 val replay = blackboard.replay(after)
                 if (replay.reset || (clientEpoch != null && clientEpoch != epoch)) {
                     val reason = if (clientEpoch != null && clientEpoch != epoch) "epoch_changed" else "replay_gap"

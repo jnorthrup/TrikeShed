@@ -62,7 +62,18 @@ class BlackboardRecoveryTest {
         }
         val snapshot = board.snapshot()
         assertEquals(400L, snapshot.revision)
+        assertEquals(snapshot.revision, board.revisions.value, "concurrent wakeups never regress")
         assertEquals(4, snapshot.values.size)
         assertTrue(snapshot.provenance.values.all { it.revision <= snapshot.revision })
+    }
+
+    @Test fun revisionWakeupsLeadToFullSnapshotsInsteadOfPartialDocuments() = runTest {
+        val board = ConfixBlackboard()
+        board.put("first", mapOf("nested" to listOf(1)), "test")
+        board.put("second", null, "test")
+        board.remove("first")
+        assertEquals(3L, board.revisions.value)
+        assertEquals(mapOf("second" to null), board.snapshot().values)
+        assertEquals(3L, board.replay(2).changes.single().revision)
     }
 }

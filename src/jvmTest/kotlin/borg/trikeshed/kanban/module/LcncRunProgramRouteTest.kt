@@ -284,4 +284,75 @@ class LcncRunProgramRouteTest {
             assertEquals(original["returns"], recovered["returns"])
         } finally { next.detach("kanban") }
     }
+
+    @Test fun immutableVersionsAndReceiptLineageUseTheExecutionStore() = runBlocking {
+        val cas = CasStore.inMemory()
+        val routes = ModuleRouteRegistry()
+        val ctx = newContext(routes, tempDir("content"), cas)
+        val supervisor = ModuleSupervisor(ctx)
+        supervisor.attach(KanbanModule())
+        val server = JvmKanbanServer(moduleRoutes = routes)
+        suspend fun get(query: String) = server.routeHttp("GET /api/lcnc/content?$query HTTP/1.1\r\nHost: t\r\n\r\n".encodeToByteArray())
+        try {
+            val entry = ctx.blackboard.get("lcnc/program/preset-scope-inner") as Map<*, *>
+            val candidate = get("cid=${entry["programCid"]}&key=lcnc/program/preset-scope-inner")
+            assertEquals(200, candidate.status, candidate.body)
+            assertEquals(entry["programCid"], borg.trikeshed.job.ContentId.of(candidate.body.encodeToByteArray()).value)
+            assertEquals(409, get("cid=${borg.trikeshed.job.ContentId.of("different".encodeToByteArray()).value}&key=lcnc/program/preset-scope-inner").status)
+            val run = post(server, "/api/lcnc/run", """{"program":"preset-scope"}""")
+            assertEquals(200, run.status, run.body)
+            val receipt = json(run)
+            val cid = receipt["programCid"].toString()
+            val content = get("cid=$cid")
+            assertEquals(200, content.status)
+            assertEquals(cid, borg.trikeshed.job.ContentId.of(content.body.encodeToByteArray()).value)
+            val sheets = get("cid=$cid&view=sheet")
+            assertEquals(200, sheets.status, sheets.body)
+            val family = JsonSupport.parse(sheets.body) as List<*>
+            assertEquals(cid, (family.first() as Map<*, *>)["id"])
+            assertEquals("root-at-admission,subprogram-at-first-use", receipt["versionPolicy"])
+            val stored = json(get("cid=${receipt["receiptCid"]}"))["lcncRun"] as Map<*, *>
+            assertTrue("receiptCid" !in stored && "sequence" !in stored && "timelineRevision" !in stored)
+            val previous = json(get("cid=${stored["previousReceiptCid"]}"))["lcncRun"] as Map<*, *>
+            assertEquals("running", previous["status"])
+            assertEquals(400, get("cid=invalid").status)
+            assertEquals(404, get("cid=${borg.trikeshed.job.ContentId.of("missing".encodeToByteArray()).value}").status)
+            assertEquals(400, get("cid=$cid&view=invalid").status)
+            val large = cas.put("\"${"x".repeat(1_048_576)}\"".encodeToByteArray())
+            assertEquals(413, get("cid=${large.value}").status)
+        } finally { supervisor.detach("kanban") }
+    }
+
+    @Test fun interruptedRecoveryLinksTheLastDurableReceipt() = runBlocking {
+        for (phase in listOf("validating", "running")) {
+            val dir = tempDir("interrupted-$phase")
+            val cas = CasStore.inMemory()
+            val ctx = newContext(ModuleRouteRegistry(), dir, cas)
+            val first = borg.trikeshed.kanban.BoardStoreElement(borg.trikeshed.kanban.JvmBoardWal(dir), cas)
+            val jobId = "lcnc/run/recover-$phase"
+            first.open()
+            suspend fun record(op: String, revision: Long, status: String): borg.trikeshed.kanban.BoardApply.Committed {
+                val reply = kotlinx.coroutines.CompletableDeferred<borg.trikeshed.kanban.BoardApply>()
+                first.intake.send(borg.trikeshed.kanban.BoardIntake(mapOf(
+                    "type" to op, "jobId" to jobId, "owner" to "lcnc-runner",
+                    "expectedRevision" to revision, "idempotencyKey" to "$jobId-$status",
+                    "lcncRun" to mapOf("runId" to "recover-$phase", "program" to "fixture", "status" to status),
+                ), reply))
+                return reply.await() as borg.trikeshed.kanban.BoardApply.Committed
+            }
+            var last = record("submit", 0, "validating")
+            if (phase == "running") last = record("start", 1, "running")
+            first.drain()
+            val next = borg.trikeshed.kanban.BoardStoreElement(borg.trikeshed.kanban.JvmBoardWal(dir), cas)
+            next.open()
+            try {
+                LcncRunService(ctx, next) { emptyMap() }.recover()
+                val receipt = ctx.blackboard.get(jobId) as Map<*, *>
+                assertEquals("interrupted", receipt["status"])
+                assertEquals(last.cid.value, receipt["previousReceiptCid"])
+                assertEquals(last.revision + 1, (receipt["timelineRevision"] as Number).toLong())
+                assertEquals("runtime_restarted", receipt["error"])
+            } finally { next.drain() }
+        }
+    }
 }

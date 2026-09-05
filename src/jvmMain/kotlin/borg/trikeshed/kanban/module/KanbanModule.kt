@@ -550,6 +550,12 @@ class KanbanModule : ForgeModule {
             JvmKanbanServer.HttpResponse(200, JsonSupport.stringify(result.toMap()))
         }
 
+        ctx.routes.claim(id, "/api/lcnc/content") { method, path, _, _ ->
+            if (method != "GET") return@claim JvmKanbanServer.HttpResponse(405, """{"error":"method_not_allowed"}""")
+            val query = borg.trikeshed.relaxfactory.CouchHttpSurface.parseQuery(path.substringAfter('?', ""))
+            runs.content(query["cid"], query["view"], query["key"])
+        }
+
         // The generic runner dispatch: ONE execution author. The browser (and any
         // client) posts {type, params?, inputs?} to run ONE node (a job), or
         // {program, inputs?} to run a WHOLE stored program (a procedure — spec

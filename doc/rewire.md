@@ -121,6 +121,10 @@ those runtime deltas to the same absorption/replication contract.
 
 ### Dimensional coherence
 
+The current consolidation contract and acceptance evidence are maintained in
+[Landscape consolidation](landscape-consolidation.md). The north star above
+states direction; that ledger distinguishes verified paths from open work.
+
 Every projected citizen needs the same minimum coordinates:
 
 | Dimension | Meaning |

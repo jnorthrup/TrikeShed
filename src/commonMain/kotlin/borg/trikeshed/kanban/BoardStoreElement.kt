@@ -173,17 +173,23 @@ class BoardStoreElement(
     private val projection = JobKanbanProjection.rebuild(emptyList())
     private val causal = CausalGraphBuilder()
     private var sequence = 0L
-
-    /** COW row table: readers grab the volatile reference, never lock. */
+    private var consumer: Job? = null
     @Volatile
+    var failure: Throwable? = null
+        private set
+
+    // Private working rows let guards see earlier commands in the same batch.
     private var rows: Map<String, CardRow> = emptyMap()
+    private data class Published(val rows: Map<String, CardRow>, val sequence: Long)
+    @Volatile
+    private var published = Published(emptyMap(), 0L)
 
-    fun cards(): Collection<CardRow> = rows.values
+    fun cards(): Collection<CardRow> = published.rows.values
 
-    fun card(jobId: String): CardRow? = rows[jobId]
+    fun card(jobId: String): CardRow? = published.rows[jobId]
 
     suspend fun command(jobId: String): Map<*, *>? {
-        val cid = rows[jobId]?.commandCid ?: return null
+        val cid = published.rows[jobId]?.commandCid ?: return null
         return withContext(Dispatchers.IO) {
             cas.get(cid)?.let { JsonSupport.parse(it.decodeToString()) as? Map<*, *> }
         }
@@ -193,7 +199,7 @@ class BoardStoreElement(
 
     fun graph(): CausalGraph = causal.toGraph()
 
-    val lastSequence: Long get() = sequence
+    val lastSequence: Long get() = published.sequence
 
     // ── lifecycle ─────────────────────────────────────────────────────
 
@@ -204,31 +210,39 @@ class BoardStoreElement(
             val tab = text.indexOf('\t')
             if (tab > 0) {
                 val cid = ContentId(text.substring(tab + 1))
-                val payload = cas.get(cid)
+                val payload = withContext(Dispatchers.IO) { cas.get(cid) }
                 if (payload != null) {
                     val raw = runCatching { JsonSupport.parse(payload.decodeToString()) as? Map<*, *> }.getOrNull()
-                    if (raw != null) applyOne(raw, durable = false, replaySeq = seq)
+                    if (raw != null) applyOne(raw, durable = false, replaySeq = seq, replayCid = cid)
                 }
             }
         }
+        published = Published(rows, sequence)
         if (state == ElementState.OPEN) state = ElementState.ACTIVE
-        CoroutineScope(supervisor + Dispatchers.Default).launch {
+        consumer = CoroutineScope(supervisor + Dispatchers.Default).launch {
             for (first in intake) {
                 // Group commit: drain whatever queued behind the first, ONE flush for the batch.
                 val batch = ArrayList<BoardIntake>(4).apply { add(first) }
                 while (batch.size < 256) batch.add(intake.tryReceive().getOrNull() ?: break)
-                val events = ArrayList<BoardCommitted>()
+                val events = ArrayList<PendingCommit>()
                 try {
                     val results = batch.map { applyOne(it.raw, durable = true, pending = events) }
                     if (events.isNotEmpty()) withContext(Dispatchers.IO) { wal?.flush() }
+                    events.forEach { publishCommit(it) }
+                    published = Published(rows, sequence)
                     // Acknowledgments and causal fanout are released only after the durability barrier.
-                    events.forEach { _committed.emit(it) }
+                    events.forEach { _committed.emit(it.event) }
                     batch.zip(results).forEach { (cmd, result) -> cmd.reply?.complete(result) }
                 } catch (failure: Throwable) {
-                    batch.forEach { it.reply?.completeExceptionally(failure) }
+                    // The private reducer cannot resume after an uncertain append/flush.
+                    // Fail closed; a fresh element must recover from the WAL.
+                    rows = published.rows
+                    sequence = published.sequence
+                    this@BoardStoreElement.failure = failure
                     intake.close(failure)
+                    batch.forEach { it.reply?.completeExceptionally(failure) }
                     while (true) (intake.tryReceive().getOrNull() ?: break).reply?.completeExceptionally(failure)
-                    throw failure
+                    return@launch
                 }
             }
         }
@@ -236,13 +250,21 @@ class BoardStoreElement(
 
     override suspend fun drain() {
         intake.close()
-        withContext(Dispatchers.IO) { wal?.flush() }
+        consumer?.join()
         super.drain()
     }
 
     // ── the spine (single consumer; also the replay path with durable=false) ──
 
-    private suspend fun applyOne(incoming: Map<*, *>, durable: Boolean, replaySeq: Long? = null, pending: MutableList<BoardCommitted>? = null): BoardApply {
+    private data class PendingCommit(val event: BoardCommitted, val raw: Map<*, *>)
+
+    private fun publishCommit(commit: PendingCommit) {
+        val event = commit.event
+        projection.applyCommit(event.jobId, event.snapshot, event.cid)
+        appendCausal(event.jobId, event.command, event.snapshot, event.cid, commit.raw)
+    }
+
+    private suspend fun applyOne(incoming: Map<*, *>, durable: Boolean, replaySeq: Long? = null, replayCid: ContentId? = null, pending: MutableList<PendingCommit>? = null): BoardApply {
         // Delta (reaper): the transition clock is part of the WAL truth. The live path
         // stamps `atMs` into the raw map before it is serialized, and advanceRow reads
         // it back — so a replay re-derives the SAME lastMoveMs. Before this, replay
@@ -266,16 +288,14 @@ class BoardStoreElement(
         val snapshot = reduced.snapshot!!
 
         // Durable truth: the raw command map, canonical-serialized once, CAS-addressed.
-        val bytes = JsonSupport.stringify(raw).encodeToByteArray()
         val (cid, seq) = withContext(Dispatchers.IO) {
-            val cid = cas.put(bytes)
+            // Parsing may normalize numbers; replay must never re-address the payload.
+            val cid = replayCid ?: cas.put(JsonSupport.stringify(raw).encodeToByteArray())
             cid to (replaySeq
                 ?: if (durable && wal != null) wal.append("$jobId\t${cid.value}".encodeToByteArray())
                 else sequence + 1)
         }
         if (seq > sequence) sequence = seq
-
-        projection.applyCommit(jobId, snapshot, cid)
 
         val prev = rows[jobId]
         val row = advanceRow(prev, jobId, raw, lowered, snapshot, seq)?.copy(commandCid = cid)
@@ -288,8 +308,6 @@ class BoardStoreElement(
         if (lowered is JobCommand.Move && row != null && beforeId != null) {
             rows = repackColumn(rows, row.col, jobId, beforeId)
         }
-
-        appendCausal(jobId, lowered, snapshot, cid, raw)
 
         val event = BoardCommitted(
             sequence = seq,
@@ -308,7 +326,8 @@ class BoardStoreElement(
             parent = row?.parent ?: "",
             atMs = (raw["atMs"] as? Number)?.toLong() ?: 0L,
         )
-        if (pending != null) pending.add(event)
+        val commit = PendingCommit(event, raw)
+        if (pending != null) pending.add(commit) else publishCommit(commit)
         return BoardApply.Committed(jobId, seq, snapshot.revision, lowered.idempotencyKey, cid)
     }
 
@@ -554,6 +573,6 @@ class BoardStoreElement(
 
             else -> return // Move/Progress/Block/Acknowledge are board refinements, not causal events
         }
-        causal.append(workId = jobId, epochMs = clock(), edgeKind = kind, payload = payload)
+        causal.append(workId = jobId, epochMs = (raw["atMs"] as? Number)?.toLong() ?: clock(), edgeKind = kind, payload = payload)
     }
 }

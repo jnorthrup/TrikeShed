@@ -82,6 +82,7 @@ object RouteManifest {
             RouteEntry("GET", "/api/lcnc/ontology", "the same vocabulary as Turtle triples (kinds, ports, bindings)"),
             RouteEntry("GET", "/api/lcnc/facts", "the vocabulary, corpus wires and bindings as KIF tuples — what LcncFacts.parse reads back"),
             RouteEntry("POST", "/api/lcnc/run", "generic runner dispatch"),
+            RouteEntry("GET", "/api/lcnc/content", "bounded immutable LCNC content by cid; raw JSON or shared sheet projection"),
             RouteEntry("POST", "/api/lcnc/run/cancel", "cancel an active scoped run; receipt lands on the durable work timeline"),
             RouteEntry("GET", "/api/lcnc/council", "council case read-back: index fact + transcript/verdict from CAS (?caseId=<id>)"),
             RouteEntry("GET", "/api/mcp", "MCP server card: protocol versions, tools, resource URIs"),

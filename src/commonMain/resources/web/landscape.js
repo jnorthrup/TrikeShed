@@ -36,7 +36,8 @@ const Landscape = {
       const box={x:(rect.left-vr.left-view.x)/view.z,y:(rect.top-vr.top-view.y)/view.z,w:rect.width/view.z,h:rect.height/view.z};
       const b=screen(box),scope=!!n.children?.length;
       const absorbed=visibleClosure(n)!==n;
-      const detail=!absorbed&&b.w>=115&&b.h>=38&&view.z>=.45;
+      const onScreen=b.x<=width&&b.y<=height&&b.x+b.w>=0&&b.y+b.h>=0;
+      const detail=onScreen&&!absorbed&&b.w>=115&&b.h>=38&&view.z>=.45;
       n.el.style.visibility=detail?"visible":"hidden";
       if(absorbed||detail||b.x>width||b.y>height||b.x+b.w<0||b.y+b.h<0)continue;
       const size=Math.min(b.w,b.h);
@@ -79,26 +80,66 @@ const Landscape = {
     }catch(e){Harness.message("Object terrain unavailable: "+e.message);}
   },
   async inspect(id) {
+    const signal=Harness.beginInspection(id,"Object","Loading");
     const dialog=document.getElementById("factInspector"),body=document.getElementById("factValue");
-    document.getElementById("factKey").textContent=id;document.getElementById("factActor").textContent="Object";body.textContent="Loading";
-    dialog.querySelectorAll(".terrain-ref").forEach(e=>e.remove());if(!dialog.open)dialog.showModal();
     try {
-      const response=await fetch(this.terrain.url(id));if(!response.ok)throw Error(response.status);
-      const doc=await response.json();body.textContent=JSON.stringify(doc,null,2);
+      const response=await fetch(this.terrain.url(id),{signal});if(!response.ok)throw Error(response.status);
+      const doc=JSON.parse(await this.readText(response));if(signal.aborted)return;
+      body.textContent=JSON.stringify(doc,null,2);
+      Harness.loadSheets([{url:"/api/graal/sheet?id="+encodeURIComponent(id)}],id);
       const attachment=doc._attachments?.content;
       if(attachment){
-        const content=await fetch(this.terrain.url(id)+"/content");
-        if(content.ok){
-          const type=content.headers.get("content-type")||"";
-          if(type.startsWith("text/")||/json|javascript|xml/.test(type)||/\.(kt|kts|py|md|txt|java|rs|sh|js|html|css)$/.test(id))body.textContent=await content.text();
-          else {const bytes=new Uint8Array(await content.arrayBuffer());body.textContent=JSON.stringify(doc,null,2)+"\n\n"+Array.from(bytes.slice(0,2048),b=>b.toString(16).padStart(2,"0")).join(" ");}
+        try {
+          const content=await fetch(this.terrain.url(id)+"/content",{signal});
+          if(content.ok){
+            const type=content.headers.get("content-type")||"";
+            const texty=type.startsWith("text/")||/json|javascript|xml/.test(type)||/\.(kt|kts|py|md|txt|java|rs|sh|js|html|css)$/.test(id);
+            const bytes=await this.readBytes(content,texty?131072:2048);
+            if(signal.aborted)return;
+            body.textContent=texty?new TextDecoder().decode(bytes):JSON.stringify(doc,null,2)+"\n\n"+Array.from(bytes,b=>b.toString(16).padStart(2,"0")).join(" ");
+          }
+        }catch(e){if(signal.aborted)return;body.textContent+="\n\nContent preview unavailable: "+e.message;}
+      }
+      const dagResponse=await fetch("/api/graal/dag?id="+encodeURIComponent(id),{signal});
+      if(dagResponse.ok){const dag=JSON.parse(await this.readText(dagResponse));if(signal.aborted)return;
+        this.edges=(dag.edges||[]).slice(0,256).map(e=>({...e,from:id}));
+        for(const edge of this.edges){
+          const button=Harness.el("button","terrain-ref",edge.kind+" → "+edge.to);
+          button.dataset.relation=edge.kind==="pointcut-source"?"association":"reference";
+          if(button.dataset.relation==="association")button.title="Class-name association, not causal support";
+          button.addEventListener("click",()=>this.inspect(edge.to));dialog.append(button);
         }
       }
-      const dagResponse=await fetch("/api/graal/dag?id="+encodeURIComponent(id));
-      if(dagResponse.ok){const dag=await dagResponse.json();this.edges=(dag.edges||[]).map(e=>({...e,from:id}));
-        for(const edge of this.edges){const button=Harness.el("button","terrain-ref",edge.kind+" → "+edge.to);button.addEventListener("click",()=>this.inspect(edge.to));dialog.append(button);}}
       this.schedule();
-    }catch(e){body.textContent="Object read failed: "+e.message;}
+    }catch(e){if(!signal.aborted){body.textContent="Object read failed: "+e.message;Harness.rawSheets(true);}}
+  },
+  async inspectCid(cid, programKey) {
+    const signal=Harness.beginInspection(cid,"Immutable program version","Loading");
+    const body=document.getElementById("factValue");
+    try {
+      const url="/api/lcnc/content?cid="+encodeURIComponent(cid)+(programKey?"&key="+encodeURIComponent(programKey):"");
+      const response=await fetch(url,{signal});if(!response.ok)throw Error(response.status);
+      const text=await this.readText(response);if(signal.aborted)return;
+      body.textContent=text;
+      await Harness.loadSheets([{url:url+"&view=sheet"}],cid);
+    }catch(e){if(!signal.aborted){body.textContent="Version read failed: "+e.message;Harness.rawSheets(true);}}
+  },
+  async readBytes(response, limit=1048576) {
+    const reader=response.body?.getReader();if(!reader)throw Error("Response stream unavailable");
+    const chunks=[];let size=0;
+    try {
+      if(Number(response.headers.get("content-length"))>limit)throw Error("payload_limit");
+      while(true){
+        const {done,value}=await reader.read();if(done)break;
+        size+=value.byteLength;if(size>limit)throw Error("payload_limit");chunks.push(value);
+      }
+    }catch(e){await reader.cancel().catch(()=>{});throw e;}finally{reader.releaseLock();}
+    const bytes=new Uint8Array(size);let offset=0;
+    for(const chunk of chunks){bytes.set(chunk,offset);offset+=chunk.byteLength;}
+    return bytes;
+  },
+  async readText(response, limit=1048576) {
+    return new TextDecoder().decode(await this.readBytes(response,limit));
   },
   hit(e) {
     const r=viewport.getBoundingClientRect(),x=(e.clientX-r.left-view.x)/view.z,y=(e.clientY-r.top-view.y)/view.z;

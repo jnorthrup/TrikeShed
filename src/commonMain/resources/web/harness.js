@@ -53,7 +53,7 @@ const Harness = {
     return true;
   },
   mount(name,document) {
-    const entry=this.board["lcnc/program/"+name];if(!entry?.document)return;
+    const entry=this.board["lcnc/program/"+name]||{document:this.drafts.get(name)};if(!entry?.document)return;
     const previous=this.applying;this.applying=true;
     try {
       let anchor=this.mounts.get(name);
@@ -133,7 +133,7 @@ const Harness = {
       territory.classList.add("active-program");if(name===this.selected)territory.classList.add("selected");
       const head=territory.querySelector("header");head.addEventListener("click",()=>this.select(name));
       const cid=this.board["lcnc/program/"+name]?.programCid;
-      if(cid){const source=this.el("button","source-ref","◇");source.title="Program version "+cid;source.setAttribute("aria-label","Inspect version of "+name);source.dataset.relation="reference";source.addEventListener("click",e=>{e.stopPropagation();Landscape.inspectCid(cid);});head.append(source);}
+      if(cid){const source=this.el("button","source-ref","◇");source.title="Program version "+cid;source.setAttribute("aria-label","Inspect version of "+name);source.dataset.relation="reference";source.addEventListener("click",e=>{e.stopPropagation();Landscape.inspectCid(cid,"lcnc/program/"+name);});head.append(source);}
       const run=this.el("button","run","▶ Run");run.disabled=this.running||this.drafts.has(name);run.setAttribute("aria-label","Run "+name);
       run.addEventListener("click",e=>{e.stopPropagation();this.select(name,false);this.run();});head.append(run);
     }
@@ -314,10 +314,20 @@ const Harness = {
     if (!value || typeof value !== "object") return String(value);
     return Object.entries(value).slice(0,4).map(([k,v])=>k+": "+(typeof v === "object" ? JSON.stringify(v) : v)).join(" / ").slice(0,250);
   },
-  inspect(key) {
+  beginInspection(key, actor, raw = "") {
+    this.inspectionController?.abort();
+    this.inspectionController = new AbortController();
+    this.sheetTicket = (this.sheetTicket || 0) + 1;
+    this.sheetNode = null;
     $("#factInspector").querySelectorAll(".terrain-ref").forEach(e=>e.remove());
-    $("#factKey").textContent=key;$("#factActor").textContent=this.actors.get(key)||this.board[key]?.actor||"";
-    $("#factValue").textContent=JSON.stringify(this.board[key],null,2);$("#factInspector").showModal();
+    $("#factKey").textContent = key; $("#factActor").textContent = actor;
+    $("#factValue").textContent = raw; $("#factSheet").replaceChildren(); $("#sheetRoots").replaceChildren();
+    this.rawSheets(false);
+    if (!$("#factInspector").open) $("#factInspector").showModal();
+    return this.inspectionController.signal;
+  },
+  inspect(key) {
+    this.beginInspection(key, this.actors.get(key)||this.board[key]?.actor||"", JSON.stringify(this.board[key],null,2));
     this.loadSheets([{url:"/blackboard/sheet?key="+encodeURIComponent(key)}], key);
     const receipt=this.board[key];
     if(receipt?.programCid){const button=this.el("button","terrain-ref","Program version "+receipt.programCid.slice(0,16));button.addEventListener("click",()=>Landscape.inspectCid(receipt.programCid));$("#factInspector").append(button);}
@@ -339,9 +349,7 @@ const Harness = {
     const list = prefixes.length ? prefixes : [...new Set(Object.keys(this.board).map(k => k.split("/")[0]))].sort();
     const sources = list.map(p => ({url:"/blackboard/sheet?prefix=" + encodeURIComponent(p) + "&max=1024"}));
     if (list.includes("kanban")) sources.push({url:"/api/lcnc/kanban", kanban:true});
-    $("#factKey").textContent = (prefixes.length ? list.join(" · ") : "blackboard") + " as sheets";
-    $("#factActor").textContent = ""; $("#factValue").textContent = "";
-    $("#factInspector").showModal();
+    this.beginInspection((prefixes.length ? list.join(" · ") : "blackboard") + " as sheets", "");
     this.loadSheets(sources, list.includes("kanban") ? "board" : list[0]);
   },
   async loadSheets(sources, cur) {
@@ -352,8 +360,8 @@ const Harness = {
     const idx = {}, notes = [], continuations=[]; let orch = null;
     await Promise.all(sources.map(async src => {
       try {
-        const r = await fetch(src.url); if (!r.ok) throw Error(r.status + " on " + src.url);
-        const j = await r.json();
+        const r = await fetch(src.url, {signal:this.inspectionController?.signal}); if (!r.ok) throw Error(r.status + " on " + src.url);
+        const j = JSON.parse(await Landscape.readText(r));
         const sheets = src.kanban ? [j.board, ...(j.byStatus || []), ...(j.byPriority || [])] : j;
         if(!src.kanban&&j[0]?.nextKey){const url=new URL(src.url,location.href);url.searchParams.set("after",j[0].nextKey);url.searchParams.set("revision",j[0].boardRevision);continuations.push(url.pathname+url.search);}
         if (src.kanban) orch = j.orchestration || null;
@@ -593,6 +601,9 @@ $("#viewUp").addEventListener("click",()=>Harness.enclosingView());
 $("#cancelRun").addEventListener("click",()=>Harness.cancelRun().catch(e=>Harness.message(e.message)));
 $("#sheetsBtn").addEventListener("click",()=>Harness.openSheets([]));
 $("#sheetRawBtn").addEventListener("click",()=>Harness.rawSheets(!$("#factInspector").classList.contains("raw")));
+$("#factInspector").addEventListener("close",()=>{
+  Harness.inspectionController?.abort(); Harness.sheetTicket = (Harness.sheetTicket || 0) + 1;
+});
 $("#terrainLayer").addEventListener("change",e=>{Landscape.terrain?.setLayer(Number(e.target.value));Landscape.schedule();});
 viewport.addEventListener("pointerdown",e=>{
   const element=e.target.closest(".node"),n=element&&G.nodes.find(n=>n.el===element);

@@ -10,8 +10,8 @@
 #bar #stopBtn,#bar #storeLoadBtn,#bar #presetsBtn,#bar #rdfBtn,#bar #exportBtn,#bar #importBtn,#bar #clearBtn,#bar #qsBtn,#bar #fbBtn,#bar .sub{display:none}
 #boardnav{position:absolute;top:52px;left:0;right:0;height:34px;display:flex;gap:16px;align-items:center;padding:0 12px;border-bottom:1px solid var(--line);background:#181c1e;overflow-x:auto;white-space:nowrap}
 #boardnav button{border:0;padding:0;background:none;color:var(--dim);font-size:11px}
-#viewport{inset:86px 290px 25px 0;background:#111315;touch-action:none}
-#world{isolation:isolate}
+#viewport{inset:86px 290px 25px 0;background:#111315;touch-action:none;overflow:clip}
+#world{isolation:isolate;left:0;top:0}
 #landscape{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}
 #terrainLayer{background:var(--panel);border:1px solid var(--line);color:var(--ink);border-radius:4px;padding:6px}
 .territory.objects{background:none;pointer-events:none}
@@ -85,11 +85,11 @@ dialog::backdrop{background:#0008}dialog form{float:right}dialog h2{font:14px va
 #sheetRawBtn[aria-pressed="true"]{border-color:var(--graal);color:var(--graal)}
 #factInspector.raw #factSheet,#factInspector.raw #sheetRoots{display:none}
 #factInspector:not(.raw) #factValue{display:none}
-#factSheet .csheet{margin:0;font-size:12px}
+#factSheet .csheet{margin:0;font-size:12px;min-width:0;max-width:100%;overflow-wrap:anywhere}
 #factSheet .csheet .tablewrap{max-height:58vh}
 #factSheet .csheet td{max-width:420px;padding:4px 8px}
 #factSheet .csheet th{font-size:10px}
-#factSheet .dagchip{font-size:11px;padding:1px 6px}
+#factSheet .dagchip{font-size:11px;padding:1px 6px;max-width:100%;white-space:normal;overflow-wrap:anywhere}
 #factSheet .csheet .crumbrow,#factSheet .csheet .ringrow{font-size:12px;margin:4px 0 8px}
 #factSheet .kboard-status,.sheet-note{font:12px var(--mono);color:var(--dim);padding:6px 0}
 .sheet-note.error{color:var(--err)}
