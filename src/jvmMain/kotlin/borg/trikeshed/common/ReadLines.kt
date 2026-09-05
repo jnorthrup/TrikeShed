@@ -14,6 +14,7 @@ actual fun readLinesSeq(path: String): Sequence<String> {
 <<<<<<< HEAD
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
 actual fun readLines(path: String): List<String> =borg.trikeshed.userspace.nio.file.Files.readAllLines( Paths.get(path))
 =======
 actual fun readLines(path: String): List<String> = borg.trikeshed.userspace.nio.file.Files.readAllLines(Paths.get(path))
@@ -29,3 +30,6 @@ actual fun readLines(path: String): List<String> = borg.trikeshed.userspace.nio.
 // returning the result of Files.readAllLines directly avoids this overhead.
 actual fun readLines(path: String): List<String> =borg.trikeshed.userspace.nio.file.Files.readAllLines( Paths.get(path))
 >>>>>>> origin/bolt-remove-redundant-map-13984665341473829744
+=======
+actual fun readLines(path: String): List<String> =borg.trikeshed.userspace.nio.file.Files.readAllLines( Paths.get(path))
+>>>>>>> origin/bolt-remove-redundant-map-16127802584372370913
