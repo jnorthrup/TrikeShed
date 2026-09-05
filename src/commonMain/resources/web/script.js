@@ -1361,6 +1361,7 @@
     mutate((s) => { s.view = view; }, 'view');
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
     for (const [k, [el, btn, sidebarBtn]] of Object.entries(VIEWS)) {
 =======
     const SIDEBAR_BTNS = { doc: 'btn-home', board: 'btn-board', graph: 'btn-graph', sheet: 'btn-sheet', host: 'btn-host' };
@@ -1531,12 +1532,20 @@
       for (const btn of config.btns) {
 >>>>>>> origin/palette-sync-aria-current-6449805464969164506
         if (!btn) continue;
+=======
+    for (const [k, [el, topBtn]] of Object.entries(VIEWS)) {
+      el.hidden = k !== view;
+      const sideBtnId = 'btn-' + (k === 'doc' ? 'home' : k);
+      const sideBtn = document.getElementById(sideBtnId);
+      for (const btn of (sideBtn ? [topBtn, sideBtn] : [topBtn])) {
+>>>>>>> origin/palette/sync-sidebar-active-states-11623088566429376151
         btn.classList.toggle('active', k === view);
         if (k === view) {
           btn.setAttribute('aria-current', 'page');
         } else {
           btn.removeAttribute('aria-current');
         }
+<<<<<<< HEAD
 <<<<<<< HEAD
 >>>>>>> origin/palette-sync-aria-current-5674151201601486281
 =======
@@ -1599,6 +1608,8 @@
           b.removeAttribute('aria-current');
         }
 >>>>>>> origin/palette/sidebar-active-states-16899461393671200881
+=======
+>>>>>>> origin/palette/sync-sidebar-active-states-11623088566429376151
       }
     }
     if (view === 'board') { renderBoard(); hydrateBoard(); }
