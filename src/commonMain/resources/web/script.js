@@ -1320,9 +1320,13 @@
 <<<<<<< HEAD
   const SIDEBAR_BTNS = { doc: 'btn-home', board: 'btn-board', graph: 'btn-graph', sheet: 'btn-sheet', host: 'btn-host' };
   const VIEWS = { doc: [docScrollEl, viewDocBtn], board: [boardScrollEl, viewBoardBtn], graph: [graphScrollEl, viewGraphBtn], sheet: [sheetScrollEl, viewSheetBtn], shape: [shapeScrollEl, viewShapeBtn], host: [hostScrollEl, viewHostBtn] };
+<<<<<<< HEAD
 =======
   const VIEWS = { doc: [docScrollEl, viewDocBtn, document.getElementById('btn-home')], board: [boardScrollEl, viewBoardBtn, document.getElementById('btn-board')], graph: [graphScrollEl, viewGraphBtn, document.getElementById('btn-graph')], sheet: [sheetScrollEl, viewSheetBtn, document.getElementById('btn-sheet')], shape: [shapeScrollEl, viewShapeBtn], host: [hostScrollEl, viewHostBtn, document.getElementById('btn-host')] };
 >>>>>>> origin/jules-17428175357654286191-b5258251
+=======
+  const SIDEBAR_BTNS = { doc: document.getElementById('btn-home'), board: document.getElementById('btn-board'), graph: document.getElementById('btn-graph'), sheet: document.getElementById('btn-sheet'), host: document.getElementById('btn-host') };
+>>>>>>> origin/palette-sidebar-active-states-15969824106785082289
   function setView(view) {
     mutate((s) => { s.view = view; }, 'view');
 <<<<<<< HEAD
@@ -1336,6 +1340,7 @@
       el.hidden = k !== view;
       const sidebarBtn = SIDEBAR_BTNS[k] ? document.getElementById(SIDEBAR_BTNS[k]) : null;
       btn.classList.toggle('active', k === view);
+<<<<<<< HEAD
       if (sidebarBtn) sidebarBtn.classList.toggle('active', k === view);
       if (k === view) {
         btn.setAttribute('aria-current', 'page');
@@ -1343,6 +1348,16 @@
       } else {
         btn.removeAttribute('aria-current');
         if (sidebarBtn) sidebarBtn.removeAttribute('aria-current');
+=======
+      const sideBtn = SIDEBAR_BTNS[k];
+      if (sideBtn) sideBtn.classList.toggle('active', k === view);
+      if (k === view) {
+        btn.setAttribute('aria-current', 'page');
+        if (sideBtn) sideBtn.setAttribute('aria-current', 'page');
+      } else {
+        btn.removeAttribute('aria-current');
+        if (sideBtn) sideBtn.removeAttribute('aria-current');
+>>>>>>> origin/palette-sidebar-active-states-15969824106785082289
       }
     }
     if (view === 'board') { renderBoard(); hydrateBoard(); }
