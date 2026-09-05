@@ -184,6 +184,7 @@ The code looks correct and fully optimized. The tests passed on the relevant par
 <<<<<<< HEAD
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
 
 <<<<<<< HEAD
 <<<<<<< HEAD
@@ -227,3 +228,9 @@ The code looks correct and fully optimized. The tests passed on the relevant par
 **Learning:** In Kotlin, using `.map { it }` on a collection (e.g., `Files.readAllLines(path).map { it }`) is a redundant identity transform. It needlessly allocates a full copy of the list, increasing heap allocations and GC pressure in hot paths.
 **Action:** Remove redundant `.map { it }` calls to directly return the list and avoid the O(N) allocation overhead.
 >>>>>>> origin/bolt-readlines-optimization-1347311716355117455
+=======
+
+## 2026-10-25 - Avoid redundant identity maps on already materialized lists
+**Learning:** Using `.map { it }` on a `List` (like the result of `Files.readAllLines`) just forces Kotlin to allocate a completely new `ArrayList` and iterate over every element to perform an identity mapping, wasting O(N) memory and time.
+**Action:** Remove trailing `.map { it }` calls when the original collection is already the expected type.
+>>>>>>> origin/bolt-remove-redundant-map-16172767021023886607
