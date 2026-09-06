@@ -198,6 +198,19 @@ class LcncPublisher(
     /** The whole board entry — document, typed cables, violations, sourceCid — as the canvas SHOWS it. */
     fun boardEntry(name: String): Any? = blackboard.get(LcncBlackboard.programKey(name))
 
+    /** The board's current version of a program; null when it is not on the board. */
+    fun boardProgramCid(name: String): String? = (boardEntry(name) as? Map<*, *>)?.get("programCid")?.toString()
+
+    /** A publish outcome, ok or refused, as a board-only receipt: `lcnc/publish/<name>` (Forge genesis, Cut C). */
+    fun publishOutcome(name: String, outcome: Map<String, Any?>) {
+        putIfChanged(LcncBlackboard.publishKey(name), outcome, "lcnc")
+    }
+
+    /** The workspace snapshot head: `lcnc/snapshot/head`, through the one writer. */
+    fun publishSnapshot(head: Map<String, Any?>) {
+        putIfChanged(WorkspaceSnapshot.HEAD_KEY, head, "lcnc")
+    }
+
     /**
      * THE LOADER — the blackboard is what the run seam obeys.
      *  - A sourced name (preset, attachment) seeds its entry, and overwrites it

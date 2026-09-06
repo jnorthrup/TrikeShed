@@ -469,6 +469,13 @@ object LcncContracts {
         LcncPortContract("agent.list", "installed coding agents",
             emptyList(), listOf("agents", "count"),
             outputKinds = mapOf("agents" to "json", "count" to "num")),
+        // The workspace snapshot (Forge genesis, Cut C): one content-addressed document naming every
+        // program version, prompt version, project sequence and latest receipt; taking one is an effect.
+        LcncPortContract("workspace.snapshot", "take a workspace snapshot",
+            listOf("trigger?", "note?"), listOf("cid", "previousCid", "snapshot"),
+            inputKinds = mapOf("trigger" to "trigger", "note" to "text"),
+            outputKinds = mapOf("cid" to "id", "previousCid" to "id", "snapshot" to "json"),
+            params = mapOf("note" to LcncPortContract.LcncParamSpec(ph = "why this moment is worth naming")), isEffect = true),
         LcncPortContract("pytest.pure", "pytest (pure, in-vm)",
             listOf("vmId"), listOf("exit", "tail"),
             inputKinds = mapOf("vmId" to "id"),

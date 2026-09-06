@@ -1218,6 +1218,12 @@ object OroborosDaemon {
         // The mounted projects as one document set (Forge genesis, Cut F/D): the legos and the
         // document surface read the same seam.
         val projectCorpus = borg.trikeshed.forge.server.JvmProjectCorpus(projectDbRegistry, projectScopes)
+        // Workspace snapshots (Forge genesis, Cut C): the whole workspace named as one cid, a lineage
+        // in <forgeHome>/snapshots/ledger.jsonl, the head as lcnc/snapshot/head.
+        val snapshotService = borg.trikeshed.forge.server.WorkspaceSnapshotService(
+            daemonBlackboard, casStore, attachmentGateway, promptStore, projectDbRegistry, lcncPublisher,
+            borg.trikeshed.forge.server.WorkspaceSnapshotService.ledgerFile(forgeHome),
+        )
         val patchWire = borg.trikeshed.forge.server.PatchWire(
             brain = brainClient,
             scopes = projectScopes,
@@ -1225,6 +1231,7 @@ object OroborosDaemon {
             publisher = lcncPublisher,
             prompts = promptStore,
             corpus = projectCorpus,
+            snapshots = snapshotService,
             muxContext = htxElement + muxReactor,
             mountScope = wireScope,
             miner = projectMiner,
@@ -1323,6 +1330,8 @@ object OroborosDaemon {
         // one write; then the ledger thaws and the seeds install where no head exists.
         moduleContext.lcncRunners.putAll(borg.trikeshed.lcnc.PromptNodes.registry(promptStore))
         promptStore.register(moduleContext)
+        snapshotService.register(moduleContext)
+        System.err.println("[OROBOROS] workspace snapshots: " + snapshotService.restore() + " in the ledger" + (snapshotService.head?.let { ", head " + it.cid.take(19) } ?: ""))
         promptStore.thaw(borg.trikeshed.lcnc.LcncPromptSeeds.all()).let { restored ->
             System.err.println("[OROBOROS] prompts: $restored head(s) restored from the ledger; ${promptStore.list().size} on the board")
         }

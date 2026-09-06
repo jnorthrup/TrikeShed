@@ -6,7 +6,7 @@ const Harness = {
   epoch: null, connectionGeneration: 0, viewHistory: [], focusKey: "", viewNode: null,
   board: Object.create(null), seq: 0, selected: null, applying: false, dirty: false,
   events: [], drafts: new Map(), actors: new Map(), positions: new Map(), flashes: new Map(), // Delta 2026-09-05 (fan-out): Map<key, expiresAt ms>; one Set with one timer collapsed a burst into one border
-  mounts: new Map(), baselines: new Map(), nextY: 0, nextX:0, rowHeight:0,
+  mounts: new Map(), baselines: new Map(), loadedCids: new Map(), nextY: 0, nextX:0, rowHeight:0,
   ready: false, live: false, running: false, frame: 0, activeBounds: {w:1600,h:900},
   connectionReport: null, shaking: false,
   parentHandle: null, parentRevision: 0, dragMoved: false,
@@ -170,6 +170,8 @@ const Harness = {
         else {this.nextX=anchor.x+anchor.left+anchor.w+120;this.rowHeight=Math.max(this.rowHeight,anchor.h);if(this.nextX>6500){this.nextY+=this.rowHeight+180;this.nextX=0;this.rowHeight=0;}}
       }
       if(!document&&!this.drafts.has(name))this.baselines.set(name,JSON.stringify(this.document(name)));
+      // The version this editor loaded: what publish() names as its base (Forge genesis, Cut C).
+      if(!document)this.loadedCids.set(name,this.board["lcnc/program/"+name]?.programCid||null);
     }finally{this.applying=previous;}
   },
   replaceSelected(doc) { this.mount(this.selected,doc);this.changed();this.render(); },
@@ -177,7 +179,7 @@ const Harness = {
     const ids=new Set(G.nodes.filter(n=>n._program===name).map(n=>n.id));
     for(const n of G.nodes)if(ids.has(n.id)){if(n._timer)clearInterval(n._timer);n._es?.close();n.el?.remove();}
     G.nodes=G.nodes.filter(n=>!ids.has(n.id));G.wires=G.wires.filter(w=>!ids.has(w.from[0])&&!ids.has(w.to[0]));
-    this.mounts.delete(name);this.baselines.delete(name);
+    this.mounts.delete(name);this.baselines.delete(name);this.loadedCids.delete(name);
     for(const table of [BOARD.cables,BOARD.violations])for(const key of table.keys())if(key.startsWith(name+"::"))table.delete(key);
   },
   schedule() {
@@ -438,6 +440,17 @@ const Harness = {
       button.title="Recorded identifier reference, not causal support";button.addEventListener("click",()=>this.inspect(target));$("#factInspector").append(button);
     }
     if(receipt?.programCid){const button=this.el("button","terrain-ref","Program version "+receipt.programCid.slice(0,16));button.addEventListener("click",()=>Landscape.inspectCid(receipt.programCid));$("#factInspector").append(button);}
+    // A refused publish offers the two honest exits: take the board's version, or overwrite it knowingly.
+    if(key.startsWith("lcnc/publish/")&&receipt?.verdict==="refused"){
+      const name=key.slice(13);
+      const reload=this.el("button","terrain-ref","Reload board version (discard draft)");
+      reload.addEventListener("click",()=>{this.drafts.delete(name);this.dirty=false;this.unmount(name);this.mount(name);this.select(name,false);$("#factInspector").close();});
+      $("#factInspector").append(reload);
+      const overwrite=this.el("button","terrain-ref","Overwrite "+String(receipt.currentCid).slice(0,16));
+      overwrite.addEventListener("click",()=>{$("#factInspector").close();this.publish(receipt.currentCid);});
+      $("#factInspector").append(overwrite);
+    }
+    if(key.startsWith("lcnc/snapshot/")&&receipt?.cid){const button=this.el("button","terrain-ref","Snapshot "+String(receipt.cid).slice(0,16));button.addEventListener("click",()=>Landscape.inspectCid(receipt.cid));$("#factInspector").append(button);}
   },
   /* Sheets. A fact, a territory, or the whole board opens as the grid-in-cell family
      /blackboard/sheet projects (CursorSheet/confixSheets — the same projection /api/graal/sheet
@@ -615,18 +628,39 @@ const Harness = {
     const response=await fetch("/api/lcnc/run/cancel",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({runId:run.runId})});
     this.message(response.ok?"Cancellation requested":"Run is no longer active");
   },
-  async publish() {
+  async publish(overrideBaseCid) {
     const name=$("#panelName").value.trim();
     if(!/^[a-z0-9][a-z0-9._-]*$/.test(name)){this.message("Use a lowercase program name");return;}
+    // Stale-base refusal (Forge genesis, Cut C): publishing over the program this editor
+    // loaded names that version; a board that moved on refuses, and the draft stays here.
+    const baseCid=overrideBaseCid||(name===this.selected?this.loadedCids.get(name):null)||null;
+    const url="/api/panels/"+encodeURIComponent(name)+(baseCid?"?baseCid="+encodeURIComponent(baseCid):"");
     try {
-      const response=await fetch("/api/panels/"+encodeURIComponent(name),{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(this.document())});
-      const result=await response.json();if(!response.ok||result.verdict!=="ok")throw Error(result.error||result.detail||response.status);
+      const response=await fetch(url,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(this.document())});
+      const result=await response.json();
+      if(response.status===409&&result.error==="stale_base"){
+        this.board["lcnc/publish/"+name]={...result,actor:"panels-editor",atMs:Date.now()};
+        this.message("Publish refused: "+name+" moved on the board (now "+String(result.currentCid).slice(0,19)+")");
+        this.inspect("lcnc/publish/"+name);
+        return;
+      }
+      if(!response.ok||result.verdict!=="ok")throw Error(result.error||result.detail||response.status);
       const entryResponse=await fetch("/api/panels/"+encodeURIComponent(name)+"?entry=1");
       if(!entryResponse.ok)throw Error("Published entry unavailable");
       this.board["lcnc/program/"+name]=await entryResponse.json();
       this.drafts.delete(this.selected);this.dirty=false;this.mount(name);this.select(name,false);
       this.message("Published "+name+(result.violations?.length?" with refused cables":""));
     }catch(e){this.message("Publish failed: "+e.message);}
+  },
+  /** A workspace snapshot from the toolbar (Forge genesis, Cut C): the head lands on the board and opens in the inspector. */
+  async snapshot() {
+    try {
+      const response=await fetch("/api/snapshots",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({note:"from the harness"})});
+      const result=await response.json();if(!response.ok||result.verdict!=="ok")throw Error(result.error||result.detail||response.status);
+      this.board["lcnc/snapshot/head"]={cid:result.cid,previousCid:result.previousCid,atMs:result.atMs,counts:result.counts,note:"from the harness",actor:"snapshots-route"};
+      this.message("Snapshot "+String(result.cid).slice(0,19)+(result.previousCid?" after "+String(result.previousCid).slice(0,19):""));
+      this.inspect("lcnc/snapshot/head");
+    }catch(e){this.message("Snapshot failed: "+e.message);}
   },
   async layoutHints(document,parentId) {
     const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),8000);
@@ -766,6 +800,7 @@ document.body.dataset.surface=Harness.surface;
 document.title=Harness.surface==="graal"?"Graal":Harness.surface==="panels"?"Panels":"Blackboard";
 $("#bar b").textContent=document.title.toUpperCase();
 $("#argumentsBtn").addEventListener("click",()=>HarnessArguments.open());
+$("#snapshotBtn")?.addEventListener("click",()=>Harness.snapshot());
 $("#argumentAdd").addEventListener("click",()=>HarnessArguments.add());
 $("#argumentRun").addEventListener("click",()=>{if(HarnessArguments.validate())Harness.run();});
 $("#programSelect").addEventListener("change",e=>Harness.select(e.target.value));

@@ -35,6 +35,11 @@ object LcncBlackboard {
 
     fun promptKey(name: String): String = PROMPT_PREFIX + name
 
+    /** Publish outcomes (Forge genesis, Cut C): `lcnc/publish/<name>` — ok or a stale-base refusal, board-only. */
+    const val PUBLISH_PREFIX = "lcnc/publish/"
+
+    fun publishKey(name: String): String = PUBLISH_PREFIX + name
+
     /** The entry for one stored prompt's head version — what the palette lists and a receipt cites. */
     fun promptEntry(doc: PromptDocument, savedAtMs: Long, actor: String): Map<String, Any?> = linkedMapOf(
         "name" to doc.name,

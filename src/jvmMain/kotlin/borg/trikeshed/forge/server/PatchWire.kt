@@ -410,6 +410,8 @@ class PatchWire(
     private val prompts: borg.trikeshed.lcnc.PromptStore? = null,
     /** The mounted projects as a document set (Forge genesis, Cut D): the same seam the project legos read. */
     private val corpus: borg.trikeshed.lcnc.ProjectCorpus? = null,
+    /** Workspace snapshots (Forge genesis, Cut C): the whole workspace named as one cid, with a lineage. */
+    private val snapshots: WorkspaceSnapshotService? = null,
 ) {
     private val muxSessions = MuxSessionService(brain, attachments, mountScope, muxContext, catalogProvider, sessionSnapshot)
 
@@ -637,6 +639,26 @@ class PatchWire(
             // same bytes /api/lcnc/content?cid= verifies), ?history=1 its ledger;
             // POST saves a version — text/plain body, or JSON {text, role?, tags?,
             // baseCid?}; a baseCid that is no longer the head is refused (409).
+            // ── workspace snapshots (Forge genesis, Cut C) ──────────────────
+            // POST takes one {note?} (201: cid, previousCid, atMs, counts); GET lists the
+            // lineage newest first; GET /{cid} serves the canonical bytes, cid-verified.
+            method == "POST" && p == "/api/snapshots" -> {
+                val svc = snapshots ?: return json(mapOf("error" to "snapshots not wired"), 503)
+                val note = parse(text)["note"]?.toString().orEmpty()
+                val taken = svc.take(note, actor = "snapshots-route")
+                json(mapOf("verdict" to "ok", "cid" to taken.cid, "previousCid" to taken.previousCid, "atMs" to taken.atMs, "counts" to taken.counts), 201)
+            }
+            method == "GET" && p == "/api/snapshots" -> {
+                val svc = snapshots ?: return json(mapOf("error" to "snapshots not wired"), 503)
+                json(mapOf("snapshots" to svc.list(), "head" to svc.head?.cid))
+            }
+            method == "GET" && p.startsWith("/api/snapshots/") -> {
+                val svc = snapshots ?: return json(mapOf("error" to "snapshots not wired"), 503)
+                val cid = p.removePrefix("/api/snapshots/").trimEnd('/')
+                val bytes = svc.open(cid) ?: return json(mapOf("error" to "no such snapshot", "cid" to cid), 404)
+                JvmKanbanServer.HttpResponse(200, bytes.decodeToString())
+            }
+
             method == "GET" && p == "/api/prompts" -> {
                 val store = prompts ?: return json(mapOf("error" to "prompt store not wired"), 503)
                 json(mapOf("prompts" to store.list().map { it.toMap() }))
@@ -741,6 +763,15 @@ class PatchWire(
                     .getOrElse { return json(mapOf("error" to (it.message ?: "bad program")), 400) }
                 val bytes = borg.trikeshed.lcnc.LcncProgramConfix.toJson(program).encodeToByteArray()
                 val cid = borg.trikeshed.job.ContentId.of(bytes)
+                // Stale-base refusal (Forge genesis, Cut C): the editor names the version it loaded;
+                // when the board has moved on nothing is written and the refusal is a receipt. No
+                // baseCid keeps the legacy last-writer-wins (curl unchanged).
+                val baseCid = borg.trikeshed.relaxfactory.CouchHttpSurface.parseQuery(path.substringAfter('?', ""))["baseCid"]?.takeIf { it.isNotBlank() }
+                val currentCid = publisher?.boardProgramCid(name)
+                if (baseCid != null && currentCid != null && currentCid != baseCid) {
+                    publisher.publishOutcome(name, mapOf("verdict" to "refused", "reason" to "stale_base", "baseCid" to baseCid, "currentCid" to currentCid, "atMs" to System.currentTimeMillis(), "actor" to "panels-editor"))
+                    return json(mapOf("verdict" to "refused", "error" to "stale_base", "name" to name, "baseCid" to baseCid, "currentCid" to currentCid), 409)
+                }
                 att.putAttachment(
                     borg.trikeshed.util.oroboros.OroborosAttachmentRef(
                         path = "panels/$name", contentType = "application/json", length = bytes.size.toLong(),
@@ -759,7 +790,8 @@ class PatchWire(
                     pub.publishAll()
                     e
                 }
-                json(mapOf("verdict" to "ok", "cid" to cid.value, "violations" to (entry?.get("violations") ?: emptyList<Any?>())))
+                publisher?.publishOutcome(name, mapOf("verdict" to "ok", "cid" to cid.value, "previousCid" to currentCid, "baseCid" to baseCid, "atMs" to System.currentTimeMillis(), "actor" to "panels-editor"))
+                json(mapOf("verdict" to "ok", "cid" to cid.value, "previousCid" to currentCid, "violations" to (entry?.get("violations") ?: emptyList<Any?>())))
             }
 
             // The document surface's reads: a project's document listing (prefix, glob, limit as query
