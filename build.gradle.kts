@@ -153,6 +153,15 @@ kotlin {
                     }
                 }
             }
+            // The POSIX non-Linux canary (Jim, 2026-09-06): one native executable that runs
+            // commonMain end to end with no JVM. Several main()s live on the native classpath,
+            // so the entry point is named. Link: ./gradlew linkCanaryReleaseExecutableMacos
+            // → build/bin/macos/canaryReleaseExecutable/canary.kexe
+            binaries {
+                executable("canary") {
+                    entryPoint = "borg.trikeshed.canary.main"
+                }
+            }
         }
         // macIntel: nobody cares (Jim, 2026-09-05). The arm64 target above is named
         // "macos", so `macosMain` is ITS default source set and macosX64Main cannot
