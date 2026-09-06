@@ -228,7 +228,10 @@ object BrainMuxNodes {
         // key+url entries that don't match any registered model.
         "prompt.chat" to LcncNodeRunner { node, inputs ->
             val modelMux = mux()
+            // Inputs arrive keyed by the wire's literal to-port, `prompt?` included
+            // (LcncRunner.gather) — a stored prompt cabled in must be honoured.
             val prompt = (inputs["prompt"] as? String)
+                ?: (inputs["prompt?"] as? String)
                 ?: node.params["prompt"]?.takeIf { it.isNotBlank() }
                 ?: ""
 

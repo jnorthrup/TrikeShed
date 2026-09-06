@@ -47,6 +47,7 @@ data object BlackboardNamespaces {
         Namespace("kanban/review/", "kanban-nars review gloss per angular", "KanbanModule review bridge"),
         Namespace("kanban/drift/", "board drift observations stamped by the module clock", "KanbanModule ticker"),
         Namespace("kanban/", "kanban module surface (anything not under a narrower kanban/ row)", "KanbanModule"),
+        Namespace("lcnc/prompt/", "stored prompt heads {name, cid, previousCid, role, variables, tags, chars, text, savedAtMs} per prompt", "LcncPublisher.publishPrompt"),
         Namespace("lcnc/program/", "typed program entries {name, document, cables, violations, sourceCid} per canvas", "LcncPublisher.publishProgram"),
         Namespace("lcnc/vocabulary", "the node-type vocabulary the canvases are built from", "LcncPublisher.publishAll"),
         Namespace("lcnc/", "LCNC surface (anything not under a narrower lcnc/ row)", "LcncPublisher"),

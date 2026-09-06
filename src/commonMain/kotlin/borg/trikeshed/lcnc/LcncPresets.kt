@@ -123,7 +123,14 @@ object LcncPresets {
             does = "Finds which provider keys are already available to this machine, sends a prompt with the one that resolves, and shows the modelmux's strategy, last selection and quota standings.",
             needs = "At least one provider key present in the environment, hermes .env, or saved credentials — nothing needs to be entered when one resolves.",
             see = "Which providers are reachable, the answer to your prompt, and the mux's live meta (strategy, last selection, quota).",
-            tweakFirst = "The prompt text.",
+            tweakFirst = "The stored prompt named hello, on the prompt node.",
+        ),
+        LcncPresetInfo(
+            "preset-prompt", "Save a prompt",
+            does = "Saves the text you write as a named prompt that other programs read by name, and keeps every version.",
+            needs = "Nothing — it runs as it is.",
+            see = "The saved prompt's identity in the result card, and the prompt listed for the ask nodes to pick.",
+            tweakFirst = "The text, then the name on the save node.",
         ),
         LcncPresetInfo(
             "preset-ccek-mux", "Hermes CCEK Orchestration",
@@ -326,6 +333,7 @@ object LcncPresets {
         "preset-scope-inner" to scopeInner(),
         "preset-pairs" to pairsDemo(),
         "preset-brain-mux" to brainMux(),
+        "preset-prompt" to promptEditor(),
         "preset-ccek-mux" to ccekMux(),
         "preset-media" to mediaDemo(),
         "preset-hermes-train" to hermesTrain(),
@@ -886,8 +894,8 @@ object LcncPresets {
         // question, the router's account at the bottom. x starts at 320 because
         // the palette (216px, fixed) covers the canvas's left edge — a note at
         // x=30 is a note nobody sees. Rows are spaced by the tallest node above
-        // them (ask a model runs ~700 canvas px): the loader pushes an
-        // overlapping node sideways, which scattered a tighter grid.
+        // them (ask a model runs ~700 canvas px, the prompt node ~280): the loader
+        // pushes an overlapping node sideways, which scattered a tighter grid.
         val program = LcncProgram(
             name = "preset-brain-mux",
             nodes = listOf(
@@ -897,11 +905,14 @@ object LcncPresets {
                 LcncNode("k1", "keys.status", x = 620.0, y = 60.0),
                 LcncNode("kd", "display", x = 1000.0, y = 60.0),
                 LcncNode("note-ask", "note",
-                    params = mapOf("text" to "2 · ask —\npick a model (the list is what runs here,\nnewest first), type a question, press ▶ run.\nThe answer lands in the green card;\na red card says what went wrong."),
-                    x = 320.0, y = 440.0),
+                    params = mapOf("text" to "2 · ask —\nthe question is the stored prompt named hello\n(the Save a prompt gallery item changes it);\npick a model (the list is what runs here,\nnewest first), press ▶ run.\nThe answer lands in the green card;\na red card says what went wrong."),
+                    x = 320.0, y = 640.0),
+                // The prompt is a citizen, not a literal: read by name, its version
+                // recorded on the run's receipt as promptVersions.
+                LcncNode("pr1", "prompt.get", params = mapOf("name" to "hello"), x = 620.0, y = 300.0),
                 LcncNode("p1", "prompt.chat",
                     params = mapOf(
-                        "prompt" to "Say hello in one sentence.",
+                        "prompt" to "",
                         // Blank model/prefill/url/key: the live list leads with the newest
                         // model Hermes ran here and the router finds the key.
                         "model" to "",
@@ -913,27 +924,28 @@ object LcncPresets {
                         "url" to "",
                         "key" to "",
                         "headers" to "[]",
-                    ), x = 620.0, y = 440.0),
-                LcncNode("d1", "result.confirm", x = 1000.0, y = 440.0),
+                    ), x = 620.0, y = 640.0),
+                LcncNode("d1", "result.confirm", x = 1000.0, y = 640.0),
                 LcncNode("note-save", "note",
                     params = mapOf("text" to "3 · optional: save your own key —\nfor a provider step 1 does not list.\nIt then shows up under \"prefill\" in step 2."),
-                    x = 320.0, y = 1180.0),
+                    x = 320.0, y = 1380.0),
                 LcncNode("c1", "credential.enter",
                     params = mapOf(
                         "key_type" to "nvidia",
                         "url" to "https://integrate.api.nvidia.com/v1",
                         "api_type" to "openai",
                         "key" to "",
-                    ), x = 620.0, y = 1180.0),
+                    ), x = 620.0, y = 1380.0),
                 LcncNode("note-router", "note",
                     params = mapOf("text" to "what the router did —\nthe last answer: which model and provider,\nwhether it succeeded, how long it took,\nand the tokens spent. Refreshes every 30 s."),
-                    x = 320.0, y = 1640.0),
-                LcncNode("t1", "timer", params = mapOf("seconds" to "30"), x = 620.0, y = 1640.0),
-                LcncNode("me1", "mux.meta", x = 850.0, y = 1640.0),
-                LcncNode("dm1", "display", x = 1130.0, y = 1640.0),
+                    x = 320.0, y = 1840.0),
+                LcncNode("t1", "timer", params = mapOf("seconds" to "30"), x = 620.0, y = 1840.0),
+                LcncNode("me1", "mux.meta", x = 850.0, y = 1840.0),
+                LcncNode("dm1", "display", x = 1130.0, y = 1840.0),
             ).toSeries(),
             wires = listOf(
                 LcncWire("k1", "have", "kd", "x"),
+                LcncWire("pr1", "text", "p1", "prompt?"),
                 LcncWire("p1", "content", "d1", "content"),
                 LcncWire("p1", "ok", "d1", "ok"),
                 LcncWire("p1", "error", "d1", "error"),
@@ -942,6 +954,34 @@ object LcncPresets {
                 LcncWire("me1", "lastAnswer", "dm1", "x"),
             ).toSeries(),
             view = LcncView(x = 20.0, y = 20.0, zoom = 0.65),
+        )
+        return LcncProgramConfix.toJson(program)
+    }
+
+    // ── save a prompt: the stored set of prompts, authored on the canvas ──
+    // The post Forge answers asked for "a stored set of prompts". This is the
+    // rendered way to author a version without a dialog: write the text, name
+    // it, press run. A byte-identical save changes nothing; a changed text
+    // mints a new version whose lineage names the one it replaced.
+    private fun promptEditor(): String {
+        val program = LcncProgram(
+            name = "preset-prompt",
+            nodes = listOf(
+                LcncNode("note-write", "note",
+                    params = mapOf("text" to "1 · write the prompt —\nthe text below is what gets saved.\nA {{name}} in it is a hole a program\nfills at run time."),
+                    x = 320.0, y = 60.0),
+                LcncNode("t1", "text.value", params = mapOf("value" to "Say hello in one sentence."), x = 620.0, y = 60.0),
+                LcncNode("note-save", "note",
+                    params = mapOf("text" to "2 · name it and press ▶ run —\na saved prompt keeps its name across runs;\nsaving the same text again changes nothing;\nask nodes pick it by that name."),
+                    x = 320.0, y = 360.0),
+                LcncNode("s1", "prompt.save", params = mapOf("name" to "hello", "role" to "user", "tags" to ""), x = 620.0, y = 360.0),
+                LcncNode("d1", "display", x = 1000.0, y = 360.0),
+            ).toSeries(),
+            wires = listOf(
+                LcncWire("t1", "value", "s1", "text"),
+                LcncWire("s1", "cid", "d1", "x"),
+            ).toSeries(),
+            view = LcncView(x = 20.0, y = 20.0, zoom = 0.8),
         )
         return LcncProgramConfix.toJson(program)
     }

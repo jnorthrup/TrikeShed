@@ -186,6 +186,11 @@ class LcncPublisher(
         return lb
     }
 
+    /** One stored prompt's head on the blackboard: `lcnc/prompt/<name>`, through the one writer. */
+    fun publishPrompt(entry: Map<String, Any?>) {
+        putIfChanged(LcncBlackboard.promptKey(entry["name"].toString()), entry, "lcnc")
+    }
+
     /** The board entry's document, as the Confix JSON text a canvas loads — a board-only program included. */
     fun boardDocumentJson(name: String): String? =
         LcncBlackboard.documentJsonOf(blackboard.get(LcncBlackboard.programKey(name)))

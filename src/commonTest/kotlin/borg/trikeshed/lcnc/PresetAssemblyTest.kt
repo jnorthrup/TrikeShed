@@ -25,9 +25,10 @@ class PresetAssemblyTest {
         val all = LcncPresets.all()
         assertEquals(
             setOf(
+                LcncShakeDemo.NAME,
                 "preset-hermes", "preset-tribunal", "preset-curator",
                 "preset-context", "preset-kanban", "preset-ccek", "preset-scope", "preset-scope-inner",
-                "preset-pairs", "preset-brain-mux", "preset-ccek-mux", "preset-media",
+                "preset-pairs", "preset-brain-mux", "preset-prompt", "preset-ccek-mux", "preset-media",
                 "preset-hermes-train", "preset-legal-tribunal", "preset-state-freeze",
                 "preset-council", "preset-bughunter", "preset-subvm-audit",
                 "preset-turbohaul",
@@ -134,6 +135,8 @@ class PresetAssemblyTest {
         // W2.4 + W6.2 compose: presets ship view/seq so a load restores the camera.
         for ((name, _) in LcncPresets.all()) {
             val p = parsed(name)
+            // A wiring specimen (the Shake Demo) is inspection-only and carries no camera of its own.
+            if (p.controls.inspectionOnly) continue
             assertTrue(p.view != null, "$name carries a viewport")
             assertTrue(p.seq >= 1, "$name carries a seq")
         }

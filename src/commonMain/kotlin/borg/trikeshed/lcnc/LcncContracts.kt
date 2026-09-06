@@ -541,8 +541,8 @@ object LcncContracts {
 
         // ── mux / chat ───────────────────────────────────────────────
         LcncPortContract("mux.chat", "mux chat (provider-neutral)",
-            listOf("prompt?"), listOf("content", "model"),
-            inputKinds = mapOf("prompt" to "text"),
+            listOf("prompt?", "system?"), listOf("content", "model"),
+            inputKinds = mapOf("prompt" to "text", "system" to "text"),
             outputKinds = mapOf("content" to "text", "model" to "id"),
             params = mapOf(
                 "prompt" to LcncPortContract.LcncParamSpec(ta = true, ph = "prompt (or wire one in)"),
@@ -1014,6 +1014,40 @@ object LcncContracts {
                 "headers" to LcncPortContract.LcncParamSpec(
                     cols = listOf("name", "value"),
                     ph = "advanced: extra request headers"),
+            ), isEffect = true),
+        // ── stored prompts: citizens, not literals ─────────────────────
+        // A prompt has a name, a role, a text with {{variables}} and a content id
+        // minted from its canonical bytes (PromptDocument). Programs read one by
+        // name; a receipt records which version ran (promptVersions). Only
+        // prompt.save writes, so it is the effect.
+        LcncPortContract(PromptNodes.GET, "a stored prompt",
+            listOf("name?"), listOf("text", "cid", "name", "role"),
+            inputKinds = mapOf("name" to "text"),
+            outputKinds = mapOf("text" to "text", "cid" to "id", "name" to "text", "role" to "text"),
+            params = mapOf(
+                "name" to LcncPortContract.LcncParamSpec(
+                    ph = "which stored prompt — the list is what is saved here",
+                    optsFrom = "prompt.list#prompts[].name"),
+            )),
+        LcncPortContract(PromptNodes.RENDER, "fill a prompt's holes",
+            listOf("template", "args?"), listOf("text", "variables"),
+            inputKinds = mapOf("template" to "text", "args" to "json"),
+            outputKinds = mapOf("text" to "text", "variables" to "json"),
+            params = mapOf(
+                "template" to LcncPortContract.LcncParamSpec(ta = true, ph = "text with {{name}} holes (or wire one in)"),
+            )),
+        LcncPortContract(PromptNodes.LIST, "the stored prompts",
+            listOf("trigger?"), listOf("prompts", "count"),
+            inputKinds = mapOf("trigger" to "trigger"),
+            outputKinds = mapOf("prompts" to "json", "count" to "num")),
+        LcncPortContract(PromptNodes.SAVE, "save a prompt version",
+            listOf("text"), listOf("cid", "previousCid", "name", "changed"),
+            inputKinds = mapOf("text" to "text"),
+            outputKinds = mapOf("cid" to "id", "previousCid" to "id", "name" to "text", "changed" to "json"),
+            params = mapOf(
+                "name" to LcncPortContract.LcncParamSpec(ph = "the prompt's name: lowercase, dots, dashes"),
+                "role" to LcncPortContract.LcncParamSpec(v = PromptDocument.ROLE_USER, opts = PromptDocument.ROLES),
+                "tags" to LcncPortContract.LcncParamSpec(ph = "comma-separated tags"),
             ), isEffect = true),
         // result.confirm: content is the completion signal. `ok` and `error`
         // refine that completion when the producer has an explicit verdict;

@@ -497,11 +497,11 @@ class KanbanModule : ForgeModule {
         val publisher = borg.trikeshed.lcnc.LcncPublisher(ctx.blackboard, { ctx.lcncRunners }, ctx.attachments, ctx.rete, ctx.kifBank)
         val runs = LcncRunService(ctx, store, publisher::vocabulary)
         val archives = ArchiveService(ctx.casStore)
-        for (operation in listOf("import", "manifest", "content")) {
-            ctx.routes.claim(id, "/api/archives/$operation") { method, path, text, _ ->
-                archives.route(method, path, rawBody(text))
-            }
-        }
+        // Three literal claims, not a loop over an interpolated path: the route-manifest parity
+        // scan reads literals, and an interpolation is a route the gate cannot see.
+        ctx.routes.claim(id, "/api/archives/import") { method, path, text, _ -> archives.route(method, path, rawBody(text)) }
+        ctx.routes.claim(id, "/api/archives/manifest") { method, path, text, _ -> archives.route(method, path, rawBody(text)) }
+        ctx.routes.claim(id, "/api/archives/content") { method, path, text, _ -> archives.route(method, path, rawBody(text)) }
         runs.recover()
         runCatching { publisher.publishAll() }
             .onFailure { System.err.println("[KanbanModule] lcnc → blackboard publish failed: ${it.message}") }

@@ -94,7 +94,8 @@ object TribunalNodes {
         // default motion is the preset's whole point (the end-to-end gate
         // pins it). Resolution: input → brief binding → prompt param.
         "mux.chat" to LcncNodeRunner { node, inputs ->
-            val system = node.params["system"] ?: ""
+            // A stored system prompt cabled onto `system?` wins over the param.
+            val system = (inputs["system"] as? String) ?: (inputs["system?"] as? String) ?: node.params["system"] ?: ""
             // The prior seat's content arrives on the wire as `prompt?`
             // (gather keys by the to-port, trailing ? included); a hand-fed
             // `prompt` is honoured identically. Inputs-over-params.

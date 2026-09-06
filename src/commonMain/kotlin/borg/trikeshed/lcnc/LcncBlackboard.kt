@@ -30,6 +30,25 @@ object LcncBlackboard {
 
     fun programKey(name: String): String = PROGRAM_PREFIX + name
 
+    /** Stored prompt heads: `lcnc/prompt/<name>` — one entry per prompt, the head version with its lineage. */
+    const val PROMPT_PREFIX = "lcnc/prompt/"
+
+    fun promptKey(name: String): String = PROMPT_PREFIX + name
+
+    /** The entry for one stored prompt's head version — what the palette lists and a receipt cites. */
+    fun promptEntry(doc: PromptDocument, savedAtMs: Long, actor: String): Map<String, Any?> = linkedMapOf(
+        "name" to doc.name,
+        "cid" to doc.cid,
+        "previousCid" to doc.previousCid,
+        "role" to doc.role,
+        "variables" to doc.variables,
+        "tags" to doc.tags,
+        "chars" to doc.text.length,
+        "text" to doc.text,
+        "savedAtMs" to savedAtMs,
+        "actor" to actor,
+    )
+
     /** The content id of a program's canonical Confix bytes — the same cid a panel save mints. */
     fun cidOf(program: LcncProgram): String =
         ContentId.of(LcncProgramConfix.toJson(program).encodeToByteArray()).value

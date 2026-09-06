@@ -406,6 +406,8 @@ class PatchWire(
     private val miner: ProjectMiner? = null,
     private val catalogProvider: (suspend () -> modelmux.ModelMux)? = null,
     private val sessionSnapshot: File? = null,
+    /** The stored set of prompts (Forge genesis, Cut P): read, save, history — each version a CAS citizen. */
+    private val prompts: borg.trikeshed.lcnc.PromptStore? = null,
 ) {
     private val muxSessions = MuxSessionService(brain, attachments, mountScope, muxContext, catalogProvider, sessionSnapshot)
 
@@ -627,6 +629,57 @@ class PatchWire(
                     },
                 ),
             )
+
+            // ── stored prompts: the citizen set behind prompt.get ──────────
+            // GET lists heads; GET /{name} serves the head's canonical bytes (the
+            // same bytes /api/lcnc/content?cid= verifies), ?history=1 its ledger;
+            // POST saves a version — text/plain body, or JSON {text, role?, tags?,
+            // baseCid?}; a baseCid that is no longer the head is refused (409).
+            method == "GET" && p == "/api/prompts" -> {
+                val store = prompts ?: return json(mapOf("error" to "prompt store not wired"), 503)
+                json(mapOf("prompts" to store.list().map { it.toMap() }))
+            }
+            method == "GET" && p.startsWith("/api/prompts/") -> {
+                val store = prompts ?: return json(mapOf("error" to "prompt store not wired"), 503)
+                val name = p.removePrefix("/api/prompts/").trimEnd('/')
+                if (!borg.trikeshed.lcnc.PromptDocument.isValidName(name)) return json(mapOf("error" to "bad name"), 400)
+                if (path.substringAfter('?', "").split('&').contains("history=1")) {
+                    return json(mapOf("name" to name, "versions" to store.history(name).map { it.toMap() }))
+                }
+                val doc = store.get(name) ?: return json(mapOf("error" to "no such prompt", "name" to name), 404)
+                JvmKanbanServer.HttpResponse(200, doc.canonicalJson())
+            }
+            method == "POST" && p.startsWith("/api/prompts/") -> {
+                val store = prompts ?: return json(mapOf("error" to "prompt store not wired"), 503)
+                val name = p.removePrefix("/api/prompts/").trimEnd('/')
+                if (!borg.trikeshed.lcnc.PromptDocument.isValidName(name)) return json(mapOf("error" to "bad name"), 400)
+                val body = rawBody(text)
+                val headers = text.substringBefore("\r\n\r\n").substringBefore("\n\n")
+                val isJson = headers.lines().any { it.lowercase().startsWith("content-type:") && it.lowercase().contains("application/json") }
+                var promptText = body
+                var role = borg.trikeshed.lcnc.PromptDocument.ROLE_USER
+                var tags = emptyList<String>()
+                var baseCid: String? = null
+                if (isJson) {
+                    val m = runCatching { JsonSupport.parseMap(body) }.getOrElse { return json(mapOf("error" to "bad json"), 400) }
+                    promptText = m["text"]?.toString() ?: return json(mapOf("error" to "text required"), 400)
+                    role = m["role"]?.toString()?.takeIf { it.isNotBlank() } ?: role
+                    tags = (m["tags"] as? List<*>)?.map { it.toString() } ?: tags
+                    baseCid = m["baseCid"]?.toString()?.takeIf { it.isNotBlank() }
+                }
+                if (promptText.length > borg.trikeshed.lcnc.PromptDocument.MAX_CHARS)
+                    return json(mapOf("error" to "prompt over ${borg.trikeshed.lcnc.PromptDocument.MAX_CHARS} chars"), 413)
+                if (role !in borg.trikeshed.lcnc.PromptDocument.ROLES) return json(mapOf("error" to "bad role"), 400)
+                val saved = try {
+                    store.save(borg.trikeshed.lcnc.PromptDocument(name, promptText, role, tags), actor = "prompts-route", baseCid = baseCid)
+                } catch (e: borg.trikeshed.lcnc.PromptStore.StaleBase) {
+                    return json(mapOf("verdict" to "refused", "error" to "stale_base", "name" to name, "baseCid" to e.baseCid, "currentCid" to e.currentCid), 409)
+                }
+                json(mapOf(
+                    "verdict" to "ok", "name" to name, "cid" to saved.cid, "previousCid" to saved.previousCid,
+                    "variables" to saved.document.variables, "changed" to saved.changed,
+                ))
+            }
 
             // ── panel constructions: LCNC graphs as replicated store documents ──
             // (revived: the concentric editor at /panels saves/loads HERE, not

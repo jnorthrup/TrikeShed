@@ -71,7 +71,7 @@ after every observable above was seen on the page, not inferred from a status co
 
 | Cut | Files | Tests | Rendered check |
 |---|---|---|---|
-| P prompts | pending | pending | pending |
+| P prompts | `lcnc/PromptDocument.kt`, `lcnc/PromptNodes.kt`, `lcnc/LcncPromptSeeds.kt` (commonMain); `lcnc/PromptStore.kt` (jvmMain); contracts `prompt.get`, `prompt.render`, `prompt.list`, `prompt.save` and `mux.chat.system?` in `LcncContracts.kt`; `prompt.chat` honours a cabled `prompt?`; `lcnc/prompt/<name>` keys in `LcncBlackboard`, `LcncPublisher.publishPrompt`, a `BlackboardNamespaces` row; `preset-brain-mux` reads `hello` through `prompt.get`; new preset `preset-prompt` "Save a prompt"; `GET/POST /api/prompts[/{name}]` in `PatchWire.kt` with `RouteManifest` rows; `promptVersions` on run receipts in `LcncRunService.kt`; daemon wiring and the seed thaw in `OroborosDaemon.kt` | `PromptTemplateTest` (6), `PromptNodesTest` (5), `PromptStoreTest` (5), `PatchWirePromptsTest` (3), `PromptProvenanceReceiptTest` (1); gates `LcncContractParityTest`, `LcncPresetCatalogTest`, `LcncPresetsGateTest`, `PresetAssemblyTest`, `PresetRequiredInputsTest`, `RouteManifestParityTest`, `LcncShakeDemoTest`, `ArchiveServiceTest`, `KanbanModuleHttpTest`, `McpSurfaceParityTest` all green; `compileKotlinJs` 0 errors | 2026-09-06 on `bin/oroboros-up --fresh --port 8899`: "Save a prompt" opened from `?load=prompt`, the text changed, Publish (as `prompt`), Run; the activity pane gained `lcnc/prompt/hello` and the inspector showed its new cid with `previousCid` = the seed cid, text and actor `prompt.save`; `/api/prompts`, `/api/prompts/hello?history=1`, `/api/lcnc/content?cid=` and the ledger on disk agreed; a restart on the same home logged "1 head(s) restored from the ledger" and served the same head |
 | F project documents | pending | pending | pending |
 | A coding-agent lane | pending | pending | pending |
 | X run export | pending | pending | pending |
@@ -80,5 +80,22 @@ after every observable above was seen on the page, not inferred from a status co
 
 ## Verification snapshot
 
-Not yet run. This section will list, in the style of `doc/shake-demo.md`, exactly which gates,
-tests and rendered steps passed, on which date, and what is not claimed.
+### 2026-09-06, Cut P
+
+- `./gradlew jvmMainClasses` green; `./gradlew compileKotlinJs --continue` 0 errors (343 warnings,
+  the 21-line ratchet unchanged).
+- 20 new JVM test cases pass; the ten gate suites named in the table pass. Two of those gates were
+  red at HEAD before this cut and were repaired here, not worked around: the preset set gate did
+  not list the Shake Demo specimen and asked it for a viewport and fed sockets it does not have by
+  design (`PresetAssemblyTest`, `PresetRequiredInputsTest` now skip inspection-only specimens and
+  name every offered preset), and the route manifest could not see the mux session routes or the
+  interpolated archive claims (`RouteManifestParityTest` now scans `MuxSessionService.kt`; the
+  three archive claims are literals with manifest rows).
+- Rendered on a fresh scratch daemon (port 8899), in Chrome: the walk's step 2 first half. The
+  seeds `hello` and `summarize` were on the board at boot; "Save a prompt" ran after a publish as
+  `prompt` and the fact, the inspector, the wire, the content route and the ledger agreed on the
+  new version and its lineage; the restart re-read the ledger.
+- Not claimed: the harness palette group listing stored prompts and the inspector's "Prompt
+  version" button are deferred to the Kotlin/JS gateway cut (the owner's 09-06 ruling: UI logic
+  from commonMain, not more hand-written JS); no model call was made, so `preset-brain-mux`
+  answering through its stored prompt is not claimed here.

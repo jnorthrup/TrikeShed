@@ -178,8 +178,12 @@ internal class LcncRunService(
                             try { assembly.result.await() } finally { assembly.cancel("run scope closed") }
                         }
                     }
+                    // Which stored prompts the run READ, by name → cid, beside programVersions:
+                    // a receipt names its prompts the way it names its program (Cut P).
+                    val promptVersions = PromptNodes.promptVersionsOf(listOf(frozen) + pinned.values, result.nodeOutputs)
                     val output = mapOf("returns" to result.returns, "outputs" to result.nodeOutputs,
-                        "bindings" to result.bindings, "bindingsTruncated" to result.bindingsTruncated)
+                        "bindings" to result.bindings, "bindingsTruncated" to result.bindingsTruncated,
+                        "promptVersions" to promptVersions)
                     val limit = ValueBudget().violation(output)
                     if (limit != null) finish(413, "fail", "failed", mapOf("ok" to false, "phase" to "reporting", "error" to limit))
                     else finish(200, "complete", "completed", output + ("ok" to true))

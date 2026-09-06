@@ -1200,12 +1200,19 @@ object OroborosDaemon {
         // idempotently, as the belt to this brace.
         val (kifTee, kifTeeDisposer) = borg.trikeshed.dag.KifTee.attach(rete, kifBank)
         val lcncPublisher = borg.trikeshed.lcnc.LcncPublisher(daemonBlackboard, { lcncRunnersRef.get() }, attachmentGateway, rete, kifBank)
+        // The stored set of prompts (Forge genesis, Cut P): versions are CAS citizens, heads are
+        // `prompts/<name>` attachments + `lcnc/prompt/<name>` on the board, the ledger under the
+        // forge home is what a restart re-reads (the couch index is per boot).
+        val promptStore = borg.trikeshed.lcnc.PromptStore(
+            attachmentGateway, casStore, borg.trikeshed.lcnc.PromptStore.ledgerFile(forgeHome), lcncPublisher,
+        ) { System.currentTimeMillis() }
         val operatorMux = kotlinx.coroutines.CompletableDeferred<suspend () -> modelmux.ModelMux>()
         val patchWire = borg.trikeshed.forge.server.PatchWire(
             brain = brainClient,
             scopes = projectScopes,
             attachments = attachmentGateway,
             publisher = lcncPublisher,
+            prompts = promptStore,
             muxContext = htxElement + muxReactor,
             mountScope = wireScope,
             miner = projectMiner,
@@ -1287,6 +1294,13 @@ object OroborosDaemon {
         // Sub-VM module legos: tika/corenlp/camel/graalce as supervised guest evals
         // over the daemon's own hypervisor (VmSupervisor.current — VmWire's same host).
         borg.trikeshed.lcnc.SubVmLegos.register(moduleContext)
+        // Stored prompts: prompt.get / prompt.render / prompt.list over the store, prompt.save the
+        // one write; then the ledger thaws and the seeds install where no head exists.
+        moduleContext.lcncRunners.putAll(borg.trikeshed.lcnc.PromptNodes.registry(promptStore))
+        promptStore.register(moduleContext)
+        promptStore.thaw(borg.trikeshed.lcnc.LcncPromptSeeds.all()).let { restored ->
+            System.err.println("[OROBOROS] prompts: $restored head(s) restored from the ledger; ${promptStore.list().size} on the board")
+        }
         // Pure/presentation node runners: canvas-authored programs (preset-kanban)
         // complete HEADLESS via /api/lcnc/run — the curl-able smoke-test lane.
         moduleContext.lcncRunners.putAll(borg.trikeshed.lcnc.PureNodes.registry { System.currentTimeMillis() })

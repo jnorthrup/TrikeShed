@@ -41,6 +41,8 @@ class RouteManifestParityTest {
         "src/jvmMain/kotlin/borg/trikeshed/forge/server/CouchWire.kt",
         "src/jvmMain/kotlin/borg/trikeshed/forge/server/VmWire.kt",
         "src/jvmMain/kotlin/borg/trikeshed/forge/server/PatchWire.kt",
+        // The mux session routes PatchWire delegates to (Route enum paths are literals too).
+        "src/jvmMain/kotlin/borg/trikeshed/forge/server/MuxSessionService.kt",
         "src/jvmMain/kotlin/borg/trikeshed/forge/server/LcncRdfWire.kt",
         "src/jvmMain/kotlin/borg/trikeshed/forge/server/ReteWire.kt",
         "src/jvmMain/kotlin/borg/trikeshed/forge/server/BlackboardWire.kt",

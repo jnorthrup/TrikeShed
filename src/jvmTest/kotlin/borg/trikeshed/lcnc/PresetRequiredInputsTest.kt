@@ -16,6 +16,9 @@ class PresetRequiredInputsTest {
 
         for ((name, document) in LcncPresets.all()) {
             val program = LcncProgramConfix.fromJson(name, document)
+            // A wiring specimen (the Shake Demo) ships every socket open on purpose; it is
+            // inspection-only and never dispatched, so its holes are not holes.
+            if (program.controls.inspectionOnly) continue
             val fed = (0 until program.wires.size)
                 .map { program.wires[it] }
                 .map { it.toNode to it.toPort.removeSuffix("?") }
