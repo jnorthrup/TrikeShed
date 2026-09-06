@@ -1,4 +1,4 @@
-@file:Suppress("SpellCheckingInspection", "ControlFlowWithEmptyBody")
+@file:Suppress("SpellCheckingInspection", "ControlFlowWithEmptyBody", "OVERRIDE_BY_INLINE")
 
 package borg.trikeshed.lib
 
@@ -18,7 +18,14 @@ class CharSeries(
 
     /** the mark accessor */
     var mark: Int = -1,
-) : Series<Char> by buf, CharSequence { //delegate to the underlying series
+) : Series<Char>, CharSequence {
+    @PublishedApi
+    internal val characters: CharSequence = when (buf) {
+        is CharSeries -> buf.characters
+        else -> buf.cs
+    }
+    override val a: Int get() = characters.length
+    override val b: (Int) -> Char = { index -> get(index) }
 
     // ── CharSequence, the conversion currency ────────────────────────────
     // The point of this type was to hand text onward as a CharSequence and
@@ -28,14 +35,20 @@ class CharSeries(
     // removes the wrapper and makes the currency the default rather than a
     // deliberate act.
     //
-    // Semantics are EXACTLY the adapter's, which are exactly the indexing this
-    // class already had: `Join.get(key) = b(key)`, so a member `get` shadowing
-    // that extension is the same call. Nothing indexes differently than before.
-    override val length: Int get() = size
-    override fun get(index: Int): Char = b(index)
-    override fun subSequence(startIndex: Int, endIndex: Int): CharSequence =
-        CharSeries(this[startIndex until endIndex])
+    // Direct reads preserve primitive indices; b remains the generic Join bridge.
+    override val length: Int get() = characters.length
+    override fun get(index: Int): Char = characters[index]
 
+    /** Half-open bounds, kept as a concrete packed pair. */
+    operator fun get(range: TwInt): Series<Char> =
+        characterWindow(characters, range)
+
+    operator fun get(range: IntRange): Series<Char> =
+        this[if (range.isEmpty()) 0 j 0 else range.first j (range.last + 1)]
+
+    fun subSequence(bounds: TwInt): CharSequence = CharSeries(this[bounds])
+
+    override fun subSequence(startIndex: Int, endIndex: Int) = subSequence(startIndex j endIndex)
 
     /** get, the verb - the char at the current position and increment position */
     inline val get: Char
@@ -51,7 +64,7 @@ class CharSeries(
      * exist is not copying. A CharSequence is a bound joined to an accessor,
      * which is what Series<Char> already is, so the view is the conversion.
      */
-    constructor(s: CharSequence) : this(s.length j { i: Int -> s[i] })
+    constructor(s: CharSequence) : this(characterWindow(s, 0 j s.length))
 
     /**remaining chars*/
     val rem: Int get() = limit - pos
@@ -102,13 +115,7 @@ class CharSeries(
 
     /** slice creates/returns a subrange CharSeries from pos until limit */
     val slice: CharSeries
-        get() {
-            val pos1 = this.pos
-            val limit1 = this.limit
-            val intRange = pos1 until limit1
-            val buf = (this)[intRange]
-            return CharSeries(buf)
-        }
+        get() = CharSeries(this[pos j limit])
 
     /** limit, the verb - redefines the last position accessable by get and redefines remaining accordingly*/
     fun lim(i: Int): CharSeries = apply { limit = i }
@@ -116,10 +123,10 @@ class CharSeries(
     /** skip whitespace */
     val skipWs: CharSeries get() = apply { while (hasRemaining && mk.get.isWhitespace()); res }
 
-    val rtrim: CharSeries get() = apply { while (rem > 0 && b(limit - 1).isWhitespace()) limit-- }
+    val rtrim: CharSeries get() = apply { while (rem > 0 && get(limit - 1).isWhitespace()) limit-- }
 
 
-    fun clone(): CharSeries = CharSeries(a j b).also { it.pos = pos; it.limit = limit; it.mark = mark }
+    fun clone(): CharSeries = CharSeries(this, pos, limit, mark)
 
 
     /** a hash of contents only. not position, limit, mark */
@@ -127,7 +134,7 @@ class CharSeries(
         get() {
             var h = 1
             for (i in pos until limit) {
-                h = 31 * h + b(i).hashCode()
+                h = 31 * h + get(i).hashCode()
             }
             return h
         }
@@ -144,7 +151,7 @@ class CharSeries(
         if (this === other) return true
         if (other !is CharSeries) return false
         if (rem != other.rem) return false
-        for (i in 0 until rem) if (b(pos + i) != other.b(other.pos + i)) return false
+        for (i in 0 until rem) if (get(pos + i) != other.get(other.pos + i)) return false
         return true
     }
 
@@ -173,13 +180,13 @@ class CharSeries(
     override fun hashCode(): Int =
         throw UnsupportedOperationException(
             "CharSeries is a cursor, not a key — pos/limit move. " +
-                "Reify at the gate with asString() and key on that; " +
-                "cacheCode is the content hash if you are building the cache yourself."
+                    "Reify at the gate with asString() and key on that; " +
+                    "cacheCode is the content hash if you are building the cache yourself."
         )
 
 
     fun asString(upto: Int = Int.MAX_VALUE): String =
-        ((limit - pos) j { x: Int -> this[x + pos] }).toArray().concatToString()
+        buildString(rem) { for (i in pos until limit) append(this@CharSeries.get(i)) }
 
     /**
      * DELIBERATELY NOT THE CHARACTERS. A friendly toString() is not a
@@ -201,7 +208,7 @@ class CharSeries(
      */
     override fun toString(): String {
         val n = minOf(4, size)
-        val peek = CharArray(n) { b(it) }.concatToString()
+        val peek = CharArray(n) { get(it) }.concatToString()
         return "CharSeries(position=$pos, limit=$limit, mark=$mark, size=$size, take-4=$peek)"
     }
 
@@ -286,7 +293,7 @@ class CharSeries(
     operator fun dec(): CharSeries = apply { require(pos > 0) { "Underflow" }; pos-- }
 
     /** advance 1*/
-    operator fun inc(): CharSeries = apply { require(hasRemaining) { "Overflow" };pos++ }
+    operator fun inc(): CharSeries = apply { require(hasRemaining) { "Overflow" }; pos++ }
 
     //toArray override
     fun toArray(): CharArray {
@@ -362,23 +369,56 @@ operator fun Series<Byte>.div(delim: Byte): Series<Series<Byte>> { //lazy split
  * accepts a CharSequence.
  */
 val Series<Char>.cs: CharSequence
-    get() = if (this is CharSeries) this else object : CharSequence {
+    get() = if (this is CharSequence) this else object : CharSequence {
         override val length: Int by ::a
         override fun get(index: Int) = b(index)
         override fun toString(): String = asString()
-        override fun subSequence(startIndex: Int, endIndex: Int): CharSequence = this@cs[startIndex until endIndex].cs
+        override fun subSequence(startIndex: Int, endIndex: Int): CharSequence =
+            characterWindow(this, startIndex j endIndex).cs
     }
 
 fun CharSeries.splitWs(): Series<CharSeries> {
     val result = mutableListOf<CharSeries>()
     var start = pos
     while (start < limit) {
-        while (start < limit && b(start).isWhitespace()) start++
+        while (start < limit && get(start).isWhitespace()) start++
         if (start >= limit) break
         var end = start
-        while (end < limit && !b(end).isWhitespace()) end++
-        result.add(CharSeries(this[start until end]))
+        while (end < limit && !get(end).isWhitespace()) end++
+        result.add(CharSeries(this[start j end]))
         start = end
     }
     return result.toSeries()
+}
+
+/** Flatten nested windows so each read crosses one primitive CharSequence accessor. */
+private class CharWindow(val root: CharSequence, val bounds: TwInt) : Series<Char>, CharSequence {
+    override val length: Int get() = bounds.second - bounds.first
+    override val a: Int get() = length
+    override val b: (Int) -> Char = { index -> get(index) }
+
+    override fun get(index: Int): Char {
+        if (index < 0 || index >= length) throw IndexOutOfBoundsException("index: $index, length: $length")
+        return root[bounds.first + index]
+    }
+
+    override fun subSequence(startIndex: Int, endIndex: Int): CharSequence =
+        characterWindow(this, startIndex j endIndex).cs
+
+    override fun toString(): String = buildString(length) {
+        for (index in 0 until this@CharWindow.length) append(this@CharWindow[index])
+    }
+}
+
+private fun characterWindow(source: CharSequence, bounds: TwInt): Series<Char> {
+    val start = bounds.first
+    val end = bounds.second
+    if (start < 0 || end < start || end > source.length) {
+        throw IndexOutOfBoundsException("window: $start..<$end, length: ${source.length}")
+    }
+    val characters = if (source is CharSeries) source.characters else source
+    return if (characters is CharWindow) {
+        if (start == 0 && end == characters.length) characters
+        else CharWindow(characters.root, (characters.bounds.first + start) j (characters.bounds.first + end))
+    } else CharWindow(characters, bounds)
 }

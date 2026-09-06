@@ -29,12 +29,12 @@ window.AllocationInspector=(()=>{
     if(!r.ok)throw Error(r.status===404?"Site expired; refresh the recent samples.":"HTTP "+r.status);return r.json();}
   async function load(){
     controller?.abort();frameController?.abort();controller=new AbortController();const signal=controller.signal;
-    q("input").value=selectedClass;q(".alloc-status").textContent="Loading recent samples";q(".alloc-sites").replaceChildren();q(".alloc-detail").replaceChildren();activeFrame=null;
+    q("input").value=selectedClass;q(".alloc-status").textContent="Loading recent samples";q(".alloc-sites").replaceChildren();q(".alloc-detail").replaceChildren();activeFrame=null;data=null;
     try{
       const result=await request("/api/graal/allocations?class="+encodeURIComponent(selectedClass),signal);if(signal.aborted)return;data=result;
       q("datalist").replaceChildren(...(result.classes||[]).map(c=>{const o=el("option");o.value=c.class;return o;}));
       let status=bytes(result.bytes)+" sampled / "+result.windowSeconds+"s | "+result.samples+" samples | "+new Date(result.toMs).toLocaleTimeString();
-      if(origin?.bytes!=null)status+=" | "+(origin.kind==="live"?"Live histogram: ":"Since start: ")+bytes(origin.bytes);
+      if(origin?.class===selectedClass&&origin.bytes!=null)status+=" | "+(origin.kind==="live"?"Live histogram: ":"Since start: ")+bytes(origin.bytes);
       if(result.omittedSamples)status+=" | Capacity omitted "+result.omittedSamples+" samples ("+bytes(result.omittedBytes)+", all classes)";
       if(result.omittedSiteRows)status+=" | "+result.omittedSiteRows+" additional sites";
       if(!result.jfr)status+=" | JFR unavailable: "+(result.jfrError||"not running");
@@ -84,6 +84,7 @@ window.AllocationInspector=(()=>{
       const pre=el("pre","alloc-bytecode");
       for(const ins of f.instructions||[]){const row=el("span",(ins.sampled?"alloc-sampled ":"")+(ins.boxing?"alloc-boxing":""));
         row.textContent=String(ins.bci).padStart(5)+"  "+ins.opcode+" "+(ins.owner?ins.owner+".":"")+(ins.name||"")+" "+(ins.descriptor||"")+(ins.boxing?"  [boxing]":"");pre.append(row);}
+      if(!f.instructions?.length)pre.textContent=f.methodFound?"No bytecode for this method.":"Method not found in this class resource.";
       code.append(el("h3",null,"Bytecode"),pre);
       if(!f.bciMatched)code.append(el("p","alloc-muted","Recorded BCI unavailable in this class resource."));
       code.append(el("p","alloc-muted",f.sourceEvidence));
@@ -92,7 +93,9 @@ window.AllocationInspector=(()=>{
   }
   function download(){if(!data)return;const url=URL.createObjectURL(new Blob([JSON.stringify({allocation:data,frame:activeFrame},null,2)],{type:"application/json"}));
     const a=el("a");a.href=url;a.download="allocation-sites.json";a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);}
-  function open(name="java.lang.Integer",context=null){mount();selectedClass=name;origin=context;
+  function open(name="java.lang.Integer",context=null){mount();selectedClass=name;origin=context?{...context,class:name}:null;
     if(typeof blipLeave==="function")blipLeave();if(!dialog.open)dialog.showModal();load();}
   return {open};
 })();
+if(new URL(location.href).searchParams.has("allocation"))
+  AllocationInspector.open(new URL(location.href).searchParams.get("allocation")||"java.lang.Integer");

@@ -87,6 +87,17 @@ test("runtime inspection reads its measurement locally without a document reques
   assert.equal(JSON.parse(body.textContent).count,1);
 });
 
+test("allocation terrain opens the site inspector with class and historical weight",async()=>{
+  const {context,model,terrain}=fixture();
+  const rows=model.heapRows({allocation:[{class:"java.lang.Integer",bytes:128}]});
+  terrain.setRows(rows,{x:0,y:0,w:1600,h:1000});
+  let selected;context.AllocationInspector={open(...args){selected=args;}};
+  context.fetch=()=>assert.fail("allocation class fetched as a document");
+  vm.runInContext(fs.readFileSync(path.join(web,"landscape.js"),"utf8")+"\nglobalThis.landscape=Landscape",context);
+  context.landscape.terrain=terrain;await context.landscape.inspect(rows[0][0]);
+  assert.equal(selected[0],"java.lang.Integer");assert.equal(selected[1].bytes,128);
+});
+
 test("heap refresh admits one request, preserves masks, and clears stale failed sources",async()=>{
   const {context}=fixture();
   context.Harness={schedule(){}};

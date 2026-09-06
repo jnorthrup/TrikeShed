@@ -10,16 +10,39 @@ reactor hubs** (Coroutine, Context, Element, Key). There is one event loop,
 entered via `runBlocking` exactly once at `main`. Everything else is a
 suspended coroutine inside that scope.
 
-**NEVER introduce blocking calls inside a coroutine scope.** This means:
+**NEVER block the reactor thread.** This means:
 
 - No `runBlocking { }` inside a coroutine, signal handler, `finally` block,
   or `CycleBody.run()`. If you need a suspend function called from a
   non-suspend context (signal handler, shutdown hook), cancel the Job and let
   the outer `runBlocking` unwind — do not nest a new `runBlocking`.
-- No `Thread.sleep`, no `.waitFor()`, no `.get()`, no `CompletableFuture.join()`
-  inside `launch`/`async`/`withContext`.
-- No raw `ProcessBuilder` inside a suspend function without wrapping it in
-  `withContext(Dispatchers.IO)`.
+- No `Thread.sleep`, process `.waitFor()`, blocking future `.get()`, or
+  `CompletableFuture.join()` on the reactor thread. A platform SPI may use
+  blocking operations only on its dedicated blocking dispatcher, with
+  deadlines, cancellation handling, and bounded resource cleanup.
+- No raw `ProcessBuilder` in application code. Process creation belongs in
+  the platform `ProcessOperations` SPI implementation, with blocking work
+  dispatched off the reactor.
+
+## Portability: platform APIs stay behind SPIs
+
+`userspace.nio` and its CCEK elements are the application contract, including
+Oroboros. JVM/JDK APIs (`java.*`, `javax.*`, `jdk.*`) and `sun.*` internals
+belong only in platform SPI implementations. Being in `jvmMain` does not
+exempt a daemon, server, or application from this boundary.
+
+- Callers use portable operations, values, and errors. Do not expose platform
+  channels, paths, processes, reflection objects, or management beans in SPI
+  signatures. Kotlin's platform mappings and `@JvmInline` are not JDK API
+  bypasses.
+- Extend the existing SPI when a capability is missing; implement it in the
+  relevant backends. Do not add a caller-side JDK fallback or a parallel I/O
+  stack. Platform composition roots may select and install providers.
+- Platform-specific acceleration, diagnostics, and internal APIs are allowed
+  behind the SPI. Report unavailable capabilities and the backend actually
+  used; never report an emulated operation as native support.
+- SPI placement alone proves neither portability nor speed. Follow the
+  conformance and measurement requirements in `docs/nio-spi-contract.md`.
 
 ## Network: userspace.nio only
 
@@ -35,34 +58,41 @@ All TCP/UDP/HTTP traffic flows through the userspace.nio CCEK stack:
 - ktor-server, okhttp, apache-httpclient
 - Any JDK HTTP client
 
-The only exception is `java.nio.channels.ServerSocketChannel` bound to
-`StandardProtocolFamily.UNIX` for the health socket (a UNIX domain socket,
-not TCP). TCP bind lives in `JvmLitebikeBindAdapter` only.
+UNIX domain health sockets follow the same boundary: any JDK channel or
+address handling belongs in a platform SPI implementation, not the daemon.
+TCP bind lives in `JvmLitebikeBindAdapter` only; it is a platform backend,
+not an example for application code to copy.
 
 ## Blocking calls: how to do them correctly
 
-When you genuinely need a blocking operation (git command, file I/O, process
-spawn), wrap it:
+Application code requests an operation through its portable SPI:
 
 ```kotlin
-// CORRECT — dispatch to IO, don't block the reactor
-suspend fun gitHead(repoDir: File): String = withContext(Dispatchers.IO) {
-    ProcessBuilder("git", "rev-parse", "HEAD")
-        .directory(repoDir).redirectErrorStream(true).start()
-        .let { it.waitFor(); it.inputStream.bufferedReader().readText().trim() }
+// ProcessOperations is userspace.nio.channels.spi.ProcessOperations.
+suspend fun gitHead(process: ProcessOperations, repoDir: String): String {
+    val result = process.exec("git", listOf("-C", repoDir, "rev-parse", "HEAD"))
+    check(result.exitCode == 0) { result.stderr.decodeToString() }
+    return result.stdout.decodeToString().trim()
 }
 ```
 
 ```kotlin
-// WRONG — blocks the event loop thread
+// WRONG: bypasses the SPI and blocks the event loop thread.
 val head = ProcessBuilder("git", "rev-parse", "HEAD")
     .directory(repoDir).start().let { it.waitFor(); ... }
 ```
 
+The platform implementation owns blocking dispatch (`withContext(Dispatchers.IO)`
+on JVM), cancellation, deadlines, and resource cleanup. Dispatching a blocking
+call does not make it cancellable. Existing synchronous `FileOperations`
+methods must not be called on the reactor thread; migrate that scheduling
+boundary through the portable contract rather than treating the SPI name as
+proof of nonblocking behavior.
+
 ## Shutdown: cancel, don't block
 
-The signal handler cancels Jobs; the outer `runBlocking` in `main` does the
-actual cleanup as coroutines unwind through `finally` blocks.
+The platform SPI signal handler cancels Jobs; the outer `runBlocking` in
+`main` does the actual cleanup as coroutines unwind through `finally` blocks.
 
 ```kotlin
 // CORRECT — cancel the supervisor, let structured concurrency clean up
@@ -138,5 +168,3 @@ Rules:
 ## vast expanse 
 
  - rod doc/concepts.md in order to avoid low entropy 
-
-

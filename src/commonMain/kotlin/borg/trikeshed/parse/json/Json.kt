@@ -79,6 +79,7 @@ object JsonParser {
         /** an optional int that gives you n commas max, presuming undefined null bias in the last comma */
         takeFirst: Int? = null,
     ): JsElement {
+        val chars = if (src is CharSeries) src else CharSeries(src)
         var depth = 0
         var openIdx = -1
         var closeIdx = -1
@@ -87,7 +88,7 @@ object JsonParser {
         var escapeNextChar = false
         var maxDepth = 0
         for (i in 0 until src.size) {
-            val c: Char = src[i]
+            val c: Char = chars[i]
             when {
 
                 insideQuote -> when {

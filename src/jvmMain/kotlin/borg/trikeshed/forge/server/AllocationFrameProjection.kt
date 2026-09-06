@@ -34,7 +34,7 @@ class AllocationFrameProjection(
             mapOf("bci" to row.get(0), "opcode" to row.get(2), "owner" to owner,
                 "name" to name, "descriptor" to row.get(5), "line" to row.get(6),
                 "sampled" to (row.get(0) == frame.bci),
-                "boxing" to ((name == "valueOf" && owner in WRAPPERS) ||
+                "boxing" to (((name == "valueOf" || name == "<init>" || row.get(2) == "NEW") && owner in WRAPPERS) ||
                     (owner == "kotlin.coroutines.jvm.internal.Boxing" && name.startsWith("box"))))
         }
         val sourceFile = taxonomy.sourceFile()

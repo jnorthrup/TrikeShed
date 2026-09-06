@@ -53,11 +53,7 @@ import sun.misc.SignalHandler
 
 /**
  * Oroboros daemon — serves the Couch/kanban/console surfaces.
- *
- * The Jules flywheel (FlywheelDriver + CycleBody) was deleted 2026-08-24 as a
- * failed migration; the daemon no longer polls, drains, or dispatches sessions.
- *
- * Env: JULES_API_KEY (required)
+ 
  * Flags:
  *   --once                  single cycle then exit (default: --watch loops)
  *   --watch                 loop forever

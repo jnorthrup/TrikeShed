@@ -1,5 +1,5 @@
 .alloc-inspector{box-sizing:border-box;width:min(1120px,calc(100vw - 24px));height:min(860px,calc(100dvh - 24px));max-width:none;max-height:none;padding:0;border:1px solid #485153;border-radius:6px;background:#141819;color:#e4e9e8;font:13px system-ui,sans-serif;letter-spacing:0;overflow:hidden}
-.alloc-inspector[open]{display:flex;flex-direction:column}.alloc-inspector::backdrop{background:#0008}
+.alloc-inspector[open]{display:flex;flex-direction:column;margin:auto}.alloc-inspector::backdrop{background:#0008}
 .alloc-inspector *{box-sizing:border-box;letter-spacing:0}.alloc-inspector h2{font-size:16px;margin:0;flex:1;min-width:0}.alloc-inspector h3{font-size:12px;margin:0 0 8px;color:#a8c7c1}
 .alloc-header{display:flex;align-items:center;gap:6px;padding:10px 12px;border-bottom:1px solid #374042;flex:none}
 .alloc-inspector button{font:inherit;color:inherit;background:none;border:1px solid transparent;border-radius:3px;cursor:pointer;margin:0;text-align:left}

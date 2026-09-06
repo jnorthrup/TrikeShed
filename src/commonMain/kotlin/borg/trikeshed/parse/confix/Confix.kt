@@ -5,6 +5,7 @@ import borg.trikeshed.charstr.CharStr
 import borg.trikeshed.cursor.*
 import borg.trikeshed.lib.*
 import borg.trikeshed.collections.*
+import borg.trikeshed.job.ContentId
 
 interface ConfixLifecycle
 typealias ConfixIndex = FacetedRow<Any>
@@ -407,6 +408,35 @@ enum class Syntax {
             YAML -> scanYaml0(src)
             else -> scan0(src)
         }
+        // Payload bounds must be checked even when neither derived facet is requested.
+        for (index in 0 until flat.spans.size) {
+            val span = flat.spans[index]
+            require(span.b < span.a || (span.a >= 0 && span.b < src.size)) {
+                "Token $index exceeds source bounds: ${span.a}..${span.b}"
+            }
+        }
+        val keys by lazy { buildKeyIndex(flat, src) }
+
+        val structuralNodes by lazy { buildStructuralNodes(flat, src) }
+
+        return flat.spans.size j { operation: Any? ->
+            when (operation) {
+                ConfixIndexK.Spans -> flat.spans
+                ConfixIndexK.Tags -> flat.tags
+                ConfixIndexK.Depths -> flat.depths
+                ConfixIndexK.DirectChildren -> flat.childOf
+                ConfixIndexK.TreeCursor -> tree
+                ConfixIndexK.KeyToChild -> ({ key: CharSequence -> keys[key.toString()] })
+                ConfixIndexK.StructuralNodes -> structuralNodes
+                else -> null
+            }
+        }
+    }
+
+    private fun buildKeyIndex(
+        flat: FlatIndex,
+        src: Series<Byte>
+    ): LinkedHashMap<String, Int> {
         val keys = LinkedHashMap<String, Int>()
         for (index in 0 until flat.spans.size) {
             if (flat.tags[index] != IOMemento.IoString) continue
@@ -421,7 +451,13 @@ enum class Syntax {
             }
             if (key !in keys) keys[key] = index
         }
+        return keys
+    }
 
+    private fun buildStructuralNodes(
+        flat: FlatIndex,
+        src: Series<Byte>
+    ): Series<String?> {
         val cids = arrayOfNulls<String>(flat.spans.size)
         for (i in flat.spans.size - 1 downTo 0) {
             val tag = flat.tags[i]
@@ -433,27 +469,15 @@ enum class Syntax {
                     val childIdx = children[c]
                     hashStringBuilder.append(cids[childIdx]).append('\n')
                 }
-                cids[i] = borg.trikeshed.job.ContentId.of(hashStringBuilder.toString().encodeToByteArray()).value
+                cids[i] = ContentId.of(hashStringBuilder.toString().encodeToByteArray()).value
             } else {
                 val span = flat.spans[i]
                 val length = maxOf(0, span.b - span.a + 1)
                 val bytes = ByteArray(length) { offset -> src[span.a + offset] }
-                cids[i] = borg.trikeshed.job.ContentId.of(bytes).value
+                cids[i] = ContentId.of(bytes).value
             }
         }
         val structuralNodes = flat.spans.size j { i: Int -> cids[i] }
-
-        return flat.spans.size j { operation: Any? ->
-            when (operation) {
-                ConfixIndexK.Spans -> flat.spans
-                ConfixIndexK.Tags -> flat.tags
-                ConfixIndexK.Depths -> flat.depths
-                ConfixIndexK.DirectChildren -> flat.childOf
-                ConfixIndexK.TreeCursor -> tree
-                ConfixIndexK.KeyToChild -> ({ key: CharSequence -> keys[key.toString()] })
-                ConfixIndexK.StructuralNodes -> structuralNodes
-                else -> null
-            }
-        }
+        return structuralNodes
     }
 }

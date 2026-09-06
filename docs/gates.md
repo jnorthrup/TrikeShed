@@ -27,6 +27,13 @@ This document describes the automated quality gates run to verify the integrity 
 ---
 
 ### 3. commonMainPurity — commonMain purity check
+
+**Current implementation gap**: `scripts/common-purity.sh` is a placeholder,
+not an executable purity check. The task does not currently enforce the
+patterns described below. Do not count it as portability evidence. The
+required application/platform boundary and performance evidence are defined
+in [Userspace NIO Contract](nio-spi-contract.md).
+
 ```bash
 ./gradlew commonMainPurity --console=plain
 ```
