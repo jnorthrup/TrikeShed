@@ -37,7 +37,7 @@ class LcncEachRingTest {
     )
 
     @Test
-    fun eachRingRunsOncePerElementAndYieldsLists() = runBlocking {
+    fun eachRingRunsOncePerElementAndYieldsLists(): Unit = runBlocking {
         val res = LcncRunner(registry).runProcedure(ringProgram("a,b,c"))
         val ring = res.nodeOutputs.getValue("ring")
         assertEquals(listOf("A", "B", "C"), ring["loud"])
@@ -47,20 +47,20 @@ class LcncEachRingTest {
     }
 
     @Test
-    fun anEmptyEachYieldsEmptyListsNotAbsence() = runBlocking {
+    fun anEmptyEachYieldsEmptyListsNotAbsence(): Unit = runBlocking {
         val ring = LcncRunner(registry).runProcedure(ringProgram("")).nodeOutputs.getValue("ring")
         assertEquals(emptyList<Any?>(), ring["loud"]); assertEquals(0, ring["count"])
     }
 
     @Test
-    fun eachOnANonListIsLoud() = runBlocking {
+    fun eachOnANonListIsLoud(): Unit = runBlocking {
         val bad = registry + mapOf("items" to LcncNodeRunner { _, _ -> mapOf("xs" to "not-a-list") })
         val e = assertFailsWith<IllegalArgumentException> { LcncRunner(bad).runProcedure(ringProgram("x")) }
         assertTrue("each must be a list" in e.message!!, e.message)
     }
 
     @Test
-    fun eachRingKeepsTheNavigatorChainPerIterationAndHonoursTheLimit() = runBlocking {
+    fun eachRingKeepsTheNavigatorChainPerIterationAndHonoursTheLimit(): Unit = runBlocking {
         val runner = LcncRunner(registry)
         val chains = mutableListOf<String>()
         runner.onScopeEnter = { path, chain -> chains.add(path.joinToString("/") + "@" + chain.toString()) }

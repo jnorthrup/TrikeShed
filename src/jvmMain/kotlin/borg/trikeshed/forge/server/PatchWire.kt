@@ -408,6 +408,8 @@ class PatchWire(
     private val sessionSnapshot: File? = null,
     /** The stored set of prompts (Forge genesis, Cut P): read, save, history — each version a CAS citizen. */
     private val prompts: borg.trikeshed.lcnc.PromptStore? = null,
+    /** The mounted projects as a document set (Forge genesis, Cut D): the same seam the project legos read. */
+    private val corpus: borg.trikeshed.lcnc.ProjectCorpus? = null,
 ) {
     private val muxSessions = MuxSessionService(brain, attachments, mountScope, muxContext, catalogProvider, sessionSnapshot)
 
@@ -758,6 +760,35 @@ class PatchWire(
                     e
                 }
                 json(mapOf("verdict" to "ok", "cid" to cid.value, "violations" to (entry?.get("violations") ?: emptyList<Any?>())))
+            }
+
+            // The document surface's reads: a project's document listing (prefix, glob, limit as query
+            // params) and one document's text with its identity, plus the miner's .extract.md twin.
+            method == "GET" && p.startsWith("/api/projects/") && (p.removePrefix("/api/projects/").substringAfter('/', "") == "docs" || p.removePrefix("/api/projects/").substringAfter('/', "").startsWith("docs/")) -> {
+                val c = corpus ?: return json(mapOf("error" to "project corpus not wired"), 503)
+                val rest = p.removePrefix("/api/projects/")
+                val name = rest.substringBefore('/')
+                val tail = rest.substringAfter("docs", "").removePrefix("/")
+                val query = path.substringAfter('?', "").split('&').filter { it.contains('=') }
+                    .associate { it.substringBefore('=') to java.net.URLDecoder.decode(it.substringAfter('='), "UTF-8") }
+                if (tail.isEmpty()) {
+                    val limit = query["limit"]?.toIntOrNull()?.coerceIn(1, 4096) ?: 256
+                    val docs = c.docs(name, query["prefix"].orEmpty(), query["glob"].orEmpty(), limit)
+                    json(mapOf("project" to name, "docs" to docs.map { it.toMap() }, "count" to docs.size))
+                } else {
+                    val id = java.net.URLDecoder.decode(tail, "UTF-8")
+                    val text = c.read(name, id, 262_144)
+                    if (text == null) {
+                        val listed = c.docs(name, id, "", 8).firstOrNull { it.id == id }
+                        if (listed == null) json(mapOf("error" to "absent", "project" to name, "id" to id), 404)
+                        else json(mapOf("error" to "not_text", "project" to name, "id" to id, "contentType" to listed.contentType, "length" to listed.length, "cid" to listed.cid), 415)
+                    } else {
+                        val twin = c.read(name, id + borg.trikeshed.lcnc.ProjectNodes.EXTRACT_SUFFIX, 262_144)
+                        val listed = c.docs(name, id, "", 8).firstOrNull { it.id == id }
+                        json(linkedMapOf<String, Any?>("project" to name, "id" to id, "cid" to text.cid, "rev" to text.rev, "seq" to text.seq,
+                            "contentType" to (listed?.contentType ?: "text/plain"), "length" to (listed?.length ?: text.text.length.toLong()), "text" to text.text).also { m -> twin?.let { m["extract"] = it.text } })
+                    }
+                }
             }
 
             method == "POST" && p.startsWith("/api/projects/") && p.endsWith("/mine") -> {

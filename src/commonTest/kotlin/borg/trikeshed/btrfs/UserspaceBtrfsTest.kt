@@ -7,8 +7,56 @@ import kotlin.test.assertTrue
 import kotlin.test.assertFalse
 import kotlin.test.assertNull
 import kotlin.test.assertNotNull
+import kotlin.test.assertContentEquals
 
 class UserspaceBtrfsTest {
+    @Test
+    fun fourHexExtentsSurviveRemountSnapshotAndSweep() {
+        val fileOps = InMemoryFileOperations()
+        val root = "/mem/sharded-btrfs"
+        val btrfs = UserspaceBtrfs(root, fileOps)
+        val path = "$root/extents/sha256/e/3/b/0/c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        assertTrue(btrfs.createSubvolume("live"))
+        assertTrue(btrfs.writeFile("live", "empty", ByteArray(0)))
+        assertTrue(fileOps.isFile(path))
+        assertTrue(btrfs.snapshot("live", "saved"))
+        assertTrue(btrfs.writeFile("live", "empty", "changed".encodeToByteArray()))
+
+        val reopened = UserspaceBtrfs(root, fileOps)
+        assertContentEquals(ByteArray(0), reopened.fetchFile("saved", "empty"))
+        assertTrue(reopened.deleteSubvolume("live"))
+        assertTrue(fileOps.isFile(path))
+        assertContentEquals(ByteArray(0), reopened.fetchFile("saved", "empty"))
+        assertTrue(reopened.deleteSubvolume("saved"))
+        assertFalse(fileOps.exists(path))
+    }
+
+    @Test
+    fun legacyFlatExtentsRemainReadableAndLiveDuringSweep() {
+        val fileOps = InMemoryFileOperations()
+        val root = "/mem/legacy-btrfs"
+        val btrfs = UserspaceBtrfs(root, fileOps)
+        val hex = "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        val current = "$root/extents/sha256/e/3/b/0/${hex.substring(4)}"
+        val legacy = "$root/extents/sha256_$hex"
+        assertTrue(btrfs.createSubvolume("live"))
+        assertTrue(btrfs.writeFile("live", "empty", ByteArray(0)))
+        assertTrue(btrfs.snapshot("live", "saved"))
+        fileOps.write(legacy, fileOps.readAllBytes(current))
+        fileOps.deleteRecursively(current)
+
+        val reopened = UserspaceBtrfs(root, fileOps)
+        assertContentEquals(ByteArray(0), reopened.fetchFile("live", "empty"))
+        assertTrue(reopened.deleteSubvolume("live"))
+        assertTrue(fileOps.isFile(legacy))
+        assertContentEquals(ByteArray(0), reopened.fetchFile("saved", "empty"))
+        val destination = UserspaceBtrfs("/mem/received-btrfs", fileOps)
+        assertTrue(destination.receive("saved", assertNotNull(reopened.send("saved"))))
+        assertContentEquals(ByteArray(0), destination.fetchFile("saved", "empty"))
+        assertTrue(reopened.deleteSubvolume("saved"))
+        assertFalse(fileOps.exists(legacy))
+    }
+
     @Test
     fun testSubvolumeCrudAndSendFetch() {
         val fileOps = InMemoryFileOperations()

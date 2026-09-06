@@ -1570,13 +1570,9 @@ function applyWireBox(){
   // In the blackboard, ropes live in a viewport-sized SVG. Project world
   // coordinates through its viewBox instead of magnifying a CSS bitmap layer.
   if(wiresSvg.parentElement===viewport){
-    const width=viewport.clientWidth,height=viewport.clientHeight,z=view.z;
     for(const svg of [wiresSvg,document.getElementById("channels")]){
       if(!svg)continue;
-      svg.setAttribute("width",width);svg.setAttribute("height",height);
-      svg.setAttribute("viewBox",`${-view.x/z} ${-view.y/z} ${width/z} ${height/z}`);
-      svg.style.setProperty("--wire-scale",Math.min(1,z));
-      svg.style.setProperty("--wire-label-scale",1/Math.max(1,z));
+      LandscapeNavigation.projectWires(svg,viewport,view);
     }
     return;
   }
@@ -1650,7 +1646,7 @@ function redraw(){
     if(!a||!b)return;
     ends.push(a,b);
     const path=document.createElementNS("http://www.w3.org/2000/svg","path");
-    path.setAttribute("d",bez(a,b)); path.classList.add("live");
+    LandscapeNavigation.wireCurve(path,a,b,viewport,view); path.classList.add("live");
     const srcN=G.nodes.find(x=>x.id===wr.from[0]);
     const tc=KINDCOLOR[srcN?portClass(srcN.type,"out",wr.from[1]):""];
     if(tc) path.style.stroke=tc;
@@ -1690,7 +1686,7 @@ function redraw(){
     const a=portCenter(...link.from),b=portCenter(...link.to);if(!a||!b)continue;
     ends.push(a,b);
     const path=document.createElementNS("http://www.w3.org/2000/svg","path");
-    path.setAttribute("d",bez(a,b));path.classList.add("scope-binding",link.kind);
+    LandscapeNavigation.wireCurve(path,a,b,viewport,view);path.classList.add("scope-binding",link.kind);
     path.dataset.scope=link.scope.id;path.dataset.child=link.child.id;
     const title=document.createElementNS("http://www.w3.org/2000/svg","title");
     title.textContent=link.label;path.appendChild(title);wiresSvg.appendChild(path);
@@ -1763,80 +1759,7 @@ async function fdLayout(){
   }catch(e){$("#status").textContent=e.message;}
   finally{fdLayout.busy=false;$("#fdBtn").disabled=false;}
 }
-/* TREESHAKE — the whole graph, not one cable.
-   Every port that is still OPEN (an input nothing feeds, an output feeding
-   nothing) is a loose end. The shake pairs them by the two laws a drop already
-   obeys — kinds mate on exact equality, data flows lateral or inward — and then
-   takes the CLOSEST surviving pair first, because proximity on this canvas is
-   how intent is expressed: you put the parts near what they belong to.
-   Required inputs go before optional ones; a hole that stops the graph meaning
-   anything outranks a convenience port. Greedy, one wire per input, an output
-   spent once per shake so it stops being open. Everything it does is one
-   save() and therefore one undo. */
-const SHAKE_REACH=340;   // world units; past this it is a guess, not a mate
-let STARVED=new Set();   // node ids whose reach runs on nothing (redraw paints their cables)
-let VERDICTS=[];       // [{nodeId,dir,port,cls}] — the shaken sockets and their outcome
-function verdictLayer(){
-  let L=document.getElementById("verdicts");
-  if(!L){ L=document.createElement("div"); L.id="verdicts"; world.appendChild(L); }
-  return L;
-}
-function clearVerdicts(){
-  document.querySelectorAll(".port.v-ok,.port.v-dead,.port.v-open,.port.v-scope,.port.v-optional,.port.v-binding")
-    .forEach(e=>e.classList.remove("v-ok","v-dead","v-open","v-scope","v-optional","v-binding"));
-  document.querySelectorAll(".node.starved").forEach(e=>e.classList.remove("starved"));
-  verdictLayer().textContent="";
-  VERDICTS=[]; STARVED=new Set();
-}
-/* Build the badges once, staggered, so the pass reads as a pass. */
-function buildVerdicts(){
-  const L=verdictLayer(); L.textContent="";
-  VERDICTS.forEach((v,i)=>{
-    const c=portCenter(v.nodeId,v.dir,v.port); if(!c) return;
-    const d=document.createElement("div");
-    d.className="vmark "+v.cls;
-    d.textContent=v.cls==="ok"?"✓":v.cls==="dead"?"✕":v.cls==="scope"?"⇱":"?";
-    d.style.left=c.x+"px"; d.style.top=c.y+"px";
-    d.style.animationDelay=(i*55)+"ms";
-    d.title=v.label||"";
-    L.appendChild(d); v.el=d;
-  });
-}
-/* Re-anchor on redraw — cheap, and it keeps a badge on its socket when the
-   node it belongs to is dragged. Rebuilding here would restart every animation
-   on every pointermove. */
-function positionVerdicts(){
-  if(!VERDICTS.length) return;
-  for(const v of VERDICTS){
-    if(!v.el) continue;
-    const c=portCenter(v.nodeId,v.dir,v.port);
-    if(c){ v.el.style.left=c.x+"px"; v.el.style.top=c.y+"px"; v.el.style.display=""; }
-    else v.el.style.display="none";
-  }
-}
-/* mark one of a node's OWN ports (a ring's DOM holds its children's ports too) */
-function markPort(nd,dir,port,cls){
-  if(!nd.el) return;
-  for(const pe of nd.el.querySelectorAll('.port[data-dir="'+dir+'"]')){
-    if(pe.closest(".node")!==nd.el) continue;
-    if(pe.dataset.port!==port) continue;
-    pe.classList.add(cls); return;
-  }
-}
-/* Everything a starved node reaches is starved too. This is the propagation the
-   runtime cannot do for you: a node with no input still returns, its consumers
-   still run, and the whole chain reports ok. */
-function starvedReach(seedIds){
-  const out=new Set(seedIds);
-  let grew=true;
-  while(grew){
-    grew=false;
-    for(const w of G.wires){
-      if(out.has(w.from[0])&&!out.has(w.to[0])){ out.add(w.to[0]); grew=true; }
-    }
-  }
-  return out;
-}
+/* TREESHAKE requests and verdicts are shared in patch-shake.js. */
 /**
  * Resolve a live picklist: "<runner>#<path>" — run the node through the ordinary
  * /api/lcnc/run lane, then walk the path out of its outputs. `models[].id`
@@ -1870,244 +1793,7 @@ async function livePicklist(spec){
   PICKLIST_CACHE.set(spec,p);
   return p;
 }
-async function treeshake(opts){
-  if(typeof Harness!=="undefined")return Harness.shake(opts);
-  const inclOptional=!!(opts&&opts.optional);
-  try{
-    const res=await api("POST","/api/lcnc/treeshake",{program:G,options:{optional:inclOptional,reach:SHAKE_REACH}});
-    if(res&&res.ok){
-      return applyServerTreeShake(res, inclOptional);
-    }
-  }catch(e){
-    console.warn("server treeshake fallback:",e);
-  }
-  return localTreeshake(opts);
-}
-function applyServerTreeShake(res, inclOptional, programName){
-  if(programName){
-    const id=local=>programName+"::"+local;
-    res={...res,made:(res.made||[]).map(m=>({...m,fromNode:id(m.fromNode),toNode:id(m.toNode)})),
-      verdicts:(res.verdicts||[]).map(v=>({...v,nodeId:id(v.nodeId)})),starved:(res.starved||[]).map(id)};
-  }
-  clearVerdicts();
-  const made = res.made || [];
-  for(const m of made){
-    const exists = G.wires.some(w => w.from[0]===m.fromNode && w.from[1]===m.fromPort && w.to[0]===m.toNode && w.to[1]===m.toPort);
-    if(!exists) G.wires.push({from:[m.fromNode,m.fromPort], to:[m.toNode,m.toPort]});
-  }
-  if(made.length){ redraw(); save(); }
-
-  const verdicts = res.verdicts || [];
-  for(const v of verdicts){
-    const nd = G.nodes.find(x => x.id === v.nodeId);
-    if(nd){
-      markPort(nd, v.dir, v.port, "v-" + v.status);
-      VERDICTS.push({nodeId: v.nodeId, dir: v.dir, port: v.port, cls: v.status, label: v.label});
-    }
-  }
-  buildVerdicts();
-
-  STARVED = new Set(res.starved || []);
-  for(const id of STARVED){
-    const nd = G.nodes.find(x => x.id === id);
-    if(nd && nd.el) nd.el.classList.add("starved");
-  }
-  if(STARVED.size) redraw();
-
-  const reachable = verdicts.filter(v => v.status === "open");
-  const scoped = verdicts.filter(v => v.status === "scope");
-  const dead = verdicts.filter(v => v.status === "dead");
-  const parts = [];
-  parts.push(made.length ? made.length + " cables connected" : "No cables changed");
-  const coverage=res.coverage;
-  if(coverage&&Number.isInteger(coverage.total)&&coverage.total>0&&Number.isInteger(coverage.connected)&&coverage.connected>=0&&coverage.connected<=coverage.total){
-    parts.push(coverage.connected+"/"+coverage.total+" sockets connected ("+Math.floor(100*coverage.connected/coverage.total)+"%)");
-  }
-  if(reachable.length) parts.push(reachable.length + " inputs need an explicit connection or closer source");
-  if(scoped.length) parts.push("⇱ " + scoped.length + " scope-blocked");
-  if(dead.length) parts.push("✕ " + dead.length + " with no mate on the board");
-  if(STARVED.size) parts.push(STARVED.size + " node" + (STARVED.size===1?"":"s") + " downstream run on nothing");
-  if(res.outletBlocked) parts.push("⇱ " + res.outletBlocked + " outlet" + (res.outletBlocked===1?"":"s") + " blocked by ring depth");
-  const optional=verdicts.filter(v=>v.status==="optional").length;
-  if(optional)parts.push(optional+" optional inputs unchanged");
-  if(!made.length&&!reachable.length&&!scoped.length&&!dead.length&&!STARVED.size)parts.push("No required cable gaps found");
-  $("#status").textContent = parts.join(" · ");
-  if(programName)Harness.showConnections(programName,res,$("#status").textContent);
-
-  for(const m of made){
-    for(const el of document.querySelectorAll('.port[data-port="'+CSS.escape(m.toPort)+'"]')){
-      const nd = G.nodes.find(x => x.id === m.toNode);
-      if(nd && el.closest(".node") === nd.el){
-        el.classList.add("just-shook");
-        setTimeout(() => el.classList.remove("just-shook"), 1400);
-      }
-    }
-    const a = portCenter(m.fromNode, "out", m.fromPort), b = portCenter(m.toNode, "in", m.toPort);
-    if(a && b){
-      const g = document.createElementNS("http://www.w3.org/2000/svg", "path");
-      g.classList.add("cand", "only", "just-merged");
-      g.setAttribute("d", bez(a, b));
-      g.style.stroke = "var(--ok)";
-      wiresSvg.appendChild(g);
-      setTimeout(() => g.remove(), 1400);
-    }
-  }
-  return made.length;
-}
-function localTreeshake(opts){
-  const inclOptional=!!(opts&&opts.optional);
-  const KEY=(id,port)=>id+"\u0000"+port;
-  const bare=p=>String(p).replace("?","");
-  const fedIn=new Set(G.wires.map(w=>KEY(w.to[0],bare(w.to[1]))));
-  const usedOut=new Set(G.wires.map(w=>KEY(w.from[0],bare(w.from[1]))));
-  const scopePathOf=m=>{const q=[];let sc=m._parentScope;while(sc){q.unshift(sc.id);sc=sc._parentScope;}return q;};
-  const openIns=[],openOuts=[];
-  for(const nd of G.nodes){
-    const c=CONTRACTS[nd.type]; if(!c||!nd.el) continue;
-    // A shake tidies a graph; it does not perform one. An input on an effect
-    // node is a write waiting to happen, and auto-wiring it is the shake
-    // deciding to submit a card, freeze state or spend a token on your behalf.
-    // They are reported, never merged.
-    const isEffect = !!(c.effect);
-    for(const ip of (c.ins||[])){
-      if(fedIn.has(KEY(nd.id,bare(ip)))) continue;
-      // An OPTIONAL port left open is not a gap — it is a choice. Filling those
-      // by default is how a shake turns into vandalism: the pass would happily
-      // reach 580 units across the canvas to feed kanban.submit.command? from
-      // activeSheets.laneOrder, which is kind-legal and means nothing.
-      const req=!String(ip).endsWith("?");
-      if(!req&&!inclOptional) continue;
-      const ctr=portCenter(nd.id,"in",ip); if(!ctr) continue;
-      openIns.push({nd,port:ip,req,c:ctr,effect:isEffect,
-                    kind:nodeKindOf(nd,"in",ip),sp:scopePathOf(nd)});
-    }
-    for(const op of (c.outs||[])){
-      if(usedOut.has(KEY(nd.id,bare(op)))) continue;
-      const ctr=portCenter(nd.id,"out",op); if(!ctr) continue;
-      openOuts.push({nd,port:op,c:ctr,kind:nodeKindOf(nd,"out",op),sp:scopePathOf(nd)});
-    }
-  }
-  const pairs=[];
-  for(const i of openIns) for(const o of openOuts){
-    if(o.nd.id===i.nd.id) continue;
-    if(!kindsCompatible(o.kind,i.kind)) continue;
-    if(!(o.sp.length<=i.sp.length&&o.sp.every((v,ix)=>i.sp[ix]===v))) continue;
-    const d=Math.hypot(o.c.x-i.c.x,o.c.y-i.c.y);
-    // "closest" has to mean close. Proximity is the intent signal; a cable
-    // dragged across the whole canvas by a machine is not reading intent.
-    if(d>SHAKE_REACH) continue;
-    pairs.push({i,o,d});
-  }
-  // required first, then nearest
-  pairs.sort((a,b)=> (a.i.req!==b.i.req) ? (a.i.req?-1:1) : a.d-b.d );
-  const tookIn=new Set(),tookOut=new Set(),made=[];
-  for(const pr of pairs){
-    if(pr.i.effect) continue;              // never auto-wire into an effect
-    const ik=KEY(pr.i.nd.id,bare(pr.i.port)), ok=KEY(pr.o.nd.id,bare(pr.o.port));
-    if(tookIn.has(ik)||tookOut.has(ok)) continue;
-    tookIn.add(ik); tookOut.add(ok);
-    G.wires.push({from:[pr.o.nd.id,pr.o.port],to:[pr.i.nd.id,pr.i.port]});
-    made.push(pr);
-  }
-  // EVERY socket the shake looked at gets a verdict, not just the required ones.
-  // Filtering to req here meant an optional port that nothing could close sat
-  // unmarked — indistinguishable, on the board, from one that was closed.
-  const stillOpen=openIns.filter(i=>!tookIn.has(KEY(i.nd.id,bare(i.port))));
-  // Does a mate exist ANYWHERE on the board, ignoring reach and the greedy
-  // contest? That is the line between "move it closer" and "nothing here can
-  // ever feed this".
-  // KIND and CONTAINMENT are different questions and were being asked as one,
-  // so a socket whose only producers sat outside its ring reported "no mate on
-  // the board" — which is false, and sends you hunting for a node that is
-  // already on the canvas. Scope impedance is the invisible failure here: the
-  // types line up, the frames do not.
-  const kindMates=i=>openOuts.filter(o=>o.nd.id!==i.nd.id&&kindsCompatible(o.kind,i.kind));
-  const inScope=(o,i)=>o.sp.length<=i.sp.length&&o.sp.every((v,ix)=>i.sp[ix]===v);
-  const dead=stillOpen.filter(i=>kindMates(i).length===0);
-  const scoped=stillOpen.filter(i=>{ const k=kindMates(i); return k.length>0&&!k.some(o=>inScope(o,i)); });
-  const reachable=stillOpen.filter(i=>{ const k=kindMates(i); return k.some(o=>inScope(o,i)); });
-  if(made.length){ redraw(); save(); }
-  clearVerdicts();
-  const parts0=[];
-  // Ordered so the pass tells a story as it lands: what closed, then what is
-  // merely out of reach, then what nothing here can ever close.
-  for(const pr of made){ markPort(pr.i.nd,"in",pr.i.port,"v-ok");
-    VERDICTS.push({nodeId:pr.i.nd.id,dir:"in",port:pr.i.port,cls:"ok",
-      label:"closed by "+pr.o.nd.type+"."+pr.o.port}); }
-  for(const i of reachable){ markPort(i.nd,"in",i.port,"v-open");
-    VERDICTS.push({nodeId:i.nd.id,dir:"in",port:i.port,cls:"open",
-      label:"a legal mate exists, but not within "+SHAKE_REACH+"px"}); }
-  for(const i of scoped){ markPort(i.nd,"in",i.port,"v-scope");
-    VERDICTS.push({nodeId:i.nd.id,dir:"in",port:i.port,cls:"scope",
-      label:"kind-compatible producers exist, but every one is outside this ring — "+
-            "data flows lateral or inward, so thread it through scope.in/scope.out or move it"}); }
-  for(const i of dead){ markPort(i.nd,"in",i.port,"v-dead");
-    VERDICTS.push({nodeId:i.nd.id,dir:"in",port:i.port,cls:"dead",
-      label:"no kind-compatible mate anywhere on this board"}); }
-  buildVerdicts();
-  // the dead reach: every node downstream of a required input nobody feeds
-  // Starvation still seeds from REQUIRED holes only: an optional port left open
-  // is a choice, and a node is not running on nothing because you declined one.
-  // OUTLET BLOCKED — the mirror of scope impedance, on the producing side.
-  // A yield deep in a ring whose only kind-compatible consumers sit OUTWARD has
-  // nowhere to go: data flows lateral or inward, so the value dies at the ring
-  // unless it is threaded out through scope.out. Nothing said so; the port just
-  // sat there looking ordinary while its result went nowhere.
-  const allIns=[];
-  for(const nd of G.nodes){
-    const c=CONTRACTS[nd.type]; if(!c||!nd.el) continue;
-    for(const ip of (c.ins||[])) allIns.push({nd,port:ip,kind:nodeKindOf(nd,"in",ip),sp:scopePathOf(nd)});
-  }
-  let outletBlocked=0;
-  for(const o of openOuts){
-    if(!o.sp.length) continue;                       // top level: nothing encloses it
-    const consumers=allIns.filter(i=>i.nd.id!==o.nd.id&&kindsCompatible(o.kind,i.kind));
-    if(!consumers.length) continue;                  // nobody wants it at all — a different problem
-    if(consumers.some(i=>o.sp.length<=i.sp.length&&o.sp.every((v,ix)=>i.sp[ix]===v))) continue;
-    markPort(o.nd,"out",o.port,"outletblocked");
-    VERDICTS.push({nodeId:o.nd.id,dir:"out",port:o.port,cls:"scope",
-      label:"outlet blocked — every consumer of this yield is outside the ring. "+
-            "Thread it out through scope.out, or the value dies here."});
-    outletBlocked++;
-  }
-  if(outletBlocked) parts0.push("⇱ "+outletBlocked+" outlet"+(outletBlocked===1?"":"s")+" blocked by ring depth");
-
-  STARVED=starvedReach(stillOpen.filter(i=>i.req).map(i=>i.nd.id));
-  for(const id of STARVED){ const nd=G.nodes.find(x=>x.id===id); if(nd&&nd.el) nd.el.classList.add("starved"); }
-  if(STARVED.size) redraw();   // repaint so the starved cables pick up their class
-  // The numbers name the three verdicts now on the board, so the status line
-  // stops being a truncated list nobody can find on a 98-node graph.
-  const parts=parts0.slice();
-  parts.unshift("✓ "+made.length+" closed");
-  if(reachable.length) parts.push("? "+reachable.length+" fillable — out of "+SHAKE_REACH+"px reach or lost the pass");
-  if(scoped.length) parts.push("⇱ "+scoped.length+" scope-blocked — mate exists, wrong ring: "
-      +scoped.slice(0,2).map(i=>i.nd.type+"."+i.port).join(", ")+(scoped.length>2?"…":""));
-  if(dead.length) parts.push("✕ "+dead.length+" with no mate on the board: "
-      +dead.slice(0,2).map(i=>i.nd.type+"."+i.port).join(", ")+(dead.length>2?"…":""));
-  if(STARVED.size) parts.push(STARVED.size+" node"+(STARVED.size===1?"":"s")+" downstream run on nothing");
-  // "nothing open" used to fire whenever no REQUIRED hole was left, and said it
-  // over a graph full of open optional ports that simply had no mate in reach.
-  if(!openIns.length) parts.push("nothing open"+(inclOptional?"":" — shift-click to include optional ports"));
-  else if(!made.length&&!reachable.length&&!dead.length)
-    parts.push(openIns.length+" open port"+(openIns.length===1?"":"s")+", none with a legal mate within "+SHAKE_REACH+"px"
-      +(inclOptional?"":" — shift-click to include optional ports"));
-  $("#status").textContent=parts.join(" · ");
-  // flash what it just made, so a shake is legible instead of a silent diff
-  for(const pr of made){
-    for(const el of document.querySelectorAll('.port[data-port="'+CSS.escape(pr.i.port)+'"]')){
-      if(el.closest(".node")===pr.i.nd.el){ el.classList.add("just-shook"); setTimeout(()=>el.classList.remove("just-shook"),1400); }
-    }
-    // and the cable itself: a merge you cannot see is a merge you cannot judge
-    const a=portCenter(pr.o.nd.id,"out",pr.o.port), b=portCenter(pr.i.nd.id,"in",pr.i.port);
-    if(a&&b){
-      const g=document.createElementNS("http://www.w3.org/2000/svg","path");
-      g.classList.add("cand","only","just-merged"); g.setAttribute("d",bez(a,b));
-      g.style.stroke="var(--ok)";
-      wiresSvg.appendChild(g); setTimeout(()=>g.remove(),1400);
-    }
-  }
-  return made.length;
-}
+async function treeshake(opts){ return Harness.shake(opts); }
 // Screen-space speed stays manageable at every fractal zoom level.
 function wireEdgeVelocity(point,rect){
   if(!point||![point.x,point.y,rect.left,rect.right,rect.top,rect.bottom].every(Number.isFinite))return {x:0,y:0};
@@ -2172,7 +1858,7 @@ function startWireDrag(n,dir,name,e){
     const b=portCenter(c.nd.id,c.pdir,c.port); if(!b) continue;
     const g=document.createElementNS("http://www.w3.org/2000/svg","path");
     g.classList.add("cand");
-    g.setAttribute("d", dir==="out"?bez(anchor,b):bez(b,anchor));
+    LandscapeNavigation.wireCurve(g,dir==="out"?anchor:b,dir==="out"?b:anchor,viewport,view);
     const kc=KINDCOLOR[portClass(c.nd.type,c.pdir,c.port)]||KINDCOLOR[portClass(n.type,dir,name)];
     if(kc) g.style.stroke=kc;
     wiresSvg.insertBefore(g,wiresSvg.firstChild); // behind the live cable
@@ -2183,7 +1869,7 @@ function startWireDrag(n,dir,name,e){
     const b=portCenter(c.nd.id,c.pdir,c.port); if(!b) continue;
     const g=document.createElementNS("http://www.w3.org/2000/svg","path");
     g.classList.add("cand","blocked");
-    g.setAttribute("d", dir==="out"?bez(anchor,b):bez(b,anchor));
+    LandscapeNavigation.wireCurve(g,dir==="out"?anchor:b,dir==="out"?b:anchor,viewport,view);
     wiresSvg.insertBefore(g,wiresSvg.firstChild);
     ghosts.push({...c,g,b,blocked:true});
   }
@@ -2214,7 +1900,7 @@ function startWireDrag(n,dir,name,e){
     const m={x:(point.x-w.left)/view.z,y:(point.y-w.top)/view.z};
     const a=portCenter(n.id,dir,name)||m;
     if(growWireBox([a,m]))applyWireBox();
-    path.setAttribute("d", dir==="out"?bez(a,m):bez(m,a));
+    LandscapeNavigation.wireCurve(path,dir==="out"?a:m,dir==="out"?m:a,viewport,view);
     // the nearest candidate leads: its spline brightens as you approach, so a
     // dense fan still reads as one intention rather than a hairball
     let best=null,bd=Infinity;
@@ -2315,7 +2001,7 @@ function startWireDrag(n,dir,name,e){
   dragWire.repaint=()=>{
     for(const gh of ghosts){
       gh.b=portCenter(gh.nd.id,gh.pdir,gh.port)||gh.b;
-      const a=portCenter(n.id,dir,name);if(a)gh.g.setAttribute("d",dir==="out"?bez(a,gh.b):bez(gh.b,a));
+      const a=portCenter(n.id,dir,name);if(a)LandscapeNavigation.wireCurve(gh.g,dir==="out"?a:gh.b,dir==="out"?gh.b:a,viewport,view);
       wiresSvg.appendChild(gh.g);
     }
     wiresSvg.appendChild(path);paint();
@@ -2403,110 +2089,7 @@ async function showMateMenu(cx,cy,srcNode,srcPort,wx,wy,scope,dir){
   setTimeout(()=>q.focus(),0);
 }
 /* ── pan / zoom ────────────────────────────────────────────────────────── */
-function applyView(){
-  // Keep geometry in the original flat world. CSS layout zoom invalidates
-  // nested panel layout on every camera frame; the camera only transforms.
-  world.style.transform=`translate(${view.x}px,${view.y}px) scale(${view.z})`;
-  applyWireBox();
-  document.body.classList.toggle("zoomed-out",view.z<.45);
-  if(typeof Landscape!=="undefined")Landscape.schedule();
-  if(typeof Harness!=="undefined"){
-    Harness.rememberView();
-    const breakout=document.getElementById("panelsBreakout");
-    if(breakout)breakout.href="/panels"+(Harness.selected?"?load="+encodeURIComponent(Harness.selected):"");
-  }
-}
-/* momentum — ported from graal.html's kinetic camera. Pan velocity in SCREEN
-   px/ms (the harness camera IS a screen translate, so it applies directly);
-   zoom velocity in log-scale per 16.7ms, anchored at the last wheel point so
-   the glide keeps diving into the point the wheel math holds fixed. A drag
-   records a low-passed flick velocity; a release within 80ms turns it into a
-   glide. Frame-rate independent decay. Off under prefers-reduced-motion. */
-const reducedMotion=matchMedia("(prefers-reduced-motion: reduce)").matches;
-const mom={vx:0,vy:0,zv:0,ax:0,ay:0};
-let momT=0,momFrame=0,panning=false;
-function killMomentum(){ mom.vx=0; mom.vy=0; mom.zv=0; }
-function tickMomentum(){
-  momFrame=0;
-  const now=performance.now(),dt=Math.min(50,now-momT); momT=now;
-  if(reducedMotion){ killMomentum(); return; }
-  const k=dt/16.7;
-  let live=false;
-  if(!panning&&(Math.abs(mom.vx)>0.002||Math.abs(mom.vy)>0.002)){
-    view.x+=mom.vx*dt; view.y+=mom.vy*dt;
-    const fr=Math.pow(0.93,k); mom.vx*=fr; mom.vy*=fr;
-    if(Math.abs(mom.vx)<=0.002&&Math.abs(mom.vy)<=0.002){ mom.vx=0; mom.vy=0; } else live=true;
-  }
-  if(Math.abs(mom.zv)>0.0008){
-    const f=Math.exp(mom.zv*k);
-    const nz=Math.min(4000,Math.max(.01,view.z*f));
-    view.x=mom.ax-(mom.ax-view.x)*(nz/view.z);
-    view.y=mom.ay-(mom.ay-view.y)*(nz/view.z);
-    view.z=nz;
-    mom.zv*=Math.pow(0.88,k);
-    if(Math.abs(mom.zv)<=0.0008) mom.zv=0; else live=true;
-  }
-  applyView();
-  if(live) glide(); else saveCameraSoon();
-}
-function glide(){ if(!momFrame) momFrame=requestAnimationFrame(tickMomentum); }
-
-viewport.addEventListener("pointerdown",e=>{
-  if(e.button!==0)return;
-  killMomentum(); panning=true;
-  viewport.classList.add("panning");
-  const sx=e.clientX,sy=e.clientY,ox=view.x,oy=view.y;
-  let lx=sx,ly=sy,velX=0,velY=0,velT=performance.now();
-  const mv=ev=>{
-    view.x=ox+ev.clientX-sx; view.y=oy+ev.clientY-sy; applyView();
-    const now=performance.now(),dt=Math.max(1,now-velT);
-    velX=0.75*velX+0.25*((ev.clientX-lx)/dt); velY=0.75*velY+0.25*((ev.clientY-ly)/dt); // low-passed flick velocity
-    lx=ev.clientX; ly=ev.clientY; velT=now;
-  };
-  const up=()=>{
-    panning=false; viewport.classList.remove("panning"); removeEventListener("pointermove",mv); removeEventListener("pointerup",up); save();
-    if(!reducedMotion&&performance.now()-velT<80){ mom.vx=velX; mom.vy=velY; momT=performance.now(); glide(); } // recent flick → glide
-  };
-  addEventListener("pointermove",mv); addEventListener("pointerup",up);
-});
-/* A camera move is not a document mutation.
-   save() serializes the WHOLE document twice (once for history, once for
-   localStorage), JSON.parses it twice more for the shape check, and writes
-   localStorage synchronously. Calling that per wheel event — a trackpad emits
-   50-100 a second — is what made zooming stutter, and it buried every real edit
-   under a hundred camera frames in the undo stack. Pan already saves only on
-   pointerup; the wheel was the outlier. */
-let camSaveT=0;
-function saveCameraSoon(){ clearTimeout(camSaveT); camSaveT=setTimeout(save,250); }
-
-/* deltaMode: 0=pixel, 1=line, 2=page. Firefox sends lines. */
-function wheelPixels(e,rect){ const k=e.deltaMode===1?16:e.deltaMode===2?rect.height:1; return {dx:e.deltaX*k,dy:e.deltaY*k}; }
-
-viewport.addEventListener("wheel",e=>{
-  e.preventDefault();
-  const r=viewport.getBoundingClientRect();
-  // Anchor on the viewport's own box rather than a hardcoded 40px bar height,
-  // so the point under the cursor stays under the cursor.
-  const px=e.clientX-r.left, py=e.clientY-r.top;
-  const {dy}=wheelPixels(e,r);
-  // Wheel zooms, as it always has. Only the STEP changed: proportional to the
-  // gesture instead of a fixed 1.1 per event, because a trackpad sends many
-  // small deltas where a mouse sends few large ones — a constant step made the
-  // trackpad rocket and the wheel crawl.
-  const f=Math.exp(-dy*0.0025);
-  const nz=Math.min(4000,Math.max(.01,view.z*f));
-  view.x=px-(px-view.x)*(nz/view.z);
-  view.y=py-(py-view.y)*(nz/view.z);
-  const zoomingIn=nz>view.z;
-  view.z=nz;
-  if(zoomingIn&&typeof Harness!=="undefined")Harness.observeZoom(px,py);
-  applyView(); saveCameraSoon();
-  if(!reducedMotion){ // glide anchor = wheel point; the zoom keeps diving there after the gesture ends
-    mom.ax=px; mom.ay=py; mom.vx=0; mom.vy=0;
-    mom.zv=Math.max(-0.12,Math.min(0.12,mom.zv+Math.log(f)*0.28));
-    momT=performance.now(); glide();
-  }
-},{passive:false});
+// Camera gestures and projection live in patch-camera.js.
 
 /* Frame every top-level node. The rings have had a fit gesture all along
    (double-click the D-tab); the top-level canvas had none, so a board wider
@@ -3173,7 +2756,7 @@ function fromConfix(doc){
   // children map RECURSIVELY — a preset's rings land concentric, never flattened.
   const nodeOf=n=>({id:n.id,type:n.type,x:n.x||0,y:n.y||0,params:n.params||{},collapsed:!!n.collapsed,subprogram:n.subprogram||undefined,
     children:(n.children&&n.children.length)?n.children.map(nodeOf):undefined});
-  return {view:doc.view?{x:doc.view.x||0,y:doc.view.y||0,z:doc.view.z||doc.view.zoom||1}:undefined, seq:doc.seq||1,
+  return {controls:doc.controls,view:doc.view?{x:doc.view.x||0,y:doc.view.y||0,z:doc.view.z||doc.view.zoom||1}:undefined, seq:doc.seq||1,
     nodes:(doc.nodes||[]).map(nodeOf),
     wires:(doc.wires||[]).map(w=>({from:w.from||[w.fromNode,w.fromPort],to:w.to||[w.toNode,w.toPort]}))};
 }
@@ -3252,7 +2835,7 @@ $("#presetsBtn").addEventListener("click",openGallery);
    mention them, and the KIF facts about them. Turtle in the box is editable and
    "apply" maps it back onto the canvas; "→ NAL" ingests the causal projection
    (each cable as `causes`) so the program becomes implication beliefs. */
-function toConfix(){ const d=serialize(); return {name:($("#panelName").value||"canvas"),nodes:d.nodes,wires:d.wires,view:{x:view.x,y:view.y,z:view.z}}; }
+function toConfix(){ const d=serialize(); return {name:($("#panelName").value||"canvas"),nodes:d.nodes,wires:d.wires,controls:d.controls,view:{x:view.x,y:view.y,z:view.z}}; }
 let RDF_TIMER=null, RDF_NOTE="";
 function refreshRdf(){ if(!$("#rdfPanel")) return; clearTimeout(RDF_TIMER); RDF_TIMER=setTimeout(()=>{ const t=$("#rdfPanel").dataset.tab||"graph"; rdfTab(t); },400); }
 async function rdfTab(tab){

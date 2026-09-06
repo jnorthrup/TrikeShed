@@ -158,15 +158,7 @@ dialog::backdrop{background:#0008}dialog form{float:right}dialog h2{font:14px va
 
 /* Screen-space cables sit below interactive panels, with 1x stroke ceilings.
    vector-effect also keeps dashes in screen units during deep fractal zoom. */
-#world{z-index:2}
-#wires,#channels{left:0;top:0;width:100%;height:100%;z-index:1;overflow:hidden}
-#wires path,#channels path{vector-effect:non-scaling-stroke;stroke-linecap:round;stroke-width:calc(2.2px * var(--wire-scale,1))}
-#wires path.scope-binding,#channels path.chain{stroke-width:calc(1.5px * var(--wire-scale,1))}
-#channels path{stroke-width:calc(2px * var(--wire-scale,1))}
-#wires path.cand{stroke-width:calc(1.4px * var(--wire-scale,1))}
-#wires path.cand.near{stroke-width:calc(2.4px * var(--wire-scale,1))}
-#wires path.cand.only{stroke-width:calc(2.8px * var(--wire-scale,1));filter:none}
-#wires text.wiretype,#channels text{font-size:calc(12px * var(--wire-label-scale,1));stroke-width:calc(4px * var(--wire-label-scale,1))}
+/* Shared rope projection is styled by patch-camera.css. */
 /* Glass is confined to fixed chrome; zooming never magnifies its blur. */
 #bar,#boardnav,#topologyLegend,#activity{background:rgba(24,28,30,.9);-webkit-backdrop-filter:blur(12px);backdrop-filter:blur(12px)}
 #bar a{color:var(--graal);text-decoration:none;flex-shrink:0}

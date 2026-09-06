@@ -102,24 +102,14 @@ private fun inodeOf(p: Path): String = try {
 
 private fun blobSet(casRoot: Path): List<Path> {
     // THE COUNTING RULE (VAL-BTRFS-002): the blob set is exactly the files matching
-    // <casRoot>/sha256/<2hex>/<62hex>. Nothing else under the mount is a blob.
+    // Four single-hex shards plus 60 hex digits, or the legacy 2/62 layout.
     val sha = casRoot.resolve("sha256")
     if (!Files.isDirectory(sha)) return emptyList()
-    val hex = Regex("^[0-9a-f]+$")
-    val out = ArrayList<Path>()
-    Files.newDirectoryStream(sha).use { shards ->
-        for (shard in shards) {
-            val d = shard.fileName.toString()
-            if (!Files.isDirectory(shard) || d.length != 2 || !hex.matches(d)) continue
-            Files.newDirectoryStream(shard).use { files ->
-                for (f in files) {
-                    val n = f.fileName.toString()
-                    if (Files.isRegularFile(f) && n.length == 62 && hex.matches(n)) out.add(f)
-                }
-            }
-        }
+    val layout = Regex("(?:[0-9a-f]/){4}[0-9a-f]{60}|[0-9a-f]{2}/[0-9a-f]{62}")
+    Files.walk(sha, 5).use { paths ->
+        return paths.filter { Files.isRegularFile(it) && layout.matches(sha.relativize(it).joinToString("/")) }
+            .sorted().toList()
     }
-    return out.sortedBy { it.toString() }
 }
 
 private fun tmpResidue(casRoot: Path): List<Path> {
@@ -244,7 +234,7 @@ fun main(argv: Array<String>) {
     say("shard directories under $sha : count=${shards.size}")
     say("shard names: ${shards.joinToString(" ")}")
     val set = blobSet(casRootPath)
-    say("BLOB SET per the counting rule <casRoot>/sha256/<2hex>/<62hex> : ${set.size} files")
+    say("BLOB SET: sha256/<h0>/<h1>/<h2>/<h3>/<60hex> plus legacy 2/62 : ${set.size} files")
     set.take(8).forEach { say("  blob-set sample: $it") }
 
     // ── 3. byte-equality on retrieval ────────────────────────────────────────

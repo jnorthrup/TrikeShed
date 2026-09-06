@@ -33,7 +33,7 @@ class ProjectNodesTest {
     }
 
     @Test
-    fun docsFilterByPrefixAndGlobAndReportCount() = runBlocking {
+    fun docsFilterByPrefixAndGlobAndReportCount(): Unit = runBlocking {
         val docs = ProjectNodes.registry(corpus()).getValue(ProjectNodes.DOCS)
         val md = docs.run(LcncNode("d", ProjectNodes.DOCS, params = mapOf("project" to "notes", "glob" to "*.md")), emptyMap())
         assertEquals(3, md["count"], "a glob without a slash matches the last path segment, anywhere")
@@ -51,7 +51,7 @@ class ProjectNodesTest {
     }
 
     @Test
-    fun readReturnsTextAndIdentityOrAnErrorForBinaries() = runBlocking {
+    fun readReturnsTextAndIdentityOrAnErrorForBinaries(): Unit = runBlocking {
         val read = ProjectNodes.registry(corpus()).getValue(ProjectNodes.READ)
         val docs = ProjectNodes.registry(corpus()).getValue(ProjectNodes.DOCS)
         val doc = ((docs.run(LcncNode("d", ProjectNodes.DOCS, params = mapOf("project" to "notes", "glob" to "a.md")), emptyMap())["docs"] as List<*>)[0]) as Map<*, *>
@@ -67,7 +67,7 @@ class ProjectNodesTest {
     }
 
     @Test
-    fun extractReadsTheMinedTwinOrSaysNotFound() = runBlocking {
+    fun extractReadsTheMinedTwinOrSaysNotFound(): Unit = runBlocking {
         val extract = ProjectNodes.registry(corpus()).getValue(ProjectNodes.EXTRACT)
         val found = extract.run(LcncNode("e", ProjectNodes.EXTRACT, params = mapOf("project" to "notes", "id" to "a.md")), emptyMap())
         assertEquals(true, found["found"]); assertEquals("mined alpha", found["text"])
@@ -76,7 +76,7 @@ class ProjectNodesTest {
     }
 
     @Test
-    fun listReportsTheProjectsAndTheirDocumentCounts() = runBlocking {
+    fun listReportsTheProjectsAndTheirDocumentCounts(): Unit = runBlocking {
         val list = ProjectNodes.registry(corpus()).getValue(ProjectNodes.LIST).run(LcncNode("l", ProjectNodes.LIST), emptyMap())
         val refs = list["projects"] as List<*>
         assertEquals(listOf("notes", "other"), refs.map { (it as Map<*, *>)["name"] })

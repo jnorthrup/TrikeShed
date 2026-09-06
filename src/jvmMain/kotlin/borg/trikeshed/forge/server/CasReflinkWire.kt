@@ -13,7 +13,7 @@ import java.nio.charset.StandardCharsets
  * text-decoded [JvmKanbanServer.ExtraRoute] surface cannot carry losslessly):
  *
  *  - `POST /api/cas/put`         — body bytes → [BtrfsReflinkStore.put]; answers the cid and
- *                                  the exact `<casRoot>/sha256/<2hex>/<62hex>` path written.
+ *                                  the exact `<casRoot>/sha256/<h0>/<h1>/<h2>/<h3>/<60hex>` path written.
  *  - `POST /api/cas/materialize` — `{"cid":…,"topic":…,"path":…}` → the D13 MATERIALIZE
  *                                  primitive [BtrfsReflinkStore.reflinkReorganize], i.e.
  *                                  `cp --reflink=always` from the CAS blob to

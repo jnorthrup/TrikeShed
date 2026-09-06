@@ -76,9 +76,10 @@ const LandscapeActivity = {
 };
 
 function visibleClosure(node) {
+  const measured=Landscape.drawingGeometry;
   if(typeof Harness!=="undefined"&&node?._program===Harness.selected&&Landscape.details.has(node.id))return node;
   let result=node,parent=node?._parentScope;
-  while(parent){const r=parent.el.getBoundingClientRect();if(r.width<420||r.height<240)result=parent;parent=parent._parentScope;}
+  while(parent){const r=measured?.get(parent)?.rect||parent.el.getBoundingClientRect();if(r.width<420||r.height<240)result=parent;parent=parent._parentScope;}
   return result;
 }
 
@@ -146,6 +147,23 @@ const Landscape = {
     if(active&&readable)this.details.add(node.id);
     return active&&this.details.has(node.id);
   },
+  measure(vr) {
+    // Read all layout before changing visibility/inert. Interleaving these
+    // forced a style flush for every node, multiplied by nesting depth.
+    const geometry=new Map();
+    for(const n of G.nodes)if(n.el)geometry.set(n,{
+      rect:n.el.getBoundingClientRect(),host:n._childHost?.getBoundingClientRect(),
+    });
+    const intersect=(a,b)=>({left:Math.max(a.left,b.left),top:Math.max(a.top,b.top),right:Math.min(a.right,b.right),bottom:Math.min(a.bottom,b.bottom)});
+    const clip=n=>{
+      const g=geometry.get(n);if(!g)return vr;
+      if(g.clip)return g.clip;
+      const parent=geometry.get(n._parentScope);
+      return g.clip=parent?.host?intersect(clip(n._parentScope),parent.host):vr;
+    };
+    for(const n of geometry.keys())clip(n);
+    return geometry;
+  },
   draw() {
     if(typeof Harness==="undefined"||!Harness.ready)return;
     const width=viewport.clientWidth,height=viewport.clientHeight,dpr=devicePixelRatio||1;
@@ -169,26 +187,28 @@ const Landscape = {
     }
     if(this.terrain)this.terrain.draw({s:view.z,ox:-view.x/view.z,oy:-view.y/view.z},width,height);
     const byId=new Map(G.nodes.map(n=>[n.id,n])),vr=viewport.getBoundingClientRect();
+    const geometry=this.measure(vr),visibility=[];
+    this.drawingGeometry=geometry;
+    try {
     ctx.strokeStyle="#81aaa8";ctx.lineWidth=.7;
     for(const wire of G.wires){
       const from=byId.get(wire.from[0]),to=byId.get(wire.to[0]);if(!from?.el||!to?.el)continue;
       const closure=visibleClosure(from);
       if(closure===from||closure!==visibleClosure(to)||!closure._childHost)continue;
-      const a=from.el.getBoundingClientRect(),b=to.el.getBoundingClientRect(),clip=closure._childHost.getBoundingClientRect();
+      const a=geometry.get(from).rect,b=geometry.get(to).rect,clip=geometry.get(closure).host;
       if(clip.right<vr.left||clip.left>vr.right||clip.bottom<vr.top||clip.top>vr.bottom)continue;
       ctx.save();ctx.beginPath();ctx.rect(clip.left-vr.left,clip.top-vr.top,clip.width,clip.height);ctx.clip();
       ctx.beginPath();ctx.moveTo(a.right-vr.left,a.top+a.height/2-vr.top);ctx.lineTo(b.left-vr.left,b.top+b.height/2-vr.top);ctx.stroke();ctx.restore();
     }
     for(const n of G.nodes){
       if(!n.el)continue;
-      const rect=n.el.getBoundingClientRect(),vr=viewport.getBoundingClientRect();
+      const {rect,clip}=geometry.get(n);
       const box={x:(rect.left-vr.left-view.x)/view.z,y:(rect.top-vr.top-view.y)/view.z,w:rect.width/view.z,h:rect.height/view.z};
       const b=screen(box),scope=!!n.children?.length;
       const absorbed=visibleClosure(n)!==n;
-      const onScreen=b.x<=width&&b.y<=height&&b.x+b.w>=0&&b.y+b.h>=0;
+      const onScreen=rect.left<clip.right&&rect.top<clip.bottom&&rect.right>clip.left&&rect.bottom>clip.top&&clip.right>clip.left&&clip.bottom>clip.top;
       const detail=onScreen&&this.detailFor(n,b,absorbed);
-      n.el.style.visibility=detail?"visible":"hidden";
-      n.el.inert=n._program!==Harness.selected;
+      visibility.push([n,detail]);
       if(detail||!onScreen)continue;
       const size=Math.min(b.w,b.h);
       // The same interior survives at every depth, down to a pixel. Collapsing
@@ -197,9 +217,7 @@ const Landscape = {
       const hue=this.terrain?.hueOf(n._program||n.type)||175;
       ctx.save();
       if(!this.activityVisible(n))ctx.globalAlpha=.16;
-      for(let parent=n._parentScope;parent;parent=parent._parentScope){
-        const clip=parent._childHost.getBoundingClientRect();ctx.beginPath();ctx.rect(clip.left-vr.left,clip.top-vr.top,clip.width,clip.height);ctx.clip();
-      }
+      ctx.beginPath();ctx.rect(clip.left-vr.left,clip.top-vr.top,clip.right-clip.left,clip.bottom-clip.top);ctx.clip();
       ctx.fillStyle=scope?`hsl(${hue} 23% 28%)`:n.type.startsWith("beliefs.")?"#b2a270":n.type.startsWith("vm.")?"#ad93c2":"#669b9c";
       if(size<4){ctx.fillRect(b.x+b.w/2-1,b.y+b.h/2-1,2,2);}
       else {ctx.fillRect(b.x,b.y,b.w,b.h);ctx.strokeStyle=scope?"#8ac5bb":"#28383b";ctx.strokeRect(b.x,b.y,b.w,b.h);}
@@ -235,6 +253,12 @@ const Landscape = {
     ctx.setLineDash([]);
     const closureKey=Harness.selected+":"+G.nodes.map(n=>visibleClosure(n)?.id).join("|");
     if(this.closureKey!==closureKey){this.closureKey=closureKey;redraw();}
+    for(const [n,detail] of visibility){
+      const value=detail?"visible":"hidden",inert=n._program!==Harness.selected;
+      if(n.el.style.visibility!==value)n.el.style.visibility=value;
+      if(n.el.inert!==inert)n.el.inert=inert;
+    }
+    }finally{this.drawingGeometry=null;}
   },
   async refresh() {
     this.initLegend();

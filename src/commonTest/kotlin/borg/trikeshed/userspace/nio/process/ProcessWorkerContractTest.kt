@@ -1,6 +1,6 @@
 package borg.trikeshed.userspace.nio.process
 
-import kotlinx.coroutines.runBlocking
+import borg.trikeshed.runBlocking
 import kotlin.test.*
 
 class ProcessWorkerContractTest {

@@ -1,5 +1,6 @@
 package borg.trikeshed.btrfs
 
+import borg.trikeshed.cas.CasPaths
 import borg.trikeshed.job.ContentId
 import borg.trikeshed.reflink.InMemoryReferenceCounter
 import borg.trikeshed.userspace.nio.channels.spi.JvmProcessOperations
@@ -14,15 +15,15 @@ import kotlin.system.exitProcess
  * VAL-BTRFS-005 lane w-m5-integrity — WHOLE-SET cid re-verification at the application
  * layer, on the live btrfs volume, through TrikeShed's own store code.
  *
- * THE COUNTING RULE is inherited VERBATIM from VAL-BTRFS-002: the blob set is exactly
- * the files matching `<casRoot>/sha256/<2hex>/<62hex>` and nothing else under the mount
+ * The blob set includes `sha256/<h0>/<h1>/<h2>/<h3>/<60hex>` and legacy `sha256/<2hex>/<62hex>`.
+ * Nothing else under the mount
  * is a blob. `.tmp` residue is counted separately and must be zero.
  *
  * Every blob in that set — the FULL set, never a sample — is re-verified three ways:
- *   1. the cid implied by the PATH (`<2hex>` + `<62hex>`) is handed to
+ *   1. the cid implied by concatenating the hex path components is handed to
  *      `BtrfsReflinkStore.get()`, which itself re-hashes and throws on divergence;
  *   2. sha256 is recomputed here over the returned bytes and compared to `cid.hex`;
- *   3. `store.pathFor(cid)` is compared to the path the blob was found at, so a blob
+ *   3. the canonical or legacy path is compared to the path the blob was found at, so a blob
  *      cannot sit at a path the store would never address.
  *
  * The named exclusion list (VAL-BTRFS-002's planted-divergence cid) is passed in BY
@@ -40,25 +41,15 @@ private fun vsay(msg: String) {
 private fun hex256(bytes: ByteArray): String =
     MessageDigest.getInstance("SHA-256").digest(bytes).joinToString("") { "%02x".format(it) }
 
-/** THE COUNTING RULE, inherited verbatim from VAL-BTRFS-002. */
+/** The current and legacy layouts both belong to the stored blob set. */
 private fun countingRuleBlobSet(casRoot: Path): List<Path> {
     val sha = casRoot.resolve("sha256")
     if (!Files.isDirectory(sha)) return emptyList()
-    val hex = Regex("^[0-9a-f]+$")
-    val out = ArrayList<Path>()
-    Files.newDirectoryStream(sha).use { shards ->
-        for (shard in shards) {
-            val d = shard.fileName.toString()
-            if (!Files.isDirectory(shard) || d.length != 2 || !hex.matches(d)) continue
-            Files.newDirectoryStream(shard).use { files ->
-                for (f in files) {
-                    val n = f.fileName.toString()
-                    if (Files.isRegularFile(f) && n.length == 62 && hex.matches(n)) out.add(f)
-                }
-            }
-        }
+    val layout = Regex("(?:[0-9a-f]/){4}[0-9a-f]{60}|[0-9a-f]{2}/[0-9a-f]{62}")
+    Files.walk(sha, 5).use { paths ->
+        return paths.filter { Files.isRegularFile(it) && layout.matches(sha.relativize(it).joinToString("/")) }
+            .sorted().toList()
     }
-    return out.sortedBy { it.toString() }
 }
 
 private fun tmpResidueOf(casRoot: Path): List<Path> {
@@ -121,7 +112,7 @@ fun main(argv: Array<String>) {
 
     // ── the blob set, by the inherited counting rule ──────────────────────────
     val set = countingRuleBlobSet(casRootPath)
-    vsay("BLOB SET per the COUNTING RULE <casRoot>/sha256/<2hex>/<62hex> : ${set.size} files")
+    vsay("BLOB SET: sha256/<h0>/<h1>/<h2>/<h3>/<60hex> plus legacy 2/62 : ${set.size} files")
     val allRegular = Files.walk(casRootPath).use { s -> s.filter { Files.isRegularFile(it) }.toList() }
     vsay("all regular files under casRoot = ${allRegular.size} " +
         "(must equal the blob set, else something non-blob is hiding: ${allRegular.size == set.size})")
@@ -136,13 +127,12 @@ fun main(argv: Array<String>) {
     var totalLogicalBytes = 0L
 
     for (p in set) {
-        val shard = p.parent.fileName.toString()
-        val name = p.fileName.toString()
-        val hexFromPath = shard + name
+        val hexFromPath = casRootPath.resolve("sha256").relativize(p).joinToString("")
         val cid = ContentId("sha256:$hexFromPath")
 
         val pathFor = store.pathFor(cid)
-        val pathAgrees = Paths.get(pathFor).toAbsolutePath().normalize() == p.toAbsolutePath().normalize()
+        val pathAgrees = Paths.get(pathFor).toAbsolutePath().normalize() == p.toAbsolutePath().normalize() ||
+            casRootPath.resolve(CasPaths.legacyBlob(cid)).toAbsolutePath().normalize() == p.toAbsolutePath().normalize()
 
         var got: ByteArray? = null
         var thrown: String? = null

@@ -121,8 +121,8 @@ live)
   find "$MNT" -type f | head -20
   ctx "[VAL-BTRFS-002] directory-fanout count: shard directories under $CAS/sha256"
   find "$CAS/sha256" -mindepth 1 -maxdepth 1 -type d | wc -l
-  ctx "[VAL-BTRFS-002] blob set per the COUNTING RULE <casRoot>/sha256/<2hex>/<62hex>"
-  find "$CAS/sha256" -mindepth 2 -maxdepth 2 -type f -regextype posix-extended -regex '.*/sha256/[0-9a-f]{2}/[0-9a-f]{62}' | wc -l
+  ctx "[VAL-BTRFS-002] blob set: four single-hex shards plus 60 hex digits, and legacy 2/62"
+  find "$CAS/sha256" -mindepth 2 -maxdepth 5 -type f -regextype posix-extended -regex '.*/sha256/(([0-9a-f]/){4}[0-9a-f]{60}|[0-9a-f]{2}/[0-9a-f]{62})' | wc -l
   ctx "[VAL-BTRFS-002] all regular files under $CAS (must equal the blob set — nothing else is a blob)"
   find "$CAS" -type f | wc -l
   ctx "[VAL-BTRFS-002] .tmp residue check: find $CAS \\( -name '.*.tmp' -o -name '*.tmp' \\)"

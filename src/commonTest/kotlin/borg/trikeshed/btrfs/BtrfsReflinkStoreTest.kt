@@ -5,9 +5,12 @@ import borg.trikeshed.userspace.nio.file.spi.InMemoryFileOperations
 import borg.trikeshed.userspace.nio.channels.spi.ProcessOperations
 import borg.trikeshed.userspace.nio.channels.spi.ProcessResult
 import borg.trikeshed.reflink.InMemoryReferenceCounter
+import borg.trikeshed.util.oroboros.FileCasStore
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertContentEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
@@ -17,6 +20,36 @@ class BtrfsReflinkStoreTest {
     // filesystem at all; the btrfs guard is satisfied with an explicit stub so the
     // guard itself stays a REQUIRED constructor argument (no permissive default).
     private val BTRFS_PROBE = FilesystemTypeProbe { BtrfsReflinkStore.BTRFS }
+
+    @Test
+    fun testFourHexLayoutAndLegacyInterop() = runTest {
+        val fileOps = InMemoryFileOperations()
+        val processOps = MockProcessOperations()
+        val store = BtrfsReflinkStore(
+            "/btrfs/cas", fileOps, processOps, InMemoryReferenceCounter(), BTRFS_PROBE
+        )
+        val bytes = ByteArray(0)
+        val cid = ContentId.of(bytes)
+        val legacy = "/btrfs/cas/sha256/e3/b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        val current = "/btrfs/cas/sha256/e/3/b/0/c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        fileOps.write(legacy, bytes)
+        assertContentEquals(bytes, store.get(cid))
+        assertTrue(store.reflinkCopy(cid, "/btrfs/legacy-copy"))
+        assertEquals(listOf("--reflink=always", legacy, "/btrfs/legacy-copy"), processOps.lastArgs)
+
+        assertEquals(cid, store.put(bytes))
+        assertEquals(current, store.pathFor(cid))
+        assertTrue(fileOps.exists(current))
+        val fileStore = FileCasStore(fileOps, "/btrfs/cas")
+        assertContentEquals(bytes, fileStore.get(cid))
+        val other = "written by FileCasStore".encodeToByteArray()
+        assertContentEquals(other, store.get(fileStore.put(other)))
+        assertTrue(store.reflinkCopy(cid, "/btrfs/new-copy"))
+        assertEquals(listOf("--reflink=always", current, "/btrfs/new-copy"), processOps.lastArgs)
+
+        fileOps.write(current, "corrupt".encodeToByteArray())
+        assertFailsWith<IllegalStateException> { store.get(cid) }
+    }
 
     
     // Mock ProcessOperations

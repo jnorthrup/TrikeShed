@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Documents</title>
+<style>
+:root{--bg:#111315;--panel:#1c2022;--panel2:#24292c;--line:#3c4448;--ink:#e9eeee;--dim:#a0adb1;--graal:#64ceca}
+html,body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif}
+header.top{display:flex;gap:16px;align-items:center;padding:8px 14px;border-bottom:1px solid var(--line);background:var(--panel)}
+header.top b{letter-spacing:.06em}
+header.top a{color:var(--graal);text-decoration:none}
+#document-surface{display:grid;grid-template-columns:220px 300px 1fr;height:calc(100vh - 41px)}
+.ds-pane{overflow:auto;border-right:1px solid var(--line);padding:10px 12px}
+.ds-doc{border-right:0;padding:14px 28px;max-width:900px}
+.ds-pane h2{font-size:12px;text-transform:uppercase;letter-spacing:.08em;color:var(--dim);margin:6px 0 8px}
+.ds-list{list-style:none;margin:0;padding:0}
+.ds-list a{display:block;padding:6px 8px;border-radius:5px;color:var(--ink);text-decoration:none}
+.ds-list a:hover{background:var(--panel2)}
+.ds-list a.ds-selected{background:var(--panel2);box-shadow:inset 2px 0 0 var(--graal)}
+.ds-dim{color:var(--dim);font-size:12px}
+.ds-empty{color:var(--dim)}
+.ds-actions a{color:var(--graal)}
+.ds-head h1{font-size:20px;margin:0 0 6px}
+.ds-meta{display:grid;grid-template-columns:auto 1fr;gap:2px 12px;margin:0 0 16px;font-size:12px;color:var(--dim)}
+.ds-meta dt{margin:0}
+.ds-meta dd{margin:0;color:var(--ink)}
+.ds-body pre,.ds-extract pre{background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:10px;overflow:auto}
+.ds-body code,.ds-extract code{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12.5px}
+.ds-body a{color:var(--graal)}
+.ds-body blockquote{border-left:3px solid var(--line);margin:8px 0;padding:2px 12px;color:var(--dim)}
+.ds-extract{margin-top:24px;padding-top:12px;border-top:1px dashed var(--line)}
+.ds-loading{padding:16px;color:var(--dim)}
+</style>
+</head>
+<body>
+<header class="top"><b>DOCUMENTS</b><a href="/harness">Blackboard ↗</a><a href="/kanban">Board ↗</a><span class="ds-dim">every pane is drawn by commonMain Kotlin through the browser bundle</span></header>
+<div id="document-surface" class="ds"><p class="ds-loading">Loading the Kotlin/JS bundle (/kotlin/TrikeShed.js). If this line stays, run <code>./gradlew stageKotlinJs</code> and reload.</p></div>
+<script src="/kotlin/TrikeShed.js" defer></script>
+</body>
+</html>

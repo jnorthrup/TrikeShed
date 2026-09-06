@@ -191,8 +191,8 @@ ERRSUM="$(grep -c -E 'read_errors: *[1-9]|csum_errors: *[1-9]|verify_errors: *[1
 echo "non-zero error-counter lines across scrub status -d and -R = $ERRSUM   (must be 0)"
 
 # ── the counting rule, from the shell, and the .tmp residue check ──────────────
-ctx "[VAL-BTRFS-005] COUNTING RULE (inherited verbatim from VAL-BTRFS-002): find <casRoot>/sha256 -regex '.*/sha256/[0-9a-f]{2}/[0-9a-f]{62}'"
-find "$CAS/sha256" -mindepth 2 -maxdepth 2 -type f -regextype posix-extended -regex '.*/sha256/[0-9a-f]{2}/[0-9a-f]{62}' | wc -l
+ctx "[VAL-BTRFS-005] COUNTING RULE: four single-hex shards plus 60 hex digits, and legacy 2/62"
+find "$CAS/sha256" -mindepth 2 -maxdepth 5 -type f -regextype posix-extended -regex '.*/sha256/(([0-9a-f]/){4}[0-9a-f]{60}|[0-9a-f]{2}/[0-9a-f]{62})' | wc -l
 ctx "[VAL-BTRFS-005] all regular files under $CAS (must equal the blob set — nothing else is a blob)"
 find "$CAS" -type f | wc -l
 ctx "[VAL-BTRFS-005] find $CAS -name '*.tmp'  (and the writeAtomically dot-prefixed form) — must return NOTHING"
@@ -204,9 +204,10 @@ BAD=0; N=0
 while IFS= read -r f; do
   N=$((N+1))
   H="$(sha256sum "$f" | cut -d' ' -f1)"
-  E="$(basename "$(dirname "$f")")$(basename "$f")"
+  E="${f#"$CAS/sha256/"}"
+  E="${E//\//}"
   if [ "$H" != "$E" ]; then BAD=$((BAD+1)); echo "MISMATCH $f  sha256=$H  expected=$E"; fi
-done < <(find "$CAS/sha256" -mindepth 2 -maxdepth 2 -type f -regextype posix-extended -regex '.*/sha256/[0-9a-f]{2}/[0-9a-f]{62}' | sort)
+done < <(find "$CAS/sha256" -mindepth 2 -maxdepth 5 -type f -regextype posix-extended -regex '.*/sha256/(([0-9a-f]/){4}[0-9a-f]{60}|[0-9a-f]{2}/[0-9a-f]{62})' | sort)
 echo "sha256sum cross-check: $N blobs hashed, $BAD mismatches"
 
 # ── the application-layer full-set re-verification ─────────────────────────────

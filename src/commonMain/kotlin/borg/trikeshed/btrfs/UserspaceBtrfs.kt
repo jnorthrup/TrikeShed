@@ -1,5 +1,6 @@
 package borg.trikeshed.btrfs
 
+import borg.trikeshed.cas.CasPaths
 import borg.trikeshed.job.ContentId
 import borg.trikeshed.userspace.nio.file.spi.FileOperations
 
@@ -270,11 +271,15 @@ class UserspaceBtrfs(val rootDir: String, val fileOps: FileOperations) {
 
     private fun putExtentVerified(id: String, bytes: ByteArray) {
         val path = extentPathOf(id)
-        if (!fileOps.exists(path)) fileOps.write(path, bytes.copyOf())
+        if (!fileOps.exists(path)) {
+            fileOps.mkdirs(fileOps.resolvePath(extentsDir, CasPaths.shard(ContentId(id))))
+            fileOps.writeAtomically(path, bytes.copyOf())
+        }
     }
 
     private fun getExtent(id: String): ByteArray? {
-        val path = extentPathOf(id)
+        val current = extentPathOf(id)
+        val path = if (fileOps.exists(current)) current else legacyExtentPathOf(id)
         if (!fileOps.exists(path)) return null
         val bytes = fileOps.readAllBytes(path)
         return if (ContentId.of(bytes).value == id) bytes else null // silent corruption caught, not served
@@ -283,17 +288,32 @@ class UserspaceBtrfs(val rootDir: String, val fileOps: FileOperations) {
     private fun sweepUnreferencedExtents() {
         val live = HashSet<String>()
         for (sv in subvolumes.values) for (e in sv.entries.values) e.extentId?.let(live::add)
-        for (name in fileOps.listDir(extentsDir).map { it.substringBefore('/') }.distinct()) {
-            if (name !in live) runCatching { fileOps.deleteRecursively(extentPathOf(rawExtentName(name))) }
+        val sharded = Regex("sha256/(?:[0-9a-f]/){4}[0-9a-f]{60}")
+        val legacy = Regex("sha256_[0-9a-f]{64}")
+        fun sweep(directory: String, prefix: String) {
+            for (name in fileOps.listDir(directory).map { it.substringBefore('/') }.distinct()) {
+                val path = fileOps.resolvePath(directory, name)
+                val relative = prefix + name
+                if (fileOps.isDir(path)) {
+                    sweep(path, "$relative/")
+                } else if (fileOps.isFile(path)) {
+                    val id = when {
+                        sharded.matches(relative) -> "sha256:" + relative.removePrefix("sha256/").replace("/", "")
+                        legacy.matches(relative) -> relative.replace('_', ':')
+                        else -> continue
+                    }
+                    if (id !in live) runCatching { fileOps.deleteRecursively(path) }
+                }
+            }
         }
+        sweep(extentsDir, "")
     }
 
     // ── manifest persistence ─────────────────────────────────────
 
     private fun manifestPathOf(name: String) = fileOps.resolvePath(subvolDir, "$name.manifest")
-    private fun extentPathOf(id: String) = fileOps.resolvePath(extentsDir, fileSafe(id))
-    private fun fileSafe(id: String) = id.replace(':', '_')
-    private fun rawExtentName(fileSafeName: String) = fileSafeName.replace('_', ':')
+    private fun extentPathOf(id: String) = fileOps.resolvePath(extentsDir, CasPaths.blob(ContentId(id)))
+    private fun legacyExtentPathOf(id: String) = fileOps.resolvePath(extentsDir, id.replace(':', '_'))
 
     private fun persistManifest(name: String) {
         val sv = subvolumes[name] ?: return

@@ -2,7 +2,7 @@ package borg.trikeshed.cas
 
 import borg.trikeshed.job.ContentId
 import borg.trikeshed.userspace.volume.Volume
-import kotlinx.coroutines.runBlocking
+import borg.trikeshed.runBlocking
 import kotlin.random.Random
 import kotlin.test.*
 

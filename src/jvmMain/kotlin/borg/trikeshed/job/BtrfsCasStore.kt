@@ -1,5 +1,7 @@
 package borg.trikeshed.job
 
+import borg.trikeshed.cas.CasPaths
+
 import borg.trikeshed.lib.Series
 import borg.trikeshed.lib.Series2
 import borg.trikeshed.lib.j
@@ -29,26 +31,16 @@ class BtrfsCasStore(
     private val root: File,
 ) {
     
-    private val subdirs = mutableSetOf<String>()
-    
     init {
         root.mkdirs()
     }
     
-    private suspend fun cidPath(cid: ContentId): File {
-        val hash = cid.value
-        val prefix = hash.substring(0, 2)
-        val dir = File(root, prefix)
-        if (!subdirs.contains(prefix)) {
-            withContext(Dispatchers.IO) { dir.mkdirs() }
-            subdirs.add(prefix)
-        }
-        return File(dir, hash)
-    }
+    private fun cidPath(cid: ContentId): File = File(root, CasPaths.blob(cid))
     
     suspend fun put(bytes: ByteArray): ContentId {
         val cid = ContentId.of(bytes)
         val target = cidPath(cid)
+        withContext(Dispatchers.IO) { target.parentFile.mkdirs() }
         
         val exists = withContext(Dispatchers.IO) { target.exists() }
         if (exists) {
@@ -97,7 +89,10 @@ class BtrfsCasStore(
     }
     
     suspend fun get(cid: ContentId): ByteArray? {
-        val target = cidPath(cid)
+        val target = withContext(Dispatchers.IO) {
+            cidPath(cid).takeIf { it.exists() }
+                ?: File(root, "sh/${cid.value}")
+        }
         val exists = withContext(Dispatchers.IO) { target.exists() }
         if (!exists) return null
         

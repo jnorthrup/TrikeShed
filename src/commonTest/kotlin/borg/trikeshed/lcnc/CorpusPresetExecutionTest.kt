@@ -31,7 +31,7 @@ class CorpusPresetExecutionTest {
         )
 
     @Test
-    fun theDigestSummarisesEveryMatchingDocumentWithTheStoredPrompt() = runBlocking {
+    fun theDigestSummarisesEveryMatchingDocumentWithTheStoredPrompt(): Unit = runBlocking {
         val corpus = InMemoryProjectCorpus().apply {
             put("notes", "a.md", "alpha".encodeToByteArray())
             put("notes", "sub/b.md", "beta".encodeToByteArray())
@@ -63,7 +63,7 @@ class CorpusPresetExecutionTest {
     }
 
     @Test
-    fun theSameCorpusTwiceYieldsTheSameDigest() = runBlocking {
+    fun theSameCorpusTwiceYieldsTheSameDigest(): Unit = runBlocking {
         val corpus = InMemoryProjectCorpus().apply { put("notes", "a.md", "alpha".encodeToByteArray()) }
         val prompts = InMemoryPromptReads().apply { put(LcncPromptSeeds.byName(LcncPromptSeeds.SUMMARIZE)!!) }
         val program = LcncProgramConfix.fromJson("preset-corpus", LcncPresets.all().getValue("preset-corpus"))

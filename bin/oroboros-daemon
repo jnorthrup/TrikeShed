@@ -75,7 +75,7 @@ LIB="$ROOT/build/staging/lib"
 
 # Materialize the classpath from a forge home's CAS per its manifest. The daemon
 # writes the manifest (kind\trelpath\tsha256hex\tlength) on every build-plane
-# absorb; blobs hardlink out of cas/sha256/<xx>/<rest> into .oroboros/runtime.
+# absorb; blobs hardlink out of cas/sha256/<h0>/<h1>/<h2>/<h3>/<rest> into .oroboros/runtime.
 # Idempotent: a matching manifest digest stamp skips the rebuild.
 hydrate_runtime() {
     local forge="$1"
@@ -93,7 +93,8 @@ hydrate_runtime() {
     local kind rel hex len blob dest
     while IFS=$'\t' read -r kind rel hex len; do
         [[ -z "$kind" || "$kind" == "#"* ]] && continue
-        blob="$forge/cas/sha256/${hex:0:2}/${hex:2}"
+        blob="$forge/cas/sha256/${hex:0:1}/${hex:1:1}/${hex:2:1}/${hex:3:1}/${hex:4}"
+        [[ -f "$blob" ]] || blob="$forge/cas/sha256/${hex:0:2}/${hex:2}"
         if [[ ! -f "$blob" ]]; then
             echo "[oroboros-daemon] CAS blob missing for $kind/$rel ($hex)" >&2
             rm -rf "$fresh"

@@ -166,7 +166,7 @@ class DurableStoragePrimitivesTest {
         val cas = FileCasStore(fileOps, root.toString())
         val expected = "durable Jules artifact".encodeToByteArray()
         val cid = cas.put(expected)
-        val objectPath = root.resolve("sha256").resolve(cid.hex.take(2)).resolve(cid.hex.drop(2))
+        val objectPath = root.resolve(borg.trikeshed.cas.CasPaths.blob(cid))
 
         try {
             Files.write(objectPath, "corrupt".encodeToByteArray())

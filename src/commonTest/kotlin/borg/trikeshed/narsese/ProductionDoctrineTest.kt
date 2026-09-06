@@ -10,7 +10,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertNotEquals
 import kotlin.test.assertTrue
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.runBlocking
+import borg.trikeshed.runBlocking
 
 class ProductionDoctrineTest {
     private fun cid(text: String): ContentId = ContentId.of(text.encodeToByteArray())

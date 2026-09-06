@@ -42,11 +42,10 @@ class BlackboardWire(val blackboard: ConfixBlackboard, scope: CoroutineScope) {
     }
 
     suspend fun route(method: String, path: String, text: String, respond: (suspend (ByteArray) -> Unit)? = null): JvmKanbanServer.HttpResponse? {
-        // R7: one consolidated blackboard page. Resource I/O stays off the reactor thread.
+        // The blackboard harness is the whole-board operator surface. Graal and LCNC
+        // panels keep their own canvases while sharing the same fact and API wires.
         if (method == "GET" && (path == "/blackboard" || path == "/blackboard/")) {
             return withContext(Dispatchers.IO) {
-                // One page, one landscape: /blackboard and /graal serve the SAME console
-                // document — the blackboard is the console's O panel, not a sibling page.
                 val html = BlackboardWire::class.java.classLoader
                     .getResourceAsStream("web/harness.html")
                     ?.bufferedReader(StandardCharsets.UTF_8)?.use { it.readText() }

@@ -500,14 +500,22 @@ class JvmKanbanServer(
         "/mux.css" to ("web/mux.css" to "text/css; charset=utf-8"),
         "/vendor/lucide-mux.js" to ("web/vendor/lucide-mux.js" to "application/javascript; charset=utf-8"),
         "/styles.css" to ("web/styles.css" to "text/css; charset=utf-8"),
-        "/panels.html" to ("web/harness.html" to "text/html; charset=utf-8"),
+        "/panels.html" to ("web/panels.html" to "text/html; charset=utf-8"),
         // the concentric construction canvas rides the page plane, not a module
         // claim — ModuleRouteRegistry is exact /api/* by discipline
-        "/panels" to ("web/harness.html" to "text/html; charset=utf-8"),
+        "/panels" to ("web/panels.html" to "text/html; charset=utf-8"),
         // the blackboard harness draws board territories and LCNC typed cables
         "/harness.html" to ("web/harness.html" to "text/html; charset=utf-8"),
         "/harness" to ("web/harness.html" to "text/html; charset=utf-8"),
+        // the document surface: the first page drawn by commonMain through the Kotlin/JS bundle
+        // (Forge genesis, Cut D); the bundle is staged by ./gradlew stageKotlinJs
+        "/documents.html" to ("web/documents.html" to "text/html; charset=utf-8"),
+        "/documents" to ("web/documents.html" to "text/html; charset=utf-8"),
+        "/kotlin/TrikeShed.js" to ("web/kotlin/TrikeShed.js" to "application/javascript; charset=utf-8"),
         "/patch.js" to ("web/patch.js" to "application/javascript; charset=utf-8"),
+        "/patch-shake.js" to ("web/patch-shake.js" to "application/javascript; charset=utf-8"),
+        "/patch-camera.js" to ("web/patch-camera.js" to "application/javascript; charset=utf-8"),
+        "/patch-camera.css" to ("web/patch-camera.css" to "text/css; charset=utf-8"),
         "/patch-layout.js" to ("web/patch-layout.js" to "application/javascript; charset=utf-8"),
         "/vendor/d3-force-3.0.0.js" to ("web/vendor/d3-force-3.0.0.js" to "application/javascript; charset=utf-8"),
         "/patch.css" to ("web/patch.css" to "text/css; charset=utf-8"),

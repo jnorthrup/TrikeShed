@@ -1,0 +1,13 @@
+#world{z-index:2}
+/* Fractional window offsets are pixel-snapped during painting but not hit
+   testing; that discrepancy is magnified thousands of times in deep rings. */
+.node.scope>.seed,.node.scope>.emit{line-height:14px}
+.vmark{scale:var(--verdict-scale,1)}
+#wires,#channels{left:0;top:0;width:100%;height:100%;z-index:1;overflow:hidden}
+#wires path,#channels path{vector-effect:non-scaling-stroke;stroke-linecap:round;stroke-width:calc(2.2px * var(--wire-scale,1))}
+#wires path.scope-binding,#channels path.chain{stroke-width:calc(1.5px * var(--wire-scale,1))}
+#channels path{stroke-width:calc(2px * var(--wire-scale,1))}
+#wires path.cand{stroke-width:calc(1.4px * var(--wire-scale,1))}
+#wires path.cand.near{stroke-width:calc(2.4px * var(--wire-scale,1))}
+#wires path.cand.only{stroke-width:calc(2.8px * var(--wire-scale,1));filter:none}
+#wires text.wiretype,#channels text{font-size:calc(12px * var(--wire-label-scale,1));stroke-width:calc(4px * var(--wire-label-scale,1))}

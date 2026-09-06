@@ -504,43 +504,44 @@ object OroborosDaemon {
         // ── The store: CAS-collapsed Couch (rev hash = body blob CID) over the forge-home CAS ──
         // Built before the HTTP tier so the server can host the PWA and the build out of it.
         // fileOps was created above (the KeyMux harness lane shares it).
-        // Store selection is EXPLICIT (mission-002 decision D6): `TRIKESHED_CAS=btrfs` selects
-        // the reflink store, anything else (default `file`) keeps FileCasStore. There is NO
-        // autodetect and NO silent fallback — if btrfs is asked for and the CAS root does not
-        // resolve onto a btrfs filesystem, the store's own guard throws and the daemon REFUSES
-        // TO BOOT here, loudly. A quiet degrade to FileCasStore is exactly the failure that
-        // would let "the daemon is on btrfs" pass while nothing had changed.
+        // This selects the host-filesystem CAS backend. UserspaceBtrfs worlds below
+        // use FileOperations independently of whether the host filesystem is Btrfs.
         val casRootPath = fileOps.resolvePath(forgeHome.absolutePath, "cas")
+        val casBacking = withContext(Dispatchers.IO) {
+            borg.trikeshed.btrfs.JvmFilesystemTypeProbe.probe(casRootPath)
+        }
         val casSelection = (System.getenv("TRIKESHED_CAS") ?: "file").trim().lowercase()
         var btrfsCasStore: borg.trikeshed.btrfs.BtrfsReflinkStore? = null
-        val casStore: borg.trikeshed.job.CasStore = when (casSelection) {
-            "btrfs" -> {
-                val store = try {
-                    borg.trikeshed.btrfs.BtrfsReflinkStore(
-                        rootDir = casRootPath,
-                        fileOps = fileOps,
-                        processOps = borg.trikeshed.userspace.nio.channels.spi.JvmProcessOperations(),
-                        refCounter = borg.trikeshed.reflink.InMemoryReferenceCounter(),
-                        fsProbe = borg.trikeshed.btrfs.JvmFilesystemTypeProbe,
-                    )
-                } catch (t: Throwable) {
-                    System.err.println("[OROBOROS] CAS STORE REFUSED: TRIKESHED_CAS=btrfs but $casRootPath is not on btrfs — ${t.message}")
-                    System.err.println("[OROBOROS] BOOT ABORTED: no silent fallback to FileCasStore (mission-002 decision D6).")
+        val casStore: borg.trikeshed.job.CasStore = withContext(Dispatchers.IO) {
+            when (casSelection) {
+                "btrfs" -> {
+                    val store = try {
+                        borg.trikeshed.btrfs.BtrfsReflinkStore(
+                            rootDir = casRootPath,
+                            fileOps = fileOps,
+                            processOps = borg.trikeshed.userspace.nio.channels.spi.JvmProcessOperations(),
+                            refCounter = borg.trikeshed.reflink.InMemoryReferenceCounter(),
+                            fsProbe = borg.trikeshed.btrfs.JvmFilesystemTypeProbe,
+                        )
+                    } catch (t: Throwable) {
+                        System.err.println("[OROBOROS] CAS STORE REFUSED: TRIKESHED_CAS=btrfs but $casRootPath is not on btrfs — ${t.message}")
+                        System.err.println("[OROBOROS] BOOT ABORTED: no silent fallback to FileCasStore (mission-002 decision D6).")
+                        exitProcess(1)
+                    }
+                    btrfsCasStore = store
+                    store
+                }
+                "file" -> FileCasStore(fileOps, casRootPath)
+                else -> {
+                    System.err.println("[OROBOROS] BOOT ABORTED: TRIKESHED_CAS='$casSelection' is not a known store (expected 'btrfs' or 'file').")
                     exitProcess(1)
                 }
-                btrfsCasStore = store
-                store
-            }
-            "file" -> FileCasStore(fileOps, casRootPath)
-            else -> {
-                System.err.println("[OROBOROS] BOOT ABORTED: TRIKESHED_CAS='$casSelection' is not a known store (expected 'btrfs' or 'file').")
-                exitProcess(1)
             }
         }
         System.err.println(
             "[OROBOROS] CAS STORE SELECTED: ${casStore::class.java.name} casRoot=$casRootPath " +
-                "TRIKESHED_CAS=$casSelection fstype=${borg.trikeshed.btrfs.JvmFilesystemTypeProbe.typeOf(casRootPath) ?: "<undeterminable>"} " +
-                "source=${borg.trikeshed.btrfs.JvmFilesystemTypeProbe.sourceOf(casRootPath) ?: "<undeterminable>"}"
+                "TRIKESHED_CAS=$casSelection fstype=${casBacking?.first ?: "<undeterminable>"} " +
+                "source=${casBacking?.second ?: "<undeterminable>"}"
         )
         // The D13 MATERIALIZE surface exists only when the btrfs store is live: reflinkReorganize
         // is a BtrfsReflinkStore member, absent from the CasStore base class.
@@ -1207,12 +1208,16 @@ object OroborosDaemon {
             attachmentGateway, casStore, borg.trikeshed.lcnc.PromptStore.ledgerFile(forgeHome), lcncPublisher,
         ) { System.currentTimeMillis() }
         val operatorMux = kotlinx.coroutines.CompletableDeferred<suspend () -> modelmux.ModelMux>()
+        // The mounted projects as one document set (Forge genesis, Cut F/D): the legos and the
+        // document surface read the same seam.
+        val projectCorpus = borg.trikeshed.forge.server.JvmProjectCorpus(projectDbRegistry, projectScopes)
         val patchWire = borg.trikeshed.forge.server.PatchWire(
             brain = brainClient,
             scopes = projectScopes,
             attachments = attachmentGateway,
             publisher = lcncPublisher,
             prompts = promptStore,
+            corpus = projectCorpus,
             muxContext = htxElement + muxReactor,
             mountScope = wireScope,
             miner = projectMiner,
@@ -1303,9 +1308,7 @@ object OroborosDaemon {
         }
         // Project documents as typed workflow input (Forge genesis, Cut F): project.list /
         // project.docs / project.read / project.extract over the mounted project databases.
-        moduleContext.lcncRunners.putAll(
-            borg.trikeshed.lcnc.ProjectNodes.registry(borg.trikeshed.forge.server.JvmProjectCorpus(projectDbRegistry, projectScopes)),
-        )
+        moduleContext.lcncRunners.putAll(borg.trikeshed.lcnc.ProjectNodes.registry(projectCorpus))
         // Pure/presentation node runners: canvas-authored programs (preset-kanban)
         // complete HEADLESS via /api/lcnc/run — the curl-able smoke-test lane.
         moduleContext.lcncRunners.putAll(borg.trikeshed.lcnc.PureNodes.registry { System.currentTimeMillis() })

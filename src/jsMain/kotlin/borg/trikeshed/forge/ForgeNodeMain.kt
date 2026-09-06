@@ -77,6 +77,12 @@ private suspend fun forgeNodeMain() {
     }
 
     val inBrowser = js("typeof window !== 'undefined' && typeof document !== 'undefined'") as Boolean
+    // The document surface (Forge genesis, Cut D): a served shell carrying #document-surface is
+    // painted by commonMain through DocumentSurfacePage; nothing else on that page is touched.
+    if (inBrowser && borg.trikeshed.docs.DocumentSurfacePage.present()) {
+        borg.trikeshed.docs.DocumentSurfacePage.mount()
+        return
+    }
     if (inBrowser && (js("document.getElementById('forge-seed') !== null") as Boolean)) {
         // GitHub Pages / JVM server: the page already carries the baked seed (ForgeBakePages). In a browser
         // loadProjection has no fs and would fall back to the demo seed, so never document.write over it —

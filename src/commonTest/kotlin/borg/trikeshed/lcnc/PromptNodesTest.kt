@@ -29,7 +29,7 @@ class PromptNodesTest {
     }
 
     @Test
-    fun getHonoursTheWireOverTheParamAndIsLoudWhenNothingNames() = runBlocking {
+    fun getHonoursTheWireOverTheParamAndIsLoudWhenNothingNames(): Unit = runBlocking {
         val get = PromptNodes.registry(reads()).getValue(PromptNodes.GET)
         val byParam = get.run(LcncNode("g", PromptNodes.GET, params = mapOf("name" to "hello")), emptyMap())
         assertEquals("Say hello in one sentence.", byParam["text"])
@@ -43,7 +43,7 @@ class PromptNodesTest {
     }
 
     @Test
-    fun renderFillsHolesFromAJsonArgsMap() = runBlocking {
+    fun renderFillsHolesFromAJsonArgsMap(): Unit = runBlocking {
         val render = PromptNodes.registry(reads()).getValue(PromptNodes.RENDER)
         val out = render.run(LcncNode("r", PromptNodes.RENDER), mapOf("template" to "Greet {{who}} in {{lang}}.", "args?" to mapOf("who" to "Jim", "lang" to "Kotlin")))
         assertEquals("Greet Jim in Kotlin.", out["text"])
@@ -51,7 +51,7 @@ class PromptNodesTest {
     }
 
     @Test
-    fun listReportsTheHeads() = runBlocking {
+    fun listReportsTheHeads(): Unit = runBlocking {
         val out = PromptNodes.registry(reads()).getValue(PromptNodes.LIST).run(LcncNode("l", PromptNodes.LIST), emptyMap())
         assertEquals(2, out["count"])
         val names = (out["prompts"] as List<*>).map { (it as Map<*, *>)["name"] }

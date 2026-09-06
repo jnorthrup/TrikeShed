@@ -3,7 +3,7 @@ package borg.trikeshed.lcnc
 import borg.trikeshed.lib.toSeries
 import borg.trikeshed.lib.toList
 import kotlinx.coroutines.currentCoroutineContext
-import kotlinx.coroutines.runBlocking
+import borg.trikeshed.runBlocking
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue

@@ -170,13 +170,19 @@ put_blob() {         # $1 = file, $2 = label — response saved to $WORK/put-$2.
 jf() { grep -o "\"$2\":\"[^\"]*\"" "$1" | head -1 | sed 's/.*":"//; s/"$//'; }
 
 blob_manifest() {    # $1 = out file — VAL-BTRFS-002's counting rule
-  find "$CAS/sha256" -type f -regextype posix-extended -regex '.*/sha256/[0-9a-f]{2}/[0-9a-f]{62}' 2>/dev/null \
-    | sed -E 's|.*/sha256/([0-9a-f]{2})/([0-9a-f]{62})$|\1\2|' | sort > "$1"
+  find "$CAS/sha256" -type f -regextype posix-extended -regex '.*/sha256/(([0-9a-f]/){4}[0-9a-f]{60}|[0-9a-f]{2}/[0-9a-f]{62})' 2>/dev/null \
+    | sed -E 's|.*/sha256/||; s|/||g' | sort -u > "$1"
+}
+blob_path() {        # $1 = CAS root, $2 = CID hex; prefer the current layout
+  local root="$1" hex="$2" path
+  path="$root/sha256/${hex:0:1}/${hex:1:1}/${hex:2:1}/${hex:3:1}/${hex:4}"
+  [ -f "$path" ] || path="$root/sha256/${hex:0:2}/${hex:2}"
+  echo "$path"
 }
 blob_bytes() {       # total bytes of the cids listed in $1
   local total=0 c f
   while read -r c; do
-    f="$CAS/sha256/${c:0:2}/${c:2}"
+    f="$(blob_path "$CAS" "$c")"
     [ -f "$f" ] && total=$((total + $(stat -c %s "$f")))
   done < "$1"
   echo "$total"
@@ -341,7 +347,7 @@ phase-a)
   ctx "[VAL-BTRFS-006c] the store's own refusal in the daemon log"
   tail -5 "$WORK/daemon-a-btrfs.log" | grep -i "read-only\|readonly" || tail -5 "$WORK/daemon-a-btrfs.log"
   ctx "[VAL-BTRFS-006c] blob2 must NOT be on the plane"
-  ls -l "$CAS/sha256/$(sha256sum /payload/blob2.bin | cut -c1-2)/$(sha256sum /payload/blob2.bin | cut -c3-64)" 2>&1 || true
+  ls -l "$(blob_path "$CAS" "$(sha256sum /payload/blob2.bin | cut -d' ' -f1)")" 2>&1 || true
 
   ctx "[VAL-BTRFS-006c] RESTORE: btrfs property set $CAS ro false"
   btrfs property set "$CAS" ro false
@@ -366,7 +372,7 @@ phase-a)
   ( : > "$SNAP/should-not-exist" ) 2>&1 || true
 
   ctx "[VAL-BTRFS-009] the snapshot holds the NAMED blob written over HTTP: $CID1"
-  ls -l "$SNAP/sha256/${HEX1:0:2}/${HEX1:2}"
+  ls -l "$(blob_path "$SNAP" "$HEX1")"
 
   ctx "[VAL-BTRFS-009] MUTATE the live plane — DELETE the named blob $CID1 (written through the daemon's HTTP surface, VAL-BTRFS-008's record)"
   rm -f "$PATH1"
@@ -383,9 +389,9 @@ phase-a)
   echo "added: $CID3  $CID4"
 
   ctx "[VAL-BTRFS-009] read the DELETED cid back OUT OF THE SNAPSHOT and verify sha256 == cid"
-  sha256sum "$SNAP/sha256/${HEX1:0:2}/${HEX1:2}"
+  sha256sum "$(blob_path "$SNAP" "$HEX1")"
   echo "cid hex : $HEX1"
-  SNAPHEX="$(sha256sum "$SNAP/sha256/${HEX1:0:2}/${HEX1:2}" | cut -d' ' -f1)"
+  SNAPHEX="$(sha256sum "$(blob_path "$SNAP" "$HEX1")" | cut -d' ' -f1)"
   if [ "$SNAPHEX" = "$HEX1" ]; then echo "EARLY MEMORY SURVIVES: sha256(snapshot bytes) == cid"; else echo "MISMATCH — FAIL"; fi
 
   sync_fs
@@ -405,7 +411,7 @@ phase-a)
   # ── VAL-BTRFS-007: the MANIFEST is the FIRST act of the durability window ──
   sync_fs
   ctx "[VAL-BTRFS-007] MANIFEST — captured AFTER VAL-BTRFS-009's mutation, as the FIRST act of the durability window"
-  echo "command: find $CAS/sha256 -type f -regextype posix-extended -regex '.*/sha256/[0-9a-f]{2}/[0-9a-f]{62}' | sed -E 's|.*/sha256/(..)/(.*)|\\1\\2|' | sort"
+  echo "command: blob_manifest (four single-hex shards plus legacy 2/62, unique CIDs)"
   blob_manifest "$WORK/manifest.txt"
   MCOUNT=$(wc -l < "$WORK/manifest.txt"); MBYTES=$(blob_bytes "$WORK/manifest.txt")
   echo "manifest captured at $(date -u +%Y-%m-%dT%H:%M:%SZ)"
@@ -445,7 +451,7 @@ phase-a)
   bad=0; n=0
   while read -r c; do
     n=$((n+1))
-    h="$(sha256sum "$CAS/sha256/${c:0:2}/${c:2}" 2>/dev/null | cut -d' ' -f1)"
+    h="$(sha256sum "$(blob_path "$CAS" "$c")" 2>/dev/null | cut -d' ' -f1)"
     [ "$h" = "$c" ] || { echo "MISMATCH $c -> ${h:-<missing>}"; bad=$((bad+1)); }
   done < "$WORK/manifest.txt"
   echo "re-verified $n/$MCOUNT manifest cids; mismatches=$bad"
@@ -494,7 +500,7 @@ phase-b)
   bad=0; n=0
   while read -r c; do
     n=$((n+1))
-    h="$(sha256sum "$CAS/sha256/${c:0:2}/${c:2}" 2>/dev/null | cut -d' ' -f1)"
+    h="$(sha256sum "$(blob_path "$CAS" "$c")" 2>/dev/null | cut -d' ' -f1)"
     [ "$h" = "$c" ] || { echo "MISMATCH $c -> ${h:-<missing>}"; bad=$((bad+1)); }
   done < "$WORK/manifest.txt"
   echo "re-verified $n/$MCOUNT manifest cids; mismatches=$bad"
@@ -552,7 +558,7 @@ control)
        -w '\nHTTP %{http_code}\n' "$BASE/trikeshed/m5-host-control-doc"
   curl -sS -w '\nHTTP %{http_code}\n' "$BASE/trikeshed/m5-host-control-doc"
   ctx "[CONTROL] blobs the FileCasStore control wrote (its own CAS root, on the overlay)"
-  find /root/forge-control/cas/sha256 -type f -regextype posix-extended -regex '.*/sha256/[0-9a-f]{2}/[0-9a-f]{62}' | wc -l
+  find /root/forge-control/cas/sha256 -type f -regextype posix-extended -regex '.*/sha256/(([0-9a-f]/){4}[0-9a-f]{60}|[0-9a-f]{2}/[0-9a-f]{62})' | wc -l
   ctx "[CONTROL] THE DISCRIMINATOR: the store-attributable observable is ABSENT from this run's log"
   echo "grep -c '\\[BTRFS-CAS\\]' $WORK/daemon-control.log  ->  $(grep -c '\[BTRFS-CAS\]' "$WORK/daemon-control.log")"
   grep '\[BTRFS-CAS\]' "$WORK/daemon-control.log" | head -5 || echo "(no [BTRFS-CAS] lines — as required)"

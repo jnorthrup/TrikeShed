@@ -169,6 +169,6 @@ class BtrfsHostedVmWorldTest {
     private fun extentCount(root: String): Int {
         val dir = Path.of(root, "extents")
         if (!Files.isDirectory(dir)) return 0
-        Files.list(dir).use { return it.count().toInt() }
+        Files.walk(dir).use { return it.filter(Files::isRegularFile).count().toInt() }
     }
 }

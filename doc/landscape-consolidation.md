@@ -16,7 +16,7 @@ point neither deletes its scope nor grants execution authority.
 | Immutable attribution | Replay retains the WAL's recorded CID, never a CID recomputed from parsed JSON. `programCid` identifies frozen program bytes; `receiptCid` identifies the raw work command carrying the receipt. |
 | Receipt lineage | Raw `lcncRun` payloads carry `previousReceiptCid`, not inherited current `receiptCid`, `sequence` or `timelineRevision`. Those current coordinates are derived from the actual commit. Older payloads remain readable. |
 | Program closure | `versionPolicy` is `root-at-admission,subprogram-at-first-use`. Named children are pinned on first acquisition and recorded in `programVersions`. This is not an admission-time snapshot of every dependency or the runtime environment. |
-| Navigation | `/harness`, `/panels`, `/panels.html`, `/blackboard` and `/graal` share the harness. Camera bookmarks and scoped identities are view state; unpublished drafts remain caller-owned. |
+| Navigation | `/harness` and `/blackboard` share the Blackboard surface. `/panels` and `/panels.html` retain Construction Panels; `/graal` retains its console. Panels and Harness consume `patch-camera.js` and `patch-shake.js`, not copies of their implementations. Camera bookmarks and scoped identities are view state; unpublished drafts remain caller-owned. |
 | Inspection | `GET /api/lcnc/content?cid=...` reads and verifies the execution store's exact JSON bytes. Optional `key` locates a published, unexecuted program only when its canonical bytes match the requested CID. `view=sheet` reuses Confix sheet projection and the existing concentric renderer. No inspection triggers execution. |
 
 Storage roles remain independent: hot lookup, immutable CAS identity, canonical
@@ -50,7 +50,7 @@ distinguishable; term matches and spatial proximity are not evidence.
 | --- | --- | --- |
 | Integrity | `BoardStoreElementTest`: grouped flush, invisible unflushed state, failed intake, restart ordering and original command identity. `LcncRunProgramRouteTest`: restart receipts and immutable content/lineage. | Crash behavior beyond the existing WAL contract is not newly certified. |
 | Projection | `BlackboardRecoveryTest`, `BlackboardWireRepairTest`, `BlackboardSheetRouteTest`, `ProjectionBudgetTest`, `JsonArrayShapeTest`. | Large projections must continue to satisfy combined limits, including fallback values. |
-| Navigation | `src/jvmTest/js/landscape.test.cjs`: identity bookmarks, reversible closure collapse, bounded streams and stale inspection isolation. `BlackboardPageTest`: served route aliases. Live browser checks below cover the core journey. | Legacy operational capability parity still requires explicit review; route parity alone does not prove feature parity. |
+| Navigation | `src/jvmTest/js/landscape.test.cjs`: identity bookmarks, reversible closure collapse, bounded streams and stale inspection isolation. `BlackboardPageTest`: distinct page identities and shared assets. Live browser checks below cover the core journey. | Legacy operational capability parity still requires explicit review; route parity alone does not prove feature parity. |
 | Runtime | `LcncRunProgramRouteTest`: stored/inline scopes, server validation, work limit, timeout and cancellation receipts. | Single-node compatibility dispatch is not yet on the scoped-run receipt contract. |
 
 The build gate remains `./gradlew jvmMainClasses --console=plain`; targeted
@@ -134,6 +134,27 @@ reported one weak warning and one style suggestion; repository-wide warnings
 remain outside this increment's clean-build claim.
 
 ### Scope Inputs and Connection Diagnostics
+
+Both construction surfaces now consume the shared `patch-shake.js` request
+and verdict renderer. Panels sends its serialized program tree, not `G` with
+flattened children, DOM references and cyclic parent pointers. The duplicate
+browser matchers are removed from both pages: server refusal, timeout or bad
+JSON cannot fall back to local cable creation. Requests are single-flight,
+limited to 1 MiB, and aborted after eight seconds. Edits, program changes and
+Panels remounts invalidate pending results; camera movement does not.
+
+Panels targets its displayed construction. Harness retains its selected-parent
+contract, namespace mapping and server scope confirmation. This consolidation
+does not claim that Panels' remaining compatibility execution and layout code
+has been migrated. Shared coverage and optional/binding verdicts are displayed
+without claiming that every unconnected socket is an error. A no-op does not
+save or remount; accepted cables are one undoable change.
+
+`controls.inspectionOnly` survives Panels import, serialization and export, so
+diagnostic specimens reach the server's inspection-only matcher. They cannot
+arm client sources or execute through Panels Run, including after undo/redo.
+Regression coverage: `panels-shake.test.cjs`; live browser acceptance:
+`panels-shake-browser.check.cjs` (execution and publication blocked).
 
 Scope sockets are projected from direct child `scope.in` and `scope.out`
 declarations, alongside the existing envelope ports. Captions are not sockets:

@@ -1327,3 +1327,16 @@ tasks.register<JavaExec>("curatorStateModel") {
     providers.gradleProperty("profileDir").orNull?.let { args(it) }
     providers.gradleProperty("daysAhead").orNull?.let { args(it) }
 }
+
+// ── The document surface's bundle (Forge genesis, Cut D) ────────────────────
+// GWT-style: page logic is commonMain Kotlin compiled to the browser bundle. This stages that
+// bundle beside the JVM resources so the daemon serves it at /kotlin/TrikeShed.js for
+// /documents. It is not part of hotswapFeed (webpack is a separate step); run it when the
+// bundle's sources change: ./gradlew stageKotlinJs
+tasks.register<Copy>("stageKotlinJs") {
+    group = "forge"
+    description = "Stage build/kotlin-webpack/js/productionExecutable/TrikeShed.js as web/kotlin/TrikeShed.js under the JVM resources."
+    dependsOn("jsBrowserProductionWebpack")
+    from(project.layout.buildDirectory.dir("kotlin-webpack/js/productionExecutable")) { include("TrikeShed.js") }
+    into(project.layout.buildDirectory.dir("processedResources/jvm/main/web/kotlin"))
+}

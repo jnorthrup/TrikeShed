@@ -8,6 +8,8 @@ const path = require("node:path");
 const web = path.resolve(__dirname, "../../commonMain/resources/web");
 const navigation = require(path.join(web, "landscape-navigation.js"));
 const patchLayout = require(path.join(web, "patch-layout.js"));
+const cameraSource = fs.readFileSync(path.join(web, "patch-camera.js"), "utf8");
+const shakeSource = fs.readFileSync(path.join(web, "patch-shake.js"), "utf8");
 
 function fixture() {
   const elements = new Map();
@@ -25,13 +27,14 @@ function fixture() {
   const context = vm.createContext({
     document:{getElementById:element}, $:selector=>element(selector.slice(1)),
     URL, URLSearchParams, AbortController, TextDecoder, TextEncoder, Uint8Array, setTimeout, clearTimeout,
-    PatchLayout:patchLayout,
+    PatchLayout:patchLayout, LandscapeNavigation:navigation,
     G:{nodes:[],wires:[]},
     fetch:async()=>{throw Error("unexpected fetch");},
   });
   vm.runInContext(fs.readFileSync(path.join(web,"landscape.js"),"utf8")+"\nglobalThis.landscape=Landscape;",context);
   const harness = fs.readFileSync(path.join(web,"harness.js"),"utf8").split("\nAUTOSAVE=false;")[0];
   vm.runInContext(harness+"\nglobalThis.harness=Harness;",context);
+  vm.runInContext(shakeSource.slice(0,shakeSource.indexOf("let STARVED=")),context);
   return {context, landscape:context.landscape, harness:context.harness, element};
 }
 
@@ -43,8 +46,7 @@ test("Shake reuses verdict rendering with program-local identities and no-op pre
   let saves=0,report;
   context.save=()=>{saves++;};context.redraw=()=>{};
   harness.showConnections=(name,result)=>{report={name,result};};
-  const patch=fs.readFileSync(path.join(web,"patch.js"),"utf8");
-  vm.runInContext(patch.slice(patch.indexOf("function applyServerTreeShake("),patch.indexOf("function localTreeshake(")),context);
+  vm.runInContext(shakeSource.slice(shakeSource.indexOf("function applyServerTreeShake(")),context);
   harness.selected="scope-demo";harness.document=()=>({nodes:[{id:"arg"}],wires:[]});
   harness.replaceSelected=()=>assert.fail("no-op must not remount nodes");
   context.fetch=async()=>({ok:true,json:async()=>({ok:true,made:[],verdicts:[{nodeId:"arg",dir:"out",port:"value",status:"binding",label:"Default binding: hello"}],starved:[]})});
@@ -305,6 +307,35 @@ test("interactive detail sticks through zoom-out until another main owns edits",
   assert.equal(harness.prominent(),"b");
 });
 
+test("a deep landscape frame reads geometry once before writing visibility",()=>{
+  const {context,landscape,harness}=fixture();
+  let reads=0,writes=0;
+  const rect=(left=0,right=600)=>({left,right,top:0,bottom:400,width:right-left,height:400});
+  const read=r=>{assert.equal(writes,0,"layout read after a visibility write");reads++;return r;};
+  let parent=null;
+  for(let i=0;i<1000;i++){
+    const node={id:"a::"+i,_program:"a",type:"scope",_parentScope:i<16?parent:null,children:[]};
+    let visibility="",inert=false;
+    node.el={getBoundingClientRect:()=>read(rect()),style:{
+      get visibility(){return visibility;},set visibility(v){writes++;visibility=v;},
+    },get inert(){return inert;},set inert(v){writes++;inert=v;}};
+    if(i<16){node._childHost={getBoundingClientRect:()=>read(rect(0,100))};parent=node;}
+    context.G.nodes.push(node);
+  }
+  const child=context.G.nodes[16];child._parentScope=parent;
+  child.el.getBoundingClientRect=()=>read(rect(200,300));
+  harness.selected="a";harness.ready=true;
+  context.viewport={clientWidth:1000,clientHeight:800,getBoundingClientRect:()=>read({...rect(0,1000),bottom:800,height:800})};
+  context.view={x:0,y:0,z:1};context.devicePixelRatio=1;context.redraw=()=>{};
+  landscape.canvas={width:1000,height:800,getContext:()=>new Proxy({},{get:()=>()=>{},set:()=>true})};
+  landscape.draw();
+  assert.equal(reads,1017,"one read per node, scope window and viewport, independent of depth");
+  assert.equal(child.el.style.visibility,"hidden","clipped children cannot override parent visibility");
+  assert.equal(landscape.drawingGeometry,null,"frame geometry must not leak into later graph edits");
+  reads=0;writes=0;landscape.draw();
+  assert.equal(reads,1017);assert.equal(writes,0,"steady frames do not rewrite inert or visibility");
+});
+
 test("only a zoom into a dominant main transfers editing ownership",()=>{
   const {context,harness}=fixture();
   context.viewport={getBoundingClientRect:()=>({width:1000,height:800})};
@@ -323,11 +354,12 @@ test("only a zoom into a dominant main transfers editing ownership",()=>{
 
 test("the wheel routes ownership checks only on zoom-in",()=>{
   const {context,harness}=fixture();
-  const patch=fs.readFileSync(path.join(web,"patch.js"),"utf8");
+  const patch=cameraSource;
   let wheel,checks=0;
   context.viewport={addEventListener:(name,handler)=>{wheel=handler;},getBoundingClientRect:()=>({left:0,top:0,width:1000,height:800})};
   context.view={x:0,y:0,z:1};context.wheelPixels=e=>({dy:e.deltaY});
   context.applyView=()=>{};context.saveCameraSoon=()=>{};context.reducedMotion=true;
+  vm.runInContext(patch.slice(patch.indexOf("function scopeZoomCeiling"),patch.indexOf("function applyView")),context);
   harness.observeZoom=()=>{checks++;};
   const start=patch.indexOf('viewport.addEventListener("wheel",e=>{');
   vm.runInContext(patch.slice(start,patch.indexOf('},{passive:false});',start)+19),context);

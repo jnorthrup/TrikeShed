@@ -1,6 +1,7 @@
 package borg.trikeshed.util.oroboros
 
 import borg.trikeshed.cas.CasReplicationElement
+import borg.trikeshed.cas.CasPaths
 import borg.trikeshed.job.CasStore
 import borg.trikeshed.job.ContentId
 import borg.trikeshed.userspace.nio.file.spi.FileOperations
@@ -8,20 +9,15 @@ import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.channels.ReceiveChannel
 
 /**
- * File-backed CAS store using sharded paths (sha256/<first-two>/<rest>).
+ * File-backed CAS store using sha256/<hex[0]>/<hex[1]>/<hex[2]>/<hex[3]>/<hex[4:]>.
  */
 class FileCasStore(
     private val fileOps: FileOperations,
     private val casRoot: String
 ) : CasStore() {
 
-    private fun getShardedPath(cid: ContentId): String {
-        val hex = cid.hex
-        require(hex.length == 64) { "Invalid ContentId hex length" }
-        val dir = hex.substring(0, 2)
-        val file = hex.substring(2)
-        return fileOps.resolvePath(casRoot, "sha256", dir, file)
-    }
+    private fun getShardedPath(cid: ContentId): String =
+        fileOps.resolvePath(casRoot, CasPaths.blob(cid))
 
     override fun put(bytes: ByteArray): ContentId {
         val cid = ContentId.of(bytes)
@@ -31,7 +27,7 @@ class FileCasStore(
             return cid
         }
 
-        val dirPath = fileOps.resolvePath(casRoot, "sha256", cid.hex.substring(0, 2))
+        val dirPath = fileOps.resolvePath(casRoot, CasPaths.shard(cid))
         if (!fileOps.exists(dirPath)) fileOps.mkdirs(dirPath)
         // A corrupt object at the expected CID path is repaired from the
         // caller-provided bytes without ever exposing a partial object.
@@ -48,7 +44,9 @@ class FileCasStore(
     }
 
     override fun get(cid: ContentId): ByteArray? {
-        val path = getShardedPath(cid)
+        val shardedPath = getShardedPath(cid)
+        val path = if (fileOps.exists(shardedPath)) shardedPath
+            else fileOps.resolvePath(casRoot, CasPaths.legacyBlob(cid))
         if (!fileOps.exists(path)) return null
 
         val bytes = fileOps.readAllBytes(path)

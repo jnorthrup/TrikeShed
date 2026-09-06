@@ -397,18 +397,18 @@ const Harness = {
       if(!from||!to||from===to)continue;
       const path=document.createElementNS(svg.namespaceURI,"path");path.setAttribute("class","activity-ref");path.dataset.relation="reference";
       const title=document.createElementNS(svg.namespaceURI,"title");title.textContent=link.kind+": "+link.from+" → "+link.to+" (not causal support)";path.append(title);
-      path.setAttribute("d",bez({x:from.x+from.w,y:from.y+70},{x:to.x+to.w,y:to.y+70}));svg.append(path);
+      LandscapeNavigation.wireCurve(path,{x:from.x+from.w,y:from.y+70},{x:to.x+to.w,y:to.y+70},viewport,view);svg.append(path);
     }
     for (const [from,to] of this.narseseChains || []) {
       const a=from.getBoundingClientRect(), b=to.getBoundingClientRect();
       const ax=(a.right-w.left)/view.z, ay=(a.top+a.height/2-w.top)/view.z, bx=(b.right-w.left)/view.z, by=(b.top+b.height/2-w.top)/view.z;
       const path=document.createElementNS(svg.namespaceURI,"path");path.setAttribute("class","chain");
       path.dataset.relation="association";const title=document.createElementNS(svg.namespaceURI,"title");title.textContent="Term association, not causal support";path.append(title);
-      path.setAttribute("d",`M ${ax} ${ay} C ${ax+70} ${ay}, ${bx+70} ${by}, ${bx} ${by}`);svg.append(path);
+      LandscapeNavigation.wireCurve(path,{x:ax,y:ay},{x:bx,y:by},viewport,view,[{x:ax+70,y:ay},{x:bx+70,y:by}]);svg.append(path);
     }
     if(!receipt)return;
     const a=this.positions.get(receipt.programKey),b=this.positions.get("receipts");if(!a||!b)return;
-    const path=document.createElementNS(svg.namespaceURI,"path");path.dataset.relation="execution";path.setAttribute("d",bez({x:a.x+a.w,y:a.y+160},{x:b.x,y:b.y+160}));svg.append(path);
+    const path=document.createElementNS(svg.namespaceURI,"path");path.dataset.relation="execution";LandscapeNavigation.wireCurve(path,{x:a.x+a.w,y:a.y+160},{x:b.x,y:b.y+160},viewport,view);svg.append(path);
     const label=document.createElementNS(svg.namespaceURI,"text");label.setAttribute("x",String(a.x+a.w+8));label.setAttribute("y",String(a.y+147));label.textContent=receipt.status;svg.append(label);
   },
   summary(value) {
@@ -514,12 +514,18 @@ const Harness = {
       button.addEventListener("click",()=>this.inspect(event.key));host.append(button);
     }
   },
-  focus(box, identity="", remember=true) {
+  zoomCeiling(px,py,camera=view) { return scopeZoomCeiling(px,py,camera); },
+  restoreCamera(camera) {
+    if(typeof killMomentum==="function")killMomentum();
+    const r=viewport.getBoundingClientRect(),anchor={x:r.width/2,y:r.height/2};
+    Object.assign(view,LandscapeNavigation.zoomAt(camera,camera.z,anchor,this.zoomCeiling(anchor.x,anchor.y,camera)));
+  },
+  focus(box, identity="", remember=true, scale=1) {
     if(remember){this.viewHistory.push({camera:{...view},focus:this.focusKey,node:this.viewNode});if(this.viewHistory.length>64)this.viewHistory.shift();}
     this.focusKey=identity;this.viewNode=null;$("#viewBack").disabled=!this.viewHistory.length;
     if(typeof killMomentum==="function")killMomentum(); // a focus is a hard cut, never a glide target
     const r=viewport.getBoundingClientRect(),pad=30;
-    view.z=Math.min(4000,Math.max(.01,Math.min((r.width-pad*2)/box.w,(r.height-pad*2)/box.h)));
+    view.z=Math.min(LandscapeNavigation.maxZoom(scale),Math.max(LandscapeNavigation.minZoom,Math.min((r.width-pad*2)/box.w,(r.height-pad*2)/box.h)));
     view.x=(r.width-box.w*view.z)/2-box.x*view.z;view.y=(r.height-box.h*view.z)/2-box.y*view.z;applyView();redraw();
     this.rememberView();
   },
@@ -531,7 +537,7 @@ const Harness = {
   },
   previousView() {
     const previous=this.viewHistory.pop();if(!previous)return;
-    Object.assign(view,previous.camera);this.focusKey=previous.focus;this.viewNode=previous.node;
+    this.restoreCamera(previous.camera);this.focusKey=previous.focus;this.viewNode=previous.node;
     $("#viewBack").disabled=!this.viewHistory.length;applyView();redraw();this.rememberView();
   },
   enclosingView() {
@@ -567,7 +573,11 @@ const Harness = {
     const x=Math.min(...boxes.map(b=>b.x)),y=Math.min(...boxes.map(b=>b.y));
     this.focus({x,y,w:Math.max(...boxes.map(b=>b.x+b.w))-x,h:Math.max(...boxes.map(b=>b.y+b.h))-y});
   },
-  focusElement(el,identity="") {const a=el.getBoundingClientRect(),b=world.getBoundingClientRect();this.focus({x:(a.left-b.left)/view.z,y:(a.top-b.top)/view.z,w:a.width/view.z,h:a.height/view.z},identity);},
+  focusElement(el,identity="") {
+    const a=el.getBoundingClientRect(),b=world.getBoundingClientRect();
+    this.focus({x:(a.left-b.left)/view.z,y:(a.top-b.top)/view.z,w:a.width/view.z,h:a.height/view.z},identity,true,
+      el.offsetWidth>0?a.width/el.offsetWidth/view.z:1);
+  },
   output(receipt) {
     if(typeof HarnessArguments!=="undefined")HarnessArguments.record(receipt);
     if(!receipt?.programKey)return;
@@ -637,20 +647,7 @@ const Harness = {
       return result.made||[];
     }finally{clearTimeout(timer);}
   },
-  async shake(options) {
-    if(this.shaking||!this.selected)return;
-    const target=this.parentTarget();if(!target)return;
-    const name=this.selected,document=this.document(),snapshot=JSON.stringify(document),revision=this.parentRevision,parentId=target.handle.nodeId;
-    this.shaking=true;$("#shakeBtn").disabled=true;this.message("Checking connections in "+name);
-    try {
-      const response=await fetch("/api/lcnc/treeshake",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({program:document,options:{...options,parentId}})});
-      const result=await response.json();if(!response.ok||!result.ok)throw Error(result.detail||result.error||response.status);
-      if(this.selected!==name||this.parentRevision!==revision||JSON.stringify(this.document())!==snapshot){this.message("Connections or selected parent changed during the check; run Shake again");return;}
-      if(parentId!=null&&result.parentId!==parentId)throw Error("Server did not confirm the selected parent; use an updated server");
-      applyServerTreeShake(result,!!options?.optional,name);
-    }catch(e){this.message("Connections refused: "+e.message);}
-    finally{this.shaking=false;$("#shakeBtn").disabled=false;}
-  },
+  async shake(options) { return requestTreeShake(this,options,this.selected); },
   showConnections(program,result,summary) {
     this.connectionReport={program,result};
     const host=$("#connections");host.hidden=false;host.replaceChildren(this.el("h3","","Connections"),this.el("p","",summary));
@@ -755,7 +752,7 @@ const Harness = {
       buffer=[];hydrating=false;this.render();buildPalette();
       await Landscape.refresh();
       if(generation!==this.connectionGeneration)return;
-      if(bookmark){Object.assign(view,bookmark.camera);this.focusKey=bookmark.focus;applyView();redraw();}
+      if(bookmark){this.restoreCamera(bookmark.camera);this.focusKey=bookmark.focus;applyView();redraw();}
       else if(initial&&this.surface==="graal")this.focus(Landscape.objectBox,LandscapeNavigation.object(""));
       else if(initial&&!requested)this.fit(this.surface!=="panels");
       $("#connection").textContent="Live";$("#connection").classList.add("live");

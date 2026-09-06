@@ -1,5 +1,6 @@
 package borg.trikeshed.btrfs
 
+import borg.trikeshed.cas.CasPaths
 import borg.trikeshed.job.CasStore
 import borg.trikeshed.job.ContentId
 import borg.trikeshed.userspace.nio.channels.spi.ProcessOperations
@@ -25,7 +26,7 @@ fun interface FilesystemTypeProbe {
  * CAS store on a btrfs volume.
  *
  * Layout is BYTE-IDENTICAL to `FileCasStore.getShardedPath`
- * (`util/oroboros/Sha2CasBus.kt`): `<rootDir>/sha256/<hex[0:2]>/<hex[2:]>`, derived
+ * (`util/oroboros/Sha2CasBus.kt`): `<rootDir>/sha256/<h0>/<h1>/<h2>/<h3>/<hex[4:]>`, derived
  * from [ContentId.hex] and never from [ContentId.value] (which carries the
  * `"sha256:"` prefix — sharding on it would drop every blob into one `sh/`
  * directory with a colon in the file name).
@@ -88,16 +89,15 @@ class BtrfsReflinkStore(
         }
     }
 
-    /** `<rootDir>/sha256/<hex[0:2]>/<hex[2:]>` — identical to FileCasStore.getShardedPath. */
-    private fun cidPath(cid: ContentId): String {
-        val hex = cid.hex
-        require(hex.length == 64) { "Invalid ContentId hex length: ${hex.length}" }
-        return fileOps.resolvePath(rootDir, SHA256_DIR, hex.substring(0, 2), hex.substring(2))
+    private fun cidPath(cid: ContentId): String = fileOps.resolvePath(rootDir, CasPaths.blob(cid))
+
+    private fun readablePath(cid: ContentId): String = cidPath(cid).let { path ->
+        if (fileOps.exists(path)) path else fileOps.resolvePath(rootDir, CasPaths.legacyBlob(cid))
     }
 
     /** The shard directory for [cid] — created only on the write path. */
     private fun shardDir(cid: ContentId): String =
-        fileOps.resolvePath(rootDir, SHA256_DIR, cid.hex.substring(0, 2))
+        fileOps.resolvePath(rootDir, CasPaths.shard(cid))
 
     override fun put(bytes: ByteArray): ContentId {
         requireBtrfsRoot("put")
@@ -160,7 +160,7 @@ class BtrfsReflinkStore(
      */
     suspend fun reflinkReorganize(srcCid: ContentId, dstTopic: String, newPath: String): Boolean {
         requireBtrfsRoot("reflink-reorganize")
-        val srcPath = cidPath(srcCid)
+        val srcPath = readablePath(srcCid)
         val dstDirPath = if (dstTopic.isEmpty()) topicRoot else fileOps.resolvePath(topicRoot, dstTopic)
         val target = fileOps.resolvePath(dstDirPath, newPath)
         val targetParent = target.substringBeforeLast('/', dstDirPath)
@@ -190,7 +190,7 @@ class BtrfsReflinkStore(
      * measured (`filefrag -v`, `btrfs filesystem du -s`), never inferred from this boolean.
      */
     suspend fun reflinkCopy(srcCid: ContentId, dstPath: String): Boolean {
-        val srcPath = cidPath(srcCid)
+        val srcPath = readablePath(srcCid)
         if (!fileOps.exists(srcPath)) return false
 
         return try {
@@ -216,7 +216,7 @@ class BtrfsReflinkStore(
     fun pathFor(cid: ContentId): String = cidPath(cid)
 
     override fun get(cid: ContentId): ByteArray? {
-        val target = cidPath(cid)
+        val target = readablePath(cid)
         if (!fileOps.exists(target)) return null
 
         val bytes = fileOps.readAllBytes(target)
@@ -228,7 +228,6 @@ class BtrfsReflinkStore(
 
     companion object {
         const val BTRFS: String = "btrfs"
-        private const val SHA256_DIR: String = "sha256"
 
         /** Prefix of every line [emit] writes. Grep this to see what THIS store did. */
         const val OBSERVABLE_TAG: String = "[BTRFS-CAS]"

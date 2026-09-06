@@ -11,6 +11,7 @@ import kotlinx.coroutines.yield
 import kotlin.coroutines.CoroutineContext
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertContentEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertTrue
 
@@ -35,7 +36,7 @@ class MockFileOperations : FileOperations {
     override fun mkdirs(path: String) { directories.add(path) }
     override fun deleteRecursively(path: String) {}
     override fun resolvePath(vararg parts: String): String = parts.joinToString("/")
-    override fun readZip(path: String): List<Pair<String, ByteArray>> = emptyList()
+    override fun readZip(path: String): List<Join<String, ByteArray>> = emptyList()
     override fun createTempDir(prefix: String): String = prefix
     override fun close(fd: Int): Int = 0
     override fun size(fd: Int): Long = 0
@@ -54,7 +55,8 @@ class Sha2CasBusTest {
         val cid = bus.put(emptyBytes)
 
         assertEquals("sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855", cid.value)
-        assertTrue(fileOps.exists("casRoot/sha256/e3/b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"))
+        assertTrue(fileOps.exists("casRoot/sha256/e/3/b/0/c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"))
+        assertContentEquals(emptyBytes, FileCasStore(fileOps, "casRoot").get(cid))
 
         val events = bus.subscribe()
         val eventBytes = events.receive()
@@ -83,9 +85,7 @@ class Sha2CasBusTest {
 
         val bytes = "hello world".encodeToByteArray()
         val cid = ContentId.of(bytes)
-        val dir = cid.hex.substring(0, 2)
-        val file = cid.hex.substring(2)
-        val path = "casRoot/sha256/$dir/$file"
+        val path = "casRoot/sha256/b/9/4/d/27b9934d3e08a52e52d7da7dabfac484efe37a5380ee9088f7ace2efcde9"
 
         // Manually write corrupt bytes
         fileOps.write(path, "corrupt data".encodeToByteArray())
@@ -93,6 +93,26 @@ class Sha2CasBusTest {
         assertFailsWith<IllegalStateException> {
             fileCasStore.get(cid)
         }
+    }
+
+    @Test
+    fun testLegacyReadAndNewPublication() {
+        val fileOps = MockFileOperations()
+        val bytes = ByteArray(0)
+        val cid = ContentId.of(bytes)
+        val legacy = "casRoot/sha256/e3/b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        val current = "casRoot/sha256/e/3/b/0/c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        fileOps.write(legacy, bytes)
+
+        val store = FileCasStore(fileOps, "casRoot")
+        assertContentEquals(bytes, store.get(cid))
+        assertEquals(1, fileOps.memoryFiles.size)
+        assertEquals(cid, store.put(bytes))
+        assertTrue(fileOps.exists(current))
+        assertTrue(fileOps.exists(legacy))
+
+        fileOps.write(current, "corrupt".encodeToByteArray())
+        assertFailsWith<IllegalStateException> { store.get(cid) }
     }
 
     @OptIn(ExperimentalCoroutinesApi::class)

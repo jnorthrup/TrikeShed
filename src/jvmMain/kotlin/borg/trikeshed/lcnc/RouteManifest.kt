@@ -59,6 +59,8 @@ object RouteManifest {
             RouteEntry("GET", "/api/prompts", "the stored prompts: every head with its lineage"),
             RouteEntry("GET", "/api/prompts/{name}", "a prompt head's canonical bytes; ?history=1 lists its recorded versions"),
             RouteEntry("POST", "/api/prompts/{name}", "save a prompt version (text/plain, or JSON {text, role?, tags?, baseCid?}); a stale baseCid is refused"),
+            RouteEntry("GET", "/api/projects/{name}/docs", "a mounted project's document listing (prefix, glob, limit)"),
+            RouteEntry("GET", "/api/projects/{name}/docs/{id}", "one project document: text, cid, rev, seq, and the miner's extract twin"),
             RouteEntry("POST", "/api/projects/{name}/mine", "Tika/OCR mining over a project"),
             RouteEntry("GET", "/api/projects/{name}/mine", "mining progress"),
         ),
@@ -229,6 +231,9 @@ object RouteManifest {
             RouteEntry("GET", "/api/cap", "server capabilities"),
             RouteEntry("GET", "/api/metrics", "flywheel metrics (retired)"),
             RouteEntry("GET", "/harness", "blackboard harness surface"),
+            RouteEntry("GET", "/documents", "document surface: the first page drawn by commonMain through the Kotlin/JS bundle"),
+            RouteEntry("GET", "/documents.html", "document surface (file name form)"),
+            RouteEntry("GET", "/kotlin/TrikeShed.js", "the browser bundle compiled from commonMain (staged by ./gradlew stageKotlinJs)"),
         ),
     )
 

@@ -36,8 +36,8 @@ test("Shake reports actual socket coverage and does not label partial coverage a
     clearVerdicts(){},redraw(){},save(){},markPort(){},buildVerdicts(){},portCenter:()=>null,
     document:{querySelectorAll:()=>[]},CSS:{escape:x=>x},VERDICTS:[],STARVED:new Set(),
   });
-  const patch=fs.readFileSync(path.resolve(__dirname,"../../commonMain/resources/web/patch.js"),"utf8");
-  vm.runInContext(patch.slice(patch.indexOf("function applyServerTreeShake("),patch.indexOf("function localTreeshake(")),context);
+  const patch=fs.readFileSync(path.resolve(__dirname,"../../commonMain/resources/web/patch-shake.js"),"utf8");
+  vm.runInContext(patch.slice(patch.indexOf("function applyServerTreeShake(")),context);
   context.applyServerTreeShake({made:[],coverage:{connected:741,total:742}});
   assert.match(status.textContent,/741\/742 sockets connected \(99%\)/);
   context.applyServerTreeShake({made:[{fromNode:"a",fromPort:"out",toNode:"b",toPort:"in"}],coverage:{connected:742,total:742}});
