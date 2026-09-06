@@ -43,12 +43,25 @@ uses JDK representations for Kotlin strings and collections; do not label
 those mappings as application bypasses. Source dependency checks must resolve
 aliases and distinguish platform implementations from portable contracts.
 
-## Performance Evidence
+## Investigating Slowdowns
 
-Measure the portable call path and the concrete backend separately, using
-identical workloads. Record revision, actual backend, runtime/compiler flags,
-hardware/filesystem, payload sizes, concurrency, cache state, warmup, and a
-hard wall-clock deadline. Compare repeated runs before claiming a change.
+Start with a real-world slowdown in an actual workflow. Performance testing
+is an on-demand diagnostic, not a standing workload or a requirement for
+every edit. Do not keep benchmarks, allocation sampling, or profiling sessions
+running after the investigation. Ordinary operational telemetry is separate
+from active performance testing.
+
+Reproduce the symptom, form a specific hypothesis, and use the smallest
+bounded measurement that can distinguish causes. Verify the fix in the
+affected workflow, stop the diagnostic, and return to product work. Focused
+correctness checks and the compilation gate still apply.
+
+When comparison is useful, measure the portable call path and concrete backend
+with the same workload. Record enough context to reproduce the result:
+revision, actual backend, runtime, workload, cache state, and execution limit.
+Use repeated runs only when needed to distinguish an improvement from noise.
+The metrics below are options for a specific investigation, not a mandatory
+dashboard or continuous test battery.
 
 | Metric | Purpose |
 | --- | --- |

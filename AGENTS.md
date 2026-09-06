@@ -42,7 +42,10 @@ exempt a daemon, server, or application from this boundary.
   behind the SPI. Report unavailable capabilities and the backend actually
   used; never report an emulated operation as native support.
 - SPI placement alone proves neither portability nor speed. Follow the
-  conformance and measurement requirements in `docs/nio-spi-contract.md`.
+  conformance guidance in `docs/nio-spi-contract.md`. Performance investigation
+  is symptom-driven: reproduce a real slowdown, measure only what helps fix
+  it, verify the affected workflow, then stop. Do not maintain standing
+  benchmarks or always-on allocation profiling by default.
 
 ## Network: userspace.nio only
 
