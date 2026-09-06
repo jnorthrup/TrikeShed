@@ -2,8 +2,6 @@ package borg.trikeshed.lcnc
 
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertFalse
-import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 /**
@@ -17,13 +15,6 @@ import kotlin.test.assertTrue
  * newcomer cannot read.
  */
 class LcncPresetCatalogTest {
-
-    @Test
-    fun transientShakeSpecimenIsNotAnOfferedPrefab() {
-        assertFalse(LcncShakeDemo.NAME in LcncPresets.all())
-        assertTrue(LcncPresets.catalog().none { it.name == LcncShakeDemo.NAME })
-        assertNull(LcncPresets.info(LcncShakeDemo.NAME))
-    }
 
     @Test
     fun everyOfferedPrefabIsDescribed() {

@@ -295,10 +295,11 @@ class CouchDatabaseReplicationTest {
         val pusher = CouchReplicator(a.db, HttpExchange { method, url, body, type ->
             if (url.endsWith("/_cas") && method == "POST") sent += body!!.size
             peer.call(method, url, body, type)
-        }, maxPushBlobBytes = 200)
+        }, maxPushBlobBytes = 280) // the document's own canonical body (~226 B) fits; the 300 B attachment does not
         val e = assertFailsWith<IllegalStateException> { pusher.push("http://b/trikeshed") }
-        assertTrue(e.message!!.contains("huge.bin") && e.message!!.contains("300 bytes"), "the failure names the blob: ${e.message}")
-        assertTrue(sent.none { it > 200 }, "no oversized body was written toward the peer: $sent")
+        assertTrue(e.message!!.contains("huge.bin") && e.message!!.contains("300 bytes") && e.message!!.contains("push bound"),
+            "the failure names the document, the blob and the bound: ${e.message}")
+        assertTrue(sent.none { it > 280 }, "no oversized body was written toward the peer: $sent")
         assertNull(a.db.localGet(CouchReplicator.replicationId("push", "trikeshed", "http://b/trikeshed")), "the checkpoint holds")
     }
 }

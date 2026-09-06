@@ -22,6 +22,7 @@ import borg.trikeshed.forge.server.ForgeRoutes
 import borg.trikeshed.parse.json.JsonSupport
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.channels.ClosedReceiveChannelException
@@ -266,7 +267,11 @@ class JvmKanbanServer(
         httpScope.launch {
             val httpSlot = listener.register(Protocol.Http)
             while (true) {
-                val msg = httpSlot.consume()
+                // A closed slot is the listener shutting down (the finally below): end the worker
+                // quietly. Before this, the close resumed us with ClosedReceiveChannelException on a
+                // scope with no handler, and it surfaced as an uncaught exception in whatever ran next
+                // in the same JVM (CouchWireSocketTest → RequestFactoryProxyTest, 2026-09-05).
+                val msg = try { httpSlot.consume() } catch (_: kotlinx.coroutines.channels.ClosedReceiveChannelException) { break }
                 val payload = msg.payload
 
                 val wireNuid = nuid(Capability.Wireproto("http"), Nonce.RandomBytes(), Subnet.lanLocalhost)
@@ -362,8 +367,9 @@ class JvmKanbanServer(
             JvmLitebikeBindAdapter.bindAndServe(listener, port = port, connections = connections)
         } finally {
             kotlinx.coroutines.withContext(kotlinx.coroutines.NonCancellable) {
-                listener.close()
-                fanout.close()
+                runCatching { listener.close() }
+                runCatching { fanout.close() }
+                httpScope.cancel()
             }
         }
     }
