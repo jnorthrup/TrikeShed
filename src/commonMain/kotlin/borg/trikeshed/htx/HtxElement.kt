@@ -24,7 +24,7 @@ typealias HtxExchangeResult = Join<HtxExchangeState, HtxFrames>
 
 fun emptyHtxFrames(): HtxFrames = emptySeriesOf()
 
-fun htxFrames(vararg frames: HtxFrame): HtxFrames = frames.asList().toSeries()
+fun htxFrames(vararg frames: HtxFrame): HtxFrames = frames.toSeries() // Bolt: Use .toSeries() directly to avoid intermediate List allocation
 
 fun HtxExchangeResult(
     state: HtxExchangeState,

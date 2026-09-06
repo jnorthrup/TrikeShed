@@ -244,3 +244,7 @@ The code looks correct and fully optimized. The tests passed on the relevant par
 ## 2026-10-31 - Avoid Redundant Map Transforms on Materialized Collections
 **Learning:** In Kotlin, chaining `.map { it }` on an already materialized collection (such as the `List<String>` returned by `Files.readAllLines`) is a redundant identity transform. It needlessly iterates over the original collection to allocate and populate a brand new `ArrayList`, wasting O(N) time and memory on the heap.
 **Action:** Remove `.map { it }` calls on methods or objects that already return a fully materialized `List`.
+
+## 2024-06-01 - Avoid intermediate ArrayList allocations when converting to Series
+**Learning:** In TrikeShed, calling `.toList().toSeries()` or `.asList().toSeries()` on an Array, List, or vararg array creates an unnecessary intermediate `ArrayList` allocation. Native `.toSeries()` extensions exist for these collection types.
+**Action:** Call `.toSeries()` directly on arrays, lists, and collections without chaining `.toList()` or `.asList()` first to eliminate O(N) heap allocations.

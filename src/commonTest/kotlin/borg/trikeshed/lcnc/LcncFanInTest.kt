@@ -32,7 +32,7 @@ class LcncFanInTest {
     )
 
     private fun program(vararg nodes: LcncNode, wires: List<LcncWire>) =
-        LcncProgram("fanin", nodes.toList().toSeries(), wires.toSeries())
+        LcncProgram("fanin", nodes.toSeries() /* Bolt: Use .toSeries() directly to avoid intermediate List allocation */, wires.toSeries())
 
     // ── fan-in ────────────────────────────────────────────────────────────
 

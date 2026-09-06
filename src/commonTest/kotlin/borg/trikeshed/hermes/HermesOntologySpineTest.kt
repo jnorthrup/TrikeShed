@@ -12,7 +12,7 @@ import kotlin.test.assertNotEquals
 import kotlin.test.assertTrue
 
 class HermesOntologySpineTest {
-    private fun facts(vararg facts: HermesOntologyFact) = facts.toList().toSeries()
+    private fun facts(vararg facts: HermesOntologyFact) = facts.toSeries() // Bolt: Use .toSeries() directly to avoid intermediate List allocation
 
     @Test
     fun semanticAperturesZoomKindThenRootThenPackage() {

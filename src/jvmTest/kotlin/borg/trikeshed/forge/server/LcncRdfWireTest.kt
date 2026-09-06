@@ -21,7 +21,7 @@ class LcncRdfWireTest {
     private val wire = LcncRdfWire(productions = { emptyList() }, causalRules = { emptyList() }, facts = { emptyList() })
 
     private fun program(vararg nodes: LcncNode, wires: List<LcncWire> = emptyList()) =
-        LcncProgram("t", nodes.toList().toSeries(), wires.toSeries())
+        LcncProgram("t", nodes.toSeries() /* Bolt: Use .toSeries() directly to avoid intermediate List allocation */, wires.toSeries())
 
     private fun post(path: String, body: String) = runBlocking { wire.route("POST", path, body, null)!! }
 
