@@ -1,6 +1,7 @@
 package borg.trikeshed.lcnc
 
 import borg.trikeshed.lib.Series
+import kotlinx.coroutines.currentCoroutineContext
 import borg.trikeshed.lib.get
 import borg.trikeshed.lib.size
 
@@ -88,6 +89,7 @@ object PromptNodes {
                 ?: node.params["name"]?.takeIf { it.isNotBlank() }
                 ?: throw IllegalArgumentException("prompt.get: no prompt name — wire one in or set the name param")
             val doc = reads.get(name) ?: throw IllegalArgumentException("prompt.get: no stored prompt named '$name'")
+            currentCoroutineContext()[LcncConsumedLedger]?.consumed(LcncConsumedLedger.PROMPT, doc.name, doc.cid)
             mapOf("text" to doc.text, "cid" to doc.cid, "name" to doc.name, "role" to doc.role)
         },
         RENDER to LcncNodeRunner { node, inputs ->

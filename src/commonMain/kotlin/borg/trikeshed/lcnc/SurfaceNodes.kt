@@ -66,10 +66,6 @@ object SurfaceNodes {
             val r = call("GET", "/api/panels", null)
             mapOf("panels" to (field(r, "panels") ?: emptyList<Any?>()))
         },
-        "project.list" to LcncNodeRunner { _, _ ->
-            val r = call("GET", "/api/projects", null)
-            mapOf("scopes" to (field(r, "scopes") ?: r))
-        },
         "mux.standings" to LcncNodeRunner { _, _ ->
             val r = call("GET", "/api/mux/standings", null)
             mapOf("standings" to (field(r, "standings") ?: emptyList<Any?>()))
@@ -81,6 +77,6 @@ object SurfaceNodes {
         "http.get", "http.post",
         "blackboard.facts", "blackboard.board", "blackboard.sites",
         "graal.vitals", "graal.heap", "vms.list", "pointcut.routes",
-        "panels.list", "project.list", "mux.standings",
+        "panels.list", "mux.standings",
     )
 }

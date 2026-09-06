@@ -27,7 +27,11 @@ the full hypothetical assignment with the existing type and scope checker.
 Moving the nodes must not alter that compatibility result.
 
 Ordinary Shake on this inspection-only specimen includes optional and effect
-sockets. It uses augmenting-path matching with consistent per-node generic type
+sockets. The one socket it never touches is a ring's `each?` (added 2026-09-06
+with the project-document legos): feeding it turns every per-name yield of the
+ring into a list, which is an authoring decision, so the specimen holds it open,
+the matcher never proposes it, and the oracle enumerates every socket but that
+one. An authored cable into `each?` is still type-checked like any other. It uses augmenting-path matching with consistent per-node generic type
 bindings, then validates the resulting graph with the shared type and scope
 checker. Distance ranks alternatives but does not exclude compatible counterparts.
 The test oracle is not available to the matcher. Starting positions can change

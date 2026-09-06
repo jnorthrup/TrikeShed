@@ -35,7 +35,11 @@ class LcncShakeDemoTest {
             endpoints += Triple(w.toNode, "in", w.toPort.removeSuffix("?"))
         }
         for (node in nodes) {
-            for ((dir, ports) in listOf("in" to LcncTypeCheck.inputsOf(node, contracts), "out" to LcncTypeCheck.outputsOf(node, contracts))) {
+            // The ring's `each?` is an authoring socket (feeding it re-types every yield into a
+            // list); the specimen holds it open and the matcher never proposes it, so the oracle
+            // enumerates every socket but that one.
+            val ins = LcncTypeCheck.inputsOf(node, contracts).filter { it != LcncTypeCheck.RING_EACH }
+            for ((dir, ports) in listOf("in" to ins, "out" to LcncTypeCheck.outputsOf(node, contracts))) {
                 for (port in ports) assertTrue(Triple(node.id, dir, port.removeSuffix("?")) in endpoints, "missing counterpart: ${node.id}/$dir/$port")
             }
         }

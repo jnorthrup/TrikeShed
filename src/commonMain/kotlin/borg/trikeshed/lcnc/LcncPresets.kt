@@ -133,6 +133,13 @@ object LcncPresets {
             tweakFirst = "The text, then the name on the save node.",
         ),
         LcncPresetInfo(
+            "preset-corpus", "Corpus digest",
+            does = "Reads every matching document in a mounted folder, asks a model to summarise each one, and lists the answers.",
+            needs = "A folder mounted as a project and named in the run's inputs, and a model that can answer here.",
+            see = "One summary per document in the result card, and the run record naming which documents were read.",
+            tweakFirst = "The glob on the documents node, then the stored prompt named summarize.",
+        ),
+        LcncPresetInfo(
             "preset-ccek-mux", "Hermes CCEK Orchestration",
             does = "Resolves available provider keys through KeyMux, prompts the Hermes model via ModelMux, choreographs the resulting action into a CCEK reactor hub with fact assertions, and displays both the live projection and router meta.",
             needs = "A provider key (OpenAI/Anthropic/OpenRouter/NVIDIA/local) or saved credentials. Defaults to Hermes 3.",
@@ -334,6 +341,7 @@ object LcncPresets {
         "preset-pairs" to pairsDemo(),
         "preset-brain-mux" to brainMux(),
         "preset-prompt" to promptEditor(),
+        "preset-corpus" to corpusDigest(),
         "preset-ccek-mux" to ccekMux(),
         "preset-media" to mediaDemo(),
         "preset-hermes-train" to hermesTrain(),
@@ -898,20 +906,23 @@ object LcncPresets {
         // pushes an overlapping node sideways, which scattered a tighter grid.
         val program = LcncProgram(
             name = "preset-brain-mux",
+            // Columns 320 / 720 / 1000 / 1240 and these rows are measured against Chrome's node
+            // sizes (a note is 330 wide; prompt.chat is 644 tall) so the harness's overlap
+            // resolver moves nothing and the preset opens on the blackboard, not as a draft.
             nodes = listOf(
                 LcncNode("note-keys", "note",
                     params = mapOf("text" to "1 · keys this machine already has —\nany model from one of these providers\nanswers with nothing typed."),
                     x = 320.0, y = 60.0),
-                LcncNode("k1", "keys.status", x = 620.0, y = 60.0),
+                LcncNode("k1", "keys.status", x = 720.0, y = 60.0),
                 LcncNode("kd", "display", x = 1000.0, y = 60.0),
                 LcncNode("note-ask", "note",
                     // Lines stay under ~42 characters: a wider note overlaps the next column and
                     // the loader would push that column sideways, opening the preset as a draft.
                     params = mapOf("text" to "2 · ask —\nthe question is the stored prompt\nnamed hello (change it with the\nSave a prompt gallery item);\npick a model (the list is what runs here,\nnewest first), press ▶ run.\nThe answer lands in the green card;\na red card says what went wrong."),
-                    x = 320.0, y = 640.0),
+                    x = 320.0, y = 700.0),
                 // The prompt is a citizen, not a literal: read by name, its version
                 // recorded on the run's receipt as promptVersions.
-                LcncNode("pr1", "prompt.get", params = mapOf("name" to "hello"), x = 620.0, y = 300.0),
+                LcncNode("pr1", "prompt.get", params = mapOf("name" to "hello"), x = 720.0, y = 330.0),
                 LcncNode("p1", "prompt.chat",
                     params = mapOf(
                         "prompt" to "",
@@ -920,30 +931,30 @@ object LcncPresets {
                         "model" to "",
                         // 256, not 128: a thinking model spends its budget on reasoning
                         // first, and a small cap returned an empty answer.
-                        "maxTokens" to "256",
+                        "maxTokens" to "1024",
                         "temperature" to "0.3",
                         "prefill" to "",
                         "url" to "",
                         "key" to "",
                         "headers" to "[]",
-                    ), x = 620.0, y = 640.0),
-                LcncNode("d1", "result.confirm", x = 1000.0, y = 640.0),
+                    ), x = 720.0, y = 700.0),
+                LcncNode("d1", "result.confirm", x = 1000.0, y = 700.0),
                 LcncNode("note-save", "note",
                     params = mapOf("text" to "3 · optional: save your own key —\nfor a provider step 1 does not list.\nIt then shows up under \"prefill\" in step 2."),
-                    x = 320.0, y = 1380.0),
+                    x = 320.0, y = 1420.0),
                 LcncNode("c1", "credential.enter",
                     params = mapOf(
                         "key_type" to "nvidia",
                         "url" to "https://integrate.api.nvidia.com/v1",
                         "api_type" to "openai",
                         "key" to "",
-                    ), x = 620.0, y = 1380.0),
+                    ), x = 720.0, y = 1420.0),
                 LcncNode("note-router", "note",
                     params = mapOf("text" to "what the router did —\nthe last answer: which model and provider,\nwhether it succeeded, how long it took,\nand the tokens spent. Refreshes every 30 s."),
                     x = 320.0, y = 1840.0),
-                LcncNode("t1", "timer", params = mapOf("seconds" to "30"), x = 620.0, y = 1840.0),
-                LcncNode("me1", "mux.meta", x = 850.0, y = 1840.0),
-                LcncNode("dm1", "display", x = 1130.0, y = 1840.0),
+                LcncNode("t1", "timer", params = mapOf("seconds" to "30"), x = 720.0, y = 1840.0),
+                LcncNode("me1", "mux.meta", x = 1000.0, y = 1840.0),
+                LcncNode("dm1", "display", x = 1240.0, y = 1840.0),
             ).toSeries(),
             wires = listOf(
                 LcncWire("k1", "have", "kd", "x"),
@@ -984,6 +995,73 @@ object LcncPresets {
                 LcncWire("s1", "cid", "d1", "x"),
             ).toSeries(),
             view = LcncView(x = 20.0, y = 20.0, zoom = 0.8),
+        )
+        return LcncProgramConfix.toJson(program)
+    }
+
+    // ── corpus digest: iterate a mounted folder, fully drawn ─────────────
+    // The post Forge answers: "all this stuff which I want to process over in an
+    // iterated way". A mounted folder is the document set; the ring's each? is the
+    // iteration; the question is a stored prompt; the receipt records which
+    // documents and which prompt version were read. Every step is an ordinary
+    // lego the palette offers on its own — the can and the atoms are one substance.
+    private fun corpusDigest(): String {
+        val program = LcncProgram(
+            name = "preset-corpus",
+            // Geometry measured in Chrome (2026-09-06): a note is 330 wide, scope.in 296 tall,
+            // project.docs 401 tall, a ring frame ~776 tall. Columns 320 / 720 / 1100 and the row
+            // gaps below clear the harness's overlap resolver, so the preset opens on the
+            // blackboard rather than as a pushed-around draft.
+            nodes = listOf(
+                LcncNode("note-which", "note",
+                    params = mapOf("text" to "1 · which folder —\nname the mounted project in the run's\ninputs; the glob picks the documents."),
+                    x = 320.0, y = 60.0),
+                LcncNode("n-proj", LcncContracts.SCOPE_IN, params = mapOf("name" to "project", "kind" to "id"), x = 320.0, y = 300.0),
+                LcncNode("n-docs", ProjectNodes.DOCS,
+                    params = mapOf("project" to "", "prefix" to "", "glob" to "*.md", "limit" to "32"),
+                    x = 720.0, y = 60.0),
+                LcncNode("n-count", "display", x = 1100.0, y = 60.0),
+                LcncNode("note-each", "note",
+                    params = mapOf("text" to "2 · for each document —\nread it, ask the model with the stored\nprompt named summarize, keep the answer."),
+                    x = 320.0, y = 700.0),
+                LcncNode("n-ring", LcncContracts.SCOPE,
+                    params = mapOf("item" to "doc", "limit" to "32"),
+                    x = 720.0, y = 700.0,
+                    children = listOf(
+                        LcncNode("r-in", LcncContracts.SCOPE_IN, params = mapOf("name" to "doc", "kind" to ProjectDoc.KIND), x = 40.0, y = 40.0),
+                        LcncNode("r-read", ProjectNodes.READ, params = mapOf("maxChars" to "65536"), x = 300.0, y = 40.0),
+                        LcncNode("r-q", PromptNodes.GET, params = mapOf("name" to LcncPromptSeeds.SUMMARIZE), x = 300.0, y = 420.0),
+                        LcncNode("r-fold", "text.fold", params = mapOf("label" to "", "numbered" to "false", "separator" to "\n\n"), x = 560.0, y = 40.0),
+                        LcncNode("r-ask", "prompt.chat",
+                            params = mapOf("prompt" to "", "model" to "", "maxTokens" to "1024", "temperature" to "0.2", "prefill" to "", "url" to "", "key" to "", "headers" to "[]"),
+                            x = 820.0, y = 40.0),
+                        LcncNode("r-sum", LcncContracts.SCOPE_OUT, params = mapOf("name" to "summary", "kind" to "text"), x = 1100.0, y = 40.0),
+                        LcncNode("r-id", LcncContracts.SCOPE_OUT, params = mapOf("name" to "id", "kind" to "id"), x = 1100.0, y = 260.0),
+                        LcncNode("r-cid", LcncContracts.SCOPE_OUT, params = mapOf("name" to "cid", "kind" to "id"), x = 1100.0, y = 400.0),
+                    ).toSeries()),
+                LcncNode("note-digest", "note",
+                    params = mapOf("text" to "3 · the digest —\none line per document, and the whole\nlist as the run's result."),
+                    x = 320.0, y = 1600.0),
+                LcncNode("n-lines", "list.format", params = mapOf("template" to "{id}: {summary}", "limit" to ""), x = 720.0, y = 1600.0),
+                LcncNode("n-show", "display", x = 1100.0, y = 1600.0),
+                LcncNode("n-out", LcncContracts.SCOPE_OUT, params = mapOf("name" to "summaries", "kind" to "json"), x = 1100.0, y = 1800.0),
+            ).toSeries(),
+            wires = listOf(
+                LcncWire("n-proj", "value", "n-docs", "project?"),
+                LcncWire("n-docs", "count", "n-count", "x"),
+                LcncWire("n-docs", "docs", "n-ring", "each?"),
+                LcncWire("r-in", "value", "r-read", "doc?"),
+                LcncWire("r-q", "text", "r-fold", "brief?"),
+                LcncWire("r-read", "text", "r-fold", "parts"),
+                LcncWire("r-fold", "text", "r-ask", "prompt?"),
+                LcncWire("r-ask", "content", "r-sum", "value"),
+                LcncWire("r-read", "id", "r-id", "value"),
+                LcncWire("r-read", "cid", "r-cid", "value"),
+                LcncWire("n-ring", "returns", "n-lines", "x"),
+                LcncWire("n-lines", "lines", "n-show", "x"),
+                LcncWire("n-ring", "returns", "n-out", "value"),
+            ).toSeries(),
+            view = LcncView(x = 20.0, y = 20.0, zoom = 0.6),
         )
         return LcncProgramConfix.toJson(program)
     }

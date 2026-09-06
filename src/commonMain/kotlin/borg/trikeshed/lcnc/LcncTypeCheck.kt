@@ -153,9 +153,12 @@ object LcncTypeCheck {
         if (isRing(n)) ringPorts(n, LcncContracts.SCOPE_OUT) + "returns"
         else contracts[n.type]?.outputs.orEmpty()
 
-    /** A ring's inputs are the `args?`/`when?` envelope plus its body's `scope.in` names. */
+    /** The ring's iteration socket. Typed by derivation; never auto-wired (feeding it re-types the ring). */
+    const val RING_EACH = "each?"
+
+    /** A ring's inputs are the `args?`/`when?`/`each?` envelope plus its body's `scope.in` names. */
     fun inputsOf(n: LcncNode, contracts: Map<String, LcncPortContract>): List<String> =
-        if (isRing(n)) listOf("args?", "when?") + ringPorts(n, LcncContracts.SCOPE_IN)
+        if (isRing(n)) listOf("args?", "when?", "each?") + ringPorts(n, LcncContracts.SCOPE_IN)
         else contracts[n.type]?.inputs.orEmpty()
 
     /**
@@ -296,6 +299,16 @@ object LcncTypeCheck {
                 n.params["kind"]?.takeIf { it.isNotBlank() }?.let { return PortKind(it, generic = false) }
                 return unresolved
             }
+            // A ring's `each`: the list of what its item parameter declares — `for (doc in
+            // docs)` types `each` as List<ProjectDoc> when the body's scope.in `doc` says
+            // ProjectDoc; else the cable that feeds it fixes it. The contract row's `json`
+            // is a placeholder that must not type it (the scope.in/scope.out precedent).
+            if (isRing(n) && dir == "in" && port == "each") {
+                val item = n.params["item"]?.takeIf { it.isNotBlank() } ?: "item"
+                childOf(n, LcncContracts.SCOPE_IN, item)?.params?.get("kind")?.takeIf { it.isNotBlank() }
+                    ?.let { return PortKind("List<$it>", generic = false) }
+                return feederOf(n.id, "each") ?: unresolved
+            }
             val contract = contracts[n.type]
             val declared = contract?.let { if (dir == "out") it.outputKinds[port] else it.inputKinds[port] }
             if (declared != null) {
@@ -323,10 +336,16 @@ object LcncTypeCheck {
             // else the type of the cable that fixes it.
             val childType = if (dir == "out") LcncContracts.SCOPE_OUT else LcncContracts.SCOPE_IN
             val child = childOf(n, childType, port)
-            child?.params?.get("kind")?.takeIf { it.isNotBlank() }?.let { return PortKind(it, generic = false) }
-            return if (dir == "in") feederOf(n.id, port) ?: unresolved
-            else child?.let { feederOf(it.id, "value") } ?: unresolved
+            // Under a fed `each`, a per-name yield is the LIST of what one iteration yields.
+            val listed = dir == "out" && eachFed(n)
+            child?.params?.get("kind")?.takeIf { it.isNotBlank() }?.let { return PortKind(if (listed) "List<$it>" else it, generic = false) }
+            if (dir == "in") return feederOf(n.id, port) ?: unresolved
+            val fed = child?.let { feederOf(it.id, "value") } ?: return unresolved
+            return if (listed && !fed.generic && fed.kind != null) PortKind("List<${fed.kind}>", generic = false) else fed
         }
+
+        private fun eachFed(n: LcncNode): Boolean =
+            wires.any { it.toNode == n.id && it.toPort.removeSuffix("?") == "each" }
     }
 
     private fun isRing(n: LcncNode): Boolean =

@@ -110,11 +110,19 @@ object LcncContracts {
         // names); the generic args?/returns pair is the declared wire spelling —
         // args? merges UNDER per-name wires (per-name wins), returns carries the
         // composed map beside the per-name pass-through (spec §4).
+        // `each?` is the ring's `for`: fed a list, the body runs once per element with the
+        // `item` parameter bound to it, per-name yields become lists, `returns` the list of
+        // per-iteration maps. Its `json` here is a placeholder like scope.in/scope.out's:
+        // LcncTypeCheck types it as List<K> from the item's declared kind or the feeding cable.
         LcncPortContract(SCOPE, "scope (a ring — holds its children)",
-            listOf("args?", "when?"), listOf("returns"),
-            inputKinds = mapOf("args" to "json", "when" to "json"),
+            listOf("args?", "when?", "each?"), listOf("returns"),
+            inputKinds = mapOf("args" to "json", "when" to "json", "each" to "json"),
             outputKinds = mapOf("returns" to "json"),
-            params = mapOf("program" to LcncPortContract.LcncParamSpec(ph = "named ring (stored program / preset) — empty for inline children"))),
+            params = mapOf(
+                "program" to LcncPortContract.LcncParamSpec(ph = "named ring (stored program / preset) — empty for inline children"),
+                "item" to LcncPortContract.LcncParamSpec(v = "item", ph = "the parameter name each element binds to when each? is fed"),
+                "limit" to LcncPortContract.LcncParamSpec(v = "64", ph = "at most this many iterations over each?"),
+            )),
         LcncPortContract(SCOPE_IN, "scope.in (formal parameter)",
             emptyList(), listOf("value"),
             outputKinds = mapOf("value" to "json"),
@@ -366,9 +374,41 @@ object LcncContracts {
             outputKinds = mapOf("verdict" to "json"),
             params = mapOf("name" to LcncPortContract.LcncParamSpec(ph = "project db name (hierarchy kill)")), isEffect = true),
         LcncPortContract("project.list", "mounted scopes",
-            listOf("trigger?"), listOf("scopes"),
+            listOf("trigger?"), listOf("scopes", "projects"),
             inputKinds = mapOf("trigger" to "trigger"),
-            outputKinds = mapOf("scopes" to "json")),
+            outputKinds = mapOf("scopes" to "json", "projects" to "List<ProjectRef>")),
+        // ── project documents as typed workflow input (Forge genesis, Cut F) ──
+        // A mounted folder is a document set a program can walk: `project.docs` lists
+        // its documents as the exact type ProjectDoc, `project.read` reads one as text,
+        // `project.extract` reads the mined twin the miner leaves beside it.
+        LcncPortContract(ProjectNodes.DOCS, "documents of a mounted folder",
+            listOf("project?", "trigger?"), listOf("docs", "count"),
+            inputKinds = mapOf("project" to "id", "trigger" to "trigger"),
+            outputKinds = mapOf("docs" to ProjectDoc.LIST_KIND, "count" to "num"),
+            params = mapOf(
+                "project" to LcncPortContract.LcncParamSpec(ph = "which mounted folder — the list is what is mounted here", optsFrom = "project.list#scopes[].name"),
+                "prefix" to LcncPortContract.LcncParamSpec(ph = "only documents under this path"),
+                "glob" to LcncPortContract.LcncParamSpec(ph = "*.md matches Markdown anywhere; a glob with / matches the whole path"),
+                "limit" to LcncPortContract.LcncParamSpec(v = "256"),
+            ),
+            kindShapes = mapOf(ProjectDoc.LIST_KIND to ProjectDoc.SHAPE)),
+        LcncPortContract(ProjectNodes.READ, "one document as text",
+            listOf("doc?", "project?", "id?"), listOf("text", "cid", "id", "doc", "error"),
+            inputKinds = mapOf("doc" to ProjectDoc.KIND, "project" to "id", "id" to "id"),
+            outputKinds = mapOf("text" to "text", "cid" to "id", "id" to "id", "doc" to ProjectDoc.KIND, "error" to "text"),
+            params = mapOf(
+                "project" to LcncPortContract.LcncParamSpec(ph = "the mounted folder, when no document is wired"),
+                "id" to LcncPortContract.LcncParamSpec(ph = "the document's path in it, when no document is wired"),
+                "maxChars" to LcncPortContract.LcncParamSpec(v = "65536"),
+            )),
+        LcncPortContract(ProjectNodes.EXTRACT, "the mined text of a document, if any",
+            listOf("doc?", "project?", "id?"), listOf("text", "cid", "found"),
+            inputKinds = mapOf("doc" to ProjectDoc.KIND, "project" to "id", "id" to "id"),
+            outputKinds = mapOf("text" to "text", "cid" to "id", "found" to "json"),
+            params = mapOf(
+                "project" to LcncPortContract.LcncParamSpec(ph = "the mounted folder, when no document is wired"),
+                "id" to LcncPortContract.LcncParamSpec(ph = "the document's path in it, when no document is wired"),
+            )),
         // The field is a SUMMARY of the bag — size, crux bits, concepts: a
         // Confix object, so `json` is honest here. It is `beliefs.review` that
         // names the exact type it consumes; a cable between them is not a cable.

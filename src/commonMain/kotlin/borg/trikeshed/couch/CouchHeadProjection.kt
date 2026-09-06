@@ -108,6 +108,9 @@ class CouchHeadProjection {
         return docs[idx]
     }
 
+    /** The store sequence that last committed [docId], or null when it is unknown here. */
+    fun sequenceOf(docId: String): Long? = frames[docId]?.sequence
+
     fun getRev(docId: String): String? {
         return frames[docId]?.rev
     }

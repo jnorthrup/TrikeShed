@@ -1301,6 +1301,11 @@ object OroborosDaemon {
         promptStore.thaw(borg.trikeshed.lcnc.LcncPromptSeeds.all()).let { restored ->
             System.err.println("[OROBOROS] prompts: $restored head(s) restored from the ledger; ${promptStore.list().size} on the board")
         }
+        // Project documents as typed workflow input (Forge genesis, Cut F): project.list /
+        // project.docs / project.read / project.extract over the mounted project databases.
+        moduleContext.lcncRunners.putAll(
+            borg.trikeshed.lcnc.ProjectNodes.registry(borg.trikeshed.forge.server.JvmProjectCorpus(projectDbRegistry, projectScopes)),
+        )
         // Pure/presentation node runners: canvas-authored programs (preset-kanban)
         // complete HEADLESS via /api/lcnc/run — the curl-able smoke-test lane.
         moduleContext.lcncRunners.putAll(borg.trikeshed.lcnc.PureNodes.registry { System.currentTimeMillis() })

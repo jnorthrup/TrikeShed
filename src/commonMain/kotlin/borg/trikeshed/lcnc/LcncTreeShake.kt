@@ -255,7 +255,8 @@ object LcncTreeShake {
 
         for (nd in selectedNodes) {
             val c = contracts[nd.type]
-            val ins = LcncTypeCheck.inputsOf(nd, contracts)
+            // A ring's `each?` is never proposed: feeding it re-types the ring's yields.
+            val ins = LcncTypeCheck.inputsOf(nd, contracts).filter { it != LcncTypeCheck.RING_EACH }
             val outs = LcncTypeCheck.outputsOf(nd, contracts)
             val isEffect = c?.isEffect == true
             val sp = pathOf[nd.id] ?: emptyList()
@@ -416,7 +417,7 @@ object LcncTreeShake {
         // Outlet blocked
         val allIns = ArrayList<OpenIn>()
         for (nd in allNodes) {
-            val ins = LcncTypeCheck.inputsOf(nd, contracts)
+            val ins = LcncTypeCheck.inputsOf(nd, contracts).filter { it != LcncTypeCheck.RING_EACH }
             val sp = pathOf[nd.id] ?: emptyList()
             for (ip in ins) {
                 val kind = LcncTypeCheck.portKind(nd, "in", ip, contracts, facts)
@@ -472,7 +473,7 @@ object LcncTreeShake {
         var socketCount = 0
         var connectedSocketCount = 0
         for (nd: LcncNode in selectedNodes) {
-            for (port: String in LcncTypeCheck.inputsOf(nd, contracts)) {
+            for (port: String in LcncTypeCheck.inputsOf(nd, contracts).filter { it != LcncTypeCheck.RING_EACH }) {
                 socketCount++
                 if (PortKey(nd.id, bare(port)) in fedIn) connectedSocketCount++
             }

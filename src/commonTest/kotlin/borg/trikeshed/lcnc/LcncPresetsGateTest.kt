@@ -61,10 +61,10 @@ class LcncPresetsGateTest {
             names + "returns"
         } else contracts.getValue(n.type).outputs
 
-    /** A ring's inputs are args?/when? plus its body's scope.in names. */
+    /** A ring's inputs are args?/when?/each? plus its body's scope.in names. */
     private fun inputsOf(n: LcncNode, contracts: Map<String, LcncPortContract>): List<String> =
         if (n.children.size > 0) {
-            val names = arrayListOf("args?", "when?")
+            val names = arrayListOf("args?", "when?", "each?")
             for (i in 0 until n.children.size) {
                 val c = n.children[i]
                 if (c.type == LcncContracts.SCOPE_IN) c.params["name"]?.let { names.add(it) }

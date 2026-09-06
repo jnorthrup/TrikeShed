@@ -36,7 +36,9 @@ object LcncShakeDemo {
                 params["kind"] = "json"
             }
             val subject = LcncNode(id, contract.type, params, x = left + 380.0, y = row)
-            val inputs = LcncTypeCheck.inputsOf(subject, vocabulary)
+            // A ring's `each?` is an authoring decision (feeding it turns every per-name yield
+            // into a list), so the specimen holds it open and offers no counterpart for it.
+            val inputs = LcncTypeCheck.inputsOf(subject, vocabulary).filter { it != LcncTypeCheck.RING_EACH }
             val outputs = LcncTypeCheck.outputsOf(subject, vocabulary)
             fun kind(dir: String, port: String): String {
                 val resolved = LcncTypeCheck.portKind(subject, dir, port, vocabulary, facts)

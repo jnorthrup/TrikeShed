@@ -28,7 +28,7 @@ class PresetAssemblyTest {
                 LcncShakeDemo.NAME,
                 "preset-hermes", "preset-tribunal", "preset-curator",
                 "preset-context", "preset-kanban", "preset-ccek", "preset-scope", "preset-scope-inner",
-                "preset-pairs", "preset-brain-mux", "preset-prompt", "preset-ccek-mux", "preset-media",
+                "preset-pairs", "preset-brain-mux", "preset-prompt", "preset-corpus", "preset-ccek-mux", "preset-media",
                 "preset-hermes-train", "preset-legal-tribunal", "preset-state-freeze",
                 "preset-council", "preset-bughunter", "preset-subvm-audit",
                 "preset-turbohaul",
@@ -83,7 +83,7 @@ class PresetAssemblyTest {
                 } else LcncContracts.find(n.type)!!.outputs
             fun inPorts(n: LcncNode): List<String> =
                 if (n.children.size > 0) {
-                    listOf("args?", "when?") + (0 until n.children.size).mapNotNull { i ->
+                    listOf("args?", "when?", "each?") + (0 until n.children.size).mapNotNull { i ->
                         n.children[i].takeIf { it.type == LcncContracts.SCOPE_IN }?.params?.get("name")
                     }
                 } else LcncContracts.find(n.type)!!.inputs

@@ -126,7 +126,18 @@ class LcncRunner(private val registry: Map<String, LcncNodeRunner>) {
         val returns: Map<String, Any?>,
         val bindings: List<Map<String, Any?>> = emptyList(),
         val bindingsTruncated: Boolean = false,
+        /** What the run READ (LcncConsumedLedger entries), and one fingerprint over their cids. */
+        val consumed: List<Map<String, Any?>> = emptyList(),
+        val consumedTruncated: Boolean = false,
+        val inputFingerprint: String? = null,
     )
+
+    /**
+     * The consumed-input ledger this walk records into, installed with the root
+     * frame so a reading runner anywhere in the ring tree finds it in its context.
+     * Null records nothing (a bare walk).
+     */
+    var ledger: LcncConsumedLedger? = null
 
     suspend fun runAll(program: LcncProgram): Map<String, Map<String, Any?>> =
         runProcedure(program).nodeOutputs
@@ -143,10 +154,16 @@ class LcncRunner(private val registry: Map<String, LcncNodeRunner>) {
         bindingsTruncated = false
         val state = WalkState(program)
         val root = LcncScopeFrame(bindings = args, chain = FrameIdChain.root(ROOT_SCOPE), bindingSources = args.keys.associateWith { "invocation" })
-        val returns = withContext(root) {
+        val ledger = this.ledger
+        val returns = withContext(if (ledger == null) root else root + ledger) {
             runRing(program.nodes, state, root, emptyList())
         }
-        return ScopeResult(root.outputs, returns, argumentBindings.toList(), bindingsTruncated)
+        return ScopeResult(
+            root.outputs, returns, argumentBindings.toList(), bindingsTruncated,
+            consumed = ledger?.entries()?.map { it.toMap() } ?: emptyList(),
+            consumedTruncated = ledger?.truncated ?: false,
+            inputFingerprint = ledger?.fingerprint(),
+        )
     }
 
     /** Per-document walk state: the node universe, each node's ring path,
@@ -284,6 +301,7 @@ class LcncRunner(private val registry: Map<String, LcncNodeRunner>) {
 
                 val bodyNodes: Series<LcncNode>
                 val bodyState: WalkState
+                var bodyDoc: LcncProgram? = null
                 if (inline) {
                     bodyNodes = node.children
                     bodyState = state
@@ -293,6 +311,7 @@ class LcncRunner(private val registry: Map<String, LcncNodeRunner>) {
                     require(!doc.controls.inspectionOnly) { "Inspection-only wiring specimen: $subName" }
                     bodyNodes = doc.nodes
                     bodyState = WalkState(doc)
+                    bodyDoc = doc
                 }
 
                 // Install the envelope: the generic args? map merges UNDER the
@@ -311,11 +330,46 @@ class LcncRunner(private val registry: Map<String, LcncNodeRunner>) {
                     val p = port.removeSuffix("?")
                     if (p != "args" && p != "when") { bound[p] = v; sources[p] = "input" }
                 }
+                // for (item in each) { ring }: a fed `each?` runs the body once per element,
+                // binding the item name per iteration (source "each"); per-name yields
+                // collect into lists, `returns` becomes the list of per-iteration maps and
+                // `count` the length. The chain is the ring's, not the iteration's: the
+                // navigator dives one path per ring (LcncScopeSemanticsTest pins that).
+                val eachFed = inputs.containsKey("each") || inputs.containsKey("each?")
+                val itemName = node.params["item"]?.takeIf { it.isNotBlank() } ?: "item"
                 // Required = the body's non-optional scope.in names, satisfiable
-                // by the envelope OR the enclosing chain — rings are blocks.
-                if (requiredScopeIns(bodyNodes).view.any { !bound.containsKey(it) && !frame.hasBinding(it) }) continue
+                // by the envelope OR the enclosing chain — rings are blocks. Under
+                // `each`, the item name is bound per iteration.
+                if (requiredScopeIns(bodyNodes).view.any { !bound.containsKey(it) && !frame.hasBinding(it) && !(eachFed && it == itemName) }) continue
 
                 val childChain = FrameIdChain.append(frame.chain, ringName)
+                if (eachFed) {
+                    val each = if (inputs.containsKey("each")) inputs["each"] else inputs["each?"]
+                    require(each is List<*>) { "scope ${node.id}: each must be a list, got ${each?.let { it::class.simpleName } ?: "null"}" }
+                    val limit = node.params["limit"]?.toIntOrNull()?.coerceAtLeast(1) ?: 64
+                    val iterations = ArrayList<Map<String, Any?>>()
+                    val perName = LinkedHashMap<String, MutableList<Any?>>()
+                    // Every declared yield name is a list even when nothing iterates: an empty
+                    // corpus yields empty lists, not absent ports.
+                    for (c in bodyNodes.view) if (c.type == LcncContracts.SCOPE_OUT) c.params["name"]?.removeSuffix("?")?.let { perName.getOrPut(it) { ArrayList() } }
+                    for (element in each.take(limit)) {
+                        val iterBound = LinkedHashMap(bound).also { it[itemName] = element }
+                        val iterSources = LinkedHashMap(sources).also { it[itemName] = "each" }
+                        // A named body re-walks from a fresh state per iteration; an inline
+                        // body shares the walk (its statements ran, in authored order, once).
+                        val iterState = if (inline) state else WalkState(bodyDoc!!)
+                        val iterFrame = LcncScopeFrame(bindings = iterBound, chain = childChain, parent = frame, bindingSources = iterSources)
+                        onScopeEnter?.invoke(pathNames + ringName, childChain)
+                        val yielded = withContext(iterFrame) {
+                            runRing(bodyNodes, iterState, iterFrame, pathNames + ringName)
+                        }
+                        iterations.add(yielded)
+                        for ((k, v) in yielded) perName.getOrPut(k) { ArrayList() }.add(v)
+                    }
+                    frame.outputs[node.id] = perName.mapValues { it.value.toList() } +
+                        ("returns" to iterations.toList()) + ("count" to iterations.size)
+                    continue
+                }
                 val childFrame = LcncScopeFrame(bindings = bound, chain = childChain, parent = frame, bindingSources = sources)
                 onScopeEnter?.invoke(pathNames + ringName, childChain)
                 // Ring entry IS withContext: any suspend runner in the subtree

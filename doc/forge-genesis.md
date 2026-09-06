@@ -46,9 +46,11 @@ bin/oroboros-up --fresh --port 8899
    terrain and `project.docs` lists its files when asked (step 2 does the asking).
 2. **Prompts and a workflow.** Open the preset "Save a prompt", set the name to `summarize`, type a
    new question, press Run. Expect: `lcnc/prompt/summarize` appears in the activity pane with a new
-   cid whose `previousCid` is the seed. Open the preset "Corpus digest", set the project in the
-   invocation editor, press Run. Expect: a completed receipt whose `promptVersions.summarize` is the
-   new cid and whose `consumed` list names every document read; the program lamp reads Completed.
+   cid whose `previousCid` is the seed. Open the preset "Corpus digest". The harness records the
+   daemon's pinned model into the opened draft (its live-picklist rule), so publish it as `corpus`,
+   set the project in the invocation editor, press Run. Expect: a completed receipt whose
+   `promptVersions.summarize` is the new cid and whose `consumed` list names every document read;
+   the program lamp reads Completed.
 3. **A coding agent.** On the board page submit a card whose spec says `AGENT: codex` and carries a
    MUST naming a file change; move it to Ready. Expect: Running with owner `claim:agent:codex`, then
    a claim row with `agent codex`, a patch and a transcript, then Review or Done signed by
@@ -72,7 +74,8 @@ after every observable above was seen on the page, not inferred from a status co
 | Cut | Files | Tests | Rendered check |
 |---|---|---|---|
 | P prompts | `lcnc/PromptDocument.kt`, `lcnc/PromptNodes.kt`, `lcnc/LcncPromptSeeds.kt` (commonMain); `lcnc/PromptStore.kt` (jvmMain); contracts `prompt.get`, `prompt.render`, `prompt.list`, `prompt.save` and `mux.chat.system?` in `LcncContracts.kt`; `prompt.chat` honours a cabled `prompt?`; `lcnc/prompt/<name>` keys in `LcncBlackboard`, `LcncPublisher.publishPrompt`, a `BlackboardNamespaces` row; `preset-brain-mux` reads `hello` through `prompt.get`; new preset `preset-prompt` "Save a prompt"; `GET/POST /api/prompts[/{name}]` in `PatchWire.kt` with `RouteManifest` rows; `promptVersions` on run receipts in `LcncRunService.kt`; daemon wiring and the seed thaw in `OroborosDaemon.kt` | `PromptTemplateTest` (6), `PromptNodesTest` (5), `PromptStoreTest` (5), `PatchWirePromptsTest` (3), `PromptProvenanceReceiptTest` (1); gates `LcncContractParityTest`, `LcncPresetCatalogTest`, `LcncPresetsGateTest`, `PresetAssemblyTest`, `PresetRequiredInputsTest`, `RouteManifestParityTest`, `LcncShakeDemoTest`, `ArchiveServiceTest`, `KanbanModuleHttpTest`, `McpSurfaceParityTest` all green; `compileKotlinJs` 0 errors | 2026-09-06 on `bin/oroboros-up --fresh --port 8899`: "Save a prompt" opened from `?load=prompt`, the text changed, Publish (as `prompt`), Run; the activity pane gained `lcnc/prompt/hello` and the inspector showed its new cid with `previousCid` = the seed cid, text and actor `prompt.save`; `/api/prompts`, `/api/prompts/hello?history=1`, `/api/lcnc/content?cid=` and the ledger on disk agreed; a restart on the same home logged "1 head(s) restored from the ledger" and served the same head |
-| F project documents | pending | pending | pending |
+| N canary binary | `build.gradle.kts` (`macosArm64("macos")` gains `binaries.executable("canary")` with a named entry point); `nativeMain/.../canary/TrikeShedCanary.kt` | the binary is the proof: `./gradlew linkCanaryDebugExecutableMacos` then `build/bin/macos/canaryDebugExecutable/canary.kexe` | 2026-09-06: a Mach-O 64-bit arm64 executable (8.8 MB) ran Confix parse + canonical CBOR identity, a CAS round trip, a stored prompt's identity and render, and an LCNC program walked by the one executor with the prompt legos (`Greet the canary.`), 138 contracts, receipt cid printed, exit 0. No JVM. |
+| F project documents | `lcnc/ProjectNodes.kt` (commonMain: `ProjectCorpus`, `ProjectDoc`/`ProjectRef`/`ProjectText`, `InMemoryProjectCorpus`, `ProjectGlob`, runners `project.list`/`project.docs`/`project.read`/`project.extract`); `forge/server/JvmProjectCorpus.kt` (jvmMain, over `ProjectDbRegistry` and `ProjectScopes`); the ring gains `each?` with `item` and `limit` (`LcncRunner.runRing`, `LcncTypeCheck` derives `List<K>` from the item's declared kind and lists the per-name yields); contracts with exact kinds `ProjectDoc`, `List<ProjectDoc>`, `List<ProjectRef>`; `CouchHeadProjection.sequenceOf`; `SurfaceNodes` no longer serves `project.list`; new preset `preset-corpus` "Corpus digest"; `lcnc/LcncConsumedLedger.kt` (the consumed-input ledger a run carries: what it read and one fingerprint over the cids; `prompt.get`, `project.docs`, `project.read` and `project.extract` record into it; receipts gain `consumed`, `consumedTruncated`, `inputFingerprint`, and `promptVersions` now names prompts read inside rings); the ring's `each?` is held open by the shake specimen and never proposed by the matcher (`LcncTypeCheck.RING_EACH`, `LcncShakeDemo`, `LcncTreeShake`, `doc/shake-demo.md`); `preset-brain-mux` and `preset-corpus` re-spaced to Chrome's measured node sizes (columns 320/720/1000) and their `prompt.chat` budgets raised from 256 to 1024 tokens; daemon wiring | `ProjectNodesTest`, `LcncEachRingTest`, `LcncEachTypeTest`, `CorpusPresetExecutionTest` (commonTest), `ProjectCorpusJvmTest` (jvmTest); a 25-suite batch of the LCNC, prompt, preset, route-manifest, run-route and claim-loop gates green; `compileKotlinJs` 0 errors | 2026-09-06 on the scratch daemon (port 8899, restarted on its home), in Chrome: the notes folder (`a.md`, `b.md`, `c.txt`) mounted through `POST /api/projects` and listed as project `genesis-notes` with 3 docs; "Corpus digest" opened from `?load=preset-corpus`, the daemon recorded its model into the draft, Publish as `corpus`, `project` set to `genesis-notes` in the invocation dialog, Run. The dialog's Resolved Bindings listed `n-proj project` from the invocation and two `r-in doc` rows sourced `each` carrying the documents' cids and sequences 0 and 1; the receipt (`7aa8b867`, cid `sha256:910e84`) carried `promptVersions.summarize` = the seed cid, `consumed` = the listing (glob `*.md`), `a.md`, the prompt, `b.md` (the `.txt` excluded by the glob), `consumedTruncated` false, and an `inputFingerprint` byte-identical to an earlier run over the same inputs; the display node read `a.md: The document is a brief note titled "Alpha," ...` and `b.md: ...`; `/api/lcnc/content?cid=` served the same receipt |
 | A coding-agent lane | pending | pending | pending |
 | X run export | pending | pending | pending |
 | C stale publish, snapshot | pending | pending | pending |
@@ -99,3 +102,29 @@ after every observable above was seen on the page, not inferred from a status co
   version" button are deferred to the Kotlin/JS gateway cut (the owner's 09-06 ruling: UI logic
   from commonMain, not more hand-written JS); no model call was made, so `preset-brain-mux`
   answering through its stored prompt is not claimed here.
+
+### 2026-09-06, Cut F
+
+- `./gradlew jvmMainClasses` green; a 25-suite batch (the Cut F suites, the prompt suites, the
+  preset gates, `LcncShakeDemoTest`, the tree-shake suites, `RouteManifestParityTest`,
+  `LcncRunProgramRouteTest`, `KanbanClaimLoopTest`) green; `compileKotlinJs` 0 errors; the macOS
+  canary re-linked and ran on the same commonMain.
+- Rendered on the scratch daemon in Chrome, as the table says. Two facts about the harness came out
+  of it and are recorded rather than worked around. First, a preset with a blank live-list param
+  (`prompt.chat` model and prefill, `project.docs` project) becomes an unpublished draft a second or
+  two after it opens: the harness's live picklist records its first entry so that "what the select
+  shows is what the daemon runs" (the owner's rule, commit 298de829b). The claim in 04b1e2474 that
+  `preset-brain-mux` opens on the blackboard was read from the status line before the picklists
+  landed; it opens clean geometrically now (its columns were also being pushed by the resolver, since
+  a note is 330 wide) and then becomes a draft by that rule, so the walk publishes and runs. Second,
+  the first paint of a large board takes about fifteen seconds in Chrome: the overlap resolver reads
+  element widths inside an all-pairs loop over every top-level node on the landscape, and each read
+  forces a reflow. That code is in another session's in-flight file and under the no-panels-widget
+  rule, so it is noted for the owner, not touched.
+- The first rendered run returned two empty summaries with the presets' 256-token budget: the
+  scratch daemon's failover answered as a reasoning model, which spends that budget on hidden
+  thinking. With 1024 tokens the same run summarised both notes. Both presets now say 1024; the
+  runner's own default of 256 is the owner's call and is unchanged.
+- Not claimed: the drop-to-mount gesture of walk step 1 (the folder was mounted through the
+  projects route); the stale and rebuild half of the corpus story (Cut S); a model answer from
+  `preset-brain-mux`, which was opened but not run here.

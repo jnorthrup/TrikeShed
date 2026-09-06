@@ -160,6 +160,9 @@ internal class LcncRunService(
                     record("start", "running")
                     val walker = LcncRunner(ctx.lcncRunners).apply {
                         maxNodeExecutions = maxNodes
+                        // What the run READS rides the receipt (Cut F/S): stored prompts by name to cid,
+                        // project documents and listings by id to cid, one fingerprint over the cids.
+                        ledger = LcncConsumedLedger()
                         subprogramLoader = { label ->
                             pinned[label] ?: ctx.programLoader(label)?.let { source ->
                                 val (body, version) = freeze(label, source)
@@ -180,10 +183,13 @@ internal class LcncRunService(
                     }
                     // Which stored prompts the run READ, by name → cid, beside programVersions:
                     // a receipt names its prompts the way it names its program (Cut P).
-                    val promptVersions = PromptNodes.promptVersionsOf(listOf(frozen) + pinned.values, result.nodeOutputs)
+                    val promptVersions = PromptNodes.promptVersionsOf(listOf(frozen) + pinned.values, result.nodeOutputs) +
+                        (walker.ledger?.promptVersions() ?: emptyMap())
                     val output = mapOf("returns" to result.returns, "outputs" to result.nodeOutputs,
                         "bindings" to result.bindings, "bindingsTruncated" to result.bindingsTruncated,
-                        "promptVersions" to promptVersions)
+                        "promptVersions" to promptVersions,
+                        "consumed" to result.consumed, "consumedTruncated" to result.consumedTruncated,
+                        "inputFingerprint" to result.inputFingerprint)
                     val limit = ValueBudget().violation(output)
                     if (limit != null) finish(413, "fail", "failed", mapOf("ok" to false, "phase" to "reporting", "error" to limit))
                     else finish(200, "complete", "completed", output + ("ok" to true))
