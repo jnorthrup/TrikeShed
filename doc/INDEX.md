@@ -19,6 +19,8 @@ Source: `doc/archives/archive-2026-07-22.md` (13,066 lines, 762KB) — consolida
 | **Rewrite** (`rewire.md`) | User-centric Forge workspace architecture | Storage unification (1 CID, 5 lenses), Unified surface, Storage layer (btrfs), VCS gateway (pijul/git/IPFS), Agent layer (Modelmux/Kanban/Jules), Ingest pipeline, Mesh layer (Litebike/SSH/UPnP) |
 | **Taste** (`taste.md`) | High-performance hierarchical UI engine principles | 10 principles, Meta-finding, Cut list (T1–T10 ranked by unblocking power) |
 | **Kernel shapes** (`kernel/`) | The algebraic kernel's documents carried from CCEKCMMKPlatform @ f3f276eeb (2026-09-03), plus `parity.tsv` and `scripts/kernel-parity.sh`; `KernelParityTest` holds the shared kernel files to the manifest | Whitepaper, Curiously Recursive MetaSeries shapes, algebra deep dive, CharStr DAG, Confix architecture, parity gate |
+| **Forge genesis** (`forge-genesis.md`) | The post that started Forge, scored bullet by bullet, and the rendered walk that answers it | Scorecard with path pointers, the six-step walk, what landed, verification snapshot |
+| **Moat inventory** (`moat-inventory.md`) | Inert inventory of the distinctive concepts and how far each is | Layer-ordered table (state, wiring, next falsifiable cut), only-in-docs, only-in-code, docs that describe deleted things |
 
 ---
 
