@@ -642,9 +642,17 @@ function renderHeap(n){
   let cv=n.el.querySelector("canvas.heapmap");
   if(!cv){ cv=document.createElement("canvas"); cv.className="heapmap"; cv.width=664; cv.height=150;
     cv.style.cssText="display:block;margin:0 8px 4px;border:1px solid var(--line);border-radius:3px"; n.el.appendChild(cv);
+    cv.tabIndex=0;cv.setAttribute("role","button");cv.setAttribute("aria-label","Inspect allocation sites by class");
+    const inspect=(tile)=>{if(tile)AllocationInspector.open(tile.row.class,{bytes:tile.row.bytes,kind:n._heapLane==="histogram"?"live":"allocation"});};
+    cv.addEventListener("pointerdown",e=>e.stopPropagation());
+    cv.addEventListener("click",e=>{e.stopPropagation();const r=cv.getBoundingClientRect();
+      const x=(e.clientX-r.left)*cv.width/r.width,y=(e.clientY-r.top)*cv.height/r.height;
+      inspect(n._heapTiles?.find(t=>x>=t.x&&x<t.x+t.w&&y>=t.y&&y<t.y+t.h));});
+    cv.addEventListener("keydown",e=>{if(e.key==="Enter"||e.key===" "){e.preventDefault();e.stopPropagation();inspect(n._heapTiles?.[0]);}});
     const st=document.createElement("div"); st.className="kboard-status heapstat"; n.el.appendChild(st); }
   const h=n._heap||{}, lane=p(n,"lane")||"allocation";
   const rows=(lane==="histogram"&&(h.rows||[]).length?h.rows:h.allocation)||[];
+  n._heapTiles=[];n._heapLane=lane==="histogram"&&(h.rows||[]).length?"histogram":"allocation";
   const top=rows.slice().sort((a,b)=>(b.bytes||0)-(a.bytes||0)).slice(0,24);
   const total=top.reduce((a,r)=>a+(r.bytes||0),0);
   const x2=cv.getContext("2d"); x2.clearRect(0,0,cv.width,cv.height);
@@ -656,6 +664,7 @@ function renderHeap(n){
     if(!items.length||w<1||hgt<1) return;
     if(items.length===1){
       const r=items[0];
+      n._heapTiles.push({row:r,x,y,w,h:hgt});
       x2.fillStyle="hsl("+hue(r.class)+" 45% 32%)"; x2.fillRect(x+0.5,y+0.5,w-1,hgt-1);
       if(w>60&&hgt>12){ x2.fillStyle="#d8dce6"; x2.font="9px monospace";
         const short=r.class.replace(/^.*\./,"").slice(0,Math.floor(w/6));
@@ -672,7 +681,7 @@ function renderHeap(n){
   }
   tile(top,0,0,cv.width,cv.height,true);
   if(stat) stat.textContent=lane+": "+(total/1048576).toFixed(1)+"MB across top "+top.length+" classes"+
-    (lane==="histogram"?" · "+(h.classes||0)+" classes "+((h.bytes||0)/1048576).toFixed(1)+"MB live":"");
+    (n._heapLane==="histogram"?" · "+(h.classes||0)+" classes "+((h.bytes||0)/1048576).toFixed(1)+"MB live":" · sampled since start");
 }
 /* ── quota legion standings: reactor roster × ledger, usable-first ── */
 function renderStandings(n){

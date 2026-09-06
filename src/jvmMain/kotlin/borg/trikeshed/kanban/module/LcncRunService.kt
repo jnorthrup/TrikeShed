@@ -19,9 +19,9 @@ import java.util.concurrent.ConcurrentHashMap
 internal class LcncRunService(
     private val ctx: ModuleContext,
     private val store: BoardStoreElement,
-    private val vocabulary: () -> Map<String, LcncPortContract>,
     /** Consumed-document facts per completed run (Forge genesis, Cut S); null keeps the plane silent. */
     private val facts: borg.trikeshed.lcnc.LcncRunFacts? = null,
+    private val vocabulary: () -> Map<String, LcncPortContract>,
 ) {
     private val active = ConcurrentHashMap<String, Job>()
     private val slots = Semaphore(3)

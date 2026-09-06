@@ -512,7 +512,7 @@ class KanbanModule : ForgeModule {
         // The same ReteNetwork and KIF bank the daemon's publisher holds: the panels plane and
         // the vocabulary tuples come from one network and one bank however many publishers exist.
         val publisher = borg.trikeshed.lcnc.LcncPublisher(ctx.blackboard, { ctx.lcncRunners }, ctx.attachments, ctx.rete, ctx.kifBank)
-        val runs = LcncRunService(ctx, store, publisher::vocabulary, runFacts)
+        val runs = LcncRunService(ctx, store, runFacts, publisher::vocabulary)
         val archives = ArchiveService(ctx.casStore)
         // Three literal claims, not a loop over an interpolated path: the route-manifest parity
         // scan reads literals, and an interpolation is a route the gate cannot see.
