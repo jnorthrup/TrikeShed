@@ -905,7 +905,9 @@ object LcncPresets {
                 LcncNode("k1", "keys.status", x = 620.0, y = 60.0),
                 LcncNode("kd", "display", x = 1000.0, y = 60.0),
                 LcncNode("note-ask", "note",
-                    params = mapOf("text" to "2 · ask —\nthe question is the stored prompt named hello\n(the Save a prompt gallery item changes it);\npick a model (the list is what runs here,\nnewest first), press ▶ run.\nThe answer lands in the green card;\na red card says what went wrong."),
+                    // Lines stay under ~42 characters: a wider note overlaps the next column and
+                    // the loader would push that column sideways, opening the preset as a draft.
+                    params = mapOf("text" to "2 · ask —\nthe question is the stored prompt\nnamed hello (change it with the\nSave a prompt gallery item);\npick a model (the list is what runs here,\nnewest first), press ▶ run.\nThe answer lands in the green card;\na red card says what went wrong."),
                     x = 320.0, y = 640.0),
                 // The prompt is a citizen, not a literal: read by name, its version
                 // recorded on the run's receipt as promptVersions.
