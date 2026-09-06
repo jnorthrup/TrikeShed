@@ -82,6 +82,8 @@ class ModuleContext(
      * contexts) means each publisher keeps a private bank, as before.
      */
     val kifBank: borg.trikeshed.kif.KifKnowledgeBase? = null,
+    /** The coding-agent lane (Forge genesis, Cut A): filled by the daemon after attach, read by the claim worker at claim time. */
+    @Volatile var agentRuns: borg.trikeshed.lcnc.AgentRuns? = null,
 )
 
 /** The grip the supervisor holds: describe for /api/modules, drain-then-close on detach. */

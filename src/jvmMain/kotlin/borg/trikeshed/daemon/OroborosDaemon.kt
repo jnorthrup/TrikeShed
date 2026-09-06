@@ -173,6 +173,8 @@ object OroborosDaemon {
         val projects: List<String> = emptyList(),
         /** Dynamic modules attached at boot: --module <fqcn> (repeatable). Proxy-ctor loaded (app CP, then build/live). */
         val modules: List<String> = emptyList(),
+        /** Coding agents offered to AGENT: cards and agent.run: --agents codex,opencode[,claude] or TRIKESHED_AGENTS; default codex,opencode. */
+        val agents: Set<String> = borg.trikeshed.agent.AgentCli.DEFAULT_ENABLED,
     )
 
     @Volatile
@@ -192,6 +194,7 @@ object OroborosDaemon {
         val positional = mutableListOf<String>()
         val projects = mutableListOf<String>()
         val modules = mutableListOf<String>()
+        var agents: Set<String>? = null
 
         val flags = listOf(
             ForgeCliArgs.Flag(name = "--once") { _, i -> watch = false; i + 1 },
@@ -200,6 +203,7 @@ object OroborosDaemon {
             ForgeCliArgs.Flag(name = "--belief-bag") { _, i -> i + 1 },
             ForgeCliArgs.Flag(name = "--project", withValue = true) { a, i -> projects.add(a[i]); i + 1 },
             ForgeCliArgs.Flag(name = "--module", withValue = true) { a, i -> modules.add(a[i]); i + 1 },
+            ForgeCliArgs.Flag(name = "--agents", withValue = true) { a, i -> agents = a[i].split(',').map { it.trim().lowercase() }.filter { it.isNotEmpty() }.toSet(); i + 1 },
             ForgeCliArgs.Flag(name = "--interval-ms", withValue = true) { a, i ->
                 val v = a[i].toLongOrNull() ?: die("--interval-ms requires a positive long")
                 intervalMs = v
@@ -234,7 +238,10 @@ object OroborosDaemon {
             ForgeCliArgs.Result.Help -> { usage(); exitProcess(0) }
             is ForgeCliArgs.Result.Error -> die(r.message)
         }
-        return DaemonConfig(watch, intervalMs, maxSlots, kanbanPort, hermesRoot, hermesSleeve, hermesConsole, positional, projects, modules)
+        val agentsResolved = agents
+            ?: System.getenv("TRIKESHED_AGENTS")?.split(',')?.map { it.trim().lowercase() }?.filter { it.isNotEmpty() }?.toSet()
+            ?: borg.trikeshed.agent.AgentCli.DEFAULT_ENABLED
+        return DaemonConfig(watch, intervalMs, maxSlots, kanbanPort, hermesRoot, hermesSleeve, hermesConsole, positional, projects, modules, agentsResolved)
     }
 
     @JvmStatic
@@ -1299,6 +1306,19 @@ object OroborosDaemon {
         // Sub-VM module legos: tika/corenlp/camel/graalce as supervised guest evals
         // over the daemon's own hypervisor (VmSupervisor.current — VmWire's same host).
         borg.trikeshed.lcnc.SubVmLegos.register(moduleContext)
+        // The coding-agent lane (Forge genesis, Cut A): the host's CLIs probed once; agent.run /
+        // agent.list legos and the claim worker's lane share one runner; receipts are agent/run/<runId>.
+        val agentRoster = borg.trikeshed.agent.AgentCli.probe(config.agents)
+        val agentRunner = borg.trikeshed.agent.JvmAgentRunner(
+            agentRoster, repoDir = repoDir, forgeHome = forgeHome, cas = casStore, attachments = attachmentGateway, blackboard = daemonBlackboard,
+        )
+        moduleContext.agentRuns = agentRunner
+        moduleContext.lcncRunners.putAll(borg.trikeshed.lcnc.AgentNodes.registry(agentRunner) { java.util.UUID.randomUUID().toString() })
+        val agentWire = borg.trikeshed.forge.server.AgentWire(
+            agentRunner, daemonBlackboard, probedAtMs = System.currentTimeMillis(),
+            enabledBy = if ("--agents" in args) "--agents" else if (System.getenv("TRIKESHED_AGENTS") != null) "TRIKESHED_AGENTS" else "default",
+        )
+        System.err.println("[OROBOROS] coding agents: " + agentRoster.joinToString { it.id + if (it.enabled) " " + it.version else " (" + it.why + ")" })
         // Stored prompts: prompt.get / prompt.render / prompt.list over the store, prompt.save the
         // one write; then the ledger thaws and the seeds install where no head exists.
         moduleContext.lcncRunners.putAll(borg.trikeshed.lcnc.PromptNodes.registry(promptStore))
@@ -1895,7 +1915,7 @@ object OroborosDaemon {
         val extraRouteList: List<borg.trikeshed.litebike.ExtraRoute> = listOfNotNull(
             graalWire::route, vmWire::route, hermesWire::route, beliefWire?.let { it::route },
             patchWire::route, moduleWire::route, webhookWire::route, blackboardWire::route, rdfWire::route,
-            reteWire::route, blipWire::route,
+            reteWire::route, blipWire::route, agentWire::route,
         )
         // ── the surface family: node types the canvas could only reach by fetch ──
         // blackboard.*, graal.vitals/heap, vms.list, panels.list … existed (board.get /

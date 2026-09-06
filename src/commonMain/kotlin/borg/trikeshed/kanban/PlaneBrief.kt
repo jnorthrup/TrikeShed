@@ -46,6 +46,10 @@ object PlaneBrief {
          */
         val models: List<String> = emptyList(),
         val fanout: Int? = null,
+        /** `AGENT: codex` — a coding agent works the card in a scratch clone (Forge genesis, Cut A); blank = the chat brain. */
+        val agent: String = "",
+        /** `AGENT-BUDGET: <seconds>`, clamped by the lane to the reaper's ceiling. */
+        val agentBudget: Int? = null,
     ) {
         val musts: List<Criterion> get() = criteria.filter { it.level == "MUST" }
 
@@ -101,6 +105,8 @@ object PlaneBrief {
         var tokens: Int? = null
         var models: List<String> = emptyList()
         var fanout: Int? = null
+        var agent = ""
+        var agentBudget: Int? = null
         val counts = HashMap<String, Int>()
         for (raw in spec.lines()) {
             val h = specHead(raw) ?: continue
@@ -119,12 +125,15 @@ object PlaneBrief {
                 "TOKENS" -> tokens = rest.toIntOrNull()
                 "MODELS" -> if (h.colon) models = rest.split(',').map { it.trim() }.filter { it.isNotEmpty() }
                 "FANOUT" -> if (h.colon) fanout = rest.toIntOrNull()
+                // The coding-agent lane: the colon is required, exactly as MODELS: reads.
+                "AGENT" -> if (h.colon) agent = rest.trim().lowercase()
+                "AGENT-BUDGET" -> if (h.colon) agentBudget = rest.trim().toIntOrNull()
             }
         }
         if (criteria.none { it.level == "MUST" }) criteria.add(0, Criterion("MUST", 1, DEFAULT_MUST))
         // one MODELS entry is a MODEL, not a fan-out
         if (models.size == 1 && model.isBlank()) model = models[0]
-        return Spec(goal, criteria, out, human, model, tokens, models, fanout)
+        return Spec(goal, criteria, out, human, model, tokens, models, fanout, agent, agentBudget)
     }
 
     /** The card's own terms: lowercase words of 4+ letters, stopwords out, in first-seen order. */
@@ -209,6 +218,14 @@ object PlaneBrief {
     )
 
     /** How much of one child's answer the merge brief carries; the receipt on the blackboard keeps the whole. */
+    /** The coding-agent lane's block in a brief: who the reader is, where it works, what its diff is called. */
+    data class AgentBlock(val cli: String, val version: String, val repo: String, val evidenceId: String, val budgetSeconds: Int)
+
+    fun agentLines(a: AgentBlock): String =
+        "AGENT: you are " + a.cli + (if (a.version.isNotBlank()) " " + a.version else "") + ", working in a scratch clone of " + a.repo + " at its current HEAD.\n" +
+        "  Edit files there; do not commit or push. Your diff is recorded as evidence id " + a.evidenceId + ";\n" +
+        "  cite it for any MUST met by a file change. Budget: " + a.budgetSeconds + " s. End with the REPLY block.\n"
+
     const val MAX_CHILD_CHARS: Int = 600
 
     /** The merge instruction, one line, verbatim in every fan-in brief. */
@@ -274,6 +291,7 @@ object PlaneBrief {
          * child receipt ids as citable evidence.
          */
         children: List<ChildReceipt> = emptyList(),
+        agent: AgentBlock? = null,
     ): String = buildString {
         append("Card ").append(jobId).append(" — brief (RFC 2119: MUST, SHOULD, MAY)\n")
         append("GOAL: ").append(spec.goal).append('\n')
@@ -286,6 +304,7 @@ object PlaneBrief {
         append("EVIDENCE on the daemon's plane (cite these ids verbatim):\n")
         if (evidence.isEmpty()) append("  (no fact mentions this card's terms)\n")
         for (r in evidence) append("  ").append(evidenceLine(r)).append('\n')
+        if (agent != null) append(agentLines(agent))
         if (children.isNotEmpty()) {
             append("CHILDREN (this card fanned out; each child's receipt id is citable evidence):\n")
             for (c in children) {

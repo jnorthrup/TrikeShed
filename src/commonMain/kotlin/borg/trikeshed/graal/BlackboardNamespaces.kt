@@ -42,6 +42,7 @@ data object BlackboardNamespaces {
         Namespace("narsese/rete/firing/", "NARS rete firing receipts keyed by firing cid", "OroborosDaemon narsese firing collector", admitted = false),
         Namespace("kanban/rule/", "production-sink activation receipts: bindings + salience per (ruleId, activationId)", "KanbanModule productionSink", admitted = false),
         Namespace("kanban/claim/", "claim receipts per jobId: {owner, model, ok, content|error, atMs, revision} — the brain's answer a human reads in REVIEW", "BoardClaimWorker"),
+        Namespace("agent/run/", "coding-agent run receipts per runId (Forge genesis, Cut A): {agent, cli, version, model, repo, base, exit, ok, killed, truncated, transcriptCid, patchCid, patchBytes, filesChanged, summary, error} — the evidence id a MUST met by a file change cites", "AgentLegos / BoardClaimWorker agent lane"),
         Namespace("kanban/fanout/", "fan-out receipts per parent jobId: {models, children, submitted, readied, join, ok, startedAtMs, finishedAtMs, atMs, revision} — how a MODELS:/FANOUT: card was split into child cards (Delta 2026-09-05); admitted like kanban/claim/, so the plane can cite the split", "BoardFanOutWorker"),
         Namespace("kanban/committed/", "board store commit receipts per (jobId, sequence)", "KanbanModule committed collector"),
         Namespace("kanban/review/", "kanban-nars review gloss per angular", "KanbanModule review bridge"),

@@ -43,6 +43,11 @@ object BoardRules {
     /** The owner a claim stamps on the card: the daemon's own brain, never a person, never Hermes. */
     const val CLAIM_OWNER = "claim:brain"
 
+    /** The coding-agent lane (Forge genesis, Cut A): a card whose spec says `AGENT: <id>` is owned by `claim:agent:<id>`. */
+    const val CLAIM_AGENT_PREFIX = "claim:agent:"
+
+    fun agentOwner(agentId: String): String = CLAIM_AGENT_PREFIX + agentId
+
     /** Delta (reaper): a claimed RUNNING card the worker never brought back goes to READY — thrice, then BLOCKED. */
     const val REAPER = "reaper"
 
@@ -75,6 +80,9 @@ object BoardRules {
 
     /** The card fact's `FANOUT: n` count; 0 = none asked. */
     internal fun fanout(fact: ReteStoredFact): Int = (fact.fields["fanout"] as? Number)?.toInt() ?: 0
+
+    /** The card fact's `AGENT:` id (the coding-agent lane); blank = the chat brain claims it. */
+    internal fun agent(fact: ReteStoredFact): String = (fact.fields["agent"] as? String).orEmpty()
 
     /**
      * Is [jobId] a child the fan-out worker minted for [parent]? The worker's naming is
@@ -357,7 +365,8 @@ class ClaimProduction(private val owner: String = BoardRules.CLAIM_OWNER) : Rete
                         "jobId" to jobId,
                         "toColumn" to BoardCol.RUNNING.wire,
                         "expectedRevision" to "$revision",
-                        "owner" to owner,
+                        // An AGENT: card is owned by its agent's claim owner; the worker reads it back from the binding.
+                        "owner" to BoardRules.agent(card).let { if (it.isNotBlank()) BoardRules.agentOwner(it) else owner },
                     ),
                 ),
             )

@@ -2,6 +2,10 @@ package borg.trikeshed.kanban
 
 import borg.trikeshed.graal.ConfixBlackboard
 import borg.trikeshed.kanban.rules.BoardRules
+import borg.trikeshed.lcnc.AgentNodes
+import borg.trikeshed.lcnc.AgentRunRequest
+import borg.trikeshed.lcnc.AgentRunResult
+import borg.trikeshed.lcnc.AgentRuns
 import borg.trikeshed.lcnc.LcncNode
 import borg.trikeshed.lcnc.LcncNodeRunner
 import kotlinx.coroutines.CancellationException
@@ -62,6 +66,13 @@ class BoardClaimWorker(
      * brain sees the files, panels and daemon state that mention the card's terms.
      */
     private val plane: suspend () -> List<PlaneBrief.Row> = { emptyList() },
+    /**
+     * The coding-agent lane (Forge genesis, Cut A): the host's agent runs, looked up at claim
+     * time like the runners (the daemon fills them in after the module attaches); null = no lane,
+     * and an `AGENT:` card is not taken.
+     */
+    private val agents: () -> AgentRuns? = { null },
+    private val mintRunId: () -> String = { "run-" + clock() },
 ) {
     companion object {
         const val RECEIPT_PREFIX: String = "kanban/claim/"
@@ -98,12 +109,13 @@ class BoardClaimWorker(
             plane: List<PlaneBrief.Row>,
             receipts: List<PlaneBrief.Receipt>,
             children: List<PlaneBrief.ChildReceipt> = emptyList(),
+            agent: PlaneBrief.AgentBlock? = null,
         ): String {
             val parsed = PlaneBrief.parseSpec(title, spec)
             return PlaneBrief.render(
                 jobId, title, parsed,
                 PlaneBrief.select(plane, title + " " + spec), PlaneBrief.state(plane), PlaneBrief.lessons(receipts),
-                children,
+                children, agent,
             )
         }
 
@@ -165,9 +177,20 @@ class BoardClaimWorker(
 
     /** One claim, start to finish. Returns the receipt as written (plus `review`: the REVIEW move's verdict). */
     suspend fun claim(jobId: String, expectedRevision: Long, owner: String = BoardRules.CLAIM_OWNER): Map<String, Any?> = coroutineScope {
-        // ── 0. no brain, no claim ─────────────────────────────────────────────
+        // ── 0. who works this card: the agent its spec names, else the brain ─────
+        val card0 = store.card(jobId)
+        val spec0 = PlaneBrief.parseSpec(card0?.title ?: jobId, card0?.spec.orEmpty())
+        val lane = if (spec0.agent.isNotBlank()) agents() else null
+        val agentInfo = if (spec0.agent.isNotBlank()) lane?.roster()?.firstOrNull { it.id == spec0.agent } else null
+        if (spec0.agent.isNotBlank() && (agentInfo == null || !agentInfo.enabled)) {
+            val why = agentInfo?.why?.takeIf { it.isNotEmpty() }?.let { " ($it)" }.orEmpty()
+            return@coroutineScope receipt(
+                jobId, owner, model = "", ok = false, revision = expectedRevision,
+                body = "error" to "agent '${spec0.agent}' is not installed/enabled here$why, claim not taken",
+            ) + ("review" to "not attempted")
+        }
         val chat = runner("prompt.chat")
-        if (chat == null) {
+        if (agentInfo == null && chat == null) {
             return@coroutineScope receipt(
                 jobId, owner, model = "", ok = false, revision = expectedRevision,
                 body = "error" to "no brain: this daemon has no prompt.chat runner, claim not taken",
@@ -250,7 +273,8 @@ class BoardClaimWorker(
             })
         }
         val children = childReceipts(blackboard, childIds)
-        val model = spec.model.ifBlank { resolveModel() }
+        // An agent runs its own model; the mux pick is the brain's business only.
+        val model = if (agentInfo != null) spec.model else spec.model.ifBlank { resolveModel() }
         // A merge never gets less than a child did: the floor is MERGE_TOKENS, the same
         // rule as the worker's child floor (max of the parent's TOKENS: and 4096).
         val tokens = (if (children.isNotEmpty()) maxOf(spec.tokens ?: 0, MERGE_TOKENS) else (spec.tokens ?: MAX_TOKENS.toInt())).toString()
@@ -260,14 +284,28 @@ class BoardClaimWorker(
                 PlaneBrief.Receipt(m["model"]?.toString().orEmpty(), m["ok"] == true, m["error"]?.toString().orEmpty())
             }
         }
-        val briefText = brief(jobId, title, specText, planeRows, priorReceipts, children)
+        val agentRunId = if (agentInfo != null) mintRunId() else ""
+        val agentBudget = AgentNodes.clampBudget(spec.agentBudget)
+        val agentBlock = agentInfo?.let {
+            PlaneBrief.AgentBlock(cli = it.id, version = it.version, repo = "the daemon's repository", evidenceId = AgentNodes.evidenceId(agentRunId), budgetSeconds = agentBudget)
+        }
+        val briefText = brief(jobId, title, specText, planeRows, priorReceipts, children, agentBlock)
         val mentioned = PlaneBrief.select(planeRows, title + " " + specText).size
         // Delta 2026-09-05 (receipt timing): this worker's clock brackets the brain call so the
         // receipt shows when the model was asked and when it answered, independent of what
         // prompt.chat reports (latencyMs there is the provider round trip, measured by the node).
         val startedAtMs = clock()
+        var agentResult: AgentRunResult? = null
         val answer: Map<String, Any?> = try {
-            chat.run(
+            if (agentInfo != null) {
+                // The lane: the agent works a scratch clone; its last message is the reply the judge reads.
+                val r = lane!!.run(AgentRunRequest(agent = agentInfo.id, brief = briefText, model = model, budgetSeconds = agentBudget, runId = agentRunId, jobId = jobId))
+                agentResult = r
+                mapOf(
+                    "ok" to r.ok, "content" to r.summary, "model" to r.model.ifBlank { agentInfo.id },
+                    "error" to r.error.ifEmpty { if (r.ok) "" else "agent exited ${r.exit}" },
+                )
+            } else chat!!.run(
                 LcncNode(
                     id = "claim-$jobId",
                     type = "prompt.chat",
@@ -297,8 +335,11 @@ class BoardClaimWorker(
         // A child receipt id is evidence the judge accepts even where the blackboard is not
         // on the plane (the test rig has no BlackboardChangesFactElement; the daemon does).
         for (c in children) planeIds.add(c.evidenceId)
+        // A recorded diff is citable evidence; an empty one is not.
+        if ((agentResult?.patchBytes ?: 0L) > 0L) planeIds.add(AgentNodes.evidenceId(agentRunId))
         val humanTag = card?.tags?.any { it.lowercase() in HUMAN_TAGS } == true
-        val decision = PlaneJudge.decide(spec, humanTag, ok, answer["content"]?.toString().orEmpty(), planeIds)
+        val decision = if (agentResult?.killed == true) PlaneJudge.Decision(PlaneJudge.Outcome.REVIEW, "agent budget of ${agentBudget}s exceeded; a person decides", null)
+            else PlaneJudge.decide(spec, humanTag, ok, answer["content"]?.toString().orEmpty(), planeIds)
         // The revision the card landed RUNNING on — NOT store.card().revision: a person who
         // moved the card during the brain call must win, and the CAS refusal records it.
         val current = landed.snapshot.revision
@@ -308,6 +349,10 @@ class BoardClaimWorker(
             "verdict" to (decision.reply?.verdict ?: ""),
             "criteria" to (decision.reply?.lines?.map { l -> mapOf("label" to l.label, "met" to l.met, "evidence" to l.evidence) } ?: emptyList<Any>()),
         )
+        agentResult?.let { r ->
+            judged["agent"] = r.agent; judged["runId"] = r.runId; judged["patchCid"] = r.patchCid; judged["transcriptCid"] = r.transcriptCid
+            judged["exit"] = r.exit; judged["killed"] = r.killed; judged["truncated"] = r.truncated; judged["patchBytes"] = r.patchBytes
+        }
         val written = receipt(jobId, owner, model = answer["model"]?.toString() ?: model, ok = ok, body = body, revision = current, facts = mentioned, judged = judged, timing = timing)
         val trail = ArrayList<String>()
         suspend fun move(to: BoardCol, rev: Long, key: String, extra: Map<String, Any?> = emptyMap()): BoardApply? {

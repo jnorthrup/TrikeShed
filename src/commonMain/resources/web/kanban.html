@@ -794,11 +794,19 @@ function describe(f) {
     const latency = typeof v.latencyMs === "number" && v.latencyMs > 0 ? `<span>${v.latencyMs} ms</span>` : `<span class="rev" title="no latency reported">–</span>`;
     const verdict = v.verdict ? `<span>${escapeHtml(v.verdict)}</span>` : "";
     const decision = v.decision ? `<span class="rev">${escapeHtml(v.decision)}</span>` : "";
+    // The coding-agent lane (Forge genesis, Cut A): the receipt names the agent, its patch and
+    // transcript as CAS citizens (raw bytes at /trikeshed/_cas/<cid>), and whether the budget
+    // or the output cap cut it short.
+    const agent = v.agent ? `<span>agent <b>${escapeHtml(v.agent)}</b></span>` : "";
+    const patch = v.patchCid ? `<a href="/trikeshed/_cas/${encodeURIComponent(v.patchCid)}" download="${escapeHtml(jobId)}.diff" title="${escapeHtml(v.patchCid)}">patch</a>` : "";
+    const transcript = v.transcriptCid ? `<a href="/trikeshed/_cas/${encodeURIComponent(v.transcriptCid)}" title="${escapeHtml(v.transcriptCid)}">transcript</a>` : "";
+    const budget = v.killed === true ? `<span class="bad" title="the agent exceeded its budget">budget</span>` : "";
+    const cut = v.truncated === true ? `<span class="rev" title="output over the cap was dropped">truncated</span>` : "";
     return {
       bucket: "claim receipts", cls: "claim",
       html: `${stampOf(at)}<span class="id" title="${escapeHtml(jobId)}">${escapeHtml(shortId(jobId))}</span><span>claim</span>` +
         (v.owner ? `<span>${escapeHtml(v.owner)}</span>` : "") + (v.model ? `<span class="rev">${escapeHtml(v.model)}</span>` : "") +
-        ok + latency + verdict + decision + tail,
+        agent + ok + latency + verdict + decision + patch + transcript + budget + cut + tail,
     };
   }
   if (parts[1] === "fanout") {

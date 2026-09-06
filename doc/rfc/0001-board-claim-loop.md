@@ -72,3 +72,27 @@ verdict, criteria:[{label, met, evidence}]}. `kanban/committed/<jobId>/<seq>` is
 
 The brain is ModelMux over the QuotaLegion walked back from Hermes' success ledger; a claim
 costs one call within the provider's proven daily budget. No Claude model is in the loop.
+
+## 8. The coding-agent lane (2026-09-06, Forge genesis Cut A)
+
+A card may say `AGENT: codex` (or `opencode`, or `claude` when the operator enabled it) and,
+optionally, `AGENT-BUDGET: <seconds>` (clamped to 840, under the reaper's fifteen minutes).
+Such a card is claimed by owner `claim:agent:<id>` instead of `claim:brain`; every guard that
+keys on the `claim:` prefix applies unchanged. The worker makes a shared clone of the daemon's
+repository at its committed HEAD under `<forgeHome>/agents/<runId>/repo`, runs the CLI there
+non-interactively with a whitelisted environment and the brief on its input, bounded by the
+budget, then records `git diff --cached --binary` against the base and the CLI's transcript as
+CAS citizens and attachment documents. The brief gains an `AGENT:` block naming the reader, the
+clone and the evidence id `blackboard/agent/run/<runId>`; that id is on the plane only when the
+diff is non-empty, so a MUST "met" by a file change needs a real change. The CLI's last message
+is the reply the judge reads, in the same REPLY shape. A budget kill parks the card in REVIEW
+(a person decides) and is not a strike. `kanban/claim/<jobId>` gains `agent, runId, patchCid,
+transcriptCid, exit, killed, truncated, patchBytes`; `agent/run/<runId>` is the run's own
+receipt; `GET /api/agents` is the roster and `GET /api/agents/runs` the receipts.
+
+Opt-in per card and outside section 7's quota: no agent runs unless a card names one, and no
+card names one unless a person wrote the line. An agent not installed or not enabled here means
+the claim is not taken and the card stays READY, exactly as a missing brain does. Fan-out stays
+chat-only: `AGENT:` lines never reach child cards. `claude` is installed on the owner's Mac but
+is not in the default enabled set; `--agents codex,opencode,claude` (or `TRIKESHED_AGENTS`) says
+otherwise.

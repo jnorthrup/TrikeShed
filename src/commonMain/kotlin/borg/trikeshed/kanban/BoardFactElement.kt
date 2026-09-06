@@ -61,6 +61,8 @@ class BoardFactElement(
             // FANOUT: n count (0 = none asked); the worker resolves n against mux.models.
             "models" to spec.models,
             "fanout" to (spec.fanout ?: 0),
+            // The coding-agent lane: ClaimProduction binds the owner from this.
+            "agent" to spec.agent,
         )
         if (known.add(jobId)) rete.assert(factId, fields, ev.cid, board)
         else rete.modify(factId, fields, ev.cid)

@@ -173,6 +173,9 @@ class KanbanModule : ForgeModule {
             clock = ctx.clock,
             // The brief is grounded in the plane: one snapshot per claim, selected by the card's terms.
             plane = { ctx.rete.snapshot().map { f -> borg.trikeshed.kanban.PlaneBrief.Row(f.factId.partitionId, f.factId.localId, f.fields) } },
+            // The coding-agent lane: the daemon fills ctx.agentRuns after attach, like the runners.
+            agents = { ctx.agentRuns },
+            mintRunId = { java.util.UUID.randomUUID().toString() },
         )
         val claimsInFlight = java.util.concurrent.ConcurrentHashMap.newKeySet<String>()
         // Delta 2026-09-05 (fan-out): the fan-out worker — child submits, READY moves, the

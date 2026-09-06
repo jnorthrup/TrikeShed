@@ -73,6 +73,20 @@ paths:
           description: accepted - per-command results {accepted,rejected,results}
         "400":
           description: empty body or malformed JSON
+  /api/agents:
+    get:
+      operationId: agentsList
+      summary: the coding-agent roster on this host - which CLIs exist, their versions, which are enabled and why not
+      responses:
+        "200":
+          description: JSON with probedAtMs, enabledBy and agents[] rows (id, path, version, enabled, why)
+  /api/agents/runs:
+    get:
+      operationId: agentRuns
+      summary: agent/run receipts, newest first; limit and jobId query params
+      responses:
+        "200":
+          description: JSON with runs[] receipts and count
   /api/vm:
     get:
       operationId: vmList

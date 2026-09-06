@@ -74,7 +74,8 @@ class BoardFanOutWorker(
          * the human gate, if any, is the parent's). Same head grammar as
          * [PlaneBrief.parseSpec] so what the parser would read is what is stripped.
          */
-        val STRIPPED_HEADS: Set<String> = setOf("MODELS", "FANOUT", "MODEL", "TOKENS", "REVIEW")
+        // Fan-out stays chat-only: an AGENT: line never reaches a child.
+        val STRIPPED_HEADS: Set<String> = setOf("MODELS", "FANOUT", "MODEL", "TOKENS", "REVIEW", "AGENT", "AGENT-BUDGET")
 
         /** The i-th (1-based) child's jobId — the shape [BoardRules.isMintedChild] recognises. */
         fun childJobId(parent: String, index: Int): String = "$parent-m$index"

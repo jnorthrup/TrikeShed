@@ -136,6 +136,8 @@ object RouteManifest {
         // -- VmWire: metered sub-VMs + terminals --
         "VmWire" to listOf(
             RouteEntry("GET", "/vm-terminal", "VT220 web terminal page"),
+            RouteEntry("GET", "/api/agents", "the coding-agent roster on this host: which CLIs exist, versions, enabled or why not"),
+            RouteEntry("GET", "/api/agents/runs", "agent/run receipts, newest first (limit, jobId)"),
             RouteEntry("GET", "/api/vm", "VM sheet"),
             RouteEntry("POST", "/api/vm/spawn", "spawn a sub-VM"),
             RouteEntry("POST", "/api/vm/{id}/eval", "evaluate source in a VM"),
