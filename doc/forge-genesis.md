@@ -30,6 +30,7 @@ path or a test, and the verification snapshot says what passed and what is not c
 | 6 iterated compute | absorption → Couch `_changes` → Rete facts is real; `CausalGraphNode.inputFingerprint` is recorded | nothing compared fingerprints, so nothing was ever stale and nothing rebuilt; `Configure` is a 0-byte file | S |
 
 The concept inventory behind this table is [moat-inventory.md](moat-inventory.md).
+The framing itself, one object read as both halves, is planned in [autotools-notion.md](autotools-notion.md).
 
 ## The walk
 

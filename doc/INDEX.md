@@ -21,6 +21,7 @@ Source: `doc/archives/archive-2026-07-22.md` (13,066 lines, 762KB) — consolida
 | **Kernel shapes** (`kernel/`) | The algebraic kernel's documents carried from CCEKCMMKPlatform @ f3f276eeb (2026-09-03), plus `parity.tsv` and `scripts/kernel-parity.sh`; `KernelParityTest` holds the shared kernel files to the manifest | Whitepaper, Curiously Recursive MetaSeries shapes, algebra deep dive, CharStr DAG, Confix architecture, parity gate |
 | **Forge genesis** (`forge-genesis.md`) | The post that started Forge, scored bullet by bullet, and the rendered walk that answers it | Scorecard with path pointers, the six-step walk, what landed, verification snapshot |
 | **Moat inventory** (`moat-inventory.md`) | Inert inventory of the distinctive concepts and how far each is | Layer-ordered table (state, wiring, next falsifiable cut), only-in-docs, only-in-code, docs that describe deleted things |
+| **The AutoTools Notion** (`autotools-notion.md`) | The post's own framing as one object: a page whose blocks are build targets; both halves mapped to the tree, the cuts, the walk, the rulings it needs | Invariants, the build half, the page half, cuts 0-8, the walk, rulings, what this is not |
 
 ---
 
