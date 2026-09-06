@@ -63,6 +63,15 @@ class CouchWire(
 
         if (p == "/${db.name}/_replicate" || p == "/_replicate") return replicate(method, bodyOf(payload))
 
+        // The IPFS aliases are root-level by protocol shape (Kubo's `/api/v0/block/…`); they are
+        // this db's CAS under another name, so they are the ONE non-`/{db}` prefix the wire owns.
+        // Until 2026-09-05 the `/{db}` guard below swallowed them: the router answered them in
+        // every in-process test and the daemon 404'd them on the socket (CouchWireSocketTest).
+        if (p.startsWith("/api/v0/")) {
+            val reply = router.handle(method, path, bodyOf(payload)) ?: return null
+            return JvmKanbanServer.HttpResponse(reply.status, "", reply.contentType, reply.bytes)
+        }
+
         // The ddoc vhost (gh-pages PWA hoisted out of store attachments) does NOT
         // ride the app port: it shadowed `/`, `/sw.js`, and any page docs/ carries
         // with the stale PUBLIC build. Only the db surface is couch's here —

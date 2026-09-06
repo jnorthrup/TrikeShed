@@ -42,7 +42,7 @@ The Couch surface provides a CouchDB 1.6-compatible document store with CRUD ope
 
 | Method | Path | Status | Request | Response |
 |--------|------|--------|---------|----------|
-| `POST` | `/{db}/_replicate` | verified-live | `{ "source": "...", "target": "...", "continuous": false, "interval_ms": 1000, "cancel": false }` | `{ "ok": true, "history": [...] }` |
+| `POST` | `/{db}/_replicate` | verified-live (two daemons, 2026-09-05; see note) | `{ "source": "...", "target": "...", "continuous": false, "interval_ms": 1000, "cancel": false }` | `{ "ok": true, "history": [...] }` |
 | `GET` | `/{db}/_replicate` | verified-live | — | `{ "jobs": [...] }` |
 
 **Note:** Replication is a 1.x replicator. Interrupted replication has no automatic recovery procedure—you must restart manually.
@@ -149,3 +149,42 @@ Response:
 - **Replication** is stateless—if interrupted, you must restart from scratch.
 - **Longpoll mode** is blocking. Use with timeout handling.
 - **No attachment rewrite** wiring. Attachments are not reliably served.
+
+## Replication, verified between two daemons (2026-09-05)
+
+The rows above were written from in-process tests. On 2026-08-29 a real two-daemon run (8891/8892)
+502'd on push and hung on pull; on 2026-09-05 the same experiment on two scratch daemons (8930/8934,
+each with its own home, both absorbing this worktree) reproduced a deterministic 502 in both
+directions: `Replication pull incomplete: 252 revision(s) not delivered; checkpoint retained`.
+
+Root cause, not HTX: both absorbers had minted the same 252 `.git/**` attachment documents under
+different revisions — identical bytes, but the attachment body carries the absorber's wall-clock
+`sequence` (`CouchAttachmentGateway.putAttachment`), so content-equal documents diverge by
+timestamp — and `CouchReplicator` counted a revision the 1.x winner rule declined as "not
+delivered", failed the page, and never advanced the checkpoint past it. The replicator now keeps
+**undelivered** (a blob that never arrived: the checkpoint holds) apart from **conflicts** (a
+declined loser: reported, and the pass completes). `CouchWireSocketTest` is the checked-in form:
+two `JvmKanbanServer`s on real loopback sockets, replicating through the same HTX client element
+the daemon uses, asserting a document and its blob land by pull and by push, a divergent head
+resolves by winner rule and is reported, and the checkpoint advances past it.
+
+Note also that the changes feed carries `credential:*` documents (provider, base_url, and the key
+itself); replication moves them to whatever peer pulls. That is a policy decision the code does
+not make today.
+
+### Push bound and long first syncs (2026-09-05)
+
+A listener reassembles one request in memory and answers `413` then closes above its cap
+(`JvmKanbanServer.maxRequestBatch`, 4 MiB on the daemon). Push sends each blob as one `POST _cas`, so a
+blob above the cap broke the pipe under the HTX write — "HTX reactor write failed for fd=N", the
+2026-08-29 push failure; on 2026-09-05 the first such blob was a 30.7 MiB `.git/lost-found` object at
+sequence 344 of a fresh absorber. `CouchReplicator` now refuses a blob over `maxPushBlobBytes`
+(4 MiB less headroom) before sending it and fails the pass naming the document, the cid and the size;
+blobs that size cross by **pull**, whose `_cas` reads are bounded by the server. A chunked upload lane
+is the open design item.
+
+A first pull between two absorbers of one worktree walks ~9,000 revisions; run it with `"async": true`
+and read the outcome from `GET /{db}/_replicate`, or the HTTP client times out while the daemon is still
+working (the 2026-08-29 "hung pull"). The pull no longer fetches bodies for revisions the winner rule
+will decline, which was most of that walk.
+

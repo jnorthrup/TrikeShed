@@ -16,6 +16,8 @@ import modelmux.ModelEntry
 import modelmux.ModelMux
 import modelmux.acp.AcpMessage
 import kotlinx.coroutines.withTimeout
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import kotlinx.datetime.Clock
 import borg.trikeshed.userspace.nio.platform.spi.SystemOperations
 
@@ -354,6 +356,7 @@ open class BrainClient(
         var result = attempt()
         if (endpoints.size != 1) return result
         for (backoffMs in RATE_LIMIT_BACKOFF_MS) {
+            currentCoroutineContext().ensureActive()
             val msg = result.exceptionOrNull()?.message ?: return result
             if (!isRetryableFailure(msg)) return result
             kotlinx.coroutines.delay(backoffMs)
@@ -372,6 +375,7 @@ open class BrainClient(
         var lastError = "all providers exhausted"
         val routed = internalModelMux.route("conflict-resolve").a
         for (modelId in orderedModelIds(routed)) {
+            currentCoroutineContext().ensureActive()
             val endpoint = endpointByModel[modelId] ?: continue
             if (endpoint.name in retiredVerdicts) continue
 
@@ -395,6 +399,7 @@ open class BrainClient(
                     return response.a  // AcpResponse.a = full_text content
                 },
                 onFailure = { t ->
+                    currentCoroutineContext().ensureActive()
                     val message = t.message.orEmpty()
                     lastError = "Brain ${endpoint.name} chat failed: $message"
                     if (isRetiredModelFailure(message)) retiredVerdicts.add(endpoint.name)
@@ -440,6 +445,7 @@ open class BrainClient(
         if (endpoints.isEmpty()) throw BrainNoRoute(trail + "no provider endpoints discovered")
         val routed = internalModelMux.route("conflict-resolve").a
         for (modelId in seatOrder(orderedModelIds(routed), preferredModel)) {
+            currentCoroutineContext().ensureActive()
             val endpoint = endpointByModel[modelId] ?: continue
             if (endpoint.name in noKeyVerdicts) {
                 trail.add("${endpoint.name}/$modelId: skipped (no-key verdict cached)")
@@ -470,6 +476,7 @@ open class BrainClient(
                 onFailure = { t ->
                     val message = t.message ?: t.toString()
                     trail.add("${endpoint.name}/$modelId: ${message.take(200)}")
+                    currentCoroutineContext().ensureActive()
                     if (isMissingKeyFailure(message)) noKeyVerdicts.add(endpoint.name)
                     if (isRetiredModelFailure(message)) retiredVerdicts.add(endpoint.name)
                     logError(endpoint.name, -1, message.take(500))

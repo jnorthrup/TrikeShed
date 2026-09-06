@@ -2,6 +2,7 @@
 
 // View state only. Documents, vocabulary, run receipts and provenance come from the board.
 const Harness = {
+  surface: typeof location==="undefined"?"board":/^\/panels(?:\.html)?\/?$/.test(location.pathname)?"panels":/^\/graal\/?$/.test(location.pathname)?"graal":"board",
   epoch: null, connectionGeneration: 0, viewHistory: [], focusKey: "", viewNode: null,
   board: Object.create(null), seq: 0, selected: null, applying: false, dirty: false,
   events: [], drafts: new Map(), actors: new Map(), positions: new Map(), flashes: new Map(), // Delta 2026-09-05 (fan-out): Map<key, expiresAt ms>; one Set with one timer collapsed a burst into one border
@@ -48,6 +49,10 @@ const Harness = {
     if (this.selected && this.dirty) this.drafts.set(this.selected, this.document());
     const changedMain=this.selected!==name;
     this.selected = name;
+    if(this.surface==="panels"){
+      for(const mounted of [...this.mounts.keys()])if(mounted!==name)this.unmount(mounted);
+      this.nextX=0;this.nextY=0;this.rowHeight=0;
+    }
     if(changedMain||!preserveParent)this.setParent(null);
     if(this.connectionReport?.program!==name){this.connectionReport=null;$("#connections").hidden=true;clearVerdicts();}
     if(!this.mounts.has(name))this.mount(name);
@@ -60,7 +65,7 @@ const Harness = {
     this.render();
     if (focus) this.fit(false);
     this.message(name + (this.dirty ? " has unpublished changes" : " on the blackboard"));
-    const url=new URL(location.href);url.pathname="/harness";url.searchParams.set("load",name);history.replaceState(null,"",url);
+    const url=new URL(location.href);url.pathname=this.surface==="board"?"/harness":"/"+this.surface;url.searchParams.set("load",name);history.replaceState(null,"",url);
     return true;
   },
   setParent(node) {
@@ -124,6 +129,7 @@ const Harness = {
     addEventListener("pointermove",move);addEventListener("pointerup",up);addEventListener("pointercancel",cancel);
   },
   mount(name,document) {
+    if(this.surface==="panels"&&name!==this.selected)return;
     const entry=this.board["lcnc/program/"+name]||{document:this.drafts.get(name)};if(!entry?.document)return;
     if(this.connectionReport?.program===name){this.connectionReport=null;$("#connections").hidden=true;clearVerdicts();}
     const previous=this.applying;this.applying=true;
@@ -146,6 +152,7 @@ const Harness = {
       const doc=document||this.drafts.get(name)||entry.document;
       for(const n of doc.nodes||[])clone(n,null);
       for(const n of G.nodes.filter(n=>n._program===name&&n._childHost))refreshRingChrome(n);
+      if(typeof ArchiveUI!=="undefined")for(const n of G.nodes.filter(n=>n._program===name))ArchiveUI.decorate(n);
       for(const n of G.nodes.filter(n=>n._program===name&&n._childHost&&!n._parentScope))layoutRing(n,!!document||this.drafts.has(name));
       resolveTopLevelOverlaps();
       const allIds=new Set(G.nodes.filter(n=>n._program===name).map(n=>n.id));
@@ -208,7 +215,10 @@ const Harness = {
     const {w,h} = this.activeBounds = this.bounds();
     for(const [name,anchor] of this.mounts){
       const box=this.bounds(name);Object.assign(anchor,box);
-      const territory=this.territory("lcnc/program/"+name,name,this.drafts.has(name)?"Unpublished":"lcnc/program/"+name,anchor.x+box.left-24,anchor.y+box.top-64,box.w+48,box.h+88,"#64ceca");
+      const archiveCid=(this.drafts.get(name)||this.board["lcnc/program/"+name]?.document)?.nodes?.[0]?.params?.archiveCid;
+      const archive=typeof archiveCid==="string"&&/^sha256:[0-9a-f]{64}$/.test(archiveCid)&&this.inspectionOnly(name);
+      const territory=this.territory("lcnc/program/"+name,archive?"Archive "+archiveCid.slice(7,19):name,this.drafts.has(name)?"Unpublished":archive?"Stored archive":"lcnc/program/"+name,anchor.x+box.left-24,anchor.y+box.top-64,box.w+48,box.h+88,"#64ceca");
+      territory.classList.toggle("archive-territory",archive);
       territory.classList.add("active-program");if(name===this.selected)territory.classList.add("selected");
       territory.classList.toggle("selected-parent",name===this.selected&&!this.parentTarget()?.node);
       const head=territory.querySelector("header");
@@ -217,7 +227,7 @@ const Harness = {
       const cid=this.board["lcnc/program/"+name]?.programCid;
       if(cid){const source=this.el("button","source-ref","◇");source.title="Program version "+cid;source.setAttribute("aria-label","Inspect version of "+name);source.dataset.relation="reference";source.addEventListener("click",e=>{e.stopPropagation();Landscape.inspectCid(cid,"lcnc/program/"+name);});head.append(source);}
       const run=this.el("button","run","▶ Run");run.disabled=this.running||this.drafts.has(name)||this.inspectionOnly(name);run.setAttribute("aria-label","Run "+name);
-      run.addEventListener("click",e=>{e.stopPropagation();this.select(name,false);this.run();});head.append(run);
+      run.addEventListener("click",e=>{e.stopPropagation();this.select(name,false);this.run();});if(!archive)head.append(run);
     }
     const groups = new Map();
     for (const [key,value] of Object.entries(this.board)) {
@@ -608,6 +618,25 @@ const Harness = {
       this.message("Published "+name+(result.violations?.length?" with refused cables":""));
     }catch(e){this.message("Publish failed: "+e.message);}
   },
+  async layoutHints(document,parentId) {
+    const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),8000);
+    try{
+      const pending=(document.nodes||[]).map(n=>[n,0]);let count=0;
+      while(pending.length){const [n,depth]=pending.pop();
+        if(++count>1500||depth>32)throw Error("Layout matching size budget exceeded");
+        for(const child of n.children||[])pending.push([child,depth+1]);
+      }
+      // Proximity ranks layout hints across the document, not just today's Shake reach.
+      // These proposals move boxes only; normal Shake keeps its own reach and effect rules.
+      const body=JSON.stringify({program:document,options:{parentId,reach:Number.MAX_SAFE_INTEGER}});
+      if(new TextEncoder().encode(body).length>1048576)throw Error("Layout request payload limit exceeded");
+      const response=await fetch("/api/lcnc/treeshake",{method:"POST",signal:controller.signal,headers:{"Content-Type":"application/json"},body});
+      const result=JSON.parse(await Landscape.readText(response,2097152));
+      if(!response.ok||!result.ok)throw Error(result.detail||result.error||response.status);
+      if(parentId!=null&&result.parentId!==parentId)throw Error("Server did not confirm the selected parent");
+      return result.made||[];
+    }finally{clearTimeout(timer);}
+  },
   async shake(options) {
     if(this.shaking||!this.selected)return;
     const target=this.parentTarget();if(!target)return;
@@ -727,7 +756,8 @@ const Harness = {
       await Landscape.refresh();
       if(generation!==this.connectionGeneration)return;
       if(bookmark){Object.assign(view,bookmark.camera);this.focusKey=bookmark.focus;applyView();redraw();}
-      else if(initial&&!requested)this.fit(true);
+      else if(initial&&this.surface==="graal")this.focus(Landscape.objectBox,LandscapeNavigation.object(""));
+      else if(initial&&!requested)this.fit(this.surface!=="panels");
       $("#connection").textContent="Live";$("#connection").classList.add("live");
       this.live=true;Landscape.refreshActivity();
     }catch(e){if(generation===this.connectionGeneration){this.message("Blackboard unavailable: "+e.message);this.reconnect();}}
@@ -735,6 +765,9 @@ const Harness = {
 };
 
 AUTOSAVE=false;
+document.body.dataset.surface=Harness.surface;
+document.title=Harness.surface==="graal"?"Graal":Harness.surface==="panels"?"Panels":"Blackboard";
+$("#bar b").textContent=document.title.toUpperCase();
 $("#argumentsBtn").addEventListener("click",()=>HarnessArguments.open());
 $("#argumentAdd").addEventListener("click",()=>HarnessArguments.add());
 $("#argumentRun").addEventListener("click",()=>{if(HarnessArguments.validate())Harness.run();});

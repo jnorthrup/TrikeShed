@@ -1,8 +1,19 @@
-# Shake Demo
+# Transient Shake Fixture
 
-One offered palette/gallery item: `preset-shake` (catalog title: Shake Demo).
-It opens in the existing harness and is generated from `LcncContracts.all()`.
-It does not create another UI or maintain a second vocabulary.
+`preset-shake` is a transient developer specimen, not a permanent gallery item
+or default workspace program. `LcncShakeDemo.build()` still generates it from
+`LcncContracts.all()` for explicit inspection and regression tests. Ordinary
+catalog enumeration, corpus loading and publication do not generate or seed it.
+The Shake operation and its shared matching behavior remain available.
+
+It remains the comprehensive wiring reference for [local patch gravity](patch-layout.md):
+FD reuses the live matcher to pull nearby legal counterparts around each segment,
+with short patch spans and measured box clearance. FD does not install cables.
+
+Existing blackboard entries and saved constructions are not deleted or
+overwritten by removing this default registration. A retained copy can still
+be opened in its workspace; its name is no longer reserved as a built-in preset.
+No separate UI, vocabulary or transient-state registry is introduced.
 
 Every advertised node type appears once as a subject. Each input has a typed
 `scope.in` counterpart and each output a typed `scope.out` counterpart.
@@ -59,9 +70,10 @@ Verification commands:
 node --test src/jvmTest/js/landscape.test.cjs src/jvmTest/js/shake-demo.test.cjs
 ```
 
-## Verification Snapshot: 2026-09-05
+## Historical Verification Snapshot: 2026-09-05
 
-Current acceptance, after the matching correction:
+The following receipts predate removal from the default corpus. They record
+earlier verification, not the current catalog or running daemon state:
 
 - The live catalog on port 8888 serves 121 palette types, 507 nodes, zero initial
   wires, and `inspectionOnly` enabled.
@@ -79,8 +91,8 @@ Current acceptance, after the matching correction:
 - Port 8888 was restarted with kill and Gradle's `runOroborosDaemon`. Other
   listeners were left alone. Nothing was stashed or manually removed.
 
-Open the existing palette item at
-[Shake Demo](http://127.0.0.1:8888/harness?load=preset-shake).
+The earlier `/harness?load=preset-shake` link requires a retained or explicitly
+published workspace copy now; a fresh workspace does not offer this specimen.
 
 ### Earlier Attempts (Superseded)
 
@@ -153,4 +165,3 @@ wires; pressing Shake rendered the status line
 with Run disabled and the Connections panel listing each closed socket (for
 example `palette.ccek.activate.in.0 / value` — Caller input). This is the
 rendered check, not a curl.
-

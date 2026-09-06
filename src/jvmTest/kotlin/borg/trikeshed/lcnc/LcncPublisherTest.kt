@@ -7,6 +7,7 @@ import borg.trikeshed.lib.toSeries
 import borg.trikeshed.parse.json.JsonSupport
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
@@ -27,6 +28,34 @@ class LcncPublisherTest {
         listOf(LcncNode("t", "text.value", params = mapOf("value" to value)), LcncNode("d", "display")).toSeries(),
         listOf(LcncWire("t", "value", "d", "x")).toSeries(),
     )
+
+    @Test
+    fun normalPublishingDoesNotSeedTheTransientShakeSpecimen() {
+        val board = ConfixBlackboard.empty()
+        val pub = publisher(board)
+        assertFalse(pub.isPreset(LcncShakeDemo.NAME))
+        assertFalse(LcncShakeDemo.NAME in pub.storedCorpus())
+        pub.publishAll()
+        assertNull(board.get(LcncBlackboard.programKey(LcncShakeDemo.NAME)))
+        assertNull(pub.load(LcncShakeDemo.NAME))
+    }
+
+    @Test
+    fun retiringTheShakePresetPreservesAnExistingWorkspaceConstruction() {
+        val board = ConfixBlackboard.empty()
+        val pub = publisher(board)
+        val retained = program(LcncShakeDemo.NAME, "user-owned")
+        val key = LcncBlackboard.programKey(LcncShakeDemo.NAME)
+        pub.publishProgram(LcncShakeDemo.NAME, retained)
+        val before = pub.boardDocumentJson(LcncShakeDemo.NAME)
+        val provenance = assertNotNull(board.snapshot().provenance[key])
+        pub.publishAll()
+        val loaded = assertNotNull(pub.load(LcncShakeDemo.NAME))
+        assertEquals("user-owned", loaded.nodes[0].params["value"])
+        assertEquals(before, pub.boardDocumentJson(LcncShakeDemo.NAME))
+        assertEquals(provenance, board.snapshot().provenance[key],
+            "default publication must not overwrite or remove a retained specimen")
+    }
 
     @Test
     fun loadingAPresetSeedsItsEntryWithTypedCablesAndTheSourceCid() {

@@ -113,7 +113,11 @@ function chip(cid,label="blob"){
   if(!isCid(cid))return esc(cid||"");
   return '<button class="blob-ref" data-blob-cid="'+cid+'" title="Open blob '+cid+'">'+esc(label)+' '+cid.slice(7,19)+'</button>';
 }
-function bindRefs(mount){mount.querySelectorAll("[data-blob-cid]").forEach(button=>button.addEventListener("click",e=>{e.stopPropagation();api.open({cid:button.dataset.blobCid});}));}
+function bindRefs(mount,reference){mount.querySelectorAll("[data-blob-cid]").forEach(button=>button.addEventListener("click",e=>{
+  e.stopPropagation();
+  // Framed archive content has a document CID but is restored through its manifest.
+  api.open(reference?.cid===button.dataset.blobCid?{...reference,signal:undefined}:{cid:button.dataset.blobCid});
+}));}
 function dispose(mount){const state=states.get(mount);if(!state)return;state.controller.abort();for(const url of state.urls)URL.revokeObjectURL(url);states.delete(mount);}
 async function sourceMates(id,mount,state){
   const region=element("div","file-mates");mount.append(region);
@@ -162,7 +166,7 @@ async function render(mount,options){
     const meta=element("div","file-meta");
     meta.innerHTML=(options.cid?chip(options.cid):"");meta.append(element("span",null,fmtBytes(bytes.byteLength)));
     const gauge=element("meter","kgauge");gauge.min=0;gauge.max=1;gauge.value=0;gauge.setAttribute("aria-label","Gzip compression ratio");
-    const k=element("span","file-note","Measuring K");meta.append(gauge,k);mount.replaceChildren(meta);bindRefs(meta);
+    const k=element("span","file-note","Measuring K");meta.append(gauge,k);mount.replaceChildren(meta);bindRefs(meta,options);
     measure(bytes).then(result=>{
       if(signal.aborted)return;
       if(!result){gauge.hidden=true;k.textContent="Gzip measurement unavailable";return;}

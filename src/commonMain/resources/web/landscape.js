@@ -206,7 +206,7 @@ const Landscape = {
       const activity=this.activityNodes.get(n.id);
       if(activity&&size>=4){ctx.fillStyle=LandscapeActivity.states.find(s=>s.id===activity.state).color;ctx.fillRect(b.x,b.y,Math.min(4,b.w),Math.min(8,b.h));}
       if(b.w>85&&b.h>20){
-        const label=n.type==="scope.in"?"in: "+(n.params?.name||"?"):n.type==="scope.out"?"yield: "+(n.params?.name||"?"):n.type;
+        const label=n.params?.archiveCid?(n.params.archivePath?.replace(/\/$/,"").split("/").pop()||"Archive"):n.type==="scope.in"?"in: "+(n.params?.name||"?"):n.type==="scope.out"?"yield: "+(n.params?.name||"?"):n.type;
         ctx.fillStyle=scope?"#d7ebe5":"#101c1d";ctx.font="10px system-ui";ctx.fillText(label.slice(0,Math.floor(b.w/6)),b.x+4,b.y+13);
       }
       ctx.restore();

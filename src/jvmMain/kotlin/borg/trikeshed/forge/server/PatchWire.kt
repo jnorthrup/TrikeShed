@@ -404,7 +404,11 @@ class PatchWire(
     private val mountScope: kotlinx.coroutines.CoroutineScope? = null,
     /** Tika/OCR mining over project dbs; extracts land as `.extract.md` citizens + belief mints. */
     private val miner: ProjectMiner? = null,
+    private val catalogProvider: (suspend () -> modelmux.ModelMux)? = null,
+    private val sessionSnapshot: File? = null,
 ) {
+    private val muxSessions = MuxSessionService(brain, attachments, mountScope, muxContext, catalogProvider, sessionSnapshot)
+
     suspend fun route(
         method: String,
         path: String,
@@ -412,6 +416,7 @@ class PatchWire(
         respond: (suspend (ByteArray) -> Unit)?,
     ): JvmKanbanServer.HttpResponse? {
         val p = path.substringBefore('?')
+        muxSessions.route(method, path, text)?.let { return it }
         return when {
             method == "GET" && p == "/api/mux/models" -> json(
                 mapOf(

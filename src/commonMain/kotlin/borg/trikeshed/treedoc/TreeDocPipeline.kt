@@ -5,13 +5,8 @@ import borg.trikeshed.job.CanonicalCbor
 import borg.trikeshed.job.CasStore
 import borg.trikeshed.job.ContentId
 import borg.trikeshed.lib.*
-import borg.trikeshed.parse.confix.ConfixDoc
-import borg.trikeshed.parse.confix.confixDoc
-import borg.trikeshed.parse.confix.Syntax
-import borg.trikeshed.userspace.nio.spi.NioSupervisor
 import borg.trikeshed.cursor.nioSupervisor
 import kotlin.coroutines.coroutineContext
-import kotlinx.coroutines.withContext
 
 class TreeDocPipeline(
     private val cas: CasStore,
@@ -84,11 +79,8 @@ class TreeDocPipeline(
         val frames: Cursor = framesList.size j { framesList[it] }
         val docsCursor = buildDocsCursor(documents, docFirstFrame, docFrameCount)
 
-        // Build canonical manifest for CID
-        val manifestJson = buildManifestJson(documents, framesList)
-        val manifestDoc = confixDoc(manifestJson)
-        val manifestCid = ContentId.of(manifestDoc) // This canonicalizes internally
-        cas.put(manifestDoc) // Puts canonical CBOR
+        // Encode the structured manifest, not the Confix parser's lazy child-row views.
+        val manifestCid = cas.put(CanonicalCbor.encodeMap(buildManifest(documents, framesList)))
 
         return TreeDocK.entries.size j { i ->
             when (TreeDocK.entries[i]) {
@@ -145,11 +137,7 @@ class TreeDocPipeline(
         val frames: Cursor = framesList.size j { framesList[it] }
         val docsCursor = buildDocsCursor(documents, docFirstFrame, docFrameCount)
 
-        // Build canonical manifest for CID
-        val manifestJson = buildManifestJson(documents, framesList)
-        val manifestDoc = confixDoc(manifestJson)
-        val manifestCid = ContentId.of(manifestDoc) // This canonicalizes internally
-        cas.put(manifestDoc) // Puts canonical CBOR
+        val manifestCid = cas.put(CanonicalCbor.encodeMap(buildManifest(documents, framesList)))
 
         return TreeDocK.entries.size j { i ->
             when (TreeDocK.entries[i]) {
@@ -184,28 +172,58 @@ class TreeDocPipeline(
             createDocRow(rowValues)
         }
 
-    private fun buildManifestJson(documents: Series<TreeDocument>, frames: List<RowVec>): String {
-        val sb = StringBuilder()
-        sb.append("{")
-        sb.append("\"docs\":[")
-        for (i in 0 until documents.size) {
-            if (i > 0) sb.append(",")
+    private fun buildManifest(documents: Series<TreeDocument>, frames: List<RowVec>): Map<String, Any?> {
+        val docs = (0 until documents.size).map { i ->
             val doc = documents.b(i)
-            sb.append("{\"path\":\"${doc.path}\",\"mediaType\":\"${doc.mediaType}\",\"cid\":\"${ContentId.of(doc.bytes).value}\"}")
+            mapOf("path" to doc.path, "mediaType" to doc.mediaType, "cid" to ContentId.of(doc.bytes).value)
         }
-        sb.append("],")
-        sb.append("\"frames\":[")
-        for (i in 0 until frames.size) {
-            if (i > 0) sb.append(",")
-            val r = frames[i]
+        val chunks = frames.map { r ->
             val vals = (r as borg.trikeshed.cursor.ReifiedSplitSeries2<Any?, `ColumnMeta↻`>).leftSeries
-            val docOrd = vals.b(0) as Int
-            val cid = vals.b(1) as ContentId
-            sb.append("{\"doc\":$docOrd,\"cid\":\"${cid.value}\"}")
+            mapOf("doc" to vals.b(0), "cid" to (vals.b(1) as ContentId).value)
         }
-        sb.append("]")
-        sb.append("}")
-        return sb.toString()
+        return mapOf("docs" to docs, "frames" to chunks)
+    }
+
+    /** Reconstitute cursor indexes from the durable manifest, never a session cache. */
+    fun open(cid: ContentId, maxDocuments: Int, maxFrames: Int, maxManifestBytes: Int): Series<Any?> {
+        require(maxDocuments >= 0 && maxFrames >= 0 && maxManifestBytes > 0)
+        val bytes = cas.get(cid) ?: throw NoSuchElementException("Archive not found: $cid")
+        require(bytes.size <= maxManifestBytes) { "Manifest byte limit exceeded" }
+        val manifest = CanonicalCbor.decodeMap(bytes)
+        val docs = manifest["docs"] as? List<*> ?: error("Invalid archive documents")
+        val chunks = manifest["frames"] as? List<*> ?: error("Invalid archive frames")
+        require(docs.size <= maxDocuments && chunks.size <= maxFrames) { "Archive index limit exceeded" }
+        val first = IntArray(docs.size)
+        val counts = IntArray(docs.size)
+        var previous = -1
+        val frames = chunks.mapIndexed { i, raw ->
+            val frame = raw as? Map<*, *> ?: error("Invalid frame")
+            val number = frame["doc"] as? Number ?: error("Invalid document ordinal")
+            val ordinal = number.toInt()
+            require(number.toDouble() == ordinal.toDouble() && ordinal in docs.indices && ordinal >= previous) { "Invalid frame order" }
+            if (counts[ordinal] == 0) first[ordinal] = i
+            counts[ordinal]++
+            previous = ordinal
+            val frameCid = ContentId(frame["cid"] as? String ?: error("Invalid frame CID"))
+            createFrameRow(2 j { column -> if (column == 0) ordinal else frameCid })
+        }.toSeries()
+        val rows = docs.mapIndexed { i, raw ->
+            val doc = raw as? Map<*, *> ?: error("Invalid document")
+            require(counts[i] > 0) { "Missing document frames" }
+            val path = doc["path"] as? String ?: error("Invalid path")
+            val mediaType = doc["mediaType"] as? String ?: error("Invalid media type")
+            val docCid = ContentId(doc["cid"] as? String ?: error("Invalid document CID"))
+            createDocRow(5 j { column -> when (column) {
+                0 -> path; 1 -> mediaType; 2 -> docCid; 3 -> first[i]; else -> counts[i]
+            } })
+        }.toSeries()
+        return TreeDocK.entries.size j { i -> when (TreeDocK.entries[i]) {
+            TreeDocK.ArchiveId, TreeDocK.ManifestCid -> cid
+            TreeDocK.DocumentCount -> docs.size
+            TreeDocK.FrameCount -> chunks.size
+            TreeDocK.Documents -> rows
+            TreeDocK.Frames -> frames
+        } }
     }
 
     suspend fun replay(archive: Series<Any?>, ordinal: Int): ByteArray {
@@ -255,7 +273,8 @@ class TreeDocPipeline(
     /**
      * Restores a document from the archive by its ordinal.
      */
-    fun restoreDocument(archive: Series<Any?>, ordinal: Int): ByteArray {
+    fun restoreDocument(archive: Series<Any?>, ordinal: Int, maxBytes: Int = Int.MAX_VALUE): ByteArray {
+        require(maxBytes >= 0)
         val frames = archive.b(TreeDocK.Frames.ordinal) as Cursor
         val documents = archive.b(TreeDocK.Documents.ordinal) as Cursor
 
@@ -279,6 +298,7 @@ class TreeDocPipeline(
             val cid = vals.b(1) as ContentId
             val chunk = cas.get(cid) ?: throw IllegalStateException("CAS corruption: chunk $cid not found")
             // cas.get verifies the digest implicitly
+            require(chunk.size <= maxBytes - totalBytes) { "Document byte limit exceeded" }
             chunks.add(chunk)
             totalBytes += chunk.size
         }

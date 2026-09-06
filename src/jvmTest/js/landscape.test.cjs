@@ -7,6 +7,7 @@ const vm = require("node:vm");
 const path = require("node:path");
 const web = path.resolve(__dirname, "../../commonMain/resources/web");
 const navigation = require(path.join(web, "landscape-navigation.js"));
+const patchLayout = require(path.join(web, "patch-layout.js"));
 
 function fixture() {
   const elements = new Map();
@@ -23,7 +24,8 @@ function fixture() {
   }
   const context = vm.createContext({
     document:{getElementById:element}, $:selector=>element(selector.slice(1)),
-    URL, URLSearchParams, AbortController, TextDecoder, Uint8Array,
+    URL, URLSearchParams, AbortController, TextDecoder, TextEncoder, Uint8Array, setTimeout, clearTimeout,
+    PatchLayout:patchLayout,
     G:{nodes:[],wires:[]},
     fetch:async()=>{throw Error("unexpected fetch");},
   });
@@ -96,9 +98,10 @@ test("Fit, FD, Shake and drag resolve one stable parent handle",async()=>{
   let focused,saves=0,resized,request;
   harness.focusElement=el=>{focused=el;};harness.fit(false);assert.equal(focused,inner.el);
   context.resizeParentFrames=node=>{resized=node;};context.save=()=>{saves++;};context.requestAnimationFrame=fn=>fn();context.fitToContent=()=>harness.fit(false);
-  vm.runInContext(patch.slice(patch.indexOf("function fdLayout("),patch.indexOf("/* TREESHAKE")),context);
+  vm.runInContext(patch.slice(patch.indexOf("async function fdLayout("),patch.indexOf("/* TREESHAKE")),context);
+  harness.layoutHints=async()=>[];
   const untouched=[outer,inner,other].map(n=>[n.x,n.y]);
-  context.fdLayout();assert.equal(resized,inner);assert.equal(focused,inner.el);assert.equal(saves,1);
+  await context.fdLayout();assert.equal(resized,inner);assert.equal(focused,inner.el);assert.equal(saves,1);
   assert.deepEqual([outer,inner,other].map(n=>[n.x,n.y]),untouched);
   harness.document=()=>({nodes:[{id:"outer",children:[{id:"inner",children:[{id:"leaf"}]}]}],wires:[{from:["other","value"],to:["leaf","x"]}]});
   context.fetch=async(url,options)=>{request=JSON.parse(options.body);return {ok:true,json:async()=>({ok:true,parentId:"inner"})};};
@@ -135,6 +138,53 @@ test("main-handle drag is assembly placement, not a document edit",()=>{
   }
   outer.x+=20;
   assert.notEqual(JSON.stringify(harness.document()),document,"a genuine local move must still be an edit");
+});
+
+test("FD uses legal hints without installing cables and ignores other parents",async()=>{
+  const {context,harness,inner,leaf,peer,other,patch}=parentFixture();
+  let saves=0,resized;
+  context.save=()=>saves++;context.resizeParentFrames=n=>resized=n;
+  context.requestAnimationFrame=()=>{};
+  harness.layoutHints=async()=>[
+    {fromNode:"leaf",fromPort:"value",toNode:"peer",toPort:"x"},
+    {fromNode:"other",fromPort:"value",toNode:"leaf",toPort:"x"},
+  ];
+  const otherPosition=[other.x,other.y],wires=JSON.stringify(context.G.wires);
+  vm.runInContext(patch.slice(patch.indexOf("async function fdLayout("),patch.indexOf("/* TREESHAKE")),context);
+  await context.fdLayout();
+  assert.equal(JSON.stringify(context.G.wires),wires);assert.equal(saves,1);assert.equal(resized,inner);
+  assert.deepEqual([other.x,other.y],otherPosition);
+  assert.ok(peer.x>leaf.x);assert.match(context.$("#status").textContent,/1 candidate pulls/);
+});
+
+test("FD rejects a changed parent, draft, or measured frame while checking hints",async()=>{
+  for(const change of ["parent","draft","frame"]){
+    const {context,harness,leaf,peer,patch}=parentFixture();
+    let release,doc=1;
+    harness.document=()=>({doc});harness.layoutHints=()=>new Promise(resolve=>release=resolve);
+    context.save=()=>assert.fail("stale layout must not save");
+    vm.runInContext(patch.slice(patch.indexOf("async function fdLayout("),patch.indexOf("/* TREESHAKE")),context);
+    const positions=[leaf.x,leaf.y,peer.x,peer.y],pending=context.fdLayout();
+    if(change==="parent")harness.parentRevision++;else if(change==="draft")doc++;else leaf.el.offsetWidth++;
+    release([]);await pending;
+    assert.deepEqual([leaf.x,leaf.y,peer.x,peer.y],positions);
+    assert.match(context.$("#status").textContent,/discarded/);
+    assert.equal(context.$("#fdBtn").disabled,false);
+  }
+});
+
+test("layout hints use the shared matcher with bounded payloads and confirmed scope",async()=>{
+  const {context,harness}=fixture();let request;
+  context.fetch=async(url,options)=>{request={url,...JSON.parse(options.body)};return new Response(JSON.stringify({ok:true,parentId:"inner",made:[]}));};
+  await harness.layoutHints({nodes:[]},"inner");
+  assert.equal(request.url,"/api/lcnc/treeshake");assert.equal(request.options.parentId,"inner");
+  assert.equal(request.options.reach,Number.MAX_SAFE_INTEGER);
+  context.fetch=async()=>new Response(JSON.stringify({ok:true,made:[]}));
+  await assert.rejects(harness.layoutHints({nodes:[]},"inner"),/confirm/);
+  context.fetch=async()=>new Response("x".repeat(2097153));
+  await assert.rejects(harness.layoutHints({nodes:[]},null),/payload_limit/);
+  context.fetch=()=>assert.fail("oversized input must not dispatch");
+  await assert.rejects(harness.layoutHints({nodes:Array.from({length:1501},()=>({}))},null),/size budget/);
 });
 
 test("Meta-drag captures an occluded parent without retargeting or activating the covered control",()=>{

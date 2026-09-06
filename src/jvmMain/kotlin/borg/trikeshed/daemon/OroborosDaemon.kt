@@ -1200,6 +1200,7 @@ object OroborosDaemon {
         // idempotently, as the belt to this brace.
         val (kifTee, kifTeeDisposer) = borg.trikeshed.dag.KifTee.attach(rete, kifBank)
         val lcncPublisher = borg.trikeshed.lcnc.LcncPublisher(daemonBlackboard, { lcncRunnersRef.get() }, attachmentGateway, rete, kifBank)
+        val operatorMux = kotlinx.coroutines.CompletableDeferred<suspend () -> modelmux.ModelMux>()
         val patchWire = borg.trikeshed.forge.server.PatchWire(
             brain = brainClient,
             scopes = projectScopes,
@@ -1208,6 +1209,8 @@ object OroborosDaemon {
             muxContext = htxElement + muxReactor,
             mountScope = wireScope,
             miner = projectMiner,
+            catalogProvider = { operatorMux.await().invoke() },
+            sessionSnapshot = File(forgeHome, ".modelmux/sessions.json"),
         )
         // (boot mounts + ledger remount happen below, once the Rete tendon hook is armed)
         // ── Dynamic modules: Rete (hoisted — the tendon below feeds it) + production
@@ -1607,6 +1610,7 @@ object OroborosDaemon {
             }
         }
         val lcncMux = borg.trikeshed.jules.LiveHolder(hermesWatch, buildLcncMux()) { buildLcncMux() }
+        operatorMux.complete { lcncMux.current() }
         moduleContext.lcncRunners.putAll(
             borg.trikeshed.lcnc.BrainMuxNodes.registry(
                 keyMux = keyMux,

@@ -96,9 +96,9 @@ Per the gap analysis (2026-08-23, §3), the absorber's reconcile step between ga
 
 ## CAS Routes on the Wire
 
-The `_cas/{cid}` route serves raw CAS blocks. The IPFS-compatible alias `/api/v0/block/{cid}` routes to the same handler (defined in `CouchWireRouter.kt`, commonMain). Both return the raw bytes for a given CID.
+The `_cas/{cid}` route serves raw CAS blocks. The IPFS-shaped alias `/api/v0/block/get?arg={cid}` (and `block/put`) routes to the same handler (defined in `CouchWireRouter.kt`, commonMain). Both return the raw bytes for a given CID.
 
-> **Status:** verified-live — route aliases exist in `CouchWireRouter.kt`.
+> **Status (corrected 2026-09-05):** the alias existed in the router and passed every in-process test, but was unreachable on the daemon's socket: `CouchWire` (jvmMain) owned only `/{db}` paths, so the daemon's built-in table answered `/api/v0/…` with 404 while `_cas/{cid}` served the same block. `CouchWire.route` now forwards `/api/v0/` to the router and `CouchWireSocketTest` proves it over a real socket. The keys it accepts are still `sha256:<hex>` ContentIds, not CIDv1 (`bafk…` → 404); the codec is open work.
 
 ## Wave-2 Target Statement
 

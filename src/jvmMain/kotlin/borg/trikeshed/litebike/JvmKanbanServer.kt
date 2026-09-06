@@ -484,6 +484,15 @@ class JvmKanbanServer(
 
     /** Static PWA assets straight from `src/commonMain/resources/web/` on the classpath. Paths are fixed — no traversal. */
     private val staticAssets: Map<String, Pair<String, String>> = mapOf(
+        "/keymux" to ("web/mux.html" to "text/html; charset=utf-8"),
+        "/modelmux" to ("web/mux.html" to "text/html; charset=utf-8"),
+        "/mux/sessions" to ("web/mux.html" to "text/html; charset=utf-8"),
+        "/mux/stats" to ("web/mux.html" to "text/html; charset=utf-8"),
+        "/mux.html" to ("web/mux.html" to "text/html; charset=utf-8"),
+        "/mux.js" to ("web/mux.js" to "application/javascript; charset=utf-8"),
+        "/mux-core.js" to ("web/mux-core.js" to "application/javascript; charset=utf-8"),
+        "/mux.css" to ("web/mux.css" to "text/css; charset=utf-8"),
+        "/vendor/lucide-mux.js" to ("web/vendor/lucide-mux.js" to "application/javascript; charset=utf-8"),
         "/styles.css" to ("web/styles.css" to "text/css; charset=utf-8"),
         "/panels.html" to ("web/harness.html" to "text/html; charset=utf-8"),
         // the concentric construction canvas rides the page plane, not a module
@@ -493,9 +502,17 @@ class JvmKanbanServer(
         "/harness.html" to ("web/harness.html" to "text/html; charset=utf-8"),
         "/harness" to ("web/harness.html" to "text/html; charset=utf-8"),
         "/patch.js" to ("web/patch.js" to "application/javascript; charset=utf-8"),
+        "/patch-layout.js" to ("web/patch-layout.js" to "application/javascript; charset=utf-8"),
+        "/vendor/d3-force-3.0.0.js" to ("web/vendor/d3-force-3.0.0.js" to "application/javascript; charset=utf-8"),
         "/patch.css" to ("web/patch.css" to "text/css; charset=utf-8"),
         "/harness.js" to ("web/harness.js" to "application/javascript; charset=utf-8"),
         "/harness-arguments.js" to ("web/harness-arguments.js" to "application/javascript; charset=utf-8"),
+        "/archive-core.js" to ("web/archive-core.js" to "application/javascript; charset=utf-8"),
+        "/archive-ui.js" to ("web/archive-ui.js" to "application/javascript; charset=utf-8"),
+        "/archive-worker.js" to ("web/archive-worker.js" to "application/javascript; charset=utf-8"),
+        "/archive.css" to ("web/archive.css" to "text/css; charset=utf-8"),
+        "/vendor/fflate-0.8.2.js" to ("web/vendor/fflate-0.8.2.js" to "application/javascript; charset=utf-8"),
+        "/graal-file-viewer.js" to ("web/graal-file-viewer.js" to "application/javascript; charset=utf-8"),
         "/harness.css" to ("web/harness.css" to "text/css; charset=utf-8"),
         "/graal-terrain.js" to ("web/graal-terrain.js" to "application/javascript; charset=utf-8"),
         "/landscape.js" to ("web/landscape.js" to "application/javascript; charset=utf-8"),

@@ -1567,6 +1567,19 @@ function growWireBox(pts){
   return true;
 }
 function applyWireBox(){
+  // In the blackboard, ropes live in a viewport-sized SVG. Project world
+  // coordinates through its viewBox instead of magnifying a CSS bitmap layer.
+  if(wiresSvg.parentElement===viewport){
+    const width=viewport.clientWidth,height=viewport.clientHeight,z=view.z;
+    for(const svg of [wiresSvg,document.getElementById("channels")]){
+      if(!svg)continue;
+      svg.setAttribute("width",width);svg.setAttribute("height",height);
+      svg.setAttribute("viewBox",`${-view.x/z} ${-view.y/z} ${width/z} ${height/z}`);
+      svg.style.setProperty("--wire-scale",Math.min(1,z));
+      svg.style.setProperty("--wire-label-scale",1/Math.max(1,z));
+    }
+    return;
+  }
   const b=WIRE_BOX; if(!b) return;
   wiresSvg.setAttribute("width",b.w); wiresSvg.setAttribute("height",b.h);
   wiresSvg.setAttribute("viewBox",b.x+" "+b.y+" "+b.w+" "+b.h);
@@ -1689,96 +1702,66 @@ function redraw(){
   if(dragWire?.repaint)dragWire.repaint();
 }
 let dragWire=null;
-/* FD PLACEMENT, ONCE.
-   Not a simulation. No rAF loop, no jitter, no ongoing chatter — press it, it
-   settles, it stops, and the result is a document you can still drag.
-
-   Pure force-direction is wrong for a patch panel: it has no idea a cable has a
-   POLARITY, so it happily parks a producer to the right of its consumer and
-   every wire runs backwards. So x is LAYERED — longest path along the wires, a
-   node sits one column right of everything feeding it — and only y is relaxed.
-   Cables then flow left to right by construction; nothing spawns backwards.
-
-   Rings take part as single boxes at their own measured size. That is the
-   outer-scope-as-passive-projection reading: a ring does not get placed by its
-   contents, it gets SIZED by them, and the size is what pushes its neighbours
-   away. Ring children are left alone — layoutRing owns them. */
-function fdLayout(){
+/* One bounded settlement of the selected parent's direct children. Matching
+   proposes gravity links; only Shake or an explicit connection installs wires. */
+async function fdLayout(){
+  if(fdLayout.busy)return;
   const target=typeof Harness!=="undefined"?Harness.parentTarget():null;
   if(typeof Harness!=="undefined"&&!target)return;
   const nodes=(target?target.nodes:G.nodes.filter(n=>!n._parentScope)).filter(n=>n.el);
   const origin=target?.origin||{x:0,y:0},parent=target?.node||null;
   const revision=typeof Harness!=="undefined"?Harness.parentRevision:0;
   if(nodes.length<2){ $("#status").textContent="fd: nothing to place"; return; }
-  const idx=new Map(nodes.map((n,i)=>[n.id,i]));
-  const topOf=id=>{ let m=G.nodes.find(x=>x.id===id); while(m&&m._parentScope&&m._parentScope!==parent) m=m._parentScope; return m; };
-  const edges=[];
-  for(const w of G.wires){
-    const a=topOf(w.from[0]), b=topOf(w.to[0]);
-    if(a&&b&&a!==b&&idx.has(a.id)&&idx.has(b.id)) edges.push([idx.get(a.id),idx.get(b.id)]);
-  }
-  // ── x: longest-path layering, so every cable points forward ──
-  const layer=new Array(nodes.length).fill(0);
-  for(let pass=0;pass<nodes.length;pass++){
-    let moved=false;
-    for(const [a,b] of edges) if(layer[b]<layer[a]+1){ layer[b]=layer[a]+1; moved=true; }
-    if(!moved) break;                       // a cycle just stops improving
-  }
-  const size=n=>({w:(n.el.offsetWidth||220),h:(n.el.offsetHeight||120)});
-  const COLGAP=90, ROWGAP=42;
-  const byLayer=new Map();
-  nodes.forEach((n,i)=>{ if(!byLayer.has(layer[i])) byLayer.set(layer[i],[]); byLayer.get(layer[i]).push(i); });
-  // A layer of eight tall displays is one 5600px column and a legible graph
-  // becomes an unreadable strip. Wrap a layer into as many sub-columns as its
-  // own height demands: still the same layer, still left of everything it
-  // feeds, just not a single tower.
-  const MAXCOL=1800;
-  const cols=[...byLayer.keys()].sort((a,b)=>a-b);
-  const colX=new Map();          // layer -> [x per sub-column]
-  const sub=new Array(nodes.length).fill(0);
-  let x=40;
-  for(const c of cols){
-    const members=byLayer.get(c);
-    const total=members.reduce((t,i)=>t+size(nodes[i]).h+ROWGAP,0);
-    const parts=Math.max(1,Math.ceil(total/MAXCOL));
-    const per=total/parts;
-    const xs=[]; let run=0, k=0;
-    for(const i of members){ sub[i]=Math.min(parts-1,k); run+=size(nodes[i]).h+ROWGAP;
-      if(run>=per*(k+1)) k++; }
-    const wide=Math.max(...members.map(i=>size(nodes[i]).w));
-    for(let q=0;q<parts;q++){ xs.push(x); x+=wide+COLGAP; }
-    colX.set(c,xs);
-  }
-  const bucket=i=>colX.get(layer[i])[sub[i]];
-  // ── y: barycentre relaxation, a few sweeps, then stop ──
-  const preds=nodes.map(()=>[]), succs=nodes.map(()=>[]);
-  for(const [a,b] of edges){ succs[a].push(b); preds[b].push(a); }
-  // stacks are per SUB-column now, not per layer
-  const stacks=new Map();
-  nodes.forEach((n,i)=>{ const k=layer[i]+":"+sub[i]; if(!stacks.has(k)) stacks.set(k,[]); stacks.get(k).push(i); });
-  const y=new Array(nodes.length).fill(0);
-  for(const [,st] of stacks){ let cy=40; for(const i of st){ y[i]=cy; cy+=size(nodes[i]).h+ROWGAP; } }
-  for(let sweep=0;sweep<24;sweep++){
-    for(const [,st] of stacks){
-      for(const i of st){
-        const nb=[...preds[i],...succs[i]];
-        if(nb.length) y[i]=nb.reduce((s,j)=>s+y[j]+size(nodes[j]).h/2,0)/nb.length-size(nodes[i]).h/2;
-      }
-      st.sort((p,q)=>y[p]-y[q]);
-      let floor=40;
-      for(const i of st){ if(y[i]<floor) y[i]=floor; floor=y[i]+size(nodes[i]).h+ROWGAP; }
+  const name=target?.handle.program,document=target?Harness.document():null,snapshot=JSON.stringify(document);
+  const boxes=nodes.map(n=>({id:n.id,x:n.x-origin.x,y:n.y-origin.y,w:n.el.offsetWidth||220,h:n.el.offsetHeight||120}));
+  const current=()=>nodes.every((n,i)=>G.nodes.includes(n)&&(n.el.offsetWidth||220)===boxes[i].w&&(n.el.offsetHeight||120)===boxes[i].h)&&
+    (!target||(Harness.selected===name&&Harness.parentRevision===revision&&JSON.stringify(Harness.document())===snapshot));
+  fdLayout.busy=true;$("#fdBtn").disabled=true;$("#status").textContent="Checking nearby patches";
+  try{
+    if(nodes.length>PatchLayout.limits.nodes)throw Error("Layout size budget exceeded; select a smaller scope");
+    let hints=[],warning="";
+    if(target)try{hints=await Harness.layoutHints(document,target.handle.nodeId);}
+    catch(e){warning="; existing cables only: "+e.message;}
+    if(!current())throw Error("Layout discarded: document or selected parent changed");
+    const byId=new Map(G.nodes.map(n=>[n.id,n])),selected=new Map(nodes.map(n=>[n.id,n]));
+    const topOf=id=>{let n=byId.get(id);while(n&&n._parentScope&&n._parentScope!==parent)n=n._parentScope;return n;};
+    const edges=[],seen=new Set();
+    // DOM coordinates are divided by the full enclosing scale, including ring zoom.
+    const pin=(id,dir,port,top)=>{
+      const n=byId.get(id);if(n!==top)return null;
+      const el=[...n.el.querySelectorAll?.(".port")||[]].find(p=>p.dataset.dir===dir&&p.dataset.port===port&&p.closest(".node")===n.el);
+      if(!el)return null;
+      const a=el.getBoundingClientRect(),b=n.el.getBoundingClientRect(),scale=view.z*ringScaleOf(n);
+      return {x:(a.left+a.width/2-b.left)/scale-(n.el.offsetWidth||220)/2,y:(a.top+a.height/2-b.top)/scale-(n.el.offsetHeight||120)/2};
+    };
+    const add=(from,to,hint)=>{
+      const a=topOf(from[0]),b=topOf(to[0]);if(!a||!b||a===b||!selected.has(a.id)||!selected.has(b.id))return;
+      const key=JSON.stringify([from,to]);if(seen.has(key))return;seen.add(key);
+      edges.push({from:a.id,to:b.id,out:pin(from[0],"out",from[1],a),in:pin(to[0],"in",to[1],b),hint});
+    };
+    for(const w of G.wires)add(w.from,w.to,false);
+    for(const h of hints)add([name+"::"+h.fromNode,h.fromPort],[name+"::"+h.toNode,h.toPort],true);
+    $("#status").textContent="Settling nearby patches";
+    const result=await PatchLayout.layout(boxes,edges,{valid:current});
+    if(!current())throw Error("Layout discarded: document or selected parent changed");
+    if(target&&!parent){
+      const left=Math.min(...result.positions.map(p=>p.x)),top=Math.min(...result.positions.map(p=>p.y));
+      const box={x:origin.x+left-24,y:origin.y+top-64,
+        w:Math.max(...result.positions.map((p,i)=>p.x+boxes[i].w))-left+48,
+        h:Math.max(...result.positions.map((p,i)=>p.y+boxes[i].h))-top+88};
+      const obstacles=[];
+      for(const [other,anchor] of Harness.mounts){if(other===name)continue;const b=Harness.bounds(other);
+        obstacles.push({x:anchor.x+b.left-24,y:anchor.y+b.top-64,w:b.w+48,h:b.h+88});}
+      const position=PatchLayout.placement(box,obstacles);
+      origin.x+=position.x-box.x;origin.y+=position.y-box.y;
     }
-  }
-  nodes.forEach((n,i)=>{ n.x=origin.x+Math.round(bucket(i)); n.y=origin.y+Math.round(y[i]);
-    n.el.style.left=n.x+"px"; n.el.style.top=n.y+"px"; });
-  if(parent)resizeParentFrames(parent);
-  redraw(); save();
-  // The frame has to come AFTER the browser has reflowed the boxes we just
-  // moved; fitting in the same tick measures the layout we replaced.
-  requestAnimationFrame(()=>{ redraw(); if(typeof Harness==="undefined"||Harness.parentRevision===revision)fitToContent(); });
-  const back=edges.filter(([a,b])=>layer[b]<=layer[a]).length;
-  $("#status").textContent="fd: "+nodes.length+" boxes in "+cols.length+" columns"
-    +(back?" · "+back+" cable(s) still fold back — a cycle, not a placement bug":" · every cable points forward");
+    for(const p of result.positions){const n=selected.get(p.id);n.x=origin.x+p.x;n.y=origin.y+p.y;n.el.style.left=n.x+"px";n.el.style.top=n.y+"px";}
+    if(parent)resizeParentFrames(parent);
+    redraw();save();
+    requestAnimationFrame(()=>{redraw();if(typeof Harness==="undefined"||Harness.selected===name&&Harness.parentRevision===revision)fitToContent();});
+    $("#status").textContent="fd: "+nodes.length+" boxes, "+result.segments+" segments, "+result.hints+" candidate pulls; cables unchanged"+warning;
+  }catch(e){$("#status").textContent=e.message;}
+  finally{fdLayout.busy=false;$("#fdBtn").disabled=false;}
 }
 /* TREESHAKE — the whole graph, not one cable.
    Every port that is still OPEN (an input nothing feeds, an output feeding
@@ -2420,7 +2403,19 @@ async function showMateMenu(cx,cy,srcNode,srcPort,wx,wy,scope,dir){
   setTimeout(()=>q.focus(),0);
 }
 /* ── pan / zoom ────────────────────────────────────────────────────────── */
-function applyView(){ world.style.transform=`translate(${view.x}px,${view.y}px) scale(${view.z})`; document.body.classList.toggle("zoomed-out",view.z<.45); if(typeof Landscape!=="undefined")Landscape.schedule(); if(typeof Harness!=="undefined")Harness.rememberView(); }
+function applyView(){
+  // Keep geometry in the original flat world. CSS layout zoom invalidates
+  // nested panel layout on every camera frame; the camera only transforms.
+  world.style.transform=`translate(${view.x}px,${view.y}px) scale(${view.z})`;
+  applyWireBox();
+  document.body.classList.toggle("zoomed-out",view.z<.45);
+  if(typeof Landscape!=="undefined")Landscape.schedule();
+  if(typeof Harness!=="undefined"){
+    Harness.rememberView();
+    const breakout=document.getElementById("panelsBreakout");
+    if(breakout)breakout.href="/panels"+(Harness.selected?"?load="+encodeURIComponent(Harness.selected):"");
+  }
+}
 /* momentum — ported from graal.html's kinetic camera. Pan velocity in SCREEN
    px/ms (the harness camera IS a screen translate, so it applies directly);
    zoom velocity in log-scale per 16.7ms, anchored at the last wheel point so

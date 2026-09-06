@@ -7,6 +7,7 @@ import borg.trikeshed.lib.j
 import borg.trikeshed.lib.size
 import borg.trikeshed.lib.toSeries
 import borg.trikeshed.modelmux.ModelResponseReceipt
+import borg.trikeshed.isam.synchronizedLock
 import borg.trikeshed.userspace.reactor.MuxKeyEntry
 import borg.trikeshed.userspace.reactor.MuxKeyStatus
 import borg.trikeshed.userspace.reactor.MuxReactorState
@@ -71,6 +72,7 @@ class QuotaLegion(
     ledgerSpentByProvider: Map<String, Long> = emptyMap(),
     ledgerWindowStartMs: Long = 0L,
 ) {
+    private val meterGate = Any()
     var limitsByProvider: Map<String, Long> = limitsByProvider
         private set
     var ledgerSpentByProvider: Map<String, Long> = ledgerSpentByProvider
@@ -83,7 +85,7 @@ class QuotaLegion(
      * the daemon calls it when Hermes' state.db changes, so ONE legion (one pool) serves
      * the brain's mux and the LCNC mux across rebuilds.
      */
-    fun refresh(rows: List<LedgerRow>, nowMs: Long) {
+    fun refresh(rows: List<LedgerRow>, nowMs: Long): Unit = synchronizedLock(meterGate) {
         val walked = walkBack(rows, nowMs, windowMs)
         limitsByProvider = walked.mapValues { it.value.provenLimit }
         ledgerSpentByProvider = walked.mapValues { it.value.spentThisWindow }
@@ -92,7 +94,9 @@ class QuotaLegion(
 
     /** The ledger pre-charge still in force for [provider] at [nowMs] (0 once its window rolled). */
     fun ledgerSpentFor(provider: String, nowMs: Long): Long =
-        if (nowMs < ledgerWindowStartMs + windowMs) ledgerSpentByProvider[provider] ?: 0L else 0L
+        synchronizedLock(meterGate) {
+            if (nowMs < ledgerWindowStartMs + windowMs) ledgerSpentByProvider[provider] ?: 0L else 0L
+        }
 
     companion object {
         const val DAY_MS: Long = 86_400_000L
@@ -152,11 +156,11 @@ class QuotaLegion(
     private val meters = mutableMapOf<String, Meter>()
 
     /** Per-key budget: provider override, else the legion default. */
-    fun limitFor(provider: String): Long = limitsByProvider[provider] ?: defaultLimit
+    fun limitFor(provider: String): Long = synchronizedLock(meterGate) { limitsByProvider[provider] ?: defaultLimit }
 
     /** Meter one receipt's tokens against its key. Window rollover included. */
-    fun applyReceipt(keyId: String, provider: String, receipt: ModelResponseReceipt, nowMs: Long) {
-        val tokens = (receipt.inputTokens + receipt.outputTokens).toLong()
+    fun applyReceipt(keyId: String, provider: String, receipt: ModelResponseReceipt, nowMs: Long): Unit = synchronizedLock(meterGate) {
+        val tokens = receipt.inputTokens.toLong() + receipt.outputTokens.toLong()
         val meter = meterFor(keyId, provider, nowMs)
         if (receipt.httpStatus == 429) {
             meter.exhausted = true
@@ -166,12 +170,12 @@ class QuotaLegion(
     }
 
     /** Record an out-of-band exhaustion signal (429 surfaced by the caller). */
-    fun exhaust(keyId: String, provider: String, nowMs: Long) {
+    fun exhaust(keyId: String, provider: String, nowMs: Long): Unit = synchronizedLock(meterGate) {
         meterFor(keyId, provider, nowMs).exhausted = true
     }
 
     /** Clear exhaustion after backoff — the key re-enters the legion. */
-    fun reinstate(keyId: String) {
+    fun reinstate(keyId: String): Unit = synchronizedLock(meterGate) {
         meters[keyId]?.exhausted = false
     }
 
@@ -190,7 +194,7 @@ class QuotaLegion(
      * most-remaining. Keys the reactor has benched/backoffed carry that
      * status into `exhausted` — the reactor's word outranks the ledger.
      */
-    fun standings(state: MuxReactorState, nowMs: Long): Series<QuotaStanding> {
+    fun standings(state: MuxReactorState, nowMs: Long): Series<QuotaStanding> = synchronizedLock(meterGate) {
         val keys = state.keys
         val out = ArrayList<QuotaStanding>(keys.size + limitsByProvider.size)
         // Providers the ledger proved but no key has touched yet: shown as

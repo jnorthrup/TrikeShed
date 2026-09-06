@@ -3,6 +3,7 @@ package borg.trikeshed.couch
 import borg.trikeshed.couch.replicate.CouchReplicator
 import borg.trikeshed.couch.replicate.HttpExchange
 import borg.trikeshed.couch.replicate.HttpReply
+import borg.trikeshed.couch.replicate.ReplicationReport
 import borg.trikeshed.job.CasStore
 import borg.trikeshed.job.ContentId
 import borg.trikeshed.parse.json.JsonSupport
@@ -12,6 +13,7 @@ import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
@@ -21,6 +23,84 @@ import kotlin.test.assertTrue
  * daemon mounts on its listener — replicate through the 1.x protocol with blobs as the payload.
  */
 class CouchDatabaseReplicationTest {
+
+    @Test
+    fun unavailableAndMalformedPeersAreFailuresNotEmptySuccess() = runTest {
+        for (reply in listOf(HttpReply(503, byteArrayOf()), HttpReply(200, "{}".encodeToByteArray()))) {
+            val node = Node("trikeshed")
+            val replicator = CouchReplicator(node.db, HttpExchange { _, _, _, _ -> reply })
+            assertFailsWith<IllegalStateException> { replicator.pull("http://peer/trikeshed") }
+            assertNull(node.db.localGet(CouchReplicator.replicationId("pull", "http://peer/trikeshed", "trikeshed")))
+        }
+    }
+
+    @Test
+    fun missingBlobDoesNotAdvanceCheckpointAndRetryRepairsTheHole() = runTest {
+        val a = Node("trikeshed")
+        val b = Node("trikeshed")
+        val bytes = "must survive a failed transfer".encodeToByteArray()
+        val cid = ContentId.of(bytes)
+        a.putFile("proof.txt", bytes)
+        var unavailable = true
+        val peer = a.exchange()
+        val replicator = CouchReplicator(b.db, HttpExchange { method, url, body, type ->
+            if (unavailable && (url.endsWith("/_cas/_bulk") || url.endsWith(cid.value))) HttpReply(503, byteArrayOf())
+            else peer.call(method, url, body, type)
+        })
+        assertFailsWith<IllegalStateException> { replicator.pull("http://a/trikeshed") }
+        assertNull(b.db.localGet(CouchReplicator.replicationId("pull", "http://a/trikeshed", "trikeshed")))
+        assertNull(b.attachments.getAttachment(PREFIX + "proof.txt"))
+        unavailable = false
+        assertEquals(1, replicator.pull("http://a/trikeshed").docsWritten)
+        assertContentEquals(bytes, b.attachments.getAttachment(PREFIX + "proof.txt")!!.second)
+        assertEquals(0, replicator.pull("http://a/trikeshed").docsWritten)
+    }
+
+    @Test
+    fun incompleteBulkAcknowledgementDoesNotCheckpointPush() = runTest {
+        val a = Node("trikeshed")
+        val b = Node("trikeshed")
+        a.db.put("proof", mapOf("value" to 7), null)
+        var omit = true
+        val peer = b.exchange()
+        val replicator = CouchReplicator(a.db, HttpExchange { method, url, body, type ->
+            if (omit && url.endsWith("/_bulk_docs")) HttpReply(200, "[]".encodeToByteArray())
+            else peer.call(method, url, body, type)
+        })
+        assertFailsWith<IllegalStateException> { replicator.push("http://b/trikeshed") }
+        assertNull(a.db.localGet(CouchReplicator.replicationId("push", "trikeshed", "http://b/trikeshed")))
+        omit = false
+        assertEquals(1, replicator.push("http://b/trikeshed").docsWritten)
+        assertEquals(7, (b.db.docJson("proof")!!["value"] as Number).toInt())
+    }
+
+    @Test
+    fun asynchronousFailureSentinelNeverReportsSuccess() {
+        assertEquals(false, ReplicationReport("pull", "peer", 0, 0, 0, 0, 0, -1).toMap()["ok"])
+        // 2026-09-05: a POSITIVE conflict count is a report, not a failure — those are revisions the
+        // receiving side declined because its head wins (revWins); nothing is missing on either side.
+        // Before this, one divergent head failed every pass forever (two daemons absorbing one worktree).
+        // An undelivered revision — a blob that never arrived — still throws and never reaches a report.
+        assertEquals(true, ReplicationReport("pull", "peer", 0, 1, 1, 0, 0, 1).toMap()["ok"])
+    }
+
+    @Test
+    fun pushAfterIncrementalPullDoesNotReinstallObsoleteHeads() = runTest {
+        val a = Node("trikeshed")
+        val b = Node("trikeshed")
+        a.db.put("shared", mapOf("value" to 1), null)
+        val puller = CouchReplicator(b.db, a.exchange())
+        puller.pull("http://a/trikeshed")
+        a.db.put("shared", mapOf("value" to 2), a.store.head.getRev("shared"))
+        puller.pull("http://a/trikeshed")
+        b.db.put("backchannel", mapOf("value" to "from-b"), null)
+        val report = CouchReplicator(b.db, a.exchange()).push("http://a/trikeshed")
+        assertEquals(0, report.conflicts)
+        assertEquals(1, report.docsWritten)
+        assertEquals(a.store.head.getRev("shared"), b.store.head.getRev("shared"))
+        assertEquals(2, (a.db.docJson("shared")!!["value"] as Number).toInt())
+        assertEquals("from-b", a.db.docJson("backchannel")!!["value"])
+    }
 
     private class Node(name: String) {
         val cas: CasStore = CasStore.inMemory()
@@ -175,5 +255,50 @@ class CouchDatabaseReplicationTest {
 
     companion object {
         const val PREFIX = "projects/trikeshed/"
+    }
+
+    @Test
+    fun aLosingRevisionIsDecidedFromItsStringAndFetchesNoBytes() = runTest {
+        val a = Node("trikeshed")
+        val b = Node("trikeshed")
+        // the same id on both sides with different bodies: two heads, one winner under revWins
+        a.db.put("shared", mapOf("v" to "a"), null)
+        b.db.put("shared", mapOf("v" to "b"), null)
+        val revA = a.store.head.getRev("shared")!!; val revB = b.store.head.getRev("shared")!!
+        val casCalls = ArrayList<String>()
+        val peer = a.exchange()
+        val puller = CouchReplicator(b.db, HttpExchange { method, url, body, type ->
+            if (url.contains("/_cas")) casCalls += url
+            peer.call(method, url, body, type)
+        })
+        val r = puller.pull("http://a/trikeshed")
+        if (revWins(revA, revB)) {
+            assertEquals(1, r.docsWritten); assertEquals(0, r.conflicts)
+            assertEquals(revA, b.store.head.getRev("shared"))
+        } else {
+            assertEquals(0, r.docsWritten); assertEquals(1, r.conflicts, "the loser is reported, not failed: $r")
+            assertEquals(revB, b.store.head.getRev("shared"), "B keeps its winning head")
+            assertTrue(casCalls.isEmpty(), "no blob was fetched for a revision the winner rule declines: $casCalls")
+        }
+        // and the pass completed: the checkpoint is past the divergence
+        assertEquals(0, puller.pull("http://a/trikeshed").docsRead)
+    }
+
+    @Test
+    fun anOversizedBlobIsRefusedByPushBeforeAnyByteIsSent() = runTest {
+        val a = Node("trikeshed")
+        val b = Node("trikeshed")
+        val big = ByteArray(300) { 7 }
+        a.putFile("huge.bin", big, "application/octet-stream")
+        val sent = ArrayList<Int>()
+        val peer = b.exchange()
+        val pusher = CouchReplicator(a.db, HttpExchange { method, url, body, type ->
+            if (url.endsWith("/_cas") && method == "POST") sent += body!!.size
+            peer.call(method, url, body, type)
+        }, maxPushBlobBytes = 200)
+        val e = assertFailsWith<IllegalStateException> { pusher.push("http://b/trikeshed") }
+        assertTrue(e.message!!.contains("huge.bin") && e.message!!.contains("300 bytes"), "the failure names the blob: ${e.message}")
+        assertTrue(sent.none { it > 200 }, "no oversized body was written toward the peer: $sent")
+        assertNull(a.db.localGet(CouchReplicator.replicationId("push", "trikeshed", "http://b/trikeshed")), "the checkpoint holds")
     }
 }

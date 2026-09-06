@@ -98,7 +98,7 @@ class GitCouchGateway(
                 if (fileOps.isDir(fullPath)) {
                     queue.add(fullPath to relative)
                 } else {
-                    files[relative] = fullPath
+                    files[GIT_PREFIX + relative] = fullPath
                 }
             }
         }

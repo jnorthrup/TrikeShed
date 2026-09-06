@@ -49,13 +49,6 @@ object LcncPresets {
     /** The offered prefabs, described for the person adopting them. */
     fun catalog(): List<LcncPresetInfo> = listOf(
         LcncPresetInfo(
-            LcncShakeDemo.NAME, "Shake Demo",
-            does = "Places every node type beside typed input and output counterparts, with no cables installed.",
-            needs = "Nothing for wiring and inspection. Execution is disabled for this specimen.",
-            see = "The complete node palette, empty sockets, and eight nested scopes carrying the same named value.",
-            tweakFirst = "A counterpart's position, then compare the connection results.",
-        ),
-        LcncPresetInfo(
             "preset-hermes", "Board at a glance",
             does = "Reads the kanban board every 15 seconds and lays its cards out in columns by status.",
             needs = "Nothing — it runs as it is.",
@@ -315,7 +308,6 @@ object LcncPresets {
 
     /** name → Confix JSON document, the exact shape LcncProgramConfix parses. */
     fun all(): Map<String, String> = linkedMapOf(
-        LcncShakeDemo.NAME to LcncProgramConfix.toJson(LcncShakeDemo.build().program),
         "preset-hermes" to hermes(),
         "preset-tribunal" to tribunal(),
         "preset-curator" to curator(),

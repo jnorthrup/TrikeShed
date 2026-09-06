@@ -6,14 +6,16 @@
 <title>Blackboard</title>
 <link rel="stylesheet" href="/patch.css">
 <link rel="stylesheet" href="/harness.css">
+<link rel="stylesheet" href="/archive.css">
 </head>
 <body>
 <div id="bar">
-  <b>BLACKBOARD</b><span id="connection">Connecting</span>
+  <b>BLACKBOARD</b><a href="/harness" target="_blank" rel="noopener" title="Open full blackboard">Board ↗</a><a href="/graal" target="_blank" rel="noopener" title="Open Graal console in its own window">Graal ↗</a><a id="panelsBreakout" href="/panels" target="_blank" rel="noopener" title="Open selected program in a panel window">Panels ↗</a><span id="connection">Connecting</span>
   <button id="boardHome" title="Fit the blackboard" aria-label="Fit blackboard">⊞</button>
   <button id="viewBack" title="Previous view" aria-label="Previous view" disabled>←</button>
   <button id="viewUp" title="Enclosing scope" aria-label="Enclosing scope">↑</button>
   <button id="objectsBtn" title="Fit object terrain" aria-label="Object terrain">◇</button>
+  <button id="archiveBtn" title="Archive import and restore" aria-label="Archives">▣</button>
   <select id="terrainLayer" aria-label="Terrain layer"><option value="1">Objects</option><option value="2">Entropy</option><option value="3">Recency</option></select>
   <select id="programSelect" aria-label="Program"><option>Loading programs</option></select>
   <div id="parentTools" role="group" aria-label="Selected parent controls">
@@ -32,6 +34,7 @@
   <button id="rdfBtn" title="the canvas as RDF — graph, ontology, and its alignment with productions and causal rules">⟁ rdf</button>
   <button id="paletteBtn" title="drag node types and programs onto the canvas">⧉ palette</button>
   <button id="keysBtn" title="keymux endpoints — names & addresses; key values never cross">⚿ keys</button>
+  <a href="/keymux" title="KeyMux">KeyMux</a><a href="/modelmux" title="ModelMux">ModelMux</a>
   <button id="sheetsBtn" title="every territory as grid-in-cell sheets (CursorSheet) — a container cell drills in, the crumb climbs out">▤ sheets</button>
   <button id="exportBtn">export</button>
   <button id="importBtn">import</button>
@@ -40,8 +43,8 @@
   <button id="clearBtn">clear</button>
   <button id="qsBtn" aria-label="Run quickstart" title="run the quickstart in anger" style="border-color:#3ddc84;color:#3ddc84">⚡</button>
   <button id="fbBtn" aria-label="Provide feedback" title="open a GitHub issue prefilled with this construction's coordinates" style="border-color:var(--warn);color:var(--warn)">⚑</button>
-  <span id="status" role="status">Loading board</span>
 </div>
+<span id="status" role="status">Loading board</span>
 <nav id="boardnav" aria-label="Blackboard territories"></nav>
 <details id="topologyLegend" open>
   <summary>Topology <span id="topologyCount"></span></summary>
@@ -53,7 +56,7 @@
 </details>
 <div id="crumb" style="display:none"></div>
 <div id="palette"></div>
-<div id="viewport"><canvas id="landscape" aria-label="Graal and blackboard landscape"></canvas><div id="world"><div id="territories"></div><svg id="channels"></svg><svg id="wires"></svg></div></div>
+<div id="viewport"><canvas id="landscape" aria-label="Graal and blackboard landscape"></canvas><div id="world"><div id="territories"></div></div><svg id="channels"></svg><svg id="wires"></svg></div>
 <aside id="activity"><section id="connections" aria-label="Connection results" hidden></section><header><b>Activity</b><span id="boardCount"></span></header><div id="events"></div></aside>
 <dialog id="factInspector"><form method="dialog"><button aria-label="Close fact inspector">×</button></form><h2 id="factKey"></h2><p id="factActor"></p><div id="sheetBar"><div id="sheetRoots"></div><button id="sheetRawBtn" title="the fact as raw JSON instead of sheets" aria-pressed="false">{ } raw</button></div><div id="factSheet"></div><pre id="factValue"></pre></dialog>
 <div id="blip"></div>
@@ -68,14 +71,29 @@
   <div class="argument-table"><table><thead><tr><th>Node</th><th>Name</th><th>Type</th><th>Source</th><th>Value</th><th>Status</th></tr></thead><tbody id="argumentResolved"></tbody></table></div>
 </dialog>
 <div id="menu"></div>
+<dialog id="archiveInspector" aria-labelledby="archiveTitle">
+  <form method="dialog"><button aria-label="Close archive">×</button></form>
+  <h2 id="archiveTitle">Archives</h2>
+  <div class="archive-actions"><button id="archiveUpload" title="Import ZIP">↑ Import ZIP</button><button id="archiveDemo">Load demo</button><button id="archiveLandscape" title="Fit archive in landscape">⤢ Landscape</button><button id="archiveDownload" title="Download selected files">↓ Download</button><button id="archiveCancel" aria-label="Cancel archive operation" title="Cancel archive operation">■</button></div>
+  <div class="archive-actions"><input id="archiveCid" aria-label="Archive content ID" placeholder="sha256:…"><button id="archiveOpen" aria-label="Open archive by content ID" title="Open archive by content ID">→</button></div>
+  <p id="archiveStatus" role="status"></p>
+  <div class="archive-columns"><ul id="archiveEntries" aria-label="Archive entries"></ul><section><h3 id="archivePreviewTitle"></h3><div id="archivePreview"></div></section></div>
+  <input id="archiveFile" type="file" accept=".zip,application/zip" hidden>
+</dialog>
 <canvas id="minimap" width="168" height="112"></canvas>
 <div id="hint"></div>
 <input type="file" id="fileIn" accept="application/json" style="display:none">
+<script src="/vendor/d3-force-3.0.0.js"></script>
+<script src="/patch-layout.js"></script>
 <script src="/patch.js"></script>
 <script src="/graal-terrain.js"></script>
 <script src="/landscape.js"></script>
 <script src="/landscape-navigation.js"></script>
 <script src="/harness-arguments.js"></script>
+<script src="/vendor/fflate-0.8.2.js"></script>
+<script src="/archive-core.js"></script>
+<script src="/graal-file-viewer.js"></script>
+<script src="/archive-ui.js"></script>
 <script src="/harness.js"></script>
 </body>
 </html>

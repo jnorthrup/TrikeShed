@@ -496,6 +496,12 @@ class KanbanModule : ForgeModule {
         // the vocabulary tuples come from one network and one bank however many publishers exist.
         val publisher = borg.trikeshed.lcnc.LcncPublisher(ctx.blackboard, { ctx.lcncRunners }, ctx.attachments, ctx.rete, ctx.kifBank)
         val runs = LcncRunService(ctx, store, publisher::vocabulary)
+        val archives = ArchiveService(ctx.casStore)
+        for (operation in listOf("import", "manifest", "content")) {
+            ctx.routes.claim(id, "/api/archives/$operation") { method, path, text, _ ->
+                archives.route(method, path, rawBody(text))
+            }
+        }
         runs.recover()
         runCatching { publisher.publishAll() }
             .onFailure { System.err.println("[KanbanModule] lcnc → blackboard publish failed: ${it.message}") }

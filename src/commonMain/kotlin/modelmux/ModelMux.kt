@@ -129,6 +129,8 @@ class ModelMux internal constructor(
     private val models: Series<ModelEntry> get() = core.a
     private val router: ModelRouter get() = core.b
 
+    val activity = MuxActivity()
+
     /**
      * Observer sink for [ModelSelectionEvent]. Null by default. Single-writer: set once, before
      * routing. The sink is called inline on the routing path but is isolated from it — a sink
@@ -266,6 +268,42 @@ class ModelMux internal constructor(
          * Receipt → frame reconciliation needs no second field.
          */
         contextId: String? = null,
+    ): Result<AcpResponse> {
+        val attribution = currentCoroutineContext()[MuxCallContext]
+        val callActivity = attribution?.activity ?: activity
+        val provider = models.view.firstOrNull { it.a == modelId }?.b?.providerTag ?: modelId
+        val callId = callActivity.start(modelId, provider, attribution, assessmentId ?: contextId)
+        var receipt: ModelResponseReceipt? = null
+        var keyId: String? = null
+        var failure: Throwable? = null
+        try {
+            currentCoroutineContext().ensureActive()
+            val result = chatCall(modelId, messages, tools, assessmentId, maxTokens, temperature, contextId) { r, k ->
+                receipt = r
+                keyId = k
+            }
+            failure = result.exceptionOrNull()
+            if (failure is CancellationException) throw failure as CancellationException
+            return result
+        } catch (t: Throwable) {
+            failure = t
+            throw t
+        } finally {
+            withContext(NonCancellable) {
+                callActivity.finish(callId, receipt, keyId, failure)?.let { attribution?.onFinished?.invoke(it) }
+            }
+        }
+    }
+
+    private suspend fun chatCall(
+        modelId: String,
+        messages: Series<AcpMessage>,
+        tools: Series<AcpTool>,
+        assessmentId: String?,
+        maxTokens: Int?,
+        temperature: Double?,
+        contextId: String?,
+        capture: (ModelResponseReceipt, String?) -> Unit,
     ): Result<AcpResponse> {
         val receiptAssessment = assessmentId ?: contextId
         if (modelId.isEmpty()) return Result.failure(IllegalArgumentException("modelId must be non-empty"))
@@ -426,6 +464,7 @@ class ModelMux internal constructor(
             // Quota legion metering: only real (non-cached) calls consume provider
             // quota. A 429 receipt exhausts the key inside applyReceipt.
             session.lastReceipt?.let { receipt ->
+                capture(receipt, keyId)
                 lastReceipt = receipt
                 if (keyId != null && !receipt.cachedHit) {
                     quotaLegion?.applyReceipt(
@@ -584,6 +623,11 @@ class ModelMux internal constructor(
     }
 
     /** List available model cards, optionally filtered by capability */
+    suspend fun modelKeyId(modelId: String): String? =
+        models.view.firstOrNull { it.a == modelId }?.b?.let { resolveKeyId(it) }
+
+    fun configuredBaseUrl(modelId: String): String? = configuredBaseUrls[modelId]
+
     fun listModels(vararg cap: String): Series<AcpModelCard> {
         val cards = models.α { it.b }
         if (cap.isEmpty()) return cards
