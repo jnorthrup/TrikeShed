@@ -231,9 +231,10 @@ class BlackboardChangesFactElementTest {
     }
 
     @Test
-    fun namespacesTableResolvesLongestPrefixAndListsTheThreeExclusions() {
+    fun namespacesTableResolvesLongestPrefixAndListsTheRuleOutputExclusions() {
+        // Every row a rule firing or a refusal writes: never re-admitted to the fact plane.
         assertEquals(
-            setOf("narsese/curation/", "narsese/rete/firing/", "kanban/rule/"),
+            setOf("narsese/curation/", "narsese/rete/firing/", "kanban/rule/", "lcnc/publish/", "lcnc/stale/"),
             BlackboardNamespaces.excludedByDefault.toSet(),
         )
         assertEquals("narsese/curation/", BlackboardNamespaces.namespaceOf("narsese/curation/x/1")!!.prefix)

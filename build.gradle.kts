@@ -1185,10 +1185,11 @@ tasks.named("check") {
 tasks.register<Exec>("hotswapFeed") {
     group = "build"
     description = "Atomic compile feed for the live dir (replaces wrong 17; hot-swap stays)"
-    dependsOn("compileKotlinJvm", "jvmProcessResources", "stageDaemonLib")
+    dependsOn("jvmMainClasses", "stageDaemonLib")
 
     val buildDir = project.layout.buildDirectory.get().asFile
     val srcDir = File(buildDir, "classes/kotlin/jvm/main")
+    val javaDir = File(buildDir, "classes/java/jvmMain")
     val liveDir = File(buildDir, "live")
     val destDir = File(liveDir, "classes")
 
@@ -1196,7 +1197,7 @@ tasks.register<Exec>("hotswapFeed") {
         destDir.mkdirs()
     }
     
-    commandLine("rsync", "-a", "--delay-updates", "--delete", "${srcDir.absolutePath}/", "${destDir.absolutePath}/")
+    commandLine("rsync", "-a", "--delay-updates", "--delete", "${srcDir.absolutePath}/", "${javaDir.absolutePath}/", "${destDir.absolutePath}/")
 
     doLast {
         val genFile = File(liveDir, ".generation")
@@ -1340,3 +1341,5 @@ tasks.register<Copy>("stageKotlinJs") {
     from(project.layout.buildDirectory.dir("kotlin-webpack/js/productionExecutable")) { include("TrikeShed.js") }
     into(project.layout.buildDirectory.dir("processedResources/jvm/main/web/kotlin"))
 }
+// The staged bundle lands in a directory other JVM tasks read; Gradle wants that ordering said.
+tasks.matching { it.name == "jvmJar" || it.name == "jvmTest" || it.name == "stageDaemonLib" }.configureEach { mustRunAfter("stageKotlinJs") }

@@ -88,7 +88,21 @@ class CorpusStaleRebuildRouteTest {
         ctx.lcncRunners.putAll(ProjectNodes.registry(JvmProjectCorpus(registry, scopes)))
         val prompts = InMemoryPromptReads { 1L }.apply { LcncPromptSeeds.all().forEach { put(it) } }
         ctx.lcncRunners.putAll(PromptNodes.registry(prompts))
-        ctx.lcncRunners["prompt.chat"] = LcncNodeRunner { _, inputs -> mapOf("ok" to true, "content" to "summary: " + (inputs["prompt"] ?: inputs["prompt?"]).toString().takeLast(24), "model" to "fake") }
+        // The pure and council runners the daemon registers, as the corpus execution test fakes them.
+        ctx.lcncRunners.putAll(borg.trikeshed.lcnc.PureNodes.registry { System.currentTimeMillis() })
+        ctx.lcncRunners.putAll(mapOf(
+            "note" to LcncNodeRunner { _, _ -> emptyMap() },
+            "display" to LcncNodeRunner { _, inputs -> mapOf("shown" to inputs["x"]) },
+            "text.fold" to LcncNodeRunner { node, inputs ->
+                val brief = (inputs["brief"] ?: inputs["brief?"])?.toString().orEmpty()
+                val parts = (inputs["parts"] as? List<*>)?.map { it.toString() } ?: listOfNotNull(inputs["parts"]?.toString())
+                mapOf("text" to (listOf(brief) + parts).joinToString(node.params["separator"] ?: "\n\n"))
+            },
+            "prompt.chat" to LcncNodeRunner { _, inputs ->
+                val prompt = (inputs["prompt"] ?: inputs["prompt?"]).toString()
+                mapOf("content" to "summary of <" + prompt.substringAfterLast("\n\n") + ">", "model" to "stub", "ok" to true, "error" to "", "cached" to false)
+            },
+        ))
         val server = JvmKanbanServer(moduleRoutes = routes)
         val supervisor = ModuleSupervisor(ctx)
         runBlocking { supervisor.attach(KanbanModule()) }

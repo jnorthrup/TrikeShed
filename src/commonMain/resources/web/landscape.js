@@ -379,7 +379,7 @@ const Landscape = {
   },
   async inspect(id) {
     const runtime=this.terrain?.nodeFor(id)?.detail;
-    if(runtime?.runtime&&(runtime.category==="allocation"||runtime.category==="live")){
+    if(runtime?.runtime&&runtime.category==="allocation"){
       AllocationInspector.open(runtime.name,{kind:runtime.category,bytes:runtime.sampledBytes??runtime.bytes});return;
     }
     if(runtime?.runtime){
