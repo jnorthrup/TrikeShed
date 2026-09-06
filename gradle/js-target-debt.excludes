@@ -18,4 +18,3 @@
 **/cas/VolumeCasStoreTest.kt
 **/userspace/nio/process/ProcessWorkerContractTest.kt
 **/pointcut/polyglot/PointcutPolyglotBlackboardTaxonomyTest.kt
-**/RunBlockingHelper.kt
