@@ -208,3 +208,28 @@ after every observable above was seen on the page, not inferred from a status co
 - Not claimed: the folder watcher path (the edit went through the upload lane); `controls.rebuildOnStale`
   is not parsed (rebuild stays a gesture, as ruled); a stale receipt of a program that was republished
   since is Unknown, not Stale, by design.
+
+### 2026-09-06, the walk, twice from fresh homes
+
+Both passes ran on a daemon launched over a private copy of the built classes, resources and
+libraries (the checkout's build directories were being rewritten by another session all afternoon),
+each on an empty home under the temp dir, with the notes folder mounted through the projects route.
+Pass one's home was `oroboros-walk1.7Wq8Ay`, pass two's `oroboros-walk2.GVzTi9`. Each pass started
+from the two seed prompts, no snapshots, no user programs, the roster codex and opencode.
+
+| step | pass one | pass two |
+|---|---|---|
+| 1 files and context | `/documents` painted `genesis-notes` with `a.md`, `b.md`, `c.txt` from the bundle; the Archives dialog's demo import stored six entries under one manifest cid | the same, the self-mounted `trikeshed` project beside it |
+| 2 prompts and a workflow | "Save a prompt" saved `summarize` as `sha256:6cdc6921...` with `previousCid` = the seed `sha256:f621f848...`; "Corpus digest" published as `corpus` and run over the project: `promptVersions.summarize` = the new cid, `consumed` = the listing, `a.md`, the prompt, `b.md`; the digest read `**Title:** Alpha ... **Summary:** ...`; lamp Completed | the same prompt cid, the same receipt shape, lamp Completed |
+| 3 a coding agent | `walk1-codex` READY to RUNNING under `claim:agent:codex` to DONE in about a minute; base = the committed HEAD, a 134-byte one-file patch, a REPLY citing its own evidence id; the board's DONE column shows the card under its claim owner | `walk2-codex`, the same, closed in about a minute |
+| 4 a snapshot and two editors | tab A published a second version; tab B, holding the first, was refused with `stale_base`, both cids and both exits, and its Reload took the board's version; the snapshot named the second program version, the new prompt cid, `genesis-notes seq 3 docs 3`, and the latest receipt | the same, with its own cids |
+| 5 a shareable output | not walked: Cut X is another session's card, still in Running, and the export route is not on the tree | the same |
+| 6 iterated compute | the second version run once more, then `a.md` edited through the upload lane; the marker and the Stale lamp within about ten seconds; Rebuild produced a receipt naming the stale one, reading the new cid, marker gone, lamp Completed | the same, cids of its own |
+
+What the walk did not do, said plainly: the folder was mounted through the projects route rather
+than dropped on the landscape; the agent card went in through the reactor ingress because the
+board page has no submit form; step 5 was not walked; and twice the evidence dialog opened one
+second before the activity refresh had seen the marker, so Rebuild appeared on the second opening.
+Both passes ended in the same state, which is the stop condition the plan set. Port 8888 was not
+restarted by this session: it already answered the snapshot and rebuild routes, its classes having
+been refreshed by the hot-swap agent and a restart another session made in the afternoon.
