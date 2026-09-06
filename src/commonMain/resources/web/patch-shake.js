@@ -28,7 +28,7 @@ let STARVED=new Set();   // node ids whose reach runs on nothing (redraw paints 
 let VERDICTS=[];       // [{nodeId,dir,port,cls}] — the shaken sockets and their outcome
 function verdictLayer(){
   let L=document.getElementById("verdicts");
-  if(!L){ L=document.createElement("div"); L.id="verdicts"; world.appendChild(L); }
+  if(!L){ L=document.createElement("div"); L.id="verdicts"; viewport.appendChild(L); }
   return L;
 }
 function clearVerdicts(){
@@ -56,13 +56,16 @@ function buildVerdicts(){
 }
 function projectVerdicts(){
   if(!VERDICTS.length)return;
-  verdictLayer().style.setProperty("--verdict-scale",1/Math.max(1,view.z));
+  verdictLayer().style.setProperty("--verdict-scale",Math.min(1,view.z));
   const width=viewport.clientWidth,height=viewport.clientHeight;
   for(const v of VERDICTS){
     if(!v.el)continue;
     const c=v.point,x=c&&c.x*view.z+view.x,y=c&&c.y*view.z+view.y;
     const display=c&&x>=-32&&y>=-32&&x<=width+32&&y<=height+32?"":"none";
     if(v.el.style.display!==display)v.el.style.display=display;
+    if(display!=="none"){
+      v.el.style.left=x+"px";v.el.style.top=y+"px";
+    }
   }
 }
 /* Re-anchor on redraw — cheap, and it keeps a badge on its socket when the
@@ -74,7 +77,6 @@ function positionVerdicts(){
   for(const [v,c] of positions){
     if(!v.el) continue;
     v.point=c;
-    if(c){ v.el.style.left=c.x+"px"; v.el.style.top=c.y+"px"; }
   }
   projectVerdicts();
 }

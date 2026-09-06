@@ -4,6 +4,14 @@ const web=path.resolve(__dirname,"../../commonMain/resources/web");
 const navigation=require(path.join(web,"landscape-navigation.js"));
 const patch=fs.readFileSync(path.join(web,"patch-camera.js"),"utf8");
 
+test("blackboard camera persistence never signals a document edit or clears Shake evidence",()=>{
+  let remembered=0;
+  const context=vm.createContext({Harness:{rememberView(){remembered++;}},clearTimeout(){},
+    save(){assert.fail("camera persisted the document");},setTimeout(){assert.fail("camera scheduled a document save");}});
+  vm.runInContext(patch.slice(patch.indexOf("let camSaveT="),patch.indexOf("function wheelPixels(")),context);
+  context.saveCameraSoon();assert.equal(remembered,1);
+});
+
 function fixture(){
   const handlers=new Map(),frames=[],elements=new Map();let time=0,kills=0;
   const element=id=>{if(!elements.has(id))elements.set(id,{});return elements.get(id);};

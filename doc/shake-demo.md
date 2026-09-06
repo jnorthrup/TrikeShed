@@ -158,3 +158,27 @@ with Run disabled and the Connections panel listing each closed socket (for
 example `palette.ccek.activate.in.0 / value` — Caller input). This is the
 rendered check, not a curl.
 
+### Zoom Regression (2026-09-06)
+
+The 8888 blackboard mounted 936 nodes and 23 scope windows. Before the fix,
+twelve camera frames at 4000x took approximately 764 ms. SVG viewport clipping
+alone still left the stroker processing enormous off-screen dashed curves.
+Curves now retain their original control points but submit only bounded,
+subdivided visible portions. Landscape geometry is read once per node/window
+before visibility writes, rather than repeatedly walking and flushing the DOM.
+
+Deep detail temporarily reparents the same ringworld into the viewport when
+its enclosing window covers the entire viewport. This avoids native hit-test
+rounding without changing the graph or duplicating nodes. Integral scope-label
+spacing also prevents compounded paint-position rounding. Zoom saves only a
+bookmark, not the document or a cleared Shake report. Verdicts are culled and
+projected in screen coordinates, with bounded glyph/glow sizes.
+
+`src/jvmTest/js/shake-zoom-browser.check.cjs` checks the real matcher workload
+(603 verdicts in this run), 4000x zoom, unchanged node identities/parameters,
+clickable deep inputs, outline pixels, subtree restoration and a frame-work
+budget at 1440x1000 and 390x844. The final local runs took about 8-14 ms per
+camera frame; these are local observations, not universal frame-rate promises.
+The shared `patch-camera-browser.check.cjs`, 49 focused Node tests and the
+`jvmMainClasses` gate passed. Browser checks never execute programs or publish
+documents; only the pure tree-shake matcher POST is allowed by the Shake check.

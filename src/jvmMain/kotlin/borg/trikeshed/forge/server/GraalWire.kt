@@ -93,6 +93,24 @@ class GraalWire(
             method == "GET" && p == "/api/graal/heap" -> withContext(Dispatchers.IO) {
                 JvmKanbanServer.HttpResponse(200, JsonSupport.stringify(vitals.heapHistogram()))
             }
+            method == "GET" && p == "/api/graal/allocations" -> withContext(Dispatchers.IO) {
+                val q = borg.trikeshed.relaxfactory.CouchHttpSurface.parseQuery(path.substringAfter('?', ""))
+                val allocated = q["class"]?.takeIf { it.isNotBlank() }
+                val recent = vitals.allocationSites.snapshot(allocated, System.currentTimeMillis())
+                JvmKanbanServer.HttpResponse(200, JsonSupport.stringify(recent + mapOf(
+                    "jfr" to vitals.jfrLive, "jfrError" to vitals.jfrError,
+                    "aot" to HotSpotAotBlobAccess.snapshot(),
+                )))
+            }
+            method == "GET" && p == "/api/graal/allocation-frame" -> withContext(Dispatchers.IO) {
+                val q = borg.trikeshed.relaxfactory.CouchHttpSurface.parseQuery(path.substringAfter('?', ""))
+                val frame = vitals.allocationSites.frame(q["site"].orEmpty(), q["frame"]?.toIntOrNull() ?: -1,
+                    System.currentTimeMillis())
+                    ?: return@withContext JvmKanbanServer.HttpResponse(404, """{"error":"allocation_site_expired_or_missing"}""")
+                val result = runCatching { AllocationFrameProjection(couchDatabase).project(frame) }
+                    .getOrElse { frame.wire() + mapOf("available" to false, "reason" to (it.message ?: "projection_failed")) }
+                JvmKanbanServer.HttpResponse(200, JsonSupport.stringify(result))
+            }
             method == "GET" && p == "/api/graal/pointcuts" -> JvmKanbanServer.HttpResponse(200, JsonSupport.stringify(mapOf("routes" to pointcutRoutes())))
             method == "GET" && p == "/api/graal/map" -> JvmKanbanServer.HttpResponse(200, JsonSupport.stringify(mapMap()))
             method == "GET" && p == "/api/graal/zoom" -> zoomRoute(path)

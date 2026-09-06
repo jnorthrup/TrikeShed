@@ -66,6 +66,7 @@ class JvmVitals {
     private val poolUsage = java.util.concurrent.ConcurrentHashMap<String, LongArray>()   // pool → [lastUsed, reclaimed, grown]
     private val gcPhases = java.util.concurrent.ConcurrentHashMap<String, LongArray>()    // phase → [count, pauseNanos]
     private val allocByClass = java.util.concurrent.ConcurrentHashMap<String, AtomicLong>() // class → sampled bytes
+    val allocationSites = AllocationSites()
 
     fun start() {
         if (stream != null) return
@@ -82,7 +83,7 @@ class JvmVitals {
             rs.enable("jdk.GCHeapMemoryUsage").withoutThreshold()
             rs.enable("jdk.GCHeapMemoryPoolUsage").withoutThreshold()
             rs.enable("jdk.GCPhasePause").withoutThreshold()
-            rs.enable("jdk.ObjectAllocationSample").withPeriod(Duration.ofMillis(250))
+            rs.enable("jdk.ObjectAllocationSample").with("throttle", "100/s").withStackTrace()
             rs.onEvent("jdk.Compilation") { e -> onCompilation(e) }
             rs.onEvent("jdk.Deoptimization") { e -> onDeopt(e) }
             rs.onEvent("jdk.GarbageCollection") { e -> onGc(e) }
@@ -134,7 +135,20 @@ class JvmVitals {
         val className = (e.getValue<Any?>("objectClass") as? RecordedClass)?.name
             ?: e.getStringOr("objectClass") ?: "unknown"
         val weight = e.getLongOr("weight")
-        if (weight > 0) recordAllocationSample(className, weight)
+        if (weight > 0) {
+            recordAllocationSample(className, weight)
+            val stack = e.stackTrace
+            val frames = stack?.frames.orEmpty().take(AllocationSites.MAX_FRAMES).map { frame ->
+                val method = frame.method
+                val loader = method.type.classLoader
+                AllocationFrame(method.type.name, method.name, method.descriptor,
+                    frame.bytecodeIndex, frame.lineNumber, frame.type ?: "unknown",
+                    loader?.name ?: "bootstrap", loader?.id ?: 0L)
+            }
+            allocationSites.record(className, weight, frames,
+                stack?.isTruncated == true || (stack?.frames?.size ?: 0) > AllocationSites.MAX_FRAMES,
+                e.startTime.toEpochMilli())
+        }
     }
 
     fun stop() {

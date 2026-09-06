@@ -1,6 +1,9 @@
 <!doctype html>
 <html lang="en">
 <head>
+<link rel="stylesheet" href="/allocation-inspector.css">
+<script src="/vendor/lucide-mux.js" defer></script>
+<script src="/allocation-inspector.js" defer></script>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Construction Panels</title>
@@ -762,33 +765,68 @@ function p(n,k){ return n.params[k]; }
    productions whose interests hit this node), and the GRAAL plane beside them
    (facts keyed to the node, then the JVM-wide tick). Nothing here is authored
    by the page: every row is a fact id or a binding the daemon returned. */
-let BLIP={timer:null,node:null,seq:0,x:0,y:0};
+let BLIP={timer:null,node:null,seq:0,x:0,y:0,frame:0,anchor:null,geometry:null};
 function blipEl(){ return document.getElementById("blip"); }
-function blipMove(e){ BLIP.x=e.clientX; BLIP.y=e.clientY; blipPlace(); }
-function blipPlace(){
-  const b=blipEl(); if(b.style.display!=="block") return;
-  const w=b.offsetWidth,h=b.offsetHeight;
-  let x=BLIP.x+16,y=BLIP.y+14;
-  if(x+w>innerWidth-8) x=BLIP.x-w-12; if(y+h>innerHeight-8) y=Math.max(8,innerHeight-h-8);
-  b.style.left=x+"px"; b.style.top=y+"px";
+function blipMove(e){
+  if(!BLIP.node||e.currentTarget!==BLIP.node.el)return;
+  if(e.buttons){blipLeave();return;}
+  BLIP.x=e.clientX;BLIP.y=e.clientY;
+  if(!BLIP.frame&&BLIP.geometry)BLIP.frame=requestAnimationFrame(()=>{BLIP.frame=0;blipPlace();});
 }
-function blipLeave(){ clearTimeout(BLIP.timer); BLIP.timer=null; BLIP.node=null; BLIP.seq++; blipEl().style.display="none"; }
+function blipShow(html){
+  const b=blipEl(),r=viewport.getBoundingClientRect(),margin=12;
+  const bounds={left:Math.max(0,r.left)+margin,top:Math.max(0,r.top)+margin,
+    right:Math.min(innerWidth,r.right)-margin,bottom:Math.min(innerHeight,r.bottom)-margin};
+  b.innerHTML='<div class="blip-body">'+html+'</div>';
+  b.setAttribute("role","tooltip");b.style.display="block";b.style.visibility="hidden";
+  b.style.maxWidth=Math.max(0,bounds.right-bounds.left)+"px";
+  const beside=Math.max(BLIP.x-bounds.left-28,bounds.right-BLIP.x-28);
+  const vertical=Math.max(BLIP.y-bounds.top-28,bounds.bottom-BLIP.y-28);
+  const height=beside<Math.min(360,bounds.right-bounds.left)?vertical:300;
+  b.style.maxHeight=Math.max(0,Math.min(300,height,bounds.bottom-bounds.top))+"px";
+  // Measure once when content arrives, not on every pointer event.
+  BLIP.geometry={bounds,size:{width:b.offsetWidth,height:b.offsetHeight},subject:BLIP.node?.el.getBoundingClientRect()};
+  BLIP.anchor=null;blipPlace();
+}
+function blipPlace(){
+  const b=blipEl(),g=BLIP.geometry;if(!g||!BLIP.node)return;
+  const anchor=BLIP.anchor,drift=v=>Math.max(-48,Math.min(48,v*.2));
+  const preferred=anchor?{x:anchor.left+drift(BLIP.x-anchor.x),y:anchor.top+drift(BLIP.y-anchor.y)}:null;
+  const next=LandscapeNavigation.callout(BLIP,g.size,g.bounds,g.subject,preferred);
+  if(!next){b.style.visibility="hidden";return;}
+  if(!anchor)BLIP.anchor={x:BLIP.x,y:BLIP.y,left:next.x,top:next.y};
+  b.style.transform=`translate3d(${next.x}px,${next.y}px,0)`;
+  b.dataset.side=next.side;b.style.setProperty("--tail",next.tail+"px");b.style.visibility="visible";
+}
+function blipLeave(e){
+  if(e?.type==="pointerleave"&&e.currentTarget!==BLIP.node?.el)return;
+  clearTimeout(BLIP.timer);cancelAnimationFrame(BLIP.frame);
+  BLIP.timer=null;BLIP.frame=0;BLIP.node=null;BLIP.anchor=null;BLIP.geometry=null;BLIP.seq++;
+  blipEl().style.display="none";
+}
 function blipEnter(n,e){
-  BLIP.x=e.clientX; BLIP.y=e.clientY; BLIP.node=n; clearTimeout(BLIP.timer);
-  const seq=++BLIP.seq;
+  if(e.pointerType==="touch"||e.buttons)return;
+  blipLeave();BLIP.x=e.clientX;BLIP.y=e.clientY;BLIP.node=n;
+  const seq=BLIP.seq;
   BLIP.timer=setTimeout(async()=>{
+    BLIP.timer=null;
     const q="program="+encodeURIComponent(BOARD.name||"")+"&node="+encodeURIComponent(n.id)+"&type="+encodeURIComponent(n.type);
-    let r; try{ r=await api("GET","/api/lcnc/blip?"+q); }catch(_){ r={error:"unreachable"}; }
-    if(seq!==BLIP.seq||BLIP.node!==n) return;
+    let r;try{r=await api("GET","/api/lcnc/blip?"+q);}catch(_){r={error:"unreachable"};}
+    if(seq!==BLIP.seq||BLIP.node!==n)return;
     blipRender(n,r);
   },320);
 }
+addEventListener("resize",blipLeave);
+addEventListener("blur",blipLeave);
+addEventListener("keydown",e=>{if(e.key==="Escape")blipLeave();});
+viewport.addEventListener("pointerdown",blipLeave,true);
+viewport.addEventListener("wheel",blipLeave,{passive:true});
 function blipRender(n,r){
   const b=blipEl(); const esc=s=>String(s).replace(/[&<>]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;"}[c]));
   const row=(cls,html)=>`<div class="row ${cls}">${html}</div>`;
   const none=(cls,txt)=>row(cls+" none",esc(txt));
   let h=`<div class="bt">${esc(n.type)}<i>${esc(n.id)}${BOARD.name?" · "+esc(BOARD.name):""}</i></div>`;
-  if(r.error){ b.innerHTML=h+row("i refused",esc(r.error)); b.style.display="block"; blipPlace(); return; }
+  if(r.error){ blipShow(h+row("i refused",esc(r.error))); return; }
   // asserted
   const A=r.asserted||{}, af=A.facts||[];
   h+=`<h6 class="asserted">asserted · ${af.length} fact${af.length===1?"":"s"} · actor lcnc</h6>`;
@@ -815,7 +853,7 @@ function blipRender(n,r){
     else if(x.kind==="gc") h+=row("g",`<b>${esc(x.collector)}</b> ${esc(x.collections)} collections · ${esc(x.pauseMsTotal)} ms · last ${esc(x.lastCause||"")}`);
     else if(x.kind==="jit") h+=row("g",`<b>jit</b> ${esc(x.compilations)} compilations · ${esc(x.osr)} osr · ${mb(x.compiledBytes)} code`); }
   if(!gj.length) h+=none("g","jvm tick not on the plane yet (graal facts land after the couch reconcile)");
-  b.innerHTML=h; b.style.display="block"; blipPlace();
+  blipShow(h);
 }
 function mb(v){ v=Number(v); return isFinite(v)?(v>=1048576?(v/1048576).toFixed(1)+" MB":(v/1024).toFixed(0)+" KB"):"?"; }
 async function api(method,path,body){

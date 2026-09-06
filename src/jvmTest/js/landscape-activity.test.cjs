@@ -76,3 +76,20 @@ test("activity masks are independent of blob masks and preserve node identity",(
   assert.deepEqual(node,{id:"n",x:10,y:20});l.activityMask.add("completed");
   assert.equal(l.activityVisible(node),true);
 });
+
+// Stale (Forge genesis, Cut S): a completed run whose consumed inputs moved since, per its lcnc/stale marker.
+test("a completed run with a stale marker reads Stale, an active run does not, and only the moved node turns",()=>{
+  const {activity:a}=fixture();
+  const stale={runId:"r1",count:1,inputs:[{kind:"project",project:"notes",id:"a.md",oldCid:"cid-old",newCid:"cid-new",deleted:false}]};
+  const board={"lcnc/run/1":run("completed",{runId:"r1",finishedAtMs:1500,outputs:{read:{cid:"cid-old",text:"x"},show:{x:["a"]}}}),"lcnc/stale/r1":stale};
+  const program=a.program("a",entry,a.latest(board),false,true,2000);
+  assert.equal(program.state,"stale");assert.match(program.reason,/a\.md/);
+  assert.equal(a.node({_localId:"read"},program).state,"stale");
+  assert.equal(a.node({_localId:"show"},program).state,"completed");
+  assert.equal(a.node({_localId:"never-ran"},program).state,"unknown");
+  const live={...board,"lcnc/run/2":run("running",{runId:"r2",startedAtMs:1900})};
+  assert.equal(a.program("a",entry,a.latest(live),false,true,2000).state,"operational","an active run outranks a stale receipt");
+  assert.ok(a.states.some(s=>s.id==="stale"&&s.color),"the legend knows the state");
+  const other={"lcnc/run/1":run("completed",{runId:"r1",programCid:"cid-other"}),"lcnc/stale/r1":stale};
+  assert.equal(a.program("a",entry,a.latest(other),false,true,2000).state,"unknown","a stale receipt of another version stays Unknown");
+});

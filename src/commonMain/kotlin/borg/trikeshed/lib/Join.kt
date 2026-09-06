@@ -16,10 +16,13 @@ interface Join<out A, out B> {
     companion object
 }
 
-/** Infix constructor grammar — exactly like `to` for Pair, but for Join. */
-inline infix fun <A, B> A.j(b: B): Join<A, B> = object : Join<A, B> {
-    override val a: A get() = this@j
-    override val b: B get() = b
+/** Primitive pairs up to 64 bits pack even when constructed through erased types. */
+inline infix fun <A, B> A.j(b: B): Join<A, B> {
+    packedPrimitiveJoin(this, b)?.let { return it as Join<A, B> }
+    return object : Join<A, B> {
+        override val a: A get() = this@j
+        override val b: B get() = b
+    }
 }
 
 /** Same-typed Join. */
@@ -122,5 +125,4 @@ object s_ {
 
 /** Range selection as composition, not control flow. */
 operator fun <T> Series<T>.get(range: IntRange): Series<T> = range.count() j { i -> this[range.first + i] }
-
 

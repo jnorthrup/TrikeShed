@@ -195,7 +195,7 @@ object ProjectNodes {
             val docs = corpus.docs(project, prefix, glob, limit)
             // The listing itself is an input: an added or removed file moves its fingerprint.
             currentCoroutineContext()[LcncConsumedLedger]?.let { ledger ->
-                ledger.consumed(LcncConsumedLedger.PROJECT_INDEX, "$project/", ledger.indexFingerprint(docs.map { it.id to it.cid }), prefix = prefix, glob = glob)
+                ledger.consumed(LcncConsumedLedger.PROJECT_INDEX, "$project/", ledger.indexFingerprint(docs.map { it.id }), prefix = prefix, glob = glob)
             }
             mapOf("docs" to docs.map { it.toMap() }, "count" to docs.size)
         },

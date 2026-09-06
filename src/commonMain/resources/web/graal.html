@@ -1,6 +1,9 @@
 <!doctype html>
 <html lang="en">
 <head>
+<link rel="stylesheet" href="/allocation-inspector.css">
+<script src="/vendor/lucide-mux.js" defer></script>
+<script src="/allocation-inspector.js" defer></script>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Graal Console</title>
@@ -936,6 +939,8 @@ function shapeStripHtml(text){
 function jumpLine(n){const cv=document.querySelector('#proj .codeview');if(!cv)return;
   const row=cv.children[n-1];if(row){row.scrollIntoView({block:'center'});row.style.outline='1px solid var(--commit)';setTimeout(()=>row.style.outline='',1200);}}
 async function openDoc(id){
+  const allocation=heapLeaves.get(id);
+  if(allocation){AllocationInspector.open(allocation.cls,{kind:allocation.kind,bytes:allocation.bytes});return;}
   $('docTitle').textContent=id.split('/').pop();$('docBody').innerHTML='…';$('docBody').style.display='';
   $('docSheetBody').style.display='none';$('docSheetBody').innerHTML='';sheetFamily=null;sheetCurrentId=null;
   show('doc');

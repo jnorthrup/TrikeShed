@@ -7,11 +7,11 @@ package borg.trikeshed.lib
  *
  * Starts in a probing state.  The first call to [pack] inspects the runtime
  * type of its arguments and locks in the densest monomorphic packer.  All
- * subsequent calls use the locked packer — zero [is] checks, zero megamorphic
- * dispatch, even when called from generic contexts like [zipWithNext].
+ * subsequent calls reuse it. Inputs must remain homogeneous; JVM inlining
+ * and elimination of generic-boundary boxing are not guaranteed.
  *
- * If the runtime type is not one of the five dense-packed primitives
- * (Int/Short/Byte/Char/Float), the locked packer delegates to [autoTwin]
+ * If the runtime type is not one of the six dense-packed primitives
+ * (Boolean/Int/Short/Byte/Char/Float), the locked packer delegates to [autoTwin]
  * with per-element [is] checks — that case is already the cold path.
  *
  * Usage:
@@ -53,6 +53,7 @@ class AutoTwinContext<T> {
 
         // ── Probe: determine runtime type and lock ──────────────────────
         locked = when {
+            a is Boolean && b is Boolean -> booleanPacker()
             a is Int    && b is Int    -> intPacker()
             a is Short  && b is Short  -> shortPacker()
             a is Byte   && b is Byte   -> bytePacker()
@@ -90,6 +91,10 @@ class AutoTwinContext<T> {
 
     private fun floatPacker(): (T, T) -> Twin<T> {
         val cast: (T) -> Float = { it as Float }
-        return { a, b -> TwInt(packFloats(cast(a), cast(b))) as Twin<T> }
+        return { a, b -> TwFloat(packFloats(cast(a), cast(b))) as Twin<T> }
+    }
+
+    private fun booleanPacker(): (T, T) -> Twin<T> {
+        return { a, b -> TwBoolean(a as Boolean, b as Boolean) as Twin<T> }
     }
 }

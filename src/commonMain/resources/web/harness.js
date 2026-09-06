@@ -451,6 +451,7 @@ const Harness = {
       $("#factInspector").append(overwrite);
     }
     if(key.startsWith("lcnc/snapshot/")&&receipt?.cid){const button=this.el("button","terrain-ref","Snapshot "+String(receipt.cid).slice(0,16));button.addEventListener("click",()=>Landscape.inspectCid(receipt.cid));$("#factInspector").append(button);}
+    if(key.startsWith("lcnc/stale/")&&receipt?.runId){const button=this.el("button","terrain-ref","Rebuild");button.addEventListener("click",()=>this.rebuild(receipt).catch(e=>this.message(e.message)));$("#factInspector").append(button);}
   },
   /* Sheets. A fact, a territory, or the whole board opens as the grid-in-cell family
      /blackboard/sheet projects (CursorSheet/confixSheets — the same projection /api/graal/sheet
@@ -627,6 +628,13 @@ const Harness = {
     if(!run)return;
     const response=await fetch("/api/lcnc/run/cancel",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({runId:run.runId})});
     this.message(response.ok?"Cancellation requested":"Run is no longer active");
+  },
+  /** Rebuild (Forge genesis, Cut S): the same program version, the same inputs, over the documents as they are now. */
+  async rebuild(receipt) {
+    const response=await fetch("/api/lcnc/run/rebuild",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({runId:receipt.runId})});
+    const result=await response.json().catch(()=>({}));
+    if(!response.ok)throw Error(result.error||response.status);
+    this.output(result);this.message("Rebuilt "+(receipt.program||"")+": "+(result.ok?"completed":result.error||"failed")+(result.rebuildOf?" (rebuild of "+String(result.rebuildOf).slice(0,19)+")":""));
   },
   async publish(overrideBaseCid) {
     const name=$("#panelName").value.trim();

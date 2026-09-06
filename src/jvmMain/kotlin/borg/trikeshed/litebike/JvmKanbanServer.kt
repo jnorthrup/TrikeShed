@@ -516,6 +516,8 @@ class JvmKanbanServer(
         "/patch-shake.js" to ("web/patch-shake.js" to "application/javascript; charset=utf-8"),
         "/patch-camera.js" to ("web/patch-camera.js" to "application/javascript; charset=utf-8"),
         "/patch-camera.css" to ("web/patch-camera.css" to "text/css; charset=utf-8"),
+        "/allocation-inspector.js" to ("web/allocation-inspector.js" to "application/javascript; charset=utf-8"),
+        "/allocation-inspector.css" to ("web/allocation-inspector.css" to "text/css; charset=utf-8"),
         "/patch-layout.js" to ("web/patch-layout.js" to "application/javascript; charset=utf-8"),
         "/vendor/d3-force-3.0.0.js" to ("web/vendor/d3-force-3.0.0.js" to "application/javascript; charset=utf-8"),
         "/patch.css" to ("web/patch.css" to "text/css; charset=utf-8"),

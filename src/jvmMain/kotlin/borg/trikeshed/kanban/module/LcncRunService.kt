@@ -20,6 +20,8 @@ internal class LcncRunService(
     private val ctx: ModuleContext,
     private val store: BoardStoreElement,
     private val vocabulary: () -> Map<String, LcncPortContract>,
+    /** Consumed-document facts per completed run (Forge genesis, Cut S); null keeps the plane silent. */
+    private val facts: borg.trikeshed.lcnc.LcncRunFacts? = null,
 ) {
     private val active = ConcurrentHashMap<String, Job>()
     private val slots = Semaphore(3)
@@ -100,7 +102,9 @@ internal class LcncRunService(
                     "finishedAtMs" to ctx.clock(),
                 ), row.revision)
             } else {
-                project(receipt, BoardApply.Committed(row.jobId, row.lastSequence, row.revision, "replay", row.commandCid ?: continue))
+                val value = project(receipt, BoardApply.Committed(row.jobId, row.lastSequence, row.revision, "replay", row.commandCid ?: continue))
+                // The recovered receipt's consumed facts return to the plane with it.
+                runCatching { facts?.assertRun(value) }.onFailure { System.err.println("[LcncRunService] consumed facts for ${row.jobId} not restored: ${it.message}") }
             }
         }
     }
@@ -132,12 +136,25 @@ internal class LcncRunService(
                 }
                 val (frozen, cid) = freeze(name, program)
                 if (named) { pinned[name] = frozen; versions[name] = cid }
+                // A rebuild (Forge genesis, Cut S) names the receipt it refreshes, must land on the very
+                // program version that receipt recorded, and pins the subprogram versions it recorded.
+                val rebuildOf = request["rebuildOf"]?.toString()?.takeIf { it.isNotBlank() }
+                val rebuildOfRunId = request["rebuildOfRunId"]?.toString()?.takeIf { it.isNotBlank() }
+                request["expectProgramCid"]?.toString()?.takeIf { it.isNotBlank() }?.let { expected ->
+                    if (expected != cid) return@coroutineScope response(409, mapOf("ok" to false, "error" to "program_version_drift", "expected" to expected, "actual" to cid))
+                }
+                (request["pinnedVersions"] as? Map<*, *>)?.forEach { (label, version) ->
+                    val l = label.toString(); val v = version?.toString() ?: return@forEach
+                    if (l == name || pinned.containsKey(l)) return@forEach
+                    val bytes = ctx.casStore.get(borg.trikeshed.job.ContentId(v)) ?: return@forEach
+                    runCatching { LcncProgramConfix.fromJson(l, bytes.decodeToString()) }.getOrNull()?.let { pinned[l] = it; versions[l] = v }
+                }
                 var receipt: Map<String, Any?> = mapOf(
                     "runId" to runId, "program" to name, "programKey" to if (named) LcncBlackboard.programKey(name) else null,
                     "programCid" to cid, "inputs" to inputs, "startedAtMs" to ctx.clock(),
                     "versionPolicy" to "root-at-admission,subprogram-at-first-use",
                     "budgets" to mapOf("timeoutMs" to timeoutMs, "maxNodes" to maxNodes, "maxPayloadChars" to 131072),
-                )
+                ) + (if (rebuildOf != null) mapOf("rebuildOf" to rebuildOf, "rebuildOfRunId" to rebuildOfRunId) else emptyMap())
                 var revision = 0L
                 suspend fun record(op: String, status: String, fields: Map<String, Any?> = emptyMap()): Map<String, Any?> {
                     receipt = commit(jobId, op, receipt + fields + mapOf(
@@ -192,7 +209,16 @@ internal class LcncRunService(
                         "inputFingerprint" to result.inputFingerprint)
                     val limit = ValueBudget().violation(output)
                     if (limit != null) finish(413, "fail", "failed", mapOf("ok" to false, "phase" to "reporting", "error" to limit))
-                    else finish(200, "complete", "completed", output + ("ok" to true))
+                    else {
+                        val done = finish(200, "complete", "completed", output + ("ok" to true))
+                        // What this run read is now on the plane; a rebuilt run's predecessor leaves it.
+                        runCatching { facts?.assertRun(receipt) }.onFailure { System.err.println("[LcncRunService] consumed facts for $jobId not asserted: ${it.message}") }
+                        if (rebuildOfRunId != null) {
+                            runCatching { facts?.retractRun(rebuildOfRunId) }
+                            ctx.blackboard.remove(borg.trikeshed.lcnc.LcncStaleMarker.key(rebuildOfRunId))
+                        }
+                        done
+                    }
                 } catch (e: TimeoutCancellationException) {
                     finish(504, "cancel", "timed_out", mapOf("ok" to false, "error" to "time_limit"))
                 } catch (e: CancellationException) {

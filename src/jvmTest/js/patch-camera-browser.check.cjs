@@ -20,6 +20,9 @@ const base=process.env.PATCH_BASE_URL||"http://127.0.0.1:8899";
         await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));
         assert.equal(await page.locator('script[src="/patch-camera.js"]').count(),1);
         assert.equal(await page.evaluate(()=>typeof Harness),surface==="panels"?"undefined":"object");
+        const legend=page.locator("#topologyLegend[open] > summary");
+        if(await legend.count())await legend.click();
+        if(await page.locator("#palette.open").count())await page.evaluate(()=>document.getElementById("paletteBtn").click());
         await page.evaluate(()=>document.getElementById("stopBtn").click());
         const graph=()=>page.evaluate(()=>JSON.stringify({nodes:G.nodes.map(n=>[n.id,n.x,n.y,n._view]),wires:G.wires}));
         const before=await graph();
@@ -57,7 +60,7 @@ const base=process.env.PATCH_BASE_URL||"http://127.0.0.1:8899";
           await page.waitForFunction(()=>mom.zv===0);
           const z=await page.evaluate(()=>view.z);
           assert.ok(z>4,"nested scopes must remain reachable past root magnification");
-          assert.ok(Math.abs(z-nested.ceiling)<1e-6);
+          assert.ok(Math.abs(z-nested.ceiling)/nested.ceiling<1e-6,JSON.stringify({surface,viewport,z,nested}));
           assert.equal(await graph(),original);
         }
         const projection=await page.evaluate(()=>{

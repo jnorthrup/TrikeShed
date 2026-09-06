@@ -74,6 +74,7 @@ function projectCameraDetail() {
 }
 
 function applyView(){
+  if(typeof blipLeave==="function")blipLeave();
   // Keep geometry in the original flat world. CSS layout zoom invalidates
   // nested panel layout on every camera frame; the camera only transforms.
   // Matrix translations are numbers, not CSS lengths (which clamp around
@@ -139,25 +140,20 @@ viewport.addEventListener("pointerdown",e=>{
     lx=ev.clientX; ly=ev.clientY; velT=now;
   };
   const up=()=>{
-    panning=false; viewport.classList.remove("panning"); removeEventListener("pointermove",mv); removeEventListener("pointerup",up); save();
+    panning=false; viewport.classList.remove("panning"); removeEventListener("pointermove",mv); removeEventListener("pointerup",up); saveCameraSoon();
     if(!reducedMotion&&performance.now()-velT<80){ mom.vx=velX; mom.vy=velY; momT=performance.now(); glide(); } // recent flick → glide
   };
   addEventListener("pointermove",mv); addEventListener("pointerup",up);
 });
-/* A camera move is not a document mutation.
-   save() serializes the WHOLE document twice (once for history, once for
-   localStorage), JSON.parses it twice more for the shape check, and writes
-   localStorage synchronously. Calling that per wheel event — a trackpad emits
-   50-100 a second — is what made zooming stutter, and it buried every real edit
-   under a hundred camera frames in the undo stack. Pan already saves only on
-   pointerup; the wheel was the outlier. */
+// Blackboard navigation saves only its bookmark. save() signals a graph edit,
+// serializes every node and clears Shake evidence even when only the view moved.
 let camSaveT=0;
 function saveCameraSoon(){
-  clearTimeout(camSaveT);camSaveT=setTimeout(()=>{
+  clearTimeout(camSaveT);
+  if(typeof Harness!=="undefined"){Harness.rememberView();return;}
+  camSaveT=setTimeout(()=>{
     save();
-    if(typeof Harness==="undefined"){
-      const url=new URL(location.href);url.hash=LandscapeNavigation.encode(view);history.replaceState(null,"",url);
-    }
+    const url=new URL(location.href);url.hash=LandscapeNavigation.encode(view);history.replaceState(null,"",url);
   },250);
 }
 

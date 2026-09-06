@@ -1,8 +1,19 @@
 #world{z-index:2}
+#blip{left:0;top:0;width:360px;max-width:calc(100vw - 24px);min-width:0;padding:0;
+  max-height:300px;border-radius:5px;pointer-events:none;box-shadow:0 5px 18px #0005;font-size:11px;letter-spacing:0}
+#blip .blip-body{padding:8px 11px;max-height:inherit;overflow:hidden;box-sizing:border-box}
+#blip .bt{overflow-wrap:anywhere}
+#blip .bt i{display:block;margin-left:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#blip h6{letter-spacing:0}
+#blip::before{content:"";position:absolute;width:8px;height:8px;background:var(--panel);transform:rotate(45deg);border:1px solid var(--line);pointer-events:none}
+#blip[data-side="right"]::before{left:-5px;top:calc(var(--tail) - 4px);border-top:0;border-right:0}
+#blip[data-side="left"]::before{right:-5px;top:calc(var(--tail) - 4px);border-bottom:0;border-left:0}
+#blip[data-side="below"]::before{top:-5px;left:calc(var(--tail) - 4px);border-bottom:0;border-right:0}
+#blip[data-side="above"]::before{bottom:-5px;left:calc(var(--tail) - 4px);border-top:0;border-left:0}
 /* Fractional window offsets are pixel-snapped during painting but not hit
    testing; that discrepancy is magnified thousands of times in deep rings. */
 .node.scope>.seed,.node.scope>.emit{line-height:14px}
-.vmark{scale:var(--verdict-scale,1)}
+.vmark{scale:var(--verdict-scale,1);transform:scale(1)}
 #wires,#channels{left:0;top:0;width:100%;height:100%;z-index:1;overflow:hidden}
 #wires path,#channels path{vector-effect:non-scaling-stroke;stroke-linecap:round;stroke-width:calc(2.2px * var(--wire-scale,1))}
 #wires path.scope-binding,#channels path.chain{stroke-width:calc(1.5px * var(--wire-scale,1))}

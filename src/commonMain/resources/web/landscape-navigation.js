@@ -9,6 +9,31 @@ const LandscapeNavigation = {
   wheelFactor(delta) {
     return Number.isFinite(delta)?Math.exp(Math.max(-.35,Math.min(.35,-delta*.0025))):1;
   },
+  callout(pointer,size,bounds,subject,preferred) {
+    const {width:w,height:h}=size,gap=28;
+    const clamp=(v,lo,hi)=>Math.max(lo,Math.min(hi,v));
+    const fit=p=>({x:clamp(p.x,bounds.left,bounds.right-w),y:clamp(p.y,bounds.top,bounds.bottom-h)});
+    const area=(p,r)=>Math.max(0,Math.min(p.x+w,r.right)-Math.max(p.x,r.left))*
+      Math.max(0,Math.min(p.y+h,r.bottom)-Math.max(p.y,r.top));
+    const origin=preferred||{x:pointer.x+gap,y:pointer.y+18};
+    const candidates=[origin,
+      {x:pointer.x+gap,y:pointer.y-h/2},{x:pointer.x-w-gap,y:pointer.y-h/2},
+      {x:pointer.x-w/2,y:pointer.y+gap},{x:pointer.x-w/2,y:pointer.y-h-gap}];
+    if(subject)candidates.push(
+      {x:subject.right+16,y:origin.y},{x:subject.left-w-16,y:origin.y},
+      {x:origin.x,y:subject.bottom+16},{x:origin.x,y:subject.top-h-16});
+    const exclusion={left:pointer.x-gap,right:pointer.x+gap,top:pointer.y-gap,bottom:pointer.y+gap};
+    let best=null,score=null;
+    for(const candidate of candidates){
+      const p=fit(candidate),covered=subject?area(p,subject):0;
+      const rank=[area(p,exclusion)>0?1:0,covered,Math.hypot(p.x-origin.x,p.y-origin.y)];
+      if(!score||rank[0]<score[0]||rank[0]===score[0]&&(rank[1]<score[1]||rank[1]===score[1]&&rank[2]<score[2])){best=p;score=rank;}
+    }
+    if(!best||score[0]||w>bounds.right-bounds.left||h>bounds.bottom-bounds.top)return null;
+    const side=pointer.x<best.x?"right":pointer.x>best.x+w?"left":pointer.y<best.y?"below":"above";
+    const horizontal=side==="left"||side==="right";
+    return {...best,side,tail:clamp(horizontal?pointer.y-best.y:pointer.x-best.x,12,(horizontal?h:w)-12)};
+  },
   zoomAt(camera,requested,anchor,ceiling=this.detailZoom) {
     const z=Math.max(this.minZoom,Math.min(ceiling,this.absoluteZoom,Number.isNaN(requested)?camera.z:requested));
     const ratio=z/camera.z;

@@ -1,0 +1,168 @@
+package borg.trikeshed.kanban.module
+
+import borg.trikeshed.couch.CouchChangesFactElement
+import borg.trikeshed.couch.CouchDatabase
+import borg.trikeshed.couch.CouchStoreFactory
+import borg.trikeshed.cursor.BlackboardContext
+import borg.trikeshed.dag.ReteNetwork
+import borg.trikeshed.dag.ReteProductionRegistry
+import borg.trikeshed.forge.server.JvmProjectCorpus
+import borg.trikeshed.forge.server.ProjectDbRegistry
+import borg.trikeshed.forge.server.ProjectScopes
+import borg.trikeshed.graal.ConfixBlackboard
+import borg.trikeshed.job.CasStore
+import borg.trikeshed.lcnc.InMemoryPromptReads
+import borg.trikeshed.lcnc.LcncNodeRunner
+import borg.trikeshed.lcnc.LcncPromptSeeds
+import borg.trikeshed.lcnc.LcncRunFacts
+import borg.trikeshed.lcnc.LcncStaleMarker
+import borg.trikeshed.lcnc.ProjectNodes
+import borg.trikeshed.lcnc.PromptNodes
+import borg.trikeshed.litebike.JvmKanbanServer
+import borg.trikeshed.memory.CouchIndexBridge
+import borg.trikeshed.memory.MemoryIndexLayer
+import borg.trikeshed.memory.MemoryStore
+import borg.trikeshed.module.ModuleContext
+import borg.trikeshed.module.ModuleRouteRegistry
+import borg.trikeshed.module.ModuleSupervisor
+import borg.trikeshed.parse.json.JsonSupport
+import borg.trikeshed.userspace.nio.file.spi.JvmFileOperations
+import borg.trikeshed.util.oroboros.CouchAttachmentGateway
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.runBlocking
+import java.io.File
+import java.nio.charset.StandardCharsets
+import kotlin.test.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertNotEquals
+import kotlin.test.assertNull
+import kotlin.test.assertTrue
+
+/**
+ * The corpus story, end to end on the module rig (Forge genesis, Cut S): Corpus digest runs over a
+ * mounted project, its consumed facts land in the project's partition, an edited file marks the run
+ * stale, a second edit raises the count under one key, rebuild re-executes the same program version
+ * over the moved inputs, names the old receipt, and retires the marker and the old facts.
+ */
+class CorpusStaleRebuildRouteTest {
+
+    private fun tempDir(name: String): File = File(System.getProperty("java.io.tmpdir"), "corpus-stale-$name-${System.nanoTime()}").apply { mkdirs() }
+
+    private class Rig(val server: JvmKanbanServer, val ctx: ModuleContext, val supervisor: ModuleSupervisor, val scopes: ProjectScopes, val project: String, val tendon: CouchChangesFactElement)
+
+    private fun rig(name: String): Rig {
+        val cas = CasStore.inMemory()
+        val couchStore = CouchStoreFactory.casBacked(cas)
+        val routes = ModuleRouteRegistry()
+        val home = tempDir("$name-home")
+        val ctx = ModuleContext(
+            couchDb = CouchDatabase("corpus-stale-$name", couchStore, cas),
+            rete = ReteNetwork(),
+            productions = ReteProductionRegistry(),
+            beliefBag = null,
+            turnReview = null,
+            blackboard = ConfixBlackboard.empty(),
+            casStore = cas,
+            attachments = CouchAttachmentGateway(couchStore, cas),
+            routes = routes,
+            scope = CoroutineScope(SupervisorJob() + Dispatchers.Default),
+            clock = { System.currentTimeMillis() },
+            stateDir = home,
+            programLoader = { n -> borg.trikeshed.lcnc.LcncPresets.all()[n]?.let { borg.trikeshed.lcnc.LcncProgramConfix.fromJson(n, it) } },
+        )
+        // The mounted project, its tendon into the module's one network, and the runners the preset needs.
+        val gateway = CouchAttachmentGateway(couchStore, cas)
+        val registry = ProjectDbRegistry("corpus-stale-$name")
+        var tendon: CouchChangesFactElement? = null
+        registry.onMount = { pdb -> tendon = CouchChangesFactElement(pdb.db, ctx.rete, admit = { true }) }
+        val scopes = ProjectScopes(JvmFileOperations(), gateway, CouchIndexBridge(gateway, MemoryIndexLayer(MemoryStore(cas, couchStore))), cas, null, projectDbs = registry, ledgerFile = File(home, "mount-ledger.tsv"), filesRoot = File(home, "files"))
+        val folder = tempDir("$name-notes")
+        File(folder, "a.md").writeText("# Alpha\n\nthe first note")
+        File(folder, "b.md").writeText("# Beta\n\nthe second note")
+        File(folder, "c.txt").writeText("not markdown")
+        val scope = runBlocking { scopes.mount(folder.absolutePath) }
+        runBlocking { tendon!!.drainFrames() }
+        ctx.lcncRunners.putAll(ProjectNodes.registry(JvmProjectCorpus(registry, scopes)))
+        val prompts = InMemoryPromptReads { 1L }.apply { LcncPromptSeeds.all().forEach { put(it) } }
+        ctx.lcncRunners.putAll(PromptNodes.registry(prompts))
+        ctx.lcncRunners["prompt.chat"] = LcncNodeRunner { _, inputs -> mapOf("ok" to true, "content" to "summary: " + (inputs["prompt"] ?: inputs["prompt?"]).toString().takeLast(24), "model" to "fake") }
+        val server = JvmKanbanServer(moduleRoutes = routes)
+        val supervisor = ModuleSupervisor(ctx)
+        runBlocking { supervisor.attach(KanbanModule()) }
+        return Rig(server, ctx, supervisor, scopes, scope.name, tendon!!)
+    }
+
+    private fun post(server: JvmKanbanServer, path: String, body: String): JvmKanbanServer.HttpResponse = runBlocking {
+        server.routeHttp("POST $path HTTP/1.1\r\nHost: t\r\nContent-Type: application/json\r\n\r\n$body".toByteArray(StandardCharsets.UTF_8))
+    }
+
+    @Suppress("UNCHECKED_CAST")
+    private fun json(resp: JvmKanbanServer.HttpResponse): Map<String, Any?> = JsonSupport.parse(resp.body) as Map<String, Any?>
+
+    private fun consumedFacts(rig: Rig) = rig.ctx.rete.workingMemory.query(BlackboardContext(rig.project), "kind" to LcncRunFacts.KIND)
+
+    private fun awaitMarker(rig: Rig, runId: String, count: Int): Map<*, *> {
+        val deadline = System.currentTimeMillis() + 10_000
+        while (System.currentTimeMillis() < deadline) {
+            val m = rig.ctx.blackboard.get(LcncStaleMarker.key(runId)) as? Map<*, *>
+            if (m != null && (m["count"] as? Number)?.toInt() == count) return m
+            runBlocking { delay(100) }
+        }
+        error("no stale marker with count $count for $runId; have ${rig.ctx.blackboard.get(LcncStaleMarker.key(runId))}")
+    }
+
+    @Test
+    fun anEditedDocumentMarksTheRunStaleAndRebuildRefreshesIt() {
+        val rig = rig("flow")
+        try {
+            val first = post(rig.server, "/api/lcnc/run", """{"program":"preset-corpus","inputs":{"project":"${rig.project}"}}""")
+            assertEquals(200, first.status, first.body)
+            val receipt = json(first)
+            val runId = receipt["runId"] as String
+            val consumed = receipt["consumed"] as List<Map<*, *>>
+            assertEquals(listOf("project-index", "project", "prompt", "project"), consumed.map { it["kind"] }, consumed.toString())
+            assertEquals(3, consumedFacts(rig).size, "the listing and both documents are facts in the project's partition")
+            assertNull(rig.ctx.blackboard.get(LcncStaleMarker.key(runId)), "nothing moved yet")
+
+            // a.md edited through the project store: within the tick, the marker names it and only it.
+            val aBefore = consumed.first { it["id"] == "${rig.project}/a.md" }["cid"] as String
+            rig.scopes.uploadPut(rig.project, "a.md", "# Alpha\n\nthe first note, revised".encodeToByteArray())
+            runBlocking { rig.tendon.drainFrames() }
+            val one = awaitMarker(rig, runId, 1)
+            val input = (one["inputs"] as List<Map<*, *>>).single()
+            assertEquals("a.md", input["id"]); assertEquals(aBefore, input["oldCid"]); assertNotEquals(aBefore, input["newCid"]); assertEquals(false, input["deleted"])
+            assertEquals(receipt["receiptCid"], one["receiptCid"]); assertEquals("lcnc/program/preset-corpus", one["programKey"])
+            assertEquals(LcncStaleMarker.LANGUAGE, rig.ctx.blackboard.getProvenance(LcncStaleMarker.key(runId))?.language)
+
+            // b.md too: the count is 2, the key is still one.
+            rig.scopes.uploadPut(rig.project, "b.md", "# Beta\n\nchanged as well".encodeToByteArray())
+            runBlocking { rig.tendon.drainFrames() }
+            val two = awaitMarker(rig, runId, 2)
+            assertEquals(setOf("a.md", "b.md"), (two["inputs"] as List<Map<*, *>>).map { it["id"] }.toSet())
+            assertEquals(1, rig.ctx.blackboard.keys().count { it.startsWith(LcncStaleMarker.PREFIX) })
+
+            // Rebuild: the same program version, the same inputs, over the documents as they are now.
+            val rebuilt = post(rig.server, "/api/lcnc/run/rebuild", """{"runId":"$runId"}""")
+            assertEquals(200, rebuilt.status, rebuilt.body)
+            val fresh = json(rebuilt)
+            assertEquals(true, fresh["ok"]); assertEquals(receipt["receiptCid"], fresh["rebuildOf"]); assertEquals(runId, fresh["rebuildOfRunId"])
+            assertEquals(receipt["programCid"], fresh["programCid"]); assertEquals(receipt["inputs"], fresh["inputs"])
+            assertNotEquals(receipt["inputFingerprint"], fresh["inputFingerprint"], "the inputs moved, so the fingerprint moved")
+            val freshA = (fresh["consumed"] as List<Map<*, *>>).first { it["id"] == "${rig.project}/a.md" }["cid"]
+            assertEquals((two["inputs"] as List<Map<*, *>>).first { it["id"] == "a.md" }["newCid"], freshA, "the rebuild read the new a.md")
+            assertNull(rig.ctx.blackboard.get(LcncStaleMarker.key(runId)), "the old marker is gone")
+            val facts = consumedFacts(rig)
+            assertEquals(3, facts.size, "only the new run's facts remain: $facts")
+            assertTrue(facts.all { it.fields["runId"] == fresh["runId"] })
+            assertEquals(2, rig.ctx.blackboard.keys().count { it.startsWith("lcnc/run/") })
+
+            assertEquals(404, post(rig.server, "/api/lcnc/run/rebuild", """{"runId":"nope"}""").status)
+            assertEquals(400, post(rig.server, "/api/lcnc/run/rebuild", "not json").status)
+        } finally {
+            runBlocking { rig.supervisor.detach("kanban") }
+        }
+    }
+}

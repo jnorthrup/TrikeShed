@@ -20,6 +20,10 @@ class LcncConsumedLedger(val limit: Int = 1024) : AbstractCoroutineContextElemen
         const val PROMPT = "prompt"
         const val PROJECT = "project"
         const val PROJECT_INDEX = "project-index"
+
+        /** The listing identity a production recomputes: over the sorted, distinct file ids. */
+        fun indexFingerprintOf(ids: Collection<String>): String =
+            ContentId.of(ids.distinct().sorted().joinToString("\n").encodeToByteArray()).value
     }
 
     data class Consumed(
@@ -67,7 +71,11 @@ class LcncConsumedLedger(val limit: Int = 1024) : AbstractCoroutineContextElemen
     fun fingerprintOf(cids: Collection<String>): String =
         ContentId.of(cids.distinct().sorted().joinToString("\n").encodeToByteArray()).value
 
-    /** The listing fingerprint `project.docs` records: over (id, cid) pairs, so an added or removed file moves it. */
-    fun indexFingerprint(pairs: List<Pair<String, String>>): String =
-        ContentId.of(pairs.sortedBy { it.first }.joinToString("\n") { it.first + "=" + it.second }.encodeToByteArray()).value
+    /**
+     * The listing fingerprint `project.docs` records: over the sorted file ids, so an added or
+     * removed file moves it while an edited file does not (the edit is the document's own row).
+     */
+    fun indexFingerprint(ids: Collection<String>): String = indexFingerprintOf(ids)
+
+
 }

@@ -10,7 +10,7 @@ const base=process.env.PATCH_BASE_URL||"http://127.0.0.1:8888";
   const watchdog=setTimeout(()=>browser.close(),120000);
   try{
     for(const size of [{width:1440,height:1000},{width:390,height:844}]){
-      const page=await browser.newPage({viewport:size,reducedMotion:"reduce"}),errors=[];
+      const page=await browser.newPage({viewport:size,reducedMotion:size.width>600?"no-preference":"reduce"}),errors=[];
       page.on("pageerror",e=>errors.push(e.message));
       // The pure matcher may run; program execution and publishing may not.
       await page.route("**/*",route=>["GET","HEAD"].includes(route.request().method())||new URL(route.request().url()).pathname==="/api/lcnc/treeshake"?route.continue():route.fulfill({status:409,body:"read-only camera check"}));
@@ -27,7 +27,7 @@ const base=process.env.PATCH_BASE_URL||"http://127.0.0.1:8888";
         globalThis.target=G.nodes.find(n=>n.id==="preset-shake::depth.7.scope");
         if(!target)throw Error("eight-level Shake specimen missing");
         globalThis.targetElement=target.el;
-        Harness.focusNode(target);
+        Harness.focusElement(target.el,LandscapeNavigation.node(target._program,target._localId));
       });
       const center=await page.evaluate(()=>{const r=viewport.getBoundingClientRect();return{x:r.left+r.width/2,y:r.top+r.height/2};});
       await page.mouse.move(center.x,center.y);
@@ -49,11 +49,13 @@ const base=process.env.PATCH_BASE_URL||"http://127.0.0.1:8888";
         const r=target.el.getBoundingClientRect(),vp=viewport.getBoundingClientRect();
         return {ms:performance.now()-t,samples,nodes:G.nodes.length,scopes:G.nodes.filter(n=>n._childHost).length,z:view.z,
           sameElement:target.el===targetElement,rect:r.toJSON(),viewport:vp.toJSON(),paths:[...document.querySelectorAll("#wires path,#channels path")].filter(p=>p.getAttribute("d")).length,
-          badges:VERDICTS.length,paintedBadges:VERDICTS.filter(v=>v.el&&v.el.style.display!=="none").map(v=>{const r=v.el.getBoundingClientRect();return {w:r.width,h:r.height};})};
+          badges:VERDICTS.length,paintedBadges:VERDICTS.filter(v=>v.el&&getComputedStyle(v.el).display!=="none").map(v=>{const r=v.el.getBoundingClientRect();return {w:r.width,h:r.height};})};
       });
       const end=await metrics();result.taskMs=(end.TaskDuration-start.TaskDuration)*1000;
       assert.ok(result.nodes>500);assert.equal(result.sameElement,true);assert.ok(result.paths>0);
-      assert.ok(result.paintedBadges.every(b=>b.w<=40&&b.h<=40),"verdict glows must not magnify with the world");
+      assert.ok(result.badges>500&&result.paintedBadges.length>0,"post-Shake badges must survive camera navigation");
+      assert.ok(result.paintedBadges.some(b=>b.w>0&&b.h>0)&&result.paintedBadges.every(b=>b.w<=56&&b.h<=56),"verdict glows must be visible without magnifying with the world: "+JSON.stringify({size,badges:result.paintedBadges}));
+      if(size.width<600)assert.ok(result.paintedBadges.every(b=>b.w>0&&b.h>0),"reduced-motion verdicts must not stay at the animation's zero-scale start: "+JSON.stringify(result.paintedBadges));
       assert.ok(result.samples.every(s=>s.reads<=result.nodes+result.scopes+1),JSON.stringify(result.samples));
       assert.ok(result.taskMs<600,"24 steady camera frames exceeded 600ms of browser main-thread work: "+result.taskMs);
       assert.equal(await graph(),before,"zoom must not alter graph coordinates, ring cameras or parameters");

@@ -5,6 +5,7 @@ const LandscapeActivity = {
     {id:"operational",label:"Operational",color:"#69cd92",hint:"Observed running program or armed browser source; not proof every child is executing"},
     {id:"waiting",label:"Waiting",color:"#e4c66f",hint:"Validation or an explicit waiting state"},
     {id:"completed",label:"Completed",color:"#7baedc",hint:"A recorded result, not a currently running process"},
+    {id:"stale",label:"Stale",color:"#d9a066",hint:"Completed against inputs that have since changed; rebuild to refresh"},
     {id:"blocked",label:"Blocked",color:"#ee8884",hint:"Recorded failure, refusal or timeout"},
     {id:"inert",label:"Inert",color:"#a9a0ba",hint:"Explicitly stopped, cancelled or inspection-only"},
     {id:"unknown",label:"Unknown",color:"#9da6ac",hint:"Missing, disconnected, expired or different-version evidence"},
@@ -13,7 +14,7 @@ const LandscapeActivity = {
     const runs=new Map();
     for(const [key,r] of Object.entries(board)){
       if(!key.startsWith("lcnc/run/")||!r?.programKey)continue;
-      const list=runs.get(r.programKey)||[];list.push({key,...r});runs.set(r.programKey,list);
+      const list=runs.get(r.programKey)||[];list.push({key,...r,stale:board["lcnc/stale/"+r.runId]||null});runs.set(r.programKey,list);
     }
     for(const list of runs.values())list.sort((a,b)=>(b.startedAtMs||0)-(a.startedAtMs||0)||(b.sequence||0)-(a.sequence||0));
     return runs;
@@ -35,6 +36,9 @@ const LandscapeActivity = {
         return {...base,state:"unknown",reason:"Run freshness unconfirmed; no timely terminal receipt"};
     }
     const states={running:"operational",validating:"waiting",completed:"completed",failed:"blocked",refused:"blocked",timed_out:"blocked",cancelled:"inert",interrupted:"inert"};
+    // Stale (Forge genesis, Cut S): completed, but the run's consumed inputs moved since; the marker names them.
+    if(receipt.status==="completed"&&receipt.stale&&!active.length)
+      return {...base,state:"stale",reason:"Completed against inputs that have since changed: "+((receipt.stale.inputs||[]).map(i=>i.id||(i.project+"/ listing")).join(", ")||receipt.stale.count)};
     return {...base,state:states[receipt.status]||"unknown",reason:"Program "+receipt.status+(active.length>1?"; "+active.length+" concurrent runs":"")};
   },
   node(n,program) {
@@ -42,6 +46,13 @@ const LandscapeActivity = {
     if(n._es?.readyState===1)return {state:"operational",reason:"Browser event subscription connected"};
     if(program.state==="inert"&&!program.receipt)return program;
     const r=program.receipt,id=n._localId||n.id;
+    if(program.state==="stale"){
+      // Only the node whose recorded output carries a moved cid turns Stale; the rest stay Completed.
+      const moved=new Set((r?.stale?.inputs||[]).map(i=>i.oldCid).filter(Boolean));
+      const out=r?.outputs?.[id];
+      if(out&&JSON.stringify(out).split('"').some(s=>moved.has(s)))return {...program,state:"stale",reason:"Node "+id+" read an input that has since changed"};
+      if(r?.status==="completed"&&Object.prototype.hasOwnProperty.call(r.outputs||{},id))return {...program,state:"completed",reason:"Output recorded for node "+id+"; its inputs did not move"};
+    }
     if(r?.status==="completed"&&Object.prototype.hasOwnProperty.call(r.outputs||{},id))
       return {...program,state:"completed",reason:"Output recorded for node "+id};
     if(r?.phase==="validation"&&(r.violations||[]).some(v=>v.toNode===id||v.fromNode===id))
@@ -130,7 +141,13 @@ const Landscape = {
     const evidence=nodeId?this.activityNodes.get(nodeId):this.activityPrograms.get(program);
     Harness.beginInspection(program+(nodeId?" / "+nodeId:""),"Activity evidence");Harness.rawSheets(true);
     document.getElementById("factValue").textContent=JSON.stringify({state:evidence?.state||"unknown",reason:evidence?.reason,
-      atMs:evidence?.atMs,programCid:Harness.board["lcnc/program/"+program]?.programCid,receipt:evidence?.receipt||null,lastOtherVersionReceipt:evidence?.lastReceipt||null},null,2);
+      atMs:evidence?.atMs,programCid:Harness.board["lcnc/program/"+program]?.programCid,stale:evidence?.receipt?.stale||null,receipt:evidence?.receipt||null,lastOtherVersionReceipt:evidence?.lastReceipt||null},null,2);
+    if(evidence?.state==="stale"&&evidence.receipt?.runId){
+      const button=document.createElement("button");button.className="terrain-ref";button.textContent="Rebuild";
+      button.title="Re-run this exact program version over the inputs as they are now";
+      button.addEventListener("click",()=>Harness.rebuild(evidence.receipt).catch(e=>Harness.message(e.message)));
+      document.getElementById("factInspector").append(button);
+    }
   },
   objectBox:{x:3000,y:1000,w:2200,h:1600},
   positionObjects() {
@@ -362,6 +379,9 @@ const Landscape = {
   },
   async inspect(id) {
     const runtime=this.terrain?.nodeFor(id)?.detail;
+    if(runtime?.runtime&&(runtime.category==="allocation"||runtime.category==="live")){
+      AllocationInspector.open(runtime.name,{kind:runtime.category,bytes:runtime.sampledBytes??runtime.bytes});return;
+    }
     if(runtime?.runtime){
       Harness.beginInspection(runtime.name,GraalTopology.categories.find(c=>c.id===runtime.category)?.label||"Runtime","Measured snapshot");
       document.getElementById("factValue").textContent=JSON.stringify(runtime,null,2);

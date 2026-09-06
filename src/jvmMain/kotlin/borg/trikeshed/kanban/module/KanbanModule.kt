@@ -146,6 +146,8 @@ class KanbanModule : ForgeModule {
         //     Delta 2026-09-05 (fan-out): fan-out splits a MODELS: card into child cards, and
         //     dependency-blocked parks a parent whose child struck out)
         val facts = borg.trikeshed.kanban.BoardFactElement(ctx.rete)
+        // What completed runs read, as facts in each project's partition (Forge genesis, Cut S).
+        val runFacts = borg.trikeshed.lcnc.LcncRunFacts(ctx.rete)
         val ruleDisposers = listOf(
             ctx.rete.register(borg.trikeshed.kanban.rules.FanOutProduction()),
             ctx.rete.register(borg.trikeshed.kanban.rules.DependencyReadyProduction()),
@@ -159,6 +161,7 @@ class KanbanModule : ForgeModule {
                 ),
             ),
             ctx.rete.register(borg.trikeshed.kanban.rules.CycleGuardProduction()),
+            ctx.rete.register(borg.trikeshed.lcnc.rules.RunStaleProduction()),
         )
         // kanban.alerts = the same tail board.view#alerts carries.
         ctx.lcncRunners["kanban.alerts"] = LcncNodeRunner { _, _ -> alertMap() }
@@ -201,6 +204,17 @@ class KanbanModule : ForgeModule {
             )
             synchronized(alerts) { alerts.retain(a) }
             bridge?.onRuleFired(a)
+            // run-stale (Forge genesis, Cut S): every firing folds into the run's one marker, a board-only
+            // receipt (not admitted to the fact plane, so it never loops back into Rete).
+            if (a.ruleId == borg.trikeshed.lcnc.rules.RunStaleProduction.RULE) {
+                val runId = a.bindings["runId"]
+                if (runId != null) {
+                    val key = borg.trikeshed.lcnc.LcncStaleMarker.key(runId)
+                    borg.trikeshed.lcnc.LcncStaleMarker.merge(ctx.blackboard.get(key), a.bindings, ctx.clock())?.let { marker ->
+                        ctx.blackboard.put(key, marker, borg.trikeshed.lcnc.LcncStaleMarker.LANGUAGE)
+                    }
+                }
+            }
             if (a.ruleId == borg.trikeshed.kanban.rules.BoardRules.DEPENDENCY_READY) {
                 val jobId = a.bindings["jobId"]
                 val rev = a.bindings["expectedRevision"]?.toLongOrNull()
@@ -498,7 +512,7 @@ class KanbanModule : ForgeModule {
         // The same ReteNetwork and KIF bank the daemon's publisher holds: the panels plane and
         // the vocabulary tuples come from one network and one bank however many publishers exist.
         val publisher = borg.trikeshed.lcnc.LcncPublisher(ctx.blackboard, { ctx.lcncRunners }, ctx.attachments, ctx.rete, ctx.kifBank)
-        val runs = LcncRunService(ctx, store, publisher::vocabulary)
+        val runs = LcncRunService(ctx, store, publisher::vocabulary, runFacts)
         val archives = ArchiveService(ctx.casStore)
         // Three literal claims, not a loop over an interpolated path: the route-manifest parity
         // scan reads literals, and an interpolation is a route the gate cannot see.
@@ -514,6 +528,40 @@ class KanbanModule : ForgeModule {
             else JvmKanbanServer.HttpResponse(200, JsonSupport.stringify(publisher.publishVocabulary()))
         }
 
+        // Rebuild (Forge genesis, Cut S): re-execute a completed receipt's exact program version with its
+        // recorded inputs, budgets and pinned subprogram versions; the new receipt names the old as
+        // rebuildOf and, once complete, the old run's consumed facts and stale marker are retired.
+        ctx.routes.claim(id, "/api/lcnc/run/rebuild") { method, _, text, _ ->
+            if (method != "POST") return@claim JvmKanbanServer.HttpResponse(405, """{"error":"method_not_allowed"}""")
+            val req = runCatching { JsonSupport.parse(rawBody(text)) as? Map<*, *> }.getOrNull()
+                ?: return@claim JvmKanbanServer.HttpResponse(400, """{"error":"bad_json"}""")
+            val wantedRun = req["runId"]?.toString()?.takeIf { it.isNotBlank() }
+            val wantedCid = req["receiptCid"]?.toString()?.takeIf { it.isNotBlank() }
+            @Suppress("UNCHECKED_CAST")
+            val receipt = (when {
+                wantedRun != null -> ctx.blackboard.get("lcnc/run/$wantedRun")
+                wantedCid != null -> ctx.blackboard.keys().filter { it.startsWith("lcnc/run/") }.map { ctx.blackboard.get(it) }
+                    .firstOrNull { (it as? Map<*, *>)?.get("receiptCid") == wantedCid }
+                else -> null
+            } as? Map<String, Any?>) ?: return@claim JvmKanbanServer.HttpResponse(404, """{"error":"no_such_receipt"}""")
+            val status = receipt["status"]?.toString()
+            if (status in listOf("validating", "running")) return@claim JvmKanbanServer.HttpResponse(409, JsonSupport.stringify(mapOf("error" to "receipt_not_terminal", "status" to status)))
+            val programCid = receipt["programCid"]?.toString()
+                ?: return@claim JvmKanbanServer.HttpResponse(422, """{"error":"receipt_names_no_program"}""")
+            val bytes = ctx.casStore.get(borg.trikeshed.job.ContentId(programCid))
+                ?: return@claim JvmKanbanServer.HttpResponse(404, JsonSupport.stringify(mapOf("error" to "program_version_missing", "programCid" to programCid)))
+            val name = receipt["program"]?.toString() ?: "rebuild"
+            val program = runCatching { borg.trikeshed.lcnc.LcncProgramConfix.fromJson(name, bytes.decodeToString()) }
+                .getOrElse { return@claim JvmKanbanServer.HttpResponse(422, JsonSupport.stringify(mapOf("error" to "program_version_unreadable", "detail" to (it.message ?: "")))) }
+            val inputs = (receipt["inputs"] as? Map<*, *>)?.entries?.associate { (k, v) -> k.toString() to v } ?: emptyMap<String, Any?>()
+            val budgets = receipt["budgets"] as? Map<*, *>
+            val request = mapOf(
+                "timeoutMs" to budgets?.get("timeoutMs"), "maxNodes" to budgets?.get("maxNodes"),
+                "rebuildOf" to receipt["receiptCid"], "rebuildOfRunId" to receipt["runId"],
+                "expectProgramCid" to programCid, "pinnedVersions" to receipt["programVersions"],
+            )
+            runs.execute(name, program, receipt["programKey"] != null, inputs, request)
+        }
         ctx.routes.claim(id, "/api/lcnc/run/cancel") { method, _, text, _ ->
             if (method != "POST") return@claim JvmKanbanServer.HttpResponse(405, """{"error":"method_not_allowed"}""")
             val req = runCatching { JsonSupport.parse(rawBody(text)) as? Map<*, *> }.getOrNull()
@@ -716,6 +764,7 @@ class KanbanModule : ForgeModule {
                 ctx.rete.productionSink = null
                 ruleDisposers.forEach { runCatching { it.close() } }
                 runCatching { facts.retractAll() }
+                runCatching { runFacts.retractAll() }
                 store.close()
             }
         }

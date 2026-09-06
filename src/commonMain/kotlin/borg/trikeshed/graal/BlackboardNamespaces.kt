@@ -50,6 +50,7 @@ data object BlackboardNamespaces {
         Namespace("kanban/", "kanban module surface (anything not under a narrower kanban/ row)", "KanbanModule"),
         Namespace("lcnc/prompt/", "stored prompt heads {name, cid, previousCid, role, variables, tags, chars, text, savedAtMs} per prompt", "LcncPublisher.publishPrompt"),
         Namespace("lcnc/publish/", "publish outcomes per program (Forge genesis, Cut C): {verdict, reason?, cid?, previousCid?, baseCid?, currentCid?, atMs, actor} — a stale-base refusal is a receipt, board-only", "PatchWire via LcncPublisher.publishOutcome", admitted = false),
+        Namespace("lcnc/stale/", "one marker per completed run whose consumed inputs moved since it read them (Forge genesis, Cut S): {runId, receiptKey, receiptCid, programKey, programCid, inputs[], count, atMs} — a rule firing's output, kept off the fact plane", "KanbanModule productionSink via LcncStaleMarker", admitted = false),
         Namespace("lcnc/snapshot/", "the workspace snapshot head: {cid, previousCid, atMs, note, counts} — the whole workspace named at one instant (Forge genesis, Cut C)", "WorkspaceSnapshotService via LcncPublisher.publishSnapshot"),
         Namespace("lcnc/program/", "typed program entries {name, document, cables, violations, sourceCid} per canvas", "LcncPublisher.publishProgram"),
         Namespace("lcnc/vocabulary", "the node-type vocabulary the canvases are built from", "LcncPublisher.publishAll"),
