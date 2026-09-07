@@ -84,6 +84,44 @@ class BoardClaimGuardTest {
         el.drain()
     }
 
+    /**
+     * ARCHIVED is settled (DependencyReady, statusFor) and cancel/retract land there:
+     * each was a way around the gate. Every settling verb is the same door now —
+     * refused from RUNNING, open from REVIEW to somebody other than the claimant.
+     */
+    @Test
+    fun everySettlingPathIsTheSameDoor() = runBlocking {
+        val el = BoardStoreElement(JvmBoardWal(tempDir("settle")), CasStore.inMemory(), clock = { 5L })
+        el.open()
+        val rev = claimed(el, "s")
+        val attempts = listOf(
+            mapOf("type" to "move", "toColumn" to "archived"),
+            mapOf("type" to "cancel"),
+            mapOf("type" to "retract"),
+            mapOf("type" to "complete"),
+        )
+        attempts.forEachIndexed { i, extra ->
+            val r = send(el, "jobId" to "s", "idempotencyKey" to "settle-$i", "expectedRevision" to rev, "actor" to "claim:brain", *extra.entries.map { it.key to it.value as Any? }.toTypedArray())
+            val why = assertIs<BoardApply.Rejected>(r, "$extra must be refused from RUNNING").reason
+            assertTrue("claimed work passes review first" in why, why)
+            assertEquals(BoardCol.RUNNING, el.card("s")!!.col, "$extra changed nothing")
+        }
+        // the unlabeled gesture is refused from RUNNING too: the column, not the actor, is the gate here
+        assertIs<BoardApply.Rejected>(send(el, "type" to "move", "jobId" to "s", "idempotencyKey" to "settle-x", "expectedRevision" to rev, "toColumn" to "archived"))
+
+        // from REVIEW a human may archive; another claimed card, a human may cancel
+        val review = assertIs<BoardApply.Committed>(send(el, "type" to "move", "jobId" to "s", "idempotencyKey" to "s#claim-review#$rev", "expectedRevision" to rev, "toColumn" to "review"))
+        assertIs<BoardApply.Rejected>(send(el, "type" to "move", "jobId" to "s", "idempotencyKey" to "a-self", "expectedRevision" to review.revision, "toColumn" to "archived", "actor" to "claim:brain"))
+        assertIs<BoardApply.Committed>(send(el, "type" to "move", "jobId" to "s", "idempotencyKey" to "a-jim", "expectedRevision" to review.revision, "toColumn" to "archived", "actor" to "jim"))
+        assertEquals(BoardCol.ARCHIVED, el.card("s")!!.col)
+
+        val rev2 = claimed(el, "t")
+        val review2 = assertIs<BoardApply.Committed>(send(el, "type" to "move", "jobId" to "t", "idempotencyKey" to "t#claim-review#$rev2", "expectedRevision" to rev2, "toColumn" to "review"))
+        assertIs<BoardApply.Committed>(send(el, "type" to "cancel", "jobId" to "t", "idempotencyKey" to "c-jim", "expectedRevision" to review2.revision, "actor" to "jim"))
+        assertEquals(BoardCol.ARCHIVED, el.card("t")!!.col)
+        el.drain()
+    }
+
     @Test
     fun guardSurvivesReplay() = runBlocking {
         val dir = tempDir("replay")
