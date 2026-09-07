@@ -52,9 +52,15 @@ object ForgeApp {
         julesSurface: JulesBlackboardSurface? = null,
         bundles: List<String> = emptyList(),
         vmHost: VmHost = PlatformHost.default.vmHost,
+        /**
+         * The `docs/` corpus, for the docs mindmap. Passed in rather than read, so commonMain
+         * stays free of IO and the map is a pure function of the text (see [DocsGraph]).
+         * Empty means the graph view simply has no docs mode to offer.
+         */
+        docs: List<borg.trikeshed.forge.concept.DocSource> = emptyList(),
     ): String {
         val reduction = runCatching { ForgeKanbanIngest.loadProjection(userId) }.getOrElse { ForgeKanbanIngest.fallbackReduction() }
-        val seed = forgeSeedJson(userId, reduction, julesSurface, vmHost)
+        val seed = forgeSeedJson(userId, reduction, julesSurface, vmHost, docs)
         return htmlShell(seed, bundles)
     }
 
@@ -63,6 +69,8 @@ object ForgeApp {
         reduction: ForgeKanbanReduction,
         julesSurface: JulesBlackboardSurface?,
         vmHost: VmHost,
+        docs: List<borg.trikeshed.forge.concept.DocSource> = emptyList(),
+    
     ): String {
         val seedMap = mapOf<String, Any?>(
             "userId" to userId,
@@ -109,6 +117,9 @@ object ForgeApp {
             },
             "graphLayout" to forgeGraphLayoutSeed(reduction),
             "conceptGraph" to ConceptGraph.layoutSeed(),
+            // The third mindmap: the same {nodes,edges,layers,camera} shape, so script.js draws it
+            // with the renderer it already has. Absent when nothing handed us a corpus.
+            "docsGraph" to (if (docs.isEmpty()) null else borg.trikeshed.forge.concept.DocsGraph.layoutSeed(docs)),
             "sheets" to forgeSheetsSeed(reduction),
             "blackboardSeed" to forgeBlackboardSeed(julesSurface),
             "dashboards" to forgeDashboardSeed(),

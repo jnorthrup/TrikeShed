@@ -25,6 +25,7 @@ object SubVmLegos {
     const val CORENLP = "vm.corenlp"
     const val CORENLP_EXTRACT = "vm.corenlp.extract"
     const val CAMEL = "vm.camel"
+    const val CAMEL_CATALOG = "vm.camel.catalog"
     const val GRAALCE = "vm.graalce"
     const val MODULES = "vm.modules"
 
@@ -40,6 +41,70 @@ object SubVmLegos {
         ctx.lcncRunners[GRAALCE] = graalce(host)
         ctx.lcncRunners[CORENLP_EXTRACT] = corenlpExtract(host)
         ctx.lcncRunners[MODULES] = modules()
+        ctx.lcncRunners[CAMEL_CATALOG] = camelCatalog()
+    }
+
+    // ── camel.catalog: what the mounted module can offer, read lazily ──
+
+    /**
+     * `vm.camel.catalog` — enumerate the mounted Camel module's own self-description.
+     *
+     * This is the lego behind the palette's LIVE picklists. `vm.camel`'s `from` and `to`
+     * declare `optsFrom = "vm.camel.catalog#endpoints[]"`, so the editor fills them by
+     * running THIS node with no params through the ordinary /api/lcnc/run lane — which is
+     * why the default output has to be picklist-shaped and why it must never need a VM.
+     * A palette that listed every endpoint statically would go stale the moment a module
+     * was mounted or re-resolved; there is no list here to go stale.
+     *
+     * Read-only in the same structural sense as `vm.modules`: it takes no VM and declares
+     * no port that could mount, install or execute anything. [CamelCatalog] only opens
+     * zips. The worst a wrong `name` produces is a row saying that name is not there.
+     */
+    fun camelCatalog() = LcncNodeRunner { node, _ ->
+        val module = node.params["module"]?.takeIf { it.isNotBlank() }
+            ?: borg.trikeshed.graal.subvm.CamelCatalog.MODULE
+        val kind = node.params["kind"]?.takeIf { it.isNotBlank() } ?: "endpoint"
+        val name = node.params["name"]?.takeIf { it.isNotBlank() }
+        val reach = when (node.params["reach"]?.trim()?.uppercase()) {
+            "DEPARTMENT" -> borg.trikeshed.lcnc.CamelLinkage.Reach.DEPARTMENT
+            else -> borg.trikeshed.lcnc.CamelLinkage.Reach.LOCAL
+        }
+        val catalog = borg.trikeshed.graal.subvm.CamelCatalog
+        val installed = catalog.available(module)
+        val chain = if (installed) catalog.mounted(module) else listOf(module)
+        // `endpoints` is a real List<String>, not a JSON string: the picklist resolver walks
+        // outputs.endpoints[] in the browser and a serialized array would arrive as text.
+        //
+        // Every kind here is SCOPED — by the mounted chain, and by reach. A picklist over
+        // everything Camel ships would be a few hundred rows and unusable; a picklist over
+        // one department is a dozen. That is the point of departments showing up as a
+        // vocabulary rather than as a packaging detail.
+        val names: List<String> = if (!installed) emptyList() else when (kind) {
+            "eip" -> catalog.eips(module)
+            "scheme" -> catalog.schemes(module)
+            "linkage" -> borg.trikeshed.lcnc.CamelLinkage.admissible(reach, chain)
+            "department" -> catalog.departments()
+            else -> catalog.endpoints(module, reach)
+        }
+        val detail: String = when {
+            !installed || name == null -> ""
+            kind == "eip" -> catalog.eipJson(name, module) ?: ""
+            kind == "scheme" -> catalog.componentJson(name, module) ?: ""
+            else -> ""
+        }
+        mapOf(
+            "endpoints" to names,
+            "count" to names.size,
+            "detail" to detail,
+            "installed" to installed,
+            // The chain a mount of this module actually sees, child first. An operator reading
+            // a refusal needs to know what WAS mounted, not only what was missing.
+            "mounted" to chain,
+            // Schemes present on disk with no CamelLinkage row. Surfaced rather than logged:
+            // drift between the mount and the admission table is exactly what an operator
+            // needs to see before a route names something the gate will refuse.
+            "unlisted" to if (installed) catalog.unlisted(module) else emptyList<String>(),
+        )
     }
 
     // ── modules: what classpaths can this daemon execute from? ────────
@@ -226,6 +291,42 @@ object SubVmLegos {
         val facet = facetOf(node, default = "JVM")
         val from = node.params["from"] ?: "direct:lcnc"
         val to = node.params["to"] ?: "log:lcnc"
+        // LOCAL LINKAGES ONLY, refused HERE rather than inside the guest.
+        //
+        // `from` and `to` are the entire reachable surface of this route — the EIPs between
+        // them only move an Exchange around inside one context. Checking the two declared
+        // URIs therefore checks everything the route can touch, which is the same argument
+        // `vm.modules` makes about its own capability being its declaration.
+        //
+        // At the boundary, for the reason CamelLegoExecutionTest already asserts about an
+        // absent module: a refusal the lego states is an error an operator can read, while
+        // the same refusal taken inside GraalJS is a stack trace about a class it could not
+        // resolve. Egress policy also cannot be enforced once Camel has opened its own
+        // socket on its own thread pool — the only place to decline is before the eval.
+        // The mount chain decides what is even nameable: with only the spine, `smtp:` has no
+        // MailComponent to resolve, so provision answers the question before policy does.
+        // `reach` is the second, narrower gate — see CamelLinkage.
+        val moduleName = node.params["module"]?.takeIf { it.isNotBlank() }
+            ?: borg.trikeshed.lcnc.CamelLinkage.SPINE
+        val mountedChain = borg.trikeshed.graal.subvm.GuestModules.chain(moduleName)
+        val reach = when (node.params["reach"]?.trim()?.uppercase()) {
+            "DEPARTMENT" -> borg.trikeshed.lcnc.CamelLinkage.Reach.DEPARTMENT
+            else -> borg.trikeshed.lcnc.CamelLinkage.Reach.LOCAL
+        }
+        // A module that is not installed AT ALL is a different fault from a scheme that is not
+        // provisioned, and it has a better error waiting for it downstream ("not installed",
+        // naming the install command). Running the provision gate first would answer a typo in
+        // `module` with "mount 'camel'", which is confusing and points at the wrong thing.
+        val gateApplies = borg.trikeshed.graal.subvm.GuestModules.isInstalled(moduleName)
+        for ((port, uri) in if (gateApplies) listOf("from" to from, "to" to to) else emptyList()) {
+            borg.trikeshed.lcnc.CamelLinkage.refusal(uri, reach, mountedChain)?.let { why ->
+                return@LcncNodeRunner mapOf(
+                    "routed" to "",
+                    "ok" to false,
+                    "error" to "vm.camel refuses $port='$uri': $why",
+                )
+            }
+        }
         // Body to dispatch through the route. Without one the lego only proves the context
         // starts; with one it proves the route actually carries a message end to end.
         val body = inputStrings(node, inputs, key = "body").joinToString("\n")

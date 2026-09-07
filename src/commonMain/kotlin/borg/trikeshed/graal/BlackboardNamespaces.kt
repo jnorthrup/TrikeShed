@@ -75,6 +75,8 @@ data object BlackboardNamespaces {
         Namespace("hook-delivery-out/", "outbound hook delivery ledger entries", "CausalHookDeliveryLedger"),
         Namespace("hook-delivery/", "inbound hook delivery ledger entries", "CausalHookDeliveryLedger"),
         Namespace("context-receipt/", "ACE context chunk receipts keyed by chain head", "AceContextNodes"),
+        Namespace("camel/route/", "one entry per LONG-LIVED camel route: {id, module, from, to, status, routes, exchanges, startedAtMs, lastExchangeAtMs} on start and stop, and `camel/route/<id>/exchange` {route, seq, body, truncated, from, to, atMs} once per Exchange that crosses the tap — INPUT to the fact plane, not a rule firing's output, which is why it is admitted: a route is the daemon's intake and a fact per arrival is the whole reason it is watchable", "CamelRouteLegos via CamelRuntime"),
+        Namespace("camel/", "camel surface (anything not under a narrower camel/ row)", "CamelRouteLegos"),
         Namespace("module/", "module supervisor receipts: attached, detached, attach-failed", "ModuleSupervisor"),
         Namespace("daemon/", "daemon boot and index receipts (daemon/boot/*, daemon/linecas-index)", "OroborosDaemon"),
         Namespace("oroboros/", "reserved for daemon-lane receipts; no writer in the source tree today", "none yet"),

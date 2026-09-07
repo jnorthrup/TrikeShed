@@ -185,8 +185,13 @@ class CharSeries(
         )
 
 
-    fun asString(upto: Int = Int.MAX_VALUE): String =
-        buildString(rem) { for (i in pos until limit) append(this@CharSeries.get(i)) }
+    fun asString(upto: Int = Int.MAX_VALUE): String {
+        require(upto >= 0) { "Character count must not be negative: $upto" }
+        val count = minOf(rem, upto)
+        return buildString(count) {
+            for (i in 0 until count) append(this@CharSeries.get(pos + i))
+        }
+    }
 
     /**
      * DELIBERATELY NOT THE CHARACTERS. A friendly toString() is not a

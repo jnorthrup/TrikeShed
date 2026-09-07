@@ -48,11 +48,22 @@ data class GuestModuleManifest(
     val module: String,
     val declared: List<String> = emptyList(),
     val entries: List<GuestModuleEntry> = emptyList(),
+    /**
+     * The module this one EXTENDS, or null when it stands alone.
+     *
+     * A department (`camel-mail`) ships only the jars its parent (`camel`) does not already
+     * have, and is mounted with the parent's classpath behind it. Recording the relation in
+     * the manifest rather than in host code keeps the rule where every other fact about a
+     * module lives: a module that says nothing about a parent has none, and the classpath a
+     * deployment mounts is fully described by what is on disk.
+     */
+    val parent: String? = null,
 ) {
     val totalBytes: Long get() = entries.sumOf { it.size }
 
     fun render(): String = buildString {
         appendLine("# guest module\t$module")
+        parent?.let { appendLine("# parent\t$it") }
         declared.forEach { appendLine("# declared\t$it") }
         appendLine("# resolved\t${entries.size} jars\t$totalBytes bytes")
         appendLine("file\tsize\tsha256")
@@ -68,6 +79,7 @@ data class GuestModuleManifest(
          */
         fun parse(tsv: String, fallbackModule: String = ""): GuestModuleManifest {
             var module = fallbackModule
+            var parent: String? = null
             val declared = mutableListOf<String>()
             val entries = mutableListOf<GuestModuleEntry>()
             for (raw in tsv.lineSequence()) {
@@ -77,6 +89,7 @@ data class GuestModuleManifest(
                     val cols = line.removePrefix("#").trim().split('\t')
                     if (cols.size >= 2) when (cols[0].trim()) {
                         "guest module" -> module = cols[1].trim()
+                        "parent" -> parent = cols[1].trim().takeIf { it.isNotEmpty() }
                         "declared" -> declared += cols[1].trim()
                     }
                     continue
@@ -86,7 +99,7 @@ data class GuestModuleManifest(
                 val size = cols[1].toLongOrNull() ?: continue
                 entries += GuestModuleEntry(cols[0], size, cols[2])
             }
-            return GuestModuleManifest(module, declared, entries)
+            return GuestModuleManifest(module, declared, entries, parent)
         }
     }
 }

@@ -675,9 +675,11 @@
   const SVG_NS = 'http://www.w3.org/2000/svg';
   const EMPTY_LAYOUT = { nodes: [], edges: [], camera: { x: 0, y: 0, zoom: 1 } };
   function layoutOf(v) { return (v && Array.isArray(v.nodes)) ? v : EMPTY_LAYOUT; }
-  // Two sources, one renderer: the causal graph (forceLayout) and the concept lattice (ConceptGraph.layoutSeed).
-  const layouts = { causal: layoutOf(seed.graphLayout), concept: layoutOf(seed.conceptGraph) };
-  let graphMode = (state.graphMode === 'concept') ? 'concept' : 'causal';
+  // Three sources, one renderer: the causal graph (forceLayout), the concept lattice
+  // (ConceptGraph.layoutSeed) and the docs mindmap (DocsGraph.layoutSeed, derived from docs/).
+  const layouts = { causal: layoutOf(seed.graphLayout), concept: layoutOf(seed.conceptGraph), docs: layoutOf(seed.docsGraph) };
+  const GRAPH_MODES = ['causal', 'concept', 'docs'];
+  let graphMode = GRAPH_MODES.includes(state.graphMode) ? state.graphMode : 'causal';
   let layout = layouts[graphMode];
   const cam = { x: 0, y: 0, zoom: 1 };
   function resetCam() { const c = layout.camera || { x: 0, y: 0, zoom: 1 }; cam.x = c.x; cam.y = c.y; cam.zoom = c.zoom; }
@@ -688,6 +690,7 @@
   const graphInspector = document.getElementById('graph-inspector');
   const graphModeCausalBtn = document.getElementById('graph-mode-causal');
   const graphModeConceptBtn = document.getElementById('graph-mode-concept');
+  const graphModeDocsBtn = document.getElementById('graph-mode-docs');
 
   function svgEl(tag, attrs) {
     const el = document.createElementNS(SVG_NS, tag);
@@ -700,7 +703,10 @@
     if (mode !== graphMode) { graphMode = mode; layout = layouts[mode]; graphBuilt = false; resetCam(); mutate((s) => { s.graphMode = mode; }, 'graphMode'); }
     graphModeCausalBtn.classList.toggle('active', graphMode === 'causal');
     graphModeConceptBtn.classList.toggle('active', graphMode === 'concept');
-    graphEmptyEl.textContent = graphMode === 'concept' ? 'No concept lattice in the seed.' : 'No causal nodes in the seed yet — ingest a donor to populate the graph.';
+    if (graphModeDocsBtn) graphModeDocsBtn.classList.toggle('active', graphMode === 'docs');
+    graphEmptyEl.textContent = graphMode === 'concept' ? 'No concept lattice in the seed.'
+      : graphMode === 'docs' ? 'No docs mindmap in the seed — bake with a docs/ corpus to populate it.'
+      : 'No causal nodes in the seed yet — ingest a donor to populate the graph.';
     graphInspector.hidden = true;
     buildGraph(); applyCamera();
   }
@@ -785,6 +791,7 @@
   }
   graphModeCausalBtn.addEventListener('click', () => setGraphMode('causal'));
   graphModeConceptBtn.addEventListener('click', () => setGraphMode('concept'));
+  if (graphModeDocsBtn) graphModeDocsBtn.addEventListener('click', () => setGraphMode('docs'));
   graphSvg.addEventListener('click', () => inspectNode(null));
 
   // world → screen: translate(-cam) → scale(zoom) → center in viewport (ForgeBlackboardCamera convention)
@@ -1371,6 +1378,7 @@
     if (causal.length) parts.push(causal.length + ' causal nodes');
     if (Array.isArray(seed.correlations) && seed.correlations.length) parts.push(seed.correlations.length + ' correlations');
     if (seed.conceptGraph && Array.isArray(seed.conceptGraph.nodes) && seed.conceptGraph.nodes.length) parts.push(seed.conceptGraph.nodes.length + ' concepts');
+    if (seed.docsGraph && Array.isArray(seed.docsGraph.nodes) && seed.docsGraph.nodes.length) parts.push(seed.docsGraph.nodes.length + ' documents');
     if (sheets.length) parts.push(sheets.length + ' sheets');
     if (seed.hosts && seed.hosts.host) parts.push(seed.hosts.host.subVm ? 'host: ' + seed.hosts.host.platform : 'host: dead');
     seedNoteEl.textContent = parts.length ? 'Seed: ' + parts.join(' · ') : 'Local-first workspace';

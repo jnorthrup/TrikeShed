@@ -61,6 +61,47 @@ internal class LcncRunService(
         HttpResponse(200, JsonSupport.stringify(sheets))
     }
 
+    /**
+     * THE RUN HEAD (AutoTools, Cut B): which recorded run IS the build of `(this program's current
+     * version, these inputs)`, and what lamp it burns. The decision itself is
+     * [borg.trikeshed.lcnc.LcncRunHead] in commonMain — pinned on jvm and js — so a curl reader and
+     * a page's block frame are told the same verdict, and Cut V's sheet cells get it for free.
+     *
+     * The version is DERIVED, never read off a board entry: the loader hands back the program the
+     * next Build would run, and [LcncBlackboard.cidOf] mints byte-for-byte the cid [execute]'s
+     * freeze mints. That is what makes this answer true in a bare rig where no entry exists, and
+     * what makes a re-published program read Never built rather than showing the old artifact.
+     */
+    suspend fun head(programName: String?, inputsText: String?, show: String?): HttpResponse = withContext(Dispatchers.IO) {
+        val name = programName?.takeIf { it.isNotBlank() }
+            ?: return@withContext response(400, mapOf("error" to "program_required"))
+        val inputsValue: Any? = if (inputsText.isNullOrBlank()) emptyMap<String, Any?>()
+        else runCatching { JsonSupport.parse(inputsText) }.getOrElse {
+            return@withContext response(400, mapOf("error" to "bad_inputs", "detail" to (it.message ?: "unparsed")))
+        }
+        if (inputsValue !is Map<*, *>) return@withContext response(400, mapOf("error" to "inputs_must_be_object"))
+        val program = ctx.programLoader(name)
+            ?: return@withContext response(404, mapOf("error" to "no_such_program", "program" to name))
+        val programCid = LcncBlackboard.cidOf(program)
+        val programKey = LcncBlackboard.programKey(name)
+        // ONE snapshot: the immutable store map, no key copy and no per-key get, and a consistent
+        // view of the run entries and the stale markers that name them.
+        val entries = ctx.blackboard.snapshot().values
+        val head = LcncRunHead.head(LcncRunHead.rows(entries), programKey, programCid, LcncRunHead.canonicalInputs(inputsValue))
+        val marker = head.latest?.takeIf { it.status == LcncRunHead.STATUS_COMPLETED }
+            ?.let { entries[LcncStaleMarker.key(it.runId)] }
+        val verdict = LcncRunHead.decide(head, marker, ctx.clock())
+        val body = LcncRunHead.headBody(name, programKey, programCid, inputsValue, head, verdict, marker, show)
+        // The preflight DEGRADES rather than refuses. Every list in the body is already capped, so
+        // this only fires on a reader-supplied extreme (a vast `inputs` echo, a `returns` that
+        // slipped under its own budget); shedding the output and the rows still answers with the
+        // lamp and the button, where a 413 would leave the frame "Unavailable" with nothing to
+        // press — on exactly the stale target the reader opened the page to rebuild.
+        val fitted = LcncRunHead.fitToBudget(body)
+            ?: return@withContext response(413, mapOf("error" to (ValueBudget().violation(body) ?: "work_limit")))
+        response(200, fitted)
+    }
+
     private fun project(receipt: Map<String, Any?>, commit: BoardApply.Committed): Map<String, Any?> {
         val value = receipt + mapOf(
             "jobId" to commit.jobId, "sequence" to commit.sequence,

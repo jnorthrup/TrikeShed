@@ -877,11 +877,15 @@ tasks.register<Sync>("generateForgePages") {
     into(project.layout.projectDirectory.dir("docs"))
 
     // docs/ is also the markdown doc root and holds the baked index.html: never sweep those.
+    // `*.md` is TOP LEVEL ONLY — a Sync deletes whatever the spec does not produce, so every
+    // hand-written subtree has to be named. docs/subvm/ was swept by this task on 2026-09-07
+    // (capability-matrix.md and its capabilities json) because nothing here claimed it.
     preserve {
         include("index.html")
         include(".nojekyll")
         include("*.md")
         include("dispatch/**")
+        include("subvm/**")
     }
 
     // Hand-written sw.js: expand the precache token with the selected bundles; stamp the cache name per stage set.

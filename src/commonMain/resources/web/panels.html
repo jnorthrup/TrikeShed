@@ -1708,7 +1708,7 @@ function buildNode(n){
       // no longer offered — marked stale rather than silently replaced.
       if(def.optsFrom){
         inp.classList.add("live");
-        livePicklist(def.optsFrom).then(list=>{ if(list&&list.length) fill(list); })
+        livePicklist(def.optsFrom,n).then(list=>{ if(list&&list.length) fill(list); })
           .catch(()=>{});
       }
       inp.value=n.params[k];
@@ -2006,12 +2006,31 @@ function fdLayout(){
  * Cached per source for the session; a reload is a refresh.
  */
 const PICKLIST_CACHE=new Map();
-async function livePicklist(spec){
-  if(PICKLIST_CACHE.has(spec)) return PICKLIST_CACHE.get(spec);
-  const [type,path]=String(spec).split("#");
+// SCOPED live picklist. `spec` is "<type>#<path>" or "<type>?k=v&k2=$other#<path>":
+// the query is sent as the runner's params, and a `$name` value is read from THIS
+// node's params. That is what keeps a list short enough to use — vm.camel.catalog
+// over everything Camel ships is hundreds of rows, but scoped to the node's own
+// module and reach it is a dozen. A dependent list must not share a cache entry
+// with a differently-scoped one, so the resolved params are part of the key.
+async function livePicklist(spec,node){
+  const raw=String(spec);
+  const hash=raw.indexOf("#");
+  if(hash<0) return [];
+  const head=raw.slice(0,hash), path=raw.slice(hash+1);
+  const q=head.indexOf("?");
+  const type=q<0?head:head.slice(0,q);
+  const params={};
+  if(q>=0){ for(const pair of head.slice(q+1).split("&")){ if(!pair) continue;
+    const eq=pair.indexOf("="); if(eq<0) continue;
+    const key=decodeURIComponent(pair.slice(0,eq));
+    let val=decodeURIComponent(pair.slice(eq+1));
+    if(val.startsWith("$")) val=(node&&node.params&&node.params[val.slice(1)])||"";
+    if(val!=="") params[key]=val; } }
   if(!type||!path) return [];
+  const key=type+"?"+JSON.stringify(params)+"#"+path;
+  if(PICKLIST_CACHE.has(key)) return PICKLIST_CACHE.get(key);
   const p=(async()=>{
-    const res=await api("POST","/api/lcnc/run",{type,inputs:{}});
+    const res=await api("POST","/api/lcnc/run",{type,params,inputs:{}});
     if(!res||!res.outputs) return [];
     let cur=res.outputs;
     for(const seg of path.split(".")){
@@ -2028,7 +2047,7 @@ async function livePicklist(spec){
     const out=cur&&cur.__list?cur.__list:(Array.isArray(cur)?cur:[]);
     return out.map(String).filter(Boolean);
   })();
-  PICKLIST_CACHE.set(spec,p);
+  PICKLIST_CACHE.set(key,p);
   return p;
 }
 const PanelsShake={

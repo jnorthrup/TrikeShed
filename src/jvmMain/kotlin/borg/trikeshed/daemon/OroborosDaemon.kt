@@ -1317,6 +1317,10 @@ object OroborosDaemon {
         // Sub-VM module legos: tika/corenlp/camel/graalce as supervised guest evals
         // over the daemon's own hypervisor (VmSupervisor.current — VmWire's same host).
         borg.trikeshed.lcnc.SubVmLegos.register(moduleContext)
+        // The LIFETIME half of camel: vm.camel.up/down/routes hold a CamelContext open past the
+        // run that started it, so a poller (timer:, file:, imaps:) has somewhere to live and every
+        // Exchange that crosses lands on the board as camel/route/<id>/exchange.
+        borg.trikeshed.lcnc.CamelRouteLegos.register(moduleContext)
         // The coding-agent lane (Forge genesis, Cut A): the host's CLIs probed once; agent.run /
         // agent.list legos and the claim worker's lane share one runner; receipts are agent/run/<runId>.
         val agentRoster = borg.trikeshed.agent.AgentCli.probe(config.agents)
@@ -2174,16 +2178,34 @@ object OroborosDaemon {
         // Build plane: the hot-swap feed rewrites build/live/classes (and stageDaemonLib the jars);
         // each generation is re-absorbed so the store always serves the classes that are running.
         val buildDirty = Channel<Unit>(Channel.CONFLATED)
-        for (dir in listOf(buildClassesDir, stagingLibDir)) {
-            if (!dir.isDirectory) continue
+        for ((dir, phase) in listOf(
+            buildClassesDir to "staged",
+            stagingLibDir to "staged",
+            File(repoDir, "build/classes/kotlin/jvm/main") to "compiled",
+            File(repoDir, "build/classes/java/jvmMain") to "compiled",
+        )) {
             val w = JvmFileWatchReactorElement(
                 root = dir.absolutePath,
                 parentJob = coroutineContext[kotlinx.coroutines.Job],
                 includeGlobs = emptyList(),
                 excludeGlobs = emptyList(),
             )
-            launch(Dispatchers.IO) { w.open() }
-            launch { for (e in w.events) buildDirty.trySend(Unit) }
+            launch(Dispatchers.IO) {
+                try {
+                    w.open()
+                    for (e in w.events) {
+                        if (phase == "staged") buildDirty.trySend(Unit)
+                        if (dir != stagingLibDir && e.path.endsWith(".class")) {
+                            graalWire.classFileChanged(
+                                buildPlanes.classesPrefix + e.path, phase,
+                                e.type == borg.trikeshed.util.oroboros.FileEventType.DELETE,
+                            )
+                        }
+                    }
+                } finally {
+                    withContext(kotlinx.coroutines.NonCancellable) { w.close() }
+                }
+            }
         }
         launch(Dispatchers.IO) {
             for (unit in buildDirty) {

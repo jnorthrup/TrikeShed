@@ -78,6 +78,14 @@ class GraalWire(
     private val memoryStore: borg.trikeshed.memory.MemoryStore? = null,
 ) {
     private val occupancies = ConcurrentHashMap<String, RepoOccupancy>()
+    private val classEvents = MutableSharedFlow<JvmVitals.VitalEvent>(extraBufferCapacity = 256)
+
+    /** File activity is observable before content-addressed ingestion, including identical rebuilds. */
+    suspend fun classFileChanged(id: String, phase: String, deleted: Boolean) {
+        classEvents.emit(JvmVitals.VitalEvent("class-update", mapOf(
+            "id" to id, "phase" to phase, "deleted" to deleted,
+        )))
+    }
     companion object {
         const val EVENTS_PATH = "/api/graal/events"
         val STREAMING: Set<String> = setOf(EVENTS_PATH)
@@ -726,16 +734,19 @@ class GraalWire(
         val out = Channel<String>(capacity = 256)
         val jobs = mutableListOf(
             vitals.events.onEach { e ->
-                out.trySend(JsonSupport.stringify(mapOf("kind" to e.kind, "at" to e.atMs) + e.detail.mapKeys { (k, _) -> k }))
+                out.send(JsonSupport.stringify(mapOf("kind" to e.kind, "at" to e.atMs) + e.detail))
+            }.launchIn(scope),
+            classEvents.onEach { e ->
+                out.send(JsonSupport.stringify(mapOf("kind" to e.kind, "at" to e.atMs) + e.detail))
             }.launchIn(scope),
             scoreEvents.onEach { m ->
-                out.trySend(JsonSupport.stringify(mapOf("kind" to "score", "at" to System.currentTimeMillis()) + m))
+                out.send(JsonSupport.stringify(mapOf("kind" to "score", "at" to System.currentTimeMillis()) + m))
             }.launchIn(scope),
         )
         report?.let { r ->
             jobs += r.events.onEach { e ->
                 if (e is CouchReportEvent.Committed) {
-                    out.trySend(JsonSupport.stringify(mapOf("kind" to "commit", "id" to e.docId, "seq" to e.seq, "deleted" to e.deleted, "at" to e.timestampMs)))
+                    out.send(JsonSupport.stringify(mapOf("kind" to "commit", "id" to e.docId, "seq" to e.seq, "deleted" to e.deleted, "at" to e.timestampMs)))
                 }
             }.launchIn(scope)
         }
@@ -744,7 +755,7 @@ class GraalWire(
             // the console until the next 5s poll. These land on the same feed the terrain uses.
             jobs += h.events.onEach { e ->
                 val m = e.toMap()
-                out.trySend(JsonSupport.stringify(mapOf("kind" to "vm", "vmKind" to m["kind"]) + m.filterKeys { it != "kind" }))
+                out.send(JsonSupport.stringify(mapOf("kind" to "vm", "vmKind" to m["kind"]) + m.filterKeys { it != "kind" }))
             }.launchIn(scope)
         }
         try {

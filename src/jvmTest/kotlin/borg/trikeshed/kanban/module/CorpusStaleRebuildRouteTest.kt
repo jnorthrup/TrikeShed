@@ -34,6 +34,7 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
 import java.io.File
+import java.net.URLEncoder
 import java.nio.charset.StandardCharsets
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -113,6 +114,10 @@ class CorpusStaleRebuildRouteTest {
         server.routeHttp("POST $path HTTP/1.1\r\nHost: t\r\nContent-Type: application/json\r\n\r\n$body".toByteArray(StandardCharsets.UTF_8))
     }
 
+    private fun get(server: JvmKanbanServer, path: String): JvmKanbanServer.HttpResponse = runBlocking {
+        server.routeHttp("GET $path HTTP/1.1\r\nHost: t\r\n\r\n".toByteArray(StandardCharsets.UTF_8))
+    }
+
     @Suppress("UNCHECKED_CAST")
     private fun json(resp: JvmKanbanServer.HttpResponse): Map<String, Any?> = JsonSupport.parse(resp.body) as Map<String, Any?>
 
@@ -175,6 +180,77 @@ class CorpusStaleRebuildRouteTest {
 
             assertEquals(404, post(rig.server, "/api/lcnc/run/rebuild", """{"runId":"nope"}""").status)
             assertEquals(400, post(rig.server, "/api/lcnc/run/rebuild", "not json").status)
+        } finally {
+            runBlocking { rig.supervisor.detach("kanban") }
+        }
+    }
+
+    /**
+     * The run head over the same story (AutoTools, Cut B): what a page's `lcnc-run` block is told
+     * at each step. This is the one lamp the lighter rig cannot reach — Stale needs a mounted
+     * project, its tendon and the production sink's marker.
+     */
+    @Test
+    fun theRunHeadRouteBurnsTheSameFourLampsAPageShows() {
+        val rig = rig("head")
+        val inputs = """{"project":"${rig.project}"}"""
+        fun head(show: String? = null): Map<String, Any?> {
+            val path = "/api/lcnc/runs?program=preset-corpus&inputs=" + URLEncoder.encode(inputs, "UTF-8") +
+                (show?.let { "&show=" + URLEncoder.encode(it, "UTF-8") } ?: "")
+            val response = get(rig.server, path)
+            assertEquals(200, response.status, response.body)
+            return json(response)
+        }
+        fun awaitLamp(lamp: String): Map<String, Any?> {
+            val deadline = System.currentTimeMillis() + 10_000
+            var last: Map<String, Any?> = emptyMap()
+            while (System.currentTimeMillis() < deadline) {
+                last = head()
+                if (last["lamp"] == lamp) return last
+                runBlocking { delay(100) }
+            }
+            error("the head never read $lamp; last was $last")
+        }
+        try {
+            val cold = head()
+            assertEquals("never_built", cold["lamp"])
+            assertEquals("Never built", cold["word"])
+            assertNull(cold["runId"])
+
+            val first = json(post(rig.server, "/api/lcnc/run", """{"program":"preset-corpus","inputs":$inputs}"""))
+            val runId = first["runId"] as String
+            val warm = head(show = "n-show")
+            assertEquals("completed", warm["lamp"])
+            assertEquals(first["receiptCid"], warm["receiptCid"])
+            assertEquals(runId, warm["runId"])
+            // The display sink's output key differs by rig (the daemon's returns "x", this stub
+            // "shown"), so the assertion is that the node's map is there, never on a fixed key.
+            assertTrue((warm["shown"] as Map<*, *>).values.first().toString().contains("a.md"), warm["shown"].toString())
+            assertEquals(false, warm["shownMissing"])
+            assertNull(warm["stale"])
+
+            // a.md edited through the upload lane: within the tick the block reads Stale and names it.
+            rig.scopes.uploadPut(rig.project, "a.md", "# Alpha\n\nthe first note, revised".encodeToByteArray())
+            runBlocking { rig.tendon.drainFrames() }
+            val stale = awaitLamp("stale")
+            assertEquals("Stale", stale["word"])
+            assertEquals(listOf("a.md"), stale["moved"])
+            assertTrue(stale["reason"].toString().contains("a.md"), stale["reason"].toString())
+            assertEquals(1, ((stale["stale"] as Map<*, *>)["count"] as Number).toInt())
+            assertEquals(first["receiptCid"], stale["receiptCid"], "the artifact is still the last good build")
+
+            // Rebuild names the run the block was showing; the head flips back with the lineage.
+            val rebuilt = post(rig.server, "/api/lcnc/run/rebuild", """{"runId":"${stale["runId"]}"}""")
+            assertEquals(200, rebuilt.status, rebuilt.body)
+            val fresh = json(rebuilt)
+            val after = head(show = "n-show")
+            assertEquals("completed", after["lamp"])
+            assertEquals(fresh["receiptCid"], after["receiptCid"])
+            assertEquals(first["receiptCid"], after["rebuildOf"])
+            assertEquals(runId, after["rebuildOfRunId"])
+            assertNull(after["stale"])
+            assertTrue((after["shown"] as Map<*, *>).values.first().toString().contains("revised"),
+                "the rebuilt digest read the new a.md: ${after["shown"]}")
         } finally {
             runBlocking { rig.supervisor.detach("kanban") }
         }

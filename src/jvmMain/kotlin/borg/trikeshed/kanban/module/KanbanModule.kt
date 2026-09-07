@@ -614,6 +614,18 @@ class KanbanModule : ForgeModule {
             runs.content(query["cid"], query["view"], query["key"])
         }
 
+        // The RUN HEAD (AutoTools, Cut B): which recorded run is the build of (a program's current
+        // version, a canonical set of inputs), what lamp it burns, and which documents moved under
+        // it. A page's `lcnc-run` block asks this and paints the answer; the decision itself lives
+        // in commonMain (LcncRunHead) so the page, this route and a curl reader cannot disagree.
+        // ModuleRouteRegistry claims are EXACT paths with the query stripped, so /api/lcnc/runs is
+        // its own key and neither it nor /api/lcnc/run shadows the other.
+        ctx.routes.claim(id, "/api/lcnc/runs") { method, path, _, _ ->
+            if (method != "GET") return@claim JvmKanbanServer.HttpResponse(405, """{"error":"method_not_allowed"}""")
+            val query = borg.trikeshed.relaxfactory.CouchHttpSurface.parseQuery(path.substringAfter('?', ""))
+            runs.head(query["program"], query["inputs"], query["show"])
+        }
+
         // The generic runner dispatch: ONE execution author. The browser (and any
         // client) posts {type, params?, inputs?} to run ONE node (a job), or
         // {program, inputs?} to run a WHOLE stored program (a procedure — spec

@@ -51,7 +51,27 @@ object ForgeBakePages {
             System.err.println("forge-bake: no donor at $donor; using persisted board for '$userId' (or fallback)")
         }
 
-        val html = ForgeApp.renderHtml(userId, bundles = bundles)
+        // The docs mindmap is read from the same directory the page is written into, so the map
+        // cannot describe a document that was deleted or miss one that was added. Sorted, because
+        // a directory listing is not ordered and the picture must not shuffle between bakes.
+        val docsDir = out.parent ?: Paths.get("docs")
+        val docs = runCatching {
+            Files.list(docsDir).use { stream ->
+                stream.filter { it.fileName.toString().endsWith(".md") }
+                    .map { borg.trikeshed.forge.concept.DocSource(docsDir.fileName.toString() + "/" + it.fileName, Files.readString(it)) }
+                    .toList()
+            }.sortedBy { it.path }
+        }.getOrElse {
+            System.err.println("forge-bake: no docs corpus at $docsDir (${it.message}); the docs mindmap will be absent")
+            emptyList()
+        }
+        System.err.println(
+            "forge-bake: docs mindmap = ${docs.size} documents, " +
+                "${borg.trikeshed.forge.concept.DocsGraph.edgesOf(docs).size} cross-references, " +
+                "${borg.trikeshed.forge.concept.DocsGraph.orphans(docs).size} unlinked"
+        )
+
+        val html = ForgeApp.renderHtml(userId, bundles = bundles, docs = docs)
         val seedStart = html.indexOf("id=\"forge-seed\"")
         require(seedStart >= 0) { "rendered shell has no forge-seed slot" }
         val seedEmpty = html.regionMatches(html.indexOf('>', seedStart) + 1, "{}<", 0, 3)

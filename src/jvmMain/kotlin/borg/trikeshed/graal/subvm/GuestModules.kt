@@ -109,6 +109,24 @@ object GuestModules {
     /** Classpath roots in the order [GuestModuleLayout] specifies: `classes/` first, then the jars. */
     fun classpath(module: String): List<File> = listOfNotNull(classesDir(module)) + jars(module)
 
+    /**
+     * A module and everything it extends, nearest first: `camel-mail` -> [camel-mail, camel].
+     *
+     * The relation is read from each module's own MANIFEST (`# parent`), so the shape of a
+     * deployment is a property of what is on disk rather than of a table in here. Cycles are
+     * cut rather than diagnosed — a manifest that names itself an ancestor is a broken install,
+     * and looping forever while mounting is a worse answer than mounting the prefix.
+     */
+    fun chain(module: String): List<String> {
+        val seen = LinkedHashSet<String>()
+        var cur: String? = module
+        while (cur != null && seen.add(cur)) cur = manifest(cur).parent?.takeIf { moduleDir(it) != null }
+        return seen.toList()
+    }
+
+    /** Every classpath root of [chain], child-first so a department shadows its parent. */
+    fun composedClasspath(module: String): List<File> = chain(module).flatMap { classpath(it) }
+
     fun isInstalled(module: String): Boolean = classpath(module).isNotEmpty()
 
     /** Installed module names. */
@@ -141,14 +159,24 @@ object GuestModules {
                 check(v.ok) {
                     "guest module '$module' failed verification against ${GuestModuleLayout.MANIFEST} " +
                         "and was NOT mounted:\n  " + v.problems.joinToString("\n  ") +
-                        "\nRe-resolve it: ./gradlew -p utils/subvm install${module.replaceFirstChar { it.uppercase() }}"
+                        "\nRe-resolve it: ./gradlew -p utils/subvm install${gradleTaskName(module)}"
                 }
             }
+            // A DEPARTMENT is parented at the module it extends, not at the platform loader, so
+            // `camel-mail` resolves MailComponent from its own 4 jars and CamelContext from the
+            // spine behind it. Delegation is parent-first, which is also the shape's one limit:
+            // the parent cannot see the child, so a CamelContext built in the spine's loader will
+            // not find the department's META-INF/services. Build it in the DEPARTMENT's loader —
+            // VmSpec.module = "camel-mail" already does exactly that — and both halves resolve.
+            // A route needing two departments at once still wants a composed loader over
+            // [composedClasspath]; that case is not this one and is deliberately not built.
+            val parentModule = manifest(module).parent?.takeIf { moduleDir(it) != null }
+            val parentLoader = parentModule?.let { loaderFor(it) } ?: ClassLoader.getPlatformClassLoader()
             URLClassLoader(
                 // File.toURI() appends the trailing slash for an existing directory, which is what
                 // URLClassLoader needs to treat `classes/` as a directory rather than a jar.
                 classpath(module).map { f -> f.toURI().toURL() }.toTypedArray(),
-                ClassLoader.getPlatformClassLoader(),
+                parentLoader,
             ).also { loader ->
                 // Under the supervisor from birth. A URLClassLoader holds open jar handles and is
                 // the thing the daemon executes code from; releasing it must not depend on some
@@ -162,6 +190,14 @@ object GuestModules {
             }
         }
     }
+
+    /**
+     * The install task's name for a module: `camel-mail` -> `installCamelMail`. Mirrors
+     * `gradleName` in `utils/subvm/build.gradle.kts`; a dashed module would otherwise be
+     * advertised as `installCamel-mail`, which is not a task anyone can run.
+     */
+    private fun gradleTaskName(module: String): String =
+        module.split('-').filter { it.isNotEmpty() }.joinToString("") { it.replaceFirstChar { c -> c.uppercase() } }
 
     /** Whether a binary name resolves in this module — the predicate `allowHostClassLookup` wants. */
     fun canResolve(loader: ClassLoader, binaryName: String): Boolean =

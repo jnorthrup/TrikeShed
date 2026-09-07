@@ -41,7 +41,16 @@ class LcncKindsTest {
         assertTrue("T" in variables, "coalesce declares T: $variables")
         assertEquals((listOf("Any", "List<TurnFact>") + variables).sorted(), facts.acceptance()["List<TurnFact>"])
         assertEquals((listOf("Any", "json") + variables).sorted(), facts.acceptance()["json"])
-        assertEquals(mapOf("List<TurnFact>" to listOf("verb", "ok", "context", "object")), facts.shapes())
+        // Every kind whose contract declares a shape, not one of them: project.docs added
+        // List<ProjectDoc> in dbc0d8201 and this assertion lagged it. A shape is what lets a
+        // ring bind a field of an exactly-typed element without the cable degrading to json.
+        assertEquals(
+            mapOf(
+                "List<ProjectDoc>" to listOf("project", "id", "cid"),
+                "List<TurnFact>" to listOf("verb", "ok", "context", "object"),
+            ),
+            facts.shapes(),
+        )
     }
 
     @Test

@@ -1,0 +1,10 @@
+# guest module	camel-mail
+# parent	camel
+# declared	org.apache.camel:camel-mail:4.8.5
+# inherited	10 jars from camel
+# resolved	4 jars	967625 bytes
+file	size	sha256
+angus-mail-2.0.3.jar	498535	6b5b6fc2ba633c53733d829c56cae51d343fb1eadee3e17b8eea01a49edc72d3
+camel-attachments-4.8.5.jar	24710	6b78e2cddb2183913cb97f12754fb4f625527de29ad93b984ecfb259da07c58b
+camel-mail-4.8.5.jar	207926	bca472276272d4b6ab602eb756299d9f40938bc9edcbd06b1122e337ab3a9bb7
+jakarta.mail-api-2.1.3.jar	236454	8051b58d75f982f9a5b963b3765426e824b2a64865ef0af17205e455b98db05c

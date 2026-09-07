@@ -1169,20 +1169,117 @@ object LcncContracts {
             ),
         ),
         LcncPortContract(SubVm.LEGO_PREFIX + "camel", "camel: route DSL in a sub-VM",
-            listOf("messages?"), listOf("routed"),
+            listOf("messages?"), listOf("routed", "ok", "error"),
             inputKinds = mapOf("messages" to "json"),
-            outputKinds = mapOf("routed" to "text"),
+            // ok/error are declared because the linkage gate can refuse a route before it is
+            // ever built: a lego that can decline has to be able to SAY it declined, or the
+            // refusal arrives as a blank `routed` and reads like a route that carried nothing.
+            outputKinds = mapOf("routed" to "text", "ok" to "json", "error" to "text"),
             params = mapOf(
                 "facet" to LcncPortContract.LcncParamSpec(v = "JVM"),
                 // Guest module supplying this lego's classes (utils/subvm/<module>). Declared so the
                 // surface can express the override; blank means the lego's own default.
                 "module" to LcncPortContract.LcncParamSpec(v = ""),
-                "from" to LcncPortContract.LcncParamSpec(v = "direct:lcnc"),
-                "to" to LcncPortContract.LcncParamSpec(v = "log:lcnc"),
+                // LIVE, not a typed list: the endpoints an author may pick are exactly the ones
+                // the mounted module ships and CamelLinkage admits, and both change when a module
+                // is mounted or re-resolved. vm.camel.catalog runs as a one-node program to fill
+                // these, so a stale option is impossible — there is no list here to go stale.
+                // Scoped by THIS node's own module and reach, not global. A picklist over
+                // everything Camel ships is a few hundred rows and useless; scoped to the
+                // mounted department it is a dozen, and it lists exactly what the gate below
+                // will actually admit — so the editor cannot offer a value that then fails.
+                "from" to LcncPortContract.LcncParamSpec(
+                    v = "direct:lcnc",
+                    optsFrom = SubVm.LEGO_PREFIX + "camel.catalog?module=\$module&reach=\$reach#endpoints[]"),
+                "to" to LcncPortContract.LcncParamSpec(
+                    v = "log:lcnc",
+                    optsFrom = SubVm.LEGO_PREFIX + "camel.catalog?module=\$module&reach=\$reach#endpoints[]"),
+                // How far this route may reach, spelled out on the node. LOCAL is the default
+                // and admits only schemes that stay on the machine; DEPARTMENT admits whatever
+                // a mounted department provides, the wire included. Mounting camel-mail is what
+                // makes smtp POSSIBLE; setting this is what makes it ALLOWED, and putting the
+                // second half in the graph is the point — otherwise a route's reach is implied
+                // by what someone installed months ago.
+                "reach" to LcncPortContract.LcncParamSpec(v = "LOCAL", opts = listOf("LOCAL", "DEPARTMENT")),
                 "world" to LcncPortContract.LcncParamSpec(ph = "comma-separated host dirs seeded to /workspace"),
                 "trust" to LcncPortContract.LcncParamSpec(v = "OWN", opts = VM_TRUST_OPTIONS),
                 "keep" to LcncPortContract.LcncParamSpec(v = "false", opts = BOOLEAN_OPTIONS),
             )),
+        // The lazy half of the palette: one entry that stands for everything the mounted
+        // module offers, instead of a hundred rows that go stale on the next re-resolve.
+        // Read-only in the structural sense — no VM, and no port through which it could
+        // mount, install or execute. It opens zips and reports names.
+        LcncPortContract(SubVm.LEGO_PREFIX + "camel.catalog", "camel: enumerate the mounted module (lazy)",
+            emptyList(), listOf("endpoints", "count", "detail", "installed", "mounted", "unlisted"),
+            outputKinds = mapOf(
+                "endpoints" to "json", "count" to "json", "detail" to "text",
+                "installed" to "json", "mounted" to "json", "unlisted" to "json",
+            ),
+            params = mapOf(
+                // A DEPARTMENT name here scopes everything below it to that department plus the
+                // spine it extends — which is how one palette entry stays small while the set of
+                // mountable components grows.
+                "module" to LcncPortContract.LcncParamSpec(
+                    v = "", optsFrom = SubVm.LEGO_PREFIX + "camel.catalog?kind=department#endpoints[]"),
+                // endpoint = ready-to-run URIs (the picklist shape, and the default because the
+                // picklist resolver runs this node with no params at all); eip = the 104 model
+                // names; scheme = every component the mounted chain announces; linkage = what the
+                // gate admits under this reach; department = the installed modules that extend another.
+                "kind" to LcncPortContract.LcncParamSpec(
+                    v = "endpoint", opts = listOf("endpoint", "eip", "scheme", "linkage", "department")),
+                "reach" to LcncPortContract.LcncParamSpec(v = "LOCAL", opts = listOf("LOCAL", "DEPARTMENT")),
+                "name" to LcncPortContract.LcncParamSpec(
+                    ph = "one eip or scheme — fetches its full JSON into detail"),
+            )),
+        // The LIFETIME half of camel, as against vm.camel above, which is the DISPATCH half.
+        // vm.camel starts a context, carries one body and stops it inside a single run — the right
+        // shape for a request and the wrong one for a consumer, because every consumer Camel has
+        // (timer:, file:, imaps:) is a poller and a poller outlives the gesture that started it.
+        // These three put a route on the daemon's clock and publish what crosses it as facts.
+        LcncPortContract(SubVm.LEGO_PREFIX + "camel.up", "camel: start a route and leave it running",
+            emptyList(), listOf("id", "status", "routes", "ok", "error"),
+            outputKinds = mapOf(
+                "id" to "id", "status" to "text", "routes" to "json", "ok" to "json", "error" to "text",
+            ),
+            params = mapOf(
+                // The route's name for as long as it runs. Blank takes the node's own id, so the
+                // simple case needs no ceremony; naming it matters when one program starts several.
+                "id" to LcncPortContract.LcncParamSpec(ph = "route id — blank uses this node's id"),
+                // Same LIVE picklists as vm.camel, and for the same reason: the admissible set is
+                // whatever the mounted module ships under this node's reach, and it changes when a
+                // module is mounted or re-resolved. There is no list here to go stale.
+                "from" to LcncPortContract.LcncParamSpec(
+                    v = "timer:lcnc?period=1000",
+                    optsFrom = SubVm.LEGO_PREFIX + "camel.catalog?module=\$module&reach=\$reach#endpoints[]"),
+                "to" to LcncPortContract.LcncParamSpec(
+                    v = "log:lcnc",
+                    optsFrom = SubVm.LEGO_PREFIX + "camel.catalog?module=\$module&reach=\$reach#endpoints[]"),
+                "module" to LcncPortContract.LcncParamSpec(v = ""),
+                // The second gate, spelled on the node. Mounting camel-mail makes smtp POSSIBLE;
+                // this is what makes it ALLOWED, and a long-lived route is exactly the case the
+                // distinction was drawn for — a route that stays up is reaching for as long as it
+                // is up, so what it may reach belongs in the graph and not in an install history.
+                "reach" to LcncPortContract.LcncParamSpec(v = "LOCAL", opts = listOf("LOCAL", "DEPARTMENT")),
+            )),
+        LcncPortContract(SubVm.LEGO_PREFIX + "camel.down", "camel: stop a running route",
+            emptyList(), listOf("stopped", "count", "ok", "error"),
+            outputKinds = mapOf(
+                "stopped" to "json", "count" to "json", "ok" to "json", "error" to "text",
+            ),
+            params = mapOf(
+                // Picked from what is actually up, not typed from memory: a stop that names a
+                // route which ended an hour ago is the most common way an operator concludes the
+                // stop is broken.
+                "id" to LcncPortContract.LcncParamSpec(
+                    ph = "route id", optsFrom = SubVm.LEGO_PREFIX + "camel.routes#ids[]"),
+                "all" to LcncPortContract.LcncParamSpec(v = "false", opts = BOOLEAN_OPTIONS),
+            )),
+        // Read-only, no params, and no port through which it could start, stop or reach anything —
+        // which is what makes it safe to call from a picklist that fills on every editor open,
+        // the same argument camel.catalog makes about itself.
+        LcncPortContract(SubVm.LEGO_PREFIX + "camel.routes", "camel: what is running right now",
+            emptyList(), listOf("ids", "routes", "count"),
+            outputKinds = mapOf("ids" to "json", "routes" to "json", "count" to "json")),
         LcncPortContract(SubVm.LEGO_PREFIX + "graalce", "graalce: any Graal language, inline source",
             listOf("context?"), listOf("result"),
             inputKinds = mapOf("context" to "json"),

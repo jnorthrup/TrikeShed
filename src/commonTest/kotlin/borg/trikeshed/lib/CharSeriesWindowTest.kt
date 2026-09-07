@@ -9,6 +9,17 @@ import kotlin.test.assertTrue
 
 class CharSeriesWindowTest {
     @Test
+    fun stringRenderingHonorsItsCapWithoutAdvancingTheCursor() {
+        val chars = CharSeries("0123456789").pos(2).lim(8)
+        assertEquals("234", chars.asString(3))
+        assertEquals("234567", chars.asString(Int.MAX_VALUE))
+        assertEquals("", chars.asString(0))
+        assertEquals(2, chars.pos)
+        assertEquals(8, chars.limit)
+        assertFailsWith<IllegalArgumentException> { chars.asString(-1) }
+    }
+
+    @Test
     fun packedAndRangeWindowsShareTheCharacterSequenceView() {
         val source = CharSeries("0123456789")
         val packed = source[2 j 8]

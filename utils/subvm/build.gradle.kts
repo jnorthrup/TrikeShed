@@ -30,9 +30,25 @@ val guestModules: Map<String, List<String>> = mapOf(
         "edu.stanford.nlp:stanford-corenlp:4.5.10:models",
     ),
     // The dispatch fabric: routes, components and the DefaultCamelContext lifecycle.
+    // This is the SPINE, not the whole of Camel — it carries the EIP engine and the 22
+    // component schemes that ship with core. Everything else arrives as a DEPARTMENT.
     "camel" to listOf(
         "org.apache.camel:camel-core:4.8.5",
         "org.apache.camel:camel-main:4.8.5",
+    ),
+    // ── departments ────────────────────────────────────────────────────────────────
+    // A department is a guest module that EXTENDS the camel spine rather than repeating
+    // it: it resolves with camel-core on the compile side but ships only what core does
+    // not already have, and it is mounted alongside `camel` as a composed classpath
+    // (see GuestModules.loaderFor). Bundling camel-core into each department instead
+    // would put two CamelContext classes in two loaders and turn a missing-class error
+    // into a class-identity one, which is strictly worse to diagnose.
+    //
+    // Departments are the unit of PURCHASE and of PRIVILEGE. A deployment that mounts
+    // only `camel` cannot name an smtp endpoint, because the scheme is not on any
+    // mounted classpath — nothing has to enforce that, it is simply absent.
+    "camel-mail" to listOf(
+        "org.apache.camel:camel-mail:4.8.5",
     ),
     // Text/metadata extraction. Listed so the door is open; note that unlike the other
     // two, Tika still has a real host-side consumer (JvmTikaIngestAdapter.kt), so it
@@ -43,6 +59,22 @@ val guestModules: Map<String, List<String>> = mapOf(
     ),
 )
 
+/**
+ * Gradle-name form of a module key: `camel-mail` -> `CamelMail`, `camel` -> `Camel`.
+ * The directory keeps the dashed name because it matches the Maven artifact an
+ * operator is looking for; only the task and configuration names are folded.
+ */
+/**
+ * Departments and the module each EXTENDS. A department resolves against its parent's
+ * artifacts but ships only the delta, and mounts with the parent's classpath behind it.
+ */
+val departmentParents: Map<String, String> = mapOf(
+    "camel-mail" to "camel",
+)
+
+fun gradleName(module: String): String =
+    module.split('-').filter { it.isNotEmpty() }.joinToString("") { it.replaceFirstChar { c -> c.uppercase() } }
+
 fun sha256(f: File): String =
     MessageDigest.getInstance("SHA-256").digest(f.readBytes()).joinToString("") { "%02x".format(it) }
 
@@ -52,13 +84,13 @@ val installAll = tasks.register("installAll") {
 }
 
 guestModules.forEach { (module, coordinates) ->
-    val cfg = configurations.create("guest${module.replaceFirstChar { it.uppercase() }}") {
+    val cfg = configurations.create("guest${gradleName(module)}") {
         isCanBeConsumed = false
         isCanBeResolved = true
     }
     dependencies { coordinates.forEach { add(cfg.name, it) } }
 
-    val task = tasks.register("install${module.replaceFirstChar { it.uppercase() }}") {
+    val task = tasks.register("install${gradleName(module)}") {
         group = "subvm"
         description = "Resolve $module into $module/lib"
         val libDir = layout.projectDirectory.dir("$module/lib").asFile
@@ -67,20 +99,40 @@ guestModules.forEach { (module, coordinates) ->
         // Resolve at execution time; the configuration is the task's real input.
         val resolved = cfg
         outputs.dir(libDir)
+        val parentModule = departmentParents[module]
+        val parentLib = parentModule?.let { layout.projectDirectory.dir("$it/lib").asFile }
         doLast {
             libDir.deleteRecursively()
             libDir.mkdirs()
-            val files = resolved.resolve().sortedBy { it.name }
+            // A department resolves its parent's artifacts too — camel-mail pulls camel-core,
+            // camel-support and the rest of the spine. Shipping those again would put a second
+            // copy of every spine class on a second classloader, so the SAME class arriving
+            // through two loaders stops being the same class. Subtracting by file name is the
+            // whole mechanism: what the parent already carries, the department does not.
+            val parentJars = parentLib?.listFiles { f: File -> f.isFile && f.name.endsWith(".jar") }
+                ?.map { it.name }?.toSet() ?: emptySet()
+            if (parentModule != null && parentJars.isEmpty()) {
+                throw GradleException(
+                    "department '$module' extends '$parentModule', which is not resolved yet — " +
+                        "run ./gradlew -p utils/subvm install${gradleName(parentModule)} first",
+                )
+            }
+            val all = resolved.resolve().sortedBy { it.name }
+            val files = all.filter { it.name !in parentJars }
+            val shared = all.size - files.size
             files.forEach { it.copyTo(File(libDir, it.name), overwrite = true) }
             val lines = buildList {
                 add("# guest module\t$module")
+                parentModule?.let { add("# parent\t$it") }
                 declared.forEach { add("# declared\t$it") }
+                if (parentModule != null) add("# inherited\t$shared jars from $parentModule")
                 add("# resolved\t${files.size} jars\t${files.sumOf { it.length() }} bytes")
                 add("file\tsize\tsha256")
                 files.forEach { add("${it.name}\t${it.length()}\t${sha256(it)}") }
             }
             manifest.writeText(lines.joinToString("\n") + "\n")
-            logger.lifecycle("[subvm] $module: ${files.size} jars, ${files.sumOf { it.length() } / 1024 / 1024} MB -> ${libDir.path}")
+            val inherited = if (parentModule != null) " (+$shared inherited from $parentModule)" else ""
+            logger.lifecycle("[subvm] $module: ${files.size} jars, ${files.sumOf { it.length() } / 1024 / 1024} MB$inherited -> ${libDir.path}")
         }
     }
     installAll.configure { dependsOn(task) }

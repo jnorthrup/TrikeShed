@@ -1,6 +1,9 @@
 <!doctype html>
 <html lang="en">
 <head>
+<link rel="stylesheet" href="/allocation-inspector.css">
+<script src="/vendor/lucide-mux.js" defer></script>
+<script src="/allocation-inspector.js" defer></script>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Graal Console</title>
@@ -200,6 +203,7 @@ function fit(){if(typeof killMomentum==='function')killMomentum();const s=Math.m
   cam={s,ox:W/2-innerWidth/(2*s),oy:H/2-innerHeight/(2*s)+30/s};}
 /* ── terrain tree from /api/graal/map ───────────────────── */
 let root=null,byId=new Map();
+const classNodes=new Map();
 const HUES={'forge':300,'projects':172,'.git':262,'pointcut':8,'_design':318,'memories':210,'lost-found':48,'jules':132,'vms':282};
 function hueOf(name){if(name in HUES)return HUES[name];let h=0;for(const c of name)h=(h*31+c.charCodeAt(0))>>>0;return h%360;}
 function node(name,parent){return{name,parent,children:new Map(),bytes:0,mass:0,docs:0,leaf:false,rect:null,laid:false,hue:parent?parent.hue:hueOf(name)};}
@@ -230,9 +234,11 @@ function buildAll(){
 }
 function toggleArrange(){ARRANGE=ARRANGE==='positional'?'similarity':'positional';localStorage.setItem('arrange',ARRANGE);buildAll();}
 function toggleHeapTerrain(){HEAP_TERRAIN=!HEAP_TERRAIN;localStorage.setItem('heapTerrain',HEAP_TERRAIN?'1':'0');
-  if(HEAP_TERRAIN&&!heapRows)loadMap();else buildAll();}
+  if(HEAP_TERRAIN&&!heapRows)loadHeap();else buildAll();}
 function buildTree(rows){
   root=node('trikeshed',null);root.rect={x:0,y:0,w:W,h:H};byId=new Map();maxSeq=1;
+  classNodes.clear();
+  for(const [id,at] of heat)if(performance.now()-at>=120000)heat.delete(id);
   for(const row of rows){
     const [id,bytes,seq,gen,code]=row;
     const parts=ARRANGE==='similarity'
@@ -246,6 +252,11 @@ function buildTree(rows){
       n=c;n.bytes+=bytes;n.mass+=mass;n.docs++;
     }
     n.leaf=true;n.id=id;n.seq=seq||0;n.gen=gen||1;n.mass=mass;byId.set(id,n);
+    const classPath=id.split('/build/live/classes/')[1];
+    const className=classPath?.endsWith('.class')?classPath.slice(0,-6).replaceAll('/','.'):
+      /^heap-(live|alloc)\//.test(id)?id.slice(id.indexOf('/')+1):null;
+    if(className){const nodes=classNodes.get(className)||[];nodes.push(n);classNodes.set(className,nodes);}
+    const touched=heat.get(id);if(touched!==undefined)heatUp(n,touched);
     if(n.seq>maxSeq)maxSeq=n.seq;
     let a=n.parent;while(a){if((a.maxSeq||0)<n.seq)a.maxSeq=n.seq;a=a.parent;}
     if((root.maxSeq||0)<n.seq)root.maxSeq=n.seq;
@@ -315,7 +326,7 @@ applySkin();
 let mode='map';               // M cycles
 let fog=false;                // F toggles: dim territories with no recent activity
 const heat=new Map();         // territory path → last activity ms
-function heatUp(n){const now=performance.now();while(n&&n!==root){heat.set(pathOf(n),now);n=n.parent;}}
+function heatUp(n,now=performance.now()){while(n&&n!==root){const id=pathOf(n);heat.set(id,Math.max(heat.get(id)||0,now));n=n.parent;}}
 function heatOf(n){const t=heat.get(pathOf(n));return t?Math.max(0,1-(performance.now()-t)/120000):0;}
 function cycleMode(){mode=mode==='map'?'graph':mode==='graph'?'tree':mode==='tree'?'notion':'map';
   if(mode==='graph')buildGraph();
@@ -936,6 +947,8 @@ function shapeStripHtml(text){
 function jumpLine(n){const cv=document.querySelector('#proj .codeview');if(!cv)return;
   const row=cv.children[n-1];if(row){row.scrollIntoView({block:'center'});row.style.outline='1px solid var(--commit)';setTimeout(()=>row.style.outline='',1200);}}
 async function openDoc(id){
+  const allocation=heapLeaves.get(id);
+  if(allocation){AllocationInspector.open(allocation.cls,{kind:allocation.kind,bytes:allocation.bytes});return;}
   $('docTitle').textContent=id.split('/').pop();$('docBody').innerHTML='…';$('docBody').style.display='';
   $('docSheetBody').style.display='none';$('docSheetBody').innerHTML='';sheetFamily=null;sheetCurrentId=null;
   show('doc');
@@ -1480,11 +1493,13 @@ async function captureAot(){
   else $('aotBody').insertAdjacentHTML('beforeend','<div style="color:var(--deopt);margin-top:6px">capture failed: '+esc(x.error||r.status)+'</div>');
 }
 /* ── the flourish feed ──────────────────────────────────── */
-const COLORS={compile:'var(--compile)',deopt:'var(--deopt)',gc:'var(--gc)',commit:'var(--commit)',cpu:'var(--cpu)',vm:'var(--vm)'};
-const PING={compile:'#3ddc84',deopt:'#ff4f58',gc:'#ffb02e',commit:'#3fd0ff'};
+const COLORS={build:'#68c8c1',compile:'var(--compile)',deopt:'var(--deopt)',gc:'var(--gc)',commit:'var(--commit)',cpu:'var(--cpu)',vm:'var(--vm)'};
+const PING={build:'#68c8c1',compile:'#3ddc84',deopt:'#ff4f58',gc:'#ffb02e',commit:'#3fd0ff'};
 function river(kind,text){
   const d=document.createElement('div');d.className='evt';d.style.borderLeftColor=COLORS[kind]||'var(--dim)';
-  d.innerHTML='<small>'+new Date().toTimeString().slice(0,8)+'</small> <b style="color:'+(COLORS[kind]||'#fff')+'">'+kind+'</b> '+text;
+  const time=document.createElement('small');time.textContent=new Date().toTimeString().slice(0,8);
+  const tag=document.createElement('b');tag.style.color=COLORS[kind]||'#fff';tag.textContent=kind;
+  d.append(time,' ',tag,' ',String(text));
   const r=$('river');r.prepend(d);while(r.children.length>34)r.lastChild.remove();
 }
 function flash(chip,cls){if(reduced)return;chip.classList.add(cls);setTimeout(()=>chip.classList.remove(cls),450);}
@@ -1504,19 +1519,39 @@ function nodeFor(id){
 const quakeBuf=new Map();let quakeTimer=null,recentCommits=0;
 setInterval(()=>{recentCommits=0;},1000);
 function topOf(n){let t=n;while(t&&t.parent&&t.parent!==root)t=t.parent;return t||n;}
-function quake(e,n){
+function quake(e,n,kind='commit'){
   recentCommits++;
-  if(recentCommits<=12){river('commit',(e.deleted?'✕ ':'')+e.id);pingAt(n,PING.commit);return;}
-  const t=topOf(n||root),k=t===root?'/':t.name;
-  const q=quakeBuf.get(k)||{n:t,count:0};q.count++;quakeBuf.set(k,q);
+  const color=PING[kind];
+  const label=e.phase||kind;
+  if(recentCommits<=12){river(kind,(e.phase?e.phase+' ':'')+(e.deleted?'✕ ':'')+e.id);pingAt(n,color);return;}
+  const t=kind==='commit'?topOf(n||root):(n?.leaf?n.parent:n)||root;
+  const territory=t===root?'/':pathOf(t),k=label+':'+territory;
+  const q=quakeBuf.get(k)||{n:t,count:0,kind,color,label,territory};q.count++;quakeBuf.set(k,q);
   if(!quakeTimer)quakeTimer=setTimeout(()=>{
-    for(const [k,q] of quakeBuf){
-      river('commit','⚡ quake: '+q.count.toLocaleString()+' commits in '+k);
-      pingAt(q.n,PING.commit,'⚡'+q.count);
-      if(!reduced&&q.count>200)shake=Math.min(shake+4,8);
+    for(const q of quakeBuf.values()){
+      river(q.kind,q.count.toLocaleString()+' '+q.label+' in '+q.territory);
+      pingAt(q.n,q.color,String(q.count));
+      if(q.kind==='commit'&&!reduced&&q.count>200)shake=Math.min(shake+4,8);
     }
     quakeBuf.clear();quakeTimer=null;
   },900);
+}
+function touchDocument(e){
+  if(typeof e.id!=='string')return;
+  heat.set(e.id,performance.now());
+  const n=nodeFor(e.id);heatUp(n);
+  if(e.kind==='commit'){
+    if(e.deleted||!byId.has(e.id))requestMapRefresh();
+    if(byId.has(e.id)&&Number.isFinite(e.seq)){
+      n.seq=e.seq;maxSeq=Math.max(maxSeq,e.seq);
+      for(let p=n.parent;p;p=p.parent)p.maxSeq=Math.max(p.maxSeq||0,e.seq);
+    }
+  }
+  quake(e,n,e.kind==='class-update'?'build':'commit');
+}
+function touchCompilation(e){
+  // Short method labels are not identities: use the declaring class supplied by JFR.
+  for(const n of classNodes.get(e.className)||[])heatUp(n);
 }
 function connectSse(){
   const es=new EventSource('/api/graal/events');
@@ -1524,10 +1559,10 @@ function connectSse(){
     const e=JSON.parse(m.data);
     switch(e.kind){
       case 'vm':vmLine(e);river(e.vmKind==='revoked'?'deopt':'commit','vm '+e.vmKind+' '+(e.vmId||'')+' — '+vmDetail(e));break;
-      case 'compile':river('compile',(e.method||'?')+' L'+(e.level??'?')+' '+fmtBytes(e.codeSize||0));flash($('cComp'),'flash-compile');break;
+      case 'compile':touchCompilation(e);river('compile',(e.method||'?')+' L'+(e.level??'?')+' '+fmtBytes(e.codeSize||0));flash($('cComp'),'flash-compile');break;
       case 'deopt':river('deopt',(e.reason||'?')+' → '+(e.action||'?')+' #'+(e.compileId??''));flash($('cDeopt'),'flash-deopt');shake=Math.min(shake+5,9);pingAt(nodeFor('pointcut'),PING.deopt,e.reason);break;
       case 'gc':river('gc',(e.name||'?')+' '+(e.cause||'')+' '+(e.pauseMs||0)+'ms');flash($('cGc'),'flash-gc');break;
-      case 'commit':{const n=nodeFor(e.id);heatUp(n);quake(e,n);}break;
+      case 'class-update':case 'commit':touchDocument(e);break;
       case 'score':river('compile','scoring session '+(e.session||'').slice(0,12)+'… seq='+(e.corpusSeq??'?')+' '+(e.scores??0)+' scores — '+(e.confidence||'?'));break;
       case 'cpu':break;
       default:river(e.kind||'?',JSON.stringify(e).slice(0,90));
@@ -1561,18 +1596,34 @@ async function productRows(){
   }catch(_){}
   return rows;
 }
+let mapTimer=null,mapBusy=false,mapAgain=false,mapUrgent=false,heapTimer=null,heapBusy=false;
+function requestMapRefresh(){
+  if(mapBusy){mapAgain=true;return;}
+  if(mapUrgent)return;
+  mapUrgent=true;clearTimeout(mapTimer);mapTimer=setTimeout(loadMap,750);
+}
 async function loadMap(){
+  if(mapBusy){mapAgain=true;return;}
+  clearTimeout(mapTimer);mapUrgent=false;mapBusy=true;
   let mapErr='';
   try{const m=await (await fetch('/api/graal/map')).json();
     PROJECT_DBS=new Set(m.dbs||[]);
     const prod=await productRows();
     lastRows=(m.rows||[]).concat(prod);}
   catch(e){mapErr=String(e);}
-  try{const h=await (await fetch('/api/graal/heap')).json();heapRows=heapContinentRows(h);}catch(e){heapRows=heapRows||[];}
   lastRows=lastRows||[];
   if(!lastRows.length)$('crumb').textContent='map fetch failed: '+(mapErr||'empty');
-  buildAll();
-  setTimeout(loadMap,30000);
+  try{buildAll();}finally{
+    mapBusy=false;mapTimer=setTimeout(loadMap,mapAgain?750:30000);mapAgain=false;
+  }
+}
+async function loadHeap(){
+  if(heapBusy)return;
+  clearTimeout(heapTimer);heapBusy=true;
+  try{const h=await (await fetch('/api/graal/heap')).json();heapRows=heapContinentRows(h);
+    if(HEAP_TERRAIN)buildAll();
+  }catch(e){heapRows=heapRows||[];}
+  finally{heapBusy=false;heapTimer=setTimeout(loadHeap,30000);}
 }
 /* R1: the JVM heap continent as treemap rows. Both continents from /api/graal/heap:
    `rows` (per-class live-set, the GC class histogram) and `allocation` (JFR
@@ -1597,7 +1648,7 @@ function heapContinentRows(h){
   return rows;
 }
 const heapLeaves=new Map();
-resize();$('crumb').textContent='drop lane v2 armed — drag a folder anywhere';loadMap();pollVitals();pollVms();loadAot();connectSse();boardRefresh();requestAnimationFrame(draw);
+resize();$('crumb').textContent='drop lane v2 armed — drag a folder anywhere';loadMap();loadHeap();pollVitals();pollVms();loadAot();connectSse();boardRefresh();requestAnimationFrame(draw);
 </script>
 </body>
 </html>

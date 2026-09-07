@@ -17,6 +17,7 @@ import java.nio.file.Path
 import java.nio.file.StandardWatchEventKinds
 import java.nio.file.WatchKey
 import java.nio.file.WatchService
+import java.util.concurrent.TimeUnit
 import kotlin.coroutines.CoroutineContext
 
 /** JVM bind for the Oroboros file-event reactor. WatchService blocks only on Dispatchers.IO. */
@@ -61,6 +62,7 @@ class JvmFileWatchReactorElement(
     private val directories = mutableMapOf<WatchKey, Path>()
     private var watchService: WatchService? = null
     private var watchJob: Job? = null
+    private var rootKey: WatchKey? = null
 
     private val glob: PathGlob = PathGlob(includeGlobs, excludeGlobs)
 
@@ -68,7 +70,6 @@ class JvmFileWatchReactorElement(
 
     override suspend fun open() {
         if (state != ElementState.CREATED) return
-        require(Files.isDirectory(rootPath)) { "Watch root is not a directory: $rootPath" }
         super.open()
         val service = FileSystems.getDefault().newWatchService()
         watchService = service
@@ -93,19 +94,33 @@ class JvmFileWatchReactorElement(
     private suspend fun watchLoop(service: WatchService) {
         try {
             while (true) {
-                val watchKey = service.take()
+                // A clean build can remove the root itself, not just its children.
+                if (rootKey?.isValid != true) {
+                    directories.keys.forEach { it.cancel() }
+                    directories.clear()
+                    rootKey = null
+                    if (Files.isDirectory(rootPath)) {
+                        registerTree(rootPath, service, publishExisting = true)
+                        eventChannel.send(FileEvent("", FileEventType.MODIFY))
+                    }
+                }
+                val watchKey = service.poll(500, TimeUnit.MILLISECONDS) ?: continue
                 val directory = directories[watchKey]
                 if (directory != null) {
                     for (rawEvent in watchKey.pollEvents()) {
-                        if (rawEvent.kind() == StandardWatchEventKinds.OVERFLOW) continue
+                        if (rawEvent.kind() == StandardWatchEventKinds.OVERFLOW) {
+                            registerTree(directory, service, publishExisting = true)
+                            eventChannel.send(FileEvent("", FileEventType.MODIFY))
+                            continue
+                        }
                         @Suppress("UNCHECKED_CAST")
                         val relative = (rawEvent.context() as? Path) ?: continue
                         val path = directory.resolve(relative).normalize()
                         val relStr = rootPath.relativize(path).toString().replace('\\', '/')
-                        if (!glob.accepts(relStr)) continue
                         if (rawEvent.kind() == StandardWatchEventKinds.ENTRY_CREATE && Files.isDirectory(path)) {
-                            registerTree(path, service)
+                            registerTree(path, service, publishExisting = true)
                         }
+                        if (!glob.accepts(relStr)) continue
                         val type = when (rawEvent.kind()) {
                             StandardWatchEventKinds.ENTRY_CREATE -> FileEventType.CREATE
                             StandardWatchEventKinds.ENTRY_DELETE -> FileEventType.DELETE
@@ -123,12 +138,12 @@ class JvmFileWatchReactorElement(
         }
     }
 
-    private fun registerTree(start: java.nio.file.Path, service: WatchService) {
+    private suspend fun registerTree(start: Path, service: WatchService, publishExisting: Boolean = false) {
         // The walked tree churns underneath us (CAS atomic-write temps appear and vanish between
         // list and stat). Files.walk's readAttributes then throws NoSuchFileException, and letting
         // that escape open() cancelled the daemon's WHOLE job tree (the "Parent job is Cancelling"
         // kanban deaths). Walk manually; every vanished entry is simply not a directory to watch.
-        fun walk(dir: java.nio.file.Path) {
+        suspend fun walk(dir: Path) {
             if (isIgnored(dir)) return
             runCatching {
                 dir.register(
@@ -137,10 +152,18 @@ class JvmFileWatchReactorElement(
                     StandardWatchEventKinds.ENTRY_MODIFY,
                     StandardWatchEventKinds.ENTRY_DELETE,
                 )
-            }.onSuccess { key -> directories[key] = dir }
+            }.onSuccess { key ->
+                directories[key] = dir
+                if (dir == rootPath) rootKey = key
+            }
             val children = runCatching { Files.newDirectoryStream(dir).use { it.toList() } }.getOrElse { return }
             for (child in children) {
-                if (runCatching { Files.isDirectory(child) }.getOrDefault(false)) walk(child)
+                if (runCatching { Files.isDirectory(child) }.getOrDefault(false)) {
+                    walk(child)
+                } else if (publishExisting) {
+                    val relative = rootPath.relativize(child).toString().replace('\\', '/')
+                    if (glob.accepts(relative)) eventChannel.send(FileEvent(relative, FileEventType.CREATE))
+                }
             }
         }
         if (runCatching { Files.isDirectory(start) }.getOrDefault(false)) walk(start)

@@ -95,35 +95,17 @@ object ConceptGraph {
     fun layerIndex(layer: String): Int = LAYERS.indexOf(layer)
 
     /**
-     * Layered DAG layout: one column per layer (x), nodes stacked in declaration order (y), centred per column.
-     * Deterministic, overlap-free, and the proven idiom for a lattice — no force simulation needed.
+     * Layered DAG layout, shared with [DocsGraph] — see [layeredLayoutSeed]. The concept lattice
+     * and the docs mindmap are the same picture over different corpora, so they lay out with one
+     * implementation rather than two that can drift apart.
      */
-    fun layoutSeed(colGap: Double = 300.0, rowGap: Double = 58.0): Map<String, Any?> {
-        val byLayer = nodes.groupBy { it.layer }
-        val tallest = byLayer.values.maxOfOrNull { it.size } ?: 1
-        val laidOut = nodes.map { n ->
-            val col = layerIndex(n.layer)
-            val column = byLayer.getValue(n.layer)
-            val row = column.indexOf(n)
-            val yOffset = (tallest - column.size) * rowGap / 2.0
-            mapOf(
-                "id" to n.id,
-                "title" to n.title,
-                "layer" to n.layer,
-                "symbol" to n.symbol,
-                "file" to "src/commonMain/kotlin/" + n.file,
-                "x" to col * colGap,
-                "y" to yOffset + row * rowGap,
-                "topo" to col,
-            )
-        }
-        val width = (LAYERS.size - 1) * colGap
-        val height = (tallest - 1) * rowGap
-        return mapOf(
-            "nodes" to laidOut,
-            "edges" to edges.map { mapOf("from" to it.from, "to" to it.to, "rel" to it.rel) },
-            "layers" to LAYERS,
-            "camera" to mapOf("x" to width / 2.0, "y" to height / 2.0, "zoom" to 0.7),
+    fun layoutSeed(colGap: Double = 300.0, rowGap: Double = 58.0): Map<String, Any?> =
+        layeredLayoutSeed(
+            nodes = nodes.map { LayeredNode(it.id, it.title, it.layer, it.symbol, it.file) },
+            edges = edges.map { LayeredEdge(it.from, it.to, it.rel) },
+            layers = LAYERS,
+            colGap = colGap,
+            rowGap = rowGap,
+            filePrefix = "src/commonMain/kotlin/",
         )
-    }
 }

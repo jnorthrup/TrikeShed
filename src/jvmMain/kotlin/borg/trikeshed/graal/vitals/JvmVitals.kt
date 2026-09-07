@@ -170,6 +170,9 @@ class JvmVitals {
         e.getLongOr("codeSize").let { if (it > 0) compiledBytes.addAndGet(it) }
         val d = mapOf(
             "method" to method,
+            "className" to runCatching {
+                e.getValue<jdk.jfr.consumer.RecordedMethod>("method")?.type?.name
+            }.getOrNull(),
             "level" to e.getLongOr("compileLevel"),
             "codeSize" to e.getLongOr("codeSize"),
             "osr" to e.getBooleanOr("isOsr"),
