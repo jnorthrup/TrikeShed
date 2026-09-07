@@ -280,7 +280,10 @@ test("bookmarks round-trip distinct program, object and local scope identities",
 });
 
 test("invalid and incomplete cameras never become navigation state",()=>{
-  for(const hash of ["", "#x=1", "#x=NaN&y=1&z=1", "#x=1&y=2&z=0", "#x=1&y=2&z=4001"])
+  // The out-of-range sample tracks the ceiling instead of restating it: absoluteZoom is
+  // the reach of the dive, and pinning a literal here made a wider reach look like a bug.
+  const tooDeep="#x=1&y=2&z="+(navigation.absoluteZoom+1);
+  for(const hash of ["", "#x=1", "#x=NaN&y=1&z=1", "#x=1&y=2&z=0", tooDeep])
     assert.equal(navigation.decode(hash),null);
 });
 

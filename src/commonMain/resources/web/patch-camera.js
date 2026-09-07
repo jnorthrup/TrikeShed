@@ -2,6 +2,9 @@
 
 // Both construction surfaces use this camera; navigation never edits a graph.
 function scopeZoomCeiling(px,py,camera=view) {
+    // Screen pixels of slop the pointer gets when aiming at a scope, so a deeply nested
+    // one stays reachable after it shrinks below a pixel.
+    const PICK_MIN_PX=12;
     const viewportBox=viewport.getBoundingClientRect(),wx=(px-camera.x)/camera.z,wy=(py-camera.y)/camera.z;
     const regions=new Map();
     const region=n=>{
@@ -13,14 +16,26 @@ function scopeZoomCeiling(px,py,camera=view) {
       }:null;
       regions.set(n,box);return box;
     };
-    const contains=b=>b&&wx>=b.x&&wy>=b.y&&wx<=b.x+b.w&&wy<=b.y+b.h;
+    // A scope authorises magnification only while the pointer is inside it, which is what
+    // keeps the ceiling honest. But a scope four levels down measures a fraction of a pixel,
+    // so nothing could ever be inside it: the ceiling it would authorise was unreachable and
+    // the camera stopped at detailZoom with the recursion still a smear. Pointing is a
+    // gesture with a finger's worth of slop, so a box narrower than PICK_MIN_PX is grown to
+    // that width for the hit test alone. Boxes already bigger than the slop are untouched,
+    // so a clipped descendant still cannot reach past its parent.
+    const contains=b=>{
+      if(!b)return false;
+      const slop=PICK_MIN_PX/camera.z;
+      const px=Math.max(0,(slop-b.w)/2),py=Math.max(0,(slop-b.h)/2);
+      return wx>=b.x-px&&wy>=b.y-py&&wx<=b.x+b.w+px&&wy<=b.y+b.h+py;
+    };
     let scale=1,depth=-1;
     for(const n of G.nodes){
       if(!n._childHost)continue;
       const box=region(n);if(!contains(box))continue;
       let level=0,visible=true;
       for(let p=n._parentScope;p;p=p._parentScope){level++;if(!contains(region(p))){visible=false;break;}}
-      if(visible&&level>depth){scale=box.scale;depth=level;}
+        if(visible&&level>depth){scale=box.scale;depth=level;}
     }
     return LandscapeNavigation.maxZoom(scale);
 }
@@ -33,6 +48,9 @@ function restoreCameraView(camera) {
 }
 
 let cameraDetailRoot=null;
+// Zoom past which #world's single raster is visibly magnified and a covering scope is
+// re-projected at its own scale instead. Below this the one world raster is still sharp.
+const DETAIL_LIFT_ZOOM=8;
 function restoreCameraDetail() {
   if(!cameraDetailRoot)return;
   const n=cameraDetailRoot,v=n._view;
@@ -52,7 +70,12 @@ function projectCameraDetail() {
   };
   if(cameraDetailRoot&&!project(cameraDetailRoot))restoreCameraDetail();
   let next=null,depth=-1;
-  if(view.z>64)for(const n of G.nodes){
+  // Chrome rasterises #world ONCE for the whole matrix and magnifies that texture, so
+  // past a few multiples every glyph inside is a blown-up bitmap however modest a nested
+  // scope's own scale is (the camera ceiling keeps that at detailZoom). The lift is the
+  // only escape: it re-projects the scope at ITS scale, which the ceiling holds low, so
+  // the raster is crisp. It used to wait for 64x, which left the whole 8x-64x band fuzzy.
+  if(view.z>DETAIL_LIFT_ZOOM)for(const n of G.nodes){
     if(!n._childHost||!n.el.isConnected||n.collapsed||n._program!==Harness.selected)continue;
     const r=n._childHost.getBoundingClientRect();
     if(r.left>vr.left||r.top>vr.top||r.right<vr.right||r.bottom<vr.bottom)continue;

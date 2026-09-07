@@ -2,7 +2,7 @@
 
 // A bookmark is a view projection, never an execution command or a document edit.
 const LandscapeNavigation = {
-  minZoom:.01, detailZoom:4, absoluteZoom:4000,
+  minZoom:.01, detailZoom:4, absoluteZoom:4e9,
   maxZoom(scale=1) {
     return Math.min(this.absoluteZoom,this.detailZoom/(Number.isFinite(scale)&&scale>0?scale:1));
   },

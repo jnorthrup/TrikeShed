@@ -48,7 +48,11 @@ test("detail magnification is bounded without flattening nested scope reach",()=
   assert.ok(Math.abs(harness.zoomCeiling(180,180)-200)<1e-9);
   inner.collapsed=true;assert.equal(harness.zoomCeiling(180,180),20);
   outer.collapsed=true;assert.equal(harness.zoomCeiling(180,180),4);
-  assert.equal(navigation.maxZoom(.000001),4000);
+  // A microscopic scope authorises magnification by its own scale, and that reach is what
+  // the old 4000 cut short: four levels down a scope measures a fraction of a pixel, so its
+  // honest ceiling is millions, not thousands. absoluteZoom is still the backstop.
+  assert.equal(navigation.maxZoom(.000001),4e6);
+  assert.equal(navigation.maxZoom(1e-12),navigation.absoluteZoom);
 });
 
 test("clipped descendants cannot authorize magnification outside their parent",()=>{
