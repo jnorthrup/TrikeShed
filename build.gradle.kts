@@ -423,8 +423,13 @@ if (!focusedTransportSlice) {
 tasks.withType<Test>().configureEach {
     useJUnitPlatform()
     testLogging {
-        events("passed", "skipped", "failed")
+        // "started" is what makes a wedged run diagnosable: the last STARTED line
+        // with no matching result names the test that is hanging, live, instead of
+        // leaving the run a wall of daemon chatter with no test attached to it.
+        // Per-test budgets live in src/jvmTest/resources/junit-platform.properties.
+        events("started", "passed", "skipped", "failed")
         showStandardStreams = true
+        exceptionFormat = org.gradle.api.tasks.testing.logging.TestExceptionFormat.FULL
     }
     jvmArgs(
         "-Xmx3g",

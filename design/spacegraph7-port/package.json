@@ -1,0 +1,11 @@
+{
+  "name": "@narchy/spacegraph-web",
+  "private": true,
+  "scripts": {
+    "build": "NODE_PATH=./node_modules esbuild ../../src/commonMain/resources/web/narchy/spacegraph/SpatialWorkspace.mjs --bundle --format=iife --minify --supported:template-literal=false --legal-comments=inline --outfile=../../src/commonMain/resources/web/spacegraph-shadow.js"
+  },
+  "devDependencies": {
+    "esbuild": "0.25.12",
+    "three": "0.185.1"
+  }
+}

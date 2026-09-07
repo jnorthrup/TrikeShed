@@ -40,12 +40,41 @@ class LcncRdfWireTest {
     @Test
     fun duplicateNodeIdsAreRefusedNotMerged() {
         val p = program(LcncNode("n1", "note", mapOf("text" to "a note")), LcncNode("n1", "text.value", mapOf("value" to "a literal")))
-        for (path in listOf("/api/lcnc/rdf", "/api/lcnc/rdf/align")) {
+        for (path in listOf("/api/lcnc/rdf", "/api/lcnc/rdf/align", "/api/lcnc/spacegraph")) {
             val r = post(path, LcncProgramConfix.toJson(p))
             assertEquals(400, r.status, "$path: ${r.body}")
             @Suppress("UNCHECKED_CAST")
             val m = JsonSupport.parse(r.body) as Map<String, Any?>
             assertEquals(listOf("n1"), m["duplicates"])
+        }
+    }
+
+    @Test
+    fun spatialProjectionPreservesTheDocumentAndRejectsInvalidPresentation() {
+        val p = program(LcncNode("a", "text.value", mapOf("value" to "keep")))
+        val document = JsonSupport.parse(LcncProgramConfix.toJson(p)) as Map<*, *>
+        val geometry = mapOf("id" to "a", "x" to 12, "y" to 24, "width" to 200, "height" to 90)
+        val result = post("/api/lcnc/spacegraph?alignment=0&width=390&height=600",
+            JsonSupport.stringify(document + mapOf("geometry" to listOf(geometry))))
+        assertEquals(200, result.status, result.body)
+        val body = JsonSupport.parse(result.body) as Map<*, *>
+        assertEquals(document, body["document"])
+        assertEquals(null, body["alignment"])
+        assertEquals(emptyList<Any>(), body["epistemic"])
+        val scene = body["scene"] as Map<*, *>
+        val measuredNode = (scene["nodes"] as List<*>).single() as Map<*, *>
+        assertEquals(true, measuredNode["measured"])
+        assertEquals(390.0, ((body["frame"] as Map<*, *>)["width"] as Number).toDouble())
+        for (options in listOf(
+            mapOf("geometry" to "not an array"),
+            mapOf("geometry" to listOf(geometry + mapOf("width" to -1))),
+            mapOf("geometry" to listOf(geometry + mapOf("id" to "foreign"))),
+            mapOf("camera" to mapOf("position" to listOf(0, 0, 0), "center" to listOf(0, 0, 0))),
+            mapOf("spacing" to -1),
+        )) {
+            val refused = post("/api/lcnc/spacegraph?alignment=0", JsonSupport.stringify(document + options))
+            assertEquals(400, refused.status, refused.body)
+            assertTrue((JsonSupport.parse(refused.body) as Map<*, *>).containsKey("error"))
         }
     }
 

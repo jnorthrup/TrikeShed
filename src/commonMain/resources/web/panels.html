@@ -1556,6 +1556,20 @@ function wireKindOk(w){
   if(!s||!d) return false;
   return kindsCompatible(nodeKindOf(s,"out",w.from[1]),nodeKindOf(d,"in",w.to[1]));
 }
+/* Shared authoring operation: both projections obey the same kind and containment rules. */
+function connectPanelPorts(from,to){
+  const src=G.nodes.find(n=>n.id===from[0]),dst=G.nodes.find(n=>n.id===to[0]);
+  if(!src||!dst||src===dst)return false;
+  const pathOf=n=>{const path=[];for(let p=n._parentScope;p;p=p._parentScope)path.unshift(p.id);return path;};
+  const sk=nodeKindOf(src,"out",from[1]),dk=nodeKindOf(dst,"in",to[1]),sp=pathOf(src),dp=pathOf(dst);
+  if(!kindsCompatible(sk,dk)){
+    $("#status").textContent="kind mismatch: "+src.type+"."+from[1]+" emits "+(sk||"untyped")+", "+dst.type+"."+to[1]+" wants "+(dk||"untyped");return false;
+  }
+  if(!(sp.length<=dp.length&&sp.every((v,i)=>dp[i]===v))){
+    $("#status").textContent="ring boundary: data flows lateral or inward — yields leave through scope.out";return false;
+  }
+  G.wires=G.wires.filter(w=>!(w.to[0]===to[0]&&w.to[1]===to[1]));G.wires.push({from,to});redraw();save();return true;
+}
 function buildNode(n){
   const t=CONTRACTS[n.type]; if(!t) return; // vocabulary is server-owned
   const el=document.createElement("div"); el.className="node"; el.dataset.id=n.id; el.dataset.type=n.type; n.el=el;
@@ -1580,7 +1594,7 @@ function buildNode(n){
   el.addEventListener("pointerdown",blipLeave);
   const collapse=hd.querySelectorAll("s")[0];
   collapse.addEventListener("pointerdown",e=>e.stopPropagation());
-  collapse.addEventListener("click",e=>{ e.stopPropagation(); el.classList.toggle("collapsed"); save(); });
+  collapse.addEventListener("click",e=>{ e.stopPropagation(); n.collapsed=el.classList.toggle("collapsed"); save(); });
   if(isScope){
     // the ring label: the frame identity — name + depth + the Key it runs under
     const depth=ringDepth(n);
@@ -2190,24 +2204,9 @@ function startWireDrag(n,dir,name,e){
       const owner=tgt.closest(".node");
       const tn=owner&&G.nodes.find(x=>x.el===owner);
       if(tn&&tn.id!==n.id){
-        const pathOf=m=>{const q=[];let s=m._parentScope;while(s){q.unshift(s.id);s=s._parentScope;}return q;};
-        const src=dir==="out"?n:tn, dst=dir==="out"?tn:n;
         const from = dir==="out" ? [n.id,name] : [tn.id,tgt.dataset.port];
         const to   = dir==="out" ? [tn.id,tgt.dataset.port] : [n.id,name];
-        // ENFORCED kinds: the daemon's mating rule is exact equality — a
-        // mismatched wire is refused here, not discovered at run time.
-        const sk=nodeKindOf(src,"out",from[1]), dk=nodeKindOf(dst,"in",to[1]);
-        const sp=pathOf(src), dp=pathOf(dst);
-        // the daemon's own rule: data flows lateral or inward, never outward
-        const lateralOrInward=sp.length<=dp.length&&sp.every((v,ix)=>dp[ix]===v);
-        if(!kindsCompatible(sk,dk)){
-          $("#status").textContent="kind mismatch: "+src.type+"."+from[1]+" emits "+(sk||"untyped")+", "+dst.type+"."+to[1]+" wants "+(dk||"untyped");
-        } else if(!lateralOrInward){
-          $("#status").textContent="ring boundary: data flows lateral or inward — yields leave through scope.out";
-        } else {
-          G.wires=G.wires.filter(w=>!(w.to[0]===to[0]&&w.to[1]===to[1])); // one wire per input
-          G.wires.push({from,to}); save();
-        }
+        connectPanelPorts(from,to);
       }
     } else {
       // released on EMPTY context: the MATE POPUP, both directions.
@@ -3181,7 +3180,7 @@ async function syncContracts(){
 // Boot waits for contract hydration: the vocabulary is server-owned, and the
 // starter board's addNode calls must see it or the first paint is empty.
 (async()=>{ await Promise.all([syncContracts(),syncLanes()]);
-buildPalette(); $("#palette").classList.add("open");
+buildPalette(); if(!document.body.classList.contains("sg-spatial")) $("#palette").classList.add("open");
 if(new URLSearchParams(location.search).get("dlg")==="keys") openKeyMuxDlg();
 // /panels?load=<name> IS a link to a document: presets first, then the
 // store. Link views are ephemeral — the localStorage scratch stays put.

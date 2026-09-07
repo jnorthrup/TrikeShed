@@ -307,6 +307,18 @@ class HermesPythonPort(
             mapOf("backend" to "userspace-btrfs", "subvolume" to "live", "baseline" to baseline, "generation" to guest.vfs.generation()),
             "graal-python",
         )
+        // A directory with no __init__.py is a PEP 420 namespace package on a real filesystem,
+        // and Hermes leans on that: `plugins/platforms`, `plugins/browser`, `scripts` and friends
+        // carry no __init__.py, so they never enter the inventory and every module beneath them
+        // was unreachable — the single largest class of import misses in the guest.
+        val namespaces = sortedSetOf<String>().apply {
+            for (name in inventory.modules.keys) {
+                var parent = name.substringBeforeLast('.', "")
+                while (parent.isNotEmpty() && parent !in inventory.modules) {
+                    add(parent); parent = parent.substringBeforeLast('.', "")
+                }
+            }
+        }
         guest.delegate("verdict") { args ->
             val name = (args.firstOrNull() as? Teleported.Str)?.v.orEmpty()
             val root = name.substringBefore('.')
@@ -314,6 +326,7 @@ class HermesPythonPort(
                 inventory.modules[name]?.sleeved == true -> Teleported.Str("allow")
                 root in banlist -> Teleported.Str("ban:${banlist.getValue(root).reason}")
                 name in inventory.modules -> Teleported.Str("allow")
+                name in namespaces -> Teleported.Str("namespace")
                 else -> Teleported.Str("miss")
             }
         }
@@ -343,6 +356,12 @@ class HermesPythonPort(
         }
         pen?.install(guest)
         guest.eval(IMPORTER_BOOTSTRAP, "hermes-blackboard-importer.py")
+        // The prelude twins the capabilities the polyglot bounds withhold, and it has to run
+        // before the guest binds them: stdlib `threading` copies `_thread.start_joinable_thread`
+        // into a module global at import, so a twin installed after that import is never seen.
+        if (GUEST_PRELUDE in inventory.modules) {
+            guest.eval("import importlib\nimportlib.import_module(${pythonString(GUEST_PRELUDE)})\nTrue", "hermes-guest-prelude.py")
+        }
         return try {
             guest.eval("import importlib\nimportlib.import_module(${pythonString(entry)})\nTrue", "hermes-entry.py")
         } catch (t: Throwable) {
@@ -487,6 +506,8 @@ class HermesPythonPort(
     }
 
     companion object {
+        /** Sleeve module holding the withheld/ported capability twins; imported at the waist when present. */
+        const val GUEST_PRELUDE = "trikeshed_guest_prelude"
         private val EXCLUDED_DIRS = setOf("__pycache__", "build", "dist", "docs", "node_modules", "optional-skills", "skills", "tests", "venv")
         private val MODULE_NAME = Regex("[A-Za-z_][A-Za-z0-9_.]*")
         private val FROM_IMPORT = Regex("from\\s+([.A-Za-z_][A-Za-z0-9_.]*)\\s+import\\s+.+")
@@ -507,13 +528,16 @@ class HermesPythonPort(
         }
 
         private val IMPORTER_BOOTSTRAP = """
-            import sys, importlib.abc, importlib.util
+            import sys, importlib.abc, importlib.machinery, importlib.util
 
             class _HermesBlackboardImporter(importlib.abc.MetaPathFinder, importlib.abc.Loader):
                 def find_spec(self, fullname, path=None, target=None):
                     verdict = host.call('verdict', fullname)
                     if verdict.startswith('ban:'):
                         raise ImportError('native module banned in TrikeShed guest: ' + fullname + ': ' + verdict[4:])
+                    if verdict == 'namespace':
+                        # A directory with no __init__.py: PEP 420 shape, no source to execute.
+                        return importlib.machinery.ModuleSpec(fullname, None, is_package=True)
                     if verdict != 'allow':
                         return None
                     is_package = bool(host.call('is_package', fullname))

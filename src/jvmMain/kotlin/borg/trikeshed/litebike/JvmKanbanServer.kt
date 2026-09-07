@@ -504,8 +504,6 @@ class JvmKanbanServer(
         // the concentric construction canvas rides the page plane, not a module
         // claim — ModuleRouteRegistry is exact /api/* by discipline
         "/panels" to ("web/panels.html" to "text/html; charset=utf-8"),
-        "/spacegraph-shadow.js" to ("web/spacegraph-shadow.js" to "application/javascript; charset=utf-8"),
-        "/spacegraph-shadow.css" to ("web/spacegraph-shadow.css" to "text/css; charset=utf-8"),
         // the blackboard harness draws board territories and LCNC typed cables
         "/harness.html" to ("web/harness.html" to "text/html; charset=utf-8"),
         "/harness" to ("web/harness.html" to "text/html; charset=utf-8"),
@@ -549,7 +547,12 @@ class JvmKanbanServer(
     )
 
     private fun staticAsset(path: String): HttpResponse? {
-        val (resource, contentType) = staticAssets[path.substringBefore('?')] ?: return null
+        // Method dispatch lets new presentation assets land without recreating the reactor hub.
+        val (resource, contentType) = when (val assetPath = path.substringBefore('?')) {
+            "/spacegraph-shadow.js" -> "web/spacegraph-shadow.js" to "application/javascript; charset=utf-8"
+            "/spacegraph-shadow.css" -> "web/spacegraph-shadow.css" to "text/css; charset=utf-8"
+            else -> staticAssets[assetPath]
+        } ?: return null
         val bytes = JvmKanbanServer::class.java.classLoader.getResourceAsStream(resource)?.use { it.readBytes() }
             ?: return HttpResponse(404, """{"error":"asset_missing","resource":"$resource"}""")
         return HttpResponse(200, String(bytes, StandardCharsets.UTF_8), contentType)

@@ -6,12 +6,21 @@ import org.junit.jupiter.api.Assertions.assertEquals
 import java.io.File
 import java.nio.file.Files
 
+/** A port the OS says is free right now, so this boot never fights the dev
+ *  daemon on 8888. Same reasoning as OroborosDaemonHealthTest. */
+private fun freePort(): Int = java.net.ServerSocket(0).use { it.localPort }
+
 class OroborosDaemonShutdownTest {
 
     @Test
     fun testSigtermGracefulShutdown() {
         val forgeHome = Files.createTempDirectory("forge_test").toFile()
-        val repoDir = File(System.getProperty("user.dir"))
+        // A throwaway repo, not user.dir. Pointed at the real worktree this child
+        // ran the full Git/Worktree/Build reconcile -- thousands of paths -- purely
+        // to prove a signal handler answers, and any real state it touched was the
+        // developer's. A directory with a .git in it is all the daemon needs here.
+        val repoDir = Files.createTempDirectory("repo_test").toFile()
+        File(repoDir, ".git").mkdirs()
 
         // Mock JULES_API_KEY for the child process so it doesn't abort early.
         val pb = ProcessBuilder(
@@ -19,6 +28,10 @@ class OroborosDaemonShutdownTest {
             "-cp", System.getProperty("java.class.path"),
             "borg.trikeshed.daemon.OroborosDaemon",
             "--watch", "--interval-ms", "30000",
+            // Without an explicit port the child takes DEFAULT_KANBAN_PORT (8888)
+            // and burns five bind retries against a running dev daemon before
+            // continuing headless.
+            "--kanban-port", freePort().toString(),
             forgeHome.absolutePath,
             repoDir.absolutePath
         )
@@ -56,6 +69,7 @@ class OroborosDaemonShutdownTest {
                 process.waitFor(5, java.util.concurrent.TimeUnit.SECONDS)
             }
             forgeHome.deleteRecursively()
+            repoDir.deleteRecursively()
         }
     }
 }

@@ -126,4 +126,120 @@ class HermesPythonPortTest {
             assertTrue(port.blackboard().has("hermes/python/vfs"))
         }
     }
+
+    private fun sleeveFile(name: String): Pair<String, Pair<String, String>> {
+        val relative = if (name.contains('.')) name.replace('.', '/') + "/__init__.py" else "$name.py"
+        return name to (relative to Files.readString(Path.of("graalpy-sleeve/hermes").resolve(relative)))
+    }
+
+    @Test
+    fun withheldThreadVerbKillsTheIsolateWithoutThePreludeTwin() {
+        HermesPythonPort().use { port ->
+            val inventory = port.inventorySources(mapOf(
+                "spawner" to ("spawner.py" to """
+                    import threading
+                    try:
+                        threading.Thread(target=lambda: None).start()
+                    except BaseException:
+                        pass
+                """.trimIndent()),
+            ))
+            // allowCreateThread(false) surfaces as a host IllegalStateException, which Python cannot
+            // catch and which fails the isolate closed — one library's worker thread downs the VM.
+            val failure = assertFailsWith<borg.trikeshed.graal.subvm.GuestException> { port.importInVm(inventory, "spawner") }
+            assertEquals(borg.trikeshed.graal.subvm.GuestFailure.DEAD, failure.kind)
+            assertTrue(failure.message.orEmpty().contains("Creating threads is not allowed"))
+        }
+    }
+
+    @Test
+    fun preludeTwinTurnsThreadCreationIntoACatchableGuestError() {
+        HermesPythonPort().use { port ->
+            val inventory = port.inventorySources(
+                sources = mapOf(
+                    "spawner" to ("spawner.py" to """
+                        import threading
+                        try:
+                            threading.Thread(target=lambda: None).start()
+                            OUTCOME = 'started'
+                        except RuntimeError as exc:
+                            OUTCOME = str(exc)
+                        assert OUTCOME == "can't start new thread", OUTCOME
+                    """.trimIndent()),
+                ),
+                // the prelude's QueueListener twin imports logging.handlers, which imports socket
+                sleeveSources = mapOf(sleeveFile(HermesPythonPort.GUEST_PRELUDE), sleeveFile("socket")),
+            )
+            assertEquals(Teleported.Bool(true), port.importInVm(inventory, "spawner"))
+            assertTrue(port.vmStarted)
+        }
+    }
+
+    @Test
+    fun queueListenerTwinDrainsToItsHandlersWithoutAWorkerThread() {
+        HermesPythonPort().use { port ->
+            val inventory = port.inventorySources(
+                sources = mapOf(
+                    "logs" to ("logs.py" to """
+                        import logging, queue
+                        from logging.handlers import QueueHandler, QueueListener
+                        seen = []
+                        class Capture(logging.Handler):
+                            def emit(self, record): seen.append(record.getMessage())
+                        q = queue.SimpleQueue()
+                        listener = QueueListener(q, Capture())
+                        listener.start()
+                        log = logging.getLogger('twin.probe')
+                        log.addHandler(QueueHandler(q))
+                        log.error('landed')
+                        assert seen == ['landed'], seen
+                        assert q.qsize() == 0, q.qsize()
+                    """.trimIndent()),
+                ),
+                // the prelude's QueueListener twin imports logging.handlers, which imports socket
+                sleeveSources = mapOf(sleeveFile(HermesPythonPort.GUEST_PRELUDE), sleeveFile("socket")),
+            )
+            assertEquals(Teleported.Bool(true), port.importInVm(inventory, "logs"))
+        }
+    }
+
+    @Test
+    fun contextVarTwinRestoresTheNameAttributeGraalPyOmits() {
+        HermesPythonPort().use { port ->
+            val inventory = port.inventorySources(
+                sources = mapOf(
+                    "channels" to ("channels.py" to """
+                        import contextvars
+                        var = contextvars.ContextVar('session')
+                        assert var.name == 'session', var
+                        token = var.set(7)
+                        assert var.get() == 7
+                        var.reset(token)
+                        assert contextvars.copy_context() is not None
+                    """.trimIndent()),
+                ),
+                sleeveSources = mapOf(sleeveFile("contextvars")),
+            )
+            assertEquals(Teleported.Bool(true), port.importInVm(inventory, "channels"))
+        }
+    }
+
+    @Test
+    fun directoriesWithoutInitResolveAsNamespacePackages() {
+        HermesPythonPort().use { port ->
+            // `plugins/platforms/<x>.py` with no plugins/platforms/__init__.py is the PEP 420 shape
+            // Hermes actually ships; without namespace specs the whole subtree is unreachable.
+            val inventory = port.inventorySources(mapOf(
+                "plugins" to ("plugins/__init__.py" to ""),
+                "plugins.platforms.chat" to ("plugins/platforms/chat.py" to "NAME = 'chat'"),
+                "entry" to ("entry.py" to """
+                    import plugins.platforms.chat
+                    assert plugins.platforms.chat.NAME == 'chat'
+                    assert plugins.platforms.__path__ == []
+                    assert type(plugins.platforms.__spec__.loader).__name__ == 'NamespaceLoader'
+                """.trimIndent()),
+            ))
+            assertEquals(Teleported.Bool(true), port.importInVm(inventory, "entry"))
+        }
+    }
 }

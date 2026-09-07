@@ -1,15 +1,45 @@
 # SpaceGraph 7: Epistemic Surface and Multiplatform Port
 
-Status: alignment design and port inventory, 2026-09-07. No SpaceGraph Kotlin
-implementation or executable target configuration is claimed by this document.
-The JSON files alongside it are planning inputs; Gradle does not load them yet.
+Status: LCNC spatial workspace implementation in progress, 2026-09-07.
+The common scene, measured LCNC extrusion, SVG projection, browser GL/Canvas/SVG
+presenters and editor integration are implemented under `narchy.spacegraph`.
+The full upstream port and desktop/native window providers are not complete.
+The inventory remains a parity backlog, not a statement of implemented features.
 
 The requested `autonull/spacegraph7` was not resolvable through GitHub or the
 authenticated CLI. This design uses the apparent intended repository,
 [autonull/spacegraphjs7](https://github.com/autonull/spacegraphjs7), pinned to
-`ff74a475abd368746fe0db884c41052193e4b402`. Confirm that identity before importing
-implementation code. TrikeShed was inspected at
+`ff74a475abd368746fe0db884c41052193e4b402`. TrikeShed was initially inspected at
 `18c741c0f4ae3bf17bf6723149a0cfe57f18477c`.
+
+## Spatial Workspace
+
+- `/panels` opens the spatial workspace; `?spacegraph=0` opens the original
+  editor. Both operate on the same LCNC objects, controls and undo history.
+- `LcncExtrusion` lifts measured world-space bounds and own-port coordinates
+  into Y-up solids. Containment determines Z separation. These are presentation
+  values, not invented confidence or ontology coordinates.
+- GL draws extruded surfaces using Three.js. Canvas and SVG consume a commonMain
+  projection of those same solids, cables and camera values. They are projected
+  backends, not hardware GL implementations.
+- The parameter inspector temporarily hosts the original controls, preserving
+  handlers and asynchronous picklists, with a dimension-preserving placeholder.
+  Rich output views remain in the original editor.
+- Rete, causal and KIF term matches are explicitly alignment candidates. Exact
+  epistemic bindings remain absent unless supplied by an authoritative caller.
+- Browser sources live in `src/commonMain/resources/web/narchy/spacegraph/`.
+  Rebuild the checked-in browser bundle with `npm ci && npm run build` from
+  this directory. The dependency versions are pinned; Three's MIT license is
+  retained in the web vendor directory.
+
+The IntelliJ strategy in `~/.codex/skills/intellij-counter-triage/SKILL.md` now
+requires a verified semantic cycle, fresh focus between mutating steps, bounded
+recovery, and explicit fallback disclosure. In this run IDE navigation worked,
+but source selection failed; no successful semantic refactor is claimed.
+
+Focused JVM verification: `LcncExtrusionTest` (6), `LcncRdfWireTest` (3), and
+`RouteParityGate` (8) passed. Browser verification is recorded separately by
+`src/jvmTest/js/spacegraph-browser.check.cjs`; compilation is not visual proof.
 
 ## Alignment With the Epistemic Model
 
@@ -182,9 +212,9 @@ that dependency. Inspect generated imports and run Node with no document/window
 globals. Prove the Kotlin 2.4.10 packaging setup before committing to its DSL.
 See Kotlin's [custom compilation contract](https://kotlinlang.org/docs/multiplatform/multiplatform-configure-compilations.html).
 
-[target-profiles.json](target-profiles.json) separates renderer profiles from
-Native platform settings. These are proposed inputs for a future typed
-Confix loader and Gradle wiring, with implementation status explicit.
+The profile families below separate renderer choices from Native platform
+settings. Typed profile loading and dedicated Gradle wiring are still pending;
+this table is not a set of runnable target configurations.
 
 | Profile family | Implementation choice | Configuration that differs |
 | --- | --- | --- |

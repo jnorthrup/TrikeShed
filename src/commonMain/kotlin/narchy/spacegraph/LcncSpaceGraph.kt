@@ -55,8 +55,10 @@ object LcncSpaceGraph {
                 val position = Vec3(node.x + width / 2 - parentHalf.x, -node.y - height / 2 + parentHalf.y)
                 nodes.add(NodeSpec(node.id, if (node.children.size > 0) NodeKind.GroupNode else NodeKind.PanelNode,
                     contract?.title ?: node.type, Transform(position), data, parent))
-                contract?.inputs?.forEach { name -> ports.add(ShadowPort(node.id, name.removeSuffix("?"), true, contract.inputKinds[name.removeSuffix("?")], name.endsWith("?"))) }
-                contract?.outputs?.forEach { name -> ports.add(ShadowPort(node.id, name, false, contract.outputKinds[name], false)) }
+                LcncTypeCheck.inputsOf(node, vocabulary).forEach { name -> ports.add(ShadowPort(node.id, name.removeSuffix("?"), true,
+                    LcncTypeCheck.portKind(node, "in", name, vocabulary).kind, name.endsWith("?"))) }
+                LcncTypeCheck.outputsOf(node, vocabulary).forEach { name -> ports.add(ShadowPort(node.id, name, false,
+                    LcncTypeCheck.portKind(node, "out", name, vocabulary).kind, false)) }
                 visit(node.children, node.id)
             }
         }
