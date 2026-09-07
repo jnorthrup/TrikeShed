@@ -701,9 +701,17 @@
   function setGraphMode(mode) {
     if (!layouts[mode]) return;
     if (mode !== graphMode) { graphMode = mode; layout = layouts[mode]; graphBuilt = false; resetCam(); mutate((s) => { s.graphMode = mode; }, 'graphMode'); }
-    graphModeCausalBtn.classList.toggle('active', graphMode === 'causal');
-    graphModeConceptBtn.classList.toggle('active', graphMode === 'concept');
-    if (graphModeDocsBtn) graphModeDocsBtn.classList.toggle('active', graphMode === 'docs');
+
+    const updateBtn = (btn, isAct) => {
+      if (!btn) return;
+      btn.classList.toggle('active', isAct);
+      if (isAct) btn.setAttribute('aria-current', 'page');
+      else btn.removeAttribute('aria-current');
+    };
+    updateBtn(graphModeCausalBtn, graphMode === 'causal');
+    updateBtn(graphModeConceptBtn, graphMode === 'concept');
+    updateBtn(graphModeDocsBtn, graphMode === 'docs');
+
     graphEmptyEl.textContent = graphMode === 'concept' ? 'No concept lattice in the seed.'
       : graphMode === 'docs' ? 'No docs mindmap in the seed — bake with a docs/ corpus to populate it.'
       : 'No causal nodes in the seed yet — ingest a donor to populate the graph.';
