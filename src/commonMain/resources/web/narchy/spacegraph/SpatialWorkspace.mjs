@@ -17,7 +17,7 @@ import './SpatialRenderer.mjs';
     return G.nodes.map(n=>{
       const r=n.el.getBoundingClientRect();let visible=!!r.width&&!!r.height;
       for(let p=n._parentScope;p;p=p._parentScope)if(p.el.classList.contains('collapsed'))visible=false;
-      return {id:n.id,x:(r.left-origin.left)/scale,y:(r.top-origin.top)/scale,width:r.width/scale,height:r.height/scale,visible,
+      return {id:n.id,x:(r.left-origin.left)/scale,y:(r.top-origin.top)/scale,width:r.width/scale,height:r.height/scale,visible,scale:ringScaleOf(n),
         ports:[...n.el.querySelectorAll('.port')].filter(p=>p.closest('.node')===n.el&&p.getClientRects().length).map(p=>{
           const r=p.getBoundingClientRect();return {name:p.dataset.port,input:p.dataset.dir==='in',x:(r.left+r.width/2-origin.left)/scale,y:(r.top+r.height/2-origin.top)/scale};
         })};
@@ -96,7 +96,7 @@ import './SpatialRenderer.mjs';
       const body=await reply.json();if(!reply.ok)throw new Error(body.error||`Projection failed (${reply.status})`);if(current!==serial||!open)return;
       if(!body.scene)throw new Error('Spatial endpoint is not loaded in this daemon');body.alignment??=response?.alignment;response=body;lastIdentity=identity;
       for(const spec of body.scene.nodes){const n=node(spec.id);spec.params=Object.fromEntries(Object.entries(n?.params||{}).map(([key,value])=>[key,CONTRACTS[n.type]?.params?.[key]?.ph?.startsWith('secret:')?'[redacted]':value]));}
-      renderer.update(body.scene,reset&&revision===cameraRevision);resetCamera=false;renderer.frame(body.frame,body.svg);
+      renderer.update(body.scene,reset&&revision===cameraRevision);resetCamera=false;
       badge.textContent=`${backend.toUpperCase()} · ${body.scene.nodes.length} nodes · ${body.scene.cables.length} cables${body.scene.issues.length?` · ${body.scene.issues.length} unprojected`:''}`;delete badge.dataset.error;
       if(!inspector.contains(document.activeElement))paintInspector();paintTree();
     }catch(error){dirtyAlignment||=align;if(error.name!=='AbortError')report(error);}
@@ -130,7 +130,8 @@ import './SpatialRenderer.mjs';
     badge=el('div','sg-badge','Preparing scene');badge.setAttribute('role','status');workspace.append(badge);
     spatial.append(command('Node inspector','panels-top-left',()=>{if(matchMedia('(max-width:650px)').matches)document.body.classList.toggle('sg-inspecting');else document.body.classList.toggle('sg-inspector-hidden');}));
     if(typeof SpaceGraphRenderer==='undefined'){report('Spatial renderer asset unavailable');activate(false);return;}
-    renderer=new SpaceGraphRenderer(surface,{select,moveNode,viewChanged:()=>{cameraRevision++;if(backend!=='gl')schedule();},unavailable:message=>{useProvider('canvas');report(message);}});useProvider('gl');
+    try {renderer=new SpaceGraphRenderer(surface,{select,moveNode,viewChanged:()=>{cameraRevision++;},unavailable:message=>{useProvider('canvas');report(message);}});useProvider('gl');}
+    catch(error){report(error);activate(false);return;}
     new ResizeObserver(()=>schedule()).observe(surface);
     observer=new MutationObserver(records=>{if(records.some(r=>{
       const target=r.target.nodeType===1?r.target:r.target.parentElement;

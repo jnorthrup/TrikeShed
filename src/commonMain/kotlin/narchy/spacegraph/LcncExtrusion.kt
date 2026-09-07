@@ -7,12 +7,15 @@ import kotlin.math.*
 
 /** Browser measurements are presentation values in LCNC world units, not replacement document state. */
 data class MeasuredPort(val name: String, val input: Boolean, val position: Vec3)
-data class MeasuredNode(val id: String, val bounds: Rect, val ports: Series<MeasuredPort>, val visible: Boolean = true)
+data class MeasuredNode(val id: String, val bounds: Rect, val ports: Series<MeasuredPort>, val visible: Boolean = true, val scale: Double = 1.0) {
+    init { require(scale.isFinite() && scale > 0) }
+}
 data class ExtrudedPort(val nodeId: String, val name: String, val input: Boolean, val position: Vec3, val kind: String?)
 data class ExtrudedNode(
     val id: String, val parent: String?, val title: String, val type: String,
     val position: Vec3, val size: Vec3, val level: Int, val scope: Boolean,
     val measured: Boolean, val color: Rgba, val ports: Series<ExtrudedPort>,
+    val scale: Double = 1.0, val details: Series<Join<String, String>> = emptySeriesOf(),
 ) {
     val bounds get() = Bounds3(position - size * .5, position + size * .5)
     val corners: Series<Vec3> get() = 8 j { i -> position + Vec3(
@@ -20,9 +23,22 @@ data class ExtrudedNode(
         if (i and 2 == 0) -size.y / 2 else size.y / 2,
         if (i and 4 == 0) -size.z / 2 else size.z / 2,
     ) }
+    /** A scope is the same frame at every scale, never a filled slab hiding its children. */
+    val solids: Series<Bounds3> get() {
+        if (!scope) return s_[bounds]
+        val b = bounds; val rim = minOf(4 * scale, size.x / 4, size.y / 4)
+        return s_[
+            Bounds3(b.min, Vec3(b.min.x + rim, b.max.y, b.max.z)),
+            Bounds3(Vec3(b.max.x - rim, b.min.y, b.min.z), b.max),
+            Bounds3(Vec3(b.min.x + rim, b.min.y, b.min.z), Vec3(b.max.x - rim, b.min.y + rim, b.max.z)),
+            Bounds3(Vec3(b.min.x + rim, b.max.y - rim, b.min.z), Vec3(b.max.x - rim, b.max.y, b.max.z)),
+        ]
+    }
 }
 data class ExtrudedCable(val id: String, val from: ExtrudedPort, val to: ExtrudedPort, val points: Series<Vec3>)
 data class ExtrudedScene(val nodes: Series<ExtrudedNode>, val cables: Series<ExtrudedCable>, val issues: Series<String>) {
+    private val children = nodes.view.groupBy { it.parent }.mapValues { it.value.toSeries() }
+    val branches: MetaSeries<String?, Series<ExtrudedNode>> = null j { parent: String? -> children[parent] ?: emptySeriesOf() }
     val bounds: Bounds3 get() {
         if (nodes.size == 0) return Bounds3(Vec3(-200.0, -150.0), Vec3(200.0, 150.0, 40.0))
         val boxes = nodes.view.map { it.bounds }
@@ -64,7 +80,7 @@ object LcncExtrusion {
                     val input = port["input"] as? Boolean ?: throw IllegalArgumentException("port requires direction")
                     require(portIds.add("$input:$name")) { "duplicate measured port $id:$name" }
                     MeasuredPort(name, input, Vec3(number(port, "x"), number(port, "y")))
-                }.toSeries(), row["visible"] != false)
+                }.toSeries(), row["visible"] != false, (row["scale"] as? Number)?.toDouble() ?: 1.0)
         }.toSeries()
     }
 
@@ -77,6 +93,10 @@ object LcncExtrusion {
         require(measured.keys.all { it in specs }) { "geometry names a node outside this document" }
         val issues = mutableListOf<String>()
         val nodes = mutableListOf<ExtrudedNode>()
+        val elevations = mutableMapOf<String, Double>()
+        fun elevation(id: String): Double = elevations.getOrPut(id) {
+            specs.getValue(id).parent?.let { elevation(it) + spacing * (measured[id]?.scale ?: 1.0) } ?: 0.0
+        }
         fun hidden(id: String): Boolean {
             val node = specs.getValue(id)
             return measured[id]?.visible == false || (node.parent?.let { hidden(it) || specs.getValue(it).data.flag("collapsed") } ?: false)
@@ -90,20 +110,21 @@ object LcncExtrusion {
             val r = m?.bounds ?: Rect(fallback.x - spec.data.width / 2, -fallback.y - spec.data.height / 2, spec.data.width, spec.data.height)
             if (r.width == 0.0 || r.height == 0.0) continue
             val scope = spec.kind == NodeKind.GroupNode || spec.data.string("lcncType") == "scope"
-            val depth = if (scope) 12.0 else 28.0
-            val z = level * spacing
+            val scale = m?.scale ?: 1.0
+            val depth = (if (scope) 12.0 else 28.0) * scale
+            val z = elevation(spec.id)
             val center = Vec3(r.center.x, -r.center.y, z + depth / 2)
             val contracts = shadow.ports.view.toList().filter { it.nodeId == spec.id }
             val ports = if (m != null) m.ports.view.map { p ->
                 val contract = contracts.find { it.name == p.name.removeSuffix("?") && it.input == p.input }
-                ExtrudedPort(spec.id, p.name, p.input, Vec3(p.position.x, -p.position.y, z + depth + 3), contract?.kind)
+                ExtrudedPort(spec.id, p.name, p.input, Vec3(p.position.x, -p.position.y, z + depth + 3 * scale), contract?.kind)
             } else contracts.mapIndexed { i, p -> ExtrudedPort(spec.id, p.name, p.input,
                 Vec3(if (p.input) r.x else r.right, -r.y - 36 - i * 18.0, z + depth + 3), p.kind) }
             val color = when { scope -> Rgba(71, 119, 111); spec.data.flag("effect") -> Rgba(176, 70, 83)
                 spec.data.flag("source") -> Rgba(47, 116, 166); spec.data.flag("sink") -> Rgba(121, 98, 155)
                 else -> Rgba(82, 103, 117) }
             nodes.add(ExtrudedNode(spec.id, spec.parent, spec.label, spec.data.string("lcncType"), center,
-                Vec3(r.width, r.height, depth), level, scope, m != null, color, ports.toSeries()))
+                Vec3(r.width, r.height, depth), level, scope, m != null, color, ports.toSeries(), scale))
         }
         val byId = nodes.associateBy { it.id }
         val cables = mutableListOf<ExtrudedCable>()
@@ -145,7 +166,8 @@ object LcncExtrusion {
         return mapOf("coordinateSystem" to "right-handed-y-up-z-extrusion", "nodes" to scene.nodes.view.map { n ->
             mapOf("id" to n.id, "parent" to n.parent, "title" to n.title, "type" to n.type, "position" to point(n.position),
                 "size" to point(n.size), "level" to n.level, "scope" to n.scope, "measured" to n.measured,
-                "color" to n.color.css, "ports" to n.ports.view.map(::port))
+                "color" to n.color.css, "rgba" to listOf(n.color.red, n.color.green, n.color.blue, n.color.alpha),
+                "scale" to n.scale, "ports" to n.ports.view.map(::port))
         }, "cables" to scene.cables.view.map { c -> mapOf("id" to c.id, "from" to port(c.from), "to" to port(c.to), "points" to c.points.view.map(::point)) },
             "camera" to mapOf("position" to point(camera.position), "center" to point(camera.center), "zoom" to camera.zoom,
                 "fov" to camera.fieldOfView, "near" to camera.near, "far" to camera.far), "issues" to scene.issues.view.toList())

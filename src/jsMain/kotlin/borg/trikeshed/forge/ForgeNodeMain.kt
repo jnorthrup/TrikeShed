@@ -36,6 +36,7 @@ import kotlinx.coroutines.launch
  * → seed and saves mutations back to localStorage + IndexedDB permanently.
  */
 fun main() {
+    if (js("typeof document !== 'undefined' && document.querySelector('script[data-kotlin-library]') !== null") as Boolean) return
     // Ingest is a suspending contract (the Rete assertion pass suspends) and Kotlin/JS has
     // no runBlocking, so the whole entry point runs as a single coroutine on the JS event
     // loop.  One coroutine keeps the persist -> render ordering that the seed JSON depends on.

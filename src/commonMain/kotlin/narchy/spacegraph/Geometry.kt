@@ -52,7 +52,7 @@ data class Bounds3(val min: Vec3, val max: Vec3) {
     }
 }
 
-/** Column-major matrix, matching the upstream Three.js transform convention. */
+/** Column-major affine and projective transforms. */
 class Matrix4 private constructor(private val values: DoubleArray) {
     operator fun get(row: Int, col: Int): Double = values[col * 4 + row]
     operator fun times(other: Matrix4) = Matrix4(DoubleArray(16) { i ->
