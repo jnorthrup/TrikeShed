@@ -287,13 +287,30 @@ kotlin {
         val nativeTest = maybeCreate("nativeTest").apply { dependsOn(commonTest) }
         val posixMain = maybeCreate("posixMain").apply { dependsOn(nativeMain) }
         val posixTest = maybeCreate("posixTest").apply { dependsOn(nativeTest) }
-        val linuxMain = maybeCreate("linuxMain").apply {
-            dependsOn(posixMain)
-            kotlin.exclude("linux_uring/**")
+        // Native targets are host- and property-gated above, so their source sets are created
+        // only when the target they belong to exists — asked of the target list rather than by
+        // re-deriving the gate, which cannot drift. Creating them unconditionally left linuxMain,
+        // linuxTest, mingwX64Main and mingwX64Test attached to no compilation on every Mac build,
+        // which is the "Unused Kotlin Source Sets" warning.
+        if (targets.findByName("linuxX64") != null) {
+            // linuxMain is an INTERMEDIATE, not linuxX64's default source set, and this project
+            // turns off the default hierarchy template (gradle.properties), so nothing would
+            // connect the two on its own: linuxMain would be orphaned even on Linux and its
+            // linux_uring exclude would quietly do nothing. Connect it by hand, both ways.
+            val linuxMain = maybeCreate("linuxMain").apply {
+                dependsOn(posixMain)
+                kotlin.exclude("linux_uring/**")
+            }
+            val linuxTest = maybeCreate("linuxTest").apply { dependsOn(posixTest) }
+            getByName("linuxX64Main").dependsOn(linuxMain)
+            getByName("linuxX64Test").dependsOn(linuxTest)
         }
-        maybeCreate("mingwX64Main").apply { dependsOn(nativeMain) }
-        maybeCreate("mingwX64Test").apply { dependsOn(nativeTest) }
-        val linuxTest = maybeCreate("linuxTest").apply { dependsOn(posixTest) }
+        if (targets.findByName("mingwX64") != null) {
+            // These two ARE mingwX64's own default source sets, so the target wires the
+            // compilation; all that is needed is their place in the hierarchy.
+            maybeCreate("mingwX64Main").apply { dependsOn(nativeMain) }
+            maybeCreate("mingwX64Test").apply { dependsOn(nativeTest) }
+        }
         val macosMain = maybeCreate("macosMain").apply { dependsOn(posixMain) }
         val macosTest = maybeCreate("macosTest").apply { dependsOn(posixTest) }
 
@@ -314,8 +331,7 @@ kotlin {
         // findByName("macosX64Main")?.dependsOn(getByName("macosMain"))   // macIntel target commented out above
         findByName("macosTest")?.dependsOn(posixTest)
         // findByName("macosX64Test")?.dependsOn(posixTest)
-        findByName("linuxMain")?.dependsOn(posixMain)
-        findByName("linuxTest")?.dependsOn(posixTest)
+        // linuxMain/linuxTest are connected where they are created, above.
         // T7 browser storage: IndexedDB test doubles for JS/Wasm storage tests.
         getByName("jsTest") {
             dependencies {
