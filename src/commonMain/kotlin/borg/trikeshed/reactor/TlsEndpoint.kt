@@ -36,7 +36,7 @@ typealias TlsCodecResult = Join<TlsFlowState, TlsFrames>
 
 fun emptyTlsFrames(): TlsFrames = emptySeriesOf()
 
-fun tlsFrames(vararg frames: TlsChannelFrame): TlsFrames = frames.asList().toSeries()
+fun tlsFrames(vararg frames: TlsChannelFrame): TlsFrames = frames.toSeries() // Bolt: Use .toSeries() directly to avoid intermediate List allocation
 
 fun TlsCodecResult(
     state: TlsFlowState,

@@ -17,7 +17,7 @@ typealias HtxBody = ByteSeries
 
 fun emptyHtxHeaders(): HtxHeaders = emptySeriesOf()
 fun emptyHtxBody(): HtxBody = ByteSeries(byteArrayOf())
-fun htxHeaders(vararg headers: HtxHeader): HtxHeaders = headers.asList().toSeries()
+fun htxHeaders(vararg headers: HtxHeader): HtxHeaders = headers.toSeries() // Bolt: Use .toSeries() directly to avoid intermediate List allocation
 
 enum class HtxScheme {
     HTTP,

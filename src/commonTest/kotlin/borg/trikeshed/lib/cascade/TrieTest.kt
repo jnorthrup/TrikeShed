@@ -9,7 +9,7 @@ import kotlin.test.assertTrue
 /** Ports the assertions of the retired collections.associative.trie.{Trie,RadixTree} onto cascade.Trie. */
 class TrieTest {
     private val d = Int.MIN_VALUE
-    private fun k(vararg s: String) = s.toList().toSeries()
+    private fun k(vararg s: String) = s.toSeries() // Bolt: Use .toSeries() directly to avoid intermediate List allocation
 
     @Test
     fun segmentTrie() {

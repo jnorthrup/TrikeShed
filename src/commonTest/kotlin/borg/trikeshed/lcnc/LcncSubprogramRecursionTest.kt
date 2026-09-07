@@ -21,7 +21,7 @@ class LcncSubprogramRecursionTest {
     )
 
     private fun program(vararg nodes: LcncNode, wires: List<LcncWire> = emptyList()) =
-        LcncProgram("prog", nodes.toList().toSeries(), wires.toSeries())
+        LcncProgram("prog", nodes.toSeries() /* Bolt: Use .toSeries() directly to avoid intermediate List allocation */, wires.toSeries())
 
     @Test
     fun subprogramNodeRunsItsInnerProgramAndKeepsLocalsInvisible() = runBlocking {

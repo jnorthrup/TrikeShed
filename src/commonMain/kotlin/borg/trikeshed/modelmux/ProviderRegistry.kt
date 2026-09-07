@@ -2,6 +2,7 @@ package borg.trikeshed.modelmux
 
 import borg.trikeshed.lib.Series
 import borg.trikeshed.lib.j
+import borg.trikeshed.lib.toSeries
 
 class ProviderRegistry {
     private val providers = mutableMapOf<String, ModelProvider>()
@@ -28,6 +29,6 @@ class ProviderRegistry {
         }
     }
 
-    fun descriptors(): Series<ProviderDescriptor> = descriptors.values.toList().let { list -> list.size j list::get }
+    fun descriptors(): Series<ProviderDescriptor> = descriptors.values.toSeries() // Bolt: Use native Collection.toSeries() instead of intermediate list copy
 }
 
