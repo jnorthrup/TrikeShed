@@ -13,7 +13,16 @@ package borg.trikeshed.docs
  */
 object DocumentMarkdown {
 
-    fun render(markdown: String): String {
+    /**
+     * [fence] is the seam a caller uses to own a fenced block by its info string: it is handed the
+     * info string and the block's RAW (unescaped) body, and whatever HTML it returns replaces the
+     * `<pre><code>` this renderer would otherwise emit. Returning null leaves the block alone, which
+     * is what every existing caller gets by default — this renderer knows nothing about LCNC.
+     *
+     * The handler is NOT passed into the blockquote recursion: a fence quoted inside a `>` block
+     * stays literal code, so quoting a build target is quoting it, not arming it.
+     */
+    fun render(markdown: String, fence: (info: String, body: String) -> String? = { _, _ -> null }): String {
         val lines = markdown.replace("\r\n", "\n").split('\n')
         val out = StringBuilder()
         var i = 0
@@ -31,12 +40,19 @@ object DocumentMarkdown {
                     flushParagraph()
                     val language = trimmed.removePrefix("```").trim()
                     val code = StringBuilder()
+                    val raw = StringBuilder()
                     i++
-                    while (i < lines.size && !lines[i].trim().startsWith("```")) { code.append(escape(lines[i])).append('\n'); i++ }
+                    while (i < lines.size && !lines[i].trim().startsWith("```")) {
+                        code.append(escape(lines[i])).append('\n'); raw.append(lines[i]).append('\n'); i++
+                    }
                     i++ // the closing fence, or the end of the text
-                    out.append("<pre><code")
-                    if (language.isNotEmpty() && language.all { it.isLetterOrDigit() || it == '-' || it == '_' || it == '+' }) out.append(" class=\"language-").append(language).append('"')
-                    out.append('>').append(code).append("</code></pre>\n")
+                    val owned = fence(language, raw.toString())
+                    if (owned != null) out.append(owned)
+                    else {
+                        out.append("<pre><code")
+                        if (language.isNotEmpty() && language.all { it.isLetterOrDigit() || it == '-' || it == '_' || it == '+' }) out.append(" class=\"language-").append(language).append('"')
+                        out.append('>').append(code).append("</code></pre>\n")
+                    }
                 }
                 trimmed.isEmpty() -> { flushParagraph(); i++ }
                 HEADING.matches(trimmed) -> {
