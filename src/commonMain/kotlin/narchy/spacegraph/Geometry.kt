@@ -139,6 +139,7 @@ data class GraphCamera(
     }
     fun unproject(point: Vec3, viewport: Viewport, planeZ: Double = 0.0): Vec3? {
         val ray = ray(point, viewport)
+        if (mode == CameraMode.ORTHOGRAPHIC) return Vec3(ray.origin.x, ray.origin.y, planeZ)
         if (abs(ray.direction.z) < 1e-12) return null
         val distance = (planeZ - ray.origin.z) / ray.direction.z
         return if (distance < 0) null else ray.origin + ray.direction * distance

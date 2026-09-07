@@ -2,7 +2,7 @@ export class SpatialRenderer {
   constructor(host, callbacks) {
     const Engine = globalThis.TrikeShed?.narchy?.spacegraph?.BrowserSpatialEngine;
     if (!Engine) throw new Error('Kotlin scene engine unavailable; run ./gradlew stageKotlinJs');
-    this.engine = new Engine(); this.host = host; this.callbacks = callbacks; this.backend = 'canvas'; this.mode = 'orbit';
+    this.engine = new Engine(); this.host = host; this.callbacks = callbacks; this.backend = 'canvas'; this.mode = 'pan';
     this.output = document.createElement('div'); this.output.className = 'sg-output'; host.append(this.output);
     this.canvas = document.createElement('canvas'); this.canvas.setAttribute('aria-label', 'LCNC extruded scene');
     this.canvas.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;pointer-events:none';
@@ -28,7 +28,7 @@ export class SpatialRenderer {
         if (g.drag) {
           const p = this.engine.unproject(x,y,g.drag.z);
           if (p && g.drag.point) {const dx=p[0]-g.drag.point[0],dy=g.drag.point[1]-p[1];this.callbacks.moveNode(g.drag.id,dx,dy,false);g.drag.dx+=dx;g.drag.dy+=dy;g.drag.point=p;}
-        } else { if (g.pan) this.engine.pan(dx,dy); else this.engine.orbit(dx,dy); this.changed(); }
+        } else { this.engine.pan(dx,dy); this.changed(); }
       },
       pointerup: e => {
         const g = this.gesture; this.finishDrag(true); this.gesture = null;this.pointers.delete(e.pointerId);this.pinch=null;
@@ -53,7 +53,6 @@ export class SpatialRenderer {
   }
   cameraValue() { return this.hasCamera?this.engine.camera():null; }
   changed() { this.render(); this.callbacks.viewChanged(); }
-  front() { this.engine.front(); this.changed(); }
   fit() { this.engine.fit(); this.changed(); }
   zoom(factor) { this.engine.zoom(factor,this.host.clientWidth/2,this.host.clientHeight/2); this.changed(); }
   focus(id) { this.engine.focus(id); this.changed(); }

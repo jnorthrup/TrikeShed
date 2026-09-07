@@ -56,12 +56,11 @@ data class ExtrudedScene(val nodes: Series<ExtrudedNode>, val cables: Series<Ext
             Vec3(boxes.maxOf { it.max.x }, boxes.maxOf { it.max.y }, boxes.maxOf { it.max.z }))
     }
     fun camera(viewport: Viewport): GraphCamera {
-        val radius = max(bounds.size.length / 2, 100.0)
-        val limitingAngle = atan(tan(PI / 8) * min(1.0, viewport.width.toDouble() / viewport.height))
-        val distance = radius / sin(limitingAngle) * 1.12
-        return GraphCamera(center = bounds.center, mode = CameraMode.PERSPECTIVE,
-            position = bounds.center + Vec3(.22, -.38, 1.0).normalized() * distance,
-            fieldOfView = 45.0, far = max(10000.0, distance * 8))
+        val bounds = bounds
+        val center = Vec3(bounds.center.x, bounds.center.y)
+        val zoom = .9 * min(viewport.width / max(bounds.size.x, 1e-12), viewport.height / max(bounds.size.y, 1e-12))
+        return GraphCamera(center = center, zoom = zoom, mode = CameraMode.ORTHOGRAPHIC,
+            position = center + Vec3(z = 500.0), far = max(10000.0, bounds.max.z + 1000.0))
     }
 }
 
@@ -94,7 +93,7 @@ object LcncExtrusion {
         }.toSeries()
     }
 
-    fun project(program: LcncProgram, measurements: Series<MeasuredNode> = emptySeriesOf(), spacing: Double = 110.0): ExtrudedScene {
+    fun project(program: LcncProgram, measurements: Series<MeasuredNode> = emptySeriesOf(), spacing: Double = 0.0): ExtrudedScene {
         require(spacing.isFinite() && spacing in 0.0..1000.0)
         val shadow = LcncSpaceGraph.project(program)
         val graph = SpaceGraph(shadow.graph, historyLimit = 0)

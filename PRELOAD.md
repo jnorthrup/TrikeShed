@@ -32,6 +32,13 @@ interface Join<A, B> {
 /** exactly like `to` for Join, but shorter and idiomatic to the algebra */
 inline infix fun <A, B> A.j(b: B): Join<A, B> = Join(this, b)
 
+// Named factory, literal syntax, and a stdlib boundary conversion; all retain j's packing.
+val joined = `⋈`("name", 42)
+val literal = `⋈`[1, 2.0f]
+val converted = `⋈`("name" to 42)
+val indexed = `⋈`(4) { i -> i * i } // inferred Series<Int>, lazy oracle
+val zipped = `⋈`.zip(indexed, indexed) // lazy Series2; unequal sizes are rejected
+
 typealias Twin<T> = Join<T, T>
 typealias Series<T> = Join<Int, (Int) -> T>
 
@@ -67,6 +74,7 @@ Read this algebra as:
 - Twin = same-typed Join
 - Series = size paired with index function
 - `j` = infix constructor grammar
+- `⋈` = factory/literal grammar over the same Join representations (backticks required in Kotlin)
 - `α` = lazy map / projection
 - `↺` = visible constant / left identity anchor
 - literals like `_l`, `_a`, `_s`, `s_` keep composition dense without hiding type shape

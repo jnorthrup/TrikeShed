@@ -45,7 +45,7 @@ class LcncExtrusionTest {
             for(n in scene.nodes.view)for(p in n.corners.view)assertTrue(viewport.bounds.contains(camera.project(p,viewport)!!))
             val frame=LcncExtrusion.frame(scene,camera,viewport)
             assertTrue(frame.items.view.filterIsInstance<narchy.spacegraph.graphics.spi.DrawItem.Text>().all { it.clip != null })
-            assertTrue(frame.items.size>scene.nodes.size*6)
+            assertTrue(frame.items.size>scene.nodes.view.sumOf { it.solids.size })
             val svg=SvgGraphicsProvider.encode(frame)
             assertTrue(svg.a.contains("data-entity=\"source\""))
             assertEquals(0,svg.b.refusals.size)

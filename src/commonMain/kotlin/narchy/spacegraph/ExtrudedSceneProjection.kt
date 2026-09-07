@@ -9,11 +9,13 @@ object ExtrudedSceneProjection {
     fun frame(scene: ExtrudedScene, camera: GraphCamera, viewport: Viewport, selected: String? = null): FramePlan {
         val items = mutableListOf<Join<Double, DrawItem>>()
         val labels = mutableListOf<DrawItem>()
+        fun depth(p: Vec3, level: Int) = if (camera.mode == CameraMode.ORTHOGRAPHIC) -level.toDouble() else p.z
         val faceIndices = listOf(listOf(0, 1, 3, 2), listOf(4, 6, 7, 5), listOf(0, 4, 5, 1),
             listOf(2, 3, 7, 6), listOf(0, 2, 6, 4), listOf(1, 5, 7, 3))
         for (n in scene.nodes.view) {
             val outline = if (n.id == selected) Rgba(227, 80, 103) else n.color
             for (solid in n.solids.view) for ((faceIndex, face) in faceIndices.withIndex()) {
+                if (camera.mode == CameraMode.ORTHOGRAPHIC && faceIndex != 1) continue
                 val corners: Series<Vec3> = 8 j { i -> Vec3(
                     if (i and 1 == 0) solid.min.x else solid.max.x,
                     if (i and 2 == 0) solid.min.y else solid.max.y,
@@ -24,7 +26,7 @@ object ExtrudedSceneProjection {
                 val parts = (listOf<PathPart>(PathPart.Move(p[0])) + p.drop(1).map { PathPart.Line(it) } + PathPart.Close).toSeries()
                 val fill = if (n.scope) n.color
                     else if (faceIndex == 1) Rgba(244, 246, 247) else n.color
-                items.add(p.sumOf { it.z } / 4 j DrawItem.Path(n.id, parts, fill, outline, if (n.id == selected) 2.0 else .65))
+                items.add(p.sumOf { depth(it, n.level) } / 4 j DrawItem.Path(n.id, parts, fill, outline, if (n.id == selected) 2.0 else .65))
             }
             val top = camera.project(n.position + Vec3(-n.size.x / 2 + 12 * n.scale, n.size.y / 2 - 23 * n.scale, n.size.z / 2 + n.scale), viewport)
             val projected = n.corners.view.mapNotNull { camera.project(it, viewport) }
@@ -60,7 +62,7 @@ object ExtrudedSceneProjection {
                     val q = p + Vec3(cos(i * PI / 6) * 3, sin(i * PI / 6) * 3)
                     if (i == 0) PathPart.Move(q) else if (i == 13) PathPart.Close else PathPart.Line(q)
                 }
-                items.add((p.z - .2) j DrawItem.Path(n.id, parts, n.color))
+                items.add((depth(p, n.level) - .2) j DrawItem.Path(n.id, parts, n.color))
             }
         }
         for (c in scene.cables.view) {
@@ -69,7 +71,8 @@ object ExtrudedSceneProjection {
                 camera.project(c.points[0] * (u*u*u) + c.points[1] * (3*u*u*t) + c.points[2] * (3*u*t*t) + c.points[3] * (t*t*t), viewport)
             }
             if (p.size < 2) continue
-            items.add(p.sumOf { it.z } / p.size j DrawItem.Path(c.id,
+            val cableLevel = scene.nodes.view.maxOfOrNull { it.level } ?: 0
+            items.add((p.sumOf { depth(it, cableLevel) } / p.size - .1) j DrawItem.Path(c.id,
                 (listOf<PathPart>(PathPart.Move(p.first())) + p.drop(1).map { PathPart.Line(it) }).toSeries(), stroke = Rgba(25, 145, 139), width = 1.6))
         }
         return FramePlan(viewport, (items.sortedByDescending { it.a }.map { it.b } + labels).toSeries(), Rgba(235, 239, 240))

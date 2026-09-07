@@ -38,7 +38,7 @@ class BrowserSpatialEngine {
     }
     fun svg(): String = SvgGraphicsProvider.encode(view.frame()).a
     fun camera(): dynamic = value(mapOf("position" to xyz(view.camera.position), "center" to xyz(view.camera.center),
-        "zoom" to view.camera.zoom, "near" to view.camera.near, "far" to view.camera.far, "fov" to view.camera.fieldOfView))
+        "zoom" to view.camera.zoom, "mode" to view.camera.mode.name, "near" to view.camera.near, "far" to view.camera.far, "fov" to view.camera.fieldOfView))
     fun pick(x: Double, y: Double): dynamic {
         val hit = view.pick(x, y) ?: return null
         val p = hit.b
@@ -48,9 +48,7 @@ class BrowserSpatialEngine {
     fun unproject(x: Double, y: Double, z: Double): dynamic = view.point(x, y, z)?.let { value(xyz(it)) }
     fun select(id: String?) { view.selected = id }
     fun fit() = view.fit()
-    fun front() = view.front()
     fun focus(id: String) = view.focus(id)
-    fun orbit(dx: Double, dy: Double) = view.orbit(dx, dy)
     fun pan(dx: Double, dy: Double) = view.pan(dx, dy)
     fun zoom(factor: Double, x: Double, y: Double) = view.zoom(factor, Vec3(x, y))
     private fun xyz(p: Vec3) = listOf(p.x, p.y, p.z)

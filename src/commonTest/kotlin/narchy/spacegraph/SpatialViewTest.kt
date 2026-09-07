@@ -16,7 +16,7 @@ class SpatialViewTest {
             LcncNode("b", "scope", children = s_[LcncNode("c", "scope", children = s_[LcncNode("d", "text.value")])])])], emptySeriesOf())
         val scene = LcncExtrusion.project(program, s_[
             measured("a", 0.0, 0.0, 800.0, 800.0), measured("b", 100.0, 100.0, 400.0, 400.0, .5),
-            measured("c", 150.0, 150.0, 200.0, 200.0, .25), measured("d", 175.0, 175.0, 100.0, 100.0, .125)])
+            measured("c", 150.0, 150.0, 200.0, 200.0, .25), measured("d", 175.0, 175.0, 100.0, 100.0, .125)], spacing = 110.0)
         assertEquals(listOf(0.0, 55.0, 82.5, 96.25), scene.nodes.view.map { it.bounds.min.z })
         assertEquals(listOf(12.0, 6.0, 3.0, 3.5), scene.nodes.view.map { it.size.z })
         assertEquals(listOf("b", "c", "d"), scene.subtree("b").view.map { it.id })
@@ -28,7 +28,7 @@ class SpatialViewTest {
     @Test fun hollowScopeIsNotPickedThroughItsOpening() {
         val scene = LcncExtrusion.project(LcncProgram("ring", s_[LcncNode("ring", "scope")], emptySeriesOf()),
             s_[measured("ring", 0.0, 0.0, 200.0, 200.0)])
-        val view = SpatialView(viewport); view.update(scene, scene.camera(viewport), true); view.front()
+        val view = SpatialView(viewport); view.update(scene, scene.camera(viewport), true)
         assertNull(view.pick(500.0, 350.0))
         val rim = view.camera.project(Vec3(2.0, -100.0, 12.0), viewport)!!
         assertEquals("ring", view.pick(rim.x, rim.y)?.a)
@@ -40,8 +40,8 @@ class SpatialViewTest {
         val scene = LcncExtrusion.project(LcncProgram("tiny", s_[LcncNode("tiny", "text.value")], emptySeriesOf()),
             s_[measured("tiny", 0.0, 0.0, .00022, .00009, .000001)])
         val view = SpatialView(viewport); view.update(scene, scene.camera(viewport), true); view.focus("tiny")
-        assertTrue((view.camera.position - view.camera.center).length < .001)
-        view.orbit(100.0, 40.0); view.pan(20.0, -10.0); view.zoom(2.0)
+        assertTrue(view.camera.zoom > 1e6)
+        view.pan(20.0, -10.0); view.zoom(2.0)
         val p = scene.nodes[0].position
         val screen = view.camera.project(p, viewport)!!
         val back = view.point(screen.x, screen.y, p.z)!!
@@ -58,11 +58,25 @@ class SpatialViewTest {
         val scene = LcncExtrusion.project(program)
         assertEquals("unchanged", scene.nodes[0].details[0].b)
         val view = SpatialView(viewport); view.update(scene, scene.camera(viewport), true)
-        view.focus("value"); view.orbit(70.0, 20.0); view.zoom(.5); view.pan(11.0, 18.0)
+        view.focus("value"); view.zoom(.5); view.pan(11.0, 18.0)
         view.focus("value")
         val frame = view.frame()
         assertTrue(FrameTriangles.vertices(frame).size > 0)
         assertTrue(SvgGraphicsProvider.encode(frame).a.contains("unchanged"))
         assertEquals(before, LcncProgramConfix.toJson(program))
+    }
+
+    @Test fun defaultSurfaceStaysFlatThroughPanZoomAndFocus() {
+        val program = LcncProgram("flat", s_[LcncNode("scope", "scope", children = s_[LcncNode("leaf", "text.value")])], emptySeriesOf())
+        val scene = LcncExtrusion.project(program)
+        assertTrue(scene.nodes.view.all { it.bounds.min.z == 0.0 })
+        val view = SpatialView(viewport); view.update(scene, scene.camera(viewport), true)
+        fun flat() {
+            assertEquals(CameraMode.ORTHOGRAPHIC, view.camera.mode)
+            assertEquals(Vec3(z = 500.0), view.camera.position - view.camera.center)
+            assertEquals(view.camera.project(Vec3(20.0, 30.0, 0.0), viewport)?.x,
+                view.camera.project(Vec3(20.0, 30.0, 1000.0), viewport)?.x)
+        }
+        flat(); view.pan(220.0, -70.0); flat(); view.zoom(4.0); flat(); view.focus("leaf"); flat()
     }
 }

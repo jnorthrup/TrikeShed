@@ -25,6 +25,26 @@ inline infix fun <A, B> A.j(b: B): Join<A, B> {
     }
 }
 
+/** Join factory and literal syntax, retaining the representations selected by [j]. */
+object `⋈` {
+    inline operator fun <A, B> invoke(a: A, b: B): Join<A, B> = a j b
+
+    inline operator fun <A, B> get(a: A, b: B): Join<A, B> = invoke(a, b)
+
+    inline operator fun <A, B> invoke(pair: Pair<A, B>): Join<A, B> = invoke(pair.first, pair.second)
+
+    /** Infer the oracle's key type from its domain; construction never calls the oracle. */
+    operator fun <I, T> invoke(domain: I, oracle: (I) -> T): MetaSeries<I, T> = domain j oracle
+
+    operator fun <I, T> get(domain: I, oracle: (I) -> T): MetaSeries<I, T> = invoke(domain, oracle)
+
+    /** Lazy positional zip with equal bounds, not a relational join or a truncating zip. */
+    fun <A, B> zip(left: Series<A>, right: Series<B>): Series2<A, B> {
+        require(left.size == right.size) { "Join zip requires equal sizes: ${left.size} != ${right.size}" }
+        return left joins right
+    }
+}
+
 /** Same-typed Join. */
 typealias Twin<T> = Join<T, T>
 
@@ -125,4 +145,3 @@ object s_ {
 
 /** Range selection as composition, not control flow. */
 operator fun <T> Series<T>.get(range: IntRange): Series<T> = range.count() j { i -> this[range.first + i] }
-

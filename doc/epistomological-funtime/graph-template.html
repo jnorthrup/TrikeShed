@@ -1,0 +1,159 @@
+<div id="rete-sumo-graph">
+  <style>
+    #rete-sumo-graph { color:var(--foreground); font:13px/1.45 system-ui,sans-serif; letter-spacing:0; }
+    #rete-sumo-graph * { box-sizing:border-box; }
+    #rete-sumo-graph h3 { font-size:19px; margin:0 0 4px; font-weight:650; }
+    #rete-sumo-graph .stamp { font-size:12px; opacity:.72; margin-bottom:14px; }
+    #rete-sumo-graph .controls { display:flex; flex-wrap:wrap; align-items:center; gap:8px 18px; margin-bottom:12px; }
+    #rete-sumo-graph label { display:flex; align-items:center; gap:6px; font-size:12px; }
+    #rete-sumo-graph select { max-width:230px; color:var(--foreground); background:var(--background); border:1px solid var(--border); border-radius:4px; padding:5px 7px; font:inherit; }
+    #rete-sumo-graph .legend { display:flex; flex-wrap:wrap; gap:8px 16px; margin:8px 0; font-size:11px; }
+    #rete-sumo-graph .legend span { display:flex; align-items:center; gap:6px; }
+    #rete-sumo-graph .line { width:23px; height:0; border-top:2px solid var(--foreground); opacity:.65; }
+    #rete-sumo-graph .optional { border-top-style:dashed; }
+    #rete-sumo-graph .excluded { border-color:var(--viz-series-4); border-top-style:dotted; }
+    #rete-sumo-graph .viewport { overflow:auto; max-height:590px; border:1px solid var(--border); position:relative; overscroll-behavior:contain; }
+    #rete-sumo-graph svg { display:block; max-width:none !important; max-height:none !important; touch-action:pan-x pan-y; }
+    #rete-sumo-graph svg text { fill:var(--foreground); font:12px system-ui,sans-serif; letter-spacing:0; pointer-events:none; }
+    #rete-sumo-graph .node { cursor:pointer; outline:none; }
+    #rete-sumo-graph .node rect { fill:var(--background); stroke:var(--border); stroke-width:1; }
+    #rete-sumo-graph .node:hover rect, #rete-sumo-graph .node:focus rect, #rete-sumo-graph .node.selected rect { stroke:var(--foreground); stroke-width:2; }
+    #rete-sumo-graph .edge { fill:none; stroke-width:1.35; opacity:.48; }
+    #rete-sumo-graph .edge.active { stroke-width:2.2; opacity:1; }
+    #rete-sumo-graph .edge-hit { fill:none; stroke:transparent; stroke-width:12; cursor:pointer; }
+    #rete-sumo-graph .detail { min-height:48px; padding:12px 0 8px; border-bottom:1px solid var(--border); overflow-wrap:anywhere; }
+    #rete-sumo-graph .detail strong { font-weight:600; }
+    #rete-sumo-graph .note { opacity:.75; font-size:12px; margin-top:3px; }
+    #rete-sumo-graph .connections { max-height:360px; overflow:auto; margin-top:4px; }
+    #rete-sumo-graph .connection { display:grid; grid-template-columns:minmax(160px,1fr) minmax(180px,1.25fr); gap:4px 18px; padding:9px 0; border-bottom:1px solid var(--border); }
+    #rete-sumo-graph .connection .source { grid-column:1/-1; font-size:11px; opacity:.65; }
+    #rete-sumo-graph a { color:var(--foreground); text-decoration:underline; text-underline-offset:3px; overflow-wrap:anywhere; }
+    #rete-sumo-graph .pair { font-weight:550; }
+    #rete-sumo-graph details { margin-top:12px; }
+    #rete-sumo-graph summary { cursor:pointer; font-weight:550; padding:4px 0; }
+    #rete-sumo-graph table { width:100%; border-collapse:collapse; font-size:12px; margin-top:8px; }
+    #rete-sumo-graph td, #rete-sumo-graph th { padding:6px 8px 6px 0; text-align:left; border-bottom:1px solid var(--border); overflow-wrap:anywhere; }
+    #rete-sumo-graph th { font-weight:550; }
+    #rete-sumo-graph .tooltip { display:none; position:fixed; z-index:20; max-width:310px; background:var(--popover); color:var(--popover-foreground); border:1px solid var(--border); padding:8px 10px; pointer-events:none; font-size:12px; }
+    @media(max-width:480px) {
+      #rete-sumo-graph .controls { gap:8px; }
+      #rete-sumo-graph label { width:100%; justify-content:space-between; }
+      #rete-sumo-graph select { width:calc(100% - 60px); max-width:none; }
+      #rete-sumo-graph .connection { grid-template-columns:1fr; gap:3px; }
+      #rete-sumo-graph .viewport { max-height:510px; }
+    }
+  </style>
+  <h3>Rete + SUMO: directed connections</h3>
+  <div class="stamp" data-stamp></div>
+  <div class="controls">
+    <label>Graph <select data-view aria-label="Graph scope"><option value="overview">System overview</option></select></label>
+    <label>Node <select data-node aria-label="Inspect a node"><option value="">All in view</option></select></label>
+  </div>
+  <div class="legend"><span><i class="line"></i>Data / control flow</span><span><i class="line optional"></i>Optional / separate instance</span><span><i class="line excluded"></i>Admission excluded</span></div>
+  <div class="viewport" data-viewport><svg role="img" aria-label="Directed Rete and SUMO connection graph"></svg></div>
+  <div class="detail" data-detail aria-live="polite"></div>
+  <div class="connections" data-connections></div>
+  <details data-live><summary>Daemon snapshot</summary><div data-live-content></div></details>
+  <details data-ledger><summary data-ledger-summary>All source connections</summary><div class="connections" data-ledger-content></div></details>
+  <div class="tooltip" role="tooltip" data-tooltip></div>
+  <script>
+  (() => {
+    const D = /* GRAPH_DATA */;
+    const root=document.getElementById('rete-sumo-graph');
+    const $=s=>root.querySelector(s);
+    const svg=$('svg'),viewport=$('[data-viewport]'),viewSelect=$('[data-view]'),nodeSelect=$('[data-node]');
+    const byId=new Map(D.nodes.map(n=>[n.id,n]));
+    const groups=new Map(D.groups.map(g=>[g.id,g]));
+    const ns='http://www.w3.org/2000/svg';
+    let view='overview',selected='',currentEdges=[],currentNodes=[];
+    function el(tag,attrs={},text){const n=document.createElementNS(ns,tag);for(const[k,v]of Object.entries(attrs))n.setAttribute(k,v);if(text!==undefined)n.textContent=text;return n;}
+    function color(g){return 'var(--viz-series-'+groups.get(g).color+')';}
+    function addOption(select,value,label){const o=document.createElement('option');o.value=value;o.textContent=label;select.append(o);}
+    D.groups.forEach(g=>addOption(viewSelect,g.id,g.label));addOption(viewSelect,'all','Every connection');
+    D.nodes.slice().sort((a,b)=>a.label.localeCompare(b.label)).forEach(n=>addOption(nodeSelect,n.id,n.label));
+    $('[data-stamp]').textContent=D.nodes.length+' nodes / '+D.edges.length+' source connections / '+D.runtime.productions.length+' live productions';
+    function labelLines(label,max=23){const words=label.split(' '),lines=[''];for(const w of words){const i=lines.length-1;if(lines[i]&&(lines[i]+' '+w).length>max)lines.push(w);else lines[i]+=(lines[i]?' ':'')+w;}return lines;}
+    function drawNode(n,x,y,w=158,h=48,overview=false){
+      const g=el('g',{class:'node',transform:'translate('+x+','+y+')',tabindex:0,role:'button','aria-label':n.label,'data-node-id':n.id});
+      g.append(el('rect',{x:-w/2,y:-h/2,width:w,height:h,rx:4}));
+      g.append(el('line',{x1:-w/2+1,y1:-h/2+7,x2:-w/2+1,y2:h/2-7,stroke:color(overview?n.id:n.g),'stroke-width':3}));
+      const lines=labelLines(n.label);const t=el('text',{'text-anchor':'middle'});
+      lines.forEach((line,i)=>t.append(el('tspan',{x:0,y:(i-(lines.length-1)/2)*15+4},line)));g.append(t);
+      g.append(el('title',{},n.note||n.label));
+      const activate=()=>{if(overview){view=n.id;selected='';viewSelect.value=view;nodeSelect.value='';draw();}else selectNode(n.id);};
+      g.addEventListener('click',activate);g.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();activate();}});svg.append(g);
+    }
+    function drawEdge(edge,d,group){
+      const c=color(group);const p=el('path',{d,class:'edge','data-edge-id':edge.id,stroke:c,'marker-end':'url(#rete-arrow-'+group+')'});
+      if(edge.type==='optional')p.setAttribute('stroke-dasharray','6 4');
+      if(edge.type==='excluded'){p.setAttribute('stroke-dasharray','2 5');p.setAttribute('stroke','var(--viz-series-4)');}
+      svg.append(p);const hit=el('path',{d,class:'edge-hit','data-edge-hit':edge.id});
+      hit.addEventListener('click',()=>showEdge(edge));
+      hit.addEventListener('pointerenter',e=>{const t=$('[data-tooltip]');t.textContent=edge.label;t.style.display='block';t.style.left=Math.max(6,Math.min(e.clientX+10,window.innerWidth-320))+'px';t.style.top=(e.clientY+12)+'px';});
+      hit.addEventListener('pointerleave',()=>{$('[data-tooltip]').style.display='none';});svg.append(hit);
+    }
+    function defs(){const d=el('defs');for(const g of D.groups){const m=el('marker',{id:'rete-arrow-'+g.id,viewBox:'0 0 10 10',refX:9,refY:5,markerWidth:7,markerHeight:7,orient:'auto'});m.append(el('path',{d:'M 0 0 L 10 5 L 0 10 z',fill:color(g.id)}));d.append(m);}svg.append(d);}
+    function drawOverview(){
+      const w=Math.max(320,viewport.clientWidth-2),mobile=w<520;const columns=mobile?2:3;const nw=mobile?Math.min(145,(w-42)/2):170;
+      const arrangement=mobile?['inputs','core','rules','belief','read','sumo','agent','isa']:['inputs','core','rules','agent','sumo','belief','isa','read'];
+      const positions={};arrangement.forEach((id,i)=>{positions[id]={x:(i%columns+.5)*w/columns,y:58+Math.floor(i/columns)*126};});
+      const h=116+(Math.ceil(arrangement.length/columns)-1)*126;svg.setAttribute('width',w);svg.setAttribute('height',h);svg.style.width=w+'px';svg.style.height=h+'px';svg.setAttribute('viewBox','0 0 '+w+' '+h);
+      const bundles=new Map();
+      for(const e of D.edges){if(e.type==='excluded')continue;const a=byId.get(e.a).g,b=byId.get(e.b).g;if(a===b)continue;const key=a+'|'+b;if(!bundles.has(key))bundles.set(key,{id:key,a,b,links:[]});bundles.get(key).links.push(e);}
+      let index=0;for(const b of bundles.values()){
+        const a=positions[b.a],z=positions[b.b],dx=z.x-a.x,dy=z.y-a.y;const vertical=Math.abs(dy)>Math.abs(dx);
+        const sx=a.x+(vertical?0:Math.sign(dx)*nw/2),sy=a.y+(vertical?Math.sign(dy)*28:0);
+        const tx=z.x-(vertical?0:Math.sign(dx)*nw/2),ty=z.y-(vertical?Math.sign(dy)*28:0);
+        const offset=(index++%3-1)*16;
+        const d=vertical?'M '+sx+' '+sy+' C '+(sx+offset)+' '+(sy+dy*.42)+' '+(tx+offset)+' '+(ty-dy*.42)+' '+tx+' '+ty:'M '+sx+' '+sy+' C '+(sx+dx*.35)+' '+(sy+offset)+' '+(tx-dx*.35)+' '+(ty+offset)+' '+tx+' '+ty;
+        drawEdge({...b,label:groups.get(b.a).label+' -> '+groups.get(b.b).label+' / '+b.links.length+' source connections',bundle:true},d,b.a);
+      }
+      for(const g of D.groups)drawNode(g,positions[g.id].x,positions[g.id].y,nw,56,true);
+      currentEdges=D.edges;currentNodes=D.nodes;
+      showDetail('System overview','Source wiring across commonMain and jvmMain; arrow direction is data/control flow.');
+      renderConnections(D.edges.filter(e=>e.a==='net'&&e.b==='tee'||e.a==='tee'&&e.b==='kb'||e.a==='kb'&&e.b==='kbclosure'||e.a==='kbclosure'&&e.b==='closure'||e.a==='corpus'&&e.b==='classifier'));
+    }
+    function bezier(points){if(!points?.length)return '';let s='M '+points[0].join(' ');for(let i=1;i+2<points.length;i+=3)s+=' C '+points.slice(i,i+3).map(p=>p.join(' ')).join(' ');return s;}
+    function draw(){
+      svg.replaceChildren();defs();$('[data-tooltip]').style.display='none';
+      if(view==='overview'){drawOverview();return;}
+      const l=D.layouts[view];currentEdges=view==='all'?D.edges:D.edges.filter(e=>e.view===view);
+      const ids=new Set(currentEdges.flatMap(e=>[e.a,e.b]));currentNodes=D.nodes.filter(n=>ids.has(n.id));
+      svg.setAttribute('width',Math.max(viewport.clientWidth-2,l.w));svg.setAttribute('height',Math.max(320,l.h));svg.style.width=Math.max(viewport.clientWidth-2,l.w)+'px';svg.style.height=Math.max(320,l.h)+'px';svg.setAttribute('viewBox','0 0 '+Math.max(viewport.clientWidth-2,l.w)+' '+Math.max(320,l.h));
+      for(const edge of currentEdges){const a=l.nodes[edge.a],b=l.nodes[edge.b];const d=l.paths[edge.id]?bezier(l.paths[edge.id]):'M '+a.x+' '+(a.y+25)+' Q '+((a.x+b.x)/2)+' '+(Math.max(a.y,b.y)+70)+' '+b.x+' '+(b.y+25);drawEdge(edge,d,byId.get(edge.a).g);}
+      for(const n of currentNodes){const p=l.nodes[n.id];drawNode(n,p.x,p.y);}
+      if(selected)selectNode(selected,false);else {showDetail(view==='all'?'Every source connection':groups.get(view).label,currentNodes.length+' nodes / '+currentEdges.length+' directed links');renderConnections(currentEdges);}
+      viewport.scrollLeft=0;viewport.scrollTop=0;
+    }
+    function showDetail(title,note=''){const d=$('[data-detail]');d.replaceChildren();const b=document.createElement('strong');b.textContent=title;d.append(b);if(note){const p=document.createElement('div');p.className='note';p.textContent=note;d.append(p);}}
+    function selectNode(id,scroll=true){
+      selected=id;nodeSelect.value=id;const n=byId.get(id);const links=D.edges.filter(e=>e.a===id||e.b===id);
+      if(!currentNodes.some(n=>n.id===id)||view==='overview'){view=n.g;viewSelect.value=view;draw();}
+      root.querySelectorAll('.node').forEach(x=>x.classList.toggle('selected',x.dataset.nodeId===id));
+      root.querySelectorAll('.edge').forEach(x=>{const e=D.edges.find(e=>e.id===x.dataset.edgeId);const active=e&&(e.a===id||e.b===id);x.classList.toggle('active',!!active);x.style.opacity=active?'1':'.12';});
+      showDetail(n.label,links.filter(e=>e.b===id).length+' incoming / '+links.filter(e=>e.a===id).length+' outgoing'+(n.note?' | '+n.note:''));renderConnections(links);
+      if(scroll){const p=D.layouts[view]?.nodes[id];if(p){viewport.scrollLeft=Math.max(0,p.x-viewport.clientWidth/2);viewport.scrollTop=Math.max(0,p.y-viewport.clientHeight/2);}}
+    }
+    function showEdge(edge){if(edge.bundle){showDetail(edge.label);renderConnections(edge.links);return;}showDetail(byId.get(edge.a).label+' -> '+byId.get(edge.b).label,edge.label);renderConnections([edge]);root.querySelectorAll('.edge').forEach(x=>{x.classList.toggle('active',x.dataset.edgeId===edge.id);x.style.opacity=x.dataset.edgeId===edge.id?'1':'.12';});}
+    function row(edge){const r=document.createElement('div');r.className='connection';
+      const pair=document.createElement('div');pair.className='pair';pair.textContent=byId.get(edge.a).label+' -> '+byId.get(edge.b).label;
+      const label=document.createElement('div');label.textContent=edge.label;
+      const source=document.createElement('a');source.className='source';source.href=D.root+'/'+edge.ref.file+':'+edge.ref.line;source.textContent=edge.ref.file+':'+edge.ref.line;
+      r.append(pair,label,source);return r;}
+    function renderConnections(links){$('[data-connections]').replaceChildren(...links.map(row));}
+    viewSelect.addEventListener('change',()=>{view=viewSelect.value;selected='';nodeSelect.value='';draw();});
+    nodeSelect.addEventListener('change',()=>{if(nodeSelect.value)selectNode(nodeSelect.value);else{selected='';draw();}});
+    $('[data-ledger-summary]').textContent='All '+D.edges.length+' source connections';
+    $('[data-ledger]').addEventListener('toggle',()=>{if($('[data-ledger]').open&&!$('[data-ledger-content]').childElementCount)$('[data-ledger-content]').append(...D.edges.map(row));});
+    const live=$('[data-live-content]');
+    function table(headers,rows){const t=document.createElement('table'),head=document.createElement('tr');headers.forEach(h=>{const th=document.createElement('th');th.textContent=h;head.append(th);});t.append(head);for(const values of rows){const tr=document.createElement('tr');values.forEach(v=>{const td=document.createElement('td');td.textContent=v;tr.append(td);});t.append(tr);}return t;}
+    const time=document.createElement('div');time.className='note';time.textContent=D.runtime.at+' / localhost:8888 / '+D.runtime.facts.toLocaleString()+' facts / blackboard revision '+D.runtime.blackboardRevision;live.append(time);
+    live.append(table(['Partition','Facts'],D.runtime.partitions.map(p=>[p.partition,p.count.toLocaleString()])));
+    live.append(table(['Production','Salience','Interest'],D.runtime.productions.map(p=>[p.ruleId,p.salience,p.interests.join(', ')])));
+    const receipt=document.createElement('div');receipt.className='note';receipt.textContent='Causal firing receipts in this retained blackboard snapshot: '+D.runtime.causalFiringReceipts+'. SUMO query observed: AutonomousAgent -> Object, Physical, Entity. Runtime counts are a snapshot; source edges are implementation wiring.';live.append(receipt);
+    let prevWidth=0;new ResizeObserver(()=>{const width=viewport.clientWidth;if(Math.abs(width-prevWidth)>2){prevWidth=width;if(view==='overview')draw();}}).observe(viewport);
+    draw();
+    root.dataset.ready='true';
+  })();
+  </script>
+</div>

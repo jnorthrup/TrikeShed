@@ -51,9 +51,10 @@ class PrimitiveJoinTest {
     fun allOrderedPrimitivePairsPackThroughGenericConstruction() {
         for ((i, left) in samples.withIndex()) for ((k, right) in samples.withIndex()) {
             for (a in left) for (b in right) {
-                val result = erasedJoin(a, b)
-                assertEquals(layouts[i][k], result::class)
-                checkJoin(a, b, result)
+                for (result in listOf(erasedJoin(a, b), `⋈`(a, b), `⋈`[a, b])) {
+                    assertEquals(layouts[i][k], result::class)
+                    checkJoin(a, b, result)
+                }
             }
         }
     }

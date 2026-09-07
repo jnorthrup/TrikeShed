@@ -4,7 +4,7 @@ import './SpatialRenderer.mjs';
 (() => {
   'use strict';
   let open=false,backend='gl',response,request,timer,serial=0,selected=null,pendingPort=null;
-  let workspace,surface,inspector,tree,badge,renderer,provider,modeButton,editButton,spacing,query,observer;
+  let workspace,surface,inspector,tree,badge,renderer,provider,modeButton,editButton,tools,query,observer;
   let resetCamera=true,dirtyAlignment=true,heldParams=null,lastIdentity='',paletteWasOpen=false;
   const $=id=>document.getElementById(id);
   const el=(tag,cls,text)=>{const n=document.createElement(tag);if(cls)n.className=cls;if(text!=null)n.textContent=text;return n;};
@@ -26,7 +26,7 @@ import './SpatialRenderer.mjs';
   function releaseParams(){if(!heldParams)return;const{params,placeholder}=heldParams;if(placeholder.isConnected)placeholder.replaceWith(params);else params.remove();heldParams=null;}
   function activate(value){
     if(value!==open){if(value){paletteWasOpen=$('palette').classList.contains('open');$('palette').classList.remove('open');}else $('palette').classList.toggle('open',paletteWasOpen);}
-    open=value;workspace.hidden=!open;document.body.classList.toggle('sg-spatial',open);
+    open=value;workspace.hidden=!open;tools.hidden=!open;document.body.classList.toggle('sg-spatial',open);
     modeButton.setAttribute('aria-pressed',String(open));editButton.setAttribute('aria-pressed',String(!open));$('viewport').inert=open;
     document.querySelectorAll('[data-spatial]').forEach(n=>n.hidden=!open);
     if(open)schedule();else{releaseParams();request?.abort();request=null;serial++;clearTimeout(timer);timer=null;pendingPort=null;}
@@ -90,7 +90,7 @@ import './SpatialRenderer.mjs';
     if(!open||typeof serialize!=='function'||!renderer)return;
     try{
       const identity=G.nodes.map(n=>n.id).join('|'),document=serialize(),name=$('panelName').value||'canvas';
-      const scene=renderer.project(name,document,measurements(),+spacing.value,resetCamera||lastIdentity!==identity);
+      const scene=renderer.project(name,document,measurements(),0,resetCamera||lastIdentity!==identity);
       response={scene,alignment:lastIdentity===identity?response?.alignment:null};lastIdentity=identity;resetCamera=false;
       badge.textContent=`${backend.toUpperCase()} · ${scene.nodes.length} nodes · ${scene.cables.length} cables${scene.issues.length?` · ${scene.issues.length} unprojected`:''}`;delete badge.dataset.error;
       if(!inspector.contains(window.document.activeElement))paintInspector();paintTree();
@@ -104,25 +104,15 @@ import './SpatialRenderer.mjs';
     }catch(error){report(error);}
   }
   function schedule(alignment=false){dirtyAlignment||=alignment;if(!open||timer)return;timer=setTimeout(()=>{timer=null;refresh();},20);}
-  function retitle(id,name,glyph,label=false){const b=$(id);if(!b)return;b.replaceChildren(icon(glyph));if(label)b.append(el('span','',name));b.title=name;b.setAttribute('aria-label',name);b.classList.add('sg-command');}
   addEventListener('DOMContentLoaded',()=>{
-    if(!$('spacegraphBtn'))return;document.body.classList.add('sg-workbench');
-    const bar=$('bar');bar.querySelector('b').textContent='LCNC';bar.querySelector('.sub').textContent='SpaceGraph';
-    for(const args of [['runBtn','Run','play',true],['stopBtn','Stop timers','square'],['addBtn','Add node','plus',true],['fdBtn','Layout','git-branch'],['shakeBtn','Connect open ports','git-merge'],['fitBtn','Fit document','search'],['storeSaveBtn','Save to store','archive'],['storeLoadBtn','Load from store','download'],['presetsBtn','Programs','panels-top-left',true],['rdfBtn','RDF and ontology','network'],['paletteBtn','Node library','panels-top-left'],['keysBtn','Provider keys','key-round'],['exportBtn','Export','download'],['importBtn','Import','arrow-up'],['undoBtn','Undo','rotate-ccw'],['redoBtn','Redo','rotate-ccw'],['clearBtn','Clear document','trash-2'],['qsBtn','Quickstart','external-link'],['fbBtn','Feedback','message-square']])retitle(...args);
-    $('redoBtn').classList.add('sg-redo');
-    const tools=el('div','sg-tools');tools.id='sg-tools';document.body.append(tools);
+    if(!$('spacegraphBtn'))return;
+    tools=el('div','sg-tools');tools.id='sg-tools';tools.hidden=true;document.body.append(tools);
     const modes=el('div','sg-modes');modes.setAttribute('role','group');modes.setAttribute('aria-label','Workspace view');
-    editButton=command('Editor','panels-top-left',()=>activate(false),true);editButton.id='sg-editor';modeButton=$('spacegraphBtn');modeButton.replaceChildren(icon('network'),el('span','','Spatial'));modeButton.title='Spatial workspace';modeButton.setAttribute('aria-label','Spatial workspace');modeButton.onclick=()=>activate(true);modes.append(editButton,modeButton);tools.append(modes);
-    for(const id of ['addBtn','paletteBtn','fdBtn','shakeBtn','fitBtn','undoBtn','redoBtn'])tools.append($(id));
-    const documents=el('div','sg-documents');for(const id of ['presetsBtn','storeSaveBtn'])documents.append($(id));bar.append(documents);
-    const more=el('details','sg-more'),summary=el('summary');summary.title='Document actions';summary.setAttribute('aria-label','Document actions');summary.append(icon('panels-top-left'));more.append(summary);
-    const menu=el('div','sg-more-menu');for(const id of ['storeLoadBtn','exportBtn','importBtn','rdfBtn','keysBtn','clearBtn','qsBtn','fbBtn']){const b=$(id);b.append(el('span','',b.getAttribute('aria-label')));b.addEventListener('click',()=>more.open=false);menu.append(b);}more.append(menu);bar.append(more,$('runBtn'),$('stopBtn'));
+    editButton=command('Editor','panels-top-left',()=>activate(false),true);editButton.id='sg-editor';modeButton=$('spacegraphBtn');modeButton.title='Flat SpaceGraph projection preview';modeButton.setAttribute('aria-label','SpaceGraph projection');modeButton.onclick=()=>activate(!open);modes.append(editButton);tools.append(modes);
     const spatial=el('div','sg-spatial-tools');spatial.dataset.spatial='';provider=el('select');provider.setAttribute('aria-label','Rendering provider');for(const value of ['gl','canvas','svg']){const o=el('option','',value.toUpperCase());o.value=value;provider.append(o);}provider.onchange=()=>useProvider(provider.value);
     const fit=command('Frame scene','search',()=>{resetCamera=true;schedule();});fit.id='sg-fit';
-    const front=command('Front view','square',()=>renderer.front());front.id='sg-front';
-    const move=command('Move nodes','pencil',()=>{const on=renderer.mode!=='move';renderer.mode=on?'move':'orbit';move.setAttribute('aria-pressed',String(on));});move.id='sg-move';move.setAttribute('aria-pressed','false');
-    spacing=el('input');spacing.type='range';spacing.min='0';spacing.max='400';spacing.step='10';spacing.value='110';spacing.setAttribute('aria-label','Layer spacing');spacing.title='Layer spacing';spacing.oninput=()=>schedule();
-    spatial.append(provider,fit,front,move,command('Zoom in','plus',()=>renderer.zoom(1.3)),command('Zoom out','search',()=>renderer.zoom(1/1.3)),spacing);tools.append(spatial);
+    const move=command('Move nodes','pencil',()=>{const on=renderer.mode!=='move';renderer.mode=on?'move':'pan';move.setAttribute('aria-pressed',String(on));});move.id='sg-move';move.setAttribute('aria-pressed','false');
+    spatial.append(provider,fit,move,command('Zoom in','plus',()=>renderer.zoom(1.3)),command('Zoom out','search',()=>renderer.zoom(1/1.3)));tools.append(spatial);
     workspace=el('main','sg-workspace');workspace.id='spacegraph-shadow';workspace.hidden=true;
     const navigator=el('nav','sg-navigator');navigator.setAttribute('aria-label','Scene nodes');const nh=el('header');nh.append(el('strong','','Nodes'));navigator.append(nh);
     query=el('input');query.type='search';query.placeholder='Find a node';query.setAttribute('aria-label','Find a node');query.oninput=paintTree;navigator.append(query);tree=el('div','sg-tree');navigator.append(tree);
@@ -142,7 +132,7 @@ import './SpatialRenderer.mjs';
     observer.observe($('world'),{attributes:true,attributeFilter:['class','style'],childList:true,subtree:true,characterData:true});
     $('fitBtn').addEventListener('click',()=>{if(open){resetCamera=true;schedule();}});
     window.SpaceGraphWorkspace={select,activate,refresh:()=>schedule(true),measurements,get scene(){return response?.scene;},get renderer(){return renderer;},get backend(){return backend;}};
-    icons();activate(new URLSearchParams(location.search).get('spacegraph')!=='0');
+    icons();activate(new URLSearchParams(location.search).get('spacegraph')==='1');
   });
   addEventListener('lcnc:shadow-update',()=>schedule(true));
   addEventListener('pagehide',()=>{releaseParams();request?.abort();clearTimeout(timer);observer?.disconnect();renderer?.destroy();});

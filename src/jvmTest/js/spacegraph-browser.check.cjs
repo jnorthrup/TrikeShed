@@ -15,6 +15,14 @@ const base=process.env.SPACEGRAPH_BASE_URL||'http://127.0.0.1:8888';
         return route.continue();
       });
       await page.goto(base+'/panels?load=preset-scope',{waitUntil:'domcontentloaded'});
+      await page.waitForFunction(()=>typeof G!=='undefined'&&G.nodes.length>0);
+      assert.equal(await page.evaluate(()=>document.body.classList.contains('sg-spatial')),false,'The real editor is the default');
+      assert.equal(await page.evaluate(()=>document.body.classList.contains('sg-workbench')),false,'Do not restyle the existing editor');
+      assert.equal(await page.locator('#viewport').evaluate(el=>el.inert),false);
+      assert.equal(await page.locator('#runBtn').evaluate(el=>el.parentElement.id),'bar');
+      assert.equal(await page.locator('#rdfBtn').evaluate(el=>el.parentElement.id),'bar');
+      await page.screenshot({path:path.join(output,`default-editor-${viewport.width}.png`)});
+      await page.locator('#spacegraphBtn').click();
       await page.waitForFunction(()=>window.SpaceGraphWorkspace?.scene?.nodes.length>0,null,{timeout:45000}).catch(async error=>{
         console.error(JSON.stringify({output,errors,state:await page.evaluate(()=>({badge:document.querySelector('.sg-badge')?.textContent,status:document.getElementById('status')?.textContent,workspace:!!window.SpaceGraphWorkspace,nodes:typeof G==='undefined'?null:G.nodes.length}))}));
         await page.screenshot({path:path.join(output,'failure.png')});throw error;
@@ -25,9 +33,9 @@ const base=process.env.SPACEGRAPH_BASE_URL||'http://127.0.0.1:8888';
         const s=SpaceGraphWorkspace.scene,r=SpaceGraphWorkspace.renderer;r.render();
         const gl=r.gl,w=gl.drawingBufferWidth,h=gl.drawingBufferHeight,pixels=new Uint8Array(w*h*4);gl.readPixels(0,0,w,h,gl.RGBA,gl.UNSIGNED_BYTE,pixels);
         let colored=0,samples=0;for(let i=0;i<pixels.length;i+=4*31){samples++;if(Math.abs(pixels[i]-235)+Math.abs(pixels[i+1]-239)+Math.abs(pixels[i+2]-240)>35)colored++;}
-        return {nodes:s.nodes.length,cables:s.cables.length,measured:s.nodes.every(n=>n.measured),depth:Math.max(...s.nodes.map(n=>n.position[2])),colored,samples,vertices:r.vertices,engine:typeof r.engine.project};
+        return {nodes:s.nodes.length,cables:s.cables.length,measured:s.nodes.every(n=>n.measured),flat:s.nodes.every(n=>Math.abs(n.position[2]-n.size[2]/2)<1e-10),colored,samples,vertices:r.vertices,engine:typeof r.engine.project,mode:r.cameraValue().mode};
       });
-      assert.ok(measure.measured);assert.ok(measure.depth>28);assert.ok(measure.colored>50,JSON.stringify(measure));assert.ok(measure.vertices>measure.nodes*36);assert.equal(measure.engine,'function');
+      assert.ok(measure.measured);assert.ok(measure.flat);assert.equal(measure.mode,'ORTHOGRAPHIC');assert.ok(measure.colored>50,JSON.stringify(measure));assert.ok(measure.vertices>measure.nodes*36);assert.equal(measure.engine,'function');
       await page.screenshot({path:path.join(output,`spatial-${viewport.width}.png`)});
       const canvas=await page.locator('#sg-surface').boundingBox(),before=await page.evaluate(()=>SpaceGraphWorkspace.renderer.cameraValue());
       await page.mouse.move(canvas.x+canvas.width*.35,canvas.y+canvas.height*.35);await page.mouse.down();await page.mouse.move(canvas.x+canvas.width*.65,canvas.y+canvas.height*.45,{steps:12});await page.mouse.up();
@@ -51,7 +59,7 @@ const base=process.env.SPACEGRAPH_BASE_URL||'http://127.0.0.1:8888';
         const moved=await page.evaluate(id=>{const n=G.nodes.find(n=>n.id===id);return {x:n.x,y:n.y,undo:UNDO.length};},drag.id);
         assert.notEqual(moved.x,drag.x);assert.equal(moved.undo,drag.undo+1,'One drag is one undo step');
         await page.locator('#undoBtn').click();
-        assert.deepEqual(await page.evaluate(id=>{const n=G.nodes.find(n=>n.id===id);SpaceGraphWorkspace.renderer.mode='orbit';return {x:n.x,y:n.y};},drag.id),{x:drag.x,y:drag.y});
+        assert.deepEqual(await page.evaluate(id=>{const n=G.nodes.find(n=>n.id===id);SpaceGraphWorkspace.renderer.mode='pan';return {x:n.x,y:n.y};},drag.id),{x:drag.x,y:drag.y});
       }
       const selected=await page.evaluate(()=>{
         const n=G.nodes.find(n=>n.el.querySelector(':scope > .params input,:scope > .params textarea'));window.sgTestNode=n;window.sgTestControl=n.el.querySelector(':scope > .params input,:scope > .params textarea');SpaceGraphWorkspace.select(n.id);return {id:n.id,value:sgTestControl.value};
@@ -80,8 +88,7 @@ const base=process.env.SPACEGRAPH_BASE_URL||'http://127.0.0.1:8888';
           const scene=SpaceGraphWorkspace.scene,byId=new Map(scene.nodes.map(n=>[n.id,n]));
           return scene.nodes.filter(n=>n.parent).map(n=>({id:n.id,scale:n.scale,step:n.position[2]-n.size[2]/2-(byId.get(n.parent).position[2]-byId.get(n.parent).size[2]/2)}));
         });
-        for(const n of recursion)assert.ok(Math.abs(n.step-110*n.scale)<1e-8,JSON.stringify(n));
-        await page.evaluate(()=>SpaceGraphWorkspace.renderer.front());
+        for(const n of recursion)assert.ok(Math.abs(n.step)<1e-8,JSON.stringify(n));
         const frameBefore=await page.evaluate(()=>JSON.stringify(SpaceGraphWorkspace.renderer.engine.frame(false)));
         for(const provider of ['canvas','svg','gl']){
           await page.getByLabel('Rendering provider',{exact:true}).selectOption(provider);

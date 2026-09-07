@@ -58,7 +58,7 @@ class LcncRdfWire(
                 val extrusion = narchy.spacegraph.LcncExtrusion
                 val scene = try {
                     extrusion.project(program, extrusion.measurements(options["geometry"]),
-                        (options["spacing"] as? Number)?.toDouble() ?: 110.0)
+                        (options["spacing"] as? Number)?.toDouble() ?: 0.0)
                 } catch (e: IllegalArgumentException) { return json(mapOf("error" to e.message), 400) }
                 val camera = try { extrusion.camera(options["camera"], scene.camera(viewport)) }
                     catch (e: IllegalArgumentException) { return json(mapOf("error" to e.message), 400) }
