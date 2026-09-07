@@ -2,7 +2,9 @@ package narchy.spacegraph
 
 import borg.trikeshed.lcnc.LcncProgram
 import borg.trikeshed.lcnc.LcncContracts
-import borg.trikeshed.parse.confix.value
+import borg.trikeshed.parse.confix.cellKids
+import borg.trikeshed.parse.confix.docAt
+import borg.trikeshed.parse.confix.reify
 import borg.trikeshed.lib.*
 import narchy.spacegraph.graphics.spi.*
 import kotlin.math.*
@@ -132,10 +134,12 @@ object LcncExtrusion {
                 spec.data.flag("source") -> Rgba(47, 116, 166); spec.data.flag("sink") -> Rgba(121, 98, 155)
                 else -> Rgba(82, 103, 117) }
             val type = spec.data.string("lcncType")
-            val params = spec.data.document.value("params") as? Map<*, *> ?: emptyMap<Any, Any>()
+            val params = spec.data.document.docAt("params")?.cellKids ?: emptySeriesOf()
             val contract = LcncContracts.find(type)
-            val details = params.map { (key, value) -> key.toString() j
-                (if (contract?.params?.get(key.toString())?.ph?.startsWith("secret:") == true) "[redacted]" else value.toString()) }.toSeries()
+            val details: Series<Join<String, String>> = (params.size / 2) j { i ->
+                val key = params[i * 2].reify().toString()
+                key j (if (contract?.params?.get(key)?.ph?.startsWith("secret:") == true) "[redacted]" else params[i * 2 + 1].reify().toString())
+            }
             nodes.add(ExtrudedNode(spec.id, spec.parent, spec.label, spec.data.string("lcncType"), center,
                 Vec3(r.width, r.height, depth), level, scope, m != null, color, ports.toSeries(), scale, details))
         }

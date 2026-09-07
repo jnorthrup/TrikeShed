@@ -83,7 +83,7 @@ import './SpatialRenderer.mjs';
     for(const[label,values]of [['Rete',alignment?.watchedBy],['Causal rules',alignment?.causalRules],['KIF',alignment?.facts]])s.append(el('h4','',label),el('pre','',(values||[]).join('\n')||'None'));
     section('Epistemic bindings').append(el('p','sg-muted','Not supplied'));icons();
   }
-  function moveNode(id,dx,dy){const n=node(id);if(!n)return;const scale=n.el.getBoundingClientRect().width/view.z/n.el.offsetWidth;n.x+=dx/scale;n.y+=dy/scale;n.el.style.left=`${n.x}px`;n.el.style.top=`${n.y}px`;if(n._parentScope)growRingWorldFor(n);redraw();save();}
+  function moveNode(id,dx,dy,commit=true){const n=node(id);if(!n)return;const scale=n.el.getBoundingClientRect().width/view.z/n.el.offsetWidth;n.x+=dx/scale;n.y+=dy/scale;n.el.style.left=`${n.x}px`;n.el.style.top=`${n.y}px`;if(n._parentScope)growRingWorldFor(n);redraw();if(commit)save();else schedule();}
   function report(error){badge.textContent=error.message||String(error);badge.dataset.error='true';}
   function useProvider(value){try{renderer.setBackend(value);backend=value;provider.value=value;schedule();}catch(error){backend='canvas';provider.value='canvas';renderer.setBackend('canvas');report(`GL unavailable: ${error.message}`);schedule();}}
   function refresh(){
@@ -103,7 +103,7 @@ import './SpatialRenderer.mjs';
       }
     }catch(error){report(error);}
   }
-  function schedule(alignment=false){dirtyAlignment||=alignment;if(!open||timer)return;timer=setTimeout(()=>{timer=null;refresh();},140);}
+  function schedule(alignment=false){dirtyAlignment||=alignment;if(!open||timer)return;timer=setTimeout(()=>{timer=null;refresh();},20);}
   function retitle(id,name,glyph,label=false){const b=$(id);if(!b)return;b.replaceChildren(icon(glyph));if(label)b.append(el('span','',name));b.title=name;b.setAttribute('aria-label',name);b.classList.add('sg-command');}
   addEventListener('DOMContentLoaded',()=>{
     if(!$('spacegraphBtn'))return;document.body.classList.add('sg-workbench');

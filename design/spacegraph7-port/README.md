@@ -41,14 +41,22 @@ authenticated CLI. This design uses the apparent intended repository,
   root. `stageKotlinJs` stages the shared Kotlin bundle; `data-kotlin-library`
   prevents its Forge application entry point from replacing the Panels page.
 
-The IntelliJ strategy in `~/.codex/skills/intellij-counter-triage/SKILL.md` now
-requires a verified semantic cycle, fresh focus between mutating steps, bounded
-recovery, and explicit fallback disclosure. In this run IDE navigation worked,
-but source selection failed; no successful semantic refactor is claimed.
+IntelliJ was used for the exact Git before/after comparison and navigation to
+the common engine. Implementation edits used focused patches; no IDE semantic
+refactor is claimed while its resolve context remained loading.
 
-Focused JVM verification: `LcncExtrusionTest` (6), `LcncRdfWireTest` (3), and
-`RouteParityGate` (8) passed. Browser verification is recorded separately by
-`src/jvmTest/js/spacegraph-browser.check.cjs`; compilation is not visual proof.
+Verified: JVM build gate, Kotlin/JS production bundle, macOS Native compile;
+`LcncExtrusionTest` (6), `SpatialViewTest` (4), `LcncRdfWireTest` (4), and
+`RouteParityGate` (8); 44 existing panel/landscape/scope/rope Node tests.
+`src/jvmTest/js/spacegraph-browser.check.cjs` verifies 1440x960, 390x844 and
+2560x1440 GL pixels, all three providers, orbiting, parameters, undo, and no
+remote geometry requests. Its four-level recursive fixture additionally checks
+inherited Z increments, identical frames across providers, focused descendant
+picking and parameter previews, and one undo step per drag. Screenshots are
+written to the temporary directory printed by the check.
+
+This does not complete harness/Graal integration, named-program recursive
+loading, the upstream widget inventory, or native GL/Canvas window providers.
 
 ## Alignment With the Epistemic Model
 

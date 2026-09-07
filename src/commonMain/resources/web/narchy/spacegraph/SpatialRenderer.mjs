@@ -7,29 +7,35 @@ export class SpatialRenderer {
     this.canvas = document.createElement('canvas'); this.canvas.setAttribute('aria-label', 'LCNC extruded scene');
     this.canvas.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;pointer-events:none';
     this.context = this.canvas.getContext('2d');
+    this.pointers = new Map();
+    const pinch = () => {const [a,b]=[...this.pointers.values()];return b?{x:(a[0]+b[0])/2,y:(a[1]+b[1])/2,d:Math.hypot(b[0]-a[0],b[1]-a[1])}:null;};
     this.handlers = {
       pointerdown: e => {
         if (e.button > 2) return;
         const [x,y] = this.point(e), hit = this.engine.pick(x,y), n = this.packet?.nodes.find(n => n.id === hit?.nodeId);
+        this.pointers.set(e.pointerId,[x,y]);host.setPointerCapture(e.pointerId);
+        if(this.pointers.size>1){this.finishDrag(false);this.gesture=null;this.pinch=pinch();return;}
         this.gesture = {x,y,lastX:x,lastY:y,button:e.button,pan:e.shiftKey||e.button!==0,hit};
-        if (this.mode === 'move' && e.button === 0 && n) this.gesture.drag = {id:n.id,z:n.position[2],point:this.engine.unproject(x,y,n.position[2])};
+        if (this.mode === 'move' && e.button === 0 && n) this.gesture.drag = {id:n.id,z:n.position[2],point:this.engine.unproject(x,y,n.position[2]),dx:0,dy:0};
         host.setPointerCapture(e.pointerId);
       },
       pointermove: e => {
+        if(this.pointers.has(e.pointerId))this.pointers.set(e.pointerId,this.point(e));
+        const next=pinch();if(next&&this.pinch){const old=this.pinch;this.engine.pan(next.x-old.x,next.y-old.y);if(old.d>0&&next.d>0)this.engine.zoom(next.d/old.d,next.x,next.y);this.pinch=next;this.changed();return;}
         const g = this.gesture; if (!g) return;
         const [x,y] = this.point(e), dx = x-g.lastX, dy = y-g.lastY;
         g.lastX=x; g.lastY=y;
         if (g.drag) {
           const p = this.engine.unproject(x,y,g.drag.z);
-          if (p && g.drag.point) { this.callbacks.moveNode(g.drag.id,p[0]-g.drag.point[0],g.drag.point[1]-p[1]); g.drag.point=p; }
+          if (p && g.drag.point) {const dx=p[0]-g.drag.point[0],dy=g.drag.point[1]-p[1];this.callbacks.moveNode(g.drag.id,dx,dy,false);g.drag.dx+=dx;g.drag.dy+=dy;g.drag.point=p;}
         } else { if (g.pan) this.engine.pan(dx,dy); else this.engine.orbit(dx,dy); this.changed(); }
       },
       pointerup: e => {
-        const g = this.gesture; this.gesture = null;
+        const g = this.gesture; this.finishDrag(true); this.gesture = null;this.pointers.delete(e.pointerId);this.pinch=null;
         if (host.hasPointerCapture(e.pointerId)) host.releasePointerCapture(e.pointerId);
         if (g && Math.hypot(g.lastX-g.x,g.lastY-g.y)<5 && e.button===0) this.callbacks.select(g.hit?.nodeId||null,g.hit?.port||null);
       },
-      pointercancel: () => { this.gesture=null; },
+      pointercancel: e => {this.finishDrag(false);this.gesture=null;this.pointers.delete(e.pointerId);this.pinch=null;},
       wheel: e => { e.preventDefault(); const [x,y]=this.point(e); this.engine.zoom(Math.exp(-Math.max(-200,Math.min(200,e.deltaY))*.004),x,y); this.changed(); },
       dblclick: e => { const hit=this.hit(e); if(hit) this.focus(hit.nodeId); },
       contextmenu: e => e.preventDefault(),
@@ -38,6 +44,7 @@ export class SpatialRenderer {
     this.resizeObserver=new ResizeObserver(()=>this.resize()); this.resizeObserver.observe(host);
   }
   point(e) { const r=this.host.getBoundingClientRect(); return [e.clientX-r.left,e.clientY-r.top]; }
+  finishDrag(commit) {const d=this.gesture?.drag;if(d&&(d.dx||d.dy))this.callbacks.moveNode(d.id,commit?0:-d.dx,commit?0:-d.dy,commit);}
   hit(e) { return this.engine.pick(...this.point(e)); }
   project(name,document,geometry,spacing,reset=false) {
     this.engine.resize(Math.max(1,this.host.clientWidth),Math.max(1,this.host.clientHeight));

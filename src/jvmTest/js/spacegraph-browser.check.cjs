@@ -42,6 +42,17 @@ const base=process.env.SPACEGRAPH_BASE_URL||'http://127.0.0.1:8888';
         await page.screenshot({path:path.join(output,`${provider}-${viewport.width}.png`)});
       }
       assert.equal(remoteGeometry,0,'Camera and provider changes must not request remote geometry');
+      if(viewport.width===1440){
+        await page.waitForTimeout(650);
+        const drag=await page.evaluate(()=>{const n=G.nodes.find(n=>!n._parentScope&&n.type!=='scope');const r=SpaceGraphWorkspace.renderer;r.focus(n.id);r.mode='move';return {id:n.id,x:n.x,y:n.y,undo:UNDO.length};});
+        const r=await page.locator('#sg-surface').boundingBox();
+        await page.mouse.move(r.x+r.width/2,r.y+r.height/2);await page.mouse.down();
+        await page.mouse.move(r.x+r.width/2+45,r.y+r.height/2+25,{steps:10});await page.mouse.up();
+        const moved=await page.evaluate(id=>{const n=G.nodes.find(n=>n.id===id);return {x:n.x,y:n.y,undo:UNDO.length};},drag.id);
+        assert.notEqual(moved.x,drag.x);assert.equal(moved.undo,drag.undo+1,'One drag is one undo step');
+        await page.locator('#undoBtn').click();
+        assert.deepEqual(await page.evaluate(id=>{const n=G.nodes.find(n=>n.id===id);SpaceGraphWorkspace.renderer.mode='orbit';return {x:n.x,y:n.y};},drag.id),{x:drag.x,y:drag.y});
+      }
       const selected=await page.evaluate(()=>{
         const n=G.nodes.find(n=>n.el.querySelector(':scope > .params input,:scope > .params textarea'));window.sgTestNode=n;window.sgTestControl=n.el.querySelector(':scope > .params input,:scope > .params textarea');SpaceGraphWorkspace.select(n.id);return {id:n.id,value:sgTestControl.value};
       });
@@ -54,6 +65,35 @@ const base=process.env.SPACEGRAPH_BASE_URL||'http://127.0.0.1:8888';
       await page.locator('#undoBtn').click();
       assert.equal(await page.evaluate(id=>Object.values(G.nodes.find(n=>n.id===id).params).some(v=>String(v).endsWith(' verified')),selected.id),false);
       await page.screenshot({path:path.join(output,`editor-${viewport.width}.png`)});
+      if(viewport.width===1440){
+        await page.evaluate(()=>{
+          const scope=d=>({id:`ring-${d}`,type:'scope',params:{},children:[
+            {id:`input-${d}`,type:'scope.in',params:{name:'x',kind:'text'}},
+            d<3?scope(d+1):{id:'tiny-leaf',type:'text.value',params:{value:'recursive leaf'}},
+            {id:`output-${d}`,type:'scope.out',params:{name:'x',kind:'text'}}]});
+          load({nodes:[scope(0)],wires:[]});
+          for(const n of G.nodes.filter(n=>n.type==='scope')){n._view={x:0,y:0,z:.55};applyRingView(n);}
+          layoutRing(G.nodes.find(n=>n.id==='ring-0'));SpaceGraphWorkspace.activate(true);SpaceGraphWorkspace.refresh();
+        });
+        await page.waitForFunction(()=>SpaceGraphWorkspace.scene?.nodes.some(n=>n.id==='tiny-leaf'&&n.scale<.1));
+        const recursion=await page.evaluate(()=>{
+          const scene=SpaceGraphWorkspace.scene,byId=new Map(scene.nodes.map(n=>[n.id,n]));
+          return scene.nodes.filter(n=>n.parent).map(n=>({id:n.id,scale:n.scale,step:n.position[2]-n.size[2]/2-(byId.get(n.parent).position[2]-byId.get(n.parent).size[2]/2)}));
+        });
+        for(const n of recursion)assert.ok(Math.abs(n.step-110*n.scale)<1e-8,JSON.stringify(n));
+        await page.evaluate(()=>SpaceGraphWorkspace.renderer.front());
+        const frameBefore=await page.evaluate(()=>JSON.stringify(SpaceGraphWorkspace.renderer.engine.frame(false)));
+        for(const provider of ['canvas','svg','gl']){
+          await page.getByLabel('Rendering provider',{exact:true}).selectOption(provider);
+          await page.waitForTimeout(100);
+          assert.equal(await page.evaluate(()=>JSON.stringify(SpaceGraphWorkspace.renderer.engine.frame(false))),frameBefore,'Every provider must consume the identical common frame');
+          await page.screenshot({path:path.join(output,`recursive-${provider}.png`)});
+        }
+        await page.evaluate(()=>SpaceGraphWorkspace.renderer.focus('tiny-leaf'));
+        assert.equal(await page.evaluate(()=>{const r=SpaceGraphWorkspace.renderer;return r.engine.pick(r.width/2,r.height/2)?.nodeId;}),'tiny-leaf');
+        assert.ok(await page.evaluate(()=>SpaceGraphWorkspace.renderer.engine.svg().includes('recursive leaf')),'Focused descendants retain their parameter previews');
+        await page.screenshot({path:path.join(output,'recursive-focused.png')});
+      }
       assert.deepEqual(errors,[]);receipts.push({viewport,measure});await page.close();
     }
     console.log(JSON.stringify({output,receipts},null,2));

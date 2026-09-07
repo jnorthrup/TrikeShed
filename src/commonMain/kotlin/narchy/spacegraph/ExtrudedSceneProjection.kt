@@ -31,18 +31,25 @@ object ExtrudedSceneProjection {
             if (top != null && projected.size == 8) {
                 val left = projected.minOf { it.x }; val right = projected.maxOf { it.x }
                 val upper = projected.minOf { it.y }; val lower = projected.maxOf { it.y }
-                val size = min(16.0, 12.0 * n.scale * (right - left) / n.size.x)
-                if (size >= 5.0 && lower - upper >= size + 4) {
+                val size = (12.0 * n.scale * (right - left) / n.size.x).coerceIn(9.0, 16.0)
+                if (right - left >= 42 && lower - upper >= size + 8) {
                     val clip = Rect(left, upper, right - left, lower - upper)
-                    labels.add(DrawItem.Text(n.id, n.title, top, Rgba(37, 45, 51), size,
-                        maxWidth = max(1.0, right - top.x - 4), clip = clip))
+                    val x = top.x.coerceIn(left + 3, right - 4)
+                    val y = top.y.coerceIn(upper + size + 2, lower - 2)
+                    val width = max(1.0, right - x - 4)
+                    fun fit(text: String, fontSize: Double): String {
+                        val count = max(1, (width / (fontSize * .61)).toInt())
+                        return if (text.length <= count) text else text.take(max(0, count - 2)) + ".."
+                    }
+                    labels.add(DrawItem.Text(n.id, fit(if (width < 120) n.type else n.title, size), Vec3(x, y), Rgba(37, 45, 51), size,
+                        font = "monospace", maxWidth = width, clip = clip))
                     if (!n.scope && size >= 9 && lower - top.y > size * 4) {
                         val lines = listOf(n.type) + n.details.view.take(5).map { "${it.a}: ${it.b}" }
                         for ((i, line) in lines.withIndex()) {
-                            val y = top.y + (i + 1) * size * 1.6
-                            if (y > lower - size) break
-                            labels.add(DrawItem.Text(n.id, line, Vec3(top.x, y), Rgba(82, 103, 117), size * .85,
-                                maxWidth = max(1.0, right - top.x - 4), clip = clip))
+                            val baseline = y + (i + 1) * size * 1.6
+                            if (baseline > lower - size) break
+                            labels.add(DrawItem.Text(n.id, fit(line, size * .85), Vec3(x, baseline), Rgba(82, 103, 117), size * .85,
+                                font = "monospace", maxWidth = width, clip = clip))
                         }
                     }
                 }
