@@ -161,9 +161,14 @@ const Landscape = {
   // bounds this — a 1310x889 viewport holds ~260 boxes of 115x38 — so the cap only
   // exists so a pathological layout cannot hand the document thousands of live nodes.
   detailBudget: 400,
+  // Detail is acquired at a box an operator can read and held down to a slightly smaller
+  // one, so a node resting on the boundary does not flip between panel and fill each frame.
+  detailRelease: {w:100,h:33},
   detailFor(node, box, absorbed) {
     if(this.detailOwner!==Harness.selected){this.detailOwner=Harness.selected;this.details.clear();}
-    const readable=!absorbed&&box.w>=115&&box.h>=38;
+    const held=this.details.has(node.id);
+    const floor=held?this.detailRelease:{w:115,h:38};
+    const readable=!absorbed&&box.w>=floor.w&&box.h>=floor.h;
     // Detail used to be reserved for the SELECTED program, so every other territory
     // stayed the flat canvas fill however far you dove into it. Measured on this board
     // at z=0.83: 820 nodes were large enough on screen to read and not one resolved —
@@ -171,7 +176,15 @@ const Landscape = {
     // is itself the budget: a node only qualifies once an operator has zoomed in far
     // enough to ask for it, and the viewport bounds how many can qualify at once. The
     // selected program keeps priority, so it is never crowded out of its own interior.
-    if(readable&&(node._program===this.detailOwner||this.details.size<this.detailBudget))this.details.add(node.id);
+    // Readable is also how detail LEAVES. It was only ever granted, so a dive that resolved
+    // a ring's interior left those panels in the document all the way back out, painting a
+    // 200px panel of 11px type into 3px of screen: the smear the whole board wore after one
+    // dive, where the flat fill it replaced is crisp at any size. What must survive a
+    // zoom-out is an edit in progress, not the pixels — a node holding the caret keeps its
+    // DOM however small it is drawn.
+    const editing=held&&node.el&&typeof document.activeElement!=="undefined"&&document.activeElement&&node.el.contains?.(document.activeElement);
+    if((readable||editing)&&(held||node._program===this.detailOwner||this.details.size<this.detailBudget))this.details.add(node.id);
+    else this.details.delete(node.id);
     return this.details.has(node.id);
   },
   measure(vr) {
@@ -234,7 +247,8 @@ const Landscape = {
       const b=screen(box),scope=!!n.children?.length;
       const absorbed=visibleClosure(n)!==n;
       const onScreen=rect.left<clip.right&&rect.top<clip.bottom&&rect.right>clip.left&&rect.bottom>clip.top&&clip.right>clip.left&&clip.bottom>clip.top;
-      const detail=onScreen&&this.detailFor(n,b,absorbed);
+      // Off screen is not eligible either, so panning releases what leaves the view.
+      const detail=this.detailFor(n,b,absorbed||!onScreen);
       visibility.push([n,detail]);
       if(detail||!onScreen)continue;
       const size=Math.min(b.w,b.h);

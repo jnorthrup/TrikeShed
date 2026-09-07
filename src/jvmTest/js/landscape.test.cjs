@@ -298,15 +298,41 @@ test("collapsed closures retain the original node and re-expand reversibly",()=>
   assert.equal(child._parentScope,scope);
 });
 
-test("interactive detail sticks through zoom-out until another main owns edits",()=>{
+test("detail resolves what can be read, holds through the boundary, and releases what cannot",()=>{
+  const {landscape,harness}=fixture();
+  const node={id:"a::one",_program:"a"};
+  harness.selected="a";
+  assert.equal(landscape.detailFor(node,{w:114,h:100},false),false,"a box too small to read stays the flat fill");
+  assert.equal(landscape.detailFor(node,{w:200,h:100},false),true,"a readable box resolves into the document");
+  assert.equal(landscape.detailFor(node,{w:104,h:34},false),true,"it holds just under the acquire floor, so the boundary cannot flicker");
+  // Detail used to be granted and never taken back, so a dive that resolved a ring's
+  // interior left those panels in the document all the way out: 200px of chrome and 11px
+  // of type painted into 20px of screen, the smear the whole board wore after one dive.
+  assert.equal(landscape.detailFor(node,{w:20,h:10},false),false,"a 20px smear returns to the fill it replaced");
+  assert.equal(landscape.details.size,0);
+  assert.equal(landscape.detailFor(node,{w:200,h:100},true),false,"an absorbed node never resolves");
+});
+
+test("an edit in progress outlives the zoom-out that would release it",()=>{
+  const {context,landscape,harness}=fixture();
+  const field={};
+  const node={id:"a::one",_program:"a",el:{contains:element=>element===field}};
+  harness.selected="a";
+  assert.equal(landscape.detailFor(node,{w:200,h:100},false),true);
+  context.document.activeElement=field;
+  assert.equal(landscape.detailFor(node,{w:20,h:10},false),true,"the caret keeps its panel alive however small it is drawn");
+  context.document.activeElement=null;
+  assert.equal(landscape.detailFor(node,{w:20,h:10},false),false,"and it leaves with the caret");
+});
+
+test("another main owning edits drops the detail the last one held",()=>{
   const {landscape,harness}=fixture();
   const node={id:"a::one",_program:"a"};
   harness.selected="a";
   assert.equal(landscape.detailFor(node,{w:200,h:100},false),true);
-  assert.equal(landscape.detailFor(node,{w:20,h:10},true),true);
   harness.selected="b";
-  assert.equal(landscape.detailFor(node,{w:200,h:100},false),false);
-  assert.equal(landscape.details.size,0);
+  landscape.detailFor({id:"b::one",_program:"b"},{w:200,h:100},false);
+  assert.equal(landscape.details.has("a::one"),false,"the previous main's detail does not survive the handover");
   assert.equal(harness.prominent(),"b");
 });
 
