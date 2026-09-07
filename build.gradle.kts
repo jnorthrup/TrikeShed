@@ -697,7 +697,11 @@ tasks.register<Exec>("stageDaemonAot") {
     val port = (project.findProperty("aotTrainPort") as String?)?.toIntOrNull() ?: 8971
     val aot = daemonAotCache.get().asFile
     val cpFile = daemonAotCpFile.get().asFile
-    val trainHome = layout.buildDirectory.dir("aot/train-home").get().asFile
+    // OUTSIDE the worktree on purpose: the daemon refuses a forge home inside the repo
+    // ("daemon state never lands in source"), so a home under build/ made every training run die
+    // one second in — and because the dump happens on exit, that produced a cache of nothing but
+    // JDK classes which still passed `test -s` and reported success.
+    val trainHome = File(providers.systemProperty("java.io.tmpdir").get(), "trikeshed-aot-train")
     val repo = projectDir.path
     val javaBin = File(providers.systemProperty("java.home").get(), "bin/java").path
     doFirst {
@@ -709,18 +713,50 @@ tasks.register<Exec>("stageDaemonAot") {
         // (we want to link the class graph fast, not replicate 600MB of agent home).
         commandLine("bash", "-c", """
             set -u
+            LOG='${trainHome.path}/train.log'
             HOME='${trainHome.path}' \
               '$javaBin' -XX:AOTCacheOutput='${aot.path}' -Xlog:aot=info \
               -cp '$cp' borg.trikeshed.daemon.OroborosDaemon \
-              --watch --kanban-port $port --interval-ms 86400000 '${trainHome.path}/forge' '$repo' &
+              --watch --kanban-port $port --interval-ms 86400000 '${trainHome.path}/forge' '$repo' > "${'$'}LOG" 2>&1 &
             PID=${'$'}!
-            for i in ${'$'}(seq 1 90); do curl -sf -m 2 http://127.0.0.1:$port/api/health >/dev/null 2>&1 && break; kill -0 ${'$'}PID 2>/dev/null || break; sleep 1; done
-            echo "[aot] warmed daemon booted; holding ${warm}s to link the hot path"
+            # A training run is only worth dumping once the daemon is SERVING: the class graph a
+            # cache exists to link is the one boot walks. The old loop could not tell "healthy"
+            # from "died" — it broke on either and echoed success regardless, so a daemon that
+            # fell over in its first second still wrote a JDK-only archive and the task passed.
+            READY=0
+            for i in ${'$'}(seq 1 180); do
+              curl -sf -m 2 http://127.0.0.1:$port/api/health >/dev/null 2>&1 && { READY=1; break; }
+              kill -0 ${'$'}PID 2>/dev/null || break
+              sleep 1
+            done
+            if [ "${'$'}READY" != 1 ]; then
+              echo "[aot] FAILED: the training daemon never answered /api/health on port $port" >&2
+              tail -40 "${'$'}LOG" >&2
+              kill -9 ${'$'}PID 2>/dev/null || true
+              exit 1
+            fi
+            echo "[aot] daemon healthy; holding ${warm}s to link the hot path"
             sleep $warm
             kill -TERM ${'$'}PID 2>/dev/null || true
-            for i in ${'$'}(seq 1 60); do kill -0 ${'$'}PID 2>/dev/null || break; sleep 1; done
+            for i in ${'$'}(seq 1 120); do kill -0 ${'$'}PID 2>/dev/null || break; sleep 1; done
             kill -9 ${'$'}PID 2>/dev/null || true
-            test -s '${aot.path}'
+            if [ ! -s '${aot.path}' ]; then
+              echo "[aot] FAILED: no cache was written" >&2; tail -40 "${'$'}LOG" >&2; exit 1
+            fi
+            # The symptom that made this lane worthless while reporting success: an archive of
+            # nothing but JDK classes. It is 17MB, passes every file test, and saves the daemon
+            # nothing because none of ITS classes are in it. Measured on this repo: a run that died
+            # at boot records 18,652 CP entries, a run that actually served records 73,671. Anything
+            # near the former means the daemon was not running when the graph was recorded.
+            # ("App loader initiated classes" is NOT the signal — it is a loader-constraint count
+            # and reads 0 for both.)
+            ENTRIES=${'$'}(grep -oE 'Class +CP entries += +[0-9]+' "${'$'}LOG" | tail -1 | grep -oE '[0-9]+${'$'}')
+            if [ -z "${'$'}ENTRIES" ] || [ "${'$'}ENTRIES" -lt 30000 ]; then
+              echo "[aot] FAILED: only ${'$'}{ENTRIES:-0} classes were recorded — that is a JDK-only archive, not the daemon's graph." >&2
+              grep -E 'Class +CP entries|AOTCache creation' "${'$'}LOG" >&2
+              exit 1
+            fi
+            grep -E 'Class +CP entries|AOTCache creation is complete' "${'$'}LOG" || true
         """.trimIndent())
     }
     doLast { println("[aot] wrote ${aot.path} (${if (aot.exists()) aot.length() else 0} bytes); classpath pinned in ${cpFile.name}") }
