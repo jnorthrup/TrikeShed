@@ -412,6 +412,12 @@ class PatchWire(
     private val corpus: borg.trikeshed.lcnc.ProjectCorpus? = null,
     /** Workspace snapshots (Forge genesis, Cut C): the whole workspace named as one cid, with a lineage. */
     private val snapshots: WorkspaceSnapshotService? = null,
+    /**
+     * The program ledger (AutoTools notion, Cut 0): `<forgeHome>/programs/ledger.jsonl`.
+     * The couch id→rev index behind `panels/<name>` is rebuilt per boot; this is
+     * what a restart re-reads to put the published head back where it was.
+     */
+    private val programs: borg.trikeshed.lcnc.ProgramLedger? = null,
 ) {
     private val muxSessions = MuxSessionService(brain, attachments, mountScope, muxContext, catalogProvider, sessionSnapshot)
 
@@ -737,6 +743,12 @@ class PatchWire(
                 val att = attachments ?: return json(mapOf("error" to "store not wired"), 503)
                 val name = p.removePrefix("/api/panels/").trimEnd('/')
                 if (!name.matches(Regex("^[a-z0-9][a-z0-9._-]*$"))) return json(mapOf("error" to "bad name"), 400)
+                // `?history=1`: the versions the ledger recorded, oldest first, the way a
+                // prompt's lineage reads — the durable plane made legible (AutoTools Cut 0).
+                if (path.substringAfter('?', "").split('&').contains("history=1")) {
+                    val store = programs ?: return json(mapOf("error" to "program ledger not wired"), 503)
+                    return json(mapOf("name" to name, "versions" to store.history(name).map { it.toMap() }))
+                }
                 // `?entry=1`: the BOARD ENTRY itself — document, every cable with the
                 // exact type it carries, violations — so the canvas can SHOW what the
                 // daemon obeys. Seen is believed.
@@ -779,6 +791,15 @@ class PatchWire(
                         sequence = System.currentTimeMillis(),
                     ), bytes,
                 )
+                // THE DURABLE PLANE (AutoTools notion, Cut 0), before the volatile ones:
+                // `CouchStoreFactory.casBacked` rebuilds its head projection per boot, so the
+                // attachment above dies with the daemon. This one line names the head; the bytes
+                // are already CAS citizens (CouchAttachmentGateway.putAttachment put them there).
+                // `currentCid` is the value the reply reports as `previousCid`, so the ledger's
+                // chain and the editor's chain are the same number by construction. Written
+                // first because a publish that throws after it is repaired by the next thaw,
+                // where a board entry with no ledger line is exactly the bug being closed.
+                programs?.record(name, cid.value, previousCid = currentCid, actor = "panels-editor")
                 // ON THE BLACKBOARD, by the one writer: the program with every cable
                 // typed against the late-bound vocabulary and its violations beside
                 // it, then the vocabulary itself (a panel with formal ports is a new

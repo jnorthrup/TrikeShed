@@ -68,6 +68,39 @@ class LcncFactsOneBankTest {
         assertEquals(size, bank.size(), "the compiled table and its own .kif text land on the same strings")
     }
 
+    /**
+     * The one family here that is NOT monotone. A binding answers "which runner
+     * backs this type" against a registry that grows all through a boot, so the
+     * same type resolves `unbound` at one moment and `kotlin` at the next. Told
+     * by `assert` the two rows would coexist — the bank retracts nothing on its
+     * own — and [LcncFacts.bindingOf] reads the first row in telling order, so
+     * the stalest answer would win forever. `learn(bindings)` therefore REPLACES.
+     */
+    @Test
+    fun aBindingIsReplacedNotStackedWhenTheRegistryGrows() {
+        val bank = KifKnowledgeBase()
+        val contracts = LcncContracts.all().take(3)
+        val types = contracts.map { it.type }
+        fun tellAll(bindings: List<LcncBinding>) = LcncFacts.of(contracts, into = bank).learn(bindings)
+        fun how(type: String) = bank.query(KifExpr.parse("(binding $type ?how ?by)")).singleOrNull()?.getValue("?how")
+
+        tellAll(types.map { LcncBinding(it, LcncBindingKind.UNBOUND, "") })
+        val size = bank.size()
+        assertEquals(types.map { "unbound" }, types.map { how(it) })
+
+        tellAll(types.map { LcncBinding(it, LcncBindingKind.UNBOUND, "") })
+        assertEquals(size, bank.size(), "the same resolution twice is still a no-op")
+
+        // A runner arrives for the first type — the registry grew between the two passes.
+        val bound = tellAll(
+            listOf(LcncBinding(types[0], LcncBindingKind.KOTLIN, "borg.x.Y\$registry\$1")) +
+                types.drop(1).map { LcncBinding(it, LcncBindingKind.UNBOUND, "") },
+        )
+        assertEquals(size, bank.size(), "one row per type, still — the superseded row is retracted, not kept")
+        assertEquals(listOf("kotlin", "unbound", "unbound"), types.map { how(it) })
+        assertEquals("kotlin" to "borg.x.Y\$registry\$1", bound.bindingOf(types[0]), "and the view reads the LATER answer")
+    }
+
     @Test
     fun theDefaultIsStillAPrivateBankPerCall() {
         val bank = KifKnowledgeBase()

@@ -54,7 +54,7 @@ object RouteManifest {
             RouteEntry("DELETE", "/api/projects/{name}", "unmount a project scope"),
             RouteEntry("GET", "/api/panels", "list stored panel constructions"),
             RouteEntry("GET", "/api/panels/presets", "LCNC preset gallery"),
-            RouteEntry("GET", "/api/panels/{name}", "load a panel construction"),
+            RouteEntry("GET", "/api/panels/{name}", "load a panel construction; ?entry=1 is the board entry with typed cables, ?history=1 lists the versions the program ledger recorded"),
             RouteEntry("POST", "/api/panels/{name}", "save a panel construction; ?baseCid= names the version the editor loaded and a moved board refuses with 409 stale_base"),
             RouteEntry("GET", "/api/prompts", "the stored prompts: every head with its lineage"),
             RouteEntry("GET", "/api/prompts/{name}", "a prompt head's canonical bytes; ?history=1 lists its recorded versions"),

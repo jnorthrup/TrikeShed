@@ -64,7 +64,7 @@ to other targets, built as a whole, and carried out of the tool with its artifac
 | the source tree | a mounted project database: `POST /api/projects`, `ProjectDbWire.kt`; documents with cid, rev and seq; `project.list/docs/read/extract` (`lcnc/ProjectNodes.kt`) | no page is written from the surface; drop-to-mount not walked |
 | `Makefile.am`, the rule template | a preset (`lcnc/LcncPresets.kt`) with blanks for model, prefill and project | — |
 | `./configure` | the harness's live picklist records the daemon's pinned model and project into the opened draft; the roster probes `GET /api/agents`, `GET /api/mux/models` | no configure citizen: a receipt names program, prompt and input versions, not the toolchain it ran under; `Configure` at the repo root is 0 bytes |
-| `Makefile`, the concrete rules | a published program `lcnc/program/<name>` with `programCid`; `POST /api/panels/{name}?baseCid=` refuses `409 stale_base` | published programs do not survive a restart (the Cut C finding; prompts and snapshots do, by ledger) |
+| `Makefile`, the concrete rules | a published program `lcnc/program/<name>` with `programCid`; `POST /api/panels/{name}?baseCid=` refuses `409 stale_base`; `<forgeHome>/programs/ledger.jsonl` names each published head and the boot thaw re-files and republishes it (Cut 0) | — |
 | `make target` | `POST /api/lcnc/run {program, inputs}`; the receipt carries `outputs` per node, `returns`, `consumed`, `inputFingerprint`, `promptVersions`, `programVersions` (`kanban/module/LcncRunService.kt`) | — |
 | the `.d` files and mtimes | `lcnc/LcncConsumedLedger.kt`; `lcnc-consumed` facts in the project's partition; the `run-stale` production; `lcnc/stale/<runId>` | — |
 | `make` again | `POST /api/lcnc/run/rebuild {runId}`; the Rebuild gesture on the harness | one run per gesture; no build of a whole project |
@@ -243,6 +243,149 @@ The snapshot's next cut in [moat-inventory.md](moat-inventory.md): pin program a
 versions from a snapshot through the draft machinery. Here it is `config.status` re-applied. It
 stays last because nothing above needs it.
 
+## What landed
+
+| Cut | Files | Tests | Rendered check |
+|---|---|---|---|
+| 0 program ledger | `lcnc/ProgramLedger.kt` (jvmMain: `{name, cid, previousCid, atMs, actor}` per published version in `<forgeHome>/programs/ledger.jsonl`, `PromptStore`'s shape; `record` appends and is a no-op on a byte-identical re-publish; `thaw()` replays the last line per name, re-reads the bytes from CAS by cid, re-files the `panels/<name>` attachment with the recorded actor, instant and cid — skipping one already at that cid — and then calls `LcncPublisher.publishAll()` ONCE, so a composite is filed before any cable is typed against it; a preset's name is skipped, and NOTHING in the thaw throws: each head is restored under a total guard, a blob that is missing OR unreadable is skipped and logged (the CAS answers `null` only for an absent blob — a present one that no longer hashes to its own id makes `CasStore.get`/`FileCasStore.get` raise `digest mismatch`), an unreadable ledger file restores no head instead of dying, and the closing `publishAll()` is guarded too, so a corpus fault leaves the heads re-filed and `LcncPublisher.load` still resolving them; only cancellation propagates); `PatchWire.kt` (the ctor gains `programs`, defaulted null; the one publish path records the head between the attachment put and the board publish, with `previousCid` the same value the 200 body reports; `GET /api/panels/{name}?history=1` lists the recorded versions, 503 when the ledger is not wired); `RouteManifest.kt` (that row's description; no new path); `OroborosDaemon.kt` (construction beside the prompt store, `programs = programLedger` on the wire, and `programLedger.thaw()` sequential in the boot AFTER the last `lcncRunners.putAll(...)` and immediately before `moduleSupervisor.attach(KanbanModule())` — the republish is a `lateBound()`, so resolving it beside the prompt thaw would have answered the vocabulary with two thirds of the runner registry missing — and that call is `runCatching`-guarded like the module attach beside it: the thaw is boot code before `kanbanServer.run(...)` binds and `main` catches only `CancellationException`, so nothing here may cost the daemon its HTTP surface); `lcnc/LcncPublisher.kt` (jvmMain: `storedCorpus()`'s per-panel `getAttachment` and `storedPanel`'s are guarded like the `listAttachments` and `fromJson` around them — the read goes through the CAS, so one rotted `panels/*` blob used to throw the WHOLE corpus, presets included, out of every `publishAll()`; an unreadable panel now costs that panel); `lcnc/PromptStore.kt` and `forge/server/WorkspaceSnapshotService.kt` (jvmMain, the same unguarded CAS read on the same boot path, pre-existing from Cuts P and C: `thaw()`'s and `open()`'s `cas.get` now read a rotted blob as absent — `open`'s own `takeIf { ContentId.of(it) == id }` already said that was the intent); `lcnc/LcncFacts.kt` (commonMain: `learn(bindings)` REPLACES a type's binding row instead of asserting a second one — a binding is the one non-monotone family here, since the registry grows all through a boot, and the shared KIF bank retracts nothing on its own while `bindingOf` reads the first row in telling order) | `ProgramLedgerTest` (9, jvmTest: the chain replays last-per-name and the lineage continues across the boot; the restored `programCid` is the cid the round trip mints; a head whose blob is gone is skipped and the rest restore; a head whose blob is ROTTED (`cas.corrupt`, which makes `cas.get` throw rather than answer null) is skipped the same way and the boot keeps its other programs; a rotted `panels/*` panel the ledger never named does not cost the thaw its republish — the restored head still reaches the board and so do the presets that shared its corpus; a name that has since become a preset is not resurrected; a second thaw moves neither the board revision nor the attachment; an unwired ledger and a garbage line are both survivable; a thaw published while the registry is still empty leaves exactly one binding row per type, and the row is the later, true one); `LcncFactsOneBankTest` gains `aBindingIsReplacedNotStackedWhenTheRegistryGrows`; `PatchWirePublishTest` gains `aRestartOnTheSameHomeServesTheSameProgramCid` (404 and a null board cid BEFORE the thaw — the bug — then the same `programCid` in `/api/panels`, the v2 document text, and a further publish reporting v2 as its predecessor) and `aWireWithNoLedgerPublishesAsBeforeAndRefusesTheHistoryRead`; gates `RouteManifestParityTest`, `PatchWirePromptsTest`, `PatchWireTest`, `ProjectDocsRoutesTest`, `LcncPublisherTest`, `LcncPublisherFactsTest`, `PromptStoreTest`, `WorkspaceSnapshotTest`, `LcncFactsTest`, `LcncFactsOneBankTest`, `CorpusStaleRebuildRouteTest`, `LcncContractParityTest`, `LcncShakeDemoTest`, `BlackboardChangesFactElementTest` green. NOT covered by a rig: the daemon's own `runCatching` at the thaw call site and the unreadable-ledger-file branch — there is no test that runs `mainImpl`, and no portable way to make `File.readLines()` fail; both are guards, and the behaviour they protect is the two-boot rendered check. `ForgeHostSpecParityTest > specMatchesTheRouteTableBothWays` is RED at HEAD and untouched by this cut — `GET /blackboard/sheet` is in `BlackboardWire.ROUTES` (BlackboardWire.kt:16) with no row in `forge-host.openapi.yaml`, both files clean at HEAD, and no input to that test is a file this cut changes. No lego, no route path, no blackboard key family, no preset, no JS; the one commonMain file is `LcncFacts.kt` above | 2026-09-06 on a private scratch daemon (port 8897, fresh home `oroboros-cut0.uQhkws`, the staged 956,065-byte `TrikeShed.js`), driven in headless Chromium. Boot 1 came up on the empty home logging `programs: 0 head(s) restored from the ledger`, with the notes folder mounted as `genesis-notes` (3 paths, 3 docs). `/harness?load=preset-corpus` connected Live, `#panelName` pre-filled `corpus`, the live picklists recorded the daemon's model into the draft (`prompt.chat` model `glm-5.3-flash` of 34 options, prefill `(none - env/harness keys)`) and the status turned `Unpublished changes in preset-corpus`; the harness's own `↑ Publish` answered `Published corpus`, the program select grew to 23 options, `GET /api/panels` read `corpus` at `sha256:d5324cb10d66…` (4507 bytes), and `<forgeHome>/programs/ledger.jsonl` held exactly one line, `{name corpus, cid sha256:d5324cb10d66…, previousCid null, atMs 1788741810160, actor panels-editor}`. The cid was read off the page, not off curl: the `corpus` territory header (`corpus | lcnc/program/corpus | ◇ | ▶ Run`) and its version diamond, whose title and whose inspector `#factKey` both read `sha256:d5324cb10d6609d77cc37b48946660d5755bc04cfa2cbc2f5ce511e54d94af0c` under the actor `Immutable program version`. The daemon was then killed (pid gone, port free, `/api/health` HTTP 000) and relaunched on the SAME home: `programs: 1 head(s) restored from the ledger`, no skip line. The reopened harness listed `corpus` among its 23 options; selecting it read `corpus on the blackboard` — not a draft — with `▶ Run` enabled, and the same diamond gesture gave back the same cid character for character. `GET /api/panels` agreed (same cid, same 4507 bytes), `?entry=1` gave the same `programCid` and `sourceCid` with 13 cables and no violations, `/blackboard/board` carried `lcnc/program/corpus` at that cid, `/api/panels/presets` still listed 22, and `⊞ Fit the blackboard` drew 23 program territories with `preset-bughunter`, `preset-ccek`, `preset-council`, `preset-kanban`, `preset-legal-tribunal`, `preset-shake` and `preset-turbohaul` painted by name. Zoomed into the restored `corpus`, its `prompt.chat` node painted MODEL `glm-5.3-flash`, MAXTOKENS 1024, TEMPERATURE 0.2 and the version bytes under the cid (4496 chars) carried `"model": "glm-5.3-flash"` — the model the live picklists recorded before the publish, so what came back is the published document and not just a name. Not run: `corpus` itself. No `/api/lcnc/run` was posted for it, so no receipt, lamp word or digest is claimed; the harness Activity reads `corpus: Unknown`, which is the expected lamp for a program with no version-matched receipt |
+
+Cut 0 makes the program name → version binding durable and nothing else. Pages, run heads and
+`lcnc/configure/head` belong to Cuts B, E and G; the walk's step 7 is not claimed here. No
+`pages` document kind lands in this run either, so a page sitting inside the glob its own
+program digests remains the author's problem — that ruling row above stays a recommendation.
+
+## Verification snapshot
+
+### 2026-09-06, Cut 0
+
+- The Cut C finding was that a published program does not survive this daemon's restart: the
+  CAS-backed store rebuilds its document index per boot and the `panels/<name>` attachment goes with
+  it. Cut 0 closes it in the shape `lcnc/PromptStore.kt` already uses — a ledger under the forge home,
+  thawed at boot — so the `Makefile` row of the build table has no gap left, and a run block (Cut B)
+  can name a program and still find it tomorrow.
+- Compile gates: `./gradlew jvmMainClasses` green; `./gradlew compileKotlinJvm compileJvmMainJava
+  --rerun` green (the compiled `ProgramLedger` carries `restoreHead`, so the classes on disk are these
+  sources); `./gradlew compileKotlinJs` green with no line added to `gradle/js-target-debt.excludes`.
+  `utils/lcnc-depth` `scan_repo --fail-on-ccek-gap` reports 0 gaps: the cut adds no public capability
+  to the CCEK plane, no lego, no route path, no blackboard key family and no preset.
+- Test gates: each changed suite alone first — `ProgramLedgerTest` 9/9, `LcncFactsOneBankTest` 5/5,
+  `PatchWirePublishTest` 4/4 — then one batch, 29 suites and 152 tests with 0 failures and no
+  contamination: `ProgramLedgerTest`, `PromptStoreTest`, `LcncPublisherTest`, `LcncPublisherFactsTest`,
+  `LcncFactsOneBankTest`, `LcncFactsTest`, `LcncFactsOrderingTest`, `WorkspaceSnapshotTest`,
+  `PatchWirePublishTest`, `PatchWirePromptsTest`, `PatchWireTest`, `MediaPatchWireTest`,
+  `ProjectDocsRoutesTest`, `RouteManifestParityTest`, `LcncContractParityTest`, `LcncShakeDemoTest`,
+  `BlackboardChangesFactElementTest`, `CorpusStaleRebuildRouteTest`, `LcncRunProgramRouteTest`,
+  `LcncPresetCatalogTest`, `LcncPresetsGateTest`, `PresetAssemblyTest`, `PresetRequiredInputsTest`,
+  `KanbanModuleHttpTest`, `LcncRdfWireTest`, `ReteWireTest`, `KifTeeTest`,
+  `KifKnowledgeBaseRetractTest`, `KifKnowledgeBaseReplaceTest`. `BoardProductionsTest`,
+  `KernelParityTest`, `RunStaleProductionTest` and `McpSurfaceParityTest` green in a second batch. On
+  the JS target, `./gradlew jsNodeTest` over the commonTest gates: 10 suites, 47 tests, 0 failures
+  (`BlackboardChangesFactElementTest`, `KifKnowledgeBaseReplaceTest`, `KifKnowledgeBaseRetractTest`,
+  `LcncContractParityTest`, `LcncFactsOrderingTest`, `LcncPresetCatalogTest`, `LcncPresetsGateTest`,
+  `LcncShakeDemoTest`, `PresetAssemblyTest`, `WorkspaceSnapshotTest`).
+- `ForgeHostSpecParityTest > specMatchesTheRouteTableBothWays` is red and is not this cut's:
+  `(GET, /blackboard/sheet)` is in `BlackboardWire.ROUTES` (`BlackboardWire.kt:16`) with no row in
+  `src/commonMain/resources/openapi/forge-host.openapi.yaml`; all four of the test's inputs print
+  nothing under `git status --porcelain`, and `git log -S'/blackboard/sheet'` dates the route to
+  `dd34eae1f` (2026-09-05, the day before). The suite's other case passes.
+- The premise the fix rests on, since it is easy to get backwards: the CAS does not answer `null` for a
+  corrupt blob. `CasStore.get` and the daemon's `FileCasStore.get` re-hash what they read and throw
+  `digest mismatch`; only an absent blob is `null`. Every skip-and-log branch on the boot path had been
+  written for the `null` case alone.
+- Falsifiability, run three ways before the fix was accepted. With `thaw()`'s CAS read and
+  `LcncPublisher.storedCorpus`'s per-panel read put back in their unguarded form, the two new cases fail
+  with the predicted traces (`CasStore.get(CasStore.kt:27)` → `ProgramLedger.thaw`, and
+  `getAttachment` → `storedCorpus` → `lateBound` → `publishAll` → `thaw`). With only the thaw guarded,
+  the panel case still fails, on the board assertion rather than an exception, so the test cannot be
+  satisfied by swallowing the throw. And on the real `FileCasStore`, a boot over a home whose head blob
+  had one byte flipped, run on pre-fix classes, died before binding the port: `Exception in thread
+  "main" java.lang.IllegalStateException: digest mismatch … at FileCasStore.get(Sha2CasBus.kt:55) at
+  ProgramLedger.thaw`, `/api/health` unreachable. All three needed the sources edited, so neither the
+  gate re-run nor the rendered check reproduced them; they are the implementer's observation.
+- Rendered: the two-boot check in the table above, on port 8897 from one fresh home, with the daemon
+  killed between the two boots. Screenshots under the session scratchpad's `rendered-cut0/`:
+  `01-harness-preset-corpus-loaded.png`, `02-picklists-recorded.png`, `03-published-corpus.png`,
+  `10-before-restart-harness-on-load.png`, `11-before-restart-program-select-corpus.png`,
+  `12-before-restart-program-version-inspector.png`, `10-after-restart-harness-on-load.png`,
+  `11-after-restart-program-select-corpus.png`, `12-after-restart-program-version-inspector.png`,
+  `13-after-restart-corpus-fitted.png`, `14-after-restart-version-bytes-raw.png`,
+  `15-after-restart-corpus-zoomed.png`, `16-after-restart-prompt-chat-node.png`,
+  `17-after-restart-model-on-the-restored-corpus.png`, `20-harness-idle-no-run.png`,
+  `21-panels-idle-after-load.png`, `23-after-restart-board-fit-corpus-among-presets.png`,
+  `24-after-restart-toolbar-select-corpus.png`.
+- Findings recorded rather than fixed, all of them the owner's call:
+  - **A page runs something nobody asked for, on `/panels`.** Opening `/panels?load=corpus` and pressing
+    nothing posts `POST /api/lcnc/run` within about 25 seconds: an inline ring run labelled
+    `corpus:n-ring` (`programKey` null, empty inputs) that fails with `project.read: no document wired
+    and no project named` and lands a failed receipt at `lcnc/run/<id>`. Reproduced twice on the scratch
+    daemon, against zero new runs from an idle `/harness` holding the same program for 20 seconds. The
+    mechanism is `runAll()` on load in `web/patch.js` (:2536 and :2620) and the scope runner posting the
+    ring as an inline document (:239-244). It is pre-existing canvas behaviour on a surface outside this
+    cut and it touched no Cut 0 observable, but it contradicts invariant 4: a reader who merely opens a
+    program in a panel window gets a failed receipt with their program's name on the board.
+  - **The publish path is three writes with no shared critical section.** `att.putAttachment`,
+    `programs?.record` and `publisher.publishProgram` in `PatchWire.kt` are separate, and
+    `ProgramLedger`'s mutex covers only the append. Two concurrent publishes of one name can leave the
+    ledger's last line at v1 while the board and the 200 body say v2 — and now that a restart replays the
+    ledger, the restart serves the loser. `PromptStore.save` does not have this hole: it holds its mutex
+    across validation, head read, install and append. The fix is to serialise the whole publish body per
+    name.
+  - **`ProgramLedger.record` and `thaw` do not validate the name** that `POST /api/panels/{name}`
+    validates (`^[a-z0-9][a-z0-9._-]*$`). A hand-edited or copied ledger line carrying `/` re-files at a
+    couch id outside the one-segment `panels/<name>` shape and reaches the board as
+    `lcnc/program/sub/name`, a key family with no `BlackboardNamespaces` row. One regex, hoisted so the
+    route and the ledger spell it once.
+  - **`LcncFacts.learn` replaces across two lock acquisitions.** `kb.asserts()` takes and releases the
+    bank's gate, then `kb.replace(gone, told)` takes it again, so two `lateBound()` passes over the one
+    shared bank can each compute `gone` from the same snapshot and both `tell`, leaving the doubled row
+    the change exists to prevent. The window is the boot: `POST /api/panels/{name}` is served from
+    `kanbanServer.run` while `KanbanModule.attach`'s own `publishAll()` is still in flight. Not a
+    regression — before this cut the stacking was unconditional — but the invariant is not actually held
+    until `KifKnowledgeBase` grows one locked filter-forget-tell primitive.
+  - **The one commonMain behaviour change is pinned only on the JVM.** `LcncFacts.learn` ships to js and
+    to the native targets, but both regressions for it (`LcncFactsOneBankTest`'s
+    `aBindingIsReplacedNotStackedWhenTheRegistryGrows` and `ProgramLedgerTest`'s thaw-before-the-runners
+    case) live in jvmTest. The first has no jvm-only dependency and belongs in commonTest beside
+    `LcncFactsOrderingTest`.
+  - Smaller: `GET /api/panels/{name}?history=1` sits below the `attachments` 503 guard, so a wire with a
+    ledger and no attachment store answers `store not wired` instead of the history it could serve;
+    `ProgramLedger.ACTOR` is documented as the publish route's actor but the route passes the literal, so
+    the constant's only caller is a test; `ProgramLedger.head(name)` has no caller at all; and
+    `aSecondThawMovesNeitherTheBoardNorTheAttachment` asserts sequence equality without pinning the
+    value, so it would pass if `atMs` round-tripped as 0.
+- Not claimed:
+  - The `corpus` program was never run on the scratch daemon, so no receipt, no lamp word, no digest and
+    no consumed facts were seen. Cut 0's claim — the name → version binding survives a restart — is what
+    was checked; the second half of the plan's Rendered line for this cut, a run block resolving the
+    program, belongs to Cut B and is not claimed.
+  - One kill-and-relaunch cycle, on an intact home, with one published version: `previousCid` is null and
+    the ledger has a single line, so the chained-version path was exercised only in `ProgramLedgerTest`,
+    not rendered. The rotted-blob boots were the implementer's, on a different home, and were not
+    repeated by the rendered check.
+  - Two branches of the fix have no rig: the daemon's `runCatching` around the thaw call site (nothing
+    runs `mainImpl` in a test) and `readLedger()`'s unreadable-file guard (no portable way to make
+    `File.readLines()` fail as root). Both are covered only by the live boots.
+  - `storedCorpus()` skips an unreadable panel silently, matching the two guards beside it: it runs on
+    every `publishAll`, so a log line would repeat per publish. A rotted panel is therefore diagnosable
+    from the thaw's own line or from a 404, not from the corpus read.
+  - Other boot-path calls stay unguarded at their call sites: `snapshotService.restore()` and
+    `promptStore.thaw(...)` are bare in the daemon. The CAS reads inside both were fixed here; a
+    different throw inside either still costs the boot. Those are Cut P and Cut C surfaces.
+  - `/documents` was not opened during the rendered check, and the staged bundle was not exercised by it:
+    `/harness` is hand JS (`harness.html`, `patch.js`, `harness.js`). The presets drawer could not be
+    opened either — `#presetsBtn` computes to `display:none` on that surface at every width tried — so
+    "the presets are back" rests on the 22 preset options read off the program select and the named
+    territories on the fitted board.
+  - No native target was linked or tested by anyone this session, so `LcncFacts.kt` ships to macos, linux
+    and mingw unverified here. `jsNodeTest`'s pre-existing whole-suite failures (the `runBlocking has no
+    JS actual` family, plus `tessera.core.RlncTest`) were not swept in and are unchanged.
+  - Two exposures were left open on purpose and are unchanged: `appendText` on a ledger under a home two
+    daemons share interleaves lines, so two boots of a check must not run concurrently on one home; and a
+    program edited straight onto the board through `/blackboard/assert` never touches the ledger, so after
+    a restart the last published version wins over that board edit.
+  - Practical notes for the next rendered check: `/harness` holds an SSE stream open, so Playwright's
+    `wait_until='networkidle'` never settles — use `domcontentloaded` and then wait for `#connection.live`.
+
 ## The walk
 
 Every step on a rendered page, on a daemon from a fresh scratch home
@@ -273,9 +416,9 @@ only after every observable above was seen on the page, not inferred from a stat
 
 | Question | Recommendation |
 |---|---|
-| The program ledger now, or with the VCS gateway (deferred in Cut C) | now: run blocks bind pages to programs by name |
+| The program ledger now, or with the VCS gateway (deferred in Cut C) | **taken, now** — landed as Cut 0 below; run blocks bind pages to programs by name |
 | The block's form | a fenced `lcnc-run` block whose body is the run request: no new grammar, survives every editor, diffs as text |
-| A page holding a block inside the glob its program reads | pages of kind `pages` are excluded from `project.docs` unless the glob names them; the alternative is a self-consuming target |
+| A page holding a block inside the glob its program reads | pages of kind `pages` are excluded from `project.docs` unless the glob names them; the alternative is a self-consuming target — **still a recommendation**: no `pages` kind lands in this run, so a page inside its own program's glob stays the author's problem |
 | Does a re-pinned model make runs stale? | no: record `configureCid` on receipts and never fire on it; a toolchain change is a rebuild the owner chooses, and model calls cost |
 | `Configure` at the repo root | the checked-in description of what the citizen probes, or deleted by the owner's word |
 | Rebuild by itself | stays a gesture (the Cut S ruling); Cut M's build is a gesture over a project |

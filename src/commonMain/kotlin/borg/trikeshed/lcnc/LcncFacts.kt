@@ -153,9 +153,47 @@ class LcncFacts private constructor(private val kb: KifKnowledgeBase) {
         }
     }
 
-    /** The bindings, as tuples — one pass ([LcncWrappers.bindings]), told once. */
+    /**
+     * The bindings, as tuples — one pass ([LcncWrappers.bindings]), told as a
+     * REPLACEMENT of whatever the bank already says about those types.
+     *
+     * Every other family here is monotone: a contract's ports, kinds and params
+     * are the same tuples however often they are told, so `assert`'s exact-string
+     * dedupe makes a re-telling a no-op — the invariant `LcncFactsOneBankTest`
+     * pins. A binding is not. It answers "which runner backs this type" against a
+     * registry that keeps GROWING while the daemon boots (node families are
+     * registered one block at a time, a module adds its own on attach), so the
+     * same type reads `(binding T unbound "")` at one moment and
+     * `(binding T kotlin "…Nodes…")` at the next. Told by `assert` into the one
+     * shared bank the two rows would COEXIST — the bank retracts nothing on its
+     * own — and [bindingOf]/[bindings] take the FIRST row in telling order, so
+     * the earliest (stalest) answer would win forever: `/api/lcnc/contracts` and
+     * `/api/beliefs/query` would call a bound lego unbound, permanently, because
+     * something resolved the vocabulary early.
+     *
+     * So the rows this pass supersedes are retracted and the new ones told in ONE
+     * step under the bank's lock ([KifKnowledgeBase.replace]): one row per type,
+     * always the latest resolution, and telling the same bindings twice still
+     * moves nothing. Only types this pass actually resolved are touched — a
+     * binding the bank holds for a type outside [bindings] is another author's.
+     */
     fun learn(bindings: List<LcncBinding>): LcncFacts {
-        for (b in bindings) tell("binding", b.type, b.kind.name.lowercase(), str(b.provenance))
+        if (bindings.isEmpty()) return this
+        val told = bindings.map { b ->
+            KifExpr.ListExpr(listOf("binding", b.type, b.kind.name.lowercase(), str(b.provenance)).map { KifExpr.Atom(atom(it)) })
+        }
+        val fresh = told.mapTo(HashSet()) { it.toKifString() }
+        val subjects = bindings.mapTo(HashSet()) { atom(it.type) }
+        // ONE pass over the bank's cached snapshot, no unification: a superseded
+        // row is a `binding` 4-tuple about a type this pass resolved whose exact
+        // string is not among the strings being told.
+        val gone = kb.asserts().filter { e ->
+            e is KifExpr.ListExpr && e.elements.size == 4 &&
+                (e.elements[0] as? KifExpr.Atom)?.token == "binding" &&
+                (e.elements[1] as? KifExpr.Atom)?.token in subjects &&
+                e.toKifString() !in fresh
+        }
+        kb.replace(gone, told)
         return this
     }
 

@@ -1210,6 +1210,13 @@ object OroborosDaemon {
         val promptStore = borg.trikeshed.lcnc.PromptStore(
             attachmentGateway, casStore, borg.trikeshed.lcnc.PromptStore.ledgerFile(forgeHome), lcncPublisher,
         ) { System.currentTimeMillis() }
+        // The program ledger (AutoTools notion, Cut 0): a published program's bytes are CAS
+        // citizens already, but its `panels/<name>` head lives in a couch index rebuilt per boot;
+        // <forgeHome>/programs/ledger.jsonl is what a restart re-reads, and the head is re-filed
+        // and republished as `lcnc/program/<name>` at the same programCid.
+        val programLedger = borg.trikeshed.lcnc.ProgramLedger(
+            attachmentGateway, casStore, borg.trikeshed.lcnc.ProgramLedger.ledgerFile(forgeHome), lcncPublisher,
+        ) { System.currentTimeMillis() }
         val operatorMux = kotlinx.coroutines.CompletableDeferred<suspend () -> modelmux.ModelMux>()
         // The mounted projects as one document set (Forge genesis, Cut F/D): the legos and the
         // document surface read the same seam.
@@ -1228,6 +1235,7 @@ object OroborosDaemon {
             prompts = promptStore,
             corpus = projectCorpus,
             snapshots = snapshotService,
+            programs = programLedger,
             muxContext = htxElement + muxReactor,
             mountScope = wireScope,
             miner = projectMiner,
@@ -1331,6 +1339,7 @@ object OroborosDaemon {
         promptStore.thaw(borg.trikeshed.lcnc.LcncPromptSeeds.all()).let { restored ->
             System.err.println("[OROBOROS] prompts: $restored head(s) restored from the ledger; ${promptStore.list().size} on the board")
         }
+        // (the program ledger thaws far below, after the LAST runner registration — see there)
         // Project documents as typed workflow input (Forge genesis, Cut F): project.list /
         // project.docs / project.read / project.extract over the mounted project databases.
         moduleContext.lcncRunners.putAll(borg.trikeshed.lcnc.ProjectNodes.registry(projectCorpus))
@@ -1954,6 +1963,29 @@ object OroborosDaemon {
             stateDir = forgeHome,
             moduleRoutes = moduleRoutes,
         )
+        // Published programs (AutoTools notion, Cut 0): every head the ledger names is re-filed as
+        // its `panels/<name>` attachment and republished as `lcnc/program/<name>` at the same
+        // programCid. PLACED HERE, after the last `moduleContext.lcncRunners.putAll(...)` above and
+        // not beside the prompt thaw: the republish is `LcncPublisher.publishAll()`, i.e. a
+        // `lateBound()`, which resolves every contract against the runner registry AS IT STANDS and
+        // tells the answer into the daemon's one KIF bank. Beside the prompts it would have been
+        // the boot's first lateBound() with two thirds of the registry (ProjectNodes … SurfaceNodes)
+        // still unregistered, so the bank would have learned `unbound` for legos that are bound.
+        // (`LcncFacts.learn` now REPLACES a type's binding instead of adding a second row, so an
+        // early pass can no longer strand that answer — but the honest resolution is the late one.)
+        // Sequential, not launch{}: it must finish before `moduleSupervisor.attach(KanbanModule())`
+        // below, whose own publishAll() computes the corpus from these attachments and whose
+        // runs.recover() replays receipts against the entries.
+        // Guarded like the module attach below and `KanbanModule`'s own publishAll(): this is
+        // SEQUENTIAL boot code running before `kanbanServer.run(...)` binds, and `main`'s only
+        // catch is CancellationException — so anything that escaped here would cost the daemon
+        // its whole HTTP surface for a fault whose honest cost is the ledger's heads. The thaw
+        // already refuses one bad head at a time; this is the brace to that belt, for the faults
+        // it cannot foresee (the corpus-wide republish reads every `panels/` attachment, ledger
+        // line or not).
+        runCatching { programLedger.thaw() }
+            .onSuccess { restored -> System.err.println("[OROBOROS] programs: $restored head(s) restored from the ledger") }
+            .onFailure { System.err.println("[OROBOROS] programs: ledger thaw FAILED (${it.message}); the daemon boots without the ledger's heads") }
         launch {
             // KanbanModule is the point of the module system: attached by DEFAULT (the WAL-backed
             // board replaces the fossil plan-parser). TRIKESHED_NO_KANBAN_MODULE=1 opts out.

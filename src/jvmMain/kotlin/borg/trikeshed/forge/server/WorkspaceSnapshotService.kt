@@ -78,7 +78,13 @@ class WorkspaceSnapshotService(
     /** One snapshot's canonical bytes, only when they still hash to the cid asked for. */
     fun open(cid: String): ByteArray? {
         val id = runCatching { ContentId(cid) }.getOrNull() ?: return null
-        val bytes = cas.get(id) ?: return null
+        // The mismatch this method already refuses (`takeIf` below) is one the CAS reports by
+        // THROWING, not by answering null — `CasStore.get` / `FileCasStore.get` re-hash what
+        // they read and raise `digest mismatch`, and only an ABSENT blob is null. Unwrapped,
+        // a rotted snapshot blob threw out of `restore()`, which `mainImpl` calls sequentially
+        // before the HTTP server binds. Unreadable now reads as absent, which is what the
+        // caller's own "in the ledger but not in the CAS" branch is written for.
+        val bytes = runCatching { cas.get(id) }.getOrNull() ?: return null
         return bytes.takeIf { ContentId.of(it) == id }
     }
 

@@ -99,7 +99,12 @@ class PromptStore(
         var restored = 0
         for ((_, line) in last) {
             val id = runCatching { ContentId(line.cid) }.getOrNull() ?: continue
-            val bytes = withContext(Dispatchers.IO) { cas.get(id) } ?: continue
+            // The CAS answers null only for an ABSENT blob: a blob that is present and no
+            // longer hashes to its own id makes `CasStore.get` / `FileCasStore.get` THROW
+            // `digest mismatch` (job/CasStore.kt:24, util/oroboros/Sha2CasBus.kt:52). This
+            // thaw is boot code, sequential in `mainImpl` before the HTTP server binds, so
+            // an unreadable head must cost its own prompt exactly as a missing one does.
+            val bytes = withContext(Dispatchers.IO) { runCatching { cas.get(id) }.getOrNull() } ?: continue
             val doc = runCatching { PromptDocument.fromJson(bytes.decodeToString()) }.getOrNull() ?: continue
             lock.withLock { install(doc, line.actor, line.atMs, record = false) }
             restored++

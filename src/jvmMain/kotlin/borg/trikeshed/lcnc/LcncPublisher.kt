@@ -63,17 +63,25 @@ class LcncPublisher(
         for (ref in runCatching { att.listAttachments("panels/") }.getOrDefault(emptyList())) {
             val name = ref.path.removePrefix("panels/")
             if (name in out) continue
-            att.getAttachment(ref.path)?.let { (_, bytes) ->
+            // Guarded like its two neighbours, and for the same reason they are: the read
+            // goes through the CAS, and the CAS THROWS `digest mismatch` for a blob that is
+            // present and no longer hashes to its own id (job/CasStore.kt:24,
+            // util/oroboros/Sha2CasBus.kt:52) — only an ABSENT blob is null. Unwrapped, one
+            // rotted `panels/*` blob under a copied or partially-synced home made the whole
+            // corpus throw: every publishAll() (the module attach, a panel save, the boot's
+            // program-ledger thaw) died with it, and the presets went with the panel. An
+            // unreadable panel costs that panel.
+            runCatching { att.getAttachment(ref.path) }.getOrNull()?.let { (_, bytes) ->
                 runCatching { LcncProgramConfix.fromJson(name, bytes.decodeToString()) }.onSuccess { out[name] = it }
             }
         }
         return out
     }
 
-    /** One user program from its attachment, or null. */
+    /** One user program from its attachment, or null — unreadable reads as absent, as in [storedCorpus]. */
     fun storedPanel(name: String): LcncProgram? {
         val att = attachments ?: return null
-        val (_, bytes) = att.getAttachment("panels/$name") ?: return null
+        val (_, bytes) = runCatching { att.getAttachment("panels/$name") }.getOrNull() ?: return null
         return runCatching { LcncProgramConfix.fromJson(name, bytes.decodeToString()) }.getOrNull()
     }
 
