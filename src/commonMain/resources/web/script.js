@@ -1220,8 +1220,9 @@
     Promise.all([...files].map((f) => SHAPE_MEDIA.test(f.name) ? f.arrayBuffer().then((b) => shapeOfBoxes(f.name, b)) : SHAPE_TEXT.test(f.name) ? f.text().then((t) => shapeOf(f.name, t)) : tikaIngest(f)))
       .then((docs) => { shapeDocs.push(...docs); shapePick = null; setView('shape'); });
   }
-  document.addEventListener('dragover', (e) => e.preventDefault());
-  document.addEventListener('drop', (e) => { e.preventDefault(); if (e.dataTransfer.files.length) shapeIngest(e.dataTransfer.files); });
+  document.addEventListener('dragover', (e) => { e.preventDefault(); if (dropZoneEl) dropZoneEl.classList.add('drag-active'); });
+  document.addEventListener('dragleave', (e) => { if (!e.relatedTarget && dropZoneEl) dropZoneEl.classList.remove('drag-active'); });
+  document.addEventListener('drop', (e) => { e.preventDefault(); if (dropZoneEl) dropZoneEl.classList.remove('drag-active'); if (e.dataTransfer.files.length) shapeIngest(e.dataTransfer.files); });
   fileInputEl.addEventListener('change', () => { shapeIngest(fileInputEl.files); fileInputEl.value = ''; });
 
   // ── Render: host (the sub-VM substrate — borg.trikeshed.vm) ─────────
