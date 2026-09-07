@@ -70,6 +70,7 @@ object RouteManifest {
         // -- ModuleWire: module lifecycle --
         // -- LcncRdfWire: the canvas as RDF, and its alignment --
         "LcncRdfWire" to listOf(
+            RouteEntry("POST", "/api/lcnc/spacegraph", "commonMain SpaceGraph shadow of the full LCNC document, typed ports and epistemic alignment candidates"),
             RouteEntry("GET", "/api/lcnc/rdf", "LCNC vocabulary as Turtle (ontology + bindings)"),
             RouteEntry("POST", "/api/lcnc/rdf", "a program document as Turtle (ports as resources, one lcnc:feeds per cable)"),
             RouteEntry("POST", "/api/lcnc/rdf/program", "Turtle in the LCNC vocabulary back to a program document"),

@@ -46,6 +46,35 @@ class LcncRdfWire(
     ): JvmKanbanServer.HttpResponse? {
         val p = path.substringBefore('?')
         return when {
+            method == "POST" && p == "/api/lcnc/spacegraph" -> {
+                val program = programFrom(text) ?: return json(mapOf("error" to "a program document is required"), 400)
+                duplicateIds(program)?.let { return it }
+                val query = borg.trikeshed.relaxfactory.CouchHttpSurface.parseQuery(path.substringAfter('?', ""))
+                val viewport = narchy.spacegraph.Viewport(
+                    query["width"]?.toIntOrNull()?.coerceIn(1, 8192) ?: 1000,
+                    query["height"]?.toIntOrNull()?.coerceIn(1, 8192) ?: 700,
+                )
+                val shadow = narchy.spacegraph.LcncSpaceGraph.project(program)
+                val graph = narchy.spacegraph.SpaceGraph(shadow.graph, historyLimit = 0)
+                graph.execute(narchy.spacegraph.GraphCommand.SetCamera(graph.fit(viewport)), recordHistory = false)
+                val frame = narchy.spacegraph.SceneProjection.frame(graph, viewport)
+                val encoded = narchy.spacegraph.graphics.spi.SvgGraphicsProvider.encode(frame)
+                json(linkedMapOf(
+                    "source" to "LCNC/commonMain", "name" to program.name,
+                    "document" to JsonSupport.parse(LcncProgramConfix.toJson(program)),
+                    "frame" to narchy.spacegraph.FrameJson.value(frame), "svg" to encoded.a,
+                    "ports" to (0 until shadow.ports.size).map { i -> shadow.ports[i].let { port ->
+                        mapOf("nodeId" to port.nodeId, "name" to port.name, "input" to port.input, "kind" to port.kind, "optional" to port.optional)
+                    } },
+                    "issues" to (0 until shadow.issues.size).map { i -> shadow.issues[i].let { issue ->
+                        mapOf("rule" to issue.rule, "nodeId" to issue.nodeId, "message" to issue.message)
+                    } },
+                    "alignment" to align(program),
+                    "epistemic" to emptyList<Any>(),
+                    "epistemicStatus" to "Exact belief-to-node bindings have not been supplied; term matches are alignment candidates",
+                ))
+            }
+
             method == "GET" && p == "/api/lcnc/rdf" -> {
                 val query = borg.trikeshed.relaxfactory.CouchHttpSurface.parseQuery(path.substringAfter('?', ""))
                 val triples = ArrayList(LcncRdf.ontology())

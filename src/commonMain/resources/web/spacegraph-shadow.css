@@ -1,0 +1,14 @@
+#spacegraph-shadow{position:fixed;right:0;top:90px;bottom:0;width:46%;z-index:30;background:#f8fafc;color:#17212b;border-left:1px solid #cbd5e1;display:grid;grid-template-rows:42px 26px minmax(180px,1fr) minmax(80px,28%);font:13px system-ui,sans-serif}
+#spacegraph-shadow[hidden]{display:none}
+#spacegraph-shadow header{display:flex;align-items:center;gap:12px;padding:8px 12px;border-bottom:1px solid #d1d5db}
+#spacegraph-shadow header strong{margin-right:auto;font-size:15px}
+#spacegraph-shadow select,#spacegraph-shadow button{font:inherit;color:inherit;background:#fff;border:1px solid #94a3b8;border-radius:4px;padding:4px 8px}
+#spacegraph-shadow header button{width:28px;height:28px;padding:0;font-size:20px}
+#spacegraph-shadow .sg-status{padding:5px 12px;color:#475569;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;font-size:11px}
+#spacegraph-shadow .sg-surface{min-height:0;overflow:hidden}
+#spacegraph-shadow .sg-details{overflow:auto;padding:12px;border-top:1px solid #cbd5e1}
+#spacegraph-shadow .sg-details>div{margin-top:12px}
+#spacegraph-shadow pre{white-space:pre-wrap;overflow-wrap:anywhere;margin:4px 0;font:12px ui-monospace,monospace}
+.sg-shadow-open #viewport{right:46%}
+.sg-shadow-open #minimap{right:calc(46% + 12px)}
+@media(max-width:760px){#spacegraph-shadow{width:100%;top:105px}.sg-shadow-open #viewport{right:0}.sg-shadow-open #minimap{display:none}}

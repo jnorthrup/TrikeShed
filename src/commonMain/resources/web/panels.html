@@ -397,6 +397,7 @@ button{border-radius:6px;padding:4px 12px;transition:border-color .12s,color .12
   <button id="storeLoadBtn" title="load a construction from the store">⇩ store</button>
   <button id="presetsBtn" title="server-authored programs — offered, never installed">▤ presets</button>
   <button id="rdfBtn" title="the canvas as RDF — graph, ontology, and its alignment with productions and causal rules">⟁ rdf</button>
+  <button id="spacegraphBtn" title="SpaceGraph shadow and ontology alignment" aria-pressed="false">SpaceGraph</button>
   <button id="paletteBtn" title="drag node types and programs onto the canvas">⧉ palette</button>
   <button id="keysBtn" title="keymux endpoints — names & addresses; key values never cross">⚿ keys</button>
   <button id="exportBtn">export</button>
@@ -417,6 +418,8 @@ button{border-radius:6px;padding:4px 12px;transition:border-color .12s,color .12
 <div id="hint">right-click / double-click: search nodes · drag port→port: wire · click wire: cut · drop a folder: mount scope · SSE node re-fires downstream on pointcut events · graphs autosave</div>
 <input type="file" id="fileIn" accept="application/json" style="display:none">
 <script src="/landscape-navigation.js"></script>
+<link rel="stylesheet" href="/spacegraph-shadow.css">
+<script src="/spacegraph-shadow.js"></script>
 <script>
 "use strict";
 /* ── registry of node types: each speaks a REAL daemon surface ─────────── */
@@ -2659,6 +2662,7 @@ function save(){
   // poking at it still gets to back out. Undo is not autosave.
   recordHistory(JSON.stringify(serialize()));
   refreshRdf();
+  window.dispatchEvent(new CustomEvent("lcnc:shadow-update"));
   if(!AUTOSAVE) return;
   try{ localStorage.setItem("trikeshed.panels.v3", JSON.stringify(serialize())); }catch(e){}
 }
