@@ -244,3 +244,9 @@ The code looks correct and fully optimized. The tests passed on the relevant par
 ## 2026-10-31 - Avoid Redundant Map Transforms on Materialized Collections
 **Learning:** In Kotlin, chaining `.map { it }` on an already materialized collection (such as the `List<String>` returned by `Files.readAllLines`) is a redundant identity transform. It needlessly iterates over the original collection to allocate and populate a brand new `ArrayList`, wasting O(N) time and memory on the heap.
 **Action:** Remove `.map { it }` calls on methods or objects that already return a fully materialized `List`.
+## 2026-11-20 - Avoid redundant identity mapping on already materialized collections
+**Learning:** In Kotlin, using `.map { it }` on an already materialized collection (such as a `List` returned by `Files.readAllLines` or a `Series` from a `filter` mapping) is a redundant identity transform. It needlessly copies the entire list, allocating an intermediate `ArrayList` and wasting O(N) time and memory.
+**Action:** Remove redundant `.map { it }` calls after functions that already return materialized collections to return the original list directly without extra overhead (calling `.view.toList()` safely extracts the list from the series if needed).
+## 2026-11-20 - Avoid redundant identity mapping on already materialized collections
+**Learning:** In Kotlin, using `.map { it }` on an already materialized collection (such as a `List` returned by `Files.readAllLines`) is a redundant identity transform. It needlessly copies the entire list, allocating an intermediate `ArrayList` and wasting O(N) time and memory.
+**Action:** Remove redundant `.map { it }` calls after functions that already return materialized collections to return the original list directly without extra overhead.

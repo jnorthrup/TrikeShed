@@ -106,7 +106,8 @@ data class KanbanGraph(
     /** W4.4: all edges in a FANOUT/JOIN group — the branches that must lower together. */
     fun edgesInGroup(group: String?): List<KanbanEdge> =
         if (group == null) emptyList()
-        else edges.filter { it.group == group }.map { it }
+        // Bolt: Removed redundant identity map to avoid O(N) allocation
+        else edges.filter { it.group == group }.view.toList()
 }
 
 fun interface KanbanPredicate { fun test(card: KanbanCardState, edge: KanbanEdge): Boolean }
