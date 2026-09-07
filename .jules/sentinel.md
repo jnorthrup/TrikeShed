@@ -62,3 +62,8 @@
 **Vulnerability:** Found `waitFor()` being called on a `Process` without a timeout and while synchronously reading from the process `InputStream` in `CouchWal.java`, `PanamaKanbanMovie.kt`, and `HeatSoak.kt`.
 **Learning:** `Process.waitFor()` without a timeout can lead to Denial of Service (DoS) if the subprocess hangs. Further, reading the input stream synchronously on the main thread before calling `waitFor` can block indefinitely if the process fills the OS pipe buffer or simply hangs, preventing the timeout from ever being reached.
 **Prevention:** Always read process streams asynchronously (e.g., using `CompletableFuture.supplyAsync`) to prevent pipe buffer deadlocks, and explicitly use bounded `waitFor(timeout, TimeUnit)` with forceful termination `destroyForcibly()` on timeout.
+
+## 2024-05-27 - ProcessBuilder Environment Leak in OroborosDaemon
+**Vulnerability:** ProcessBuilder in `OroborosDaemon.kt` inherited the host process environment variables by default when spawning `git fetch` and `git rev-parse`, potentially leaking daemon secrets like API keys to git credential helpers or pre-commit hooks.
+**Learning:** Process spawns, even for trusted binaries like `git`, must explicitly clear the environment and use a whitelisted environment to prevent accidental leakages through credential helpers or hooks.
+**Prevention:** Always explicitly call `environment().clear()` and populate it with `GuestEnvironment.curated()` before starting any process with `ProcessBuilder`.
