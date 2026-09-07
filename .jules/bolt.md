@@ -253,3 +253,6 @@ The code looks correct and fully optimized. The tests passed on the relevant par
 ## 2024-06-01 - Avoid intermediate ArrayList allocations when converting to Series
 **Learning:** In TrikeShed, calling `.toList().toSeries()` or `.asList().toSeries()` on an Array, List, or vararg array creates an unnecessary intermediate `ArrayList` allocation. Native `.toSeries()` extensions exist for these collection types.
 **Action:** Call `.toSeries()` directly on arrays, lists, and collections without chaining `.toList()` or `.asList()` first to eliminate O(N) heap allocations.
+## 2024-05-30 - Avoid intermediate ArrayList allocations when mapping Series
+**Learning:** Chaining `.toList().map { ... }` on a `Series` collection creates an unnecessary intermediate `ArrayList` allocation.
+**Action:** Use `Series.map { ... }` directly (requires `import borg.trikeshed.lib.map`) to return a mapped List without an intermediate `ArrayList` copy.

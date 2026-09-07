@@ -2,6 +2,7 @@ package borg.trikeshed.kanban
 
 import borg.trikeshed.lib.toSeries
 import borg.trikeshed.lib.toList
+import borg.trikeshed.lib.map
 import borg.trikeshed.parse.json.JsonSupport
 
 /** Confix document for the orchestration graph; predicate bodies stay runtime-registered. */
@@ -9,9 +10,12 @@ object KanbanGraphConfix {
     fun toJson(graph: KanbanGraph): String = JsonSupport.stringify(linkedMapOf(
         "version" to 2,
         "boardId" to graph.boardId,
-        "lanes" to graph.lanes.toList().map { lane -> linkedMapOf("id" to lane.id, "title" to lane.title, "order" to lane.order, "role" to lane.role, "inputs" to lane.inputs, "outputs" to lane.outputs) },
-        "edges" to graph.edges.toList().map { edge -> linkedMapOf("id" to edge.id, "from" to edge.from, "to" to edge.to, "mode" to edge.mode.name, "group" to edge.group, "requiredBranches" to edge.requiredBranches, "maxIterations" to edge.maxIterations, "condition" to edge.condition?.let { mapOf("predicate" to it.predicate, "parameters" to it.parameters) }) },
-        "cards" to graph.cards.toList().map { card -> linkedMapOf("id" to card.id, "owner" to card.owner, "lane" to card.lane, "state" to card.state, "revision" to card.revision, "io" to card.io, "effects" to card.effects.toList()) },
+        // Bolt: Remove .toList() before map to prevent O(N) allocation
+        "lanes" to graph.lanes.map { lane -> linkedMapOf("id" to lane.id, "title" to lane.title, "order" to lane.order, "role" to lane.role, "inputs" to lane.inputs, "outputs" to lane.outputs) },
+        // Bolt: Remove .toList() before map to prevent O(N) allocation
+        "edges" to graph.edges.map { edge -> linkedMapOf("id" to edge.id, "from" to edge.from, "to" to edge.to, "mode" to edge.mode.name, "group" to edge.group, "requiredBranches" to edge.requiredBranches, "maxIterations" to edge.maxIterations, "condition" to edge.condition?.let { mapOf("predicate" to it.predicate, "parameters" to it.parameters) }) },
+        // Bolt: Remove .toList() before map to prevent O(N) allocation
+        "cards" to graph.cards.map { card -> linkedMapOf("id" to card.id, "owner" to card.owner, "lane" to card.lane, "state" to card.state, "revision" to card.revision, "io" to card.io, "effects" to card.effects.toList()) },
     ))
 
     fun fromJson(json: String): KanbanGraph {
