@@ -1529,8 +1529,21 @@ function buildNode(n){
   sBtn.addEventListener("pointerdown",e=>e.stopPropagation());
   sBtn.addEventListener("dblclick",e=>e.stopPropagation());
   sBtn.addEventListener("click",e=>{e.stopPropagation();if(typeof Harness!=="undefined")Harness.selectParent(n);removeNode(n.id);});
-  hd.addEventListener("pointerdown",e=>{
-    if(e.target.closest("button"))return;
+  /* The BODY is the handle, not the topline. A header is a thin strip: at half zoom a
+     scope's is a dozen screen pixels, and once you are zoomed inside a ring it has left
+     the top of the screen entirely while the thing you want to move fills it — so the
+     only way to shift a scope was to hunt its header back into view. Everything the node
+     draws that is not a control, a port, or the ring WINDOW now drags it: the seed and
+     emit rails, the port labels, the margins around the parameters, the band beneath
+     them. The window is left alone deliberately — it is how the camera is panned, and a
+     scope big enough to cover the viewport must never trap it. */
+  const HANDS_OFF="button,input,textarea,select,option,a,.port,.node-resize,.childgrid,.result,.csheet,.ctree,.kboard,.dagchip,.ref-dive,[contenteditable]";
+  el.addEventListener("pointerdown",e=>{
+    const off=e.target.closest(HANDS_OFF);
+    // el.contains, because closest() walks past this node into its ancestors: a child
+    // inside a ring would otherwise find the RING's window and refuse to drag itself.
+    if(off&&el.contains(off))return;
+    if(e.target.closest(".node")!==el)return;   // a child inside a ring drags itself
     if(typeof Harness!=="undefined"){
       if(e.button===0){Harness.selectParent(n);Harness.dragParent(e,n._childHost?null:n);}
       return;

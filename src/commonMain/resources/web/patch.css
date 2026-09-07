@@ -49,7 +49,12 @@ button.stop{border-color:var(--err);color:var(--err)}
 #wires path.cand.only{stroke-dasharray:8 6}
 @media (prefers-reduced-motion:reduce){ #wires path.cand.only{animation:none;stroke-dasharray:none} }
 #wires path:hover{stroke:var(--err)}
-.node{position:absolute;min-width:190px;padding-bottom:24px;background:var(--panel);border:1px solid var(--line);border-radius:6px;box-shadow:0 4px 18px rgba(0,0,0,.45)}
+.node{position:absolute;min-width:190px;padding-bottom:24px;background:var(--panel);border:1px solid var(--line);border-radius:6px;box-shadow:0 4px 18px rgba(0,0,0,.45);cursor:move}
+/* The whole body says "move", because the whole body moves it. Controls, ports, the ring
+   window and the text you can select keep their own cursors — those rules follow this one
+   and win on order, except buttons, whose element selector loses to this class. */
+.node button{cursor:pointer}
+.node .params input,.node .params textarea,.node .params select,.node .result,.node .csheet,.node .ctree{cursor:auto}
 .node .hd{display:flex;align-items:center;gap:6px;padding:5px 8px;border-bottom:1px solid var(--line);border-radius:6px 6px 0 0;background:var(--panel2);cursor:move}
 .node .hd i{width:8px;height:8px;border-radius:50%;background:var(--dim)}
 .node.running .hd i{background:var(--warn);box-shadow:0 0 8px var(--warn)}
