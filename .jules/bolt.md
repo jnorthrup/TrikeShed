@@ -244,3 +244,6 @@ The code looks correct and fully optimized. The tests passed on the relevant par
 ## 2026-10-31 - Avoid Redundant Map Transforms on Materialized Collections
 **Learning:** In Kotlin, chaining `.map { it }` on an already materialized collection (such as the `List<String>` returned by `Files.readAllLines`) is a redundant identity transform. It needlessly iterates over the original collection to allocate and populate a brand new `ArrayList`, wasting O(N) time and memory on the heap.
 **Action:** Remove `.map { it }` calls on methods or objects that already return a fully materialized `List`.
+## 2026-11-21 - Series collection return type mismatch
+**Learning:** In TrikeShed, `Series` implements the standard Kotlin `List` interface. The custom `.filter` extension natively returns a `Series`. Therefore, chaining `.toList()` or `.map { it }` on the result of `Series.filter { ... }` just to satisfy a `List` return type is an anti-pattern. It creates an unnecessary O(N) memory allocation and copy.
+**Action:** Return the `Series` directly whenever a `List` is expected instead of coercing it to an `ArrayList` via `.toList()` or `.map { it }`.
