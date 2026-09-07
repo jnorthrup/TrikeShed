@@ -3,34 +3,20 @@
 package narchy.spacegraph
 
 import borg.trikeshed.lib.*
+import borg.trikeshed.lcnc.LcncProgramConfix
+import borg.trikeshed.parse.json.JsonSupport
 import narchy.spacegraph.graphics.spi.*
 
 /** JS is a value adapter. Geometry, camera, traversal and picking all execute commonMain code. */
 @JsExport
 class BrowserSpatialEngine {
     private val view = SpatialView()
-    private fun point(p: dynamic): Vec3 = Vec3(p[0] as Double, p[1] as Double, p[2] as Double)
-    private fun port(p: dynamic) = ExtrudedPort(p.nodeId as String, p.name as String, p.input as Boolean, point(p.position), p.kind as String?)
-    fun update(packet: dynamic, reset: Boolean) {
-        val nodes: Series<ExtrudedNode> = (packet.nodes.length as Int) j { i ->
-            val n = packet.nodes[i]
-            val rgba = n.rgba
-            val color = if (rgba != null) Rgba(rgba[0] as Int, rgba[1] as Int, rgba[2] as Int, rgba[3] as Double)
-                else cssColor(n.color as String)
-            val params = n.params ?: js("({})"); val keys: dynamic = js("Object.keys(params)")
-            ExtrudedNode(n.id as String, n.parent as String?, n.title as String, n.type as String,
-                point(n.position), point(n.size), n.level as Int, n.scope as Boolean, n.measured as Boolean, color,
-                (n.ports.length as Int) j { p -> port(n.ports[p]) }, (n.scale as Double?) ?: 1.0,
-                (keys.length as Int) j { p -> (keys[p] as String) j (js("String(params[keys[p]])") as String) })
-        }
-        val cables: Series<ExtrudedCable> = (packet.cables.length as Int) j { i ->
-            val c = packet.cables[i]
-            ExtrudedCable(c.id as String, port(c.from), port(c.to), 4 j { p -> point(c.points[p]) })
-        }
-        val c = packet.camera
-        view.update(ExtrudedScene(nodes, cables, emptySeriesOf()), GraphCamera(center = point(c.center), position = point(c.position),
-            mode = CameraMode.PERSPECTIVE, fieldOfView = (c.fov as Double?) ?: 45.0, near = (c.near as Double?) ?: .1,
-            far = (c.far as Double?) ?: 1e6, zoom = (c.zoom as Double?) ?: 1.0), reset)
+    fun project(name: String, document: String, geometry: String, spacing: Double, reset: Boolean): dynamic {
+        val program = LcncProgramConfix.fromJson(name, document)
+        val scene = LcncExtrusion.project(program, LcncExtrusion.measurements(JsonSupport.parse(geometry)), spacing)
+        val camera = scene.camera(view.viewport)
+        view.update(scene, camera, reset)
+        return value(LcncExtrusion.value(scene, camera))
     }
     fun resize(width: Int, height: Int) { view.viewport = Viewport(width.coerceAtLeast(1), height.coerceAtLeast(1)) }
     fun frame(gl: Boolean): dynamic {
@@ -68,10 +54,6 @@ class BrowserSpatialEngine {
     fun pan(dx: Double, dy: Double) = view.pan(dx, dy)
     fun zoom(factor: Double, x: Double, y: Double) = view.zoom(factor, Vec3(x, y))
     private fun xyz(p: Vec3) = listOf(p.x, p.y, p.z)
-    private fun cssColor(css: String): Rgba {
-        val parts = css.removePrefix("rgba(").removeSuffix(")").split(',')
-        return if (parts.size == 4) Rgba(parts[0].toInt(), parts[1].toInt(), parts[2].toInt(), parts[3].toDouble()) else Rgba.parse(css)
-    }
     private fun value(v: Any?): dynamic = when (v) {
         is Map<*, *> -> { val result = js("({})"); v.forEach { (k, item) -> result[k.toString()] = value(item) }; result }
         is List<*> -> v.map { value(it) }.toTypedArray()

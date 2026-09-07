@@ -19,18 +19,27 @@ authenticated CLI. This design uses the apparent intended repository,
 - `LcncExtrusion` lifts measured world-space bounds and own-port coordinates
   into Y-up solids. Containment determines Z separation. These are presentation
   values, not invented confidence or ontology coordinates.
-- GL draws extruded surfaces using Three.js. Canvas and SVG consume a commonMain
-  projection of those same solids, cables and camera values. They are projected
-  backends, not hardware GL implementations.
+- Three.js is removed. `SpatialView` owns camera and picking in commonMain;
+  `ExtrudedSceneProjection` produces the one ordered frame for all providers.
+  GL uploads `FrameTriangles` vertices in one draw and uses Canvas for text.
+  Canvas draws that frame directly; SVG uses the common writer. GL is a projected
+  triangle provider, not a general 3D engine or a native text renderer.
+- Nodes are `Series`, colored vertices are `Join`, and containment is a
+  `MetaSeries` parent-to-children oracle. Scope frames remain hollow; inherited
+  scale controls thickness and recursive Z increments, not just flat depth.
+- The existing Kotlin/JS build runs `LcncExtrusion` locally. Rendering, camera
+  gestures and picking do not call HTTP; the independent alignment request still
+  uses the daemon's authoritative facts. The JVM endpoint remains compatible.
 - The parameter inspector temporarily hosts the original controls, preserving
   handlers and asynchronous picklists, with a dimension-preserving placeholder.
   Rich output views remain in the original editor.
 - Rete, causal and KIF term matches are explicitly alignment candidates. Exact
   epistemic bindings remain absent unless supplied by an authoritative caller.
 - Browser sources live in `src/commonMain/resources/web/narchy/spacegraph/`.
-  Rebuild the checked-in browser bundle with `npm ci && npm run build` from
-  this directory. The dependency versions are pinned; Three's MIT license is
-  retained in the web vendor directory.
+  Rebuild the checked-in provider bundle with `npm ci && npm run build` from
+  this directory, then run `./gradlew stageKotlinJs jvmMainClasses` at the repo
+  root. `stageKotlinJs` stages the shared Kotlin bundle; `data-kotlin-library`
+  prevents its Forge application entry point from replacing the Panels page.
 
 The IntelliJ strategy in `~/.codex/skills/intellij-counter-triage/SKILL.md` now
 requires a verified semantic cycle, fresh focus between mutating steps, bounded
@@ -198,19 +207,15 @@ the current Kotlin/JDK versions while adding the graphics feature.
 | `src/commonMain/kotlin/narchy/spacegraph/` | Graph, camera/input reducers, layouts, scene projection, resources as values, SVG encoding, capability selection. |
 | `src/commonMain/kotlin/narchy/spacegraph/graphics/spi/` | Shared operations and portable errors; no Three.js, DOM, JDK or C pointer types. |
 | `src/jsMain/kotlin/narchy/spacegraph/graphics/spi/` | Browser Canvas/SVG adapters and portable JS binding helpers; no module-load DOM access. |
-| `src/spacegraphBrowserMain/kotlin/narchy/spacegraph/` | Proposed custom JS compilation source set for the Three.js adapter, DOM/editor/media integrations and browser entry point. |
-| `src/spacegraphNodeMain/kotlin/narchy/spacegraph/` | Proposed custom JS compilation source set for headless SVG/analysis and CLI, with no browser provider imports. |
+| `src/jsMain/kotlin/narchy/spacegraph/BrowserSpatialEngine.kt` | Thin exported value adapter using the existing JS compilation; no duplicate geometry or interaction implementation. |
 | `src/jvmMain/kotlin/narchy/spacegraph/graphics/spi/` | Skia/Skiko Canvas adapter, optional LWJGL GL/window provider and JVM content/inference backends. |
 | `src/nativeMain/kotlin/narchy/spacegraph/` | Shared Native composition and capability handling. Platform C types stay in concrete backend source sets. |
 | `src/macosMain/`, `src/linuxMain/`, `src/mingwX64Main/` | Native surface, GL, Canvas, text, content and inference implementations; target-specific cinterop and linker settings. |
 | `src/wasmJsMain/` | Existing target must keep compiling. Rich Wasm graphics requires its own interop implementation and is additional scope beyond JS. |
 
-The custom JS compilations need explicit commonMain dependencies and their own
-bundling/run tasks. A directory named browserMain alone creates no isolation;
-associating a Node compilation with a DOM-dependent main output would import
-that dependency. Inspect generated imports and run Node with no document/window
-globals. Prove the Kotlin 2.4.10 packaging setup before committing to its DSL.
-See Kotlin's [custom compilation contract](https://kotlinlang.org/docs/multiplatform/multiplatform-configure-compilations.html).
+No custom JS compilation or replacement algebra library is necessary for this
+renderer. Browser-specific surface allocation stays in the small JS provider;
+the common geometry and SVG encoder do not access DOM or GL objects.
 
 The profile families below separate renderer choices from Native platform
 settings. Typed profile loading and dedicated Gradle wiring are still pending;
@@ -218,7 +223,7 @@ this table is not a set of runnable target configurations.
 
 | Profile family | Implementation choice | Configuration that differs |
 | --- | --- | --- |
-| Browser GL | Three.js WebGL provider and optional DOM overlay | Pinned npm dependencies, ES modules, shader/assets, pixel ratio, context loss, browser frame/input hooks. |
+| Browser GL | WebGL projected triangles plus Canvas text | GLSL ES shaders, pixel ratio, context loss, browser frame/input hooks; no Three.js. |
 | Browser Canvas | CanvasRenderingContext2D | Canvas size/DPR, paths and text metrics; DOM content is an independently selected overlay. |
 | Browser SVG | DOM SVG presenter over common scene projection | Namespace, clip IDs, viewBox, pointer targets and accessibility; export can use the common writer. |
 | Node SVG | Common SVG writer plus portable resource access | Node entry point, explicit viewport/fonts and deterministic timestamps; no display or GPU dependency. |
@@ -229,7 +234,7 @@ this table is not a set of runnable target configurations.
 | Native Canvas | Cairo/Pango backend candidate | Pinned C libraries, text shaping, image decoding and window-surface integration; verify each host ABI before adoption. |
 | Native SVG | Common SVG writer | Native executable entry point and userspace output; no display-library link requirement. |
 
-GL uses a feature subset implemented by WebGL2 and desktop GL core, with separate
+The current browser sink uses WebGL 1. Desktop/native sinks still need separate
 GLSL ES and desktop shader sources. Detect capabilities instead of passing GLSL
 unchanged between APIs. macOS needs its own core-profile context configuration;
 GLFW documents the platform's [OpenGL constraints](https://www.glfw.org/docs/latest/compat_guide.html#compat_osx).
@@ -257,7 +262,7 @@ Keep host-selected defaults; use the existing Linux/MinGW opt-ins for CI.
 3. Implement common frame projection and SVG export, then browser SVG and Canvas.
    Deliver a visible graph with labels, edges, selection, drag, resize, pan/zoom,
    nesting and disposal. Wire actual target entry points and profile parsing.
-4. Implement browser GL with Three.js and desktop GL/Canvas providers. Use the
+4. Reuse the common frame/triangle projection for desktop GL/Canvas providers. Use the
    same graph fixtures to verify transforms, clipping, hit tests, text/image
    rendering, resource release and context restoration on real surfaces.
 5. Complete all node/edge variants, layout containers, ten layout plugins,

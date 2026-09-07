@@ -20,10 +20,12 @@ class SpatialView(var viewport: Viewport = Viewport(1, 1)) {
     fun fit() { camera = fitted }
     fun front() { camera = camera.copy(position = camera.center + Vec3(z = (camera.position - camera.center).length)) }
     fun focus(id: String) {
-        val n = scene.nodes.view.find { it.id == id } ?: return
+        val subtree = scene.subtree(id)
+        if (subtree.size == 0) return
+        val bounds = scene.copy(nodes = subtree).bounds
         val angle = atan(tan(camera.fieldOfView * PI / 360) * min(1.0, viewport.width.toDouble() / viewport.height))
-        val distance = max(n.size.length / 2 / sin(angle) * 1.15, 1e-9)
-        camera = camera.copy(center = n.position, position = n.position + (camera.position - camera.center).normalized() * distance,
+        val distance = max(bounds.size.length / 2 / sin(angle) * 1.15, 1e-9)
+        camera = camera.copy(center = bounds.center, position = bounds.center + (camera.position - camera.center).normalized() * distance,
             zoom = 1.0, near = max(distance * 1e-6, 1e-12), far = max(scene.bounds.size.length * 8, distance * 8))
     }
     fun orbit(dx: Double, dy: Double) {

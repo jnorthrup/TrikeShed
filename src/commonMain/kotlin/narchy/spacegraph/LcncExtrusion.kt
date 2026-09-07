@@ -1,6 +1,8 @@
 package narchy.spacegraph
 
 import borg.trikeshed.lcnc.LcncProgram
+import borg.trikeshed.lcnc.LcncContracts
+import borg.trikeshed.parse.confix.value
 import borg.trikeshed.lib.*
 import narchy.spacegraph.graphics.spi.*
 import kotlin.math.*
@@ -39,6 +41,12 @@ data class ExtrudedCable(val id: String, val from: ExtrudedPort, val to: Extrude
 data class ExtrudedScene(val nodes: Series<ExtrudedNode>, val cables: Series<ExtrudedCable>, val issues: Series<String>) {
     private val children = nodes.view.groupBy { it.parent }.mapValues { it.value.toSeries() }
     val branches: MetaSeries<String?, Series<ExtrudedNode>> = null j { parent: String? -> children[parent] ?: emptySeriesOf() }
+    fun subtree(id: String): Series<ExtrudedNode> {
+        val result = mutableListOf<ExtrudedNode>()
+        fun visit(parent: String) { for (n in branches[parent].view) { result.add(n); visit(n.id) } }
+        nodes.view.find { it.id == id }?.let { result.add(it); visit(id) }
+        return result.toSeries()
+    }
     val bounds: Bounds3 get() {
         if (nodes.size == 0) return Bounds3(Vec3(-200.0, -150.0), Vec3(200.0, 150.0, 40.0))
         val boxes = nodes.view.map { it.bounds }
@@ -123,8 +131,13 @@ object LcncExtrusion {
             val color = when { scope -> Rgba(71, 119, 111); spec.data.flag("effect") -> Rgba(176, 70, 83)
                 spec.data.flag("source") -> Rgba(47, 116, 166); spec.data.flag("sink") -> Rgba(121, 98, 155)
                 else -> Rgba(82, 103, 117) }
+            val type = spec.data.string("lcncType")
+            val params = spec.data.document.value("params") as? Map<*, *> ?: emptyMap<Any, Any>()
+            val contract = LcncContracts.find(type)
+            val details = params.map { (key, value) -> key.toString() j
+                (if (contract?.params?.get(key.toString())?.ph?.startsWith("secret:") == true) "[redacted]" else value.toString()) }.toSeries()
             nodes.add(ExtrudedNode(spec.id, spec.parent, spec.label, spec.data.string("lcncType"), center,
-                Vec3(r.width, r.height, depth), level, scope, m != null, color, ports.toSeries(), scale))
+                Vec3(r.width, r.height, depth), level, scope, m != null, color, ports.toSeries(), scale, details))
         }
         val byId = nodes.associateBy { it.id }
         val cables = mutableListOf<ExtrudedCable>()
@@ -166,8 +179,7 @@ object LcncExtrusion {
         return mapOf("coordinateSystem" to "right-handed-y-up-z-extrusion", "nodes" to scene.nodes.view.map { n ->
             mapOf("id" to n.id, "parent" to n.parent, "title" to n.title, "type" to n.type, "position" to point(n.position),
                 "size" to point(n.size), "level" to n.level, "scope" to n.scope, "measured" to n.measured,
-                "color" to n.color.css, "rgba" to listOf(n.color.red, n.color.green, n.color.blue, n.color.alpha),
-                "scale" to n.scale, "ports" to n.ports.view.map(::port))
+                "color" to n.color.css, "scale" to n.scale, "ports" to n.ports.view.map(::port))
         }, "cables" to scene.cables.view.map { c -> mapOf("id" to c.id, "from" to port(c.from), "to" to port(c.to), "points" to c.points.view.map(::point)) },
             "camera" to mapOf("position" to point(camera.position), "center" to point(camera.center), "zoom" to camera.zoom,
                 "fov" to camera.fieldOfView, "near" to camera.near, "far" to camera.far), "issues" to scene.issues.view.toList())

@@ -23,15 +23,16 @@ const base=process.env.SPACEGRAPH_BASE_URL||'http://127.0.0.1:8888';
       assert.equal(await page.evaluate(()=>SpaceGraphWorkspace.backend),'gl');
       const measure=await page.evaluate(()=>{
         const s=SpaceGraphWorkspace.scene,r=SpaceGraphWorkspace.renderer;r.render();
-        const gl=r.gl.getContext(),w=gl.drawingBufferWidth,h=gl.drawingBufferHeight,pixels=new Uint8Array(w*h*4);gl.readPixels(0,0,w,h,gl.RGBA,gl.UNSIGNED_BYTE,pixels);
+        const gl=r.gl,w=gl.drawingBufferWidth,h=gl.drawingBufferHeight,pixels=new Uint8Array(w*h*4);gl.readPixels(0,0,w,h,gl.RGBA,gl.UNSIGNED_BYTE,pixels);
         let colored=0,samples=0;for(let i=0;i<pixels.length;i+=4*31){samples++;if(Math.abs(pixels[i]-235)+Math.abs(pixels[i+1]-239)+Math.abs(pixels[i+2]-240)>35)colored++;}
-        return {nodes:s.nodes.length,cables:s.cables.length,measured:s.nodes.every(n=>n.measured),depth:Math.max(...s.nodes.map(n=>n.position[2])),colored,samples,drawCalls:r.gl.info.render.calls};
+        return {nodes:s.nodes.length,cables:s.cables.length,measured:s.nodes.every(n=>n.measured),depth:Math.max(...s.nodes.map(n=>n.position[2])),colored,samples,vertices:r.vertices,engine:typeof r.engine.project};
       });
-      assert.ok(measure.measured);assert.ok(measure.depth>28);assert.ok(measure.colored>50,JSON.stringify(measure));assert.ok(measure.drawCalls>5);
+      assert.ok(measure.measured);assert.ok(measure.depth>28);assert.ok(measure.colored>50,JSON.stringify(measure));assert.ok(measure.vertices>measure.nodes*36);assert.equal(measure.engine,'function');
       await page.screenshot({path:path.join(output,`spatial-${viewport.width}.png`)});
       const canvas=await page.locator('#sg-surface').boundingBox(),before=await page.evaluate(()=>SpaceGraphWorkspace.renderer.cameraValue());
       await page.mouse.move(canvas.x+canvas.width*.35,canvas.y+canvas.height*.35);await page.mouse.down();await page.mouse.move(canvas.x+canvas.width*.65,canvas.y+canvas.height*.45,{steps:12});await page.mouse.up();
-      assert.notDeepEqual(await page.evaluate(()=>SpaceGraphWorkspace.renderer.cameraValue()),before,JSON.stringify({errors,hit:await page.evaluate(()=>{const r=document.getElementById('sg-surface').getBoundingClientRect(),renderer=SpaceGraphWorkspace.renderer;return {element:document.elementFromPoint(r.x+r.width*.35,r.y+r.height*.35)?.outerHTML.slice(0,200),enabled:renderer.controls.enabled,mode:renderer.mode};})}));
+      assert.notDeepEqual(await page.evaluate(()=>SpaceGraphWorkspace.renderer.cameraValue()),before,JSON.stringify({errors}));
+      let remoteGeometry=0;page.on('request',r=>{if(new URL(r.url()).pathname==='/api/lcnc/spacegraph')remoteGeometry++;});
       const documentBefore=await page.evaluate(()=>JSON.stringify(serialize()));
       for(const provider of ['canvas','svg','gl']){
         await page.getByLabel('Rendering provider',{exact:true}).selectOption(provider);
@@ -40,6 +41,7 @@ const base=process.env.SPACEGRAPH_BASE_URL||'http://127.0.0.1:8888';
         assert.ok(await page.locator(provider==='svg'?'.sg-output svg':'.sg-output canvas').count());
         await page.screenshot({path:path.join(output,`${provider}-${viewport.width}.png`)});
       }
+      assert.equal(remoteGeometry,0,'Camera and provider changes must not request remote geometry');
       const selected=await page.evaluate(()=>{
         const n=G.nodes.find(n=>n.el.querySelector(':scope > .params input,:scope > .params textarea'));window.sgTestNode=n;window.sgTestControl=n.el.querySelector(':scope > .params input,:scope > .params textarea');SpaceGraphWorkspace.select(n.id);return {id:n.id,value:sgTestControl.value};
       });

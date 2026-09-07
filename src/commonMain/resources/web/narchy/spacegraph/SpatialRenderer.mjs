@@ -39,7 +39,11 @@ export class SpatialRenderer {
   }
   point(e) { const r=this.host.getBoundingClientRect(); return [e.clientX-r.left,e.clientY-r.top]; }
   hit(e) { return this.engine.pick(...this.point(e)); }
-  update(packet,reset=false) { this.packet=packet; this.engine.update(packet,reset||!this.hasCamera); this.hasCamera=true; this.resize(); }
+  project(name,document,geometry,spacing,reset=false) {
+    this.engine.resize(Math.max(1,this.host.clientWidth),Math.max(1,this.host.clientHeight));
+    this.packet=this.engine.project(name,JSON.stringify(document),JSON.stringify(geometry),spacing,reset||!this.hasCamera);
+    this.hasCamera=true;this.render();return this.packet;
+  }
   cameraValue() { return this.hasCamera?this.engine.camera():null; }
   changed() { this.render(); this.callbacks.viewChanged(); }
   front() { this.engine.front(); this.changed(); }
