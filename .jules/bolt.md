@@ -244,3 +244,7 @@ The code looks correct and fully optimized. The tests passed on the relevant par
 ## 2026-10-31 - Avoid Redundant Map Transforms on Materialized Collections
 **Learning:** In Kotlin, chaining `.map { it }` on an already materialized collection (such as the `List<String>` returned by `Files.readAllLines`) is a redundant identity transform. It needlessly iterates over the original collection to allocate and populate a brand new `ArrayList`, wasting O(N) time and memory on the heap.
 **Action:** Remove `.map { it }` calls on methods or objects that already return a fully materialized `List`.
+
+## 2024-05-30 - Avoid intermediate ArrayList allocations when mapping Series
+**Learning:** Chaining `.toList().map { ... }` on a `Series` collection creates an unnecessary intermediate `ArrayList` allocation.
+**Action:** Use `Series.map { ... }` directly (requires `import borg.trikeshed.lib.map`) to return a mapped List without an intermediate `ArrayList` copy.
