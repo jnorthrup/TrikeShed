@@ -2,35 +2,17 @@
 
 package borg.trikeshed.userspace.nio.channels.spi
 
-import borg.trikeshed.userspace.Liburing
+import borg.trikeshed.userspace.FunctionalUringFacade
+import borg.trikeshed.userspace.UringOp
+import borg.trikeshed.userspace.UringOp.Companion.UringSubmission
+import borg.trikeshed.userspace.openUserspaceChannelBackend
 import borg.trikeshed.userspace.nio.ByteBuffer
 import kotlinx.cinterop.*
 import platform.posix.*
 
-/**
- * Linux io_uring-backed [ChannelOperations].
- *
- * Socket/bind/listen/accept/connect use POSIX syscalls directly (same semantics
- * as [PosixChannelOperations]). File/socket read-write and accept SQEs are queued
- * through the [Liburing] global ring and flushed via [ChannelHandle.submit].
- *
- * A monotonic per-operation request ID is used as the io_uring userData.  The
- * caller-supplied [userData] is stored alongside the pinned buffer in [pendingOps]
- * and echoed back in [ChannelResult.userData] on completion, preserving the
- * caller's correlation token while keeping io_uring userData unique.
- */
+/** Linux primitives with channel submissions governed by the common uring facade. */
 class LinuxChannelOperations : ChannelOperations {
-
-    private data class PendingOp(
-        val outerUserData: Long,
-        val fd: Int,
-        val pin: Pinned<ByteArray>?,
-    )
-
-    override fun openChannel(entries: Int): ChannelOperations.ChannelHandle {
-        Liburing.open(entries).getOrThrow()
-        return UringChannelHandle()
-    }
+    override fun openChannel(entries: Int): ChannelOperations.ChannelHandle = UringChannelHandle(entries)
 
     override fun socket(domain: Int, type: Int, protocol: Int): Int =
         platform.posix.socket(domain, type, protocol)
@@ -61,95 +43,53 @@ class LinuxChannelOperations : ChannelOperations {
 
     override fun close(fd: Int): Int = platform.posix.close(fd)
 
-    // ── UringChannelHandle ────────────────────────────────────────────────────
-
-    private inner class UringChannelHandle : ChannelOperations.ChannelHandle {
+    private class UringChannelHandle(entries: Int) : ChannelOperations.ChannelHandle {
         override val id: Int = -1
+        private val facade = FunctionalUringFacade(entries, openUserspaceChannelBackend(entries))
+        private var nextRequest = 0L
+        private data class Request(val fd: Int, val userData: Long, val opcode: UringOp, val len: Int)
+        private val pending = mutableMapOf<Long, Request>()
 
-        /** Monotonic ID issued per SQE so io_uring userData is always unique. */
-        private var nextReqId: Long = 0L
-
-        /** In-flight operations: ioReqId → (outerUserData, fd, pinned buffer or null). */
-        private val pendingOps = mutableMapOf<Long, PendingOp>()
-
-        // ── SQE preparation ───────────────────────────────────────────────
-
-        override fun prepAccept(serverFd: Int, userData: Long): Int {
-            val rid = nextReqId++
-            pendingOps[rid] = PendingOp(userData, serverFd, null)
-            return Liburing.prepAccept(serverFd, rid).fold({ 0 }, {
-                pendingOps.remove(rid); -1
-            })
+        private fun enqueue(sub: UringSubmission, userData: Long): Int {
+            val request = nextRequest++
+            facade.enqueue(sub.copy(userData = request))
+            pending[request] = Request(sub.fd, userData, sub.opcode, sub.len)
+            return 0
         }
 
-        override fun readv(fd: Int, buffer: ByteBuffer, userData: Long): Int {
-            val rid = nextReqId++
-            val off = buffer.arrayOffset() + buffer.position()
-            val pin = buffer.array().pin()
-            pendingOps[rid] = PendingOp(userData, fd, pin)
-            val addr = pin.addressOf(off).rawValue.toLong()
-            return Liburing.prepRead(fd, addr, buffer.remaining(), 0L, rid).fold({ 0 }, {
-                pendingOps.remove(rid)?.pin?.unpin(); -1
-            })
-        }
+        override fun readv(fd: Int, buffer: ByteBuffer, userData: Long): Int =
+            enqueue(UringSubmission(UringOp.READ, fd, 0, buffer.remaining(), -1, buffer = buffer), userData)
 
-        override fun writev(fd: Int, buffer: ByteBuffer, userData: Long): Int {
-            val rid = nextReqId++
-            val off = buffer.arrayOffset() + buffer.position()
-            val pin = buffer.array().pin()
-            pendingOps[rid] = PendingOp(userData, fd, pin)
-            val addr = pin.addressOf(off).rawValue.toLong()
-            return Liburing.prepWrite(fd, addr, buffer.remaining(), 0L, rid).fold({ 0 }, {
-                pendingOps.remove(rid)?.pin?.unpin(); -1
-            })
-        }
+        override fun writev(fd: Int, buffer: ByteBuffer, userData: Long): Int =
+            enqueue(UringSubmission(UringOp.WRITE, fd, 0, buffer.remaining(), -1, buffer = buffer), userData)
 
-        // ── Synchronous pread/pwrite (file I/O) ───────────────────────────
+        override fun prepAccept(serverFd: Int, userData: Long): Int =
+            enqueue(UringSubmission(UringOp.ACCEPT, serverFd, 0, 0, 0), userData)
 
-        override fun read(buffer: ByteBuffer, offset: Long): Int {
-            val off = buffer.arrayOffset() + buffer.position()
-            return buffer.array().usePinned {
-                pread(id, it.addressOf(off), buffer.remaining().convert(), offset)
-            }.toInt()
-        }
+        override fun sendmsg(fd: Int, msgHdrPtr: Long, userData: Long): Int =
+            enqueue(UringSubmission(UringOp.SENDMSG, fd, msgHdrPtr, 0, 0), userData)
 
-        override fun write(buffer: ByteBuffer, offset: Long): Int {
-            val off = buffer.arrayOffset() + buffer.position()
-            return buffer.array().usePinned {
-                pwrite(id, it.addressOf(off), buffer.remaining().convert(), offset)
-            }.toInt()
-        }
+        override fun recvmsg(fd: Int, msgHdrPtr: Long, userData: Long): Int =
+            enqueue(UringSubmission(UringOp.RECVMSG, fd, msgHdrPtr, 0, 0), userData)
 
-        // ── Submit / wait ─────────────────────────────────────────────────
+        // This handle owns a ring, not a file descriptor.
+        override fun read(buffer: ByteBuffer, offset: Long): Int = -9
+        override fun write(buffer: ByteBuffer, offset: Long): Int = -9
+        override fun submit(): Int = facade.submit()
 
-        override fun submit(): Int = Liburing.submit().getOrElse { -1 }
-
-        /** Async UDP sendmsg — queues a SENDMSG SQE with msghdr. */
-        override fun sendmsg(fd: Int, msgHdrPtr: Long, userData: Long = 0L): Int {
-            return Liburing.prepSendmsg(fd, msgHdrPtr, 0, userData).fold({ 0 }, { -1 })
-        }
-
-        /** Async UDP recvmsg — queues a RECVMSG SQE with msghdr. */
-        override fun recvmsg(fd: Int, msgHdrPtr: Long, userData: Long = 0L): Int {
-            return Liburing.prepRecvmsg(fd, msgHdrPtr, 0, userData).fold({ 0 }, { -1 })
-        }
-
-        override fun wait(minComplete: Int): List<ChannelResult> {
-            val results = mutableListOf<ChannelResult>()
-            repeat(minComplete) {
-                val c = Liburing.waitCqe().getOrNull() ?: return results
-                val op = pendingOps.remove(c.userData)
-                op?.pin?.unpin()
-                results.add(ChannelResult(op?.fd ?: -1, c.res, op?.outerUserData ?: c.userData))
+        override fun wait(minComplete: Int): List<ChannelResult> = facade.wait(minComplete).map { completion ->
+            val request = checkNotNull(pending.remove(completion.userData)) { "foreign channel completion" }
+            val result = when {
+                completion.res == -11 -> 0
+                completion.res == 0 && request.opcode == UringOp.READ && request.len > 0 -> -1
+                else -> completion.res
             }
-            // Drain any additional ready completions without blocking.
-            while (true) {
-                val c = Liburing.peekCqe().getOrNull() ?: break
-                val op = pendingOps.remove(c.userData)
-                op?.pin?.unpin()
-                results.add(ChannelResult(op?.fd ?: -1, c.res, op?.outerUserData ?: c.userData))
-            }
-            return results
+            ChannelResult(request.fd, result, request.userData)
+        }
+
+        override fun close() {
+            facade.closeNow()
+            pending.clear()
         }
     }
 }

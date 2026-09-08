@@ -1,7 +1,8 @@
 package borg.trikeshed.userspace
 
 import borg.trikeshed.lib.Series
-import borg.trikeshed.userspace.nio.ByteBuffer
+import borg.trikeshed.lib.toList
+import borg.trikeshed.lib.toSeries
 import borg.trikeshed.userspace.UringOp.Companion.UringSubmission
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -10,9 +11,10 @@ import kotlin.test.assertFailsWith
 class FunctionalUringFacadeXattrTest {
 
     private class StubBackend : UserspaceChannelBackend {
+        override val capabilities: Long = UringOp.entries.fold(0L) { mask, op -> mask or op.mask }
         override fun submitBatch(submissions: List<UringSubmission>): List<SelectionResult> =
             submissions.map { SelectionResult(0, it.userData) }
-        override suspend fun batchEnqueue(submissions: Series<UringSubmission>): Series<UringCompletion> = TODO()
+        override suspend fun batchEnqueue(submissions: Series<UringSubmission>): Series<UringCompletion> = submitBatch(submissions.toList()).map { UringCompletion(it.userData, it.res, 0) }.toSeries()
     }
 
     // ── Layer 2: all 8 xattr ops are rejected at enqueue ──
@@ -81,14 +83,15 @@ class FunctionalUringFacadeXattrTest {
         }
     }
 
-    // ── Layer 2: STATX timestamp quantization ──
+    // CQE res is syscall status, never a timestamp payload.
 
     @Test
-    fun statx_completion_is_quantized_to_synthetic_epoch() {
+    fun statx_failure_is_not_replaced_with_success() {
         val backend = object : UserspaceChannelBackend {
+            override val capabilities: Long = UringOp.caps(UringOp.STATX, UringOp.READ)
             override fun submitBatch(submissions: List<UringSubmission>): List<SelectionResult> =
-                submissions.map { SelectionResult(1700000000, it.userData) } // real timestamp
-            override suspend fun batchEnqueue(submissions: Series<UringSubmission>): Series<UringCompletion> = TODO()
+                submissions.map { SelectionResult(-9, it.userData) }
+            override suspend fun batchEnqueue(submissions: Series<UringSubmission>): Series<UringCompletion> = submitBatch(submissions.toList()).map { UringCompletion(it.userData, it.res, 0) }.toSeries()
         }
         val facade = FunctionalUringFacade(8, backend)
         facade.enqueue(UringSubmission(UringOp.STATX, fd = 3, addr = 0, len = 256, offset = 0, userData = 42L))
@@ -97,17 +100,17 @@ class FunctionalUringFacadeXattrTest {
         val results = facade.wait(minComplete = 1)
 
         assertEquals(1, results.size)
-        // Quantized to syntheticEpoch = 0, not the real timestamp 1700000000
-        assertEquals(0, results[0].res)
+        assertEquals(-9, results[0].res)
         assertEquals(42L, results[0].userData)
     }
 
     @Test
     fun non_statx_ops_are_not_quantized() {
         val backend = object : UserspaceChannelBackend {
+            override val capabilities: Long = UringOp.caps(UringOp.STATX, UringOp.READ)
             override fun submitBatch(submissions: List<UringSubmission>): List<SelectionResult> =
                 submissions.map { SelectionResult(99, it.userData) }
-            override suspend fun batchEnqueue(submissions: Series<UringSubmission>): Series<UringCompletion> = TODO()
+            override suspend fun batchEnqueue(submissions: Series<UringSubmission>): Series<UringCompletion> = submitBatch(submissions.toList()).map { UringCompletion(it.userData, it.res, 0) }.toSeries()
         }
         val facade = FunctionalUringFacade(8, backend)
         facade.enqueue(UringSubmission(UringOp.READ, fd = 3, addr = 0, len = 1024, offset = 0, userData = 1L))

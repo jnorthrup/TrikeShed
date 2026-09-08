@@ -42,6 +42,14 @@ class UringChannel(
     fun map(file: File, mode: String, position: Long, size: Long, userData: Long) =
         facade.map(file.impl, mode, position, size, userData)
 
+    val capabilities: Long get() = facade.capabilities
+    val nativeCapabilities: Long get() = facade.nativeCapabilities
+    val availability: String get() = facade.availability
+    fun enqueue(submission: borg.trikeshed.userspace.UringOp.Companion.UringSubmission) = facade.enqueue(submission)
+    suspend fun drain() = facade.drain()
+    suspend fun close() = facade.close()
+    fun closeNow() = facade.closeNow()
+
     fun submit(): Int = facade.submit()
 
     suspend fun submitAwait() = facade.submitAwait()

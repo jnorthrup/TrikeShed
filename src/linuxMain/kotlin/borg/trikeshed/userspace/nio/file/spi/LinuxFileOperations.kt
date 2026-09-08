@@ -3,6 +3,11 @@
 package borg.trikeshed.userspace.nio.file.spi
 
 import borg.trikeshed.PosixUringIO
+import borg.trikeshed.userspace.FunctionalUringFacade
+import borg.trikeshed.userspace.UringOp.Companion.Submissions
+import borg.trikeshed.userspace.UringOp.Companion.UringSubmission
+import borg.trikeshed.userspace.nio.ByteBuffer
+import borg.trikeshed.userspace.openUserspaceChannelBackend
 import borg.trikeshed.common.createTempDirectory
 import borg.trikeshed.lib.Join
 import borg.trikeshed.lib.Series
@@ -19,41 +24,47 @@ class LinuxFileOperations : FileOperations {
             if (it.isNotEmpty() && it.last().isEmpty()) it.dropLast(1) else it
         }
 
-    override fun readAllBytes(filename: String): ByteArray = memScoped {
-        val fd = open(filename, O_RDONLY)
-        if (fd < 0) throw IllegalArgumentException("open($filename) failed")
-        try {
-            val size = PosixUringIO.fileSize(fd)
-            if (size <= 0) return ByteArray(0)
-            val bytes = ByteArray(size.toInt())
-            var offset = 0
-            while (offset < bytes.size) {
-                val read = PosixUringIO.readAt(fd, bytes, offset, bytes.size - offset, offset.toLong())
-                if (read <= 0) break
-                offset += read
-            }
-            if (offset == bytes.size) bytes else bytes.copyOf(offset)
-        } finally {
-            PosixUringIO.closeFd(fd)
+    override fun readAllBytes(filename: String): ByteArray = withFile(filename, 0) { facade, fd ->
+        val size = PosixUringIO.fileSize(fd)
+        check(size in 0..Int.MAX_VALUE.toLong()) { "invalid file size: $size" }
+        val bytes = ByteArray(size.toInt())
+        val buffer = ByteBuffer(bytes)
+        while (buffer.hasRemaining()) {
+            val read = execute(facade, Submissions.read(fd, 0, buffer.remaining(), buffer.position().toLong(), 0)
+                .copy(buffer = buffer))
+            check(read >= 0) { "read failed on $filename: $read" }
+            if (read == 0) break
         }
+        if (buffer.position() == bytes.size) bytes else bytes.copyOf(buffer.position())
     }
 
     override fun readString(filename: String): String = readAllBytes(filename).decodeToString()
 
-    override fun write(filename: String, bytes: ByteArray) {
-        val fd = open(filename, O_WRONLY or O_CREAT or O_TRUNC, 438) // 0666
-        if (fd < 0) throw IllegalArgumentException("open($filename) failed")
-        try {
-            var offset = 0
-            while (offset < bytes.size) {
-                val written = PosixUringIO.writeAt(fd, bytes, offset, bytes.size - offset, offset.toLong())
-                if (written <= 0) break
-                offset += written
-            }
-            require(offset == bytes.size) { "short write on $filename: $offset/${bytes.size}" }
-        } finally {
-            PosixUringIO.closeFd(fd)
+    override fun write(filename: String, bytes: ByteArray) = withFile(filename, 1 or 64 or 512) { facade, fd ->
+        val buffer = ByteBuffer(bytes)
+        while (buffer.hasRemaining()) {
+            val written = execute(facade, Submissions.write(fd, 0, buffer.remaining(), buffer.position().toLong(), 0)
+                .copy(buffer = buffer))
+            check(written > 0) { "write failed on $filename: $written" }
         }
+    }
+
+    private fun execute(facade: FunctionalUringFacade, submission: UringSubmission): Int {
+        facade.enqueue(submission)
+        facade.submit()
+        val completion = facade.wait().single()
+        check(completion.userData == submission.userData)
+        return completion.res
+    }
+
+    private inline fun <T> withFile(path: String, flags: Int, block: (FunctionalUringFacade, Int) -> T): T {
+        val facade = FunctionalUringFacade(2, openUserspaceChannelBackend(2))
+        try {
+            val fd = execute(facade, Submissions.openat(path, flags))
+            check(fd >= 0) { "open failed on $path: $fd" }
+            return try { block(facade, fd) }
+            finally { execute(facade, Submissions.close(fd, 0)) }
+        } finally { facade.closeNow() }
     }
 
     override fun write(filename: String, lines: List<String>) { write(filename, lines.joinToString("\n")) }
