@@ -67,6 +67,8 @@ data class DocumentCurationResult(
     val recordCid: ContentId,
     val record: DocumentCurationRecord,
     val attributions: Series<DocumentAttribution>,
+    /** Includes late tap failures without requiring another business-ledger transaction. */
+    val observerFailures: Series<String> = record.observerFailures,
 ) {
     val submittedReceiptCids: Series<ContentId> get() = record.submittedReceiptCids
     val acceptedReceiptCids: Series<ContentId> get() = submittedReceiptCids

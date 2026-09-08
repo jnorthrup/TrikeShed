@@ -33,6 +33,8 @@ import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import java.util.UUID
 import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicInteger
+import java.util.concurrent.atomic.AtomicReference
 import kotlin.coroutines.CoroutineContext
 
 /** Host-library boundary. Document IO and curator workers are owned in commonMain. */
@@ -42,6 +44,7 @@ class DocumentFeed private constructor(
     private val nlp: CoreNlpRuntime,
     private val cas: CasStore,
     private val points: PointcutBlackboardAdapter,
+    private val tikaOptions: TikaRuntime.TikaOptions,
     val routeId: String,
     val job: kotlinx.coroutines.CompletableJob,
 ) : CoroutineContext.Element {
@@ -56,6 +59,7 @@ class DocumentFeed private constructor(
             model: suspend (Prompt) -> ModelResponse,
             modelId: String,
             routeId: String = "document-${UUID.randomUUID()}",
+            tikaOptions: TikaRuntime.TikaOptions = TikaRuntime.TikaOptions(),
         ): DocumentFeed {
             val job = SupervisorJob(scope.coroutineContext[Job])
             val owner = CoroutineScope(scope.coroutineContext + job)
@@ -67,7 +71,7 @@ class DocumentFeed private constructor(
                     observer = DocumentCuratorObserver { name, correlation, refs ->
                         land(points, name, correlation, mapOf("receipts" to List(refs.size) { refs[it].value }))
                     })
-                return DocumentFeed(input, curator, nlp, cas, points, routeId, job).also { it.start() }
+                return DocumentFeed(input, curator, nlp, cas, points, tikaOptions, routeId, job).also { it.start() }
             } catch (failure: Throwable) {
                 withContext(NonCancellable) {
                     try { curator?.drain() } finally {
@@ -92,7 +96,9 @@ class DocumentFeed private constructor(
             brain: BrainClient,
             muxContext: CoroutineContext,
             modelId: String,
-        ): DocumentFeed = create(scope, volume, cas, log, bag, points, documentModel(brain, muxContext), modelId)
+            tikaOptions: TikaRuntime.TikaOptions = TikaRuntime.TikaOptions(),
+        ): DocumentFeed = create(scope, volume, cas, log, bag, points, documentModel(brain, muxContext), modelId,
+            tikaOptions = tikaOptions)
 
         private fun land(
             points: PointcutBlackboardAdapter,
@@ -108,8 +114,22 @@ class DocumentFeed private constructor(
     override val key: CoroutineContext.Key<*> get() = Key
     private val gate = Mutex()
     private val closed = AtomicBoolean(false)
+    private val observationFailures = AtomicInteger()
+    private val observationFailure = AtomicReference<String?>()
+
+    val observationFailureCount: Int get() = observationFailures.get()
+    val lastObservationFailure: String? get() = observationFailure.get()
 
     data class Receipt(val cid: ContentId, val record: DocumentCurationRecord)
+
+    private fun observe(stage: String, correlation: String, fields: Map<String, Any?> = emptyMap()) {
+        try {
+            land(points, stage, correlation, fields)
+        } catch (failure: Exception) {
+            observationFailures.incrementAndGet()
+            observationFailure.set("$stage ($correlation): ${failure.message}")
+        }
+    }
 
     private fun start() {
         CamelRuntime.start(routeId, "direct:$routeId", "log:$routeId?showBody=false",
@@ -123,11 +143,11 @@ class DocumentFeed private constructor(
                     val mediaType = envelope["mediaType"] as? String
                     val correlation = "$routeId:${payload.seq}"
                     val bytes = cas.get(originalCid) ?: error("Missing original document $originalCid")
-                    land(points, "exchange", correlation, mapOf("originalCid" to originalCid.value,
+                    observe("exchange", correlation, mapOf("originalCid" to originalCid.value,
                         "exchangeId" to payload.exchangeId, "sequence" to payload.seq))
-                    val extracted = TikaRuntime.extract(bytes, name, mediaType)
+                    val extracted = TikaRuntime.extract(bytes, name, mediaType, options = tikaOptions)
                     val textCid = cas.put(extracted.text.encodeToByteArray())
-                    land(points, "extraction", correlation, mapOf("originalCid" to originalCid.value,
+                    observe("extraction", correlation, mapOf("originalCid" to originalCid.value,
                         "extractedTextCid" to textCid.value, "characters" to extracted.text.length))
                     val source = DocumentSource(originalCid, textCid, extracted.text, name,
                         extracted.metadata["Content-Type"]?.firstOrNull() ?: mediaType ?: "application/octet-stream",
@@ -138,10 +158,10 @@ class DocumentFeed private constructor(
                 }
             },
             observer = CamelRuntime.Observer { exchange ->
-                land(points, "tap", "$routeId:${exchange.seq}", mapOf(
+                observe("tap", "$routeId:${exchange.seq}", mapOf(
                     "preview" to exchange.body, "truncated" to exchange.truncated))
             })
-        land(points, "routeStart", routeId)
+        observe("routeStart", routeId)
     }
 
     /** Serialized CAS access and route requests; NLP/model work fans out inside the curator. */
@@ -165,7 +185,7 @@ class DocumentFeed private constructor(
         gate.withLock {
             try {
                 withContext(Dispatchers.IO) { CamelRuntime.stop(routeId) }
-                land(points, "routeStop", routeId)
+                observe("routeStop", routeId)
             } finally {
                 try { curator.drain() } finally {
                     try { input.drain() } finally {

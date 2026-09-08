@@ -252,6 +252,23 @@ paths:
           description: no_spine
         "503":
           description: store_not_mounted
+  /api/graal/classfile:
+    get:
+      operationId: graalClassfile
+      summary: selected class attachment projection via JDK Class-File API
+      parameters:
+        - { name: id, in: query, required: true, schema: { type: string } }
+      responses:
+        "200":
+          description: ok
+        "400":
+          description: class_id_required
+        "404":
+          description: class_blob_missing
+        "422":
+          description: classfile_parse_failed
+        "503":
+          description: cas_database_unavailable
   /hook/{program}/{node}/{port}:
     post:
       operationId: hookIntake

@@ -54,6 +54,7 @@ public class ClassfileTaxonomy {
 
     private final List<Row> rows;
     private final List<borg.trikeshed.classfile.model.PointcutCoordinate> pointcuts;
+    private final List<String> interfaceNames;
     private String sourceFile = "Unknown";
     private String className = "";
     private String superClass = "";
@@ -61,6 +62,7 @@ public class ClassfileTaxonomy {
     public ClassfileTaxonomy() {
         this.rows = new ArrayList<>();
         this.pointcuts = new ArrayList<>();
+        this.interfaceNames = new ArrayList<>();
     }
 
     public List<borg.trikeshed.classfile.model.PointcutCoordinate> pointcuts() {
@@ -70,6 +72,7 @@ public class ClassfileTaxonomy {
     public String sourceFile() { return sourceFile; }
     public String className() { return className; }
     public String superClass() { return superClass; }
+    public List<String> interfaces() { return List.copyOf(interfaceNames); }
 
     public void addClass(String thisClass, String superClass,
                          int majorVersion, int minorVersion,
@@ -77,6 +80,10 @@ public class ClassfileTaxonomy {
         rows.add(new Row(Kind.CLASS, new Object[] {
             thisClass, superClass, majorVersion, minorVersion, accessFlags, interfaceCount
         }));
+    }
+
+    public void addInterface(String internalName) {
+        interfaceNames.add(internalName);
     }
 
     public void addField(String name, String descriptor, int accessFlags) {
@@ -152,6 +159,83 @@ public class ClassfileTaxonomy {
         out.put("className", className.replace('/', '.'));
         out.put("superClass", superClass.replace('/', '.'));
         out.put("sourceFile", sourceFile);
+        List<String> interfaces = interfaceNames.stream().map(name -> name.replace('/', '.')).toList();
+        out.put("interfaces", interfaces);
+        int fieldCount = 0;
+        int methodCount = 0;
+        int instructionCount = 0;
+        int constantCount = 0;
+        int majorVersion = -1;
+        int minorVersion = -1;
+        String access = "";
+        for (Row row : rows) {
+            if (row.kind == Kind.CLASS) {
+                majorVersion = (Integer) row.get(2);
+                minorVersion = (Integer) row.get(3);
+                access = Modifier.toString((Integer) row.get(4));
+            } else if (row.kind == Kind.FIELD) {
+                fieldCount++;
+            } else if (row.kind == Kind.METHOD) {
+                methodCount++;
+            } else if (row.kind == Kind.INSTRUCTION) {
+                instructionCount++;
+            } else if (row.kind == Kind.CONSTANT) {
+                constantCount++;
+            }
+        }
+        boolean hasSourceLines = false;
+        for (Row instruction : instructions()) {
+            if (instruction.length() >= 7 && ((Integer) instruction.get(6)) >= 0) {
+                hasSourceLines = true;
+                break;
+            }
+        }
+        Map<String, Object> debug = new LinkedHashMap<>();
+        debug.put("sourceFile", sourceFile);
+        debug.put("hasSourceFile", !"Unknown".equals(sourceFile));
+        debug.put("hasSourceLines", hasSourceLines);
+        Map<String, Object> classFile = new LinkedHashMap<>();
+        classFile.put("majorVersion", majorVersion);
+        classFile.put("minorVersion", minorVersion);
+        classFile.put("access", access);
+        classFile.put("interfaceCount", interfaces.size());
+        classFile.put("fieldCount", fieldCount);
+        classFile.put("methodCount", methodCount);
+        classFile.put("instructionCount", instructionCount);
+        classFile.put("constantCount", constantCount);
+        classFile.put("debug", debug);
+        out.put("classFile", classFile);
+
+        Map<String, String> pointcutKinds = new HashMap<>();
+        List<Map<String, Object>> pointcutRows = new ArrayList<>();
+        for (borg.trikeshed.classfile.model.PointcutCoordinate pointcut : pointcuts) {
+            borg.trikeshed.classfile.model.SourceCoordinate source = pointcut.getSource();
+            borg.trikeshed.classfile.model.SymbolCoordinate symbol = pointcut.getSymbol();
+            String key = symbol.getMethodName() + "\u0000" + symbol.getMethodDescriptor() +
+                "\u0000" + pointcut.getBytecodeOffset();
+            pointcutKinds.put(key, pointcut.getKind().name());
+            Map<String, Object> row = new LinkedHashMap<>();
+            row.put("kind", pointcut.getKind().name());
+            row.put("jvmOpcode", pointcut.getJvmOpcode());
+            row.put("bytecodeOffset", pointcut.getBytecodeOffset());
+            Map<String, Object> sourceRow = new LinkedHashMap<>();
+            sourceRow.put("sourceFile", source.getSourceFile());
+            sourceRow.put("line", source.getLine());
+            sourceRow.put("column", source.getColumn());
+            sourceRow.put("language", source.getLanguage());
+            sourceRow.put("bytecodeOffset", source.getBytecodeOffset());
+            row.put("source", sourceRow);
+            Map<String, Object> symbolRow = new LinkedHashMap<>();
+            symbolRow.put("owner", symbol.getOwner().replace('/', '.'));
+            symbolRow.put("name", symbol.getName());
+            symbolRow.put("descriptor", symbol.getDescriptor());
+            symbolRow.put("methodName", symbol.getMethodName());
+            symbolRow.put("methodDescriptor", symbol.getMethodDescriptor());
+            row.put("symbol", symbolRow);
+            pointcutRows.add(row);
+        }
+        out.put("pointcuts", pointcutRows);
+
         List<Map<String, Object>> fieldRows = new ArrayList<>();
         for (Row row : rows) if (row.kind == Kind.FIELD) {
             Map<String, Object> field = new LinkedHashMap<>();
@@ -165,6 +249,9 @@ public class ClassfileTaxonomy {
         pseudo.append("class ").append(className.replace('/', '.'));
         if (!superClass.isEmpty() && !"java/lang/Object".equals(superClass)) {
             pseudo.append(" : ").append(superClass.replace('/', '.'));
+        }
+        if (!interfaces.isEmpty()) {
+            pseudo.append(" implements ").append(String.join(", ", interfaces));
         }
         pseudo.append(" {\n");
         for (Map<String, Object> field : fieldRows) {
@@ -182,6 +269,8 @@ public class ClassfileTaxonomy {
             method.put("maxLocals", methodRow.get(4));
             method.put("instructionCount", methodRow.get(5));
             List<Map<String, Object>> insns = new ArrayList<>();
+            int minLine = Integer.MAX_VALUE;
+            int maxLine = Integer.MIN_VALUE;
             pseudo.append("\n  ").append(method.get("access")).append(" fun ")
                 .append(methodName).append(descriptor).append(" {\n");
             int lastLine = Integer.MIN_VALUE;
@@ -197,8 +286,16 @@ public class ClassfileTaxonomy {
                 insn.put("name", instruction.get(4));
                 insn.put("descriptor", instruction.get(5));
                 insn.put("sourceLine", instruction.get(6));
+                String pointcutKey = methodName + "\u0000" + descriptor + "\u0000" + instruction.get(0);
+                if (pointcutKinds.containsKey(pointcutKey)) {
+                    insn.put("pointcutKind", pointcutKinds.get(pointcutKey));
+                }
                 insns.add(insn);
                 int line = (Integer) instruction.get(6);
+                if (line >= 0) {
+                    minLine = Math.min(minLine, line);
+                    maxLine = Math.max(maxLine, line);
+                }
                 if (line >= 0 && line != lastLine) {
                     pseudo.append("    // source line ").append(line).append("\n");
                     lastLine = line;
@@ -215,6 +312,13 @@ public class ClassfileTaxonomy {
             }
             pseudo.append("  }\n");
             method.put("instructions", insns);
+            Map<String, Object> sourceLines = new LinkedHashMap<>();
+            sourceLines.put("available", minLine != Integer.MAX_VALUE);
+            if (minLine != Integer.MAX_VALUE) {
+                sourceLines.put("min", minLine);
+                sourceLines.put("max", maxLine);
+            }
+            method.put("sourceLines", sourceLines);
             methodRows.add(method);
         }
         pseudo.append("}\n");
@@ -268,6 +372,9 @@ public class ClassfileTaxonomy {
             classModel.flags().flagsMask(),
             classModel.interfaces().size()
         );
+        for (ClassEntry iface : classModel.interfaces()) {
+            ct.addInterface(iface.asInternalName());
+        }
 
         // fields
         for (FieldModel fm : classModel.fields()) {

@@ -32,9 +32,11 @@ import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
 
 class DocumentCuratorTest {
-    @Test fun attributionAndDedupUseRealIntake() = runBlocking {
+    @Test fun attributionAndDedupUseRealIntake(): Unit = runBlocking {
         withTimeout(10000) {
             val f = fixture(this)
             var confidence = 0.1
@@ -69,7 +71,7 @@ class DocumentCuratorTest {
         }
     }
 
-    @Test fun malformedUnsupportedAndHallucinatedStayPending() = runBlocking {
+    @Test fun malformedUnsupportedAndHallucinatedStayPending(): Unit = runBlocking {
         withTimeout(10000) {
             val f = fixture(this)
             val replies = mutableListOf(
@@ -96,7 +98,7 @@ class DocumentCuratorTest {
         }
     }
 
-    @Test fun conflictsKeepBothProposalsWithoutMinting() = runBlocking {
+    @Test fun conflictsKeepBothProposalsWithoutMinting(): Unit = runBlocking {
         withTimeout(10000) {
             val f = fixture(this)
             val curator = f.curator(this, model = { response(envelope(proposal(), proposal(polarity = false))) })
@@ -112,7 +114,7 @@ class DocumentCuratorTest {
         }
     }
 
-    @Test fun dependencyDisagreementIsNotGrounding() = runBlocking {
+    @Test fun dependencyDisagreementIsNotGrounding(): Unit = runBlocking {
         withTimeout(10000) {
             val f = fixture(this)
             val reader = NlpReader { text ->
@@ -130,7 +132,7 @@ class DocumentCuratorTest {
         }
     }
 
-    @Test fun branchFailuresRetainPeerAndAllowRetry() = runBlocking {
+    @Test fun branchFailuresRetainPeerAndAllowRetry(): Unit = runBlocking {
         withTimeout(10000) {
             val f = fixture(this)
             var failNlp = false
@@ -154,7 +156,7 @@ class DocumentCuratorTest {
         }
     }
 
-    @Test fun metadataUnicodeAndAnsweringIdentitySurviveReplay() = runBlocking {
+    @Test fun metadataUnicodeAndAnsweringIdentitySurviveReplay(): Unit = runBlocking {
         withTimeout(10000) {
             val text = "\uD83D\uDE00\nRain causes floods."
             val f = fixture(this, text)
@@ -178,7 +180,7 @@ class DocumentCuratorTest {
         }
     }
 
-    @Test fun observerFailuresAreNotBusinessFailures() = runBlocking {
+    @Test fun observerFailuresAreNotBusinessFailures(): Unit = runBlocking {
         withTimeout(10000) {
             val f = fixture(this)
             val curator = f.curator(this, observer = DocumentCuratorObserver { _, _, _ -> error("tap unavailable") })
@@ -188,12 +190,46 @@ class DocumentCuratorTest {
                 assertEquals(0, result.pendingReceiptCids.size)
                 assertEquals(0, result.unresolvedReasons.size)
                 assertEquals(6, result.record.observerFailures.size)
-                assertEquals(0, curator.curate(f.source).acceptedReceiptCids.size)
+                val duplicate = curator.curate(f.source)
+                assertEquals(0, duplicate.acceptedReceiptCids.size)
+                assertEquals(5, duplicate.observerFailures.size)
             } finally { curator.close(); f.bag.drain() }
         }
     }
 
-    @Test fun fanoutUsesOwnerContextAndDrainJoinsAcceptedQueueWork() = runBlocking {
+    @Test fun pendingRecordObserverFailureSurvivesCasAndReplay(): Unit = runBlocking {
+        withTimeout(10000) {
+            val f = fixture(this)
+            var recordTaps = 0
+            val curator = f.curator(this, model = { response(envelope(proposal(modality = "possible"))) },
+                observer = DocumentCuratorObserver { name, _, _ ->
+                    if (name == "curator.record") { recordTaps++; error("record tap unavailable") }
+                })
+            try {
+                val result = try { curator.curate(f.source) } finally { curator.drain() }
+                assertEquals(0, result.acceptedReceiptCids.size)
+                assertEquals(0, result.record.reservedReceiptCids.size)
+                assertTrue(result.pendingReceiptCids.size > 0)
+                assertEquals(1, recordTaps)
+                val expected = listOf("observer curator.record: record tap unavailable")
+                assertEquals(expected, result.observerFailures.values())
+                val stored = DocumentCuratorCodec.decode(assertNotNull(f.cas.get(result.recordCid)))
+                assertEquals(expected, stored.observerFailures.values())
+                assertEquals(expected, result.record.observerFailures.values())
+                assertEquals(0, stored.reasons.size)
+                val restored = f.curator(this)
+                try {
+                    val replayed = restored.records().values().last()
+                    assertEquals(expected, replayed.observerFailures.values())
+                    assertEquals(0, replayed.submittedReceiptCids.size)
+                    assertTrue(replayed.proposals[0].reasons.size > 0)
+                } finally { restored.drain() }
+                assertEquals(0, f.bag.size)
+            } finally { curator.close(); f.bag.drain() }
+        }
+    }
+
+    @Test fun fanoutUsesOwnerContextAndDrainJoinsAcceptedQueueWork(): Unit = runBlocking {
         withTimeout(10000) {
             val f = fixture(this)
             val nlpStarted = CompletableDeferred<Unit>()
@@ -226,7 +262,7 @@ class DocumentCuratorTest {
         }
     }
 
-    @Test fun uncertainSubmissionReplayDoesNotInflateEvidence() = runBlocking {
+    @Test fun uncertainSubmissionReplayDoesNotInflateEvidence(): Unit = runBlocking {
         withTimeout(10000) {
             val f = fixture(this)
             f.log.failFlushAt = 2
@@ -248,7 +284,7 @@ class DocumentCuratorTest {
         }
     }
 
-    @Test fun badSourceCannotMintAndDoesNotStopLaterWork() = runBlocking {
+    @Test fun badSourceCannotMintAndDoesNotStopLaterWork(): Unit = runBlocking {
         withTimeout(10000) {
             val f = fixture(this)
             val curator = f.curator(this)
@@ -258,6 +294,68 @@ class DocumentCuratorTest {
                 assertTrue(invalid.pendingReceiptCids.size > 0)
                 assertEquals(1, curator.curate(f.source).acceptedReceiptCids.size)
             } finally { curator.close(); f.bag.drain() }
+        }
+    }
+
+    @Test fun casReadbackFailureDoesNotAppendOrMint(): Unit = runBlocking {
+        withTimeout(10000) {
+            val cas = object : CasStore() {
+                var reject = false
+                override fun put(bytes: ByteArray): ContentId {
+                    val cid = super.put(bytes)
+                    return if (reject) ContentId.of("wrong-cas-key".encodeToByteArray()) else cid
+                }
+            }
+            val f = fixture(this, cas = cas)
+            val curator = f.curator(this)
+            try {
+                cas.reject = true
+                assertFailsWith<IllegalStateException> { curator.curate(f.source) }
+                assertEquals(0, curator.records().size)
+                assertEquals(0, f.bag.size)
+                cas.reject = false
+                assertEquals(1, curator.curate(f.source).acceptedReceiptCids.size)
+            } finally { curator.close(); f.bag.drain() }
+        }
+    }
+
+    @Test fun strictJsonPreservesValidEscapesAndRejectsTrailingInput(): Unit = runBlocking {
+        withTimeout(10000) {
+            val f = fixture(this)
+            var raw = envelope(proposal()).replace("\"subject\":\"Rain\"", "\"subject\":\"\\u0052ain\"").replace("0.9", "9e-1")
+            val curator = f.curator(this, model = { response(raw) })
+            try {
+                val valid = curator.curate(f.source)
+                assertEquals(1, valid.acceptedReceiptCids.size)
+                assertEquals("Rain", valid.record.proposals[0].subject)
+                assertEquals(raw, valid.record.model!!.content)
+                raw += " trailing"
+                val malformed = curator.curate(f.source)
+                assertEquals(0, malformed.acceptedReceiptCids.size)
+                assertTrue(malformed.pendingReceiptCids.size > 0)
+                assertEquals(raw, malformed.record.model!!.content)
+            } finally { curator.close(); f.bag.drain() }
+        }
+    }
+
+    @Test fun blockingNlpDoesNotSerializeModelBranch(): Unit = runBlocking {
+        withTimeout(10000) {
+            val f = fixture(this)
+            val nlpStarted = CountDownLatch(1)
+            val modelStarted = CountDownLatch(1)
+            val curator = f.curator(this, nlp = NlpReader { text ->
+                assertNotNull(currentCoroutineContext()[DocumentCuratorElement])
+                nlpStarted.countDown()
+                check(modelStarted.await(2, TimeUnit.SECONDS)) { "blocking NLP prevented model start" }
+                svo(text)
+            }, model = {
+                check(nlpStarted.await(2, TimeUnit.SECONDS)) { "NLP worker never started" }
+                modelStarted.countDown()
+                response(envelope(proposal()))
+            })
+            try {
+                assertEquals(1, curator.curate(f.source).acceptedReceiptCids.size)
+            } finally { modelStarted.countDown(); curator.close(); f.bag.drain() }
         }
     }
 
@@ -289,8 +387,7 @@ class DocumentCuratorTest {
             DocumentCuratorElement.create(scope, nlp, model, "requested-model", cas, log, bag, observer, capacity)
     }
 
-    private suspend fun fixture(scope: CoroutineScope, text: String = "Rain causes floods."): Fixture {
-        val cas = CasStore.inMemory()
+    private suspend fun fixture(scope: CoroutineScope, text: String = "Rain causes floods.", cas: CasStore = CasStore.inMemory()): Fixture {
         val source = DocumentSource(cas.put("original document bytes".encodeToByteArray()),
             cas.put(text.encodeToByteArray()), text, "source.txt", "text/plain", "route-1",
             mapOf("authors" to listOf("one", "two"), "title" to listOf("\uD83D\uDE00 title")))
@@ -332,9 +429,13 @@ object DocumentCuratorTestMain {
             "branch failure/retry" to test::branchFailuresRetainPeerAndAllowRetry,
             "replay/provenance" to test::metadataUnicodeAndAnsweringIdentitySurviveReplay,
             "observer isolation" to test::observerFailuresAreNotBusinessFailures,
+            "pending observer persistence" to test::pendingRecordObserverFailureSurvivesCasAndReplay,
             "fanout/drain" to test::fanoutUsesOwnerContextAndDrainJoinsAcceptedQueueWork,
             "uncertain submission" to test::uncertainSubmissionReplayDoesNotInflateEvidence,
             "source validation" to test::badSourceCannotMintAndDoesNotStopLaterWork,
+            "CAS readback" to test::casReadbackFailureDoesNotAppendOrMint,
+            "strict JSON" to test::strictJsonPreservesValidEscapesAndRejectsTrailingInput,
+            "blocking NLP concurrency" to test::blockingNlpDoesNotSerializeModelBranch,
         )
         for ((name, check) in checks) { check(); println("PASS $name") }
         println("PASS ${checks.size} DocumentCurator checks")

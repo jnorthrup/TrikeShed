@@ -12,7 +12,20 @@ import borg.trikeshed.userspace.reactor.Interest
 import java.nio.channels.FileChannel
 import java.nio.channels.Selector
 import java.util.concurrent.ConcurrentHashMap
-import java.util.concurrent.atomic.AtomicInteger
+
+private object JvmFileTable {
+    private val files = ConcurrentHashMap<Int, FileChannel>()
+
+    fun register(fd: Int, channel: FileChannel) {
+        files[fd] = channel
+    }
+
+    fun channel(fd: Int): FileChannel? = files[fd]?.takeIf { it.isOpen }
+
+    fun unregister(fd: Int, channel: FileChannel? = null) {
+        if (channel == null) files.remove(fd) else files.remove(fd, channel)
+    }
+}
 
 /**
  * JVM backend for [FunctionalUringFacade] using Java NIO.
@@ -27,8 +40,6 @@ private class JvmUserspaceChannelBackend(
 
     // fd -> ChannelWrapper
     private val channels = ConcurrentHashMap<Int, ChannelWrapper>()
-    private val fdCounter = AtomicInteger(3000)
-
 
     override fun submitBatch(submissions: List<UringSubmission>): List<SelectionResult> {
         if (submissions.isEmpty()) return emptyList()
@@ -40,16 +51,8 @@ private class JvmUserspaceChannelBackend(
             if (wrapper == null) {
                 // Auto-register if not present (for files opened via FilesImpl)
                 if (sub.opcode in setOf(UringOp.READ, UringOp.WRITE, UringOp.FSYNC, UringOp.FTRUNCATE, UringOp.CLOSE)) {
-                    // File operation - create wrapper lazily
-                    val fc = java.nio.channels.FileChannel.open(
-                        java.nio.file.Paths.get(""),
-                        java.util.EnumSet.noneOf(java.nio.file.StandardOpenOption::class.java)
-                    )
-                    val newWrapper = registerChannel(fc, sub.fd)
-                    if (newWrapper != null) {
-                        wrapper = newWrapper
-                        channels[sub.fd] = wrapper
-                    }
+                    val fc = JvmFileTable.channel(sub.fd)
+                    wrapper = if (fc == null) null else registerChannel(fc, sub.fd)
                 } else {
                     results.add(SelectionResult(-1, sub.userData))
                     continue
@@ -62,7 +65,12 @@ private class JvmUserspaceChannelBackend(
                     UringOp.WRITE, UringOp.WRITEV -> wrapper.executeWrite(sub)
                     UringOp.FSYNC -> wrapper.executeSync()
                     UringOp.FTRUNCATE -> wrapper.executeTruncate(sub.offset)
-                    UringOp.CLOSE -> wrapper.executeClose()
+                    UringOp.CLOSE -> {
+                        val closed = wrapper.executeClose()
+                        channels.remove(sub.fd)
+                        JvmFileTable.unregister(sub.fd)
+                        closed
+                    }
                     else -> {
                         results.add(SelectionResult(-1, sub.userData))
                         continue
@@ -79,13 +87,13 @@ private class JvmUserspaceChannelBackend(
     @Suppress("UNUSED_PARAMETER")
     private fun registerChannel(ch: java.nio.channels.Channel, desiredFd: Int): ChannelWrapper? =
         when (ch) {
-            is FileChannel -> FileWrapper(fc = ch, id = fdCounter.incrementAndGet()).also { channels[desiredFd] = it }
-            is java.nio.channels.SocketChannel -> SocketWrapper(sc = ch, id = fdCounter.incrementAndGet()).also {
+            is FileChannel -> FileWrapper(fc = ch, id = desiredFd).also { channels[desiredFd] = it }
+            is java.nio.channels.SocketChannel -> SocketWrapper(sc = ch, id = desiredFd).also {
                 channels[desiredFd] = it
                 // Register with reactor
                 reactor.bindChannel(ch, setOf(Interest.READ, Interest.WRITE))
             }
-            is java.nio.channels.ServerSocketChannel -> ServerWrapper(ssc = ch, id = fdCounter.incrementAndGet()).also {
+            is java.nio.channels.ServerSocketChannel -> ServerWrapper(ssc = ch, id = desiredFd).also {
                 channels[desiredFd] = it
                 reactor.bindChannel(ch, setOf(Interest.ACCEPT))
             }
@@ -244,10 +252,12 @@ private fun ByteBuffer.toNioByteBuffer(): java.nio.ByteBuffer {
 actual class FileImpl actual constructor(actual val id: Int) {
     @PublishedApi internal var path: String = ""
     @PublishedApi internal var jvmChannel: java.nio.channels.FileChannel? = null
-    actual fun isOpen(): Boolean = id >= 0
+    actual fun isOpen(): Boolean = jvmChannel?.isOpen ?: false
     actual fun close() {
-        jvmChannel?.close()
+        val channel = jvmChannel
         jvmChannel = null
+        JvmFileTable.unregister(id, channel)
+        channel?.close()
     }
     actual fun size(): Long {
         jvmChannel?.let { return it.size() }
@@ -269,6 +279,7 @@ internal actual object FilesImpl {
                 if (readOnly) java.util.EnumSet.of(java.nio.file.StandardOpenOption.READ)
                 else java.util.EnumSet.of(java.nio.file.StandardOpenOption.READ, java.nio.file.StandardOpenOption.WRITE)
             )
+            fi.jvmChannel?.let { JvmFileTable.register(fi.id, it) }
         }
 }
 

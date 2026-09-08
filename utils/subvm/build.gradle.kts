@@ -53,6 +53,8 @@ val guestModules: Map<String, List<String>> = mapOf(
     // Text/metadata extraction. Listed so the door is open; note that unlike the other
     // two, Tika still has a real host-side consumer (JvmTikaIngestAdapter.kt), so it
     // cannot leave TrikeShed's classpath until that adapter moves guest-side too.
+    // This is the managed aggregate recipe, not the old tika4all embedded Maven launcher:
+    // the resolved tika-parser-*-module jars are transitive output recorded in MANIFEST.tsv.
     "tika" to listOf(
         "org.apache.tika:tika-core:3.2.3",
         "org.apache.tika:tika-parsers-standard-package:3.2.3",

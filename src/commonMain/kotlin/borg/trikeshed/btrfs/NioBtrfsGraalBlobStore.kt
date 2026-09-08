@@ -7,7 +7,7 @@ import borg.trikeshed.userspace.nio.file.spi.FileOperations
  *
  * One mount = local-exclusive GraalVM-access filesystem blobs:
  *  - growable, linkable (per span mount), raidable (per c userspace btrfs RAID)
- *  - on-disk layout stays mountable by `btrfs check` (superblock + chunk tree + dev item)
+ *  - on-disk layout must pass `btrfs check` before any mountable claim
  *
  * Every platform-specific seam is a TODO chokepoint so the whole object lives in commonMain.
  * Targets fill their actuals; jvmMainClasses stays green via TODO stubs.
@@ -55,19 +55,9 @@ object NioBtrfsGraalBlobStore {
         // c parity type bits (btrfs_block_group_flags): SINGLE=0x0 DUP=0x01 RAID0=0x8
         // RAID1=0x10 RAID10=0x20 RAID5=0x40 RAID6=0x80 — BtrfsChunkTree.parse verifies.
         require(stripes.isNotEmpty()) { "chunk needs at least one stripe" }
-        val known = raidType == CHUNK_SINGLE || raidType == CHUNK_DUP || raidType == CHUNK_RAID0 ||
-            raidType == CHUNK_RAID1 || raidType == CHUNK_RAID10 || raidType == CHUNK_RAID5 || raidType == CHUNK_RAID6
-        require(known) { "unknown raid type bits 0x${raidType.toString(16)}" }
-        when (raidType) {
-            CHUNK_DUP -> require(stripes.size == 2 && stripes[0].devid == stripes[1].devid) {
-                "DUP needs two stripes on one device"
-            }
-            CHUNK_RAID1 -> require(stripes.size >= 2) { "RAID1 needs >= 2 mirrors" }
-            CHUNK_RAID10 -> require(stripes.size >= 4 && stripes.size % 2 == 0) { "RAID10 needs >= 4 stripes in pairs" }
-            CHUNK_RAID5 -> require(stripes.size >= 2) { "RAID5 needs >= 2 stripes" }
-            CHUNK_RAID6 -> require(stripes.size >= 3) { "RAID6 needs >= 3 stripes" }
-        }
-        val subStripes: UShort = if (raidType == CHUNK_RAID10) 2u else 0u
+        val profile = BtrfsBlockGroupProfile.fromBits(raidType)
+        profile.validate(stripes)
+        val subStripes: UShort = if (profile == BtrfsBlockGroupProfile.RAID10) 2u else 0u
         return BtrfsChunkItem(
             stripeLength = length,
             type = raidType,
@@ -79,18 +69,23 @@ object NioBtrfsGraalBlobStore {
 
     fun stripeForRaid(raidType: UByte, devids: List<ULong>): List<BtrfsStripe> {
         require(devids.isNotEmpty()) { "need at least one devid" }
-        return when (raidType) {
-            // mirror layouts: one stripe per device at the same offset (DUP mirrors on ONE device)
-            CHUNK_DUP -> listOf(BtrfsStripe(devids[0], 0uL), BtrfsStripe(devids[0], 0uL))
-            CHUNK_RAID1, CHUNK_RAID10 -> devids.map { BtrfsStripe(it, 0uL) }
-            // stripe layouts: one stripe per device, data striped across them
-            CHUNK_SINGLE -> listOf(BtrfsStripe(devids[0], 0uL))
-            CHUNK_RAID0, CHUNK_RAID5, CHUNK_RAID6 -> devids.map { BtrfsStripe(it, 0uL) }
-            else -> throw IllegalArgumentException("unknown raid type bits 0x${raidType.toString(16)}")
+        val profile = BtrfsBlockGroupProfile.fromBits(raidType)
+        require(devids.size >= if (profile == BtrfsBlockGroupProfile.DUP) 1 else profile.minStripes) {
+            "${profile.name} needs enough devices for ${profile.minStripes} stripes"
         }
+        val stripes = when (profile) {
+            // mirror layouts: one stripe per device at the same offset (DUP mirrors on ONE device)
+            BtrfsBlockGroupProfile.DUP -> listOf(BtrfsStripe(devids[0], 0uL), BtrfsStripe(devids[0], 0uL))
+            BtrfsBlockGroupProfile.RAID1, BtrfsBlockGroupProfile.RAID10 -> devids.map { BtrfsStripe(it, 0uL) }
+            // stripe layouts: one stripe per device, data striped across them
+            BtrfsBlockGroupProfile.SINGLE -> listOf(BtrfsStripe(devids[0], 0uL))
+            BtrfsBlockGroupProfile.RAID0, BtrfsBlockGroupProfile.RAID5, BtrfsBlockGroupProfile.RAID6 -> devids.map { BtrfsStripe(it, 0uL) }
+        }
+        profile.validate(stripes)
+        return stripes
     }
 
-    /** On-disk mountable layout: superblock + chunk tree + dev item inside btrfs.img. */
+    /** On-disk seed layout. It is not mountable until the offline btrfs-progs oracle passes. */
     fun writeMountableImage(imagePath: String, totalBytes: ULong, fileOps: FileOperations): Boolean {
         require(totalBytes >= (SUPER_OFFSET_PRIMARY + SUPER_SIZE).toULong()) {
             "image must at least hold the 64K superblock: totalBytes=$totalBytes"
@@ -127,7 +122,7 @@ object NioBtrfsGraalBlobStore {
     }
 
     fun verifyWithCBtrfs(imagePath: String): Boolean =
-        TODO("posixMain: ProcessOperations.exec(\"btrfs\", \"check\", imagePath) == 0; jvmMain: BtrfsSuperblock.parse(readAt(SUPER_OFFSET_PRIMARY)).magic == BTRFS_MAGIC; test harness tags as mountable")
+        TODO("posixMain: pinned btrfs-progs ProcessOperations.exec(\"btrfs\", \"check\", imagePath) == 0; jvmMain: local superblock parse is not a mountability oracle")
 
     /** Span mount: multiple devices in one volume (device tree). */
     fun spanMount(devices: List<String>, fileOps: FileOperations): BtrfsDeviceTree =
@@ -146,7 +141,7 @@ object NioBtrfsGraalBlobStore {
      *       │                         ▲ reflink (span mount)  ▲ raid (chunk tree)
      *       │                         │ BtrfsReflinkStore       │ BtrfsChunkItem
      *       ▼                         │                         │
-     *  btrfs.img (superblock+chunk tree, mountable) ◄──── writeMountableImage
+     *  btrfs.img (superblock seed; btrfs-progs gated) ◄──── writeMountableImage
      *       │
      *       └─► acquireExclusive ──► TrikeShedGraalVfs / GraalBtrfsSupervisor  // local-exclusive
      *                              blobs are growable (CoW) + linkable + raidable
@@ -160,6 +155,6 @@ object NioBtrfsGraalBlobStore {
         appendLine(" - BtrfsReflinkStore reflink (span mount linkable)")
         appendLine(" - BtrfsChunkTree/BtrfsStripe RAID (c userspace btrfs type bits)")
         appendLine(" - TrikeShedGraalVfs local-exclusive (file lock)")
-        appendLine(" - on-disk mountable: superblock BTRFS_MAGIC=0x4D5F53665248425F at 64K, chunk+dev trees")
+        appendLine(" - on-disk seed: superblock BTRFS_MAGIC=0x4D5F53665248425F at 64K; btrfs-progs oracle still required")
     }
 }

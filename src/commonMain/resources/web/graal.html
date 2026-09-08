@@ -66,6 +66,30 @@ canvas.spark{display:block;margin-top:3px}
 .mdview a{color:var(--commit)}
 .imgview{max-width:100%;max-height:48vh;background:repeating-conic-gradient(var(--panel2) 0 25%,transparent 0 50%) 0 0/16px 16px;border-radius:4px}
 .classcard td{font-variant-numeric:tabular-nums}
+.classdetail{margin-top:8px;border-top:1px solid var(--line);padding-top:8px;color:var(--ink);max-width:100%;overflow-x:hidden}
+.classhead{display:flex;flex-direction:column;gap:6px;margin-bottom:8px}
+.classname{font-size:12px;color:var(--commit);word-break:break-all}
+.classrow{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+.classpill{display:inline-block;border:1px solid var(--line);border-radius:3px;background:var(--panel2);padding:1px 5px;font-size:10px;color:var(--dim);max-width:100%;word-break:break-all}
+.classpill.ok{color:var(--compile);border-color:var(--compile)}
+.classpill.warn{color:var(--gc);border-color:var(--gc)}
+.classdetail .hashchip,.classpill,.classmono{max-width:100%;overflow-wrap:anywhere;white-space:normal}
+.classrow>*{min-width:0}
+.classsplit{display:grid;grid-template-columns:minmax(150px,210px) 1fr;gap:8px;margin-top:8px}
+.classsplit>*{min-width:0}
+.classlist{border:1px solid var(--line);border-radius:4px;overflow:hidden}
+.classitem{display:block;width:100%;text-align:left;background:transparent;border:0;border-bottom:1px solid var(--line);color:var(--ink);font:inherit;font-size:10px;padding:5px 7px;cursor:pointer;word-break:break-all;white-space:normal}
+.classitem:last-child{border-bottom:0}
+.classitem:hover,.classitem.active{background:var(--panel2);color:var(--commit)}
+.classdetailbox{border:1px solid var(--line);border-radius:4px;background:var(--panel2);padding:7px;min-width:0;max-width:100%;overflow:hidden}
+.classinsns{max-height:260px;overflow:auto;border:1px solid var(--line);border-radius:3px;background:var(--panel)}
+.classinsns table{font-size:10px}
+.classinsns tr{cursor:pointer}
+.classinsns tr:hover td,.classinsns tr.active td{background:var(--panel2);color:var(--commit)}
+.classnote{color:var(--dim);font-size:10px;margin:4px 0 6px}
+.classmono{word-break:break-all}
+.classdetail table{table-layout:fixed}
+.classdetail td,.classdetail th{overflow-wrap:anywhere;word-break:break-word}
 #notion{position:absolute;left:10px;right:320px;top:78px;bottom:36px;background:var(--panel);border:1px solid var(--line);border-radius:6px;z-index:4;display:none;flex-direction:column}
 #notion .nhead{display:flex;gap:10px;align-items:center;padding:8px 12px;border-bottom:1px solid var(--line)}
 #notion input{background:var(--panel2);border:1px solid var(--line);border-radius:4px;color:var(--ink);padding:4px 10px;font:inherit;width:260px}
@@ -136,6 +160,7 @@ th{color:var(--dim);font-weight:normal;font-size:10px;text-transform:uppercase}
 #help{position:absolute;right:10px;bottom:8px;color:var(--dim);font-size:10px;z-index:5}
 #help b{color:var(--ink)}
 @media (prefers-reduced-motion: reduce){.evt{animation:none}}
+@media (max-width:760px){#doc{width:calc(100vw - 20px)}.classhead .classrow{flex-direction:column;align-items:flex-start;gap:4px}.classhead .classrow>*{margin:0}.classsplit{grid-template-columns:1fr}.classinsns{max-height:220px}.classdetail table,.classdetail tbody{display:block}.classdetail tr{display:grid;grid-template-columns:minmax(70px,32%) minmax(0,1fr);width:100%}.classdetail td,.classdetail th{display:block;min-width:0;border-bottom:0}.classinsns tr{grid-template-columns:38px 82px 46px minmax(0,1fr)}}
 /* ── skins: ops (default) · chalk = AI blackboard · marker = developer whiteboard ── */
 html[data-skin="chalk"] body{--bg:#1b2420;--panel:#212b26;--panel2:#26312c;--line:#39463f;--ink:#e9efe8;--dim:#93a398;
   --graal:#ffc46b;--compile:#8fe6b0;--deopt:#ff8a8f;--gc:#ffd27a;--commit:#8fd8ff;--cpu:#9db8e8}
@@ -864,6 +889,7 @@ let sel=null,selEdges=[];
 function chip(hex,label){const t=(hex||'').toString();const short=t.replace('sha256:','').slice(0,8);
   return '<span class="hashchip" title="'+t+'" onclick="navigator.clipboard&&navigator.clipboard.writeText(this.title)">'+(label?label+' ':'')+short+'…</span>';}
 function esc(x){return (x??'').toString().replace(/&/g,'&amp;').replace(/</g,'&lt;');}
+function attrEsc(x){return esc(x).replace(/"/g,'&quot;').replace(/'/g,'&#39;');}
 const KW=/\b(fun|val|var|class|object|interface|override|suspend|return|if|else|when|for|while|import|package|private|public|internal|data|companion|def|lambda|function|const|let|new|static|void|int|long|boolean|public|final|try|catch|finally|throw|async|await)\b/g;
 function codeView(text,maxLines){
   const lines=text.split('\n').slice(0,maxLines||1200);
@@ -1056,13 +1082,130 @@ async function projectBytes(id,ct,ext){
     else if(ct.startsWith('image/')){const b=new Blob([buf],{type:ct});proj.innerHTML='<img class="imgview" src="'+URL.createObjectURL(b)+'">';}
     else if(ext==='md'||ct.includes('markdown')){const t=asText();proj.innerHTML=shapeStripHtml(t)+mdView(t);}
     else if(ct.includes('html')||ext==='html'){proj.innerHTML='<iframe sandbox srcdoc="'+asText().replace(/&/g,'&amp;').replace(/"/g,'&quot;')+'" style="width:100%;height:44vh;border:1px solid var(--line);border-radius:4px;background:#fff"></iframe>';}
-    else if(ext==='class'||ct.includes('java-vm')){proj.innerHTML=classCard(buf)||hexHead(buf,128);}
+    else if(ext==='class'||ct.includes('java-vm')){proj.innerHTML=classCard(buf)||hexHead(buf,128);await classfileProjection(id,proj);}
     else if(ct.startsWith('text/')||/^(kt|kts|java|py|js|ts|json|yaml|yml|css|sh|gradle|xml|txt|toml|properties|sql|rs|c|h|cpp|go)$/.test(ext)){
       const t=ext==='json'?JSON.stringify(JSON.parse(asText()),null,2):asText();
       proj.innerHTML=shapeStripHtml(t)+codeView(t);
       if(/^(kt|kts|java)$/.test(ext))await sourceMates(id,proj);}
     else proj.innerHTML=hexHead(buf,128);
   }catch(e){proj.textContent='projection failed: '+e;}
+}
+async function classfileProjection(id,proj){
+  const mount=document.createElement('div');
+  mount.className='classdetail';
+  mount.innerHTML='<div class="classnote">JDK ClassFile API projection…</div>';
+  proj.appendChild(mount);
+  try{
+    const r=await fetch('/api/graal/classfile?id='+encodeURIComponent(id));
+    const x=await r.json();
+    if(!r.ok||x.error){
+      mount.innerHTML='<div class="classnote" style="color:var(--deopt)">classfile projection: '+esc(x.error||r.status)+'</div>';
+      return;
+    }
+    renderClassfileProjection(x,mount);
+  }catch(e){
+    mount.innerHTML='<div class="classnote" style="color:var(--deopt)">classfile projection failed: '+esc(e)+'</div>';
+  }
+}
+function lineText(line){return Number.isFinite(Number(line))&&Number(line)>=0?String(line):'unavailable';}
+function methodLabel(m){return (m&&m.name?m.name:'?')+(m&&m.descriptor?m.descriptor:'');}
+function methodLineText(m){
+  const s=m.sourceLines||{};
+  return s.available?'lines '+s.min+(s.max===s.min?'':'-'+s.max):'source lines unavailable';
+}
+function counterText(obs,scope){
+  if(!obs||obs.available===false)return 'runtime observations unavailable: '+esc((obs&&obs.reason)||'JvmVitals not attached');
+  if(scope==='class'){
+    const c=obs.classRecentCompiles||[];
+    if(c.length)return c.length+' recent class-level JFR compile event'+(c.length===1?'':'s')+' observed; method and instruction counters remain unavailable at selected-class identity.';
+    return 'no recent class-level JFR compile event observed; this is unobserved, not a zero lifetime count.';
+  }
+  const key=scope==='instruction'?'instructionCounters':'methodCounters';
+  const u=obs[key]||{};
+  return 'runtime '+scope+' counters unavailable: '+esc(u.reason||'no descriptor/loader/BCI keyed counter is exposed here');
+}
+function pointcutMatch(p,m,insn){
+  const s=p.symbol||{};
+  if(!m||s.methodName!==m.name||s.methodDescriptor!==m.descriptor)return false;
+  return !insn||Number(p.bytecodeOffset)===Number(insn.offset);
+}
+function renderClassfileProjection(x,mount){
+  const cf=x.classFile||{},debug=cf.debug||{},obs=x.runtimeObservation||{};
+  const methods=x.methods||[],fields=x.fields||[],interfaces=x.interfaces||[],pointcuts=x.pointcuts||[];
+  const status=x.exactRuntimeBlob?'runtime bytes match selected blob':x.onClasspath?'same class resource is on classpath, bytes differ':'not on runtime classpath';
+  const statusClass=x.exactRuntimeBlob?'ok':(x.onClasspath?'warn':'');
+  const byKind={};for(const p of pointcuts)byKind[p.kind]=(byKind[p.kind]||0)+1;
+  const kindRows=Object.entries(byKind).sort((a,b)=>a[0]<b[0]?-1:1)
+    .map(([k,v])=>'<tr><td>'+esc(k)+'</td><td>'+v+'</td></tr>').join('');
+  const stats=[
+    ['api',x.classfileApi||'java.lang.classfile'],
+    ['version',(cf.majorVersion??'?')+'.'+(cf.minorVersion??'?')],
+    ['access',cf.access||'package'],
+    ['interfaces',cf.interfaceCount??interfaces.length],
+    ['fields',cf.fieldCount??fields.length],
+    ['methods',cf.methodCount??methods.length],
+    ['instructions',cf.instructionCount??'unavailable'],
+    ['constants',cf.constantCount??'unavailable'],
+    ['debug',debug.hasSourceFile?(debug.hasSourceLines?'source lines from '+debug.sourceFile:'SourceFile only: '+debug.sourceFile):'debug metadata unavailable'],
+  ].map(([k,v])=>'<tr><td>'+esc(k)+'</td><td>'+esc(v)+'</td></tr>').join('');
+  mount.innerHTML=
+    '<div class="classhead">'+
+      '<div class="classname">'+esc(x.className||'(unknown class)')+'</div>'+
+      '<div class="classrow">'+
+        '<span class="classpill">super '+esc(x.superClass||'(none)')+'</span> '+
+        '<span class="classpill '+statusClass+'">'+esc(status)+'</span> '+
+        chip(x.blobCid,'blob')+' '+(x.runtimeCid?chip(x.runtimeCid,'runtime')+' ':'')+
+        '<span class="classpill">'+esc(x.blobBytes||0)+' bytes</span>'+
+      '</div>'+
+      '<div class="classrow">'+(interfaces.length?interfaces.map(i=>'<span class="classpill">implements '+esc(i)+'</span>').join(' '):'<span class="classpill">no interfaces</span>')+'</div>'+
+      '<div class="classnote">'+counterText(obs,'class')+'</div>'+
+    '</div>'+
+    '<table class="kv">'+stats+'</table>'+
+    '<div class="classsplit">'+
+      '<div><div class="classnote">methods use full JVM descriptors</div><div class="classlist" data-class-methods>'+
+        (methods.length?methods.map((m,i)=>'<button class="classitem" data-method-index="'+i+'" title="'+attrEsc(methodLabel(m))+'">'+
+          esc(m.name||'?')+'<br><span style="color:var(--dim)">'+esc(m.descriptor||'')+'</span><br><span style="color:var(--dim)">'+esc(methodLineText(m))+' · '+esc(m.instructionCount||0)+' insn</span></button>').join(''):'<div class="classitem">no methods</div>')+
+      '</div>'+
+      (fields.length?'<div class="classnote" style="margin-top:8px">fields</div><table>'+fields.slice(0,80).map(f=>'<tr><td>'+esc(f.name)+'</td><td class="classmono">'+esc(f.descriptor)+'</td></tr>').join('')+'</table>':'')+
+      (kindRows?'<div class="classnote" style="margin-top:8px">pointcut coordinates</div><table>'+kindRows+'</table>':'<div class="classnote">no value-bearing pointcut coordinates</div>')+
+      '</div><div class="classdetailbox" data-class-detail></div>'+
+    '</div>';
+  const detail=mount.querySelector('[data-class-detail]');
+  function renderMethod(i){
+    const m=methods[i];if(!m){detail.innerHTML='<div class="classnote">no method selected</div>';return;}
+    mount.querySelectorAll('[data-method-index]').forEach(b=>b.classList.toggle('active',Number(b.dataset.methodIndex)===i));
+    const insns=m.instructions||[];
+    const pcs=pointcuts.filter(p=>pointcutMatch(p,m));
+    detail.innerHTML=
+      '<div><b>'+esc(m.name||'?')+'</b> <span class="classmono">'+esc(m.descriptor||'')+'</span></div>'+
+      '<div class="classnote">static class-file method · access '+esc(m.access||'package')+' · max stack '+esc(m.maxStack??'?')+' · locals '+esc(m.maxLocals??'?')+' · '+esc(methodLineText(m))+'</div>'+
+      '<div class="classnote">'+counterText(obs,'method')+'</div>'+
+      '<div class="classnote">'+pcs.length+' static pointcut coordinate'+(pcs.length===1?'':'s')+' in this method</div>'+
+      '<div class="classinsns"><table><tr><th>bci</th><th>opcode</th><th>line</th><th>site</th></tr>'+
+        insns.map((insn,ii)=>'<tr data-insn-index="'+ii+'"><td>'+esc(insn.offset)+'</td><td>'+esc(insn.mnemonic)+'</td><td>'+esc(lineText(insn.sourceLine))+'</td><td class="classmono">'+esc((insn.owner?insn.owner+'.':'')+(insn.name||'')+(insn.pointcutKind?' · '+insn.pointcutKind:''))+'</td></tr>').join('')+
+      '</table></div><div data-insn-detail style="margin-top:8px"></div>';
+    detail.querySelectorAll('[data-insn-index]').forEach(row=>row.addEventListener('click',()=>renderInstruction(i,Number(row.dataset.insnIndex))));
+    if(insns.length)renderInstruction(i,0);
+  }
+  function renderInstruction(mi,ii){
+    const m=methods[mi],insns=(m&&m.instructions)||[],insn=insns[ii],box=detail.querySelector('[data-insn-detail]');
+    if(!box||!insn)return;
+    detail.querySelectorAll('[data-insn-index]').forEach(row=>row.classList.toggle('active',Number(row.dataset.insnIndex)===ii));
+    const pcs=pointcuts.filter(p=>pointcutMatch(p,m,insn));
+    const pcRows=pcs.map(p=>{
+      const s=p.source||{},sym=p.symbol||{};
+      return '<tr><td>'+esc(p.kind)+'</td><td>'+esc(p.jvmOpcode)+'</td><td>'+esc(lineText(s.line))+'</td><td class="classmono">'+esc((sym.owner?`${sym.owner}.`:'')+(sym.name||'')+(sym.descriptor?' '+sym.descriptor:''))+'</td></tr>';
+    }).join('');
+    box.innerHTML=
+      '<div class="classdetailbox" style="background:var(--panel);margin-top:0">'+
+        '<div><b>instruction</b> <span class="classmono">'+esc(x.className||'')+'.'+esc(m.name||'')+esc(m.descriptor||'')+' @ bci '+esc(insn.offset)+'</span></div>'+
+        '<table class="kv"><tr><td>mnemonic</td><td>'+esc(insn.mnemonic)+'</td></tr><tr><td>opcode</td><td>'+esc(insn.opcode)+'</td></tr><tr><td>source line</td><td>'+esc(lineText(insn.sourceLine))+'</td></tr><tr><td>owner</td><td class="classmono">'+esc(insn.owner||'')+'</td></tr><tr><td>name</td><td>'+esc(insn.name||'')+'</td></tr><tr><td>descriptor</td><td class="classmono">'+esc(insn.descriptor||'')+'</td></tr></table>'+
+        '<div class="classnote">'+counterText(obs,'instruction')+'</div>'+
+        (pcRows?'<div class="classnote">static pointcut coordinate for this BCI</div><table><tr><th>kind</th><th>opcode</th><th>line</th><th>symbol</th></tr>'+pcRows+'</table>':'<div class="classnote">no value-bearing pointcut coordinate for this BCI</div>')+
+      '</div>';
+  }
+  mount.querySelectorAll('[data-method-index]').forEach(btn=>btn.addEventListener('click',()=>renderMethod(Number(btn.dataset.methodIndex))));
+  renderMethod(0);
 }
 /* JDK 25 ClassFile API over the exact compiled blobs absorbed from build/live/classes. */
 async function sourceMates(id,proj){

@@ -69,6 +69,87 @@ val JsContext.segments: Series<JsIndex>
  * and provides a way to query it.
  */
 object JsonParser {
+    /** Validate one complete JSON value before using the existing indexed reifier. */
+    fun reifyStrict(src: Series<Char>): Any? {
+        var offset = 0
+        fun peek(): Char? = if (offset < src.size) src[offset] else null
+        fun whitespace() {
+            while (peek() == ' ' || peek() == '\t' || peek() == '\r' || peek() == '\n') offset++
+        }
+        fun expect(char: Char) {
+            require(peek() == char) { "Expected '$char' at JSON offset $offset" }
+            offset++
+        }
+        fun string() {
+            expect('"')
+            while (true) {
+                val char = peek() ?: error("Unterminated JSON string at offset $offset")
+                offset++
+                when {
+                    char == '"' -> return
+                    char == '\\' -> {
+                        val escape = peek() ?: error("Unterminated JSON escape at offset $offset")
+                        offset++
+                        if (escape == 'u') repeat(4) {
+                            val hex = peek()
+                            require(hex != null && (hex in '0'..'9' || hex in 'a'..'f' || hex in 'A'..'F')) {
+                                "Invalid JSON Unicode escape at offset $offset"
+                            }
+                            offset++
+                        } else require(escape in "\"\\/bfnrt") { "Invalid JSON escape at offset ${offset - 1}" }
+                    }
+                    char.code < 0x20 -> error("Unescaped JSON control character at offset ${offset - 1}")
+                }
+            }
+        }
+        fun digits() {
+            require(peek() in '0'..'9') { "Expected JSON digit at offset $offset" }
+            while (peek() in '0'..'9') offset++
+        }
+        fun number() {
+            if (peek() == '-') offset++
+            if (peek() == '0') offset++ else digits()
+            if (peek() == '.') { offset++; digits() }
+            if (peek() == 'e' || peek() == 'E') {
+                offset++
+                if (peek() == '+' || peek() == '-') offset++
+                digits()
+            }
+        }
+        fun value(depth: Int) {
+            require(depth <= 256) { "JSON nesting exceeds 256 levels" }
+            whitespace()
+            when (peek()) {
+                '{', '[' -> {
+                    val objectValue = peek() == '{'
+                    val close = if (objectValue) '}' else ']'
+                    offset++
+                    whitespace()
+                    if (peek() == close) { offset++; return }
+                    while (true) {
+                        if (objectValue) { string(); whitespace(); expect(':') }
+                        value(depth + 1)
+                        whitespace()
+                        if (peek() == close) { offset++; return }
+                        expect(',')
+                        whitespace()
+                    }
+                }
+                '"' -> string()
+                't', 'f', 'n' -> {
+                    val literal = when (peek()) { 't' -> "true"; 'f' -> "false"; else -> "null" }
+                    for (char in literal) expect(char)
+                }
+                '-', in '0'..'9' -> number()
+                else -> error("Expected JSON value at offset $offset")
+            }
+        }
+        value(0)
+        whitespace()
+        require(offset == src.size) { "Trailing JSON input at offset $offset" }
+        return reify(src)
+    }
+
     /** includes open and close braces and provides a list of comma indexes*/
     fun index(
         src: Series<Char>,

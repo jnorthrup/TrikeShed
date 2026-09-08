@@ -126,6 +126,7 @@ object RouteManifest {
             RouteEntry("GET", "/api/graal/density", "per-region residual density at a zoom band"),
             RouteEntry("GET", "/api/graal/sheet", "live CursorSheet for a document"),
             RouteEntry("GET", "/api/graal/dag", "DAG arcs and cross-links"),
+            RouteEntry("GET", "/api/graal/classfile", "selected class attachment projection via JDK 25"),
             RouteEntry("GET", "/api/graal/decompile", "source + classpath mates via JDK 25"),
             RouteEntry("GET", "/api/graal/aot", "AOT flags and HotSpot cache metadata"),
             RouteEntry("GET", "/api/graal/aot/blob", "HotSpot AOT archive bytes"),

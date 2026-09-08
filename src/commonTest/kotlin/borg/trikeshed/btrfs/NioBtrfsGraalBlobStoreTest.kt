@@ -9,10 +9,10 @@ import kotlin.test.assertTrue
 
 class NioBtrfsGraalBlobStoreTest {
 
-    // ── writeMountableImage → BtrfsSuperblock.parse round trip ──────────────
+    // ── writeMountableImage → BtrfsSuperblock.parse seed round trip ─────────
 
     @Test
-    fun mountableImageSuperblockRoundTrips() {
+    fun seedImageSuperblockRoundTrips() {
         val fileOps = InMemoryFileOperations()
         val img = "/mem/vol/btrfs.img"
         val total = 128uL * 1024uL * 1024uL // 128 MiB — big enough for the 64MiB mirror

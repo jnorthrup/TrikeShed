@@ -11,7 +11,7 @@ const val CHUNK_RAID6: UByte = 0x80u
 
 data class BtrfsChunkItem(
     val stripeLength: ULong,
-    val type: UByte,             // 0=RAID0, 1=RAID1, 2=SINGLE, 10=DUP
+    val type: UByte,
     val numStripes: UShort,
     val subStripes: UShort,
     val stripes: List<BtrfsStripe>,

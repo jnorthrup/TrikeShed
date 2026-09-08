@@ -2,6 +2,7 @@ package borg.trikeshed.userspace.nio.channels.spi
 
 import java.io.ByteArrayOutputStream
 import kotlinx.coroutines.async
+import kotlinx.coroutines.runInterruptible
 
 class JvmProcessOperations : ProcessOperations {
 
@@ -25,38 +26,39 @@ class JvmProcessOperations : ProcessOperations {
         return kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { kotlinx.coroutines.coroutineScope {
             val proc = pb.start()
 
-            // Feed stdin if provided
-            proc.outputStream.use {
-                if (stdin != null) {
-                    it.write(stdin)
-                    it.flush()
+            try {
+                // All pipes progress together; writing stdin first can block on a full stdout pipe.
+                val stdoutDeferred = this.async {
+                    val stdoutOut = ByteArrayOutputStream()
+                    proc.inputStream.use { it.copyTo(stdoutOut) }
+                    stdoutOut.toByteArray()
                 }
-            }
 
-            // Read stdout asynchronously to prevent deadlocks
-            val stdoutDeferred = this.async {
-                val stdoutOut = ByteArrayOutputStream()
-                proc.inputStream.use { it.copyTo(stdoutOut) }
-                stdoutOut.toByteArray()
-            }
-
-            // Read stderr asynchronously
-            val stderrDeferred = this.async {
-                val stderrOut = ByteArrayOutputStream()
-                if (!pb.redirectErrorStream()) {
-                    proc.errorStream.use { it.copyTo(stderrOut) }
+                val stderrDeferred = this.async {
+                    val stderrOut = ByteArrayOutputStream()
+                    if (!pb.redirectErrorStream()) {
+                        proc.errorStream.use { it.copyTo(stderrOut) }
+                    }
+                    stderrOut.toByteArray()
                 }
-                stderrOut.toByteArray()
-            }
 
-            // Security: Prevent thread starvation and DoS by using bounded waitFor
-            val finished = proc.waitFor(1, java.util.concurrent.TimeUnit.HOURS)
-            if (!finished) {
-                proc.destroyForcibly()
-                throw java.util.concurrent.TimeoutException("Process timed out: $command")
+                val stdinDeferred = this.async {
+                    proc.outputStream.use { stream ->
+                        if (stdin != null) stream.write(stdin)
+                    }
+                }
+
+                val finished = runInterruptible { proc.waitFor(1, java.util.concurrent.TimeUnit.HOURS) }
+                if (!finished) throw java.util.concurrent.TimeoutException("Process timed out: $command")
+                val exitCode = proc.exitValue()
+                stdinDeferred.await()
+                ProcessResult(exitCode, stdoutDeferred.await(), stderrDeferred.await())
+            } finally {
+                if (proc.isAlive) proc.destroyForcibly()
+                runCatching { proc.outputStream.close() }
+                runCatching { proc.inputStream.close() }
+                runCatching { proc.errorStream.close() }
             }
-            val exitCode = proc.exitValue()
-            ProcessResult(exitCode, stdoutDeferred.await(), stderrDeferred.await())
         } }
     }
 }

@@ -3,9 +3,6 @@ package borg.trikeshed.kanban
 import borg.trikeshed.graal.subvm.TikaRuntime
 import borg.trikeshed.media.officeText
 import borg.trikeshed.util.io.ContentTypes
-import borg.trikeshed.userspace.nio.process.ProcessCapability
-import borg.trikeshed.userspace.nio.process.ProcessSpec
-import borg.trikeshed.userspace.nio.process.ProcessWorkerFactory
 import kotlinx.coroutines.runBlocking
 import java.nio.file.Files
 import java.nio.file.Path
@@ -16,12 +13,12 @@ import kotlin.io.path.name
  * JvmTikaIngestAdapter — Path -> extracted text. Markdown/plaintext verbatim; docx/pptx/xlsx through the commonMain
  * zip walker + [officeText] (raw deflate via `Inflater(true)`, no POI); only PDF and images go through managed Tika
  * ([TikaRuntime]: PDF OCR_STRATEGY.AUTO, images -> Tesseract when on PATH). Images first get the
- * tika4all pre-pass — grayscale + contrast/brightness equalisation — run through ffmpeg via the process factory. This used to be tika-config.xml +
- * ffmpeg_ocr.sh; Tika 3 has no `imageProcessingCommand` param, so that config never loaded and the script never ran.
+ * tika4all pre-pass — grayscale + contrast/brightness equalisation — through the byte-pipe process SPI. That preserves the
+ * old ffmpeg_ocr.sh filter for top-level raster images; managed Tika 3.2.3 has no `imageProcessingCommand` hook
+ * for PDF-rendered OCR images.
  * CLI twin, same filter and same Tika config: src/jvmMain/resources/tika/run_tika.sh.
  */
 object JvmTikaIngestAdapter {
-    private val worker = ProcessWorkerFactory.create(ProcessCapability("forge-ingest", setOf("ffmpeg")))
     private val images = setOf("png", "jpg", "jpeg", "tif", "tiff", "bmp", "gif", "webp", "heic")
 
     val ffmpeg = "ffmpeg"
@@ -29,9 +26,13 @@ object JvmTikaIngestAdapter {
     /** OCR pre-pass (was ffmpeg_ocr.sh): returns a temp PNG the caller deletes. */
     suspend fun preprocess(image: Path): Path {
         val out = Files.createTempFile("forge-ocr-", ".png")
-        val r = worker.spawn(ProcessSpec(ffmpeg, listOf("-y", "-i", image.toString(), "-vf",
-            "format=gray,eq=contrast=1.5:brightness=0.1:gamma=1.0:saturation=0.0", out.toString()), timeoutMs = 120_000))
-        require(r.exitCode == 0) { "ffmpeg exit ${r.exitCode}: ${r.stderr.decodeToString().takeLast(300)}" }
+        val processed = TikaRuntime.preprocessImageForOcr(
+            bytes = Files.readAllBytes(image),
+            name = image.fileName.toString(),
+            mediaType = ContentTypes.forPath(image.fileName.toString()),
+            options = TikaRuntime.OcrOptions(preprocessImages = true, ffmpegCommand = ffmpeg),
+        )
+        Files.write(out, processed)
         return out
     }
 
@@ -59,14 +60,21 @@ object JvmTikaIngestAdapter {
             IngestRoute.Office -> return runBlocking { Files.readAllBytes(path).officeText(inflate) }
             else -> {}
         }
-        val src = if (path.extension.lowercase() in images) runBlocking { preprocess(path) } else path
-        try {
-            return TikaRuntime.extract(
-                bytes = Files.readAllBytes(src),
-                name = src.fileName?.toString(),
-                mediaType = ContentTypes.forPath(src.fileName.toString()),
-            ).text.trim()
-        } finally { if (src !== path) Files.deleteIfExists(src) }
+        val name = path.fileName.toString()
+        val mediaType = ContentTypes.forPath(name)
+        val options = if (path.extension.lowercase() in images) {
+            TikaRuntime.TikaOptions(
+                ocr = TikaRuntime.OcrOptions(preprocessImages = true, ffmpegCommand = ffmpeg),
+            )
+        } else {
+            TikaRuntime.TikaOptions()
+        }
+        return TikaRuntime.extract(
+            bytes = Files.readAllBytes(path),
+            name = name,
+            mediaType = mediaType,
+            options = options,
+        ).text.trim()
     }
 
     /** [extract] wrapped as markdown under a `# <filename>` heading, the shape [ForgeKanbanIngest] expects. */

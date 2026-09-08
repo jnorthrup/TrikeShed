@@ -12,6 +12,8 @@ import borg.trikeshed.parse.confix.*
 object JsonSupport {
     fun parse(text: String): Any? = JsonParser.reify(CharSeries(text))
 
+    fun parseStrict(text: String): Any? = JsonParser.reifyStrict(CharSeries(text))
+
     /**
      * Parses the given text and safely validates it is a Map.
      * Prevents unchecked ClassCastExceptions during deserialization.

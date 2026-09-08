@@ -13,7 +13,6 @@ import borg.trikeshed.nlp.NlpDocument
 import borg.trikeshed.nlp.NlpSentence
 import borg.trikeshed.nlp.NlpToken
 import borg.trikeshed.parse.json.JsonSupport
-import kotlinx.serialization.json.Json
 
 /** Uses the existing canonical map/CBOR path, not the lossy ConfixDoc-to-map projection. */
 internal object DocumentCuratorCodec {
@@ -91,10 +90,7 @@ internal object DocumentCuratorCodec {
     }
 
     /** Validate syntax strictly before crossing the existing JSON-shaped value boundary. */
-    fun strictJson(text: String): Any? {
-        Json.parseToJsonElement(text)
-        return JsonSupport.parse(text)
-    }
+    fun strictJson(text: String): Any? = JsonSupport.parseStrict(text)
 
     private fun Map<*, *>.str(key: String) = this[key] as String
     private fun Map<*, *>.int(key: String) = (this[key] as Number).toInt()

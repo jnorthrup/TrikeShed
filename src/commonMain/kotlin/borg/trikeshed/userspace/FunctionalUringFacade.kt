@@ -3,9 +3,13 @@ package borg.trikeshed.userspace
 import borg.trikeshed.lib.Series
 import borg.trikeshed.lib.get
 import borg.trikeshed.lib.size
+import borg.trikeshed.lib.toList
 import borg.trikeshed.lib.toSeries
 import borg.trikeshed.userspace.nio.ByteBuffer
 import borg.trikeshed.userspace.UringOp.Companion.UringSubmission
+import borg.trikeshed.userspace.nio.ebpf.UringEbpfContext
+import borg.trikeshed.userspace.nio.ebpf.UringEbpfPhase
+import borg.trikeshed.userspace.nio.ebpf.UringEbpfProgram
 
 /**
  * Interface abstracting the underlying polling/completion logic.
@@ -39,9 +43,12 @@ public class FunctionalUringFacade(
     private val backend: UserspaceChannelBackend,
     private val containmentPolicy: borg.trikeshed.userspace.containment.ContainmentPolicy =
         borg.trikeshed.userspace.containment.ContainmentPolicy.MAXIMUM,
+    ebpfPrograms: List<UringEbpfProgram> = emptyList(),
 ) {
     private val pending = ArrayDeque<UringSubmission>()
     private val completions = ArrayDeque<SelectionResult>()
+    private val submitPrograms = ebpfPrograms.filter { it.phase == UringEbpfPhase.SUBMIT }
+    private val completionPrograms = ebpfPrograms.filter { it.phase == UringEbpfPhase.COMPLETE }
 
     init {
         require(entries > 0) { "entries must be positive" }
@@ -108,6 +115,11 @@ public class FunctionalUringFacade(
             "xattr ops are deterministically rejected to close covert signaling channels: ${submission.opcode}"
         }
         require(pending.size < entries) { "submission queue full" }
+        val rejected = runSubmitPrograms(submission)
+        if (rejected != null) {
+            completions.addLast(SelectionResult(rejected, submission.userData))
+            return
+        }
         pending.addLast(submission)
     }
 
@@ -162,17 +174,32 @@ public class FunctionalUringFacade(
     /** Suspend through the backend; never invoke the synchronous compatibility path. */
     suspend fun batchEnqueue(submissions: Series<UringSubmission>): Series<UringCompletion> {
         require(submissions.size <= entries) { "submission queue full" }
+        val ordered = arrayOfNulls<UringCompletion>(submissions.size)
+        val admitted = mutableListOf<UringSubmission>()
+        val admittedIndexes = mutableListOf<Int>()
         for (i in 0 until submissions.size) {
-            require(submissions[i].opcode !in REJECTED_OPS) {
-                "Operation rejected by containment policy: ${submissions[i].opcode}"
+            val submission = submissions[i]
+            require(submission.opcode !in REJECTED_OPS) {
+                "Operation rejected by containment policy: ${submission.opcode}"
+            }
+            val rejected = runSubmitPrograms(submission)
+            if (rejected == null) {
+                admitted += submission
+                admittedIndexes += i
+            } else {
+                ordered[i] = UringCompletion(submission.userData, rejected, 0)
             }
         }
-        val result = backend.batchEnqueue(submissions)
-        check(result.size == submissions.size) { "Backend lost submission completions" }
-        for (i in 0 until submissions.size) {
-            check(result[i].userData == submissions[i].userData) { "Backend changed completion correlation" }
+        val result = if (admitted.isEmpty()) emptyList()
+        else backend.batchEnqueue(admitted.toSeries()).toList()
+        check(result.size == admitted.size) { "Backend lost submission completions" }
+        for (i in 0 until admitted.size) {
+            val submission = admitted[i]
+            val completion = result[i]
+            check(completion.userData == submission.userData) { "Backend changed completion correlation" }
+            ordered[admittedIndexes[i]] = sanitizeCompletion(submission, completion)
         }
-        return result
+        return ordered.map { it ?: error("missing completion") }.toSeries()
     }
 
     /** Submit the prepared queue and suspend until every entry has completed. */
@@ -193,14 +220,8 @@ public class FunctionalUringFacade(
 
         if (unified.isNotEmpty()) {
             val results = backend.submitBatch(unified)
-            // Legion Doc 04 Layer 2 §2: quantize STATX completions to collapse
-            // micro-timing side-channels. The result code is replaced with a
-            // synthetic epoch value for metadata ops.
-            val sanitized = results.mapIndexed { i, r ->
-                if (i < unified.size && unified[i].opcode in METADATA_QUANTIZED_OPS) {
-                    SelectionResult(syntheticEpoch.toInt(), r.userData)
-                } else r
-            }
+            check(results.size == unified.size) { "Backend lost submission completions" }
+            val sanitized = results.mapIndexed { i, r -> sanitizeCompletion(unified[i], r) }
             completions.addAll(sanitized)
         }
         return submitted
@@ -221,5 +242,42 @@ public class FunctionalUringFacade(
         while (completions.isNotEmpty()) {
             add(completions.removeFirst())
         }
+    }
+
+    private fun runSubmitPrograms(submission: UringSubmission): Int? {
+        if (submitPrograms.isEmpty()) return null
+        val context = UringEbpfContext(UringEbpfPhase.SUBMIT, submission, null)
+        for (program in submitPrograms) {
+            val value = program.run(context, 0L)
+            if (value < 0L) return value.toCompletionResult()
+        }
+        return null
+    }
+
+    private fun sanitizeCompletion(submission: UringSubmission, result: UringCompletion): UringCompletion {
+        val contained = if (submission.opcode in METADATA_QUANTIZED_OPS) {
+            UringCompletion(result.userData, syntheticEpoch.toInt(), result.flags)
+        } else result
+        if (completionPrograms.isEmpty()) return contained
+        var completion = contained
+        var value = contained.res.toLong()
+        for (program in completionPrograms) {
+            val context = UringEbpfContext(UringEbpfPhase.COMPLETE, submission, completion)
+            value = program.run(context, value)
+            completion = completion.copy(res = value.toCompletionResult())
+        }
+        return completion
+    }
+
+    private fun sanitizeCompletion(submission: UringSubmission, result: SelectionResult): SelectionResult {
+        val completion = sanitizeCompletion(submission, UringCompletion(result.userData, result.res, 0))
+        return SelectionResult(completion.res, completion.userData)
+    }
+
+    private fun Long.toCompletionResult(): Int {
+        require(this in Int.MIN_VALUE.toLong()..Int.MAX_VALUE.toLong()) {
+            "eBPF completion result out of Int range: $this"
+        }
+        return toInt()
     }
 }

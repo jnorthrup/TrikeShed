@@ -6,6 +6,7 @@ import borg.trikeshed.graal.ConfixBlackboard
 import borg.trikeshed.graal.subvm.CamelRuntime
 import borg.trikeshed.graal.subvm.DocumentFeed
 import borg.trikeshed.graal.subvm.GuestModules
+import borg.trikeshed.graal.subvm.TikaRuntime
 import borg.trikeshed.job.CasStore
 import borg.trikeshed.job.ContentId
 import borg.trikeshed.lib.get
@@ -25,15 +26,22 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.runBlocking
+import java.awt.Color
+import java.awt.Font
+import java.awt.image.BufferedImage
+import java.io.ByteArrayOutputStream
+import javax.imageio.ImageIO
 
 /** Real managed libraries; deterministic model and explicitly volatile IO fixtures. */
 object DocumentFeedHarness {
     @JvmStatic
     fun main(args: Array<String>) = runBlocking {
-        println(JsonSupport.stringify(run(CoroutineScope(currentCoroutineContext()))))
+        System.setProperty("java.awt.headless", "true")
+        require(args.isEmpty() || args.contentEquals(arrayOf("--ocr"))) { "Supported argument: --ocr" }
+        println(JsonSupport.stringify(run(CoroutineScope(currentCoroutineContext()), args.isNotEmpty())))
     }
 
-    suspend fun run(scope: CoroutineScope): Map<String, Any?> {
+    suspend fun run(scope: CoroutineScope, ocr: Boolean = false): Map<String, Any?> {
         for (module in arrayOf("tika", "camel", "corenlp")) check(GuestModules.isInstalled(module)) {
             "Install managed module $module with ./gradlew -p utils/subvm install${module.replaceFirstChar { it.uppercase() }}"
         }
@@ -67,6 +75,7 @@ object DocumentFeedHarness {
         val conflict = stage("conflict.txt", "Acme pays Beta. Acme does not pay Beta.".encodeToByteArray(), "text/plain")
         val retry = stage("retry.txt", "Alpha pays Omega.".encodeToByteArray(), "text/plain")
         val wrong = stage("span.txt", "Theta pays Sigma.".encodeToByteArray(), "text/plain")
+        val raster = if (ocr) stage("ocr.png", raster("Acme pays Beta."), "image/png") else null
         val cas = CasStore.inMemory()
         val log = MemoryLog()
         val bag = BeliefBagElement(parentJob = scope.coroutineContext[Job])
@@ -98,6 +107,7 @@ object DocumentFeedHarness {
             val route = feed.routeId
             feed.drain()
             check(!CamelRuntime.isRunning(route) && feed.job.isCompleted)
+            check(feed.observationFailureCount == 0) { feed.lastObservationFailure.orEmpty() }
             feed = null
 
             // Recreate the curator over the same stored frames and CAS, not its old in-memory sets.
@@ -105,17 +115,34 @@ object DocumentFeedHarness {
             val replayed = feed.submit(pdf).also(receipts::add)
             check(replayed.record.submittedReceiptCids.size == 0 && replayed.record.duplicateReceiptCids.size == 1)
             feed.drain()
+            check(feed.observationFailureCount == 0) { feed.lastObservationFailure.orEmpty() }
             feed = null
+
+            if (raster != null) {
+                feed = DocumentFeed.create(scope, volume, cas, log, bag, points, model::invoke, "fixture",
+                    tikaOptions = TikaRuntime.TikaOptions(ocr = TikaRuntime.OcrOptions(
+                        preprocessImages = true, requireTesseract = true)))
+                val recognized = feed.submit(raster).also(receipts::add)
+                check(recognized.record.source.originalCid == raster.expectedCid)
+                check(recognized.record.submittedReceiptCids.size == 1) { describe(recognized) }
+                check(recognized.record.source.metadata["trikeshed:source:transform"] ==
+                    listOf("ffmpeg:${TikaRuntime.TIKA4ALL_FFMPEG_FILTER}"))
+                feed.drain()
+                check(feed.observationFailureCount == 0) { feed.lastObservationFailure.orEmpty() }
+                check(!CamelRuntime.isRunning(feed.routeId) && feed.job.isCompleted)
+                feed = null
+            }
         } finally {
             try { feed?.drain() } finally { bag.drain() }
         }
-        check(bag.size == 3) { "Expected three source attributions, found ${bag.size}" }
+        val expectedAttributions = if (ocr) 4 else 3
+        check(bag.size == expectedAttributions) { "Expected $expectedAttributions source attributions, found ${bag.size}" }
         for ((key, signal) in bag.snapshot()) {
             val gloss = bag.glossOf(signal.angular) ?: error("Missing attribution expression")
             check(gloss.startsWith("(states ")) { "Inner assertion was admitted: $gloss" }
             check(signal.provenanceCid != null && cas.get(ContentId(signal.provenanceCid!!)) != null)
         }
-        check(readCalls >= 8 && writeCalls == 5)
+        check(readCalls >= receipts.size && writeCalls == if (ocr) 6 else 5)
         check(log.flushes > 0)
         for (receipt in receipts) {
             val saved = DocumentCuratorCodec.decode(cas.get(receipt.cid) ?: error("Missing record"))
@@ -140,8 +167,26 @@ object DocumentFeedHarness {
             "sourceAttributions" to bag.size, "volumeReads" to readCalls, "volumeWrites" to writeCalls,
             "pointcutLandings" to points.landings.size, "duplicateAndReplay" to true,
             "conflictAndInvalidSpanRetained" to true, "modelFailureRetry" to true,
+            "rasterOcrPreprocessing" to if (ocr) "verified" else "not exercised",
             "storage" to "volatile userspace volume/CAS/log fixtures; not disk durability or native io_uring",
             "recordCids" to receipts.map { it.cid.value })
+    }
+
+    private fun raster(text: String): ByteArray {
+        val image = BufferedImage(1000, 160, BufferedImage.TYPE_INT_RGB)
+        image.createGraphics().let { graphics ->
+            try {
+                graphics.color = Color.WHITE
+                graphics.fillRect(0, 0, image.width, image.height)
+                graphics.color = Color.BLACK
+                graphics.font = Font(Font.SANS_SERIF, Font.PLAIN, 72)
+                graphics.drawString(text, 25, 110)
+            } finally { graphics.dispose() }
+        }
+        return ByteArrayOutputStream().use { output ->
+            check(ImageIO.write(image, "png", output))
+            output.toByteArray()
+        }
     }
 
     private fun describe(receipt: DocumentFeed.Receipt): String = JsonSupport.stringify(mapOf(

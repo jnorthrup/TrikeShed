@@ -18,7 +18,7 @@ object ForgeHostRoutes {
      */
     val GRAAL: List<Pair<String, String>> = listOf(
         "GET" to "/api/graal/heap", "GET" to "/api/graal/zoom", "GET" to "/api/graal/strength",
-        "GET" to "/api/graal/density",
+        "GET" to "/api/graal/density", "GET" to "/api/graal/classfile",
     )
     val ALL: List<Pair<String, String>> get() = BUILT_IN + VmWire.ROUTES + BlackboardWire.ROUTES + WebhookWire.ROUTES + AgentWire.ROUTES + GRAAL
 }

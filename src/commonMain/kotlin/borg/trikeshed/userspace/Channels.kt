@@ -2,13 +2,14 @@ package borg.trikeshed.userspace
 
 import borg.trikeshed.userspace.nio.file.File
 import borg.trikeshed.userspace.nio.ByteBuffer
+import borg.trikeshed.userspace.nio.ebpf.UringEbpfProgram
 
 /**
  * Channel factory — backed by expect/actual [ChannelsImpl].
  */
 object Channels {
-    fun open(entries: Int = 256): Channel =
-        Channel(FunctionalUringFacade(entries, openUserspaceChannelBackend(entries)))
+    fun open(entries: Int = 256, ebpfPrograms: List<UringEbpfProgram> = emptyList()): Channel =
+        Channel(FunctionalUringFacade(entries, openUserspaceChannelBackend(entries), ebpfPrograms = ebpfPrograms))
 
     fun socket(domain: Int, type: Int, protocol: Int): File =
         File.fromImpl(ChannelsImpl.socket(domain, type, protocol))

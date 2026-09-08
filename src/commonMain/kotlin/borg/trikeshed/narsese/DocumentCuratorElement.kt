@@ -19,6 +19,7 @@ import borg.trikeshed.userspace.concurrency.Channel
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.channels.SendChannel
@@ -153,7 +154,7 @@ class DocumentCuratorElement private constructor(
                     var nlp: Outcome<NlpDocument>? = null
                     var model: Outcome<ModelResponse>? = null
                     channelFlow<Branch> {
-                        launch {
+                        launch(Dispatchers.Default) {
                             val owner = currentCoroutineContext()[Key] ?: error("missing curator owner")
                             val result = attempt { owner.nlp.read(work.source.text) }
                             send(Branch.Nlp(Outcome(result, owner.observe("curator.nlp", work.source))))
@@ -194,7 +195,7 @@ class DocumentCuratorElement private constructor(
         }
     }
 
-    private suspend fun reconcile(join: Joined): DocumentCurationResult = ledgerGate.withLock {
+    private suspend fun reconcile(join: Joined): DocumentCurationResult {
         val source = join.work.source
         val reasons = mutableListOf<String>()
         val observerFailures = join.notices.toMutableList()
@@ -261,14 +262,15 @@ class DocumentCuratorElement private constructor(
                 observe("curator.intake", source, listOf(a.receiptCid).toSeries())?.let(observerFailures::add)
             } else reasons.add("intake unconfirmed; automatic retry suppressed: ${a.receiptCid.value}: ${result.exceptionOrNull()?.message}")
         }
-        if (reservations.isNotEmpty() || reasons.size != record.reasons.size) {
+        if (reservations.isNotEmpty() || reasons.size != record.reasons.size ||
+            observerFailures.size != record.observerFailures.size) {
             record = record.copy(submittedReceiptCids = sent.toSeries(), reasons = reasons.toSeries(), observerFailures = observerFailures.toSeries())
             recordCid = append(record)
         }
-        DocumentCurationResult(recordCid, record, attributions.toSeries())
+        return DocumentCurationResult(recordCid, record, attributions.toSeries(), observerFailures.toSeries())
     }
 
-    private fun append(record: DocumentCurationRecord): ContentId {
+    private suspend fun append(record: DocumentCurationRecord): ContentId = ledgerGate.withLock {
         val cid = putVerified(cas, DocumentCuratorCodec.encode(record))
         val next = sequence + 1
         check(log.append(next, cid.value.encodeToByteArray()) == next) { "unexpected ledger sequence" }
@@ -278,7 +280,7 @@ class DocumentCuratorElement private constructor(
         // Flush before any intake; a flush failure cannot be mistaken for completed persistence.
         log.flush()
         submitted.addAll(record.submittedReceiptCids.values())
-        return cid
+        cid
     }
 
     private suspend fun replay() = ledgerGate.withLock {

@@ -38,6 +38,7 @@ import java.util.concurrent.ConcurrentHashMap
  *   GET /api/graal/map            the whole store as compact `[id, bytes]` rows — the RTS terrain
  *   GET /api/graal/dag[?id=…]     the DAG arcs the tree cannot show: shared-blob cross-links and
  *                                 pointcut→class edges for one node, or the high-degree hubs
+ *   GET /api/graal/classfile?id=… selected class attachment projection, parsed by JDK 25
  *   GET /api/graal/decompile?source=… source + byte-identical classpath mates, parsed by JDK 25
  *   GET /api/graal/aot             process AOT flags and configured HotSpot cache metadata
  *   GET /api/graal/aot/blob        configured opaque HotSpot AOT archive bytes
@@ -127,6 +128,16 @@ class GraalWire(
             method == "GET" && p == "/api/graal/dag" -> {
                 val q = borg.trikeshed.relaxfactory.CouchHttpSurface.parseQuery(path.substringAfter('?', ""))
                 JvmKanbanServer.HttpResponse(200, JsonSupport.stringify(q["id"]?.let { dagFor(it) } ?: dagHubs()))
+            }
+            method == "GET" && p == "/api/graal/classfile" -> withContext(Dispatchers.IO) {
+                val id = borg.trikeshed.relaxfactory.CouchHttpSurface
+                    .parseQuery(path.substringAfter('?', ""))["id"]
+                    ?: return@withContext JvmKanbanServer.HttpResponse(400, """{"error":"class_id_required"}""")
+                val projection = ClassfileBlobProjection(couch, vitals).project(id)
+                JvmKanbanServer.HttpResponse(
+                    (projection["status"] as? Number)?.toInt() ?: if (projection["error"] == null) 200 else 404,
+                    JsonSupport.stringify(projection),
+                )
             }
             method == "GET" && p == "/api/graal/decompile" -> withContext(Dispatchers.IO) {
                 val source = borg.trikeshed.relaxfactory.CouchHttpSurface

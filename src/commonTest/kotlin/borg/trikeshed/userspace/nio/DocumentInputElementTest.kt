@@ -1,16 +1,51 @@
 package borg.trikeshed.userspace.nio
 
 import borg.trikeshed.job.ContentId
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertFailsWith
 import kotlin.test.assertTrue
 
 class DocumentInputElementTest {
+    @Test
+    fun drainWaitsForActiveAndQueuedReads() = runTest {
+        val stored = InMemoryVolume(16, 2)
+        val entered = CompletableDeferred<Unit>()
+        val release = CompletableDeferred<Unit>()
+        var reads = 0
+        val volume = object : Volume by stored {
+            override suspend fun read(lba: Long, count: Int): ByteBuffer {
+                reads++
+                entered.complete(Unit)
+                release.await()
+                return stored.read(lba, count)
+            }
+        }
+        val input = DocumentInputElement.create(this, volume, capacity = 1)
+        val extent = DocumentExtent(0, 1, "pending")
+        val active = async(start = CoroutineStart.UNDISPATCHED) { input.read(extent) }
+        entered.await()
+        val queued = async(start = CoroutineStart.UNDISPATCHED) { input.read(extent) }
+        val draining = async(start = CoroutineStart.UNDISPATCHED) { input.drain() }
+        assertFalse(draining.isCompleted)
+        assertFalse(active.isCompleted)
+        assertFalse(queued.isCompleted)
+        assertFailsWith<IllegalStateException> { input.read(extent) }
+        release.complete(Unit)
+        assertEquals(1, active.await().bytes.size)
+        assertEquals(1, queued.await().bytes.size)
+        draining.await()
+        assertEquals(2, reads)
+        assertTrue(input.job.isCompleted)
+    }
+
     @Test
     fun readsExactExtentThroughVolumeAndJoinsAcceptedReads() = runTest {
         val stored = InMemoryVolume(16, 16)
