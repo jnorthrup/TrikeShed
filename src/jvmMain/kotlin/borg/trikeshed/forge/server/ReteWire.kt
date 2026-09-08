@@ -4,6 +4,8 @@ import borg.trikeshed.dag.PlaneFacts
 import borg.trikeshed.dag.ReteNetwork
 import borg.trikeshed.dag.ReteProduction
 import borg.trikeshed.dag.ReteStoredFact
+import borg.trikeshed.dag.KifTee
+import borg.trikeshed.kif.KifExpr
 import borg.trikeshed.job.ContentId
 import borg.trikeshed.lib.get
 import borg.trikeshed.lib.size
@@ -53,7 +55,7 @@ import borg.trikeshed.parse.json.JsonSupport
  * `curl '/api/rete/facts?partition=blackboard&key=probe/x'` after a
  * `POST /blackboard/assert`.
  */
-class ReteWire(private val network: ReteNetwork) {
+class ReteWire(private val network: ReteNetwork, private val kifTee: KifTee? = null) {
 
     suspend fun route(
         method: String,
@@ -86,8 +88,86 @@ class ReteWire(private val network: ReteNetwork) {
                 json(linkedMapOf("count" to prods.size, "productions" to prods.map(::productionRow)))
             }
 
+            p == "/api/rete/connections" -> {
+                val q = query(path)
+                val limit = q["limit"]?.toIntOrNull() ?: if ("limit" in q) -1 else 100
+                val offset = q["offset"]?.toIntOrNull() ?: if ("offset" in q) -1 else 0
+                if (limit !in 1..1000 || offset < 0) json(mapOf("error" to "limit must be 1..1000; offset must be non-negative"), 400)
+                else json(connections(Selection.of(q), offset, limit))
+            }
+
             else -> null
         }
+    }
+
+    /**
+     * Component-local runtime snapshots. Fact pages are bounded; all retained
+     * admissions and all subclass index rows are included. No static call-graph
+     * arrows or inferred production matches are added to the evidence.
+     */
+    private suspend fun connections(selection: Selection, offset: Int, limit: Int): Map<String, Any?> {
+        val selected = selection.select(network.snapshot())
+        val page = selected.drop(offset).take(limit)
+        val trace = network.admissionSnapshot()
+        val receipts = trace.receipts.filter { selection.partition == null || it.partitionId == selection.partition }
+        val bank = kifTee?.bank
+        val subclasses = bank?.subclassSnapshot()
+        return linkedMapOf(
+            "schema" to "trikeshed.rete-connections/v1",
+            "scope" to linkedMapOf(
+                "network" to "injected ReteNetwork",
+                "consistency" to "component-local snapshots, not a cross-component transaction",
+                "activationMeaning" to "refraction admission and immediate delivery only; not downstream action completion",
+                "ontologyMeaning" to "subclass assertions in the injected KIF bank; corpus origin is not tracked",
+                "excluded" to listOf("other ReteNetwork instances", "CausalityReteElement", "ReteAgent", "standalone SumoClassifier and IsALattice indexes"),
+            ),
+            "facts" to linkedMapOf(
+                "matched" to selected.size, "offset" to offset, "limit" to limit,
+                "nextOffset" to (offset + page.size).takeIf { it < selected.size },
+                "rows" to page.map(::factRow),
+            ),
+            "productions" to network.productions.all().map(::productionRow),
+            "trace" to linkedMapOf(
+                "capacity" to trace.capacity, "admitted" to trace.admitted, "dropped" to trace.dropped,
+                "filter" to "partition only; fact field/key filters do not filter admission history",
+                "receipts" to receipts.map { receipt ->
+                    val a = receipt.activation
+                    linkedMapOf(
+                        "ordinal" to receipt.ordinal, "productionId" to receipt.productionId,
+                        "partition" to receipt.partitionId, "activationId" to a.activationId,
+                        "ruleId" to a.ruleId, "ruleVersionCid" to a.ruleVersionCid.value,
+                        "sequence" to a.sequence, "salience" to a.salience,
+                        "supportCids" to a.supportCids.map { it.value }, "bindings" to a.bindings,
+                        "delivery" to receipt.delivery,
+                    )
+                },
+            ),
+            "projections" to page.map { fact ->
+                val projection = kifTee?.projection(fact.factId)
+                linkedMapOf(
+                    "partition" to fact.factId.partitionId, "id" to fact.factId.localId,
+                    "versionCid" to fact.versionCid.value,
+                    "tracked" to (projection != null),
+                    "matchesFactSnapshot" to (projection?.let { it == PlaneFacts.toKif(fact) }),
+                    "tuples" to projection?.map { expr ->
+                        linkedMapOf(
+                            "kif" to expr.toKifString(), "held" to bank?.contains(expr),
+                            "atoms" to ((expr as? KifExpr.ListExpr)?.elements?.mapNotNull { (it as? KifExpr.Atom)?.token } ?: emptyList<String>()),
+                        )
+                    },
+                )
+            },
+            "ontology" to subclasses?.let { snap ->
+                linkedMapOf(
+                    "revision" to snap.revision, "byteSize" to snap.byteSize, "containers" to snap.containers,
+                    "directEdges" to snap.directEdges.map { listOf(it.first, it.second) },
+                    "nodes" to snap.nodes.map { node ->
+                        linkedMapOf("name" to node.name, "nodeIndex" to node.nodeIndex, "preorderId" to node.preorderId,
+                            "ancestorIds" to node.ancestorIds, "descendantIds" to node.descendantIds)
+                    },
+                )
+            },
+        )
     }
 
     // ── the selection ───────────────────────────────────────────────────

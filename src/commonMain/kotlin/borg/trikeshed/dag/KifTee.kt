@@ -44,6 +44,9 @@ class KifTee(val bank: KifKnowledgeBase) {
     /** Facts whose projection this tee currently holds in the bank. */
     fun trackedCount(): Int = synchronizedLock(gate) { told.size }
 
+    /** Last applied projection for a fact; never recomputed from a reader's snapshot. */
+    fun projection(id: FactId): List<KifExpr>? = synchronizedLock(gate) { told[id]?.toList() }
+
     /** Register on [net]; the disposer detaches (the bank keeps what was told). */
     fun attach(net: ReteNetwork): AutoCloseable = net.observe { op, fact -> apply(op, fact) }
 

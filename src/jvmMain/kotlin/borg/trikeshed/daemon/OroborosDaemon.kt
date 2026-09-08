@@ -1923,7 +1923,7 @@ object OroborosDaemon {
             facts = { pattern -> curatorImpulse?.let { c -> runCatching { c.queryBank(pattern) }.getOrDefault(emptyList()) }.orEmpty() },
         )
         // The fact plane itself, read-only: /api/rete/facts, /api/facts/rdf, /api/rete/productions.
-        val reteWire = borg.trikeshed.forge.server.ReteWire(rete)
+        val reteWire = borg.trikeshed.forge.server.ReteWire(rete, kifTee)
         // The hover blip: one LCNC node read across panels + KIF + productions + graal (/api/lcnc/blip).
         val blipWire = borg.trikeshed.forge.server.LcncBlipWire(
             network = rete,

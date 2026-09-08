@@ -128,6 +128,7 @@ class KifKnowledgeBase {
     private val held = LinkedLinearHashMap<String, KifExpr>(1024)
     /** [asserts] in telling order, rebuilt lazily after a write. */
     private var snapshot: List<KifExpr>? = null
+    private var subclassRevision = 0L
 
     fun assert(expr: KifExpr) {
         borg.trikeshed.isam.synchronizedLock(gate) { tell(expr) }
@@ -165,25 +166,31 @@ class KifKnowledgeBase {
         if (key in held) return false
         held[key] = expr
         snapshot = null
-        if (subclassEdge(expr) != null) closureCache = null
+        if (subclassEdge(expr) != null) { closureCache = null; subclassRevision++ }
         return true
     }
 
     private fun forget(expr: KifExpr): Boolean {
         if (held.remove(expr.toKifString()) == null) return false
         snapshot = null
-        if (subclassEdge(expr) != null) closureCache = null
+        if (subclassEdge(expr) != null) { closureCache = null; subclassRevision++ }
         return true
     }
 
     fun asserts(): List<KifExpr> = borg.trikeshed.isam.synchronizedLock(gate) {
+        assertsLocked()
+    }
+
+    private fun assertsLocked(): List<KifExpr> =
         snapshot ?: ArrayList<KifExpr>(held.count).also { out ->
             for (entry in held.entriesInOrder().view) out.add(entry.b)
             snapshot = out
         }
-    }
     /** Distinct assertions currently held. */
     fun size(): Int = borg.trikeshed.isam.synchronizedLock(gate) { held.count }
+
+    /** Exact membership, without a query's transitive inference. */
+    fun contains(expr: KifExpr): Boolean = borg.trikeshed.isam.synchronizedLock(gate) { expr.toKifString() in held }
 
     fun toKifFile(): String = asserts().joinToString("\n") { it.toKifString() }
 
@@ -218,9 +225,45 @@ class KifKnowledgeBase {
      * told or forgotten — the loop was O(E²) per pass and could not hold the
      * SUMO corpus.
      */
-    private fun subclassClosure(): Set<Pair<String, String>> {
+    data class SubclassNode(
+        val name: String,
+        val nodeIndex: Int,
+        val preorderId: Int,
+        val ancestorIds: List<Int>,
+        val descendantIds: List<Int>,
+    )
+
+    data class SubclassSnapshot(
+        val revision: Long,
+        val nodes: List<SubclassNode>,
+        val directEdges: List<Pair<String, String>>,
+        val byteSize: Int,
+        val containers: Map<String, Int>,
+    )
+
+    /** The same cached Roaring index used by subclass queries, copied to portable values. */
+    fun subclassSnapshot(): SubclassSnapshot {
+        val cached = subclassIndex()
+        return SubclassSnapshot(cached.revision, cached.names.mapIndexed { n, name ->
+            SubclassNode(name, n, cached.index.id(n), cached.index.ancestorIds(n).toIntArray().toList(),
+                cached.index.descendantIds(n).toIntArray().toList())
+        }, cached.edges.toList(), cached.index.byteSize(), cached.index.shapeHistogram())
+    }
+
+    private data class CachedSubclassIndex(
+        val revision: Long,
+        val names: List<String>,
+        val edges: List<Pair<String, String>>,
+        val index: borg.trikeshed.collections.bits.ClosureIndex,
+        val pairs: Set<Pair<String, String>>,
+    )
+
+    private fun subclassClosure(): Set<Pair<String, String>> = subclassIndex().pairs
+
+    private fun subclassIndex(): CachedSubclassIndex {
         borg.trikeshed.isam.synchronizedLock(gate) { closureCache }?.let { return it }
-        val edges = asserts().mapNotNull { e -> subclassEdge(e) }
+        val (revision, assertions) = borg.trikeshed.isam.synchronizedLock(gate) { subclassRevision to assertsLocked() }
+        val edges = assertions.mapNotNull { e -> subclassEdge(e) }
         val names = ArrayList<String>(); val index = HashMap<String, Int>()
         fun id(n: String) = index.getOrPut(n) { names.size.also { names.add(n) } }
         val parents = Array(edges.size * 2 + 1) { ArrayList<Int>() }
@@ -228,11 +271,15 @@ class KifKnowledgeBase {
         val closure = borg.trikeshed.collections.bits.ClosureIndex.build(names.size) { n -> parents[n].toIntArray() }
         val out = LinkedHashSet<Pair<String, String>>()
         for (n in names.indices) for (anc in closure.ancestorNodes(n)) out.add(names[n] to names[anc])
-        borg.trikeshed.isam.synchronizedLock(gate) { closureCache = out }
-        return out
+        val built = CachedSubclassIndex(revision, names, edges, closure, out)
+        borg.trikeshed.isam.synchronizedLock(gate) {
+            // A concurrent subclass mutation must not reinstall an obsolete cache.
+            if (subclassRevision == revision) closureCache = built
+        }
+        return built
     }
 
-    private var closureCache: Set<Pair<String, String>>? = null
+    private var closureCache: CachedSubclassIndex? = null
 
     private fun subclassEdge(e: KifExpr): Pair<String, String>? {
         val l = e as? KifExpr.ListExpr ?: return null

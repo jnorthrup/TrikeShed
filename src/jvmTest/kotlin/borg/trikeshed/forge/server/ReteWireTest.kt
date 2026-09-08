@@ -6,6 +6,8 @@ import borg.trikeshed.dag.PlaneFacts
 import borg.trikeshed.dag.ReteNetwork
 import borg.trikeshed.dag.ReteProduction
 import borg.trikeshed.dag.Activation
+import borg.trikeshed.dag.KifTee
+import borg.trikeshed.kif.KifKnowledgeBase
 import borg.trikeshed.job.ContentId
 import borg.trikeshed.lib.Join
 import borg.trikeshed.lib.Series
@@ -254,5 +256,59 @@ class ReteWireTest {
         assertEquals(ReteWire.Selection(null, null, null, null), empty, "blank parameters are absent parameters")
         assertTrue(ReteWire.matches(3L, "3") && ReteWire.matches(false, "false") && !ReteWire.matches("3 ", "3"))
         assertEquals(BlackboardContext(PlaneFacts.PANELS), cable1.board)
+    }
+
+    @Suppress("UNCHECKED_CAST")
+    private fun objectRows(value: Any?): List<Map<String, Any?>> = when (value) {
+        is Array<*> -> value.map { it as Map<String, Any?> }
+        is Iterable<*> -> value.map { it as Map<String, Any?> }
+        else -> error("not rows: $value")
+    }
+
+    @Test
+    fun connectionsExposeAppliedProjectionAndTheRealSubclassIndex() = runBlocking {
+        val bank = KifKnowledgeBase()
+        bank.assertKif("(subclass Probe Entity)")
+        val (tee, handle) = KifTee.attach(network, bank)
+        try {
+            tee.prime(network)
+            val connectionWire = ReteWire(network, tee)
+            val response = connectionWire.route("GET", "/api/rete/connections?partition=panels&limit=1", "", null)!!
+            assertEquals(200, response.status)
+            @Suppress("UNCHECKED_CAST")
+            val data = JsonSupport.parse(response.body) as Map<String, Any?>
+            assertEquals("trikeshed.rete-connections/v1", data["schema"])
+            @Suppress("UNCHECKED_CAST")
+            val facts = data["facts"] as Map<String, Any?>
+            assertEquals(3, (facts["matched"] as Number).toInt())
+            assertEquals(1, (facts["nextOffset"] as Number).toInt())
+            assertEquals(1, objectRows(facts["rows"]).size)
+            val projection = objectRows(data["projections"]).single()
+            assertEquals(true, projection["tracked"])
+            assertEquals(true, projection["matchesFactSnapshot"])
+            assertEquals(PlaneFacts.toKif(cable1).map { it.toKifString() }, objectRows(projection["tuples"]).map { it["kif"] })
+            assertTrue(objectRows(projection["tuples"]).all { it["held"] == true })
+            @Suppress("UNCHECKED_CAST")
+            val ontology = data["ontology"] as Map<String, Any?>
+            assertEquals(setOf("Probe", "Entity"), objectRows(ontology["nodes"]).map { it["name"] }.toSet())
+
+            network.retract(cable1.factId)
+            assertNull(tee.projection(cable1.factId))
+            assertTrue(PlaneFacts.toKif(cable1).none(bank::contains))
+        } finally { handle.close() }
+    }
+
+    @Test
+    fun connectionsWithoutAnAttachedBankDoNotFabricateKifLinks() {
+        @Suppress("UNCHECKED_CAST")
+        val data = JsonSupport.parse(get("/api/rete/connections?limit=1")!!.body) as Map<String, Any?>
+        assertNull(data["ontology"])
+        val projection = objectRows(data["projections"]).single()
+        assertEquals(false, projection["tracked"])
+        assertNull(projection["tuples"])
+        for (query in listOf("limit=0", "limit=1001", "limit=no", "offset=-1", "offset=no")) {
+            assertEquals(400, get("/api/rete/connections?$query")!!.status)
+        }
+        assertNull(runBlocking { wire.route("POST", "/api/rete/connections", "", null) })
     }
 }

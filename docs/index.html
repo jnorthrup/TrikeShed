@@ -8,14 +8,20 @@
     :root { color-scheme: light dark; }
     body { margin: 0; font: 14px/1.5 system-ui, sans-serif; }
     main { display: flex; flex-direction: column; height: 100vh; height: 100dvh; }
-    nav { padding: 10px 16px; }
+    nav { display: flex; flex-wrap: wrap; gap: 8px 16px; padding: 10px 16px; }
     a { color: inherit; }
+    .provenance { margin: 0; padding: 0 16px 12px; font-size: 13px; }
     iframe { display: block; width: 100%; min-height: 0; flex: 1; border: 0; }
   </style>
 </head>
 <body>
   <main>
-    <nav aria-label="Documentation"><a href="./index.html">docs/index.html</a></nav>
+    <nav aria-label="Documentation">
+      <a href="https://jnorthrup.github.io/TrikeShed/">GitHub Pages</a>
+      <a href="./demo/index.html">Old demo</a>
+      <a href="./index.html">docs/index.html</a>
+    </nav>
+    <p class="provenance" role="note"><strong>Hand-curated architecture sketch.</strong> The 110 nodes and 191 relationships were manually assembled from source references. The relationships and completeness have not been exhaustively verified; the arrows are not a recorded runtime causal trace.</p>
     <iframe src="./rete-sumo-preview.html" title="Interactive Rete and SUMO causal graph"></iframe>
   </main>
 </body>

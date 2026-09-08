@@ -3,6 +3,9 @@ package borg.trikeshed.mux
 import borg.trikeshed.htx.HtxElement
 import borg.trikeshed.htx.openHtxElement
 import borg.trikeshed.job.ContentId
+import borg.trikeshed.lcnc.LcncProgramConfix
+import borg.trikeshed.lcnc.MuxAgentTricks
+import borg.trikeshed.parse.json.JsonSupport
 import borg.trikeshed.lib.Series
 import borg.trikeshed.lib.get
 import borg.trikeshed.lib.j
@@ -19,8 +22,10 @@ import keymux.KeyMux
 import keymux.defaultHermesHome
 import keymux.operatorKeyMux
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeout
 import modelmux.ModelMux
 import modelmux.acp.AcpMessage
 import kotlin.system.exitProcess
@@ -60,6 +65,8 @@ Usage:
   mux keys   [--json] [--all]        which providers resolve a key, and from where
   mux models [--json]                what the mux would route, and the key each binds
   mux chat   --model <id> [--provider <p>] [--base-url <u>] [--max-tokens N] <prompt...>
+  mux tricks --provider <p> [--model <id>] [--max-tokens N] [--json] [--expanded]
+             [--describe]            draft, critic, exact cached encore; describe makes no calls
   mux doctor [--json] [--provider <p>]   resolve → probe a real call → verdict
   mux stack  [--port N]              the WHOLE product: daemon, MCP, LCNC, live chat
 
@@ -88,6 +95,7 @@ Secrets are never printed — keys show as len= and sha256 prefix."""
                 "keys" -> runBlocking { cmdKeys(json, all, provider) }
                 "models" -> runBlocking { cmdModels(json) }
                 "chat" -> runBlocking { cmdChat(rest) }
+                "tricks" -> runBlocking { cmdTricks(rest) }
                 "doctor" -> runBlocking { cmdDoctor(json, provider) }
                 "stack" -> runBlocking { cmdStack(flagValue(rest, "--port")?.toIntOrNull() ?: 8888) }
                 else -> {
@@ -132,11 +140,63 @@ Secrets are never printed — keys show as len= and sha256 prefix."""
      */
     private suspend fun <T> withMuxRuntime(block: suspend (HtxElement, MuxReactorElement) -> T): T {
         val nio = NioSupervisor()
-        nio.open()
-        val htx = openHtxElement(nioSupervisor = nio)
         val reactor = MuxReactorElement(initialConfig = MuxReactorConfig())
-        reactor.open()
-        return block(htx, reactor)
+        var htx: HtxElement? = null
+        try {
+            nio.open()
+            val transport = openHtxElement(nioSupervisor = nio)
+            htx = transport
+            reactor.open()
+            return block(transport, reactor)
+        } finally {
+            withContext(NonCancellable) {
+                try {
+                    withTimeout(5_000) { reactor.drain(); reactor.close() }
+                } finally {
+                    try {
+                        withTimeout(5_000) { htx?.drain(); htx?.close() }
+                    } finally {
+                        withTimeout(5_000) { nio.drain(); nio.close() }
+                    }
+                }
+            }
+        }
+    }
+
+    private suspend fun cmdTricks(args: List<String>): Boolean {
+        val provider = flagValue(args, "--provider")
+        val model = flagValue(args, "--model") ?: providersOf(provider).singleOrNull()?.probeModel
+        val maxTokens = if ("--max-tokens" in args) flagValue(args, "--max-tokens")?.toIntOrNull() else 192
+        if (provider == null || model.isNullOrBlank() || maxTokens == null || maxTokens !in 16..512) {
+            println("mux tricks: choose --provider and a --model (or its registry default); --max-tokens must be 16..512")
+            return false
+        }
+        val collapsed = "--expanded" !in args
+        if ("--describe" in args) {
+            println(JsonSupport.stringify(MuxAgentTricks.programs(model, maxTokens, collapsed).mapValues {
+                JsonSupport.parse(LcncProgramConfix.toJson(it.value))
+            }))
+            return true
+        }
+        val row = resolveRows(provider).singleOrNull()
+        if (row?.present != true || row.baseUrl.isBlank()) {
+            println("mux tricks: no configured key and endpoint for $provider; no model calls made")
+            return false
+        }
+        val fileOps = JvmFileOperations()
+        val keyMux = buildKeyMux(fileOps)
+        return withMuxRuntime { htx, reactor ->
+            withContext(Dispatchers.IO + fileOps + htx + reactor) {
+                val mux = ModelMux(keyMux) {
+                    model(id = model, caps = setOf("chat"), baseUrl = row.baseUrl, provider = provider)
+                }
+                val report = MuxAgentTricks.run(keyMux, mux, model, maxTokens, collapsed) { step ->
+                    if ("--json" !in args) println(JsonSupport.stringify(mapOf("step" to step)))
+                }
+                println(JsonSupport.stringify(report))
+                report["ok"] == true
+            }
+        }
     }
 
     private fun providersOf(only: String?): List<HarnessProvider> {
