@@ -1,6 +1,9 @@
 package borg.trikeshed.btrfs
 
+import borg.trikeshed.userspace.nio.ebpf.UringEbpfProgram
+import borg.trikeshed.userspace.nio.channels.UringChannel
 import borg.trikeshed.userspace.nio.file.spi.FileOperations
+import borg.trikeshed.userspace.nio.spi.NioCapabilityReport
 
 /**
  * Nio ↔ Btrfs ↔ Graal blob wiring — all commonMain, per-target chokepoints as TODO.
@@ -87,39 +90,35 @@ object NioBtrfsGraalBlobStore {
 
     /** On-disk seed layout. It is not mountable until the offline btrfs-progs oracle passes. */
     fun writeMountableImage(imagePath: String, totalBytes: ULong, fileOps: FileOperations): Boolean {
-        require(totalBytes >= (SUPER_OFFSET_PRIMARY + SUPER_SIZE).toULong()) {
-            "image must at least hold the 64K superblock: totalBytes=$totalBytes"
-        }
-        // Superblock field layout matches BtrfsSuperblock.parse exactly:
-        // bytenr@0 flags@8 magic@16 generation@24 root@32 chunkRoot@40 totalBytes@48 bytesUsed@56.
-        val superBytes = ByteArray(SUPER_SIZE)
-        writeULongLE(superBytes, 0, SUPER_OFFSET_PRIMARY.toULong())
-        writeULongLE(superBytes, 8, 0uL)
-        writeULongLE(superBytes, 16, BTRFS_MAGIC)
-        writeULongLE(superBytes, 24, 1uL) // generation 1 — fresh filesystem
-        writeULongLE(superBytes, 32, 0uL) // root tree bytenr skeleton
-        writeULongLE(superBytes, 40, 0uL) // chunk root bytenr skeleton
-        writeULongLE(superBytes, 48, totalBytes)
-        writeULongLE(superBytes, 56, 0uL)
-
-        val withMirror = totalBytes >= (SUPER_OFFSET_MIRRORS + SUPER_SIZE).toULong()
-        val imgSize = if (withMirror) SUPER_OFFSET_MIRRORS + SUPER_SIZE else SUPER_OFFSET_PRIMARY + SUPER_SIZE
+        BtrfsSeedImageLayout.requireTotalBytes(totalBytes)
+        val imgSize = BtrfsSeedImageLayout.requiredBytes(totalBytes).toLong()
         val img = ByteArray(imgSize.toInt())
-        superBytes.copyInto(img, SUPER_OFFSET_PRIMARY.toInt())
-        if (withMirror) {
-            // btrfs writes the 64MiB mirror only on devices big enough to hold it;
-            // the mirror's bytenr field carries its own location.
-            val mirrorBytes = superBytes.copyOf()
-            writeULongLE(mirrorBytes, 0, SUPER_OFFSET_MIRRORS.toULong())
-            mirrorBytes.copyInto(img, SUPER_OFFSET_MIRRORS.toInt())
+        for (offset in BtrfsSeedImageLayout.superblockOffsets(totalBytes)) {
+            // btrfs writes the 64MiB mirror only on devices big enough to hold it.
+            BtrfsSeedImageLayout.superblockBytes(offset.toULong(), totalBytes).copyInto(img, offset.toInt())
         }
         fileOps.writeAtomically(imagePath, img)
         return true
     }
 
-    private fun writeULongLE(buf: ByteArray, offset: Int, v: ULong) {
-        for (i in 0..7) buf[offset + i] = ((v shr (i * 8)) and 0xFFuL).toByte()
-    }
+    /** Compatibility uring path for disposable pre-sized image files; returns backend/completion receipts. */
+    suspend fun writeImageViaUring(
+        imagePath: String,
+        totalBytes: ULong,
+        entries: Int = 8,
+        ebpfPrograms: List<UringEbpfProgram> = emptyList(),
+    ): BtrfsImageWriteReceipt =
+        BtrfsImageIo.writeSeedImage(imagePath, totalBytes, entries, ebpfPrograms)
+
+    /** Connected uring path: caller supplies the selected channel; image OPENAT/FTRUNCATE go through SQE/CQE. */
+    suspend fun writeImageViaUring(
+        channel: UringChannel,
+        imagePath: String,
+        totalBytes: ULong,
+        backend: NioCapabilityReport,
+        channelReport: BtrfsUringChannelReport? = null,
+    ): BtrfsImageWriteReceipt =
+        BtrfsImageIo.writeSeedImage(channel, imagePath, totalBytes, backend, channelReport)
 
     fun verifyWithCBtrfs(imagePath: String): Boolean =
         TODO("posixMain: pinned btrfs-progs ProcessOperations.exec(\"btrfs\", \"check\", imagePath) == 0; jvmMain: local superblock parse is not a mountability oracle")
@@ -155,6 +154,7 @@ object NioBtrfsGraalBlobStore {
         appendLine(" - BtrfsReflinkStore reflink (span mount linkable)")
         appendLine(" - BtrfsChunkTree/BtrfsStripe RAID (c userspace btrfs type bits)")
         appendLine(" - TrikeShedGraalVfs local-exclusive (file lock)")
+        appendLine(" - BtrfsUringFileVolume: nonvolatile userspace.nio.Volume over selected uring channel")
         appendLine(" - on-disk seed: superblock BTRFS_MAGIC=0x4D5F53665248425F at 64K; btrfs-progs oracle still required")
     }
 }

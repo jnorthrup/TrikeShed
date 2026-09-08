@@ -39,5 +39,6 @@ class BtrfsImplementationStatusTest {
         assertTrue(BtrfsCapability.MKFS_IMAGE in oracleGated)
         assertTrue(BtrfsCapability.CHECK_READ_ONLY in oracleGated)
         assertEquals(BtrfsSupportStatus.SKELETON, BtrfsImplementationStatus.statusOf(BtrfsCapability.MKFS_IMAGE).status)
+        assertEquals(BtrfsSupportStatus.IMPLEMENTED, BtrfsImplementationStatus.statusOf(BtrfsCapability.URING_FILE_VOLUME).status)
     }
 }

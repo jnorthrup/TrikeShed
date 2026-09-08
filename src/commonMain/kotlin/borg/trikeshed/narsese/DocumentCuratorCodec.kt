@@ -22,6 +22,15 @@ internal object DocumentCuratorCodec {
         "correlation" to source.correlation, "metadata" to source.metadata,
     )
 
+    fun nlp(doc: NlpDocument): Map<String, Any?> = mapOf("text" to doc.text,
+        "sentences" to doc.sentences.values { s -> mapOf(
+            "index" to s.index, "begin" to s.begin, "end" to s.end,
+            "tokens" to s.tokens.values { t -> mapOf("index" to t.index, "begin" to t.begin,
+                "end" to t.end, "word" to t.word, "lemma" to t.lemma, "tag" to t.tag, "ner" to t.ner) },
+            "dependencies" to s.dependencies.values { d -> mapOf("governor" to d.governor,
+                "dependent" to d.dependent, "relation" to d.relation) },
+        ) })
+
     fun proposal(p: DocumentProposal): Map<String, Any?> = mapOf(
         "raw" to p.raw, "subject" to p.subject, "predicate" to p.predicate, "object" to p.obj,
         "confidence" to p.confidence, "quote" to p.quote, "begin" to p.begin, "end" to p.end,
@@ -41,14 +50,7 @@ internal object DocumentCuratorCodec {
         "model" to record.model?.let { mapOf("content" to it.content, "providerId" to it.providerId, "modelId" to it.modelId,
             "promptTokens" to it.usage.promptTokens, "completionTokens" to it.usage.completionTokens,
             "totalTokens" to it.usage.totalTokens) },
-        "nlp" to record.nlp?.let { doc -> mapOf("text" to doc.text,
-            "sentences" to doc.sentences.values { s -> mapOf(
-                "index" to s.index, "begin" to s.begin, "end" to s.end,
-                "tokens" to s.tokens.values { t -> mapOf("index" to t.index, "begin" to t.begin,
-                    "end" to t.end, "word" to t.word, "lemma" to t.lemma, "tag" to t.tag, "ner" to t.ner) },
-                "dependencies" to s.dependencies.values { d -> mapOf("governor" to d.governor,
-                    "dependent" to d.dependent, "relation" to d.relation) },
-            ) }) },
+        "nlp" to record.nlp?.let(::nlp),
         "proposals" to record.proposals.values { proposal(it) }, "reasons" to record.reasons.values(),
         "reserved" to record.reservedReceiptCids.values { it.value },
         "submitted" to record.submittedReceiptCids.values { it.value },

@@ -24,17 +24,16 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.channels.SendChannel
 import kotlinx.coroutines.currentCoroutineContext
-import kotlinx.coroutines.flow.buffer
-import kotlinx.coroutines.flow.channelFlow
 import kotlinx.coroutines.joinAll
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlin.coroutines.CoroutineContext
+import kotlin.coroutines.EmptyCoroutineContext
 
 /**
- * Bounded input -> bounded NLP/model channelFlow -> fan-in -> ledger/intake -> result queue.
- * One dispatcher joins one branch pair at a time; there is no unbounded correlation map.
+ * Bounded input -> NLP -> bounded model input -> ledger/intake -> result queue.
+ * Each model call consumes its source's completed NLP output; every stage has one owned worker.
  * The injected log is exclusively owned here and MUST NOT be the belief log.
  *
  * CAS-before-WAL reservations give conservative at-most-once submission across retries.
@@ -78,6 +77,7 @@ class DocumentCuratorElement private constructor(
     private val supervisor = SupervisorJob(scope.coroutineContext[Job])
     private val workers = CoroutineScope(scope.coroutineContext + this + supervisor)
     private val input = Channel.buffered<Work>(capacity)
+    private val analyzed = Channel.buffered<Analyzed>(capacity)
     private val joined = Channel.buffered<Joined>(capacity)
     private val output = Channel.buffered<Completion>(capacity)
     private val jobs = mutableListOf<Job>()
@@ -93,11 +93,8 @@ class DocumentCuratorElement private constructor(
 
     private data class Work(val source: DocumentSource, val reply: CompletableDeferred<Result<DocumentCurationResult>>)
     private data class Outcome<T>(val result: Result<T>, val observerError: String?)
-    private sealed interface Branch {
-        data class Nlp(val outcome: Outcome<NlpDocument>) : Branch
-        data class Model(val outcome: Outcome<ModelResponse>) : Branch
-    }
-    private data class Joined(val work: Work, val nlp: Outcome<NlpDocument>, val model: Outcome<ModelResponse>, val notices: List<String>)
+    private data class Analyzed(val work: Work, val nlp: Outcome<NlpDocument>, val notices: List<String>)
+    private data class Joined(val work: Work, val nlp: Outcome<NlpDocument>, val model: Outcome<ModelResponse>?, val notices: List<String>)
     private data class Completion(val work: Work, val result: Result<DocumentCurationResult>)
 
     suspend fun curate(source: DocumentSource): DocumentCurationResult {
@@ -132,8 +129,8 @@ class DocumentCuratorElement private constructor(
 
     suspend fun close() = drain()
 
-    private fun owned(block: suspend DocumentCuratorElement.() -> Unit) {
-        jobs.add(workers.launch {
+    private fun owned(context: CoroutineContext = EmptyCoroutineContext, block: suspend DocumentCuratorElement.() -> Unit) {
+        jobs.add(workers.launch(context) {
             val owner = currentCoroutineContext()[Key] ?: error("missing DocumentCuratorElement context")
             try { owner.block() }
             catch (e: CancellationException) { owner.supervisor.cancel(e); throw e }
@@ -145,37 +142,40 @@ class DocumentCuratorElement private constructor(
     }
 
     private fun start() {
-        owned {
+        owned(Dispatchers.Default) {
             try {
                 while (true) {
                     val work = input.recv().getOrNull() ?: break
                     val notices = mutableListOf<String>()
                     observe("curator.input", work.source)?.let(notices::add)
-                    var nlp: Outcome<NlpDocument>? = null
-                    var model: Outcome<ModelResponse>? = null
-                    channelFlow<Branch> {
-                        launch(Dispatchers.Default) {
-                            val owner = currentCoroutineContext()[Key] ?: error("missing curator owner")
-                            val result = attempt { owner.nlp.read(work.source.text) }
-                            send(Branch.Nlp(Outcome(result, owner.observe("curator.nlp", work.source))))
-                        }
-                        launch {
-                            val owner = currentCoroutineContext()[Key] ?: error("missing curator owner")
-                            val result = attempt { owner.model(Prompt(
-                                listOf(PromptMessage.System(DocumentCuratorGrounding.instructions),
-                                    PromptMessage.User(JsonSupport.stringify(DocumentCuratorCodec.source(work.source)))).toSeries(),
-                                owner.modelId, temperature = 0.0, maxTokens = 4096,
-                            )) }
-                            send(Branch.Model(Outcome(result, owner.observe("curator.model", work.source))))
-                        }
-                    }.buffer(capacity).collect { branch ->
-                        when (branch) {
-                            is Branch.Nlp -> nlp = branch.outcome
-                            is Branch.Model -> model = branch.outcome
-                        }
+                    val result = attempt { nlp.read(work.source.text) }
+                    analyzed.send(Analyzed(work, Outcome(result, observe("curator.nlp", work.source)), notices)).getOrThrow()
+                }
+            } finally { analyzed.close() }
+        }
+        owned {
+            try {
+                while (true) {
+                    val analysis = analyzed.recv().getOrNull() ?: break
+                    val source = analysis.work.source
+                    val notices = analysis.notices.toMutableList()
+                    val document = analysis.nlp.result.getOrNull()
+                    val response = if (nlpIssue(source, document) == null) {
+                        val result = attempt { model(Prompt(
+                            listOf(PromptMessage.System(DocumentCuratorGrounding.instructions),
+                                PromptMessage.User(JsonSupport.stringify(mapOf(
+                                    "source" to DocumentCuratorCodec.source(source),
+                                    "nlp" to DocumentCuratorCodec.nlp(checkNotNull(document)),
+                                )))).toSeries(),
+                            modelId, temperature = 0.0, maxTokens = 4096,
+                        )) }
+                        Outcome(result, observe("curator.model", source))
+                    } else {
+                        observe("curator.model.skipped", source)?.let(notices::add)
+                        null
                     }
-                    observe("curator.join", work.source)?.let(notices::add)
-                    joined.send(Joined(work, checkNotNull(nlp), checkNotNull(model), notices)).getOrThrow()
+                    observe("curator.join", source)?.let(notices::add)
+                    joined.send(Joined(analysis.work, analysis.nlp, response, notices)).getOrThrow()
                 }
             } finally { joined.close() }
         }
@@ -199,15 +199,16 @@ class DocumentCuratorElement private constructor(
         val source = join.work.source
         val reasons = mutableListOf<String>()
         val observerFailures = join.notices.toMutableList()
-        join.nlp.observerError?.let(observerFailures::add); join.model.observerError?.let(observerFailures::add)
+        join.nlp.observerError?.let(observerFailures::add); join.model?.observerError?.let(observerFailures::add)
         join.nlp.result.exceptionOrNull()?.let { reasons.add("nlp: ${it.message}") }
-        join.model.result.exceptionOrNull()?.let { reasons.add("model: ${it.message}") }
+        join.model?.result?.exceptionOrNull()?.let { reasons.add("model: ${it.message}") }
+        if (join.model == null) reasons.add("model skipped: ${nlpIssue(source, join.nlp.result.getOrNull())}")
         val original = cas.get(source.originalCid)
         val sourceValid = original != null && ContentId.of(original) == source.originalCid &&
             ContentId.of(source.text.encodeToByteArray()) == source.extractedTextCid
         if (!sourceValid) reasons.add("source CID absent or extracted text CID mismatch")
         else putVerified(cas, source.text.encodeToByteArray())
-        val response = join.model.result.getOrNull()
+        val response = join.model?.result?.getOrNull()
         val parsed = response?.let { DocumentCuratorGrounding.parse(it.content) } ?: emptySeriesOf()
         if (response != null && parsed.size == 0) reasons.add("model proposed no assertions")
         val grounded = DocumentCuratorGrounding.reconcile(source, join.nlp.result.getOrNull(), parsed)
@@ -306,6 +307,13 @@ class DocumentCuratorElement private constructor(
     private suspend fun observe(name: String, source: DocumentSource, refs: Series<ContentId> =
         listOf(source.originalCid, source.extractedTextCid).toSeries()): String? =
         attempt { observer.boundary(name, source.correlation, refs) }.exceptionOrNull()?.let { "observer $name: ${it.message}" }
+
+    private fun nlpIssue(source: DocumentSource, document: NlpDocument?): String? = when {
+        document == null -> "nlp unavailable"
+        document.text != source.text -> "nlp text differs from extracted text"
+        document.sentences.size == 0 -> "nlp returned no sentences"
+        else -> null
+    }
 }
 
 private suspend fun <T> attempt(block: suspend () -> T): Result<T> = try {

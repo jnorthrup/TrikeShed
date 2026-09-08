@@ -44,6 +44,7 @@ enum class BtrfsSupportStatus {
 }
 
 enum class BtrfsCapability {
+    URING_FILE_VOLUME,
     MKFS_IMAGE,
     CHECK_READ_ONLY,
     SUPERBLOCK_READ,
@@ -70,6 +71,12 @@ data class BtrfsCapabilityStatus(
 object BtrfsImplementationStatus {
     val matrix: List<BtrfsCapabilityStatus> = listOf(
         BtrfsCapabilityStatus(
+            BtrfsCapability.URING_FILE_VOLUME,
+            BtrfsSupportStatus.IMPLEMENTED,
+            BtrfsOracleKind.LOCAL_INVARIANT,
+            "BtrfsUringFileVolume implements userspace.nio.Volume over a channel-opened image fd and routes open, resize, block reads, writes, fsync, and close through the common uring channel.",
+        ),
+        BtrfsCapabilityStatus(
             BtrfsCapability.SUPERBLOCK_READ,
             BtrfsSupportStatus.IMPLEMENTED,
             BtrfsOracleKind.LOCAL_INVARIANT,
@@ -85,13 +92,13 @@ object BtrfsImplementationStatus {
             BtrfsCapability.MKFS_IMAGE,
             BtrfsSupportStatus.SKELETON,
             BtrfsOracleKind.BTRFS_PROGS_OFFLINE,
-            "writeMountableImage writes superblock slots but does not yet emit complete root, chunk, device, extent, checksum, or fs trees.",
+            "BtrfsImageIo writes superblock slots through the common uring volume and verifies local readback, but does not yet emit complete root, chunk, device, extent, checksum, or fs trees.",
         ),
         BtrfsCapabilityStatus(
             BtrfsCapability.CHECK_READ_ONLY,
-            BtrfsSupportStatus.MISSING,
+            BtrfsSupportStatus.SKELETON,
             BtrfsOracleKind.BTRFS_PROGS_OFFLINE,
-            "No pinned btrfs-progs oracle currently runs btrfs check against produced images.",
+            "BtrfsProgsOracle can run btrfs check --readonly when a JVM-visible btrfs executable is configured or found; missing btrfs-progs remains a concrete blocker.",
         ),
         BtrfsCapabilityStatus(
             BtrfsCapability.ROOT_TREE_READ,
