@@ -238,10 +238,7 @@ kotlin {
                 implementation("org.graalvm.polyglot:llvm-community:$graalVersion")
                 implementation("org.graalvm.truffle:truffle-api:$graalVersion")
 
-                // Apache Tika — document text extraction (PDF/DOCX/images via Tesseract OCR).
-                // Parsers pull in POI/PDFBox/etc. only on the JVM target.
-                implementation("org.apache.tika:tika-core:3.2.3")
-                implementation("org.apache.tika:tika-parsers-standard-package:3.2.3")
+                // Tika is loaded from the managed utils/subvm/tika module by TikaRuntime.
                 implementation("org.xerial:sqlite-jdbc:3.42.0.0")
 
                 // Stanford CoreNLP is deliberately NOT here any more. It has no compile-time
@@ -621,6 +618,14 @@ tasks.register<JavaExec>("subvmHarness") {
     useStagedJvmClasspath()
     mainClass.set("borg.trikeshed.graal.subvm.harness.HarnessMain")
     args(listOf("docs/subvm"))
+}
+
+tasks.register<JavaExec>("documentFeedHarness") {
+    group = "subvm"
+    description = "Run managed Tika/Camel/CoreNLP through the document curator and NARS intake."
+    useStagedJvmClasspath()
+    mainClass.set("borg.trikeshed.graal.subvm.harness.DocumentFeedHarness")
+    maxHeapSize = "3g"
 }
 
 tasks.register<Exec>("subvmHarnessNative") {

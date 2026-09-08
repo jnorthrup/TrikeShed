@@ -1,11 +1,14 @@
 package borg.trikeshed.modelmux
 
 import modelmux.defaultSecureIdGenerator
+import kotlin.jvm.JvmOverloads
 
-data class ModelResponse(
+data class ModelResponse @JvmOverloads constructor(
     val content: String,
     val usage: ModelUsage,
-    val providerId: String
+    val providerId: String,
+    /** Actual answering model when the adapter can report it, including failover. */
+    val modelId: String? = null,
 )
 
 /**

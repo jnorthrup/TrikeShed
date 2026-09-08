@@ -1,6 +1,7 @@
 package borg.trikeshed.graal.subvm
 
 import borg.trikeshed.lcnc.CamelLinkage
+import java.lang.reflect.InvocationTargetException
 import java.lang.reflect.Method
 import java.lang.reflect.Proxy
 import java.util.concurrent.ConcurrentHashMap
@@ -46,6 +47,15 @@ object CamelRuntime {
      */
     const val MAX_FACT_BODY: Int = 4096
 
+    /** Headers this runtime writes onto the actual Camel Exchange before the tap returns. */
+    const val HEADER_ROUTE_ID: String = "TrikeShedCamelRouteId"
+    const val HEADER_EXCHANGE_ID: String = "TrikeShedCamelExchangeId"
+    const val HEADER_SEQ: String = "TrikeShedCamelSeq"
+    const val HEADER_PROCESSED: String = "TrikeShedCamelProcessed"
+
+    /** Exchange property set before rethrowing a failing [PayloadProcessor]. */
+    const val PROPERTY_PROCESSOR_ERROR: String = "TrikeShedCamelProcessorError"
+
     /** One Exchange as it crossed the tap, for the caller to publish however it publishes. */
     data class Exchange(
         val routeId: String,
@@ -58,6 +68,32 @@ object CamelRuntime {
     /** What a caller hands in to see traffic. Called on Camel's own consumer thread. */
     fun interface Observer {
         fun onExchange(exchange: Exchange)
+    }
+
+    /** Full body plus route-local identity, for code that participates in the Exchange. */
+    data class Payload(
+        val routeId: String,
+        val exchangeId: String?,
+        val seq: Long,
+        val body: String,
+        val atMs: Long,
+    )
+
+    /** Host request for a callable route. */
+    data class Request(
+        val body: String,
+        val headers: Map<String, Any?> = emptyMap(),
+    )
+
+    /** Body and headers written back to the actual Exchange. */
+    data class Reply(
+        val body: String,
+        val headers: Map<String, Any?> = emptyMap(),
+    )
+
+    /** What a caller hands in to process traffic. Called on Camel's own consumer thread. */
+    fun interface PayloadProcessor {
+        fun process(payload: Payload): Reply
     }
 
     /** A started route, and the handle that stops it. */
@@ -138,6 +174,32 @@ object CamelRuntime {
         module: String = MODULE,
         reach: CamelLinkage.Reach = CamelLinkage.Reach.LOCAL,
         observer: Observer? = null,
+    ): Route = startRoute(id, from, to, module, reach, observer, null)
+
+    /**
+     * Start a route with a host-side processor that receives the COMPLETE body and may replace it.
+     *
+     * The processor is Exchange work, unlike [Observer]: a failure remains a Camel failure and
+     * the caller of [send] or [request] sees it. The bounded observer still runs first.
+     */
+    fun start(
+        id: String,
+        from: String,
+        to: String,
+        module: String = MODULE,
+        reach: CamelLinkage.Reach = CamelLinkage.Reach.LOCAL,
+        processor: PayloadProcessor,
+        observer: Observer? = null,
+    ): Route = startRoute(id, from, to, module, reach, observer, processor)
+
+    private fun startRoute(
+        id: String,
+        from: String,
+        to: String,
+        module: String,
+        reach: CamelLinkage.Reach,
+        observer: Observer?,
+        payloadProcessor: PayloadProcessor?,
     ): Route {
         require(id.isNotBlank()) { "route id is blank — a running route has to be nameable to be stoppable" }
         check(!routes.containsKey(id)) { "route '$id' is already running — stop it first, or pick another id" }
@@ -162,40 +224,72 @@ object CamelRuntime {
 
         var camelContext: Any? = null
         try {
-            camelContext = withLoader(loader) {
+            withLoader(loader) {
                 val ctx = bridge.newContext()
+                camelContext = ctx
                 val route = Route(id, module, from, to, startedAtMs, bridge, ctx)
                 bridge.addRoute(ctx, from, to, id, bridge.processor { exchange ->
                     val seq = route.counter.incrementAndGet()
                     route.lastAtMs = System.currentTimeMillis()
-                    if (observer != null) {
+                    val exchangeId = bridge.exchangeIdOf(exchange)
+                    bridge.setHeader(exchange, HEADER_ROUTE_ID, id)
+                    exchangeId?.let { bridge.setHeader(exchange, HEADER_EXCHANGE_ID, it) }
+                    bridge.setHeader(exchange, HEADER_SEQ, seq)
+                    if (observer != null || payloadProcessor != null) {
+                        val raw = bridge.bodyOf(exchange)
                         // A broken observer must not kill the route: this runs ON Camel's consumer
                         // thread, and a throw here would fail the Exchange and, on a transacted
                         // route, roll it back. The tap observes; it does not participate.
-                        runCatching {
-                            val raw = bridge.bodyOf(exchange)
-                            observer.onExchange(
-                                Exchange(
-                                    routeId = id,
-                                    seq = seq,
-                                    body = raw.take(MAX_FACT_BODY),
-                                    truncated = raw.length > MAX_FACT_BODY,
-                                    atMs = route.lastAtMs,
-                                ),
-                            )
+                        if (observer != null) {
+                            runCatching {
+                                observer.onExchange(
+                                    Exchange(
+                                        routeId = id,
+                                        seq = seq,
+                                        body = raw.take(MAX_FACT_BODY),
+                                        truncated = raw.length > MAX_FACT_BODY,
+                                        atMs = route.lastAtMs,
+                                    ),
+                                )
+                            }
                         }
+                        if (payloadProcessor != null) {
+                            val payload = Payload(
+                                routeId = id,
+                                exchangeId = exchangeId,
+                                seq = seq,
+                                body = raw,
+                                atMs = route.lastAtMs,
+                            )
+                            try {
+                                val reply = payloadProcessor.process(payload)
+                                bridge.setBody(exchange, reply.body)
+                                reply.headers.forEach { (name, value) -> bridge.setHeader(exchange, name, value) }
+                                bridge.setHeader(exchange, HEADER_PROCESSED, true)
+                            } catch (t: Throwable) {
+                                bridge.setProperty(
+                                    exchange,
+                                    PROPERTY_PROCESSOR_ERROR,
+                                    t.message ?: t::class.java.name,
+                                )
+                                throw t
+                            }
+                        }
+                    } else {
+                        // Still stamp correlation on exchanges that have no observer or processor.
+                        bridge.setHeader(exchange, HEADER_PROCESSED, false)
                     }
                 })
                 bridge.start(ctx)
                 routes[id] = route
-                ctx
             }
             return routes.getValue(id)
         } catch (t: Throwable) {
             routes.remove(id)
             camelContext?.let { c -> runCatching { withLoader(loader) { bridge.stop(c) } } }
-            throw if (t is IllegalStateException) t
-            else IllegalStateException("route '$id' failed to start: ${t.message ?: t::class.java.name}", t)
+            val unwrapped = unwrap(t)
+            throw if (unwrapped is IllegalStateException) unwrapped
+            else IllegalStateException("route '$id' failed to start: ${unwrapped.message ?: unwrapped::class.java.name}", unwrapped)
         }
     }
 
@@ -210,14 +304,22 @@ object CamelRuntime {
     fun stopAll(): List<String> = running().map { it.id }.onEach { stop(it) }
 
     /**
-     * Send [body] into a running route's `from` endpoint and return the reply.
+     * Send [body] into a running route's `from` endpoint and return the reply body.
      *
      * Only meaningful for a route whose `from` is callable (`direct:`, `seda:`); a `timer:`
      * route produces its own Exchanges and has nothing to send into.
      */
-    fun send(id: String, body: String): String {
+    fun send(id: String, body: String): String = request(id, Request(body)).body
+
+    /**
+     * Send [request] into a running route's `from` endpoint and return the Exchange reply.
+     *
+     * Request headers are put onto Camel's input message, route identity is stamped by the tap,
+     * and the returned headers are read from the message after the route has completed.
+     */
+    fun request(id: String, request: Request): Reply {
         val route = routes[id] ?: throw IllegalStateException("route '$id' is not running")
-        return withLoader(route.bridge.loader) { route.bridge.requestBody(route.camelContext, route.from, body) }
+        return withLoader(route.bridge.loader) { route.bridge.request(route.camelContext, route.from, request) }
     }
 
     // ── the one reflective seam ────────────────────────────────────────────────
@@ -241,6 +343,7 @@ object CamelRuntime {
         private val routeClass: Class<*> = loader.loadClass("org.apache.camel.Route")
         private val routeDefinitionClass: Class<*> = loader.loadClass("org.apache.camel.model.RouteDefinition")
         private val processorDefinitionClass: Class<*> = loader.loadClass("org.apache.camel.model.ProcessorDefinition")
+        private val producerTemplateClass: Class<*> = loader.loadClass("org.apache.camel.ProducerTemplate")
 
         // Camel 4 exposes the static seam an abstract RouteBuilder otherwise denies a non-subclass:
         // addRoutes(CamelContext, LambdaRouteBuilder), whose second parameter is a functional
@@ -252,13 +355,21 @@ object CamelRuntime {
         private val processMethod: Method = processorDefinitionClass.getMethod("process", processorClass)
         private val toMethod: Method = processorDefinitionClass.getMethod("to", String::class.java)
         private val getMessage: Method = exchangeClass.getMethod("getMessage")
+        private val getExchangeId: Method = exchangeClass.getMethod("getExchangeId")
+        private val setPropertyMethod: Method = exchangeClass.getMethod("setProperty", String::class.java, Any::class.java)
+        private val getException: Method = exchangeClass.getMethod("getException")
         private val getBody: Method = messageClass.getMethod("getBody", Class::class.java)
+        private val getHeaders: Method = messageClass.getMethod("getHeaders")
+        private val setBodyMethod: Method = messageClass.getMethod("setBody", Any::class.java)
+        private val setHeaderMethod: Method = messageClass.getMethod("setHeader", String::class.java, Any::class.java)
         private val startMethod: Method = defaultContextClass.getMethod("start")
         private val stopMethod: Method = defaultContextClass.getMethod("stop")
         private val getStatus: Method = defaultContextClass.getMethod("getStatus")
         private val getRoutes: Method = defaultContextClass.getMethod("getRoutes")
         private val routeGetId: Method = routeClass.getMethod("getId")
         private val createProducerTemplate: Method = defaultContextClass.getMethod("createProducerTemplate")
+        private val requestMethod: Method = producerTemplateClass.getMethod("request", String::class.java, processorClass)
+        private val templateStop: Method = producerTemplateClass.getMethod("stop")
 
         fun newContext(): Any {
             val ctx = defaultContextClass.getConstructor().newInstance()
@@ -272,7 +383,7 @@ object CamelRuntime {
             return ctx
         }
 
-        /** A `Processor` that hands each Exchange to [tap] and passes it along untouched. */
+        /** A `Processor` that hands each Exchange to [tap]; [tap] may mutate or fail it. */
         fun processor(tap: (Any) -> Unit): Any =
             Proxy.newProxyInstance(loader, arrayOf(processorClass)) { proxy, method, args ->
                 if (method.name == "process" && args != null && args.size == 1) {
@@ -311,15 +422,50 @@ object CamelRuntime {
             return getBody.invoke(message, String::class.java)?.toString() ?: ""
         }
 
-        fun requestBody(ctx: Any, endpoint: String, body: String): String {
-            val template = createProducerTemplate.invoke(ctx)
-            val templateClass = loader.loadClass("org.apache.camel.ProducerTemplate")
-            val request = templateClass.getMethod(
-                "requestBody", String::class.java, Any::class.java, Class::class.java,
-            )
-            val reply = request.invoke(template, endpoint, body, String::class.java)
-            runCatching { templateClass.getMethod("stop").invoke(template) }
-            return reply?.toString() ?: ""
+        fun exchangeIdOf(exchange: Any): String? = getExchangeId.invoke(exchange)?.toString()
+
+        fun setBody(exchange: Any, body: String) {
+            val message = getMessage.invoke(exchange) ?: return
+            setBodyMethod.invoke(message, body)
+        }
+
+        fun setHeader(exchange: Any, name: String, value: Any?) {
+            val message = getMessage.invoke(exchange) ?: return
+            setHeaderMethod.invoke(message, name, value)
+        }
+
+        fun setProperty(exchange: Any, name: String, value: Any?) {
+            setPropertyMethod.invoke(exchange, name, value)
+        }
+
+        fun headersOf(exchange: Any): Map<String, Any?> {
+            val message = getMessage.invoke(exchange) ?: return emptyMap()
+            val headers = getHeaders.invoke(message) as? Map<*, *> ?: return emptyMap()
+            return headers.entries.mapNotNull { entry ->
+                (entry.key as? String)?.let { it to entry.value }
+            }.toMap()
+        }
+
+        fun request(ctx: Any, endpoint: String, request: Request): Reply {
+            var template: Any? = null
+            try {
+                template = createProducerTemplate.invoke(ctx)
+                val reply = requestMethod.invoke(
+                    template,
+                    endpoint,
+                    processor { exchange ->
+                        setBody(exchange, request.body)
+                        request.headers.forEach { (name, value) -> setHeader(exchange, name, value) }
+                    },
+                ) ?: return Reply("")
+                val failure = getException.invoke(reply) as? Throwable
+                if (failure != null) throw failure
+                return Reply(bodyOf(reply), headersOf(reply))
+            } catch (t: Throwable) {
+                throw unwrap(t)
+            } finally {
+                template?.let { runCatching { templateStop.invoke(it) } }
+            }
         }
 
         /**
@@ -353,6 +499,9 @@ object CamelRuntime {
             thread.contextClassLoader = previous
         }
     }
+
+    private tailrec fun unwrap(t: Throwable): Throwable =
+        if (t is InvocationTargetException) unwrap(t.targetException) else t
 
     /** `camel-mail` -> `CamelMail`, so a refusal names a Gradle task that exists. */
     private fun gradleTaskName(module: String): String =

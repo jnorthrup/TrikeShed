@@ -8,8 +8,8 @@ below is the project's kernel fp concepts we use in our kotlin-common projects.
 > | `Series<T> = Join<Int, (Int) -> T>` | **K / kdb+ enumerable** (1993) | size + index oracle. `α`=`each`, `j`=`,`, `s_[]`=`enlist`, `/`=`reshape`, `%`=`where` |
 > | `Cursor = Series<RowVec>` + `ColumnMeta` + `IOMemento` | **Apache Arrow RecordBatch + FieldVector + ArrowType** | lazified; `get(range)`/`get(IntArray)` = fancy indexing |
 > | `ConfixIndexK<R>` / `facet(key): R` GADT-key pattern | **Haskell `Lens' s a` / Monocle optics** | sealed-key singletons fix the result type by the key |
-> | CCEK (`CREATED→OPEN→ACTIVE→DRAINING→CLOSED` + fanout) | **Rx `Subject` / Reactor `Flux`** | same state machine, different alphabet |
->
+> |
+
 > The design bias below (composition over inheritance; ranges and projections
 > over mutable loops; lazy views first; typealiases compress semantics) is the
 > K/Arrow house style. Where a primitive here diverges from its original — e.g.
@@ -139,7 +139,7 @@ Cursor rules:
 
 ## JSON scan / path algebra
 
-now handles yaml and cbor, and cursors under the name Confix 
+now also  handles yaml and cbor, and cursors under the name Confix 
 
 ```kotlin
 typealias JsElement = Join<Twin<Int>, Series<Int>>
@@ -179,6 +179,39 @@ Read this as:
 - lifecycle = explicit state machine
 - fanout = structured delivery, not callback soup
 - userspace = composition and coordination layer around effects
+
+## CCEK composition mandate
+
+CCEK means Coroutine, Context, Element, Key. It is an acronym for composition
+using the documented algebra, not a package, library, separate runtime, or
+central module.
+
+- CCEK composition is required in **at least half the codebase** and in
+  **all asynchronous code**.
+- Implement actual **channel compositions under owning SupervisorJobs**.
+  Straight pipelines and branched fan-out/fan-in are both valid. Bounded
+  channels carry work through stages and return results or failures. Branched
+  work requires fan-in; every composition accounts for and joins admitted
+  work before completion. A discarded claim is not processed work.
+- Implement these asynchronous compositions **exclusively through userspace
+  NIO/uring in `commonMain`**.
+- Resolve dependencies through singleton typed `CoroutineContext.Key`
+  identities and compose the existing domain elements. Follow the documented
+  Join, Series, Cursor, and ConfixIndexK algebra and zero-cost taxonomy.
+- Drain stops admission, finishes in-flight work, joins children, and closes
+  channels. Detached work and hard cancellation do not substitute for drain.
+- **No do-nothing placeholder modules, god classes, or replacement CCEK
+  runtime. Do not resurrect the removed `CCEK.kt` facade.**
+- Adding an element to a scope, importing CCEK names, or attaching labels does
+  not establish composition. Completion requires actual channel dispatch,
+  stage processing, fan-in where the topology requires it, and lifecycle
+  behavior through the callers.
+  Do not weaken these requirements to match unfinished implementations.
+
+Fan out the implementation work into **25 tasks** with concrete ownership,
+then integrate their changes and verify the composed behavior. This directs
+the implementation work; it does not call for 25 new modules. These are
+requirements, not a claim that the current code already satisfies them.
 
 ## What this preload is trying to preserve
 
@@ -246,170 +279,42 @@ typealias Serializer = Confix
 alternate:
 value class LightYear (it:Double){...}
 
-# CCEK element completeness
+# RFC: CCEK element completeness
 
-The lifecycle is five states. Implementations with fewer are incomplete:
+Status: Draft for proofreading. This RFC describes the intended design.
 
-```
-CREATED → OPEN → ACTIVE → DRAINING → CLOSED
-```
+| Term | Kotlin default | TrikeShed CCEK role |
+| --- | --- | --- |
+| [SupervisorJob](https://kotlinlang.org/api/kotlinx.coroutines/kotlinx-coroutines-core/kotlinx.coroutines/-supervisor-job.html) | Parent job whose children can fail independently. | Supervises the launched CCEK coroutines. |
+| [Element](https://kotlinlang.org/api/core/kotlin-stdlib/kotlin.coroutines/-coroutine-context/-element/) | A keyed member of a coroutine context. | A constructed instance carrying mutable state. |
+| [Key](https://kotlinlang.org/api/core/kotlin-stdlib/kotlin.coroutines/-coroutine-context/-key/) | Typed identity used to look up an element. | A factory defining the element's module boundary. |
 
-- CREATED: element exists, not wired. `open()` → OPEN.
-- OPEN: registered, idle. First subscriber/consumer → ACTIVE.
-- ACTIVE: processing. `drain()` → DRAINING.
-- DRAINING: no new work; in-flight completes, then → CLOSED.
-- CLOSED: resources released, channels closed.
+For a coroutine launch, use one or more key factories to construct elements,
+or supply already constructed elements with their existing state. The resulting
+elements are composed into the context supplied to or inherited by
+[`launch`](https://kotlinlang.org/api/kotlinx.coroutines/kotlinx-coroutines-core/kotlinx.coroutines/launch.html).
+The context carries the elements; the scope's supervisor job supervises the
+launched child jobs.
 
-An element IS a `CoroutineContext.Element`:
-- `key: CoroutineContext.Key<*>` — singleton identity object, reference equality. NEVER `.toString()` comparison.
-- `lifecycleState`, `fanoutSubscribers`
-- `open()` / `drain()` / `close()`
+An element may contain one or more supervisor jobs within the module boundary
+defined by its key. The key can be a fully enabled factory for that entire job
+composition.
 
-DRAINING is graceful drain, not hard cancel. In-flight operations finish; the
-channel drains to empty before close. Hard-cancel of children is a last resort,
-not the default shutdown path.
+TrikeShed element design uses Linux kernel `io_uring` through the userspace I/O
+boundary, with channelization as the primary means of conveying state between
+elements.
 
-## HTX serial element chain
+## Userspace I/O and structured completion
 
-```
-HtxKey → HtxElement → HtxReactorElement → JvmTlsCodecBackend → SSLEngine
-```
+TrikeShed's CCEK I/O model combines Java NIO patterns with native or emulated
+Linux kernel I/O, including `io_uring`, through userspace NIO in Kotlin
+`commonMain`. Unix, TCP/IP, and file streams share asynchronous Kotlin channel
+and flow abstractions for fan-out and fan-in.
 
-One SSLEngine per endpoint ordinal. Cipher state (sequence numbers, handshake
-context) is mutable and serial — concurrent writes corrupt it. Therefore:
-
-- All HTX exchanges through one endpoint ordinal serialize (per-element mutex).
-- HtxReactorElement should be a POOL: N elements, each owning its own SSLEngine,
-  borrow/return lifecycle. Pool capacity = concurrency limit. The global htxMutex
-  is a degenerate pool of size 1.
-- HtxKey must be baked into the CoroutineScope: `CoroutineScope(htxElement +
-  Dispatchers.IO)`. Every `scope.launch {}` inherits it; there is no way to
-  drop the transport by forgetting `+ htxElement`.
-
-## HTX terminology is mandatory
-
-Never summarize HTX as "TLS" or "the transport layer." The element chain is:
-HtxKey (context key) → HtxElement (context element) → HtxReactorElement (reactor)
-→ JvmTlsCodecBackend (codec) → SSLEngine (JVM). `connectionOrdinal` on
-`TlsFlowState` identifies the engine instance. These are the names; use them.
-
-# Zero-cost domain taxonomy mandate
-
-The value-class algebra in lib/ extends to the domain layer. Every domain
-identity is a packed primitive, not a heap object or String.
-
-```kotlin
-@JvmInline value class Nuid(val raw: Long)        // cap(4) + subnet(4) + nonceHash(56)
-@JvmInline value class ContentId(val raw: Long)    // or Twin<Long> for full fingerprint
-@JvmInline value class CausalKey(val raw: Long)    // mix64 of causal fields
-@JvmInline value class BlockId(val raw: Int)       // interning pool index
-@JvmInline value class ColumnId(val raw: Byte)     // enum ordinal (3 columns = 1 byte)
-@JvmInline value class SessionId(val raw: Long)
-@JvmInline value class CausalGraphNode(val rowIndex: Int)  // row into the graph Cursor
-```
-
-Strings exist only at the JSON/HTTP serialization boundary — `Id.toString()`
-for the wire, never as the in-process identity. The existing bit-packing
-primitives (TwInt, TwinPacked, IsAEdge, packInts, packFloats, NeighborStamp,
-Mini64) are the templates.
-
-**The causal graph is one Cursor, not N heap objects.** Columns: nodeId
-(Series<String>, interned), opId, parentNodeIds, causalClock (LongArray),
-topoOrdinal (IntArray). A CausalGraphNode IS a row index; "fields" are column
-projections via ConfixIndexK facet lookup.
-
-**The board is a Cursor.** Columns: title (Series<String>), order (IntArray),
-priority (IntArray of enum ordinals), columnId (ByteArray). A KanbanCard IS a
-row index. boardJson is `(board α { it.toCardMap() })` at the boundary, not N
-Map allocations.
-
-# Reactor decomposition rules
-
-A daemon is a composition of CCEK elements, not an object with methods:
-
-1. **Acceptor** (LitebikeListenerElement): owns the bind, emits ChannelMessages.
-2. **Router** (NuidFanoutElement): dispatches by typed key (NUID capability), not
-   by string path. Routing IS ConfixIndexK facet lookup:
-   `routes.faclet(nuid.capability)` returns the reducer element.
-3. **Reducers**: one element per concern (board, submit, health, invoke). Each
-   has its own lifecycle, subscribes to the fanout, produces typed responses.
-4. **Responder**: ChannelMessage carries `CompletableDeferred<HttpResponse>`.
-   Reducer completes it; acceptor awaits it. No side-channel ConnectionRegistry.
-5. **Persistence** (WAL element): CCEK element with open()/drain()/close().
-   Reducers emit to its input channel; it batches and fsyncs.
-
-A god object (one class with accept + route + reduce + persist + respond) is
-prohibited. Each role is an element; composition is through fanout channels,
-not method calls.
-
-# Durability contract
-
-A WAL is not `append + fsync per record`. It is:
-
-1. **Group-committed**: batch N appends, one fsync per flush interval.
-2. **Commit-marked**: each record carries CRC32 or trailing sentinel. Replay
-   validates; torn tail records truncate to last-good. A crash mid-write must
-   not corrupt the WAL.
-3. **CAS-addressed payloads**: payload stored in the CAS once (content-addressed);
-   the WAL stores only ContentId. Deduplicates; keeps the WAL a thin ordering log.
-4. **Series projection**: `replay()` returns `Series<EventNode>`, not
-   `Sequence<Pair<String, ByteArray>>`. The graph is a lazy WAL projection.
-5. **Segmented + snapshoted**: roll segments at N bytes; periodic checkpoints;
-   boot is O(snapshot + delta).
-6. **Directory fsync** after initial WAL creation (ext4/xfs can lose the file
-   entry on crash even if data was fsync'd).
-
-# MutableSeries fill/spill cascade
-
-MutableSeries.append must not be O(N). The backing is a tiered chunk tree:
-
-```
-Level 0: inline Array (capacity C)         — hot, heap
-Level 1: direct ByteBuffer chunks           — warm, off-heap
-Level 2: mmap'd SeekFileBuffer segments     — cold, disk-backed
-```
-
-- **Fill**: write to current chunk's cursor. O(1) amortized.
-- **Spill**: chunk fills → cascade to next level. New chunk, linked in tier index.
-- **Read**: `Series[i]` traverses tier index O(log_C(N)), O(1) within chunk.
-- **freeze**: O(1) flag flip. Persistent-vector trie (32-ary): subsequent
-  mutation copies only O(log32(N)) nodes.
-- **cowSnapshot**: O(1) shared backing, ref-counted. Copy on first write.
-  NOT a full array copy.
-
-IOMemento already tags which tier a range lives in. The spill cascade is the
-materialization of that metadata as a tiered storage strategy.
-
-HashSeriesSet needs a treeify threshold (chain depth > N → balanced subtree),
-matching Java 8+ HashMap. resize() must redistribute buckets directly without
-re-entering add() (which re-checks the threshold and cascades).
-
-# Prohibited patterns (debt this session surfaced)
-
-- `when(path)` string switch for routing — use typed key facet lookup
-- `mutableListOf` built and never mutated — use Series / s_[] / α projection
-- Per-record fsync — use group commit
-- `@Volatile var` on a data class field inside ConcurrentHashMap — race condition
-- `Channel.UNLIMITED` for back-pressured pipelines — use bounded channels
-- SharedFlow with `replay=64` for real-time projections — use CONFLATED
-- Swallowed `catch (e: Throwable) {}` — errors are first-class projections
-- `.toString()` comparison for CoroutineContext.Key identity — use reference eq
-- String domain IDs in-process — use value-class packed primitives
-- God object daemon — decompose into CCEK elements
-
-# Open gaps (RGA Aug 08 2026 — factual observations, not spec changes)
-
-These are things PRELOAD describes that the code does not yet implement.
-They are TODOs for the code, not corrections to PRELOAD.
-
-- ~~Cursor fancy indexing~~ CLOSED Aug 24 2026: operator grammar lives in
-  cursor/CursorIndexing.kt (`cursor[1,3,2]` ordinal projection, `cursor["name","age"]`,
-  `cursor[-"debug"]` via ColumnExclusion value class + CharSequence.unaryMinus) as thin
-  delegates over the named CursorOps combinators; `cursor[range]`/`cursor[IntArray]` were
-  already covered by the generic Series gets (Join.kt range view is lazy); `join()`/
-  `combine()` already existed in CursorOps. Proof: CursorIndexingTest (7 tests).
-- ~~`↺` (leftIdentity)~~ STALE: standalone `T.`↺`` exists at Join.kt:91 over
-  `leftIdentity` at Join.kt:94. The Aug 08 observation no longer holds.
-- ~~Series.filter laziness~~ CLOSED Aug 24 2026: Series.kt filter now memoizes the
-  match scan behind `lazy {}` — no work at call time, one scan on first size/element
-  access (the K `where` vector, deferred). Predicate.kt `%` (rem) still scans eagerly.
+Each composition defines its expected final element state and the intermediate
+tasks required to reach it. Nested and parallel coroutines are owned by one
+supervisor scope or explicitly parented nested supervisor scopes. A straight
+channel pipeline is a first-class composition; branching is introduced where
+the work requires it. Kotlin coroutine scopes contain the work, with fan-in
+where branches must be collected.
+ 

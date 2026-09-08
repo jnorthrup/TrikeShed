@@ -1,36 +1,26 @@
 package borg.trikeshed.kanban
 
+import borg.trikeshed.graal.subvm.TikaRuntime
 import borg.trikeshed.media.officeText
+import borg.trikeshed.util.io.ContentTypes
 import borg.trikeshed.userspace.nio.process.ProcessCapability
 import borg.trikeshed.userspace.nio.process.ProcessSpec
 import borg.trikeshed.userspace.nio.process.ProcessWorkerFactory
 import kotlinx.coroutines.runBlocking
-import org.apache.tika.metadata.Metadata
-import org.apache.tika.parser.AutoDetectParser
-import org.apache.tika.parser.ParseContext
-import org.apache.tika.parser.ocr.TesseractOCRConfig
-import org.apache.tika.parser.pdf.PDFParserConfig
-import org.apache.tika.sax.BodyContentHandler
 import java.nio.file.Files
 import java.nio.file.Path
 import kotlin.io.path.extension
-import kotlin.io.path.inputStream
 import kotlin.io.path.name
 
 /**
  * JvmTikaIngestAdapter — Path -> extracted text. Markdown/plaintext verbatim; docx/pptx/xlsx through the commonMain
- * zip walker + [officeText] (raw deflate via `Inflater(true)`, no POI); only PDF and images go through Tika
- * (PDF -> PDFBox with OCR_STRATEGY.AUTO, images -> Tesseract when on PATH). Images first get the
+ * zip walker + [officeText] (raw deflate via `Inflater(true)`, no POI); only PDF and images go through managed Tika
+ * ([TikaRuntime]: PDF OCR_STRATEGY.AUTO, images -> Tesseract when on PATH). Images first get the
  * tika4all pre-pass — grayscale + contrast/brightness equalisation — run through ffmpeg via the process factory. This used to be tika-config.xml +
  * ffmpeg_ocr.sh; Tika 3 has no `imageProcessingCommand` param, so that config never loaded and the script never ran.
  * CLI twin, same filter and same Tika config: src/jvmMain/resources/tika/run_tika.sh.
  */
 object JvmTikaIngestAdapter {
-    private val parser = AutoDetectParser()
-    private val context = ParseContext().apply {
-        set(TesseractOCRConfig::class.java, TesseractOCRConfig())
-        set(PDFParserConfig::class.java, PDFParserConfig().apply { ocrStrategy = PDFParserConfig.OCR_STRATEGY.AUTO })
-    }
     private val worker = ProcessWorkerFactory.create(ProcessCapability("forge-ingest", setOf("ffmpeg")))
     private val images = setOf("png", "jpg", "jpeg", "tif", "tiff", "bmp", "gif", "webp", "heic")
 
@@ -71,9 +61,11 @@ object JvmTikaIngestAdapter {
         }
         val src = if (path.extension.lowercase() in images) runBlocking { preprocess(path) } else path
         try {
-            val handler = BodyContentHandler(-1)
-            src.inputStream().use { parser.parse(it, handler, Metadata(), context) }
-            return handler.toString().trim()
+            return TikaRuntime.extract(
+                bytes = Files.readAllBytes(src),
+                name = src.fileName?.toString(),
+                mediaType = ContentTypes.forPath(src.fileName.toString()),
+            ).text.trim()
         } finally { if (src !== path) Files.deleteIfExists(src) }
     }
 

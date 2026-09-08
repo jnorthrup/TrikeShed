@@ -1,5 +1,6 @@
 package borg.trikeshed.graal.subvm
 
+import borg.trikeshed.context.ElementState
 import borg.trikeshed.vm.GuestModuleEntry
 import borg.trikeshed.vm.GuestModuleLayout
 import borg.trikeshed.vm.GuestModuleManifest
@@ -34,38 +35,32 @@ object GuestModules {
     /** Override for a deployment whose modules do not live beside the checkout. */
     const val HOME_ENV = "TRIKESHED_SUBVM_HOME"
 
-    private val loaders = java.util.concurrent.ConcurrentHashMap<String, URLClassLoader>()
+    private val mounts = MountTable()
 
     /**
-     * Mounted classpaths under a CCEK lifecycle.
+     * Mounted classpaths under a forward-only lifecycle.
      *
      * A mount is a resource: a [URLClassLoader] holding open jar handles, from which the daemon
      * executes code. The first version of this object kept them in a static map and closed none of
      * them, so a module remounted after a re-resolve leaked its predecessor and the daemon kept
      * executing from file handles nobody could name any more.
      *
-     * Registering each mount with [borg.trikeshed.ccek.SupervisorJob] makes release structural:
-     * [closeAll] closes every loader the supervisor holds, with no list here to keep exhaustive.
-     * That is the same discount the daemon's own shutdown needed and did not have.
+     * The CCEK facade that used to own these handles is gone; the resource ownership remains here,
+     * at the one object that creates the handles. [closeAll] closes every loader in reverse mount
+     * order and makes later mounts fail rather than leak into a closed daemon.
      */
-    private val supervisor: borg.trikeshed.ccek.SupervisorJob =
-        borg.trikeshed.ccek.RealSupervisorJob("guest-modules").also { it.open() }
 
     /** Module names currently mounted in this process. */
-    fun mounted(): List<String> = loaders.keys.sorted()
+    fun mounted(): List<String> = mounts.mounted()
 
-    /** Lifecycle of the mount supervisor — OPEN until [closeAll]. */
-    fun lifecycle(): borg.trikeshed.ccek.FanoutLifecycle = supervisor.lifecycle
+    /** Lifecycle of the mount table: OPEN until [closeAll], then DRAINING and CLOSED. */
+    fun lifecycle(): ElementState = mounts.lifecycle()
 
     /**
-     * Release every mounted classpath. After this the supervisor is CLOSED, so a later mount is
-     * cancelled on arrival rather than silently retained — mounting during shutdown is a leak.
+     * Release every mounted classpath. After this the mount table is CLOSED, so a later mount is
+     * refused rather than silently retained; mounting during shutdown is a leak.
      */
-    fun closeAll() {
-        supervisor.drain()
-        supervisor.close()
-        loaders.clear()
-    }
+    fun closeAll() = mounts.closeAll()
 
     /**
      * The `utils/subvm` directory: `$TRIKESHED_SUBVM_HOME` when set, else the nearest ancestor of
@@ -140,11 +135,11 @@ object GuestModules {
      */
     fun loaderFor(module: String): URLClassLoader? {
         if (!isInstalled(module)) return null
-        return loaders.computeIfAbsent(module) {
+        return mounts.loader(module) {
             // Verify BEFORE handing back a loader. A mounted classpath is code the daemon
             // executes, so "a drifted jar should be visible, not silent" has to be enforced at the
             // one place that makes it executable — otherwise verify() is a function nobody calls.
-            // computeIfAbsent means this hashes the module's bytes once per process, not per eval.
+            // MountTable means this hashes the module's bytes once per process, not per eval.
             // The branch is on whether a manifest EXISTS, not on whether it has rows. A manifest
             // present but empty is not a debug drop — it is a manifest that accounts for nothing,
             // and every jar beside it is unaccounted for. Keying on `entries.isEmpty()` let exactly
@@ -177,17 +172,7 @@ object GuestModules {
                 // URLClassLoader needs to treat `classes/` as a directory rather than a jar.
                 classpath(module).map { f -> f.toURI().toURL() }.toTypedArray(),
                 parentLoader,
-            ).also { loader ->
-                // Under the supervisor from birth. A URLClassLoader holds open jar handles and is
-                // the thing the daemon executes code from; releasing it must not depend on some
-                // future shutdown path remembering this map exists.
-                supervisor.hold(object : borg.trikeshed.ccek.CancelToken {
-                    override fun cancel() {
-                        runCatching { loader.close() }
-                        loaders.remove(module, loader)
-                    }
-                })
-            }
+            )
         }
     }
 
@@ -219,4 +204,35 @@ object GuestModules {
 
     /** Read the bytes here; decide in commonMain. */
     fun verify(module: String): GuestModuleVerification = verifyGuestModule(manifest(module), observed(module))
+
+    internal class MountTable {
+        private val lock = Any()
+        private val loaders = LinkedHashMap<String, URLClassLoader>()
+
+        @Volatile
+        private var state: ElementState = ElementState.OPEN
+
+        fun mounted(): List<String> = synchronized(lock) { loaders.keys.sorted() }
+
+        fun lifecycle(): ElementState = state
+
+        fun loader(module: String, create: () -> URLClassLoader): URLClassLoader = synchronized(lock) {
+            check(state == ElementState.OPEN) {
+                "guest module mounts are ${state.name.lowercase()} - restart before mounting '$module'"
+            }
+            loaders[module]?.let { return it }
+            val loader = create()
+            loaders[module] = loader
+            loader
+        }
+
+        fun closeAll(): Unit = synchronized(lock) {
+            if (state == ElementState.CLOSED) return
+            state = ElementState.DRAINING
+            val current = loaders.values.toList().asReversed()
+            loaders.clear()
+            for (loader in current) runCatching { loader.close() }
+            state = ElementState.CLOSED
+        }
+    }
 }

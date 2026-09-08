@@ -65,6 +65,9 @@ class CamelRuntimeTest {
         return predicate()
     }
 
+    private fun messages(t: Throwable): String =
+        generateSequence(t) { it.cause }.joinToString(" | ") { it.message ?: it::class.java.name }
+
     private fun newContext(blackboard: ConfixBlackboard): ModuleContext {
         val cas = CasStore.inMemory()
         val couchStore = CouchStoreFactory.casBacked(cas)
@@ -220,6 +223,193 @@ class CamelRuntimeTest {
             awaitUntil { bodies.contains("smb-signal-7f3a") },
             "the tap between from and to must have seen it: ${bodies.toList()}",
         )
+    }
+
+    @Test
+    fun payloadProcessorGetsTheFullBodyWhileObserverStaysBounded() {
+        requireModule()
+        val id = track("probe-full-payload")
+        val observed = ConcurrentLinkedQueue<CamelRuntime.Exchange>()
+        val payloads = ConcurrentLinkedQueue<CamelRuntime.Payload>()
+        val body = "x".repeat(CamelRuntime.MAX_FACT_BODY + 512) + "tail"
+
+        CamelRuntime.start(
+            id = id,
+            from = "direct:full-payload",
+            to = "log:full-payload",
+            processor = CamelRuntime.PayloadProcessor { payload ->
+                payloads += payload
+                CamelRuntime.Reply(
+                    body = "processed:${payload.body.length}:${payload.body.takeLast(4)}",
+                    headers = mapOf(
+                        "curator.length" to payload.body.length,
+                        "curator.exchange" to (payload.exchangeId ?: ""),
+                    ),
+                )
+            },
+            observer = CamelRuntime.Observer { observed += it },
+        )
+
+        val reply = CamelRuntime.request(
+            id,
+            CamelRuntime.Request(body, mapOf("curator.source" to "llp-test")),
+        )
+
+        assertEquals("processed:${body.length}:tail", reply.body)
+        assertEquals(body.length, reply.headers["curator.length"])
+        assertEquals("llp-test", reply.headers["curator.source"])
+        assertEquals(true, reply.headers[CamelRuntime.HEADER_PROCESSED])
+        assertEquals(1L, reply.headers[CamelRuntime.HEADER_SEQ])
+        assertFalse(
+            reply.headers.keys.any { it.startsWith("TrikeShedCamelRetry") },
+            "correlation is exchangeId plus route-local seq; the runtime must not mint retry evidence",
+        )
+
+        val payload = payloads.toList().single()
+        assertEquals(id, payload.routeId)
+        assertEquals(1L, payload.seq)
+        assertEquals(body, payload.body)
+        assertTrue(!payload.exchangeId.isNullOrBlank(), "Camel should supply an exchange id")
+        assertEquals(payload.exchangeId, reply.headers[CamelRuntime.HEADER_EXCHANGE_ID])
+        assertEquals(payload.exchangeId, reply.headers["curator.exchange"])
+
+        val exchange = observed.toList().single()
+        assertEquals(id, exchange.routeId)
+        assertEquals(1L, exchange.seq)
+        assertEquals(CamelRuntime.MAX_FACT_BODY, exchange.body.length)
+        assertTrue(exchange.truncated, "observer facts stay bounded")
+        assertFalse(exchange.body.endsWith("tail"), "the observer should not receive the hidden tail")
+    }
+
+    @Test
+    fun payloadProcessorFailureFailsTheExchange() {
+        requireModule()
+        val id = track("probe-full-payload-failure")
+        val observed = ConcurrentLinkedQueue<CamelRuntime.Exchange>()
+
+        CamelRuntime.start(
+            id = id,
+            from = "direct:full-payload-failure",
+            to = "log:full-payload-failure",
+            processor = CamelRuntime.PayloadProcessor { payload -> error("curator failed seq=${payload.seq}") },
+            observer = CamelRuntime.Observer { observed += it },
+        )
+
+        val failure = runCatching { CamelRuntime.send(id, "bad-payload") }.exceptionOrNull()
+        assertTrue(failure != null, "processor failure must reach the sender")
+        assertTrue(
+            "curator failed seq=1" in messages(failure),
+            "the original processor error must remain in the causal chain: ${messages(failure)}",
+        )
+        assertEquals(1L, CamelRuntime.route(id)?.exchanges())
+
+        val exchange = observed.toList().single()
+        assertEquals("bad-payload", exchange.body, "observer still sees the bounded tap before processing")
+        assertFalse(exchange.truncated)
+    }
+
+    @Test
+    fun payloadCorrelationUsesCamelExchangeIdAndRouteSequenceOnly() {
+        requireModule()
+        val id = track("probe-payload-correlation")
+        val payloads = ConcurrentLinkedQueue<CamelRuntime.Payload>()
+
+        CamelRuntime.start(
+            id = id,
+            from = "direct:payload-correlation",
+            to = "log:payload-correlation",
+            processor = CamelRuntime.PayloadProcessor { payload ->
+                payloads += payload
+                CamelRuntime.Reply(
+                    body = "seq=${payload.seq}",
+                    headers = mapOf("seen.exchange" to (payload.exchangeId ?: "")),
+                )
+            },
+        )
+
+        val first = CamelRuntime.request(id, CamelRuntime.Request("one"))
+        val second = CamelRuntime.request(id, CamelRuntime.Request("two"))
+        val seen = payloads.toList()
+
+        assertEquals(listOf(1L, 2L), seen.map { it.seq })
+        assertEquals("seq=1", first.body)
+        assertEquals("seq=2", second.body)
+        assertEquals(id, first.headers[CamelRuntime.HEADER_ROUTE_ID])
+        assertEquals(id, second.headers[CamelRuntime.HEADER_ROUTE_ID])
+        assertEquals(1L, first.headers[CamelRuntime.HEADER_SEQ])
+        assertEquals(2L, second.headers[CamelRuntime.HEADER_SEQ])
+        assertTrue(seen.all { !it.exchangeId.isNullOrBlank() }, "Camel should name each Exchange")
+        assertEquals(seen[0].exchangeId, first.headers[CamelRuntime.HEADER_EXCHANGE_ID])
+        assertEquals(seen[1].exchangeId, second.headers[CamelRuntime.HEADER_EXCHANGE_ID])
+        assertEquals(seen[0].exchangeId, first.headers["seen.exchange"])
+        assertEquals(seen[1].exchangeId, second.headers["seen.exchange"])
+        assertTrue(
+            seen[0].exchangeId != seen[1].exchangeId,
+            "new sends get new Camel Exchange ids; seq is route-local delivery bookkeeping",
+        )
+        assertFalse(
+            (first.headers.keys + second.headers.keys).any {
+                it.startsWith("TrikeShedCamelRetry") || it.startsWith("TrikeShedCamelEvidence")
+            },
+            "the runtime must not convert correlation into retry or evidence identifiers",
+        )
+    }
+
+    @Test
+    fun stoppingATimerRouteStopsProcessorCallbacks() {
+        requireModule()
+        val id = track("probe-processor-stop")
+        val calls = AtomicInteger(0)
+        val threadNames = ConcurrentLinkedQueue<String>()
+        val testThread = Thread.currentThread().name
+
+        CamelRuntime.start(
+            id = id,
+            from = "timer:processor-stop?period=75&delay=0",
+            to = "log:processor-stop",
+            processor = CamelRuntime.PayloadProcessor { payload ->
+                calls.incrementAndGet()
+                threadNames += Thread.currentThread().name
+                CamelRuntime.Reply("tick:${payload.seq}")
+            },
+        )
+
+        assertTrue(awaitUntil { calls.get() >= 3 }, "timer processor should fire before stop")
+        assertTrue(
+            threadNames.any { it != testThread },
+            "timer route must invoke the host processor from Camel's consumer thread: ${threadNames.toList()}",
+        )
+        assertTrue(CamelRuntime.stop(id), "the running processor route should stop")
+        started.remove(id)
+
+        val stoppedAt = calls.get()
+        Thread.sleep(350)
+        assertEquals(stoppedAt, calls.get(), "no processor callbacks should arrive after stop")
+        assertFalse(CamelRuntime.isRunning(id), "the route should stay out of the registry after stop")
+    }
+
+    @Test
+    fun startupFailureAfterContextAllocationLeavesNoRouteOrCallbacks() {
+        requireModule()
+        val id = "probe-startup-cleanup"
+        val calls = AtomicInteger(0)
+
+        val failure = runCatching {
+            CamelRuntime.start(
+                id = id,
+                from = "timer:startup-cleanup?period=not-a-number",
+                to = "log:startup-cleanup",
+                processor = CamelRuntime.PayloadProcessor { payload ->
+                    calls.incrementAndGet()
+                    CamelRuntime.Reply(payload.body)
+                },
+            )
+        }.exceptionOrNull()
+
+        assertTrue(failure != null, "the installed Camel module should reject the malformed timer period")
+        assertFalse(CamelRuntime.isRunning(id), "a failed start must not enter the runtime registry")
+        Thread.sleep(200)
+        assertEquals(0, calls.get(), "a route that failed during start must not keep a timer callback alive")
     }
 
     // ── the gate ───────────────────────────────────────────────────────────────
