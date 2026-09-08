@@ -1,6 +1,8 @@
 package borg.trikeshed.lib
 
+import borg.trikeshed.platform.jsNodeProcess
 import kotlin.js.Date
+import kotlin.js.jsTypeOf
 import kotlin.random.Random
 
 // Node.js module access that is invisible to webpack's static analysis.
@@ -10,13 +12,29 @@ import kotlin.random.Random
 
 private fun nodeRequire(name: String): dynamic {
     require(name == "fs" || name == "os" || name == "path") { "Unauthorized Node.js module: $name" }
-    return js("typeof module !== 'undefined' ? module.require(name) : null")
+    val process: dynamic = processObj
+    if (!jsNodeProcess(process)) return null
+    val builtin: dynamic = try {
+        if (jsTypeOf(process.getBuiltinModule) == "function") process.getBuiltinModule(name) else null
+    } catch (_: dynamic) {
+        null
+    }
+    if (builtin != null) return builtin
+    return try {
+        js("typeof module !== 'undefined' && typeof module.require === 'function' ? module.require(name) : null")
+    } catch (_: dynamic) {
+        null
+    }
 }
 
 val fs: dynamic get() = nodeRequire("fs")
 val os: dynamic get() = nodeRequire("os")
 val path: dynamic get() = nodeRequire("path")
-val processObj: dynamic get() = js("typeof process !== 'undefined' ? process : null")
+val processObj: dynamic get() = try {
+    js("typeof process !== 'undefined' ? process : null")
+} catch (_: dynamic) {
+    null
+}
 val Buffer: dynamic get() = js("typeof globalThis !== 'undefined' ? globalThis.Buffer : null")
 
 internal fun jsCwd(): String = processObj.cwd() as String

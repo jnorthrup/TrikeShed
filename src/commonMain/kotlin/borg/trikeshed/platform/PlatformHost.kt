@@ -23,6 +23,7 @@ interface PlatformHost : CoroutineContext.Element {
 
     val clock: PlatformClock
     val processors: Int
+    val descriptor: HostDescriptor get() = HostDescriptor()
 
     // TODO interfaces for later tasks (documented, not wired)
     val fs: Any? get() = null
