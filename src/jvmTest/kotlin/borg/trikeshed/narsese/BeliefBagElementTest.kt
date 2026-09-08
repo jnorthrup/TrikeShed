@@ -7,11 +7,15 @@ import borg.trikeshed.job.CasStore
 import borg.trikeshed.job.ContentId
 import borg.trikeshed.lib.get
 import borg.trikeshed.lib.size
+import kotlinx.coroutines.async
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
 import java.io.File
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
@@ -22,6 +26,34 @@ class BeliefBagElementTest {
         val blobs = HashMap<ContentId, ByteArray>()
         override fun put(bytes: ByteArray): ContentId = ContentId.of(bytes).also { blobs[it] = bytes }
         override fun get(cid: ContentId): ByteArray? = blobs[cid]
+    }
+
+    private class BlockingLog : borg.trikeshed.couch.isam.DurableAppendLog {
+        private val frames = mutableListOf<Pair<Long, ByteArray>>()
+        private var committed = 0
+        val appendEntered = CountDownLatch(1)
+        val releaseAppend = CountDownLatch(1)
+        val flushEntered = CountDownLatch(1)
+
+        override fun append(sequence: Long, payload: ByteArray): Long {
+            appendEntered.countDown()
+            check(releaseAppend.await(2, TimeUnit.SECONDS)) { "append was not released" }
+            synchronized(frames) { frames.add(sequence to payload.copyOf()) }
+            return sequence
+        }
+
+        override suspend fun replay(onFrame: suspend (Long, ByteArray) -> Unit): Long {
+            val committedFrames = synchronized(frames) { frames.take(committed) }
+            for ((seq, payload) in committedFrames) onFrame(seq, payload.copyOf())
+            return committedFrames.lastOrNull()?.first ?: 0L
+        }
+
+        override fun flush() {
+            flushEntered.countDown()
+            synchronized(frames) { committed = frames.size }
+        }
+
+        override fun injectCorruptionAfter(sequence: Long) = error("not used")
     }
 
     private fun signal(angular: Long, positive: Long = Nal.UNIT, relation: RelationKind = RelationKind.CAUSALITY) =
@@ -139,6 +171,25 @@ class BeliefBagElementTest {
         assertEquals(2, reborn.size)
         assertEquals(3 * Nal.UNIT, reborn.snapshot().entries.first { it.key.a == 100L }.value.evidence.positive)
         assertEquals(0.2f, reborn.budgetOf(200L)!!.pf, 1e-3f)
+        reborn.drain()
+    }
+
+    @Test
+    fun drainJoinsIntakeBeforeFinalWalFlush() = runBlocking {
+        val log = BlockingLog()
+        val bag = BeliefBagElement(capacity = 16, wal = log, flushEvery = Int.MAX_VALUE)
+        bag.open()
+        bag.intake.send(BeliefIntake.Mint(signal(300L), BudgetCoord(0.6f, 0.5f, 0.5f)))
+        assertTrue(log.appendEntered.await(2, TimeUnit.SECONDS), "intake consumer never reached WAL append")
+        val draining = async { bag.drain() }
+        val flushedBeforeJoin = log.flushEntered.await(250, TimeUnit.MILLISECONDS)
+        log.releaseAppend.countDown()
+        draining.await()
+        assertFalse(flushedBeforeJoin, "drain must join the intake consumer before final WAL flush")
+
+        val reborn = BeliefBagElement(capacity = 16, wal = log)
+        reborn.open()
+        assertNotNull(reborn.signalOf(300L), "accepted intake must replay after drain returns")
         reborn.drain()
     }
 

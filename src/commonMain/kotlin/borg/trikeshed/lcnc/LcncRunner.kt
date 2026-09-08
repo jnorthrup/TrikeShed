@@ -80,7 +80,7 @@ class LcncUseBeforeDef(val fromNode: String, val toNode: String) :
  * Cancellation is cooperative: each node checks the caller's Job before it
  * runs, so an aborted assembly stops at the next node boundary and in-flight
  * suspend runners cancel at their next suspension point ([runAllIn]).
- * SupervisorJob is already the substrate (CCEK.childScope) — failure
+ * SupervisorJob is already the substrate — failure
  * isolation is a fact, not a feature.
  */
 class LcncRunner(private val registry: Map<String, LcncNodeRunner>) {

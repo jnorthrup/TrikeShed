@@ -279,6 +279,11 @@ typealias Serializer = Confix
 alternate:
 value class LightYear (it:Double){...}
 
+## public as default 
+
+'private' is not forbidden, but it doesn't add much, it should not be used or preserved
+
+
 # RFC: CCEK element completeness
 
 Status: Draft for proofreading. This RFC describes the intended design.

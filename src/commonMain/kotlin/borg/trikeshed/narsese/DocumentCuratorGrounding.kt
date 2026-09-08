@@ -15,10 +15,10 @@ import borg.trikeshed.parse.json.JsonSupport
 /** Deliberately only positive, unmodified, active, single-token noun/verb/noun assertions. */
 internal object DocumentCuratorGrounding {
     const val instructions = """The input contains source and nlp objects. source holds the full extracted text,
-original and extracted-text CIDs, route correlation and metadata. nlp is the preceding parser's output
-for that exact text: sentences, UTF-16 spans, indexed tokens with word/lemma/tag/ner, and dependencies
-with sentence-local token endpoints (governor 0 is the explicit root). Use this actual structure and
-the full source when proposing assertions; do not substitute filename, link or adjacency heuristics.
+original and extracted-text CIDs, route correlation and metadata. nlp may be null: the host parser runs
+as a peer branch and its sentences, UTF-16 spans, indexed tokens, and dependencies are joined after the
+model response to admit or refuse proposals. Use the full source when proposing assertions; do not
+substitute filename, link or adjacency heuristics.
 Return only a JSON object with format "TRIPLET_JSON" and a triplets array.
 Each entry requires subject, predicate, object, confidence (number 0..1), quote, begin, end,
 polarity (boolean), modality (string). begin/end are exact UTF-16 offsets in text; end is exclusive.

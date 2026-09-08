@@ -1,7 +1,6 @@
 package borg.trikeshed.lcnc.ccek
 
 import borg.trikeshed.ccek.ArticulatedNode
-import borg.trikeshed.ccek.CCEK
 import borg.trikeshed.ccek.ForgeSignal
 import borg.trikeshed.ccek.ProjectionKind
 import borg.trikeshed.forge.ForgeBlockId
@@ -36,7 +35,7 @@ import kotlin.coroutines.EmptyCoroutineContext
  * ordinary document/board/markdown projections — no parallel receipt bus.
  */
 class LcncCcekAssembly(
-    private val binding: CCEK.CcekReactorBinding,
+    private val binding: CcekReactorBinding,
     private val runner: LcncRunner,
 ) {
     data class Run(

@@ -20,8 +20,9 @@ import borg.trikeshed.util.oroboros.GitCouchGateway
 import borg.trikeshed.util.oroboros.JvmFileWatchReactorElement
 import borg.trikeshed.util.oroboros.WorktreeCouchGateway
 import borg.trikeshed.userspace.reactor.MuxReactorElement
-import borg.trikeshed.ccek.CCEK
 import borg.trikeshed.userspace.reactor.MuxReactorConfig
+import borg.trikeshed.lcnc.ccek.ccekReactorBinding
+import kotlinx.coroutines.CoroutineName
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.NonCancellable
@@ -459,7 +460,7 @@ object OroborosDaemon {
         // agent fan-out that LCNC nodes, model panels, and the curator
         // all run through. Modules access it via the binding's
         // reactorScope for coroutine dispatch.
-        val ccekBinding = CCEK.initialize(coroutineContext + Dispatchers.Default + nioSupervisor + fileOps + htxElement + muxReactor)
+        val ccekBinding = ccekReactorBinding(coroutineContext + Dispatchers.Default + nioSupervisor + fileOps + htxElement + muxReactor)
         System.err.println("[OROBOROS] CCEK binding open: reactor=${ccekBinding.reactorScope}")
         // Seed from already-resolved KeyMux env keys so the ReactorSource
         // (read path `llm.*.key`) returns real keyIds the very first cycle.
@@ -691,7 +692,11 @@ object OroborosDaemon {
             borg.trikeshed.graal.subvm.Hypervisor(blackboard = daemonBlackboard, adapter = pointcutAdapter, worldStore = vmWorldStore),
         )
         borg.trikeshed.vm.VmSupervisor.install(vmHost)
-        val wireScope = CCEK.childScope("wire", ccekBinding.reactorScope)
+        val wireScope = CoroutineScope(
+            ccekBinding.reactorScope.coroutineContext +
+                SupervisorJob(ccekBinding.reactorScope.coroutineContext[kotlinx.coroutines.Job]) +
+                CoroutineName("oroboros-wire")
+        )
         // H1: the daemon's own blackboard is finally SERVED. The Hypervisor and the
         // pointcut adapter already write receipts into it; the wire streams them out
         // on the same litebike listener. Repair contract: seq-ordered replay, `id:`
@@ -1247,7 +1252,11 @@ object OroborosDaemon {
         //    so a class compiled after boot attaches without a bounce).
         // (reteProductions / rete are constructed above the LcncPublisher, which needs them)
         val moduleRoutes = borg.trikeshed.module.ModuleRouteRegistry()
-        val moduleScope = CCEK.childScope("module", ccekBinding.reactorScope)
+        val moduleScope = CoroutineScope(
+            ccekBinding.reactorScope.coroutineContext +
+                SupervisorJob(ccekBinding.reactorScope.coroutineContext[kotlinx.coroutines.Job]) +
+                CoroutineName("oroboros-module")
+        )
         // Spec §3.1 production wiring: ONE stored-program resolver — the offered
         // presets (the panels/ attachment namespace was rooted out 2026-08-27
         // with the browser editor) — shared by module program runs
@@ -2501,6 +2510,12 @@ object OroborosDaemon {
                 runCatching { graalFacts.close() }
                 runCatching { kifTeeDisposer.close() }
                 runCatching { kanbanJob.cancel() }
+                runCatching { moduleSupervisor.drainAll() }
+                runCatching { moduleScope.coroutineContext.job.cancelAndJoin() }
+                runCatching { turnReview?.close() }
+                runCatching { causalityRete?.close() }
+                runCatching { curatorImpulse?.close() }
+                runCatching { beliefBag?.close() }
                 runCatching { incrementalViews.closeAll() }
                 runCatching { hermesConsole.close() }
                 runCatching { reportReactor.close() }

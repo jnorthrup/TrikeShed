@@ -150,6 +150,12 @@ has been migrated. Shared coverage and optional/binding verdicts are displayed
 without claiming that every unconnected socket is an error. A no-op does not
 save or remount; accepted cables are one undoable change.
 
+Unresolved input summaries retain the daemon's reason and identify the affected
+sockets. Effect inputs require explicit authoring; moving a source closer does
+not authorize them. Distance-limited inputs and already-assigned outputs retain
+their distinct remedies. Repeated reasons group at most three socket names
+plus the remaining count rather than flooding the status area.
+
 `controls.inspectionOnly` survives Panels import, serialization and export, so
 diagnostic specimens reach the server's inspection-only matcher. They cannot
 arm client sources or execute through Panels Run, including after undo/redo.

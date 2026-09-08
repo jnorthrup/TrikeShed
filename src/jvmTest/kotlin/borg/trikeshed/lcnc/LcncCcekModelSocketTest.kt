@@ -1,7 +1,7 @@
 package borg.trikeshed.lcnc
 
-import borg.trikeshed.ccek.CCEK
 import borg.trikeshed.htx.openHtxElement
+import borg.trikeshed.lcnc.ccek.ccekReactorBinding
 import borg.trikeshed.lcnc.ccek.LcncCcekAssembly
 import borg.trikeshed.lib.s_
 import borg.trikeshed.parse.json.JsonSupport
@@ -70,7 +70,7 @@ class LcncCcekModelSocketTest {
             assertEquals(0, keyReads.get())
             assertFalse(received.isCompleted)
 
-            val binding = CCEK.initialize(Dispatchers.Default + htx + reactor)
+            val binding = ccekReactorBinding(Dispatchers.Default + htx + reactor)
             val program = LcncProgram("socket", s_[
                 LcncNode("ring", LcncContracts.SCOPE, children = s_[
                     chat,

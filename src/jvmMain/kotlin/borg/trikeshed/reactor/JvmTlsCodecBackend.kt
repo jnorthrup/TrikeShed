@@ -29,7 +29,7 @@ import javax.net.ssl.SSLContext
 import javax.net.ssl.TrustManager
 import javax.net.ssl.TrustManagerFactory
 
-class JvmTlsCodecBackend : TlsCodecBackend, KeyedService {
+class JvmTlsCodecBackend : TlsCodecBackend {
     private data class EngineHandle(
         val engine: SSLEngine,
         var started: Boolean = false,

@@ -25,6 +25,7 @@ class LcncNodeElement internal constructor(
     private val runner: LcncNodeRunner,
     parent: Job,
 ) : CoroutineContext.Element {
+    private val parentJob = parent
     val supervisor = SupervisorJob(parent)
     private val phase = MutableStateFlow(ElementState.CREATED)
     val lifecycleState: ElementState get() = phase.value
@@ -72,7 +73,7 @@ class LcncNodeElement internal constructor(
         }
         try {
             currentCoroutineContext().ensureActive()
-            val value = withContext(supervisor + this) {
+            val value = withContext(supervisor + this + LcncOwnerJob(parentJob)) {
                 check(currentCoroutineContext()[key] === this@LcncNodeElement)
                 runner.execute(node, inputs)
             }

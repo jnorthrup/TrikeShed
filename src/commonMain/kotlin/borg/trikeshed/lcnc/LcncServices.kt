@@ -5,6 +5,7 @@ import borg.trikeshed.lib.get
 import borg.trikeshed.lib.j
 import borg.trikeshed.lib.size
 import borg.trikeshed.relaxfactory.RequestFactoryProxy
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.withContext
 import kotlin.coroutines.AbstractCoroutineContextElement
@@ -36,6 +37,10 @@ interface LcncServiceBinding {
     val providedKeys: Series<CoroutineContext.Key<*>>
 }
 
+class LcncOwnerJob(val job: Job?) : AbstractCoroutineContextElement(Key) {
+    companion object Key : CoroutineContext.Key<LcncOwnerJob>
+}
+
 /**
  * Install the caller's element or the host's default and resolve the actual provider inside
  * that context. This borrows even lifecycle-bearing elements: LcncNodeElement owns the
@@ -61,8 +66,10 @@ fun <E : CoroutineContext.Element> boundLcnc(defaultElement: E, delegate: LcncNo
             prependKey(key, (delegate as? LcncServiceBinding)?.providedKeys)
 
         override suspend fun execute(node: LcncNode, inputs: Map<String, Any?>): Map<String, Any?> {
-            val bound = currentCoroutineContext()[key] ?: defaultElement
-            return withContext(bound) { delegate.execute(node, inputs) }
+            val current = currentCoroutineContext()
+            val bound = current[key] ?: defaultElement
+            val ownerJob = current[LcncOwnerJob]?.job ?: current[Job]
+            return withContext(bound + LcncOwnerJob(ownerJob)) { delegate.execute(node, inputs) }
         }
     }
 

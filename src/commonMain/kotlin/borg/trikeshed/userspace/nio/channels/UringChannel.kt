@@ -42,6 +42,13 @@ class UringChannel(
     fun map(file: File, mode: String, position: Long, size: Long, userData: Long) =
         facade.map(file.impl, mode, position, size, userData)
 
+    val capabilities: Long get() = facade.capabilities
+    val nativeCapabilities: Long get() = facade.nativeCapabilities
+    val availability: String get() = facade.availability
+    fun closeNow() = facade.closeNow()
+    suspend fun drain() = facade.drain()
+    suspend fun close() = facade.close()
+
     fun submit(): Int = facade.submit()
 
     suspend fun submitAwait() = facade.submitAwait()

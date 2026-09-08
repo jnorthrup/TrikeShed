@@ -6,7 +6,7 @@ import kotlin.coroutines.CoroutineContext
  * JVM logging sink for Forge Kanban signals.
  * Prints signals to stdout for debugging / observation.
  */
-class LoggingForgeKanbanSink : ForgeKanbanSignalSink, KeyedService {
+class LoggingForgeKanbanSink : ForgeKanbanSignalSink {
 
     companion object Key : CoroutineContext.Key<LoggingForgeKanbanSink>
 

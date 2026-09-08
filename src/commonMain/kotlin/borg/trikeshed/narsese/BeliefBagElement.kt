@@ -149,9 +149,9 @@ class BeliefBagElement(
 
     override suspend fun drain() {
         intake.close()
-        // In-flight intakes finish via the consumer loop; flush what's buffered.
-        wal?.flush()
+        // The consumer loop drains the closed channel under the element supervisor.
         super.drain()
+        wal?.flush()
     }
 
     // ── reads (COW: the map reference is immutable, superseded on write) ──

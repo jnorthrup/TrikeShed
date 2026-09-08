@@ -15,7 +15,8 @@ class CancellationError(message: String) : CancellationException(message)
  * Job abstraction ported from literbike.
  * In Kotlin, this is backed by [kotlinx.coroutines.Job].
  */
-interface Job : borg.trikeshed.ccek.KeyedService {
+interface Job : CoroutineContext.Element {
+    override val key: CoroutineContext.Key<*> get() = Key
     fun isActive(): Boolean
     fun cancel(cause: CancellationException? = null)
 

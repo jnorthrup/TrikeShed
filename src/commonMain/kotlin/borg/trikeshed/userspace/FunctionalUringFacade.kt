@@ -19,6 +19,10 @@ import borg.trikeshed.userspace.nio.ebpf.UringEbpfProgram
  * in the same order (userData preserved).
  */
 public interface UserspaceChannelBackend {
+    val capabilities: Long get() = 0L
+    val nativeCapabilities: Long get() = 0L
+    val availability: String get() = "emulated"
+
     /**
      * Submit a batch of [UringSubmission] entries and return completions.
      *
@@ -29,6 +33,8 @@ public interface UserspaceChannelBackend {
 
     /** One completion per entry, in submission order; cancellation must propagate. */
     suspend fun batchEnqueue(submissions: Series<UringSubmission>): Series<UringCompletion>
+
+    fun close() {}
 }
 
 /**
@@ -49,6 +55,11 @@ public class FunctionalUringFacade(
     private val completions = ArrayDeque<SelectionResult>()
     private val submitPrograms = ebpfPrograms.filter { it.phase == UringEbpfPhase.SUBMIT }
     private val completionPrograms = ebpfPrograms.filter { it.phase == UringEbpfPhase.COMPLETE }
+    private var closed = false
+
+    val capabilities: Long get() = backend.capabilities
+    val nativeCapabilities: Long get() = backend.nativeCapabilities
+    val availability: String get() = backend.availability
 
     init {
         require(entries > 0) { "entries must be positive" }
@@ -242,6 +253,22 @@ public class FunctionalUringFacade(
         while (completions.isNotEmpty()) {
             add(completions.removeFirst())
         }
+    }
+
+    fun closeNow() {
+        if (!closed) {
+            if (pending.isNotEmpty()) submit()
+            backend.close()
+            closed = true
+        }
+    }
+
+    suspend fun drain() {
+        closeNow()
+    }
+
+    suspend fun close() {
+        drain()
     }
 
     private fun runSubmitPrograms(submission: UringSubmission): Int? {

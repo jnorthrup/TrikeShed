@@ -457,7 +457,10 @@ class KeyMux constructor(
     fun withBinding(path: String, source: KeySource): KeyMux {
         val binding = path.toKeyPath() j source
         val inherited = bindings
-        return KeyMux(((inherited.size + 1) j { i -> if (i == 0) binding else inherited[i - 1] }) j resolver)
+        val expanded: Series<KeyBinding> = (inherited.size + 1) j { i: Int ->
+            if (i == 0) binding else inherited[i - 1]
+        }
+        return KeyMux(expanded j resolver)
     }
 
     suspend fun set(key: String, value: String) {

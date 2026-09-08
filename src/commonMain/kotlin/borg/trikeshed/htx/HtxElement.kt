@@ -89,7 +89,7 @@ interface HtxFrameSubscriber {
     suspend fun onHtxFrames(frames: HtxFrames)
 }
 
-interface HtxRouteService : KeyedService {
+interface HtxRouteService : CoroutineContext.Element {
     companion object Key : CoroutineContext.Key<HtxRouteService>
     override val key: CoroutineContext.Key<*> get() = Key
 

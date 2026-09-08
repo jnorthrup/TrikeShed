@@ -59,7 +59,7 @@ class ModuleContext(
      * P1: live CCEK control-plane binding. When present, whole LCNC program runs
      * launch as structured CCEK assemblies; null preserves reduced/test contexts.
      */
-    val ccekBinding: borg.trikeshed.ccek.CCEK.CcekReactorBinding? = null,
+    val ccekBinding: borg.trikeshed.lcnc.ccek.CcekReactorBinding? = null,
     /**
      * Modules publish their LCNC runner registries here (additive); the host composes
      * them — webhook node dispatch resolves `program/node/port` against this map.

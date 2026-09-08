@@ -160,7 +160,30 @@ th{color:var(--dim);font-weight:normal;font-size:10px;text-transform:uppercase}
 #help{position:absolute;right:10px;bottom:8px;color:var(--dim);font-size:10px;z-index:5}
 #help b{color:var(--ink)}
 @media (prefers-reduced-motion: reduce){.evt{animation:none}}
-@media (max-width:760px){#doc{width:calc(100vw - 20px)}.classhead .classrow{flex-direction:column;align-items:flex-start;gap:4px}.classhead .classrow>*{margin:0}.classsplit{grid-template-columns:1fr}.classinsns{max-height:220px}.classdetail table,.classdetail tbody{display:block}.classdetail tr{display:grid;grid-template-columns:minmax(70px,32%) minmax(0,1fr);width:100%}.classdetail td,.classdetail th{display:block;min-width:0;border-bottom:0}.classinsns tr{grid-template-columns:38px 82px 46px minmax(0,1fr)}}
+@media (max-width:760px){
+  #hud{gap:6px;overflow-x:auto;overflow-y:hidden;align-items:stretch;padding:8px 10px 12px;pointer-events:auto;scrollbar-width:none}
+  #hud::-webkit-scrollbar{display:none}
+  #ident{flex:0 0 184px;margin-right:0}
+  .chip{flex:0 0 86px;min-width:86px;margin-right:0}
+  .chip b{font-size:16px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .chip span{letter-spacing:.05em}
+  #river{display:none}
+  #mini{right:8px;bottom:42px;width:120px;height:74px}
+  #crumb{left:10px;right:10px;bottom:26px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  #help{left:10px;right:10px;bottom:6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  #doc{width:calc(100vw - 20px);max-height:calc(100vh - 118px)}
+  #notion{right:10px;bottom:42px}
+  #points,#sheet,#zoom{width:auto;right:10px;max-height:calc(100vh - 118px)}
+  #vms,#ledger,#aot,#gc{left:10px;right:10px;width:auto;max-height:calc(100vh - 118px)}
+  .classhead .classrow{flex-direction:column;align-items:flex-start;gap:4px}
+  .classhead .classrow>*{margin:0}
+  .classsplit{grid-template-columns:1fr}
+  .classinsns{max-height:220px}
+  .classdetail table,.classdetail tbody{display:block}
+  .classdetail tr{display:grid;grid-template-columns:minmax(70px,32%) minmax(0,1fr);width:100%}
+  .classdetail td,.classdetail th{display:block;min-width:0;border-bottom:0}
+  .classinsns tr{grid-template-columns:38px 82px 46px minmax(0,1fr)}
+}
 /* ── skins: ops (default) · chalk = AI blackboard · marker = developer whiteboard ── */
 html[data-skin="chalk"] body{--bg:#1b2420;--panel:#212b26;--panel2:#26312c;--line:#39463f;--ink:#e9efe8;--dim:#93a398;
   --graal:#ffc46b;--compile:#8fe6b0;--deopt:#ff8a8f;--gc:#ffd27a;--commit:#8fd8ff;--cpu:#9db8e8}

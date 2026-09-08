@@ -1,5 +1,8 @@
 package borg.trikeshed.ccek
 
+import borg.trikeshed.lcnc.PanelVote
+import borg.trikeshed.lcnc.VoteBallot
+import borg.trikeshed.lcnc.VoteVerdict
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith

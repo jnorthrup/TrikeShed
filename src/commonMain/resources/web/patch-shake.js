@@ -129,7 +129,20 @@ function applyServerTreeShake(res, inclOptional, programName){
   if(coverage&&Number.isInteger(coverage.total)&&coverage.total>0&&Number.isInteger(coverage.connected)&&coverage.connected>=0&&coverage.connected<=coverage.total){
     parts.push(coverage.connected+"/"+coverage.total+" sockets connected ("+Math.floor(100*coverage.connected/coverage.total)+"%)");
   }
-  if(reachable.length) parts.push(reachable.length + " inputs need an explicit connection or closer source");
+  // Preserve the daemon's reason: proximity cannot authorize an effect input.
+  const reasons=new Map();
+  for(const v of reachable){
+    const label=v.label||"Connection unresolved";
+    if(!reasons.has(label))reasons.set(label,{count:0,ports:[]});
+    const group=reasons.get(label);group.count++;
+    if(group.ports.length<3){
+      const node=G.nodes.find(n=>n.id===v.nodeId);
+      group.ports.push((node?._localId||v.nodeId)+"."+v.port);
+    }
+  }
+  for(const [label,group] of reasons){
+    parts.push(group.ports.join(", ")+(group.count>3?" and "+(group.count-3)+" more inputs":"")+": "+label);
+  }
   if(scoped.length) parts.push("⇱ " + scoped.length + " scope-blocked");
   if(dead.length) parts.push("✕ " + dead.length + " with no mate on the board");
   if(STARVED.size) parts.push(STARVED.size + " node" + (STARVED.size===1?"":"s") + " downstream run on nothing");

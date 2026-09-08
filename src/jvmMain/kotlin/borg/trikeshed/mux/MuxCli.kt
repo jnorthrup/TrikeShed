@@ -2,7 +2,7 @@ package borg.trikeshed.mux
 
 import borg.trikeshed.htx.HtxElement
 import borg.trikeshed.htx.openHtxElement
-import borg.trikeshed.ccek.CCEK
+import borg.trikeshed.lcnc.ccek.ccekReactorBinding
 import borg.trikeshed.job.ContentId
 import borg.trikeshed.lcnc.BrainMuxNodes
 import borg.trikeshed.lcnc.LcncNode
@@ -423,7 +423,7 @@ Secrets are never printed — keys show as len= and sha256 prefix."""
         }
         val outcome = withMuxRuntime(keyMux, { mux }) { htx, reactor ->
             withContext(Dispatchers.IO + fileOps + htx + reactor) {
-                val binding = CCEK.initialize(currentCoroutineContext())
+                val binding = ccekReactorBinding(currentCoroutineContext())
                 val program = LcncProgram("mux.chat", s_[LcncNode("chat", "prompt.chat", params = mapOf(
                     "model" to model, "prompt" to prompt, "maxTokens" to maxTokens.toString(), "temperature" to "0.2",
                 ))], emptySeriesOf())

@@ -43,6 +43,20 @@ test("Shake reports actual socket coverage and does not label partial coverage a
   context.applyServerTreeShake({made:[{fromNode:"a",fromPort:"out",toNode:"b",toPort:"in"}],coverage:{connected:742,total:742}});
   assert.match(status.textContent,/742\/742 sockets connected \(100%\)/);
   assert.equal(context.G.wires.length,1);
+
+  context.applyServerTreeShake({made:[],verdicts:[
+    {nodeId:"review",dir:"in",port:"facts",status:"open",label:"Effect input requires an explicit connection"},
+    {nodeId:"display",dir:"in",port:"x",status:"open",label:"Compatible output beyond 340 units; move it closer or connect explicitly"},
+  ]});
+  assert.match(status.textContent,/review\.facts: Effect input requires an explicit connection/);
+  assert.match(status.textContent,/display\.x: Compatible output beyond 340 units/);
+  assert.doesNotMatch(status.textContent,/explicit connection or closer source/);
+
+  context.applyServerTreeShake({made:[],verdicts:Array.from({length:100},(_,i)=>({
+    nodeId:"effect"+i,dir:"in",port:"x",status:"open",label:"Effect input requires an explicit connection",
+  }))});
+  assert.match(status.textContent,/effect0\.x, effect1\.x, effect2\.x and 97 more inputs/);
+  assert.equal(status.textContent.split("Effect input requires an explicit connection").length,2);
 });
 
 test("inspection-only control is program-local and follows the selected draft",()=>{

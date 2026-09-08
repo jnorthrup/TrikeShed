@@ -535,6 +535,7 @@ private fun KanbanCard.toProperties(): Map<String, String> = buildMap {
         else -> "medium"
     }
     put("kanban.status", status)
+    put("kanban.column.id", columnId.value)
     put("kanban.priority", priority)
     if (assignee != null) put("kanban.assignee", assignee!!)
     if (tags.isNotEmpty()) put("kanban.tags", tags.joinToString(","))

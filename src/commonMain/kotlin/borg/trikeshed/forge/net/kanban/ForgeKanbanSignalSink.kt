@@ -8,8 +8,9 @@ import kotlin.coroutines.CoroutineContext
  * Implementations live in platform modules (JVM: CLI, desktop, server; JS: browser; etc.).
  * The commonMain conduit only depends on this interface.
  */
-interface ForgeKanbanSignalSink : KeyedService {
+interface ForgeKanbanSignalSink : CoroutineContext.Element {
     companion object Key : CoroutineContext.Key<ForgeKanbanSignalSink>
+    override val key: CoroutineContext.Key<*> get() = Key
 
     suspend fun accept(signal: ForgeKanbanSignal): Boolean
 }

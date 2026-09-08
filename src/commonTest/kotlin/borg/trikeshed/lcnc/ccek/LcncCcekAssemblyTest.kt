@@ -1,7 +1,6 @@
 package borg.trikeshed.lcnc.ccek
 
 import borg.trikeshed.ccek.ArticulatedNode
-import borg.trikeshed.ccek.CCEK
 import borg.trikeshed.ccek.ForgeProjection
 import borg.trikeshed.ccek.ForgeSignal
 import borg.trikeshed.context.ElementState
@@ -57,11 +56,11 @@ class LcncCcekAssemblyTest {
     private fun program(name: String, vararg nodes: LcncNode): LcncProgram =
         LcncProgram(name, nodes.size j { i: Int -> nodes[i] }, emptySeriesOf())
 
-    private suspend fun withBinding(block: suspend (CCEK.CcekReactorBinding) -> Unit) {
+    private suspend fun withBinding(block: suspend (CcekReactorBinding) -> Unit) {
         val reactor = MuxReactorElement()
         reactor.open()
         try {
-            block(CCEK.initialize(reactor))
+            block(ccekReactorBinding(reactor))
         } finally {
             reactor.close()
         }

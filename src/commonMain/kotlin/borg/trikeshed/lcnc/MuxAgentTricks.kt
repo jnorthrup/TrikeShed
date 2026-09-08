@@ -1,12 +1,14 @@
 package borg.trikeshed.lcnc
 
-import borg.trikeshed.ccek.CCEK
 import borg.trikeshed.lib.get
 import borg.trikeshed.lib.size
 import borg.trikeshed.lib.toSeries
 import keymux.KeyMux
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineName
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.async
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.currentCoroutineContext
@@ -135,7 +137,10 @@ object MuxAgentTricks {
                 output
             })
         val runner = LcncRunner(registry).apply { subprogramLoader = { documents[it] } }
-        val scope = CCEK.childScope(NAME, CoroutineScope(currentCoroutineContext()))
+        val parentScope = CoroutineScope(currentCoroutineContext())
+        val scope = CoroutineScope(
+            parentScope.coroutineContext + SupervisorJob(parentScope.coroutineContext[Job]) + CoroutineName("lcnc:$NAME")
+        )
         var error: String? = null
         try {
             scope.async { runner.runProcedure(documents.getValue(NAME)) }.await()

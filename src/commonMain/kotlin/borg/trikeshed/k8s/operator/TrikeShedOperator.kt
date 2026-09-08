@@ -4,14 +4,13 @@ import borg.trikeshed.k8s.crd.TrikeShedResource
 import borg.trikeshed.operator.BaseOperatorSdk
 import borg.trikeshed.operator.K8sEvent
 import borg.trikeshed.operator.Reconciler
-import borg.trikeshed.ccek.CCEK
 import borg.trikeshed.ccek.ForgeSignal
 import borg.trikeshed.forge.ForgeBlockKind
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 
 class TrikeShedOperator(private val scope: CoroutineScope) : BaseOperatorSdk<TrikeShedResource>(scope) {
-    val dummyDocNode = borg.trikeshed.ccek.UserContext("dummy", scope).choreograph(
+    val resourceNode = borg.trikeshed.ccek.UserContext("resource", scope).choreograph(
         borg.trikeshed.forge.ForgeDocument(
             rootPageId = borg.trikeshed.forge.ForgeBlockId("doc"),
             blocks = emptyMap<String, borg.trikeshed.forge.ForgeBlock>(),
@@ -36,11 +35,11 @@ class TrikeShedOperator(private val scope: CoroutineScope) : BaseOperatorSdk<Tri
 
     override suspend fun start() {
         super.start()
-        dummyDocNode.start()
+        resourceNode.start()
     }
 
     override suspend fun stop() {
-        dummyDocNode.stop()
+        resourceNode.stop()
         super.stop()
     }
 
@@ -51,7 +50,7 @@ class TrikeShedOperator(private val scope: CoroutineScope) : BaseOperatorSdk<Tri
                 text = "Resource added: ${resource.metadata.name}",
                 properties = emptyMap<String, String>()
             )
-            dummyDocNode.sendSignal(signal)
+            resourceNode.sendSignal(signal)
         }
     }
 
@@ -62,7 +61,7 @@ class TrikeShedOperator(private val scope: CoroutineScope) : BaseOperatorSdk<Tri
                 text = "Resource modified: ${newResource.metadata.name}",
                 properties = emptyMap<String, String>()
             )
-            dummyDocNode.sendSignal(signal)
+            resourceNode.sendSignal(signal)
         }
     }
 
@@ -73,7 +72,7 @@ class TrikeShedOperator(private val scope: CoroutineScope) : BaseOperatorSdk<Tri
                 text = "Resource deleted: ${resource.metadata.name}",
                 properties = emptyMap<String, String>()
             )
-            dummyDocNode.sendSignal(signal)
+            resourceNode.sendSignal(signal)
         }
     }
 }

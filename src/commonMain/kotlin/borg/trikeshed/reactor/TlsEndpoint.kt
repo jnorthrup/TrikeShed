@@ -155,7 +155,7 @@ interface TlsChannelSubscriber {
     suspend fun onTlsFrames(frames: TlsFrames)
 }
 
-interface TlsCodecBackend : KeyedService {
+interface TlsCodecBackend : CoroutineContext.Element {
     companion object Key : CoroutineContext.Key<TlsCodecBackend>
     override val key: CoroutineContext.Key<*> get() = Key
 
