@@ -22,6 +22,27 @@ internal object DocumentCuratorCodec {
         "correlation" to source.correlation, "metadata" to source.metadata,
     )
 
+    /** The same typed index feeds model interaction and downstream cursor projection. */
+    fun modelInput(index: DocumentCurationIndex): Map<String, Any?> = source(index.facet(DocumentCurationIndexK.Source)) + mapOf(
+        "linguistics" to mapOf(
+            "status" to index.facet(DocumentCurationIndexK.NlpStatus).name,
+            "coordinateSystem" to "UTF-16; end exclusive; sentence-local one-based token indices; governor 0 is root",
+            "reasons" to index.facet(DocumentCurationIndexK.Reasons).values(),
+            "parseConfidence" to index.facet(DocumentCurationIndexK.ParseConfidence),
+            "expressedCertainty" to index.facet(DocumentCurationIndexK.ExpressedCertainty),
+            "externalVerification" to index.facet(DocumentCurationIndexK.ExternalVerification).name,
+            "sentences" to sentences(index.facet(DocumentCurationIndexK.Sentences)),
+        ),
+    )
+
+    private fun sentences(sentences: Series<NlpSentence>): List<Map<String, Any?>> = sentences.values { s -> mapOf(
+        "index" to s.index, "begin" to s.begin, "end" to s.end,
+        "tokens" to s.tokens.values { t -> mapOf("index" to t.index, "begin" to t.begin,
+            "end" to t.end, "word" to t.word, "lemma" to t.lemma, "tag" to t.tag, "ner" to t.ner) },
+        "dependencies" to s.dependencies.values { d -> mapOf("governor" to d.governor,
+            "dependent" to d.dependent, "relation" to d.relation) },
+    ) }
+
     fun proposal(p: DocumentProposal): Map<String, Any?> = mapOf(
         "raw" to p.raw, "subject" to p.subject, "predicate" to p.predicate, "object" to p.obj,
         "confidence" to p.confidence, "quote" to p.quote, "begin" to p.begin, "end" to p.end,
@@ -36,25 +57,21 @@ internal object DocumentCuratorCodec {
         "polarity" to p.polarity, "modality" to p.modality,
     ))
 
-    fun encode(record: DocumentCurationRecord): ByteArray = CanonicalCbor.encodeMap(mapOf(
+    fun encode(record: DocumentCurationRecord): ByteArray = CanonicalCbor.encodeMap(record(record))
+
+    fun record(record: DocumentCurationRecord): Map<String, Any?> = mapOf(
         "version" to 1, "source" to source(record.source), "modelId" to record.modelId,
         "model" to record.model?.let { mapOf("content" to it.content, "providerId" to it.providerId, "modelId" to it.modelId,
             "promptTokens" to it.usage.promptTokens, "completionTokens" to it.usage.completionTokens,
             "totalTokens" to it.usage.totalTokens) },
         "nlp" to record.nlp?.let { doc -> mapOf("text" to doc.text,
-            "sentences" to doc.sentences.values { s -> mapOf(
-                "index" to s.index, "begin" to s.begin, "end" to s.end,
-                "tokens" to s.tokens.values { t -> mapOf("index" to t.index, "begin" to t.begin,
-                    "end" to t.end, "word" to t.word, "lemma" to t.lemma, "tag" to t.tag, "ner" to t.ner) },
-                "dependencies" to s.dependencies.values { d -> mapOf("governor" to d.governor,
-                    "dependent" to d.dependent, "relation" to d.relation) },
-            ) }) },
+            "sentences" to sentences(doc.sentences)) },
         "proposals" to record.proposals.values { proposal(it) }, "reasons" to record.reasons.values(),
         "reserved" to record.reservedReceiptCids.values { it.value },
         "submitted" to record.submittedReceiptCids.values { it.value },
         "duplicates" to record.duplicateReceiptCids.values { it.value },
         "observerFailures" to record.observerFailures.values(),
-    ))
+    )
 
     fun decode(bytes: ByteArray): DocumentCurationRecord {
         val m = CanonicalCbor.decodeMap(bytes)

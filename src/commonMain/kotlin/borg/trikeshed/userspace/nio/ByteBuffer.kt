@@ -215,6 +215,8 @@ public open class ByteBuffer protected constructor(
 
     public override fun isDirect(): Boolean = false
 
+    public override fun isReadOnly(): Boolean = readOnly
+
     // ── Byte order ─────────────────────────────────────────────────
 
     public fun order(): ByteOrder = order0

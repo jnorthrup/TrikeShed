@@ -20,8 +20,9 @@ import borg.trikeshed.util.oroboros.GitCouchGateway
 import borg.trikeshed.util.oroboros.JvmFileWatchReactorElement
 import borg.trikeshed.util.oroboros.WorktreeCouchGateway
 import borg.trikeshed.userspace.reactor.MuxReactorElement
-import borg.trikeshed.ccek.CCEK
 import borg.trikeshed.userspace.reactor.MuxReactorConfig
+import borg.trikeshed.lcnc.ccek.ccekReactorBinding
+import kotlinx.coroutines.CoroutineName
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.NonCancellable
@@ -34,6 +35,7 @@ import kotlinx.coroutines.cancel
 import kotlinx.coroutines.job
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.coroutines.channels.Channel
 import java.io.BufferedWriter
 import java.io.File
@@ -58,6 +60,7 @@ import sun.misc.SignalHandler
  *   --hermes-root <path>    Hermes Python source checkout
  *   --hermes-sleeve <path>  GraalPy-safe overlay root
  *   --hermes-console        eagerly boot the VT220 Hermes VM panel
+ *   --document-feed         enable managed document curation (requires --belief-bag)
  * Positional args (must come last):
  *   forgeHome               default = ~/.local/forge (ForgeHome.defaultHome)
  *   repoDir                 default = cwd
@@ -193,6 +196,7 @@ object OroborosDaemon {
             ForgeCliArgs.Flag(name = "--watch") { _, i -> watch = true; i + 1 },
             // Consumed by mainImpl via the raw args (P2 belief-bag wiring); registered so the parser accepts it.
             ForgeCliArgs.Flag(name = "--belief-bag") { _, i -> i + 1 },
+            ForgeCliArgs.Flag(name = "--document-feed") { _, i -> i + 1 },
             ForgeCliArgs.Flag(name = "--project", withValue = true) { a, i -> projects.add(a[i]); i + 1 },
             ForgeCliArgs.Flag(name = "--module", withValue = true) { a, i -> modules.add(a[i]); i + 1 },
             ForgeCliArgs.Flag(name = "--agents", withValue = true) { a, i -> agents = a[i].split(',').map { it.trim().lowercase() }.filter { it.isNotEmpty() }.toSet(); i + 1 },
@@ -269,6 +273,24 @@ object OroborosDaemon {
     }
 
     private suspend fun kotlinx.coroutines.CoroutineScope.mainImpl(args: Array<String>) {
+        var documentFeed: borg.trikeshed.lib.Join<borg.trikeshed.userspace.nio.DocumentFeedStorage, borg.trikeshed.graal.subvm.DocumentFeed>? = null
+        suspend fun drainDocumentFeed() {
+            val owned = documentFeed ?: return
+            documentFeed = null
+            try { owned.b.drain() } finally { owned.a.drain() }
+        }
+        try {
+            mainBody(args, { documentFeed = it }, ::drainDocumentFeed)
+        } finally {
+            withContext(NonCancellable) { drainDocumentFeed() }
+        }
+    }
+
+    private suspend fun kotlinx.coroutines.CoroutineScope.mainBody(
+        args: Array<String>,
+        registerDocumentFeed: (borg.trikeshed.lib.Join<borg.trikeshed.userspace.nio.DocumentFeedStorage, borg.trikeshed.graal.subvm.DocumentFeed>) -> Unit,
+        drainDocumentFeed: suspend () -> Unit,
+    ) {
         // KeyMux, env-FIRST: harness lane (conventional env names + hermes .env
         // + codex/opencode credential files), then the legacy derived-name env
         // lane (LLM_<X>_KEY), then the hermes CREDENTIAL POOL as the borrowing
@@ -352,29 +374,7 @@ object OroborosDaemon {
         val healthSock = File(oroborosDir, "health.sock")
         if (healthSock.exists()) healthSock.delete()
 
-        // Bind with retry: a prior daemon may have left a stale socket file
-        // even after the JVM exited; the bind() then creates a regular file
-        // instead of a UNIX socket. Retry up to 3× with the file removed
-        // between attempts so we always end up with a real socket.
-        var serverSocket: ServerSocketChannel? = null
-        var bindAttempt = 0
-        while (serverSocket == null && bindAttempt < 3) {
-            try {
-                serverSocket = ServerSocketChannel.open(StandardProtocolFamily.UNIX)
-                serverSocket.bind(UnixDomainSocketAddress.of(healthSock.toPath()))
-                serverSocket.configureBlocking(false)
-            } catch (e: Throwable) {
-                System.err.println("[OROBOROS] health.sock bind attempt ${bindAttempt + 1} failed: ${e.message}")
-                try { serverSocket?.close() } catch (_: Exception) {}
-                serverSocket = null
-                if (healthSock.exists()) healthSock.delete()
-                bindAttempt++
-            }
-        }
-        if (serverSocket == null) {
-            System.err.println("[OROBOROS] health.sock bind FAILED after 3 attempts; aborting")
-            return
-        }
+        val serverSocket = openHealthSocket(healthSock) ?: return
 
         val healthJob = launch(Dispatchers.IO) {
             while (isActive) {
@@ -459,7 +459,7 @@ object OroborosDaemon {
         // agent fan-out that LCNC nodes, model panels, and the curator
         // all run through. Modules access it via the binding's
         // reactorScope for coroutine dispatch.
-        val ccekBinding = CCEK.initialize(coroutineContext + Dispatchers.Default + nioSupervisor + fileOps + htxElement + muxReactor)
+        val ccekBinding = ccekReactorBinding(coroutineContext + Dispatchers.Default + nioSupervisor + fileOps + htxElement + muxReactor)
         System.err.println("[OROBOROS] CCEK binding open: reactor=${ccekBinding.reactorScope}")
         // Seed from already-resolved KeyMux env keys so the ReactorSource
         // (read path `llm.*.key`) returns real keyIds the very first cycle.
@@ -691,7 +691,11 @@ object OroborosDaemon {
             borg.trikeshed.graal.subvm.Hypervisor(blackboard = daemonBlackboard, adapter = pointcutAdapter, worldStore = vmWorldStore),
         )
         borg.trikeshed.vm.VmSupervisor.install(vmHost)
-        val wireScope = CCEK.childScope("wire", ccekBinding.reactorScope)
+        val wireScope = CoroutineScope(
+            ccekBinding.reactorScope.coroutineContext +
+                SupervisorJob(ccekBinding.reactorScope.coroutineContext[kotlinx.coroutines.Job]) +
+                CoroutineName("oroboros-wire")
+        )
         // H1: the daemon's own blackboard is finally SERVED. The Hypervisor and the
         // pointcut adapter already write receipts into it; the wire streams them out
         // on the same litebike listener. Repair contract: seq-ordered replay, `id:`
@@ -1247,7 +1251,11 @@ object OroborosDaemon {
         //    so a class compiled after boot attaches without a bounce).
         // (reteProductions / rete are constructed above the LcncPublisher, which needs them)
         val moduleRoutes = borg.trikeshed.module.ModuleRouteRegistry()
-        val moduleScope = CCEK.childScope("module", ccekBinding.reactorScope)
+        val moduleScope = CoroutineScope(
+            ccekBinding.reactorScope.coroutineContext +
+                SupervisorJob(ccekBinding.reactorScope.coroutineContext[kotlinx.coroutines.Job]) +
+                CoroutineName("oroboros-module")
+        )
         // Spec §3.1 production wiring: ONE stored-program resolver — the offered
         // presets (the panels/ attachment namespace was rooted out 2026-08-27
         // with the browser editor) — shared by module program runs
@@ -1315,6 +1323,9 @@ object OroborosDaemon {
         // Sub-VM module legos: tika/corenlp/camel/graalce as supervised guest evals
         // over the daemon's own hypervisor (VmSupervisor.current — VmWire's same host).
         borg.trikeshed.lcnc.SubVmLegos.register(moduleContext)
+        if ("--document-feed" in args || System.getenv("TRIKESHED_DOCUMENT_FEED") == "1") {
+            registerDocumentFeed(openDocumentFeed(moduleContext, brainClient, pointcutAdapter))
+        }
         // The LIFETIME half of camel: vm.camel.up/down/routes hold a CamelContext open past the
         // run that started it, so a poller (timer:, file:, imaps:) has somewhere to live and every
         // Exchange that crosses lands on the board as camel/route/<id>/exchange.
@@ -2435,15 +2446,7 @@ object OroborosDaemon {
         val reactiveJob = SupervisorJob(mainJob)
         val reactiveScope = CoroutineScope(coroutineContext + reactiveJob)
 
-        // Shutdown: cancel Jobs only — never nest runBlocking in a signal handler.
-        // Structured concurrency unwinds the finally block in mainImpl which
-        // closes every CCEK element in scope.
-        val sigHandler = SignalHandler {
-            isRunning = false
-            mainJob?.cancel()
-        }
-        Signal.handle(Signal("TERM"), sigHandler)
-        Signal.handle(Signal("INT"), sigHandler)
+        val shutdown = shutdownChannel()
 
         val traceFile = File(forgeHome, "oroboros-cycles.jsonl")
         var traceLineCount = if (traceFile.exists()) traceFile.readLines().size else 0
@@ -2477,19 +2480,13 @@ object OroborosDaemon {
             } catch (e: Exception) { /* ignore */ }
         })
         try {
-            if (watch) {
-                while (isRunning) {
-                    delay(intervalMs)
-                }
-            } else {
-                // --once: settle the reactive elements, then exit.
-                delay(intervalMs)
-                isRunning = false
-                reactiveJob.cancelAndJoin()
-                return
-            }
+            awaitShutdown(watch, intervalMs, shutdown, reactiveJob)
         } finally {
             withContext(NonCancellable) {
+                runCatching { drainDocumentFeed() }.onFailure {
+                    System.err.println("[OROBOROS] Document feed drain failed: ${it.message}")
+                }
+                shutdown.close()
                 reactiveJob.cancelAndJoin()
                 healthJob.cancel()
                 try { serverSocket.close() } catch (_: Exception) {}
@@ -2515,6 +2512,104 @@ object OroborosDaemon {
                 try { muxReactor.close() } catch (_: Exception) {}
                 try { nioSupervisor.close() } catch (_: Exception) {}
             }
+        }
+    }
+
+    private fun shutdownChannel(): Channel<Unit> {
+        val shutdown = Channel<Unit>(Channel.CONFLATED)
+        // Stop admission and drain the feed before cancelling its owned workers.
+        val sigHandler = SignalHandler {
+            isRunning = false
+            shutdown.trySend(Unit)
+        }
+        Signal.handle(Signal("TERM"), sigHandler)
+        Signal.handle(Signal("INT"), sigHandler)
+
+        return shutdown
+    }
+
+    private suspend fun awaitShutdown(
+        watch: Boolean,
+        intervalMs: Long,
+        shutdown: Channel<Unit>,
+        reactiveJob: kotlinx.coroutines.Job,
+    ) {
+            if (watch) {
+                while (isRunning) {
+                    withTimeoutOrNull(intervalMs) { shutdown.receive() }
+                }
+            } else {
+                // --once: settle the reactive elements, then exit.
+                withTimeoutOrNull(intervalMs) { shutdown.receive() }
+                isRunning = false
+                reactiveJob.cancelAndJoin()
+            }
+    }
+
+    private fun openHealthSocket(healthSock: File): ServerSocketChannel? {
+        // Bind with retry: a prior daemon may have left a stale socket file
+        // even after the JVM exited; the bind() then creates a regular file
+        // instead of a UNIX socket. Retry up to 3× with the file removed
+        // between attempts so we always end up with a real socket.
+        var serverSocket: ServerSocketChannel? = null
+        var bindAttempt = 0
+        while (serverSocket == null && bindAttempt < 3) {
+            try {
+                serverSocket = ServerSocketChannel.open(StandardProtocolFamily.UNIX)
+                serverSocket.bind(UnixDomainSocketAddress.of(healthSock.toPath()))
+                serverSocket.configureBlocking(false)
+            } catch (e: Throwable) {
+                System.err.println("[OROBOROS] health.sock bind attempt ${bindAttempt + 1} failed: ${e.message}")
+                try { serverSocket?.close() } catch (_: Exception) {}
+                serverSocket = null
+                if (healthSock.exists()) healthSock.delete()
+                bindAttempt++
+            }
+        }
+        if (serverSocket == null) {
+            System.err.println("[OROBOROS] health.sock bind FAILED after 3 attempts; aborting")
+            return null
+        }
+
+        return serverSocket
+    }
+
+    private suspend fun openDocumentFeed(
+        context: borg.trikeshed.module.ModuleContext,
+        brain: borg.trikeshed.jules.BrainClient,
+        points: borg.trikeshed.pointcut.PointcutBlackboardAdapter,
+    ): borg.trikeshed.lib.Join<borg.trikeshed.userspace.nio.DocumentFeedStorage, borg.trikeshed.graal.subvm.DocumentFeed> {
+        val bag = requireNotNull(context.beliefBag) {
+            "Document curation requires --belief-bag or TRIKESHED_BELIEF_BAG=1"
+        }
+        val storage = borg.trikeshed.userspace.nio.DocumentFeedStorage.open(context.scope, context.stateDir.absolutePath)
+        var feed: borg.trikeshed.graal.subvm.DocumentFeed? = null
+        try {
+            val model = System.getenv("TRIKESHED_DOCUMENT_MODEL")?.trim()?.takeIf { it.isNotEmpty() } ?: "auto"
+            val opened = borg.trikeshed.lcnc.DocumentCurationLegos.create(
+                context.scope, storage.volume, storage.cas, storage.log, bag, points,
+                borg.trikeshed.narsese.documentModel(brain, context.muxContext), model,
+                context.lcncRunners, stagingLba = 0,
+            )
+            feed = opened
+            context.blackboard.put("daemon/document-feed", mapOf(
+                "status" to "ACTIVE", "routeId" to opened.routeId,
+                "model" to model, "stateRoot" to context.stateDir.absolutePath,
+                "source" to "document-source.bin", "cas" to "document-cas.wal", "ledger" to "document-curator.wal",
+                "backend" to storage.volume.backendReport.backendName,
+                "ioUringAvailable" to storage.volume.backendReport.ioUringAvailable,
+                "channelAvailability" to storage.volume.channelReport?.availability,
+                "channelCapabilities" to storage.volume.channelReport?.capabilities,
+                "nativeCapabilities" to storage.volume.channelReport?.nativeCapabilities,
+                "entrypoint" to "/api/lcnc/run", "type" to borg.trikeshed.lcnc.DocumentCurationLegos.CURATE,
+            ), "oroboros")
+            return storage j opened
+        } catch (failure: Throwable) {
+            withContext(NonCancellable) {
+                runCatching { feed?.drain() }.exceptionOrNull()?.let(failure::addSuppressed)
+                runCatching { storage.drain() }.exceptionOrNull()?.let(failure::addSuppressed)
+            }
+            throw failure
         }
     }
 
@@ -2567,9 +2662,12 @@ object OroborosDaemon {
     private fun usage() {
         System.err.println(
             """usage: OroborosDaemon [--once | --watch] [--interval-ms N] [--max-slots N] [--kanban-port N]
-              [--hermes-root PATH] [--hermes-sleeve PATH] [--hermes-console] [forgeHome] [repoDir]
+              [--hermes-root PATH] [--hermes-sleeve PATH] [--hermes-console]
+              [--belief-bag] [--document-feed] [forgeHome] [repoDir]
               env: JULES_API_KEY (required)
                    HERMES_SOURCE_ROOT / HERMES_GRAAL_SLEEVE (optional)
+                   TRIKESHED_DOCUMENT_FEED=1 (same as --document-feed; requires belief bag)
+                   TRIKESHED_DOCUMENT_MODEL (optional model route; default auto)
               forgeHome default: ~/.local/forge (ForgeHome.defaultHome)
               repoDir  default: cwd
               kanban-port default: 8888"""

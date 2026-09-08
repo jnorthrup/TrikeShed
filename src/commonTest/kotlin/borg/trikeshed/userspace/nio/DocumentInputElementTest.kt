@@ -15,6 +15,50 @@ import kotlin.test.assertTrue
 
 class DocumentInputElementTest {
     @Test
+    fun stagedBytesAreSyncedAndReadBackWithoutPadding() = runTest {
+        val stored = InMemoryVolume(16, 4)
+        val events = mutableListOf<String>()
+        val volume = object : Volume by stored {
+            override suspend fun write(lba: Long, data: ByteBuffer) {
+                events.add("write")
+                stored.write(lba, data)
+            }
+            override suspend fun sync() { events.add("sync") }
+            override suspend fun read(lba: Long, count: Int): ByteBuffer {
+                events.add("read")
+                return stored.read(lba, count)
+            }
+        }
+        val input = DocumentInputElement.create(this, volume)
+        val bytes = "Exact λ source.".encodeToByteArray()
+        try {
+            val staged = input.stage(1, bytes, "source.txt", "text/plain")
+            assertContentEquals(bytes, staged.bytes)
+            assertEquals(ContentId.of(bytes), staged.cid)
+            assertEquals(listOf("write", "sync", "read"), events)
+            assertEquals(1L, staged.extent.lba)
+        } finally { input.drain() }
+    }
+
+    @Test
+    fun failedStageDoesNotReadOrReportSourceBytes() = runTest {
+        val stored = InMemoryVolume(16, 2)
+        var read = false
+        val volume = object : Volume by stored {
+            override suspend fun sync() { error("source sync failed") }
+            override suspend fun read(lba: Long, count: Int): ByteBuffer {
+                read = true
+                return stored.read(lba, count)
+            }
+        }
+        val input = DocumentInputElement.create(this, volume)
+        try {
+            assertFailsWith<IllegalStateException> { input.stage(0, byteArrayOf(1), "source") }
+            assertFalse(read)
+        } finally { input.drain() }
+    }
+
+    @Test
     fun drainWaitsForActiveAndQueuedReads() = runTest {
         val stored = InMemoryVolume(16, 2)
         val entered = CompletableDeferred<Unit>()

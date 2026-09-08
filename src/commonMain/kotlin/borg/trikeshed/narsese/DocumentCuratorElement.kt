@@ -24,17 +24,16 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.channels.SendChannel
 import kotlinx.coroutines.currentCoroutineContext
-import kotlinx.coroutines.flow.buffer
-import kotlinx.coroutines.flow.channelFlow
 import kotlinx.coroutines.joinAll
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withContext
 import kotlin.coroutines.CoroutineContext
 
 /**
- * Bounded input -> bounded NLP/model channelFlow -> fan-in -> ledger/intake -> result queue.
- * One dispatcher joins one branch pair at a time; there is no unbounded correlation map.
+ * Bounded input -> NLP -> model -> ledger/intake -> result queue.
+ * A document's model depends on its NLP; independent documents overlap across stages.
  * The injected log is exclusively owned here and MUST NOT be the belief log.
  *
  * CAS-before-WAL reservations give conservative at-most-once submission across retries.
@@ -78,6 +77,7 @@ class DocumentCuratorElement private constructor(
     private val supervisor = SupervisorJob(scope.coroutineContext[Job])
     private val workers = CoroutineScope(scope.coroutineContext + this + supervisor)
     private val input = Channel.buffered<Work>(capacity)
+    private val analyzed = Channel.buffered<Analyzed>(capacity)
     private val joined = Channel.buffered<Joined>(capacity)
     private val output = Channel.buffered<Completion>(capacity)
     private val jobs = mutableListOf<Job>()
@@ -93,10 +93,7 @@ class DocumentCuratorElement private constructor(
 
     private data class Work(val source: DocumentSource, val reply: CompletableDeferred<Result<DocumentCurationResult>>)
     private data class Outcome<T>(val result: Result<T>, val observerError: String?)
-    private sealed interface Branch {
-        data class Nlp(val outcome: Outcome<NlpDocument>) : Branch
-        data class Model(val outcome: Outcome<ModelResponse>) : Branch
-    }
+    private data class Analyzed(val work: Work, val nlp: Outcome<NlpDocument>, val notices: List<String>)
     private data class Joined(val work: Work, val nlp: Outcome<NlpDocument>, val model: Outcome<ModelResponse>, val notices: List<String>)
     private data class Completion(val work: Work, val result: Result<DocumentCurationResult>)
 
@@ -151,31 +148,35 @@ class DocumentCuratorElement private constructor(
                     val work = input.recv().getOrNull() ?: break
                     val notices = mutableListOf<String>()
                     observe("curator.input", work.source)?.let(notices::add)
-                    var nlp: Outcome<NlpDocument>? = null
-                    var model: Outcome<ModelResponse>? = null
-                    channelFlow<Branch> {
-                        launch(Dispatchers.Default) {
-                            val owner = currentCoroutineContext()[Key] ?: error("missing curator owner")
-                            val result = attempt { owner.nlp.read(work.source.text) }
-                            send(Branch.Nlp(Outcome(result, owner.observe("curator.nlp", work.source))))
+                    val result = attempt { withContext(Dispatchers.Default) { nlp.read(work.source.text) } }
+                    val outcome = Outcome(result, observe("curator.nlp", work.source))
+                    analyzed.send(Analyzed(work, outcome, notices)).getOrThrow()
+                }
+            } finally { analyzed.close() }
+        }
+        owned {
+            try {
+                while (true) {
+                    val analysis = analyzed.recv().getOrNull() ?: break
+                    val work = analysis.work
+                    val notices = analysis.notices.toMutableList()
+                    val index = work.source.curationIndex(analysis.nlp.result.getOrNull(),
+                        analysis.nlp.result.exceptionOrNull()?.let { listOf("nlp: ${it.message}").toSeries() }
+                            ?: emptySeriesOf())
+                    val available = index.facet(DocumentCurationIndexK.NlpStatus) == DocumentNlpStatus.AVAILABLE
+                    val result = attempt {
+                        check(available) {
+                            "skipped: NLP unavailable or invalid: ${index.facet(DocumentCurationIndexK.Reasons).values().joinToString()}"
                         }
-                        launch {
-                            val owner = currentCoroutineContext()[Key] ?: error("missing curator owner")
-                            val result = attempt { owner.model(Prompt(
-                                listOf(PromptMessage.System(DocumentCuratorGrounding.instructions),
-                                    PromptMessage.User(JsonSupport.stringify(DocumentCuratorCodec.source(work.source)))).toSeries(),
-                                owner.modelId, temperature = 0.0, maxTokens = 4096,
-                            )) }
-                            send(Branch.Model(Outcome(result, owner.observe("curator.model", work.source))))
-                        }
-                    }.buffer(capacity).collect { branch ->
-                        when (branch) {
-                            is Branch.Nlp -> nlp = branch.outcome
-                            is Branch.Model -> model = branch.outcome
-                        }
+                        model(Prompt(
+                            listOf(PromptMessage.System(DocumentCuratorGrounding.instructions),
+                                PromptMessage.User(JsonSupport.stringify(DocumentCuratorCodec.modelInput(index)))).toSeries(),
+                            modelId, temperature = 0.0, maxTokens = 4096,
+                        ))
                     }
+                    val model = Outcome(result, observe(if (available) "curator.model" else "curator.model.skipped", work.source))
                     observe("curator.join", work.source)?.let(notices::add)
-                    joined.send(Joined(work, checkNotNull(nlp), checkNotNull(model), notices)).getOrThrow()
+                    joined.send(Joined(work, analysis.nlp, model, notices)).getOrThrow()
                 }
             } finally { joined.close() }
         }

@@ -46,6 +46,10 @@ object SubVmLegos {
         ctx.lcncRunners[CORENLP_EXTRACT] = corenlpExtract(host)
         ctx.lcncRunners[MODULES] = modules()
         ctx.lcncRunners[CAMEL_CATALOG] = camelCatalog()
+        // Only a host-supplied feed may bind document storage and ledger ownership.
+        ctx.scope.coroutineContext[borg.trikeshed.graal.subvm.DocumentFeed]?.let { feed ->
+            ctx.lcncRunners[DocumentCurationLegos.CURATE] = DocumentCurationLegos.curate(feed)
+        }
     }
 
     // ── camel.catalog: what the mounted module can offer, read lazily ──

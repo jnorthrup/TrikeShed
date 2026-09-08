@@ -11,6 +11,10 @@ import borg.trikeshed.userspace.nio.ebpf.UringEbpfProgram
  * Channel factory — backed by expect/actual [ChannelsImpl].
  */
 object UringChannels {
+    fun open(scope: kotlinx.coroutines.CoroutineScope, entries: Int = 256,
+             ebpfPrograms: List<UringEbpfProgram> = emptyList()): UringChannel =
+        UringChannel(FunctionalUringFacade.create(scope, entries, ebpfPrograms = ebpfPrograms))
+
     fun open(entries: Int = 256, ebpfPrograms: List<UringEbpfProgram> = emptyList()): UringChannel =
         UringChannel(FunctionalUringFacade(entries, openUserspaceChannelBackend(entries), ebpfPrograms = ebpfPrograms))
 

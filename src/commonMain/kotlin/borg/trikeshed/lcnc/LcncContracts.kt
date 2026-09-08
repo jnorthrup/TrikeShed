@@ -986,6 +986,12 @@ object LcncContracts {
                 "discount" to LcncPortContract.LcncParamSpec(v = "0.5"),
             )),
 
+        LcncPortContract("document.curate", "document curation (managed NLP, source-linked cursor)",
+            listOf("extent?", "source?"), listOf("receiptCid", "record", "nlpStatus", "sheet", "sheets"),
+            inputKinds = mapOf("extent" to "json", "source" to "json"),
+            outputKinds = mapOf("receiptCid" to "id", "record" to "json", "nlpStatus" to "text",
+                "sheet" to "json", "sheets" to "json"), isEffect = true),
+
         // ── CoreNLP extract (NER + deps) ──────────────────────────
         LcncPortContract(SubVm.LEGO_PREFIX + "corenlp.extract", "corenlp extract (NER, deps)",
             listOf("text?"), listOf("sentences"),

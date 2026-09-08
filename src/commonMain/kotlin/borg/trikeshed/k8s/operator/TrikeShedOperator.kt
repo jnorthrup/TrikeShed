@@ -4,7 +4,6 @@ import borg.trikeshed.k8s.crd.TrikeShedResource
 import borg.trikeshed.operator.BaseOperatorSdk
 import borg.trikeshed.operator.K8sEvent
 import borg.trikeshed.operator.Reconciler
-import borg.trikeshed.ccek.CCEK
 import borg.trikeshed.ccek.ForgeSignal
 import borg.trikeshed.forge.ForgeBlockKind
 import kotlinx.coroutines.CoroutineScope

@@ -106,6 +106,7 @@ enum class LcncNodeKey(val type: String) : CoroutineContext.Key<LcncNodeElement>
     VIEW_EMIT(LcncContracts.VIEW_EMIT),
     VIEW_REDUCE(LcncContracts.VIEW_REDUCE),
     READ_CONSTRUCT("read.construct"),
+    DOCUMENT_CURATE("document.curate"),
     NAL_MINT("nal.mint"),
     NAL_DECAY("nal.decay"),
     NAL_RECALL("nal.recall"),

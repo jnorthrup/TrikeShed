@@ -6,6 +6,12 @@ import kotlin.test.assertEquals
 class OroborosDaemonArgsTest {
 
     @Test
+    fun documentFeedFlagsDoNotBecomeStoragePaths() {
+        val config = OroborosDaemon.parseConfig(arrayOf("--belief-bag", "--document-feed", "/state/forge", "/source/repo"))
+        assertEquals(listOf("/state/forge", "/source/repo"), config.positional)
+    }
+
+    @Test
     fun testDefaultIntervalMs() {
         val args = emptyArray<String>()
         val config = OroborosDaemon.parseConfig(args)

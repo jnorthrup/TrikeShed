@@ -24,6 +24,8 @@ data class DocumentExtent(
 
 data class DocumentBytes(val extent: DocumentExtent, val bytes: ByteArray, val cid: ContentId)
 
+data class DocumentContent(val bytes: ByteArray, val name: String, val mediaType: String? = null)
+
 /** The owner supplies the volume. This element never substitutes a host filesystem backend. */
 class DocumentInputElement private constructor(
     parent: CoroutineScope,
@@ -47,8 +49,12 @@ class DocumentInputElement private constructor(
     }
     override val key: CoroutineContext.Key<*> get() = Key
 
-    private data class Read(val extent: DocumentExtent, val result: CompletableDeferred<DocumentBytes>)
-    private val input = Channel<Read>(capacity.also { require(it > 0) })
+    private data class Input(
+        val extent: DocumentExtent,
+        val bytes: ByteArray?,
+        val result: CompletableDeferred<DocumentBytes>,
+    )
+    private val input = Channel<Input>(capacity.also { require(it > 0) })
     val job = SupervisorJob(parent.coroutineContext[Job])
     private val consumer: Job
 
@@ -65,6 +71,11 @@ class DocumentInputElement private constructor(
             try {
                 for (request in input) {
                     try {
+                        request.bytes?.let { bytes ->
+                            owner.validate(request.extent)
+                            owner.volume.write(request.extent.lba, ByteBuffer.wrap(bytes))
+                            owner.volume.sync()
+                        }
                         request.result.complete(owner.readExtent(request.extent))
                     } catch (cancelled: CancellationException) {
                         request.result.completeExceptionally(cancelled)
@@ -86,15 +97,30 @@ class DocumentInputElement private constructor(
 
     suspend fun read(extent: DocumentExtent): DocumentBytes {
         val result = CompletableDeferred<DocumentBytes>()
-        input.send(Read(extent, result))
+        input.send(Input(extent, null, result))
         return result.await()
     }
 
-    private suspend fun readExtent(extent: DocumentExtent): DocumentBytes {
+    /** The caller reserves this region; writes and read-back share the existing input worker. */
+    suspend fun stage(lba: Long, bytes: ByteArray, name: String, mediaType: String? = null): DocumentBytes {
+        validate(DocumentExtent(lba, bytes.size, name, mediaType))
+        val retained = bytes.copyOf()
+        val extent = DocumentExtent(lba, retained.size, name, mediaType, ContentId.of(retained))
+        val result = CompletableDeferred<DocumentBytes>()
+        input.send(Input(extent, retained, result))
+        return result.await()
+    }
+
+    private fun validate(extent: DocumentExtent) {
         require(extent.byteLength in 0..maxDocumentBytes) { "Document length exceeds the configured bound" }
         require(extent.lba >= 0 && extent.lba <= volume.capacity)
         val blocks = (extent.byteLength.toLong() + volume.blockSize - 1) / volume.blockSize
         require(blocks <= volume.capacity - extent.lba) { "Document extent exceeds the volume" }
+    }
+
+    private suspend fun readExtent(extent: DocumentExtent): DocumentBytes {
+        validate(extent)
+        val blocks = (extent.byteLength.toLong() + volume.blockSize - 1) / volume.blockSize
         val bytes = ByteArray(extent.byteLength)
         var block = 0L
         var offset = 0

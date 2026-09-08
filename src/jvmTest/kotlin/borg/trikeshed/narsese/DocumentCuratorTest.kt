@@ -31,6 +31,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
@@ -132,7 +133,7 @@ class DocumentCuratorTest {
         }
     }
 
-    @Test fun branchFailuresRetainPeerAndAllowRetry(): Unit = runBlocking {
+    @Test fun nlpFailureSkipsModelAndModelFailureRetainsNlpForRetry(): Unit = runBlocking {
         withTimeout(10000) {
             val f = fixture(this)
             var failNlp = false
@@ -145,7 +146,8 @@ class DocumentCuratorTest {
                 assertTrue(modelFailure.unresolvedReasons.values().any { "model unavailable" in it })
                 failNlp = true; failModel = false
                 val nlpFailure = curator.curate(f.source)
-                assertNotNull(nlpFailure.record.model)
+                assertNull(nlpFailure.record.model)
+                assertTrue(nlpFailure.unresolvedReasons.values().any { "skipped: NLP" in it })
                 assertEquals(0, nlpFailure.acceptedReceiptCids.size)
                 failNlp = false
                 assertEquals(1, curator.curate(f.source).acceptedReceiptCids.size)
@@ -229,7 +231,7 @@ class DocumentCuratorTest {
         }
     }
 
-    @Test fun fanoutUsesOwnerContextAndDrainJoinsAcceptedQueueWork(): Unit = runBlocking {
+    @Test fun pipelineUsesOwnerContextAndDrainJoinsAcceptedQueueWork(): Unit = runBlocking {
         withTimeout(10000) {
             val f = fixture(this)
             val nlpStarted = CompletableDeferred<Unit>()
@@ -239,16 +241,27 @@ class DocumentCuratorTest {
             var modelCalls = 0
             val curator = f.curator(this, nlp = NlpReader {
                 assertNotNull(currentCoroutineContext()[DocumentCuratorElement])
-                nlpCalls++; nlpStarted.complete(Unit); modelStarted.await(); release.await(); svo(it)
+                nlpCalls++; nlpStarted.complete(Unit); release.await(); svo(it)
             }, model = {
                 assertNotNull(currentCoroutineContext()[DocumentCuratorElement])
-                modelCalls++; nlpStarted.await(); modelStarted.complete(Unit); response(envelope(proposal()))
+                modelCalls++
+                assertTrue(release.isCompleted)
+                val input = JsonSupport.parse(it.messages[it.messages.size - 1].content) as Map<*, *>
+                val linguistic = input["linguistics"] as Map<*, *>
+                assertEquals("AVAILABLE", linguistic["status"])
+                assertNull(linguistic["parseConfidence"])
+                assertEquals("UNAVAILABLE", linguistic["externalVerification"])
+                val sentence = (linguistic["sentences"] as List<*>).single() as Map<*, *>
+                assertEquals(4, (sentence["tokens"] as List<*>).size)
+                assertEquals("Rain causes floods.", input["text"])
+                modelStarted.complete(Unit); response(envelope(proposal()))
             }, capacity = 1)
             try {
                 val requests = (0..5).map { i -> async(start = CoroutineStart.UNDISPATCHED) {
                     curator.curate(f.source.copy(correlation = "queued-$i"))
                 } }
-                modelStarted.await()
+                nlpStarted.await()
+                assertFalse(modelStarted.isCompleted)
                 val drained = async { curator.drain() }
                 yield()
                 assertFalse(drained.isCompleted)
@@ -338,24 +351,52 @@ class DocumentCuratorTest {
         }
     }
 
-    @Test fun blockingNlpDoesNotSerializeModelBranch(): Unit = runBlocking {
+    @Test fun blockingNlpOverlapsPriorDocumentsModel(): Unit = runBlocking {
         withTimeout(10000) {
             val f = fixture(this)
-            val nlpStarted = CountDownLatch(1)
-            val modelStarted = CountDownLatch(1)
+            val secondNlpStarted = CountDownLatch(1)
+            val release = CountDownLatch(1)
+            var nlpCalls = 0
+            var modelCalls = 0
             val curator = f.curator(this, nlp = NlpReader { text ->
                 assertNotNull(currentCoroutineContext()[DocumentCuratorElement])
-                nlpStarted.countDown()
-                check(modelStarted.await(2, TimeUnit.SECONDS)) { "blocking NLP prevented model start" }
+                if (++nlpCalls == 2) {
+                    secondNlpStarted.countDown()
+                    check(release.await(3, TimeUnit.SECONDS)) { "prior model could not overlap blocking NLP" }
+                }
                 svo(text)
             }, model = {
-                check(nlpStarted.await(2, TimeUnit.SECONDS)) { "NLP worker never started" }
-                modelStarted.countDown()
+                if (++modelCalls == 1) {
+                    kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
+                        check(secondNlpStarted.await(3, TimeUnit.SECONDS)) { "next document NLP did not start" }
+                    }
+                    release.countDown()
+                }
                 response(envelope(proposal()))
             })
             try {
-                assertEquals(1, curator.curate(f.source).acceptedReceiptCids.size)
-            } finally { modelStarted.countDown(); curator.close(); f.bag.drain() }
+                val requests = (0..1).map { i -> async { curator.curate(f.source.copy(correlation = "overlap-$i")) } }
+                assertEquals(1, requests.awaitAll().sumOf { it.acceptedReceiptCids.size })
+                assertEquals(2, modelCalls)
+            } finally { release.countDown(); curator.close(); f.bag.drain() }
+        }
+    }
+
+    @Test fun invalidNlpIsRetainedAndCannotReachModel(): Unit = runBlocking {
+        withTimeout(10000) {
+            val f = fixture(this)
+            var modelCalls = 0
+            val curator = f.curator(this, nlp = NlpReader { svo(it).copy(text = "wrong source") }, model = {
+                modelCalls++; response(envelope(proposal()))
+            })
+            try {
+                val result = curator.curate(f.source)
+                assertEquals(0, modelCalls)
+                assertEquals("wrong source", result.record.nlp?.text)
+                assertEquals(DocumentNlpStatus.INVALID, result.record.curationIndex().facet(DocumentCurationIndexK.NlpStatus))
+                assertEquals(0, result.acceptedReceiptCids.size)
+                assertTrue(result.unresolvedReasons.values().any { "skipped: NLP" in it })
+            } finally { curator.close(); f.bag.drain() }
         }
     }
 
@@ -426,16 +467,17 @@ object DocumentCuratorTestMain {
             "pending" to test::malformedUnsupportedAndHallucinatedStayPending,
             "conflict" to test::conflictsKeepBothProposalsWithoutMinting,
             "dependency disagreement" to test::dependencyDisagreementIsNotGrounding,
-            "branch failure/retry" to test::branchFailuresRetainPeerAndAllowRetry,
+            "NLP prerequisite/failure/retry" to test::nlpFailureSkipsModelAndModelFailureRetainsNlpForRetry,
             "replay/provenance" to test::metadataUnicodeAndAnsweringIdentitySurviveReplay,
             "observer isolation" to test::observerFailuresAreNotBusinessFailures,
             "pending observer persistence" to test::pendingRecordObserverFailureSurvivesCasAndReplay,
-            "fanout/drain" to test::fanoutUsesOwnerContextAndDrainJoinsAcceptedQueueWork,
+            "NLP prompt/pipeline/drain" to test::pipelineUsesOwnerContextAndDrainJoinsAcceptedQueueWork,
             "uncertain submission" to test::uncertainSubmissionReplayDoesNotInflateEvidence,
             "source validation" to test::badSourceCannotMintAndDoesNotStopLaterWork,
             "CAS readback" to test::casReadbackFailureDoesNotAppendOrMint,
             "strict JSON" to test::strictJsonPreservesValidEscapesAndRejectsTrailingInput,
-            "blocking NLP concurrency" to test::blockingNlpDoesNotSerializeModelBranch,
+            "blocking NLP document overlap" to test::blockingNlpOverlapsPriorDocumentsModel,
+            "invalid NLP excludes model" to test::invalidNlpIsRetainedAndCannotReachModel,
         )
         for ((name, check) in checks) { check(); println("PASS $name") }
         println("PASS ${checks.size} DocumentCurator checks")

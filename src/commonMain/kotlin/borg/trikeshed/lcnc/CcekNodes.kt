@@ -11,18 +11,24 @@ import borg.trikeshed.ccek.MetaLcncParadigm
 import borg.trikeshed.ccek.PolyglotFact
 import borg.trikeshed.ccek.ProjectionKind
 import borg.trikeshed.ccek.UserContext
-import borg.trikeshed.ccek.requireCcekScope
 import borg.trikeshed.forge.ForgeBlockKind
 import borg.trikeshed.forge.ForgeDoc
 import borg.trikeshed.htx.HtxKey
+import borg.trikeshed.htx.HtxRouteService
+import borg.trikeshed.lcnc.ccek.CcekReactorBinding
 import borg.trikeshed.parse.json.JsonSupport
+import borg.trikeshed.reactor.TlsCodecBackend
 import borg.trikeshed.userspace.concurrency.ParseScopeKey
+import borg.trikeshed.userspace.nio.channels.spi.ChannelOperations
 import borg.trikeshed.userspace.nio.file.spi.FileOperations
 import borg.trikeshed.userspace.nio.spi.NioSupervisor
 import borg.trikeshed.userspace.reactor.MuxReactorElement
 import kotlin.coroutines.CoroutineContext
 import kotlin.coroutines.AbstractCoroutineContextElement
+import kotlinx.coroutines.CompletableJob
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.channels.Channel
@@ -110,11 +116,11 @@ data class CcekSeams(
 
         /**
          * The daemon's plane: nodes are choreographed by the reactor-bound
-         * [CCEK.CcekReactorBinding] (OroborosDaemon's `CCEK.initialize(muxReactor)`),
+         * [CcekReactorBinding],
          * so a program drives the same CCEK the rest of the process rides —
          * not a private instance beside it.
          */
-        fun live(binding: borg.trikeshed.ccek.CCEK.CcekReactorBinding): CcekSeams = liveOf(
+        fun live(binding: CcekReactorBinding): CcekSeams = liveOf(
             scope = binding.reactorScope,
             newNode = { title, record, maxConcurrency, projections ->
                 binding.choreograph(ForgeDoc.empty(title), record, projections, maxConcurrency)
@@ -543,7 +549,6 @@ object CcekNodes {
         "ParseScope" to ParseScopeKey,
         "NioSupervisor" to NioSupervisor.Key,
         "LcncScopeFrame" to LcncScopeFrame.Key,
-        "CcekKeyService" to CcekKeyService.Key,
         "ArticulatedNode" to ArticulatedNode.Key,
         "UserContext" to UserContext.Key,
         "CcekSeams" to CcekSeams.Key,
@@ -825,7 +830,7 @@ object CcekNodes {
             }
             val spis = csv(node.params["minimumSpis"])
             val validation = try {
-                requireCcekScope()
+                validateCcekScope()
             } catch (e: IllegalStateException) {
                 return@runner mapOf(
                     "valid" to false, "providedKeys" to emptyList<String>(), "missingKeys" to names,
@@ -855,4 +860,35 @@ object CcekNodes {
         "ccek.polyglot.load", "ccek.polyglot.query", "ccek.predict", "ccek.table.test",
         "ccek.flow", "ccek.veneer", "ccek.paradigm", "ccek.validate",
     )
+
+    private data class ScopeValidation(
+        val providedKeys: List<CoroutineContext.Key<*>>,
+        val providedSpis: Set<String>,
+    )
+
+    private suspend fun validateCcekScope(): ScopeValidation {
+        val context = currentCoroutineContext()
+        val job = context[Job] ?: throw IllegalStateException("CCEK scope requires a CompletableJob")
+        if (job !is CompletableJob) {
+            throw IllegalStateException("CCEK scope requires a CompletableJob, got ${job::class.simpleName}")
+        }
+        val keys = context.fold(ArrayList<CoroutineContext.Key<*>>()) { acc, element ->
+            acc += element.key
+            acc
+        }
+        val spis = LinkedHashSet<String>()
+        fun register(key: CoroutineContext.Key<*>) {
+            when (key) {
+                FileOperations.Key -> spis += "FileOperations"
+                ChannelOperations.Key -> spis += "ChannelOperations"
+                HtxRouteService.Key -> spis += "HtxRouteService"
+                TlsCodecBackend.Key -> spis += "TlsCodecBackend"
+                MuxReactorElement.Key -> spis += "MuxReactorElement"
+                NioSupervisor.Key -> spis += "NioSupervisor"
+            }
+        }
+        keys.forEach(::register)
+        context[NioSupervisor.Key]?.services?.forEach { service -> register(service.key) }
+        return ScopeValidation(keys, spis)
+    }
 }

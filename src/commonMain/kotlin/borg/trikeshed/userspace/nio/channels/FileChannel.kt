@@ -13,7 +13,7 @@ import borg.trikeshed.userspace.nio.file.Files
 /**
  * FileChannel wired behind UringFacade.
  *
- * Every read/write routes through Channel → ChannelImpl → FunctionalUringFacade.
+ * Open, read, write, sync and close route through FunctionalUringFacade.
  */
 public abstract class FileChannel protected constructor() : AbstractInterruptibleChannel(), SeekableByteChannel, GatheringByteChannel, ScatteringByteChannel {
     public abstract override fun close()
@@ -41,12 +41,35 @@ public abstract class FileChannel protected constructor() : AbstractInterruptibl
 
     companion object {
         fun open(path: Path, options: Set<OpenOption>, vararg attrs: FileAttribute<*>): FileChannel {
-            val readOnly = !options.any { it is StandardOpenOption && it == StandardOpenOption.WRITE }
-            val file = Files.open(path.toString(), readOnly)
+            return open(path.toString(), options, *attrs)
+        }
+        fun open(path: String, options: Set<OpenOption>, vararg attrs: FileAttribute<*>): FileChannel {
+            require(attrs.isEmpty()) { "File attributes are not supported by portable OPENAT" }
+            val supported = setOf(StandardOpenOption.READ, StandardOpenOption.WRITE, StandardOpenOption.CREATE,
+                StandardOpenOption.CREATE_NEW, StandardOpenOption.TRUNCATE_EXISTING)
+            require(options.all { it in supported }) { "Unsupported OPENAT option" }
+            val write = StandardOpenOption.WRITE in options
+            require(write || options.none { it == StandardOpenOption.CREATE || it == StandardOpenOption.CREATE_NEW || it == StandardOpenOption.TRUNCATE_EXISTING }) {
+                "Creation and truncation require WRITE"
+            }
+            var flags = if (write) { if (StandardOpenOption.READ in options) 2 else 1 } else 0
+            if (StandardOpenOption.CREATE in options || StandardOpenOption.CREATE_NEW in options) flags = flags or 64
+            if (StandardOpenOption.CREATE_NEW in options) flags = flags or 128
+            if (StandardOpenOption.TRUNCATE_EXISTING in options) flags = flags or 512
             val channel = UringChannels.open()
-            return UringFileChannel(file, channel)
+            try {
+                channel.enqueue(borg.trikeshed.userspace.UringOp.Companion.Submissions.openat(path.toString(), flags, 0))
+                channel.submit()
+                val completion = channel.wait(1).single { it.userData == 0L }
+                if (completion.res < 0) throw borg.trikeshed.userspace.nio.IOException("OPENAT errno ${-completion.res}: $path")
+                return UringFileChannel(borg.trikeshed.userspace.nio.file.File.fromFd(completion.res), channel)
+            } catch (failure: Throwable) {
+                channel.closeNow()
+                throw failure
+            }
         }
         fun open(path: Path, vararg options: OpenOption): FileChannel = open(path, options.toSet())
+        fun open(path: String, vararg options: OpenOption): FileChannel = open(path, options.toSet())
     }
 
     public open class MapMode {

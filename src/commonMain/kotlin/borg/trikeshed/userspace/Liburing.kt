@@ -33,12 +33,13 @@ interface LiburingFacade {
     fun submit(): Result<Int>
 
     /**
-     * Drain the CQ, dispatching each [UringCompletion] to handlers registered
-     * via [registerFanoutHandler] for the matching userData token.
-     * Returns the next peek-safe completion (or null) without dequeuing the ring.
+     * Transfer one CQE and dispatch it to handlers registered for its userData.
+     * The native ring advances exactly once when the completion is returned.
      */
     fun waitCqe(): Result<UringCompletion?>
+    /** Nonblocking transfer of one CQE; null means no ready completion. */
     fun peekCqe(): Result<UringCompletion?>
+    /** Compatibility acknowledgement; transferred CQEs have already advanced. */
     fun cqAdvance(count: Int)
     fun registerFanoutHandler(token: Long, handler: (UringCompletion) -> Unit)
     fun removeFanoutHandler(token: Long, handler: (UringCompletion) -> Unit)
