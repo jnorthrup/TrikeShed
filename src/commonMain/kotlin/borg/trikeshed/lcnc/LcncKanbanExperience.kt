@@ -26,14 +26,14 @@ class LcncKanbanExperience(
     private val store: BoardStoreElement,
     private val graph: () -> KanbanGraph = { KanbanGraph.hermesDefault() },
     /** NARS garnish per card id (`attention`, `contested`), when a belief bag is live; null = bag off. */
-    private val attention: (() -> Map<String, Map<String, Any?>>)? = null,
+    private val attention: ((BoardStoreElement) -> Map<String, Map<String, Any?>>)? = null,
     /** The board productions' live tail (`breaches`, `stalls`, `cycles`, `ready`) — what `board.view#alerts` carries. */
     private val alerts: () -> Map<String, Any?> = { emptyMap() },
 ) {
 
     /**
      * THE board projection — the one map `/api/board` serializes and
-     * `board.get`/`board.view` hand the canvas. It reads [store] directly:
+     * `board.get`/`board.view` hand the canvas. It reads the supplied [store]:
      * cards, then the fields the store persists but the bare cursor drops
      * (owner, dependencies, tags), then the attention garnish when a bag is
      * live. One author; the route and the node cannot answer differently.
@@ -42,10 +42,10 @@ class LcncKanbanExperience(
      * table — a no-code node playing no-function. It is a unit over
      * [BoardStoreElement] now, like every other kanban lego here.
      */
-    fun boardView(title: String = "Oroboros board"): Map<String, Any?> {
+    fun boardView(title: String = "Oroboros board", store: BoardStoreElement = this.store): Map<String, Any?> {
         val seq = store.lastSequence
         val base = borg.trikeshed.kanban.BoardCursor.of(store.cards()).toBoardMap(seq, title)
-        val garnish = attention?.invoke().orEmpty()
+        val garnish = attention?.invoke(store).orEmpty()
         val items = (base["items"] as List<*>).map { item ->
             val m = item as Map<*, *>
             val id = m["id"].toString()
@@ -65,7 +65,7 @@ class LcncKanbanExperience(
     }
 
     /** Current board plus the two useful concentric partitions. */
-    fun activeSheets(): Map<String, Any?> {
+    fun activeSheets(store: BoardStoreElement = this.store): Map<String, Any?> {
         // One committed store projection feeds both the gesture surface and the
         // concentric sheets. Keeping this boundary in Kotlin means the browser
         // never groups cards, invents statuses, or reshapes commands.
@@ -86,13 +86,13 @@ class LcncKanbanExperience(
     /** Registry for a complete in-process Kanban panel program. */
     fun registry(): Map<String, LcncNodeRunner> =
         sheetLcncRegistry() + kanbanLcncRegistry() + PanelVoteNode.registry() + mapOf(
-            "board.get" to LcncNodeRunner { _, _ -> mapOf("json" to boardView()) },
-            "board.view" to LcncNodeRunner { _, _ -> mapOf("board" to boardView(), "alerts" to alerts()) },
-            "kanban.activeSheets" to LcncNodeRunner { _, _ -> activeSheets() },
+            "board.get" to boundLcnc(store) { store, _, _ -> mapOf("json" to boardView(store = store)) },
+            "board.view" to boundLcnc(store) { store, _, _ -> mapOf("board" to boardView(store = store), "alerts" to alerts()) },
+            "kanban.activeSheets" to boundLcnc(store) { store, _, _ -> activeSheets(store) },
             // A wired `command` map (the gesture, shaped upstream) overrides params —
             // same inputs-over-params precedence confix.sheets already honours. Params
             // remain the no-wire path: type a jobId, click run.
-            "kanban.submit" to LcncNodeRunner { node, inputs ->
+            "kanban.submit" to boundLcnc(store) { store, node, inputs ->
                 val c = wiredCommand(inputs)
                 val title = c["title"]?.toString()?.takeIf { it.isNotBlank() }
                     ?: node.params["title"]?.takeIf { it.isNotBlank() }
@@ -108,6 +108,7 @@ class LcncKanbanExperience(
                 // program run): NO-OP with a reason — silent degrade, not error.
                 if (jobId.isNullOrBlank()) mapOf("accepted" to false, "reason" to "no gesture: jobId/title absent")
                 else command(
+                    store,
                     buildMap {
                         put("type", "submit")
                         put("jobId", jobId)
@@ -150,11 +151,12 @@ class LcncKanbanExperience(
                     },
                 )
             },
-            "kanban.move" to LcncNodeRunner { node, inputs ->
+            "kanban.move" to boundLcnc(store) { store, node, inputs ->
                 val c = wiredCommand(inputs)
                 val jobId = c["jobId"]?.toString() ?: c["itemId"]?.toString() ?: node.params["jobId"]
                 if (jobId.isNullOrBlank()) mapOf("accepted" to false, "reason" to "no gesture: command input or jobId param absent")
                 else command(
+                    store,
                     buildMap {
                         put("type", "move")
                         put("jobId", jobId)
@@ -171,7 +173,7 @@ class LcncKanbanExperience(
             },
             // Plan-doc import as a lego: bullets in, cards out — the node form of
             // POST /api/board/import (same parse rules, same content-hash dedupe).
-            "kanban.import" to LcncNodeRunner { node, inputs ->
+            "kanban.import" to boundLcnc(store) { store, node, inputs ->
                 val text = (inputs["text"] ?: node.params["text"])?.toString().orEmpty()
                 val bullets = text.lineSequence()
                     .map { it.trim() }
@@ -188,6 +190,7 @@ class LcncKanbanExperience(
                     val hex = borg.trikeshed.job.ContentId.of(title.encodeToByteArray()).hex
                     val jobId = "card-" + hex.take(12)
                     val r = command(
+                        store,
                         mapOf(
                             "type" to "submit", "jobId" to jobId,
                             "title" to title, "idempotencyKey" to "import#" + hex.take(16),
@@ -231,7 +234,7 @@ class LcncKanbanExperience(
             },
         )
 
-    private suspend fun command(raw: Map<String, Any?>): Map<String, Any?> {
+    private suspend fun command(store: BoardStoreElement, raw: Map<String, Any?>): Map<String, Any?> {
         val reply = CompletableDeferred<BoardApply>()
         store.intake.send(BoardIntake(raw, reply))
         return when (val applied = reply.await()) {
@@ -243,14 +246,14 @@ class LcncKanbanExperience(
                 "idempotencyKey" to applied.idempotencyKey,
                 "cid" to applied.cid.value,
                 // This is deliberately re-projected after the commit, not a pre-command cache.
-                "sheets" to activeSheets(),
+                "sheets" to activeSheets(store),
             )
 
             is BoardApply.Rejected -> mapOf(
                 "accepted" to false,
                 "idempotencyKey" to applied.idempotencyKey,
                 "reason" to applied.reason,
-                "sheets" to activeSheets(),
+                "sheets" to activeSheets(store),
             )
         }
     }

@@ -92,7 +92,7 @@ object CouncilNodes {
         // dialog call NEVER throws through: a throwing dialog becomes a
         // Refused banner that still emits content, so downstream folds and
         // prompts carry the failure ON the record (degrade loudly).
-        "council.seat" to LcncNodeRunner { node, inputs ->
+        "council.seat" to boundLcnc(CouncilDialogKey(dialog)) { service, node, inputs ->
             val prompt = ((inputs["prompt"] as? String)
                 ?: (inputs["prompt?"] as? String))
                 ?.takeIf { it.isNotBlank() }
@@ -116,7 +116,7 @@ object CouncilNodes {
                 contextId = contextId,
             )
             val outcome = try {
-                dialog.seat(call)
+                service.value.seat(call)
             } catch (c: CancellationException) {
                 throw c
             } catch (t: Throwable) {
@@ -261,7 +261,8 @@ object CouncilNodes {
         // doc, the (ruling …) KIF assertion, and the per-case lifecycle
         // advance. Commit-time mistrial rule: all seats refused OR a banner
         // verdict OR the verdict itself declares mistrial — never silent.
-        "council.record" to LcncNodeRunner { node, inputs ->
+        "council.record" to boundLcnc(CouncilRecordKey(seams)) { service, node, inputs ->
+            val seams = service.value
             val verdict = inputs["verdict"] ?: inputs["verdict?"]
             require(verdict != null) { "council.record: no verdict wired" }
             val caseId = ((inputs["caseId"] ?: inputs["caseId?"]) as? String)?.takeIf { it.isNotBlank() }
@@ -352,7 +353,8 @@ object CouncilNodes {
         // Read-back veneer: index fact (blackboard, falling back to the
         // durable couch doc) plus the transcript/verdict bytes from CAS —
         // the GET /api/lcnc/council/{caseId} route is a thin shell over this.
-        "council.case" to LcncNodeRunner { node, inputs ->
+        "council.case" to boundLcnc(CouncilRecordKey(seams)) { service, node, inputs ->
+            val seams = service.value
             val caseId = ((inputs["caseId"] ?: inputs["caseId?"]) as? String)?.takeIf { it.isNotBlank() }
                 ?: node.params["caseId"]?.takeIf { it.isNotBlank() }
                 ?: "default"

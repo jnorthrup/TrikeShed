@@ -14,6 +14,7 @@ import borg.trikeshed.lcnc.LcncNode
 import borg.trikeshed.lcnc.LcncContracts
 import borg.trikeshed.lcnc.LcncNodeRunner
 import borg.trikeshed.lcnc.LcncRunner
+import borg.trikeshed.lcnc.boundLcnc
 import borg.trikeshed.lcnc.ccek.LcncCcekAssembly
 import borg.trikeshed.litebike.JvmKanbanServer
 import borg.trikeshed.module.ForgeModule
@@ -72,8 +73,8 @@ class KanbanModule : ForgeModule {
         val lcnc = LcncKanbanExperience(
             store,
             attention = if (bag == null) null else {
-                {
-                    borg.trikeshed.kanban.BoardAttentionOrder.garnish(bag, store.cards())
+                { board ->
+                    borg.trikeshed.kanban.BoardAttentionOrder.garnish(bag, board.cards())
                         .mapValues { (_, g) -> mapOf("attention" to g.score, "contested" to g.contested) }
                 }
             },
@@ -88,8 +89,8 @@ class KanbanModule : ForgeModule {
         // kanban.attention = BoardAttentionOrder.garnish (per-card score/contested +
         // attention-descending order), kanban.drift = the Hotelling T² cohort alarm.
         if (bag != null) {
-            ctx.lcncRunners["kanban.attention"] = LcncNodeRunner { _, _ ->
-                val g = borg.trikeshed.kanban.BoardAttentionOrder.garnish(bag, store.cards())
+            ctx.lcncRunners["kanban.attention"] = boundLcnc(store) { board, _, _ ->
+                val g = borg.trikeshed.kanban.BoardAttentionOrder.garnish(bag, board.cards())
                 mapOf(
                     "cards" to g.mapValues { (_, v) -> mapOf("attention" to v.score, "contested" to v.contested) },
                     "ordered" to g.entries.sortedByDescending { it.value.score }.map { it.key },

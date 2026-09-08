@@ -10,6 +10,12 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.withContext
 import kotlin.coroutines.CoroutineContext
 
+sealed interface LcncNodeOutcome {
+    data class Returned(val outputs: Map<String, Any?>) : LcncNodeOutcome
+    data class Failed(val cause: Throwable) : LcncNodeOutcome
+    data class Cancelled(val cause: CancellationException) : LcncNodeOutcome
+}
+
 /** A single invocation owns its inputs, result and structured child work. */
 class LcncNodeElement internal constructor(
     override val key: LcncNodeKey,
@@ -23,8 +29,9 @@ class LcncNodeElement internal constructor(
     val lifecycleState: ElementState get() = phase.value
     val state: ElementState get() = phase.value
     val fanoutSubscribers: List<LcncNodeElement> get() = emptyList()
-    private val output = MutableStateFlow<Map<String, Any?>?>(null)
-    val result: Map<String, Any?>? get() = output.value
+    private val completion = MutableStateFlow<LcncNodeOutcome?>(null)
+    val outcome: LcncNodeOutcome? get() = completion.value
+    val result: Map<String, Any?>? get() = (outcome as? LcncNodeOutcome.Returned)?.outputs
 
     init {
         supervisor.invokeOnCompletion { advance(ElementState.CLOSED) }
@@ -56,9 +63,11 @@ class LcncNodeElement internal constructor(
                 check(currentCoroutineContext()[key] === this@LcncNodeElement)
                 runner.execute(node, inputs)
             }
-            output.value = value
+            completion.value = LcncNodeOutcome.Returned(value)
             return value
         } catch (failure: Throwable) {
+            completion.value = if (failure is CancellationException) LcncNodeOutcome.Cancelled(failure)
+                else LcncNodeOutcome.Failed(failure)
             val cancellation = failure as? CancellationException
                 ?: CancellationException("${node.id}: invocation failed").apply { initCause(failure) }
             supervisor.cancel(cancellation)

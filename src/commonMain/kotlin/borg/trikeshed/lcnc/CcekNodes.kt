@@ -152,7 +152,8 @@ data class CcekSeams(
                     val channel = Channel<Map<String, Any?>>(256, BufferOverflow.DROP_OLDEST)
                     statusChannels[title] = channel
                     statusLog[title] = ArrayList()
-                    scope.launch { node.agentStatus.collect { channel.trySend(statusMap(it)) } }
+                    val statusJob = scope.launch { node.agentStatus.collect { channel.trySend(statusMap(it)) } }
+                    node.supervisor.invokeOnCompletion { statusJob.cancel(); channel.close() }
                     constructions[title] = requested
                     node
                 }
@@ -201,8 +202,10 @@ data class CcekSeams(
                     if (node == null) emptyList() else {
                         val key = "$handle $agent"
                         val fresh = !agentBuffers.containsKey(key)
-                        val buffer = agentBuffers.getOrPut(key) { Channel(Channel.UNLIMITED) }
-                        if (fresh) node.subscribeAgent(agent) { signal -> buffer.trySend(signal) }
+                        val buffer = agentBuffers.getOrPut(key) { Channel(256) }
+                        if (fresh) node.subscribeAgent(agent) { signal ->
+                            check(buffer.trySend(signal).isSuccess) { "LCNC agent buffer full: $agent" }
+                        }
                         val out = ArrayList<ForgeSignal>()
                         while (true) {
                             val r = buffer.tryReceive()
@@ -331,7 +334,7 @@ data class CcekSeams(
             },
             send = { handle, signal ->
                 val n = store.nodes[handle]
-                if (n == null) false else {
+                if (n == null || n.drained) false else {
                     if (n.record) n.recorded.add(signal)
                     n.pending.add(signal)
                     n.markdown = (n.markdown.orEmpty() + describe(signal) + "\n")
@@ -378,6 +381,8 @@ data class CcekSeams(
                     linkedMapOf<String, Any?>(
                         "active" to !n.drained, "childScopes" to 0,
                         "markdownProjections" to n.markdown.orEmpty().lines().count { it.isNotBlank() },
+                        "lifecycle" to if (n.drained) "CLOSED" else "ACTIVE",
+                        "subscribers" to n.agents.size,
                     )
                 }
             },
@@ -720,7 +725,8 @@ object CcekNodes {
 
         "ccek.vitals" to runner { seams, node, inputs ->
             val handle = inputs.port("handle")?.toString() ?: node.params["handle"].orEmpty()
-            seams.vitals(handle) ?: mapOf("active" to false, "childScopes" to 0, "markdownProjections" to 0)
+            seams.vitals(handle) ?: mapOf("active" to false, "childScopes" to 0, "markdownProjections" to 0,
+                "lifecycle" to "UNKNOWN", "subscribers" to 0)
         },
 
         // Idempotent by title, like incarnate; the handle is the same handle space,

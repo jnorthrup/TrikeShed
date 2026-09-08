@@ -6,6 +6,7 @@ import borg.trikeshed.kanban.KanbanPredicate
 import borg.trikeshed.kanban.KanbanPredicateRegistry
 import borg.trikeshed.parse.json.JsonSupport
 import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.withContext
 import kotlin.coroutines.CoroutineContext
 
@@ -65,7 +66,7 @@ fun hermesEnvDialog(
 ): TribunalDialog = TribunalDialog { node, system, prompt ->
     // The daemon's [chat] closure returns (content, resolved model id) —
     // BrainClient.chat(...) then BrainClient.lastModel() for provenance.
-    withContext(muxContext) { chat(system, prompt)() }
+    withContext(muxContext.minusKey(Job) + currentCoroutineContext()) { chat(system, prompt)() }
 }
 
 /**
@@ -93,7 +94,7 @@ object TribunalNodes {
         // the canned `prompt` param, because human oversight beating the
         // default motion is the preset's whole point (the end-to-end gate
         // pins it). Resolution: input → brief binding → prompt param.
-        "mux.chat" to LcncNodeRunner { node, inputs ->
+        "mux.chat" to boundLcnc(TribunalDialogKey(dialog)) { service, node, inputs ->
             // A stored system prompt cabled onto `system?` wins over the param.
             val system = (inputs["system"] as? String) ?: (inputs["system?"] as? String) ?: node.params["system"] ?: ""
             // The prior seat's content arrives on the wire as `prompt?`
@@ -107,7 +108,7 @@ object TribunalNodes {
                 ?: node.params["prompt"]?.takeIf { it.isNotBlank() }
             )?.takeIf { it.isNotBlank() }
             require(prompt != null) { "mux.chat: no prompt wired, bound as '${node.params["brief"] ?: "<brief>"}', or in params" }
-            val (content, model) = dialog.seat(node, system, prompt!!)
+            val (content, model) = service.value.seat(node, system, prompt!!)
             mapOf("content" to content, "model" to model)
         },
         // The verdict seam: chat text → content-addressed report, tracked
@@ -115,7 +116,7 @@ object TribunalNodes {
         // commits the verdict (the judge's job active → closed) and returns
         // the recorded cid; the report carries both cids, so the displayed
         // verdict is the VERIFIED one, not just the model's last words.
-        "kg.ingest" to LcncNodeRunner { node, inputs ->
+        "kg.ingest" to boundLcnc(TribunalIngestKey(ingest)) { service, node, inputs ->
             // Inputs are keyed by the wire's literal toPort (gather() in
             // LcncRunner does not strip the `?`), so an optional `text?`
             // wire lands under that exact key — check both spellings, the
@@ -123,7 +124,7 @@ object TribunalNodes {
             val text = (inputs["text"] as? String)
                 ?: (inputs["text?"] as? String)
                 ?: node.params["kg"].orEmpty()
-            val recorded = ingest(text)
+            val recorded = service.value.invoke(text)
             val cid = ContentId.of(text.encodeToByteArray())
             mapOf("report" to linkedMapOf(
                 "text" to text,

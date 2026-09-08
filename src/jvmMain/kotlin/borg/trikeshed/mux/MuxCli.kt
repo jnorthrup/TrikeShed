@@ -427,9 +427,9 @@ Secrets are never printed — keys show as len= and sha256 prefix."""
                 val program = LcncProgram("mux.chat", s_[LcncNode("chat", "prompt.chat", params = mapOf(
                     "model" to model, "prompt" to prompt, "maxTokens" to maxTokens.toString(), "temperature" to "0.2",
                 ))], emptySeriesOf())
+                val t0 = System.currentTimeMillis()
                 val run = LcncCcekAssembly(binding, LcncRunner(BrainMuxNodes.registry()))
                     .launch("mux.chat", program, context = currentCoroutineContext())
-                val t0 = System.currentTimeMillis()
                 val res = try {
                     val result = withTimeout(60_000) { run.result.await() }
                     val output = result.nodeOutputs.getValue("chat") as Map<*, *>

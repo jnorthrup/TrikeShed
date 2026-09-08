@@ -50,11 +50,13 @@ object BrainMuxNodes {
     ): Map<String, LcncNodeRunner> = registryWith({
         currentCoroutineContext()[MuxReactorElement]?.modelMux()
             ?: modelMuxProvider?.invoke() ?: modelMux
-    }, keyMux, credStore)
+    }, {
+        currentCoroutineContext()[MuxReactorElement]?.keyMux() ?: keyMux
+    }, credStore)
 
     private fun registryWith(
         mux: suspend () -> ModelMux?,
-        keyMux: KeyMux?,
+        keys: suspend () -> KeyMux?,
         credStore: CouchKeyStore?,
     ): Map<String, LcncNodeRunner> = mapOf(
 
@@ -62,8 +64,8 @@ object BrainMuxNodes {
         // Queries the daemon's KeyMux for each HarnessRegistry provider.
         // Returns a roster: [{provider, keyPresent, baseUrl}].
         // KeyMux.get() resolves its source elements from the inherited context.
-        "keys.status" to LcncNodeRunner { _, _ ->
-            val keyMux = currentCoroutineContext()[MuxReactorElement]?.keyMux() ?: keyMux
+        "keys.status" to boundLcnc(KeyMuxProviderKey(keys), LcncNodeRunner { _, _ ->
+            val keyMux = KeyMuxProviderKey.require().invoke()
             if (keyMux == null) return@LcncNodeRunner mapOf("roster" to emptyList<Any>())
             val roster = ArrayList<Map<String, Any?>>()
             for (i in 0 until keymux.HarnessRegistry.providers.size) {
@@ -87,14 +89,14 @@ object BrainMuxNodes {
                 "have" to roster.filter { it["keyPresent"] == true }.map { it["provider"] },
                 "missing" to roster.filter { it["keyPresent"] != true }.map { it["provider"] },
             )
-        },
+        }),
 
         // ── mux.models ──────────────────────────────────────────────
         // Queries the daemon's ModelMux for available models.
         // Returns: [{id, caps, provider}] — provider lets the browser
         // map a model to its KeyMux binding for credential selection.
-        "mux.models" to LcncNodeRunner { _, _ ->
-            val modelMux = mux()
+        "mux.models" to boundLcnc(ModelMuxProviderKey(mux), LcncNodeRunner { _, _ ->
+            val modelMux = ModelMuxProviderKey.require().invoke()
             if (modelMux == null) return@LcncNodeRunner mapOf("models" to emptyList<Any>())
             val cards = modelMux.listModels()
             val models = ArrayList<Map<String, Any?>>()
@@ -124,15 +126,15 @@ object BrainMuxNodes {
                 ))
             }
             mapOf("models" to models)
-        },
+        }),
 
         // ── mux.meta ────────────────────────────────────────────────
         // Modelmux presence: the ranking discipline in force, the most recent
         // selection this mux made, and the quota legion's standings (usable-
         // first). Empty lists/absent fields when the reactor ledger is not yet
         // warm — meta is a live projection, never a guess.
-        "mux.meta" to LcncNodeRunner { _, _ ->
-            val modelMux = mux()
+        "mux.meta" to boundLcnc(ModelMuxProviderKey(mux), LcncNodeRunner { _, _ ->
+            val modelMux = ModelMuxProviderKey.require().invoke()
             if (modelMux == null) return@LcncNodeRunner mapOf("meta" to emptyList<Any>())
             // lastSelection is written by route() — capability ranking. A
             // prompt.chat names its model outright and never routes, so after
@@ -189,12 +191,13 @@ object BrainMuxNodes {
                 )
             }
             mapOf("meta" to meta, "lastAnswer" to answered)
-        },
+        }),
 
         // ── credential.enter ────────────────────────────────────────
         // Output carries manualKey/manualUrl so the panel's prefill lane
         // can read the manual entry back without re-typing.
-        "credential.enter" to LcncNodeRunner { node, _ ->
+        "credential.enter" to boundLcnc(CredentialStoreKey(credStore), LcncNodeRunner { node, _ ->
+            val credStore = CredentialStoreKey.require()
             val keyType = node.params["key_type"] ?: ""
             val url = node.params["url"] ?: ""
             val apiType = node.params["api_type"] ?: "openai"
@@ -211,15 +214,16 @@ object BrainMuxNodes {
                 "manualKey" to key,
                 "manualUrl" to url,
             ))
-        },
+        }),
 
         // ── prompt.chat ─────────────────────────────────────────────
         // Routes through ModelMux.chat() when the model is registered —
         // gains MuxReactor receipt tracking, content-addressed cache, and
         // provider health recording. Falls back to direct HTX for manual
         // key+url entries that don't match any registered model.
-        "prompt.chat" to LcncNodeRunner { node, inputs ->
-            val modelMux = mux()
+        "prompt.chat" to boundLcnc(ModelMuxProviderKey(mux), boundLcnc(CredentialStoreKey(credStore), LcncNodeRunner { node, inputs ->
+            val modelMux = ModelMuxProviderKey.require().invoke()
+            val credStore = CredentialStoreKey.require()
             // Inputs arrive keyed by the wire's literal to-port, `prompt?` included
             // (LcncRunner.gather) — a stored prompt cabled in must be honoured.
             val prompt = (inputs["prompt"] as? String)
@@ -231,7 +235,7 @@ object BrainMuxNodes {
             if (model.isBlank()) {
                 // The live router owns the default; a previous explicit call does not.
                 val candidates = modelMux?.route("chat", "chat")?.a
-                if (candidates != null) for (i in 0 until candidates.size) {
+                if (modelMux != null && candidates != null) for (i in 0 until candidates.size) {
                     val id = candidates[i].a
                     if (modelMux.modelKeyId(id) != null) {
                         model = id
@@ -415,7 +419,7 @@ object BrainMuxNodes {
                     )
                 },
             )
-        },
+        })),
 
         // ── note: passthrough, no-op ──────────────────────────────
         "note" to LcncNodeRunner { _, _ -> emptyMap() },
@@ -426,10 +430,11 @@ object BrainMuxNodes {
         // actually stored (CouchKeyStore), led by the "none" entry — blank is
         // not offerable through a live list, and prompt.chat already reads a
         // leading "(none" as "let the mux key chain answer".
-        "credential.list" to LcncNodeRunner { _, _ ->
+        "credential.list" to boundLcnc(CredentialStoreKey(credStore), LcncNodeRunner { _, _ ->
+            val credStore = CredentialStoreKey.require()
             val stored = credStore?.let { runCatching { it.listProviders() }.getOrDefault(emptyList()) }.orEmpty()
             mapOf("names" to listOf(PREFILL_NONE) + stored, "stored" to stored)
-        },
+        }),
 
         "result.confirm" to LcncNodeRunner { _, inputs ->
             val content = (inputs["content"] as? String).orEmpty()

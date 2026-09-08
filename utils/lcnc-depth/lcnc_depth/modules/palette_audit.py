@@ -265,7 +265,19 @@ class Index:
             target = self.resolve(source, ref, i)
             argument = None
             if source.v[stop:stop + 1] == ["<"]:
-                argument, _ = source.ref(stop + 1)
+                right, depth = stop + 1, 1
+                while right < end:
+                    token = source.v[right]
+                    if token == "<":
+                        depth += 1
+                    elif token == ">":
+                        depth -= 1
+                        if depth == 0:
+                            break
+                    elif token == "," and depth == 1:
+                        break
+                    right += 1
+                argument = source.raw(stop + 1, right)
             yield target, argument, i
             i = stop
             angle = 0
@@ -280,12 +292,31 @@ class Index:
                 i = source.pairs.get(i, i) + 1
 
     def inherits(self, name, target, seen=frozenset()):
-        if name == target:
+        if name == target or (name == ABSTRACT_ELEMENT and target == ELEMENT):
             return True
         if not name or name in seen:
             return False
         return any(self.inherits(base, target, seen | {name})
                    for s, d in self.symbols.get(name, []) for base, _, _ in self.bases(s, d))
+
+    def key_element(self, source, declaration, parameters=None, seen=frozenset()):
+        parameters = parameters or {}
+        if declaration["qualified"] in seen:
+            return None, None
+        for base, argument, pos in self.bases(source, declaration):
+            if not self.inherits(base, KEY):
+                continue
+            ref = re.match(r"[A-Za-z_][\w.]*", argument or "")
+            value = parameters.get(argument, (self.resolve(source, ref.group(), pos) if ref else None, argument))
+            if base == KEY:
+                return value
+            declarations = self.symbols.get(base, [])
+            if len(declarations) == 1:
+                parent_source, parent = declarations[0]
+                header = parent["header"]
+                bound = {parent_source.v[header + 1]: value} if parent_source.v[header:header + 1] == ["<"] else {}
+                return self.key_element(parent_source, parent, bound, seen | {declaration["qualified"]})
+        return None, None
 
     def method(self, owner, name):
         declarations = self.symbols.get(owner, [])
@@ -380,9 +411,9 @@ def key_declarations(index):
                 continue
             base = next(((base, arg, pos) for base, arg, pos in index.bases(source, declaration)
                          if index.inherits(base, KEY)), None)
-            element = index.resolve(source, base[1], base[2]) if base and base[1] else None
+            element, element_expression = index.key_element(source, declaration)
             row = {**source.site(declaration["start"]), "qualified": declaration["qualified"],
-                   "element": element, "element_expression": base[1] if base else None,
+                   "element": element, "element_expression": element_expression,
                    "key_base": base[0] if base else None, "kind": declaration["kind"],
                    "singleton": declaration["kind"] == "object", "palette_type": None,
                    "aliases": [declaration["owner"]] if declaration["companion"] else []}
@@ -421,6 +452,19 @@ def source_sites(index, keys):
             resolved = index.resolve(source, ref, i)
             if i not in declarations and source.v[end:end + 1] == ["("] and end in source.pairs:
                 close = source.pairs[end]
+                key = index.resolve(source, ref, i, key_symbols)
+                if key in key_symbols and index.inherits(key, _LCNC + "LcncServiceKey"):
+                    constructions.append({**source.site(i), "key": key, "element": key_symbols[key]["element"],
+                                          "expression": source.raw(i, close + 1), "evidence": "service-key-invoke"})
+                if ref.endswith(".require"):
+                    key = index.resolve(source, ref[:-8], i, key_symbols)
+                    if key in key_symbols and index.inherits(key, _LCNC + "LcncServiceKey"):
+                        require = index.method(_LCNC + "LcncServiceKey", "require")
+                        checked = require and _match(require[0], require[2], require[3], r"checkNotNull \( currentCoroutineContext \( \) \[ this \] \)") is not None
+                        demands.append({**source.site(i), "source_offset": source.tokens[i].start,
+                                        "receiver": ref, "key_expression": ref[:-8], "key": key,
+                                        "severity": "throws" if checked else "unresolved", "evidence": "service-require-call",
+                                        "palette_reachability": "unresolved"})
                 if resolved in elements:
                     constructions.append({**source.site(i), "element": resolved, "expression": source.raw(i, close + 1), "evidence": "constructor-call"})
                 if ref.rsplit(".", 1)[-1] in ("withContext", "CoroutineScope", "launch", "async"):
@@ -443,7 +487,8 @@ def source_sites(index, keys):
             severity = "throws" if tail[:1] == ["!!"] or (tail[:1] == ["?:"] and tail[1:2] in (["error"], ["throw"])) else "optional"
             if severity != "throws" and tail[:1] == ["?:"]:
                 severity = "fallback"
-            demands.append({**source.site(i), "receiver": ref, "key_expression": source.raw(end + 1, close),
+            demands.append({**source.site(i), "source_offset": source.tokens[i].start,
+                            "receiver": ref, "key_expression": source.raw(end + 1, close),
                             "key": aliases.get(key, key) if key in key_symbols else None,
                             "severity": severity, "evidence": "context-read" if context_syntax else "key-index-candidate",
                             "palette_reachability": "unresolved"})
@@ -602,6 +647,41 @@ def executor_evidence(index):
             "runtime_verified": False, "checks": checks}
 
 
+def structural_evidence(index):
+    method = index.method(_LCNC + "LcncRunner", "runRing")
+    result = {}
+    if method is None:
+        return result
+    source, _, start, end = method
+    for node_type, constant, operation in (
+        ("scope.in", "SCOPE_IN", r"frame \. binding \( name \)"),
+        ("scope.out", "SCOPE_OUT", r"returns \[ name \] = inputs \["),
+    ):
+        match = _match(source, start, end, rf"if \( node \. type = = LcncContracts \. {constant} \) \{{")
+        if match is None:
+            continue
+        opening = source.pairs[match + 1] + 1
+        close = source.pairs.get(opening, opening)
+        read = _match(source, opening + 1, close, operation)
+        if read is not None and _match(source, opening + 1, close, r"continue") is not None:
+            result[node_type] = {"status": "observed-source-branch", "evidence": [source.site(match), source.site(read)]}
+    constructor = _match(source, start, end, r"val childFrame = LcncScopeFrame \(")
+    install = _match(source, start, end, r"withContext \( childFrame \) \{")
+    if constructor is not None and install is not None and constructor < install:
+        opening = source.pairs[install + 1] + 1
+        close = source.pairs.get(opening, opening)
+        run = _match(source, opening + 1, close, r"runRing \( bodyNodes , bodyState , childFrame ,")
+        if run is not None and index.resolve(source, "withContext", install) == "kotlinx.coroutines.withContext":
+            result["scope"] = {"status": "observed-frame-construction", "evidence": [source.site(constructor), source.site(install), source.site(run)]}
+    presentation = _match(source, start, end,
+        r"if \( contract ! = null & & contract \. inputs \. isEmpty \( \) & & contract \. outputs \. isEmpty \( \) \) continue")
+    lookup = _match(source, start, end, r"val contract = LcncContracts \. find \( node \. type \)")
+    if lookup is not None and presentation is not None and lookup < presentation:
+        for node_type in ("note", "program.ref"):
+            result[node_type] = {"status": "observed-presentation-filter", "evidence": [source.site(lookup), source.site(presentation)]}
+    return result
+
+
 def runner_sites(index, demands):
     """Associate only reads lexically inside a literal runner body with its type."""
     out = []
@@ -614,11 +694,56 @@ def runner_sites(index, demands):
                 a -= 2
             value = index.string(source, a, i)
             close = source.pairs[i + 2]
-            first, last = source.site(i + 2)["line"], source.site(close)["line"]
+            first, last = source.tokens[i + 2].start, source.tokens[close].start
             out.append({**source.site(a), "type": value, "type_expression": source.raw(a, i),
-                        "direct_demands": [d for d in demands if d["path"] == source.path and first <= d["line"] <= last],
+                        "direct_demands": [d for d in demands if d["path"] == source.path and first < d["source_offset"] < last],
                         "transitive_requirements": "unresolved"})
     return out
+
+
+def service_metadata(index, keys, demands):
+    declarations = [{**s.site(d["start"]), "qualified": d["qualified"]}
+                    for s, d in index.symbols.get(_LCNC + "LcncServiceBinding", [])]
+    key_symbols = {k["qualified"]: k for k in keys if k["singleton"]}
+    sites, exports, wrappers = [], [], []
+    for source in index.sources:
+        for i, token in enumerate(source.v):
+            if token == "withContext" and source.v[i + 1:i + 5] == ["(", "bound", ")", "{"]:
+                close = source.pairs.get(i + 4, i + 4)
+                if _match(source, i + 5, close, r"delegate \. execute \( node , inputs \)") is not None:
+                    wrappers.append({**source.site(i), "evidence": "bound-context-delegate-call", "runtime_verified": False})
+            if token in ("requiredKeys", "providedKeys") and i and source.v[i - 1] == ".":
+                exports.append({**source.site(i), "member": token})
+            if source.v[i:i + 3] != ["to", "boundLcnc", "("] or i + 2 not in source.pairs:
+                continue
+            if index.resolve(source, "boundLcnc", i, {_LCNC + "boundLcnc": True}) != _LCNC + "boundLcnc":
+                continue
+            left = i - 1
+            while left >= 2 and source.v[left - 1] in (".", "+"):
+                left -= 2
+            type_value = index.string(source, left, i)
+            close = source.pairs[i + 2]
+            if source.v[close + 1:close + 2] == ["{"]:
+                close = source.pairs.get(close + 1, close)
+            defaults = []
+            for j in range(i + 1, close):
+                if source.v[j:j + 2] != ["boundLcnc", "("] or j + 1 not in source.pairs:
+                    continue
+                span = source.args(j + 1).get("defaultElement", source.args(j + 1).get(0))
+                if not span:
+                    continue
+                ref, stop = source.ref(span[0])
+                key = index.resolve(source, ref, span[0], key_symbols)
+                direct = source.v[stop:stop + 1] == ["("] and source.pairs.get(stop) == span[1] - 1
+                key = key if direct and key in key_symbols and index.inherits(key, _LCNC + "LcncServiceKey") else None
+                defaults.append({**source.site(j), "default_expression": source.raw(*span), "key": key,
+                                 "status": "declared-default" if key else "unresolved-element-key"})
+            first, last = source.tokens[i].start, source.tokens[close].end
+            sites.append({**source.site(left), "type": type_value, "type_expression": source.raw(left, i),
+                          "defaults": defaults, "runtime_fulfillment": "unresolved",
+                          "direct_demands": [d for d in demands if d["path"] == source.path and first < d["source_offset"] < last]})
+    return {"declarations": declarations, "binding_sites": sites, "key_member_sites": exports,
+            "wrapper_sites": wrappers, "transitive_requirements": "unresolved"}
 
 
 def audit(texts):
@@ -628,7 +753,9 @@ def audit(texts):
     sites = source_sites(index, keys)
     metadata = context_metadata(index, keys)
     executor = executor_evidence(index)
+    structural_paths = structural_evidence(index)
     runners = runner_sites(index, sites["demand_sites"])
+    services = service_metadata(index, keys, sites["demand_sites"])
     by_type = defaultdict(list)
     for key in keys:
         if key["singleton"] and key["palette_type"] and key["element"] == _LCNC + "LcncNodeElement" and key["qualified"].startswith(_LCNC + "LcncNodeKey."):
@@ -647,7 +774,8 @@ def audit(texts):
             status = "structural" if valid_key and not declared else "ambiguous"
         if not entry["type_resolved"]:
             status = "unresolved-type"
-        dispatch = executor["status"] if status == "declared" else "not-applicable" if status == "structural" else "unresolved"
+        structural_path = structural_paths.get(entry["type"])
+        dispatch = executor["status"] if status == "declared" else structural_path["status"] if status == "structural" and structural_path else "unresolved"
         metadata_status = "declared" if metadata["contract_property"] and (structural or (declared and metadata["invocation_lookup"])) else "unresolved"
         gap = status not in ("declared", "structural") or dispatch == "unresolved" or metadata_status == "unresolved"
         rows.append({**entry, "invocation_mapping": status,
@@ -655,7 +783,9 @@ def audit(texts):
                      "executor_construction": dispatch, "context_metadata": metadata_status,
                      "structural_exception": structural if expected_role != "SCOPE" else None,
                      "scope_construction": structural if expected_role == "SCOPE" else None,
+                     "structural_evidence": structural_path,
                      "runner_sites": [r for r in runners if r["type"] == entry["type"]],
+                     "service_bindings": [r for r in services["binding_sites"] if r["type"] == entry["type"]],
                      "service_requirements": "unresolved-transitive-reachability",
                      "gap": gap})
     palette_types = {r["type"] for r in rows if r["type"] is not None}
@@ -667,11 +797,12 @@ def audit(texts):
                             "Construction and context-call inventories do not prove installation or inheritance on a palette path.",
                             "Only exact palette types and resolved singleton identities can establish declared correspondence."],
             "palette": vocabulary, "keys": keys, **sites, "context_metadata": metadata,
-            "executor": executor, "runner_sites": runners, "rows": rows,
+            "executor": executor, "structural_paths": structural_paths, "runner_sites": runners,
+            "service_metadata": services, "rows": rows,
             "extra_invocation_keys": extra_keys, "unresolved_invocation_keys": unresolved_keys,
             "gaps": [r for r in rows if r["gap"]],
             "summary": {"palette_entries": len(rows), "mapping_status": dict(Counter(r["invocation_mapping"] for r in rows)),
                         "structural_exceptions": sum(r["structural_exception"] is not None for r in rows),
                         "unresolved_service_requirements": sum(r["invocation_mapping"] != "structural" for r in rows),
                         "unresolved_executor_paths": sum(r["executor_construction"] == "unresolved" for r in rows),
-                        "gaps": sum(r["gap"] for r in rows) + len(vocabulary["issues"]) + len(vocabulary["duplicate_types"]) + len(extra_keys) + len(unresolved_keys)}}
+                        "gaps": sum(r["gap"] for r in rows) + len(vocabulary["issues"]) + len(vocabulary["duplicate_types"]) + len(extra_keys) + len(unresolved_keys) + len(metadata["unresolved"])}}

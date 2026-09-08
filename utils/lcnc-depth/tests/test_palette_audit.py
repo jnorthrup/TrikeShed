@@ -58,12 +58,33 @@ class LcncNodeElement internal constructor(
 }
 ''',
     "lcnc/Runner.kt": '''package borg.trikeshed.lcnc
+import kotlinx.coroutines.withContext
 fun interface LcncNodeRunner {
     suspend fun execute(node: LcncNode, inputs: Inputs)
     suspend fun run(node: LcncNode, inputs: Inputs) {
         val key = LcncNodeKey.of(node.type)
         return if (key == null) execute(node, inputs)
             else key.construct(node, inputs, this, currentCoroutineContext().job).execute()
+    }
+}
+class LcncRunner {
+    private suspend fun runRing(nodes: Nodes, state: State, frame: LcncScopeFrame, pathNames: Names) {
+        for (node in nodes) {
+            if (node.type == LcncContracts.SCOPE_IN) {
+                frame.binding(name)
+                continue
+            }
+            if (node.type == LcncContracts.SCOPE_OUT) {
+                returns[name] = inputs["value"]
+                continue
+            }
+            val childFrame = LcncScopeFrame(bindings = bound)
+            val yielded = withContext(childFrame) {
+                runRing(bodyNodes, bodyState, childFrame, pathNames)
+            }
+            val contract = LcncContracts.find(node.type)
+            if (contract != null && contract.inputs.isEmpty() && contract.outputs.isEmpty()) continue
+        }
     }
 }
 ''',
@@ -245,6 +266,7 @@ def test_cli_gate_is_independent_of_historical_ccek_reachability(tmp_path, capsy
 def test_test_source_set_does_not_supply_a_production_key(tmp_path):
     from lcnc_depth.scan_repo import analyse
     (tmp_path / "Contracts.kt").write_text(SOURCES["lcnc/Contracts.kt"])
+    (tmp_path / "Element.kt").write_text(SOURCES["lcnc/Element.kt"])
     test = tmp_path / "commonTest" / "kotlin"
     test.mkdir(parents=True)
     (test / "Keys.kt").write_text(SOURCES["lcnc/Keys.kt"])

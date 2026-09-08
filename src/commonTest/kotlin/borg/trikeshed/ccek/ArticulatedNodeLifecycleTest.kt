@@ -248,4 +248,16 @@ class ArticulatedNodeLifecycleTest {
         assertSame(failure, (node.projections.replayCache.last() as ForgeProjection.Error).cause)
         assertEquals(ElementState.CLOSED, node.lifecycleState)
     }
+
+    @Test
+    fun callbackCancellationPropagatesThroughTheOwnedFanout() = runTest {
+        val node = ArticulatedNode(ForgeDoc.empty("cancellation"), backgroundScope, record = true)
+        node.subscribeAgent("cancelled") { throw CancellationException("cancel delivery") }
+        node.sendSignal(signal("first"))
+        node.sendSignal(signal("queued"))
+        assertFailsWith<CancellationException> { node.drain() }
+        assertEquals(1, node.recording().size)
+        assertEquals(ElementState.CLOSED, node.lifecycleState)
+        assertFalse(node.projections.replayCache.any { it is ForgeProjection.Error })
+    }
 }

@@ -2,6 +2,8 @@ package borg.trikeshed.lcnc
 
 import borg.trikeshed.parse.json.JsonSupport
 
+object LcncClockKey : LcncServiceKey<() -> Long>("LcncClockKey")
+
 /**
  * Server-side runners for the pure/presentation node types the panels canvas
  * executes in-browser. Registered in the daemon so a stored program authored
@@ -27,7 +29,7 @@ object PureNodes {
     private val FIELD = Regex("""\{([^{}]+)\}""")
 
     fun registry(clock: () -> Long): Map<String, LcncNodeRunner> = mapOf(
-        "timer" to LcncNodeRunner { _, _ -> mapOf("tick" to clock()) },
+        "timer" to boundLcnc(LcncClockKey(clock)) { source, _, _ -> mapOf("tick" to source.value()) },
         "pick" to LcncNodeRunner { node, inputs ->
             var v: Any? = inputs["x"]
             for (k in (node.params["path"] ?: "").split('.').filter { it.isNotBlank() }) {
@@ -96,5 +98,6 @@ object PureNodes {
         },
         "dom.board" to LcncNodeRunner { _, inputs -> mapOf("rendered" to inputs["groups"]) },
         "sheet.concentric" to LcncNodeRunner { _, inputs -> mapOf("rendered" to inputs["board"]) },
-    )
+        "gauge" to LcncNodeRunner { _, _ -> emptyMap() },
+    ) + ViewNodes.registry()
 }

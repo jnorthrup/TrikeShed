@@ -2,6 +2,7 @@ package borg.trikeshed.lcnc
 
 import borg.trikeshed.dag.ReteNetwork
 import borg.trikeshed.graal.ConfixBlackboard
+import borg.trikeshed.lib.view
 import borg.trikeshed.parse.json.JsonSupport
 import borg.trikeshed.util.oroboros.CouchAttachmentGateway
 import kotlinx.coroutines.runBlocking
@@ -117,6 +118,7 @@ class LcncPublisher(
         val facts = lb.facts
         val bindingOf = facts.bindings()
         val shapes = facts.shapes()
+        val registry = runners()
         return mapOf(
             "contracts" to lb.vocabulary.values.map { c -> mapOf(
                 "type" to c.type, "title" to c.title,
@@ -132,8 +134,14 @@ class LcncPublisher(
                 },
                 "source" to c.isSource, "sink" to c.isSink, "wide" to c.wide, "effect" to c.isEffect,
                 "kindShapes" to c.kindShapes,
-                "context" to LcncContextContract.of(c.type,
-                    composite = lb.bindings.any { it.type == c.type && it.kind == LcncBindingKind.COMPOSITE }).toMap(),
+                "context" to (LcncContextContract.of(c.type,
+                    composite = lb.bindings.any { it.type == c.type && it.kind == LcncBindingKind.COMPOSITE }).toMap() + mapOf(
+                    "runnerBound" to (c.type in registry),
+                    "services" to (registry[c.type] as? LcncServiceBinding)?.let { services -> mapOf(
+                        "requiredKeys" to services.requiredKeys.view.map(CcekNodes::keyName),
+                        "providedKeys" to services.providedKeys.view.map(CcekNodes::keyName),
+                    ) },
+                )),
                 "binding" to bindingOf[c.type]?.let { (how, by) -> mapOf("kind" to how, "provenance" to by) },
             ) },
             "kindHierarchy" to facts.hierarchy().map { (child, parent) ->

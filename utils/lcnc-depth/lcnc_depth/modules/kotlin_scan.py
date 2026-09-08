@@ -335,7 +335,7 @@ def casts(text: str, path: str = "") -> list[dict]:
 
 # ── 4. the contract table ───────────────────────────────────────────────
 
-_CONTRACT = re.compile(r"LcncPortContract\s*\(")
+_CONTRACT = re.compile(r"\bLcncPortContract\s*\(")
 _PAIR = re.compile(r'"([^"]*)"\s+to\s+("([^"]*)"|[A-Za-z_][\w.]*)')
 _STR = re.compile(r'"([^"]*)"')
 _CONST = re.compile(r'(?:private\s+)?(?:const\s+)?val\s+([A-Z][A-Z0-9_]*)\s*=\s*"([^"]*)"')
@@ -488,7 +488,7 @@ def contracts(text: str, path: str = "") -> list[dict]:
     constants = {m.group(1): m.group(2) for m in _CONST.finditer(clean)}
 
     out: list[dict] = []
-    for m in _CONTRACT.finditer(clean):
+    for m in _CONTRACT.finditer(masked):
         # Skip the data class DECLARATION itself — its parameter list looks like
         # a call and would otherwise arrive as a contract named "val type: String".
         if re.search(r"\b(?:class|fun)\s*$", clean[:m.start()]):
