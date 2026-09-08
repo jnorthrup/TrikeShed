@@ -6,6 +6,7 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.withContext
 import kotlin.coroutines.CoroutineContext
@@ -34,7 +35,12 @@ class LcncNodeElement internal constructor(
     val result: Map<String, Any?>? get() = (outcome as? LcncNodeOutcome.Returned)?.outputs
 
     init {
-        supervisor.invokeOnCompletion { advance(ElementState.CLOSED) }
+        supervisor.invokeOnCompletion { cause ->
+            if (cause is CancellationException) {
+                completion.compareAndSet(null, LcncNodeOutcome.Cancelled(cause))
+            }
+            advance(ElementState.CLOSED)
+        }
     }
 
     private fun advance(target: ElementState) {
@@ -52,13 +58,20 @@ class LcncNodeElement internal constructor(
 
     suspend fun open() {
         phase.compareAndSet(ElementState.CREATED, ElementState.OPEN)
-        check(lifecycleState < ElementState.DRAINING) { "${node.id}: invocation is closed to new work" }
+        if (lifecycleState >= ElementState.DRAINING) {
+            if (supervisor.isCancelled) supervisor.ensureActive()
+            error("${node.id}: invocation is closed to new work")
+        }
     }
 
     suspend fun execute(): Map<String, Any?> {
         open()
-        check(phase.compareAndSet(ElementState.OPEN, ElementState.ACTIVE)) { "${node.id}: invocation already consumed" }
+        if (!phase.compareAndSet(ElementState.OPEN, ElementState.ACTIVE)) {
+            if (supervisor.isCancelled) supervisor.ensureActive()
+            error("${node.id}: invocation already consumed")
+        }
         try {
+            currentCoroutineContext().ensureActive()
             val value = withContext(supervisor + this) {
                 check(currentCoroutineContext()[key] === this@LcncNodeElement)
                 runner.execute(node, inputs)

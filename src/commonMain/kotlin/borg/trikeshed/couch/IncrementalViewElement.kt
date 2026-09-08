@@ -10,6 +10,7 @@ import borg.trikeshed.lib.cascade.cascadeWorthCaching
 import borg.trikeshed.lib.get
 import borg.trikeshed.lib.j
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.channels.Channel
@@ -66,7 +67,7 @@ class IncrementalViewElement(
         if (state != ElementState.CREATED) return
         super.open()
         cancelSubscription = db.store.changes.subscribe { wake.trySend(Unit) }
-        CoroutineScope(supervisor + Dispatchers.Default).launch {
+        CoroutineScope(currentCoroutineContext() + this + supervisor + Dispatchers.Default).launch {
             try {
                 drainFrames()
                 for (unit in wake) drainFrames()

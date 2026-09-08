@@ -44,7 +44,7 @@ class TorrentElement(
 
     private val engine = TorrentEngine(
         blockStore = blockStore,
-        scope = CoroutineScope(supervisor + reactorContext),
+        scope = CoroutineScope(reactorContext + this + supervisor),
     )
 
     /** Active torrent handles: info-hash hex → handle. */

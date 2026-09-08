@@ -110,8 +110,10 @@ object CamelRouteLegos {
 
     // ── up: start a route and leave it running ─────────────────────────────────
 
-    fun up(ctx: ModuleContext, registry: CamelRouteRegistry = HostCamelRouteRegistry) =
-        boundLcnc(CamelRouteRegistryKey(registry)) { service, node, inputs ->
+    fun up(
+        ctx: ModuleContext,
+        registry: CamelRouteRegistry = HostCamelRouteRegistry,
+    ) = boundLcnc(CamelRouteRegistryKey(registry)) { service, node, inputs ->
         val routes = service.value
         val id = VmRuntimeNodes.string(node, inputs, "id", node.id).trim()
         val from = VmRuntimeNodes.string(node, inputs, "from", "timer:lcnc?period=1000")
@@ -180,8 +182,10 @@ object CamelRouteLegos {
 
     // ── down: stop a route ─────────────────────────────────────────────────────
 
-    fun down(ctx: ModuleContext, registry: CamelRouteRegistry = HostCamelRouteRegistry) =
-        boundLcnc(CamelRouteRegistryKey(registry)) { service, node, inputs ->
+    fun down(
+        ctx: ModuleContext,
+        registry: CamelRouteRegistry = HostCamelRouteRegistry,
+    ) = boundLcnc(CamelRouteRegistryKey(registry)) { service, node, inputs ->
         val routes = service.value
         val allValue = VmRuntimeNodes.value(node, inputs, "all") ?: false
         val all = when (allValue) {
@@ -227,8 +231,9 @@ object CamelRouteLegos {
      * The same argument `vm.camel.catalog` makes about itself — a lego with no port through which
      * it could start, stop or reach anything is safe to call from a picklist that fills on open.
      */
-    fun routes(registry: CamelRouteRegistry = HostCamelRouteRegistry) =
-        boundLcnc(CamelRouteRegistryKey(registry)) { service, _, _ ->
+    fun routes(
+        registry: CamelRouteRegistry = HostCamelRouteRegistry,
+    ) = boundLcnc(CamelRouteRegistryKey(registry)) { service, _, _ ->
         val running = service.value.running()
         mapOf(
             // A real List<String>, not a serialized array: the picklist resolver walks

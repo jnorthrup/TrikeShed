@@ -16,6 +16,7 @@ import borg.trikeshed.parse.json.JsonSupport
 import borg.trikeshed.util.oroboros.LexicalMemory
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.channels.Channel
@@ -219,7 +220,7 @@ class BoardStoreElement(
         }
         published = Published(rows, sequence)
         if (state == ElementState.OPEN) state = ElementState.ACTIVE
-        consumer = CoroutineScope(supervisor + Dispatchers.Default).launch {
+        consumer = CoroutineScope(currentCoroutineContext() + this + supervisor + Dispatchers.Default).launch {
             for (first in intake) {
                 // Group commit: drain whatever queued behind the first, ONE flush for the batch.
                 val batch = ArrayList<BoardIntake>(4).apply { add(first) }

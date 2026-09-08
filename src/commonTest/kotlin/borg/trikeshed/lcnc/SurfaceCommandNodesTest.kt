@@ -75,7 +75,7 @@ class SurfaceCommandNodesTest {
             )
             assertEquals(removed, kill["verdict"])
         }
-        assertEquals(listOf(Triple("POST", "/api/projects", mapOf("path" to "/caller/path")),
+        assertEquals(listOf<Triple<String, String, Any?>>(Triple("POST", "/api/projects", mapOf("path" to "/caller/path")),
             Triple("DELETE", "/api/projects/project", null)), requests)
     }
 

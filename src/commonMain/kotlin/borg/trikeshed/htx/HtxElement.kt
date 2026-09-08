@@ -1,6 +1,5 @@
 package borg.trikeshed.htx
 
-import borg.trikeshed.ccek.KeyedService
 import borg.trikeshed.context.AsyncContextElement
 import borg.trikeshed.context.AsyncContextKey
 import borg.trikeshed.context.ElementState
@@ -10,7 +9,6 @@ import borg.trikeshed.lib.Join
 import borg.trikeshed.lib.Series
 import borg.trikeshed.lib.emptySeriesOf
 import borg.trikeshed.lib.j
-import borg.trikeshed.lib.toList
 import borg.trikeshed.lib.toSeries
 import borg.trikeshed.userspace.FanoutEvent
 import borg.trikeshed.userspace.FanoutEventSubscriber

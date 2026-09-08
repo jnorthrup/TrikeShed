@@ -3,7 +3,6 @@ package borg.trikeshed.lcnc
 import borg.trikeshed.ccek.AgentStatusEvent
 import borg.trikeshed.ccek.ArticulatedNode
 import borg.trikeshed.ccek.CausalAssertion
-import borg.trikeshed.ccek.CcekKeyService
 import borg.trikeshed.ccek.ForgeSignal
 import borg.trikeshed.ccek.GraphicalBlock
 import borg.trikeshed.ccek.GraphicalEdge
@@ -24,7 +23,6 @@ import borg.trikeshed.userspace.reactor.MuxReactorElement
 import kotlin.coroutines.CoroutineContext
 import kotlin.coroutines.AbstractCoroutineContextElement
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.channels.Channel
@@ -131,6 +129,7 @@ data class CcekSeams(
         ): CcekSeams {
             val nodes = LinkedHashMap<String, ArticulatedNode>()
             val constructions = LinkedHashMap<String, CcekConstruction>()
+            val nodeContexts = LinkedHashMap<String, UserContext>()
             val incarnationMutex = Mutex()
             val agentBuffers = LinkedHashMap<String, Channel<ForgeSignal>>()
             val contexts = LinkedHashMap<String, UserContext>()
@@ -252,11 +251,14 @@ data class CcekSeams(
                 choreograph = { contextId, title ->
                     val ctx = contexts[contextId]
                     if (ctx == null) null else incarnationMutex.withLock {
+                        require(title !in nodes || nodeContexts[title] === ctx) {
+                            "incarnation_conflict: $title already exists with different context ownership"
+                        }
                         // UserContext.choreograph builds the node with ArticulatedNode's
                         // defaults; recording that construction is what lets a later
                         // ccek.incarnate of the same title attach rather than conflict.
                         adopt(title, CcekConstruction(title, false, 8, ProjectionKind.ALL)) {
-                            ctx.choreograph(ForgeDoc.empty(title))
+                            ctx.choreograph(ForgeDoc.empty(title)).also { nodeContexts[title] = ctx }
                         }
                         title
                     }
@@ -389,6 +391,9 @@ data class CcekSeams(
             choreograph = { contextId, title ->
                 if (!store.contexts.containsKey(contextId)) null else {
                     store.nodes[title]?.let { existing ->
+                        require(existing.choreographedBy == contextId) {
+                            "incarnation_conflict: $title already exists with different context ownership"
+                        }
                         require(!existing.record && existing.maxConcurrency == 8 && existing.projections == ProjectionKind.ALL.map { it.name }.toSet()) {
                             "incarnation_conflict: $title already exists with different construction settings"
                         }

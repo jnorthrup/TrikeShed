@@ -10,6 +10,7 @@ import borg.trikeshed.lib.j
 import borg.trikeshed.userspace.reactor.MuxReactorElement
 import keymux.KeyMux
 import keymux.TestKeySource
+import keymux.FixedKeySource
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.runTest
@@ -26,6 +27,58 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class BrainMuxNodesContractTest {
+    @Test
+    fun configuredModelOutranksCatalogOrderAndPreviousAnswer() = runTest {
+        val inherited = KeyMux { bind("llm.other.key", TestKeySource(value = "other-key")) }
+        val keys = inherited.withBinding("llm.custom.key", FixedKeySource("profile-key", "hermes-pin"))
+        val mux = ModelMux(keys) {
+            model("other", caps = setOf("chat"), provider = "other")
+            model("configured", caps = setOf("chat"), provider = "custom")
+            defaultModel("configured")
+        }
+        val transport = FakeTransport { _, _ -> FakeTransport.chatJson("answer") }
+        val htx = openHtxElement(routeService = transport)
+        val runner = BrainMuxNodes.registry(modelMux = mux).getValue("prompt.chat")
+        try {
+            withContext(htx) {
+                val explicit = runner.run(LcncNode("chat", "prompt.chat", mapOf("model" to "other")), mapOf("prompt" to "explicit"))
+                assertTrue(explicit["ok"] == true)
+                val output = runner.run(LcncNode("chat", "prompt.chat", mapOf("model" to " ")), mapOf("prompt" to "default"))
+                assertTrue(output["ok"] == true)
+                assertEquals("configured", output["model"])
+                val receipt = output["receipt"] as Map<*, *>
+                assertEquals("custom", receipt["provider"])
+                assertEquals("llm.custom.key", receipt["keyId"])
+                assertEquals("hermes-pin", keys.getWithSource("llm.custom.key").b)
+                assertNull(inherited.get("llm.custom.key"))
+            }
+            assertEquals(2, transport.calls)
+        } finally {
+            htx.close()
+        }
+    }
+
+    @Test
+    fun unavailableConfiguredModelDoesNotDispatchAnotherProvider() = runTest {
+        val mux = ModelMux(KeyMux { bind("llm.other.key", TestKeySource()) }) {
+            model("other", caps = setOf("chat"), provider = "other")
+            model("configured", caps = setOf("chat"), provider = "custom")
+            defaultModel("configured")
+        }
+        val transport = FakeTransport { _, _ -> error("No provider should be contacted") }
+        val htx = openHtxElement(routeService = transport)
+        try {
+            val runner = BrainMuxNodes.registry(modelMux = mux).getValue("prompt.chat")
+            val output = withContext(htx) { runner.run(LcncNode("chat", "prompt.chat"), mapOf("prompt" to "request")) }
+            assertFalse(output["ok"] as Boolean)
+            assertEquals("configured", output["model"])
+            assertEquals("custom", (output["receipt"] as Map<*, *>)["provider"])
+            assertEquals(0, transport.calls)
+        } finally {
+            htx.close()
+        }
+    }
+
     private fun mux(): ModelMux = ModelMux(KeyMux {
         bind("llm.primary-provider.key", TestKeySource(value = "fixture-primary"))
         bind("llm.secondary.key", TestKeySource(value = "fixture-secondary"))

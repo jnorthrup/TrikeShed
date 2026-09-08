@@ -1,6 +1,9 @@
 package borg.trikeshed.userspace
 
 import borg.trikeshed.lib.Series
+import borg.trikeshed.lib.get
+import borg.trikeshed.lib.size
+import borg.trikeshed.lib.toSeries
 import borg.trikeshed.userspace.nio.ByteBuffer
 import borg.trikeshed.userspace.UringOp.Companion.UringSubmission
 
@@ -20,6 +23,7 @@ public interface UserspaceChannelBackend {
      */
     fun submitBatch(submissions: List<UringSubmission>): List<SelectionResult>
 
+    /** One completion per entry, in submission order; cancellation must propagate. */
     suspend fun batchEnqueue(submissions: Series<UringSubmission>): Series<UringCompletion>
 }
 
@@ -145,14 +149,38 @@ public class FunctionalUringFacade(
     }
 
     fun truncate(file: FileImpl, size: Long, userData: Long) {
-        enqueue(UringOp.Companion.Submissions.nop(userData))
+        require(size >= 0)
+        enqueue(UringSubmission(UringOp.FTRUNCATE, file.id, 0, 0, size, userData = userData))
     }
 
     fun map(file: FileImpl, mode: String, position: Long, size: Long, userData: Long) {
-        enqueue(UringOp.Companion.Submissions.nop(userData))
+        throw UnsupportedOperationException("Memory mapping is not a submission-queue operation")
     }
 
     // -- Completion drain --
+
+    /** Suspend through the backend; never invoke the synchronous compatibility path. */
+    suspend fun batchEnqueue(submissions: Series<UringSubmission>): Series<UringCompletion> {
+        require(submissions.size <= entries) { "submission queue full" }
+        for (i in 0 until submissions.size) {
+            require(submissions[i].opcode !in REJECTED_OPS) {
+                "Operation rejected by containment policy: ${submissions[i].opcode}"
+            }
+        }
+        val result = backend.batchEnqueue(submissions)
+        check(result.size == submissions.size) { "Backend lost submission completions" }
+        for (i in 0 until submissions.size) {
+            check(result[i].userData == submissions[i].userData) { "Backend changed completion correlation" }
+        }
+        return result
+    }
+
+    /** Submit the prepared queue and suspend until every entry has completed. */
+    suspend fun submitAwait(): Series<UringCompletion> {
+        val batch = pending.toList().toSeries()
+        pending.clear()
+        return batchEnqueue(batch)
+    }
 
     fun submit(): Int {
         val submitted = pending.size

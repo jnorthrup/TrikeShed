@@ -24,7 +24,8 @@ class FileCasStore(
         val path = getShardedPath(cid)
 
         if (fileOps.exists(path)) {
-            return cid
+            val existing = fileOps.readAllBytes(path)
+            if (ContentId.of(existing) == cid) return cid
         }
 
         val dirPath = fileOps.resolvePath(casRoot, CasPaths.shard(cid))

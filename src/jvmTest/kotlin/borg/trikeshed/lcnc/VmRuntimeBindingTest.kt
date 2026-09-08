@@ -143,7 +143,9 @@ class VmRuntimeBindingTest {
         }
         assertEquals("guest cancelled", error.message)
         assertEquals(1, host.revoked.size)
-        assertTrue(error.suppressedExceptions.any { it.message == "revoke failed" })
+        assertTrue(generateSequence<Throwable>(error) { it.cause }.any { failure ->
+            failure.suppressedExceptions.any { it.message == "revoke failed" }
+        })
         assertFalse(host.closed)
     }
 

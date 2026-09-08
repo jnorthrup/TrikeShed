@@ -5,6 +5,7 @@ import borg.trikeshed.context.ElementState
 import borg.trikeshed.job.ContentId
 import borg.trikeshed.userspace.context.AsyncContextElement
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.coroutineScope
@@ -31,7 +32,7 @@ class CasReplicationElement(
     override suspend fun open() {
         super.open()
 
-        CoroutineScope(supervisor).launch {
+        CoroutineScope(currentCoroutineContext() + this + supervisor).launch {
             for ((cid, payload) in replicationChannel) {
                 if (state.isLessThan(ElementState.CLOSED)) {
                     // structured concurrency over listeners

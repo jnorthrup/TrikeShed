@@ -14,7 +14,8 @@ actual class FileImpl actual constructor(actual val id: Int) {
 }
 
 internal actual object FilesImpl {
-    actual fun open(path: String, readOnly: Boolean): FileImpl = WasmFileRegistry.open()
+    actual fun open(path: String, readOnly: Boolean): FileImpl =
+        throw UnsupportedOperationException("Wasm file backend is unavailable")
 }
 
 internal actual object ChannelsImpl {
@@ -22,12 +23,12 @@ internal actual object ChannelsImpl {
 }
 
 private class WasmUserspaceChannelBackend : UserspaceChannelBackend {
-    override fun submitBatch(submissions: List<UringOp.Companion.UringSubmission>): List<SelectionResult> = emptyList()
+    override fun submitBatch(submissions: List<UringOp.Companion.UringSubmission>): List<SelectionResult> =
+        throw UnsupportedOperationException("Wasm submission backend is unavailable")
     override suspend fun batchEnqueue(
         submissions: borg.trikeshed.lib.Series<UringOp.Companion.UringSubmission>,
     ): borg.trikeshed.lib.Series<UringCompletion> =
-        @Suppress("UNCHECKED_CAST") (borg.trikeshed.lib.EmptySeries as borg.trikeshed.lib.Series<UringCompletion>)
+        throw UnsupportedOperationException("Wasm submission backend is unavailable")
 }
 
 actual fun openUserspaceChannelBackend(entries: Int): UserspaceChannelBackend = WasmUserspaceChannelBackend()
-

@@ -9,6 +9,7 @@ import borg.trikeshed.litebike.taxonomy.Protocol
 import borg.trikeshed.litebike.taxonomy.ProtocolMark
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.launch
@@ -147,7 +148,7 @@ class LitebikeListenerElement(
     override suspend fun open() {
         if (state == ElementState.CREATED) {
             state = ElementState.OPEN
-            CoroutineScope(supervisor).launch {
+            CoroutineScope(currentCoroutineContext() + this + supervisor).launch {
                 for (event in fanoutChannel) {
                     for (subscriber in fanoutSubscribers.toList()) {
                         if (subscriber is LitebikeFanoutEventSink) {

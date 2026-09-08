@@ -8,6 +8,7 @@ import borg.trikeshed.dag.FactId
 import borg.trikeshed.dag.ReteNetwork
 import borg.trikeshed.job.ContentId
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.channels.Channel
@@ -56,7 +57,7 @@ class CouchChangesFactElement(
         if (state != ElementState.CREATED) return
         super.open()
         cancelSubscription = db.store.changes.subscribe { wake.trySend(Unit) }
-        CoroutineScope(supervisor + Dispatchers.Default).launch {
+        CoroutineScope(currentCoroutineContext() + this + supervisor + Dispatchers.Default).launch {
             try {
                 drainFrames()
                 for (unit in wake) drainFrames()

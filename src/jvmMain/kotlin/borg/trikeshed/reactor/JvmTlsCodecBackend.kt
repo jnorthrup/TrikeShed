@@ -1,6 +1,5 @@
 package borg.trikeshed.reactor
 
-import borg.trikeshed.ccek.KeyedService
 import borg.trikeshed.lib.ByteSeries
 import borg.trikeshed.lib.toList
 import borg.trikeshed.lib.size

@@ -4,6 +4,7 @@ import borg.trikeshed.context.AsyncContextElement
 import borg.trikeshed.context.AsyncContextKey
 import borg.trikeshed.context.ElementState
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.launch
@@ -45,7 +46,7 @@ class IncrementalViewRegistry(
         super.open()
         scanDesignDocs()
         cancelSubscription = db.store.changes.subscribe { wake.trySend(Unit) }
-        CoroutineScope(supervisor + Dispatchers.Default).launch {
+        CoroutineScope(currentCoroutineContext() + this + supervisor + Dispatchers.Default).launch {
             try {
                 for (unit in wake) scanDesignDocs()
             } catch (_: kotlinx.coroutines.CancellationException) {

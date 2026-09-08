@@ -9,6 +9,7 @@ import borg.trikeshed.dag.PlaneFacts
 import borg.trikeshed.dag.ReteNetwork
 import borg.trikeshed.job.ContentId
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.channels.Channel
@@ -148,7 +149,7 @@ class BlackboardChangesFactElement(
     override suspend fun open() {
         if (state != ElementState.CREATED) return
         super.open()
-        val scope = CoroutineScope(supervisor + Dispatchers.Default)
+        val scope = CoroutineScope(currentCoroutineContext() + this + supervisor + Dispatchers.Default)
         // replay=1 on changes hands the collector the current board at attach, so the
         // first wake arrives without waiting for a put.
         collector = scope.launch {

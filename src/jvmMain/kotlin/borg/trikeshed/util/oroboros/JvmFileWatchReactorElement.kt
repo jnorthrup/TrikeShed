@@ -75,7 +75,7 @@ class JvmFileWatchReactorElement(
         watchService = service
         registerTree(rootPath, service)
         state = ElementState.ACTIVE
-        watchJob = CoroutineScope(supervisor + Dispatchers.IO).launch {
+        watchJob = CoroutineScope(kotlinx.coroutines.currentCoroutineContext() + this + supervisor + Dispatchers.IO).launch {
             watchLoop(service)
         }
     }

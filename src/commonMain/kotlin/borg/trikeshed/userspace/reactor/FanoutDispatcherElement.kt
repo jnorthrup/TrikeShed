@@ -7,6 +7,7 @@ import borg.trikeshed.userspace.UringCompletion
 import borg.trikeshed.userspace.context.AsyncContextKey
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.channels.BufferOverflow
@@ -83,7 +84,7 @@ open class FanoutDispatcherElement(
     override suspend fun open() {
         super.open()
         if (consumer != null) return // open() is idempotent; one consumer loop only
-        consumer = CoroutineScope(supervisor).launch {
+        consumer = CoroutineScope(currentCoroutineContext() + this + supervisor).launch {
             for (completion in dispatchChannel) {
                 // Legacy callbacks are a broadcast independent of any awaiter, and
                 // they run before the deferred completes so a resuming awaiter

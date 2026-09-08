@@ -28,6 +28,7 @@ fun interface LcncNodeRunner {
     suspend fun execute(node: LcncNode, inputs: Map<String, Any?>): Map<String, Any?>
 
     suspend fun run(node: LcncNode, inputs: Map<String, Any?>): Map<String, Any?> {
+        currentCoroutineContext().ensureActive()
         val key = LcncNodeKey.of(node.type)
         check(LcncContracts.find(node.type) == null || key != null) {
             "${node.type}: palette contract has no invocation key"

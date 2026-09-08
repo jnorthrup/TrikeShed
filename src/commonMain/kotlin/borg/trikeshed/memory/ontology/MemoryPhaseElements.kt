@@ -71,7 +71,7 @@ class MemoryRetrievalElement(
     private val resultChannel: Channel<Join<SubstratePhase, Any>> = Channel(Channel.BUFFERED)
 
     /** Subscribers awaiting retrieval results. */
-    private val subscriberScope: CoroutineScope = CoroutineScope(supervisor + reactorContext)
+    private val subscriberScope: CoroutineScope = CoroutineScope(reactorContext + this + supervisor)
 
     override suspend fun open() {
         if (state == CREATED) state = OPEN
@@ -162,7 +162,7 @@ class MemoryWritebackElement(
     private val signalChannel: Channel<Join<SubstratePhase, Any>> = Channel(Channel.BUFFERED)
 
     /** Subscribers awaiting write-back signals. */
-    private val subscriberScope: CoroutineScope = CoroutineScope(supervisor + reactorContext)
+    private val subscriberScope: CoroutineScope = CoroutineScope(reactorContext + this + supervisor)
 
     override suspend fun open() {
         if (state == CREATED) state = OPEN

@@ -38,7 +38,7 @@ class WorktreeReconcileElement(
         if (state != ElementState.CREATED) return
         super.open()
 
-        kotlinx.coroutines.CoroutineScope(supervisor).launch(Dispatchers.Default) {
+        kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.currentCoroutineContext() + this + supervisor).launch(Dispatchers.Default) {
             while (isActive) {
                 worktreeDirty.receive()
                 delay(250)

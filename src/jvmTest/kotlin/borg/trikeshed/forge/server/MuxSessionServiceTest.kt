@@ -141,6 +141,26 @@ class MuxSessionServiceTest {
         } finally { scope.coroutineContext[Job]?.cancelAndJoin() }
     }
 
+    @Test fun catalogReportsConfiguredModelWithoutCallingProvider(): Unit = runBlocking {
+        val keys = KeyMux { bind("llm.custom.key", FixedKeySource("private-test-key")) }
+        val mux = ModelMux(keys) {
+            model("configured", caps = setOf("chat"), provider = "custom")
+            defaultModel("configured")
+        }
+        val brain = BrainClient(apiKey = "private-test-key", model = "previous")
+        val service = MuxSessionService(brain, null, null, kotlin.coroutines.EmptyCoroutineContext, catalogProvider = { mux })
+        val response = service.route("GET", "/api/mux/catalog", "")!!
+        assertEquals(200, response.status)
+        val body = JsonSupport.parseMap(response.body)
+        assertEquals("configured", body["defaultModel"])
+        val card = (body["models"] as List<*>).single() as Map<*, *>
+        assertEquals("custom", card["name"])
+        assertEquals(true, card["keyPresent"])
+        assertEquals("llm.custom.key", card["envVar"])
+        assertFalse(response.body.contains("private-test-key"))
+        assertTrue(mux.activity.snapshot().isEmpty())
+    }
+
     @Test fun diskCheckpointRestoresWithAFreshAttachmentGateway(): Unit = runBlocking {
         val scope = CoroutineScope(coroutineContext + SupervisorJob())
         val directory = withContext(Dispatchers.IO) { java.nio.file.Files.createTempDirectory("mux-checkpoint-").toFile() }

@@ -14,6 +14,7 @@ import borg.trikeshed.lib.get
 import borg.trikeshed.lib.j
 import borg.trikeshed.lib.size
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.channels.Channel
@@ -141,7 +142,7 @@ class BeliefBagElement(
             applyWalRecord(payload)
         }
         if (state == ElementState.OPEN) state = ElementState.ACTIVE
-        CoroutineScope(supervisor + Dispatchers.Default).launch {
+        CoroutineScope(currentCoroutineContext() + this + supervisor + Dispatchers.Default).launch {
             for (cmd in intake) handle(cmd)
         }
     }

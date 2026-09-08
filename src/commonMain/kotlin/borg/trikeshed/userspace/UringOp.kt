@@ -104,6 +104,14 @@ enum class UringOp(val desc: String) : BitMasked<Long> {
 
         /** Convenience constructors. */
         object Submissions {
+            /** Portable OPENAT path bytes; flags use Linux O_RDONLY/O_RDWR/O_CREAT/O_TRUNC. */
+            fun openat(path: String, flags: Int = 0, userData: Long = 0): UringSubmission {
+                require(path.isNotEmpty() && '\u0000' !in path)
+                val bytes = path.encodeToByteArray()
+                return UringSubmission(OPENAT, -100, 0, bytes.size, flags.toLong(),
+                    userData = userData, buffer = ByteBuffer(bytes))
+            }
+
             fun read(fd: Int, bufAddr: Long, len: Int, offset: Long, userData: Long): UringSubmission =
                 UringSubmission(READ, fd, bufAddr, len, offset, 0, userData)
 

@@ -44,6 +44,11 @@ class UringChannel(
 
     fun submit(): Int = facade.submit()
 
+    suspend fun submitAwait() = facade.submitAwait()
+
+    suspend fun batchEnqueue(submissions: borg.trikeshed.lib.Series<borg.trikeshed.userspace.UringOp.Companion.UringSubmission>) =
+        facade.batchEnqueue(submissions)
+
     fun wait(minComplete: Int = 1): List<SelectionResult> = facade.wait(minComplete)
 
     fun peek(): List<SelectionResult> = facade.peek()

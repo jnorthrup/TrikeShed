@@ -13,6 +13,7 @@ import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -72,7 +73,8 @@ class DurableCouchPersistence(
             }
         }
 
-        CoroutineScope(supervisor + Dispatchers.Default).launch {
+        val scope = CoroutineScope(currentCoroutineContext() + this + supervisor + Dispatchers.Default)
+        scope.launch {
             while (!channel.isClosedForSend) {
                 delay(flushIntervalMs)
                 if (!channel.isClosedForSend) {
@@ -81,7 +83,7 @@ class DurableCouchPersistence(
             }
         }
 
-        CoroutineScope(supervisor).launch {
+        scope.launch {
             val batch = mutableListOf<Cmd>()
             for (cmd in channel) {
                 batch.add(cmd)

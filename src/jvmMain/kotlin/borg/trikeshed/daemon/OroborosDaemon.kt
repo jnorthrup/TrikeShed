@@ -1647,13 +1647,14 @@ object OroborosDaemon {
             val hermesInstances = hermesKnown.filter { hermesKeyed[it.provider] == true }
             val hermesSpecs = borg.trikeshed.jules.HermesInstances.specs(hermesInstances)
             val hermesClaimed = hermesSpecs.mapTo(HashSet()) { it.provider to it.model }
-            val discovered = hermesSpecs + liveBrain.providerRoster().filterNot { (it.provider ?: it.name) to it.model in hermesClaimed }
+            val staticSpecs = liveBrain.providerRoster().filterNot { (it.provider ?: it.name) to it.model in hermesClaimed }
+            val discovered = hermesSpecs + staticSpecs
             val lcncRoster = if (pinnedSpec == null) discovered else listOf(pinnedSpec) + discovered.filterNot {
                 (it.provider ?: it.name) == pinnedSpec.provider && it.model == pinnedSpec.model
             }
             System.err.println(
                 "[OROBOROS] mux cards: ${hermesSpecs.size} from hermes (${borg.trikeshed.jules.HermesModelUsage.stateDb()}), " +
-                    "${lcncRoster.size - hermesSpecs.size} from the static roster" +
+                    "${staticSpecs.size} from the static roster; configured default=${pinnedSpec?.model ?: "none"}" +
                     hermesInstances.take(3).joinToString(prefix = " — newest: ", separator = ", ") { "${it.model}@${it.provider}" } +
                     hermesKeyed.filterValues { !it }.keys.takeIf { it.isNotEmpty() }
                         ?.joinToString(prefix = "; hermes providers with no key here (not offered): ", separator = ", ").orEmpty(),

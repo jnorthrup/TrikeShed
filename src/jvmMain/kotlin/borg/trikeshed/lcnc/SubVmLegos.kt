@@ -531,6 +531,7 @@ object SubVmLegos {
 
     /** Input lane: wire-carried values win; the `in:`-prefixed param is the fallback spelling. */
     private fun inputStrings(node: LcncNode, inputs: Map<String, Any?>, key: String): List<String> {
+        if (key == "files" || key == "world") return VmRuntimeNodes.strings(node, inputs, key)
         return when (val value = VmRuntimeNodes.value(node, inputs, key)) {
             null -> emptyList()
             is String -> listOf(value)

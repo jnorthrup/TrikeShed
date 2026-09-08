@@ -69,7 +69,7 @@ class AuthFileWatchElement(
         watchElement = element
         element.open()
 
-        watchJob = CoroutineScope(supervisor + Dispatchers.Default).launch {
+        watchJob = CoroutineScope(kotlinx.coroutines.currentCoroutineContext() + this + supervisor + Dispatchers.Default).launch {
             for (event in element.events) {
                 // The event.path is relative to watchDir and uses '/'
                 if (event.path == watchFileName || event.path.endsWith("/" + watchFileName)) {

@@ -26,7 +26,6 @@ abstract class OpenAddressingMap<K : Any, V, IK : Any>(
 
     // ─── sentinel markers (target-stable across JVM/JS/Wasm) ───
     companion object {
-        protected const val MAX_PROBES = 32
         protected val DELETED = Any()
         protected val ABSENT  = Any()
 
@@ -71,7 +70,9 @@ abstract class OpenAddressingMap<K : Any, V, IK : Any>(
         val hash = mix(internalKeyHash(ik))
         var firstTomb = -1
         var i = 0
-        while (i < MAX_PROBES) {
+        // Triangular probing visits every slot in a power-of-two table. A fixed
+        // probe cap rejects distinct filesystem paths with the same hash.
+        while (i < capacity) {
             val slot = triangularProbe(hash, i, capacity)
             val k = keys[slot]
             when {
@@ -95,14 +96,14 @@ abstract class OpenAddressingMap<K : Any, V, IK : Any>(
             }
             i++
         }
-        throw IllegalStateException("LinearHashMap set() exhausted: probes=$MAX_PROBES size=$size hash=${key.hashCode()}")
+        error("LinearHashMap table full: capacity=$capacity size=$size")
     }
 
     operator fun get(key: K): V? {
         val ik = makeInternalKey(key)
         val hash = mix(internalKeyHash(ik))
         var i = 0
-        while (i < MAX_PROBES) {
+        while (i < capacity) {
             val slot = triangularProbe(hash, i, capacity)
             val k = keys[slot]
             when {
@@ -120,7 +121,7 @@ abstract class OpenAddressingMap<K : Any, V, IK : Any>(
         val ik = makeInternalKey(key)
         val hash = mix(internalKeyHash(ik))
         var i = 0
-        while (i < MAX_PROBES) {
+        while (i < capacity) {
             val slot = triangularProbe(hash, i, capacity)
             val k = keys[slot]
             when {
@@ -182,7 +183,7 @@ abstract class OpenAddressingMap<K : Any, V, IK : Any>(
     private fun reinsert(ik: IK, value: V) {
         val hash = mix(internalKeyHash(ik))
         var i = 0
-        while (i < MAX_PROBES) {
+        while (i < capacity) {
             val slot = triangularProbe(hash, i, capacity)
             if (isAbsent(keys[slot])) {
                 keys[slot] = ik
@@ -192,7 +193,7 @@ abstract class OpenAddressingMap<K : Any, V, IK : Any>(
             }
             i++
         }
-        throw IllegalStateException("LinearHashMap resize() exhausted: probes=$MAX_PROBES size=$size")
+        error("LinearHashMap rehash failed: capacity=$capacity size=$size")
     }
 }
 

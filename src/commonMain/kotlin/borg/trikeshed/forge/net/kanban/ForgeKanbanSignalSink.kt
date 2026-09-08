@@ -1,6 +1,5 @@
 package borg.trikeshed.forge.net.kanban
 
-import borg.trikeshed.ccek.KeyedService
 import kotlin.coroutines.CoroutineContext
 
 /**
