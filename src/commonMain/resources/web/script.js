@@ -288,6 +288,9 @@
       item.role = 'button';
       item.tabIndex = 0;
       item.setAttribute('aria-label', (isActive ? 'Active page: ' : 'Page: ') + (page.title || 'Untitled'));
+      if (isActive) {
+        item.setAttribute('aria-current', 'page');
+      }
       const toggle = document.createElement('span');
       toggle.className = 'tree-toggle';
       toggle.textContent = page.children && page.children.length ? '▾' : '▸';
