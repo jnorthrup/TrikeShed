@@ -1,7 +1,7 @@
 package borg.trikeshed.lcnc
 
 import borg.trikeshed.couch.CouchChangesFactElement
-import borg.trikeshed.couch.CouchDatabase
+import borg.trikeshed.couch.Couch
 import borg.trikeshed.couch.CouchStoreFactory
 import borg.trikeshed.cursor.BlackboardContext
 import borg.trikeshed.dag.Activation
@@ -23,7 +23,7 @@ class RunStaleProductionTest {
     private class Rig {
         val cas = CasStore.inMemory()
         val store = CouchStoreFactory.casBacked(cas)
-        val db = CouchDatabase("notes", store, cas)
+        val db = Couch("notes", store, cas)
         val rete = ReteNetwork()
         val tendon = CouchChangesFactElement(db, rete, admit = { true })
         val facts = LcncRunFacts(rete)

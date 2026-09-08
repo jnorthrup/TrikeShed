@@ -1,7 +1,7 @@
 package borg.trikeshed.relaxfactory
 
 import borg.trikeshed.couch.ConfixDocStore
-import borg.trikeshed.couch.CouchDatabase
+import borg.trikeshed.couch.Couch
 import borg.trikeshed.couch.replicate.CouchReplicator
 import borg.trikeshed.lib.get
 import borg.trikeshed.lib.size
@@ -16,7 +16,7 @@ import borg.trikeshed.parse.json.JsonSupport
  * `CouchDatabase` behind `_changes`/`_replicate`/`_cas`. A document put through the envelope was
  * therefore invisible to replication — the revision named no CAS blob, so no peer could ask for it.
  *
- * [of] over a [CouchDatabase] is the canonical binding: revisions are `gen-sha256:<hex>`, every put
+ * [of] over a [Couch] is the canonical binding: revisions are `gen-sha256:<hex>`, every put
  * appends a committed frame, and the same bytes answer on `_cas`. [of] over a [ConfixDocStore] is
  * kept for [CouchHttpSurface], whose store has no changes log — it reports [lanes] as null and the
  * distributed operations answer `not_implemented` rather than pretending.
@@ -48,7 +48,7 @@ interface RelaxStore {
 
     companion object {
         /** The canonical binding: the database the daemon serves on `_changes`, `_replicate` and `_cas`. */
-        fun of(db: CouchDatabase, replicator: CouchReplicator? = null): RelaxStore =
+        fun of(db: Couch, replicator: CouchReplicator? = null): RelaxStore =
             CouchDatabaseRelaxStore(db, replicator)
 
         /** [CouchHttpSurface]'s store: documents only, no changes log, no CAS. */
@@ -116,7 +116,7 @@ interface RelaxLanes {
 }
 
 private class CouchDatabaseRelaxStore(
-    val db: CouchDatabase,
+    val db: Couch,
     val replicator: CouchReplicator?,
 ) : RelaxStore, RelaxLanes {
 

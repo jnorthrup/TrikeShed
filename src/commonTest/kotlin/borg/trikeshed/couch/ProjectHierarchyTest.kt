@@ -21,9 +21,9 @@ import kotlin.test.assertTrue
  */
 class ProjectHierarchyTest {
 
-    private fun node(): CouchDatabase {
+    private fun node(): Couch {
         val cas = CasStore.inMemory()
-        return CouchDatabase("trikeshed", CouchStoreFactory.casBacked(cas), cas)
+        return Couch("trikeshed", CouchStoreFactory.casBacked(cas), cas)
     }
 
     // ── the grammar ───────────────────────────────────────────────
@@ -111,7 +111,7 @@ class ProjectHierarchyTest {
         val projects = Projects(db)
         val first = projects.put("trikeshed", mapOf("head" to "aaa"))
         val rev1 = first["rev"] as String
-        assertNotNull(CouchDatabase.revToCid(rev1), "the manifest rev names no CAS blob")
+        assertNotNull(Couch.revToCid(rev1), "the manifest rev names no CAS blob")
 
         val second = projects.put("trikeshed", mapOf("head" to "bbb"))
         assertEquals(true, second["ok"])
@@ -121,7 +121,7 @@ class ProjectHierarchyTest {
         // and it is in _changes like anything else
         val changes = db.changes(since = 0L)
         assertTrue(
-            CouchDatabase.asList(changes["results"])!!.any { (it as Map<*, *>)["id"] == "projects/trikeshed" },
+            Couch.asList(changes["results"])!!.any { (it as Map<*, *>)["id"] == "projects/trikeshed" },
             "the project heading never entered _changes",
         )
     }
@@ -176,7 +176,7 @@ class ProjectHierarchyTest {
             JsonSupport.parse(router.handle("GET", path, ByteArray(0))!!.bytes.decodeToString()) as Map<String, Any?>
 
         val listed = json("/trikeshed/_projects")
-        val rows = CouchDatabase.asList(listed["rows"])!!.map { it as Map<*, *> }
+        val rows = Couch.asList(listed["rows"])!!.map { it as Map<*, *> }
         assertEquals(listOf("trikeshed", "undeclared"), rows.map { it["id"] })
         assertEquals(true, rows.first { it["id"] == "trikeshed" }["declared"])
         assertEquals(false, rows.first { it["id"] == "undeclared" }["declared"])
@@ -185,7 +185,7 @@ class ProjectHierarchyTest {
         assertEquals("aaa", one["head"])
         assertEquals(
             listOf("projects/trikeshed/docs/index.html"),
-            CouchDatabase.asList(one["documents"])!!.map { it.toString() },
+            Couch.asList(one["documents"])!!.map { it.toString() },
             "the heading lists what hangs under it, not itself",
         )
     }

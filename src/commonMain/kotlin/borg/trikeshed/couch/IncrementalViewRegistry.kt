@@ -8,12 +8,11 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.launch
 import java.util.concurrent.ConcurrentHashMap
-import kotlin.coroutines.coroutineContext
 
 /**
  * P2 production wiring: the daemon-side registry of live [IncrementalViewElement]s,
  * handed to [CouchWireRouter] as its `incrementalView` hook. A design doc marked
- * `"incremental": true` gets exactly one tendon over the daemon's [CouchDatabase] —
+ * `"incremental": true` gets exactly one tendon over the daemon's [Couch] —
  * opened here, in this element's scope, the same pattern as the Changes→Rete
  * tendon — so its `_view` reads never rescan the corpus.
  *
@@ -27,7 +26,7 @@ import kotlin.coroutines.coroutineContext
  * [ViewRoute] path, which stays the one evaluator for everything else.
  */
 class IncrementalViewRegistry(
-    private val db: CouchDatabase,
+    private val db: Couch,
     parentJob: kotlinx.coroutines.Job? = null,
     private val log: (String) -> Unit = {},
 ) : AsyncContextElement(ElementState.CREATED, parentJob) {

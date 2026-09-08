@@ -132,6 +132,8 @@ class LcncPublisher(
                 },
                 "source" to c.isSource, "sink" to c.isSink, "wide" to c.wide, "effect" to c.isEffect,
                 "kindShapes" to c.kindShapes,
+                "context" to LcncContextContract.of(c.type,
+                    composite = lb.bindings.any { it.type == c.type && it.kind == LcncBindingKind.COMPOSITE }).toMap(),
                 "binding" to bindingOf[c.type]?.let { (how, by) -> mapOf("kind" to how, "provenance" to by) },
             ) },
             "kindHierarchy" to facts.hierarchy().map { (child, parent) ->

@@ -1,6 +1,6 @@
 package borg.trikeshed.forge.server
 
-import borg.trikeshed.couch.CouchDatabase
+import borg.trikeshed.couch.Couch
 import borg.trikeshed.couch.CouchStore
 import borg.trikeshed.couch.CouchWireRouter
 import borg.trikeshed.litebike.JvmKanbanServer
@@ -8,7 +8,7 @@ import borg.trikeshed.util.oroboros.CouchAttachmentGateway
 import java.util.concurrent.ConcurrentHashMap
 
 /**
- * One dropped directory hierarchy = one PROJECT DB: its own [CouchDatabase]
+ * One dropped directory hierarchy = one PROJECT DB: its own [Couch]
  * (own head projection, own `_changes` order, own doc namespace — the db name
  * IS the project), sharing the daemon's CAS so identical blobs dedupe across
  * every project. This is the couch-shaped multiproject step past increment-1's
@@ -19,7 +19,7 @@ class ProjectDb(
     val name: String,
     val path: String,
     val kind: String,           // "git" | "assets"
-    val db: CouchDatabase,
+    val db: Couch,
     val store: CouchStore,
     val gateway: CouchAttachmentGateway,
     val router: CouchWireRouter,

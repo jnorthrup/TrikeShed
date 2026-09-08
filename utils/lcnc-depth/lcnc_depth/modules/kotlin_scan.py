@@ -455,11 +455,12 @@ def _map_value(expr: str) -> dict[str, str]:
     return out
 
 
-def _balanced(text: str, open_pos: int) -> str:
+def _balanced(text: str, open_pos: int, scan: str | None = None) -> str:
     """The text between the paren at `open_pos` and its match."""
+    scan = _mask(text) if scan is None else scan
     depth, i, n = 0, open_pos, len(text)
     while i < n:
-        c = text[i]
+        c = scan[i]
         if c == "(":
             depth += 1
         elif c == ")":
@@ -483,16 +484,16 @@ def contracts(text: str, path: str = "") -> list[dict]:
     the trailing "?", so callers must strip before lookup — normalised here.
     """
     clean = _mask(text, keep_strings=True)
+    masked = _mask(text)
     constants = {m.group(1): m.group(2) for m in _CONST.finditer(clean)}
 
     out: list[dict] = []
     for m in _CONTRACT.finditer(clean):
         # Skip the data class DECLARATION itself — its parameter list looks like
         # a call and would otherwise arrive as a contract named "val type: String".
-        line_start = clean.rfind("\n", 0, m.start()) + 1
-        if re.search(r"\b(?:data\s+)?class\s*$", clean[line_start : m.start()]):
+        if re.search(r"\b(?:class|fun)\s*$", clean[:m.start()]):
             continue
-        body = _balanced(clean, m.end() - 1)
+        body = _balanced(clean, m.end() - 1, masked)
         if not body.strip():
             continue
         entry: dict = {
@@ -510,11 +511,7 @@ def contracts(text: str, path: str = "") -> list[dict]:
         positional = 0
         for arg in _split_args(body):
             nm = _NAMED.match(arg)
-            if nm and nm.group(1) in (
-                "type", "title", "inputs", "outputs",
-                "inputKinds", "outputKinds", "cardinality",
-                "functions", "params", "isSource", "isSink", "wide",
-            ):
+            if nm:
                 name, value = nm.group(1), nm.group(2).strip()
             else:
                 if positional >= len(_POSITIONAL):
@@ -523,9 +520,9 @@ def contracts(text: str, path: str = "") -> list[dict]:
                 positional += 1
 
             if name == "type":
-                if value.startswith('"'):
-                    entry["type"] = _STR.findall(value)[0] if _STR.findall(value) else None
-                    entry["type_resolved"] = entry["type"] is not None
+                if re.fullmatch(r'"[^"$\\]*"', value):
+                    entry["type"] = value[1:-1]
+                    entry["type_resolved"] = True
                 elif value in constants:
                     entry["type"] = constants[value]
                     entry["type_resolved"] = True

@@ -1,6 +1,6 @@
 package borg.trikeshed.btrfs
 
-import borg.trikeshed.couch.CouchDatabase
+import borg.trikeshed.couch.Couch
 import borg.trikeshed.job.ContentId
 
 /**
@@ -28,7 +28,7 @@ import borg.trikeshed.job.ContentId
  * [restore] is the far side: fetch the block this node now holds and receive it into a subvolume.
  */
 class VmWorldTeleport(
-    private val db: CouchDatabase,
+    private val db: Couch,
     private val store: BtrfsWorldStore,
 ) {
     /** A guest's world document id. */

@@ -1,6 +1,6 @@
 package borg.trikeshed.lcnc
 
-import borg.trikeshed.couch.CouchDatabase
+import borg.trikeshed.couch.Couch
 import borg.trikeshed.couch.CouchStoreFactory
 import borg.trikeshed.job.CasStore
 import borg.trikeshed.lib.toSeries
@@ -17,7 +17,7 @@ class RequestFactoryNodesTest {
 
     private fun registry(): Map<String, LcncNodeRunner> {
         val cas = CasStore.inMemory()
-        val db = CouchDatabase("trikeshed", CouchStoreFactory.casBacked(cas), cas)
+        val db = Couch("trikeshed", CouchStoreFactory.casBacked(cas), cas)
         val server = RequestFactoryServerProxy(
             mapOf(
                 "session.echo" to RequestFactoryRpcTarget { args ->

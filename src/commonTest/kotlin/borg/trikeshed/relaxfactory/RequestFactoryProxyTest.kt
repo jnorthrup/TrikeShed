@@ -1,7 +1,7 @@
 package borg.trikeshed.relaxfactory
 
 import borg.trikeshed.couch.ConfixDocStoreFactory
-import borg.trikeshed.couch.CouchDatabase
+import borg.trikeshed.couch.Couch
 import borg.trikeshed.couch.CouchStoreFactory
 import borg.trikeshed.couch.CouchWireRouter
 import borg.trikeshed.couch.replicate.CouchReplicator
@@ -37,7 +37,7 @@ class RequestFactoryProxyTest {
     private class Node(val name: String = "trikeshed") {
         val cas: CasStore = CasStore.inMemory()
         val store = CouchStoreFactory.casBacked(cas)
-        val db = CouchDatabase(name, store, cas)
+        val db = Couch(name, store, cas)
         val router = CouchWireRouter(db, PREFIX)
         fun exchange(): HttpExchange = exchangeFor(router)
     }
@@ -70,7 +70,7 @@ class RequestFactoryProxyTest {
         // The revision names a CAS blob — the property replication depends on. A UUID rev, which is
         // what the factory used to mint against its own store, yields null here and no peer could
         // ever ask for the body.
-        assertNotNull(CouchDatabase.revToCid(rev), "rev '$rev' does not name a CAS blob")
+        assertNotNull(Couch.revToCid(rev), "rev '$rev' does not name a CAS blob")
         assertEquals(rev, a.store.head.getRev("w1"), "envelope and store disagree on the head rev")
 
         // The same revision the REST route reports, and the same document body.
@@ -220,7 +220,7 @@ class RequestFactoryProxyTest {
         a.db.put("_design/rf", mapOf("views" to mapOf("by_type" to mapOf("map" to mapOf("key" to "type", "value" to "qty")))), null)
 
         val route = json(a.router.handle("GET", "/trikeshed/_design/rf/_view/by_type", ByteArray(0))!!.bytes)
-        val routeRows = CouchDatabase.asList(route["rows"])!!.map { it as Map<*, *> }
+        val routeRows = Couch.asList(route["rows"])!!.map { it as Map<*, *> }
 
         val envelope = RequestFactoryProxy(RelaxTransport.local(a.db))
             .query(mapOf("ddoc" to "_design/rf", "name" to "by_type", "key" to "type", "value" to "qty"))
@@ -253,7 +253,7 @@ class RequestFactoryProxyTest {
 
         // The route's answer for a stored view...
         val route = json(a.router.handle("GET", "/trikeshed/_design/rf/_view/by_type?group=true", ByteArray(0))!!.bytes)
-        val routeRows = CouchDatabase.asList(route["rows"])!!.map { it as Map<*, *> }
+        val routeRows = Couch.asList(route["rows"])!!.map { it as Map<*, *> }
 
         // ...and the envelope's, for the same stored view. `query` could only ever take an inline
         // spec, so this was the one report the route could serve and a proxy client could not.

@@ -106,7 +106,7 @@ class ProjectScopes(
         val registry = projectDbs
         val (prefix, scopeGateway) = if (registry != null) {
             val store = borg.trikeshed.couch.CouchStoreFactory.casBacked(casStore)
-            val db = borg.trikeshed.couch.CouchDatabase(name, store, casStore)
+            val db = borg.trikeshed.couch.Couch(name, store, casStore)
             val gateway = CouchAttachmentGateway(store, casStore)
             val pdb = ProjectDb(name, dir.absolutePath, kind, db, store, gateway,
                 borg.trikeshed.couch.CouchWireRouter(db, attachmentPrefix = ""))
@@ -188,7 +188,7 @@ class ProjectScopes(
         // the CLIENT classifies by build-system markers and tells us. git|project → "git".
         val k = if (kind == "git" || kind == "project") "git" else "assets"
         val store = borg.trikeshed.couch.CouchStoreFactory.casBacked(casStore)
-        val db = borg.trikeshed.couch.CouchDatabase(name, store, casStore)
+        val db = borg.trikeshed.couch.Couch(name, store, casStore)
         val gateway = CouchAttachmentGateway(store, casStore)
         registry.register(
             ProjectDb(name, "@upload", k, db, store, gateway,
@@ -314,7 +314,7 @@ class ProjectScopes(
         val registry = projectDbs ?: return null
         if (scopes.any { it.name == name } || registry.refusalFor(name) != null) return null
         val store = borg.trikeshed.couch.CouchStoreFactory.casBacked(casStore)
-        val db = borg.trikeshed.couch.CouchDatabase(name, store, casStore)
+        val db = borg.trikeshed.couch.Couch(name, store, casStore)
         val gateway = CouchAttachmentGateway(store, casStore)
         registry.register(
             ProjectDb(name, "@upload", kind, db, store, gateway,

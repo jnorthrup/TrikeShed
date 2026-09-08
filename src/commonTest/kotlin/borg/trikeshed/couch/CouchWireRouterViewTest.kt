@@ -13,7 +13,7 @@ import kotlin.test.assertTrue
  * [borg.trikeshed.relaxfactory.CouchHttpSurface]. Everything `HtxLitebikeCouchE2eTest` proves
  * about `_view` (1.6.2 params: reduce/group/group_level/key/startkey/endkey/inclusive_end/
  * descending/skip/limit/include_docs, collation, rereduce, builtin reducers) must be answered
- * by [CouchWireRouter] over a CAS-backed [CouchDatabase] — the wiring the live daemon mounts
+ * by [CouchWireRouter] over a CAS-backed [Couch] — the wiring the live daemon mounts
  * (`OroborosDaemon.kt` `router = CouchWireRouter(couchDb, …)`).
  */
 class CouchWireRouterViewTest {
@@ -21,7 +21,7 @@ class CouchWireRouterViewTest {
     private class Node {
         val cas: CasStore = CasStore.inMemory()
         val store = CouchStoreFactory.casBacked(cas)
-        val db = CouchDatabase("trike", store, cas)
+        val db = Couch("trike", store, cas)
         val router = CouchWireRouter(db, PREFIX)
 
         @Suppress("UNCHECKED_CAST")
@@ -38,7 +38,7 @@ class CouchWireRouterViewTest {
 
         @Suppress("UNCHECKED_CAST")
         fun rows(reply: Map<String, Any?>): List<Map<String, Any?>> =
-            CouchDatabase.asList(reply["rows"])!!.map { it as Map<String, Any?> }
+            Couch.asList(reply["rows"])!!.map { it as Map<String, Any?> }
     }
 
     @Test

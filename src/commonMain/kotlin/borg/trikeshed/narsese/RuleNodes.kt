@@ -1,6 +1,7 @@
 package borg.trikeshed.narsese
 
 import borg.trikeshed.lcnc.LcncNodeRunner
+import borg.trikeshed.lcnc.boundLcnc
 import borg.trikeshed.lib.get
 import borg.trikeshed.lib.size
 import borg.trikeshed.lib.toSeries
@@ -52,7 +53,7 @@ object RuleNodes {
          * added one costs nothing and avoids losing a rule that a concurrent admit raced us to.
          */
         ledger: ((EternalRule) -> Unit)? = null,
-    ): LcncNodeRunner = LcncNodeRunner { node, inputs ->
+    ): LcncNodeRunner = boundLcnc(element) { element, node, inputs ->
         val specs: List<Map<*, *>> = when (val raw = inputs["rules"] ?: inputs["rules?"]) {
             is List<*> -> raw.mapNotNull { it as? Map<*, *> }
             is String -> (JsonSupport.parse(raw) as? List<*>)?.mapNotNull { it as? Map<*, *> } ?: emptyList()
@@ -85,7 +86,7 @@ object RuleNodes {
      * mapped temporal copulas are reported as `rejectedTemporal` — refused
      * at admission along with everything else non-eternal.
      */
-    fun rulesFromKgRunner(element: CausalityReteElement): LcncNodeRunner = LcncNodeRunner { node, inputs ->
+    fun rulesFromKgRunner(element: CausalityReteElement): LcncNodeRunner = boundLcnc(element) { element, node, inputs ->
         val kgText = (inputs["kgText"] ?: inputs["kgText?"])?.toString() ?: node.params["kgText"] ?: ""
         val confidence = node.params["confidence"]?.toFloatOrNull() ?: 0.9f
         val forced = node.params["copula"]?.takeIf { it.isNotBlank() }?.let(::copulaOf)

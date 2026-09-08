@@ -84,11 +84,11 @@ object PromptNodes {
     }
 
     fun registry(reads: PromptReads): Map<String, LcncNodeRunner> = mapOf(
-        GET to LcncNodeRunner { node, inputs ->
+        GET to boundLcnc(PromptReadsKey(reads)) { service, node, inputs ->
             val name = (inputs["name"] ?: inputs["name?"])?.toString()?.takeIf { it.isNotBlank() }
                 ?: node.params["name"]?.takeIf { it.isNotBlank() }
                 ?: throw IllegalArgumentException("prompt.get: no prompt name — wire one in or set the name param")
-            val doc = reads.get(name) ?: throw IllegalArgumentException("prompt.get: no stored prompt named '$name'")
+            val doc = service.value.get(name) ?: throw IllegalArgumentException("prompt.get: no stored prompt named '$name'")
             currentCoroutineContext()[LcncConsumedLedger]?.consumed(LcncConsumedLedger.PROMPT, doc.name, doc.cid)
             mapOf("text" to doc.text, "cid" to doc.cid, "name" to doc.name, "role" to doc.role)
         },
@@ -99,8 +99,8 @@ object PromptNodes {
             val args = (inputs["args"] ?: inputs["args?"]) as? Map<String, Any?> ?: emptyMap()
             mapOf("text" to PromptTemplate.render(template, args), "variables" to PromptTemplate.variables(template))
         },
-        LIST to LcncNodeRunner { _, _ ->
-            val heads = reads.heads()
+        LIST to boundLcnc(PromptReadsKey(reads)) { service, _, _ ->
+            val heads = service.value.heads()
             mapOf("prompts" to heads.map { it.toMap() }, "count" to heads.size)
         },
     )

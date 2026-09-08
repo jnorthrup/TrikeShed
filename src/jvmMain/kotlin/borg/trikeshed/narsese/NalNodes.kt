@@ -7,6 +7,7 @@ import borg.trikeshed.jules.BrainClient
 import borg.trikeshed.job.ContentId
 import borg.trikeshed.lcnc.LcncNode
 import borg.trikeshed.lcnc.LcncNodeRunner
+import borg.trikeshed.lcnc.boundLcnc
 import borg.trikeshed.lib.get
 import borg.trikeshed.lib.j
 import borg.trikeshed.lib.size
@@ -31,10 +32,10 @@ object NalNodes {
         bag: BeliefBagElement,
         rete: ReteNetwork,
         kifSink: (String) -> Unit = {},
-    ): LcncNodeRunner = LcncNodeRunner { node, inputs ->
+    ): LcncNodeRunner = boundLcnc(bag) { bag, node, inputs ->
         // Delegate to ConstructionBotNode.runner — the only model-spend seam.
         val delegate = ConstructionBotNode.runner(brain, muxContext, cas, bag, rete, kifSink)
-        delegate.run(node, inputs)
+        delegate.execute(node, inputs)
     }
 
     /**
@@ -42,7 +43,7 @@ object NalNodes {
      * bag's intake channel.  The real formula is [AttentionEconomy.decay];
      * the node is just a timer trigger.
      */
-    fun decayRunner(bag: BeliefBagElement): LcncNodeRunner = LcncNodeRunner { _, _ ->
+    fun decayRunner(bag: BeliefBagElement): LcncNodeRunner = boundLcnc(bag) { bag, _, _ ->
         bag.intake.send(BeliefIntake.DecayTick)
         mapOf("decayed" to linkedMapOf(
             "size" to bag.size,
@@ -55,7 +56,7 @@ object NalNodes {
      * Mode param selects: `top` (priority-sorted), `sample` (stochastic),
      * `near` (angular neighborhood — requires `centroid` and `maxDistance` params).
      */
-    fun recallRunner(bag: BeliefBagElement): LcncNodeRunner = LcncNodeRunner { node, _ ->
+    fun recallRunner(bag: BeliefBagElement): LcncNodeRunner = boundLcnc(bag) { bag, node, _ ->
         val mode = node.params["mode"] ?: "top"
         val k = node.params["k"]?.toIntOrNull() ?: 16
         val beliefs = when (mode) {
@@ -111,7 +112,7 @@ object NalNodes {
      * Reads skill usage data and applies decay, exposing the resulting budgets.
      * Thin wrapper: the real formula is AttentionEconomy.budgetOf + decay.
      */
-    fun skillDecayRunner(bag: BeliefBagElement): LcncNodeRunner = LcncNodeRunner { _, _ ->
+    fun skillDecayRunner(bag: BeliefBagElement): LcncNodeRunner = boundLcnc(bag) { bag, _, _ ->
         // Skill budget decay is the same AttentionEconomy.decay applied to
         // the bag.  This runner pulses the bag and returns the current
         // budget state for display/monitoring.

@@ -1,6 +1,6 @@
 package borg.trikeshed.kanban.module
 
-import borg.trikeshed.couch.CouchDatabase
+import borg.trikeshed.couch.Couch
 import borg.trikeshed.couch.CouchStoreFactory
 import borg.trikeshed.dag.ReteNetwork
 import borg.trikeshed.dag.ReteProductionRegistry
@@ -76,7 +76,7 @@ class RunHeadRouteTest {
         val routes = ModuleRouteRegistry()
         val programs = linkedMapOf<String, LcncProgram>("echo" to echoProgram("echo"))
         val ctx = ModuleContext(
-            couchDb = CouchDatabase("run-head-$name", couchStore, cas),
+            couch = Couch("run-head-$name", couchStore, cas),
             rete = ReteNetwork(),
             productions = ReteProductionRegistry(),
             beliefBag = null,

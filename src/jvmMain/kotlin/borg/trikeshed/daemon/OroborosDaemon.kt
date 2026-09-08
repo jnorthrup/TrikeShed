@@ -2,7 +2,6 @@ package borg.trikeshed.daemon
 
 import borg.trikeshed.couch.CouchReportReactorElement
 import borg.trikeshed.htx.HtxElement
-import borg.trikeshed.htx.HtxKey
 import borg.trikeshed.htx.openHtxElement
 import borg.trikeshed.torrent.TorrentElement
 import borg.trikeshed.litebike.JvmKanbanServer
@@ -23,8 +22,6 @@ import borg.trikeshed.util.oroboros.WorktreeCouchGateway
 import borg.trikeshed.userspace.reactor.MuxReactorElement
 import borg.trikeshed.ccek.CCEK
 import borg.trikeshed.userspace.reactor.MuxReactorConfig
-import keymux.KeyMux
-import keymux.EnvSource
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.NonCancellable
@@ -38,7 +35,6 @@ import kotlinx.coroutines.job
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.channels.Channel
-import kotlinx.coroutines.sync.withLock
 import java.io.BufferedWriter
 import java.io.File
 import java.io.FileOutputStream
@@ -450,9 +446,12 @@ object OroborosDaemon {
         // ReactorSource and ModelMux lease/release calls were unreachable:
         // no MuxReactorElement.Key was ever present in any coroutine context,
         // so every quota edge was dead code in production.
+        val operatorMux = kotlinx.coroutines.CompletableDeferred<suspend () -> modelmux.ModelMux>(coroutineContext[kotlinx.coroutines.Job])
         val muxReactor = MuxReactorElement(
             initialConfig = MuxReactorConfig(),
             parentJob = coroutineContext[kotlinx.coroutines.Job],
+            keyMux = keyMux,
+            modelMuxProvider = { operatorMux.await().invoke() },
         )
         muxReactor.open()
         // ── CCEK binding: the single control plane for assemblies ────
@@ -460,7 +459,7 @@ object OroborosDaemon {
         // agent fan-out that LCNC nodes, model panels, and the curator
         // all run through. Modules access it via the binding's
         // reactorScope for coroutine dispatch.
-        val ccekBinding = CCEK.initialize(muxReactor)
+        val ccekBinding = CCEK.initialize(coroutineContext + Dispatchers.Default + nioSupervisor + fileOps + htxElement + muxReactor)
         System.err.println("[OROBOROS] CCEK binding open: reactor=${ccekBinding.reactorScope}")
         // Seed from already-resolved KeyMux env keys so the ReactorSource
         // (read path `llm.*.key`) returns real keyIds the very first cycle.
@@ -608,7 +607,7 @@ object OroborosDaemon {
                 "scratch", "sandboxes", "venv", "node_modules", "__pycache__", ".git", ".curator_backups",
             ),
         )
-        val couchDb = borg.trikeshed.couch.CouchDatabase(COUCH_DB_NAME, couchStore, casStore)
+        val couchDb = borg.trikeshed.couch.Couch(COUCH_DB_NAME, couchStore, casStore)
         couchDb.ensureDesignDoc(vhostRoot = "docs/")
         // Declare the heading the worktree gateway has always been minting documents under. Until
         // now `projects/<repo>/…` was an id prefix nobody had declared, so the store could not say
@@ -692,7 +691,7 @@ object OroborosDaemon {
             borg.trikeshed.graal.subvm.Hypervisor(blackboard = daemonBlackboard, adapter = pointcutAdapter, worldStore = vmWorldStore),
         )
         borg.trikeshed.vm.VmSupervisor.install(vmHost)
-        val wireScope = CoroutineScope(SupervisorJob(coroutineContext[kotlinx.coroutines.Job]) + Dispatchers.Default)
+        val wireScope = CCEK.childScope("wire", ccekBinding.reactorScope)
         // H1: the daemon's own blackboard is finally SERVED. The Hypervisor and the
         // pointcut adapter already write receipts into it; the wire streams them out
         // on the same litebike listener. Repair contract: seq-ordered replay, `id:`
@@ -924,7 +923,7 @@ object OroborosDaemon {
                         mapOf(
                             "event" to "dependent-rete-firing",
                             "firingCid" to firing.firingCid.value,
-                            "ruleCid" to firing.rule.ruleCid.value,
+                            "ruleCid" to firing.sourceRuleCid.value,
                             "antecedent" to firing.rule.antecedent,
                             "consequent" to firing.rule.consequent,
                             "dependence" to firing.dependence.name,
@@ -1217,7 +1216,6 @@ object OroborosDaemon {
         val programLedger = borg.trikeshed.lcnc.ProgramLedger(
             attachmentGateway, casStore, borg.trikeshed.lcnc.ProgramLedger.ledgerFile(forgeHome), lcncPublisher,
         ) { System.currentTimeMillis() }
-        val operatorMux = kotlinx.coroutines.CompletableDeferred<suspend () -> modelmux.ModelMux>()
         // The mounted projects as one document set (Forge genesis, Cut F/D): the legos and the
         // document surface read the same seam.
         val projectCorpus = borg.trikeshed.forge.server.JvmProjectCorpus(projectDbRegistry, projectScopes)
@@ -1239,7 +1237,7 @@ object OroborosDaemon {
             muxContext = htxElement + muxReactor,
             mountScope = wireScope,
             miner = projectMiner,
-            catalogProvider = { operatorMux.await().invoke() },
+            catalogProvider = { requireNotNull(muxReactor.modelMux()) },
             sessionSnapshot = File(forgeHome, ".modelmux/sessions.json"),
         )
         // (boot mounts + ledger remount happen below, once the Rete tendon hook is armed)
@@ -1249,7 +1247,7 @@ object OroborosDaemon {
         //    so a class compiled after boot attaches without a bounce).
         // (reteProductions / rete are constructed above the LcncPublisher, which needs them)
         val moduleRoutes = borg.trikeshed.module.ModuleRouteRegistry()
-        val moduleScope = CoroutineScope(SupervisorJob(coroutineContext[kotlinx.coroutines.Job]) + Dispatchers.Default)
+        val moduleScope = CCEK.childScope("module", ccekBinding.reactorScope)
         // Spec §3.1 production wiring: ONE stored-program resolver — the offered
         // presets (the panels/ attachment namespace was rooted out 2026-08-27
         // with the browser editor) — shared by module program runs
@@ -1259,7 +1257,7 @@ object OroborosDaemon {
         // fresh, and the entry is what the run seam obeys.
         val storedProgramLoader: suspend (String) -> borg.trikeshed.lcnc.LcncProgram? = { name -> lcncPublisher.load(name) }
         val moduleContext = borg.trikeshed.module.ModuleContext(
-            couchDb = couchDb,
+            couch = couchDb,
             rete = rete,
             productions = reteProductions,
             beliefBag = beliefBag,
@@ -1602,9 +1600,7 @@ object OroborosDaemon {
         // could talk to, not the brain's runtime pin (GLM single-endpoint).
         // One key pool: every card's provider tag resolves llm.<provider>.key
         // through the same env → dotenv → harness chain keys.status reports.
-        // chatContext rides HtxKey + the MuxReactor: ModelMux.chat resolves
-        // the HTX client and reactor metering from the caller's context, and
-        // the CCEK assembly scope carries the reactor but NOT the HTX element.
+        // HtxKey and MuxReactorElement are inherited from the CCEK binding.
         // Card ids must be UNIQUE. ModelMux.session takes the first entry whose id
         // matches, so a model id served by two providers is not ambiguous — the
         // second one is silently unreachable while still being listed in the panel.
@@ -1673,10 +1669,7 @@ object OroborosDaemon {
         operatorMux.complete { lcncMux.current() }
         moduleContext.lcncRunners.putAll(
             borg.trikeshed.lcnc.BrainMuxNodes.registry(
-                keyMux = keyMux,
-                modelMuxProvider = { lcncMux.current() },
                 credStore = couchKeyStore,
-                chatContext = htxElement + muxReactor,
             ),
         )
         launch(Dispatchers.Default) {
@@ -1923,7 +1916,7 @@ object OroborosDaemon {
             facts = { pattern -> curatorImpulse?.let { c -> runCatching { c.queryBank(pattern) }.getOrDefault(emptyList()) }.orEmpty() },
         )
         // The fact plane itself, read-only: /api/rete/facts, /api/facts/rdf, /api/rete/productions.
-        val reteWire = borg.trikeshed.forge.server.ReteWire(rete, kifTee)
+        val reteWire = borg.trikeshed.forge.server.ReteWire(rete, kifTee, causalityRete, borg.trikeshed.ontology.SumoCorpus.pinned)
         // The hover blip: one LCNC node read across panels + KIF + productions + graal (/api/lcnc/blip).
         val blipWire = borg.trikeshed.forge.server.LcncBlipWire(
             network = rete,

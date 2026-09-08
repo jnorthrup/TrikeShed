@@ -1,6 +1,6 @@
 package borg.trikeshed.forge.server
 
-import borg.trikeshed.couch.CouchDatabase
+import borg.trikeshed.couch.Couch
 import borg.trikeshed.couch.Document
 import borg.trikeshed.couch.Field
 import borg.trikeshed.job.ContentId
@@ -53,7 +53,7 @@ object HotSpotAotBlobAccess {
     }
 
     /** Persist the configured AOT archive as a normal replicated attachment document. */
-    fun capture(database: CouchDatabase): Map<String, Any?> {
+    fun capture(database: Couch): Map<String, Any?> {
         val (path, bytes) = blob()
             ?: return mapOf("error" to "aot_blob_unavailable", "state" to snapshot())
         val cid = database.blockPut(bytes)

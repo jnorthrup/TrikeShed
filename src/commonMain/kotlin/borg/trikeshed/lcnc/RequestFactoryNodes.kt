@@ -13,20 +13,20 @@ import borg.trikeshed.relaxfactory.RequestFactoryProxy
 object RequestFactoryNodes {
 
     fun registry(proxy: RequestFactoryProxy): Map<String, LcncNodeRunner> = mapOf(
-        "rf.rpc" to LcncNodeRunner { node, inputs ->
+        "rf.rpc" to boundLcnc(RequestFactoryProxyKey(proxy)) { service, node, inputs ->
             val target = ((inputs["target"] ?: inputs["target?"])?.toString()
                 ?: node.params["target"]).orEmpty()
             if (target.isBlank()) {
                 val receipt = mapOf("ok" to false, "error" to "rpc", "reason" to "target required")
                 mapOf("result" to null, "receipt" to receipt)
             } else {
-                val receipt = proxy.rpc(target, jsonObject(inputs["args"] ?: inputs["args?"] ?: node.params["args"]))
+                val receipt = service.value.rpc(target, jsonObject(inputs["args"] ?: inputs["args?"] ?: node.params["args"]))
                 mapOf("result" to receipt.result, "receipt" to receipt.fields)
             }
         },
-        "rf.batch" to LcncNodeRunner { node, inputs ->
+        "rf.batch" to boundLcnc(RequestFactoryProxyKey(proxy)) { service, node, inputs ->
             val raw = inputs["operations"] ?: inputs["operations?"] ?: node.params["operations"]
-            val batch = proxy.submit(operationMaps(raw).map { RelaxOp.Raw(it) })
+            val batch = service.value.submit(operationMaps(raw).map { RelaxOp.Raw(it) })
             mapOf(
                 "ok" to batch.ok,
                 "receipts" to batch.receipts.map { it.fields },

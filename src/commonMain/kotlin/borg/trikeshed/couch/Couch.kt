@@ -23,7 +23,7 @@ import kotlinx.coroutines.channels.Channel
  * renders the JSON map back. Sequence numbers on the wire are 1-based (`frame.sequence + 1`) so
  * `since=0` means "everything" and `since=update_seq` means "nothing", as in 1.x.
  */
-class CouchDatabase(
+class Couch(
     val name: String,
     val store: CouchStore,
     val cas: CasStore,

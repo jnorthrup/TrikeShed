@@ -16,7 +16,7 @@ data class WireReply(val status: Int, val contentType: String, val bytes: ByteAr
 }
 
 /**
- * CouchWireRouter — the CouchDB 1.6/1.7 HTTP shape over one [CouchDatabase], plus the two lanes
+ * CouchWireRouter — the CouchDB 1.6/1.7 HTTP shape over one [Couch], plus the two lanes
  * that collapse it onto the CAS: `_cas/{cid}` blocks and the IPFS `/api/v0/block/…` aliases.
  * commonMain: no sockets; the litebike HTTP worker hands (method, path, body) in and writes the
  * [WireReply] back. `feed=continuous|longpoll` is the JVM wire's job (it needs the connection).
@@ -42,7 +42,7 @@ data class WireReply(val status: Int, val contentType: String, val bytes: ByteAr
  * [attachmentPrefix] is the logical prefix rewrites resolve under (`projects/trikeshed/`).
  */
 class CouchWireRouter(
-    val db: CouchDatabase,
+    val db: Couch,
     val attachmentPrefix: String,
     /** Bound so the envelope's `replicate` operation can drive m2m sync; null leaves it unimplemented. */
     val replicator: borg.trikeshed.couch.replicate.CouchReplicator? = null,
@@ -89,7 +89,7 @@ class CouchWireRouter(
                 // so a client written against either mounting works against both. The sniff is
                 // narrower than "has the key": `operations` must be a list, which a document
                 // carrying a scalar or object under that name is not.
-                if (CouchDatabase.asList(doc["operations"]) != null) envelope(body)
+                if (Couch.asList(doc["operations"]) != null) envelope(body)
                 else {
                     val id = doc["_id"] as? String ?: borg.trikeshed.job.ContentId.of(body).hex
                     val r = db.put(id, doc, doc["_rev"] as? String)
@@ -113,13 +113,13 @@ class CouchWireRouter(
             "_revs_diff" -> {
                 if (m != "POST") return WireReply.methodNotAllowed(m)
                 val offered = parseMap(body) ?: return WireReply.badRequest("invalid JSON body")
-                WireReply.json(200, db.revsDiff(offered.mapValues { (_, v) -> CouchDatabase.asList(v)?.map { it.toString() } ?: emptyList() }))
+                WireReply.json(200, db.revsDiff(offered.mapValues { (_, v) -> Couch.asList(v)?.map { it.toString() } ?: emptyList() }))
             }
             "_bulk_docs" -> {
                 if (m != "POST") return WireReply.methodNotAllowed(m)
                 val req = parseMap(body) ?: return WireReply.badRequest("invalid JSON body")
                 @Suppress("UNCHECKED_CAST")
-                val docs = CouchDatabase.asList(req["docs"])?.mapNotNull { it as? Map<String, Any?> } ?: return WireReply.badRequest("docs required")
+                val docs = Couch.asList(req["docs"])?.mapNotNull { it as? Map<String, Any?> } ?: return WireReply.badRequest("docs required")
                 WireReply.json(201, db.bulkDocs(docs, newEdits = req["new_edits"] != false))
             }
             // The project headings: what namespaces this database holds, declared or merely in use.
@@ -148,7 +148,7 @@ class CouchWireRouter(
     private fun welcome() = WireReply.json(200, mapOf("couchdb" to "Welcome", "version" to CouchHttpSurface.COUCH_VERSION, "vendor" to mapOf("name" to "TrikeShed", "version" to "oroboros")))
 
     private fun allDocs(m: String, query: Map<String, String>, body: ByteArray): WireReply {
-        val keys = if (m == "POST") CouchDatabase.asList(parseMap(body)?.get("keys"))?.map { it.toString() } else null
+        val keys = if (m == "POST") Couch.asList(parseMap(body)?.get("keys"))?.map { it.toString() } else null
         if (m != "GET" && m != "POST") return WireReply.methodNotAllowed(m)
         return WireReply.json(
             200,
@@ -176,7 +176,7 @@ class CouchWireRouter(
 
     private fun cas(m: String, cid: String?, body: ByteArray): WireReply = when {
         m == "POST" && cid == "_bulk" -> {
-            val want = CouchDatabase.asList(parseMap(body)?.get("cids"))?.map { it.toString() } ?: return WireReply.badRequest("cids required")
+            val want = Couch.asList(parseMap(body)?.get("cids"))?.map { it.toString() } ?: return WireReply.badRequest("cids required")
             // Cap one reply by BYTES, not block count: jar-sized blobs make a 64-block reply tens of
             // megabytes. Omitted blocks are re-requested (bulk again or singles) by the reader.
             var budget = 8 * 1024 * 1024

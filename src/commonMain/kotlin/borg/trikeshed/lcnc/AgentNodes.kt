@@ -127,19 +127,19 @@ object AgentNodes {
     }
 
     fun registry(runs: AgentRuns, mintRunId: () -> String): Map<String, LcncNodeRunner> = mapOf(
-        LIST to LcncNodeRunner { _, _ ->
-            val rows = runs.roster()
+        LIST to boundLcnc(AgentRunsKey(runs)) { service, _, _ ->
+            val rows = service.value.roster()
             mapOf("agents" to rows.map { it.toMap() }, "count" to rows.size)
         },
-        RUN to LcncNodeRunner { node, inputs ->
-            val request = requestOf(node, inputs, mintRunId())
+        RUN to boundLcnc(AgentRunsKey(runs), boundLcnc(AgentRunIdKey(mintRunId)) { ids, node, inputs ->
+            val request = requestOf(node, inputs, ids.value())
             require(request.agent.isNotEmpty()) { "agent.run: no agent named (wire agent? or set the agent param)" }
             require(request.brief.isNotEmpty()) { "agent.run: no brief wired or in params" }
-            val result = runs.run(request)
+            val result = AgentRunsKey.require().run(request)
             mapOf(
                 "summary" to result.summary, "transcriptCid" to result.transcriptCid, "patchCid" to result.patchCid,
                 "exit" to result.exit, "ok" to result.ok, "error" to result.error, "runId" to result.runId, "truncated" to result.truncated,
             )
-        },
+        }),
     )
 }

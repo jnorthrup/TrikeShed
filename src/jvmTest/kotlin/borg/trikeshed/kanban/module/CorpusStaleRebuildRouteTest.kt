@@ -1,7 +1,7 @@
 package borg.trikeshed.kanban.module
 
 import borg.trikeshed.couch.CouchChangesFactElement
-import borg.trikeshed.couch.CouchDatabase
+import borg.trikeshed.couch.Couch
 import borg.trikeshed.couch.CouchStoreFactory
 import borg.trikeshed.cursor.BlackboardContext
 import borg.trikeshed.dag.ReteNetwork
@@ -60,7 +60,7 @@ class CorpusStaleRebuildRouteTest {
         val routes = ModuleRouteRegistry()
         val home = tempDir("$name-home")
         val ctx = ModuleContext(
-            couchDb = CouchDatabase("corpus-stale-$name", couchStore, cas),
+            couch = Couch("corpus-stale-$name", couchStore, cas),
             rete = ReteNetwork(),
             productions = ReteProductionRegistry(),
             beliefBag = null,

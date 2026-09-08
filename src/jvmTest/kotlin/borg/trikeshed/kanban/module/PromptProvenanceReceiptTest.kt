@@ -1,6 +1,6 @@
 package borg.trikeshed.kanban.module
 
-import borg.trikeshed.couch.CouchDatabase
+import borg.trikeshed.couch.Couch
 import borg.trikeshed.couch.CouchStoreFactory
 import borg.trikeshed.dag.ReteNetwork
 import borg.trikeshed.dag.ReteProductionRegistry
@@ -55,7 +55,7 @@ class PromptProvenanceReceiptTest {
         val cas = CasStore.inMemory()
         val couchStore = CouchStoreFactory.casBacked(cas)
         val ctx = ModuleContext(
-            couchDb = CouchDatabase("prompt-provenance", couchStore, cas),
+            couch = Couch("prompt-provenance", couchStore, cas),
             rete = ReteNetwork(), productions = ReteProductionRegistry(),
             beliefBag = null, turnReview = null,
             blackboard = ConfixBlackboard.empty(), casStore = cas,

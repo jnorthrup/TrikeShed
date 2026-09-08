@@ -232,11 +232,14 @@ internal class LcncRunService(
                         }
                     }
                     val result = withTimeout(timeoutMs) {
+                        val hostContext = ctx.scope.coroutineContext.minusKey(Job) +
+                            ctx.muxContext.minusKey(Job) + currentCoroutineContext()
                         val binding = ctx.ccekBinding
-                        if (binding == null) walker.runProcedure(frozen, inputs)
+                        if (binding == null) withContext(hostContext) { walker.runProcedure(frozen, inputs) }
                         else {
-                            val assembly = LcncCcekAssembly(binding, walker).launch(name, frozen, inputs)
-                            try { assembly.result.await() } finally { assembly.cancel("run scope closed") }
+                            LcncCcekAssembly(binding, walker).launch(
+                                name, frozen, inputs, context = hostContext,
+                            ).result.await()
                         }
                     }
                     // Which stored prompts the run READ, by name → cid, beside programVersions:
@@ -263,8 +266,12 @@ internal class LcncRunService(
                 } catch (e: TimeoutCancellationException) {
                     finish(504, "cancel", "timed_out", mapOf("ok" to false, "error" to "time_limit"))
                 } catch (e: CancellationException) {
-                    withContext(NonCancellable) {
-                        withTimeout(5000) { finish(499, "cancel", "cancelled", mapOf("ok" to false, "error" to (e.message ?: "cancelled"))) }
+                    try {
+                        withContext(NonCancellable) {
+                            withTimeout(5000) { finish(499, "cancel", "cancelled", mapOf("ok" to false, "error" to (e.message ?: "cancelled"))) }
+                        }
+                    } catch (receiptFailure: Throwable) {
+                        if (receiptFailure !== e) e.addSuppressed(receiptFailure)
                     }
                     throw e
                 } catch (e: Exception) {

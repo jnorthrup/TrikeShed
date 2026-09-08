@@ -22,7 +22,7 @@ import kotlin.test.assertTrue
  * Two CAS-backed nodes wired together in-process through [CouchWireRouter] — the same code the
  * daemon mounts on its listener — replicate through the 1.x protocol with blobs as the payload.
  */
-class CouchDatabaseReplicationTest {
+class CouchReplicationTest {
 
     @Test
     fun unavailableAndMalformedPeersAreFailuresNotEmptySuccess() = runTest {
@@ -105,7 +105,7 @@ class CouchDatabaseReplicationTest {
     private class Node(name: String) {
         val cas: CasStore = CasStore.inMemory()
         val store = CouchStoreFactory.casBacked(cas)
-        val db = CouchDatabase(name, store, cas)
+        val db = Couch(name, store, cas)
         val router = CouchWireRouter(db, PREFIX)
         val attachments = CouchAttachmentGateway(store, cas)
 
@@ -136,7 +136,7 @@ class CouchDatabaseReplicationTest {
 
         // rev names the CBOR body blob in the CAS
         val rev = a.store.head.getRev(PREFIX + "docs/index.html")!!
-        val cid = CouchDatabase.revToCid(rev)
+        val cid = Couch.revToCid(rev)
         assertNotNull(cid)
         val body = CouchStoreFactory.documentFromBody(a.cas.get(cid)!!)
         assertEquals(PREFIX + "docs/index.html", body?.id)
@@ -222,7 +222,7 @@ class CouchDatabaseReplicationTest {
         assertEquals(false, b.store.putReplicated(Document("w", listOf(Field("v", "y"))), "w", "2-sha256:${"f".repeat(64)}", false))
         assertEquals("x", b.db.docJson("w")!!["v"])
         assertEquals(1, b.db.revsDiff(mapOf("w" to listOf("3-sha256:${"0".repeat(64)}", "9-sha256:${"1".repeat(64)}")))
-            .let { CouchDatabase.asList((it["w"] as Map<*, *>)["missing"])!! }.size)
+            .let { Couch.asList((it["w"] as Map<*, *>)["missing"])!! }.size)
     }
 
     @Test
@@ -234,13 +234,13 @@ class CouchDatabaseReplicationTest {
         assertEquals(2L, a.db.updateSeq)
 
         val all = json(a.router.handle("GET", "/trikeshed/_all_docs?include_docs=true", ByteArray(0))!!)
-        assertEquals(listOf("a", "b"), CouchDatabase.asList(all["rows"])!!.map { (it as Map<*, *>)["id"] })
+        assertEquals(listOf("a", "b"), Couch.asList(all["rows"])!!.map { (it as Map<*, *>)["id"] })
 
         val ch = json(a.router.handle("GET", "/trikeshed/_changes?since=1", ByteArray(0))!!)
-        assertEquals(1, CouchDatabase.asList(ch["results"])!!.size)
+        assertEquals(1, Couch.asList(ch["results"])!!.size)
         assertEquals(2L, (ch["last_seq"] as Number).toLong())
         val none = json(a.router.handle("GET", "/trikeshed/_changes?since=2", ByteArray(0))!!)
-        assertEquals(0, CouchDatabase.asList(none["results"])!!.size)
+        assertEquals(0, Couch.asList(none["results"])!!.size)
 
         val put = a.router.handle("PUT", "/trikeshed/_local/ckpt", """{"last_seq":7}""".encodeToByteArray())!!
         assertEquals(201, put.status)

@@ -1,6 +1,6 @@
 package borg.trikeshed.forge.server
 
-import borg.trikeshed.couch.CouchDatabase
+import borg.trikeshed.couch.Couch
 import borg.trikeshed.couch.CouchStoreFactory
 import borg.trikeshed.couch.Document
 import borg.trikeshed.couch.Field
@@ -16,7 +16,7 @@ class ClasspathSourceProjectionTest {
     fun sourceAttachmentMatesToExactRuntimeClassBlobThroughJdk25ClassfileApi() {
         val cas = CasStore.inMemory()
         val store = CouchStoreFactory.casBacked(cas)
-        val database = CouchDatabase("test", store, cas)
+        val database = Couch("test", store, cas)
         val sourceId = "projects/trikeshed/src/jvmTest/kotlin/borg/trikeshed/forge/server/ClasspathSourceProjectionTest.kt"
         val source = """
             package borg.trikeshed.forge.server
@@ -68,7 +68,7 @@ class ClasspathSourceProjectionTest {
     }
 
     private fun attach(
-        database: CouchDatabase,
+        database: Couch,
         cas: CasStore,
         id: String,
         bytes: ByteArray,

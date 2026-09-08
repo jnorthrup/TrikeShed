@@ -44,6 +44,8 @@ data class LcncPortContract(
      */
     val kindShapes: Map<String, List<String>> = emptyMap(),
 ) {
+    val context: LcncContextContract get() = LcncContextContract.of(type)
+
     /** One editable parameter: default value, optional dropdown options, multi-line flag, placeholder.
      *  [cols] non-empty makes it a LIST widget: rows of {col: value}, the param
      *  VALUE is the JSON array text — daemon shape (Map<String,String>) unchanged. */
@@ -1059,11 +1061,11 @@ object LcncContracts {
         //   CouchKeyStore entry; (3) the manual url+key fields. The key field
         //   is a password input (secret: prefix).
         LcncPortContract("prompt.chat", "ask a model",
-            listOf("prompt?"), listOf("content", "model", "ok", "error", "cached"),
+            listOf("prompt?"), listOf("content", "model", "ok", "error", "cached", "receipt"),
             inputKinds = mapOf("prompt" to "text"),
             // cached: the reactor answered from its cache (same question as before) —
             // the answer card says so, because a repeat that looks live is a lie.
-            outputKinds = mapOf("content" to "text", "model" to "id", "ok" to "json", "error" to "text", "cached" to "json"),
+            outputKinds = mapOf("content" to "text", "model" to "id", "ok" to "json", "error" to "text", "cached" to "json", "receipt" to "json"),
             params = mapOf(
                 "prompt" to LcncPortContract.LcncParamSpec(ta = true, ph = "what do you want to ask?"),
                 // Blank default: the live list leads, and its first entry is the newest

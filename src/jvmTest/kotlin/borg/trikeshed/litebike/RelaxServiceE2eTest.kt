@@ -3,7 +3,7 @@ package borg.trikeshed.litebike
 import borg.trikeshed.btrfs.BtrfsWorldStore
 import borg.trikeshed.btrfs.UserspaceBtrfs
 import borg.trikeshed.btrfs.VmWorldTeleport
-import borg.trikeshed.couch.CouchDatabase
+import borg.trikeshed.couch.Couch
 import borg.trikeshed.couch.CouchReportEvent
 import borg.trikeshed.couch.CouchReportReactorElement
 import borg.trikeshed.couch.CouchStoreFactory
@@ -55,7 +55,7 @@ class RelaxServiceE2eTest {
     fun theServiceAnswersOnOneSocket() = runBlocking {
         val port = ServerSocket(0).use { it.localPort }
         val cas = CasStore.inMemory()
-        val database = CouchDatabase(db, CouchStoreFactory.casBacked(cas), cas)
+        val database = Couch(db, CouchStoreFactory.casBacked(cas), cas)
         val report = CouchReportReactorElement().also { it.open() }
         val router = CouchWireRouter(database, "projects/trikeshed/", report = report)
         val worlds = BtrfsWorldStore.ofFiles(InMemoryFileOperations(cwd = "/"), "/vm-worlds")
@@ -112,7 +112,7 @@ class RelaxServiceE2eTest {
             val receipts = (seeded.first["receipts"] as List<*>).map { it as Map<String, Any?> }
             assertEquals(3, receipts.size)
             // Every revision is CAS-derived, which is what makes these documents replicable.
-            for (r in receipts) assertNotNull(CouchDatabase.revToCid(r["rev"] as String), "rev ${r["rev"]} names no blob")
+            for (r in receipts) assertNotNull(Couch.revToCid(r["rev"] as String), "rev ${r["rev"]} names no blob")
 
             // it entered _changes, over the wire
             val changes = client.json(base, "/$db/_changes?since=0")

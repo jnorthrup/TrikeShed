@@ -6,7 +6,13 @@ import borg.trikeshed.collections.bits.IntAccumulator
 import borg.trikeshed.collections.bits.RoaringSeries
 import borg.trikeshed.kif.KifExpr
 import borg.trikeshed.lib.Series
+import borg.trikeshed.lib.Series2
 import borg.trikeshed.lib.j
+import borg.trikeshed.lib.α
+
+enum class SumoMask { ANCESTORS, DESCENDANTS, INSTANCES, DISJOINT }
+
+@JvmInline value class SumoClassId(val value: Int)
 
 /**
  * SUMO as a classifier that is bitset in shape.
@@ -51,6 +57,33 @@ class SumoClassifier private constructor(
 ) {
     val termCount: Int get() = names.size
     val classCount: Int get() = termOfClass.size
+
+    /** Class IDs are the classifier's own preorder IDs, not the KIF bank's IDs. */
+    fun classId(term: String): SumoClassId? = classIndex(term).takeIf { it >= 0 }?.let { SumoClassId(closure.id(it)) }
+
+    fun className(id: SumoClassId): String = names[termOfClass[closure.node(id.value)]]
+
+    fun mask(term: String, kind: SumoMask): RoaringSeries {
+        val t = termId(term)
+        if (t < 0) return RoaringSeries.EMPTY
+        if (kind == SumoMask.INSTANCES) return instanceTypes[t]
+        val c = classOfTerm[t]
+        if (c < 0) return RoaringSeries.EMPTY
+        return when (kind) {
+            SumoMask.ANCESTORS -> closure.ancestorIds(c)
+            SumoMask.DESCENDANTS -> closure.descendantIds(c)
+            SumoMask.DISJOINT -> disjointMask(c)
+            SumoMask.INSTANCES -> instanceTypes[t]
+        }
+    }
+
+    val domainSlots: Series2<String, String>
+        get() = domains.entries() α { it.a j names[termOfClass[it.b]] }
+
+    val rangeSlots: Series2<String, String>
+        get() = ranges.entries() α { it.a j names[termOfClass[it.b]] }
+
+    fun domainIsSubclass(predicate: String, argIdx: Int): Boolean = domainSubclass["$predicate/$argIdx"] == true
 
     /** Every term in pool order. */
     val terms: Series<String> get() = names.size j { i: Int -> names[i] }

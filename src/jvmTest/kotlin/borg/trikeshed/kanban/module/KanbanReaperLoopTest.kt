@@ -1,6 +1,6 @@
 package borg.trikeshed.kanban.module
 
-import borg.trikeshed.couch.CouchDatabase
+import borg.trikeshed.couch.Couch
 import borg.trikeshed.couch.CouchStoreFactory
 import borg.trikeshed.dag.ReteNetwork
 import borg.trikeshed.dag.ReteProductionRegistry
@@ -46,7 +46,7 @@ class KanbanReaperLoopTest {
         val couchStore = CouchStoreFactory.casBacked(cas)
         val routes = ModuleRouteRegistry()
         val ctx = ModuleContext(
-            couchDb = CouchDatabase("kanban-reaper-test-$name", couchStore, cas),
+            couch = Couch("kanban-reaper-test-$name", couchStore, cas),
             rete = ReteNetwork(),
             productions = ReteProductionRegistry(),
             beliefBag = null,

@@ -110,6 +110,7 @@ data class ReteFiring(
     val matched: ReteAssertion,
     val support: EvidenceCoord,
     val floored: Boolean,
+    val sourceRuleCid: ContentId = rule.ruleCid,
 ) {
     /** Angular identity of the proposed consequent assertion (FNV of subject+predicate). */
     val consequentAngular: Long
@@ -118,7 +119,7 @@ data class ReteFiring(
     /** Stable identity of this rule application against this live assertion. */
     val firingCid: ContentId
         get() = ContentId.of(
-            "${rule.ruleCid.value}|${matched.angular}|$consequentAngular".encodeToByteArray(),
+            "${sourceRuleCid.value}|${matched.angular}|$consequentAngular".encodeToByteArray(),
         )
 
     /** Rule output is dependent derived support, never an independent observation. */
@@ -213,7 +214,7 @@ class CausalityRete(
         val discountedNeg = (rule.evidence.negative * discount).toLong()
         val floored = discountedPos < minSupport && discountedNeg == 0L
         val support = if (floored) EvidenceCoord(minSupport, discountedNeg) else EvidenceCoord(discountedPos, discountedNeg)
-        return ReteFiring(rule.copy(consequent = consequent), matched, support, floored)
+        return ReteFiring(rule.copy(antecedent = matched.subject, consequent = consequent), matched, support, floored, rule.ruleCid)
     }
 
     companion object {

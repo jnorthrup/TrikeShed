@@ -1,6 +1,6 @@
 package borg.trikeshed.module
 
-import borg.trikeshed.couch.CouchDatabase
+import borg.trikeshed.couch.Couch
 import borg.trikeshed.dag.ReteNetwork
 import borg.trikeshed.dag.ReteProductionRegistry
 import borg.trikeshed.graal.ConfixBlackboard
@@ -38,7 +38,7 @@ interface ForgeModule {
  * absent — coherence is garnish, never load-bearing.
  */
 class ModuleContext(
-    val couchDb: CouchDatabase,
+    val couch: Couch,
     val rete: ReteNetwork,
     val productions: ReteProductionRegistry,
     val beliefBag: BeliefBagElement?,

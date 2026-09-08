@@ -19,10 +19,11 @@ from collections import Counter, defaultdict
 from pathlib import Path
 
 from .modules import kotlin_scan as ks
+from .modules.palette_audit import audit as palette_key_audit
 
-# Elements the CCEK assembly scope is known to provide. A `throws`-severity
-# demand for anything outside this set is unsatisfiable under that scope.
-CCEK_ASSEMBLY_PROVIDES = {"MuxReactorElement.Key", "LcncScopeFrame", "Job"}
+# Historical heuristic only. This list is not derived from scope construction
+# and cannot establish service availability, absence, or palette reachability.
+ASSUMED_CCEK_ASSEMBLY_KEYS = {"MuxReactorElement.Key", "LcncScopeFrame", "Job"}
 
 # The plane's package. Files elsewhere that happen to sit in a `ccek/` directory
 # (lcnc/ccek/LcncCcekAssembly.kt) are the LCNC side of the assembly, not the plane.
@@ -139,11 +140,13 @@ def analyse(root: Path, include_tests: bool = False) -> dict:
     contracts: list[dict] = []
     cast_rows: list[dict] = []
     texts: dict[str, str] = {}
+    source_errors: list[dict] = []
 
     for p in _iter_sources(root, include_tests):
         try:
             text = p.read_text(errors="replace")
-        except OSError:
+        except OSError as error:
+            source_errors.append({"path": str(p.relative_to(root)), "reason": str(error)})
             continue
         rel = str(p.relative_to(root))
         texts[rel] = text
@@ -154,7 +157,7 @@ def analyse(root: Path, include_tests: bool = False) -> dict:
             contracts += ks.contracts(text, rel)
 
     hard = [d for d in demands if d["severity"] == "throws"]
-    unsatisfiable = [d for d in hard if d["element_key"] not in CCEK_ASSEMBLY_PROVIDES]
+    outside_assumption = [d for d in hard if d["element_key"] not in ASSUMED_CCEK_ASSEMBLY_KEYS]
     suspicious = [s for s in supervision if s.get("suspicious")]
 
     kind_freq: Counter[str] = Counter()
@@ -163,6 +166,13 @@ def analyse(root: Path, include_tests: bool = False) -> dict:
         kind_freq.update(c["outputKinds"].values())
 
     silent = [c for c in cast_rows if c["on_cast_failure"] in ("silent-empty", "silent-null")]
+    audit_texts = {p: t for p, t in texts.items() if include_tests or not any(
+        part.lower() in ("test", "tests", "testfixtures") or part.endswith("Test")
+        for part in Path(p).parts[:-1]
+    )}
+    palette = palette_key_audit(audit_texts)
+    palette["scope"].update(include_tests=include_tests, source_errors=source_errors)
+    palette["summary"]["gaps"] += len(source_errors)
 
     return {
         "root": str(root),
@@ -170,12 +180,17 @@ def analyse(root: Path, include_tests: bool = False) -> dict:
         "kind_frequency": dict(kind_freq.most_common()),
         "context_demands": demands,
         "hard_demands": hard,
-        "unsatisfiable_under_ccek_assembly": unsatisfiable,
+        "hard_demands_outside_assumed_assembly": outside_assumption,
+        "assembly_assumption": {
+            "keys": sorted(ASSUMED_CCEK_ASSEMBLY_KEYS), "basis": "historical-hardcoded-heuristic",
+            "scope_provision_proven": False, "palette_reachability_proven": False,
+        },
         "supervision": supervision,
         "suspicious_supervision": suspicious,
         "casts": cast_rows,
         "silent_cast_failures": silent,
         "ccek": ccek_decomposition(root, texts),
+        "palette_key_audit": palette,
     }
 
 
@@ -187,7 +202,8 @@ def _report(a: dict) -> None:
     # ── vocabulary ──
     kinds = a["kind_frequency"]
     total = sum(kinds.values())
-    w(f"\nVOCABULARY  {len(a['contracts'])} contracts, {total} kind declarations\n")
+    w(f"\nCONTRACT CONSTRUCTOR SITES  {len(a['contracts'])} sites, {total} kind declarations\n")
+    w("    Includes constructors outside LcncContracts.all(); this is not the palette count.\n")
     for k, n in kinds.items():
         share = 100 * n / total if total else 0
         w(f"    {k:10} {n:4}  {share:5.1f}%\n")
@@ -204,10 +220,11 @@ def _report(a: dict) -> None:
     by_key: dict[str, list[dict]] = defaultdict(list)
     for d in a["hard_demands"]:
         by_key[d["element_key"]].append(d)
-    w(f"\nCONTEXT DEMANDS  {len(a['hard_demands'])} hard (node cannot run if absent)\n")
+    w(f"\nCONTEXT DEMANDS  {len(a['hard_demands'])} lexical hard reads (throw if executed without key)\n")
+    w("    Historical assumed-key comparison only; scope supply and node reachability are unproven.\n")
     for key in sorted(by_key, key=lambda k: -len(by_key[k])):
-        ok = key in CCEK_ASSEMBLY_PROVIDES
-        mark = "provided" if ok else "NOT PROVIDED by the CCEK assembly scope"
+        ok = key in ASSUMED_CCEK_ASSEMBLY_KEYS
+        mark = "in assumed key list" if ok else "outside assumed key list"
         w(f"    {key:26} {len(by_key[key]):2} sites   [{mark}]\n")
         if not ok:
             for d in sorted(by_key[key], key=lambda d: d["path"]):
@@ -266,7 +283,40 @@ def _report(a: dict) -> None:
         f"    → {len(c['gaps'])} GAP(s): public capability with no LCNC lego and no ruling.\n"
         f"      A ruling lives in CCEK_RULINGS with its reason; a lego is a contract + runner.\n"
     )
+    _palette_report(a["palette_key_audit"])
     w("\n")
+
+
+def _palette_report(a: dict) -> None:
+    w = sys.stdout.write
+    summary = a["summary"]
+    palette = a["palette"]
+    w(f"\nPALETTE KEY CORRESPONDENCE  {palette['entry_count']} entries in LcncContracts.all(), "
+      f"{palette['unique_type_count']} unique resolved types\n")
+    w(f"    Mapping: {summary['mapping_status']}; {summary['gaps']} correspondence gap(s)\n")
+    w(f"    Invocation executor: {a['executor']['status']} (lexical evidence; not runtime verified)\n")
+    w(f"    Service requirements: {summary['unresolved_service_requirements']} invocation rows unresolved; "
+      "invocation keys do not prove service fulfillment.\n")
+    w(f"    All-package inventory: {sum(k['singleton'] for k in a['keys'])} singleton keys, "
+      f"{len(a['construction_sites'])} construction sites, {len(a['installation_sites'])} context-call candidates, "
+      f"{len(a['demand_sites'])} read sites\n")
+    for row in a["rows"]:
+        structural = row["structural_exception"] or row["scope_construction"]
+        if structural:
+            w(f"    {row['type']}: {structural['role']} / {structural['key_expression']} "
+              f"({structural['path']}:{structural['line']})\n")
+            if structural["exception"]:
+                w(f"        {structural['exception']}\n")
+        if row["gap"]:
+            w(f"    GAP {row['type'] or row['type_expression']}: mapping={row['invocation_mapping']}, "
+              f"executor={row['executor_construction']}, metadata={row['context_metadata']} "
+              f"({row['path']}:{row['line']})\n")
+    for issue in palette["issues"] + a["scope"].get("source_errors", []):
+        w(f"    UNRESOLVED {issue}\n")
+    for key in a["extra_invocation_keys"] + a["unresolved_invocation_keys"]:
+        w(f"    UNRESOLVED KEY {key['qualified']} ({key['path']}:{key['line']})\n")
+    if palette["duplicate_types"]:
+        w(f"    DUPLICATE TYPES {palette['duplicate_types']}\n")
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -277,8 +327,13 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument(
         "--fail-on-suspicious",
         action="store_true",
-        help="exit non-zero when a suspicious supervision site or an unsatisfiable "
-        "context demand is found — for use as a CI gate",
+        help="historical heuristic gate: suspicious supervision or a hard read "
+        "outside the assumed assembly key list; not a scope-supply proof",
+    )
+    ap.add_argument(
+        "--fail-on-palette-key-gap", action="store_true",
+        help="exit non-zero for missing/unresolved palette key correspondence, "
+        "metadata, or invocation executor source evidence; independent of --fail-on-ccek-gap",
     )
     ap.add_argument(
         "--fail-on-ccek-gap",
@@ -301,9 +356,11 @@ def main(argv: list[str] | None = None) -> int:
 
     bad = 0
     if args.fail_on_suspicious:
-        bad += len(a["suspicious_supervision"]) + len(a["unsatisfiable_under_ccek_assembly"])
+        bad += len(a["suspicious_supervision"]) + len(a["hard_demands_outside_assumed_assembly"])
     if args.fail_on_ccek_gap:
         bad += len(a["ccek"]["gaps"])
+    if args.fail_on_palette_key_gap:
+        bad += a["palette_key_audit"]["summary"]["gaps"]
     return 1 if bad else 0
 
 

@@ -1,6 +1,6 @@
 package borg.trikeshed.forge.server
 
-import borg.trikeshed.couch.CouchDatabase
+import borg.trikeshed.couch.Couch
 import borg.trikeshed.cursor.ClassfileTaxonomy
 import borg.trikeshed.job.ContentId
 import borg.trikeshed.util.oroboros.WorktreeCouchGateway
@@ -14,7 +14,7 @@ import borg.trikeshed.util.oroboros.WorktreeCouchGateway
  * introspect right now.
  */
 class ClasspathSourceProjection(
-    private val database: CouchDatabase,
+    private val database: Couch,
     private val classLoader: ClassLoader = ClasspathSourceProjection::class.java.classLoader,
 ) {
     fun project(requestedSourceId: String): Map<String, Any?> {

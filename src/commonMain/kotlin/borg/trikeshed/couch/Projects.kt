@@ -1,7 +1,7 @@
 package borg.trikeshed.couch
 
 /**
- * Projects — the heading entity over one [CouchDatabase].
+ * Projects — the heading entity over one [Couch].
  *
  * Spec C7 recorded "no `Project` entity": documents were already namespaced under
  * `projects/<id>/…` by the worktree gateway and the memory bridge, but nothing declared a project,
@@ -13,7 +13,7 @@ package borg.trikeshed.couch
  * anything else; a project arriving on a peer brings its heading with it. Content documents are not
  * moved or rewritten — [ProjectPath] reads the layout that is already there.
  */
-class Projects(private val db: CouchDatabase) {
+class Projects(private val db: Couch) {
 
     /** Declare or update a project's manifest. Extra [fields] are kept as the Confix body. */
     fun put(id: String, fields: Map<String, Any?> = emptyMap()): Map<String, Any?> {

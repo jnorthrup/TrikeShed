@@ -22,7 +22,10 @@ import borg.trikeshed.userspace.nio.file.spi.FileOperations
 import borg.trikeshed.userspace.nio.spi.NioSupervisor
 import borg.trikeshed.userspace.reactor.MuxReactorElement
 import kotlin.coroutines.CoroutineContext
+import kotlin.coroutines.AbstractCoroutineContextElement
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.launch
@@ -52,7 +55,7 @@ data class CcekSeams(
     /** Agent status events seen so far (Started / Completed / Failed). */
     val status: (handle: String) -> List<Map<String, Any?>>,
     /** Graceful cancel + drain; the node stays addressable, inert. */
-    val drain: (handle: String) -> Boolean,
+    val drain: suspend (handle: String) -> Boolean,
     /** Fork a user context (parent null ⇒ a root context); returns its document. */
     val forkContext: (parent: String?, role: String) -> Map<String, Any?>,
     /** Assert one causal fact into a context; returns the new fact count. */
@@ -82,8 +85,10 @@ data class CcekSeams(
     val facet: (contextId: String, column: String, value: String) -> List<Map<String, Any?>>?,
     /** [UserContext.adaptParadigm]: rules land as facts; `name`, `active`, `rows`, `factCount`. */
     val adapt: (contextId: String, paradigm: MetaLcncParadigm) -> Map<String, Any?>?,
-) {
-    companion object {
+    val nodeElement: (handle: String) -> ArticulatedNode? = { null },
+    val contextElement: (contextId: String) -> UserContext? = { null },
+) : AbstractCoroutineContextElement(Key) {
+    companion object Key : CoroutineContext.Key<CcekSeams> {
 
         /**
          * The real plane. Every handle is a live [ArticulatedNode] under [scope]
@@ -217,7 +222,7 @@ data class CcekSeams(
                         log.toList()
                     }
                 },
-                drain = { handle -> nodes[handle]?.let { it.cancel(); true } ?: false },
+                drain = { handle -> nodes[handle]?.let { it.drain(); true } ?: false },
                 forkContext = { parent, role ->
                     val child = parent?.let { contexts[it] }?.fork(role) ?: newContext(role)
                     contexts[child.id] = child
@@ -236,6 +241,8 @@ data class CcekSeams(
                             "active" to node.isActive,
                             "childScopes" to node.childScopeCount,
                             "markdownProjections" to node.markdownProjectionCount,
+                            "lifecycle" to node.lifecycleState.name,
+                            "subscribers" to node.agentCount,
                         )
                     }
                 },
@@ -295,6 +302,8 @@ data class CcekSeams(
                 facet = { contextId, column, value ->
                     contexts[contextId]?.spreadsheetVeneer()?.facet(column, value)?.map(::assertion)
                 },
+                nodeElement = { nodes[it] },
+                contextElement = { contexts[it] },
                 adapt = { contextId, paradigm ->
                     contexts[contextId]?.let { ctx ->
                         val adapted = ctx.adaptParadigm(paradigm)
@@ -525,9 +534,23 @@ object CcekNodes {
         "NioSupervisor" to NioSupervisor.Key,
         "LcncScopeFrame" to LcncScopeFrame.Key,
         "CcekKeyService" to CcekKeyService.Key,
-    )
+        "ArticulatedNode" to ArticulatedNode.Key,
+        "UserContext" to UserContext.Key,
+        "CcekSeams" to CcekSeams.Key,
+        "BoardStoreElement" to borg.trikeshed.kanban.BoardStoreElement.Key,
+        "BeliefBagElement" to borg.trikeshed.narsese.BeliefBagElement.Key,
+        "TurnReviewElement" to borg.trikeshed.narsese.TurnReviewElement.Key,
+        "CausalityReteElement" to borg.trikeshed.narsese.CausalityReteElement.Key,
+        "LcncConsumedLedger" to LcncConsumedLedger.Key,
+        "ProjectCorpusKey" to ProjectCorpusKey,
+        "PromptReadsKey" to PromptReadsKey,
+        "AgentRunsKey" to AgentRunsKey,
+        "AgentRunIdKey" to AgentRunIdKey,
+        "RequestFactoryProxyKey" to RequestFactoryProxyKey,
+        "SurfaceCallKey" to SurfaceCallKey,
+    ) + LcncNodeKey.entries.associate { "LcncNodeKey.${it.name}" to it }
 
-    private fun keyName(key: CoroutineContext.Key<*>): String =
+    fun keyName(key: CoroutineContext.Key<*>): String =
         CONTEXT_KEYS.entries.firstOrNull { it.value === key }?.key ?: key.toString()
 
     private fun Map<String, Any?>.port(name: String): Any? = this[name] ?: this["$name?"]
@@ -552,11 +575,20 @@ object CcekNodes {
         "continue", "repeat", "abort", "fork", "join", "vote",
     )
 
-    fun registry(seams: CcekSeams): Map<String, LcncNodeRunner> = mapOf(
+    fun registry(defaults: CcekSeams): Map<String, LcncNodeRunner> {
+        fun runner(body: suspend (CcekSeams, LcncNode, Map<String, Any?>) -> Map<String, Any?>) =
+            boundLcnc(defaults) { seams, node, inputs ->
+                var context: CoroutineContext = seams
+                val handle = inputs.port("handle")?.toString() ?: node.params["handle"].orEmpty()
+                seams.nodeElement(handle)?.let { context += it }
+                seams.contextElement(contextIdOf(node, inputs))?.let { context += it }
+                withContext(context) { body(seams, node, inputs) }
+            }
+        return mapOf(
 
         // Idempotent by title: the sweep re-runs this node every tick and a
         // fresh ArticulatedNode per tick would discard agents and recordings.
-        "ccek.incarnate" to LcncNodeRunner { node, inputs ->
+        "ccek.incarnate" to runner { seams, node, inputs ->
             val resolved = CcekConstruction.resolve(node.params, inputs)
             val c = resolved.configuration
             val handle = seams.incarnate(c.title, c.record, c.maxConcurrency, c.projections)
@@ -565,7 +597,7 @@ object CcekNodes {
 
         // Every ForgeSignal case, constructible from params or wired `fields`.
         // A wired map wins over params, field by field.
-        "ccek.signal" to LcncNodeRunner { node, inputs ->
+        "ccek.signal" to runner { seams, node, inputs ->
             val handle = (inputs["handle"] ?: inputs["handle?"])?.toString()
                 ?: node.params["handle"].orEmpty()
             require(handle.isNotBlank()) { "ccek.signal ${node.id}: no handle wired" }
@@ -610,7 +642,7 @@ object CcekNodes {
             )
         },
 
-        "ccek.projection" to LcncNodeRunner { node, inputs ->
+        "ccek.projection" to runner { seams, node, inputs ->
             val handle = (inputs["handle"] ?: inputs["handle?"])?.toString()
                 ?: node.params["handle"].orEmpty()
             val kind = node.params["kind"] ?: "markdown"
@@ -618,7 +650,7 @@ object CcekNodes {
         },
 
         // Replay: the signal log CCEK recorded, as the program's own data.
-        "ccek.recording" to LcncNodeRunner { node, inputs ->
+        "ccek.recording" to runner { seams, node, inputs ->
             val handle = (inputs["handle"] ?: inputs["handle?"])?.toString()
                 ?: node.params["handle"].orEmpty()
             val signals = seams.recording(handle)
@@ -630,7 +662,7 @@ object CcekNodes {
 
         // An LCNC program hosting a CCEK agent: this node IS a subscriber on the
         // node's bounded fan-out, and each run drains what the fan-out delivered.
-        "ccek.agent" to LcncNodeRunner { node, inputs ->
+        "ccek.agent" to runner { seams, node, inputs ->
             val handle = (inputs["handle"] ?: inputs["handle?"])?.toString()
                 ?: node.params["handle"].orEmpty()
             val name = node.params["name"]?.takeIf { it.isNotBlank() } ?: node.id
@@ -642,7 +674,7 @@ object CcekNodes {
             )
         },
 
-        "ccek.status" to LcncNodeRunner { node, inputs ->
+        "ccek.status" to runner { seams, node, inputs ->
             val handle = (inputs["handle"] ?: inputs["handle?"])?.toString()
                 ?: node.params["handle"].orEmpty()
             val events = seams.status(handle)
@@ -654,7 +686,7 @@ object CcekNodes {
             )
         },
 
-        "ccek.drain" to LcncNodeRunner { node, inputs ->
+        "ccek.drain" to runner { seams, node, inputs ->
             val handle = (inputs["handle"] ?: inputs["handle?"])?.toString()
                 ?: node.params["handle"].orEmpty()
             mapOf("drained" to seams.drain(handle))
@@ -662,7 +694,7 @@ object CcekNodes {
 
         // Context lineage: fork a UserContext (parent wins over param), the
         // document out — id, name, parentId, factCount.
-        "ccek.context" to LcncNodeRunner { node, inputs ->
+        "ccek.context" to runner { seams, node, inputs ->
             val parent = ((inputs["parent"] ?: inputs["parent?"])?.toString()
                 ?: node.params["parent"]).orEmpty().takeIf { it.isNotBlank() }
             val role = node.params["role"]?.takeIf { it.isNotBlank() } ?: "root"
@@ -670,7 +702,7 @@ object CcekNodes {
             mapOf("context" to doc, "contextId" to (doc["id"]?.toString() ?: ""))
         },
 
-        "ccek.fact" to LcncNodeRunner { node, inputs ->
+        "ccek.fact" to runner { seams, node, inputs ->
             val contextId = (inputs["contextId"] ?: inputs["contextId?"])?.toString()
                 ?: node.params["contextId"].orEmpty()
             val kind = node.params["kind"]?.takeIf { it.isNotBlank() } ?: "observation"
@@ -686,28 +718,28 @@ object CcekNodes {
 
         // ── the rest of the engine ─────────────────────────────────────
 
-        "ccek.vitals" to LcncNodeRunner { node, inputs ->
+        "ccek.vitals" to runner { seams, node, inputs ->
             val handle = inputs.port("handle")?.toString() ?: node.params["handle"].orEmpty()
             seams.vitals(handle) ?: mapOf("active" to false, "childScopes" to 0, "markdownProjections" to 0)
         },
 
         // Idempotent by title, like incarnate; the handle is the same handle space,
         // so every other ccek.* node can drive the choreographed node.
-        "ccek.choreograph" to LcncNodeRunner { node, inputs ->
+        "ccek.choreograph" to runner { seams, node, inputs ->
             val title = inputs.port("title")?.toString()?.takeIf { it.isNotBlank() }
                 ?: node.params["title"]?.takeIf { it.isNotBlank() } ?: node.id
             val handle = seams.choreograph(contextIdOf(node, inputs), title)
             mapOf("handle" to (handle ?: ""), "bound" to (handle != null))
         },
 
-        "ccek.activate" to LcncNodeRunner { node, inputs ->
+        "ccek.activate" to runner { seams, node, inputs ->
             val mode = node.params["mode"]?.takeIf { it.isNotBlank() } ?: "activate"
             require(mode == "activate" || mode == "deactivate") { "ccek.activate ${node.id}: mode must be activate|deactivate, not '$mode'" }
             val active = seams.activate(contextIdOf(node, inputs), mode == "activate")
             mapOf("active" to (active ?: false), "known" to (active != null))
         },
 
-        "ccek.lineage" to LcncNodeRunner { node, inputs ->
+        "ccek.lineage" to runner { seams, node, inputs ->
             val doc = seams.lineage(contextIdOf(node, inputs))
             mapOf(
                 "context" to doc,
@@ -717,35 +749,35 @@ object CcekNodes {
             )
         },
 
-        "ccek.query" to LcncNodeRunner { node, inputs ->
+        "ccek.query" to runner { seams, node, inputs ->
             val kind = node.params["kind"]?.takeIf { it.isNotBlank() } ?: "observation"
             val facts = seams.query(contextIdOf(node, inputs), kind) ?: emptyList()
             mapOf("facts" to facts, "count" to facts.size, "contains" to facts.isNotEmpty())
         },
 
-        "ccek.polyglot.load" to LcncNodeRunner { node, inputs ->
+        "ccek.polyglot.load" to runner { seams, node, inputs ->
             val facts = rows(inputs.port("facts")).map { r -> PolyglotFact(str(r, "language"), str(r, "opcode"), str(r, "target"), str(r, "kind")) }
             mapOf("loaded" to seams.loadPolyglot(contextIdOf(node, inputs), facts))
         },
 
-        "ccek.polyglot.query" to LcncNodeRunner { node, inputs ->
+        "ccek.polyglot.query" to runner { seams, node, inputs ->
             val facts = seams.queryPolyglot(contextIdOf(node, inputs), node.params["language"].orEmpty(), node.params["kind"].orEmpty()) ?: emptyList()
             mapOf("facts" to facts, "count" to facts.size)
         },
 
-        "ccek.predict" to LcncNodeRunner { node, inputs ->
+        "ccek.predict" to runner { seams, node, inputs ->
             val model = node.params["model"]?.takeIf { it.isNotBlank() } ?: "default"
             val args: Map<String, Any> = obj(inputs.port("inputs")).mapNotNull { (k, v) -> v?.let { k to it } }.toMap()
             mapOf("prediction" to (seams.predict(contextIdOf(node, inputs), model, args) ?: emptyMap<String, Any?>()))
         },
 
-        "ccek.table.test" to LcncNodeRunner { node, inputs ->
+        "ccek.table.test" to runner { seams, node, inputs ->
             val prediction: Map<String, Any> = obj(inputs.port("prediction")).mapNotNull { (k, v) -> v?.let { k to it } }.toMap()
             val result = seams.tableTest(contextIdOf(node, inputs), prediction)
             mapOf("passed" to (result?.get("passed") == true), "evidence" to (result?.get("evidence")?.toString() ?: "unknown context"))
         },
 
-        "ccek.flow" to LcncNodeRunner { node, inputs ->
+        "ccek.flow" to runner { seams, node, inputs ->
             val name = node.params["name"]?.takeIf { it.isNotBlank() } ?: "flow"
             val blocks = rows(inputs.port("blocks")).map { r ->
                 GraphicalBlock(str(r, "id"), str(r, "label"), obj(r["properties"]).mapValues { it.value.toString() })
@@ -755,12 +787,12 @@ object CcekNodes {
             mapOf("flow" to flow, "size" to ((flow?.get("size") as? Int) ?: 0))
         },
 
-        "ccek.veneer" to LcncNodeRunner { node, inputs ->
+        "ccek.veneer" to runner { seams, node, inputs ->
             val rows = seams.facet(contextIdOf(node, inputs), node.params["column"].orEmpty(), node.params["value"].orEmpty()) ?: emptyList()
             mapOf("rows" to rows, "count" to rows.size)
         },
 
-        "ccek.paradigm" to LcncNodeRunner { node, inputs ->
+        "ccek.paradigm" to runner { seams, node, inputs ->
             val name = node.params["name"]?.takeIf { it.isNotBlank() } ?: "paradigm"
             val rules = rows(inputs.port("rules")).map { r -> LcncRule(str(r, "name"), str(r, "expression")) }
             val adapted = seams.adapt(contextIdOf(node, inputs), MetaLcncParadigm(name, rules))
@@ -773,7 +805,7 @@ object CcekNodes {
         // requireCcekScope, read for its facts rather than its throw: the runner asks
         // for NO keys (so the call reports what is there) and does the same identity
         // set-difference the validator does for the keys the program named.
-        "ccek.validate" to LcncNodeRunner { node, _ ->
+        "ccek.validate" to runner { _, node, _ ->
             val names = csv(node.params["requiredKeys"])
             val required = names.map { name ->
                 CONTEXT_KEYS[name] ?: throw IllegalArgumentException(
@@ -784,7 +816,7 @@ object CcekNodes {
             val validation = try {
                 requireCcekScope()
             } catch (e: IllegalStateException) {
-                return@LcncNodeRunner mapOf(
+                return@runner mapOf(
                     "valid" to false, "providedKeys" to emptyList<String>(), "missingKeys" to names,
                     "providedSpis" to emptyList<String>(), "missingSpis" to spis,
                     "error" to (e.message ?: "no CCEK scope"),
@@ -802,6 +834,7 @@ object CcekNodes {
             )
         },
     )
+    }
 
     /** The full contract: which node types the CCEK registry serves. */
     fun servedTypes(): Set<String> = setOf(

@@ -28,7 +28,7 @@ import kotlin.coroutines.CoroutineContext
  * decision is logged on every rebuild and never silently overridden.
  */
 class IncrementalViewElement(
-    private val db: CouchDatabase,
+    private val db: Couch,
     val definition: ViewDefinition,
     private val log: (String) -> Unit = {},
     parentJob: Job? = null,

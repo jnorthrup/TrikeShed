@@ -6,6 +6,7 @@ import borg.trikeshed.job.CasStore
 import borg.trikeshed.job.ContentId
 import borg.trikeshed.kif.KifKnowledgeBase
 import borg.trikeshed.lcnc.LcncNodeRunner
+import borg.trikeshed.lcnc.boundLcnc
 import borg.trikeshed.rdf.RdfGraph
 import borg.trikeshed.rdf.TurtleRdf
 
@@ -33,7 +34,7 @@ object StateNodes {
         kif: KifKnowledgeBase,
         graph: () -> RdfGraph,  // lazy: graph may be mutated between ticks
         cas: CasStore,
-    ): LcncNodeRunner = LcncNodeRunner { _, _ ->
+    ): LcncNodeRunner = boundLcnc(bag) { bag, _, _ ->
         // 1. Bag snapshot: COW map of angular → signal
         val bagSnap = bag.snapshot()
         val bagJson = buildString {
@@ -90,12 +91,12 @@ object StateNodes {
         bag: BeliefBagElement,
         cas: CasStore,
         kif: KifKnowledgeBase,
-    ): LcncNodeRunner = LcncNodeRunner { node, _ ->
+    ): LcncNodeRunner = boundLcnc(bag) { bag, node, _ ->
         val cidStr = (node.params["cid"]
             ?: (node.params["snapshotCid"] ?: ""))
         require(cidStr.isNotEmpty()) { "state.thaw requires a cid param" }
         val receiptBytes = cas.get(ContentId(cidStr))
-            ?: return@LcncNodeRunner mapOf("restored" to mapOf("error" to "CID not found in CAS"))
+            ?: return@boundLcnc mapOf("restored" to mapOf("error" to "CID not found in CAS"))
         val receipt = receiptBytes.decodeToString()
 
         // Parse the freeze receipt to get component CIDs

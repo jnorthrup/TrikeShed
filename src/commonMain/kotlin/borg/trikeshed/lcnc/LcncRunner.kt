@@ -25,7 +25,16 @@ import kotlinx.coroutines.withContext
  * ArticulatedNode's bounded fan-out (Phase 1).
  */
 fun interface LcncNodeRunner {
-    suspend fun run(node: LcncNode, inputs: Map<String, Any?>): Map<String, Any?>
+    suspend fun execute(node: LcncNode, inputs: Map<String, Any?>): Map<String, Any?>
+
+    suspend fun run(node: LcncNode, inputs: Map<String, Any?>): Map<String, Any?> {
+        val key = LcncNodeKey.of(node.type)
+        check(LcncContracts.find(node.type) == null || key != null) {
+            "${node.type}: palette contract has no invocation key"
+        }
+        return if (key == null) execute(node, inputs)
+            else key.construct(node, inputs, this, currentCoroutineContext().job).execute()
+    }
 }
 
 class LcncUnknownNodeType(val type: String) : Exception("no runner registered for node type '$type'")

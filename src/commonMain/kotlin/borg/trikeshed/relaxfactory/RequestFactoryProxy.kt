@@ -2,7 +2,7 @@
 
 package borg.trikeshed.relaxfactory
 
-import borg.trikeshed.couch.CouchDatabase
+import borg.trikeshed.couch.Couch
 import borg.trikeshed.couch.ViewServer
 import borg.trikeshed.couch.replicate.CouchReplicator
 import borg.trikeshed.couch.replicate.HttpExchange
@@ -40,7 +40,7 @@ fun interface RelaxTransport {
             RelaxTransport { envelope -> factory.processRequest(envelope) }
 
         /** Server-side state, spelled from the database — the daemon's own binding. */
-        fun local(db: CouchDatabase, replicator: borg.trikeshed.couch.replicate.CouchReplicator? = null): RelaxTransport =
+        fun local(db: Couch, replicator: borg.trikeshed.couch.replicate.CouchReplicator? = null): RelaxTransport =
             local(CouchRequestFactory.forDatabase(db, replicator))
 
         /**
@@ -196,11 +196,11 @@ class RelaxReceipt(val fields: Map<String, Any?>) {
 
     @Suppress("UNCHECKED_CAST")
     val rows: List<Map<String, Any?>>
-        get() = CouchDatabase.asList(fields["rows"])?.mapNotNull { it as? Map<String, Any?> } ?: emptyList()
+        get() = Couch.asList(fields["rows"])?.mapNotNull { it as? Map<String, Any?> } ?: emptyList()
 
     @Suppress("UNCHECKED_CAST")
     val results: List<Map<String, Any?>>
-        get() = CouchDatabase.asList(fields["results"])?.mapNotNull { it as? Map<String, Any?> } ?: emptyList()
+        get() = Couch.asList(fields["results"])?.mapNotNull { it as? Map<String, Any?> } ?: emptyList()
 
     /** The map-reduce proof of a `query` — the receipt anyone can replay. */
     val proofCid: String? get() = fields["proofCid"] as? String
@@ -261,7 +261,7 @@ class RequestFactoryProxy(private val transport: RelaxTransport) {
         val reply = runCatching { JsonSupport.parse(transport.exchange(envelope)) }.getOrNull() as? Map<*, *>
             ?: return RelaxBatch(false, listOf(RelaxReceipt(mapOf("ok" to false, "error" to "parse", "reason" to "unreadable reply"))))
         @Suppress("UNCHECKED_CAST")
-        val receipts = CouchDatabase.asList(reply["receipts"])
+        val receipts = Couch.asList(reply["receipts"])
             ?.mapNotNull { (it as? Map<String, Any?>)?.let(::RelaxReceipt) }
             ?: emptyList()
         return RelaxBatch(reply["ok"] == true, receipts)
@@ -341,7 +341,7 @@ class RequestFactoryServerProxy(
     ): CouchRequestFactory = CouchRequestFactory(store, viewServer, targets)
 
     fun bind(
-        db: CouchDatabase,
+        db: Couch,
         replicator: CouchReplicator? = null,
         viewServer: ViewServer = ViewServer(),
     ): CouchRequestFactory = CouchRequestFactory(RelaxStore.of(db, replicator), viewServer, targets)

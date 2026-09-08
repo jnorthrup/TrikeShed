@@ -3,6 +3,8 @@ package borg.trikeshed.lcnc
 import keymux.CouchKeyStore
 import keymux.KeyMux
 import modelmux.ModelMux
+import modelmux.MuxCallContext
+import modelmux.MuxCallRecord
 import modelmux.acp.AcpMessage
 import modelmux.acp.providerTag
 import borg.trikeshed.lib.ByteSeries
@@ -12,15 +14,14 @@ import borg.trikeshed.lib.j
 import borg.trikeshed.lib.size
 import borg.trikeshed.lib.toSeries
 import borg.trikeshed.parse.json.JsonSupport
-import borg.trikeshed.htx.HtxElement
 import borg.trikeshed.htx.HtxKey
 import borg.trikeshed.htx.HtxMethod
 import borg.trikeshed.htx.HtxHeader
 import borg.trikeshed.htx.parseHtxRequest
 import borg.trikeshed.htx.htxHeaders
+import borg.trikeshed.userspace.reactor.MuxReactorElement
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.withContext
-import kotlin.coroutines.CoroutineContext
 
 /**
  * BrainMuxNodes — BrainClient decomposed as LCNC graph nodes.
@@ -46,31 +47,23 @@ object BrainMuxNodes {
          */
         modelMuxProvider: (suspend () -> ModelMux?)? = null,
         credStore: CouchKeyStore? = null,
-        /**
-         * Coroutine context the chat rides under. MUST carry [HtxElement] under
-         * [HtxKey] and the MuxReactorElement — [ModelMux.chat] resolves the HTX
-         * client and the reactor (receipt/cache/lease metering) from the caller's
-         * context. The CCEK assembly scope rides the reactor but NOT the HTX
-         * element, so without this the ModelMux path threw
-         * "No HtxKey found in coroutine context" on every call.
-         */
-        chatContext: CoroutineContext? = null,
-    ): Map<String, LcncNodeRunner> = registryWith({ modelMuxProvider?.invoke() ?: modelMux }, keyMux, credStore, chatContext)
+    ): Map<String, LcncNodeRunner> = registryWith({
+        currentCoroutineContext()[MuxReactorElement]?.modelMux()
+            ?: modelMuxProvider?.invoke() ?: modelMux
+    }, keyMux, credStore)
 
     private fun registryWith(
         mux: suspend () -> ModelMux?,
         keyMux: KeyMux?,
         credStore: CouchKeyStore?,
-        chatContext: CoroutineContext?,
     ): Map<String, LcncNodeRunner> = mapOf(
 
         // ── keys.status ─────────────────────────────────────────────
         // Queries the daemon's KeyMux for each HarnessRegistry provider.
         // Returns a roster: [{provider, keyPresent, baseUrl}].
-        // NOTE: KeyMux.get() is suspend and must run in the caller's
-        // coroutine context — wrapping in withContext(Dispatchers.Default)
-        // drops MuxReactorElement, defeating lease/quota tracking.
+        // KeyMux.get() resolves its source elements from the inherited context.
         "keys.status" to LcncNodeRunner { _, _ ->
+            val keyMux = currentCoroutineContext()[MuxReactorElement]?.keyMux() ?: keyMux
             if (keyMux == null) return@LcncNodeRunner mapOf("roster" to emptyList<Any>())
             val roster = ArrayList<Map<String, Any?>>()
             for (i in 0 until keymux.HarnessRegistry.providers.size) {
@@ -108,6 +101,7 @@ object BrainMuxNodes {
             for (i in 0 until cards.size) {
                 val card = cards[i] // AcpModelCard = Join<String, Join<Series<AcpCapability>, AcpMeta>>
                 val id = card.a
+                if (modelMux.modelKeyId(id) == null) continue
                 val capsList = ArrayList<String>()
                 val caps = card.b.a
                 for (c in 0 until caps.size) capsList += caps[c]
@@ -178,12 +172,10 @@ object BrainMuxNodes {
                     "at" to sel.at,
                 )
             }
-            // Standings live in the MuxReactor; without its context the roster
-            // is unknowable and the list is empty. Ride chatContext like chat does.
+            // Standings resolve the inherited MuxReactorElement.
             val standings = runCatching {
                 val now = kotlinx.datetime.Clock.System.now().toEpochMilliseconds()
-                if (chatContext != null) withContext(chatContext) { modelMux.quotaStandings(now) }
-                else modelMux.quotaStandings(now)
+                modelMux.quotaStandings(now)
             }.getOrDefault(emptyList())
             meta["quota"] = standings.map { s ->
                 linkedMapOf<String, Any?>(
@@ -237,11 +229,15 @@ object BrainMuxNodes {
 
             var model = node.params["model"] ?: ""
             if (model.isBlank()) {
-                // Ensure using last hermes model as a crutch example for keymux and modelmux to hit the ground running
-                val firstCardId = modelMux?.listModels()?.let { if (it.size > 0) it[0].a else null }
-                model = modelMux?.lastReceipt?.modelId?.takeIf { it.isNotBlank() }
-                    ?: firstCardId?.takeIf { it.isNotBlank() }
-                    ?: "nousresearch/hermes-3-llama-3.1-405b"
+                // The live router owns the default; a previous explicit call does not.
+                val candidates = modelMux?.route("chat", "chat")?.a
+                if (candidates != null) for (i in 0 until candidates.size) {
+                    val id = candidates[i].a
+                    if (modelMux.modelKeyId(id) != null) {
+                        model = id
+                        break
+                    }
+                }
             }
 
             // Prefill sentinel: the env-first default — resolve through the
@@ -268,47 +264,72 @@ object BrainMuxNodes {
                 )
             }
 
+            if (model.isBlank()) {
+                return@LcncNodeRunner mapOf(
+                    "content" to "", "model" to "", "ok" to false,
+                    "error" to "no model configured in the live catalog or node",
+                )
+            }
+
 
             val maxTokens = (node.params["maxTokens"] ?: "256").toIntOrNull() ?: 256
             val temperature = (node.params["temperature"] ?: "0.2").toDoubleOrNull() ?: 0.2
 
             // Primary path: route through ModelMux when available —
-            // receipt-tracked, quota-metered, cache-backed. Rides [chatContext]
-            // because ModelMux.chat resolves HtxKey + MuxReactorElement from the
-            // caller's context, and the CCEK assembly scope lacks HtxKey.
+            // receipt-tracked, quota-metered, cache-backed. HtxKey and
+            // MuxReactorElement resolve from the inherited coroutine context.
             if (modelMux != null) {
                 val acpMessages: Series<AcpMessage> = 1 j { _: Int -> "user" j prompt }
                 // Delta 2026-09-05 (receipt timing): wall clock around the mux call, measured
                 // HERE — not read back from lastReceipt, which a cache hit or a failed call
                 // may leave stale or absent. The kanban claim receipt copies it as-is.
                 val startedAtMs = kotlinx.datetime.Clock.System.now().toEpochMilliseconds()
+                val parentAttribution = currentCoroutineContext()[MuxCallContext]
+                val frame = currentCoroutineContext()[LcncScopeFrame]
+                var attributed: MuxCallRecord? = null
+                val attribution = MuxCallContext(
+                    conversationId = parentAttribution?.conversationId,
+                    turnId = parentAttribution?.turnId,
+                    activity = parentAttribution?.activity,
+                    onFinished = { record ->
+                        attributed = record
+                        parentAttribution?.onFinished?.invoke(record)
+                    },
+                )
                 val result = try {
-                    val chatCt = chatContext ?: currentCoroutineContext()
-                    withContext(chatCt) {
-                        modelMux.chat(
+                    withContext(attribution) {
+                        Result.success(modelMux.chat(
                             modelId = model,
                             messages = acpMessages,
                             maxTokens = maxTokens,
                             temperature = temperature,
-                            // Stamped on the mux receipt's assessmentId slot, so THIS call's
-                            // receipt can be told from a concurrent call's below.
                             contextId = node.id,
-                        ).getOrThrow()
-                    }.let { Result.success(it) }
+                        ).getOrThrow())
+                    }
                 } catch (t: kotlinx.coroutines.CancellationException) {
                     throw t
                 } catch (t: Throwable) {
                     Result.failure(t)
                 }
                 val latencyMs = kotlinx.datetime.Clock.System.now().toEpochMilliseconds() - startedAtMs
-                // `lastReceipt` is ONE var on the mux, overwritten by every call's finally;
-                // under concurrent claims it can be another call's. Only a receipt stamped
-                // with this node's id is this call's: `cachedHit` is reported from it, and
-                // omitted (not guessed false) when the receipt cannot be attributed.
-                val attributed = modelMux.lastReceipt?.takeIf { it.assessmentId == node.id }
+                // The callback belongs to this invocation, including repeated node ids.
                 val cachedHitKnown: Boolean? = attributed?.cachedHit
                 val cachedHit = cachedHitKnown == true
-                val cachedHitEntry: Map<String, Any?> = if (cachedHitKnown != null) mapOf("cachedHit" to cachedHitKnown) else emptyMap()
+                val receiptOutput: Map<String, Any?> = attributed?.let { record ->
+                    mapOf("cachedHit" to record.cachedHit, "receipt" to linkedMapOf(
+                        "id" to record.id, "conversationId" to record.conversationId, "turnId" to record.turnId,
+                        "scopeCid" to frame?.chain?.cid?.value, "node" to node.id,
+                        "model" to record.model, "provider" to record.provider, "keyId" to record.keyId,
+                        "status" to record.status, "httpStatus" to record.httpStatus,
+                        "startedAt" to record.startedAt, "endedAt" to record.endedAt,
+                        "cachedHit" to record.cachedHit, "error" to record.error,
+                        "inputTokens" to record.takeIf { it.status == "completed" }?.inputTokens,
+                        "outputTokens" to record.takeIf { it.status == "completed" }?.outputTokens,
+                        "cacheReadTokens" to record.takeIf { it.status == "completed" }?.cacheReadTokens,
+                        "cacheWriteTokens" to record.takeIf { it.status == "completed" }?.cacheWriteTokens,
+                        "maxTokens" to maxTokens, "temperature" to temperature,
+                    ))
+                } ?: emptyMap()
                 return@LcncNodeRunner result.fold(
                     onSuccess = { response ->
                         val content = response.a
@@ -341,7 +362,7 @@ object BrainMuxNodes {
                                 "latencyMs" to latencyMs,
                                 "inputTokens" to inTok,
                                 "outputTokens" to outTok,
-                            ) + cachedHitEntry
+                            ) + receiptOutput
                         } else {
                             mapOf(
                                 "content" to content, "model" to model, "ok" to true, "error" to "",
@@ -349,7 +370,7 @@ object BrainMuxNodes {
                                 "latencyMs" to latencyMs,
                                 "inputTokens" to inTok,
                                 "outputTokens" to outTok,
-                            ) + cachedHitEntry
+                            ) + receiptOutput
                         }
                     },
                     onFailure = { t ->
@@ -360,7 +381,7 @@ object BrainMuxNodes {
                             "content" to "", "model" to model, "ok" to false, "error" to (t.message ?: "unknown error"),
                             "cached" to cachedHit,
                             "latencyMs" to latencyMs,
-                        ) + cachedHitEntry
+                        ) + receiptOutput
                     },
                 )
             }
@@ -376,13 +397,7 @@ object BrainMuxNodes {
             }
             val extraHeaders = parseHeaders(node.params["headers"] ?: "")
             val directStartedAtMs = kotlinx.datetime.Clock.System.now().toEpochMilliseconds()
-            val chatResult = if (chatContext != null) {
-                withContext(chatContext) {
-                    directHtxChat(baseUrl, apiKey, model, prompt, maxTokens, temperature, extraHeaders)
-                }
-            } else {
-                directHtxChat(baseUrl, apiKey, model, prompt, maxTokens, temperature, extraHeaders)
-            }
+            val chatResult = directHtxChat(baseUrl, apiKey, model, prompt, maxTokens, temperature, extraHeaders)
             val directLatencyMs = kotlinx.datetime.Clock.System.now().toEpochMilliseconds() - directStartedAtMs
             // Same output shape as the mux path; this path has no cache (cachedHit is an honest
             // false) and reads no usage block, so the token keys are absent = not reported.

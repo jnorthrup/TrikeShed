@@ -3,7 +3,7 @@ package borg.trikeshed.forge.server
 import borg.trikeshed.couch.CouchReportEvent
 import borg.trikeshed.couch.CouchReportReactorElement
 import borg.trikeshed.couch.CouchStore
-import borg.trikeshed.couch.CouchDatabase
+import borg.trikeshed.couch.Couch
 import borg.trikeshed.cas.LineCas
 import borg.trikeshed.graal.subvm.HermesCapsule
 import borg.trikeshed.graal.vitals.JvmVitals
@@ -22,7 +22,6 @@ import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
-import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.nio.charset.StandardCharsets
 import java.util.concurrent.ConcurrentHashMap
@@ -63,7 +62,7 @@ class GraalWire(
     private val couchStore: CouchStore?,
     private val report: CouchReportReactorElement?,
     private val scope: CoroutineScope,
-    private val couchDatabase: CouchDatabase? = null,
+    private val couch: Couch? = null,
     /** Sub-VM host, when mounted: its Spawned/Evaluated/Revoked/Landed events join the flourish feed. */
     private val vmHost: borg.trikeshed.vm.VmHost? = null,
     /** Needed only to [RepoOccupancy.occupy] a repo on demand; absent means /api/graal/occupy 503s. */
@@ -115,7 +114,7 @@ class GraalWire(
                 val frame = vitals.allocationSites.frame(q["site"].orEmpty(), q["frame"]?.toIntOrNull() ?: -1,
                     System.currentTimeMillis())
                     ?: return@withContext JvmKanbanServer.HttpResponse(404, """{"error":"allocation_site_expired_or_missing"}""")
-                val result = runCatching { AllocationFrameProjection(couchDatabase).project(frame) }
+                val result = runCatching { AllocationFrameProjection(couch).project(frame) }
                     .getOrElse { frame.wire() + mapOf("available" to false, "reason" to (it.message ?: "projection_failed")) }
                 JvmKanbanServer.HttpResponse(200, JsonSupport.stringify(result))
             }
@@ -133,7 +132,7 @@ class GraalWire(
                 val source = borg.trikeshed.relaxfactory.CouchHttpSurface
                     .parseQuery(path.substringAfter('?', ""))["source"]
                     ?: return@withContext JvmKanbanServer.HttpResponse(400, """{"error":"source_required"}""")
-                val db = couchDatabase
+                val db = couch
                     ?: return@withContext JvmKanbanServer.HttpResponse(503, """{"error":"cas_database_unavailable"}""")
                 val projection = ClasspathSourceProjection(db).project(source)
                 JvmKanbanServer.HttpResponse(
@@ -150,7 +149,7 @@ class GraalWire(
                 JvmKanbanServer.HttpResponse(200, "", "application/x-java-aot-cache", blob.second)
             }
             method == "POST" && p == "/api/graal/aot/capture" -> withContext(Dispatchers.IO) {
-                val db = couchDatabase
+                val db = couch
                     ?: return@withContext JvmKanbanServer.HttpResponse(503, """{"error":"cas_database_unavailable"}""")
                 val captured = HotSpotAotBlobAccess.capture(db)
                 JvmKanbanServer.HttpResponse(
@@ -270,7 +269,7 @@ class GraalWire(
         if (p == "/api/graal/occupy" || p.startsWith("/api/graal/occupy/")) return occupyRoute(method, p, payload)
         if (p != "/api/graal/ingest") return null
         if (method != "POST") return JvmKanbanServer.HttpResponse(405, """{"error":"method_not_allowed"}""")
-        val database = couchDatabase ?: return JvmKanbanServer.HttpResponse(501, """{"error":"no store mounted"}""")
+        val database = couch ?: return JvmKanbanServer.HttpResponse(501, """{"error":"no store mounted"}""")
         val q = borg.trikeshed.relaxfactory.CouchHttpSurface.parseQuery(path.substringAfter('?', ""))
         val rawName = (q["name"] ?: "drop-${System.currentTimeMillis()}").substringAfterLast('/').substringAfterLast('\\')
         val name = rawName.replace(Regex("[^\\w .()-]+"), "_").ifBlank { "drop" }
@@ -475,7 +474,7 @@ class GraalWire(
     }
 
     private fun putAttachmentDoc(
-        database: borg.trikeshed.couch.CouchDatabase,
+        database: borg.trikeshed.couch.Couch,
         id: String,
         contentType: String,
         cid: borg.trikeshed.job.ContentId,
@@ -511,7 +510,7 @@ class GraalWire(
      * bytes via `_cas` when it wants the content side by side.
      */
     private fun zoomRoute(path: String): JvmKanbanServer.HttpResponse {
-        val db = couchDatabase ?: return JvmKanbanServer.HttpResponse(503, """{"error":"no store mounted"}""")
+        val db = couch ?: return JvmKanbanServer.HttpResponse(503, """{"error":"no store mounted"}""")
         val q = borg.trikeshed.relaxfactory.CouchHttpSurface.parseQuery(path.substringAfter('?', ""))
         val raw = q["code"] ?: return JvmKanbanServer.HttpResponse(400, """{"error":"code required"}""")
         val ring8 = (raw.toIntOrNull(16) ?: raw.toIntOrNull())?.and(0xFF)
@@ -541,7 +540,7 @@ class GraalWire(
      * actual stored bytes side by side — the bytes prove the grouping, not the chrome.
      */
     private fun strengthRoute(path: String): JvmKanbanServer.HttpResponse {
-        val db = couchDatabase ?: return JvmKanbanServer.HttpResponse(503, """{"error":"no store mounted"}""")
+        val db = couch ?: return JvmKanbanServer.HttpResponse(503, """{"error":"no store mounted"}""")
         val q = borg.trikeshed.relaxfactory.CouchHttpSurface.parseQuery(path.substringAfter('?', ""))
         val a = q["a"] ?: return JvmKanbanServer.HttpResponse(400, """{"error":"a cid required"}""")
         val b = q["b"] ?: return JvmKanbanServer.HttpResponse(400, """{"error":"b cid required"}""")

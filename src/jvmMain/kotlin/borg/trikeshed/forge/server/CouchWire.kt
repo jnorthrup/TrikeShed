@@ -1,6 +1,6 @@
 package borg.trikeshed.forge.server
 
-import borg.trikeshed.couch.CouchDatabase
+import borg.trikeshed.couch.Couch
 import borg.trikeshed.couch.CouchWireRouter
 import borg.trikeshed.couch.replicate.CouchReplicator
 import borg.trikeshed.couch.replicate.ReplicationReport
@@ -17,7 +17,7 @@ import java.nio.charset.StandardCharsets
 import java.util.concurrent.ConcurrentHashMap
 
 /**
- * CouchWire — mounts one [CouchDatabase] on the daemon's HTTP tier ([JvmKanbanServer] raw-route
+ * CouchWire — mounts one [Couch] on the daemon's HTTP tier ([JvmKanbanServer] raw-route
  * seam), so the Couch 1.6/1.7 surface, the store-hosted PWA and the CAS lanes all answer on the
  * same port as `/api/…`. The HTTP tier lives in the reactor; there is no second server.
  *
@@ -36,7 +36,7 @@ class CouchWire(
     private val scope: CoroutineScope,
     private val defaultHeartbeatMs: Long = 15_000,
 ) {
-    val db: CouchDatabase get() = router.db
+    val db: Couch get() = router.db
 
     private class Continuous(@Volatile var job: Job, val spec: Map<String, Any?>, @Volatile var last: ReplicationReport?)
     private val continuous = ConcurrentHashMap<String, Continuous>()

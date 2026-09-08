@@ -106,7 +106,7 @@ class LlmSession(
 
 class ModelMux internal constructor(
     private val core: ModelMuxCore,
-    private val keyMux: KeyMux,
+    internal val keyMux: KeyMux,
     private val configuredBaseUrls: Map<String, String>,
     /**
      * Optional quota legion metering every chat receipt. Null = standalone
@@ -231,8 +231,7 @@ class ModelMux internal constructor(
         if (result.a.size > 0) {
             val chosen = result.a[0]
             val event = ModelSelectionEvent.ModelSelected(
-                // A card carries one identity; provider and model coincide until cards split them.
-                provider = chosen.b.id,
+                provider = chosen.b.providerTag ?: chosen.b.id,
                 model = chosen.a,
                 strategy = strategyName,
                 requestId = defaultSecureIdGenerator.generateHexId("req", 8),

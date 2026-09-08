@@ -9,19 +9,27 @@ import borg.trikeshed.forge.ForgeBlockKind
 import borg.trikeshed.forge.ForgeDoc
 import borg.trikeshed.lcnc.LcncProgram
 import borg.trikeshed.lcnc.LcncRunner
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineName
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Deferred
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.async
 import kotlinx.coroutines.cancel
-import kotlinx.coroutines.channels.SendChannel
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.yield
+import kotlin.coroutines.CoroutineContext
+import kotlin.coroutines.EmptyCoroutineContext
 
 /**
  * P1 — one LCNC ring program hosted as a first-class CCEK assembly.
  *
- * The assembly scope is a structured child of [CCEK.CcekReactorBinding.reactorScope].
- * Therefore a node runner sees BOTH the reactor element and the LcncScopeFrame that
- * LcncRunner installs at ring entry in one currentCoroutineContext(). Cancelling the
- * returned [Run] cancels the walk and any in-flight suspend runner.
+ * Invocation elements compose with the binding's authoritative reactor. The caller
+ * owns the run when supplied; reactor cancellation also stops it. The result owns
+ * both the walker and receipt node and completes only after their work drains.
  *
  * Start/finish/failure receipts are real ForgeSignals delivered to a choreographed
  * [ArticulatedNode]. Its existing Semaphore bounds agent fan-out; observers consume the
@@ -42,51 +50,80 @@ class LcncCcekAssembly(
         }
     }
 
+    /** [context] supplies invocation elements and its parent job; absent context uses the binding. */
     fun launch(
         name: String,
         program: LcncProgram,
         args: Map<String, Any?> = emptyMap(),
         recordSignals: Boolean = true,
+        context: CoroutineContext = EmptyCoroutineContext,
     ): Run {
-        val child = CCEK.childScope("lcnc:$name", binding.reactorScope)
-        val doc = ForgeDoc.page(ForgeBlockId("lcnc-run-$name"), "LCNC run: $name")
-        val node = binding.choreograph(
-            doc = doc,
-            record = recordSignals,
-            enabledProjections = setOf(ProjectionKind.DOCUMENT, ProjectionKind.MARKDOWN),
-            maxConcurrency = 8,
+        val reactorContext = binding.reactorScope.coroutineContext
+        val reactorJob = reactorContext[Job]
+        val parent = context[Job] ?: reactorJob
+        val owner = SupervisorJob(parent)
+        val child = CoroutineScope(
+            reactorContext + context + binding.reactor + owner + CoroutineName("CCEK-lcnc:$name")
         )
-        val deferred = child.async {
-            receipt(node.signalIn, name, "started")
+        // A leaf job observes reactor cancellation without replacing the caller parent.
+        val reactorLink = if (parent !== reactorJob) Job(reactorJob) else null
+        reactorLink?.invokeOnCompletion { cause ->
+            if (cause != null) owner.cancel(CancellationException("LCNC reactor closed", cause))
+        }
+        owner.invokeOnCompletion { reactorLink?.complete() }
+
+        val doc = ForgeDoc.page(ForgeBlockId("lcnc-run-$name"), "LCNC run: $name")
+        lateinit var node: ArticulatedNode
+        // Install the node before returning, even when the parent is already cancelled.
+        val deferred = child.async(start = CoroutineStart.UNDISPATCHED) {
+            node = ArticulatedNode(
+                initialDoc = doc,
+                scope = this,
+                record = recordSignals,
+                enabledProjections = setOf(ProjectionKind.DOCUMENT, ProjectionKind.MARKDOWN),
+                maxConcurrency = 8,
+            )
+            var failure: Throwable? = null
             try {
-                val out = runner.runProcedure(program, args)
-                receipt(node.signalIn, name, "finished", mapOf(
-                    "outputs" to out.nodeOutputs.size.toString(),
-                    "returns" to out.returns.size.toString(),
-                ))
-                out
+                yield()
+                withContext(node) {
+                    node.signalIn.send(receipt(name, "started"))
+                    val out = runner.runProcedure(program, args)
+                    node.signalIn.send(receipt(name, "finished", mapOf(
+                        "outputs" to out.nodeOutputs.size.toString(),
+                        "returns" to out.returns.size.toString(),
+                    )))
+                    out
+                }
             } catch (t: Throwable) {
-                receipt(node.signalIn, name, "failed", mapOf(
+                failure = t
+                // A cancelled or closed receipt channel must not replace the run failure.
+                node.signalIn.trySend(receipt(name, "failed", mapOf(
                     "error" to (t.message ?: t::class.simpleName.orEmpty()),
-                ))
+                )))
+                if (t is CancellationException) node.abort(t)
                 throw t
+            } finally {
+                try {
+                    withContext(NonCancellable) { node.drain() }
+                } catch (cleanup: Throwable) {
+                    val original = failure
+                    if (original == null) throw cleanup
+                    if (cleanup !== original) original.addSuppressed(cleanup)
+                }
             }
         }
-        return Run(name, child, node, deferred)
+        deferred.invokeOnCompletion { owner.complete() }
+        return Run(name, CoroutineScope(child.coroutineContext + deferred + node), node, deferred)
     }
 
-    private suspend fun receipt(
-        sink: SendChannel<ForgeSignal>,
+    private fun receipt(
         name: String,
         state: String,
         extra: Map<String, String> = emptyMap(),
-    ) {
-        sink.send(
-            ForgeSignal.AppendBlock(
-                kind = ForgeBlockKind.TEXT,
-                text = "lcnc:$name:$state",
-                properties = mapOf("program" to name, "state" to state) + extra,
-            )
-        )
-    }
+    ): ForgeSignal = ForgeSignal.AppendBlock(
+        kind = ForgeBlockKind.TEXT,
+        text = "lcnc:$name:$state",
+        properties = mapOf("program" to name, "state" to state) + extra,
+    )
 }

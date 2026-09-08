@@ -374,8 +374,10 @@ def test_scan_repo_analyses_a_tree(tmp_path):
     a = analyse(tmp_path)
     assert len(a["hard_demands"]) == 1
     assert a["hard_demands"][0]["element_key"] == "HtxKey"
-    # HtxKey is not in the CCEK assembly scope, so this demand is unsatisfiable.
-    assert len(a["unsatisfiable_under_ccek_assembly"]) == 1
+    # Historical list comparison is not evidence about a runtime scope.
+    assert len(a["hard_demands_outside_assumed_assembly"]) == 1
+    assert a["assembly_assumption"]["scope_provision_proven"] is False
+    assert a["assembly_assumption"]["palette_reachability_proven"] is False
     # A top-level val scope nothing can cancel is the suspicious shape.
     assert len(a["suspicious_supervision"]) == 1
     assert a["suspicious_supervision"][0]["position"] == "top-level-val"

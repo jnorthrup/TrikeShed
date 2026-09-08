@@ -31,7 +31,7 @@ import kotlin.coroutines.CoroutineContext
  * on [close]. No clock, no sockets.
  */
 class CouchChangesFactElement(
-    private val db: CouchDatabase,
+    private val db: Couch,
     private val rete: ReteNetwork,
     private val report: CouchReportReactorElement? = null,
     private val board: BlackboardContext = BlackboardContext(id = db.name),
@@ -85,7 +85,7 @@ class CouchChangesFactElement(
             return
         }
         val factId = FactId(db.name, f.docId)
-        val version = CouchDatabase.revToCid(f.rev) ?: ContentId.of(f.rev.encodeToByteArray())
+        val version = Couch.revToCid(f.rev) ?: ContentId.of(f.rev.encodeToByteArray())
         if (f.deleted) {
             if (known.remove(f.docId)) rete.retract(factId)
             return

@@ -1,6 +1,6 @@
 package keymux
 
-import borg.trikeshed.couch.CouchDatabase
+import borg.trikeshed.couch.Couch
 import borg.trikeshed.lib.get
 import borg.trikeshed.lib.size
 
@@ -26,7 +26,7 @@ import borg.trikeshed.lib.size
  * Also usable standalone (no KeyMux) by LCNC nodes that read/write directly.
  */
 class CouchKeyStore(
-    private val db: CouchDatabase,
+    private val db: Couch,
 ) : KeySource() {
     override val name = "couch-credential"
 

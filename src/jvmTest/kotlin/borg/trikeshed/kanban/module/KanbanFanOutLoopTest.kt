@@ -1,6 +1,6 @@
 package borg.trikeshed.kanban.module
 
-import borg.trikeshed.couch.CouchDatabase
+import borg.trikeshed.couch.Couch
 import borg.trikeshed.couch.CouchStoreFactory
 import borg.trikeshed.dag.ReteNetwork
 import borg.trikeshed.dag.ReteProductionRegistry
@@ -63,7 +63,7 @@ class KanbanFanOutLoopTest {
         val couchStore = CouchStoreFactory.casBacked(cas)
         val routes = ModuleRouteRegistry()
         val ctx = ModuleContext(
-            couchDb = CouchDatabase("kanban-fanout-test-$name", couchStore, cas),
+            couch = Couch("kanban-fanout-test-$name", couchStore, cas),
             rete = ReteNetwork(),
             productions = ReteProductionRegistry(),
             beliefBag = null,

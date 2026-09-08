@@ -1,6 +1,6 @@
 package borg.trikeshed.btrfs
 
-import borg.trikeshed.couch.CouchDatabase
+import borg.trikeshed.couch.Couch
 import borg.trikeshed.couch.CouchStoreFactory
 import borg.trikeshed.couch.CouchWireRouter
 import borg.trikeshed.couch.replicate.CouchReplicator
@@ -32,7 +32,7 @@ class VmWorldTeleportTest {
     /** One node: a couch database over its own CAS, plus a btrfs root for guest worlds. */
     private class Node(val name: String = "trikeshed") {
         val cas: CasStore = CasStore.inMemory()
-        val db = CouchDatabase(name, CouchStoreFactory.casBacked(cas), cas)
+        val db = Couch(name, CouchStoreFactory.casBacked(cas), cas)
         // A file-shaped store over an in-memory backing: the teleport does not care which, and
         // this keeps the test off the real filesystem while exercising the durable code path.
         val worlds = BtrfsWorldStore.ofFiles(InMemoryFileOperations(cwd = "/"), "/vm-worlds")

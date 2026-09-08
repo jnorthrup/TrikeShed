@@ -31,10 +31,37 @@ import borg.trikeshed.lib.j
 class MuxReactorElement(
     parentJob: Job? = null,
     initialConfig: MuxReactorConfig = MuxReactorConfig(),
+    private val keyMux: keymux.KeyMux? = null,
+    private val modelMuxProvider: (suspend () -> modelmux.ModelMux)? = null,
 ) : AsyncContextElement(ElementState.CREATED, parentJob) {
     companion object Key : AsyncContextKey<MuxReactorElement>()
 
     override val key: CoroutineContext.Key<*> get() = Key
+
+    init {
+        require(modelMuxProvider == null || keyMux != null) { "ModelMux binding requires KeyMux" }
+    }
+
+    fun keyMux(): keymux.KeyMux? {
+        if (keyMux != null) requireMuxOpen()
+        return keyMux
+    }
+
+    /** Resolve on every invocation so inherited contexts observe catalog refreshes. */
+    suspend fun modelMux(): modelmux.ModelMux? {
+        val provider = modelMuxProvider ?: return null
+        requireMuxOpen()
+        val mux = provider()
+        requireMuxOpen()
+        check(mux.keyMux === keyMux) { "ModelMux must use the reactor's KeyMux binding" }
+        return mux
+    }
+
+    private fun requireMuxOpen() {
+        check(state == ElementState.OPEN || state == ElementState.ACTIVE) {
+            "MuxReactorElement is not accepting model or key resolution: $state"
+        }
+    }
 
     private var config: MuxReactorConfig = initialConfig
     private var tickSequence: Long = 0

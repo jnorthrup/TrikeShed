@@ -182,31 +182,31 @@ object ProjectNodes {
         ((inputs["doc"] ?: inputs["doc?"]) as? Map<*, *>)?.let(ProjectDoc::fromMap)
 
     fun registry(corpus: ProjectCorpus): Map<String, LcncNodeRunner> = mapOf(
-        LIST to LcncNodeRunner { _, _ ->
-            val refs = corpus.projects()
+        LIST to boundLcnc(ProjectCorpusKey(corpus)) { service, _, _ ->
+            val refs = service.value.projects()
             mapOf("scopes" to refs.map { it.toMap() }, "projects" to refs.map { it.toMap() })
         },
-        DOCS to LcncNodeRunner { node, inputs ->
+        DOCS to boundLcnc(ProjectCorpusKey(corpus)) { service, node, inputs ->
             val project = str(inputs, node, "project")
                 ?: throw IllegalArgumentException("project.docs: no project named — wire one in or set the project param")
             val limit = node.params["limit"]?.toIntOrNull()?.coerceIn(1, 4096) ?: 256
             val prefix = node.params["prefix"].orEmpty()
             val glob = node.params["glob"].orEmpty()
-            val docs = corpus.docs(project, prefix, glob, limit)
+            val docs = service.value.docs(project, prefix, glob, limit)
             // The listing itself is an input: an added or removed file moves its fingerprint.
             currentCoroutineContext()[LcncConsumedLedger]?.let { ledger ->
                 ledger.consumed(LcncConsumedLedger.PROJECT_INDEX, "$project/", ledger.indexFingerprint(docs.map { it.id }), prefix = prefix, glob = glob)
             }
             mapOf("docs" to docs.map { it.toMap() }, "count" to docs.size)
         },
-        READ to LcncNodeRunner { node, inputs ->
+        READ to boundLcnc(ProjectCorpusKey(corpus)) { service, node, inputs ->
             val doc = docOf(inputs)
             val project = doc?.project ?: str(inputs, node, "project")
                 ?: throw IllegalArgumentException("project.read: no document wired and no project named")
             val id = doc?.id ?: str(inputs, node, "id")
                 ?: throw IllegalArgumentException("project.read: no document wired and no id named")
             val maxChars = node.params["maxChars"]?.toIntOrNull()?.coerceIn(1, 1_048_576) ?: 65_536
-            val text = corpus.read(project, id, maxChars)
+            val text = service.value.read(project, id, maxChars)
             if (text != null) currentCoroutineContext()[LcncConsumedLedger]?.consumed(LcncConsumedLedger.PROJECT, "$project/$id", text.cid, text.seq, text.rev)
             if (text == null) mapOf("error" to "project.read: '$id' in '$project' is absent, binary, or over $maxChars chars")
             else mapOf(
@@ -214,13 +214,13 @@ object ProjectNodes {
                 "doc" to (doc ?: ProjectDoc(project, id, text.cid, text.rev, text.seq, text.text.length.toLong(), InMemoryProjectCorpus.contentTypeOf(id))).toMap(),
             )
         },
-        EXTRACT to LcncNodeRunner { node, inputs ->
+        EXTRACT to boundLcnc(ProjectCorpusKey(corpus)) { service, node, inputs ->
             val doc = docOf(inputs)
             val project = doc?.project ?: str(inputs, node, "project")
                 ?: throw IllegalArgumentException("project.extract: no document wired and no project named")
             val id = doc?.id ?: str(inputs, node, "id")
                 ?: throw IllegalArgumentException("project.extract: no document wired and no id named")
-            val twin = corpus.read(project, id + EXTRACT_SUFFIX, 1_048_576)
+            val twin = service.value.read(project, id + EXTRACT_SUFFIX, 1_048_576)
             if (twin != null) currentCoroutineContext()[LcncConsumedLedger]?.consumed(LcncConsumedLedger.PROJECT, "$project/$id$EXTRACT_SUFFIX", twin.cid, twin.seq, twin.rev)
             if (twin == null) mapOf("found" to false)
             else mapOf("text" to twin.text, "cid" to twin.cid, "found" to true)

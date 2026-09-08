@@ -2,14 +2,22 @@ package borg.trikeshed.mux
 
 import borg.trikeshed.htx.HtxElement
 import borg.trikeshed.htx.openHtxElement
+import borg.trikeshed.ccek.CCEK
 import borg.trikeshed.job.ContentId
+import borg.trikeshed.lcnc.BrainMuxNodes
+import borg.trikeshed.lcnc.LcncNode
+import borg.trikeshed.lcnc.LcncProgram
 import borg.trikeshed.lcnc.LcncProgramConfix
+import borg.trikeshed.lcnc.LcncRunner
 import borg.trikeshed.lcnc.MuxAgentTricks
+import borg.trikeshed.lcnc.ccek.LcncCcekAssembly
 import borg.trikeshed.parse.json.JsonSupport
 import borg.trikeshed.lib.Series
 import borg.trikeshed.lib.get
 import borg.trikeshed.lib.j
 import borg.trikeshed.lib.size
+import borg.trikeshed.lib.emptySeriesOf
+import borg.trikeshed.lib.s_
 import borg.trikeshed.userspace.nio.file.spi.FileOperations
 import borg.trikeshed.userspace.nio.file.spi.JvmFileOperations
 import borg.trikeshed.userspace.nio.channels.spi.EgressAllowlist
@@ -23,6 +31,7 @@ import keymux.defaultHermesHome
 import keymux.operatorKeyMux
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
@@ -138,9 +147,15 @@ Secrets are never printed — keys show as len= and sha256 prefix."""
      * duration of [block] and closed after — the same elements the daemon puts
      * on the chat path, so a call that works here works there.
      */
-    private suspend fun <T> withMuxRuntime(block: suspend (HtxElement, MuxReactorElement) -> T): T {
+    private suspend fun <T> withMuxRuntime(
+        keyMux: KeyMux? = null,
+        modelMuxProvider: (suspend () -> ModelMux)? = null,
+        block: suspend (HtxElement, MuxReactorElement) -> T,
+    ): T {
         val nio = NioSupervisor()
-        val reactor = MuxReactorElement(initialConfig = MuxReactorConfig())
+        val reactor = MuxReactorElement(
+            initialConfig = MuxReactorConfig(), keyMux = keyMux, modelMuxProvider = modelMuxProvider,
+        )
         var htx: HtxElement? = null
         try {
             nio.open()
@@ -402,23 +417,40 @@ Secrets are never printed — keys show as len= and sha256 prefix."""
             return false
         }
 
-        val outcome = withMuxRuntime { htx, reactor ->
-            val mux = ModelMux(keyMux) {
-                model(id = model, caps = setOf("chat"), baseUrl = baseUrl, provider = prov)
-            }
+        EgressAllowlist.allowUrl(baseUrl)
+        val mux = ModelMux(keyMux) {
+            model(id = model, caps = setOf("chat"), baseUrl = baseUrl, provider = prov)
+        }
+        val outcome = withMuxRuntime(keyMux, { mux }) { htx, reactor ->
             withContext(Dispatchers.IO + fileOps + htx + reactor) {
-                val messages: Series<AcpMessage> = 1 j { _: Int -> "user" j prompt }
+                val binding = CCEK.initialize(currentCoroutineContext())
+                val program = LcncProgram("mux.chat", s_[LcncNode("chat", "prompt.chat", params = mapOf(
+                    "model" to model, "prompt" to prompt, "maxTokens" to maxTokens.toString(), "temperature" to "0.2",
+                ))], emptySeriesOf())
+                val run = LcncCcekAssembly(binding, LcncRunner(BrainMuxNodes.registry()))
+                    .launch("mux.chat", program, context = currentCoroutineContext())
                 val t0 = System.currentTimeMillis()
-                val res = mux.chat(modelId = model, messages = messages, maxTokens = maxTokens, temperature = 0.2)
+                val res = try {
+                    val result = withTimeout(60_000) { run.result.await() }
+                    val output = result.nodeOutputs.getValue("chat") as Map<*, *>
+                    check(output["ok"] == true) { output["error"]?.toString() ?: "model call failed" }
+                    Result.success(output)
+                } catch (t: Throwable) {
+                    if (t is kotlinx.coroutines.CancellationException) throw t
+                    Result.failure(t)
+                } finally {
+                    run.cancel()
+                }
                 val ms = System.currentTimeMillis() - t0
                 res.fold(
                     onSuccess = { r ->
-                        println(r.a)
+                        println(r["content"])
                         println()
                         println("── receipt ──────────────────────────────────")
                         println("  model      $model  (provider $prov, binds llm.$prov.key)")
                         println("  base_url   $baseUrl")
-                        println("  tokens     in=${r.b.a} out=${r.b.b}")
+                        println("  tokens     in=${r["inputTokens"]} out=${r["outputTokens"]}")
+                        println("  context    CCEK / mux.chat / prompt.chat")
                         println("  latency    ${ms}ms")
                         val standings = runCatching { mux.quotaStandings(System.currentTimeMillis()) }.getOrDefault(emptyList())
                         if (standings.isNotEmpty()) {

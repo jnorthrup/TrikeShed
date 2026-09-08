@@ -1,6 +1,6 @@
 package borg.trikeshed.module
 
-import borg.trikeshed.couch.CouchDatabase
+import borg.trikeshed.couch.Couch
 import borg.trikeshed.couch.CouchStoreFactory
 import borg.trikeshed.dag.ReteNetwork
 import borg.trikeshed.dag.ReteProductionRegistry
@@ -57,7 +57,7 @@ class ModuleSupervisorTest {
         val cas = CasStore.inMemory()
         val couchStore = CouchStoreFactory.casBacked(cas)
         return ModuleContext(
-            couchDb = CouchDatabase("module-test", couchStore, cas),
+            couch = Couch("module-test", couchStore, cas),
             rete = ReteNetwork(),
             productions = ReteProductionRegistry(),
             beliefBag = null,          // null-bag context MUST open (garnish, not load-bearing)

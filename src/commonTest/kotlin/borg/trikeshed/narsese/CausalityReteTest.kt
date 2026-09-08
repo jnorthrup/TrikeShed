@@ -81,6 +81,9 @@ class CausalityReteTest {
         assertEquals("mass", fromLeft[0].rule.consequent)
         assertEquals(1, fromRight.size)
         assertEquals("energy", fromRight[0].rule.consequent, "equivalence must fire toward the unmatched end")
+        assertEquals("mass", fromRight[0].rule.antecedent)
+        assertEquals(fromLeft[0].sourceRuleCid, fromRight[0].sourceRuleCid, "both directions retain the admitted rule identity")
+        assertEquals(KgTriplet("mass", "entails", "energy").angularIdentity(), fromRight[0].consequentAngular)
     }
 
     @Test

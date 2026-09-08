@@ -1,6 +1,6 @@
 package borg.trikeshed.kanban.module
 
-import borg.trikeshed.couch.CouchDatabase
+import borg.trikeshed.couch.Couch
 import borg.trikeshed.couch.CouchStoreFactory
 import borg.trikeshed.dag.ReteNetwork
 import borg.trikeshed.dag.ReteProductionRegistry
@@ -88,7 +88,7 @@ class LcncRunProgramRouteTest {
     ): ModuleContext {
         val couchStore = CouchStoreFactory.casBacked(cas)
         return ModuleContext(
-            couchDb = CouchDatabase("lcnc-run-test", couchStore, cas),
+            couch = Couch("lcnc-run-test", couchStore, cas),
             rete = ReteNetwork(),
             productions = ReteProductionRegistry(),
             beliefBag = null,

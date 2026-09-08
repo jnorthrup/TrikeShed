@@ -2,6 +2,7 @@ package borg.trikeshed.narsese
 
 import borg.trikeshed.cursor.BudgetCoord
 import borg.trikeshed.lcnc.LcncNodeRunner
+import borg.trikeshed.lcnc.boundLcnc
 import borg.trikeshed.parse.json.JsonSupport
 import kotlin.math.abs
 
@@ -37,7 +38,7 @@ object BeliefsNodes {
      * concepts, cohort Hotelling T². `cohortTaxonomy` (comma-separated
      * taxonomy keys) overrides the pen-cohort default.
      */
-    fun introspectRunner(bag: BeliefBagElement): LcncNodeRunner = LcncNodeRunner { node, _ ->
+    fun introspectRunner(bag: BeliefBagElement): LcncNodeRunner = boundLcnc(bag) { bag, node, _ ->
         val field = bag.field()
         val cruxTop = node.params["cruxTop"]?.toIntOrNull() ?: 6
         val conceptsK = node.params["concepts"]?.toIntOrNull() ?: 3
@@ -76,11 +77,11 @@ object BeliefsNodes {
     fun resonateRunner(
         bag: BeliefBagElement,
         glossOf: (Long) -> String? = { null },
-    ): LcncNodeRunner = LcncNodeRunner { node, inputs ->
+    ): LcncNodeRunner = boundLcnc(bag) { bag, node, inputs ->
         val goal = port(inputs, "goal")?.toString()?.takeIf { it.isNotBlank() }
             ?: node.params["goal"]?.takeIf { it.isNotBlank() }
             ?: node.params["subject"]?.takeIf { it.isNotBlank() }
-            ?: return@LcncNodeRunner mapOf(
+            ?: return@boundLcnc mapOf(
                 "synonymPeaks" to emptyList<Any?>(),
                 "antonymPeaks" to emptyList<Any?>(),
                 "error" to "goal required",
@@ -136,7 +137,7 @@ object BeliefsNodes {
     fun reviewRunner(
         review: TurnReviewElement,
         glossSink: (Long, String) -> Unit = { _, _ -> },
-    ): LcncNodeRunner = LcncNodeRunner { node, inputs ->
+    ): LcncNodeRunner = boundLcnc(review) { review, node, inputs ->
         val turnSucceeded = node.params["turnSucceeded"]?.toBooleanStrictOrNull() ?: true
         val raw = port(inputs, "facts")
         val list = when (raw) {
@@ -170,9 +171,9 @@ object BeliefsNodes {
      * resident budget's value (0.5 when the angular is not resident — the
      * bag's Attend on a non-resident angular is a no-op anyway).
      */
-    fun attendRunner(bag: BeliefBagElement): LcncNodeRunner = LcncNodeRunner { node, inputs ->
+    fun attendRunner(bag: BeliefBagElement): LcncNodeRunner = boundLcnc(bag) { bag, node, inputs ->
         val angular = parseAngular(port(inputs, "angular") ?: node.params["angular"])
-            ?: return@LcncNodeRunner mapOf("attended" to mapOf("error" to "angular required"))
+            ?: return@boundLcnc mapOf("attended" to mapOf("error" to "angular required"))
         val base = bag.budgetOf(angular)
         val p = node.params["p"]?.toFloatOrNull() ?: base?.pf ?: 0.5f
         val d = node.params["d"]?.toFloatOrNull() ?: base?.df ?: 0.5f
@@ -192,9 +193,9 @@ object BeliefsNodes {
      * onto an existing angular, budget untouched. `wPlus`/`wMinus` are in
      * observation units (scaled by [Nal.UNIT] like [Nal.observe]).
      */
-    fun reinforceRunner(bag: BeliefBagElement): LcncNodeRunner = LcncNodeRunner { node, inputs ->
+    fun reinforceRunner(bag: BeliefBagElement): LcncNodeRunner = boundLcnc(bag) { bag, node, inputs ->
         val angular = parseAngular(port(inputs, "angular") ?: node.params["angular"])
-            ?: return@LcncNodeRunner mapOf("revised" to mapOf("error" to "angular required"))
+            ?: return@boundLcnc mapOf("revised" to mapOf("error" to "angular required"))
         val wPlus = node.params["wPlus"]?.toFloatOrNull() ?: 1f
         val wMinus = node.params["wMinus"]?.toFloatOrNull() ?: 0f
         val delta = EvidenceCoord((wPlus * Nal.UNIT).toLong(), (wMinus * Nal.UNIT).toLong())

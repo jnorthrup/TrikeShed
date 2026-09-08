@@ -1,6 +1,5 @@
 package borg.trikeshed.couch
 
-import borg.trikeshed.relaxfactory.CouchRequestFactory
 import borg.trikeshed.relaxfactory.RelaxTransport
 import borg.trikeshed.relaxfactory.RequestFactoryProxy
 import borg.trikeshed.relaxfactory.ViewQuery
@@ -191,7 +190,7 @@ class CouchCascadeReducerTest {
     @Test
     fun cascadeIsSelectableFromADesignDocAndFromTheEnvelope() = runTest {
         val cas = CasStore.inMemory()
-        val db = CouchDatabase("trikeshed", CouchStoreFactory.casBacked(cas), cas)
+        val db = Couch("trikeshed", CouchStoreFactory.casBacked(cas), cas)
         db.put("a", reading("m1", 100.0, 512.0), null)
         db.put("b", reading("m1", 300.0, 1536.0), null)
         val router = CouchWireRouter(db, "projects/trikeshed/")
@@ -209,7 +208,7 @@ class CouchCascadeReducerTest {
         assertEquals(200, route.status)
         @Suppress("UNCHECKED_CAST")
         val routeJson = JsonSupport.parse(route.bytes.decodeToString()) as Map<String, Any?>
-        val routeRows = CouchDatabase.asList(routeJson["rows"])!!.map { it as Map<*, *> }
+        val routeRows = Couch.asList(routeJson["rows"])!!.map { it as Map<*, *> }
         assertEquals(1, routeRows.size)
         @Suppress("UNCHECKED_CAST")
         val routeRollup = ((routeRows[0]["value"] as List<*>)[0] as Map<*, *>)

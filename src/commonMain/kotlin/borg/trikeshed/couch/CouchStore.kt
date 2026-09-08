@@ -4,9 +4,6 @@ import borg.trikeshed.lib.*
 import borg.trikeshed.collections.MutableSeries
 import borg.trikeshed.collections.mutableSeriesOf
 import borg.trikeshed.cursor.Cursor
-import borg.trikeshed.cursor.RowVec
-import borg.trikeshed.cursor.ColumnMeta
-import borg.trikeshed.isam.meta.IOMemento
 import kotlinx.serialization.*
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -293,7 +290,7 @@ object CouchStoreFactory {
      * CAS-collapsed store: every committed body is written to [cas] as canonical CBOR and the
      * revision hash IS that blob's ContentId (`gen-<sha256 hex>`). Replication of a revision is
      * then a block fetch; nothing about a document exists outside the CAS. JSON is only the wire
-     * commutation ([CouchDatabase] renders it in and out).
+     * commutation ([Couch] renders it in and out).
      */
     fun casBacked(cas: borg.trikeshed.job.CasStore): CouchStore {
         val head = CouchHeadProjection()

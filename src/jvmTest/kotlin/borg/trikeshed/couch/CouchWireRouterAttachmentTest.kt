@@ -18,7 +18,7 @@ class CouchWireRouterAttachmentTest {
     private class Node {
         val cas: CasStore = CasStore.inMemory()
         val store = CouchStoreFactory.casBacked(cas)
-        val db = CouchDatabase("trike", store, cas)
+        val db = Couch("trike", store, cas)
         val router = CouchWireRouter(db, "projects/trikeshed/")
 
         suspend fun raw(method: String, path: String, body: ByteArray = ByteArray(0)): WireReply =

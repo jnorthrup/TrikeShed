@@ -19,7 +19,17 @@ import kotlin.concurrent.Volatile
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.SharedFlow
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlin.coroutines.CoroutineContext
+
+data class CausalityReteSnapshot(
+    val rules: Series<EternalRule>,
+    val assertions: Series<ReteAssertion>,
+    val firings: Series<ReteFiring>,
+    val offered: Long,
+    val capacity: Int,
+)
 
 /**
  * CausalityReteElement — the LIVE rete over the daemon's BeliefBag.
@@ -53,6 +63,7 @@ class CausalityReteElement(
     /** Attention budget for minted consequents (discounted to match evidence). */
     private val mintBudget: BudgetCoord = BudgetCoord(0.5f, 0.4f, 0.5f),
     parentJob: Job? = null,
+    private val traceCapacity: Int = 256,
 ) : AsyncContextElement(ElementState.CREATED, parentJob) {
 
     companion object Key : AsyncContextKey<CausalityReteElement>()
@@ -70,6 +81,15 @@ class CausalityReteElement(
     /** Every non-duplicate firing, for Curator/Forge explanation. */
     val firings: SharedFlow<ReteFiring> get() = _firings
     private val seenFirings = HashSet<ContentId>()
+    private val fireGate = Mutex()
+    private val firingTrace = ArrayDeque<ReteFiring>()
+    private var offeredCount = 0L
+
+    init { require(traceCapacity >= 0) }
+
+    suspend fun snapshot(): CausalityReteSnapshot = fireGate.withLock {
+        CausalityReteSnapshot(rules, projectLive(), firingTrace.toTypedArray().toSeries(), offeredCount, traceCapacity)
+    }
 
     // angular → (subject, obj) term registry; the caller owns registration.
 
@@ -155,16 +175,15 @@ class CausalityReteElement(
      * a render layer can caption the minted consequents. Quota-free: no model
      * call anywhere on this path.
      */
-    suspend fun fireLive(): Series2<Long, String> {
-        if (state != ElementState.ACTIVE) return emptySeriesOf()
+    suspend fun fireLive(): Series2<Long, String> = fireGate.withLock {
+        if (state != ElementState.ACTIVE) return@withLock emptySeriesOf()
         val assertions = projectLive()
-        if (assertions.size == 0) return emptySeriesOf()
+        if (assertions.size == 0) return@withLock emptySeriesOf()
         val firings = rete.fire(assertions)
         val landed = ArrayList<Join<Long, String>>()
         for (i in 0 until firings.size) {
             val firing = firings[i]
-            if (!seenFirings.add(firing.firingCid)) continue
-            _firings.tryEmit(firing)
+            if (firing.firingCid in seenFirings) continue
             val consequentAngular = firing.consequentAngular
             val receipt = DerivationReceipt.observation(
                 subject = TermIdentity(firing.matched.angular),
@@ -191,12 +210,19 @@ class CausalityReteElement(
                     gloss = gloss,
                 ),
             )
+            seenFirings.add(firing.firingCid)
+            offeredCount++
+            if (traceCapacity > 0) {
+                if (firingTrace.size == traceCapacity) firingTrace.removeFirst()
+                firingTrace.addLast(firing)
+            }
+            _firings.tryEmit(firing)
             // register the consequent under its own subject term so a later
             // rule may chain from it without this rule matching its own output
             register(consequentAngular, firing.rule.consequent, firing.rule.antecedent)
             synchronizedLock(admitGate) { glosses[consequentAngular] = gloss }
             landed.add(consequentAngular j gloss)
         }
-        return landed.toSeries()
+        landed.toSeries()
     }
 }

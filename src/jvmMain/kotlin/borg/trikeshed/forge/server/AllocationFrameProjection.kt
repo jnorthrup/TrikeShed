@@ -1,6 +1,6 @@
 package borg.trikeshed.forge.server
 
-import borg.trikeshed.couch.CouchDatabase
+import borg.trikeshed.couch.Couch
 import borg.trikeshed.cursor.ClassfileTaxonomy
 import borg.trikeshed.graal.vitals.AllocationFrame
 import borg.trikeshed.job.ContentId
@@ -10,7 +10,7 @@ import java.util.zip.ZipFile
 
 /** On-demand classpath inspection; no class initialization, attach pause or recursive file walk. */
 class AllocationFrameProjection(
-    private val database: CouchDatabase?,
+    private val database: Couch?,
     private val loader: ClassLoader = AllocationFrameProjection::class.java.classLoader,
 ) {
     fun project(frame: AllocationFrame): Map<String, Any?> {

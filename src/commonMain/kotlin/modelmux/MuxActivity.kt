@@ -10,8 +10,8 @@ import kotlin.coroutines.CoroutineContext
 
 /** Attribution follows a coroutine through failover without consulting lastReceipt. */
 class MuxCallContext(
-    val conversationId: Long,
-    val turnId: Long,
+    val conversationId: Long? = null,
+    val turnId: Long? = null,
     val activity: MuxActivity? = null,
     val onFinished: ((MuxCallRecord) -> Unit)? = null,
 ) :

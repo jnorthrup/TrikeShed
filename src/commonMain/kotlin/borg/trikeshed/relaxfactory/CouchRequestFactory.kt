@@ -3,7 +3,7 @@
 package borg.trikeshed.relaxfactory
 
 import borg.trikeshed.couch.ConfixDocStore
-import borg.trikeshed.couch.CouchDatabase
+import borg.trikeshed.couch.Couch
 import borg.trikeshed.couch.Document
 import borg.trikeshed.couch.Field
 import borg.trikeshed.couch.MapFunction
@@ -28,7 +28,7 @@ import kotlin.io.encoding.ExperimentalEncodingApi
  * behaviour). Receipts are CouchTx-shaped per operation: `{ ok, id, rev, error?, reason? }`; errors
  * are per-op, never per-batch, so a bad operation costs its own receipt and nothing else.
  *
- * The store is an [RelaxStore], not a store of the factory's own. Bound to a [CouchDatabase] (the
+ * The store is an [RelaxStore], not a store of the factory's own. Bound to a [Couch] (the
  * canonical binding, [forDatabase]) every operation here is the batched face of a route the wire
  * already serves: a `put` mints the same `gen-sha256:<hex>` revision, appends the same committed
  * frame, and lands the same CAS blob as `PUT /{db}/{id}` — which is what makes a document written
@@ -88,7 +88,7 @@ class CouchRequestFactory(
         } catch (e: Throwable) {
             return failure(null, "parse", e.message ?: "unparseable payload")
         }
-        val ops = CouchDatabase.asList((root as? Map<*, *>)?.get("operations"))
+        val ops = Couch.asList((root as? Map<*, *>)?.get("operations"))
             ?: return mapOf("ok" to true, "receipts" to listOf(put(null, null, payload)))
         val receipts = ops.map { op ->
             (op as? Map<*, *>)?.let { dispatch(it) } ?: failure(null, "op", "operation is not an object")
@@ -257,7 +257,7 @@ class CouchRequestFactory(
             skip = num(op["skip"])?.toInt() ?: 0,
             descending = op["descending"] == true,
             includeDocs = op["include_docs"] == true,
-            keys = CouchDatabase.asList(op["keys"])?.map { it.toString() },
+            keys = Couch.asList(op["keys"])?.map { it.toString() },
         )
         return mapOf("ok" to true) + r
     }
@@ -266,7 +266,7 @@ class CouchRequestFactory(
         val l = lanes ?: return noLane("revs_diff")
         val offered = op["revs"] as? Map<*, *> ?: return failure(null, "revs_diff", "revs required")
         val asked = offered.entries.associate { (k, v) ->
-            k.toString() to (CouchDatabase.asList(v)?.map { it.toString() } ?: emptyList())
+            k.toString() to (Couch.asList(v)?.map { it.toString() } ?: emptyList())
         }
         return mapOf("ok" to true, "diff" to l.revsDiff(asked))
     }
@@ -274,7 +274,7 @@ class CouchRequestFactory(
     private fun bulkDocs(op: Map<*, *>): Map<String, Any?> {
         val l = lanes ?: return noLane("bulk_docs")
         @Suppress("UNCHECKED_CAST")
-        val docs = CouchDatabase.asList(op["docs"])?.mapNotNull { it as? Map<String, Any?> }
+        val docs = Couch.asList(op["docs"])?.mapNotNull { it as? Map<String, Any?> }
             ?: return failure(null, "bulk_docs", "docs required")
         val results = l.bulkDocs(docs, newEdits = op["new_edits"] != false)
         return mapOf("ok" to results.all { it["ok"] == true }, "results" to results)
@@ -398,7 +398,7 @@ class CouchRequestFactory(
     companion object {
         /** The canonical binding: the database `_changes`, `_replicate` and `_cas` answer over. */
         fun forDatabase(
-            db: CouchDatabase,
+            db: Couch,
             replicator: CouchReplicator? = null,
             viewServer: ViewServer = ViewServer(),
             rpcTargets: Map<String, RequestFactoryRpcTarget> = emptyMap(),

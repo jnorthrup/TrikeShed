@@ -77,7 +77,7 @@ class CouchReportServerTest {
         val report = CouchReportReactorElement()
         report.open()
         val cas = CasStore.inMemory()
-        val db = CouchDatabase("trikeshed", CouchStoreFactory.casBacked(cas), cas)
+        val db = Couch("trikeshed", CouchStoreFactory.casBacked(cas), cas)
         db.put("a", mapOf("type" to "widget", "qty" to 2), null)
         db.put("b", mapOf("type" to "gadget", "qty" to 7), null)
         db.put(

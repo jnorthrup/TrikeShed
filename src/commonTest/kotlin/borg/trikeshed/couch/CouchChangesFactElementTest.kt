@@ -13,7 +13,7 @@ class CouchChangesFactElementTest {
     fun framesBecomeFactsAndBusEvents() = runTest {
         val cas = CasStore.inMemory()
         val store = CouchStoreFactory.casBacked(cas)
-        val db = CouchDatabase("trikeshed", store, cas)
+        val db = Couch("trikeshed", store, cas)
         val rete = ReteNetwork()
         val report = CouchReportReactorElement()
         report.open()
@@ -34,7 +34,7 @@ class CouchChangesFactElementTest {
         val fact = rete.workingMemory.facts(FactId("trikeshed", "a")).first()
         assertTrue(fact.versionCid != v1, "modify carries the new revision's blob cid")
         assertEquals("x2", fact.fields["kind"])
-        assertEquals(CouchDatabase.revToCid(store.head.getRev("a")!!), fact.versionCid)
+        assertEquals(Couch.revToCid(store.head.getRev("a")!!), fact.versionCid)
 
         db.delete("b", store.head.getRev("b"))
         tendon.drainFrames()

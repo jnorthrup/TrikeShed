@@ -18,9 +18,9 @@ import kotlin.test.assertTrue
 
 /** P2 gates: LCNC lowering parity, incremental=eager, checkpoint resume, logged Trie cache. */
 class IncrementalViewTest {
-    private fun db(): CouchDatabase {
+    private fun db(): Couch {
         val cas = CasStore.inMemory()
-        return CouchDatabase("inc", CouchStoreFactory.casBacked(cas), cas)
+        return Couch("inc", CouchStoreFactory.casBacked(cas), cas)
     }
 
     private fun program(reducer: String = "_sum"): LcncProgram {
@@ -40,7 +40,7 @@ class IncrementalViewTest {
         return out.sorted()
     }
 
-    private fun live(db: CouchDatabase): List<Document> =
+    private fun live(db: Couch): List<Document> =
         db.store.all().filter { !db.isTombstone(it) && !it.id.startsWith("_design/") }
 
     @Test
@@ -140,7 +140,7 @@ class IncrementalViewTest {
         @Suppress("UNCHECKED_CAST")
         val body = JsonSupport.parse(reply.bytes.decodeToString()) as Map<String, Any?>
         assertEquals(true, body["incremental"], "route proves it used the registered element")
-        val rows = CouchDatabase.asList(body["rows"])!!
+        val rows = Couch.asList(body["rows"])!!
         assertEquals(1, rows.size)
         assertTrue(rows[0].toString().contains("5.0"))
     }

@@ -11,7 +11,6 @@ import borg.trikeshed.couch.ViewDefinition
 import borg.trikeshed.couch.ViewServer
 import borg.trikeshed.lib.get
 import borg.trikeshed.lib.size
-import borg.trikeshed.parse.json.JsonSupport
 
 /**
  * The documents a [ViewRoute] serves over: live (non-tombstone, non-design) documents as
@@ -48,11 +47,11 @@ interface ViewDocs {
         }
 
         /**
-         * Adapter over the daemon's [borg.trikeshed.couch.CouchDatabase] — the same projection
+         * Adapter over the daemon's [borg.trikeshed.couch.Couch] — the same projection
          * `CouchWireRouter` mounts `_view` on, so a view answers identically whether it is asked
          * for over `GET _design/…/_view/…` or inside a RequestFactory `query` operation.
          */
-        fun of(db: borg.trikeshed.couch.CouchDatabase): ViewDocs = object : ViewDocs {
+        fun of(db: borg.trikeshed.couch.Couch): ViewDocs = object : ViewDocs {
             override fun all(): List<Pair<String, Map<String, Any?>>> =
                 db.store.all().filter { !db.isTombstone(it) && !it.id.startsWith("_design/") }
                     .map { it.id to db.render(it, db.store.head.getRev(it.id)).filterKeys { k -> k != "_id" && k != "_rev" } }
@@ -198,7 +197,7 @@ internal fun reduceFn(spec: Any?): ReduceFunction? = when (spec) {
         spec.containsKey("cascade") -> {
             val cfg = spec["cascade"]
             val metrics = (cfg as? Map<*, *>)?.get("metrics")
-                ?.let { borg.trikeshed.couch.CouchDatabase.asList(it) }
+                ?.let { borg.trikeshed.couch.Couch.asList(it) }
                 ?.map { it.toString() }
                 ?.takeIf { it.isNotEmpty() }
             ReduceFunction.Cascade(metrics ?: CouchCascade.METRICS)

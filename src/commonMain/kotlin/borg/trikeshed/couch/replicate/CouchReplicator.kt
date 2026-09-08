@@ -1,12 +1,12 @@
 package borg.trikeshed.couch.replicate
 
-import borg.trikeshed.couch.CouchDatabase
+import borg.trikeshed.couch.Couch
 import borg.trikeshed.couch.revWins
 import borg.trikeshed.couch.CouchStoreFactory
 import borg.trikeshed.job.ContentId
 import borg.trikeshed.parse.json.JsonSupport
 
-/** One HTTP round trip. The daemon binds this to HtxElement; tests bind it to another [CouchDatabase] in-process. */
+/** One HTTP round trip. The daemon binds this to HtxElement; tests bind it to another [Couch] in-process. */
 fun interface HttpExchange {
     suspend fun call(method: String, url: String, body: ByteArray?, contentType: String?): HttpReply
 }
@@ -65,7 +65,7 @@ data class ReplicationReport(
  * `sequence`), so neither could ever reach the documents behind them.
  */
 class CouchReplicator(
-    private val local: CouchDatabase,
+    private val local: Couch,
     private val http: HttpExchange,
     private val batch: Int = 500,
     /** Upper bound of cids offered per `_cas/_bulk` exchange; the SERVER caps each reply by bytes. */
@@ -91,7 +91,7 @@ class CouchReplicator(
         var read = 0; var written = 0; var blobs = 0; var conflicts = 0; var undelivered = 0
         while (true) {
             val page = getJson("$src/_changes?since=$since&limit=$batch")
-            val results = CouchDatabase.asList(page["results"]) ?: error("Replication changes response has no results array")
+            val results = Couch.asList(page["results"]) ?: error("Replication changes response has no results array")
             if (results.isEmpty()) break
             read += results.size
             // Ask ourselves what we lack (local _revs_diff), then move only blobs.
@@ -99,7 +99,7 @@ class CouchReplicator(
             val rows = results.map { r ->
                 val m = r as? Map<*, *> ?: error("Invalid replication change row")
                 val id = m["id"] as? String ?: error("Replication change has no document id")
-                val rev = (CouchDatabase.asList(m["changes"])?.firstOrNull() as? Map<*, *>)?.get("rev") as? String ?: error("Replication change has no revision")
+                val rev = (Couch.asList(m["changes"])?.firstOrNull() as? Map<*, *>)?.get("rev") as? String ?: error("Replication change has no revision")
                 Row(id, rev, m["deleted"] == true)
             }
             val missing = local.revsDiff(rows.groupBy({ it.id }, { it.rev }))
@@ -112,12 +112,12 @@ class CouchReplicator(
             conflicts += losers.size
             // Stage 1: body blobs (the rev names them). Stage 2: whatever the bodies reference.
             blobs += fetchBlobs(src, wantedRows.filter { !it.deleted }
-                .mapNotNull { CouchDatabase.revToCid(it.rev)?.value }
+                .mapNotNull { Couch.revToCid(it.rev)?.value }
                 .filter { local.cas.get(ContentId(it)) == null })
             val decoded = HashMap<Row, borg.trikeshed.couch.Document?>()
             for (row in wantedRows) {
                 if (row.deleted) continue
-                decoded[row] = CouchDatabase.revToCid(row.rev)
+                decoded[row] = Couch.revToCid(row.rev)
                     ?.let { local.cas.get(it) ?: fetchBlob(src, it)?.also { _ -> blobs++ } }
                     ?.let { CouchStoreFactory.documentFromBody(it) }
             }
@@ -181,7 +181,7 @@ class CouchReplicator(
                 val rendered = local.render(doc, f.rev)
                 // Ship blobs first: the body the rev names, then anything the body references.
                 var complete = true
-                val bodyCid = CouchDatabase.revToCid(f.rev)
+                val bodyCid = Couch.revToCid(f.rev)
                 val bodyBytes = bodyCid?.let { local.cas.get(it) } ?: CouchStoreFactory.canonicalBody(doc)
                 if (!putBlob(dst, bodyBytes, f.docId)) complete = false else blobs++
                 if (complete) for (cidText in local.referencedCids(rendered)) {
@@ -194,7 +194,7 @@ class CouchReplicator(
             }
             if (docs.isNotEmpty()) {
                 val reply = postJson("$dst/_bulk_docs", mapOf("docs" to docs, "new_edits" to false), expectList = true)
-                val list = CouchDatabase.asList(reply["results"]) ?: error("Replication bulk response has no results array")
+                val list = Couch.asList(reply["results"]) ?: error("Replication bulk response has no results array")
                 check(list.size == docs.size) { "Replication bulk response omitted acknowledgements" }
                 for ((index, r) in list.withIndex()) {
                     val ack = r as? Map<*, *>
@@ -283,7 +283,7 @@ class CouchReplicator(
     private fun missingRevision(diff: Map<String, Any?>, id: String, rev: String): Boolean {
         if (!diff.containsKey(id)) return false
         val entry = diff[id] as? Map<*, *> ?: error("Invalid replication revision difference")
-        val missing = CouchDatabase.asList(entry["missing"]) ?: error("Replication revision difference has no missing array")
+        val missing = Couch.asList(entry["missing"]) ?: error("Replication revision difference has no missing array")
         check(missing.all { it is String }) { "Invalid missing revision" }
         return rev in missing
     }
@@ -300,7 +300,7 @@ class CouchReplicator(
         val r = http.call("POST", url, JsonSupport.stringify(body).encodeToByteArray(), "application/json")
         check(r.ok) { "Replication POST failed: HTTP ${r.status}" }
         val parsed = JsonSupport.parse(r.text)
-        return if (expectList) mapOf("results" to (CouchDatabase.asList(parsed) ?: error("Replication POST returned a non-array response")))
+        return if (expectList) mapOf("results" to (Couch.asList(parsed) ?: error("Replication POST returned a non-array response")))
         else parsed as? Map<String, Any?> ?: error("Replication POST returned a non-object response")
     }
 

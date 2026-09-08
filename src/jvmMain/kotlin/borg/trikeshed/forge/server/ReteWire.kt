@@ -9,6 +9,10 @@ import borg.trikeshed.kif.KifExpr
 import borg.trikeshed.job.ContentId
 import borg.trikeshed.lib.get
 import borg.trikeshed.lib.size
+import borg.trikeshed.lib.view
+import borg.trikeshed.narsese.CausalityReteElement
+import borg.trikeshed.ontology.SumoClassifier
+import borg.trikeshed.ontology.SumoMask
 import borg.trikeshed.litebike.JvmKanbanServer
 import borg.trikeshed.parse.json.JsonSupport
 
@@ -55,7 +59,22 @@ import borg.trikeshed.parse.json.JsonSupport
  * `curl '/api/rete/facts?partition=blackboard&key=probe/x'` after a
  * `POST /blackboard/assert`.
  */
-class ReteWire(private val network: ReteNetwork, private val kifTee: KifTee? = null) {
+class ReteWire(
+    private val network: ReteNetwork,
+    private val kifTee: KifTee? = null,
+    private val causality: CausalityReteElement? = null,
+    private val classifier: SumoClassifier? = null,
+) {
+
+    private enum class Route(val path: String) {
+        FACTS("/api/rete/facts"), RDF("/api/facts/rdf"), PRODUCTIONS("/api/rete/productions"),
+        CONNECTIONS("/api/rete/connections"), SUMO("/api/rete/sumo");
+
+        companion object {
+            private val byPath = entries.associateBy { it.path }
+            fun of(path: String): Route? = byPath[path]
+        }
+    }
 
     suspend fun route(
         method: String,
@@ -64,9 +83,8 @@ class ReteWire(private val network: ReteNetwork, private val kifTee: KifTee? = n
         respond: (suspend (ByteArray) -> Unit)?,
     ): JvmKanbanServer.HttpResponse? {
         if (method != "GET") return null
-        val p = path.substringBefore('?')
-        return when {
-            p == "/api/rete/facts" -> {
+        return when (Route.of(path.substringBefore('?'))) {
+            Route.FACTS -> {
                 val selection = Selection.of(query(path))
                 val facts = selection.select(network.snapshot())
                 json(
@@ -78,17 +96,17 @@ class ReteWire(private val network: ReteNetwork, private val kifTee: KifTee? = n
                 )
             }
 
-            p == "/api/facts/rdf" -> {
+            Route.RDF -> {
                 val selection = Selection.of(query(path))
                 turtle(PlaneFacts.toTurtle(selection.select(network.snapshot())))
             }
 
-            p == "/api/rete/productions" -> {
+            Route.PRODUCTIONS -> {
                 val prods = network.productions.all()
                 json(linkedMapOf("count" to prods.size, "productions" to prods.map(::productionRow)))
             }
 
-            p == "/api/rete/connections" -> {
+            Route.CONNECTIONS -> {
                 val q = query(path)
                 val limit = q["limit"]?.toIntOrNull() ?: if ("limit" in q) -1 else 100
                 val offset = q["offset"]?.toIntOrNull() ?: if ("offset" in q) -1 else 0
@@ -96,7 +114,30 @@ class ReteWire(private val network: ReteNetwork, private val kifTee: KifTee? = n
                 else json(connections(Selection.of(q), offset, limit))
             }
 
-            else -> null
+            Route.SUMO -> {
+                val sumo = classifier ?: return json(mapOf("error" to "SUMO classifier is not attached"), 503)
+                val q = query(path)
+                val term = q["term"].orEmpty()
+                val predicate = q["predicate"].orEmpty()
+                val argument = q["argument"]?.toIntOrNull() ?: if ("argument" in q) -1 else 1
+                if (argument < 1) return json(mapOf("error" to "argument must be a positive integer"), 400)
+                json(linkedMapOf(
+                    "term" to term, "known" to (sumo.termId(term) >= 0),
+                    "classId" to sumo.classId(term)?.value,
+                    "classes" to sumo.classesOf(term).view.toList(),
+                    "subclasses" to sumo.subclassesOf(term).view.toList(),
+                    "masks" to SumoMask.entries.associate { it.name to sumo.mask(term, it).toIntArray().toList() },
+                    "isA" to q["class"]?.let { sumo.isA(term, it) },
+                    "disjoint" to q["class"]?.let { sumo.disjoint(term, it) },
+                    "domain" to sumo.domainOf(predicate, argument),
+                    "domainOk" to sumo.domainOk(predicate, argument, term),
+                    "range" to sumo.rangeOf(predicate),
+                    "numberClasses" to q["literal"]?.let { sumo.numberClassesOf(it).view.toList() },
+                    "literalDomainOk" to q["literal"]?.let { sumo.domainOkLiteral(predicate, argument, it) },
+                ))
+            }
+
+            null -> null
         }
     }
 
@@ -112,6 +153,7 @@ class ReteWire(private val network: ReteNetwork, private val kifTee: KifTee? = n
         val receipts = trace.receipts.filter { selection.partition == null || it.partitionId == selection.partition }
         val bank = kifTee?.bank
         val subclasses = bank?.subclassSnapshot()
+        val semantic = causality?.snapshot()
         return linkedMapOf(
             "schema" to "trikeshed.rete-connections/v1",
             "scope" to linkedMapOf(
@@ -119,7 +161,9 @@ class ReteWire(private val network: ReteNetwork, private val kifTee: KifTee? = n
                 "consistency" to "component-local snapshots, not a cross-component transaction",
                 "activationMeaning" to "refraction admission and immediate delivery only; not downstream action completion",
                 "ontologyMeaning" to "subclass assertions in the injected KIF bank; corpus origin is not tracked",
-                "excluded" to listOf("other ReteNetwork instances", "CausalityReteElement", "ReteAgent", "standalone SumoClassifier and IsALattice indexes"),
+                "excluded" to listOf("other ReteNetwork instances", "ReteAgent", "IsALattice indexes"),
+                "semanticMeaning" to "observed offers to BeliefBag intake; residence is reported separately",
+                "classifierMeaning" to "independent injected SUMO classifier; its preorder IDs are not KIF-bank IDs",
             ),
             "facts" to linkedMapOf(
                 "matched" to selected.size, "offset" to offset, "limit" to limit,
@@ -164,6 +208,46 @@ class ReteWire(private val network: ReteNetwork, private val kifTee: KifTee? = n
                     "nodes" to snap.nodes.map { node ->
                         linkedMapOf("name" to node.name, "nodeIndex" to node.nodeIndex, "preorderId" to node.preorderId,
                             "ancestorIds" to node.ancestorIds, "descendantIds" to node.descendantIds)
+                    },
+                )
+            },
+            "semantic" to semantic?.let { snap ->
+                val assertions = snap.assertions.view.associateBy { it.angular }
+                linkedMapOf(
+                    "offered" to snap.offered, "capacity" to snap.capacity, "dropped" to (snap.offered - snap.firings.size),
+                    "rules" to snap.rules.view.map { r ->
+                        linkedMapOf("ruleCid" to r.ruleCid.value, "antecedent" to r.antecedent, "consequent" to r.consequent,
+                            "copula" to r.copula.name, "provenanceCid" to r.provenanceCid)
+                    },
+                    "assertions" to snap.assertions.view.map { a ->
+                        linkedMapOf("angular" to a.angular.toString(), "subject" to a.subject, "object" to a.obj,
+                            "relation" to a.relation.name, "positive" to a.evidence.positive, "negative" to a.evidence.negative)
+                    },
+                    "firings" to snap.firings.view.map { f ->
+                        linkedMapOf("firingCid" to f.firingCid.value, "ruleCid" to f.sourceRuleCid.value,
+                            "matchedAngular" to f.matched.angular.toString(), "matchedSubject" to f.matched.subject,
+                            "consequentAngular" to f.consequentAngular.toString(), "antecedent" to f.rule.antecedent,
+                            "consequent" to f.rule.consequent, "positive" to f.support.positive, "negative" to f.support.negative,
+                            "floored" to f.floored, "dependent" to true,
+                            "resident" to assertions.containsKey(f.consequentAngular))
+                    },
+                )
+            },
+            "classifier" to classifier?.let { sumo ->
+                linkedMapOf(
+                    "stats" to sumo.stats, "containers" to sumo.shapeHistogram(),
+                    "terms" to sumo.terms.view.map { term ->
+                        linkedMapOf("name" to term, "preorderId" to sumo.classId(term)?.value,
+                            "masks" to SumoMask.entries.associate { it.name to sumo.mask(term, it).toIntArray().toList() })
+                    },
+                    "domains" to sumo.domainSlots.view.map { slot ->
+                        val predicate = slot.a.substringBeforeLast('/')
+                        val argument = slot.a.substringAfterLast('/').toInt()
+                        linkedMapOf("predicate" to predicate, "argument" to argument, "class" to slot.b,
+                            "subclass" to sumo.domainIsSubclass(predicate, argument))
+                    },
+                    "ranges" to sumo.rangeSlots.view.map { slot ->
+                        linkedMapOf("predicate" to slot.a, "class" to slot.b, "subclass" to sumo.rangeIsSubclass(slot.a))
                     },
                 )
             },

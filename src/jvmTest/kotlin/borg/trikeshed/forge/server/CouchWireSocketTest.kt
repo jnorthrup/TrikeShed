@@ -1,10 +1,9 @@
 package borg.trikeshed.forge.server
 
 import borg.trikeshed.job.CasStore
-import borg.trikeshed.couch.CouchDatabase
+import borg.trikeshed.couch.Couch
 import borg.trikeshed.couch.CouchStoreFactory
 import borg.trikeshed.couch.CouchWireRouter
-import borg.trikeshed.couch.ProductionCouchIngress
 import borg.trikeshed.couch.replicate.CouchReplicator
 import borg.trikeshed.couch.replicate.HttpExchange
 import borg.trikeshed.couch.replicate.HttpReply
@@ -56,7 +55,7 @@ class CouchWireSocketTest {
     private class Node(val name: String, exchange: HttpExchange, val scope: CoroutineScope) {
         val port = ServerSocket(0).use { it.localPort }
         val cas = CasStore.inMemory()
-        val db = CouchDatabase("trikeshed", CouchStoreFactory.casBacked(cas), cas)
+        val db = Couch("trikeshed", CouchStoreFactory.casBacked(cas), cas)
         val replicator = CouchReplicator(db, exchange)
         val router = CouchWireRouter(db, "projects/trikeshed/", replicator = replicator)
         val wire = CouchWire(router, replicator, scope)

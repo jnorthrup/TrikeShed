@@ -1,6 +1,6 @@
 package borg.trikeshed.kanban.module
 
-import borg.trikeshed.couch.CouchDatabase
+import borg.trikeshed.couch.Couch
 import borg.trikeshed.couch.CouchStoreFactory
 import borg.trikeshed.dag.ReteNetwork
 import borg.trikeshed.dag.ReteProductionRegistry
@@ -31,7 +31,7 @@ class KanbanModuleHttpTest {
     private fun newContext(routes: ModuleRouteRegistry, stateDir: File, cas: CasStore): ModuleContext {
         val couchStore = CouchStoreFactory.casBacked(cas)
         return ModuleContext(
-            couchDb = CouchDatabase("kanban-module-test", couchStore, cas),
+            couch = Couch("kanban-module-test", couchStore, cas),
             rete = ReteNetwork(),
             productions = ReteProductionRegistry(),
             beliefBag = null,

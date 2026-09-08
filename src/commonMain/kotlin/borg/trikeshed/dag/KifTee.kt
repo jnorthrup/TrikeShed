@@ -3,6 +3,7 @@ package borg.trikeshed.dag
 import borg.trikeshed.isam.synchronizedLock
 import borg.trikeshed.kif.KifExpr
 import borg.trikeshed.kif.KifKnowledgeBase
+import borg.trikeshed.lib.view
 
 /**
  * The KIF half of the join: every plane fact the [ReteNetwork] applies is
@@ -56,7 +57,7 @@ class KifTee(val bank: KifKnowledgeBase) {
      * here and through the observer is projected once.
      */
     suspend fun prime(net: ReteNetwork) {
-        for (fact in net.snapshot()) apply(ReteOp.ASSERT, fact)
+        net.snapshot { facts -> for (fact in facts.view) apply(ReteOp.ASSERT, fact) }
     }
 
     /** The projection step itself, usable without a network (tests, replays). */
@@ -67,18 +68,20 @@ class KifTee(val bank: KifKnowledgeBase) {
         }
     }
 
-    private fun project(fact: ReteStoredFact) {
+    private fun project(fact: ReteStoredFact) = synchronizedLock(gate) {
         val next = PlaneFacts.toKif(fact)
-        val previous = synchronizedLock(gate) { told[fact.factId] }
-        if (previous == next) return
+        val previous = told[fact.factId]
+        if (previous == next) return@synchronizedLock
         val gone = if (previous == null) emptyList() else previous.filter { it !in next }
         bank.replace(gone, next)
-        synchronizedLock(gate) { told[fact.factId] = next }
+        told[fact.factId] = next
     }
 
-    private fun unproject(id: FactId) {
-        val previous = synchronizedLock(gate) { told.remove(id) } ?: return
+    private fun unproject(id: FactId) = synchronizedLock(gate) {
+        val previous = told[id] ?: return@synchronizedLock
         bank.replace(previous, emptyList())
+        told.remove(id)
+        Unit
     }
 
     companion object {

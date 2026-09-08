@@ -1,7 +1,7 @@
 package borg.trikeshed.lcnc
 
 import borg.trikeshed.util.oroboros.CouchAttachmentGateway
-import borg.trikeshed.couch.CouchDatabase
+import borg.trikeshed.couch.Couch
 import borg.trikeshed.couch.CouchStoreFactory
 import borg.trikeshed.dag.ReteNetwork
 import borg.trikeshed.dag.ReteProductionRegistry
@@ -69,7 +69,7 @@ class CamelRuntimeTest {
         val cas = CasStore.inMemory()
         val couchStore = CouchStoreFactory.casBacked(cas)
         return ModuleContext(
-            couchDb = CouchDatabase("camel-runtime-test", couchStore, cas),
+            couch = Couch("camel-runtime-test", couchStore, cas),
             rete = ReteNetwork(),
             productions = ReteProductionRegistry(),
             beliefBag = null,

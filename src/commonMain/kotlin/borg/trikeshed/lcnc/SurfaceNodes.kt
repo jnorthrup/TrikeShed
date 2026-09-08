@@ -31,42 +31,53 @@ object SurfaceNodes {
         // BoardStoreElement (LcncKanbanExperience.registry). A self-fetch of
         // /api/board was a no-code node playing no-function, and its `alerts`
         // output was a constant [] because the route never carried one.
-        "http.get" to LcncNodeRunner { node, _ ->
+        "http.get" to boundLcnc(SurfaceCallKey(call)) { service, node, _ ->
+            val call = service.value
             mapOf("json" to call("GET", node.params["path"]?.takeIf { it.isNotBlank() } ?: "/api/health", null))
         },
-        "http.post" to LcncNodeRunner { node, inputs ->
+        "http.post" to boundLcnc(SurfaceCallKey(call)) { service, node, inputs ->
+            val call = service.value
             val body = inputs["body"] ?: inputs["body?"]
             mapOf("json" to call("POST", node.params["path"]?.takeIf { it.isNotBlank() } ?: "/api/submit", body))
         },
-        "blackboard.facts" to LcncNodeRunner { _, _ ->
+        "blackboard.facts" to boundLcnc(SurfaceCallKey(call)) { service, _, _ ->
+            val call = service.value
             mapOf("facts" to call("GET", "/blackboard/facts", null))
         },
-        "blackboard.board" to LcncNodeRunner { _, _ ->
+        "blackboard.board" to boundLcnc(SurfaceCallKey(call)) { service, _, _ ->
+            val call = service.value
             mapOf("board" to call("GET", "/blackboard/board", null))
         },
-        "blackboard.sites" to LcncNodeRunner { node, _ ->
+        "blackboard.sites" to boundLcnc(SurfaceCallKey(call)) { service, node, _ ->
+            val call = service.value
             val owner = node.params["owner"].orEmpty()
             mapOf("sites" to call("GET", "/blackboard/sites" + if (owner.isBlank()) "" else "?owner=$owner", null))
         },
-        "graal.vitals" to LcncNodeRunner { _, _ ->
+        "graal.vitals" to boundLcnc(SurfaceCallKey(call)) { service, _, _ ->
+            val call = service.value
             mapOf("json" to call("GET", "/api/graal/vitals", null))
         },
-        "graal.heap" to LcncNodeRunner { _, _ ->
+        "graal.heap" to boundLcnc(SurfaceCallKey(call)) { service, _, _ ->
+            val call = service.value
             mapOf("heap" to call("GET", "/api/graal/heap", null))
         },
-        "vms.list" to LcncNodeRunner { _, _ ->
+        "vms.list" to boundLcnc(SurfaceCallKey(call)) { service, _, _ ->
+            val call = service.value
             val r = call("GET", "/api/vm", null)
             mapOf("rows" to (field(r, "rows") ?: r))
         },
-        "pointcut.routes" to LcncNodeRunner { _, _ ->
+        "pointcut.routes" to boundLcnc(SurfaceCallKey(call)) { service, _, _ ->
+            val call = service.value
             val r = call("GET", "/api/graal/pointcuts", null)
             mapOf("routes" to (field(r, "routes") ?: r))
         },
-        "panels.list" to LcncNodeRunner { _, _ ->
+        "panels.list" to boundLcnc(SurfaceCallKey(call)) { service, _, _ ->
+            val call = service.value
             val r = call("GET", "/api/panels", null)
             mapOf("panels" to (field(r, "panels") ?: emptyList<Any?>()))
         },
-        "mux.standings" to LcncNodeRunner { _, _ ->
+        "mux.standings" to boundLcnc(SurfaceCallKey(call)) { service, _, _ ->
+            val call = service.value
             val r = call("GET", "/api/mux/standings", null)
             mapOf("standings" to (field(r, "standings") ?: emptyList<Any?>()))
         },

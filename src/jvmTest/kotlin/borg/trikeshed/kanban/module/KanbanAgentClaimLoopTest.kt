@@ -2,7 +2,7 @@ package borg.trikeshed.kanban.module
 
 import borg.trikeshed.agent.AgentCli
 import borg.trikeshed.agent.JvmAgentRunner
-import borg.trikeshed.couch.CouchDatabase
+import borg.trikeshed.couch.Couch
 import borg.trikeshed.couch.CouchStoreFactory
 import borg.trikeshed.graal.ConfixBlackboard
 import borg.trikeshed.job.CasStore
@@ -69,7 +69,7 @@ class KanbanAgentClaimLoopTest {
         val home = tempDir("$name-home")
         val source = sourceRepo(name)
         val ctx = ModuleContext(
-            couchDb = CouchDatabase("kanban-agent-test-$name", couchStore, cas),
+            couch = Couch("kanban-agent-test-$name", couchStore, cas),
             rete = ReteNetwork(),
             productions = ReteProductionRegistry(),
             beliefBag = null,
